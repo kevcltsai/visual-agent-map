@@ -771,3 +771,22 @@ test('F13b: a user selection (not a framing action) still pans a card clear of t
   view.alignCardTools(view.cardEls.get('c2'));
   assert.notEqual(view.map.viewport.x, before, 'the canvas still pans outside a framing action');
 });
+
+// Review round 1, M3: framing a reply's ring with one to three cards must show the picture they circle too.
+test('M3: fitCards on ring cards frames the picture as well, not only the cards (and plain fit-only frames are unchanged)', () => {
+  const { view, nodes } = makeView();
+  nodes[0].x = 0; nodes[0].y = 0; nodes[1].parentId = null; nodes[1].x = 0; nodes[1].y = 800;
+  view.map.canvasItems = [{ id: 'img', kind: 'annotated-image', path: 'a.png', x: 100, y: 100, w: 720, h: 600, anchors: [{ id: 'p', at: { kind: 'image-2d', x: 0.5, y: 0.5 } }], relations: [{ kind: 'related', from: 'p', to: 'b', ring: true }] }];
+  view.fitCards(new Set(['b']));
+  const v = view.map.viewport;
+  const inside = (x, y) => x * v.zoom + v.x >= -1e-6 && x * v.zoom + v.x <= 1000 + 1e-6 && y * v.zoom + v.y >= -1e-6 && y * v.zoom + v.y <= 600 + 1e-6;
+  assert.ok(inside(100, 100) && inside(820, 700), 'both corners of the picture are on screen');
+  assert.ok(inside(0, 800) && inside(280, 980), 'and so is the card');
+  // A card that is no ring member frames only itself, as before.
+  const other = makeView();
+  other.nodes[1].x = 0; other.nodes[1].y = 800;
+  other.view.map.canvasItems = [{ id: 'img', kind: 'annotated-image', path: 'a.png', x: 100, y: 100, w: 720, h: 600, anchors: [], relations: [] }];
+  other.view.fitCards(new Set(['b']));
+  const o = other.view.map.viewport;
+  assert.ok(Math.abs(o.zoom - 1) < 1e-9 || o.zoom > v.zoom, 'the picture is not part of this frame');
+});

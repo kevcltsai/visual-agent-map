@@ -150,16 +150,26 @@ export function ringSlotsAt(clearance: Rect, cell: { w: number; h: number }): Ri
   return out;
 }
 
-/** At least `count` slots around the picture, growing R by {@link RING_GROW} until they fit. `margin` is where R starts. */
+/**
+ * At least `count` slots around the picture, growing R by {@link RING_GROW} until they fit. `margin` is where R starts.
+ * With `fixedLines` (lines of cards that stay where they are) a slot whose card would touch one of them is left out, so R
+ * grows until `count` usable slots remain.
+ */
 export function ringSlots(
   image: Rect,
   count: number,
   cell: { w: number; h: number },
-  margin: number = RING_MARGIN
+  margin: number = RING_MARGIN,
+  fixedLines: readonly Segment[] = []
 ): { slots: RingSlot[]; clearance: Rect } {
   for (let m = margin; ; m += RING_GROW) {
     const clearance = expand(image, m);
-    const slots = ringSlotsAt(clearance, cell);
+    let slots = ringSlotsAt(clearance, cell);
+    if (fixedLines.length)
+      slots = slots.filter(slot => {
+        const rect = ringCardRect(slot, cell.w, cell.h);
+        return !fixedLines.some(line => segmentHitsRect(line, rect));
+      });
     if (slots.length >= count) return { slots, clearance };
   }
 }
@@ -257,7 +267,7 @@ const lengthOf = (s: Segment): number => Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
 export function ringViolations(
   image: Rect,
   cards: readonly RingCardState[],
-  options: { memberCount?: number; others?: readonly Rect[] } = {}
+  options: { memberCount?: number; others?: readonly Rect[]; fixedLines?: readonly Segment[] } = {}
 ): RingViolation[] {
   const out: RingViolation[] = [];
   const lines = cards.map(c => ringLine(image, c.anchorX, c.anchorY, c));
@@ -270,6 +280,11 @@ export function ringViolations(
     const a = cards[i];
     if (intersects(a, image)) out.push({ code: "card-on-image", ids: [a.id] });
     for (const o of options.others ?? []) if (intersects(a, o)) out.push({ code: "overlap-other", ids: [a.id] });
+    // Lines of cards that stay where they are: neither a card nor a ring line may meet them.
+    for (const fixed of options.fixedLines ?? []) {
+      if (segmentHitsRect(fixed, a)) out.push({ code: "line-through-card", ids: [a.id] });
+      if (segmentsCross(lines[i], fixed)) out.push({ code: "crossing", ids: [a.id] });
+    }
     for (let j = 0; j < cards.length; j++) {
       if (j === i) continue;
       const b = cards[j];
@@ -339,18 +354,89 @@ function assign(cost: readonly (readonly number[])[]): number[] {
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
-/** Places every card in the ring: the smallest R whose slots fit them, anchors matched to slots by shortest total line. Same input, same output. */
-export function solveRing(image: Rect, members: readonly RingCardInput[]): RingLayout {
+/**
+ * A fixed line can make the cheapest matching swap two cards' slots, and the two lines then cross. Swaps the slots of a
+ * crossing pair back whenever that keeps both lines clear of the fixed lines (a swap that adds none is never taken). Edits `picked`; returns the crossings left.
+ */
+function uncross(
+  points: readonly (readonly [number, number])[],
+  slots: readonly RingSlot[],
+  cost: readonly (readonly number[])[],
+  picked: number[]
+): number {
+  const line = (i: number, j: number): Segment => ({
+    x1: points[i][0],
+    y1: points[i][1],
+    x2: slots[j].ax,
+    y2: slots[j].ay
+  });
+  const crossings = (): number => {
+    let count = 0;
+    for (let a = 0; a < picked.length; a++)
+      for (let b = a + 1; b < picked.length; b++) if (segmentsCross(line(a, picked[a]), line(b, picked[b]))) count++;
+    return count;
+  };
+  for (let round = 0, before = crossings(); before > 0 && round < 100; round++) {
+    let improved = false;
+    for (let a = 0; a < picked.length && !improved; a++)
+      for (let b = a + 1; b < picked.length && !improved; b++) {
+        if (!segmentsCross(line(a, picked[a]), line(b, picked[b]))) continue;
+        if (cost[a][picked[b]] >= CROSSING_PENALTY || cost[b][picked[a]] >= CROSSING_PENALTY) continue;
+        [picked[a], picked[b]] = [picked[b], picked[a]];
+        const after = crossings();
+        if (after < before) {
+          before = after;
+          improved = true;
+        } else [picked[a], picked[b]] = [picked[b], picked[a]];
+      }
+    if (!improved) break;
+  }
+  return crossings();
+}
+
+/** Added to the cost of a card-slot pair whose line would cross a fixed line, so a matching with a crossing is the last resort. */
+const CROSSING_PENALTY = 1e6;
+/** How many steps larger than the first fitting R the ring may grow to get away from a crossing with a fixed line. */
+const CROSSING_GROW_STEPS = 12;
+
+/**
+ * Places every card in the ring: the smallest R whose slots fit them, anchors matched to slots by shortest total line. Same
+ * input, same output. `fixedLines` are the lines of cards that stay where they are (anchor to card): no slot whose card
+ * would touch one is used, and a pairing whose line would cross one costs far more than any other (R grows a few steps
+ * when only such pairings are left).
+ */
+export function solveRing(
+  image: Rect,
+  members: readonly RingCardInput[],
+  fixedLines: readonly Segment[] = []
+): RingLayout {
   const cell = {
     w: members.reduce((m, c) => Math.max(m, cardW(c)), 0) || CARD_WIDTH,
     h: members.reduce((m, c) => Math.max(m, cardH(c)), 0) || DEFAULT_CARD_HEIGHT
   };
-  const { slots, clearance } = ringSlots(image, members.length, cell);
   const points = members.map(
     c => [image.x + clamp01(c.anchorX) * image.w, image.y + clamp01(c.anchorY) * image.h] as const
   );
-  const cost = points.map(p => slots.map(s => Math.hypot(p[0] - s.ax, p[1] - s.ay)));
-  const picked = assign(cost);
+  let { slots, clearance } = ringSlots(image, members.length, cell, RING_MARGIN, fixedLines);
+  let picked: number[] = [];
+  for (let step = 0; ; step++) {
+    const cost = points.map(p =>
+      slots.map(s => {
+        const length = Math.hypot(p[0] - s.ax, p[1] - s.ay);
+        const line = { x1: p[0], y1: p[1], x2: s.ax, y2: s.ay };
+        return fixedLines.some(fixed => segmentsCross(line, fixed)) ? length + CROSSING_PENALTY : length;
+      })
+    );
+    picked = assign(cost);
+    const crossed = fixedLines.length ? uncross(points, slots, cost, picked) : 0;
+    if (
+      !fixedLines.length ||
+      (crossed === 0 && picked.every((j, i) => cost[i][j] < CROSSING_PENALTY)) ||
+      step >= CROSSING_GROW_STEPS
+    )
+      break;
+    ({ slots, clearance } = ringSlots(image, members.length, cell, image.x - clearance.x + RING_GROW, fixedLines));
+  }
   const cards = members.map((c, i): RingPlacement => {
     const slot = slots[picked[i]];
     const rect = ringCardRect(slot, cardW(c), cardH(c));
@@ -373,7 +459,8 @@ export function placeNewMember(
   image: Rect,
   current: readonly RingCardState[],
   member: RingCardInput,
-  others: readonly Rect[] = []
+  others: readonly Rect[] = [],
+  fixedLines: readonly Segment[] = []
 ): RingPlacement | null {
   const w = cardW(member);
   const h = cardH(member);
@@ -393,7 +480,11 @@ export function placeNewMember(
         anchorX: clamp01(member.anchorX),
         anchorY: clamp01(member.anchorY)
       };
-      if (ringViolations(image, [...current, state], { others }).length) continue;
+      // Next to fixed lines a card may have to take a slot that is not its shortest, so `pairing` does not count there.
+      const bad = ringViolations(image, [...current, state], { others, fixedLines }).filter(
+        v => !fixedLines.length || v.code !== "pairing"
+      );
+      if (bad.length) continue;
       best = { id: member.id, ...rect, side: slot.side, line: { x1: px, y1: py, x2: slot.ax, y2: slot.ay } };
       bestLength = length;
     }

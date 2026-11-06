@@ -29917,10 +29917,15 @@ function ringSlotsAt(clearance, cell) {
       out.push({ side, ax, ay: (T + B) / 2 - columnSpan / 2 + i * (cell.h + RING_GAP) });
   return out;
 }
-function ringSlots(image, count2, cell, margin = RING_MARGIN) {
+function ringSlots(image, count2, cell, margin = RING_MARGIN, fixedLines = []) {
   for (let m = margin; ; m += RING_GROW) {
     const clearance = expand(image, m);
-    const slots = ringSlotsAt(clearance, cell);
+    let slots = ringSlotsAt(clearance, cell);
+    if (fixedLines.length)
+      slots = slots.filter((slot) => {
+        const rect2 = ringCardRect(slot, cell.w, cell.h);
+        return !fixedLines.some((line) => segmentHitsRect(line, rect2));
+      });
     if (slots.length >= count2) return { slots, clearance };
   }
 }
@@ -29986,7 +29991,7 @@ function segmentsCross(a, b) {
 }
 var lengthOf = (s) => Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
 function ringViolations(image, cards, options = {}) {
-  var _a2;
+  var _a2, _b2;
   const out = [];
   const lines = cards.map((c) => ringLine(image, c.anchorX, c.anchorY, c));
   if (options.memberCount !== void 0 && options.memberCount !== cards.length || new Set(cards.map((c) => c.id)).size !== cards.length)
@@ -29995,6 +30000,10 @@ function ringViolations(image, cards, options = {}) {
     const a = cards[i];
     if (intersects(a, image)) out.push({ code: "card-on-image", ids: [a.id] });
     for (const o of (_a2 = options.others) != null ? _a2 : []) if (intersects(a, o)) out.push({ code: "overlap-other", ids: [a.id] });
+    for (const fixed2 of (_b2 = options.fixedLines) != null ? _b2 : []) {
+      if (segmentHitsRect(fixed2, a)) out.push({ code: "line-through-card", ids: [a.id] });
+      if (segmentsCross(lines[i], fixed2)) out.push({ code: "crossing", ids: [a.id] });
+    }
     for (let j = 0; j < cards.length; j++) {
       if (j === i) continue;
       const b = cards[j];
@@ -30057,17 +30066,62 @@ function assign(cost) {
   return rows2;
 }
 var clamp012 = (v) => Math.min(1, Math.max(0, v));
-function solveRing(image, members) {
+function uncross(points, slots, cost, picked) {
+  const line = (i, j) => ({
+    x1: points[i][0],
+    y1: points[i][1],
+    x2: slots[j].ax,
+    y2: slots[j].ay
+  });
+  const crossings = () => {
+    let count2 = 0;
+    for (let a = 0; a < picked.length; a++)
+      for (let b = a + 1; b < picked.length; b++) if (segmentsCross(line(a, picked[a]), line(b, picked[b]))) count2++;
+    return count2;
+  };
+  for (let round3 = 0, before = crossings(); before > 0 && round3 < 100; round3++) {
+    let improved = false;
+    for (let a = 0; a < picked.length && !improved; a++)
+      for (let b = a + 1; b < picked.length && !improved; b++) {
+        if (!segmentsCross(line(a, picked[a]), line(b, picked[b]))) continue;
+        if (cost[a][picked[b]] >= CROSSING_PENALTY || cost[b][picked[a]] >= CROSSING_PENALTY) continue;
+        [picked[a], picked[b]] = [picked[b], picked[a]];
+        const after = crossings();
+        if (after < before) {
+          before = after;
+          improved = true;
+        } else [picked[a], picked[b]] = [picked[b], picked[a]];
+      }
+    if (!improved) break;
+  }
+  return crossings();
+}
+var CROSSING_PENALTY = 1e6;
+var CROSSING_GROW_STEPS = 12;
+function solveRing(image, members, fixedLines = []) {
   const cell = {
     w: members.reduce((m, c) => Math.max(m, cardW(c)), 0) || CARD_WIDTH,
     h: members.reduce((m, c) => Math.max(m, cardH(c)), 0) || DEFAULT_CARD_HEIGHT
   };
-  const { slots, clearance } = ringSlots(image, members.length, cell);
   const points = members.map(
     (c) => [image.x + clamp012(c.anchorX) * image.w, image.y + clamp012(c.anchorY) * image.h]
   );
-  const cost = points.map((p) => slots.map((s) => Math.hypot(p[0] - s.ax, p[1] - s.ay)));
-  const picked = assign(cost);
+  let { slots, clearance } = ringSlots(image, members.length, cell, RING_MARGIN, fixedLines);
+  let picked = [];
+  for (let step = 0; ; step++) {
+    const cost = points.map(
+      (p) => slots.map((s) => {
+        const length = Math.hypot(p[0] - s.ax, p[1] - s.ay);
+        const line = { x1: p[0], y1: p[1], x2: s.ax, y2: s.ay };
+        return fixedLines.some((fixed2) => segmentsCross(line, fixed2)) ? length + CROSSING_PENALTY : length;
+      })
+    );
+    picked = assign(cost);
+    const crossed = fixedLines.length ? uncross(points, slots, cost, picked) : 0;
+    if (!fixedLines.length || crossed === 0 && picked.every((j, i) => cost[i][j] < CROSSING_PENALTY) || step >= CROSSING_GROW_STEPS)
+      break;
+    ({ slots, clearance } = ringSlots(image, members.length, cell, image.x - clearance.x + RING_GROW, fixedLines));
+  }
   const cards = members.map((c, i) => {
     const slot = slots[picked[i]];
     const rect2 = ringCardRect(slot, cardW(c), cardH(c));
@@ -30080,7 +30134,7 @@ function solveRing(image, members) {
   });
   return { clearance, cards };
 }
-function placeNewMember(image, current, member, others = []) {
+function placeNewMember(image, current, member, others = [], fixedLines = []) {
   const w = cardW(member);
   const h = cardH(member);
   const px = image.x + clamp012(member.anchorX) * image.w;
@@ -30099,7 +30153,10 @@ function placeNewMember(image, current, member, others = []) {
         anchorX: clamp012(member.anchorX),
         anchorY: clamp012(member.anchorY)
       };
-      if (ringViolations(image, [...current, state], { others }).length) continue;
+      const bad = ringViolations(image, [...current, state], { others, fixedLines }).filter(
+        (v) => !fixedLines.length || v.code !== "pairing"
+      );
+      if (bad.length) continue;
       best = { id: member.id, ...rect2, side: slot.side, line: { x1: px, y1: py, x2: slot.ax, y2: slot.ay } };
       bestLength = length;
     }
@@ -30341,26 +30398,49 @@ function obstacleRects(nodes, items, selfImageId, trees, heightOf, widthOf, hidd
   }
   return [...out, ...placed];
 }
-function layoutSubtree(nodes, items, rootId, direction, spacing, heightOf, widthOf) {
+function fixedLinesOf(group, image, nodes, trees, hidden, heightOf) {
+  var _a2, _b2;
+  const out = [];
+  const shown = new Map(visibleNodes(nodes).map((node) => [node.id, node]));
+  const anchors = new Map(group.image.anchors.map((anchor) => [anchor.id, anchor]));
+  for (const relation of (_a2 = group.image.relations) != null ? _a2 : []) {
+    if (relation.ring === true) continue;
+    const anchor = (_b2 = anchors.get(relation.from)) != null ? _b2 : anchors.get(relation.to);
+    if (!anchor || anchor.at.kind !== "image-2d") continue;
+    const topic = shown.get(anchor.id === relation.from ? relation.to : relation.from);
+    if (!topic || trees.has(topic.id) || (hidden == null ? void 0 : hidden.has(topic.id))) continue;
+    const box = nodeRect(topic, heightOf);
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    if (cx > image.x && cx < image.x + image.w && cy > image.y && cy < image.y + image.h) continue;
+    out.push(ringLine(image, anchor.at.x, anchor.at.y, box));
+  }
+  return out;
+}
+function cardTextOffsets(nodes, items, rootId, direction, spacing, heightOf, widthOf) {
+  const out = /* @__PURE__ */ new Map();
+  if (!items.some((item) => item.kind === "text" && item.parentId === rootId)) return out;
   const ids = /* @__PURE__ */ new Set([rootId, ...descendants(nodes, rootId)]);
   const sub = nodes.filter((node) => ids.has(node.id));
-  const layout = { direction, ...spacing ? { spacing } : {} };
-  const out = arrangeMapWithText(sub, items, void 0, heightOf, layout, { widthOf });
-  const at = new Map(out.nodes.map((node) => [node.id, node]));
-  const root = at.get(rootId);
-  const cards = /* @__PURE__ */ new Map();
-  const shown = visibleNodes(sub);
-  for (const node of shown) {
-    const spot = at.get(node.id);
-    cards.set(node.id, { dx: spot.x - root.x, dy: spot.y - root.y });
+  const laid = arrangeMapWithText(
+    sub,
+    items,
+    void 0,
+    heightOf,
+    { direction, ...spacing ? { spacing } : {} },
+    { widthOf }
+  );
+  const root = laid.nodes.find((node) => node.id === rootId);
+  const shownIds = new Set(visibleNodes(sub).map((node) => node.id));
+  for (const text12 of visibleTexts(sub, items).filter((item) => item.parentId === rootId && shownIds.has(rootId))) {
+    const spot = laid.items.find((item) => item.kind === "text" && item.id === text12.id);
+    out.set(text12.id, { dx: spot.x - root.x, dy: spot.y - root.y });
   }
-  const texts2 = /* @__PURE__ */ new Map();
-  const shownIds = new Set(shown.map((node) => node.id));
-  for (const text12 of visibleTexts(sub, items).filter((item) => shownIds.has(item.parentId))) {
-    const spot = out.items.find((item) => item.id === text12.id && item.kind === "text");
-    texts2.set(text12.id, { dx: spot.x - root.x, dy: spot.y - root.y });
-  }
-  return { cards, texts: texts2 };
+  return out;
+}
+function ringFixedLines(nodes, items, imageId, heightOf, hidden) {
+  const group = ringGroups(nodes, items).find((each) => each.image.id === imageId);
+  return group ? fixedLinesOf(group, imageRectOf(group.image), nodes, ringTreeIds(nodes, items), hidden, heightOf) : [];
 }
 function solveRings(nodes, items, heightOf, widthOf, layout, options = {}) {
   const groups = ringGroups(nodes, items).filter((group) => !options.imageIds || options.imageIds.has(group.image.id));
@@ -30375,25 +30455,15 @@ function solveRings(nodes, items, heightOf, widthOf, layout, options = {}) {
     var _a2;
     return (_a2 = movedNodes.get(id)) != null ? _a2 : nodes.find((node) => node.id === id);
   };
+  const textItems = items.filter((item) => item.kind === "text");
   for (const group of groups) {
-    const image = options.enlarge ? ringImageSize(imageRectOf(group.image)) : imageRectOf(group.image);
+    const base = options.enlarge ? ringImageSize(imageRectOf(group.image)) : imageRectOf(group.image);
     const inputs = group.members.map((member) => {
       const rect2 = nodeRect(nodeAt(member.topicId), heightOf);
       return { id: member.topicId, anchorX: member.x, anchorY: member.y, w: rect2.w, h: rect2.h };
     });
-    const solved = solveRing(image, inputs);
-    const subtrees = solved.cards.map(
-      (card) => layoutSubtree(nodes, items, card.id, OUTWARD[ringSide(image, card)], spacing, heightOf, widthOf)
-    );
-    const footprint = [];
-    solved.cards.forEach((card, i) => {
-      for (const [id, off] of subtrees[i].cards)
-        footprint.push({ ...nodeRect(nodeAt(id), heightOf), x: card.x + off.dx, y: card.y + off.dy });
-      for (const [id, off] of subtrees[i].texts) {
-        const text12 = items.find((item) => item.kind === "text" && item.id === id);
-        footprint.push({ ...textRect(text12, heightOf, widthOf), x: card.x + off.dx, y: card.y + off.dy });
-      }
-    });
+    const memberIds = new Set(group.members.map((member) => member.topicId));
+    const below = new Map(group.members.map((member) => [member.topicId, descendants(nodes, member.topicId)]));
     const obstacles = obstacleRects(
       nodes,
       items,
@@ -30404,38 +30474,87 @@ function solveRings(nodes, items, heightOf, widthOf, layout, options = {}) {
       options.hidden,
       placedRects
     );
-    const { dx, dy } = findFreeOffset(ringBounds(image, footprint), obstacles);
-    solved.cards.forEach((card, i) => {
-      const old = nodeAt(card.id);
-      const tx = Math.round(card.x + dx);
-      const ty = Math.round(card.y + dy);
-      const sub = subtrees[i];
-      const rootOff = { x: tx - old.x, y: ty - old.y };
-      for (const id of /* @__PURE__ */ new Set([card.id, ...descendants(nodes, card.id)])) {
-        const node = nodeAt(id);
-        const off = sub.cards.get(id);
-        movedNodes.set(
-          id,
-          off ? { ...node, x: tx + off.dx, y: ty + off.dy } : { ...node, x: node.x + rootOff.x, y: node.y + rootOff.y }
-        );
+    const place = (shift2) => {
+      const image = { ...base, x: base.x + shift2.dx, y: base.y + shift2.dy };
+      const solved = solveRing(image, inputs, fixedLinesOf(group, image, nodes, trees, options.hidden, heightOf));
+      const here = /* @__PURE__ */ new Map();
+      const hereTexts = /* @__PURE__ */ new Map();
+      const textsNow = () => items.map(
+        (item) => item.kind === "text" && hereTexts.has(item.id) ? { ...item, ...hereTexts.get(item.id) } : item
+      );
+      for (const card of solved.cards) {
+        const old = nodeAt(card.id);
+        const rootOff = { x: Math.round(card.x) - old.x, y: Math.round(card.y) - old.y };
+        for (const id of /* @__PURE__ */ new Set([card.id, ...below.get(card.id)])) {
+          const node = nodeAt(id);
+          here.set(
+            id,
+            id === card.id ? { ...node, x: Math.round(card.x), y: Math.round(card.y) } : { ...node, x: node.x + rootOff.x, y: node.y + rootOff.y }
+          );
+        }
+        const own2 = cardTextOffsets(nodes, items, card.id, OUTWARD[card.side], spacing, heightOf, widthOf);
+        for (const text12 of textItems)
+          if (text12.parentId !== void 0 && (text12.parentId === card.id || below.get(card.id).has(text12.parentId))) {
+            const off = own2.get(text12.id);
+            hereTexts.set(
+              text12.id,
+              off ? { x: Math.round(card.x) + off.dx, y: Math.round(card.y) + off.dy } : { x: text12.x + rootOff.x, y: text12.y + rootOff.y }
+            );
+          }
       }
-      for (const item of items) {
-        if (item.kind !== "text") continue;
-        const text12 = item;
-        const below = text12.parentId !== void 0 && (text12.parentId === card.id || descendants(nodes, card.id).has(text12.parentId));
-        if (!below) continue;
-        const off = sub.texts.get(text12.id);
-        movedTexts.set(
-          text12.id,
-          off ? { x: tx + off.dx, y: ty + off.dy } : { x: text12.x + rootOff.x, y: text12.y + rootOff.y }
+      const done = /* @__PURE__ */ new Set();
+      const footprint = [];
+      for (const card of solved.cards) {
+        const own2 = { direction: OUTWARD[card.side], ...spacing ? { spacing } : {} };
+        const ids = below.get(card.id);
+        const drawn = new Set(
+          visibleNodes(nodes.filter((node) => node.id === card.id || ids.has(node.id))).map((node) => node.id)
         );
+        const toPlace = new Set([...ids].filter((id) => drawn.has(id)));
+        const list = nodes.map((node) => {
+          var _a2;
+          return (_a2 = here.get(node.id)) != null ? _a2 : nodeAt(node.id);
+        }).filter(
+          (node) => memberIds.has(node.id) || done.has(node.id) || ids.has(node.id) || !(trees.has(node.id) && !movedNodes.has(node.id))
+        );
+        let placed = list;
+        if (toPlace.size) {
+          const out = arrangeNewBranchWithText(list, textsNow(), card.id, toPlace, heightOf, void 0, own2, widthOf);
+          placed = out.nodes;
+          for (const item of out.items)
+            if (item.kind === "text" && hereTexts.has(item.id))
+              hereTexts.set(item.id, { x: item.x, y: item.y });
+        }
+        const byId = new Map(placed.map((node) => [node.id, node]));
+        for (const id of toPlace) {
+          const node = byId.get(id);
+          here.set(id, { ...node, x: Math.round(node.x), y: Math.round(node.y) });
+          done.add(id);
+        }
+        done.add(card.id);
       }
-    });
-    const finalImage = { ...image, x: image.x + dx, y: image.y + dy };
+      const shown = visibleNodes(nodes.filter((node) => here.has(node.id)));
+      for (const node of shown) footprint.push(nodeRect(here.get(node.id), heightOf));
+      const shownIds = new Set(shown.map((node) => node.id));
+      for (const text12 of textItems)
+        if (hereTexts.has(text12.id) && shownIds.has(text12.parentId))
+          footprint.push({ ...textRect(text12, heightOf, widthOf), ...hereTexts.get(text12.id) });
+      return { image, here, hereTexts, footprint };
+    };
+    let shift = { dx: 0, dy: 0 };
+    let result = place(shift);
+    for (let pass = 0; pass < 3; pass++) {
+      const free = findFreeOffset(ringBounds(result.image, result.footprint), obstacles);
+      if (!free.dx && !free.dy) break;
+      shift = { dx: shift.dx + free.dx, dy: shift.dy + free.dy };
+      result = place(shift);
+    }
+    for (const [id, node] of result.here) movedNodes.set(id, node);
+    for (const [id, spot] of result.hereTexts) movedTexts.set(id, spot);
+    const finalImage = result.image;
     if (finalImage.x !== group.image.x || finalImage.y !== group.image.y || finalImage.w !== group.image.w || finalImage.h !== group.image.h)
       movedImages.set(group.image.id, { ...group.image, ...finalImage });
-    placedRects.push(finalImage);
-    for (const rect2 of footprint) placedRects.push({ ...rect2, x: rect2.x + dx, y: rect2.y + dy });
+    placedRects.push(finalImage, ...result.footprint);
   }
   return {
     nodes: nodes.map((node) => {
@@ -64612,7 +64731,8 @@ ${request.requirements}` : preset.text,
       { x: image.x, y: image.y, w: image.w, h: image.h },
       states,
       { id: topicId, anchorX: me.x, anchorY: me.y, w: mine.w, h: mine.h },
-      this.ringObstacles(map, imageId, /* @__PURE__ */ new Set([topicId, ...before.map((member) => member.topicId), ...pending2]))
+      this.ringObstacles(map, imageId, /* @__PURE__ */ new Set([topicId, ...before.map((member) => member.topicId), ...pending2])),
+      ringFixedLines(map.nodes, items, imageId, this.cardHeightOf, supersededAimNodeIds(map))
     );
     if (!placed) {
       this.solveRingsIn(map, { imageIds: only });
@@ -74779,22 +74899,29 @@ ${note.detail.trim()}` : "",
     if (persist) this.saveViewport();
   }
   fit() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e;
     if (!this.map || !this.viewportEl) return;
     const only = this.fitOnly;
     if (this.holdCamera(() => only ? this.fitCards(only) : this.fit())) return;
     const nodes = this.canvasNodes().filter((n) => !only || only.has(n.id));
     if (!nodes.length) return;
     const boxes = nodes.map((n) => {
-      var _a3, _b3, _c2, _d;
+      var _a3, _b3, _c2, _d2;
       return {
         x: n.x,
         y: n.y,
         w: (_a3 = n.width) != null ? _a3 : CARD_WIDTH,
-        h: (_d = (_c2 = (_b3 = this.stageEl) == null ? void 0 : _b3.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)) == null ? void 0 : _c2.offsetHeight) != null ? _d : 180
+        h: (_d2 = (_c2 = (_b3 = this.stageEl) == null ? void 0 : _b3.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)) == null ? void 0 : _c2.offsetHeight) != null ? _d2 : 180
       };
     });
-    for (const item of only ? [] : (_a2 = this.map.canvasItems) != null ? _a2 : []) {
+    if (only) {
+      const imageIds = new Set(
+        ringMembers((_a2 = this.map.canvasItems) != null ? _a2 : [], this.map.nodes).filter((member) => only.has(member.topicId)).map((member) => member.imageId)
+      );
+      for (const item of (_b2 = this.map.canvasItems) != null ? _b2 : [])
+        if (isAnnotatedImage(item) && imageIds.has(item.id)) boxes.push({ x: item.x, y: item.y, w: item.w, h: item.h });
+    }
+    for (const item of only ? [] : (_c = this.map.canvasItems) != null ? _c : []) {
       if (item.kind !== "text") continue;
       const text12 = item;
       const el = this.textEls.get(text12.id);
@@ -74829,8 +74956,8 @@ ${note.detail.trim()}` : "",
     this.saveViewport();
     if (anyBoxOffscreen(boxes, this.map.viewport, fitSize)) {
       const hint = t("ui.fit_clamped");
-      (_b2 = this.announcer) == null ? void 0 : _b2.setText(hint);
-      (_c = this.fitNotice) == null ? void 0 : _c.hide();
+      (_d = this.announcer) == null ? void 0 : _d.setText(hint);
+      (_e = this.fitNotice) == null ? void 0 : _e.hide();
       this.fitNotice = new import_obsidian37.Notice(hint);
     }
   }
@@ -77155,7 +77282,7 @@ ${note.detail.trim()}` : "",
    * automatic layout and a move of the view to the new cards.
    */
   async applyMapChatActions(result, baseline, alive = () => true, anchor = { path: this.path, id: ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)() }, options = {}) {
-    var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
+    var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
     const touched = /* @__PURE__ */ new Set([anchor.path]);
     const record = this.chatLastRecord;
     const same = () => {
@@ -77356,8 +77483,11 @@ ${note.detail.trim()}` : "",
         this.updateHistoryButtons();
       }
     }
-    const branchRoot = this.chatBranchRoot(run);
-    if (branchRoot && same() && !this.closed) this.applySelectionChange(this.selection.setSelected(branchRoot.id));
+    const branchRoot = ((_i = run.ringImages) == null ? void 0 : _i.size) ? void 0 : this.chatBranchRoot(run);
+    if ((_j = run.ringImages) == null ? void 0 : _j.size) {
+      if (same() && !this.closed) this.applySelectionChange(this.selection.clickEmpty());
+    } else if (branchRoot && same() && !this.closed)
+      this.applySelectionChange(this.selection.setSelected(branchRoot.id));
     for (const index of later) {
       const action = result.actions[index];
       const label = this.chatActionLabel(action, refTitles);
@@ -77386,25 +77516,25 @@ ${note.detail.trim()}` : "",
               run
             );
             const mergeIds = (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && resolved.action.action === "merge" ? new Set(resolved.action.nodeIds) : void 0;
-            const mine = mergeIds ? ((_i = run.held) != null ? _i : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
+            const mine = mergeIds ? ((_k = run.held) != null ? _k : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
             let asked;
             for (const entry of mine) {
               const change2 = chatAppearanceChange(entry.action);
               asked = {
                 ...asked,
                 ...change2,
-                addMarkers: [...(_j = asked == null ? void 0 : asked.addMarkers) != null ? _j : [], ...(_k = change2.addMarkers) != null ? _k : []],
-                removeMarkers: [...(_l = asked == null ? void 0 : asked.removeMarkers) != null ? _l : [], ...(_m = change2.removeMarkers) != null ? _m : []],
-                addStyles: [...(_n = asked == null ? void 0 : asked.addStyles) != null ? _n : [], ...(_o = change2.addStyles) != null ? _o : []],
-                removeStyles: [...(_p = asked == null ? void 0 : asked.removeStyles) != null ? _p : [], ...(_q = change2.removeStyles) != null ? _q : []]
+                addMarkers: [...(_l = asked == null ? void 0 : asked.addMarkers) != null ? _l : [], ...(_m = change2.addMarkers) != null ? _m : []],
+                removeMarkers: [...(_n = asked == null ? void 0 : asked.removeMarkers) != null ? _n : [], ...(_o = change2.removeMarkers) != null ? _o : []],
+                addStyles: [...(_p = asked == null ? void 0 : asked.addStyles) != null ? _p : [], ...(_q = change2.addStyles) != null ? _q : []],
+                removeStyles: [...(_r = asked == null ? void 0 : asked.removeStyles) != null ? _r : [], ...(_s = change2.removeStyles) != null ? _s : []]
               };
             }
-            outcome = resolved ? await this.runChatSelection(resolved.action, (_r = result.message) != null ? _r : "", laterBatch, asked, options.work) : skipped("ui.map_chat_skip_parent_missing");
+            outcome = resolved ? await this.runChatSelection(resolved.action, (_t = result.message) != null ? _t : "", laterBatch, asked, options.work) : skipped("ui.map_chat_skip_parent_missing");
             if (options.work && outcome.status === "done" && (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && ["synthesize", "merge", "rate_by_goal"].includes(resolved.action.action))
               options.work.otherBackground = true;
             if (outcome.status !== "done" && mine.length && same()) {
               const merged = new Set(mine.flatMap((entry) => entry.ids));
-              run.mergeSourceIds = new Set([...(_s = run.mergeSourceIds) != null ? _s : []].filter((id) => !merged.has(id)));
+              run.mergeSourceIds = new Set([...(_u = run.mergeSourceIds) != null ? _u : []].filter((id) => !merged.has(id)));
               for (const entry of mine) {
                 const keep = entry.ids;
                 await this.plugin.mutate(async () => {
@@ -79879,6 +80009,8 @@ ${addition}` : addition });
       const label = createSvg("text");
       label.addClass("vam-relation-label");
       if (link.anchor) label.setAttribute("data-anchor-relation", "");
+      if (link.anchor && link.relation.ring === true && link.kind === "related")
+        label.addClass("is-ring-quiet");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(
@@ -79929,11 +80061,7 @@ ${addition}` : addition });
   anchorLinesToDraw() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     const out = [];
-    const ringed = new Set(
-      ringMembers((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], (_d = (_c = this.map) == null ? void 0 : _c.nodes) != null ? _d : []).map(
-        (m) => `${m.imageId}\0${m.anchorId}\0${m.topicId}`
-      )
-    );
+    const ringed = new Set(ringMembers((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], (_d = (_c = this.map) == null ? void 0 : _c.nodes) != null ? _d : []).map((m) => m.imageId));
     for (const item of (_f = (_e = this.map) == null ? void 0 : _e.canvasItems) != null ? _f : []) {
       if (!isAnnotatedImage(item)) continue;
       for (const relation of (_g = item.relations) != null ? _g : []) {
@@ -79951,7 +80079,7 @@ ${addition}` : addition });
             point,
             fromAnchor,
             anchorNote: (_h = anchor.note) != null ? _h : "",
-            ...ringed.has(`${item.id}\0${anchor.id}\0${topicId}`) ? { image: { x: item.x, y: item.y, w: item.w, h: item.h } } : {}
+            ...ringed.has(item.id) ? { image: { x: item.x, y: item.y, w: item.w, h: item.h } } : {}
           },
           relation
         ]);

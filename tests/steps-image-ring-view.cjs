@@ -325,3 +325,99 @@ test('keys: a ring card goes to its child with the outward arrow; other top-leve
   assert.equal(plainView.displayedNeighbor(plainMap.nodes[1], 'ArrowDown')?.id, 'r3');
   assert.equal(plainView.displayedNeighbor(plainMap.nodes[2], 'ArrowUp')?.id, 'r2');
 });
+
+
+// Geometry written here on purpose (not ring.ringViolations): the check must not share code with what it checks.
+const segHitsRect = (s, r) => {
+  let t0 = 0, t1 = 1;
+  const dx = s.x2 - s.x1, dy = s.y2 - s.y1;
+  for (const [p, q] of [[-dx, s.x1 - r.x], [dx, r.x + r.w - s.x1], [-dy, s.y1 - r.y], [dy, r.y + r.h - s.y1]]) {
+    if (p === 0) { if (q < 0) return false; continue; }
+    const t = q / p;
+    if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; }
+  }
+  return t0 <= t1;
+};
+const side = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+const segCross = (s, u) => {
+  const a = { x: s.x1, y: s.y1 }, b = { x: s.x2, y: s.y2 }, c = { x: u.x1, y: u.y1 }, d = { x: u.x2, y: u.y2 };
+  return side(a, b, c) * side(a, b, d) < -1e-6 && side(c, d, a) * side(c, d, b) < -1e-6;
+};
+/** Ring cards (with anchors) against fixed lines: cards a line passes through, and ring lines that cross a fixed line. */
+const againstFixed = (image, cards, fixed) => {
+  const out = [];
+  for (const c of cards) {
+    const line = ring.ringLine(image, c.anchorX, c.anchorY, c);
+    for (const f of fixed) {
+      if (segHitsRect(f, c)) out.push(`${c.id} on a fixed line`);
+      if (segCross(line, f)) out.push(`${c.id} crosses a fixed line`);
+    }
+  }
+  return out;
+};
+
+// Review round 1, R1: topics that already stood on the map and are joined to anchors of the picture keep their place, so
+// their lines are fixed; the ring is placed around them. The lines are checked as the view draws them (straight, to the facing edge).
+test('R1 (L2 shape): existing cards above the picture with lines to it: no ring card on those lines, no crossing, nothing covered', () => {
+  const rows = [['a1', 't1', [0.3, 0.12]], ['a2', 't2', [0.55, 0.2]], ['a3', 't3', [0.7, 0.15]], ['a4', 't4', [0.5, 0.6]], ['a5', 't5', [0.2, 0.8]]];
+  const fixedRows = [['f1', 'e1', [0.4, 0.3]], ['f2', 'e2', [0.6, 0.3]]];
+  const pic = picture(rows);
+  for (const [anchor, topic, at] of fixedRows) {
+    pic.anchors.push({ id: anchor, at: { kind: 'image-2d', x: at[0], y: at[1] } });
+    pic.relations.push({ kind: 'supports', from: anchor, to: topic });
+  }
+  const map = doc([node('e1', null, 420, 40), node('e2', null, 760, 40), ...rows.map(r => node(r[1], null, 5000, 5000))], [pic]);
+  // The way a reply with a new ring does it: only the ring is solved, the cards that were there stay.
+  bare(map).solveRingsIn(map, { enlarge: true });
+  const at = id => map.nodes.find(n => n.id === id);
+  const image = imageOf(map);
+  const fixed = fixedRows.map(([, topic, a]) => ring.ringLine(image, a[0], a[1], rect(at(topic))));
+  const others = [rect(at('e1')), rect(at('e2'))];
+  const bad = ring.ringViolations(image, ringStates(map, rows.map(r => r[1])), { memberCount: 5, fixedLines: fixed, others }).filter(v => v.code !== 'pairing');
+  assert.deepEqual(plain(bad), []);
+  assert.deepEqual(againstFixed(image, ringStates(map, rows.map(r => r[1])), fixed), [], 'independent check of the same lines');
+  assert.deepEqual([at('e1').x, at('e1').y, at('e2').x, at('e2').y], [420, 40, 760, 40], 'existing cards do not move');
+});
+
+// Review round 1, M2: neighbouring ring cards with branches (the branches of one card used to land on the next card's).
+test('M2: ring cards that each have 2 or 3 sub-topics (4 or 12 cards) overlap nothing, and no card sits on the picture', () => {
+  for (const [members, children] of [[12, 1], [12, 2], [12, 3], [4, 2]]) {
+    const rows = Array.from({ length: members }, (_, i) => [`a${i}`, `r${i}`, [0.2 + (0.6 * (i % 4)) / 3, 0.2 + (0.6 * Math.floor(i / 4)) / 2]]);
+    const nodes = rows.map(r => node(r[1], null, 0, 0));
+    for (const r of rows) for (let c = 0; c < children; c++) nodes.push(node(`${r[1]}_${c}`, r[1], 0, 0));
+    const map = doc(nodes, [picture(rows, { x: 400, y: 300, w: 720, h: 533 })]);
+    bare(map).arrangeAll(map);
+    const rects = map.nodes.map(n => ({ id: n.id, ...rect(n) }));
+    const pairs = [];
+    for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) if (hit(rects[i], rects[j])) pairs.push(`${rects[i].id}|${rects[j].id}`);
+    assert.deepEqual(pairs, [], `${members} cards x ${children} children`);
+    assert.deepEqual(rects.filter(r => hit(r, imageOf(map))).map(r => r.id), [], 'none on the picture');
+  }
+});
+
+test('R1: one more ring member (placed alone, the others stay) is not put on or across the lines to the cards that stay', () => {
+  const rows = [['a1', 't1', [0.3, 0.12]], ['a2', 't2', [0.7, 0.15]], ['a3', 't3', [0.5, 0.6]]];
+  const fixedRows = [['f1', 'e1', [0.4, 0.3]], ['f2', 'e2', [0.6, 0.3]]];
+  const pic = picture(rows);
+  for (const [anchor, topic, at] of fixedRows) {
+    pic.anchors.push({ id: anchor, at: { kind: 'image-2d', x: at[0], y: at[1] } });
+    pic.relations.push({ kind: 'supports', from: anchor, to: topic });
+  }
+  const map = doc([node('e1', null, 420, 40), node('e2', null, 760, 40), ...rows.map(r => node(r[1], null, 5000, 5000))], [pic]);
+  const view = bare(map);
+  view.solveRingsIn(map, { enlarge: true });
+  // The new member's anchor lies between the two lines, where its best slots are on them.
+  map.nodes.push(node('t9', null, 5000, 5000));
+  imageOf(map).anchors.push({ id: 'a9', at: { kind: 'image-2d', x: 0.5, y: 0.1 } });
+  imageOf(map).relations.push({ kind: 'related', from: 'a9', to: 't9', ring: true });
+  view.placeRingMember(map, 'img', 't9');
+  const at = id => map.nodes.find(n => n.id === id);
+  const image = imageOf(map);
+  const fixed = fixedRows.map(([, topic, a]) => ring.ringLine(image, a[0], a[1], rect(at(topic))));
+  const cards = [...rows.map(r => r[1]), 't9'].map(id => {
+    const rel = image.relations.find(r => r.to === id);
+    const a = image.anchors.find(x => x.id === rel.from).at;
+    return { id, ...rect(at(id)), anchorX: a.x, anchorY: a.y };
+  });
+  assert.deepEqual(againstFixed(image, cards, fixed), []);
+});

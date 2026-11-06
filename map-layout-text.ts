@@ -9,6 +9,7 @@ import {
 import {
   findFreeOffset,
   ringBounds,
+  ringLine,
   ringImageSize,
   ringMembers,
   ringSide,
@@ -16,7 +17,8 @@ import {
   solveRing,
   type Rect,
   type RingMember,
-  type RingSide
+  type RingSide,
+  type Segment
 } from "./experiences/visual-map/image-ring";
 import { allowsBranchLayout, branchDirectionOf, layoutDirectionFor } from "./layouts/compose";
 import {
@@ -330,14 +332,42 @@ function obstacleRects(
   return [...out, ...placed];
 }
 
-interface SubtreeLayout {
-  /** Where each shown card and text of the branch sits relative to the branch's top card. */
-  cards: Map<string, { dx: number; dy: number }>;
-  texts: Map<string, { dx: number; dy: number }>;
+/**
+ * The straight lines (as drawn) from the anchors of `group`'s picture, shown at `image`, to the topics that stay where they
+ * are: the picture's non-ring relations whose topic is an ordinary shown card. A topic in the picture is drawn as a curve and is left out.
+ */
+function fixedLinesOf(
+  group: RingGroup,
+  image: Rect,
+  nodes: readonly MapNode[],
+  trees: ReadonlySet<string>,
+  hidden: ReadonlySet<string> | undefined,
+  heightOf: HeightOf | undefined
+): Segment[] {
+  const out: Segment[] = [];
+  const shown = new Map(visibleNodes(nodes as MapNode[]).map(node => [node.id, node]));
+  const anchors = new Map(group.image.anchors.map(anchor => [anchor.id, anchor]));
+  for (const relation of group.image.relations ?? []) {
+    if (relation.ring === true) continue;
+    const anchor = anchors.get(relation.from) ?? anchors.get(relation.to);
+    if (!anchor || anchor.at.kind !== "image-2d") continue;
+    const topic = shown.get(anchor.id === relation.from ? relation.to : relation.from);
+    if (!topic || trees.has(topic.id) || hidden?.has(topic.id)) continue;
+    const box = nodeRect(topic, heightOf);
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    if (cx > image.x && cx < image.x + image.w && cy > image.y && cy < image.y + image.h) continue;
+    out.push(ringLine(image, anchor.at.x as number, anchor.at.y as number, box));
+  }
+  return out;
 }
 
-/** The branch of one ring member laid out on its own, growing `direction`, as offsets from its top card. */
-function layoutSubtree(
+/**
+ * Where the text blocks that hang directly on a ring card stand relative to it: the card's branch laid out on its own,
+ * growing `direction`, as offsets from the card. Cards of the branch are not read from it (they are placed one after
+ * another against the cards already there).
+ */
+function cardTextOffsets(
   nodes: readonly MapNode[],
   items: readonly CanvasItem[],
   rootId: string,
@@ -345,27 +375,38 @@ function layoutSubtree(
   spacing: MapLayout["spacing"],
   heightOf: HeightOf | undefined,
   widthOf: TextWidthOf | undefined
-): SubtreeLayout {
+): Map<string, { dx: number; dy: number }> {
+  const out = new Map<string, { dx: number; dy: number }>();
+  if (!items.some(item => item.kind === "text" && (item as TextItem).parentId === rootId)) return out;
   const ids = new Set([rootId, ...descendants(nodes as MapNode[], rootId)]);
   const sub = nodes.filter(node => ids.has(node.id));
-  const layout: MapLayout = { direction, ...(spacing ? { spacing } : {}) };
-  const out = arrangeMapWithText(sub, items, undefined, heightOf, layout, { widthOf });
-  const at = new Map(out.nodes.map(node => [node.id, node]));
-  const root = at.get(rootId)!;
-  const cards = new Map<string, { dx: number; dy: number }>();
-  const shown = visibleNodes(sub);
-  for (const node of shown) {
-    const spot = at.get(node.id)!;
-    cards.set(node.id, { dx: spot.x - root.x, dy: spot.y - root.y });
+  const laid = arrangeMapWithText(
+    sub,
+    items,
+    undefined,
+    heightOf,
+    { direction, ...(spacing ? { spacing } : {}) },
+    { widthOf }
+  );
+  const root = laid.nodes.find(node => node.id === rootId)!;
+  const shownIds = new Set(visibleNodes(sub).map(node => node.id));
+  for (const text of visibleTexts(sub, items).filter(item => item.parentId === rootId && shownIds.has(rootId))) {
+    const spot = laid.items.find(item => item.kind === "text" && (item as TextItem).id === text.id) as TextItem;
+    out.set(text.id, { dx: spot.x - root.x, dy: spot.y - root.y });
   }
-  const texts = new Map<string, { dx: number; dy: number }>();
-  const shownIds = new Set(shown.map(node => node.id));
-  // A text under a card inside a folded branch is not drawn by the layout, so it keeps its place and follows its card.
-  for (const text of visibleTexts(sub, items).filter(item => shownIds.has(item.parentId as string))) {
-    const spot = out.items.find(item => (item as TextItem).id === text.id && item.kind === "text") as TextItem;
-    texts.set(text.id, { dx: spot.x - root.x, dy: spot.y - root.y });
-  }
-  return { cards, texts };
+  return out;
+}
+
+/** The fixed lines of one picture's ring (see `fixedLinesOf`), for placing one more member without solving the ring again. */
+export function ringFixedLines(
+  nodes: readonly MapNode[],
+  items: readonly CanvasItem[],
+  imageId: string,
+  heightOf: HeightOf | undefined,
+  hidden?: ReadonlySet<string>
+): Segment[] {
+  const group = ringGroups(nodes, items).find(each => each.image.id === imageId);
+  return group ? fixedLinesOf(group, imageRectOf(group.image), nodes, ringTreeIds(nodes, items), hidden, heightOf) : [];
 }
 
 export interface RingSolveOptions {
@@ -399,26 +440,15 @@ export function solveRings(
   const movedTexts = new Map<string, { x: number; y: number }>();
   const movedImages = new Map<string, AnnotatedImageItem>();
   const nodeAt = (id: string): MapNode => movedNodes.get(id) ?? nodes.find(node => node.id === id)!;
+  const textItems = items.filter((item): item is TextItem => item.kind === "text");
   for (const group of groups) {
-    const image = options.enlarge ? ringImageSize(imageRectOf(group.image)) : imageRectOf(group.image);
+    const base = options.enlarge ? ringImageSize(imageRectOf(group.image)) : imageRectOf(group.image);
     const inputs = group.members.map(member => {
       const rect = nodeRect(nodeAt(member.topicId), heightOf);
       return { id: member.topicId, anchorX: member.x, anchorY: member.y, w: rect.w, h: rect.h };
     });
-    const solved = solveRing(image, inputs);
-    const subtrees = solved.cards.map(card =>
-      layoutSubtree(nodes, items, card.id, OUTWARD[ringSide(image, card)], spacing, heightOf, widthOf)
-    );
-    // The footprint: the picture, the cards and everything grown from them.
-    const footprint: Rect[] = [];
-    solved.cards.forEach((card, i) => {
-      for (const [id, off] of subtrees[i].cards)
-        footprint.push({ ...nodeRect(nodeAt(id), heightOf), x: card.x + off.dx, y: card.y + off.dy });
-      for (const [id, off] of subtrees[i].texts) {
-        const text = items.find(item => item.kind === "text" && (item as TextItem).id === id) as TextItem;
-        footprint.push({ ...textRect(text, heightOf, widthOf), x: card.x + off.dx, y: card.y + off.dy });
-      }
-    });
+    const memberIds = new Set(group.members.map(member => member.topicId));
+    const below = new Map(group.members.map(member => [member.topicId, descendants(nodes, member.topicId)]));
     const obstacles = obstacleRects(
       nodes,
       items,
@@ -429,36 +459,100 @@ export function solveRings(
       options.hidden,
       placedRects
     );
-    const { dx, dy } = findFreeOffset(ringBounds(image, footprint), obstacles);
-    // Apply: shifted picture, cards and branches. What the branch layout did not draw (folded branches) follows its card.
-    solved.cards.forEach((card, i) => {
-      const old = nodeAt(card.id);
-      const tx = Math.round(card.x + dx);
-      const ty = Math.round(card.y + dy);
-      const sub = subtrees[i];
-      const rootOff = { x: tx - old.x, y: ty - old.y };
-      for (const id of new Set([card.id, ...descendants(nodes, card.id)])) {
-        const node = nodeAt(id);
-        const off = sub.cards.get(id);
-        movedNodes.set(
-          id,
-          off ? { ...node, x: tx + off.dx, y: ty + off.dy } : { ...node, x: node.x + rootOff.x, y: node.y + rootOff.y }
+    // The ring at one position of the picture: cards in their slots, then each branch laid out growing away from the picture.
+    const place = (shift: { dx: number; dy: number }) => {
+      const image: Rect = { ...base, x: base.x + shift.dx, y: base.y + shift.dy };
+      const solved = solveRing(image, inputs, fixedLinesOf(group, image, nodes, trees, options.hidden, heightOf));
+      const here = new Map<string, MapNode>();
+      const hereTexts = new Map<string, { x: number; y: number }>();
+      const textsNow = (): CanvasItem[] =>
+        items.map(item =>
+          item.kind === "text" && hereTexts.has((item as TextItem).id)
+            ? { ...(item as TextItem), ...hereTexts.get((item as TextItem).id)! }
+            : item
         );
+      // Cards in their slots; what hangs below a card follows it rigidly first (a folded branch keeps that place).
+      for (const card of solved.cards) {
+        const old = nodeAt(card.id);
+        const rootOff = { x: Math.round(card.x) - old.x, y: Math.round(card.y) - old.y };
+        for (const id of new Set([card.id, ...below.get(card.id)!])) {
+          const node = nodeAt(id);
+          here.set(
+            id,
+            id === card.id
+              ? { ...node, x: Math.round(card.x), y: Math.round(card.y) }
+              : { ...node, x: node.x + rootOff.x, y: node.y + rootOff.y }
+          );
+        }
+        const own = cardTextOffsets(nodes, items, card.id, OUTWARD[card.side], spacing, heightOf, widthOf);
+        for (const text of textItems)
+          if (text.parentId !== undefined && (text.parentId === card.id || below.get(card.id)!.has(text.parentId))) {
+            const off = own.get(text.id);
+            hereTexts.set(
+              text.id,
+              off
+                ? { x: Math.round(card.x) + off.dx, y: Math.round(card.y) + off.dy }
+                : { x: text.x + rootOff.x, y: text.y + rootOff.y }
+            );
+          }
       }
-      for (const item of items) {
-        if (item.kind !== "text") continue;
-        const text = item as TextItem;
-        const below =
-          text.parentId !== undefined && (text.parentId === card.id || descendants(nodes, card.id).has(text.parentId));
-        if (!below) continue;
-        const off = sub.texts.get(text.id);
-        movedTexts.set(
-          text.id,
-          off ? { x: tx + off.dx, y: ty + off.dy } : { x: text.x + rootOff.x, y: text.y + rootOff.y }
+      // Branches one after another; the cards already placed are obstacles for the next.
+      const done = new Set<string>();
+      const footprint: Rect[] = [];
+      for (const card of solved.cards) {
+        const own: MapLayout = { direction: OUTWARD[card.side], ...(spacing ? { spacing } : {}) };
+        const ids = below.get(card.id)!;
+        // What a folded card hides is not laid out: it keeps its place against the card.
+        const drawn = new Set(
+          visibleNodes(nodes.filter(node => node.id === card.id || ids.has(node.id))).map(node => node.id)
         );
+        const toPlace = new Set([...ids].filter(id => drawn.has(id)));
+        const list = nodes
+          .map(node => here.get(node.id) ?? nodeAt(node.id))
+          .filter(
+            node =>
+              memberIds.has(node.id) ||
+              done.has(node.id) ||
+              ids.has(node.id) ||
+              !(trees.has(node.id) && !movedNodes.has(node.id))
+          );
+        let placed: MapNode[] = list;
+        if (toPlace.size) {
+          const out = arrangeNewBranchWithText(list, textsNow(), card.id, toPlace, heightOf, undefined, own, widthOf);
+          placed = out.nodes;
+          for (const item of out.items)
+            if (item.kind === "text" && hereTexts.has((item as TextItem).id))
+              hereTexts.set((item as TextItem).id, { x: (item as TextItem).x, y: (item as TextItem).y });
+        }
+        const byId = new Map(placed.map(node => [node.id, node]));
+        for (const id of toPlace) {
+          const node = byId.get(id)!;
+          here.set(id, { ...node, x: Math.round(node.x), y: Math.round(node.y) });
+          done.add(id);
+        }
+        done.add(card.id);
       }
-    });
-    const finalImage: Rect = { ...image, x: image.x + dx, y: image.y + dy };
+      const shown = visibleNodes(nodes.filter(node => here.has(node.id)));
+      for (const node of shown) footprint.push(nodeRect(here.get(node.id)!, heightOf));
+      const shownIds = new Set(shown.map(node => node.id));
+      for (const text of textItems)
+        if (hereTexts.has(text.id) && shownIds.has(text.parentId as string))
+          footprint.push({ ...textRect(text, heightOf, widthOf), ...hereTexts.get(text.id)! });
+      return { image, here, hereTexts, footprint };
+    };
+    // A shift of the ring changes the lines to the cards that stay, so the ring is solved again at the new place and
+    // checked once more (at most a few times), instead of moving it afterwards.
+    let shift = { dx: 0, dy: 0 };
+    let result = place(shift);
+    for (let pass = 0; pass < 3; pass++) {
+      const free = findFreeOffset(ringBounds(result.image, result.footprint), obstacles);
+      if (!free.dx && !free.dy) break;
+      shift = { dx: shift.dx + free.dx, dy: shift.dy + free.dy };
+      result = place(shift);
+    }
+    for (const [id, node] of result.here) movedNodes.set(id, node);
+    for (const [id, spot] of result.hereTexts) movedTexts.set(id, spot);
+    const finalImage = result.image;
     if (
       finalImage.x !== group.image.x ||
       finalImage.y !== group.image.y ||
@@ -466,8 +560,7 @@ export function solveRings(
       finalImage.h !== group.image.h
     )
       movedImages.set(group.image.id, { ...group.image, ...finalImage });
-    placedRects.push(finalImage);
-    for (const rect of footprint) placedRects.push({ ...rect, x: rect.x + dx, y: rect.y + dy });
+    placedRects.push(finalImage, ...result.footprint);
   }
   return {
     nodes: nodes.map(node => movedNodes.get(node.id) ?? node),

@@ -711,3 +711,26 @@ test('geometry: the anchor end starts at least 7px (the anchor radius) from the 
     }
   assert.match(geometry.pointToBoxPathData({ x: 500, y: 250 }, box, true), /^M 500 250 C .* 540 250$/, 'inside the card: as before');
 });
+
+// Review round 1, R1: the ring is placed around the cards that stay, which only works if their lines are the straight
+// lines the placement counted. On a picture with a ring every line is straight; a picture without one keeps its curves.
+test('R1: on a picture that has a ring a line to an ordinary topic is straight too, to the edge facing the picture', () => {
+  const h = ringHarness([rel('supports', 'p1', 'a', { ring: true }), rel('supports', 'p2', 'b')]);
+  const d = h.pathOf(KEY('img1', 'p2', 'b')).attrs.d;
+  assert.equal(d, geometry.pointToBoxStraightPathData({ x: 150, y: 675 }, { x: 400, y: 200, width: 280, height: 100 }, 'top', true));
+  assert.doesNotMatch(d, / C /);
+  // The same line on a picture without a ring is the curve, as before.
+  const plain = harness({ relations: [rel('supports', 'p2', 'b')] });
+  plain.view.draw();
+  assert.match(plain.pathOf(KEY('img1', 'p2', 'b')).attrs.d, / C /);
+});
+
+// Review round 1, M1: a plain "related" ring line needs no name on the picture; hovering or selecting it shows the name.
+test('M1: the name of a ring line of the kind related shows only when expanded; other lines keep theirs', () => {
+  const h = ringHarness([rel('related', 'p1', 'a', { ring: true }), rel('supports', 'p2', 'b', { ring: true })]);
+  const quiet = h.view.relationLabelEls.get(KEY('img1', 'p1', 'a')), loud = h.view.relationLabelEls.get(KEY('img1', 'p2', 'b'));
+  assert.ok(quiet.hasClass('is-ring-quiet'), 'ring + related: quiet');
+  assert.ok(!loud.hasClass('is-ring-quiet'), 'ring + supports: named as before');
+  const other = ringHarness([rel('related', 'p1', 'a', { ring: true }), rel('related', 'p2', 'b')]);
+  assert.ok(!other.view.relationLabelEls.get(KEY('img1', 'p2', 'b')).hasClass('is-ring-quiet'), 'a related line that is not a ring line keeps its name');
+});

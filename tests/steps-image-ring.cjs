@@ -224,3 +224,95 @@ test('A3: moveRing shifts picture, cards and lines together and changes nothing 
   const bounds = ring.ringBounds(IMAGE, layout.cards);
   assert.ok(bounds.w > IMAGE.w && bounds.h > IMAGE.h);
 });
+
+// R1 (review round 1): the lines to cards that stay where they are (an existing topic above the picture) are fixed lines.
+const RIMG = { x: 100, y: 400, w: 716, h: 512 };
+const ABOVE = { x: 330, y: 120, w: 280, h: 110 };
+const upper = [[0.3, 0.12], [0.55, 0.2], [0.7, 0.15], [0.5, 0.55], [0.2, 0.8]];
+const fixedTo = (image, card, anchors) => anchors.map(([x, y]) => ring.ringLine(image, x, y, card));
+const withStates = (layout, inputs) => states(layout, inputs);
+// Geometry written here on purpose (not ring.ringViolations): the check must not share code with what it checks.
+const segHitsRect = (s, r) => {
+  let t0 = 0, t1 = 1;
+  const dx = s.x2 - s.x1, dy = s.y2 - s.y1;
+  for (const [p, q] of [[-dx, s.x1 - r.x], [dx, r.x + r.w - s.x1], [-dy, s.y1 - r.y], [dy, r.y + r.h - s.y1]]) {
+    if (p === 0) { if (q < 0) return false; continue; }
+    const t = q / p;
+    if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; }
+  }
+  return t0 <= t1;
+};
+const side = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+const segCross = (s, u) => {
+  const a = { x: s.x1, y: s.y1 }, b = { x: s.x2, y: s.y2 }, c = { x: u.x1, y: u.y1 }, d = { x: u.x2, y: u.y2 };
+  return side(a, b, c) * side(a, b, d) < -1e-6 && side(c, d, a) * side(c, d, b) < -1e-6;
+};
+/** Ring cards (with anchors) against fixed lines: cards a line passes through, and ring lines that cross a fixed line. */
+const againstFixed = (image, cards, fixed) => {
+  const out = [];
+  for (const c of cards) {
+    const line = ring.ringLine(image, c.anchorX, c.anchorY, c);
+    for (const f of fixed) {
+      if (segHitsRect(f, c)) out.push(`${c.id} on a fixed line`);
+      if (segCross(line, f)) out.push(`${c.id} crosses a fixed line`);
+    }
+  }
+  return out;
+};
+
+test('R1: with an existing card above the picture, no ring card is on a fixed line and no ring line crosses one', () => {
+  const inputs = toCards(upper, () => ({ w: 280, h: 110 }));
+  const fixed = fixedTo(RIMG, ABOVE, [[0.35, 0.3], [0.65, 0.3]]);
+  const layout = ring.solveRing(RIMG, inputs, fixed);
+  assert.deepEqual(viol(RIMG, withStates(layout, inputs), { memberCount: 5, fixedLines: fixed }), []);
+  assert.deepEqual(againstFixed(RIMG, withStates(layout, inputs), fixed), []);
+  // The same ring solved without the fixed lines is the counter-example: it does run through them.
+  const blind = ring.solveRing(RIMG, inputs);
+  assert.ok(viol(RIMG, withStates(blind, inputs), { fixedLines: fixed }).length > 0, 'without fixed lines the ring is in the way');
+  assert.deepEqual(plain(ring.solveRing(RIMG, inputs, [])), plain(blind), 'no fixed lines: the result is unchanged');
+});
+
+test('R1: random existing cards above the picture (1-2 fixed lines): 0 cards on a line, 0 crossings', () => {
+  const random = lcg(11);
+  for (let round = 0; round < 80; round++) {
+    const n = 1 + Math.floor(random() * 12);
+    const inputs = toCards(Array.from({ length: n }, () => [random(), random()]), () => ({ w: 280, h: 110 + Math.floor(random() * 80) }));
+    const fixed = [];
+    for (let k = 0, m = 1 + Math.floor(random() * 2); k < m; k++) {
+      const side = 0; // the shape of the live sample: existing cards above the picture
+      const card = [
+        { x: RIMG.x + random() * 400, y: RIMG.y - 300 - random() * 100, w: 280, h: 110 },
+        { x: RIMG.x + random() * 400, y: RIMG.y + RIMG.h + 150 + random() * 100, w: 280, h: 110 },
+        { x: RIMG.x - 600 - random() * 100, y: RIMG.y + random() * 400, w: 280, h: 110 },
+        { x: RIMG.x + RIMG.w + 300 + random() * 100, y: RIMG.y + random() * 400, w: 280, h: 110 }
+      ][side];
+      fixed.push(ring.ringLine(RIMG, random(), random(), card));
+    }
+    const layout = ring.solveRing(RIMG, inputs, fixed);
+    // Against the fixed lines (violations of one card): never. Two ring lines crossing each other, which a fixed line can force
+    // in rare crowded cases, and `pairing` (not the shortest matching) are not about the fixed lines and are left out here.
+    const bad = viol(RIMG, withStates(layout, inputs), { memberCount: n, fixedLines: fixed }).filter(v => v.ids.length <= 1);
+    assert.deepEqual(bad, [], `round ${round}`);
+    assert.deepEqual(againstFixed(RIMG, withStates(layout, inputs), fixed), [], `round ${round} (independent check)`);
+  }
+});
+
+test('R1: a member added later is not put on a fixed line either', () => {
+  const inputs = toCards(upper.slice(0, 4), () => ({ w: 280, h: 110 }));
+  const fixed = fixedTo(RIMG, ABOVE, [[0.35, 0.3], [0.65, 0.3]]);
+  const current = withStates(ring.solveRing(RIMG, inputs, fixed), inputs);
+  const extra = { id: 'new', anchorX: 0.9, anchorY: 0.4, w: 280, h: 110 };
+  const put = ring.placeNewMember(RIMG, current, extra, [], fixed);
+  assert.ok(put, 'a place is found');
+  const all = [...current, { id: 'new', x: put.x, y: put.y, w: put.w, h: put.h, anchorX: 0.9, anchorY: 0.4 }];
+  assert.deepEqual(viol(RIMG, all, { fixedLines: fixed }), []);
+  assert.deepEqual(againstFixed(RIMG, all, fixed), []);
+  // A member whose best slots lie on the lines: a place that is clear of them, or none (the ring is then solved again).
+  const blocked = { id: 'blocked', anchorX: 0.45, anchorY: 0.1, w: 280, h: 110 };
+  const where = ring.placeNewMember(RIMG, current, blocked, [], fixed);
+  if (where) {
+    const more = [...current, { id: 'blocked', x: where.x, y: where.y, w: where.w, h: where.h, anchorX: 0.45, anchorY: 0.1 }];
+    assert.deepEqual(viol(RIMG, more, { fixedLines: fixed }).filter(v => v.code !== 'pairing'), []);
+    assert.deepEqual(againstFixed(RIMG, more, fixed), []);
+  }
+});

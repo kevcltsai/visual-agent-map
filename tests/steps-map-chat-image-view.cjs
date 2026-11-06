@@ -927,3 +927,25 @@ test('P5b A7/A13: a new sub-topic under a ring member lands outside that card an
     for (const id of ringIds) assert.ok(!hitBox(boxOf(h, sub), boxOf(h, h.view.map.nodes.find(x => x.id === id))), 'does not cover a ring card');
   }
 });
+
+// Review round 1, R2: a selected card dims every other line of the picture to 25%, so a reply that makes a ring selects nothing.
+test('R2: after a reply that makes a ring no card is selected (what addNode selected is cleared too); an old-style reply still selects its branch root', async () => {
+  const h = await harness();
+  await h.apply(manyActions(3));
+  assert.equal(h.view.selection.state.selected, null, 'no selected card');
+  assert.equal(h.view.selection.state.multiSelected.length ?? h.view.selection.state.multiSelected.size, 0);
+  const old = await harness();
+  await old.apply([
+    addAnchor('p1', 0.2, 0.3), topChild('root', 'Cuts'),
+    { kind: 'add_child', parentId: 'new:root', title: 'Rib', ref: 'c1' },
+    link('anchor:p1', 'new:c1')
+  ]);
+  assert.ok(old.view.selection.state.selected, 'the reply that made no ring keeps selecting its new branch root');
+});
+
+test('R2/M1 style: the anchor lines are heavier and nearer the text colour; a quiet ring label is hidden unless expanded', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-view \.vam-relation\[data-anchor-relation\]:not\(\.vam-relation-derives_from\) \{ --vam-relation-width: 2\.25px; \}/);
+  assert.match(css, /\.vam-view \.vam-relation\[data-anchor-relation\]:not\(\.is-selected\) \{ stroke: color-mix\(in srgb, var\(--text-normal\) 92%/);
+  assert.match(css, /\.vam-view \.vam-relation-label\.is-ring-quiet:not\(\.is-expanded\) \{ display: none; \}/);
+});

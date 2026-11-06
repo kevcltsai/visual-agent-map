@@ -1908,6 +1908,11 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-anchor-pick-row button { flex: 1 1 auto; min-width: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vam-anchor-pick-taken { flex: 0 0 auto; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-view .vam-relation[data-anchor-relation] { transition: opacity 0.12s ease, stroke-width 0.12s ease; }
+/* Anchor lines are the first thing seen on a picture: heavier than a topic line and nearly the text colour, so they hold on a light picture. */
+.vam-view .vam-relation[data-anchor-relation]:not(.vam-relation-derives_from) { --vam-relation-width: 2.25px; }
+.vam-view .vam-relation[data-anchor-relation]:not(.is-selected) { stroke: color-mix(in srgb, var(--text-normal) 92%, var(--background-primary)); }
+/* A ring line of the plain "related" kind says nothing the line does not: its name shows only when the line is hovered or selected. */
+.vam-view .vam-relation-label.is-ring-quiet:not(.is-expanded) { display: none; }
 .vam-view .vam-relation[data-anchor-relation].is-related { stroke-width: calc(var(--vam-relation-width, 1.75px) + 2px); opacity: 1; }
 .vam-view .vam-relation[data-anchor-relation].is-dimmed { opacity: 0.25; }
 .vam-view .vam-anchor.is-related { transform: scale(1.35); box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 35%, transparent); }

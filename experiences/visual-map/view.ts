@@ -290,6 +290,7 @@ import {
   directionWithRings,
   ringImagesInTheWay,
   ringMemberIds,
+  ringFixedLines,
   ringOutwardDirections,
   ringTreeIds,
   solveRings,
@@ -9132,7 +9133,8 @@ export class VisualAgentMapView extends ItemView {
       { x: image.x, y: image.y, w: image.w, h: image.h },
       states,
       { id: topicId, anchorX: me.x, anchorY: me.y, w: mine.w, h: mine.h },
-      this.ringObstacles(map, imageId, new Set([topicId, ...before.map(member => member.topicId), ...pending]))
+      this.ringObstacles(map, imageId, new Set([topicId, ...before.map(member => member.topicId), ...pending])),
+      ringFixedLines(map.nodes, items, imageId, this.cardHeightOf, supersededAimNodeIds(map))
     );
     if (!placed) {
       this.solveRingsIn(map, { imageIds: only });
@@ -20185,6 +20187,16 @@ export class VisualAgentMapView extends ItemView {
       w: n.width ?? CARD_WIDTH,
       h: this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(n.id)}"]`)?.offsetHeight ?? 180
     }));
+    // Framing a ring (a reply's cards) takes its picture in: with one to three cards the picture would otherwise be cut off.
+    if (only) {
+      const imageIds = new Set(
+        ringMembers(this.map.canvasItems ?? [], this.map.nodes)
+          .filter(member => only.has(member.topicId))
+          .map(member => member.imageId)
+      );
+      for (const item of this.map.canvasItems ?? [])
+        if (isAnnotatedImage(item) && imageIds.has(item.id)) boxes.push({ x: item.x, y: item.y, w: item.w, h: item.h });
+    }
     for (const item of only ? [] : (this.map.canvasItems ?? [])) {
       if (item.kind !== "text") continue;
       const text = item as TextItem;
@@ -23036,8 +23048,12 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     // addNode selects each card it makes, which leaves the last one selected; the reply's new branch root is the better start. Done before the later actions so a select_topics or run_map_action of the same reply keeps its selection.
-    const branchRoot = this.chatBranchRoot(run);
-    if (branchRoot && same() && !this.closed) this.applySelectionChange(this.selection.setSelected(branchRoot.id));
+    // A reply that made a ring selects nothing: a selected card would dim every other line of the picture on first sight.
+    const branchRoot = run.ringImages?.size ? undefined : this.chatBranchRoot(run);
+    if (run.ringImages?.size) {
+      if (same() && !this.closed) this.applySelectionChange(this.selection.clickEmpty());
+    } else if (branchRoot && same() && !this.closed)
+      this.applySelectionChange(this.selection.setSelected(branchRoot.id));
     for (const index of later) {
       const action = result.actions[index];
       const label = this.chatActionLabel(action, refTitles);
@@ -25829,6 +25845,8 @@ export class VisualAgentMapView extends ItemView {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
       if (link.anchor) label.setAttribute("data-anchor-relation", "");
+      if (link.anchor && (link.relation as { ring?: boolean }).ring === true && link.kind === "related")
+        label.addClass("is-ring-quiet");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(
@@ -25890,11 +25908,8 @@ export class VisualAgentMapView extends ItemView {
    */
   private anchorLinesToDraw(): [string, AnchorLine, TopicRelation][] {
     const out: [string, AnchorLine, TopicRelation][] = [];
-    const ringed = new Set(
-      ringMembers(this.map?.canvasItems ?? [], this.map?.nodes ?? []).map(
-        m => `${m.imageId}\u0000${m.anchorId}\u0000${m.topicId}`
-      )
-    );
+    // On a picture with a ring every line is straight (the ring's placement allows for them); other pictures keep curves.
+    const ringed = new Set(ringMembers(this.map?.canvasItems ?? [], this.map?.nodes ?? []).map(m => m.imageId));
     for (const item of this.map?.canvasItems ?? []) {
       if (!isAnnotatedImage(item)) continue;
       for (const relation of item.relations ?? []) {
@@ -25913,9 +25928,7 @@ export class VisualAgentMapView extends ItemView {
             point,
             fromAnchor,
             anchorNote: anchor.note ?? "",
-            ...(ringed.has(`${item.id}\u0000${anchor.id}\u0000${topicId}`)
-              ? { image: { x: item.x, y: item.y, w: item.w, h: item.h } }
-              : {})
+            ...(ringed.has(item.id) ? { image: { x: item.x, y: item.y, w: item.w, h: item.h } } : {})
           },
           relation
         ]);

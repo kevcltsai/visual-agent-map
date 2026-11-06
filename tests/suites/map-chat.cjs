@@ -153,6 +153,14 @@ test('map chat: messages, draft and chips survive a repaint, and the message fie
   assert.equal(f.panel.isOpen, true);
 });
 
+test('map chat: the keyboard on the fold button stays on it through a repaint', () => {
+  const f = panelFixture();
+  const toggle = f.parts.toggle(); toggle.focus();
+  const restore = f.panel.captureFocus(); f.panel.detach(); f.page.doc.activeElement = null; // a removed element loses focus
+  f.panel.mount(f.page.attach(find(f.page.root, i => hasClass(i, 'vam-canvas-overlay')))); restore();
+  assert.equal(f.page.doc.activeElement, toggle);
+});
+
 test('map chat: no focus restore when the message field did not have focus', () => {
   const f = panelFixture(); f.panel.setOpen(true);
   const restore = f.panel.captureFocus(); restore();

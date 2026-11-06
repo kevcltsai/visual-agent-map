@@ -36934,11 +36934,18 @@ var MapChatPanel = class {
   }
   /**
    * Call before a repaint: when the message field has focus, the returned function (call it after the repaint) gives it
-   * focus again with the caret and selection where they were.
+   * focus again with the caret and selection where they were. Any other control of the window (it is moved, not rebuilt)
+   * gets it back the same way, so a repaint never drops the keyboard to the page.
    */
   captureFocus() {
-    if (!this.built || this.host.activeElement() !== this.inputEl) return () => {
+    if (!this.built) return () => {
     };
+    const active = this.host.activeElement();
+    if (active !== this.inputEl) {
+      if (!active || !this.el.contains(active)) return () => {
+      };
+      return () => active.focus();
+    }
     const { selectionStart, selectionEnd } = this.inputEl;
     return () => {
       this.inputEl.focus();
@@ -73289,15 +73296,12 @@ ${note.detail.trim()}` : "",
     });
   }
   // ---- AI chat window -------------------------------------------------------------------------------------------
-  /** Before a repaint: takes the chat window out of the page and returns what gives its text field focus back after it. */
+  /** Before a repaint: takes the chat window out of the page and returns what gives its controls focus back after it. */
   detachMapChat() {
-    var _a2, _b2, _c, _d, _e, _f, _g;
-    const active = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.activeElement) != null ? _c : null;
-    const held = !!active && !!((_d = this.chat) == null ? void 0 : _d.isInput(active));
-    const restore = (_f = (_e = this.chat) == null ? void 0 : _e.captureFocus()) != null ? _f : () => {
+    var _a2, _b2, _c;
+    const restore = (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.captureFocus()) != null ? _b2 : () => {
     };
-    (_g = this.chat) == null ? void 0 : _g.detach();
-    if (!held) return restore;
+    (_c = this.chat) == null ? void 0 : _c.detach();
     return () => {
       if (this.mapWindowIsActive()) restore();
     };

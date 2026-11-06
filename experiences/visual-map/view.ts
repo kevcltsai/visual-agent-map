@@ -19966,13 +19966,10 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   // ---- AI chat window -------------------------------------------------------------------------------------------
-  /** Before a repaint: takes the chat window out of the page and returns what gives its text field focus back after it. */
+  /** Before a repaint: takes the chat window out of the page and returns what gives its controls focus back after it. */
   private detachMapChat(): () => void {
-    const active = this.contentEl?.ownerDocument?.activeElement ?? null;
-    const held = !!active && !!this.chat?.isInput(active);
     const restore = this.chat?.captureFocus() ?? ((): void => {});
     this.chat?.detach();
-    if (!held) return restore;
     return () => {
       if (this.mapWindowIsActive()) restore();
     };

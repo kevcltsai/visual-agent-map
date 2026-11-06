@@ -700,10 +700,16 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
   /**
    * Call before a repaint: when the message field has focus, the returned function (call it after the repaint) gives it
-   * focus again with the caret and selection where they were.
+   * focus again with the caret and selection where they were. Any other control of the window (it is moved, not rebuilt)
+   * gets it back the same way, so a repaint never drops the keyboard to the page.
    */
   captureFocus(): () => void {
-    if (!this.built || this.host.activeElement() !== this.inputEl) return () => {};
+    if (!this.built) return () => {};
+    const active = this.host.activeElement();
+    if (active !== this.inputEl) {
+      if (!active || !this.el.contains(active)) return () => {};
+      return () => (active as HTMLElement).focus();
+    }
     const { selectionStart, selectionEnd } = this.inputEl;
     return () => {
       this.inputEl.focus();

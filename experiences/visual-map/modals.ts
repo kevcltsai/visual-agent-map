@@ -122,6 +122,8 @@ export interface PendingOutline {
 export interface OutputLanguageMemory {
   /** What the map remembers today; unknown stored values are already dropped. */
   outputLanguage?: ContentLanguage;
+  /** The map's title: a Latin card title in a map titled in another script is written in the map's language. */
+  mapTitle?: string;
   /** Records the language picked by hand in this dialog; called once, when a run starts. */
   rememberOutputLanguage?: (language: ContentLanguage) => Promise<void>;
 }
@@ -228,7 +230,7 @@ export interface SelectionSynthesis {
   initialTitle: string;
   /** The direction used when the AI suggestions are skipped. */
   defaultDirection: string;
-  fields: Pick<NextStepSettings, "sources" | "currentStyle" | "outputLanguage" | "rememberOutputLanguage">;
+  fields: Pick<NextStepSettings, "sources" | "currentStyle" | "outputLanguage" | "mapTitle" | "rememberOutputLanguage">;
   /** Reopened from the selection bar with directions waiting. */
   pending?: { directions: Suggestion[]; discard: () => void };
   background?: BackgroundHooks;
@@ -337,7 +339,8 @@ export class NextStepModal extends Modal {
   }
   /** Where the shared fields (data sources, template, tone) come from: the topic's settings, or the selection's. */
   private get info():
-    Pick<NextStepSettings, "sources" | "currentStyle" | "outputLanguage" | "rememberOutputLanguage"> | undefined {
+    | Pick<NextStepSettings, "sources" | "currentStyle" | "outputLanguage" | "mapTitle" | "rememberOutputLanguage">
+    | undefined {
     return this.modelSettings ?? this.selectionFlow?.fields;
   }
   /** Suggests the next step from where the topic stands: frontier → research, settled leaf → expand, settled branch → synthesize. */
@@ -1544,7 +1547,8 @@ export class NextStepModal extends Modal {
       this.plugin.settings.language,
       this.topic,
       this.modelSettings?.contentLanguage,
-      this.info?.outputLanguage
+      this.info?.outputLanguage,
+      this.info?.mapTitle
     );
     languageSelect.setAttr("aria-label", t("ui.output_language"));
     languageSelect.addEventListener("change", () => {

@@ -1,4 +1,5 @@
 import {
+  cardOutputLanguage,
   defaultOutputLanguage,
   existingNoteLanguage,
   mapChatLanguageSources,
@@ -434,7 +435,13 @@ import {
   clampMapChatWidth,
   isChatNarrow
 } from "../../core/map-chat-layout";
-import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
+import {
+  floorSuggestedTiers,
+  relevanceMode,
+  relevanceModeAfterWrite,
+  type RelevanceMode,
+  type RelevancePin
+} from "./relevance-pins";
 import { createAimMap } from "../aim/create-map";
 import { aimEnabled } from "../aim/availability";
 import {
@@ -2793,6 +2800,7 @@ export class VisualAgentMapView extends ItemView {
     const remembered = rememberedOutputLanguage(this.map);
     return {
       ...(remembered ? { outputLanguage: remembered } : {}),
+      ...(this.map?.title ? { mapTitle: this.map.title } : {}),
       rememberOutputLanguage: language =>
         this.plugin.mutate(() =>
           this.mapChange(map => {
@@ -2831,7 +2839,7 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
-        const outputLanguage = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+        const outputLanguage = cardOutputLanguage(this.map, this.plugin.settings.language, note.title);
         await this.runAgent(node, undefined, message => new Notice(message), {
           task: researchTopicTask(outputLanguage, note.title),
           referenceGroups: [],
@@ -3946,6 +3954,7 @@ export class VisualAgentMapView extends ItemView {
     this.render();
     let added = 0;
     let skipped = 0;
+    const addedIds = new Set<string>();
     try {
       await this.plugin.mutate(async () => {
         if (!this.goalSuggestCurrent(task)) {
@@ -3961,10 +3970,12 @@ export class VisualAgentMapView extends ItemView {
               skipped++;
               continue;
             }
+            const known = new Set(this.map.nodes.map(node => node.id));
             await this.addNode(parent, item.title, false, false);
             added++;
             // The AI's one-line summary is the new card's summary, written like a chat card's.
             await this.noteChange(this.map.nodes.at(-1)!, { summary: item.summary });
+            for (const node of this.map?.nodes ?? []) if (!known.has(node.id)) addedIds.add(node.id);
           }
           if (added) await this.plugin.rebuildDerivedData();
         } finally {
@@ -3988,7 +3999,8 @@ export class VisualAgentMapView extends ItemView {
       { goal, context: this.relevanceContext },
       this.relevanceAiGrades().length > 0
     );
-    void this.submitRelevanceGoal(goal, context, mode);
+    // The cards just added are the ones the grade may not leave at "side" (a floor for this call only).
+    void this.submitRelevanceGoal(goal, context, mode, addedIds);
   }
   /** True when the suggestion no longer fits the map as it is now. */
   private goalSuggestStale(
@@ -4424,7 +4436,12 @@ export class VisualAgentMapView extends ItemView {
    * whole map is graded and the result is written in one step. Nothing is written when the AI is declined, stopped,
    * fails or returns anything but exactly one valid grade for every card.
    */
-  private async submitRelevanceGoal(raw: string, contextRaw?: string, planned: RelevanceMode = "full"): Promise<void> {
+  private async submitRelevanceGoal(
+    raw: string,
+    contextRaw?: string,
+    planned: RelevanceMode = "full",
+    suggested?: ReadonlySet<string>
+  ): Promise<void> {
     const goal = normalizeRelevanceGoal(raw);
     const context = contextRaw === undefined ? undefined : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
@@ -4451,6 +4468,7 @@ export class VisualAgentMapView extends ItemView {
     let basis: StructureNode[] = [];
     let mode: RelevanceMode = planned;
     let pins: RelevancePin[] = [];
+    let previousGrades: RelevancePin[] = [];
     const repairs: string[] = [];
     try {
       await this.plugin.mutate(async () => {
@@ -4517,10 +4535,11 @@ export class VisualAgentMapView extends ItemView {
             this.paintRelevanceReceived(run);
           }
         };
+        previousGrades = mode === "recalibrate" ? this.relevanceAiGrades() : [];
         result =
           mode === "recalibrate"
             ? await this.plugin.relevanceGrade.recalibrate(
-                { ...request, previous: this.relevanceAiGrades() },
+                { ...request, previous: previousGrades },
                 run.controller.signal,
                 hooks
               )
@@ -4528,8 +4547,11 @@ export class VisualAgentMapView extends ItemView {
       });
       if (!this.relevanceRunIsCurrent(run, mapPath)) return;
       if (!started) return this.finishRelevance(run, mapPath, "declined", t("ui.relevance_not_started"));
-      const graded = result;
-      if (!graded) return;
+      const answered: RelevanceGradeResult | undefined = result;
+      if (!answered) return;
+      const graded = suggested?.size
+        ? { ...answered, items: floorSuggestedTiers(basis, previousGrades, answered.items, pins, suggested) }
+        : answered;
       // Writing the notes makes the view synchronize, which repaints when a note changed (the run is already "done"
       // by then); repaint here only when it did not, so a run costs one repaint after the write.
       const paintedBefore = this.paintCount;
@@ -12586,6 +12608,9 @@ export class VisualAgentMapView extends ItemView {
       this.openLayoutMenu(event);
     });
     this.stageEl = this.viewportEl.createDiv("vam-stage");
+    // Before any card exists: focus handed back below measures the selected card's tool row, and a card on an untransformed stage
+    // reads at scale 1 with no pan, which would throw the map off the canvas.
+    this.applyStageTransform();
     this.stageEl.setAttr("role", "tree");
     this.stageEl.setAttr("aria-label", this.map.title);
     this.stageEl.setAttr("aria-multiselectable", String(this.selection.state.multiSelectMode));
@@ -14577,7 +14602,7 @@ export class VisualAgentMapView extends ItemView {
         async (options, focus, done, failed, accepted) => {
           const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
           const taskLanguage =
-            options.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, latest.title);
+            options.outputLanguage ?? cardOutputLanguage(this.map, this.plugin.settings.language, latest.title);
           const task = researchTopicTask(taskLanguage, latest.title);
           const runStyle = await this.detailTemplateFor(
             node,
@@ -17102,6 +17127,7 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<void> {
     const signal = options.signal;
     const pendingOptions = this.researchChoices(options);
+    const languageSource = this.batchLanguageSource();
     const placed = new Map<string, { x: number; y: number }>();
     for (const child of children) {
       const node = this.map?.nodes.find(item => item.id === child.id);
@@ -17122,7 +17148,8 @@ export class VisualAgentMapView extends ItemView {
           pendingOptions,
           pendingOptions.researchMode !== "local",
           undefined,
-          gate
+          gate,
+          languageSource
         ),
       () => {
         const state = this.plugin.expansionBatches.get(parent.path);
@@ -17142,6 +17169,10 @@ export class VisualAgentMapView extends ItemView {
       signal
     );
   }
+  /** The map's language inputs as they are when a batch starts: a copy, so a later map switch cannot change the batch. */
+  private batchLanguageSource(): Pick<MapDocument, "title" | "outputLanguage"> | undefined {
+    return this.map ? { title: this.map.title, outputLanguage: this.map.outputLanguage } : undefined;
+  }
   private async researchChild(
     child: MapNode,
     batchSignal: AbortSignal,
@@ -17149,11 +17180,13 @@ export class VisualAgentMapView extends ItemView {
     choices: TaskOptions,
     charts = true,
     onResult?: (result: AiResult) => void,
-    gate?: { shown: boolean }
+    gate?: { shown: boolean },
+    languageSource?: Pick<MapDocument, "title" | "outputLanguage">
   ): Promise<void> {
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
     const outputLanguage =
-      choices.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+      choices.outputLanguage ??
+      cardOutputLanguage(languageSource ?? this.map, this.plugin.settings.language, note.title);
     const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage);
     let started = false;
     let failure: string | undefined;
@@ -17221,6 +17254,7 @@ export class VisualAgentMapView extends ItemView {
     onSettled?: (web: ResearchWebTally) => void
   ): Promise<void> {
     if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
+    const languageSource = this.batchLanguageSource();
     const key = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key)) {
       new Notice(t("ui.multi_research_already_running"));
@@ -17322,7 +17356,8 @@ export class VisualAgentMapView extends ItemView {
                   web.searches += result.retrievals;
                   if (!result.retrievals) web.withoutSearch++;
                 },
-                gate
+                gate,
+                languageSource
               );
               return undefined;
             },
@@ -18596,12 +18631,18 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The zoom the selected card's tool row was last fitted at. */
   private toolsZoom: number | null = null;
-  private transform(): void {
+  /** Only puts the viewport on the stage; measures nothing, so it is safe while a repaint is still drawing cards. */
+  private applyStageTransform(): void {
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
     // The stylesheet counter-scales each card's tool row by this, so its buttons stay a tappable size when zoomed out.
     this.stageEl.style.setProperty("--vam-zoom", String(zoom));
+  }
+  private transform(): void {
+    if (!this.map || !this.stageEl) return;
+    this.applyStageTransform();
+    const { zoom } = this.map.viewport;
     if (zoom !== this.toolsZoom) {
       this.toolsZoom = zoom;
       // The open row was fitted at the old zoom: its max-width and shift would linger.
@@ -21929,7 +21970,8 @@ export class VisualAgentMapView extends ItemView {
             this.plugin.settings.language,
             note.title,
             existingNoteLanguage(note),
-            this.outputLanguageMemory().outputLanguage
+            this.outputLanguageMemory().outputLanguage,
+            this.map?.title
           ),
           limits
         },
@@ -21951,7 +21993,8 @@ export class VisualAgentMapView extends ItemView {
           this.plugin.settings.language,
           note.title,
           existingNoteLanguage(note),
-          this.outputLanguageMemory().outputLanguage
+          this.outputLanguageMemory().outputLanguage,
+          this.map?.title
         )
       });
     } catch (error) {
@@ -21993,7 +22036,13 @@ export class VisualAgentMapView extends ItemView {
         return skipped("ui.map_chat_skip_synthesis_busy");
       const note = await this.plugin.repo.readNote(node.path, map);
       const options = chatSynthesisOptions({
-        outputLanguage: defaultOutputLanguage(settings.language, note.title, existingNoteLanguage(note), remembered)
+        outputLanguage: defaultOutputLanguage(
+          settings.language,
+          note.title,
+          existingNoteLanguage(note),
+          remembered,
+          map.title
+        )
       });
       return this.launchChatTask(note.model, (failed, accepted) =>
         this.startSynthesis(node, options, message, failed, accepted)

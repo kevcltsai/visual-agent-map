@@ -349,12 +349,17 @@ const LABEL_LIMIT = 40;
 /** Result lines that are notes: shown, but not counted as results. */
 export const chatNoteTexts = (): string[] => [t("ui.map_chat_not_undoable"), t("ui.map_chat_auto_layout_added")];
 /** The lines that are results of actions (what the next round of a continuation is told), without the explanation notes. */
-export function chatResultLines<T extends { status: "done" | "skipped" | "failed"; text: string }>(lines: readonly T[]): T[] {
+export function chatResultLines<T extends { status: "done" | "skipped" | "failed"; text: string }>(
+  lines: readonly T[]
+): T[] {
   return splitChatLines(lines, chatNoteTexts()).results;
 }
 /** The failed result line of one card's expansion that started with a reply: names the card, not a count. */
 export function expandFailureLine(title: string, reason: string): MapChatLine {
-  return { status: "failed", text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_topic_0", title), reason) };
+  return {
+    status: "failed",
+    text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_topic_0", title), reason)
+  };
 }
 const clip = (value: string, limit = LABEL_LIMIT): string => {
   const text = value.replace(/\s+/g, " ").trim();
@@ -1444,7 +1449,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (!last || last.role !== "assistant") return was;
     const at = last.lines.findIndex(line => line.basis === was);
     if (at < 0) last.lines = [...last.lines, failure];
-    else if (next) last.lines = [...last.lines.map((line, index) => (index === at ? { ...line, basis: next } : line)), failure];
+    else if (next)
+      last.lines = [...last.lines.map((line, index) => (index === at ? { ...line, basis: next } : line)), failure];
     else last.lines = last.lines.map((line, index) => (index === at ? failure : line));
     this.renderLog();
     return at >= 0 ? next : was;

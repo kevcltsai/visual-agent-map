@@ -36543,7 +36543,10 @@ function chatResultLines(lines) {
   return splitChatLines(lines, chatNoteTexts()).results;
 }
 function expandFailureLine(title, reason) {
-  return { status: "failed", text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_topic_0", title), reason) };
+  return {
+    status: "failed",
+    text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_topic_0", title), reason)
+  };
 }
 var clip2 = (value, limit = LABEL_LIMIT2) => {
   const text12 = value.replace(/\s+/g, " ").trim();
@@ -37588,7 +37591,8 @@ ${typed}` : draft;
     if (!last || last.role !== "assistant") return was;
     const at = last.lines.findIndex((line) => line.basis === was);
     if (at < 0) last.lines = [...last.lines, failure];
-    else if (next) last.lines = [...last.lines.map((line, index) => index === at ? { ...line, basis: next } : line), failure];
+    else if (next)
+      last.lines = [...last.lines.map((line, index) => index === at ? { ...line, basis: next } : line), failure];
     else last.lines = last.lines.map((line, index) => index === at ? failure : line);
     this.renderLog();
     return at >= 0 ? next : was;

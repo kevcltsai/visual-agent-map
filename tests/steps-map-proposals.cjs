@@ -58,7 +58,14 @@ test('outline prompt with a note: the note and existing subtopics are quoted unt
   assert.match(prompt, /do not add facts that the note does not state/);
   assert.ok(outline.buildOutlineGeneratePrompt(outlineRequest({ noteDetail: 'x {{preset}} {{noteSection}} y' })).includes('"x {{preset}} {{noteSection}} y"'), 'template markers in a note stay literal data');
   const onlyChildren = outline.buildOutlineGeneratePrompt(outlineRequest({ existingChildren: ['Alpha'] }));
-  assert.ok(onlyChildren.includes('["Alpha"]') && !onlyChildren.includes('Note (JSON string)'));
+  assert.ok(onlyChildren.includes('["Alpha"]') && !onlyChildren.includes('Note of the topic (JSON string)'));
+  // M1: the sentence about the note appears only with a note; with only subtopics just "do not repeat" is left.
+  assert.doesNotMatch(onlyChildren, /what the note says|facts that the note/);
+  assert.match(onlyChildren, /Do not repeat an existing subtopic/);
+  const onlyNote = outline.buildOutlineGeneratePrompt(outlineRequest({ noteDetail: 'N' }));
+  assert.match(onlyNote, /Base the sub-headings on what the note says, and do not add facts that the note does not state/);
+  assert.match(onlyNote, /Do not repeat an existing subtopic/);
+  assert.match(prompt, /what the note says/);
 });
 
 test('note too long: refused with note_too_long before any provider call, nothing truncated, not the missing_summary retry; no note keeps over_budget', async () => {
@@ -193,6 +200,17 @@ test('outline service: a blank line before the summary is retried once like a mi
   const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, fx.options, fx.active)));
   const result = await service.generate(outlineRequest(), new AbortController().signal);
   assert.equal(fx.calls.length, 2); assert.deepEqual([...result.nodes.map(node => node.summary)], ['r', 'a']);
+});
+
+test('outline service: the retry after a missing summary sends the same prompt, with the note and subtopics again', async () => {
+  const replies = ['# Root\n> r\n## A', withSummaries];
+  const fx = serviceFixture(() => replies.shift());
+  const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, fx.options, fx.active)));
+  const request = outlineRequest({ noteDetail: 'Bamboo note', existingChildren: ['Alpha'] });
+  await service.generate(request, new AbortController().signal);
+  assert.equal(fx.calls.length, 2);
+  for (const call of fx.calls) assert.ok(call[0].includes(JSON.stringify('Bamboo note')) && call[0].includes('["Alpha"]'), 'both calls carry the note and subtopics');
+  assert.equal(fx.calls[0][0], fx.calls[1][0]);
 });
 
 test('outline summary: injection-looking summary text is cleaned to one safe line', () => {

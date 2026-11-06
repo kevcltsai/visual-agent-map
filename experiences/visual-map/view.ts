@@ -3259,14 +3259,8 @@ export class VisualAgentMapView extends ItemView {
             ? this.map?.nodes.find(node => node.id === (request.placement as { parentId: string }).parentId)
             : undefined;
         // AI lock: no outline for a locked parent, read fresh so a lock set meanwhile counts; refused before any AI.
-        if (
-          parent &&
-          this.aiLockReason(
-            "addChild",
-            [parent.id],
-            new Map([[parent.id, await this.plugin.repo.readNote(parent.path, this.map ?? undefined)]])
-          )
-        ) {
+        const parentNote = parent ? await this.plugin.repo.readNote(parent.path, this.map ?? undefined) : undefined;
+        if (parent && parentNote && this.aiLockReason("addChild", [parent.id], new Map([[parent.id, parentNote]]))) {
           new Notice(t("ui.ai_locked_notice"));
           throw new Error(t("ui.ai_locked_notice"));
         }
@@ -3278,6 +3272,17 @@ export class VisualAgentMapView extends ItemView {
         });
         const { placement: _placement, ...forService } = request;
         void _placement;
+        // Under a card whose own title is the topic (the user did not change it): the new subtopics follow the card's note and do not
+        // repeat its current subtopics (quoted as data). A changed topic is a different subject, so nothing of the card is carried.
+        const carry =
+          parent && parentNote && request.topic.trim() === parentNote.title.trim()
+            ? {
+                noteDetail: parentNote.detail,
+                existingChildren: (this.map?.nodes ?? [])
+                  .filter(item => item.parentId === parent.id)
+                  .map(item => this.notes.get(item.id)?.title ?? "")
+              }
+            : {};
         const controller = new AbortController();
         // Closing the window before AI starts (usage notice still open) stops the run; after that only Stop does.
         const forward = (): void => controller.abort();
@@ -3300,6 +3305,7 @@ export class VisualAgentMapView extends ItemView {
             const result = await this.plugin.outlineGeneration.generate(
               {
                 ...forService,
+                ...carry,
                 ...this.usageMapField(),
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),

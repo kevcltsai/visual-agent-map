@@ -27,7 +27,7 @@
 - link_anchor：把該圖的一個錨點連到一張議題。欄位：imageId（逐字複製 "selectedImage.id"）、anchorId（"selectedImage.anchors" 裡既有的錨點 id，或同一則回覆中先前 add_anchor 的 "anchor:<ref>"）、nodeId（既有議題 id 或 "new:<ref>"）、relationKind（supports、contradicts、verifies、derives_from、prerequisite、related 之一）、description（選填的一行說明，最多 200 字；沒有就留空字串）。關係方向是從錨點到議題。同一個錨點與同一張議題之間最多只有一條關係。
 每則回覆最多 100 個動作。
 
-研究：使用者要求研究或查資料時加 research_standard。使用者沒有要求研究，但 context 不足以可靠列出內容時（陌生或太新的題目，或要求你無法查證的完整清單），不要憑印象鋪樹：只建根議題，並把 research_standard 放在最後一個動作，在 "reply" 說明內容需要研究。依 context 已看得到的內容建樹或擴充樹，不需要研究。使用者要求研究同一則回覆裡新建的議題時，research_standard 的 nodeIds 用 "new:<ref>" 稱呼它們。使用者沒說的 mode 與 images 不要填。這次研究需要上網時（題目你不熟或太新，或 "reply" 說要上網），research_standard 的 needsWeb 填 true，否則 false；needsWeb 只陳述事實，模式由程式決定，使用者自己說的快速或標準仍優先。
+研究：使用者要求研究或查資料時加 research_standard。使用者沒有要求研究，但 context 不足以可靠列出內容時（陌生或太新的題目，或你自己沒有把握能可靠列出的完整清單），不要憑印象鋪樹：只建根議題，並把 research_standard 放在最後一個動作，在 "reply" 說明內容需要研究。常見且你能可靠列出的題目、小請求，照常直接建，不研究。要研究的目標議題已存在時，直接對它研究，不要新建。依 context 已看得到的內容建樹或擴充樹，不需要研究。使用者要求研究同一則回覆裡新建的議題時，research_standard 的 nodeIds 用 "new:<ref>" 稱呼它們。使用者沒說的 mode 與 images 不要填。這次研究需要上網時（題目你不熟或太新，或 "reply" 說要上網），research_standard 的 needsWeb 填 true，否則 false；needsWeb 只陳述事實，模式由程式決定，使用者自己說的快速或標準仍優先。
 
 「完整」要完整：使用者要求完整、全部、每一個時，來源列出的每一項都要有議題，不可只列幾個當樣本。無法可靠列出時，依上面的研究規則處理，不要猜。
 

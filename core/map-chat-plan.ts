@@ -2,7 +2,6 @@ import { toSimplifiedFold } from "../i18n/han-fold";
 import type { MapAiMode, ResearchDepth, ResearchMode } from "../ai/types";
 import type { MapChatContext } from "./map-chat-context";
 import type { MapChatAction } from "./steps/map-chat/step";
-export { replyPromisesWeb } from "./steps/map-chat/step";
 
 /**
  * Plan confirmation. Most replies are applied at once; a reply that can do a lot of damage or cost a lot is shown as a plan

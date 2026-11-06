@@ -432,7 +432,7 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 16 (version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
+test('C1: the style is not part of the action schema, and the step version is 17 (version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
   assert.equal(mapChatStep.version, 17);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
@@ -682,6 +682,10 @@ test('B1/B2 plan: the estimate counts research and synthesis (main call plus dia
   assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y', 'z'] })]), 3, 'no map mode = Quick: one call each, no diagram call');
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], mode: 'quick' })], 0, standard), 1, 'a named Quick beats the map Standard');
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], mode: 'standard' })], 0, { mapAiMode: 'quick' }), 2, 'a named Standard beats the map Quick');
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true })]), 2, 'needsWeb with no map mode: Standard, research plus diagram call');
+  assert.equal(estimate([{ ...run('research_standard', { nodeIds: ['x'] }), webPromised: true }]), 2, 'a web promise in the reply: Standard');
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true, mode: 'quick' })], 0, standard), 1, 'a named Quick beats needsWeb');
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true })], 0, { mapAiMode: 'quick', diagrams: false }), 1, 'needsWeb with diagrams off: no diagram call');
   assert.equal(estimate([run('expand', { nodeIds: ['x', 'y'] })]), 2, 'expand: one outline call per card');
   assert.equal(estimate([run('expand')], 4), 4, 'no targets = the selection');
   assert.equal(estimate([run('rate_by_goal')]), 1);
@@ -765,10 +769,35 @@ test('P1 needsWeb: strict schema field; only a boolean true counts; a missing fi
   assert.equal(parse(JSON.stringify({ reply: '我會上網研究', actions: [researchItem()] })).actions[0].webPromised, true);
   assert.equal(parse(JSON.stringify({ reply: '不需要上網', actions: [researchItem()] })).actions[0].webPromised, undefined);
 });
-test('P1 replyPromisesWeb: fixed words in zh-TW, zh-CN and English; a negation in the same clause cancels', () => {
-  for (const text of ['我會上網研究這個主題', '先建根議題，再上網搜尋', '需要聯網查詢', '我会上网搜索资料', '会联网查询', 'I will search the web for this', "I'll look it up online", 'Research it on the web next', "I don't know this so I'll search the web"]) assert.equal(replyPromisesWeb(text), true, text);
-  for (const text of ['不需要上網', '沒有上網', '這次不會上網搜尋', '無須上網', '不用聯網', '不需要上网', '没有联网', '不会上网搜索', 'No need to search the web', "I won't need to search the web.", 'without searching the web', 'I will not look it up online', 'web search is not needed', '我會建立三張議題', 'Adding two subtopics from the note', '']) assert.equal(replyPromisesWeb(text), false, text);
-});
+// Each class has zh-TW, zh-CN and en rows. Precision first: needsWeb is the main signal, so a miss is cheaper than a false hit.
+const PROMISES_WEB = {
+  'zh-TW': ['我會上網研究', '我會上網查', '我會在網路上搜尋這個主題', '在網路上查資料', '會到網路上查', '用網路搜尋', '我會查網路資料', '我會用網路研究這張卡', '需要網路研究', '線上搜尋相關資料', '透過標準研究查找最新資料', '用標準研究上網查證', '這題我不熟，先上網研究', '先建根議題，再上網搜尋'],
+  'zh-CN': ['我会上网研究', '我会在网上搜索', '我会在网络上搜索', '我会查网络资料', '我会用网络研究这张卡', '在线上搜索相关资料', '这题我不熟，先上网查证'],
+  en: ['I will search the web', 'I will do web research', 'I will search online', 'I will look this up online', 'I will search for it on the web', 'I will run a web search', "I'll research this online", 'I will look it up on the internet', 'I will browse the web', 'I will use the web to research', "I'll go online to research this", 'I’ll research this online']
+};
+const NOT_PROMISES_WEB = {
+  'topic words': {
+    'zh-TW': ['我會研究物聯網的安全議題', '研究車聯網的發展', '研究工業互聯網', '研究青少年上網習慣', '整理上網行為的研究'],
+    'zh-CN': ['我会研究物联网安全', '研究互联网金融', '研究车联网的发展', '研究青少年上网习惯'],
+    en: ['I will research the Internet of Things', 'Researching internet protocols for this card', 'I will research online learning', 'I will research online education for this card', 'Research online marketing', 'I will look up online banking', 'Research on the web of trust', 'I will research web search engines', 'Research the web platform APIs', 'I will check the internet connection topic', 'I will research how spiders build on the web']
+  },
+  negation: {
+    'zh-TW': ['我無法上網', '我無法上網查證，先用快速研究', '沒辦法上網', '不需要另外上網', '不必特地上網查', '這次沒有實際上網', '我沒有上網搜尋', '不需上網', '快速研究不會上網', '不需要上網', '無須上網', '不用聯網'],
+    'zh-CN': ['没办法上网', '我无法上网查证', '不需要另外上网', '不必特地上网查', '这次没有实际上网', '不会上网搜索', '没有联网'],
+    en: ['I cannot search the web', 'I am unable to search the web', 'This does not require searching the web', 'no web search', 'Quick research only, no web search needed', 'This uses my own knowledge instead of searching the web', 'Rather than searching the web I will use the note', 'No need to search the web', "I won't need to search the web.", 'without searching the web', 'I will not look it up online', 'web search is not needed']
+  },
+  condition: {
+    'zh-TW': ['先用快速研究；標準研究才會上網', '如需上網請改用標準研究', '要上網的話請說標準研究'],
+    'zh-CN': ['标准研究才会上网', '如需上网请改用标准研究', '要上网的话请说标准研究'],
+    en: ['If you want a web search, ask for standard research', 'Standard research would search the web', 'Only standard research searches the web']
+  },
+  other: { 'zh-TW': ['我會建立三張議題', ''], 'zh-CN': ['我会建立三张议题'], en: ['Adding two subtopics from the note', ''] }
+};
+for (const [language, rows] of Object.entries(PROMISES_WEB))
+  test(`P1 replyPromisesWeb (${language}): a reply that says it will search the web is a promise`, () => { for (const text of rows) assert.equal(replyPromisesWeb(text), true, text); });
+for (const [kind, byLanguage] of Object.entries(NOT_PROMISES_WEB))
+  for (const [language, rows] of Object.entries(byLanguage))
+    test(`P1 replyPromisesWeb (${language}): ${kind} is not a promise`, () => { for (const text of rows) assert.equal(replyPromisesWeb(text), false, text); });
 test('P1 research mode order: named mode > needsWeb or a web promise (Standard) > map mode > Quick; the user saying quick stays quick', () => {
   const act = (fields = {}) => parse(reply(researchItem(fields))).actions[0];
   const web = { needsWeb: true };
@@ -1538,7 +1567,7 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(en, /go one step only/); assert.match(en, /Never express a topic type through the title/);
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
-test('hypothesis-leaning: S21 the step version is 16 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
+test('hypothesis-leaning: S21 the step version is 17 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
   assert.equal(mapChatStep.version, 17);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;

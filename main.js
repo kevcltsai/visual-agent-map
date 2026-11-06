@@ -28787,7 +28787,11 @@ function mermaidBlocks(markdown) {
       body.push(content);
     }
     const code = (_a2 = codes.get(index)) != null ? _a2 : null;
-    blocks.push({ unsafe: unsafeMermaid(body), code, key: `${fence[2].trim()}${body.join("\n")}\0${code != null ? code : ""}` });
+    blocks.push({
+      unsafe: unsafeMermaid(body),
+      code,
+      key: `${fence[2].trim()}${body.join("\n")}\0${code != null ? code : ""}`
+    });
   });
   return blocks;
 }

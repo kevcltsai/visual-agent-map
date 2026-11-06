@@ -299,7 +299,11 @@ function mermaidBlocks(markdown: string): Array<MermaidBlock & { key: string }> 
       body.push(content);
     }
     const code = codes.get(index) ?? null;
-    blocks.push({ unsafe: unsafeMermaid(body), code, key: `${fence[2].trim()}\u0002${body.join("\n")}\u0000${code ?? "\u0001"}` });
+    blocks.push({
+      unsafe: unsafeMermaid(body),
+      code,
+      key: `${fence[2].trim()}\u0002${body.join("\n")}\u0000${code ?? "\u0001"}`
+    });
   });
   return blocks;
 }

@@ -8,7 +8,7 @@
 
 
 
-只回傳 JSON，不要使用 Markdown code fence。格式必須符合：{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}。若沒有視覺參考，visualReferences 回傳空陣列。
+只回傳 JSON，不要使用 Markdown code fence。格式必須符合：{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}。若沒有視覺參考，visualReferences 回傳空陣列；parentTitle 只能填同一批另一筆建議的 title，否則留空字串。
 
 語氣規則：語氣只改變措辭與呈現方式，絕不降低來源、引用與準確性的要求；其他所有規則（來源標示、引用、事實查核、JSON 契約）照常適用。
 寫作語氣：範例語氣。請溫暖地寫作。

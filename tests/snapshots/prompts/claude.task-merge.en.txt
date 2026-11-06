@@ -8,7 +8,7 @@ For every important factual claim based on local material, keep its [S#] marker 
 
 
 
-Return JSON only, without a Markdown code fence. Use this exact shape: {"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}. Return an empty visualReferences array when there are no visual references.
+Return JSON only, without a Markdown code fence. Use this exact shape: {"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}. Return an empty visualReferences array when there are no visual references. parentTitle may only be the title of another suggestion in this same response; otherwise leave it empty.
 When you finish, call the StructuredOutput tool directly to return the result; do not write the answer or JSON as text first.
 
 Writing baseline (applies to every voice): do not use filler transitions or wrap-ups such as "First", "Second", "In conclusion" or "To sum up"; do not exaggerate or use hype words such as "revolutionary" or "unprecedented"; state numbers concretely, with the value, unit, year and range, and never write "many", "significantly" or "recently".

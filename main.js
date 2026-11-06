@@ -23004,10 +23004,10 @@ var label_detail_top_zh_default = "\u4EE5\u4E0B\u662F\u73FE\u6709\u7B46\u8A18\uF
 var label_detail_top_en_default = "Existing note, for reference only; return only what is newly found, split by section heading, and omit sections with nothing new\n";
 
 // core/steps/task/json.zh.md
-var json_zh_default = '\u53EA\u56DE\u50B3 JSON\uFF0C\u4E0D\u8981\u4F7F\u7528 Markdown code fence\u3002\u683C\u5F0F\u5FC5\u9808\u7B26\u5408\uFF1A{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}\u3002\u82E5\u6C92\u6709\u8996\u89BA\u53C3\u8003\uFF0CvisualReferences \u56DE\u50B3\u7A7A\u9663\u5217\u3002\n';
+var json_zh_default = '\u53EA\u56DE\u50B3 JSON\uFF0C\u4E0D\u8981\u4F7F\u7528 Markdown code fence\u3002\u683C\u5F0F\u5FC5\u9808\u7B26\u5408\uFF1A{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}\u3002\u82E5\u6C92\u6709\u8996\u89BA\u53C3\u8003\uFF0CvisualReferences \u56DE\u50B3\u7A7A\u9663\u5217\uFF1BparentTitle \u53EA\u80FD\u586B\u540C\u4E00\u6279\u53E6\u4E00\u7B46\u5EFA\u8B70\u7684 title\uFF0C\u5426\u5247\u7559\u7A7A\u5B57\u4E32\u3002\n';
 
 // core/steps/task/json.en.md
-var json_en_default = 'Return JSON only, without a Markdown code fence. Use this exact shape: {"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}. Return an empty visualReferences array when there are no visual references.\n';
+var json_en_default = 'Return JSON only, without a Markdown code fence. Use this exact shape: {"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}. Return an empty visualReferences array when there are no visual references. parentTitle may only be the title of another suggestion in this same response; otherwise leave it empty.\n';
 
 // core/steps/task/label-detail.zh.md
 var label_detail_zh_default = "\u73FE\u6709 Detail\uFF08\u9808\u6574\u5408\u5F8C\u5B8C\u6574\u53D6\u4EE3\uFF0C\u4E0D\u80FD\u539F\u6A23\u91CD\u8907\u8FFD\u52A0\uFF09\n";
@@ -48000,6 +48000,10 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
   var _a2;
   suggestions = suggestions.map(
     (item) => options.rootTitle && item.parentTitle === options.rootTitle ? { ...item, parentTitle: "" } : item
+  );
+  const batchTitles = new Set(suggestions.map((item) => item.title));
+  suggestions = suggestions.map(
+    (item) => item.key === void 0 && !item.kind && item.parentTitle && (item.parentTitle === item.title || !batchTitles.has(item.parentTitle)) ? { ...item, parentTitle: "" } : item
   );
   const keyOf2 = (item) => {
     var _a3;

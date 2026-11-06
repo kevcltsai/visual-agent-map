@@ -1176,6 +1176,40 @@ integrationTest('proposal list links checks and parents at any depth', () => {
   assert.equal(JSON.stringify(picked.map(item => [item.title, item.parentTitle])), JSON.stringify([['Heat', ''], ['Pan', 'Heat'], ['Iron pan', 'Pan']]));
 });
 
+integrationTest('proposal list treats an orphan or self parentTitle as first level and keeps real parents', () => {
+  const element = (tag, options = {}) => ({
+    tag, type: options.type, text: options.text, value: options.value ?? options.text ?? '', cls: options.cls ?? '', attr: options.attr ?? {}, children: [], hidden: false, disabled: false, checked: false,
+    createDiv(value) { const child = element('div', typeof value === 'string' ? { cls: value } : value); this.children.push(child); return child; },
+    createEl(name, value) { const child = element(name, value); this.children.push(child); return child; },
+    createSpan(value) { const child = element('span', value); this.children.push(child); return child; },
+    addClass(name) { this.cls = `${this.cls} ${name}`.trim(); }, setText(value) { this.text = value; }, setAttr(name, value) { this.attr[name] = value; },
+    addEventListener(name, handler) { this[name] = handler; }
+  });
+  const all = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(child => all(child, predicate))];
+  const { renderProposalList } = load('experiences/visual-map/modals.ts', { obsidian });
+  const item = (title, parentTitle, extra = {}) => ({ title, task: '', contribution: '', parentTitle, ...extra });
+  const render = (items, options) => { const parent = element('panel'); const list = renderProposalList(parent, items, () => {}, options); return { parent, list, checks: all(parent, node => node.type === 'checkbox') }; };
+  const pairs = picked => JSON.stringify(picked.map(row => [row.title, row.parentTitle]));
+  // Orphan parent titles (not the root, not in the batch) become first level, so selected() returns rows.
+  let r = render([item('One', 'Missing'), item('Two', 'Also missing')], { rootTitle: 'Q&A' });
+  assert.equal(pairs(r.list.selected()), JSON.stringify([['One', ''], ['Two', '']]));
+  // A parentTitle equal to the row's own title is first level.
+  r = render([item('Self', 'Self')]);
+  assert.equal(pairs(r.list.selected()), JSON.stringify([['Self', '']]));
+  // A chain inside the batch survives when only its head is an orphan.
+  r = render([item('A', 'Nowhere'), item('B', 'A')]);
+  assert.equal(pairs(r.list.selected()), JSON.stringify([['A', ''], ['B', 'A']]));
+  // A real in-batch parent that is unchecked still blocks the child.
+  r = render([item('A', ''), item('B', 'A')]);
+  r.checks[1].checked = true; r.checks[0].checked = false;
+  assert.equal(typeof r.list.selected(), 'string');
+  // Keyed rows and kind rows with an absent parent are not rewritten.
+  r = render([{ ...item('K', ''), key: 'k1', parentKey: 'gone' }]);
+  assert.equal(typeof r.list.selected(), 'string');
+  r = render([item('M', 'Elsewhere', { kind: 'move' })]);
+  assert.equal(typeof r.list.selected(), 'string');
+});
+
 // A small fake DOM that keeps classes, attributes, tabIndex, handlers and focus calls so selection can be asserted per card.
 const selectionDom = () => {
   const make = (tag, init = {}) => {

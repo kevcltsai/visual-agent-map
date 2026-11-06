@@ -3,7 +3,9 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test, integrationTest, root: projectRoot, load, core, DEFAULT_SETTINGS, node, map, fixture, withExpansionCoordinator, until, deferred, obsidian } = require('../support.cjs');
+const { test, integrationTest, root: projectRoot, load, core, DEFAULT_SETTINGS, node, map, fixture, withExpansionCoordinator, deferred, obsidian } = require('../support.cjs');
+// A goal save that follows a press or Tab waits on a 0 ms timer, which a loop of setImmediate turns can outrun on a fast machine; wait on real timers.
+const until = async predicate => { for (let i = 0; i < 200; i++) { if (predicate()) return; await new Promise(r => setTimeout(r, 2)); } throw new Error('condition not reached'); };
 const dom = require('../support-dom.cjs');
 const { hasCls, element, find, findAll, button, tick } = dom;
 

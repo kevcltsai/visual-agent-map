@@ -2670,7 +2670,7 @@ export const en = {
   "error.relevance_grade_unavailable":
     "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
   "error.relevance_grade_hierarchy":
-    "The AI's parent-child tiers were still inconsistent. Click Recalibrate next to the goal to try again.",
+    "The AI's parent-child tiers were still inconsistent. Hover over the goal, then press a grading icon next to it to try again.",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map · read-only",
   "share.viewer_made_with": "Made with VAM",

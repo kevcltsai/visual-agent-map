@@ -425,18 +425,17 @@ const ATTACH_GAP = Number(cssRule('.vam-goal-attachment').match(/top: calc\(100%
 const PANE_LEFT = 44, PANE_TOP = 40, PANE_BOTTOM = 800, CHAT_COLUMN = 44, HOST_BORDER = 1, HEADER_MIN = 40;
 // MEASURED: a one-line goal bar is 29.5 high narrow, 34 high wide (its icons sit in the row); the header row of a taller bar is bar + 1.
 const BAR_H_NARROW = 29.5, BAR_H_WIDE = 34;
-// MEASURED toolbar heights (the info row: map name, "+ New map", outline/undo/redo/export/more). Header row shown: 78.5 at 360 (it wraps
-// onto two lines; also wrapped at 440 and 520, whose height was not read, taken as 78.5), 48 in one line (540 and wider: the icons overlapped
-// the buttons there). Header row hidden (the bar is a toolbar child): 114 at 360 and 440, 79 at 520 and 600, 83 at 640; 936 is NOT
-// measured: with decision #10 (flex-basis 280px) the goal no longer fits next to the other children and wraps like at 640, so 83 is assumed.
-const TOOLBAR_H_HEADER = width => width <= 520 ? 78.5 : 48;
-const TOOLBAR_H_FALLBACK = width => width <= 440 ? 114 : width <= 600 ? 79 : 83;
+// MEASURED toolbar heights (the info row: map name, "+ New map", outline/undo/redo/export/more; ui-evidence-final item C, 2026-11-06). Header
+// row shown: 78.5 at 360, 440, 520 and 540 (it wraps onto two lines), 48 in one line at 600 and wider. Header row hidden (the bar is a
+// toolbar child): 114 at 360 to 540, 78.5 at 600, 83 at 936 (640 is not measured: 83 is assumed, the same wrapped layout as 936).
+const TOOLBAR_H_HEADER = width => width <= 540 ? 78.5 : 48;
+const TOOLBAR_H_FALLBACK = width => width <= 540 ? 114 : width <= 600 ? 78.5 : 83;
 // MEASURED button geometry of the info row: 28 x 24 buttons 2px apart, the last one ends 10px inside the pane's right edge; "+ New map" is
 // a 120.4 x 30 span 8px left of the outline button. Button top inside the toolbar: header row shown 44.5 (wrapped, 2nd line) / 11.5 (one
-// line); header row hidden 80 (3rd line at 360 and 440) / 8.5 (1st line, 520 and wider; 8.5 is NOT measured, taken from the 6px padding + 2.5 centring).
+// line); header row hidden 80 (3rd line, 360 to 540) / 44.5 (2nd line, 600) / 49 (2nd line, 936; 640 is not measured and taken as 936).
 const INFO_BUTTONS = ['outline', 'undo', 'redo', 'export', 'more'];
 const INFO_BTN_W = 28, INFO_BTN_H = 24, INFO_BTN_GAP = 2, INFO_RIGHT_INSET = 10, NEW_MAP_W = 120.4, NEW_MAP_H = 30, NEW_MAP_GAP = 8;
-const infoButtonTop = (inHeader, width, toolbarTop) => toolbarTop + (inHeader ? (width <= 520 ? 44.5 : 11.5) : (width <= 440 ? 80 : 8.5));
+const infoButtonTop = (inHeader, width, toolbarTop) => toolbarTop + (inHeader ? (width <= 540 ? 44.5 : 11.5) : (width <= 540 ? 80 : width <= 600 ? 44.5 : 49));
 // MEASURED: the tools group wrapped onto two lines by --vam-tools-max is 68 high (30 + 2 + 30 + 3 + 3 padding), not 72.
 const WRAPPED_TOOLS_H = 68;
 // MEASURED at 360: the zoom bar (with the Token button) is 286 x 40, 12px from the canvas' right and bottom edges. Not measured at other widths.
@@ -502,6 +501,9 @@ const actionsStyle = (narrow, on) => {
   const last = prop => hits.filter(r => r[prop] !== undefined).at(-1)?.[prop];
   return { opacity: last('opacity'), pointerEvents: last('pe') };
 };
+// The strip between the goal and the floating icons is owned by the bar (::after on .vam-goal-bar, not on the icons that take no pointer while hidden) and reads its box from what the view writes.
+{ const strip = cssRule('.vam-goal-bar::after', /content/); for (const n of ['top', 'left', 'width', 'height']) assert.match(strip, new RegExp(`${n}: var\\(--vam-goal-bridge-${n}, 0\\)`), `the strip's ${n} comes from --vam-goal-bridge-${n}`); assert.match(strip, /position: absolute/); assert.doesNotMatch(STYLES, /\.vam-goal-actions::before/, 'the icons own no strip'); }
+const actions_isVacant = bar => bar.querySelector?.('.vam-goal-actions')?.hasClass?.('is-vacant');
 assert.ok(ACTION_RULES.length >= 4, 'the scan finds the icon visibility rules');
 
 async function stackRig(width, chat, state, host = HOSTS[0]) {
@@ -564,9 +566,14 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   const hint = element('div'); hint.addClass('vam-canvas-hint'); h.rootEl.appendChild(hint);
   hint.getBoundingClientRect = () => width === 360 ? R(canvas.left + 12, canvas.bottom - 134, canvas.left + 132, canvas.bottom - 74) : R(canvas.left + 12, canvas.bottom - 70, canvas.left + 190, canvas.bottom - 30);
   // The info row's buttons (outline, undo, redo, export, more) and the "+ New map" span: not floating layers, but what the icons must not sit on.
-  const top = infoButtonTop(inHeader, width, toolbarTop);
+  // Hidden header row: the info row sits under the goal, so a taller goal pushes it down by the same amount (toolbarH grows the same way).
+  const top = infoButtonTop(inHeader, width, toolbarTop) + (inHeader ? 0 : Math.max(0, barH - baseBar));
   const infoButtons = INFO_BUTTONS.map((label, i) => { const right = paneRight - INFO_RIGHT_INSET - (INFO_BUTTONS.length - 1 - i) * (INFO_BTN_W + INFO_BTN_GAP); return [label, R(right - INFO_BTN_W, top, right, top + INFO_BTN_H)]; });
   infoButtons.unshift(['new map', R(infoButtons[0][1].left - NEW_MAP_GAP - NEW_MAP_W, top - 3, infoButtons[0][1].left - NEW_MAP_GAP, top - 3 + NEW_MAP_H)]);
+  // The box the icons are positioned in: the whole row narrow (the host; with the info row's buttons inside it only when the host is the toolbar), the bar wide.
+  const infoBox = element('div'); infoBox.clientTop = HOST_BORDER; infoBox.clientLeft = 0; infoBox.getBoundingClientRect = () => R(PANE_LEFT, PANE_TOP, paneRight, hostBottom);
+  if (!inHeader) for (const [, rect] of infoButtons) { const b = element('button'); b.getBoundingClientRect = () => rect; infoBox.appendChild(b); }
+  actions.offsetParent = narrow ? infoBox : bar;
   const attachment = find(h.rootEl, i => hasCls(i, 'vam-goal-attachment'));
   if (state.attachment) {
     assert.ok(attachment, `${state.attachment} panel carries vam-goal-attachment`);
@@ -635,6 +642,22 @@ test('goal stack: in every host, state and width the layers around the goal do n
       assert.ok(laidOutW <= row, `${where}: the bar is not wider than its row`);
       assert.equal(lines(9), 1, `${where}: a short goal (9 characters) is on one line`);
       assert.ok(lines(60) <= 4, `${where}: a 60-character goal is not ${lines(60)} lines`);
+    }
+    // The bar owns a strip from its bottom to the icons' top, as wide as the icons (so the pointer keeps the hover on its way down to them), only inside the gap:
+    // it sits on no button of the info row; where such a button lies in the gap (toolbar fallback, icons below the info row) there is no strip.
+    const bridge = ['top', 'left', 'width', 'height'].map(n => px(bar.style[`--vam-goal-bridge-${n}`]));
+    const barBox = bar.getBoundingClientRect(), iconBox = actionsRect();
+    if (bridge[0] === null) assert.ok(bridge.every(v => v === null), `${where}: the strip is written whole or not at all`);
+    else {
+      const strip = R(PANE_LEFT + bridge[1], PANE_TOP + HOST_BORDER + bridge[0], PANE_LEFT + bridge[1] + bridge[2], PANE_TOP + HOST_BORDER + bridge[0] + bridge[3]);
+      assert.ok(narrow && inHeader, `${where}: only a narrow header row bridges (${JSON.stringify(strip)})`);
+      assert.equal(strip.top, barBox.bottom, `${where}: the strip starts at the bar's bottom`); assert.equal(strip.bottom, iconBox.top, `${where}: and ends at the icons' top`);
+      assert.equal(strip.left, iconBox.left, `${where}: as wide as the icons`); assert.equal(strip.right, iconBox.right, `${where}: as wide as the icons`);
+      for (const [label, rect] of infoButtons) assert.ok(!rectsIntersect(strip, rect), `${where}: the strip sits on the ${label} button`);
+    }
+    if (narrow && !actions_isVacant(bar) && iconBox.top > barBox.bottom) {
+      if (inHeader) assert.ok(bridge[0] !== null, `${where}: a goal with a gap above its icons has a strip (the pointer reaches them)`);
+      else if (infoButtons.some(([, rect]) => rectsIntersect(rect, R(iconBox.left, barBox.bottom, iconBox.right, iconBox.top)))) assert.ok(bridge[0] === null, `${where}: no strip over the info row's buttons`);
     }
     const capped = px(tools.style['--vam-tools-max']);
     if (narrow && actionsRect().bottom > canvas.top + 12) assert.ok(capped !== null && toolsRect().right <= actionsRect().left, `${where}: the tool group gives way to the icons`);

@@ -2503,7 +2503,7 @@ var en = {
   "ui.technical_details": "Technical details",
   "ui.copy_technical_details": "Copy technical details",
   "error.relevance_grade_unavailable": "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
-  "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Click Recalibrate next to the goal to try again.",
+  "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Hover over the goal, then press a grading icon next to it to try again.",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map \xB7 read-only",
   "share.viewer_made_with": "Made with VAM",
@@ -5239,7 +5239,7 @@ var zhCN = {
   "ui.technical_details": "\u6280\u672F\u7EC6\u8282",
   "ui.copy_technical_details": "\u590D\u5236\u6280\u672F\u7EC6\u8282",
   "error.relevance_grade_unavailable": "AI \u76EE\u524D\u65E0\u6CD5\u4E3A\u8FD9\u5F20\u5FC3\u667A\u56FE\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u5185\u5BB9\u88AB\u6539\u53D8\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002",
-  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u6309\u76EE\u6807\u65C1\u7684\u201C\u91CD\u65B0\u6821\u51C6\u201D\u91CD\u8BD5",
+  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u6ED1\u8FC7\u76EE\u6807\uFF0C\u6309\u65C1\u8FB9\u7684\u5206\u7EA7\u56FE\u6807\u91CD\u8BD5",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5730\u56FE\u30FB\u53EA\u8BFB",
   "share.viewer_made_with": "\u7531 VAM \u5236\u4F5C",
@@ -7975,7 +7975,7 @@ var zhTW = {
   "ui.technical_details": "\u6280\u8853\u7D30\u7BC0",
   "ui.copy_technical_details": "\u8907\u88FD\u6280\u8853\u7D30\u7BC0",
   "error.relevance_grade_unavailable": "AI \u76EE\u524D\u7121\u6CD5\u70BA\u9019\u5F35\u5FC3\u667A\u5716\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u5167\u5BB9\u88AB\u6539\u8B8A\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002",
-  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u6309\u76EE\u6A19\u65C1\u7684\u300C\u91CD\u65B0\u6821\u6E96\u300D\u91CD\u8A66",
+  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u6ED1\u904E\u76EE\u6A19\uFF0C\u6309\u65C1\u908A\u7684\u5206\u7D1A\u5716\u793A\u91CD\u8A66",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5FC3\u667A\u5716\u30FB\u552F\u8B80",
   "share.viewer_made_with": "\u7531 VAM \u88FD\u4F5C",
@@ -58374,7 +58374,11 @@ ${request.requirements}` : preset.text,
   commitGoalEdit(how) {
     var _a2, _b2, _c, _d;
     const edit = this.goalEdit;
-    if (!edit || this.closed || edit.path !== this.path) return;
+    if (!edit) return;
+    if (this.closed || edit.path !== this.path) {
+      this.closeGoalEdit({ redraw: false });
+      return;
+    }
     if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") {
       this.closeGoalEdit();
       return;
@@ -58434,9 +58438,10 @@ ${request.requirements}` : preset.text,
     let disarm = null;
     const pressStarted = (event) => {
       var _a3, _b3, _c;
+      if (event.button !== 0 && event.button !== void 0) return;
       const target = event.target;
       if (!target || ((_b3 = (_a3 = this.relevanceBarEl) == null ? void 0 : _a3.contains) == null ? void 0 : _b3.call(_a3, target))) return;
-      if ((_c = target.closest) == null ? void 0 : _c.call(target, ".menu, .modal-container, .prompt")) return;
+      if ((_c = target.closest) == null ? void 0 : _c.call(target, ".menu, .modal-container, .prompt, .vam-map-actions-button")) return;
       disarm == null ? void 0 : disarm();
       const pressEnded = () => {
         disarm == null ? void 0 : disarm();
@@ -66374,7 +66379,7 @@ ${request.requirements}` : preset.text,
         "more-vertical",
         t("ui.more_mind_map_actions"),
         (event) => this.openMapActions(event)
-      );
+      ).addClass("vam-map-actions-button");
     }
     const selectedNode = (_r = this.map) == null ? void 0 : _r.nodes.find((node) => node.id === this.selection.state.selected);
     if (aimEnabled() && ((_s = this.map) == null ? void 0 : _s.aim)) {
@@ -66558,6 +66563,7 @@ ${request.requirements}` : preset.text,
       if (aimEnabled()) this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
       if ((_G = this.deletedMap) == null ? void 0 : _G.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
+      this.dropGoalEdit();
       return;
     }
     if (!this.aimLive()) this.renderMultiResearchStatus(this.contentEl);
@@ -67541,7 +67547,8 @@ ${request.requirements}` : preset.text,
     const rects = [];
     for (const selector of FLOATING_LAYER_SELECTORS) {
       const el = (_b2 = (_a2 = this.goalLayerRoot()) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, selector);
-      if (((_f = (_e = (_d = (_c = el == null ? void 0 : el.ownerDocument) == null ? void 0 : _c.defaultView) == null ? void 0 : _d.getComputedStyle) == null ? void 0 : _e.call(_d, el)) == null ? void 0 : _f.opacity) === "0") continue;
+      if (selector === ".vam-goal-actions" && ((_f = (_e = (_d = (_c = el == null ? void 0 : el.ownerDocument) == null ? void 0 : _c.defaultView) == null ? void 0 : _d.getComputedStyle) == null ? void 0 : _e.call(_d, el)) == null ? void 0 : _f.opacity) === "0")
+        continue;
       const rect2 = (_g = el == null ? void 0 : el.getBoundingClientRect) == null ? void 0 : _g.call(el);
       if (rect2 && rect2.right > rect2.left && rect2.bottom > rect2.top) rects.push(rect2);
     }
@@ -72776,6 +72783,7 @@ ${note.detail.trim()}` : "",
   removeGoalBar() {
     var _a2, _b2, _c, _d, _e, _f, _g;
     (_b2 = (_a2 = this.relevanceBarEl) == null ? void 0 : _a2.remove) == null ? void 0 : _b2.call(_a2);
+    this.relevanceBarEl = null;
     for (const stray of Array.from((_e = (_d = (_c = this.goalLayerRoot()) == null ? void 0 : _c.querySelectorAll) == null ? void 0 : _d.call(_c, ".vam-goal-bar")) != null ? _e : []))
       stray.remove();
     (_g = (_f = this.goalHostEl) == null ? void 0 : _f.removeClass) == null ? void 0 : _g.call(_f, "vam-goal-host");
@@ -72843,6 +72851,7 @@ ${note.detail.trim()}` : "",
         if (room2 !== null) attachment.style.setProperty("--vam-goal-attach-max", `${room2}px`);
       }
     }
+    this.layoutGoalBridge(bar, actions, actionsRect);
     const toolsRect = (_k = tools.getBoundingClientRect) == null ? void 0 : _k.call(tools);
     if (actionsRect && toolsRect && actionsRect.bottom > toolsRect.top && actionsRect.left > toolsRect.left) {
       tools.style.setProperty("--vam-tools-max", `${actionsRect.left - toolsRect.left - INSET_GAP}px`);
@@ -72858,6 +72867,35 @@ ${note.detail.trim()}` : "",
     if (room !== null && typeof ((_m = sources.style) == null ? void 0 : _m.setProperty) === "function") {
       sources.style.setProperty("--vam-sources-max", `${room}px`);
     }
+  }
+  /**
+   * The strip that lets the pointer go from the goal down to the floating icons (they are invisible and take no pointer until the
+   * goal is hovered, so a gap between them would drop the hover). The bar owns it (a pseudo-element, so it counts as the bar), it
+   * spans exactly the measured gap from the bar's bottom to the icons' top, as wide as the icons. Where something clickable lies in
+   * that gap (the info row between a goal and icons that float below the toolbar) there is no strip: it would block those clicks.
+   */
+  layoutGoalBridge(bar, actions, actionsRect) {
+    var _a2, _b2, _c, _d;
+    const style = bar == null ? void 0 : bar.style;
+    if (!bar || typeof (style == null ? void 0 : style.setProperty) !== "function") return;
+    const names3 = ["top", "left", "width", "height"].map((name2) => `--vam-goal-bridge-${name2}`);
+    const box = actions == null ? void 0 : actions.offsetParent;
+    const barRect = (_a2 = bar.getBoundingClientRect) == null ? void 0 : _a2.call(bar);
+    const strip3 = actions && box && actionsRect && barRect && actionsRect.width > 0 && actionsRect.top > barRect.bottom ? { left: actionsRect.left, right: actionsRect.right, top: barRect.bottom, bottom: actionsRect.top } : null;
+    const boxRect = strip3 ? (_b2 = box == null ? void 0 : box.getBoundingClientRect) == null ? void 0 : _b2.call(box) : void 0;
+    const blocked = !!strip3 && Array.from((_d = (_c = box == null ? void 0 : box.querySelectorAll) == null ? void 0 : _c.call(box, "button, input, textarea, a, [role='button']")) != null ? _d : []).some((el) => {
+      var _a3;
+      const rect2 = bar.contains(el) ? null : (_a3 = el.getBoundingClientRect) == null ? void 0 : _a3.call(el);
+      return !!rect2 && rectsIntersect(rect2, strip3);
+    });
+    if (!strip3 || !box || !boxRect || blocked) {
+      for (const name2 of names3) style.removeProperty(name2);
+      return;
+    }
+    style.setProperty(names3[0], `${strip3.top - boxRect.top - box.clientTop}px`);
+    style.setProperty(names3[1], `${strip3.left - boxRect.left - box.clientLeft}px`);
+    style.setProperty(names3[2], `${strip3.right - strip3.left}px`);
+    style.setProperty(names3[3], `${strip3.bottom - strip3.top}px`);
   }
   /** Screen y the panels under the top stack must stay above: the zoom bar (with the status bar) or the hint, INSET_GAP clear. */
   bottomLimit(overlay, canvasHeight) {
@@ -82355,7 +82393,6 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node[data-relevance="side"] { border-style: dashed; }
 .vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
 .vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }
-.vam-toolbar > .vam-goal-bar { flex-basis: 280px; }
 .theme-dark .vam-viewport { background-color: var(--background-primary); }
 .theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }
 .vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }

@@ -58,7 +58,7 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
     prewarmClaudeStep: (...args) => control.prewarms.push(args), releaseWarmClaude: () => { control.releases++; },
     confirmAiUsage: async (_model, run) => { control.usageAsks++; if (control.confirmGate) await control.confirmGate; if (control.decline) return false; await run(); return true; }
   });
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: class { constructor(m) { notices.push(m); } }, Menu, setTooltip(el, text) { tips.set(el, text); } } }, { setInterval: fn => { control.intervals.push(fn); return control.intervals.length; }, clearInterval: () => {}, createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: class { constructor(m) { notices.push(m); } }, Menu, setTooltip(el, text) { tips.set(el, text); } } }, { get activeDocument() { return ctx.activeDocument; }, setInterval: fn => { control.intervals.push(fn); return control.intervals.length; }, clearInterval: () => {}, createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
   const gradeModule = load('core/relevance-grade-service.ts');
   const { RelevanceGradeService } = gradeModule;
   plugin.relevanceGrade = new RelevanceGradeService(async (request, signal, prepared, onJson) => {
@@ -80,7 +80,7 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
   const cards = new Map(view.map.nodes.map(n => [n.id, element('div', 'vam-node')]));
   for (const [id, card] of cards) view.cardEls.set(id, card);
   const h = {
-    repo, app, contents, view, plugin, ids, gradeModule, control, notices, opened, cards, rootEl, menus, tips,
+    ctx, repo, app, contents, view, plugin, ids, gradeModule, control, notices, opened, cards, rootEl, menus, tips,
     renders: () => renders,
     chip: () => find(rootEl, i => hasCls(i, 'vam-goal-text')),
     goalBar: () => find(rootEl, i => hasCls(i, 'vam-goal-bar')),
@@ -285,7 +285,7 @@ integrationTest('relevance: a reply that is not exactly one valid grade per card
     await h.enter('Goal'); await h.settled();
     assert.equal(h.run().status, 'failed', name);
     // A hierarchy-only failure that survives both repair rounds shows a plain message instead of card ids.
-    if (name === 'a child above its parent') assert.equal(h.barText(), "Grading failed. No topic was changed. The AI's parent-child tiers were still inconsistent. Click Recalibrate next to the goal to try again.", name);
+    if (name === 'a child above its parent') assert.equal(h.barText(), "Grading failed. No topic was changed. The AI's parent-child tiers were still inconsistent. Hover over the goal, then press a grading icon next to it to try again.", name);
     else assert.match(h.barText(), /^Grading failed\. No topic was changed\. The AI grading could not be used: /, name);
     assert.deepEqual(await graded(h), [], `${name}: no note written`);
     assert.deepEqual(h.barButtons(), ['Dismiss'], name);
@@ -678,7 +678,7 @@ integrationTest('relevance repair: still violating after TWO repair rounds write
   await h.enter('Goal'); await h.settled();
   assert.deepEqual(h.control.calls.map(c => c.step), ['relevance-grade', 'relevance-grade-repair', 'relevance-grade-repair'], 'at most two repair rounds');
   assert.equal(h.run().status, 'failed');
-  assert.equal(h.barText(), "Grading failed. No topic was changed. The AI's parent-child tiers were still inconsistent. Click Recalibrate next to the goal to try again.");
+  assert.equal(h.barText(), "Grading failed. No topic was changed. The AI's parent-child tiers were still inconsistent. Hover over the goal, then press a grading icon next to it to try again.");
   assert.doesNotMatch(h.barText(), /hierarchy|[0-9a-f]{8}-[0-9a-f]{4}/, 'no card id or UUID in the user-facing text');
   assert.deepEqual(await graded(h), [], 'nothing written'); assert.equal(h.view.history.past.length, 1, 'only the goal step');
 });
@@ -1194,41 +1194,27 @@ integrationTest('relevance pins: the More menu offers "Hand all back to AI (N ca
   const real = h.view.map; h.view.map = { ...real, aim: { runs: [] } };
   assert.ok(!titles().some(x => entry.test(x)), 'AIM map: no entry');
   h.view.map = real;
-  // Choosing it: one mutation, one undo step, no AI call (the only hand-back entry since the edit panel went).
+  // Choosing it: one mutation, one undo step, no AI call (the only hand-back entry since the edit panel went); undo and redo.
   const past = h.view.history.past.length, calls = h.control.calls.length;
+  const aiKept = { b: rawNote(h, 'b'), d: rawNote(h, 'd') };
   h.view.openMapActions();
   h.menus.at(-1).items.find(i => entry.test(i.title)).click(); await afterWrite();
-  for (const key of ['a', 'c']) assert.equal(await h.relevanceOf(key), undefined, `${key} handed back`);
+  for (const key of ['a', 'c']) { assert.doesNotMatch(rawNote(h, key), /relevance-(tier|reason|manual)/); assert.equal(await h.relevanceOf(key), undefined, `${key} handed back`); }
   assert.equal(rawNote(h, 'b'), before.b, 'an AI grade stays');
+  for (const key of ['b', 'd']) assert.equal(rawNote(h, key), aiKept[key], `${key} untouched`);
   assert.equal(h.view.history.past.length, past + 1, 'one undo step'); assert.equal(h.control.calls.length, calls, 'no AI call');
+  assert.equal(h.control.calls.length, 1, 'no AI call (the one from entering the goal only)');
   await h.view.travel(false); await afterWrite();
   for (const key of ['a', 'c']) assert.equal(rawNote(h, key), before[key], `${key} pinned again by undo`);
-  const { translate } = load('i18n.ts');
-  assert.equal(translate('zh-TW', 'ui.relevance_unpin_all_0', 3), '全部交還 AI（3 張）');
-  assert.equal(translate('zh-CN', 'ui.relevance_unpin_all_0', 3), '全部交还 AI（3 张）');
-});
-
-integrationTest('relevance pins: Hand all back to AI removes every pin in one mutation and one undo step; the AI grades stay', async () => {
-  const h = await harness();
-  await h.enter('Goal'); await h.settled();
-  await pinNote(h, 'a', 'side'); await pinNote(h, 'c', 'core');
-  const pinned = { a: rawNote(h, 'a'), c: rawNote(h, 'c') };
-  const aiKept = { b: rawNote(h, 'b'), d: rawNote(h, 'd') };
-  const past = h.view.history.past.length;
-  h.view.openMapActions();
-  h.menus.at(-1).items.find(i => /^Hand all back to AI/.test(i.title)).click(); await afterWrite();
-  for (const key of ['a', 'c']) { assert.doesNotMatch(rawNote(h, key), /relevance-(tier|reason|manual)/); assert.equal(await h.relevanceOf(key), undefined); }
-  for (const key of ['b', 'd']) assert.equal(rawNote(h, key), aiKept[key], `${key} untouched`);
-  assert.equal(h.view.history.past.length, past + 1, 'one undo step');
-  assert.equal(h.control.calls.length, 1, 'no AI call');
-  await h.view.travel(false); await afterWrite();
-  for (const key of ['a', 'c']) assert.equal(rawNote(h, key), pinned[key], `${key} pinned again`);
   assert.equal(h.view.history.past.length, past);
   await h.view.travel(true); await afterWrite();
   for (const key of ['a', 'c']) assert.equal(await h.relevanceOf(key), undefined, 'redo hands them back again');
   // The next recalibration must grade them (they have no tier now).
   h.view.openMapActions();
   assert.ok(!h.menus.at(-1).items.some(i => /^Hand all back to AI/.test(i.title)), 'no pins left: no entry');
+  const { translate } = load('i18n.ts');
+  assert.equal(translate('zh-TW', 'ui.relevance_unpin_all_0', 3), '全部交還 AI（3 張）');
+  assert.equal(translate('zh-CN', 'ui.relevance_unpin_all_0', 3), '全部交还 AI（3 张）');
 });
 
 integrationTest('relevance pins: handing one card back (the tag menu) leaves it ungraded so the next run grades it; the hint is on the item where the host allows', async () => {
@@ -1491,7 +1477,7 @@ test('the editor reads its fields back before a repaint empties the view (source
   const capture = body.indexOf('this.captureGoalEdit()'), remove = body.indexOf('this.removeGoalBar()'), empty = body.indexOf('this.contentEl.empty()'), refocus = body.indexOf('this.focusGoalEdit()');
   assert.ok(capture > 0 && remove > capture && empty > remove, 'capture, then the bar goes, then the view is emptied');
   assert.ok(refocus > empty, 'the keyboard is given back after the repaint');
-  assert.match(source, /this\.relevanceBarEl = null;\s*this\.dropGoalEdit\(\);/, 'a render that finds nothing to grade (empty map, AIM, no map) drops an open edit');
+  assert.match(source, /this\.relevanceBarEl = null;\s*this\.dropGoalEdit\(\);/, 'a render that finds nothing to grade (empty map, AIM) drops an open edit (the no-map early return has its own test, through view.deleted)');
 });
 
 test('a click on the goal while a grade runs says why and opens nothing; an AIM map opens no editor either', () => {
@@ -1597,6 +1583,32 @@ integrationTest('goal edit (counter-example 8): a map switch or closing the view
     noAi(h, how); assert.equal(h.view.goalEdit, null, `${how}: the edit is gone`); assert.equal(h.control.releases, 1, `${how}: the process is stopped`); assert.equal(d.count(), 0, `${how}: no document listener left`);
     assert.equal(await h.repo.readRelevanceGoal(MAP), 'Sleep better', `${how}: the saved goal is untouched`);
   }
+});
+
+integrationTest('goal edit (counter-example 8, no map): the map is deleted under an open edit (view.deleted): the render has no map, yet the edit is dropped: nothing is asked, the process is stopped, the document listeners are gone, no bar is kept', async () => {
+  const h = await withGoal(); const d = withDoc(h);
+  openWithContext(h, 'Half typed');
+  assert.ok(d.count() > 0 && h.control.prewarms.length === 1 && h.view.relevanceBarEl, 'an edit is open');
+  // The harness paints with a stand-in (render draws the goal bar only); here the view's own render() and paint() run, up to the no-map branch.
+  h.view.render = Object.getPrototypeOf(h.view).render; h.plugin.syncOutline = () => {}; h.view.leaf = { setViewState: async () => {} }; h.ctx.activeDocument = { activeElement: null };
+  Object.defineProperty(d.doc, 'activeElement', { value: null }); // nothing focused: the focus bookkeeping of paint() has no fake elements to describe
+  h.view.deleted({ path: MAP });
+  assert.equal(h.view.map, null, 'the view has no map any more');
+  noAi(h, 'deleted'); assert.equal(h.view.goalEdit, null, 'the edit is gone'); assert.equal(h.view.relevanceBarEl, null, 'no bar reference is kept');
+  assert.equal(d.count(), 0, 'no document listener left'); assert.equal(h.control.releases, 1, 'the process is stopped (one release)');
+});
+
+integrationTest('goal edit (decision #13): only a primary-button press elsewhere saves; a right or middle press on a card, and a press on the map actions button (it opens a menu), save nothing and leave the editor open', async () => {
+  for (const [what, target, event] of [['right-click on a card', null, { button: 2 }], ['middle press on a card', null, { button: 1 }], ['press on the map actions button', insideOverlay('vam-map-actions-button'), { button: 0 }]]) {
+    const h = await withGoal(); const d = withDoc(h); const before = h.contents.get(MAP);
+    open(h); h.input().value = 'Changed'; h.input().fire('input');
+    d.press(target ?? h.cards.get(h.ids.a), event); assert.equal(d.listeners.pointerup.length + d.listeners.pointercancel.length, 0, `${what}: nothing is waiting for the press to end`);
+    d.release(); d.cancel(); await later();
+    noAi(h, what); assert.ok(h.input(), `${what}: the editor stays open`); assert.equal(h.input().value, 'Changed', `${what}: the draft stays`); assert.equal(h.contents.get(MAP), before, `${what}: nothing written`);
+    assert.equal(h.control.releases, 0, `${what}: the process stays`); assert.ok(d.count() > 0, `${what}: still listening`);
+  }
+  // Control: the primary button (and an event without a button) elsewhere still saves.
+  for (const event of [{ button: 0 }, {}]) { const h = await withGoal(); const d = withDoc(h); open(h); h.input().value = 'Saved'; h.input().fire('input'); d.press(element('div'), event); d.release(); await h.settled(); assert.equal(await h.repo.readRelevanceGoal(MAP), 'Saved', JSON.stringify(event)); }
 });
 
 integrationTest('goal edit (counter-example 9): a press elsewhere that ends after the view closed or the map changed saves nothing (checked again when it runs)', async () => {

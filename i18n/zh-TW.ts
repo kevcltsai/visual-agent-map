@@ -2492,7 +2492,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.technical_details": "技術細節",
   "ui.copy_technical_details": "複製技術細節",
   "error.relevance_grade_unavailable": "AI 目前無法為這張心智圖分級，沒有任何內容被改變，請稍後再試。",
-  "error.relevance_grade_hierarchy": "AI 的上下層分級仍不一致，請按目標旁的「重新校準」重試",
+  "error.relevance_grade_hierarchy": "AI 的上下層分級仍不一致，請滑過目標，按旁邊的分級圖示重試",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "分享的心智圖・唯讀",
   "share.viewer_made_with": "由 VAM 製作",

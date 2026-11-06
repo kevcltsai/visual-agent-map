@@ -4017,7 +4017,12 @@ export class VisualAgentMapView extends ItemView {
    */
   private commitGoalEdit(how: "enter" | "outside" | "tab"): void {
     const edit = this.goalEdit;
-    if (!edit || this.closed || edit.path !== this.path) return;
+    if (!edit) return;
+    // The view closed or moved to another map since the edit began: the draft is not this map's, so the edit ends without saving.
+    if (this.closed || edit.path !== this.path) {
+      this.closeGoalEdit({ redraw: false });
+      return;
+    }
     if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
       this.closeGoalEdit();
       return;
@@ -4078,10 +4083,12 @@ export class VisualAgentMapView extends ItemView {
     const doc = this.goalLayerRoot()?.ownerDocument;
     if (!edit || !doc?.addEventListener) return;
     let disarm: (() => void) | null = null;
-    const pressStarted = (event: Event): void => {
+    const pressStarted = (event: PointerEvent): void => {
+      // Only the primary button counts as "elsewhere" (a right-click opens a menu); so does not a press on the map actions button, which opens one.
+      if (event.button !== 0 && event.button !== undefined) return;
       const target = event.target as Element | null;
       if (!target || this.relevanceBarEl?.contains?.(target)) return;
-      if (target.closest?.(".menu, .modal-container, .prompt")) return;
+      if (target.closest?.(".menu, .modal-container, .prompt, .vam-map-actions-button")) return;
       disarm?.();
       const pressEnded = (): void => {
         disarm?.();
@@ -12618,7 +12625,7 @@ export class VisualAgentMapView extends ItemView {
       this.addExportButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), event =>
         this.openMapActions(event)
-      );
+      ).addClass("vam-map-actions-button");
     }
     const selectedNode = this.map?.nodes.find(node => node.id === this.selection.state.selected);
     if (aimEnabled() && this.map?.aim) {
@@ -12822,6 +12829,8 @@ export class VisualAgentMapView extends ItemView {
       if (aimEnabled()) this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
       if (this.deletedMap?.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
+      // Nothing to grade: an edit left open belongs to the map that is gone.
+      this.dropGoalEdit();
       return;
     }
     if (!this.aimLive()) this.renderMultiResearchStatus(this.contentEl);
@@ -13976,7 +13985,8 @@ export class VisualAgentMapView extends ItemView {
     for (const selector of FLOATING_LAYER_SELECTORS) {
       const el = this.goalLayerRoot()?.querySelector?.<HTMLElement>(selector);
       // A layer that is invisible (the goal's icons while the pointer is elsewhere) covers nothing: cards need not avoid it.
-      if (el?.ownerDocument?.defaultView?.getComputedStyle?.(el)?.opacity === "0") continue;
+      if (selector === ".vam-goal-actions" && el?.ownerDocument?.defaultView?.getComputedStyle?.(el)?.opacity === "0")
+        continue;
       const rect = el?.getBoundingClientRect?.();
       if (rect && rect.right > rect.left && rect.bottom > rect.top) rects.push(rect);
     }
@@ -19568,6 +19578,7 @@ export class VisualAgentMapView extends ItemView {
   /** Takes the bar out of its row and clears the host mark: before a repaint empties the view, and when it closes. */
   private removeGoalBar(): void {
     this.relevanceBarEl?.remove?.();
+    this.relevanceBarEl = null;
     for (const stray of Array.from(this.goalLayerRoot()?.querySelectorAll?.<HTMLElement>(".vam-goal-bar") ?? []))
       stray.remove();
     this.goalHostEl?.removeClass?.("vam-goal-host");
@@ -19636,6 +19647,7 @@ export class VisualAgentMapView extends ItemView {
         if (room !== null) attachment.style.setProperty("--vam-goal-attach-max", `${room}px`);
       }
     }
+    this.layoutGoalBridge(bar, actions, actionsRect);
     // Icons floating over the tool group's row: the group gives up the width they take (it wraps) instead of sliding under them.
     const toolsRect = tools.getBoundingClientRect?.();
     if (actionsRect && toolsRect && actionsRect.bottom > toolsRect.top && actionsRect.left > toolsRect.left) {
@@ -19652,6 +19664,42 @@ export class VisualAgentMapView extends ItemView {
     if (room !== null && typeof sources.style?.setProperty === "function") {
       sources.style.setProperty("--vam-sources-max", `${room}px`);
     }
+  }
+  /**
+   * The strip that lets the pointer go from the goal down to the floating icons (they are invisible and take no pointer until the
+   * goal is hovered, so a gap between them would drop the hover). The bar owns it (a pseudo-element, so it counts as the bar), it
+   * spans exactly the measured gap from the bar's bottom to the icons' top, as wide as the icons. Where something clickable lies in
+   * that gap (the info row between a goal and icons that float below the toolbar) there is no strip: it would block those clicks.
+   */
+  private layoutGoalBridge(
+    bar: HTMLElement | null,
+    actions: HTMLElement | null,
+    actionsRect: DOMRect | undefined
+  ): void {
+    const style = bar?.style;
+    if (!bar || typeof style?.setProperty !== "function") return;
+    const names = ["top", "left", "width", "height"].map(name => `--vam-goal-bridge-${name}`);
+    const box = actions?.offsetParent;
+    const barRect = bar.getBoundingClientRect?.();
+    const strip =
+      actions && box && actionsRect && barRect && actionsRect.width > 0 && actionsRect.top > barRect.bottom
+        ? { left: actionsRect.left, right: actionsRect.right, top: barRect.bottom, bottom: actionsRect.top }
+        : null;
+    const boxRect = strip ? box?.getBoundingClientRect?.() : undefined;
+    const blocked =
+      !!strip &&
+      Array.from(box?.querySelectorAll?.<HTMLElement>("button, input, textarea, a, [role='button']") ?? []).some(el => {
+        const rect = bar.contains(el) ? null : el.getBoundingClientRect?.();
+        return !!rect && rectsIntersect(rect, strip);
+      });
+    if (!strip || !box || !boxRect || blocked) {
+      for (const name of names) style.removeProperty(name);
+      return;
+    }
+    style.setProperty(names[0], `${strip.top - boxRect.top - box.clientTop}px`);
+    style.setProperty(names[1], `${strip.left - boxRect.left - box.clientLeft}px`);
+    style.setProperty(names[2], `${strip.right - strip.left}px`);
+    style.setProperty(names[3], `${strip.bottom - strip.top}px`);
   }
   /** Screen y the panels under the top stack must stay above: the zoom bar (with the status bar) or the hint, INSET_GAP clear. */
   private bottomLimit(overlay: HTMLElement | null | undefined, canvasHeight: number): number {

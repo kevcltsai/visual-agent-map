@@ -2491,7 +2491,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.technical_details": "技术细节",
   "ui.copy_technical_details": "复制技术细节",
   "error.relevance_grade_unavailable": "AI 目前无法为这张心智图分级，没有任何内容被改变，请稍后再试。",
-  "error.relevance_grade_hierarchy": "AI 的上下层分级仍不一致，请按目标旁的“重新校准”重试",
+  "error.relevance_grade_hierarchy": "AI 的上下层分级仍不一致，请滑过目标，按旁边的分级图标重试",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "分享的地图・只读",
   "share.viewer_made_with": "由 VAM 制作",

@@ -491,8 +491,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
   .view-header.vam-goal-host > .view-header-title-container { display: none; }
   .vam-goal-bar { position: static; }
   .vam-goal-actions { position: absolute; top: calc(100% + 4px); right: 8px; padding: 2px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); }
-  /* Bridges the 4px between the goal and the icons, so the pointer keeps the bar hovered on its way there. */
-  .vam-goal-actions::before { content: ""; position: absolute; left: 0; right: 0; top: -4px; height: 4px; }
+  /* Bridges the gap between the goal and the icons, so the pointer keeps the bar hovered on its way there. The bar owns it; the view measures it (bar bottom to icon top, as wide as the icons) and leaves it out where something clickable lies in the gap. */
+  .vam-goal-bar::after { content: ""; position: absolute; top: var(--vam-goal-bridge-top, 0); left: var(--vam-goal-bridge-left, 0); width: var(--vam-goal-bridge-width, 0); height: var(--vam-goal-bridge-height, 0); }
   /* Here the icons float over the info row's buttons, so they show only while the pointer is on the goal or the keyboard is in it (:focus-visible), not for the focus a mouse click leaves behind (the wide rule above, :focus-within, is turned off). */
   .vam-goal-bar:focus-within .vam-goal-actions { opacity: 0; pointer-events: none; }
   .vam-goal-bar:hover .vam-goal-actions, .vam-goal-bar:has(:focus-visible) .vam-goal-actions { opacity: 1; pointer-events: auto; }

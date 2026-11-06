@@ -4670,7 +4670,7 @@ test('goal bar: the tool group never moves for the bar (style.top stays empty, w
   const tools = { style: { setProperty(n, v) { this[n] = v; }, removeProperty(n) { delete this[n]; } }, getBoundingClientRect: () => toolsRect };
   const actionsRect = { left: 344, top: 52, right: 452, bottom: 82 };
   const actions = { getBoundingClientRect: () => actionsRect };
-  const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {} }, ownerDocument: null, toggleClass() {}, querySelector: s => (s === '.vam-goal-actions' ? actions : null), getBoundingClientRect: () => ({ left: 0, top: 0, right: 0, bottom: 62 }) };
+  const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {}, removeProperty() {} }, ownerDocument: null, toggleClass() {}, querySelector: s => (s === '.vam-goal-actions' ? actions : null), getBoundingClientRect: () => ({ left: 0, top: 0, right: 0, bottom: 62 }) };
   view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : s === '.vam-goal-bar' ? bar : null) };
   for (const height of [62, 140]) { bar.offsetHeight = height; view.placeMapTools(); assert.equal(tools.style.top, undefined, `bar height ${height}: the tool group keeps the stylesheet top`); }
   assert.equal(tools.style['--vam-tools-max'], `${344 - 12 - 8}px`, 'icons over the tool group row: it ends INSET_GAP before them and wraps');
@@ -4689,7 +4689,7 @@ test('goal bar: the layout re-runs on size changes of the bar, the header row, t
   const watchers = [];
   class FakeRO { constructor(fn) { this.fn = fn; this.targets = []; this.disconnected = false; watchers.push(this); } observe(el) { this.targets.push(el); } disconnect() { this.disconnected = true; } }
   const doc = { defaultView: { ResizeObserver: FakeRO, getComputedStyle: () => ({ display: 'flex' }) } };
-  const tools = { style: { setProperty() {}, removeProperty() {} } }; const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {} }, ownerDocument: doc, toggleClass() {}, querySelector: () => null };
+  const tools = { style: { setProperty() {}, removeProperty() {} } }; const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {}, removeProperty() {} }, ownerDocument: doc, toggleClass() {}, querySelector: () => null };
   const header = { ownerDocument: doc, querySelector: () => null };
   bar.parentElement = header; // already in its row: this test is about the watch, not the move
   const canvas = { ownerDocument: doc };

@@ -351,6 +351,7 @@ test('collect snapshots: Coffee Tables, Reframe, Markdown context', async () => 
   const { buildStructureReviewPrompt, STRUCTURE_REVIEW_SCHEMA } = support.load('core/structure-review-service.ts', { obsidian: support.obsidian });
   const { buildRelevanceGradePrompt, RELEVANCE_GRADE_SCHEMA, relevanceGradeRepairStep, relevanceGradeMissingRepairStep, RELEVANCE_RECALIBRATE_SCHEMA, relevanceRecalibrateStep, relevanceRecalibrateRepairStep } = support.load('core/relevance-grade-service.ts', { obsidian: support.obsidian });
   const { buildGoalTopicSuggestPrompt, GOAL_TOPIC_SUGGEST_SCHEMA } = support.load('core/goal-topic-suggest-service.ts', { obsidian: support.obsidian });
+  const { buildGoalRecommendPrompt, GOAL_RECOMMEND_SCHEMA } = support.load('core/goal-recommend-service.ts', { obsidian: support.obsidian });
   const reviewNodes = [{ id: 'n1', title: 'Root topic', summary: 'Root summary', status: 'completed', parentId: null, depth: 0 }, { id: 'n2', title: 'Child topic', summary: 'Child summary', status: 'idea', parentId: 'n1', depth: 1 }];
   const { buildMapChatPrompt, MAP_CHAT_SCHEMA } = support.load('core/map-chat-service.ts', { obsidian: support.obsidian });
   const { buildMapChatContext } = support.load('core/map-chat-context.ts', { obsidian: support.obsidian });
@@ -392,6 +393,14 @@ test('collect snapshots: Coffee Tables, Reframe, Markdown context', async () => 
     record(`claude.relevance-grade-repair-missing.${tag}`, 'core/relevance-grade-service.ts relevanceGradeMissingRepairStep.render for Claude (a bounded card left out)', language, relevanceGradeMissingRepairStep.render({ ...pinned, model: claudeModel, previousReply: { items: [{ id: 'n4', tier: 'support' }, { id: 'n5', tier: 'core' }] }, violations: [], missing: ['n2'] }), RELEVANCE_GRADE_SCHEMA);
     record(`claude.relevance-recalibrate.${tag}`, 'core/relevance-grade-service.ts relevanceRecalibrateStep.render for Claude', language, relevanceRecalibrateStep.render({ ...recal, model: claudeModel }), RELEVANCE_RECALIBRATE_SCHEMA);
     record(`claude.relevance-recalibrate-repair.${tag}`, 'core/relevance-grade-service.ts relevanceRecalibrateRepairStep.render for Claude (bounds violation)', language, relevanceRecalibrateRepairStep.render({ ...recal, model: claudeModel, previousReply: { items: [{ id: 'n5', tier: 'core' }] }, violations: [{ childId: 'n3', childTier: 'core', parentId: 'n2', parentTier: 'support' }] }), RELEVANCE_RECALIBRATE_SCHEMA);
+    // goal-recommend: one call rates the cards and suggests new ones. `all` sends no earlier tier; `current` sends the current tiers.
+    const recommend = { language, goal: 'Learner goal text', nodes: reviewNodes, model: 'm', reasoning: 'low', scope: 'all' };
+    record(`goal-recommend.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt (scope all, goal only)', language, buildGoalRecommendPrompt(recommend), GOAL_RECOMMEND_SCHEMA);
+    record(`goal-recommend-current.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt (scope current, current tiers sent)', language, buildGoalRecommendPrompt({ ...recommend, scope: 'current', current: [{ id: 'n2', tier: 'support' }] }), GOAL_RECOMMEND_SCHEMA);
+    record(`goal-recommend-pinned.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt (scope all, one pinned and one locked card)', language, buildGoalRecommendPrompt({ ...pinned, scope: 'all', lockedIds: ['n5'] }), GOAL_RECOMMEND_SCHEMA);
+    record(`goal-recommend-context.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt (goal and context, output language ja)', language, buildGoalRecommendPrompt({ ...recommend, contentLanguage: 'ja', context: 'Learner context text' }), GOAL_RECOMMEND_SCHEMA);
+    record(`claude.goal-recommend.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt for Claude (StructuredOutput wording)', language, buildGoalRecommendPrompt({ ...recommend, model: claudeModel }), GOAL_RECOMMEND_SCHEMA);
+    record(`claude.goal-recommend-current.${tag}`, 'core/goal-recommend-service.ts buildGoalRecommendPrompt for Claude (scope current)', language, buildGoalRecommendPrompt({ ...recommend, scope: 'current', current: [{ id: 'n2', tier: 'support' }], model: claudeModel }), GOAL_RECOMMEND_SCHEMA);
   }
   const { planStep } = support.load('experiences/markdown-context/steps/plan/step.ts', { obsidian: support.obsidian });
   const planPrompt = (instruction, selected, context, hasImage) => planStep.render({ instruction, selected, context, hasImage });

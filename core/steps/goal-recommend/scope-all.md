@@ -1,0 +1,1 @@
+Rate every card whose parentId is not null. Every such card that is not marked "pinned" or "locked" must appear exactly once in "items", with its own tier. The cards below carry no earlier tier; judge them all from scratch.

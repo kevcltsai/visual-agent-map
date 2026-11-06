@@ -1,0 +1,2 @@
+The map was rated before. Each card below has "tier": its current tier, or null when it has none yet. Reply in "items" with ONLY the cards whose tier should change, plus every card (parentId not null, not "pinned", not "locked") whose tier is null. Leave every other card out. If nothing needs to change, "items" is an empty list; "suggestions" is still required.
+Change a card only when the goal, the learner context or a pinned card calls for it. When in doubt, leave it as it is. Do not re-judge cards just to re-judge them. Each id appears at most once.

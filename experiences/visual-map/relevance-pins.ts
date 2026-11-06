@@ -217,6 +217,35 @@ export function floorSuggestedTiers<T extends RelevancePin>(
   });
 }
 
+/**
+ * A card never ranks below what it holds: raise every non-frozen, tiered, non-top-level card to at least the highest tier
+ * among its descendants. Pure: returns only the cards that change (id -> new tier), in map order. `tiers` is the merged
+ * result (previous grades plus the AI's items plus pins). A frozen card (pinned by hand, locked, outside the AI's view)
+ * keeps its tier, but the height of its descendants keeps passing up to its ancestors. A card without a tier is never
+ * given one here; it passes the height up too. Top-level cards are context and are never raised. The tree is parent
+ * before child.
+ */
+export function raiseParents(
+  tree: ReadonlyArray<PinTreeNode>,
+  tiers: ReadonlyMap<string, RelevanceTier>,
+  frozen: ReadonlySet<string>
+): Map<string, RelevanceTier> {
+  const below = new Map<string, number>();
+  const raised = new Map<string, RelevanceTier>();
+  for (const node of [...tree].reverse()) {
+    if (node.parentId === null) continue;
+    const own = tiers.get(node.id);
+    let up = Math.max(own === undefined ? -1 : TIER_RANK[own], below.get(node.id) ?? -1);
+    const need = below.get(node.id) ?? -1;
+    if (own !== undefined && !frozen.has(node.id) && need > TIER_RANK[own]) {
+      raised.set(node.id, TIER_BY_RANK[need]);
+      up = need;
+    }
+    below.set(node.parentId, Math.max(below.get(node.parentId) ?? -1, up));
+  }
+  return new Map([...tree].filter(node => raised.has(node.id)).map(node => [node.id, raised.get(node.id) as RelevanceTier]));
+}
+
 // ---- Which button the panel offers -------------------------------------------------------------------------
 
 export interface RelevanceSetupDraft {

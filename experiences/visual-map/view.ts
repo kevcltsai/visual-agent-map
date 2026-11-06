@@ -11250,7 +11250,8 @@ export class VisualAgentMapView extends ItemView {
     if (imageEl) {
       const dot = target?.closest?.<HTMLElement>(".vam-anchor[data-anchor-id]");
       const anchorId = dot?.dataset.anchorId;
-      if (dot && anchorId && imageEl.dataset.itemId && !this.placing && !this.picking) this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
+      if (dot && anchorId && imageEl.dataset.itemId && !this.placing && !this.picking)
+        this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
       else this.openImageMenu(event, imageEl);
       return;
     }

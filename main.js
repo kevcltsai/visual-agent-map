@@ -74131,12 +74131,10 @@ ${note.detail.trim()}` : "",
   }
   /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
   stopChainWork(run) {
-    var _a2;
     const work = run.work;
     if (!work) return;
     work.controller.abort();
     for (const key2 of work.researchKeys) this.plugin.expansionCoordinator.stop(key2);
-    for (const item of work.expand) (_a2 = this.plugin.activeTasks.get(item.path)) == null ? void 0 : _a2.abort();
   }
   /** A round ended with its reply applied (or its plan): the chain goes on, waits or ends, unless the user spoke meanwhile. */
   finishChatRound(run, round3) {

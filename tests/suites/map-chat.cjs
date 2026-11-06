@@ -6888,6 +6888,10 @@ integrationTest('P3 A4: Stop during a round and Stop while waiting both end the 
   const w = await harness(); await w.view.hydrate(); const { spy: wspy, runs } = await researchChain(w); const stops = []; const rawStop = w.plugin.expansionCoordinator.stop.bind(w.plugin.expansionCoordinator); w.plugin.expansionCoordinator.stop = key => { stops.push(key); return rawStop(key); };
   w.view.stopMapChat(); await chainEnded(wspy); eq(wspy.reasons(), ['stopped']); assert.equal(runs[0].signal.aborted, true, 'the research that was not started yet is told to stop'); eq(stops, [`multi-research:${MAP}`]);
   settleRun(runs[0]); await tick(); await tick(); assert.equal(w.control.requests.length, 1); eq(wspy.reasons(), ['stopped'], 'the late outcome changes nothing');
+  const x = await harness(); await x.view.hydrate(); const xchat = x.open(); const xspy = chainSpy(xchat); let expandSignal = null;
+  x.view.chatExpand = (parent, _d, signal) => { expandSignal = signal; return new Promise(resolve => signal.addEventListener('abort', () => resolve({ status: 'stopped' }), { once: true })); };
+  chainReplies(x, say('Expanding.', [{ kind: 'run_map_action', action: 'expand', nodeIds: [x.ids.a], title: '', goal: '', direction: '', mode: '', images: false }], 'More'));
+  x.type('expand'); await x.view.sendMapChat(); await until(() => expandSignal); x.view.stopMapChat(); await chainEnded(xspy); eq(xspy.reasons(), ['stopped']); assert.equal(expandSignal.aborted, true, 'Stop reaches the expansion the chain started');
 });
 integrationTest('P3 race: the research ends and Stop is pressed in the same tick, in either order: one ending, no round', async () => {
   const a = await harness(); await a.view.hydrate(); const { spy: aspy, runs: aruns } = await researchChain(a);

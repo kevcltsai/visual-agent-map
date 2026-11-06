@@ -20743,9 +20743,9 @@ export class VisualAgentMapView extends ItemView {
   private stopChainWork(run: ChatChainRun): void {
     const work = run.work;
     if (!work) return;
+    // The controller reaches the expansions (chatExpand listens to it) and the research that has not started.
     work.controller.abort();
     for (const key of work.researchKeys) this.plugin.expansionCoordinator.stop(key);
-    for (const item of work.expand) this.plugin.activeTasks.get(item.path)?.abort();
   }
   /** A round ended with its reply applied (or its plan): the chain goes on, waits or ends, unless the user spoke meanwhile. */
   private finishChatRound(run: ChatChainRun, round: ChatRoundEnd): void {

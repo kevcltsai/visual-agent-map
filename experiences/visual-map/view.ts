@@ -9207,7 +9207,7 @@ export class VisualAgentMapView extends ItemView {
         .setTitle(t("ui.anchor_menu_delete"))
         .setIcon("trash-2")
         .setWarning(true)
-        .onClick(() => this.enqueue(() => this.deleteAnchor(imageId, anchorId)))
+        .onClick(() => void this.deleteAnchor(imageId, anchorId))
     );
     // The Menu key and Shift+F10 send a contextmenu event at (0, 0): put the menu beside the anchor.
     if (event.clientX === 0 && event.clientY === 0) {
@@ -11129,7 +11129,7 @@ export class VisualAgentMapView extends ItemView {
     if (imageEl) {
       const dot = target?.closest?.<HTMLElement>(".vam-anchor[data-anchor-id]");
       const anchorId = dot?.dataset.anchorId;
-      if (dot && anchorId && imageEl.dataset.itemId) this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
+      if (dot && anchorId && imageEl.dataset.itemId && !this.placing && !this.picking) this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
       else this.openImageMenu(event, imageEl);
       return;
     }

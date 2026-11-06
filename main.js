@@ -64334,7 +64334,7 @@ ${request.requirements}` : preset.text,
     );
     menu.addSeparator();
     menu.addItem(
-      (item) => item.setTitle(t("ui.anchor_menu_delete")).setIcon("trash-2").setWarning(true).onClick(() => this.enqueue(() => this.deleteAnchor(imageId, anchorId)))
+      (item) => item.setTitle(t("ui.anchor_menu_delete")).setIcon("trash-2").setWarning(true).onClick(() => void this.deleteAnchor(imageId, anchorId))
     );
     if (event.clientX === 0 && event.clientY === 0) {
       const box = dot.getBoundingClientRect();
@@ -66157,7 +66157,7 @@ ${request.requirements}` : preset.text,
     if (imageEl) {
       const dot = (_f = target == null ? void 0 : target.closest) == null ? void 0 : _f.call(target, ".vam-anchor[data-anchor-id]");
       const anchorId = dot == null ? void 0 : dot.dataset.anchorId;
-      if (dot && anchorId && imageEl.dataset.itemId) this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
+      if (dot && anchorId && imageEl.dataset.itemId && !this.placing && !this.picking) this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
       else this.openImageMenu(event, imageEl);
       return;
     }

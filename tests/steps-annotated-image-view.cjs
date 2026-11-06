@@ -1007,6 +1007,18 @@ const anchorMenu = (h, { keyboard = false, anchorId = 'a1', preview = false } = 
   h.view.onCanvasContextMenu({ target: { closest }, clientX: keyboard ? 0 : 5, clientY: keyboard ? 0 : 5, preventDefault() { prevented = true; } });
   return h.menus.length > before ? Object.assign(h.menus.at(-1), { prevented }) : null;
 };
+/** The same semantics as main.ts mutate(): every write waits for the earlier ones, so a write started inside a write never finishes. */
+const serialMutate = view => {
+  let queue = Promise.resolve(), tail = Promise.resolve();
+  view.plugin.mutate = work => { const result = queue.then(work); queue = result.catch(() => {}); tail = queue; return result; };
+  return async () => {
+    const stuck = Symbol('stuck');
+    let timer;
+    const got = await Promise.race([Promise.resolve().then(() => dom.tick()).then(() => tail), new Promise(r => { timer = setTimeout(() => r(stuck), 1000); })]);
+    clearTimeout(timer);
+    assert.notEqual(got, stuck, 'the write queue deadlocked');
+  };
+};
 const withRelations = root => [annotated({ note: 'n', anchors: [anchor('a1'), anchor('a2')], relations: [{ kind: 'related', from: 'a1', to: 'a2' }, { kind: 'supports', from: root, to: 'a2' }] })];
 
 test('anchor menu: right-click on an anchor offers Edit anchor and Delete anchor; the Menu key opens it beside the anchor', async () => {
@@ -1025,8 +1037,9 @@ test('counter-example (destructive): Delete anchor removes only that anchor and 
   h.view.render();
   const nodes = h.view.map.nodes.length, entries = h.view.history.past.length;
   const before = await h.onDisk();
+  const drained = serialMutate(h.view);
   anchorMenu(h).items[1].fn();
-  await h.settle();
+  await drained();
   const [img] = await h.onDisk();
   assert.equal(img.id, 'img1');
   assert.deepEqual(img.anchors.map(a => a.id), ['a2']);
@@ -1074,4 +1087,16 @@ test('regression: deleting the image keeps every topic on the map', async () => 
   assert.equal(await h.onDisk(), undefined);
   assert.equal(h.view.map.nodes.length, nodes);
   assert.equal((await h.repo.readMap(MAP)).nodes.length, nodes);
+});
+
+test('counter-example (modes): in place mode or topic-pick mode a right-click on an anchor keeps the image menu', async () => {
+  for (const mode of ['placing', 'picking']) {
+    const h = await harness(withRelations);
+    h.view.render();
+    if (mode === 'placing') h.view.startPlacingAnchor('img1');
+    else h.view.picking = { topicId: 't', kind: 'related' };
+    assert.ok(h.view[mode], mode);
+    const menu = anchorMenu(h);
+    assert.deepEqual(menu.items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)'], mode);
+  }
 });

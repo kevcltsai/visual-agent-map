@@ -1740,6 +1740,8 @@ export class VisualAgentMapView extends ItemView {
   /** A menu of this view hid a moment ago (cleared on the next task): the Esc that closed it must not also clear the selection. */
   private menuClosedByKey = false;
   private closed = false;
+  /** The map a state change is opening: a new tab's default map must not race it (see onOpen). */
+  private requestedFile: string | null = null;
   private aimViewEpoch = 0;
   /**
    * Whether `map` is an AIM map this view treats as one: its AIM controls, status bar and edit locks apply. While AIM is hidden
@@ -1825,9 +1827,48 @@ export class VisualAgentMapView extends ItemView {
   getState(): Record<string, unknown> {
     return { file: this.path };
   }
+  /** A map is on its way to this tab (the tab was opened for it, or a state change is opening it): the default map must not open. */
+  private mapOpenPending(): boolean {
+    return Boolean(this.requestedFile) || Boolean(this.leaf && this.plugin.pendingTabMaps?.has(this.leaf));
+  }
+  /** The map this tab shows, or the one a state change has asked it to open and has not finished opening. */
+  targetPath(): string | null {
+    return this.requestedFile ?? this.path;
+  }
+  /**
+   * Whether replacing this tab's map now would stop something: closing or switching a map aborts these (see
+   * {@link dropMapBackground}, abortRelevanceGrade, abortMapChat and the map-change branch of the chat mount).
+   */
+  hasRunningWork(): boolean {
+    if (this.chatController || this.chatApplying || this.chatImageSearches.size) return true;
+    // The chat's preparing stage (before its controller exists) is stopped by a map change too.
+    if (this.chat?.isBusy || this.chatPrepAbandon) return true;
+    for (const task of this.synthesisTasks.values()) if (task.state === "running") return true;
+    if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
+    if (this.aimBusy || this.aimController) return true;
+    if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
+    if (this.startedRelevance && this.path) {
+      const run = this.plugin.relevanceGrades.get(this.path);
+      if (run?.owner === this && run.status === "running") return true;
+    }
+    const runs = this.plugin.topicRuns,
+      batches = this.plugin.expansionCoordinator;
+    return (this.map?.nodes ?? []).some(
+      node =>
+        runs.isBusy(node.path) ||
+        this.plugin.quickExpandPending?.has(node.path) ||
+        batches.isRunning(node.path) ||
+        batches.isQueued(node.path)
+    );
+  }
   async setState(state: Record<string, unknown>, result: { history: boolean; layout?: boolean }): Promise<void> {
     if (typeof state.file === "string" && state.file !== this.path) {
-      await this.openMap(state.file);
+      this.requestedFile = state.file;
+      try {
+        await this.openMap(state.file);
+      } finally {
+        this.requestedFile = null;
+      }
       // Another map in the same tab: ask the workspace to redraw the tab and the window title, which names the map.
       result.layout = true;
     }
@@ -1844,6 +1885,7 @@ export class VisualAgentMapView extends ItemView {
     this.registerEvent(
       workspace.on("active-leaf-change", leaf => {
         if (leaf?.view instanceof MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+        this.drawWhenShown();
         this.chat?.refreshNote();
         this.syncStatusBarClearance();
       })
@@ -1853,6 +1895,7 @@ export class VisualAgentMapView extends ItemView {
       workspace.on("layout-change", () => {
         this.chat?.refreshNote();
         this.syncStatusBarClearance();
+        this.drawWhenShown();
       })
     );
     // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
@@ -1921,7 +1964,7 @@ export class VisualAgentMapView extends ItemView {
     this.registerDomEvent(this.contentEl, "focusin", event => this.trackMapFocus(event.target));
     await this.plugin.ready;
     if (this.closed || this.aimViewEpoch !== epoch) return;
-    if (!this.path) {
+    if (!this.path && !this.mapOpenPending()) {
       if (!this.plugin.repo.workspaceExists()) this.render();
       else {
         const files = await this.plugin.repo.mapFiles();
@@ -1936,11 +1979,13 @@ export class VisualAgentMapView extends ItemView {
               continue;
             }
             if (this.closed || this.aimViewEpoch !== epoch) return;
+            if (this.mapOpenPending()) return;
             if (!candidate.aim) {
               defaultPath = file.path;
               break;
             }
           }
+          if (this.mapOpenPending() || this.path) return;
           await this.openMap(defaultPath);
         } else this.render();
       }
@@ -3115,6 +3160,7 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
     }
     if (path !== this.path) {
+      this.cameraWhenShown = null;
       this.stopAimProgress();
       this.mapSourcesOpen = false;
       if (this.relevancePanelOpen) this.plugin.releaseWarmClaude?.();
@@ -3208,20 +3254,35 @@ export class VisualAgentMapView extends ItemView {
     }));
     new AimStartModal(
       this.app,
-      input =>
-        this.plugin.mutate(async () => {
+      async input => {
+        const pending: { created: Awaited<ReturnType<typeof createAimMap>> | null } = { created: null };
+        await this.plugin.mutate(async () => {
           if (!isCurrent()) return;
           await this.plugin.repo.ensureWorkspace();
           if (!isCurrent()) return;
           const created = await createAimMap(this.plugin.repo, input.model, input);
           await this.plugin.rebuildDerivedData();
           if (!isCurrent()) return;
+          const hasMap = Boolean(this.map);
+          if (hasMap) {
+            // A map is open: the new one gets its own tab, opened after this mutation (the tab opens its map through mutate).
+            pending.created = created;
+            return;
+          }
           await this.openMapInMutation(created.mapPath);
           if (!isCurrent() || this.path !== created.mapPath || this.map?.id !== created.map.id) return;
           this.selection.setSelected(created.root.id);
           this.render();
           this.focusNode(created.root);
-        }),
+        });
+        const created = pending.created;
+        if (!created) return;
+        const view = await this.plugin.openMapInNewTab(created.mapPath);
+        if (!view || view.closed || view.path !== created.mapPath || view.map?.id !== created.map.id) return;
+        view.selection.setSelected(created.root.id);
+        view.render();
+        view.focusNode(created.root);
+      },
       modelChoices,
       configuredModel,
       defaultReasoning,
@@ -5741,14 +5802,29 @@ export class VisualAgentMapView extends ItemView {
     }
     // From here on the map exists: failures only notify and never reject, so the import window closes.
     let opened = true;
+    // The view that shows the new map: this one when it had no map, else a new tab (the shallow research below runs there).
+    let newTabView: VisualAgentMapView | null = null;
     try {
+      let inNewTab = false as boolean;
       await this.plugin.mutate(async () => {
         // A style chosen in the window shaped the root note and the research only: nothing is written to the map (#44).
         // Notes and Map.md were written directly; derive their Reference Links (map, parent, children) like any map change.
         await this.plugin.rebuildDerivedData();
+        if (this.map) {
+          inNewTab = true;
+          return;
+        }
         await this.openMapInMutation(result.mapPath);
         if (!this.closed && this.path === result.mapPath) this.fit();
       });
+      if (inNewTab) {
+        const view = await this.plugin.openMapInNewTab(result.mapPath);
+        if (!view || view.path !== result.mapPath) opened = false;
+        else {
+          newTabView = view;
+          if (!view.closed && view.path === result.mapPath) view.fit();
+        }
+      }
     } catch {
       opened = false; // mutate() has already shown the Notice.
     }
@@ -5756,12 +5832,13 @@ export class VisualAgentMapView extends ItemView {
     if (result.failure || !opened || !request.shallowResearch || result.nodes.length < 2) return;
     const root = result.nodes.find(node => node.parentId === null);
     if (!root) return;
+    const target: VisualAgentMapView = newTabView ?? this;
     const children = result.nodes.filter(node => node.parentId !== null);
     // The import window closes once the topics exist: the research runs in the background (Stop is on the batch badge)
     // and an error becomes a Notice instead of keeping the window waiting.
     void this.plugin
       .confirmAiUsage(model, () =>
-        this.startShallowResearch(
+        target.startShallowResearch(
           root,
           children,
           {
@@ -5984,11 +6061,18 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "New map": an untitled empty map opens at once (no name is asked); the first message names it, the title renames it. */
   private openNewMindMapModal(): void {
-    this.enqueue(async () => {
-      const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
-      const title = uniqueDefaultName(t("ui.untitled_mind_map"), titles);
-      await this.openMapInMutation(await this.plugin.repo.createMap(title));
-    });
+    let created = "";
+    void this.plugin
+      .mutate(async () => {
+        const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
+        const title = uniqueDefaultName(t("ui.untitled_mind_map"), titles);
+        const mapPath = await this.plugin.repo.createMap(title);
+        // With a map open the new one gets its own tab (after this mutation), so this tab's work is not stopped.
+        if (this.map) created = mapPath;
+        else await this.openMapInMutation(mapPath);
+      })
+      .then(() => (created ? this.plugin.openMapInNewTab(created) : undefined))
+      .catch(error => errorNotice(error));
   }
   async planAimQuestion(
     parentNodeId: string,
@@ -6675,12 +6759,19 @@ export class VisualAgentMapView extends ItemView {
   private openMapSwitcher(): void {
     this.enqueue(async () => {
       const items = await this.plugin.repo.mapSwitcherItems();
-      this.openMapModal(
-        new MapSwitcherModal(this.app, items, this.path, item =>
-          this.enqueue(() => this.openMapInMutation(item.mapPath))
-        )
-      );
+      this.openMapModal(new MapSwitcherModal(this.app, items, this.path, item => this.switchToMap(item.mapPath)));
     });
+  }
+  /**
+   * Choosing a map in the switcher: a map that is open in another tab is shown there; while this tab has running work the map
+   * opens in a new tab (swapping would stop that work); otherwise it replaces this tab's map.
+   */
+  private switchToMap(path: string): void {
+    const open = path === this.path ? undefined : this.plugin.findMapLeaf(path);
+    if (open) void this.plugin.showLeaf(open);
+    else if (path !== this.path && this.hasRunningWork())
+      void this.plugin.openMapInNewTab(path).catch(error => errorNotice(error));
+    else this.enqueue(() => this.openMapInMutation(path));
   }
   /** The three ways to start a map sit together, so none reads as the only or the hidden option. */
   private openNewMapMenu(event: MouseEvent): void {
@@ -12235,16 +12326,21 @@ export class VisualAgentMapView extends ItemView {
   private duplicateCurrentMap(): void {
     if (!this.map) return;
     const source = this.path;
-    this.enqueue(async () => {
-      if (!this.map || this.path !== source) return;
-      try {
-        const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
-        const title = uniqueDefaultName(t("ui.duplicate_map_title", this.map.title), titles);
-        await this.openMapInMutation(await this.plugin.repo.duplicateMap(source, title));
-      } catch (error) {
-        errorNotice(error);
-      }
-    });
+    let copy = "";
+    void this.plugin
+      .mutate(async () => {
+        if (!this.map || this.path !== source) return;
+        try {
+          const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
+          const title = uniqueDefaultName(t("ui.duplicate_map_title", this.map.title), titles);
+          copy = await this.plugin.repo.duplicateMap(source, title);
+        } catch (error) {
+          errorNotice(error);
+        }
+      })
+      // Outside the mutation: the new tab opens its map through mutate.
+      .then(() => (copy ? this.plugin.openMapInNewTab(copy) : undefined))
+      .catch(error => errorNotice(error));
   }
   /** Renames the open map (Map.md title and folder) as one undo step; shared by the dialog, the title field and the chat. */
   private async renameMapTo(title: string): Promise<void> {
@@ -12429,6 +12525,30 @@ export class VisualAgentMapView extends ItemView {
       ])
     );
   }
+  /** True while the tab is in the background (display:none): its boxes measure 0, so nothing is measured or saved from them then. */
+  private hiddenTab(): boolean {
+    const el = this.contentEl as { isShown?: () => boolean } | undefined;
+    return typeof el?.isShown === "function" && !el.isShown();
+  }
+  /** Draws again what a hidden tab drew without measures (see paint), then runs the camera move it was asked for, once it can be seen. */
+  private drawWhenShown(): void {
+    if (this.closed || this.hiddenTab()) return;
+    if (this.renderWhenShown) {
+      this.renderWhenShown = false;
+      this.render();
+    }
+    const camera = this.cameraWhenShown;
+    this.cameraWhenShown = null;
+    camera?.();
+  }
+  private renderWhenShown = false;
+  /** The last camera move (fit, focus) asked of a hidden tab: its pane measures 0, so it waits for drawWhenShown. */
+  private cameraWhenShown: (() => void) | null = null;
+  private holdCamera(move: () => void): boolean {
+    if (!this.hiddenTab()) return false;
+    this.cameraWhenShown = move;
+    return true;
+  }
   private render(): void {
     // A batch of chat writes repaints once, when it is done.
     if (this.renderHold > 0 && !this.closed) {
@@ -12440,6 +12560,8 @@ export class VisualAgentMapView extends ItemView {
     this.settleCardHeights();
   }
   private paint(): void {
+    // A hidden tab paints like any other (outline, title, canvas), so its other consumers stay live; its measures are 0, so it paints again when shown.
+    if (!this.closed && this.hiddenTab()) this.renderWhenShown = true;
     // Repainting would replace the dragged card and drop its pointer capture, so wait for the drop (a closed view still ends the drag below).
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
@@ -14184,7 +14306,7 @@ export class VisualAgentMapView extends ItemView {
    * heights; when nothing is covered nothing moves. The first paint of a map only records heights (opening never moves a card).
    */
   private settleCardHeights(): void {
-    if (!this.map || this.closed || !this.cardEls) return;
+    if (!this.map || this.closed || !this.cardEls || this.hiddenTab()) return;
     // A chat reply lays out its own cards (resized / arranged / placed) inside its undo step; looking now would also record
     // heights it has not finished with. Nothing is recorded, so the first render after the reply compares against the old ones.
     if (this.renderHold > 0 || this.history.grouping) return;
@@ -17308,7 +17430,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Camera on the parent and its new children (current zoom kept, or smaller if they do not fit), saved like a pan. */
   private frameBranch(ids: string[]): void {
-    if (!this.map || !this.viewportEl) return;
+    if (!this.map || !this.viewportEl || this.holdCamera(() => this.frameBranch(ids))) return;
     const shown = this.map.nodes.filter(node => ids.includes(node.id));
     if (!shown.length) return;
     const bounds = {
@@ -18999,6 +19121,9 @@ export class VisualAgentMapView extends ItemView {
     this.zoomLabel?.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
   private saveViewport(): void {
+    // A hidden pane measures 0: nothing is requested from it (a camera move asked meanwhile is replayed when the tab is shown).
+    // A save scheduled while the pane was shown was computed from a sized pane, so it is written even if the tab hides within the wait.
+    if (this.hiddenTab()) return;
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
@@ -19193,6 +19318,11 @@ export class VisualAgentMapView extends ItemView {
       this.map.viewport = viewport;
       return;
     }
+    // A hidden pane has no toolbar to measure: the first paint that can see it does this.
+    if (this.hiddenTab()) {
+      this.map.viewport = viewport;
+      return;
+    }
     this.toolbarClearedFor = this.path;
     this.map.viewport = clearToolbar(viewport, inset, this.topsUnderToolbar(this.map.viewport.zoom));
   }
@@ -19235,6 +19365,14 @@ export class VisualAgentMapView extends ItemView {
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
   private focusNode(target: MapNode, persist = true): void {
     if (!this.map || !this.viewportEl) return;
+    const id = target.id;
+    if (
+      this.holdCamera(() => {
+        const node = this.map?.nodes.find(item => item.id === id);
+        if (node) this.focusNode(node, persist);
+      })
+    )
+      return;
     // Centre on where the card is drawn, which differs from its saved position while sorted by relevance.
     const node = this.relevanceSortOn() ? (this.canvasNodes().find(item => item.id === target.id) ?? target) : target;
     this.map.viewport = focusViewport(
@@ -19250,7 +19388,7 @@ export class VisualAgentMapView extends ItemView {
   /** True while a framing action (fit) applies its viewport: tool-row placement must not pan the canvas then. */
   private framingViewport = false;
   private fit(): void {
-    if (!this.map || !this.viewportEl) return;
+    if (!this.map || !this.viewportEl || this.holdCamera(() => this.fit())) return;
     const nodes = this.canvasNodes();
     if (!nodes.length) return;
     // Free text blocks (canvas-text-node decision #8) count too: fit must not hide what the user placed.
@@ -19485,12 +19623,31 @@ export class VisualAgentMapView extends ItemView {
     this.placeMapTools();
   }
   /** Opening screen: the keyboard starts in the message field, once per map, unless it is in another pane. */
+  focusChatHero(): void {
+    this.focusChatHeroOnce();
+  }
   private focusChatHeroOnce(): void {
     const chat = this.chat;
     if (!chat?.isHero || !this.map || this.chatHeroFocusedFor === this.map.id) return;
-    this.chatHeroFocusedFor = this.map.id;
-    const active = this.contentEl.ownerDocument?.activeElement ?? null;
-    if (!active || active === this.contentEl.ownerDocument?.body || this.contentEl.contains(active)) chat.focusInput();
+    // A tab that is not shown yet cannot take focus: the once is kept for when it is.
+    if (this.hiddenTab()) return;
+    const doc = this.contentEl.ownerDocument;
+    const active = doc?.activeElement ?? null;
+    // Focus in another pane the user can see is theirs to keep. Focus left in a hidden pane (the tab just switched away from) is not.
+    const heldElsewhere =
+      active &&
+      active !== doc?.body &&
+      !this.contentEl.contains(active) &&
+      (active as { isShown?: () => boolean }).isShown?.() !== false;
+    if (heldElsewhere) {
+      // Focus in a visible pane stays theirs: the once is used up, so a later repaint cannot take it when the focus falls to BODY.
+      this.chatHeroFocusedFor = this.map.id;
+      return;
+    }
+    chat.focusInput();
+    // The once is used up only when the keyboard really moved into the pane.
+    const now = doc?.activeElement ?? null;
+    if (now && this.contentEl.contains(now)) this.chatHeroFocusedFor = this.map.id;
   }
   /** The pane's width and what the topic panel takes of it; null while the pane has no size yet (not shown, or a test). */
   private chatPaneWidths(): { pane: number; inspector: number } | null {
@@ -19660,6 +19817,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {
+    this.drawWhenShown();
     this.syncChatNarrow();
     this.fitKindShapes();
     this.syncStatusBarClearance();

@@ -56824,6 +56824,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     /** A menu of this view hid a moment ago (cleared on the next task): the Esc that closed it must not also clear the selection. */
     __publicField(this, "menuClosedByKey", false);
     __publicField(this, "closed", false);
+    /** The map a state change is opening: a new tab's default map must not race it (see onOpen). */
+    __publicField(this, "requestedFile", null);
     __publicField(this, "aimViewEpoch", 0);
     __publicField(this, "mapOpenEpoch", 0);
     __publicField(this, "headerTitle", "");
@@ -56856,6 +56858,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
     /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
     __publicField(this, "unbindClipboard", null);
+    __publicField(this, "renderWhenShown", false);
+    /** The last camera move (fit, focus) asked of a hidden tab: its pane measures 0, so it waits for drawWhenShown. */
+    __publicField(this, "cameraWhenShown", null);
     /** Heights (canvas units) the cards had at the last check, and the map they belong to. */
     __publicField(this, "heightsSeen", /* @__PURE__ */ new Map());
     __publicField(this, "heightsSeenMap", null);
@@ -56993,9 +56998,48 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   getState() {
     return { file: this.path };
   }
+  /** A map is on its way to this tab (the tab was opened for it, or a state change is opening it): the default map must not open. */
+  mapOpenPending() {
+    var _a2;
+    return Boolean(this.requestedFile) || Boolean(this.leaf && ((_a2 = this.plugin.pendingTabMaps) == null ? void 0 : _a2.has(this.leaf)));
+  }
+  /** The map this tab shows, or the one a state change has asked it to open and has not finished opening. */
+  targetPath() {
+    var _a2;
+    return (_a2 = this.requestedFile) != null ? _a2 : this.path;
+  }
+  /**
+   * Whether replacing this tab's map now would stop something: closing or switching a map aborts these (see
+   * {@link dropMapBackground}, abortRelevanceGrade, abortMapChat and the map-change branch of the chat mount).
+   */
+  hasRunningWork() {
+    var _a2, _b2, _c;
+    if (this.chatController || this.chatApplying || this.chatImageSearches.size) return true;
+    if (((_a2 = this.chat) == null ? void 0 : _a2.isBusy) || this.chatPrepAbandon) return true;
+    for (const task of this.synthesisTasks.values()) if (task.state === "running") return true;
+    if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
+    if (this.aimBusy || this.aimController) return true;
+    if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
+    if (this.startedRelevance && this.path) {
+      const run = this.plugin.relevanceGrades.get(this.path);
+      if ((run == null ? void 0 : run.owner) === this && run.status === "running") return true;
+    }
+    const runs = this.plugin.topicRuns, batches = this.plugin.expansionCoordinator;
+    return ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : []).some(
+      (node) => {
+        var _a3;
+        return runs.isBusy(node.path) || ((_a3 = this.plugin.quickExpandPending) == null ? void 0 : _a3.has(node.path)) || batches.isRunning(node.path) || batches.isQueued(node.path);
+      }
+    );
+  }
   async setState(state, result) {
     if (typeof state.file === "string" && state.file !== this.path) {
-      await this.openMap(state.file);
+      this.requestedFile = state.file;
+      try {
+        await this.openMap(state.file);
+      } finally {
+        this.requestedFile = null;
+      }
       result.layout = true;
     }
     if (this.titleRefresh) {
@@ -57012,6 +57056,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       workspace.on("active-leaf-change", (leaf) => {
         var _a2;
         if ((leaf == null ? void 0 : leaf.view) instanceof import_obsidian37.MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+        this.drawWhenShown();
         (_a2 = this.chat) == null ? void 0 : _a2.refreshNote();
         this.syncStatusBarClearance();
       })
@@ -57021,6 +57066,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
         var _a2;
         (_a2 = this.chat) == null ? void 0 : _a2.refreshNote();
         this.syncStatusBarClearance();
+        this.drawWhenShown();
       })
     );
     this.registerEvent(workspace.on("resize", () => {
@@ -57080,7 +57126,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     this.registerDomEvent(this.contentEl, "focusin", (event) => this.trackMapFocus(event.target));
     await this.plugin.ready;
     if (this.closed || this.aimViewEpoch !== epoch) return;
-    if (!this.path) {
+    if (!this.path && !this.mapOpenPending()) {
       if (!this.plugin.repo.workspaceExists()) this.render();
       else {
         const files = await this.plugin.repo.mapFiles();
@@ -57095,11 +57141,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
               continue;
             }
             if (this.closed || this.aimViewEpoch !== epoch) return;
+            if (this.mapOpenPending()) return;
             if (!candidate.aim) {
               defaultPath = file.path;
               break;
             }
           }
+          if (this.mapOpenPending() || this.path) return;
           await this.openMap(defaultPath);
         } else this.render();
       }
@@ -58228,6 +58276,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       if (!isCurrent()) return;
     }
     if (path !== this.path) {
+      this.cameraWhenShown = null;
       this.stopAimProgress();
       this.mapSourcesOpen = false;
       if (this.relevancePanelOpen) (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
@@ -58321,20 +58370,36 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     }));
     new AimStartModal(
       this.app,
-      (input2) => this.plugin.mutate(async () => {
+      async (input2) => {
         var _a3;
-        if (!isCurrent()) return;
-        await this.plugin.repo.ensureWorkspace();
-        if (!isCurrent()) return;
-        const created = await createAimMap(this.plugin.repo, input2.model, input2);
-        await this.plugin.rebuildDerivedData();
-        if (!isCurrent()) return;
-        await this.openMapInMutation(created.mapPath);
-        if (!isCurrent() || this.path !== created.mapPath || ((_a3 = this.map) == null ? void 0 : _a3.id) !== created.map.id) return;
-        this.selection.setSelected(created.root.id);
-        this.render();
-        this.focusNode(created.root);
-      }),
+        const pending2 = { created: null };
+        await this.plugin.mutate(async () => {
+          var _a4;
+          if (!isCurrent()) return;
+          await this.plugin.repo.ensureWorkspace();
+          if (!isCurrent()) return;
+          const created2 = await createAimMap(this.plugin.repo, input2.model, input2);
+          await this.plugin.rebuildDerivedData();
+          if (!isCurrent()) return;
+          const hasMap = Boolean(this.map);
+          if (hasMap) {
+            pending2.created = created2;
+            return;
+          }
+          await this.openMapInMutation(created2.mapPath);
+          if (!isCurrent() || this.path !== created2.mapPath || ((_a4 = this.map) == null ? void 0 : _a4.id) !== created2.map.id) return;
+          this.selection.setSelected(created2.root.id);
+          this.render();
+          this.focusNode(created2.root);
+        });
+        const created = pending2.created;
+        if (!created) return;
+        const view = await this.plugin.openMapInNewTab(created.mapPath);
+        if (!view || view.closed || view.path !== created.mapPath || ((_a3 = view.map) == null ? void 0 : _a3.id) !== created.map.id) return;
+        view.selection.setSelected(created.root.id);
+        view.render();
+        view.focusNode(created.root);
+      },
       modelChoices,
       configuredModel,
       defaultReasoning,
@@ -60705,12 +60770,26 @@ ${request.requirements}` : preset.text,
       return;
     }
     let opened = true;
+    let newTabView = null;
     try {
+      let inNewTab = false;
       await this.plugin.mutate(async () => {
         await this.plugin.rebuildDerivedData();
+        if (this.map) {
+          inNewTab = true;
+          return;
+        }
         await this.openMapInMutation(result.mapPath);
         if (!this.closed && this.path === result.mapPath) this.fit();
       });
+      if (inNewTab) {
+        const view = await this.plugin.openMapInNewTab(result.mapPath);
+        if (!view || view.path !== result.mapPath) opened = false;
+        else {
+          newTabView = view;
+          if (!view.closed && view.path === result.mapPath) view.fit();
+        }
+      }
     } catch (e) {
       opened = false;
     }
@@ -60718,12 +60797,13 @@ ${request.requirements}` : preset.text,
     if (result.failure || !opened || !request.shallowResearch || result.nodes.length < 2) return;
     const root = result.nodes.find((node) => node.parentId === null);
     if (!root) return;
+    const target = newTabView != null ? newTabView : this;
     const children = result.nodes.filter((node) => node.parentId !== null);
     void this.plugin.confirmAiUsage(
       model,
       () => {
         var _a3;
-        return this.startShallowResearch(
+        return target.startShallowResearch(
           root,
           children,
           {
@@ -60911,11 +60991,14 @@ ${request.requirements}` : preset.text,
   }
   /** "New map": an untitled empty map opens at once (no name is asked); the first message names it, the title renames it. */
   openNewMindMapModal() {
-    this.enqueue(async () => {
+    let created = "";
+    void this.plugin.mutate(async () => {
       const titles = (await this.plugin.repo.topics()).map((topic) => topic.title);
       const title = uniqueDefaultName(t("ui.untitled_mind_map"), titles);
-      await this.openMapInMutation(await this.plugin.repo.createMap(title));
-    });
+      const mapPath = await this.plugin.repo.createMap(title);
+      if (this.map) created = mapPath;
+      else await this.openMapInMutation(mapPath);
+    }).then(() => created ? this.plugin.openMapInNewTab(created) : void 0).catch((error) => errorNotice(error));
   }
   async planAimQuestion(parentNodeId, requestId, parentBranchId = null, signal) {
     if (this.closed || !this.map || !this.path)
@@ -61550,15 +61633,19 @@ ${request.requirements}` : preset.text,
   openMapSwitcher() {
     this.enqueue(async () => {
       const items = await this.plugin.repo.mapSwitcherItems();
-      this.openMapModal(
-        new MapSwitcherModal(
-          this.app,
-          items,
-          this.path,
-          (item) => this.enqueue(() => this.openMapInMutation(item.mapPath))
-        )
-      );
+      this.openMapModal(new MapSwitcherModal(this.app, items, this.path, (item) => this.switchToMap(item.mapPath)));
     });
+  }
+  /**
+   * Choosing a map in the switcher: a map that is open in another tab is shown there; while this tab has running work the map
+   * opens in a new tab (swapping would stop that work); otherwise it replaces this tab's map.
+   */
+  switchToMap(path) {
+    const open = path === this.path ? void 0 : this.plugin.findMapLeaf(path);
+    if (open) void this.plugin.showLeaf(open);
+    else if (path !== this.path && this.hasRunningWork())
+      void this.plugin.openMapInNewTab(path).catch((error) => errorNotice(error));
+    else this.enqueue(() => this.openMapInMutation(path));
   }
   /** The three ways to start a map sit together, so none reads as the only or the hidden option. */
   openNewMapMenu(event) {
@@ -66693,16 +66780,17 @@ ${request.requirements}` : preset.text,
   duplicateCurrentMap() {
     if (!this.map) return;
     const source = this.path;
-    this.enqueue(async () => {
+    let copy = "";
+    void this.plugin.mutate(async () => {
       if (!this.map || this.path !== source) return;
       try {
         const titles = (await this.plugin.repo.topics()).map((topic) => topic.title);
         const title = uniqueDefaultName(t("ui.duplicate_map_title", this.map.title), titles);
-        await this.openMapInMutation(await this.plugin.repo.duplicateMap(source, title));
+        copy = await this.plugin.repo.duplicateMap(source, title);
       } catch (error) {
         errorNotice(error);
       }
-    });
+    }).then(() => copy ? this.plugin.openMapInNewTab(copy) : void 0).catch((error) => errorNotice(error));
   }
   /** Renames the open map (Map.md title and folder) as one undo step; shared by the dialog, the title field and the chat. */
   async renameMapTo(title) {
@@ -66891,6 +66979,27 @@ ${request.requirements}` : preset.text,
       ])
     );
   }
+  /** True while the tab is in the background (display:none): its boxes measure 0, so nothing is measured or saved from them then. */
+  hiddenTab() {
+    const el = this.contentEl;
+    return typeof (el == null ? void 0 : el.isShown) === "function" && !el.isShown();
+  }
+  /** Draws again what a hidden tab drew without measures (see paint), then runs the camera move it was asked for, once it can be seen. */
+  drawWhenShown() {
+    if (this.closed || this.hiddenTab()) return;
+    if (this.renderWhenShown) {
+      this.renderWhenShown = false;
+      this.render();
+    }
+    const camera = this.cameraWhenShown;
+    this.cameraWhenShown = null;
+    camera == null ? void 0 : camera();
+  }
+  holdCamera(move) {
+    if (!this.hiddenTab()) return false;
+    this.cameraWhenShown = move;
+    return true;
+  }
   render() {
     if (this.renderHold > 0 && !this.closed) {
       this.renderPending = true;
@@ -66901,6 +67010,7 @@ ${request.requirements}` : preset.text,
   }
   paint() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N;
+    if (!this.closed && this.hiddenTab()) this.renderWhenShown = true;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
         this.renderAfterDrag = true;
@@ -68439,7 +68549,7 @@ ${request.requirements}` : preset.text,
    * heights; when nothing is covered nothing moves. The first paint of a map only records heights (opening never moves a card).
    */
   settleCardHeights() {
-    if (!this.map || this.closed || !this.cardEls) return;
+    if (!this.map || this.closed || !this.cardEls || this.hiddenTab()) return;
     if (this.renderHold > 0 || this.history.grouping) return;
     const now = /* @__PURE__ */ new Map();
     for (const [id, card] of this.cardEls) now.set(id, card.offsetHeight);
@@ -71373,7 +71483,7 @@ ${request.requirements}` : preset.text,
   }
   /** Camera on the parent and its new children (current zoom kept, or smaller if they do not fit), saved like a pan. */
   frameBranch(ids) {
-    if (!this.map || !this.viewportEl) return;
+    if (!this.map || !this.viewportEl || this.holdCamera(() => this.frameBranch(ids))) return;
     const shown = this.map.nodes.filter((node) => ids.includes(node.id));
     if (!shown.length) return;
     const bounds = {
@@ -72940,6 +73050,7 @@ ${note.detail.trim()}` : "",
     (_d = this.zoomLabel) == null ? void 0 : _d.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
   saveViewport() {
+    if (this.hiddenTab()) return;
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
@@ -73121,6 +73232,10 @@ ${note.detail.trim()}` : "",
       this.map.viewport = viewport;
       return;
     }
+    if (this.hiddenTab()) {
+      this.map.viewport = viewport;
+      return;
+    }
     this.toolbarClearedFor = this.path;
     this.map.viewport = clearToolbar(viewport, inset, this.topsUnderToolbar(this.map.viewport.zoom));
   }
@@ -73160,6 +73275,13 @@ ${note.detail.trim()}` : "",
   focusNode(target, persist = true) {
     var _a2, _b2;
     if (!this.map || !this.viewportEl) return;
+    const id = target.id;
+    if (this.holdCamera(() => {
+      var _a3;
+      const node2 = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === id);
+      if (node2) this.focusNode(node2, persist);
+    }))
+      return;
     const node = this.relevanceSortOn() ? (_a2 = this.canvasNodes().find((item) => item.id === target.id)) != null ? _a2 : target : target;
     this.map.viewport = focusViewport(
       this.map.viewport,
@@ -73172,7 +73294,7 @@ ${note.detail.trim()}` : "",
   }
   fit() {
     var _a2, _b2, _c;
-    if (!this.map || !this.viewportEl) return;
+    if (!this.map || !this.viewportEl || this.holdCamera(() => this.fit())) return;
     const nodes = this.canvasNodes();
     if (!nodes.length) return;
     const boxes = nodes.map((n) => {
@@ -73386,13 +73508,24 @@ ${note.detail.trim()}` : "",
     this.placeMapTools();
   }
   /** Opening screen: the keyboard starts in the message field, once per map, unless it is in another pane. */
+  focusChatHero() {
+    this.focusChatHeroOnce();
+  }
   focusChatHeroOnce() {
     var _a2, _b2, _c;
     const chat = this.chat;
     if (!(chat == null ? void 0 : chat.isHero) || !this.map || this.chatHeroFocusedFor === this.map.id) return;
-    this.chatHeroFocusedFor = this.map.id;
-    const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
-    if (!active || active === ((_c = this.contentEl.ownerDocument) == null ? void 0 : _c.body) || this.contentEl.contains(active)) chat.focusInput();
+    if (this.hiddenTab()) return;
+    const doc = this.contentEl.ownerDocument;
+    const active = (_a2 = doc == null ? void 0 : doc.activeElement) != null ? _a2 : null;
+    const heldElsewhere = active && active !== (doc == null ? void 0 : doc.body) && !this.contentEl.contains(active) && ((_b2 = active.isShown) == null ? void 0 : _b2.call(active)) !== false;
+    if (heldElsewhere) {
+      this.chatHeroFocusedFor = this.map.id;
+      return;
+    }
+    chat.focusInput();
+    const now = (_c = doc == null ? void 0 : doc.activeElement) != null ? _c : null;
+    if (now && this.contentEl.contains(now)) this.chatHeroFocusedFor = this.map.id;
   }
   /** The pane's width and what the topic panel takes of it; null while the pane has no size yet (not shown, or a test). */
   chatPaneWidths() {
@@ -73561,6 +73694,7 @@ ${note.detail.trim()}` : "",
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize() {
+    this.drawWhenShown();
     this.syncChatNarrow();
     this.fitKindShapes();
     this.syncStatusBarClearance();
@@ -87768,6 +87902,8 @@ var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
      * Each registered writer gets `setEnabled(false)` the moment the switch goes off and `setEnabled(true)` when it goes on.
      */
     __publicField(this, "mapChatRecordWriters", /* @__PURE__ */ new Set());
+    /** Maps whose new tab is being opened, by leaf: the tab's own default map must not open first (see the view's onOpen). */
+    __publicField(this, "pendingTabMaps", /* @__PURE__ */ new WeakMap());
   }
   /** Background chart steps (running and queued), keyed by note path; owned by {@link topicRuns}. */
   get chartJobs() {
@@ -89362,16 +89498,74 @@ ${t("ui.organize_link_wait_hint")}`;
   async openResearchMap(path) {
     await this.activateView(path);
   }
+  /** The map tab that already shows (or is about to show) `path`, so one map is never opened twice. */
+  findMapLeaf(path) {
+    return this.app.workspace.getLeavesOfType(VIEW_TYPE).find((leaf) => {
+      var _a2;
+      if (leaf.view instanceof VisualAgentMapView) return leaf.view.targetPath() === path;
+      const state = (_a2 = leaf.getViewState) == null ? void 0 : _a2.call(leaf).state;
+      return (state == null ? void 0 : state.file) === path;
+    });
+  }
+  /**
+   * Shows `path` in its own tab (or jumps to the tab that has it) and leaves every other map tab as it is. Never call this
+   * inside `mutate`: the new tab opens its map through `mutate`, so waiting for it there would block the queue for good.
+   */
+  async openMapInNewTab(path) {
+    const workspace = this.app.workspace;
+    let leaf = this.findMapLeaf(path);
+    const fresh = !leaf;
+    if (!leaf) {
+      leaf = workspace.getLeaf("tab");
+      this.pendingTabMaps.set(leaf, path);
+      try {
+        await leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true });
+      } finally {
+        this.pendingTabMaps.delete(leaf);
+      }
+    }
+    const view = leaf.view instanceof VisualAgentMapView ? leaf.view : null;
+    if (!view || fresh && view.targetPath() !== path) {
+      if (fresh) leaf.detach();
+      return null;
+    }
+    await this.showLeaf(leaf);
+    view.focusChatHero();
+    return view;
+  }
+  /** Brings a tab forward and makes it the active leaf, so commands and the visible map are the same map. */
+  async showLeaf(leaf) {
+    await this.app.workspace.revealLeaf(leaf);
+    this.app.workspace.setActiveLeaf(leaf, { focus: true });
+  }
   async activateView(path) {
     await this.ready;
+    if (path) {
+      const open = this.findMapLeaf(path);
+      if (open) {
+        await this.showLeaf(open);
+        return;
+      }
+    }
     let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+    if (path && (leaf == null ? void 0 : leaf.view) instanceof VisualAgentMapView && leaf.view.hasRunningWork()) leaf = void 0;
+    const fresh = !leaf;
     if (!leaf) leaf = this.app.workspace.getLeaf("tab");
-    await leaf.setViewState({
-      type: VIEW_TYPE,
-      active: true,
-      state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {}
-    });
-    await this.app.workspace.revealLeaf(leaf);
+    if (path) this.pendingTabMaps.set(leaf, path);
+    try {
+      await leaf.setViewState({
+        type: VIEW_TYPE,
+        active: true,
+        state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {}
+      });
+    } finally {
+      this.pendingTabMaps.delete(leaf);
+    }
+    if (fresh && path && !(leaf.view instanceof VisualAgentMapView && leaf.view.targetPath() === path)) {
+      leaf.detach();
+      return;
+    }
+    await this.showLeaf(leaf);
   }
   async loadCodexModels() {
     const adapter = this.app.vault.adapter;

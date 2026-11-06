@@ -28,7 +28,7 @@ function makeView({ existing = [], title = 'Untitled mind map' } = {}) {
   const created = [], opened = [], modals = [];
   class Modal { constructor() { modals.push(this); } open() {} close() {} }
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal } }, { createFragment: dom.createFragment });
-  const plugin = { settings: { ...DEFAULT_SETTINGS, language: 'en' }, repo: { topics: async () => existing.map(t => ({ title: t })), createMap: async t => { created.push(t); return `${t}/Map.md`; } }, mutate: async work => work() };
+  const plugin = { settings: { ...DEFAULT_SETTINGS, language: 'en' }, repo: { topics: async () => existing.map(t => ({ title: t })), createMap: async t => { created.push(t); return `${t}/Map.md`; } }, mutate: async work => work(), openMapInNewTab: async path => { opened.push(path); } };
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.openMapInMutation = async path => { opened.push(path); };
   view.map = { id: 'm', title, nodes: [] }; view.path = 'Maps/Untitled mind map/Map.md';

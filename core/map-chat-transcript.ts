@@ -272,6 +272,10 @@ export interface TranscriptImages {
 }
 export interface TranscriptTurn {
   question: string;
+  /** An automatic round of a continuation: the heading says so, and the question (the user's original words) is not repeated. */
+  auto?: boolean;
+  /** What the cards of the turn were built from, one plain line each (the view words it; escaped here). */
+  basis?: string[];
   /** Follow-ups typed while the reply was made (only those that reached the AI), oldest first. */
   steers?: string[];
   refs: TranscriptRef[];
@@ -287,6 +291,8 @@ export interface TranscriptLabels {
   map: string;
   saved: string;
   you: string;
+  /** Heading of an automatic round (falls back to `you`). */
+  auto?: string;
   /** Heading of the follow-ups typed while the AI was answering. */
   steer: string;
   ai: string;
@@ -347,8 +353,8 @@ export function transcriptMarkdown(input: TranscriptInput): string {
   ];
   input.turns.forEach((turn, index) => {
     parts.push("---");
-    parts.push(`## ${index + 1}. ${escapeLine(labels.you)}`);
-    parts.push(escapeMultiline(turn.question));
+    parts.push(`## ${index + 1}. ${escapeLine(turn.auto ? (labels.auto ?? labels.you) : labels.you)}`);
+    if (!turn.auto) parts.push(escapeMultiline(turn.question));
     const steers = (turn.steers ?? []).filter(text => text.trim());
     if (steers.length) {
       parts.push(`**${escapeLine(labels.steer)}**`);
@@ -359,9 +365,10 @@ export function transcriptMarkdown(input: TranscriptInput): string {
     parts.push(`### ${escapeLine(labels.ai)}`);
     const answer = replyMarkdown(turn.answer);
     if (answer.trim()) parts.push(answer);
-    if (turn.lines.length) {
+    const basis = (turn.basis ?? []).filter(line => line.trim());
+    if (turn.lines.length || basis.length) {
       parts.push(`**${escapeLine(labels.results)}**`);
-      parts.push(turn.lines.map(line => `- ${escapeLine(line)}`).join("\n"));
+      parts.push([...turn.lines, ...basis].map(line => `- ${escapeLine(line)}`).join("\n"));
     }
     if (turn.plan)
       parts.push(

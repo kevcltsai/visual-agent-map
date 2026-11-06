@@ -2160,16 +2160,81 @@ export default class VisualAgentMapPlugin extends Plugin {
   async openResearchMap(path: string): Promise<void> {
     await this.activateView(path);
   }
+  /** The map tab that already shows (or is about to show) `path`, so one map is never opened twice. */
+  findMapLeaf(path: string): WorkspaceLeaf | undefined {
+    return this.app.workspace.getLeavesOfType(VIEW_TYPE).find(leaf => {
+      if (leaf.view instanceof VisualAgentMapView) return leaf.view.targetPath() === path;
+      const state = leaf.getViewState?.().state as { file?: unknown } | undefined;
+      return state?.file === path;
+    });
+  }
+  /**
+   * Shows `path` in its own tab (or jumps to the tab that has it) and leaves every other map tab as it is. Never call this
+   * inside `mutate`: the new tab opens its map through `mutate`, so waiting for it there would block the queue for good.
+   */
+  async openMapInNewTab(path: string): Promise<VisualAgentMapView | null> {
+    const workspace = this.app.workspace;
+    let leaf = this.findMapLeaf(path);
+    const fresh = !leaf;
+    if (!leaf) {
+      leaf = workspace.getLeaf("tab");
+      // Obsidian opens the view (onOpen) before it hands it the state, so the tab is told which map it is for up front.
+      this.pendingTabMaps.set(leaf, path);
+      try {
+        await leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true });
+      } finally {
+        this.pendingTabMaps.delete(leaf);
+      }
+    }
+    const view = leaf.view instanceof VisualAgentMapView ? leaf.view : null;
+    // setViewState swallows a failed setState (the queue has already shown its Notice): a new tab that did not end up on the map is closed, not left blank.
+    if (!view || (fresh && view.targetPath() !== path)) {
+      if (fresh) leaf.detach();
+      return null;
+    }
+    await this.showLeaf(leaf);
+    // The map drew while the tab was still being set up; the opening screen's input takes the keyboard now that it is shown.
+    view.focusChatHero();
+    return view;
+  }
+  /** Maps whose new tab is being opened, by leaf: the tab's own default map must not open first (see the view's onOpen). */
+  readonly pendingTabMaps = new WeakMap<WorkspaceLeaf, string>();
+  /** Brings a tab forward and makes it the active leaf, so commands and the visible map are the same map. */
+  async showLeaf(leaf: WorkspaceLeaf): Promise<void> {
+    await this.app.workspace.revealLeaf(leaf);
+    this.app.workspace.setActiveLeaf(leaf, { focus: true });
+  }
   private async activateView(path?: string): Promise<void> {
     await this.ready;
-    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+    if (path) {
+      const open = this.findMapLeaf(path);
+      if (open) {
+        await this.showLeaf(open);
+        return;
+      }
+    }
+    let leaf: WorkspaceLeaf | undefined = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+    // Replacing the map in a tab stops its running work, so a tab that is busy keeps its map and the target gets a new tab.
+    if (path && leaf?.view instanceof VisualAgentMapView && leaf.view.hasRunningWork()) leaf = undefined;
+    const fresh = !leaf;
     if (!leaf) leaf = this.app.workspace.getLeaf("tab");
-    await leaf.setViewState({
-      type: VIEW_TYPE,
-      active: true,
-      state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {}
-    });
-    await this.app.workspace.revealLeaf(leaf);
+    // A tab made here opens its view before it is given the map (see openMapInNewTab).
+    if (path) this.pendingTabMaps.set(leaf, path);
+    try {
+      await leaf.setViewState({
+        type: VIEW_TYPE,
+        active: true,
+        state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {}
+      });
+    } finally {
+      this.pendingTabMaps.delete(leaf);
+    }
+    // A new tab whose map did not open (the queue has already shown its Notice) is closed, not left blank.
+    if (fresh && path && !(leaf.view instanceof VisualAgentMapView && leaf.view.targetPath() === path)) {
+      leaf.detach();
+      return;
+    }
+    await this.showLeaf(leaf);
   }
   private async loadCodexModels(): Promise<{ models: string[]; reasoningEfforts: Record<string, string[]> }> {
     const adapter = this.app.vault.adapter;

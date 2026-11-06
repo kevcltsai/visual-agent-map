@@ -1311,6 +1311,21 @@
       "language": "zh-CN",
       "schema": false
     },
+    "outline-generate-note.en": {
+      "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (note with an injection attempt and existing subtopics)",
+      "language": "en",
+      "schema": false
+    },
+    "outline-generate-note.zh": {
+      "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (note with an injection attempt and existing subtopics)",
+      "language": "zh-TW",
+      "schema": false
+    },
+    "outline-generate-note.zh-CN": {
+      "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (note with an injection attempt and existing subtopics)",
+      "language": "zh-CN",
+      "schema": false
+    },
     "outline-generate.en": {
       "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (preset with topic placeholder)",
       "language": "en",

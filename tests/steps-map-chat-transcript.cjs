@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
+const { basisSummary, parseChatBasis } = load('core/map-chat-basis.ts');
 const { chatNoteName, chatFirstSentence, hasUnsavedChat, transcriptMarkdown, replyMarkdown, escapeText, localDate, localStamp } = load('core/map-chat-transcript.ts');
 
 const FALLBACK = 'Chat';
@@ -251,4 +252,31 @@ test('persona-16: closing warns only when finished turns exist that were not sav
   assert.equal(hasUnsavedChat(2, 0), true, 'never saved');
   assert.equal(hasUnsavedChat(2, 2), false, 'saved after the last turn');
   assert.equal(hasUnsavedChat(3, 2), true, 'a turn finished after the save');
+});
+
+// ---- automatic continuation (P3): the round is named, its basis is one escaped line ------------------------------------------
+test('P3 transcript: an automatic round is headed as one and does not repeat the user\'s question; the heading falls back to You without the label', () => {
+  const out = render([turn(), turn({ question: 'What is tea?', auto: true })], { labels: { ...labels, auto: 'Automatic continuation' } });
+  assert.match(out, /## 2\. Automatic continuation\n\n### AI/);
+  assert.equal(out.split('What is tea').length - 1, 1, 'the question appears once');
+  assert.match(render([turn({ auto: true })]), /## 1\. You\n/, 'no label, no new heading');
+});
+test('P3 transcript: the basis is one escaped line each under the results, even when the titles carry markup, links or line breaks', () => {
+  const research = basisSummary({ kind: 'research', sources: [{ id: 'a', title: '**Bold** [[Secret]]\n![x](y)' }, { id: 'b', title: 'Two' }] }, { research: 'Basis: research read: {0}', note: 'Basis: notes read: {0}', outline: 'Basis: titles only' });
+  const out = render([turn({ lines: ['Done: card'], basis: [research, 'Basis: titles only'] })]);
+  const basisLines = out.split('\n').filter(line => line.startsWith('- Basis'));
+  assert.equal(basisLines.length, 2); assert.ok(out.indexOf('Done') < out.indexOf('- Basis'), 'after the result lines');
+  assert.ok(basisLines[0].includes('\\*\\*Bold\\*\\* \\[\\[Secret\\]\\] \\!\\[x\\]\\(y\\)\\, Two'), basisLines[0]);
+  assert.ok(!out.includes('![x]') && !out.includes('[[Secret]]'), 'no embed and no live link');
+  assert.ok(render([turn({ basis: ['Basis: titles only'] })]).includes('**Results**'), 'a basis alone still makes the results block');
+});
+test('P3 basis: a long list is cut, a note read is not called checked, and a basis read back from a file keeps only its known shape', () => {
+  const labelsBasis = { research: 'R {0}', note: 'N {0}', outline: 'O' };
+  const many = { kind: 'note', sources: Array.from({ length: 8 }, (_, i) => ({ id: `${i}`, title: `T${i}` })) };
+  assert.equal(basisSummary(many, labelsBasis), 'N T0, T1, T2, T3, T4, …');
+  assert.equal(basisSummary({ kind: 'outline_only', alsoRead: [{ path: 'x.md', title: 'x' }] }, labelsBasis), 'O');
+  const same = (value, expected) => assert.deepEqual(JSON.parse(JSON.stringify(value)), expected);
+  same(parseChatBasis({ kind: 'note', sources: [{ id: 1, title: 'bad' }, { id: 'a', title: 'ok' }], existingChildren: 2, extra: 1 }), { kind: 'note', sources: [{ id: 'a', title: 'ok' }], existingChildren: 2 });
+  same(parseChatBasis({ kind: 'outline_only', alsoRead: 'no', existingChildren: -1 }), { kind: 'outline_only', alsoRead: [] });
+  for (const bad of [null, 'research', [], { kind: 'checked' }, { kind: 'research' }]) assert.equal(parseChatBasis(bad), undefined, JSON.stringify(bad));
 });

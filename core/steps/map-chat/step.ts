@@ -364,11 +364,13 @@ export const MAP_CHAT_SCHEMA = {
 };
 
 /** Fixed words, per language, that say the reply will search the web. */
-const WEB_WORDS_ZH = /上網|上网|聯網|联网|(?:網路|网络|網絡|網上|网上)(?:搜尋|搜索|查詢|查询|查找|查|找|檢索|检索)|(?:搜尋|搜索|查詢|查询|查找|檢索|检索)(?:網路|网络|網絡|網頁|网页|網上|网上)/g;
+const WEB_WORDS_ZH =
+  /上網|上网|聯網|联网|(?:網路|网络|網絡|網上|网上)(?:搜尋|搜索|查詢|查询|查找|查|找|檢索|检索)|(?:搜尋|搜索|查詢|查询|查找|檢索|检索)(?:網路|网络|網絡|網頁|网页|網上|网上)/g;
 const WEB_WORDS_EN =
   /\b(?:search(?:ing)?|look(?:ing)?\s+(?:it\s+|this\s+|that\s+)?up|check(?:ing)?|research(?:ing)?|browse|browsing|find(?:ing)?)\s+(?:the\s+)?(?:web|internet|online)\b|\bweb\s+(?:search|research)\b|\bon\s+the\s+(?:web|internet)\b|\bonline\s+(?:search|research)\b|\b(?:search|research|look(?:ing)?\s+up)\b[^.;!?]{0,30}\bonline\b/gi;
 /** A negation right before the matched words (a few words at most), so "不需要上網" and "won't need to search the web" do not count. */
-const NEGATION_ZH = /(?:不|沒|没|無|无|未|別|别|勿)(?:需要|需|必須|必|須|用|會|会|要|能|可以|可|再|想|打算|有|曾)?(?:再|要|去|先)?$/;
+const NEGATION_ZH =
+  /(?:不|沒|没|無|无|未|別|别|勿)(?:需要|需|必須|必|須|用|會|会|要|能|可以|可|再|想|打算|有|曾)?(?:再|要|去|先)?$/;
 const NEGATION_EN = /(?:\b(?:not|no|never|without|cannot|unable)|n't)(?:\s+\w+){0,3}\s*$/i;
 /** "web search is not needed": a negation right after the matched words. */
 const TRAILING_NEGATION_EN = /^\s+(?:is|are|was|will be)?\s*(?:not|never)\b|^\s+(?:isn't|aren't)\b/i;

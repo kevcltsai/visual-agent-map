@@ -1,6 +1,7 @@
-// Goal-banner P5: the "suggest new topics for the goal" list on the real view and repository.
-// The AI is a fake behind the real GoalTopicSuggestService and RelevanceGradeService (strict parsers included); the DOM is tests/support-dom.cjs.
+// Goal recommend (P3): the "recommended new cards" list on the real view and repository.
+// The AI is a fake behind the real GoalRecommendService (strict parser included); the DOM is tests/support-dom.cjs.
 // No provider is called. Picked up by `npm run test:unit` through the tests/steps-*.cjs glob.
+// Every list test asserts how many AI calls were made: the run is ONE call, and neither the list nor Add asks again.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,10 +13,9 @@ const { hasCls, element, find, findAll, tick } = dom;
 const MAP = 'Agent Workspace/Topics/map-a/Map.md';
 const TITLES = { Body: 'core', Mind: 'support', REM: 'side', Dreams: 'support' };
 const labelOf = (request, id) => `c${request.nodes.findIndex(n => n.id === id) + 1}`;
-const gradeAll = request => ({ items: request.nodes.filter(n => n.parentId !== null).map(n => ({ id: labelOf(request, n.id), tier: TITLES[n.title] ?? 'support' })) });
-const recalibrateNew = request => ({ changes: request.nodes.filter(n => n.parentId !== null && !request.previous.some(p => p.id === n.id)).map(n => ({ id: labelOf(request, n.id), tier: 'support', anchor: null })) });
+const gradeAll = request => request.nodes.filter(n => n.parentId !== null).map(n => ({ id: labelOf(request, n.id), tier: TITLES[n.title] ?? 'support' }));
 // The model sees the map parent-first: c1 Sleep (root), c2 Body, c3 REM (under Body), c4 Mind, c5 Dreams
-const TWO = [{ parentId: 'c2', title: 'Sleep stages', summary: 'About it.' }, { parentId: 'c4', title: 'Stress habits', summary: 'About it.' }];
+const TWO = [{ parentId: 'c2', title: 'Sleep stages', summary: 'About it.', suggestedTier: 'core' }, { parentId: 'c4', title: 'Stress habits', summary: 'About it too.', suggestedTier: 'support' }];
 
 async function harness({ language = 'en' } = {}) {
   const { repo, app, contents } = fixture(language);
@@ -34,10 +34,10 @@ async function harness({ language = 'en' } = {}) {
   await repo.rebuildDerivedData();
   await repo.writeRelevanceGoal(MAP, 'Sleep better');
   const notices = [], ctx = {}, listeners = { pointerdown: [], pointerup: [], pointercancel: [] };
+  // `calls` is every AI request of the run; `reply` builds one reply for one request (items for the tiers, suggestions for the list).
   const control = {
-    decline: false, usageAsks: 0, suggestCalls: [], gradeCalls: [], gradeGate: null,
-    suggest: async () => JSON.stringify({ suggestions: TWO }),
-    grade: async (request, _signal, prepared) => prepared.step.id.startsWith('relevance-recalibrate') ? recalibrateNew(request) : gradeAll(request)
+    decline: false, usageAsks: 0, calls: [],
+    reply: async request => ({ items: gradeAll(request), suggestions: TWO })
   };
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), releaseOutline() {},
@@ -53,21 +53,16 @@ async function harness({ language = 'en' } = {}) {
     confirmAiUsage: async (_model, run) => { control.usageAsks++; if (control.decline) return false; await run(); return true; }
   });
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: dom.makeModal(), Notice: class { constructor(m) { notices.push(m); } }, setTooltip() {} } }, { setInterval: () => 1, clearInterval: () => {}, createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
-  plugin.relevanceGrade = new (load('core/relevance-grade-service.ts').RelevanceGradeService)(async (request, signal, prepared) => {
-    control.gradeCalls.push({ request, step: prepared.step.id });
-    if (control.gradeGate) await control.gradeGate.promise;
-    const out = await control.grade(request, signal, prepared);
+  plugin.goalRecommend = new (load('core/goal-recommend-service.ts', { obsidian }).GoalRecommendService)(async (request, signal, prepared) => {
+    control.calls.push({ request, signal, step: prepared.step.id });
+    const out = await control.reply(request, signal, prepared);
     return typeof out === 'string' ? out : JSON.stringify(out);
-  });
-  plugin.goalTopicSuggest = new (load('core/goal-topic-suggest-service.ts', { obsidian }).GoalTopicSuggestService)(async (request, signal) => {
-    control.suggestCalls.push({ request, signal });
-    return control.suggest(request, signal);
   });
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
   const rootEl = element('div');
   rootEl.ownerDocument = { addEventListener: (name, fn) => listeners[name]?.push(fn), removeEventListener: (name, fn) => { listeners[name] = listeners[name]?.filter(f => f !== fn); } };
-  rootEl.querySelector = selector => selector.includes('data-goal-action="suggest"') ? find(rootEl, i => i.attrs['data-goal-action'] === 'suggest') ?? null : find(rootEl, i => hasCls(i, selector.replace(/^\./, ''))) ?? null;
+  rootEl.querySelector = selector => selector.includes('data-goal-action="recommend"') ? find(rootEl, i => i.attrs['data-goal-action'] === 'recommend') ?? null : find(rootEl, i => hasCls(i, selector.replace(/^\./, ''))) ?? null;
   const reload = async () => {
     view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)])));
     ({ goal: view.relevanceGoal, context: view.relevanceContext } = await repo.readRelevanceSetup(MAP));
@@ -76,57 +71,64 @@ async function harness({ language = 'en' } = {}) {
   view.render = () => { view.paintCount++; rootEl.empty(); view.renderRelevanceStatus(rootEl); view.renderGoalBar(rootEl); };
   await reload(); view.render();
   const h = {
-    repo, view, plugin, ids, control, notices, rootEl, listeners,
-    spark: () => find(rootEl, i => i.tag === 'button' && i.attrs['data-goal-action'] === 'suggest'),
+    repo, view, plugin, ids, control, notices, rootEl, listeners, contents,
+    spark: () => find(rootEl, i => i.tag === 'button' && i.attrs['data-goal-action'] === 'recommend'),
     icons: () => findAll(rootEl, i => i.tag === 'button' && hasCls(i, 'vam-goal-icon')),
     panel: () => find(rootEl, i => hasCls(i, 'vam-goal-suggest')),
     rows: () => findAll(rootEl, i => hasCls(i, 'vam-goal-suggest-row')),
     boxes: () => findAll(rootEl, i => i.tag === 'input'),
     titles: () => findAll(rootEl, i => hasCls(i, 'vam-goal-suggest-title')).map(i => i.text),
+    summaries: () => findAll(rootEl, i => hasCls(i, 'vam-goal-suggest-summary')).map(i => i.text),
+    tiers: () => findAll(rootEl, i => hasCls(i, 'vam-goal-suggest-tier')).map(i => i.text),
     whys: () => findAll(rootEl, i => hasCls(i, 'vam-goal-suggest-why')).map(i => i.text),
     addBtn: () => find(rootEl, i => hasCls(i, 'vam-goal-suggest-add')),
     skipBtn: () => find(rootEl, i => hasCls(i, 'vam-goal-suggest-skip')),
-    stopBtn: () => find(rootEl, i => hasCls(i, 'vam-goal-suggest-stop')),
+    stopBtn: () => findAll(rootEl, i => i.tag === 'button' && i.attrs['aria-label'] === 'Stop' || i.text === 'Stop')[0],
     titlesOnDisk: async () => (await Promise.all((await repo.readMap(MAP)).nodes.map(async n => (await repo.readNote(n.path)).title))).sort(),
-    // Press the spark and wait for the list.
-    open: async () => { h.spark().click(); await until(() => h.panel() && !h.stopBtn()); },
+    noteOf: async title => { for (const n of (await repo.readMap(MAP)).nodes) { const note = await repo.readNote(n.path); if (note.title === title) return { note, path: n.path }; } return null; },
+    tierOf: async title => (await h.noteOf(title))?.note.relevance?.tier,
+    // Press the recommend button and wait for the list.
+    open: async () => { h.spark().click(); await until(() => h.panel()); },
     run: () => plugin.relevanceGrades.get(MAP),
     settled: () => until(() => h.run() && h.run().status !== 'running')
   };
   return h;
 }
 const BASE = ['Body', 'Dreams', 'Mind', 'REM', 'Sleep'];
+const hasHtmlApi = /innerHTML|outerHTML|insertAdjacentHTML|createEl\(\s*"template"/;
 
-test('goal suggest: the spark asks for the usage confirmation, shows "Suggesting…" with Stop and three disabled icons, then the list', async () => {
+test('goal recommend: the button asks for the usage confirmation once, makes ONE AI call, writes the tiers, then opens the list with summary and tier per card', async () => {
   const h = await harness();
   assert.equal(h.spark().disabled, false);
-  const gate = deferred(); h.control.suggest = async () => { await gate.promise; return JSON.stringify({ suggestions: TWO }); };
+  assert.equal(h.spark().attrs['aria-label'], 'Recommend new cards for this goal and update the tiers');
+  const gate = deferred(); h.control.reply = async request => { await gate.promise; return { items: gradeAll(request), suggestions: TWO }; };
   h.spark().click();
+  await until(() => h.control.calls.length);
   assert.equal(h.control.usageAsks, 1);
-  await until(() => h.stopBtn());
-  assert.equal(find(h.panel(), i => i.attrs.role === 'status').text, 'Suggesting…');
-  assert.equal(h.stopBtn().text, 'Stop'); assert.equal(h.stopBtn().focused, true, 'the keyboard stays in the panel');
-  assert.ok(h.icons().length === 3 && h.icons().every(b => b.disabled), 'the three goal icons are disabled while asking');
-  gate.resolve(); await until(() => !h.stopBtn() && h.rows().length);
+  assert.ok(h.icons().length === 2 && h.icons().every(b => b.disabled), 'both goal icons (recommend, sort) are disabled while the run asks');
+  assert.equal(h.panel(), undefined, 'no list while the call is out');
+  gate.resolve(); await until(() => h.panel());
+  assert.equal(h.control.calls.length, 1, 'one AI call');
   assert.deepEqual(h.titles(), ['Sleep stages', 'Stress habits']);
+  assert.deepEqual(h.summaries(), ['About it.', 'About it too.']);
+  assert.deepEqual(h.tiers(), ['Must learn', 'Learn when needed']);
   assert.deepEqual(h.whys(), ['Goes under “Body”', 'Goes under “Mind”']);
-  assert.equal(h.panel().attrs.role, 'group'); assert.equal(h.panel().attrs['aria-label'], 'Suggested new topics');
+  assert.equal(h.panel().attrs.role, 'group'); assert.equal(h.panel().attrs['aria-label'], 'Recommended new topics');
   assert.ok(h.boxes().every(b => b.attrs.type === 'checkbox' || b.type === 'checkbox'));
-  assert.ok(h.boxes().every(b => b.checked), 'default: every suggestion is checked');
+  assert.ok(h.boxes().every(b => b.checked), 'default: every recommended card is checked');
   assert.equal(h.addBtn().text, 'Add 2'); assert.equal(h.skipBtn().text, 'Skip');
-  assert.equal(h.boxes()[0].focused, true, 'focus moves into the list');
-  const others = h.icons().filter(b => b.attrs['data-goal-action'] !== 'suggest');
-  assert.equal(others.length, 2);
-  for (const label of ['Grade with this', 'Sort by relevance']) {
-    const icon = others.find(b => b.attrs['aria-label'] === label);
-    assert.ok(icon, `the ${label} icon exists`); assert.equal(icon.disabled, false, `${label} is enabled while the list is ready`);
-  }
-  assert.equal(h.spark().disabled, false, 'the spark (closes the list) is enabled too');
-  assert.deepEqual(await h.titlesOnDisk(), BASE, 'nothing is written by suggesting');
-  assert.equal(h.control.suggestCalls[0].request.goal, 'Sleep better');
+  assert.equal(h.boxes()[0].focused, true, 'focus moves into the list (it was on the page)');
+  assert.equal(h.icons().length, 2);
+  const sort = h.icons().find(b => b.attrs['aria-label'] === 'Sort by relevance');
+  assert.ok(sort && !sort.disabled, 'the sort icon is enabled while the list is ready');
+  assert.equal(h.spark().disabled, false, 'the recommend button (closes the list) is enabled too');
+  assert.deepEqual(await h.titlesOnDisk(), BASE, 'no card is added by recommending');
+  assert.equal(await h.tierOf('Body'), 'core', 'the tiers of the map were written by the same call');
+  assert.equal(h.control.calls[0].request.goal, 'Sleep better');
+  assert.equal(h.control.usageAsks, 1);
 });
 
-test('goal suggest: the count follows the checked rows and Add is disabled at 0', async () => {
+test('goal recommend: the count follows the checked rows and Add is disabled at 0', async () => {
   const h = await harness();
   await h.open();
   h.boxes()[0].checked = false; h.boxes()[0].fire('change');
@@ -135,49 +137,101 @@ test('goal suggest: the count follows the checked rows and Add is disabled at 0'
   assert.equal(h.addBtn().text, 'Add 0'); assert.equal(h.addBtn().disabled, true);
   h.addBtn().fire('click'); await tick();
   assert.deepEqual(await h.titlesOnDisk(), BASE, 'a forced click at N=0 still writes nothing');
-  assert.equal(h.control.usageAsks, 1);
+  assert.equal(h.control.usageAsks, 1); assert.equal(h.control.calls.length, 1);
 });
 
-test('goal suggest: model text goes into the DOM as text only (an <img onerror> title stays literal)', async () => {
+test('goal recommend: model text (title and summary) goes into the DOM as text only (an <img onerror> stays literal; counter-example 6)', async () => {
   const h = await harness();
   const evil = '<img src=x onerror=alert(1)>';
-  h.control.suggest = async () => JSON.stringify({ suggestions: [{ parentId: 'c2', title: evil, summary: 'About it.' }] });
+  h.control.reply = async request => ({ items: gradeAll(request), suggestions: [{ parentId: 'c2', title: evil, summary: evil, suggestedTier: 'support' }] });
   await h.open();
-  assert.deepEqual(h.titles(), [evil]);
+  assert.deepEqual(h.titles(), [evil]); assert.deepEqual(h.summaries(), [evil]);
   assert.equal(findAll(h.rootEl, i => i.tag === 'img').length, 0);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   const section = source.slice(source.indexOf('Suggest new topics for the goal'), source.indexOf('Starts the Claude CLI for the grade'));
-  assert.ok(section.length > 3000, 'the scanned section is the goal-suggest code');
-  assert.doesNotMatch(section, /innerHTML|outerHTML|insertAdjacentHTML|createEl\(\s*"template"/);
+  assert.ok(section.length > 3000, 'the scanned section is the goal-recommend list code');
+  assert.doesNotMatch(section, hasHtmlApi);
+  assert.equal(h.control.calls.length, 1);
 });
 
-test('goal suggest: Add writes only the checked cards under their parents as ONE undo step, then grades by the goal (full when nothing is graded)', async () => {
+test('goal recommend: Add writes only the checked cards, each with the list\'s tier (not hand-set), never the summary, as ONE undo step, and asks no AI (counter-examples 5, 6)', async () => {
   const h = await harness();
   await h.open();
   h.boxes()[1].checked = false; h.boxes()[1].fire('change');
   const past = h.view.history.past.length;
-  const gate = deferred(); h.control.gradeGate = gate;
   h.addBtn().click();
-  await until(() => h.control.gradeCalls.length);
-  const saved = await h.repo.readMap(MAP);
-  const created = saved.nodes.filter(n => !Object.values(h.ids).includes(n.id));
-  assert.equal(created.length, 1);
+  await until(() => h.panel() === undefined && h.view.goalSuggestTask === null);
+  const created = (await h.repo.readMap(MAP)).nodes.filter(n => !Object.values(h.ids).includes(n.id));
+  assert.equal(created.length, 1, 'only the checked card was added');
   assert.equal(created[0].parentId, h.ids.a, 'under Body');
-  assert.equal((await h.repo.readNote(created[0].path)).title, 'Sleep stages');
-  assert.equal((await h.repo.readNote(created[0].path)).summary, 'About it.', 'the AI summary is the new card\'s summary, not the placeholder');
+  const note = await h.repo.readNote(created[0].path);
+  assert.equal(note.title, 'Sleep stages');
+  assert.equal(note.relevance?.tier, 'core', 'the tier the list showed');
+  assert.ok(!note.relevance?.manual, 'an AI tier, not a hand-set one');
+  assert.ok(!(await h.titlesOnDisk()).includes('Stress habits'), 'the unchecked card does not exist');
+  assert.ok(![...h.view.notes.values()].some(n => /About it/.test(n.summary ?? '')), 'no summary of the list is on any card');
   assert.equal(h.view.history.past.length, past + 1, 'the add is one undo step');
-  assert.equal(h.panel(), undefined, 'the list closes');
-  assert.equal(h.control.gradeCalls[0].step, 'relevance-grade', 'no AI grade yet: a full grade');
-  assert.ok(h.control.gradeCalls[0].request.nodes.some(n => n.title === 'Sleep stages'), 'the new card is in the graded map');
-  assert.equal(h.control.usageAsks, 2, 'the grade asks for the usage confirmation itself');
-  gate.resolve(); await h.settled();
-  assert.equal((await h.repo.readNote(created[0].path)).relevance?.tier, 'support', 'the new card got a tier');
+  assert.equal(h.control.calls.length, 1, 'Add made no AI call');
+  assert.equal(h.control.usageAsks, 1, 'and asked for no usage confirmation');
 });
 
-test('goal suggest: one undo removes every card the Add step created', async () => {
+test('goal recommend: nothing of the list summary reaches any note file; it lives only in the list DOM (counter-example 6)', async () => {
+  const h = await harness();
+  h.control.reply = async request => ({ items: gradeAll(request), suggestions: [{ parentId: 'c2', title: 'Sleep stages', summary: 'ZZ-summary-only-in-the-list', suggestedTier: 'support' }] });
+  await h.open();
+  assert.deepEqual(h.summaries(), ['ZZ-summary-only-in-the-list']);
+  h.addBtn().click();
+  await until(() => h.view.goalSuggestTask === null);
+  const card = await h.noteOf('Sleep stages');
+  assert.ok(card, 'the card was added');
+  for (const n of (await h.repo.readMap(MAP)).nodes) {
+    const note = await h.repo.readNote(n.path);
+    assert.ok(!JSON.stringify(note).includes('ZZ-summary-only-in-the-list'), `${note.title}: the summary is not on the card`);
+  }
+  assert.ok([...h.contents.values()].length > 0); for (const [file, text] of h.contents) assert.ok(!String(text).includes('ZZ-summary-only-in-the-list'), `${file}: the summary is in no file`);
+  assert.equal(card.note.relevance?.tier, 'support'); assert.ok(!card.note.relevance?.manual);
+  assert.equal(h.control.calls.length, 1);
+});
+
+test('goal recommend: Add raises an AI-set parent above a new card in the same undo step; a hand-set parent keeps its tier (counter-example 7)', async () => {
+  const h = await harness();
+  // Mind (support, AI) gets a core child: Mind is raised. Body is hand-set support: REM (side, AI) gets a core child and is raised, Body is not.
+  h.control.reply = async request => ({ items: gradeAll(request), suggestions: [{ parentId: 'c4', title: 'Stress habits', summary: 's', suggestedTier: 'core' }, { parentId: 'c3', title: 'Dream recall', summary: 's', suggestedTier: 'core' }] });
+  await h.open();
+  const bodyPath = h.view.map.nodes.find(n => n.id === h.ids.a).path;
+  await h.repo.writeRelevance(bodyPath, { tier: 'support', manual: true });
+  assert.equal(await h.tierOf('Mind'), 'support'); assert.equal(await h.tierOf('REM'), 'side');
+  const past = h.view.history.past.length;
+  h.addBtn().click();
+  await until(() => h.view.goalSuggestTask === null && h.view.history.past.length === past + 1);
+  assert.equal(await h.tierOf('Mind'), 'core', 'the AI-set parent is raised to the new card');
+  assert.equal(await h.tierOf('REM'), 'core', 'a side parent is raised too');
+  const body = (await h.noteOf('Body')).note.relevance;
+  assert.deepEqual({ tier: body.tier, manual: !!body.manual }, { tier: 'support', manual: true }, 'a hand-set parent is not changed');
+  assert.equal(h.control.calls.length, 1);
+  await h.view.travel(false);
+  assert.equal(h.view.history.past.length, past, 'one undo takes the whole step back');
+  assert.deepEqual(await h.titlesOnDisk(), BASE, 'both cards are gone');
+  assert.equal(await h.tierOf('Mind'), 'support', 'and the raised parent is back'); assert.equal(await h.tierOf('REM'), 'side');
+});
+
+test('goal recommend: an AI-locked parent is not raised, but the height still reaches the next unlocked parent (counter-example 7)', async () => {
+  const h = await harness();
+  // Dreams is under Mind (support). Lock Mind: it keeps its tier. Dreams (support, AI) is raised by a core child.
+  h.control.reply = async request => ({ items: gradeAll(request), suggestions: [{ parentId: 'c5', title: 'Dream recall', summary: 's', suggestedTier: 'core' }] });
+  await h.open();
+  await h.repo.writeAiLocked(h.view.map.nodes.find(n => n.id === h.ids.b).path, true);
+  h.addBtn().click();
+  await until(() => h.view.goalSuggestTask === null);
+  assert.equal(await h.tierOf('Dream recall'), 'core');
+  assert.equal(await h.tierOf('Dreams'), 'core', 'the direct parent is raised');
+  assert.equal(await h.tierOf('Mind'), 'support', 'the locked grandparent keeps its tier');
+  assert.equal(h.control.calls.length, 1);
+});
+
+test('goal recommend: one undo removes every card the Add step created', async () => {
   const h = await harness();
   await h.open();
-  h.control.decline = true; // the follow-up grade is declined, so the only history entry is the add step
   const past = h.view.history.past.length;
   h.addBtn().click();
   await until(() => h.view.history.past.length === past + 1);
@@ -187,119 +241,126 @@ test('goal suggest: one undo removes every card the Add step created', async () 
   assert.equal(h.view.history.past.length, past, 'one undo takes the whole step back');
   assert.deepEqual(await h.titlesOnDisk(), BASE, 'every card the step added is gone');
   assert.equal((await h.repo.readMap(MAP)).nodes.length, 5);
+  assert.equal(h.control.calls.length, 1);
 });
 
-test('goal suggest: with an AI grade already there the follow-up grade is a recalibrate', async () => {
+test('goal recommend: with AI tiers already there, the button asks scope current and Add still makes no second call (approval point 1: no follow-up grade)', async () => {
   const h = await harness();
-  h.view.relevanceAiGrades = () => [{ id: h.ids.a }];
-  await h.open();
-  h.addBtn().click();
-  await until(() => h.control.gradeCalls.length);
-  assert.equal(h.control.gradeCalls[0].step, 'relevance-recalibrate');
-  await h.settled();
+  await h.open(); h.skipBtn().click();
+  await h.view.hydrate();
+  h.control.reply = async () => ({ items: [], suggestions: TWO });
+  h.spark().click(); await until(() => h.control.calls.length === 2 && h.panel());
+  assert.equal(h.control.calls[1].request.scope, 'current'); assert.ok(h.control.calls[1].request.current.length > 0);
+  h.addBtn().click(); await until(() => h.view.goalSuggestTask === null);
+  for (let i = 0; i < 20; i++) await tick();
+  assert.equal(h.control.calls.length, 2, 'Add asked no AI');
+  assert.deepEqual(h.control.calls.map(c => c.step), ['goal-recommend', 'goal-recommend']);
+  assert.equal(h.control.usageAsks, 2);
 });
 
-test('goal suggest: Add twice quickly adds once', async () => {
+test('goal recommend: Add twice quickly adds once', async () => {
   const h = await harness();
   await h.open();
   const add = h.addBtn();
   let addNodeCalls = 0; const addNode = h.view.addNode.bind(h.view); h.view.addNode = (...args) => { addNodeCalls++; return addNode(...args); };
-  h.control.gradeGate = deferred();
   add.fire('click'); add.fire('click');
-  await until(() => h.control.gradeCalls.length);
+  await until(() => h.view.goalSuggestTask === null);
   for (let i = 0; i < 30; i++) await tick(); // a second, unguarded Add would still be writing
   assert.deepEqual((await h.titlesOnDisk()).filter(x => !BASE.includes(x)), ['Sleep stages', 'Stress habits']);
   assert.equal(addNodeCalls, 2, 'two cards were written once, not twice');
-  assert.equal(h.control.gradeCalls.length, 1);
-  h.control.gradeGate.resolve(); await h.settled();
+  assert.equal(h.control.calls.length, 1);
 });
 
-test('goal suggest: a parent deleted, renamed or AI-locked while the list waited is skipped on Add and the count is announced', async () => {
+test('goal recommend: a parent deleted, renamed or AI-locked while the list waited is skipped on Add, counted and announced (counter-example 18)', async () => {
   const h = await harness();
-  h.control.suggest = async () => JSON.stringify({ suggestions: [{ parentId: 'c2', title: 'Sleep stages', summary: 'About it.' }, { parentId: 'c5', title: 'Stress habits', summary: 'About it.' }, { parentId: 'c3', title: 'Light exposure', summary: 'About it.' }] });
+  h.control.reply = async request => ({ items: gradeAll(request), suggestions: [{ parentId: 'c2', title: 'Sleep stages', summary: 'About it.', suggestedTier: 'core' }, { parentId: 'c5', title: 'Stress habits', summary: 'About it.', suggestedTier: 'support' }, { parentId: 'c3', title: 'Light exposure', summary: 'About it.', suggestedTier: 'support' }] });
   await h.open();
   h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.d); // Dreams deleted (in the map file too, so the write finds no outside change)
   await h.repo.saveMap(MAP, h.view.map);
   await h.repo.writeAiLocked(h.view.map.nodes.find(n => n.id === h.ids.c).path, true); // REM locked meanwhile, on disk (Add reads the notes again)
-  h.control.gradeGate = deferred();
   h.addBtn().click();
   await until(() => h.notices.some(m => /no longer fit/.test(m)));
   const added = (await h.titlesOnDisk()).filter(x => !BASE.includes(x));
-  assert.ok(added.includes('Sleep stages'), 'the intact suggestion is added');
+  assert.ok(added.includes('Sleep stages'), 'the intact recommendation is added');
   assert.ok(!added.includes('Stress habits'), 'the deleted parent is skipped');
   assert.ok(!added.includes('Light exposure'), 'the parent locked meanwhile is skipped');
-  assert.match(h.notices.find(m => /no longer fit/.test(m)), /^2 suggestions no longer fit the map and were skipped$/);
-  h.control.gradeGate.resolve(); await h.settled().catch(() => {});
+  assert.match(h.notices.find(m => /no longer fit/.test(m)), /^2 recommendations no longer fit the map and were skipped$/);
+  assert.equal(h.control.calls.length, 1);
 });
 
-test('goal suggest: a renamed parent is skipped on Add', async () => {
+test('goal recommend: a renamed parent is skipped on Add (counter-example 18)', async () => {
   const h = await harness();
   await h.open();
   await h.repo.updateNote(h.view.map.nodes.find(n => n.id === h.ids.a).path, { title: 'Body (renamed)' });
-  h.control.gradeGate = deferred();
   h.addBtn().click();
   await until(() => h.notices.some(m => /no longer fit/.test(m)));
   assert.ok(!(await h.titlesOnDisk()).includes('Sleep stages'));
   assert.ok((await h.titlesOnDisk()).includes('Stress habits'));
-  h.control.gradeGate.resolve(); await h.settled().catch(() => {});
+  assert.equal(h.control.calls.length, 1);
 });
 
-test('goal suggest: Stop writes nothing, and the late result is dropped', async () => {
+test('goal recommend: Stop writes nothing, opens no list, and the late reply is dropped', async () => {
   const h = await harness();
-  const gate = deferred(); h.control.suggest = async () => { await gate.promise; return JSON.stringify({ suggestions: TWO }); };
-  h.spark().click(); await until(() => h.stopBtn());
-  const signal = h.control.suggestCalls[0].signal;
+  const gate = deferred(); h.control.reply = async request => { await gate.promise; return { items: gradeAll(request), suggestions: TWO }; };
+  h.spark().click(); await until(() => h.control.calls.length);
+  const signal = h.control.calls[0].signal;
   h.stopBtn().click();
-  assert.equal(signal.aborted, true); assert.equal(h.panel(), undefined);
-  assert.ok(h.icons().every(b => !b.disabled || b.attrs['aria-label'] === 'Recalibrate'), 'icons are back');
-  assert.equal(h.spark().focused, true, 'focus returns to the spark');
-  gate.resolve(); await tick(); await tick();
-  assert.equal(h.panel(), undefined); assert.deepEqual(await h.titlesOnDisk(), BASE); assert.equal(h.notices.length, 0, 'a stop is silent');
+  assert.equal(signal.aborted, true); assert.equal(h.panel(), undefined); assert.equal(h.run().status, 'stopped');
+  gate.resolve(); for (let i = 0; i < 10; i++) await tick();
+  assert.equal(h.panel(), undefined); assert.deepEqual(await h.titlesOnDisk(), BASE);
+  assert.equal(await h.tierOf('Body'), undefined, 'no tier was written');
+  assert.equal(h.control.calls.length, 1);
 });
 
-test('goal suggest: closing the view or switching maps drops the late result', async () => {
+test('goal recommend: closing the view or switching maps drops the late reply (no tiers, no list)', async () => {
   for (const how of ['close', 'switch']) {
     const h = await harness();
-    const gate = deferred(); h.control.suggest = async () => { await gate.promise; return JSON.stringify({ suggestions: TWO }); };
-    h.spark().click(); await until(() => h.stopBtn());
-    const signal = h.control.suggestCalls[0].signal;
-    if (how === 'close') { h.view.closed = true; h.view.dropMapBackground(); } else { h.view.dropMapBackground(); h.view.path = 'Agent Workspace/Topics/other/Map.md'; }
+    const gate = deferred(); h.control.reply = async request => { await gate.promise; return { items: gradeAll(request), suggestions: TWO }; };
+    h.spark().click(); await until(() => h.control.calls.length);
+    const signal = h.control.calls[0].signal;
+    if (how === 'close') { h.view.closed = true; h.view.abortRelevanceGrade?.(); h.view.dropMapBackground(); } else { h.view.abortRelevanceGrade?.(); h.view.dropMapBackground(); h.view.path = 'Agent Workspace/Topics/other/Map.md'; }
     assert.equal(signal.aborted, true, how);
-    gate.resolve(); await tick(); await tick();
+    gate.resolve(); for (let i = 0; i < 10; i++) await tick();
     assert.equal(h.view.goalSuggestTask, null, how);
     assert.equal(h.rows().length, 0, how);
     h.view.path = MAP;
     assert.deepEqual(await h.titlesOnDisk(), BASE, how);
+    assert.equal(await h.tierOf('Body'), undefined, `${how}: no tier was written`);
+    assert.equal(h.control.calls.length, 1, how);
   }
 });
 
-test('goal suggest: a declined usage notice calls no AI and writes nothing', async () => {
+test('goal recommend: a declined usage notice calls no AI and writes nothing', async () => {
   const h = await harness();
   h.control.decline = true;
-  h.spark().click(); await until(() => h.view.goalSuggestTask === null);
-  assert.equal(h.control.suggestCalls.length, 0); assert.equal(h.panel(), undefined);
+  h.spark().click(); await until(() => h.run() && h.run().status !== 'running');
+  assert.equal(h.control.calls.length, 0); assert.equal(h.panel(), undefined);
   assert.deepEqual(await h.titlesOnDisk(), BASE);
+  assert.equal(await h.tierOf('Body'), undefined);
   assert.equal(h.spark().disabled, false, 'it can be pressed again');
 });
 
-test('goal suggest: Skip, Esc and a press outside close the list, write nothing, and return focus to the spark', async () => {
+test('goal recommend: Skip, Esc and a press outside close the list, keep the tiers, make no AI call, and return focus to the button (counter-example 8)', async () => {
   for (const how of ['skip', 'esc', 'outside']) {
     const h = await harness();
     await h.open();
     assert.equal(h.listeners.pointerdown.length, 1, 'one outside listener while the list is open');
+    const entries = h.view.history.past.length;
     if (how === 'skip') h.skipBtn().click();
     else if (how === 'esc') h.panel().fire('keydown', { key: 'Escape' });
     else h.listeners.pointerdown[0]({ target: element('div') });
     assert.equal(h.panel(), undefined, how);
     assert.equal(h.listeners.pointerdown.length, 0, `${how}: listener removed`);
     assert.deepEqual(await h.titlesOnDisk(), BASE, how);
-    assert.equal(h.control.gradeCalls.length, 0, how);
+    assert.equal(await h.tierOf('Body'), 'core', `${how}: the tiers stay`);
+    assert.equal(h.view.history.past.length, entries, `${how}: and the run's undo step stays`);
+    assert.equal(h.control.calls.length, 1, how);
     if (how !== 'outside') assert.equal(h.spark().focused, true, how);
     else { await new Promise(r => setTimeout(r, 5)); assert.equal(h.spark().focused, true, 'outside press: focus comes back once the browser has settled'); }
   }
 });
 
-test('goal suggest: Esc anywhere on the canvas closes an open list first; with no list the old Esc handling is untouched; hidden icons send focus to the goal text', async () => {
+test('goal recommend: Esc anywhere on the canvas closes an open list first; with no list the old Esc handling is untouched; hidden icons send focus to the goal text', async () => {
   const h = await harness();
   const esc = () => { const e = { key: 'Escape', target: { closest: () => null }, defaultPrevented: false, prevented: 0, stopped: 0, preventDefault() { this.prevented++; }, stopPropagation() { this.stopped++; } }; return e; };
   h.view.contentEl.ownerDocument.querySelector = () => null;
@@ -309,66 +370,91 @@ test('goal suggest: Esc anywhere on the canvas closes an open list first; with n
   assert.equal(h.panel(), undefined, 'the list is closed by an Esc with focus on the canvas');
   assert.equal(h.escaped, undefined, 'the selection was not cleared by that Esc'); assert.ok(e.prevented && e.stopped);
   assert.equal(h.spark().focused, true);
-  // A hidden spark (no hover, icons display:none) cannot take focus: the goal text gets it and shows the icons.
+  // A hidden button (no hover, icons display:none) cannot take focus: the goal text gets it and shows the icons.
+  h.control.reply = async request => ({ items: [], suggestions: TWO });
+  await h.view.hydrate();
   await h.open();
   const query = h.rootEl.querySelector;
-  h.rootEl.querySelector = selector => { const el = query(selector); if (el && selector.includes('data-goal-action="suggest"')) Object.defineProperty(el, 'offsetParent', { value: null, configurable: true }); return el; };
+  h.rootEl.querySelector = selector => { const el = query(selector); if (el && selector.includes('data-goal-action="recommend"')) Object.defineProperty(el, 'offsetParent', { value: null, configurable: true }); return el; };
   const hidden = esc(); h.view.onMapKeydown(hidden);
   assert.equal(h.panel(), undefined);
   assert.equal(find(h.rootEl, i => hasCls(i, 'vam-goal-text')).focused, true, 'focus fell back to the goal text');
-  assert.ok(!h.spark().focused, 'not on the hidden spark');
+  assert.ok(!h.spark().focused, 'not on the hidden button');
 });
 
-test('goal suggest: starting a grade while the list is open closes the list', async () => {
+test('goal recommend: pressing the button while the list is open only closes the list; no AI call, no usage notice (counter-example 12)', async () => {
   const h = await harness();
   await h.open();
-  h.icons().find(b => b.attrs['aria-label'] === 'Grade by goal' || /alibrate|Grade/.test(b.attrs['aria-label'] ?? '')).click();
-  await until(() => h.control.gradeCalls.length);
+  h.spark().click();
   assert.equal(h.panel(), undefined); assert.equal(h.view.goalSuggestTask, null);
-  await h.settled();
+  for (let i = 0; i < 10; i++) await tick();
+  assert.equal(h.control.calls.length, 1); assert.equal(h.control.usageAsks, 1);
+  assert.equal(h.spark().focused, true);
 });
 
-test('goal suggest: an empty answer says so and closes; an entirely unusable one says that', async () => {
+test('goal recommend: a reply with no recommendations opens no list and says nothing; the tiers are still written (counter-example 13)', async () => {
   const h = await harness();
-  h.control.suggest = async () => JSON.stringify({ suggestions: [] });
-  h.spark().click(); await until(() => h.notices.length);
-  assert.deepEqual(h.notices, ['No topics to add']); assert.equal(h.panel(), undefined);
-  h.control.suggest = async () => JSON.stringify({ suggestions: [{ parentId: 'c9', title: 'Ghost', summary: 'About it.' }] });
-  h.spark().click(); await until(() => h.notices.length === 2);
-  assert.equal(h.notices[1], "The AI's 1 suggestions could not be used. Nothing was changed.");
-  assert.equal(h.panel(), undefined);
+  h.control.reply = async request => ({ items: gradeAll(request), suggestions: [] });
+  h.spark().click(); await h.settled();
+  for (let i = 0; i < 6; i++) await tick();
+  assert.equal(h.panel(), undefined); assert.deepEqual(h.notices, []);
+  assert.equal(await h.tierOf('Body'), 'core');
+  assert.equal(h.control.calls.length, 1);
 });
 
-test('goal suggest: a suggestion under an AI-locked parent is dropped with a count', async () => {
+test('goal recommend: a recommended card marked side is dropped alone; if all are side no list opens and the tiers are still written (counter-example 1)', async () => {
   const h = await harness();
-  h.view.notes.set(h.ids.b, { ...h.view.notes.get(h.ids.b), aiLocked: true });
+  h.control.reply = async request => ({ items: gradeAll(request), suggestions: [{ ...TWO[0], suggestedTier: 'side' }, TWO[1]] });
+  await h.open();
+  assert.deepEqual(h.titles(), ['Stress habits'], 'only the side one is dropped');
+  assert.deepEqual(h.tiers(), ['Learn when needed']);
+  assert.equal(h.control.calls.length, 1);
+  const all = await harness();
+  all.control.reply = async request => ({ items: gradeAll(request), suggestions: TWO.map(item => ({ ...item, suggestedTier: 'side' })) });
+  all.spark().click(); await all.settled();
+  for (let i = 0; i < 6; i++) await tick();
+  assert.equal(all.panel(), undefined, 'no list when every card is side');
+  assert.equal(await all.tierOf('Body'), 'core', 'the tiers are still written');
+  assert.equal(all.control.calls.length, 1);
+});
+
+test('goal recommend: a recommendation under an AI-locked parent is dropped with a count', async () => {
+  const h = await harness();
   const original = h.view.hydrate; h.view.hydrate = async () => { await original(); h.view.notes.set(h.ids.b, { ...h.view.notes.get(h.ids.b), aiLocked: true }); };
+  await h.view.hydrate();
   await h.open();
   assert.deepEqual(h.titles(), ['Sleep stages']);
   assert.ok(h.notices.some(m => /^1 suggestions touch locked topics/.test(m)));
+  assert.equal(h.control.calls.length, 1);
 });
 
-test('goal suggest: a provider failure shows a Notice, writes nothing, and can be pressed again', async () => {
+test('goal recommend: a provider failure shows the failure on the status bar, writes nothing, asks no second time, and can be pressed again', async () => {
   const h = await harness();
-  h.control.suggest = async () => { throw new Error('connection timed out'); };
-  h.spark().click(); await until(() => h.notices.length);
+  h.control.reply = async () => { throw new Error('connection timed out'); };
+  h.spark().click(); await h.settled();
+  assert.equal(h.run().status, 'failed');
   assert.equal(h.panel(), undefined); assert.deepEqual(await h.titlesOnDisk(), BASE);
+  assert.equal(await h.tierOf('Body'), undefined);
+  assert.equal(h.control.calls.length, 1, 'no retry');
   assert.equal(h.spark().disabled, false);
 });
 
-test('goal suggest: zh-TW and zh-CN strings use the product wording (the view reads the language at load, so the strings are checked directly)', () => {
+test('goal recommend: zh-TW and zh-CN strings use the product wording (the view reads the language at load, so the strings are checked directly)', () => {
   const { translate } = load('i18n.ts');
+  assert.equal(translate('zh-TW', 'ui.goal_recommend'), '依目標推薦新卡並更新等級');
   assert.equal(translate('zh-TW', 'ui.goal_suggest_under_0', 'Body'), '放在「Body」底下');
   assert.equal(translate('zh-TW', 'ui.goal_suggest_add_0', 2), '加入 2 個');
   assert.equal(translate('zh-TW', 'ui.goal_suggest_skip'), '略過');
-  assert.equal(translate('zh-TW', 'ui.goal_suggest_running'), '建議中…');
-  assert.equal(translate('zh-TW', 'ui.goal_suggest_stop'), '停止');
-  assert.equal(translate('zh-TW', 'ui.goal_suggest_none'), '沒有可補的議題');
   assert.equal(translate('zh-CN', 'ui.goal_suggest_add_0', 2), '加入 2 个');
-  for (const locale of ['zh-TW', 'zh-CN']) for (const key of ['ui.goal_suggest_list_label', 'ui.goal_suggest_unusable_0', 'ui.goal_suggest_skipped_0', 'ui.goal_suggest_added_0', 'ui.goal_suggest_history_label', 'error.plain_goal_suggest_context']) assert.doesNotMatch(translate(locale, key, 1), /地圖|地图/, key);
+  for (const locale of ['zh-TW', 'zh-CN']) for (const key of ['ui.goal_recommend', 'ui.goal_suggest_list_label', 'ui.goal_suggest_unusable_0', 'ui.goal_suggest_skipped_0', 'ui.goal_suggest_added_0', 'ui.goal_suggest_history_label', 'ui.relevance_history_label', 'ui.relevance_goal_set_hint', 'ui.relevance_goal_edit_hint', 'ui.relevance_clear_hint']) {
+    const text = translate(locale, key, 1);
+    assert.doesNotMatch(text, /地圖|地图|建議|建议|分級|分级/, `${locale} ${key}: recommend wording, no old words`);
+  }
+  for (const locale of ['zh-TW', 'zh-CN']) for (const key of ['ui.goal_suggest_list_label', 'ui.goal_suggest_unusable_0', 'ui.goal_suggest_skipped_0', 'ui.goal_suggest_history_label']) assert.match(translate(locale, key, 1), /推薦|推荐/, `${locale} ${key}`);
+  assert.equal(translate('en', 'ui.goal_recommend'), 'Recommend new cards for this goal and update the tiers');
 });
 
-test('goal suggest: the card scrolls its rows inside the canvas height and keeps the footer outside the scroll area', async () => {
+test('goal recommend: the card scrolls its rows inside the canvas height and keeps the footer outside the scroll area', async () => {
   const h = await harness();
   await h.open();
   const panel = h.panel();
@@ -414,10 +500,11 @@ const HEADER_SCOPE = '.view-header.vam-goal-host ';
 const FLOAT_MATCH = [...STYLES.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(m => /position: absolute/.test(m[2]) && /\.vam-goal-actions$/.test(m[1].trim()));
 assert.equal(FLOAT_MATCH.length, 1, 'exactly one rule floats the icons'); const ACTIONS_FLOAT = FLOAT_MATCH[0][2], FLOAT_SELECTOR = FLOAT_MATCH[0][1].trim();
 const floatsIn = inHeader => FLOAT_SELECTOR.startsWith(HEADER_SCOPE) ? inHeader : true; // does the narrow floating rule reach this host?
-const ICON_GAP = cssPx(ACTIONS_BASE, 'gap'), ICON_COUNT = 3; // three icons since P3 (the pencil is gone): the narrow icon box is 82 wide, not 108, and the wide slot 84, not 108; both are computed from these CSS values below
+const ICON_GAP = cssPx(ACTIONS_BASE, 'gap'), ICON_COUNT = 2; // two icons since goal-recommend P3 (recommend, sort; the grade icon is gone): the narrow icon box and the wide slot shrink with it; both are computed from these CSS values below
 const FLOAT_PAD = cssPx(ACTIONS_FLOAT, 'padding'), FLOAT_BORDER = cssPx(ACTIONS_FLOAT, 'border'), FLOAT_GAP = Number(ACTIONS_FLOAT.match(/top: calc\(100% \+ (\d+)px\)/)[1]), FLOAT_RIGHT = cssPx(ACTIONS_FLOAT, 'right');
 // In the bar: the icons plus the left padding. Floating under the row: the icons in a bordered chip.
-const INLINE_W = ICON_COUNT * ICON_W + (ICON_COUNT - 1) * ICON_GAP + cssPx(ACTIONS_BASE, 'padding-left'), INLINE_H = ICON_H;
+// The slot keeps its 84px (min-width) with two icons: the "+ Context" chip needs the room, and a goal's text wraps as it did with three icons.
+const INLINE_W = Math.max(cssPx(ACTIONS_BASE, 'min-width'), ICON_COUNT * ICON_W + (ICON_COUNT - 1) * ICON_GAP + cssPx(ACTIONS_BASE, 'padding-left')), INLINE_H = ICON_H;
 const FLOAT_W = ICON_COUNT * ICON_W + (ICON_COUNT - 1) * ICON_GAP + 2 * FLOAT_PAD + 2 * FLOAT_BORDER, FLOAT_H = ICON_H + 2 * FLOAT_PAD + 2 * FLOAT_BORDER;
 // While editing the slot holds "+ Context" (at most as wide as the icons' content) and keeps the icons' width in the wide bar; narrow it floats in the same kind of box.
 const EDIT_SLOT_W = cssPx(cssRule('.vam-goal-bar.is-editing .vam-goal-actions', /width: \d+px/), 'width'), CHIP_H = cssPx(cssRule('.vam-goal-add-context', /height:/), 'height');
@@ -472,7 +559,7 @@ const STATES = [
   { name: 'icon clicked by mouse, pointer left + tools hover', mouseFocus: true, hover: true },
   { name: 'suggest list at its tallest', attachment: 'suggest', content: 900 },
   { name: 'suggest list, long goal', attachment: 'suggest', content: 900, goalHeight: 120 },
-  { name: 'suggest list running', attachment: 'suggest', content: 40, running: true },
+  { name: 'suggest list applying (Add pressed)', attachment: 'suggest', content: 900, applying: true },
   { name: 'suggest list + tools hover', attachment: 'suggest', content: 900, hover: true },
   // Edit in place (P3): the slot holds "+ Context" once the goal has text (empty: nothing in it), and the context row is a one-line attachment. The textarea always matches :focus-visible.
   { name: 'editing, empty goal (nothing in the slot)', edit: 'empty' },
@@ -530,14 +617,14 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   const pane = R(PANE_LEFT, PANE_TOP, paneRight, PANE_BOTTOM);
   const overlay = element('div'); overlay.addClass('vam-canvas-overlay'); overlay.clientHeight = PANE_BOTTOM - canvasTop; overlay.getBoundingClientRect = () => canvas;
   view.viewportEl = { getBoundingClientRect: () => canvas };
-  view.chat = chat ? { isOverlay: true, overlayWidth: 44 + chat } : null;
+  view.chat = chat ? { isOverlay: true, overlayWidth: 44 + chat, refreshReplyUndo() {} } : null; // the run writes tiers and refreshes the chat's undo button
   if (state.attachment === 'suggest') await h.open();
   if (state.edit) {
     view.startGoalEdit({});
     if (state.edit === 'empty') { const area = find(h.rootEl, i => i.tag === 'textarea'); area.value = ''; area.fire('input'); }
     if (state.edit === 'context') find(h.rootEl, i => hasCls(i, 'vam-goal-add-context')).click();
   }
-  if (state.running) { const task = view.goalSuggestTask; task.state = 'running'; task.focus = null; view.render(); }
+  if (state.applying) { const task = view.goalSuggestTask; task.state = 'applying'; task.focus = null; view.render(); }
   h.rootEl.appendChild(overlay);
   const bar = find(h.rootEl, i => hasCls(i, 'vam-goal-bar'));
   // Narrow: measured widths; wide: centred in the row, capped at 460.
@@ -730,14 +817,14 @@ test('goal stack: only one attachment is open at a time (the list and the editor
   const textarea = () => find(h.rootEl, i => i.tag === 'textarea');
   h.view.startGoalEdit({}); find(h.rootEl, i => hasCls(i, 'vam-goal-add-context')).click();
   assert.ok(textarea() && find(h.rootEl, i => hasCls(i, 'vam-goal-context')), 'the editor with its context row is open');
-  assert.equal(h.icons().length, 0, 'no icons while editing, so the spark cannot open the list; startGoalSuggest is the only way in');
-  await h.view.startGoalSuggest(); await until(() => h.panel() && !h.stopBtn());
+  assert.equal(h.icons().length, 0, 'no icons while editing, so the button cannot start a run; a chat rate_by_goal run is the way in');
+  await h.view.submitRelevanceGoal('Sleep better', ''); await until(() => h.panel());
   assert.equal(textarea(), undefined, 'opening the list drops the editor'); assert.equal(h.view.goalEdit, null);
   assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-goal-attachment')).length, 1);
   find(h.rootEl, i => hasCls(i, 'vam-goal-text')).click();
   assert.ok(textarea(), 'a press on the goal opens the editor'); assert.equal(h.panel(), undefined, 'and closes the list'); assert.equal(h.view.goalSuggestTask, null);
   assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-goal-attachment')).length, 0, 'the editor has no attachment until its context row is asked for');
-  assert.equal(h.control.gradeCalls.length, 0);
+  assert.equal(h.control.calls.length, 1, 'the one run is the only AI call');
 });
 
 test('goal stack: the one z rule is on the goal host (above the overlay chat 12 and the hover card 10); the bar and its panels set none; the sources panel and its bounds stay', () => {
@@ -787,43 +874,41 @@ test('goal stack: the strip is left out where a clickable lies in the gap betwee
   assert.equal(px(blocked.bar.style['--vam-goal-bridge-top']), null, 'a button in the gap: no strip over it');
 });
 
-// ---- the tier floor for just-added cards, and no suggestion under a skippable card --------------------------------
+// ---- the tier of a just-added card is the list's tier; no floor and no second call ---------------------------------
 
-const SIDE_FOR_NEW = request => request.nodes.filter(n => n.parentId !== null).map(n => ({ id: labelOf(request, n.id), tier: ['Sleep stages', 'Stress habits'].includes(n.title) ? 'side' : (TITLES[n.title] ?? 'support') }));
-const tierOnDisk = async (h, title) => {
-  const map = await h.repo.readMap(MAP);
-  for (const n of map.nodes) { const note = await h.repo.readNote(n.path); if (note.title === title) return note.relevance?.tier; }
-  return 'missing';
-};
-
-test('goal suggest: a card the AI grades side under a non-side parent is written as support after Add (full grade; counter-examples 1, 7)', async () => {
+test('goal recommend: a recommended side card never reaches the list, so no card is written side under a non-side parent; Add keeps the list tier with ONE call in all (counter-example 1, replaces the old floor test)', async () => {
   const h = await harness();
-  h.control.grade = async request => request.nodes.length && { items: SIDE_FOR_NEW(request) };
-  await h.open(); h.addBtn().click(); await until(() => h.control.gradeCalls.length); await h.settled();
-  assert.equal(h.control.gradeCalls[0].step, 'relevance-grade');
-  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'support', 'under Body (core)');
-  assert.equal(await tierOnDisk(h, 'Stress habits'), 'support', 'under Mind (support)');
-  assert.equal(await tierOnDisk(h, 'REM'), 'side', 'an old card the AI called side stays side');
+  h.control.reply = async request => ({ items: gradeAll(request), suggestions: [{ ...TWO[0], suggestedTier: 'side' }, TWO[1], { parentId: 'c3', title: 'Light exposure', summary: 's', suggestedTier: 'support' }] });
+  await h.open(); h.addBtn().click(); await until(() => h.view.goalSuggestTask === null);
+  for (let i = 0; i < 10; i++) await tick();
+  assert.equal(await h.tierOf('Sleep stages'), undefined, 'the side recommendation was dropped, not added');
+  assert.equal(await h.tierOf('Stress habits'), 'support');
+  assert.equal(await h.tierOf('Light exposure'), 'support');
+  assert.equal(await h.tierOf('REM'), 'support', 'REM (side, AI) was raised because it now holds a support card');
+  assert.equal(h.control.calls.length, 1);
 });
 
-test('goal suggest: the same floor applies in recalibrate mode (counter-example 7)', async () => {
+test('goal recommend: the same holds with scope current: the side recommendation is dropped and Add makes no call', async () => {
   const h = await harness();
-  h.control.grade = async request => ({ changes: request.nodes.filter(n => ['Sleep stages', 'Stress habits'].includes(n.title)).map(n => ({ id: labelOf(request, n.id), tier: 'side', anchor: null })) });
-  h.view.relevanceAiGrades = () => [{ id: h.ids.a, tier: 'core' }, { id: h.ids.b, tier: 'support' }, { id: h.ids.c, tier: 'side' }, { id: h.ids.d, tier: 'support' }];
-  await h.open(); h.addBtn().click(); await until(() => h.control.gradeCalls.length); await h.settled();
-  assert.equal(h.control.gradeCalls[0].step, 'relevance-recalibrate');
-  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'support');
-  assert.equal(await tierOnDisk(h, 'Stress habits'), 'support');
+  await h.open(); h.skipBtn().click(); await h.view.hydrate();
+  h.control.reply = async () => ({ items: [], suggestions: [{ ...TWO[0], suggestedTier: 'side' }, TWO[1]] });
+  h.spark().click(); await until(() => h.control.calls.length === 2 && h.panel());
+  assert.equal(h.control.calls[1].request.scope, 'current');
+  assert.deepEqual(h.titles(), ['Stress habits']);
+  h.addBtn().click(); await until(() => h.view.goalSuggestTask === null);
+  for (let i = 0; i < 10; i++) await tick();
+  assert.equal(await h.tierOf('Stress habits'), 'support');
+  assert.equal(h.control.calls.length, 2, 'only the two button presses asked');
 });
 
-test('goal suggest: an ordinary grade without suggested cards leaves side as side, and the floor is not kept (counter-examples 2, 9)', async () => {
+test('goal recommend: the list tier is not kept: the next run rates an added card freely, even as side (decision 3 of suggest-tier-floor still holds)', async () => {
   const h = await harness();
-  h.control.grade = async request => ({ items: SIDE_FOR_NEW(request) });
-  await h.open(); h.addBtn().click(); await until(() => h.control.gradeCalls.length); await h.settled();
-  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'support');
+  await h.open(); h.addBtn().click(); await until(() => h.view.goalSuggestTask === null);
+  for (let i = 0; i < 10; i++) await tick();
+  assert.equal(await h.tierOf('Sleep stages'), 'core');
   await h.view.hydrate();
-  await h.view.submitRelevanceGoal('Sleep better', '', 'full');
-  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'side', 'the next ordinary grade is not floored');
-  assert.equal(await tierOnDisk(h, 'Stress habits'), 'side');
+  h.control.reply = async request => ({ items: request.nodes.filter(n => n.title === 'Stress habits').map(n => ({ id: labelOf(request, n.id), tier: 'side' })), suggestions: [] });
+  await h.view.submitRelevanceGoal('Sleep better', '');
+  assert.equal(h.control.calls.length, 2, 'Add asked nothing; the explicit second run asked once');
+  assert.equal(await h.tierOf('Stress habits'), 'side', 'the next run is not floored');
 });
-

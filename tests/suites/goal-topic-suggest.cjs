@@ -127,8 +127,9 @@ test('goal-topic-suggest: abort gives no result (before, during and after the ca
   await rejects(lateService.suggest(request(), late.signal), 'stopped');
 });
 
-test('goal-topic-suggest: the plugin wires the service', () => {
+test('goal-topic-suggest: the plugin no longer wires the old suggestion service; the one recommend service replaced it (goal-recommend P3)', () => {
   const { default: Plugin } = load('main.ts', { obsidian });
   const plugin = new Plugin();
-  assert.equal(plugin.goalTopicSuggest.constructor.name, 'GoalTopicSuggestService');
+  assert.equal(plugin.goalTopicSuggest, undefined);
+  assert.equal(plugin.goalRecommend.constructor.name, 'GoalRecommendService');
 });

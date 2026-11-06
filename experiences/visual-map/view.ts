@@ -527,11 +527,6 @@ import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal, type MultiResearchRequest } from "./multi-research-modal";
 import { StructureReviewModal } from "./structure-review-modal";
 import {
-  GoalTopicSuggestError,
-  goalTopicTitleKey,
-  type GoalTopicSuggestion
-} from "../../core/goal-topic-suggest-service";
-import {
   buildStructureReviewNodes,
   isSuggestionStale,
   type StructureNode,
@@ -549,7 +544,11 @@ import type {
   GoalRecommendScope,
   GoalRecommendSuggestion
 } from "../../core/goal-recommend-service";
-import { GOAL_RECOMMEND_SCHEMA, goalRecommendFailureDetail } from "../../core/goal-recommend-service";
+import {
+  GOAL_RECOMMEND_SCHEMA,
+  goalRecommendFailureDetail,
+  goalRecommendTitleKey
+} from "../../core/goal-recommend-service";
 import { renderTopicTree } from "../../ui/topic-tree";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
@@ -814,7 +813,7 @@ const cardAiLockButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
 let relevancePanelSeq = 0;
-type GoalIcon = "target" | "spark" | "refresh" | "sort" | "select";
+type GoalIcon = "target" | "spark" | "sort" | "select";
 /** The goal bar's own inline icons (drawn like the approved mock-up); colour follows `currentColor`. */
 function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
   const svg = createSvg("svg");
@@ -841,8 +840,6 @@ function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
         "l-.9-2.1L16 18l2.1-.9z"
       ].join("")
     });
-  else if (kind === "refresh")
-    add("path", { ...line, "stroke-linecap": "round", d: "M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" });
   else if (kind === "sort")
     add("path", {
       ...line,
@@ -1265,20 +1262,20 @@ export type MapCommandAction =
   | "shortcuts";
 let goalSuggestSeq = 0;
 /**
- * `confirming`: the usage notice is open; `running`: the AI call is out (Stop works); `ready`: the list is shown;
- * `applying`: Add was pressed and the topics are being written.
+ * The recommended cards of a finished run. `ready`: the list is shown; `applying`: Add was pressed and the cards are being
+ * written. The controller makes no AI call: it only fences a late Add (a dropped task is aborted).
  */
 interface GoalSuggestTask {
   mapPath: string;
   token: number;
   controller: AbortController;
-  state: "confirming" | "running" | "ready" | "applying";
-  suggestions: GoalTopicSuggestion[];
+  state: "ready" | "applying";
+  suggestions: GoalRecommendSuggestion[];
   /** What the AI saw of each parent (title, its parent): Add skips a suggestion whose parent no longer matches. */
   basis: Map<string, { title: string; parentId: string | null }>;
   checked: Set<number>;
   /** Where the keyboard goes when the panel is next drawn (consumed by the draw). */
-  focus: "stop" | "list" | null;
+  focus: "list" | null;
 }
 
 /**
@@ -2168,7 +2165,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     // An open suggestion list closes first, wherever the focus is (it is the topmost thing on the canvas).
     const suggest = this.goalSuggestTask;
-    if (event.key === "Escape" && suggest && (suggest.state === "ready" || suggest.state === "running")) {
+    if (event.key === "Escape" && suggest && suggest.state === "ready") {
       event.preventDefault();
       event.stopPropagation();
       this.endGoalSuggest(suggest, { refocus: true });
@@ -4019,7 +4016,7 @@ export class VisualAgentMapView extends ItemView {
     bar.addEventListener("keydown", event => {
       const suggest = this.goalSuggestTask;
       if (event.key !== "Escape" || event.defaultPrevented || !suggest) return;
-      if (suggest.state !== "ready" && suggest.state !== "running") return;
+      if (suggest.state !== "ready") return;
       event.preventDefault();
       event.stopPropagation();
       this.endGoalSuggest(suggest, { refocus: true });
@@ -4091,29 +4088,20 @@ export class VisualAgentMapView extends ItemView {
       });
       return button;
     };
-    // Busy (confirming, asking, writing): all three icons are off. A shown list leaves them on; the spark then closes it.
+    // Busy (writing the added cards): the icons are off. A shown list leaves them on; the spark then closes it.
     const suggestTask = this.goalSuggestTask;
     const busy = !!suggestTask && suggestTask.state !== "ready";
     const spark = icon(
       "spark",
-      t("ui.goal_suggest_topics"),
+      t("ui.goal_recommend"),
       () => {
+        // A shown list: the button only closes it (no AI call). Otherwise one request recommends cards and rates the map.
         if (this.goalSuggestTask?.state === "ready") this.endGoalSuggest(this.goalSuggestTask, { refocus: true });
-        else void this.startGoalSuggest();
+        else if (goal) void this.submitRelevanceGoal(goal, this.relevanceContext ?? "");
       },
       running || !goal || busy
     );
-    spark.setAttr("data-goal-action", "suggest");
-    // The icon rates the map again for the saved goal: only what should change once the map has AI tiers, every card before.
-    const recalibrating = this.relevanceAiGrades().length > 0;
-    icon(
-      "refresh",
-      t(recalibrating ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button"),
-      () => {
-        if (goal) void this.submitRelevanceGoal(goal, this.relevanceContext ?? "");
-      },
-      running || !goal || busy
-    );
+    spark.setAttr("data-goal-action", "recommend");
     const sort = icon(
       "sort",
       t("ui.relevance_sort"),
@@ -4464,99 +4452,21 @@ export class VisualAgentMapView extends ItemView {
       }, 0);
     }
   }
-  /** Focus goes back to the spark icon; while the icons are hidden (no hover) it goes to the goal text, which shows them. */
+  /** Focus goes back to the recommend button; while the icons are hidden (no hover) it goes to the goal text, which shows them. */
   private focusGoalReturn(): void {
     const root = this.goalLayerRoot();
-    const spark = root?.querySelector?.<HTMLElement>('.vam-goal-icon[data-goal-action="suggest"]') ?? null;
+    const spark = root?.querySelector?.<HTMLElement>('.vam-goal-icon[data-goal-action="recommend"]') ?? null;
     const usable = spark && !(spark as HTMLButtonElement).disabled && spark.offsetParent !== null;
     if (usable) spark.focus();
     else root?.querySelector?.<HTMLElement>(".vam-goal-text")?.focus();
   }
-  /** The spark icon: ask the AI which topics are missing for the goal. Nothing is written until the user adds some. */
-  private async startGoalSuggest(): Promise<void> {
-    const goal = this.relevanceGoal;
-    if (!goal || !this.map || !this.map.nodes.length || !this.relevanceGradeable() || this.presentation) return;
-    if (this.outlineImportTarget().map !== "editable") return;
-    if (this.goalSuggestTask || this.plugin.relevanceGrades.get(this.path)?.status === "running") return;
-    // A goal edit is dropped: the list takes its place (its draft was never saved).
-    this.dropGoalEdit();
-    const task: GoalSuggestTask = {
-      mapPath: this.path,
-      token: ++goalSuggestSeq,
-      controller: new AbortController(),
-      state: "confirming",
-      suggestions: [],
-      basis: new Map(),
-      checked: new Set(),
-      focus: null
-    };
-    // Claimed before the first await: a second press cannot start another call.
-    this.goalSuggestTask = task;
-    this.render();
-    const settings = this.plugin.settings;
-    const { model, reasoning } = this.plugin.currentModelChoice();
-    let began = false;
-    try {
-      await this.plugin.confirmAiUsage(model, async () => {
-        if (!this.goalSuggestCurrent(task) || !this.map) return;
-        began = true;
-        task.state = "running";
-        task.focus = "stop";
-        this.render();
-        try {
-          const context = this.relevanceContext ?? undefined;
-          const result = await this.plugin.goalTopicSuggest.suggest(
-            {
-              ...this.usageMapField(),
-              goal,
-              ...(context ? { context } : {}),
-              nodes: buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id), null),
-              language: settings.language,
-              contentLanguage: outputLanguageForMap(this.map, settings.language, this.map.title),
-              model,
-              reasoning
-            },
-            task.controller.signal
-          );
-          if (!this.goalSuggestCurrent(task)) return;
-          this.showGoalSuggestions(task, result.suggestions, result.dropped.length);
-        } catch (error) {
-          if (!this.goalSuggestCurrent(task)) return;
-          this.endGoalSuggest(task, { refocus: true });
-          new Notice(
-            error instanceof GoalTopicSuggestError
-              ? error.message
-              : plainFailure(t("error.plain_goal_suggest_context"), error)
-          );
-        }
-      });
-    } catch (error) {
-      if (this.goalSuggestCurrent(task)) {
-        this.endGoalSuggest(task, { refocus: true });
-        new Notice(plainFailure(t("error.plain_goal_suggest_context"), error));
-      }
-      return;
-    }
-    // Usage notice declined (or closed): nothing was asked, nothing is written.
-    if (!began && this.goalSuggestCurrent(task)) this.endGoalSuggest(task, { refocus: true });
-  }
-  /** Locked parents are dropped (counted in a Notice); an empty rest says so and closes; otherwise the list opens. */
-  private showGoalSuggestions(
-    task: GoalSuggestTask,
-    suggestions: GoalTopicSuggestion[],
-    unusable: number,
-    takeFocus = true
-  ): void {
+  /** Locked parents are dropped (counted in a Notice); when none is left the task closes; otherwise the list opens. */
+  private showGoalSuggestions(task: GoalSuggestTask, suggestions: GoalRecommendSuggestion[], takeFocus = true): void {
     const kept = suggestions.filter(item => !this.aiLockReason("addChild", [item.parentId]));
     const locked = suggestions.length - kept.length;
     if (locked) new Notice(t("ui.ai_locked_suggestions_skipped_0", locked));
     if (!kept.length) {
-      this.endGoalSuggest(task, { refocus: true });
-      // Quiet about single drops; only a reply that was entirely unusable says so.
-      if (!locked)
-        new Notice(
-          suggestions.length === 0 && unusable ? t("ui.goal_suggest_unusable_0", unusable) : t("ui.goal_suggest_none")
-        );
+      this.endGoalSuggest(task, { refocus: takeFocus });
       return;
     }
     for (const item of kept) {
@@ -4572,7 +4482,7 @@ export class VisualAgentMapView extends ItemView {
     task.focus = takeFocus ? "list" : null;
     this.render();
   }
-  /** The card under the bar: "Suggesting…" with Stop, or the checkable list with Skip and Add. Model text goes in as text only. */
+  /** The card under the bar: the checkable list (title, one-line summary, tier) with Skip and Add. Model text goes in as text only. */
   private drawGoalSuggest(bar: HTMLElement): void {
     const task = this.goalSuggestTask;
     if (!task) return;
@@ -4581,33 +4491,8 @@ export class VisualAgentMapView extends ItemView {
       task.controller.abort();
       return;
     }
-    if (task.state === "confirming") return;
     const panel = bar.createDiv("vam-goal-suggest vam-goal-attachment");
     this.goalSuggestPanelEl = panel;
-    if (task.state === "running") {
-      panel.addClass("is-running");
-      panel.createSpan({
-        cls: "vam-goal-suggest-status",
-        text: t("ui.goal_suggest_running"),
-        attr: { role: "status", "aria-live": "polite" }
-      });
-      const stop = panel.createEl("button", { cls: "vam-goal-suggest-stop", text: t("ui.goal_suggest_stop") });
-      stop.addEventListener("click", event => {
-        event.stopPropagation();
-        this.endGoalSuggest(task, { refocus: true });
-      });
-      panel.addEventListener("keydown", event => {
-        if (event.key !== "Escape") return;
-        event.preventDefault();
-        event.stopPropagation();
-        this.endGoalSuggest(task, { refocus: true });
-      });
-      if (task.focus === "stop") {
-        task.focus = null;
-        stop.focus();
-      }
-      return;
-    }
     const applying = task.state === "applying";
     panel.setAttr("role", "group");
     panel.setAttr("aria-label", t("ui.goal_suggest_list_label"));
@@ -4622,9 +4507,15 @@ export class VisualAgentMapView extends ItemView {
       boxes.push(box);
       const text = row.createSpan("vam-goal-suggest-text");
       text.createSpan({ cls: "vam-goal-suggest-title", text: item.title });
+      // The summary and the tier are shown here only; Add writes the tier, never the summary.
+      text.createSpan({ cls: "vam-goal-suggest-summary", text: item.summary });
       text.createSpan({
         cls: "vam-goal-suggest-why",
         text: t("ui.goal_suggest_under_0", task.basis.get(item.parentId)?.title ?? "")
+      });
+      row.createSpan({
+        cls: `vam-goal-suggest-tier is-${item.suggestedTier}`,
+        text: t(RELEVANCE_LABEL[item.suggestedTier])
       });
       box.addEventListener("change", () => {
         if (box.checked) task.checked.add(index);
@@ -4664,7 +4555,7 @@ export class VisualAgentMapView extends ItemView {
     if (doc?.addEventListener && !applying) {
       const outside = (event: Event): void => {
         const target = event.target as Node | null;
-        const spark = bar.querySelector?.('.vam-goal-icon[data-goal-action="suggest"]');
+        const spark = bar.querySelector?.('.vam-goal-icon[data-goal-action="recommend"]');
         if (!target || panel.contains(target) || spark?.contains(target)) return;
         this.endGoalSuggest(task, { refocus: false, repaint: false });
       };
@@ -4675,7 +4566,8 @@ export class VisualAgentMapView extends ItemView {
   /**
    * Add: every checked suggestion is checked again inside the map write (parent still there, same name and place, not
    * AI-locked, title not taken meanwhile); the ones that no longer fit are skipped and counted. All the cards are one
-   * undo step. Then the map is graded by the goal again, which asks for the usage confirmation itself.
+   * undo step. No AI call: each new card gets the tier the list showed (not hand-set), and a parent that now ranks below
+   * a card it holds is raised (same undo step). The summary is not written to the card.
    */
   private async applyGoalSuggest(task: GoalSuggestTask): Promise<void> {
     if (this.goalSuggestTask !== task || task.state !== "ready" || !task.checked.size) return;
@@ -4702,10 +4594,13 @@ export class VisualAgentMapView extends ItemView {
               continue;
             }
             await this.addNode(parent, item.title, false, false);
-            added++;
-            // The AI's one-line summary is the new card's summary, written like a chat card's.
-            await this.noteChange(this.map.nodes.at(-1)!, { summary: item.summary });
+            const card = this.map.nodes.at(-1);
+            if (card) {
+              await this.plugin.repo.writeRelevance(card.path, { tier: item.suggestedTier });
+              added++;
+            }
           }
+          if (added) await this.raiseParentsAfterAdd();
           if (added) await this.plugin.rebuildDerivedData();
         } finally {
           this.history.collapseSince(mark, t("ui.goal_suggest_history_label"));
@@ -4720,14 +4615,67 @@ export class VisualAgentMapView extends ItemView {
     if (skipped) new Notice(t("ui.goal_suggest_skipped_0", skipped));
     if (!added) return;
     this.announcer?.setText(t("ui.goal_suggest_added_0", added));
-    const goal = this.relevanceGoal;
-    if (!goal) return;
-    // Until the add path stops asking again (the list rework), the cards just added are rated by one more request.
-    void this.submitRelevanceGoal(goal, this.relevanceContext ?? "");
+  }
+  /**
+   * After Add: a parent never ranks below a card it holds. Reads every note fresh, raises the AI-set parents above the
+   * new cards (any number of levels), and records them as one history entry the surrounding collapse merges into the add
+   * step. A hand-set or AI-locked parent keeps its tier (its height still passes up); top-level cards are never raised.
+   */
+  private async raiseParentsAfterAdd(): Promise<void> {
+    if (!this.map) return;
+    const repo = this.plugin.repo;
+    const notes = new Map<string, Note>();
+    for (const node of this.map.nodes) {
+      try {
+        notes.set(node.id, await repo.readNote(node.path, this.map));
+      } catch {
+        /* An unreadable note is frozen below: it is not raised. */
+      }
+    }
+    const tree = buildStructureReviewNodes(this.map.nodes, () => undefined).map(node => ({
+      id: node.id,
+      parentId: node.parentId
+    }));
+    const tiers = new Map<string, RelevanceTier>();
+    for (const [id, note] of notes) if (note.relevance) tiers.set(id, note.relevance.tier);
+    const frozen = new Set(
+      tree
+        .filter(node => {
+          const note = notes.get(node.id);
+          return !note || note.aiLocked || !!note.relevance?.manual;
+        })
+        .map(node => node.id)
+    );
+    const raised = raiseParents(tree, tiers, frozen);
+    const changes: GoalRecommendChange[] = [];
+    for (const [id, tier] of raised) {
+      const node = this.map.nodes.find(item => item.id === id);
+      const note = notes.get(id);
+      if (!node || !note?.relevance) continue;
+      try {
+        await repo.writeRelevance(node.path, { tier });
+        changes.push({
+          id,
+          path: node.path,
+          title: note.title,
+          before: { tier: note.relevance.tier },
+          after: { tier },
+          raised: true
+        });
+      } catch (error) {
+        this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage(error)));
+      }
+    }
+    if (!changes.length) return;
+    this.history.push({
+      label: t("ui.relevance_history_label"),
+      undo: () => this.restoreRelevance(changes, "undo"),
+      redo: () => this.restoreRelevance(changes, "redo")
+    });
   }
   /** True when the suggestion no longer fits the map as it is now. */
   private goalSuggestStale(
-    item: GoalTopicSuggestion,
+    item: GoalRecommendSuggestion,
     task: GoalSuggestTask,
     parent: MapNode,
     fresh: ReadonlyMap<string, Note>
@@ -4736,8 +4684,8 @@ export class VisualAgentMapView extends ItemView {
     const title = fresh.get(parent.id)?.title ?? this.describeForReview(parent.id)?.title ?? "";
     if (!basis || title !== basis.title || parent.parentId !== basis.parentId) return true;
     if (this.isMerging(parent.id) || this.aiLockReason("addChild", [parent.id], fresh)) return true;
-    const key = goalTopicTitleKey(item.title);
-    return !!this.map?.nodes.some(node => goalTopicTitleKey(this.notes.get(node.id)?.title ?? "") === key);
+    const key = goalRecommendTitleKey(item.title);
+    return !!this.map?.nodes.some(node => goalRecommendTitleKey(this.notes.get(node.id)?.title ?? "") === key);
   }
   /**
    * Starts the Claude CLI for the grade an edited goal would run (no model call; a Codex model starts nothing). The
@@ -5122,14 +5070,14 @@ export class VisualAgentMapView extends ItemView {
       mapPath,
       token: ++goalSuggestSeq,
       controller: new AbortController(),
-      state: "confirming",
+      state: "ready",
       suggestions: [],
       basis: new Map(),
       checked: new Set(),
       focus: null
     };
     this.goalSuggestTask = task;
-    this.showGoalSuggestions(task, suggestions, 0, this.focusIsFreeForList());
+    this.showGoalSuggestions(task, suggestions, this.focusIsFreeForList());
   }
   /** True when the keyboard is on the status bar, the goal bar or the page body: the list may take it. */
   private focusIsFreeForList(): boolean {

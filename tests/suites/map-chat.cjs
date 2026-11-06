@@ -411,7 +411,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
       const result = await control.reply(request, signal, onReply, onProgress, onSteer); if (!signal.aborted || control.rawAlways) onRaw?.(control.raw ?? JSON.stringify(result)); return result; } },
     manifest: { version: '9.9.9' },
     // The switch reaches the writers a view registered (main.ts keeps the set; this stand-in keeps a list).
-    registerMapChatRecordWriter: writer => { control.writers.push(writer); writer.setEnabled(settings.mapChatRecords); return () => { control.writers.splice(control.writers.indexOf(writer), 1); }; },
+    registerMapChatRecordWriter: writer => { control.writers.push(writer); plugin.mapChatRecordWriters.add(writer); writer.setEnabled(settings.mapChatRecords); return () => { control.writers.splice(control.writers.indexOf(writer), 1); plugin.mapChatRecordWriters.delete(writer); }; },
     // B3: the web image search of the Markdown quick action; the thumbnail check is stubbed on the view below.
     searchImages: async (query, model, signal) => { control.calls.push('search'); control.searches.push({ query, model, signal }); return control.search(query, model, signal); }
   });
@@ -7590,20 +7590,64 @@ integrationTest('R6 B-1: research started while the record was off: the mark is 
   assert.equal(recordLines(g, recordFiles(g)[0]).filter(l => l.type === 'event' && l.kind === 'research_started').length, 1, 'later turns do not repeat it');
   await reopenAndDelete(lines2);
 });
-integrationTest('R7 F2: research mark, then every record deleted, then the same conversation goes on: the rebuilt file gets the mark again and a reopened conversation still asks before delete', async () => {
-  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
-  const started = await researchChain(h, { remaining: '' }); await until(() => !started.chat.isBusy); await r5Wait(); await recordIdle(h);
-  const [first] = recordFiles(h); assert.equal(recordLines(h, first).filter(l => l.type === 'event' && l.kind === 'research_started').length, 1, 'marked once');
-  // the owner deletes every record while the conversation is open
-  for (const path of allRecordFiles(h)) { h.files.delete(path); h.contents.delete(path); }
-  assert.equal(recordFiles(h).length, 0);
-  chainReplies(h, say('ok', [], '')); h.type('after'); await h.view.sendMapChat(); await r5Wait(); await recordIdle(h);
-  chainReplies(h, say('more', [], '')); h.type('more'); await h.view.sendMapChat(); await r5Wait(); await recordIdle(h);
-  const lines = recordLines(h, recordFiles(h)[0]);
-  assert.equal(lines.filter(l => l.type === 'event' && l.kind === 'research_started').length, 1, 'the rebuilt file has the mark once');
-  const { r, c } = await r6Reopen(lines); assert.equal(r.view.chatStartedResearch, true, 'the mark came back');
+const r8Marks = h => recordLines(h, recordFiles(h)[0]).filter(l => l.type === 'event' && l.kind === 'research_started').length;
+const r8Wipe = h => { for (const path of allRecordFiles(h)) { h.files.delete(path); h.contents.delete(path); } };
+const r8Send = async (h, text, ...replies) => { chainReplies(h, ...(replies.length ? replies : [say('ok', [], '')])); h.type(text); await h.view.sendMapChat(); await r5Wait(); await recordIdle(h); };
+const r8Ask = async (lines, label) => {
+  const { r, c } = await r6Reopen(lines); assert.equal(r.view.chatStartedResearch, true, label + ': the mark came back');
   chainReplies(r, say('Doing.', [r4Del(r.ids.b)], '')); r.type('tidy'); await r.view.sendMapChat(); await r5Wait();
-  assert.ok(c.pendingPlan(), 'a plan card'); assert.ok(r4Has(r, r.ids.b));
+  assert.ok(c.pendingPlan(), label + ': a plan card'); assert.ok(r4Has(r, r.ids.b), label + ': the card is still on the map');
+};
+integrationTest('R8 F2: research mark, then every record deleted, then ONE send: the rebuilt file has the mark exactly once (more turns do not repeat it) and a reopened conversation still asks before delete', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); h.open();
+  const started = await researchChain(h, { remaining: '' }); await until(() => !started.chat.isBusy); await r5Wait(); await recordIdle(h);
+  assert.equal(r8Marks(h), 1, 'marked once');
+  r8Wipe(h); assert.equal(recordFiles(h).length, 0);
+  await r8Send(h, 'after');
+  assert.equal(r8Marks(h), 1, 'one turn: the rebuilt file has the mark once');
+  const lines = recordLines(h, recordFiles(h)[0]); eq(lineKinds(lines).slice(0, 2), ['conversation', 'event:research_started'], 'the mark follows the header');
+  await r8Send(h, 'more'); await r8Send(h, 'again'); assert.equal(r8Marks(h), 1, 'later turns do not repeat it');
+  await r8Ask(recordLines(h, recordFiles(h)[0]), 'one send');
+});
+integrationTest('R8 F2b: record off during research, file deleted, record on again: two sends write the mark once', async () => {
+  const g = await harness({ records: true }); await g.view.hydrate(); g.open();
+  await r8Send(g, 'hi', say('hi', [], '')); r8Wipe(g);
+  g.view.plugin.settings.mapChatRecords = false;
+  researchStub(g); chainReplies(g, say('r', [researchAct({ nodeIds: [g.ids.a] })], '')); g.type('research'); await g.view.sendMapChat(); await r5Wait();
+  g.view.plugin.settings.mapChatRecords = true;
+  await r8Send(g, 'after'); assert.equal(r8Marks(g), 1, 'after the first turn');
+  await r8Send(g, 'more'); assert.equal(r8Marks(g), 1, 'after the second turn');
+});
+integrationTest('R8 F2c: a reopened (resumed) marked file, deleted, then one send and a second reopen: the mark is still there', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); h.open();
+  const started = await researchChain(h, { remaining: '' }); await until(() => !started.chat.isBusy); await r5Wait(); await recordIdle(h);
+  const { r, c } = await r6Reopen(recordLines(h, recordFiles(h)[0])); assert.equal(r.view.chatStartedResearch, true); void c;
+  r8Wipe(r); assert.equal(recordFiles(r).length, 0);
+  await r8Send(r, 'after'); assert.equal(r8Marks(r), 1, 'the resumed writer kept the mark');
+  await r8Ask(recordLines(r, recordFiles(r)[0]), 'second reopen');
+});
+integrationTest('R8 F2d: the first create of the rebuilt file fails, the retry works: the new file has the mark once', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); h.open();
+  const started = await researchChain(h, { remaining: '' }); await until(() => !started.chat.isBusy); await r5Wait(); await recordIdle(h);
+  r8Wipe(h);
+  const create = h.app.vault.create.bind(h.app.vault); let failed = 0;
+  h.app.vault.create = async (path, text) => { if (path.includes('/Chats/records/') && failed++ === 0) throw new Error('disk busy'); return create(path, text); };
+  await r8Send(h, 'after'); assert.ok(failed >= 2, 'the first create failed and was retried');
+  assert.equal(r8Marks(h), 1, 'one mark'); await r8Send(h, 'more'); assert.equal(r8Marks(h), 1);
+});
+integrationTest('R8 F2e: the real settings flow (switch off, delete all records, switch on) keeps the mark in the new file', async () => {
+  const { turnMapChatRecordsOff } = load('ui/modals/map-chat-records-off-modal.ts', { obsidian });
+  const h = await harness({ records: true }); await h.view.hydrate(); h.open();
+  const started = await researchChain(h, { remaining: '' }); await until(() => !started.chat.isBusy); await r5Wait(); await recordIdle(h);
+  const writer = h.view.chatRecords; assert.equal(r8Marks(h), 1);
+  h.view.plugin.settings.mapChatRecords = false;
+  const app = { vault: Object.assign(Object.create(h.app.vault), { getFiles: () => [...h.files.values()].filter(f => f instanceof obsidian.TFile) }), fileManager: { trashFile: async file => { h.files.delete(file.path); h.contents.delete(file.path); } } };
+  const res = await turnMapChatRecordsOff({ app, writers: h.plugin.mapChatRecordWriters, ask: async () => true }); assert.equal(res.deleted > 0, true, 'the files were deleted');
+  assert.equal(allRecordFiles(h).filter(p => p.endsWith('.jsonl')).length, 0);
+  await h.plugin.setMapChatRecords(true);
+  assert.equal(h.view.chatRecords, writer, 'the same writer and conversation carry on (nothing swaps them)');
+  await r8Send(h, 'after'); assert.equal(r8Marks(h), 1);
+  await r8Ask(recordLines(h, recordFiles(h)[0]), 'settings flow');
 });
 integrationTest('R7 F1: the first turn stopped with a chain_end: nothing is pushed alone on reopen, two sends pair up, earlierTurns are right, no backfilled line, and a second reopen matches the screen', async () => {
   // Decision #19: the stopped first turn does not come back, and its end sentence is dropped (it used to be pushed as one lone assistant message).

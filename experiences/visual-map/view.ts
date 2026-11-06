@@ -21319,10 +21319,6 @@ export class VisualAgentMapView extends ItemView {
         onFailure: () => {
           new Notice(t("ui.map_chat_record_failed"));
         },
-        // A rebuilt file has lost the `research_started` mark: the next turn writes it again.
-        onRebuilt: id => {
-          if (this.chatResearchMarkedIn === id) this.chatResearchMarkedIn = null;
-        },
         pluginVersion: this.plugin.manifest?.version ?? "0.0.0",
         configDir: this.app.vault.configDir
       });
@@ -21531,7 +21527,8 @@ export class VisualAgentMapView extends ItemView {
       latest.id,
       handle instanceof TFile ? handle : (latest.path ?? ""),
       this.chatRecordTarget(),
-      latest.parsed.cleanEnd
+      latest.parsed.cleanEnd,
+      restored.startedResearch
     );
     // Every turn number of the file is taken: a late result of one of them can never be written again.
     const numbers = latest.parsed.lines.flatMap((line: RecordLine) =>

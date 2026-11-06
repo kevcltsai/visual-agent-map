@@ -265,8 +265,6 @@ export interface MapChatRestoredConversation {
   id: string;
   /** The time of the last finished turn (ISO); the "restored" line shows it in local time. Null with no turn. */
   restoredAt: string | null;
-  /** The end of a continuation with no turn to show: only its sentence comes back. */
-  chainEnd?: { reason: MapChatChainEndReason; round: number; remaining: string };
   turns: {
     message: string;
     reply: string;

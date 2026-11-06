@@ -486,22 +486,22 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-goal-icon:disabled { opacity: .4; cursor: default; }
 /* While editing the icons' slot holds "+ Context" and keeps the width the three icons take, so the text wraps the same in all three states. */
 .vam-goal-bar.is-editing .vam-goal-actions { box-sizing: border-box; width: 84px; justify-content: flex-end; }
-/* A narrow row (the same 600px as the toolbar): the title goes, the icons float under the goal so the row never grows when the pointer passes, and the panels under the goal are measured from the row, almost its full width. */
+/* A narrow row (the same 600px as the toolbar): the title goes and the panels under the goal are measured from the row, almost its full width. Only in Obsidian's header row do the icons float under the goal (so the row never grows when the pointer passes); in the toolbar (header row hidden) they keep the bar's own slot at every width, so nothing hangs below and nothing is hidden behind the info row's buttons. */
 @container vam-goal-host (max-width: 600px) {
   .view-header.vam-goal-host > .view-header-title-container { display: none; }
   .vam-goal-bar { position: static; }
-  .vam-goal-actions { position: absolute; top: calc(100% + 4px); right: 8px; padding: 2px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); }
+  .view-header.vam-goal-host .vam-goal-actions { position: absolute; top: calc(100% + 4px); right: 8px; padding: 2px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); }
   /* Bridges the gap between the goal and the icons, so the pointer keeps the bar hovered on its way there. The bar owns it; the view measures it (bar bottom to icon top, as wide as the icons) and leaves it out where something clickable lies in the gap. */
-  .vam-goal-bar::after { content: ""; position: absolute; top: var(--vam-goal-bridge-top, 0); left: var(--vam-goal-bridge-left, 0); width: var(--vam-goal-bridge-width, 0); height: var(--vam-goal-bridge-height, 0); }
-  /* Here the icons float over the info row's buttons, so they show only while the pointer is on the goal or the keyboard is in it (:focus-visible), not for the focus a mouse click leaves behind (the wide rule above, :focus-within, is turned off). */
-  .vam-goal-bar:focus-within .vam-goal-actions { opacity: 0; pointer-events: none; }
-  .vam-goal-bar:hover .vam-goal-actions, .vam-goal-bar:has(:focus-visible) .vam-goal-actions { opacity: 1; pointer-events: auto; }
+  .view-header.vam-goal-host .vam-goal-bar::after { content: ""; position: absolute; top: var(--vam-goal-bridge-top, 0); left: var(--vam-goal-bridge-left, 0); width: var(--vam-goal-bridge-width, 0); height: var(--vam-goal-bridge-height, 0); }
+  /* Here the icons float over what is under the row, so they show only while the pointer is on the goal or the keyboard is in it (:focus-visible), not for the focus a mouse click leaves behind (the wide rule above, :focus-within, is turned off). */
+  .view-header.vam-goal-host .vam-goal-bar:focus-within .vam-goal-actions { opacity: 0; pointer-events: none; }
+  .view-header.vam-goal-host .vam-goal-bar:hover .vam-goal-actions, .view-header.vam-goal-host .vam-goal-bar:has(:focus-visible) .vam-goal-actions { opacity: 1; pointer-events: auto; }
   /* An open panel keeps the icons shown (the pointer may have left), so the panel under them never leaves a gap above it. */
-  .vam-goal-bar.has-attachment .vam-goal-actions { opacity: 1; pointer-events: auto; }
+  .view-header.vam-goal-host .vam-goal-bar.has-attachment .vam-goal-actions { opacity: 1; pointer-events: auto; }
   .vam-goal-bar .vam-goal-attachment { left: 8px; right: 8px; }
-  /* Editing: the slot floats like the icons and is as wide as what is in it; with nothing in it (no text yet, or the context row is open) it is not there at all. */
-  .vam-goal-bar.is-editing .vam-goal-actions { width: auto; }
-  .vam-goal-actions.is-vacant { display: none; }
+  /* Editing: the floating slot is as wide as what is in it; with nothing in it (no text yet, or the context row is open) it is not there at all. */
+  .view-header.vam-goal-host .vam-goal-bar.is-editing .vam-goal-actions { width: auto; }
+  .view-header.vam-goal-host .vam-goal-actions.is-vacant { display: none; }
 }
 /* Every panel under the goal starts here: 6px under whatever box it is positioned in, plus the part of the floating icons that hangs below that box (--vam-goal-attach-clear, measured by the view; 0 when the icons are in the bar). */
 .vam-goal-attachment { top: calc(100% + 6px + var(--vam-goal-attach-clear, 0px)); }

@@ -408,7 +408,12 @@ const STYLES = fs.readFileSync(path.join(root, 'styles.css'), 'utf8').replace(/\
 const cssRule = (selector, has) => { const hits = [...STYLES.matchAll(new RegExp(`(?:^|[};{])\\s*${selector.replace(/[.\\]/g, '\\$&')} \\{([^{}]*)\\}`, 'g'))].map(m => m[1]).filter(body => !has || has.test(body)); assert.equal(hits.length, 1, `exactly one ${selector} rule${has ? ` matching ${has}` : ''}`); return hits[0]; };
 const cssPx = (body, prop) => { const m = body.match(new RegExp(`(?:^|[\\s;])${prop}:\\s*(-?[\\d.]+)px`)); assert.ok(m, `${prop} in ${body}`); return Number(m[1]); };
 const ICON = cssRule('.vam-goal-icon', /width:/), ICON_W = cssPx(ICON, 'width'), ICON_H = cssPx(ICON, 'height');
-const ACTIONS_BASE = cssRule('.vam-goal-actions', /display: flex/), ACTIONS_FLOAT = cssRule('.vam-goal-actions', /position: absolute/);
+const ACTIONS_BASE = cssRule('.vam-goal-actions', /display: flex/);
+// The rule that floats the icons: the selector decides which host it applies to (scoped to .view-header.vam-goal-host = the header row only; unscoped = the toolbar fallback too).
+const HEADER_SCOPE = '.view-header.vam-goal-host ';
+const FLOAT_MATCH = [...STYLES.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(m => /position: absolute/.test(m[2]) && /\.vam-goal-actions$/.test(m[1].trim()));
+assert.equal(FLOAT_MATCH.length, 1, 'exactly one rule floats the icons'); const ACTIONS_FLOAT = FLOAT_MATCH[0][2], FLOAT_SELECTOR = FLOAT_MATCH[0][1].trim();
+const floatsIn = inHeader => FLOAT_SELECTOR.startsWith(HEADER_SCOPE) ? inHeader : true; // does the narrow floating rule reach this host?
 const ICON_GAP = cssPx(ACTIONS_BASE, 'gap'), ICON_COUNT = 3; // three icons since P3 (the pencil is gone): the narrow icon box is 82 wide, not 108, and the wide slot 84, not 108; both are computed from these CSS values below
 const FLOAT_PAD = cssPx(ACTIONS_FLOAT, 'padding'), FLOAT_BORDER = cssPx(ACTIONS_FLOAT, 'border'), FLOAT_GAP = Number(ACTIONS_FLOAT.match(/top: calc\(100% \+ (\d+)px\)/)[1]), FLOAT_RIGHT = cssPx(ACTIONS_FLOAT, 'right');
 // In the bar: the icons plus the left padding. Floating under the row: the icons in a bordered chip.
@@ -489,20 +494,20 @@ const NARROW_SPAN = (() => { const i = STYLES.indexOf('@container vam-goal-host 
 const ACTION_RULES = [...STYLES.matchAll(/([^{}]+)\{([^{}]*)\}/g)].flatMap(m => {
   const at = m.index + m[1].length - m[1].trimStart().length, narrowRule = at > NARROW_SPAN[0] && at < NARROW_SPAN[1];
   return m[1].split(',').map(x => x.trim()).flatMap(sel => {
-    const parsed = sel.match(/^(?:\.vam-goal-bar((?::hover|:focus-within|:has\(:focus-visible\)|\.has-attachment)*) )?\.vam-goal-actions$/);
+    const parsed = sel.match(/^(\.view-header\.vam-goal-host )?(?:\.vam-goal-bar((?::hover|:focus-within|:has\(:focus-visible\)|\.has-attachment)*) )?\.vam-goal-actions$/);
     if (!parsed) return [];
-    const tokens = (parsed[1] ?? '').match(/:hover|:focus-within|:has\(:focus-visible\)|\.has-attachment/g) ?? [];
-    return [{ tokens, narrowRule, spec: tokens.length + (parsed[1] === undefined ? 1 : 2), at, opacity: m[2].match(/opacity:\s*([\d.]+)/)?.[1], pe: m[2].match(/pointer-events:\s*(\w+)/)?.[1] }];
+    const tokens = (parsed[2] ?? '').match(/:hover|:focus-within|:has\(:focus-visible\)|\.has-attachment/g) ?? [];
+    return [{ tokens, narrowRule, headerOnly: !!parsed[1], spec: tokens.length + (parsed[2] === undefined ? 1 : 2) + (parsed[1] ? 2 : 0), at, opacity: m[2].match(/opacity:\s*([\d.]+)/)?.[1], pe: m[2].match(/pointer-events:\s*(\w+)/)?.[1] }];
   });
 });
-const actionsStyle = (narrow, on) => {
+const actionsStyle = (floating, on) => {
   const key = { ':hover': on.hover, ':focus-within': on.focusWithin, ':has(:focus-visible)': on.focusVisible, '.has-attachment': on.attachment };
-  const hits = ACTION_RULES.filter(r => (narrow || !r.narrowRule) && r.tokens.every(t => key[t])).sort((a, b) => a.spec - b.spec || a.at - b.at);
+  const hits = ACTION_RULES.filter(r => (floating || !r.narrowRule) && r.tokens.every(t => key[t])).sort((a, b) => a.spec - b.spec || a.at - b.at);
   const last = prop => hits.filter(r => r[prop] !== undefined).at(-1)?.[prop];
   return { opacity: last('opacity'), pointerEvents: last('pe') };
 };
 // The strip between the goal and the floating icons is owned by the bar (::after on .vam-goal-bar, not on the icons that take no pointer while hidden) and reads its box from what the view writes.
-{ const strip = cssRule('.vam-goal-bar::after', /content/); for (const n of ['top', 'left', 'width', 'height']) assert.match(strip, new RegExp(`${n}: var\\(--vam-goal-bridge-${n}, 0\\)`), `the strip's ${n} comes from --vam-goal-bridge-${n}`); assert.match(strip, /position: absolute/); assert.doesNotMatch(STYLES, /\.vam-goal-actions::before/, 'the icons own no strip'); }
+{ const stripRules = [...STYLES.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(m => /\.vam-goal-bar::after$/.test(m[1].trim()) && /content/.test(m[2])); assert.equal(stripRules.length, 1, 'exactly one strip rule'); const strip = stripRules[0][2]; for (const n of ['top', 'left', 'width', 'height']) assert.match(strip, new RegExp(`${n}: var\\(--vam-goal-bridge-${n}, 0\\)`), `the strip's ${n} comes from --vam-goal-bridge-${n}`); assert.match(strip, /position: absolute/); assert.doesNotMatch(STYLES, /\.vam-goal-actions::before/, 'the icons own no strip'); }
 const actions_isVacant = bar => bar.querySelector?.('.vam-goal-actions')?.hasClass?.('is-vacant');
 assert.ok(ACTION_RULES.length >= 4, 'the scan finds the icon visibility rules');
 
@@ -511,6 +516,7 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   const view = h.view;
   const inHeader = host === HOSTS[0];
   const narrow = width <= 600;
+  const floating = narrow && floatsIn(inHeader); // the icons float under the row (narrow header row only; in the toolbar fallback they keep the bar's slot)
   const barH = state.goalHeight ?? (narrow ? BAR_H_NARROW : BAR_H_WIDE);
   const paneRight = PANE_LEFT + width;
   // Rows above the canvas: the header row (when shown) then the toolbar; the row holding the bar grows with the goal.
@@ -547,12 +553,12 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
     assert.equal(actions.hasClass('is-vacant'), state.edit !== 'chip', 'the slot is vacant exactly when "+ Context" is not on offer');
   }
   // Wide: in the bar's own row. Narrow: FLOAT_GAP under the row (from the host's padding box, HOST_BORDER above its border-box bottom), right-aligned (styles.css, container query).
-  const actionsRect = () => narrow && actions.hasClass('is-vacant') ? R(0, 0, 0, 0) : narrow ? R(paneRight - FLOAT_RIGHT - FLOAT_W, hostBottom - HOST_BORDER + FLOAT_GAP, paneRight - FLOAT_RIGHT, hostBottom - HOST_BORDER + FLOAT_GAP + FLOAT_H) : R(barLeft + barW - 8 - INLINE_W, barTop + (barH - INLINE_H) / 2, barLeft + barW - 8, barTop + (barH - INLINE_H) / 2 + INLINE_H);
+  const actionsRect = () => floating && actions.hasClass('is-vacant') ? R(0, 0, 0, 0) : floating ? R(paneRight - FLOAT_RIGHT - FLOAT_W, hostBottom - HOST_BORDER + FLOAT_GAP, paneRight - FLOAT_RIGHT, hostBottom - HOST_BORDER + FLOAT_GAP + FLOAT_H) : R(barLeft + barW - 8 - INLINE_W, barTop + (barH - INLINE_H) / 2, barLeft + barW - 8, barTop + (barH - INLINE_H) / 2 + INLINE_H);
   actions.getBoundingClientRect = actionsRect;
   // What shows the icons comes from the stylesheet (actionsStyle): hover, keyboard focus (focus-visible), focus a mouse press left (focus-within only), an open panel.
   const conditions = { hover: !!state.goalHover, focusVisible: !!state.goalFocus || !!state.edit, focusWithin: !!state.goalFocus || !!state.mouseFocus || !!state.attachment || !!state.edit, // a list opened from the spark leaves focus in the bar
      attachment: !!state.attachment };
-  const shownStyle = actionsStyle(narrow, conditions);
+  const shownStyle = actionsStyle(floating, conditions);
   const actionsShown = shownStyle.opacity !== '0';
   actions.ownerDocument = { defaultView: { getComputedStyle: () => ({ opacity: shownStyle.opacity }) } };
   const tools = element('div'); tools.addClass('vam-map-tools'); h.rootEl.appendChild(tools);
@@ -572,8 +578,8 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   infoButtons.unshift(['new map', R(infoButtons[0][1].left - NEW_MAP_GAP - NEW_MAP_W, top - 3, infoButtons[0][1].left - NEW_MAP_GAP, top - 3 + NEW_MAP_H)]);
   // The box the icons are positioned in: the whole row narrow (the host; with the info row's buttons inside it only when the host is the toolbar), the bar wide.
   const infoBox = element('div'); infoBox.clientTop = HOST_BORDER; infoBox.clientLeft = 0; infoBox.getBoundingClientRect = () => R(PANE_LEFT, PANE_TOP, paneRight, hostBottom);
-  if (!inHeader) for (const [, rect] of infoButtons) { const b = element('button'); b.getBoundingClientRect = () => rect; infoBox.appendChild(b); }
-  actions.offsetParent = narrow ? infoBox : bar;
+  if (!inHeader || state.gapButton) for (const [, rect] of state.gapButton ? [['gap', R(paneRight - 60, barTop + barH + 2, paneRight - 30, barTop + barH + 8)]] : infoButtons) { const b = element('button'); b.getBoundingClientRect = () => rect; infoBox.appendChild(b); }
+  actions.offsetParent = floating ? infoBox : bar;
   const attachment = find(h.rootEl, i => hasCls(i, 'vam-goal-attachment'));
   if (state.attachment) {
     assert.ok(attachment, `${state.attachment} panel carries vam-goal-attachment`);
@@ -601,7 +607,7 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   if (actionsShown && actionsRect().right > actionsRect().left) labelled.push(['actions', actionsRect()]);
   if (state.attachment) labelled.push(['attachment', attachment.getBoundingClientRect()]);
   if (sources) labelled.push(['sources panel', sources.getBoundingClientRect()]);
-  return { h, view, bar, tools, canvas, pane, labelled, attachment, sources, actionsShown, actions, narrow, hostBottom, actionsRect, toolsRect, infoButtons, conditions, barW, inHeader };
+  return { h, view, bar, tools, canvas, pane, labelled, attachment, sources, actionsShown, actions, narrow, floating, hostBottom, actionsRect, toolsRect, infoButtons, conditions, barW, inHeader };
 }
 
 test('goal stack: in every host, state and width the layers around the goal do not overlap, the tool group never moves, and the list stops above the bottom controls', async () => {
@@ -611,7 +617,7 @@ test('goal stack: in every host, state and width the layers around the goal do n
   for (const host of HOSTS) for (const w of WIDTHS) for (const state of STATES) {
     cells++;
     const where = `${host} / ${w.name} / ${state.name}`;
-    const { view, canvas, labelled, tools, actionsShown, bar, attachment, narrow, hostBottom, actionsRect, toolsRect, infoButtons, conditions, barW, inHeader } = await stackRig(w.width, w.chat, state, host);
+    const { view, canvas, labelled, tools, actionsShown, bar, attachment, narrow, floating, hostBottom, actionsRect, toolsRect, infoButtons, conditions, barW, inHeader } = await stackRig(w.width, w.chat, state, host);
     assert.ok(!tools.style.top, `${where}: the tool group keeps the stylesheet top (style.top is empty)`);
     const name = rect => labelled.find(([, r]) => JSON.stringify(r) === JSON.stringify(rect))?.[0];
     const seen = view.floatingControlRects().map(rect => ({ rect, label: name(rect) }));
@@ -621,18 +627,19 @@ test('goal stack: in every host, state and width the layers around the goal do n
     assert.equal(bar.hasClass('has-attachment'), !!state.attachment, `${where}: has-attachment follows the open panel`);
     if (attachment) {
       const clear = px(attachment.style['--vam-goal-attach-clear']);
-      assert.equal(clear, narrow ? Math.max(0, actionsRect().bottom - hostBottom) : 0, `${where}: the panel clears exactly the part of the icons that hangs below its box (0 when they are in the bar)`);
+      assert.equal(clear, floating ? Math.max(0, actionsRect().bottom - hostBottom) : 0, `${where}: the panel clears exactly the part of the icons that hangs below its box (0 when they are in the bar)`);
       if (state.edit) assert.equal(clear, 0, `${where}: no icons are drawn while editing, so nothing hangs below the box (narrow and wide)`);
-      else if (narrow) assert.ok(clear > 0, `${where}: narrow icons hang below the row`);
+      else if (floating) assert.ok(clear > 0, `${where}: floating icons hang below the row`);
+      else assert.equal(clear, 0, `${where}: icons in the bar's slot hang below nothing (the toolbar fallback measures 0 by itself)`);
       assert.ok(px(attachment.style['--vam-goal-attach-max']) > 0, `${where}: the list has room`);
     }
     // Narrow, the icons float over the info row's buttons: they show only while the pointer is on the goal, the keyboard is in the bar (:focus-visible) or a panel is
     // open (the user just opened it; approved: it covers the row too). The focus a mouse click leaves behind, or the focus the view gives the spark again after a
     // mouse action, is not a reason (decision #9). Wide, they sit in the bar's own row, so focus-within may show them.
-    if (narrow) {
+    if (floating) {
       assert.equal(actionsShown, conditions.hover || conditions.focusVisible || conditions.attachment, `${where}: the floating icons are shown exactly for hover, keyboard focus or an open panel`);
       if (!conditions.hover && !conditions.focusVisible && !conditions.attachment) for (const [label, rect] of infoButtons) assert.ok(!actionsShown || !load('experiences/visual-map/viewport-inset.ts').rectsIntersect(actionsRect(), rect), `${where}: the shown icons ${JSON.stringify(actionsRect())} sit on the ${label} button ${JSON.stringify(rect)} without hover or keyboard focus`);
-    } else assert.equal(actionsShown, conditions.hover || conditions.focusWithin, `${where}: wide, the icons in the row show for hover, focus or an open panel`);
+    } else assert.equal(actionsShown, conditions.hover || conditions.focusWithin, `${where}: wide or toolbar fallback, the icons in the bar's slot show for hover, focus or an open panel`);
     // The goal in the toolbar fallback (decision #10): its flex-basis is more than the room next to the other children (measured), so it takes its own row and a goal is
     // not squeezed into a narrow column: the short goal is one line, the 60-character goal stays within its row and is far from 9 lines.
     if (state.name === 'none' && !inHeader) {
@@ -650,17 +657,22 @@ test('goal stack: in every host, state and width the layers around the goal do n
     if (bridge[0] === null) assert.ok(bridge.every(v => v === null), `${where}: the strip is written whole or not at all`);
     else {
       const strip = R(PANE_LEFT + bridge[1], PANE_TOP + HOST_BORDER + bridge[0], PANE_LEFT + bridge[1] + bridge[2], PANE_TOP + HOST_BORDER + bridge[0] + bridge[3]);
-      assert.ok(narrow && inHeader, `${where}: only a narrow header row bridges (${JSON.stringify(strip)})`);
+      assert.ok(floating, `${where}: only floating icons (narrow header row) have a strip (${JSON.stringify(strip)})`);
       assert.equal(strip.top, barBox.bottom, `${where}: the strip starts at the bar's bottom`); assert.equal(strip.bottom, iconBox.top, `${where}: and ends at the icons' top`);
       assert.equal(strip.left, iconBox.left, `${where}: as wide as the icons`); assert.equal(strip.right, iconBox.right, `${where}: as wide as the icons`);
       for (const [label, rect] of infoButtons) assert.ok(!rectsIntersect(strip, rect), `${where}: the strip sits on the ${label} button`);
     }
-    if (narrow && !actions_isVacant(bar) && iconBox.top > barBox.bottom) {
-      if (inHeader) assert.ok(bridge[0] !== null, `${where}: a goal with a gap above its icons has a strip (the pointer reaches them)`);
-      else if (infoButtons.some(([, rect]) => rectsIntersect(rect, R(iconBox.left, barBox.bottom, iconBox.right, iconBox.top)))) assert.ok(bridge[0] === null, `${where}: no strip over the info row's buttons`);
+    if (floating && !actions_isVacant(bar) && iconBox.top > barBox.bottom) assert.ok(bridge[0] !== null, `${where}: a goal with a gap above its icons has a strip (the pointer reaches them)`);
+    // Not floating (wide, or the toolbar fallback at any width): the icons sit inside the bar, so hovering the bar reaches them, no strip, nothing hangs below, and no info-row button is under them.
+    if (!floating) {
+      assert.ok(bridge.every(v => v === null), `${where}: no strip when the icons are in the bar`);
+      assert.ok(iconBox.left >= barBox.left && iconBox.right <= barBox.right && iconBox.top >= barBox.top && iconBox.bottom <= barBox.bottom, `${where}: the icons ${JSON.stringify(iconBox)} are inside the bar ${JSON.stringify(barBox)} (mouse reach)`);
+      assert.ok(iconBox.bottom <= hostBottom, `${where}: nothing hangs below the host`);
+      if (narrow) for (const [label, rect] of infoButtons) assert.ok(!rectsIntersect(iconBox, rect), `${where}: the icons sit on the ${label} button`); // narrow geometry is measured; the wide fallback rig positions are assumed (640), left to the existing wide checks
+      assert.equal(iconBox.width, state.edit ? EDIT_SLOT_W : INLINE_W, `${where}: the slot is the same width idle, hovered and editing`);
     }
     const capped = px(tools.style['--vam-tools-max']);
-    if (narrow && actionsRect().bottom > canvas.top + 12) assert.ok(capped !== null && toolsRect().right <= actionsRect().left, `${where}: the tool group gives way to the icons`);
+    if (floating && actionsRect().bottom > canvas.top + 12) assert.ok(capped !== null && toolsRect().right <= actionsRect().left, `${where}: the tool group gives way to the icons`);
     else assert.equal(capped, null, `${where}: the tool group keeps its width when the icons are not over its row`);
     for (let a = 0; a < seen.length; a++) {
       const label = seen[a].label, rect = seen[a].rect;
@@ -687,7 +699,7 @@ test('goal stack: the tool group sits at the stylesheet top whatever the goal do
   const absolute = new Set();
   for (const [, selectors, body] of STYLES.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (!/position:\s*absolute/.test(body)) continue;
-    for (const part of selectors.split(',')) { const m = part.trim().match(/^\.([\w-]+)$/); if (m) absolute.add(m[1]); }
+    for (const part of selectors.split(',')) { const m = part.trim().match(/^(?:.*\s)?\.([\w-]+)$/); if (m) absolute.add(m[1]); }
   }
   assert.ok(absolute.has('vam-goal-actions'), 'the scan sees the icons, which float only inside the container query');
   const listed = new Set(FLOATING_LAYER_SELECTORS.map(s => s.replace(/^\./, '')));
@@ -754,14 +766,25 @@ test('goal stack: the one z rule is on the goal host (above the overlay chat 12 
   const narrowBlock = css.match(/@container vam-goal-host \(max-width: 600px\) \{([\s\S]*?)\n\}/)?.[1];
   assert.ok(narrowBlock, 'the narrow container block exists');
   assert.match(narrowBlock, /\.vam-goal-bar \.vam-goal-attachment \{ left: 8px; right: 8px; \}/);
-  assert.match(narrowBlock, /\.vam-goal-bar\.has-attachment \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}/);
-  assert.match(narrowBlock, /\.vam-goal-actions\.is-vacant \{ display: none; \}/, 'narrow: an empty slot is not drawn (no empty box floats under the goal)');
-  assert.match(narrowBlock, /\.vam-goal-bar\.is-editing \.vam-goal-actions \{ width: auto; \}/, 'narrow: the editing slot is as wide as its content');
-  assert.match(narrowBlock, /\.vam-goal-bar:focus-within \.vam-goal-actions \{ opacity: 0; pointer-events: none; \}/, 'narrow: the focus a mouse click leaves does not show the icons');
-  assert.match(narrowBlock, /\.vam-goal-bar:hover \.vam-goal-actions, \.vam-goal-bar:has\(:focus-visible\) \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}/);
+  const HS = String.raw`\.view-header\.vam-goal-host `;
+  assert.match(narrowBlock, new RegExp(HS + String.raw`\.vam-goal-bar\.has-attachment \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}`));
+  assert.match(narrowBlock, new RegExp(HS + String.raw`\.vam-goal-actions\.is-vacant \{ display: none; \}`), 'narrow header row: an empty slot is not drawn (no empty box floats under the goal)');
+  assert.match(narrowBlock, new RegExp(HS + String.raw`\.vam-goal-bar\.is-editing \.vam-goal-actions \{ width: auto; \}`), 'narrow header row: the editing slot is as wide as its content');
+  assert.match(narrowBlock, new RegExp(HS + String.raw`\.vam-goal-bar:focus-within \.vam-goal-actions \{ opacity: 0; pointer-events: none; \}`), 'narrow header row: the focus a mouse click leaves does not show the icons');
+  assert.match(narrowBlock, new RegExp(HS + String.raw`\.vam-goal-bar:hover \.vam-goal-actions, ` + HS + String.raw`\.vam-goal-bar:has\(:focus-visible\) \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}`));
+  // The toolbar fallback keeps the bar's slot at every width: no rule in the narrow block that touches the icons, their slot or the strip may reach it, so every such rule is scoped to the header row.
+  for (const line of narrowBlock.split('\n')) { const [selectors, body] = line.split('{'); if (body === undefined || !/vam-goal-actions|::after/.test(selectors)) continue; for (const sel of selectors.split(',')) assert.ok(sel.trim().startsWith('.view-header.vam-goal-host '), `narrow rule not scoped to the header row: ${sel.trim()}`); }
   assert.match(rule('.vam-toolbar > .vam-goal-bar'), /flex-basis: 280px/);
   for (const m of css.matchAll(/([^{}]*has-attachment[^{}]*)\{([^{}]*)\}/g)) assert.doesNotMatch(m[2], /z-index/, `${m[1].trim()} sets no z-index (display only)`);
   assert.doesNotMatch(css, /!important/);
+});
+
+test('goal stack: the strip is left out where a clickable lies in the gap between the goal and the floating icons (header row)', async () => {
+  const plain = await stackRig(360, 0, { name: 'plain', goalHover: true }, HOSTS[0]);
+  assert.equal(px(plain.bar.style['--vam-goal-bridge-top']) !== null, true, 'without a clickable in the gap the strip is written');
+  const blocked = await stackRig(360, 0, { name: 'button in the gap', goalHover: true, gapButton: true }, HOSTS[0]);
+  assert.equal(blocked.floating, true);
+  assert.equal(px(blocked.bar.style['--vam-goal-bridge-top']), null, 'a button in the gap: no strip over it');
 });
 
 // ---- the tier floor for just-added cards, and no suggestion under a skippable card --------------------------------

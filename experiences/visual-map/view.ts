@@ -1716,6 +1716,10 @@ export class VisualAgentMapView extends ItemView {
   getState(): Record<string, unknown> {
     return { file: this.path };
   }
+  /** A map is on its way to this tab (the tab was opened for it, or a state change is opening it): the default map must not open. */
+  private mapOpenPending(): boolean {
+    return Boolean(this.requestedFile) || Boolean(this.leaf && this.plugin.pendingTabMaps?.has(this.leaf));
+  }
   /** The map this tab shows, or the one a state change has asked it to open and has not finished opening. */
   targetPath(): string | null {
     return this.requestedFile ?? this.path;
@@ -1726,6 +1730,8 @@ export class VisualAgentMapView extends ItemView {
    */
   hasRunningWork(): boolean {
     if (this.chatController || this.chatApplying || this.chatImageSearches.size) return true;
+    // The chat's preparing stage (before its controller exists) is stopped by a map change too.
+    if (this.chat?.isBusy || this.chatPrepAbandon) return true;
     for (const task of this.synthesisTasks.values()) if (task.state === "running") return true;
     if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
     if (this.aimBusy || this.aimController) return true;
@@ -1768,6 +1774,7 @@ export class VisualAgentMapView extends ItemView {
     this.registerEvent(
       workspace.on("active-leaf-change", leaf => {
         if (leaf?.view instanceof MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+        this.drawWhenShown();
         this.chat?.refreshNote();
         this.syncStatusBarClearance();
       })
@@ -1777,6 +1784,7 @@ export class VisualAgentMapView extends ItemView {
       workspace.on("layout-change", () => {
         this.chat?.refreshNote();
         this.syncStatusBarClearance();
+        this.drawWhenShown();
       })
     );
     // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
@@ -1845,7 +1853,7 @@ export class VisualAgentMapView extends ItemView {
     this.registerDomEvent(this.contentEl, "focusin", event => this.trackMapFocus(event.target));
     await this.plugin.ready;
     if (this.closed || this.aimViewEpoch !== epoch) return;
-    if (!this.path && !this.requestedFile) {
+    if (!this.path && !this.mapOpenPending()) {
       if (!this.plugin.repo.workspaceExists()) this.render();
       else {
         const files = await this.plugin.repo.mapFiles();
@@ -1860,13 +1868,13 @@ export class VisualAgentMapView extends ItemView {
               continue;
             }
             if (this.closed || this.aimViewEpoch !== epoch) return;
-            if (this.requestedFile) return;
+            if (this.mapOpenPending()) return;
             if (!candidate.aim) {
               defaultPath = file.path;
               break;
             }
           }
-          if (this.requestedFile || this.path) return;
+          if (this.mapOpenPending() || this.path) return;
           await this.openMap(defaultPath);
         } else this.render();
       }
@@ -5688,7 +5696,7 @@ export class VisualAgentMapView extends ItemView {
       });
       if (inNewTab) {
         const view = await this.plugin.openMapInNewTab(result.mapPath);
-        if (!view) opened = false;
+        if (!view || view.path !== result.mapPath) opened = false;
         else {
           newTabView = view;
           if (!view.closed && view.path === result.mapPath) view.fit();
@@ -5941,7 +5949,7 @@ export class VisualAgentMapView extends ItemView {
         else await this.openMapInMutation(mapPath);
       })
       .then(() => (created ? this.plugin.openMapInNewTab(created) : undefined))
-      .catch(() => {});
+      .catch(error => errorNotice(error));
   }
   async planAimQuestion(
     parentNodeId: string,
@@ -6637,7 +6645,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private switchToMap(path: string): void {
     const open = path === this.path ? undefined : this.plugin.findMapLeaf(path);
-    if (open) void this.app.workspace.revealLeaf(open);
+    if (open) void this.plugin.showLeaf(open);
     else if (path !== this.path && this.hasRunningWork())
       void this.plugin.openMapInNewTab(path).catch(error => errorNotice(error));
     else this.enqueue(() => this.openMapInMutation(path));
@@ -12394,7 +12402,23 @@ export class VisualAgentMapView extends ItemView {
       ])
     );
   }
+  /** True while the tab is in the background (display:none): its boxes measure 0, so nothing is drawn or measured then. */
+  private hiddenTab(): boolean {
+    const el = this.contentEl as { isShown?: () => boolean } | undefined;
+    return typeof el?.isShown === "function" && !el.isShown();
+  }
+  /** Draws what a hidden tab skipped, once it can be seen again. */
+  private drawWhenShown(): void {
+    if (!this.renderWhenShown || this.closed || this.hiddenTab()) return;
+    this.renderWhenShown = false;
+    this.render();
+  }
+  private renderWhenShown = false;
   private render(): void {
+    if (!this.closed && this.hiddenTab()) {
+      this.renderWhenShown = true;
+      return;
+    }
     // A batch of chat writes repaints once, when it is done.
     if (this.renderHold > 0 && !this.closed) {
       this.renderPending = true;
@@ -14147,7 +14171,7 @@ export class VisualAgentMapView extends ItemView {
    * heights; when nothing is covered nothing moves. The first paint of a map only records heights (opening never moves a card).
    */
   private settleCardHeights(): void {
-    if (!this.map || this.closed || !this.cardEls) return;
+    if (!this.map || this.closed || !this.cardEls || this.hiddenTab()) return;
     // A chat reply lays out its own cards (resized / arranged / placed) inside its undo step; looking now would also record
     // heights it has not finished with. Nothing is recorded, so the first render after the reply compares against the old ones.
     if (this.renderHold > 0 || this.history.grouping) return;
@@ -19123,7 +19147,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
   private focusNode(target: MapNode, persist = true): void {
-    if (!this.map || !this.viewportEl) return;
+    if (!this.map || !this.viewportEl || this.hiddenTab()) return;
     // Centre on where the card is drawn, which differs from its saved position while sorted by relevance.
     const node = this.relevanceSortOn() ? (this.canvasNodes().find(item => item.id === target.id) ?? target) : target;
     this.map.viewport = focusViewport(
@@ -19139,7 +19163,7 @@ export class VisualAgentMapView extends ItemView {
   /** True while a framing action (fit) applies its viewport: tool-row placement must not pan the canvas then. */
   private framingViewport = false;
   private fit(): void {
-    if (!this.map || !this.viewportEl) return;
+    if (!this.map || !this.viewportEl || this.hiddenTab()) return;
     const nodes = this.canvasNodes();
     if (!nodes.length) return;
     // Free text blocks (canvas-text-node decision #8) count too: fit must not hide what the user placed.
@@ -19373,9 +19397,14 @@ export class VisualAgentMapView extends ItemView {
     this.placeMapTools();
   }
   /** Opening screen: the keyboard starts in the message field, once per map, unless it is in another pane. */
+  focusChatHero(): void {
+    this.focusChatHeroOnce();
+  }
   private focusChatHeroOnce(): void {
     const chat = this.chat;
     if (!chat?.isHero || !this.map || this.chatHeroFocusedFor === this.map.id) return;
+    // A tab that is not shown yet cannot take focus: the once is kept for when it is.
+    if (this.hiddenTab()) return;
     this.chatHeroFocusedFor = this.map.id;
     const active = this.contentEl.ownerDocument?.activeElement ?? null;
     if (!active || active === this.contentEl.ownerDocument?.body || this.contentEl.contains(active)) chat.focusInput();
@@ -19548,6 +19577,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {
+    this.drawWhenShown();
     this.syncChatNarrow();
     this.fitKindShapes();
     this.syncStatusBarClearance();

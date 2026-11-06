@@ -2175,19 +2175,38 @@ export default class VisualAgentMapPlugin extends Plugin {
   async openMapInNewTab(path: string): Promise<VisualAgentMapView | null> {
     const workspace = this.app.workspace;
     let leaf = this.findMapLeaf(path);
+    const fresh = !leaf;
     if (!leaf) {
       leaf = workspace.getLeaf("tab");
-      await leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true });
+      // Obsidian opens the view (onOpen) before it hands it the state, so the tab is told which map it is for up front.
+      this.pendingTabMaps.set(leaf, path);
+      try {
+        await leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true });
+      } finally {
+        this.pendingTabMaps.delete(leaf);
+      }
     }
-    await workspace.revealLeaf(leaf);
-    return leaf.view instanceof VisualAgentMapView ? leaf.view : null;
+    await this.showLeaf(leaf);
+    const view = leaf.view instanceof VisualAgentMapView ? leaf.view : null;
+    // setViewState swallows a failed setState: a tab that did not end up on the map is not a success.
+    if (!view || (fresh && view.targetPath() !== path)) return null;
+    // The map drew while the tab was still being set up; the opening screen's input takes the keyboard now that it is shown.
+    view.focusChatHero();
+    return view;
+  }
+  /** Maps whose new tab is being opened, by leaf: the tab's own default map must not open first (see the view's onOpen). */
+  readonly pendingTabMaps = new WeakMap<WorkspaceLeaf, string>();
+  /** Brings a tab forward and makes it the active leaf, so commands and the visible map are the same map. */
+  async showLeaf(leaf: WorkspaceLeaf): Promise<void> {
+    await this.app.workspace.revealLeaf(leaf);
+    this.app.workspace.setActiveLeaf(leaf, { focus: true });
   }
   private async activateView(path?: string): Promise<void> {
     await this.ready;
     if (path) {
       const open = this.findMapLeaf(path);
       if (open) {
-        await this.app.workspace.revealLeaf(open);
+        await this.showLeaf(open);
         return;
       }
     }
@@ -2195,12 +2214,18 @@ export default class VisualAgentMapPlugin extends Plugin {
     // Replacing the map in a tab stops its running work, so a tab that is busy keeps its map and the target gets a new tab.
     if (path && leaf?.view instanceof VisualAgentMapView && leaf.view.hasRunningWork()) leaf = undefined;
     if (!leaf) leaf = this.app.workspace.getLeaf("tab");
-    await leaf.setViewState({
-      type: VIEW_TYPE,
-      active: true,
-      state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {}
-    });
-    await this.app.workspace.revealLeaf(leaf);
+    // A tab made here opens its view before it is given the map (see openMapInNewTab).
+    if (path) this.pendingTabMaps.set(leaf, path);
+    try {
+      await leaf.setViewState({
+        type: VIEW_TYPE,
+        active: true,
+        state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {}
+      });
+    } finally {
+      this.pendingTabMaps.delete(leaf);
+    }
+    await this.showLeaf(leaf);
   }
   private async loadCodexModels(): Promise<{ models: string[]; reasoningEfforts: Record<string, string[]> }> {
     const adapter = this.app.vault.adapter;

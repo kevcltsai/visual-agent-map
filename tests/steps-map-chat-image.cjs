@@ -40,7 +40,7 @@ test('schema and kinds carry add_anchor and link_anchor with the new required fi
   assert.equal(item.properties.y.type, 'number');
   assert.equal(item.properties.imageId.type, 'string');
   assert.ok(item.properties.kind.enum.includes('add_anchor'));
-  assert.equal(mapChatStep.version, 16);
+  assert.equal(mapChatStep.version, 17);
 });
 test('add_anchor and link_anchor are parsed with clamped coordinates, a cleaned one-line note and anchor refs', () => {
   const result = parse(reply(

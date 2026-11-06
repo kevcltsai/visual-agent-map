@@ -2,6 +2,7 @@ import { toSimplifiedFold } from "../i18n/han-fold";
 import type { MapAiMode, ResearchDepth, ResearchMode } from "../ai/types";
 import type { MapChatContext } from "./map-chat-context";
 import type { MapChatAction } from "./steps/map-chat/step";
+export { replyPromisesWeb } from "./steps/map-chat/step";
 
 /**
  * Plan confirmation. Most replies are applied at once; a reply that can do a lot of damage or cost a lot is shown as a plan
@@ -208,14 +209,18 @@ export interface ChatResearchRequest {
   imageSearch: boolean;
 }
 /**
- * The mode a research runs in: the mode the user named, then the mode the map remembers, then Quick (D-2026-10-228, 231).
- * Whether the targets are all new cards no longer matters. Decided here, not by the model.
+ * The mode a research runs in: the mode the user named, then Standard when the model says the research needs the web
+ * (`needsWeb`) or its reply promises a web search (`webPromised`, see `replyPromisesWeb`), then the mode the map remembers,
+ * then Quick (D-2026-10-228, 231; the web rule replaces 228's "no guess at how unfamiliar the topic is", map chat only).
+ * Whether the targets are all new cards no longer matters. Decided here, not by the model: it only states the fact.
  */
 export function chatResearchMode(
   action: Extract<MapChatAction, { kind: "run_map_action" }>,
   mapAiMode: MapAiMode | undefined
 ): MapAiMode {
-  return action.mode || mapAiMode || "quick";
+  if (action.mode) return action.mode;
+  if (action.needsWeb === true || action.webPromised === true) return "standard";
+  return mapAiMode || "quick";
 }
 /** The research options of a mode (the view hands in `aiModeOptions(mode, "research")`; core does not import an experience). */
 export type ChatModeOptions = (mode: MapAiMode) => { researchMode: ResearchMode; researchDepth: ResearchDepth };

@@ -118,6 +118,9 @@
           "images": {
             "type": "boolean"
           },
+          "needsWeb": {
+            "type": "boolean"
+          },
           "otherProvider": {
             "type": "boolean"
           },
@@ -310,6 +313,7 @@
           "direction",
           "mode",
           "images",
+          "needsWeb",
           "otherProvider",
           "topicKind",
           "leaning",

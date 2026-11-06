@@ -125,6 +125,10 @@ export type MapChatAction =
       mode: MapChatResearchMode | "";
       /** research_standard: true = also search for images (Standard only; a Quick research never does). Ignored by every other action. */
       images: boolean;
+      /** research_standard: the model says this research needs the web (unfamiliar or recent topic, or its reply says it will search). Present only when true; a missing or non-boolean-true field in the reply is false. */
+      needsWeb?: true;
+      /** research_standard: the safety net, true when the reply text itself promises a web search ({@link replyPromisesWeb}). */
+      webPromised?: true;
       /** research_standard: true = retry the targets on the other provider (this run only); the view honours it only for targets that offer `retryWith`. Present only when true. */
       otherProvider?: true;
     }
@@ -291,6 +295,7 @@ export const MAP_CHAT_SCHEMA = {
           direction: STRING,
           mode: { type: "string", enum: [...MAP_CHAT_RESEARCH_MODES, ""] },
           images: { type: "boolean" },
+          needsWeb: { type: "boolean" },
           otherProvider: { type: "boolean" },
           topicKind: { type: "string", enum: [...TOPIC_KINDS, ""] },
           leaning: { type: "string", enum: [...HYPOTHESIS_LEANINGS, ""] },
@@ -332,6 +337,7 @@ export const MAP_CHAT_SCHEMA = {
           "direction",
           "mode",
           "images",
+          "needsWeb",
           "otherProvider",
           "topicKind",
           "leaning",
@@ -356,6 +362,37 @@ export const MAP_CHAT_SCHEMA = {
   },
   required: ["reply", "actions"]
 };
+
+/** Fixed words, per language, that say the reply will search the web. */
+const WEB_WORDS_ZH = /上網|上网|聯網|联网|(?:網路|网络|網絡|網上|网上)(?:搜尋|搜索|查詢|查询|查找|查|找|檢索|检索)|(?:搜尋|搜索|查詢|查询|查找|檢索|检索)(?:網路|网络|網絡|網頁|网页|網上|网上)/g;
+const WEB_WORDS_EN =
+  /\b(?:search(?:ing)?|look(?:ing)?\s+(?:it\s+|this\s+|that\s+)?up|check(?:ing)?|research(?:ing)?|browse|browsing|find(?:ing)?)\s+(?:the\s+)?(?:web|internet|online)\b|\bweb\s+(?:search|research)\b|\bon\s+the\s+(?:web|internet)\b|\bonline\s+(?:search|research)\b|\b(?:search|research|look(?:ing)?\s+up)\b[^.;!?]{0,30}\bonline\b/gi;
+/** A negation right before the matched words (a few words at most), so "不需要上網" and "won't need to search the web" do not count. */
+const NEGATION_ZH = /(?:不|沒|没|無|无|未|別|别|勿)(?:需要|需|必須|必|須|用|會|会|要|能|可以|可|再|想|打算|有|曾)?(?:再|要|去|先)?$/;
+const NEGATION_EN = /(?:\b(?:not|no|never|without|cannot|unable)|n't)(?:\s+\w+){0,3}\s*$/i;
+/** "web search is not needed": a negation right after the matched words. */
+const TRAILING_NEGATION_EN = /^\s+(?:is|are|was|will be)?\s*(?:not|never)\b|^\s+(?:isn't|aren't)\b/i;
+/**
+ * The safety net behind `needsWeb`: true when a reply's text promises a web search ("我會上網研究", "I'll search the web"). A promise
+ * that is negated in the same clause ("不需要上網", "沒有上網", "without searching the web") is not one. Pure; fixed words only.
+ */
+export function replyPromisesWeb(reply: string): boolean {
+  const clauses = reply.split(/[。．.;；!！?？,，、\n]+/);
+  for (const clause of clauses) {
+    for (const [pattern, negation, window] of [
+      [WEB_WORDS_ZH, NEGATION_ZH, 8],
+      [WEB_WORDS_EN, NEGATION_EN, 60]
+    ] as const) {
+      pattern.lastIndex = 0;
+      for (let match = pattern.exec(clause); match; match = pattern.exec(clause)) {
+        const before = clause.slice(Math.max(0, match.index - window), match.index);
+        const after = clause.slice(match.index + match[0].length, match.index + match[0].length + 20);
+        if (!negation.test(before) && !TRAILING_NEGATION_EN.test(after)) return true;
+      }
+    }
+  }
+  return false;
+}
 
 const invalid = (detail: string): MapChatError => new MapChatError("invalid", `Map chat reply is not valid: ${detail}`);
 
@@ -636,6 +673,9 @@ export function parseMapChat(
             direction: text("direction", false),
             mode,
             images: research && mode !== "quick" && flag("images"),
+            // Only a boolean `true` counts: a missing field (an older reply) or a string "true" is false.
+            ...(research && flag("needsWeb") ? { needsWeb: true as const } : {}),
+            ...(research && replyPromisesWeb(String(body.reply)) ? { webPromised: true as const } : {}),
             ...(research && flag("otherProvider") ? { otherProvider: true as const } : {})
           });
           break;
@@ -820,7 +860,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 16,
+  version: 17,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

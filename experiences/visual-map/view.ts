@@ -3436,7 +3436,12 @@ export class VisualAgentMapView extends ItemView {
             language: request.language,
             model: used.model,
             reasoning: normalizeReasoningLevel(used.reasoning ?? settings.cliReasoning),
-            limits: request.limits
+            limits: request.limits,
+            // The card's own note and its current subtopics, so the new subtopics follow the note and do not repeat (quoted as data).
+            noteDetail: note.detail,
+            existingChildren: (this.map?.nodes ?? [])
+              .filter(item => item.parentId === node.id)
+              .map(item => this.notes.get(item.id)?.title ?? "")
           },
           signal
         );

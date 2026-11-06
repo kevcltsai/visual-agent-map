@@ -16,6 +16,11 @@ import languageZh from "./language.zh.md";
 import limitsEn from "./limits.en.md";
 import limitsZh from "./limits.zh.md";
 import template from "./prompt.md";
+import sourceBlock from "./source-block.md";
+import sourceChildren from "./source-children.md";
+import sourceNote from "./source-note.md";
+import summaryBasis from "./summary-basis.md";
+import summaryBasisNote from "./summary-basis-note.md";
 import topicLineEn from "./topic-line.en.md";
 import topicLineZh from "./topic-line.zh.md";
 
@@ -32,6 +37,10 @@ export interface OutlineGenerateRequest {
   reasoning: ReasoningLevel;
   /** Quick explore's chosen levels and size; they override the preset's own and are enforced after parsing. */
   limits?: OutlineLimits;
+  /** Untrusted: the topic's current note body, quoted as data in the prompt (expansion only). Blank = none. */
+  noteDetail?: string;
+  /** Untrusted: titles of the topic's current subtopics, quoted as data; the outline must not repeat them. */
+  existingChildren?: string[];
 }
 export interface OutlineGenerateResult {
   /** Heading-only Markdown (fence removed, summary lines taken out), ready for the outline textarea and `parseOutline`. */
@@ -42,6 +51,8 @@ export interface OutlineGenerateResult {
 export type OutlineGenerateErrorCode =
   | "empty_topic"
   | "over_budget"
+  /** The request carries a note or existing subtopics and exceeds the budget: refused whole, never truncated. */
+  | "note_too_long"
   | "stopped"
   | "invalid"
   | "no_headings"
@@ -77,6 +88,23 @@ export function applyTopicToPreset(presetText: string, topic: string, language: 
   if (PLACEHOLDER_PATTERN.test(presetText)) return presetText.replace(PLACEHOLDER_PATTERN, () => quoted);
   const line = renderTemplate(inLanguage({ zh: topicLineZh, en: topicLineEn }, language), { topic: quoted });
   return `${presetText.trimEnd()}\n\n${line}`;
+}
+
+/** The note and existing subtopics a request carries (blank note and blank titles dropped). */
+function noteInputs(request: OutlineGenerateRequest): { note: string; children: string[] } {
+  return {
+    note: request.noteDetail?.trim() ? request.noteDetail : "",
+    children: (request.existingChildren ?? []).map(item => item.trim()).filter(Boolean)
+  };
+}
+/** The block placed before the preset: the note and subtopics as quoted, untrusted data. Empty when there are neither. */
+function noteSection(request: OutlineGenerateRequest): string {
+  const { note, children } = noteInputs(request);
+  if (!note && !children.length) return "";
+  return `${renderTemplate(sourceBlock, {
+    note: note ? `\n${renderTemplate(sourceNote, { json: JSON.stringify(note) })}` : "",
+    children: children.length ? `\n${renderTemplate(sourceChildren, { json: JSON.stringify(children) })}` : ""
+  })}\n\n`;
 }
 
 const WRAPPING_FENCE = /^(`{3,}|~{3,})[ \t]*[\w-]*[ \t]*\n([\s\S]*?)\n[ \t]*\1[`~]*[ \t]*$/;
@@ -169,10 +197,13 @@ export function parseOutlineReply(raw: string, language: ContentLanguage): Outli
  */
 export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, OutlineGenerateResult> = {
   id: "outline-generate",
-  version: 2,
+  version: 3,
   render: request => {
     const content = request.contentLanguage ?? request.language;
+    const hasSource = !!noteSection(request);
     return renderTemplate(template, {
+      noteSection: noteSection(request),
+      summaryBasis: hasSource ? summaryBasisNote : summaryBasis,
       languageInstruction: inLanguageNaming({ zh: languageZh, en: languageEn }, content, { language: "region" }, "en", {
         kind: "topic",
         text: request.topic
@@ -189,8 +220,15 @@ export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, Outline
     const locale = uiLocale(request.language);
     if (!request.topic.trim())
       throw new OutlineGenerateError("empty_topic", translate(locale, "error.outline_generate_empty_topic"));
-    if (estimateTokens(prompt) > OUTLINE_GENERATE_TOKEN_BUDGET)
-      throw new OutlineGenerateError("over_budget", translate(locale, "error.outline_generate_over_budget"));
+    if (estimateTokens(prompt) > OUTLINE_GENERATE_TOKEN_BUDGET) {
+      // A request with a note or subtopics is refused whole (never truncated, never retried with the title only). The string is the
+      // over-budget one until the UI has its own wording.
+      const { note, children } = noteInputs(request);
+      throw new OutlineGenerateError(
+        note || children.length ? "note_too_long" : "over_budget",
+        translate(locale, "error.outline_generate_over_budget")
+      );
+    }
   },
   parse: (raw, request) => parseOutlineReply(raw, request.language)
 };

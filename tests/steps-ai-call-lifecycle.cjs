@@ -49,13 +49,13 @@ const KINDS = {
   outline: {
     request: (extra = {}) => ({ topic: 'Sleep and memory', presetText: 'Make a tree for {research topic}.', language: 'en', model: 'gpt-6-luna', reasoning: 'low', ...extra }),
     good: '# Root\n> r\n## A\n> a', bad: 'Sorry, I cannot do that.',
-    name: 'outline-generate', topic: 'Outline · Sleep and memory', step: 'outline-generate@2', stopped: 'Outline generation stopped',
+    name: 'outline-generate', topic: 'Outline · Sleep and memory', step: 'outline-generate@3', stopped: 'Outline generation stopped',
     schema: () => undefined, stream: false
   },
   'map-chat': {
     request: (extra = {}) => ({ message: 'What is missing?', context: buildMapChatContext({ mapTitle: 'Steak', outline, selected: [], references: [], snippets: [], files: [], activeFile: null, history: [] }), language: 'en', model: 'claude:sonnet', reasoning: 'low', ...extra }),
     good: JSON.stringify({ reply: 'ok', actions: [] }), bad: 'not json',
-    name: 'map-chat', topic: 'Map chat · What is missing?', step: 'map-chat@16', stopped: 'Map chat stopped',
+    name: 'map-chat', topic: 'Map chat · What is missing?', step: 'map-chat@17', stopped: 'Map chat stopped',
     schema: () => bundle.MAP_CHAT_SCHEMA, stream: true
   },
   reframe: {

@@ -43401,9 +43401,10 @@ var MapChatRecordWriter = class {
   }
   /**
    * Continues an existing record (restored on open): later lines are appended to `file`, or, given its path, through the adapter
-   * (a record the Vault index does not list). `cleanEnd` is `parseRecord(text).cleanEnd`.
+   * (a record the Vault index does not list). `cleanEnd` is `parseRecord(text).cleanEnd`. `startedResearch` is the restored
+   * conversation's `startedResearch`: the file already has the mark, and a file made again must keep it.
    */
-  resume(id, file, target, cleanEnd = true) {
+  resume(id, file, target, cleanEnd = true, startedResearch = false) {
     this.conv = {
       ...this.freshConversation(id),
       file: typeof file === "string" ? null : file,
@@ -43413,7 +43414,8 @@ var MapChatRecordWriter = class {
       mapId: target.mapId,
       // A cut last line gets a line break first, so the next line is not glued to it.
       pending: cleanEnd ? [] : ["\n"],
-      ended: /* @__PURE__ */ new Set()
+      ended: /* @__PURE__ */ new Set(),
+      researchLine: startedResearch ? serializeLine({ type: "event", turn: 0, kind: "research_started", at: this.stamp() }) : null
     };
     this.target = target;
   }
@@ -43435,6 +43437,7 @@ var MapChatRecordWriter = class {
     if (!conv.file && !(target == null ? void 0 : target.root)) conv.held = true;
     void this.enqueue(async () => {
       conv.pending.push(text12);
+      if (line.type === "event" && line.kind === "research_started") conv.researchLine = text12;
       await this.flush(conv, target);
     });
   }
@@ -43519,7 +43522,8 @@ var MapChatRecordWriter = class {
       held: false,
       failed: false,
       notified: false,
-      ended: /* @__PURE__ */ new Set()
+      ended: /* @__PURE__ */ new Set(),
+      researchLine: null
     };
   }
   dead() {
@@ -43558,7 +43562,7 @@ var MapChatRecordWriter = class {
     else if (!this.dead() && !conv.pending.length) conv.failed = false;
   }
   async writePending(conv, root, target, retry) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d;
     const configDir = this.deps.configDir;
     const vault = this.deps.app.vault;
     if (!conv.file && conv.adapterPath) {
@@ -43569,7 +43573,6 @@ var MapChatRecordWriter = class {
       conv.held = false;
       return;
     }
-    const hadFile = !!conv.file;
     if (conv.file && (retry || !isFile(vault.getAbstractFileByPath(conv.file.path))))
       conv.file = this.resolve(conv, configDir);
     if (!conv.file) {
@@ -43589,11 +43592,11 @@ var MapChatRecordWriter = class {
         });
         conv.mapPath = (_c = target == null ? void 0 : target.mapPath) != null ? _c : conv.mapPath;
         conv.mapId = (_d = target == null ? void 0 : target.mapId) != null ? _d : conv.mapId;
-        conv.file = await vault.create(path, header + conv.pending.join(""));
+        const lines = conv.researchLine && !conv.pending.includes(conv.researchLine) ? [conv.researchLine] : [];
+        conv.file = await vault.create(path, header + lines.join("") + conv.pending.join(""));
         conv.root = root;
         conv.pending = [];
         conv.held = false;
-        if (hadFile) (_f = (_e = this.deps).onRebuilt) == null ? void 0 : _f.call(_e, conv.id);
         return;
       }
       conv.root = root;
@@ -75221,10 +75224,6 @@ ${note.detail.trim()}` : "",
         onFailure: () => {
           new import_obsidian37.Notice(t("ui.map_chat_record_failed"));
         },
-        // A rebuilt file has lost the `research_started` mark: the next turn writes it again.
-        onRebuilt: (id) => {
-          if (this.chatResearchMarkedIn === id) this.chatResearchMarkedIn = null;
-        },
         pluginVersion: (_b2 = (_a2 = this.plugin.manifest) == null ? void 0 : _a2.version) != null ? _b2 : "0.0.0",
         configDir: this.app.vault.configDir
       });
@@ -75417,7 +75416,8 @@ ${note.detail.trim()}` : "",
       latest.id,
       handle instanceof import_obsidian37.TFile ? handle : (_c = latest.path) != null ? _c : "",
       this.chatRecordTarget(),
-      latest.parsed.cleanEnd
+      latest.parsed.cleanEnd,
+      restored.startedResearch
     );
     const numbers = latest.parsed.lines.flatMap(
       (line) => "turn" in line && typeof line.turn === "number" ? [line.turn] : []

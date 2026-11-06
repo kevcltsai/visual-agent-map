@@ -9601,9 +9601,17 @@ export class VisualAgentMapView extends ItemView {
       await this.changeCanvasItems(
         id,
         items => updateTextNode(items, id, value),
-        // The topics after it are laid out again against the new size in the same step.
+        // The topics after it are laid out again against the new size in the same step; a block with none keeps its facing edge alone.
         map => {
-          if (before && after) this.relayoutFollowers(map, id, before, after);
+          if (!before || !after) return;
+          if (this.followersOf(map, id).size) {
+            this.relayoutFollowers(map, id, before, after);
+            return;
+          }
+          const x = this.textAnchoredX(id, before.width, after.width);
+          map.canvasItems = (map.canvasItems ?? []).map(item =>
+            item.kind === "text" && (item as TextItem).id === id ? { ...(item as TextItem), x } : item
+          );
         }
       );
     }

@@ -788,6 +788,32 @@ for (const text of ['hi', 'hello~~'])
     assert.equal(snap(h).C2.x, start.C1.x, 'widening does not move C2');
   });
 
+// A block with no followers yet keeps its facing edge when its text grows, as when it is widened, so it stays on its side of the root
+// and the first topic added after it goes there too.
+for (const text of ['hi', 'hello~~'])
+  test(`placement: balanced: left half, block "${text}" with no followers: longer text keeps its right edge, and + stays on the left`, async () => {
+    const h = await begin('right', { text, followers: [] });
+    await h.view.mapChange(m => { m.layout = { direction: 'balanced' }; h.view.arrangeAll(m, { reset: true }); }, false);
+    await done(h);
+    const box = boxOf(h), start = snap(h);
+    assert.ok(start.t1.x + box.w <= start.Root.x, 'the deal puts this block on the left half');
+    await h.view.saveTextItem('t1', 'a much longer line of text here');
+    await done(h);
+    assert.equal(snap(h).t1.x + boxOf(h).w, start.t1.x + box.w, 'the right edge stays');
+    await h.view.addNode(h.owner(), 'C1', true, false, 'topic', false, {}, 't1');
+    await done(h);
+    assert.ok(snap(h).C1.x < start.Root.x, 'C1 goes on the left half');
+  });
+test('placement: left: a block with no followers keeps its right edge when its text grows; right keeps x', async () => {
+  for (const [D, edge] of [['left', (x, w) => x + w], ['right', x => x]]) {
+    const h = await begin(D, { followers: [] });
+    const want = edge(snap(h).t1.x, boxOf(h).w);
+    await h.view.saveTextItem('t1', 'a much longer line of text here');
+    await done(h);
+    assert.equal(edge(snap(h).t1.x, boxOf(h).w), want, D);
+  }
+});
+
 // Row "add C" beside a wide text block (under the same topic, or under the neighbouring topic): the obstacle is as wide as it is drawn.
 for (const D of DIRS) for (const under of ['root', 'child'])
   test(`placement: ${D}: topics added after a block keep clear of a wide text block under the ${under === 'root' ? 'same topic' : 'neighbouring topic'}`, async () => {

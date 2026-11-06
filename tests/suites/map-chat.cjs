@@ -352,10 +352,10 @@ test('map chat 15: the reader hears each stage name once through the live region
 
 class MarkdownView {}
 
-async function harness({ aim = false, document = false, empty = false, realRender = false, viaSync = false, language = 'en' } = {}) {
+async function harness({ aim = false, document = false, empty = false, realRender = false, viaSync = false, language = 'en', records = false } = {}) {
   const { repo, app, contents, files } = fixture('en');
   app.vault.configDir = '.obsidian';
-  const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'claude:sonnet' };
+  const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'claude:sonnet', mapChatRecords: records };
   repo.settings = settings;
   const mapDoc = { id: 'map-a', title: 'Sleep map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   await repo.ensureTopicFolders('Agent Workspace/Topics/map-a');
@@ -375,7 +375,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
     await app.vault.create(file, text);
   }
   const notices = [], opened = [];
-  const control = { reply: async () => ({ reply: 'ok', actions: [], rejected: [] }), requests: [], models: [], claudeReady: true, listeners: [], refreshes: [], usageAsks: 0, decline: false, nested: 0, mutates: 0, depth: 0, calls: [], markdown: [], searches: [], search: async () => [], probe: null };
+  const control = { reply: async () => ({ reply: 'ok', actions: [], rejected: [] }), requests: [], models: [], claudeReady: true, listeners: [], refreshes: [], usageAsks: 0, decline: false, nested: 0, mutates: 0, depth: 0, calls: [], markdown: [], searches: [], writers: [], search: async () => [], probe: null };
   let queue = Promise.resolve();
   const ctx = {};
   const plugin = withExpansionCoordinator({
@@ -394,6 +394,9 @@ async function harness({ aim = false, document = false, empty = false, realRende
     saveSettings: async () => { control.saves = (control.saves ?? 0) + 1; },
     // The real plugin's methods (main.ts) on this stand-in, so the view is tested against the shipped current-model logic.
     currentModelListeners: new Set(),
+    mapChatRecordWriters: new Set(),
+    // The real switch on a stand-in whose `views` lists the one view under test (the plugin's own `views` is the other windows) and whose vault holds no record file (the keep/delete question is tested with the modal).
+    setMapChatRecords: on => realPlugin.prototype.setMapChatRecords.call({ settings, app: { vault: { getFiles: () => [] } }, mapChatRecordWriters: plugin.mapChatRecordWriters, saveSettings: plugin.saveSettings, views: () => [ctx.view] }, on),
     setCurrentModel: model => realPlugin.prototype.setCurrentModel.call(plugin, model),
     subscribeCurrentModel: listener => realPlugin.prototype.subscribeCurrentModel.call(plugin, listener),
     availableModels: () => control.claudeReady ? ['gpt-6-luna', 'claude:sonnet', 'claude:haiku'] : ['gpt-6-luna'], modelLabel: id => `label(${id})`,
@@ -402,7 +405,13 @@ async function harness({ aim = false, document = false, empty = false, realRende
     // The real confirmAiUsage asks this first; a test that stubs it to false gets the real not-ready path of the send.
     aiReadyForModel: async () => true,
     confirmAiUsage: async (model, run) => { control.usageAsks++; control.models.push(model); control.calls.push('confirm'); if (!(await plugin.aiReadyForModel(model))) return false; if (control.decline) return false; await run(); return true; },
-    mapChat: { chat: async (request, signal, onReply, onProgress, onSteer) => { control.calls.push('chat'); control.requests.push(request); return control.reply(request, signal, onReply, onProgress, onSteer); } },
+    // Like the real service: the raw output goes to `onRaw` right before the reply is used, and never after a stop (unless a test asks for it).
+    mapChat: { chat: async (request, signal, onReply, onProgress, onSteer, onRaw) => { control.calls.push('chat'); control.requests.push(request); if (control.invalidRaw !== undefined) { // Like the real runner: it hands the output to onRaw, then its parse throws before the service returns.
+        if (!signal.aborted) onRaw?.(control.invalidRaw); throw Object.assign(new Error('Map chat reply is not valid'), { name: 'MapChatError', code: 'invalid' }); }
+      const result = await control.reply(request, signal, onReply, onProgress, onSteer); if (!signal.aborted || control.rawAlways) onRaw?.(control.raw ?? JSON.stringify(result)); return result; } },
+    manifest: { version: '9.9.9' },
+    // The switch reaches the writers a view registered (main.ts keeps the set; this stand-in keeps a list).
+    registerMapChatRecordWriter: writer => { control.writers.push(writer); writer.setEnabled(settings.mapChatRecords); return () => { control.writers.splice(control.writers.indexOf(writer), 1); }; },
     // B3: the web image search of the Markdown quick action; the thumbnail check is stubbed on the view below.
     searchImages: async (query, model, signal) => { control.calls.push('search'); control.searches.push({ query, model, signal }); return control.search(query, model, signal); }
   });
@@ -5953,6 +5962,488 @@ test('P4a undo button (counter-example): a reply buried under later steps leaves
   assert.equal(f.state.later, 1); assert.deepEqual(f.state.undone, []);
 });
 
+// ---- map chat records: the panel side (new conversation, restore, inert controls) ----------------------------------
+const restoredConversation = (extra = {}) => ({
+  id: '20261105-134000-abcdef', restoredAt: new Date(2026, 10, 5, 21, 40).toISOString(),
+  turns: [
+    { message: 'split pricing', reply: 'Done **now**.', lines: [{ status: 'done', text: 'Added A' }], modelLabel: 'Claude Sonnet', stalePlan: false },
+    { message: 'research all', reply: 'Plan ready.', lines: [], modelLabel: 'Claude Sonnet', stalePlan: true,
+      images: { state: 'ready', items: [{ title: 'Pic one', sourceUrl: 'https://example.com/1' }, { title: 'Pic two', sourceUrl: 'https://example.com/2' }], inserted: [1] } }
+  ], ...extra
+});
+const newButton = f => find(f.panel.headEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-new'));
+const stalePress = (el, calls) => { el.click(); key(el, { key: 'Enter' }); key(el, { key: ' ' }); return calls; };
+
+test('map chat records: the New conversation button exists only while records are on, and the title row is unchanged otherwise', () => {
+  const off = panelFixture(); off.panel.setOpen(true);
+  assert.equal(newButton(off), undefined);
+  eq(off.panel.headEl.children.map(c => c.cls.split(' ')[0]), ['vam-map-chat-title', 'vam-map-chat-model-tag', 'vam-map-chat-model', 'vam-map-chat-save', 'vam-map-chat-close']);
+  const falsy = panelFixture({ recordsEnabled: () => false, newConversation() {} }); falsy.panel.setOpen(true);
+  assert.equal(newButton(falsy), undefined);
+  let on = true; const calls = [];
+  const f = panelFixture({ recordsEnabled: () => on, newConversation: () => calls.push('new') }); f.panel.setOpen(true);
+  const button = newButton(f);
+  assert.ok(button); assert.equal(button.attrs['aria-label'], 'New conversation'); assert.equal(button.attrs.title, 'New conversation');
+  assert.equal(button.attrs.type, 'button', 'a real button: Tab, Enter and Space work');
+  eq(f.panel.headEl.children.map(c => c.cls.split(' ')[0]), ['vam-map-chat-title', 'vam-map-chat-model-tag', 'vam-map-chat-model', 'vam-map-chat-new', 'vam-map-chat-save', 'vam-map-chat-close']);
+  on = false; f.panel.refreshNote(); f.panel.begin('q'); f.panel.finish('a', []);
+  assert.equal(newButton(f), undefined, 'switching records off removes the button');
+});
+
+test('map chat records: new conversation clears the panel and starts a new file', () => {
+  const calls = [];
+  const f = panelFixture({ recordsEnabled: () => true, newConversation: () => calls.push('new') }); f.panel.setOpen(true);
+  f.panel.begin('first'); f.panel.finish('answer', []);
+  f.panel.conversationId = '20261105-134000-abcdef';
+  assert.equal(f.panel.hasMessages, true);
+  newButton(f).click();
+  assert.equal(f.panel.hasMessages, false); eq(f.panel.turns(), []); assert.equal(f.panel.conversationId, null);
+  eq(calls, ['new'], 'the host is told once, after the panel was cleared');
+  assert.equal(f.page.doc.activeElement, f.parts.input(), 'the keyboard goes to the message field');
+  // While a turn runs it waits (Stop first): no state is lost.
+  f.panel.begin('running');
+  assert.equal(newButton(f).attrs['aria-disabled'], 'true');
+  newButton(f).click();
+  assert.equal(f.panel.hasMessages, true); eq(calls, ['new']);
+  f.panel.finish('done', []);
+  assert.equal(newButton(f).attrs['aria-disabled'], 'false');
+});
+
+test('map chat records: restore shows the finished turns, the restored line, and feeds the next request', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  f.panel.restore(restoredConversation());
+  assert.equal(f.panel.conversationId, '20261105-134000-abcdef');
+  assert.equal(f.panel.restoredEl.text, 'Restored the conversation from 11/5 21:40');
+  assert.equal(f.panel.restoredEl.hidden, false);
+  eq(f.panel.turns(), [{ role: 'user', text: 'split pricing' }, { role: 'assistant', text: 'Done **now**.' }, { role: 'user', text: 'research all' }, { role: 'assistant', text: 'Plan ready.' }]);
+  assert.match(visibleText(f.parts.log()), /Added A/);
+  assert.equal(f.panel.pendingPlan(), null, 'a restored plan never waits for an answer');
+  assert.equal(f.panel.hintEl.hidden, true);
+  f.panel.restore({ id: '20261105-134000-abcdef', restoredAt: new Date(2026, 0, 3, 4, 5).toISOString(), turns: restoredConversation().turns });
+  assert.equal(f.panel.restoredEl.text, 'Restored the conversation from 1/3 04:05', 'M/D HH:mm in local time, hours and minutes padded');
+  newButton(f).click();
+  assert.equal(f.panel.restoredEl.hidden, true, 'a new conversation drops the line');
+});
+
+test('map chat records: restored plan, images, retry and choices are inert', () => {
+  const calls = []; const f = panelFixture({ recordsEnabled: () => true, newConversation() {}, retry: () => calls.push('retry'), insertImage: async () => { calls.push('insert'); return { ok: true }; }, send: () => calls.push('send') });
+  f.panel.setOpen(true); f.panel.restore(restoredConversation());
+  const log = f.parts.log();
+  const plan = find(log, i => hasClass(i, 'vam-map-chat-plan'));
+  assert.ok(plan); assert.ok(hasClass(plan, 'is-stale'));
+  assert.ok(visibleText(plan).includes('No longer valid'), 'the stale explanation is in the card');
+  const planButtons = findAll(plan, i => i.tag === 'button');
+  eq(planButtons.map(b => b.text), ['Apply', 'Cancel']);
+  const picks = findAll(log, i => hasClass(i, 'vam-map-chat-images-pick'));
+  assert.equal(picks.length, 2); assert.equal(findAll(log, i => i.tag === 'img').length, 0, 'no thumbnail is fetched for a restored candidate');
+  assert.equal(findAll(log, i => i.tag === 'a').length, 0, 'no source link from the record');
+  // restored choices (the shape a live one has) are inert too
+  f.panel.showChoices({ prompt: 'Pick', options: [{ label: 'Map A', pick: () => calls.push('pick-a') }, { label: 'Type X', pick: () => calls.push('pick-x') }], picked: false, stale: true });
+  const choices = findAll(log, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-choice'));
+  assert.equal(choices.length, 2);
+  for (const control of [...planButtons, ...picks, ...choices]) {
+    assert.equal(control.attrs['aria-disabled'], 'true', `${control.text} is aria-disabled`);
+    assert.ok(hasClass(control, 'is-stale'));
+  }
+  const rowControls = () => [...findAll(log, i => i.tag === 'button' && (hasClass(i, 'vam-map-chat-plan-apply') || hasClass(i, 'vam-map-chat-choice') || hasClass(i, 'vam-map-chat-images-pick') || hasClass(i, 'vam-map-chat-retry')))];
+  assert.equal(findAll(log, i => hasClass(i, 'vam-map-chat-plan-apply')).length, 0, 'no live Apply button exists');
+  for (const control of [...planButtons, ...picks, ...choices]) stalePress(control, calls);
+  eq(calls, [], 'click, Enter and Space call no apply, insert, retry, pick or send');
+  assert.ok(rowControls().every(c => c.attrs['aria-disabled'] === 'true'));
+  // a stale message keeps Retry inert even if one is built for it
+  const keyDown = key(planButtons[0], { key: 'Enter' });
+  assert.equal(keyDown, true, 'Enter on an inert control is consumed, so the browser makes no click');
+  // an undone reply still shows
+  const undone = restoredConversation(); undone.turns[0].reply = 'Undone reply stays';
+  f.panel.restore(undone);
+  assert.match(visibleText(f.parts.log()), /Undone reply stays/);
+});
+
+test('map chat records: F2 a restored plan card shows what became of it: waiting, cancelled or applied with its results', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  const turn = extra => ({ message: 'research all', reply: 'Plan ready.', lines: [], modelLabel: 'Claude Sonnet', stalePlan: true, ...extra });
+  const card = () => find(f.parts.log(), i => hasClass(i, 'vam-map-chat-plan'));
+  const check = (extra, cls, title) => {
+    f.panel.restore(restoredConversation({ turns: [turn(extra)] }));
+    const c = card(); assert.ok(hasClass(c, cls), `card is ${cls}`); assert.ok(hasClass(c, 'is-stale'));
+    assert.equal(c.attrs['aria-label'], title); assert.ok(visibleText(c).includes('No longer valid'));
+    for (const b of findAll(c, i => i.tag === 'button')) assert.equal(b.attrs['aria-disabled'], 'true');
+    assert.equal(f.panel.pendingPlan(), null, 'a restored card never waits for an answer'); assert.equal(f.panel.hintEl.hidden, true);
+  };
+  check({}, 'is-pending', 'Plan to review');
+  check({ planState: 'cancelled', planLines: [] }, 'is-cancelled', 'Cancelled plan');
+  check({ planState: 'applied', planLines: [{ status: 'done', text: 'Researched A' }, { status: 'failed', text: 'B failed' }] }, 'is-applied', 'Applied plan');
+  assert.match(visibleText(f.parts.log()), /Researched A/); assert.match(visibleText(f.parts.log()), /B failed/, 'the results of the applied plan are listed');
+  check({ planState: 'stopped', planLines: [{ status: 'done', text: 'Half done' }] }, 'is-applied', 'Applied plan');
+  assert.match(visibleText(f.parts.log()), /Half done/);
+});
+
+test('map chat records: F3 restore replaces only the messages; the draft, the dropped references and the note chip stay', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  f.showNote('Notes/Visible.md');
+  f.parts.input().value = 'half typed'; drop(f.panel.el, '[[Note]]'); drop(f.panel.el, 'some words');
+  const before = f.panel.attachments();
+  f.panel.restore(restoredConversation());
+  assert.equal(f.parts.input().value, 'half typed', 'the draft stays');
+  eq(f.panel.attachments(), before, 'dropped references and the note chip are still attached');
+  assert.equal(f.panel.currentNote(), 'Notes/Visible.md'); assert.ok(f.panel.hasMessages);
+  assert.ok(visibleText(f.parts.chips()).includes('Visible'), 'the chips are still drawn');
+});
+
+integrationTest('map chat records: F3 a draft typed and a reference added while the record is read survive the restore and go with the next request', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate();
+  await seedRecord(h, sampleRecord());
+  const chat = h.open(); h.type('typing while it loads'); chat.chips.push({ kind: 'topic', id: h.ids.a });
+  await until(() => chat.hasMessages);
+  assert.equal(chat.inputEl.value, 'typing while it loads'); eq(chat.attachments(), [{ kind: 'topic', id: h.ids.a }]);
+  await h.view.sendMapChat(); await recordIdle(h);
+  assert.equal(h.control.requests.at(-1).message, 'typing while it loads');
+  assert.equal(JSON.parse(h.control.requests.at(-1).context.json).references.length, 1, 'the reference reaches the request');
+});
+
+test('map chat records: L1 a restored picture block is named without an empty card title', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  f.panel.restore(restoredConversation());
+  const box = find(f.parts.log(), i => hasClass(i, 'vam-map-chat-images'));
+  assert.equal(box.attrs['aria-label'], 'Picture candidates');
+  assert.doesNotMatch(box.attrs['aria-label'], /“”/);
+});
+
+test('map chat records: record text with HTML restores as plain text', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  const evil = '<img src=x onerror=alert(1)> and <script>alert(2)</script>';
+  f.panel.restore({ id: '20261105-134000-abcdef', restoredAt: new Date().toISOString(), turns: [{ message: evil, reply: evil, lines: [{ status: 'done', text: evil }], modelLabel: evil, stalePlan: false }] });
+  const log = f.parts.log();
+  assert.equal(findAll(log, i => i.tag === 'img' || i.tag === 'script').length, 0, 'no img or script element');
+  assert.match(visibleText(log), /<img src=x onerror=alert\(1\)>/, 'the markup is shown as text');
+});
+
+// ---- map chat records: the view side (writer lifecycle, restore, late results) -----------------------------------------
+const ROOT_A = 'Agent Workspace/Topics/map-a';
+const REC_ID = '20261105-134000-abcdef';
+const REC_AT = '2026-11-05T13:40:00.000Z';
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const recordFiles = (h, root = ROOT_A) => [...h.files.keys()].filter(p => p.startsWith(`${root}/Chats/records/`) && p.endsWith('.jsonl'));
+const allRecordFiles = h => [...h.files.keys()].filter(p => p.includes('/Chats/records/'));
+const recordLines = (h, path) => (h.contents.get(path) ?? '').split('\n').filter(Boolean).map(line => JSON.parse(line));
+const recordIdle = async h => { for (const writer of [...h.control.writers]) await writer.idle(); await tick(); };
+const lineKinds = lines => lines.map(l => l.type === 'turn_end' ? `end:${l.status}` : l.type === 'event' ? `event:${l.kind}` : l.type === 'plan' ? `plan:${l.state}` : l.type);
+const rec = (type, extra) => ({ v: 1, type, ...extra });
+const sampleRecord = (id = REC_ID, at = REC_AT, extra = []) => [
+  rec('conversation', { id, startedAt: at, mapPath: MAP, mapId: 'map-a', pluginVersion: '1' }),
+  rec('turn_start', { turn: 1, at, message: 'split pricing' }),
+  rec('turn_end', { turn: 1, at, status: 'done', raw: null, reply: 'Split it in two.', lines: [{ status: 'done', text: 'Added A' }], modelLabel: 'Claude Sonnet' }),
+  rec('turn_start', { turn: 2, at, message: 'try a thing' }),
+  rec('turn_end', { turn: 2, at, status: 'failed', raw: null, reply: 'oops', lines: [], modelLabel: '' }),
+  ...extra
+];
+async function seedRecord(h, lines, id = REC_ID, root = ROOT_A) {
+  for (const folder of [`${root}/Chats`, `${root}/Chats/records`]) if (!h.files.has(folder)) await h.app.vault.createFolder(folder);
+  const path = `${root}/Chats/records/${id}.jsonl`;
+  await h.app.vault.create(path, lines.map(line => JSON.stringify(line)).join('\n') + '\n');
+  return path;
+}
+const saySomething = (h, text = 'ok') => { h.control.reply = async () => ({ reply: text, actions: [], rejected: [] }); };
+const sendOne = async (h, text, reply) => { if (reply) saySomething(h, reply); h.type(text); await h.view.sendMapChat(); await recordIdle(h); };
+const unsavedNotice = h => h.notices.filter(message => /not kept after you close/.test(message));
+const switchTo = (h, id, path) => { h.view.map.id = id; h.view.path = path; h.repaint(); };
+const MAP_B = 'Agent Workspace/Topics/map-b/Map.md';
+
+integrationTest('map chat records: A1 records off writes nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  await sendOne(h, 'one', 'first answer');
+  h.control.reply = async () => { throw new Error('boom'); }; await sendOne(h, 'fails');
+  const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'late', actions: [], rejected: [] }; };
+  h.type('stopped'); const stopping = h.view.sendMapChat(); await requestOut(chat); h.view.stopMapChat(); gate.resolve(); await stopping;
+  h.control.reply = async () => ({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] });
+  await sendOne(h, 'rename'); await h.view.travel(false); await h.view.travel(true);
+  switchTo(h, 'map-b', MAP_B); switchTo(h, 'map-a', MAP);
+  await sendOne(h, 'again', 'after the switch');
+  await h.view.onClose(); await tick();
+  eq(allRecordFiles(h), [], 'no record file or folder'); assert.equal([...h.files.keys()].some(p => p.includes('Chats/records')), false);
+  eq(h.control.writers, [], 'no writer was made or registered'); assert.equal(h.view.chatRecords, null);
+  assert.equal(unsavedNotice(h).length, 1, 'closing still says the chat is not kept');
+  const f = await harness(); await f.view.hydrate(); const c = f.open(); assert.equal(find(c.headEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-new')), undefined, 'no New conversation button');
+});
+
+integrationTest('map chat records: A1 flipping the switch with the side window open shows and hides the New conversation button at once', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const button = () => find(chat.headEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-new'));
+  assert.equal(button(), undefined);
+  await h.plugin.setMapChatRecords(true);
+  assert.ok(button(), 'on: the button appears without a repaint');
+  await h.plugin.setMapChatRecords(false);
+  assert.equal(button(), undefined, 'off: the button goes away without a repaint');
+});
+
+integrationTest('map chat records: A4 records failed, stopped, resent turns and undo/redo of a reply as events', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  assert.equal(h.control.writers.length, 1, 'the view registered one writer');
+  // done, then undo, redo and a refused undo
+  h.control.reply = async () => ({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] });
+  await sendOne(h, 'rename it');
+  await h.view.travel(false); await h.view.travel(true);
+  await h.repo.updateNote(h.node('a').path, { title: 'Edited by hand' }); await h.view.hydrate();
+  await assert.rejects(() => h.view.travel(false), /cannot be undone/);
+  // failed (error, then a timeout)
+  h.control.reply = async () => { throw new Error('model exploded'); }; await sendOne(h, 'will fail');
+  h.control.reply = async () => { throw new Error('request timed out'); }; await sendOne(h, 'will time out');
+  // stopped
+  const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'late', actions: [], rejected: [] }; };
+  h.type('stop me'); const stopping = h.view.sendMapChat(); await requestOut(chat); h.view.stopMapChat(); gate.resolve(); await stopping; await recordIdle(h);
+  // resent
+  const attempts = [];
+  h.control.reply = (request, signal, onReply, onProgress) => new Promise((resolve, reject) => { attempts.push({ signal, resolve, reject }); });
+  h.type('slow one'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000);
+  resendButton(chat).click(); await until(() => attempts.length === 2); attempts[1].resolve({ reply: 'second try', actions: [], rejected: [] }); await sending; await recordIdle(h);
+  const [file] = recordFiles(h); eq(recordFiles(h).length, 1);
+  const lines = recordLines(h, file);
+  eq(lineKinds(lines), ['conversation', 'turn_start', 'end:done', 'event:undo', 'event:redo', 'event:undo_refused', 'turn_start', 'end:failed', 'turn_start', 'end:failed', 'turn_start', 'end:stopped', 'turn_start', 'event:resend', 'end:done']);
+  const ends = lines.filter(l => l.type === 'turn_end');
+  eq(ends.map(l => l.reason ?? null), [null, 'error', 'timeout', null, null]);
+  assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
+  assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
+  assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 16 }); assert.equal(start.request.model, 'claude:sonnet');
+  assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
+  assert.equal(lines.every(l => l.v === 1), true);
+  assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');
+});
+
+integrationTest('map chat records: A4 a stopped turn that left text is not written again at the next send, and closing does not warn', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  const gate = deferred(); h.control.reply = async (_request, _signal, onReply) => { onReply('half an ans'); await gate.promise; return { reply: 'late', actions: [], rejected: [] }; };
+  h.type('stop midway'); const stopping = h.view.sendMapChat(); await requestOut(chat); h.view.stopMapChat(); gate.resolve(); await stopping; await recordIdle(h);
+  assert.equal(chat.completedTurns().length, 1, 'the stopped turn with text counts as finished in memory');
+  await sendOne(h, 'next', 'fine');
+  const [file] = recordFiles(h); const lines = recordLines(h, file);
+  eq(lineKinds(lines), ['conversation', 'turn_start', 'end:stopped', 'turn_start', 'end:done']);
+  assert.equal(lines.some(l => l.backfilled), false, 'no backfilled start');
+  await h.view.onClose(); eq(unsavedNotice(h), [], 'nothing is lost, so no notice');
+  const again = await harness({ records: true }); await again.view.hydrate();
+  await seedRecord(again, lines.map(l => ({ ...l })), file.split('/').at(-1).replace('.jsonl', ''));
+  const c = again.open(); await until(() => c.hasMessages);
+  eq(c.transcript().map(m => m.text), ['next', 'fine'], 'a stopped turn is not shown again');
+});
+
+integrationTest('map chat records: A5 restores the latest conversation on reopen, the next turn carries it and appends to the same file', async () => {
+  const first = await harness({ records: true }); await first.view.hydrate(); first.open();
+  await sendOne(first, 'what is sleep', 'Sleep is rest.');
+  const [file] = recordFiles(first); const text = first.contents.get(file);
+  const h = await harness({ records: true }); await h.view.hydrate();
+  await seedRecord(h, recordLines(first, file).map(l => ({ ...l })), file.split('/').at(-1).replace('.jsonl', ''));
+  const chat = h.open(); await until(() => chat.hasMessages);
+  eq(chat.transcript().map(m => m.text), ['what is sleep', 'Sleep is rest.']);
+  assert.match(chat.restoredEl.text, /^Restored the conversation from \d+\/\d+ \d\d:\d\d$/);
+  const copied = recordFiles(h); eq(copied.length, 1);
+  await sendOne(h, 'and the first question?', 'It was: what is sleep.');
+  const context = JSON.parse(h.control.requests[0].context.json);
+  eq(context.earlierTurns, [{ role: 'user', text: 'what is sleep' }, { role: 'assistant', text: 'Sleep is rest.' }]);
+  eq(recordFiles(h), copied, 'the new turn went into the same file'); eq(allRecordFiles(h), copied);
+  eq(lineKinds(recordLines(h, copied[0])), ['conversation', 'turn_start', 'end:done', 'turn_start', 'end:done']);
+  assert.equal(recordLines(h, copied[0]).at(-2).turn, 2, 'turn numbers go on after the restored ones');
+  void text;
+});
+
+integrationTest('map chat records: A5 a record with a failed turn shows only the finished turns, and a v:2 file is not restored, not changed, and the next send opens a new file', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate();
+  const path = await seedRecord(h, sampleRecord()); const chat = h.open(); await until(() => chat.hasMessages);
+  eq(chat.transcript().map(m => m.text), ['split pricing', 'Split it in two.']);
+  const odd = await harness({ records: true }); await odd.view.hydrate();
+  const future = [rec('conversation', { id: REC_ID, startedAt: REC_AT, mapPath: MAP, mapId: 'map-a', pluginVersion: '9' }), { v: 2, type: 'turn_start', turn: 1, message: 'from the future' }];
+  const old = await seedRecord(odd, future); const before = odd.contents.get(old);
+  const c = odd.open(); await tick(); await recordIdle(odd); assert.equal(c.hasMessages, false, 'nothing restored');
+  await sendOne(odd, 'hello', 'hi');
+  assert.equal(odd.contents.get(old), before, 'the unknown-version file is left as it was');
+  eq(recordFiles(odd).length, 2, 'a new file was opened');
+  void path;
+});
+
+integrationTest('map chat records: F2 a restored waiting plan is not cancelled or recorded by the next send', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate();
+  const planned = [rec('conversation', { id: REC_ID, startedAt: REC_AT, mapPath: MAP, mapId: 'map-a', pluginVersion: '1' }), rec('turn_start', { turn: 1, at: REC_AT, message: 'research all' }),
+    rec('turn_end', { turn: 1, at: REC_AT, status: 'plan', raw: null, reply: 'Plan ready.', lines: [], modelLabel: '' })];
+  const path = await seedRecord(h, planned); const chat = h.open(); await until(() => chat.hasMessages);
+  assert.equal(chat.pendingPlan(), null);
+  await sendOne(h, 'something else', 'ok'); await recordIdle(h);
+  assert.equal(recordLines(h, path).some(l => l.type === 'plan'), false, 'no plan line was written for the restored card');
+  assert.ok(find(chat.logEl, i => hasClass(i, 'vam-map-chat-plan') && hasClass(i, 'is-pending') && hasClass(i, 'is-stale')), 'the card stays as it was');
+});
+
+integrationTest('map chat records: A6 new conversation starts a new file; the old one is untouched and the next open restores the new one', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  await sendOne(h, 'first', 'one'); const [a] = recordFiles(h); const aText = h.contents.get(a);
+  await sleep(5);
+  find(chat.headEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-new')).click();
+  assert.equal(chat.hasMessages, false);
+  await sendOne(h, 'second', 'two');
+  const files = recordFiles(h); eq(files.length, 2); const b = files.find(p => p !== a);
+  assert.equal(h.contents.get(a), aText, 'the first file did not change'); eq(lineKinds(recordLines(h, b)), ['conversation', 'turn_start', 'end:done']);
+  assert.equal(JSON.parse(h.control.requests[1].context.json).earlierTurns.length, 0, 'the new conversation sends no earlier turns');
+  switchTo(h, 'map-b', MAP_B); switchTo(h, 'map-a', MAP); await until(() => chat.hasMessages);
+  eq(chat.transcript().map(m => m.text), ['second', 'two'], 'the newest conversation comes back');
+});
+
+integrationTest('map chat records: A7 a restored plan, candidate picture and choice do nothing when pressed in the view', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate();
+  await seedRecord(h, [
+    rec('conversation', { id: REC_ID, startedAt: REC_AT, mapPath: MAP, mapId: 'map-a', pluginVersion: '1' }),
+    rec('turn_start', { turn: 1, at: REC_AT, message: 'research all' }),
+    rec('turn_end', { turn: 1, at: REC_AT, status: 'plan', raw: null, reply: 'Plan ready.', lines: [], modelLabel: 'M' }),
+    rec('images', { turn: 1, at: REC_AT, state: 'ready', items: [{ title: 'Pic', sourceUrl: 'https://example.com/1' }], inserted: [] })
+  ]);
+  const chat = h.open(); await until(() => chat.hasMessages);
+  const calls = []; h.view.applyChatPlan = async () => { calls.push('apply'); }; h.view.chatInsertImage = async () => { calls.push('insert'); return { ok: true }; };
+  const send = h.view.sendMapChat; h.view.sendMapChat = async (...args) => { calls.push('send'); return send(...args); };
+  const controls = findAll(chat.logEl, i => i.tag === 'button' && (hasClass(i, 'is-stale') || i.attrs['aria-disabled'] === 'true'));
+  assert.ok(controls.length >= 3, 'the plan buttons and the picture are there but inert');
+  for (const control of controls) { control.click(); key(control, { key: 'Enter' }); key(control, { key: ' ' }); }
+  await tick(); eq(calls, []); eq(h.control.calls, [], 'no consent asked, no request sent');
+});
+
+integrationTest('map chat records: A8 conversation file follows create_map / open_map', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  await sendOne(h, 'first', 'hello'); const [old] = recordFiles(h); const oldRoot = ROOT_A;
+  h.control.reply = async () => ({ reply: 'I will create a map.', actions: [{ kind: 'create_map', title: 'Quantum computing' }, addRoot('r', 'Quantum')], rejected: [] });
+  h.type('new map on quantum'); await h.view.sendMapChat();
+  planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.pendingPlan() === null && chat.transcript().at(-1).lines.length > 0); await recordIdle(h);
+  const newRoot = h.repo.topicRoot(h.view.path); assert.notEqual(newRoot, oldRoot);
+  eq(recordFiles(h, oldRoot), [], 'the old map has no record file'); eq(recordFiles(h, newRoot).length, 1);
+  const kinds = lineKinds(recordLines(h, recordFiles(h, newRoot)[0]));
+  eq(kinds, ['conversation', 'turn_start', 'end:done', 'turn_start', 'end:plan', 'moved', 'plan:applied']);
+  assert.equal(h.files.has(old), false);
+  assert.equal(h.control.nested, 0, 'the writer never took the map transaction');
+  await sendOne(h, 'in the new map', 'carried on');
+  assert.equal(lineKinds(recordLines(h, recordFiles(h, newRoot)[0])).at(-1), 'end:done', 'later lines go to the new place');
+  // open_map
+  const coffee = await h.repo.createMap('Coffee industry');
+  h.control.reply = async () => ({ reply: 'Switching.', actions: [{ kind: 'open_map', title: 'coffee' }], rejected: [] });
+  await sendOne(h, 'go to coffee');
+  assert.equal(h.view.path, coffee); const coffeeRoot = h.repo.topicRoot(coffee);
+  eq(recordFiles(h, newRoot), [], 'left the previous map'); eq(recordFiles(h, coffeeRoot).length, 1);
+  assert.equal(lineKinds(recordLines(h, recordFiles(h, coffeeRoot)[0])).filter(k => k === 'moved').length, 2, 'one moved line per move');
+});
+
+integrationTest('map chat records: A8 unmanaged start is written only into the created map', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  h.view.path = 'Elsewhere/Map.md';
+  h.control.reply = async () => ({ reply: 'I will create a map.', actions: [{ kind: 'create_map', title: 'Fresh start' }, addRoot('r', 'Fresh')], rejected: [] });
+  h.type('start from nothing'); await h.view.sendMapChat(); await recordIdle(h);
+  eq(allRecordFiles(h), [], 'nothing written while there is no map to hold it'); assert.equal(h.view.chatRecords.unsaved, true);
+  planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.pendingPlan() === null && chat.transcript().at(-1).lines.length > 0); await recordIdle(h);
+  const root = h.repo.topicRoot(h.view.path); eq(recordFiles(h, root).length, 1); eq(allRecordFiles(h).length, 1);
+  assert.equal([...h.files.keys()].some(p => p.startsWith('Elsewhere')), false, 'the old place has nothing');
+  const kinds = lineKinds(recordLines(h, recordFiles(h, root)[0])); assert.deepEqual(kinds.slice(0, 3), ['conversation', 'turn_start', 'end:plan']);
+  assert.equal(h.view.chatRecords.unsaved, false);
+});
+
+integrationTest('map chat records: A9 manual switch with records on: clears, then switching back restores', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  await sendOne(h, 'remember me', 'I will.');
+  switchTo(h, 'map-b', MAP_B);
+  assert.equal(chat.hasMessages, false, 'the other map starts empty'); await tick(); await recordIdle(h); eq(recordFiles(h, 'Agent Workspace/Topics/map-b'), [], 'nothing written for the other map');
+  switchTo(h, 'map-a', MAP); await until(() => chat.hasMessages);
+  eq(chat.transcript().map(m => m.text), ['remember me', 'I will.']);
+  await sendOne(h, 'and again', 'yes'); eq(recordFiles(h).length, 1, 'the same file went on');
+});
+
+integrationTest('map chat records: A10 a conversation that began with the switch off is backfilled at the next send', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  await sendOne(h, 'before the switch', 'answer one'); eq(allRecordFiles(h), []);
+  h.plugin.settings.mapChatRecords = true;
+  await sendOne(h, 'after the switch', 'answer two');
+  eq(h.control.writers.length, 1); const [file] = recordFiles(h); const lines = recordLines(h, file);
+  eq(lineKinds(lines), ['conversation', 'turn_start', 'end:done', 'turn_start', 'end:done']);
+  assert.equal(lines[1].backfilled, true); assert.equal(lines[1].message, 'before the switch'); assert.equal(lines[2].reply, 'answer one'); assert.equal(lines[3].backfilled, undefined);
+  eq(lines.filter(l => l.type === 'turn_start').map(l => l.turn), [1, 2]);
+});
+
+integrationTest('map chat records: A11 late result after stop / resend / view close / map switch adds no line after turn_end', async () => {
+  const late = { reply: 'LATE', actions: [{ kind: 'rename_topic', nodeId: 'zzz', title: 'LATE' }], rejected: [] };
+  // stop
+  let h = await harness({ records: true }); await h.view.hydrate(); let chat = h.open(); h.control.rawAlways = true;
+  let gate = deferred(); h.control.reply = async () => { await gate.promise; return late; };
+  h.type('stop me'); let sending = h.view.sendMapChat(); await requestOut(chat); h.view.stopMapChat(); await recordIdle(h);
+  gate.resolve(); await sending; await recordIdle(h);
+  let lines = recordLines(h, recordFiles(h)[0]); eq(lineKinds(lines), ['conversation', 'turn_start', 'end:stopped']); assert.equal(lines.at(-1).raw, null); assert.equal(JSON.stringify(lines).includes('LATE'), false);
+  // resend
+  h = await harness({ records: true }); await h.view.hydrate(); chat = h.open(); h.control.rawAlways = true;
+  const attempts = []; h.control.reply = (request, signal) => new Promise(resolve => { attempts.push({ signal, resolve }); });
+  h.type('slow'); sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2);
+  attempts[0].resolve(late); await tick(); await recordIdle(h);
+  eq(lineKinds(recordLines(h, recordFiles(h)[0])), ['conversation', 'turn_start', 'event:resend'], 'the replaced attempt writes nothing');
+  attempts[1].resolve({ reply: 'NEW', actions: [], rejected: [] }); await sending; await recordIdle(h);
+  lines = recordLines(h, recordFiles(h)[0]); eq(lineKinds(lines), ['conversation', 'turn_start', 'event:resend', 'end:done']);
+  assert.equal(lines.at(-1).raw, JSON.stringify({ reply: 'NEW', actions: [], rejected: [] }), 'the raw is the new attempt\'s'); assert.equal(JSON.stringify(lines).includes('LATE'), false);
+  // view close
+  h = await harness({ records: true }); await h.view.hydrate(); chat = h.open(); h.control.rawAlways = true;
+  gate = deferred(); h.control.reply = async () => { await gate.promise; return late; };
+  h.type('close me'); sending = h.view.sendMapChat(); await requestOut(chat); await h.view.onClose(); await recordIdle(h);
+  gate.resolve(); await sending; await recordIdle(h);
+  lines = recordLines(h, recordFiles(h)[0]); eq(lineKinds(lines), ['conversation', 'turn_start', 'end:aborted']); assert.equal(lines.at(-1).reason, 'view_closed'); assert.equal(JSON.stringify(lines).includes('LATE'), false);
+  assert.equal(h.control.writers.length, 0, 'the writer was unregistered');
+  // map switch
+  h = await harness({ records: true }); await h.view.hydrate(); chat = h.open(); h.control.rawAlways = true;
+  gate = deferred(); h.control.reply = async () => { await gate.promise; return late; };
+  h.type('leave'); sending = h.view.sendMapChat(); await requestOut(chat); const mapRecord = recordFiles(h);
+  switchTo(h, 'map-b', MAP_B); await recordIdle(h);
+  gate.resolve(); await sending; await recordIdle(h);
+  lines = recordLines(h, recordFiles(h)[0]); eq(lineKinds(lines), ['conversation', 'turn_start', 'end:aborted']); assert.equal(lines.at(-1).reason, 'map_switch'); assert.equal(JSON.stringify(lines).includes('LATE'), false);
+  eq(allRecordFiles(h).length, 1, 'the late result opened no other file'); void mapRecord;
+});
+
+integrationTest('map chat records: A12 records follow renameMapTo, Organize move and undo', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); h.open();
+  await sendOne(h, 'first', 'one');
+  await h.plugin.mutate(() => h.view.renameMapTo('Renamed sleep map')); await recordIdle(h);
+  const renamedRoot = h.repo.topicRoot(h.view.path); assert.notEqual(renamedRoot, ROOT_A);
+  await sendOne(h, 'second', 'two');
+  eq(recordFiles(h, ROOT_A), [], 'the old path has no record'); eq(recordFiles(h, renamedRoot).length, 1);
+  eq(lineKinds(recordLines(h, recordFiles(h, renamedRoot)[0])), ['conversation', 'turn_start', 'end:done', 'turn_start', 'end:done']);
+  // Organize moves the whole folder with the vault's rename (as does Obsidian's own); the handle follows, and so does the undo
+  const folder = h.app.vault.getAbstractFileByPath(renamedRoot); await h.app.vault.rename(folder, 'Organized/Sleep');
+  h.view.path = 'Organized/Sleep/Map.md'; h.repaint();
+  await sendOne(h, 'third', 'three'); eq(recordFiles(h, renamedRoot), []); eq(recordFiles(h, 'Organized/Sleep').length, 1);
+  await h.app.vault.rename(h.app.vault.getAbstractFileByPath('Organized/Sleep'), renamedRoot); h.view.path = `${renamedRoot}/Map.md`; h.repaint();
+  await sendOne(h, 'fourth', 'four'); eq(recordFiles(h, 'Organized/Sleep'), []); eq(recordFiles(h, renamedRoot).length, 1);
+  assert.equal(lineKinds(recordLines(h, recordFiles(h, renamedRoot)[0])).filter(k => k === 'end:done').length, 4);
+});
+
+integrationTest('map chat records: A12 delete map keeps records; undo delete restores conversation', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  await sendOne(h, 'keep me', 'kept'); const [file] = recordFiles(h); const text = h.contents.get(file);
+  h.app.fileManager.trashFile = async item => { h.files.delete(item.path); h.contents.delete(item.path); }; h.view.restoreMapFocus = () => {};
+  h.view.deleteCurrentMap(); h.control.modals.at(-1).choices[0].action(); await until(() => h.view.deletedMap?.deleted);
+  assert.equal(h.contents.get(file), text, 'the record is not touched'); assert.equal(h.files.has(MAP), false, 'only the map file went to the trash');
+  await h.view.travel(false); await until(() => h.view.map);
+  assert.equal(h.files.has(MAP), true); assert.equal(h.contents.get(file), text);
+  chat.reset(); h.view.chatMapId = ''; h.repaint(); await until(() => chat.hasMessages);
+  eq(chat.transcript().map(m => m.text), ['keep me', 'kept'], 'the conversation is back after the map is');
+});
+
+integrationTest('map chat records: A13 append failure keeps chat working, shows one notice, close falls back to unsaved notice', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  h.app.vault.append = async () => { throw new Error('disk full'); };
+  await sendOne(h, 'one', 'first answer');
+  assert.equal(chat.transcript().at(-1).text, 'first answer', 'the chat works'); assert.equal(chat.isBusy, false);
+  await sendOne(h, 'two', 'second answer');
+  assert.equal(chat.transcript().at(-1).text, 'second answer');
+  eq(h.notices.filter(m => /could not be saved|not saved|record/i.test(m) && !/not kept/.test(m)).length, 1, `one notice only: ${JSON.stringify(h.notices)}`);
+  assert.equal(h.view.chatRecords.failed, true);
+  await h.view.onClose(); assert.equal(unsavedNotice(h).length, 1, 'closing warns again');
+});
+
+integrationTest('map chat records: A14 records on: closing the view shows no unsaved notice', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); h.open();
+  await sendOne(h, 'one', 'saved'); assert.equal(h.view.chatRecords.landed, true);
+  await h.view.onClose(); eq(unsavedNotice(h), []);
+  eq(h.control.writers.length, 0);
+  // a map outside the managed folders holds nothing: the old warning stays
+  const u = await harness({ records: true }); await u.view.hydrate(); u.open(); u.view.path = 'Elsewhere/Map.md';
+  await sendOne(u, 'one', 'not saved'); assert.equal(u.view.chatRecords.landed, false);
+  await u.view.onClose(); assert.equal(unsavedNotice(u).length, 1);
+});
+
 // ---- steer: a follow-up typed while the AI works (packet B2) ---------------------------------------------------------------
 
 const steerBubbles = chat => findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-steer'));
@@ -6218,4 +6709,83 @@ test('F-b M6 plan: a plan card with an image reason opens its groups at once; a 
   assert.deepEqual(groups().map(d => !!d.open), [false, false]);
   f.panel.begin('b'); f.panel.finish('plan', []); f.panel.showPlan(card(true));
   assert.deepEqual(groups().slice(2).map(d => !!d.open), [true, true]);
+});
+
+// ---- records: the follow-ups of a turn (decision #5) ------------------------------------------------------------------------
+
+integrationTest('map chat records: a turn with a follow-up records it in steers and restores it into the next request\'s earlierTurns', async () => {
+  const first = await harness({ records: true }); await first.view.hydrate(); const chat = first.open(); const s = steerReply(first);
+  first.type('go'); const sending = first.view.sendMapChat(); await requestOut(chat);
+  first.type('extra'); pressEnter(chat); await tick(); await tick(); eq(s.handled, ['extra']);
+  first.type('and more'); pressEnter(chat); await tick(); await tick(); eq(s.handled, ['extra', 'and more']);
+  s.gate.resolve(); await sending; await recordIdle(first);
+  const [file] = recordFiles(first); const lines = recordLines(first, file);
+  eq(lines.filter(l => l.type === 'turn_start').map(l => l.message), ['go'], 'the turn start keeps the bare question');
+  eq(lines.find(l => l.type === 'turn_end').steers, ['extra', 'and more']);
+  const h = await harness({ records: true }); await h.view.hydrate();
+  await seedRecord(h, lines.map(l => ({ ...l })), file.split('/').at(-1).replace('.jsonl', ''));
+  const again = h.open(); await until(() => again.hasMessages);
+  eq(steerTags(again), ['Added midway', 'Added midway']); eq(steerTexts(again), ['extra', 'and more']);
+  await sendOne(h, 'next', 'ok');
+  eq(JSON.parse(h.control.requests[0].context.json).earlierTurns, [{ role: 'user', text: 'go\n\nextra\n\nand more' }, { role: 'assistant', text: 'done' }]);
+});
+
+integrationTest('map chat records: B1 an invalid reply ends the turn as failed and keeps the raw string', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); h.open();
+  h.control.invalidRaw = 'not json {'; h.type('go'); await h.view.sendMapChat(); await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]); eq(lineKinds(lines), ['conversation', 'turn_start', 'end:failed']);
+  assert.equal(lines.at(-1).raw, 'not json {'); assert.equal(lines.at(-1).status, 'failed');
+});
+
+integrationTest('map chat records: M2 a follow-up received while the switch is off is backfilled into steers and restored into earlierTurns', async () => {
+  const first = await harness(); await first.view.hydrate(); const chat = first.open(); const s = steerReply(first);
+  first.type('go'); const sending = first.view.sendMapChat(); await requestOut(chat);
+  first.type('extra'); pressEnter(chat); await tick(); await tick(); eq(s.handled, ['extra']);
+  s.gate.resolve(); await sending; eq(allRecordFiles(first), []);
+  first.plugin.settings.mapChatRecords = true;
+  await sendOne(first, 'after the switch', 'answer two');
+  const [file] = recordFiles(first); const lines = recordLines(first, file);
+  eq(lineKinds(lines), ['conversation', 'turn_start', 'end:done', 'turn_start', 'end:done']);
+  assert.equal(lines[1].backfilled, true); eq(lines[2].steers, ['extra']); assert.equal(lines[4].steers, undefined);
+  const h = await harness({ records: true }); await h.view.hydrate();
+  await seedRecord(h, lines.map(l => ({ ...l })), file.split('/').at(-1).replace('.jsonl', ''));
+  const again = h.open(); await until(() => again.hasMessages);
+  eq(steerTexts(again), ['extra']);
+  await sendOne(h, 'next', 'ok');
+  eq(JSON.parse(h.control.requests[0].context.json).earlierTurns.slice(0, 2), [{ role: 'user', text: 'go\n\nextra' }, { role: 'assistant', text: 'done' }]);
+});
+
+integrationTest('map chat records: a queued follow-up is not in steers and becomes its own turn', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h, { reject: true });
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  h.type('late one'); pressEnter(chat); await tick(); await tick(); eq(steerTags(chat), ['Sends after this reply ends']);
+  s.gate.resolve(); await sending; await until(() => h.control.requests.length === 2 && !chat.isBusy); await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]);
+  const ends = lines.filter(l => l.type === 'turn_end');
+  eq(ends.length, 2); assert.equal('steers' in ends[0], false, 'no steers field when none went in');
+  eq(lines.filter(l => l.type === 'turn_start').map(l => l.message), ['go', 'late one']);
+});
+
+integrationTest('map chat records: json-fallback requeue leaves a re-delivered steer once', async () => {
+  // json-fallback: the delivered steer is queued again, so it is the next turn's message and not in the first turn's steers.
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); let n = 0; const raw = h.control.reply;
+  h.control.reply = async (...args) => { n++; if (n === 2) return { reply: 'second', actions: [], rejected: [] }; args[3]({ kind: 'stream-mode', mode: 'stream-json' }); return raw(...args); };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('extra'); pressEnter(chat); await tick(); await tick();
+  eq(s.handled, ['extra']); s.progress({ kind: 'stream-mode', mode: 'json-fallback' }); await tick();
+  s.gate.resolve(); await sending; await until(() => h.control.requests.length === 2 && !chat.isBusy); await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]);
+  const ends = lines.filter(l => l.type === 'turn_end');
+  assert.equal('steers' in ends[0], false); eq(lines.filter(l => l.type === 'turn_start').map(l => l.message), ['go', 'extra']);
+  eq(lines.flatMap(l => [l.message, ...(l.steers ?? [])]).filter(text => text === 'extra').length, 1, 'the text is a message or a steer once');
+  // "Resend": the new attempt gets the steer again, still one steer in the end line.
+  const r = await harness({ records: true }); await r.view.hydrate(); const rc = r.open(); const attempts = [];
+  r.control.reply = async (_request, signal, _onReply, onProgress, onSteer) => {
+    const attempt = { handled: [] }; attempts.push(attempt); onProgress({ kind: 'stream-mode', mode: 'stream-json' });
+    onSteer(async text => { attempt.handled.push(text); });
+    if (attempts.length === 1) await new Promise(resolve => signal.addEventListener('abort', resolve));
+    return { reply: 'ok', actions: [], rejected: [] };
+  };
+  r.type('go'); const again = r.view.sendMapChat(); await requestOut(rc); r.type('extra'); pressEnter(rc); await tick(); await tick();
+  r.clock.advance(20_000); resendButton(rc).click(); await again; await recordIdle(r);
+  eq(recordLines(r, recordFiles(r)[0]).filter(l => l.type === 'turn_end').map(l => l.steers), [['extra']]);
 });

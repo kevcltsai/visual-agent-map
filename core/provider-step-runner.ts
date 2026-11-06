@@ -20,6 +20,8 @@ export interface ProviderStepHooks {
   onStreamMode?: (mode: "stream-json" | "json" | "json-fallback") => void;
   /** Receives a function that adds a user message to the running turn (Claude: stdin; Codex: `turn/steer`). It rejects once the turn can no longer take one. */
   onSteer?: (steer: (text: string) => Promise<void>) => void;
+  /** The model's raw output, right before it is parsed (so also for a reply that then fails to parse); never after a stop. Called once per output. */
+  onRaw?: (raw: string) => void;
 }
 
 /**
@@ -88,6 +90,7 @@ export function providerStepRunner<
       },
       (raw, exchange) => {
         if (exchange.signal.aborted) throw config.stopped();
+        hooks?.onRaw?.(raw);
         prepared.parse(raw);
         exchange.parsed();
         return raw;

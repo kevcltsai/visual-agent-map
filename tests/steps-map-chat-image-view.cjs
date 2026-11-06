@@ -29,6 +29,7 @@ function fakeChat(control) {
     showPlan(card) { chat.plans.push(card); chat.calls.push(['plan']); },
     settlePlan(card, state, lines) { card.state = state; chat.calls.push(['settle', state]); if (lines) chat.lines.push(lines); },
     markTurn(extra) { chat.marks.push(extra); }, refreshReplyUndo() {},
+    completedTurns: () => [], conversationId: undefined,
     takeQueued: () => [], takeSteerTexts: () => [], addSteer: () => ({}), setSteerState() {}, restoreDraft(texts) { chat.calls.push(['restore', texts]); },
     setApplying() {}, focusInput() {}, reset() {}
   };
@@ -228,6 +229,24 @@ test('send: a selected annotated image goes with its words in the context and it
   assert.equal(h.chat.transcript[0].origin.imageId, 'img1');
   assert.equal(JSON.stringify(h.chat.transcript[0].origin).includes('data:image'), false);
   assert.equal(request.context.selectedImage.kind, 'annotated');
+});
+
+test('records: a turn that sent a picture writes the words and the context to the chat record, never the picture itself', async () => {
+  const h = await harness();
+  h.plugin.settings.mapChatRecords = true;
+  const writers = [];
+  h.plugin.registerMapChatRecordWriter = writer => { writers.push(writer); writer.setEnabled(true); return () => {}; };
+  h.select('img1');
+  await h.send('place anchors');
+  assert.match(h.control.requests[0].imageDataUrl, /^data:image\/png;base64,/, 'the picture went to the AI');
+  for (const writer of writers) await writer.idle();
+  const paths = [...h.contents.keys()].filter(path => path.includes('/Chats/records/'));
+  assert.equal(paths.length, 1, 'one record file');
+  const written = h.contents.get(paths[0]);
+  assert.match(written, /turn_start/, 'the turn was recorded');
+  assert.match(written, /Cow cuts/, 'the words of the picture are in the context');
+  assert.equal(written.includes('base64,'), false, 'no picture bytes in the record');
+  assert.equal(written.includes('imageDataUrl'), false);
 });
 
 test('send: a selected ordinary image sends only that it is ordinary, no picture, no read', async () => {

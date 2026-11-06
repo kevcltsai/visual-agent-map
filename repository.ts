@@ -151,6 +151,8 @@ export interface Note {
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
+  /** Save every map AI conversation as a record file in the map folder (off by default). */
+  mapChatRecords: boolean;
   detailTemplates: DetailTemplate[];
   defaultDetailTemplateId?: string;
   /** Workspace default note style: `style:<file name>`, an old template id, or a built-in style id. Absent = defaultDetailTemplateId. */
@@ -302,6 +304,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
   mapChatOpen: true,
   mapChatImageMode: "preview",
+  mapChatRecords: false,
   cliReasoning: "low",
   previewScale: 120,
   models: "",

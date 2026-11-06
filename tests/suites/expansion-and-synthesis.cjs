@@ -1165,6 +1165,73 @@ integrationTest('multi research runs selected topics in the background with the 
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'completed');
   assert.equal(h.plugin.activeTasks.has(h.key), false);
 });
+integrationTest('multi research dialog: Standard runs every topic as research with images even when its note stored local; Quick runs standard notes as local', async () => {
+  for (const [picked, stored, expected, mode, charts] of [['research', 'local', 'auto', 'standard', true], ['local', 'research', 'off', 'quick', false]]) {
+    const h = await multiResearchHarness(['A', 'B']);
+    for (const n of h.nodes) await h.repo.updateNote(n.path, { researchMode: stored });
+    h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+    await h.view.startMultiResearch({ researchMode: picked, researchDepth: 'normal', requirements: '', imageSearch: picked === 'research' });
+    await until(() => h.runs.length === 2);
+    for (const run of h.runs) { assert.equal(run.options.researchMode, picked); assert.equal(run.options.visualMode, expected); assert.equal(run.options.mapAiMode, mode); assert.equal(run.options.addCharts, charts); }
+    h.finish.get('A')(); h.finish.get('B')();
+  }
+});
+integrationTest('multi research without a mode override (retry with another provider) keeps each topic on its own stored mode', async () => {
+  const h = await multiResearchHarness(['A', 'B']);
+  await h.repo.updateNote(h.nodes[0].path, { researchMode: 'research' }); await h.repo.updateNote(h.nodes[1].path, { researchMode: 'local' });
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  await h.view.retryWithOtherProvider(h.nodes, 'model-b');
+  await until(() => h.runs.length === 2);
+  assert.equal(h.runs.find(r => r.title === 'A').options.researchMode, 'research'); assert.equal(h.runs.find(r => r.title === 'A').options.visualMode, 'auto');
+  assert.equal(h.runs.find(r => r.title === 'B').options.researchMode, 'local');
+  h.finish.get('A')(); h.finish.get('B')();
+});
+integrationTest('multi research dialog opens on the map\'s remembered mode, remembers the pick on start without clearing the selection, and remembers nothing on cancel', async () => {
+  const h = await multiResearchHarness(['A', 'B']);
+  h.view.notes = new Map(h.nodes.map(n => [n.id, { title: n.id, researchMode: 'local' }]));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  h.view.openMultiResearch();
+  assert.equal(h.opened[0].initialMode, 'quick', 'no remembered mode: Quick');
+  h.view.map.aiMode = 'standard'; h.view.openMultiResearch();
+  assert.equal(h.opened[1].initialMode, 'standard');
+  // Cancel (nothing submitted): the map keeps its mode and nothing starts.
+  assert.equal(h.view.map.aiMode, 'standard'); assert.equal(h.runs.length, 0);
+  // Quick picked from the dialog: remembered, selection survives the map write, and both topics really start.
+  // As the existing aiModeMemory test: the map write is a stub that applies the change and must not clear the selection.
+  h.view.mapChange = async change => { change(h.view.map); };
+  h.opened[1].submit({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: false });
+  await until(() => h.runs.length === 2);
+  assert.equal(h.view.map.aiMode, 'quick'); assert.equal(h.runs.length, h.nodes.length);
+  h.finish.get('A')(); h.finish.get('B')();
+});
+integrationTest('multi research dialog: a map write that fails starts nothing, shows a Notice and leaves no unhandled rejection', async () => {
+  const h = await multiResearchHarness(['A', 'B']);
+  h.view.notes = new Map(h.nodes.map(n => [n.id, { title: n.id, researchMode: 'local' }]));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  h.view.openMultiResearch();
+  const unhandled = []; const onUnhandled = e => unhandled.push(e); process.on('unhandledRejection', onUnhandled);
+  h.view.mapChange = async () => { throw new Error('disk full'); };
+  try {
+    h.opened[0].submit({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: false });
+    await until(() => h.notices.length > 0);
+    await new Promise(resolve => setTimeout(resolve, 20));
+  } finally { process.off('unhandledRejection', onUnhandled); }
+  assert.deepEqual(unhandled, []); assert.equal(h.runs.length, 0);
+  assert.ok(h.notices.includes('The research did not start because the map could not be saved.'));
+});
+integrationTest('multi research dialog: the batch the dialog listed runs even if the selection is cleared or changed while the map is written', async () => {
+  for (const change of [view => view.selection.replaceMulti([]), view => view.selection.replaceMulti([view.map.nodes[0].id])]) {
+    const h = await multiResearchHarness(['A', 'B']);
+    h.view.notes = new Map(h.nodes.map(n => [n.id, { title: n.id, researchMode: 'local' }]));
+    h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+    h.view.openMultiResearch();
+    h.view.mapChange = async fn => { fn(h.view.map); change(h.view); };
+    h.opened[0].submit({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: false });
+    await until(() => h.runs.length === 2);
+    assert.deepEqual(plain(h.runs.map(r => r.title).sort()), ['A', 'B']);
+    h.finish.get('A')(); h.finish.get('B')();
+  }
+});
 integrationTest('multi research without an explicit language answers each topic in its own title language', async () => {
   const h = await multiResearchHarness(['要如何在陽台養香草', 'Balcony herbs']);
   h.view.selection.replaceMulti(h.nodes.map(n => n.id));

@@ -2186,10 +2186,13 @@ export default class VisualAgentMapPlugin extends Plugin {
         this.pendingTabMaps.delete(leaf);
       }
     }
-    await this.showLeaf(leaf);
     const view = leaf.view instanceof VisualAgentMapView ? leaf.view : null;
-    // setViewState swallows a failed setState: a tab that did not end up on the map is not a success.
-    if (!view || (fresh && view.targetPath() !== path)) return null;
+    // setViewState swallows a failed setState (the queue has already shown its Notice): a new tab that did not end up on the map is closed, not left blank.
+    if (!view || (fresh && view.targetPath() !== path)) {
+      if (fresh) leaf.detach();
+      return null;
+    }
+    await this.showLeaf(leaf);
     // The map drew while the tab was still being set up; the opening screen's input takes the keyboard now that it is shown.
     view.focusChatHero();
     return view;
@@ -2213,6 +2216,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     let leaf: WorkspaceLeaf | undefined = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
     // Replacing the map in a tab stops its running work, so a tab that is busy keeps its map and the target gets a new tab.
     if (path && leaf?.view instanceof VisualAgentMapView && leaf.view.hasRunningWork()) leaf = undefined;
+    const fresh = !leaf;
     if (!leaf) leaf = this.app.workspace.getLeaf("tab");
     // A tab made here opens its view before it is given the map (see openMapInNewTab).
     if (path) this.pendingTabMaps.set(leaf, path);
@@ -2224,6 +2228,11 @@ export default class VisualAgentMapPlugin extends Plugin {
       });
     } finally {
       this.pendingTabMaps.delete(leaf);
+    }
+    // A new tab whose map did not open (the queue has already shown its Notice) is closed, not left blank.
+    if (fresh && path && !(leaf.view instanceof VisualAgentMapView && leaf.view.targetPath() === path)) {
+      leaf.detach();
+      return;
     }
     await this.showLeaf(leaf);
   }

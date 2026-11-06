@@ -56076,6 +56076,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
     __publicField(this, "unbindClipboard", null);
     __publicField(this, "renderWhenShown", false);
+    /** The last camera move (fit, focus) asked of a hidden tab: its pane measures 0, so it waits for drawWhenShown. */
+    __publicField(this, "cameraWhenShown", null);
     /** Heights (canvas units) the cards had at the last check, and the map they belong to. */
     __publicField(this, "heightsSeen", /* @__PURE__ */ new Map());
     __publicField(this, "heightsSeenMap", null);
@@ -57491,6 +57493,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       if (!isCurrent()) return;
     }
     if (path !== this.path) {
+      this.cameraWhenShown = null;
       this.stopAimProgress();
       this.mapSourcesOpen = false;
       if (this.relevancePanelOpen) (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
@@ -66182,22 +66185,28 @@ ${request.requirements}` : preset.text,
       ])
     );
   }
-  /** True while the tab is in the background (display:none): its boxes measure 0, so nothing is drawn or measured then. */
+  /** True while the tab is in the background (display:none): its boxes measure 0, so nothing is measured or saved from them then. */
   hiddenTab() {
     const el = this.contentEl;
     return typeof (el == null ? void 0 : el.isShown) === "function" && !el.isShown();
   }
-  /** Draws what a hidden tab skipped, once it can be seen again. */
+  /** Draws again what a hidden tab drew without measures (see paint), then runs the camera move it was asked for, once it can be seen. */
   drawWhenShown() {
-    if (!this.renderWhenShown || this.closed || this.hiddenTab()) return;
-    this.renderWhenShown = false;
-    this.render();
+    if (this.closed || this.hiddenTab()) return;
+    if (this.renderWhenShown) {
+      this.renderWhenShown = false;
+      this.render();
+    }
+    const camera = this.cameraWhenShown;
+    this.cameraWhenShown = null;
+    camera == null ? void 0 : camera();
+  }
+  holdCamera(move) {
+    if (!this.hiddenTab()) return false;
+    this.cameraWhenShown = move;
+    return true;
   }
   render() {
-    if (!this.closed && this.hiddenTab()) {
-      this.renderWhenShown = true;
-      return;
-    }
     if (this.renderHold > 0 && !this.closed) {
       this.renderPending = true;
       return;
@@ -66207,6 +66216,7 @@ ${request.requirements}` : preset.text,
   }
   paint() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N;
+    if (!this.closed && this.hiddenTab()) this.renderWhenShown = true;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
         this.renderAfterDrag = true;
@@ -70678,7 +70688,7 @@ ${request.requirements}` : preset.text,
   }
   /** Camera on the parent and its new children (current zoom kept, or smaller if they do not fit), saved like a pan. */
   frameBranch(ids) {
-    if (!this.map || !this.viewportEl) return;
+    if (!this.map || !this.viewportEl || this.holdCamera(() => this.frameBranch(ids))) return;
     const shown = this.map.nodes.filter((node) => ids.includes(node.id));
     if (!shown.length) return;
     const bounds = {
@@ -72186,6 +72196,7 @@ ${note.detail.trim()}` : "",
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
+      if (this.hiddenTab()) return;
       this.queueViewportWrite();
     }, 250);
   }
@@ -72364,6 +72375,10 @@ ${note.detail.trim()}` : "",
       this.map.viewport = viewport;
       return;
     }
+    if (this.hiddenTab()) {
+      this.map.viewport = viewport;
+      return;
+    }
     this.toolbarClearedFor = this.path;
     this.map.viewport = clearToolbar(viewport, inset, this.topsUnderToolbar(this.map.viewport.zoom));
   }
@@ -72402,7 +72417,14 @@ ${note.detail.trim()}` : "",
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
   focusNode(target, persist = true) {
     var _a2, _b2;
-    if (!this.map || !this.viewportEl || this.hiddenTab()) return;
+    if (!this.map || !this.viewportEl) return;
+    const id = target.id;
+    if (this.holdCamera(() => {
+      var _a3;
+      const node2 = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === id);
+      if (node2) this.focusNode(node2, persist);
+    }))
+      return;
     const node = this.relevanceSortOn() ? (_a2 = this.canvasNodes().find((item) => item.id === target.id)) != null ? _a2 : target : target;
     this.map.viewport = focusViewport(
       this.map.viewport,
@@ -72415,7 +72437,7 @@ ${note.detail.trim()}` : "",
   }
   fit() {
     var _a2, _b2, _c;
-    if (!this.map || !this.viewportEl || this.hiddenTab()) return;
+    if (!this.map || !this.viewportEl || this.holdCamera(() => this.fit())) return;
     const nodes = this.canvasNodes();
     if (!nodes.length) return;
     const boxes = nodes.map((n) => {
@@ -72636,9 +72658,13 @@ ${note.detail.trim()}` : "",
     const chat = this.chat;
     if (!(chat == null ? void 0 : chat.isHero) || !this.map || this.chatHeroFocusedFor === this.map.id) return;
     if (this.hiddenTab()) return;
-    this.chatHeroFocusedFor = this.map.id;
-    const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
-    if (!active || active === ((_c = this.contentEl.ownerDocument) == null ? void 0 : _c.body) || this.contentEl.contains(active)) chat.focusInput();
+    const doc = this.contentEl.ownerDocument;
+    const active = (_a2 = doc == null ? void 0 : doc.activeElement) != null ? _a2 : null;
+    const heldElsewhere = active && active !== (doc == null ? void 0 : doc.body) && !this.contentEl.contains(active) && ((_b2 = active.isShown) == null ? void 0 : _b2.call(active)) !== false;
+    if (heldElsewhere) return;
+    chat.focusInput();
+    const now = (_c = doc == null ? void 0 : doc.activeElement) != null ? _c : null;
+    if (now && this.contentEl.contains(now)) this.chatHeroFocusedFor = this.map.id;
   }
   /** The pane's width and what the topic panel takes of it; null while the pane has no size yet (not shown, or a test). */
   chatPaneWidths() {
@@ -88169,9 +88195,12 @@ ${t("ui.organize_link_wait_hint")}`;
         this.pendingTabMaps.delete(leaf);
       }
     }
-    await this.showLeaf(leaf);
     const view = leaf.view instanceof VisualAgentMapView ? leaf.view : null;
-    if (!view || fresh && view.targetPath() !== path) return null;
+    if (!view || fresh && view.targetPath() !== path) {
+      if (fresh) leaf.detach();
+      return null;
+    }
+    await this.showLeaf(leaf);
     view.focusChatHero();
     return view;
   }
@@ -88191,6 +88220,7 @@ ${t("ui.organize_link_wait_hint")}`;
     }
     let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
     if (path && (leaf == null ? void 0 : leaf.view) instanceof VisualAgentMapView && leaf.view.hasRunningWork()) leaf = void 0;
+    const fresh = !leaf;
     if (!leaf) leaf = this.app.workspace.getLeaf("tab");
     if (path) this.pendingTabMaps.set(leaf, path);
     try {
@@ -88201,6 +88231,10 @@ ${t("ui.organize_link_wait_hint")}`;
       });
     } finally {
       this.pendingTabMaps.delete(leaf);
+    }
+    if (fresh && path && !(leaf.view instanceof VisualAgentMapView && leaf.view.targetPath() === path)) {
+      leaf.detach();
+      return;
     }
     await this.showLeaf(leaf);
   }

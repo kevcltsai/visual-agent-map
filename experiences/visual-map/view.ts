@@ -3049,6 +3049,7 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
     }
     if (path !== this.path) {
+      this.cameraWhenShown = null;
       this.stopAimProgress();
       this.mapSourcesOpen = false;
       if (this.relevancePanelOpen) this.plugin.releaseWarmClaude?.();
@@ -12402,23 +12403,31 @@ export class VisualAgentMapView extends ItemView {
       ])
     );
   }
-  /** True while the tab is in the background (display:none): its boxes measure 0, so nothing is drawn or measured then. */
+  /** True while the tab is in the background (display:none): its boxes measure 0, so nothing is measured or saved from them then. */
   private hiddenTab(): boolean {
     const el = this.contentEl as { isShown?: () => boolean } | undefined;
     return typeof el?.isShown === "function" && !el.isShown();
   }
-  /** Draws what a hidden tab skipped, once it can be seen again. */
+  /** Draws again what a hidden tab drew without measures (see paint), then runs the camera move it was asked for, once it can be seen. */
   private drawWhenShown(): void {
-    if (!this.renderWhenShown || this.closed || this.hiddenTab()) return;
-    this.renderWhenShown = false;
-    this.render();
+    if (this.closed || this.hiddenTab()) return;
+    if (this.renderWhenShown) {
+      this.renderWhenShown = false;
+      this.render();
+    }
+    const camera = this.cameraWhenShown;
+    this.cameraWhenShown = null;
+    camera?.();
   }
   private renderWhenShown = false;
+  /** The last camera move (fit, focus) asked of a hidden tab: its pane measures 0, so it waits for drawWhenShown. */
+  private cameraWhenShown: (() => void) | null = null;
+  private holdCamera(move: () => void): boolean {
+    if (!this.hiddenTab()) return false;
+    this.cameraWhenShown = move;
+    return true;
+  }
   private render(): void {
-    if (!this.closed && this.hiddenTab()) {
-      this.renderWhenShown = true;
-      return;
-    }
     // A batch of chat writes repaints once, when it is done.
     if (this.renderHold > 0 && !this.closed) {
       this.renderPending = true;
@@ -12429,6 +12438,8 @@ export class VisualAgentMapView extends ItemView {
     this.settleCardHeights();
   }
   private paint(): void {
+    // A hidden tab paints like any other (outline, title, canvas), so its other consumers stay live; its measures are 0, so it paints again when shown.
+    if (!this.closed && this.hiddenTab()) this.renderWhenShown = true;
     // Repainting would replace the dragged card and drop its pointer capture, so wait for the drop (a closed view still ends the drag below).
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
@@ -17295,7 +17306,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Camera on the parent and its new children (current zoom kept, or smaller if they do not fit), saved like a pan. */
   private frameBranch(ids: string[]): void {
-    if (!this.map || !this.viewportEl) return;
+    if (!this.map || !this.viewportEl || this.holdCamera(() => this.frameBranch(ids))) return;
     const shown = this.map.nodes.filter(node => ids.includes(node.id));
     if (!shown.length) return;
     const bounds = {
@@ -18915,6 +18926,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
+      // A hidden pane measures 0: nothing is saved from it (a camera move asked meanwhile is replayed when the tab is shown).
+      if (this.hiddenTab()) return;
       this.queueViewportWrite();
     }, 250);
   }
@@ -19106,6 +19119,11 @@ export class VisualAgentMapView extends ItemView {
       this.map.viewport = viewport;
       return;
     }
+    // A hidden pane has no toolbar to measure: the first paint that can see it does this.
+    if (this.hiddenTab()) {
+      this.map.viewport = viewport;
+      return;
+    }
     this.toolbarClearedFor = this.path;
     this.map.viewport = clearToolbar(viewport, inset, this.topsUnderToolbar(this.map.viewport.zoom));
   }
@@ -19147,7 +19165,15 @@ export class VisualAgentMapView extends ItemView {
   }
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
   private focusNode(target: MapNode, persist = true): void {
-    if (!this.map || !this.viewportEl || this.hiddenTab()) return;
+    if (!this.map || !this.viewportEl) return;
+    const id = target.id;
+    if (
+      this.holdCamera(() => {
+        const node = this.map?.nodes.find(item => item.id === id);
+        if (node) this.focusNode(node, persist);
+      })
+    )
+      return;
     // Centre on where the card is drawn, which differs from its saved position while sorted by relevance.
     const node = this.relevanceSortOn() ? (this.canvasNodes().find(item => item.id === target.id) ?? target) : target;
     this.map.viewport = focusViewport(
@@ -19163,7 +19189,7 @@ export class VisualAgentMapView extends ItemView {
   /** True while a framing action (fit) applies its viewport: tool-row placement must not pan the canvas then. */
   private framingViewport = false;
   private fit(): void {
-    if (!this.map || !this.viewportEl || this.hiddenTab()) return;
+    if (!this.map || !this.viewportEl || this.holdCamera(() => this.fit())) return;
     const nodes = this.canvasNodes();
     if (!nodes.length) return;
     // Free text blocks (canvas-text-node decision #8) count too: fit must not hide what the user placed.
@@ -19405,9 +19431,19 @@ export class VisualAgentMapView extends ItemView {
     if (!chat?.isHero || !this.map || this.chatHeroFocusedFor === this.map.id) return;
     // A tab that is not shown yet cannot take focus: the once is kept for when it is.
     if (this.hiddenTab()) return;
-    this.chatHeroFocusedFor = this.map.id;
-    const active = this.contentEl.ownerDocument?.activeElement ?? null;
-    if (!active || active === this.contentEl.ownerDocument?.body || this.contentEl.contains(active)) chat.focusInput();
+    const doc = this.contentEl.ownerDocument;
+    const active = doc?.activeElement ?? null;
+    // Focus in another pane the user can see is theirs to keep. Focus left in a hidden pane (the tab just switched away from) is not.
+    const heldElsewhere =
+      active &&
+      active !== doc?.body &&
+      !this.contentEl.contains(active) &&
+      (active as { isShown?: () => boolean }).isShown?.() !== false;
+    if (heldElsewhere) return;
+    chat.focusInput();
+    // The once is used up only when the keyboard really moved into the pane.
+    const now = doc?.activeElement ?? null;
+    if (now && this.contentEl.contains(now)) this.chatHeroFocusedFor = this.map.id;
   }
   /** The pane's width and what the topic panel takes of it; null while the pane has no size yet (not shown, or a test). */
   private chatPaneWidths(): { pane: number; inspector: number } | null {

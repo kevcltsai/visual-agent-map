@@ -36835,6 +36835,10 @@ var MapChatPanel = class {
   isInput(element) {
     return this.built && element === this.inputEl;
   }
+  /** True when the element is one of this window's controls. */
+  holdsFocus(element) {
+    return this.built && this.el.contains(element);
+  }
   /** Path of the visible note the next message goes with (the chip's note), or null. */
   currentNote() {
     this.refreshNote();
@@ -36944,7 +36948,7 @@ var MapChatPanel = class {
     if (active !== this.inputEl) {
       if (!active || !this.el.contains(active)) return () => {
       };
-      return () => active.focus();
+      return () => active.focus({ preventScroll: true });
     }
     const { selectionStart, selectionEnd } = this.inputEl;
     return () => {
@@ -59074,10 +59078,12 @@ ${request.requirements}` : preset.text,
     const doc = (_b2 = this.contentEl) == null ? void 0 : _b2.ownerDocument;
     if ((doc == null ? void 0 : doc.addEventListener) && !applying) {
       const outside = (event) => {
-        var _a3;
+        var _a3, _b3, _c, _d, _e, _f;
         const target = event.target;
         const spark = (_a3 = bar.querySelector) == null ? void 0 : _a3.call(bar, '.vam-goal-icon[data-goal-action="recommend"]');
         if (!target || panel.contains(target) || (spark == null ? void 0 : spark.contains(target))) return;
+        if ((_e = (_d = (_c = (_b3 = this.contentEl) == null ? void 0 : _b3.querySelector) == null ? void 0 : _c.call(_b3, ".vam-relevance-statusbar")) == null ? void 0 : _d.contains) == null ? void 0 : _e.call(_d, target)) return;
+        if ((_f = target.closest) == null ? void 0 : _f.call(target, ".vam-relevance-summary-modal")) return;
         this.endGoalSuggest(task, { refocus: false, repaint: false });
       };
       doc.addEventListener("pointerdown", outside, true);
@@ -73298,10 +73304,13 @@ ${note.detail.trim()}` : "",
   // ---- AI chat window -------------------------------------------------------------------------------------------
   /** Before a repaint: takes the chat window out of the page and returns what gives its controls focus back after it. */
   detachMapChat() {
-    var _a2, _b2, _c;
-    const restore = (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.captureFocus()) != null ? _b2 : () => {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    const active = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.activeElement) != null ? _c : null;
+    const held = !!active && (!!((_d = this.chat) == null ? void 0 : _d.isInput(active)) || !!((_f = (_e = this.chat) == null ? void 0 : _e.holdsFocus) == null ? void 0 : _f.call(_e, active)));
+    const restore = (_h = (_g = this.chat) == null ? void 0 : _g.captureFocus()) != null ? _h : () => {
     };
-    (_c = this.chat) == null ? void 0 : _c.detach();
+    (_i = this.chat) == null ? void 0 : _i.detach();
+    if (!held) return restore;
     return () => {
       if (this.mapWindowIsActive()) restore();
     };

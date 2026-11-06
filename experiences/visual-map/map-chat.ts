@@ -600,6 +600,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   isInput(element: unknown): boolean {
     return this.built && element === this.inputEl;
   }
+  /** True when the element is one of this window's controls. */
+  holdsFocus(element: Node): boolean {
+    return this.built && this.el.contains(element);
+  }
   /** Path of the visible note the next message goes with (the chip's note), or null. */
   currentNote(): string | null {
     this.refreshNote();
@@ -708,7 +712,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const active = this.host.activeElement();
     if (active !== this.inputEl) {
       if (!active || !this.el.contains(active)) return () => {};
-      return () => (active as HTMLElement).focus();
+      // The log's scroll was restored by the repaint: a button far up in it must not pull the log back.
+      return () => (active as HTMLElement).focus({ preventScroll: true });
     }
     const { selectionStart, selectionEnd } = this.inputEl;
     return () => {

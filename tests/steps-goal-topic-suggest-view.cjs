@@ -360,6 +360,21 @@ test('goal recommend: Skip, Esc and a press outside close the list, keep the tie
   }
 });
 
+test('goal recommend: a press on the status bar or in its changes window leaves the list open; a press elsewhere still closes it', async () => {
+  const h = await harness();
+  await h.open();
+  const statusBar = find(h.rootEl, i => hasCls(i, 'vam-relevance-statusbar'));
+  assert.ok(statusBar, 'the finished run shows its status bar');
+  h.listeners.pointerdown[0]({ target: statusBar });
+  assert.ok(h.panel(), 'status bar: the list stays');
+  const inModal = element('button'); inModal.closest = selector => (selector === '.vam-relevance-summary-modal' ? inModal : null);
+  h.listeners.pointerdown[0]({ target: inModal });
+  assert.ok(h.panel(), 'changes window: the list stays');
+  h.listeners.pointerdown[0]({ target: element('div') });
+  assert.equal(h.panel(), undefined, 'anywhere else: it closes');
+  assert.equal(h.control.calls.length, 1);
+});
+
 test('goal recommend: Esc anywhere on the canvas closes an open list first; with no list the old Esc handling is untouched; hidden icons send focus to the goal text', async () => {
   const h = await harness();
   const esc = () => { const e = { key: 'Escape', target: { closest: () => null }, defaultPrevented: false, prevented: 0, stopped: 0, preventDefault() { this.prevented++; }, stopPropagation() { this.stopped++; } }; return e; };

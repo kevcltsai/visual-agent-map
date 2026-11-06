@@ -577,7 +577,7 @@ test('classify records duration_ms and sums it over a repair round (v2)', () => 
 });
 
 test('classify with the product prompt accepts a goal-less reply, records duration_ms, and never sends a repair round (a violation is only counted)', () => {
-  const ok = { items: PIN_BASE.map(i => ({ id: tool.positionLabels(PIN_TREE).toShort.get(i.id), tier: i.tier, reason: 'r' })), suggestions: [] };
+  const ok = { items: PIN_BASE.map(i => ({ id: tool.positionLabels(PIN_TREE).toShort.get(i.id), tier: i.tier })), suggestions: [] };
   const bad = { items: ok.items.map(i => (i.id === 'c3' ? { ...i, tier: 'core' } : i.id === 'c2' ? { ...i, tier: 'side' } : i)), suggestions: [] };
   const calls = [];
   const out = tool.classify({ version: 'product', goal: 'g', level: null, context: null, tree: PIN_TREE, model: 'm', hierarchy: 'reject', call: p => { calls.push(p); return { text: JSON.stringify(bad), usage: null, cost: null, durationMs: 100 }; } });

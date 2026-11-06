@@ -144,7 +144,7 @@ function fail(failureClass, message) {
 }
 
 // Strict: missing ids, extra ids, duplicates, bad tier or empty reason all throw. Nothing is coerced.
-function validateReply(value, tree, { requireGoal = true } = {}) {
+function validateReply(value, tree, { requireGoal = true, requireReason = true } = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw fail('not-object', 'reply is not an object');
   if (requireGoal && (typeof value.goal !== 'string' || !value.goal.trim())) throw fail('goal', 'missing goal');
   if (!Array.isArray(value.items)) throw fail('items', 'items is not an array');
@@ -158,7 +158,7 @@ function validateReply(value, tree, { requireGoal = true } = {}) {
     if (seen.has(item.id)) throw fail('duplicate', `duplicate id ${item.id}`);
     seen.add(item.id);
     if (!TIERS.includes(item.tier)) throw fail('bad-tier', `bad tier for ${item.id}: ${String(item.tier)}`);
-    if (typeof item.reason !== 'string' || !item.reason.trim()) throw fail('empty-reason', `empty reason for ${item.id}`);
+    if (requireReason && (typeof item.reason !== 'string' || !item.reason.trim())) throw fail('empty-reason', `empty reason for ${item.id}`);
   }
   const missing = [...expected].filter(id => !seen.has(id));
   if (missing.length || extra.length)
@@ -581,10 +581,10 @@ function mapShortIds(value, tree) {
   return { ...value, items };
 }
 
-function parseReply(text, tree, { shortIds = true, requireGoal = true } = {}) {
+function parseReply(text, tree, { shortIds = true, requireGoal = true, requireReason = true } = {}) {
   try {
     const value = extractJson(text);
-    return validateReply(shortIds ? mapShortIds(value, tree) : value, tree, { requireGoal });
+    return validateReply(shortIds ? mapShortIds(value, tree) : value, tree, { requireGoal, requireReason });
   } catch (error) {
     error.failureClass = classifyFailure(error);
     throw error;
@@ -603,7 +603,9 @@ function classify({ version, goal, level, context, tree, model, hierarchy, langu
   const reply = call(prompt, model);
   const shortIds = version !== 'v1';
   const requireGoal = version !== 'product';
-  const value = parseReply(reply.text, tree, { shortIds, requireGoal });
+  // The product prompt's schema has no reason (its parser rejects one): only the kept v1 and v2 prompts must give it.
+  const requireReason = version !== 'product';
+  const value = parseReply(reply.text, tree, { shortIds, requireGoal, requireReason });
   const violations = hierarchyViolations(value.items, tree);
   // The product has no repair round (it raises a parent by program), so under the product prompt a violation is only counted.
   if (version === 'product' || hierarchy !== 'reject' || !violations.length) return { value, usage: reply.usage, cost: reply.cost, durationMs: reply.durationMs ?? null, violations, repair: null };
@@ -619,7 +621,7 @@ function classify({ version, goal, level, context, tree, model, hierarchy, langu
     let next;
     try {
       next = call(buildRepairPrompt({ prompt, value: current, violations: pending, tree: shortIds ? tree : [], version, language }), model);
-      repaired = parseReply(next.text, tree, { shortIds, requireGoal });
+      repaired = parseReply(next.text, tree, { shortIds, requireGoal, requireReason });
     } catch (error) {
       repair.failureClass = classifyFailure(error);
       error.repair = repair;

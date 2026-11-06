@@ -4557,6 +4557,9 @@ export class VisualAgentMapView extends ItemView {
         const target = event.target as Node | null;
         const spark = bar.querySelector?.('.vam-goal-icon[data-goal-action="recommend"]');
         if (!target || panel.contains(target) || spark?.contains(target)) return;
+        // The status bar and its changes window work with the list open: pressing them must not lose the recommendations.
+        if (this.contentEl?.querySelector?.(".vam-relevance-statusbar")?.contains?.(target)) return;
+        if ((target as Element).closest?.(".vam-relevance-summary-modal")) return;
         this.endGoalSuggest(task, { refocus: false, repaint: false });
       };
       doc.addEventListener("pointerdown", outside, true);
@@ -19968,8 +19971,11 @@ export class VisualAgentMapView extends ItemView {
   // ---- AI chat window -------------------------------------------------------------------------------------------
   /** Before a repaint: takes the chat window out of the page and returns what gives its controls focus back after it. */
   private detachMapChat(): () => void {
+    const active = this.contentEl?.ownerDocument?.activeElement ?? null;
+    const held = !!active && (!!this.chat?.isInput(active) || !!this.chat?.holdsFocus?.(active));
     const restore = this.chat?.captureFocus() ?? ((): void => {});
     this.chat?.detach();
+    if (!held) return restore;
     return () => {
       if (this.mapWindowIsActive()) restore();
     };

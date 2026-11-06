@@ -80229,7 +80229,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node[data-relevance="side"] { border-style: dashed; }
 .vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
 .vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }
-.vam-toolbar > .vam-goal-bar { flex-basis: 240px; }
+.vam-toolbar > .vam-goal-bar { flex-basis: 280px; }
 .theme-dark .vam-viewport { background-color: var(--background-primary); }
 .theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }
 .vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }

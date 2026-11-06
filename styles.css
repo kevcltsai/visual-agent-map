@@ -469,7 +469,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .view-header.vam-goal-host { height: auto; min-height: var(--header-height); flex: none; align-items: center; }
 .view-header.vam-goal-host > .view-header-title-container { flex: 0 1 auto; max-width: 30%; }
 .vam-goal-bar { position: relative; flex: 1 1 auto; min-width: 0; max-width: 460px; margin-inline: auto; box-sizing: border-box; display: flex; align-items: center; gap: 7px; padding: 4px 8px; border: 1px solid transparent; border-radius: 8px; color: var(--text-normal); font-size: var(--font-ui-small); font-weight: 700; line-height: 1.35; }
-.vam-toolbar > .vam-goal-bar { flex-basis: 240px; }
+.vam-toolbar > .vam-goal-bar { flex-basis: 280px; }
 .vam-goal-bar:hover, .vam-goal-bar:focus-within { border-color: var(--interactive-accent); }
 .vam-goal-target { display: inline-flex; flex: none; color: var(--interactive-accent); }
 .vam-goal-target svg { width: 16px; height: 16px; }
@@ -491,6 +491,9 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
   .vam-goal-actions { position: absolute; top: calc(100% + 4px); right: 8px; padding: 2px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); }
   /* Bridges the 4px between the goal and the icons, so the pointer keeps the bar hovered on its way there. */
   .vam-goal-actions::before { content: ""; position: absolute; left: 0; right: 0; top: -4px; height: 4px; }
+  /* Here the icons float over the info row's buttons, so they show only while the pointer is on the goal or the keyboard is in it (:focus-visible), not for the focus a mouse click leaves behind (the wide rule above, :focus-within, is turned off). */
+  .vam-goal-bar:focus-within .vam-goal-actions { opacity: 0; pointer-events: none; }
+  .vam-goal-bar:hover .vam-goal-actions, .vam-goal-bar:has(:focus-visible) .vam-goal-actions { opacity: 1; pointer-events: auto; }
   /* An open panel keeps the icons shown (the pointer may have left), so the panel under them never leaves a gap above it. */
   .vam-goal-bar.has-attachment .vam-goal-actions { opacity: 1; pointer-events: auto; }
   .vam-goal-bar .vam-goal-attachment { left: 8px; right: 8px; }

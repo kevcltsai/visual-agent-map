@@ -414,19 +414,54 @@ const FLOAT_PAD = cssPx(ACTIONS_FLOAT, 'padding'), FLOAT_BORDER = cssPx(ACTIONS_
 const INLINE_W = ICON_COUNT * ICON_W + (ICON_COUNT - 1) * ICON_GAP + cssPx(ACTIONS_BASE, 'padding-left'), INLINE_H = ICON_H;
 const FLOAT_W = ICON_COUNT * ICON_W + (ICON_COUNT - 1) * ICON_GAP + 2 * FLOAT_PAD + 2 * FLOAT_BORDER, FLOAT_H = ICON_H + 2 * FLOAT_PAD + 2 * FLOAT_BORDER;
 const ATTACH_GAP = Number(cssRule('.vam-goal-attachment').match(/top: calc\(100% \+ (\d+)px \+ var\(--vam-goal-attach-clear, 0px\)\)/)[1]);
-const CANVAS_H = 700, CANVAS_LEFT = 100, HEADER_MIN = 40, TOOLBAR_H = 48;
+// MEASURED, not derived (vam-tester's CDP run on the real view, 2026-11-06, ui-evidence-p1.md; screen coordinates of that window): the pane
+// (.workspace-leaf-content) starts at x 44, y 40 and ends at y 800; the canvas starts CHAT_COLUMN right of the pane's left edge (the chat
+// toggle column) and ends at the pane's right edge and bottom; a host's bottom border is 1px (an absolutely positioned child is placed
+// from the padding box, so it sits 1px higher than the border-box bottom).
+const PANE_LEFT = 44, PANE_TOP = 40, PANE_BOTTOM = 800, CHAT_COLUMN = 44, HOST_BORDER = 1, HEADER_MIN = 40;
+// MEASURED: a one-line goal bar is 29.5 high narrow, 34 high wide (its icons sit in the row); the header row of a taller bar is bar + 1.
+const BAR_H_NARROW = 29.5, BAR_H_WIDE = 34;
+// MEASURED toolbar heights (the info row: map name, "+ New map", outline/undo/redo/export/more). Header row shown: 78.5 at 360 (it wraps
+// onto two lines; also wrapped at 440 and 520, whose height was not read, taken as 78.5), 48 in one line (540 and wider: the icons overlapped
+// the buttons there). Header row hidden (the bar is a toolbar child): 114 at 360 and 440, 79 at 520 and 600, 83 at 640; 936 is NOT
+// measured: with decision #10 (flex-basis 280px) the goal no longer fits next to the other children and wraps like at 640, so 83 is assumed.
+const TOOLBAR_H_HEADER = width => width <= 520 ? 78.5 : 48;
+const TOOLBAR_H_FALLBACK = width => width <= 440 ? 114 : width <= 600 ? 79 : 83;
+// MEASURED button geometry of the info row: 28 x 24 buttons 2px apart, the last one ends 10px inside the pane's right edge; "+ New map" is
+// a 120.4 x 30 span 8px left of the outline button. Button top inside the toolbar: header row shown 44.5 (wrapped, 2nd line) / 11.5 (one
+// line); header row hidden 80 (3rd line at 360 and 440) / 8.5 (1st line, 520 and wider; 8.5 is NOT measured, taken from the 6px padding + 2.5 centring).
+const INFO_BUTTONS = ['outline', 'undo', 'redo', 'export', 'more'];
+const INFO_BTN_W = 28, INFO_BTN_H = 24, INFO_BTN_GAP = 2, INFO_RIGHT_INSET = 10, NEW_MAP_W = 120.4, NEW_MAP_H = 30, NEW_MAP_GAP = 8;
+const infoButtonTop = (inHeader, width, toolbarTop) => toolbarTop + (inHeader ? (width <= 520 ? 44.5 : 11.5) : (width <= 440 ? 80 : 8.5));
+// MEASURED: the tools group wrapped onto two lines by --vam-tools-max is 68 high (30 + 2 + 30 + 3 + 3 padding), not 72.
+const WRAPPED_TOOLS_H = 68;
+// MEASURED at 360: the zoom bar (with the Token button) is 286 x 40, 12px from the canvas' right and bottom edges. Not measured at other widths.
+const ZOOM_W = 286, ZOOM_H = 40, ZOOM_INSET = 12;
+// MEASURED goal bar width/left (360): next to the nav buttons and the more button in the header row 236 wide at pane.left + 76; as a toolbar
+// child 344 wide at pane.left + 6. Wide widths: the bar is centred in the space left and capped at 460 (item 4 of the run).
+const BAR_NARROW = { header: { w: 236, left: 76 }, toolbar: { w: 344, left: 6 } };
+// MEASURED: with the header row hidden the goal bar had 245.7px next to the other toolbar children at 936 (it fills what is left); a bar whose
+// flex-basis is larger than that wraps onto its own row (then it can use the row, capped at 460). One CJK character of the goal is 13px wide
+// (--font-ui-small), the bar spends 2 border + 16 padding + 16 target + 14 gaps + the wide icon slot on everything but the text.
+const TOOLBAR_ROOM_FOR_BAR = 245.7, CJK_W = 13;
 const WIDTHS = [
   { name: '360', width: 360, chat: 0 },
+  { name: '540', width: 540, chat: 0 },
   { name: '640 + chat overlay', width: 640, chat: 200 },
   { name: '936', width: 936, chat: 0 }
 ];
 const HOSTS = ['header row', 'toolbar (header row hidden)'];
+// goalHover: the pointer is on the goal. goalFocus: the keyboard is in the bar (:focus-visible). mouseFocus: focus is inside the bar only because
+// a mouse press left it there (clicking an icon; or the programmatic focus the view gives the spark after a mouse action, which the browser does
+// not treat as keyboard focus) while the pointer has gone.
 const STATES = [
   { name: 'none' },
   { name: 'long wrapped goal', goalHeight: 120 },
   { name: 'icons hovered', goalHover: true },
   { name: 'goal focused (keyboard)', goalFocus: true },
   { name: 'goal focused + tools hover', goalFocus: true, hover: true },
+  { name: 'icon clicked by mouse, pointer left', mouseFocus: true },
+  { name: 'icon clicked by mouse, pointer left + tools hover', mouseFocus: true, hover: true },
   { name: 'suggest list at its tallest', attachment: 'suggest', content: 900 },
   { name: 'suggest list, long goal', attachment: 'suggest', content: 900, goalHeight: 120 },
   { name: 'suggest list running', attachment: 'suggest', content: 40, running: true },
@@ -438,19 +473,44 @@ const STATES = [
   { name: 'sources panel + tools hover', sources: 500, hover: true }
 ];
 
+// What the stylesheet shows of the icons, for a set of conditions ({ hover, focusWithin, focusVisible, attachment }) at a width: a small cascade over the
+// rules whose subject is `.vam-goal-actions` under `.vam-goal-bar` (pseudo-classes :hover, :focus-within, :has(:focus-visible), class .has-attachment),
+// the narrow container block counted only when narrow. Specificity = number of classes and pseudo-classes; later rules win ties. Returns { opacity, pointerEvents }.
+const NARROW_SPAN = (() => { const i = STYLES.indexOf('@container vam-goal-host (max-width: 600px) {'); assert.ok(i >= 0, 'the narrow container block exists'); const m = STYLES.slice(i).match(/\n\}/); return [i, i + m.index]; })();
+const ACTION_RULES = [...STYLES.matchAll(/([^{}]+)\{([^{}]*)\}/g)].flatMap(m => {
+  const at = m.index + m[1].length - m[1].trimStart().length, narrowRule = at > NARROW_SPAN[0] && at < NARROW_SPAN[1];
+  return m[1].split(',').map(x => x.trim()).flatMap(sel => {
+    const parsed = sel.match(/^(?:\.vam-goal-bar((?::hover|:focus-within|:has\(:focus-visible\)|\.has-attachment)*) )?\.vam-goal-actions$/);
+    if (!parsed) return [];
+    const tokens = (parsed[1] ?? '').match(/:hover|:focus-within|:has\(:focus-visible\)|\.has-attachment/g) ?? [];
+    return [{ tokens, narrowRule, spec: tokens.length + (parsed[1] === undefined ? 1 : 2), at, opacity: m[2].match(/opacity:\s*([\d.]+)/)?.[1], pe: m[2].match(/pointer-events:\s*(\w+)/)?.[1] }];
+  });
+});
+const actionsStyle = (narrow, on) => {
+  const key = { ':hover': on.hover, ':focus-within': on.focusWithin, ':has(:focus-visible)': on.focusVisible, '.has-attachment': on.attachment };
+  const hits = ACTION_RULES.filter(r => (narrow || !r.narrowRule) && r.tokens.every(t => key[t])).sort((a, b) => a.spec - b.spec || a.at - b.at);
+  const last = prop => hits.filter(r => r[prop] !== undefined).at(-1)?.[prop];
+  return { opacity: last('opacity'), pointerEvents: last('pe') };
+};
+assert.ok(ACTION_RULES.length >= 4, 'the scan finds the icon visibility rules');
+
 async function stackRig(width, chat, state, host = HOSTS[0]) {
   const h = await harness();
   const view = h.view;
   const inHeader = host === HOSTS[0];
   const narrow = width <= 600;
-  const barH = state.goalHeight ?? 30;
+  const barH = state.goalHeight ?? (narrow ? BAR_H_NARROW : BAR_H_WIDE);
+  const paneRight = PANE_LEFT + width;
   // Rows above the canvas: the header row (when shown) then the toolbar; the row holding the bar grows with the goal.
-  const headerH = inHeader ? Math.max(HEADER_MIN, barH + 10) : 0;
-  const toolbarH = inHeader ? TOOLBAR_H : Math.max(TOOLBAR_H, barH + 12);
-  const hostBottom = inHeader ? headerH : toolbarH;
-  const canvasTop = headerH + toolbarH;
-  const canvas = R(CANVAS_LEFT, canvasTop, CANVAS_LEFT + width, canvasTop + CANVAS_H);
-  const overlay = element('div'); overlay.addClass('vam-canvas-overlay'); overlay.clientHeight = CANVAS_H; overlay.getBoundingClientRect = () => canvas;
+  const headerH = inHeader ? Math.max(HEADER_MIN, barH + 1) : 0;
+  const baseBar = narrow ? BAR_H_NARROW : BAR_H_WIDE;
+  const toolbarH = inHeader ? TOOLBAR_H_HEADER(width) : TOOLBAR_H_FALLBACK(width) + Math.max(0, barH - baseBar);
+  const toolbarTop = PANE_TOP + headerH;
+  const hostBottom = PANE_TOP + (inHeader ? headerH : toolbarH);
+  const canvasTop = toolbarTop + toolbarH;
+  const canvas = R(PANE_LEFT + CHAT_COLUMN, canvasTop, paneRight, PANE_BOTTOM);
+  const pane = R(PANE_LEFT, PANE_TOP, paneRight, PANE_BOTTOM);
+  const overlay = element('div'); overlay.addClass('vam-canvas-overlay'); overlay.clientHeight = PANE_BOTTOM - canvasTop; overlay.getBoundingClientRect = () => canvas;
   view.viewportEl = { getBoundingClientRect: () => canvas };
   view.chat = chat ? { isOverlay: true, overlayWidth: 44 + chat } : null;
   if (state.attachment === 'suggest') await h.open();
@@ -458,36 +518,46 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   if (state.running) { const task = view.goalSuggestTask; task.state = 'running'; task.focus = null; view.render(); }
   h.rootEl.appendChild(overlay);
   const bar = find(h.rootEl, i => hasCls(i, 'vam-goal-bar'));
-  const barW = narrow ? width - 16 : Math.min(460, width - 200);
-  const barLeft = CANVAS_LEFT + (narrow ? 8 : (width - barW) / 2);
-  const barTop = (hostBottom - barH) / 2;
+  // Narrow: measured widths; wide: centred in the row, capped at 460.
+  const barW = narrow ? BAR_NARROW[inHeader ? 'header' : 'toolbar'].w : Math.min(460, width - 200);
+  const barLeft = PANE_LEFT + (narrow ? BAR_NARROW[inHeader ? 'header' : 'toolbar'].left : (width - barW) / 2);
+  const barTop = narrow && !inHeader ? PANE_TOP + 41.5 : PANE_TOP + ((inHeader ? headerH : toolbarH) - barH) / 2;
   const barRect = () => R(barLeft, barTop, barLeft + barW, barTop + barH);
   bar.getBoundingClientRect = barRect;
   const actions = find(h.rootEl, i => hasCls(i, 'vam-goal-actions'));
   assert.equal(findAll(actions, i => i.tag === 'button').length, ICON_COUNT, 'the icon count the rig assumes');
-  // Wide: in the bar's own row. Narrow: floating FLOAT_GAP under the row, right-aligned (styles.css, container query).
-  const actionsRect = () => narrow ? R(canvas.right - FLOAT_RIGHT - FLOAT_W, hostBottom + FLOAT_GAP, canvas.right - FLOAT_RIGHT, hostBottom + FLOAT_GAP + FLOAT_H) : R(barLeft + barW - 8 - INLINE_W, barTop + (barH - INLINE_H) / 2, barLeft + barW - 8, barTop + (barH - INLINE_H) / 2 + INLINE_H);
+  // Wide: in the bar's own row. Narrow: FLOAT_GAP under the row (from the host's padding box, HOST_BORDER above its border-box bottom), right-aligned (styles.css, container query).
+  const actionsRect = () => narrow ? R(paneRight - FLOAT_RIGHT - FLOAT_W, hostBottom - HOST_BORDER + FLOAT_GAP, paneRight - FLOAT_RIGHT, hostBottom - HOST_BORDER + FLOAT_GAP + FLOAT_H) : R(barLeft + barW - 8 - INLINE_W, barTop + (barH - INLINE_H) / 2, barLeft + barW - 8, barTop + (barH - INLINE_H) / 2 + INLINE_H);
   actions.getBoundingClientRect = actionsRect;
-  // The icons are invisible and ignore the pointer unless the pointer is on the goal or the keyboard is in it (an open panel counts: has-attachment).
-  const actionsShown = !!state.goalHover || !!state.goalFocus || !!state.attachment;
-  actions.ownerDocument = { defaultView: { getComputedStyle: () => ({ opacity: actionsShown ? '1' : '0' }) } };
+  // What shows the icons comes from the stylesheet (actionsStyle): hover, keyboard focus (focus-visible), focus a mouse press left (focus-within only), an open panel.
+  const conditions = { hover: !!state.goalHover, focusVisible: !!state.goalFocus, focusWithin: !!state.goalFocus || !!state.mouseFocus || !!state.attachment, // a list opened from the spark leaves focus in the bar
+     attachment: !!state.attachment };
+  const shownStyle = actionsStyle(narrow, conditions);
+  const actionsShown = shownStyle.opacity !== '0';
+  actions.ownerDocument = { defaultView: { getComputedStyle: () => ({ opacity: shownStyle.opacity }) } };
   const tools = element('div'); tools.addClass('vam-map-tools'); h.rootEl.appendChild(tools);
   tools.offsetHeight = 36; tools.parentElement = overlay;
-  // The group is 165 wide, 246 hovered; when the view caps its width (--vam-tools-max) it wraps onto a second row.
-  const toolsRect = () => { const left = CANVAS_LEFT + (px(tools.style.left) ?? 12), top = canvasTop + (px(tools.style.top) ?? 12), natural = state.hover ? 246 : 165, cap = px(tools.style['--vam-tools-max']), w = cap === null ? natural : Math.min(natural, cap); return R(left, top, left + w, top + (w < natural ? 72 : 36)); };
+  // The group is 165 wide, 246 hovered; when the view caps its width (--vam-tools-max) it wraps onto a second row (68 high, measured).
+  const toolsRect = () => { const left = canvas.left + (px(tools.style.left) ?? 12), top = canvasTop + (px(tools.style.top) ?? 12), natural = state.hover ? 246 : 165, cap = px(tools.style['--vam-tools-max']), w = cap === null ? natural : Math.min(natural, cap); return R(left, top, left + w, top + (w < natural ? WRAPPED_TOOLS_H : 36)); };
   tools.getBoundingClientRect = toolsRect;
   const zoom = element('div'); zoom.addClass('vam-zoom-controls'); h.rootEl.appendChild(zoom);
-  zoom.getBoundingClientRect = () => R(canvas.right - 12 - 198, canvas.bottom - 77, canvas.right - 12, canvas.bottom - 37);
+  zoom.getBoundingClientRect = () => R(canvas.right - ZOOM_INSET - ZOOM_W, canvas.bottom - ZOOM_INSET - ZOOM_H, canvas.right - ZOOM_INSET, canvas.bottom - ZOOM_INSET);
+  // The hint's rect is not measured here (hidden at 360 in the run); it keeps the earlier stand-in.
   const hint = element('div'); hint.addClass('vam-canvas-hint'); h.rootEl.appendChild(hint);
   hint.getBoundingClientRect = () => width === 360 ? R(canvas.left + 12, canvas.bottom - 134, canvas.left + 132, canvas.bottom - 74) : R(canvas.left + 12, canvas.bottom - 70, canvas.left + 190, canvas.bottom - 30);
+  // The info row's buttons (outline, undo, redo, export, more) and the "+ New map" span: not floating layers, but what the icons must not sit on.
+  const top = infoButtonTop(inHeader, width, toolbarTop);
+  const infoButtons = INFO_BUTTONS.map((label, i) => { const right = paneRight - INFO_RIGHT_INSET - (INFO_BUTTONS.length - 1 - i) * (INFO_BTN_W + INFO_BTN_GAP); return [label, R(right - INFO_BTN_W, top, right, top + INFO_BTN_H)]; });
+  infoButtons.unshift(['new map', R(infoButtons[0][1].left - NEW_MAP_GAP - NEW_MAP_W, top - 3, infoButtons[0][1].left - NEW_MAP_GAP, top - 3 + NEW_MAP_H)]);
   const attachment = find(h.rootEl, i => hasCls(i, 'vam-goal-attachment'));
   if (state.attachment) {
     assert.ok(attachment, `${state.attachment} panel carries vam-goal-attachment`);
-    // The panel is positioned in the bar (wide) or in the whole row (narrow, where the bar is static): the view reads that box
-    // through offsetParent. Its top is ATTACH_GAP under the box plus --vam-goal-attach-clear, the value the view wrote.
-    const rowBox = { getBoundingClientRect: () => R(canvas.left, 0, canvas.right, hostBottom) };
+    // The panel is positioned in the bar (wide) or in the whole host row (narrow, where the bar is static): the view reads that box
+    // through offsetParent. Its top is ATTACH_GAP under the box (from its padding box) plus --vam-goal-attach-clear, the value the view wrote.
+    // Narrow it spans the pane (not the canvas): left 8 .. right 8 of the host.
+    const rowBox = { getBoundingClientRect: () => R(PANE_LEFT, PANE_TOP, paneRight, hostBottom) };
     attachment.offsetParent = narrow ? rowBox : bar;
-    const attachRect = () => { const top = attachment.offsetParent.getBoundingClientRect().bottom + ATTACH_GAP + (px(attachment.style['--vam-goal-attach-clear']) ?? 0); const left = narrow ? canvas.left + 8 : barLeft, right = narrow ? canvas.right - 8 : barLeft + barW; return R(left, top, right, top + attachment.offsetHeight); };
+    const attachRect = () => { const box = attachment.offsetParent.getBoundingClientRect(), top = box.bottom - (narrow ? HOST_BORDER : 0) + ATTACH_GAP + (px(attachment.style['--vam-goal-attach-clear']) ?? 0); const left = narrow ? pane.left + 8 : barLeft, right = narrow ? pane.right - 8 : barLeft + barW; return R(left, top, right, top + attachment.offsetHeight); };
     Object.defineProperty(attachment, 'offsetHeight', { get() { const max = px(this.style['--vam-goal-attach-max']); return max === null ? state.content : Math.min(state.content, max); } });
     attachment.getBoundingClientRect = attachRect;
   }
@@ -506,7 +576,7 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   if (actionsShown) labelled.push(['actions', actionsRect()]);
   if (state.attachment) labelled.push(['attachment', attachment.getBoundingClientRect()]);
   if (sources) labelled.push(['sources panel', sources.getBoundingClientRect()]);
-  return { h, view, bar, tools, canvas, labelled, attachment, sources, actionsShown, actions, narrow, hostBottom, actionsRect, toolsRect };
+  return { h, view, bar, tools, canvas, pane, labelled, attachment, sources, actionsShown, actions, narrow, hostBottom, actionsRect, toolsRect, infoButtons, conditions, barW, inHeader };
 }
 
 test('goal stack: in every host, state and width the layers around the goal do not overlap, the tool group never moves, and the list stops above the bottom controls', async () => {
@@ -514,7 +584,7 @@ test('goal stack: in every host, state and width the layers around the goal do n
   const parentChild = new Set(['tools|sources panel']);
   for (const host of HOSTS) for (const w of WIDTHS) for (const state of STATES) {
     const where = `${host} / ${w.name} / ${state.name}`;
-    const { view, canvas, labelled, tools, actionsShown, bar, attachment, narrow, hostBottom, actionsRect, toolsRect } = await stackRig(w.width, w.chat, state, host);
+    const { view, canvas, labelled, tools, actionsShown, bar, attachment, narrow, hostBottom, actionsRect, toolsRect, infoButtons, conditions, barW, inHeader } = await stackRig(w.width, w.chat, state, host);
     assert.ok(!tools.style.top, `${where}: the tool group keeps the stylesheet top (style.top is empty)`);
     const name = rect => labelled.find(([, r]) => JSON.stringify(r) === JSON.stringify(rect))?.[0];
     const seen = view.floatingControlRects().map(rect => ({ rect, label: name(rect) }));
@@ -527,6 +597,23 @@ test('goal stack: in every host, state and width the layers around the goal do n
       assert.equal(clear, narrow ? Math.max(0, actionsRect().bottom - hostBottom) : 0, `${where}: the panel clears exactly the part of the icons that hangs below its box (0 when they are in the bar)`);
       if (narrow) assert.ok(clear > 0, `${where}: narrow icons hang below the row`);
       assert.ok(px(attachment.style['--vam-goal-attach-max']) > 0, `${where}: the list has room`);
+    }
+    // Narrow, the icons float over the info row's buttons: they show only while the pointer is on the goal, the keyboard is in the bar (:focus-visible) or a panel is
+    // open (the user just opened it; approved: it covers the row too). The focus a mouse click leaves behind, or the focus the view gives the spark again after a
+    // mouse action, is not a reason (decision #9). Wide, they sit in the bar's own row, so focus-within may show them.
+    if (narrow) {
+      assert.equal(actionsShown, conditions.hover || conditions.focusVisible || conditions.attachment, `${where}: the floating icons are shown exactly for hover, keyboard focus or an open panel`);
+      if (!conditions.hover && !conditions.focusVisible && !conditions.attachment) for (const [label, rect] of infoButtons) assert.ok(!actionsShown || !load('experiences/visual-map/viewport-inset.ts').rectsIntersect(actionsRect(), rect), `${where}: the shown icons ${JSON.stringify(actionsRect())} sit on the ${label} button ${JSON.stringify(rect)} without hover or keyboard focus`);
+    } else assert.equal(actionsShown, conditions.hover || conditions.focusWithin, `${where}: wide, the icons in the row show for hover, focus or an open panel`);
+    // The goal in the toolbar fallback (decision #10): its flex-basis is more than the room next to the other children (measured), so it takes its own row and a goal is
+    // not squeezed into a narrow column: the short goal is one line, the 60-character goal stays within its row and is far from 9 lines.
+    if (state.name === 'none' && !inHeader) {
+      const basis = cssPx(cssRule('.vam-toolbar > .vam-goal-bar'), 'flex-basis'), row = w.width - 16, iconSlot = narrow ? 0 : INLINE_W;
+      const ownRow = basis > TOOLBAR_ROOM_FOR_BAR, laidOutW = narrow ? barW : ownRow ? Math.min(460, row) : Math.min(460, TOOLBAR_ROOM_FOR_BAR);
+      const lines = chars => Math.ceil(chars * CJK_W / (laidOutW - 2 - 16 - 16 - 14 - iconSlot));
+      assert.ok(laidOutW <= row, `${where}: the bar is not wider than its row`);
+      assert.equal(lines(9), 1, `${where}: a short goal (9 characters) is on one line`);
+      assert.ok(lines(60) <= 4, `${where}: a 60-character goal is not ${lines(60)} lines`);
     }
     const capped = px(tools.style['--vam-tools-max']);
     if (narrow && actionsRect().bottom > canvas.top + 12) assert.ok(capped !== null && toolsRect().right <= actionsRect().left, `${where}: the tool group gives way to the icons`);
@@ -617,6 +704,9 @@ test('goal stack: the one z rule is on the goal host (above the overlay chat 12 
   assert.ok(narrowBlock, 'the narrow container block exists');
   assert.match(narrowBlock, /\.vam-goal-bar \.vam-goal-attachment \{ left: 8px; right: 8px; \}/);
   assert.match(narrowBlock, /\.vam-goal-bar\.has-attachment \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}/);
+  assert.match(narrowBlock, /\.vam-goal-bar:focus-within \.vam-goal-actions \{ opacity: 0; pointer-events: none; \}/, 'narrow: the focus a mouse click leaves does not show the icons');
+  assert.match(narrowBlock, /\.vam-goal-bar:hover \.vam-goal-actions, \.vam-goal-bar:has\(:focus-visible\) \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}/);
+  assert.match(rule('.vam-toolbar > .vam-goal-bar'), /flex-basis: 280px/);
   for (const m of css.matchAll(/([^{}]*has-attachment[^{}]*)\{([^{}]*)\}/g)) assert.doesNotMatch(m[2], /z-index/, `${m[1].trim()} sets no z-index (display only)`);
   assert.doesNotMatch(css, /!important/);
 });

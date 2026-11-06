@@ -85,6 +85,21 @@ export function expandBasis(card: {
     : { kind: "outline_only", alsoRead: [], existingChildren: card.existingChildren };
 }
 
+/**
+ * The basis of one expand line over several cards: the cards' notes that were read, and the subtopics they already had. A card
+ * whose expansion failed is left out by the caller (nothing was built from it); no card left means no basis at all (null).
+ */
+export function expandBasisOf(
+  cards: readonly { id: string; title: string; hasNote: boolean; existingChildren: number }[]
+): MapChatBasis | null {
+  if (!cards.length) return null;
+  const sources = cards.flatMap(card => (card.hasNote ? [{ id: card.id, title: card.title }] : []));
+  const existingChildren = cards.reduce((sum, card) => sum + card.existingChildren, 0);
+  return sources.length
+    ? { kind: "note", sources, existingChildren }
+    : { kind: "outline_only", alsoRead: [], existingChildren };
+}
+
 const BASIS_TEXT_LIMIT = 200;
 const BASIS_LIST_LIMIT = 50;
 const text = (value: unknown): string | null =>

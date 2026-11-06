@@ -40,7 +40,7 @@ function panelEntryFile() {
   panelEntryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-map-chat-entry-'));
   process.on('exit', () => fs.rmSync(panelEntryDir, { recursive: true, force: true }));
   const file = path.join(panelEntryDir, 'entry.ts');
-  fs.writeFileSync(file, `export { MapChatPanel } from ${JSON.stringify(path.join(root, 'experiences/visual-map/map-chat'))};\nexport { setUiLanguage } from ${JSON.stringify(path.join(root, 'i18n'))};\n`);
+  fs.writeFileSync(file, `export { MapChatPanel, chatResultLines, expandFailureLine } from ${JSON.stringify(path.join(root, 'experiences/visual-map/map-chat'))};\nexport { setUiLanguage } from ${JSON.stringify(path.join(root, 'i18n'))};\n`);
   return file;
 }
 function loadPanelModule(windowValues = {}) {
@@ -7244,4 +7244,43 @@ test('P4 records: a restored automatic round carries its round number only when 
   const turn = (n, extra) => [{ v: 1, type: 'turn_start', turn: n, at: 'a', message: 'm', ...extra }, { v: 1, type: 'turn_end', turn: n, at: 'a', status: 'done', raw: null, reply: 'r', modelLabel: '', lines: [] }];
   const restored = restoreConversation('x', [...turn(1, {}), ...turn(2, { auto: true, round: 2 }), ...turn(3, { auto: true, round: 1 }), ...turn(4, { auto: true, round: 2.5 }), ...turn(5, { auto: true, round: '3' }), ...turn(6, { auto: true }), ...turn(7, { round: 4 })]);
   eq(restored.turns.map(t => [t.auto, t.round ?? null]), [[false, null], [true, 2], [true, null], [true, null], [true, null], [true, null], [false, null]]);
+});
+
+test('P6 F1/F2: a failed expansion is not a basis and replaces its start line; a partly failed one counts only the cards that worked; the failure names the card', () => {
+  const { expandBasisOf } = load('core/map-chat-basis.ts');
+  const cards = [{ id: 'a', title: 'Biology', hasNote: true, existingChildren: 9 }, { id: 'b', title: 'Chem', hasNote: true, existingChildren: 2 }];
+  eq(expandBasisOf([]), null); eq(expandBasisOf(cards.slice(1)), { kind: 'note', sources: [{ id: 'b', title: 'Chem' }], existingChildren: 2 });
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('expand');
+  const start = expandBasisOf(cards.slice(0, 1));
+  f.panel.finish('Started.', [{ status: 'done', text: 'Done: expand subtopics for 1 topic', basis: start }]);
+  eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), ['Based on note “Biology” and 9 existing subtopics']);
+  const mod = loadPanelModule(); const { expandFailureLine, setUiLanguage } = mod;
+  const left = f.panel.settleExpandFailure(start, null, expandFailureLine('Biology', 'simulated'));
+  assert.equal(left, null); eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), [], 'no basis for work that built nothing');
+  eq(f.panel.transcript().at(-1).lines.map(l => l.text), ['Failed: Expand “Biology” (simulated)'], 'the failure replaces the start line, no "done" left');
+  const g = panelFixture(); g.panel.setOpen(true); g.panel.begin('expand'); const both = expandBasisOf(cards);
+  g.panel.finish('Started.', [{ status: 'done', text: 'Done: expand subtopics for 2 topics', basis: both }]);
+  const rest = g.panel.settleExpandFailure(both, expandBasisOf(cards.slice(1)), expandFailureLine('Biology', 'simulated'));
+  eq(rest, expandBasisOf(cards.slice(1))); eq(classTexts(g.parts.log(), 'vam-map-chat-basis-line'), ['Based on note “Chem” and 2 existing subtopics']);
+  eq(g.panel.transcript().at(-1).lines.map(l => l.status), ['done', 'failed']);
+  setUiLanguage('zh-TW'); const failure = expandFailureLine('高中生物必修課', '模擬失敗'); setUiLanguage('en');
+  assert.equal(failure.text, '失敗：展開「高中生物必修課」（模擬失敗）'); assert.equal(failure.status, 'failed');
+  assert.equal(expandFailureLine('Biology', 'x').text, 'Failed: Expand “Biology” (x)');
+});
+
+test('P6 F3: the wait label is written only when its text changes; the seconds still tick', () => {
+  const s = stageFixture(); const { f } = s; f.panel.begin('go'); f.panel.finish('Started.', []);
+  f.panel.setChainWaiting({ kinds: ['research'], total: 5, settled: 2 }, REMAINING);
+  const label = find(f.parts.log(), i => hasClass(i, 'vam-map-chat-chain-wait-label')); const elapsed = find(f.parts.log(), i => hasClass(i, 'vam-map-chat-chain-wait-elapsed'));
+  let writes = 0; const setText = label.setText.bind(label); label.setText = value => { writes++; setText(value); };
+  s.tickSeconds(1); s.tickSeconds(1); s.tickSeconds(1);
+  assert.equal(writes, 0, 'same progress, no rewrite inside the status region'); assert.equal(elapsed.text, ' · 0:03');
+  f.panel.setChainWaiting({ kinds: ['research'], total: 5, settled: 3 }, REMAINING);
+  const now = find(f.parts.log(), i => hasClass(i, 'vam-map-chat-chain-wait-label')); assert.equal(now.text, 'Researching 3/5');
+});
+
+test('P6 F4: result lines for the next round leave out the explanation notes', () => {
+  const { chatResultLines } = loadPanelModule(); const { t } = load('i18n.ts');
+  const lines = [{ status: 'done', text: 'Added A' }, { status: 'failed', text: 'Failed: x' }, { status: 'done', text: t('ui.map_chat_not_undoable') }, { status: 'done', text: t('ui.map_chat_auto_layout_added') }];
+  eq(chatResultLines(lines).map(l => l.text), ['Added A', 'Failed: x']);
 });

@@ -393,7 +393,9 @@ import {
   type MapChatSavedTurn,
   type MapChatSteer,
   type MapChatTurnHandle,
-  settledLine
+  settledLine,
+  chatResultLines,
+  expandFailureLine
 } from "./map-chat";
 import { imageMarkdown, type ImageCandidate } from "../../core/image-candidates";
 import {
@@ -421,8 +423,8 @@ import {
 import {
   chatBasisFor,
   createdParentsOf,
-  expandBasis,
   basisSummary,
+  expandBasisOf,
   type MapChatBasis
 } from "../../core/map-chat-basis";
 import {
@@ -20934,7 +20936,7 @@ export class VisualAgentMapView extends ItemView {
   private advanceChain(run: ChatChainRun, round: ChatRoundEnd): void {
     if (this.chatChain !== run || run.state.phase === "ended") return;
     run.partial = null;
-    run.lastResults = round.lines.map(line => ({ text: line.text, status: line.status }));
+    run.lastResults = chatResultLines(round.lines).map(line => ({ text: line.text, status: line.status }));
     run.anchor = { path: round.anchor.path, id: round.anchor.id };
     const step = finishRound(run.state, {
       remaining: round.result.remaining,
@@ -23061,19 +23063,16 @@ export class VisualAgentMapView extends ItemView {
         );
         const expandChat = this.chat;
         const expandTurns = expandChat?.transcript().length ?? 0;
-        const sources: { id: string; title: string }[] = [];
-        let existing = 0;
-        for (const { parent, note } of infos) {
-          const count = map.nodes.filter(node => node.parentId === parent.id).length;
-          const basis = expandBasis({
-            id: parent.id,
-            title: note.title,
-            hasNote: !!note.detail.trim(),
-            existingChildren: count
-          });
-          existing += count;
-          if (basis.kind === "note") sources.push(...basis.sources);
-        }
+        const cards = infos.map(({ parent, note }) => ({
+          id: parent.id,
+          title: note.title,
+          hasNote: !!note.detail.trim(),
+          existingChildren: map.nodes.filter(node => node.parentId === parent.id).length
+        }));
+        const allBasis = expandBasisOf(cards);
+        // The basis counts only the expansions that did not fail: a failure takes its card out of it.
+        let liveBasis: MapChatBasis | null = allBasis;
+        const failedIds = new Set<string>();
         for (const { parent, note } of infos) {
           const done = new Promise<ChatExpandOutcome>(resolve => {
             Promise.resolve(
@@ -23099,27 +23098,28 @@ export class VisualAgentMapView extends ItemView {
             );
           }).then(outcome => {
             // A failure of an expansion that started with this reply is a result line of it, like the search count of research.
+            // The basis is judged by the expansions that did not fail; with none left the failure replaces the start line.
             if (
               outcome.status === "failed" &&
               expandChat &&
               this.chat === expandChat &&
               !this.closed &&
               expandChat.transcript().length === expandTurns
-            )
-              expandChat.appendLines([
-                {
-                  status: "failed",
-                  text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_0", note.title), outcome.reason)
-                }
-              ]);
+            ) {
+              failedIds.add(parent.id);
+              if (liveBasis)
+                liveBasis = expandChat.settleExpandFailure(
+                  liveBasis,
+                  expandBasisOf(cards.filter(card => !failedIds.has(card.id))),
+                  expandFailureLine(note.title, outcome.reason)
+                );
+              else expandChat.appendLines([expandFailureLine(note.title, outcome.reason)]);
+            }
             return outcome;
           });
           work?.expand.push({ id: parent.id, title: note.title, path: parent.path, done });
         }
-        const basis: MapChatBasis = sources.length
-          ? { kind: "note", sources, existingChildren: existing }
-          : { kind: "outline_only", alsoRead: [], existingChildren: existing };
-        return { status: "done", basis };
+        return { status: "done", ...(allBasis ? { basis: allBasis } : {}) };
       }
       case "synthesize":
         return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message);

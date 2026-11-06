@@ -347,7 +347,15 @@ export interface MapChatHost {
 
 const LABEL_LIMIT = 40;
 /** Result lines that are notes: shown, but not counted as results. */
-const chatNoteTexts = (): string[] => [t("ui.map_chat_not_undoable"), t("ui.map_chat_auto_layout_added")];
+export const chatNoteTexts = (): string[] => [t("ui.map_chat_not_undoable"), t("ui.map_chat_auto_layout_added")];
+/** The lines that are results of actions (what the next round of a continuation is told), without the explanation notes. */
+export function chatResultLines<T extends { status: "done" | "skipped" | "failed"; text: string }>(lines: readonly T[]): T[] {
+  return splitChatLines(lines, chatNoteTexts()).results;
+}
+/** The failed result line of one card's expansion that started with a reply: names the card, not a count. */
+export function expandFailureLine(title: string, reason: string): MapChatLine {
+  return { status: "failed", text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_topic_0", title), reason) };
+}
 const clip = (value: string, limit = LABEL_LIMIT): string => {
   const text = value.replace(/\s+/g, " ").trim();
   const characters = [...text];
@@ -904,7 +912,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const els = this.chainWaitingEls;
     const state = this.chainWaitingState;
     if (!els || !state) return;
-    els.label.setText(t("ui.map_chat_chain_wait_label_0_1_2", this.waitWord(state), state.settled, state.total));
+    // The label sits in a live region: rewriting the same text every second can be read out again, so only a change is written.
+    const label = t("ui.map_chat_chain_wait_label_0_1_2", this.waitWord(state), state.settled, state.total);
+    if (els.label.textContent !== label) els.label.setText(label);
     const seconds = Math.max(0, Math.round((this.clockNow() - this.chainWaitingSince) / 1000));
     els.elapsed.setText(
       t("ui.map_chat_stage_elapsed_0", `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`)
@@ -1423,6 +1433,21 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (!last || last.role !== "assistant") return;
     last.lines = [...last.lines, ...lines];
     this.renderLog();
+  }
+  /**
+   * An expansion that started with the last reply failed. The basis of its start line no longer counts that card: `next` is the
+   * basis of the cards still expanding, or null when none is left, and then the failure takes the place of the start line (no
+   * "done" line and no basis for work that built nothing). Without a start line to find, the failure is just added.
+   */
+  settleExpandFailure(was: MapChatBasis, next: MapChatBasis | null, failure: MapChatLine): MapChatBasis | null {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return was;
+    const at = last.lines.findIndex(line => line.basis === was);
+    if (at < 0) last.lines = [...last.lines, failure];
+    else if (next) last.lines = [...last.lines.map((line, index) => (index === at ? { ...line, basis: next } : line)), failure];
+    else last.lines = last.lines.map((line, index) => (index === at ? failure : line));
+    this.renderLog();
+    return at >= 0 ? next : was;
   }
   /** A picture search starts under the last answer. The block is shown at once and changes with {@link settleImages}. */
   addImages(block: MapChatImages): void {

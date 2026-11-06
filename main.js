@@ -35631,8 +35631,11 @@ function createdParentsOf(actions) {
     if (action.kind === "add_child" && action.ref) created[`new:${action.ref}`] = action.parentId || null;
   return created;
 }
-function expandBasis(card) {
-  return card.hasNote ? { kind: "note", sources: [{ id: card.id, title: card.title }], existingChildren: card.existingChildren } : { kind: "outline_only", alsoRead: [], existingChildren: card.existingChildren };
+function expandBasisOf(cards) {
+  if (!cards.length) return null;
+  const sources = cards.flatMap((card) => card.hasNote ? [{ id: card.id, title: card.title }] : []);
+  const existingChildren = cards.reduce((sum2, card) => sum2 + card.existingChildren, 0);
+  return sources.length ? { kind: "note", sources, existingChildren } : { kind: "outline_only", alsoRead: [], existingChildren };
 }
 var BASIS_TEXT_LIMIT = 200;
 var BASIS_LIST_LIMIT = 50;
@@ -36536,6 +36539,12 @@ function settledLine(line) {
 var STAGE_ORDER = { preparing: 0, consent: 1, waiting: 2, writing: 3, applying: 4 };
 var LABEL_LIMIT2 = 40;
 var chatNoteTexts = () => [t("ui.map_chat_not_undoable"), t("ui.map_chat_auto_layout_added")];
+function chatResultLines(lines) {
+  return splitChatLines(lines, chatNoteTexts()).results;
+}
+function expandFailureLine(title, reason) {
+  return { status: "failed", text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_topic_0", title), reason) };
+}
 var clip2 = (value, limit = LABEL_LIMIT2) => {
   const text12 = value.replace(/\s+/g, " ").trim();
   const characters = [...text12];
@@ -37058,7 +37067,8 @@ var MapChatPanel = class {
     const els = this.chainWaitingEls;
     const state = this.chainWaitingState;
     if (!els || !state) return;
-    els.label.setText(t("ui.map_chat_chain_wait_label_0_1_2", this.waitWord(state), state.settled, state.total));
+    const label = t("ui.map_chat_chain_wait_label_0_1_2", this.waitWord(state), state.settled, state.total);
+    if (els.label.textContent !== label) els.label.setText(label);
     const seconds = Math.max(0, Math.round((this.clockNow() - this.chainWaitingSince) / 1e3));
     els.elapsed.setText(
       t("ui.map_chat_stage_elapsed_0", `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`)
@@ -37567,6 +37577,21 @@ ${typed}` : draft;
     if (!last || last.role !== "assistant") return;
     last.lines = [...last.lines, ...lines];
     this.renderLog();
+  }
+  /**
+   * An expansion that started with the last reply failed. The basis of its start line no longer counts that card: `next` is the
+   * basis of the cards still expanding, or null when none is left, and then the failure takes the place of the start line (no
+   * "done" line and no basis for work that built nothing). Without a start line to find, the failure is just added.
+   */
+  settleExpandFailure(was, next, failure) {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return was;
+    const at = last.lines.findIndex((line) => line.basis === was);
+    if (at < 0) last.lines = [...last.lines, failure];
+    else if (next) last.lines = [...last.lines.map((line, index) => index === at ? { ...line, basis: next } : line), failure];
+    else last.lines = last.lines.map((line, index) => index === at ? failure : line);
+    this.renderLog();
+    return at >= 0 ? next : was;
   }
   /** A picture search starts under the last answer. The block is shown at once and changes with {@link settleImages}. */
   addImages(block) {
@@ -74719,7 +74744,7 @@ ${note.detail.trim()}` : "",
   advanceChain(run, round3) {
     if (this.chatChain !== run || run.state.phase === "ended") return;
     run.partial = null;
-    run.lastResults = round3.lines.map((line) => ({ text: line.text, status: line.status }));
+    run.lastResults = chatResultLines(round3.lines).map((line) => ({ text: line.text, status: line.status }));
     run.anchor = { path: round3.anchor.path, id: round3.anchor.id };
     const step = finishRound(run.state, {
       remaining: round3.result.remaining,
@@ -76588,19 +76613,15 @@ ${note.detail.trim()}` : "",
         );
         const expandChat = this.chat;
         const expandTurns = (_b2 = expandChat == null ? void 0 : expandChat.transcript().length) != null ? _b2 : 0;
-        const sources = [];
-        let existing = 0;
-        for (const { parent, note } of infos) {
-          const count2 = map.nodes.filter((node) => node.parentId === parent.id).length;
-          const basis2 = expandBasis({
-            id: parent.id,
-            title: note.title,
-            hasNote: !!note.detail.trim(),
-            existingChildren: count2
-          });
-          existing += count2;
-          if (basis2.kind === "note") sources.push(...basis2.sources);
-        }
+        const cards = infos.map(({ parent, note }) => ({
+          id: parent.id,
+          title: note.title,
+          hasNote: !!note.detail.trim(),
+          existingChildren: map.nodes.filter((node) => node.parentId === parent.id).length
+        }));
+        const allBasis = expandBasisOf(cards);
+        let liveBasis = allBasis;
+        const failedIds = /* @__PURE__ */ new Set();
         for (const { parent, note } of infos) {
           const done = new Promise((resolve) => {
             Promise.resolve(
@@ -76625,19 +76646,21 @@ ${note.detail.trim()}` : "",
               }
             );
           }).then((outcome) => {
-            if (outcome.status === "failed" && expandChat && this.chat === expandChat && !this.closed && expandChat.transcript().length === expandTurns)
-              expandChat.appendLines([
-                {
-                  status: "failed",
-                  text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_0", note.title), outcome.reason)
-                }
-              ]);
+            if (outcome.status === "failed" && expandChat && this.chat === expandChat && !this.closed && expandChat.transcript().length === expandTurns) {
+              failedIds.add(parent.id);
+              if (liveBasis)
+                liveBasis = expandChat.settleExpandFailure(
+                  liveBasis,
+                  expandBasisOf(cards.filter((card) => !failedIds.has(card.id))),
+                  expandFailureLine(note.title, outcome.reason)
+                );
+              else expandChat.appendLines([expandFailureLine(note.title, outcome.reason)]);
+            }
             return outcome;
           });
           work == null ? void 0 : work.expand.push({ id: parent.id, title: note.title, path: parent.path, done });
         }
-        const basis = sources.length ? { kind: "note", sources, existingChildren: existing } : { kind: "outline_only", alsoRead: [], existingChildren: existing };
-        return { status: "done", basis };
+        return { status: "done", ...allBasis ? { basis: allBasis } : {} };
       }
       case "synthesize":
         return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message);

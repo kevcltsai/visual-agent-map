@@ -5249,7 +5249,11 @@ export class VisualAgentMapView extends ItemView {
           .setIcon(kindIconId(kind))
           .onClick(() =>
             this.whenEditing(() =>
-              this.enqueue(() => this.addNode(parent, undefined, true, true, kind, false, {}, afterTextId))
+              this.enqueue(() =>
+                afterTextId
+                  ? this.addNode(parent, undefined, true, true, kind, false, {}, afterTextId)
+                  : this.addNode(parent, undefined, true, true, kind)
+              )
             )
           )
       );

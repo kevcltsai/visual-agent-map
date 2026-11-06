@@ -59229,7 +59229,9 @@ ${request.requirements}` : preset.text,
       menu.addItem(
         (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(kindIconId(kind)).onClick(
           () => this.whenEditing(
-            () => this.enqueue(() => this.addNode(parent, void 0, true, true, kind, false, {}, afterTextId))
+            () => this.enqueue(
+              () => afterTextId ? this.addNode(parent, void 0, true, true, kind, false, {}, afterTextId) : this.addNode(parent, void 0, true, true, kind)
+            )
           )
         )
       );

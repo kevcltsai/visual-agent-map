@@ -983,7 +983,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
     renderDisclosure(parent) { return parent.createDiv('vam-disclosure-body'); }, renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderAiLockSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
-    cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch,
+    cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch, relayoutBlocksOf: VisualAgentMapView.prototype.relayoutBlocksOf,
     map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },

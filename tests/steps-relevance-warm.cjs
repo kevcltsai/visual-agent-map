@@ -1,4 +1,4 @@
-// The relevance grade and the pre-started Claude CLI (D-2026-10-99..103): the plugin starts the very command the grade
+// The goal recommend run and the pre-started Claude CLI (D-2026-10-99..103): the plugin starts the very command the grade
 // will run, the real runner takes that process, and nothing else is started or killed. Synthetic: no process, no AI.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,7 +11,7 @@ const { loadWithAiCalls, aiCallsFor } = require('./support-ai-calls.cjs');
 const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 
 const { default: Plugin } = S.load('main.ts', { obsidian: S.obsidian });
-const grade = loadWithAiCalls('core/relevance-grade-service.ts');
+const grade = loadWithAiCalls('core/goal-recommend-service.ts');
 const { AiExchangeLog } = S.load('ai-exchange-log.ts');
 const { stepEffort } = S.load('core/provider-step-runner.ts');
 
@@ -27,21 +27,20 @@ test('plugin: prewarmClaudeStep starts the step\'s own command (model id, effort
   const plugin = newPlugin();
   const calls = [];
   plugin.aiRuntime.claude = directory => ({ prewarm: (...args) => { calls.push([directory, ...args]); return true; } });
-  plugin.prewarmClaudeStep('claude:sonnet', 'auto', grade.RELEVANCE_GRADE_SCHEMA);
-  plugin.prewarmClaudeStep('claude:opus', 'high', grade.RELEVANCE_RECALIBRATE_SCHEMA);
-  assert.deepEqual(calls.map(call => [call[0], call[1], call[2], call[3] === grade.RELEVANCE_GRADE_SCHEMA, call[4]]), [['/plugin', 'sonnet', 'low', true, false], ['/plugin', 'opus', 'high', false, false]], 'auto is low, like the run');
-  assert.equal(calls[1][3], grade.RELEVANCE_RECALIBRATE_SCHEMA);
+  plugin.prewarmClaudeStep('claude:sonnet', 'auto', grade.GOAL_RECOMMEND_SCHEMA);
+  plugin.prewarmClaudeStep('claude:opus', 'high', grade.GOAL_RECOMMEND_SCHEMA);
+  assert.deepEqual(calls.map(call => [call[0], call[1], call[2], call[3] === grade.GOAL_RECOMMEND_SCHEMA, call[4]]), [['/plugin', 'sonnet', 'low', true, false], ['/plugin', 'opus', 'high', true, false]], 'auto is low, like the run; one schema serves both scopes');
   assert.equal(stepEffort('auto'), 'low'); assert.equal(stepEffort('medium'), 'medium');
   let released = 0;
   Object.assign(plugin.aiRuntime, { releaseWarm: () => { released++; }, reset: () => { released += 10; }, dispose: () => { released += 100; } });
-  plugin.prewarmClaudeStep('gpt-test', 'low', grade.RELEVANCE_GRADE_SCHEMA);
+  plugin.prewarmClaudeStep('gpt-test', 'low', grade.GOAL_RECOMMEND_SCHEMA);
   assert.equal(released, 1, 'Codex starts nothing and drops a waiting process'); assert.equal(calls.length, 2);
   plugin.pluginDirectory = () => { throw new Error('no folder'); };
-  assert.doesNotThrow(() => plugin.prewarmClaudeStep('claude:sonnet', 'low', grade.RELEVANCE_GRADE_SCHEMA), 'pre-starting never fails the panel');
+  assert.doesNotThrow(() => plugin.prewarmClaudeStep('claude:sonnet', 'low', grade.GOAL_RECOMMEND_SCHEMA), 'pre-starting never fails the panel');
   plugin.repo = { dispose() {} }; plugin.expansionCoordinator = { stopAll() {} }; plugin.modelDiscovery = { invalidate() {} };
   plugin.onunload();
   plugin.pluginDirectory = () => '/plugin';
-  plugin.prewarmClaudeStep('claude:sonnet', 'low', grade.RELEVANCE_GRADE_SCHEMA);
+  plugin.prewarmClaudeStep('claude:sonnet', 'low', grade.GOAL_RECOMMEND_SCHEMA);
   assert.equal(calls.length, 2, 'a panel event after unload starts nothing');
   assert.equal(plugin.usageNoticePending('claude:sonnet'), !plugin.settings.claudeUsageNoticeSeen);
 });
@@ -70,23 +69,23 @@ function fixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-relevance-warm-'));
   const log = new AiExchangeLog(nodeFsAdapter, path.join(dir, 'ai-exchanges.json'), error => { throw error; });
   const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => true, exchanges: () => log, codexRuntime: () => { throw new Error('unexpected provider'); }, claudeRuntime: () => runtime };
-  const service = new grade.RelevanceGradeService(grade.providerRelevanceGradeRunner(aiCallsFor(grade, options, new Map())));
+  const service = new grade.GoalRecommendService(grade.providerGoalRecommendRunner(aiCallsFor(grade, options, new Map())));
   // Answers whichever process received the prompt with a valid grade of the two cards.
   const answer = async child => {
     for (let i = 0; i < 50 && !child.writes.length; i++) await new Promise(resolve => setImmediate(resolve));
-    const lines = [{ type: 'system', subtype: 'init' }, { type: 'result', subtype: 'success', is_error: false, structured_output: { items: [{ id: 'c2', tier: 'core' }, { id: 'c3', tier: 'side' }] } }];
+    const lines = [{ type: 'system', subtype: 'init' }, { type: 'result', subtype: 'success', is_error: false, structured_output: { items: [{ id: 'c2', tier: 'core' }, { id: 'c3', tier: 'side' }], suggestions: [] } }];
     child.stdout.emit('data', Buffer.from(lines.map(line => JSON.stringify(line)).join('\n') + '\n'));
     process.nextTick(() => child.emit('close', 0));
   };
   return { children, pool, runtime, service, log, answer };
 }
 
-test('a grade takes the process the panel pre-started (same command), reads stream-json and records prespawned', async () => {
+test('a recommend run takes the process the panel pre-started (same command), reads stream-json and records prespawned', async () => {
   const f = fixture();
-  assert.equal(f.runtime.prewarm('sonnet', stepEffort('auto'), grade.RELEVANCE_GRADE_SCHEMA, false), true);
+  assert.equal(f.runtime.prewarm('sonnet', stepEffort('auto'), grade.GOAL_RECOMMEND_SCHEMA, false), true);
   assert.equal(f.children.length, 1); assert.deepEqual(f.children[0].writes, [], 'nothing is sent while it waits');
   const warm = f.children[0];
-  const run = f.service.grade(request(), new AbortController().signal);
+  const run = f.service.recommend(request({ scope: 'all' }), new AbortController().signal);
   await f.answer(warm);
   const result = await run;
   assert.equal(f.children.length, 1, 'no second process: the pre-started one is used');
@@ -100,29 +99,29 @@ test('a grade takes the process the panel pre-started (same command), reads stre
   assert.equal(f.pool.size, 0);
 });
 
-test('without a pre-started process the grade starts its own and records prespawned false; a recalibration pre-start does not serve a full grade and is left alone', async () => {
+test('without a pre-started process the run starts its own and records prespawned false; a pre-start with another schema (another command) does not serve it and is left alone', async () => {
   const cold = fixture();
-  const run = cold.service.grade(request(), new AbortController().signal);
+  const run = cold.service.recommend(request({ scope: 'all' }), new AbortController().signal);
   for (let i = 0; i < 50 && !cold.children.length; i++) await new Promise(resolve => setImmediate(resolve));
   await cold.answer(cold.children[0]); await run;
   assert.equal(cold.log.getEntries()[0].milestones.prespawned, false);
   const f = fixture();
-  f.runtime.prewarm('sonnet', 'low', grade.RELEVANCE_RECALIBRATE_SCHEMA, false);
-  const other = f.service.grade(request(), new AbortController().signal);
+  f.runtime.prewarm('sonnet', 'low', { type: 'object', properties: { other: { type: 'string' } }, required: ['other'] }, false);
+  const other = f.service.recommend(request({ scope: 'all' }), new AbortController().signal);
   for (let i = 0; i < 50 && f.children.length < 2; i++) await new Promise(resolve => setImmediate(resolve));
-  assert.equal(f.children.length, 2, 'the full grade started its own process');
+  assert.equal(f.children.length, 2, 'the run started its own process');
   assert.deepEqual(f.children[0].signals, [], 'and left the waiting one alone'); assert.equal(f.pool.size, 1);
   await f.answer(f.children[1]); await other;
 });
 
 test('a different reasoning level, model or folder starts cold; Stop before the call releases the waiting process', async () => {
   const f = fixture();
-  f.runtime.prewarm('sonnet', 'low', grade.RELEVANCE_GRADE_SCHEMA, false);
-  const high = f.service.grade(request({ reasoning: 'high' }), new AbortController().signal);
+  f.runtime.prewarm('sonnet', 'low', grade.GOAL_RECOMMEND_SCHEMA, false);
+  const high = f.service.recommend(request({ scope: 'all', reasoning: 'high' }), new AbortController().signal);
   for (let i = 0; i < 50 && f.children.length < 2; i++) await new Promise(resolve => setImmediate(resolve));
   assert.equal(f.children.length, 2, 'effort high differs from the pre-started low');
   await f.answer(f.children[1]); await high;
   const early = new AbortController(); early.abort();
-  await assert.rejects(f.service.grade(request(), early.signal), error => error.code === 'stopped');
+  await assert.rejects(f.service.recommend(request({ scope: 'all' }), early.signal), error => error.code === 'stopped');
   assert.equal(f.children.length, 2, 'a run stopped before it started sends nothing');
 });

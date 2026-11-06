@@ -109,8 +109,8 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
 }
 // The accessible name of an element named through aria-labelledby (the goal bar uses hidden labels: aria-label would show as a tooltip).
 const nameOf = (h, el) => find(h.rootEl, i => i.attrs.id === el.attrs['aria-labelledby'])?.text;
-// The recalibrate / grade icon: the second one.
-const refreshIcon = h => h.icons()[1];
+// The recommend button (spark): the first icon, and the only way to run the grade for the saved goal (scope all or current follows the repository).
+const recommendIcon = h => h.icons()[0];
 const frontmatterOf = h => h.contents.get(MAP).match(/^---\n([\s\S]*?)\n---/)[1];
 // The Undo button pops the history entry first and restores notes afterwards, so wait for the work as well.
 const afterTravel = async h => { await until(() => h.view.history.canRedo); for (let i = 0; i < 12; i++) await tick(); };
@@ -123,7 +123,7 @@ integrationTest('relevance: Prioritize by goal -> field -> Enter writes the goal
   const input = h.input();
   assert.equal(nameOf(h, input), 'Map goal'); assert.equal(input.focused, true); assert.equal(h.chip(), undefined, 'the goal text becomes the field in the same place; there is no panel and no key hint');
   input.value = 'Sleep better\nthrough the night'; input.fire('keydown', { key: 'Enter' });
-  assert.equal(h.run().status, 'running'); assert.ok(h.icons().length === 3 && h.icons().every(b => b.disabled), 'the three goal icons are disabled while grading');
+  assert.equal(h.run().status, 'running'); assert.ok(h.icons().length === 2 && h.icons().every(b => b.disabled), 'the two goal icons are disabled while grading');
   assert.equal(h.bar().attrs['aria-live'], 'polite'); assert.equal(h.barText(), 'Recommending by goal…'); assert.deepEqual(h.barButtons(), ['Stop']);
   await h.settled();
   assert.equal(await h.repo.readRelevanceGoal(MAP), 'Sleep better through the night', 'newlines are removed');
@@ -182,14 +182,14 @@ integrationTest('relevance: changing the goal appends history and regrades; the 
   assert.equal([...h.cards.values()].filter(card => hasCls(card, 'vam-structure-suggested')).length, 0, 'closing clears the marks');
 });
 
-integrationTest('relevance: a first grade shows "Not graded" as the old tag; Enter on an unchanged setup asks nothing (decision #2), the recalibrate icon recalibrates with no history entry and nothing to change', async () => {
+integrationTest('relevance: a first grade shows "Not graded" as the old tag; Enter on an unchanged setup asks nothing (decision #2), the recommend button asks scope current with no history entry and nothing to change', async () => {
   const h = await harness();
   await h.enter('Goal'); await h.settled();
   button(h.bar(), 'View changes').click();
   assert.equal(find(h.opened.at(-1).contentEl, i => hasCls(i, 'vam-relevance-ungraded')).text, 'Not graded');
   await h.enter('Goal'); await tick(); await tick();
-  assert.equal(h.control.calls.length, 1, 'the same text again: Enter does not grade, the recalibrate icon does'); assert.equal(h.control.usageAsks, 1);
-  refreshIcon(h).click(); await h.settled();
+  assert.equal(h.control.calls.length, 1, 'the same text again: Enter does not grade, the recommend button does'); assert.equal(h.control.usageAsks, 1);
+  recommendIcon(h).click(); await h.settled();
   assert.equal(h.control.calls.length, 2, 'asked again');
   assert.equal(h.control.calls[1].step, 'goal-recommend'); assert.equal(h.control.calls[1].request.scope, 'current', 'same goal and context after an AI grade: only what should change is asked');
   assert.equal(h.control.calls[1].request.current.length, 4, 'the current AI tiers are sent');
@@ -547,7 +547,7 @@ integrationTest('relevance: goal and context are saved in one write, sent to the
   assert.match(frontmatterOf(h), /relevance-goal: "Grow herbs"\nrelevance-context: "Half a day of sun"/);
 });
 
-integrationTest('relevance: only a context change is one undo step without a new history entry; the same text again asks nothing, the recalibrate icon regrades with no new step', async () => {
+integrationTest('relevance: only a context change is one undo step without a new history entry; the same text again asks nothing, the recommend button asks again with no new step', async () => {
   const h = await harness();
   await h.enter('Goal'); await h.settled();
   assert.equal(h.view.history.past.length, 2);
@@ -558,8 +558,8 @@ integrationTest('relevance: only a context change is one undo step without a new
   open(h); assert.equal(contextInput(h).value, 'Half a day', 'the saved context is shown straight away'); assert.equal(addContext(h), undefined, 'and "+ Context" is not offered');
   h.input().fire('keydown', { key: 'Enter' }); await tick(); await tick();
   assert.equal(h.control.calls.length, 2, 'nothing changed: Enter asks nothing'); assert.equal(h.control.usageAsks, 2); assert.equal(h.input(), undefined, 'and the editor closes');
-  refreshIcon(h).click(); await h.settled();
-  assert.equal(h.control.calls.length, 3, 'the recalibrate icon regrades'); assert.equal(h.view.history.past.length, 3, 'nothing changed: no setup step, no grading step');
+  recommendIcon(h).click(); await h.settled();
+  assert.equal(h.control.calls.length, 3, 'the recommend button asks again'); assert.equal(h.view.history.past.length, 3, 'nothing changed: no setup step, no grading step');
   // Clearing the context removes its key.
   open(h); contextInput(h).value = '   '; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
   assert.doesNotMatch(h.contents.get(MAP), /relevance-context/); assert.equal(h.chip().text, 'Goal');
@@ -598,11 +598,11 @@ integrationTest('relevance: Esc cancels from either field, an IME-confirming Ent
   assert.equal(await h.repo.readRelevanceGoal(MAP), undefined, 'nothing written for a blank goal');
 });
 
-integrationTest('relevance: while a run is going the three goal icons are disabled and the goal text opens no editor (it says why)', async () => {
+integrationTest('relevance: while a run is going the two goal icons are disabled and the goal text opens no editor (it says why)', async () => {
   const h = await harness();
   const gate = deferred(); h.control.reply = request => gate.promise.then(() => gradeAll(request));
   await h.enter('Goal'); await until(() => h.control.calls.length);
-  assert.ok(h.icons().length === 3 && h.icons().every(b => b.disabled)); const before = h.renders();
+  assert.ok(h.icons().length === 2 && h.icons().every(b => b.disabled)); const before = h.renders();
   h.chip().click(); assert.equal(h.input(), undefined, 'a running map opens no editor'); assert.deepEqual(h.notices, ['Grading is still running; try again when it finishes.']);
   assert.equal(h.renders(), before);
   gate.resolve(); await h.settled();
@@ -683,7 +683,7 @@ integrationTest('N2: a later run that moves only a child raises its parent and u
   await h.enter('Goal'); await h.settled();
   assert.deepEqual(await h.allRelevance(), { root: undefined, a: 'core', b: 'support', c: 'side', d: 'support' });
   h.control.reply = async request => ({ items: [{ id: labelOf(request, h.ids.d), tier: 'core', anchor: null }], suggestions: [] });
-  refreshIcon(h).click(); await h.settled();
+  recommendIcon(h).click(); await h.settled();
   assert.equal(h.control.calls.length, 2); assert.equal(h.control.calls[1].request.scope, 'current');
   assert.equal(await h.relevanceOf('d'), 'core'); assert.equal(await h.relevanceOf('b'), 'core', 'Mind was not in the reply and rises with Dreams');
   assert.equal(h.run().outcome.raised, 1); assert.equal(h.barText(), 'Updated 2 topics');
@@ -755,14 +755,14 @@ integrationTest('relevance sort: adding a child while sorted saves coordinates f
 // ---- Phase 6: one toolbar button + popover panel ------------------------------------------------------------------
 const fakeDoc = () => { const doc = { activeElement: null, listeners: {}, addEventListener(n, f) { (this.listeners[n] ??= []).push(f); }, removeEventListener(n, f) { this.listeners[n] = (this.listeners[n] ?? []).filter(x => x !== f); } }; return doc; };
 
-integrationTest('relevance goal bar: the text is one tab stop named by a hidden label (no aria-expanded, aria-haspopup, aria-controls or aria-label); three named icons; no separate goal line or sort chip', async () => {
+integrationTest('relevance goal bar: the text is one tab stop named by a hidden label (no aria-expanded, aria-haspopup, aria-controls or aria-label); two named icons; no separate goal line or sort chip', async () => {
   const h = await harness();
   const chip = h.chip();
   assert.equal(chip.text, 'What do you want to achieve with this map?');
   for (const attr of ['aria-expanded', 'aria-haspopup', 'aria-controls', 'aria-label']) assert.equal(chip.attrs[attr], undefined, `no ${attr} on the goal text`);
   assert.equal(nameOf(h, chip), 'What do you want to achieve with this map?');
   assert.equal(chip.attrs.tabindex, '0'); assert.equal(chip.attrs.role, 'button');
-  assert.deepEqual(h.icons().map(b => b.attrs['aria-label']), ['Suggest new topics for this goal', 'Grade with this', 'Sort by relevance'], 'three icons, each with an accessible name');
+  assert.deepEqual(h.icons().map(b => b.attrs['aria-label']), ['Recommend new cards for this goal and update the tiers', 'Sort by relevance'], 'two icons (recommend and sort), each with an accessible name');
   assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-relevance-goal-slot')).length, 0);
   chip.click();
   assert.ok(h.input(), 'a click turns the text into the field'); assert.equal(h.chip(), undefined);
@@ -770,24 +770,24 @@ integrationTest('relevance goal bar: the text is one tab stop named by a hidden 
   assert.equal(h.input(), undefined, 'Esc closes it'); assert.equal(h.chip().focused, true);
   h.view.relevanceGoal = 'Sleep better'; h.view.relevanceContext = 'Night shifts'; h.view.render();
   assert.equal(h.chip().text, 'Sleep better', 'the goal text is shown whole, not "Goal: ..." and not cut'); assert.equal(nameOf(h, h.chip()), 'Goal: Sleep better');
-  assert.equal(h.chip().attrs['aria-description'], 'Change the goal and grade again');
+  assert.equal(h.chip().attrs['aria-description'], 'Change the goal, recommend again and update the tiers');
   assert.equal(h.icon('Sort by relevance').attrs['aria-pressed'], 'false');
   const long = 'x'.repeat(200); h.view.relevanceGoal = long; h.view.render();
   assert.equal(h.chip().text, long, 'a 200-character goal is not truncated');
-  // The suggest icon (P5) is on once there is a goal (the list itself is tested in tests/steps-goal-topic-suggest-view.cjs) and off without one.
-  assert.equal(h.icon('Suggest new topics for this goal').disabled, false);
+  // The recommend icon is on once there is a goal (the list itself is tested in tests/steps-goal-topic-suggest-view.cjs) and off without one.
+  assert.equal(h.icon('Recommend new cards for this goal and update the tiers').disabled, false);
   h.view.relevanceGoal = null; h.view.render();
-  assert.equal(h.icon('Suggest new topics for this goal').disabled, true, 'no goal: nothing to suggest for');
+  assert.equal(h.icon('Recommend new cards for this goal and update the tiers').disabled, true, 'no goal: nothing to recommend for');
 });
 
-integrationTest('relevance goal bar: the recalibrate icon is named by its mode and runs the grade it names; Enter and Space on the goal text open the field and Esc closes it', async () => {
+integrationTest('relevance goal bar: the recommend button keeps one name before and after a grade and runs one request with the saved goal; Enter and Space on the goal text open the field and Esc closes it', async () => {
   const h = await harness();
   await h.enter('Goal'); await h.settled();
-  assert.equal(h.icon('Grade with this'), undefined, 'the map holds an AI grade now, so the icon says Recalibrate');
+  assert.equal(h.icons().length, 2, 'no mode-named icon: the recommend button is the only way to run, whatever the map holds');
   const calls = h.control.calls.length;
-  const grade = h.icon('Recalibrate');
+  const grade = h.icon('Recommend new cards for this goal and update the tiers');
   grade.click(); await h.settled();
-  assert.equal(h.control.calls.length, calls + 1, 'the icon runs one grade with the saved goal');
+  assert.equal(h.control.calls.length, calls + 1, 'the button runs one request with the saved goal'); assert.equal(h.control.calls.at(-1).request.scope, 'current', 'the map holds an AI grade now');
   h.chip().fire('keydown', { key: 'Enter', preventDefault() {}, stopPropagation() {} }); assert.ok(h.input(), 'Enter on the goal text opens the field'); assert.equal(h.input().focused, true);
   h.input().fire('keydown', { key: 'Escape' }); assert.equal(h.input(), undefined);
   h.chip().fire('keydown', { key: ' ', preventDefault() {}, stopPropagation() {} }); assert.ok(h.input(), 'Space opens it too');
@@ -938,8 +938,8 @@ integrationTest('relevance manual: an AI tag has no tooltip or description, a ha
   assert.equal(translate('zh-TW', 'ui.relevance_manual_reason'), '你手動設定');
   assert.equal(translate('zh-TW', 'ui.relevance_tag_label_0').replace('{0}', '必學'), '分級：必學，點擊更改');
   assert.equal(translate('zh-TW', 'ui.relevance_clear'), '交還 AI');
-  assert.equal(translate('zh-TW', 'ui.relevance_clear_hint'), '下次分級由 AI 判斷');
-  assert.equal(translate('en', 'ui.relevance_clear_hint'), 'The AI decides the next time you grade');
+  assert.equal(translate('zh-TW', 'ui.relevance_clear_hint'), '下次推薦時由 AI 判斷');
+  assert.equal(translate('en', 'ui.relevance_clear_hint'), 'The AI decides the next time it recommends');
 });
 
 integrationTest('relevance manual: the tag and its menu are disabled while this map is being graded', async () => {
@@ -1013,24 +1013,25 @@ const keyOfId = (h, id) => Object.entries(h.ids).find(([, value]) => value === i
 const pinsRow = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-pins-row'));
 // The old hand-back row of the edit panel is gone with the panel; the More menu carries the entry (tested below).
 
-integrationTest('relevance recalibrate: the recalibrate icon is named by the mode (saved setup + AI grades); the editor shows neither a pinned count nor a hand-back button (en)', async () => {
+integrationTest('relevance recalibrate: the recommend button is disabled without a goal and keeps its name; the editor shows neither a pinned count nor a hand-back button (en)', async () => {
   const h = await harness();
-  assert.equal(h.icon('Grade with this').disabled, true, 'no goal yet: the full-grade icon is disabled');
+  assert.equal(h.icon('Recommend new cards for this goal and update the tiers').disabled, true, 'no goal yet: the recommend button is disabled');
   await h.enter('Goal'); await h.settled();
-  assert.equal(h.icon('Recalibrate').disabled, false, 'the saved setup is unchanged and the map holds an AI grade');
-  assert.equal(h.icon('Grade with this'), undefined);
+  assert.equal(h.icon('Recommend new cards for this goal and update the tiers').disabled, false, 'the saved setup is unchanged and the map holds an AI grade');
   open(h); assert.equal(pinsRow(h), undefined, 'no pins: no line and no hand-back button'); h.input().fire('keydown', { key: 'Escape' });
   await pinNote(h, 'a', 'side');
   h.view.render();
-  assert.equal(h.icon('Recalibrate').disabled, false);
+  assert.equal(h.icon('Recommend new cards for this goal and update the tiers').disabled, false);
   open(h);
   assert.equal(pinsRow(h), undefined, 'pins: the old "Keeping the N you set" row is gone with the panel');
   assert.deepEqual(findAll(h.goalBar(), i => i.tag === 'button').map(b => b.text), ['+ Context'], 'the editor has no hand-back button; the More menu has the entry');
-  // Only pinned cards graded by hand: nothing for the AI to recalibrate from, so the icon grades in full.
+  // Only pinned cards graded by hand: no AI tier to start from, so the button asks scope all.
   const empty = await harness();
   await pinNote(empty, 'a', 'core'); await pinNote(empty, 'b', 'core'); await pinNote(empty, 'c', 'core'); await pinNote(empty, 'd', 'core');
   await empty.repo.writeRelevanceGoal(MAP, 'Goal'); await empty.view.hydrate(); empty.view.render();
-  assert.ok(empty.icon('Grade with this')); assert.equal(empty.icon('Grade with this').disabled, false);
+  assert.equal(empty.icon('Recommend new cards for this goal and update the tiers').disabled, false);
+  recommendIcon(empty).click(); await empty.settled();
+  assert.equal(empty.control.calls.length, 1); assert.equal(empty.control.calls[0].request.scope, 'all'); assert.equal('current' in empty.control.calls[0].request, false);
 });
 
 integrationTest('relevance recalibrate (scope current): the AI gets the pins and the current tiers, answers only with the moves, and only those are written (one history entry, pins untouched)', async () => {
@@ -1040,7 +1041,7 @@ integrationTest('relevance recalibrate (scope current): the AI gets the pins and
   const rawBefore = Object.fromEntries(['a', 'b', 'c', 'd'].map(k => [k, rawNote(h, k)]));
   const past = h.view.history.past.length;
   h.control.reply = async request => ({ items: [{ id: labelOf(request, h.ids.d), tier: 'side', anchor: labelOf(request, h.ids.b) }], suggestions: [] });
-  await refreshIcon(h).click(); await h.settled();
+  await recommendIcon(h).click(); await h.settled();
   const call = h.control.calls.at(-1);
   assert.equal(call.step, 'goal-recommend'); assert.equal(h.control.calls.length, 2); assert.equal(call.request.scope, 'current');
   assert.deepEqual(JSON.parse(JSON.stringify(call.request.pins)), [{ id: h.ids.b, tier: 'side' }]);
@@ -1076,12 +1077,12 @@ integrationTest('relevance recalibrate: nothing to adjust says so; an entry for 
   await pinNote(h, 'a', 'side');
   const rawBefore = Object.fromEntries(['a', 'b', 'c', 'd'].map(k => [k, rawNote(h, k)]));
   h.control.reply = async request => ({ items: [{ id: labelOf(request, h.ids.a), tier: 'core', anchor: null }], suggestions: [] });
-  await refreshIcon(h).click(); await h.settled();
+  await recommendIcon(h).click(); await h.settled();
   assert.equal(h.barText(), 'Updated 0 topics'); assert.deepEqual(h.barButtons(), ['Dismiss']); assert.equal(h.run().outcome.pinnedIgnored, 1);
   for (const key of ['a', 'b', 'c', 'd']) assert.equal(rawNote(h, key), rawBefore[key], `${key} byte-identical`);
   const past = h.view.history.past.length;
   h.control.reply = async () => ({ items: [] });
-  await refreshIcon(h).click(); await h.settled();
+  await recommendIcon(h).click(); await h.settled();
   assert.equal(h.run().status, 'failed'); assert.match(h.barText(), /^Recommending failed\. No topic was changed\./, 'items without suggestions is not a reply');
   for (const key of ['a', 'b', 'c', 'd']) assert.equal(rawNote(h, key), rawBefore[key]);
   assert.equal(h.view.history.past.length, past, 'a failed run adds no history');
@@ -1092,14 +1093,14 @@ integrationTest('relevance recalibrate: a card that has no tier yet must be grad
   await h.enter('Goal'); await h.settled();
   await h.repo.writeRelevance(pathOfKey(h, 'c'), null); await h.view.hydrate();   // REM handed back
   h.control.reply = async request => ({ items: [{ id: labelOf(request, h.ids.c), tier: 'support', anchor: null }], suggestions: [] });
-  await refreshIcon(h).click(); await h.settled();
+  await recommendIcon(h).click(); await h.settled();
   assert.equal(await h.relevanceOf('c'), 'support');
   assert.equal(h.barText(), 'Updated 1 topics');
   const missing = await harness();
   await missing.enter('Goal'); await missing.settled();
   await missing.repo.writeRelevance(pathOfKey(missing, 'c'), null); await missing.view.hydrate();
   missing.control.reply = async () => ({ items: [], suggestions: [] });
-  await refreshIcon(missing).click(); await missing.settled();
+  await recommendIcon(missing).click(); await missing.settled();
   assert.equal(missing.run().status, 'failed'); assert.equal(await missing.relevanceOf('c'), undefined);
 });
 
@@ -1152,7 +1153,7 @@ integrationTest('relevance pins: a conflict between two pins is told even when t
   await h.enter('Goal'); await h.settled();
   await pinNote(h, 'a', 'side'); await pinNote(h, 'c', 'core');
   h.control.reply = async () => ({ items: [], suggestions: [] });
-  await refreshIcon(h).click(); await h.settled();
+  await recommendIcon(h).click(); await h.settled();
   assert.equal(h.barText(), 'Updated 0 topics');
   assert.deepEqual(h.barButtons(), ['View changes', 'Dismiss'], 'the window is offered for the notice; there is nothing to undo');
   button(h.bar(), 'View changes').click();
@@ -1280,7 +1281,7 @@ integrationTest('relevance: one run repaints the map at most twice when the usag
   assert.equal(withMap.length, h.view.map.nodes.length, 'one read per card carries the map'); assert.ok(withMap.every(map => map === h.view.map));
   // A recalibrate that changes nothing repaints twice too: the start and the end.
   const second = h.renders();
-  await refreshIcon(h).click(); await h.settled();
+  await recommendIcon(h).click(); await h.settled();
   assert.ok(h.renders() - second <= 2, `a recalibrate with nothing to change repaints ${h.renders() - second} times`);
   // The notice still shows its own state when it really opens.
   const waiting = await harness();
@@ -1400,7 +1401,7 @@ integrationTest('relevance: a recalibration counts changes received, without a t
   const h = await progressHarness();
   await h.enter('Goal'); await h.settled();
   const gate = deferred(); h.control.reply = request => gate.promise.then(() => recalibrateNew(request));
-  refreshIcon(h).click(); await until(() => h.control.calls.length === 2);
+  recommendIcon(h).click(); await until(() => h.control.calls.length === 2);
   assert.equal(h.run().request ?? h.control.calls[1].request.scope, 'current');
   h.control.calls[1].onJson('');
   h.advance(300); h.control.calls[1].onJson('{"items":[{"id":"c2","tier":"core","anchor":null},{"id":"c3","tier":"side","anchor":null}');
@@ -1420,7 +1421,7 @@ integrationTest('N9: the button asks scope current with the current tiers; an em
   await h.enter('Goal'); await h.settled();
   const past = h.view.history.past.length, before = JSON.stringify(await h.allRelevance());
   h.control.reply = async () => ({ items: [], suggestions: [] });
-  refreshIcon(h).click(); await h.settled();
+  recommendIcon(h).click(); await h.settled();
   assert.equal(h.control.calls.length, 2); assert.equal(h.control.calls[1].request.scope, 'current');
   assert.equal(h.control.calls[1].request.current.length, 4, 'the current tiers are in the request');
   assert.equal(JSON.stringify(await h.allRelevance()), before, 'nothing written'); assert.equal(h.view.history.past.length, past, 'no history entry');
@@ -1526,8 +1527,8 @@ test('the unset goal bar shows the placeholder as its name, with a hint that say
   assert.equal(f.label(f.chip()), 'What do you want to achieve with this map?', 'the accessible name is the placeholder, from a hidden label');
   for (const [language, hint] of [['en', /Must learn.*Learn when needed.*Skippable/], ['zh-TW', /必學.*需要時學.*可跳過/]])
     assert.match(f.translate(language, 'ui.relevance_goal_set_hint'), hint);
-  assert.equal(f.translate('zh-TW', 'ui.goal_suggest_topics'), '依目標建議新議題');
-  assert.doesNotMatch(f.translate('zh-TW', 'ui.goal_suggest_topics'), /地圖/);
+  assert.equal(f.translate('zh-TW', 'ui.goal_recommend'), '依目標推薦新卡並更新等級');
+  assert.doesNotMatch(f.translate('zh-TW', 'ui.goal_recommend'), /地圖/);
 });
 
 test('counter-example 7: a repaint rebuilds the open editor from its state; draft, caret and the keyboard survive three repaints, nothing is asked and nothing is pre-started again', () => {

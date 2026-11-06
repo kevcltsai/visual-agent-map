@@ -4769,7 +4769,7 @@ integrationTest('MS-03: result rows end with the model label(s) of the task; sev
   assert.equal(label('expand', { ids: [h.ids.a, h.ids.b] }), 'Expand subtopics for 2 topics (label(gpt-x), label(claude:sonnet))');
   assert.equal(label('expand', { ids: [h.ids.root, h.ids.b] }), 'Expand subtopics for 2 topics (label(claude:sonnet))', 'the same model is named once');
   assert.match(label('research_standard', { ids: [h.ids.a] }), / \(label\(gpt-x\)\)$/);
-  assert.equal(label('rate_by_goal', { fields: { goal: 'Sleep' } }), 'Prioritize topics by the goal “Sleep” (label(claude:sonnet))', 'grading uses the current model');
+  assert.equal(label('rate_by_goal', { fields: { goal: 'Sleep' } }), 'Recommend new cards and update the tiers by the goal “Sleep” (label(claude:sonnet))', 'recommending uses the current model');
   assert.match(label('find_images', { ids: [h.ids.a], fields: { direction: 'x' } }), /^Start looking for pictures for “Body” \(label\(gpt-x\)\)$/);
   assert.match(label('synthesize', { ids: [h.ids.a, h.ids.b] }), / \(label\(claude:sonnet\)\)$/, 'several cards, only one override: the current model');
   assert.match(label('synthesize', { ids: [h.ids.a] }), / \(label\(gpt-x\)\)$/, 'a single card: its own model');

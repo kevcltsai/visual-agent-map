@@ -178,17 +178,17 @@ test('output languages: ja AIM shell prompts equal the en prompts except the lan
   }
 });
 
-test('output languages: ja outline and structure-review prompts equal the en prompts except the language name', () => {
+test('output languages: ja outline, structure-review and goal-recommend prompts equal the en prompts except the language name', () => {
   const { buildOutlineGeneratePrompt } = support.load('core/outline-generation-service.ts', { obsidian: support.obsidian });
   const { buildStructureReviewPrompt } = support.load('core/structure-review-service.ts', { obsidian: support.obsidian });
-  const { buildRelevanceGradePrompt } = support.load('core/relevance-grade-service.ts', { obsidian: support.obsidian });
+  const { buildGoalRecommendPrompt } = support.load('core/goal-recommend-service.ts', { obsidian: support.obsidian });
   const nodes = [{ id: 'n1', title: 'Root topic', summary: 'Root summary', status: 'completed', parentId: null, depth: 0 }, { id: 'n2', title: 'Child topic', summary: 'Child summary', status: 'idea', parentId: 'n1', depth: 1 }];
   const calls = {
     outline: contentLanguage => buildOutlineGeneratePrompt({ language: 'en', contentLanguage, topic: 'Topic under study', presetText: 'Build a knowledge tree for {Enter research topic} in three levels.', model: 'm', reasoning: 'low' }),
-    structure: contentLanguage => buildStructureReviewPrompt({ language: 'en', contentLanguage, rootQuestion: 'Root question text', nodes, model: 'm', reasoning: 'low' })
+    structure: contentLanguage => buildStructureReviewPrompt({ language: 'en', contentLanguage, rootQuestion: 'Root question text', nodes, model: 'm', reasoning: 'low' }),
+    // The recommend step writes new card titles and summaries, so it names the output language (the tiers carry no prose).
+    recommend: contentLanguage => buildGoalRecommendPrompt({ language: 'en', contentLanguage, goal: 'Learner goal text', nodes, model: 'm', reasoning: 'low', scope: 'all' })
   };
-  // The relevance grade has no output language since D-2026-10-99..103 (it writes no prose): its prompt is the same for every language.
-  assert.equal(buildRelevanceGradePrompt({ language: 'en', goal: 'Learner goal text', nodes, model: 'm', reasoning: 'low' }), buildRelevanceGradePrompt({ language: 'zh-TW', goal: 'Learner goal text', nodes, model: 'm', reasoning: 'low' }));
   for (const [name, build] of Object.entries(calls)) {
     const en = build('en'), ja = build('ja');
     assert.ok(ja.includes('Japanese'), `${name} names Japanese`);

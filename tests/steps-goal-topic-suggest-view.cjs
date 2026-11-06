@@ -446,11 +446,11 @@ test('goal recommend: zh-TW and zh-CN strings use the product wording (the view 
   assert.equal(translate('zh-TW', 'ui.goal_suggest_add_0', 2), '加入 2 個');
   assert.equal(translate('zh-TW', 'ui.goal_suggest_skip'), '略過');
   assert.equal(translate('zh-CN', 'ui.goal_suggest_add_0', 2), '加入 2 个');
-  for (const locale of ['zh-TW', 'zh-CN']) for (const key of ['ui.goal_recommend', 'ui.goal_suggest_list_label', 'ui.goal_suggest_unusable_0', 'ui.goal_suggest_skipped_0', 'ui.goal_suggest_added_0', 'ui.goal_suggest_history_label', 'ui.relevance_history_label', 'ui.relevance_goal_set_hint', 'ui.relevance_goal_edit_hint', 'ui.relevance_clear_hint']) {
+  for (const locale of ['zh-TW', 'zh-CN']) for (const key of ['ui.goal_recommend', 'ui.goal_suggest_list_label', 'ui.goal_suggest_skipped_0', 'ui.goal_suggest_added_0', 'ui.goal_suggest_history_label', 'ui.relevance_history_label', 'ui.relevance_goal_set_hint', 'ui.relevance_goal_edit_hint', 'ui.relevance_clear_hint']) {
     const text = translate(locale, key, 1);
     assert.doesNotMatch(text, /地圖|地图|建議|建议|分級|分级/, `${locale} ${key}: recommend wording, no old words`);
   }
-  for (const locale of ['zh-TW', 'zh-CN']) for (const key of ['ui.goal_suggest_list_label', 'ui.goal_suggest_unusable_0', 'ui.goal_suggest_skipped_0', 'ui.goal_suggest_history_label']) assert.match(translate(locale, key, 1), /推薦|推荐/, `${locale} ${key}`);
+  for (const locale of ['zh-TW', 'zh-CN']) for (const key of ['ui.goal_suggest_list_label', 'ui.goal_suggest_skipped_0', 'ui.goal_suggest_history_label']) assert.match(translate(locale, key, 1), /推薦|推荐/, `${locale} ${key}`);
   assert.equal(translate('en', 'ui.goal_recommend'), 'Recommend new cards for this goal and update the tiers');
 });
 

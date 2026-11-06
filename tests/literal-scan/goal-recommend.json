@@ -1,0 +1,7 @@
+{
+  "dirs": [
+    "core/steps/goal-recommend",
+    "core/goal-recommend-service.ts"
+  ],
+  "allow": []
+}

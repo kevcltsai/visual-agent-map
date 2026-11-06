@@ -77,9 +77,9 @@ test('structure review and relevance grading read the one resolution (no direct 
   assert.match(structure, /const \{ model, reasoning \} = this\.plugin\.currentModelChoice\(\)/);
   assert.doesNotMatch(structure, /settings\.cliModel|settings\.cliReasoning/);
   const grade = body('  private async submitRelevanceGoal(', '  private async applyRelevanceGrade(');
-  assert.match(grade, /this\.plugin\.currentModelChoice\(\)/);
+  assert.match(grade, /const \{ model, reasoning \} = this\.plugin\.currentModelChoice\(\)/);
   assert.doesNotMatch(grade, /settings\.cliModel|settings\.cliReasoning/);
-  assert.match(grade, /reasoning: gradeReasoning/);
+  assert.match(grade, /\n\s+model,\n\s+reasoning,\n/, 'the request carries the resolved model and reasoning');
 });
 
 test('share translation defaults to the one resolution (#27)', () => {

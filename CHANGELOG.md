@@ -9,9 +9,16 @@
 
 The goal now sits in the row above the map, in small text with no frame, and the map no longer sits under it.
 
-- Click the goal to type in it. Enter, or a click elsewhere, saves; Esc cancels. Hover it for the three icons: suggest new topics, recalibrate, and sort.
-- Saving grades again only when the text changed. Press Recalibrate to grade again with the same goal.
+- Click the goal to type in it. Enter, or a click elsewhere, saves; Esc cancels. Hover it for the two icons: recommend, and sort.
+- Saving the goal recommends again only when the text changed. Press the recommend icon to recommend again with the same goal.
 - "Hand all back to AI" moved to the map's "..." menu.
+
+### Recommend new cards by your goal
+
+One press recommends new cards for your goal and updates every card's tier in the same go.
+
+- You pick which recommended cards to add; each shows why it is needed and its tier, and nothing is written until you add it.
+- A parent card is never ranked lower than a card under it: it is raised to match, and one undo takes both back.
 
 ### Mark points on a picture
 

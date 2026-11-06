@@ -244,7 +244,7 @@ const ACTIVE_TASKS_SET = /\bactiveTasks\s*\.\s*set\(/g;
 const PROVIDER_FOR_MODEL_ALLOWED = [
   { file: 'ai/providers/provider.ts', count: 2, reason: 'definition and providerModelId' },
   { file: 'core/ai-runtime-service.ts', count: 2, reason: 'import and aiRuntimeForModel' },
-  { file: 'core/steps/relevance-grade/step.ts', count: 3, reason: 'import and two prompt branches (kept, changing them changes the prompt input)' },
+  { file: 'core/steps/goal-recommend/step.ts', count: 2, reason: 'import and the one prompt branch (tools and output wording follow the provider; changing it changes the prompt input)' },
   { file: 'experiences/coffee-tables/view.ts', count: 2, reason: 'UI leftover, waits for C1' }
 ];
 const CLAUDE_PREFIX_ALLOWED = [{ file: 'ai/providers/provider.ts', count: 1, reason: 'the one place that knows the claude: model prefix' }];

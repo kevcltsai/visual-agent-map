@@ -2,10 +2,18 @@
 // fake replies through the real service and parser. Every service case counts the provider calls.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { nodeFsAdapter } = require('./support-fs-adapter.cjs');
 const { load } = require('./support-replay.cjs');
+const { loadWithAiCalls, aiCallsFor } = require('./support-ai-calls.cjs');
 const rec = load('core/goal-recommend-service.ts');
 const pins = load('experiences/visual-map/relevance-pins.ts');
 const { translate } = load('i18n.ts');
+const { estimateTokens } = load('ai/context-builder.ts');
+const { AiExchangeLog } = load('ai-exchange-log.ts');
+const recWithCalls = loadWithAiCalls('core/goal-recommend-service.ts');
 
 const plain = value => JSON.parse(JSON.stringify(value));
 const node = (id, parentId, depth, summary = `${id} summary`) => ({ id, title: id.toUpperCase(), summary, status: 'idea', parentId, depth });
@@ -46,7 +54,8 @@ test('N1: when every suggestion is side the list is empty, the tiers still come 
 
 test('suggestions: a missing field, an unknown tier word or an extra key refuses the WHOLE reply', () => {
   const noTier = { parentId: 'c2', title: 'T', summary: 'S' };
-  for (const bad of [noTier, sug('a', 'T', { suggestedTier: 'maybe' }), sug('a', 'T', { extra: 1 }), sug('a', 'T', { suggestedTier: null }), 'text'])
+  for (const bad of [noTier, sug('a', 'T', { suggestedTier: 'maybe' }), sug('a', 'T', { extra: 1 }), sug('a', 'T', { reason: 'x' }), sug('a', 'T', { suggestedTier: null }), 'text', null,
+    sug('a', 'T', { parentId: 1 }), sug('a', 'T', { title: null }), sug('a', 'T', { summary: null }), sug('a', 'T', { summary: 5 }), { parentId: 'c2', title: 'A', suggestedTier: 'core' }])
     assert.equal(errorOf(() => parse(reply(fullItems(), [bad]))).code, 'invalid', JSON.stringify(bad));
 });
 
@@ -60,6 +69,15 @@ test('suggestions: unusable ones are dropped one by one (unknown parent, UUID, e
   assert.deepEqual(plain(result.dropped.map(d => d.code)), ['unknown_parent', 'unknown_parent', 'empty_title', 'duplicate_title', 'empty_summary', 'duplicate_title', 'title_too_long']);
   assert.equal(result.suggestions[0].parentId, 'a', 'the short id is turned back into the real id');
   assert.deepEqual(plain(parse(reply(fullItems(), [sug('a', 'Two\nlines')])).dropped), [{ index: 0, code: 'title_too_long' }]);
+});
+
+test('suggestions: titles and summaries are trimmed and the summary is one plain line', () => {
+  const result = parse(reply(fullItems(), [sug('a', '  Burial sites ', { summary: 'Line one.\nLine   two [[x]] ```' })]));
+  assert.deepEqual(plain(result.suggestions.map(s => [s.title, s.summary])), [['Burial sites', 'Line one. Line two [x]']]);
+});
+
+test('parser: a top-level key beyond items and suggestions refuses the whole reply', () => {
+  assert.equal(errorOf(() => parse(JSON.stringify({ items: fullItems(), suggestions: [], extra: 1 }))).code, 'invalid');
 });
 
 test('suggestions: a top-level card may be the parent', () => {
@@ -276,6 +294,12 @@ test('N19: every language x provider x scope prompt uses the new definitions and
   }
 });
 
+test('prompt: the suggestion rules keep the no-new-facts rule and the reply shape names both lists', () => {
+  const prompt = rec.buildGoalRecommendPrompt(request());
+  assert.match(prompt, /must not state any new fact/);
+  assert.ok(prompt.includes('{"items": [{"id": "...", "tier": "core|support|side"}], "suggestions": [{"parentId": "...", "title": "...", "summary": "...", "suggestedTier": "core|support"}]}'));
+});
+
 test('N19/N10: scope all sends no earlier tier; scope current sends the current tier (null when none); pinned and locked are marked', () => {
   const cardsOf = prompt => JSON.parse(prompt.slice(prompt.lastIndexOf('\n') + 1));
   const all = cardsOf(rec.buildGoalRecommendPrompt(request({ current, pins: [{ id: 'a', tier: 'core' }], lockedIds: ['b'] })));
@@ -300,8 +324,8 @@ test('prompt: goal and context are JSON strings, an injection stays inside them,
 
 test('schema: strict-mode complete, and a suggestion has suggestedTier (never a key named tier)', () => {
   const { items, suggestions } = rec.GOAL_RECOMMEND_SCHEMA.properties;
-  assert.deepEqual(plain(items.items.required.sort()), ['anchor', 'id', 'tier']);
-  assert.deepEqual(plain(suggestions.items.required.sort()), ['parentId', 'suggestedTier', 'summary', 'title']);
+  assert.deepEqual(plain([...items.items.required].sort()), ['anchor', 'id', 'tier']);
+  assert.deepEqual(plain([...suggestions.items.required].sort()), ['parentId', 'suggestedTier', 'summary', 'title']);
   assert.equal('tier' in suggestions.items.properties, false);
   assert.deepEqual(plain(rec.GOAL_RECOMMEND_SCHEMA.required), ['items', 'suggestions']);
 });
@@ -331,4 +355,165 @@ test('raiseParents: a frozen card keeps its tier, and the height keeps passing u
 
 test('raiseParents: a card without a tier is not given one, but the height passes through it', () => {
   assert.deepEqual(raise({ p: 'side', x: 'core' }), [['p', 'core']]);
+});
+
+// ---- Moved from relevance-grade (P4): locale, budget, real runner and log, stop cleanup, failure words, short ids --------------
+
+test('parser: the error is localized to the interface language', () => {
+  assert.throws(() => rec.parseGoalRecommend('nope', request({ language: 'zh-TW' })), error => error.message === translate('zh-TW', 'error.goal_recommend_invalid', 'JSON'));
+});
+
+function syntheticMap(count = 132) {
+  const nodes = [{ id: 'n0', title: 'Synthetic topic', summary: 'Synthetic root summary.', status: 'idea', parentId: null, depth: 0 }];
+  for (let i = 1; i < count; i++) {
+    const parent = i <= 8 ? nodes[0] : nodes[1 + ((i - 9) % 8)];
+    nodes.push({ id: `n${i}`, title: `Synthetic subtopic number ${i} about a concept`, summary: `Synthetic summary sentence for card ${i} that explains what the card covers in some detail for the learner.`, status: 'idea', parentId: parent.id, depth: parent.depth + 1 });
+  }
+  return nodes;
+}
+
+test('budget: a 132-card synthetic map fits well inside the 32,000-token budget (both scopes)', () => {
+  assert.equal(rec.GOAL_RECOMMEND_TOKEN_BUDGET, 32000);
+  const nodes = syntheticMap(132);
+  for (const extra of [{}, { scope: 'current', current: nodes.slice(1).map(n => ({ id: n.id, tier: 'support' })) }]) {
+    const tokens = estimateTokens(rec.buildGoalRecommendPrompt(request({ nodes, ...extra })) + JSON.stringify(rec.GOAL_RECOMMEND_SCHEMA));
+    assert.ok(tokens < 32000, `${extra.scope ?? 'all'}: ${tokens} tokens`);
+  }
+});
+
+function serviceFixture(answer) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-goal-recommend-'));
+  const log = new AiExchangeLog(nodeFsAdapter, path.join(dir, 'ai-exchanges.json'), error => { throw error; });
+  const calls = [];
+  const runtime = { runTask: async (...args) => { calls.push(args); args[4].onRequest?.({ via: 'runtime' }); return typeof answer === 'function' ? answer(args) : answer; } };
+  const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => true, exchanges: () => log, codexRuntime: () => runtime, claudeRuntime: () => runtime };
+  return { log, calls, active: new Map(), options };
+}
+const realService = fx => new recWithCalls.GoalRecommendService(recWithCalls.providerGoalRecommendRunner(aiCallsFor(recWithCalls, fx.options, fx.active)));
+
+test('service through the real runner: strict JSON with schema and step label; one request; a malformed reply fails typed and is logged as failed', async () => {
+  const fx = serviceFixture(reply(fullItems(), [sug('a', 'Knife skills')]));
+  const result = await realService(fx).recommend(request({ model: 'gpt-6-luna' }), new AbortController().signal);
+  assert.equal(result.items.length, 4); assert.equal(fx.active.size, 0); assert.equal(fx.calls.length, 1);
+  const [prompt, model, effort, schema, controls] = fx.calls[0];
+  assert.equal(prompt, rec.buildGoalRecommendPrompt(request({ model: 'gpt-6-luna' }))); assert.equal(model, 'gpt-6-luna'); assert.equal(effort, 'low');
+  assert.equal(JSON.stringify(schema), JSON.stringify(rec.GOAL_RECOMMEND_SCHEMA));
+  assert.equal(controls.textOnly, true); assert.equal(controls.searchBudget, 0);
+  assert.equal(fx.log.getEntries()[0].step, `goal-recommend@${rec.goalRecommendStep.version}`); assert.equal(fx.log.getEntries()[0].status, 'completed');
+  const bad = serviceFixture(reply([item('a'), item('b')]));
+  await assert.rejects(realService(bad).recommend(request({ model: 'gpt-6-luna' }), new AbortController().signal), error => error.code === 'invalid');
+  assert.equal(bad.calls.length, 1, 'no repair round'); assert.equal(bad.log.getEntries().length, 1); assert.equal(bad.log.getEntries()[0].status, 'failed'); assert.equal(bad.active.size, 0);
+});
+
+test('service through the real runner: Stop during the call reads as stopped with the localized message and the active task is cleaned up', async () => {
+  const during = new AbortController();
+  const mid = serviceFixture(() => { during.abort(); return reply(fullItems()); });
+  await assert.rejects(realService(mid).recommend(request({ model: 'gpt-6-luna' }), during.signal), error => error.code === 'stopped' && error.message === translate('en', 'error.goal_recommend_stopped'));
+  assert.equal(mid.active.size, 0); assert.equal(mid.calls.length, 1);
+});
+
+test('a failed recommend shows plain words, never raw JSON or schema text', () => {
+  const raw = new Error('{"error":{"message":"Invalid schema for response_format \'codex_output_schema\': In context=(\'properties\', \'items\', \'items\'), \'required\' is required to be supplied and to be an array including every key in properties. Missing \'anchor\'.","type":"invalid_request_error"}}');
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    const text = rec.goalRecommendFailureDetail(raw, language);
+    assert.ok(text.length > 0 && text.length < 160, text);
+    assert.doesNotMatch(text, /[{}]|schema|anchor|required|json|invalid_request/i);
+  }
+  assert.equal(rec.goalRecommendFailureDetail(new rec.GoalRecommendError('invalid', 'Recommending stopped.'), 'en'), 'Recommending stopped.');
+  assert.equal(rec.goalRecommendFailureDetail(new Error('Codex is not signed in.'), 'en'), 'Codex is not signed in.');
+});
+
+test('i18n: the context placeholder reads as specified and the old level labels stay removed', () => {
+  assert.equal(translate('zh-TW', 'ui.relevance_context_placeholder'), '補充（選填）：已經會什麼、條件或限制');
+  for (const key of ['goal_level_0_1', 'level_label', 'level_none', 'level_beginner', 'level_intermediate', 'level_familiar'])
+    for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.equal(translate(lang, `ui.relevance_${key}`), `ui.relevance_${key}`, `${lang} ${key} removed`);
+});
+
+test('i18n: the recommend strings exist in English, Traditional and Simplified Chinese with the same placeholders; zh avoids 節點 and 地圖', () => {
+  const keys = ['ui.goal_recommend', 'ui.relevance_running', 'ui.relevance_updated_0', ...['empty', 'over_budget', 'stopped', 'invalid', 'too_many', 'unavailable'].map(name => `error.goal_recommend_${name}`)];
+  const placeholders = text => [...text.matchAll(/\{\d+\}/g)].map(match => match[0]).sort().join();
+  for (const key of keys) {
+    const en = translate('en', key, '\u0001a', '\u0001b'), tw = translate('zh-TW', key, '\u0001a', '\u0001b'), cn = translate('zh-CN', key, '\u0001a', '\u0001b');
+    for (const [lang, text] of [['en', en], ['zh-TW', tw], ['zh-CN', cn]]) assert.notEqual(text, key, `${key} exists in ${lang}`);
+    assert.notEqual(tw, en, `${key} is translated`);
+    assert.equal(placeholders(translate('en', key)), placeholders(translate('zh-TW', key)), `${key} placeholders match (zh-TW)`);
+    assert.equal(placeholders(translate('en', key)), placeholders(translate('zh-CN', key)), `${key} placeholders match (zh-CN)`);
+    assert.doesNotMatch(tw + cn, /節點|地圖|节点|地图/, key);
+  }
+});
+
+// Short position ids: the model sees c1..cN, never a UUID; the result carries real ids.
+const uuid = n => `${String(n).padStart(8, '0')}-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const uuidTree = (count = 40) => {
+  const nodes = [{ id: uuid(0), title: 'Top', summary: '', status: 'idea', parentId: null, depth: 0 }];
+  for (let i = 1; i < count; i++) {
+    const parent = i <= 4 ? nodes[0] : nodes[1 + ((i - 5) % 4)];
+    nodes.push({ id: uuid(i), title: `Card ${i}`, summary: `Summary ${i}.`, status: 'idea', parentId: parent.id, depth: parent.depth + 1 });
+  }
+  return nodes;
+};
+const allCards = nodes => nodes.slice(1).map((n, i) => ({ id: `c${i + 2}`, tier: 'side', anchor: null }));
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+
+test('short ids: the prompt shows only position ids, the same tree renders the same twice', () => {
+  const nodes = uuidTree();
+  const prompt = rec.buildGoalRecommendPrompt(request({ nodes }));
+  assert.doesNotMatch(prompt, UUID, 'no UUID in the prompt');
+  const cards = JSON.parse(prompt.slice(prompt.lastIndexOf('\n') + 1));
+  assert.deepEqual(cards.map(card => card.id), nodes.map((_, i) => `c${i + 1}`));
+  assert.ok(cards.every(card => card.parentId === null || /^c\d+$/.test(card.parentId)));
+  assert.equal(cards[5].parentId, 'c2');
+  assert.equal(rec.buildGoalRecommendPrompt(request({ nodes })), prompt, 'deterministic');
+});
+
+test('short ids: the parser maps position ids back to real ids; unknown, odd-cased and UUID ids refuse the whole reply', () => {
+  const nodes = uuidTree();
+  const ok = allCards(nodes);
+  const result = rec.parseGoalRecommend(JSON.stringify({ items: ok, suggestions: [] }), request({ nodes }));
+  assert.deepEqual(plain(result.items.map(entry => entry.id)), nodes.slice(1).map(n => n.id));
+  const bad = items => assert.throws(() => rec.parseGoalRecommend(JSON.stringify({ items, suggestions: [] }), request({ nodes })), error => error.code === 'invalid');
+  bad([{ ...ok[0], id: nodes[1].id }, ...ok.slice(1)]);
+  bad([{ ...ok[0], id: 'C2' }, ...ok.slice(1)]); bad([{ ...ok[0], id: ' c2' }, ...ok.slice(1)]); bad([{ ...ok[0], id: 'c02' }, ...ok.slice(1)]);
+});
+
+test('short ids regression: c36 duplicated and c35 missing is rejected, and the technical detail names the real UUID (the cook2 failure shape)', () => {
+  const nodes = uuidTree(60);
+  const items = allCards(nodes).map(entry => (entry.id === 'c35' ? { ...entry, id: 'c36' } : entry));
+  assert.equal(items.filter(entry => entry.id === 'c36').length, 2);
+  const error = errorOf(() => rec.parseGoalRecommend(JSON.stringify({ items, suggestions: [] }), request({ nodes })));
+  assert.equal(error.code, 'invalid'); assert.match(error.detail, /duplicate/);
+  const missing = errorOf(() => rec.parseGoalRecommend(JSON.stringify({ items: allCards(nodes).filter(entry => entry.id !== 'c35'), suggestions: [] }), request({ nodes })));
+  assert.match(missing.detail, new RegExp(`missing 1: ${uuid(34)}`));
+});
+
+test('short ids: the shared helper is a one-to-one position map in the given order', () => {
+  const { positionIds } = load('core/short-ids.ts');
+  const ids = positionIds(['u-a', 'u-b', 'u-c']);
+  assert.deepEqual(['u-a', 'u-b', 'u-c'].map(ids.short), ['c1', 'c2', 'c3']);
+  assert.deepEqual(['c1', 'c2', 'c3', 'c4', 'u-a', undefined].map(label => ids.real(label)), ['u-a', 'u-b', 'u-c', undefined, undefined, undefined]);
+  assert.equal(ids.short('nope'), undefined);
+});
+
+// ---- Pin conflicts (moved from relevance-recalibrate; the bounds, exempt edges and merged violations are gone) -------
+
+// r(top) -> a -> a1 -> a11 ; r -> b -> b1 ; second top-level s -> s1
+const pinTree = [node('r', null, 0), node('a', 'r', 1), node('a1', 'a', 2), node('a11', 'a1', 3), node('b', 'r', 1), node('b1', 'b', 2), node('s', null, 0), node('s1', 's', 1)];
+const pin = (id, tier) => ({ id, tier });
+const conflictsOf = list => plain(pins.relevancePinConflicts(pinTree, list));
+
+test('pin conflicts: a pin ranked above a pinned ancestor is one conflict with the path between them', () => {
+  assert.deepEqual(conflictsOf([pin('a', 'side'), pin('a11', 'core')]), [{ ancestorId: 'a', ancestorTier: 'side', descendantId: 'a11', descendantTier: 'core', path: ['a', 'a1', 'a11'] }]);
+  assert.deepEqual(conflictsOf([pin('a1', 'side'), pin('a11', 'support')]).map(c => c.path), [['a1', 'a11']], 'adjacent pins');
+});
+
+test('pin conflicts: an agreeing chain is none; a conflict deeper down names only the nearest pinned ancestor', () => {
+  assert.deepEqual(conflictsOf([pin('a', 'core'), pin('a1', 'support'), pin('a11', 'side')]), []);
+  assert.deepEqual(conflictsOf([pin('a', 'core'), pin('a1', 'side'), pin('a11', 'support')]).map(c => [c.ancestorId, c.descendantId]), [['a1', 'a11']]);
+});
+
+test('pin conflicts: another branch, unknown ids and top-level cards take no part; no pins is none', () => {
+  assert.deepEqual(conflictsOf([pin('a', 'side'), pin('a11', 'core'), pin('b1', 'support'), pin('ghost', 'core')]).map(c => c.descendantId), ['a11']);
+  assert.deepEqual(conflictsOf([pin('a', 'core'), pin('r', 'side'), pin('s', 'side')]), [], 'a pin on a top-level card is ignored');
+  assert.deepEqual(conflictsOf([pin('s1', 'support')]), []);
+  assert.deepEqual(conflictsOf([]), []);
 });

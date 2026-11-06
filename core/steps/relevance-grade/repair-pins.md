@@ -1,1 +1,0 @@
-- A pinned card (it carries "pinned" in the original task, and appears in the ancestor chains with its pinned tier) cannot move and is not part of the reply: fix every pair by changing only cards that are not pinned, which may mean raising a parent and its ancestors or lowering a child, within each card's bounds. Reply only with the cards that are not pinned.

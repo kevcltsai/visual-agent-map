@@ -5178,12 +5178,12 @@ export class VisualAgentMapView extends ItemView {
       const merged = new Map<string, RelevanceTier>();
       for (const [id, note] of fresh) if (note.relevance) merged.set(id, note.relevance.tier);
       for (const item of items) if (writable.has(item.id)) merged.set(item.id, item.tier);
-      // Everything else is frozen: its tier stays, though the height of what it holds still passes up.
+      // Everything else is frozen: its tier stays, though the height of what it holds still passes up. `raised` therefore
+      // never names a frozen card, and a frozen card has no item here: this is the only gate on who is written.
       const frozen = new Set(tree.filter(node => !writable.has(node.id)).map(node => node.id));
       const raised = raiseParents(tree, merged, frozen);
       for (const base of basis) {
-        if (!writable.has(base.id)) continue;
-        const item = byId.get(base.id);
+        const item = writable.has(base.id) ? byId.get(base.id) : undefined;
         const lift = raised.get(base.id);
         const tier = lift ?? item?.tier;
         if (!tier) continue;

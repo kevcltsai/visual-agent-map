@@ -580,16 +580,18 @@ test('06 outline: an AI outline under a locked topic is refused and says how man
 });
 
 test('06 grade by goal: a locked card keeps its tier and is counted as skipped', async () => {
-  const h = await harness(['A', 'B']);
-  const [a, b] = h.nodes;
+  const h = await harness(['Root', 'A', 'B']);
+  const [root, a, b] = h.nodes;
   await h.repo.writeRelevance(a.path, { tier: 'side' });
   await h.view.setAiLock([a], true);
+  // The run rates the cards below the top level; the top-level card is only context.
+  for (const node of [a, b]) for (const list of [h.nodes, h.view.map.nodes]) list.find(n => n.id === node.id).parentId = root.id;
   const run = { token: 1, owner: h.view, controller: new AbortController(), goal: 'g', status: 'running' };
   h.host.relevanceGrades = new Map([[MAP, run]]);
   h.host.logs = { appendLog() {} };
-  const basis = h.nodes.map(n => ({ id: n.id, title: h.view.notes.get(n.id).title, parentId: null }));
+  const basis = h.nodes.map(n => ({ id: n.id, title: h.view.notes.get(n.id).title, parentId: n.parentId ?? null }));
   const before = h.raw(a);
-  await h.view.applyRelevanceGrade(run, MAP, basis, { items: [{ id: a.id, tier: 'core' }, { id: b.id, tier: 'core' }] }, { mode: 'full', pins: [], repairs: [] });
+  await h.view.applyRelevanceGrade(run, MAP, basis, { items: [{ id: a.id, tier: 'core' }, { id: b.id, tier: 'core' }], suggestions: [], dropped: [] }, { scope: 'all', pins: [] });
   assert.equal(h.raw(a), before, 'the locked tier is unchanged');
   assert.equal((await h.repo.readNote(b.path)).relevance.tier, 'core');
   assert.equal(run.outcome.skipped, 1);

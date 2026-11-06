@@ -556,37 +556,35 @@ const PIN_TREE = [
 const items = map => Object.entries(map).map(([id, tier]) => ({ id, tier, reason: 'x' }));
 const PIN_BASE = items({ a: 'core', a1: 'core', a2: 'side', b: 'support', b1: 'side', b2: 'support', s1: 'core', s11: 'support', s2: 'side' });
 
-test('product prompt source renders exactly what the product step renders (grade and repair), legacy stays reachable', () => {
+test('product prompt source renders exactly what the product step renders (scope all), has no repair round, legacy stays reachable', () => {
   const { load } = require('./support-replay.cjs');
-  const { relevanceGradeStep, relevanceGradeRepairStep } = load('core/steps/relevance-grade/step.ts');
+  const { goalRecommendStep } = load('core/steps/goal-recommend/step.ts');
   for (const language of ['zh-TW', 'en']) {
     const args = { goal: 'Cook a steak', level: 'beginner', context: '半天日照', tree: PIN_TREE, language };
-    const expected = relevanceGradeStep.render({ goal: args.goal, level: args.level, context: args.context, nodes: PIN_TREE, language, model: 'm', reasoning: 'low' });
-    assert.equal(tool.buildPrompt({ version: 'product', ...args }), expected);
-    const prompt = tool.buildPrompt({ version: 'product', ...args });
-    const previous = items({ a: 'support', a1: 'core', a2: 'side', b: 'support', b1: 'side', b2: 'support', s1: 'core', s11: 'support', s2: 'side' });
-    const violations = tool.hierarchyViolations(previous, PIN_TREE);
-    const repair = relevanceGradeRepairStep.render({
-      goal: args.goal, level: args.level, context: args.context, nodes: PIN_TREE, language, model: 'm', reasoning: 'low',
-      previousReply: { items: previous },
-      violations: violations.map(v => ({ childId: v.child, childTier: v.childTier, parentId: v.parent, parentTier: v.parentTier }))
-    });
-    assert.equal(tool.buildRepairPrompt({ prompt, value: { items: previous }, violations, tree: PIN_TREE, version: 'product', language }), repair);
+    const expected = goalRecommendStep.render({ goal: args.goal, context: args.context, nodes: PIN_TREE, language, model: 'm', reasoning: 'low', scope: 'all' });
+    assert.equal(tool.buildPrompt({ version: 'product', ...args }), expected, 'the level is not part of the product prompt');
+    assert.equal(tool.buildPrompt({ version: 'product', ...args, level: null, context: null }), goalRecommendStep.render({ goal: args.goal, nodes: PIN_TREE, language, model: 'm', reasoning: 'low', scope: 'all' }));
   }
+  assert.throws(() => tool.buildRepairPrompt({ prompt: 'p', value: { items: [] }, violations: [], tree: PIN_TREE, version: 'product' }), /no repair round/);
   assert.match(tool.buildPrompt({ version: 'v2', goal: 'g', level: null, context: null, tree: PIN_TREE }), /"goal"/);
   assert.match(tool.promptHash('product'), /^[0-9a-f]{12}$/);
   assert.notEqual(tool.promptHash('product'), tool.promptHash('v2'));
 });
 
-test('classify with the product prompt accepts a goal-less reply, records duration_ms, and sums it over a repair round', () => {
-  const ok = { items: PIN_BASE.map(i => ({ id: tool.positionLabels(PIN_TREE).toShort.get(i.id), tier: i.tier, reason: 'r' })) };
-  const bad = { items: ok.items.map(i => (i.id === 'c3' ? { ...i, tier: 'core' } : i.id === 'c2' ? { ...i, tier: 'side' } : i)) };
-  const replies = [JSON.stringify(bad), JSON.stringify(ok)];
+test('classify records duration_ms and sums it over a repair round (v2)', () => {
+  const fx = classifyWith([{ ...replyOf(BAD), durationMs: 100 }, { ...replyOf(FIXED), durationMs: 200 }]);
+  assert.equal(fx.run().durationMs, 300);
+});
+
+test('classify with the product prompt accepts a goal-less reply, records duration_ms, and never sends a repair round (a violation is only counted)', () => {
+  const ok = { items: PIN_BASE.map(i => ({ id: tool.positionLabels(PIN_TREE).toShort.get(i.id), tier: i.tier, reason: 'r' })), suggestions: [] };
+  const bad = { items: ok.items.map(i => (i.id === 'c3' ? { ...i, tier: 'core' } : i.id === 'c2' ? { ...i, tier: 'side' } : i)), suggestions: [] };
   const calls = [];
-  const out = tool.classify({ version: 'product', goal: 'g', level: null, context: null, tree: PIN_TREE, model: 'm', hierarchy: 'reject', call: p => { calls.push(p); return { text: replies[calls.length - 1], usage: null, cost: null, durationMs: 100 * calls.length }; } });
-  assert.equal(calls.length, 2);
-  assert.equal(out.durationMs, 300);
-  assert.equal(out.repair.ok, true);
+  const out = tool.classify({ version: 'product', goal: 'g', level: null, context: null, tree: PIN_TREE, model: 'm', hierarchy: 'reject', call: p => { calls.push(p); return { text: JSON.stringify(bad), usage: null, cost: null, durationMs: 100 }; } });
+  assert.equal(calls.length, 1, 'no repair request even under --hierarchy=reject');
+  assert.equal(out.durationMs, 100);
+  assert.equal(out.repair, null);
+  assert.equal(out.violations.length, 1);
 });
 
 test('selectPins: P/D/PD follow the design rules and P stays outside D\'s subtree', () => {

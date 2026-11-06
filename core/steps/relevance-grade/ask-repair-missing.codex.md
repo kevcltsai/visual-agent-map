@@ -1,1 +1,0 @@
-Reply with ONE complete JSON object for ALL cards that are not pinned: the cards of your previous reply (change them only if needed) plus every card listed above.

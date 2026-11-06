@@ -1,7 +1,0 @@
-{
-  "dirs": [
-    "core/steps/relevance-grade",
-    "core/relevance-grade-service.ts"
-  ],
-  "allow": []
-}

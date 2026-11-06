@@ -4,7 +4,7 @@ import { providerForModel } from "../../../ai/providers/provider";
 import type { ReasoningLevel } from "../../../ai/types";
 import type { RelevanceTier } from "../../../note-values";
 import {
-  relevancePinBounds,
+  relevancePinConflicts,
   type PinConflict,
   type RelevancePin
 } from "../../../experiences/visual-map/relevance-pins";
@@ -311,7 +311,7 @@ export function parseGoalRecommend(raw: string, request: GoalRecommendRequest): 
     taken.add(key);
     suggestions.push({ parentId, title, summary, suggestedTier: suggestedTier as "core" | "support" });
   });
-  const conflicts = relevancePinBounds(tree, pins).conflicts;
+  const conflicts = relevancePinConflicts(tree, pins);
   return {
     items,
     suggestions,

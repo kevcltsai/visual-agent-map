@@ -5,7 +5,8 @@
 //   node tests/tools/relevance-offline.cjs run --map=<map dir> --vault=<vault root> --out=<runs dir> --slug=<slug>
 //        [--runs=2] [--label-depth=2|all] [--model=sonnet] [--goal=<text>]
 //        [--prompt=product|legacy|v1|v2] [--lang=zh-TW|en] [--level=beginner|intermediate|familiar] [--context=<text>] [--hierarchy=count|reject]
-//        product (default) renders the product's core/steps/relevance-grade/*.md (no goal/title/depth in the reply);
+//        product (default) renders the product's core/steps/goal-recommend/*.md (scope all, no pins; no goal/title/depth in the reply,
+//        and no repair round: the product raises a parent by program, so a hierarchy violation is only counted);
 //        legacy (= v2) and v1 are the old tool copies, kept so Phase 4 runs stay reproducible.
 //        v2 sends level/context and rejects a reply that ranks a card above its parent (--hierarchy=reject,
 //        default); v1 is the old prompt (no level/context) and only counts such violations.
@@ -42,8 +43,10 @@ const TOOL_DIR = path.join(__dirname, 'relevance-offline');
 const LEVELS = ['beginner', 'intermediate', 'familiar'];
 const CONTEXT_LIMIT = 200;
 const PROMPT_FILES = { v1: 'prompt-v1.md', v2: 'prompt.md' };
-// The product's own prompt files; --prompt=product (the default) renders these like core/steps/relevance-grade/step.ts.
-const PRODUCT_DIR = path.join(__dirname, '..', '..', 'core', 'steps', 'relevance-grade');
+// The product's own prompt files; --prompt=product (the default) renders these like core/steps/goal-recommend/step.ts.
+const PRODUCT_DIR = path.join(__dirname, '..', '..', 'core', 'steps', 'goal-recommend');
+const PRODUCT_LIMIT = '8';
+const PRODUCT_LANGUAGE_NAMES = { 'zh-TW': 'Traditional Chinese (Taiwan)', en: 'English' };
 const PROMPT_SOURCES = { product: 'product', legacy: 'v2', v1: 'v1', v2: 'v2' };
 
 // ---- parsing -------------------------------------------------------------------------------------------------
@@ -456,9 +459,9 @@ function promptPath(version) {
   return path.join(TOOL_DIR, file);
 }
 
-// The prompt hash covers every file that shapes the text (product: prompt, repair and the Codex wording of the tools and output sentences).
+// The prompt hash covers every file that shapes the text (product: prompt, the scope-all rule and the Codex wording of the tools and output sentences).
 function promptFiles(version) {
-  if (version === 'product') return ['prompt.md', 'repair.md', 'tools.codex.md', 'output-grade.codex.md', 'output-repair.codex.md'].map(f => path.join(PRODUCT_DIR, f));
+  if (version === 'product') return ['prompt.md', 'scope-all.md', 'language.en.md', 'tools.codex.md', 'output.codex.md'].map(f => path.join(PRODUCT_DIR, f));
   return [promptPath(version), ...(version === 'v1' ? [] : [path.join(TOOL_DIR, 'repair.md')])];
 }
 
@@ -483,12 +486,10 @@ function renderTemplate(template, variables) {
   return text;
 }
 
-// The product prompt has no language line since D-2026-10-99..103; the tool renders the Codex wording of the two sentences
-// that differ per provider (the `language` argument of buildPrompt/buildRepairPrompt is accepted and ignored).
-const productText = output => ({
-  toolLine: fs.readFileSync(path.join(PRODUCT_DIR, 'tools.codex.md'), 'utf8').replace(/\n$/, ''),
-  outputLine: fs.readFileSync(path.join(PRODUCT_DIR, output), 'utf8').replace(/\n$/, '')
-});
+// The tool renders the Codex wording of the two sentences that differ per provider, and names the output language the way
+// the step does for a fixed content language (`Write in English.`).
+const productFile = name => fs.readFileSync(path.join(PRODUCT_DIR, name), 'utf8').replace(/\n$/, '');
+const productText = () => ({ toolLine: productFile('tools.codex.md'), outputLine: productFile('output.codex.md') });
 
 // Product cards: position ids, and only id/title/summary/parentId/depth (no status), as step.ts promptCards.
 function productNodesForPrompt(tree) {
@@ -517,10 +518,12 @@ function shortNodesForPrompt(tree) {
 function buildPrompt({ version, goal, level, context, tree, language = 'zh-TW' }) {
   if (version === 'product')
     return renderTemplate(fs.readFileSync(promptPath('product'), 'utf8'), {
-      ...productText('output-grade.codex.md'),
+      ...productText(),
+      scopeSection: productFile('scope-all.md'),
       pinsSection: '',
+      limit: PRODUCT_LIMIT,
+      languageInstruction: renderTemplate(productFile('language.en.md'), { language: PRODUCT_LANGUAGE_NAMES[language] ?? PRODUCT_LANGUAGE_NAMES['zh-TW'] }),
       goal: JSON.stringify(goal),
-      level: JSON.stringify(level ?? null),
       context: JSON.stringify(context ?? null),
       nodes: JSON.stringify(productNodesForPrompt(tree))
     });
@@ -544,28 +547,7 @@ const REPAIR_MAX_ROUNDS = 2;
 // Builds a repair prompt: the original prompt, the latest reply and every violating pair, each with the chain of
 // ancestors from the parent up to the top-level card and their tiers in that reply (null for the top-level card).
 function buildRepairPrompt({ prompt, value, violations, tree, version, language = 'zh-TW' }) {
-  if (version === 'product') {
-    const { toShort: short } = positionLabels(tree);
-    const lab = id => short.get(id) ?? id;
-    const parentMap = new Map(tree.map(n => [n.id, n.parentId]));
-    const tiers = new Map(value.items.map(i => [i.id, i.tier]));
-    const chainOf = parentId => {
-      const result = [];
-      const seen = new Set();
-      for (let id = parentId; id && !seen.has(id); id = parentMap.get(id)) {
-        seen.add(id);
-        result.push({ id: lab(id), tier: tiers.get(id) ?? null });
-      }
-      return result;
-    };
-    return renderTemplate(fs.readFileSync(path.join(PRODUCT_DIR, 'repair.md'), 'utf8'), {
-      originalPrompt: prompt,
-      previousReply: JSON.stringify({ items: value.items.map(i => ({ ...i, id: lab(i.id) })) }),
-      violations: JSON.stringify(violations.map(v => ({ childId: lab(v.child), childTier: v.childTier, parentId: lab(v.parent), parentTier: v.parentTier, ancestors: chainOf(v.parent) }))),
-      pinsNote: '',
-      ...productText('output-repair.codex.md')
-    });
-  }
+  if (version === 'product') throw new Error('the product prompt has no repair round');
   const template = fs.readFileSync(path.join(TOOL_DIR, 'repair.md'), 'utf8');
   const { toShort } = positionLabels(tree);
   const label = id => toShort.get(id) ?? id;
@@ -623,7 +605,8 @@ function classify({ version, goal, level, context, tree, model, hierarchy, langu
   const requireGoal = version !== 'product';
   const value = parseReply(reply.text, tree, { shortIds, requireGoal });
   const violations = hierarchyViolations(value.items, tree);
-  if (hierarchy !== 'reject' || !violations.length) return { value, usage: reply.usage, cost: reply.cost, durationMs: reply.durationMs ?? null, violations, repair: null };
+  // The product has no repair round (it raises a parent by program), so under the product prompt a violation is only counted.
+  if (version === 'product' || hierarchy !== 'reject' || !violations.length) return { value, usage: reply.usage, cost: reply.cost, durationMs: reply.durationMs ?? null, violations, repair: null };
   const repair = { attempted: true, rounds: 0, firstViolations: violations.length, ok: false, failureClass: null, violations: null };
   let current = value;
   let pending = violations;

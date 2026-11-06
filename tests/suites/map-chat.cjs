@@ -2836,10 +2836,11 @@ integrationTest('goal banner P3: both toolbar renderers drop "+ Topic" and its c
   assert.match(css, /^\.vam-tools-select-label \{ display: none;/m, 'the label is hidden while collapsed');
   assert.match(css, /\.vam-tools-mini:hover \.vam-tools-select-label, \.vam-tools-mini:focus-within \.vam-tools-select-label, \.vam-tools-mini\.is-open \.vam-tools-select-label \{ display: inline; \}/, 'hover, focus or selecting opens it');
   assert.match(css, /^\.vam-tools-mini \{[^}]*padding: 2px; opacity: \.75;/m);
-  assert.match(css, /^\.vam-tools-mini \{[^}]*z-index: 3;/m, 'the opened toolbar floats over the goal bar (z-index 2)');
+  assert.match(css, /^\.vam-tools-mini \{[^}]*z-index: 3;/m, 'the opened toolbar keeps its own z-index');
   const goal = css.split('\n').find(l => l.startsWith('.vam-goal-bar {'));
-  assert.match(goal, /z-index: 2;/); assert.match(goal, /width: min\(460px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\)\)\)/, 'at most 460px, and truly centred: no side reservation for the toolbar icon');
-  assert.doesNotMatch(goal, /108px/, 'the old side reservation is gone');
+  assert.doesNotMatch(goal, /z-index|position: absolute|--vam-goal-inset/, 'the goal bar is a row item now: no z-index of its own, not floating, no chat-window inset');
+  assert.match(goal, /max-width: 460px/, 'at most 460px, centred in its row by auto margins'); assert.doesNotMatch(goal, /108px/, 'the old side reservation is gone');
+  assert.match(css, /^\.vam-goal-host \{[^}]*z-index: 20;/m, 'the one z rule is on the host');
 });
 integrationTest('goal banner P3: the empty canvas button opens the add menu and the keyboard goes to it after "Create an empty mind map"', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate();
@@ -2910,7 +2911,7 @@ integrationTest('UX B9: an empty map leaves out "Select several topics", the goa
   assert.deepEqual(all, ['Select several topics', 'Data sources']); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
   const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.renderGoalBar\(overlay\);/, 'no goal bar on an empty or AIM map');
+  assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.mountGoalBar\(\);/, 'no goal bar on an empty or AIM map');
   assert.match(source, /this\.hintEl =\s*this\.map\.nodes\.length > 0 && !this\.selection\.state\.multiSelectMode/, 'no "drag to pan, click a node" hint on a map with no nodes');
 });
 

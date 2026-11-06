@@ -2,7 +2,16 @@
 
 ## [Unreleased]
 
+- A text block under a topic has its own "+": topics added there follow the block in every layout, with the line drawn from the block. Deleting the block hands those topics back to the topic above, and turning it into a topic card makes them its subtopics; older versions show them under the topic above.
 - The "+" and "Add subtopic" lists show each topic type's shape and colour next to its name, the same as the type picker.
+
+### Edit the goal in place
+
+The goal now sits in the row above the map, in small text with no frame, and the map no longer sits under it.
+
+- Click the goal to type in it. Enter, or a click elsewhere, saves; Esc cancels. Hover it for the three icons: suggest new topics, recalibrate, and sort.
+- Saving grades again only when the text changed. Press Recalibrate to grade again with the same goal.
+- "Hand all back to AI" moved to the map's "..." menu.
 
 ### Mark points on a picture
 

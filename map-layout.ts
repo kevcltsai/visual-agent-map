@@ -16,6 +16,14 @@ function widthExcess(node: MapNode): number {
 function textBlockWidth(node: MapNode): number {
   return node.path === "" ? (node.width ?? CARD_WIDTH) : CARD_WIDTH;
 }
+/** The width an already placed card or block takes up when another one is placed beside it: a text block wider than a card is as wide as it is drawn. */
+function obstacleWidth(node: MapNode): number {
+  return node.path === "" ? Math.max(WIDTH, node.width ?? 0) : WIDTH;
+}
+/** Growing left, a text block narrower than a card keeps its right edge where a card's would be, so the column of what follows it is measured from there; cards and wider blocks give 0. */
+function textParentNarrow(parent: MapNode): number {
+  return parent.path === "" ? Math.max(0, CARD_WIDTH - textBlockWidth(parent)) : 0;
+}
 /** The side a first-level topic stands on now: a text block by its own box, a card by its x against the root's. */
 function knownSide(topic: MapNode, root: MapNode): BalancedSide | undefined {
   return topic.path === "" ? sideFromTextBox(topic.x, textBlockWidth(topic), root.x) : sideFromOffset(topic.x - root.x);
@@ -376,9 +384,11 @@ function arrangeVerticalBranch(
 ): MapNode[] {
   const { direction, column: COLUMN, gap: LAYOUT_GAP } = resolveLayout(layout);
   const placed = positions(fresh, roots, 0, 0, false, heightOf, layout);
-  const rootCentres = roots.map(root => placed.get(root.id)!.x + WIDTH / 2);
-  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : WIDTH / 2;
-  let shiftX = parent.x + WIDTH / 2 - middle;
+  // Under a text block the cards are centred as drawn (CARD_WIDTH wide, like Auto layout); under a card the standard width stays.
+  const cardSpan = parent.path === "" ? CARD_WIDTH : WIDTH;
+  const rootCentres = roots.map(root => placed.get(root.id)!.x + cardSpan / 2);
+  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : cardSpan / 2;
+  let shiftX = parent.x + (parent.path === "" ? (parent.width ?? WIDTH) : WIDTH) / 2 - middle;
   // Row 0 of the branch is the roots; they start one row gap below the parent's bottom edge (above its top edge for up).
   const rowGap = COLUMN - WIDTH;
   const rootTop = Math.min(...roots.map(root => placed.get(root.id)!.y));
@@ -395,12 +405,12 @@ function arrangeVerticalBranch(
         const other = cardHeight(heightOf, node.id);
         const x = point.x + shiftX;
         if (
-          x < node.x + WIDTH + LAYOUT_GAP &&
+          x < node.x + obstacleWidth(node) + LAYOUT_GAP &&
           node.x < x + WIDTH + LAYOUT_GAP &&
           topY < node.y + other + LAYOUT_GAP &&
           node.y < topY + own + LAYOUT_GAP
         )
-          next = Math.max(next, node.x + WIDTH + LAYOUT_GAP - point.x);
+          next = Math.max(next, node.x + obstacleWidth(node) + LAYOUT_GAP - point.x);
       }
     }
     if (next === shiftX) break;
@@ -417,7 +427,7 @@ function branchSide(byId: Map<string, MapNode>, node: MapNode): BalancedSide | u
   let topic = node;
   while (topic.parentId && byId.get(topic.parentId)?.parentId) topic = byId.get(topic.parentId)!;
   const root = topic.parentId ? byId.get(topic.parentId) : undefined;
-  return root ? sideFromOffset(topic.x - root.x) : undefined;
+  return root ? knownSide(topic, root) : undefined;
 }
 
 /**
@@ -526,7 +536,7 @@ export function arrangeNewBranch(
   const startX =
     signOf(direction) > 0
       ? parent.x + COLUMN + widthExcess(parent)
-      : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess));
+      : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess)) - textParentNarrow(parent);
   const placed = positions(fresh, roots, startX, 0, false, heightOf, layout);
   const centers = roots.map(root => placed.get(root.id)!.y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
@@ -541,7 +551,12 @@ export function arrangeNewBranch(
       for (const node of fixed) {
         const other = cardHeight(heightOf, node.id);
         const top = point.y + offset;
-        if (Math.abs(point.x - node.x) < WIDTH && top < node.y + other + LAYOUT_GAP && node.y < top + own + LAYOUT_GAP)
+        if (
+          point.x - node.x < obstacleWidth(node) &&
+          node.x - point.x < WIDTH &&
+          top < node.y + other + LAYOUT_GAP &&
+          node.y < top + own + LAYOUT_GAP
+        )
           next = Math.max(next, node.y + other + LAYOUT_GAP - point.y);
       }
     }
@@ -633,14 +648,18 @@ export function arrangeNewTree(
  * children change places with each other in the array, which is the order every arrangement lays them out in; every other
  * card keeps its index. An unknown id, a card that is not a child of `parentId` or `movedId === beforeId` returns `nodes` itself.
  */
-export function reorderSiblings<T extends { id: string; parentId?: string | null }>(
+export function reorderSiblings<T extends { id: string; parentId?: string | null; afterTextId?: string }>(
   nodes: T[],
   parentId: string,
   movedId: string,
   beforeId: string
 ): T[] {
   if (movedId === beforeId) return nodes;
-  const slots = nodes.flatMap((node, index) => (node.parentId === parentId ? [index] : []));
+  // Topics that follow a text block are siblings of each other only, never of the block's own topic's direct children.
+  const group = nodes.find(node => node.id === movedId)?.afterTextId;
+  const slots = nodes.flatMap((node, index) =>
+    node.parentId === parentId && node.afterTextId === group ? [index] : []
+  );
   const kids = slots.map(index => nodes[index]);
   const moved = kids.find(node => node.id === movedId);
   if (!moved || !kids.some(node => node.id === beforeId)) return nodes;
@@ -659,13 +678,17 @@ export function reorderSiblings<T extends { id: string; parentId?: string | null
  * their index. An id that is not a child of `parentId`, a repeated id, fewer than two ids, or an order that already holds
  * returns `nodes` itself.
  */
-export function orderSiblings<T extends { id: string; parentId?: string | null }>(
+export function orderSiblings<T extends { id: string; parentId?: string | null; afterTextId?: string }>(
   nodes: T[],
   parentId: string,
   orderedIds: readonly string[]
 ): T[] {
   if (orderedIds.length < 2 || new Set(orderedIds).size !== orderedIds.length) return nodes;
-  const slots = nodes.flatMap((node, index) => (node.parentId === parentId ? [index] : []));
+  // The listed ids are ordered among the siblings that share the first one's text block (or none); a mixed list changes nothing.
+  const group = nodes.find(node => node.id === orderedIds[0])?.afterTextId;
+  const slots = nodes.flatMap((node, index) =>
+    node.parentId === parentId && node.afterTextId === group ? [index] : []
+  );
   const listed = new Set(orderedIds);
   const wanted = orderedIds.map(id => slots.map(index => nodes[index]).find(node => node.id === id));
   if (wanted.some(node => !node)) return nodes;
@@ -682,14 +705,17 @@ export function orderSiblings<T extends { id: string; parentId?: string | null }
  * lays them out in. Only those children change places with each other; every other card keeps its index. An unknown id, a card
  * without a parent or one that is already first (or last) returns `nodes` itself.
  */
-export function shiftSibling<T extends { id: string; parentId?: string | null }>(
+export function shiftSibling<T extends { id: string; parentId?: string | null; afterTextId?: string }>(
   nodes: T[],
   id: string,
   offset: -1 | 1
 ): T[] {
   const moved = nodes.find(node => node.id === id);
   if (!moved?.parentId) return nodes;
-  const slots = nodes.flatMap((node, index) => (node.parentId === moved.parentId ? [index] : []));
+  // Topics that follow a text block are siblings of each other, not of the block's own topic children.
+  const slots = nodes.flatMap((node, index) =>
+    node.parentId === moved.parentId && node.afterTextId === moved.afterTextId ? [index] : []
+  );
   const order = slots.map(index => nodes[index]);
   const from = order.indexOf(moved);
   const to = from + offset;
@@ -707,14 +733,15 @@ export function shiftSibling<T extends { id: string; parentId?: string | null }>
  * places with each other in the array; every other card keeps its index. An unknown id, a card that is not a first-level
  * topic of that root or a `dropX` that is not a finite number returns `nodes` itself.
  */
-export function reorderTopLevel<T extends { id: string; parentId?: string | null; x: number }>(
+export function reorderTopLevel<T extends { id: string; parentId?: string | null; x: number; afterTextId?: string }>(
   nodes: T[],
   rootId: string,
   movedId: string,
   dropX: number
 ): T[] {
   if (!Number.isFinite(dropX)) return nodes;
-  const slots = nodes.flatMap((node, index) => (node.parentId === rootId ? [index] : []));
+  // A topic that follows a text block is not a first-level topic of the root.
+  const slots = nodes.flatMap((node, index) => (node.parentId === rootId && !node.afterTextId ? [index] : []));
   const moved = slots.map(index => nodes[index]).find(node => node.id === movedId);
   if (!moved) return nodes;
   const others = slots.map(index => nodes[index]).filter(node => node !== moved);

@@ -3,6 +3,8 @@
  * untrusted input, so `sanitizeCanvasItems` rebuilds each known item from fixed fields and drops malformed ones one
  * by one. Unknown kinds are kept as they are (a newer plugin may have written them). Pure functions, no DOM.
  */
+import type { MapNode } from "../../map-graph";
+
 export interface ImageItem {
   id: string;
   kind: "image";
@@ -592,6 +594,41 @@ export function pruneAnnotatedImages(
   return dropped ? { items: out, dropped } : { items: [...items], dropped: 0 };
 }
 
+/**
+ * Drops a topic's `afterTextId` unless it names an attached text block (not free, its topic exists) that hangs on the same
+ * parent as the topic, so `parentId` stays the one real parent. Changes the nodes in place and returns how many fields it
+ * dropped. Never throws; nodes without the field are not touched, so such a map stays byte for byte.
+ */
+export function pruneAfterText(
+  map: { nodes?: MapNode[]; canvasItems?: readonly CanvasItem[] },
+  log?: (level: "warn", message: string) => void
+): number {
+  let dropped = 0;
+  try {
+    const nodes = Array.isArray(map.nodes) ? map.nodes : [];
+    if (!nodes.some(node => node && typeof node === "object" && "afterTextId" in node)) return 0;
+    const items = Array.isArray(map.canvasItems) ? map.canvasItems : [];
+    const parentOf = new Map(
+      treeTextNodes(
+        items,
+        nodes.flatMap(node => (node && typeof node.id === "string" ? [node.id] : []))
+      ).attached.map(text => [text.id, text.parentId])
+    );
+    for (const node of nodes) {
+      if (!node || typeof node !== "object" || !("afterTextId" in node)) continue;
+      const value: unknown = node.afterTextId;
+      if (typeof value === "string" && parentOf.has(value) && parentOf.get(value) === node.parentId) continue;
+      delete node.afterTextId;
+      dropped++;
+    }
+    if (dropped)
+      log?.("warn", `Dropped ${dropped} dangling after-text link${dropped === 1 ? "" : "s"} while reading the map.`);
+  } catch {
+    // Cleanup must never stop a map from opening.
+  }
+  return dropped;
+}
+
 /** Drops every anchor relation that touches one of `topicIds`. Returns the new list and how many were dropped (same array contents when 0). */
 export function removeAnchorRelationsForTopics(
   items: readonly CanvasItem[],
@@ -808,6 +845,8 @@ export function removeLinksTo(
 export interface SummaryNode {
   id: string;
   parentId: string | null;
+  /** A topic that follows a text block is not a sibling a bracket can frame (it hangs after the block, not in the row). */
+  afterTextId?: string;
 }
 export type SummaryRefusal =
   "invalid" | "duplicate" | "root" | "cross-parent" | "not-adjacent" | "too-many" | "unknown";
@@ -816,7 +855,7 @@ export type SummaryResult =
 
 const isSummary = (item: CanvasItem): item is SummaryItem => item.kind === "summary";
 const childIds = (nodes: readonly SummaryNode[], parentId: string): string[] =>
-  nodes.filter(n => n.parentId === parentId).map(n => n.id);
+  nodes.filter(n => n.parentId === parentId && !n.afterTextId).map(n => n.id);
 
 /**
  * Whether `members` can be framed together: valid ids, none a root, all children of one parent, and (among that parent's
@@ -837,6 +876,7 @@ export function checkSummaryMembers(
     const node = byId.get(id);
     if (!node) return { ok: false, reason: "unknown" };
     if (node.parentId === null || !byId.has(node.parentId)) return { ok: false, reason: "root" };
+    if (node.afterTextId) return { ok: false, reason: "invalid" };
     if (parentId === null) parentId = node.parentId;
     else if (parentId !== node.parentId) return { ok: false, reason: "cross-parent" };
   }

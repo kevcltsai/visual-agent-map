@@ -5,6 +5,7 @@ import type { AiResult } from "./ai/types";
 import { debugLog, type LogLevel } from "./log-manager";
 import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
 import {
+  pruneAfterText,
   pruneAnnotatedImages,
   removeAnchorRelationsForTopics,
   retargetAnchorRelations,
@@ -757,6 +758,7 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
       );
     }
   }
+  pruneAfterText(map, log ?? ((l, m) => debugLog.appendLog(l, m)));
   return map;
 }
 function validateAimMap(map: MapDocument): void {

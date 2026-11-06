@@ -49,7 +49,7 @@
 .vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
 .vam-canvas-overlay > * { pointer-events: auto; }
 .vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
-.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }
+.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; --vam-tools-max: 100%; max-width: min(calc(100% - 24px), var(--vam-tools-max)); }
 .vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }
 /* box-shadow: none above removes Obsidian's own focus ring, so these buttons draw one. */
 .vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
@@ -462,29 +462,66 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-node[data-relevance="side"] { border-style: dashed; }
 .vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
 .vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }
-/* The goal bar: a chat-input style bar at the top centre of the canvas. --vam-goal-inset is the width of a laid-over chat window, so the bar centres on the visible canvas. The goal wraps and is never cut off. */
-.vam-goal-bar { position: absolute; z-index: 2; top: 12px; left: calc(50% + var(--vam-goal-inset, 0px) / 2); transform: translateX(-50%); box-sizing: border-box; width: min(460px, calc(100% - 24px - var(--vam-goal-inset, 0px))); display: flex; align-items: center; gap: 12px; padding: 14px 18px; border: 1px solid var(--background-modifier-border); border-radius: 16px; background: var(--background-primary); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
+/* The goal bar: the goal as a title in the middle of the row above the map, with no frame. The row (`.vam-goal-host`) is Obsidian's header row, or .vam-toolbar when that row is hidden. The goal wraps and is never cut off; the row grows with it. */
+/* The one z rule for the goal's layers: the row rises above the canvas and its overlays (hover card 10, chat 12) so the list under the goal covers them while it is open. A container, so the narrow layout follows the row's own width. */
+.vam-goal-host { position: relative; z-index: 20; overflow: visible; container: vam-goal-host / inline-size; }
+.view-header.vam-goal-host { height: auto; min-height: var(--header-height); flex: none; align-items: center; }
+.view-header.vam-goal-host > .view-header-title-container { flex: 0 1 auto; max-width: 30%; }
+.vam-goal-bar { position: relative; flex: 1 1 auto; min-width: 0; max-width: 460px; margin-inline: auto; box-sizing: border-box; display: flex; align-items: center; gap: 7px; padding: 4px 8px; border: 1px solid transparent; border-radius: 8px; color: var(--text-normal); font-size: var(--font-ui-small); font-weight: 700; line-height: 1.35; }
+.vam-toolbar > .vam-goal-bar { flex-basis: 280px; }
 .vam-goal-bar:hover, .vam-goal-bar:focus-within { border-color: var(--interactive-accent); }
-/* A bar that carries an open panel (edit, suggestions) rises as a whole above the mini tool group (3); the panel's own z-index would only count inside the bar's stacking context. Stays below the selection bar (6), hover card (10) and overlay chat (12). */
-.vam-goal-bar.has-attachment { z-index: 4; }
 .vam-goal-target { display: inline-flex; flex: none; color: var(--interactive-accent); }
-.vam-goal-target svg { width: 26px; height: 26px; }
-.vam-goal-text { flex: 1 1 auto; min-width: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: .01em; line-height: 1.35; padding-block: 3px; color: var(--text-normal); overflow-wrap: anywhere; cursor: default; border-radius: var(--radius-s); }
-.vam-goal-bar.is-empty .vam-goal-text { color: var(--text-muted); font-weight: 600; cursor: text; }
+.vam-goal-target svg { width: 16px; height: 16px; }
+.vam-goal-text { flex: 1 1 auto; min-width: 0; padding-block: 1px; color: var(--text-normal); overflow-wrap: anywhere; cursor: default; border-radius: var(--radius-s); }
+.vam-goal-bar.is-empty .vam-goal-text { color: var(--text-muted); font-weight: 500; cursor: text; }
 .vam-goal-text:focus-visible, .vam-goal-icon:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
-/* The four icons show only while the pointer is over the bar or the keyboard is inside it. */
-.vam-goal-actions { display: none; flex: none; align-items: center; gap: 2px; margin-left: auto; }
-.vam-goal-bar:hover .vam-goal-actions, .vam-goal-bar:focus-within .vam-goal-actions { display: flex; }
-.vam-goal-icon { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 8px; background: transparent; box-shadow: none; color: var(--text-muted); cursor: pointer; }
-.vam-goal-icon svg { width: 17px; height: 17px; }
+/* The icons keep their place in the bar (so the goal wraps the same with or without them); they only show while the pointer is over the bar or the keyboard is inside it. opacity, not visibility: they stay in the tab order. */
+.vam-goal-actions { display: flex; flex: none; align-items: center; gap: 2px; margin-left: auto; padding-left: 8px; opacity: 0; pointer-events: none; }
+.vam-goal-bar:hover .vam-goal-actions, .vam-goal-bar:focus-within .vam-goal-actions { opacity: 1; pointer-events: auto; }
+.vam-goal-icon { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: 6px; background: transparent; box-shadow: none; color: var(--text-muted); cursor: pointer; }
+.vam-goal-icon svg { width: 15px; height: 15px; }
 .vam-goal-icon:hover:not(:disabled) { background: var(--background-modifier-hover); color: var(--text-normal); }
 .vam-goal-icon.on { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent); color: var(--text-accent); }
 .vam-goal-icon:disabled { opacity: .4; cursor: default; }
-/* The edit popover opens under the bar, on the same surface. */
-.vam-relevance-panel { position: absolute; top: calc(100% + 6px); left: 0; right: 0; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); box-shadow: 0 6px 18px rgb(0 0 0 / .16); max-height: var(--vam-goal-attach-max, none); overflow-y: auto; animation: vam-relevance-panel-in 150ms ease-out; }
-@keyframes vam-relevance-panel-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* While editing the icons' slot holds "+ Context" and keeps the width the three icons take, so the text wraps the same in all three states. */
+.vam-goal-bar.is-editing .vam-goal-actions { box-sizing: border-box; width: 84px; justify-content: flex-end; }
+/* A narrow row (the same 600px as the toolbar): the title goes and the panels under the goal are measured from the row, almost its full width. Only in Obsidian's header row do the icons float under the goal (so the row never grows when the pointer passes); in the toolbar (header row hidden) they keep the bar's own slot at every width, so nothing hangs below and nothing is hidden behind the info row's buttons. */
+@container vam-goal-host (max-width: 600px) {
+  .view-header.vam-goal-host > .view-header-title-container { display: none; }
+  .vam-goal-bar { position: static; }
+  .view-header.vam-goal-host .vam-goal-actions { position: absolute; top: calc(100% + 4px); right: 8px; padding: 2px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); }
+  /* Bridges the gap between the goal and the icons, so the pointer keeps the bar hovered on its way there. The bar owns it; the view measures it (bar bottom to icon top, as wide as the icons) and leaves it out where something clickable lies in the gap. */
+  .view-header.vam-goal-host .vam-goal-bar::after { content: ""; position: absolute; top: var(--vam-goal-bridge-top, 0); left: var(--vam-goal-bridge-left, 0); width: var(--vam-goal-bridge-width, 0); height: var(--vam-goal-bridge-height, 0); }
+  /* Here the icons float over what is under the row, so they show only while the pointer is on the goal or the keyboard is in it (:focus-visible), not for the focus a mouse click leaves behind (the wide rule above, :focus-within, is turned off). */
+  .view-header.vam-goal-host .vam-goal-bar:focus-within .vam-goal-actions { opacity: 0; pointer-events: none; }
+  /* The way off the goal to the icons is rarely straight down the bridge: they stay a moment after the pointer leaves, so a diagonal path still reaches them. */
+  .view-header.vam-goal-host .vam-goal-actions { transition: opacity 0s linear 300ms, pointer-events 0s linear 300ms; transition-behavior: allow-discrete; }
+  .view-header.vam-goal-host .vam-goal-bar:hover .vam-goal-actions, .view-header.vam-goal-host .vam-goal-bar:has(:focus-visible) .vam-goal-actions { opacity: 1; pointer-events: auto; }
+  .view-header.vam-goal-host .vam-goal-bar:hover .vam-goal-actions, .view-header.vam-goal-host .vam-goal-bar:has(:focus-visible) .vam-goal-actions { transition-delay: 0s; }
+  /* An open panel keeps the icons shown (the pointer may have left), so the panel under them never leaves a gap above it. */
+  .view-header.vam-goal-host .vam-goal-bar.has-attachment .vam-goal-actions { opacity: 1; pointer-events: auto; }
+  .vam-goal-bar .vam-goal-attachment { left: 8px; right: 8px; }
+  /* Editing: the floating slot is as wide as what is in it; with nothing in it (no text yet, or the context row is open) it is not there at all. */
+  .view-header.vam-goal-host .vam-goal-bar.is-editing .vam-goal-actions { width: auto; }
+  .view-header.vam-goal-host .vam-goal-actions.is-vacant { display: none; }
+}
+/* Every panel under the goal starts here: 6px under whatever box it is positioned in, plus the part of the floating icons that hangs below that box (--vam-goal-attach-clear, measured by the view; 0 when the icons are in the bar). */
+.vam-goal-attachment { top: calc(100% + 6px + var(--vam-goal-attach-clear, 0px)); }
+@keyframes vam-goal-panel-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* Editing the goal in place: the same box as the shown goal (a 2px border and 1px less padding make up the 1px border), the text a field with no frame of its own. */
+.vam-goal-bar.is-editing { padding: 3px 7px; border-width: 2px; border-color: var(--interactive-accent); background: var(--background-secondary); }
+.vam-goal-bar .vam-goal-input, .vam-goal-bar .vam-goal-input:focus, .vam-goal-bar .vam-goal-input:focus-visible { flex: 1 1 auto; min-width: 0; box-sizing: border-box; height: var(--vam-goal-edit-height, auto); margin: 0; padding: 1px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; resize: none; overflow: hidden; color: var(--text-normal); font: inherit; line-height: inherit; overflow-wrap: anywhere; }
+.vam-goal-bar .vam-goal-input::placeholder { color: var(--text-muted); font-weight: 500; opacity: 1; }
+.vam-goal-add-context { height: 24px; padding: 0 7px; border-radius: 6px; background: transparent; box-shadow: none; color: var(--text-muted); font-size: 11.5px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.vam-goal-add-context:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.vam-goal-add-context:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-goal-actions.is-vacant .vam-goal-add-context { display: none; }
+/* The context row: one line under the goal, over the canvas like the list, so the row does not grow. */
+.vam-goal-context { position: absolute; left: 0; right: 0; box-sizing: border-box; padding: 6px 10px; border: 2px solid var(--interactive-accent); border-radius: 8px; background: var(--background-secondary); font-size: var(--font-ui-small); font-weight: 400; animation: vam-goal-panel-in 150ms ease-out; }
+.vam-goal-bar .vam-goal-context-input, .vam-goal-bar .vam-goal-context-input:focus, .vam-goal-bar .vam-goal-context-input:focus-visible { display: block; width: 100%; box-sizing: border-box; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; color: var(--text-normal); font: inherit; }
+.vam-goal-bar .vam-goal-context-input::placeholder { color: var(--text-muted); opacity: 1; }
 /* Suggested new topics: a card under the bar, same width, with one checkable row per suggestion. */
-.vam-goal-suggest { position: absolute; top: calc(100% + 6px); left: 0; right: 0; display: flex; flex-direction: column; gap: 7px; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); box-shadow: 0 6px 18px rgb(0 0 0 / .16); max-height: var(--vam-goal-attach-max, none); font-size: var(--font-ui-small); animation: vam-relevance-panel-in 150ms ease-out; }
+.vam-goal-suggest { position: absolute; left: 0; right: 0; display: flex; flex-direction: column; gap: 7px; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); box-shadow: 0 6px 18px rgb(0 0 0 / .16); max-height: var(--vam-goal-attach-max, none); font-size: var(--font-ui-small); animation: vam-goal-panel-in 150ms ease-out; }
 .vam-goal-suggest.is-running { flex-direction: row; align-items: center; justify-content: space-between; color: var(--text-muted); }
 .vam-goal-suggest-rows { display: flex; flex-direction: column; gap: 7px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .vam-goal-suggest-foot { flex: none; }
@@ -495,10 +532,6 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-goal-suggest-why { color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
 .vam-goal-suggest-foot { display: flex; justify-content: flex-end; gap: 6px; padding-top: 7px; border-top: 1px solid var(--background-modifier-border); }
 .vam-goal-suggest button:focus-visible, .vam-goal-suggest input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
-.vam-relevance-setup { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.vam-relevance-goal-input, .vam-relevance-context-input { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; font-size: var(--font-ui-small); }
-.vam-relevance-goal-input::placeholder, .vam-relevance-context-input::placeholder { color: var(--text-muted); opacity: 1; }
-.vam-relevance-goal-input:focus-visible, .vam-relevance-context-input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-relevance-changes { margin: 0; padding: 0; list-style: none; }
 .vam-relevance-change { padding: 10px 0; border-bottom: 1px solid var(--background-modifier-border); }
 .vam-relevance-change:last-child { border-bottom: 0; }
@@ -510,11 +543,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-relevance-anchor-title, .vam-relevance-other-title, .vam-relevance-conflicts-title { margin: 12px 0 0; font-size: var(--font-ui-small); font-weight: 600; color: var(--text-muted); }
 .vam-relevance-conflicts { margin: 4px 0 0; padding: 0; list-style: none; }
 .vam-relevance-conflict { padding: 6px 0; font-size: var(--font-ui-small); color: var(--text-muted); overflow-wrap: anywhere; }
-.vam-relevance-pins-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; font-size: var(--font-ui-small); color: var(--text-muted); }
-.vam-relevance-unpin-all { font-size: var(--font-ui-small); }
-.vam-relevance-unpin-all:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) {
-  .vam-relevance-panel, .vam-goal-suggest { animation: none; }
+  .vam-goal-suggest, .vam-goal-context { animation: none; }
   /* Same selector weight as the scan animation rule above, otherwise that rule keeps winning. */
   .vam-status-running::before, .vam-node:not([data-aim-kind])[data-status="running"]::after { animation: none; }
   .vam-node:not([data-aim-kind])[data-status="running"]::after { background: var(--interactive-accent); }
@@ -953,7 +983,7 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-sources-button-label { overflow: hidden; text-overflow: ellipsis; }
 .vam-map-sources-warning { display: inline-flex; flex: 0 0 auto; color: var(--text-error); }
 .vam-map-sources-warning .svg-icon { width: 14px; height: 14px; }
-.vam-map-sources-panel { position: absolute; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-width: min(440px, calc(100vw - 32px)); padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); max-height: var(--vam-sources-max, none); overflow-y: auto; animation: vam-relevance-panel-in 150ms ease-out; }
+.vam-map-sources-panel { position: absolute; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-width: min(440px, calc(100vw - 32px)); padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); max-height: var(--vam-sources-max, none); overflow-y: auto; animation: vam-goal-panel-in 150ms ease-out; }
 .vam-map-sources-title { margin: 0; font-size: var(--font-ui-medium); }
 .vam-map-sources-panel p { margin: 0; }
 .vam-map-sources-drop { display: grid; gap: 4px; justify-items: center; box-sizing: border-box; padding: 18px 12px; border: 2px dashed var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); text-align: center; }
@@ -1882,6 +1912,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-relation[data-anchor-relation].is-dimmed { opacity: 0.25; }
 .vam-view .vam-anchor.is-related { transform: scale(1.35); box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
 @media (prefers-reduced-motion: reduce) { .vam-view .vam-relation[data-anchor-relation] { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .vam-view .vam-text-node > .vam-text-add.vam-text-add { transition: none; } }
 /* Map search (Mod+F). Every rule starts with .vam-view so the share viewer never collects it. */
 .vam-view .vam-map-search { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 24px); padding: 4px 6px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-view .vam-map-search-input { width: 180px; min-width: 0; flex: 1 1 auto; }
@@ -1905,7 +1936,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-text-node { position: absolute; box-sizing: border-box; width: max-content; min-width: 32px; max-width: 300px; padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text-normal); font-size: var(--font-ui-small); line-height: 1.45; cursor: text; user-select: none; }
 .vam-view .vam-text-node.has-width { max-width: none; }
 .vam-view .vam-text-node-measure { position: absolute; left: 0; top: 0; visibility: hidden; white-space: pre; pointer-events: none; font: inherit; line-height: inherit; }
-.vam-view .vam-text-resize { position: absolute; top: 3px; right: -5px; bottom: 3px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
+/* A copy of a text block the layout measures for a moment (built and removed in one go); never seen. */
+.vam-view .vam-text-node.vam-text-probe { visibility: hidden; pointer-events: none; }
+.vam-view .vam-text-resize { z-index: 3; position: absolute; top: 3px; right: -5px; bottom: 3px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
 .vam-view .vam-text-node:hover > .vam-text-resize, .vam-view .vam-text-node:focus-within > .vam-text-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
 .vam-view .vam-text-resize:hover, .vam-view .vam-text-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }
 .vam-view .vam-stage[data-presenting] .vam-text-resize { display: none; }
@@ -1915,6 +1948,13 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-text-node-input, .vam-view .vam-text-node-input:focus, .vam-view .vam-text-node-input:hover { display: block; width: 100%; box-sizing: border-box; min-height: 0; margin: 0; padding: 0; border: none; border-radius: 0; background: transparent; box-shadow: none; outline: none; resize: none; overflow: hidden; font: inherit; line-height: inherit; color: inherit; user-select: text; }
 .vam-view .vam-text-node-promote { display: none; position: absolute; left: 0; top: 100%; z-index: 1; font-size: var(--font-ui-smaller); white-space: nowrap; }
 .vam-view .vam-text-node:hover .vam-text-node-promote, .vam-view .vam-text-node:focus-within .vam-text-node-promote { display: inline-block; }
+/* The + of a text block that hangs on a topic: same behaviour as the card's +, to the right of the block (past its width handle). */
+.vam-view .vam-text-node > .vam-text-add { position: absolute; right: -32px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: 50%; background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); font-size: var(--font-ui-medium); line-height: 1; opacity: 0; transition: opacity 120ms ease-out; z-index: 2; pointer-events: none; }
+/* Invisible bridge between the width handle and the + (4px, overlapping the handle's edge, which sits above it), so a slow move from the text keeps the + reachable. */
+.vam-view .vam-text-node > .vam-text-add::before { content: ""; position: absolute; right: 100%; top: 0; bottom: 0; width: 4px; pointer-events: auto; }
+.vam-view .vam-text-node > .vam-text-add:hover { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); border-color: var(--interactive-accent); }
+.vam-view .vam-text-node:hover > .vam-text-add, .vam-view .vam-text-node:focus-within > .vam-text-add, .vam-view .vam-text-node.is-selected > .vam-text-add { opacity: 1; pointer-events: auto; }
+.vam-view .vam-stage[data-presenting] .vam-text-node > .vam-text-add { display: none; }
 .vam-view .vam-text-edge { opacity: 0.8; }
 .vam-view .vam-text-link { fill: none; stroke: var(--text-muted); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.8; pointer-events: none; }
 .vam-view .vam-text-node.is-free { cursor: grab; }

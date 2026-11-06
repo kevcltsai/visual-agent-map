@@ -873,6 +873,7 @@ var en = {
   "ui.text_node_removed": "Text node removed.",
   "ui.text_node_promote": "To card",
   "ui.text_node_promote_label": "Turn this text node into a topic card",
+  "ui.text_node_add_topic_label": "Add a topic after this text",
   "ui.text_node_promoted": "Text node turned into a topic card.",
   "ui.text_node_select_topic": "Select a topic first.",
   "ui.text_node_add_multiselect": "Finish selecting topics first, then add a text node.",
@@ -1017,11 +1018,10 @@ var en = {
   "ui.goal_suggest_skipped_0": "{0} suggestions no longer fit the map and were skipped",
   "ui.goal_suggest_added_0": "Added {0} topics",
   "ui.goal_suggest_history_label": "Add suggested topics",
-  "ui.goal_edit": "Edit goal",
-  "ui.relevance_panel_label": "Goal",
   "ui.relevance_goal_placeholder": "What do you want to achieve with this map?",
   "ui.relevance_context_label": "Extra context",
   "ui.relevance_context_placeholder": "Optional: what you already know, conditions or limits",
+  "ui.goal_add_context": "+ Context",
   "ui.relevance_grade_button": "Grade with this",
   "ui.relevance_running": "Grading by goal\u2026",
   "ui.relevance_awaiting_usage": "Waiting for AI usage confirmation\u2026",
@@ -1048,8 +1048,7 @@ var en = {
   "ui.relevance_clear_hint": "The AI decides the next time you grade",
   "ui.relevance_manual_reason": "You set this",
   "ui.relevance_recalibrate_button": "Recalibrate",
-  "ui.relevance_pins_note_0": "Keeping the {0} you set",
-  "ui.relevance_unpin_all": "Hand all back to AI",
+  "ui.relevance_unpin_all_0": "Hand all back to AI ({0} cards)",
   "ui.relevance_unpin_all_history_label": "Hand back to AI",
   "ui.relevance_recalibrated_0_1": "Adjusted {1} topics based on your {0} settings",
   "ui.relevance_recalibrate_none": "No topics needed adjusting",
@@ -1239,7 +1238,6 @@ var en = {
   "ui.remove_entire_branch": "Remove entire branch",
   "ui.removed_0_undo_available": 'Removed "{0}". Undo to bring it back.',
   "ui.relevance_goal_unavailable_grading": "Grading is still running; try again when it finishes.",
-  "ui.relevance_goal_unavailable_toolbar": "The goal panel is not available on this map.",
   "ui.no_topics_with_a_missing_map_md": "No topics with a missing Map.md.",
   "ui.repair_missing_map": "Repair missing map",
   "ui.choose_a_topic_to_repair": "Choose a topic to repair",
@@ -2554,7 +2552,7 @@ var en = {
   "ui.technical_details": "Technical details",
   "ui.copy_technical_details": "Copy technical details",
   "error.relevance_grade_unavailable": "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
-  "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.",
+  "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Hover over the goal, then press a grading icon next to it to try again.",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map \xB7 read-only",
   "share.viewer_made_with": "Made with VAM",
@@ -3660,6 +3658,7 @@ var zhCN = {
   "ui.text_node_removed": "\u5DF2\u5220\u9664\u6587\u5B57\u8282\u70B9\u3002",
   "ui.text_node_promote": "\u8F6C\u6210\u8BAE\u9898\u5361",
   "ui.text_node_promote_label": "\u628A\u8FD9\u4E2A\u6587\u5B57\u8282\u70B9\u8F6C\u6210\u8BAE\u9898\u5361",
+  "ui.text_node_add_topic_label": "\u5728\u8FD9\u6BB5\u6587\u5B57\u540E\u9762\u65B0\u589E\u8BAE\u9898",
   "ui.text_node_promoted": "\u5DF2\u628A\u6587\u5B57\u8282\u70B9\u8F6C\u6210\u8BAE\u9898\u5361\u3002",
   "ui.text_node_select_topic": "\u8BF7\u5148\u9009\u4E2D\u4E00\u4E2A\u8BAE\u9898\u3002",
   "ui.text_node_add_multiselect": "\u8BF7\u5148\u7ED3\u675F\u591A\u9009\u6A21\u5F0F\uFF0C\u518D\u6DFB\u52A0\u6587\u5B57\u8282\u70B9\u3002",
@@ -3804,11 +3803,10 @@ var zhCN = {
   "ui.goal_suggest_skipped_0": "{0} \u6761\u5EFA\u8BAE\u5DF2\u4E0D\u9002\u7528\u4E8E\u5F53\u524D\u7684\u5FC3\u667A\u56FE\uFF0C\u5DF2\u8DF3\u8FC7",
   "ui.goal_suggest_added_0": "\u5DF2\u52A0\u5165 {0} \u4E2A\u8BAE\u9898",
   "ui.goal_suggest_history_label": "\u52A0\u5165\u5EFA\u8BAE\u7684\u8BAE\u9898",
-  "ui.goal_edit": "\u7F16\u8F91\u76EE\u6807",
-  "ui.relevance_panel_label": "\u76EE\u6807",
   "ui.relevance_goal_placeholder": "\u4F60\u60F3\u7528\u8FD9\u5F20\u56FE\u8FBE\u6210\u4EC0\u4E48\uFF1F",
   "ui.relevance_context_label": "\u8865\u5145\u8BF4\u660E",
   "ui.relevance_context_placeholder": "\u8865\u5145\uFF08\u9009\u586B\uFF09\uFF1A\u5DF2\u7ECF\u4F1A\u4EC0\u4E48\u3001\u6761\u4EF6\u6216\u9650\u5236",
+  "ui.goal_add_context": "\uFF0B \u8865\u5145",
   "ui.relevance_grade_button": "\u4F9D\u6B64\u5206\u7EA7",
   "ui.relevance_running": "\u4F9D\u76EE\u6807\u5206\u7EA7\u4E2D\u2026",
   "ui.relevance_awaiting_usage": "\u7B49\u5F85\u786E\u8BA4 AI \u7528\u91CF\u2026",
@@ -3835,8 +3833,7 @@ var zhCN = {
   "ui.relevance_clear_hint": "\u4E0B\u6B21\u5206\u7EA7\u7531 AI \u5224\u65AD",
   "ui.relevance_manual_reason": "\u4F60\u624B\u52A8\u8BBE\u7F6E",
   "ui.relevance_recalibrate_button": "\u91CD\u65B0\u6821\u51C6",
-  "ui.relevance_pins_note_0": "\u4FDD\u7559\u4F60\u8BBE\u7F6E\u7684 {0} \u5F20",
-  "ui.relevance_unpin_all": "\u5168\u90E8\u4EA4\u8FD8 AI",
+  "ui.relevance_unpin_all_0": "\u5168\u90E8\u4EA4\u8FD8 AI\uFF08{0} \u5F20\uFF09",
   "ui.relevance_unpin_all_history_label": "\u4EA4\u8FD8 AI",
   "ui.relevance_recalibrated_0_1": "\u4F9D\u4F60\u7684 {0} \u4E2A\u8BBE\u7F6E\u8C03\u6574\u4E86 {1} \u5F20",
   "ui.relevance_recalibrate_none": "\u6CA1\u6709\u9700\u8981\u8C03\u6574\u7684\u5361",
@@ -4026,7 +4023,6 @@ var zhCN = {
   "ui.remove_entire_branch": "\u79FB\u9664\u6574\u4E2A\u5206\u652F",
   "ui.removed_0_undo_available": "\u5DF2\u79FB\u9664\u201C{0}\u201D\uFF0C\u53EF\u64A4\u9500",
   "ui.relevance_goal_unavailable_grading": "\u6B63\u5728\u4F9D\u76EE\u6807\u5206\u7EA7\uFF0C\u5B8C\u6210\u540E\u518D\u8BD5\u3002",
-  "ui.relevance_goal_unavailable_toolbar": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u5F53\u524D\u65E0\u6CD5\u8BBE\u7F6E\u76EE\u6807\u3002",
   "ui.no_topics_with_a_missing_map_md": "\u6CA1\u6709\u7F3A\u5C11 Map.md \u7684\u4E3B\u9898\u3002",
   "ui.repair_missing_map": "\u4FEE\u590D\u9057\u5931\u7684\u5FC3\u667A\u56FE",
   "ui.choose_a_topic_to_repair": "\u9009\u62E9\u8981\u4FEE\u590D\u7684\u4E3B\u9898",
@@ -5341,7 +5337,7 @@ var zhCN = {
   "ui.technical_details": "\u6280\u672F\u7EC6\u8282",
   "ui.copy_technical_details": "\u590D\u5236\u6280\u672F\u7EC6\u8282",
   "error.relevance_grade_unavailable": "AI \u76EE\u524D\u65E0\u6CD5\u4E3A\u8FD9\u5F20\u5FC3\u667A\u56FE\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u5185\u5BB9\u88AB\u6539\u53D8\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002",
-  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u70B9\u201C\u76EE\u6807\u201D\u518D\u6309 Enter \u91CD\u8BD5",
+  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u6ED1\u8FC7\u76EE\u6807\uFF0C\u6309\u65C1\u8FB9\u7684\u5206\u7EA7\u56FE\u6807\u91CD\u8BD5",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5730\u56FE\u30FB\u53EA\u8BFB",
   "share.viewer_made_with": "\u7531 VAM \u5236\u4F5C",
@@ -6447,6 +6443,7 @@ var zhTW = {
   "ui.text_node_removed": "\u5DF2\u522A\u9664\u6587\u5B57\u5340\u584A\u3002",
   "ui.text_node_promote": "\u8F49\u6210\u8B70\u984C\u5361",
   "ui.text_node_promote_label": "\u628A\u9019\u500B\u6587\u5B57\u5340\u584A\u8F49\u6210\u8B70\u984C\u5361",
+  "ui.text_node_add_topic_label": "\u5728\u9019\u6BB5\u6587\u5B57\u5F8C\u9762\u65B0\u589E\u8B70\u984C",
   "ui.text_node_promoted": "\u5DF2\u628A\u6587\u5B57\u5340\u584A\u8F49\u6210\u8B70\u984C\u5361\u3002",
   "ui.text_node_select_topic": "\u8ACB\u5148\u9078\u53D6\u4E00\u500B\u8B70\u984C\u3002",
   "ui.text_node_add_multiselect": "\u8ACB\u5148\u7D50\u675F\u591A\u9078\u6A21\u5F0F\uFF0C\u518D\u65B0\u589E\u6587\u5B57\u5340\u584A\u3002",
@@ -6591,11 +6588,10 @@ var zhTW = {
   "ui.goal_suggest_skipped_0": "{0} \u5247\u5EFA\u8B70\u5DF2\u4E0D\u9069\u7528\u65BC\u76EE\u524D\u7684\u5FC3\u667A\u5716\uFF0C\u5DF2\u7565\u904E",
   "ui.goal_suggest_added_0": "\u5DF2\u52A0\u5165 {0} \u500B\u8B70\u984C",
   "ui.goal_suggest_history_label": "\u52A0\u5165\u5EFA\u8B70\u7684\u8B70\u984C",
-  "ui.goal_edit": "\u7DE8\u8F2F\u76EE\u6A19",
-  "ui.relevance_panel_label": "\u76EE\u6A19",
   "ui.relevance_goal_placeholder": "\u4F60\u60F3\u7528\u9019\u5F35\u5716\u9054\u6210\u4EC0\u9EBC\uFF1F",
   "ui.relevance_context_label": "\u88DC\u5145\u8AAA\u660E",
   "ui.relevance_context_placeholder": "\u88DC\u5145\uFF08\u9078\u586B\uFF09\uFF1A\u5DF2\u7D93\u6703\u4EC0\u9EBC\u3001\u689D\u4EF6\u6216\u9650\u5236",
+  "ui.goal_add_context": "\uFF0B \u88DC\u5145",
   "ui.relevance_grade_button": "\u4F9D\u6B64\u5206\u7D1A",
   "ui.relevance_running": "\u4F9D\u76EE\u6A19\u5206\u7D1A\u4E2D\u2026",
   "ui.relevance_awaiting_usage": "\u7B49\u5F85\u78BA\u8A8D AI \u7528\u91CF\u2026",
@@ -6622,8 +6618,7 @@ var zhTW = {
   "ui.relevance_clear_hint": "\u4E0B\u6B21\u5206\u7D1A\u7531 AI \u5224\u65B7",
   "ui.relevance_manual_reason": "\u4F60\u624B\u52D5\u8A2D\u5B9A",
   "ui.relevance_recalibrate_button": "\u91CD\u65B0\u6821\u6E96",
-  "ui.relevance_pins_note_0": "\u4FDD\u7559\u4F60\u8A2D\u5B9A\u7684 {0} \u5F35",
-  "ui.relevance_unpin_all": "\u5168\u90E8\u4EA4\u9084 AI",
+  "ui.relevance_unpin_all_0": "\u5168\u90E8\u4EA4\u9084 AI\uFF08{0} \u5F35\uFF09",
   "ui.relevance_unpin_all_history_label": "\u4EA4\u9084 AI",
   "ui.relevance_recalibrated_0_1": "\u4F9D\u4F60\u7684 {0} \u500B\u8A2D\u5B9A\u8ABF\u6574\u4E86 {1} \u5F35",
   "ui.relevance_recalibrate_none": "\u6C92\u6709\u9700\u8981\u8ABF\u6574\u7684\u5361",
@@ -6813,7 +6808,6 @@ var zhTW = {
   "ui.remove_entire_branch": "\u79FB\u9664\u6574\u500B\u5206\u652F",
   "ui.removed_0_undo_available": "\u5DF2\u79FB\u9664\u300C{0}\u300D\uFF0C\u53EF\u5FA9\u539F",
   "ui.relevance_goal_unavailable_grading": "\u6B63\u5728\u4F9D\u76EE\u6A19\u5206\u7D1A\uFF0C\u5B8C\u6210\u5F8C\u518D\u8A66\u3002",
-  "ui.relevance_goal_unavailable_toolbar": "\u9019\u5F35\u5FC3\u667A\u5716\u76EE\u524D\u7121\u6CD5\u8A2D\u5B9A\u76EE\u6A19\u3002",
   "ui.no_topics_with_a_missing_map_md": "\u6C92\u6709\u7F3A\u5C11 Map.md \u7684\u4E3B\u984C\u3002",
   "ui.repair_missing_map": "\u4FEE\u5FA9\u907A\u5931\u7684\u5FC3\u667A\u5716",
   "ui.choose_a_topic_to_repair": "\u9078\u64C7\u8981\u4FEE\u5FA9\u7684\u4E3B\u984C",
@@ -8128,7 +8122,7 @@ var zhTW = {
   "ui.technical_details": "\u6280\u8853\u7D30\u7BC0",
   "ui.copy_technical_details": "\u8907\u88FD\u6280\u8853\u7D30\u7BC0",
   "error.relevance_grade_unavailable": "AI \u76EE\u524D\u7121\u6CD5\u70BA\u9019\u5F35\u5FC3\u667A\u5716\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u5167\u5BB9\u88AB\u6539\u8B8A\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002",
-  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u9EDE\u300C\u76EE\u6A19\u300D\u518D\u6309 Enter \u91CD\u8A66",
+  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u6ED1\u904E\u76EE\u6A19\uFF0C\u6309\u65C1\u908A\u7684\u5206\u7D1A\u5716\u793A\u91CD\u8A66",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5FC3\u667A\u5716\u30FB\u552F\u8B80",
   "share.viewer_made_with": "\u7531 VAM \u88FD\u4F5C",
@@ -18477,6 +18471,31 @@ function pruneAnnotatedImages(items, nodeIds) {
   });
   return dropped ? { items: out, dropped } : { items: [...items], dropped: 0 };
 }
+function pruneAfterText(map, log) {
+  let dropped = 0;
+  try {
+    const nodes = Array.isArray(map.nodes) ? map.nodes : [];
+    if (!nodes.some((node) => node && typeof node === "object" && "afterTextId" in node)) return 0;
+    const items = Array.isArray(map.canvasItems) ? map.canvasItems : [];
+    const parentOf = new Map(
+      treeTextNodes(
+        items,
+        nodes.flatMap((node) => node && typeof node.id === "string" ? [node.id] : [])
+      ).attached.map((text12) => [text12.id, text12.parentId])
+    );
+    for (const node of nodes) {
+      if (!node || typeof node !== "object" || !("afterTextId" in node)) continue;
+      const value = node.afterTextId;
+      if (typeof value === "string" && parentOf.has(value) && parentOf.get(value) === node.parentId) continue;
+      delete node.afterTextId;
+      dropped++;
+    }
+    if (dropped)
+      log == null ? void 0 : log("warn", `Dropped ${dropped} dangling after-text link${dropped === 1 ? "" : "s"} while reading the map.`);
+  } catch (e) {
+  }
+  return dropped;
+}
 function removeAnchorRelationsForTopics(items, topicIds) {
   let dropped = 0;
   const out = items.map((item) => {
@@ -18631,7 +18650,7 @@ function removeLinksTo(items, nodeIds) {
   });
 }
 var isSummary = (item) => item.kind === "summary";
-var childIds = (nodes, parentId) => nodes.filter((n) => n.parentId === parentId).map((n) => n.id);
+var childIds = (nodes, parentId) => nodes.filter((n) => n.parentId === parentId && !n.afterTextId).map((n) => n.id);
 function checkSummaryMembers(members, nodes) {
   if (!Array.isArray(members) || !members.every((m) => typeof m === "string" && ID.test(m)))
     return { ok: false, reason: "invalid" };
@@ -18644,6 +18663,7 @@ function checkSummaryMembers(members, nodes) {
     const node = byId.get(id);
     if (!node) return { ok: false, reason: "unknown" };
     if (node.parentId === null || !byId.has(node.parentId)) return { ok: false, reason: "root" };
+    if (node.afterTextId) return { ok: false, reason: "invalid" };
     if (parentId === null) parentId = node.parentId;
     else if (parentId !== node.parentId) return { ok: false, reason: "cross-parent" };
   }
@@ -19542,6 +19562,96 @@ function collapsedAncestors(nodes, id) {
   return result;
 }
 
+// map-graph.ts
+var CARD_WIDTH = 280;
+var CARD_WIDTH_MIN = 200;
+var CARD_WIDTH_MAX = 560;
+var CARD_WIDTH_STEP = 40;
+function clampCardWidth(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
+  return Math.min(CARD_WIDTH_MAX, Math.max(CARD_WIDTH_MIN, Math.round(value)));
+}
+var CARD_HEIGHT_MIN = 80;
+var CARD_HEIGHT_MAX = 720;
+var CARD_HEIGHT_STEP = 40;
+function clampCardHeight(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
+  return Math.min(CARD_HEIGHT_MAX, Math.max(CARD_HEIGHT_MIN, Math.round(value)));
+}
+function withTextParents(nodes, texts2) {
+  if (!texts2.size) return nodes;
+  let changed = false;
+  const out = nodes.map((node) => {
+    const textId = node.afterTextId;
+    if (textId === void 0 || texts2.get(textId) !== node.parentId) return node;
+    changed = true;
+    return { ...node, parentId: textId };
+  });
+  return changed ? out : nodes;
+}
+function parentIdsForNode(node) {
+  var _a2;
+  const convergenceParents = node.aimKind === "question" ? [] : (_a2 = node.aimConvergesFromNodeIds) != null ? _a2 : [];
+  return [...node.parentId ? [node.parentId] : [], ...convergenceParents.filter((id) => id !== node.parentId)];
+}
+function childIndex(nodes) {
+  var _a2;
+  const index = /* @__PURE__ */ new Map();
+  for (const node of nodes) {
+    const key2 = (_a2 = node.parentId) != null ? _a2 : "";
+    const list = index.get(key2);
+    if (list) list.push(node);
+    else index.set(key2, [node]);
+  }
+  return index;
+}
+function walkDescendants(index, id, found) {
+  var _a2;
+  const pending2 = [id];
+  while (pending2.length) {
+    const parent = pending2.pop();
+    for (const node of (_a2 = index.get(parent)) != null ? _a2 : []) {
+      if (node.id !== id && !found.has(node.id)) {
+        found.add(node.id);
+        pending2.push(node.id);
+      }
+    }
+  }
+}
+function branchSize(index, id) {
+  const found = /* @__PURE__ */ new Set();
+  walkDescendants(index, id, found);
+  return found.size;
+}
+function descendants(nodes, id) {
+  const found = /* @__PURE__ */ new Set();
+  walkDescendants(childIndex(nodes), id, found);
+  return found;
+}
+function visibleNodes(nodes) {
+  const index = childIndex(nodes);
+  const hidden = /* @__PURE__ */ new Set();
+  for (const node of nodes) if (node.collapsed && !hidden.has(node.id)) walkDescendants(index, node.id, hidden);
+  return nodes.filter((node) => !hidden.has(node.id));
+}
+function applyCollapseLevel(nodes, shownLevels) {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const depthOf2 = (node) => {
+    let depth = 0;
+    const seen = /* @__PURE__ */ new Set([node.id]);
+    for (let parent = node.parentId; parent && byId.has(parent) && !seen.has(parent); parent = byId.get(parent).parentId) {
+      seen.add(parent);
+      depth++;
+    }
+    return depth;
+  };
+  const parents = new Set(nodes.map((node) => node.parentId).filter((id) => !!id && byId.has(id)));
+  for (const node of nodes) {
+    if (!parents.has(node.id)) continue;
+    node.collapsed = shownLevels === null ? false : depthOf2(node) >= shownLevels;
+  }
+}
+
 // experiences/visual-map/presentation-order.ts
 function readingOrder(topics, opts = {}) {
   var _a2, _b2;
@@ -19554,7 +19664,7 @@ function readingOrder(topics, opts = {}) {
       known.add(text12.id);
       leaves.push({ id: text12.id, path: "", parentId: text12.parentId, x: text12.x, y: text12.y, collapsed: false });
     }
-    nodes = [...topics, ...leaves];
+    nodes = withTextParents([...topics, ...leaves], new Map(leaves.map((leaf) => [leaf.id, leaf.parentId])));
   }
   const axis = (_b2 = opts.siblingAxis) != null ? _b2 : "y";
   const other = axis === "y" ? "x" : "y";
@@ -19617,15 +19727,16 @@ var bySiblingAxis = (axis) => (a, b) => axis === "y" ? a.y - b.y || a.x - b.x : 
 function alignSiblingsToScreen(nodes, axisOf) {
   const slots = /* @__PURE__ */ new Map();
   nodes.forEach((node, index) => {
-    const list = slots.get(node.parentId);
+    const key2 = node.afterTextId && node.parentId ? `${node.parentId}\0${node.afterTextId}` : node.parentId;
+    const list = slots.get(key2);
     if (list) list.push(index);
-    else slots.set(node.parentId, [index]);
+    else slots.set(key2, [index]);
   });
   const result = nodes.slice();
   let moved = false;
-  for (const [parentId, list] of slots) {
+  for (const list of slots.values()) {
     if (list.length < 2) continue;
-    const axis = axisOf(parentId, nodes[list[0]].id);
+    const axis = axisOf(nodes[list[0]].parentId, nodes[list[0]].id);
     if (!axis) continue;
     const order = list.map((index) => nodes[index]).sort(bySiblingAxis(axis));
     list.forEach((index, place) => {
@@ -20277,85 +20388,6 @@ function radialPositions(input2) {
   return result;
 }
 
-// map-graph.ts
-var CARD_WIDTH = 280;
-var CARD_WIDTH_MIN = 200;
-var CARD_WIDTH_MAX = 560;
-var CARD_WIDTH_STEP = 40;
-function clampCardWidth(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
-  return Math.min(CARD_WIDTH_MAX, Math.max(CARD_WIDTH_MIN, Math.round(value)));
-}
-var CARD_HEIGHT_MIN = 80;
-var CARD_HEIGHT_MAX = 720;
-var CARD_HEIGHT_STEP = 40;
-function clampCardHeight(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
-  return Math.min(CARD_HEIGHT_MAX, Math.max(CARD_HEIGHT_MIN, Math.round(value)));
-}
-function parentIdsForNode(node) {
-  var _a2;
-  const convergenceParents = node.aimKind === "question" ? [] : (_a2 = node.aimConvergesFromNodeIds) != null ? _a2 : [];
-  return [...node.parentId ? [node.parentId] : [], ...convergenceParents.filter((id) => id !== node.parentId)];
-}
-function childIndex(nodes) {
-  var _a2;
-  const index = /* @__PURE__ */ new Map();
-  for (const node of nodes) {
-    const key2 = (_a2 = node.parentId) != null ? _a2 : "";
-    const list = index.get(key2);
-    if (list) list.push(node);
-    else index.set(key2, [node]);
-  }
-  return index;
-}
-function walkDescendants(index, id, found) {
-  var _a2;
-  const pending2 = [id];
-  while (pending2.length) {
-    const parent = pending2.pop();
-    for (const node of (_a2 = index.get(parent)) != null ? _a2 : []) {
-      if (node.id !== id && !found.has(node.id)) {
-        found.add(node.id);
-        pending2.push(node.id);
-      }
-    }
-  }
-}
-function branchSize(index, id) {
-  const found = /* @__PURE__ */ new Set();
-  walkDescendants(index, id, found);
-  return found.size;
-}
-function descendants(nodes, id) {
-  const found = /* @__PURE__ */ new Set();
-  walkDescendants(childIndex(nodes), id, found);
-  return found;
-}
-function visibleNodes(nodes) {
-  const index = childIndex(nodes);
-  const hidden = /* @__PURE__ */ new Set();
-  for (const node of nodes) if (node.collapsed && !hidden.has(node.id)) walkDescendants(index, node.id, hidden);
-  return nodes.filter((node) => !hidden.has(node.id));
-}
-function applyCollapseLevel(nodes, shownLevels) {
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const depthOf2 = (node) => {
-    let depth = 0;
-    const seen = /* @__PURE__ */ new Set([node.id]);
-    for (let parent = node.parentId; parent && byId.has(parent) && !seen.has(parent); parent = byId.get(parent).parentId) {
-      seen.add(parent);
-      depth++;
-    }
-    return depth;
-  };
-  const parents = new Set(nodes.map((node) => node.parentId).filter((id) => !!id && byId.has(id)));
-  for (const node of nodes) {
-    if (!parents.has(node.id)) continue;
-    node.collapsed = shownLevels === null ? false : depthOf2(node) >= shownLevels;
-  }
-}
-
 // layouts/vertical.ts
 function verticalPositions(input2) {
   const { roots, kidsOf, joinsOf, heightFor, column, rowGap, flip, left, top } = input2;
@@ -20482,6 +20514,13 @@ function widthExcess(node) {
 function textBlockWidth(node) {
   var _a2;
   return node.path === "" ? (_a2 = node.width) != null ? _a2 : CARD_WIDTH : CARD_WIDTH;
+}
+function obstacleWidth(node) {
+  var _a2;
+  return node.path === "" ? Math.max(WIDTH, (_a2 = node.width) != null ? _a2 : 0) : WIDTH;
+}
+function textParentNarrow(parent) {
+  return parent.path === "" ? Math.max(0, CARD_WIDTH - textBlockWidth(parent)) : 0;
 }
 function knownSide(topic, root) {
   return topic.path === "" ? sideFromTextBox(topic.x, textBlockWidth(topic), root.x) : sideFromOffset(topic.x - root.x);
@@ -20719,11 +20758,13 @@ function rearrangeWhole(nodes, heightOf, layout) {
   });
 }
 function arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout) {
+  var _a2;
   const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
   const placed = positions(fresh, roots, 0, 0, false, heightOf, layout);
-  const rootCentres = roots.map((root) => placed.get(root.id).x + WIDTH / 2);
-  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : WIDTH / 2;
-  let shiftX = parent.x + WIDTH / 2 - middle;
+  const cardSpan = parent.path === "" ? CARD_WIDTH : WIDTH;
+  const rootCentres = roots.map((root) => placed.get(root.id).x + cardSpan / 2);
+  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : cardSpan / 2;
+  let shiftX = parent.x + (parent.path === "" ? (_a2 = parent.width) != null ? _a2 : WIDTH : WIDTH) / 2 - middle;
   const rowGap = COLUMN - WIDTH;
   const rootTop = Math.min(...roots.map((root) => placed.get(root.id).y));
   const rootBottom = Math.max(...roots.map((root) => placed.get(root.id).y + cardHeight(heightOf, root.id)));
@@ -20737,8 +20778,8 @@ function arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, la
       for (const node of fixed2) {
         const other = cardHeight(heightOf, node.id);
         const x = point.x + shiftX;
-        if (x < node.x + WIDTH + LAYOUT_GAP2 && node.x < x + WIDTH + LAYOUT_GAP2 && topY < node.y + other + LAYOUT_GAP2 && node.y < topY + own2 + LAYOUT_GAP2)
-          next = Math.max(next, node.x + WIDTH + LAYOUT_GAP2 - point.x);
+        if (x < node.x + obstacleWidth(node) + LAYOUT_GAP2 && node.x < x + WIDTH + LAYOUT_GAP2 && topY < node.y + other + LAYOUT_GAP2 && node.y < topY + own2 + LAYOUT_GAP2)
+          next = Math.max(next, node.x + obstacleWidth(node) + LAYOUT_GAP2 - point.x);
       }
     }
     if (next === shiftX) break;
@@ -20754,7 +20795,7 @@ function branchSide(byId, node) {
   let topic = node;
   while (topic.parentId && ((_a2 = byId.get(topic.parentId)) == null ? void 0 : _a2.parentId)) topic = byId.get(topic.parentId);
   const root = topic.parentId ? byId.get(topic.parentId) : void 0;
-  return root ? sideFromOffset(topic.x - root.x) : void 0;
+  return root ? knownSide(topic, root) : void 0;
 }
 function arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout) {
   var _a2;
@@ -20838,7 +20879,7 @@ function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout = "r
   if (isVertical(direction)) return arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout);
   if (direction === "balanced")
     return arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout);
-  const startX = signOf(direction) > 0 ? parent.x + COLUMN + widthExcess(parent) : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess));
+  const startX = signOf(direction) > 0 ? parent.x + COLUMN + widthExcess(parent) : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess)) - textParentNarrow(parent);
   const placed = positions(fresh, roots, startX, 0, false, heightOf, layout);
   const centers = roots.map((root) => placed.get(root.id).y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
@@ -20853,7 +20894,7 @@ function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout = "r
       for (const node of fixed2) {
         const other = cardHeight(heightOf, node.id);
         const top = point.y + offset;
-        if (Math.abs(point.x - node.x) < WIDTH && top < node.y + other + LAYOUT_GAP2 && node.y < top + own2 + LAYOUT_GAP2)
+        if (point.x - node.x < obstacleWidth(node) && node.x - point.x < WIDTH && top < node.y + other + LAYOUT_GAP2 && node.y < top + own2 + LAYOUT_GAP2)
           next = Math.max(next, node.y + other + LAYOUT_GAP2 - point.y);
       }
     }
@@ -20928,8 +20969,12 @@ function arrangeNewTree(nodes, rootId, newIds, heightOf, layout = "right") {
   });
 }
 function reorderSiblings(nodes, parentId, movedId, beforeId) {
+  var _a2;
   if (movedId === beforeId) return nodes;
-  const slots = nodes.flatMap((node, index) => node.parentId === parentId ? [index] : []);
+  const group = (_a2 = nodes.find((node) => node.id === movedId)) == null ? void 0 : _a2.afterTextId;
+  const slots = nodes.flatMap(
+    (node, index) => node.parentId === parentId && node.afterTextId === group ? [index] : []
+  );
   const kids = slots.map((index) => nodes[index]);
   const moved = kids.find((node) => node.id === movedId);
   if (!moved || !kids.some((node) => node.id === beforeId)) return nodes;
@@ -20943,8 +20988,12 @@ function reorderSiblings(nodes, parentId, movedId, beforeId) {
   return result;
 }
 function orderSiblings(nodes, parentId, orderedIds) {
+  var _a2;
   if (orderedIds.length < 2 || new Set(orderedIds).size !== orderedIds.length) return nodes;
-  const slots = nodes.flatMap((node, index) => node.parentId === parentId ? [index] : []);
+  const group = (_a2 = nodes.find((node) => node.id === orderedIds[0])) == null ? void 0 : _a2.afterTextId;
+  const slots = nodes.flatMap(
+    (node, index) => node.parentId === parentId && node.afterTextId === group ? [index] : []
+  );
   const listed = new Set(orderedIds);
   const wanted = orderedIds.map((id) => slots.map((index) => nodes[index]).find((node) => node.id === id));
   if (wanted.some((node) => !node)) return nodes;
@@ -20959,7 +21008,9 @@ function orderSiblings(nodes, parentId, orderedIds) {
 function shiftSibling(nodes, id, offset) {
   const moved = nodes.find((node) => node.id === id);
   if (!(moved == null ? void 0 : moved.parentId)) return nodes;
-  const slots = nodes.flatMap((node, index) => node.parentId === moved.parentId ? [index] : []);
+  const slots = nodes.flatMap(
+    (node, index) => node.parentId === moved.parentId && node.afterTextId === moved.afterTextId ? [index] : []
+  );
   const order = slots.map((index) => nodes[index]);
   const from = order.indexOf(moved);
   const to = from + offset;
@@ -20973,7 +21024,7 @@ function shiftSibling(nodes, id, offset) {
 }
 function reorderTopLevel(nodes, rootId, movedId, dropX) {
   if (!Number.isFinite(dropX)) return nodes;
-  const slots = nodes.flatMap((node, index) => node.parentId === rootId ? [index] : []);
+  const slots = nodes.flatMap((node, index) => node.parentId === rootId && !node.afterTextId ? [index] : []);
   const moved = slots.map((index) => nodes[index]).find((node) => node.id === movedId);
   if (!moved) return nodes;
   const others = slots.map((index) => nodes[index]).filter((node) => node !== moved);
@@ -21336,6 +21387,7 @@ function parseMap(content, log) {
       );
     }
   }
+  pruneAfterText(map, log != null ? log : (l, m) => debugLog.appendLog(l, m));
   return map;
 }
 function validateAimMap(map) {
@@ -22101,6 +22153,7 @@ function begin(deps) {
           const before = befores.get(mapPath);
           const after = clone(before);
           for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment);
+          pruneAfterText(after);
           records.push({ mapPath, before, after });
           for (const path of relationNotePaths(before, after)) if (!refresh.includes(path)) refresh.push(path);
           if (ownership(before) !== ownership(after)) rebuildNeeded = true;
@@ -24267,15 +24320,22 @@ function buildMapChatContext(input2) {
     snippets,
     files,
     ...((_i = input2.userTexts) == null ? void 0 : _i.length) ? {
-      userTexts: input2.userTexts.map((item) => ({
-        id: item.id,
-        parentId: item.parentId,
-        ...item.parentId === null ? { unattached: true } : {},
-        readOnly: true,
-        text: item.text,
-        ...linkedTo(item.links)
-      })),
-      userTextsNote: "userTexts are notes the user wrote on the map. Read them as the user's own words; they are not cards, have no card id you may act on, and must not be rewritten or deleted."
+      userTexts: input2.userTexts.map((item) => {
+        var _a3;
+        return {
+          id: item.id,
+          parentId: item.parentId,
+          ...item.parentId === null ? { unattached: true } : {},
+          readOnly: true,
+          text: item.text,
+          ...linkedTo(item.links),
+          ...((_a3 = item.followedBy) == null ? void 0 : _a3.length) ? { followedBy: item.followedBy } : {}
+        };
+      }),
+      userTextsNote: "userTexts are notes the user wrote on the map. Read them as the user's own words; they are not cards, have no card id you may act on, and must not be rewritten or deleted." + (input2.userTexts.some((item) => {
+        var _a3;
+        return (_a3 = item.followedBy) == null ? void 0 : _a3.length;
+      }) ? " followedBy lists the topics that come after that text in the reading order; read the text as leading into them." : "")
     } : {},
     ...((_j = input2.summaries) == null ? void 0 : _j.length) ? {
       summaries: input2.summaries.map((item) => ({
@@ -30115,13 +30175,24 @@ function withTextPositions(items, texts2, placed) {
     return spot ? { ...text12, x: spot.x, y: spot.y } : item;
   });
 }
+function virtualTree(nodes, texts2, widthOf) {
+  const parents = new Map(texts2.map((text12) => [text12.id, text12.parentId]));
+  return [...withTextParents(nodes, parents), ...texts2.map(asLeaf(widthOf))];
+}
+function mergePositions(nodes, placed) {
+  const at = new Map(placed.map((node) => [node.id, node]));
+  return nodes.map((node) => {
+    const spot = at.get(node.id);
+    return spot ? { ...node, x: spot.x, y: spot.y } : node;
+  });
+}
 function arrangeMapWithText(nodes, items, hidden, heightOf, layout = "right", options = {}) {
   const texts2 = visibleTexts(nodes, items, hidden);
   if (!texts2.length) return { nodes: arrangeMap(nodes, hidden, heightOf, layout, options), items: [...items] };
-  const placed = arrangeMap([...nodes, ...texts2.map(asLeaf(options.widthOf))], hidden, heightOf, layout, options);
+  const placed = arrangeMap(virtualTree(nodes, texts2, options.widthOf), hidden, heightOf, layout, options);
   const real = new Set(nodes.map((node) => node.id));
   return {
-    nodes: placed.filter((node) => real.has(node.id)),
+    nodes: mergePositions(nodes, placed),
     items: withTextPositions(
       items,
       texts2,
@@ -30133,19 +30204,42 @@ function arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minT
   const texts2 = visibleTexts(nodes, items);
   if (!texts2.length)
     return { nodes: arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout), items: [...items] };
+  const virtual = virtualTree(nodes, texts2, widthOf);
+  const textIds = new Set(texts2.map((text12) => text12.id));
   const withNew = new Set(newIds);
+  const brought = /* @__PURE__ */ new Set();
   for (const text12 of texts2) if (newIds.has(text12.parentId)) withNew.add(text12.id);
-  const placed = arrangeNewBranch(
-    [...nodes, ...texts2.map(asLeaf(widthOf))],
-    parentId,
-    withNew,
-    heightOf,
-    minTop,
-    layout
-  );
+  for (const node of virtual)
+    if (newIds.has(node.id) && textIds.has(node.parentId) && node.parentId !== parentId) {
+      withNew.add(node.parentId);
+      brought.add(node.parentId);
+    }
+  if (brought.size) {
+    const index = childIndex(virtual);
+    const below = /* @__PURE__ */ new Set();
+    for (const id of brought) walkDescendants(index, id, below);
+    for (const id of below) withNew.add(id);
+  }
+  const placed = arrangeNewBranch(virtual, parentId, withNew, heightOf, minTop, layout);
   const real = new Set(nodes.map((node) => node.id));
   return {
-    nodes: placed.filter((node) => real.has(node.id)),
+    nodes: mergePositions(nodes, placed),
+    items: withTextPositions(
+      items,
+      texts2,
+      placed.filter((node) => !real.has(node.id))
+    )
+  };
+}
+function arrangeNewTreeWithText(nodes, items, rootId, newIds, heightOf, layout = "right", widthOf) {
+  const followed = new Set(nodes.flatMap((node) => node.afterTextId ? [node.afterTextId] : []));
+  const texts2 = visibleTexts(nodes, items).filter((text12) => newIds.has(text12.parentId) && followed.has(text12.id));
+  if (!texts2.length) return { nodes: arrangeNewTree(nodes, rootId, newIds, heightOf, layout), items: [...items] };
+  const withNew = /* @__PURE__ */ new Set([...newIds, ...texts2.map((text12) => text12.id)]);
+  const placed = arrangeNewTree(virtualTree(nodes, texts2, widthOf), rootId, withNew, heightOf, layout);
+  const real = new Set(nodes.map((node) => node.id));
+  return {
+    nodes: mergePositions(nodes, placed),
     items: withTextPositions(
       items,
       texts2,
@@ -35983,19 +36077,12 @@ function rectsIntersect(a, b) {
 }
 var FLOATING_LAYER_SELECTORS = [
   ".vam-map-tools",
-  ".vam-goal-bar",
+  ".vam-goal-actions",
   ".vam-goal-attachment",
   ".vam-map-sources-panel",
   ".vam-zoom-controls",
   ".vam-canvas-hint"
 ];
-function sharesHorizontalSpace(a, b) {
-  var _a2, _b2;
-  const first = (_a2 = a.getBoundingClientRect) == null ? void 0 : _a2.call(a);
-  const second = (_b2 = b.getBoundingClientRect) == null ? void 0 : _b2.call(b);
-  if (!first || !second) return true;
-  return first.left < second.right && second.left < first.right;
-}
 function isObscured(rect2, view, covers) {
   if (rect2.left < view.left || rect2.right > view.right || rect2.top < view.top || rect2.bottom > view.bottom) return true;
   return covers.some((cover) => rectsIntersect(rect2, cover));
@@ -57052,7 +57139,7 @@ function appendGoalSvg(parent, kind) {
       "stroke-linecap": "round",
       d: ["M4 6h10M4 12h7M4 18h4", "M17 5v14m0 0l-3-3m3 3l3-3"].join("")
     });
-  else if (kind === "select") {
+  else {
     add("rect", { ...line, "stroke-linejoin": "round", x: "3", y: "3", width: "8", height: "8", rx: "1.5" });
     add("rect", {
       ...line,
@@ -57065,11 +57152,11 @@ function appendGoalSvg(parent, kind) {
       rx: "1.5"
     });
     add("path", { ...line, "stroke-linejoin": "round", d: "M5 7l1.5 1.5L9.5 5" });
-  } else add("path", { ...line, "stroke-linejoin": "round", d: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4" });
+  }
   parent.appendChild(svg);
 }
 var relevanceSortedMaps = /* @__PURE__ */ new Set();
-function branchDirectionResolver(nodes, mapDirection, rings) {
+function branchDirectionResolver(nodes, mapDirection, texts2, rings) {
   const layered = allowsBranchLayout(mapDirection);
   if (!layered && !(rings == null ? void 0 : rings.size)) return () => mapDirection;
   const byId = new Map(nodes.map((node) => [node.id, node]));
@@ -57078,6 +57165,12 @@ function branchDirectionResolver(nodes, mapDirection, rings) {
     var _a2, _b2;
     const hit = known.get(id);
     if (hit !== void 0) return hit;
+    const textParent = texts2 == null ? void 0 : texts2.get(id);
+    if (textParent !== void 0 && !byId.has(id)) {
+      const answer2 = resolve(textParent, seen);
+      known.set(id, answer2);
+      return answer2;
+    }
     const node = byId.get(id);
     let answer = mapDirection;
     if (node && !seen.has(id)) {
@@ -57127,10 +57220,15 @@ function estimateTextWidth(text12) {
   );
   return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
 }
+function lineKind(nodes, fromId, childId, direction) {
+  var _a2;
+  return direction === "fishbone" && ((_a2 = nodes.find((node) => node.id === childId)) == null ? void 0 : _a2.afterTextId) === fromId ? "radial" : direction;
+}
 function depthOf(nodes, id) {
   const byId = new Map(nodes.map((node) => [node.id, node]));
   let depth = 0;
-  for (let node = byId.get(id); (node == null ? void 0 : node.parentId) && depth < nodes.length; node = byId.get(node.parentId)) depth++;
+  for (let node = byId.get(id); (node == null ? void 0 : node.parentId) && depth < nodes.length; node = byId.get(node.parentId))
+    depth += node.afterTextId ? 2 : 1;
   return depth;
 }
 var anchorLineKey = (imageId, anchorId, topicId) => `anchor:${imageId}:${anchorId}:${topicId}`;
@@ -57223,7 +57321,6 @@ function researchWebLines(web) {
 }
 var CHAT_RAIL_WIDTH = 44;
 var CHAT_TOOLS_GAP = 12;
-var GOAL_BAR_TOOLS_GAP = 8;
 var GOAL_SUGGEST_GAP = 6;
 var CHAT_EXPAND_LEVELS = 2;
 var CHAT_EXPAND_MAX_TOPICS = 15;
@@ -57257,6 +57354,10 @@ function relationPairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 var goalSuggestSeq = 0;
+var NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-map-actions-button", ".view-action"].join(
+  ", "
+);
+var CLICKABLE_SELECTOR = ["button", "input", "textarea", "a", "[role='button']"].join(",");
 var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -57280,17 +57381,25 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     /** True once this view has started a relevance grading run (so closing it has a run to abort). */
     __publicField(this, "startedRelevance", false);
     __publicField(this, "relevancePanelId", `vam-relevance-panel-${++relevancePanelSeq}`);
-    __publicField(this, "relevancePanelOpen", false);
-    __publicField(this, "relevanceDraft", null);
+    /** The goal being edited in place (null when the goal is just shown). Changes only through startGoalEdit / closeGoalEdit. */
+    __publicField(this, "goalEdit", null);
+    __publicField(this, "goalEditInput", null);
+    __publicField(this, "goalEditContextInput", null);
+    __publicField(this, "goalEditChip", null);
+    __publicField(this, "goalEditActions", null);
+    /** Removes the document listeners of the open edit (a press outside it saves). */
+    __publicField(this, "goalEditCleanup", null);
+    /** True while a goal save started by a press elsewhere or Tab runs: the grading must not take the keyboard from where the user went. */
+    __publicField(this, "holdFocusOnGrade", false);
     __publicField(this, "relevanceBarEl", null);
+    /** The element the bar was last drawn into (the header row or the toolbar); redrawing in place needs it. */
+    __publicField(this, "goalBarHost", null);
+    /** The row the goal bar sits in (Obsidian's header row, or the toolbar when that row is hidden); it carries `vam-goal-host`. */
+    __publicField(this, "goalHostEl", null);
     /** The "suggest new topics for the goal" task: one at a time; it owns the AI call, the list and the Add press. */
     __publicField(this, "goalSuggestTask", null);
     __publicField(this, "goalSuggestCleanup", null);
     __publicField(this, "goalSuggestPanelEl", null);
-    __publicField(this, "relevanceButtonEl", null);
-    __publicField(this, "relevancePanelEl", null);
-    __publicField(this, "relevancePanelGen", 0);
-    __publicField(this, "relevancePanelCleanup", null);
     /** This map's saved data sources (`map-sources`), loaded with the map; the toolbar button and its panel draw from it. */
     __publicField(this, "mapSources", []);
     __publicField(this, "mapSourcesPanelId", `vam-map-sources-panel-${++relevancePanelSeq}`);
@@ -57499,14 +57608,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "cardHeightOf", (id) => {
       var _a2, _b2, _c, _d;
       return ((_a2 = this.cardEls.get(id)) == null ? void 0 : _a2.offsetHeight) || // card-height: a card that is not drawn yet is as tall as the user set it, before the median guess.
-      ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((node) => node.id === id)) == null ? void 0 : _c.height) || // A text node is no card: its own rendered height, or the default while it is not drawn yet.
-      (this.isTextId(id) ? ((_d = this.textEls.get(id)) == null ? void 0 : _d.offsetHeight) || TEXT_NODE_HEIGHT : medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight)));
+      ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((node) => node.id === id)) == null ? void 0 : _c.height) || // A text node is no card: its measured height (drawn, or measured in a hidden copy), else the default.
+      (this.isTextId(id) ? ((_d = this.textBoxOf(id)) == null ? void 0 : _d.height) || TEXT_NODE_HEIGHT : medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight)));
     });
-    /** A text block's width for the layout: as drawn, else the stored one, else a guess from its text (a block not drawn yet). */
+    /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
     __publicField(this, "textWidthOf", (id) => {
       var _a2, _b2, _c, _d;
-      const drawn = (_a2 = this.textEls.get(id)) == null ? void 0 : _a2.offsetWidth;
-      if (drawn) return drawn;
+      const measured = (_a2 = this.textBoxOf(id)) == null ? void 0 : _a2.width;
+      if (measured) return measured;
       const item = ((_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : []).find(
         (entry) => entry.kind === "text" && entry.id === id
       );
@@ -57638,8 +57747,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "chatForcedOpen", false);
     __publicField(this, "goalBarObserver", null);
     __publicField(this, "goalBarObserved", []);
-    /** The attachment the tools were last pushed below; they stay there while it is open (see layoutTopStack). */
-    __publicField(this, "toolsStackedFor", null);
     /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
     __publicField(this, "blankMapPaths", /* @__PURE__ */ new Set());
     __publicField(this, "aimStyleNoticed", /* @__PURE__ */ new Set());
@@ -57678,6 +57785,38 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   droppedCyclesOfLastMerge() {
     return this.lastDroppedCycles;
   }
+  /**
+   * The one measurer of a text block: its width and height as the browser lays it out. Without `as` a drawn block is read
+   * from the DOM; with `as` (the text or width it is about to have; `width: null` = automatic) or when it is not drawn, a
+   * hidden copy is built in the text layer, read at once and removed, so nothing is painted and no extra undo step is needed.
+   * The copy never reads the drawn block, so a drag that already changed its width cannot change the answer.
+   */
+  textBoxOf(id, as) {
+    var _a2, _b2, _c, _d, _e;
+    const drawn = this.textEls.get(id);
+    if (!as && (drawn == null ? void 0 : drawn.offsetWidth) && drawn.offsetHeight)
+      return { width: drawn.offsetWidth, height: drawn.offsetHeight };
+    const item = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+      (entry) => entry.kind === "text" && entry.id === id
+    );
+    const layer = (_c = this.stageEl) == null ? void 0 : _c.querySelector(".vam-text-nodes");
+    if (!item || !layer) return void 0;
+    const width = (as == null ? void 0 : as.width) === void 0 ? item.width : (_d = as.width) != null ? _d : void 0;
+    const probe = layer.createDiv("vam-text-node");
+    try {
+      probe.addClass("vam-text-probe");
+      probe.setAttr("aria-hidden", "true");
+      if (width !== void 0) {
+        probe.style.width = `${width}px`;
+        probe.addClass("has-width");
+      }
+      probe.createDiv({ cls: "vam-text-node-body", text: (_e = as == null ? void 0 : as.text) != null ? _e : item.text });
+      const box = { width: probe.offsetWidth, height: probe.offsetHeight };
+      return box.width && box.height ? box : void 0;
+    } finally {
+      probe.remove();
+    }
+  }
   isTextId(id) {
     var _a2, _b2;
     return id.startsWith("txt-") || !!((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) == null ? void 0 : _b2.some((item) => item.kind === "text" && item.id === id));
@@ -57711,16 +57850,31 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
   }
-  /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. */
-  arrangeBranch(map, parentId, newIds, minTop) {
+  /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. `sizes` gives the text sizes the layout is to assume. */
+  arrangeBranch(map, parentId, newIds, minTop, sizes = { widthOf: this.textWidthOf, heightOf: this.cardHeightOf }) {
     var _a2;
     const out = arrangeNewBranchWithRings(
       map.nodes,
       (_a2 = map.canvasItems) != null ? _a2 : [],
       parentId,
       newIds,
-      this.cardHeightOf,
+      sizes.heightOf,
       minTop,
+      layoutOf(map),
+      sizes.widthOf
+    );
+    map.nodes = out.nodes;
+    if (map.canvasItems) map.canvasItems = out.items;
+  }
+  /** A branch became a top-level tree: it is laid out below the rest; a text block with followers inside it goes with it, as it would in Auto layout. */
+  arrangeTree(map, rootId, ids) {
+    var _a2;
+    const out = arrangeNewTreeWithText(
+      map.nodes,
+      (_a2 = map.canvasItems) != null ? _a2 : [],
+      rootId,
+      ids,
+      this.cardHeightOf,
       layoutOf(map),
       this.textWidthOf
     );
@@ -57768,6 +57922,48 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     });
     map.nodes = out.nodes;
     map.canvasItems = out.items;
+  }
+  /**
+   * The topics that follow text block `textId` and everything below them, or an empty set when none follow it. Laid out again
+   * after the block's width, text or place changed, so the topics after it keep clear of it.
+   */
+  followersOf(map, textId) {
+    const ids = /* @__PURE__ */ new Set();
+    for (const node of map.nodes)
+      if (node.afterTextId === textId) {
+        ids.add(node.id);
+        for (const below of descendants(map.nodes, node.id)) ids.add(below);
+      }
+    return ids;
+  }
+  /**
+   * The block's own edit (its width or its text), for a block that has followers: the edge facing its topic stays (right: x;
+   * left: the right edge; down: centre and top; up: centre and bottom), and the followers are laid out against the block at
+   * its new size. The only place this rule lives; `from` and `to` are measured sizes (see `textBoxOf`). Nothing when no
+   * topic follows the block.
+   */
+  relayoutFollowers(map, textId, from, to) {
+    var _a2;
+    const items = (_a2 = map.canvasItems) != null ? _a2 : [];
+    const text12 = items.find((item) => item.kind === "text" && item.id === textId);
+    const followers = this.followersOf(map, textId);
+    if (!(text12 == null ? void 0 : text12.parentId) || !followers.size) return;
+    const upward = branchDirectionResolver(
+      map.nodes,
+      layoutOf(map).direction,
+      void 0,
+      this.ringDirections(map)
+    )(text12.parentId) === "up";
+    const anchored = {
+      ...text12,
+      x: this.textAnchoredX(textId, from.width, to.width),
+      y: upward ? text12.y + from.height - to.height : text12.y
+    };
+    map.canvasItems = items.map((item) => item === text12 ? anchored : item);
+    this.arrangeBranch(map, textId, followers, void 0, {
+      widthOf: (id) => id === textId ? to.width : this.textWidthOf(id),
+      heightOf: (id) => id === textId ? to.height : this.cardHeightOf(id)
+    });
   }
   onMapWindowFocus() {
     var _a2, _b2, _c;
@@ -58675,7 +58871,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     return true;
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     this.closeTopicLinkMenu();
     this.closed = true;
     this.closeMapSearch(false);
@@ -58692,6 +58888,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     (_d = this.goalBarObserver) == null ? void 0 : _d.disconnect();
     this.goalBarObserver = null;
     this.goalBarObserved = [];
+    this.removeGoalBar();
     this.statusBarObserved = null;
     this.renderAfterDrag = false;
     (_e = this.announcer) == null ? void 0 : _e.remove();
@@ -58714,13 +58911,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     this.closeChatRecords();
     this.abortMapChat();
     (_i = this.chat) == null ? void 0 : _i.dispose();
-    (_j = this.relevancePanelCleanup) == null ? void 0 : _j.call(this);
-    this.relevancePanelCleanup = null;
-    (_k = this.goalSuggestCleanup) == null ? void 0 : _k.call(this);
+    (_j = this.goalSuggestCleanup) == null ? void 0 : _j.call(this);
     this.goalSuggestCleanup = null;
-    (_l = this.mapSourcesPanelCleanup) == null ? void 0 : _l.call(this);
+    (_k = this.mapSourcesPanelCleanup) == null ? void 0 : _k.call(this);
     this.mapSourcesPanelCleanup = null;
-    if (this.relevancePanelOpen) (_n = (_m = this.plugin).releaseWarmClaude) == null ? void 0 : _n.call(_m);
+    this.dropGoalEdit();
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -58741,8 +58936,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_o = this.hoverCard) == null ? void 0 : _o.remove();
-    (_p = this.dragCleanup) == null ? void 0 : _p.call(this);
+    (_l = this.hoverCard) == null ? void 0 : _l.remove();
+    (_m = this.dragCleanup) == null ? void 0 : _m.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -58769,10 +58964,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     }
   }
   renderPreservingFocus() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e;
     const doc = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument;
     const current = (_b2 = doc == null ? void 0 : doc.activeElement) != null ? _b2 : null;
-    if (!doc || !current || !this.contentEl.contains(current) || ((_c = this.chat) == null ? void 0 : _c.isInput(current)) || current.closest(".vam-text-node")) {
+    if (!doc || !current || !(this.contentEl.contains(current) || !!((_d = (_c = this.relevanceBarEl) == null ? void 0 : _c.contains) == null ? void 0 : _d.call(_c, current))) || ((_e = this.chat) == null ? void 0 : _e.isInput(current)) || current.closest(".vam-text-node")) {
       this.render();
       return;
     }
@@ -58782,7 +58977,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     const selection = active.tagName === "INPUT" || active.tagName === "TEXTAREA" ? [active.selectionStart, active.selectionEnd] : null;
     this.render();
     if (!this.mapWindowIsActive()) return;
-    const target = anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null;
+    const target = anchor ? this.resolveMapFocus(anchor) : null;
     if (focusedContainer) this.contentEl.focus();
     else if (target) target.focus();
     else this.restoreMapFocus(anchor);
@@ -58812,13 +59007,23 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     return { card: (id) => this.cardEls.get(id), text: (id) => this.textEls.get(id) };
   }
   describeMapFocus(el) {
-    return describeFocus(el, this.contentEl, (id) => {
-      var _a2, _b2, _c;
-      const text12 = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+    var _a2;
+    const bar = this.relevanceBarEl;
+    const root = el && ((_a2 = bar == null ? void 0 : bar.contains) == null ? void 0 : _a2.call(bar, el)) && !this.contentEl.contains(el) ? bar : this.contentEl;
+    return describeFocus(el, root, (id) => {
+      var _a3, _b2, _c;
+      const text12 = ((_b2 = (_a3 = this.map) == null ? void 0 : _a3.canvasItems) != null ? _b2 : []).find(
         (item) => item.kind === "text" && item.id === id
       );
       return text12 ? text12.parentId : ((_c = this.lastMapFocus) == null ? void 0 : _c.itemId) === id ? this.lastMapFocus.parentId : null;
     });
+  }
+  /** The element that now stands for the anchor: found in the view first, else in the goal bar (which sits outside contentEl). */
+  resolveMapFocus(anchor) {
+    var _a2;
+    const lookup = this.mapFocusLookup();
+    const bar = this.relevanceBarEl;
+    return (_a2 = resolveFocus(anchor, this.contentEl, lookup)) != null ? _a2 : bar && anchor.key && !anchor.nodeId && !anchor.itemId ? resolveFocus(anchor, bar, lookup) : null;
   }
   /** Focus moved inside the map: remember the control, so a dialog or menu that closes onto a removed opener can send it back. */
   trackMapFocus(target) {
@@ -58861,7 +59066,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     if (!doc || this.closed || !this.mapWindowIsActive() || !focusIsLost(doc, this.contentEl)) return;
     const selected = this.selection.state.selected;
     const candidates = [
-      anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null,
+      anchor ? this.resolveMapFocus(anchor) : null,
       (anchor == null ? void 0 : anchor.parentId) ? this.cardEls.get(anchor.parentId) : void 0,
       fallbackNodeId ? this.cardEls.get(fallbackNodeId) : void 0,
       selected ? this.cardEls.get(selected) : void 0
@@ -59065,7 +59270,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     await this.plugin.mutate(() => this.openMapInMutation(path));
   }
   async openMapInMutation(path) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2;
     const viewEpoch = this.aimViewEpoch, openEpoch = ++this.mapOpenEpoch;
     const isCurrent = () => !this.closed && this.aimViewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
@@ -59083,12 +59288,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       this.cameraWhenShown = null;
       this.stopAimProgress();
       this.mapSourcesOpen = false;
-      if (this.relevancePanelOpen) (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
+      this.dropGoalEdit();
       this.abortRelevanceGrade();
     }
     let map = await this.plugin.repo.readMap(path);
     if (!isCurrent()) return;
-    if (aimEnabled() && ((_c = map.aim) == null ? void 0 : _c.creationId) && map.aim.rootDraft) {
+    if (aimEnabled() && ((_a2 = map.aim) == null ? void 0 : _a2.creationId) && map.aim.rootDraft) {
       const resumed = await createAimMap(this.plugin.repo, this.plugin.settings.cliModel, {
         requestId: map.aim.creationId,
         topic: map.title,
@@ -59099,7 +59304,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       if (!isCurrent()) return;
       map = resumed.map;
     }
-    if (aimEnabled() && ((_d = map.aim) == null ? void 0 : _d.questionDraft)) {
+    if (aimEnabled() && ((_b2 = map.aim) == null ? void 0 : _b2.questionDraft)) {
       await this.aimRecovery.recoverQuestionDraft(path);
       if (!isCurrent()) return;
       map = await this.plugin.repo.readMap(path);
@@ -59693,22 +59898,32 @@ ${request.requirements}` : preset.text,
     return !!this.map && !this.map.aim && !!this.path;
   }
   /**
-   * The goal bar: a chat-input style bar at the top centre of the canvas (not in the toolbar). It shows the goal, big and
-   * wrapped, never cut off; the four icons (suggest topics, recalibrate, sort, edit) show on hover or keyboard focus.
-   * Editing opens a popover under the bar with the goal and the extra context.
+   * The goal bar: the goal as a title in the middle of the row above the map (Obsidian's header row, or the toolbar when
+   * that row is hidden). It wraps and is never cut off; the three icons (suggest topics, recalibrate, sort) show on hover or
+   * keyboard focus. A click on the goal turns it into a field in the same place (see startGoalEdit); no icons are drawn while
+   * it is edited. `before` is the sibling the bar goes in front of (the row's action group); without it the bar is appended.
    */
-  renderGoalBar(overlay) {
-    var _a2, _b2, _c, _d;
-    this.relevancePanelGen++;
-    (_a2 = this.relevancePanelCleanup) == null ? void 0 : _a2.call(this);
-    this.relevancePanelCleanup = null;
-    this.relevancePanelEl = null;
-    (_b2 = this.goalSuggestCleanup) == null ? void 0 : _b2.call(this);
+  renderGoalBar(host, before) {
+    var _a2, _b2;
+    this.captureGoalEdit();
+    (_a2 = this.goalSuggestCleanup) == null ? void 0 : _a2.call(this);
     this.goalSuggestCleanup = null;
     this.goalSuggestPanelEl = null;
-    const bar = overlay.createDiv({
+    if (this.goalEdit && (this.goalEdit.path !== this.path || ((_b2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _b2.status) === "running"))
+      this.dropGoalEdit();
+    this.goalBarHost = host;
+    const bar = host.createDiv({
       cls: "vam-goal-bar",
       attr: { role: "group", "aria-labelledby": `${this.relevancePanelId}-name` }
+    });
+    if (before && before.parentElement === host) host.insertBefore(bar, before);
+    bar.addEventListener("keydown", (event) => {
+      const suggest = this.goalSuggestTask;
+      if (event.key !== "Escape" || event.defaultPrevented || !suggest) return;
+      if (suggest.state !== "ready" && suggest.state !== "running") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.endGoalSuggest(suggest, { refocus: true });
     });
     bar.createSpan({
       cls: "vam-sr-only",
@@ -59718,14 +59933,6 @@ ${request.requirements}` : preset.text,
     this.relevanceBarEl = bar;
     this.drawGoalBar(bar);
     this.drawGoalSuggest(bar);
-    if (!this.relevancePanelOpen) return;
-    if (((_c = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _c.status) === "running") {
-      this.relevancePanelOpen = false;
-      this.relevanceDraft = null;
-      (_d = this.relevanceButtonEl) == null ? void 0 : _d.setAttr("aria-expanded", "false");
-      return;
-    }
-    this.drawRelevancePanel(false);
   }
   /** Display-only toggle: within each sibling group show core, support, side, then ungraded. */
   relevanceSortOn() {
@@ -59740,39 +59947,35 @@ ${request.requirements}` : preset.text,
     const target = bar.createSpan("vam-goal-target");
     target.setAttr("aria-hidden", "true");
     appendGoalSvg(target, "target");
-    const text12 = bar.createDiv({ cls: "vam-goal-text", attr: { role: "button", tabindex: "0" } });
+    if (this.goalEdit) {
+      bar.addClass("is-editing");
+      this.drawGoalEdit(bar, this.goalEdit);
+      return;
+    }
+    const textName = `${this.relevancePanelId}-text`;
+    const text12 = bar.createDiv({
+      cls: "vam-goal-text",
+      attr: { role: "button", tabindex: "0", "aria-labelledby": textName }
+    });
     text12.setText(goal != null ? goal : t("ui.relevance_goal_placeholder"));
     const label = goal ? t("ui.relevance_goal_0", goal) : t("ui.relevance_goal_placeholder");
-    text12.setAttr("aria-label", sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label);
-    text12.setAttr("aria-haspopup", "dialog");
-    text12.setAttr("aria-expanded", String(this.relevancePanelOpen));
-    text12.setAttr("aria-controls", this.relevancePanelId);
+    bar.createSpan({
+      cls: "vam-sr-only",
+      text: sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label,
+      attr: { id: textName }
+    });
     text12.setAttr("aria-description", t(goal ? "ui.relevance_goal_edit_hint" : "ui.relevance_goal_set_hint"));
-    const toggleEditor = () => {
-      if (this.relevancePanelOpen && this.relevancePanelEl) this.closeRelevancePanel(true);
-      else this.editRelevanceGoal();
-    };
-    text12.addEventListener("click", toggleEditor);
+    text12.addEventListener(
+      "click",
+      (event) => this.startGoalEdit({ caret: this.caretOffsetAt(text12, event.clientX, event.clientY) })
+    );
     text12.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && this.relevancePanelOpen) {
+      if ((event.key === "Enter" || event.key === " ") && !event.isComposing) {
         event.preventDefault();
         event.stopPropagation();
-        this.closeRelevancePanel(true);
-      } else if ((event.key === "Enter" || event.key === " ") && !event.isComposing) {
-        event.preventDefault();
-        event.stopPropagation();
-        toggleEditor();
+        this.startGoalEdit({});
       }
     });
-    text12.addEventListener("mousedown", (event) => event.preventDefault());
-    text12.addEventListener("focusout", (event) => {
-      var _a3;
-      if (!this.relevancePanelOpen || this.relevanceButtonEl !== text12) return;
-      const next = event.relatedTarget;
-      if (next && (next === text12 || ((_a3 = this.relevancePanelEl) == null ? void 0 : _a3.contains(next)))) return;
-      this.closeRelevancePanel(false);
-    });
-    this.relevanceButtonEl = text12;
     const actions = bar.createDiv({ cls: "vam-goal-actions" });
     const icon = (kind, name2, run, disabled) => {
       const button = actions.createEl("button", { cls: "vam-goal-icon" });
@@ -59825,7 +60028,310 @@ ${request.requirements}` : preset.text,
     );
     sort.setAttr("aria-pressed", String(sorted));
     sort.toggleClass("on", sorted);
-    icon("edit", t("ui.goal_edit"), () => toggleEditor(), running || busy);
+  }
+  // ---- Goal: edit in place ---------------------------------------------------------------------------------------
+  /**
+   * The goal editor, drawn into the bar in place of the goal text. What saves is decided here and only here: Enter (not while
+   * an IME composes), a press outside the bar (saved once the press ends, so the thing pressed still gets its click), and Tab
+   * leaving the last field (or Shift+Tab the first). Esc cancels. Nothing else saves: not a window or focus change, not a repaint,
+   * not opening a menu or dialog. Unchanged or empty never reaches the AI.
+   */
+  drawGoalEdit(bar, edit) {
+    const area = bar.createEl("textarea", { cls: "vam-goal-input" });
+    area.setAttr("rows", "1");
+    area.setAttr("dir", "auto");
+    area.setAttr("aria-labelledby", `${this.relevancePanelId}-name`);
+    area.setAttr("placeholder", t("ui.relevance_goal_placeholder"));
+    area.maxLength = RELEVANCE_GOAL_MAX_LENGTH;
+    area.value = edit.goal;
+    this.goalEditInput = area;
+    const actions = bar.createDiv({ cls: "vam-goal-actions" });
+    this.goalEditActions = actions;
+    this.goalEditChip = null;
+    this.goalEditContextInput = null;
+    if (!edit.showContext) {
+      const chip = actions.createEl("button", { cls: "vam-goal-add-context", text: t("ui.goal_add_context") });
+      chip.setAttr("aria-expanded", "false");
+      chip.addEventListener("mousedown", (event) => event.preventDefault());
+      chip.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.showGoalContext();
+      });
+      chip.addEventListener("keydown", (event) => this.goalEditKeys(event, false));
+      this.goalEditChip = chip;
+    }
+    this.syncGoalChip();
+    if (edit.showContext) {
+      const box = bar.createDiv({ cls: "vam-goal-context vam-goal-attachment" });
+      const labelId = `${this.relevancePanelId}-context`;
+      box.createSpan({ cls: "vam-sr-only", text: t("ui.relevance_context_label"), attr: { id: labelId } });
+      const context = box.createEl("input", { cls: "vam-goal-context-input", type: "text" });
+      context.setAttr("aria-labelledby", labelId);
+      context.setAttr("placeholder", t("ui.relevance_context_placeholder"));
+      context.maxLength = RELEVANCE_CONTEXT_MAX_LENGTH;
+      context.value = edit.context;
+      context.addEventListener("input", () => {
+        edit.context = context.value;
+        this.warmGoalEdit(edit);
+      });
+      context.addEventListener("keydown", (event) => this.goalEditKeys(event, true));
+      this.goalEditContextInput = context;
+    }
+    area.addEventListener("input", () => {
+      var _a2, _b2;
+      if (/[\r\n]/.test(area.value)) {
+        const at = (_a2 = area.selectionStart) != null ? _a2 : area.value.length;
+        const kept = area.value.slice(0, at).replace(/[\r\n]+/g, " ").length;
+        area.value = area.value.replace(/[\r\n]+/g, " ");
+        (_b2 = area.setSelectionRange) == null ? void 0 : _b2.call(area, kept, kept);
+      }
+      edit.goal = area.value;
+      this.growGoalInput(area);
+      this.syncGoalChip();
+      this.warmGoalEdit(edit);
+    });
+    area.addEventListener("keydown", (event) => this.goalEditKeys(event, true));
+    bar.addEventListener("mousedown", (event) => {
+      if (event.target !== this.goalEditInput && event.target !== this.goalEditContextInput) event.preventDefault();
+    });
+    this.growGoalInput(area);
+  }
+  /** The field grows with its text: a goal wraps like the shown one and the row grows with it. */
+  growGoalInput(area) {
+    var _a2, _b2;
+    (_a2 = area.setCssProps) == null ? void 0 : _a2.call(area, { "--vam-goal-edit-height": "auto" });
+    (_b2 = area.setCssProps) == null ? void 0 : _b2.call(area, { "--vam-goal-edit-height": `${area.scrollHeight}px` });
+  }
+  /** "+ Context" is there once the goal has text and the context row is closed; otherwise its slot stays, empty. */
+  syncGoalChip() {
+    var _a2, _b2, _c;
+    const show = !!this.goalEditChip && !!normalizeRelevanceGoal((_b2 = (_a2 = this.goalEditInput) == null ? void 0 : _a2.value) != null ? _b2 : "");
+    (_c = this.goalEditActions) == null ? void 0 : _c.toggleClass("is-vacant", !show);
+  }
+  /** The setup the editor would save: normalised the way the repository stores it, and whether it differs from what is saved. */
+  goalEditSetup(edit) {
+    var _a2, _b2, _c, _d, _e, _f;
+    const goal = normalizeRelevanceGoal((_b2 = (_a2 = this.goalEditInput) == null ? void 0 : _a2.value) != null ? _b2 : edit.goal);
+    const context = normalizeRelevanceContext((_d = (_c = this.goalEditContextInput) == null ? void 0 : _c.value) != null ? _d : edit.context);
+    const changed = !!goal && (goal !== normalizeRelevanceGoal((_e = this.relevanceGoal) != null ? _e : "") || context !== normalizeRelevanceContext((_f = this.relevanceContext) != null ? _f : ""));
+    return { goal, context, changed };
+  }
+  /** Pre-starts the CLI once the text really differs from the saved setup (a click on the goal alone starts nothing). */
+  warmGoalEdit(edit) {
+    if (edit.warmed || !this.relevanceGradeable() || !this.goalEditSetup(edit).changed) return;
+    edit.warmed = true;
+    this.prewarmRelevance("full");
+  }
+  /** Reads the fields back into the edit state, ahead of a repaint that drops them; remembers whether the keyboard was in them. */
+  captureGoalEdit() {
+    var _a2, _b2, _c, _d, _e;
+    const edit = this.goalEdit;
+    const goal = this.goalEditInput;
+    const context = this.goalEditContextInput;
+    this.goalEditInput = null;
+    this.goalEditContextInput = null;
+    this.goalEditChip = null;
+    this.goalEditActions = null;
+    if (!edit) return;
+    const active = (_c = (_b2 = (_a2 = this.goalLayerRoot()) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.activeElement) != null ? _c : null;
+    if (goal) {
+      edit.goal = goal.value;
+      edit.caret = (_d = goal.selectionStart) != null ? _d : edit.caret;
+      if (active && active === goal) {
+        edit.field = "goal";
+        edit.refocus = true;
+      }
+    }
+    if (context) {
+      edit.context = context.value;
+      edit.contextCaret = (_e = context.selectionStart) != null ? _e : edit.contextCaret;
+      if (active && active === context) {
+        edit.field = "context";
+        edit.refocus = true;
+      }
+    }
+  }
+  /** After a repaint or a redraw: the field the keyboard was in takes it back, caret where it was (the end when it is not known). */
+  focusGoalEdit() {
+    var _a2;
+    const edit = this.goalEdit;
+    if (!(edit == null ? void 0 : edit.refocus) || this.closed || !this.mapWindowIsActive()) return;
+    const goal = this.goalEditInput;
+    const context = this.goalEditContextInput;
+    const field = edit.field === "context" && context ? context : goal;
+    if (!field) return;
+    edit.refocus = false;
+    field.focus({ preventScroll: true });
+    const caret = field === context ? edit.contextCaret : edit.caret;
+    const at = Math.min(caret != null ? caret : field.value.length, field.value.length);
+    (_a2 = field.setSelectionRange) == null ? void 0 : _a2.call(field, at, at);
+  }
+  /** Draws the bar again in the same row from the current state (an edit opened, closed, or got its context row). */
+  redrawGoalBar() {
+    const old = this.relevanceBarEl;
+    const host = this.goalBarHost;
+    if (this.closed || !old || !host) return;
+    this.captureGoalEdit();
+    const target = this.goalHostTarget();
+    const before = target && target.host === host ? target.before : null;
+    old.remove();
+    this.renderGoalBar(host, before);
+    this.placeMapTools();
+    this.focusGoalEdit();
+  }
+  /** The goal text becomes a field, caret where it was clicked (the end for the keyboard). */
+  startGoalEdit(at) {
+    var _a2, _b2, _c, _d;
+    if (this.closed || this.goalEdit || !this.relevanceGradeable() || !this.relevanceBarEl || !this.goalBarHost) return;
+    if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") {
+      new import_obsidian37.Notice(t("ui.relevance_goal_unavailable_grading"));
+      return;
+    }
+    if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
+    const context = (_b2 = this.relevanceContext) != null ? _b2 : "";
+    this.goalEdit = {
+      path: this.path,
+      goal: (_c = this.relevanceGoal) != null ? _c : "",
+      context,
+      showContext: !!context,
+      caret: (_d = at.caret) != null ? _d : null,
+      contextCaret: null,
+      field: "goal",
+      refocus: true,
+      warmed: false
+    };
+    this.bindGoalEditOutside();
+    this.redrawGoalBar();
+  }
+  /** The "+ Context" slot: a second row appears under the goal and takes the keyboard. */
+  showGoalContext() {
+    const edit = this.goalEdit;
+    if (!edit || edit.showContext) return;
+    this.captureGoalEdit();
+    edit.showContext = true;
+    edit.field = "context";
+    edit.refocus = true;
+    this.redrawGoalBar();
+  }
+  /**
+   * Closes the edit without saving what is typed (Esc, a map switch, closing the view, a grading that started elsewhere) or after
+   * its draft was handed over (`keepWarm`: the grade takes the pre-started CLI). A CLI started for a grade that will never be sent is stopped.
+   */
+  closeGoalEdit(options = {}) {
+    var _a2, _b2, _c, _d, _e, _f;
+    const edit = this.goalEdit;
+    if (!edit) return;
+    this.goalEdit = null;
+    (_a2 = this.goalEditCleanup) == null ? void 0 : _a2.call(this);
+    this.goalEditCleanup = null;
+    this.goalEditInput = null;
+    this.goalEditContextInput = null;
+    this.goalEditChip = null;
+    this.goalEditActions = null;
+    if (edit.warmed && !options.keepWarm) (_c = (_b2 = this.plugin).releaseWarmClaude) == null ? void 0 : _c.call(_b2);
+    if (options.redraw !== false) this.redrawGoalBar();
+    if (options.refocus) (_f = (_e = (_d = this.goalLayerRoot()) == null ? void 0 : _d.querySelector) == null ? void 0 : _e.call(_d, ".vam-goal-text")) == null ? void 0 : _f.focus();
+  }
+  /** Drops the edit where a repaint follows anyway (or nothing is shown any more). */
+  dropGoalEdit() {
+    this.closeGoalEdit({ redraw: false });
+  }
+  /**
+   * Saves or cancels, by what the editor holds against what is saved. Empty: cancelled, the goal stays. Unchanged: cancelled,
+   * no file written and no AI. Changed: the edit hands its draft over and closes first (so a second Enter finds nothing to
+   * save), then the usual grade runs. Checked again when it runs: the view still open, still on the map the edit was opened on.
+   */
+  commitGoalEdit(how) {
+    var _a2, _b2, _c, _d;
+    const edit = this.goalEdit;
+    if (!edit) return;
+    if (this.closed || edit.path !== this.path) {
+      this.closeGoalEdit({ redraw: false });
+      return;
+    }
+    if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") {
+      this.closeGoalEdit();
+      return;
+    }
+    const setup = this.goalEditSetup(edit);
+    if (!setup.changed) {
+      this.closeGoalEdit({ refocus: how === "enter" });
+      return;
+    }
+    this.closeGoalEdit({ keepWarm: true, redraw: false });
+    this.holdFocusOnGrade = how !== "enter";
+    try {
+      void this.submitRelevanceGoal(setup.goal, (_b2 = setup.context) != null ? _b2 : "", "full");
+    } finally {
+      this.holdFocusOnGrade = false;
+    }
+    if (!this.goalEdit && ((_d = (_c = this.relevanceBarEl) == null ? void 0 : _c.hasClass) == null ? void 0 : _d.call(_c, "is-editing"))) this.redrawGoalBar();
+  }
+  goalEditKeys(event, enterSaves) {
+    var _a2;
+    event.stopPropagation();
+    if (event.key === "Enter" && enterSaves) {
+      if (event.isComposing) return;
+      event.preventDefault();
+      this.commitGoalEdit("enter");
+    } else if (event.key === "Escape") {
+      if (event.isComposing) return;
+      event.preventDefault();
+      this.closeGoalEdit({ refocus: true });
+    } else if (event.key === "Tab") {
+      const chip = ((_a2 = this.goalEditActions) == null ? void 0 : _a2.hasClass("is-vacant")) ? null : this.goalEditChip;
+      const stops = [this.goalEditInput, chip, this.goalEditContextInput].flatMap(
+        (el) => el ? [el] : []
+      );
+      const at = stops.indexOf(event.target);
+      const leaving = !stops.length || (event.shiftKey ? at === 0 : at === stops.length - 1);
+      if (!leaving) return;
+      const edit = this.goalEdit;
+      window.setTimeout(() => {
+        if (this.goalEdit === edit) this.commitGoalEdit("tab");
+      }, 0);
+    }
+  }
+  /**
+   * A press outside the bar saves, but only once the press is over (pointerup, or pointercancel) and the click it makes has been
+   * delivered: saving at pointerdown would repaint the map under the pointer and the card pressed would never get its click.
+   * Presses on Obsidian's menus, dialogs and command palette are not "elsewhere". Another press starts over; if the window is
+   * left before the press ends, nothing saves. The edit may be gone by then (closed, map switched): the check is made again.
+   */
+  bindGoalEditOutside() {
+    var _a2, _b2;
+    (_a2 = this.goalEditCleanup) == null ? void 0 : _a2.call(this);
+    this.goalEditCleanup = null;
+    const edit = this.goalEdit;
+    const doc = (_b2 = this.goalLayerRoot()) == null ? void 0 : _b2.ownerDocument;
+    if (!edit || !(doc == null ? void 0 : doc.addEventListener)) return;
+    let disarm = null;
+    const pressStarted = (event) => {
+      var _a3, _b3, _c;
+      if (event.button !== 0 && event.button !== void 0) return;
+      const target = event.target;
+      if (!target || ((_b3 = (_a3 = this.relevanceBarEl) == null ? void 0 : _a3.contains) == null ? void 0 : _b3.call(_a3, target))) return;
+      if ((_c = target.closest) == null ? void 0 : _c.call(target, NOT_ELSEWHERE_SELECTOR)) return;
+      disarm == null ? void 0 : disarm();
+      const pressEnded = () => {
+        disarm == null ? void 0 : disarm();
+        window.setTimeout(() => {
+          if (this.goalEdit === edit) this.commitGoalEdit("outside");
+        }, 0);
+      };
+      doc.addEventListener("pointerup", pressEnded, true);
+      doc.addEventListener("pointercancel", pressEnded, true);
+      disarm = () => {
+        doc.removeEventListener("pointerup", pressEnded, true);
+        doc.removeEventListener("pointercancel", pressEnded, true);
+        disarm = null;
+      };
+    };
+    doc.addEventListener("pointerdown", pressStarted, true);
+    this.goalEditCleanup = () => {
+      disarm == null ? void 0 : disarm();
+      doc.removeEventListener("pointerdown", pressStarted, true);
+    };
   }
   // ---- Suggest new topics for the goal --------------------------------------------------------------------------
   /** A result, a stop or a failure only counts while this is true: the task is still the view's own, on the same map. */
@@ -59858,11 +60364,12 @@ ${request.requirements}` : preset.text,
   }
   /** Focus goes back to the spark icon; while the icons are hidden (no hover) it goes to the goal text, which shows them. */
   focusGoalReturn() {
-    var _a2, _b2, _c, _d, _e, _f;
-    const spark = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, '.vam-goal-icon[data-goal-action="suggest"]')) != null ? _c : null;
+    var _a2, _b2, _c, _d;
+    const root = this.goalLayerRoot();
+    const spark = (_b2 = (_a2 = root == null ? void 0 : root.querySelector) == null ? void 0 : _a2.call(root, '.vam-goal-icon[data-goal-action="suggest"]')) != null ? _b2 : null;
     const usable = spark && !spark.disabled && spark.offsetParent !== null;
     if (usable) spark.focus();
-    else (_f = (_e = (_d = this.contentEl) == null ? void 0 : _d.querySelector) == null ? void 0 : _e.call(_d, ".vam-goal-text")) == null ? void 0 : _f.focus();
+    else (_d = (_c = root == null ? void 0 : root.querySelector) == null ? void 0 : _c.call(root, ".vam-goal-text")) == null ? void 0 : _d.focus();
   }
   /** The spark icon: ask the AI which topics are missing for the goal. Nothing is written until the user adds some. */
   async startGoalSuggest() {
@@ -59871,7 +60378,7 @@ ${request.requirements}` : preset.text,
     if (!goal || !this.map || !this.map.nodes.length || !this.relevanceGradeable() || this.presentation) return;
     if (this.outlineImportTarget().map !== "editable") return;
     if (this.goalSuggestTask || ((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") return;
-    if (this.relevancePanelOpen) this.closeRelevancePanel(false);
+    this.dropGoalEdit();
     const task = {
       mapPath: this.path,
       token: ++goalSuggestSeq,
@@ -60135,7 +60642,7 @@ ${request.requirements}` : preset.text,
     }));
   }
   /**
-   * Starts the Claude CLI for the grade the open panel would run (no model call; a Codex model starts nothing). The
+   * Starts the Claude CLI for the grade an edited goal would run (no model call; a Codex model starts nothing). The
    * very same command the run uses, so sending only has to write the prompt.
    */
   prewarmRelevance(mode) {
@@ -60147,161 +60654,6 @@ ${request.requirements}` : preset.text,
       reasoning,
       mode === "recalibrate" ? RELEVANCE_RECALIBRATE_SCHEMA : RELEVANCE_GRADE_SCHEMA
     );
-  }
-  /** `keepWarm`: the panel closes to send, so the pre-started process stays for that run; otherwise it is killed. */
-  closeRelevancePanel(refocus, keepWarm = false) {
-    var _a2, _b2, _c, _d, _e, _f;
-    if (!keepWarm) (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
-    this.relevancePanelGen++;
-    (_c = this.relevancePanelCleanup) == null ? void 0 : _c.call(this);
-    this.relevancePanelCleanup = null;
-    (_d = this.relevancePanelEl) == null ? void 0 : _d.remove();
-    this.relevancePanelEl = null;
-    this.relevancePanelOpen = false;
-    this.relevanceDraft = null;
-    (_e = this.relevanceButtonEl) == null ? void 0 : _e.setAttr("aria-expanded", "false");
-    this.placeMapTools();
-    if (refocus) (_f = this.relevanceButtonEl) == null ? void 0 : _f.focus();
-  }
-  /** Open the goal panel under the toolbar button (no-op while a grading run is going). */
-  editRelevanceGoal() {
-    var _a2, _b2, _c, _d;
-    if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") {
-      new import_obsidian37.Notice(t("ui.relevance_goal_unavailable_grading"));
-      return;
-    }
-    if (!this.relevanceBarEl) {
-      new import_obsidian37.Notice(t("ui.relevance_goal_unavailable_toolbar"));
-      return;
-    }
-    if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
-    this.relevancePanelOpen = true;
-    this.relevanceDraft = {
-      goal: (_b2 = this.relevanceGoal) != null ? _b2 : "",
-      context: (_c = this.relevanceContext) != null ? _c : ""
-    };
-    (_d = this.relevanceButtonEl) == null ? void 0 : _d.setAttr("aria-expanded", "true");
-    this.drawRelevancePanel(true);
-  }
-  /**
-   * The popover under the goal bar holds exactly two fields: the goal and the extra context (plus "hand all back to AI"
-   * while the user has pinned grades). Enter in a field saves the goal and grades; Esc, a press outside, or focus
-   * leaving the panel closes it without submitting. Tab inside the panel does not.
-   */
-  drawRelevancePanel(focus) {
-    var _a2, _b2, _c, _d, _e;
-    const tools = this.relevanceBarEl;
-    if (!tools) return;
-    (_a2 = this.relevancePanelEl) == null ? void 0 : _a2.remove();
-    const gen = ++this.relevancePanelGen;
-    const draft = (_d = this.relevanceDraft) != null ? _d : this.relevanceDraft = {
-      goal: (_b2 = this.relevanceGoal) != null ? _b2 : "",
-      context: (_c = this.relevanceContext) != null ? _c : ""
-    };
-    const panel = tools.createDiv({
-      cls: "vam-relevance-panel vam-goal-attachment",
-      attr: { id: this.relevancePanelId, role: "dialog", "aria-label": t("ui.relevance_panel_label") }
-    });
-    this.relevancePanelEl = panel;
-    const group = panel.createDiv({
-      cls: "vam-relevance-setup",
-      attr: { role: "group", "aria-label": t("ui.relevance_goal_label") }
-    });
-    const input2 = group.createEl("input", { cls: "vam-relevance-goal-input", type: "text" });
-    input2.value = draft.goal;
-    input2.maxLength = RELEVANCE_GOAL_MAX_LENGTH;
-    input2.setAttr("aria-label", t("ui.relevance_goal_label"));
-    input2.setAttr("placeholder", t("ui.relevance_goal_placeholder"));
-    const context = group.createEl("input", { cls: "vam-relevance-context-input", type: "text" });
-    context.value = draft.context;
-    context.maxLength = RELEVANCE_CONTEXT_MAX_LENGTH;
-    context.setAttr("aria-label", t("ui.relevance_context_label"));
-    context.setAttr("placeholder", t("ui.relevance_context_placeholder"));
-    const pinCount = this.relevancePinList().length;
-    const planMode = () => relevanceMode(
-      { goal: input2.value, context: context.value },
-      { goal: this.relevanceGoal, context: this.relevanceContext },
-      this.relevanceAiGrades().length > 0
-    );
-    let warmedMode = planMode();
-    if (focus && this.relevanceGradeable()) this.prewarmRelevance(warmedMode);
-    const showMode = () => {
-      const mode = planMode();
-      if (mode !== warmedMode) {
-        warmedMode = mode;
-        if (this.relevanceGradeable()) this.prewarmRelevance(mode);
-      }
-    };
-    input2.addEventListener("input", () => {
-      draft.goal = input2.value;
-      showMode();
-    });
-    context.addEventListener("input", () => {
-      draft.context = context.value;
-      showMode();
-    });
-    let unpinAllButton;
-    if (pinCount) {
-      const pinsRow = panel.createDiv("vam-relevance-pins-row");
-      pinsRow.createSpan({ text: t("ui.relevance_pins_note_0", pinCount) });
-      unpinAllButton = pinsRow.createEl("button", {
-        cls: "vam-relevance-unpin-all",
-        text: t("ui.relevance_unpin_all")
-      });
-    }
-    let finished = false;
-    const alive = () => !finished && gen === this.relevancePanelGen;
-    const finish = (submit, refocus) => {
-      if (!alive()) return;
-      finished = true;
-      const value = input2.value;
-      const extra = context.value;
-      const planned = planMode();
-      this.closeRelevancePanel(refocus, submit && !!normalizeRelevanceGoal(value));
-      if (submit) void this.submitRelevanceGoal(value, extra, planned);
-    };
-    const confirm = () => finish(true, !normalizeRelevanceGoal(input2.value));
-    const keys = (event, enterConfirms) => {
-      event.stopPropagation();
-      if (event.key === "Enter" && enterConfirms) {
-        if (event.isComposing) return;
-        event.preventDefault();
-        confirm();
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        finish(false, true);
-      }
-    };
-    input2.addEventListener("keydown", (event) => keys(event, true));
-    context.addEventListener("keydown", (event) => keys(event, true));
-    unpinAllButton == null ? void 0 : unpinAllButton.addEventListener("keydown", (event) => keys(event, false));
-    unpinAllButton == null ? void 0 : unpinAllButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      finish(false, true);
-      this.unpinAllRelevance();
-    });
-    unpinAllButton == null ? void 0 : unpinAllButton.addEventListener("mousedown", (event) => event.preventDefault());
-    for (const control of [input2, context, ...unpinAllButton ? [unpinAllButton] : []])
-      control.addEventListener("focusout", (event) => {
-        const next = event.relatedTarget;
-        if (next && !panel.contains(next) && next !== this.relevanceButtonEl) finish(false, false);
-      });
-    const doc = (_e = this.contentEl) == null ? void 0 : _e.ownerDocument;
-    if (doc == null ? void 0 : doc.addEventListener) {
-      const outside = (event) => {
-        var _a3;
-        const target = event.target;
-        if (target && (panel.contains(target) || ((_a3 = this.relevanceButtonEl) == null ? void 0 : _a3.contains(target)))) return;
-        finish(false, false);
-      };
-      doc.addEventListener("pointerdown", outside, true);
-      this.relevancePanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
-    }
-    this.placeMapTools();
-    if (focus) {
-      input2.focus();
-      input2.select();
-    }
   }
   // ---- Map data sources: toolbar button and panel ---------------------------------------------------------------
   /**
@@ -60530,7 +60882,7 @@ ${request.requirements}` : preset.text,
     return () => {
       var _a3, _b3, _c2, _d2, _e2, _f2, _g;
       if (!this.mapWindowIsActive()) return;
-      const target = (_g = (_d2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.contentEl) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-goal-text");
+      const target = (_g = (_d2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.goalLayerRoot()) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-goal-text");
       target == null ? void 0 : target.focus();
     };
   }
@@ -60541,7 +60893,8 @@ ${request.requirements}` : preset.text,
     const bar = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-relevance-statusbar");
     const hadFocus = !!bar && !!((_e = bar.contains) == null ? void 0 : _e.call(bar, (_d = (_c = this.contentEl.ownerDocument) == null ? void 0 : _c.activeElement) != null ? _d : null));
     this.render();
-    if (focusBar || hadFocus) (_h = (_g = (_f = this.contentEl) == null ? void 0 : _f.querySelector) == null ? void 0 : _g.call(_f, ".vam-relevance-statusbar button")) == null ? void 0 : _h.focus();
+    if (focusBar && !this.holdFocusOnGrade || hadFocus)
+      (_h = (_g = (_f = this.contentEl) == null ? void 0 : _f.querySelector) == null ? void 0 : _g.call(_f, ".vam-relevance-statusbar button")) == null ? void 0 : _h.focus();
   }
   /**
    * Enter in the goal field. The goal is saved first (its own undo step), then, after the usage confirmation, the
@@ -60934,7 +61287,7 @@ ${request.requirements}` : preset.text,
       var _a3, _b3, _c;
       this.plugin.relevanceGrades.delete(this.path);
       this.render();
-      (_c = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-goal-text")) == null ? void 0 : _c.focus();
+      (_c = (_b3 = (_a3 = this.goalLayerRoot()) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-goal-text")) == null ? void 0 : _c.focus();
     });
   }
   /** Rewrites only the "N of M received" text; nothing is repainted. Empty (and hidden) until the first tier arrives. */
@@ -61065,6 +61418,7 @@ ${request.requirements}` : preset.text,
       const moving = map.nodes.find((item) => item.id === node.id);
       const oldParentId = moving.parentId;
       moving.parentId = parent.id;
+      delete moving.afterTextId;
       map.nodes.find((item) => item.id === parent.id).collapsed = false;
       const movedIds = /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]);
       this.closeGapAt(map, oldParentId, parent.id, movedIds);
@@ -61145,10 +61499,12 @@ ${request.requirements}` : preset.text,
       const moving = map.nodes.find((item) => item.id === node.id);
       const target = map.nodes.find((item) => item.id === parent.id);
       const next = map.nodes.find((item) => item.id === before.id);
-      if (!moving || !target || (next == null ? void 0 : next.parentId) !== parent.id || !canParent(map.nodes, node.id, parent.id)) return;
+      if (!moving || !target || (next == null ? void 0 : next.parentId) !== parent.id || next.afterTextId || !canParent(map.nodes, node.id, parent.id))
+        return;
       map.nodes = this.onScreenSiblingOrder(map);
       const oldParentId = (_b2 = (_a2 = map.nodes.find((item) => item.id === node.id)) == null ? void 0 : _a2.parentId) != null ? _b2 : null;
       moving.parentId = parent.id;
+      delete moving.afterTextId;
       target.collapsed = false;
       map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
       box.placed = true;
@@ -61190,7 +61546,9 @@ ${request.requirements}` : preset.text,
   droppedAmongSiblings(map, card) {
     var _a2;
     if (ringMemberIds(map.nodes, (_a2 = map.canvasItems) != null ? _a2 : []).has(card.id)) return false;
-    const others = map.nodes.filter((item) => item.parentId === card.parentId && item.id !== card.id);
+    const others = map.nodes.filter(
+      (item) => item.parentId === card.parentId && item.afterTextId === card.afterTextId && item.id !== card.id
+    );
     if (!others.length) return false;
     const direction = this.directionOf(map, card.id);
     const vertical = direction === "down" || direction === "up";
@@ -61232,16 +61590,22 @@ ${request.requirements}` : preset.text,
    * The "+" of a card and the toolbar's "+ Topic": a list of what to add (the six topic types and a text block). One pick makes
    * it; Enter takes the first row, "Topic". Esc closes the list and adds nothing.
    */
-  openAddMenu(event, parent) {
+  openAddMenu(event, parent, afterTextId) {
     var _a2;
     if (this.presentation) return;
     const menu = this.newMenu();
     this.drawInDom(menu);
     for (const kind of TOPIC_KINDS)
       menu.addItem(
-        (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(kindIconId(kind)).onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(parent, void 0, true, true, kind))))
+        (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(kindIconId(kind)).onClick(
+          () => this.whenEditing(
+            () => this.enqueue(
+              () => afterTextId ? this.addNode(parent, void 0, true, true, kind, false, {}, afterTextId) : this.addNode(parent, void 0, true, true, kind)
+            )
+          )
+        )
       );
-    if (this.canEditText())
+    if (this.canEditText() && !afterTextId)
       menu.addItem(
         (item) => item.setTitle(t("ui.text_node_add")).setIcon("text-cursor-input").onClick(() => this.whenEditing(() => this.addTextNodeUnder(parent)))
       );
@@ -64488,6 +64852,21 @@ ${request.requirements}` : preset.text,
       });
       promote.addEventListener("keydown", (event) => event.stopPropagation());
       promote.addEventListener("dblclick", (event) => event.stopPropagation());
+      if (!free && !this.selection.state.multiSelectMode && !this.aimLive()) {
+        const add = el.createEl("button", {
+          cls: "vam-text-add",
+          text: "+",
+          attr: { type: "button", "aria-label": t("ui.text_node_add_topic_label"), "aria-haspopup": "menu" }
+        });
+        add.addEventListener("click", (event) => {
+          var _a3;
+          event.stopPropagation();
+          const owner = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === text12.parentId);
+          if (owner) this.openAddMenu(event, owner, text12.id);
+        });
+        add.addEventListener("keydown", (event) => event.stopPropagation());
+        add.addEventListener("dblclick", (event) => event.stopPropagation());
+      }
       if (free) this.addFreeTextControls(el, text12, liveLinks);
       el.addEventListener("keydown", (event) => {
         if (event.target !== el || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -64665,6 +65044,7 @@ ${request.requirements}` : preset.text,
     let direction = branchDirectionResolver(
       this.map.nodes,
       layoutOf(this.map).direction,
+      void 0,
       this.ringDirections(this.map)
     )(item.parentId);
     if (direction === "balanced") {
@@ -64683,14 +65063,36 @@ ${request.requirements}` : preset.text,
    * `from` is the width before the change; resetting to automatic measures the fitted width for `to`.
    */
   async resizeText(id, width, from) {
+    var _a2, _b2, _c, _d, _e;
     const el = this.textEls.get(id);
-    const to = width != null ? width : el ? fittedTextWidth(el) : from;
+    const stored = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+      (item) => item.kind === "text" && item.id === id
+    );
+    const before = (_d = this.textBoxOf(id, { width: (_c = stored == null ? void 0 : stored.width) != null ? _c : null })) != null ? _d : {
+      width: from,
+      height: (el == null ? void 0 : el.offsetHeight) || TEXT_NODE_HEIGHT
+    };
+    const after = this.textBoxOf(id, { width: width != null ? width : null });
+    const to = (_e = width != null ? width : after == null ? void 0 : after.width) != null ? _e : el ? fittedTextWidth(el) : from;
     const x = this.textAnchoredX(id, from, to);
+    const follows = this.followersOf(this.map, id).size > 0;
     await this.changeCanvasItems(
       id,
       (items) => setTextNodeWidth(items, id, width).map(
-        (entry) => entry.kind === "text" && entry.id === id ? { ...entry, x } : entry
-      )
+        (entry) => (
+          // With followers the one rule in `relayoutFollowers` places the block.
+          entry.kind === "text" && entry.id === id && !follows ? { ...entry, x } : entry
+        )
+      ),
+      (map) => {
+        var _a3;
+        return this.relayoutFollowers(
+          map,
+          id,
+          { width: from, height: before.height },
+          { width: to, height: (_a3 = after == null ? void 0 : after.height) != null ? _a3 : before.height }
+        );
+      }
     );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
@@ -64995,24 +65397,59 @@ ${request.requirements}` : preset.text,
   }
   /** Saves edited text as one undo step; an empty text removes the node (still one undo step). */
   async saveTextItem(id, value) {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     const current = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
       (item) => item.kind === "text" && item.id === id
     );
     if (!current) return;
     this.focusItemId = id;
     if (cleanText(value) === null) {
-      this.focusItemId = null;
-      await this.changeCanvasItems(id, (items) => removeTextNode(items, id));
-      (_c = this.announcer) == null ? void 0 : _c.setText(t("ui.text_node_removed"));
-    } else if (cleanText(value) !== current.text)
-      await this.changeCanvasItems(id, (items) => updateTextNode(items, id, value));
+      await this.removeTextItem(id);
+    } else if (cleanText(value) !== current.text) {
+      const text12 = cleanText(value);
+      const before = this.textBoxOf(id);
+      const after = this.textBoxOf(id, { text: text12 });
+      await this.changeCanvasItems(
+        id,
+        (items) => updateTextNode(items, id, value),
+        // The topics after it are laid out again against the new size in the same step; a block with none keeps its facing edge alone.
+        (map) => {
+          var _a3;
+          if (!before || !after) return;
+          if (this.followersOf(map, id).size) {
+            this.relayoutFollowers(map, id, before, after);
+            return;
+          }
+          const x = this.textAnchoredX(id, before.width, after.width);
+          map.canvasItems = ((_a3 = map.canvasItems) != null ? _a3 : []).map(
+            (item) => item.kind === "text" && item.id === id ? { ...item, x } : item
+          );
+        }
+      );
+    }
   }
+  /**
+   * Deletes a text block. The topics that follow it stay: they are direct children of the block's topic again and are laid
+   * out there. Only the canvas item and those fields change; notes are never touched. One undo step.
+   */
   async removeTextItem(id) {
     var _a2;
     this.focusItemId = null;
-    await this.changeCanvasItems(id, (items) => removeTextNode(items, id));
+    await this.changeCanvasItems(
+      id,
+      (items) => removeTextNode(items, id),
+      (map) => this.releaseFollowers(map, id)
+    );
     (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.text_node_removed"));
+  }
+  /** Text block `textId` is gone from `map.canvasItems`: its followers become direct children of the topic and are placed again. */
+  releaseFollowers(map, textId) {
+    const followers = map.nodes.filter((node) => node.afterTextId === textId);
+    if (!followers.length) return;
+    const parentId = followers[0].parentId;
+    const brought = this.followersOf(map, textId);
+    for (const node of followers) delete node.afterTextId;
+    if (parentId && map.nodes.some((node) => node.id === parentId)) this.arrangeBranch(map, parentId, brought);
   }
   /**
    * Turns a text node into a topic card (decision #2): the first line (at most 80 characters) is the title, the whole text the
@@ -65027,6 +65464,8 @@ ${request.requirements}` : preset.text,
     const parent = (_b2 = this.map.nodes.find((node) => node.id === text12.parentId)) != null ? _b2 : null;
     const title = text12.text.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
     if (!title) return;
+    const followerIds = this.map.nodes.filter((node) => node.afterTextId === id).map((node) => node.id);
+    if (followerIds.length && !this.mergeUnlocked(followerIds)) return;
     const historyMark = this.history.mark();
     try {
       const before = new Set(this.map.nodes.map((node) => node.id));
@@ -65041,7 +65480,15 @@ ${request.requirements}` : preset.text,
         if (!map.canvasItems.length) delete map.canvasItems;
         const created = map.nodes.find((node) => node.id === child.id);
         if (!created) return;
-        if (parent) this.arrangeBranch(map, parent.id, /* @__PURE__ */ new Set([created.id]));
+        const adopted = /* @__PURE__ */ new Set([created.id]);
+        for (const node of map.nodes)
+          if (node.afterTextId === id) {
+            node.parentId = created.id;
+            delete node.afterTextId;
+            adopted.add(node.id);
+            for (const below of descendants(map.nodes, node.id)) adopted.add(below);
+          }
+        if (parent) this.arrangeBranch(map, parent.id, adopted);
         else {
           created.x = text12.x;
           created.y = text12.y;
@@ -65058,13 +65505,15 @@ ${request.requirements}` : preset.text,
   }
   /** The text nodes the user wrote under `nodeId`, as a read-only block for the prompt; empty when there are none (decision #4). */
   userTextContext(nodeId) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     if (!((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) == null ? void 0 : _b2.length)) return "";
     const { attached } = treeTextNodes(
       this.map.canvasItems,
       this.map.nodes.map((node) => node.id)
     );
-    return attached.filter((text12) => text12.parentId === nodeId).map((text12) => `- ${text12.text.replace(/\n/g, "\n  ")}`).join("\n");
+    const after = (_c = this.map.nodes.find((node) => node.id === nodeId)) == null ? void 0 : _c.afterTextId;
+    const first = after ? attached.filter((text12) => text12.id === after) : [];
+    return [...first, ...attached.filter((text12) => text12.parentId === nodeId)].map((text12) => `- ${text12.text.replace(/\n/g, "\n  ")}`).join("\n");
   }
   /** The annotated-image anchors that relate to `nodeId` as the read-only prompt block (research and expand only); "" when there are none. */
   anchorContextText(nodeId, language2) {
@@ -65107,16 +65556,20 @@ ${request.requirements}` : preset.text,
   }
   /** Every text node of the map for the chat context; a free one (its topic is gone) goes with `parentId: null` (decision #4). */
   chatUserTexts() {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     const items = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [];
     const ids = new Set(((_d = (_c = this.map) == null ? void 0 : _c.nodes) != null ? _d : []).map((node) => node.id));
+    const followers = /* @__PURE__ */ new Map();
+    for (const node of (_f = (_e = this.map) == null ? void 0 : _e.nodes) != null ? _f : [])
+      if (node.afterTextId) followers.set(node.afterTextId, [...(_g = followers.get(node.afterTextId)) != null ? _g : [], node.id]);
     return items.filter((item) => item.kind === "text").map((text12) => {
       var _a3;
       return {
         id: text12.id,
         parentId: text12.parentId && ids.has(text12.parentId) ? text12.parentId : null,
         text: text12.text,
-        ...((_a3 = text12.links) == null ? void 0 : _a3.length) ? { links: text12.links } : {}
+        ...((_a3 = text12.links) == null ? void 0 : _a3.length) ? { links: text12.links } : {},
+        ...followers.has(text12.id) ? { followedBy: followers.get(text12.id) } : {}
       };
     });
   }
@@ -65748,7 +66201,7 @@ ${request.requirements}` : preset.text,
     };
   }
   /** Writes a canvas-item change as one undo step; an empty list leaves no `canvasItems` field in Map.md. */
-  async changeCanvasItems(id, change2, alongside) {
+  async changeCanvasItems(id, change2, after) {
     var _a2;
     if (!this.map || !this.canEditCanvasItems()) return;
     if (!((_a2 = this.map.canvasItems) == null ? void 0 : _a2.some((item) => item.id === id))) return;
@@ -65764,7 +66217,7 @@ ${request.requirements}` : preset.text,
       const next = pruneBoundaries(dangling.size ? removeLinksTo(changed, dangling) : changed, [...alive]);
       if (next.length) map.canvasItems = next;
       else delete map.canvasItems;
-      alongside == null ? void 0 : alongside(map);
+      after == null ? void 0 : after(map);
     }, false);
   }
   /** The topics of a picture's ring and everything below them (folded branches too): what moves with the picture. */
@@ -66248,7 +66701,9 @@ ${request.requirements}` : preset.text,
       for (const root of roots) {
         if (target && !canParent(map.nodes, root.id, target.id))
           throw new Error(t("ui.circular_links_are_not_allowed"));
-        map.nodes.find((item) => item.id === root.id).parentId = (_a2 = target == null ? void 0 : target.id) != null ? _a2 : null;
+        const moving = map.nodes.find((item) => item.id === root.id);
+        moving.parentId = (_a2 = target == null ? void 0 : target.id) != null ? _a2 : null;
+        delete moving.afterTextId;
         const branch = /* @__PURE__ */ new Set([root.id, ...descendants(map.nodes, root.id)]);
         branchOf.set(root.id, branch);
         for (const id of branch) moved.add(id);
@@ -66257,8 +66712,7 @@ ${request.requirements}` : preset.text,
         map.nodes.find((node) => node.id === target.id).collapsed = false;
         this.arrangeBranch(map, target.id, moved, void 0);
       } else {
-        for (const root of roots)
-          map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id), this.cardHeightOf, layoutOf(map));
+        for (const root of roots) this.arrangeTree(map, root.id, branchOf.get(root.id));
       }
     });
     this.selection.afterMove(clearSelection);
@@ -67692,6 +68146,7 @@ ${request.requirements}` : preset.text,
   }
   /** The header's "More mind map actions": an Obsidian menu under the button, each entry a verb. */
   openMapActions(event) {
+    var _a2;
     const menu = this.newMenu();
     const add = (title, icon, action, warning = false) => {
       menu.addItem((item) => {
@@ -67705,6 +68160,9 @@ ${request.requirements}` : preset.text,
     if (this.map && !this.aimLive())
       add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
+    const pins = this.relevanceGradeable() ? this.relevancePinList().length : 0;
+    if (pins > 0 && ((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) !== "running")
+      add(t("ui.relevance_unpin_all_0", pins), "rotate-ccw", () => this.unpinAllRelevance());
     menu.addSeparator();
     add(t("ui.keyboard_shortcuts"), "keyboard", () => this.openKeyboardShortcuts());
     if (this.map) {
@@ -67982,7 +68440,7 @@ ${request.requirements}` : preset.text,
     this.settleCardHeights();
   }
   paint() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K;
     if (!this.closed && this.hiddenTab()) this.renderWhenShown = true;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
@@ -68028,33 +68486,31 @@ ${request.requirements}` : preset.text,
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const restoreSearch = this.holdMapSearch();
-    this.relevancePanelGen++;
-    (_h = this.relevancePanelCleanup) == null ? void 0 : _h.call(this);
-    this.relevancePanelCleanup = null;
-    this.relevancePanelEl = null;
-    (_i = this.mapSourcesPanelCleanup) == null ? void 0 : _i.call(this);
+    this.captureGoalEdit();
+    (_h = this.mapSourcesPanelCleanup) == null ? void 0 : _h.call(this);
     this.mapSourcesPanelCleanup = null;
     this.mapSourcesPanelEl = null;
-    (_j = this.suspendInlineName) == null ? void 0 : _j.call(this);
-    if (((_k = this.inlineName) == null ? void 0 : _k.target) === "card" && !((_l = this.map) == null ? void 0 : _l.nodes.some((node) => {
+    (_i = this.suspendInlineName) == null ? void 0 : _i.call(this);
+    if (((_j = this.inlineName) == null ? void 0 : _j.target) === "card" && !((_k = this.map) == null ? void 0 : _k.nodes.some((node) => {
       var _a3;
       return node.id === ((_a3 = this.inlineName) == null ? void 0 : _a3.id);
     })))
       this.inlineName = null;
-    if (((_m = this.inlineName) == null ? void 0 : _m.target) === "map" && !this.map) this.inlineName = null;
+    if (((_l = this.inlineName) == null ? void 0 : _l.target) === "map" && !this.map) this.inlineName = null;
     this.inlineNameInput = null;
-    (_n = this.suspendInlineSummary) == null ? void 0 : _n.call(this);
-    if (this.inlineSummary && !((_o = this.map) == null ? void 0 : _o.nodes.some((node) => {
+    (_m = this.suspendInlineSummary) == null ? void 0 : _m.call(this);
+    if (this.inlineSummary && !((_n = this.map) == null ? void 0 : _n.nodes.some((node) => {
       var _a3;
       return node.id === ((_a3 = this.inlineSummary) == null ? void 0 : _a3.id);
     })))
       this.inlineSummary = null;
     this.inlineSummaryInput = null;
+    this.removeGoalBar();
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     const switcher = toolbar.createDiv({ cls: "vam-map-switcher" });
-    const mapName = (_q = (_p = this.map) == null ? void 0 : _p.title) != null ? _q : "Visual Agent Map";
-    if (this.map && ((_r = this.inlineName) == null ? void 0 : _r.target) === "map") {
+    const mapName = (_p = (_o = this.map) == null ? void 0 : _o.title) != null ? _p : "Visual Agent Map";
+    if (this.map && ((_q = this.inlineName) == null ? void 0 : _q.target) === "map") {
       const field = this.createInlineNameInput(switcher, "vam-map-title-input", t("ui.rename_mind_map"), (value) => {
         var _a3;
         const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
@@ -68108,10 +68564,10 @@ ${request.requirements}` : preset.text,
         "more-vertical",
         t("ui.more_mind_map_actions"),
         (event) => this.openMapActions(event)
-      );
+      ).addClass("vam-map-actions-button");
     }
-    const selectedNode = (_s = this.map) == null ? void 0 : _s.nodes.find((node) => node.id === this.selection.state.selected);
-    if (aimEnabled() && ((_t = this.map) == null ? void 0 : _t.aim)) {
+    const selectedNode = (_r = this.map) == null ? void 0 : _r.nodes.find((node) => node.id === this.selection.state.selected);
+    if (aimEnabled() && ((_s = this.map) == null ? void 0 : _s.aim)) {
       const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
       statusbar.setAttr("aria-live", "polite");
       const data = this.map.aim;
@@ -68127,19 +68583,19 @@ ${request.requirements}` : preset.text,
       let stateText;
       let stateClass;
       if (this.aimBusy) {
-        const activeTitle = (_w = (_v = this.notes.get((_u = this.aimActiveQuestionNodeId) != null ? _u : "")) == null ? void 0 : _v.title) != null ? _w : this.map.title;
+        const activeTitle = (_v = (_u = this.notes.get((_t = this.aimActiveQuestionNodeId) != null ? _t : "")) == null ? void 0 : _u.title) != null ? _v : this.map.title;
         const planning = this.aimActivityKind === "planning";
         stateText = this.aimActivityKind === "clarifying" ? t("ui.aim_preparing_clarification") : this.aimProgress ? this.aimStageText() : t(planning ? "ui.aim_status_planning_0" : "ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (runningBranch) {
-        const activeTitle = (_y = (_x = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _x.title) != null ? _y : this.map.title;
+        const activeTitle = (_x = (_w = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _w.title) != null ? _x : this.map.title;
         stateText = t("ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (!questions.length) {
         stateText = t("ui.aim_status_ready");
         stateClass = "idea";
       } else if (pendingQuestion) {
-        stateText = t("ui.aim_status_waiting_answer_0", (_A = (_z = this.notes.get(pendingQuestion.id)) == null ? void 0 : _z.title) != null ? _A : "");
+        stateText = t("ui.aim_status_waiting_answer_0", (_z = (_y = this.notes.get(pendingQuestion.id)) == null ? void 0 : _y.title) != null ? _z : "");
         stateClass = "idea";
       } else if (data.branches.some((branch) => branch.results.some((result) => result.kind === "conclusion"))) {
         stateText = t("ui.aim_status_complete");
@@ -68159,7 +68615,7 @@ ${request.requirements}` : preset.text,
           var _a3;
           (_a3 = this.aimController) == null ? void 0 : _a3.abort();
         });
-        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_C = (_B = this.aimProgress) == null ? void 0 : _B.branchId) != null ? _C : null };
+        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_B = (_A = this.aimProgress) == null ? void 0 : _A.branchId) != null ? _B : null };
         const steer = this.button(
           statusbar,
           t("ui.aim_steer"),
@@ -68180,9 +68636,9 @@ ${request.requirements}` : preset.text,
         attr: { target: "_blank", rel: "noopener noreferrer" }
       });
     }
-    if (!aimEnabled() && ((_D = this.map) == null ? void 0 : _D.aim))
+    if (!aimEnabled() && ((_C = this.map) == null ? void 0 : _C.aim))
       this.contentEl.createDiv({ cls: "vam-aim-attribution", text: t("ui.aim_paused_notice"), attr: { role: "note" } });
-    if (aimEnabled() && ((_E = this.map) == null ? void 0 : _E.aim)) {
+    if (aimEnabled() && ((_D = this.map) == null ? void 0 : _D.aim)) {
       const data = this.map.aim;
       const isAnswered = (node) => data.branches.some((branch) => branch.questionNodeId === node.id);
       const pending2 = this.map.nodes.find((node) => node.aimKind === "question" && node.aimQuestion && !isAnswered(node));
@@ -68236,10 +68692,10 @@ ${request.requirements}` : preset.text,
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
     }
-    if ((_F = this.deletedMap) == null ? void 0 : _F.deleted)
+    if ((_E = this.deletedMap) == null ? void 0 : _E.deleted)
       this.button(toolbar, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
     const startingSelection = this.startingTasks.get(this.selectionTaskKey());
-    if (startingSelection && !(((_G = this.integrationTask) == null ? void 0 : _G.mapPath) === this.path && this.integrationTask.state === "running")) {
+    if (startingSelection && !(((_F = this.integrationTask) == null ? void 0 : _F.mapPath) === this.path && this.integrationTask.state === "running")) {
       const state = this.contentEl.createDiv("vam-integration-progress");
       state.setAttr("aria-live", "polite");
       state.createSpan({ text: t("ui.integration_running") });
@@ -68290,8 +68746,9 @@ ${request.requirements}` : preset.text,
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
       if (aimEnabled()) this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
-      if ((_H = this.deletedMap) == null ? void 0 : _H.deleted)
+      if ((_G = this.deletedMap) == null ? void 0 : _G.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
+      this.dropGoalEdit();
       return;
     }
     if (!this.aimLive()) this.renderMultiResearchStatus(this.contentEl);
@@ -68301,7 +68758,7 @@ ${request.requirements}` : preset.text,
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    if (((_I = this.map) == null ? void 0 : _I.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
+    if (((_H = this.map) == null ? void 0 : _H.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
     else this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     const canvas = workspace.createDiv("vam-canvas");
@@ -68311,15 +68768,10 @@ ${request.requirements}` : preset.text,
     canvas.insertBefore(overlay, this.viewportEl);
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
-    if (this.relevanceGradeable() && this.map.nodes.length) this.renderGoalBar(overlay);
+    if (this.relevanceGradeable() && this.map.nodes.length) this.mountGoalBar();
     else {
       this.relevanceBarEl = null;
-      this.relevanceButtonEl = null;
-      if (this.relevancePanelOpen) {
-        this.relevancePanelOpen = false;
-        this.relevanceDraft = null;
-        (_K = (_J = this.plugin).releaseWarmClaude) == null ? void 0 : _K.call(_J);
-      }
+      this.dropGoalEdit();
     }
     this.mountMapChat(workspace, overlay);
     this.placeGoalBar();
@@ -68329,7 +68781,7 @@ ${request.requirements}` : preset.text,
     }) : null;
     const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");
     const zoom = controls.createDiv("vam-zoom-controls");
-    (_L = this.usageControl) == null ? void 0 : _L.mount(zoom, controls);
+    (_I = this.usageControl) == null ? void 0 : _I.mount(zoom, controls);
     this.iconButton(zoom, "minus", t("ui.zoom_out"), () => {
       var _a3;
       this.markCanvasHintSeen();
@@ -68402,7 +68854,7 @@ ${request.requirements}` : preset.text,
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_M = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _M.focus({ preventScroll: true });
+        (_J = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _J.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -68412,9 +68864,9 @@ ${request.requirements}` : preset.text,
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
-        (_N = this.stageEl.querySelector(
+        (_K = this.stageEl.querySelector(
           `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
-        )) == null ? void 0 : _N.focus({ preventScroll: true });
+        )) == null ? void 0 : _K.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -68434,6 +68886,7 @@ ${request.requirements}` : preset.text,
     keepMapFocus();
     this.focusInlineName();
     this.focusInlineSummary();
+    this.focusGoalEdit();
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
     restoreSearch();
@@ -69336,10 +69789,13 @@ ${request.requirements}` : preset.text,
   }
   /** Screen rectangles of the floating layers that cover part of the canvas (FLOATING_LAYER_SELECTORS). */
   floatingControlRects() {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     const rects = [];
     for (const selector of FLOATING_LAYER_SELECTORS) {
-      const rect2 = (_d = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, selector)) == null ? void 0 : _c.getBoundingClientRect) == null ? void 0 : _d.call(_c);
+      const el = (_b2 = (_a2 = this.goalLayerRoot()) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, selector);
+      if (selector === ".vam-goal-actions" && ((_f = (_e = (_d = (_c = el == null ? void 0 : el.ownerDocument) == null ? void 0 : _c.defaultView) == null ? void 0 : _d.getComputedStyle) == null ? void 0 : _e.call(_d, el)) == null ? void 0 : _f.opacity) === "0")
+        continue;
+      const rect2 = (_g = el == null ? void 0 : el.getBoundingClientRect) == null ? void 0 : _g.call(el);
       if (rect2 && rect2.right > rect2.left && rect2.bottom > rect2.top) rects.push(rect2);
     }
     return rects;
@@ -70429,13 +70885,17 @@ ${request.requirements}` : preset.text,
         if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
         await this.mapChange((map) => {
           if (!canParent(map.nodes, node.id, parentId)) throw new Error(t("ui.circular_links_are_not_allowed"));
-          map.nodes.find((n) => n.id === node.id).parentId = parentId;
+          const moving = map.nodes.find((n) => n.id === node.id);
+          moving.parentId = parentId;
+          delete moving.afterTextId;
           const branch = /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]);
           const parent2 = parentId ? map.nodes.find((n) => n.id === parentId) : void 0;
           if (parent2) {
             parent2.collapsed = false;
             this.arrangeBranch(map, parent2.id, branch, void 0);
-          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutOf(map));
+          } else {
+            this.arrangeTree(map, node.id, branch);
+          }
         });
       });
     };
@@ -72178,7 +72638,7 @@ ${request.requirements}` : preset.text,
    * `keyboardFocus` also hands DOM focus to the new card; only the name dialog's save asks for it, because other
    * callers (the structure review dialog stays open) must not pull focus out from under their own UI.
    */
-  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true, kind = "topic", keyboardFocus = false, hypothesisStart = {}) {
+  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true, kind = "topic", keyboardFocus = false, hypothesisStart = {}, afterTextId) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
@@ -72231,22 +72691,31 @@ ${request.requirements}` : preset.text,
     try {
       await this.mapChangeSnapshots(
         (map) => {
+          var _a3;
           map.nodes.push(node);
           const owner = parent ? map.nodes.find((n) => n.id === parent.id) : void 0;
+          const follows = owner && afterTextId ? treeTextNodes(
+            (_a3 = map.canvasItems) != null ? _a3 : [],
+            map.nodes.map((n) => n.id)
+          ).attached.find((text12) => text12.id === afterTextId && text12.parentId === owner.id) : void 0;
+          if (follows) node.afterTextId = follows.id;
+          else delete node.afterTextId;
           if (owner) {
             owner.collapsed = false;
-            const siblings = map.nodes.filter((n) => n.parentId === owner.id && n.id !== node.id);
+            const siblings = map.nodes.filter(
+              (n) => n.parentId === owner.id && n.id !== node.id && n.afterTextId === node.afterTextId
+            );
             const minTop = siblings.length ? Math.max(...siblings.map((n) => {
-              var _a3;
-              return n.y + ((_a3 = this.cardHeightOf(n.id)) != null ? _a3 : DEFAULT_CARD_HEIGHT);
+              var _a4;
+              return n.y + ((_a4 = this.cardHeightOf(n.id)) != null ? _a4 : DEFAULT_CARD_HEIGHT);
             })) + LAYOUT_GAP : void 0;
-            this.arrangeBranch(map, owner.id, /* @__PURE__ */ new Set([node.id]), minTop);
+            this.arrangeBranch(map, node.afterTextId ? node.afterTextId : owner.id, /* @__PURE__ */ new Set([node.id]), minTop);
           } else if (!parent) {
             const roots = map.nodes.filter((n) => n.id !== node.id && !n.parentId);
             if (roots.length)
               node.y = Math.max(...roots.map((n) => {
-                var _a3;
-                return n.y + ((_a3 = this.cardHeightOf(n.id)) != null ? _a3 : DEFAULT_CARD_HEIGHT);
+                var _a4;
+                return n.y + ((_a4 = this.cardHeightOf(n.id)) != null ? _a4 : DEFAULT_CARD_HEIGHT);
               })) + LAYOUT_GAP;
           }
         },
@@ -74214,17 +74683,11 @@ ${note.detail.trim()}` : "",
   }
   /** Safe area under the floating toolbar, measured so a wrapped toolbar is covered too. */
   canvasInset() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e;
     const canvas = (_b2 = (_a2 = this.viewportEl) == null ? void 0 : _a2.getBoundingClientRect) == null ? void 0 : _b2.call(_a2);
-    return canvas ? Math.max(
-      insetFromRects(
-        canvas.top,
-        (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector(".vam-map-tools")) == null ? void 0 : _d.getBoundingClientRect) == null ? void 0 : _e.call(_d)
-      ),
-      insetFromRects(
-        canvas.top,
-        (_h = (_g = (_f = this.contentEl) == null ? void 0 : _f.querySelector(".vam-goal-bar")) == null ? void 0 : _g.getBoundingClientRect) == null ? void 0 : _h.call(_g)
-      )
+    return canvas ? insetFromRects(
+      canvas.top,
+      (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector(".vam-map-tools")) == null ? void 0 : _d.getBoundingClientRect) == null ? void 0 : _e.call(_d)
     ) : 0;
   }
   /**
@@ -74240,10 +74703,7 @@ ${note.detail.trim()}` : "",
       return (_c = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector(selector)) == null ? void 0 : _b3.getBoundingClientRect) == null ? void 0 : _c.call(_b3);
     };
     return {
-      top: Math.max(
-        insetFromRects(canvas.top, rectOf(".vam-map-tools")),
-        insetFromRects(canvas.top, rectOf(".vam-goal-bar"))
-      ),
+      top: insetFromRects(canvas.top, rectOf(".vam-map-tools")),
       right: 0,
       bottom: bottomInsetFromRects(canvas.bottom, rectOf(".vam-zoom-controls")),
       left: leftInsetFromRects(canvas.left, rectOf(".vam-map-chat.is-overlay"))
@@ -74273,7 +74733,7 @@ ${note.detail.trim()}` : "",
     var _a2, _b2, _c, _d;
     const canvas = (_b2 = (_a2 = this.viewportEl) == null ? void 0 : _a2.getBoundingClientRect) == null ? void 0 : _b2.call(_a2);
     if (!this.map || !canvas) return [];
-    const bars = [".vam-map-tools", ".vam-goal-bar"].flatMap((selector) => {
+    const bars = [".vam-map-tools"].flatMap((selector) => {
       var _a3, _b3, _c2;
       const rect2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector(selector)) == null ? void 0 : _b3.getBoundingClientRect) == null ? void 0 : _c2.call(_b3);
       return rect2 && rect2.bottom > rect2.top ? [
@@ -74589,36 +75049,95 @@ ${note.detail.trim()}` : "",
    * so it moves to the window's right edge, as it sits beside a docked window.
    */
   placeMapTools() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const bar = this.placeGoalBar();
     const tools = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-map-tools");
     if (!tools) return;
     const left = ((_b2 = this.chat) == null ? void 0 : _b2.isOverlay) ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
     tools.style.left = left > 0 ? `${left}px` : "";
+    if ((_c = this.goalEditInput) == null ? void 0 : _c.isConnected) this.growGoalInput(this.goalEditInput);
     this.layoutTopStack(bar);
   }
   /**
-   * The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. Returns the
-   * bar (null without one); layoutTopStack then places everything that hangs below it.
+   * Keeps the goal bar in the right row and returns it (null without one); layoutTopStack then places everything that hangs
+   * below it. The row can change without any event (the user hides or shows Obsidian's header row), so every layout pass
+   * looks again and moves the bar when its row changed.
    */
   placeGoalBar() {
-    var _a2, _b2, _c;
-    const bar = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-goal-bar")) != null ? _b2 : null;
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const bar = (_c = (_b2 = (_a2 = this.goalLayerRoot()) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-goal-bar")) != null ? _c : null;
+    if (bar) {
+      const target = this.goalHostTarget();
+      if (target && bar.parentElement !== target.host) {
+        const active = (_e = (_d = bar.ownerDocument) == null ? void 0 : _d.activeElement) != null ? _e : null;
+        const held = this.goalEdit && active && ((_f = bar.contains) == null ? void 0 : _f.call(bar, active)) ? active : null;
+        target.host.insertBefore(bar, target.before);
+        this.markGoalHost(target.host);
+        this.goalBarHost = target.host;
+        (_g = held == null ? void 0 : held.focus) == null ? void 0 : _g.call(held, { preventScroll: true });
+      }
+    }
     this.watchToolPlacement(bar);
-    if (!bar) return null;
-    const covered = ((_c = this.chat) == null ? void 0 : _c.isOverlay) ? Math.max(0, this.chat.overlayWidth - CHAT_RAIL_WIDTH) : 0;
-    bar.style.setProperty("--vam-goal-inset", `${covered}px`);
     return bar;
   }
-  /** The panel hanging under the goal bar (edit panel or suggestion list; at most one is open), if it is on screen. */
+  /** What holds the goal bar's layers: the container (it has the header row), else the view's own element. */
+  goalLayerRoot() {
+    var _a2;
+    return (_a2 = this.containerEl) != null ? _a2 : this.contentEl;
+  }
+  /** Obsidian's header row of this view, whether or not it is shown. */
+  goalHeaderEl() {
+    var _a2, _b2, _c;
+    return (_c = (_b2 = (_a2 = this.containerEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ":scope > .view-header")) != null ? _c : null;
+  }
+  /**
+   * Where the goal bar goes: Obsidian's header row (in front of its action group) while that row is shown, else the middle
+   * of the toolbar (in front of the toolbar's actions). Shown is read from the row's own computed display, not its height:
+   * a tab hidden behind another has no height either. Null when the toolbar is not there yet.
+   */
+  goalHostTarget() {
+    var _a2, _b2, _c;
+    const header = this.goalHeaderEl();
+    const win = (_a2 = header == null ? void 0 : header.ownerDocument) == null ? void 0 : _a2.defaultView;
+    if (header && win && win.getComputedStyle(header).display !== "none") {
+      return { host: header, before: header.querySelector(":scope > .view-actions") };
+    }
+    const toolbar = (_c = (_b2 = this.contentEl) == null ? void 0 : _b2.querySelector) == null ? void 0 : _c.call(_b2, ".vam-toolbar");
+    return toolbar ? { host: toolbar, before: toolbar.querySelector(":scope > .vam-toolbar-actions") } : null;
+  }
+  /** Draws the goal bar into its row. */
+  mountGoalBar() {
+    const target = this.goalHostTarget();
+    if (!target) return;
+    this.renderGoalBar(target.host, target.before);
+    this.markGoalHost(target.host);
+  }
+  /** The one z rule and the container live on the host (styles.css `.vam-goal-host`); it moves with the bar. */
+  markGoalHost(host) {
+    var _a2, _b2, _c;
+    if (this.goalHostEl && this.goalHostEl !== host) (_b2 = (_a2 = this.goalHostEl).removeClass) == null ? void 0 : _b2.call(_a2, "vam-goal-host");
+    this.goalHostEl = host;
+    (_c = host.addClass) == null ? void 0 : _c.call(host, "vam-goal-host");
+  }
+  /** Takes the bar out of its row and clears the host mark: before a repaint empties the view, and when it closes. */
+  removeGoalBar() {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    (_b2 = (_a2 = this.relevanceBarEl) == null ? void 0 : _a2.remove) == null ? void 0 : _b2.call(_a2);
+    this.relevanceBarEl = null;
+    for (const stray of Array.from((_e = (_d = (_c = this.goalLayerRoot()) == null ? void 0 : _c.querySelectorAll) == null ? void 0 : _d.call(_c, ".vam-goal-bar")) != null ? _e : []))
+      stray.remove();
+    (_g = (_f = this.goalHostEl) == null ? void 0 : _f.removeClass) == null ? void 0 : _g.call(_f, "vam-goal-host");
+    this.goalHostEl = null;
+  }
+  /** The panel hanging under the goal bar (the suggestion list), if it is on screen. */
   goalAttachmentEl() {
     var _a2, _b2;
     const el = (_b2 = (_a2 = this.relevanceBarEl) == null ? void 0 : _a2.querySelector(".vam-goal-attachment")) != null ? _b2 : null;
     return el && el.isConnected !== false ? el : null;
   }
   /**
-   * Every layer that decides the stack is watched: bar, attachment, tools, sources panel, canvas, zoom bar and hint (a
-   * collapsing sidebar changes the canvas without any chat event). The watch is dropped when the view closes.
+   * Every layer that decides the stack is watched: bar, the header row (hiding it changes its size), attachment, tools,
+   * sources panel, canvas, zoom bar and hint (a collapsing sidebar changes the canvas without any chat event). The watch is dropped when the view closes.
    */
   watchToolPlacement(bar) {
     var _a2, _b2, _c, _d, _e;
@@ -74629,6 +75148,7 @@ ${note.detail.trim()}` : "",
     const sources = this.mapSourcesPanelEl;
     const targets = [
       bar,
+      this.goalHeaderEl(),
       this.goalAttachmentEl(),
       q(".vam-map-tools"),
       (sources == null ? void 0 : sources.isConnected) === false ? null : sources,
@@ -74649,38 +75169,73 @@ ${note.detail.trim()}` : "",
     for (const el of targets) this.goalBarObserver.observe(el);
   }
   /**
-   * The one place that stacks the top of the canvas: goal bar, then the panel hanging under it (height limited, it scrolls),
-   * then the tool group (below the panel only where the two share horizontal space; otherwise GOAL_BAR_TOOLS_GAP under the
-   * bar), then the sources panel hanging from the tools (height limited). Without a bar the tools keep the stylesheet's top.
+   * The one place that stacks what hangs off the top of the canvas: the panel hanging under the goal bar (height limited, it
+   * scrolls; it may cover the toolbar and the canvas while open), and the sources panel hanging from the tool group (height
+   * limited). The tool group itself never moves: it keeps the stylesheet's top.
    */
   layoutTopStack(bar) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const tools = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-map-tools");
     if (!(tools == null ? void 0 : tools.style)) return;
-    let bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
     const attachment = bar ? this.goalAttachmentEl() : null;
     (_b2 = bar == null ? void 0 : bar.toggleClass) == null ? void 0 : _b2.call(bar, "has-attachment", !!attachment);
+    const actions = (_d = (_c = bar == null ? void 0 : bar.querySelector) == null ? void 0 : _c.call(bar, ".vam-goal-actions")) != null ? _d : null;
+    const actionsRect = (_e = actions == null ? void 0 : actions.getBoundingClientRect) == null ? void 0 : _e.call(actions);
     if (bar && attachment) {
-      const stacked = ((_c = attachment.hasClass) == null ? void 0 : _c.call(attachment, "vam-goal-suggest")) === true || this.toolsStackedFor === attachment || sharesHorizontalSpace(attachment, tools);
-      this.toolsStackedFor = stacked ? attachment : null;
-      const room2 = this.attachRoom(bar, bottom, stacked ? tools.offsetHeight : 0);
-      if (room2 !== null && typeof ((_d = attachment.style) == null ? void 0 : _d.setProperty) === "function") {
-        attachment.style.setProperty("--vam-goal-attach-max", `${room2}px`);
+      const box = (_f = attachment.offsetParent) != null ? _f : bar;
+      const boxBottom = (_i = (_h = (_g = box.getBoundingClientRect) == null ? void 0 : _g.call(box)) == null ? void 0 : _h.bottom) != null ? _i : 0;
+      const clear = actionsRect ? Math.max(0, actionsRect.bottom - boxBottom) : 0;
+      if (typeof ((_j = attachment.style) == null ? void 0 : _j.setProperty) === "function") {
+        attachment.style.setProperty("--vam-goal-attach-clear", `${clear}px`);
+        const room2 = this.attachRoom(boxBottom + GOAL_SUGGEST_GAP + clear);
+        if (room2 !== null) attachment.style.setProperty("--vam-goal-attach-max", `${room2}px`);
       }
-      if (stacked) bottom += GOAL_SUGGEST_GAP + attachment.offsetHeight;
-    } else {
-      this.toolsStackedFor = null;
     }
-    tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
+    this.layoutGoalBridge(bar, actions, actionsRect);
+    const toolsRect = (_k = tools.getBoundingClientRect) == null ? void 0 : _k.call(tools);
+    if (actionsRect && toolsRect && actionsRect.bottom > toolsRect.top && actionsRect.left > toolsRect.left) {
+      tools.style.setProperty("--vam-tools-max", `${actionsRect.left - toolsRect.left - INSET_GAP}px`);
+    } else {
+      tools.style.removeProperty("--vam-tools-max");
+    }
     const sources = this.mapSourcesPanelEl;
     const open = !!sources && sources.isConnected !== false;
-    (_e = tools.toggleClass) == null ? void 0 : _e.call(tools, "has-panel", open);
+    (_l = tools.toggleClass) == null ? void 0 : _l.call(tools, "has-panel", open);
     if (!open || !sources) return;
     this.placeMapSourcesPanel(sources);
     const room = this.sourcesRoom(tools);
-    if (room !== null && typeof ((_f = sources.style) == null ? void 0 : _f.setProperty) === "function") {
+    if (room !== null && typeof ((_m = sources.style) == null ? void 0 : _m.setProperty) === "function") {
       sources.style.setProperty("--vam-sources-max", `${room}px`);
     }
+  }
+  /**
+   * The strip that lets the pointer go from the goal down to the floating icons (they are invisible and take no pointer until the
+   * goal is hovered, so a gap between them would drop the hover). The bar owns it (a pseudo-element, so it counts as the bar), it
+   * spans exactly the measured gap from the bar's bottom to the icons' top, as wide as the icons. Where something clickable lies in
+   * that gap (the info row between a goal and icons that float below the toolbar) there is no strip: it would block those clicks.
+   */
+  layoutGoalBridge(bar, actions, actionsRect) {
+    var _a2, _b2, _c, _d;
+    const style = bar == null ? void 0 : bar.style;
+    if (!bar || typeof (style == null ? void 0 : style.setProperty) !== "function") return;
+    const names3 = ["top", "left", "width", "height"].map((name2) => `--vam-goal-bridge-${name2}`);
+    const box = actions == null ? void 0 : actions.offsetParent;
+    const barRect = (_a2 = bar.getBoundingClientRect) == null ? void 0 : _a2.call(bar);
+    const strip3 = actions && box && actionsRect && barRect && actionsRect.width > 0 && actionsRect.top > barRect.bottom ? { left: actionsRect.left, right: actionsRect.right, top: barRect.bottom, bottom: actionsRect.top } : null;
+    const boxRect = strip3 ? (_b2 = box == null ? void 0 : box.getBoundingClientRect) == null ? void 0 : _b2.call(box) : void 0;
+    const blocked = !!strip3 && Array.from((_d = (_c = box == null ? void 0 : box.querySelectorAll) == null ? void 0 : _c.call(box, CLICKABLE_SELECTOR)) != null ? _d : []).some((el) => {
+      var _a3;
+      const rect2 = bar.contains(el) ? null : (_a3 = el.getBoundingClientRect) == null ? void 0 : _a3.call(el);
+      return !!rect2 && rectsIntersect(rect2, strip3);
+    });
+    if (!strip3 || !box || !boxRect || blocked) {
+      for (const name2 of names3) style.removeProperty(name2);
+      return;
+    }
+    style.setProperty(names3[0], `${strip3.top - boxRect.top - box.clientTop}px`);
+    style.setProperty(names3[1], `${strip3.left - boxRect.left - box.clientLeft}px`);
+    style.setProperty(names3[2], `${strip3.right - strip3.left}px`);
+    style.setProperty(names3[3], `${strip3.bottom - strip3.top}px`);
   }
   /** Screen y the panels under the top stack must stay above: the zoom bar (with the status bar) or the hint, INSET_GAP clear. */
   bottomLimit(overlay, canvasHeight) {
@@ -74696,20 +75251,16 @@ ${note.detail.trim()}` : "",
     return (canvas ? canvas.bottom : (_g = overlayRect == null ? void 0 : overlayRect.bottom) != null ? _g : canvasHeight) - clear;
   }
   /**
-   * Height the panel under the goal bar may take: down to the top of the lowest bottom control, kept INSET_GAP clear, minus
-   * the tool group when that hangs under the panel (`toolsHeight`, else 0). Measured on screen, so the overlay and the
-   * viewport need not share an origin. Null when the canvas is not laid out.
+   * Height the panel under the goal bar may take: from `top` (screen y where the panel starts) down to the top of the lowest
+   * bottom control, kept INSET_GAP clear. Measured on screen (the bar is in another element than the canvas). Null when the
+   * canvas is not laid out. The panel's own rect is not read: its entry animation moves it a few px for a moment.
    */
-  attachRoom(bar, barBottom, toolsHeight) {
-    var _a2, _b2, _c, _d;
-    const overlay = bar.parentElement;
-    const canvasHeight = (_a2 = overlay == null ? void 0 : overlay.clientHeight) != null ? _a2 : 0;
+  attachRoom(top) {
+    var _a2, _b2;
+    const overlay = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-canvas-overlay");
+    const canvasHeight = (_b2 = overlay == null ? void 0 : overlay.clientHeight) != null ? _b2 : 0;
     if (!(canvasHeight > 0)) return null;
-    const overlayRect = (_b2 = overlay == null ? void 0 : overlay.getBoundingClientRect) == null ? void 0 : _b2.call(overlay);
-    const canvas = (_d = (_c = this.viewportEl) == null ? void 0 : _c.getBoundingClientRect) == null ? void 0 : _d.call(_c);
-    const limit = this.bottomLimit(overlay, canvasHeight);
-    const barBottomOnScreen = (overlayRect ? overlayRect.top : canvas ? canvas.top : 0) + barBottom;
-    return Math.max(0, limit - barBottomOnScreen - GOAL_SUGGEST_GAP - GOAL_BAR_TOOLS_GAP - (toolsHeight || 0));
+    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - top);
   }
   /** Height the sources panel may take: from the tools' bottom edge (plus the gap) down to the same limit. */
   sourcesRoom(tools) {
@@ -77170,7 +77721,8 @@ ${note.detail.trim()}` : "",
           if (beforeId === null) return skipped("ui.map_chat_skip_parent_missing");
           const before = nodeOf(beforeId);
           if (!before) return gone;
-          if (before.id === node.id || before.parentId !== parent.id) return skipped("ui.map_chat_skip_not_sibling");
+          if (before.id === node.id || before.parentId !== parent.id || before.afterTextId)
+            return skipped("ui.map_chat_skip_not_sibling");
           if (!await this.chatMoveBefore(node, parent, before)) return skipped("ui.map_chat_skip_not_sibling");
         } else await this.moveTopic(node, parent);
         await this.chatTopicAccept(node.id, baseline.topicHashes);
@@ -77185,7 +77737,8 @@ ${note.detail.trim()}` : "",
         if (!parent || kids.some((kid) => !kid)) return gone;
         if (this.isMerging(parent.id) || kids.some((kid) => this.isMerging(kid.id)))
           return skipped("ui.map_chat_skip_merge_locked");
-        if (kids.some((kid) => kid.parentId !== parent.id)) return skipped("ui.map_chat_skip_not_sibling");
+        if (kids.some((kid) => kid.parentId !== parent.id || kid.afterTextId !== kids[0].afterTextId))
+          return skipped("ui.map_chat_skip_not_sibling");
         await this.chatReorderChildren(parent, ids);
         return done;
       }
@@ -78701,10 +79254,10 @@ ${addition}` : addition });
       };
       const locked = group ? [...group.keys()].some((id) => this.isMerging(id)) : this.isMerging(node.id);
       const timelineBlocked = !!group && !this.map.aim && layoutOf(this.map).direction === "timeline" && [...group.keys()].some((id) => {
-        var _a3, _b3, _c2;
-        const parentId = (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === id)) == null ? void 0 : _b3.parentId;
-        const parent = parentId ? (_c2 = this.map) == null ? void 0 : _c2.nodes.find((item) => item.id === parentId) : void 0;
-        return !!parent && !parent.parentId;
+        var _a3, _b3;
+        const item = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((n) => n.id === id);
+        const parent = (item == null ? void 0 : item.parentId) ? (_b3 = this.map) == null ? void 0 : _b3.nodes.find((n) => n.id === item.parentId) : void 0;
+        return !!parent && !parent.parentId && !(item == null ? void 0 : item.afterTextId);
       });
       let warned = false;
       let overChat = false;
@@ -78838,7 +79391,7 @@ ${addition}` : addition });
               const current = map.nodes.find((n) => n.id === node.id);
               if (!current) return;
               const root = current.parentId ? map.nodes.find((n) => n.id === current.parentId) : void 0;
-              if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId) {
+              if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId && !current.afterTextId) {
                 const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
                 map.nodes = reordered;
                 this.arrangeAll(map);
@@ -78881,7 +79434,7 @@ ${addition}` : addition });
     if (!found) return null;
     if (found.id === selfId) return null;
     const target = found;
-    if (roots.every((root) => root.parentId === target.id)) return null;
+    if (roots.every((root) => root.parentId === target.id && !root.afterTextId)) return null;
     const inside2 = roots.some((root) => root.id === target.id || descendants(nodes, root.id).has(target.id));
     return { node: target, invalid: inside2 || !roots.every((root) => canParent(nodes, root.id, target.id)) };
   }
@@ -78900,15 +79453,20 @@ ${addition}` : addition });
    * with both; an edge with one end in the group keeps the other end where it was measured.
    */
   groupDragEdges(group, movingImageId) {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
-    const directionOf = branchDirectionResolver(nodes, layoutOf(this.map).direction, this.ringDirections(this.map));
+    const directionOf = branchDirectionResolver(
+      nodes,
+      layoutOf(this.map).direction,
+      this.drawnTextParents(),
+      this.ringDirections(this.map)
+    );
     const base = /* @__PURE__ */ new Map();
     for (const [id, el] of group) base.set(id, boxOf(el));
     const boxFor = (id) => {
       const known = base.get(id);
       if (known) return known;
-      const el = this.cardEls.get(id);
+      const el = this.lineEndEl(id);
       return el ? boxOf(el) : void 0;
     };
     const shifted = (id, dx, dy) => {
@@ -78920,7 +79478,13 @@ ${addition}` : addition });
       const [parentId, childId] = key2.split("\0");
       if (!group.has(parentId) && !group.has(childId)) continue;
       if (!boxFor(parentId) || !boxFor(childId)) continue;
-      tree.push({ key: key2, parentId, childId, direction: directionOf(parentId), depth: depthOf(nodes, childId) });
+      tree.push({
+        key: key2,
+        parentId,
+        childId,
+        direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
+        depth: depthOf(nodes, childId)
+      });
     }
     const linked = [];
     for (const key2 of this.relationEls.keys()) {
@@ -78934,9 +79498,10 @@ ${addition}` : addition });
         anchored.push({ key: key2, line });
     const spineIds = /* @__PURE__ */ new Set();
     for (const id of group.keys()) {
-      const parentId = (_c = nodes.find((item) => item.id === id)) == null ? void 0 : _c.parentId;
+      const member = nodes.find((item) => item.id === id);
+      const parentId = member == null ? void 0 : member.parentId;
       if (this.spineEls.has(id)) spineIds.add(id);
-      else if (parentId && this.spineEls.has(parentId)) spineIds.add(parentId);
+      else if (parentId && !(member == null ? void 0 : member.afterTextId) && this.spineEls.has(parentId)) spineIds.add(parentId);
     }
     const spines = [...spineIds].flatMap((id) => {
       const boxes = this.spineBoxes(id);
@@ -78996,6 +79561,22 @@ ${addition}` : addition });
       if (!this.closed) this.render();
     }
   }
+  /** The drawn text blocks hanging on a topic: text id -> topic id (the lines of a topic that follows a block start at the block). */
+  drawnTextParents() {
+    var _a2, _b2;
+    const parents = /* @__PURE__ */ new Map();
+    for (const item of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []) {
+      const text12 = item;
+      const el = text12.kind === "text" ? this.textEls.get(text12.id) : void 0;
+      if (el && text12.parentId && !el.classList.contains("is-free")) parents.set(text12.id, text12.parentId);
+    }
+    return parents;
+  }
+  /** The element a tree line starts or ends at: a card, or the text block a following topic's line starts at. */
+  lineEndEl(id) {
+    var _a2;
+    return (_a2 = this.cardEls.get(id)) != null ? _a2 : this.textEls.get(id);
+  }
   /**
    * The edges touching one card, with the geometry they need already measured. `update` moves only those edges to
    * the dragged card's new position; every other edge stays untouched.
@@ -79005,16 +79586,21 @@ ${addition}` : addition });
     const size = { width: card.offsetWidth, height: card.offsetHeight };
     const mapDirection = layoutOf(this.map).direction;
     const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
-    const directionOf = branchDirectionResolver(nodes, mapDirection, this.ringDirections(this.map));
+    const directionOf = branchDirectionResolver(
+      nodes,
+      mapDirection,
+      this.drawnTextParents(),
+      this.ringDirections(this.map)
+    );
     const touching2 = [];
     for (const key2 of this.edgeEls.keys()) {
       const [parentId, childId] = key2.split("\0");
       if (parentId !== id && childId !== id) continue;
-      const other = this.cardEls.get(parentId === id ? childId : parentId);
+      const other = this.lineEndEl(parentId === id ? childId : parentId);
       if (!other) continue;
       touching2.push({
         key: key2,
-        direction: directionOf(parentId),
+        direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
         depth: depthOf(nodes, childId),
         dragIsParent: parentId === id,
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
@@ -79029,7 +79615,7 @@ ${addition}` : addition });
     }
     const anchored = [...this.anchorLinks].filter(([, line]) => line.topicId === id);
     const dragged = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === id);
-    const spineId = this.spineEls.has(id) ? id : (dragged == null ? void 0 : dragged.parentId) && this.spineEls.has(dragged.parentId) ? dragged.parentId : null;
+    const spineId = this.spineEls.has(id) ? id : (dragged == null ? void 0 : dragged.parentId) && !dragged.afterTextId && this.spineEls.has(dragged.parentId) ? dragged.parentId : null;
     const spineBoxes = spineId ? this.spineBoxes(spineId) : null;
     return {
       update: (x, y) => {
@@ -79075,7 +79661,7 @@ ${addition}` : addition });
     if (!head || !this.map) return null;
     const topics = [];
     for (const node of this.canvasNodes()) {
-      if (node.parentId !== headId) continue;
+      if (node.parentId !== headId || node.afterTextId) continue;
       const card = this.cardEls.get(node.id);
       if (card) topics.push({ id: node.id, box: boxOf(card) });
     }
@@ -79108,16 +79694,23 @@ ${addition}` : addition });
     );
     const mapDirection = layoutOf(this.map).direction;
     const allNodes = this.map.nodes;
-    const directionOf = branchDirectionResolver(allNodes, mapDirection, this.ringDirections(this.map));
+    const directionOf = branchDirectionResolver(
+      allNodes,
+      mapDirection,
+      this.drawnTextParents(),
+      this.ringDirections(this.map)
+    );
     const lines = [];
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
-        const parent = this.cardEls.get(parentId), child = this.cardEls.get(node.id);
+        const afterText = parentId === node.parentId && node.afterTextId && this.textEls.has(node.afterTextId) ? node.afterTextId : null;
+        const sourceId = afterText != null ? afterText : parentId;
+        const parent = afterText ? this.textEls.get(afterText) : this.cardEls.get(parentId), child = this.cardEls.get(node.id);
         if (!parent || !child) continue;
         if (parentId === node.parentId && related.has(relationPairKey(parentId, node.id))) continue;
         const path = createSvg("path");
-        const direction = directionOf(parentId);
+        const direction = lineKind(allNodes, sourceId, node.id, directionOf(parentId));
         path.setAttribute(
           "d",
           direction === "right" ? edgePathData(
@@ -79133,7 +79726,7 @@ ${addition}` : addition });
         if (!this.map.aim && ((_c = (_b2 = this.notes.get(node.id)) == null ? void 0 : _b2.relevance) == null ? void 0 : _c.tier) === "side") path.addClass("vam-edge-side");
         else if (!this.map.aim && parentId === node.parentId) path.setAttribute("data-parent-line", "");
         lines.push(path);
-        this.edgeEls.set(`${parentId}\0${node.id}`, path);
+        this.edgeEls.set(`${sourceId}\0${node.id}`, path);
       }
     }
     for (const [textId, textEl] of this.textEls) {
@@ -82854,7 +83447,7 @@ function shareSummaries(map) {
     const parent = byId.get(raw.parentId);
     if (!text12 || !parent) continue;
     const picked = new Set(raw.members.filter((id) => typeof id === "string"));
-    const siblings = map.nodes.filter((node) => node.parentId === parent.id);
+    const siblings = map.nodes.filter((node) => node.parentId === parent.id && !node.afterTextId);
     const at = siblings.flatMap((node, index) => picked.has(node.id) ? [index] : []);
     if (!at.length) continue;
     const range = siblings.slice(at[0], at[at.length - 1] + 1);
@@ -82877,12 +83470,13 @@ function shareSummaries(map) {
   return out;
 }
 function buildSharePayload(map, notesById, options) {
+  var _a2;
   if (aimEnabled() && (map.aim || map.nodes.some((node) => node.aimKind !== void 0)))
     throw new ShareError("aim-map", "AIM maps cannot be shared.");
   const nodes = map.nodes.map((node) => {
-    var _a2, _b2, _c, _d;
+    var _a3, _b2, _c, _d;
     const note = notesById[node.id];
-    const fallbackTitle = (_b2 = (_a2 = node.path.split("/").pop()) == null ? void 0 : _a2.replace(/\.md$/i, "")) != null ? _b2 : node.id;
+    const fallbackTitle = (_b2 = (_a3 = node.path.split("/").pop()) == null ? void 0 : _a3.replace(/\.md$/i, "")) != null ? _b2 : node.id;
     const out = {
       id: node.id,
       parentId: node.parentId,
@@ -82918,6 +83512,12 @@ function buildSharePayload(map, notesById, options) {
   });
   const goal = optionalText(options.goal);
   const textNodes = shareTextNodes(map);
+  const textParent = new Map(textNodes.map((text12) => [text12.id, text12.parentId]));
+  for (const out of nodes) {
+    const textId = (_a2 = map.nodes.find((node) => node.id === out.id)) == null ? void 0 : _a2.afterTextId;
+    if (typeof textId === "string" && out.parentId !== null && textParent.get(textId) === out.parentId)
+      out.afterTextId = textId;
+  }
   const summaries = shareSummaries(map);
   return {
     format: SHARE_FORMAT,
@@ -84527,7 +85127,7 @@ function shareViewerUiExtras(languages) {
 }
 
 // experiences/sharing/viewer-bundle.generated.ts
-var SHARE_VIEWER_JS = '(()=>{function rn(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(560,Math.max(200,Math.round(t)))}var pr=80,mr=720;function on(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(mr,Math.max(pr,Math.round(t)))}function sn(t){var r;let o=t.aimKind==="question"?[]:(r=t.aimConvergesFromNodeIds)!=null?r:[];return[...t.parentId?[t.parentId]:[],...o.filter(a=>a!==t.parentId)]}function gr(t){var r;let o=new Map;for(let a of t){let i=(r=a.parentId)!=null?r:"",c=o.get(i);c?c.push(a):o.set(i,[a])}return o}function hr(t,o,r){var i;let a=[o];for(;a.length;){let c=a.pop();for(let f of(i=t.get(c))!=null?i:[])f.id!==o&&!r.has(f.id)&&(r.add(f.id),a.push(f.id))}}function oe(t,o){let r=new Set;return hr(gr(t),o,r),r}function ve(t,o){let r=new Map(t.map(c=>[c.id,c])),a=c=>{let f=0,d=new Set([c.id]);for(let g=c.parentId;g&&r.has(g)&&!d.has(g);g=r.get(g).parentId)d.add(g),f++;return f},i=new Set(t.map(c=>c.parentId).filter(c=>!!c&&r.has(c)));for(let c of t)i.has(c.id)&&(c.collapsed=o===null?!1:a(c)>=o)}function ie(t){if(t>150)return"right";if(t<-150)return"left"}function an(t,o,r){var a;return(a=ie(t-r))!=null?a:t+o<=r?"left":"right"}function ln(t,o,r,a={left:0,right:0}){let i={...a},c=new Map;for(let f of t){let d=i.left<i.right?"left":"right";c.set(f.id,d),i[d]+=o(f)+r}return c}function cn(t,o,r,a){let i=t.map(a),c={left:0,right:0};t.forEach((d,g)=>{let b=i[g];b&&(c[b]+=o(d)+r)});let f=ln(t.filter((d,g)=>!i[g]),o,r,c);return new Map(t.map((d,g)=>{var b;return[d.id,(b=i[g])!=null?b:f.get(d.id)]}))}function br(t){return t==="right"||t==="left"||t==="down"||t==="up"}function dn(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function se(t){if(!(t!=null&&t.parentId))return;let o=t.layout;if(!o||typeof o!="object"||Array.isArray(o))return;let r=o.direction;return br(r)?r:void 0}function un(t){let{width:o,column:r,mapDirection:a,engine:i}=t,c=(f,d)=>{var v,F;let g=[],b=(w,h)=>{for(let x of[...t.kidsOf(w),...t.joinsOf(w)])se(x)?g.push({node:x,root:h}):b(x,h)};for(let w of f)b(w,w);let p={roots:f,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!g.length)return i(d,p);let y=d==="down"||d==="up",T=g.map(({node:w,root:h})=>{let x=c([w],se(w)),O=1/0,D=-1/0,u=1/0,R=-1/0,S=new Map,$=N=>{S.set(N.id,N);for(let I of[...t.kidsOf(N),...t.joinsOf(N)])$(I)};$(w);for(let[N,I]of x)O=Math.min(O,I.x),D=Math.max(D,I.x+o),u=Math.min(u,I.y),R=Math.max(R,I.y+t.heightFor(S.get(N)));let A=Math.max(1,Math.ceil((D-O+r-o)/r));return{node:w,root:h,placed:x,minX:O,maxX:D,minY:u,maxY:R,slots:A}}),E=new Map(T.map(w=>[w.node.id,w])),z=w=>{let h=E.get(w.id);return!h||!y?[]:Array.from({length:h.slots},(x,O)=>({id:`${w.id}\\0pad${O}`}))},P=new Set,k=i(d,{roots:f,kidsOf:w=>{if(!E.has(w.id))return t.kidsOf(w);let h=z(w);for(let x of h)P.add(x.id);return h},joinsOf:w=>E.has(w.id)?[]:t.joinsOf(w),heightFor:w=>{if(P.has(w.id))return 0;let h=E.get(w.id);return h&&!y?h.maxY-h.minY:t.heightFor(w)}}),B=new Map;for(let[w,h]of k)!P.has(w)&&!E.has(w)&&B.set(w,h);for(let w of T){let h=k.get(w.node.id),x,O;y?(x=h.x+r/2-(w.minX+w.maxX)/2,O=d==="down"?h.y-w.minY:h.y+t.heightFor(w.node)-w.maxY):(x=d==="right"||d==="balanced"&&h.x>=((F=(v=k.get(w.root.id))==null?void 0:v.x)!=null?F:h.x)?h.x-w.minX:h.x+o-w.maxX,O=h.y-w.minY);for(let[D,u]of w.placed)B.set(D,{x:u.x+x,y:u.y+O})}return B};return c(t.roots,a)}var fn=1/Math.tan(Math.PI/3);function pn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:f,gap:d,left:g,top:b}=t,p=f-c,y=L=>[...r(L),...a(L)],T=o.map(L=>{let k=new Map,B=S=>S.reduce(($,A)=>$+k.get(A.id),0)+Math.max(0,S.length-1)*d,v=S=>{let $=y(S);for(let A of $)v(A);k.set(S.id,Math.max(i(S),B($)))},F=(S,$,A,N)=>{let I=y(S),U=A+(k.get(S.id)-B(I))/2,j=I.map(rt=>{let Q=F(rt,$+1,U,N);return U+=k.get(rt.id)+d,Q}),Z=i(S),J=j.length?(j[0]+j[j.length-1])/2:A+k.get(S.id)/2;return N.push({id:S.id,x:-$*f,centre:J,height:Z}),J},w=y(L).map((S,$)=>{let A=$%2===0?1:-1,N=y(S);for(let q of N)v(q);let I=[],U=d;for(let q of N){let yt=I.length,pt=F(q,0,U,I)*fn-p;for(let st=yt;st<I.length;st++)I[st].x+=pt-c;U+=k.get(q.id)+d}let j=Math.max(f,U),Z=j*fn,J=i(S),rt=[-c/2,...I.map(q=>q.x)],Q=[c/2,Z,...I.map(q=>q.x+c)];return{topic:S,side:A,length:j,height:J,cards:I,minX:Math.min(...rt),maxX:Math.max(...Q)}}),h=i(L),x=[{id:L.id,x:0,y:-h/2,height:h}],O={above:-p,below:-p};for(let S of w){let $=S.side===1?"above":"below",A=O[$]-S.maxX,N=-S.side*S.length;x.push({id:S.topic.id,x:A-c/2,y:N-S.side*(S.height/2)-S.height/2,height:S.height});for(let I of S.cards)x.push({id:I.id,x:A+I.x,y:N+S.side*I.centre-I.height/2,height:I.height});O[$]=A+S.minX-p}let D=Math.min(...x.map(S=>S.x)),u=Math.min(...x.map(S=>S.y)),R=Math.max(...x.map(S=>S.y+S.height));return{out:x,minX:D,minY:u,maxY:R}}),E=new Map,z=g+Math.max(0,...T.map(L=>-L.minX)),P=b;for(let L of T){for(let k of L.out)E.set(k.id,{x:z+k.x,y:P+k.y-L.minY});P+=L.maxY-L.minY+d}return E}var yr=Math.PI*2,xr=6,Mr=60;function Tr(t,o,r,a){let i=[...t.values()].sort((f,d)=>f.y-d.y),c=new Set;for(let f=0;f<i.length;f++){let d=i[f];for(let g=f+1;g<i.length;g++){let b=i[g];if(b.y>=d.y+d.height+r)break;a&&a.checks++,Math.abs(d.x-b.x)<o&&d.y<b.y+b.height+r&&c.add(Math.max(d.depth,b.depth))}}return c}function mn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:f,gap:d,left:g,top:b}=t,p=new Map,y=b;for(let T of o){let E=[],z=new Map,P=A=>[...r(A),...a(A)],L=A=>{let N=P(A),I=N.length?N.reduce((U,j)=>U+L(j),0):1;return z.set(A.id,I),I};L(T);let k=(A,N,I,U)=>{E.push({id:A.id,depth:N,angle:(I+U)/2,height:i(A)});let j=I,Z=(U-I)/z.get(A.id);for(let J of P(A)){let rt=Z*z.get(J.id);k(J,N+1,j,j+rt),j+=rt}};k(T,0,0,yr);let B=Math.max(...E.map(A=>A.depth)),v=Array.from({length:B+1},(A,N)=>N*f),F=()=>{let A=[];return v.forEach((N,I)=>A.push(I?Math.max(N,A[I-1]+f):0)),new Map(E.map(N=>{let I=A[N.depth];return[N.id,{x:Math.round(I*Math.sin(N.angle)-c/2),y:Math.round(-I*Math.cos(N.angle)-N.height/2),depth:N.depth,height:N.height}]}))},w=f/xr,h=()=>(t.stats&&t.stats.rounds++,Tr(F(),c,d,t.stats)),x=w,O=h(),D=v.slice();for(let A=0;O.size&&A<Mr;A++){D=v.slice();for(let N of O)v[N]+=x;x*=2,O=h()}if(!O.size&&D.some((A,N)=>v[N]-A>w)){let A=v.slice();for(;A.some((N,I)=>N-D[I]>w);){let N=A.map((I,U)=>(I+D[U])/2);v.splice(0,v.length,...N),h().size?D=N:A=N}v.splice(0,v.length,...A)}let u=F(),R=Math.min(...[...u.values()].map(A=>A.x)),S=Math.min(...[...u.values()].map(A=>A.y)),$=Math.max(...[...u.values()].map(A=>A.y+A.height));for(let[A,N]of u)p.set(A,{x:Math.round(g)+N.x-R,y:y+N.y-S});y+=$-S+d}return p}function ae(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:c,rowGap:f,flip:d,left:g,top:b}=t,p=u=>{var R,S;return(S=(R=t.widthFor)==null?void 0:R.call(t,u))!=null?S:280},y=new Map,T=new Map,E=u=>u.reduce((R,S)=>R+y.get(S.id),0),z=u=>{let R=r(u),S=a(u);for(let $ of[...R,...S])z($);y.set(u.id,Math.max(c,E(R),E(S),p(u)+c-280)),T.set(u.id,1+Math.max(0,...R.map($=>T.get($.id))))},P=new Map,L=new Map,k=(u,R,S)=>{let $=r(u),A=a(u),N=y.get(u.id),I=(q,yt)=>{let ut=S+(N-E(q))/2;return q.map(pt=>{k(pt,yt,ut);let st=P.get(pt.id);return ut+=y.get(pt.id),st})},U=I($,R+1),j=I(A,R+T.get(u.id)),Z=U.length?U:j;L.set(u.id,R);let J=(q,yt)=>yt.map((ut,pt)=>ut+p(q[pt])/2),rt=U.length?$:A,Q=J(rt,Z);P.set(u.id,Z.length?(Q[0]+Q[Q.length-1])/2-p(u)/2:S+Math.max(0,280-p(u))/2)},B=g,v=[],F=u=>{v.push(u);for(let R of[...r(u),...a(u)])F(R)};for(let u of o)z(u),k(u,0,B),B+=y.get(u.id),F(u);let w=Math.max(0,...L.values()),h=Array.from({length:w+1},()=>0);for(let u of v)h[L.get(u.id)]=Math.max(h[L.get(u.id)],i(u));let x=[],O=b;for(let u=0;u<=w;u++){let R=d?w-u:u;x[R]=O,O+=h[R]+f}let D=new Map;for(let u of v){let R=L.get(u.id),S=d?x[R]+h[R]-i(u):x[R];D.set(u.id,{x:P.get(u.id),y:S})}return D}function gn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:f,gap:d,left:g,top:b}=t,p=new Map,y=b;for(let T of o){let E=new Map,z=v=>{E.set(v.id,i(v));for(let F of[...r(v),...a(v)])z(F)};z(T);let P=[{id:T.id,x:g,y:0}],L=g+f;[...r(T),...a(T)].forEach((v,F)=>{let w=ae({roots:[v],kidsOf:r,joinsOf:a,heightFor:i,column:f,rowGap:f-c,flip:F%2===1,left:L,top:0}),h=w.get(v.id).y,x=L;for(let[O,D]of w)P.push({id:O,x:D.x,y:D.y-h}),x=Math.max(x,D.x);L=x+f});let k=Math.min(...P.map(v=>v.y)),B=Math.max(...P.map(v=>v.y+E.get(v.id)));for(let v of P)p.set(v.id,{x:v.x,y:y+v.y-k});y+=B-k+d}return p}var jt=300;function wr(t){var o;return Math.max(0,((o=t.width)!=null?o:280)-280)}function Se(t){var o;return t.path===""?(o=t.width)!=null?o:280:280}function vr(t,o){return t.path===""?an(t.x,Se(t),o.x):ie(t.x-o.x)}var kr=24,Sr={compact:{column:330,gap:12},standard:{column:360,gap:kr},spacious:{column:420,gap:48}};function Ar(t){return t==="compact"||t==="spacious"}var Er=180;function Lr(t){let o=typeof t=="string"?t:t.direction,r=typeof t=="string"?void 0:t.spacing;return{direction:o,...Sr[Ar(r)?r:"standard"]}}var Nr=t=>t==="left"?-1:1;var _r=(t,o)=>{let r=t==null?void 0:t(o);return r!==void 0&&Number.isFinite(r)&&r>0?r:Er};function Ir(t,o){var g,b;let r=new Map(t.map(p=>[p.id,p])),a=new Map,i=new Map,c=(p,y,T)=>{var E;return p.set(y,[...(E=p.get(y))!=null?E:[],T])};for(let p of t){if(!p.parentId)continue;let y=p.aimKind!=="question"&&((g=p.aimConvergesFromNodeIds)!=null&&g.length)?sn(p).map(E=>r.get(E)):[],T=(b=y[0])==null?void 0:b.parentId;T&&r.has(T)&&y.every(E=>E&&E.parentId===T)?c(i,T,p):c(a,p.parentId,p)}return{kidsOf:p=>{var y;return o&&p.collapsed?[]:(y=a.get(p.id))!=null?y:[]},joinsOf:p=>{var y;return o&&p.collapsed?[]:((y=i.get(p.id))!=null?y:[]).filter(T=>{var E;return!(o&&((E=r.get(T.parentId))!=null&&E.collapsed))})}}}function ke(t){var w;let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:c,gap:f,sign:d,left:g,top:b}=t,p=new Map,y=new Map,T=new Map,E=new Map,z=new Map,P=h=>h.reduce((x,O)=>x+y.get(O.id),0)+Math.max(0,h.length-1)*f,L=h=>{let x=r(h),O=a(h);z.set(h.id,h);for(let D of[...x,...O])L(D);y.set(h.id,Math.max(i(h),P(x),P(O))),T.set(h.id,1+Math.max(0,...x.map(D=>T.get(D.id))))},k=(h,x,O)=>{let D=r(h),u=a(h),R=y.get(h.id),S=(Z,J)=>{let rt=O+(R-P(Z))/2;return Z.map(Q=>{let q=k(Q,J,rt);return rt+=y.get(Q.id)+f,q})},$=S(D,x+1),A=S(u,x+T.get(h.id)),N=$.length?D:u,I=$.length?$:A,U=i(h),j=O+(R-U)/2;if(I.length){let Z=I[0]+i(N[0])/2,J=I[I.length-1]+i(N[N.length-1])/2;j=(Z+J)/2-U/2}return p.set(h.id,{x:0,y:b+j}),E.set(h.id,x),j},B=0;for(let h of o)L(h),k(h,0,B),B+=y.get(h.id)+f;let v=[];for(let[h,x]of E)v[x]=Math.max((w=v[x])!=null?w:0,wr(z.get(h)));let F=h=>{var O,D;let x=0;if(d>0)for(let u=0;u<h;u++)x+=(O=v[u])!=null?O:0;else for(let u=1;u<=h;u++)x+=(D=v[u])!=null?D:0;return x};for(let[h,x]of p){let O=E.get(h),D=d<0?Math.max(0,280-Se(z.get(h))):0;x.x=g+d*(O*c+F(O))+D}return{placed:p,sizes:y}}function Cr(t,o,r){let{roots:a,kidsOf:i,joinsOf:c,heightFor:f,gap:d,left:g,top:b}=o,p=ke({...o,sign:1}).sizes,y=new Map(t.map(k=>[k.id,k])),T=a.map(k=>{var w;let B=(w=y.get(k.id))!=null?w:k,v=cn(i(k),h=>p.get(h.id),d,h=>{var x;return r?void 0:vr((x=y.get(h.id))!=null?x:h,B)}),F=h=>ke({...o,roots:[k],kidsOf:x=>x.id===k.id?i(x).filter(O=>v.get(O.id)===h):i(x),joinsOf:x=>x.id===k.id&&h==="left"?[]:c(x),sign:h==="left"?-1:1,left:0,top:0}).placed;return{root:k,right:F("right"),left:F("left")}}),E=Math.max(0,...T.flatMap(({left:k})=>[...k.values()].map(B=>-B.x))),z=g+E,P=new Map,L=0;for(let{root:k,right:B,left:v}of T){let F=u=>u.get(k.id).y+f(k)/2,w=Math.max(F(B),F(v)),h=[];for(let u of[{placed:B,isLeft:!1},{placed:v,isLeft:!0}]){let{placed:R,isLeft:S}=u,$=w-F(R);for(let[A,N]of R)S&&A===k.id||h.push([A,{x:z+N.x,y:N.y+$}])}let x=u=>f(y.get(u)),O=Math.min(...h.map(([,u])=>u.y)),D=Math.max(...h.map(([u,R])=>R.y+x(u)));for(let[u,R]of h)P.set(u,{x:R.x,y:b+L+R.y-O});L+=D-O+d}return P}function Or(t,o,r,a,i=!1,c,f="right",d=!1){let{direction:g,column:b,gap:p}=Lr(f),{kidsOf:y,joinsOf:T}=Ir(t,i),E=L=>_r(c,L.id),z=(L,k)=>{if(L==="down"||L==="up")return ae({...k,column:b,rowGap:b-jt,flip:L==="up",left:r,top:a,widthFor:Se});let B={...k,column:b,gap:p,left:r,top:a};if(L==="radial")return mn({...B,width:jt});if(L==="timeline")return gn({...B,width:jt});if(L==="fishbone")return pn({...B,width:jt});let v={...B,sign:Nr(L)};return L==="balanced"?Cr(t,v,d):ke(v).placed},P={roots:o,kidsOf:y,joinsOf:T,heightFor:E};return dn(g)&&t.some(L=>se(L))?un({...P,width:jt,column:b,mapDirection:g,engine:z}):z(g,P)}function hn(t,o,r,a="right",i={}){let c=o!=null&&o.size?t.filter(g=>!o.has(g.id)):t,f=c.filter(g=>!g.parentId),d=Or(c,f,80,80,!0,r,a,i.reset===!0);return t.map(g=>({...g,...d.get(g.id)}))}function bn(t){return typeof t=="number"?{top:t,right:0,bottom:0,left:0}:t}function yn(t,o){return!o||!(o.bottom>o.top)?0:Math.max(0,Math.ceil(o.bottom-t))+8}function xn(t,o,r,a){let i=t.zoom,c=bn(a);return{zoom:i,x:c.left+(r.width-c.left-c.right)/2-o.x*i,y:c.top+(r.height-c.top-c.bottom)/2-o.y*i}}var Rr=.25;function Mn(t,o,r,a=1.2){let i=bn(r),c=Math.max(1,o.width-i.left-i.right),f=Math.max(1,o.height-i.top-i.bottom),d=t.maxX-t.minX,g=t.maxY-t.minY,b=Math.max(Rr,Math.min(a,(c-80)/d,(f-80)/g));return{zoom:b,x:i.left+(c-d*b)/2-t.minX*b,y:i.top+(f-g*b)/2-t.minY*b}}var le={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",linksLabel:"Links: {0}",linkOpen:"Open link: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3","priority-4":"Priority 4","priority-5":"Priority 5","progress-0":"Progress 0%","progress-25":"Progress 25%","progress-50":"Progress 50%","progress-75":"Progress 75%","progress-100":"Progress 100%","flag-red":"Red flag","flag-yellow":"Yellow flag","flag-green":"Green flag","flag-blue":"Blue flag",smile:"Smile",neutral:"Neutral",sad:"Sad",question:"Question"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function Ae(t){let o=3735928559,r=1103547991;for(let a=0;a<t.length;a++){let i=t.charCodeAt(a);o=Math.imul(o^i,2654435761),r=Math.imul(r^i,1597334677)}return o=Math.imul(o^o>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),r=Math.imul(r^r>>>16,2246822507)^Math.imul(o^o>>>13,3266489909),(4294967296*(2097151&r)+(o>>>0)).toString(36)}var Et="\\u27E6",Lt="\\u27E7",Gt=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,vn=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),Ee=new Set(["pre","script","style","textarea","template","noscript"]),Pr=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),Hr=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),Dr=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,zr=/\\p{L}/u,Xt=t=>t.localName.toLowerCase(),kn=t=>{var o;return((o=t.getAttribute("class"))!=null?o:"").split(/\\s+/).filter(Boolean)},ce=t=>Array.from(t.childNodes).filter(o=>o.nodeType===1);function Sn(t){for(let o of ce(t))if(vn.has(Xt(o))||Ee.has(Xt(o))||Sn(o))return!0;return!1}function An(t){let o=Xt(t);return Ee.has(o)?"skip":Pr.has(o)||t.getAttribute("translate")==="no"||kn(t).some(r=>Hr.has(r))?"atom":vn.has(o)||Sn(t)?"block":"inline"}function Br(t,o){return t.replace(Dr,r=>(o.push({literal:r,atom:!0}),`${Et}${o.length}/${Lt}`))}function $r(t,o){let r="",a=i=>{var f;if(i.nodeType===3){r+=Br((f=i.nodeValue)!=null?f:"",o);return}if(i.nodeType!==1){o.push({node:i,atom:!0}),r+=`${Et}${o.length}/${Lt}`;return}let c=i;if(An(c)==="inline"){o.push({node:c,atom:!1});let d=o.length;r+=`${Et}${d}${Lt}`;for(let g of Array.from(c.childNodes))a(g);r+=`${Et}/${d}${Lt}`;return}o.push({node:c,atom:!0}),r+=`${Et}${o.length}/${Lt}`};for(let i of t)a(i);return r}function Tn(t){return zr.test(t.replace(Gt,""))}function En(t){let o=[],r=f=>{let d=f.getAttribute("alt");d&&Tn(d)&&o.push({index:o.length,kind:"attribute",text:d.trim(),nodes:[],lead:"",trail:"",parts:[],element:f,attribute:"alt"})},a=f=>{for(let d of ce(f)){let g=Xt(d);Ee.has(g)||g==="svg"||(g==="img"?r(d):a(d))}},i=f=>{if(!f.length)return;let d=[],g=$r(f,d),b=g.trim();if(!b||!Tn(b)||g.includes("\\u27E6\\u27E6"))return;let p=g.replace(Gt,"");if(p.includes(Et)||p.includes(Lt))return;let y=g.slice(0,g.length-g.trimStart().length),T=g.slice(g.trimEnd().length);o.push({index:o.length,kind:"run",text:b,nodes:f,lead:y,trail:T,parts:d})},c=f=>{let d=[];for(let g of Array.from(f.childNodes)){if(g.nodeType===3){d.push(g);continue}if(g.nodeType!==1){i(d),d=[];continue}let b=g,p=An(b);p==="atom"||p==="inline"?d.push(b):(i(d),d=[],p==="block"&&c(b))}i(d)};return a(t),c(t),{units:o}}var wn=t=>[...t.matchAll(Gt)].map(o=>o[0]);function Fr(t,o){if(!o.trim())return!1;let r=wn(t),a=wn(o);if(r.length!==a.length||r.some((c,f)=>c!==a[f]))return!1;let i=o.replace(Gt,"");return!i.includes(Et)&&!i.includes(Lt)}function Wr(t,o,r){var g;let a=[],i=[],c=b=>{let p=i[i.length-1];p?p.appendChild(b):a.push(b)},f=b=>{b&&c(r.createTextNode(b))};f(t.lead);let d=0;for(let b of o.matchAll(Gt)){f(o.slice(d,b.index)),d=((g=b.index)!=null?g:0)+b[0].length;let p=t.parts[Number(b[2])-1];if(b[1]==="/")i.pop();else if(b[3]==="/")p.literal!==void 0?f(p.literal):p.node&&c(p.node.cloneNode(!0));else if(p.node){let y=p.node.cloneNode(!1);c(y),i.push(y)}}return f(o.slice(d)),f(t.trail),a}function Ln(t,o){var i,c,f;let r={applied:0,kept:0},a=[...t.units.filter(d=>d.kind==="attribute"),...t.units.filter(d=>d.kind==="run")];for(let d of a){let g=o(d);if(g===void 0||!Fr(d.text,g)){r.kept++;continue}if(d.kind==="attribute"){(c=d.element)==null||c.setAttribute((i=d.attribute)!=null?i:"alt",g.trim()),r.applied++;continue}let b=d.nodes[0],p=b==null?void 0:b.parentNode,y=b==null?void 0:b.ownerDocument;if(!b||!p||!y){r.kept++;continue}for(let T of Wr(d,g,y))p.insertBefore(T,b);for(let T of d.nodes)(f=T.parentNode)==null||f.removeChild(T);r.applied++}return r}function Nn(t){let o=[],r=a=>{for(let i of ce(a))Xt(i)==="svg"?o.push(i):r(i)};return r(t),o}function _n(t,o){let r=[],a=i=>{for(let c of ce(i))kn(c).includes(o)&&r.push(c),a(c)};return a(t),r}var In="vam-mermaid-slot",de=1,Cn=3,On=t=>{let o=t;return!!o&&(Array.isArray(o.detailSegments)||Array.isArray(o.detailDiagrams))},Kr=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),Ur=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function Vr(t){var o,r;return t.nodeType===Cn?Kr((o=t.nodeValue)!=null?o:""):t.nodeType!==de?`\\0${t.nodeType}:${(r=t.nodeValue)!=null?r:""}\\0`:Rn(t)}function Rn(t){let o=t.localName.toLowerCase(),r=t.getAttributeNames().sort().map(a=>{var i;return` ${a}="${Ur((i=t.getAttribute(a))!=null?i:"")}"`}).join("");return`<${o}${r}>${Yr(t)}</${o}>`}function Yr(t){return Array.from(t.childNodes).map(Vr).join("")}function jr(t){let o=[],r=a=>{if(o.push(a),a.nodeType===de)for(let i of Array.from(a.childNodes))r(i)};return r(t),o}function Xr(t,o){var a;let r=Nn(t);for(let i of r){let c=o();c.setAttribute("class",In),(a=i.parentNode)==null||a.replaceChild(c,i)}return{root:t,svgs:r,extraction:En(t)}}function Gr(t){let o=t.units.map(r=>`${r.kind}\\0${r.text}`).join("");return`${t.units.length}.${Ae(o)}`}var qr=t=>Ae(Rn(t));function Qr(t,o){if(!Array.isArray(o))return!1;let r=jr(t);for(let a of o){if(!Array.isArray(a)||a.length!==2)return!1;let[i,c]=a;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=r.length)return!1;let f=r[i];if(typeof c=="string"){if(f.nodeType!==Cn)return!1;f.nodeValue=c}else if(c&&typeof c=="object"&&!Array.isArray(c)){if(f.nodeType!==de)return!1;for(let[d,g]of Object.entries(c))if(g===null)f.removeAttribute(d);else if(typeof g=="string")f.setAttribute(d,g);else return!1}else return!1}return!0}function Zr(t,o,r){if(!t||typeof t!="object")return null;let a=t;if(typeof a.svg=="string"){let i=r(a.svg),c=Array.from(i.childNodes).filter(f=>f.nodeType===de);return c.length===1&&c[0].localName.toLowerCase()==="svg"?c[0]:null}if(typeof a.check=="string"&&a.check===qr(o)){let i=o.cloneNode(!0);return Qr(i,a.patch)?i:null}return null}function Pn(t,o,r){var g,b;let a={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:c}=Xr(t,r.createSlot),f=o.detailSegments;if(f!==void 0||o.detailCheck!==void 0)if(Array.isArray(f)&&f.length===c.units.length&&o.detailCheck===Gr(c)){let p=Ln(c,T=>{let E=f[T.index];return typeof E=="string"?E:void 0}),y=f.filter(T=>typeof T!="string").length;if(a.applied=p.applied,a.kept=Math.max(0,p.kept-y),r.afterText&&!r.afterText(t))return a.fallback=!0,a}else a.fallback=!0;let d=_n(t,In);d.length!==i.length&&(a.fallback=!0);for(let[p,y]of d.entries()){let T=i[p];if(!T)break;let E=(g=o.detailDiagrams)==null?void 0:g[p],z=T;if(E){let P=null;try{P=Zr(E,T,r.parse)}catch{P=null}P?z=P:a.diagramsKept++}(b=y.parentNode)==null||b.replaceChild(z,y)}return a}function mt(t,o,r){let a=t.createElement(o);return r&&(a.className=r),a}function Jr(t,o){var f;let r=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),a=(f=r==null?void 0:r[1])!=null?f:t,[i,c=""]=o.imageSource.split("{0}");return[i,a,c]}var to=20,Hn=2048,Dn=URL;function eo(t){if(typeof t!="string")return null;let o=t.trim();if(!o||o.length>Hn||/[\\x00-\\x20\\x7f-\\x9f\\u2028\\u2029]/.test(o)||!/^https?:\\/\\//i.test(o))return null;let r;try{r=new Dn(o)}catch{return null}return r.protocol!=="http:"&&r.protocol!=="https:"||!r.hostname||r.username||r.password||r.href.length>Hn?null:r.href}function no(t){if(!Array.isArray(t))return[];let o=new Set,r=[];for(let a of t){let i=eo(a);if(!(!i||o.has(i))&&(o.add(i),r.push({href:i,host:new Dn(i).host}),r.length>=to))break}return r}function zn(t,o,r){let a=no(o);if(!a.length)return null;let i=mt(t,"div");i.className="vam-inspector-links",i.setAttribute("role","group"),i.setAttribute("aria-label",r.linksLabel.replace("{0}",a.map(c=>c.host).join(", ")));for(let{href:c,host:f}of a){let d=mt(t,"a");d.setAttribute("href",c),d.setAttribute("target","_blank"),d.setAttribute("rel","noopener noreferrer"),d.setAttribute("referrerpolicy","no-referrer"),d.setAttribute("aria-label",r.linkOpen.replace("{0}",f)),d.textContent=f,i.append(d)}return i}function ro(t,o,r){let[a,i,c]=Jr(o,r),f=mt(t,"span");f.className="vam-image-source";let d=mt(t,"a");return d.setAttribute("href",o),d.setAttribute("target","_blank"),d.setAttribute("rel","noopener noreferrer"),d.textContent=i,f.append(t.createTextNode(a),d,t.createTextNode(c)),f}function Le(t,o,r,a,i){Bn(t,o,new DOMParser().parseFromString(r,"text/html").body,a,i)}function Bn(t,o,r,a,i){var f,d,g,b;for(let p of Array.from(r.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))p.remove();for(let p of Array.from(r.querySelectorAll("*")))for(let y of p.getAttributeNames()){let T=(f=p.getAttribute(y))!=null?f:"",E=y.toLowerCase();(E.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(E)&&/^\\s*(javascript|vbscript):/i.test(T))&&p.removeAttribute(y)}let c=()=>{let p=mt(t,"span");return p.className="vam-image-omitted",p.textContent=i.imageOmitted,p};for(let p of Array.from(r.querySelectorAll("img"))){let y=(d=p.getAttribute("src"))!=null?d:"";if(y.startsWith("vam-asset:")){let T=a[y.slice(10)];typeof T=="string"&&T.startsWith("data:image/")?p.setAttribute("src",T):p.replaceWith(c())}else if(/^https?:\\/\\//i.test(y)){p.setAttribute("referrerpolicy","no-referrer"),p.setAttribute("loading","lazy");let T=p.closest("a");(T!=null?T:p).after(ro(t,y,i))}else/^data:image\\//i.test(y)||p.replaceWith(c())}for(let p of Array.from(r.querySelectorAll("a"))){let y=(g=p.getAttribute("href"))!=null?g:"";/^(https?:|mailto:)/i.test(y)?(p.setAttribute("target","_blank"),p.setAttribute("rel","noopener noreferrer")):y.startsWith("#")||p.removeAttribute("href")}for(let p of Array.from(r.querySelectorAll("table"))){if((b=p.parentElement)!=null&&b.classList.contains("vam-table-scroll"))continue;let y=mt(t,"div");y.className="vam-table-scroll",p.replaceWith(y),y.append(p)}o.append(...Array.from(r.childNodes).map(p=>t.importNode(p,!0)))}function $n(t,o,r,a,i,c){let f=d=>new DOMParser().parseFromString(d,"text/html").body;try{let d=f(r);Pn(d,a,{parse:f,createSlot:()=>mt(t,"div")}),Bn(t,o,d,i,c)}catch{o.replaceChildren(),Le(t,o,r,i,c)}}function ue(t,o,r,a){let i=r-t,c=i>=40?i/2:i>=0?60-i:Math.max(60,-i/2);return`M ${t} ${o} C ${t+c} ${o}, ${r-c} ${a}, ${r} ${a}`}var Ne=["red","orange","yellow","green","blue","purple"];function Wn(t){let o=t["topic-color"];return Ne.find(r=>r===o)}var oo=["bold","text-small","text-large","border-thick","line-thick"],Fn=["text-small","text-large"];function io(t){return Array.isArray(t)?t:typeof t=="string"&&t?[t]:[]}function Kn(t){let o=io(t["topic-style"]),r=o.find(a=>Fn.some(i=>i===a));return oo.filter(a=>Fn.includes(a)?a===r:o.includes(a))}var so=["done","warning","star","priority-1","priority-2","priority-3","priority-4","priority-5","progress-0","progress-25","progress-50","progress-75","progress-100","flag-red","flag-yellow","flag-green","flag-blue","smile","neutral","sad","question"],Un=[{group:"status",single:!1,ids:["done","warning","star"]},{group:"priority",single:!0,ids:["priority-1","priority-2","priority-3","priority-4","priority-5"]},{group:"progress",single:!0,ids:["progress-0","progress-25","progress-50","progress-75","progress-100"]},{group:"flag",single:!1,ids:["flag-red","flag-yellow","flag-green","flag-blue"]},{group:"face",single:!1,ids:["smile","neutral","sad","question"]}];function ao(t){return Un.find(o=>o.ids.includes(t)).group}function lo(t){return Un.find(o=>o.ids.includes(t)).single}var co={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3","priority-4":"P4","priority-5":"P5","progress-0":"\\u25CB","progress-25":"\\u25D4","progress-50":"\\u25D1","progress-75":"\\u25D5","progress-100":"\\u25CF","flag-red":"\\u2691R","flag-yellow":"\\u2691Y","flag-green":"\\u2691G","flag-blue":"\\u2691B",smile:"\\u263A",neutral:"-_-",sad:"\\u2639",question:"?"};function Vn(t){let o=t["topic-markers"];if(!Array.isArray(o))return[];let r=new Set;return so.filter(a=>{if(!o.includes(a))return!1;if(!lo(a))return!0;let i=ao(a);return r.has(i)?!1:(r.add(i),!0)})}function Yn(t){return co[t]}var uo=(t,o)=>t.toLowerCase()===o.toLowerCase(),fe=(t,o)=>t.find(r=>uo(r,o));function fo(t,o){if(typeof t!="string"||!t.trim())return;let r=fe(o,t.trim());if(r)return r;let a=t.trim().toLowerCase().split(/[-_]/),i=a[0];if(i==="zh"){let f=a.slice(1).some(d=>d==="hant"||d==="tw"||d==="hk"||d==="mo")?"TW":"CN";return fe(o,`${i}-${f}`)}return o.find(c=>c.toLowerCase().split(/[-_]/)[0]===i)}function jn(t){let{languages:o}=t,r=o[0];if(typeof t.stored=="string"){let a=fe(o,t.stored);if(a)return a}if(typeof t.defaultLanguage=="string"){let a=fe(o,t.defaultLanguage);if(a)return a}for(let a of t.browser){let i=fo(a,o);if(i)return i}return r}function Xn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var po="https://github.com/kevcltsai/visual-agent-map?ref=share",mo="und",wt="http://www.w3.org/2000/svg",Gn="vam-share-panel-width",qn="vam-share-outline-open",go="(max-width: 600px)",ho=300,_e=240,bo=.25,yo=2,xo=4,Mo={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},To={core:"target",support:"library",side:"skip"},Qn=t=>t==="core"||t==="support"||t==="side",Nt=(t,o)=>t.replace("{0}",String(o));function Oe(t,o){var a;let r=(a=t.getElementById(o))==null?void 0:a.textContent;if(r)try{return JSON.parse(r)}catch{return}}function Zn(t){let o={...le};if(t&&typeof t=="object")for(let i of Object.keys(o)){let c=t[i];typeof c=="string"&&(o[i]=c)}let r=t&&typeof t=="object"?t.markerNames:void 0;if(r&&typeof r=="object"){o.markerNames={...le.markerNames};for(let i of Object.keys(o.markerNames)){let c=r[i];typeof c=="string"&&c.trim()&&(o.markerNames[i]=c)}}let a=t&&typeof t=="object"?t.colorNames:void 0;if(o.colorNames={...le.colorNames},a&&typeof a=="object")for(let i of Ne){let c=a[i];typeof c=="string"&&c.trim()&&(o.colorNames[i]=c)}return o}function wo(t){let o=Oe(t,"vam-ui"),r=new Map,a={};if(o&&typeof o=="object"){if(o.uiByLanguage&&typeof o.uiByLanguage=="object")for(let[i,c]of Object.entries(o.uiByLanguage))r.set(i,Zn(c));if(o.languageNames&&typeof o.languageNames=="object")for(let[i,c]of Object.entries(o.languageNames))typeof c=="string"&&c&&(a[i]=c)}return{sets:r,names:a}}var gt=t=>typeof t=="string"&&t.trim()!=="";function Ie(t){try{return window.localStorage.getItem(t)}catch{return null}}function Ce(t,o){try{window.localStorage.setItem(t,o)}catch{}}function vo(t,o){let r=Math.min(...o.map(x=>x.x)),a=Math.min(...o.map(x=>x.y)),i=Math.max(...o.map(x=>x.x+x.w)),c=Math.max(...o.map(x=>x.y+x.h)),f=14,d=12,g=8,b=t==="down"||t==="up",p=b?r:a,y=b?i:c,T=t==="right"?i+f:t==="left"?r-f:t==="down"?c+f:a-f,E=t==="right"||t==="down"?1:-1,z=(p+y)/2,P=Math.min(d,Math.max(0,(y-p)/4)),L=x=>Math.round(x*100)/100,k=(x,O)=>b?`${L(x)} ${L(O)}`:`${L(O)} ${L(x)}`,B=T,v=T+E*d,F=T+E*2*d,w=[`M ${k(p,B)}`,`Q ${k(p,v)} ${k(p+P,v)}`,`L ${k(z-P,v)}`,`Q ${k(z,v)} ${k(z,F)}`,`Q ${k(z,v)} ${k(z+P,v)}`,`L ${k(y-P,v)}`,`Q ${k(y,v)} ${k(y,B)}`].join(" "),h=F+E*g;return b?{path:w,x:L(z),y:L(h)}:{path:w,x:L(h),y:L(z)}}var bt=()=>window.matchMedia(go).matches;function Jn(t){var Ze,Je,tn,en;let o=Zn(Oe(t,"vam-ui")),r=o;t.documentElement.lang=r.lang;let a=t.getElementById("vam-app"),i=Oe(t,"vam-map");if(!a)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){a.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let c=i.assets&&typeof i.assets=="object"?i.assets:{},f=new Map,d=[];for(let e of i.nodes){if(!e||typeof e.id!="string"||f.has(e.id))continue;f.set(e.id,e);let n=rn(e.width),s=on(e.height);d.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed,...n!==void 0&&n!==280?{width:n}:{},...s!==void 0?{height:s}:{}})}let g=new Map(d.map(e=>[e.id,e]));for(let e of d)e.parentId&&(!g.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let b=[];if(Array.isArray(i.textNodes)){let e=new Set;for(let n of i.textNodes){if(!n||typeof n.id!="string"||e.has(n.id)||typeof n.text!="string"||!n.text.trim()||!Number.isFinite(n.x)||!Number.isFinite(n.y))continue;e.add(n.id);let s=typeof n.parentId=="string"?g.get(n.parentId):void 0;b.push({id:n.id,parentId:s?s.id:null,text:n.text,dx:s?n.x-s.x:n.x,dy:s?n.y-s.y:n.y,links:!s&&Array.isArray(n.links)?Array.from(new Set(n.links.filter(l=>typeof l=="string"&&g.has(l)))):[]})}}let p=e=>e==="right"||e==="left"||e==="down"||e==="up"?e:null,y=[];if(Array.isArray(i.summaries)){let e=new Set;for(let n of i.summaries){let s=p(n==null?void 0:n.side);if(!n||typeof n.id!="string"||e.has(n.id)||!s||typeof n.text!="string"||!n.text.trim()||!Array.isArray(n.members))continue;let l=Array.from(new Set(n.members.filter(m=>typeof m=="string"&&g.has(m))));l.length&&(e.add(n.id),y.push({id:n.id,members:l,side:s,text:n.text}))}}let T=new Map,E=new Map;for(let e of d)e.parentId&&E.set(e.parentId,[...(Ze=E.get(e.parentId))!=null?Ze:[],e]);let z=wo(t),P=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(gt))):[],L=Xn((Je=i.source)==null?void 0:Je.mapId),k=P.length>=2,B=k?P[0]:"",v=B;if(k){let e=[];try{e=Array.from((tn=window.navigator.languages)!=null?tn:[window.navigator.language]).filter(gt)}catch{}v=jn({languages:P,stored:L?Ie(L):null,defaultLanguage:gt(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let F=e=>{var n;return(n=z.sets.get(e))!=null?n:o},w=k&&B===mo,h=()=>k&&v!==B;k&&(r=F(v),t.documentElement.lang=v);let x=e=>{var s;let n=h()?(s=e.translations)==null?void 0:s[v]:void 0;return!n||typeof n!="object"?e:{title:gt(n.title)?n.title:e.title,summary:gt(n.summary)?n.summary:e.summary,reason:gt(n.reason)?n.reason:e.reason,detailHtml:gt(n.detailHtml)?n.detailHtml:e.detailHtml,...On(n)&&gt(e.detailHtml)?{compact:n,detailHtml:e.detailHtml}:{}}},O=()=>{var l;let e=h()?(l=i.translations)==null?void 0:l[v]:void 0,n=gt(e==null?void 0:e.title)?e.title:i.title,s=gt(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof n=="string"&&n.trim()||r.untitledMap,goal:typeof s=="string"?s.trim():""}},D=(e,n)=>{var s;try{let l=new Intl.DisplayNames([n!=null?n:e],{type:"language"}).of(e);if(l&&l!==e)return l}catch{}return(s=z.names[e])!=null?s:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),n=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};n(),e.addEventListener("change",n)}catch{}let u=(e,n,s)=>{let l=mt(t,e);return n&&(l.className=n),s!==void 0&&(l.textContent=s),l},R=e=>{let n=t.createElementNS(wt,"svg");n.setAttribute("class","svg-icon"),n.setAttribute("viewBox","0 0 24 24"),n.setAttribute("aria-hidden","true");for(let s of Mo[e]){let[l,...m]=s.split("|"),M=t.createElementNS(wt,l);for(let _ of m)M.setAttribute(_.slice(0,_.indexOf("=")),_.slice(_.indexOf("=")+1));n.append(M)}return n},S=(e,n,s,l)=>{let m=u("button",s,n);return m.type="button",m.addEventListener("click",M=>{M.stopPropagation(),l()}),e.append(m),m},$=(e,n,s,l)=>{let m=u("button");return m.type="button",m.setAttribute("aria-label",s),m.title=s,m.append(R(n)),m.addEventListener("click",M=>{M.stopPropagation(),l()}),e.append(m),m},A=e=>e==="core"?r.tierCore:e==="support"?r.tierSupport:r.tierSide,N=e=>Vn({"topic-markers":e.markers}),I=()=>/^(zh|ja)/.test(r.lang),U=(e,n)=>{if(!n.length)return e;let s=n.map(l=>r.markerNames[l]).join(I()?"\\u3001":", ");return`${e}${I()?"\\uFF0C":", "}${Nt(r.markerLabel,s)}`},j=e=>Wn({"topic-color":e.color}),Z=e=>Kn({"topic-style":e.style}),J=e=>{let n=u("span","vam-markers");for(let s of e){let l=u("span","vam-marker",Yn(s));l.dataset.marker=s,l.setAttribute("aria-hidden","true"),n.append(l)}return n},rt=(e,n)=>{let s=u("span","vam-relevance-tag");s.dataset.tier=e,n&&(s.title=n);let l=u("span","vam-relevance-icon");return l.append(R(To[e])),s.append(l,u("span",void 0,A(e))),s};a.className="vam-app";let Q=u("div","vam-toolbar"),q=u("h1","vam-map-switcher"),yt=u("span","vam-shared");Q.append(q,yt);let ut=$(Q,"list","",()=>Ot(tt.hidden,!0));Q.prepend(ut),ut.setAttribute("aria-controls","vam-outline");let pt=u("div","vam-toolbar-actions"),st=u("select","vam-language");if(k){for(let e of P){let n=u("option",void 0,(en=z.names[e])!=null?en:D(e));n.value=e,w&&e===B&&(n.dataset.original="1"),st.append(n)}st.value=v,pt.append(st)}let Re=u("span","vam-made-with"),Pt=u("a","vam-install");Pt.href=po,Pt.target="_blank",Pt.rel="noopener noreferrer",pt.append(Re,Pt),Q.append(pt);let Ht=u("div","vam-translate-note");Ht.hidden=!0;let vt=u("div","vam-workspace"),Y=u("div","vam-viewport"),xt=u("div","vam-stage");xt.setAttribute("role","tree");let kt=t.createElementNS(wt,"svg");kt.setAttribute("class","vam-edges"),kt.setAttribute("aria-hidden","true"),xt.append(kt);let Dt=u("div","vam-summaries");Dt.setAttribute("role","group"),y.length&&xt.append(Dt),Y.append(xt);let qt=u("div","vam-canvas-overlay"),_t=u("div","vam-map-tools"),zt=u("span","vam-goal"),Pe=u("span","vam-goal-text");zt.append(R("target"),Pe);let He=u("span","vam-canvas-hint"),Mt=u("div","vam-zoom-controls"),tr=$(Mt,"minus","",()=>Ft(1/1.2)),Bt=u("button","vam-zoom","100%");Bt.type="button",Bt.addEventListener("click",e=>{e.stopPropagation(),Ft(1/W.zoom)}),Mt.append(Bt);let er=$(Mt,"plus","",()=>Ft(1.2)),nr=$(Mt,"max","",()=>Wt()),ht=u("button","vam-layout-button");ht.type="button",ht.setAttribute("aria-haspopup","menu"),ht.setAttribute("aria-expanded","false"),Mt.append(ht);let at=u("div","vam-layout-menu");at.setAttribute("role","menu"),at.hidden=!0,Mt.append(at),qt.append(_t,He,Mt);let K=u("aside","vam-inspector");K.hidden=!0;let tt=u("nav","vam-outline");tt.id="vam-outline";let $t=u("div","vam-outline-tree");$t.setAttribute("role","tree"),tt.append($t),vt.append(tt,Y,qt,K),a.replaceChildren(...k?[Q,Ht,vt]:[Q,vt]);let W={x:0,y:0,zoom:1},et=null,pe=!1,Qt=Number(Ie(Gn))||ho,V=new Map,rr=()=>{let e=new Set,n=(s,l)=>{var m;for(let M of(m=E.get(s.id))!=null?m:[])l&&e.add(M.id),n(M,l||M.collapsed)};for(let s of d)s.parentId||n(s,s.collapsed);return e},De=e=>{var s,l;let n=0;for(let m=e.parentId;m&&!(++n>d.length);m=(l=(s=g.get(m))==null?void 0:s.parentId)!=null?l:null);return n},ze=()=>yn(Y.getBoundingClientRect().top,_t.hidden?void 0:_t.getBoundingClientRect());function Tt(){xt.style.transform=`translate(${W.x}px, ${W.y}px) scale(${W.zoom})`;let e=`${Math.round(W.zoom*100)}%`;Bt.textContent=e,Bt.setAttribute("aria-label",Nt(r.zoomReset,e))}function Ft(e,n){let s=n!=null?n:{x:Y.clientWidth/2,y:Y.clientHeight/2},l=Math.min(yo,Math.max(bo,W.zoom*e)),m=l/W.zoom;W={x:s.x-(s.x-W.x)*m,y:s.y-(s.y-W.y)*m,zoom:l},Tt()}let me=!1;function Wt(){if(!V.size)return;if(!Y.clientWidth||!Y.clientHeight){me=!0;return}let e=1/0,n=1/0,s=-1/0,l=-1/0;for(let m of V.values())e=Math.min(e,m.offsetLeft),n=Math.min(n,m.offsetTop),s=Math.max(s,m.offsetLeft+(m.offsetWidth||280)),l=Math.max(l,m.offsetTop+m.offsetHeight);for(let m of b){let M=m.parentId?void 0:T.get(m.id);M&&(e=Math.min(e,M.offsetLeft),n=Math.min(n,M.offsetTop),s=Math.max(s,M.offsetLeft+(M.offsetWidth||300)),l=Math.max(l,M.offsetTop+(M.offsetHeight||60)))}for(let m of Array.from(Dt.querySelectorAll(".vam-summary"))){let M=m.querySelector(".vam-summary-text");if(!M)continue;let _=parseFloat(M.style.left),H=parseFloat(M.style.top),C=M.offsetWidth,X=M.offsetHeight;if(!Number.isFinite(_)||!Number.isFinite(H))continue;let lt=m.classList.contains("is-side-left")?_-C:m.classList.contains("is-side-down")||m.classList.contains("is-side-up")?_-C/2:_,ct=m.classList.contains("is-side-up")?H-X:m.classList.contains("is-side-down")?H:H-X/2;e=Math.min(e,lt),n=Math.min(n,ct),s=Math.max(s,lt+C),l=Math.max(l,ct+X)}W=Mn({minX:e,minY:n,maxX:s,maxY:l},{width:Y.clientWidth,height:Y.clientHeight},ze()),Tt()}function Be(e){let n=V.get(e);n&&(W=xn(W,{x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2},{width:Y.clientWidth,height:Y.clientHeight},ze()),Tt())}function It(){var e;kt.replaceChildren();for(let n of d){let s=n.parentId?V.get(n.parentId):void 0,l=V.get(n.id);if(!s||!l)continue;let m=t.createElementNS(wt,"path");m.setAttribute("d",ue(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),m.setAttribute("class",((e=f.get(n.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge");let M=f.get(n.id);M&&Z(M).includes("line-thick")&&m.setAttribute("data-line-thick",""),kt.append(m)}for(let n of b){let s=n.parentId?V.get(n.parentId):void 0,l=T.get(n.id);if(!s||!l)continue;let m=t.createElementNS(wt,"path");m.setAttribute("d",ue(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),m.setAttribute("class","vam-edge vam-text-edge"),kt.append(m)}for(let n of b){let s=T.get(n.id);if(s)for(let l of n.links){let m=V.get(l);if(!m)continue;let M=s.offsetLeft+s.offsetWidth/2<=m.offsetLeft+m.offsetWidth/2,_=t.createElementNS(wt,"path");_.setAttribute("d",ue(M?s.offsetLeft+s.offsetWidth:s.offsetLeft,s.offsetTop+s.offsetHeight/2,M?m.offsetLeft:m.offsetLeft+m.offsetWidth,m.offsetTop+m.offsetHeight/2)),_.setAttribute("class","vam-edge vam-text-link"),kt.append(_)}}or()}function or(){Dt.replaceChildren();for(let e of y){let n=[];for(let H of e.members)for(let C of[H,...oe(d,H)]){let X=V.get(C);X&&n.push({x:X.offsetLeft,y:X.offsetTop,w:X.offsetWidth||280,h:X.offsetHeight})}if(!n.length)continue;let s=vo(e.side,n),l=u("div",`vam-summary is-side-${e.side}`);l.setAttribute("role","note");let m=t.createElementNS(wt,"svg");m.setAttribute("class","vam-summary-brace"),m.setAttribute("aria-hidden","true");let M=t.createElementNS(wt,"path");M.setAttribute("d",s.path),M.setAttribute("fill","none"),m.append(M),l.append(m);let _=u("div","vam-summary-text");_.textContent=e.text,_.style.left=`${s.x}px`,_.style.top=`${s.y}px`,l.append(_),Dt.append(l)}}let ge=0,$e=()=>{ge||(ge=window.requestAnimationFrame(()=>{ge=0,It()}))},he=e=>{let n=V.get(e),s=g.get(e);!n||!s||(n.style.left=`${s.x}px`,n.style.top=`${s.y}px`,s.width&&(n.style.width=`${s.width}px`),s.height&&(n.style.height=`${s.height}px`),Fe(e))},Fe=e=>{let n=g.get(e);if(n)for(let s of b){let l=s.parentId===e?T.get(s.id):void 0;l&&(l.style.left=`${n.x+s.dx}px`,l.style.top=`${n.y+s.dy}px`)}};function ir(){for(let e of T.values())e.remove();T.clear();for(let e of b){let n=e.parentId?g.get(e.parentId):void 0;if(e.parentId&&(!n||!V.has(e.parentId)||n.collapsed))continue;let s=u("div",`vam-text-node${n?"":" is-free"}`);s.setAttribute("role","note"),s.textContent=e.text,n||(s.style.left=`${e.dx}px`,s.style.top=`${e.dy}px`),xt.append(s),T.set(e.id,s),n&&Fe(n.id)}}function be(){var n,s;for(let l of V.values())l.remove();V.clear();let e=rr();for(let l of d){if(e.has(l.id))continue;let m=f.get(l.id),M=x(m),_=oe(d,l.id).size,H=Qn(m.tier)?m.tier:void 0,C=u("div",`vam-node${l.id===et?" is-selected":""}`);C.dataset.nodeId=l.id,C.dataset.status=m.status==="completed"?"completed":"idea",H&&(C.dataset.relevance=H),C.tabIndex=0,C.setAttribute("role","treeitem"),C.setAttribute("aria-level",String(De(l)+1)),C.setAttribute("aria-selected",String(l.id===et));let X=N(m),lt=j(m);lt&&(C.dataset.topicColor=lt);let ct=Z(m);ct.includes("bold")&&(C.dataset.topicStyleBold="true"),ct.includes("border-thick")&&(C.dataset.topicStyleBorder="thick"),ct.includes("text-small")?C.dataset.topicStyleSize="small":ct.includes("text-large")&&(C.dataset.topicStyleSize="large");let nt=U(String((n=M.title)!=null?n:""),X);C.setAttribute("aria-label",lt?`${nt}${I()?"\\uFF0C":", "}${Nt(r.colorLabel,r.colorNames[lt])}`:nt),_&&C.setAttribute("aria-expanded",String(!l.collapsed));let ot=u("div","vam-node-header");C.append(ot),m.status!=="completed"&&ot.append(u("span","vam-status vam-status-idea",r.toResearch)),H&&ot.append(rt(H,typeof M.reason=="string"?M.reason:void 0)),X.length&&ot.append(J(X));let nn=u("div","vam-node-tools");if(C.append(nn),_){let it=l.collapsed?Nt(r.expandCount,_):r.collapse,Rt=S(ot,it,"vam-collapse-button",()=>{l.collapsed=!l.collapsed,Kt(l.id,!0)});Rt.setAttribute("aria-expanded",String(!l.collapsed)),Rt.setAttribute("aria-label",it),Rt.title=it}if(S(nn,r.detailsButton,void 0,()=>Ct(l.id)),C.append(u("h3","vam-card-title",String((s=M.title)!=null?s:""))),typeof M.summary=="string"&&M.summary.trim()&&C.append(u("p","vam-card-summary",M.summary)),l.height){let it=u("span","vam-card-fade"),Rt=u("span","vam-card-more","\\u2026");it.setAttribute("aria-hidden","true"),Rt.setAttribute("aria-hidden","true"),C.append(it,Rt)}C.addEventListener("click",()=>{pe||Ct(l.id)}),C.addEventListener("keydown",it=>{it.target===C&&(it.key==="Enter"||it.key===" "?(it.preventDefault(),Ct(l.id)):_&&it.key===(l.collapsed?"ArrowRight":"ArrowLeft")&&(it.preventDefault(),l.collapsed=!l.collapsed,Kt(l.id)))}),C.addEventListener("pointerdown",it=>sr(it,l,C)),xt.append(C),V.set(l.id,C),he(l.id)}ir(),We()}function We(){var e;for(let[n,s]of V)(e=g.get(n))!=null&&e.height&&(s.classList.remove("is-clipped"),s.classList.toggle("is-clipped",s.scrollHeight>s.clientHeight+1))}function Zt(){hn(d,void 0,n=>{var s;return(s=V.get(n))==null?void 0:s.offsetHeight}).forEach((n,s)=>{d[s].x=n.x,d[s].y=n.y});for(let n of V.keys())he(n);We()}function Kt(e,n=!1){var m;let s=e?(m=V.get(e))==null?void 0:m.getBoundingClientRect():void 0;be(),Zt(),It();let l=e?V.get(e):void 0;if(l){if(s){let _=l.getBoundingClientRect();W={...W,x:W.x+s.left-_.left,y:W.y+s.top-_.top},Tt()}let M=n?l.querySelector(".vam-collapse-button"):null;(M!=null?M:l).focus({preventScroll:!0})}}function sr(e,n,s){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let l=e.clientX,m=e.clientY,M=n.x,_=n.y,H=!1,C=lt=>{let ct=lt.clientX-l,nt=lt.clientY-m;if(!H){if(Math.hypot(ct,nt)<=xo)return;H=!0,s.classList.add("is-dragging"),s.setPointerCapture(lt.pointerId)}n.x=M+ct/W.zoom,n.y=_+nt/W.zoom,he(n.id),$e()},X=()=>{s.removeEventListener("pointermove",C),s.removeEventListener("pointerup",X),s.removeEventListener("pointercancel",X),s.classList.remove("is-dragging"),H&&(pe=!0,window.setTimeout(()=>pe=!1,0))};s.addEventListener("pointermove",C),s.addEventListener("pointerup",X),s.addEventListener("pointercancel",X)}let ye=e=>Math.round(Math.min(Math.max(_e,e),Math.max(_e,vt.clientWidth*.7)));function Jt(){let e=bt();if(K.hidden||e){K.style.removeProperty("width"),qt.style.removeProperty("right");return}let n=ye(Qt);K.style.width=`${n}px`,qt.style.right=`${n}px`,G.setAttribute("aria-valuenow",String(n)),G.setAttribute("aria-valuemax",String(ye(1/0)))}let G=u("div","vam-inspector-resizer");G.setAttribute("role","separator"),G.setAttribute("aria-orientation","vertical"),G.setAttribute("aria-label",r.resizePanel),G.setAttribute("aria-valuemin",String(_e)),G.tabIndex=0;let te=(e,n)=>{Qt=ye(e),Jt(),n&&Ce(Gn,String(Qt))};G.addEventListener("pointerdown",e=>{e.preventDefault();let n=e.clientX,s=K.offsetWidth;G.setPointerCapture(e.pointerId),G.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let l=M=>te(s+n-M.clientX,!1),m=()=>{G.removeEventListener("pointermove",l),G.removeEventListener("pointerup",m),G.removeEventListener("pointercancel",m),G.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),te(Qt,!0)};G.addEventListener("pointermove",l),G.addEventListener("pointerup",m),G.addEventListener("pointercancel",m)}),G.addEventListener("keydown",e=>{let n=e.shiftKey?48:16;if(e.key==="ArrowLeft")te(K.offsetWidth+n,!0);else if(e.key==="ArrowRight")te(K.offsetWidth-n,!0);else return;e.preventDefault()});let xe=bt();window.addEventListener("resize",()=>{Jt(),Tt(),bt()!==xe&&(xe=bt(),Ot(xe?!1:Ye(),!1))});function Me(){et=null;for(let e of V.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");K.hidden=!0,vt.classList.remove("has-inspector"),K.replaceChildren(),Jt(),At()}function Ct(e){var X,lt,ct;let n=g.get(e),s=f.get(e);if(!n||!s)return;let l={...s,...x(s)};et=e;for(let[nt,ot]of V)ot.classList.toggle("is-selected",nt===e),ot.setAttribute("aria-selected",String(nt===e));K.replaceChildren(G);let m=u("div","vam-inspector-heading");m.append(u("strong",void 0,r.topicDetails)),S(m,r.close,void 0,Me),K.append(m,u("h3",void 0,String((X=l.title)!=null?X:"")));let M=Qn(l.tier)?l.tier:void 0;if(M){let nt=u("div","vam-inspector-why");nt.append(rt(M));let ot=typeof l.reason=="string"&&l.reason.trim()?l.reason:l.manual?r.manualReason:"";ot&&nt.append(u("span",void 0,ot)),K.append(nt)}typeof l.summary=="string"&&l.summary.trim()&&K.append(u("p","vam-sample-summary",l.summary));let _=zn(t,l.links,r);_&&K.append(_);let H=u("div","vam-sample-detail");typeof l.detailHtml=="string"&&l.detailHtml.trim()?l.compact?$n(t,H,l.detailHtml,l.compact,c,r):Le(t,H,l.detailHtml,c,r):H.append(u("p","vam-inspector-empty",r.noContent)),K.append(H);let C=(lt=E.get(e))!=null?lt:[];if(C.length){let nt=u("div","vam-subtopics");nt.append(u("strong",void 0,r.subtopics));for(let ot of C)S(nt,String((ct=x(f.get(ot.id)).title)!=null?ct:""),void 0,()=>{n.collapsed&&(n.collapsed=!1,Kt(n.id)),Ct(ot.id),Be(ot.id)});K.append(nt)}K.hidden=!1,vt.classList.add("has-inspector"),Jt(),K.scrollTop=0,At(),je()}let Te=e=>{ve(d,e),Kt(),Wt()},Ut=e=>{at.hidden||(at.hidden=!0,ht.setAttribute("aria-expanded","false"),e&&ht.focus())};function ar(){at.replaceChildren();let e=[{label:r.collapseAll,run:()=>Te(0)},{label:r.expandAll,run:()=>Te(null)},...[1,2,3].map(n=>({label:Nt(r.expandToLevel,n),run:()=>Te(n)})),null,{label:r.autoLayout,run:()=>{Zt(),It()}}];for(let n of e){if(!n){at.append(u("hr"));continue}let s=u("button",void 0,n.label);s.type="button",s.setAttribute("role","menuitem"),s.addEventListener("click",l=>{l.stopPropagation(),Ut(!0),n.run()}),at.append(s)}}let Ke=()=>Array.from(at.querySelectorAll("button"));ht.addEventListener("click",e=>{var n;if(e.stopPropagation(),!at.hidden)return Ut(!0);at.hidden=!1,ht.setAttribute("aria-expanded","true"),(n=Ke()[0])==null||n.focus()}),at.addEventListener("keydown",e=>{let n=Ke(),s=n.indexOf(t.activeElement);if(e.key==="ArrowDown")n[(s+1)%n.length].focus();else if(e.key==="ArrowUp")n[(s-1+n.length)%n.length].focus();else if(e.key==="Home")n[0].focus();else if(e.key==="End")n[n.length-1].focus();else return e.key==="Tab"?Ut(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!at.hidden&&!Mt.contains(e.target)&&Ut(!1);let n=e.target;bt()&&!tt.hidden&&!tt.contains(n)&&!ut.contains(n)&&Ot(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!at.hidden)Ut(!0);else if(bt()&&!tt.hidden)Ot(!1,!1),ut.focus();else if(!K.hidden){let n=et?V.get(et):void 0;Me(),n==null||n.focus({preventScroll:!0})}}});function Ue(){let e=O();if(t.title=e.title,q.textContent=e.title,xt.setAttribute("aria-label",e.title),yt.textContent=r.readOnly,Re.textContent=r.madeWithVam,Pt.textContent=r.install,st.setAttribute("aria-label",r.language),st.title=r.language,w)for(let s of Array.from(st.options))s.dataset.original&&(s.textContent=r.originalText);e.goal?(Pe.textContent=Nt(r.goal,e.goal),zt.title=e.goal,zt.parentElement||_t.append(zt),_t.hidden=!1):(zt.remove(),_t.hidden=!0),He.textContent=r.hint;let n=(s,l)=>{s.setAttribute("aria-label",l),s.title=l};if(n(tr,r.zoomOut),n(er,r.zoomIn),n(nr,r.showAll),ht.textContent=r.layout,K.setAttribute("aria-label",r.topicDetails),tt.setAttribute("aria-label",r.outline),$t.setAttribute("aria-label",r.outline),n(ut,r.outline),G.setAttribute("aria-label",r.resizePanel),ar(),h()){let s=w?r.aiTranslatedUnknown:Nt(r.aiTranslated,D(B,v));Ht.textContent=`${s} ${r.imageTextUntranslated}`,Ht.hidden=!1}else Ht.hidden=!0;Tt()}function lr(e){if(e===v||!P.includes(e))return;v=e,r=F(e),L&&Ce(L,e),t.documentElement.lang=e;let n=K.scrollTop;Ue(),be(),It(),Ge(),et!==null&&g.has(et)&&!K.hidden&&(Ct(et),K.scrollTop=n),$e()}st.addEventListener("change",()=>lr(st.value));let ee=[],Ve=e=>{var n;ee.push(e);for(let s of(n=E.get(e.id))!=null?n:[])Ve(s)};for(let e of d)e.parentId||Ve(e);let Vt=new Set,St=new Map,ne=null;function Ye(){return Ie(qn)!=="0"}function Ot(e,n){tt.hidden=!e,vt.classList.toggle("has-outline",e),ut.setAttribute("aria-expanded",String(e)),n&&!bt()&&Ce(qn,e?"1":"0")}let cr=()=>ee.filter(e=>{var n;return!((n=St.get(e.id))!=null&&n.hidden)});function At(){var s,l,m;let e=[];for(let M of ee){let _=St.get(M.id);if(!_)continue;let H=!1;for(let C=M.parentId;C&&!H;C=(l=(s=g.get(C))==null?void 0:s.parentId)!=null?l:null)H=Vt.has(C);_.hidden=H,H||e.push(M),E.has(M.id)&&_.setAttribute("aria-expanded",String(!Vt.has(M.id))),M.id===et?_.setAttribute("aria-current","true"):_.removeAttribute("aria-current")}let n=(m=e.find(M=>M.id===ne))!=null?m:e[0];for(let[M,_]of St)_.tabIndex=M===(n==null?void 0:n.id)?0:-1}function je(){let e=et?St.get(et):void 0;!e||e.hidden||!tt.clientHeight||(e.offsetTop<tt.scrollTop?tt.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>tt.scrollTop+tt.clientHeight&&(tt.scrollTop=e.offsetTop+e.offsetHeight-tt.clientHeight))}function we(e){Vt.delete(e)||Vt.add(e),At()}function dr(e){var n;ne=e,At(),(n=St.get(e))==null||n.focus()}function ur(){for(let[e,n]of V)n.classList.toggle("is-selected",e===et),n.setAttribute("aria-selected",String(e===et))}function Xe(e){var m,M,_;let n=g.get(e);if(!n)return;let s=!1,l=0;for(let H=n.parentId;H&&l++<=d.length;H=(M=(m=g.get(H))==null?void 0:m.parentId)!=null?M:null){let C=g.get(H);C!=null&&C.collapsed&&(C.collapsed=!1,s=!0)}et=e,s&&Kt(),Be(e),K.hidden?ur():Ct(e),At(),je(),bt()&&Ot(!1,!1),(_=V.get(e))==null||_.focus({preventScroll:!0})}function fr(e,n){var H;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let s=cr(),l=s.indexOf(n),m=(H=E.get(n.id))!=null?H:[],M=Vt.has(n.id),_;switch(e.key){case"ArrowDown":_=s[l+1];break;case"ArrowUp":_=s[l-1];break;case"Home":_=s[0];break;case"End":_=s[s.length-1];break;case"ArrowRight":m.length&&M?we(n.id):_=m[0];break;case"ArrowLeft":m.length&&!M?we(n.id):_=n.parentId?g.get(n.parentId):void 0;break;case"Enter":case" ":Xe(n.id);break;default:return}e.preventDefault(),_&&dr(_.id)}function Ge(){var e;$t.replaceChildren(),St.clear();for(let n of ee){let s=String((e=x(f.get(n.id)).title)!=null?e:""),l=u("div","vam-outline-item");l.dataset.outlineId=n.id,l.setAttribute("role","treeitem");let m=De(n)+1;l.setAttribute("aria-level",String(m)),l.style.setProperty("--depth",String(m-1));let M=u("span","vam-outline-twist");E.has(n.id)&&(M.append(R("chevron")),M.addEventListener("click",C=>{C.stopPropagation(),we(n.id)}));let _=u("span","vam-outline-title",s);_.title=s,l.append(M,_);let H=N(f.get(n.id));H.length&&(l.append(J(H)),l.setAttribute("aria-label",U(s,H))),l.addEventListener("click",()=>Xe(n.id)),l.addEventListener("keydown",C=>fr(C,n)),l.addEventListener("focus",()=>{ne!==n.id&&(ne=n.id,At())}),$t.append(l),St.set(n.id,l)}At()}let ft=new Map,Yt=0,re=!1;Y.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(Y.setPointerCapture(e.pointerId),ft.set(e.pointerId,{x:e.clientX,y:e.clientY}),Y.classList.add("is-panning"),ft.size===1&&(re=!1),ft.size===2)){let[n,s]=Array.from(ft.values());Yt=Math.hypot(n.x-s.x,n.y-s.y)}}),Y.addEventListener("pointermove",e=>{let n=ft.get(e.pointerId);if(!n)return;if(ft.set(e.pointerId,{x:e.clientX,y:e.clientY}),ft.size===2&&Yt){let[m,M]=Array.from(ft.values()),_=Math.hypot(m.x-M.x,m.y-M.y),H=Y.getBoundingClientRect();Ft(_/Yt,{x:(m.x+M.x)/2-H.left,y:(m.y+M.y)/2-H.top}),Yt=_,re=!0;return}let s=e.clientX-n.x,l=e.clientY-n.y;re||(re=Math.abs(s)+Math.abs(l)>0),W={...W,x:W.x+s,y:W.y+l},Tt()});let qe=e=>{ft.delete(e.pointerId)&&(ft.size<2&&(Yt=0),ft.size||(Y.classList.remove("is-panning"),!re&&e.type==="pointerup"&&!K.hidden&&Me()))};Y.addEventListener("pointerup",qe),Y.addEventListener("pointercancel",qe),Y.addEventListener("wheel",e=>{e.preventDefault();let n=Y.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?Ft(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-n.left,y:e.clientY-n.top}):(W={...W,x:W.x-e.deltaX,y:W.y-e.deltaY},Tt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{me&&(me=!1,Wt())}).observe(Y),Ue(),Ge(),Ot(bt()?!1:Ye(),!1),ve(d,1),be(),Zt(),It(),Wt();let Qe=t.fonts;Qe&&Qe.ready.then(()=>{et!==null||ft.size||(Zt(),It(),Wt())})}Jn(document);})();';
+var SHARE_VIEWER_JS = '(()=>{function on(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(560,Math.max(200,Math.round(t)))}var mr=80,gr=720;function sn(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(gr,Math.max(mr,Math.round(t)))}function an(t,o){if(!o.size)return t;let r=!1,l=t.map(i=>{let d=i.afterTextId;return d===void 0||o.get(d)!==i.parentId?i:(r=!0,{...i,parentId:d})});return r?l:t}function ln(t){var r;let o=t.aimKind==="question"?[]:(r=t.aimConvergesFromNodeIds)!=null?r:[];return[...t.parentId?[t.parentId]:[],...o.filter(l=>l!==t.parentId)]}function hr(t){var r;let o=new Map;for(let l of t){let i=(r=l.parentId)!=null?r:"",d=o.get(i);d?d.push(l):o.set(i,[l])}return o}function yr(t,o,r){var i;let l=[o];for(;l.length;){let d=l.pop();for(let f of(i=t.get(d))!=null?i:[])f.id!==o&&!r.has(f.id)&&(r.add(f.id),l.push(f.id))}}function oe(t,o){let r=new Set;return yr(hr(t),o,r),r}function ve(t,o){let r=new Map(t.map(d=>[d.id,d])),l=d=>{let f=0,c=new Set([d.id]);for(let p=d.parentId;p&&r.has(p)&&!c.has(p);p=r.get(p).parentId)c.add(p),f++;return f},i=new Set(t.map(d=>d.parentId).filter(d=>!!d&&r.has(d)));for(let d of t)i.has(d.id)&&(d.collapsed=o===null?!1:l(d)>=o)}function ie(t){if(t>150)return"right";if(t<-150)return"left"}function cn(t,o,r){var l;return(l=ie(t-r))!=null?l:t+o<=r?"left":"right"}function dn(t,o,r,l={left:0,right:0}){let i={...l},d=new Map;for(let f of t){let c=i.left<i.right?"left":"right";d.set(f.id,c),i[c]+=o(f)+r}return d}function un(t,o,r,l){let i=t.map(l),d={left:0,right:0};t.forEach((c,p)=>{let y=i[p];y&&(d[y]+=o(c)+r)});let f=dn(t.filter((c,p)=>!i[p]),o,r,d);return new Map(t.map((c,p)=>{var y;return[c.id,(y=i[p])!=null?y:f.get(c.id)]}))}function br(t){return t==="right"||t==="left"||t==="down"||t==="up"}function fn(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function se(t){if(!(t!=null&&t.parentId))return;let o=t.layout;if(!o||typeof o!="object"||Array.isArray(o))return;let r=o.direction;return br(r)?r:void 0}function pn(t){let{width:o,column:r,mapDirection:l,engine:i}=t,d=(f,c)=>{var k,F;let p=[],y=(v,b)=>{for(let M of[...t.kidsOf(v),...t.joinsOf(v)])se(M)?p.push({node:M,root:b}):y(M,b)};for(let v of f)y(v,v);let m={roots:f,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!p.length)return i(c,m);let x=c==="down"||c==="up",w=p.map(({node:v,root:b})=>{let M=d([v],se(v)),R=1/0,D=-1/0,u=1/0,P=-1/0,A=new Map,$=_=>{A.set(_.id,_);for(let O of[...t.kidsOf(_),...t.joinsOf(_)])$(O)};$(v);for(let[_,O]of M)R=Math.min(R,O.x),D=Math.max(D,O.x+o),u=Math.min(u,O.y),P=Math.max(P,O.y+t.heightFor(A.get(_)));let E=Math.max(1,Math.ceil((D-R+r-o)/r));return{node:v,root:b,placed:M,minX:R,maxX:D,minY:u,maxY:P,slots:E}}),L=new Map(w.map(v=>[v.node.id,v])),z=v=>{let b=L.get(v.id);return!b||!x?[]:Array.from({length:b.slots},(M,R)=>({id:`${v.id}\\0pad${R}`}))},H=new Set,S=i(c,{roots:f,kidsOf:v=>{if(!L.has(v.id))return t.kidsOf(v);let b=z(v);for(let M of b)H.add(M.id);return b},joinsOf:v=>L.has(v.id)?[]:t.joinsOf(v),heightFor:v=>{if(H.has(v.id))return 0;let b=L.get(v.id);return b&&!x?b.maxY-b.minY:t.heightFor(v)}}),B=new Map;for(let[v,b]of S)!H.has(v)&&!L.has(v)&&B.set(v,b);for(let v of w){let b=S.get(v.node.id),M,R;x?(M=b.x+r/2-(v.minX+v.maxX)/2,R=c==="down"?b.y-v.minY:b.y+t.heightFor(v.node)-v.maxY):(M=c==="right"||c==="balanced"&&b.x>=((F=(k=S.get(v.root.id))==null?void 0:k.x)!=null?F:b.x)?b.x-v.minX:b.x+o-v.maxX,R=b.y-v.minY);for(let[D,u]of v.placed)B.set(D,{x:u.x+M,y:u.y+R})}return B};return d(t.roots,l)}var mn=1/Math.tan(Math.PI/3);function gn(t){let{roots:o,kidsOf:r,joinsOf:l,heightFor:i,width:d,column:f,gap:c,left:p,top:y}=t,m=f-d,x=N=>[...r(N),...l(N)],w=o.map(N=>{let S=new Map,B=A=>A.reduce(($,E)=>$+S.get(E.id),0)+Math.max(0,A.length-1)*c,k=A=>{let $=x(A);for(let E of $)k(E);S.set(A.id,Math.max(i(A),B($)))},F=(A,$,E,_)=>{let O=x(A),Y=E+(S.get(A.id)-B(O))/2,X=O.map(rt=>{let Q=F(rt,$+1,Y,_);return Y+=S.get(rt.id)+c,Q}),Z=i(A),J=X.length?(X[0]+X[X.length-1])/2:E+S.get(A.id)/2;return _.push({id:A.id,x:-$*f,centre:J,height:Z}),J},v=x(N).map((A,$)=>{let E=$%2===0?1:-1,_=x(A);for(let q of _)k(q);let O=[],Y=c;for(let q of _){let bt=O.length,pt=F(q,0,Y,O)*mn-m;for(let st=bt;st<O.length;st++)O[st].x+=pt-d;Y+=S.get(q.id)+c}let X=Math.max(f,Y),Z=X*mn,J=i(A),rt=[-d/2,...O.map(q=>q.x)],Q=[d/2,Z,...O.map(q=>q.x+d)];return{topic:A,side:E,length:X,height:J,cards:O,minX:Math.min(...rt),maxX:Math.max(...Q)}}),b=i(N),M=[{id:N.id,x:0,y:-b/2,height:b}],R={above:-m,below:-m};for(let A of v){let $=A.side===1?"above":"below",E=R[$]-A.maxX,_=-A.side*A.length;M.push({id:A.topic.id,x:E-d/2,y:_-A.side*(A.height/2)-A.height/2,height:A.height});for(let O of A.cards)M.push({id:O.id,x:E+O.x,y:_+A.side*O.centre-O.height/2,height:O.height});R[$]=E+A.minX-m}let D=Math.min(...M.map(A=>A.x)),u=Math.min(...M.map(A=>A.y)),P=Math.max(...M.map(A=>A.y+A.height));return{out:M,minX:D,minY:u,maxY:P}}),L=new Map,z=p+Math.max(0,...w.map(N=>-N.minX)),H=y;for(let N of w){for(let S of N.out)L.set(S.id,{x:z+S.x,y:H+S.y-N.minY});H+=N.maxY-N.minY+c}return L}var xr=Math.PI*2,Mr=6,Tr=60;function wr(t,o,r,l){let i=[...t.values()].sort((f,c)=>f.y-c.y),d=new Set;for(let f=0;f<i.length;f++){let c=i[f];for(let p=f+1;p<i.length;p++){let y=i[p];if(y.y>=c.y+c.height+r)break;l&&l.checks++,Math.abs(c.x-y.x)<o&&c.y<y.y+y.height+r&&d.add(Math.max(c.depth,y.depth))}}return d}function hn(t){let{roots:o,kidsOf:r,joinsOf:l,heightFor:i,width:d,column:f,gap:c,left:p,top:y}=t,m=new Map,x=y;for(let w of o){let L=[],z=new Map,H=E=>[...r(E),...l(E)],N=E=>{let _=H(E),O=_.length?_.reduce((Y,X)=>Y+N(X),0):1;return z.set(E.id,O),O};N(w);let S=(E,_,O,Y)=>{L.push({id:E.id,depth:_,angle:(O+Y)/2,height:i(E)});let X=O,Z=(Y-O)/z.get(E.id);for(let J of H(E)){let rt=Z*z.get(J.id);S(J,_+1,X,X+rt),X+=rt}};S(w,0,0,xr);let B=Math.max(...L.map(E=>E.depth)),k=Array.from({length:B+1},(E,_)=>_*f),F=()=>{let E=[];return k.forEach((_,O)=>E.push(O?Math.max(_,E[O-1]+f):0)),new Map(L.map(_=>{let O=E[_.depth];return[_.id,{x:Math.round(O*Math.sin(_.angle)-d/2),y:Math.round(-O*Math.cos(_.angle)-_.height/2),depth:_.depth,height:_.height}]}))},v=f/Mr,b=()=>(t.stats&&t.stats.rounds++,wr(F(),d,c,t.stats)),M=v,R=b(),D=k.slice();for(let E=0;R.size&&E<Tr;E++){D=k.slice();for(let _ of R)k[_]+=M;M*=2,R=b()}if(!R.size&&D.some((E,_)=>k[_]-E>v)){let E=k.slice();for(;E.some((_,O)=>_-D[O]>v);){let _=E.map((O,Y)=>(O+D[Y])/2);k.splice(0,k.length,..._),b().size?D=_:E=_}k.splice(0,k.length,...E)}let u=F(),P=Math.min(...[...u.values()].map(E=>E.x)),A=Math.min(...[...u.values()].map(E=>E.y)),$=Math.max(...[...u.values()].map(E=>E.y+E.height));for(let[E,_]of u)m.set(E,{x:Math.round(p)+_.x-P,y:x+_.y-A});x+=$-A+c}return m}function ae(t){let{roots:o,kidsOf:r,joinsOf:l,heightFor:i,column:d,rowGap:f,flip:c,left:p,top:y}=t,m=u=>{var P,A;return(A=(P=t.widthFor)==null?void 0:P.call(t,u))!=null?A:280},x=new Map,w=new Map,L=u=>u.reduce((P,A)=>P+x.get(A.id),0),z=u=>{let P=r(u),A=l(u);for(let $ of[...P,...A])z($);x.set(u.id,Math.max(d,L(P),L(A),m(u)+d-280)),w.set(u.id,1+Math.max(0,...P.map($=>w.get($.id))))},H=new Map,N=new Map,S=(u,P,A)=>{let $=r(u),E=l(u),_=x.get(u.id),O=(q,bt)=>{let ut=A+(_-L(q))/2;return q.map(pt=>{S(pt,bt,ut);let st=H.get(pt.id);return ut+=x.get(pt.id),st})},Y=O($,P+1),X=O(E,P+w.get(u.id)),Z=Y.length?Y:X;N.set(u.id,P);let J=(q,bt)=>bt.map((ut,pt)=>ut+m(q[pt])/2),rt=Y.length?$:E,Q=J(rt,Z);H.set(u.id,Z.length?(Q[0]+Q[Q.length-1])/2-m(u)/2:A+Math.max(0,280-m(u))/2)},B=p,k=[],F=u=>{k.push(u);for(let P of[...r(u),...l(u)])F(P)};for(let u of o)z(u),S(u,0,B),B+=x.get(u.id),F(u);let v=Math.max(0,...N.values()),b=Array.from({length:v+1},()=>0);for(let u of k)b[N.get(u.id)]=Math.max(b[N.get(u.id)],i(u));let M=[],R=y;for(let u=0;u<=v;u++){let P=c?v-u:u;M[P]=R,R+=b[P]+f}let D=new Map;for(let u of k){let P=N.get(u.id),A=c?M[P]+b[P]-i(u):M[P];D.set(u.id,{x:H.get(u.id),y:A})}return D}function yn(t){let{roots:o,kidsOf:r,joinsOf:l,heightFor:i,width:d,column:f,gap:c,left:p,top:y}=t,m=new Map,x=y;for(let w of o){let L=new Map,z=k=>{L.set(k.id,i(k));for(let F of[...r(k),...l(k)])z(F)};z(w);let H=[{id:w.id,x:p,y:0}],N=p+f;[...r(w),...l(w)].forEach((k,F)=>{let v=ae({roots:[k],kidsOf:r,joinsOf:l,heightFor:i,column:f,rowGap:f-d,flip:F%2===1,left:N,top:0}),b=v.get(k.id).y,M=N;for(let[R,D]of v)H.push({id:R,x:D.x,y:D.y-b}),M=Math.max(M,D.x);N=M+f});let S=Math.min(...H.map(k=>k.y)),B=Math.max(...H.map(k=>k.y+L.get(k.id)));for(let k of H)m.set(k.id,{x:k.x,y:x+k.y-S});x+=B-S+c}return m}var jt=300;function vr(t){var o;return Math.max(0,((o=t.width)!=null?o:280)-280)}function Se(t){var o;return t.path===""?(o=t.width)!=null?o:280:280}function kr(t,o){return t.path===""?cn(t.x,Se(t),o.x):ie(t.x-o.x)}var Sr=24,Ar={compact:{column:330,gap:12},standard:{column:360,gap:Sr},spacious:{column:420,gap:48}};function Er(t){return t==="compact"||t==="spacious"}var Lr=180;function Nr(t){let o=typeof t=="string"?t:t.direction,r=typeof t=="string"?void 0:t.spacing;return{direction:o,...Ar[Er(r)?r:"standard"]}}var Ir=t=>t==="left"?-1:1;var _r=(t,o)=>{let r=t==null?void 0:t(o);return r!==void 0&&Number.isFinite(r)&&r>0?r:Lr};function Cr(t,o){var p,y;let r=new Map(t.map(m=>[m.id,m])),l=new Map,i=new Map,d=(m,x,w)=>{var L;return m.set(x,[...(L=m.get(x))!=null?L:[],w])};for(let m of t){if(!m.parentId)continue;let x=m.aimKind!=="question"&&((p=m.aimConvergesFromNodeIds)!=null&&p.length)?ln(m).map(L=>r.get(L)):[],w=(y=x[0])==null?void 0:y.parentId;w&&r.has(w)&&x.every(L=>L&&L.parentId===w)?d(i,w,m):d(l,m.parentId,m)}return{kidsOf:m=>{var x;return o&&m.collapsed?[]:(x=l.get(m.id))!=null?x:[]},joinsOf:m=>{var x;return o&&m.collapsed?[]:((x=i.get(m.id))!=null?x:[]).filter(w=>{var L;return!(o&&((L=r.get(w.parentId))!=null&&L.collapsed))})}}}function ke(t){var v;let{roots:o,kidsOf:r,joinsOf:l,heightFor:i,column:d,gap:f,sign:c,left:p,top:y}=t,m=new Map,x=new Map,w=new Map,L=new Map,z=new Map,H=b=>b.reduce((M,R)=>M+x.get(R.id),0)+Math.max(0,b.length-1)*f,N=b=>{let M=r(b),R=l(b);z.set(b.id,b);for(let D of[...M,...R])N(D);x.set(b.id,Math.max(i(b),H(M),H(R))),w.set(b.id,1+Math.max(0,...M.map(D=>w.get(D.id))))},S=(b,M,R)=>{let D=r(b),u=l(b),P=x.get(b.id),A=(Z,J)=>{let rt=R+(P-H(Z))/2;return Z.map(Q=>{let q=S(Q,J,rt);return rt+=x.get(Q.id)+f,q})},$=A(D,M+1),E=A(u,M+w.get(b.id)),_=$.length?D:u,O=$.length?$:E,Y=i(b),X=R+(P-Y)/2;if(O.length){let Z=O[0]+i(_[0])/2,J=O[O.length-1]+i(_[_.length-1])/2;X=(Z+J)/2-Y/2}return m.set(b.id,{x:0,y:y+X}),L.set(b.id,M),X},B=0;for(let b of o)N(b),S(b,0,B),B+=x.get(b.id)+f;let k=[];for(let[b,M]of L)k[M]=Math.max((v=k[M])!=null?v:0,vr(z.get(b)));let F=b=>{var R,D;let M=0;if(c>0)for(let u=0;u<b;u++)M+=(R=k[u])!=null?R:0;else for(let u=1;u<=b;u++)M+=(D=k[u])!=null?D:0;return M};for(let[b,M]of m){let R=L.get(b),D=c<0?Math.max(0,280-Se(z.get(b))):0;M.x=p+c*(R*d+F(R))+D}return{placed:m,sizes:x}}function Or(t,o,r){let{roots:l,kidsOf:i,joinsOf:d,heightFor:f,gap:c,left:p,top:y}=o,m=ke({...o,sign:1}).sizes,x=new Map(t.map(S=>[S.id,S])),w=l.map(S=>{var v;let B=(v=x.get(S.id))!=null?v:S,k=un(i(S),b=>m.get(b.id),c,b=>{var M;return r?void 0:kr((M=x.get(b.id))!=null?M:b,B)}),F=b=>ke({...o,roots:[S],kidsOf:M=>M.id===S.id?i(M).filter(R=>k.get(R.id)===b):i(M),joinsOf:M=>M.id===S.id&&b==="left"?[]:d(M),sign:b==="left"?-1:1,left:0,top:0}).placed;return{root:S,right:F("right"),left:F("left")}}),L=Math.max(0,...w.flatMap(({left:S})=>[...S.values()].map(B=>-B.x))),z=p+L,H=new Map,N=0;for(let{root:S,right:B,left:k}of w){let F=u=>u.get(S.id).y+f(S)/2,v=Math.max(F(B),F(k)),b=[];for(let u of[{placed:B,isLeft:!1},{placed:k,isLeft:!0}]){let{placed:P,isLeft:A}=u,$=v-F(P);for(let[E,_]of P)A&&E===S.id||b.push([E,{x:z+_.x,y:_.y+$}])}let M=u=>f(x.get(u)),R=Math.min(...b.map(([,u])=>u.y)),D=Math.max(...b.map(([u,P])=>P.y+M(u)));for(let[u,P]of b)H.set(u,{x:P.x,y:y+N+P.y-R});N+=D-R+c}return H}function Rr(t,o,r,l,i=!1,d,f="right",c=!1){let{direction:p,column:y,gap:m}=Nr(f),{kidsOf:x,joinsOf:w}=Cr(t,i),L=N=>_r(d,N.id),z=(N,S)=>{if(N==="down"||N==="up")return ae({...S,column:y,rowGap:y-jt,flip:N==="up",left:r,top:l,widthFor:Se});let B={...S,column:y,gap:m,left:r,top:l};if(N==="radial")return hn({...B,width:jt});if(N==="timeline")return yn({...B,width:jt});if(N==="fishbone")return gn({...B,width:jt});let k={...B,sign:Ir(N)};return N==="balanced"?Or(t,k,c):ke(k).placed},H={roots:o,kidsOf:x,joinsOf:w,heightFor:L};return fn(p)&&t.some(N=>se(N))?pn({...H,width:jt,column:y,mapDirection:p,engine:z}):z(p,H)}function Ae(t,o,r,l="right",i={}){let d=o!=null&&o.size?t.filter(p=>!o.has(p.id)):t,f=d.filter(p=>!p.parentId),c=Rr(d,f,80,80,!0,r,l,i.reset===!0);return t.map(p=>({...p,...c.get(p.id)}))}function bn(t){return typeof t=="number"?{top:t,right:0,bottom:0,left:0}:t}function xn(t,o){return!o||!(o.bottom>o.top)?0:Math.max(0,Math.ceil(o.bottom-t))+8}function Mn(t,o,r,l){let i=t.zoom,d=bn(l);return{zoom:i,x:d.left+(r.width-d.left-d.right)/2-o.x*i,y:d.top+(r.height-d.top-d.bottom)/2-o.y*i}}var Pr=.25;function Tn(t,o,r,l=1.2){let i=bn(r),d=Math.max(1,o.width-i.left-i.right),f=Math.max(1,o.height-i.top-i.bottom),c=t.maxX-t.minX,p=t.maxY-t.minY,y=Math.max(Pr,Math.min(l,(d-80)/c,(f-80)/p));return{zoom:y,x:i.left+(d-c*y)/2-t.minX*y,y:i.top+(f-p*y)/2-t.minY*y}}var le={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",linksLabel:"Links: {0}",linkOpen:"Open link: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3","priority-4":"Priority 4","priority-5":"Priority 5","progress-0":"Progress 0%","progress-25":"Progress 25%","progress-50":"Progress 50%","progress-75":"Progress 75%","progress-100":"Progress 100%","flag-red":"Red flag","flag-yellow":"Yellow flag","flag-green":"Green flag","flag-blue":"Blue flag",smile:"Smile",neutral:"Neutral",sad:"Sad",question:"Question"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function Ee(t){let o=3735928559,r=1103547991;for(let l=0;l<t.length;l++){let i=t.charCodeAt(l);o=Math.imul(o^i,2654435761),r=Math.imul(r^i,1597334677)}return o=Math.imul(o^o>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),r=Math.imul(r^r>>>16,2246822507)^Math.imul(o^o>>>13,3266489909),(4294967296*(2097151&r)+(o>>>0)).toString(36)}var Et="\\u27E6",Lt="\\u27E7",Gt=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,kn=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),Le=new Set(["pre","script","style","textarea","template","noscript"]),Hr=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),Dr=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),zr=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,Br=/\\p{L}/u,Xt=t=>t.localName.toLowerCase(),Sn=t=>{var o;return((o=t.getAttribute("class"))!=null?o:"").split(/\\s+/).filter(Boolean)},ce=t=>Array.from(t.childNodes).filter(o=>o.nodeType===1);function An(t){for(let o of ce(t))if(kn.has(Xt(o))||Le.has(Xt(o))||An(o))return!0;return!1}function En(t){let o=Xt(t);return Le.has(o)?"skip":Hr.has(o)||t.getAttribute("translate")==="no"||Sn(t).some(r=>Dr.has(r))?"atom":kn.has(o)||An(t)?"block":"inline"}function $r(t,o){return t.replace(zr,r=>(o.push({literal:r,atom:!0}),`${Et}${o.length}/${Lt}`))}function Fr(t,o){let r="",l=i=>{var f;if(i.nodeType===3){r+=$r((f=i.nodeValue)!=null?f:"",o);return}if(i.nodeType!==1){o.push({node:i,atom:!0}),r+=`${Et}${o.length}/${Lt}`;return}let d=i;if(En(d)==="inline"){o.push({node:d,atom:!1});let c=o.length;r+=`${Et}${c}${Lt}`;for(let p of Array.from(d.childNodes))l(p);r+=`${Et}/${c}${Lt}`;return}o.push({node:d,atom:!0}),r+=`${Et}${o.length}/${Lt}`};for(let i of t)l(i);return r}function wn(t){return Br.test(t.replace(Gt,""))}function Ln(t){let o=[],r=f=>{let c=f.getAttribute("alt");c&&wn(c)&&o.push({index:o.length,kind:"attribute",text:c.trim(),nodes:[],lead:"",trail:"",parts:[],element:f,attribute:"alt"})},l=f=>{for(let c of ce(f)){let p=Xt(c);Le.has(p)||p==="svg"||(p==="img"?r(c):l(c))}},i=f=>{if(!f.length)return;let c=[],p=Fr(f,c),y=p.trim();if(!y||!wn(y)||p.includes("\\u27E6\\u27E6"))return;let m=p.replace(Gt,"");if(m.includes(Et)||m.includes(Lt))return;let x=p.slice(0,p.length-p.trimStart().length),w=p.slice(p.trimEnd().length);o.push({index:o.length,kind:"run",text:y,nodes:f,lead:x,trail:w,parts:c})},d=f=>{let c=[];for(let p of Array.from(f.childNodes)){if(p.nodeType===3){c.push(p);continue}if(p.nodeType!==1){i(c),c=[];continue}let y=p,m=En(y);m==="atom"||m==="inline"?c.push(y):(i(c),c=[],m==="block"&&d(y))}i(c)};return l(t),d(t),{units:o}}var vn=t=>[...t.matchAll(Gt)].map(o=>o[0]);function Wr(t,o){if(!o.trim())return!1;let r=vn(t),l=vn(o);if(r.length!==l.length||r.some((d,f)=>d!==l[f]))return!1;let i=o.replace(Gt,"");return!i.includes(Et)&&!i.includes(Lt)}function Kr(t,o,r){var p;let l=[],i=[],d=y=>{let m=i[i.length-1];m?m.appendChild(y):l.push(y)},f=y=>{y&&d(r.createTextNode(y))};f(t.lead);let c=0;for(let y of o.matchAll(Gt)){f(o.slice(c,y.index)),c=((p=y.index)!=null?p:0)+y[0].length;let m=t.parts[Number(y[2])-1];if(y[1]==="/")i.pop();else if(y[3]==="/")m.literal!==void 0?f(m.literal):m.node&&d(m.node.cloneNode(!0));else if(m.node){let x=m.node.cloneNode(!1);d(x),i.push(x)}}return f(o.slice(c)),f(t.trail),l}function Nn(t,o){var i,d,f;let r={applied:0,kept:0},l=[...t.units.filter(c=>c.kind==="attribute"),...t.units.filter(c=>c.kind==="run")];for(let c of l){let p=o(c);if(p===void 0||!Wr(c.text,p)){r.kept++;continue}if(c.kind==="attribute"){(d=c.element)==null||d.setAttribute((i=c.attribute)!=null?i:"alt",p.trim()),r.applied++;continue}let y=c.nodes[0],m=y==null?void 0:y.parentNode,x=y==null?void 0:y.ownerDocument;if(!y||!m||!x){r.kept++;continue}for(let w of Kr(c,p,x))m.insertBefore(w,y);for(let w of c.nodes)(f=w.parentNode)==null||f.removeChild(w);r.applied++}return r}function In(t){let o=[],r=l=>{for(let i of ce(l))Xt(i)==="svg"?o.push(i):r(i)};return r(t),o}function _n(t,o){let r=[],l=i=>{for(let d of ce(i))Sn(d).includes(o)&&r.push(d),l(d)};return l(t),r}var Cn="vam-mermaid-slot",de=1,On=3,Rn=t=>{let o=t;return!!o&&(Array.isArray(o.detailSegments)||Array.isArray(o.detailDiagrams))},Ur=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),Vr=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function Yr(t){var o,r;return t.nodeType===On?Ur((o=t.nodeValue)!=null?o:""):t.nodeType!==de?`\\0${t.nodeType}:${(r=t.nodeValue)!=null?r:""}\\0`:Pn(t)}function Pn(t){let o=t.localName.toLowerCase(),r=t.getAttributeNames().sort().map(l=>{var i;return` ${l}="${Vr((i=t.getAttribute(l))!=null?i:"")}"`}).join("");return`<${o}${r}>${jr(t)}</${o}>`}function jr(t){return Array.from(t.childNodes).map(Yr).join("")}function Xr(t){let o=[],r=l=>{if(o.push(l),l.nodeType===de)for(let i of Array.from(l.childNodes))r(i)};return r(t),o}function Gr(t,o){var l;let r=In(t);for(let i of r){let d=o();d.setAttribute("class",Cn),(l=i.parentNode)==null||l.replaceChild(d,i)}return{root:t,svgs:r,extraction:Ln(t)}}function qr(t){let o=t.units.map(r=>`${r.kind}\\0${r.text}`).join("");return`${t.units.length}.${Ee(o)}`}var Qr=t=>Ee(Pn(t));function Zr(t,o){if(!Array.isArray(o))return!1;let r=Xr(t);for(let l of o){if(!Array.isArray(l)||l.length!==2)return!1;let[i,d]=l;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=r.length)return!1;let f=r[i];if(typeof d=="string"){if(f.nodeType!==On)return!1;f.nodeValue=d}else if(d&&typeof d=="object"&&!Array.isArray(d)){if(f.nodeType!==de)return!1;for(let[c,p]of Object.entries(d))if(p===null)f.removeAttribute(c);else if(typeof p=="string")f.setAttribute(c,p);else return!1}else return!1}return!0}function Jr(t,o,r){if(!t||typeof t!="object")return null;let l=t;if(typeof l.svg=="string"){let i=r(l.svg),d=Array.from(i.childNodes).filter(f=>f.nodeType===de);return d.length===1&&d[0].localName.toLowerCase()==="svg"?d[0]:null}if(typeof l.check=="string"&&l.check===Qr(o)){let i=o.cloneNode(!0);return Zr(i,l.patch)?i:null}return null}function Hn(t,o,r){var p,y;let l={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:d}=Gr(t,r.createSlot),f=o.detailSegments;if(f!==void 0||o.detailCheck!==void 0)if(Array.isArray(f)&&f.length===d.units.length&&o.detailCheck===qr(d)){let m=Nn(d,w=>{let L=f[w.index];return typeof L=="string"?L:void 0}),x=f.filter(w=>typeof w!="string").length;if(l.applied=m.applied,l.kept=Math.max(0,m.kept-x),r.afterText&&!r.afterText(t))return l.fallback=!0,l}else l.fallback=!0;let c=_n(t,Cn);c.length!==i.length&&(l.fallback=!0);for(let[m,x]of c.entries()){let w=i[m];if(!w)break;let L=(p=o.detailDiagrams)==null?void 0:p[m],z=w;if(L){let H=null;try{H=Jr(L,w,r.parse)}catch{H=null}H?z=H:l.diagramsKept++}(y=x.parentNode)==null||y.replaceChild(z,x)}return l}function mt(t,o,r){let l=t.createElement(o);return r&&(l.className=r),l}function to(t,o){var f;let r=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),l=(f=r==null?void 0:r[1])!=null?f:t,[i,d=""]=o.imageSource.split("{0}");return[i,l,d]}var eo=20,Dn=2048,zn=URL;function no(t){if(typeof t!="string")return null;let o=t.trim();if(!o||o.length>Dn||/[\\x00-\\x20\\x7f-\\x9f\\u2028\\u2029]/.test(o)||!/^https?:\\/\\//i.test(o))return null;let r;try{r=new zn(o)}catch{return null}return r.protocol!=="http:"&&r.protocol!=="https:"||!r.hostname||r.username||r.password||r.href.length>Dn?null:r.href}function ro(t){if(!Array.isArray(t))return[];let o=new Set,r=[];for(let l of t){let i=no(l);if(!(!i||o.has(i))&&(o.add(i),r.push({href:i,host:new zn(i).host}),r.length>=eo))break}return r}function Bn(t,o,r){let l=ro(o);if(!l.length)return null;let i=mt(t,"div");i.className="vam-inspector-links",i.setAttribute("role","group"),i.setAttribute("aria-label",r.linksLabel.replace("{0}",l.map(d=>d.host).join(", ")));for(let{href:d,host:f}of l){let c=mt(t,"a");c.setAttribute("href",d),c.setAttribute("target","_blank"),c.setAttribute("rel","noopener noreferrer"),c.setAttribute("referrerpolicy","no-referrer"),c.setAttribute("aria-label",r.linkOpen.replace("{0}",f)),c.textContent=f,i.append(c)}return i}function oo(t,o,r){let[l,i,d]=to(o,r),f=mt(t,"span");f.className="vam-image-source";let c=mt(t,"a");return c.setAttribute("href",o),c.setAttribute("target","_blank"),c.setAttribute("rel","noopener noreferrer"),c.textContent=i,f.append(t.createTextNode(l),c,t.createTextNode(d)),f}function Ne(t,o,r,l,i){$n(t,o,new DOMParser().parseFromString(r,"text/html").body,l,i)}function $n(t,o,r,l,i){var f,c,p,y;for(let m of Array.from(r.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))m.remove();for(let m of Array.from(r.querySelectorAll("*")))for(let x of m.getAttributeNames()){let w=(f=m.getAttribute(x))!=null?f:"",L=x.toLowerCase();(L.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(L)&&/^\\s*(javascript|vbscript):/i.test(w))&&m.removeAttribute(x)}let d=()=>{let m=mt(t,"span");return m.className="vam-image-omitted",m.textContent=i.imageOmitted,m};for(let m of Array.from(r.querySelectorAll("img"))){let x=(c=m.getAttribute("src"))!=null?c:"";if(x.startsWith("vam-asset:")){let w=l[x.slice(10)];typeof w=="string"&&w.startsWith("data:image/")?m.setAttribute("src",w):m.replaceWith(d())}else if(/^https?:\\/\\//i.test(x)){m.setAttribute("referrerpolicy","no-referrer"),m.setAttribute("loading","lazy");let w=m.closest("a");(w!=null?w:m).after(oo(t,x,i))}else/^data:image\\//i.test(x)||m.replaceWith(d())}for(let m of Array.from(r.querySelectorAll("a"))){let x=(p=m.getAttribute("href"))!=null?p:"";/^(https?:|mailto:)/i.test(x)?(m.setAttribute("target","_blank"),m.setAttribute("rel","noopener noreferrer")):x.startsWith("#")||m.removeAttribute("href")}for(let m of Array.from(r.querySelectorAll("table"))){if((y=m.parentElement)!=null&&y.classList.contains("vam-table-scroll"))continue;let x=mt(t,"div");x.className="vam-table-scroll",m.replaceWith(x),x.append(m)}o.append(...Array.from(r.childNodes).map(m=>t.importNode(m,!0)))}function Fn(t,o,r,l,i,d){let f=c=>new DOMParser().parseFromString(c,"text/html").body;try{let c=f(r);Hn(c,l,{parse:f,createSlot:()=>mt(t,"div")}),$n(t,o,c,i,d)}catch{o.replaceChildren(),Ne(t,o,r,i,d)}}function ue(t,o,r,l){let i=r-t,d=i>=40?i/2:i>=0?60-i:Math.max(60,-i/2);return`M ${t} ${o} C ${t+d} ${o}, ${r-d} ${l}, ${r} ${l}`}var Ie=["red","orange","yellow","green","blue","purple"];function Kn(t){let o=t["topic-color"];return Ie.find(r=>r===o)}var io=["bold","text-small","text-large","border-thick","line-thick"],Wn=["text-small","text-large"];function so(t){return Array.isArray(t)?t:typeof t=="string"&&t?[t]:[]}function Un(t){let o=so(t["topic-style"]),r=o.find(l=>Wn.some(i=>i===l));return io.filter(l=>Wn.includes(l)?l===r:o.includes(l))}var ao=["done","warning","star","priority-1","priority-2","priority-3","priority-4","priority-5","progress-0","progress-25","progress-50","progress-75","progress-100","flag-red","flag-yellow","flag-green","flag-blue","smile","neutral","sad","question"],Vn=[{group:"status",single:!1,ids:["done","warning","star"]},{group:"priority",single:!0,ids:["priority-1","priority-2","priority-3","priority-4","priority-5"]},{group:"progress",single:!0,ids:["progress-0","progress-25","progress-50","progress-75","progress-100"]},{group:"flag",single:!1,ids:["flag-red","flag-yellow","flag-green","flag-blue"]},{group:"face",single:!1,ids:["smile","neutral","sad","question"]}];function lo(t){return Vn.find(o=>o.ids.includes(t)).group}function co(t){return Vn.find(o=>o.ids.includes(t)).single}var uo={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3","priority-4":"P4","priority-5":"P5","progress-0":"\\u25CB","progress-25":"\\u25D4","progress-50":"\\u25D1","progress-75":"\\u25D5","progress-100":"\\u25CF","flag-red":"\\u2691R","flag-yellow":"\\u2691Y","flag-green":"\\u2691G","flag-blue":"\\u2691B",smile:"\\u263A",neutral:"-_-",sad:"\\u2639",question:"?"};function Yn(t){let o=t["topic-markers"];if(!Array.isArray(o))return[];let r=new Set;return ao.filter(l=>{if(!o.includes(l))return!1;if(!co(l))return!0;let i=lo(l);return r.has(i)?!1:(r.add(i),!0)})}function jn(t){return uo[t]}var fo=(t,o)=>t.toLowerCase()===o.toLowerCase(),fe=(t,o)=>t.find(r=>fo(r,o));function po(t,o){if(typeof t!="string"||!t.trim())return;let r=fe(o,t.trim());if(r)return r;let l=t.trim().toLowerCase().split(/[-_]/),i=l[0];if(i==="zh"){let f=l.slice(1).some(c=>c==="hant"||c==="tw"||c==="hk"||c==="mo")?"TW":"CN";return fe(o,`${i}-${f}`)}return o.find(d=>d.toLowerCase().split(/[-_]/)[0]===i)}function Xn(t){let{languages:o}=t,r=o[0];if(typeof t.stored=="string"){let l=fe(o,t.stored);if(l)return l}if(typeof t.defaultLanguage=="string"){let l=fe(o,t.defaultLanguage);if(l)return l}for(let l of t.browser){let i=po(l,o);if(i)return i}return r}function Gn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var mo="https://github.com/kevcltsai/visual-agent-map?ref=share",go="und",wt="http://www.w3.org/2000/svg",qn="vam-share-panel-width",Qn="vam-share-outline-open",ho="(max-width: 600px)",yo=300,_e=240,bo=.25,xo=2,Mo=4,To={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},wo={core:"target",support:"library",side:"skip"},Zn=t=>t==="core"||t==="support"||t==="side",Nt=(t,o)=>t.replace("{0}",String(o));function Re(t,o){var l;let r=(l=t.getElementById(o))==null?void 0:l.textContent;if(r)try{return JSON.parse(r)}catch{return}}function Jn(t){let o={...le};if(t&&typeof t=="object")for(let i of Object.keys(o)){let d=t[i];typeof d=="string"&&(o[i]=d)}let r=t&&typeof t=="object"?t.markerNames:void 0;if(r&&typeof r=="object"){o.markerNames={...le.markerNames};for(let i of Object.keys(o.markerNames)){let d=r[i];typeof d=="string"&&d.trim()&&(o.markerNames[i]=d)}}let l=t&&typeof t=="object"?t.colorNames:void 0;if(o.colorNames={...le.colorNames},l&&typeof l=="object")for(let i of Ie){let d=l[i];typeof d=="string"&&d.trim()&&(o.colorNames[i]=d)}return o}function vo(t){let o=Re(t,"vam-ui"),r=new Map,l={};if(o&&typeof o=="object"){if(o.uiByLanguage&&typeof o.uiByLanguage=="object")for(let[i,d]of Object.entries(o.uiByLanguage))r.set(i,Jn(d));if(o.languageNames&&typeof o.languageNames=="object")for(let[i,d]of Object.entries(o.languageNames))typeof d=="string"&&d&&(l[i]=d)}return{sets:r,names:l}}var gt=t=>typeof t=="string"&&t.trim()!=="";function Ce(t){try{return window.localStorage.getItem(t)}catch{return null}}function Oe(t,o){try{window.localStorage.setItem(t,o)}catch{}}function ko(t,o){let r=Math.min(...o.map(M=>M.x)),l=Math.min(...o.map(M=>M.y)),i=Math.max(...o.map(M=>M.x+M.w)),d=Math.max(...o.map(M=>M.y+M.h)),f=14,c=12,p=8,y=t==="down"||t==="up",m=y?r:l,x=y?i:d,w=t==="right"?i+f:t==="left"?r-f:t==="down"?d+f:l-f,L=t==="right"||t==="down"?1:-1,z=(m+x)/2,H=Math.min(c,Math.max(0,(x-m)/4)),N=M=>Math.round(M*100)/100,S=(M,R)=>y?`${N(M)} ${N(R)}`:`${N(R)} ${N(M)}`,B=w,k=w+L*c,F=w+L*2*c,v=[`M ${S(m,B)}`,`Q ${S(m,k)} ${S(m+H,k)}`,`L ${S(z-H,k)}`,`Q ${S(z,k)} ${S(z,F)}`,`Q ${S(z,k)} ${S(z+H,k)}`,`L ${S(x-H,k)}`,`Q ${S(x,k)} ${S(x,B)}`].join(" "),b=F+L*p;return y?{path:v,x:N(z),y:N(b)}:{path:v,x:N(b),y:N(z)}}var yt=()=>window.matchMedia(ho).matches;function tr(t){var Je,tn,en,nn;let o=Jn(Re(t,"vam-ui")),r=o;t.documentElement.lang=r.lang;let l=t.getElementById("vam-app"),i=Re(t,"vam-map");if(!l)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){l.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let d=i.assets&&typeof i.assets=="object"?i.assets:{},f=new Map,c=[];for(let e of i.nodes){if(!e||typeof e.id!="string"||f.has(e.id))continue;f.set(e.id,e);let n=on(e.width),s=sn(e.height);c.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed,...n!==void 0&&n!==280?{width:n}:{},...s!==void 0?{height:s}:{}})}let p=new Map(c.map(e=>[e.id,e]));for(let e of c)e.parentId&&(!p.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let y=[];if(Array.isArray(i.textNodes)){let e=new Set;for(let n of i.textNodes){if(!n||typeof n.id!="string"||e.has(n.id)||typeof n.text!="string"||!n.text.trim()||!Number.isFinite(n.x)||!Number.isFinite(n.y))continue;e.add(n.id);let s=typeof n.parentId=="string"?p.get(n.parentId):void 0;y.push({id:n.id,parentId:s?s.id:null,text:n.text,dx:s?n.x-s.x:n.x,dy:s?n.y-s.y:n.y,links:!s&&Array.isArray(n.links)?Array.from(new Set(n.links.filter(a=>typeof a=="string"&&p.has(a)))):[]})}}for(let e of i.nodes){let n=e&&typeof e.id=="string"?p.get(e.id):void 0;!n||typeof e.afterTextId!="string"||!n.parentId||y.some(s=>s.id===e.afterTextId&&s.parentId===n.parentId)&&(n.afterTextId=e.afterTextId)}let m=e=>e==="right"||e==="left"||e==="down"||e==="up"?e:null,x=[];if(Array.isArray(i.summaries)){let e=new Set;for(let n of i.summaries){let s=m(n==null?void 0:n.side);if(!n||typeof n.id!="string"||e.has(n.id)||!s||typeof n.text!="string"||!n.text.trim()||!Array.isArray(n.members))continue;let a=Array.from(new Set(n.members.filter(g=>typeof g=="string"&&p.has(g))));a.length&&(e.add(n.id),x.push({id:n.id,members:a,side:s,text:n.text}))}}let w=new Map,L=new Map;for(let e of c)e.parentId&&L.set(e.parentId,[...(Je=L.get(e.parentId))!=null?Je:[],e]);let z=vo(t),H=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(gt))):[],N=Gn((tn=i.source)==null?void 0:tn.mapId),S=H.length>=2,B=S?H[0]:"",k=B;if(S){let e=[];try{e=Array.from((en=window.navigator.languages)!=null?en:[window.navigator.language]).filter(gt)}catch{}k=Xn({languages:H,stored:N?Ce(N):null,defaultLanguage:gt(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let F=e=>{var n;return(n=z.sets.get(e))!=null?n:o},v=S&&B===go,b=()=>S&&k!==B;S&&(r=F(k),t.documentElement.lang=k);let M=e=>{var s;let n=b()?(s=e.translations)==null?void 0:s[k]:void 0;return!n||typeof n!="object"?e:{title:gt(n.title)?n.title:e.title,summary:gt(n.summary)?n.summary:e.summary,reason:gt(n.reason)?n.reason:e.reason,detailHtml:gt(n.detailHtml)?n.detailHtml:e.detailHtml,...Rn(n)&&gt(e.detailHtml)?{compact:n,detailHtml:e.detailHtml}:{}}},R=()=>{var a;let e=b()?(a=i.translations)==null?void 0:a[k]:void 0,n=gt(e==null?void 0:e.title)?e.title:i.title,s=gt(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof n=="string"&&n.trim()||r.untitledMap,goal:typeof s=="string"?s.trim():""}},D=(e,n)=>{var s;try{let a=new Intl.DisplayNames([n!=null?n:e],{type:"language"}).of(e);if(a&&a!==e)return a}catch{}return(s=z.names[e])!=null?s:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),n=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};n(),e.addEventListener("change",n)}catch{}let u=(e,n,s)=>{let a=mt(t,e);return n&&(a.className=n),s!==void 0&&(a.textContent=s),a},P=e=>{let n=t.createElementNS(wt,"svg");n.setAttribute("class","svg-icon"),n.setAttribute("viewBox","0 0 24 24"),n.setAttribute("aria-hidden","true");for(let s of To[e]){let[a,...g]=s.split("|"),h=t.createElementNS(wt,a);for(let T of g)h.setAttribute(T.slice(0,T.indexOf("=")),T.slice(T.indexOf("=")+1));n.append(h)}return n},A=(e,n,s,a)=>{let g=u("button",s,n);return g.type="button",g.addEventListener("click",h=>{h.stopPropagation(),a()}),e.append(g),g},$=(e,n,s,a)=>{let g=u("button");return g.type="button",g.setAttribute("aria-label",s),g.title=s,g.append(P(n)),g.addEventListener("click",h=>{h.stopPropagation(),a()}),e.append(g),g},E=e=>e==="core"?r.tierCore:e==="support"?r.tierSupport:r.tierSide,_=e=>Yn({"topic-markers":e.markers}),O=()=>/^(zh|ja)/.test(r.lang),Y=(e,n)=>{if(!n.length)return e;let s=n.map(a=>r.markerNames[a]).join(O()?"\\u3001":", ");return`${e}${O()?"\\uFF0C":", "}${Nt(r.markerLabel,s)}`},X=e=>Kn({"topic-color":e.color}),Z=e=>Un({"topic-style":e.style}),J=e=>{let n=u("span","vam-markers");for(let s of e){let a=u("span","vam-marker",jn(s));a.dataset.marker=s,a.setAttribute("aria-hidden","true"),n.append(a)}return n},rt=(e,n)=>{let s=u("span","vam-relevance-tag");s.dataset.tier=e,n&&(s.title=n);let a=u("span","vam-relevance-icon");return a.append(P(wo[e])),s.append(a,u("span",void 0,E(e))),s};l.className="vam-app";let Q=u("div","vam-toolbar"),q=u("h1","vam-map-switcher"),bt=u("span","vam-shared");Q.append(q,bt);let ut=$(Q,"list","",()=>Ot(tt.hidden,!0));Q.prepend(ut),ut.setAttribute("aria-controls","vam-outline");let pt=u("div","vam-toolbar-actions"),st=u("select","vam-language");if(S){for(let e of H){let n=u("option",void 0,(nn=z.names[e])!=null?nn:D(e));n.value=e,v&&e===B&&(n.dataset.original="1"),st.append(n)}st.value=k,pt.append(st)}let Pe=u("span","vam-made-with"),Pt=u("a","vam-install");Pt.href=mo,Pt.target="_blank",Pt.rel="noopener noreferrer",pt.append(Pe,Pt),Q.append(pt);let Ht=u("div","vam-translate-note");Ht.hidden=!0;let vt=u("div","vam-workspace"),j=u("div","vam-viewport"),xt=u("div","vam-stage");xt.setAttribute("role","tree");let kt=t.createElementNS(wt,"svg");kt.setAttribute("class","vam-edges"),kt.setAttribute("aria-hidden","true"),xt.append(kt);let Dt=u("div","vam-summaries");Dt.setAttribute("role","group"),x.length&&xt.append(Dt),j.append(xt);let qt=u("div","vam-canvas-overlay"),It=u("div","vam-map-tools"),zt=u("span","vam-goal"),He=u("span","vam-goal-text");zt.append(P("target"),He);let De=u("span","vam-canvas-hint"),Mt=u("div","vam-zoom-controls"),er=$(Mt,"minus","",()=>Ft(1/1.2)),Bt=u("button","vam-zoom","100%");Bt.type="button",Bt.addEventListener("click",e=>{e.stopPropagation(),Ft(1/W.zoom)}),Mt.append(Bt);let nr=$(Mt,"plus","",()=>Ft(1.2)),rr=$(Mt,"max","",()=>Wt()),ht=u("button","vam-layout-button");ht.type="button",ht.setAttribute("aria-haspopup","menu"),ht.setAttribute("aria-expanded","false"),Mt.append(ht);let at=u("div","vam-layout-menu");at.setAttribute("role","menu"),at.hidden=!0,Mt.append(at),qt.append(It,De,Mt);let K=u("aside","vam-inspector");K.hidden=!0;let tt=u("nav","vam-outline");tt.id="vam-outline";let $t=u("div","vam-outline-tree");$t.setAttribute("role","tree"),tt.append($t),vt.append(tt,j,qt,K),l.replaceChildren(...S?[Q,Ht,vt]:[Q,vt]);let W={x:0,y:0,zoom:1},et=null,pe=!1,Qt=Number(Ce(qn))||yo,U=new Map,or=()=>{let e=new Set,n=(s,a)=>{var g;for(let h of(g=L.get(s.id))!=null?g:[])a&&e.add(h.id),n(h,a||h.collapsed)};for(let s of c)s.parentId||n(s,s.collapsed);return e},ze=e=>{var s,a;let n=0;for(let g=e.parentId;g&&!(++n>c.length);g=(a=(s=p.get(g))==null?void 0:s.parentId)!=null?a:null);return n},Be=()=>xn(j.getBoundingClientRect().top,It.hidden?void 0:It.getBoundingClientRect());function Tt(){xt.style.transform=`translate(${W.x}px, ${W.y}px) scale(${W.zoom})`;let e=`${Math.round(W.zoom*100)}%`;Bt.textContent=e,Bt.setAttribute("aria-label",Nt(r.zoomReset,e))}function Ft(e,n){let s=n!=null?n:{x:j.clientWidth/2,y:j.clientHeight/2},a=Math.min(xo,Math.max(bo,W.zoom*e)),g=a/W.zoom;W={x:s.x-(s.x-W.x)*g,y:s.y-(s.y-W.y)*g,zoom:a},Tt()}let me=!1;function Wt(){if(!U.size)return;if(!j.clientWidth||!j.clientHeight){me=!0;return}let e=1/0,n=1/0,s=-1/0,a=-1/0;for(let g of U.values())e=Math.min(e,g.offsetLeft),n=Math.min(n,g.offsetTop),s=Math.max(s,g.offsetLeft+(g.offsetWidth||280)),a=Math.max(a,g.offsetTop+g.offsetHeight);for(let g of y){let h=g.parentId?void 0:w.get(g.id);h&&(e=Math.min(e,h.offsetLeft),n=Math.min(n,h.offsetTop),s=Math.max(s,h.offsetLeft+(h.offsetWidth||300)),a=Math.max(a,h.offsetTop+(h.offsetHeight||60)))}for(let g of Array.from(Dt.querySelectorAll(".vam-summary"))){let h=g.querySelector(".vam-summary-text");if(!h)continue;let T=parseFloat(h.style.left),C=parseFloat(h.style.top),I=h.offsetWidth,V=h.offsetHeight;if(!Number.isFinite(T)||!Number.isFinite(C))continue;let lt=g.classList.contains("is-side-left")?T-I:g.classList.contains("is-side-down")||g.classList.contains("is-side-up")?T-I/2:T,ct=g.classList.contains("is-side-up")?C-V:g.classList.contains("is-side-down")?C:C-V/2;e=Math.min(e,lt),n=Math.min(n,ct),s=Math.max(s,lt+I),a=Math.max(a,ct+V)}W=Tn({minX:e,minY:n,maxX:s,maxY:a},{width:j.clientWidth,height:j.clientHeight},Be()),Tt()}function $e(e){let n=U.get(e);n&&(W=Mn(W,{x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2},{width:j.clientWidth,height:j.clientHeight},Be()),Tt())}function _t(){var e,n;kt.replaceChildren();for(let s of c){let a=(e=s.afterTextId?w.get(s.afterTextId):void 0)!=null?e:s.parentId?U.get(s.parentId):void 0,g=U.get(s.id);if(!a||!g)continue;let h=t.createElementNS(wt,"path");h.setAttribute("d",ue(a.offsetLeft+a.offsetWidth,a.offsetTop+a.offsetHeight/2,g.offsetLeft,g.offsetTop+g.offsetHeight/2)),h.setAttribute("class",((n=f.get(s.id))==null?void 0:n.tier)==="side"?"vam-edge vam-edge-side":"vam-edge");let T=f.get(s.id);T&&Z(T).includes("line-thick")&&h.setAttribute("data-line-thick",""),kt.append(h)}for(let s of y){let a=s.parentId?U.get(s.parentId):void 0,g=w.get(s.id);if(!a||!g)continue;let h=t.createElementNS(wt,"path");h.setAttribute("d",ue(a.offsetLeft+a.offsetWidth,a.offsetTop+a.offsetHeight/2,g.offsetLeft,g.offsetTop+g.offsetHeight/2)),h.setAttribute("class","vam-edge vam-text-edge"),kt.append(h)}for(let s of y){let a=w.get(s.id);if(a)for(let g of s.links){let h=U.get(g);if(!h)continue;let T=a.offsetLeft+a.offsetWidth/2<=h.offsetLeft+h.offsetWidth/2,C=t.createElementNS(wt,"path");C.setAttribute("d",ue(T?a.offsetLeft+a.offsetWidth:a.offsetLeft,a.offsetTop+a.offsetHeight/2,T?h.offsetLeft:h.offsetLeft+h.offsetWidth,h.offsetTop+h.offsetHeight/2)),C.setAttribute("class","vam-edge vam-text-link"),kt.append(C)}}ir()}function ir(){Dt.replaceChildren();for(let e of x){let n=[];for(let C of e.members)for(let I of[C,...oe(c,C)]){let V=U.get(I);V&&n.push({x:V.offsetLeft,y:V.offsetTop,w:V.offsetWidth||280,h:V.offsetHeight})}if(!n.length)continue;let s=ko(e.side,n),a=u("div",`vam-summary is-side-${e.side}`);a.setAttribute("role","note");let g=t.createElementNS(wt,"svg");g.setAttribute("class","vam-summary-brace"),g.setAttribute("aria-hidden","true");let h=t.createElementNS(wt,"path");h.setAttribute("d",s.path),h.setAttribute("fill","none"),g.append(h),a.append(g);let T=u("div","vam-summary-text");T.textContent=e.text,T.style.left=`${s.x}px`,T.style.top=`${s.y}px`,a.append(T),Dt.append(a)}}let ge=0,Fe=()=>{ge||(ge=window.requestAnimationFrame(()=>{ge=0,_t()}))},he=e=>{let n=U.get(e),s=p.get(e);!n||!s||(n.style.left=`${s.x}px`,n.style.top=`${s.y}px`,s.width&&(n.style.width=`${s.width}px`),s.height&&(n.style.height=`${s.height}px`),We(e))},We=e=>{let n=p.get(e);if(n)for(let s of y){let a=s.parentId===e?w.get(s.id):void 0;a&&(a.style.left=`${n.x+s.dx}px`,a.style.top=`${n.y+s.dy}px`)}};function sr(){for(let e of w.values())e.remove();w.clear();for(let e of y){let n=e.parentId?p.get(e.parentId):void 0;if(e.parentId&&(!n||!U.has(e.parentId)||n.collapsed))continue;let s=u("div",`vam-text-node${n?"":" is-free"}`);s.setAttribute("role","note"),s.textContent=e.text,n||(s.style.left=`${e.dx}px`,s.style.top=`${e.dy}px`),xt.append(s),w.set(e.id,s),n&&We(n.id)}}function ye(){var n,s;for(let a of U.values())a.remove();U.clear();let e=or();for(let a of c){if(e.has(a.id))continue;let g=f.get(a.id),h=M(g),T=oe(c,a.id).size,C=Zn(g.tier)?g.tier:void 0,I=u("div",`vam-node${a.id===et?" is-selected":""}`);I.dataset.nodeId=a.id,I.dataset.status=g.status==="completed"?"completed":"idea",C&&(I.dataset.relevance=C),I.tabIndex=0,I.setAttribute("role","treeitem"),I.setAttribute("aria-level",String(ze(a)+1)),I.setAttribute("aria-selected",String(a.id===et));let V=_(g),lt=X(g);lt&&(I.dataset.topicColor=lt);let ct=Z(g);ct.includes("bold")&&(I.dataset.topicStyleBold="true"),ct.includes("border-thick")&&(I.dataset.topicStyleBorder="thick"),ct.includes("text-small")?I.dataset.topicStyleSize="small":ct.includes("text-large")&&(I.dataset.topicStyleSize="large");let nt=Y(String((n=h.title)!=null?n:""),V);I.setAttribute("aria-label",lt?`${nt}${O()?"\\uFF0C":", "}${Nt(r.colorLabel,r.colorNames[lt])}`:nt),T&&I.setAttribute("aria-expanded",String(!a.collapsed));let ot=u("div","vam-node-header");I.append(ot),g.status!=="completed"&&ot.append(u("span","vam-status vam-status-idea",r.toResearch)),C&&ot.append(rt(C,typeof h.reason=="string"?h.reason:void 0)),V.length&&ot.append(J(V));let rn=u("div","vam-node-tools");if(I.append(rn),T){let it=a.collapsed?Nt(r.expandCount,T):r.collapse,Rt=A(ot,it,"vam-collapse-button",()=>{a.collapsed=!a.collapsed,Kt(a.id,!0)});Rt.setAttribute("aria-expanded",String(!a.collapsed)),Rt.setAttribute("aria-label",it),Rt.title=it}if(A(rn,r.detailsButton,void 0,()=>Ct(a.id)),I.append(u("h3","vam-card-title",String((s=h.title)!=null?s:""))),typeof h.summary=="string"&&h.summary.trim()&&I.append(u("p","vam-card-summary",h.summary)),a.height){let it=u("span","vam-card-fade"),Rt=u("span","vam-card-more","\\u2026");it.setAttribute("aria-hidden","true"),Rt.setAttribute("aria-hidden","true"),I.append(it,Rt)}I.addEventListener("click",()=>{pe||Ct(a.id)}),I.addEventListener("keydown",it=>{it.target===I&&(it.key==="Enter"||it.key===" "?(it.preventDefault(),Ct(a.id)):T&&it.key===(a.collapsed?"ArrowRight":"ArrowLeft")&&(it.preventDefault(),a.collapsed=!a.collapsed,Kt(a.id)))}),I.addEventListener("pointerdown",it=>ar(it,a,I)),xt.append(I),U.set(a.id,I),he(a.id)}sr(),Ke()}function Ke(){var e;for(let[n,s]of U)(e=p.get(n))!=null&&e.height&&(s.classList.remove("is-clipped"),s.classList.toggle("is-clipped",s.scrollHeight>s.clientHeight+1))}function Zt(){let e=new Set(y.filter(s=>s.parentId&&w.has(s.id)&&c.some(a=>a.afterTextId===s.id)).map(s=>s.parentId)),n=y.filter(s=>s.parentId&&w.has(s.id)&&e.has(s.parentId));if(!n.length)Ae(c,void 0,a=>{var g;return(g=U.get(a))==null?void 0:g.offsetHeight}).forEach((a,g)=>{c[g].x=a.x,c[g].y=a.y});else{let s=n.map(T=>{let C=p.get(T.parentId),I=w.get(T.id);return{id:T.id,path:"",parentId:C.id,x:C.x+T.dx,y:C.y+T.dy,collapsed:!1,width:I.offsetWidth||void 0}}),a=an([...c,...s],new Map(n.map(T=>[T.id,T.parentId]))),h=Ae(a,void 0,T=>{var C,I;return(I=(C=U.get(T))!=null?C:w.get(T))==null?void 0:I.offsetHeight});h.slice(0,c.length).forEach((T,C)=>{c[C].x=T.x,c[C].y=T.y}),n.forEach((T,C)=>{let I=h[c.length+C],V=p.get(T.parentId);T.dx=I.x-V.x,T.dy=I.y-V.y})}for(let s of U.keys())he(s);Ke()}function Kt(e,n=!1){var g;let s=e?(g=U.get(e))==null?void 0:g.getBoundingClientRect():void 0;ye(),Zt(),_t();let a=e?U.get(e):void 0;if(a){if(s){let T=a.getBoundingClientRect();W={...W,x:W.x+s.left-T.left,y:W.y+s.top-T.top},Tt()}let h=n?a.querySelector(".vam-collapse-button"):null;(h!=null?h:a).focus({preventScroll:!0})}}function ar(e,n,s){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let a=e.clientX,g=e.clientY,h=n.x,T=n.y,C=!1,I=lt=>{let ct=lt.clientX-a,nt=lt.clientY-g;if(!C){if(Math.hypot(ct,nt)<=Mo)return;C=!0,s.classList.add("is-dragging"),s.setPointerCapture(lt.pointerId)}n.x=h+ct/W.zoom,n.y=T+nt/W.zoom,he(n.id),Fe()},V=()=>{s.removeEventListener("pointermove",I),s.removeEventListener("pointerup",V),s.removeEventListener("pointercancel",V),s.classList.remove("is-dragging"),C&&(pe=!0,window.setTimeout(()=>pe=!1,0))};s.addEventListener("pointermove",I),s.addEventListener("pointerup",V),s.addEventListener("pointercancel",V)}let be=e=>Math.round(Math.min(Math.max(_e,e),Math.max(_e,vt.clientWidth*.7)));function Jt(){let e=yt();if(K.hidden||e){K.style.removeProperty("width"),qt.style.removeProperty("right");return}let n=be(Qt);K.style.width=`${n}px`,qt.style.right=`${n}px`,G.setAttribute("aria-valuenow",String(n)),G.setAttribute("aria-valuemax",String(be(1/0)))}let G=u("div","vam-inspector-resizer");G.setAttribute("role","separator"),G.setAttribute("aria-orientation","vertical"),G.setAttribute("aria-label",r.resizePanel),G.setAttribute("aria-valuemin",String(_e)),G.tabIndex=0;let te=(e,n)=>{Qt=be(e),Jt(),n&&Oe(qn,String(Qt))};G.addEventListener("pointerdown",e=>{e.preventDefault();let n=e.clientX,s=K.offsetWidth;G.setPointerCapture(e.pointerId),G.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let a=h=>te(s+n-h.clientX,!1),g=()=>{G.removeEventListener("pointermove",a),G.removeEventListener("pointerup",g),G.removeEventListener("pointercancel",g),G.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),te(Qt,!0)};G.addEventListener("pointermove",a),G.addEventListener("pointerup",g),G.addEventListener("pointercancel",g)}),G.addEventListener("keydown",e=>{let n=e.shiftKey?48:16;if(e.key==="ArrowLeft")te(K.offsetWidth+n,!0);else if(e.key==="ArrowRight")te(K.offsetWidth-n,!0);else return;e.preventDefault()});let xe=yt();window.addEventListener("resize",()=>{Jt(),Tt(),yt()!==xe&&(xe=yt(),Ot(xe?!1:je(),!1))});function Me(){et=null;for(let e of U.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");K.hidden=!0,vt.classList.remove("has-inspector"),K.replaceChildren(),Jt(),At()}function Ct(e){var V,lt,ct;let n=p.get(e),s=f.get(e);if(!n||!s)return;let a={...s,...M(s)};et=e;for(let[nt,ot]of U)ot.classList.toggle("is-selected",nt===e),ot.setAttribute("aria-selected",String(nt===e));K.replaceChildren(G);let g=u("div","vam-inspector-heading");g.append(u("strong",void 0,r.topicDetails)),A(g,r.close,void 0,Me),K.append(g,u("h3",void 0,String((V=a.title)!=null?V:"")));let h=Zn(a.tier)?a.tier:void 0;if(h){let nt=u("div","vam-inspector-why");nt.append(rt(h));let ot=typeof a.reason=="string"&&a.reason.trim()?a.reason:a.manual?r.manualReason:"";ot&&nt.append(u("span",void 0,ot)),K.append(nt)}typeof a.summary=="string"&&a.summary.trim()&&K.append(u("p","vam-sample-summary",a.summary));let T=Bn(t,a.links,r);T&&K.append(T);let C=u("div","vam-sample-detail");typeof a.detailHtml=="string"&&a.detailHtml.trim()?a.compact?Fn(t,C,a.detailHtml,a.compact,d,r):Ne(t,C,a.detailHtml,d,r):C.append(u("p","vam-inspector-empty",r.noContent)),K.append(C);let I=(lt=L.get(e))!=null?lt:[];if(I.length){let nt=u("div","vam-subtopics");nt.append(u("strong",void 0,r.subtopics));for(let ot of I)A(nt,String((ct=M(f.get(ot.id)).title)!=null?ct:""),void 0,()=>{n.collapsed&&(n.collapsed=!1,Kt(n.id)),Ct(ot.id),$e(ot.id)});K.append(nt)}K.hidden=!1,vt.classList.add("has-inspector"),Jt(),K.scrollTop=0,At(),Xe()}let Te=e=>{ve(c,e),Kt(),Wt()},Ut=e=>{at.hidden||(at.hidden=!0,ht.setAttribute("aria-expanded","false"),e&&ht.focus())};function lr(){at.replaceChildren();let e=[{label:r.collapseAll,run:()=>Te(0)},{label:r.expandAll,run:()=>Te(null)},...[1,2,3].map(n=>({label:Nt(r.expandToLevel,n),run:()=>Te(n)})),null,{label:r.autoLayout,run:()=>{Zt(),_t()}}];for(let n of e){if(!n){at.append(u("hr"));continue}let s=u("button",void 0,n.label);s.type="button",s.setAttribute("role","menuitem"),s.addEventListener("click",a=>{a.stopPropagation(),Ut(!0),n.run()}),at.append(s)}}let Ue=()=>Array.from(at.querySelectorAll("button"));ht.addEventListener("click",e=>{var n;if(e.stopPropagation(),!at.hidden)return Ut(!0);at.hidden=!1,ht.setAttribute("aria-expanded","true"),(n=Ue()[0])==null||n.focus()}),at.addEventListener("keydown",e=>{let n=Ue(),s=n.indexOf(t.activeElement);if(e.key==="ArrowDown")n[(s+1)%n.length].focus();else if(e.key==="ArrowUp")n[(s-1+n.length)%n.length].focus();else if(e.key==="Home")n[0].focus();else if(e.key==="End")n[n.length-1].focus();else return e.key==="Tab"?Ut(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!at.hidden&&!Mt.contains(e.target)&&Ut(!1);let n=e.target;yt()&&!tt.hidden&&!tt.contains(n)&&!ut.contains(n)&&Ot(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!at.hidden)Ut(!0);else if(yt()&&!tt.hidden)Ot(!1,!1),ut.focus();else if(!K.hidden){let n=et?U.get(et):void 0;Me(),n==null||n.focus({preventScroll:!0})}}});function Ve(){let e=R();if(t.title=e.title,q.textContent=e.title,xt.setAttribute("aria-label",e.title),bt.textContent=r.readOnly,Pe.textContent=r.madeWithVam,Pt.textContent=r.install,st.setAttribute("aria-label",r.language),st.title=r.language,v)for(let s of Array.from(st.options))s.dataset.original&&(s.textContent=r.originalText);e.goal?(He.textContent=Nt(r.goal,e.goal),zt.title=e.goal,zt.parentElement||It.append(zt),It.hidden=!1):(zt.remove(),It.hidden=!0),De.textContent=r.hint;let n=(s,a)=>{s.setAttribute("aria-label",a),s.title=a};if(n(er,r.zoomOut),n(nr,r.zoomIn),n(rr,r.showAll),ht.textContent=r.layout,K.setAttribute("aria-label",r.topicDetails),tt.setAttribute("aria-label",r.outline),$t.setAttribute("aria-label",r.outline),n(ut,r.outline),G.setAttribute("aria-label",r.resizePanel),lr(),b()){let s=v?r.aiTranslatedUnknown:Nt(r.aiTranslated,D(B,k));Ht.textContent=`${s} ${r.imageTextUntranslated}`,Ht.hidden=!1}else Ht.hidden=!0;Tt()}function cr(e){if(e===k||!H.includes(e))return;k=e,r=F(e),N&&Oe(N,e),t.documentElement.lang=e;let n=K.scrollTop;Ve(),ye(),_t(),qe(),et!==null&&p.has(et)&&!K.hidden&&(Ct(et),K.scrollTop=n),Fe()}st.addEventListener("change",()=>cr(st.value));let ee=[],Ye=e=>{var n;ee.push(e);for(let s of(n=L.get(e.id))!=null?n:[])Ye(s)};for(let e of c)e.parentId||Ye(e);let Vt=new Set,St=new Map,ne=null;function je(){return Ce(Qn)!=="0"}function Ot(e,n){tt.hidden=!e,vt.classList.toggle("has-outline",e),ut.setAttribute("aria-expanded",String(e)),n&&!yt()&&Oe(Qn,e?"1":"0")}let dr=()=>ee.filter(e=>{var n;return!((n=St.get(e.id))!=null&&n.hidden)});function At(){var s,a,g;let e=[];for(let h of ee){let T=St.get(h.id);if(!T)continue;let C=!1;for(let I=h.parentId;I&&!C;I=(a=(s=p.get(I))==null?void 0:s.parentId)!=null?a:null)C=Vt.has(I);T.hidden=C,C||e.push(h),L.has(h.id)&&T.setAttribute("aria-expanded",String(!Vt.has(h.id))),h.id===et?T.setAttribute("aria-current","true"):T.removeAttribute("aria-current")}let n=(g=e.find(h=>h.id===ne))!=null?g:e[0];for(let[h,T]of St)T.tabIndex=h===(n==null?void 0:n.id)?0:-1}function Xe(){let e=et?St.get(et):void 0;!e||e.hidden||!tt.clientHeight||(e.offsetTop<tt.scrollTop?tt.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>tt.scrollTop+tt.clientHeight&&(tt.scrollTop=e.offsetTop+e.offsetHeight-tt.clientHeight))}function we(e){Vt.delete(e)||Vt.add(e),At()}function ur(e){var n;ne=e,At(),(n=St.get(e))==null||n.focus()}function fr(){for(let[e,n]of U)n.classList.toggle("is-selected",e===et),n.setAttribute("aria-selected",String(e===et))}function Ge(e){var g,h,T;let n=p.get(e);if(!n)return;let s=!1,a=0;for(let C=n.parentId;C&&a++<=c.length;C=(h=(g=p.get(C))==null?void 0:g.parentId)!=null?h:null){let I=p.get(C);I!=null&&I.collapsed&&(I.collapsed=!1,s=!0)}et=e,s&&Kt(),$e(e),K.hidden?fr():Ct(e),At(),Xe(),yt()&&Ot(!1,!1),(T=U.get(e))==null||T.focus({preventScroll:!0})}function pr(e,n){var C;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let s=dr(),a=s.indexOf(n),g=(C=L.get(n.id))!=null?C:[],h=Vt.has(n.id),T;switch(e.key){case"ArrowDown":T=s[a+1];break;case"ArrowUp":T=s[a-1];break;case"Home":T=s[0];break;case"End":T=s[s.length-1];break;case"ArrowRight":g.length&&h?we(n.id):T=g[0];break;case"ArrowLeft":g.length&&!h?we(n.id):T=n.parentId?p.get(n.parentId):void 0;break;case"Enter":case" ":Ge(n.id);break;default:return}e.preventDefault(),T&&ur(T.id)}function qe(){var e;$t.replaceChildren(),St.clear();for(let n of ee){let s=String((e=M(f.get(n.id)).title)!=null?e:""),a=u("div","vam-outline-item");a.dataset.outlineId=n.id,a.setAttribute("role","treeitem");let g=ze(n)+1;a.setAttribute("aria-level",String(g)),a.style.setProperty("--depth",String(g-1));let h=u("span","vam-outline-twist");L.has(n.id)&&(h.append(P("chevron")),h.addEventListener("click",I=>{I.stopPropagation(),we(n.id)}));let T=u("span","vam-outline-title",s);T.title=s,a.append(h,T);let C=_(f.get(n.id));C.length&&(a.append(J(C)),a.setAttribute("aria-label",Y(s,C))),a.addEventListener("click",()=>Ge(n.id)),a.addEventListener("keydown",I=>pr(I,n)),a.addEventListener("focus",()=>{ne!==n.id&&(ne=n.id,At())}),$t.append(a),St.set(n.id,a)}At()}let ft=new Map,Yt=0,re=!1;j.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(j.setPointerCapture(e.pointerId),ft.set(e.pointerId,{x:e.clientX,y:e.clientY}),j.classList.add("is-panning"),ft.size===1&&(re=!1),ft.size===2)){let[n,s]=Array.from(ft.values());Yt=Math.hypot(n.x-s.x,n.y-s.y)}}),j.addEventListener("pointermove",e=>{let n=ft.get(e.pointerId);if(!n)return;if(ft.set(e.pointerId,{x:e.clientX,y:e.clientY}),ft.size===2&&Yt){let[g,h]=Array.from(ft.values()),T=Math.hypot(g.x-h.x,g.y-h.y),C=j.getBoundingClientRect();Ft(T/Yt,{x:(g.x+h.x)/2-C.left,y:(g.y+h.y)/2-C.top}),Yt=T,re=!0;return}let s=e.clientX-n.x,a=e.clientY-n.y;re||(re=Math.abs(s)+Math.abs(a)>0),W={...W,x:W.x+s,y:W.y+a},Tt()});let Qe=e=>{ft.delete(e.pointerId)&&(ft.size<2&&(Yt=0),ft.size||(j.classList.remove("is-panning"),!re&&e.type==="pointerup"&&!K.hidden&&Me()))};j.addEventListener("pointerup",Qe),j.addEventListener("pointercancel",Qe),j.addEventListener("wheel",e=>{e.preventDefault();let n=j.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?Ft(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-n.left,y:e.clientY-n.top}):(W={...W,x:W.x-e.deltaX,y:W.y-e.deltaY},Tt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{me&&(me=!1,Wt())}).observe(j),Ve(),qe(),Ot(yt()?!1:je(),!1),ve(c,1),ye(),Zt(),_t(),Wt();let Ze=t.fonts;Ze&&Ze.ready.then(()=>{et!==null||ft.size||(Zt(),_t(),Wt())})}tr(document);})();';
 var SHARE_VIEWER_CSS = `/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */
 :root {
   color-scheme: light;
@@ -84618,7 +85218,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
 .vam-canvas-overlay > * { pointer-events: auto; }
 .vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
-.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }
+.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; --vam-tools-max: 100%; max-width: min(calc(100% - 24px), var(--vam-tools-max)); }
 .vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }
 .vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }

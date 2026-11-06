@@ -983,7 +983,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
     renderDisclosure(parent) { return parent.createDiv('vam-disclosure-body'); }, renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderAiLockSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
-    cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch,
+    cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch, arrangeTree: VisualAgentMapView.prototype.arrangeTree,
     map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
@@ -4608,12 +4608,18 @@ integrationTest('hypothesis-leaning: styles.css dims a disabled choice with not-
   assert.match(block('.vam-topic-modal .vam-choice-group'), /repeat\(3,/, 'the shared group keeps three columns');
 });
 
-// The goal bar floats over the top centre of the canvas, so every fit/focus/initial-viewport path measures it like the toolbar.
-test('goal bar: canvasInset, canvasInsets, floatingControlRects and topsUnderToolbar all include the bar (the tallest of toolbar and bar wins)', () => {
+// The goal bar now sits in the row above the map (Obsidian's header row, or the toolbar), not over the canvas: the paths that keep cards clear of
+// floating controls measure the tool group (and the goal's icons and panel while they are visible), not the bar.
+test('goal bar: it is in the header row, so canvasInset, canvasInsets and topsUnderToolbar measure only the tool group; floatingControlRects lists the goal icons and panel only while they are visible', () => {
   const { view, a } = viewportFixture();
   a.x = 400; a.y = 20; a.width = 280;
-  const rects = { '.vam-map-tools': { left: 12, top: 12, right: 60, bottom: 50 }, '.vam-goal-bar': { left: 220, top: 12, right: 780, bottom: 110 } };
-  const query = hidden => selector => (rects[selector] && selector !== hidden ? { getBoundingClientRect: () => rects[selector] } : null);
+  const shown = { actions: true };
+  const rects = { '.vam-map-tools': { left: 12, top: 12, right: 60, bottom: 50 }, '.vam-goal-bar': { left: 220, top: 12, right: 780, bottom: 110 }, '.vam-goal-actions': { left: 600, top: 60, right: 700, bottom: 90 } };
+  const query = hidden => selector => {
+    if (!rects[selector] || selector === hidden) return null;
+    const ownerDocument = selector === '.vam-goal-actions' ? { defaultView: { getComputedStyle: () => ({ opacity: shown.actions ? '1' : '0' }) } } : undefined;
+    return { getBoundingClientRect: () => rects[selector], ownerDocument };
+  };
   view.viewportEl = { clientWidth: 1000, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, top: 0, right: 1000, bottom: 600 }) };
   view.contentEl = { querySelector: query('') };
   view.cardEls = new Map([['a', { offsetHeight: 120 }]]);
@@ -4621,82 +4627,167 @@ test('goal bar: canvasInset, canvasInsets, floatingControlRects and topsUnderToo
   view.map.viewport = { x: 1, y: 0, zoom: 1 };
   const withBar = view.canvasInset();
   view.contentEl = { querySelector: query('.vam-goal-bar') };
-  const withoutBar = view.canvasInset();
-  assert.ok(withBar > withoutBar, `the bar (${withBar}) is taller than the toolbar alone (${withoutBar})`);
+  assert.equal(view.canvasInset(), withBar, 'the bar (in the header row) does not change the inset: only the tool group counts');
+  assert.equal(withBar, view.canvasInsets().top, 'Show all / focus use the same top inset');
   view.contentEl = { querySelector: query('') };
-  assert.equal(view.canvasInsets().top, withBar, 'Show all / focus keep the bar clear too');
-  assert.ok(view.floatingControlRects().some(r => r.left === 220 && r.right === 780), 'a card under the bar counts as obscured');
-  assert.deepEqual([...view.topsUnderToolbar(1)], [20], 'a card drawn under the bar (not under the toolbar) is lifted');
-  view.contentEl = { querySelector: query('.vam-goal-bar') };
-  assert.deepEqual([...view.topsUnderToolbar(1)], [], 'without the bar the same card is clear');
+  assert.ok(!view.floatingControlRects().some(r => r.left === 220 && r.right === 780), 'the bar is not a floating layer');
+  assert.ok(view.floatingControlRects().some(r => r.left === 600 && r.right === 700), 'visible icons count as obscuring');
+  shown.actions = false;
+  assert.ok(!view.floatingControlRects().some(r => r.left === 600 && r.right === 700), 'invisible (opacity 0) icons cover nothing: cards need not avoid them');
+  assert.ok(view.floatingControlRects().some(r => r.left === 12 && r.right === 60), 'the tool group still counts');
+  assert.deepEqual([...view.topsUnderToolbar(1)], [], 'a card under where the bar was drawn is no longer lifted');
+  a.x = 20; a.width = 120;
+  assert.deepEqual([...view.topsUnderToolbar(1)], [20], 'a card under the tool group is lifted');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /for \(const selector of FLOATING_LAYER_SELECTORS\)/);
+  assert.match(source, /getComputedStyle\?\.\(el\)\?\.opacity === "0"/, 'floatingControlRects skips invisible layers in production, not only in a test filter');
 });
 
-test('goal bar: styles keep it above the cards, centred on the visible canvas, wrapping (no ellipsis), icons only on hover or focus, theme variables only', () => {
+test('goal bar: styles give it no frame, wrapping text (no ellipsis), icons that keep their place and show only on hover or focus (opacity, so they stay in the tab order), theme variables only', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = selector => css.split('\n').find(line => line.startsWith(`${selector} {`)) ?? '';
   const bar = rule('.vam-goal-bar');
-  assert.match(bar, /position: absolute;[^}]*top: 12px;[^}]*left: calc\(50% \+ var\(--vam-goal-inset, 0px\) \/ 2\);[^}]*transform: translateX\(-50%\)/, 'centred on the canvas the chat window does not cover');
-  assert.match(bar, /width: min\(460px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\)\)\)/, 'at most 460px, never wider than the visible canvas minus 24px, no side reservation (the tools sit below the bar)');
-  assert.doesNotMatch(bar, /108px/);
-  assert.match(bar, /padding: 14px 18px/); assert.match(bar, /border-radius: 16px/); assert.match(bar, /background: var\(--background-primary\)/); assert.match(bar, /border: 1px solid var\(--background-modifier-border\)/);
+  assert.match(bar, /position: relative/); assert.match(bar, /max-width: 460px/); assert.match(bar, /margin-inline: auto/);
+  assert.match(bar, /border: 1px solid transparent/, 'no frame until hover or focus');
+  assert.doesNotMatch(bar, /background|box-shadow|position: absolute|--vam-goal-inset/, 'no card surface, not over the canvas, no chat inset');
+  assert.match(bar, /font-size: var\(--font-ui-small\)/);
   assert.doesNotMatch(bar, /#[0-9a-f]{3,6}\b/i, 'theme variables, not mock-up hex colours');
   const text = rule('.vam-goal-text');
-  assert.match(text, /font-size: 1\.2rem;[^}]*font-weight: 800/); assert.match(text, /overflow-wrap: anywhere/); assert.doesNotMatch(text, /text-overflow|ellipsis|white-space: nowrap|overflow: hidden/, 'the goal wraps, never cut');
-  assert.match(rule('.vam-goal-actions'), /display: none/);
-  // Showing the icons must not change the bar height: one text line (1.2rem x 1.35 + 2 x 3px) is already as tall as the 30px icons.
-  assert.match(text, /padding-block: 3px/); assert.match(text, /line-height: 1\.35/);
-  assert.ok(19.2 * 1.35 + 6 >= 30, 'a one-line text box is at least as tall as the icon row, so hover does not grow the bar');
+  assert.match(text, /overflow-wrap: anywhere/); assert.doesNotMatch(text, /text-overflow|ellipsis|white-space: nowrap|overflow: hidden/, 'the goal wraps, never cut');
+  const actions = rule('.vam-goal-actions');
+  assert.match(actions, /display: flex/, 'the icons keep their place, so hover never re-wraps the goal');
+  assert.match(actions, /opacity: 0; pointer-events: none/); assert.doesNotMatch(actions, /display: none|visibility/, 'opacity, not display/visibility: the icons stay in the tab order');
+  assert.match(css, /\.vam-goal-bar:hover \.vam-goal-actions, \.vam-goal-bar:focus-within \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}/);
   assert.match(css, /^\.vam-empty \{[^}]*top: 50%;[^}]*left: 50%;[^}]*translate\(-50%, -50%\)/m, 'the empty-map text and button are centred in the canvas');
-  assert.match(css, /\.vam-goal-bar:hover \.vam-goal-actions, \.vam-goal-bar:focus-within \.vam-goal-actions \{ display: flex; \}/);
   assert.match(css, /\.vam-goal-bar:hover, \.vam-goal-bar:focus-within \{ border-color: var\(--interactive-accent\); \}/);
-  assert.match(rule('.vam-goal-icon'), /width: 30px; height: 30px/);
+  assert.match(rule('.vam-goal-icon'), /width: 24px; height: 24px/);
   assert.doesNotMatch(css, /vam-relevance-level|vam-relevance-sort|vam-relevance-grade-button|\.vam-map-tools \.vam-relevance-goal/, 'the old goal pill and panel rules are gone');
 });
 
-test('goal bar: the tool group is placed right below the bar and follows its height; without a bar it keeps the stylesheet top', () => {
+test('goal bar: the tool group never moves for the bar (style.top stays empty, whatever the bar height); icons floating over its row make it give way in width, and only then', () => {
   const { view } = viewportFixture();
-  const tools = { style: {} }; const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {} }, ownerDocument: null };
+  const toolsRect = { left: 12, top: 60, right: 258, bottom: 96 };
+  const tools = { style: { setProperty(n, v) { this[n] = v; }, removeProperty(n) { delete this[n]; } }, getBoundingClientRect: () => toolsRect };
+  const actionsRect = { left: 344, top: 52, right: 452, bottom: 82 };
+  const actions = { getBoundingClientRect: () => actionsRect };
+  const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {}, removeProperty() {} }, ownerDocument: null, toggleClass() {}, querySelector: s => (s === '.vam-goal-actions' ? actions : null), getBoundingClientRect: () => ({ left: 0, top: 0, right: 0, bottom: 62 }) };
   view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : s === '.vam-goal-bar' ? bar : null) };
-  view.placeMapTools();
-  assert.equal(tools.style.top, '82px', 'bar bottom (74) + 8px gap');
-  bar.offsetHeight = 140; view.placeMapTools();
-  assert.equal(tools.style.top, '160px', 'a wrapped, taller bar pushes the tools down with it');
-  for (const height of [62, 140]) { bar.offsetHeight = height; view.placeMapTools(); const barBottom = bar.offsetTop + bar.offsetHeight; assert.ok(parseInt(tools.style.top, 10) > barBottom, `tools start below the bar (${height})`); }
+  for (const height of [62, 140]) { bar.offsetHeight = height; view.placeMapTools(); assert.equal(tools.style.top, undefined, `bar height ${height}: the tool group keeps the stylesheet top`); }
+  assert.equal(tools.style['--vam-tools-max'], `${344 - 12 - 8}px`, 'icons over the tool group row: it ends INSET_GAP before them and wraps');
+  actionsRect.top = 20; actionsRect.bottom = 50; view.placeMapTools();
+  assert.equal(tools.style['--vam-tools-max'], undefined, 'icons above the tool group row: it keeps its width');
+  actionsRect.top = 52; actionsRect.bottom = 82; view.placeMapTools();
+  assert.equal(tools.style['--vam-tools-max'], `${344 - 12 - 8}px`, 'and back again when they float over it');
   view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : null) };
   view.placeMapTools();
-  assert.equal(tools.style.top, '', 'no goal bar (AIM or empty map): today\'s top');
+  assert.equal(tools.style['--vam-tools-max'], undefined, 'no goal bar (AIM or empty map): the group is not capped');
+  assert.equal(tools.style.top, undefined, 'and keeps the stylesheet top');
 });
 
-test('goal bar: tools sit below the open suggestion card, and follow canvas, bar and card size changes; the watch is dropped on close', async () => {
+test('goal bar: the layout re-runs on size changes of the bar, the header row, the panel, the tools and the canvas; the watch is dropped on close', async () => {
   const { view } = viewportFixture();
   const watchers = [];
   class FakeRO { constructor(fn) { this.fn = fn; this.targets = []; this.disconnected = false; watchers.push(this); } observe(el) { this.targets.push(el); } disconnect() { this.disconnected = true; } }
-  const doc = { defaultView: { ResizeObserver: FakeRO } };
-  const tools = { style: {} }; const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {} }, ownerDocument: doc };
+  const doc = { defaultView: { ResizeObserver: FakeRO, getComputedStyle: () => ({ display: 'flex' }) } };
+  const tools = { style: { setProperty() {}, removeProperty() {} } }; const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {}, removeProperty() {} }, ownerDocument: doc, toggleClass() {}, querySelector: () => null };
+  const header = { ownerDocument: doc, querySelector: () => null };
+  bar.parentElement = header; // already in its row: this test is about the watch, not the move
   const canvas = { ownerDocument: doc };
   view.viewportEl = canvas;
-  view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : s === '.vam-goal-bar' ? bar : null) };
+  view.containerEl = { querySelector: s => (s === ':scope > .view-header' ? header : s === '.vam-goal-bar' ? bar : null) };
+  view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : null) };
   view.placeMapTools();
-  assert.equal(tools.style.top, '82px');
-  assert.equal(watchers.length, 1); assert.deepEqual([...watchers[0].targets], [bar, tools, canvas], 'the bar, the tools and the canvas are watched');
-  // Canvas resize (sidebar collapsed): the same placement runs again with the new bar height.
-  bar.offsetHeight = 100; watchers[0].fn();
-  assert.equal(tools.style.top, '120px', 'a canvas resize re-places the tools');
-  // The suggestion card hangs 6px under the bar: the tools go below the card and follow its height.
-  const card = { offsetHeight: 200, isConnected: true, hasClass: c => c === 'vam-goal-suggest' };
+  assert.equal(watchers.length, 1); assert.deepEqual([...watchers[0].targets], [bar, header, tools, canvas], 'the bar, the header row, the tools and the canvas are watched');
+  watchers[0].fn();
+  assert.equal(tools.style.top, undefined, 'a resize re-runs the layout and the tools never get a top');
+  // An open panel under the bar is watched too, and the old watch is dropped.
+  const card = { offsetHeight: 200, isConnected: true, hasClass: c => c === 'vam-goal-suggest', style: { setProperty() {} } };
   view.relevanceBarEl = { querySelector: () => card }; view.placeMapTools();
-  assert.equal(tools.style.top, String(12 + 100 + 6 + 200 + 8) + 'px', 'below the card, nothing is covered');
-  assert.ok(watchers.at(-1).targets.includes(card) && watchers[0].disconnected, 'the card is watched too (the old watch was dropped)');
-  card.offsetHeight = 320; watchers.at(-1).fn();
-  assert.equal(tools.style.top, String(12 + 100 + 6 + 320 + 8) + 'px', 'a taller card pushes the tools further down');
+  assert.ok(watchers.at(-1).targets.includes(card) && watchers[0].disconnected, 'the panel is watched too (the old watch was dropped)');
   view.relevanceBarEl = { querySelector: () => null }; view.placeMapTools();
-  assert.equal(tools.style.top, '120px', 'card closed: back below the bar');
   const live = watchers.at(-1); assert.equal(live.disconnected, false);
   await view.onClose();
   assert.equal(live.disconnected, true, 'closing the view disconnects the observer');
   assert.equal(view.goalBarObserved.length, 0);
+});
+
+// ---- Goal header P1: where the goal bar lives ----
+// A fake of the parts of Obsidian's DOM the placement reads: the container with `.view-header` (and its action group), the view's own element with the toolbar.
+const goalHostFixture = ({ headerShown }) => {
+  const { view } = viewportFixture();
+  const { element } = dom;
+  const watchers = [];
+  class FakeRO { constructor(fn) { this.fn = fn; this.targets = []; this.disconnected = false; watchers.push(this); } observe(el) { this.targets.push(el); } disconnect() { this.disconnected = true; } }
+  const state = { headerDisplay: headerShown ? 'flex' : 'none' };
+  const doc = { defaultView: { ResizeObserver: FakeRO, getComputedStyle: () => ({ display: state.headerDisplay }) } };
+  const containerEl = element('div');
+  const header = containerEl.createDiv('view-header'); header.ownerDocument = doc;
+  const title = header.createDiv('view-header-title-container'); const viewActions = header.createDiv('view-actions');
+  header.querySelector = s => (s === ':scope > .view-actions' ? viewActions : null);
+  containerEl.querySelector = s => (s === ':scope > .view-header' ? header : dom.find(containerEl, i => dom.hasCls(i, s.replace(/^\./, ''))) ?? null);
+  containerEl.querySelectorAll = s => dom.findAll(containerEl, i => dom.hasCls(i, s.replace(/^\./, '')));
+  const contentEl = containerEl.createDiv('view-content');
+  const toolbar = contentEl.createDiv('vam-toolbar'); const toolbarActions = toolbar.createDiv('vam-toolbar-actions');
+  toolbar.querySelector = s => (s === ':scope > .vam-toolbar-actions' ? toolbarActions : null);
+  contentEl.querySelector = s => dom.find(contentEl, i => dom.hasCls(i, s.replace(/^\./, ''))) ?? null;
+  view.containerEl = containerEl; view.contentEl = contentEl; contentEl.ownerDocument = doc;
+  const tools = contentEl.createDiv('vam-map-tools');
+  view.closed = false;
+  // support-dom keeps `parent`; production reads parentElement.
+  const makeBar = () => { const bar = contentEl.createDiv('vam-goal-bar'); Object.defineProperty(bar, 'parentElement', { get() { return this.parent; } }); bar.ownerDocument = doc; return bar; };
+  return { view, containerEl, contentEl, header, title, viewActions, toolbar, toolbarActions, state, watchers, doc, tools, makeBar };
+};
+
+test('goal bar host: with Obsidian\'s header row shown the bar goes in front of its action group and the header is the host; with it hidden the bar goes in front of the toolbar actions and the toolbar is the host', () => {
+  for (const headerShown of [true, false]) {
+    const f = goalHostFixture({ headerShown });
+    f.view.renderGoalBar = (host, before) => { const bar = f.makeBar(); host.insertBefore(bar, before ?? null); f.view.relevanceBarEl = bar; };
+    f.view.mountGoalBar();
+    const bar = f.view.relevanceBarEl;
+    const [host, before, other] = headerShown ? [f.header, f.viewActions, f.toolbar] : [f.toolbar, f.toolbarActions, f.header];
+    assert.equal(bar.parent, host, `${headerShown ? 'header' : 'toolbar'}: the bar is in the host row`);
+    assert.equal(host.children.indexOf(bar) + 1, host.children.indexOf(before), 'and directly in front of the row\'s actions');
+    assert.ok(host.hasClass('vam-goal-host') && !other.hasClass('vam-goal-host'), 'only the host carries vam-goal-host');
+  }
+});
+
+test('goal bar host: when the user shows or hides Obsidian\'s header row the next layout pass (the ResizeObserver) moves the bar and the host mark; nothing loops when the row did not change', () => {
+  const f = goalHostFixture({ headerShown: true });
+  const bar = f.makeBar(); f.view.relevanceBarEl = bar;
+  f.view.placeMapTools();
+  assert.equal(bar.parent, f.header); assert.ok(f.header.hasClass('vam-goal-host'));
+  const moves = []; const insert = f.header.insertBefore; f.header.insertBefore = (...a) => { moves.push('header'); return insert.apply(f.header, a); };
+  f.watchers.at(-1).fn(); f.watchers.at(-1).fn();
+  assert.equal(moves.length, 0, 'the row did not change: the bar is not touched');
+  f.state.headerDisplay = 'none';
+  assert.ok(f.watchers.at(-1).targets.includes(f.header), 'the header row is watched, so hiding it triggers a pass');
+  f.watchers.at(-1).fn();
+  assert.equal(bar.parent, f.toolbar, 'the header row is hidden: the bar moved into the toolbar');
+  assert.equal(f.toolbar.children.indexOf(bar) + 1, f.toolbar.children.indexOf(f.toolbarActions));
+  assert.ok(f.toolbar.hasClass('vam-goal-host') && !f.header.hasClass('vam-goal-host'), 'the host mark moved with it');
+  f.state.headerDisplay = 'flex'; f.watchers.at(-1).fn();
+  assert.equal(bar.parent, f.header, 'and back when the row is shown again');
+  assert.ok(f.header.hasClass('vam-goal-host') && !f.toolbar.hasClass('vam-goal-host'));
+});
+
+test('goal bar host: removeGoalBar takes the bar out of its row (also a stray one) and clears the host mark; a repaint and closing the view both call it', async () => {
+  const f = goalHostFixture({ headerShown: true });
+  const bar = f.makeBar(); f.view.relevanceBarEl = bar;
+  f.view.placeMapTools();
+  const stray = f.header.createDiv('vam-goal-bar');
+  f.view.removeGoalBar();
+  assert.ok(!f.header.children.includes(bar) && !f.header.children.includes(stray) && !f.toolbar.children.includes(bar), 'no bar is left in any row');
+  assert.ok(!f.header.hasClass('vam-goal-host'), 'the host mark is gone');
+  assert.equal(f.view.goalHostEl, null);
+  // closing the view
+  const again = f.makeBar(); f.view.relevanceBarEl = again; f.view.placeMapTools();
+  assert.ok(f.header.hasClass('vam-goal-host'));
+  await f.view.onClose();
+  assert.ok(!f.header.children.includes(again), 'onClose removes the bar from Obsidian\'s header row (it is outside contentEl)');
+  assert.ok(!f.header.hasClass('vam-goal-host'), 'and the mark');
+  // a repaint empties contentEl, which would leave the bar behind in the header row
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /this\.removeGoalBar\(\);\s*this\.contentEl\.empty\(\);/, 'render removes the bar before it empties the view');
 });
 
 // ---- Map data sources (P3): toolbar button and panel ----------------------------------------------------------------

@@ -158,14 +158,15 @@ test('A9 plan counterexample: splitting research over rounds does not get around
   // M1: the total only matters for a round that researches; after 10 a round of cards alone is not a plan.
   assert.equal(plan([add(1)], { round: 4, researchSoFar: 10 }), null, 'cumulative 10 and only add_child: no card');
 });
-test('R3 B1 plan counterexample: a first round whose context carried research text also asks before delete and rewrite, with its own reason; an ordinary message and the first round without research do not', () => {
-  // R4 (decision #16): "the conversation has researched successfully" is the view's `trusted.researchedIds`, not the context's `research.sent`.
+test('R3 B1 plan counterexample: a first round or ordinary message of a conversation that started research asks before delete and rewrite, with its own reason; one that never started research does not', () => {
+  // R5 (decision #17): "the conversation has started research" is the view's `chatStartedResearch`, not the context's `research.sent` and not which cards succeeded.
   const withResearch = { parents: {}, selectedCount: 0 };
-  const researched = { trusted: { researchedIds: new Set(['a']) } };
+  const researched = { chatStartedResearch: true };
   const r1 = { chain: { round: 1, researchSoFar: 0 }, ...researched };
   for (const action of UNSAFE) assert.deepEqual(plain(planFor([action], withResearch, r1)?.reasons ?? []).filter(r => r.endsWith('_other_actions') && r !== 'image_other_actions'), ['research_text_other_actions'], `${action.kind} ${action.action ?? ''}`);
   assert.deepEqual(plain(planFor([UNSAFE[0]], withResearch, researched)?.reasons), ['research_text_other_actions'], 'a message after the research, no chain at all');
-  assert.equal(planFor([UNSAFE[0]], withResearch, { chain: { round: 1, researchSoFar: 0 } }), null, 'no successful research, no change')
+  assert.equal(planFor([UNSAFE[0]], withResearch, { chain: { round: 1, researchSoFar: 0 } }), null, 'no research started, no change')
+  assert.equal(planFor([UNSAFE[0]], withResearch, { trusted: { researchedIds: new Set(['a']) } }), null, 'researched cards alone no longer decide (decision #17)')
   assert.equal(planFor([UNSAFE[0]], { parents: {}, selectedCount: 0, research: { sent: ['a'], deferred: [] } }, { chain: { round: 1, researchSoFar: 0 } }), null, 'the context alone no longer decides');
   assert.equal(planFor([add(1)], withResearch, r1), null, 'adding cards is safe');
   const many = Array.from({ length: MAP_CHAT_PLAN_ACTION_LIMIT + 1 }, (_, i) => add(i));

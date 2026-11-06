@@ -26,7 +26,7 @@ export const MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
  * Its context carries web research text, which is untrusted, so deleting, rewriting, moving, writing files, opening maps and
  * the like are always shown as a plan.
  *
- * `research_text_other_actions`: the same rule for a first round or an ordinary message of a conversation that has researched successfully
+ * `research_text_other_actions`: the same rule for a first round or an ordinary message of a conversation that has started research
  * (decisions #14, #16): the text can reach the model by any card or earlier reply and is untrusted wherever it is read.
  *
  * `image_preview`: the reply places or links anchors and the user chose to see image changes first. `image_other_actions`: a turn
@@ -173,6 +173,8 @@ export function planFor(
     chain?: MapChatPlanChain;
     /** Cards that may be rewritten or researched without a plan when the reply read research text or is an automatic round. */
     trusted?: MapChatTrusted;
+    /** This conversation has started research (decision #17): any turn of it may read web text, so the allow-list applies. */
+    chatStartedResearch?: boolean;
   } = {}
 ): MapChatPlan | null {
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
@@ -182,12 +184,12 @@ export function planFor(
     options.imageMode === "direct" &&
     options.imageAttached === true &&
     actions.every(action => IMAGE_SAFE_KINDS.has(action.kind));
-  // A reply that may read web research text (an automatic round, or any turn of a conversation that has researched successfully:
-  // the text can reach the model through any card or earlier reply, decision #16) does not do what
+  // A reply that may read web research text (an automatic round, or any turn of a conversation that has started research:
+  // the text can reach the model through any card or earlier reply, decisions #16 and #17) does not do what
   // that text could have injected: only safe actions on safe cards go without a plan. An automatic round of only such actions is
   // also not stopped by the number of actions (the first round keeps the rule).
   const autoRound = (options.chain?.round ?? 1) >= 2;
-  const readsResearch = autoRound || (options.trusted?.researchedIds?.size ?? 0) > 0;
+  const readsResearch = autoRound || options.chatStartedResearch === true;
   const onlySafe = readsResearch && actions.every(action => isChainSafeFor(action, options.trusted));
   const autoOnlySafe = autoRound && onlySafe;
   if (actions.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe) reasons.push("many_actions");

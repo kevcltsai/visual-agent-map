@@ -5,6 +5,7 @@
  */
 
 import { parseChatBasis, type MapChatBasis } from "./map-chat-basis";
+import { MAP_CHAT_CHAIN_END_REASONS, type MapChatChainEndReason } from "./map-chat-chain";
 
 export const RECORD_VERSION = 1;
 export const RECORDS_SUBPATH = "Chats/records";
@@ -55,6 +56,8 @@ export interface RecordTurnStartLine extends RecordLineBase {
   auto?: true;
   /** The round of the continuation, from 1 (present on an automatic round). */
   round?: number;
+  /** What the previous round said was still to do (an automatic round; shown on its separator when the conversation is opened again). */
+  remaining?: string;
 }
 export interface RecordTurnEndLine extends RecordLineBase {
   type: "turn_end";
@@ -89,7 +92,8 @@ export interface RecordImagesLine extends RecordLineBase {
   items: { title: string; sourceUrl: string }[];
   inserted: number[];
 }
-export type RecordEventKind = "resend" | "undo" | "redo" | "undo_refused" | "chain_end";
+/** `research_started` marks that the conversation started web research (it keeps the plan allow-list on after a restore). */
+export type RecordEventKind = "resend" | "undo" | "redo" | "undo_refused" | "chain_end" | "research_started";
 export interface RecordEventLine extends RecordLineBase {
   type: "event";
   turn: number;
@@ -340,6 +344,10 @@ export interface RestoredTurn {
   auto: boolean;
   /** The round of an automatic round, when the record says it (2 and up). */
   round?: number;
+  /** What the automatic round's separator said was left (plain text; capped). */
+  remaining?: string;
+  /** How the continuation that ended with this turn ended (known reasons only; its words are the panel's). */
+  chainEnd?: { reason: MapChatChainEndReason; round: number; remaining: string };
 }
 export interface RestoredConversation {
   id: string;
@@ -348,6 +356,8 @@ export interface RestoredConversation {
   turns: RestoredTurn[];
   /** The time of the last finished turn, for "restored <M/D HH:mm>" (the UI formats it); null with no turn. */
   restoredAt: string | null;
+  /** The file says this conversation started web research (an older file has no mark: false). */
+  startedResearch: boolean;
 }
 
 /** Result lines read back from a file: the basis keeps its known shape only (a hand-edited file cannot put anything else on screen). */
@@ -372,6 +382,8 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
   const images = new Map<number, RestoredImages>();
   const current = new Map<number, RecordLineItem[]>();
   const undone = new Map<number, boolean>();
+  const chainEnds = new Map<number, { reason: MapChatChainEndReason; round: number; remaining: string }>();
+  let startedResearch = false;
   for (const line of lines) {
     if (line.type === "conversation") {
       mapPath = typeof line.mapPath === "string" ? line.mapPath : mapPath;
@@ -392,6 +404,17 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     } else if (line.type === "event") {
       if (line.kind === "undo") undone.set(line.turn, true);
       else if (line.kind === "redo") undone.set(line.turn, false);
+      else if (line.kind === "research_started") startedResearch = true;
+      else if (line.kind === "chain_end") {
+        // A hand-edited file cannot put anything but a known reason on screen; the words are the panel's, the rest is plain text.
+        const reason = (MAP_CHAT_CHAIN_END_REASONS as readonly unknown[]).find(item => item === line.reason);
+        if (reason && reason !== "map_changed")
+          chainEnds.set(line.turn, {
+            reason: reason as MapChatChainEndReason,
+            round: Number.isInteger(line.round) && line.round! >= 1 ? Math.min(line.round!, 99) : 1,
+            remaining: typeof line.remaining === "string" ? line.remaining.slice(0, 1000) : ""
+          });
+      }
     }
   }
   const turns: RestoredTurn[] = [];
@@ -419,8 +442,19 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       auto: start.auto === true,
       ...(start.auto === true && typeof start.round === "number" && Number.isInteger(start.round) && start.round >= 2
         ? { round: start.round }
-        : {})
+        : {}),
+      ...(start.auto === true && typeof start.remaining === "string" && start.remaining.trim()
+        ? { remaining: start.remaining.slice(0, 1000) }
+        : {}),
+      ...(chainEnds.has(number) ? { chainEnd: chainEnds.get(number) } : {})
     });
   }
-  return { id, mapPath, mapId, turns, restoredAt: turns.length ? turns[turns.length - 1].at : null };
+  return {
+    id,
+    mapPath,
+    mapId,
+    turns,
+    restoredAt: turns.length ? turns[turns.length - 1].at : null,
+    startedResearch
+  };
 }

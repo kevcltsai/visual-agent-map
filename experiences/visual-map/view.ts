@@ -1360,6 +1360,11 @@ export class VisualAgentMapView extends ItemView {
   private chatChainSeq = 0;
   /** Cards this conversation researched (a `research_standard` that really started) and how each came out; reset with the conversation. */
   private chatResearched = new Map<string, { title: string; status: "succeeded" | "failed" | "stopped" }>();
+  /**
+   * This conversation has started web research (a `research_standard` that really began, the first card of a batch included);
+   * only a new conversation clears it, and a restored record sets it again. Any turn of it may read web text (decision #17).
+   */
+  private chatStartedResearch = false;
   /** Research notes an earlier round already sent whole (they go last when the budget is short). */
   private chatResearchSent = new Set<string>();
   /** Counts conversations: the result of research another conversation started is not recorded in this one. */
@@ -20644,6 +20649,7 @@ export class VisualAgentMapView extends ItemView {
                     imageMode: this.chatImageMode(),
                     imageAttached: !!request.imageDataUrl,
                     chain: planChainOf(run.state),
+                    chatStartedResearch: this.chatStartedResearch,
                     trusted: {
                       createdIds: run.createdIds,
                       researchedIds: new Set(
@@ -21254,6 +21260,7 @@ export class VisualAgentMapView extends ItemView {
     // The dashed dots give way to the real anchors the writes make.
     this.clearChatPreview();
     chat.settlePlan(card, "applied");
+    // Expansions that fail while the plan is still being applied wait in the panel and join the result lines below.
     // The window shows that it is working, and Stop ends the rest of the plan.
     chat.setApplying(true);
     const stopped = (): boolean => token !== this.chatPlanToken;
@@ -21273,7 +21280,8 @@ export class VisualAgentMapView extends ItemView {
       chat.setApplying(false);
     }
     if (!this.closed) {
-      chat.settlePlan(card, "applied", lines);
+      // The lines as shown (failures that came in meanwhile merged): the screen, the record and the chain's next round agree.
+      lines = chat.settlePlan(card, "applied", lines) ?? lines;
       this.chatPlanRecords.get(card)?.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
       if (run) {
         // Stop ends the continuation (and the work it started); otherwise the round is over like any other.
@@ -21389,7 +21397,13 @@ export class VisualAgentMapView extends ItemView {
         type: "turn_start",
         turn: number,
         message: origin.text,
-        ...(origin.chain ? { auto: true as const, round: origin.chain.state.round } : {}),
+        ...(origin.chain
+          ? {
+              auto: true as const,
+              round: origin.chain.state.round,
+              ...(origin.chain.continuation.remaining.trim() ? { remaining: origin.chain.continuation.remaining } : {})
+            }
+          : {}),
         origin: { chips, selectedIds: [...origin.selectedIds] },
         request: {
           step: { id: mapChatStep.id, version: mapChatStep.version },
@@ -21413,6 +21427,7 @@ export class VisualAgentMapView extends ItemView {
     this.chatConversation++;
     this.chatResearched.clear();
     this.chatResearchSent.clear();
+    this.chatStartedResearch = false;
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   private startChatRecords(): void {
@@ -21490,6 +21505,8 @@ export class VisualAgentMapView extends ItemView {
     const restored = restoreConversation(latest.id, latest.parsed.lines);
     chat.restore(restored);
     if (chat.conversationId !== restored.id) return;
+    // The file says this conversation started research: its turns keep the allow-list (an older file has no mark: false).
+    if (restored.startedResearch) this.chatStartedResearch = true;
     const handle = this.plugin.repo.app.vault.getAbstractFileByPath(latest.path ?? "");
     writer.resume(
       latest.id,
@@ -23036,6 +23053,12 @@ export class VisualAgentMapView extends ItemView {
         const researchIds = [...this.selection.state.multiSelected];
         const conversation = this.chatConversation;
         const key = this.multiResearchKey();
+        // From here on any turn of this conversation may read web text (decision #17): set before the first card is written, and
+        // kept in the record so a reopened conversation keeps it.
+        if (!this.chatStartedResearch) {
+          this.chatStartedResearch = true;
+          this.chatLastRecord?.event("research_started");
+        }
         // Told once (see startMultiResearch), whichever way the batch ends or never starts; the conversation remembers what
         // it researched, and the continuation (if any) waits on the same promise.
         const outcome = new Promise<ChatResearchOutcome>(resolve => {

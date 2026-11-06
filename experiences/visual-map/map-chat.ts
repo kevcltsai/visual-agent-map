@@ -276,6 +276,10 @@ export interface MapChatRestoredConversation {
     /** An automatic round of a continuation, and its round number when the record has it. */
     auto?: boolean;
     round?: number;
+    /** What the automatic round's separator said was left (plain text). */
+    remaining?: string;
+    /** How the continuation that ended with this turn ended: shown as its end sentence, nothing is resumed. */
+    chainEnd?: { reason: MapChatChainEndReason; round: number; remaining: string };
     /** What became of the plan card: no line (undefined) = it was still waiting; stopped counts as applied. */
     planState?: "applied" | "cancelled" | "stopped";
     /** The result lines the applied plan wrote. */
@@ -985,7 +989,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     reason: MapChatChainEndReason,
     remaining: string,
     details: string[] | undefined,
-    last: MapChatMessage
+    last: MapChatMessage,
+    round = this.chainRound,
+    restored = false
   ): string {
     // One sentence's tail is cut so a model's "..." or full stop does not double the one the template ends with.
     const bare = (value: string): string => clip(value, 200).replace(/[\s.。!！?？…]+$/u, "");
@@ -1004,7 +1010,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const say = (key: Parameters<typeof t>[0], ...values: unknown[]): string => t(key, ...values);
     switch (reason) {
       case "done":
-        return say("ui.map_chat_chain_end_done_0", this.chainRound);
+        return say("ui.map_chat_chain_end_done_0", round);
       case "no_progress":
         return this.joinSentences(say("ui.map_chat_chain_end_no_progress"), left);
       case "max_rounds":
@@ -1034,8 +1040,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       case "failed":
         // The retry sentence only where the failed round is still there with its button (a round that never went out is taken back).
         return this.joinSentences(
-          say("ui.map_chat_chain_end_failed_0", this.chainRound),
-          this.canRetry(last, this.messages[this.messages.indexOf(last) - 1])
+          say("ui.map_chat_chain_end_failed_0", round),
+          !restored && this.canRetry(last, this.messages[this.messages.indexOf(last) - 1])
             ? say("ui.map_chat_chain_end_failed_retry")
             : ""
         );
@@ -1439,10 +1445,17 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     return this.messages.find(message => message.plan?.state === "pending" && !message.plan.stale)?.plan ?? null;
   }
   /** A plan was applied or cancelled: its buttons stop working; `lines` (the result of applying) join its message. */
-  settlePlan(plan: MapChatPlanCard, state: "applied" | "cancelled", lines?: MapChatLine[]): void {
+  settlePlan(plan: MapChatPlanCard, state: "applied" | "cancelled", lines?: MapChatLine[]): MapChatLine[] | undefined {
     const message = this.messages.find(item => item.plan === plan);
-    if (!message) return;
+    if (!message) return lines;
     plan.state = state;
+    // An applied plan without lines yet is being applied: expansion failures that come in meanwhile wait (like a streaming reply's)
+    // and are settled into the result lines when they arrive, so they are not written over. The merged lines are returned.
+    if (state === "applied" && !lines) message.lateFailures = [];
+    else if (lines) {
+      lines = message.lateFailures?.length ? settleExpandFailures(lines, message.lateFailures) : lines;
+      message.lateFailures = undefined;
+    } else message.lateFailures = undefined;
     if (lines) message.lines = lines;
     this.renderLog();
     this.renderHint();
@@ -1450,6 +1463,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     // The results of an applied plan arrive well after the reply: say them once, like the results of a reply.
     if (lines?.length)
       this.announce(t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, chatNoteTexts()))));
+    return lines;
   }
   /** Offers a short list to pick from under the last answer. */
   showChoices(choices: MapChatChoices): void {
@@ -1463,7 +1477,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   appendLines(lines: MapChatLine[]): void {
     const last = this.messages.at(-1);
     if (!last || last.role !== "assistant") return;
-    if (last.streaming) {
+    if (last.streaming || last.lateFailures) {
       last.lateFailures = [...(last.lateFailures ?? []), ...lines.map(failure => ({ was: null, next: null, failure }))];
       return;
     }
@@ -1479,7 +1493,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const last = this.messages.at(-1);
     if (!last || last.role !== "assistant") return was;
     // The reply is still being applied: its lines do not exist yet. The failure waits for `finish`.
-    if (last.streaming) {
+    if (last.streaming || last.lateFailures) {
       last.lateFailures = [...(last.lateFailures ?? []), { was, next, failure }];
       return next;
     }
@@ -1573,7 +1587,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
               auto: true as const,
               autoInfo: {
                 ...(Number.isInteger(turn.round) && turn.round! >= 2 ? { round: turn.round } : {}),
-                maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS
+                maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS,
+                ...(turn.remaining?.trim() ? { remaining: turn.remaining } : {})
               }
             }
           : {})
@@ -1629,6 +1644,13 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
             }))
           }
         ];
+      }
+      // The end sentence of the continuation that ended here (display only: nothing is resumed). Only a known reason gets one,
+      // and `done` only after two rounds or more, like the live panel.
+      const end = turn.chainEnd;
+      if (end && end.reason !== "map_changed" && (end.reason !== "done" || end.round >= 2)) {
+        const text = this.chainEndText(end.reason, end.remaining, undefined, answer, end.round, true);
+        if (text) answer.chainNote = { reason: end.reason, text };
       }
       this.messages.push(answer);
     }

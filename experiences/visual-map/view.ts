@@ -12946,6 +12946,7 @@ export class VisualAgentMapView extends ItemView {
     const state = this.emptyCanvasState();
     box.toggleClass("is-building", state === "building");
     box.toggleClass("is-waiting", state === "plan" || state === "consent");
+    box.toggleClass("is-add-first", state === "idle" && !this.aimLive());
     if (state === "building") {
       // Three faint card outlines, no motion: the map is on its way.
       box.createSpan({ text: t("ui.map_chat_canvas_building") });
@@ -12965,9 +12966,10 @@ export class VisualAgentMapView extends ItemView {
       box.createSpan({ text: t("ui.aim_empty_map_hint") });
       return;
     }
-    // The toolbar no longer adds topics, so the empty canvas carries the one button for it, in the middle.
-    box.createDiv({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
+    // The toolbar no longer adds topics, so the empty canvas carries the one button for it, in the top-left corner: a picture
+    // placed in the middle of the canvas must stay uncovered.
     const add = box.createEl("button", { cls: "mod-cta vam-empty-add", text: t("ui.add_first_topic") });
+    box.createDiv({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
     add.addEventListener("click", event => {
       event.stopPropagation();
       // The menu opens under the button, also when the click came from the keyboard.

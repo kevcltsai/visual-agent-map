@@ -2833,6 +2833,10 @@ integrationTest('goal banner P3: the empty canvas button opens the add menu and 
   const box = element('div'); h.view.fillEmptyMap(box);
   const add = findAll(box, i => i.tag === 'button')[0];
   assert.equal(add.attrs.tabindex, undefined, 'Tab reaches it'); assert.ok(add.classes.includes('vam-empty-add'));
+  assert.ok(box.classes.includes('is-add-first'), 'the button and hint leave the middle of the canvas');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /^\.vam-empty\.is-add-first \{[^}]*top: 12px;[^}]*left: 12px;[^}]*transform: none;/m, 'they sit in the top-left corner, so a picture in the middle stays uncovered');
+  assert.ok(css.indexOf('.vam-empty.is-add-first {') < css.indexOf('.has-chat-hero .vam-empty { display: none; }'), 'the chat hero still hides them: its rule has equal specificity, so it must come later');
   add.click(); assert.deepEqual(menu, [null]);
   const aim = await harness({ aim: true }); await aim.view.hydrate();
   const aimBox = element('div'); aim.view.aimLive = () => true; aim.view.fillEmptyMap(aimBox);

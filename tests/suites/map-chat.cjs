@@ -7550,3 +7550,74 @@ integrationTest('R5 O6: an auto round restores its "left" line and a chain end i
   const plain = lines.map(l => (l.type === 'event' && l.kind === 'chain_end' ? { ...l, reason: 'max_rounds', round: 8, remaining: '<b>x</b>' } : l));
   const text = await shown(plain); assert.ok(text.msgs.some(m => m.chainNote && /<b>x<\/b>/.test(m.chainNote.text)), 'the words are plain text'); assert.equal(findAll(text.c.logEl, i => i.tag === 'b').length, 0, 'no element is made of it');
 });
+
+// R6: record writing and restore - the research mark (B-1), a plan applied and then a failure (B-2 / P6 F5), the end sentence of a failed or stopped round (M-1).
+const r6Reopen = async (lines, id = REC_ID) => { const r = await harness({ records: true }); await r.view.hydrate(); await seedRecord(r, lines.map(l => ({ ...l })), id); const c = r.open(); await until(() => c.hasMessages); return { r, c }; };
+const r6Notes = c => c.transcript().map(m => m.chainNote?.text).filter(Boolean);
+integrationTest('R6 B-1: research started while the record was off: the mark is written with the next turn after the record is on, a reopened conversation still asks before delete', async () => {
+  const reopenAndDelete = async lines => {
+    const { r, c } = await r6Reopen(lines); assert.equal(r.view.chatStartedResearch, true, 'the mark came back');
+    chainReplies(r, say('Doing.', [r4Del(r.ids.b)], '')); r.type('tidy'); await r.view.sendMapChat(); await r5Wait();
+    assert.ok(c.pendingPlan(), 'a plan card'); assert.ok(r4Has(r, r.ids.b));
+  };
+  // the record is off from the start of the conversation
+  const h = await harness({ records: false }); await h.view.hydrate();
+  const started = await researchChain(h, { remaining: '' }); await until(() => !started.chat.isBusy);
+  assert.equal(h.view.chatStartedResearch, true);
+  h.view.plugin.settings.mapChatRecords = true;
+  chainReplies(h, say('ok', [], '')); h.type('after'); await h.view.sendMapChat(); await r5Wait(); await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]);
+  assert.equal(lines.filter(l => l.type === 'event' && l.kind === 'research_started').length, 1, 'written once');
+  await reopenAndDelete(lines);
+  // on, then off for the research, then on again
+  const g = await harness({ records: true }); await g.view.hydrate(); g.open();
+  chainReplies(g, say('hi', [], '')); g.type('hi'); await g.view.sendMapChat(); await r5Wait(); await recordIdle(g);
+  g.view.plugin.settings.mapChatRecords = false;
+  researchStub(g); chainReplies(g, say('r', [researchAct({ nodeIds: [g.ids.a] })], '')); g.type('research'); await g.view.sendMapChat(); await r5Wait();
+  assert.equal(g.view.chatStartedResearch, true);
+  assert.equal(recordLines(g, recordFiles(g)[0]).some(l => l.type === 'event' && l.kind === 'research_started'), false, 'nothing is written while off');
+  g.view.plugin.settings.mapChatRecords = true;
+  chainReplies(g, say('ok', [], '')); g.type('after'); await g.view.sendMapChat(); await r5Wait(); await recordIdle(g);
+  const lines2 = recordLines(g, recordFiles(g)[0]);
+  assert.equal(lines2.filter(l => l.type === 'event' && l.kind === 'research_started').length, 1);
+  chainReplies(g, say('again', [], '')); g.type('more'); await g.view.sendMapChat(); await r5Wait(); await recordIdle(g);
+  assert.equal(recordLines(g, recordFiles(g)[0]).filter(l => l.type === 'event' && l.kind === 'research_started').length, 1, 'later turns do not repeat it');
+  await reopenAndDelete(lines2);
+});
+integrationTest('R6 B-2: an expansion fails after the plan was applied: the restored lines are the screen (the result once, no old start line), and the plan card has no Apply / Cancel', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  await h.repo.updateNote(h.node('a').path, { detail: 'N' }); await h.view.hydrate();
+  const gate = deferred(); h.view.chatExpand = async () => { await gate.promise; return { status: 'failed', reason: 'too long' }; };
+  const act = { kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a], title: '', goal: '', direction: '', mode: '', images: false };
+  chainReplies(h, say('Expanding.', [...Array.from({ length: 16 }, (_, i) => addRoot('n' + i, 'N' + i)), act], ''));
+  h.type('expand'); await h.view.sendMapChat(); await r5Wait(); assert.ok(chat.pendingPlan(), 'plan');
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying); await r5Wait();
+  gate.resolve(); await r5Wait(); await recordIdle(h);
+  const fmt = ls => ls.map(l => l.status + '|' + l.text);
+  const screen = fmt(chat.transcript().at(-1).lines);
+  assert.ok(screen.some(x => x.startsWith('failed|')), 'the failure is on the screen');
+  const lines = recordLines(h, recordFiles(h)[0]); assert.deepEqual(lineKinds(lines).slice(-3), ['end:plan', 'plan:applied', 'lines'], 'the failure lines come after the plan line');
+  const { r, c } = await r6Reopen(lines); const msg = c.transcript().at(-1);
+  eq(fmt(msg.lines), screen, 'the restored lines are the screen');
+  assert.equal(msg.plan.state, 'applied');
+  const card = findAll(c.logEl, i => hasClass(i, 'vam-map-chat-plan'))[0];
+  assert.equal(findAll(card, i => i.tag === 'button').length, 0, 'no button on an applied card');
+  assert.match(visibleText(card), /Applied|applied/i);
+});
+integrationTest('R6 M-1: a failed or stopped round: the restored conversation keeps the end sentence (without the retry sentence), a research failure has no reason and still shows', async () => {
+  { const h = await harness({ records: true }); await h.view.hydrate(); const { runs } = await researchChain(h, { remaining: 'Add' });
+    const rootId = runs[0].ids[0]; await h.repo.updateNote(h.view.map.nodes.find(n => n.id === rootId).path, { detail: 'R' });
+    chainReplies(h, say('Added.', [{ kind: 'add_child', parentId: rootId, title: 'Alpha', summary: '' }], 'Still more'), async () => { throw new Error('boom'); });
+    settleRun(runs[0]); await until(() => h.control.requests.length === 3 && h.view.chatChain === null && !h.view.chat.isBusy); await recordIdle(h);
+    const lines = recordLines(h, recordFiles(h)[0]); assert.deepEqual(lineKinds(lines).slice(-2), ['end:failed', 'event:chain_end']);
+    const { c } = await r6Reopen(lines); eq(r6Notes(c), ['Round 3 failed.'], 'failed: the sentence, no retry'); assert.equal(findAll(c.logEl, i => hasClass(i, 'vam-map-chat-retry')).length, 0); }
+  { const h = await harness({ records: true }); await h.view.hydrate(); const { runs } = await researchChain(h, { remaining: 'Add' });
+    const rootId = runs[0].ids[0]; await h.repo.updateNote(h.view.map.nodes.find(n => n.id === rootId).path, { detail: 'R' });
+    const gate = deferred(); chainReplies(h, async () => { await gate.promise; return say('late', [], ''); }); settleRun(runs[0]); await until(() => h.control.requests.length === 2);
+    h.view.stopMapChat(); gate.resolve(); await until(() => h.view.chatChain === null && !h.view.chat.isBusy); await r5Wait(); await recordIdle(h);
+    const lines = recordLines(h, recordFiles(h)[0]); assert.deepEqual(lineKinds(lines).slice(-2), ['end:stopped', 'event:chain_end']);
+    const { c } = await r6Reopen(lines); eq(r6Notes(c), r6Notes(h.view.chat), 'stopped: the live sentence'); assert.equal(r6Notes(c).length, 1); }
+  { const h = await harness({ records: true }); await h.view.hydrate(); const { runs } = await researchChain(h, { remaining: 'Add' });
+    settleRun(runs[0], 'failed', 'network down'); await until(() => h.view.chatChain === null && !h.view.chat.isBusy); await r5Wait(); await recordIdle(h);
+    const { c } = await r6Reopen(recordLines(h, recordFiles(h)[0])); eq(r6Notes(c), ['The research did not work, so the subtopics were not filled in.'], 'no reason is fine'); }
+});

@@ -1365,6 +1365,8 @@ export class VisualAgentMapView extends ItemView {
    * only a new conversation clears it, and a restored record sets it again. Any turn of it may read web text (decision #17).
    */
   private chatStartedResearch = false;
+  /** The record conversation whose file already carries the `research_started` mark (kept apart from the flag: the record may have been off when research began). */
+  private chatResearchMarkedIn: string | null = null;
   /** Research notes an earlier round already sent whole (they go last when the budget is short). */
   private chatResearchSent = new Set<string>();
   /** Counts conversations: the result of research another conversation started is not recorded in this one. */
@@ -21416,11 +21418,21 @@ export class VisualAgentMapView extends ItemView {
         }
       });
       this.chatLastRecord = record;
+      // Research began while the record was off: the mark goes in with the first turn written after it came back on.
+      this.markResearchRecorded(record);
       return record;
     } catch (error) {
       this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
       return null;
     }
+  }
+  /** Writes the `research_started` mark once per record conversation, and only while the record is on (otherwise the next turn writes it). */
+  private markResearchRecorded(record: MapChatTurnRecord | null): void {
+    const writer = this.chatRecords;
+    if (!this.chatStartedResearch || !record || !writer || this.plugin.settings.mapChatRecords !== true) return;
+    if (writer.conversationId !== record.conversationId || this.chatResearchMarkedIn === record.conversationId) return;
+    this.chatResearchMarkedIn = record.conversationId;
+    record.event("research_started");
   }
   /** A new conversation (another map, "New conversation"): the research of the old one is no longer this one's, and results still to come are not recorded. */
   private resetChatResearch(): void {
@@ -21506,7 +21518,10 @@ export class VisualAgentMapView extends ItemView {
     chat.restore(restored);
     if (chat.conversationId !== restored.id) return;
     // The file says this conversation started research: its turns keep the allow-list (an older file has no mark: false).
-    if (restored.startedResearch) this.chatStartedResearch = true;
+    if (restored.startedResearch) {
+      this.chatStartedResearch = true;
+      this.chatResearchMarkedIn = restored.id;
+    }
     const handle = this.plugin.repo.app.vault.getAbstractFileByPath(latest.path ?? "");
     writer.resume(
       latest.id,
@@ -23055,10 +23070,8 @@ export class VisualAgentMapView extends ItemView {
         const key = this.multiResearchKey();
         // From here on any turn of this conversation may read web text (decision #17): set before the first card is written, and
         // kept in the record so a reopened conversation keeps it.
-        if (!this.chatStartedResearch) {
-          this.chatStartedResearch = true;
-          this.chatLastRecord?.event("research_started");
-        }
+        this.chatStartedResearch = true;
+        this.markResearchRecorded(this.chatLastRecord);
         // Told once (see startMultiResearch), whichever way the batch ends or never starts; the conversation remembers what
         // it researched, and the continuation (if any) waits on the same promise.
         const outcome = new Promise<ChatResearchOutcome>(resolve => {

@@ -37807,6 +37807,15 @@ ${typed}` : draft;
       }
       this.messages.push(answer);
     }
+    const lone = conversation.chainEnd;
+    if (!conversation.turns.length && lone && lone.reason !== "map_changed") {
+      const note = { role: "assistant", text: "", lines: [], stale: true };
+      const text12 = this.chainEndText(lone.reason, lone.remaining, void 0, note, lone.round, true);
+      if (text12) {
+        note.chainNote = { reason: lone.reason, text: text12 };
+        this.messages.push(note);
+      }
+    }
     const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
     if (when && Number.isFinite(when.getTime()) && conversation.turns.length) {
       const pad3 = (value) => String(value).padStart(2, "0");
@@ -38822,6 +38831,13 @@ ${shown}` : t("ui.map_chat_model_label"));
       card.addClass("is-stale");
       card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
       card.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      if (plan.state !== "pending") {
+        card.createDiv({
+          cls: "vam-map-chat-plan-state",
+          text: t(plan.state === "applied" ? "ui.map_chat_plan_applied" : "ui.map_chat_plan_cancelled")
+        });
+        return;
+      }
       const dead = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
       for (const text12 of [t("ui.map_chat_plan_apply"), t("ui.map_chat_plan_cancel")])
         this.makeInert(dead.createEl("button", { text: text12, attr: { type: "button" } }));
@@ -43252,7 +43268,7 @@ function restoredItems(items) {
   });
 }
 function restoreConversation(id, lines) {
-  var _a2, _b2, _c, _d, _e;
+  var _a2, _b2, _c, _d, _e, _f;
   let mapPath = null;
   let mapId = null;
   const starts = /* @__PURE__ */ new Map();
@@ -43278,7 +43294,11 @@ function restoreConversation(id, lines) {
     } else if (line.type === "plan") {
       plans.set(line.turn, { state: line.state, lines: Array.isArray(line.lines) ? line.lines : [] });
     } else if (line.type === "lines") {
-      if (Array.isArray(line.lines)) current.set(line.turn, line.lines);
+      if (Array.isArray(line.lines)) {
+        const plan = plans.get(line.turn);
+        if (plan) plan.lines = line.lines;
+        else current.set(line.turn, line.lines);
+      }
     } else if (line.type === "images") {
       images.set(line.turn, { state: line.state, items: (_a2 = line.items) != null ? _a2 : [], inserted: (_b2 = line.inserted) != null ? _b2 : [] });
     } else if (line.type === "event") {
@@ -43297,6 +43317,20 @@ function restoreConversation(id, lines) {
     }
   }
   const turns = [];
+  const carried = /* @__PURE__ */ new Map();
+  let orphan;
+  {
+    let previous = null;
+    for (const number of order) {
+      const end = ends.get(number);
+      const comes = !!starts.get(number) && !!end && (end.status === "done" || end.status === "plan");
+      if (comes) previous = number;
+      else if (chainEnds.has(number)) {
+        if (previous === null) orphan = chainEnds.get(number);
+        else if (!chainEnds.has(previous) && !carried.has(previous)) carried.set(previous, chainEnds.get(number));
+      }
+    }
+  }
   for (const number of order) {
     const start = starts.get(number);
     const end = ends.get(number);
@@ -43321,7 +43355,7 @@ function restoreConversation(id, lines) {
       auto: start.auto === true,
       ...start.auto === true && typeof start.round === "number" && Number.isInteger(start.round) && start.round >= 2 ? { round: start.round } : {},
       ...start.auto === true && typeof start.remaining === "string" && start.remaining.trim() ? { remaining: start.remaining.slice(0, 1e3) } : {},
-      ...chainEnds.has(number) ? { chainEnd: chainEnds.get(number) } : {}
+      ...chainEnds.has(number) || carried.has(number) ? { chainEnd: (_f = chainEnds.get(number)) != null ? _f : carried.get(number) } : {}
     });
   }
   return {
@@ -43330,7 +43364,8 @@ function restoreConversation(id, lines) {
     mapId,
     turns,
     restoredAt: turns.length ? turns[turns.length - 1].at : null,
-    startedResearch
+    startedResearch,
+    ...!turns.length && orphan ? { chainEnd: orphan } : {}
   };
 }
 
@@ -56737,6 +56772,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
      * only a new conversation clears it, and a restored record sets it again. Any turn of it may read web text (decision #17).
      */
     __publicField(this, "chatStartedResearch", false);
+    /** The record conversation whose file already carries the `research_started` mark (kept apart from the flag: the record may have been off when research began). */
+    __publicField(this, "chatResearchMarkedIn", null);
     /** Research notes an earlier round already sent whole (they go last when the budget is short). */
     __publicField(this, "chatResearchSent", /* @__PURE__ */ new Set());
     /** Counts conversations: the result of research another conversation started is not recorded in this one. */
@@ -75287,11 +75324,20 @@ ${note.detail.trim()}` : "",
         }
       });
       this.chatLastRecord = record;
+      this.markResearchRecorded(record);
       return record;
     } catch (error) {
       this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
       return null;
     }
+  }
+  /** Writes the `research_started` mark once per record conversation, and only while the record is on (otherwise the next turn writes it). */
+  markResearchRecorded(record) {
+    const writer = this.chatRecords;
+    if (!this.chatStartedResearch || !record || !writer || this.plugin.settings.mapChatRecords !== true) return;
+    if (writer.conversationId !== record.conversationId || this.chatResearchMarkedIn === record.conversationId) return;
+    this.chatResearchMarkedIn = record.conversationId;
+    record.event("research_started");
   }
   /** A new conversation (another map, "New conversation"): the research of the old one is no longer this one's, and results still to come are not recorded. */
   resetChatResearch() {
@@ -75366,7 +75412,10 @@ ${note.detail.trim()}` : "",
     const restored = restoreConversation(latest.id, latest.parsed.lines);
     chat.restore(restored);
     if (chat.conversationId !== restored.id) return;
-    if (restored.startedResearch) this.chatStartedResearch = true;
+    if (restored.startedResearch) {
+      this.chatStartedResearch = true;
+      this.chatResearchMarkedIn = restored.id;
+    }
     const handle = this.plugin.repo.app.vault.getAbstractFileByPath((_b2 = latest.path) != null ? _b2 : "");
     writer.resume(
       latest.id,
@@ -76665,7 +76714,7 @@ ${note.detail.trim()}` : "",
   }
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
   async runChatSelection(action, message = "", batch = { imageSearches: 0 }, held, work) {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
     const launch = (work2) => {
@@ -76713,10 +76762,8 @@ ${note.detail.trim()}` : "",
         const researchIds = [...this.selection.state.multiSelected];
         const conversation = this.chatConversation;
         const key2 = this.multiResearchKey();
-        if (!this.chatStartedResearch) {
-          this.chatStartedResearch = true;
-          (_b2 = this.chatLastRecord) == null ? void 0 : _b2.event("research_started");
-        }
+        this.chatStartedResearch = true;
+        this.markResearchRecorded(this.chatLastRecord);
         const outcome = new Promise((resolve) => {
           var _a3;
           const settle = (result) => {
@@ -76773,7 +76820,7 @@ ${note.detail.trim()}` : "",
           })
         );
         const expandChat = this.chat;
-        const expandTurns = (_c = expandChat == null ? void 0 : expandChat.transcript().length) != null ? _c : 0;
+        const expandTurns = (_b2 = expandChat == null ? void 0 : expandChat.transcript().length) != null ? _b2 : 0;
         const expandRecord = this.chatLastRecord;
         const cards = infos.map(({ parent, note }) => ({
           id: parent.id,

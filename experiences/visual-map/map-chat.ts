@@ -265,6 +265,8 @@ export interface MapChatRestoredConversation {
   id: string;
   /** The time of the last finished turn (ISO); the "restored" line shows it in local time. Null with no turn. */
   restoredAt: string | null;
+  /** The end of a continuation with no turn to show: only its sentence comes back. */
+  chainEnd?: { reason: MapChatChainEndReason; round: number; remaining: string };
   turns: {
     message: string;
     reply: string;
@@ -1654,6 +1656,15 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       }
       this.messages.push(answer);
     }
+    const lone = conversation.chainEnd;
+    if (!conversation.turns.length && lone && lone.reason !== "map_changed") {
+      const note: MapChatMessage = { role: "assistant", text: "", lines: [], stale: true };
+      const text = this.chainEndText(lone.reason, lone.remaining, undefined, note, lone.round, true);
+      if (text) {
+        note.chainNote = { reason: lone.reason, text };
+        this.messages.push(note);
+      }
+    }
     const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
     if (when && Number.isFinite(when.getTime()) && conversation.turns.length) {
       const pad = (value: number): string => String(value).padStart(2, "0");
@@ -2737,6 +2748,14 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       card.addClass("is-stale");
       card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
       card.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      // A card that was applied or cancelled has nothing left to press: no buttons, only what became of it.
+      if (plan.state !== "pending") {
+        card.createDiv({
+          cls: "vam-map-chat-plan-state",
+          text: t(plan.state === "applied" ? "ui.map_chat_plan_applied" : "ui.map_chat_plan_cancelled")
+        });
+        return;
+      }
       const dead = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
       for (const text of [t("ui.map_chat_plan_apply"), t("ui.map_chat_plan_cancel")])
         this.makeInert(dead.createEl("button", { text, attr: { type: "button" } }));

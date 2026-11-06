@@ -358,6 +358,8 @@ export interface RestoredConversation {
   restoredAt: string | null;
   /** The file says this conversation started web research (an older file has no mark: false). */
   startedResearch: boolean;
+  /** The end of a continuation whose turns cannot come back and with no earlier turn to hang it on: only its sentence shows. */
+  chainEnd?: { reason: MapChatChainEndReason; round: number; remaining: string };
 }
 
 /** Result lines read back from a file: the basis keeps its known shape only (a hand-edited file cannot put anything else on screen). */
@@ -398,7 +400,13 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     } else if (line.type === "plan") {
       plans.set(line.turn, { state: line.state, lines: Array.isArray(line.lines) ? line.lines : [] });
     } else if (line.type === "lines") {
-      if (Array.isArray(line.lines)) current.set(line.turn, line.lines);
+      // Read in file order: a `lines` row after the turn's `plan` row is the complete result (a failure after the plan was applied),
+      // so it replaces the plan's lines; one written before it (during the apply) stays the turn's own lines.
+      if (Array.isArray(line.lines)) {
+        const plan = plans.get(line.turn);
+        if (plan) plan.lines = line.lines;
+        else current.set(line.turn, line.lines);
+      }
     } else if (line.type === "images") {
       images.set(line.turn, { state: line.state, items: line.items ?? [], inserted: line.inserted ?? [] });
     } else if (line.type === "event") {
@@ -418,6 +426,22 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     }
   }
   const turns: RestoredTurn[] = [];
+  // A chain ends on the turn the record was on, which may be a failed or stopped one (not restored): its sentence goes to the
+  // closest earlier turn that comes back (never over one that has its own), or stands alone with no such turn.
+  const carried = new Map<number, { reason: MapChatChainEndReason; round: number; remaining: string }>();
+  let orphan: { reason: MapChatChainEndReason; round: number; remaining: string } | undefined;
+  {
+    let previous: number | null = null;
+    for (const number of order) {
+      const end = ends.get(number);
+      const comes = !!starts.get(number) && !!end && (end.status === "done" || end.status === "plan");
+      if (comes) previous = number;
+      else if (chainEnds.has(number)) {
+        if (previous === null) orphan = chainEnds.get(number);
+        else if (!chainEnds.has(previous) && !carried.has(previous)) carried.set(previous, chainEnds.get(number)!);
+      }
+    }
+  }
   for (const number of order) {
     const start = starts.get(number);
     const end = ends.get(number);
@@ -446,7 +470,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       ...(start.auto === true && typeof start.remaining === "string" && start.remaining.trim()
         ? { remaining: start.remaining.slice(0, 1000) }
         : {}),
-      ...(chainEnds.has(number) ? { chainEnd: chainEnds.get(number) } : {})
+      ...(chainEnds.has(number) || carried.has(number) ? { chainEnd: chainEnds.get(number) ?? carried.get(number) } : {})
     });
   }
   return {
@@ -455,6 +479,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     mapId,
     turns,
     restoredAt: turns.length ? turns[turns.length - 1].at : null,
-    startedResearch
+    startedResearch,
+    ...(!turns.length && orphan ? { chainEnd: orphan } : {})
   };
 }

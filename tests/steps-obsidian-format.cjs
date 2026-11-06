@@ -6,7 +6,7 @@ const { load, promptsFor, makeService } = require('./support-replay.cjs');
 const support = require('./support.cjs');
 
 const { parseAiResult } = load('core/steps/task/parse.ts');
-const { neutralizeUnsafeMermaid } = load('ai/mermaid-safety.ts');
+const { neutralizeUnsafeMermaid, addedMermaidBlocks } = load('ai/mermaid-safety.ts');
 const { canonicalDetail } = load('ai/result-utils.ts');
 const { resolveDetailReferences } = load('ai/reference-materials.ts');
 
@@ -548,4 +548,18 @@ test('indentation inside a diagram reaches the parser: a mindmap in a list item 
   const page = ['- item', '  ```mermaid', '  mindmap', '    root["a"]', '      b["c"]', '  ```'].join('\n');
   assert.equal(await demoteUnparsableMermaid(page, async code => { seen.push(code); return 'ok'; }), page);
   assert.equal(seen[0], 'mindmap\n  root["a"]\n    b["c"]');
+});
+
+test('addedMermaidBlocks: only the blocks the after text has beyond the before text (multiset, LF-normalized, parser code keeps relative indentation)', () => {
+  const style = '```mermaid\nflowchart TD\n  A --> B\n  style A fill:#f00\n```';
+  const mind = '```mermaid\nmindmap\n  root((r))\n    child\n```';
+  assert.equal(addedMermaidBlocks(`${style}\n\ntext\n`, `${style}\n\nother\n`).length, 0);
+  assert.equal(addedMermaidBlocks(`${style}\r\n\r\ntext\r\n`, `${style}\n\nother\n`).length, 0, 'CRLF vs LF is the same block');
+  assert.equal(addedMermaidBlocks(style, `${style}\n\n${style}`).length, 1, 'a second copy counts');
+  const added = addedMermaidBlocks('text', `> - ${mind.replace(/\n/g, '\n>   ')}`);
+  assert.equal(added.length, 1);
+  assert.equal(added[0].unsafe, false);
+  assert.equal(added[0].code, 'mindmap\n  root((r))\n    child');
+  assert.equal(addedMermaidBlocks('text', style)[0].unsafe, true);
+  assert.equal(addedMermaidBlocks('a', 'a b').length, 0);
 });

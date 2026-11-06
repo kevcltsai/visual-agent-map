@@ -205,7 +205,7 @@ import {
   setIcon,
   setTooltip
 } from "obsidian";
-import { demoteUnparsableMermaid, neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
+import { addedMermaidBlocks, demoteUnparsableMermaid, neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
 import { type ReferenceGroup } from "../../ai/reference-materials";
 import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
 import {
@@ -23144,14 +23144,32 @@ export class VisualAgentMapView extends ItemView {
           configDir
         });
         if (!early.ok) return guardSkipped(early.code);
-        const source = await this.readChatFile(action.path);
+        let source = await this.readChatFile(action.path);
         if (!source) return skipped("ui.map_chat_skip_file_missing");
         if (isMdStale(hashes, action.path, source.text)) return skipped("ui.map_chat_skip_stale");
         const next = applyMdEdit(source.text, action.find, action.replace);
         if (next === null) return skipped("ui.map_chat_skip_find_failed");
-        // The edit may not turn a note without an unsafe mermaid block into one with it; what the user already had stays.
-        if (neutralizeUnsafeMermaid(source.text) === source.text && neutralizeUnsafeMermaid(next) !== next)
-          return skipped("ui.map_chat_skip_unsafe_mermaid");
+        // Only the mermaid blocks the edit adds are judged (allow-list, then parser); what the note already had stays as it is.
+        const added = addedMermaidBlocks(source.text, next);
+        if (added.some(block => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
+        const check = this.plugin.mermaidSyntax;
+        const codes = added.flatMap(block => (block.code?.trim() ? [block.code] : []));
+        if (check && codes.length) {
+          for (const code of codes) {
+            const syntax = await check(code);
+            if (syntax === "invalid") return skipped("ui.map_chat_skip_invalid_mermaid");
+            if (syntax === "unavailable") {
+              console.warn("Visual Agent Map edit mermaid unchecked");
+              break;
+            }
+          }
+          // The editor branch has no race check at the write, so the file is read again after the wait.
+          const again = await this.readChatFile(action.path);
+          if (!again || again.text !== source.text) return skipped("ui.map_chat_skip_stale");
+          source = again;
+        } else if (added.some(block => block.code?.trim())) {
+          console.warn("Visual Agent Map edit mermaid unchecked");
+        }
         const verdict = guardMapChatWrite({
           kind: "edit",
           path: action.path,

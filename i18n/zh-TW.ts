@@ -1428,6 +1428,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_skip_topic_gone": "議題已不在心智圖上",
   "ui.map_chat_skip_find_failed": "要取代的文字沒有剛好出現一次",
   "ui.map_chat_skip_unsafe_mermaid": "這個修改會加入不被允許的圖表",
+  "ui.map_chat_skip_invalid_mermaid": "這個修改會加入語法錯誤的圖表",
   "ui.map_chat_skip_file_missing": "檔案不存在",
   "ui.map_chat_skip_merge_locked": "議題正在合併",
   "ui.map_chat_skip_cycle": "這個移動會造成循環",

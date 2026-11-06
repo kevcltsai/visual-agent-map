@@ -1478,6 +1478,7 @@ var en = {
   "ui.map_chat_skip_topic_gone": "the topic is no longer on the map",
   "ui.map_chat_skip_find_failed": "the text to replace was not found exactly once",
   "ui.map_chat_skip_unsafe_mermaid": "the edit would add a diagram that is not allowed",
+  "ui.map_chat_skip_invalid_mermaid": "the edit would add a diagram with a syntax error",
   "ui.map_chat_skip_file_missing": "the file does not exist",
   "ui.map_chat_skip_merge_locked": "the topic is being merged",
   "ui.map_chat_skip_cycle": "that move would create a loop",
@@ -4264,6 +4265,7 @@ var zhCN = {
   "ui.map_chat_skip_topic_gone": "\u8BAE\u9898\u5DF2\u4E0D\u5728\u5FC3\u667A\u56FE\u4E0A",
   "ui.map_chat_skip_find_failed": "\u8981\u66FF\u6362\u7684\u6587\u5B57\u6CA1\u6709\u521A\u597D\u51FA\u73B0\u4E00\u6B21",
   "ui.map_chat_skip_unsafe_mermaid": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u52A0\u5165\u4E0D\u88AB\u5141\u8BB8\u7684\u56FE\u8868",
+  "ui.map_chat_skip_invalid_mermaid": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u52A0\u5165\u8BED\u6CD5\u9519\u8BEF\u7684\u56FE\u8868",
   "ui.map_chat_skip_file_missing": "\u6587\u4EF6\u4E0D\u5B58\u5728",
   "ui.map_chat_skip_merge_locked": "\u8BAE\u9898\u6B63\u5728\u5408\u5E76",
   "ui.map_chat_skip_cycle": "\u8FD9\u4E2A\u79FB\u52A8\u4F1A\u9020\u6210\u5FAA\u73AF",
@@ -7050,6 +7052,7 @@ var zhTW = {
   "ui.map_chat_skip_topic_gone": "\u8B70\u984C\u5DF2\u4E0D\u5728\u5FC3\u667A\u5716\u4E0A",
   "ui.map_chat_skip_find_failed": "\u8981\u53D6\u4EE3\u7684\u6587\u5B57\u6C92\u6709\u525B\u597D\u51FA\u73FE\u4E00\u6B21",
   "ui.map_chat_skip_unsafe_mermaid": "\u9019\u500B\u4FEE\u6539\u6703\u52A0\u5165\u4E0D\u88AB\u5141\u8A31\u7684\u5716\u8868",
+  "ui.map_chat_skip_invalid_mermaid": "\u9019\u500B\u4FEE\u6539\u6703\u52A0\u5165\u8A9E\u6CD5\u932F\u8AA4\u7684\u5716\u8868",
   "ui.map_chat_skip_file_missing": "\u6A94\u6848\u4E0D\u5B58\u5728",
   "ui.map_chat_skip_merge_locked": "\u8B70\u984C\u6B63\u5728\u5408\u4F75",
   "ui.map_chat_skip_cycle": "\u9019\u500B\u79FB\u52D5\u6703\u9020\u6210\u5FAA\u74B0",
@@ -28735,6 +28738,70 @@ async function demoteUnparsableMermaid(markdown, check) {
   if (!demote.length) return markdown;
   for (const index of demote) parts[at(index)] = parts[at(index)].replace(/mermaid/i, "text");
   return parts.join("");
+}
+function mermaidBlocks(markdown) {
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+  const codes = /* @__PURE__ */ new Map();
+  let outer = null;
+  for (let index = 0; index < lines.length; index++) {
+    const fence = fenceOf(lines[index]);
+    if (outer) {
+      if (fence && fence[1][0] === outer[1][0] && fence[1].length >= outer[1].length && !fence[2].trim()) outer = null;
+      continue;
+    }
+    if (!fence) continue;
+    if (!/^mermaid\b/i.test(fence[2].trim())) {
+      outer = fence;
+      continue;
+    }
+    const opening = lines[index];
+    const prefix = opening.slice(0, opening.length - core(opening).length);
+    const continued = prefix.replace(
+      /(?:[-*+]|\d+[.)])(?=[ \t])|\[[ xX]\](?=[ \t])/g,
+      (marker5) => " ".repeat(marker5.length)
+    );
+    const body = [];
+    let next = index + 1;
+    for (; next < lines.length; next++) {
+      const raw = lines[next];
+      const content = core(raw);
+      const close = FENCE.exec(content);
+      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      body.push(
+        raw.startsWith(prefix) ? raw.slice(prefix.length) : raw.startsWith(continued) ? raw.slice(continued.length) : content
+      );
+    }
+    codes.set(index, body.join("\n"));
+    index = next;
+  }
+  const blocks = [];
+  lines.forEach((line, index) => {
+    var _a2;
+    const fence = fenceOf(line);
+    if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
+    const body = [];
+    for (let next = index + 1; next < lines.length; next++) {
+      const content = core(lines[next]);
+      const close = FENCE.exec(content);
+      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      body.push(content);
+    }
+    const code = (_a2 = codes.get(index)) != null ? _a2 : null;
+    blocks.push({ unsafe: unsafeMermaid(body), code, key: `${body.join("\n")}\0${code != null ? code : ""}` });
+  });
+  return blocks;
+}
+function addedMermaidBlocks(before, after) {
+  var _a2, _b2;
+  const had = /* @__PURE__ */ new Map();
+  for (const block of mermaidBlocks(before)) had.set(block.key, ((_a2 = had.get(block.key)) != null ? _a2 : 0) + 1);
+  const added = [];
+  for (const { key: key2, unsafe, code } of mermaidBlocks(after)) {
+    const left = (_b2 = had.get(key2)) != null ? _b2 : 0;
+    if (left > 0) had.set(key2, left - 1);
+    else added.push({ unsafe, code });
+  }
+  return added;
 }
 
 // ui/map-sources-panel.ts
@@ -76963,13 +77030,36 @@ ${note.detail.trim()}` : "",
           configDir
         });
         if (!early.ok) return guardSkipped(early.code);
-        const source = await this.readChatFile(action.path);
+        let source = await this.readChatFile(action.path);
         if (!source) return skipped("ui.map_chat_skip_file_missing");
         if (isMdStale(hashes, action.path, source.text)) return skipped("ui.map_chat_skip_stale");
         const next = applyMdEdit(source.text, action.find, action.replace);
         if (next === null) return skipped("ui.map_chat_skip_find_failed");
-        if (neutralizeUnsafeMermaid(source.text) === source.text && neutralizeUnsafeMermaid(next) !== next)
-          return skipped("ui.map_chat_skip_unsafe_mermaid");
+        const added = addedMermaidBlocks(source.text, next);
+        if (added.some((block) => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
+        const check = this.plugin.mermaidSyntax;
+        const codes = added.flatMap((block) => {
+          var _a3;
+          return ((_a3 = block.code) == null ? void 0 : _a3.trim()) ? [block.code] : [];
+        });
+        if (check && codes.length) {
+          for (const code of codes) {
+            const syntax = await check(code);
+            if (syntax === "invalid") return skipped("ui.map_chat_skip_invalid_mermaid");
+            if (syntax === "unavailable") {
+              console.warn("Visual Agent Map edit mermaid unchecked");
+              break;
+            }
+          }
+          const again = await this.readChatFile(action.path);
+          if (!again || again.text !== source.text) return skipped("ui.map_chat_skip_stale");
+          source = again;
+        } else if (added.some((block) => {
+          var _a3;
+          return (_a3 = block.code) == null ? void 0 : _a3.trim();
+        })) {
+          console.warn("Visual Agent Map edit mermaid unchecked");
+        }
         const verdict = guardMapChatWrite({
           kind: "edit",
           path: action.path,

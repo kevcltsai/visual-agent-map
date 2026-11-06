@@ -240,3 +240,82 @@ export async function demoteUnparsableMermaid(
   for (const index of demote) parts[at(index)] = parts[at(index)].replace(/mermaid/i, "text");
   return parts.join("");
 }
+
+/** A mermaid block of a note: `unsafe` by the allow-list; `code` is what the parser gets (null when the block is only a quoted example inside another code block, which is never rendered). */
+export interface MermaidBlock {
+  unsafe: boolean;
+  code: string | null;
+}
+
+/** Every mermaid block of the text, read the way `neutralizeUnsafeMermaid` (allow-list) and `demoteUnparsableMermaid` (parser code) read them. Line breaks are normalized to LF first. */
+function mermaidBlocks(markdown: string): Array<MermaidBlock & { key: string }> {
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+  // Parser code per opening line, with the same scan and prefix removal as demoteUnparsableMermaid.
+  const codes = new Map<number, string>();
+  let outer: RegExpExecArray | null = null;
+  for (let index = 0; index < lines.length; index++) {
+    const fence = fenceOf(lines[index]);
+    if (outer) {
+      if (fence && fence[1][0] === outer[1][0] && fence[1].length >= outer[1].length && !fence[2].trim()) outer = null;
+      continue;
+    }
+    if (!fence) continue;
+    if (!/^mermaid\b/i.test(fence[2].trim())) {
+      outer = fence;
+      continue;
+    }
+    const opening = lines[index];
+    const prefix = opening.slice(0, opening.length - core(opening).length);
+    const continued = prefix.replace(/(?:[-*+]|\d+[.)])(?=[ \t])|\[[ xX]\](?=[ \t])/g, marker =>
+      " ".repeat(marker.length)
+    );
+    const body: string[] = [];
+    let next = index + 1;
+    for (; next < lines.length; next++) {
+      const raw = lines[next];
+      const content = core(raw);
+      const close = FENCE.exec(content);
+      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      body.push(
+        raw.startsWith(prefix)
+          ? raw.slice(prefix.length)
+          : raw.startsWith(continued)
+            ? raw.slice(continued.length)
+            : content
+      );
+    }
+    codes.set(index, body.join("\n"));
+    index = next;
+  }
+  const blocks: Array<MermaidBlock & { key: string }> = [];
+  lines.forEach((line, index) => {
+    const fence = fenceOf(line);
+    if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
+    const body: string[] = [];
+    for (let next = index + 1; next < lines.length; next++) {
+      const content = core(lines[next]);
+      const close = FENCE.exec(content);
+      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      body.push(content);
+    }
+    const code = codes.get(index) ?? null;
+    blocks.push({ unsafe: unsafeMermaid(body), code, key: `${body.join("\n")}\u0000${code ?? "\u0001"}` });
+  });
+  return blocks;
+}
+
+/**
+ * The mermaid blocks `after` has beyond those of `before` (a multiset difference, so a second copy of a block the note
+ * already had counts as added). Blocks the note already had are never returned, whatever they look like.
+ */
+export function addedMermaidBlocks(before: string, after: string): MermaidBlock[] {
+  const had = new Map<string, number>();
+  for (const block of mermaidBlocks(before)) had.set(block.key, (had.get(block.key) ?? 0) + 1);
+  const added: MermaidBlock[] = [];
+  for (const { key, unsafe, code } of mermaidBlocks(after)) {
+    const left = had.get(key) ?? 0;
+    if (left > 0) had.set(key, left - 1);
+    else added.push({ unsafe, code });
+  }
+  return added;
+}

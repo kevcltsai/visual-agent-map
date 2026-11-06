@@ -8734,7 +8734,8 @@ export class VisualAgentMapView extends ItemView {
     ref: string
   ): void {
     dot.addEventListener("pointerdown", event => {
-      if (event.button !== 0 || !this.canEditCanvasItems() || this.placing) return;
+      // Ctrl+click is the Mac right click: it opens the anchor menu, so it must not arm a drag.
+      if (event.button !== 0 || event.ctrlKey || !this.canEditCanvasItems() || this.placing) return;
       event.preventDefault();
       // preventDefault keeps the browser from focusing the button, so a plain click still leaves it focused for Enter / Delete.
       dot.focus({ preventScroll: true });

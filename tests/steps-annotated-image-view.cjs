@@ -1271,6 +1271,19 @@ test('counter-example (other buttons): a right or middle press does not start a 
   }
 });
 
+test('counter-example (Ctrl+click on a Mac is a right click): button 0 with ctrlKey starts no drag, moves nothing and leaves no listener', async () => {
+  const h = await dragHarness();
+  const before = h.fileText();
+  press(h.dot(), 1100, 550, { ctrlKey: true });
+  h.dot().fire('pointermove', { clientX: 1180, clientY: 590 });
+  h.dot().fire('pointerup', {});
+  await h.settle();
+  assert.equal(h.dot().style.left, '50%');
+  assert.equal(h.dot().style.top, '50%');
+  assert.equal(h.fileText(), before);
+  assert.equal(docListeners(h), 0);
+});
+
 test('counter-example (repaint mid-drag): the old dot writes nothing and leaves no document listener', async () => {
   const h = await dragHarness();
   const entries = h.view.history.past.length, before = h.fileText();

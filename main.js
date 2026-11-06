@@ -63844,7 +63844,7 @@ ${request.requirements}` : preset.text,
   enableAnchorDrag(dot, el, image, anchorId, origin, ref) {
     dot.addEventListener("pointerdown", (event) => {
       var _a2, _b2, _c;
-      if (event.button !== 0 || !this.canEditCanvasItems() || this.placing) return;
+      if (event.button !== 0 || event.ctrlKey || !this.canEditCanvasItems() || this.placing) return;
       event.preventDefault();
       dot.focus({ preventScroll: true });
       if (dot.isConnected === false) return;

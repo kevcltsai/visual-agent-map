@@ -30504,7 +30504,11 @@ function solveRings(nodes, items, heightOf, widthOf, layout, options = {}) {
       }
       const done = /* @__PURE__ */ new Set();
       const footprint = [];
-      for (const card of solved.cards) {
+      const SIDE_ORDER = { top: 0, right: 1, bottom: 2, left: 3 };
+      const inOrder = [...solved.cards].sort(
+        (a, b) => SIDE_ORDER[a.side] - SIDE_ORDER[b.side] || (a.side === "top" || a.side === "bottom" ? a.x - b.x : a.y - b.y)
+      );
+      for (const card of inOrder) {
         const own2 = { direction: OUTWARD[card.side], ...spacing ? { spacing } : {} };
         const ids = below.get(card.id);
         const drawn = new Set(
@@ -36215,10 +36219,14 @@ function overlapArea(a, b) {
   const width = Math.min(a.right, b.right) - Math.max(a.left, b.left), height = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
   return width > 0 && height > 0 ? width * height : 0;
 }
+var ADD_CHILD_PROTRUSION = 14;
+function cardToolsSideGap(side, zoom) {
+  return (side === "right" ? ADD_CHILD_PROTRUSION : 0) + 4 / zoom;
+}
 function chooseCardToolsSpot(input2) {
-  var _a2, _b2, _c, _d;
+  var _a2, _b2, _c, _d, _e;
   const { card, row, size, others, controls, visible } = input2;
-  const edge = (_a2 = input2.edge) != null ? _a2 : 6, maxInset = (_b2 = input2.maxInset) != null ? _b2 : 14, margin = 8;
+  const edge = (_a2 = input2.edge) != null ? _a2 : 6, maxInset = (_b2 = input2.maxInset) != null ? _b2 : 14, margin = 8, rightGap = (_c = input2.rightGap) != null ? _c : 4;
   const candidates = [];
   const slides = [0];
   for (let step = 8; step <= 120; step += 8) slides.push(-step, step);
@@ -36249,7 +36257,12 @@ function chooseCardToolsSpot(input2) {
     side: "right",
     inset: 0,
     slide: 0,
-    rect: { left: card.right + 4, right: card.right + 4 + size.width, top: sideTop, bottom: sideTop + size.height }
+    rect: {
+      left: card.right + rightGap,
+      right: card.right + rightGap + size.width,
+      top: sideTop,
+      bottom: sideTop + size.height
+    }
   });
   candidates.push({
     side: "left",
@@ -36266,7 +36279,7 @@ function chooseCardToolsSpot(input2) {
     overlap: others.reduce((total2, other) => total2 + overlapArea(candidate.rect, other), 0),
     blocked: controls.some((control) => rectsIntersect(candidate.rect, control)) || candidate.rect.left < visible.left || candidate.rect.right > visible.right || candidate.rect.top < visible.top || candidate.rect.bottom > visible.bottom
   }));
-  const chosen = (_d = (_c = scored.find((item) => item.overlap === 0 && !item.blocked)) != null ? _c : scored.find((item) => item.overlap === 0)) != null ? _d : scored.reduce((best, item) => item.overlap < best.overlap ? item : best);
+  const chosen = (_e = (_d = scored.find((item) => item.overlap === 0 && !item.blocked)) != null ? _d : scored.find((item) => item.overlap === 0)) != null ? _e : scored.reduce((best, item) => item.overlap < best.overlap ? item : best);
   let dx = 0, dy = 0;
   const row2 = chosen.rect;
   if (row2.left < visible.left + margin) dx = visible.left + margin - row2.left;
@@ -70004,14 +70017,15 @@ ${request.requirements}` : preset.text,
       size: { width, height },
       others,
       controls: this.floatingControlRects(),
-      visible: { left: visibleLeft, right: canvasRect.right, top: canvasRect.top, bottom: canvasRect.bottom }
+      visible: { left: visibleLeft, right: canvasRect.right, top: canvasRect.top, bottom: canvasRect.bottom },
+      rightGap: cardToolsSideGap("right", zoom) * zoom
     });
     if (spot.side === "bottom") tools.toggleClass("is-below", true);
     if (spot.side === "left" || spot.side === "right") {
       tools.toggleClass("is-align-left", false);
       tools.toggleClass(spot.side === "left" ? "is-side-left" : "is-side-right", true);
       tools.style.removeProperty("margin-left");
-      tools.style.setProperty("--vam-tools-gap", `${4 / zoom}px`);
+      tools.style.setProperty("--vam-tools-gap", `${cardToolsSideGap(spot.side, zoom)}px`);
     }
     if (spot.inset) tools.style.setProperty("--vam-tools-inset", `${spot.inset / zoom}px`);
     if (spot.slide) tools.style.setProperty("translate", `${spot.slide / zoom}px 0`);

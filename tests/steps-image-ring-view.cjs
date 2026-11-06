@@ -395,6 +395,31 @@ test('M2: ring cards that each have 2 or 3 sub-topics (4 or 12 cards) overlap no
   }
 });
 
+test('branch order: on each side of the picture the sub-topics of the cards follow the cards\' own order along that side, and nothing overlaps', () => {
+  for (const [members, children] of [[12, 2], [4, 2]]) {
+    const rows = Array.from({ length: members }, (_, i) => [`a${i}`, `r${i}`, [0.2 + (0.6 * (i % 4)) / 3, 0.2 + (0.6 * Math.floor(i / 4)) / 2]]);
+    const nodes = rows.map(r => node(r[1], null, 0, 0));
+    for (const r of rows) for (let c = 0; c < children; c++) nodes.push(node(`${r[1]}_${c}`, r[1], 0, 0));
+    const map = doc(nodes, [picture(rows, { x: 400, y: 300, w: 720, h: 533 })]);
+    bare(map).arrangeAll(map);
+    const rects = map.nodes.map(n => ({ id: n.id, ...rect(n) }));
+    for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) assert.equal(hit(rects[i], rects[j]), false, `${rects[i].id}|${rects[j].id}`);
+    const img = imageOf(map), mid = r => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+    const bySide = { top: [], bottom: [], left: [], right: [] };
+    for (const r of rows) {
+      const c = mid(rects.find(x => x.id === r[1]));
+      const dx = (c.x - (img.x + img.w / 2)) / img.w, dy = (c.y - (img.y + img.h / 2)) / img.h;
+      bySide[Math.abs(dy) > Math.abs(dx) ? (dy < 0 ? 'top' : 'bottom') : (dx < 0 ? 'left' : 'right')].push(r[1]);
+    }
+    for (const [side, ids] of Object.entries(bySide)) {
+      const axis = side === 'top' || side === 'bottom' ? 'x' : 'y';
+      const at = id => mid(rects.find(x => x.id === id))[axis];
+      const along = ids.map(id => ({ id, card: at(id), kids: Array.from({ length: children }, (_, c) => at(`${id}_${c}`)).reduce((a, b) => a + b, 0) / children })).sort((a, b) => a.card - b.card);
+      for (let k = 1; k < along.length; k++) assert.ok(along[k - 1].kids < along[k].kids, `${members} cards, ${side}: ${along[k - 1].id} before ${along[k].id}`);
+    }
+  }
+});
+
 test('R1: one more ring member (placed alone, the others stay) is not put on or across the lines to the cards that stay', () => {
   const rows = [['a1', 't1', [0.3, 0.12]], ['a2', 't2', [0.7, 0.15]], ['a3', 't3', [0.5, 0.6]]];
   const fixedRows = [['f1', 'e1', [0.4, 0.3]], ['f2', 'e2', [0.6, 0.3]]];

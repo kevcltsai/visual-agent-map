@@ -376,6 +376,7 @@ import {
   INSET_GAP,
   cardToolsPlacement,
   chooseCardToolsSpot,
+  cardToolsSideGap,
   clearToolbar,
   type CanvasInsets,
   anyBoxOffscreen,
@@ -14936,7 +14937,8 @@ export class VisualAgentMapView extends ItemView {
       size: { width, height },
       others,
       controls: this.floatingControlRects(),
-      visible: { left: visibleLeft, right: canvasRect.right, top: canvasRect.top, bottom: canvasRect.bottom }
+      visible: { left: visibleLeft, right: canvasRect.right, top: canvasRect.top, bottom: canvasRect.bottom },
+      rightGap: cardToolsSideGap("right", zoom) * zoom
     });
     // Panning moves every card alike, so the side and inset chosen here stay right. In memory only, like keyboard navigation.
     if (spot.side === "bottom") tools.toggleClass("is-below", true);
@@ -14944,7 +14946,7 @@ export class VisualAgentMapView extends ItemView {
       tools.toggleClass("is-align-left", false);
       tools.toggleClass(spot.side === "left" ? "is-side-left" : "is-side-right", true);
       tools.style.removeProperty("margin-left");
-      tools.style.setProperty("--vam-tools-gap", `${4 / zoom}px`);
+      tools.style.setProperty("--vam-tools-gap", `${cardToolsSideGap(spot.side, zoom)}px`);
     }
     if (spot.inset) tools.style.setProperty("--vam-tools-inset", `${spot.inset / zoom}px`);
     // `translate` moves the row in card units before the counter-scale, so it does not disturb the reveal transform.

@@ -499,7 +499,13 @@ export function solveRings(
       // Branches one after another; the cards already placed are obstacles for the next.
       const done = new Set<string>();
       const footprint: Rect[] = [];
-      for (const card of solved.cards) {
+      // Same side together, in order along it (top and bottom by x, left and right by y), so the sub-topics keep the cards' order instead of bunching into lines.
+      const SIDE_ORDER: Record<RingSide, number> = { top: 0, right: 1, bottom: 2, left: 3 };
+      const inOrder = [...solved.cards].sort(
+        (a, b) =>
+          SIDE_ORDER[a.side] - SIDE_ORDER[b.side] || (a.side === "top" || a.side === "bottom" ? a.x - b.x : a.y - b.y)
+      );
+      for (const card of inOrder) {
         const own: MapLayout = { direction: OUTWARD[card.side], ...(spacing ? { spacing } : {}) };
         const ids = below.get(card.id)!;
         // What a folded card hides is not laid out: it keeps its place against the card.

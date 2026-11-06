@@ -946,6 +946,6 @@ test('R2: after a reply that makes a ring no card is selected (what addNode sele
 test('R2/M1 style: the anchor lines are heavier and nearer the text colour; a quiet ring label is hidden unless expanded', () => {
   const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
   assert.match(css, /\.vam-view \.vam-relation\[data-anchor-relation\]:not\(\.vam-relation-derives_from\) \{ --vam-relation-width: 2\.25px; \}/);
-  assert.match(css, /\.vam-view \.vam-relation\[data-anchor-relation\]:not\(\.is-selected\) \{ stroke: color-mix\(in srgb, var\(--text-normal\) 92%/);
+  assert.match(css, /\.vam-view \.vam-relation\[data-anchor-relation\]:not\(\.is-selected\) \{ stroke: var\(--interactive-accent\); \}/);
   assert.match(css, /\.vam-view \.vam-relation-label\.is-ring-quiet:not\(\.is-expanded\) \{ display: none; \}/);
 });

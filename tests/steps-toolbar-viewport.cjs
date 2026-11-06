@@ -617,6 +617,19 @@ test('chooseCardToolsSpot: with 13 cards at 60%, the selected card\'s tool row c
   }
   assert.ok(legacyCovers >= 3, `the old placement covers neighbours on this map (${legacyCovers} cards)`);
 });
+test('side tool row on the right clears the "+" button (14 card units) at low and high zoom; on the left only the plain 4px', () => {
+  for (const zoom of [0.3, 0.6, 1, 2.5]) {
+    assert.ok(inset.cardToolsSideGap('right', zoom) >= 14, `right gap at ${zoom}`);
+    assert.equal(inset.cardToolsSideGap('right', zoom), 14 + 4 / zoom);
+    assert.equal(inset.cardToolsSideGap('left', zoom), 4 / zoom);
+  }
+  // The spot chooser reserves that width: a row beside the card on the right starts that far from the card edge.
+  const card = { left: 100, right: 300, top: 100, bottom: 200 };
+  const boxed = [{ left: 0, right: 99, top: 90, bottom: 210 }, { left: 120, right: 280, top: 0, bottom: 99 }, { left: 120, right: 280, top: 201, bottom: 300 }];
+  const spot = inset.chooseCardToolsSpot({ card, row: { left: 80, right: 290 }, size: { width: 200, height: 32 }, others: boxed, controls: [], visible: { left: 0, right: 1000, top: 0, bottom: 600 }, rightGap: 14 * 0.5 + 4 });
+  assert.equal(spot.side, 'right');
+  assert.equal(spot.rect.left, card.right + 14 * 0.5 + 4);
+});
 test('chooseCardToolsSpot: a card in the top-left corner pans clear of the canvas toolbar; a free card is not moved', () => {
   const visible = { left: 0, right: 1400, top: 0, bottom: 900 };
   const controls = [{ left: 12, top: 12, right: 330, bottom: 52 }];

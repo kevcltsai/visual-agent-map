@@ -31390,50 +31390,79 @@ function findingList(items, none, limit = 30) {
 var HEADING_ANY = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
 var KEPT_LOCALES = ["zh-TW", "zh-CN", "en"];
 var key2 = (value) => value.trim().toLocaleLowerCase();
-var SOURCE_REF_VERB = [
-  "\u6307\u51FA",
-  "\u63D0\u5230",
-  "\u986F\u793A",
-  "\u663E\u793A",
-  "\u8868\u793A",
-  "\u8868\u660E",
-  "\u8A8D\u70BA",
-  "\u8BA4\u4E3A",
-  "\u8AAA\u660E",
-  "\u8BF4\u660E",
-  "\u6307\u7A31",
-  "\u79F0",
-  "\u7A31",
-  "says?\\b",
-  "said\\b",
-  "states?\\b",
-  "shows?\\b",
-  "reports?\\b",
-  "notes?\\b",
-  "indicates?\\b",
-  "mentions?\\b",
-  "claims?\\b",
-  "suggests?\\b"
-].join("|");
+var SOURCE_REF_VERB_ZH = ["\u6307\u51FA", "\u63D0\u5230", "\u8868\u660E", "\u8A8D\u70BA", "\u8BA4\u4E3A", "\u6307\u7A31"];
+var SOURCE_REF_VERB_ZH_NOUN = ["\u986F\u793A", "\u663E\u793A", "\u8868\u793A", "\u8AAA\u660E", "\u8BF4\u660E", "\u7A31", "\u79F0"];
+var SOURCE_REF_VERB_EN = ["says?", "said", "states?", "shows?", "indicates?", "suggests?"];
+var SOURCE_REF_VERB_EN_LOOSE = ["reports?", "notes?", "mentions?", "claims?"];
 var SOURCE_REF_KEYWORD = [
   ["\u4F86\u6E90", "\u6765\u6E90"],
   ["\u51FA\u8655", "\u51FA\u5904"]
 ].map((group) => group.join("|")).join("|");
 var SOURCE_REF_JOINER = ["\u53CA", "\u548C"].join("|");
-var SOURCE_REF = new RegExp(
-  `(?:${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*\\d{1,2}(?:[ \\t]*(?:[,\uFF0C\u3001]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,2})*(?!\\d|\\.\\d)(?=[ \\t]*(?:$|[\u3002\uFF0C\u3001\uFF1B\uFF1A\uFF01\uFF1F.,;:!?)\uFF09\\]\u3011\u300D\u300F\u201D\u2019\u2026]|${SOURCE_REF_VERB}))(?![ \\t]*[,\uFF0C\u3001][ \\t]*\\d)`,
-  "gium"
-);
+function sourceRefPattern(strict) {
+  const zh = SOURCE_REF_VERB_ZH.join("|");
+  const zhNoun = SOURCE_REF_VERB_ZH_NOUN.join("|");
+  const en2 = [...SOURCE_REF_VERB_EN, ...strict ? [] : SOURCE_REF_VERB_EN_LOOSE].map((verb) => `${verb}\\b`).join("|");
+  const verbs = strict ? `${zh}|(?:${zhNoun})(?!\\p{Script=Han})|${en2}` : `${zh}|${zhNoun}|${en2}`;
+  return new RegExp(
+    `(${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*(\\d{1,2}(?:[ \\t]*(?:[,\uFF0C\u3001]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,2})*)(?!\\d|\\.\\d)(?=[ \\t]*(?:$|[\u3002\uFF0C\u3001\uFF1B\uFF1A\uFF01\uFF1F.,;:!?)\uFF09\\]\u3011\u300D\u300F\u201D\u2019\u2026]|${verbs}))(?![ \\t]*[,\uFF0C\u3001][ \\t]*\\d)`,
+    "gium"
+  );
+}
+var SOURCE_REF_LOOSE = sourceRefPattern(false);
+var SOURCE_REF_STRICT = sourceRefPattern(true);
+var SOURCE_LEAD_HAN = /[見见據据依參参如另自從从於于與与及和或至]$/;
+var SOURCE_LEAD_EN = /^(?:see|cf|per|from|in|and|to|by|also)$/i;
+var SOURCE_SECTION_NAME = /^(?:\p{Script=Han}{0,4}(?:來源|来源|出處|出处)|參考資料|参考资料|sources?|references?)$/iu;
+function leadsKeyword(before) {
+  const head = before.replace(/[ \t]+$/, "");
+  if (/\p{Script=Han}$/u.test(head)) return SOURCE_LEAD_HAN.test(head);
+  const word = /([A-Za-z]+)$/.exec(head);
+  return word ? SOURCE_LEAD_EN.test(word[1]) : true;
+}
+function sourceCount(text12, extraNames) {
+  const lines = text12.replace(/\r\n/g, "\n").split("\n");
+  const code = fencedLines(lines);
+  const names3 = new Set(extraNames.map(key2));
+  let level = 0;
+  let count2 = 0;
+  lines.forEach((line, index) => {
+    if (code[index]) return;
+    const heading = HEADING_ANY.exec(line);
+    if (heading) {
+      const depth = heading[1].length;
+      if (level && depth <= level) level = 0;
+      const name2 = heading[2].trim();
+      if (!level && (names3.has(key2(name2)) || SOURCE_SECTION_NAME.test(name2))) level = depth;
+      return;
+    }
+    if (level && /^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+|\[\^[^\]\s]+\]:)/.test(line)) count2++;
+  });
+  return count2;
+}
 function withoutSourceRefs(text12) {
-  return text12.replace(SOURCE_REF, "");
+  return text12.replace(SOURCE_REF_LOOSE, "");
+}
+function withoutOldSourceRefs(text12, max) {
+  if (!max) return text12;
+  return text12.replace(
+    SOURCE_REF_STRICT,
+    (match, _keyword, nums, offset, whole) => {
+      var _a2;
+      if (!leadsKeyword(whole.slice(0, offset))) return match;
+      return ((_a2 = nums.match(/\d+/g)) != null ? _a2 : []).every((value) => Number(value) >= 1 && Number(value) <= max) ? "" : match;
+    }
+  );
 }
 function keepDroppedContent(input2) {
   const { template: template2, language: language2 } = input2;
   const oldDetail = withoutMermaid(input2.oldDetail);
+  const sourceNames = template2.sections.filter((section3) => section3.role === "sources").flatMap((section3) => [section3.name, ...section3.aliases]);
+  const sourceMax = sourceCount(oldDetail, sourceNames);
   const logHeadings = template2.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]);
-  const check = (detail2) => checkMergePreservation({
-    sourceTexts: [withoutSourceRefs(oldDetail)],
-    mergedTexts: [withoutSourceRefs(detail2), withoutSourceRefs(input2.summary)],
+  const check = (detail2, added2 = "") => checkMergePreservation({
+    sourceTexts: [withoutOldSourceRefs(oldDetail, sourceMax)],
+    mergedTexts: [withoutSourceRefs(detail2), withoutSourceRefs(input2.summary), added2],
     mergedLinkTexts: [input2.references],
     logHeadings
   });
@@ -31443,28 +31472,44 @@ function keepDroppedContent(input2) {
   if (template2.sections.some((section3) => section3.role === "sources"))
     detail = carryForwardSources(detail, [oldDetail], [input2.summary, detail, input2.references], language2, template2);
   const missing = new Set(check(detail).missing);
-  if (missing.size) detail = quoteMissingLines(oldDetail, detail, missing, template2, language2, logHeadings);
-  return { detail, restored: Math.max(0, before.length - check(detail).missing.length) };
+  if (missing.size) detail = quoteMissingLines(oldDetail, detail, missing, template2, language2, logHeadings, sourceMax);
+  const added = addedLines(input2.newDetail, detail);
+  const rest = check(detail, added.join("\n")).missing.length;
+  return { detail, restored: Math.max(0, before.length - rest) };
+}
+function addedLines(base, now) {
+  var _a2;
+  const left = /* @__PURE__ */ new Map();
+  for (const line of base.split("\n")) left.set(line, ((_a2 = left.get(line)) != null ? _a2 : 0) + 1);
+  return now.split("\n").filter((line) => {
+    var _a3;
+    const n = (_a3 = left.get(line)) != null ? _a3 : 0;
+    if (n) left.set(line, n - 1);
+    return !n;
+  });
 }
 function keptTitles() {
   return new Set(KEPT_LOCALES.map((locale) => key2(translateNote(locale, "note.kept_from_earlier_version"))));
 }
 function mermaidLines(lines) {
   const out = lines.map(() => false);
-  let fence = null;
+  let start = -1;
+  let fence = "";
   let mermaid = false;
   lines.forEach((line, index) => {
     if (fence) {
-      out[index] = mermaid;
       const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
-      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) {
+        if (mermaid) for (let at = start; at <= index; at++) out[at] = true;
+        fence = "";
+      }
       return;
     }
     const open = /^\s*(`{3,}|~{3,})\s*(\S*)/.exec(line);
     if (open) {
       fence = open[1];
-      mermaid = open[2].toLocaleLowerCase() === "mermaid";
-      out[index] = mermaid;
+      start = index;
+      mermaid = open[2].startsWith("mermaid");
     }
   });
   return out;
@@ -31515,7 +31560,7 @@ function remapFootnotes(line, oldDefinitions, detail) {
   });
   return appended.length ? `${text12.trimEnd()} ${appended.join(" ")}` : text12;
 }
-function quoteMissingLines(oldDetail, detail, missing, template2, language2, logHeadings) {
+function quoteMissingLines(oldDetail, detail, missing, template2, language2, logHeadings, sourceMax) {
   const lookup = sectionLookup(template2);
   const logNames = new Set(logHeadings.map(key2).filter(Boolean));
   const titles = keptTitles();
@@ -31552,9 +31597,10 @@ function quoteMissingLines(oldDetail, detail, missing, template2, language2, log
       }
     }
     if (!text12) return;
-    const own2 = checkMergePreservation({ sourceTexts: [withoutSourceRefs(text12)], mergedTexts: [] }).missing.filter(
-      (item) => missing.has(item)
-    );
+    const own2 = checkMergePreservation({
+      sourceTexts: [withoutOldSourceRefs(text12, sourceMax)],
+      mergedTexts: []
+    }).missing.filter((item) => missing.has(item));
     if (!own2.some((item) => !covered.has(item))) return;
     for (const item of own2) covered.add(item);
     const list = (_b2 = groups.get(section3)) != null ? _b2 : [];

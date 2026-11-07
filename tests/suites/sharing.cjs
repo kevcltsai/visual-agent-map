@@ -598,3 +598,22 @@ test('sharing summaries: left/down/up carry their side; radial, timeline, fishbo
   assert.equal(build('balanced', (root, kids) => { root.x = 1000; kids[0].x = 600; kids[1].x = 600; }), 'left');
   assert.equal(build('balanced', (root, kids) => { root.x = 1000; kids[0].x = 600; kids[1].x = 1400; }), null);
 });
+
+// share-match-map P1: the cover look and the picture rules of buildSharePayload.
+test('sharing: a cover keeps only a usable look, needs its asset in the file, and appears only with notes and images', () => {
+  const map = { id: 'm', title: 'T', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: ['a', 'b', 'c', 'd'].map(id => ({ id, path: `${id}.md`, parentId: id === 'a' ? null : 'a', x: 0, y: 0, collapsed: false })) };
+  const notesById = Object.fromEntries(map.nodes.map(n => [n.id, { title: n.id, summary: '', status: 'idea' }]));
+  const covers = {
+    a: { asset: 'image-1', frame: { x: 0, y: 0, w: 1, h: 1 }, size: 1, position: 'top' },
+    b: { asset: 'image-1', frame: { x: 0.5, y: 0.5, w: 0.9, h: 0.5 }, size: 0.1, position: 'sideways' },
+    c: { asset: 'image-2', frame: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 }, size: 0.5, position: 'left' },
+    d: { asset: 'image-1', frame: { x: NaN, y: 0, w: 1, h: 1 }, size: NaN }
+  };
+  const build = overrides => plain(format.buildSharePayload(map, notesById, options({ covers, ...overrides }))).nodes.map(n => n.cover);
+  assert.deepEqual(build(), [{ asset: 'image-1' }, { asset: 'image-1' }, undefined, { asset: 'image-1' }], 'defaults and unusable values are not written; an asset that is not in the file gives no cover');
+  assert.deepEqual(build({ assets: { 'image-2': 'data:image/webp;base64,AA' } })[2], { asset: 'image-2', frame: [0.1, 0.2, 0.3, 0.4], size: 0.5, position: 'left' });
+  assert.deepEqual(build({ includeImages: false }), [undefined, undefined, undefined, undefined]);
+  assert.deepEqual(build({ includeDetail: false }), [undefined, undefined, undefined, undefined]);
+  assert.equal('layout' in plain(format.buildSharePayload(map, notesById, options({}))), false);
+  assert.equal('images' in plain(format.buildSharePayload(map, notesById, options({}))), false);
+});

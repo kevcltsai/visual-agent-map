@@ -70099,14 +70099,18 @@ ${request.requirements}` : preset.text,
       copy.nodes = copy.nodes.filter((node) => !superseded.has(node.id)).map((node) => withoutAimFields(node));
     }
     const covers = /* @__PURE__ */ new Map();
+    const coverLooks = /* @__PURE__ */ new Map();
     for (const node of copy.nodes) {
       const cover = this.coverPictureOf(node);
-      if (cover) covers.set(node.id, cover.path);
+      if (!cover) continue;
+      covers.set(node.id, cover.path);
+      coverLooks.set(node.id, { frame: cover.frame, size: cover.size, position: cover.position });
     }
     return {
       map: copy,
       notes: new Map(this.notes),
       covers,
+      coverLooks,
       ...this.relevanceGoal ? { goal: this.relevanceGoal } : {},
       mapPath: this.path
     };
@@ -83418,14 +83422,70 @@ function shareSummaries(map) {
   }
   return out;
 }
-function buildSharePayload(map, notesById, options) {
+var finiteNumber = (value) => typeof value === "number" && Number.isFinite(value);
+var clamp013 = (value) => Math.min(1, Math.max(0, value));
+function shareCover(raw, assets) {
+  if (!assets[raw.asset]) return void 0;
+  const out = { asset: raw.asset };
+  const f = raw.frame;
+  if (f && [f.x, f.y, f.w, f.h].every(finiteNumber) && f.x >= 0 && f.y >= 0 && f.w > 0 && f.h > 0 && f.x + f.w <= 1.0001 && f.y + f.h <= 1.0001 && !(f.x === 0 && f.y === 0 && f.w === 1 && f.h === 1))
+    out.frame = [f.x, f.y, f.w, f.h];
+  if (finiteNumber(raw.size) && raw.size >= 0.3 && raw.size < 1) out.size = raw.size;
+  if (raw.position === "bottom" || raw.position === "left" || raw.position === "right") out.position = raw.position;
+  return out;
+}
+function shareImages(map, nodeIds, assetNames, assets, plain) {
   var _a2;
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const item of (_a2 = map.canvasItems) != null ? _a2 : []) {
+    const raw = item;
+    if (raw.kind !== "annotated-image" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (![raw.x, raw.y, raw.w, raw.h].every(finiteNumber)) continue;
+    const [x, y, w, h] = [raw.x, raw.y, raw.w, raw.h];
+    if (!(w > 0 && h > 0)) continue;
+    seen.add(raw.id);
+    const image = { id: raw.id, x, y, w, h, anchors: [] };
+    const asset = assetNames[raw.id];
+    if (asset && assets[asset]) image.asset = asset;
+    const note = typeof raw.note === "string" ? optionalText(plain(raw.note)) : void 0;
+    if (note) image.note = note;
+    const anchorIds = /* @__PURE__ */ new Set();
+    for (const entry of Array.isArray(raw.anchors) ? raw.anchors : []) {
+      const anchor = entry;
+      if (typeof (anchor == null ? void 0 : anchor.id) !== "string" || !anchor.id || anchorIds.has(anchor.id)) continue;
+      const at = anchor.at;
+      if (!at || at.kind !== "image-2d" || !finiteNumber(at.x) || !finiteNumber(at.y)) continue;
+      anchorIds.add(anchor.id);
+      const entryOut = { id: anchor.id, x: clamp013(at.x), y: clamp013(at.y) };
+      const anchorNote = typeof anchor.note === "string" ? optionalText(plain(anchor.note)) : void 0;
+      if (anchorNote) entryOut.note = anchorNote;
+      image.anchors.push(entryOut);
+    }
+    const links = [];
+    for (const relation of Array.isArray(raw.relations) ? raw.relations : []) {
+      const { from, to, ring } = relation != null ? relation : {};
+      if (typeof from !== "string" || typeof to !== "string") continue;
+      const anchor = anchorIds.has(from) ? from : anchorIds.has(to) ? to : void 0;
+      const topic = anchor === from ? to : from;
+      if (!anchor || anchorIds.has(topic) || !nodeIds.has(topic)) continue;
+      links.push({ anchor, topic, ...ring === true ? { ring: true } : {} });
+    }
+    if (links.length) image.links = links;
+    out.push(image);
+  }
+  return out;
+}
+function buildSharePayload(map, notesById, options) {
+  var _a2, _b2, _c;
   if (aimEnabled() && (map.aim || map.nodes.some((node) => node.aimKind !== void 0)))
     throw new ShareError("aim-map", "AIM maps cannot be shared.");
+  const withImages = options.includeImages && options.includeDetail;
+  const assets = options.includeImages ? { ...options.assets } : {};
   const nodes = map.nodes.map((node) => {
-    var _a3, _b2, _c, _d;
+    var _a3, _b3, _c2, _d, _e;
     const note = notesById[node.id];
-    const fallbackTitle = (_b2 = (_a3 = node.path.split("/").pop()) == null ? void 0 : _a3.replace(/\.md$/i, "")) != null ? _b2 : node.id;
+    const fallbackTitle = (_b3 = (_a3 = node.path.split("/").pop()) == null ? void 0 : _a3.replace(/\.md$/i, "")) != null ? _b3 : node.id;
     const out = {
       id: node.id,
       parentId: node.parentId,
@@ -83434,7 +83494,7 @@ function buildSharePayload(map, notesById, options) {
       collapsed: node.collapsed,
       status: (note == null ? void 0 : note.status) === "completed" ? "completed" : "idea",
       title: (note == null ? void 0 : note.title) || fallbackTitle,
-      summary: (_c = note == null ? void 0 : note.summary) != null ? _c : ""
+      summary: (_c2 = note == null ? void 0 : note.summary) != null ? _c2 : ""
     };
     if (node.width !== void 0 && clampCardWidth(node.width) !== void 0 && node.width !== CARD_WIDTH)
       out.width = clampCardWidth(node.width);
@@ -83457,6 +83517,11 @@ function buildSharePayload(map, notesById, options) {
     if (options.includeDetail) {
       if ((_d = note == null ? void 0 : note.detailHtml) == null ? void 0 : _d.trim()) out.detailHtml = note.detailHtml;
     }
+    const branch = branchDirectionOf(node);
+    if (branch) out.layout = { direction: branch };
+    const coverEntry = withImages ? (_e = options.covers) == null ? void 0 : _e[node.id] : void 0;
+    const cover = coverEntry ? shareCover(coverEntry, assets) : void 0;
+    if (cover) out.cover = cover;
     return out;
   });
   const goal = optionalText(options.goal);
@@ -83468,6 +83533,14 @@ function buildSharePayload(map, notesById, options) {
       out.afterTextId = textId;
   }
   const summaries = shareSummaries(map);
+  const stored = layoutOf(map);
+  const images = shareImages(
+    map,
+    new Set(map.nodes.map((node) => node.id)),
+    withImages ? (_b2 = options.imageAssets) != null ? _b2 : {} : {},
+    assets,
+    (_c = options.plainText) != null ? _c : (text12) => text12
+  );
   return {
     format: SHARE_FORMAT,
     version: SHARE_VERSION,
@@ -83480,7 +83553,9 @@ function buildSharePayload(map, notesById, options) {
     nodes,
     ...textNodes.length ? { textNodes } : {},
     ...summaries.length ? { summaries } : {},
-    assets: options.includeImages ? { ...options.assets } : {}
+    ...stored.direction !== "right" || stored.spacing ? { layout: stored } : {},
+    ...images.length ? { images } : {},
+    assets
   };
 }
 function serializeShareJson(payload) {
@@ -85687,6 +85762,9 @@ var ShareExporter = class {
     __publicField(this, "images", /* @__PURE__ */ new Map());
     __publicField(this, "registry", createAssetRegistry());
     __publicField(this, "ownerPath", /* @__PURE__ */ new Map());
+    /** topic id -> asset name of its cover picture; annotated image id -> asset name of its picture (set by ensureImages). */
+    __publicField(this, "coverNames", /* @__PURE__ */ new Map());
+    __publicField(this, "imageNames", /* @__PURE__ */ new Map());
     __publicField(this, "component", new import_obsidian44.Component());
     __publicField(this, "container", null);
     __publicField(this, "disposed", false);
@@ -85889,7 +85967,8 @@ ${fence}`, host, "", child);
     const unsourced = diagrams.filter((diagram, index) => !diagramSources[index] && finalSvgs.includes(diagram)).length;
     return { html: clean4.innerHTML, undrawn, blocked, localRefs, diagrams: placed, unsourced };
   }
-  resolveImage(name2) {
+  /** The vault file a registered image name points at, or null when it cannot be found or is not a known image type. */
+  resolveImageFile(name2) {
     var _a2, _b2, _c;
     const entry = this.registry.entries().find((item) => item.name === name2);
     const fromPath = this.ownerPath.get(name2);
@@ -85906,13 +85985,54 @@ ${fence}`, host, "", child);
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getFileByPath(path) : null;
-      if (file) return { bytes: this.app.vault.readBinary(file), mime };
+      if (file) return { path: file.path, mime };
     }
     return null;
   }
+  resolveImage(name2) {
+    const found = this.resolveImageFile(name2);
+    const file = found ? this.app.vault.getFileByPath(found.path) : null;
+    return found && file ? { bytes: this.app.vault.readBinary(file), mime: found.mime } : null;
+  }
+  /**
+   * The asset name for a picture at a vault path (a cover, an annotated image): the name a note already registered for
+   * the same vault file when there is one, so the picture is encoded and embedded once; otherwise a new name owned by `owner`.
+   */
+  assetNameFor(path, owner) {
+    var _a2;
+    const target = (0, import_obsidian44.normalizePath)(path);
+    for (const entry of this.registry.entries()) {
+      if (this.ownerPath.has(entry.name) && ((_a2 = this.resolveImageFile(entry.name)) == null ? void 0 : _a2.path) === target) return entry.name;
+    }
+    const name2 = this.registry.nameFor(target);
+    if (!this.ownerPath.has(name2)) this.ownerPath.set(name2, owner);
+    return name2;
+  }
+  /** Names the cover pictures and annotated images (once), after the notes have registered theirs. */
+  nameExtraImages() {
+    var _a2, _b2;
+    this.coverNames.clear();
+    this.imageNames.clear();
+    for (const node of this.source.map.nodes) {
+      const cover = (_a2 = this.source.covers) == null ? void 0 : _a2.get(node.id);
+      if (cover) this.coverNames.set(node.id, this.assetNameFor(cover, node.path));
+    }
+    for (const item of (_b2 = this.source.map.canvasItems) != null ? _b2 : []) {
+      const raw = item;
+      if (raw.kind === "annotated-image" && typeof raw.id === "string" && typeof raw.path === "string" && raw.path)
+        this.imageNames.set(raw.id, this.assetNameFor(raw.path, this.source.mapPath));
+    }
+  }
   /** Converts every vault image the rendered notes use, once. */
   async ensureImages(ticket, onProgress) {
-    const names3 = [...new Set([...this.rendered.values()].flatMap((note) => note.attachments))];
+    this.nameExtraImages();
+    const names3 = [
+      .../* @__PURE__ */ new Set([
+        ...[...this.rendered.values()].flatMap((note) => note.attachments),
+        ...this.coverNames.values(),
+        ...this.imageNames.values()
+      ])
+    ];
     const todo = names3.filter((name2) => !this.images.has(name2));
     let done = names3.length - todo.length;
     for (const name2 of todo) {
@@ -86011,6 +86131,12 @@ ${fence}`, host, "", child);
     if (options.includeDetail && options.includeImages) {
       for (const [name2, data] of this.images) if (data) assets[name2] = data;
     }
+    const covers = Object.fromEntries(
+      [...this.coverNames].map(([id, asset]) => {
+        var _a3;
+        return [id, { asset, ...(_a3 = this.source.coverLooks) == null ? void 0 : _a3.get(id) }];
+      })
+    );
     const payload = buildSharePayload(this.source.map, notesById, {
       includeDetail: options.includeDetail,
       includeImages: options.includeImages && options.includeDetail,
@@ -86018,7 +86144,10 @@ ${fence}`, host, "", child);
       vamVersion: this.config.vamVersion,
       exportedAt: ((_g = (_f = (_e = this.config).now) == null ? void 0 : _f.call(_e)) != null ? _g : /* @__PURE__ */ new Date()).toISOString(),
       goal: this.source.goal,
-      assets
+      assets,
+      covers,
+      imageAssets: Object.fromEntries(this.imageNames),
+      plainText: plainWikilinks
     });
     return { payload, failed, notesWithContent, undrawn, blocked };
   }

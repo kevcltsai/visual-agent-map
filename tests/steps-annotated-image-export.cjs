@@ -1,5 +1,5 @@
-// Annotated image P6 (A6): OPML, FreeMind, the share payload and the private clipboard format never carry an annotated image,
-// its anchors, anchor notes or anchor relations. PNG / SVG export is covered in steps-canvas-items-view and steps-anchor-relations-view.
+// Annotated image P6 (A6): OPML, FreeMind and the private clipboard format never carry an annotated image, its anchors, anchor notes
+// or anchor relations. The share payload does since share-match-map (owner-approved): picture position, anchors, their notes and links, never the path, relation kind or description. PNG / SVG export is covered in steps-canvas-items-view and steps-anchor-relations-view.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load, core, fixture, obsidian } = require('./support.cjs');
@@ -43,14 +43,15 @@ for (const format of ['opml', 'freemind']) {
   });
 }
 
-test('share payload: no canvasItems, anchors or anchor relations, and the anchor text is nowhere in it', () => {
+test('share payload: the annotated image travels as images (anchors, notes, links) and the path, relation kind and description stay out', () => {
   const options = { includeDetail: true, includeImages: true, language: 'en', vamVersion: '0.31.0', exportedAt: '2026-11-05T00:00:00.000Z', assets: {} };
   const notesById = { r: { title: 'Root' }, c: { title: 'Kid' }, d: { title: 'Kid 2' } };
-  const withImage = plain(share.buildSharePayload(mapWith(true), notesById, options));
-  const without = plain(share.buildSharePayload(mapWith(false), notesById, options));
-  assert.deepEqual(withImage, without);
+  const { images, ...withImage } = plain(share.buildSharePayload(mapWith(true), notesById, options));
+  assert.deepEqual(withImage, plain(share.buildSharePayload(mapWith(false), notesById, options)), 'everything but images is unchanged');
+  assert.deepEqual(images, [{ id: 'img1', x: 500, y: 0, w: 200, h: 100, anchors: [{ id: 'a1', x: 0.5, y: 0.5, note: SECRET }], note: SECRET, links: [{ anchor: 'a1', topic: 'c' }] }]);
   const text = share.serializeShareJson(share.buildSharePayload(mapWith(true), notesById, options));
-  for (const word of [SECRET, 'canvasItems', 'anchors', 'annotated-image', 'img1', 'Pics/']) assert.equal(text.includes(word), false, word);
+  for (const word of ['canvasItems', 'annotated-image', 'Pics/', '"path"', 'supports', 'description', 'relations']) assert.equal(text.includes(word), false, word);
+  assert.equal(text.split(SECRET).length - 1, 2, 'the image note and the anchor note, nothing else');
   assert.equal('textNodes' in withImage, false);
   assert.equal('summaries' in withImage, false);
 });
@@ -99,10 +100,13 @@ for (const format of ['opml', 'freemind']) {
     assert.equal(/ring/i.test(withImage.replace(/Plan/g, '')), false);
   });
 }
-test('P6 A15 share payload: ring relations and top-level topics leave no "ring" or picture in the payload', () => {
+test('P6 A15 share payload: ring relations travel as ring links on the image, and no other payload part changes', () => {
   const options = { includeDetail: true, includeImages: true, language: 'en', vamVersion: '0.31.0', exportedAt: '2026-11-05T00:00:00.000Z', assets: {} };
   const notesById = { r1: { title: 'Part 1' }, r2: { title: 'Part 2' }, r3: { title: 'Part 3' } };
+  const { images, ...withImage } = plain(share.buildSharePayload(ringMap(true), notesById, options));
+  assert.equal(JSON.stringify(withImage), JSON.stringify(plain(share.buildSharePayload(ringMap(false), notesById, options))));
+  assert.deepEqual(images[0].links, [{ anchor: 'a1', topic: 'r1', ring: true }, { anchor: 'a2', topic: 'r2', ring: true }, { anchor: 'a3', topic: 'r3', ring: true }]);
+  assert.equal('ring' in withImage.nodes[0], false);
   const text = share.serializeShareJson(share.buildSharePayload(ringMap(true), notesById, options));
-  assert.equal(text, share.serializeShareJson(share.buildSharePayload(ringMap(false), notesById, options)));
-  for (const word of ['"ring"', 'ring', 'canvasItems', 'img1', SECRET]) assert.equal(text.includes(word), false, word);
+  for (const word of ['canvasItems', 'Pics/', '"path"', '"kind"']) assert.equal(text.includes(word), false, word);
 });

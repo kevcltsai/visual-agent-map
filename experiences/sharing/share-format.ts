@@ -3,8 +3,8 @@ import type { RelevanceTier } from "../../note-values";
 import type { ContentLanguage } from "../../i18n";
 import { readTopicColor, readTopicStyle, type TopicColor, type TopicStyle } from "../../topic-colors";
 import { CARD_WIDTH, clampCardHeight, clampCardWidth } from "../../map-graph";
-import { layoutDirectionFor } from "../../layouts/compose";
-import { layoutOf } from "../../map-layout";
+import { branchDirectionOf, layoutDirectionFor, type BranchDirection } from "../../layouts/compose";
+import { layoutOf, type MapLayout } from "../../map-layout";
 import { readTopicMarkers, type TopicMarker } from "../../topic-markers";
 import { readTopicLinks } from "../../topic-links";
 import { aimEnabled } from "../aim/availability";
@@ -109,6 +109,10 @@ export interface ShareNodePayload {
   links?: string[];
   /** Detail rendered to sanitized HTML at export time; images reference `assets` by name. */
   detailHtml?: string;
+  /** Optional (share-match-map): this branch's own growth direction (already cleaned by the map reader). Absent means the map's. `version` stays 1. */
+  layout?: { direction: BranchDirection };
+  /** Optional (share-match-map): the card's cover picture; only with notes and images in the file. Default look values are not written. `version` stays 1. */
+  cover?: ShareCoverPayload;
   /** Optional (D-2026-10-116): this note's text per translated language, keyed by language id. The original stays in the fields above. */
   translations?: Record<string, ShareNodeTranslation>;
 }
@@ -140,6 +144,39 @@ export interface ShareSummaryPayload {
   text: string;
 }
 
+/** The card's cover picture: `asset` names an `assets` entry; `frame` is [x, y, w, h] as 0-1 fractions of the picture. */
+export interface ShareCoverPayload {
+  asset: string;
+  frame?: [number, number, number, number];
+  size?: number;
+  position?: "bottom" | "left" | "right";
+}
+
+/** One anchor of an annotated image (only `image-2d` positions): x and y are 0-1 fractions of the picture. */
+export interface ShareAnchorPayload {
+  id: string;
+  x: number;
+  y: number;
+  note?: string;
+}
+
+/**
+ * Optional (share-match-map): an annotated image on the canvas. `asset` is absent when the picture is not in the file
+ * (no images, or it could not be read): the viewer then draws a placeholder. The vault path never travels.
+ */
+export interface ShareImagePayload {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  asset?: string;
+  note?: string;
+  anchors: ShareAnchorPayload[];
+  /** anchor -> topic relations (either direction in the map); kind and description are not carried. */
+  links?: Array<{ anchor: string; topic: string; ring?: true }>;
+}
+
 export interface SharePayload {
   format: typeof SHARE_FORMAT;
   version: typeof SHARE_VERSION;
@@ -154,6 +191,10 @@ export interface SharePayload {
   textNodes?: ShareTextNodePayload[];
   /** Optional (summary-bracket): present only when the map has a drawable bracket; absent keeps older files byte-identical. `version` stays 1. */
   summaries?: ShareSummaryPayload[];
+  /** Optional (share-match-map): the map's layout when it is not the default (right, standard spacing). `version` stays 1. */
+  layout?: MapLayout;
+  /** Optional (share-match-map): annotated images; absent when the map has none. `version` stays 1. */
+  images?: ShareImagePayload[];
   assets: Record<string, string>;
   /** Optional (D-2026-10-116). Language id of the original text; any registry language, so it may lie outside the six. */
   contentLanguage?: string;
@@ -194,6 +235,17 @@ export interface ShareOptions {
   goal?: string;
   /** name -> data URL, embedded only when includeImages is true. */
   assets?: Record<string, string>;
+  /** topic id -> cover picture asset name and look. Used only when includeDetail and includeImages; an asset not in `assets` is ignored. */
+  covers?: Readonly<
+    Record<
+      string,
+      { asset: string; frame?: { x: number; y: number; w: number; h: number } | null; size?: number; position?: string }
+    >
+  >;
+  /** annotated image id -> asset name. Same rule as `covers`. */
+  imageAssets?: Readonly<Record<string, string>>;
+  /** Turns free text into plain text (the exporter passes `plainWikilinks`); identity when absent. */
+  plainText?: (text: string) => string;
 }
 
 export class ShareError extends Error {
@@ -274,6 +326,80 @@ function shareSummaries(map: MapDocument): ShareSummaryPayload[] {
   return out;
 }
 
+const finiteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+
+/** The cover entry for a node: look values at their default are left out; an unusable frame is left out (the whole picture). */
+function shareCover(raw: NonNullable<ShareOptions["covers"]>[string], assets: Record<string, string>) {
+  if (!assets[raw.asset]) return undefined;
+  const out: ShareCoverPayload = { asset: raw.asset };
+  const f = raw.frame;
+  if (
+    f &&
+    [f.x, f.y, f.w, f.h].every(finiteNumber) &&
+    f.x >= 0 &&
+    f.y >= 0 &&
+    f.w > 0 &&
+    f.h > 0 &&
+    f.x + f.w <= 1.0001 &&
+    f.y + f.h <= 1.0001 &&
+    !(f.x === 0 && f.y === 0 && f.w === 1 && f.h === 1)
+  )
+    out.frame = [f.x, f.y, f.w, f.h];
+  if (finiteNumber(raw.size) && raw.size >= 0.3 && raw.size < 1) out.size = raw.size;
+  if (raw.position === "bottom" || raw.position === "left" || raw.position === "right") out.position = raw.position;
+  return out;
+}
+
+/** The map's annotated images for the payload (decision #4: only these; the vault path, relation kind and description stay out). */
+function shareImages(
+  map: MapDocument,
+  nodeIds: ReadonlySet<string>,
+  assetNames: Readonly<Record<string, string>>,
+  assets: Record<string, string>,
+  plain: (text: string) => string
+): ShareImagePayload[] {
+  const out: ShareImagePayload[] = [];
+  const seen = new Set<string>();
+  for (const item of map.canvasItems ?? []) {
+    const raw = item as unknown as Record<string, unknown>;
+    if (raw.kind !== "annotated-image" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (![raw.x, raw.y, raw.w, raw.h].every(finiteNumber)) continue;
+    const [x, y, w, h] = [raw.x, raw.y, raw.w, raw.h] as number[];
+    if (!(w > 0 && h > 0)) continue;
+    seen.add(raw.id);
+    const image: ShareImagePayload = { id: raw.id, x, y, w, h, anchors: [] };
+    const asset = assetNames[raw.id];
+    if (asset && assets[asset]) image.asset = asset;
+    const note = typeof raw.note === "string" ? optionalText(plain(raw.note)) : undefined;
+    if (note) image.note = note;
+    const anchorIds = new Set<string>();
+    for (const entry of Array.isArray(raw.anchors) ? raw.anchors : []) {
+      const anchor = entry as { id?: unknown; at?: { kind?: unknown; x?: unknown; y?: unknown }; note?: unknown };
+      if (typeof anchor?.id !== "string" || !anchor.id || anchorIds.has(anchor.id)) continue;
+      const at = anchor.at;
+      if (!at || at.kind !== "image-2d" || !finiteNumber(at.x) || !finiteNumber(at.y)) continue;
+      anchorIds.add(anchor.id);
+      const entryOut: ShareAnchorPayload = { id: anchor.id, x: clamp01(at.x), y: clamp01(at.y) };
+      const anchorNote = typeof anchor.note === "string" ? optionalText(plain(anchor.note)) : undefined;
+      if (anchorNote) entryOut.note = anchorNote;
+      image.anchors.push(entryOut);
+    }
+    const links: NonNullable<ShareImagePayload["links"]> = [];
+    for (const relation of Array.isArray(raw.relations) ? raw.relations : []) {
+      const { from, to, ring } = (relation ?? {}) as { from?: unknown; to?: unknown; ring?: unknown };
+      if (typeof from !== "string" || typeof to !== "string") continue;
+      const anchor = anchorIds.has(from) ? from : anchorIds.has(to) ? to : undefined;
+      const topic = anchor === from ? to : from;
+      if (!anchor || anchorIds.has(topic) || !nodeIds.has(topic)) continue;
+      links.push({ anchor, topic, ...(ring === true ? { ring: true as const } : {}) });
+    }
+    if (links.length) image.links = links;
+    out.push(image);
+  }
+  return out;
+}
+
 /**
  * Builds the share payload. Throws ShareError for AIM maps, which cannot be shared while AIM is available. While AIM is hidden
  * an old AIM map shares like any map: the payload is a whitelist of node fields, so it never carries `aim` or an `aim*` field.
@@ -285,6 +411,9 @@ export function buildSharePayload(
 ): SharePayload {
   if (aimEnabled() && (map.aim || map.nodes.some(node => node.aimKind !== undefined)))
     throw new ShareError("aim-map", "AIM maps cannot be shared.");
+  // Pictures travel only with the notes and only when images are on (decision #3); an asset must really be in the file.
+  const withImages = options.includeImages && options.includeDetail;
+  const assets: Record<string, string> = options.includeImages ? { ...options.assets } : {};
   const nodes: ShareNodePayload[] = map.nodes.map(node => {
     const note = notesById[node.id];
     const fallbackTitle = node.path.split("/").pop()?.replace(/\.md$/i, "") ?? node.id;
@@ -319,6 +448,11 @@ export function buildSharePayload(
     if (options.includeDetail) {
       if (note?.detailHtml?.trim()) out.detailHtml = note.detailHtml;
     }
+    const branch = branchDirectionOf(node);
+    if (branch) out.layout = { direction: branch };
+    const coverEntry = withImages ? options.covers?.[node.id] : undefined;
+    const cover = coverEntry ? shareCover(coverEntry, assets) : undefined;
+    if (cover) out.cover = cover;
     return out;
   });
   const goal = optionalText(options.goal);
@@ -331,6 +465,14 @@ export function buildSharePayload(
       out.afterTextId = textId;
   }
   const summaries = shareSummaries(map);
+  const stored = layoutOf(map);
+  const images = shareImages(
+    map,
+    new Set(map.nodes.map(node => node.id)),
+    withImages ? (options.imageAssets ?? {}) : {},
+    assets,
+    options.plainText ?? (text => text)
+  );
   return {
     format: SHARE_FORMAT,
     version: SHARE_VERSION,
@@ -343,7 +485,9 @@ export function buildSharePayload(
     nodes,
     ...(textNodes.length ? { textNodes } : {}),
     ...(summaries.length ? { summaries } : {}),
-    assets: options.includeImages ? { ...options.assets } : {}
+    ...(stored.direction !== "right" || stored.spacing ? { layout: stored } : {}),
+    ...(images.length ? { images } : {}),
+    assets
   };
 }
 

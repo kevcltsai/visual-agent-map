@@ -28,7 +28,7 @@ const parseRemaining = fields => parseMapChat(raw(fields), context()).remaining;
 test('remaining: a required string in the schema; a missing field or a value that is not a string reads as "" and never continues', () => {
   assert.ok(MAP_CHAT_SCHEMA.required.includes('remaining'));
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.remaining), { type: 'string' });
-  assert.equal(mapChatStep.version, 19);
+  assert.equal(mapChatStep.version, 20);
   assert.equal(parseMapChat(JSON.stringify({ reply: 'ok', actions: [] }), context()).remaining, '', 'a version 15/16/17 reply has none');
   for (const value of [null, 0, 12, true, false, ['x'], { a: 1 }, undefined]) assert.equal(parseRemaining({ remaining: value }), '', JSON.stringify(value));
 });
@@ -128,8 +128,10 @@ test('A9 plan: CHAIN_SAFE is exactly the safe kinds, and run_map_action is judge
   for (const action of UNSAFE) assert.equal(isChainSafe(action), false, `${action.kind} ${action.action ?? ''}`);
   assert.deepEqual([...CHAIN_SAFE].sort(), ['add_child', 'add_relation', 'auto_layout', 'collapse_topic', 'expand_topic', 'focus_topic', 'select_topics', 'set_appearance', 'set_topic_kind', 'update_summary']);
 });
+// find_images is outside CHAIN_SAFE as a kind of action, but the owner decided pictures are put in without asking: it never makes a plan (see the next test).
+const PLANNED = UNSAFE.filter(action => action.action !== 'find_images');
 test('A9 plan counterexample: from the second round on any action outside CHAIN_SAFE is a plan card (web text is untrusted), also one delete, one file edit, one note edit; the first round and an ordinary message are unchanged', () => {
-  for (const action of UNSAFE) {
+  for (const action of PLANNED) {
     assert.ok(reasons([action], { round: 2, researchSoFar: 0 }).includes('auto_round_other_actions'), `round 2 ${action.kind} ${action.action ?? ''}`);
     assert.ok(reasons([add(1), action, add(2)], { round: 5, researchSoFar: 0 }).includes('auto_round_other_actions'), `round 5 ${action.kind}`);
   }
@@ -138,6 +140,13 @@ test('A9 plan counterexample: from the second round on any action outside CHAIN_
     assert.equal(plan([action]), null, 'an ordinary message too');
   }
   assert.equal(plan(SAFE.slice(0, 5), { round: 2, researchSoFar: 0 }, { trusted: { researchedIds: new Set(['a']) } }), null, 'only safe actions on safe cards: no plan');
+});
+test('A9 plan: find_images is the one action outside CHAIN_SAFE that never asks, in any round and in a conversation that started research', () => {
+  const pictures = run('find_images');
+  assert.equal(plan([pictures], { round: 2, researchSoFar: 0 }), null);
+  assert.equal(plan([add(1), pictures, add(2)], { round: 5, researchSoFar: 0 }), null);
+  assert.equal(plan([pictures], undefined, { chatStartedResearch: true }), null);
+  assert.deepEqual(reasons([run('merge'), pictures], { round: 2, researchSoFar: 0 }), ['auto_round_other_actions'], 'the merge beside it still asks');
 });
 test('A9 plan: from the second round on, safe actions are not stopped by their number; the first round still is; unsafe ones still count', () => {
   const many = Array.from({ length: MAP_CHAT_PLAN_ACTION_LIMIT + 5 }, (_, i) => add(i));
@@ -163,7 +172,7 @@ test('R3 B1 plan counterexample: a first round or ordinary message of a conversa
   const withResearch = { parents: {}, selectedCount: 0 };
   const researched = { chatStartedResearch: true };
   const r1 = { chain: { round: 1, researchSoFar: 0 }, ...researched };
-  for (const action of UNSAFE) assert.deepEqual(plain(planFor([action], withResearch, r1)?.reasons ?? []).filter(r => r.endsWith('_other_actions') && r !== 'image_other_actions'), ['research_text_other_actions'], `${action.kind} ${action.action ?? ''}`);
+  for (const action of PLANNED) assert.deepEqual(plain(planFor([action], withResearch, r1)?.reasons ?? []).filter(r => r.endsWith('_other_actions') && r !== 'image_other_actions'), ['research_text_other_actions'], `${action.kind} ${action.action ?? ''}`);
   assert.deepEqual(plain(planFor([UNSAFE[0]], withResearch, researched)?.reasons), ['research_text_other_actions'], 'a message after the research, no chain at all');
   assert.equal(planFor([UNSAFE[0]], withResearch, { chain: { round: 1, researchSoFar: 0 } }), null, 'no research started, no change')
   assert.equal(planFor([UNSAFE[0]], withResearch, { trusted: { researchedIds: new Set(['a']) } }), null, 'researched cards alone no longer decide (decision #17)')

@@ -271,13 +271,13 @@ test('a clipboard with text next to the picture is not taken by the card (the ou
   assert.equal(h.counts.createBinary, 0);
 });
 
-// Persona UX ticket 22: a picture picked in the map chat (a web link) also becomes the card's cover. Covers read local files
+// Persona UX ticket 22 (the map chat puts the first found picture in by itself since 2026-11-07): a picture put in by the map chat (a web link) also becomes the card's cover. Covers read local files
 // only, so the file is saved beside the note, embedded and set as `topic-cover`; the Detail keeps the picked link as before.
 const pick = { url: 'https://example.org/a.png', title: 'A picture', source: 'https://example.org/page' };
 const chatPick = async (h, fetchImage = async () => png()) => {
   h.view.plugin.topicRuns = { isBusy: () => false, hasTask: () => false, stopTask() {}, dropPending() {}, flushPending: async () => {} };
   h.view.chatFetchImage = fetchImage;
-  const result = await h.view.chatInsertImage({ mapPath: MAP, mapId: h.view.map.id, nodeId: h.node.id }, { candidate: pick });
+  const result = await h.view.chatPlaceImage({ mapPath: MAP, mapId: h.view.map.id, nodeId: h.node.id }, pick, () => true);
   await h.settle();
   return result;
 };
@@ -291,6 +291,16 @@ test('chat pick: the picked web picture becomes the card cover (saved file, embe
   assert.match(text, /topic-cover: "\[\[Media\/A picture\.png\]\]"/);
   assert.match(text, /!\[\[Media\/A picture\.png\]\]/);
   assert.match(text, /!\[A picture\]\(<https:\/\/example\.org\/a\.png>\)/, 'the Detail still has the picked link');
+});
+
+test('chat pick: the note embed and the cover are ONE undo step (one Cmd+Z takes the picture back out)', async () => {
+  const h = await harness();
+  const result = await chatPick(h);
+  assert.equal(result.ok, true);
+  assert.ok(h.entries.length >= 2, 'the note write and the cover were two entries before they were folded: ' + h.entries.length);
+  let steps = 0;
+  while (h.view.history.canUndo) { h.view.history.undo(); steps++; }
+  assert.equal(steps, 1, 'one undo step for the picture');
 });
 
 test('chat pick: a cover set by hand, or turned off, is not replaced and nothing is downloaded', async () => {

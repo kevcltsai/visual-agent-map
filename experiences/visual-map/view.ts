@@ -396,10 +396,8 @@ import {
   MapChatPanel,
   type MapChatChip,
   type MapChatHost,
-  type MapChatImageItem,
   type MapChatChainOrigin,
   type MapChatImages,
-  type MapChatInsertResult,
   type MapChatLine,
   type MapChatMessage,
   type MapChatOrigin,
@@ -479,7 +477,6 @@ import { MapChatTurnRecord, type TurnEndFields } from "./map-chat-turn-record";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
   chatResearchMode,
-  MAP_CHAT_FIND_IMAGES_LIMIT,
   chatResearchRequest,
   mapChoiceParts,
   matchMapTitle,
@@ -1206,7 +1203,7 @@ function researchWebLines(web: ResearchWebTally): MapChatLine[] {
 }
 /** What one chat action came to: written, skipped with a reason (shown in the chat), or failed. */
 type ChatOutcome =
-  | { status: "done"; images?: MapChatImages; skippedCards?: number; basis?: MapChatBasis }
+  | { status: "done"; images?: MapChatImages[]; skippedCards?: number; basis?: MapChatBasis }
   | { status: "skipped" | "failed"; reason: string; created?: boolean };
 /** What the writes of one reply have made so far: the real id behind each `ref`, and the cards created, in order. */
 interface ChatRun {
@@ -1238,6 +1235,8 @@ const CHAT_RAIL_WIDTH = 44;
 const CHAT_TOOLS_GAP = 12;
 /** The suggestion card hangs this far under the goal bar (styles.css: top calc(100% + 6px)). */
 const GOAL_SUGGEST_GAP = 6;
+/** Picture searches of one reply that run at the same time; the others wait. */
+const CHAT_IMAGE_SEARCH_PARALLEL = 3;
 /** The size of a chat expand: the Next Step dialog's defaults (levels below the topic, topics in total). */
 const CHAT_EXPAND_LEVELS = 2;
 const CHAT_EXPAND_MAX_TOPICS = 15;
@@ -20945,7 +20944,6 @@ export class VisualAgentMapView extends ItemView {
         // The width decides whether the pane has room for the window beside the canvas.
         this.syncChatNarrow();
       },
-      insertImage: (images, item) => this.chatInsertImage(images, item),
       canSave: () => (!this.map ? { ok: false, reason: t("ui.map_chat_save_unavailable") } : { ok: true }),
       saveTranscript: turns => this.saveChatTranscript(turns),
       recordsEnabled: () => this.plugin.settings.mapChatRecords === true,
@@ -22531,7 +22529,10 @@ export class VisualAgentMapView extends ItemView {
     patch: Partial<Pick<MapChatImages, "state" | "reason" | "items">>
   ): void {
     chat.settleImages(block, patch);
-    this.chatImageRecords.get(block)?.images(block);
+    const record = this.chatImageRecords.get(block);
+    record?.images(block);
+    // The result line of the turn (progress, then the count) follows the blocks.
+    record?.relines();
   }
   private releaseChatTask(): void {
     if (this.chatTaskKey) this.plugin.activeTasks?.delete(this.chatTaskKey);
@@ -22797,15 +22798,11 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   private chatLine(label: string, outcome: ChatOutcome): MapChatLine {
-    // A picture search that has only started says so; its line follows the candidate block from then on (settledLine).
-    if (outcome.status === "done" && outcome.images)
-      return {
-        status: "done",
-        text:
-          t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle) +
-          (outcome.images.modelLabel ? t("ui.map_chat_model_suffix_0", outcome.images.modelLabel) : ""),
-        images: outcome.images
-      };
+    // The picture searches of the action: the line follows their blocks from then on (settledLine).
+    if (outcome.status === "done" && outcome.images) {
+      const line: MapChatLine = { status: "done", text: "", imageGroup: outcome.images };
+      return { ...line, text: settledLine(line).text };
+    }
     if (outcome.status === "done")
       return {
         status: "done",
@@ -22932,8 +22929,8 @@ export class VisualAgentMapView extends ItemView {
     // Every entry the writes push is held back, then pushed as the reply's one undo step (a create_map's map switch clears
     // the history, and so what was collected for the old map; the new map's writes are collected from there).
     this.history.openGroup();
-    // How many find_images this reply has asked for so far (the first MAP_CHAT_FIND_IMAGES_LIMIT start, the rest are skipped).
-    const laterBatch = { imageSearches: 0 };
+    // The cards this reply has already started a picture search for (a card is searched once per reply).
+    const laterBatch = { imageNodes: new Set<string>() };
     // How many cards existed when the last auto_layout of the reply ran: the ones made after it are only roughly placed.
     let laidOutCount = 0;
     let layoutDone = false;
@@ -24121,7 +24118,7 @@ export class VisualAgentMapView extends ItemView {
     /** The user's message: the direction of an integration. */
     message = "",
     /** What the later actions of this reply have started so far. */
-    batch: { imageSearches: number } = { imageSearches: 0 },
+    batch: { imageNodes: Set<string> } = { imageNodes: new Set<string>() },
     /** The appearance the reply asked for the cards this merge takes: it goes to the merged card. */
     held?: TopicAppearanceChange,
     /** Where the research and expansions this action starts are collected, for a continuation to wait for. */
@@ -24350,82 +24347,125 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /**
-   * find_images: the chat only picked the card and the search words. The search itself is the Markdown quick action's: the
-   * `markdown.image-search` step through the card's own model (after its usage notice), then only the candidates whose thumbnail
-   * loads. The outcome is "done" once the search started; its candidates join the reply's row later, and nothing is written to
-   * any note until the user picks one (see {@link chatInsertImage}).
+   * find_images: the chat only picked the cards and the search words. For every target card (its `nodeIds`, or every selected
+   * card) the Markdown quick action's `markdown.image-search` step runs through the card's own model (after its usage notice, once
+   * for the whole reply), only pictures whose thumbnail loads are kept, and the first one is put into the card's note by itself
+   * (see {@link chatPlaceImage}); there is nothing for the user to pick. Several cards are several searches, at most
+   * {@link CHAT_IMAGE_SEARCH_PARALLEL} at a time in the view. The outcome is "done" once the searches are set up; their blocks change later.
    */
   private async chatFindImages(
     direction: string,
     targets: string[],
-    batch: { imageSearches: number }
+    batch: { imageNodes: Set<string> }
   ): Promise<ChatOutcome> {
-    batch.imageSearches += 1;
-    if (batch.imageSearches > MAP_CHAT_FIND_IMAGES_LIMIT)
-      return { status: "skipped", reason: t("ui.map_chat_skip_images_limit_0", MAP_CHAT_FIND_IMAGES_LIMIT) };
     const map = this.map;
     const chat = this.chat;
     if (!map || !chat) return skipped("ui.map_chat_skip_map_changed");
-    const ids = targets.length ? targets : this.chatSelectionIds();
-    if (ids.length !== 1) return skipped("ui.map_chat_skip_images_one_card");
-    const node = map.nodes.find(item => item.id === ids[0]);
-    if (!node) return skipped("ui.map_chat_skip_topic_gone");
-    const note = await this.plugin.repo.readNote(node.path, map);
-    const query = direction.trim() || note.title.trim();
-    if (!query) return skipped("ui.map_chat_skip_unavailable");
+    const wanted = targets.length ? targets : this.chatSelectionIds();
+    if (!wanted.length) return skipped("ui.map_chat_skip_images_one_card");
+    // A card is searched once per reply.
+    const ids = [...new Set(wanted)].filter(id => !batch.imageNodes.has(id));
+    if (!ids.length) return skipped("ui.map_chat_skip_images_dup");
+    for (const id of ids) batch.imageNodes.add(id);
     const anchor = { path: this.path, id: map.id };
-    return new Promise<ChatOutcome>(resolve => {
-      let settled = false;
-      const settle = (outcome: ChatOutcome): void => {
-        if (settled) return;
-        settled = true;
-        resolve(outcome);
+    const words = direction.trim();
+    const jobs: { block: MapChatImages; controller: AbortController; model: string; key?: number }[] = [];
+    const blocks: MapChatImages[] = [];
+    for (const id of ids) {
+      const node = map.nodes.find(item => item.id === id);
+      if (!node) continue;
+      const note = await this.plugin.repo.readNote(node.path, map);
+      const title = note.title.trim();
+      // One target keeps the words as they are; several are told apart by their card ("牛肋眼 西式做法" style).
+      const query = (ids.length > 1 ? [words, title].filter(Boolean).join(" ") : words || title).trim();
+      const block: MapChatImages = {
+        query,
+        nodeId: node.id,
+        nodeTitle: note.title,
+        modelLabel: this.plugin.modelLabel(note.model),
+        mapPath: anchor.path,
+        mapId: anchor.id,
+        state: "searching",
+        items: []
       };
-      void this.plugin
-        .confirmAiUsage(note.model, async () => {
-          if (this.closed || this.chat !== chat || this.path !== anchor.path || this.map?.id !== anchor.id) {
-            settle(skipped("ui.map_chat_skip_map_changed"));
-            return;
-          }
-          const controller = new AbortController();
-          const key = ++this.chatImageSequence;
-          this.chatImageSearches.set(key, controller);
-          const block: MapChatImages = {
-            query,
-            nodeId: node.id,
-            nodeTitle: note.title,
-            modelLabel: this.plugin.modelLabel(note.model),
-            mapPath: anchor.path,
-            mapId: anchor.id,
-            state: "searching",
-            items: [],
-            stop: () => {
-              if (this.chatImageSearches.get(key) !== controller) return;
-              this.chatImageSearches.delete(key);
-              controller.abort();
-              this.settleChatImages(chat, block, { state: "stopped" });
-            }
-          };
-          chat.addImages(block);
-          if (this.chatLastRecord) this.chatImageRecords.set(block, this.chatLastRecord);
-          settle({ status: "done", images: block });
-          try {
-            await this.runImageSearch(block, controller, chat, note.model);
-          } finally {
-            if (this.chatImageSearches.get(key) === controller) this.chatImageSearches.delete(key);
-          }
-        })
-        .then(
-          () => settle(skipped("ui.map_chat_skip_not_started")),
-          error => settle({ status: "failed", reason: errorMessage(error) })
-        );
-    });
+      blocks.push(block);
+      // Checked before any AI call is spent: a card that cannot take a picture right now says why and the others go on.
+      const reason = query ? await this.chatImagePreflight(block) : t("ui.map_chat_skip_unavailable");
+      if (reason) {
+        block.state = "empty";
+        block.reason = reason;
+        continue;
+      }
+      jobs.push({ block, controller: new AbortController(), model: note.model });
+    }
+    if (!blocks.length) return skipped("ui.map_chat_skip_topic_gone");
+    // The usage notice of each model that is going to be used; a refusal starts none of this reply's searches.
+    for (const model of new Set(jobs.map(job => job.model))) {
+      let ok = false;
+      try {
+        ok = await this.plugin.confirmAiUsage(model, async () => undefined);
+      } catch (error) {
+        return { status: "failed", reason: errorMessage(error) };
+      }
+      if (!ok) return skipped("ui.map_chat_skip_not_started");
+    }
+    if (this.closed || this.chat !== chat || this.path !== anchor.path || this.map?.id !== anchor.id)
+      return skipped("ui.map_chat_skip_map_changed");
+    for (const job of jobs) {
+      const { block, controller } = job;
+      const key = ++this.chatImageSequence;
+      this.chatImageSearches.set(key, controller);
+      job.key = key;
+      block.stop = () => {
+        if (this.chatImageSearches.get(key) !== controller) return;
+        this.chatImageSearches.delete(key);
+        controller.abort();
+        this.settleChatImages(chat, block, { state: "stopped" });
+      };
+    }
+    for (const block of blocks) {
+      chat.addImages(block);
+      if (this.chatLastRecord) this.chatImageRecords.set(block, this.chatLastRecord);
+    }
+    // The cards that could not start are settled now (their record line is written with the others).
+    for (const block of blocks) if (block.state !== "searching") this.chatImageRecords.get(block)?.images(block);
+    // At most CHAT_IMAGE_SEARCH_PARALLEL searches run at once in this view (across the actions of a reply); the others wait in order.
+    for (const job of jobs)
+      void (async (): Promise<void> => {
+        await this.acquireImageSlot();
+        try {
+          await this.runImageSearch(job.block, job.controller, chat, job.model);
+        } finally {
+          this.releaseImageSlot();
+          if (job.key !== undefined && this.chatImageSearches.get(job.key) === job.controller)
+            this.chatImageSearches.delete(job.key);
+        }
+      })();
+    return { status: "done", images: blocks };
+  }
+  private chatImageRunning = 0;
+  private chatImageWaiters: (() => void)[] = [];
+  private async acquireImageSlot(): Promise<void> {
+    if (this.chatImageRunning < CHAT_IMAGE_SEARCH_PARALLEL) {
+      this.chatImageRunning += 1;
+      return;
+    }
+    // The place is handed over by releaseImageSlot, so the count stays as it is.
+    await new Promise<void>(resolve => this.chatImageWaiters.push(resolve));
+  }
+  private releaseImageSlot(): void {
+    const next = this.chatImageWaiters.shift();
+    if (next) next();
+    else this.chatImageRunning -= 1;
   }
   /** The thumbnail check of a search (a seam: it loads images, which only a real page can). */
   private chatProbeImages(found: ImageCandidate[], signal: AbortSignal): Promise<ImageCandidate[]> {
     return loadableImages(found, signal);
   }
-  /** Runs one picture search to its end and shows what came of it, unless the view, the panel or the map is not the same any more. */
+  /**
+   * Runs one card's picture search to its end: the first loadable picture is put into the card, or the block says why none was.
+   * Nothing is written when the view, the panel or the map is not the same any more, or the search was stopped.
+   */
   private async runImageSearch(
     block: MapChatImages,
     controller: AbortController,
@@ -24433,49 +24473,93 @@ export class VisualAgentMapView extends ItemView {
     model: string
   ): Promise<void> {
     const sameMap = (): boolean => this.path === block.mapPath && this.map?.id === block.mapId;
-    /** Still the place the search was started for: shown only then. */
+    /** Still the place the search was started for: written only then. */
     const current = (): boolean => !this.closed && !controller.signal.aborted && this.chat === chat && sameMap();
     /** The conversation moved on to another map (or a stop was not the cause): say it, but only when the panel is still here. */
     const dropped = (): void => {
       if (this.closed || controller.signal.aborted || this.chat !== chat) return;
       this.settleChatImages(chat, block, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
     };
+    if (!current()) return dropped();
     try {
+      // Checked again where the search really starts: a card may have been locked or started on while it waited its turn.
+      const refused = await this.chatImagePreflight(block);
+      if (!current()) return dropped();
+      if (refused) return this.settleChatImages(chat, block, { state: "empty", reason: refused });
+      chat.markImagesRunning(block);
       const found = await this.plugin.searchImages(block.query, model, controller.signal);
       if (!current()) return dropped();
-      // Web results can be stale or block hotlinking: offer only images that actually load.
-      const loadable = (await this.chatProbeImages(found, controller.signal)).slice(0, 6);
+      // Web results can be stale or block hotlinking: only an image that actually loads is used.
+      const [first] = (await this.chatProbeImages(found, controller.signal)).filter(item =>
+        item.url.startsWith("https://")
+      );
       if (!current()) return dropped();
-      if (!loadable.length) this.settleChatImages(chat, block, { state: "empty" });
-      else this.settleChatImages(chat, block, { state: "ready", items: loadable.map(candidate => ({ candidate })) });
+      if (!first) return this.settleChatImages(chat, block, { state: "empty" });
+      const placed = await this.chatPlaceImage(block, first, current);
+      // Written is written, even when a Stop came in while the write ran: the block tells the truth.
+      if (placed.ok) {
+        this.settleChatImages(chat, block, {
+          state: "ready",
+          items: [{ candidate: first, inserted: block.nodeTitle }]
+        });
+      } else if (current()) this.settleChatImages(chat, block, { state: "empty", reason: placed.reason });
+      else dropped();
     } catch (error) {
       if (!current()) return dropped();
       this.settleChatImages(chat, block, { state: "failed", reason: errorMessage(error) });
     }
   }
+  /** Whether a picture can go into the card of `block` now: the card, or the reason in words. */
+  private chatImageFence(block: MapChatImages): { reason: TranslationKey } | { node: MapNode } {
+    if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
+      return { reason: "ui.map_chat_images_stale_map" };
+    if (this.aimLive()) return { reason: "ui.map_chat_images_stale_locked" };
+    const node = this.map.nodes.find(candidate => candidate.id === block.nodeId);
+    if (!node) return { reason: "ui.map_chat_images_stale_gone" };
+    if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
+    if (this.plugin.topicRuns.isBusy(node.path) || this.plugin.topicRuns.hasTask(node.path))
+      return { reason: "ui.map_chat_images_stale_running" };
+    return { node };
+  }
+  /** Why no search may start for the card of `block` (map switched, AI lock, being merged, an AI task on it), or null. No AI call is spent. */
+  private async chatImagePreflight(block: MapChatImages): Promise<string | null> {
+    const fence = this.chatImageFence(block);
+    if ("reason" in fence) return t(fence.reason);
+    const note = await this.plugin.repo.readNote(fence.node.path, this.map ?? undefined);
+    return note.aiLocked ? t("ui.ai_locked_notice") : null;
+  }
+  /** Writes of pictures go one after another (the searches overlap, the writes and their undo steps do not). */
+  private chatImageWrites: Promise<unknown> = Promise.resolve();
   /**
-   * The user picked a picture candidate: it goes to the end of the card's Detail (a blank line before it), as one undoable edit.
-   * Refused, with the reason in words and nothing written, when the map in view is not the one the candidate came from, the card
-   * is gone, being merged or being worked on by an AI task, or the map cannot be edited. The same checks run again inside the
-   * write, where nothing else can change the map.
+   * Puts the found picture at the end of the card's Detail (a blank line before it) and, when the card has no cover, saves it
+   * beside the note as the cover: both are one undo step (one ⌘Z takes the picture back out of the note and off the card).
+   * Refused, with the reason in words and nothing written, when the map in view is not the one the search came from, the card is
+   * gone, locked, being merged or being worked on by an AI task, the map cannot be edited, or `alive` says the search was stopped.
+   * The same checks run again inside the write, where nothing else can change the map.
    */
-  private async chatInsertImage(block: MapChatImages, item: MapChatImageItem): Promise<MapChatInsertResult> {
-    const fence = (): { reason: TranslationKey } | { node: MapNode } => {
-      if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
-        return { reason: "ui.map_chat_images_stale_map" };
-      if (this.aimLive()) return { reason: "ui.map_chat_images_stale_locked" };
-      const node = this.map.nodes.find(candidate => candidate.id === block.nodeId);
-      if (!node) return { reason: "ui.map_chat_images_stale_gone" };
-      if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
-      if (this.plugin.topicRuns.isBusy(node.path) || this.plugin.topicRuns.hasTask(node.path))
-        return { reason: "ui.map_chat_images_stale_running" };
-      return { node };
-    };
+  private chatPlaceImage(
+    block: MapChatImages,
+    candidate: ImageCandidate,
+    alive: () => boolean
+  ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const work = (): Promise<{ ok: true } | { ok: false; reason: string }> =>
+      this.chatPlaceImageNow(block, candidate, alive);
+    const run = this.chatImageWrites.then(work, work);
+    this.chatImageWrites = run.catch(() => undefined);
+    return run;
+  }
+  private async chatPlaceImageNow(
+    block: MapChatImages,
+    candidate: ImageCandidate,
+    alive: () => boolean
+  ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    type Result = { ok: true } | { ok: false; reason: string };
+    const fence = (): { reason: TranslationKey } | { node: MapNode } =>
+      alive() ? this.chatImageFence(block) : { reason: "ui.map_chat_images_stale_map" };
     const first = fence();
     if ("reason" in first) return { ok: false, reason: t(first.reason) };
-    const outcome: { result: MapChatInsertResult } = {
-      result: { ok: false, reason: t("ui.map_chat_images_stale_map") }
-    };
+    const mark = this.history.mark();
+    const outcome: { result: Result } = { result: { ok: false, reason: t("ui.map_chat_images_stale_map") } };
     try {
       await this.plugin.mutate(async () => {
         const again = fence();
@@ -24486,13 +24570,13 @@ export class VisualAgentMapView extends ItemView {
         // A failure is carried out as a result, not thrown: mutate() would show its own Notice for a throw, and this is the second.
         try {
           const note = await this.plugin.repo.readNote(again.node.path, this.map ?? undefined);
-          // AI lock: the picture the chat found is not put into a locked card.
+          // AI lock: the picture is not put into a locked card.
           if (note.aiLocked) {
             outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
             return;
           }
           const before = note.detail.replace(/\s+$/, "");
-          const addition = imageMarkdown(item.candidate);
+          const addition = imageMarkdown(candidate);
           await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition });
           outcome.result = { ok: true };
         } catch (error) {
@@ -24502,10 +24586,12 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
     }
+    if (!outcome.result.ok) return outcome.result;
     // The picture is in the Detail now. A remote link never becomes a card cover (covers read local files only), so the file is
     // also saved beside the note; a failure here leaves the picture in the Detail as it is and says nothing more.
-    if (outcome.result.ok) this.chatImageRecords.get(block)?.images(block, item);
-    if (outcome.result.ok) await this.chatCoverFromPicture(block, item.candidate).catch(() => undefined);
+    await this.chatCoverFromPicture(block, candidate).catch(() => undefined);
+    // The note write and the cover are one step to undo.
+    this.history.collapseSince(mark, t("ui.map_chat_images_undo_label"));
     return outcome.result;
   }
   /** The bytes of a picked picture (a seam: it needs the network). */

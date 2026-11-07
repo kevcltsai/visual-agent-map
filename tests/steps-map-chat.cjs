@@ -7,7 +7,7 @@ const { estimateTokens } = load('ai/context-builder.ts');
 const { MAP_CHAT_TOKEN_BUDGET, renderMapChatSteer, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
 const { buildMapChatContext, contentHash, isMdStale, MAP_CHAT_MAP_TITLE_LIMIT } = load('core/map-chat-context.ts');
 const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
-const { planFor, matchMapTitle, chatResearchRequest, chatResearchMode, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT, MAP_CHAT_FIND_IMAGES_LIMIT } = load('core/map-chat-plan.ts');
+const { planFor, matchMapTitle, chatResearchRequest, chatResearchMode, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT } = load('core/map-chat-plan.ts');
 const { guardMapChatWrite, normalizeVaultPath, applyMdEdit } = load('core/map-chat-guard.ts');
 const mapChatService = loadWithAiCalls('core/map-chat-service.ts');
 const { partialReply, MapChatService, providerMapChatRunner } = mapChatService;
@@ -432,8 +432,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 19 (version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 19);
+test('C1: the style is not part of the action schema, and the step version is 20 (version 20: find_images takes several targets and the picture is put in automatically; version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 20);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -818,14 +818,16 @@ test('B2 structure tidy: no action kind or run action opens the structure-review
 
 // ---- B3-feat: find_images ----
 const findImages = (fields = {}) => item('run_map_action', { action: 'find_images', nodeIds: ['a'], direction: 'espresso beans', ...fields });
-test('B3 find_images: the strict schema lists it and the parser keeps one target with the search words in direction', () => {
+test('B3 find_images: the strict schema lists it and the parser keeps its targets with the search words in direction', () => {
   assert.ok(plain(MAP_CHAT_SCHEMA.properties.actions.items.properties.action.enum).includes('find_images'));
   const result = parse(reply(findImages()));
   assert.deepEqual(result.rejected, []);
   assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'find_images', nodeIds: ['a'], title: '', goal: '', direction: 'espresso beans', mode: '', images: false });
 });
-test('B3 find_images: more than one target is dropped as bad_value; an empty list (the selection) and a new: ref are kept', () => {
-  assert.deepEqual(codes(parse(reply(findImages({ nodeIds: ['a', 'b'] })))), ['0:bad_value']);
+test('B3 find_images: several targets are kept (owner: every selected card gets a picture); an empty list (the selection) and a new: ref are kept', () => {
+  const several = parse(reply(findImages({ nodeIds: ['a', 'b'] })));
+  assert.deepEqual(several.rejected, []);
+  assert.deepEqual(several.actions[0].nodeIds, ['a', 'b']);
   assert.deepEqual(parse(reply(findImages({ nodeIds: [] }))).rejected, []);
   const withNew = parse(reply(item('add_child', { ref: 'n1', title: 'N' }), findImages({ nodeIds: ['new:n1'] })));
   assert.deepEqual(withNew.rejected, []);
@@ -846,20 +848,35 @@ test('B3 compat: a step version 4 reply (research depth and images, no find_imag
   assert.deepEqual(result.actions[0], { kind: 'run_map_action', action: 'research_standard', nodeIds: ['a'], title: '', goal: '', direction: '', mode: 'standard', images: true }); // step v6: a v4/v5 depth reads as Standard (D-2026-10-231)
   assert.equal(result.actions[1].action, 'merge');
 });
-test('B3 plan: each find_images is one call, at most MAP_CHAT_FIND_IMAGES_LIMIT per reply', () => {
-  assert.equal(MAP_CHAT_FIND_IMAGES_LIMIT, 3);
+test('B3 plan: each target card of a find_images is one call, with no per-reply cap', () => {
   const run = (extra = {}) => ({ kind: 'run_map_action', action: 'find_images', nodeIds: ['x'], title: '', goal: '', direction: '', mode: '', images: false, ...extra });
-  const estimate = actions => planFor([{ kind: 'create_map', title: 'Q' }, ...actions], { parents: {}, selectedCount: 0 }).estimatedCalls;
+  const estimate = (actions, selectedCount = 0) => planFor([{ kind: 'create_map', title: 'Q' }, ...actions], { parents: {}, selectedCount }).estimatedCalls;
   assert.equal(estimate([run()]), 1);
   assert.equal(estimate([run(), run(), run()]), 3);
-  assert.equal(estimate([run(), run(), run(), run()]), 3, 'the fourth is skipped, so the plan counts three');
+  assert.equal(estimate([run(), run(), run(), run()]), 4, 'no cap: the fourth counts');
+  assert.equal(estimate([run({ nodeIds: ['a', 'b', 'c', 'd'] })]), 4, 'one action with four targets is four searches');
+  assert.equal(estimate([run({ nodeIds: [] })], 5), 5, 'an empty list is every selected card');
   assert.equal(estimate([run(), { kind: 'run_map_action', action: 'rate_by_goal', nodeIds: [], title: '', goal: 'g', direction: '', mode: '', images: false }]), 2);
+});
+test('B3 plan: find_images never asks for a plan by itself (not counted in the action limit, not an "other action")', () => {
+  const run = (nodeIds = ['x']) => ({ kind: 'run_map_action', action: 'find_images', nodeIds, title: '', goal: '', direction: '', mode: '', images: false });
+  const ctx = { parents: {}, selectedCount: 16 };
+  assert.equal(planFor(Array.from({ length: 16 }, () => run()), ctx), null, '16 find_images do not ask');
+  assert.equal(planFor([run(Array.from({ length: 16 }, (_, i) => 'n' + i))], ctx), null, 'one action over 16 cards does not ask');
+  assert.deepEqual(plain(planFor([{ kind: 'create_map', title: 'Q' }, run()], ctx).reasons), ['new_map'], 'create_map still asks');
+  const child = i => ({ kind: 'add_child', ref: 'r' + i, parentId: '', title: 'T' + i, summary: '' });
+  assert.ok(planFor([...Array.from({ length: 16 }, (_, i) => child(i)), run()], ctx)?.reasons.includes('many_actions'), '16 add_child plus find_images still asks');
+  for (const options of [{ chatStartedResearch: true }, { chain: { round: 2, researchSoFar: 0 } }]) {
+    const reasons = plain(planFor([run()], ctx, options)?.reasons ?? []);
+    assert.ok(!reasons.includes('research_text_other_actions') && !reasons.includes('auto_round_other_actions'), 'research text rules: ' + reasons);
+  }
+  assert.equal(plain(planFor([run()], ctx, { imageAttached: true, imageMode: 'direct' })?.reasons ?? []).includes('image_other_actions'), false);
 });
 test('B3 prompt: find_images guidance is in both languages and the chat itself still does not search the web', () => {
   const en = mapChatStep.render(request({ language: 'en' }));
-  for (const pattern of [/find_images \(look for candidate pictures for ONE card/, /find_images: short search words/, /use find_images only when the user asks for pictures/i, /You cannot see any picture/, /never that a picture was found or inserted/, /research_standard with images=true; do not combine it with find_images/, /do not inspect files, use tools or search the web/]) assert.match(en, pattern, String(pattern));
+  for (const pattern of [/find_images \(put a picture into each target card automatically/, /find_images: short search words/, /use find_images only when the user asks for pictures\. Send one find_images for each card/i, /You cannot see any picture/, /pictures will be put into those cards automatically, never that a picture was found or inserted/, /research_standard with images=true; do not combine it with find_images/, /do not inspect files, use tools or search the web/]) assert.match(en, pattern, String(pattern));
   const zh = mapChatStep.render(request({ language: 'zh-TW' }));
-  for (const pattern of [/find_images（為「一張」議題找候選圖片/, /find_images：簡短的搜尋詞/, /只有使用者要求圖片時才用 find_images/, /你看不到任何圖片/, /不說已找到或已插入/, /research_standard 並設 images=true，不要與 find_images 混用/, /不要檢視檔案、使用工具或搜尋網路/]) assert.match(zh, pattern, String(pattern));
+  for (const pattern of [/find_images（自動為目標議題放入一張圖/, /find_images：簡短的搜尋詞/, /只有使用者要求圖片時才用 find_images。每張要放圖的議題各發一個 find_images/, /你看不到任何圖片/, /只說會自動把圖放進這些議題，不說已找到或已放入/, /research_standard 並設 images=true，不要與 find_images 混用/, /不要檢視檔案、使用工具或搜尋網路/]) assert.match(zh, pattern, String(pattern));
 });
 
 // B3: the chat does not go on the web; only the picture search does, and its probe cleans up after itself.
@@ -1533,8 +1550,8 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(en, /go one step only/); assert.match(en, /Never express a topic type through the title/);
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
-test('hypothesis-leaning: S21 the step version is 19 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 19);
+test('hypothesis-leaning: S21 the step version is 20 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
+  assert.equal(mapChatStep.version, 20);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [

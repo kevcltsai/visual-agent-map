@@ -35,10 +35,10 @@ export interface MapChatLine {
   status: "done" | "skipped" | "failed";
   text: string;
   /**
-   * The picture search this line stands for. The line says how that search stands now (see {@link settledLine}), so it never
-   * claims a result the candidate block above does not show.
+   * The picture searches this line stands for (one per target card). The line says how they stand now (see {@link settledLine}),
+   * so it never claims a result the block under the reply does not show.
    */
-  images?: MapChatImages;
+  imageGroup?: MapChatImages[];
   /**
    * What the card or cards this line stands for were built from (decided by the program; "read", never "checked"). Kept with the
    * line in memory and in the conversation record. The panel shows it from P4 on.
@@ -46,37 +46,31 @@ export interface MapChatLine {
   basis?: MapChatBasis;
 }
 
-/** How many candidates of a search can still be picked (the pictures whose thumbnail does not load do not count). */
-export function usableImageCount(block: MapChatImages): number {
-  return block.items.filter(item => !item.broken).length;
+/** A search block that ended with a picture put into its card. */
+export function placedImage(block: MapChatImages): MapChatImageItem | undefined {
+  return block.state === "ready" ? block.items.find(item => item.inserted) : undefined;
 }
-/** The line as it reads now: a picture-search line follows the state of its candidate block; any other line is itself. */
+/** The line as it reads now: a picture-search line follows the blocks of its action (one per card); any other line is itself. */
 export function settledLine(line: MapChatLine): MapChatLine {
-  const block = line.images;
-  if (!block) return line;
-  const title = clip(block.nodeTitle);
-  // The model the search runs on, when the block knows it (a block saved before this was added has none: no suffix).
-  const model = block.modelLabel ? t("ui.map_chat_model_suffix_0", block.modelLabel) : "";
-  switch (block.state) {
-    case "searching":
-      return { ...line, status: "done", text: t("ui.map_chat_line_images_started_0", title) + model };
-    case "ready": {
-      const usable = usableImageCount(block);
-      return usable
-        ? { ...line, status: "done", text: t("ui.map_chat_line_images_ready_0_1", title, usable) + model }
-        : { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) + model };
-    }
-    case "empty":
-      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) + model };
-    case "failed":
-      return {
-        ...line,
-        status: "failed",
-        text: t("ui.map_chat_line_images_failed_0_1", title, clip(block.reason ?? "", 160)) + model
-      };
-    case "stopped":
-      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
+  const blocks = line.imageGroup;
+  if (!blocks) return line;
+  const total = blocks.length;
+  const pending = blocks.filter(block => block.state === "searching").length;
+  // The model(s) the searches run on, when the blocks know them (a block saved before this was added has none: no suffix).
+  const labels = [...new Set(blocks.flatMap(block => (block.modelLabel ? [block.modelLabel] : [])))];
+  const model = labels.length ? t("ui.map_chat_model_suffix_0", labels.join(t("ui.map_chat_model_separator"))) : "";
+  if (pending) {
+    return { ...line, status: "done", text: t("ui.map_chat_line_images_progress_0_1", total - pending, total) + model };
   }
+  const placed = blocks.filter(block => placedImage(block)).length;
+  const missed = total - placed;
+  return {
+    ...line,
+    status: placed ? "done" : blocks.some(block => block.state === "failed") ? "failed" : "skipped",
+    text:
+      (missed ? t("ui.map_chat_line_images_group_0_1", placed, missed) : t("ui.map_chat_line_images_group_0", placed)) +
+      model
+  };
 }
 
 /** What a question was sent with, kept so a failed turn can be sent again. */
@@ -129,24 +123,20 @@ export interface MapChatChoices {
   stale?: boolean;
 }
 
-/** One picture candidate of a search, and what became of it. */
+/** The picture a search put into its card. (A restored older record may also list candidates that were never inserted.) */
 export interface MapChatImageItem {
   candidate: ImageCandidate;
-  /** Title of the card the picture was inserted into; set once it was. */
+  /** Title of the card the picture was put into; set once it was. */
   inserted?: string;
-  /** The thumbnail could not be loaded: the candidate cannot be picked. */
-  broken?: boolean;
-  /** An insertion is running; a second click does nothing. */
-  busy?: boolean;
 }
 /**
- * The picture candidates of one `find_images`, shown under the reply that asked for them. They belong to that reply for good: a
- * later message does not drop them (they are a result that was already paid for).
+ * The picture search of one card of a `find_images`: it ends with the first loadable picture put into the card, or with a reason.
+ * The blocks of a reply are shown as one result under it; a later message does not drop them.
  */
 export interface MapChatImages {
   /** The search words. */
   query: string;
-  /** The card the picture is for, with the map it was found on. */
+  /** The card the picture is put into, with the map it was found on. */
   nodeId: string;
   nodeTitle: string;
   mapPath: string;
@@ -156,16 +146,15 @@ export interface MapChatImages {
   state: "searching" | "ready" | "empty" | "failed" | "stopped";
   /** Why the search failed. */
   reason?: string;
-  /** Why the last insertion was refused, in words. */
-  notice?: string;
+  /** The search has started (a searching block that is not running waits for one of the free places). */
+  running?: boolean;
+  /** Empty, or the one picture that was put into the card. */
   items: MapChatImageItem[];
-  /** Restored from a saved conversation: shown without thumbnails or links, and no candidate can be picked. */
+  /** Restored from a saved conversation: shown read-only, without thumbnails or links. */
   stale?: boolean;
-  /** Stops the search (only while it is running). */
+  /** Stops the search (only while it has not ended). */
   stop?(): void;
 }
-/** The outcome of inserting a candidate. */
-export type MapChatInsertResult = { ok: true } | { ok: false; reason: string };
 /** A finished question and answer, as the host saves them. */
 export interface MapChatSavedTurn {
   question: MapChatMessage;
@@ -347,7 +336,6 @@ export interface MapChatHost {
   /** The conversation's state changed (a turn started or ended, a plan appeared or was settled); the canvas may say so. */
   stateChanged?(): void;
   /** Inserts a picture candidate into the card it was found for; resolves with why it was refused, if it was. */
-  insertImage?(images: MapChatImages, item: MapChatImageItem): Promise<MapChatInsertResult>;
   /** The picture the chat is about now, or null (none chosen). */
   image?(): MapChatImageInfo | null;
   /** Calls `changed` whenever the chosen picture changes; the returned function stops listening. */
@@ -497,8 +485,6 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   /** What the reader is told once the reply that is streaming now has ended (a picture search can end in the middle of it). */
   private spokenLater: string[] = [];
   /** The pick button of each picture candidate, to give the keyboard back after a repaint. */
-  private pickEls = new WeakMap<MapChatImageItem, HTMLElement>();
-  private sourceEls = new WeakMap<MapChatImageItem, HTMLElement>();
   private built = false;
   private stopWatching: (() => void) | null = null;
   private stopWatchingImage: (() => void) | null = null;
@@ -1525,16 +1511,24 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    * is, and the reader hears one sentence (after the reply that is streaming now, if one is).
    */
   settleImages(block: MapChatImages, patch: Partial<Pick<MapChatImages, "state" | "reason" | "items">>): void {
-    if (!this.messages.some(message => message.images?.includes(block))) return;
+    const message = this.messages.find(candidate => candidate.images?.includes(block));
+    if (!message) return;
     Object.assign(block, patch);
-    block.stop = undefined;
+    if (block.state !== "searching") block.stop = undefined;
     this.renderLog();
-    if (block.state === "ready")
-      this.announceImages(t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip(block.nodeTitle)));
-    else if (block.state === "empty") this.announceImages(t("ui.map_chat_images_none"));
-    else if (block.state === "failed")
-      this.announceImages(t("ui.map_chat_images_failed_0", clip(block.reason ?? "", 160)));
-    else if (block.state === "stopped") this.announceImages(t("ui.map_chat_images_stopped"));
+    // One sentence for the whole group, once its last search has ended (a sentence per card would flood the reader).
+    if (block.state === "searching" || (message.images ?? []).some(other => other.state === "searching")) return;
+    const placed = (message.images ?? []).filter(other => placedImage(other)).length;
+    const missed = (message.images ?? []).length - placed;
+    this.announceImages(
+      missed ? t("ui.map_chat_images_summary_0_1", placed, missed) : t("ui.map_chat_images_summary_0", placed)
+    );
+  }
+  /** A queued search got a free place and starts: its row says so. */
+  markImagesRunning(block: MapChatImages): void {
+    if (!this.messages.some(message => message.images?.includes(block))) return;
+    block.running = true;
+    this.renderLog();
   }
   /** Back to an empty conversation (a different map was opened). */
   reset(): void {
@@ -2455,8 +2449,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       (message.images ?? [])
         .map(
           block =>
-            `images:${block.stale ? "stale:" : ""}${block.state}:${block.reason ?? ""}:${block.notice ?? ""}:${block.items
-              .map(item => [item.candidate.url, item.inserted ?? "", item.broken ? 1 : 0, item.busy ? 1 : 0].join("~"))
+            `images:${block.stale ? "stale:" : ""}${block.state}:${block.running ? 1 : 0}:${block.nodeTitle}:${block.reason ?? ""}:${block.items
+              .map(item => [item.candidate.url, item.inserted ?? ""].join("~"))
               .join(",")}`
         )
         .join(";"),
@@ -2538,7 +2532,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
     this.buildBasis(row, message);
-    for (const block of message.images ?? []) this.buildImages(row, block);
+    if (message.images?.length) this.buildImages(row, message.images);
     if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row);
     if (message.seenImage) {
       // The words stay one plain-text element; the eye sits beside it.
@@ -2825,165 +2819,106 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     });
   }
   /**
-   * The picture candidates of one search. Every state says itself in words. A candidate is one button (insert it) and one link
-   * (the page it came from); nothing here is run or fetched except the thumbnails, which are https images shown without a
-   * referrer. All text goes in as text.
+   * The pictures one reply put into its cards, as one result block: a summary, then a row per card (thumbnail, card, picture
+   * title, the page it came from; or the card and why it got none). While searching it also says which card is being searched,
+   * how many have ended, and offers Stop for the ones that have not. Nothing here is run or fetched except the thumbnails,
+   * which are https images shown without a referrer. All text goes in as text.
    */
-  private buildImages(row: HTMLElement, block: MapChatImages): void {
+  private buildImages(row: HTMLElement, blocks: MapChatImages[]): void {
+    const live = blocks.filter(block => !block.stale);
+    if (live.length) this.buildImageResult(row, live);
+    const old = blocks.filter(block => block.stale);
+    if (old.length) this.buildStaleImages(row, old);
+  }
+  private buildImageResult(row: HTMLElement, blocks: MapChatImages[]): void {
+    const pending = blocks.filter(block => block.state === "searching");
     const box = row.createDiv({
-      cls: `vam-map-chat-images is-${block.state}`,
-      attr: {
-        role: "group",
-        // A restored block has no card title: the generic name, not "Picture candidates for “”".
-        "aria-label": block.nodeTitle
-          ? t("ui.map_chat_images_label_0", clip(block.nodeTitle))
-          : t("ui.map_chat_images_label")
-      }
+      cls: `vam-map-chat-images ${pending.length ? "is-searching" : "is-done"}`,
+      attr: { role: "group", "aria-label": t("ui.map_chat_images_label") }
     });
-    const statusText = (): string =>
-      block.state === "searching"
-        ? t("ui.map_chat_images_searching_0", clip(block.query, 80))
-        : block.state === "ready"
-          ? usableImageCount(block)
-            ? t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip(block.nodeTitle))
-            : t("ui.map_chat_images_none")
-          : block.state === "empty"
-            ? t("ui.map_chat_images_none")
-            : block.state === "failed"
-              ? t("ui.map_chat_images_failed_0", clip(block.reason ?? "", 160))
-              : t("ui.map_chat_images_stopped");
-    if (block.stale) {
-      box.addClass("is-stale");
-      box.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
-      const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
-      for (const item of block.items) {
-        const cell = list.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
-        const pick = cell.createEl("button", { cls: "vam-map-chat-images-pick", attr: { type: "button" } });
-        pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(item.candidate.title, 80) });
-        if (item.inserted)
-          pick.createSpan({
-            cls: "vam-map-chat-images-state is-inserted",
-            text: t("ui.map_chat_images_inserted_0", clip(item.inserted))
-          });
-        this.makeInert(pick);
-      }
-      return;
-    }
-    box.createDiv({ cls: "vam-map-chat-images-status", text: statusText() });
-    if (block.state === "searching" && block.stop) {
+    const placed = blocks.filter(block => placedImage(block)).length;
+    const head = box.createDiv({ cls: "vam-map-chat-images-status" });
+    if (pending.length) {
+      const current = pending.find(block => block.running) ?? pending[0];
+      head.setText(t("ui.map_chat_images_searching_0", clip(current.nodeTitle || current.query, 80)));
+      box.createDiv({
+        cls: "vam-map-chat-images-progress",
+        text: t("ui.map_chat_images_progress_0_1", blocks.length - pending.length, blocks.length)
+      });
       const stop = box.createEl("button", {
         cls: "vam-map-chat-images-stop",
         text: t("ui.map_chat_images_stop"),
         attr: { type: "button" }
       });
-      stop.addEventListener("click", () => block.stop?.());
-    }
-    if (block.state === "ready") {
-      const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
-      // Pictures that cannot be loaded come last, so the ones that can be picked are together at the top.
-      const ordered = [...block.items.filter(item => !item.broken), ...block.items.filter(item => item.broken)];
-      ordered.forEach(item => this.buildImageItem(list, block, item));
-    }
-    if (block.notice)
-      box.createDiv({ cls: "vam-map-chat-images-notice", text: block.notice, attr: { role: "status" } });
-  }
-  private buildImageItem(list: HTMLElement, block: MapChatImages, item: MapChatImageItem): void {
-    const { candidate } = item;
-    const cell = list.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
-    const pick = cell.createEl("button", {
-      cls: "vam-map-chat-images-pick",
-      attr: {
-        type: "button",
-        "aria-label": item.inserted
-          ? t("ui.map_chat_images_inserted_0", clip(item.inserted))
-          : t("ui.map_chat_images_insert_0_1", clip(candidate.title), clip(block.nodeTitle)),
-        "aria-disabled": String(!!item.inserted || !!item.broken || !!item.busy)
-      }
-    });
-    // Inserted and cannot-load both cannot be pressed, but they are not alike: the first keeps its picture and says so with a
-    // tick and the accent colour, the second has no picture at all (a dashed frame and a muted word).
-    pick.toggleClass("is-inserted", !!item.inserted);
-    pick.toggleClass("is-broken", !!item.broken && !item.inserted);
-    this.pickEls.set(item, pick);
-    // Only the https address the parser kept; no referrer is sent, and nothing runs.
-    if (item.broken) {
-      // No picture at all: a dashed frame in its place.
-      const gap = pick.createDiv({ cls: "vam-map-chat-images-missing", attr: { "aria-hidden": "true" } });
-      setIcon(gap.createSpan({ cls: "vam-map-chat-images-missing-icon" }), "image-off");
+      stop.addEventListener("click", () => {
+        for (const block of pending) block.stop?.();
+      });
     } else {
-      const thumb = pick.createEl("img", {
-        cls: "vam-map-chat-images-thumb",
-        attr: { src: candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
-      });
-      thumb.addEventListener("error", () => {
-        item.broken = true;
-        // The row is laid out again: this card moves behind the ones that load, and the sentence above counts only those.
-        // The keyboard stays on what it was on in this row (see keepRowFocus).
-        const restore = this.keepRowFocus(block);
-        this.renderLog();
-        restore();
-      });
+      const missed = blocks.length - placed;
+      head.setText(
+        missed ? t("ui.map_chat_images_summary_0_1", placed, missed) : t("ui.map_chat_images_summary_0", placed)
+      );
     }
-    pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(candidate.title, 80) });
-    if (item.inserted) {
-      const state = pick.createSpan({ cls: "vam-map-chat-images-state is-inserted" });
-      setIcon(state.createSpan({ cls: "vam-map-chat-images-state-icon" }), "check");
-      state.createSpan({ text: t("ui.map_chat_images_inserted_0", clip(item.inserted)) });
-    } else if (item.broken) pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
-    pick.addEventListener("click", () => this.pickImage(block, item));
-    const source = cell.createEl("a", {
-      cls: "vam-map-chat-images-source",
-      text: t("ui.map_chat_images_source"),
-      attr: {
-        href: candidate.source,
-        target: "_blank",
-        rel: "noopener noreferrer",
-        "aria-label": t("ui.map_chat_images_source_0", clip(candidate.title))
+    const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
+    for (const block of blocks) {
+      const cell = list.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
+      const item = placedImage(block);
+      if (item) {
+        cell.createEl("img", {
+          cls: "vam-map-chat-images-thumb",
+          attr: { src: item.candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
+        });
+        const text = cell.createDiv({ cls: "vam-map-chat-images-text" });
+        text.createDiv({ cls: "vam-map-chat-images-topic", text: clip(block.nodeTitle, 80) });
+        text.createDiv({ cls: "vam-map-chat-images-title", text: clip(item.candidate.title, 80) });
+        if (item.candidate.source)
+          text.createEl("a", {
+            cls: "vam-map-chat-images-source",
+            text: t("ui.map_chat_images_source"),
+            attr: {
+              href: item.candidate.source,
+              target: "_blank",
+              rel: "noopener noreferrer",
+              "aria-label": t("ui.map_chat_images_source_0", clip(item.candidate.title))
+            }
+          });
+        continue;
       }
+      cell.addClass("is-missed");
+      const text = cell.createDiv({ cls: "vam-map-chat-images-text" });
+      text.createDiv({ cls: "vam-map-chat-images-topic", text: clip(block.nodeTitle, 80) });
+      const why =
+        block.state === "searching"
+          ? block.running
+            ? t("ui.map_chat_images_searching_0", clip(block.query, 80))
+            : t("ui.map_chat_images_queued")
+          : block.state === "stopped"
+            ? t("ui.map_chat_images_stopped")
+            : block.state === "failed"
+              ? t("ui.map_chat_images_failed_0", clip(block.reason ?? "", 160))
+              : (block.reason ?? t("ui.map_chat_images_none"));
+      text.createDiv({ cls: "vam-map-chat-images-reason", text: why });
+    }
+  }
+  /** Older saved records: what was listed, read-only (no link, no thumbnail, nothing to press). */
+  private buildStaleImages(row: HTMLElement, blocks: MapChatImages[]): void {
+    const box = row.createDiv({
+      cls: "vam-map-chat-images is-stale",
+      attr: { role: "group", "aria-label": t("ui.map_chat_images_label") }
     });
-    this.sourceEls.set(item, source);
-  }
-  /**
-   * Remembers what the keyboard is on in the row that shows `block` (a candidate's button or source link, or the row's
-   * retry button) and returns how to put it back once that row was built again.
-   */
-  private keepRowFocus(block: MapChatImages): () => void {
-    const active = this.host.activeElement();
-    const message = this.messages.find(candidate => candidate.images?.includes(block));
-    const entry = message ? this.rows.get(message) : undefined;
-    if (!message || !entry || !active || !entry.row.contains(active)) return () => {};
-    for (const shown of message.images ?? [])
-      for (const item of shown.items) {
-        if (this.pickEls.get(item) === active) return () => this.pickEls.get(item)?.focus();
-        if (this.sourceEls.get(item) === active) return () => this.sourceEls.get(item)?.focus();
+    box.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+    const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
+    for (const block of blocks)
+      for (const item of block.items) {
+        const cell = list.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
+        const text = cell.createDiv({ cls: "vam-map-chat-images-text" });
+        text.createDiv({ cls: "vam-map-chat-images-title", text: clip(item.candidate.title, 80) });
+        if (item.inserted)
+          text.createDiv({
+            cls: "vam-map-chat-images-state is-inserted",
+            text: t("ui.map_chat_images_inserted_0", clip(item.inserted))
+          });
       }
-    if (entry.more === active) return () => this.rows.get(message)?.more?.focus();
-    return () => {};
-  }
-  /** A candidate was chosen: the host inserts it into the card; the button is inert while that runs and afterwards. */
-  private pickImage(block: MapChatImages, item: MapChatImageItem): void {
-    if (item.inserted || item.broken || item.busy || !this.host.insertImage) return;
-    const hadFocus = this.hasFocus();
-    item.busy = true;
-    block.notice = undefined;
-    this.renderLog();
-    if (hadFocus) this.pickEls.get(item)?.focus();
-    void this.host.insertImage(block, item).then(
-      result => {
-        item.busy = false;
-        if (result.ok) item.inserted = block.nodeTitle;
-        block.notice = result.ok ? undefined : result.reason;
-        this.renderLog();
-        if (hadFocus) this.pickEls.get(item)?.focus();
-        this.announceImages(result.ok ? t("ui.map_chat_images_inserted_0", clip(block.nodeTitle)) : result.reason);
-      },
-      (error: unknown) => {
-        item.busy = false;
-        block.notice = t("ui.map_chat_images_insert_failed_0", error instanceof Error ? error.message : String(error));
-        this.renderLog();
-        if (hadFocus) this.pickEls.get(item)?.focus();
-      }
-    );
   }
   private buildChoices(row: HTMLElement, choices: MapChatChoices): void {
     const box = row.createDiv({ cls: "vam-map-chat-choices" });

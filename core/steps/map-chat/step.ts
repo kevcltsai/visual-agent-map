@@ -633,8 +633,7 @@ export function parseMapChat(
             goal = text("goal", false);
           if (action === "merge" && !title) throw new Dropped("missing_field");
           if (action === "rate_by_goal" && !goal) throw new Dropped("missing_field");
-          // find_images puts pictures on exactly one card: an existing card or a `new:<ref>`; empty means the single selected card (the view checks).
-          if (action === "find_images" && nodeIds.length > 1) throw new Dropped("bad_value");
+          // find_images: one or more cards (an existing card or a `new:<ref>`); empty means every selected card (the view checks).
           // mode and images only mean something to a research; every other action ignores them. A reply of version 5 or earlier
           // has `depth` instead of `mode`: a named depth reads as Standard, an empty one as not named.
           const research = action === "research_standard";
@@ -842,7 +841,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 19,
+  version: 20,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

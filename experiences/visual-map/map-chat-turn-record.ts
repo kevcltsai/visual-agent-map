@@ -1,6 +1,6 @@
 import type { RecordEventKind, RecordLineInput, RecordLineItem, RecordTurnStatus } from "../../core/map-chat-records";
 import type { MapChatImages, MapChatLine, MapChatMessage } from "./map-chat";
-import { settledLine } from "./map-chat";
+import { placedImage, settledLine } from "./map-chat";
 import type { MapChatRecordWriter } from "./map-chat-record-writer";
 
 /** What a turn's end line carries besides its status. Anything left out is read from the turn's answer message. */
@@ -90,14 +90,33 @@ export class MapChatTurnRecord {
     if (!this.ended) return;
     this.write({ type: "lines", turn: this.turn, lines: plainLines(this.answer.lines) });
   }
-  /** The state of a picture search of this turn (`extraInserted`: the candidate being inserted right now). */
-  images(block: MapChatImages, extraInserted?: unknown): void {
+  /**
+   * The pictures this turn put into its cards (the failure reasons are in the result lines). One line for the whole turn, the
+   * newest wins: each item is "card: picture title", and every item was inserted. The state is `ready` when any picture was
+   * put in, else `stopped` when every search was stopped, else `failed` / `empty`.
+   */
+  images(block: MapChatImages): void {
+    const blocks = this.answer.images?.includes(block) ? this.answer.images : [block];
+    const placed = blocks.flatMap(entry => {
+      const item = placedImage(entry);
+      return item
+        ? [{ title: `${entry.nodeTitle}: ${item.candidate.title}`, sourceUrl: item.candidate.source ?? "" }]
+        : [];
+    });
+    const ended = blocks.filter(entry => entry.state !== "searching");
+    const state = placed.length
+      ? "ready"
+      : ended.every(entry => entry.state === "stopped")
+        ? "stopped"
+        : ended.some(entry => entry.state === "failed")
+          ? "failed"
+          : "empty";
     this.write({
       type: "images",
       turn: this.turn,
-      state: block.state,
-      items: block.items.map(item => ({ title: item.candidate.title, sourceUrl: item.candidate.source ?? "" })),
-      inserted: block.items.flatMap((item, index) => (item.inserted || item === extraInserted ? [index] : []))
+      state,
+      items: placed,
+      inserted: placed.map((_, index) => index)
     });
   }
 }

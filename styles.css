@@ -862,23 +862,18 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-choice { height: auto; padding: 4px 8px; justify-content: flex-start; text-align: start; white-space: normal; }
 .vam-map-chat-images { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding: 6px 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); font-size: var(--font-ui-small); }
 .vam-map-chat-images-status { color: var(--text-normal); font-weight: var(--font-semibold); overflow-wrap: anywhere; }
-.vam-map-chat-images-notice { color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-map-chat-images-progress { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat .vam-map-chat-images-stop { align-self: flex-start; height: auto; padding: 2px 10px; font-size: var(--font-ui-smaller); }
-.vam-map-chat-images-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; }
-.vam-map-chat-images-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.vam-map-chat .vam-map-chat-images-pick { display: flex; flex-direction: column; align-items: stretch; gap: 4px; height: auto; padding: 4px; text-align: start; white-space: normal; }
-.vam-map-chat .vam-map-chat-images-pick[aria-disabled="true"] { cursor: default; }
-.vam-map-chat .vam-map-chat-images-pick[aria-disabled="true"]:not(.is-inserted) { color: var(--text-muted); }
-.vam-map-chat .vam-map-chat-images-pick.is-inserted { box-shadow: 0 0 0 2px var(--interactive-accent); opacity: 1; }
-.vam-map-chat .vam-map-chat-images-pick.is-broken { background: transparent; box-shadow: none; border: 1px dashed var(--background-modifier-border-hover); }
-.vam-map-chat-images-missing { display: flex; align-items: center; justify-content: center; height: 72px; border: 1px dashed var(--background-modifier-border-hover); border-radius: var(--radius-s); color: var(--text-muted); }
-.vam-map-chat-images-state.is-inserted { display: flex; align-items: center; gap: 4px; color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); }
-.vam-map-chat-images-state-icon { display: inline-flex; flex: none; }
-.vam-map-chat-images-thumb { display: block; width: 100%; height: 72px; object-fit: cover; border-radius: var(--radius-s); background: var(--background-secondary); }
-.vam-map-chat-images-title, .vam-map-chat-images-state { overflow-wrap: anywhere; font-size: var(--font-ui-smaller); }
-.vam-map-chat-images-state { color: var(--text-muted); font-weight: var(--font-semibold); }
+.vam-map-chat-images-list { display: flex; flex-direction: column; gap: 6px; }
+.vam-map-chat-images-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vam-map-chat-images-thumb { display: block; flex: none; width: 56px; height: 42px; object-fit: cover; border-radius: var(--radius-s); background: var(--background-secondary); }
+.vam-map-chat-images-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.vam-map-chat-images-topic { color: var(--text-normal); font-weight: var(--font-semibold); overflow-wrap: anywhere; font-size: var(--font-ui-smaller); }
+.vam-map-chat-images-title, .vam-map-chat-images-reason, .vam-map-chat-images-state { overflow-wrap: anywhere; font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-map-chat-images-item.is-missed .vam-map-chat-images-topic { color: var(--text-muted); }
+.vam-map-chat-images-state.is-inserted { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); }
 .vam-map-chat-images-source { font-size: var(--font-ui-smaller); }
-.vam-map-chat-images-pick:focus-visible, .vam-map-chat-images-stop:focus-visible, .vam-map-chat-images-source:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-chat-images-stop:focus-visible, .vam-map-chat-images-source:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-sr-only { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 /* Opening screen: one raised surface in the middle of the empty canvas. */
 .vam-chat-hero-slot { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; overflow: auto; pointer-events: none; }

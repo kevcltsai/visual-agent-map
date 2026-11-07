@@ -3912,91 +3912,159 @@ integrationTest('B2 synthesize: the plan card keeps the user\'s message as the i
   const o = calls[0].options; eq([o.researchMode, o.visualMode, o.synthesisContent, 'depth' in o && o.depth !== undefined], ['local', 'off', 'full', false], 'an integration from the chat is always Quick (D-2026-10-229)');
 });
 
-// ---- B3-feat: find_images (candidates, insertion, lifecycle) and "save as a note" ----------------------------------------
+// ---- B3-feat: find_images (automatic placement, lifecycle) and "save as a note" ----------------------------------------
+// Owner decision 2026-11-07: every target card gets the first loadable picture in its own note, by itself - no candidate list, no click, no question.
 const { localDate, transcriptMarkdown } = load('core/map-chat-transcript.ts');
 const imageItems = count => Array.from({ length: count }, (_, i) => ({ title: `Pic ${i}`, url: `https://img.example/${i}.jpg`, source: `https://page.example/${i}` }));
 const findAct = (h, key, extra = {}) => ({ kind: 'run_map_action', action: 'find_images', nodeIds: key ? [h.ids[key]] : [], title: '', goal: '', direction: 'espresso', depth: '', images: false, ...extra });
-const lastImages = (h, at = 0) => h.view.chat.transcript().at(-1).images?.[at];
-const pickButtons = h => findAll(h.view.chat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-images-pick'));
+const allImages = h => h.view.chat.transcript().at(-1).images ?? [];
+const lastImages = (h, at = 0) => allImages(h)[at];
+const imagesDone = h => allImages(h).length > 0 && allImages(h).every(b => b.state !== 'searching');
+const waitImages = h => withTimeout(until(() => imagesDone(h)));
+const imageRows = h => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-item'));
 const noteFile = (h, key) => h.node(key).path;
+const imageEmbed = i => `![Pic ${i}](<https://img.example/${i}.jpg>)\n\n[Pic ${i}](<https://page.example/${i}>)`;
+/** A search that answers each query with its own picture, so a note shows which search wrote it. */
+const perQuery = async query => [{ title: `Pic ${query}`, url: `https://img.example/${encodeURIComponent(query)}.jpg`, source: `https://page.example/${encodeURIComponent(query)}` }];
 /** A conversation with one open turn (the reply is still "streaming"), as while a reply's actions are applied. */
 async function imageHarness(options) {
   const h = await harness(options); await h.view.hydrate();
   const chat = h.open(); chat.begin('find a picture for Body');
   return { h, chat };
 }
-/** Starts a search for card `key`, lets it finish with `count` candidates and returns the ready block. */
+/** Starts a search for card `key`, lets it finish and returns its block (its picture is in the card by then). */
 async function readyImages(h, count = 3, key = 'a') {
   h.control.search = async () => imageItems(count);
   const lines = await apply(h, [findAct(h, key)]);
   assert.equal(lines[0].status, 'done', JSON.stringify(lines));
-  await withTimeout(until(() => lastImages(h)?.state !== 'searching'));
+  await waitImages(h);
   return lastImages(h);
 }
 
-integrationTest('B3 find_images: the chat only picks the card and the words; the search runs through the card\'s own model after its usage notice, and nothing is written', async () => {
+integrationTest('B3 find_images: the chat only picks the card and the words; the search runs through the card\'s own model after its usage notice, then the first picture goes into the note by itself', async () => {
   const { h, chat } = await imageHarness();
   const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(8); };
   const file = noteFile(h, 'a'); const before = h.contents.get(file); const note = await h.note('a');
-  const lines = await apply(h, [findAct(h, 'a')]);
-  eq(lines.map(l => l.status), ['done']); assert.equal(lines[0].text, 'Started looking for pictures for “Body” (label(claude:sonnet))', 'a start is not a "Done"'); assert.doesNotMatch(lines[0].text, /Done/);
-  assert.equal(h.control.searches.length, 1); assert.equal(h.control.searches[0].query, 'espresso', 'the search words are the direction');
+  const lines = await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => h.control.searches.length === 1));
+  eq(lines.map(l => l.status), ['done']); assert.equal(lines[0].text, 'Looking for pictures: 0 of 1 done (label(claude:sonnet))', 'a start is not a "Done"'); assert.doesNotMatch(lines[0].text, /Pictures put into/);
+  assert.equal(h.control.searches.length, 1); assert.equal(h.control.searches[0].query, 'espresso', 'one target: the search words are the direction');
   assert.equal(h.control.searches[0].model, note.model, 'the card\'s model, not the chat model'); assert.equal(h.control.models.at(-1), note.model, 'asked its usage notice first');
   assert.equal(h.control.calls.filter(c => c === 'chat').length, 0, 'the chat itself made no request of its own here');
   const block = lastImages(h); assert.equal(block.state, 'searching'); assert.equal(block.nodeId, h.ids.a);
-  assert.match(visibleText(h.view.chat.logEl), /Looking for pictures: espresso/); assert.ok(findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).length === 1, 'a Stop button while it runs');
+  assert.match(visibleText(h.view.chat.logEl), /Looking for pictures: Body/); assert.match(visibleText(h.view.chat.logEl), /0 of 1 done/);
+  assert.equal(findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).length, 1, 'one Stop button while it runs');
+  assert.equal(h.contents.get(file), before, 'nothing is written before a picture is found');
   gate.resolve(); await withTimeout(until(() => block.state === 'ready'));
-  assert.equal(block.items.length, 6, 'at most six');
-  assert.equal(h.contents.get(file), before, 'listing candidates writes nothing to the card'); assert.equal(chat.isBusy, true, 'the turn itself is not touched');
+  assert.equal(block.items.length, 1, 'only the first loadable picture; the other seven are neither shown nor kept'); assert.equal(block.items[0].candidate.title, 'Pic 0'); assert.equal(block.items[0].inserted, 'Body');
+  assert.equal((await h.note('a')).detail, imageEmbed(0), 'in the card\'s own note, with its source');
+  assert.equal(findAll(h.view.chat.logEl, i => i.tag === 'button' && /images-(pick|insert)/.test(i.cls)).length, 0, 'no insert button, no candidate list');
+  assert.equal(findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).length, 0);
+  assert.equal(chat.isBusy, true, 'the turn itself is not touched'); eq(h.control.calls.filter(c => c === 'chat'), []);
 });
-integrationTest('B3 find_images: each candidate is a button and a source link; thumbnails are https only, lazy and without a referrer; titles are text', async () => {
+integrationTest('B3 find_images: four selected cards each get one search of their own (direction + card title) and one picture in their own note, with no choice and no question', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery;
+  const keys = ['a', 'b', 'c', 'root']; const titles = { a: 'Body', b: 'Mind', c: 'REM', root: 'Sleep' };
+  const lines = await apply(h, [findAct(h, null, { nodeIds: keys.map(k => h.ids[k]) })]);
+  eq(lines.map(l => l.status), ['done']); await waitImages(h);
+  assert.equal(h.control.searches.length, 4, 'every target is searched');
+  eq(h.control.searches.map(s => s.query).sort(), keys.map(k => `espresso ${titles[k]}`).sort());
+  for (const key of keys) assert.equal((await h.note(key)).detail, `![Pic espresso ${titles[key]}](<https://img.example/${encodeURIComponent(`espresso ${titles[key]}`)}.jpg>)\n\n[Pic espresso ${titles[key]}](<https://page.example/${encodeURIComponent(`espresso ${titles[key]}`)}>)`, key);
+  assert.equal(allImages(h).length, 4); assert.ok(allImages(h).every(b => b.state === 'ready' && b.items.length === 1));
+  assert.equal(h.control.models.length, 1, 'the usage notice of a model is asked once for the reply'); assert.equal(h.view.chat.pendingPlan(), null, 'no plan, no confirmation');
+  const result = findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images')); assert.equal(result.length, 1, 'one result block under the reply');
+  assert.match(visibleText(result[0]), /Put pictures into 4 topic\(s\)/); assert.doesNotMatch(visibleText(result[0]), /not found/);
+  assert.equal(imageRows(h).length, 4); for (const row of imageRows(h)) { assert.equal(findAll(row, i => i.tag === 'img').length, 1, 'thumbnail'); assert.equal(findAll(row, i => i.tag === 'a').length, 1, 'source link'); }
+  for (const t of Object.values(titles)) assert.ok(visibleText(result[0]).includes(t), `${t} is named in its row`);
+  assert.equal(findAll(h.view.chat.logEl, i => i.tag === 'button' && !hasClass(i, 'vam-map-chat-images-stop')).filter(b => /image/.test(b.cls)).length, 0, 'nothing to press');
+});
+integrationTest('B3 find_images: an empty target list takes every selected card; with no search words each search is the card title', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery;
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([h.ids.a, h.ids.b]);
+  const lines = await apply(h, [findAct(h, null, { direction: '' })]); eq(lines.map(l => l.status), ['done']); await waitImages(h);
+  eq(h.control.searches.map(s => s.query).sort(), ['Body', 'Mind']); assert.equal(allImages(h).length, 2);
+  h.view.selection.replaceMulti([]); h.view.selection.setSelected(h.ids.c);
+  const again = await apply(h, [findAct(h, null, { direction: '' })]); eq(again.map(l => l.status), ['done']); await withTimeout(until(() => h.control.searches.length === 3)); assert.equal(h.control.searches.at(-1).query, 'REM', 'one selected card: its title');
+});
+integrationTest('B3 find_images: no target and no selection is skipped with a sentence; a card that is gone is skipped too', async () => {
   const { h } = await imageHarness();
-  h.control.search = async () => [{ title: '<img src=x onerror=alert(1)>', url: 'https://img.example/x.jpg', source: 'https://page.example/x' }, ...imageItems(1)];
-  await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'ready'));
-  const buttons2 = pickButtons(h); assert.equal(buttons2.length, 2);
-  assert.equal(buttons2[0].attrs['aria-label'], 'Insert: <img src=x onerror=alert(1)> into Body');
-  const thumbs = findAll(h.view.chat.logEl, i => i.tag === 'img'); assert.equal(thumbs.length, 2);
-  for (const thumb of thumbs) { assert.equal(thumb.attrs.referrerpolicy, 'no-referrer'); assert.equal(thumb.attrs.loading, 'lazy'); assert.equal(thumb.attrs.alt, ''); assert.match(thumb.attrs.src, /^https:\/\//); assert.ok(hasClass(thumb, 'vam-map-chat-images-thumb')); }
-  const links = findAll(h.view.chat.logEl, i => i.tag === 'a' && hasClass(i, 'vam-map-chat-images-source'));
-  assert.equal(links.length, 2); assert.equal(links[0].attrs.href, 'https://page.example/x'); assert.equal(links[0].attrs.target, '_blank'); assert.equal(links[0].attrs.rel, 'noopener noreferrer'); assert.equal(links[0].text, 'Source page');
-  assert.ok(visibleText(h.view.chat.logEl).includes('<img src=x onerror=alert(1)>'), 'shown as text');
-  assert.equal(findAll(h.view.chat.logEl, i => i.tag === 'img' && !hasClass(i, 'vam-map-chat-images-thumb')).length, 0, 'no other picture is ever created');
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
+  let lines = await apply(h, [findAct(h, null)]); assert.equal(lines[0].status, 'skipped'); assert.match(lines[0].text, /select the topics first/);
+  assert.equal(h.control.searches.length, 0);
+  lines = await apply(h, [findAct(h, null, { nodeIds: ['gone'] })]); assert.equal(lines[0].status, 'skipped'); assert.match(lines[0].text, /no longer on the map/);
 });
-integrationTest('B3 find_images: nothing that loads means a sentence and no insertion', async () => {
-  const { h } = await imageHarness(); h.control.probe = async () => [];
-  const file = noteFile(h, 'a'); const before = h.contents.get(file);
-  const block = await readyImages(h);
-  assert.equal(block.state, 'empty'); assert.match(visibleText(h.view.chat.logEl), /No loadable picture was found\. Nothing was inserted\./);
-  assert.equal(pickButtons(h).length, 0); assert.equal(h.contents.get(file), before);
+integrationTest('B3 find_images: a card the same reply created is the target through its new: ref', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery;
+  const lines = await apply(h, [{ kind: 'add_child', parentId: h.ids.root, title: 'Fresh card', summary: '', ref: 'n1' }, findAct(h, null, { nodeIds: ['new:n1'] })]);
+  eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines)); await waitImages(h);
+  assert.equal(lastImages(h).nodeTitle, 'Fresh card'); assert.equal(lastImages(h).state, 'ready');
 });
-integrationTest('B3 find_images: a failed search says why, in words', async () => {
+integrationTest('B3 find_images: a card is searched once per reply (a second find_images for it is skipped); there is no cap on the number of cards', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery;
+  const lines = await apply(h, [findAct(h, 'a'), findAct(h, 'a'), findAct(h, 'b'), findAct(h, 'c'), findAct(h, 'root')]);
+  eq(lines.map(l => l.status), ['done', 'skipped', 'done', 'done', 'done'], JSON.stringify(lines)); assert.match(lines[1].text, /already searched in this reply/);
+  await waitImages(h); assert.equal(h.control.searches.length, 4, 'four cards, four searches (no "at most 3")');
+  assert.doesNotMatch(JSON.stringify(lines), /at most/);
+});
+integrationTest('B3 find_images: no more than three searches are in flight at once (twelve cards); the others wait their turn and all get a picture', async () => {
+  const { h } = await imageHarness(); let inflight = 0; let peak = 0; const waiting = [];
+  h.control.search = async query => { inflight++; peak = Math.max(peak, inflight); const gate = deferred(); waiting.push(gate); await gate.promise; inflight--; return perQuery(query); };
+  const refs = Array.from({ length: 12 }, (_, i) => `r${i}`);
+  await apply(h, [...refs.map(ref => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${ref}`, summary: '', ref })), ...refs.map(ref => findAct(h, null, { nodeIds: [`new:${ref}`], direction: '' }))]);
+  await withTimeout(until(() => waiting.length === 3)); await tick(); await tick();
+  assert.equal(waiting.length, 3, 'three started, nine wait'); assert.equal(allImages(h).filter(b => b.running).length, 3); assert.equal(allImages(h).filter(b => b.state === 'searching').length, 12);
+  assert.match(visibleText(h.view.chat.logEl), /Waiting to search/);
+  for (let released = 0; released < 12; released++) { await withTimeout(until(() => waiting.length > released)); waiting[released].resolve(); await tick(); }
+  await waitImages(h); assert.equal(peak, 3, 'three at a time, never more'); assert.equal(h.control.searches.length, 12); assert.ok(allImages(h).every(b => b.state === 'ready'));
+});
+integrationTest('B3 find_images: a failed search says why, in words, on its row', async () => {
   const { h } = await imageHarness(); h.control.search = async () => { throw new Error('quota used up'); };
   await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'failed'));
   assert.match(visibleText(h.view.chat.logEl), /The picture search failed: quota used up/); assert.equal(lastImages(h).reason, 'quota used up');
 });
-integrationTest('B3 find_images: the Stop button ends the search; a result that arrives afterwards is neither shown nor written', async () => {
-  const { h } = await imageHarness(); const gate = deferred(); let probed = 0;
-  h.control.search = async () => { await gate.promise; return imageItems(2); }; h.control.probe = async found => { probed++; return found; };
-  const file = noteFile(h, 'a'); const before = h.contents.get(file);
-  await apply(h, [findAct(h, 'a')]); const block = lastImages(h);
-  find(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).click();
-  assert.equal(block.state, 'stopped'); assert.equal(h.control.searches[0].signal.aborted, true); assert.equal(h.view.chatImageSearches.size, 0);
-  assert.match(visibleText(h.view.chat.logEl), /The picture search was stopped\. Nothing was inserted\./);
-  gate.resolve(); await tick(); await tick();
-  assert.equal(block.state, 'stopped'); assert.equal(block.items.length, 0); assert.equal(probed, 0); assert.equal(h.contents.get(file), before);
+integrationTest('B3 find_images: nothing that loads (or only non-https results) puts nothing into the card and says so on its row', async () => {
+  for (const arrange of [h => { h.control.probe = async () => []; }, h => { h.control.search = async () => [{ title: 'Plain', url: 'http://img.example/p.jpg', source: 'https://page.example/p' }]; }]) {
+    const { h } = await imageHarness(); h.control.search = async () => imageItems(3); arrange(h); const file = noteFile(h, 'a'); const before = h.contents.get(file);
+    await apply(h, [findAct(h, 'a')]); await waitImages(h); const block = lastImages(h);
+    assert.equal(block.state, 'empty'); assert.equal(block.items.length, 0); assert.match(visibleText(h.view.chat.logEl), /No loadable picture was found\. Nothing was put in\./);
+    assert.match(visibleText(h.view.chat.logEl), /not found/); assert.equal(h.contents.get(file), before, 'the card is untouched');
+    assert.equal(findAll(h.view.chat.logEl, i => i.tag === 'img').length, 0);
+  }
 });
-integrationTest('B3 find_images: closing the view, or opening another map by hand, stops the search and nothing late is shown or written', async () => {
+integrationTest('B3 find_images: the Stop button ends the searches that have not finished; a result that arrives afterwards is neither shown nor written, and a picture already put in stays', async () => {
+  const { h } = await imageHarness(); const gate = deferred(); let probed = 0;
+  h.control.search = async query => { if (/Mind/.test(query)) await gate.promise; return perQuery(query); }; h.control.probe = async found => { probed++; return found; };
+  const fileB = noteFile(h, 'b'); const beforeB = h.contents.get(fileB);
+  await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await withTimeout(until(() => lastImages(h, 0).state === 'ready'));
+  const done = lastImages(h, 0); const waiting = lastImages(h, 1); assert.equal(waiting.state, 'searching');
+  find(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).click();
+  assert.equal(waiting.state, 'stopped'); assert.equal(done.state, 'ready', 'the picture that was put in stays'); assert.equal(h.view.chatImageSearches.size, 0);
+  assert.equal(h.control.searches[1].signal.aborted, true);
+  assert.match(visibleText(h.view.chat.logEl), /The picture search was stopped\. Nothing was put in\./);
+  const probedBefore = probed; gate.resolve(); await tick(); await tick();
+  assert.equal(waiting.state, 'stopped'); assert.equal(waiting.items.length, 0); assert.equal(probed, probedBefore, 'the late result is not even probed'); assert.equal(h.contents.get(fileB), beforeB);
+  assert.match((await h.note('a')).detail, /!\[Pic espresso Body\]/);
+});
+integrationTest('B3 find_images: the Stop button also cancels the searches still waiting for a free place', async () => {
+  const { h } = await imageHarness(); const gate = deferred(); const refs = Array.from({ length: 6 }, (_, i) => `q${i}`);
+  h.control.search = async query => { await gate.promise; return perQuery(query); };
+  await apply(h, [...refs.map(ref => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${ref}`, summary: '', ref })), ...refs.map(ref => findAct(h, null, { nodeIds: [`new:${ref}`] }))]);
+  await withTimeout(until(() => h.control.searches.length === 3));
+  find(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).click(); gate.resolve(); await tick(); await tick(); await tick();
+  assert.equal(h.control.searches.length, 3, 'the three that waited never start'); assert.ok(allImages(h).every(b => b.state === 'stopped'));
+});
+integrationTest('B3 find_images: closing the view, or opening another map by hand, stops the searches and nothing late is shown or written', async () => {
   for (const how of ['close', 'switch']) {
     const { h, chat } = await imageHarness(); const gate = deferred(); let probed = 0; let settled = 0;
     h.control.search = async () => { await gate.promise; return imageItems(2); }; h.control.probe = async found => { probed++; return found; };
     const settle = chat.settleImages.bind(chat); chat.settleImages = (...args) => { settled++; return settle(...args); };
     const file = noteFile(h, 'a'); const before = h.contents.get(file);
-    await apply(h, [findAct(h, 'a')]); assert.equal(h.view.chatImageSearches.size, 1);
+    await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => h.control.searches.length === 1)); assert.equal(h.view.chatImageSearches.size, 1);
+    const asBefore = settled;
     if (how === 'close') { h.view.closed = true; h.view.abortMapChat(); }
     else { h.view.map = { ...h.view.map, id: 'map-b' }; h.repaint(); }
     assert.equal(h.control.searches[0].signal.aborted, true, how); assert.equal(h.view.chatImageSearches.size, 0, how);
     gate.resolve(); await tick(); await tick();
-    assert.equal(probed, 0, how); assert.equal(settled, 0, `${how}: appendImages-style update never called`); assert.equal(h.contents.get(file), before, how);
+    assert.equal(probed, 0, how); assert.equal(settled, asBefore, `${how}: the block is not updated`); assert.equal(h.contents.get(file), before, how);
   }
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   const close = source.slice(source.indexOf('async onClose()'), source.indexOf('this.dropMapBackground();', source.indexOf('async onClose()')));
@@ -4005,203 +4073,128 @@ integrationTest('B3 find_images: closing the view, or opening another map by han
   assert.ok(abort.includes('this.abortChatImageSearches()'));
 });
 integrationTest('B3 find_images: the conversation moved to another map while the search ran (not stopped): the result is dropped with a reason, not written', async () => {
-  const { h } = await imageHarness(); const gate = deferred(); let probed = 0;
+  const { h } = await imageHarness(); const gate = deferred(); let probed = 0; const file = noteFile(h, 'a'); const before = h.contents.get(file);
   h.control.search = async () => { await gate.promise; return imageItems(2); }; h.control.probe = async found => { probed++; return found; };
   await apply(h, [findAct(h, 'a')]); const block = lastImages(h);
   h.view.map = { ...h.view.map, id: 'map-other' };
   gate.resolve(); await withTimeout(until(() => block.state === 'failed'));
-  assert.equal(block.reason, 'The map was switched. Nothing was inserted.'); assert.equal(probed, 0); assert.equal(block.items.length, 0);
+  assert.equal(block.reason, 'The map was switched. Nothing was inserted.'); assert.equal(probed, 0); assert.equal(block.items.length, 0); assert.equal(h.contents.get(file), before);
 });
-integrationTest('B3 find_images: a declined usage notice starts nothing', async () => {
+integrationTest('B3 find_images: a declined usage notice starts none of the reply\'s searches (also when it is the second model that is declined)', async () => {
   const { h } = await imageHarness(); h.control.decline = true;
-  const lines = await apply(h, [findAct(h, 'a')]);
+  const lines = await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]);
   eq(lines.map(l => l.status), ['skipped']); assert.match(lines[0].text, /the AI task did not start/); assert.equal(h.control.searches.length, 0); assert.equal(lastImages(h), undefined);
+  h.control.decline = false; await ms03Override(h, 'b', 'gpt-x'); const ask = h.plugin.confirmAiUsage;
+  h.plugin.confirmAiUsage = async (model, run) => model === 'gpt-x' ? (h.control.models.push(model), false) : ask(model, run);
+  const again = await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]);
+  eq(again.map(l => l.status), ['skipped']); assert.equal(h.control.searches.length, 0, 'Body (the accepted model) did not start either'); eq(h.control.models.slice(-2), ['claude:sonnet', 'gpt-x']);
+  assert.equal(allImages(h).length, 0);
 });
-integrationTest('B3 find_images: one card is the target; an empty list takes the selection only when it is exactly one card', async () => {
-  const { h } = await imageHarness();
-  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
-  let lines = await apply(h, [findAct(h, null)]); assert.equal(lines[0].status, 'skipped'); assert.match(lines[0].text, /name exactly one card first/);
-  h.view.selection.replaceMulti([h.ids.a, h.ids.b]);
-  lines = await apply(h, [findAct(h, null)]); assert.equal(lines[0].status, 'skipped'); assert.match(lines[0].text, /name exactly one card first/);
-  assert.equal(h.control.searches.length, 0);
-  h.view.selection.replaceMulti([]); h.view.selection.setSelected(h.ids.b);
-  lines = await apply(h, [findAct(h, null, { direction: '' })]); assert.equal(lines[0].status, 'done'); assert.match(lines[0].text, /for “Mind”/);
-  assert.equal(h.control.searches[0].query, 'Mind', 'no search words: the card\'s title');
-  lines = await apply(h, [findAct(h, null, { nodeIds: ['gone'] })]); assert.equal(lines[0].status, 'skipped'); assert.match(lines[0].text, /no longer on the map/);
+integrationTest('B3 find_images: an AI-locked card gets no search and no picture, with a reason on its row; the other cards go on', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; h.view.canSelectTopics = () => true;
+  await h.view.setAiLock([h.node('a')], true); await h.view.hydrate();
+  const fileA = noteFile(h, 'a'); const beforeA = h.contents.get(fileA);
+  const lines = await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); eq(lines.map(l => l.status), ['done']); await waitImages(h);
+  assert.equal(h.control.searches.length, 1, 'only the unlocked card is searched'); assert.match(h.control.searches[0].query, /Mind/);
+  const locked = lastImages(h, 0); assert.equal(locked.nodeTitle, 'Body'); assert.equal(locked.state, 'empty'); assert.match(locked.reason, /locked/i); assert.equal(h.contents.get(fileA), beforeA);
+  assert.equal(lastImages(h, 1).state, 'ready'); assert.match((await h.note('b')).detail, /!\[Pic espresso Mind\]/);
+  assert.match(visibleText(h.view.chat.logEl), /Put pictures into 1 topic\(s\), 1 not found/);
 });
-integrationTest('B3 find_images: a card the same reply created is the target through its new: ref', async () => {
-  const { h } = await imageHarness();
-  const lines = await apply(h, [{ kind: 'add_child', parentId: h.ids.root, title: 'Fresh card', summary: '', ref: 'n1' }, findAct(h, null, { nodeIds: ['new:n1'] })]);
-  eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines)); assert.match(lines[1].text, /for “Fresh card”/);
-  assert.equal(lastImages(h).nodeTitle, 'Fresh card');
+integrationTest('B3 find_images: a card that is merging or has an AI task running gets no search (no AI call) and says why; a card put under an AI task during the search is refused at the write', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery;
+  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
+  h.plugin.running.add(h.node('b').path);
+  await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b, h.ids.c] })]); await waitImages(h);
+  assert.equal(h.control.searches.length, 1, 'only REM is searched'); assert.match(lastImages(h, 0).reason, /being merged/); assert.match(lastImages(h, 1).reason, /AI is working on the card/);
+  const { h: h2 } = await imageHarness(); const gate = deferred(); h2.control.search = async query => { await gate.promise; return perQuery(query); };
+  const file = noteFile(h2, 'a'); const before = h2.contents.get(file);
+  await apply(h2, [findAct(h2, 'a')]); await withTimeout(until(() => h2.control.searches.length === 1));
+  h2.plugin.running.add(h2.node('a').path); gate.resolve(); await waitImages(h2);
+  assert.equal(lastImages(h2).state, 'empty'); assert.match(lastImages(h2).reason, /AI is working on the card/); assert.equal(h2.contents.get(file), before);
 });
-integrationTest('B3 find_images: the fourth find_images of one reply is skipped; the first three start', async () => {
-  const { h } = await imageHarness();
-  const lines = await apply(h, [findAct(h, 'a'), findAct(h, 'b'), findAct(h, 'c'), findAct(h, 'root')]);
-  eq(lines.map(l => l.status), ['done', 'done', 'done', 'skipped'], JSON.stringify(lines)); assert.match(lines[3].text, /at most 3 picture searches per reply/);
-  assert.equal(h.control.searches.length, 3);
-  const { planFor } = load('core/map-chat-plan.ts');
-  assert.equal(planFor([{ kind: 'create_map', title: 'Q' }, ...Array.from({ length: 4 }, () => ({ kind: 'run_map_action', action: 'find_images', nodeIds: ['x'], title: '', goal: '', direction: '', depth: '', images: false }))], { parents: {}, selectedCount: 0 }).estimatedCalls, 3);
+integrationTest('B3 find_images: the target card is deleted while the search runs: nothing is written and its row says why', async () => {
+  const { h } = await imageHarness(); const gate = deferred(); h.control.search = async query => { if (/Body/.test(query)) await gate.promise; return perQuery(query); };
+  const file = noteFile(h, 'a'); const before = h.contents.get(file);
+  await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await withTimeout(until(() => lastImages(h, 1).state === 'ready'));
+  h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.a); gate.resolve(); await waitImages(h);
+  assert.equal(lastImages(h, 0).state, 'empty'); assert.match(lastImages(h, 0).reason, /no longer on the map/); assert.equal(h.contents.get(file), before);
+  assert.match(visibleText(h.view.chat.logEl), /Put pictures into 1 topic\(s\), 1 not found/);
 });
-integrationTest('B3 find_images: a plan card counts one AI call for a find_images', async () => {
-  const { h } = await imageHarness();
-  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), findAct(h, 'a')], rejected: [] });
-  h.view.chat.reset(); h.type('Add cards and find a picture for Body'); await h.view.sendMapChat();
-  assert.match(visibleText(planCard(h)[0]), /At least 1 AI call/);
+integrationTest('B3 find_images: a card that already has a cover keeps it - only the note gets the picture; a card without a cover goes through the cover step with the same picture', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; const calls = [];
+  h.view.chatCoverFromPicture = async (block, candidate) => { calls.push([block.nodeId, candidate.url]); };
+  await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await waitImages(h);
+  eq(calls.map(c => c[0]).sort(), [h.ids.a, h.ids.b].sort()); for (const [, url] of calls) assert.match(url, /^https:\/\/img\.example\//);
+  assert.match((await h.note('a')).detail, /!\[Pic espresso Body\]/);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.ok(source.includes('collapseSince(mark, t("ui.map_chat_images_undo_label"))'), 'the note write and the cover are one undo step');
 });
-integrationTest('B3 candidates stay under the reply that asked for them when the next message is sent', async () => {
+integrationTest('B3 find_images: a plan is not asked for 16 find_images (or one over 16 cards), but is for create_map or 16 add_child beside it; the plan counts one call per card', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; h.control.reply = async () => ({ reply: 'pictures', actions: Array.from({ length: 16 }, () => findAct(h, 'a')), rejected: [] });
+  h.view.chat.reset(); h.type('Add pictures to everything'); await h.view.sendMapChat();
+  assert.equal(planCard(h).length, 0, 'no plan card'); await until(() => h.control.searches.length >= 1);
+  const { h: h2 } = await imageHarness();
+  h2.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h2.ids.root, title: `Card ${i}`, summary: '' })), findAct(h2, null, { nodeIds: [h2.ids.a, h2.ids.b] })], rejected: [] });
+  h2.view.chat.reset(); h2.type('Add cards and find pictures'); await h2.view.sendMapChat();
+  assert.match(visibleText(planCard(h2)[0]), /At least 2 AI calls/, 'two cards, two searches'); assert.equal(h2.control.searches.length, 0, 'nothing started before the plan is applied');
+  const { h: h3 } = await imageHarness();
+  h3.control.reply = async () => ({ reply: 'plan', actions: [{ kind: 'create_map', title: 'New map' }, findAct(h3, 'a')], rejected: [] });
+  h3.view.chat.reset(); h3.type('New map with a picture'); await h3.view.sendMapChat(); assert.ok(planCard(h3).length >= 1, 'create_map still asks');
+});
+integrationTest('B3 results stay under the reply that asked for them when the next message is sent', async () => {
   const { h, chat } = await imageHarness(); await readyImages(h, 2);
-  chat.finish('I will list pictures.', []); const block = lastImages(h);
+  chat.finish('I will put pictures in.', []); const block = lastImages(h);
   chat.begin('and another question'); chat.finish('fine', []);
-  assert.equal(chat.transcript()[1].images[0], block); assert.equal(pickButtons(h).length, 2, 'still on screen and usable');
+  assert.equal(chat.transcript()[1].images[0], block); assert.equal(imageRows(h).length, 1, 'still on screen');
 });
-integrationTest('B3 insert: a click writes the picture and its source to the end of the Detail after a blank line, as one undoable edit; the other candidates stay usable', async () => {
-  const { h } = await imageHarness(); const block = await readyImages(h, 3);
-  await h.repo.updateNote(noteFile(h, 'a'), { detail: 'Body detail text\n' }); await h.view.hydrate();
-  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
-  h.control.mutates = 0; const buttonsBefore = pickButtons(h);
-  buttonsBefore[1].click(); buttonsBefore[1].click(); // a second click while the first runs does nothing
-  await withTimeout(until(() => block.items[1].inserted));
-  assert.equal(h.control.mutates, 1, 'one write for two clicks');
-  const note = await h.note('a');
-  assert.equal(note.detail, 'Body detail text\n\n![Pic 1](<https://img.example/1.jpg>)\n\n[Pic 1](<https://page.example/1>)');
-  assert.equal(block.items[1].inserted, 'Body');
-  const after = pickButtons(h); assert.equal(after[1].attrs['aria-disabled'], 'true'); assert.match(visibleText(after[1]), /Inserted into “Body”/);
-  assert.equal(after[0].attrs['aria-disabled'], 'false'); assert.equal(after[2].attrs['aria-disabled'], 'false');
-  assert.equal(h.view.history.canUndo, true, 'an ordinary edit: the undo history is not cleared');
-  await h.view.history.undoEntry.undo(); assert.equal((await h.repo.readNote(h.node('a').path)).detail, 'Body detail text', 'undo puts the Detail back');
-  // Another candidate of the same set goes after the first.
-  await h.repo.updateNote(noteFile(h, 'a'), { detail: note.detail }); await h.view.hydrate();
-  pickButtons(h)[2].click(); await withTimeout(until(() => block.items[2].inserted));
-  assert.ok((await h.note('a')).detail.endsWith('![Pic 2](<https://img.example/2.jpg>)\n\n[Pic 2](<https://page.example/2>)'));
+integrationTest('B3 find_images: the placed picture\'s source and title are text; a title with HTML or brackets adds no extra picture to the card and is cleaned by imageMarkdown', async () => {
+  const { h } = await imageHarness(); h.control.search = async () => [{ title: '<img src=x onerror=alert(1)> [b] \\ c', url: 'https://img.example/p.jpg', source: 'https://page.example/p' }];
+  await apply(h, [findAct(h, 'a')]); await waitImages(h);
+  const detail = (await h.note('a')).detail;
+  assert.equal((detail.match(/<img/gi) ?? []).length, 0); assert.equal((detail.match(/!\[/g) ?? []).length, 1, 'exactly one picture embed');
+  const thumbs = findAll(h.view.chat.logEl, i => i.tag === 'img'); assert.equal(thumbs.length, 1);
+  assert.equal(thumbs[0].attrs.referrerpolicy, 'no-referrer'); assert.equal(thumbs[0].attrs.loading, 'lazy'); assert.equal(thumbs[0].attrs.alt, ''); assert.match(thumbs[0].attrs.src, /^https:\/\//);
+  const link = find(h.view.chat.logEl, i => i.tag === 'a' && hasClass(i, 'vam-map-chat-images-source')); assert.equal(link.attrs.href, 'https://page.example/p'); assert.equal(link.attrs.target, '_blank'); assert.equal(link.attrs.rel, 'noopener noreferrer');
+  assert.ok(visibleText(h.view.chat.logEl).includes('<img src=x onerror=alert(1)>'), 'shown as text');
+  assert.equal(findAll(h.view.chat.logEl, i => i.tag === 'img' && !hasClass(i, 'vam-map-chat-images-thumb')).length, 0, 'no other picture is ever created');
 });
-integrationTest('B3 insert: an empty Detail gets the picture alone; a title with brackets is cleaned by imageMarkdown', async () => {
-  const { h } = await imageHarness(); h.control.search = async () => [{ title: 'A [b] \\ c', url: 'https://img.example/p.jpg', source: 'https://page.example/p' }];
-  await apply(h, [findAct(h, 'b')]); await withTimeout(until(() => lastImages(h)?.state === 'ready'));
-  await h.repo.updateNote(noteFile(h, 'b'), { detail: '' }); await h.view.hydrate();
-  pickButtons(h)[0].click(); await withTimeout(until(() => lastImages(h).items[0].inserted));
-  assert.equal((await h.note('b')).detail, '![A  b    c](<https://img.example/p.jpg>)\n\n[A  b    c](<https://page.example/p>)', 'each bracket and backslash became a blank');
+integrationTest('B3 find_images: a failing write is reported on the card\'s row and does not mark it placed', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; h.view.noteChange = async () => { throw new Error('disk full'); };
+  await apply(h, [findAct(h, 'a')]); await waitImages(h); const block = lastImages(h);
+  assert.equal(block.state, 'empty'); assert.match(block.reason, /Could not insert the picture: disk full/); assert.equal(block.items.length, 0);
+  assert.equal(h.notices.filter(n => /disk full/.test(n)).length, 0, 'the reason is in the result block; no Notice on top');
 });
-integrationTest('B3 insert: stale fences - another map, a card that is gone, a merge, a running AI task and a read-only map each refuse in words and write nothing', async () => {
-  const cases = [
-    ['another map', h => { h.view.map = { ...h.view.map, id: 'map-x' }; }, /The map was switched/],
-    ['another path', h => { h.view.path = 'Agent Workspace/Topics/other/Map.md'; }, /The map was switched/],
-    ['card gone', h => { h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.a); }, /no longer on the map/],
-    ['merging', h => { h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' }); }, /being merged/],
-    ['AI running (activeTasks)', h => { h.plugin.activeTasks.set(h.node('a').path, new AbortController()); }, /AI is working on the card/],
-    ['AI running (running)', h => { h.plugin.running.add(h.node('a').path); }, /AI is working on the card/],
-    ['AIM map', h => { h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; }, /cannot be edited/]
-  ];
-  for (const [label, spoil, reason] of cases) {
-    const { h } = await imageHarness(); const block = await readyImages(h, 2);
-    const file = noteFile(h, 'a'); const before = h.contents.get(file); const guard = new AbortController(); h.plugin.activeTasks.set('probe', guard);
-    spoil(h);
-    pickButtons(h)[0].click(); await withTimeout(until(() => block.notice));
-    assert.match(block.notice, reason, label); assert.equal(block.items[0].inserted, undefined, label); assert.equal(h.contents.get(file), before, `${label}: the card is untouched`);
-    assert.equal(guard.signal.aborted, false, `${label}: nothing running was aborted`);
-    for (const task of h.plugin.activeTasks.values()) assert.equal(task.signal.aborted, false, label);
-    assert.match(visibleText(h.view.chat.logEl), reason, `${label}: the reason is on screen`);
-    assert.equal(pickButtons(h)[0].attrs['aria-disabled'], 'false', `${label}: the candidate can be tried again`);
-  }
-});
-integrationTest('B3 insert: the fences are checked again inside the write, where a merge that started in between is seen', async () => {
-  const { h } = await imageHarness(); const block = await readyImages(h, 1);
-  const file = noteFile(h, 'a'); const before = h.contents.get(file); const mutate = h.plugin.mutate.bind(h.plugin);
-  h.plugin.mutate = work => { h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' }); return mutate(work); };
-  pickButtons(h)[0].click(); await withTimeout(until(() => block.notice));
-  assert.match(block.notice, /being merged/); assert.equal(h.contents.get(file), before);
-});
-integrationTest('B3 insert: a failing write is reported on the candidate and does not mark it inserted', async () => {
-  const { h } = await imageHarness(); const block = await readyImages(h, 1);
-  h.view.noteChange = async () => { throw new Error('disk full'); };
-  pickButtons(h)[0].click(); await withTimeout(until(() => block.notice));
-  assert.match(block.notice, /Could not insert the picture: disk full/); assert.equal(block.items[0].inserted, undefined);
-  assert.equal(h.notices.filter(n => /disk full/.test(n)).length, 0, 'the reason is in the candidate block; no Notice on top');
-});
-integrationTest('B3 find_images: nothing is inserted unless a candidate is clicked; a hostile reply with an image becomes neither a candidate nor an insertion', async () => {
+integrationTest('B3 find_images: nothing is written because of what the reply says; a hostile reply with an image link writes nothing, and only a picture of the search results goes into a note', async () => {
   const { h, chat } = await imageHarness(); const file = noteFile(h, 'a'); const before = h.contents.get(file);
   const hostile = 'Here: ![](https://evil.example/x.png) and ![[Notes/Other]] <img src=https://evil.example/y.png>';
   chat.finish(hostile, []);
-  assert.equal(findAll(h.view.chat.logEl, i => i.tag === 'img').length, 0, 'the reply builds no picture'); assert.equal(lastImages(h), undefined, 'and no candidate');
-  assert.equal(h.contents.get(file), before);
+  assert.equal(findAll(h.view.chat.logEl, i => i.tag === 'img').length, 0, 'the reply builds no picture'); assert.equal(lastImages(h), undefined, 'and no result block'); assert.equal(h.contents.get(file), before);
+  const { h: h2, chat: chat2 } = await imageHarness(); h2.control.search = async () => imageItems(1);
+  const lines = await apply(h2, [findAct(h2, 'a')]); chat2.finish(hostile, lines); await waitImages(h2);
+  const detail = (await h2.note('a')).detail; assert.equal(detail, imageEmbed(0), 'the search result, not the reply\'s link');
+  assert.doesNotMatch(detail, /evil\.example/); assert.doesNotMatch(h2.contents.get(noteFile(h2, 'a')), /evil\.example|Notes\/Other/);
+  const { h: h3, chat: chat3 } = await imageHarness(); h3.control.search = async () => []; const before3 = h3.contents.get(noteFile(h3, 'a'));
+  const lines3 = await apply(h3, [findAct(h3, 'a')]); chat3.finish(hostile, lines3); await waitImages(h3);
+  assert.equal(h3.contents.get(noteFile(h3, 'a')), before3, 'no search result: nothing is written, whatever the reply says');
 });
-integrationTest('B3 find_images: the reader hears the candidates once, not while a reply streams', async () => {
+integrationTest('B3 find_images: the reader hears the result once, when the last search of the reply ends - not while a reply streams', async () => {
   const { h, chat } = await imageHarness(); const gate = deferred();
-  h.control.search = async () => { await gate.promise; return imageItems(2); };
-  await apply(h, [findAct(h, 'a')]); assert.equal(chat.liveEl.text, 'Waiting for the model (label(claude:sonnet))', 'ticket 15: only the stage name is said while searching');
-  gate.resolve(); await withTimeout(until(() => lastImages(h).state === 'ready'));
-  assert.equal(chat.liveEl.text, 'Waiting for the model (label(claude:sonnet))', 'the turn is still streaming: the candidates are held back');
+  h.control.search = async query => { await gate.promise; return perQuery(query); };
+  await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); assert.equal(chat.liveEl.text, 'Waiting for the model (label(claude:sonnet))', 'ticket 15: only the stage name is said while searching');
+  gate.resolve(); await waitImages(h);
+  assert.equal(chat.liveEl.text, 'Waiting for the model (label(claude:sonnet))', 'the turn is still streaming: the result is held back');
   chat.finish('Reply done', []);
-  assert.match(chat.liveEl.text, /AI replied: Reply done/); assert.match(chat.liveEl.text, /Found 2 usable pictures\. Pick one to insert into “Body”\./);
-  assert.equal(chat.liveEl.text.match(/Found 2 usable pictures/g).length, 1);
-  chat.begin('next'); chat.finish('ok', []); assert.doesNotMatch(chat.liveEl.text, /Found 2 usable pictures/, 'said once');
-  await readyImages(h, 2, 'b'); // a later search that ends while nothing streams is announced at once
+  assert.match(chat.liveEl.text, /AI replied: Reply done/); assert.match(chat.liveEl.text, /Put pictures into 2 topic\(s\)/);
+  assert.equal(chat.liveEl.text.match(/Put pictures into/g).length, 1);
+  chat.begin('next'); chat.finish('ok', []); assert.doesNotMatch(chat.liveEl.text, /Put pictures into/, 'said once');
 });
-integrationTest('B3 find_images: a thumbnail that cannot be loaded is marked in words and cannot be picked', async () => {
-  const { h } = await imageHarness(); const block = await readyImages(h, 2);
-  const thumb = findAll(h.view.chat.logEl, i => i.tag === 'img')[0]; thumb.fire('error');
-  assert.equal(block.items[0].broken, true); const buttons2 = pickButtons(h);
-  assert.equal(buttons2[1].attrs['aria-disabled'], 'true', 'the broken one moved behind the one that loads'); assert.match(visibleText(buttons2[1]), /Cannot load/);
-  assert.equal(buttons2[0].attrs['aria-disabled'], 'false');
-  const file = noteFile(h, 'a'); const before = h.contents.get(file); buttons2[1].click(); await tick();
-  assert.equal(h.contents.get(file), before);
-});
-// ---- B3-polish P1-1: inserted and cannot-load look different ----
-const sixWithOneBroken = async h => {
-  const block = await readyImages(h, 6);
-  findAll(h.view.chat.logEl, i => i.tag === 'img')[1].fire('error'); // Pic 1 does not load
-  return block;
-};
-integrationTest('B3-polish P1-1: six candidates with one that cannot load say "5 usable", and the broken one is last, dashed and without a picture', async () => {
-  const { h } = await imageHarness(); const block = await sixWithOneBroken(h);
-  assert.match(visibleText(h.view.chat.logEl), /Found 5 usable pictures\. Pick one to insert into “Body”\./); assert.doesNotMatch(visibleText(h.view.chat.logEl), /Found 6/);
-  const picks = pickButtons(h); assert.equal(picks.length, 6);
-  eq(picks.map(p => hasClass(p, 'is-broken')), [false, false, false, false, false, true]);
-  assert.equal(findAll(picks[5], i => i.tag === 'img').length, 0, 'a broken candidate has no picture element');
-  assert.equal(findAll(picks[5], i => hasClass(i, 'vam-map-chat-images-missing')).length, 1, 'a dashed placeholder instead');
-  assert.match(visibleText(picks[5]), /Cannot load/); assert.match(picks[5].attrs['aria-label'], /Insert: Pic 1 into Body/);
-  eq(picks.slice(0, 5).map(p => findAll(p, i => i.tag === 'img').length), [1, 1, 1, 1, 1]);
-  assert.equal(picks.filter(p => hasClass(p, 'is-inserted')).length, 0, 'cannot-load is not "inserted"');
-});
-integrationTest('B3-polish P1-1: a thumbnail that fails later rebuilds the row, and the keyboard stays on the same candidate button or source link', async () => {
-  const { h } = await imageHarness(); const block = await readyImages(h, 3);
-  const sources = () => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-source'));
-  pickButtons(h)[0].focus(); findAll(h.view.chat.logEl, i => i.tag === 'img')[1].fire('error');
-  assert.ok(block.items[1].broken); assert.ok(h.page.doc.activeElement === pickButtons(h)[0], 'the first candidate keeps the keyboard');
-  sources()[1].focus(); const label = sources()[1].attrs['aria-label']; findAll(h.view.chat.logEl, i => i.tag === 'img')[0].fire('error');
-  assert.ok(block.items[0].broken); assert.ok(h.page.doc.activeElement?.attrs?.['aria-label'] === label, 'the same source link keeps the keyboard');
-  assert.ok(sources().includes(h.page.doc.activeElement), 'and it is the link in the new row');
-});
-integrationTest('B3-polish P1-1: all candidates broken reads as none; a probe that already dropped a candidate counts only the rest', async () => {
-  const { h } = await imageHarness(); await readyImages(h, 2);
-  for (const img of findAll(h.view.chat.logEl, i => i.tag === 'img')) img.fire('error');
-  assert.match(visibleText(h.view.chat.logEl), /No loadable picture was found\. Nothing was inserted\./);
-  assert.doesNotMatch(visibleText(h.view.chat.logEl), /Found 0/);
-});
-integrationTest('B3-polish P1-1: an inserted candidate keeps its picture and is told apart from cannot-load by a tick, the accent word and an outline; it still cannot be inserted twice', async () => {
-  const { h } = await imageHarness(); const block = await readyImages(h, 3);
-  findAll(h.view.chat.logEl, i => i.tag === 'img')[2].fire('error');
-  pickButtons(h)[0].click(); await withTimeout(until(() => block.items[0].inserted));
-  const [inserted, plain, broken] = pickButtons(h);
-  assert.ok(hasClass(inserted, 'is-inserted')); assert.ok(!hasClass(inserted, 'is-broken')); assert.ok(!hasClass(plain, 'is-inserted') && !hasClass(plain, 'is-broken'));
-  assert.ok(hasClass(broken, 'is-broken') && !hasClass(broken, 'is-inserted'));
-  assert.equal(findAll(inserted, i => i.tag === 'img').length, 1, 'the inserted one keeps its picture');
-  const mark = findAll(inserted, i => hasClass(i, 'vam-map-chat-images-state-icon'))[0]; assert.equal(mark.children[0]?.iconName ?? mark.iconName, 'check');
-  assert.ok(findAll(inserted, i => hasClass(i, 'is-inserted') && hasClass(i, 'vam-map-chat-images-state')).length === 1); assert.match(visibleText(inserted), /Inserted into “Body”/);
-  assert.equal(inserted.attrs['aria-disabled'], 'true'); const file = noteFile(h, 'a'); const before = h.contents.get(file);
-  inserted.click(); await tick(); assert.equal(h.contents.get(file), before, 'no second insertion');
-  assert.doesNotMatch(visibleText(inserted), /Cannot load/); assert.doesNotMatch(visibleText(plain), /Inserted/);
-  // Obsidian dims every button[aria-disabled="true"] to opacity .7; the inserted one is not dimmed, so its picture keeps its colours.
-  const rule = fs.readFileSync(path.join(root, 'styles.css'), 'utf8').split('\n').find(line => line.startsWith('.vam-map-chat .vam-map-chat-images-pick.is-inserted {')) ?? '';
-  assert.match(rule, /opacity: 1;/);
-});
-// ---- B3-polish P1-2: the result line follows the candidate block ----
+// ---- B3-polish P1-2: the result line follows the blocks ----
 const resultTexts = h => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(i => i.text);
-integrationTest('B3-polish P1-2: the result line starts as "Started" and ends as the block ends (ready / empty / failed / stopped), never "Done" for a failure, on screen and in the saved turn', async () => {
+integrationTest('B3-polish P1-2: the result line starts as "Looking for pictures" and ends as the blocks end (placed / none / failed / stopped), never "Pictures put into 1" for a failure, on screen and in the saved turn', async () => {
   const cases = [
-    ['ready', async h => { h.control.search = async () => imageItems(3); }, /^Done: found 3 pictures for “Body” \(label\(claude:sonnet\)\)$/, 'done'],
-    ['empty', async h => { h.control.probe = async () => []; }, /^No loadable picture was found for “Body” \(label\(claude:sonnet\)\)$/, 'skipped'],
-    ['failed', async h => { h.control.search = async () => { throw new Error('quota used up'); }; }, /^Failed: picture search for “Body” \(quota used up\) \(label\(claude:sonnet\)\)$/, 'failed']
+    ['ready', async h => { h.control.search = async () => imageItems(3); }, /^Pictures put into 1 topic\(s\) \(label\(claude:sonnet\)\)$/, 'done'],
+    ['empty', async h => { h.control.probe = async () => []; }, /^Pictures put into 0 topic\(s\), 1 not found \(label\(claude:sonnet\)\)$/, 'skipped'],
+    ['failed', async h => { h.control.search = async () => { throw new Error('quota used up'); }; }, /^Pictures put into 0 topic\(s\), 1 not found \(label\(claude:sonnet\)\)$/, 'failed']
   ];
   for (const [state, arrange, expected, status] of cases) {
     const { h, chat } = await imageHarness(); await arrange(h);
@@ -4209,49 +4202,57 @@ integrationTest('B3-polish P1-2: the result line starts as "Started" and ends as
     chat.finish('Looking.', lines); // the turn may end before or after the search does
     await withTimeout(until(() => lastImages(h)?.state === state));
     const shown = resultTexts(h); eq(shown.length, 1);
-    assert.match(shown[0], expected, state); assert.doesNotMatch(shown[0], /^Done: Start/);
-    if (state !== 'ready') assert.doesNotMatch(shown[0], /Done/, `${state}: the line does not say Done`);
+    assert.match(shown[0], expected, state); assert.doesNotMatch(shown[0], /^Looking/);
     assert.equal(chat.completedTurns()[0].answer.lines.length, 1);
     assert.match(chat.transcript().at(-1).lines[0].text, expected, 'the saved turn carries the final line'); assert.equal(chat.transcript().at(-1).lines[0].status, status);
     assert.equal(findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-line'))[0].cls.includes(`is-${status}`), true);
   }
-  // A search that ends before the reply has finished: finish() must not bring the old "Started" text back.
+  // A search that ends before the reply has finished: finish() must not bring the old "Looking" text back.
   const { h, chat } = await imageHarness(); h.control.search = async () => { throw new Error('boom'); };
   const lines = await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'failed'));
-  chat.finish('Looking.', lines); eq(resultTexts(h), ['Failed: picture search for “Body” (boom) (label(claude:sonnet))']);
+  chat.finish('Looking.', lines); eq(resultTexts(h), ['Pictures put into 0 topic(s), 1 not found (label(claude:sonnet))']);
 });
-integrationTest('B3-polish P1-2: stopping the search rewrites the line to "Stopped"; the saved turn carries it', async () => {
+integrationTest('B3-polish P1-2: stopping the search rewrites the line; the saved turn carries it', async () => {
   const { h, chat } = await imageHarness(); const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(2); };
   const lines = await apply(h, [findAct(h, 'a')]); chat.finish('Looking.', lines);
-  eq(resultTexts(h), ['Started looking for pictures for “Body” (label(claude:sonnet))']);
+  eq(resultTexts(h), ['Looking for pictures: 0 of 1 done (label(claude:sonnet))']);
   find(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).click();
-  eq(resultTexts(h), ['Stopped: picture search for “Body”']); assert.equal(chat.transcript().at(-1).lines[0].status, 'skipped'); gate.resolve(); await tick();
+  eq(resultTexts(h), ['Pictures put into 0 topic(s), 1 not found (label(claude:sonnet))']); assert.equal(chat.transcript().at(-1).lines[0].status, 'skipped'); gate.resolve(); await tick();
 });
-integrationTest('B3-polish P1-2: writing the line back moves no focus and the reader hears the search result once', async () => {
+integrationTest('B3-polish P1-2: writing the line back moves no focus and the reader hears the result once', async () => {
   const { h, chat } = await imageHarness(); const input = chat.inputEl; const gate = deferred();
   h.control.search = async () => { await gate.promise; return imageItems(2); };
   const lines = await apply(h, [findAct(h, 'a')]); chat.finish('Looking.', lines);
   input.focus(); input.fire('compositionstart'); input.value = 'ni hao';
   gate.resolve(); await withTimeout(until(() => lastImages(h).state === 'ready'));
-  eq(resultTexts(h), ['Done: found 2 pictures for “Body” (label(claude:sonnet))']);
+  eq(resultTexts(h), ['Pictures put into 1 topic(s) (label(claude:sonnet))']);
   assert.equal(h.page.doc.activeElement, input); assert.equal(chat.isComposing, true); assert.equal(input.value, 'ni hao');
-  assert.equal(chat.liveEl.text.match(/Found 2 usable pictures/g).length, 1); assert.doesNotMatch(chat.liveEl.text, /Done: found/);
+  assert.equal(chat.liveEl.text.match(/Put pictures into 1 topic\(s\)/g).length, 1); assert.doesNotMatch(chat.liveEl.text, /Pictures put into/);
 });
-integrationTest('B3-polish P1-2: save as a note writes the final line, not "Done" for a failed search', async () => {
+integrationTest('B3-polish P1-2: save as a note writes the final line, not a made-up success for a failed search', async () => {
   const { h, chat } = await imageHarness(); h.control.search = async () => { throw new Error('quota used up'); };
   const lines = await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'failed'));
   chat.finish('Looking.', lines);
   saveButton(h).click(); await withTimeout(until(() => savedPaths(h).length === 1));
   const text = h.contents.get(savedPaths(h)[0]);
-  assert.match(text, /Failed\\?: picture search for “Body” \\?\(quota used up\\?\)/); assert.doesNotMatch(text, /Done|Started looking/);
+  assert.match(text, /Pictures put into 0 topic.{1,3}s.{1,3}, 1 not found/); assert.match(text, /quota used up/); assert.doesNotMatch(text, /Looking for pictures: 0 of/);
 });
-integrationTest('B3 find_images: the keyboard stays where it was when candidates arrive, and an insertion hands it back to the same button', async () => {
+integrationTest('B3 find_images: arrival of results does not move the focus or interrupt an IME composition', async () => {
   const { h } = await imageHarness(); const input = h.view.chat.inputEl; input.focus(); input.fire('compositionstart'); input.value = 'ni hao';
-  const block = await readyImages(h, 2);
+  await readyImages(h, 2);
   assert.equal(h.page.doc.activeElement, input, 'arrival does not move the focus'); assert.equal(h.view.chat.isComposing, true, 'an IME composition in progress is not interrupted'); assert.equal(input.value, 'ni hao');
-  const pick = pickButtons(h)[0]; pick.focus(); pick.click();
-  await withTimeout(until(() => block.items[0].inserted));
-  assert.equal(h.page.doc.activeElement, pickButtons(h)[0], 'the (now inert) button keeps the keyboard');
+});
+integrationTest('B3 record: the pictures that were put in are written to the conversation record as one line for the turn; failures stay in the result lines', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery;
+  await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await waitImages(h);
+  const { MapChatTurnRecord } = load('experiences/visual-map/map-chat-turn-record.ts', { obsidian }); const written = [];
+  const record = new MapChatTurnRecord({ conversationId: 'c1', write: line => written.push(line) }, 'c1', 1, { images: allImages(h), lines: [], text: '' }, () => {});
+  record.images(lastImages(h, 0));
+  const images = written.find(l => l.type === 'images'); assert.equal(images.state, 'ready'); assert.equal(images.items.length, 2, 'both pictures'); eq(images.inserted, [0, 1], 'every listed picture was put in');
+  assert.equal(images.items[0].title, 'Body: Pic espresso Body');
+  written.length = 0; const stopped = { ...lastImages(h, 0), state: 'stopped', items: [] }; const other = { ...lastImages(h, 1), state: 'stopped', items: [] };
+  new MapChatTurnRecord({ conversationId: 'c1', write: line => written.push(line) }, 'c1', 1, { images: [stopped, other], lines: [], text: '' }, () => {}).images(stopped);
+  assert.equal(written[0].state, 'stopped'); eq(written[0].items, []);
 });
 
 // ---- save as a note ----
@@ -4310,14 +4311,13 @@ integrationTest('B3 save: only finished turns are written - a reply that is stil
   saveButton(h).click(); await withTimeout(until(() => savedPaths(h).length === 1));
   const text = h.contents.get(savedPaths(h)[0]); assert.ok(text.includes('Finished answer')); assert.ok(!text.includes('Streaming question') && !text.includes('half an ans'));
 });
-integrationTest('B3 save: a hostile reply is written as text only (whitelist), with candidates as links and the card a picture went into', async () => {
-  const { h, chat } = await imageHarness(); const block = await readyImages(h, 2);
-  pickButtons(h)[0].click(); await withTimeout(until(() => block.items[0].inserted));
+integrationTest('B3 save: a hostile reply is written as text only (whitelist), with the picture that was put in as a link and the card it went into', async () => {
+  const { h, chat } = await imageHarness(); await readyImages(h, 2);
   chat.finish('![](https://x/a.png) ![[secret]] <img src=x onerror=alert(1)>\n\n```dataviewjs\ndv.x()\n```\n\n%%c%% $$x$$ [x](javascript:alert(1))', [{ status: 'done', text: 'Done: x' }]);
   saveButton(h).click(); await withTimeout(until(() => savedPaths(h).length === 1));
   const text = h.contents.get(savedPaths(h)[0]);
   assert.ok(!text.includes('![')); assert.doesNotMatch(text, /(^|[^\\])<img/m); assert.ok(!/```dataviewjs/.test(text)); assert.doesNotMatch(text, /(^|[^\\])(%%|\$\$)/);
-  assert.match(text, /- \[Pic 0\]\(<https:\/\/page\.example\/0>\) \\\(inserted into Body\\\)/); assert.match(text, /- \[Pic 1\]\(<https:\/\/page\.example\/1>\)\n/);
+  assert.match(text, /- \[Pic 0\]\(<https:\/\/page\.example\/0>\) \\\(inserted into Body\\\)/); assert.doesNotMatch(text, /Pic 1/, 'the candidates that were not used are not written');
   assert.ok(!text.includes('img.example'), 'the picture addresses themselves are not written');
 });
 integrationTest('B3 save: a failing write says why and leaves no file', async () => {
@@ -4355,13 +4355,6 @@ integrationTest('B3-fix save: Dataview inline code in a reply is written as plai
   saveButton(h).click(); await withTimeout(until(() => savedPaths(h).length === 1));
   const text = h.contents.get(savedPaths(h)[0]);
   assert.doesNotMatch(text, /`\s*[=$]/);
-});
-integrationTest('B3-fix insert: a candidate title with HTML adds no extra picture to the card', async () => {
-  const { h } = await imageHarness(); h.control.search = async () => [{ title: '<img src=x onerror=alert(1)>', url: 'https://img.example/p.jpg', source: 'https://page.example/p' }];
-  await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'ready'));
-  pickButtons(h)[0].click(); await withTimeout(until(() => lastImages(h).items[0].inserted));
-  const detail = (await h.note('a')).detail;
-  assert.equal((detail.match(/<img/gi) ?? []).length, 0); assert.equal((detail.match(/!\[/g) ?? []).length, 1, 'exactly one picture embed');
 });
 
 // ---- hypothesis-evidence (P3): the chat cannot touch the hypothesis keys, and moving a topic leaves relations alone ----
@@ -4908,36 +4901,37 @@ integrationTest('MS-03: the result line a chat research shows carries the model 
   assert.equal(lines[0].text, 'Done: Start quick research on the selected topics (label(claude:sonnet))');
 });
 
-integrationTest('MS-03: every picture-search line (started, ready, none, failed) ends with the model label of the card it runs on, also with an override', async () => {
+integrationTest('MS-03: every picture-search line (looking, placed, none, failed) ends with the model label of the card it runs on, also with an override', async () => {
   const { h } = await imageHarness();
   await ms03Override(h, 'b', 'gpt-x');
   const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(2); };
   const lines = await apply(h, [findAct(h, 'b')]);
-  assert.equal(lines[0].text, 'Started looking for pictures for “Mind” (label(gpt-x))', 'started');
+  assert.equal(lines[0].text, 'Looking for pictures: 0 of 1 done (label(gpt-x))', 'looking');
   const block = lastImages(h); assert.equal(block.modelLabel, 'label(gpt-x)');
   const { settledLine } = load('experiences/visual-map/map-chat.ts', { obsidian });
   gate.resolve(); await withTimeout(until(() => block.state === 'ready'));
-  assert.match(settledLine({ status: 'done', text: '', images: block }).text, /^Done: found 2 pictures for “Mind” \(label\(gpt-x\)\)$/);
-  for (const [state, pattern] of [['empty', /^No loadable picture was found for “Mind” \(label\(gpt-x\)\)$/], ['failed', /^Failed: picture search for “Mind” \(why\) \(label\(gpt-x\)\)$/]])
-    assert.match(settledLine({ status: 'done', text: '', images: { ...block, state, reason: 'why', items: [] } }).text, pattern, state);
+  assert.match(settledLine({ status: 'done', text: '', imageGroup: [block] }).text, /^Pictures put into 1 topic\(s\) \(label\(gpt-x\)\)$/);
+  for (const state of ['empty', 'failed'])
+    assert.match(settledLine({ status: 'done', text: '', imageGroup: [{ ...block, state, reason: 'why', items: [] }] }).text, /^Pictures put into 0 topic\(s\), 1 not found \(label\(gpt-x\)\)$/, state);
+  assert.match(settledLine({ status: 'done', text: '', imageGroup: [block, { ...block, modelLabel: 'label(claude:sonnet)', state: 'empty', items: [] }] }).text, /\(label\(gpt-x\), label\(claude:sonnet\)\)$|\(label\(gpt-x\)\/label\(claude:sonnet\)\)$|label\(gpt-x\).*label\(claude:sonnet\)/, 'two models are both named');
 });
 
-integrationTest('MS-03 counter-example: a picture block saved without a model label (older conversation) keeps its line text unchanged in every state', async () => {
+integrationTest('MS-03 counter-example: a picture block saved without a model label (older conversation) keeps its line text without a model suffix in every state', async () => {
   const { settledLine } = load('experiences/visual-map/map-chat.ts', { obsidian });
   const base = { query: 'q', nodeId: 'n', nodeTitle: 'Body', mapPath: MAP, mapId: 'map-a', items: [] };
-  const text = (state, extra = {}) => settledLine({ status: 'done', text: '', images: { ...base, state, ...extra } }).text;
-  assert.equal(text('searching'), 'Started looking for pictures for “Body”');
-  assert.equal(text('empty'), 'No loadable picture was found for “Body”');
-  assert.equal(text('failed', { reason: 'boom' }), 'Failed: picture search for “Body” (boom)');
-  assert.equal(text('ready', { items: [{ candidate: { title: 't', url: 'u', source: 's' } }] }), 'Done: found 1 pictures for “Body”');
+  const text = (state, extra = {}) => settledLine({ status: 'done', text: '', imageGroup: [{ ...base, state, ...extra }] }).text;
+  assert.equal(text('searching'), 'Looking for pictures: 0 of 1 done');
+  assert.equal(text('empty'), 'Pictures put into 0 topic(s), 1 not found');
+  assert.equal(text('failed', { reason: 'boom' }), 'Pictures put into 0 topic(s), 1 not found');
+  assert.equal(text('ready', { items: [{ candidate: { title: 't', url: 'u', source: 's' }, inserted: 'Body' }] }), 'Pictures put into 1 topic(s)');
 });
 
 integrationTest('MS-03: the saved transcript writes the same picture line text as the chat shows, with the model label', async () => {
   const { h } = await imageHarness();
   h.control.search = async () => imageItems(2);
-  const lines = await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'ready'));
+  const lines = await apply(h, [findAct(h, 'a')]); await waitImages(h);
   h.view.chat.finish('Looking.', lines);
-  assert.equal(h.view.chat.transcript().at(-1).lines[0].text, 'Done: found 2 pictures for “Body” (label(claude:sonnet))');
+  assert.equal(h.view.chat.transcript().at(-1).lines[0].text, 'Pictures put into 1 topic(s) (label(claude:sonnet))');
   assert.equal(resultTexts(h)[0], h.view.chat.transcript().at(-1).lines[0].text, 'the same text on screen and in the saved turn');
 });
 
@@ -6169,7 +6163,7 @@ test('map chat records: restore shows the finished turns, the restored line, and
 });
 
 test('map chat records: restored plan, images, retry and choices are inert', () => {
-  const calls = []; const f = panelFixture({ recordsEnabled: () => true, newConversation() {}, retry: () => calls.push('retry'), insertImage: async () => { calls.push('insert'); return { ok: true }; }, send: () => calls.push('send') });
+  const calls = []; const f = panelFixture({ recordsEnabled: () => true, newConversation() {}, retry: () => calls.push('retry'), send: () => calls.push('send') });
   f.panel.setOpen(true); f.panel.restore(restoredConversation());
   const log = f.parts.log();
   const plan = find(log, i => hasClass(i, 'vam-map-chat-plan'));
@@ -6178,7 +6172,8 @@ test('map chat records: restored plan, images, retry and choices are inert', () 
   const planButtons = findAll(plan, i => i.tag === 'button');
   eq(planButtons.map(b => b.text), ['Apply', 'Cancel']);
   const picks = findAll(log, i => hasClass(i, 'vam-map-chat-images-pick'));
-  assert.equal(picks.length, 2); assert.equal(findAll(log, i => i.tag === 'img').length, 0, 'no thumbnail is fetched for a restored candidate');
+  assert.equal(picks.length, 0, 'an older record\'s candidates are listed read-only: nothing to press'); assert.equal(findAll(log, i => hasClass(i, 'vam-map-chat-images-item')).length, 2);
+  assert.equal(findAll(log, i => i.tag === 'button' && /images/.test(i.cls)).length, 0); assert.equal(findAll(log, i => i.tag === 'img').length, 0, 'no thumbnail is fetched for a restored candidate');
   assert.equal(findAll(log, i => i.tag === 'a').length, 0, 'no source link from the record');
   // restored choices (the shape a live one has) are inert too
   f.panel.showChoices({ prompt: 'Pick', options: [{ label: 'Map A', pick: () => calls.push('pick-a') }, { label: 'Type X', pick: () => calls.push('pick-x') }], picked: false, stale: true });
@@ -6248,7 +6243,7 @@ test('map chat records: L1 a restored picture block is named without an empty ca
   const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
   f.panel.restore(restoredConversation());
   const box = find(f.parts.log(), i => hasClass(i, 'vam-map-chat-images'));
-  assert.equal(box.attrs['aria-label'], 'Picture candidates');
+  assert.equal(box.attrs['aria-label'], 'Pictures put into topics');
   assert.doesNotMatch(box.attrs['aria-label'], /“”/);
 });
 
@@ -6347,7 +6342,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 19 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 20 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');
@@ -6427,7 +6422,7 @@ integrationTest('map chat records: A6 new conversation starts a new file; the ol
   eq(chat.transcript().map(m => m.text), ['second', 'two'], 'the newest conversation comes back');
 });
 
-integrationTest('map chat records: A7 a restored plan, candidate picture and choice do nothing when pressed in the view', async () => {
+integrationTest('map chat records: A7 a restored plan and choice do nothing, and a restored picture block has nothing to press when pressed in the view', async () => {
   const h = await harness({ records: true }); await h.view.hydrate();
   await seedRecord(h, [
     rec('conversation', { id: REC_ID, startedAt: REC_AT, mapPath: MAP, mapId: 'map-a', pluginVersion: '1' }),
@@ -6436,10 +6431,10 @@ integrationTest('map chat records: A7 a restored plan, candidate picture and cho
     rec('images', { turn: 1, at: REC_AT, state: 'ready', items: [{ title: 'Pic', sourceUrl: 'https://example.com/1' }], inserted: [] })
   ]);
   const chat = h.open(); await until(() => chat.hasMessages);
-  const calls = []; h.view.applyChatPlan = async () => { calls.push('apply'); }; h.view.chatInsertImage = async () => { calls.push('insert'); return { ok: true }; };
+  const calls = []; h.view.applyChatPlan = async () => { calls.push('apply'); }; h.view.chatPlaceImage = async () => { calls.push('insert'); return { ok: true }; };
   const send = h.view.sendMapChat; h.view.sendMapChat = async (...args) => { calls.push('send'); return send(...args); };
   const controls = findAll(chat.logEl, i => i.tag === 'button' && (hasClass(i, 'is-stale') || i.attrs['aria-disabled'] === 'true'));
-  assert.ok(controls.length >= 3, 'the plan buttons and the picture are there but inert');
+  assert.ok(controls.length >= 2, 'the plan buttons are there but inert'); assert.equal(findAll(chat.logEl, i => i.tag === 'button' && /images/.test(i.cls)).length, 0, 'the restored picture block has no button'); assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-images-item')).length, 1, 'but it is listed');
   for (const control of controls) { control.click(); key(control, { key: 'Enter' }); key(control, { key: ' ' }); }
   await tick(); eq(calls, []); eq(h.control.calls, [], 'no consent asked, no request sent');
 });

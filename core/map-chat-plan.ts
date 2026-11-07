@@ -10,8 +10,6 @@ import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "./steps/map-chat/step";
 
 /** More actions than this need a plan (so exactly this many do not). */
 export const MAP_CHAT_PLAN_ACTION_LIMIT = 15;
-/** A reply starts at most this many find_images; each is a web call the user did not confirm one by one, so later ones are skipped (B3). */
-export const MAP_CHAT_FIND_IMAGES_LIMIT = 3;
 /** This many research targets or more need a plan. */
 export const MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
 
@@ -128,7 +126,7 @@ export interface MapChatPlan {
    * one the action names, then `options.mapAiMode`, then Quick (a standard research that found nothing on the web is sent once
    * more, which is a retry and is not counted). Each synthesize is one integration call plus the
    * same diagram call: B2 starts it without a dialog and without the directions step. An expand is {@link MAP_CHAT_EXPAND_CALLS_PER_CARD} outline calls per
-   * card it is asked for (the second is the ask-again when a summary is missing; its subtopics are added without further AI calls), one for rating by a goal, one for a merge, one for each find_images up to {@link MAP_CHAT_FIND_IMAGES_LIMIT} per reply (the view skips the rest; the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
+   * card it is asked for (the second is the ask-again when a summary is missing; its subtopics are added without further AI calls), one for rating by a goal, one for a merge, one for each card a find_images targets (the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
    * The chat reply itself is not counted.
    */
   estimatedCalls: number;
@@ -161,6 +159,9 @@ export function researchTargetsOf(actions: readonly MapChatAction[], selectedCou
 /** Calls one research or synthesis makes on its own: the main call, then (when diagrams are on) the diagram call. */
 export const mapChatCallsPerTask = (diagrams: boolean): number => (diagrams ? 2 : 1);
 
+const isFindImages = (action: MapChatAction): boolean =>
+  action.kind === "run_map_action" && action.action === "find_images";
+
 /** The plan a reply needs, or null when it can be applied at once. `diagrams` is the "Add diagrams after research" setting. */
 export function planFor(
   actions: readonly MapChatAction[],
@@ -183,19 +184,21 @@ export function planFor(
   const imageAddsOnly =
     options.imageMode === "direct" &&
     options.imageAttached === true &&
-    actions.every(action => IMAGE_SAFE_KINDS.has(action.kind));
+    actions.every(action => isFindImages(action) || IMAGE_SAFE_KINDS.has(action.kind));
   // A reply that may read web research text (an automatic round, or any turn of a conversation that has started research:
   // the text can reach the model through any card or earlier reply, decisions #16 and #17) does not do what
   // that text could have injected: only safe actions on safe cards go without a plan. An automatic round of only such actions is
   // also not stopped by the number of actions (the first round keeps the rule).
   const autoRound = (options.chain?.round ?? 1) >= 2;
   const readsResearch = autoRound || options.chatStartedResearch === true;
-  const onlySafe = readsResearch && actions.every(action => isChainSafeFor(action, options.trusted));
+  const onlySafe =
+    readsResearch && actions.every(action => isFindImages(action) || isChainSafeFor(action, options.trusted));
   const autoOnlySafe = autoRound && onlySafe;
-  if (actions.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe) reasons.push("many_actions");
+  // find_images never needs a plan (owner: pictures are put in without asking), so it does not count toward the action limit or the other-actions rules.
+  const planned = actions.filter(action => !isFindImages(action));
+  if (planned.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe) reasons.push("many_actions");
   let research = 0;
   let calls = 0;
-  let imageSearches = 0;
   let selection = context.selectedCount;
   let createsMap = false;
   for (const action of actions) {
@@ -227,10 +230,7 @@ export function planFor(
             calls += perTask;
             break;
           case "find_images":
-            if (imageSearches < MAP_CHAT_FIND_IMAGES_LIMIT) {
-              imageSearches += 1;
-              calls += 1;
-            }
+            calls += targetCount(action.nodeIds, selection);
             break;
         }
         break;
@@ -246,7 +246,7 @@ export function planFor(
     actions.some(action => action.kind === "add_anchor" || action.kind === "link_anchor")
   )
     reasons.push("image_preview");
-  if (options.imageAttached && actions.some(action => !IMAGE_SAFE_KINDS.has(action.kind)))
+  if (options.imageAttached && actions.some(action => !isFindImages(action) && !IMAGE_SAFE_KINDS.has(action.kind)))
     reasons.push("image_other_actions");
   if (readsResearch && !onlySafe) reasons.push(autoRound ? "auto_round_other_actions" : "research_text_other_actions");
   return reasons.length ? { reasons, estimatedCalls: calls } : null;

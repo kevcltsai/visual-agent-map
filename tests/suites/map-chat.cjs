@@ -7990,6 +7990,27 @@ integrationTest('R2-B1 find_images: a plan applied from a first-round reply keep
   planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying); await waitImages(h);
   eq(h.control.searches.map(s => s.query), ['steak western']);
 });
+integrationTest('R2-B1 find_images: an automatic round (a real chain, no research) ignores the model\'s direction; the search words come from the card', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open(); h.control.search = async () => [];
+  let round = 0;
+  h.control.reply = async () => (++round === 1
+    ? { reply: 'first', actions: [{ kind: 'rename_topic', nodeId: h.ids.b, title: 'Body two' }], rejected: [], remaining: 'add the pictures' }
+    : { reply: 'second', actions: [findAct(h, 'a', { direction: 'from the web text' })], rejected: [], remaining: '' });
+  h.view.chat.reset(); h.type('Rename, then add pictures'); await h.view.sendMapChat();
+  await withTimeout(until(() => h.control.searches.length === 1)); await waitImages(h);
+  assert.equal(round, 2, 'the second reply came from the chain');
+  assert.equal(h.view.chatStartedResearch, false, 'no research here: only the round says this is a continuation');
+  assert.doesNotMatch(h.control.searches[0].query, /web text/);
+});
+integrationTest('counterexample 9 find_images: a card that already has a cover gets the picture in its note only: no download, no cover write', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; h.view.chatHasNoCover = () => false;
+  let fetched = 0; h.view.chatFetchImage = async () => { fetched++; return pngBytes(); };
+  const file = noteFile(h, 'a');
+  await apply(h, [findAct(h, 'a')]); await waitImages(h);
+  assert.match((await h.note('a')).detail, /!\[Pic /, 'the picture is in the note');
+  assert.equal(fetched, 0, 'nothing is downloaded for a cover');
+  assert.doesNotMatch(h.contents.get(file), /topic-cover/, 'the cover is left alone');
+});
 const coverStub = h => { h.view.chatHasNoCover = () => true; h.view.chatFetchImage = async () => pngBytes(); };
 const undoLabels = h => h.view.history.past.map(e => e.label);
 integrationTest('R2-B2 place: another write that lands while the picture waits its turn stays its own undo step, and undoing the picture leaves it alone', async () => {

@@ -56924,10 +56924,10 @@ function cleanImageQuery(text12) {
     const code = char.charCodeAt(0);
     return code < 32 || code >= 127 && code <= 159 || code === 8232 || code === 8233 ? " " : char;
   }).join("");
-  return plain.replace(/\S*:\/\/\S*/g, " ").replace(/\bwww\.\S*/gi, " ").replace(/(?:[\p{L}\p{N}-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?/giu, " ").replace(/\s+/g, " ").trim().slice(0, CHAT_IMAGE_QUERY_MAX).trim();
+  return plain.replace(/\S*:\/\/\S*/g, " ").replace(/\bwww\.\S*/gi, " ").replace(/\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?(?:[/?#]\S*)?/g, " ").replace(/\[[0-9a-f:.]*:[0-9a-f:.]*\](?::\d+)?(?:[/?#]\S*)?/gi, " ").replace(/(?:[\p{L}\p{N}-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?/giu, " ").replace(/\s+/g, " ").trim().slice(0, CHAT_IMAGE_QUERY_MAX).trim();
 }
 function cleanImageTitle(text12) {
-  return text12.replace(/[^\p{L}\p{N}\s.,;:'"()\-_?+，。、：；？（）「」『』《》—…·]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 120).trim();
+  return text12.replace(/[^\p{L}\p{M}\p{N}\s.,;:'"()\-_?+，。、：；？（）「」『』《》—…·]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 120).trim();
 }
 var CHAT_EXPAND_LEVELS = 2;
 var CHAT_EXPAND_MAX_TOPICS = 15;
@@ -67247,7 +67247,7 @@ ${request.requirements}` : preset.text,
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
-  async noteChange(node, patch) {
+  async noteChange(node, patch, sink = (entry) => this.history.push(entry)) {
     var _a2, _b2, _c;
     const current = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0), before = {};
     for (const key2 of Object.keys(patch)) before[key2] = current[key2];
@@ -67278,7 +67278,7 @@ ${request.requirements}` : preset.text,
       "referencePaths"
     ].some((key2) => key2 in patch))
       this.plugin.topicRuns.stopTask(node.path);
-    this.history.push({
+    sink({
       undo: async () => {
         var _a3;
         let restore = before;
@@ -75799,7 +75799,7 @@ ${note.detail.trim()}` : "",
                 request.context,
                 alive,
                 anchor,
-                { context: request.context, work }
+                { context: request.context, work, continuation: Boolean(autoOrigin) }
               );
               if (alive() && chat.isBusy) {
                 const entry = this.chatReplyEntry();
@@ -76293,7 +76293,7 @@ ${note.detail.trim()}` : "",
     chat.showPlan(card);
   }
   async applyChatPlan(card, token, result, baseline, anchor, run = null) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const chat = this.chat;
     if (!chat || this.closed || token !== this.chatPlanToken || chat.isBusy || this.chatApplying) return;
     if (!this.map || this.path !== anchor.path || this.map.id !== anchor.id) {
@@ -76318,7 +76318,8 @@ ${note.detail.trim()}` : "",
     try {
       lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, live, {
         context: baseline,
-        work
+        work,
+        continuation: ((_b2 = run == null ? void 0 : run.state.round) != null ? _b2 : 1) > 1
       });
     } catch (error) {
       lines = [{ status: "failed", text: errorMessage(error) }];
@@ -76327,8 +76328,8 @@ ${note.detail.trim()}` : "",
       chat.setApplying(false);
     }
     if (!this.closed) {
-      lines = (_b2 = chat.settlePlan(card, "applied", lines)) != null ? _b2 : lines;
-      (_c = this.chatPlanRecords.get(card)) == null ? void 0 : _c.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
+      lines = (_c = chat.settlePlan(card, "applied", lines)) != null ? _c : lines;
+      (_d = this.chatPlanRecords.get(card)) == null ? void 0 : _d.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
       if (run) {
         if (stopped()) {
           if (this.chainShows(run)) this.stopChainWork(run);
@@ -77150,7 +77151,14 @@ ${note.detail.trim()}` : "",
                 removeStyles: [...(_r = asked == null ? void 0 : asked.removeStyles) != null ? _r : [], ...(_s = change2.removeStyles) != null ? _s : []]
               };
             }
-            outcome = resolved ? await this.runChatSelection(resolved.action, (_t = result.message) != null ? _t : "", laterBatch, asked, options.work) : skipped("ui.map_chat_skip_parent_missing");
+            outcome = resolved ? await this.runChatSelection(
+              resolved.action,
+              (_t = result.message) != null ? _t : "",
+              laterBatch,
+              asked,
+              options.work,
+              Boolean(options.continuation)
+            ) : skipped("ui.map_chat_skip_parent_missing");
             if (options.work && outcome.status === "done" && (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && ["synthesize", "merge", "rate_by_goal"].includes(resolved.action.action))
               options.work.otherBackground = true;
             if (outcome.status !== "done" && mine.length && same()) {
@@ -77946,7 +77954,7 @@ ${note.detail.trim()}` : "",
     if (!this.closed) this.render();
   }
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
-  async runChatSelection(action, message = "", batch = newChatImageBatch(), held, work) {
+  async runChatSelection(action, message = "", batch = newChatImageBatch(), held, work, continuation = false) {
     var _a2, _b2;
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
@@ -78152,7 +78160,7 @@ ${note.detail.trim()}` : "",
         return { status: "done" };
       }
       case "find_images":
-        return this.chatFindImages(action.direction, targets, batch, Boolean(work));
+        return this.chatFindImages(action.direction, targets, batch, continuation);
     }
   }
   /**
@@ -78187,7 +78195,7 @@ ${note.detail.trim()}` : "",
       const joined = cleanImageQuery(
         (readsResearch ? [parentTitle, title] : ids.length > 1 ? [words2, title] : [words2 || title]).filter(Boolean).join(" ")
       );
-      const query = joined || title;
+      const query = title ? joined || title : "";
       const block = {
         query,
         nodeId: node.id,
@@ -78359,51 +78367,59 @@ ${note.detail.trim()}` : "",
     };
     const collected = new History();
     const startMark = collected.mark();
-    const history2 = this.history;
-    const own2 = Object.getOwnPropertyDescriptor(history2, "push");
-    Object.defineProperty(history2, "push", {
-      value: (entry2) => collected.push(entry2),
-      configurable: true,
-      writable: true
-    });
     try {
       await this.plugin.mutate(async () => {
-        var _a2;
-        const again = fence();
-        if ("reason" in again) {
-          outcome.result = { ok: false, reason: t(again.reason) };
-          return;
-        }
+        var _a2, _b2;
+        const historyMark = this.history.mark();
         try {
-          const note = await this.plugin.repo.readNote(again.node.path, (_a2 = this.map) != null ? _a2 : void 0);
-          if (note.aiLocked) {
-            outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
+          const again = fence();
+          if ("reason" in again) {
+            outcome.result = { ok: false, reason: t(again.reason) };
             return;
           }
-          const before = note.detail.replace(/\s+$/, "");
-          const addition = imageMarkdown({
-            ...candidate,
-            title: cleanImageTitle(candidate.title) || cleanImageTitle(block.nodeTitle) || t("ui.map_chat_image_alt")
-          });
-          await this.noteChange(again.node, { detail: before ? `${before}
+          try {
+            const note = await this.plugin.repo.readNote(again.node.path, (_a2 = this.map) != null ? _a2 : void 0);
+            if (note.aiLocked) {
+              outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
+              return;
+            }
+            const before = note.detail.replace(/\s+$/, "");
+            const addition = imageMarkdown({
+              ...candidate,
+              title: cleanImageTitle(candidate.title) || cleanImageTitle(block.nodeTitle) || t("ui.map_chat_image_alt")
+            });
+            await this.noteChange(
+              again.node,
+              { detail: before ? `${before}
 
-${addition}` : addition });
-          outcome.result = { ok: true };
-        } catch (error) {
-          outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
-          return;
+${addition}` : addition },
+              (entry) => collected.push(entry)
+            );
+            outcome.result = { ok: true };
+          } catch (error) {
+            outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+            return;
+          }
+          if (cover) {
+            const coverEntry = await this.chatCoverWrite(block, cover, alive).catch(() => null);
+            if (coverEntry) {
+              collected.push(coverEntry);
+              outcome.coverWritten = true;
+            }
+          }
+        } finally {
+          collected.collapseSince(startMark, t("ui.map_chat_images_undo_label"));
+          const entry = collected.undoEntry;
+          const sameHistory = !this.closed && this.history.mark().epoch === historyMark.epoch && this.path === block.mapPath && ((_b2 = this.map) == null ? void 0 : _b2.id) === block.mapId;
+          if (entry && sameHistory) {
+            this.history.pushSolo(entry);
+            this.updateHistoryButtons();
+          }
         }
-        if (cover) outcome.coverWritten = await this.chatCoverWrite(block, cover, alive).catch(() => false);
       });
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
-    } finally {
-      if (own2) Object.defineProperty(history2, "push", own2);
-      else Reflect.deleteProperty(history2, "push");
     }
-    collected.collapseSince(startMark, t("ui.map_chat_images_undo_label"));
-    const entry = collected.undoEntry;
-    if (entry) this.history.push(entry);
     if (outcome.coverWritten) await this.refreshAfterSavedChange();
     return outcome.result;
   }
@@ -78481,8 +78497,8 @@ ${addition}` : addition });
    */
   async chatCoverWrite(block, cover, alive) {
     const node = this.chatCoverTarget(block);
-    if (!node || !this.map || !alive() || !this.chatHasNoCover(node)) return false;
-    if ((await this.plugin.repo.readNote(node.path, this.map)).aiLocked) return false;
+    if (!node || !this.map || !alive() || !this.chatHasNoCover(node)) return null;
+    if ((await this.plugin.repo.readNote(node.path, this.map)).aiLocked) return null;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().createAttachment("image", { name: cover.name, data: cover.data, sourcePath: node.path }).rewriteNote(node.path, async (path, attachment) => {
       const note = this.app.vault.getAbstractFileByPath(path);
@@ -78492,8 +78508,7 @@ ${addition}` : addition });
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
     }).commit({ deferRebuild: true, label: t("ui.topic_cover") });
-    this.history.push(entry);
-    return true;
+    return entry;
   }
   /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
   chatTranscriptTurn(turn) {

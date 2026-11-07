@@ -4123,7 +4123,7 @@ integrationTest('B3 find_images: the target card is deleted while the search run
 integrationTest('B3 find_images: the note gets the picture and, when the cover step has bytes for it, the cover is written inside the same write - and the two are ONE undo step', async () => {
   const { h } = await imageHarness(); h.control.search = perQuery; const calls = []; const undone = [];
   h.view.chatCoverBytes = async (block, candidate) => ({ name: `${block.nodeId}.png`, data: new ArrayBuffer(4), url: candidate.url });
-  h.view.chatCoverWrite = async (block, cover) => { calls.push([block.nodeId, cover.name]); h.view.history.push({ undo: async () => { undone.push(`cover ${block.nodeId}`); }, redo: async () => {}, label: 'cover' }); return false; };
+  h.view.chatCoverWrite = async (block, cover) => { calls.push([block.nodeId, cover.name]); return { undo: async () => { undone.push(`cover ${block.nodeId}`); }, redo: async () => {}, label: 'cover' }; };
   h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' }); const detailBefore = (await h.note('a')).detail;
   await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await waitImages(h);
   eq(calls.map(c => c[0]).sort(), [h.ids.a, h.ids.b].sort()); assert.match((await h.note('a')).detail, /!\[Pic espresso Body\]/);
@@ -4157,7 +4157,7 @@ integrationTest('R1-7 place: the cover download is outside the write queue - a s
 });
 integrationTest('R1-6 place: the cover and the note are written inside ONE mutate, and a reply being applied at that moment (its ownWrites, an open group) cannot split them', async () => {
   const { h } = await imageHarness(); h.control.search = perQuery; h.view.chatHasNoCover = () => true; h.view.chatFetchImage = async () => pngBytes();
-  const pushed = []; h.view.chatCoverWrite = async block => { h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'cover' }); return false; };
+  h.view.chatCoverWrite = async block => ({ undo: async () => {}, redo: async () => {}, label: 'cover' });
   h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' }); h.control.mutates = 0;
   h.view.history.openGroup(); const next = deferred();
   const reply = h.view.history.ownWrites(async () => { await next.promise; });
@@ -4239,8 +4239,12 @@ integrationTest('R1-1 find_images: the search words never carry a link or a doma
   eq(h3.control.searches.map(s => s.query).sort(), ['Body REM', 'Sleep', 'Sleep Body'], 'a research conversation: parent title + card title, never the model\'s words');
   const { h: h4 } = await imageHarness(); h4.control.search = async () => [];
   const work = { controller: new AbortController(), research: [], researchTargets: 0, researchKeys: new Set(), created: [], expand: [], otherBackground: false };
-  await withTimeout(h4.view.applyMapChatActions({ actions: [findAct(h4, 'c', { direction: 'https://evil.example/x.png' })], rejected: [] }, { mdHashes: {}, topicHashes: topicBaseline(h4) }, undefined, undefined, { work })); await waitImages(h4);
+  await withTimeout(h4.view.applyMapChatActions({ actions: [findAct(h4, 'c', { direction: 'https://evil.example/x.png' })], rejected: [] }, { mdHashes: {}, topicHashes: topicBaseline(h4) }, undefined, undefined, { work, continuation: true })); await waitImages(h4);
   eq(h4.control.searches.map(s => s.query), ['Body REM'], 'an automatic continuation round reads research too');
+  // Having round work is not the signal (every first reply has it): a first reply keeps the model's direction.
+  const { h: h4b } = await imageHarness(); h4b.control.search = async () => [];
+  await withTimeout(h4b.view.applyMapChatActions({ actions: [findAct(h4b, 'c', { direction: 'steak western' })], rejected: [] }, { mdHashes: {}, topicHashes: topicBaseline(h4b) }, undefined, undefined, { work: { ...work, controller: new AbortController() } })); await waitImages(h4b);
+  eq(h4b.control.searches.map(s => s.query), ['steak western'], 'a reply with work but no continuation flag keeps the direction');
   const { h: h5 } = await imageHarness(); h5.control.search = async () => [];
   await apply(h5, [findAct(h5, 'a', { direction: 'https://evil.example/x.png' })]); await waitImages(h5);
   eq(h5.control.searches.map(s => s.query), ['Body'], 'a cleaned-empty direction falls back to the card title');
@@ -7968,4 +7972,74 @@ integrationTest('R6 M-1: a failed or stopped round: the restored conversation ke
   { const h = await harness({ records: true }); await h.view.hydrate(); const { runs } = await researchChain(h, { remaining: 'Add' });
     settleRun(runs[0], 'failed', 'network down'); await until(() => h.view.chatChain === null && !h.view.chat.isBusy); await r5Wait(); await recordIdle(h);
     const { c } = await r6Reopen(recordLines(h, recordFiles(h)[0])); eq(r6Notes(c), ['The research did not work, so the subtopics were not filled in.'], 'no reason is fine'); }
+});
+
+// ---- R2 (review round 2) ----
+integrationTest('R2-B1 find_images: a real reply (sendMapChat) with one action per card keeps each action\'s direction in the search words', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open(); h.control.search = async () => [];
+  const dirs = [['a', 'steak western'], ['b', 'steak korean'], ['c', 'steak japanese']];
+  h.control.reply = async () => ({ reply: 'pictures', actions: dirs.map(([key, direction]) => findAct(h, key, { direction })), rejected: [] });
+  h.view.chat.reset(); h.type('Add pictures to the steaks'); await h.view.sendMapChat(); await waitImages(h);
+  eq(h.control.searches.map(s => s.query).sort(), dirs.map(d => d[1]).sort(), 'the direction of each action, not the card titles');
+});
+integrationTest('R2-B1 find_images: a plan applied from a first-round reply keeps the direction too', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); h.control.search = async () => [];
+  h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), findAct(h, 'a', { direction: 'steak western' })], rejected: [] });
+  chat.reset(); h.type('Add many and a picture'); await h.view.sendMapChat();
+  assert.equal(chat.pendingPlan().state, 'pending');
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying); await waitImages(h);
+  eq(h.control.searches.map(s => s.query), ['steak western']);
+});
+const coverStub = h => { h.view.chatHasNoCover = () => true; h.view.chatFetchImage = async () => pngBytes(); };
+const undoLabels = h => h.view.history.past.map(e => e.label);
+integrationTest('R2-B2 place: another write that lands while the picture waits its turn stays its own undo step, and undoing the picture leaves it alone', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery;
+  let otherUndone = 0; const other = { undo: async () => { otherUndone++; }, redo: async () => {}, label: 'other' };
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
+  const mutate = h.plugin.mutate.bind(h.plugin); let queued = false;
+  h.plugin.mutate = work => { if (!queued) { queued = true; mutate(async () => { h.view.history.push(other); }); } return mutate(work); };
+  const detailBefore = (await h.note('a')).detail;
+  await apply(h, [findAct(h, 'a')]); await waitImages(h);
+  assert.equal(lastImages(h).state, 'ready'); assert.equal(h.view.history.past.length, 3, `earlier, other and the picture: ${undoLabels(h)}`); assert.equal(h.view.history.past[1], other, 'the other entry is a step of its own');
+  const picture = h.view.history.undo(); await picture.undo();
+  assert.equal(otherUndone, 0, 'undoing the picture does not touch the other write'); assert.equal(h.view.history.undoEntry, other); assert.equal((await h.note('a')).detail, detailBefore);
+});
+integrationTest('R2-B2 place: an open reply group that wrote nothing does not take the picture\'s undo step with it', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; const detailBefore = (await h.note('a')).detail;
+  h.view.history.openGroup(); await apply(h, [findAct(h, 'a')]); await waitImages(h);
+  eq(h.view.history.closeGroup(), [], 'nothing of the picture is in the reply\'s group'); assert.ok(h.view.history.undoEntry, 'the picture has its undo step');
+  await h.view.history.undo().undo(); assert.equal((await h.note('a')).detail, detailBefore);
+});
+integrationTest('R2-B2 place: the note is written and the cover step then fails - the note\'s undo step is still pushed', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; coverStub(h); const detailBefore = (await h.note('a')).detail;
+  h.view.chatCoverWrite = () => { throw new Error('cover boom'); };
+  await apply(h, [findAct(h, 'a')]); await waitImages(h);
+  assert.match((await h.note('a')).detail, /!\[Pic espresso\]/, 'the picture is in the note'); assert.equal(h.view.history.canUndo, true, 'and can be undone');
+  await h.view.history.undo().undo(); assert.equal((await h.note('a')).detail, detailBefore);
+});
+integrationTest('R2-B2 place: the history cleared, or another map in view, before the step is pushed - the step stays out of the history', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; coverStub(h);
+  h.view.chatCoverWrite = async () => { h.view.history.clear(); return { undo: async () => {}, redo: async () => {}, label: 'cover' }; };
+  await apply(h, [findAct(h, 'a')]); await waitImages(h);
+  assert.match((await h.note('a')).detail, /!\[Pic espresso\]/); assert.equal(h.view.history.canUndo, false, 'cleared history: no step from before the clear');
+  const { h: h2 } = await imageHarness(); h2.control.search = perQuery; coverStub(h2);
+  h2.view.chatCoverWrite = async () => { h2.view.path = 'Elsewhere/Map.md'; return { undo: async () => {}, redo: async () => {}, label: 'cover' }; };
+  await apply(h2, [findAct(h2, 'a')]); await waitImages(h2);
+  assert.equal(h2.view.history.canUndo, false, 'another map in view: its history gets no step of the old map');
+});
+integrationTest('R2-B2 place: the history buttons follow the pushed picture step', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; let updates = 0; const raw = h.view.updateHistoryButtons.bind(h.view); h.view.updateHistoryButtons = () => { updates++; return raw(); };
+  await apply(h, [findAct(h, 'a')]); await waitImages(h); assert.ok(updates >= 1, 'updateHistoryButtons ran after the push');
+});
+integrationTest('R2-L find_images: a bare IP address never reaches the search words; a card whose title cleans to nothing is not searched and says why', async () => {
+  const { h } = await imageHarness(); h.control.search = async () => [];
+  await apply(h, [findAct(h, 'a', { direction: 'steak 192.168.0.1:8080/x [::1] 10.0.0.2' })]); await waitImages(h);
+  eq(h.control.searches.map(s => s.query), ['steak'], 'no address in the words');
+  const { h: h2 } = await imageHarness(); h2.control.search = async () => []; await h2.repo.updateNote(noteFile(h2, 'a'), { title: 'https://evil.example/x' }); await h2.view.hydrate();
+  await apply(h2, [findAct(h2, 'a', { direction: 'steak' })]); await waitImages(h2);
+  assert.equal(h2.control.searches.length, 0, 'nothing is searched'); assert.equal(lastImages(h2).state, 'empty'); assert.ok(lastImages(h2).reason, 'the row says why');
+});
+integrationTest('R2-L place: a combining mark in the picture title survives the whitelist', async () => {
+  const { h } = await imageHarness(); h.control.search = async () => [{ title: 'Caf\u0065\u0301 \u0e01\u0e34\u0e19', url: 'https://img.example/p.jpg', source: 'https://page.example/p' }];
+  await apply(h, [findAct(h, 'a')]); await waitImages(h); assert.ok((await h.note('a')).detail.includes('Caf\u0065\u0301 \u0e01\u0e34\u0e19'));
 });

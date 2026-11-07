@@ -1152,6 +1152,8 @@ const newChatWork = (): ChatRoundWork => ({
 interface ChatApplyOptions {
   context?: Pick<MapChatContext, "basis" | "parents">;
   work?: ChatRoundWork;
+  /** An automatic continuation round of a chat message (not the first reply, not a plan of the first round): its picture searches read researched text. */
+  continuation?: boolean;
 }
 /** What a finished round hands to its chain: the reply, what was applied, and the work it started. */
 interface ChatRoundEnd {
@@ -1269,6 +1271,8 @@ function cleanImageQuery(text: string): string {
   return plain
     .replace(/\S*:\/\/\S*/g, " ")
     .replace(/\bwww\.\S*/gi, " ")
+    .replace(/\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?(?:[/?#]\S*)?/g, " ")
+    .replace(/\[[0-9a-f:.]*:[0-9a-f:.]*\](?::\d+)?(?:[/?#]\S*)?/gi, " ")
     .replace(/(?:[\p{L}\p{N}-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?/giu, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -1281,7 +1285,7 @@ function cleanImageQuery(text: string): string {
  */
 function cleanImageTitle(text: string): string {
   return text
-    .replace(/[^\p{L}\p{N}\s.,;:'"()\-_?+，。、：；？（）「」『』《》—…·]/gu, " ")
+    .replace(/[^\p{L}\p{M}\p{N}\s.,;:'"()\-_?+，。、：；？（）「」『』《》—…·]/gu, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 120)
@@ -12448,7 +12452,12 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
-  private async noteChange(node: MapNode, patch: NotePatch): Promise<void> {
+  private async noteChange(
+    node: MapNode,
+    patch: NotePatch,
+    /** Where the undo entry goes (default: the history); the picture placement folds its two entries before they reach it. */
+    sink: (entry: Action) => void = entry => this.history.push(entry)
+  ): Promise<void> {
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
       before: NotePatch = {};
     for (const key of Object.keys(patch) as (keyof Note)[]) (before as Record<string, unknown>)[key] = current[key];
@@ -12484,7 +12493,7 @@ export class VisualAgentMapView extends ItemView {
       ].some(key => key in patch)
     )
       this.plugin.topicRuns.stopTask(node.path);
-    this.history.push({
+    sink({
       undo: async () => {
         let restore = before;
         if (written) {
@@ -21757,7 +21766,7 @@ export class VisualAgentMapView extends ItemView {
                 request.context,
                 alive,
                 anchor,
-                { context: request.context, work }
+                { context: request.context, work, continuation: Boolean(autoOrigin) }
               );
               if (alive() && chat.isBusy) {
                 // Read at once: the next reply's step replaces `chatReplyEntry`.
@@ -22337,7 +22346,8 @@ export class VisualAgentMapView extends ItemView {
     try {
       lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, live, {
         context: baseline,
-        work
+        work,
+        continuation: (run?.state.round ?? 1) > 1
       });
     } catch (error) {
       lines = [{ status: "failed", text: errorMessage(error) }];
@@ -23287,7 +23297,14 @@ export class VisualAgentMapView extends ItemView {
               };
             }
             outcome = resolved
-              ? await this.runChatSelection(resolved.action, result.message ?? "", laterBatch, asked, options.work)
+              ? await this.runChatSelection(
+                  resolved.action,
+                  result.message ?? "",
+                  laterBatch,
+                  asked,
+                  options.work,
+                  Boolean(options.continuation)
+                )
               : skipped("ui.map_chat_skip_parent_missing");
             if (
               options.work &&
@@ -24205,7 +24222,9 @@ export class VisualAgentMapView extends ItemView {
     /** The appearance the reply asked for the cards this merge takes: it goes to the merged card. */
     held?: TopicAppearanceChange,
     /** Where the research and expansions this action starts are collected, for a continuation to wait for. */
-    work?: ChatRoundWork
+    work?: ChatRoundWork,
+    /** An automatic continuation round: a picture search reads researched text and ignores the model's direction. */
+    continuation = false
   ): Promise<ChatOutcome> {
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
@@ -24426,7 +24445,7 @@ export class VisualAgentMapView extends ItemView {
         return { status: "done" };
       }
       case "find_images":
-        return this.chatFindImages(action.direction, targets, batch, Boolean(work));
+        return this.chatFindImages(action.direction, targets, batch, continuation);
     }
   }
   /**
@@ -24473,7 +24492,8 @@ export class VisualAgentMapView extends ItemView {
           .filter(Boolean)
           .join(" ")
       );
-      const query = joined || title;
+      // A card whose title is nothing after the cleaning is not searched: the words alone would find pictures of something else.
+      const query = title ? joined || title : "";
       const block: MapChatImages = {
         query,
         nodeId: node.id,
@@ -24672,58 +24692,70 @@ export class VisualAgentMapView extends ItemView {
       result: { ok: false, reason: t("ui.map_chat_images_stale_map") },
       coverWritten: false
     };
-    // The undo entries of this write are collected here, not in the history: a reply being applied meanwhile (its ownWrites)
-    // must not take one of the two into its group and leave the other. They reach the history as one entry.
+    // The undo entries of this write are collected here, not in the history. Inside the mutate they are folded into one entry
+    // and pushed as a step of its own (see below); nothing replaces or intercepts the real history's push.
     const collected = new History<Action>();
     const startMark = collected.mark();
-    const history = this.history;
-    const own = Object.getOwnPropertyDescriptor(history, "push");
-    Object.defineProperty(history, "push", {
-      value: (entry: Action): void => collected.push(entry),
-      configurable: true,
-      writable: true
-    });
     try {
       await this.plugin.mutate(async () => {
-        const again = fence();
-        if ("reason" in again) {
-          outcome.result = { ok: false, reason: t(again.reason) };
-          return;
-        }
-        // A failure is carried out as a result, not thrown: mutate() would show its own Notice for a throw, and this is the second.
+        // Taken inside the write queue: a clear() or a map switch after this point keeps the step out of the history.
+        const historyMark = this.history.mark();
         try {
-          const note = await this.plugin.repo.readNote(again.node.path, this.map ?? undefined);
-          // AI lock: the picture is not put into a locked card.
-          if (note.aiLocked) {
-            outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
+          const again = fence();
+          if ("reason" in again) {
+            outcome.result = { ok: false, reason: t(again.reason) };
             return;
           }
-          const before = note.detail.replace(/\s+$/, "");
-          // The title is a whitelist (see cleanImageTitle): nothing the search result says becomes Markdown the reader acts on.
-          const addition = imageMarkdown({
-            ...candidate,
-            title: cleanImageTitle(candidate.title) || cleanImageTitle(block.nodeTitle) || t("ui.map_chat_image_alt")
-          });
-          await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition });
-          outcome.result = { ok: true };
-        } catch (error) {
-          outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
-          return;
+          // A failure is carried out as a result, not thrown: mutate() would show its own Notice for a throw, and this is the second.
+          try {
+            const note = await this.plugin.repo.readNote(again.node.path, this.map ?? undefined);
+            // AI lock: the picture is not put into a locked card.
+            if (note.aiLocked) {
+              outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
+              return;
+            }
+            const before = note.detail.replace(/\s+$/, "");
+            // The title is a whitelist (see cleanImageTitle): nothing the search result says becomes Markdown the reader acts on.
+            const addition = imageMarkdown({
+              ...candidate,
+              title: cleanImageTitle(candidate.title) || cleanImageTitle(block.nodeTitle) || t("ui.map_chat_image_alt")
+            });
+            await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition }, entry =>
+              collected.push(entry)
+            );
+            outcome.result = { ok: true };
+          } catch (error) {
+            outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+            return;
+          }
+          // The picture is in the Detail now. A remote link never becomes a card cover (covers read local files only), so the
+          // file is also saved beside the note; a failure here leaves the picture in the Detail as it is and says nothing more.
+          if (cover) {
+            const coverEntry = await this.chatCoverWrite(block, cover, alive).catch(() => null);
+            if (coverEntry) {
+              collected.push(coverEntry);
+              outcome.coverWritten = true;
+            }
+          }
+        } finally {
+          // Whatever was written reaches the history, also when a later step threw: the note and the cover are one step to undo,
+          // and a solo one, so a reply's group or another job's collapse never takes it. Not into another map's history.
+          collected.collapseSince(startMark, t("ui.map_chat_images_undo_label"));
+          const entry = collected.undoEntry;
+          const sameHistory =
+            !this.closed &&
+            this.history.mark().epoch === historyMark.epoch &&
+            this.path === block.mapPath &&
+            this.map?.id === block.mapId;
+          if (entry && sameHistory) {
+            this.history.pushSolo(entry);
+            this.updateHistoryButtons();
+          }
         }
-        // The picture is in the Detail now. A remote link never becomes a card cover (covers read local files only), so the
-        // file is also saved beside the note; a failure here leaves the picture in the Detail as it is and says nothing more.
-        if (cover) outcome.coverWritten = await this.chatCoverWrite(block, cover, alive).catch(() => false);
       });
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
-    } finally {
-      if (own) Object.defineProperty(history, "push", own);
-      else Reflect.deleteProperty(history, "push");
     }
-    // The note write and the cover are one step to undo.
-    collected.collapseSince(startMark, t("ui.map_chat_images_undo_label"));
-    const entry = collected.undoEntry;
-    if (entry) this.history.push(entry);
     if (outcome.coverWritten) await this.refreshAfterSavedChange();
     return outcome.result;
   }
@@ -24806,11 +24838,11 @@ export class VisualAgentMapView extends ItemView {
     block: MapChatImages,
     cover: { name: string; data: ArrayBuffer },
     alive: () => boolean
-  ): Promise<boolean> {
+  ): Promise<Action | null> {
     const node = this.chatCoverTarget(block);
-    if (!node || !this.map || !alive() || !this.chatHasNoCover(node)) return false;
+    if (!node || !this.map || !alive() || !this.chatHasNoCover(node)) return null;
     // AI lock: a locked card gets no new file either.
-    if ((await this.plugin.repo.readNote(node.path, this.map)).aiLocked) return false;
+    if ((await this.plugin.repo.readNote(node.path, this.map)).aiLocked) return null;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
       .createAttachment("image", { name: cover.name, data: cover.data, sourcePath: node.path })
@@ -24824,8 +24856,8 @@ export class VisualAgentMapView extends ItemView {
         map.viewport = clone(viewport);
       })
       .commit({ deferRebuild: true, label: t("ui.topic_cover") });
-    this.history.push(entry);
-    return true;
+    // The caller folds it with the note's entry and pushes the one step.
+    return entry;
   }
   /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
   private chatTranscriptTurn(turn: MapChatSavedTurn): TranscriptTurn {

@@ -28,9 +28,9 @@ const assemble = (selection, language, step = 'research') => M.assembleTaskPromp
 const withFormat = (language, format, template) => ({ ...M.selectionFromContext(contextOf(language), language), ...(template ? { template } : {}), ...(format ? { format } : {}) });
 
 // ---- the model's constants ----
-test('recipe: the kind defaults and the eight built-in recipes follow design 3.2', () => {
+test('recipe: the kind defaults and the nine built-in recipes follow design 3.2', () => {
   assert.deepEqual(plain(M.KIND_DEFAULT_RECIPE), { topic: 'builtin:general', atomic: 'builtin:atomic', hypothesis: 'builtin:hypothesis', evidence: 'builtin:evidence', conclusion: 'builtin:conclusion', action: 'builtin:action', aim: 'builtin:aim' });
-  assert.equal(M.BUILTIN_RECIPES.map(recipe => recipe.id).join(), 'general,atomic,hypothesis,evidence,conclusion,action,aim,textbook');
+  assert.equal(M.BUILTIN_RECIPES.map(recipe => recipe.id).join(), 'general,atomic,hypothesis,evidence,conclusion,action,aim,textbook,ai-suggested');
   for (const [kind, ref] of Object.entries(M.KIND_DEFAULT_RECIPE)) assert.ok(M.BUILTIN_RECIPES.some(recipe => `builtin:${recipe.id}` === ref), kind);
   const row = id => plain(M.BUILTIN_RECIPES.find(recipe => recipe.id === id));
   for (const recipe of M.BUILTIN_RECIPES) {
@@ -42,6 +42,10 @@ test('recipe: the kind defaults and the eight built-in recipes follow design 3.2
   assert.equal(row('general').structure, 'standard');
   assert.equal(row('textbook').structure, 'textbook');
   assert.equal(row('aim').structure, 'aim-delivery');
+  assert.equal(row('ai-suggested').structure, 'standard');
+  assert.equal(row('ai-suggested').aiDecidesSections, true);
+  assert.equal(M.BUILTIN_RECIPES.filter(recipe => recipe.aiDecidesSections).length, 1);
+  assert.equal(M.BUILTIN_RECIPES[0].id, 'general');
   for (const id of ['atomic', 'hypothesis', 'evidence', 'conclusion', 'action']) assert.equal(row(id).structure, id);
   // Every named structure, voice and format of a recipe exists as a built-in part (the AIM structure is the one exception).
   for (const recipe of M.BUILTIN_RECIPES) {
@@ -53,9 +57,9 @@ test('recipe: the kind defaults and the eight built-in recipes follow design 3.2
 
 test('recipe: every recipe, structure, format and update mode has a name in three languages, the recipe names as in design 3.2', () => {
   const names = {
-    'zh-TW': ['一般研究', '原子知識', '假設檢驗', '證據紀錄', '結論', '行動計畫', 'AIM 報告', '教科書'],
-    en: ['General research', 'Atomic note', 'Hypothesis test', 'Evidence record', 'Conclusion', 'Action plan', 'AIM report', 'Textbook'],
-    'zh-CN': ['一般研究', '原子知识', '假设检验', '证据记录', '结论', '行动计划', 'AIM 报告', '教科书']
+    'zh-TW': ['一般研究', '原子知識', '假設檢驗', '證據紀錄', '結論', '行動計畫', 'AIM 報告', '教科書', 'AI 建議'],
+    en: ['General research', 'Atomic note', 'Hypothesis test', 'Evidence record', 'Conclusion', 'Action plan', 'AIM report', 'Textbook', 'AI suggested'],
+    'zh-CN': ['一般研究', '原子知识', '假设检验', '证据记录', '结论', '行动计划', 'AIM 报告', '教科书', 'AI 建议']
   };
   for (const language of LANGUAGES) {
     assert.deepEqual(plain(M.BUILTIN_RECIPES.map(recipe => M.translate(language, recipe.nameKey))), names[language], language);

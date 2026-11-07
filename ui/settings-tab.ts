@@ -196,7 +196,7 @@ export function shownStyleRef(plugin: VisualAgentMapPlugin, kind: StyleKind): st
 
 /** The styles a kind's picker offers: everything, except that only the AIM row offers the AIM report. */
 function offeredStyles(plugin: VisualAgentMapPlugin, kind: StyleKind): RecipeListItem[] {
-  return plugin.noteStyles.listRecipes().filter(item => kind === "aim" || !item.aimOnly);
+  return plugin.noteStyles.listRecipes().filter(item => (kind === "aim" || !item.aimOnly) && !item.topicOnly);
 }
 
 /** The style a kind saved when no style of that ref exists any more (renamed or deleted file); else undefined. */

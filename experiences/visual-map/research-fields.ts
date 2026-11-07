@@ -195,7 +195,7 @@ export function styleChoiceField(parent: HTMLElement, options: StyleChoiceFieldO
   let expanded = false;
   let shownTags = "";
 
-  const offered = (): PickerRecipe[] => recipes.filter(item => !item.aimOnly);
+  const offered = (): PickerRecipe[] => recipes.filter(item => !item.aimOnly && !item.topicOnly);
   const usable = (ref: string): PickerRecipe | undefined =>
     offered().find(item => item.ref === ref && item.issues.length === 0);
   const chosen = (): PickerRecipe | undefined => (expanded && select.value ? usable(select.value) : undefined);

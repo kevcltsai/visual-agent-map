@@ -10,6 +10,8 @@ export * from "./ai/note-style-file";
 export { resolveTemplate, standardTemplate, textbookTemplate, normalizeTemplates, sectionLookup, checkCounts } from "./ai/detail-templates";
 export { resolveToneText } from "./ai/prompt-presets";
 export { canonicalDetail } from "./ai/result-utils";
+export { runStyleLabelText } from "./ai/note-style-label";
+export { translate } from "./i18n";
 export { AiTaskService } from "./core/ai-task-service";
 export { builtinBlockText } from "./core/blocks/block-files";
 export { splitTemplateZones } from "./core/blocks/template-block";
@@ -367,3 +369,149 @@ test('P2 old fixture: a 0.29.0 data.json with four-key style files and 0.28.0 im
 function makeStoreWith(settings, v) {
   return new M.NoteStyleStore({ settings: () => settings, port: v.port, save: async () => { v.saves = (v.saves || 0) + 1; } });
 }
+
+// AI suggested style (P1): a built-in style for general topics whose sections come from the note (or the AI).
+const AI = 'builtin:ai-suggested';
+const aiWorld = (settings = {}, files = {}) => makeStore({ noteStylesFolder: 'WS/S', noteStyleByKind: { topic: AI }, ...settings }, files);
+const SIX = ['Core conclusions', 'Background and mechanism', 'Disagreements and limits', 'Open questions to check', 'Sources', 'Update log'];
+const noteWith = headings => headings.map(name => `### ${name}\nbody`).join('\n\n');
+
+test('AI suggested: no detail is no-note (standard, no context field); empty or blank detail is decide', async () => {
+  const { store } = aiWorld();
+  await store.refresh();
+  const none = store.runStyle({ kind: 'topic', outputLanguage: 'en' });
+  assert.equal(none.recipe.ref, AI);
+  assert.equal(none.aiSections.mode, 'no-note');
+  assert.equal(none.aiSections.forDetail, undefined);
+  eq(none.template, M.standardTemplate('en'));
+  assert.equal('aiSections' in none.contextFields, false);
+  assert.equal(none.label.templateName, 'AI decides sections');
+  assert.equal(none.updateMode, 'merge');
+  for (const detail of ['', '  \n\t \r\n']) {
+    const decide = store.runStyle({ kind: 'topic', outputLanguage: 'en', detail });
+    assert.equal(decide.aiSections.mode, 'decide');
+    assert.equal(decide.aiSections.forDetail, detail);
+    assert.equal(decide.contextFields.aiSections, 'decide');
+    eq(decide.template, M.standardTemplate('en'));
+    assert.equal(decide.label.templateName, 'AI decides sections');
+  }
+});
+
+test('AI suggested: a detail with usable sections is follow (the note\'s template); an unusable one is note-unusable (standard, general)', async () => {
+  const { store } = aiWorld();
+  await store.refresh();
+  const detail = noteWith(['Swing plane', 'Drills', 'Sources']);
+  const follow = store.runStyle({ kind: 'topic', outputLanguage: 'en', detail });
+  assert.equal(follow.aiSections.mode, 'follow');
+  assert.equal(follow.aiSections.forDetail, detail);
+  assert.equal(follow.contextFields.aiSections, 'follow');
+  assert.equal(follow.template.id, 'note-sections');
+  eq(follow.template.sections.map(section => section.name), ['Swing plane', 'Drills', 'Sources']);
+  assert.equal(follow.label.templateName, "Keep the note's sections");
+  const six = store.runStyle({ kind: 'topic', outputLanguage: 'en', detail: noteWith(SIX) });
+  eq(six.template.sections.map(section => section.role), ['none', 'none', 'none', 'none', 'sources', 'log']);
+  for (const bad of [noteWith(Array.from({ length: 14 }, (_, i) => `P${i}`)), '### Same\na\n### same\nb', '# Only a title\nbody', 'plain text', `### ${'x'.repeat(41)}\nbody`]) {
+    const unusable = store.runStyle({ kind: 'topic', outputLanguage: 'en', detail: bad });
+    assert.equal(unusable.aiSections.mode, 'note-unusable', bad.slice(0, 20));
+    assert.equal(unusable.contextFields.aiSections, 'general');
+    eq(unusable.template, M.standardTemplate('en'));
+    assert.equal(unusable.label.templateName, 'Standard six');
+  }
+});
+
+test('AI suggested: the label has no bracket for decide and follow, even from the kind level; other styles keep it', async () => {
+  const { store } = aiWorld();
+  await store.refresh();
+  const label = detail => M.runStyleLabelText(store.runStyle({ kind: 'topic', outputLanguage: 'en', ...(detail === undefined ? {} : { detail }) }).label, 'en');
+  const tone = store.runStyle({ kind: 'topic', outputLanguage: 'en' }).label.toneName;
+  assert.equal(label(''), `Note style: AI decides sections · ${tone}`);
+  assert.equal(label(noteWith(['A', 'B'])), `Note style: Keep the note's sections · ${tone}`);
+  assert.match(label('plain text'), /\(structure from topic type\)$/);
+  const general = makeStore();
+  await general.store.refresh();
+  assert.match(M.runStyleLabelText(general.store.runStyle({ kind: 'topic', outputLanguage: 'en' }).label, 'en'), /\(structure from topic type\)$/);
+});
+
+test('AI suggested: not selected means the same shape as before (no aiSections anywhere)', async () => {
+  const { store } = makeStore({ noteStylesFolder: 'WS/S' });
+  await store.refresh();
+  for (const detail of [undefined, '', noteWith(['A'])]) {
+    const run = store.runStyle({ kind: 'topic', outputLanguage: 'en', ...(detail === undefined ? {} : { detail }) });
+    assert.equal('aiSections' in run, false);
+    assert.equal('aiSections' in run.contextFields, false);
+    assert.equal(run.label.aiSectionsMode, undefined);
+    assert.equal(run.recipe.ref, 'builtin:general');
+  }
+});
+
+test('AI suggested scope: a hypothesis topic that names it falls back to the hypothesis style and the ref is missing; so do the kind setting and the AIM row', async () => {
+  const { store } = aiWorld({ noteStyleByKind: { topic: AI, hypothesis: AI, aim: AI } });
+  await store.refresh();
+  const topic = store.runStyle({ kind: 'hypothesis', topic: { style: AI }, outputLanguage: 'en', detail: '' });
+  assert.equal(topic.recipe.ref, 'builtin:hypothesis');
+  assert.deepEqual(plain(topic.issues.missing), [AI]);
+  assert.equal(topic.aiSections, undefined);
+  assert.equal('aiSections' in topic.contextFields, false);
+  const kindLevel = store.runStyle({ kind: 'hypothesis', outputLanguage: 'en', detail: '' });
+  assert.equal(kindLevel.recipe.ref, 'builtin:hypothesis');
+  assert.deepEqual(plain(kindLevel.issues.missing), [AI]);
+  const aim = store.runStyle({ kind: 'aim', outputLanguage: 'en', detail: '' });
+  assert.equal(aim.recipe.aimDelivery, true);
+  assert.deepEqual(plain(aim.issues.missing), [AI]);
+  for (const kind of ['atomic', 'evidence', 'conclusion', 'action']) {
+    const other = store.runStyle({ kind, choice: { style: AI }, outputLanguage: 'en' });
+    assert.equal(other.recipe.ref, `builtin:${kind}`, kind);
+  }
+});
+
+test('AI suggested list: topic only, no copy, structure named by the AI, and not counted as a user of Standard', async () => {
+  const { store } = aiWorld();
+  await store.refresh();
+  const item = store.listRecipes().find(entry => entry.ref === AI);
+  assert.equal(item.kind, 'builtin');
+  assert.equal(item.name, 'AI suggested');
+  assert.equal(item.topicOnly, true);
+  assert.equal(item.noCopy, true);
+  assert.equal(item.structure.name, 'AI decides sections');
+  assert.equal(item.update, 'merge');
+  assert.deepEqual(plain(item.usedByKinds), ['topic']);
+  const general = store.listRecipes().find(entry => entry.ref === 'builtin:general');
+  assert.equal(general.topicOnly, undefined);
+  assert.equal(general.noCopy, undefined);
+  const standard = store.listParts('structure').find(entry => entry.ref === 'builtin:standard');
+  assert.equal(standard.usedBy.includes('AI suggested'), false);
+  assert.equal(standard.usedBy.includes('General research'), true);
+  assert.equal(store.listRecipes().find(entry => entry.ref === 'builtin:aim').noCopy, true);
+});
+
+test('AI suggested name: a user style file with the name in any language or case is a problem and is not used; the voice "auto" still resolves', async () => {
+  const body = '---\nstructure: Standard six\n---\n';
+  const names = ['AI suggested', 'ai SUGGESTED', 'AI 建議', 'AI 建议'];
+  const files = Object.fromEntries(names.map(name => [`WS/S/Styles/${name}.md`, body]));
+  for (const name of names) {
+    const { store } = makeStore({ noteStylesFolder: 'WS/S', noteStyleByKind: { topic: `file:${name}` } }, files);
+    await store.refresh();
+    const item = store.listRecipes().find(entry => entry.ref === `file:${name}`);
+    assert.ok(item.issues.some(issue => issue.code === 'builtin_name'), name);
+    const run = store.runStyle({ kind: 'topic', outputLanguage: 'en', detail: '' });
+    assert.equal(run.recipe.ref, 'builtin:general', `${name} is not used`);
+    assert.deepEqual(plain(run.issues.missing), [`file:${name}`]);
+    assert.equal(run.aiSections, undefined);
+  }
+  const { store } = makeStore({ noteStylesFolder: 'WS/S', noteStyleByKind: { topic: 'file:Old' } }, { 'WS/S/Styles/Old.md': '---\nstructure: Standard six\nvoice: AI choice\n---\n' });
+  await store.refresh();
+  const old = store.runStyle({ kind: 'topic', outputLanguage: 'en' });
+  assert.equal(old.recipe.ref, 'file:Old');
+  assert.deepEqual(plain(old.issues.missing), []);
+  assert.equal(old.label.toneName, 'AI choice');
+  assert.ok(old.toneText);
+});
+
+test('AI suggested: the three languages name it and the text of the new keys exists in all of them', () => {
+  for (const [language, name] of [['zh-TW', 'AI 建議'], ['zh-CN', 'AI 建议'], ['en', 'AI suggested']])
+    assert.equal(M.translate(language, 'ui.recipe_name_ai_suggested'), name);
+  for (const language of ['zh-TW', 'zh-CN', 'en'])
+    for (const key of ['ui.note_style_ai_sections_decide', 'ui.note_style_ai_sections_follow', 'ui.note_style_ai_sections_invalid', 'ui.note_style_note_sections_unusable', 'ui.note_style_restored_0', 'note.kept_from_earlier_version'])
+      assert.notEqual(M.translate(language, key, '3'), key, `${language} ${key}`);
+  assert.match(M.translate('zh-TW', 'ui.note_style_restored_0', '3'), /少了 3 項/);
+});

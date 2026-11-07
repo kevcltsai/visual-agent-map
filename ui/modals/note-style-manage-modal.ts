@@ -62,6 +62,8 @@ interface Entry {
   tags?: string;
   /** The AIM report: listed, but neither editable nor a copy source. */
   aimOnly: boolean;
+  /** Listed but neither editable nor a copy source (the AIM report, the AI-suggested style). */
+  noCopy: boolean;
   /** A retired built-in a style still uses: listed marked, but not a copy source. */
   retired?: boolean;
   /** The topic types that use a style (as saved, or its built-in default); empty for a part. */
@@ -200,7 +202,8 @@ export class NoteStyleManageModal extends Modal {
           used: item.usedByKinds.filter(kind => kind !== "aim" || aimEnabled()).map(styleKindName),
           kinds: item.usedByKinds.filter(kind => kind !== "aim" || aimEnabled()),
           tags: styleTags(item),
-          aimOnly: item.aimOnly === true
+          aimOnly: item.aimOnly === true,
+          noCopy: item.noCopy === true
         }));
     return store
       .listParts(this.tab)
@@ -213,6 +216,7 @@ export class NoteStyleManageModal extends Modal {
         used: item.usedBy,
         kinds: [],
         aimOnly: false,
+        noCopy: false,
         ...(item.retired ? { retired: true } : {})
       }));
   }
@@ -247,7 +251,7 @@ export class NoteStyleManageModal extends Modal {
           text: t("ui.note_style_recipe_issue_0_1", issue.line, recipeIssueText(issue)),
           cls: "vam-block-status-error"
         });
-      if (entry.aimOnly) continue;
+      if (entry.aimOnly || entry.noCopy) continue;
       if (entry.builtin) {
         setting.addButton(button => {
           button.setButtonText(t("ui.manage_view")).onClick(() => this.view(entry, button.buttonEl));
@@ -275,7 +279,7 @@ export class NoteStyleManageModal extends Modal {
   }
 
   private async edit(entry: Entry): Promise<void> {
-    if (this.busy || entry.aimOnly) return;
+    if (this.busy || entry.aimOnly || entry.noCopy) return;
     if (this.tab === "recipe") {
       // A built-in style opens as "My <name>" (saved only when the editor saves); a user's style opens as it is.
       void this.openEditor(() => ({
@@ -703,7 +707,7 @@ export class NoteStyleManageModal extends Modal {
     /** Fills the source choices from the current list (the AIM report is no source) and keeps the choice when it is still there. */
     const fillSources = (): void => {
       if (!sourceSelect) return;
-      const sources = this.entries().filter(entry => !entry.aimOnly && !entry.retired);
+      const sources = this.entries().filter(entry => !entry.aimOnly && !entry.noCopy && !entry.retired);
       sourceSelect.replaceChildren();
       for (const entry of sources) sourceSelect.createEl("option", { value: entry.ref, text: entry.name });
       if (!sources.some(entry => entry.ref === source)) source = sources[0]?.ref ?? "";

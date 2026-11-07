@@ -158,6 +158,13 @@ test('styleChoiceField: the select lists "Keep (X)", then Built-in and Mine grou
   assert.equal(field.style(), undefined);
 });
 
+test('styleChoiceField: a topic-only style (AI suggested) is never listed in a run\'s choice, and cannot be set by code', () => {
+  const h = choice([...recipes, recipe('builtin:ai-suggested', 'AI suggested', { topicOnly: true, noCopy: true })]);
+  assert.deepEqual(optionValues(h.select), ['', 'builtin:general', 'builtin:textbook', 'file:Mine', 'file:Broken']);
+  h.toggle.click(); h.select.value = 'builtin:ai-suggested'; h.select.fire('change');
+  assert.equal(h.field.style(), undefined);
+});
+
 test('styleChoiceField: a style file with a problem is disabled with its reason and Open this file, and cannot be sent even when set by code (counter-example 7)', () => {
   const h = choice();
   const option = value => dom.find(h.select, i => i.tag === 'option' && i.value === value);
@@ -217,7 +224,9 @@ test('stylePickerFor: recipes() is the store\'s listRecipes() as it is; builtinR
   const loaded = load('experiences/visual-map/note-style-picker.ts', { obsidian: { ...obsidian, TFile: file.constructor } });
   const base = { refresh: async () => {}, listBlocks: () => [] };
   const builtins = loaded.builtinRecipeItems();
-  assert.equal(builtins.length, 8); eq(builtins.filter(i => i.aimOnly).map(i => i.ref), ['builtin:aim']);
+  assert.equal(builtins.length, 9); eq(builtins.filter(i => i.aimOnly).map(i => i.ref), ['builtin:aim']);
+  eq(builtins.filter(i => i.topicOnly).map(i => i.ref), ['builtin:ai-suggested']);
+  eq(builtins.find(i => i.ref === 'builtin:ai-suggested').name, 'AI suggested');
   eq(builtins.map(i => i.ref).slice(0, 2), ['builtin:general', 'builtin:atomic']);
   const textbook = builtins.find(i => i.ref === 'builtin:textbook');
   eq([textbook.name, textbook.structure.name, textbook.voice.name, textbook.format.name, textbook.update], ['Textbook', 'Intro + six', 'Professional', 'Standard format', 'merge']);

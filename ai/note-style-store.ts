@@ -28,6 +28,7 @@ import {
 } from "../core/blocks/builtin";
 import { parseTemplateBlock, trimFormatBody, type TemplateNotice } from "../core/blocks/template-block";
 import { builtinTemplates, isBuiltinTemplateId, type DetailTemplate } from "./detail-templates";
+import { templateFromDetail } from "./detail-sections";
 import { NOTE_STYLE_LIMITS, type NoteStyleIssue } from "./note-style-file";
 import { DEFAULT_TONE_ID, findPreset, type PromptPreset } from "./prompt-presets";
 import {
@@ -120,7 +121,17 @@ export interface RunStyleRequest {
   kind: StyleKind;
   /** The language the note is written in (the interface language is read from the settings). */
   outputLanguage: ContentLanguage;
+  /**
+   * The note's detail, read before the run. Only the AI-suggested style looks at it: undefined (no note to read) and an
+   * empty text (nothing researched yet) are different states.
+   */
+  detail?: string;
 }
+
+/** How the AI-suggested style stands for one run (see `RunStyle.aiSections`). */
+export type AiSectionsMode = "no-note" | "decide" | "follow" | "note-unusable";
+/** What the prompt side is told: the AI decides the sections, keeps the note's, or the general sections stand in. */
+export type AiSectionsField = "decide" | "follow" | "general";
 
 /** The level a run's style came from. */
 export type TemplateSource = "run" | "topic" | "kind";
@@ -151,7 +162,9 @@ export interface RunStyle {
   readonly voiceSource: PartSource;
   /** Whether the format is the global format or the style's own. */
   readonly formatSource: PartSource;
-  readonly contextFields: Readonly<{ styleSelection?: StyleSelection }>;
+  /** Only for the AI-suggested style: the state of the run and the detail it was decided from. */
+  readonly aiSections?: Readonly<{ mode: AiSectionsMode; forDetail?: string }>;
+  readonly contextFields: Readonly<{ styleSelection?: StyleSelection; aiSections?: AiSectionsField }>;
   readonly label: Readonly<{
     /** In the interface language. */
     templateName: string;
@@ -162,6 +175,8 @@ export interface RunStyle {
     styleName: string;
     /** The file used (with ".md"), for the progress label. */
     fileName?: string;
+    /** The AI-suggested state, when it decides the label's brackets (`runStyleLabelText`). */
+    aiSectionsMode?: AiSectionsMode;
   }>;
   readonly issues: Readonly<{
     /** Refs that were asked for but could not be used, most specific level first. */
@@ -217,6 +232,10 @@ export interface RecipeListItem {
   fileName?: string;
   /** The AIM report: only for the AIM kind, and not a copy source. */
   aimOnly?: true;
+  /** The AI-suggested style: general topics only (the chooser leaves it out for the other kinds). */
+  topicOnly?: true;
+  /** Not a copy source (the AIM report and the AI-suggested style). */
+  noCopy?: true;
   structure: { ref: string; name: string };
   /** The voice in effect: the global one when `voiceSource` is `global`. */
   voice: { ref: string; name: string };
@@ -309,6 +328,8 @@ interface Candidate {
   name: string;
   update: UpdateMode;
   aimDelivery?: true;
+  /** The AI decides the sections (see `BuiltinRecipe.aiDecidesSections`). */
+  aiDecidesSections?: true;
   implicit?: true;
   /** The recipe file (with ".md"), for the progress label. */
   fileName?: string;
@@ -514,7 +535,38 @@ export class NoteStyleStore {
         tryRef(typeof own === "string" ? own : undefined) ??
         this.recipeFromRef(KIND_DEFAULT_RECIPE[kind], kind, language)!;
     }
-    return this.assemble(chosen, source, missing, language);
+    const style = this.assemble(chosen, source, missing, language);
+    return chosen.aiDecidesSections ? this.withAiSections(style, request.detail, language) : style;
+  }
+
+  /** The AI-suggested style for one run: the state the note's detail puts it in (the table in the note-style spec). */
+  private withAiSections(style: RunStyle, detail: string | undefined, language: ContentLanguage): RunStyle {
+    const named = (mode: AiSectionsMode, template: DetailTemplate, key: TranslationKey | undefined): RunStyle => {
+      const aiSections = Object.freeze({ mode, ...(detail !== undefined ? { forDetail: detail } : {}) });
+      const { styleSelection } = style.contextFields;
+      const field: AiSectionsField | undefined =
+        mode === "decide" ? "decide" : mode === "follow" ? "follow" : mode === "note-unusable" ? "general" : undefined;
+      return Object.freeze({
+        ...style,
+        template,
+        aiSections,
+        contextFields: Object.freeze({
+          ...(styleSelection ? { styleSelection } : {}),
+          ...(field ? { aiSections: field } : {})
+        }),
+        label: Object.freeze({
+          ...style.label,
+          ...(key ? { templateName: translate(this.settings.language, key) } : {}),
+          aiSectionsMode: mode
+        })
+      });
+    };
+    if (detail === undefined) return named("no-note", style.template, "ui.note_style_ai_sections_decide");
+    if (!detail.trim()) return named("decide", style.template, "ui.note_style_ai_sections_decide");
+    const read = templateFromDetail(detail, noteLanguageOf(language));
+    return read.ok
+      ? named("follow", read.template, "ui.note_style_ai_sections_follow")
+      : named("note-unusable", style.template, undefined);
   }
 
   /**
@@ -579,12 +631,15 @@ export class NoteStyleStore {
     if (parsed.kind === "builtin") {
       const recipe = BUILTIN_RECIPES.find(item => item.id === parsed.id);
       if (!recipe || (recipe.id === "aim" && kind !== "aim")) return undefined;
+      // The AI-suggested style is for general topics: elsewhere the chain falls back and reports the ref as missing.
+      if (recipe.aiDecidesSections && kind !== "topic") return undefined;
       const aim = recipe.structure === AIM_DELIVERY_STRUCTURE;
       return {
         ref,
         name: translate(this.settings.language, recipe.nameKey),
         update: recipe.update,
         ...(aim ? { aimDelivery: true as const } : {}),
+        ...(recipe.aiDecidesSections ? { aiDecidesSections: true as const } : {}),
         structure: this.structurePart(`builtin:${aim ? "standard" : recipe.structure}`, language)!,
         ...this.globalAwareParts(
           recipe.followsVoice ? undefined : `builtin:${recipe.voice}`,
@@ -1011,7 +1066,10 @@ export class NoteStyleStore {
     for (const recipe of BUILTIN_RECIPES) {
       let own: string | undefined;
       if (category === "structure")
-        own = recipe.structure === AIM_DELIVERY_STRUCTURE ? undefined : builtinRef(recipe.structure);
+        own =
+          recipe.structure === AIM_DELIVERY_STRUCTURE || recipe.aiDecidesSections
+            ? undefined
+            : builtinRef(recipe.structure);
       else if (category === "voice" ? recipe.followsVoice : recipe.followsFormat) own = global;
       else own = builtinRef(recipe[category]);
       if (own === ref) names.push(translate(this.settings.language, recipe.nameKey));
@@ -1100,9 +1158,13 @@ export class NoteStyleStore {
         kind: "builtin",
         name: translate(language, recipe.nameKey),
         ...(aim ? { aimOnly: true as const } : {}),
+        ...(recipe.aiDecidesSections ? { topicOnly: true as const } : {}),
+        ...(aim || recipe.aiDecidesSections ? { noCopy: true as const } : {}),
         structure: aim
           ? { ref: recipe.structure, name: translate(language, recipe.nameKey) }
-          : partOf("structure", builtinRef(recipe.structure)),
+          : recipe.aiDecidesSections
+            ? { ref: builtinRef(recipe.structure), name: translate(language, "ui.note_style_ai_sections_decide") }
+            : partOf("structure", builtinRef(recipe.structure)),
         voice: partOf("voice", recipe.followsVoice ? this.globalPartRef("voice") : builtinRef(recipe.voice)),
         format: partOf("format", recipe.followsFormat ? this.globalPartRef("format") : builtinRef(recipe.format)),
         voiceSource: recipe.followsVoice ? "global" : "style",
@@ -1226,7 +1288,7 @@ export class NoteStyleStore {
       ]);
     const builtinKeys = new Map<string, string>();
     for (const recipe of BUILTIN_RECIPES) {
-      if (recipe.structure === AIM_DELIVERY_STRUCTURE) continue;
+      if (recipe.structure === AIM_DELIVERY_STRUCTURE || recipe.aiDecidesSections) continue;
       const key = JSON.stringify([
         builtinRef(recipe.structure),
         recipe.followsVoice ? "global" : builtinRef(recipe.voice),

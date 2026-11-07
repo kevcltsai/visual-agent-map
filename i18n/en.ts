@@ -1970,6 +1970,15 @@ export const en = {
   "ui.recipe_name_action": "Action plan",
   "ui.recipe_name_aim": "AIM report",
   "ui.recipe_name_textbook": "Textbook",
+  "ui.recipe_name_ai_suggested": "AI suggested",
+  "ui.note_style_ai_sections_decide": "AI decides sections",
+  "ui.note_style_ai_sections_follow": "Keep the note's sections",
+  "ui.note_style_ai_sections_invalid":
+    "The sections the AI chose don't meet the rules, so this run used the General research sections. All your content is kept.",
+  "ui.note_style_note_sections_unusable":
+    "The sections already in this note don't meet the rules, so this run uses the General research sections.",
+  "ui.note_style_restored_0":
+    "The rewrite dropped {0} old numbers or links. The original text was put back in the note, please check it.",
   "ui.structure_name_standard": "Standard six",
   "ui.structure_name_textbook": "Intro + six",
   "ui.structure_name_atomic": "Definition & example",
@@ -2586,6 +2595,7 @@ export const en = {
   "note.aim_conclusion": "Research conclusion",
   "note.aim_needs_followup": "Research needs follow-up",
   "note.aim_synthesis": "Research synthesis",
+  "note.kept_from_earlier_version": "Earlier version (not kept in the rewrite)",
   "note.aim_followup_draft": "Research follow-up draft",
   "note.aim_partial_summary_0": "Partial research, follow-up still needed: {0}",
   "note.aim_followup_summary_0_1": "Follow-up: {0}: {1}",

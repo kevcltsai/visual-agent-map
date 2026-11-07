@@ -24,6 +24,8 @@ export interface PickerRecipe {
   fileName?: string;
   /** The AIM report: only for the AIM kind, never offered for a topic. */
   aimOnly?: true;
+  /** The AI-suggested style: general topics only, not offered in a run's choice until the pickers open it. */
+  topicOnly?: true;
   structure: { name: string };
   voice: { name: string };
   format: { name: string };
@@ -46,7 +48,14 @@ export function builtinRecipeItems(): PickerRecipe[] {
       kind: "builtin" as const,
       name: t(recipe.nameKey),
       ...(aim ? { aimOnly: true as const } : {}),
-      structure: { name: aim ? t(recipe.nameKey) : nameOf(templates, recipe.structure) },
+      ...(recipe.aiDecidesSections ? { topicOnly: true as const } : {}),
+      structure: {
+        name: aim
+          ? t(recipe.nameKey)
+          : recipe.aiDecidesSections
+            ? t("ui.note_style_ai_sections_decide")
+            : nameOf(templates, recipe.structure)
+      },
       voice: { name: nameOf(tones, recipe.voice) },
       format: { name: nameOf(BUILTIN_FORMATS, recipe.format) },
       update: recipe.update,
@@ -322,7 +331,7 @@ export async function openTopicStyleChooser(
   } catch {
     /* an unreadable folder keeps the styles read last */
   }
-  const recipes = (picker ? picker.recipes() : builtinRecipeItems()).filter(item => !item.aimOnly);
+  const recipes = (picker ? picker.recipes() : builtinRecipeItems()).filter(item => !item.aimOnly && !item.topicOnly);
   const language = plugin.settings?.language ?? "en";
   const { note } = options;
   const legacy = !note.noteStyle && (!!note.detailTemplateId || !!note.toneId);

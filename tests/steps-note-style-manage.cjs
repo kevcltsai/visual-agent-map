@@ -166,15 +166,17 @@ test('listParts: usedBy names the styles that use a part (built-in styles and th
 });
 
 // ---- listRecipes (counter 14 data side) ----
-test('listRecipes: eight built-ins (the AIM report is aimOnly and the only one), then the user\'s style files with their parts, update mode, description, issues and usedByKinds', async () => {
+test('listRecipes: nine built-ins (the AIM report is aimOnly and the only one; the AI-suggested style is topicOnly and noCopy), then the user\'s style files with their parts, update mode, description, issues and usedByKinds', async () => {
   const files = {
     [`${dirOf('en', 'recipe')}/Mine.md`]: '---\nstructure: Gone\nupdate: sideways\n---\nMy first line.\n',
     [`${dirOf('en', 'recipe')}/General research.md`]: '---\n---\n'
   };
   const { store } = await makeStore(files, { noteStyleByKind: { action: 'file:Mine', hypothesis: 'builtin:general' } });
   const items = store.listRecipes();
-  assert.equal(items.filter(item => item.kind === 'builtin').length, 8);
+  assert.equal(items.filter(item => item.kind === 'builtin').length, 9);
   assert.deepEqual(plain(items.filter(item => item.aimOnly).map(item => item.ref)), ['builtin:aim']);
+  assert.deepEqual(plain(items.filter(item => item.topicOnly).map(item => item.ref)), ['builtin:ai-suggested']);
+  assert.deepEqual(plain(items.filter(item => item.noCopy).map(item => item.ref)), ['builtin:aim', 'builtin:ai-suggested']);
   const byRef = Object.fromEntries(items.map(item => [item.ref, item]));
   assert.deepEqual(plain(byRef['builtin:hypothesis'].usedByKinds), []);
   assert.deepEqual(plain(byRef['builtin:general'].usedByKinds), ['topic', 'hypothesis']);
@@ -564,7 +566,11 @@ test('counter 14: the AIM report is listed with its topic type but has no Edit b
   newButton(root, 'recipe').click();
   const options = dom.findAll(sourceOf(formOf(root, 'recipe')), node => node.tag === 'option').map(node => node.text);
   assert.equal(options.includes('AIM report'), false);
+  assert.equal(options.includes('AI suggested'), false);
   assert.equal(options.length, 7);
+  const suggested = rowFor(root, 'AI suggested');
+  assert.ok(suggested, 'listed');
+  assert.equal(editOf(suggested), undefined, 'no Edit (it would copy a style that is not a text)');
 });
 
 test('counter 5: Edit on a built-in part saves "My <name>" (a new file) and opens it, the list shows it and the focus is on its row; an existing "My ..." file is never overwritten', async () => {

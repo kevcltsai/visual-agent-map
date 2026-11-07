@@ -58,6 +58,8 @@ export interface BuiltinRecipe {
   readonly followsVoice: boolean;
   /** The format is the global format (`noteStyleDefaults.format`) unless false: the style fixes its own. */
   readonly followsFormat: boolean;
+  /** The AI decides the sections of the first research and later runs keep the note's own sections; general topics only. */
+  readonly aiDecidesSections?: boolean;
 }
 
 export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
@@ -140,6 +142,17 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     update: "merge",
     followsVoice: true,
     followsFormat: true
+  },
+  {
+    id: "ai-suggested",
+    nameKey: "ui.recipe_name_ai_suggested",
+    structure: "standard",
+    voice: "academic",
+    format: "standard",
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true,
+    aiDecidesSections: true
   }
 ];
 

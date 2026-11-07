@@ -8733,7 +8733,8 @@ export class VisualAgentMapView extends ItemView {
     ref: string
   ): void {
     dot.addEventListener("pointerdown", event => {
-      if (event.button !== 0 || !this.canEditCanvasItems() || this.placing) return;
+      // Ctrl+click is the Mac right click: it opens the anchor menu, so it must not arm a drag.
+      if (event.button !== 0 || event.ctrlKey || !this.canEditCanvasItems() || this.placing) return;
       event.preventDefault();
       // preventDefault keeps the browser from focusing the button, so a plain click still leaves it focused for Enter / Delete.
       dot.focus({ preventScroll: true });
@@ -9308,6 +9309,31 @@ export class VisualAgentMapView extends ItemView {
     pill.createSpan({ text: t("ui.annotated_image_pill") });
     bar.createSpan({ text: image.note || name, cls: "vam-annotated-note" });
     bar.createSpan({ text: this.annotatedCountText(image), cls: "vam-annotated-count" });
+  }
+  /** The right-click / Shift+F10 / Menu-key menu of one anchor: edit it, or delete only it (with its relations, one undo step). */
+  private openAnchorMenu(event: MouseEvent, imageId: string, anchorId: string, dot: HTMLElement): void {
+    if (!this.canEditCanvasItems()) return;
+    event.preventDefault();
+    const menu = this.newMenu();
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.anchor_menu_edit"))
+        .setIcon("pencil")
+        .onClick(() => this.editAnchorDialog(imageId, anchorId))
+    );
+    menu.addSeparator();
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.anchor_menu_delete"))
+        .setIcon("trash-2")
+        .setWarning(true)
+        .onClick(() => void this.deleteAnchor(imageId, anchorId))
+    );
+    // The Menu key and Shift+F10 send a contextmenu event at (0, 0): put the menu beside the anchor.
+    if (event.clientX === 0 && event.clientY === 0) {
+      const box = dot.getBoundingClientRect();
+      menu.showAtPosition({ x: box.left, y: box.bottom });
+    } else menu.showAtMouseEvent(event);
   }
   /**
    * The right-click / Shift+F10 / Menu-key menu of one image. A plain image offers conversion; an annotated image its own
@@ -11221,7 +11247,11 @@ export class VisualAgentMapView extends ItemView {
     const target = event.target as Element | null;
     const imageEl = target?.closest?.<HTMLElement>(".vam-canvas-image");
     if (imageEl) {
-      this.openImageMenu(event, imageEl);
+      const dot = target?.closest?.<HTMLElement>(".vam-anchor[data-anchor-id]");
+      const anchorId = dot?.dataset.anchorId;
+      if (dot && anchorId && imageEl.dataset.itemId && !this.placing && !this.picking)
+        this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
+      else this.openImageMenu(event, imageEl);
       return;
     }
     if (

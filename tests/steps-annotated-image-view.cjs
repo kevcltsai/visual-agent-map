@@ -997,6 +997,126 @@ test('counter-example (card height not measured yet): the first place uses the d
   assert.equal(again, 0);
 });
 
+// Anchor menu: right-click on a real anchor button offers edit / delete-only-this-anchor.
+const anchorMenu = (h, { keyboard = false, anchorId = 'a1', preview = false } = {}) => {
+  const el = h.imageEl(), before = h.menus.length;
+  const dot = find(h.view.stageEl, i => i.dataset && i.dataset.anchorId === anchorId) ?? { dataset: { anchorId } };
+  dot.getBoundingClientRect = () => ({ left: 11, bottom: 33 });
+  let prevented = false;
+  const closest = sel => (sel === '.vam-canvas-image' ? el : sel === '.vam-anchor[data-anchor-id]' && !preview ? dot : null);
+  h.view.onCanvasContextMenu({ target: { closest }, clientX: keyboard ? 0 : 5, clientY: keyboard ? 0 : 5, preventDefault() { prevented = true; } });
+  return h.menus.length > before ? Object.assign(h.menus.at(-1), { prevented }) : null;
+};
+/** The same semantics as main.ts mutate(): every write waits for the earlier ones, so a write started inside a write never finishes. */
+const serialMutate = view => {
+  let queue = Promise.resolve(), tail = Promise.resolve();
+  view.plugin.mutate = work => { const result = queue.then(work); queue = result.catch(() => {}); tail = queue; return result; };
+  return async () => {
+    const stuck = Symbol('stuck');
+    let timer;
+    const got = await Promise.race([Promise.resolve().then(() => dom.tick()).then(() => tail), new Promise(r => { timer = setTimeout(() => r(stuck), 1000); })]);
+    clearTimeout(timer);
+    assert.notEqual(got, stuck, 'the write queue deadlocked');
+  };
+};
+const withRelations = root => [annotated({ note: 'n', anchors: [anchor('a1'), anchor('a2')], relations: [{ kind: 'related', from: 'a1', to: 'a2' }, { kind: 'supports', from: root, to: 'a2' }] })];
+
+test('anchor menu: right-click on an anchor offers Edit anchor and Delete anchor; the Menu key opens it beside the anchor', async () => {
+  const h = await harness(withRelations);
+  h.view.render();
+  const menu = anchorMenu(h);
+  assert.deepEqual(menu.items.map(i => h.titleOf(i)), ['Edit anchor…', 'Delete anchor']);
+  assert.equal(menu.items[1].warning, true);
+  assert.equal(menu.prevented, true);
+  assert.equal(menu.mouse, true);
+  assert.deepEqual(plain(anchorMenu(h, { keyboard: true }).at), { x: 11, y: 33 });
+});
+
+test('counter-example (destructive): Delete anchor removes only that anchor and its lines; image, other anchor and topics stay; one undo restores all', async () => {
+  const h = await harness(withRelations);
+  h.view.render();
+  const nodes = h.view.map.nodes.length, entries = h.view.history.past.length;
+  const before = await h.onDisk();
+  const drained = serialMutate(h.view);
+  anchorMenu(h).items[1].fn();
+  await drained();
+  const [img] = await h.onDisk();
+  assert.equal(img.id, 'img1');
+  assert.deepEqual(img.anchors.map(a => a.id), ['a2']);
+  assert.deepEqual((img.relations ?? []).filter(r => r.from === 'a1' || r.to === 'a1'), []);
+  assert.deepEqual(img.relations, [{ kind: 'supports', from: h.view.map.nodes[0].id, to: 'a2' }]);
+  assert.equal(h.view.map.nodes.length, nodes);
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, nodes);
+  assert.equal(h.view.history.past.length, entries + 1);
+  await h.view.history.undoEntry.undo();
+  assert.deepEqual(await h.onDisk(), before);
+});
+
+test('counter-example (read-only): right-click on an anchor in selection mode or AIM opens no menu and changes nothing', async () => {
+  for (const mode of ['selection', 'aim']) {
+    const h = await harness(withRelations);
+    if (mode === 'selection') h.view.selection.toggleMultiSelect();
+    else h.view.aimLive = () => true;
+    h.view.render();
+    const before = h.fileText();
+    assert.equal(anchorMenu(h), null, mode);
+    assert.equal(h.fileText(), before, mode);
+  }
+});
+
+test('counter-example (preview anchor): a preview span without data-anchor-id still opens the image menu', async () => {
+  const h = await harness(withRelations);
+  h.view.render();
+  const menu = anchorMenu(h, { preview: true });
+  assert.deepEqual(menu.items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
+});
+
+test('counter-example (image blank area): right-click outside any anchor keeps the four-item image menu', async () => {
+  const h = await harness(withRelations);
+  h.view.render();
+  assert.deepEqual(h.contextMenu().items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
+});
+
+test('regression: deleting the image from its menu keeps every topic of a ringed map', async () => {
+  const h = await ringHarness();
+  const ids = Object.values(h.ids), before = plain(h.view.map.nodes.map(n => n.id));
+  assert.ok(ids.length >= 6);
+  h.pick(h.contextMenu(), 'Delete').fn();
+  await h.settle();
+  assert.equal((await h.onDisk()).some(i => i.kind === 'annotated-image'), false);
+  for (const map of [h.view.map, await h.repo.readMap(MAP)]) {
+    assert.deepEqual(plain(map.nodes.map(n => n.id)), before);
+    for (const id of ids) assert.ok(map.nodes.some(n => n.id === id), id);
+  }
+});
+
+test('counter-example (right press on an anchor): button 2 starts no drag and moves nothing, and the anchor menu opens', async () => {
+  const h = await dragHarness();
+  const before = h.fileText();
+  press(h.dot(), 1100, 550, { button: 2 });
+  h.dot().fire('pointermove', { clientX: 1180, clientY: 590 });
+  const menu = anchorMenu(h);
+  h.dot().fire('pointerup', {});
+  await h.settle();
+  assert.deepEqual(menu.items.map(i => h.titleOf(i)), ['Edit anchor…', 'Delete anchor']);
+  assert.equal(h.dot().style.left, '50%');
+  assert.equal(h.dot().style.top, '50%');
+  assert.equal(h.fileText(), before);
+  assert.equal(docListeners(h), 0);
+});
+
+test('counter-example (modes): in place mode or topic-pick mode a right-click on an anchor keeps the image menu', async () => {
+  for (const mode of ['placing', 'picking']) {
+    const h = await harness(withRelations);
+    h.view.render();
+    if (mode === 'placing') h.view.startPlacingAnchor('img1');
+    else h.view.picking = { topicId: 't', kind: 'related' };
+    assert.ok(h.view[mode], mode);
+    const menu = anchorMenu(h);
+    assert.deepEqual(menu.items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)'], mode);
+  }
+});
+
 // ---- anchor drag: an existing anchor moves with the mouse; the screen follows at once, Map.md is written on release -------------
 /** An annotated image whose element is 200x100 at (1000, 500) on screen, with a fake document for the Esc listener. */
 async function dragHarness(over = {}, items) {
@@ -1149,6 +1269,19 @@ test('counter-example (other buttons): a right or middle press does not start a 
     assert.equal(h.fileText(), before, String(button));
     assert.equal(docListeners(h), 0, String(button));
   }
+});
+
+test('counter-example (Ctrl+click on a Mac is a right click): button 0 with ctrlKey starts no drag, moves nothing and leaves no listener', async () => {
+  const h = await dragHarness();
+  const before = h.fileText();
+  press(h.dot(), 1100, 550, { ctrlKey: true });
+  h.dot().fire('pointermove', { clientX: 1180, clientY: 590 });
+  h.dot().fire('pointerup', {});
+  await h.settle();
+  assert.equal(h.dot().style.left, '50%');
+  assert.equal(h.dot().style.top, '50%');
+  assert.equal(h.fileText(), before);
+  assert.equal(docListeners(h), 0);
 });
 
 test('counter-example (repaint mid-drag): the old dot writes nothing and leaves no document listener', async () => {

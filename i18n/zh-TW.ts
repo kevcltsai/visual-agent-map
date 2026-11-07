@@ -836,6 +836,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.annotated_image_place_anchor": "放錨點",
   "ui.anchor_new_title": "新錨點",
   "ui.anchor_edit_title": "編輯錨點",
+  "ui.anchor_menu_edit": "編輯錨點…",
+  "ui.anchor_menu_delete": "刪除錨點",
   "ui.anchor_note_label": "錨點說明（選填）",
   "ui.anchor_target_label": "這個錨點要連到",
   "ui.anchor_target_new": "新增議題（關係：相關）",

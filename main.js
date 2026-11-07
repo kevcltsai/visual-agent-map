@@ -918,6 +918,8 @@ var en = {
   "ui.annotated_image_place_anchor": "Place anchor",
   "ui.anchor_new_title": "New anchor",
   "ui.anchor_edit_title": "Edit anchor",
+  "ui.anchor_menu_edit": "Edit anchor\u2026",
+  "ui.anchor_menu_delete": "Delete anchor",
   "ui.anchor_note_label": "Anchor note (optional)",
   "ui.anchor_target_label": "Link this anchor to",
   "ui.anchor_target_new": "Add a new topic (relation: related)",
@@ -3690,6 +3692,8 @@ var zhCN = {
   "ui.annotated_image_place_anchor": "\u653E\u7F6E\u951A\u70B9",
   "ui.anchor_new_title": "\u65B0\u951A\u70B9",
   "ui.anchor_edit_title": "\u7F16\u8F91\u951A\u70B9",
+  "ui.anchor_menu_edit": "\u7F16\u8F91\u951A\u70B9\u2026",
+  "ui.anchor_menu_delete": "\u5220\u9664\u951A\u70B9",
   "ui.anchor_note_label": "\u951A\u70B9\u8BF4\u660E\uFF08\u9009\u586B\uFF09",
   "ui.anchor_target_label": "\u8FD9\u4E2A\u951A\u70B9\u8981\u8FDE\u5230",
   "ui.anchor_target_new": "\u65B0\u589E\u8BAE\u9898\uFF08\u5173\u7CFB\uFF1A\u76F8\u5173\uFF09",
@@ -6462,6 +6466,8 @@ var zhTW = {
   "ui.annotated_image_place_anchor": "\u653E\u9328\u9EDE",
   "ui.anchor_new_title": "\u65B0\u9328\u9EDE",
   "ui.anchor_edit_title": "\u7DE8\u8F2F\u9328\u9EDE",
+  "ui.anchor_menu_edit": "\u7DE8\u8F2F\u9328\u9EDE\u2026",
+  "ui.anchor_menu_delete": "\u522A\u9664\u9328\u9EDE",
   "ui.anchor_note_label": "\u9328\u9EDE\u8AAA\u660E\uFF08\u9078\u586B\uFF09",
   "ui.anchor_target_label": "\u9019\u500B\u9328\u9EDE\u8981\u9023\u5230",
   "ui.anchor_target_new": "\u65B0\u589E\u8B70\u984C\uFF08\u95DC\u4FC2\uFF1A\u76F8\u95DC\uFF09",
@@ -63779,7 +63785,7 @@ ${request.requirements}` : preset.text,
   enableAnchorDrag(dot, el, image, anchorId, origin, ref) {
     dot.addEventListener("pointerdown", (event) => {
       var _a2, _b2, _c;
-      if (event.button !== 0 || !this.canEditCanvasItems() || this.placing) return;
+      if (event.button !== 0 || event.ctrlKey || !this.canEditCanvasItems() || this.placing) return;
       event.preventDefault();
       dot.focus({ preventScroll: true });
       if (dot.isConnected === false) return;
@@ -64361,6 +64367,23 @@ ${request.requirements}` : preset.text,
     pill.createSpan({ text: t("ui.annotated_image_pill") });
     bar.createSpan({ text: image.note || name2, cls: "vam-annotated-note" });
     bar.createSpan({ text: this.annotatedCountText(image), cls: "vam-annotated-count" });
+  }
+  /** The right-click / Shift+F10 / Menu-key menu of one anchor: edit it, or delete only it (with its relations, one undo step). */
+  openAnchorMenu(event, imageId, anchorId, dot) {
+    if (!this.canEditCanvasItems()) return;
+    event.preventDefault();
+    const menu = this.newMenu();
+    menu.addItem(
+      (item) => item.setTitle(t("ui.anchor_menu_edit")).setIcon("pencil").onClick(() => this.editAnchorDialog(imageId, anchorId))
+    );
+    menu.addSeparator();
+    menu.addItem(
+      (item) => item.setTitle(t("ui.anchor_menu_delete")).setIcon("trash-2").setWarning(true).onClick(() => void this.deleteAnchor(imageId, anchorId))
+    );
+    if (event.clientX === 0 && event.clientY === 0) {
+      const box = dot.getBoundingClientRect();
+      menu.showAtPosition({ x: box.left, y: box.bottom });
+    } else menu.showAtMouseEvent(event);
   }
   /**
    * The right-click / Shift+F10 / Menu-key menu of one image. A plain image offers conversion; an annotated image its own
@@ -66140,7 +66163,7 @@ ${request.requirements}` : preset.text,
     );
   }
   onCanvasContextMenu(event) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const hit = event.target;
     const card = (_a2 = hit == null ? void 0 : hit.closest) == null ? void 0 : _a2.call(hit, ".vam-node");
     if (card && !((_b2 = hit == null ? void 0 : hit.closest) == null ? void 0 : _b2.call(hit, INTERACTIVE_SELECTOR)) && this.canEditSummary()) {
@@ -66176,7 +66199,11 @@ ${request.requirements}` : preset.text,
     const target = event.target;
     const imageEl = (_e = target == null ? void 0 : target.closest) == null ? void 0 : _e.call(target, ".vam-canvas-image");
     if (imageEl) {
-      this.openImageMenu(event, imageEl);
+      const dot = (_f = target == null ? void 0 : target.closest) == null ? void 0 : _f.call(target, ".vam-anchor[data-anchor-id]");
+      const anchorId = dot == null ? void 0 : dot.dataset.anchorId;
+      if (dot && anchorId && imageEl.dataset.itemId && !this.placing && !this.picking)
+        this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
+      else this.openImageMenu(event, imageEl);
       return;
     }
     if (!(target == null ? void 0 : target.closest) || target.closest(".vam-node") || target.closest(".vam-summary-text") || target.closest(".vam-canvas-image") || target.closest(".vam-text-node") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR))

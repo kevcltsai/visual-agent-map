@@ -20513,7 +20513,9 @@ export class VisualAgentMapView extends ItemView {
    */
   private chatHero(): boolean {
     if (!this.chat || this.chat.hasMessages || !this.map || this.blankMapPaths.has(this.path)) return false;
-    return !this.aimLive() && this.map.nodes.length === 0 && !this.map.canvasItems?.length;
+    if (this.aimLive() || this.map.nodes.length) return false;
+    // Only what the canvas draws counts: a frame whose topics are gone stays in the file until the next canvas write, and draws nothing.
+    return !this.map.canvasItems?.some(item => item.kind === "image" || item.kind === "text" || isAnnotatedImage(item));
   }
   /** Mounts the panel where it belongs now: the opening screen's place, or the first child of the workspace. */
   private placeChatPanel(): void {
@@ -20560,7 +20562,10 @@ export class VisualAgentMapView extends ItemView {
   }
   private focusChatHeroOnce(): void {
     const chat = this.chat;
-    if (!chat?.isHero || !this.map || this.chatHeroFocusedFor === this.map.id) return;
+    if (!chat || !this.map) return;
+    // A map that opened with content on it uses the once up: emptying it later must leave the keyboard on the map, so Cmd+Z undoes.
+    if (!chat.isHero && (this.map.nodes.length || this.map.canvasItems?.length)) this.chatHeroFocusedFor = this.map.id;
+    if (!chat.isHero || this.chatHeroFocusedFor === this.map.id) return;
     // A tab that is not shown yet cannot take focus: the once is kept for when it is.
     if (this.hiddenTab()) return;
     const doc = this.contentEl.ownerDocument;

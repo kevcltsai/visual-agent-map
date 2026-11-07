@@ -12,6 +12,7 @@ import { effectiveReasoningLevel, normalizeReasoningLevel } from "../ai/task-pol
 import { canonicalDetail, normalizeOutputScriptHeadings } from "../ai/result-utils";
 import { normalizeDetailHeadings, normalizeMathDelimiters } from "../ai/markdown-blocks";
 import { checkCounts, countIssueText } from "../ai/detail-templates";
+import { decidedTemplateFromDetail } from "../ai/detail-sections";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
 import { isSearchNotPerformed } from "../ai/search-not-performed";
 import { noteLanguageOf, translate, t, type ContentLanguage, type UiLanguage } from "../i18n";
@@ -312,9 +313,23 @@ export class AiTaskService {
       // Every reply of execute passes here (task run, AIM steps, the count repair's own run), before anything is written.
       result.detail = await demoteUnparsableMermaid(result.detail, this.options.mermaidSyntax);
       if (this.options.exchangeLoggingEnabled()) exchanges?.parsed(exchangeId);
+      // "AI suggested", first research: the sections the AI wrote become the note's template (one call; no repair follows).
+      const aiDecides = input.aiSections === "decide";
+      if (
+        aiDecides &&
+        (input.mode ?? "task") === "task" &&
+        input.promptProfile !== "aim" &&
+        !input.countRepair &&
+        !input.detail?.trim()
+      ) {
+        const decided = decidedTemplateFromDetail(result.detail, noteLanguageOf(outputLanguage));
+        if (decided.ok) result.decidedTemplate = decided.template;
+        else result.aiSectionsFallback = true;
+      }
       const template = input.detailTemplate;
       if (
         template &&
+        !aiDecides &&
         template.sections.some(section => section.count) &&
         input.mode !== "decompose" &&
         input.detailFormat !== "adaptive" &&

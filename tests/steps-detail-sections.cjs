@@ -5,8 +5,9 @@ const assert = require('node:assert/strict');
 const { loadSource } = require('./support-replay.cjs');
 
 const M = loadSource(`
-export { templateFromDetail, withSourcesSection, demoteUnknownHeadings, NOTE_SECTIONS_TEMPLATE_ID } from "./ai/detail-sections";
+export { templateFromDetail, decidedTemplateFromDetail, withSourcesSection, demoteUnknownHeadings, NOTE_SECTIONS_TEMPLATE_ID } from "./ai/detail-sections";
 export { standardTemplate, sectionLookup, validateTemplate } from "./ai/detail-templates";
+export { canonicalDetail } from "./ai/result-utils";
 `);
 const plain = value => JSON.parse(JSON.stringify(value));
 const names = template => plain(template.sections.map(section => section.name));
@@ -101,4 +102,32 @@ test('demoteUnknownHeadings: unknown ### become ####, known and fenced stay, CRL
   const detail = '### One\r\nx\r\n### Extra\r\nmore\r\n```\r\n### In code\r\n```\r\n### two\r\n';
   assert.equal(M.demoteUnknownHeadings(detail, template), '### One\r\nx\r\n#### Extra\r\nmore\r\n```\r\n### In code\r\n```\r\n### two\r\n');
   assert.equal(M.demoteUnknownHeadings('no headings', template), 'no headings');
+});
+
+// P2: what the decide path (cut sections, add sources, use as the template) does at the edges of the 1-12 section limit.
+test('decided template: 11 sections and no sources get one (12 in all); 12 without sources fail as too_many instead of making 13', () => {
+  const eleven = Array.from({ length: 11 }, (_, i) => `Part ${i + 1}`);
+  const ok = M.decidedTemplateFromDetail(sectionsOf(eleven), 'en');
+  assert.equal(ok.ok, true);
+  assert.equal(ok.template.sections.length, 12);
+  assert.equal(roles(ok.template).filter(role => role === 'sources').length, 1);
+  assert.deepEqual(plain(M.validateTemplate(plain(ok.template), [])), []);
+  const twelve = M.decidedTemplateFromDetail(sectionsOf([...eleven, 'Part 12']), 'en');
+  assert.deepEqual(plain(twelve), { ok: false, reason: 'too_many' });
+  // 12 with a sources section is fine and unchanged.
+  assert.equal(M.decidedTemplateFromDetail(sectionsOf([...eleven, 'Sources']), 'en').template.sections.length, 12);
+  // The failures of the cut itself pass through.
+  assert.equal(M.decidedTemplateFromDetail('no headings', 'en').reason, 'no_sections');
+  assert.equal(M.decidedTemplateFromDetail(sectionsOf(['A', 'a']), 'en').reason, 'duplicate');
+});
+
+test('with sources section: a name clash returns the template as it is and no content is lost in the canonical detail', () => {
+  const clash = { id: 'note-sections', name: 'note-sections', sections: [
+    { id: 's1', name: 'Swing', description: '', role: 'none', aliases: [] },
+    { id: 's2', name: 'Sources', description: '', role: 'none', aliases: [] }
+  ] };
+  assert.equal(M.withSourcesSection(clash, 'en'), clash, 'returned as given');
+  const detail = '### Swing\n\nbody 12 km\n\n### Sources\n\nlist\n\n[^1]: https://example.test/a';
+  const text = M.canonicalDetail(detail, 'en', clash);
+  for (const line of ['body 12 km', 'list', '[^1]: https://example.test/a']) assert.ok(text.includes(line), line);
 });

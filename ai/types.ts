@@ -62,6 +62,12 @@ export interface TaskContext {
   updateMode?: UpdateMode;
   /** Let a task choose its Markdown structure while retaining the structured result contract. */
   detailFormat?: "adaptive";
+  /**
+   * "AI suggested" note style (trusted, never serialized): the AI decides the sections of a first research ("decide"), keeps
+   * the note's own ("follow"), or the general sections stand in because the note's cannot be used ("general"). Absent for every
+   * other style.
+   */
+  aiSections?: "decide" | "follow" | "general";
   /** The detail is intermediate evidence for a later call, never shown to the reader: no Obsidian syntax rules. */
   intermediateDetail?: boolean;
   /** Content template for fixed-section details (trusted; Standard when absent). */
@@ -122,6 +128,13 @@ export interface AiResult {
   retrievals?: number;
   /** Sections still off their template count after the repair request; present only when the context had counts. */
   formatIssues?: CountIssue[];
+  /**
+   * "AI suggested" first research only: the template made from the sections the AI wrote (with a sources section), the one
+   * the write-back, the note update and the chart job use. Absent otherwise.
+   */
+  decidedTemplate?: DetailTemplate;
+  /** "AI suggested" first research only: the AI's sections were not usable and the Standard sections stand in. */
+  aiSectionsFallback?: true;
 }
 export interface AiRunMetrics {
   provider: string;

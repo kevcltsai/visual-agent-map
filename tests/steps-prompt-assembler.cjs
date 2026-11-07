@@ -570,3 +570,105 @@ test('05: assembledTaskPrompt carries the segments and issues, and generalTaskPr
     }
   }
 });
+
+// AI suggested style (P2): the decide and follow fragments. Unit level.
+let aiModule;
+const AI = () => aiModule ??= loadSource(`
+export { assembleTaskPrompt, promptStepOf, selectionFromContext, chartsWanted } from "./core/steps/task/assemble";
+export { AI_DECIDED_SECTIONS, AI_FOLLOWED_SECTIONS } from "./core/steps/task/fragments";
+export { inLanguage } from "./core/steps/_shared/fragments";
+export { BUILTIN_BLOCKS, builtinTemplateText } from "./core/blocks/builtin";
+export { parseTemplateBlock } from "./core/blocks/template-block";
+export { standardTemplate } from "./ai/detail-templates";
+`);
+const aiPrompt = (context, language) => { const m = AI(); return m.assembleTaskPrompt(m.selectionFromContext(context, language), m.promptStepOf(context), context, language, 'codex'); };
+const idsOf = segments => segments.filter(s => s.source.kind === 'fixed').map(s => s.source.id);
+const HEADING_NOTE = { 'zh-TW': '標準', 'zh-CN': '标准', en: 'six standard Detail headings' };
+
+test('AI suggested decide: the rule stands in for the sections; no detail-structure, no heading-rule-note, no tone or format words', () => {
+  const m = AI();
+  for (const language of LANGUAGES) {
+    const context = { ...base, detail: '', aiSections: 'decide', outputLanguage: language };
+    const plain = aiPrompt({ ...context, aiSections: undefined }, language);
+    const { text, segments } = aiPrompt(context, language);
+    assert.ok(idsOf(segments).includes('ai-decided-sections'), language);
+    assert.equal(idsOf(segments).includes('detail-structure'), false, language);
+    assert.equal(segments.some(s => s.source.kind === 'block' && s.source.part === 'sections'), false, language);
+    assert.ok(text.includes(m.inLanguage(m.AI_DECIDED_SECTIONS, language)), language);
+    // The positive control: the same context without the flag does carry the heading rule.
+    assert.ok(idsOf(plain.segments).includes('detail-structure') && plain.text.includes(m.inLanguage(m.AI_DECIDED_SECTIONS, language)) === false, language);
+    const fragment = m.inLanguage(m.AI_DECIDED_SECTIONS, language);
+    assert.equal(/口吻|語氣|格式|tone|format|voice/i.test(fragment), false, `${language}: the fragment leaves tone and format to the settings`);
+    // The format rules zone stays (the format follows the settings).
+    assert.ok(segments.some(s => s.source.kind === 'block' && s.source.part === 'format'), language);
+  }
+  // The heading rule note (and every other wrapper sentence of the sections text) lives in the detail-structure segments.
+  for (const language of LANGUAGES) {
+    const plain = aiPrompt({ ...base, detail: '', outputLanguage: language }, language);
+    const decided = aiPrompt({ ...base, detail: '', aiSections: 'decide', outputLanguage: language }, language);
+    for (const segment of plain.segments.filter(s => s.source.kind === 'fixed' && s.source.id === 'detail-structure')) assert.equal(decided.text.includes(segment.text), false, `${language}: ${segment.text.slice(0, 30)}`);
+  }
+});
+
+test('AI suggested decide: only the general research steps; other steps keep their sections', () => {
+  for (const [name, context] of stepContexts('en')) {
+    const { segments } = aiPrompt({ ...context, aiSections: 'decide' }, 'en');
+    const decides = idsOf(segments).includes('ai-decided-sections');
+    assert.equal(decides, name === 'research' || name === 'quick', name);
+  }
+});
+
+test('AI suggested follow: the followed rule comes after the sections for research and synthesize, not for the other steps', () => {
+  for (const language of LANGUAGES) {
+    for (const [name, context] of stepContexts(language)) {
+      const { segments, text } = aiPrompt({ ...context, aiSections: 'follow' }, language);
+      const followed = idsOf(segments).includes('ai-followed-sections');
+      assert.equal(followed, name === 'research' || name === 'synthesize' || name === 'quick', `${language} ${name}`);
+      assert.equal(idsOf(segments).includes('ai-decided-sections'), false);
+      if (followed) {
+        const after = text.indexOf(AI().inLanguage(AI().AI_FOLLOWED_SECTIONS, language));
+        assert.ok(after > text.indexOf('###'), `${language} ${name}: after the sections list`);
+        assert.ok(idsOf(segments).includes('detail-structure'), 'the note\'s own sections stay');
+      }
+    }
+  }
+});
+
+test('AI suggested: general and an absent flag give the same prompt as before (byte for byte)', () => {
+  for (const language of LANGUAGES) {
+    for (const [, context] of stepContexts(language)) {
+      assert.equal(aiPrompt({ ...context, aiSections: 'general' }, language).text, aiPrompt(context, language).text);
+    }
+  }
+});
+
+test('AI suggested decide: charts are asked for by the format text only, not by sections', () => {
+  const m = AI();
+  const context = { ...base, detail: '', aiSections: 'decide' };
+  for (const language of LANGUAGES) {
+    const selection = { ...m.selectionFromContext(context, language), format: { id: 'file:F', body: 'No diagrams here.' } };
+    const withChart = { ...selection, format: { id: 'file:F', body: 'Use a ```mermaid diagram.' } };
+    assert.equal(m.chartsWanted(selection, context, language), false);
+    assert.equal(m.chartsWanted(withChart, context, language), true);
+  }
+});
+
+test('AI suggested decide: the structures listed in the fragment match the built-in structures (anti-drift)', () => {
+  const m = AI();
+  const structures = ['standard', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action', 'guide'];
+  for (const [language, noteLanguage, separator] of [['zh', 'zh-TW', '／'], ['en', 'en', ' / ']]) {
+    const lines = m.AI_DECIDED_SECTIONS[language].split('\n').filter(line => line.startsWith('- ') && line.includes(separator) && !/[0-9]/.test(line));
+    const listed = lines.map(line => line.slice(2));
+    const real = ['standard', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action', 'guide'].map(id => {
+      const parsed = m.parseTemplateBlock(m.builtinTemplateText(id, noteLanguage), { id, name: id });
+      assert.ok(parsed.ok, id);
+      return parsed.template.sections.map(section => section.name).join(separator);
+    });
+    // The fragment lists them in the order: standard, atomic, hypothesis, evidence, conclusion, action, guide.
+    const order = ['standard', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action', 'guide'];
+    assert.deepEqual(listed, order.map(id => real[structures.indexOf(id)]), `${language}: structures listed`);
+  }
+  // Every built-in template block except the Standard look-alike (Textbook) is listed.
+  const blocks = m.BUILTIN_BLOCKS.filter(block => block.category === 'template').map(block => block.id).filter(id => id !== 'textbook');
+  assert.deepEqual([...blocks].sort(), [...structures].sort());
+});

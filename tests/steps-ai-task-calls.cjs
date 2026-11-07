@@ -602,3 +602,97 @@ test('fresh write-back: the count repair prompt shows the first reply Detail so 
   assert.ok(!h.state.calls[0].prompt.includes(marker), 'the first call still hides the old Detail');
   assert.ok(h.state.calls[1].prompt.includes(marker), 'the repair call carries the first reply');
 });
+
+// ---- 5. AI suggested: the AI decides the sections of a first research ----
+const decideInput = (extra = {}) => context({ language: 'en', outputLanguage: 'en', aiSections: 'decide', detailTemplate: countTemplate(), ...extra });
+const sectionDetail = names => names.map(name => `### ${name}\n\nbody of ${name}\n- 12 km [S1]`).join('\n\n');
+const plainJson = value => JSON.parse(JSON.stringify(value));
+const decided = async (detail, extra = {}) => {
+  const h = rig({ handler: call => answer(call, replyWith(detail)) });
+  const result = await h.service.askModel(decideInput(extra), 'gpt-6-luna', 'low', undefined, h.mark);
+  return { h, result };
+};
+
+test('AI suggested decide: a reply with 4-8 sections gives decidedTemplate with the sources section, one call, no repair', async () => {
+  const detail = sectionDetail(['Swing plane', 'Common faults', 'Drills', 'Sources', 'Update log']);
+  const { h, result } = await decided(detail);
+  assert.equal(h.state.calls.length, 1);
+  assert.equal(result.aiSectionsFallback, undefined);
+  assert.deepEqual(plainJson(result.decidedTemplate.sections.map(section => section.name)), ['Swing plane', 'Common faults', 'Drills', 'Sources', 'Update log']);
+  assert.equal(result.decidedTemplate.id, 'note-sections');
+  assert.equal(result.formatIssues, undefined, 'no count check on the first research of this style');
+});
+
+test('AI suggested decide: a reply without a sources section gets one before the log (or last), no extra call', async () => {
+  const withLog = await decided(sectionDetail(['Swing plane', 'Drills', 'Update log']));
+  assert.deepEqual(plainJson(withLog.result.decidedTemplate.sections.map(section => section.name)), ['Swing plane', 'Drills', 'Sources', 'Update log']);
+  const noLog = await decided(sectionDetail(['Swing plane', 'Drills']));
+  assert.deepEqual(plainJson(noLog.result.decidedTemplate.sections.map(section => section.name)), ['Swing plane', 'Drills', 'Sources']);
+  assert.equal(withLog.h.state.calls.length + noLog.h.state.calls.length, 2);
+});
+
+test('AI suggested decide: 12 sections without sources would make 13, so the Standard sections stand in (content kept, one call)', async () => {
+  const twelve = Array.from({ length: 12 }, (_, i) => `Part ${i + 1}`);
+  const { h, result } = await decided(sectionDetail(twelve));
+  assert.equal(h.state.calls.length, 1);
+  assert.equal(result.aiSectionsFallback, true);
+  assert.equal(result.decidedTemplate, undefined);
+  for (const name of twelve) assert.ok(result.detail.includes(`### ${name}`) && result.detail.includes(`body of ${name}`), `${name} still in the reply`);
+});
+
+test('AI suggested decide: 12 sections with a sources section is allowed and gets no extra section', async () => {
+  const names = [...Array.from({ length: 11 }, (_, i) => `Part ${i + 1}`), 'Sources'];
+  const { result } = await decided(sectionDetail(names));
+  assert.equal(result.decidedTemplate.sections.length, 12);
+});
+
+test('AI suggested decide: no section, more than 12, a repeated name or a # in a name: fallback, one call, every line still there', async () => {
+  const cases = {
+    plain: 'Just some text.\n- 5 km [S1]\n',
+    over: sectionDetail(Array.from({ length: 14 }, (_, i) => `Part ${i + 1}`)),
+    repeated: sectionDetail(['Swing plane', 'swing plane', 'Sources']),
+    hashed: '### Part # one\n\ntext\n\n### Sources\n\nsrc'
+  };
+  for (const [name, detail] of Object.entries(cases)) {
+    const { h, result } = await decided(detail);
+    assert.equal(h.state.calls.length, 1, `${name}: one call`);
+    assert.equal(result.aiSectionsFallback, true, `${name}: fallback`);
+    assert.equal(result.decidedTemplate, undefined, `${name}: no decided template`);
+    for (const line of detail.split('\n').filter(line => line.trim())) assert.ok(result.detail.includes(line.trim()), `${name}: kept "${line}"`);
+  }
+});
+
+test('AI suggested decide: only the first research with an empty Detail, in task mode, outside AIM and the repair, decides', async () => {
+  const detail = sectionDetail(['Swing plane', 'Drills', 'Sources']);
+  const skipped = {
+    follow: { aiSections: 'follow' }, general: { aiSections: 'general' }, none: { aiSections: undefined },
+    notEmpty: { detail: '### Existing\n\nx' }, aim: { promptProfile: 'aim' }, repair: { countRepair: true }
+  };
+  for (const [name, extra] of Object.entries(skipped)) {
+    const { result } = await decided(detail, extra);
+    assert.equal(result.decidedTemplate, undefined, `${name}: no decided template`);
+    assert.equal(result.aiSectionsFallback, undefined, `${name}: no fallback`);
+  }
+  const blank = await decided(detail, { detail: '  \n ' });
+  assert.ok(blank.result.decidedTemplate, 'a Detail of only whitespace is empty');
+});
+
+test('AI suggested decide: the prompt carries the decide rule and neither the fixed-sections lines nor the heading rule', async () => {
+  const h = rig({ handler: call => answer(call, replyWith(sectionDetail(['A', 'B', 'C', 'D']))) });
+  await h.service.askModel(decideInput(), 'gpt-6-luna', 'low');
+  const prompt = h.state.calls[0].prompt;
+  assert.ok(prompt.includes('You decide the sections of this note'));
+  assert.ok(!prompt.includes('Obey the section name and order'), 'no fixed-section requirement');
+  assert.ok(!prompt.includes('### 範例'), 'the count template of the style is not listed');
+});
+
+test('AI suggested decide: [S1] footnotes go to the sources section of the decided template', async () => {
+  const { result } = await decided(sectionDetail(['Swing plane', 'Drills']), {
+    referenceGroups: [{ name: 'g', documents: [{ path: 'Refs/Golf.md', title: 'Golf', content: 'text' }] }]
+  });
+  const { canonicalDetail } = load('ai/result-utils.ts');
+  const text = canonicalDetail(result.detail, 'en', result.decidedTemplate);
+  const sources = text.slice(text.indexOf('### Sources'));
+  assert.ok(/\[\^1\]:/.test(sources), 'the footnote definition sits in the sources section');
+  assert.ok(text.indexOf('### Drills') < text.indexOf('### Sources'));
+});

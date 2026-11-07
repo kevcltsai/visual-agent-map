@@ -138,7 +138,7 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
   assert.ok(total > 0, 'the snapshots parameterise at least one language name');
 });
 
-test('zh-CN prompt snapshots: exactly 101 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
+test('zh-CN prompt snapshots: exactly 103 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
   const simplified = RESEARCH_KEYS.filter(key => zhCN[key] !== zhTW[key]).map(key => zhCN[key]);
   assert.ok(simplified.length > 0, 'some research.* texts are Simplified');
   const lines = bases.flatMap(base => fs.readFileSync(path.join(directory, cnFile(base)), 'utf8').split('\n').filter(line => simplified.some(text => line.includes(text))));
@@ -148,11 +148,12 @@ test('zh-CN prompt snapshots: exactly 101 lines carry a research.* text that dif
   // note-style-recipe), one line each = 91; + the four zh-CN snapshots service.{task,synthesize}-{top,fresh} of
   // note-style-recipe T4 P1, one line each = 95; + the four zh-CN snapshots service.reference-groups-{top,fresh}.{1,2}
   // of note-style-recipe T4 F1, one line each = 99; + the two zh-CN snapshots service.{research,decompose}-anchor-context
-  // of annotated-image P5a, one line each = 101.
-  assert.equal(lines.length, 101);
+  // of annotated-image P5a, one line each = 101; + the two zh-CN snapshots service.task-ai-{decided,followed} of
+  // ai-proposed-note-style P2, one line each = 103.
+  assert.equal(lines.length, 103);
 });
 
-test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 101 output-language sentences and 93 clauses, none in zh-TW', () => {
+test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 103 output-language sentences and 94 clauses, none in zh-TW', () => {
   const total = { rules: 0, clauses: 0 };
   for (const file of fs.readdirSync(directory).filter(name => /\.zh-CN(\.\d+)?\.txt$/.test(name))) {
     const found = stripVerbatim(fs.readFileSync(path.join(directory, file), 'utf8'));
@@ -164,6 +165,8 @@ test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 101 out
   // snapshots have the sentence but no detail structure, so no clause); the 5 service.task-kind-* zh-CN snapshots of
   // note-style-recipe P2b add 5 sentences and 5 clauses; the four zh-CN snapshots service.{task,synthesize}-{top,fresh} of note-style-recipe
   // T4 P1 add 4 sentences and 4 clauses; the four zh-CN snapshots service.reference-groups-{top,fresh}.{1,2} of T4 F1 add 4 sentences and 4 clauses; the two zh-CN snapshots service.{research,decompose}-anchor-context of annotated-image P5a add
-  // 2 sentences and 1 clause (the decompose snapshot has the sentence but no detail structure).
-  assert.deepEqual(total, { rules: 101, clauses: 93 });
+  // 2 sentences and 1 clause (the decompose snapshot has the sentence but no detail structure); the two zh-CN snapshots
+  // service.task-ai-{decided,followed} of ai-proposed-note-style P2 add 2 sentences and 1 clause (the decided prompt has
+  // no detail structure, so no clause).
+  assert.deepEqual(total, { rules: 103, clauses: 94 });
 });

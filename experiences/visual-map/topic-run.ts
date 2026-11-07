@@ -1074,11 +1074,15 @@ export class TopicRuns {
       return null;
     }
     const outputLanguage = overrides.outputLanguage ?? this.ports.settings().language;
-    const runStyle =
+    let runStyle =
       givenStyle ??
       (options.resolveStyle
         ? await options.resolveStyle(outputLanguage)
         : this.ports.runStyle({ note, outputLanguage }));
+    // The note's sections decide an "AI suggested" run, and the Detail can change between the caller's resolution and
+    // here: resolve again from the Detail this run sends.
+    if (runStyle.aiSections && runStyle.aiSections.forDetail !== note.detail)
+      runStyle = this.ports.runStyle({ note, outputLanguage });
     const detailTemplate = runStyle.template;
     const anchorText = options.anchorContext?.(outputLanguage) || undefined;
     const context: TaskContext = withThinkingOrigin(
@@ -1274,8 +1278,16 @@ export class TopicRuns {
             else if (stale) fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
             return;
           }
+          // "AI suggested" first research: the sections the AI wrote are the template of everything written below (the
+          // canonical detail, the note update, the chart job). Without the flag this is the run's own context.
+          const effective = result.decidedTemplate ?? context.detailTemplate;
+          const writeContext: TaskContext =
+            context.aiSections === "decide"
+              ? { ...context, detailTemplate: effective, aiSections: undefined }
+              : context;
+          if (result.aiSectionsFallback) options.notify?.(t("ui.note_style_ai_sections_invalid"));
           // Write-back comes after the stale fence: the old Detail is `latest.detail`, which equals the one the run started with.
-          const mode: WritebackMode = context.updateMode ?? "merge";
+          const mode: WritebackMode = writeContext.updateMode ?? "merge";
           const writeLanguage = noteLanguageOf(context.outputLanguage ?? settings().language);
           const composed = await this.composeWrite({
             mode,
@@ -1283,9 +1295,9 @@ export class TopicRuns {
             oldDetail: latest.detail,
             // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
             aiDetail:
-              mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, context.detailTemplate),
+              mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, writeContext.detailTemplate),
             summary: result.summary,
-            template: context.detailTemplate ?? standardTemplate(writeLanguage),
+            template: writeContext.detailTemplate ?? standardTemplate(writeLanguage),
             language: writeLanguage,
             signal: controller.signal,
             hooks: options,
@@ -1309,7 +1321,7 @@ export class TopicRuns {
               ...(context.researchMode ? { researchMode: context.researchMode } : {}),
               ...(mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language))
             },
-            { detailTemplate: context.detailTemplate }
+            { detailTemplate: writeContext.detailTemplate }
           );
           const saved = await repo.readNote(path, options.map);
           options.onWritten?.({ before: { ...latest, status: note.status }, after: saved });
@@ -1318,12 +1330,12 @@ export class TopicRuns {
           options.queueCharts?.({
             path,
             saved,
-            context,
+            context: writeContext,
             detail: saved.detail,
             formatIssues: mode === "top" ? [] : result.formatIssues,
             model: used.model,
             language: context.outputLanguage ?? settings().language,
-            template: context.detailTemplate,
+            template: writeContext.detailTemplate,
             ...(mode === "top" ? this.chartGuard(mode, composed.record) : {})
           });
           if (result.suggestions.length) {

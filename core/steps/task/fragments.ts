@@ -10,6 +10,10 @@ import {
 import SourceRegistryTemplate from "./source-registry.md";
 import AdaptiveDetailStructureZH from "./adaptive-detail-structure.zh.md";
 import AdaptiveDetailStructureEN from "./adaptive-detail-structure.en.md";
+import AiDecidedSectionsZH from "./ai-decided-sections.zh.md";
+import AiDecidedSectionsEN from "./ai-decided-sections.en.md";
+import AiFollowedSectionsZH from "./ai-followed-sections.zh.md";
+import AiFollowedSectionsEN from "./ai-followed-sections.en.md";
 import CustomDetailStructureZH from "./custom-detail-structure.zh.md";
 import CustomDetailStructureEN from "./custom-detail-structure.en.md";
 import CustomRuleLogZH from "./custom-detail-rule-log.zh.md";
@@ -90,6 +94,9 @@ const text = (template: string): string => renderTemplate(template, {});
 const pair = (zh: string, en: string): FragmentPair => ({ zh: text(zh), en: text(en) });
 
 export const ADAPTIVE_DETAIL_STRUCTURE: FragmentPair = pair(AdaptiveDetailStructureZH, AdaptiveDetailStructureEN);
+/** "AI suggested" style: the AI decides the sections (first research), or keeps the note's own (later research). */
+export const AI_DECIDED_SECTIONS: FragmentPair = pair(AiDecidedSectionsZH, AiDecidedSectionsEN);
+export const AI_FOLLOWED_SECTIONS: FragmentPair = pair(AiFollowedSectionsZH, AiFollowedSectionsEN);
 export const DECOMPOSE: FragmentPair = pair(DecomposeZH, DecomposeEN);
 export const DEFAULT_TASK: FragmentPair = pair(DefaultTaskZH, DefaultTaskEN);
 /** A template, not text: {@link detailStructure} fills its `{{headings}}` placeholder. */

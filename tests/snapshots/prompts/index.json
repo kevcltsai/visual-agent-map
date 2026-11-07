@@ -2181,6 +2181,36 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.task-ai-decided.en": {
+      "builder": "AiTaskService instructions: mode task, AI suggested style, first research (the AI decides the sections)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-ai-decided.zh": {
+      "builder": "AiTaskService instructions: mode task, AI suggested style, first research (the AI decides the sections)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-ai-decided.zh-CN": {
+      "builder": "AiTaskService instructions: mode task, AI suggested style, first research (the AI decides the sections)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-ai-followed.en": {
+      "builder": "AiTaskService instructions: mode task, AI suggested style, later research (the sections of the note are kept)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-ai-followed.zh": {
+      "builder": "AiTaskService instructions: mode task, AI suggested style, later research (the sections of the note are kept)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-ai-followed.zh-CN": {
+      "builder": "AiTaskService instructions: mode task, AI suggested style, later research (the sections of the note are kept)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.task-fresh.en": {
       "builder": "AiTaskService instructions: mode task, web research, update mode fresh",
       "language": "en",

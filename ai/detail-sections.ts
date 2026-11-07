@@ -145,3 +145,20 @@ export function demoteUnknownHeadings(detail: string, template: DetailTemplate):
     })
     .join("\n");
 }
+
+/**
+ * The template for a detail the AI just wrote under the "AI suggested" style: its sections plus a sources section
+ * ({@link withSourcesSection}). The sources section counts toward the limit, so a reply with the most sections allowed and
+ * none of them sources fails as `too_many` (the caller then uses the Standard sections, which keep every line). A name clash
+ * leaves the template without a sources section; nothing is lost, the footnote lines then stay at the end.
+ */
+export function decidedTemplateFromDetail(detail: string, language: NoteLanguage): DetailSectionsResult {
+  const made = templateFromDetail(detail, language);
+  if (!made.ok) return made;
+  const template = withSourcesSection(made.template, language);
+  const issues = validateTemplate(template, []);
+  if (issues.some(issue => issue.key === "ui.detail_template_error_section_count"))
+    return { ok: false, reason: "too_many" };
+  if (issues.length) return { ok: false, reason: "invalid" };
+  return { ok: true, template };
+}

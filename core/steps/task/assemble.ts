@@ -48,6 +48,8 @@ import {
 } from "../_shared/fragments";
 import {
   ADAPTIVE_DETAIL_STRUCTURE,
+  AI_DECIDED_SECTIONS,
+  AI_FOLLOWED_SECTIONS,
   customDetailCallout,
   customDetailStructure,
   customDetailRule,
@@ -359,14 +361,19 @@ export function chartsWanted(
   options: AssembleOptions = {}
 ): boolean {
   const parts = templateParts(selection, context, language, { kind: "topic", text: context.title }, options);
-  return partsAskForCharts(parts, selection, formatTextOf(selection, language, options));
+  return partsAskForCharts(parts, selection, formatTextOf(selection, language, options), context.aiSections === "decide");
 }
 
-function partsAskForCharts(parts: TemplateParts, selection: StyleSelection, format: string): boolean {
+function partsAskForCharts(
+  parts: TemplateParts,
+  selection: StyleSelection,
+  format: string,
+  sectionsUndecided = false
+): boolean {
   // The lean format draws no diagram, whatever the sections say.
   if (selection.format?.id === "lean" && selection.format.body === undefined) return false;
-  // An adaptive detail has no fixed sections: only the format rules can ask for a chart.
-  const sections = selection.template.adaptive ? "" : parts.sections;
+  // An adaptive detail, and one whose sections the AI still decides, has no fixed sections: only the format rules can ask for a chart.
+  const sections = selection.template.adaptive || sectionsUndecided ? "" : parts.sections;
   return sections.includes(CHART_BLOCK) || format.includes(CHART_BLOCK);
 }
 
@@ -450,9 +457,14 @@ export function assembleTaskPrompt(
   if (step === "decompose") add(fixed("", "template"));
   else {
     const pieces: Piece[][] = [];
+    // "AI suggested" (trusted context flag): the AI decides the sections of a first research, in place of the template's.
+    const aiDecides = context.aiSections === "decide" && isGeneral;
     if (selection.template.adaptive)
       pieces.push([fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language), "adaptive-detail-structure")]);
+    else if (aiDecides) pieces.push([fixed(inLanguage(AI_DECIDED_SECTIONS, language), "ai-decided-sections")]);
     else pieces.push(sectionPieces(parts, selection.template.id));
+    if (context.aiSections === "follow" && (isGeneral || step === "synthesize"))
+      pieces.push([fixed(inLanguage(AI_FOLLOWED_SECTIONS, language), "ai-followed-sections")]);
     // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
     if (readerFacingDetail(context) && step !== "merge") {
       const text = format;
@@ -494,7 +506,7 @@ export function assembleTaskPrompt(
   return {
     text: segments.map(segment => segment.text).join(""),
     segments,
-    charts: partsAskForCharts(parts, selection, format),
+    charts: partsAskForCharts(parts, selection, format, context.aiSections === "decide" && isGeneral),
     // The decompose step carries no template, so a template that could not be read changes nothing there.
     issues: step === "decompose" ? [] : parts.issues,
     notices: step === "decompose" ? [] : parts.notices

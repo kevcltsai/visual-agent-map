@@ -72,6 +72,9 @@ test('collect snapshots: AiTaskService general task prompt', async () => {
     }
     await recordContext(`service.task-tone.${tag}`, 'AiTaskService instructions: mode task with a resolved tone text (B1)', language, { ...ctx, toneText: language === 'en' ? 'Tone: example voice. Write warmly.' : '寫作語氣：範例語氣。請溫暖地寫作。' });
     await recordContext(`service.task-textbook.${tag}`, 'AiTaskService instructions: mode task with the built-in Textbook template (intro, six sections, empty sections omitted)', language, { ...ctx, detailTemplate: loadModule('ai/detail-templates.ts').textbookTemplate(loadModule('i18n.ts').noteLanguageOf(language)) });
+    // AI suggested style: the AI decides the sections of a first research; a later research keeps the note's own.
+    await recordContext(`service.task-ai-decided.${tag}`, 'AiTaskService instructions: mode task, AI suggested style, first research (the AI decides the sections)', language, { ...ctx, detail: '', aiSections: 'decide' });
+    await recordContext(`service.task-ai-followed.${tag}`, 'AiTaskService instructions: mode task, AI suggested style, later research (the sections of the note are kept)', language, { ...ctx, aiSections: 'follow' });
     await recordContext(`service.default-adaptive.${tag}`, 'AiTaskService instructions: no mode, adaptive detail, no sources', language, { ...ctx, mode: undefined, detailFormat: 'adaptive', sourceContext: undefined, workingFindings: undefined, detail: '', rules: '', ancestors: '' });
     await recordContext(`service.reference-groups.${tag}`, 'AiTaskService reference extraction then task', language, { ...ctx, sourceContext: undefined, referenceGroups: [{ id: 'g1', name: 'Group', location: '/refs', documents: [{ path: '/refs/a.md', content: 'Reference body A' }] }] });
     // Note style recipe T4 F1: the reference extraction pass that runs before a top or fresh task follows the update mode (no absorb-or-replace text, no old-Detail label in fresh).

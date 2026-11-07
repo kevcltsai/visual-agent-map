@@ -22875,6 +22875,18 @@ var adaptive_detail_structure_zh_default = "detail \u4F7F\u7528 Markdown\uFF0C\u
 // core/steps/task/adaptive-detail-structure.en.md
 var adaptive_detail_structure_en_default = "Write detail in Markdown with a structure suited to the user's original question and requested outcome. Choose headings, prose, steps, tables, or other appropriate formats as needed; there is no fixed section template. Produce a coherent, self-contained answer that incorporates the user's known conditions and relevant evidence. Integrate source attribution and material uncertainties where they matter. Do not paste the intermediate research reports or add empty sections and update logs. Preserve any machine-readable decision marker required by the task and the outer JSON response contract.\n";
 
+// core/steps/task/ai-decided-sections.zh.md
+var ai_decided_sections_zh_default = "\u9019\u7BC7\u7B46\u8A18\u7684\u6BB5\u843D\u7531\u4F60\u6C7A\u5B9A\uFF0C\u6C92\u6709\u56FA\u5B9A\u6E05\u55AE\u3002detail \u53EA\u7528\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6BB5\u5167\u5C0F\u6A19\u7528\u56DB\u7D1A\u6A19\u984C\uFF08####\uFF09\u3002\n\u5148\u5224\u65B7\u73FE\u6709\u7D50\u69CB\u5920\u4E0D\u5920\u7528\uFF1A\u73FE\u6709\u7D50\u69CB\u5920\u7528\u6642\u512A\u5148\u6CBF\u7528\uFF0C\u4E0D\u8981\u70BA\u4E86\u65B0\u7A4E\u53E6\u63D0\uFF1B\u53EA\u6709\u9019\u500B\u4E3B\u984C\u7684\u8B80\u8005\u771F\u7684\u9700\u8981\u4E0D\u540C\u6BB5\u843D\u6642\u624D\u81EA\u8A02\u3002\n\u73FE\u6709\u7D50\u69CB\uFF1A\n- \u6838\u5FC3\u7D50\u8AD6\uFF0F\u80CC\u666F\u8207\u6A5F\u5236\uFF0F\u4E0D\u540C\u770B\u6CD5\u8207\u9650\u5236\uFF0F\u5F85\u78BA\u8A8D\u554F\u984C\uFF0F\u4F86\u6E90\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u4E00\u53E5\u8A71\uFF0F\u70BA\u4EC0\u9EBC\uFF0F\u4F8B\u5B50\uFF0F\u548C\u8AB0\u4E0D\u540C\uFF0F\u51FA\u8655\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u4E3B\u5F35\uFF0F\u76EE\u524D\u5224\u65B7\uFF0F\u5982\u679C\u6210\u7ACB\u6703\u770B\u5230\uFF0F\u4EC0\u9EBC\u6703\u63A8\u7FFB\u5B83\uFF0F\u9A57\u8B49\u65B9\u5F0F\uFF0F\u8B49\u64DA\u5C0D\u7167\uFF0F\u4F86\u6E90\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u6458\u8981\uFF0F\u539F\u6587\u6216\u6578\u64DA\uFF0F\u600E\u9EBC\u5F97\u5230\u7684\uFF0F\u53EF\u4FE1\u5EA6\uFF0F\u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC\uFF0F\u51FA\u8655\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u7D50\u8AD6\uFF0F\u4FE1\u5FC3\uFF0F\u4F9D\u64DA\uFF0F\u4EC0\u9EBC\u6703\u6539\u8B8A\u9019\u500B\u7D50\u8AD6\uFF0F\u9069\u7528\u7BC4\u570D\uFF0F\u5F71\u97FF\u8207\u4E0B\u4E00\u6B65\uFF0F\u4F86\u6E90\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u72C0\u614B\uFF0F\u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6\uFF0F\u4E0B\u4E00\u6B65\uFF0F\u6B65\u9A5F\uFF0F\u963B\u7919\u8207\u98A8\u96AA\uFF0F\u9810\u671F\u7522\u51FA\uFF0F\u53C3\u8003\u8CC7\u6599\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u9069\u7528\u60C5\u5883\uFF0F\u505A\u6CD5\uFF0F\u5E38\u898B\u932F\u8AA4\uFF0F\u5224\u65B7\u6E96\u5247\uFF0F\u4F86\u6E90\uFF0F\u66F4\u65B0\u7D00\u9304\n\u81EA\u8A02\u6BB5\u843D\u7684\u898F\u5247\uFF1A\n- \u7E3D\u5171 4\u20138 \u6BB5\uFF1B\u6BB5\u540D 12 \u5B57\u5167\uFF0C\u4E0D\u542B #\uFF0C\u4E0D\u91CD\u8907\uFF0C\u76F4\u63A5\u63CF\u8FF0\u5167\u5BB9\uFF0C\u4E0B\u6B21\u66F4\u65B0\u540C\u4E3B\u984C\u9084\u7528\u5F97\u4E0A\u3002\n- \u5012\u6578\u7B2C\u4E8C\u6BB5\u56FA\u5B9A\u53EB\u300C\u4F86\u6E90\u300D\uFF0C\u6700\u5F8C\u4E00\u6BB5\u56FA\u5B9A\u53EB\u300C\u66F4\u65B0\u7D00\u9304\u300D\u3002\n\u5167\u5BB9\u898F\u5247\uFF1A\n- \u4E0D\u88DC\u4F86\u6E90\u6C92\u6709\u7684\u63A8\u8AD6\uFF1B\u4F86\u6E90\u6C92\u5BEB\u7684\u9069\u7528\u60C5\u5883\u3001\u7406\u7531\u6216\u56E0\u679C\u4E0D\u8981\u5BEB\u3002\u6C92\u6709\u6750\u6599\u7684\u6BB5\u4E0D\u8981\u5217\uFF0C\u4E0D\u8981\u786C\u6E4A\u3002\n- \u540C\u4E00\u5167\u5BB9\u53EA\u653E\u4E00\u6BB5\uFF0C\u4E0D\u5728\u5169\u6BB5\u91CD\u8907\u540C\u4E00\u7D44\u6578\u5B57\u6216\u7D50\u8AD6\u3002\n- \u6578\u5B57\u3001\u65E5\u671F\u3001\u9023\u7D50\u7167\u4F86\u6E90\u4FDD\u7559\u3002\n";
+
+// core/steps/task/ai-decided-sections.en.md
+var ai_decided_sections_en_default = 'You decide the sections of this note; there is no fixed list. The detail uses only third-level headings (###) for sections, and fourth-level headings (####) for sub-headings inside a section.\nFirst judge whether an existing structure is enough: when one is, prefer it and do not propose another just for novelty; define your own sections only when readers of this topic really need different ones.\nExisting structures:\n- Core conclusions / Background and mechanism / Disagreements and limits / Open questions to check / Sources / Update log\n- In one sentence / Why / Example / How it differs / Source / Update log\n- Claim / Current judgment / If true we would see / What would refute it / How to test / Evidence table / Sources / Update log\n- Summary / Source text or data / How it was obtained / Credibility / Related topics / Source / Update log\n- Conclusion / Confidence / Basis / What would change it / Scope / Impact and next steps / Sources / Update log\n- Status / Goal and done-when / Next step / Steps / Blockers and risks / Expected output / References / Update log\n- When to use / How to do it / Common mistakes / Decision rules / Sources / Update log\nRules for your own sections:\n- 4-8 sections in total; each name at most 12 words, no #, no repeats, describing the content directly, and still usable when the same topic is updated next time.\n- The second-to-last section is always named "Sources" and the last one always "Update log".\nContent rules:\n- Do not add inferences the sources do not support; do not write use cases, reasons or causes the sources do not state. Leave out a section that has no material; do not pad it.\n- Put each piece of content in one section only; do not repeat the same numbers or conclusion in two sections.\n- Keep numbers, dates and links as the sources give them.\n';
+
+// core/steps/task/ai-followed-sections.zh.md
+var ai_followed_sections_zh_default = "\u53EA\u7528\u4E0A\u9762\u5217\u51FA\u7684\u6BB5\u843D\uFF0C\u4E0D\u65B0\u589E\u6BB5\u843D\uFF1B\u653E\u4E0D\u9032\u7684\u5167\u5BB9\u4F75\u5165\u6700\u63A5\u8FD1\u7684\u6BB5\uFF0C\u6BB5\u5167\u5C0F\u6A19\u7528\u56DB\u7D1A\u6A19\u984C\uFF08####\uFF09\u3002\n\u4E0D\u88DC\u4F86\u6E90\u6C92\u6709\u7684\u63A8\u8AD6\u3002\u540C\u4E00\u5167\u5BB9\u53EA\u653E\u4E00\u6BB5\u3002\n";
+
+// core/steps/task/ai-followed-sections.en.md
+var ai_followed_sections_en_default = "Use only the sections listed above and add no new section; content that fits none goes into the closest section, with sub-headings as fourth-level headings (####).\nDo not add inferences the sources do not support. Put each piece of content in one section only.\n";
+
 // core/steps/task/custom-detail-structure.zh.md
 var custom_detail_structure_zh_default = "detail \u5FC5\u9808\u4E14\u53EA\u80FD\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B {{count}} \u500B\u4E09\u7D1A\u6A19\u984C\uFF1A{{headings}}\u3002\u6C92\u6709\u9069\u7528\u5167\u5BB9\u7684\u6BB5\u843D\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\u3002\u4F7F\u7528\u8005\u8981\u6C42\u67D0\u6BB5\u7684\u6578\u91CF\u6642\uFF0C\u9808\u9075\u5B88\u8A72\u6578\u91CF\u3002{{rules}}\n";
 
@@ -23103,6 +23115,8 @@ var visual_preserve_en_default = "When reusing one, preserve its original image 
 var text4 = (template2) => renderTemplate(template2, {});
 var pair4 = (zh, en2) => ({ zh: text4(zh), en: text4(en2) });
 var ADAPTIVE_DETAIL_STRUCTURE = pair4(adaptive_detail_structure_zh_default, adaptive_detail_structure_en_default);
+var AI_DECIDED_SECTIONS = pair4(ai_decided_sections_zh_default, ai_decided_sections_en_default);
+var AI_FOLLOWED_SECTIONS = pair4(ai_followed_sections_zh_default, ai_followed_sections_en_default);
 var DECOMPOSE = pair4(decompose_zh_default, decompose_en_default);
 var DEFAULT_TASK = pair4(default_task_zh_default, default_task_en_default);
 var DETAIL_STRUCTURE_TEMPLATE = { zh: detail_structure_zh_default, en: detail_structure_en_default };
@@ -32363,12 +32377,12 @@ function formatTextOf(selection, language2, options) {
 var CHART_BLOCK = "```mermaid";
 function chartsWanted(selection, context, language2, options = {}) {
   const parts = templateParts(selection, context, language2, { kind: "topic", text: context.title }, options);
-  return partsAskForCharts(parts, selection, formatTextOf(selection, language2, options));
+  return partsAskForCharts(parts, selection, formatTextOf(selection, language2, options), context.aiSections === "decide");
 }
-function partsAskForCharts(parts, selection, format) {
+function partsAskForCharts(parts, selection, format, sectionsUndecided = false) {
   var _a2;
   if (((_a2 = selection.format) == null ? void 0 : _a2.id) === "lean" && selection.format.body === void 0) return false;
-  const sections = selection.template.adaptive ? "" : parts.sections;
+  const sections = selection.template.adaptive || sectionsUndecided ? "" : parts.sections;
   return sections.includes(CHART_BLOCK) || format.includes(CHART_BLOCK);
 }
 var fixed = (text12, id) => [text12, { kind: "fixed", id }];
@@ -32421,9 +32435,13 @@ ${inLanguage(CONFLICT_RULE, language2)}`, "conflict-rule")
   if (step === "decompose") add(fixed("", "template"));
   else {
     const pieces = [];
+    const aiDecides = context.aiSections === "decide" && isGeneral;
     if (selection.template.adaptive)
       pieces.push([fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2), "adaptive-detail-structure")]);
+    else if (aiDecides) pieces.push([fixed(inLanguage(AI_DECIDED_SECTIONS, language2), "ai-decided-sections")]);
     else pieces.push(sectionPieces(parts, selection.template.id));
+    if (context.aiSections === "follow" && (isGeneral || step === "synthesize"))
+      pieces.push([fixed(inLanguage(AI_FOLLOWED_SECTIONS, language2), "ai-followed-sections")]);
     if (readerFacingDetail(context) && step !== "merge") {
       const text12 = format;
       if (text12)
@@ -32474,7 +32492,7 @@ ${context.task}`, "task"));
   return {
     text: segments.map((segment) => segment.text).join(""),
     segments,
-    charts: partsAskForCharts(parts, selection, format),
+    charts: partsAskForCharts(parts, selection, format, context.aiSections === "decide" && isGeneral),
     // The decompose step carries no template, so a template that could not be read changes nothing there.
     issues: step === "decompose" ? [] : parts.issues,
     notices: step === "decompose" ? [] : parts.notices
@@ -32628,6 +32646,27 @@ function templateFromDetail(detail, language2) {
     return { ok: false, reason: "too_many" };
   if (issues.some((issue2) => issue2.key === "ui.detail_template_error_section_name_taken"))
     return { ok: false, reason: "duplicate" };
+  if (issues.length) return { ok: false, reason: "invalid" };
+  return { ok: true, template: template2 };
+}
+function withSourcesSection(template2, language2) {
+  if (template2.sections.some((section3) => section3.role === "sources")) return template2;
+  const standard = standardTemplate(language2).sections.find((section3) => section3.role === "sources");
+  if (!standard) return template2;
+  const names3 = new Set(template2.sections.map((section3) => key2(section3.name)));
+  if (names3.has(key2(standard.name))) return template2;
+  const at = template2.sections.findIndex((section3) => section3.role === "log");
+  const sections = [...template2.sections];
+  sections.splice(at < 0 ? sections.length : at, 0, { ...standard, aliases: [...standard.aliases] });
+  return { ...template2, sections: withoutConflictingAliases(sections) };
+}
+function decidedTemplateFromDetail(detail, language2) {
+  const made = templateFromDetail(detail, language2);
+  if (!made.ok) return made;
+  const template2 = withSourcesSection(made.template, language2);
+  const issues = validateTemplate(template2, []);
+  if (issues.some((issue2) => issue2.key === "ui.detail_template_error_section_count"))
+    return { ok: false, reason: "too_many" };
   if (issues.length) return { ok: false, reason: "invalid" };
   return { ok: true, template: template2 };
 }
@@ -35631,7 +35670,9 @@ var TopicRuns = class {
       return null;
     }
     const outputLanguage2 = (_d = overrides.outputLanguage) != null ? _d : this.ports.settings().language;
-    const runStyle = givenStyle != null ? givenStyle : options.resolveStyle ? await options.resolveStyle(outputLanguage2) : this.ports.runStyle({ note, outputLanguage: outputLanguage2 });
+    let runStyle = givenStyle != null ? givenStyle : options.resolveStyle ? await options.resolveStyle(outputLanguage2) : this.ports.runStyle({ note, outputLanguage: outputLanguage2 });
+    if (runStyle.aiSections && runStyle.aiSections.forDetail !== note.detail)
+      runStyle = this.ports.runStyle({ note, outputLanguage: outputLanguage2 });
     const detailTemplate = runStyle.template;
     const anchorText = ((_e = options.anchorContext) == null ? void 0 : _e.call(options, outputLanguage2)) || void 0;
     const context = withThinkingOrigin(
@@ -35787,7 +35828,7 @@ var TopicRuns = class {
       observer
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n, _o;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -35803,16 +35844,19 @@ var TopicRuns = class {
           else if (stale) fail2(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
           return;
         }
-        const mode = (_b3 = context.updateMode) != null ? _b3 : "merge";
-        const writeLanguage = noteLanguageOf((_c2 = context.outputLanguage) != null ? _c2 : settings().language);
+        const effective = (_b3 = result.decidedTemplate) != null ? _b3 : context.detailTemplate;
+        const writeContext = context.aiSections === "decide" ? { ...context, detailTemplate: effective, aiSections: void 0 } : context;
+        if (result.aiSectionsFallback) (_c2 = options.notify) == null ? void 0 : _c2.call(options, t("ui.note_style_ai_sections_invalid"));
+        const mode = (_d2 = writeContext.updateMode) != null ? _d2 : "merge";
+        const writeLanguage = noteLanguageOf((_e2 = context.outputLanguage) != null ? _e2 : settings().language);
         const composed = await this.composeWrite({
           mode,
           path,
           oldDetail: latest.detail,
           // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
-          aiDetail: mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, context.detailTemplate),
+          aiDetail: mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, writeContext.detailTemplate),
           summary: result.summary,
-          template: (_d2 = context.detailTemplate) != null ? _d2 : standardTemplate(writeLanguage),
+          template: (_f2 = writeContext.detailTemplate) != null ? _f2 : standardTemplate(writeLanguage),
           language: writeLanguage,
           signal: controller.signal,
           hooks: options,
@@ -35820,7 +35864,7 @@ var TopicRuns = class {
         });
         if (!composed.ok) {
           await repo.updateNote(path, { status: note.status });
-          if (exchangeId) (_e2 = exchanges()) == null ? void 0 : _e2.failed(exchangeId, composed.message);
+          if (exchangeId) (_g2 = exchanges()) == null ? void 0 : _g2.failed(exchangeId, composed.message);
           fail2(composed.message);
           return;
         }
@@ -35836,21 +35880,21 @@ var TopicRuns = class {
             ...context.researchMode ? { researchMode: context.researchMode } : {},
             ...mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language2)
           },
-          { detailTemplate: context.detailTemplate }
+          { detailTemplate: writeContext.detailTemplate }
         );
         const saved = await repo.readNote(path, options.map);
-        (_f2 = options.onWritten) == null ? void 0 : _f2.call(options, { before: { ...latest, status: note.status }, after: saved });
-        if (exchangeId) (_g2 = exchanges()) == null ? void 0 : _g2.completed(exchangeId);
+        (_h2 = options.onWritten) == null ? void 0 : _h2.call(options, { before: { ...latest, status: note.status }, after: saved });
+        if (exchangeId) (_i = exchanges()) == null ? void 0 : _i.completed(exchangeId);
         this.ports.clearOtherHistory(options.origin);
-        (_i = options.queueCharts) == null ? void 0 : _i.call(options, {
+        (_k = options.queueCharts) == null ? void 0 : _k.call(options, {
           path,
           saved,
-          context,
+          context: writeContext,
           detail: saved.detail,
           formatIssues: mode === "top" ? [] : result.formatIssues,
           model: used.model,
-          language: (_h2 = context.outputLanguage) != null ? _h2 : settings().language,
-          template: context.detailTemplate,
+          language: (_j = context.outputLanguage) != null ? _j : settings().language,
+          template: writeContext.detailTemplate,
           ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });
         if (result.suggestions.length) {
@@ -35859,12 +35903,12 @@ var TopicRuns = class {
             result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
           );
           try {
-            await ((_k = (_j = this.pendingSuggestions).flush) == null ? void 0 : _k.call(_j));
+            await ((_m = (_l = this.pendingSuggestions).flush) == null ? void 0 : _m.call(_l));
           } catch (error) {
-            (_l = options.notify) == null ? void 0 : _l.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
+            (_n = options.notify) == null ? void 0 : _n.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
           }
         }
-        (_m = options.done) == null ? void 0 : _m.call(options, result);
+        (_o = options.done) == null ? void 0 : _o.call(options, result);
       })
     ).catch(
       (error) => this.ports.mutate()(async () => {
@@ -43024,7 +43068,7 @@ var AiTaskService = class {
   }
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
   async execute(input2, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer, role) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     if (input2.timeoutMs !== void 0 && (!Number.isInteger(input2.timeoutMs) || input2.timeoutMs < 18e4 || input2.timeoutMs > 6e5))
       throw new Error("Invalid AI task timeout.");
     const provider = this.runtimeIdFor(model);
@@ -43166,8 +43210,14 @@ var AiTaskService = class {
         result.detail = resolveDetailReferences(result.detail, referenceGroups, input2.detail, input2.detailTemplate);
       result.detail = await demoteUnparsableMermaid(result.detail, this.options.mermaidSyntax);
       if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.parsed(exchangeId);
+      const aiDecides = input2.aiSections === "decide";
+      if (aiDecides && ((_f = input2.mode) != null ? _f : "task") === "task" && input2.promptProfile !== "aim" && !input2.countRepair && !((_g = input2.detail) == null ? void 0 : _g.trim())) {
+        const decided = decidedTemplateFromDetail(result.detail, noteLanguageOf(outputLanguage2));
+        if (decided.ok) result.decidedTemplate = decided.template;
+        else result.aiSectionsFallback = true;
+      }
       const template2 = input2.detailTemplate;
-      if (template2 && template2.sections.some((section3) => section3.count) && input2.mode !== "decompose" && input2.detailFormat !== "adaptive" && // A top reply holds only the new findings, so a count over the whole page means nothing.
+      if (template2 && !aiDecides && template2.sections.some((section3) => section3.count) && input2.mode !== "decompose" && input2.detailFormat !== "adaptive" && // A top reply holds only the new findings, so a count over the whole page means nothing.
       input2.updateMode !== "top") {
         let issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage2), template2), template2);
         if (issues.length && !input2.countRepair) {

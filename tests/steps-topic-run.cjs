@@ -209,12 +209,12 @@ test('resetCodexRuntime stops every registered run; onunload disposes TopicRuns 
 const fakeNote = (over = {}) => ({ title: 'T', summary: '', rules: '', detail: '', prompt: 'ask', model: 'm1', reasoning: undefined, researchMode: 'local', visualMode: 'off', sourcePaths: [], referencePaths: [], thinkingOrigin: '', status: 'idea', newFindings: '', ...over });
 function researchRuns({ reply, ask, notes = {}, extra = {} } = {}) {
   const store = new Map(Object.entries({ 'A.md': fakeNote(), ...notes }));
-  const log = { writes: [], progress: [], failed: [], notices: [], cleared: [], refreshed: 0, asks: [], charts: [], written: [], exchanges: [], flushed: 0 };
+  const log = { writes: [], writeOptions: [], progress: [], failed: [], notices: [], cleared: [], refreshed: 0, asks: [], charts: [], written: [], exchanges: [], flushed: 0 };
   const running = new Set(); const activeTasks = new Map(); const pending = new Map();
   pending.flush = async () => { log.flushed++; };
   const repo = {
     readNote: async p => ({ ...store.get(p) }),
-    updateNote: async (p, patch) => { log.writes.push([p, patch]); Object.assign(store.get(p), patch); },
+    updateNote: async (p, patch, opt) => { log.writes.push([p, patch]); log.writeOptions.push(opt); Object.assign(store.get(p), patch); },
     resolveTopicModel: async (p, _map, runOnce) => ({ model: runOnce.model, reasoning: runOnce.reasoning })
   };
   const resolveModel = (...args) => repo.resolveTopicModel(...args);
@@ -395,6 +395,91 @@ test('research: the style comes from the given runStyle, else the options resolv
   const c = researchRuns({ extra: { runStyle: () => style('port') } });
   await (await c.runs.start('A.md', 'research', c.options())).finished;
   assert.equal(c.log.asks[0].context.toneText, 'port');
+});
+
+// ---- AI suggested style: the first research decides the sections (P2) ----
+const detailTemplates = load('ai/detail-templates.ts');
+const detailSections = load('ai/detail-sections.ts');
+const { translate: translateUi } = load('i18n.ts');
+const aiStyle = (mode, field, forDetail = '') => ({
+  template: detailTemplates.standardTemplate('en'), recipe: { ref: 'builtin:ai-suggested', source: 'topic' }, label: { fileName: 'ai' },
+  updateMode: 'merge', aiSections: { mode, forDetail }, contextFields: field ? { aiSections: field } : {}, issues: {}
+});
+const names = template => JSON.parse(JSON.stringify(template.sections.map(section => section.name)));
+const aiDetail = ['Swing plane', 'Drills', 'Update log'].map(n => `### ${n}\n\n${n} body 12 km`).join('\n\n');
+const decidedFor = detail => detailSections.decidedTemplateFromDetail(detail, 'en').template;
+
+test('AI suggested: a decided template writes the note, the note update and the chart job; the flag does not travel on', async () => {
+  const template = decidedFor(aiDetail);
+  assert.deepEqual(names(template), ['Swing plane', 'Drills', 'Sources', 'Update log']);
+  const h = researchRuns({ reply: { detail: aiDetail, decidedTemplate: template }, extra: { runStyle: () => aiStyle('decide', 'decide') } });
+  await (await h.runs.start('A.md', 'research', h.options())).finished;
+  assert.equal(h.log.asks[0].context.aiSections, 'decide', 'the request still carries the flag');
+  const written = h.store.get('A.md').detail;
+  const headings = written.split('\n').filter(line => line.startsWith('### '));
+  assert.deepEqual(headings, ['### Swing plane', '### Drills', '### Sources', '### Update log']);
+  assert.ok(written.includes('Swing plane body 12 km') && written.includes('Drills body 12 km'));
+  assert.equal(h.log.writeOptions.at(-1).detailTemplate, template, 'updateNote gets the decided template');
+  const job = h.log.charts[0];
+  assert.equal(job.template, template); assert.equal(job.context.detailTemplate, template); assert.equal(job.context.aiSections, undefined);
+  assert.deepEqual(h.log.notices, []);
+  // A re-read of the saved note gives the same section list (nothing flattened on the way).
+  const again = detailSections.templateFromDetail(written, 'en');
+  assert.ok(again.ok); assert.deepEqual(names(again.template), names(template));
+});
+
+test('AI suggested: a reply the service could not use writes the Standard sections with every line, tells once, asks once', async () => {
+  const reply = 'Plain text only.\n- 5 km from the source [x]\n- second line';
+  const h = researchRuns({ reply: { detail: reply, aiSectionsFallback: true }, extra: { runStyle: () => aiStyle('decide', 'decide') } });
+  await (await h.runs.start('A.md', 'research', h.options())).finished;
+  assert.equal(h.log.asks.length, 1);
+  assert.deepEqual(h.log.notices, [translateUi('en', 'ui.note_style_ai_sections_invalid')]);
+  const written = h.store.get('A.md').detail;
+  assert.deepEqual(written.split('\n').filter(line => line.startsWith('### ')).map(line => line.slice(4)), names(detailTemplates.standardTemplate('en')));
+  for (const line of reply.split('\n')) assert.ok(written.includes(line), line);
+  assert.equal(h.log.charts[0].context.aiSections, undefined);
+  assert.deepEqual(names(h.log.charts[0].template), names(detailTemplates.standardTemplate('en')));
+});
+
+test('AI suggested: with no decide flag the write context is the run context (no decided template used, no notice)', async () => {
+  for (const [mode, field] of [['follow', 'follow'], ['note-unusable', 'general'], ['no-note', undefined]]) {
+    const std = detailTemplates.standardTemplate('en');
+    const h = researchRuns({ reply: { detail: aiDetail, decidedTemplate: decidedFor(aiDetail), aiSectionsFallback: undefined }, notes: { 'A.md': fakeNote({ detail: '### Core conclusions\n\nold' }) }, extra: { runStyle: () => aiStyle(mode, field, '### Core conclusions\n\nold') } });
+    await (await h.runs.start('A.md', 'research', h.options())).finished;
+    assert.equal(h.log.charts[0].context.aiSections, field, mode);
+    assert.deepEqual(names(h.log.charts[0].template), names(std), mode);
+    assert.deepEqual(h.log.notices, [], mode);
+  }
+});
+
+test('AI suggested: a note changed while the AI ran is not written and shows no section notice', async () => {
+  let release; const gate = new Promise(r => { release = r; });
+  const h = researchRuns({
+    extra: { runStyle: () => aiStyle('decide', 'decide') },
+    ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); await gate; return { summary: 'NEW', detail: aiDetail, suggestions: [], visualReferences: [], decidedTemplate: decidedFor(aiDetail), aiSectionsFallback: true }; }
+  });
+  const handle = await h.runs.start('A.md', 'research', h.options());
+  h.store.get('A.md').detail = 'typed meanwhile'; release(); await handle.finished;
+  assert.equal(h.store.get('A.md').detail, 'typed meanwhile');
+  assert.equal(h.log.charts.length, 0);
+  assert.equal(h.log.notices.includes(translateUi('en', 'ui.note_style_ai_sections_invalid')), false);
+});
+
+test('AI suggested: a Detail that changed between the caller\'s style and the prelude makes the style resolve again', async () => {
+  const calls = [];
+  const fresh = ({ note }) => { calls.push(note.detail); return aiStyle('follow', 'follow', note.detail); };
+  const given = aiStyle('decide', 'decide', '');
+  const h = researchRuns({ notes: { 'A.md': fakeNote({ detail: '### Core conclusions\n\nwritten meanwhile' }) }, extra: { runStyle: fresh } });
+  await (await h.runs.start('A.md', 'research', h.options({ request: { task: 'go', researchMode: 'local', runStyle: given } }))).finished;
+  assert.deepEqual(calls, ['### Core conclusions\n\nwritten meanwhile']);
+  assert.equal(h.log.asks[0].context.aiSections, 'follow');
+  // The same Detail: no second resolution. A style without the AI flag: never resolved again.
+  const same = researchRuns({ extra: { runStyle: () => { throw new Error('resolved again'); } } });
+  await (await same.runs.start('A.md', 'research', same.options({ request: { task: 'go', researchMode: 'local', runStyle: aiStyle('decide', 'decide', '') } }))).finished;
+  assert.equal(same.log.asks[0].context.aiSections, 'decide');
+  const plain = researchRuns({ notes: { 'A.md': fakeNote({ detail: 'x' }) }, extra: { runStyle: () => { throw new Error('resolved again'); } } });
+  await (await plain.runs.start('A.md', 'research', plain.options({ request: { task: 'go', researchMode: 'local', runStyle: { template: undefined, recipe: { ref: 'builtin:general', source: 'topic' }, label: {}, contextFields: {}, issues: {} } } }))).finished;
+  assert.equal(plain.log.asks.length, 1);
 });
 
 test('research: the module still imports neither obsidian nor the view and drops isUnloaded', () => {

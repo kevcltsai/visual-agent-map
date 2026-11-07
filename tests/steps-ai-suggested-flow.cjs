@@ -607,3 +607,18 @@ test('decision #16: a kept pointer line does not hide a changed real number; the
   const out = keepDroppedContent({ ...base, template: noSources, oldDetail: H + '營收 9 倍。\n成長 9 成。', newDetail: edited.filter(l => !l.includes('成長 9 成')).join('\n') });
   assert.ok(out.restored >= 1);
 });
+
+test('keepDroppedContent: a heading the new draft repeats is not a kept line, so the update log section still ends where it should', () => {
+  const zh = 'zh-TW';
+  const tpl = templateFromDetail('### 概況\nx\n\n### 更新紀錄\n- a\n\n### 結論\ny', zh).template;
+  const std = templateFromDetail('### 概況\nx\n\n### 結論\ny\n\n### 更新紀錄\n- a', zh).template;
+  const k = (oldDetail, newDetail, template) => keepDroppedContent({ oldDetail, newDetail, summary: '', references: '', template, language: zh });
+  // M1: the log is in the middle and the new draft has none
+  const m1 = k('### 概況\nx\n\n### 更新紀錄\n- 2026-10-01 建立\n\n### 結論\n- 營收 42 億', '### 概況\nx\n\n### 結論\n- 營收 43 億', tpl);
+  assert.equal(m1.restored, 1);
+  assert.ok(m1.detail.split('\n').some(l => l.startsWith('>') && l.includes('營收 42 億')));
+  // M5: a level-2 section follows the log
+  const m5 = k('### 概況\nx\n\n### 更新紀錄\n- 2026-10-01\n\n## 附錄\n- 營收 42 億', '### 概況\nx\n\n## 附錄\n- 營收 43 億', std);
+  assert.equal(m5.restored, 1);
+  assert.ok(m5.detail.split('\n').some(l => l.startsWith('>') && l.includes('營收 42 億')));
+});

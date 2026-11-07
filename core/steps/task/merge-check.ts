@@ -166,8 +166,10 @@ export function keepDroppedContent(input: {
   // Decision #16. A line of the older Detail that the new one has word for word is not compared on either side (its numbers
   // are still there; this is also why a second run restores nothing). The new side and the summary lose every source number
   // (it can only hide a number, never add one: more is reported); the older side keeps them all.
-  const kept = keptLineSet(oldDetail, input.newDetail);
-  const oldSide = withoutLines(oldDetail, kept);
+  // Order: the log section goes first (it ends at the next heading, so a heading must not be dropped before it is found),
+  // then the kept lines, then the comparison. Headings are never kept lines.
+  const kept = keptLineSet(withoutUpdateLog(oldDetail, logHeadings), withoutUpdateLog(input.newDetail, logHeadings));
+  const oldSide = withoutLines(withoutUpdateLog(oldDetail, logHeadings), kept);
   // `added` is what this function put back: it is read as it stands.
   const check = (detail: string, added = "") =>
     checkMergePreservation({
@@ -201,13 +203,13 @@ function keptLineSet(oldDetail: string, newDetail: string): Set<string> {
     newDetail
       .split("\n")
       .map(line => line.trim())
-      .filter(Boolean)
+      .filter(line => line && !line.startsWith("#"))
   );
   return new Set(
     oldDetail
       .split("\n")
       .map(line => line.trim())
-      .filter(line => line && now.has(line))
+      .filter(line => line && !line.startsWith("#") && now.has(line))
   );
 }
 

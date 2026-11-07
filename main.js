@@ -31394,8 +31394,8 @@ function keepDroppedContent(input2) {
   const { template: template2, language: language2 } = input2;
   const oldDetail = withoutMermaid(input2.oldDetail);
   const logHeadings = template2.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]);
-  const kept = keptLineSet(oldDetail, input2.newDetail);
-  const oldSide = withoutLines(oldDetail, kept);
+  const kept = keptLineSet(withoutUpdateLog(oldDetail, logHeadings), withoutUpdateLog(input2.newDetail, logHeadings));
+  const oldSide = withoutLines(withoutUpdateLog(oldDetail, logHeadings), kept);
   const check = (detail2, added2 = "") => checkMergePreservation({
     sourceTexts: [oldSide],
     mergedTexts: [withoutSourceNumbers(withoutLines(detail2, kept, true)), withoutSourceNumbers(input2.summary), added2],
@@ -31419,10 +31419,10 @@ function withoutSourceNumbers(text12) {
 }
 function keptLineSet(oldDetail, newDetail) {
   const now = new Set(
-    newDetail.split("\n").map((line) => line.trim()).filter(Boolean)
+    newDetail.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"))
   );
   return new Set(
-    oldDetail.split("\n").map((line) => line.trim()).filter((line) => line && now.has(line))
+    oldDetail.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#") && now.has(line))
   );
 }
 function withoutLines(text12, kept, keepCharts = false) {

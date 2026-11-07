@@ -442,10 +442,24 @@ test('sharing viewer language: a plain file shows exactly the P1 page (same DOM 
   try {
     const out = path.join(directory, 'p1.html');
     execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en'], { cwd: root });
-    const dom = await dumpDomLight(chrome, directory, pathToFileURL(out).href);
+    // One evaluate: the page DOM and the card boxes the tree lines were drawn from, read in the same task.
+    const geometry = `(() => { const box = e => ({ left: e.offsetLeft, top: e.offsetTop, width: e.offsetWidth, height: e.offsetHeight }); return { html: document.documentElement.outerHTML, cards: Object.fromEntries([...document.querySelectorAll('.vam-node')].map(e => [e.dataset.nodeId, box(e)])), edges: [...document.querySelectorAll('.vam-edges .vam-edge')].map(e => e.getAttribute('d')) }; })()`;
+    const page = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => (await send('Runtime.evaluate', { expression: geometry, returnByValue: true })).result.value);
+    const dom = page.html;
     const clean = value => value.replace(/transform: translate\([^)]*\) scale\([^)]*\);/, 'transform: T;');
+    // A line ends at offsetTop + offsetHeight / 2, and the card height follows the font (one wrapped line more or less per OS): the golden keeps the x of every line and the pixel y is checked against the cards below.
+    const noLineY = value => value.replace(/(<path d=")([^"]*)(" class="vam-edge)/g, (_, a, d, c) => a + d.replace(/-?\d+(?:\.\d+)?/g, (n, i, all) => (all.slice(0, i).match(/-?\d+(?:\.\d+)?/g) ?? []).length % 2 ? 'Y' : n) + c);
     const app = dom.slice(dom.indexOf('<div id="vam-app"'), dom.indexOf('<script type="application/json" id="vam-ui">')).trimEnd() + '\n';
-    assert.equal(clean(app), clean(read('tests/fixtures/sharing/viewer-p1-app.html')));
+    assert.equal(noLineY(clean(app)), noLineY(clean(read('tests/fixtures/sharing/viewer-p1-app.html'))), 'cards, text and line x match the golden');
+    const nodes = JSON.parse(read('tests/fixtures/sharing/viewer-payload.json')).nodes.filter(node => node.parentId);
+    assert.equal(page.edges.length, nodes.length, 'one tree line per child topic');
+    nodes.forEach((node, index) => {
+      const parent = page.cards[node.parentId];
+      const child = page.cards[node.id];
+      const [x1, y1, , , , , x2, y2] = page.edges[index].match(/-?\d+(?:\.\d+)?/g).map(Number);
+      const expected = [parent.left + parent.width, parent.top + parent.height / 2, child.left, child.top + child.height / 2];
+      [x1, y1, x2, y2].forEach((value, i) => assert.ok(Math.abs(value - expected[i]) <= 0.5, `line ${node.parentId} > ${node.id} coordinate ${i}: ${value} vs ${expected[i]}`));
+    });
     assert.match(dom, /<html lang="en">/);
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
@@ -1937,6 +1951,14 @@ const OVERLAPS = `(() => {
   return { hits, rects, stage: document.querySelector('.vam-stage').style.transform };
 })()`;
 
+// One synchronous evaluate: act, then take the snapshot in the same task, so a fast machine cannot run the cover load in between (the load is a later task).
+const ACT_THEN_SNAPSHOT = (action, ids) => `(() => { ${action}
+  const rect = id => { const b = document.querySelector('[data-node-id="' + id + '"]').getBoundingClientRect(); return { left: b.left, top: b.top, width: b.width, height: b.height }; };
+  const covers = [...document.querySelectorAll('.vam-card-cover')];
+  return { transform: document.querySelector('.vam-stage').style.transform, rects: Object.fromEntries(${JSON.stringify(ids)}.map(id => [id, rect(id)])), covers: covers.length, sized: covers.filter(c => c.classList.contains('is-sized')).length };
+})()`;
+const scaleOf = transform => /scale\(([^)]*)\)/.exec(transform)?.[1];
+
 test('sharing viewer fold R1: the first expand of covered children ends with no overlap once the covers load, and opening does not move cards (headless Chrome)', async t => {
   await withChrome(t, 'vam-share-r1-', async (chrome, directory) => {
     const report = await dumpDomLight(chrome, directory, await pageOf(directory, coverFoldPayload()), 60000, async send => {
@@ -1944,8 +1966,7 @@ test('sharing viewer fold R1: the first expand of covered children ends with no 
       const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
       await wait(1000);
       const open = await evaluate(OVERLAPS);
-      await evaluate(`document.querySelector('[data-node-id="a"] .vam-collapse-button').click()`);
-      const sync = await evaluate(OVERLAPS);
+      const sync = await evaluate(`(() => { document.querySelector('[data-node-id="a"] .vam-collapse-button').click(); return ${OVERLAPS}; })()`);
       await wait(1500);
       const settled = await evaluate(OVERLAPS);
       const sized = await evaluate(`[...document.querySelectorAll('.vam-card-cover')].map(c => c.classList.contains('is-sized'))`);
@@ -1965,12 +1986,19 @@ test('sharing viewer fold R3: after the reader folds or unfolds, a cover load do
       const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
       const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
       await wait(1000);
-      await evaluate(`document.querySelector('[data-node-id="a"] .vam-collapse-button').click()`);
-      const sync = await evaluate(`document.querySelector('.vam-stage').style.transform`);
+      const before = await evaluate(ACT_THEN_SNAPSHOT('', ['a']));
+      const sync = await evaluate(ACT_THEN_SNAPSHOT(`document.querySelector('[data-node-id="a"] .vam-collapse-button').click();`, ['a']));
       await wait(1500);
-      return { sync, settled: await evaluate(`document.querySelector('.vam-stage').style.transform`) };
+      return { before, sync, settled: await evaluate(ACT_THEN_SNAPSHOT('', ['a'])) };
     });
-    assert.equal(report.settled, report.sync, 'the view stays where the click left it');
+    assert.equal(report.sync.covers, 3, 'the click drew the three covers');
+    assert.equal(report.sync.sized, 0, 'the snapshot is taken before any cover is sized, so the later load is what is tested');
+    assert.equal(report.settled.sized, 3, 'the covers are sized afterwards');
+    // The view may be shifted to keep the clicked card in place (R2-F1), but never refitted: a fit changes the scale.
+    assert.equal(scaleOf(report.sync.transform), scaleOf(report.before.transform), 'the fold itself does not change the scale');
+    assert.equal(scaleOf(report.settled.transform), scaleOf(report.sync.transform), 'a cover load does not change the scale (no fit)');
+    const moved = Math.max(Math.abs(report.sync.rects.a.left - report.settled.rects.a.left), Math.abs(report.sync.rects.a.top - report.settled.rects.a.top));
+    assert.ok(moved <= 1, `the clicked card keeps its place on screen: ${JSON.stringify(report)}`);
   });
 });
 
@@ -2012,16 +2040,14 @@ test('sharing viewer fold R2-F1: the clicked card and the selected card keep the
       return script(evaluate, wait);
     });
     const clicked = await run(async (evaluate, wait) => {
-      await evaluate(`document.querySelector('[data-node-id="a"] .vam-collapse-button').click()`);
-      const sync = await evaluate(SCREEN_RECT('a'));
+      const sync = await evaluate(`(() => { document.querySelector('[data-node-id="a"] .vam-collapse-button').click(); return ${SCREEN_RECT('a')}; })()`);
       await wait(1500);
       return { sync, settled: await evaluate(SCREEN_RECT('a')), sized: await evaluate(`[...document.querySelectorAll('.vam-card-cover')].every(c => c.classList.contains('is-sized'))`) };
     });
     assert.ok(clicked.sized, 'the covers are sized');
     assert.ok(drift(clicked.sync, clicked.settled) <= 1, `the clicked card stays put: ${JSON.stringify(clicked)}`);
     const selected = await run(async (evaluate, wait) => {
-      await evaluate(`document.querySelector('[data-node-id="a"]').click(); [...document.querySelectorAll('.vam-subtopics button')].find(b => /A3/.test(b.textContent)).click();`);
-      const sync = await evaluate(SCREEN_RECT('a3'));
+      const sync = await evaluate(`(() => { document.querySelector('[data-node-id="a"]').click(); [...document.querySelectorAll('.vam-subtopics button')].find(b => /A3/.test(b.textContent)).click(); return ${SCREEN_RECT('a3')}; })()`);
       await wait(1500);
       return { sync, settled: await evaluate(SCREEN_RECT('a3')), sel: await evaluate(`document.querySelector('.vam-node.is-selected')?.dataset.nodeId`) };
     });

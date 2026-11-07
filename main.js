@@ -844,6 +844,7 @@ var en = {
   "ui.new_mind_map": "New mind map",
   "ui.new_mind_map_from_sample": "New mind map",
   "ui.undo": "Undo",
+  "ui.undo_all": "Undo all",
   "ui.redo": "Redo",
   "ui.undo_0": "Undo: {0}",
   "ui.redo_0": "Redo: {0}",
@@ -1229,6 +1230,7 @@ var en = {
   "ui.remove_only_this_node_children_become_roots": "Remove only this node; children become roots",
   "ui.remove_entire_branch": "Remove entire branch",
   "ui.removed_0_undo_available": 'Removed "{0}". Undo to bring it back.',
+  "ui.removed_0_cards_1_undo_available": "Removed {0} cards ({1}). Undo to bring them back.",
   "ui.relevance_goal_unavailable_grading": "Grading is still running; try again when it finishes.",
   "ui.no_topics_with_a_missing_map_md": "No topics with a missing Map.md.",
   "ui.repair_missing_map": "Repair missing map",
@@ -3630,6 +3632,7 @@ var zhCN = {
   "ui.new_mind_map": "\u6DFB\u52A0\u5FC3\u667A\u56FE",
   "ui.new_mind_map_from_sample": "\u65B0\u7684\u5FC3\u667A\u56FE",
   "ui.undo": "\u590D\u539F",
+  "ui.undo_all": "\u5168\u90E8\u590D\u539F",
   "ui.redo": "\u91CD\u505A",
   "ui.undo_0": "\u590D\u539F\uFF1A{0}",
   "ui.redo_0": "\u91CD\u505A\uFF1A{0}",
@@ -4015,6 +4018,7 @@ var zhCN = {
   "ui.remove_only_this_node_children_become_roots": "\u53EA\u79FB\u9664\u6B64\u8BAE\u9898\uFF0C\u5B50\u8BAE\u9898\u53D8\u6210\u6839\u8BAE\u9898",
   "ui.remove_entire_branch": "\u79FB\u9664\u6574\u4E2A\u5206\u652F",
   "ui.removed_0_undo_available": "\u5DF2\u79FB\u9664\u201C{0}\u201D\uFF0C\u53EF\u64A4\u9500",
+  "ui.removed_0_cards_1_undo_available": "\u5DF2\u79FB\u9664 {0} \u5F20\u5361\u7247\uFF08{1}\uFF09\uFF0C\u53EF\u64A4\u9500",
   "ui.relevance_goal_unavailable_grading": "\u6B63\u5728\u4F9D\u76EE\u6807\u5206\u7EA7\uFF0C\u5B8C\u6210\u540E\u518D\u8BD5\u3002",
   "ui.no_topics_with_a_missing_map_md": "\u6CA1\u6709\u7F3A\u5C11 Map.md \u7684\u4E3B\u9898\u3002",
   "ui.repair_missing_map": "\u4FEE\u590D\u9057\u5931\u7684\u5FC3\u667A\u56FE",
@@ -6416,6 +6420,7 @@ var zhTW = {
   "ui.new_mind_map": "\u65B0\u589E\u5FC3\u667A\u5716",
   "ui.new_mind_map_from_sample": "\u65B0\u7684\u5FC3\u667A\u5716",
   "ui.undo": "\u5FA9\u539F",
+  "ui.undo_all": "\u5168\u90E8\u5FA9\u539F",
   "ui.redo": "\u91CD\u505A",
   "ui.undo_0": "\u5FA9\u539F\uFF1A{0}",
   "ui.redo_0": "\u91CD\u505A\uFF1A{0}",
@@ -6801,6 +6806,7 @@ var zhTW = {
   "ui.remove_only_this_node_children_become_roots": "\u53EA\u79FB\u9664\u6B64\u8B70\u984C\uFF0C\u5B50\u8B70\u984C\u8B8A\u6210\u6839\u8B70\u984C",
   "ui.remove_entire_branch": "\u79FB\u9664\u6574\u500B\u5206\u652F",
   "ui.removed_0_undo_available": "\u5DF2\u79FB\u9664\u300C{0}\u300D\uFF0C\u53EF\u5FA9\u539F",
+  "ui.removed_0_cards_1_undo_available": "\u5DF2\u79FB\u9664 {0} \u5F35\u5361\u7247\uFF08{1}\uFF09\uFF0C\u53EF\u5FA9\u539F",
   "ui.relevance_goal_unavailable_grading": "\u6B63\u5728\u4F9D\u76EE\u6A19\u5206\u7D1A\uFF0C\u5B8C\u6210\u5F8C\u518D\u8A66\u3002",
   "ui.no_topics_with_a_missing_map_md": "\u6C92\u6709\u7F3A\u5C11 Map.md \u7684\u4E3B\u984C\u3002",
   "ui.repair_missing_map": "\u4FEE\u5FA9\u907A\u5931\u7684\u5FC3\u667A\u5716",
@@ -57800,6 +57806,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "aimAnswerRequestIds", /* @__PURE__ */ new Map());
     /** True only while refreshFromPlugin repaints (synchronously: every restorer it triggers runs inside that call). */
     __publicField(this, "externalRefresh", false);
+    /** The run of key removals the showing Notice reports; a removal inside it replaces that Notice. */
+    __publicField(this, "removalRun", null);
     /** True while a drag that started inside this view (for example a card's own cover image) is under way. */
     __publicField(this, "internalDrag", false);
     // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
@@ -63750,6 +63758,40 @@ ${request.requirements}` : preset.text,
       );
     else new import_obsidian37.Notice(message, MERGE_DONE_NOTICE_MS);
   }
+  /**
+   * The Undo notice of a removal by key. While the last one still shows and nothing else entered the history since,
+   * the new removal joins it: one Notice with the count and "Undo all", which undoes the whole run (approved mockup,
+   * 2026-11-08, option A). Mod+Z still undoes one card at a time.
+   */
+  removalNotice(title, previous) {
+    const entry = this.history.undoEntry;
+    if (!entry || entry === previous) return;
+    const prior = this.removalRun;
+    const joins = !!prior && prior.until > Date.now() && prior.entries.at(-1) === previous;
+    prior == null ? void 0 : prior.notice.hide();
+    const entries = joins ? [...prior.entries, entry] : [entry], titles = joins ? [...prior.titles, title] : [title];
+    const names3 = titles.slice(0, 3).join(t("ui.list_separator")) + (titles.length > 3 ? "\u2026" : "");
+    const message = entries.length === 1 ? t("ui.removed_0_undo_available", title) : t("ui.removed_0_cards_1_undo_available", String(entries.length), names3);
+    const notice = backgroundResultNotice(
+      message,
+      {
+        label: entries.length === 1 ? t("ui.undo") : t("ui.undo_all"),
+        open: () => {
+          var _a2;
+          if (((_a2 = this.removalRun) == null ? void 0 : _a2.notice) === notice) this.removalRun = null;
+          if (this.closed || this.history.undoEntry !== entries.at(-1)) return;
+          this.enqueue(async () => {
+            for (const step of [...entries].reverse()) {
+              if (this.history.undoEntry !== step) return;
+              await this.travel(false);
+            }
+          });
+        }
+      },
+      MERGE_DONE_NOTICE_MS
+    );
+    this.removalRun = { notice, entries, titles, until: Date.now() + MERGE_DONE_NOTICE_MS };
+  }
   /** Stop, or clear a finished one: the run is aborted and forgotten, so a late result changes nothing. */
   stopMergeTask(task) {
     if (this.mergeTasks.get(task.mapPath) === task) this.mergeTasks.delete(task.mapPath);
@@ -64093,7 +64135,7 @@ ${request.requirements}` : preset.text,
       } finally {
         this.focusNodeId = null;
       }
-      if (this.history.undoEntry !== previous) this.undoNotice(t("ui.removed_0_undo_available", title), previous);
+      this.removalNotice(title, previous);
     });
   }
   /** The delete confirmation. `hooks` lets a caller run the chosen removal itself and hear about a cancel. */

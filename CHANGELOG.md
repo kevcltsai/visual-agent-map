@@ -13,6 +13,7 @@ General topics can now choose "AI suggested" as their note style, in Settings un
 ### Fixed
 
 - Holding Delete or Backspace on a map card, or pressing it again before the card disappears, removes the card once. Before, each extra press added another "Removed … Undo" notice and an empty undo step.
+- Deleting several map cards in a row with Delete or Backspace now shows one notice with the number of cards and an "Undo all" button that brings them all back, instead of a stack of notices where only the newest Undo worked. Mod+Z still undoes one card at a time.
 
 ## [0.31.0] - 2026-11-07
 

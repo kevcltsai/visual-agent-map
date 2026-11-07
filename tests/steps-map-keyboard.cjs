@@ -119,6 +119,43 @@ test('A4: a held or doubled Delete removes the card once: one history entry, one
   assert.equal(h.Notice.all.length, notices + 1, 'exactly one Undo notice');
 });
 
+test('A4: removals in a row share one notice with the count and "Undo all", which brings every card back', async () => {
+  const h = await harness();
+  const before = h.view.history.past.length;
+  send(h, 'leaf', 'Delete');
+  await until(() => !h.map().nodes.some(n => n.id === h.ids.leaf)); await tick(); await tick();
+  const first = h.Notice.all.at(-1);
+  send(h, 'kid', 'Delete');
+  await until(() => !h.map().nodes.some(n => n.id === h.ids.kid)); await tick(); await tick();
+  const merged = h.Notice.all.at(-1);
+  assert.equal(first.hidden, true, 'the first notice gives way');
+  assert.equal(merged.hidden, false);
+  assert.equal(String(merged.message), 'Removed 2 cards (Leaf, Kid). Undo to bring them back.');
+  assert.deepEqual(merged.actions.map(b => b.text), ['Undo all']);
+  assert.equal(h.view.history.past.length, before + 2, 'Mod+Z still has one step per card');
+  merged.actions[0].click();
+  await until(() => h.map().nodes.some(n => n.id === h.ids.leaf) && h.map().nodes.some(n => n.id === h.ids.kid));
+  await tick(); await tick();
+  assert.equal(h.view.history.past.length, before, 'both steps undone');
+  const { translate } = load('i18n.ts');
+  assert.equal(translate('zh-TW', 'ui.removed_0_cards_1_undo_available', '2', 'Leaf、Kid'), '已移除 2 張卡片（Leaf、Kid），可復原');
+  assert.equal(translate('zh-TW', 'ui.undo_all'), '全部復原');
+});
+
+test('A4: a removal after another change starts a new notice instead of joining the last one', async () => {
+  const h = await harness();
+  send(h, 'leaf', 'Delete');
+  await until(() => !h.map().nodes.some(n => n.id === h.ids.leaf)); await tick(); await tick();
+  const first = h.Notice.all.at(-1);
+  await h.plugin.mutate(() => h.view.mapChange(map => { map.title = 'Renamed'; }));
+  send(h, 'kid', 'Delete');
+  await until(() => !h.map().nodes.some(n => n.id === h.ids.kid)); await tick(); await tick();
+  const second = h.Notice.all.at(-1);
+  assert.equal(String(second.message), 'Removed "Kid". Undo to bring it back.');
+  assert.deepEqual(second.actions.map(b => b.text), ['Undo']);
+  assert.equal(first.hidden, true, 'only one removal notice shows at a time');
+});
+
 test('A4: Backspace removes the same way; the notice is translated', async () => {
   const h = await harness();
   const event = send(h, 'leaf', 'Backspace');

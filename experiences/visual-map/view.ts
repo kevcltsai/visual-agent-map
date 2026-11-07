@@ -8109,6 +8109,46 @@ export class VisualAgentMapView extends ItemView {
       );
     else new Notice(message, MERGE_DONE_NOTICE_MS);
   }
+  /** The run of key removals the showing Notice reports; a removal inside it replaces that Notice. */
+  private removalRun: { notice: Notice; entries: Action[]; titles: string[]; until: number } | null = null;
+  /**
+   * The Undo notice of a removal by key. While the last one still shows and nothing else entered the history since,
+   * the new removal joins it: one Notice with the count and "Undo all", which undoes the whole run (approved mockup,
+   * 2026-11-08, option A). Mod+Z still undoes one card at a time.
+   */
+  private removalNotice(title: string, previous: Action | undefined): void {
+    const entry = this.history.undoEntry;
+    if (!entry || entry === previous) return;
+    const prior = this.removalRun;
+    const joins = !!prior && prior.until > Date.now() && prior.entries.at(-1) === previous;
+    prior?.notice.hide();
+    const entries = joins ? [...prior.entries, entry] : [entry],
+      titles = joins ? [...prior.titles, title] : [title];
+    const names = titles.slice(0, 3).join(t("ui.list_separator")) + (titles.length > 3 ? "…" : "");
+    const message =
+      entries.length === 1
+        ? t("ui.removed_0_undo_available", title)
+        : t("ui.removed_0_cards_1_undo_available", String(entries.length), names);
+    const notice = backgroundResultNotice(
+      message,
+      {
+        label: entries.length === 1 ? t("ui.undo") : t("ui.undo_all"),
+        open: () => {
+          if (this.removalRun?.notice === notice) this.removalRun = null;
+          if (this.closed || this.history.undoEntry !== entries.at(-1)) return;
+          // Newest first; stops at the first step that is no longer on top (an outside change or a failed undo).
+          this.enqueue(async () => {
+            for (const step of [...entries].reverse()) {
+              if (this.history.undoEntry !== step) return;
+              await this.travel(false);
+            }
+          });
+        }
+      },
+      MERGE_DONE_NOTICE_MS
+    );
+    this.removalRun = { notice, entries, titles, until: Date.now() + MERGE_DONE_NOTICE_MS };
+  }
   /** Stop, or clear a finished one: the run is aborted and forgotten, so a late result changes nothing. */
   private stopMergeTask(task: MergeTask): void {
     if (this.mergeTasks.get(task.mapPath) === task) this.mergeTasks.delete(task.mapPath);
@@ -8511,7 +8551,7 @@ export class VisualAgentMapView extends ItemView {
       } finally {
         this.focusNodeId = null;
       }
-      if (this.history.undoEntry !== previous) this.undoNotice(t("ui.removed_0_undo_available", title), previous);
+      this.removalNotice(title, previous);
     });
   }
   /** The delete confirmation. `hooks` lets a caller run the chosen removal itself and hear about a cancel. */

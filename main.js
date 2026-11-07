@@ -31409,7 +31409,6 @@ function sourceRefPattern(strict) {
     "gium"
   );
 }
-var SOURCE_REF_LOOSE = sourceRefPattern(false);
 var SOURCE_REF_STRICT = sourceRefPattern(true);
 var SOURCE_LEAD_HAN = /[見见據据依參参如另自從从於于與与及和或至]$/;
 var SOURCE_LEAD_EN = /^(?:see|cf|per|from|in|and|to|by|also)$/i;
@@ -31443,15 +31442,6 @@ function sourceCount(text12, extraNames) {
   });
   return count2;
 }
-function withoutSourceRefs(text12) {
-  return text12.replace(SOURCE_REF_LOOSE, "");
-}
-function looseNewDraft(text12, oldDetail) {
-  const same = new Set(
-    oldDetail.replace(/\r\n/g, "\n").split("\n").map((line) => line.trim()).filter(Boolean)
-  );
-  return text12.split("\n").map((line) => /^[ \t]*>/.test(line) || same.has(line.trim()) ? line : withoutSourceRefs(line)).join("\n");
-}
 function withoutOldSourceRefs(text12, max) {
   if (!max) return text12;
   return text12.replace(
@@ -31469,9 +31459,10 @@ function keepDroppedContent(input2) {
   const sourceNames = template2.sections.filter((section3) => section3.role === "sources").flatMap((section3) => [section3.name, ...section3.aliases]);
   const sourceMax = sourceCount(oldDetail, sourceNames);
   const logHeadings = template2.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]);
+  const newMax = Math.max(sourceCount(input2.newDetail, sourceNames), sourceMax);
   const check = (detail2, added2 = "") => checkMergePreservation({
     sourceTexts: [withoutOldSourceRefs(oldDetail, sourceMax)],
-    mergedTexts: [looseNewDraft(detail2, oldDetail), withoutSourceRefs(input2.summary), added2],
+    mergedTexts: [withoutOldSourceRefs(detail2, newMax), withoutOldSourceRefs(input2.summary, newMax), added2],
     mergedLinkTexts: [input2.references],
     logHeadings
   });

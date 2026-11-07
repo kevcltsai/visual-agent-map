@@ -360,6 +360,24 @@ test('Medium 1: the new draft is read without its source pointers too, so a poin
   assert.equal(summaryOnly.restored, 1);
 });
 
+test('R4: old and new draft are read the same strict way; a pointer in the new draft cannot hide a changed real number', () => {
+  const H = `### ${noSources.sections[0].name}\n`;
+  const run = (o, n) => keepDroppedContent({ ...base, template: noSources, oldDetail: H + o + SRC + '\n', newDetail: H + n + SRC + '\n' });
+  const a = run('（見來源 3）\n營收成長 3 倍。', '（見來源 3）\n營收成長很多。');
+  assert.equal(a.restored, 1);
+  assert.ok(a.detail.includes('> 營收成長 3 倍。'));
+  assert.equal(run('- 見來源 2。\n- 用戶 2 萬。', '- 見來源 2。\n- 用戶很多。').restored, 1);
+  assert.equal(run('營收成長 3 倍。', '> 見來源 3。\n營收成長很多。').restored, 1);
+  // a run on its own output restores nothing again, three times, one callout
+  let cur = run('資料來源 30。\n（見來源 2）\n成長 5 倍（見來源 3）', 'nothing').detail;
+  for (let i = 0; i < 3; i++) {
+    const again = keepDroppedContent({ ...base, template: noSources, oldDetail: cur, newDetail: cur });
+    assert.equal(again.restored, 0);
+    cur = again.detail;
+  }
+  assert.equal((cur.match(/\[!note\]/g) || []).length, 1);
+});
+
 test('B2: a restored line points at the new footnote that has the same source URL; one with no match loses the marker and carries the URL', () => {
   const sourcesName = withSources.sections.find(section => section.role === 'sources').name;
   const first = withSources.sections[0].name;

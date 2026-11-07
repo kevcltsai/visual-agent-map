@@ -169,7 +169,6 @@ function sourceRefPattern(strict: boolean): RegExp {
     "gium"
   );
 }
-const SOURCE_REF_LOOSE = sourceRefPattern(false);
 const SOURCE_REF_STRICT = sourceRefPattern(true);
 // What may stand just before the keyword: a lead-in word (see, per, 見 ...) or nothing. A modifier ("資料來源", "open
 // source", "Data sources") makes the number a count of something.
@@ -212,31 +211,8 @@ function sourceCount(text: string, extraNames: string[]): number {
   return count;
 }
 
-/** "來源 1", "see source 2", "sources 1, 2": a pointer to a numbered source, not a quantity. Only when the end of the line, punctuation, a bracket or a short verb follows; a unit, a noun or a year stays a number. The new draft is read loosely (skipping more only reports more). */
-function withoutSourceRefs(text: string): string {
-  return text.replace(SOURCE_REF_LOOSE, "");
-}
-
 /**
- * The new draft line by line: a line the older draft has word for word, and a quote line (`> `, what this feature wrote
- * on an earlier run), stay as written; the rest is read loosely. So a run on its own output restores nothing again.
- */
-function looseNewDraft(text: string, oldDetail: string): string {
-  const same = new Set(
-    oldDetail
-      .replace(/\r\n/g, "\n")
-      .split("\n")
-      .map(line => line.trim())
-      .filter(Boolean)
-  );
-  return text
-    .split("\n")
-    .map(line => (/^[ \t]*>/.test(line) || same.has(line.trim()) ? line : withoutSourceRefs(line)))
-    .join("\n");
-}
-
-/**
- * The older draft is read strictly: a number is a pointer only when it is not more than the items of its sources section
+ * Both drafts and the summary are read the same strict way: a number is a pointer only when it is not more than the items of its sources section
  * (none: never), no modifier stands before the keyword, and the character after it fits the whitelist.
  */
 function withoutOldSourceRefs(text: string, max: number): string {
@@ -278,12 +254,12 @@ export function keepDroppedContent(input: {
   const logHeadings = template.sections
     .filter(section => section.role === "log")
     .flatMap(section => [section.name, ...section.aliases]);
-  // `added` is what this function put back: it is read as it stands, since the loose reading of the new draft would skip a
-  // "資料來源 30" it just quoted and count it as still missing.
+  const newMax = Math.max(sourceCount(input.newDetail, sourceNames), sourceMax);
+  // `added` is what this function put back: it is read as it stands.
   const check = (detail: string, added = "") =>
     checkMergePreservation({
       sourceTexts: [withoutOldSourceRefs(oldDetail, sourceMax)],
-      mergedTexts: [looseNewDraft(detail, oldDetail), withoutSourceRefs(input.summary), added],
+      mergedTexts: [withoutOldSourceRefs(detail, newMax), withoutOldSourceRefs(input.summary, newMax), added],
       mergedLinkTexts: [input.references],
       logHeadings
     });

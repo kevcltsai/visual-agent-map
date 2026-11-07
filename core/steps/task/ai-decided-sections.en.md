@@ -9,7 +9,7 @@ Existing structures:
 - Status / Goal and done-when / Next step / Steps / Blockers and risks / Expected output / References / Update log
 - When to use / How to do it / Common mistakes / Decision rules / Sources / Update log
 Rules for your own sections:
-- 4-8 sections in total; each name at most 12 words, no #, no repeats, describing the content directly, and still usable when the same topic is updated next time.
+- 4-8 sections in total; each name within 40 characters, no #, no repeats, describing the content directly, and still usable when the same topic is updated next time.
 - The second-to-last section is always named "Sources" and the last one always "Update log".
 Content rules:
 - Do not add inferences the sources do not support; do not write use cases, reasons or causes the sources do not state. Leave out a section that has no material; do not pad it.

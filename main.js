@@ -22879,7 +22879,7 @@ var adaptive_detail_structure_en_default = "Write detail in Markdown with a stru
 var ai_decided_sections_zh_default = "\u9019\u7BC7\u7B46\u8A18\u7684\u6BB5\u843D\u7531\u4F60\u6C7A\u5B9A\uFF0C\u6C92\u6709\u56FA\u5B9A\u6E05\u55AE\u3002detail \u53EA\u7528\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6BB5\u5167\u5C0F\u6A19\u7528\u56DB\u7D1A\u6A19\u984C\uFF08####\uFF09\u3002\n\u5148\u5224\u65B7\u73FE\u6709\u7D50\u69CB\u5920\u4E0D\u5920\u7528\uFF1A\u73FE\u6709\u7D50\u69CB\u5920\u7528\u6642\u512A\u5148\u6CBF\u7528\uFF0C\u4E0D\u8981\u70BA\u4E86\u65B0\u7A4E\u53E6\u63D0\uFF1B\u53EA\u6709\u9019\u500B\u4E3B\u984C\u7684\u8B80\u8005\u771F\u7684\u9700\u8981\u4E0D\u540C\u6BB5\u843D\u6642\u624D\u81EA\u8A02\u3002\n\u73FE\u6709\u7D50\u69CB\uFF1A\n- \u6838\u5FC3\u7D50\u8AD6\uFF0F\u80CC\u666F\u8207\u6A5F\u5236\uFF0F\u4E0D\u540C\u770B\u6CD5\u8207\u9650\u5236\uFF0F\u5F85\u78BA\u8A8D\u554F\u984C\uFF0F\u4F86\u6E90\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u4E00\u53E5\u8A71\uFF0F\u70BA\u4EC0\u9EBC\uFF0F\u4F8B\u5B50\uFF0F\u548C\u8AB0\u4E0D\u540C\uFF0F\u51FA\u8655\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u4E3B\u5F35\uFF0F\u76EE\u524D\u5224\u65B7\uFF0F\u5982\u679C\u6210\u7ACB\u6703\u770B\u5230\uFF0F\u4EC0\u9EBC\u6703\u63A8\u7FFB\u5B83\uFF0F\u9A57\u8B49\u65B9\u5F0F\uFF0F\u8B49\u64DA\u5C0D\u7167\uFF0F\u4F86\u6E90\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u6458\u8981\uFF0F\u539F\u6587\u6216\u6578\u64DA\uFF0F\u600E\u9EBC\u5F97\u5230\u7684\uFF0F\u53EF\u4FE1\u5EA6\uFF0F\u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC\uFF0F\u51FA\u8655\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u7D50\u8AD6\uFF0F\u4FE1\u5FC3\uFF0F\u4F9D\u64DA\uFF0F\u4EC0\u9EBC\u6703\u6539\u8B8A\u9019\u500B\u7D50\u8AD6\uFF0F\u9069\u7528\u7BC4\u570D\uFF0F\u5F71\u97FF\u8207\u4E0B\u4E00\u6B65\uFF0F\u4F86\u6E90\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u72C0\u614B\uFF0F\u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6\uFF0F\u4E0B\u4E00\u6B65\uFF0F\u6B65\u9A5F\uFF0F\u963B\u7919\u8207\u98A8\u96AA\uFF0F\u9810\u671F\u7522\u51FA\uFF0F\u53C3\u8003\u8CC7\u6599\uFF0F\u66F4\u65B0\u7D00\u9304\n- \u9069\u7528\u60C5\u5883\uFF0F\u505A\u6CD5\uFF0F\u5E38\u898B\u932F\u8AA4\uFF0F\u5224\u65B7\u6E96\u5247\uFF0F\u4F86\u6E90\uFF0F\u66F4\u65B0\u7D00\u9304\n\u81EA\u8A02\u6BB5\u843D\u7684\u898F\u5247\uFF1A\n- \u7E3D\u5171 4\u20138 \u6BB5\uFF1B\u6BB5\u540D 12 \u5B57\u5167\uFF0C\u4E0D\u542B #\uFF0C\u4E0D\u91CD\u8907\uFF0C\u76F4\u63A5\u63CF\u8FF0\u5167\u5BB9\uFF0C\u4E0B\u6B21\u66F4\u65B0\u540C\u4E3B\u984C\u9084\u7528\u5F97\u4E0A\u3002\n- \u5012\u6578\u7B2C\u4E8C\u6BB5\u56FA\u5B9A\u53EB\u300C\u4F86\u6E90\u300D\uFF0C\u6700\u5F8C\u4E00\u6BB5\u56FA\u5B9A\u53EB\u300C\u66F4\u65B0\u7D00\u9304\u300D\u3002\n\u5167\u5BB9\u898F\u5247\uFF1A\n- \u4E0D\u88DC\u4F86\u6E90\u6C92\u6709\u7684\u63A8\u8AD6\uFF1B\u4F86\u6E90\u6C92\u5BEB\u7684\u9069\u7528\u60C5\u5883\u3001\u7406\u7531\u6216\u56E0\u679C\u4E0D\u8981\u5BEB\u3002\u6C92\u6709\u6750\u6599\u7684\u6BB5\u4E0D\u8981\u5217\uFF0C\u4E0D\u8981\u786C\u6E4A\u3002\n- \u540C\u4E00\u5167\u5BB9\u53EA\u653E\u4E00\u6BB5\uFF0C\u4E0D\u5728\u5169\u6BB5\u91CD\u8907\u540C\u4E00\u7D44\u6578\u5B57\u6216\u7D50\u8AD6\u3002\n- \u6578\u5B57\u3001\u65E5\u671F\u3001\u9023\u7D50\u7167\u4F86\u6E90\u4FDD\u7559\u3002\n";
 
 // core/steps/task/ai-decided-sections.en.md
-var ai_decided_sections_en_default = 'You decide the sections of this note; there is no fixed list. The detail uses only third-level headings (###) for sections, and fourth-level headings (####) for sub-headings inside a section.\nFirst judge whether an existing structure is enough: when one is, prefer it and do not propose another just for novelty; define your own sections only when readers of this topic really need different ones.\nExisting structures:\n- Core conclusions / Background and mechanism / Disagreements and limits / Open questions to check / Sources / Update log\n- In one sentence / Why / Example / How it differs / Source / Update log\n- Claim / Current judgment / If true we would see / What would refute it / How to test / Evidence table / Sources / Update log\n- Summary / Source text or data / How it was obtained / Credibility / Related topics / Source / Update log\n- Conclusion / Confidence / Basis / What would change it / Scope / Impact and next steps / Sources / Update log\n- Status / Goal and done-when / Next step / Steps / Blockers and risks / Expected output / References / Update log\n- When to use / How to do it / Common mistakes / Decision rules / Sources / Update log\nRules for your own sections:\n- 4-8 sections in total; each name at most 12 words, no #, no repeats, describing the content directly, and still usable when the same topic is updated next time.\n- The second-to-last section is always named "Sources" and the last one always "Update log".\nContent rules:\n- Do not add inferences the sources do not support; do not write use cases, reasons or causes the sources do not state. Leave out a section that has no material; do not pad it.\n- Put each piece of content in one section only; do not repeat the same numbers or conclusion in two sections.\n- Keep numbers, dates and links as the sources give them.\n';
+var ai_decided_sections_en_default = 'You decide the sections of this note; there is no fixed list. The detail uses only third-level headings (###) for sections, and fourth-level headings (####) for sub-headings inside a section.\nFirst judge whether an existing structure is enough: when one is, prefer it and do not propose another just for novelty; define your own sections only when readers of this topic really need different ones.\nExisting structures:\n- Core conclusions / Background and mechanism / Disagreements and limits / Open questions to check / Sources / Update log\n- In one sentence / Why / Example / How it differs / Source / Update log\n- Claim / Current judgment / If true we would see / What would refute it / How to test / Evidence table / Sources / Update log\n- Summary / Source text or data / How it was obtained / Credibility / Related topics / Source / Update log\n- Conclusion / Confidence / Basis / What would change it / Scope / Impact and next steps / Sources / Update log\n- Status / Goal and done-when / Next step / Steps / Blockers and risks / Expected output / References / Update log\n- When to use / How to do it / Common mistakes / Decision rules / Sources / Update log\nRules for your own sections:\n- 4-8 sections in total; each name within 40 characters, no #, no repeats, describing the content directly, and still usable when the same topic is updated next time.\n- The second-to-last section is always named "Sources" and the last one always "Update log".\nContent rules:\n- Do not add inferences the sources do not support; do not write use cases, reasons or causes the sources do not state. Leave out a section that has no material; do not pad it.\n- Put each piece of content in one section only; do not repeat the same numbers or conclusion in two sections.\n- Keep numbers, dates and links as the sources give them.\n';
 
 // core/steps/task/ai-followed-sections.zh.md
 var ai_followed_sections_zh_default = "\u53EA\u7528\u4E0A\u9762\u5217\u51FA\u7684\u6BB5\u843D\uFF0C\u4E0D\u65B0\u589E\u6BB5\u843D\uFF1B\u653E\u4E0D\u9032\u7684\u5167\u5BB9\u4F75\u5165\u6700\u63A5\u8FD1\u7684\u6BB5\uFF0C\u6BB5\u5167\u5C0F\u6A19\u7528\u56DB\u7D1A\u6A19\u984C\uFF08####\uFF09\u3002\n\u4E0D\u88DC\u4F86\u6E90\u6C92\u6709\u7684\u63A8\u8AD6\u3002\u540C\u4E00\u5167\u5BB9\u53EA\u653E\u4E00\u6BB5\u3002\n";
@@ -31390,30 +31390,50 @@ function findingList(items, none, limit = 30) {
 var HEADING_ANY = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
 var KEPT_LOCALES = ["zh-TW", "zh-CN", "en"];
 var key2 = (value) => value.trim().toLocaleLowerCase();
-var SOURCE_REF_UNIT = [
-  ["\u5E74", "\u6708", "\u65E5", "%", "\uFF05", "\u2030", "\xB0", "\u5EA6", "\u5143"],
-  ["\u516C", "\u842C", "\u4E07", "\u5104", "\u4EBF", "\u5343", "\u767E", "\u500D"],
-  ["\u6B21", "\u4EBA", "\u500B", "\u4E2A", "\u53F0", "\u9805", "\u9879"]
-].map((group) => group.join("|")).join("|");
-var SOURCE_REF_ASCII_UNIT = "(?:km|m|kg|cm|mm|g|ms|s|hz|mb|gb|kb|mph|k|x|yrs?|years?|days?|months?|percent|usd|eur)\\b";
+var SOURCE_REF_VERB = [
+  "\u6307\u51FA",
+  "\u63D0\u5230",
+  "\u986F\u793A",
+  "\u663E\u793A",
+  "\u8868\u793A",
+  "\u8868\u660E",
+  "\u8A8D\u70BA",
+  "\u8BA4\u4E3A",
+  "\u8AAA\u660E",
+  "\u8BF4\u660E",
+  "\u6307\u7A31",
+  "\u79F0",
+  "\u7A31",
+  "says?\\b",
+  "said\\b",
+  "states?\\b",
+  "shows?\\b",
+  "reports?\\b",
+  "notes?\\b",
+  "indicates?\\b",
+  "mentions?\\b",
+  "claims?\\b",
+  "suggests?\\b"
+].join("|");
 var SOURCE_REF_KEYWORD = [
   ["\u4F86\u6E90", "\u6765\u6E90"],
   ["\u51FA\u8655", "\u51FA\u5904"]
 ].map((group) => group.join("|")).join("|");
 var SOURCE_REF_JOINER = ["\u53CA", "\u548C"].join("|");
 var SOURCE_REF = new RegExp(
-  `(?:${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*\\d{1,3}(?:[ \\t]*(?:[,\uFF0C\u3001]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,3})*(?!\\d|\\.\\d|\\s*(?:${SOURCE_REF_UNIT}|${SOURCE_REF_ASCII_UNIT}))`,
-  "giu"
+  `(?:${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*\\d{1,2}(?:[ \\t]*(?:[,\uFF0C\u3001]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,2})*(?!\\d|\\.\\d)(?=[ \\t]*(?:$|[\u3002\uFF0C\u3001\uFF1B\uFF1A\uFF01\uFF1F.,;:!?)\uFF09\\]\u3011\u300D\u300F\u201D\u2019\u2026]|${SOURCE_REF_VERB}))(?![ \\t]*[,\uFF0C\u3001][ \\t]*\\d)`,
+  "gium"
 );
 function withoutSourceRefs(text12) {
   return text12.replace(SOURCE_REF, "");
 }
 function keepDroppedContent(input2) {
-  const { oldDetail, template: template2, language: language2 } = input2;
+  const { template: template2, language: language2 } = input2;
+  const oldDetail = withoutMermaid(input2.oldDetail);
   const logHeadings = template2.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]);
   const check = (detail2) => checkMergePreservation({
     sourceTexts: [withoutSourceRefs(oldDetail)],
-    mergedTexts: [detail2, input2.summary],
+    mergedTexts: [withoutSourceRefs(detail2), withoutSourceRefs(input2.summary)],
     mergedLinkTexts: [input2.references],
     logHeadings
   });
@@ -31429,40 +31449,116 @@ function keepDroppedContent(input2) {
 function keptTitles() {
   return new Set(KEPT_LOCALES.map((locale) => key2(translateNote(locale, "note.kept_from_earlier_version"))));
 }
+function mermaidLines(lines) {
+  const out = lines.map(() => false);
+  let fence = null;
+  let mermaid = false;
+  lines.forEach((line, index) => {
+    if (fence) {
+      out[index] = mermaid;
+      const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
+      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      return;
+    }
+    const open = /^\s*(`{3,}|~{3,})\s*(\S*)/.exec(line);
+    if (open) {
+      fence = open[1];
+      mermaid = open[2].toLocaleLowerCase() === "mermaid";
+      out[index] = mermaid;
+    }
+  });
+  return out;
+}
+function withoutMermaid(text12) {
+  const lines = text12.split("\n");
+  const chart = mermaidLines(lines);
+  return chart.some(Boolean) ? lines.filter((_, index) => !chart[index]).join("\n") : text12;
+}
+function inlineCode(text12) {
+  var _a2;
+  const longest = Math.max(0, ...((_a2 = text12.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
+  const fence = "`".repeat(longest + 1);
+  return longest ? `${fence} ${text12} ${fence}` : `${fence}${text12}${fence}`;
+}
+var FOOTNOTE_DEFINITION = /^[ \t]*(?:>[ \t]*)*\[\^([^\]\s]+)\]:[ \t]*(.*)$/;
+var FOOTNOTE_REF = /\[\^([^\]\s]+)\](?!\(|:)/g;
+function footnoteDefinitions(text12) {
+  const lines = text12.replace(/\r\n/g, "\n").split("\n");
+  const code = fencedLines(lines);
+  const out = /* @__PURE__ */ new Map();
+  lines.forEach((line, index) => {
+    const match = code[index] ? null : FOOTNOTE_DEFINITION.exec(line);
+    if (match && !out.has(match[1])) out.set(match[1], match[2].trim());
+  });
+  return out;
+}
+function remapFootnotes(line, oldDefinitions, detail) {
+  if (!/\[\^/.test(line)) return line;
+  const fresh = footnoteDefinitions(detail);
+  const byKey = /* @__PURE__ */ new Map();
+  const byText = /* @__PURE__ */ new Map();
+  for (const [id, body] of fresh) {
+    for (const link of linksOf([body]).keys()) if (!byKey.has(link)) byKey.set(link, id);
+    if (!byText.has(key2(body))) byText.set(key2(body), id);
+  }
+  const appended = [];
+  const text12 = line.replace(FOOTNOTE_REF, (_match, id) => {
+    var _a2;
+    const body = oldDefinitions.get(id);
+    if (!body) return "";
+    const links = linksOf([body]);
+    const found = (_a2 = [...links.keys()].map((link) => byKey.get(link)).find(Boolean)) != null ? _a2 : links.size ? void 0 : byText.get(key2(body));
+    if (found) return `[^${found}]`;
+    const extra = links.size ? [...links.values()].map((url) => `<${url}>`) : [body];
+    for (const item of extra) if (item && !appended.includes(item)) appended.push(item);
+    return "";
+  });
+  return appended.length ? `${text12.trimEnd()} ${appended.join(" ")}` : text12;
+}
 function quoteMissingLines(oldDetail, detail, missing, template2, language2, logHeadings) {
   const lookup = sectionLookup(template2);
   const logNames = new Set(logHeadings.map(key2).filter(Boolean));
   const titles = keptTitles();
   const oldLines = oldDetail.replace(/\r\n/g, "\n").split("\n");
   const oldCode = fencedLines(oldLines);
+  const oldDefinitions = footnoteDefinitions(oldDetail);
   const groups = /* @__PURE__ */ new Map();
   const covered = /* @__PURE__ */ new Set();
   let section3 = -1;
   let logLevel = 0;
   oldLines.forEach((line, index) => {
     var _a2, _b2;
-    if (oldCode[index]) return;
-    const heading = HEADING_ANY.exec(line);
-    if (heading) {
-      const level = heading[1].length;
-      if (logLevel && level <= logLevel) logLevel = 0;
-      const name2 = key2(heading[2]);
-      if (!logLevel && (logNames.has(name2) || UPDATE_LOG_HEADING.test(line))) logLevel = level;
-      if (level === 3) section3 = (_a2 = lookup.get(name2)) != null ? _a2 : -1;
-      return;
+    let text12;
+    if (oldCode[index]) {
+      if (logLevel) return;
+      text12 = line.trim() ? inlineCode(line.trim()) : "";
+    } else {
+      const heading = HEADING_ANY.exec(line);
+      if (heading) {
+        const level = heading[1].length;
+        if (logLevel && level <= logLevel) logLevel = 0;
+        const name2 = key2(heading[2]);
+        if (!logLevel && (logNames.has(name2) || UPDATE_LOG_HEADING.test(line))) logLevel = level;
+        if (level === 3) section3 = (_a2 = lookup.get(name2)) != null ? _a2 : -1;
+        if (logLevel) return;
+        text12 = heading[2].trim();
+      } else {
+        if (logLevel) return;
+        text12 = line.replace(/^[ \t]*(?:>[ \t]*)+/, "").trim();
+        const callout = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text12);
+        if (callout && titles.has(key2(callout[1]))) return;
+        const definition = FOOTNOTE_DEFINITION.exec(text12);
+        if (definition) text12 = definition[2].trim();
+      }
     }
-    if (logLevel) return;
-    const text12 = line.replace(/^[ \t]*(?:>[ \t]*)+/, "").trim();
     if (!text12) return;
-    const callout = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text12);
-    if (callout && titles.has(key2(callout[1]))) return;
     const own2 = checkMergePreservation({ sourceTexts: [withoutSourceRefs(text12)], mergedTexts: [] }).missing.filter(
       (item) => missing.has(item)
     );
     if (!own2.some((item) => !covered.has(item))) return;
     for (const item of own2) covered.add(item);
     const list = (_b2 = groups.get(section3)) != null ? _b2 : [];
-    list.push(text12);
+    list.push(remapFootnotes(text12, oldDefinitions, detail));
     groups.set(section3, list);
   });
   let out = detail;
@@ -32780,6 +32876,7 @@ function uniqueBlockName(base, taken) {
 
 // ai/detail-sections.ts
 var NOTE_SECTIONS_TEMPLATE_ID = "note-sections";
+var MAX_SECTIONS = 12;
 var HEADING2 = /^###\s+(.+?)\s*$/;
 var key3 = (value) => value.trim().toLocaleLowerCase();
 function headingLines(detail) {
@@ -32883,6 +32980,8 @@ function decidedTemplateFromDetail(detail, language2) {
   const template2 = withSourcesSection(made.template, language2);
   const issues = validateTemplate(template2, []);
   if (issues.some((issue2) => issue2.key === "ui.detail_template_error_section_count"))
+    return { ok: false, reason: "too_many" };
+  if (!template2.sections.some((section3) => section3.role === "log") && template2.sections.length + 1 > MAX_SECTIONS)
     return { ok: false, reason: "too_many" };
   if (issues.length) return { ok: false, reason: "invalid" };
   return { ok: true, template: template2 };
@@ -34699,7 +34798,7 @@ function emptyNoteStyleStore(settings) {
 // ai/note-writeback.ts
 var LOG_LINE_SUMMARY_LIMIT = 60;
 var DATE_PREFIX = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}[ \t\u3000:：]*/;
-var FOOTNOTE_REF = /\[\^([^\]\s]+)\]/g;
+var FOOTNOTE_REF2 = /\[\^([^\]\s]+)\]/g;
 var FOOTNOTE_DEF = /^\[\^([^\]\s]+)\]:/;
 function formatDate(now) {
   const pad3 = (value) => String(value).padStart(2, "0");
@@ -34878,7 +34977,7 @@ function relabel(text12, map) {
   const lines = text12.split("\n");
   const code = fencedLines(lines);
   return lines.map(
-    (line, index) => code[index] ? line : line.replace(FOOTNOTE_REF, (whole, label) => map.has(label) ? `[^${map.get(label)}]` : whole)
+    (line, index) => code[index] ? line : line.replace(FOOTNOTE_REF2, (whole, label) => map.has(label) ? `[^${map.get(label)}]` : whole)
   ).join("\n");
 }
 function composeTop(input2) {
@@ -34892,7 +34991,7 @@ function composeTop(input2) {
   let counter = 0;
   oldView.lines.forEach((line, index) => {
     if (oldView.code[index]) return;
-    for (const match of line.matchAll(FOOTNOTE_REF))
+    for (const match of line.matchAll(FOOTNOTE_REF2))
       if (/^\d+$/.test(match[1])) counter = Math.max(counter, Number(match[1]));
   });
   const used = /* @__PURE__ */ new Set([...oldTargets.keys()]);
@@ -35573,7 +35672,8 @@ var TopicRuns = class {
         } else {
           const canonicalOnly = canonicalDetail(detail, noteLanguage, detailTemplate);
           issues = result.formatIssues && detail !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
-          const carried = mode === "fresh" ? canonicalOnly : carryForwardSources(
+          const keepsSections = (context.aiSections === "follow" || context.aiSections === "general") && !detailTemplate.sections.some((section3) => section3.role === "sources");
+          const carried = mode === "fresh" || keepsSections ? canonicalOnly : carryForwardSources(
             canonicalOnly,
             [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
             [summary, canonicalOnly, references2],

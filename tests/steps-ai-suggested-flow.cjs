@@ -288,14 +288,16 @@ test('keepDroppedContent: a template without a sources section is not given one,
   assert.equal(out.restored, 2);
 });
 
-test('keepDroppedContent: quoted lines do not change the item count of a section; code, headings and the log are not taken', () => {
+test('keepDroppedContent: quoted lines do not change the item count of a section; the log is not taken, code and headings are put back as quotes', () => {
   const first = withSources.sections[0].name, log = withSources.sections.find(section => section.role === 'log').name;
   const old = `### ${first}\n- a 11\n- b 22\n\`\`\`\ncode 33\n\`\`\`\n#### head 44\n\n### ${log}\n- 2020-01-01 changed 55\n`;
   const newDetail = `### ${first}\n- a\n- b\n`;
   const out = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail });
   const body = out.detail.split('\n').slice(1).join('\n');
   assert.equal(countItems(body), countItems('- a\n- b\n'));
-  assert.equal(out.detail.includes('code 33'), false);
+  // Code and headings are put back too (as inline code and as text, B3); only the log section is left out.
+  assert.equal(out.detail.includes('> `code 33`'), true);
+  assert.equal(out.detail.includes('> head 44'), true);
   assert.equal(out.detail.includes('changed 55'), false);
   assert.ok(out.detail.includes('> - a 11') && out.detail.includes('> - b 22'));
 });
@@ -309,6 +311,114 @@ test('keepDroppedContent: a line goes to the section of the same name, else the 
   assert.ok(at('> A 11.') > lines.indexOf(`### ${one}`) && at('> A 11.') < lines.indexOf(`### ${two}`));
   assert.ok(at('> B 22.') > lines.indexOf(`### ${two}`));
   assert.ok(at('> C 33.') > lines.indexOf(`### ${two}`), 'an unknown section goes to the last plain section');
+});
+
+// ---- review fixes: B1 source-number whitelist, B2 footnote remap, B3 nothing silently left out, Medium 1 ----
+const { checkMergePreservation } = load('core/steps/task/merge-check.ts');
+const keep = (oldBody, newBody, template = noSources) => {
+  const first = template.sections[0].name;
+  return keepDroppedContent({ ...base, template, oldDetail: `### ${first}\n${oldBody}\n`, newDetail: `### ${first}\n${newBody}\n` });
+};
+
+test('B1: a number after "source" that counts something (a unit, a noun, a glued character) is a real number and is restored as the original line', () => {
+  for (const line of [
+    '資料來源 300 家企業', '營收來源 7 成來自廣告', '收入來源 3 種', '共納入來源 12 篇', '來源 2 位', '來源 12 筆', '資料來源 30 分鐘訪談',
+    '來源 5 週追蹤', '來源 300 美元', '來源 8 名選手', '來源12家', 'source 12 hours of footage', 'source 3 million users',
+    'open source 40 projects', 'data sources 25 countries', 'references 3 studies', '資料來源 300', '來源 1, 2 million 人'
+  ]) {
+    const out = keep(line, 'nothing');
+    assert.equal(out.restored >= 1, true, line);
+    assert.ok(out.detail.includes(`> ${line}`), line);
+  }
+});
+
+test('B1: a source number followed by the end of the line, punctuation, a bracket or a short verb is a pointer, not a dropped number', () => {
+  for (const line of [
+    '（見來源 1）', '（见来源 2）', '見來源 1、2。', '(see source 1)', 'sources 1, 2.', 'Growth is clear, see source 3', '詳見來源 4；另見出處 5！', '來源 3 指出成長', 'Source 2 says growth'
+  ]) {
+    const out = keep(line, 'nothing');
+    assert.equal(out.restored, 0, line);
+    assert.equal(out.detail, `### ${noSources.sections[0].name}\nnothing\n`, line);
+  }
+  // 3 is the pointer and 9 is the number: only 9 is restored.
+  const mixed = keep('來源 3 指出成長 9 倍', '成長很多');
+  assert.equal(mixed.restored, 1);
+  assert.ok(mixed.detail.includes('> 來源 3 指出成長 9 倍'));
+  // Ambiguous, decided toward reporting: a three-digit number after "source" at the end of a line stays a number; one or two digits are a pointer.
+  assert.equal(keep('共 12 個來源 3', 'nothing').restored, 1, 'the 12 is a count, the trailing 3 is a pointer');
+  assert.equal(keep('資料來源 300', 'nothing').restored, 1);
+});
+
+test('Medium 1: the new draft is read without its source pointers too, so a pointer cannot hide a dropped number', () => {
+  const out = keep('成長 3 倍（見來源 1）', '成長很多（見來源 3）');
+  assert.equal(out.restored, 1);
+  assert.ok(out.detail.includes('> 成長 3 倍（見來源 1）'));
+  const summaryOnly = keepDroppedContent({ ...base, summary: '趨勢（see source 3）', template: noSources, oldDetail: `### ${noSources.sections[0].name}\n成長 3 倍\n`, newDetail: `### ${noSources.sections[0].name}\nnothing\n` });
+  assert.equal(summaryOnly.restored, 1);
+});
+
+test('B2: a restored line points at the new footnote that has the same source URL; one with no match loses the marker and carries the URL', () => {
+  const sourcesName = withSources.sections.find(section => section.role === 'sources').name;
+  const first = withSources.sections[0].name;
+  const old = `### ${first}\n速度 42 公里[^2]\n\n### ${sourcesName}\n[^2]: https://b.example/2\n`;
+  const swapped = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail: `### ${first}\n速度 40 公里[^1] 另一點[^2]\n\n### ${sourcesName}\n[^1]: https://b.example/2\n[^2]: https://a.example/1\n` });
+  assert.equal(swapped.restored, 1);
+  assert.ok(swapped.detail.includes('> 速度 42 公里[^1]'), swapped.detail);
+  assert.equal(swapped.detail.includes('42 公里[^2]'), false);
+  const gone = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail: `### ${first}\n速度 40 公里[^1]\n\n### ${sourcesName}\n[^1]: https://a.example/1\n` });
+  assert.ok(gone.detail.includes('> 速度 42 公里 <https://b.example/2>'), gone.detail);
+  assert.equal(gone.detail.includes('42 公里[^'), false);
+  // A footnote with no definition in the old detail is dropped, not pointed at whatever the new detail numbers the same.
+  const dangling = keep('速度 42 公里[^7]', '速度 40 公里[^7]\n\n[^7]: https://z.example');
+  assert.ok(dangling.detail.includes('> 速度 42 公里'), dangling.detail);
+  assert.equal(dangling.detail.includes('42 公里[^7]'), false);
+  // Without a sources section the quoted definition line keeps its URL as text, not as a second definition.
+  const noSection = keep('速度 42 公里[^2]\n[^2]: https://b.example/2', 'nothing');
+  assert.equal(noSection.detail.includes('> [^2]:'), false);
+  assert.ok(noSection.detail.includes('https://b.example/2'));
+});
+
+test('B3: whatever the comparison found missing is put back, except inside a mermaid fence; restored counts what was put back', () => {
+  const cases = [
+    '#### 2024 年 65% 的人\nplain',
+    '```\nrate = 77\n```',
+    '```python3\ncurl https://c.example/x\nn = 5\n```',
+    '~~~js\nconst x = 31\n~~~',
+    '> [!note] Title 88\n> quoted 99',
+    '| a | b |\n| --- | --- |\n| 11 | 22 |'
+  ];
+  for (const body of cases) {
+    const first = withSources.sections[0].name;
+    const old = `### ${first}\n${body}\n`;
+    const out = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail: `### ${first}\nnothing\n` });
+    const before = checkMergePreservation({ sourceTexts: [old], mergedTexts: [`### ${first}\nnothing\n`] }).missing;
+    const after = checkMergePreservation({ sourceTexts: [old], mergedTexts: [out.detail] }).missing;
+    assert.deepEqual(plain(after), [], body);
+    assert.equal(out.restored, before.length, body);
+    assert.equal(names(out.detail)[0], first, body);
+    const lines = out.detail.split('\n');
+    assert.equal(lines.some(line => /^\s*(`{3,}|~{3,})/.test(line)), false, `no fence is rebuilt: ${body}`);
+    assert.equal(lines.some(line => /^#{4}/.test(line)), false, `no heading is rebuilt: ${body}`);
+  }
+  const heading = keep('#### 2024 年 65% 的人\nplain', 'nothing');
+  assert.ok(heading.detail.includes('> 2024 年 65% 的人'));
+  const code = keep('```\nrate = 77\n```', 'nothing');
+  assert.ok(code.detail.includes('> `rate = 77`'), code.detail);
+  // Backticks inside the code line get a longer delimiter.
+  const ticks = keep('```\nuse `x` = 41\n```', 'nothing');
+  assert.ok(ticks.detail.includes('> `` use `x` = 41 ``'), ticks.detail);
+});
+
+test('B3: a mermaid fence is a chart, regenerated by the chart step, and is not put back into the note', () => {
+  const first = noSources.sections[0].name;
+  const old = `### ${first}\nKept 12.\n\n\`\`\`mermaid\ngraph TD\nA[Node 77] --> B[Node 88]\nclick A "https://m.example/x"\n\`\`\`\n`;
+  const out = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail: `### ${first}\nKept 12.\n` });
+  assert.deepEqual({ ...out }, { detail: `### ${first}\nKept 12.\n`, restored: 0 });
+  const dropped = keepDroppedContent({ ...base, template: noSources, oldDetail: old, newDetail: `### ${first}\nnothing\n` });
+  assert.equal(dropped.restored, 1);
+  assert.equal(dropped.detail.includes('Node'), false);
+  assert.equal(dropped.detail.includes('m.example'), false);
+  assert.ok(dropped.detail.includes('> Kept 12.'));
 });
 
 // ---- synthesize mode through the real AiTaskService (P3 gaps) ----

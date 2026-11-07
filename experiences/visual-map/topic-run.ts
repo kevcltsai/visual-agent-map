@@ -807,8 +807,12 @@ export class TopicRuns {
                 : result.formatIssues;
             // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
             // "Only the new content" does not read the old Detail, so nothing is carried there.
+            // "AI suggested" later research does not add a sources section to a note that has none (the section list stays).
+            const keepsSections =
+              (context.aiSections === "follow" || context.aiSections === "general") &&
+              !detailTemplate.sections.some(section => section.role === "sources");
             const carried =
-              mode === "fresh"
+              mode === "fresh" || keepsSections
                 ? canonicalOnly
                 : carryForwardSources(
                     canonicalOnly,

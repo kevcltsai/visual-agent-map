@@ -139,16 +139,34 @@ const HEADING_ANY = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
 const KEPT_LOCALES: ContentLanguage[] = ["zh-TW", "zh-CN", "en"];
 const key = (value: string): string => value.trim().toLocaleLowerCase();
 
-// What follows a number when it is a quantity or a date, not a source number.
-const SOURCE_REF_UNIT = [
-  ["年", "月", "日", "%", "％", "‰", "°", "度", "元"],
-  ["公", "萬", "万", "億", "亿", "千", "百", "倍"],
-  ["次", "人", "個", "个", "台", "項", "项"]
-]
-  .map(group => group.join("|"))
-  .join("|");
-const SOURCE_REF_ASCII_UNIT =
-  "(?:km|m|kg|cm|mm|g|ms|s|hz|mb|gb|kb|mph|k|x|yrs?|years?|days?|months?|percent|usd|eur)\\b";
+// A number after a source keyword is a pointer only when what follows shows it: the end of the line, punctuation (also
+// full-width), a closing bracket, or one of these verbs. Anything else (a unit, a noun, a glued character) makes it a
+// quantity. 1-2 digits only: "來源 300" is a count.
+const SOURCE_REF_VERB = [
+  "指出",
+  "提到",
+  "顯示",
+  "显示",
+  "表示",
+  "表明",
+  "認為",
+  "认为",
+  "說明",
+  "说明",
+  "指稱",
+  "称",
+  "稱",
+  "says?\\b",
+  "said\\b",
+  "states?\\b",
+  "shows?\\b",
+  "reports?\\b",
+  "notes?\\b",
+  "indicates?\\b",
+  "mentions?\\b",
+  "claims?\\b",
+  "suggests?\\b"
+].join("|");
 const SOURCE_REF_KEYWORD = [
   ["來源", "来源"],
   ["出處", "出处"]
@@ -157,13 +175,14 @@ const SOURCE_REF_KEYWORD = [
   .join("|");
 const SOURCE_REF_JOINER = ["及", "和"].join("|");
 const SOURCE_REF = new RegExp(
-  `(?:${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*\\d{1,3}` +
-    `(?:[ \\t]*(?:[,，、]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,3})*` +
-    `(?!\\d|\\.\\d|\\s*(?:${SOURCE_REF_UNIT}|${SOURCE_REF_ASCII_UNIT}))`,
-  "giu"
+  `(?:${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*\\d{1,2}` +
+    `(?:[ \\t]*(?:[,，、]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,2})*` +
+    `(?!\\d|\\.\\d)(?=[ \\t]*(?:$|[。，、；：！？.,;:!?)）\\]】」』”’…]|${SOURCE_REF_VERB}))` +
+    `(?![ \\t]*[,，、][ \\t]*\\d)`,
+  "gium"
 );
 
-/** "來源 1", "see source 2", "sources 1, 2": a pointer to a numbered source, not a quantity. A year, a unit or a long number stays. */
+/** "來源 1", "see source 2", "sources 1, 2": a pointer to a numbered source, not a quantity. Only when the end of the line, punctuation, a bracket or a short verb follows; a unit, a noun or a year stays a number. */
 function withoutSourceRefs(text: string): string {
   return text.replace(SOURCE_REF, "");
 }
@@ -185,14 +204,17 @@ export function keepDroppedContent(input: {
   template: DetailTemplate;
   language: ContentLanguage;
 }): { detail: string; restored: number } {
-  const { oldDetail, template, language } = input;
+  const { template, language } = input;
+  // A mermaid fence is a chart: the chart step draws it again and its numbers are not facts (the merge check ignores them
+  // too), so it is neither compared nor put back.
+  const oldDetail = withoutMermaid(input.oldDetail);
   const logHeadings = template.sections
     .filter(section => section.role === "log")
     .flatMap(section => [section.name, ...section.aliases]);
   const check = (detail: string) =>
     checkMergePreservation({
       sourceTexts: [withoutSourceRefs(oldDetail)],
-      mergedTexts: [detail, input.summary],
+      mergedTexts: [withoutSourceRefs(detail), withoutSourceRefs(input.summary)],
       mergedLinkTexts: [input.references],
       logHeadings
     });
@@ -211,6 +233,85 @@ function keptTitles(): Set<string> {
   return new Set(KEPT_LOCALES.map(locale => key(translateNote(locale, "note.kept_from_earlier_version"))));
 }
 
+/** The fenced lines whose fence is a mermaid one (info string `mermaid`), fence lines included. */
+function mermaidLines(lines: string[]): boolean[] {
+  const out = lines.map(() => false);
+  let fence: string | null = null;
+  let mermaid = false;
+  lines.forEach((line, index) => {
+    if (fence) {
+      out[index] = mermaid;
+      const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
+      if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+      return;
+    }
+    const open = /^\s*(`{3,}|~{3,})\s*(\S*)/.exec(line);
+    if (open) {
+      fence = open[1];
+      mermaid = open[2].toLocaleLowerCase() === "mermaid";
+      out[index] = mermaid;
+    }
+  });
+  return out;
+}
+
+function withoutMermaid(text: string): string {
+  const lines = text.split("\n");
+  const chart = mermaidLines(lines);
+  return chart.some(Boolean) ? lines.filter((_, index) => !chart[index]).join("\n") : text;
+}
+
+/** A line of code as inline code, with a delimiter longer than any backtick run inside it. */
+function inlineCode(text: string): string {
+  const longest = Math.max(0, ...(text.match(/`+/g) ?? []).map(run => run.length));
+  const fence = "`".repeat(longest + 1);
+  return longest ? `${fence} ${text} ${fence}` : `${fence}${text}${fence}`;
+}
+
+const FOOTNOTE_DEFINITION = /^[ \t]*(?:>[ \t]*)*\[\^([^\]\s]+)\]:[ \t]*(.*)$/;
+const FOOTNOTE_REF = /\[\^([^\]\s]+)\](?!\(|:)/g;
+
+/** The footnote definitions of a text outside code: id to the definition text. */
+function footnoteDefinitions(text: string): Map<string, string> {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const code = fencedLines(lines);
+  const out = new Map<string, string>();
+  lines.forEach((line, index) => {
+    const match = code[index] ? null : FOOTNOTE_DEFINITION.exec(line);
+    if (match && !out.has(match[1])) out.set(match[1], match[2].trim());
+  });
+  return out;
+}
+
+/**
+ * A line put back carries the old note's footnote numbers, which the new note may use for other sources. Each marker is
+ * pointed at the new definition with the same source (same URL, else the same text); when the new note has none, the marker
+ * is removed and the old definition's URL (or text) is added at the end of the line.
+ */
+function remapFootnotes(line: string, oldDefinitions: Map<string, string>, detail: string): string {
+  if (!/\[\^/.test(line)) return line;
+  const fresh = footnoteDefinitions(detail);
+  const byKey = new Map<string, string>();
+  const byText = new Map<string, string>();
+  for (const [id, body] of fresh) {
+    for (const link of linksOf([body]).keys()) if (!byKey.has(link)) byKey.set(link, id);
+    if (!byText.has(key(body))) byText.set(key(body), id);
+  }
+  const appended: string[] = [];
+  const text = line.replace(FOOTNOTE_REF, (_match, id: string) => {
+    const body = oldDefinitions.get(id);
+    if (!body) return "";
+    const links = linksOf([body]);
+    const found =
+      [...links.keys()].map(link => byKey.get(link)).find(Boolean) ?? (links.size ? undefined : byText.get(key(body)));
+    if (found) return `[^${found}]`;
+    const extra = links.size ? [...links.values()].map(url => `<${url}>`) : [body];
+    for (const item of extra) if (item && !appended.includes(item)) appended.push(item);
+    return "";
+  });
+  return appended.length ? `${text.trimEnd()} ${appended.join(" ")}` : text;
+}
+
 function quoteMissingLines(
   oldDetail: string,
   detail: string,
@@ -224,35 +325,47 @@ function quoteMissingLines(
   const titles = keptTitles();
   const oldLines = oldDetail.replace(/\r\n/g, "\n").split("\n");
   const oldCode = fencedLines(oldLines);
+  const oldDefinitions = footnoteDefinitions(oldDetail);
   // The lines to take, by the section index of the template they stand in (-1: before any section or in an unknown one).
   const groups = new Map<number, string[]>();
   const covered = new Set<string>();
   let section = -1;
   let logLevel = 0;
   oldLines.forEach((line, index) => {
-    if (oldCode[index]) return;
-    const heading = HEADING_ANY.exec(line);
-    if (heading) {
-      const level = heading[1].length;
-      if (logLevel && level <= logLevel) logLevel = 0;
-      const name = key(heading[2]);
-      if (!logLevel && (logNames.has(name) || UPDATE_LOG_HEADING.test(line))) logLevel = level;
-      if (level === 3) section = lookup.get(name) ?? -1;
-      return;
+    // A line of code is quoted as inline code; a heading as its text (a quote line is not a heading or a code block).
+    let text: string;
+    if (oldCode[index]) {
+      if (logLevel) return;
+      text = line.trim() ? inlineCode(line.trim()) : "";
+    } else {
+      const heading = HEADING_ANY.exec(line);
+      if (heading) {
+        const level = heading[1].length;
+        if (logLevel && level <= logLevel) logLevel = 0;
+        const name = key(heading[2]);
+        if (!logLevel && (logNames.has(name) || UPDATE_LOG_HEADING.test(line))) logLevel = level;
+        if (level === 3) section = lookup.get(name) ?? -1;
+        if (logLevel) return;
+        text = heading[2].trim();
+      } else {
+        if (logLevel) return;
+        // A quote this feature wrote earlier is taken as one quote again, without its title.
+        text = line.replace(/^[ \t]*(?:>[ \t]*)+/, "").trim();
+        const callout = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text);
+        if (callout && titles.has(key(callout[1]))) return;
+        // A footnote definition is quoted as its source text.
+        const definition = FOOTNOTE_DEFINITION.exec(text);
+        if (definition) text = definition[2].trim();
+      }
     }
-    if (logLevel) return;
-    // A quote this feature wrote earlier is taken as one quote again, without its title.
-    const text = line.replace(/^[ \t]*(?:>[ \t]*)+/, "").trim();
     if (!text) return;
-    const callout = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text);
-    if (callout && titles.has(key(callout[1]))) return;
     const own = checkMergePreservation({ sourceTexts: [withoutSourceRefs(text)], mergedTexts: [] }).missing.filter(
       item => missing.has(item)
     );
     if (!own.some(item => !covered.has(item))) return;
     for (const item of own) covered.add(item);
     const list = groups.get(section) ?? [];
-    list.push(text);
+    list.push(remapFootnotes(text, oldDefinitions, detail));
     groups.set(section, list);
   });
   let out = detail;

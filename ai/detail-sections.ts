@@ -24,6 +24,8 @@ export type DetailSectionsResult =
 /** The id of a template made from a note's sections: not a built-in id, so it takes the custom path. */
 export const NOTE_SECTIONS_TEMPLATE_ID = "note-sections";
 
+/** The most sections a template may have (see `validateTemplate`). */
+const MAX_SECTIONS = 12;
 const HEADING = /^###\s+(.+?)\s*$/;
 const key = (value: string): string => value.trim().toLocaleLowerCase();
 
@@ -149,7 +151,7 @@ export function demoteUnknownHeadings(detail: string, template: DetailTemplate):
 /**
  * The template for a detail the AI just wrote under the "AI suggested" style: its sections plus a sources section
  * ({@link withSourcesSection}). The sources section counts toward the limit, so a reply with the most sections allowed and
- * none of them sources fails as `too_many` (the caller then uses the Standard sections, which keep every line). A name clash
+ * none of them sources, or with no log section and the most allowed, fails as `too_many` (the caller then uses the Standard sections, which keep every line). A name clash
  * leaves the template without a sources section; nothing is lost, the footnote lines then stay at the end.
  */
 export function decidedTemplateFromDetail(detail: string, language: NoteLanguage): DetailSectionsResult {
@@ -158,6 +160,10 @@ export function decidedTemplateFromDetail(detail: string, language: NoteLanguage
   const template = withSourcesSection(made.template, language);
   const issues = validateTemplate(template, []);
   if (issues.some(issue => issue.key === "ui.detail_template_error_section_count"))
+    return { ok: false, reason: "too_many" };
+  // The write-back adds a log section when there is none, so that one counts too: otherwise a reply of 12 sections passes
+  // here, is saved as 13, and the next run cannot read the note's sections.
+  if (!template.sections.some(section => section.role === "log") && template.sections.length + 1 > MAX_SECTIONS)
     return { ok: false, reason: "too_many" };
   if (issues.length) return { ok: false, reason: "invalid" };
   return { ok: true, template };

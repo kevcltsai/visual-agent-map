@@ -640,10 +640,13 @@ test('AI suggested decide: 12 sections without sources would make 13, so the Sta
   for (const name of twelve) assert.ok(result.detail.includes(`### ${name}`) && result.detail.includes(`body of ${name}`), `${name} still in the reply`);
 });
 
-test('AI suggested decide: 12 sections with a sources section is allowed and gets no extra section', async () => {
-  const names = [...Array.from({ length: 11 }, (_, i) => `Part ${i + 1}`), 'Sources'];
+test('AI suggested decide: 12 sections with sources and a log is allowed and gets no extra section; 12 without a log fails (the write-back would make 13)', async () => {
+  const names = [...Array.from({ length: 10 }, (_, i) => `Part ${i + 1}`), 'Sources', 'Update log'];
   const { result } = await decided(sectionDetail(names));
   assert.equal(result.decidedTemplate.sections.length, 12);
+  const noLog = await decided(sectionDetail([...Array.from({ length: 11 }, (_, i) => `Part ${i + 1}`), 'Sources']));
+  assert.equal(noLog.result.aiSectionsFallback, true);
+  assert.equal(noLog.result.decidedTemplate, undefined);
 });
 
 test('AI suggested decide: no section, more than 12, a repeated name or a # in a name: fallback, one call, every line still there', async () => {

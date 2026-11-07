@@ -1037,3 +1037,28 @@ test('05: a refused selection synthesis calls refused and none of the run callba
   assert.equal(run.h.runs.isRunning('M.md'), true);
   run.release(); await first;
 });
+
+// ---- review fix (Medium 2): a followed section list is not changed by the carried-forward sources ----
+test('integrateChildren: "follow" with a template that has no sources section adds no earlier-research section; without the flag it still does', async () => {
+  const std = detailTemplates.standardTemplate('en');
+  const noSources = { ...std, sections: std.sections.filter(section => section.role !== 'sources') };
+  const first = noSources.sections[0].name;
+  const oldDetail = `### ${first}\nSee https://old.example/a for it.\n`;
+  const run = async (aiSections, template) => {
+    const h = integrateRuns({ notes: { 'A.md': fakeNote({ detail: oldDetail, status: 'completed' }) }, reply: { detail: `### ${first}\nRewritten.\n` } });
+    await h.runs.start('A.md', 'integrateChildren', h.opts({
+      prepare: async () => ({ detailTemplate: template, viewChanged: () => false, sourcesChanged: async () => false }),
+      buildContext: async note => ({ title: note.title, mode: 'synthesize', outputLanguage: 'en', ...(aiSections ? { aiSections } : {}) })
+    }));
+    assert.deepEqual(h.fails, []);
+    return h.store.get('A.md').detail;
+  };
+  for (const flag of ['follow', 'general']) {
+    const kept = await run(flag, noSources);
+    assert.equal(kept.includes('earlier research'), false, flag);
+    assert.deepEqual(kept.split('\n').filter(line => line.startsWith('#')), [...noSources.sections.filter(section => section.role !== 'log').map(section => `### ${section.name}`), '### Update log'], flag);
+  }
+  // Unchanged paths: no flag, or a template that has a sources section.
+  assert.equal((await run(undefined, noSources)).includes('earlier research'), true);
+  assert.equal((await run('follow', std)).includes('https://old.example/a'), true);
+});

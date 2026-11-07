@@ -105,20 +105,36 @@ test('demoteUnknownHeadings: unknown ### become ####, known and fenced stay, CRL
 });
 
 // P2: what the decide path (cut sections, add sources, use as the template) does at the edges of the 1-12 section limit.
-test('decided template: 11 sections and no sources get one (12 in all); 12 without sources fail as too_many instead of making 13', () => {
-  const eleven = Array.from({ length: 11 }, (_, i) => `Part ${i + 1}`);
-  const ok = M.decidedTemplateFromDetail(sectionsOf(eleven), 'en');
+// The write-back adds an "Update log" section when the template has none, so it counts toward the limit too.
+test('decided template: 10 sections and no sources/log get sources (11 in all, 12 with the log the write-back adds); more fail as too_many', () => {
+  const ten = Array.from({ length: 10 }, (_, i) => `Part ${i + 1}`);
+  const ok = M.decidedTemplateFromDetail(sectionsOf(ten), 'en');
   assert.equal(ok.ok, true);
-  assert.equal(ok.template.sections.length, 12);
+  assert.equal(ok.template.sections.length, 11);
   assert.equal(roles(ok.template).filter(role => role === 'sources').length, 1);
   assert.deepEqual(plain(M.validateTemplate(plain(ok.template), [])), []);
-  const twelve = M.decidedTemplateFromDetail(sectionsOf([...eleven, 'Part 12']), 'en');
-  assert.deepEqual(plain(twelve), { ok: false, reason: 'too_many' });
-  // 12 with a sources section is fine and unchanged.
-  assert.equal(M.decidedTemplateFromDetail(sectionsOf([...eleven, 'Sources']), 'en').template.sections.length, 12);
+  // 11 parts + the sources section added = 12, and the log the write-back adds would make 13.
+  assert.deepEqual(plain(M.decidedTemplateFromDetail(sectionsOf([...ten, 'Part 11']), 'en')), { ok: false, reason: 'too_many' });
+  assert.deepEqual(plain(M.decidedTemplateFromDetail(sectionsOf([...ten, 'Part 11', 'Part 12']), 'en')), { ok: false, reason: 'too_many' });
+  // Sources and log both present: 12 is fine and unchanged.
+  assert.equal(M.decidedTemplateFromDetail(sectionsOf([...ten, 'Sources', 'Update log']), 'en').template.sections.length, 12);
+  // Sources but no log, 12 in all: the write-back would make 13.
+  assert.deepEqual(plain(M.decidedTemplateFromDetail(sectionsOf([...ten, 'Part 11', 'Sources']), 'en')), { ok: false, reason: 'too_many' });
   // The failures of the cut itself pass through.
   assert.equal(M.decidedTemplateFromDetail('no headings', 'en').reason, 'no_sections');
   assert.equal(M.decidedTemplateFromDetail(sectionsOf(['A', 'a']), 'en').reason, 'duplicate');
+});
+
+test('decided template: any template it passes still fits the limit after the write-back adds its log section', () => {
+  for (let count = 1; count <= 13; count++) {
+    for (const extra of [[], ['Sources'], ['Sources', 'Update log'], ['Update log']]) {
+      const parts = Array.from({ length: count }, (_, i) => `Part ${i + 1}`);
+      const made = M.decidedTemplateFromDetail(sectionsOf([...parts, ...extra]), 'en');
+      if (!made.ok) continue;
+      const hasLog = roles(made.template).includes('log');
+      assert.ok(made.template.sections.length + (hasLog ? 0 : 1) <= 12, `${count} ${extra}`);
+    }
+  }
 });
 
 test('with sources section: a name clash returns the template as it is and no content is lost in the canonical detail', () => {

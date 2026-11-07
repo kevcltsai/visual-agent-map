@@ -19,3 +19,4 @@ export function openInWindowOf(modal: Modal, anchor: HTMLElement | undefined | n
   doc.body.appendChild(container);
   keep?.focus?.();
 }
+

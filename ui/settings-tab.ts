@@ -789,19 +789,19 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
               t("ui.settings_repair_name"),
               t("ui.settings_repair_desc"),
               t("ui.repair"),
-              () => void this.plugin.mutate(() => this.plugin.repairWorkspace())
+              anchor => void this.plugin.mutate(() => this.plugin.repairWorkspace(anchor))
             ),
             this.actionRow(
               t("ui.settings_rebuild_name"),
               t("ui.settings_rebuild_desc"),
               t("ui.full_rebuild"),
-              () => void this.plugin.mutate(() => this.plugin.fullRebuild())
+              anchor => void this.plugin.mutate(() => this.plugin.fullRebuild(anchor))
             ),
             this.actionRow(
               t("ui.reconnect_existing_workspace"),
               t("ui.settings_reconnect_desc"),
               t("ui.scan"),
-              () => void this.plugin.offerWorkspaceReconnect()
+              anchor => void this.plugin.offerWorkspaceReconnect(undefined, anchor)
             )
           ]
         }
@@ -1053,14 +1053,15 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     };
   }
   /** A button row of the "Advanced" page: name, one-line help and one button. */
-  private actionRow(name: string, desc: string, label: string, run: () => void): SettingDefinition {
+  /** `run` gets the button, so what it opens or reports lands in the settings window. */
+  private actionRow(name: string, desc: string, label: string, run: (anchor: HTMLElement) => void): SettingDefinition {
     return {
       name,
       render: setting => {
         setting
           .setName(name)
           .setDesc(desc)
-          .addButton(button => button.setButtonText(label).onClick(run));
+          .addButton(button => button.setButtonText(label).onClick(() => run(button.buttonEl)));
       }
     };
   }

@@ -137,6 +137,7 @@ import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
 import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
 import { AIM_CREATE_MAP_COMMAND_ID } from "./experiences/aim/legacy-names";
+import { noticeInWindowOf } from "./ui/modals/notice-in-window";
 import { openInWindowOf } from "./ui/modals/open-in-window";
 import { aimEnabled } from "./experiences/aim/availability";
 
@@ -1213,20 +1214,21 @@ export default class VisualAgentMapPlugin extends Plugin {
       ]
     ).open();
   }
-  async repairWorkspace(): Promise<void> {
+  /** `anchor` is the button that asked; its window gets the notice (the settings page may be a popout window). */
+  async repairWorkspace(anchor?: HTMLElement): Promise<void> {
     await this.repo.ensureWorkspace();
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new Notice(t("ui.agent_workspace_is_ready"));
+    noticeInWindowOf(t("ui.agent_workspace_is_ready"), anchor);
   }
-  async fullRebuild(): Promise<void> {
+  async fullRebuild(anchor?: HTMLElement): Promise<void> {
     // First re-find notes whose path changed behind the maps' back (e.g. a move interrupted by an unload); rebuilding
     // before that would read them as unowned and strip their map ids.
     await this.repo.reconcileMissingNodePaths();
     await this.repo.rebuildDerivedData();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new Notice(t("ui.vam_data_has_been_refreshed"));
+    noticeInWindowOf(t("ui.vam_data_has_been_refreshed"), anchor);
   }
   /** Builds Coffee Tables storage and manager for the current workspace folder (CoffeeStorage fixes its folder at construction). */
   private buildCoffee(): void {
@@ -1270,14 +1272,14 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.settings.mapsFolder = `${root}/Maps`;
     this.settings.workspaceInitialized = true;
   }
-  async offerWorkspaceReconnect(known?: string[]): Promise<void> {
+  async offerWorkspaceReconnect(known?: string[], anchor?: HTMLElement): Promise<void> {
     const candidates = known ?? (await this.repo.workspaceCandidates());
     this.workspaceRecoveryCandidates = [];
     if (!candidates.length) {
-      new Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
+      noticeInWindowOf(t("ui.no_recognizable_existing_vam_workspace_was_found"), anchor);
       return;
     }
-    new ChoiceModal(
+    const modal = new ChoiceModal(
       this.app,
       t("ui.reconnect_existing_workspace"),
       t("ui.choosing_a_workspace_only_reconnects_the_setting_it_does_not"),
@@ -1290,10 +1292,11 @@ export default class VisualAgentMapPlugin extends Plugin {
             await this.rebuildCoffee();
             await this.repo.rebuildDerivedData();
             for (const view of this.views()) await view.refreshFromPlugin();
-            new Notice(t("ui.reconnected_workspace_0", root));
+            noticeInWindowOf(t("ui.reconnected_workspace_0", root), anchor);
           })
       }))
-    ).open();
+    );
+    openInWindowOf(modal, anchor);
   }
   codexDiagnostic(): { executable: string; installed: boolean } {
     return this.aiRuntime.diagnostic(this.settings.codexPath);

@@ -910,6 +910,27 @@ test('P1 popout: a modal opened for a button in another window is moved to that 
 });
 
 
+test('P1 popout: a notice for a button in another window moves into that window\'s notice container, made when missing; in the same window, or with no anchor, it stays', () => {
+  const made = [];
+  class Notice { constructor(message) { this.message = message; this.containerEl = { ownerDocument: main }; made.push(this); } }
+  const { noticeInWindowOf } = S.load('ui/modals/notice-in-window.ts', { obsidian: { Notice } });
+  const host = doc => ({ children: [], appendChild(node) { node.ownerDocument = doc; this.children.push(node); return node; } });
+  const main = {};
+  const popout = { body: { hosts: [], querySelector() { return this.hosts[0] || null; }, createDiv(options) { const h = { cls: options.cls, ...host(popout) }; this.hosts.push(h); return h; } } };
+  const first = noticeInWindowOf('ready', { ownerDocument: popout });
+  assert.equal(first.message, 'ready');
+  assert.equal(popout.body.hosts.length, 1);
+  assert.equal(popout.body.hosts[0].cls, 'notice-container');
+  assert.equal(first.containerEl.ownerDocument, popout);
+  noticeInWindowOf('again', { ownerDocument: popout });
+  assert.equal(popout.body.hosts.length, 1, 'an existing notice container is reused');
+  assert.equal(popout.body.hosts[0].children.length, 2);
+  main.body = { querySelector() { throw new Error('same window: nothing moves'); } };
+  assert.equal(noticeInWindowOf('here', { ownerDocument: main }).containerEl.ownerDocument, main);
+  assert.equal(noticeInWindowOf('none', undefined).containerEl.ownerDocument, main);
+  assert.equal(made.length, 4);
+});
+
 test('P1 popout: the focus that onOpen set inside the modal is set again after the move to the other window (was failing first)', () => {
   const { openInWindowOf } = S.load('ui/modals/open-in-window.ts');
   const popout = { body: { appendChild(node) { node.ownerDocument = popout; return node; } } };

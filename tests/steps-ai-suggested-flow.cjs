@@ -1,0 +1,285 @@
+// "AI suggested" note style, packet P3: the whole flow over a real Repository and fake replies (first research, chart job,
+// re-read, second and third research), the fallbacks, the notes whose sections cannot be followed, and the numbers and
+// links a rewrite dropped. Layer 2 of the ai-semantic check: the note that was written is scanned, not only the context.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { load, core, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, until, attachTopicRuns } = require('./support.cjs');
+const { promptsFor, makeService } = require('./support-replay.cjs');
+
+const { NoteStyleStore } = load('ai/note-style-store.ts', { obsidian });
+const { templateFromDetail } = load('ai/detail-sections.ts');
+const { countItems, standardTemplate } = load('ai/detail-templates.ts');
+const { keepDroppedContent } = load('core/steps/task/merge-check.ts');
+const { translate } = load('i18n.ts');
+
+const MAP = 'Agent Workspace/Topics/map-a/Map.md';
+const research = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] };
+const noticeText = key => translate('en', key);
+const plain = value => JSON.parse(JSON.stringify(value));
+const sectionsOf = detail => (detail.match(/^### .+$/gm) ?? []).map(line => line.slice(4));
+const headingsOf = (detail, level) => (detail.match(new RegExp(`^${level} .+$`, 'gm')) ?? []).map(line => line.slice(level.length + 1));
+
+async function harness({ style = 'builtin:ai-suggested', detail } = {}) {
+  const { repo, app } = fixture('en');
+  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-a');
+  await app.vault.create(MAP, core.serializeMap({ ...mapDoc }));
+  const node = await repo.createNote('Swing plane', 'gpt-6-luna', mapDoc, MAP, 'workspace', {});
+  mapDoc.nodes.push(node);
+  await repo.saveMap(MAP, mapDoc);
+  if (detail !== undefined) await repo.updateNote(node.path, { detail });
+  const contexts = [], notices = [], jobs = [];
+  const replies = [], prompts = [];
+  // The real AiTaskService over a fake provider: the reply is what the model sends back, the service parses and judges it.
+  const service = makeService({ runTask: async prompt => { prompts.push(prompt); return JSON.stringify({ summary: 'S', visualReferences: [], suggestions: [], ...replies.shift() }); } }, { language: 'en', reuseModule: true });
+  const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna', cliReasoning: 'low', ...(style ? { noteStyleByKind: { topic: style } } : {}) };
+  const noteStyles = new NoteStyleStore({ settings: () => settings, port: { folderExists: () => false, listFiles: async () => [], readFile: async () => '' }, save: async () => {} });
+  const host = withExpansionCoordinator({
+    repo, settings, noteStyles, running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {},
+    recordFailure: (_label, error) => String(error?.message ?? error), views: () => [], mutate: async work => work(),
+    confirmAiUsage: async (_model, run) => { await run(); return true; },
+    researchProgress: { get: () => undefined, begin() {}, newAttempt() {}, stage() {}, preview() {}, markSlow() {}, end() {} },
+    askModel: (context, model, reasoning, signal, onExchange, accepted, ...rest) => {
+      contexts.push(context); accepted?.();
+      return service.askModel(context, model, reasoning, signal, onExchange, accepted, ...rest);
+    }
+  });
+  host.addChartsAfterWrite = job => jobs.push(job);
+  repo.settings = host.settings;
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } } } });
+  const view = new VisualAgentMapView({ app }, attachTopicRuns(host));
+  view.notes = new Map([[node.id, { title: 'Swing plane' }]]);
+  Object.assign(view, { path: MAP, map: mapDoc, contentEl: { querySelector: () => null }, render() {}, hydrate: async () => {}, ancestorContext: async () => '' });
+  const read = () => repo.readNote(node.path, mapDoc);
+  const run = async (reply, extra = {}) => {
+    replies.push(reply);
+    const before = contexts.length;
+    await view.runAgent(node, undefined, undefined, { task: 'go', ...research, ...extra });
+    await until(() => contexts.length === before + 1 && !host.running.has(node.path));
+    await until(() => true);
+  };
+  return { repo, host, view, node, mapDoc, contexts, prompts, notices, jobs, read, run, settings, noteStyles };
+}
+
+const FIRST = [
+  '### Swing plane', 'The plane is 60 degrees.', '#### Setup', 'Stand with 2 feet apart.', '',
+  '### Common faults', '- Over the top 3 times.', '', '### Drills', 'Use drill A.', '',
+  '### Sources', '[S1] https://example.com/plane', ''
+].join('\n');
+
+test('flow: first research decides the sections, the chart job keeps them, the re-read, second and third research follow them', async () => {
+  const h = await harness();
+  await h.run({ detail: FIRST });
+  assert.equal(h.contexts[0].aiSections, 'decide');
+  let note = await h.read();
+  // The write-back adds the update log; the chart job carries the sections the AI decided.
+  const decided = ['Swing plane', 'Common faults', 'Drills', 'Sources', 'Update log'];
+  assert.deepEqual(sectionsOf(note.detail), decided);
+  assert.equal(h.jobs.length, 1);
+  assert.deepEqual(plain(h.jobs[0].context.detailTemplate.sections.map(section => section.name)), decided.slice(0, 4));
+  // The chart job writes through the same template: the sections do not change.
+  const chart = `${h.jobs[0].detail}\n\n#### Chart\n\n\`\`\`mermaid\ngraph TD; A-->B\n\`\`\`\n`;
+  assert.equal(await h.jobs[0].apply(chart), true);
+  note = await h.read();
+  assert.deepEqual(sectionsOf(note.detail), decided);
+  // The re-read (a new Repository over the same vault) reads the same sections.
+  const again = new h.repo.constructor(h.repo.app ?? h.view.app, h.settings);
+  assert.deepEqual(sectionsOf((await again.readNote(h.node.path, h.mapDoc)).detail), decided);
+  // Second research: the reply has a section the note does not have; its content stays in the section before it.
+  await h.run({ detail: [FIRST.replace('The plane is 60 degrees.', 'The plane is 60 degrees. Also 61 degrees.'), '', '### Extra thoughts', 'EXTRA-LINE with 77 yards.'].join('\n').replace('### Sources', '### Sources') });
+  assert.equal(h.contexts[1].aiSections, 'follow');
+  note = await h.read();
+  assert.deepEqual(sectionsOf(note.detail), decided);
+  assert.ok(note.detail.includes('EXTRA-LINE with 77 yards.'));
+  assert.ok(headingsOf(note.detail, '####').includes('Extra thoughts'), 'the unknown heading is a #### now');
+  const extra = note.detail.indexOf('EXTRA-LINE');
+  assert.ok(extra > note.detail.indexOf('### Drills') || extra > note.detail.indexOf('### Common faults'));
+  // Third research: the section list that is parsed from the note is the same.
+  await h.run({ detail: FIRST });
+  assert.equal(h.contexts[2].aiSections, 'follow');
+  assert.deepEqual(plain(h.contexts[2].detailTemplate.sections.map(section => section.name)), decided);
+  const read = templateFromDetail((await h.read()).detail, 'en');
+  assert.deepEqual(plain(read.template.sections.map(section => section.name)), decided);
+  assert.deepEqual(sectionsOf((await h.read()).detail), decided);
+});
+
+test('flow: a second research that drops an old number or link gets it back once, with one Notice; the sections stay', async () => {
+  const h = await harness();
+  await h.run({ detail: FIRST });
+  h.notices.length = 0;
+  // The reply drops "60", "2 feet" and the link; it adds new numbers.
+  await h.run({ detail: ['### Swing plane', 'The plane is about 59 degrees.', '', '### Common faults', '- Over the top.', '', '### Drills', 'Use drill A.', '', '### Sources', '[S2] https://example.com/other', ''].join('\n') });
+  const note = await h.read();
+  assert.deepEqual(sectionsOf(note.detail), ['Swing plane', 'Common faults', 'Drills', 'Sources', 'Update log']);
+  assert.ok(note.detail.includes('> The plane is 60 degrees.'), note.detail);
+  assert.ok(note.detail.includes('> - Over the top 3 times.'), note.detail);
+  assert.ok(note.detail.includes('https://example.com/plane'));
+  assert.equal(note.detail.split(translate('en', 'note.kept_from_earlier_version')).length - 1 >= 1, true);
+  const restored = h.notices.filter(message => message.startsWith('The rewrite dropped'));
+  assert.equal(restored.length, 1);
+  // Running the same dropped reply again does not stack the quotes.
+  const once = note.detail.split('> The plane is 60 degrees.').length - 1;
+  assert.equal(once, 1);
+  await h.run({ detail: ['### Swing plane', 'The plane is about 59 degrees.', '', '### Common faults', '- Over the top.', '', '### Drills', 'Use drill A.', '', '### Sources', '[S2] https://example.com/other', ''].join('\n') });
+  const next = (await h.read()).detail;
+  assert.equal(next.split('The plane is 60 degrees.').length - 1, 1, next);
+  assert.equal(next.includes('> > '), false);
+});
+
+test('flow: not selected, nothing is put back (a style without aiSections runs as it did)', async () => {
+  const h = await harness({ style: 'builtin:general', detail: '### Core conclusion\nOld 4242.\n' });
+  await h.run({ detail: '### Core conclusion\nNew.\n' });
+  assert.equal('aiSections' in h.contexts[0], false);
+  const note = await h.read();
+  assert.equal(note.detail.includes('4242'), false);
+  assert.equal(h.notices.some(message => message.startsWith('The rewrite dropped')), false);
+});
+
+const unusable = {
+  'no sections in a reply': ['plain text with 5 facts and a link https://example.com/x', null],
+};
+test('flow: a first reply with no sections falls back to the general sections; every line is kept, one Notice, one call', async () => {
+  const h = await harness();
+  const body = 'Line one 11.\nLine two 22.\n- item https://example.com/a';
+  await h.run({ detail: body });
+  assert.equal(h.contexts.length, 1);
+  const note = await h.read();
+  for (const line of body.split('\n')) assert.ok(note.detail.includes(line.replace(/^- /, '')) || note.detail.includes(line), line);
+  assert.ok(sectionsOf(note.detail).length >= 1);
+  assert.deepEqual(h.notices.filter(message => message === noticeText('ui.note_style_ai_sections_invalid')).length, 1);
+  assert.equal(h.jobs[0].context.detailTemplate.id !== 'note-sections', true);
+});
+
+test('flow: a first reply with more than 12 sections or a repeated name falls back; every line is kept', async () => {
+  const many = Array.from({ length: 13 }, (_, n) => `### Part ${n + 1}\nCONTENT-${n + 1}\n`).join('\n');
+  const twice = '### Same\nFIRST-LINE\n\n### same\nSECOND-LINE\n\n### Other\nTHIRD-LINE\n';
+  for (const [reply, lines] of [[many, Array.from({ length: 13 }, (_, n) => `CONTENT-${n + 1}`)], [twice, ['FIRST-LINE', 'SECOND-LINE', 'THIRD-LINE']]]) {
+    const h = await harness();
+    await h.run({ detail: reply });
+    assert.equal(h.contexts.length, 1);
+    const note = await h.read();
+    for (const line of lines) assert.ok(note.detail.includes(line), line);
+    assert.equal(h.notices.filter(message => message === noticeText('ui.note_style_ai_sections_invalid')).length, 1);
+  }
+});
+
+const fourteen = Array.from({ length: 14 }, (_, n) => `### Part ${n + 1}\nOLD-${n + 1} value ${n + 100}.\n`).join('\n');
+const notes = {
+  'a note with 14 sections': fourteen,
+  'a note with a repeated section name': '### Same\nOLD-A value 301.\n\n### same\nOLD-B value 302.\n',
+  'a note with only a # heading': '# Title\nOLD-C value 303.\n',
+  'a note of plain text': 'OLD-D value 304 and https://example.com/old',
+};
+for (const [name, detail] of Object.entries(notes)) {
+  test(`flow: ${name} is not an error; the prompt is the general research prompt, one Notice, and the check still runs`, async () => {
+    const h = await harness({ detail });
+    await h.run({ detail: '### Core conclusion\nNothing kept.\n' });
+    assert.equal(h.contexts.length, 1);
+    const context = h.contexts[0];
+    assert.equal(context.aiSections, 'general');
+    // The prompt equals a general research run's prompt, byte for byte.
+    const [asked] = await promptsFor({ ...context, outputLanguage: 'en' }, { language: 'en' });
+    const { aiSections, ...plain } = context;
+    const [general] = await promptsFor({ ...plain, outputLanguage: 'en' }, { language: 'en' });
+    assert.equal(asked.prompt, general.prompt);
+    assert.equal(h.notices.filter(message => message === noticeText('ui.note_style_note_sections_unusable')).length, 1);
+    // The comparison ran: the old value is back in the note and the user was told.
+    const note = await h.read();
+    const value = detail.match(/\d{3}/)[0];
+    assert.ok(note.detail.includes(value), note.detail);
+    // A number on a line with a link comes back with the link in the sources section; any other line comes back as a quote.
+    assert.ok(note.detail.split('\n').some(line => (line.startsWith('> ') || line.startsWith('- ')) && line.includes(value)), note.detail);
+    assert.equal(h.notices.filter(message => message.startsWith('The rewrite dropped')).length, 1);
+  });
+}
+
+test('flow: the path table, entries that resolve the style without a note read get the general sections, and a note read gets decide or follow', async () => {
+  const h = await harness();
+  // Merge into a target, AI merge, outline import, selection synthesis and contribution call mapStyle: no note, general sections.
+  const mapStyle = await h.view.mapStyle('en', { kind: 'topic' });
+  assert.equal(mapStyle.aiSections.mode, 'no-note');
+  assert.equal('aiSections' in mapStyle.contextFields, false);
+  assert.deepEqual(plain(mapStyle.template.sections.map(section => section.name)), plain(standardTemplate('en').sections.map(section => section.name)));
+  // A topic run reads the note: empty is decide, a note with sections is follow.
+  let resolved = await h.view.detailTemplateFor(h.node);
+  assert.equal(resolved.aiSections.mode, 'decide');
+  await h.repo.updateNote(h.node.path, { detail: FIRST });
+  resolved = await h.view.detailTemplateFor(h.node);
+  assert.equal(resolved.aiSections.mode, 'follow');
+  assert.equal(resolved.contextFields.aiSections, 'follow');
+  // Integration (synthesize): follow keeps the sections; a note that cannot be followed shows one Notice.
+  h.notices.length = 0;
+  await h.repo.updateNote(h.node.path, { detail: 'plain' });
+  const gate = { shown: false };
+  await h.view.detailTemplateFor(h.node, undefined, gate);
+  await h.view.detailTemplateFor(h.node, undefined, gate);
+  assert.equal(h.notices.filter(message => message === noticeText('ui.note_style_note_sections_unusable')).length, 1);
+});
+
+// ---- keepDroppedContent ----
+const lang = 'en';
+const base = { summary: '', references: '', language: lang };
+const withSources = standardTemplate(lang);
+const noSources = { ...withSources, sections: withSources.sections.filter(section => section.role !== 'sources') };
+const names = detail => sectionsOf(detail);
+
+test('keepDroppedContent: numbers dropped, links dropped, both dropped; a restore adds nothing the next run repeats', () => {
+  const sourcesName = withSources.sections.find(section => section.role === 'sources').name;
+  const first = withSources.sections[0].name, second = withSources.sections[1].name;
+  const old = `### ${first}\nThe rate is 44 percent.\n\n### ${second}\nSee https://example.com/a for it.\n\n### ${sourcesName}\n- [S1] https://example.com/a\n`;
+  // numbers
+  const numbers = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail: `### ${first}\nThe rate is high.\n\n### ${second}\nSee https://example.com/a for it.\n\n### ${sourcesName}\n- [S1] https://example.com/a\n` });
+  assert.equal(numbers.restored, 1);
+  assert.ok(numbers.detail.includes('> The rate is 44 percent.'));
+  assert.deepEqual(names(numbers.detail), names(old));
+  // links (go to the sources section, no quote needed)
+  const links = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail: `### ${first}\nThe rate is 44 percent.\n\n### ${second}\nNothing.\n\n### ${sourcesName}\n- nothing\n` });
+  assert.equal(links.restored, 1);
+  assert.ok(links.detail.includes('https://example.com/a'));
+  assert.deepEqual(names(links.detail), names(old));
+  // both
+  const both = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail: `### ${first}\nNothing.\n\n### ${second}\nNothing.\n\n### ${sourcesName}\n- nothing\n` });
+  assert.equal(both.restored, 2);
+  assert.ok(both.detail.includes('> The rate is 44 percent.') && both.detail.includes('https://example.com/a'));
+  // nothing missing: nothing changes
+  const same = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail: old });
+  assert.deepEqual({ ...same }, { detail: old, restored: 0 });
+  // run again on the restored note with the same dropped rewrite: the line is there once, as one quote
+  const again = keepDroppedContent({ ...base, template: withSources, oldDetail: numbers.detail, newDetail: `### ${first}\nThe rate is high.\n\n### ${second}\nSee https://example.com/a for it.\n\n### ${sourcesName}\n- [S1] https://example.com/a\n` });
+  assert.equal(again.detail.split('The rate is 44 percent.').length - 1, 1);
+  assert.equal(again.detail.includes('> > '), false);
+  assert.equal(again.detail.split(translate(lang, 'note.kept_from_earlier_version')).length - 1, 1);
+});
+
+test('keepDroppedContent: a template without a sources section is not given one, and links are not carried', () => {
+  const first = noSources.sections[0].name;
+  const old = `### ${first}\nSee https://example.com/a and 55.\n`;
+  const out = keepDroppedContent({ ...base, template: noSources, oldDetail: old, newDetail: `### ${first}\nNothing.\n` });
+  assert.deepEqual(names(out.detail), [first]);
+  assert.equal(out.detail.includes('earlier research'), false);
+  assert.ok(out.detail.includes('> See https://example.com/a and 55.'));
+  assert.equal(out.restored, 2);
+});
+
+test('keepDroppedContent: quoted lines do not change the item count of a section; code, headings and the log are not taken', () => {
+  const first = withSources.sections[0].name, log = withSources.sections.find(section => section.role === 'log').name;
+  const old = `### ${first}\n- a 11\n- b 22\n\`\`\`\ncode 33\n\`\`\`\n#### head 44\n\n### ${log}\n- 2020-01-01 changed 55\n`;
+  const newDetail = `### ${first}\n- a\n- b\n`;
+  const out = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail });
+  const body = out.detail.split('\n').slice(1).join('\n');
+  assert.equal(countItems(body), countItems('- a\n- b\n'));
+  assert.equal(out.detail.includes('code 33'), false);
+  assert.equal(out.detail.includes('changed 55'), false);
+  assert.ok(out.detail.includes('> - a 11') && out.detail.includes('> - b 22'));
+});
+
+test('keepDroppedContent: a line goes to the section of the same name, else the last section that is not sources or log', () => {
+  const [one, two] = withSources.sections.filter(section => section.role === 'none').map(section => section.name);
+  const old = `### ${one}\nA 11.\n\n### ${two}\nB 22.\n\n### Gone section\nC 33.\n`;
+  const out = keepDroppedContent({ ...base, template: withSources, oldDetail: old, newDetail: `### ${one}\nx\n\n### ${two}\ny\n` });
+  const lines = out.detail.split('\n');
+  const at = text => lines.findIndex(line => line.includes(text));
+  assert.ok(at('> A 11.') > lines.indexOf(`### ${one}`) && at('> A 11.') < lines.indexOf(`### ${two}`));
+  assert.ok(at('> B 22.') > lines.indexOf(`### ${two}`));
+  assert.ok(at('> C 33.') > lines.indexOf(`### ${two}`), 'an unknown section goes to the last plain section');
+});

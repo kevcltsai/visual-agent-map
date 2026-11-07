@@ -1,4 +1,8 @@
+import { sectionLookup, type DetailTemplate } from "../../../ai/detail-templates";
+import { fencedLines } from "../../../ai/markdown-blocks";
+import { translateNote, type ContentLanguage } from "../../../i18n";
 import { noteNumbers } from "../chart/insert";
+import { carryForwardSources } from "./carry-sources";
 
 /**
  * Deterministic preservation check of an AI merge. The merge prompt says to keep every number, link and embed and to
@@ -129,4 +133,141 @@ export function findingList(items: string[], none: string, limit = 30): string {
   const lines = items.slice(0, limit).map(item => `- ${item}`);
   if (items.length > limit) lines.push(`- … (+${items.length - limit})`);
   return lines.join("\n");
+}
+
+const HEADING_ANY = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
+const KEPT_LOCALES: ContentLanguage[] = ["zh-TW", "zh-CN", "en"];
+const key = (value: string): string => value.trim().toLocaleLowerCase();
+
+/**
+ * A rewrite of a note keeps its old numbers and links. What the rewrite left out and the older Detail had is put back,
+ * with no AI call: the links go to the sources section ({@link carryForwardSources}, only when the template has one, as it
+ * adds a section otherwise), and each line of the older Detail that holds a number or link still missing is quoted
+ * (`> `) at the end of the section of the same name, under a callout title. A quoted line is not a list item or a `####`
+ * heading, so the template's counts do not change. Lines in code, headings and the log section are not taken. A run again
+ * on a note that already has the quoted lines takes them once more as one quote, not nested.
+ * `restored` is how many missing items the new detail has again.
+ */
+export function keepDroppedContent(input: {
+  oldDetail: string;
+  newDetail: string;
+  summary: string;
+  references: string;
+  template: DetailTemplate;
+  language: ContentLanguage;
+}): { detail: string; restored: number } {
+  const { oldDetail, template, language } = input;
+  const logHeadings = template.sections
+    .filter(section => section.role === "log")
+    .flatMap(section => [section.name, ...section.aliases]);
+  const check = (detail: string) =>
+    checkMergePreservation({
+      sourceTexts: [oldDetail],
+      mergedTexts: [detail, input.summary],
+      mergedLinkTexts: [input.references],
+      logHeadings
+    });
+  const before = check(input.newDetail).missing;
+  if (!before.length) return { detail: input.newDetail, restored: 0 };
+  let detail = input.newDetail;
+  if (template.sections.some(section => section.role === "sources"))
+    detail = carryForwardSources(detail, [oldDetail], [input.summary, detail, input.references], language, template);
+  const missing = new Set(check(detail).missing);
+  if (missing.size) detail = quoteMissingLines(oldDetail, detail, missing, template, language, logHeadings);
+  return { detail, restored: Math.max(0, before.length - check(detail).missing.length) };
+}
+
+/** The title lines this feature writes, in every language, so a second run takes the quoted lines and not the title. */
+function keptTitles(): Set<string> {
+  return new Set(KEPT_LOCALES.map(locale => key(translateNote(locale, "note.kept_from_earlier_version"))));
+}
+
+function quoteMissingLines(
+  oldDetail: string,
+  detail: string,
+  missing: Set<string>,
+  template: DetailTemplate,
+  language: ContentLanguage,
+  logHeadings: string[]
+): string {
+  const lookup = sectionLookup(template);
+  const logNames = new Set(logHeadings.map(key).filter(Boolean));
+  const titles = keptTitles();
+  const oldLines = oldDetail.replace(/\r\n/g, "\n").split("\n");
+  const oldCode = fencedLines(oldLines);
+  // The lines to take, by the section index of the template they stand in (-1: before any section or in an unknown one).
+  const groups = new Map<number, string[]>();
+  const covered = new Set<string>();
+  let section = -1;
+  let logLevel = 0;
+  oldLines.forEach((line, index) => {
+    if (oldCode[index]) return;
+    const heading = HEADING_ANY.exec(line);
+    if (heading) {
+      const level = heading[1].length;
+      if (logLevel && level <= logLevel) logLevel = 0;
+      const name = key(heading[2]);
+      if (!logLevel && (logNames.has(name) || UPDATE_LOG_HEADING.test(line))) logLevel = level;
+      if (level === 3) section = lookup.get(name) ?? -1;
+      return;
+    }
+    if (logLevel) return;
+    // A quote this feature wrote earlier is taken as one quote again, without its title.
+    const text = line.replace(/^[ \t]*(?:>[ \t]*)+/, "").trim();
+    if (!text) return;
+    const callout = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text);
+    if (callout && titles.has(key(callout[1]))) return;
+    const own = checkMergePreservation({ sourceTexts: [text], mergedTexts: [] }).missing.filter(item =>
+      missing.has(item)
+    );
+    if (!own.some(item => !covered.has(item))) return;
+    for (const item of own) covered.add(item);
+    const list = groups.get(section) ?? [];
+    list.push(text);
+    groups.set(section, list);
+  });
+  let out = detail;
+  const title = translateNote(language, "note.kept_from_earlier_version");
+  for (const [index, lines] of groups) {
+    const block = [`> [!note] ${title}`, ...lines.map(line => `> ${line}`)];
+    out = insertIntoSection(out, index, block, template, lookup);
+  }
+  return out;
+}
+
+/** Puts the block at the end of the section with the index (the last section that is not sources or log when there is none). */
+function insertIntoSection(
+  detail: string,
+  index: number,
+  block: string[],
+  template: DetailTemplate,
+  lookup: Map<string, number>
+): string {
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  const sections: { at: number; index: number | undefined }[] = [];
+  lines.forEach((line, at) => {
+    const match = code[at] ? null : /^###[ \t]+(.+?)[ \t]*$/.exec(line);
+    if (match) sections.push({ at, index: lookup.get(key(match[1])) });
+  });
+  const roleOf = (found: number | undefined): string | undefined =>
+    found === undefined ? undefined : template.sections[found]?.role;
+  let target = sections.findIndex(item => item.index === index && index >= 0);
+  if (target < 0) {
+    for (let n = sections.length - 1; n >= 0; n--)
+      if (roleOf(sections[n].index) !== "sources" && roleOf(sections[n].index) !== "log") {
+        target = n;
+        break;
+      }
+  }
+  if (target < 0) return `${detail.trimEnd()}\n\n${block.join("\n")}\n`;
+  let end = target + 1 < sections.length ? sections[target + 1].at : lines.length;
+  while (end > sections[target].at + 1 && !lines[end - 1].trim()) end--;
+  return [
+    ...lines.slice(0, end),
+    "",
+    ...block,
+    ...(end < lines.length && lines[end].trim() ? [""] : []),
+    ...lines.slice(end)
+  ].join("\n");
 }

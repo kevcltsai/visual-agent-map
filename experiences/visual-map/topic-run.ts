@@ -12,6 +12,7 @@ import type { ResearchObserver, ResearchPreviewFields, ResearchStageName } from 
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
 import { checkCounts, standardTemplate } from "../../ai/detail-templates";
 import { carryForwardSources } from "../../core/steps/task/carry-sources";
+import { keepDroppedContent } from "../../core/steps/task/merge-check";
 import { failureReason, type Note, type NotePatch } from "../../repository";
 import type { RunStyle } from "../../ai/note-style-store";
 import type { UpdateMode } from "../../ai/note-style-recipe";
@@ -1289,15 +1290,32 @@ export class TopicRuns {
           // Write-back comes after the stale fence: the old Detail is `latest.detail`, which equals the one the run started with.
           const mode: WritebackMode = writeContext.updateMode ?? "merge";
           const writeLanguage = noteLanguageOf(context.outputLanguage ?? settings().language);
+          // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
+          let aiDetail =
+            mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, writeContext.detailTemplate);
+          // "AI suggested" later research (or a note whose sections cannot be followed): the numbers and links the rewrite
+          // dropped are put back from the Detail this run started from; the write is never refused for it.
+          if (
+            (context.aiSections === "follow" || context.aiSections === "general") &&
+            mode === "merge" &&
+            latest.detail.trim()
+          ) {
+            const kept = keepDroppedContent({
+              oldDetail: latest.detail,
+              newDetail: aiDetail,
+              summary: result.summary,
+              references: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
+              template: writeContext.detailTemplate ?? standardTemplate(writeLanguage),
+              language: writeLanguage
+            });
+            aiDetail = kept.detail;
+            if (kept.restored > 0) options.notify?.(t("ui.note_style_restored_0", kept.restored));
+          }
           const composed = await this.composeWrite({
             mode,
             path,
             oldDetail: latest.detail,
-            // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
-            aiDetail:
-              mode === "top"
-                ? result.detail
-                : canonicalDetail(result.detail, writeLanguage, writeContext.detailTemplate),
+            aiDetail,
             summary: result.summary,
             template: writeContext.detailTemplate ?? standardTemplate(writeLanguage),
             language: writeLanguage,

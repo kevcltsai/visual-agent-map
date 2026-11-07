@@ -2,21 +2,21 @@ var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __defNormalProp = (obj, key3, value) => key3 in obj ? __defProp(obj, key3, { enumerable: true, configurable: true, writable: true, value }) : obj[key3] = value;
+var __defNormalProp = (obj, key4, value) => key4 in obj ? __defProp(obj, key4, { enumerable: true, configurable: true, writable: true, value }) : obj[key4] = value;
 var __export = (target, all) => {
   for (var name2 in all)
     __defProp(target, name2, { get: all[name2], enumerable: true });
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
-    for (let key3 of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key3) && key3 !== except)
-        __defProp(to, key3, { get: () => from[key3], enumerable: !(desc = __getOwnPropDesc(from, key3)) || desc.enumerable });
+    for (let key4 of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key4) && key4 !== except)
+        __defProp(to, key4, { get: () => from[key4], enumerable: !(desc = __getOwnPropDesc(from, key4)) || desc.enumerable });
   }
   return to;
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var __publicField = (obj, key3, value) => __defNormalProp(obj, typeof key3 !== "symbol" ? key3 + "" : key3, value);
+var __publicField = (obj, key4, value) => __defNormalProp(obj, typeof key4 !== "symbol" ? key4 + "" : key4, value);
 
 // main.ts
 var main_exports = {};
@@ -8794,23 +8794,23 @@ function setUiLanguage(value) {
 function getUiLanguage() {
   return language;
 }
-function t(key3, ...values) {
-  return translate(language, key3, ...values);
+function t(key4, ...values) {
+  return translate(language, key4, ...values);
 }
-function translate(locale, key3, ...values) {
+function translate(locale, key4, ...values) {
   const entry = entryOf(locale);
-  const selected = "dictionary" in entry ? entry.dictionary[key3] : void 0;
-  const translated = selected || en[key3] || String(key3);
+  const selected = "dictionary" in entry ? entry.dictionary[key4] : void 0;
+  const translated = selected || en[key4] || String(key4);
   return translated.replace(/\{(\d+)\}/g, (_, index) => {
     const value = values[Number(index)];
     return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : `{${index}}`;
   });
 }
-function translateNote(locale, key3, ...values) {
-  return translate(noteLanguageOf(locale), key3, ...values);
+function translateNote(locale, key4, ...values) {
+  return translate(noteLanguageOf(locale), key4, ...values);
 }
-function tNote(key3, ...values) {
-  return translateNote(language, key3, ...values);
+function tNote(key4, ...values) {
+  return translateNote(language, key4, ...values);
 }
 function topicStatusLabel(status, locale) {
   const keys = {
@@ -9450,15 +9450,15 @@ function outputScriptObserverHeadings() {
   const entries = [
     ["coffee.observers_notes", void 0],
     ...Object.entries(TITLE_KEYS).map(
-      ([category, key3]) => [key3, category]
+      ([category, key4]) => [key4, category]
     )
   ];
   for (const locale of ["zh-CN"]) {
     if (!verbatimHeadingLanguage(locale)) continue;
     const note = noteLanguageOf(locale);
-    for (const [key3, category] of entries) {
-      const written2 = translate(locale, key3);
-      const heading = translate(note, key3);
+    for (const [key4, category] of entries) {
+      const written2 = translate(locale, key4);
+      const heading = translate(note, key4);
       if (written2 !== heading) forms.set(written2, { heading, category });
     }
   }
@@ -9663,8 +9663,8 @@ function baselineFromVersions(versions, language2) {
     }
     for (const insight of parsed) {
       if (!insight.summary) continue;
-      const key3 = `${insight.category}:${normalize(insight.summary)}`;
-      const previous = byText.get(key3);
+      const key4 = `${insight.category}:${normalize(insight.summary)}`;
+      const previous = byText.get(key4);
       if (previous) {
         previous.sources = unique([...previous.sources, ...insight.sources]);
         previous.detail = [previous.detail, insight.detail].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join("\n");
@@ -9684,7 +9684,7 @@ function baselineFromVersions(versions, language2) {
         while (existingIds.has(legacyId(insight.category, insight.summary, salt))) salt++;
         insight.id = legacyId(insight.category, insight.summary, salt);
       }
-      byText.set(key3, insight);
+      byText.set(key4, insight);
       result.push(insight);
     }
   }
@@ -9871,8 +9871,8 @@ function coffeeContentLocale(language2) {
 function coffeeLanguageName(language2, form) {
   return languagePromptName(coffeeContentLocale(language2), coffeeInstruction(language2), form);
 }
-function coffeeText(language2, key3, ...values) {
-  return translate(uiLocale(language2), key3, ...values);
+function coffeeText(language2, key4, ...values) {
+  return translate(uiLocale(language2), key4, ...values);
 }
 
 // experiences/coffee-tables/steps/_shared/observer-format.md
@@ -10334,12 +10334,12 @@ function validateConvergenceText(summary, detail, language2) {
   return errors;
 }
 function observerGuidance(language2, customization) {
-  const key3 = coffeeInstruction(language2);
-  const preserved = customization.preserve.map((rule) => GUIDANCE_PRESERVE[key3][rule]).join("\u3001") || GUIDANCE_PRESERVE_FALLBACK[key3];
-  return renderTemplate(GUIDANCE_PREFERENCES_TEMPLATE[key3], {
+  const key4 = coffeeInstruction(language2);
+  const preserved = customization.preserve.map((rule) => GUIDANCE_PRESERVE[key4][rule]).join("\u3001") || GUIDANCE_PRESERVE_FALLBACK[key4];
+  return renderTemplate(GUIDANCE_PREFERENCES_TEMPLATE[key4], {
     observer: customization.observerPrompt.trim(),
-    merge: GUIDANCE_MERGE_LEVEL[key3][customization.mergeLevel],
-    detail: GUIDANCE_DETAIL_LEVEL[key3][customization.detailLevel],
+    merge: GUIDANCE_MERGE_LEVEL[key4][customization.mergeLevel],
+    detail: GUIDANCE_DETAIL_LEVEL[key4][customization.detailLevel],
     preserved
   });
 }
@@ -10553,9 +10553,9 @@ function anchorContextFields(language2) {
   const words2 = new Map(
     inLanguage(FIELDS_ANCHOR_CONTEXT, language2).split("\n").map((line) => line.trim()).filter(Boolean).map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)])
   );
-  const word = (key3) => {
+  const word = (key4) => {
     var _a2;
-    return (_a2 = words2.get(key3)) != null ? _a2 : "";
+    return (_a2 = words2.get(key4)) != null ? _a2 : "";
   };
   return {
     image: word("image"),
@@ -10613,9 +10613,9 @@ function headingsVerbatim(output, instruction, custom = false, anchor) {
 var MAX_COFFEE_CONTEXT_CHARS = 18e4;
 var BUILTIN_COFFEE_STYLE_NAME = "\u81EA\u7136\u4EA4\u6D41\u8207\u8DE8\u57DF\u63A2\u7D22";
 function builtinCoffeeStyle(language2) {
-  const key3 = coffeeInstruction(language2);
-  return renderTemplate(BUILTIN_STYLE_TEMPLATE[key3], {
-    language: languagePromptName(coffeeContentLocale(language2), key3, "usage")
+  const key4 = coffeeInstruction(language2);
+  return renderTemplate(BUILTIN_STYLE_TEMPLATE[key4], {
+    language: languagePromptName(coffeeContentLocale(language2), key4, "usage")
   });
 }
 var BUILTIN_COFFEE_STYLE_PROMPT_EN = renderTemplate(BUILTIN_STYLE_TEMPLATE.en, {
@@ -10709,29 +10709,29 @@ function conversationStyle(language2, settings) {
 ${settings.customPrompt.trim()}` : builtin;
 }
 function observerTitles(language2) {
-  const key3 = coffeeInstruction(language2);
-  const clause = headingsVerbatim(coffeeContentLocale(language2), key3);
-  return clause ? `${OBSERVER_TITLES[key3]}
-${clause}` : OBSERVER_TITLES[key3];
+  const key4 = coffeeInstruction(language2);
+  const clause = headingsVerbatim(coffeeContentLocale(language2), key4);
+  return clause ? `${OBSERVER_TITLES[key4]}
+${clause}` : OBSERVER_TITLES[key4];
 }
 function observerFormat(language2, refreshOnly = false, customization) {
-  const key3 = coffeeInstruction(language2);
+  const key4 = coffeeInstruction(language2);
   const preferences = customization ? `${observerGuidance(language2, customization)}
 ` : "";
   return renderTemplate(OBSERVER_FORMAT_TEMPLATE, {
-    operation: refreshOnly ? `${OBSERVER_REFRESH_ONLY[key3]}
+    operation: refreshOnly ? `${OBSERVER_REFRESH_ONLY[key4]}
 ` : "",
     preferences,
-    source: OBSERVER_SOURCE[key3],
-    update: INSIGHT_UPDATE_FOOTER[key3],
+    source: OBSERVER_SOURCE[key4],
+    update: INSIGHT_UPDATE_FOOTER[key4],
     titles: observerTitles(language2)
   });
 }
 function invitationContext(invitedGuests, language2) {
   if (!invitedGuests.length) return "";
-  const key3 = coffeeInstruction(language2);
-  const role = GUEST_ROLE[key3];
-  return `${CONTEXT_INVITED_GUESTS[key3]}
+  const key4 = coffeeInstruction(language2);
+  const role = GUEST_ROLE[key4];
+  return `${CONTEXT_INVITED_GUESTS[key4]}
 ${invitedGuests.map((guest) => `- ${guest.name}\uFF5C${role[guest.category]}\uFF1A${guest.description}`).join("\n")}`;
 }
 function readableCoffeeStyle(style) {
@@ -10868,11 +10868,11 @@ var observerOnlyStep = {
   version: 1,
   render: ({ session }) => {
     var _a2, _b2, _c, _d;
-    const key3 = coffeeInstruction(session.language);
+    const key4 = coffeeInstruction(session.language);
     const style = ((_a2 = session.guests) == null ? void 0 : _a2.customization) ? cleanChatStyle(conversationStyle(session.language, session.guests)) : conversationStyle(session.language, session.guests);
-    return renderTemplate(key3 === "zh" ? prompt_zh_default : prompt_en_default, {
+    return renderTemplate(key4 === "zh" ? prompt_zh_default : prompt_en_default, {
       language: coffeeLanguageName(session.language, "plain"),
-      styleSection: style ? `${LABEL_CONVERSATION_STYLE_OBSERVER[key3]}:
+      styleSection: style ? `${LABEL_CONVERSATION_STYLE_OBSERVER[key4]}:
 ${style}
 ` : "",
       references: formatReferenceContext((_c = (_b2 = session.guests) == null ? void 0 : _b2.referenceFiles) != null ? _c : []),
@@ -11000,21 +11000,21 @@ function tablePrompt(topic, language2, guests, draft = "", priorContext = "", in
   return prepareStep(tableStep, { topic, language: language2, guests, draft, priorContext, invitedGuests }).prompt;
 }
 function openingPromptPreview(topic, language2, guests) {
-  const key3 = coffeeInstruction(language2);
+  const key4 = coffeeInstruction(language2);
   const style = cleanChatStyle(conversationStyle(language2, guests));
   const prompt = tablePrompt(topic, language2, { ...guests, stylePrompt: style });
   const guidance = guests.customization ? `${observerGuidance(language2, guests.customization)}
 ` : "";
   const readableNotes = `
 
-${renderTemplate(PREVIEW_OBSERVER_NOTES_TEMPLATE[key3], { guidance, titles: observerTitles(language2) })}`;
+${renderTemplate(PREVIEW_OBSERVER_NOTES_TEMPLATE[key4], { guidance, titles: observerTitles(language2) })}`;
   const protocol = observerFormat(language2, false, guests.customization) + segmentSummaryInstruction(language2);
   return prompt.slice(0, -protocol.length) + readableNotes;
 }
 
 // experiences/coffee-tables/customization-ui.ts
 function customizationFields(parent, initial, language2, changed = () => void 0) {
-  const t2 = (key3, ...values) => translate(uiLocale(language2), key3, ...values);
+  const t2 = (key4, ...values) => translate(uiLocale(language2), key4, ...values);
   const root = parent.createDiv("ct-customization-fields");
   const organize = root.createEl("section");
   organize.createEl("h4", { text: t2("coffee.how_to_organize") });
@@ -11054,7 +11054,7 @@ function customizationFields(parent, initial, language2, changed = () => void 0)
   const preserve = /* @__PURE__ */ new Map();
   const fieldset = converge.createEl("fieldset");
   fieldset.createEl("legend", { text: t2("coffee.keep_these_aspects") });
-  for (const [key3, label] of [
+  for (const [key4, label] of [
     ["disagreements", "coffee.preserve_disagreements"],
     ["conditions", "coffee.preserve_conditions"],
     ["counterexamples", "coffee.preserve_counterexamples"],
@@ -11064,7 +11064,7 @@ function customizationFields(parent, initial, language2, changed = () => void 0)
     const row = fieldset.createEl("label");
     const input2 = row.createEl("input", { attr: { type: "checkbox" } });
     row.createSpan({ text: t2(label) });
-    preserve.set(key3, input2);
+    preserve.set(key4, input2);
   }
   const warning = converge.createEl("p", {
     cls: "ct-muted",
@@ -11086,7 +11086,7 @@ function customizationFields(parent, initial, language2, changed = () => void 0)
     convergencePrompt: convergence.value,
     mergeLevel: merge.value,
     detailLevel: detail.value,
-    preserve: [...preserve].filter(([, input2]) => input2.checked).map(([key3]) => key3)
+    preserve: [...preserve].filter(([, input2]) => input2.checked).map(([key4]) => key4)
   });
   const validate = () => {
     errors.setText(validateCustomization(read(), language2).join("\n"));
@@ -11097,8 +11097,8 @@ function customizationFields(parent, initial, language2, changed = () => void 0)
     convergence.value = current.convergencePrompt;
     merge.value = current.mergeLevel;
     detail.value = current.detailLevel;
-    for (const [key3, input2] of preserve)
-      input2.checked = current.preserve.includes(key3);
+    for (const [key4, input2] of preserve)
+      input2.checked = current.preserve.includes(key4);
     validate();
   };
   root.addEventListener("input", () => {
@@ -11129,7 +11129,7 @@ function notifyConvergencePreview(engine, before, review) {
   const [draft, raw] = convergencePreviewMarks(engine);
   if (!draft && !raw) return;
   if (draft === before[0] && raw === before[1]) return;
-  const t2 = (key3) => translate(uiLocale(engine.session.language), key3);
+  const t2 = (key4) => translate(uiLocale(engine.session.language), key4);
   backgroundResultNotice(t2("coffee.convergence_preview_ready"), { label: t2("ui.background_review"), open: review });
 }
 var CoffeeCustomizationModal = class extends import_obsidian5.Modal {
@@ -11144,7 +11144,7 @@ var CoffeeCustomizationModal = class extends import_obsidian5.Modal {
   onOpen() {
     var _a2, _b2, _c, _d;
     this.modalEl.addClass("ct-customization-modal");
-    const { contentEl: content, engine } = this, t2 = (key3, ...values) => translate(uiLocale(engine.session.language), key3, ...values);
+    const { contentEl: content, engine } = this, t2 = (key4, ...values) => translate(uiLocale(engine.session.language), key4, ...values);
     content.createEl("h2", { text: t2("coffee.customize_this_table") });
     content.createEl("p", {
       cls: "ct-muted",
@@ -11226,7 +11226,7 @@ var CoffeeConvergenceModal = class extends import_obsidian5.Modal {
   onOpen() {
     var _a2, _b2;
     this.modalEl.addClass("ct-customization-modal");
-    const content = this.contentEl, engine = this.engine, t2 = (key3, ...values) => translate(uiLocale(engine.session.language), key3, ...values);
+    const content = this.contentEl, engine = this.engine, t2 = (key4, ...values) => translate(uiLocale(engine.session.language), key4, ...values);
     const draft = engine.session.convergenceDraft;
     content.createEl("h2", { text: t2("coffee.review_convergence") });
     content.createEl("p", {
@@ -11746,8 +11746,8 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     __publicField(this, "unsubscribeModels");
     this.locale = uiLocale(plugin.settings.language);
   }
-  t(key3, ...values) {
-    return translate(this.locale, key3, ...values);
+  t(key4, ...values) {
+    return translate(this.locale, key4, ...values);
   }
   onOpen() {
     this.titleEl.setText(this.t("coffee.take_to_visual_map_for_deeper_research"));
@@ -12199,9 +12199,9 @@ function variables3({ session, baseline, customization }) {
     limitations: item.limitations,
     pinned: pinned.has(item.id)
   }));
-  const key3 = coffeeInstruction(session.language);
-  const level = MERGE_LEVEL[key3][customization.mergeLevel];
-  const detail = DETAIL_LEVEL[key3][customization.detailLevel];
+  const key4 = coffeeInstruction(session.language);
+  const level = MERGE_LEVEL[key4][customization.mergeLevel];
+  const detail = DETAIL_LEVEL[key4][customization.detailLevel];
   return {
     guidance: observerGuidance(session.language, customization),
     level,
@@ -12520,15 +12520,15 @@ var CoffeeEngine = class {
     this.changed();
   }
   /** Dictionary text in the session's language. */
-  text(key3) {
-    return translate(coffeeContentLocale(this.session.language), key3);
+  text(key4) {
+    return translate(coffeeContentLocale(this.session.language), key4);
   }
   /** Whether the session is written in a Chinese-instruction language (the messages that only they localize). */
   get zh() {
     return coffeeInstruction(this.session.language) === "zh";
   }
-  engineError(key3) {
-    return new Error(this.text(key3));
+  engineError(key4) {
+    return new Error(this.text(key4));
   }
   assertCanEditNotes() {
     if (this.deleting || this.retired) throw this.engineError("coffee.engine_session_deleted");
@@ -13482,7 +13482,7 @@ function normalizedGuests(value, language2) {
   if (raw.counts && typeof raw.counts === "object") {
     const source = raw.counts;
     const counts2 = Object.fromEntries(
-      CATEGORIES3.map((key3) => [key3, Number.isInteger(source[key3]) ? Number(source[key3]) : -1])
+      CATEGORIES3.map((key4) => [key4, Number.isInteger(source[key4]) ? Number(source[key4]) : -1])
     );
     const guests = Array.isArray(raw.guests) ? raw.guests.filter(
       (item) => !!item && typeof item === "object" && typeof item.id === "string" && CATEGORIES3.includes(item.category) && typeof item.description === "string"
@@ -13650,12 +13650,12 @@ function copyLegacySession(legacy) {
   if (legacy.notes) {
     const titles = ["\u610F\u5916\u9023\u7D50", "\u503C\u5F97\u7E7C\u7E8C\u60F3\u7684\u554F\u984C", "\u6838\u5FC3\u5206\u6B67", "\u63A2\u7D22\u65B9\u5411", "\u503C\u5F97\u67E5\u8B49\u7684\u5047\u8A2D"];
     ["connections", "questions", "disagreements", "directions", "assumptions"].forEach(
-      (key3, index) => {
+      (key4, index) => {
         var _a2, _b2;
         return lines.push(
           `### ${titles[index]}`,
           "",
-          ...((_b2 = (_a2 = legacy.notes) == null ? void 0 : _a2[key3]) != null ? _b2 : []).map((item) => `- ${item}`),
+          ...((_b2 = (_a2 = legacy.notes) == null ? void 0 : _a2[key4]) != null ? _b2 : []).map((item) => `- ${item}`),
           ""
         );
       }
@@ -15265,8 +15265,8 @@ var CoffeeDeleteModal = class extends import_obsidian8.Modal {
     __publicField(this, "resolveResult");
     __publicField(this, "confirmed", false);
   }
-  t(key3, ...values) {
-    return translate(this.locale, key3, ...values);
+  t(key4, ...values) {
+    return translate(this.locale, key4, ...values);
   }
   confirm() {
     return new Promise((resolve) => {
@@ -15306,8 +15306,8 @@ var CoffeeSummaryConfirmModal = class extends import_obsidian8.Modal {
     __publicField(this, "result");
     __publicField(this, "confirmed", false);
   }
-  t(key3, ...values) {
-    return translate(this.locale, key3, ...values);
+  t(key4, ...values) {
+    return translate(this.locale, key4, ...values);
   }
   confirm() {
     return new Promise((resolve) => {
@@ -15341,8 +15341,8 @@ var CoffeeStyleNameModal = class extends import_obsidian8.Modal {
     this.locale = locale;
     __publicField(this, "resolveResult");
   }
-  t(key3, ...values) {
-    return translate(this.locale, key3, ...values);
+  t(key4, ...values) {
+    return translate(this.locale, key4, ...values);
   }
   ask() {
     return new Promise((resolve) => {
@@ -15389,8 +15389,8 @@ var CoffeePromptPreviewModal = class extends import_obsidian8.Modal {
     this.locale = locale;
     this.fullPrompt = fullPrompt;
   }
-  t(key3, ...values) {
-    return translate(this.locale, key3, ...values);
+  t(key4, ...values) {
+    return translate(this.locale, key4, ...values);
   }
   onOpen() {
     const content = this.contentEl;
@@ -15469,8 +15469,8 @@ function categoryLabel(category, language2) {
     assumptions: "coffee.insight_category_assumptions",
     solutions: "coffee.insight_category_solutions"
   };
-  const key3 = names3[category];
-  return key3 ? translate(uiLocale(language2), key3) : category;
+  const key4 = names3[category];
+  return key4 ? translate(uiLocale(language2), key4) : category;
 }
 function parseGuests(markdown) {
   return [...markdown.matchAll(/^- \*\*(.+?)\s*[｜|]\s*(.+?)\*\*[：:]\s*(.+)$/gm)].map(
@@ -15498,7 +15498,7 @@ function rosterFor(session, markdown) {
       return { category: item.id, label: item.label, count: (_a3 = settings == null ? void 0 : settings.counts[item.id]) != null ? _a3 : 0 };
     })
   ];
-  const textsOf = (keys) => LANGUAGES.flatMap((language2) => keys.map((key3) => translate(language2.id, key3).trim().toLocaleLowerCase())).filter(
+  const textsOf = (keys) => LANGUAGES.flatMap((language2) => keys.map((key4) => translate(language2.id, key4).trim().toLocaleLowerCase())).filter(
     Boolean
   );
   const expertTail = LANGUAGES.map((language2) => {
@@ -15524,8 +15524,8 @@ function rosterFor(session, markdown) {
   };
   const used = /* @__PURE__ */ new Map();
   for (const person of people) {
-    const key3 = roleKey(person.role);
-    if (key3) used.set(key3, ((_c = used.get(key3)) != null ? _c : 0) + 1);
+    const key4 = roleKey(person.role);
+    if (key4) used.set(key4, ((_c = used.get(key4)) != null ? _c : 0) + 1);
   }
   const display = coffeeContentLocale(session.language);
   const placeholders = roles.flatMap(
@@ -15682,8 +15682,8 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     window.setTimeout(() => node.removeClass("ct-outline-highlight"), 1800);
     return true;
   }
-  t(key3, ...values) {
-    return translate(uiLocale(this.plugin.settings.language), key3, ...values);
+  t(key4, ...values) {
+    return translate(uiLocale(this.plugin.settings.language), key4, ...values);
   }
   async refreshForLanguageChange() {
     var _a2, _b2, _c, _d, _e, _f;
@@ -16111,7 +16111,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       try {
         const previewSettings = {
           counts: Object.fromEntries(
-            [...countInputs].map(([key3, input2]) => [key3, Number(input2.value) || 0])
+            [...countInputs].map(([key4, input2]) => [key4, Number(input2.value) || 0])
           ),
           guests: inviteRows.map((item) => ({
             id: item.id,
@@ -16164,7 +16164,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
         customization: JSON.stringify(customization.read()),
         refs: JSON.stringify(referenceFiles),
         hostCount: hostCount.value,
-        ...Object.fromEntries([...countInputs].map(([key3, input2]) => [`count-${key3}`, input2.value])),
+        ...Object.fromEntries([...countInputs].map(([key4, input2]) => [`count-${key4}`, input2.value])),
         invites: JSON.stringify(
           inviteRows.map((item) => ({ id: item.id, category: item.category.value, description: item.description.value }))
         )
@@ -16319,7 +16319,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
     });
     const updateWarning = () => {
       const current = Object.fromEntries(
-        [...countInputs].map(([key3, input2]) => [key3, Number(input2.value)])
+        [...countInputs].map(([key4, input2]) => [key4, Number(input2.value)])
       );
       const assigned = Object.fromEntries(
         CATEGORIES4.map((item) => [
@@ -16374,7 +16374,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
         const issues = validateCustomization(customization.read(), this.plugin.settings.language);
         if (issues.length) throw new Error(issues.join("\n"));
         const finalCounts = Object.fromEntries(
-          [...countInputs].map(([key3, input2]) => [key3, Number(input2.value)])
+          [...countInputs].map(([key4, input2]) => [key4, Number(input2.value)])
         );
         const finalTotal = total(finalCounts);
         const guests = inviteRows.filter((item) => item.description.value.trim()).map((item) => ({
@@ -17286,12 +17286,12 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       const select = composer.createEl("select", {
         attr: { "aria-label": this.t("coffee.how_to_join"), "data-ct-field": "intervention-kind" }
       });
-      for (const [value, key3] of [
+      for (const [value, key4] of [
         ["comment", "coffee.intervention_comment"],
         ["guest-question", "coffee.intervention_guest_question"],
         ["redirect", "coffee.intervention_redirect"]
       ])
-        select.createEl("option", { value, text: this.t(key3) });
+        select.createEl("option", { value, text: this.t(key4) });
       select.value = (_j = this.composerValues.get("intervention-kind")) != null ? _j : "comment";
       select.addEventListener("change", () => this.composerValues.set("intervention-kind", select.value));
       const target = composer.createEl("input", {
@@ -18020,7 +18020,7 @@ function noteLanguageFromBody(body) {
     }).filter((heading) => heading !== void 0)
   );
   const found = NOTE_LANGUAGES.filter(
-    (language2) => STANDARD_HEADING_KEYS.some((key3) => headings.has(translate(language2, key3)))
+    (language2) => STANDARD_HEADING_KEYS.some((key4) => headings.has(translate(language2, key4)))
   );
   return found.length === 1 ? found[0] : void 0;
 }
@@ -18402,8 +18402,8 @@ function anchorRelationAllowed(image, relation, replacing) {
   const list = (_a2 = image.relations) != null ? _a2 : [];
   if (!replacing && list.length >= ANCHOR_RELATION_LIMIT) return false;
   if (!cleanAnchorRelation(relation, anchorIdsOf(image))) return false;
-  const key3 = relationPair(relation);
-  return !list.some((r) => relationPair(r) === key3 && !(replacing && relationPair(replacing) === key3));
+  const key4 = relationPair(relation);
+  return !list.some((r) => relationPair(r) === key4 && !(replacing && relationPair(replacing) === key4));
 }
 function addAnchorRelation(items, imageId, relation) {
   const image = findAnnotatedImage(items, imageId);
@@ -18415,11 +18415,11 @@ function addAnchorRelation(items, imageId, relation) {
   });
 }
 function removeAnchorRelation(items, imageId, anchorId, topicId) {
-  const key3 = relationPair({ from: anchorId, to: topicId });
+  const key4 = relationPair({ from: anchorId, to: topicId });
   return mapImage(items, imageId, (image) => {
     var _a2;
     const list = (_a2 = image.relations) != null ? _a2 : [];
-    const rest = list.filter((r) => relationPair(r) !== key3);
+    const rest = list.filter((r) => relationPair(r) !== key4);
     return rest.length === list.length ? image : withRelations(image, rest);
   });
 }
@@ -18427,9 +18427,9 @@ function updateAnchorRelation(items, imageId, anchorId, topicId, next) {
   var _a2;
   const image = findAnnotatedImage(items, imageId);
   if (!image) return [...items];
-  const key3 = relationPair({ from: anchorId, to: topicId });
-  const index = ((_a2 = image.relations) != null ? _a2 : []).findIndex((r) => relationPair(r) === key3);
-  if (index < 0 || relationPair(next) !== key3) return [...items];
+  const key4 = relationPair({ from: anchorId, to: topicId });
+  const index = ((_a2 = image.relations) != null ? _a2 : []).findIndex((r) => relationPair(r) === key4);
+  if (index < 0 || relationPair(next) !== key4) return [...items];
   const old = image.relations[index];
   if (!anchorRelationAllowed(image, next, old)) return [...items];
   const clean4 = cleanAnchorRelation(next, anchorIdsOf(image));
@@ -18523,12 +18523,12 @@ function retargetAnchorRelations(items, fromIds, toId) {
         from: fromIds.has(r.from) ? toId : r.from,
         to: fromIds.has(r.to) ? toId : r.to
       };
-      const key3 = relationPair(moved);
-      if (seen.has(key3)) {
+      const key4 = relationPair(moved);
+      if (seen.has(key4)) {
         droppedSamePair++;
         continue;
       }
-      seen.add(key3);
+      seen.add(key4);
       next.push(moved);
     }
     return withRelations(item, next);
@@ -19499,10 +19499,10 @@ function describeFocus(el, root, parentOf) {
   const scope = card && root.contains(card) && card.dataset.nodeId ? card : root;
   const nodeId = scope === card ? card.dataset.nodeId : void 0;
   if (nodeId && target === card) return { nodeId };
-  const key3 = keyOf(target);
-  const same = Array.from(scope.querySelectorAll(KEYED)).filter((peer) => keyOf(peer) === key3);
+  const key4 = keyOf(target);
+  const same = Array.from(scope.querySelectorAll(KEYED)).filter((peer) => keyOf(peer) === key4);
   const nth = Math.max(0, same.indexOf(target));
-  return nodeId ? { nodeId, key: key3, nth } : { key: key3, nth };
+  return nodeId ? { nodeId, key: key4, nth } : { key: key4, nth };
 }
 function resolveFocus(anchor, root, lookup) {
   var _a2, _b2, _c, _d, _e;
@@ -19601,10 +19601,10 @@ function childIndex(nodes) {
   var _a2;
   const index = /* @__PURE__ */ new Map();
   for (const node of nodes) {
-    const key3 = (_a2 = node.parentId) != null ? _a2 : "";
-    const list = index.get(key3);
+    const key4 = (_a2 = node.parentId) != null ? _a2 : "";
+    const list = index.get(key4);
     if (list) list.push(node);
-    else index.set(key3, [node]);
+    else index.set(key4, [node]);
   }
   return index;
 }
@@ -19730,10 +19730,10 @@ var bySiblingAxis = (axis) => (a, b) => axis === "y" ? a.y - b.y || a.x - b.x : 
 function alignSiblingsToScreen(nodes, axisOf) {
   const slots = /* @__PURE__ */ new Map();
   nodes.forEach((node, index) => {
-    const key3 = node.afterTextId && node.parentId ? `${node.parentId}\0${node.afterTextId}` : node.parentId;
-    const list = slots.get(key3);
+    const key4 = node.afterTextId && node.parentId ? `${node.parentId}\0${node.afterTextId}` : node.parentId;
+    const list = slots.get(key4);
     if (list) list.push(index);
-    else slots.set(key3, [index]);
+    else slots.set(key4, [index]);
   });
   const result = nodes.slice();
   let moved = false;
@@ -19810,19 +19810,19 @@ function classifyPresentationKey(event) {
   if (event.isComposing) return null;
   const mod = !!(event.ctrlKey || event.metaKey);
   const plain = !mod && !event.altKey && !event.shiftKey;
-  const key3 = event.key;
-  if (key3 === "Escape") return "exit";
-  if (READ_ONLY_KEYS.has(key3)) return "block";
-  if (mod && (key3 === "z" || key3 === "Z")) return "block";
-  if (key3 === " " || event.code === "Space") {
+  const key4 = event.key;
+  if (key4 === "Escape") return "exit";
+  if (READ_ONLY_KEYS.has(key4)) return "block";
+  if (mod && (key4 === "z" || key4 === "Z")) return "block";
+  if (key4 === " " || event.code === "Space") {
     if (mod || event.altKey) return "block";
     return event.shiftKey ? "prev" : "next";
   }
-  if (NEXT_KEYS.has(key3) || PREV_KEYS.has(key3) || key3 === "Home" || key3 === "End") {
+  if (NEXT_KEYS.has(key4) || PREV_KEYS.has(key4) || key4 === "Home" || key4 === "End") {
     if (!plain) return "block";
-    if (key3 === "Home") return "first";
-    if (key3 === "End") return "last";
-    return NEXT_KEYS.has(key3) ? "next" : "prev";
+    if (key4 === "Home") return "first";
+    if (key4 === "End") return "last";
+    return NEXT_KEYS.has(key4) ? "next" : "prev";
   }
   return null;
 }
@@ -19885,7 +19885,7 @@ function hasProvenSource(item) {
   const source = item.source;
   return !(!source || [source.branchId, source.resultId, source.notePath, source.contentHash].some(
     (value) => typeof value !== "string" || !value.trim()
-  ) || !Number.isInteger(source.version) || source.version < 1 || !/^[a-f0-9]{64}$/i.test(source.contentHash) || !((_a2 = item.rationale) == null ? void 0 : _a2.trim()) || !((_c = (_b2 = item.validity) == null ? void 0 : _b2.reason) == null ? void 0 : _c.trim()) || !Array.isArray(item.validity.conditionKeys) || item.validity.conditionKeys.some((key3) => typeof key3 !== "string" || !key3.trim()));
+  ) || !Number.isInteger(source.version) || source.version < 1 || !/^[a-f0-9]{64}$/i.test(source.contentHash) || !((_a2 = item.rationale) == null ? void 0 : _a2.trim()) || !((_c = (_b2 = item.validity) == null ? void 0 : _b2.reason) == null ? void 0 : _c.trim()) || !Array.isArray(item.validity.conditionKeys) || item.validity.conditionKeys.some((key4) => typeof key4 !== "string" || !key4.trim()));
 }
 function researchUnprovenReuse(subtopics) {
   if (!Array.isArray(subtopics)) return subtopics;
@@ -19902,7 +19902,7 @@ function validateAimResearchPlan(subtopics) {
     if (!item || typeof item !== "object") return true;
     const fields = item;
     return ["id", "title", "task", "expectedValue"].some(
-      (key3) => typeof fields[key3] !== "string" || !fields[key3].trim()
+      (key4) => typeof fields[key4] !== "string" || !fields[key4].trim()
     );
   }))
     throw new Error("Planner must return 0\u20135 valid research subtopics before the answer can proceed.");
@@ -19941,7 +19941,7 @@ var LEGACY_VALUES = [
   ["__mindsearch_unknown__", "__aim_unknown__"]
 ];
 var LEGACY_MARKER = new RegExp(`<!--(\\s*)${LEGACY_MARKER_PREFIX}`, "g");
-var upgradeKey = (key3) => key3.startsWith(LEGACY_KEY_PREFIX) ? `aim${key3.slice(LEGACY_KEY_PREFIX.length)}` : key3;
+var upgradeKey = (key4) => key4.startsWith(LEGACY_KEY_PREFIX) ? `aim${key4.slice(LEGACY_KEY_PREFIX.length)}` : key4;
 function upgradeLegacyAimText(text12) {
   let upgraded = text12.replace(LEGACY_MARKER, "<!--$1aim-");
   for (const [legacy, current] of LEGACY_VALUES) upgraded = upgraded.split(legacy).join(current);
@@ -19952,9 +19952,9 @@ function upgradeLegacyAimData(value) {
   if (Array.isArray(value)) return value.map((item) => upgradeLegacyAimData(item));
   if (!value || typeof value !== "object") return value;
   const upgraded = {};
-  for (const [key3, item] of Object.entries(value)) {
-    const target = upgradeKey(key3);
-    if (target !== key3 && Object.prototype.hasOwnProperty.call(value, target)) continue;
+  for (const [key4, item] of Object.entries(value)) {
+    const target = upgradeKey(key4);
+    if (target !== key4 && Object.prototype.hasOwnProperty.call(value, target)) continue;
     upgraded[target] = upgradeLegacyAimData(item);
   }
   return upgraded;
@@ -20259,8 +20259,8 @@ function fishbonePositions(input2) {
     const out = [{ id: root.id, x: 0, y: -rootHeight / 2, height: rootHeight }];
     const edge = { above: -rib, below: -rib };
     for (const fish of topics) {
-      const key3 = fish.side === 1 ? "above" : "below";
-      const at = edge[key3] - fish.maxX;
+      const key4 = fish.side === 1 ? "above" : "below";
+      const at = edge[key4] - fish.maxX;
       const attachY = -fish.side * fish.length;
       out.push({
         id: fish.topic.id,
@@ -20275,7 +20275,7 @@ function fishbonePositions(input2) {
           y: attachY + fish.side * card.centre - card.height / 2,
           height: card.height
         });
-      edge[key3] = at + fish.minX - rib;
+      edge[key4] = at + fish.minX - rib;
     }
     const minX = Math.min(...out.map((card) => card.x));
     const minY = Math.min(...out.map((card) => card.y));
@@ -20570,9 +20570,9 @@ function structureOf(nodes, folded2) {
   const ids = new Map(nodes.map((node) => [node.id, node]));
   const children = /* @__PURE__ */ new Map();
   const joins = /* @__PURE__ */ new Map();
-  const add = (map, key3, node) => {
+  const add = (map, key4, node) => {
     var _a3;
-    return map.set(key3, [...(_a3 = map.get(key3)) != null ? _a3 : [], node]);
+    return map.set(key4, [...(_a3 = map.get(key4)) != null ? _a3 : [], node]);
   };
   for (const node of nodes) {
     if (!node.parentId) continue;
@@ -21116,12 +21116,12 @@ function sanitizeTopicRelations(map, log = (l, m) => debugLog.appendLog(l, m)) {
       continue;
     }
     const clean4 = { kind: r.kind, from: r.from, to: r.to };
-    const key3 = relationKey(clean4);
-    if (seen.has(key3)) {
+    const key4 = relationKey(clean4);
+    if (seen.has(key4)) {
       dropped++;
       continue;
     }
-    seen.add(key3);
+    seen.add(key4);
     if (typeof r.description === "string") clean4.description = r.description;
     else if ("description" in r) droppedDescriptions++;
     kept.push(clean4);
@@ -21165,8 +21165,8 @@ function reachesByKind(relations, kind, start, target) {
 function relationAllowed(relations, candidate, replacingIndex) {
   if (candidate.from === candidate.to) return false;
   const others = relations.filter((_, i) => i !== replacingIndex);
-  const key3 = relationKey(candidate);
-  if (others.some((r) => relationKey(r) === key3)) return false;
+  const key4 = relationKey(candidate);
+  if (others.some((r) => relationKey(r) === key4)) return false;
   if (isAcyclicKind(candidate.kind) && reachesByKind(others, candidate.kind, candidate.to, candidate.from))
     return false;
   return true;
@@ -21187,12 +21187,12 @@ function retargetTopicRelations(map, fromIds, toId) {
   map.topicRelations.forEach((r, i) => {
     const next = copyRelation(r, move(r.from), move(r.to));
     if (next.from === next.to) return;
-    const key3 = relationKey(next);
-    if (seen.has(key3)) {
+    const key4 = relationKey(next);
+    if (seen.has(key4)) {
       result.droppedSamePair++;
       return;
     }
-    seen.add(key3);
+    seen.add(key4);
     if (isAcyclicKind(next.kind) && (next.from !== r.from || next.to !== r.to)) touched.push({ r: next, i });
     else kept.push({ r: next, i });
   });
@@ -21280,7 +21280,7 @@ function validDeliveryCheckpoint(checkpoint) {
   return !!checkpoint && typeof checkpoint === "object" && !Array.isArray(checkpoint) && [checkpoint.outline, checkpoint.research, checkpoint.draft, checkpoint.acceptance].every(
     (result) => result === void 0 || resultValid(result)
   ) && hashValid(checkpoint.baseFingerprint) && hashValid(checkpoint.researchFingerprint) && hashValid(checkpoint.draftFingerprint) && (checkpoint.sections === void 0 || !!checkpoint.sections && typeof checkpoint.sections === "object" && !Array.isArray(checkpoint.sections) && Object.entries(checkpoint.sections).every(
-    ([key3, section3]) => !!key3.trim() && !!section3 && hashValid(section3.fingerprint) && typeof section3.fingerprint === "string" && Array.isArray(section3.evidenceIds) && section3.evidenceIds.every((id) => typeof id === "string" && !!id.trim()) && resultValid(section3.result)
+    ([key4, section3]) => !!key4.trim() && !!section3 && hashValid(section3.fingerprint) && typeof section3.fingerprint === "string" && Array.isArray(section3.evidenceIds) && section3.evidenceIds.every((id) => typeof id === "string" && !!id.trim()) && resultValid(section3.result)
   ));
 }
 var clone = (value) => JSON.parse(JSON.stringify(value));
@@ -21795,9 +21795,9 @@ function begin(deps) {
   const noteOps = [];
   const sources = [];
   const placed = [];
-  const attachment = (key3) => {
-    const found = placed.find((item) => item.key === key3);
-    if (!found) throw new Error(`Not an attachment of this step: ${key3}`);
+  const attachment = (key4) => {
+    const found = placed.find((item) => item.key === key4);
+    if (!found) throw new Error(`Not an attachment of this step: ${key4}`);
     return found.path;
   };
   let committed = false;
@@ -22049,9 +22049,9 @@ function begin(deps) {
       noteOps.push({ path, write });
       return transaction;
     },
-    createAttachment(key3, source) {
-      if (sources.some((item) => item.key === key3)) throw new Error(`Attachment key used twice: ${key3}`);
-      sources.push({ key: key3, ...source });
+    createAttachment(key4, source) {
+      if (sources.some((item) => item.key === key4)) throw new Error(`Attachment key used twice: ${key4}`);
+      sources.push({ key: key4, ...source });
       return transaction;
     },
     async commit(options = {}) {
@@ -22415,14 +22415,14 @@ var TopicSelection = class {
   }
   // ---- relation line ----
   /** Pointer down, click or focus on a line or its row (18032, 18038, 18181, 11724). */
-  selectRelation(key3) {
-    if (this.relation === key3) return NO_CHANGE;
-    this.relation = key3;
+  selectRelation(key4) {
+    if (this.relation === key4) return NO_CHANGE;
+    this.relation = key4;
     return change([], false, true);
   }
   /** Blur of a row, or the edited relation was removed (18185, 11716): only the same key is cleared. */
-  deselectRelation(key3) {
-    if (this.relation !== key3) return NO_CHANGE;
+  deselectRelation(key4) {
+    if (this.relation !== key4) return NO_CHANGE;
     this.relation = null;
     return change([], false, true);
   }
@@ -22476,7 +22476,7 @@ var AimClarificationModal = class extends import_obsidian11.Modal {
   }
   onOpen() {
     var _a2;
-    const text12 = (key3) => translate(this.language, key3);
+    const text12 = (key4) => translate(this.language, key4);
     this.titleEl.setText(text12("ui.aim_clarify_title"));
     this.contentEl.createEl("p", {
       text: text12("ui.aim_clarify_intro")
@@ -22810,7 +22810,7 @@ var NEW_STANDARD_HEADING_KEYS = [
 ];
 var lowered = (value) => value.trim().toLocaleLowerCase();
 var SPELLINGS = ["zh-TW", "zh-CN", "en"];
-var spellings = (key3) => SPELLINGS.map((locale) => translate(locale, key3));
+var spellings = (key4) => SPELLINGS.map((locale) => translate(locale, key4));
 var both = (value) => [value.zh, value.en];
 var rows;
 function sectionAliasRows() {
@@ -22851,19 +22851,19 @@ function sectionAliasRows() {
   return rows;
 }
 function sectionAliasesFor(heading) {
-  const key3 = lowered(heading);
+  const key4 = lowered(heading);
   const result = [];
   for (const row of sectionAliasRows())
-    if (row.names.some((entry) => lowered(entry) === key3)) {
+    if (row.names.some((entry) => lowered(entry) === key4)) {
       for (const alias of row.aliases)
-        if (lowered(alias) !== key3 && !result.some((existing) => lowered(existing) === lowered(alias)))
+        if (lowered(alias) !== key4 && !result.some((existing) => lowered(existing) === lowered(alias)))
           result.push(alias);
     }
   return result;
 }
 function isNewSourcesHeading(heading) {
-  const key3 = lowered(heading);
-  return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key3);
+  const key4 = lowered(heading);
+  return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key4);
 }
 
 // core/steps/task/source-registry.md
@@ -23234,9 +23234,9 @@ function standardTemplate(language2, display = language2) {
   return {
     id: STANDARD_TEMPLATE_ID,
     name: translate(display, "ui.detail_template_standard"),
-    sections: STANDARD.map(([id, key3, descriptionKey, role]) => {
-      const name2 = translate(language2, key3);
-      const spellings2 = NOTE_LANGUAGES.map((locale) => translate(locale, key3)).filter((alias) => alias !== name2);
+    sections: STANDARD.map(([id, key4, descriptionKey, role]) => {
+      const name2 = translate(language2, key4);
+      const spellings2 = NOTE_LANGUAGES.map((locale) => translate(locale, key4)).filter((alias) => alias !== name2);
       const earlier = sectionAliasesFor(name2).filter(
         (alias) => alias !== name2 && !spellings2.some((known) => known.toLocaleLowerCase() === alias.toLocaleLowerCase())
       );
@@ -23267,17 +23267,17 @@ var headingKey = (value) => value.trim().toLocaleLowerCase();
 function sectionLookup(template2) {
   const lookup = /* @__PURE__ */ new Map();
   template2.sections.forEach(
-    (section3, index) => section3.aliases.map(headingKey).forEach((key3) => key3 && lookup.set(key3, index))
+    (section3, index) => section3.aliases.map(headingKey).forEach((key4) => key4 && lookup.set(key4, index))
   );
   template2.sections.forEach((section3, index) => {
-    const key3 = headingKey(section3.name);
-    if (key3) lookup.set(key3, index);
+    const key4 = headingKey(section3.name);
+    if (key4) lookup.set(key4, index);
   });
   return lookup;
 }
 function sourcesHeadingKeys(template2) {
   const index = template2.sections.findIndex((section3) => section3.role === "sources");
-  return new Set([...sectionLookup(template2)].filter(([, target]) => target === index).map(([key3]) => key3));
+  return new Set([...sectionLookup(template2)].filter(([, target]) => target === index).map(([key4]) => key4));
 }
 function withoutConflictingAliases(sections) {
   const names3 = new Set(sections.map((section3) => headingKey(section3.name)));
@@ -23407,8 +23407,8 @@ function checkCounts(detail, template2) {
   return issues;
 }
 function countIssueText(issue2, language2) {
-  const key3 = issue2.mode === "exact" ? "ui.detail_count_issue_exact" : "ui.detail_count_issue_min";
-  return translate(language2, key3, issue2.section, issue2.n, issue2.actual);
+  const key4 = issue2.mode === "exact" ? "ui.detail_count_issue_exact" : "ui.detail_count_issue_min";
+  return translate(language2, key4, issue2.section, issue2.n, issue2.actual);
 }
 function detailStructurePrompt(template2, language2, standardText, anchor) {
   return [
@@ -24009,9 +24009,9 @@ function hypothesisLines(block) {
   const found = [];
   for (const line of block.split(/\r?\n/)) {
     const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
-    const key3 = match ? (_b2 = (_a2 = match[1]) != null ? _a2 : match[2]) != null ? _b2 : match[3] : void 0;
-    if (match && key3 !== void 0 && HYPOTHESIS_KEYS.includes(key3))
-      found.push(`${key3}=${match[4].replace(/^(["'])(.*)\1$/, "$2")}`);
+    const key4 = match ? (_b2 = (_a2 = match[1]) != null ? _a2 : match[2]) != null ? _b2 : match[3] : void 0;
+    if (match && key4 !== void 0 && HYPOTHESIS_KEYS.includes(key4))
+      found.push(`${key4}=${match[4].replace(/^(["'])(.*)\1$/, "$2")}`);
   }
   return found;
 }
@@ -24057,9 +24057,9 @@ function guardMapChatWrite(check) {
     return { ok: false, code: "duplicate_identity_key" };
   const was = topLevelValues(frontmatterBlock(before), TOPIC_IDENTITY_KEYS);
   const now = topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS);
-  for (const key3 of TOPIC_IDENTITY_KEYS) {
-    if (was.get(key3) === now.get(key3)) continue;
-    return { ok: false, code: was.has(key3) ? "topic_identity_changed" : "reserved_frontmatter" };
+  for (const key4 of TOPIC_IDENTITY_KEYS) {
+    if (was.get(key4) === now.get(key4)) continue;
+    return { ok: false, code: was.has(key4) ? "topic_identity_changed" : "reserved_frontmatter" };
   }
   if (hypothesisLines(frontmatterBlock(before)).join("\n") !== hypothesisLines(frontmatterBlock(check.newContent)).join("\n"))
     return { ok: false, code: "hypothesis_frontmatter_changed" };
@@ -24105,9 +24105,9 @@ function contentHash2(text12) {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, "0");
 }
 function isMdStale(hashes, path, currentContent) {
-  const key3 = normalizeVaultPath(path);
-  if (key3 === null || !Object.prototype.hasOwnProperty.call(hashes, key3)) return true;
-  return hashes[key3] !== contentHash2(currentContent);
+  const key4 = normalizeVaultPath(path);
+  if (key4 === null || !Object.prototype.hasOwnProperty.call(hashes, key4)) return true;
+  return hashes[key4] !== contentHash2(currentContent);
 }
 var clip = (value, limit) => {
   const text12 = value.replace(/\s+/g, " ").trim();
@@ -24252,37 +24252,37 @@ function buildMapChatContext(input2) {
   };
   for (const node of input2.outline) topicHashes[node.id] = { title: node.title, parentId: node.parentId };
   const record = (path, content) => {
-    const key3 = normalizeVaultPath(path);
-    if (key3 === null) return null;
-    hashes[key3] = contentHash2(content);
-    return key3;
+    const key4 = normalizeVaultPath(path);
+    if (key4 === null) return null;
+    hashes[key4] = contentHash2(content);
+    return key4;
   };
   const files = input2.files.map((file) => {
     basis.read.push({ path: file.path, title: noteTitle2(file.path) });
-    const key3 = record(file.path, file.content);
-    return { path: file.path, contentHash: key3 === null ? null : hashes[key3], content: file.content };
+    const key4 = record(file.path, file.content);
+    return { path: file.path, contentHash: key4 === null ? null : hashes[key4], content: file.content };
   });
   const active = input2.activeFile ? (() => {
-    const key3 = normalizeVaultPath(input2.activeFile.path);
-    const duplicate = key3 !== null && input2.files.some((file) => normalizeVaultPath(file.path) === key3);
+    const key4 = normalizeVaultPath(input2.activeFile.path);
+    const duplicate = key4 !== null && input2.files.some((file) => normalizeVaultPath(file.path) === key4);
     if (!duplicate) {
       record(input2.activeFile.path, input2.activeFile.content);
       basis.read.push({ path: input2.activeFile.path, title: noteTitle2(input2.activeFile.path) });
     }
     return duplicate ? { path: input2.activeFile.path, sameAsListedFile: true } : {
       path: input2.activeFile.path,
-      contentHash: key3 === null ? null : hashes[key3],
+      contentHash: key4 === null ? null : hashes[key4],
       content: input2.activeFile.content
     };
   })() : null;
   const snippets = input2.snippets.map((snippet) => {
     if (!basis.read.some((entry) => entry.path === snippet.path))
       basis.read.push({ path: snippet.path, title: noteTitle2(snippet.path) });
-    const key3 = snippet.fileContent === void 0 ? null : record(snippet.path, snippet.fileContent);
+    const key4 = snippet.fileContent === void 0 ? null : record(snippet.path, snippet.fileContent);
     return {
       path: snippet.path,
       ...snippet.pathGuessed ? { pathGuessed: true } : {},
-      contentHash: key3 === null ? null : hashes[key3],
+      contentHash: key4 === null ? null : hashes[key4],
       text: snippet.text
     };
   });
@@ -24590,12 +24590,12 @@ function normalizeOutputScriptHeadings(detail, output, template2, context = {}) 
   if (!verbatimHeadingLanguage(output) || template2 && !isBuiltinTemplateId(template2.id)) return detail;
   const note = noteLanguageOf(output);
   const forms = /* @__PURE__ */ new Map();
-  for (const key3 of [
+  for (const key4 of [
     ...[...STANDARD, ...LEGACY_STANDARD].map(([, standardKey]) => standardKey),
     ...NEW_STANDARD_HEADING_KEYS
   ]) {
-    const canonical = translate(note, key3);
-    const written2 = translate(output, key3);
+    const canonical = translate(note, key4);
+    const written2 = translate(output, key4);
     if (written2 !== canonical) forms.set(written2, canonical);
   }
   const lines = detail.split("\n");
@@ -24682,9 +24682,9 @@ function dedupeReferenceGroups(groups) {
   return groups.map((group) => ({
     ...group,
     documents: group.documents.filter((document2) => {
-      const key3 = document2.key || document2.path;
-      if (seen.has(key3)) return false;
-      seen.add(key3);
+      const key4 = document2.key || document2.path;
+      if (seen.has(key4)) return false;
+      seen.add(key4);
       return true;
     })
   }));
@@ -24864,15 +24864,15 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template2)
   const ordered = [];
   let next = 0;
   const number = (target) => {
-    const key3 = targetKey(target);
-    if (!numbers.has(key3)) {
+    const key4 = targetKey(target);
+    if (!numbers.has(key4)) {
       do
         next++;
       while (reserved.has(String(next)));
-      numbers.set(key3, next);
+      numbers.set(key4, next);
       ordered.push(`[^${next}]: ${target}`);
     }
-    return numbers.get(key3);
+    return numbers.get(key4);
   };
   const renumbered = body.map(
     (line, index) => bodyCode[index] ? line : outsideInlineCode(
@@ -25274,29 +25274,29 @@ function topicAppearanceValues(fm, change2) {
 function setFrontmatterKeys(content, values) {
   var _a2;
   const eol = content.includes("\r\n") ? "\r\n" : "\n";
-  const render = (key3, value) => typeof value === "boolean" ? [`${key3}: ${value}`] : Array.isArray(value) ? [`${key3}:`, ...value.map((item) => `  - ${JSON.stringify(item)}`)] : [`${key3}: ${JSON.stringify(value)}`];
+  const render = (key4, value) => typeof value === "boolean" ? [`${key4}: ${value}`] : Array.isArray(value) ? [`${key4}:`, ...value.map((item) => `  - ${JSON.stringify(item)}`)] : [`${key4}: ${JSON.stringify(value)}`];
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?=\r?\n|$)/.exec(content);
   if (!match) {
-    const lines = Object.entries(values).flatMap(([key3, value]) => value === null ? [] : render(key3, value));
+    const lines = Object.entries(values).flatMap(([key4, value]) => value === null ? [] : render(key4, value));
     return lines.length ? `---${eol}${lines.join(eol)}${eol}---${eol}${content}` : content;
   }
   const kept = [];
   const written2 = /* @__PURE__ */ new Set();
   let skipping = false;
   for (const line of match[1].split(/\r?\n/)) {
-    const key3 = (_a2 = /^([A-Za-z][\w-]*):/.exec(line)) == null ? void 0 : _a2[1];
-    if (key3) {
-      skipping = Object.keys(values).includes(key3);
-      if (skipping && !written2.has(key3)) {
-        written2.add(key3);
-        const value = values[key3];
-        if (value !== null) kept.push(...render(key3, value));
+    const key4 = (_a2 = /^([A-Za-z][\w-]*):/.exec(line)) == null ? void 0 : _a2[1];
+    if (key4) {
+      skipping = Object.keys(values).includes(key4);
+      if (skipping && !written2.has(key4)) {
+        written2.add(key4);
+        const value = values[key4];
+        if (value !== null) kept.push(...render(key4, value));
       }
     } else if (skipping && !/^\s+|^-(\s|$)/.test(line) && line !== "") skipping = false;
     if (!skipping) kept.push(line);
   }
-  for (const [key3, value] of Object.entries(values))
-    if (!written2.has(key3) && value !== null) kept.push(...render(key3, value));
+  for (const [key4, value] of Object.entries(values))
+    if (!written2.has(key4) && value !== null) kept.push(...render(key4, value));
   return `---${eol}${kept.join(eol)}${eol}---${content.slice(match[0].length)}`;
 }
 var localDate = (date = /* @__PURE__ */ new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -25885,8 +25885,8 @@ var Repository = class {
   headingsFor(textLanguage) {
     return noteHeadingsOf(contentLocale(textLanguage, uiLocale(this.settings.language)));
   }
-  message(key3) {
-    return translate(this.settings.language, key3);
+  message(key4) {
+    return translate(this.settings.language, key4);
   }
   file(path) {
     const file = this.app.vault.getAbstractFileByPath(path);
@@ -26135,7 +26135,7 @@ var Repository = class {
     if (Array.isArray(fm["agent-map-references"]))
       fm["agent-map-references"] = fm["agent-map-references"].map((value) => localizeReference(String(value), language2));
     fm.title = (_a2 = patch.title) != null ? _a2 : noteTitle(content, fm, baseName2(path).replace(/\.md$/, ""));
-    for (const key3 of ["summary", "model", "status"]) if (patch[key3] !== void 0) fm[key3] = patch[key3];
+    for (const key4 of ["summary", "model", "status"]) if (patch[key4] !== void 0) fm[key4] = patch[key4];
     if (patch.modelSource !== void 0) fm["model-source"] = patch.modelSource;
     if (patch.reasoning !== void 0) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
     if (patch.researchMode !== void 0) fm["research-mode"] = patch.researchMode;
@@ -26680,12 +26680,12 @@ ${body}`);
    * Markdown files whose frontmatter sets `key`. Indexed files are judged from the metadata cache; only files the
    * cache has not indexed yet (for example, created moments ago) are read, so a large vault is not read in full.
    */
-  async markedFiles(key3) {
+  async markedFiles(key4) {
     var _a2;
     const files = [];
     for (const file of this.app.vault.getMarkdownFiles()) {
       const cache = this.app.metadataCache.getFileCache(file);
-      if (cache ? marker2((_a2 = cache.frontmatter) == null ? void 0 : _a2[key3]) : marker2(frontmatter(await this.app.vault.cachedRead(file))[key3]))
+      if (cache ? marker2((_a2 = cache.frontmatter) == null ? void 0 : _a2[key4]) : marker2(frontmatter(await this.app.vault.cachedRead(file))[key4]))
         files.push(file);
     }
     return files;
@@ -26988,7 +26988,7 @@ ${body}`);
       const { head, body } = splitFrontmatter(before);
       const fm = frontmatter(before);
       const userKeyLink = Object.entries(fm).some(
-        ([key3, value]) => key3 !== "agent-map-references" && findWikilinks(JSON.stringify(value)).some((link) => {
+        ([key4, value]) => key4 !== "agent-map-references" && findWikilinks(JSON.stringify(value)).some((link) => {
           var _a2;
           return moves.has((_a2 = resolve(linkPathOf(link.target))) != null ? _a2 : "");
         })
@@ -27235,8 +27235,8 @@ ${body}`;
         };
       });
       map.viewport = { ...source.viewport };
-      for (const key3 of ["outputLanguage", "aiMode", "layout", "detailTemplateId", "toneId"])
-        if (source[key3] !== void 0) map[key3] = cloneJson(source[key3]);
+      for (const key4 of ["outputLanguage", "aiMode", "layout", "detailTemplateId", "toneId"])
+        if (source[key4] !== void 0) map[key4] = cloneJson(source[key4]);
       if (source.topicRelations)
         map.topicRelations = source.topicRelations.map((relation) => ({
           ...relation,
@@ -27266,8 +27266,8 @@ ${body}`;
     return mapPath;
   }
   /** Why `path` cannot be a Mind Maps/AIM folder, or null: empty, inside/around the legacy Topics folder, or clashing with the other one. */
-  mapFolderProblem(key3, path) {
-    const other = this.settings[key3 === "mindMapsFolder" ? "aimFolder" : "mindMapsFolder"];
+  mapFolderProblem(key4, path) {
+    const other = this.settings[key4 === "mindMapsFolder" ? "aimFolder" : "mindMapsFolder"];
     const related = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
     const workspace = this.settings.workspaceFolder;
     if (!path || path === workspace || !path.startsWith(`${workspace}/`)) return "error.map_folder_invalid";
@@ -27281,11 +27281,11 @@ ${body}`;
    * then the old folder is removed only if it is empty. Returns old Map.md path -> new Map.md path.
    * `busy` lets the caller veto when an open view has AIM work running.
    */
-  async changeMapFolder(key3, path, busy = () => false, onProgress) {
+  async changeMapFolder(key4, path, busy = () => false, onProgress) {
     var _a2;
-    const next = (0, import_obsidian13.normalizePath)(path), current = this.settings[key3];
+    const next = (0, import_obsidian13.normalizePath)(path), current = this.settings[key4];
     if (next === current) return /* @__PURE__ */ new Map();
-    const problem = this.mapFolderProblem(key3, next);
+    const problem = this.mapFolderProblem(key4, next);
     if (problem) throw new Error(this.message(problem));
     const old = this.app.vault.getAbstractFileByPath(current);
     let mapping = /* @__PURE__ */ new Map();
@@ -27319,7 +27319,7 @@ ${body}`;
         }
       }
     }
-    this.settings[key3] = next;
+    this.settings[key4] = next;
     return mapping;
   }
   /** The legacy folders that are cleaned up once empty: the old Topics folder and the old Inbox folder. */
@@ -28036,9 +28036,9 @@ function dragCoverFrame(mode, start, dx, dy) {
   if (mode.includes("s")) bottom = clamp(bottom + dy, top + MIN_FRAME_SIDE, 1);
   return { x: round2(left), y: round2(top), w: round2(right - left), h: round2(bottom - top) };
 }
-function nudgeCoverFrame(frame, key3, shift) {
-  const dx = key3 === "ArrowRight" ? FRAME_KEY_STEP : key3 === "ArrowLeft" ? -FRAME_KEY_STEP : 0;
-  const dy = key3 === "ArrowDown" ? FRAME_KEY_STEP : key3 === "ArrowUp" ? -FRAME_KEY_STEP : 0;
+function nudgeCoverFrame(frame, key4, shift) {
+  const dx = key4 === "ArrowRight" ? FRAME_KEY_STEP : key4 === "ArrowLeft" ? -FRAME_KEY_STEP : 0;
+  const dy = key4 === "ArrowDown" ? FRAME_KEY_STEP : key4 === "ArrowUp" ? -FRAME_KEY_STEP : 0;
   if (!dx && !dy) return null;
   return dragCoverFrame(shift ? "se" : "move", frame, dx, dy);
 }
@@ -28061,11 +28061,11 @@ var HANDLE_KEY = {
   sw: "ui.topic_cover_frame_handle_sw",
   w: "ui.topic_cover_frame_handle_w"
 };
-function nudgeCoverFrameEdge(mode, frame, key3) {
+function nudgeCoverFrameEdge(mode, frame, key4) {
   const horizontal = mode.includes("e") || mode.includes("w");
   const vertical = mode.includes("n") || mode.includes("s");
-  const dx = !horizontal ? 0 : key3 === "ArrowRight" ? FRAME_KEY_STEP : key3 === "ArrowLeft" ? -FRAME_KEY_STEP : 0;
-  const dy = !vertical ? 0 : key3 === "ArrowDown" ? FRAME_KEY_STEP : key3 === "ArrowUp" ? -FRAME_KEY_STEP : 0;
+  const dx = !horizontal ? 0 : key4 === "ArrowRight" ? FRAME_KEY_STEP : key4 === "ArrowLeft" ? -FRAME_KEY_STEP : 0;
+  const dy = !vertical ? 0 : key4 === "ArrowDown" ? FRAME_KEY_STEP : key4 === "ArrowUp" ? -FRAME_KEY_STEP : 0;
   if (!dx && !dy) return null;
   return dragCoverFrame(mode, frame, dx, dy);
 }
@@ -28514,7 +28514,7 @@ function kindIconId(kind) {
   return `vam-kind-icon-${kind}`;
 }
 function kindIconSvg(kind) {
-  const tag = (name2, attributes, cls = "vam-kind-outline") => `<${name2} class="${cls}" ${Object.entries(attributes).map(([key3, value]) => `${key3}="${value}"`).join(" ")}/>`;
+  const tag = (name2, attributes, cls = "vam-kind-outline") => `<${name2} class="${cls}" ${Object.entries(attributes).map(([key4, value]) => `${key4}="${value}"`).join(" ")}/>`;
   const inset = (points) => points.split(" ").map(
     (pair6) => pair6.split(",").map((value) => String(10 + Number(value) * 0.8)).join(",")
   ).join(" ");
@@ -28829,9 +28829,9 @@ function addedMermaidBlocks(before, after) {
   const had = /* @__PURE__ */ new Map();
   for (const block of mermaidBlocks(before)) had.set(block.key, ((_a2 = had.get(block.key)) != null ? _a2 : 0) + 1);
   const added = [];
-  for (const { key: key3, unsafe, code } of mermaidBlocks(after)) {
-    const left = (_b2 = had.get(key3)) != null ? _b2 : 0;
-    if (left > 0) had.set(key3, left - 1);
+  for (const { key: key4, unsafe, code } of mermaidBlocks(after)) {
+    const left = (_b2 = had.get(key4)) != null ? _b2 : 0;
+    if (left > 0) had.set(key4, left - 1);
     else added.push({ unsafe, code });
   }
   return added;
@@ -29054,8 +29054,8 @@ function drawMapSourcesPanel(parent, host, focus) {
         lines.push(t("ui.map_sources_reject_line_0", item.name, result.reason));
         continue;
       }
-      const key3 = sourceKey(result.source);
-      if (host.sources.some((source) => sourceKey(source) === key3) || accepted.some((source) => sourceKey(source) === key3))
+      const key4 = sourceKey(result.source);
+      if (host.sources.some((source) => sourceKey(source) === key4) || accepted.some((source) => sourceKey(source) === key4))
         lines.push(t("ui.map_sources_already_added_0", item.name));
       else accepted.push(result.source);
     }
@@ -29225,7 +29225,7 @@ function isTechnicalErrorText(raw) {
   return !raw || raw.length > 400 || TECHNICAL.test(raw);
 }
 function plainFailure(context, error, locale) {
-  const say = (key3, ...values) => locale ? translate(locale, key3, ...values) : t(key3, ...values);
+  const say = (key4, ...values) => locale ? translate(locale, key4, ...values) : t(key4, ...values);
   const raw = rawErrorText(error);
   const kind = classifyProviderError(raw);
   if (!kind && !NETWORK.test(raw) && !isTechnicalErrorText(raw) && raw.length > 60) return raw;
@@ -29352,7 +29352,7 @@ var AiExchangeLog = class {
         if (!item || typeof item !== "object") return false;
         const entry = item;
         return ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(
-          (key3) => typeof entry[key3] === "string"
+          (key4) => typeof entry[key4] === "string"
         ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord2(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
       });
       if (entries.length !== parsed.length) throw new Error(t("error.exchange_log_fields_invalid"));
@@ -29471,12 +29471,12 @@ function isEntry(value) {
 }
 var isFolded = (value) => isTokens(value) && (value.estimated === void 0 || value.estimated === true);
 var isMaps = (value) => isRecord3(value) && Object.values(value).every(
-  (actions) => isRecord3(actions) && Object.entries(actions).every(([key3, tokens2]) => isAction(key3) && isFolded(tokens2))
+  (actions) => isRecord3(actions) && Object.entries(actions).every(([key4, tokens2]) => isAction(key4) && isFolded(tokens2))
 );
 function isBucket(value) {
   if (!isRecord3(value) || !isMaps(value.maps)) return false;
   if (value.providers === void 0) return true;
-  return isRecord3(value.providers) && Object.entries(value.providers).every(([key3, maps]) => (key3 === "claude" || key3 === "codex") && isMaps(maps));
+  return isRecord3(value.providers) && Object.entries(value.providers).every(([key4, maps]) => (key4 === "claude" || key4 === "codex") && isMaps(maps));
 }
 function localDayStart(now = Date.now()) {
   const date = new Date(now);
@@ -29490,8 +29490,8 @@ var monthKey = (time) => {
   const date = new Date(time);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 };
-var monthStartOf = (key3) => {
-  const [year, month] = key3.split("-").map(Number);
+var monthStartOf = (key4) => {
+  const [year, month] = key4.split("-").map(Number);
   return new Date(year, month - 1, 1).getTime();
 };
 function estimateUsageTokens(text12) {
@@ -29613,8 +29613,8 @@ var AiUsageStore = class {
       if (since !== void 0 && Date.parse(entry.at) < since) continue;
       visit(entry.action, entry, entry.estimated);
     }
-    for (const [key3, bucket] of Object.entries(this.monthly)) {
-      if (since !== void 0 && monthStartOf(key3) < since) continue;
+    for (const [key4, bucket] of Object.entries(this.monthly)) {
+      if (since !== void 0 && monthStartOf(key4) < since) continue;
       const maps = provider === void 0 ? bucket.maps : (_a2 = bucket.providers) == null ? void 0 : _a2[provider];
       if (!maps) continue;
       for (const [path, actions] of Object.entries(maps)) {
@@ -30115,9 +30115,9 @@ var KeyboardShortcutsModal = class extends import_obsidian20.Modal {
     for (const entry of MAP_KEYBOARD_SHORTCUTS) {
       const row = body.createEl("tr");
       const keys = row.createEl("td", { cls: "vam-shortcuts-keys" });
-      entry.keys.forEach((key3, index) => {
+      entry.keys.forEach((key4, index) => {
         if (index) keys.appendText(" ");
-        keys.createEl("kbd", { text: shortcutLabel(key3) });
+        keys.createEl("kbd", { text: shortcutLabel(key4) });
       });
       row.createEl("td", { text: t(entry.action) });
     }
@@ -30369,13 +30369,13 @@ function uncross(points, slots, fixedLines, picked) {
   const hitsFixed = lines.map((row) => row.map((l) => fixedLines.filter((f) => segmentsCross(l, f)).length));
   const cache = new Uint8Array(n * count2 * n * count2);
   const crossing = (a, sa, b, sb) => {
-    const key3 = ((a * count2 + sa) * n + b) * count2 + sb;
-    if (!cache[key3]) {
+    const key4 = ((a * count2 + sa) * n + b) * count2 + sb;
+    if (!cache[key4]) {
       const value = segmentsCross(lines[a][sa], lines[b][sb]) ? 2 : 1;
-      cache[key3] = value;
+      cache[key4] = value;
       cache[((b * count2 + sb) * n + a) * count2 + sa] = value;
     }
-    return cache[key3] === 2;
+    return cache[key4] === 2;
   };
   const cardCost = (a, skip) => {
     let c = hitsFixed[a][picked[a]] * FIXED_CROSSING_WEIGHT;
@@ -30994,24 +30994,24 @@ function ringImagesInTheWay(nodes, items, heightOf, widthOf, touched, hidden) {
 
 // layouts/navigation.ts
 var ARROWS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
-function neighborKey(direction, key3, side) {
-  if (!ARROWS.includes(key3)) return null;
+function neighborKey(direction, key4, side) {
+  if (!ARROWS.includes(key4)) return null;
   if (direction === "balanced" && side === "root") {
-    if (key3 === "ArrowLeft") return "child-left";
-    if (key3 === "ArrowRight") return "child-right";
-    return key3 === "ArrowUp" ? "sibling-" : "sibling+";
+    if (key4 === "ArrowLeft") return "child-left";
+    if (key4 === "ArrowRight") return "child-right";
+    return key4 === "ArrowUp" ? "sibling-" : "sibling+";
   }
   if (direction === "balanced") direction = side === "left" ? "left" : "right";
   if (direction === "down" || direction === "up") {
-    if (key3 === "ArrowLeft") return "sibling-";
-    if (key3 === "ArrowRight") return "sibling+";
+    if (key4 === "ArrowLeft") return "sibling-";
+    if (key4 === "ArrowRight") return "sibling+";
     const towardsChild = direction === "down" ? "ArrowDown" : "ArrowUp";
-    return key3 === towardsChild ? "child" : "parent";
+    return key4 === towardsChild ? "child" : "parent";
   }
   const left = direction === "left";
-  if (key3 === (left ? "ArrowRight" : "ArrowLeft")) return "parent";
-  if (key3 === (left ? "ArrowLeft" : "ArrowRight")) return "child";
-  return key3 === "ArrowUp" ? "sibling-" : "sibling+";
+  if (key4 === (left ? "ArrowRight" : "ArrowLeft")) return "parent";
+  if (key4 === (left ? "ArrowLeft" : "ArrowRight")) return "child";
+  return key4 === "ArrowUp" ? "sibling-" : "sibling+";
 }
 
 // experiences/visual-map/tree-edge-rules.ts
@@ -31202,9 +31202,9 @@ async function applyCharts(detail, charts, options) {
     const anchor = anchorCheck(lines, mask, chart.anchor);
     if (anchor.code) return fail2(anchor.code);
     const block = anchor.block;
-    const key3 = block.join("-");
-    if (used.has(key3)) return fail2("anchor_shared");
-    used.add(key3);
+    const key4 = block.join("-");
+    if (used.has(key4)) return fail2("anchor_shared");
+    used.add(key4);
     items.push({ body, block });
   }
   const out = [...lines];
@@ -31220,6 +31220,87 @@ async function applyCharts(detail, charts, options) {
   if (neutralizeUnsafeMermaid(detail) === detail && neutralizeUnsafeMermaid(final) !== final)
     return { ok: false, code: "unsafe_or_header", index: 0 };
   return { ok: true, detail: final };
+}
+
+// core/steps/task/carry-sources.ts
+var HEADING_KEY = "note.earlier_research_sources";
+var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
+var TOKEN = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
+function outsideCode(text12) {
+  const lines = text12.replace(/\r\n/g, "\n").split("\n");
+  const code = fencedLines(lines);
+  return lines.filter((_, index) => !code[index]);
+}
+function keysOf(text12) {
+  return [...linksOf([text12]).keys()];
+}
+function plainLine(line) {
+  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
+  return `- ${stripped}`;
+}
+function linkTokens(line, wanted) {
+  const out = [];
+  for (const match of line.matchAll(TOKEN)) {
+    const token = match[0];
+    if (!wanted(keysOf(token))) continue;
+    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
+    else out.push(token.replace(/^!/, ""));
+  }
+  return out;
+}
+function carriedSourceLines(previousTexts, nextTexts) {
+  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
+  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key4) => !have.has(key4)));
+  if (!missing.size) return [];
+  const covered = /* @__PURE__ */ new Set();
+  const lines = [];
+  const add = (line) => {
+    if (line.trim() && !lines.includes(line)) lines.push(line);
+  };
+  const open = (keys) => keys.some((key4) => missing.has(key4) && !covered.has(key4));
+  for (const line of previousTexts.flatMap(outsideCode)) {
+    const keys = keysOf(line);
+    if (!open(keys)) continue;
+    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
+    if (definition) add(`- ${definition[1].trim()}`);
+    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
+    else add(plainLine(line));
+    for (const key4 of keys) covered.add(key4);
+  }
+  return lines;
+}
+function carryForwardSources(detail, previousTexts, nextTexts, language2, template2) {
+  const carried = carriedSourceLines(previousTexts, nextTexts);
+  if (!carried.length) return detail;
+  const heading = translateNote(language2, HEADING_KEY);
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
+  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
+  const keys = sourcesHeadingKeys(template2);
+  const start = lines.findIndex((line, index) => {
+    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+    return !!match && keys.has(match[1].toLocaleLowerCase());
+  });
+  if (start < 0) return `${detail.trimEnd()}
+
+### ${heading}
+
+${carried.join("\n")}
+`;
+  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
+}
+function insertAfterBlock(lines, code, start, add, stop, separate = false) {
+  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
+  if (end < 0) end = lines.length;
+  while (end > start + 1 && !lines[end - 1].trim()) end--;
+  return [
+    ...lines.slice(0, end),
+    ...separate ? [""] : [],
+    ...add,
+    ...end < lines.length && lines[end].trim() ? [""] : [],
+    ...lines.slice(end)
+  ].join("\n");
 }
 
 // core/steps/task/merge-check.ts
@@ -31275,8 +31356,8 @@ function linksOf(texts2) {
   const out = /* @__PURE__ */ new Map();
   const add = (kind, raw) => {
     const shown = raw.trim().replace(/[.,;:!?*_'"]+$/, "");
-    const key3 = decoded(shown).toLowerCase().replace(/\/+$/, "").replace(/\.md$/, "");
-    if (key3) out.set(`${kind}${key3}`, shown);
+    const key4 = decoded(shown).toLowerCase().replace(/\/+$/, "").replace(/\.md$/, "");
+    if (key4) out.set(`${kind}${key4}`, shown);
   };
   for (const text12 of texts2) {
     for (const match of text12.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)) add("", match[0]);
@@ -31297,7 +31378,7 @@ function checkMergePreservation(input2) {
   for (const token of sourceNumbers) if (!mergedNumbers.has(token)) missing.push(token);
   for (const token of mergedNumbers) if (!sourceNumbers.has(token) && !allowed.has(token)) added.push(token);
   const sourceLinks = linksOf([...input2.sourceTexts, ...(_c = input2.sourceLinkTexts) != null ? _c : []]), mergedLinks = linksOf([...input2.mergedTexts, ...(_d = input2.mergedLinkTexts) != null ? _d : []]);
-  for (const [key3, shown] of sourceLinks) if (!mergedLinks.has(key3)) missing.push(shown);
+  for (const [key4, shown] of sourceLinks) if (!mergedLinks.has(key4)) missing.push(shown);
   return { ok: !missing.length && !added.length, missing, added };
 }
 function findingList(items, none, limit = 30) {
@@ -31305,6 +31386,108 @@ function findingList(items, none, limit = 30) {
   const lines = items.slice(0, limit).map((item) => `- ${item}`);
   if (items.length > limit) lines.push(`- \u2026 (+${items.length - limit})`);
   return lines.join("\n");
+}
+var HEADING_ANY = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
+var KEPT_LOCALES = ["zh-TW", "zh-CN", "en"];
+var key2 = (value) => value.trim().toLocaleLowerCase();
+function keepDroppedContent(input2) {
+  const { oldDetail, template: template2, language: language2 } = input2;
+  const logHeadings = template2.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]);
+  const check = (detail2) => checkMergePreservation({
+    sourceTexts: [oldDetail],
+    mergedTexts: [detail2, input2.summary],
+    mergedLinkTexts: [input2.references],
+    logHeadings
+  });
+  const before = check(input2.newDetail).missing;
+  if (!before.length) return { detail: input2.newDetail, restored: 0 };
+  let detail = input2.newDetail;
+  if (template2.sections.some((section3) => section3.role === "sources"))
+    detail = carryForwardSources(detail, [oldDetail], [input2.summary, detail, input2.references], language2, template2);
+  const missing = new Set(check(detail).missing);
+  if (missing.size) detail = quoteMissingLines(oldDetail, detail, missing, template2, language2, logHeadings);
+  return { detail, restored: Math.max(0, before.length - check(detail).missing.length) };
+}
+function keptTitles() {
+  return new Set(KEPT_LOCALES.map((locale) => key2(translateNote(locale, "note.kept_from_earlier_version"))));
+}
+function quoteMissingLines(oldDetail, detail, missing, template2, language2, logHeadings) {
+  const lookup = sectionLookup(template2);
+  const logNames = new Set(logHeadings.map(key2).filter(Boolean));
+  const titles = keptTitles();
+  const oldLines = oldDetail.replace(/\r\n/g, "\n").split("\n");
+  const oldCode = fencedLines(oldLines);
+  const groups = /* @__PURE__ */ new Map();
+  const covered = /* @__PURE__ */ new Set();
+  let section3 = -1;
+  let logLevel = 0;
+  oldLines.forEach((line, index) => {
+    var _a2, _b2;
+    if (oldCode[index]) return;
+    const heading = HEADING_ANY.exec(line);
+    if (heading) {
+      const level = heading[1].length;
+      if (logLevel && level <= logLevel) logLevel = 0;
+      const name2 = key2(heading[2]);
+      if (!logLevel && (logNames.has(name2) || UPDATE_LOG_HEADING.test(line))) logLevel = level;
+      if (level === 3) section3 = (_a2 = lookup.get(name2)) != null ? _a2 : -1;
+      return;
+    }
+    if (logLevel) return;
+    const text12 = line.replace(/^[ \t]*(?:>[ \t]*)+/, "").trim();
+    if (!text12) return;
+    const callout = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text12);
+    if (callout && titles.has(key2(callout[1]))) return;
+    const own2 = checkMergePreservation({ sourceTexts: [text12], mergedTexts: [] }).missing.filter(
+      (item) => missing.has(item)
+    );
+    if (!own2.some((item) => !covered.has(item))) return;
+    for (const item of own2) covered.add(item);
+    const list = (_b2 = groups.get(section3)) != null ? _b2 : [];
+    list.push(text12);
+    groups.set(section3, list);
+  });
+  let out = detail;
+  const title = translateNote(language2, "note.kept_from_earlier_version");
+  for (const [index, lines] of groups) {
+    const block = [`> [!note] ${title}`, ...lines.map((line) => `> ${line}`)];
+    out = insertIntoSection(out, index, block, template2, lookup);
+  }
+  return out;
+}
+function insertIntoSection(detail, index, block, template2, lookup) {
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  const sections = [];
+  lines.forEach((line, at) => {
+    const match = code[at] ? null : /^###[ \t]+(.+?)[ \t]*$/.exec(line);
+    if (match) sections.push({ at, index: lookup.get(key2(match[1])) });
+  });
+  const roleOf = (found) => {
+    var _a2;
+    return found === void 0 ? void 0 : (_a2 = template2.sections[found]) == null ? void 0 : _a2.role;
+  };
+  let target = sections.findIndex((item) => item.index === index && index >= 0);
+  if (target < 0) {
+    for (let n = sections.length - 1; n >= 0; n--)
+      if (roleOf(sections[n].index) !== "sources" && roleOf(sections[n].index) !== "log") {
+        target = n;
+        break;
+      }
+  }
+  if (target < 0) return `${detail.trimEnd()}
+
+${block.join("\n")}
+`;
+  let end = target + 1 < sections.length ? sections[target + 1].at : lines.length;
+  while (end > sections[target].at + 1 && !lines[end - 1].trim()) end--;
+  return [
+    ...lines.slice(0, end),
+    "",
+    ...block,
+    ...end < lines.length && lines[end].trim() ? [""] : [],
+    ...lines.slice(end)
+  ].join("\n");
 }
 
 // ai/visual-guidance.ts
@@ -31428,9 +31611,9 @@ var NAME_LANGUAGES = ["zh-TW", "zh-CN", "en"];
 var lowered2 = (value) => value.trim().toLocaleLowerCase();
 var STANDARD_ROWS = [...STANDARD, ...LEGACY_STANDARD];
 function standardKeyOf(heading) {
-  const key3 = lowered2(heading);
+  const key4 = lowered2(heading);
   return STANDARD_ROWS.findIndex(
-    ([, name2]) => NAME_LANGUAGES.some((language2) => lowered2(translate(language2, name2)) === key3)
+    ([, name2]) => NAME_LANGUAGES.some((language2) => lowered2(translate(language2, name2)) === key4)
   );
 }
 function parseCount(line) {
@@ -32559,7 +32742,7 @@ function builtinBlockNames(category, id) {
   var _a2;
   const block = findBuiltinBlock(category, id);
   const keys = [block.nameKey, ...(_a2 = block.legacyNameKeys) != null ? _a2 : []];
-  return [...new Set(keys.flatMap((key3) => CANONICAL_LANGUAGES.map((language2) => translate(language2, key3))))];
+  return [...new Set(keys.flatMap((key4) => CANONICAL_LANGUAGES.map((language2) => translate(language2, key4))))];
 }
 function builtinBlockText(category, id, language2) {
   return category === "template" ? builtinTemplateText(id, language2) : findBuiltinBlock(category, id).body(language2);
@@ -32579,7 +32762,7 @@ function uniqueBlockName(base, taken) {
 // ai/detail-sections.ts
 var NOTE_SECTIONS_TEMPLATE_ID = "note-sections";
 var HEADING2 = /^###\s+(.+?)\s*$/;
-var key2 = (value) => value.trim().toLocaleLowerCase();
+var key3 = (value) => value.trim().toLocaleLowerCase();
 function headingLines(detail) {
   const lines = detail.split("\n");
   const code = fencedLines(lines);
@@ -32600,7 +32783,7 @@ function builtinStructures(language2) {
   }
   return templates;
 }
-var LOG_KEYS = new Set(NOTE_LANGUAGES.map((locale) => key2(translate(locale, "detail.update_log"))));
+var LOG_KEYS = new Set(NOTE_LANGUAGES.map((locale) => key3(translate(locale, "detail.update_log"))));
 function templateFromDetail(detail, language2) {
   const headings = headingLines(detail);
   if (!headings.length) return { ok: false, reason: "no_sections" };
@@ -32609,7 +32792,7 @@ function templateFromDetail(detail, language2) {
   const usedIds = /* @__PURE__ */ new Set();
   const sections = headings.map(({ name: name2 }, position) => {
     var _a2;
-    const heading = key2(name2);
+    const heading = key3(name2);
     let found;
     for (const { template: template3, lookup } of structures) {
       const at = heading ? lookup.get(heading) : void 0;
@@ -32624,7 +32807,7 @@ function templateFromDetail(detail, language2) {
       role = found.role;
       base = {
         description: found.description,
-        aliases: [...key2(found.name) !== heading ? [found.name] : [], ...found.aliases],
+        aliases: [...key3(found.name) !== heading ? [found.name] : [], ...found.aliases],
         ...found.count ? { count: { ...found.count } } : {},
         ...found.callouts ? { callouts: found.callouts.map((callout) => ({ ...callout })) } : {}
       };
@@ -32658,12 +32841,22 @@ function withSourcesSection(template2, language2) {
   if (template2.sections.some((section3) => section3.role === "sources")) return template2;
   const standard = standardTemplate(language2).sections.find((section3) => section3.role === "sources");
   if (!standard) return template2;
-  const names3 = new Set(template2.sections.map((section3) => key2(section3.name)));
-  if (names3.has(key2(standard.name))) return template2;
+  const names3 = new Set(template2.sections.map((section3) => key3(section3.name)));
+  if (names3.has(key3(standard.name))) return template2;
   const at = template2.sections.findIndex((section3) => section3.role === "log");
   const sections = [...template2.sections];
   sections.splice(at < 0 ? sections.length : at, 0, { ...standard, aliases: [...standard.aliases] });
   return { ...template2, sections: withoutConflictingAliases(sections) };
+}
+function demoteUnknownHeadings(detail, template2) {
+  const lookup = sectionLookup(template2);
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  return lines.map((line, index) => {
+    if (code[index]) return line;
+    const match = HEADING2.exec(line);
+    return match && !lookup.has(key3(match[1])) ? `#${line}` : line;
+  }).join("\n");
 }
 function decidedTemplateFromDetail(detail, language2) {
   const made = templateFromDetail(detail, language2);
@@ -32812,9 +33005,9 @@ function builtinNames(category) {
 var folded = (text12) => text12.toLocaleLowerCase();
 function builtinPartIdOf(category, name2) {
   var _a2;
-  const key3 = folded(name2);
+  const key4 = folded(name2);
   return (_a2 = builtinNames(category).find(
-    ({ id, nameKeys }) => id === name2 || nameKeys.some((nameKey) => LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key3))
+    ({ id, nameKeys }) => id === name2 || nameKeys.some((nameKey) => LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key4))
   )) == null ? void 0 : _a2.id;
 }
 function validatePartName(name2, category) {
@@ -32822,9 +33015,9 @@ function validatePartName(name2, category) {
   if (name2 !== name2.trim()) return { ok: false, reason: "padded" };
   if (name2.includes("/") || name2.includes("\\")) return { ok: false, reason: "separator" };
   if (name2.includes("..")) return { ok: false, reason: "dots" };
-  const key3 = folded(name2);
+  const key4 = folded(name2);
   const taken = builtinNames(category).some(
-    ({ nameKeys }) => nameKeys.some((nameKey) => LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key3))
+    ({ nameKeys }) => nameKeys.some((nameKey) => LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key4))
   );
   return taken ? { ok: false, reason: "builtin" } : { ok: true };
 }
@@ -32850,9 +33043,9 @@ function partRef(category, name2) {
   return id !== void 0 ? `builtin:${id}` : `file:${name2}`;
 }
 function updateModeOf(value) {
-  const key3 = folded(value.trim());
+  const key4 = folded(value.trim());
   return UPDATE_MODES.find(
-    (mode) => mode === key3 || LANGUAGES2.some((language2) => folded(translate(language2, UPDATE_MODE_KEYS[mode])) === key3)
+    (mode) => mode === key4 || LANGUAGES2.some((language2) => folded(translate(language2, UPDATE_MODE_KEYS[mode])) === key4)
   );
 }
 function parseRecipeFile(text12) {
@@ -32986,8 +33179,8 @@ function updateRecipeFileText(oldText, parts, language2) {
     if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
     const pair6 = /^(([^:：]+?)\s*[:：]\s*)(.*)$/.exec(raw);
     if (!pair6) continue;
-    const key3 = pair6[2].trim().toLocaleLowerCase();
-    const slot = SLOTS.find((item) => KEYS[item].includes(key3));
+    const key4 = pair6[2].trim().toLocaleLowerCase();
+    const slot = SLOTS.find((item) => KEYS[item].includes(key4));
     if (!slot) continue;
     seen.add(slot);
     if (wanted(slot) === null) {
@@ -33054,10 +33247,10 @@ var Namer = class {
     for (let n = 1; ; n++) {
       const name2 = n === 1 ? safe : `${safe} (${n})`;
       if (!validatePartName(name2, this.nameCategory).ok) continue;
-      const key3 = lower2(name2);
-      const held = this.held.get(key3);
+      const key4 = lower2(name2);
+      const held = this.held.get(key4);
       if (!held) {
-        this.held.set(key3, { base: name2, text: text12 });
+        this.held.set(key4, { base: name2, text: text12 });
         this.planned.push({ category: this.category, base: name2, text: text12 });
         return name2;
       }
@@ -33240,7 +33433,7 @@ var NoteStyleStore = class {
     const block = findBuiltinBlock(category, id);
     const names3 = [translate(this.settings.language, block.nameKey), ...builtinBlockNames(category, id)];
     for (const name2 of names3) {
-      const base = [...this.blocks[category].keys()].find((key3) => lower3(key3) === lower3(name2));
+      const base = [...this.blocks[category].keys()].find((key4) => lower3(key4) === lower3(name2));
       if (base !== void 0) return base;
     }
     return void 0;
@@ -33323,7 +33516,7 @@ var NoteStyleStore = class {
   }
   /** The AI-suggested style for one run: the state the note's detail puts it in (the table in the note-style spec). */
   withAiSections(style, detail, language2) {
-    const named = (mode, template2, key3) => {
+    const named = (mode, template2, key4) => {
       const aiSections = Object.freeze({ mode, ...detail !== void 0 ? { forDetail: detail } : {} });
       const { styleSelection } = style.contextFields;
       const field = mode === "decide" ? "decide" : mode === "follow" ? "follow" : mode === "note-unusable" ? "general" : void 0;
@@ -33337,7 +33530,7 @@ var NoteStyleStore = class {
         }),
         label: Object.freeze({
           ...style.label,
-          ...key3 ? { templateName: translate(this.settings.language, key3) } : {},
+          ...key4 ? { templateName: translate(this.settings.language, key4) } : {},
           aiSectionsMode: mode
         })
       });
@@ -33982,13 +34175,13 @@ var NoteStyleStore = class {
     const builtinKeys = /* @__PURE__ */ new Map();
     for (const recipe of BUILTIN_RECIPES) {
       if (recipe.structure === AIM_DELIVERY_STRUCTURE || recipe.aiDecidesSections) continue;
-      const key3 = JSON.stringify([
+      const key4 = JSON.stringify([
         builtinRef(recipe.structure),
         recipe.followsVoice ? "global" : builtinRef(recipe.voice),
         recipe.followsFormat ? "global" : builtinRef(recipe.format),
         recipe.update
       ]);
-      if (!builtinKeys.has(key3)) builtinKeys.set(key3, builtinRef(recipe.id));
+      if (!builtinKeys.has(key4)) builtinKeys.set(key4, builtinRef(recipe.id));
     }
     const recipeEntries = [...this.recipes].map(([name2, text12]) => ({
       name: name2,
@@ -34029,7 +34222,7 @@ var NoteStyleStore = class {
       if (name2 === old) return { ok: true, ref, unchanged: true };
       const { files, dir } = this.filesOf(category);
       if (!validatePartName(name2, category).ok || cleanBlockName(name2) !== name2) return { ok: false, reason: "name" };
-      if ([...files.keys()].some((key3) => key3 !== old && lower3(key3) === lower3(name2)))
+      if ([...files.keys()].some((key4) => key4 !== old && lower3(key4) === lower3(name2)))
         return { ok: false, reason: "taken" };
       try {
         await this.deps.port.rename(`${dir}/${old}.md`, `${dir}/${name2}.md`);
@@ -34248,7 +34441,7 @@ var NoteStyleStore = class {
     if (name2 === void 0) base = this.suggestPartName(category, from);
     else {
       base = name2;
-      if (!validatePartName(base, category).ok || cleanBlockName(base) !== base || files.has(base) || [...files.keys()].some((key3) => lower3(key3) === lower3(base)))
+      if (!validatePartName(base, category).ok || cleanBlockName(base) !== base || files.has(base) || [...files.keys()].some((key4) => lower3(key4) === lower3(base)))
         throw new Error(`Part name not available: ${name2}`);
     }
     await this.pinFolder();
@@ -34329,7 +34522,7 @@ var NoteStyleStore = class {
         return { ok: true, ref: fileRef(original.name) };
       }
       const name2 = input2.name;
-      if (!validatePartName(name2, "recipe").ok || cleanBlockName(name2) !== name2 || [...this.recipes.keys()].some((key3) => lower3(key3) === lower3(name2)))
+      if (!validatePartName(name2, "recipe").ok || cleanBlockName(name2) !== name2 || [...this.recipes.keys()].some((key4) => lower3(key4) === lower3(name2)))
         return { ok: false, reason: "name" };
       try {
         const text12 = recipeFileText(parts, language2);
@@ -34441,9 +34634,9 @@ var NoteStyleStore = class {
       try {
         await this.deps.save();
       } catch (error) {
-        for (const [key3, value] of Object.entries(before)) {
-          if (value === void 0) delete settings[key3];
-          else settings[key3] = value;
+        for (const [key4, value] of Object.entries(before)) {
+          if (value === void 0) delete settings[key4];
+          else settings[key4] = value;
         }
         throw error;
       }
@@ -34512,11 +34705,11 @@ function classifier(template2, language2) {
   );
   return {
     classify(text12) {
-      const key3 = text12.toLocaleLowerCase();
-      const index = lookup.get(key3);
+      const key4 = text12.toLocaleLowerCase();
+      const index = lookup.get(key4);
       if (index !== void 0) return `t${index}`;
-      if (logIndex < 0 && logNames.has(key3)) return "log";
-      return `h:${key3}`;
+      if (logIndex < 0 && logNames.has(key4)) return "log";
+      return `h:${key4}`;
     },
     logKey: logIndex >= 0 ? `t${logIndex}` : "log",
     sourcesKey: sourcesIndex >= 0 ? `t${sourcesIndex}` : null
@@ -34540,9 +34733,9 @@ function scan2(text12, classify3) {
   return { text: text12, lines, starts, code, headings };
 }
 var lineEnd = (view, line) => view.starts[line] + view.lines[line].length;
-function sectionRange(view, key3) {
+function sectionRange(view, key4) {
   var _a2, _b2;
-  const position = view.headings.findIndex((heading2) => heading2.key === key3);
+  const position = view.headings.findIndex((heading2) => heading2.key === key4);
   if (position < 0) return null;
   const heading = view.headings[position];
   return { heading, from: heading.line + 1, to: (_b2 = (_a2 = view.headings[position + 1]) == null ? void 0 : _a2.line) != null ? _b2 : view.lines.length };
@@ -34583,8 +34776,8 @@ function definitionLines(view) {
   for (const item of definitions(view)) for (let line = item.first; line <= item.last; line++) found.add(line);
   return found;
 }
-function logLines(view, key3) {
-  const range = sectionRange(view, key3);
+function logLines(view, key4) {
+  const range = sectionRange(view, key4);
   if (!range) return [];
   const definition = definitionLines(view);
   return view.lines.slice(range.from, range.to).filter((line, offset) => line.trim() && !isPlaceholder2(line) && !definition.has(range.from + offset));
@@ -34593,9 +34786,9 @@ function logHeadingName(template2, language2) {
   var _a2, _b2;
   return (_b2 = (_a2 = template2.sections.find((section3) => section3.role === "log")) == null ? void 0 : _a2.name) != null ? _b2 : translate(language2, "detail.update_log");
 }
-function withLogLines(detail, view, key3, heading, linesFor) {
-  const range = sectionRange(view, key3);
-  const existing = range ? logLines(view, key3) : [];
+function withLogLines(detail, view, key4, heading, linesFor) {
+  const range = sectionRange(view, key4);
+  const existing = range ? logLines(view, key4) : [];
   let body = linesFor(existing).join("\n");
   if (!range) return `${detail.trimEnd()}
 
@@ -34849,23 +35042,23 @@ function composeWriteback(input2) {
   var _a2;
   if (input2.mode === "top") return composeTop(input2);
   const classify3 = classifier(input2.template, input2.language);
-  const key3 = classify3.logKey;
+  const key4 = classify3.logKey;
   const heading = logHeadingName(input2.template, input2.language);
   const view = scan2(input2.aiDetail, classify3);
   let detail;
   if (input2.mode === "merge") {
-    const oldLines = logLines(scan2(input2.oldDetail, classify3), key3);
+    const oldLines = logLines(scan2(input2.oldDetail, classify3), key4);
     detail = withLogLines(
       input2.aiDetail,
       view,
-      key3,
+      key4,
       heading,
       (existing) => mergeLogLines(existing, oldLines, input2.summary, input2.now)
     );
   } else {
-    const oldLines = logLines(scan2(input2.oldDetail, classify3), key3);
+    const oldLines = logLines(scan2(input2.oldDetail, classify3), key4);
     const line = `${logMarker(oldLines)}${formatDate(input2.now)}\u3000${translate(input2.language, "note.writeback_fresh_replaced_0", (_a2 = input2.backupPath) != null ? _a2 : "")}`;
-    detail = withLogLines(input2.aiDetail, view, key3, heading, () => [...oldLines, line]);
+    detail = withLogLines(input2.aiDetail, view, key4, heading, () => [...oldLines, line]);
   }
   return { ok: true, detail, record: { inserts: [], kept: [detail] } };
 }
@@ -34944,87 +35137,6 @@ function aiLockedError() {
 }
 function isAiLockedError(error) {
   return error instanceof Error && error.name === "AiLockedError";
-}
-
-// core/steps/task/carry-sources.ts
-var HEADING_KEY = "note.earlier_research_sources";
-var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
-var TOKEN = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
-function outsideCode(text12) {
-  const lines = text12.replace(/\r\n/g, "\n").split("\n");
-  const code = fencedLines(lines);
-  return lines.filter((_, index) => !code[index]);
-}
-function keysOf(text12) {
-  return [...linksOf([text12]).keys()];
-}
-function plainLine(line) {
-  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
-  return `- ${stripped}`;
-}
-function linkTokens(line, wanted) {
-  const out = [];
-  for (const match of line.matchAll(TOKEN)) {
-    const token = match[0];
-    if (!wanted(keysOf(token))) continue;
-    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
-    else out.push(token.replace(/^!/, ""));
-  }
-  return out;
-}
-function carriedSourceLines(previousTexts, nextTexts) {
-  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
-  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key3) => !have.has(key3)));
-  if (!missing.size) return [];
-  const covered = /* @__PURE__ */ new Set();
-  const lines = [];
-  const add = (line) => {
-    if (line.trim() && !lines.includes(line)) lines.push(line);
-  };
-  const open = (keys) => keys.some((key3) => missing.has(key3) && !covered.has(key3));
-  for (const line of previousTexts.flatMap(outsideCode)) {
-    const keys = keysOf(line);
-    if (!open(keys)) continue;
-    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
-    if (definition) add(`- ${definition[1].trim()}`);
-    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
-    else add(plainLine(line));
-    for (const key3 of keys) covered.add(key3);
-  }
-  return lines;
-}
-function carryForwardSources(detail, previousTexts, nextTexts, language2, template2) {
-  const carried = carriedSourceLines(previousTexts, nextTexts);
-  if (!carried.length) return detail;
-  const heading = translateNote(language2, HEADING_KEY);
-  const lines = detail.split("\n");
-  const code = fencedLines(lines);
-  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
-  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
-  const keys = sourcesHeadingKeys(template2);
-  const start = lines.findIndex((line, index) => {
-    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
-    return !!match && keys.has(match[1].toLocaleLowerCase());
-  });
-  if (start < 0) return `${detail.trimEnd()}
-
-### ${heading}
-
-${carried.join("\n")}
-`;
-  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
-}
-function insertAfterBlock(lines, code, start, add, stop, separate = false) {
-  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
-  if (end < 0) end = lines.length;
-  while (end > start + 1 && !lines[end - 1].trim()) end--;
-  return [
-    ...lines.slice(0, end),
-    ...separate ? [""] : [],
-    ...add,
-    ...end < lines.length && lines[end].trim() ? [""] : [],
-    ...lines.slice(end)
-  ].join("\n");
 }
 
 // ai/note-style-label.ts
@@ -35833,7 +35945,7 @@ var TopicRuns = class {
       observer
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n, _o;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n, _o, _p, _q;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -35854,14 +35966,26 @@ var TopicRuns = class {
         if (result.aiSectionsFallback) (_c2 = options.notify) == null ? void 0 : _c2.call(options, t("ui.note_style_ai_sections_invalid"));
         const mode = (_d2 = writeContext.updateMode) != null ? _d2 : "merge";
         const writeLanguage = noteLanguageOf((_e2 = context.outputLanguage) != null ? _e2 : settings().language);
+        let aiDetail = mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, writeContext.detailTemplate);
+        if ((context.aiSections === "follow" || context.aiSections === "general") && mode === "merge" && latest.detail.trim()) {
+          const kept = keepDroppedContent({
+            oldDetail: latest.detail,
+            newDetail: aiDetail,
+            summary: result.summary,
+            references: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
+            template: (_f2 = writeContext.detailTemplate) != null ? _f2 : standardTemplate(writeLanguage),
+            language: writeLanguage
+          });
+          aiDetail = kept.detail;
+          if (kept.restored > 0) (_g2 = options.notify) == null ? void 0 : _g2.call(options, t("ui.note_style_restored_0", kept.restored));
+        }
         const composed = await this.composeWrite({
           mode,
           path,
           oldDetail: latest.detail,
-          // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
-          aiDetail: mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, writeContext.detailTemplate),
+          aiDetail,
           summary: result.summary,
-          template: (_f2 = writeContext.detailTemplate) != null ? _f2 : standardTemplate(writeLanguage),
+          template: (_h2 = writeContext.detailTemplate) != null ? _h2 : standardTemplate(writeLanguage),
           language: writeLanguage,
           signal: controller.signal,
           hooks: options,
@@ -35869,7 +35993,7 @@ var TopicRuns = class {
         });
         if (!composed.ok) {
           await repo.updateNote(path, { status: note.status });
-          if (exchangeId) (_g2 = exchanges()) == null ? void 0 : _g2.failed(exchangeId, composed.message);
+          if (exchangeId) (_i = exchanges()) == null ? void 0 : _i.failed(exchangeId, composed.message);
           fail2(composed.message);
           return;
         }
@@ -35888,17 +36012,17 @@ var TopicRuns = class {
           { detailTemplate: writeContext.detailTemplate }
         );
         const saved = await repo.readNote(path, options.map);
-        (_h2 = options.onWritten) == null ? void 0 : _h2.call(options, { before: { ...latest, status: note.status }, after: saved });
-        if (exchangeId) (_i = exchanges()) == null ? void 0 : _i.completed(exchangeId);
+        (_j = options.onWritten) == null ? void 0 : _j.call(options, { before: { ...latest, status: note.status }, after: saved });
+        if (exchangeId) (_k = exchanges()) == null ? void 0 : _k.completed(exchangeId);
         this.ports.clearOtherHistory(options.origin);
-        (_k = options.queueCharts) == null ? void 0 : _k.call(options, {
+        (_m = options.queueCharts) == null ? void 0 : _m.call(options, {
           path,
           saved,
           context: writeContext,
           detail: saved.detail,
           formatIssues: mode === "top" ? [] : result.formatIssues,
           model: used.model,
-          language: (_j = context.outputLanguage) != null ? _j : settings().language,
+          language: (_l = context.outputLanguage) != null ? _l : settings().language,
           template: writeContext.detailTemplate,
           ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });
@@ -35908,12 +36032,12 @@ var TopicRuns = class {
             result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
           );
           try {
-            await ((_m = (_l = this.pendingSuggestions).flush) == null ? void 0 : _m.call(_l));
+            await ((_o = (_n = this.pendingSuggestions).flush) == null ? void 0 : _o.call(_n));
           } catch (error) {
-            (_n = options.notify) == null ? void 0 : _n.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
+            (_p = options.notify) == null ? void 0 : _p.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
           }
         }
-        (_o = options.done) == null ? void 0 : _o.call(options, result);
+        (_q = options.done) == null ? void 0 : _q.call(options, result);
       })
     ).catch(
       (error) => this.ports.mutate()(async () => {
@@ -36006,12 +36130,12 @@ var TopicRuns = class {
   }
   /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
   abortCharts(path) {
-    for (const [key3, controller] of [...this.charts])
-      if (path === void 0 || key3 === path) {
+    for (const [key4, controller] of [...this.charts])
+      if (path === void 0 || key4 === path) {
         controller.abort();
-        this.charts.delete(key3);
+        this.charts.delete(key4);
         this.wakeIdleWaiters();
-        this.endChartProgress(key3);
+        this.endChartProgress(key4);
         const queued = this.chartQueue.findIndex((item) => item.controller === controller);
         if (queued >= 0) this.chartQueue.splice(queued, 1);
       }
@@ -36561,8 +36685,8 @@ function relevanceDisplayNodes(nodes, tierOf, hidden, direction = "right") {
   var _a2, _b2;
   const groups = /* @__PURE__ */ new Map();
   for (const node of nodes) {
-    const key3 = (_a2 = node.parentId) != null ? _a2 : null;
-    groups.set(key3, [...(_b2 = groups.get(key3)) != null ? _b2 : [], node]);
+    const key4 = (_a2 = node.parentId) != null ? _a2 : null;
+    groups.set(key4, [...(_b2 = groups.get(key4)) != null ? _b2 : [], node]);
   }
   const slot = /* @__PURE__ */ new Map();
   for (const group of groups.values())
@@ -36937,13 +37061,13 @@ function summarizeBasis(bases) {
       );
       continue;
     }
-    const key3 = kind === "outline_only" ? kind : `${kind}${titles.join("")}`;
-    const at = cardIndex.get(key3);
+    const key4 = kind === "outline_only" ? kind : `${kind}${titles.join("")}`;
+    const at = cardIndex.get(key4);
     if (at !== void 0) {
       entries[at].count++;
       continue;
     }
-    cardIndex.set(key3, entries.length);
+    cardIndex.set(key4, entries.length);
     entries.push(
       kind === "outline_only" ? { type: "cards", kind, titles: [], count: 1 } : { type: "cards", kind, titles, count: 1 }
     );
@@ -37840,8 +37964,8 @@ function droppedLinkTarget(text12) {
   const url = value.match(/^obsidian:\/\/open\?([^\s]*)$/i);
   if (url) {
     for (const part of url[1].split("&")) {
-      const [key3, raw = ""] = part.split("=");
-      if (key3 !== "file") continue;
+      const [key4, raw = ""] = part.split("=");
+      if (key4 !== "file") continue;
       try {
         const file = decodeURIComponent(raw.replace(/\+/g, " ")).trim();
         return file || null;
@@ -38402,7 +38526,7 @@ var MapChatPanel = class {
         (details != null ? details : []).slice(0, 3).map((item) => clip2(item, 120)).join(t("ui.map_chat_chain_detail_separator"))
       )
     ) : "";
-    const say = (key3, ...values) => t(key3, ...values);
+    const say = (key4, ...values) => t(key4, ...values);
     switch (reason) {
       case "done":
         return say("ui.map_chat_chain_end_done_0", round3);
@@ -40278,8 +40402,8 @@ ${shown}` : t("ui.map_chat_model_label"));
   /** The field's hint: a follow-up while a turn works, the opening screen's ask, or the ordinary one. */
   renderPlaceholder() {
     if (!this.built) return;
-    const key3 = this.working ? "ui.map_chat_steer_placeholder" : this.chainWaitingState ? "ui.map_chat_chain_wait_placeholder" : this.hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder";
-    this.inputEl.setAttr("placeholder", t(key3));
+    const key4 = this.working ? "ui.map_chat_steer_placeholder" : this.chainWaitingState ? "ui.map_chat_chain_wait_placeholder" : this.hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder";
+    this.inputEl.setAttr("placeholder", t(key4));
   }
   /** "Enter 補充" beside the stop key while a turn works and the field has text. */
   renderSteerHint() {
@@ -40413,11 +40537,11 @@ function buildPreparedTaskContext(input2, model, budget = 32e3, provider = "code
     context.sourceContext,
     context.anchorContext
   ].reduce((sum2, value) => sum2 + estimateTokens(value), 0);
-  for (const key3 of optional)
-    if (used() > budget && context[key3])
-      context[key3] = String(context[key3]).slice(
+  for (const key4 of optional)
+    if (used() > budget && context[key4])
+      context[key4] = String(context[key4]).slice(
         0,
-        Math.max(0, (budget - used() + estimateTokens(String(context[key3]))) * 4)
+        Math.max(0, (budget - used() + estimateTokens(String(context[key4]))) * 4)
       );
   const contextBreakdown = {
     task: estimateTokens(context.task),
@@ -40535,12 +40659,12 @@ var AiCalls = class {
       requestLog = "request-and-prompt",
       stopped = () => new Error(t("ui.ai_task_cancelled"))
     } = options;
-    const key3 = `${options.taskName}:${(0, import_node_crypto7.randomUUID)()}`;
+    const key4 = `${options.taskName}:${(0, import_node_crypto7.randomUUID)()}`;
     const controller = new AbortController();
     const abort = () => controller.abort();
     options.signal.addEventListener("abort", abort, { once: true });
     if (options.signal.aborted) controller.abort();
-    this.activeTasks.set(key3, controller);
+    this.activeTasks.set(key4, controller);
     const started = this.options.exchanges();
     const log = () => started ? this.options.exchanges() : void 0;
     const id = (_b2 = options.exchangeId) != null ? _b2 : (0, import_node_crypto7.randomUUID)();
@@ -40651,7 +40775,7 @@ var AiCalls = class {
     } finally {
       this.recordUsage(sentText, options, provider, reportedUsage, reply, startedMs);
       options.signal.removeEventListener("abort", abort);
-      if (this.activeTasks.get(key3) === controller) this.activeTasks.delete(key3);
+      if (this.activeTasks.get(key4) === controller) this.activeTasks.delete(key4);
     }
   }
   /** Records one call in the usage store (once, success or failure). Counting is best effort and never changes the call's result. */
@@ -41368,15 +41492,15 @@ function partialFields(buffer) {
         i = skipSpace(buffer, i + 1);
       }
       if (i >= buffer.length || buffer[i] !== '"') break;
-      const key3 = decodeString(buffer, i + 1);
-      if (!key3.complete) break;
-      i = skipSpace(buffer, key3.end);
+      const key4 = decodeString(buffer, i + 1);
+      if (!key4.complete) break;
+      i = skipSpace(buffer, key4.end);
       if (buffer[i] !== ":") break;
       i = skipSpace(buffer, i + 1);
       if (i >= buffer.length) break;
-      if ((key3.value === "summary" || key3.value === "detail") && buffer[i] === '"') {
+      if ((key4.value === "summary" || key4.value === "detail") && buffer[i] === '"') {
         const text12 = decodeString(buffer, i + 1);
-        if (key3.value === "summary") {
+        if (key4.value === "summary") {
           out.summary = text12.value;
           out.summaryComplete = text12.complete;
         } else {
@@ -42162,9 +42286,9 @@ var ClaudeWarmPool = class {
     return this.slot ? 1 : 0;
   }
   /** Starts a process for `key` unless one for the same key is already waiting (then only the idle time restarts). */
-  prewarm(key3, start) {
+  prewarm(key4, start) {
     if (this.disposed) return false;
-    if (this.slot && this.slot.key === key3 && !this.slot.exited) {
+    if (this.slot && this.slot.key === key4 && !this.slot.exited) {
       this.armIdle(this.slot);
       return true;
     }
@@ -42175,7 +42299,7 @@ var ClaudeWarmPool = class {
     } catch (e) {
       return false;
     }
-    const slot = { key: key3, child, idleTimer: void 0, exited: false };
+    const slot = { key: key4, child, idleTimer: void 0, exited: false };
     const drop = () => {
       slot.exited = true;
       this.clearIdle(slot);
@@ -42191,14 +42315,14 @@ var ClaudeWarmPool = class {
    * The waiting process if it was started for exactly `key`. Another key gets null and the slot stays: an unrelated
    * call (chart job, merge, another card) must not kill the process the open dialog is about to use.
    */
-  take(key3) {
+  take(key4) {
     const slot = this.slot;
     if (!slot) return null;
     if (slot.exited) {
       this.slot = null;
       return null;
     }
-    if (slot.key !== key3) return null;
+    if (slot.key !== key4) return null;
     this.slot = null;
     this.clearIdle(slot);
     return slot.child;
@@ -42423,8 +42547,8 @@ var AiRuntimeService = class {
   claude(pluginDirectory) {
     var _a2;
     const executable = this.resolveExecutable(this.options.claudePath());
-    const key3 = `${executable}\0${pluginDirectory}`;
-    if (((_a2 = this.claudeRuntime) == null ? void 0 : _a2.key) === key3) return this.claudeRuntime.runtime;
+    const key4 = `${executable}\0${pluginDirectory}`;
+    if (((_a2 = this.claudeRuntime) == null ? void 0 : _a2.key) === key4) return this.claudeRuntime.runtime;
     const runtime = new ClaudeCodeCliRuntime({
       executable,
       cwd: pluginDirectory,
@@ -42433,7 +42557,7 @@ var AiRuntimeService = class {
       ...this.options.claudeSpawn ? { spawn: this.options.claudeSpawn } : {},
       onLog: (level, message) => this.options.onLog(level, message)
     });
-    this.claudeRuntime = { key: key3, runtime };
+    this.claudeRuntime = { key: key4, runtime };
     return runtime;
   }
   /** The runtime that serves `model`, started lazily in the plugin folder when a call runs. */
@@ -43221,6 +43345,8 @@ var AiTaskService = class {
         if (decided.ok) result.decidedTemplate = decided.template;
         else result.aiSectionsFallback = true;
       }
+      if (input2.aiSections === "follow" && input2.detailTemplate)
+        result.detail = demoteUnknownHeadings(result.detail, input2.detailTemplate);
       const template2 = input2.detailTemplate;
       if (template2 && !aiDecides && template2.sections.some((section3) => section3.count) && input2.mode !== "decompose" && input2.detailFormat !== "adaptive" && // A top reply holds only the new findings, so a count over the whole page means nothing.
       input2.updateMode !== "top") {
@@ -43961,8 +44087,8 @@ function parseMapChat(raw, context) {
       if (index >= MAP_CHAT_MAX_ACTIONS) throw new Dropped("too_many");
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Dropped("bad_item");
       const item = entry;
-      const text12 = (key3, required = true) => {
-        const field = item[key3];
+      const text12 = (key4, required = true) => {
+        const field = item[key4];
         if (field === void 0 || field === null) {
           if (required) throw new Dropped("missing_field");
           return "";
@@ -43972,13 +44098,13 @@ function parseMapChat(raw, context) {
         if (required && !trimmed2) throw new Dropped("missing_field");
         return trimmed2;
       };
-      const rawText = (key3) => {
-        const field = item[key3];
+      const rawText = (key4) => {
+        const field = item[key4];
         if (field === void 0 || field === null) return "";
         if (typeof field !== "string") throw new Dropped("bad_value");
         return field;
       };
-      const flag = (key3) => item[key3] === true;
+      const flag = (key4) => item[key4] === true;
       const topicKind = () => {
         const given = text12("topicKind", false);
         if (given && !TOPIC_KINDS.includes(given)) throw new Dropped("bad_value");
@@ -44002,9 +44128,9 @@ function parseMapChat(raw, context) {
         if (created || !known.has(id)) throw new Dropped("unknown_node");
         return id;
       };
-      const node = (key3, allowNew = false) => resolve(text12(key3), allowNew);
-      const list = (key3) => {
-        const field = item[key3];
+      const node = (key4, allowNew = false) => resolve(text12(key4), allowNew);
+      const list = (key4) => {
+        const field = item[key4];
         if (field === void 0 || field === null) return [];
         if (!Array.isArray(field) || field.some((id) => typeof id !== "string")) throw new Dropped("bad_value");
         const ids = [...new Set(field.map((id) => id.trim()).filter(Boolean))];
@@ -44019,8 +44145,8 @@ function parseMapChat(raw, context) {
         if (!shown || shown.kind !== "annotated" || text12("imageId") !== shown.id) throw new Dropped("no_image");
         if (context.aim) throw new Dropped("no_relations");
       };
-      const unit2 = (key3) => {
-        const field = item[key3];
+      const unit2 = (key4) => {
+        const field = item[key4];
         if (typeof field !== "number" || !Number.isFinite(field)) throw new Dropped("bad_value");
         return Math.min(1, Math.max(0, field));
       };
@@ -44189,8 +44315,8 @@ function parseMapChat(raw, context) {
         case "set_appearance": {
           const nodeIds = list("nodeIds");
           if (!nodeIds.length) throw new Dropped("missing_field");
-          const values = (key3, known2) => {
-            const field = item[key3];
+          const values = (key4, known2) => {
+            const field = item[key4];
             if (field === void 0 || field === null) return [];
             if (!Array.isArray(field) || field.some((value2) => typeof value2 !== "string")) throw new Dropped("bad_value");
             const given = [...new Set(field.map((value2) => value2.trim()).filter(Boolean))];
@@ -45132,11 +45258,11 @@ function mapChoiceParts(maps) {
   return maps.map((map) => {
     var _a2;
     if (maps.filter((other) => same(other, map)).length < 2) return { title: map.title };
-    const key3 = `${shown(map)}\0${folder(map)}`;
+    const key4 = `${shown(map)}\0${folder(map)}`;
     const alike = maps.filter((other) => same(other, map) && folder(other) === folder(map));
     if (alike.length < 2) return { title: map.title, folder: folder(map) };
-    const seq = ((_a2 = seen.get(key3)) != null ? _a2 : 0) + 1;
-    seen.set(key3, seq);
+    const seq = ((_a2 = seen.get(key4)) != null ? _a2 : 0) + 1;
+    seen.set(key4, seq);
     return { title: map.title, folder: folder(map), seq };
   });
 }
@@ -45231,7 +45357,7 @@ function buildAimRootContext(context, value, language2) {
   const expectation = normalizeAimOutcomeExpectation(value);
   const sections = [context.trim()];
   if (!expectation) return sections[0];
-  const tr = (key3) => translate(language2, key3);
+  const tr = (key4) => translate(language2, key4);
   const goalLabels = {
     auto: tr("ui.aim_outcome_auto"),
     execute: tr("ui.aim_outcome_execute"),
@@ -45581,15 +45707,15 @@ var TITLE_KEY = "t:";
 var PATH_KEY = "p:";
 function outlineSummaryBank(nodes, dropSingleRoot = false) {
   const bank = /* @__PURE__ */ new Map();
-  const add = (key3, summary) => {
+  const add = (key4, summary) => {
     var _a2;
-    return bank.set(key3, [...(_a2 = bank.get(key3)) != null ? _a2 : [], summary]);
+    return bank.set(key4, [...(_a2 = bank.get(key4)) != null ? _a2 : [], summary]);
   };
   const keys = outlinePathKeys(nodes, dropSingleRoot);
   nodes.forEach((node, index) => {
-    const key3 = keys[index];
-    if (key3 === null || !node.summary) return;
-    add(PATH_KEY + key3, node.summary);
+    const key4 = keys[index];
+    if (key4 === null || !node.summary) return;
+    add(PATH_KEY + key4, node.summary);
     add(TITLE_KEY + node.title, node.summary);
   });
   return bank;
@@ -45602,18 +45728,18 @@ function applyOutlineSummaries(nodes, bank) {
   const summaries = nodes.map((node) => node.summary);
   nodes.forEach((node, index) => {
     var _a2;
-    const key3 = keys[index];
-    if (summaries[index] || key3 === null) return;
-    const list = bank.get(PATH_KEY + key3);
+    const key4 = keys[index];
+    if (summaries[index] || key4 === null) return;
+    const list = bank.get(PATH_KEY + key4);
     if (!list) return;
-    const at = (_a2 = taken.get(key3)) != null ? _a2 : 0;
-    taken.set(key3, at + 1);
+    const at = (_a2 = taken.get(key4)) != null ? _a2 : 0;
+    taken.set(key4, at + 1);
     summaries[index] = list[at];
     if (list[at]) titlesUsed.add(node.title);
   });
   nodes.forEach((node, index) => {
-    const key3 = keys[index];
-    if (summaries[index] || key3 === null || bank.has(PATH_KEY + key3) || titlesUsed.has(node.title)) return;
+    const key4 = keys[index];
+    if (summaries[index] || key4 === null || bank.has(PATH_KEY + key4) || titlesUsed.has(node.title)) return;
     const byTitle = bank.get(TITLE_KEY + node.title);
     if ((byTitle == null ? void 0 : byTitle.length) !== 1) return;
     summaries[index] = byTitle[0];
@@ -45772,7 +45898,7 @@ var RELATION_KIND_RECORD = {
 };
 var RELATION_KINDS = Object.keys(RELATION_KIND_RECORD);
 var isRecord4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-var own = (record, key3) => Object.prototype.hasOwnProperty.call(record, key3) ? record[key3] : void 0;
+var own = (record, key4) => Object.prototype.hasOwnProperty.call(record, key4) ? record[key4] : void 0;
 var fail = (reason) => ({ ok: false, reason });
 var startsWithFrontmatter = (body) => /^---[ \t]*(?:\r?\n|$)/.test(body.replace(/^\uFEFF/, ""));
 function parseClipboard(raw) {
@@ -45839,12 +45965,12 @@ function parseClipboard(raw) {
         droppedRelations++;
         continue;
       }
-      const key3 = from > to ? `${to}\0${from}` : `${from}\0${to}`;
-      if (pairs.has(key3)) {
+      const key4 = from > to ? `${to}\0${from}` : `${from}\0${to}`;
+      if (pairs.has(key4)) {
         droppedRelations++;
         continue;
       }
-      pairs.add(key3);
+      pairs.add(key4);
       const relation = { kind, from, to };
       const description = own(item, "description");
       const normalized = typeof description === "string" ? normalizeRelationDescription(description) : void 0;
@@ -49117,8 +49243,8 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     rows2.push({ item, check, title, task, contribution });
     (_a2 = options.apply) == null ? void 0 : _a2.call(options, item, { element: row, head, title });
     check.addEventListener("change", () => {
-      const uncheckChildren = (key3) => rows2.forEach((other) => {
-        if (parentOf(other.item) === key3 && other.check.checked) {
+      const uncheckChildren = (key4) => rows2.forEach((other) => {
+        if (parentOf(other.item) === key4 && other.check.checked) {
           other.check.checked = false;
           uncheckChildren(keyOf2(other.item));
         }
@@ -49755,8 +49881,8 @@ function buildStructureReviewNodes(nodes, describe, scopeRootId) {
   const children = /* @__PURE__ */ new Map();
   const ids = new Set(nodes.map((node) => node.id));
   for (const node of nodes) {
-    const key3 = node.parentId !== null && ids.has(node.parentId) ? node.parentId : null;
-    children.set(key3, [...(_a2 = children.get(key3)) != null ? _a2 : [], node.id]);
+    const key4 = node.parentId !== null && ids.has(node.parentId) ? node.parentId : null;
+    children.set(key4, [...(_a2 = children.get(key4)) != null ? _a2 : [], node.id]);
   }
   const result = [];
   const seen = /* @__PURE__ */ new Set();
@@ -49817,15 +49943,15 @@ function parseStructureReview(raw, tree, language2 = "en") {
   body.suggestions.forEach((entry, index) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw invalid2(locale, `#${index + 1}`);
     const item = entry;
-    const text12 = (key4) => {
-      const field = item[key4];
+    const text12 = (key5) => {
+      const field = item[key5];
       if (field === void 0) return "";
-      if (typeof field !== "string") throw invalid2(locale, `#${index + 1} ${key4}`);
+      if (typeof field !== "string") throw invalid2(locale, `#${index + 1} ${key5}`);
       return field.trim();
     };
-    for (const key4 of Object.keys(item))
-      if (!["kind", "targetId", "reason", "title", "newParentId", "mergeIntoId"].includes(key4))
-        throw invalid2(locale, `#${index + 1} ${key4}`);
+    for (const key5 of Object.keys(item))
+      if (!["kind", "targetId", "reason", "title", "newParentId", "mergeIntoId"].includes(key5))
+        throw invalid2(locale, `#${index + 1} ${key5}`);
     const kind = item.kind;
     if (typeof kind !== "string" || !STRUCTURE_SUGGESTION_KINDS.includes(kind))
       throw invalid2(locale, `#${index + 1} kind`);
@@ -49849,9 +49975,9 @@ function parseStructureReview(raw, tree, language2 = "en") {
       if (destinationId === targetId || descendantIds(tree, targetId).has(destinationId)) return reject2("cycle");
       if (kind === "move" && target.parentId === destinationId) return reject2("noop");
     }
-    const key3 = `${kind}:${targetId}`;
-    if (seen.has(key3)) return reject2("duplicate");
-    seen.add(key3);
+    const key4 = `${kind}:${targetId}`;
+    if (seen.has(key4)) return reject2("duplicate");
+    seen.add(key4);
     suggestions.push({
       kind,
       targetId,
@@ -50117,7 +50243,7 @@ function parseGoalRecommend(raw, request) {
     const item = entry;
     const keys = Object.keys(item);
     const withAnchor = keys.includes("anchor");
-    if (keys.length !== (withAnchor ? 3 : 2) || !["id", "tier"].every((key3) => keys.includes(key3)))
+    if (keys.length !== (withAnchor ? 3 : 2) || !["id", "tier"].every((key4) => keys.includes(key4)))
       throw invalid3(locale, `${where} keys`);
     const { id: label, tier, anchor } = item;
     if (typeof label !== "string" || !label) throw invalid3(locale, `${where} id`);
@@ -50156,7 +50282,7 @@ function parseGoalRecommend(raw, request) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw invalid3(locale, where);
     const suggestion = entry;
     const keys = Object.keys(suggestion);
-    if (keys.length !== 4 || !["parentId", "title", "summary", "suggestedTier"].every((key4) => keys.includes(key4)))
+    if (keys.length !== 4 || !["parentId", "title", "summary", "suggestedTier"].every((key5) => keys.includes(key5)))
       throw invalid3(locale, `${where} keys`);
     if (typeof suggestion.parentId !== "string") throw invalid3(locale, `${where} parentId`);
     if (typeof suggestion.title !== "string") throw invalid3(locale, `${where} title`);
@@ -50172,12 +50298,12 @@ function parseGoalRecommend(raw, request) {
     const title = suggestion.title.trim();
     if (!title) return drop("empty_title");
     if ([...title].length > GOAL_RECOMMEND_TITLE_LIMIT || /[\r\n]/.test(title)) return drop("title_too_long");
-    const key3 = goalRecommendTitleKey(title);
-    if (taken.has(key3)) return drop("duplicate_title");
+    const key4 = goalRecommendTitleKey(title);
+    if (taken.has(key4)) return drop("duplicate_title");
     const summary = sanitizeGeneratedTitle(suggestion.summary.replace(/\s+/g, " ").trim()).trim();
     if (!summary) return drop("empty_summary");
     if (suggestedTier === "side") return drop("side_tier");
-    taken.add(key3);
+    taken.add(key4);
     suggestions.push({ parentId, title, summary, suggestedTier });
   });
   const conflicts = relevancePinConflicts(tree, pins);
@@ -50346,8 +50472,8 @@ function renderTopicTree(parent, options) {
   const ids = new Set(options.nodes.map((node) => node.id));
   const children = /* @__PURE__ */ new Map();
   for (const node of options.nodes) {
-    const key3 = node.parentId && ids.has(node.parentId) ? node.parentId : null;
-    children.set(key3, [...(_a2 = children.get(key3)) != null ? _a2 : [], node]);
+    const key4 = node.parentId && ids.has(node.parentId) ? node.parentId : null;
+    children.set(key4, [...(_a2 = children.get(key4)) != null ? _a2 : [], node]);
   }
   const rows2 = [];
   const row = (id, text12, depth, enabled) => {
@@ -50937,27 +51063,27 @@ var TRIMMED_FIELDS = /* @__PURE__ */ new Set(["detail", "workingFindings", "ance
 function deduplicateAimRequest(context) {
   const prepared = { ...context };
   const passages = /* @__PURE__ */ new Map();
-  const copyFor = (text12, key3) => {
+  const copyFor = (text12, key4) => {
     const copies = passages.get(text12);
-    return copies !== void 0 && [...copies].some((copyKey) => !TRIMMED_FIELDS.has(copyKey) || copyKey === key3);
+    return copies !== void 0 && [...copies].some((copyKey) => !TRIMMED_FIELDS.has(copyKey) || copyKey === key4);
   };
-  const remember = (text12, key3) => {
+  const remember = (text12, key4) => {
     const copies = passages.get(text12);
-    if (copies) copies.add(key3);
-    else passages.set(text12, /* @__PURE__ */ new Set([key3]));
+    if (copies) copies.add(key4);
+    else passages.set(text12, /* @__PURE__ */ new Set([key4]));
   };
-  for (const key3 of ["task", "detail", "ancestors", "workingFindings", "summary", "rules", "title"]) {
-    const value = prepared[key3];
+  for (const key4 of ["task", "detail", "ancestors", "workingFindings", "summary", "rules", "title"]) {
+    const value = prepared[key4];
     if (typeof value !== "string") continue;
     const chunks = value.split(/(\n\n)/);
-    prepared[key3] = chunks.map((chunk) => {
+    prepared[key4] = chunks.map((chunk) => {
       if (chunk.length < AIM_PASSAGE_MIN_CHARS) return chunk;
-      if (copyFor(chunk, key3)) return PASSAGE_REFERENCE;
-      remember(chunk, key3);
+      if (copyFor(chunk, key4)) return PASSAGE_REFERENCE;
+      remember(chunk, key4);
       return chunk.split("\n").map((line) => {
         if (line.length < AIM_PASSAGE_MIN_CHARS || line === chunk) return line;
-        if (copyFor(line, key3)) return PASSAGE_REFERENCE;
-        remember(line, key3);
+        if (copyFor(line, key4)) return PASSAGE_REFERENCE;
+        remember(line, key4);
         return line;
       }).join("\n");
     }).join("");
@@ -51076,11 +51202,11 @@ function parseDeliveryOutline(detail) {
     if (!section3 || typeof section3 !== "object" || !("heading" in section3) || !("purpose" in section3) || !("searchTask" in section3) || typeof section3.heading !== "string" || !section3.heading.trim() || typeof section3.purpose !== "string" || !section3.purpose.trim() || typeof section3.searchTask !== "string")
       throw new Error("Final delivery outline is invalid; no conclusion was saved.");
     const mapping = {};
-    for (const key3 of ["evidenceIds", "dependencies"]) {
-      if (key3 in section3) {
-        const ids = section3[key3];
+    for (const key4 of ["evidenceIds", "dependencies"]) {
+      if (key4 in section3) {
+        const ids = section3[key4];
         if (!Array.isArray(ids)) continue;
-        mapping[key3] = [
+        mapping[key4] = [
           ...new Set(ids.filter((id) => typeof id === "string" && !!id.trim()).map((id) => id.trim()))
         ];
       }
@@ -51133,15 +51259,15 @@ async function buildFinalDelivery(base, ask, options = {}) {
     ...(savedCheckpoint == null ? void 0 : savedCheckpoint.sections) ? { sections: { ...savedCheckpoint.sections } } : {}
   };
   let reuseRemaining = true;
-  const stage = async (key3, produce, validate = validateContent) => {
+  const stage = async (key4, produce, validate = validateContent) => {
     var _a3, _b3, _c2, _d2;
     (_a3 = base.signal) == null ? void 0 : _a3.throwIfAborted();
-    const saved = reuseRemaining ? savedCheckpoint == null ? void 0 : savedCheckpoint[key3] : void 0;
+    const saved = reuseRemaining ? savedCheckpoint == null ? void 0 : savedCheckpoint[key4] : void 0;
     if (saved) {
       try {
         validateContent(saved);
         validate(saved);
-        checkpoint[key3] = saved;
+        checkpoint[key4] = saved;
         return saved;
       } catch (e) {
       }
@@ -51151,7 +51277,7 @@ async function buildFinalDelivery(base, ask, options = {}) {
     validateContent(result2);
     validate(result2);
     (_b3 = base.signal) == null ? void 0 : _b3.throwIfAborted();
-    checkpoint[key3] = result2;
+    checkpoint[key4] = result2;
     await ((_c2 = options.onCheckpoint) == null ? void 0 : _c2.call(options, { ...checkpoint }));
     (_d2 = base.signal) == null ? void 0 : _d2.throwIfAborted();
     return result2;
@@ -51720,9 +51846,9 @@ ${preservedBody}`,
     }
     if (!preserveDecision || !originalMarker) return parsed;
     const mergedMarker = { ...(_m = readMarker(repaired.detail)) == null ? void 0 : _m.raw, decision: preserveDecision };
-    for (const key3 of ["rationale", "question", "stopReason"]) {
-      const value = originalMarker.raw[key3];
-      if (typeof value === "string" && value.trim()) mergedMarker[key3] = value.trim();
+    for (const key4 of ["rationale", "question", "stopReason"]) {
+      const value = originalMarker.raw[key4];
+      if (typeof value === "string" && value.trim()) mergedMarker[key4] = value.trim();
     }
     const mergedBody = originalBody || ((_n = readMarker(repaired.detail)) == null ? void 0 : _n.body) || parsed.detail;
     return parseAimPlannerReview({
@@ -53580,18 +53706,18 @@ Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
   }
   /** Starts a new, user-invoked attempt on a saved partial branch without replacing earlier results. */
   async continuePartial(mapPath, runId, model, reasoning, signal) {
-    const key3 = `${mapPath}
+    const key4 = `${mapPath}
 ${runId}`, fingerprint2 = JSON.stringify({ model, reasoning });
-    const existing = _AimManualFlow.continuationRuns.get(key3);
+    const existing = _AimManualFlow.continuationRuns.get(key4);
     if (existing) {
       if (existing.fingerprint !== fingerprint2)
         throw new Error("This partial continuation is already running with different model settings.");
       return existing.promise;
     }
     const promise = this.runPartialContinuation(mapPath, runId, model, reasoning, signal).finally(
-      () => _AimManualFlow.continuationRuns.delete(key3)
+      () => _AimManualFlow.continuationRuns.delete(key4)
     );
-    _AimManualFlow.continuationRuns.set(key3, { fingerprint: fingerprint2, promise });
+    _AimManualFlow.continuationRuns.set(key4, { fingerprint: fingerprint2, promise });
     return promise;
   }
   async runPartialContinuation(mapPath, runId, model, reasoning, signal) {
@@ -54023,13 +54149,13 @@ Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
   }
   async planNextQuestion(mapPath, parentNodeId, model, reasoning, requestId, parentBranchId = null, signal) {
     throwIfAborted(signal);
-    const key3 = `${mapPath}
+    const key4 = `${mapPath}
 ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, model, reasoning });
-    const active = _AimManualFlow.questionPlans.get(key3);
+    const active = _AimManualFlow.questionPlans.get(key4);
     if (active) {
       if (active.fingerprint !== fingerprint2)
         throw new Error("This Planner question identity is already running with different input.");
-      return this.subscribeToQuestionPlan(key3, active, signal);
+      return this.subscribeToQuestionPlan(key4, active, signal);
     }
     const controller = new AbortController();
     const entry = {
@@ -54049,12 +54175,12 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
       controller.signal
     ).finally(() => {
       entry.settled = true;
-      if (_AimManualFlow.questionPlans.get(key3) === entry) _AimManualFlow.questionPlans.delete(key3);
+      if (_AimManualFlow.questionPlans.get(key4) === entry) _AimManualFlow.questionPlans.delete(key4);
     });
-    _AimManualFlow.questionPlans.set(key3, entry);
-    return this.subscribeToQuestionPlan(key3, entry, signal);
+    _AimManualFlow.questionPlans.set(key4, entry);
+    return this.subscribeToQuestionPlan(key4, entry, signal);
   }
-  subscribeToQuestionPlan(key3, entry, signal) {
+  subscribeToQuestionPlan(key4, entry, signal) {
     throwIfAborted(signal);
     const subscriber = Symbol("Planner request owner");
     entry.subscribers.add(subscriber);
@@ -54064,7 +54190,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
         signal == null ? void 0 : signal.removeEventListener("abort", onAbort);
         entry.subscribers.delete(subscriber);
         if (!entry.settled && entry.subscribers.size === 0) {
-          if (_AimManualFlow.questionPlans.get(key3) === entry) _AimManualFlow.questionPlans.delete(key3);
+          if (_AimManualFlow.questionPlans.get(key4) === entry) _AimManualFlow.questionPlans.delete(key4);
           entry.controller.abort();
         }
       };
@@ -54480,7 +54606,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
     return { nodeId: topic.id, branchId: null };
   }
   async answerAndResearch(mapPath, questionNodeId, input2, model, reasoning, signal, onBranchStarted) {
-    const key3 = `${mapPath}
+    const key4 = `${mapPath}
 ${input2.requestId}`;
     const fingerprint2 = JSON.stringify({
       questionNodeId,
@@ -54489,16 +54615,16 @@ ${input2.requestId}`;
       model,
       reasoning
     });
-    const existing = this.answerRuns.get(key3);
+    const existing = this.answerRuns.get(key4);
     if (existing) {
       if (existing.fingerprint !== fingerprint2)
         throw new Error("This answer submission identity is already running with different input.");
       return existing.promise;
     }
     const work = this.runAnswer(mapPath, questionNodeId, input2, model, reasoning, signal, onBranchStarted).finally(
-      () => this.answerRuns.delete(key3)
+      () => this.answerRuns.delete(key4)
     );
-    this.answerRuns.set(key3, { fingerprint: fingerprint2, promise: work });
+    this.answerRuns.set(key4, { fingerprint: fingerprint2, promise: work });
     return work;
   }
   async retryAnswerResearch(mapPath, branchId, model, reasoning, signal) {
@@ -54732,8 +54858,8 @@ ${note.detail}`
   async assessReusableResearch(target, candidate, conditions, context, model, reasoning, signal) {
     var _a2, _b2;
     const keys = (_b2 = (_a2 = target.validity) == null ? void 0 : _a2.conditionKeys) != null ? _b2 : [];
-    const sameCondition = (key3) => Object.hasOwn(candidate.conditions, key3) && Object.hasOwn(conditions, key3) && candidate.conditions[key3] === conditions[key3];
-    if (keys.some((key3) => !sameCondition(key3)))
+    const sameCondition = (key4) => Object.hasOwn(candidate.conditions, key4) && Object.hasOwn(conditions, key4) && candidate.conditions[key4] === conditions[key4];
+    if (keys.some((key4) => !sameCondition(key4)))
       throw new ReuseEvidenceRejected(
         "Reusable evidence no longer matches a relevant supplied condition; plan an update instead."
       );
@@ -54768,12 +54894,12 @@ ${note.detail}`
     } catch (e) {
       throw new ReuseEvidenceRejected("The source applicability assessment was invalid.");
     }
-    if (!audit || audit.usable !== true || typeof audit.rationale !== "string" || !audit.rationale.trim() || typeof audit.validity !== "string" || !audit.validity.trim() || !Array.isArray(audit.conditionKeys) || audit.conditionKeys.some((key3) => typeof key3 !== "string" || !sameCondition(key3)))
+    if (!audit || audit.usable !== true || typeof audit.rationale !== "string" || !audit.rationale.trim() || typeof audit.validity !== "string" || !audit.validity.trim() || !Array.isArray(audit.conditionKeys) || audit.conditionKeys.some((key4) => typeof key4 !== "string" || !sameCondition(key4)))
       throw new ReuseEvidenceRejected(
         "The full source report did not pass relevance, condition and freshness assessment; plan an update or new research."
       );
     const applicableConditions = Object.fromEntries(
-      [.../* @__PURE__ */ new Set([...keys, ...audit.conditionKeys])].map((key3) => [key3, conditions[key3]])
+      [.../* @__PURE__ */ new Set([...keys, ...audit.conditionKeys])].map((key4) => [key4, conditions[key4]])
     );
     return {
       sourceBranchId: candidate.source.branchId,
@@ -54995,7 +55121,7 @@ Planner format diagnostic: ${JSON.stringify({ initial: { detail: planned.detail.
                 }
               });
               if (Object.entries(savedRef.reuse.applicableConditions).some(
-                ([key3, value]) => currentBranch.inputSnapshot.conditions[key3] !== value
+                ([key4, value]) => currentBranch.inputSnapshot.conditions[key4] !== value
               ))
                 throw new Error("The reused report no longer matches its applicable conditions.");
             }
@@ -57160,7 +57286,7 @@ var chatAppearanceChange = (action) => {
     removeStyles: (_d = action.removeFormats) != null ? _d : []
   };
 };
-var skipped = (key3) => ({ status: "skipped", reason: t(key3) });
+var skipped = (key4) => ({ status: "skipped", reason: t(key4) });
 var GUARD_REASON = {
   outside_vault: "ui.map_chat_guard_outside_vault",
   config_dir: "ui.map_chat_guard_config_dir",
@@ -60417,10 +60543,10 @@ ${request.requirements}` : preset.text,
     const title = (_d = (_c = (_a2 = fresh.get(parent.id)) == null ? void 0 : _a2.title) != null ? _c : (_b2 = this.describeForReview(parent.id)) == null ? void 0 : _b2.title) != null ? _d : "";
     if (!basis || title !== basis.title || parent.parentId !== basis.parentId) return true;
     if (this.isMerging(parent.id) || this.aiLockReason("addChild", [parent.id], fresh)) return true;
-    const key3 = goalRecommendTitleKey(item.title);
+    const key4 = goalRecommendTitleKey(item.title);
     return !!((_e = this.map) == null ? void 0 : _e.nodes.some((node) => {
       var _a3, _b3;
-      return goalRecommendTitleKey((_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : "") === key3;
+      return goalRecommendTitleKey((_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : "") === key4;
     }));
   }
   /**
@@ -61732,12 +61858,12 @@ ${request.requirements}` : preset.text,
     super.onPaneMenu(menu, source);
     if (!this.map || !this.path) return;
     menu.addSeparator();
-    for (const [format, key3] of [
+    for (const [format, key4] of [
       ["opml", "ui.exchange_export_opml"],
       ["freemind", "ui.exchange_export_freemind"]
     ])
       menu.addItem(
-        (item) => item.setTitle(t(key3)).setIcon("file-output").onClick(() => this.exportExchange(format))
+        (item) => item.setTitle(t(key4)).setIcon("file-output").onClick(() => this.exportExchange(format))
       );
   }
   /** Writes the open map as OPML or FreeMind next to its Map.md. */
@@ -62826,16 +62952,16 @@ ${request.requirements}` : preset.text,
     const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === path);
     this.announceStage(path, (_c = node && ((_b2 = this.notes.get(node.id)) == null ? void 0 : _b2.title)) != null ? _c : path);
   }
-  announceStage(key3, title) {
+  announceStage(key4, title) {
     var _a2, _b2;
-    const progress = (_a2 = this.plugin.researchProgress) == null ? void 0 : _a2.get(key3);
+    const progress = (_a2 = this.plugin.researchProgress) == null ? void 0 : _a2.get(key4);
     if (!progress) {
-      this.announcedStages.delete(key3);
+      this.announcedStages.delete(key4);
       return;
     }
     const signature = `${progress.stage}|${progress.slow ? 1 : 0}`;
-    if (this.announcedStages.get(key3) === signature) return;
-    this.announcedStages.set(key3, signature);
+    if (this.announcedStages.get(key4) === signature) return;
+    this.announcedStages.set(key4, signature);
     (_b2 = this.announcer) == null ? void 0 : _b2.setText(
       t(
         "ui.research_announcement_0_1",
@@ -62900,34 +63026,34 @@ ${request.requirements}` : preset.text,
    * task key. The entry belongs to the caller: `end()` runs when the answer arrives (before anything is written), and again
    * in the caller's finally. A key that already has an entry (a chart step of that note) is left alone.
    */
-  startTaskProgress(key3, model) {
+  startTaskProgress(key4, model) {
     const progress = this.plugin.researchProgress;
-    if (!progress || progress.get(key3)) return { end: () => {
+    if (!progress || progress.get(key4)) return { end: () => {
     } };
     let attempt = "starting";
-    progress.begin(key3, attempt, Date.now(), model);
+    progress.begin(key4, attempt, Date.now(), model);
     return {
       observer: {
         onAttempt: (id) => {
           attempt = id;
-          progress.newAttempt(key3, id, Date.now());
+          progress.newAttempt(key4, id, Date.now());
         },
-        onStage: (id, stage, query) => progress.stage(key3, id, stage, Date.now(), query),
-        onPreview: (id, fields) => progress.preview(key3, id, fields != null ? fields : {})
+        onStage: (id, stage, query) => progress.stage(key4, id, stage, Date.now(), query),
+        onPreview: (id, fields) => progress.preview(key4, id, fields != null ? fields : {})
       },
-      end: () => progress.end(key3, attempt)
+      end: () => progress.end(key4, attempt)
     };
   }
   /** Stage text, seconds and the preview line under a synthesis or merge status bar. */
-  renderTaskProgress(bar, parent, key3) {
+  renderTaskProgress(bar, parent, key4) {
     var _a2;
-    const progress = (_a2 = this.plugin.researchProgress) == null ? void 0 : _a2.get(key3);
+    const progress = (_a2 = this.plugin.researchProgress) == null ? void 0 : _a2.get(key4);
     if (!progress) {
-      this.researchSigs.delete(key3);
-      this.taskPreviewEls.delete(key3);
+      this.researchSigs.delete(key4);
+      this.taskPreviewEls.delete(key4);
       return;
     }
-    this.researchSigs.set(key3, this.researchSig(progress));
+    this.researchSigs.set(key4, this.researchSig(progress));
     const stageEl = bar.createSpan({ cls: "vam-research-stage", text: this.researchStageText(progress) });
     stageEl.setAttr("aria-hidden", "true");
     const elapsedEl = bar.createSpan({
@@ -62937,15 +63063,15 @@ ${request.requirements}` : preset.text,
     elapsedEl.setAttr("aria-hidden", "true");
     this.trackResearchElapsed(elapsedEl, progress.startedAt);
     const preview = parent.createDiv({ cls: "vam-task-preview" });
-    this.taskPreviewEls.set(key3, preview);
-    this.paintTaskPreview(key3);
+    this.taskPreviewEls.set(key4, preview);
+    this.paintTaskPreview(key4);
   }
   /** Plain text only (never Markdown) and no render: the summary being written, which nothing has saved yet. */
-  paintTaskPreview(key3) {
+  paintTaskPreview(key4) {
     var _a2, _b2, _c, _d;
-    const element = this.taskPreviewEls.get(key3);
+    const element = this.taskPreviewEls.get(key4);
     if (!element) return;
-    const text12 = (_c = (_b2 = (_a2 = this.plugin.researchProgress) == null ? void 0 : _a2.get(key3)) == null ? void 0 : _b2.preview) == null ? void 0 : _c.summary;
+    const text12 = (_c = (_b2 = (_a2 = this.plugin.researchProgress) == null ? void 0 : _a2.get(key4)) == null ? void 0 : _b2.preview) == null ? void 0 : _c.summary;
     element.hidden = !text12;
     if (!text12) {
       if (element.hasClass("is-preview")) {
@@ -64053,11 +64179,11 @@ ${request.requirements}` : preset.text,
       const paint = (at) => {
         dot.style.left = `${Math.round(at.x * 1e6) / 1e4}%`;
         dot.style.top = `${Math.round(at.y * 1e6) / 1e4}%`;
-        for (const [key3, line] of lines()) {
+        for (const [key4, line] of lines()) {
           const end = this.lineEndEl(line.topicId);
           if (end)
             this.placeAnchorLine(
-              key3,
+              key4,
               { ...line, point: { x: image.x + at.x * image.w, y: image.y + at.y * image.h } },
               boxOf(end)
             );
@@ -64236,7 +64362,7 @@ ${request.requirements}` : preset.text,
       return target === imageEl || !!((_a3 = imageEl.contains) == null ? void 0 : _a3.call(imageEl, target));
     };
     const clamp2 = unitStep;
-    const key3 = (event) => {
+    const key4 = (event) => {
       const e = event;
       if (e.isComposing) return;
       const step = e.shiftKey ? 0.1 : 0.02, move = {
@@ -64286,11 +64412,11 @@ ${request.requirements}` : preset.text,
     viewport == null ? void 0 : viewport.addEventListener("click", blank, true);
     stage.addEventListener("pointerdown", down, true);
     stage.addEventListener("click", click, true);
-    stage.addEventListener("keydown", key3, true);
+    stage.addEventListener("keydown", key4, true);
     this.endPlacingListeners = () => {
       stage.removeEventListener("pointerdown", down, true);
       stage.removeEventListener("click", click, true);
-      stage.removeEventListener("keydown", key3, true);
+      stage.removeEventListener("keydown", key4, true);
       viewport == null ? void 0 : viewport.removeEventListener("click", blank, true);
       stage.removeClass("is-placing");
       cross.remove();
@@ -64348,7 +64474,7 @@ ${request.requirements}` : preset.text,
         );
       });
     };
-    const key3 = (event) => {
+    const key4 = (event) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopPropagation();
@@ -64356,11 +64482,11 @@ ${request.requirements}` : preset.text,
     };
     root.addEventListener("pointerdown", down, true);
     root.addEventListener("click", click, true);
-    root.addEventListener("keydown", key3, true);
+    root.addEventListener("keydown", key4, true);
     this.endPickingListeners = () => {
       root.removeEventListener("pointerdown", down, true);
       root.removeEventListener("click", click, true);
-      root.removeEventListener("keydown", key3, true);
+      root.removeEventListener("keydown", key4, true);
       hint.remove();
       this.endPickingListeners = null;
     };
@@ -65160,7 +65286,7 @@ ${request.requirements}` : preset.text,
       event.stopPropagation();
       this.finishLinking(cardId);
     };
-    const key3 = (event) => {
+    const key4 = (event) => {
       const e = event;
       if (e.key === "Escape") {
         e.preventDefault();
@@ -65181,11 +65307,11 @@ ${request.requirements}` : preset.text,
     viewport == null ? void 0 : viewport.addEventListener("click", blank, true);
     stage.addEventListener("pointerdown", down, true);
     stage.addEventListener("click", click, true);
-    stage.addEventListener("keydown", key3, true);
+    stage.addEventListener("keydown", key4, true);
     this.endLinkListeners = () => {
       stage.removeEventListener("pointerdown", down, true);
       stage.removeEventListener("click", click, true);
-      stage.removeEventListener("keydown", key3, true);
+      stage.removeEventListener("keydown", key4, true);
       viewport == null ? void 0 : viewport.removeEventListener("click", blank, true);
       stage.removeClass("is-linking");
       this.endLinkListeners = null;
@@ -67203,9 +67329,9 @@ ${request.requirements}` : preset.text,
    */
   async acceptCrossCut(payload, record) {
     const session = sessionFor(this.plugin), from = record.sourceMapPath;
-    const refuse = (key3, drop = false) => {
+    const refuse = (key4, drop = false) => {
       if (drop && session.cancelCut()) this.refreshCutMarks();
-      new import_obsidian37.Notice(t(key3));
+      new import_obsidian37.Notice(t(key4));
       return null;
     };
     if (!this.app.vault.getAbstractFileByPath(from)) return refuse("ui.clipboard_cut_missing", true);
@@ -67391,11 +67517,11 @@ ${request.requirements}` : preset.text,
     }
     const viewport = this.map.viewport;
     const target = this.map;
-    for (const key3 of Object.keys(target)) if (!(key3 in next)) delete target[key3];
-    for (const [key3, value] of Object.entries(next)) {
-      const current = target[key3];
+    for (const key4 of Object.keys(target)) if (!(key4 in next)) delete target[key4];
+    for (const [key4, value] of Object.entries(next)) {
+      const current = target[key4];
       if (Array.isArray(current) && Array.isArray(value)) current.splice(0, current.length, ...value);
-      else target[key3] = value;
+      else target[key4] = value;
     }
     this.map.viewport = clone(viewport);
   }
@@ -67469,14 +67595,14 @@ ${request.requirements}` : preset.text,
   async noteChange(node, patch, sink = (entry) => this.history.push(entry)) {
     var _a2, _b2, _c;
     const current = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0), before = {};
-    for (const key3 of Object.keys(patch)) before[key3] = current[key3];
+    for (const key4 of Object.keys(patch)) before[key4] = current[key4];
     const followsSummary = patch.summary !== void 0 && patch.preview === void 0 && patch.previewSection === void 0;
     if (followsSummary) {
       before.previewSection = current.preview;
       before.previewInitialized = current.previewInitialized;
       before.previewAutoHash = current.previewAutoHash;
     }
-    if (Object.keys(patch).every((key3) => current[key3] === patch[key3])) return;
+    if (Object.keys(patch).every((key4) => current[key4] === patch[key4])) return;
     await this.plugin.repo.updateNote(node.path, patch);
     const written2 = followsSummary ? await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0) : null;
     if (patch.referencePaths !== void 0) {
@@ -67495,7 +67621,7 @@ ${request.requirements}` : preset.text,
       "researchMode",
       "sourcePaths",
       "referencePaths"
-    ].some((key3) => key3 in patch))
+    ].some((key4) => key4 in patch))
       this.plugin.topicRuns.stopTask(node.path);
     sink({
       undo: async () => {
@@ -69004,7 +69130,7 @@ ${request.requirements}` : preset.text,
     const aimProgress = aimEnabled() && !!aimData && (node.aimKind === "question" || node.aimKind === "topic" && aimData.branches.some((branch) => branch.questionNodeId === node.id && !branch.parentBranchId));
     if (doc && aimData && aimProgress) {
       const status = aimQuestionStatus(doc, node.id, this.aimActiveQuestionNodeId);
-      const key3 = {
+      const key4 = {
         running: "ui.aim_branch_running",
         completed: "ui.aim_branch_completed",
         partial: "ui.aim_branch_partial",
@@ -69014,7 +69140,7 @@ ${request.requirements}` : preset.text,
       };
       header.createSpan({
         cls: `vam-status vam-aim-question-status vam-status-${status === "running" ? "running" : status === "completed" ? "completed" : status === "not_started" ? "idea" : "error"}`,
-        text: status === "not_started" && aimData.branches.some((branch) => branch.questionNodeId === node.id) ? t("ui.aim_answered_not_started") : t(key3[status])
+        text: status === "not_started" && aimData.branches.some((branch) => branch.questionNodeId === node.id) ? t("ui.aim_answered_not_started") : t(key4[status])
       });
     } else if (!isAimNode(node) || active || queued || !note || note.status !== "completed" || research) {
       const statusText = research ? this.researchStageText(research) : merging ? t("ui.merging") : active ? t("ui.ai_running") : queued ? t("ui.research_queued") : (note == null ? void 0 : note.status) === "completed" ? t("ui.researched") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing");
@@ -69632,14 +69758,14 @@ ${request.requirements}` : preset.text,
     }, kept, layoutOf(this.map));
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
-  keyboardNeighbor(node, key3) {
+  keyboardNeighbor(node, key4) {
     var _a2, _b2;
-    const target = this.displayedNeighbor(node, key3);
+    const target = this.displayedNeighbor(node, key4);
     return target && ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === target.id)) != null ? _b2 : target);
   }
-  displayedNeighbor(node, key3) {
+  displayedNeighbor(node, key4) {
     var _a2, _b2, _c;
-    if (!this.map || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key3)) return void 0;
+    if (!this.map || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key4)) return void 0;
     const shown = this.canvasNodes();
     const byY = bySiblingAxis("y");
     const byX = bySiblingAxis("x");
@@ -69657,7 +69783,7 @@ ${request.requirements}` : preset.text,
       const root = byId.get((_a3 = top.parentId) != null ? _a3 : "");
       return root && top.x < root.x ? "left" : "right";
     };
-    const move = neighborKey(direction, key3, direction === "balanced" ? sideOf2(node) : void 0);
+    const move = neighborKey(direction, key4, direction === "balanced" ? sideOf2(node) : void 0);
     const vertical = direction === "down" || direction === "up";
     const order = vertical ? byX : byY;
     const kids = shown.filter((item) => item.parentId === node.id).sort(order);
@@ -69670,7 +69796,7 @@ ${request.requirements}` : preset.text,
     const ringMine = ringMembers((_b2 = this.map.canvasItems) != null ? _b2 : [], this.map.nodes);
     if (!node.parentId && ringMine.length) {
       if (ringMine.some((member) => member.topicId === node.id)) {
-        if (move === "sibling-" || move === "sibling+") return this.ringCycleNeighbor(node, key3, shown, ringMine);
+        if (move === "sibling-" || move === "sibling+") return this.ringCycleNeighbor(node, key4, shown, ringMine);
       }
     }
     let siblings = shown.filter((item) => {
@@ -69695,7 +69821,7 @@ ${request.requirements}` : preset.text,
    * The key that goes forward on a card is the one that points the way the walk runs there (right on the top row, left on the
    * bottom row, down on the right column, up on the left column); the opposite key goes back.
    */
-  ringCycleNeighbor(node, key3, shown, members) {
+  ringCycleNeighbor(node, key4, shown, members) {
     var _a2, _b2;
     const mine = members.find((member) => member.topicId === node.id);
     const image = mine && findAnnotatedImage((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], mine.imageId);
@@ -69720,7 +69846,7 @@ ${request.requirements}` : preset.text,
     );
     const index = cards.findIndex((item) => item.card.id === node.id);
     if (index < 0 || cards.length < 2) return void 0;
-    const forward = key3 === FORWARD[cards[index].side];
+    const forward = key4 === FORWARD[cards[index].side];
     return cards[(index + (forward ? 1 : cards.length - 1)) % cards.length].card;
   }
   moveKeyboardFocus(target) {
@@ -70596,21 +70722,21 @@ ${request.requirements}` : preset.text,
    * What a Next Step dialog needs to hide itself once AI starts: the card shows running and Stop from `begin` until
    * the provider accepts (`end`), and a result that arrives with the dialog closed is announced by one Notice.
    */
-  backgroundHooks(key3, node) {
+  backgroundHooks(key4, node) {
     let own2;
     const mapPath = this.path;
     return {
       begin: (controller, kind) => {
         own2 = controller;
-        this.startingTasks.set(key3, controller);
-        if (kind === "expand") this.startingExpand.add(key3);
-        else this.startingExpand.delete(key3);
+        this.startingTasks.set(key4, controller);
+        if (kind === "expand") this.startingExpand.add(key4);
+        else this.startingExpand.delete(key4);
         this.render();
       },
       end: () => {
-        if (own2 && this.startingTasks.get(key3) === own2) {
-          this.startingTasks.delete(key3);
-          this.startingExpand.delete(key3);
+        if (own2 && this.startingTasks.get(key4) === own2) {
+          this.startingTasks.delete(key4);
+          this.startingExpand.delete(key4);
         }
         own2 = void 0;
         if (!this.closed) this.render();
@@ -71267,9 +71393,9 @@ ${request.requirements}` : preset.text,
    * edited shows the row alone. Everything the user typed goes in as text.
    */
   renderAnchorRelationRow(list, node, ref, repaint, editButtons) {
-    const key3 = anchorLineKey(ref.imageId, ref.anchorId, node.id), text12 = this.anchorRelationRowText(ref), described = ref.relation.description ? `${text12}. ${ref.relation.description}` : text12, end = { imageId: ref.imageId, anchorId: ref.anchorId, topicId: node.id };
+    const key4 = anchorLineKey(ref.imageId, ref.anchorId, node.id), text12 = this.anchorRelationRowText(ref), described = ref.relation.description ? `${text12}. ${ref.relation.description}` : text12, end = { imageId: ref.imageId, anchorId: ref.anchorId, topicId: node.id };
     const row = list.createEl("li", { cls: "vam-relation-row vam-anchor-relation-row" });
-    this.bindRelationRow(row, ref.relation, described, key3);
+    this.bindRelationRow(row, ref.relation, described, key4);
     this.relationSwatch(row, ref.relation.kind);
     const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
     label.createSpan({ text: text12, cls: "vam-relation-sentence", attr: { dir: "auto" } });
@@ -71279,7 +71405,7 @@ ${request.requirements}` : preset.text,
     const tools = row.createSpan({ cls: "vam-relation-tools" });
     const reopen = () => {
       var _a2;
-      return (_a2 = editButtons.get(key3)) == null ? void 0 : _a2.focus();
+      return (_a2 = editButtons.get(key4)) == null ? void 0 : _a2.focus();
     };
     row.addEventListener("click", (event) => {
       var _a2;
@@ -71287,7 +71413,7 @@ ${request.requirements}` : preset.text,
       this.openAnchorRelationEditor(end, repaint, reopen);
     });
     editButtons.set(
-      key3,
+      key4,
       this.iconButton(
         tools,
         "pencil",
@@ -71341,7 +71467,7 @@ ${request.requirements}` : preset.text,
    * Returns the close-time save, settled when its write is done.
    */
   renderAnchorRelationEditor(parent, ref, close, onChanged) {
-    const root = parent.createDiv("vam-relation-editor"), key3 = anchorLineKey(ref.imageId, ref.anchorId, ref.topicId);
+    const root = parent.createDiv("vam-relation-editor"), key4 = anchorLineKey(ref.imageId, ref.anchorId, ref.topicId);
     const apply = (next, repaint = true) => new Promise(
       (done) => this.enqueue(async () => {
         try {
@@ -71353,13 +71479,13 @@ ${request.requirements}` : preset.text,
             (items) => result ? updateAnchorRelation(items, ref.imageId, ref.anchorId, ref.topicId, result) : removeAnchorRelation(items, ref.imageId, ref.anchorId, ref.topicId)
           );
           if (!result) {
-            this.selection.deselectRelation(key3);
+            this.selection.deselectRelation(key4);
             this.syncRelationClasses();
             onChanged == null ? void 0 : onChanged();
             close == null ? void 0 : close();
             return;
           }
-          this.selection.selectRelation(key3);
+          this.selection.selectRelation(key4);
           this.syncRelationClasses();
           if (repaint) paint();
           onChanged == null ? void 0 : onChanged();
@@ -72166,11 +72292,11 @@ ${request.requirements}` : preset.text,
       case "delete_topic":
         return check("remove", [action.nodeId]);
       case "edit_md_file": {
-        const key3 = normalizeVaultPath(action.path);
-        if (!key3) return null;
-        const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === key3);
+        const key4 = normalizeVaultPath(action.path);
+        if (!key4) return null;
+        const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === key4);
         if (node) return check("write", [node.id]);
-        const file = this.app.vault.getAbstractFileByPath(key3);
+        const file = this.app.vault.getAbstractFileByPath(key4);
         const frontmatter2 = file instanceof import_obsidian37.TFile ? (_b2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _b2.frontmatter : void 0;
         return frontmatter2 && readAiLocked(frontmatter2) ? refused : null;
       }
@@ -73217,8 +73343,8 @@ ${request.requirements}` : preset.text,
   async runMultiResearch(request, retryBatchKey, onSettled, tell, signal, markStarted) {
     if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
     const languageSource = this.batchLanguageSource();
-    const key3 = this.multiResearchKey();
-    if (this.plugin.expansionCoordinator.isRunning(key3)) {
+    const key4 = this.multiResearchKey();
+    if (this.plugin.expansionCoordinator.isRunning(key4)) {
       new import_obsidian37.Notice(t("ui.multi_research_already_running"));
       return;
     }
@@ -73240,7 +73366,7 @@ ${request.requirements}` : preset.text,
       });
       await confirmEach(0, async () => {
         var _a2;
-        if (this.plugin.expansionCoordinator.isRunning(key3)) {
+        if (this.plugin.expansionCoordinator.isRunning(key4)) {
           new import_obsidian37.Notice(t("ui.multi_research_already_running"));
           return;
         }
@@ -73285,7 +73411,7 @@ ${request.requirements}` : preset.text,
           const gate = { shown: false };
           markStarted();
           await this.plugin.expansionCoordinator.start(
-            key3,
+            key4,
             nodes,
             async (child, batchSignal, accepted) => {
               var _a3;
@@ -73330,7 +73456,7 @@ ${request.requirements}` : preset.text,
             },
             () => {
               var _a3, _b2;
-              const state = this.plugin.expansionBatches.get(key3);
+              const state = this.plugin.expansionBatches.get(key4);
               if (state && state.status !== "running" && !reported) {
                 reported = true;
                 new import_obsidian37.Notice(
@@ -73441,8 +73567,8 @@ ${request.requirements}` : preset.text,
   /** Status bar under the toolbar (same place and look as the AIM status bar) with progress, Stop, and Retry/Dismiss after failures. */
   renderMultiResearchStatus(parent) {
     var _a2, _b2;
-    const key3 = this.multiResearchKey();
-    const state = this.plugin.expansionBatches.get(key3);
+    const key4 = this.multiResearchKey();
+    const state = this.plugin.expansionBatches.get(key4);
     if (!state) return;
     const running = state.status === "running";
     if (!running && !state.failures.length) return;
@@ -73461,9 +73587,9 @@ ${request.requirements}` : preset.text,
     });
     if (running) this.button(bar, t("ui.stop_research"), () => this.stopMultiResearch());
     else {
-      this.renderRetryFailedButton(bar, key3, state);
+      this.renderRetryFailedButton(bar, key4, state);
       const dismiss = this.button(bar, "\xD7", () => {
-        this.plugin.expansionBatches.delete(key3);
+        this.plugin.expansionBatches.delete(key4);
         if (!this.closed) this.render();
       });
       dismiss.setAttr("aria-label", t("ui.dismiss"));
@@ -75523,8 +75649,8 @@ ${note.detail.trim()}` : "",
   }
   /** A vault note's text as it is right now (an open note is read from its editor, which may hold unsaved typing). */
   async readChatFile(path) {
-    const key3 = normalizeVaultPath(path);
-    const file = key3 ? this.app.vault.getAbstractFileByPath(key3) : null;
+    const key4 = normalizeVaultPath(path);
+    const file = key4 ? this.app.vault.getAbstractFileByPath(key4) : null;
     if (!(file instanceof import_obsidian37.TFile)) return null;
     const editor = this.openMarkdownEditor(file.path);
     return { file, editor, text: editor ? editor.getValue() : await this.app.vault.read(file) };
@@ -75955,10 +76081,10 @@ ${note.detail.trim()}` : "",
           const openAttempt = () => {
             var _a4;
             const controller = new AbortController();
-            const key3 = `map-chat-view:${++mapChatTaskSequence}`;
+            const key4 = `map-chat-view:${++mapChatTaskSequence}`;
             this.chatController = controller;
-            this.chatTaskKey = key3;
-            (_a4 = this.plugin.activeTasks) == null ? void 0 : _a4.set(key3, controller);
+            this.chatTaskKey = key4;
+            (_a4 = this.plugin.activeTasks) == null ? void 0 : _a4.set(key4, controller);
             return {
               controller,
               alive: () => !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path
@@ -76334,7 +76460,7 @@ ${note.detail.trim()}` : "",
     const work = run.work;
     if (!work) return;
     work.controller.abort();
-    for (const key3 of work.researchKeys) this.plugin.expansionCoordinator.stop(key3);
+    for (const key4 of work.researchKeys) this.plugin.expansionCoordinator.stop(key4);
   }
   /** A round ended with its reply applied (or its plan): the chain goes on, waits or ends, unless the user spoke meanwhile. */
   finishChatRound(run, round3) {
@@ -77047,13 +77173,13 @@ ${note.detail.trim()}` : "",
       var _a2, _b2;
       return `\u201C${(_b2 = (_a2 = this.chatTopicState(id)) == null ? void 0 : _a2.title) != null ? _b2 : id}\u201D`;
     }).join(t("ui.map_chat_kind_choice_topics_separator"));
-    const follow = (key3) => {
+    const follow = (key4) => {
       if (!this.chat || this.chat !== chat || chat.isBusy || this.chatApplying || this.closed) return;
       const known = ids.filter((id) => {
         var _a2;
         return (_a2 = this.map) == null ? void 0 : _a2.nodes.some((node) => node.id === id);
       });
-      void this.sendMapChat({ text: t(key3, titles(), kindText), chips: [], selectedIds: known });
+      void this.sendMapChat({ text: t(key4, titles(), kindText), chips: [], selectedIds: known });
     };
     chat.showChoices({
       prompt: t("ui.map_chat_kind_choice_prompt_0", kindText),
@@ -77871,8 +77997,8 @@ ${note.detail.trim()}` : "",
         return done;
       }
       case "create_md_file": {
-        const key3 = normalizeVaultPath(action.path);
-        const exists = key3 ? !!this.app.vault.getAbstractFileByPath(key3) : false;
+        const key4 = normalizeVaultPath(action.path);
+        const exists = key4 ? !!this.app.vault.getAbstractFileByPath(key4) : false;
         const content = await demoteUnparsableMermaid(
           neutralizeUnsafeMermaid(action.content),
           this.plugin.mermaidSyntax
@@ -77884,14 +78010,14 @@ ${note.detail.trim()}` : "",
           exists,
           configDir
         });
-        if (!verdict.ok || !key3) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
-        const folders = key3.split("/").slice(0, -1);
+        if (!verdict.ok || !key4) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
+        const folders = key4.split("/").slice(0, -1);
         for (let depth = 1; depth <= folders.length; depth++) {
           const folder = folders.slice(0, depth).join("/");
           if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
         }
-        await this.app.vault.create(key3, content);
-        this.recordChatFileCreate(key3, content, run);
+        await this.app.vault.create(key4, content);
+        this.recordChatFileCreate(key4, content, run);
         return done;
       }
     }
@@ -78290,7 +78416,7 @@ ${note.detail.trim()}` : "",
         ) : null;
         const researchIds = [...this.selection.state.multiSelected];
         const conversation = this.chatConversation;
-        const key3 = this.multiResearchKey();
+        const key4 = this.multiResearchKey();
         this.chatStartedResearch = true;
         this.markResearchRecorded(this.chatLastRecord);
         const outcome = new Promise((resolve) => {
@@ -78328,7 +78454,7 @@ ${note.detail.trim()}` : "",
         if (work) {
           work.research.push(outcome);
           work.researchTargets += researchIds.length;
-          work.researchKeys.add(key3);
+          work.researchKeys.add(key4);
         }
         return { status: "done" };
       }
@@ -78523,12 +78649,12 @@ ${note.detail.trim()}` : "",
       return skipped("ui.map_chat_skip_map_changed");
     for (const job of jobs) {
       const { block, controller } = job;
-      const key3 = ++this.chatImageSequence;
-      this.chatImageSearches.set(key3, controller);
-      job.key = key3;
+      const key4 = ++this.chatImageSequence;
+      this.chatImageSearches.set(key4, controller);
+      job.key = key4;
       block.stop = () => {
-        if (this.chatImageSearches.get(key3) !== controller) return;
-        this.chatImageSearches.delete(key3);
+        if (this.chatImageSearches.get(key4) !== controller) return;
+        this.chatImageSearches.delete(key4);
         controller.abort();
         this.settleChatImages(chat, block, { state: "stopped" });
       };
@@ -79702,12 +79828,12 @@ ${addition}` : addition },
       return box && group.has(id) ? { ...box, x: box.x + dx, y: box.y + dy } : box;
     };
     const tree = [];
-    for (const key3 of this.edgeEls.keys()) {
-      const [parentId, childId] = key3.split("\0");
+    for (const key4 of this.edgeEls.keys()) {
+      const [parentId, childId] = key4.split("\0");
       if (!group.has(parentId) && !group.has(childId)) continue;
       if (!boxFor(parentId) || !boxFor(childId)) continue;
       tree.push({
-        key: key3,
+        key: key4,
         parentId,
         childId,
         direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
@@ -79715,15 +79841,15 @@ ${addition}` : addition },
       });
     }
     const linked = [];
-    for (const key3 of this.relationEls.keys()) {
-      const [fromId, toId] = key3.split("\0");
+    for (const key4 of this.relationEls.keys()) {
+      const [fromId, toId] = key4.split("\0");
       if (!group.has(fromId) && !group.has(toId)) continue;
-      if (boxFor(fromId) && boxFor(toId)) linked.push({ key: key3, fromId, toId });
+      if (boxFor(fromId) && boxFor(toId)) linked.push({ key: key4, fromId, toId });
     }
     const anchored = [];
-    for (const [key3, line] of this.anchorLinks)
+    for (const [key4, line] of this.anchorLinks)
       if ((group.has(line.topicId) || line.imageId === movingImageId) && boxFor(line.topicId))
-        anchored.push({ key: key3, line });
+        anchored.push({ key: key4, line });
     const spineIds = /* @__PURE__ */ new Set();
     for (const id of group.keys()) {
       const member = nodes.find((item) => item.id === id);
@@ -79758,7 +79884,7 @@ ${addition}` : addition },
           (_b3 = this.relationGapEls.get(link.key)) == null ? void 0 : _b3.setAttribute("d", d);
           this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
         }
-        for (const { key: key3, line } of anchored) {
+        for (const { key: key4, line } of anchored) {
           const box = shifted(line.topicId, dx, dy);
           if (!box) continue;
           const from = line.imageId === movingImageId ? {
@@ -79766,7 +79892,7 @@ ${addition}` : addition },
             point: { x: line.point.x + dx, y: line.point.y + dy },
             ...line.image ? { image: { ...line.image, x: line.image.x + dx, y: line.image.y + dy } } : {}
           } : line;
-          this.placeAnchorLine(key3, from, box);
+          this.placeAnchorLine(key4, from, box);
         }
         for (const edge of tree) {
           const path = this.edgeEls.get(edge.key);
@@ -79821,13 +79947,13 @@ ${addition}` : addition },
       this.ringDirections(this.map)
     );
     const touching2 = [];
-    for (const key3 of this.edgeEls.keys()) {
-      const [parentId, childId] = key3.split("\0");
+    for (const key4 of this.edgeEls.keys()) {
+      const [parentId, childId] = key4.split("\0");
       if (parentId !== id && childId !== id) continue;
       const other = this.lineEndEl(parentId === id ? childId : parentId);
       if (!other) continue;
       touching2.push({
-        key: key3,
+        key: key4,
         direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
         depth: depthOf(nodes, childId),
         dragIsParent: parentId === id,
@@ -79835,11 +79961,11 @@ ${addition}` : addition },
       });
     }
     const linked = [];
-    for (const key3 of this.relationEls.keys()) {
-      const [fromId, toId] = key3.split("\0");
+    for (const key4 of this.relationEls.keys()) {
+      const [fromId, toId] = key4.split("\0");
       if (fromId !== id && toId !== id) continue;
       const other = this.cardEls.get(fromId === id ? toId : fromId);
-      if (other) linked.push({ key: key3, dragIsFrom: fromId === id, far: boxOf(other) });
+      if (other) linked.push({ key: key4, dragIsFrom: fromId === id, far: boxOf(other) });
     }
     const anchored = [...this.anchorLinks].filter(([, line]) => line.topicId === id);
     const dragged = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === id);
@@ -79858,7 +79984,7 @@ ${addition}` : addition },
           (_b3 = this.relationGapEls.get(link.key)) == null ? void 0 : _b3.setAttribute("d", d);
           this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
         }
-        for (const [key3, line] of anchored) this.placeAnchorLine(key3, line, { x, y, ...size });
+        for (const [key4, line] of anchored) this.placeAnchorLine(key4, line, { x, y, ...size });
         for (const edge of touching2) {
           const path = this.edgeEls.get(edge.key);
           if (!path) continue;
@@ -80038,11 +80164,11 @@ ${addition}` : addition },
       if (!from || !to) continue;
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }
-    for (const [key3, anchor, relation] of this.anchorLinesToDraw()) {
+    for (const [key4, anchor, relation] of this.anchorLinesToDraw()) {
       const card = this.cardEls.get(anchor.topicId);
       if (!card) continue;
-      this.anchorLinks.set(key3, anchor);
-      links.push({ from: card, to: card, key: key3, kind: relation.kind, relation, anchor });
+      this.anchorLinks.set(key4, anchor);
+      links.push({ from: card, to: card, key: key4, kind: relation.kind, relation, anchor });
     }
     if (!links.length) return;
     const defs = createSvg("defs");
@@ -80074,15 +80200,15 @@ ${addition}` : addition },
       hit.setAttribute("d", d);
       hit.addClass("vam-relation-hit");
       if (link.anchor) hit.setAttribute("data-anchor-relation", "");
-      const key3 = link.key;
+      const key4 = link.key;
       hit.addEventListener("pointerdown", (event) => {
         event.stopPropagation();
-        this.selection.selectRelation(key3);
+        this.selection.selectRelation(key4);
         this.syncRelationClasses();
       });
       hit.addEventListener("click", (event) => {
         event.stopPropagation();
-        this.selection.selectRelation(key3);
+        this.selection.selectRelation(key4);
         this.syncRelationClasses();
         if (link.anchor)
           this.openAnchorRelationEditor({
@@ -80093,15 +80219,15 @@ ${addition}` : addition },
         else this.openRelationEditor(link.relation);
       });
       hit.addEventListener("pointerenter", () => {
-        this.hoverRelation = key3;
+        this.hoverRelation = key4;
         this.syncRelationClasses();
       });
       hit.addEventListener("pointerleave", () => {
-        if (this.hoverRelation === key3) this.hoverRelation = null;
+        if (this.hoverRelation === key4) this.hoverRelation = null;
         this.syncRelationClasses();
       });
       this.edgesEl.appendChild(hit);
-      this.relationHitEls.set(key3, hit);
+      this.relationHitEls.set(key4, hit);
     }
     for (const link of links) {
       const label = createSvg("text");
@@ -80121,13 +80247,13 @@ ${addition}` : addition },
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
   }
   /** Moves one anchor line (all its parts and its label) to meet a topic card that stands at `box`. */
-  placeAnchorLine(key3, line, box) {
+  placeAnchorLine(key4, line, box) {
     var _a2, _b2, _c;
     const d = this.anchorPathData(line, box);
-    (_a2 = this.relationEls.get(key3)) == null ? void 0 : _a2.setAttribute("d", d);
-    (_b2 = this.relationHitEls.get(key3)) == null ? void 0 : _b2.setAttribute("d", d);
-    (_c = this.relationGapEls.get(key3)) == null ? void 0 : _c.setAttribute("d", d);
-    this.placeRelationLabel(key3, this.anchorLabelPoint(line, box));
+    (_a2 = this.relationEls.get(key4)) == null ? void 0 : _a2.setAttribute("d", d);
+    (_b2 = this.relationHitEls.get(key4)) == null ? void 0 : _b2.setAttribute("d", d);
+    (_c = this.relationGapEls.get(key4)) == null ? void 0 : _c.setAttribute("d", d);
+    this.placeRelationLabel(key4, this.anchorLabelPoint(line, box));
   }
   /**
    * The side of its picture a ring card stands on, or null when the line is not a ring line or the card has been dragged
@@ -80215,8 +80341,8 @@ ${addition}` : addition },
    * The text of a relation label: just the name normally; while the line is selected (or hovered) "Name: A → B"
    * ("—" for related) and, on a second line, the note cut to 60 characters with an ellipsis. Text only, never markup.
    */
-  paintRelationLabel(key3, expanded) {
-    const label = this.relationLabelEls.get(key3), link = this.relationData.get(key3);
+  paintRelationLabel(key4, expanded) {
+    const label = this.relationLabelEls.get(key4), link = this.relationData.get(key4);
     if (!label || !link) return;
     const name2 = t(RELATION_NAME_KEY[link.kind]);
     if (!expanded) {
@@ -80224,10 +80350,10 @@ ${addition}` : addition },
       return;
     }
     label.textContent = "";
-    const anchored = this.anchorLinks.get(key3), titleOf = (id) => {
+    const anchored = this.anchorLinks.get(key4), titleOf = (id) => {
       var _a2, _b2;
       return anchored && id === anchored.anchorId ? anchored.anchorNote ? t("ui.anchor_relation_end_0", anchored.anchorNote) : t("ui.anchor_relation_end_empty") : (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
-    }, at = this.relationLabelAt.get(key3), head = createSvg("tspan");
+    }, at = this.relationLabelAt.get(key4), head = createSvg("tspan");
     head.textContent = t(
       link.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
       name2,
@@ -80244,9 +80370,9 @@ ${addition}` : addition },
       label.appendChild(note);
     }
   }
-  placeRelationLabel(key3, point) {
-    this.relationLabelAt.set(key3, point);
-    const label = this.relationLabelEls.get(key3);
+  placeRelationLabel(key4, point) {
+    this.relationLabelAt.set(key4, point);
+    const label = this.relationLabelEls.get(key4);
     if (!label) return;
     label.setAttribute("x", String(point.x));
     label.setAttribute("y", String(point.y));
@@ -80268,10 +80394,10 @@ ${addition}` : addition },
     const aimed = new Set(chosen);
     if (this.hoverTopic) aimed.add(this.hoverTopic);
     const anchorsOn = /* @__PURE__ */ new Set();
-    for (const [key3, path] of this.relationEls) {
-      const anchored = this.anchorLinks.get(key3);
-      const [fromId, toId] = anchored ? [anchored.topicId, anchored.topicId] : key3.split("\0");
-      const related = chosen.has(fromId) || chosen.has(toId) || !!anchored && this.hoverAnchor === `${anchored.imageId}\0${anchored.anchorId}`, active = key3 === this.selection.state.selectedRelation || key3 === this.previewRelation;
+    for (const [key4, path] of this.relationEls) {
+      const anchored = this.anchorLinks.get(key4);
+      const [fromId, toId] = anchored ? [anchored.topicId, anchored.topicId] : key4.split("\0");
+      const related = chosen.has(fromId) || chosen.has(toId) || !!anchored && this.hoverAnchor === `${anchored.imageId}\0${anchored.anchorId}`, active = key4 === this.selection.state.selectedRelation || key4 === this.previewRelation;
       if (anchored) {
         const on = aimed.has(anchored.topicId) || this.hoverAnchor === `${anchored.imageId}\0${anchored.anchorId}`;
         if (on) anchorsOn.add(`${anchored.imageId}\0${anchored.anchorId}`);
@@ -80282,13 +80408,13 @@ ${addition}` : addition },
         path.toggleClass("is-dimmed", chosen.size > 0 && !related);
       }
       path.toggleClass("is-selected", active);
-      const expanded = active || key3 === this.hoverRelation;
-      (_b2 = this.relationLabelEls.get(key3)) == null ? void 0 : _b2.toggleClass("is-expanded", expanded);
-      if (this.relationExpanded.has(key3) !== expanded || !this.relationPainted.has(key3)) {
-        this.paintRelationLabel(key3, expanded);
-        this.relationPainted.add(key3);
-        if (expanded) this.relationExpanded.add(key3);
-        else this.relationExpanded.delete(key3);
+      const expanded = active || key4 === this.hoverRelation;
+      (_b2 = this.relationLabelEls.get(key4)) == null ? void 0 : _b2.toggleClass("is-expanded", expanded);
+      if (this.relationExpanded.has(key4) !== expanded || !this.relationPainted.has(key4)) {
+        this.paintRelationLabel(key4, expanded);
+        this.relationPainted.add(key4);
+        if (expanded) this.relationExpanded.add(key4);
+        else this.relationExpanded.delete(key4);
       }
       if (active) {
         ends.add(fromId);
@@ -80304,24 +80430,24 @@ ${addition}` : addition },
     this.relationEndIds = ends;
   }
   /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */
-  bindRelationRow(row, link, ariaLabel, key3 = relationIdentity(link)) {
+  bindRelationRow(row, link, ariaLabel, key4 = relationIdentity(link)) {
     row.tabIndex = 0;
     row.setAttr("role", "group");
     row.setAttr("aria-label", ariaLabel);
     row.addEventListener("focus", () => {
-      this.selection.selectRelation(key3);
+      this.selection.selectRelation(key4);
       this.syncRelationClasses();
     });
     row.addEventListener("blur", () => {
-      this.selection.deselectRelation(key3);
+      this.selection.deselectRelation(key4);
       this.syncRelationClasses();
     });
     row.addEventListener("mouseenter", () => {
-      this.previewRelation = key3;
+      this.previewRelation = key4;
       this.syncRelationClasses();
     });
     row.addEventListener("mouseleave", () => {
-      if (this.previewRelation === key3) this.previewRelation = null;
+      if (this.previewRelation === key4) this.previewRelation = null;
       this.syncRelationClasses();
     });
   }
@@ -80338,8 +80464,16 @@ ${addition}` : addition },
     const { missing } = resolved.issues;
     this.noticeBlockIssues(resolved.issues, gate);
     this.noticeKindMissing(resolved.issues, (_b2 = note.topicKind) != null ? _b2 : "topic", note.detailTemplateId, gate);
+    this.noticeNoteSectionsUnusable(resolved, gate);
     this.noticeTopicStyleMissing(node, note, missing);
     return resolved;
+  }
+  /** "AI suggested" on a note whose sections cannot be followed: the run uses the general research sections; say so, once per `gate`. */
+  noticeNoteSectionsUnusable(style, gate) {
+    var _a2;
+    if (((_a2 = style.aiSections) == null ? void 0 : _a2.mode) !== "note-unusable" || (gate == null ? void 0 : gate.shown)) return;
+    if (gate) gate.shown = true;
+    new import_obsidian37.Notice(t("ui.note_style_note_sections_unusable"));
   }
   /**
    * The note style of a topic run without notifying or writing anything (see detailTemplateFor). A style file that does
@@ -80352,7 +80486,8 @@ ${addition}` : addition },
       choice: { style: chosenStyle },
       topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
       kind: (_a2 = note.topicKind) != null ? _a2 : "topic",
-      outputLanguage: outputLanguage2
+      outputLanguage: outputLanguage2,
+      detail: note.detail
     });
   }
   /**
@@ -81275,7 +81410,7 @@ var NoteStyleEditorModal = class extends import_obsidian40.Modal {
       const line = list.createDiv({ cls: "vam-editor-section" });
       const input2 = line.createEl("input", { type: "text", cls: "vam-editor-section-name" });
       input2.value = row2.name;
-      const button = (text12, key3, cls, run) => {
+      const button = (text12, key4, cls, run) => {
         const el = line.createEl("button", { text: text12, cls, attr: { type: "button" } });
         el.addEventListener("click", run);
         return el;
@@ -81305,7 +81440,7 @@ var NoteStyleEditorModal = class extends import_obsidian40.Modal {
     if (!row) return;
     const usable = (el) => !el.disabled;
     const order = focus.control === "up" ? ["up", "down", "name"] : focus.control === "down" ? ["down", "up", "name"] : [focus.control, "name"];
-    const target = (_a2 = order.map((key3) => row[key3]).find(usable)) != null ? _a2 : row.name;
+    const target = (_a2 = order.map((key4) => row[key4]).find(usable)) != null ? _a2 : row.name;
     target.focus();
   }
   // ---- the voice ----
@@ -82560,9 +82695,9 @@ function renderNoteKindSetting(setting, plugin, kind) {
     tagEls = item ? kindStyleTags(item).map((tag) => setting.nameEl.createSpan({ text: tag.text, cls: `vam-style-tag ${tag.cls}` })) : [];
   };
   const writeDesc = (line) => {
-    const key3 = line ? `${line.error ? "!" : ""}${line.text}` : "";
-    if (key3 === shownDesc) return;
-    shownDesc = key3;
+    const key4 = line ? `${line.error ? "!" : ""}${line.text}` : "";
+    if (key4 === shownDesc) return;
+    shownDesc = key4;
     setting.descEl.empty();
     if (line) setting.descEl.createDiv({ text: line.text, cls: line.error ? "vam-block-status-error" : void 0 });
   };
@@ -82664,7 +82799,7 @@ function renderMyStylesSetting(setting, plugin) {
 }
 var CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
 var CLAUDE_INSTALL_URL = "https://code.claude.com/docs/en/setup";
-function bindMapFolderInput(plugin, key3, input2) {
+function bindMapFolderInput(plugin, key4, input2) {
   const workspace = plugin.settings.workspaceFolder;
   const relative = (path) => path.startsWith(`${workspace}/`) ? path.slice(workspace.length + 1) : path;
   let running = false;
@@ -82673,7 +82808,7 @@ function bindMapFolderInput(plugin, key3, input2) {
     if (running) return;
     const name2 = input2.getValue().trim().replace(/[\\/]+/g, "/").replace(/^\/+|\/+$/g, "");
     const target = `${workspace}/${name2}`;
-    if (target === plugin.settings[key3]) return;
+    if (target === plugin.settings[key4]) return;
     running = true;
     input2.inputEl.disabled = true;
     const settingsWindow = plugin.app.setting;
@@ -82681,11 +82816,11 @@ function bindMapFolderInput(plugin, key3, input2) {
       (_a2 = settingsWindow == null ? void 0 : settingsWindow.close) == null ? void 0 : _a2.call(settingsWindow);
     } catch (e) {
     }
-    void plugin.mutate(() => plugin.changeMapFolder(key3, target)).catch(() => {
+    void plugin.mutate(() => plugin.changeMapFolder(key4, target)).catch(() => {
     }).finally(() => {
       running = false;
       input2.inputEl.disabled = false;
-      input2.setValue(relative(plugin.settings[key3]));
+      input2.setValue(relative(plugin.settings[key4]));
     });
   };
   input2.inputEl.addEventListener("blur", apply);
@@ -82856,12 +82991,12 @@ var VisualAgentMapSettingTab = class extends import_obsidian42.PluginSettingTab 
     selector == null ? void 0 : selector.focus();
   }
   /** Folder name (relative to the workspace folder) for new Mind Maps / AIM maps; stored as a full path. */
-  renderMapFolderSetting(setting, key3, label, fallback) {
-    const workspace = this.plugin.settings.workspaceFolder, current = this.plugin.settings[key3];
+  renderMapFolderSetting(setting, key4, label, fallback) {
+    const workspace = this.plugin.settings.workspaceFolder, current = this.plugin.settings[key4];
     const shown = current.startsWith(`${workspace}/`) ? current.slice(workspace.length + 1) : current;
     setting.setName(t(label)).setDesc(t("ui.settings_map_folder_desc_0", workspace)).addText((input2) => {
       input2.setPlaceholder(fallback).setValue(shown);
-      bindMapFolderInput(this.plugin, key3, input2);
+      bindMapFolderInput(this.plugin, key4, input2);
     });
   }
   getSettingDefinitions() {
@@ -83211,23 +83346,23 @@ var VisualAgentMapSettingTab = class extends import_obsidian42.PluginSettingTab 
       }
     };
   }
-  async setControlValue(key3, value) {
-    if (key3 === "language") {
+  async setControlValue(key4, value) {
+    if (key4 === "language") {
       await this.plugin.changeLanguage(value);
       return;
-    } else if (key3 === "cliModel") {
+    } else if (key4 === "cliModel") {
       if (typeof value === "string") await this.plugin.setCurrentModel(value);
       return;
-    } else if (typeof value === "string" && (key3 === "codexPath" || key3 === "claudePath"))
-      this.plugin.settings[key3] = value.trim();
-    else if (key3 === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
+    } else if (typeof value === "string" && (key4 === "codexPath" || key4 === "claudePath"))
+      this.plugin.settings[key4] = value.trim();
+    else if (key4 === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;
-    if (key3 === "codexPath") this.plugin.resetCodexRuntime();
-    if (key3 === "claudePath") this.plugin.modelDiscovery.invalidate("claude");
+    if (key4 === "codexPath") this.plugin.resetCodexRuntime();
+    if (key4 === "claudePath") this.plugin.modelDiscovery.invalidate("claude");
     await this.plugin.saveSettings();
-    if (key3 === "codexPath") void this.plugin.refreshModelDiscovery("codex");
-    if (key3 === "claudePath") void this.plugin.refreshModelDiscovery("claude");
-    if (key3 === "codexPath" || key3 === "claudePath") this.updateKeepingFocus();
+    if (key4 === "codexPath") void this.plugin.refreshModelDiscovery("codex");
+    if (key4 === "claudePath") void this.plugin.refreshModelDiscovery("claude");
+    if (key4 === "codexPath" || key4 === "claudePath") this.updateKeepingFocus();
   }
   /**
    * Redraws the page; the control that had the keyboard (Tab just moved it) is focused again. The control is found by what
@@ -83298,20 +83433,20 @@ var PendingSuggestions = class extends Map {
         if (suggestions.length !== item[1].length) throw new Error(t("error.pending_suggestions_fields_invalid"));
         entries.push([item[0], suggestions]);
       }
-      for (const [key3, suggestions] of entries) if (suggestions.length) super.set(key3, suggestions);
+      for (const [key4, suggestions] of entries) if (suggestions.length) super.set(key4, suggestions);
       this.loadError = null;
     } catch (error) {
       this.loadError = error;
       this.onError(error);
     }
   }
-  set(key3, value) {
-    super.set(key3, value);
+  set(key4, value) {
+    super.set(key4, value);
     this.save();
     return this;
   }
-  delete(key3) {
-    const removed = super.delete(key3);
+  delete(key4) {
+    const removed = super.delete(key4);
     if (removed) this.save();
     return removed;
   }
@@ -84111,9 +84246,9 @@ function forbiddenStringsFor(vault, map, notes = []) {
   for (const note of notes) add("model-name", note.model);
   const seen = /* @__PURE__ */ new Set();
   return list.filter((item) => {
-    const key3 = `${item.category}\0${item.value}`;
-    if (seen.has(key3)) return false;
-    seen.add(key3);
+    const key4 = `${item.category}\0${item.value}`;
+    if (seen.has(key4)) return false;
+    seen.add(key4);
     return true;
   });
 }
@@ -84128,11 +84263,11 @@ function scanPayloadForLeaks(payload, forbidden) {
       hits.push(...found);
     }
   };
-  const visit = (value, key3) => {
+  const visit = (value, key4) => {
     if (typeof value === "string") {
-      const codeFree = key3 === "detailHtml" ? stripHtmlCode(value) : value;
+      const codeFree = key4 === "detailHtml" ? stripHtmlCode(value) : value;
       scanText(value, codeFree);
-    } else if (Array.isArray(value)) for (const item of value) visit(item, key3);
+    } else if (Array.isArray(value)) for (const item of value) visit(item, key4);
     else if (value && typeof value === "object")
       for (const [name2, item] of Object.entries(value)) {
         scanText(name2, name2);
@@ -85340,7 +85475,7 @@ var SHARE_VIEWER_UI_EXTRA = {
 
 // experiences/sharing/share-viewer-text.ts
 function shareViewerUiFor(language2) {
-  const text12 = (key3) => translate(language2, key3);
+  const text12 = (key4) => translate(language2, key4);
   return {
     lang: language2,
     readOnly: text12("share.viewer_read_only"),
@@ -86237,7 +86372,7 @@ ${fence}`, host, "", child);
     const diagramSources = [];
     let undrawn = 0;
     let blocked = 0;
-    const note = (key3) => translate(this.config.language, key3);
+    const note = (key4) => translate(this.config.language, key4);
     topLevelMermaid(host).forEach((unit2) => {
       var _a3, _b2;
       const svg = drawnSvg(unit2);
@@ -86831,8 +86966,8 @@ var ShareModal = class extends import_obsidian45.Modal {
     const host = this.options.translation;
     const languages = this.selected();
     if (!host || !languages.length || !this.result) return null;
-    const key3 = `${languages.join(",")}|${this.resolvedModel()}|${this.includeDetail}|${this.includeImages}|${host.cache.size}`;
-    if (((_a2 = this.estimateMemo) == null ? void 0 : _a2.key) === key3) return this.estimateMemo.value;
+    const key4 = `${languages.join(",")}|${this.resolvedModel()}|${this.includeDetail}|${this.includeImages}|${host.cache.size}`;
+    if (((_a2 = this.estimateMemo) == null ? void 0 : _a2.key) === key4) return this.estimateMemo.value;
     let value = null;
     try {
       const source = this.sourceForTranslation();
@@ -86847,7 +86982,7 @@ var ShareModal = class extends import_obsidian45.Modal {
     } catch (e) {
       value = null;
     }
-    this.estimateMemo = { key: key3, value };
+    this.estimateMemo = { key: key4, value };
     return value;
   }
   async primary() {
@@ -88515,13 +88650,13 @@ function partialReply(buffer) {
       i = skipSpace2(buffer, i);
       if (buffer[i] === ",") i = skipSpace2(buffer, i + 1);
       if (i >= buffer.length || buffer[i] !== '"') break;
-      const key3 = decodeString2(buffer, i + 1);
-      if (!key3.complete) break;
-      i = skipSpace2(buffer, key3.end);
+      const key4 = decodeString2(buffer, i + 1);
+      if (!key4.complete) break;
+      i = skipSpace2(buffer, key4.end);
       if (buffer[i] !== ":") break;
       i = skipSpace2(buffer, i + 1);
       if (i >= buffer.length) break;
-      if (key3.value === "reply" && buffer[i] === '"') {
+      if (key4.value === "reply" && buffer[i] === '"') {
         const reply = decodeString2(buffer, i + 1);
         return { text: reply.value, complete: reply.complete };
       }
@@ -89997,7 +90132,8 @@ var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
         return this.noteStyles.runStyle({
           topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
           kind: (_a2 = note.topicKind) != null ? _a2 : "topic",
-          outputLanguage: outputLanguage2
+          outputLanguage: outputLanguage2,
+          detail: note.detail
         });
       },
       resolveModel: (path, map, runOnce) => this.repo.resolveTopicModel(path, map, runOnce),
@@ -90484,17 +90620,17 @@ var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
       ["map-search", "ui.command_map_search", "search"],
       ["map-keyboard-shortcuts", "ui.command_map_shortcuts", "shortcuts"]
     ];
-    for (const [id, key3, action] of mapCommands)
+    for (const [id, key4, action] of mapCommands)
       this.localizedCommands.push({
         command: this.addCommand({
           id,
-          name: t(key3),
+          name: t(key4),
           checkCallback: (checking) => {
             var _a2, _b2;
             return (_b2 = (_a2 = this.app.workspace.getActiveViewOfType(VisualAgentMapView)) == null ? void 0 : _a2.mapCommand(action, checking)) != null ? _b2 : false;
           }
         }),
-        key: key3
+        key: key4
       });
     this.addLocalizedCommand("share-map", "ui.command_share_map", () => void this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.command_open_topic_outline", () => {
@@ -90720,10 +90856,10 @@ var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
     var _a2;
     const now = Date.now();
     for (const { path, error } of failures) {
-      const key3 = `${path}
+      const key4 = `${path}
 ${error}`;
-      if (now - ((_a2 = this.unreadableReported.get(key3)) != null ? _a2 : 0) < 5e3) continue;
-      this.unreadableReported.set(key3, now);
+      if (now - ((_a2 = this.unreadableReported.get(key4)) != null ? _a2 : 0) < 5e3) continue;
+      this.unreadableReported.set(key4, now);
       const message = t("ui.map_unreadable_skipped_0_1", path, error);
       this.logs.appendLog("warn", message);
       new import_obsidian49.Notice(message);
@@ -90745,12 +90881,12 @@ ${error}`;
     };
   }
   /** Settings-page folder rename: moves the maps with it, keeps open views on their maps, then saves the setting. */
-  async changeMapFolder(key3, path) {
+  async changeMapFolder(key4, path) {
     const progress = this.moveProgress();
     let mapping;
     try {
       mapping = await this.repo.changeMapFolder(
-        key3,
+        key4,
         path,
         (mapPath) => this.views().some((view) => view.hasActiveAimWork(mapPath)),
         progress.report
@@ -91199,7 +91335,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (renamed.unchanged) return { ok: true, ref, unchanged: true, topics: 0, styles: 0, failed: [] };
     const failed = [];
     const next = renamed.ref;
-    const swap = (table) => table && Object.values(table).includes(ref) ? Object.fromEntries(Object.entries(table).map(([key3, value]) => [key3, value === ref ? next : value])) : void 0;
+    const swap = (table) => table && Object.values(table).includes(ref) ? Object.fromEntries(Object.entries(table).map(([key4, value]) => [key4, value === ref ? next : value])) : void 0;
     let settingsChanged = false;
     const byKind = category === "recipe" ? swap(this.settings.noteStyleByKind) : void 0;
     if (byKind) {
@@ -91390,16 +91526,16 @@ ${t("ui.organize_link_wait_hint")}`;
       (_b2 = this.settingTab) == null ? void 0 : _b2.refreshAfterLanguageChange();
     }
   }
-  addLocalizedCommand(id, key3, callback) {
-    this.localizedCommands.push({ command: this.addCommand({ id, name: t(key3), callback }), key: key3 });
+  addLocalizedCommand(id, key4, callback) {
+    this.localizedCommands.push({ command: this.addCommand({ id, name: t(key4), callback }), key: key4 });
   }
   refreshLocalizedEntrypoints() {
     var _a2, _b2, _c, _d, _e;
     (_a2 = this.ribbonIcon) == null ? void 0 : _a2.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
     (_b2 = this.coffeeRibbonIcon) == null ? void 0 : _b2.setAttribute("aria-label", translate(this.settings.language, "ui.open_coffee_tables"));
     (_c = this.markdownSelectionAi) == null ? void 0 : _c.refreshLanguage();
-    for (const { command, key: key3 } of this.localizedCommands)
-      command.name = `${(_e = (_d = this.manifest) == null ? void 0 : _d.name) != null ? _e : "Visual Agent Map"}: ${translate(this.settings.language, key3)}`;
+    for (const { command, key: key4 } of this.localizedCommands)
+      command.name = `${(_e = (_d = this.manifest) == null ? void 0 : _d.name) != null ? _e : "Visual Agent Map"}: ${translate(this.settings.language, key4)}`;
   }
   coffeeViews() {
     return this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE).map((leaf) => leaf.view).filter((view) => view instanceof CoffeeTablesView);

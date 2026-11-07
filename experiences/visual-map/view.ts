@@ -26583,8 +26583,15 @@ export class VisualAgentMapView extends ItemView {
     const { missing } = resolved.issues;
     this.noticeBlockIssues(resolved.issues, gate);
     this.noticeKindMissing(resolved.issues, note.topicKind ?? "topic", note.detailTemplateId, gate);
+    this.noticeNoteSectionsUnusable(resolved, gate);
     this.noticeTopicStyleMissing(node, note, missing);
     return resolved;
+  }
+  /** "AI suggested" on a note whose sections cannot be followed: the run uses the general research sections; say so, once per `gate`. */
+  private noticeNoteSectionsUnusable(style: RunStyle, gate?: { shown: boolean }): void {
+    if (style.aiSections?.mode !== "note-unusable" || gate?.shown) return;
+    if (gate) gate.shown = true;
+    new Notice(t("ui.note_style_note_sections_unusable"));
   }
   /**
    * The note style of a topic run without notifying or writing anything (see detailTemplateFor). A style file that does
@@ -26600,7 +26607,8 @@ export class VisualAgentMapView extends ItemView {
       choice: { style: chosenStyle },
       topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
       kind: note.topicKind ?? "topic",
-      outputLanguage
+      outputLanguage,
+      detail: note.detail
     });
   }
   /**

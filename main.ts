@@ -347,7 +347,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.noteStyles.runStyle({
         topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
         kind: note.topicKind ?? "topic",
-        outputLanguage
+        outputLanguage,
+        detail: note.detail
       }),
     resolveModel: (path, map, runOnce) => this.repo.resolveTopicModel(path, map, runOnce),
     clearOtherHistory: origin => {

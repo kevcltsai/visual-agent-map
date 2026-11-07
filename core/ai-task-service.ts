@@ -12,7 +12,7 @@ import { effectiveReasoningLevel, normalizeReasoningLevel } from "../ai/task-pol
 import { canonicalDetail, normalizeOutputScriptHeadings } from "../ai/result-utils";
 import { normalizeDetailHeadings, normalizeMathDelimiters } from "../ai/markdown-blocks";
 import { checkCounts, countIssueText } from "../ai/detail-templates";
-import { decidedTemplateFromDetail } from "../ai/detail-sections";
+import { decidedTemplateFromDetail, demoteUnknownHeadings } from "../ai/detail-sections";
 import type { AiResult, ReasoningLevel, TaskContext } from "../ai/types";
 import { isSearchNotPerformed } from "../ai/search-not-performed";
 import { noteLanguageOf, translate, t, type ContentLanguage, type UiLanguage } from "../i18n";
@@ -326,6 +326,9 @@ export class AiTaskService {
         if (decided.ok) result.decidedTemplate = decided.template;
         else result.aiSectionsFallback = true;
       }
+      // "AI suggested", later research: a section the note does not have stays inside the section before it.
+      if (input.aiSections === "follow" && input.detailTemplate)
+        result.detail = demoteUnknownHeadings(result.detail, input.detailTemplate);
       const template = input.detailTemplate;
       if (
         template &&

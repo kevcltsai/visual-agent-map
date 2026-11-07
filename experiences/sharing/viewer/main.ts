@@ -1035,10 +1035,35 @@ export function startViewer(doc: Document): void {
     if (coverRefit) return;
     coverRefit = window.requestAnimationFrame(() => {
       coverRefit = 0;
+      // Once the reader has folded or unfolded, covers sized after it can overlap what was just arranged: the map's settle pass, once per frame.
+      // Opening a file never gets here with a change (it keeps the saved places).
+      if (arranged && needsSecondPass()) {
+        layout();
+        drawEdges();
+      }
       if (!viewTouched && selected === null && !pointers.size) fit();
     });
   }
   let coverRefit = 0;
+  /** True after the first fold change or Auto layout: until then the saved places are what is drawn. */
+  let arranged = false;
+  /** The map's one conditional second pass: a card over another card or the centre image needs one more arrangement, with the heights now drawn. */
+  function needsSecondPass(): boolean {
+    const drawn = new Set(cards.keys());
+    return (
+      cardsOverlapAny(nodes, drawn, cardHeightOf) ||
+      ringImagesInTheWay(
+        nodes,
+        [...imageItems(), ...textItems()] as CanvasItem[],
+        cardHeightOf,
+        id => textEls.get(id)?.offsetWidth || undefined,
+        {
+          cards: drawn,
+          images: new Set(images.map(image => image.id))
+        }
+      ).size > 0
+    );
+  }
   /** Marks the fixed-height cards whose content does not fit, so the fade and the ellipsis show (read after layout, not at render). */
   function markClipped(): void {
     for (const [id, card] of cards) {
@@ -1227,28 +1252,20 @@ export function startViewer(doc: Document): void {
   /** Rebuilds the cards after a fold change, keeping the card the user acted on where it was on screen. */
   function relayout(focusId?: string, focusButton = false): void {
     const before = focusId ? cards.get(focusId)?.getBoundingClientRect() : undefined;
+    arranged = true;
+    // A fold change or level is the reader's doing: a cover that loads later must not fit the view away from it.
+    viewTouched = true;
     // The map arranges first and draws after (toggleCollapsed -> arrangeAll), so new cards are laid out with the median height.
+    const blocksBefore = [...textEls.keys()].sort().join("\n");
     layout();
     renderCards();
+    // Text blocks come and go with the fold, and they take part in the arrangement only once drawn: arrange again when the set changed.
+    if ([...textEls.keys()].sort().join("\n") !== blocksBefore) layout();
     for (const id of cards.keys()) place(id);
     placeImages();
     markClipped();
-    // The map's one conditional second pass: a card over another card or the centre image gets one more arrangement, with the heights now drawn.
-    const drawn = new Set(cards.keys());
-    if (
-      cardsOverlapAny(nodes, drawn, cardHeightOf) ||
-      ringImagesInTheWay(
-        nodes,
-        [...imageItems(), ...textItems()] as CanvasItem[],
-        cardHeightOf,
-        id => textEls.get(id)?.offsetWidth || undefined,
-        {
-          cards: drawn,
-          images: new Set(images.map(image => image.id))
-        }
-      ).size
-    )
-      layout();
+    // The map's one conditional second pass, with the heights now drawn.
+    if (needsSecondPass()) layout();
     drawEdges();
     const after = focusId ? cards.get(focusId) : undefined;
     if (after) {
@@ -1455,6 +1472,7 @@ export function startViewer(doc: Document): void {
       {
         label: ui.autoLayout,
         run: () => {
+          arranged = true;
           layout();
           drawEdges();
         }

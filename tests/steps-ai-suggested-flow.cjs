@@ -251,6 +251,33 @@ test('keepDroppedContent: numbers dropped, links dropped, both dropped; a restor
   assert.equal(again.detail.split(translate(lang, 'note.kept_from_earlier_version')).length - 1, 1);
 });
 
+test('keepDroppedContent: source numbers ("來源 1" -> [^1]) are not dropped numbers, in three languages', () => {
+  const first = noSources.sections[0].name;
+  for (const [line, fresh] of [
+    ['球桿角度很重要（見來源 1）。另一點（見來源 2）。', '球桿角度很重要[^1]。另一點[^2]。'],
+    ['球杆角度很重要（见来源 1、2）。', '球杆角度很重要[^1][^2]。'],
+    ['Swing plane matters (see source 1). Also (sources 1, 2) and References 3.', 'Swing plane matters[^1]. Also[^2] and[^3].']
+  ]) {
+    const out = keepDroppedContent({ ...base, template: noSources, oldDetail: `### ${first}\n${line}\n`, newDetail: `### ${first}\n${fresh}\n` });
+    assert.equal(out.restored, 0);
+    assert.equal(out.detail, `### ${first}\n${fresh}\n`);
+  }
+});
+
+test('keepDroppedContent: a real number next to a source number is still restored, as the original line', () => {
+  const first = noSources.sections[0].name;
+  const line = '距離少了 42 公里（見來源 1）。';
+  const out = keepDroppedContent({ ...base, template: noSources, oldDetail: `### ${first}\n${line}\n`, newDetail: `### ${first}\n距離變短[^1]。\n` });
+  assert.equal(out.restored, 1);
+  assert.ok(out.detail.includes(`> ${line}`));
+  // a year, or a quantity with a unit after "source", is a number
+  for (const text of ['來源 2018 年報告', 'source 2018 report', 'source 5 km away', '來源 3 公里']) {
+    const kept = keepDroppedContent({ ...base, template: noSources, oldDetail: `### ${first}\n${text}\n`, newDetail: `### ${first}\nnothing\n` });
+    assert.equal(kept.restored, 1, text);
+    assert.ok(kept.detail.includes(`> ${text}`), text);
+  }
+});
+
 test('keepDroppedContent: a template without a sources section is not given one, and links are not carried', () => {
   const first = noSources.sections[0].name;
   const old = `### ${first}\nSee https://example.com/a and 55.\n`;

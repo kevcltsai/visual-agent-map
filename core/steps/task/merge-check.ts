@@ -139,6 +139,29 @@ const HEADING_ANY = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
 const KEPT_LOCALES: ContentLanguage[] = ["zh-TW", "zh-CN", "en"];
 const key = (value: string): string => value.trim().toLocaleLowerCase();
 
+// What follows a number when it is a quantity or a date, not a source number.
+const SOURCE_REF_UNIT = [
+  ["年", "月", "日", "%", "％", "‰", "°", "度", "元"],
+  ["公", "萬", "万", "億", "亿", "千", "百", "倍"],
+  ["次", "人", "個", "个", "台", "項", "项"]
+]
+  .map(group => group.join("|"))
+  .join("|");
+const SOURCE_REF_ASCII_UNIT = "(?:km|m|kg|cm|mm|g|ms|s|hz|mb|gb|kb|mph|k|x|yrs?|years?|days?|months?|percent|usd|eur)\\b";
+const SOURCE_REF_KEYWORD = [["來源", "来源"], ["出處", "出处"]].map(group => group.join("|")).join("|");
+const SOURCE_REF_JOINER = ["及", "和"].join("|");
+const SOURCE_REF = new RegExp(
+  `(?:${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*\\d{1,3}` +
+    `(?:[ \\t]*(?:[,，、]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,3})*` +
+    `(?!\\d|\\.\\d|\\s*(?:${SOURCE_REF_UNIT}|${SOURCE_REF_ASCII_UNIT}))`,
+  "giu"
+);
+
+/** "來源 1", "see source 2", "sources 1, 2": a pointer to a numbered source, not a quantity. A year, a unit or a long number stays. */
+function withoutSourceRefs(text: string): string {
+  return text.replace(SOURCE_REF, "");
+}
+
 /**
  * A rewrite of a note keeps its old numbers and links. What the rewrite left out and the older Detail had is put back,
  * with no AI call: the links go to the sources section ({@link carryForwardSources}, only when the template has one, as it
@@ -162,7 +185,7 @@ export function keepDroppedContent(input: {
     .flatMap(section => [section.name, ...section.aliases]);
   const check = (detail: string) =>
     checkMergePreservation({
-      sourceTexts: [oldDetail],
+      sourceTexts: [withoutSourceRefs(oldDetail)],
       mergedTexts: [detail, input.summary],
       mergedLinkTexts: [input.references],
       logHeadings
@@ -217,7 +240,7 @@ function quoteMissingLines(
     if (!text) return;
     const callout = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text);
     if (callout && titles.has(key(callout[1]))) return;
-    const own = checkMergePreservation({ sourceTexts: [text], mergedTexts: [] }).missing.filter(item =>
+    const own = checkMergePreservation({ sourceTexts: [withoutSourceRefs(text)], mergedTexts: [] }).missing.filter(item =>
       missing.has(item)
     );
     if (!own.some(item => !covered.has(item))) return;

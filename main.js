@@ -31390,11 +31390,26 @@ function findingList(items, none, limit = 30) {
 var HEADING_ANY = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
 var KEPT_LOCALES = ["zh-TW", "zh-CN", "en"];
 var key2 = (value) => value.trim().toLocaleLowerCase();
+var SOURCE_REF_UNIT = [
+  ["\u5E74", "\u6708", "\u65E5", "%", "\uFF05", "\u2030", "\xB0", "\u5EA6", "\u5143"],
+  ["\u516C", "\u842C", "\u4E07", "\u5104", "\u4EBF", "\u5343", "\u767E", "\u500D"],
+  ["\u6B21", "\u4EBA", "\u500B", "\u4E2A", "\u53F0", "\u9805", "\u9879"]
+].map((group) => group.join("|")).join("|");
+var SOURCE_REF_ASCII_UNIT = "(?:km|m|kg|cm|mm|g|ms|s|hz|mb|gb|kb|mph|k|x|yrs?|years?|days?|months?|percent|usd|eur)\\b";
+var SOURCE_REF_KEYWORD = [["\u4F86\u6E90", "\u6765\u6E90"], ["\u51FA\u8655", "\u51FA\u5904"]].map((group) => group.join("|")).join("|");
+var SOURCE_REF_JOINER = ["\u53CA", "\u548C"].join("|");
+var SOURCE_REF = new RegExp(
+  `(?:${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*\\d{1,3}(?:[ \\t]*(?:[,\uFF0C\u3001]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,3})*(?!\\d|\\.\\d|\\s*(?:${SOURCE_REF_UNIT}|${SOURCE_REF_ASCII_UNIT}))`,
+  "giu"
+);
+function withoutSourceRefs(text12) {
+  return text12.replace(SOURCE_REF, "");
+}
 function keepDroppedContent(input2) {
   const { oldDetail, template: template2, language: language2 } = input2;
   const logHeadings = template2.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]);
   const check = (detail2) => checkMergePreservation({
-    sourceTexts: [oldDetail],
+    sourceTexts: [withoutSourceRefs(oldDetail)],
     mergedTexts: [detail2, input2.summary],
     mergedLinkTexts: [input2.references],
     logHeadings
@@ -31438,7 +31453,7 @@ function quoteMissingLines(oldDetail, detail, missing, template2, language2, log
     if (!text12) return;
     const callout = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text12);
     if (callout && titles.has(key2(callout[1]))) return;
-    const own2 = checkMergePreservation({ sourceTexts: [text12], mergedTexts: [] }).missing.filter(
+    const own2 = checkMergePreservation({ sourceTexts: [withoutSourceRefs(text12)], mergedTexts: [] }).missing.filter(
       (item) => missing.has(item)
     );
     if (!own2.some((item) => !covered.has(item))) return;

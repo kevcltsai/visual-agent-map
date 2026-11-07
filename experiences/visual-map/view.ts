@@ -20507,10 +20507,13 @@ export class VisualAgentMapView extends ItemView {
     workspace.toggleClass("has-map-chat-open", this.chat.isOpen);
     this.focusChatHeroOnce();
   }
-  /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) the user did not ask to start blank. */
+  /**
+   * Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) the user did not ask to start
+   * blank. A map with a picture or a text block on it is not empty: the opening screen would cover them and block their menu.
+   */
   private chatHero(): boolean {
     if (!this.chat || this.chat.hasMessages || !this.map || this.blankMapPaths.has(this.path)) return false;
-    return !this.aimLive() && this.map.nodes.length === 0;
+    return !this.aimLive() && this.map.nodes.length === 0 && !this.map.canvasItems?.length;
   }
   /** Mounts the panel where it belongs now: the opening screen's place, or the first child of the workspace. */
   private placeChatPanel(): void {

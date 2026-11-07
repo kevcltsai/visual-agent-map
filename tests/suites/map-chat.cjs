@@ -8018,11 +8018,11 @@ integrationTest('D1 find_images: in multi-select mode (the way to pick several c
   const written = []; h.view.chatCoverWrite = async (block, cover) => { if (!h.view.chatCoverTarget(block)) return null; written.push(cover.name); return { undo: async () => {}, redo: async () => {}, label: 'cover' }; };
   await apply(h, [findAct(h, 'a')]); await waitImages(h);
   assert.match((await h.note('a')).detail, /!\[Pic /, 'the picture is in the note'); assert.equal(downloaded, 1, 'multi-select does not stop the cover download'); assert.equal(written.length, 1, 'and the cover is written');
-  const { h: h2 } = await imageHarness(); h2.control.search = perQuery; h2.view.chatHasNoCover = () => false; h2.view.selection.state.multiSelectMode = true;
+  const { h: h2 } = await imageHarness(); h2.control.search = perQuery; h2.view.chatHasNoCover = () => false; h2.view.selection.mode = true;
   let fetched = 0; h2.view.chatFetchImage = async () => { fetched++; return pngBytes(); }; const file2 = noteFile(h2, 'a');
   await apply(h2, [findAct(h2, 'a')]); await waitImages(h2);
   assert.equal(fetched, 0); assert.doesNotMatch(h2.contents.get(file2), /topic-cover/, 'an existing cover is left alone');
-  const { h: h3 } = await imageHarness(); h3.view.selection.state.multiSelectMode = true;
+  const { h: h3 } = await imageHarness(); h3.view.selection.mode = true;
   const block = { mapPath: h3.view.path, mapId: h3.view.map.id, nodeId: h3.ids.a };
   assert.equal(h3.view.chatCoverTarget(block)?.id, h3.ids.a, 'the card is the cover target');
   h3.view.isMerging = () => true; assert.equal(h3.view.chatCoverTarget(block), null, 'a merging card gets no cover');

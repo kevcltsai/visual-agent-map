@@ -59285,7 +59285,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
   async hydrate(isCurrent = () => true) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c;
     this.aimFailedReports.clear();
     let goal;
     let context;
@@ -59300,15 +59300,26 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       } catch (e) {
       }
     }
-    const loaded = /* @__PURE__ */ new Map();
-    for (const node of (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : []) {
-      if (!isCurrent()) return;
-      try {
-        loaded.set(node.id, await this.plugin.repo.readNote(node.path, (_d = this.map) != null ? _d : void 0));
-      } catch (e) {
+    const nodes = (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : [];
+    const read = new Array(nodes.length);
+    let next = 0;
+    const worker = async () => {
+      var _a3;
+      while (next < nodes.length && isCurrent()) {
+        const index = next++;
+        try {
+          read[index] = await this.plugin.repo.readNote(nodes[index].path, (_a3 = this.map) != null ? _a3 : void 0);
+        } catch (e) {
+        }
       }
-    }
+    };
+    await Promise.all(Array.from({ length: Math.min(8, nodes.length) }, worker));
     if (!isCurrent()) return;
+    const loaded = /* @__PURE__ */ new Map();
+    nodes.forEach((node, index) => {
+      const note = read[index];
+      if (note) loaded.set(node.id, note);
+    });
     this.notes = loaded;
     this.relevanceGoal = goal;
     this.relevanceContext = context;

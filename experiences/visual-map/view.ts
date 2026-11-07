@@ -3346,16 +3346,28 @@ export class VisualAgentMapView extends ItemView {
         /* Unreadable sources are simply not shown. */
       }
     }
-    const loaded = new Map<string, Note>();
-    for (const node of this.map?.nodes ?? []) {
-      if (!isCurrent()) return;
-      try {
-        loaded.set(node.id, await this.plugin.repo.readNote(node.path, this.map ?? undefined));
-      } catch {
-        /* A missing note remains visible and removable on the map. */
+    // A first read of each file can take about a second on a slow disk or iCloud vault, and the map stays blank until
+    // every note is read, so notes are read a few at a time. Results keep the map's node order.
+    const nodes = this.map?.nodes ?? [];
+    const read = new Array<Note | undefined>(nodes.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < nodes.length && isCurrent()) {
+        const index = next++;
+        try {
+          read[index] = await this.plugin.repo.readNote(nodes[index].path, this.map ?? undefined);
+        } catch {
+          /* A missing note remains visible and removable on the map. */
+        }
       }
-    }
+    };
+    await Promise.all(Array.from({ length: Math.min(8, nodes.length) }, worker));
     if (!isCurrent()) return;
+    const loaded = new Map<string, Note>();
+    nodes.forEach((node, index) => {
+      const note = read[index];
+      if (note) loaded.set(node.id, note);
+    });
     this.notes = loaded;
     this.relevanceGoal = goal;
     this.relevanceContext = context;

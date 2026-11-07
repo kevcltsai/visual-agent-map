@@ -16,6 +16,7 @@
 // Each step holds exactly one action; extra or unknown keys (or equals/contains without assert) are a format error (exit 2).
 // Every step has a timeout (default 90s, "stepTimeoutMs" in the scenario overrides; wait steps get +60s, sleep steps +sleep
 // ms); a step that never answers (app crashed, socket gone) is a CRASH, never a silent exit.
+import { clearTimeout, setTimeout } from "node:timers";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";

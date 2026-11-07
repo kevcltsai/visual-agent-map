@@ -15545,6 +15545,7 @@ export class VisualAgentMapView extends ItemView {
         notes: Map<string, Note>;
         covers: Map<string, string>;
         coverLooks: Map<string, { frame: CoverFrame | null; size: number; position: CoverPosition }>;
+        ringHeights?: Map<string, number>;
         goal?: string;
         mapPath: string;
       }
@@ -15569,11 +15570,18 @@ export class VisualAgentMapView extends ItemView {
       covers.set(node.id, cover.path);
       coverLooks.set(node.id, { frame: cover.frame, size: cover.size, position: cover.position });
     }
+    // Ring members' rendered heights: the viewer solves the ring with the sizes the map saw.
+    const ringHeights = new Map<string, number>();
+    for (const id of ringMemberIds(copy.nodes, copy.canvasItems ?? [])) {
+      const height = this.cardEls.get(id)?.offsetHeight;
+      if (height) ringHeights.set(id, height);
+    }
     return {
       map: copy,
       notes: new Map(this.notes),
       covers,
       coverLooks,
+      ...(ringHeights.size ? { ringHeights } : {}),
       ...(this.relevanceGoal ? { goal: this.relevanceGoal } : {}),
       mapPath: this.path
     };

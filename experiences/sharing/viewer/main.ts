@@ -210,6 +210,8 @@ export function startViewer(doc: Document): void {
   const nodes: MapNode[] = [];
   const covers = new Map<string, ViewerCover>();
   const coverShapes = new Map<string, number>();
+  /** Ring members' card heights as the map measured them (optional `ringHeight`); empty for a map without rings. */
+  const ringHeights = new Map<string, number>();
   for (const item of data.nodes) {
     if (!item || typeof item.id !== "string" || info.has(item.id)) continue;
     info.set(item.id, item);
@@ -229,6 +231,9 @@ export function startViewer(doc: Document): void {
     });
     const cover = readCover(item.cover, assets);
     if (cover) covers.set(item.id, cover);
+    const ringHeight = item.ringHeight as unknown;
+    if (typeof ringHeight === "number" && Number.isFinite(ringHeight) && ringHeight >= 1 && ringHeight <= 20000)
+      ringHeights.set(item.id, ringHeight);
   }
   // The map's arrangement (direction and spacing); a file without one, or with a value the viewer does not know, is "right".
   const mapLayout: MapLayout = (() => {
@@ -700,8 +705,9 @@ export function startViewer(doc: Document): void {
         ...(text.links.length ? { links: text.links } : {})
       };
     });
+  /** The height the layout assumes: a ring member keeps the height the map measured (its card here is shorter, with no header or footer rows), else the drawn card. */
   const cardHeightOf = (id: string): number | undefined =>
-    (cards.get(id) ?? textEls.get(id))?.offsetHeight || undefined;
+    ringHeights.get(id) || (cards.get(id) ?? textEls.get(id))?.offsetHeight || undefined;
   /** Draws the tree lines as the map does (view.ts drawEdges): by the direction each branch grows in, then the lines from anchors to topic cards. */
   function drawEdges(): void {
     edges.replaceChildren();

@@ -91,6 +91,8 @@ export interface ShareNodePayload {
   width?: number;
   /** Optional (card-height): a custom card height, 80-720. Absent means as tall as the content; `version` stays 1. */
   height?: number;
+  /** Optional (share-match-map): the height the map measured for this ring member (a card around an annotated image), so the viewer solves the ring with the map's sizes. Written only for ring members; `version` stays 1. */
+  ringHeight?: number;
   /** Optional (text-then-topic): the text block (in `textNodes`, on the same `parentId`) this topic follows. Absent means a direct child; `version` stays 1. */
   afterTextId?: string;
   status: "idea" | "completed";
@@ -242,6 +244,8 @@ export interface ShareOptions {
       { asset: string; frame?: { x: number; y: number; w: number; h: number } | null; size?: number; position?: string }
     >
   >;
+  /** ring member topic id -> its rendered card height in the map (share-match-map). Absent for maps without rings. */
+  ringHeights?: Readonly<Record<string, number>>;
   /** annotated image id -> asset name. Same rule as `covers`. */
   imageAssets?: Readonly<Record<string, string>>;
   /** Turns free text into plain text (the exporter passes `plainWikilinks`); identity when absent. */
@@ -431,6 +435,9 @@ export function buildSharePayload(
       out.width = clampCardWidth(node.width);
     if (node.height !== undefined && clampCardHeight(node.height) !== undefined)
       out.height = clampCardHeight(node.height);
+    const ringHeight = options.ringHeights?.[node.id];
+    if (typeof ringHeight === "number" && Number.isFinite(ringHeight) && ringHeight >= 1 && ringHeight <= 20000)
+      out.ringHeight = Math.round(ringHeight);
     if (note?.relevance) {
       out.tier = note.relevance.tier;
       if (note.relevance.manual) out.manual = true;

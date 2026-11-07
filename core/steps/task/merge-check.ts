@@ -147,8 +147,14 @@ const SOURCE_REF_UNIT = [
 ]
   .map(group => group.join("|"))
   .join("|");
-const SOURCE_REF_ASCII_UNIT = "(?:km|m|kg|cm|mm|g|ms|s|hz|mb|gb|kb|mph|k|x|yrs?|years?|days?|months?|percent|usd|eur)\\b";
-const SOURCE_REF_KEYWORD = [["來源", "来源"], ["出處", "出处"]].map(group => group.join("|")).join("|");
+const SOURCE_REF_ASCII_UNIT =
+  "(?:km|m|kg|cm|mm|g|ms|s|hz|mb|gb|kb|mph|k|x|yrs?|years?|days?|months?|percent|usd|eur)\\b";
+const SOURCE_REF_KEYWORD = [
+  ["來源", "来源"],
+  ["出處", "出处"]
+]
+  .map(group => group.join("|"))
+  .join("|");
 const SOURCE_REF_JOINER = ["及", "和"].join("|");
 const SOURCE_REF = new RegExp(
   `(?:${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*\\d{1,3}` +
@@ -240,8 +246,8 @@ function quoteMissingLines(
     if (!text) return;
     const callout = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text);
     if (callout && titles.has(key(callout[1]))) return;
-    const own = checkMergePreservation({ sourceTexts: [withoutSourceRefs(text)], mergedTexts: [] }).missing.filter(item =>
-      missing.has(item)
+    const own = checkMergePreservation({ sourceTexts: [withoutSourceRefs(text)], mergedTexts: [] }).missing.filter(
+      item => missing.has(item)
     );
     if (!own.some(item => !covered.has(item))) return;
     for (const item of own) covered.add(item);

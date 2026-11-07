@@ -31396,7 +31396,10 @@ var SOURCE_REF_UNIT = [
   ["\u6B21", "\u4EBA", "\u500B", "\u4E2A", "\u53F0", "\u9805", "\u9879"]
 ].map((group) => group.join("|")).join("|");
 var SOURCE_REF_ASCII_UNIT = "(?:km|m|kg|cm|mm|g|ms|s|hz|mb|gb|kb|mph|k|x|yrs?|years?|days?|months?|percent|usd|eur)\\b";
-var SOURCE_REF_KEYWORD = [["\u4F86\u6E90", "\u6765\u6E90"], ["\u51FA\u8655", "\u51FA\u5904"]].map((group) => group.join("|")).join("|");
+var SOURCE_REF_KEYWORD = [
+  ["\u4F86\u6E90", "\u6765\u6E90"],
+  ["\u51FA\u8655", "\u51FA\u5904"]
+].map((group) => group.join("|")).join("|");
 var SOURCE_REF_JOINER = ["\u53CA", "\u548C"].join("|");
 var SOURCE_REF = new RegExp(
   `(?:${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*\\d{1,3}(?:[ \\t]*(?:[,\uFF0C\u3001]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,3})*(?!\\d|\\.\\d|\\s*(?:${SOURCE_REF_UNIT}|${SOURCE_REF_ASCII_UNIT}))`,

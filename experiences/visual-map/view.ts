@@ -1349,6 +1349,19 @@ const NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-ma
   ", "
 );
 const CLICKABLE_SELECTOR = ["button", "input", "textarea", "a", "[role='button']"].join(",");
+/** How long a map open reads before the cards are drawn ahead of their notes. */
+const NOTE_LOAD_FRAME_DELAY_MS = 150;
+/** The state of one map open that reads notes one by one (see VisualAgentMapView.noteLoad). */
+interface NoteLoadState {
+  epoch: number;
+  read: number;
+  total: number;
+  framed: boolean;
+  pending: Set<string>;
+  frameTimer: number | null;
+  raf: number | null;
+  isCurrent: () => boolean;
+}
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
@@ -1998,6 +2011,98 @@ export class VisualAgentMapView extends ItemView {
     return aimEnabled() && !!map?.aim;
   }
   private mapOpenEpoch = 0;
+  /**
+   * Set while opening a map reads its notes one by one: the cards are drawn from the map file alone, a card whose note is not
+   * read yet shows grey bars, and nothing is written. null in every other moment (including the fast open that paints once).
+   */
+  private noteLoad: NoteLoadState | null = null;
+  private notesLoading(): boolean {
+    return this.noteLoad !== null;
+  }
+  /** A card whose note is not read yet, or a note left at "running" by a closed Obsidian that nobody runs (recovery has not run yet). */
+  private cardLoading(node: MapNode): boolean {
+    if (!this.noteLoad) return false;
+    const note = this.notes.get(node.id);
+    return !note || (note.status === "running" && !this.plugin.isNoteTaskBusy(node.path));
+  }
+  /** The title shown before the note is read: first level-1 heading, else frontmatter title, else the file name (as the note's own title is chosen). */
+  private preReadTitle(node: MapNode): string {
+    const base = node.path.split("/").pop()?.replace(/\.md$/i, "") || node.path;
+    try {
+      const file = this.app.vault.getAbstractFileByPath(node.path);
+      if (!(file instanceof TFile)) return base;
+      const cache = this.app.metadataCache.getFileCache(file);
+      const heading = cache?.headings?.find(item => item.level === 1)?.heading?.trim();
+      const fmTitle: unknown = cache?.frontmatter?.title;
+      return heading || (typeof fmTitle === "string" && fmTitle.trim() ? fmTitle.trim() : base);
+    } catch {
+      return base;
+    }
+  }
+  /** Stops the loading state of `load` (or of whatever is current): its delayed frame and its next batch never run. */
+  private endNoteLoad(load: unknown = this.noteLoad): void {
+    const current = this.noteLoad;
+    if (!current || current !== load) return;
+    if (current.frameTimer !== null) window.clearTimeout(current.frameTimer);
+    if (current.raf !== null) window.cancelAnimationFrame(current.raf);
+    this.noteLoad = null;
+  }
+  private scheduleLoadBatch(load: NoteLoadState): void {
+    if (load.raf !== null) return;
+    load.raf = window.requestAnimationFrame(() => {
+      load.raf = null;
+      if (this.noteLoad !== load || !load.isCurrent() || !load.framed) return;
+      // A drag keeps its card: the batch waits for the next frame, the drop repaints anyway.
+      if (this.dragging) {
+        this.scheduleLoadBatch(load);
+        return;
+      }
+      this.rebuildLoadedCards(load);
+    });
+  }
+  /** Redraws only the cards whose notes arrived since the last batch, in place, then the lines once. */
+  private rebuildLoadedCards(load: NoteLoadState): void {
+    const ids = [...load.pending];
+    load.pending.clear();
+    if (!this.map || !ids.length) return;
+    const shown = new Map(this.canvasNodes().map(node => [node.id, node]));
+    const fits: Array<() => void> = [];
+    this.renderingCard = true;
+    this.paintChildIndex = childIndex(this.map.nodes);
+    this.pendingCardFits = fits;
+    try {
+      for (const id of ids) {
+        const node = shown.get(id),
+          old = this.cardEls.get(id);
+        if (!node || !old?.isConnected) continue;
+        const hadFocus = activeDocument.activeElement === old;
+        this.renderNode(node);
+        const fresh = this.cardEls.get(id);
+        if (fresh && fresh !== old) {
+          old.replaceWith(fresh);
+          if (hadFocus) fresh.focus({ preventScroll: true });
+        }
+      }
+    } finally {
+      this.renderingCard = false;
+      this.paintChildIndex = null;
+      this.pendingCardFits = null;
+    }
+    for (const fit of fits) fit();
+    this.drawEdges();
+  }
+  /** Reading: only look and move (pan, zoom, drag a card, select) are left; every button but the map switcher and the zoom row is off. */
+  private lockWhileLoading(): void {
+    if (!this.noteLoad) return;
+    const keep = ".vam-map-chat, .vam-map-title-button, .vam-map-switch-button, .vam-new-map, .vam-zoom-controls";
+    const lock = (host: ParentNode | null | undefined): void => {
+      for (const button of Array.from(host?.querySelectorAll?.<HTMLButtonElement>("button") ?? []))
+        if (!button.closest?.(keep) || button.classList?.contains("vam-layout-button")) button.disabled = true;
+    };
+    lock(this.contentEl);
+    lock(this.relevanceBarEl);
+    this.contentEl.addClass?.("is-notes-loading");
+  }
   private headerTitle = "";
   /** Raised by the header title refresh: the setState it causes asks the workspace to redraw the window title too. */
   private titleRefresh = false;
@@ -2335,7 +2440,7 @@ export class VisualAgentMapView extends ItemView {
       (sibling: boolean) =>
       (event: KeyboardEvent): boolean => {
         if (this.closed || event.isComposing || event.defaultPrevented) return true;
-        if (this.presentation) return false;
+        if (this.presentation || this.notesLoading()) return false;
         if (this.selection.state.multiSelectMode || this.aimLive()) return true;
         const active = this.contentEl.ownerDocument?.activeElement;
         const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
@@ -2355,7 +2460,7 @@ export class VisualAgentMapView extends ItemView {
   private searchKey(event: KeyboardEvent): boolean {
     if (this.closed || event.isComposing || event.defaultPrevented || !this.map) return true;
     // No search box while presenting; the key is swallowed so Obsidian's own search does not open over the show either.
-    if (this.presentation) return false;
+    if (this.presentation || this.notesLoading()) return false;
     const active = (this.contentEl.ownerDocument?.activeElement ?? null) as HTMLElement | null;
     if (!active) return true;
     // The search field itself: Mod+F selects its text instead of opening Obsidian's search.
@@ -2543,7 +2648,13 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The start button is on only when there is something to show and the map is not in select mode. */
   private canPresent(): boolean {
-    return !!this.map && !this.closed && !this.selection.state.multiSelectMode && this.canvasNodes().length > 0;
+    return (
+      !!this.map &&
+      !this.closed &&
+      !this.notesLoading() &&
+      !this.selection.state.multiSelectMode &&
+      this.canvasNodes().length > 0
+    );
   }
   private startPresentation(): void {
     if (this.presentation || !this.map || !this.canPresent()) return;
@@ -2841,7 +2952,13 @@ export class VisualAgentMapView extends ItemView {
   }
   /** True while a card's title or summary may be typed in place: not presenting, not picking cards, not in a live AIM run. */
   private cardTextEditable(): boolean {
-    return !this.closed && !this.presentation && !this.selection.state.multiSelectMode && !this.aimLive();
+    return (
+      !this.closed &&
+      !this.notesLoading() &&
+      !this.presentation &&
+      !this.selection.state.multiSelectMode &&
+      !this.aimLive()
+    );
   }
   /** The caret offset inside `el`'s text at a screen point, or null when the browser cannot say. */
   private caretOffsetAt(el: Element, x: number, y: number): number | null {
@@ -3044,6 +3161,7 @@ export class VisualAgentMapView extends ItemView {
     this.dropMapBackground();
     this.aimViewEpoch++;
     this.mapOpenEpoch++;
+    this.endNoteLoad();
     const controller = this.aimController;
     this.aimController = null;
     this.aimBusy = false;
@@ -3271,6 +3389,22 @@ export class VisualAgentMapView extends ItemView {
   private enqueue(work: () => Promise<void>): void {
     void this.plugin.mutate(work).catch(() => {});
   }
+  /**
+   * A card dropped while notes are still being read is written after the read (the queue holds it). By then the view may be
+   * closed or showing another map, and the card is not where the drop saw it: the write is dropped, never applied to the wrong map.
+   */
+  private enqueueDrop(work: () => Promise<void>): void {
+    if (!this.notesLoading()) {
+      this.enqueue(work);
+      return;
+    }
+    const epoch = this.mapOpenEpoch,
+      path = this.path;
+    this.enqueue(async () => {
+      if (this.closed || this.mapOpenEpoch !== epoch || this.path !== path || !this.map) return;
+      await work();
+    });
+  }
   /** What the next-step dialogs need to preselect and record this map's output language (D-2026-10-88). */
   private outputLanguageMemory(): OutputLanguageMemory {
     const remembered = rememberedOutputLanguage(this.map);
@@ -3329,7 +3463,10 @@ export class VisualAgentMapView extends ItemView {
   private async persist(): Promise<void> {
     if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
-  private async hydrate(isCurrent: () => boolean = () => true): Promise<void> {
+  private async hydrate(
+    isCurrent: () => boolean = () => true,
+    onRead?: (index: number, note: Note | undefined) => void
+  ): Promise<void> {
     this.aimFailedReports.clear();
     let goal: string | undefined;
     let context: string | undefined;
@@ -3359,6 +3496,7 @@ export class VisualAgentMapView extends ItemView {
         } catch {
           /* A missing note remains visible and removable on the map. */
         }
+        onRead?.(index, read[index]);
       }
     };
     await Promise.all(Array.from({ length: Math.min(8, nodes.length) }, worker));
@@ -3474,6 +3612,9 @@ export class VisualAgentMapView extends ItemView {
       await this.plugin.repo.saveMap(path, map);
       if (!isCurrent()) return;
     }
+    // Another map, or the first one this window shows: the cards are drawn before the notes are read (a slow disk or a busy
+    // machine can take a second per note). Opening the map already on screen keeps its cards until the read ends, as before.
+    const progressive = map.nodes.length > 0 && (this.path !== path || this.paintCount === 0);
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
     this.path = path;
@@ -3481,12 +3622,67 @@ export class VisualAgentMapView extends ItemView {
     this.selection.exitMultiSelect("openMap");
     this.history.clear();
     this.restoreCrossProxies();
-    await this.hydrate(isCurrent);
-    if (!isCurrent()) return;
-    await this.recoverInterruptedNotes(isCurrent);
-    if (!isCurrent()) return;
-    this.render();
-    this.app.workspace.requestSaveLayout();
+    this.endNoteLoad();
+    let load: NoteLoadState | null = null;
+    if (progressive) {
+      // Nothing of the map before this one may show or be used while this one is read.
+      this.notes = new Map();
+      this.relevanceGoal = undefined;
+      this.relevanceContext = undefined;
+      this.mapSources = [];
+      this.aimFailedReports.clear();
+      const state: NoteLoadState = {
+        epoch: openEpoch,
+        read: 0,
+        total: map.nodes.length,
+        framed: false,
+        pending: new Set(),
+        frameTimer: null,
+        raf: null,
+        isCurrent
+      };
+      load = state;
+      this.noteLoad = state;
+      // A fast read paints once, as it always did; the cards come early only when the wait is long enough to notice.
+      state.frameTimer = window.setTimeout(() => {
+        state.frameTimer = null;
+        if (this.noteLoad !== state || !isCurrent()) return;
+        state.framed = true;
+        this.render();
+      }, NOTE_LOAD_FRAME_DELAY_MS);
+    }
+    try {
+      await this.hydrate(
+        isCurrent,
+        load
+          ? (index, note) => {
+              if (this.noteLoad !== load || !isCurrent()) return;
+              const node = map.nodes[index];
+              if (note && node) this.notes.set(node.id, note);
+              load.read++;
+              if (note && node && load.framed) {
+                load.pending.add(node.id);
+                this.scheduleLoadBatch(load);
+              }
+            }
+          : undefined
+      );
+      if (!isCurrent()) return;
+      await this.recoverInterruptedNotes(isCurrent);
+      if (!isCurrent()) return;
+      this.endNoteLoad(load);
+      this.render();
+      this.app.workspace.requestSaveLayout();
+    } catch (error) {
+      // A read that fails half way must not leave the map looking half read.
+      if (load && this.noteLoad === load && isCurrent()) {
+        this.endNoteLoad(load);
+        this.render();
+      }
+      throw error;
+    } finally {
+      this.endNoteLoad(load);
+    }
   }
   /**
    * A note still at `status: running` that no task in this plugin instance owns was left by a reload or a closed Obsidian:
@@ -7639,7 +7835,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Runs a card-tool action unless a presentation is on: a presentation is read-only, so these entries do nothing. */
   private whenEditing(action: () => void): void {
-    if (this.presentation) return;
+    if (this.presentation || this.notesLoading()) return;
     action();
   }
   private button(parent: HTMLElement, text: string, action: () => void, disabled = false): HTMLButtonElement {
@@ -8602,7 +8798,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Free images only change on a map the user may edit: not AIM, not while picking topics. */
   private canEditCanvasItems(): boolean {
-    return !this.selection.state.multiSelectMode && !this.aimLive();
+    return !this.notesLoading() && !this.selection.state.multiSelectMode && !this.aimLive();
   }
   /**
    * Draws the map's free images in one layer at the end of the stage, so Tab reaches them after the topic cards and
@@ -10436,7 +10632,7 @@ export class VisualAgentMapView extends ItemView {
   // ---- Summary brackets (summary-bracket plan, decisions #1, #2, #4) -------------------------------------------------
   /** Brackets change on a map the user may edit (topic selection mode included, where they are created), never while presenting. */
   private canEditSummary(): boolean {
-    return !!this.map && !this.aimLive() && !this.presentation;
+    return !!this.map && !this.notesLoading() && !this.aimLive() && !this.presentation;
   }
   /** The rectangles of the cards drawn for a run of siblings and everything shown under them; null when none is drawn (folded away). */
   private summaryGeometry(parentId: string, range: readonly string[], text?: string): BracketResult | null {
@@ -13454,6 +13650,7 @@ export class VisualAgentMapView extends ItemView {
     }
     this.paint();
     // Outside paint(): the paint tail is pinned by the view.ts wiring tests (34, 42).
+    this.lockWhileLoading();
     this.settleCardHeights();
   }
   private paint(): void {
@@ -13478,7 +13675,8 @@ export class VisualAgentMapView extends ItemView {
     // A repaint replaces the text editor's textarea: keep what was typed and reopen it afterwards (not a blur commit).
     if (this.suspendTextEdit) this.textEditDraft = this.suspendTextEdit();
     if (this.closed) return;
-    this.plugin.syncOutline(this.map, this.notes, this);
+    // The outline lists the notes' titles and summaries: it waits for the final paint rather than show a half-read map.
+    if (!this.noteLoad) this.plugin.syncOutline(this.map, this.notes, this);
     if (this.hoverTimer !== null) {
       window.clearTimeout(this.hoverTimer);
       this.hoverTimer = null;
@@ -13526,6 +13724,7 @@ export class VisualAgentMapView extends ItemView {
     // The goal bar lives in the header row, outside contentEl: empty() would leave it behind.
     this.removeGoalBar();
     this.contentEl.empty();
+    this.contentEl.removeClass?.("is-notes-loading");
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     // The title text renames the map in place; the arrows beside it switch maps.
     const switcher = toolbar.createDiv({ cls: "vam-map-switcher" });
@@ -14051,11 +14250,17 @@ export class VisualAgentMapView extends ItemView {
     if (!this.stageEl) return;
     // Every handler below acts on the real node, so nothing written to the map can carry display coordinates.
     const node = this.map?.nodes.find(item => item.id === shownNode.id) ?? shownNode;
-    const note = this.notes.get(node.id),
+    // A card whose note is not read yet is drawn from the map alone: the title the cache knows and grey bars for the summary.
+    const loading = this.cardLoading(node);
+    const note = loading ? undefined : this.notes.get(node.id),
       card = this.stageEl.createDiv({
         cls: `vam-node${node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id) ? " is-selected" : ""}`
       });
     this.cardEls.set(node.id, card);
+    if (loading) {
+      card.addClass("vam-node-loading");
+      card.setAttr("aria-busy", "true");
+    }
     this.paintCut(card, node.id);
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
@@ -14095,7 +14300,9 @@ export class VisualAgentMapView extends ItemView {
         ? "running"
         : queued
           ? "queued"
-          : (note?.status ?? "error");
+          : loading
+            ? "idea"
+            : (note?.status ?? "error");
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
@@ -14107,7 +14314,7 @@ export class VisualAgentMapView extends ItemView {
     card.addEventListener("dragleave", event => this.onCardDragLeave(event, card));
     card.addEventListener("drop", event => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
-    this.labelCard(card, note?.title ?? t("ui.note_missing"));
+    this.labelCard(card, loading ? this.preReadTitle(node) : (note?.title ?? t("ui.note_missing")));
     if (this.selection.state.multiSelectMode) {
       const select = header.createEl("input", { type: "checkbox" });
       select.checked = this.selection.state.multiSelected.has(node.id);
@@ -14155,7 +14362,7 @@ export class VisualAgentMapView extends ItemView {
             ? t("ui.aim_answered_not_started")
             : t(key[status])
       });
-    } else if (!isAimNode(node) || active || queued || !note || note.status !== "completed" || research) {
+    } else if (!loading && (!isAimNode(node) || active || queued || !note || note.status !== "completed" || research)) {
       const statusText = research
         ? this.researchStageText(research)
         : merging
@@ -14484,8 +14691,9 @@ export class VisualAgentMapView extends ItemView {
     }
     // The cover frame sits above the title; it adds nothing when the topic has no local image.
     if (note) this.paintCover(card, node.path);
-    const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
-    title.setAttr("title", note?.title ?? node.path);
+    const shownTitle = loading ? this.preReadTitle(node) : (note?.title ?? node.path);
+    const title = card.createEl("h3", { text: shownTitle, cls: "vam-card-title" });
+    title.setAttr("title", shownTitle);
     title.setAttr("dir", "auto");
     if (note && this.inlineName?.target === "card" && this.inlineName.id === node.id) {
       // The field takes the heading's place (the heading stays for the card's label and tests that read it, but hidden).
@@ -14504,7 +14712,12 @@ export class VisualAgentMapView extends ItemView {
     if (textEditable && this.inlineSummary?.id === node.id) this.paintCardSummaryEdit(card, node);
     else if (research?.preview?.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
-    else if (!note || !isPlaceholder(note.summary)) {
+    else if (loading) {
+      const bars = card.createDiv({ cls: "vam-card-loading-bars" });
+      bars.setAttr("aria-hidden", "true");
+      bars.createSpan({ cls: "vam-loading-bar" });
+      bars.createSpan({ cls: "vam-loading-bar" });
+    } else if (!note || !isPlaceholder(note.summary)) {
       const summaryText = card.createEl("p", {
         cls: "vam-card-summary",
         text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
@@ -14685,7 +14898,7 @@ export class VisualAgentMapView extends ItemView {
       // A click selects; an already open details sidebar follows the selection, a closed one stays closed.
       const wasSelected = this.selection.state.selected === node.id;
       this.selectMapNode(node);
-      if (this.plugin.detailsShown()) this.openDetails(node);
+      if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node);
       this.openCardTextEditor(event, card, node, wasSelected);
     });
     card.addEventListener("keydown", event => {
@@ -14693,7 +14906,13 @@ export class VisualAgentMapView extends ItemView {
       // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
       if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
         event.preventDefault();
-        if (!event.isComposing && !this.selection.state.multiSelectMode && !this.aimLive() && !this.presentation)
+        if (
+          !event.isComposing &&
+          !this.selection.state.multiSelectMode &&
+          !this.aimLive() &&
+          !this.presentation &&
+          !this.notesLoading()
+        )
           this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)!));
         return;
       }
@@ -14703,7 +14922,7 @@ export class VisualAgentMapView extends ItemView {
         this.moveKeyboardFocus(target);
         return;
       }
-      const editable = !this.selection.state.multiSelectMode && !this.aimLive();
+      const editable = !this.selection.state.multiSelectMode && !this.aimLive() && !this.notesLoading();
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
@@ -14738,6 +14957,7 @@ export class VisualAgentMapView extends ItemView {
           this.applySelectionChange(this.selection.toggleByEnter(node.id));
         } else {
           this.selectMapNode(node);
+          if (this.notesLoading()) return;
           if (aimEnabled() && this.map?.aim && node.aimKind === "question") this.openAimAnswer(node);
           else this.openDetails(node);
         }
@@ -15274,6 +15494,8 @@ export class VisualAgentMapView extends ItemView {
    */
   private settleCardHeights(): void {
     if (!this.map || this.closed || !this.cardEls || this.hiddenTab()) return;
+    // Notes are still being read: cards are not at their final size, so nothing is recorded or tidied. The final paint is this map's first look.
+    if (this.noteLoad) return;
     // A chat reply lays out its own cards (resized / arranged / placed) inside its undo step; looking now would also record
     // heights it has not finished with. Nothing is recorded, so the first render after the reply compares against the old ones.
     if (this.renderHold > 0 || this.history.grouping) return;
@@ -21579,7 +21801,7 @@ export class VisualAgentMapView extends ItemView {
       this.steerMapChat();
       return;
     }
-    if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map) return;
+    if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map || this.notesLoading()) return;
     // A retry sends the same question with the same references again, after a failure; a normal send reads the draft.
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
@@ -23047,6 +23269,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.renderPending || this.closed) return;
     this.renderPending = false;
     this.paint();
+    this.lockWhileLoading();
     this.settleCardHeights();
   }
   /**
@@ -25765,7 +25988,7 @@ export class VisualAgentMapView extends ItemView {
             // On a card: the picked branches become its children (same rule and write as "Move to...").
             putBack();
             if (landed.invalid) new Notice(t("ui.circular_links_are_not_allowed"));
-            else this.enqueue(() => this.moveBranches(this.selectedRoots(), landed.node));
+            else if (!this.notesLoading()) this.enqueue(() => this.moveBranches(this.selectedRoots(), landed.node));
             return;
           }
           if (locked || timelineBlocked) {
@@ -25775,7 +25998,7 @@ export class VisualAgentMapView extends ItemView {
           placeGroup(delta.x, delta.y);
           const { x: dx, y: dy } = delta;
           // One change for the whole group, so one undo puts every card back.
-          this.enqueue(() =>
+          this.enqueueDrop(() =>
             this.mapChange(map => {
               for (const [id, from] of groupOrigins) {
                 const current = map.nodes.find(n => n.id === id);
@@ -25794,10 +26017,11 @@ export class VisualAgentMapView extends ItemView {
           putBack();
           const dragged = this.map?.nodes.find(item => item.id === node.id);
           if (landed.invalid) new Notice(t("ui.circular_links_are_not_allowed"));
-          else if (dragged) this.enqueue(() => this.moveBranches([dragged], landed.node, false));
+          else if (dragged && !this.notesLoading())
+            this.enqueue(() => this.moveBranches([dragged], landed.node, false));
         } else if (moved) {
           paint();
-          this.enqueue(() =>
+          this.enqueueDrop(() =>
             this.mapChange(map => {
               const current = map.nodes.find(n => n.id === node.id);
               if (!current) return;
@@ -25823,6 +26047,7 @@ export class VisualAgentMapView extends ItemView {
           this.applySelectionChange(this.selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
         } else {
           this.applySelectionChange(this.selection.click(node.id));
+          if (this.notesLoading()) return;
           if (aimEnabled() && this.map?.aim && node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
           // A press that never moved is a click: on the title or summary text it opens that text for typing.

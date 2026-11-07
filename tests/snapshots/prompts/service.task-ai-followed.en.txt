@@ -16,12 +16,10 @@ General task: summary is one new insight for the mind map, within 160 characters
 
 When the new sources settle an earlier statement that said no source was provided or that the point was not verified, delete that statement instead of keeping both. When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the "Open questions to check" section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
 
-The detail must use exactly these six level-three headings in order: ### Core conclusions, ### Background and mechanism, ### Disagreements and limits, ### Open questions to check, ### Sources, ### Update log. Add only one line summarizing this update in Update log; do not repeat the full answer. Write 'No new content this time' in sections with nothing applicable. Follow any requested count for the core conclusions.
-### Core conclusions: The first sentence answers the topic's question directly, then 2–4 reasons, each one sentence of conclusion plus one sentence of reason. No background here.
-### Background and mechanism: The concepts, data and workings needed to understand the conclusions; do not repeat the core conclusions or the disagreements.
-### Disagreements and limits: Where the evidence is contested, counterexamples, when the conclusions apply, and what this research did not cover; write only limits if nothing is contested.
-### Open questions to check: Questions not yet verified that are worth opening as subtopics; write each as a question that can be researched.
+The detail must use exactly these 5 level-three headings in order: ### Summary, ### Why it works, ### Pitfalls, ### Sources, ### Update log. Write 'No new content this time' in sections with nothing applicable. Follow any count the user requests for a section.
+### Summary: What this piece of evidence says, in one to three sentences, with no inference added.
 ### Sources: Mark sources with footnotes in the body; this section holds only the source list, which is added to the end of this section automatically, without restating the body.
+### Update log gets only one new line summarizing this update; do not repeat the full answer.
 ### Update log: Add only one line saying what this update changed.
 
 Use only the sections listed above and add no new section; content that fits none goes into the closest section, with sub-headings as fourth-level headings (####).

@@ -580,6 +580,8 @@ export { inLanguage } from "./core/steps/_shared/fragments";
 export { BUILTIN_BLOCKS, builtinTemplateText } from "./core/blocks/builtin";
 export { parseTemplateBlock } from "./core/blocks/template-block";
 export { standardTemplate } from "./ai/detail-templates";
+export { templateFromDetail } from "./ai/detail-sections";
+export { noteLanguageOf } from "./i18n";
 `);
 const aiPrompt = (context, language) => { const m = AI(); return m.assembleTaskPrompt(m.selectionFromContext(context, language), m.promptStepOf(context), context, language, 'codex'); };
 const idsOf = segments => segments.filter(s => s.source.kind === 'fixed').map(s => s.source.id);
@@ -630,6 +632,27 @@ test('AI suggested follow: the followed rule comes after the sections for resear
         assert.ok(after > text.indexOf('###'), `${language} ${name}: after the sections list`);
         assert.ok(idsOf(segments).includes('detail-structure'), 'the note\'s own sections stay');
       }
+    }
+  }
+});
+
+// A later research always goes through the template cut from the note, so the structure sentence must count that note's
+// sections. 5 and 8 are the two other shapes the sample of real notes holds most (23 and 41 notes against 476 with six).
+const SIX_ANYWHERE = /六個|六个|\bsix\b/i;
+// zh-CN shares the Traditional fragments of the prompt, so its sentence reads the same as zh-TW.
+const COUNT_SENTENCE = { 'zh-TW': n => `以下 ${n} 個三級標題`, 'zh-CN': n => `以下 ${n} 個三級標題`, en: n => `these ${n} level-three headings` };
+test('AI suggested follow: a note of 5 or 8 sections gets its own count and headings, never "six"', () => {
+  const m = AI();
+  for (const language of LANGUAGES) {
+    for (const count of [5, 8]) {
+      const names = Array.from({ length: count }, (_, index) => `Part ${index + 1}`);
+      const detail = names.map(name => `### ${name}\nBody of ${name}.`).join('\n\n');
+      const cut = m.templateFromDetail(detail, m.noteLanguageOf(language));
+      assert.equal(cut.ok, true, `${language} ${count}`);
+      const { text } = aiPrompt({ ...base, detail, aiSections: 'follow', detailTemplate: cut.template, outputLanguage: language }, language);
+      assert.ok(text.includes(COUNT_SENTENCE[language](count)), `${language} ${count}: the count of this note`);
+      assert.ok(text.includes(names.map(name => `### ${name}`).join(', ')), `${language} ${count}: the headings of this note`);
+      assert.equal(SIX_ANYWHERE.exec(text)?.[0], undefined, `${language} ${count}: no "six" anywhere`);
     }
   }
 });

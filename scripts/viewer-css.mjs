@@ -24,6 +24,12 @@ export const ALLOW_PREFIXES = [
 ];
 const ALLOW = new RegExp(`^(?:\\.theme-dark\\s+)?\\.(?:${ALLOW_PREFIXES.join("|")})`);
 /**
+ * The map's view root is `.vam-view`; the rules for the annotated picture, its title bar and its anchors are written under it.
+ * Only these three families are taken (the viewer's stage carries the class); no other `.vam-view` rule is.
+ */
+export const VIEW_ALLOW_PREFIXES = ["vam-canvas-image", "vam-annotated", "vam-anchor"];
+const VIEW_ALLOW = new RegExp(`^(?:\\.theme-dark\\s+)?\\.vam-view\\s+\\.(?:${VIEW_ALLOW_PREFIXES.join("|")})`);
+/**
  * A rule is left out when it styles something the read-only viewer does not have, or names a field the leak scan
  * forbids (the goal button, level and context inputs). `:not([data-aim-kind])` is how plugin rules say "ordinary topic".
  */
@@ -102,7 +108,7 @@ function splitSelectors(prelude) {
 
 export function wantsRule(rule) {
   const selectors = splitSelectors(rule.prelude);
-  if (!selectors.some(selector => ALLOW.test(selector))) return false;
+  if (!selectors.some(selector => ALLOW.test(selector) || VIEW_ALLOW.test(selector))) return false;
   return !DENY.test(rule.text.split(ORDINARY_TOPIC).join(""));
 }
 

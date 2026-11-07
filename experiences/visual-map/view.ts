@@ -301,6 +301,7 @@ import { placeNewMember, ringMembers, ringSide, type Rect as RingRect } from "./
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
+import { branchDirectionResolver, depthOf, lineKind } from "./tree-edge-rules";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
 import { mergeRepair } from "../../core/steps/task/fragments";
@@ -876,42 +877,6 @@ function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
 /** Maps whose cards are displayed sorted by relevance. Memory only: never written to a note or Map.md. */
 const relevanceSortedMaps = new Set<string>();
 /** Path data for the curve from a parent card's right edge to a child card's left edge. */
-/** `layoutDirectionFor` for many ids at once: builds the id lookup one time and remembers each answer. */
-function branchDirectionResolver(
-  nodes: MapNode[],
-  mapDirection: string,
-  /** Text block id -> the topic it hangs on: a block takes the direction of its topic (an unknown id is the whole map's). */
-  texts?: ReadonlyMap<string, string>,
-  /** Ring members and the way they grow (away from their picture); they win over every branch layout. */
-  rings?: ReadonlyMap<string, string>
-): (id: string) => string {
-  const layered = allowsBranchLayout(mapDirection);
-  if (!layered && !rings?.size) return () => mapDirection;
-  const byId = new Map(nodes.map(node => [node.id, node]));
-  const known = new Map<string, string>();
-  const resolve = (id: string, seen: Set<string>): string => {
-    const hit = known.get(id);
-    if (hit !== undefined) return hit;
-    const textParent = texts?.get(id);
-    if (textParent !== undefined && !byId.has(id)) {
-      const answer = resolve(textParent, seen);
-      known.set(id, answer);
-      return answer;
-    }
-    const node = byId.get(id);
-    let answer = mapDirection;
-    if (node && !seen.has(id)) {
-      seen.add(id);
-      answer =
-        rings?.get(id) ??
-        (layered ? branchDirectionOf(node) : undefined) ??
-        (node.parentId ? resolve(node.parentId, seen) : mapDirection);
-    }
-    known.set(id, answer);
-    return answer;
-  };
-  return id => resolve(id, new Set());
-}
 /**
  * A text block's x after its width changed from `from` to `to`: the edge or center facing its topic stays where it was
  * (left: right edge; up/down: horizontal center). Right layouts and free blocks keep x.
@@ -975,25 +940,6 @@ function estimateTextWidth(text: string): number {
       )
   );
   return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
-}
-/**
- * The arrangement a tree line is drawn in. In a fishbone the line from a text block to the topic that follows it is a
- * straight line between the two boxes (like a radial line): the block hangs beside its topic's bone, so a rib on the bone
- * would never touch the block.
- */
-function lineKind(nodes: MapNode[], fromId: string, childId: string, direction: string): string {
-  return direction === "fishbone" && nodes.find(node => node.id === childId)?.afterTextId === fromId
-    ? "radial"
-    : direction;
-}
-
-function depthOf(nodes: MapNode[], id: string): number {
-  const byId = new Map(nodes.map(node => [node.id, node]));
-  let depth = 0;
-  // A topic that follows a text block hangs one step lower: its line starts at the block, which hangs on the real parent.
-  for (let node = byId.get(id); node?.parentId && depth < nodes.length; node = byId.get(node.parentId))
-    depth += node.afterTextId ? 2 : 1;
-  return depth;
 }
 /** One anchor relation as drawn: where it starts (the anchor, map units) and which topic it meets. */
 interface AnchorLine {

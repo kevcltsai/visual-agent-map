@@ -48,6 +48,10 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     markerLabel: text("share.viewer_markers_0"),
     linksLabel: text("share.viewer_links_0"),
     linkOpen: text("share.viewer_link_open_0"),
+    annotatedImage: text("share.viewer_annotated_image"),
+    annotatedAnchors: text("share.viewer_annotated_anchors_0"),
+    anchorNamed: text("share.viewer_anchor_named_0"),
+    anchorUnnamed: text("share.viewer_anchor_unnamed"),
     markerNames: {
       done: text("share.viewer_marker_done"),
       warning: text("share.viewer_marker_warning"),

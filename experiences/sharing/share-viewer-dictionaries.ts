@@ -49,6 +49,10 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     markerLabel: "マーク：{0}",
     linksLabel: "リンク：{0}",
     linkOpen: "リンクを開く：{0}",
+    annotatedImage: "注釈付き画像",
+    annotatedAnchors: "アンカー {0} 個",
+    anchorNamed: "アンカー：{0}",
+    anchorUnnamed: "アンカー（説明なし）",
     markerNames: {
       done: "完了",
       warning: "警告",
@@ -116,6 +120,10 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     markerLabel: "표시: {0}",
     linksLabel: "링크: {0}",
     linkOpen: "링크 열기: {0}",
+    annotatedImage: "주석 이미지",
+    annotatedAnchors: "앵커 {0}개",
+    anchorNamed: "앵커: {0}",
+    anchorUnnamed: "앵커(설명 없음)",
     markerNames: {
       done: "완료",
       warning: "경고",
@@ -183,6 +191,10 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     markerLabel: "Marcas: {0}",
     linksLabel: "Enlaces: {0}",
     linkOpen: "Abrir enlace: {0}",
+    annotatedImage: "Imagen anotada",
+    annotatedAnchors: "{0} anclas",
+    anchorNamed: "Ancla: {0}",
+    anchorUnnamed: "Ancla (sin nota)",
     markerNames: {
       done: "Hecho",
       warning: "Aviso",

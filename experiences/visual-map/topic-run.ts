@@ -1295,7 +1295,9 @@ export class TopicRuns {
             oldDetail: latest.detail,
             // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
             aiDetail:
-              mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, writeContext.detailTemplate),
+              mode === "top"
+                ? result.detail
+                : canonicalDetail(result.detail, writeLanguage, writeContext.detailTemplate),
             summary: result.summary,
             template: writeContext.detailTemplate ?? standardTemplate(writeLanguage),
             language: writeLanguage,

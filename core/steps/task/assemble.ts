@@ -361,7 +361,12 @@ export function chartsWanted(
   options: AssembleOptions = {}
 ): boolean {
   const parts = templateParts(selection, context, language, { kind: "topic", text: context.title }, options);
-  return partsAskForCharts(parts, selection, formatTextOf(selection, language, options), context.aiSections === "decide");
+  return partsAskForCharts(
+    parts,
+    selection,
+    formatTextOf(selection, language, options),
+    context.aiSections === "decide"
+  );
 }
 
 function partsAskForCharts(

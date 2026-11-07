@@ -32377,7 +32377,12 @@ function formatTextOf(selection, language2, options) {
 var CHART_BLOCK = "```mermaid";
 function chartsWanted(selection, context, language2, options = {}) {
   const parts = templateParts(selection, context, language2, { kind: "topic", text: context.title }, options);
-  return partsAskForCharts(parts, selection, formatTextOf(selection, language2, options), context.aiSections === "decide");
+  return partsAskForCharts(
+    parts,
+    selection,
+    formatTextOf(selection, language2, options),
+    context.aiSections === "decide"
+  );
 }
 function partsAskForCharts(parts, selection, format, sectionsUndecided = false) {
   var _a2;

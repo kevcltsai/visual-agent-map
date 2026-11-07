@@ -1913,3 +1913,87 @@ test('sharing viewer ring (real sample): with the placeholder heights (271) the 
   const report = await runRingSample(data, driveRingSample);
   assert.throws(() => assertRingSample(data, report), /expanded .* did not move/, 'a ring solved at 271 moves the ring');
 });
+
+// ---- share-match-map R1/R2/R3 (reviewer round 1): the first fold click, the covers that load after it, and the text blocks.
+/** A folded topic `a` (and a sibling) whose three children carry tall covers: the covers are drawn, and sized, only after the first expand. */
+function coverFoldPayload() {
+  const data = payload();
+  data.assets = { tall: pngDataUri(2, 6, [50, 50, 200]), tall2: pngDataUri(2, 6, [200, 50, 50]), tall3: pngDataUri(2, 6, [50, 200, 50]) };
+  data.nodes = [
+    { ...NODE_BASE, id: 'r', parentId: null, x: 0, y: 0, title: 'Root' },
+    { ...NODE_BASE, id: 'a', parentId: 'r', x: 320, y: 0, title: 'A', collapsed: true },
+    { ...NODE_BASE, id: 'b', parentId: 'r', x: 320, y: 200, title: 'B' },
+    { ...NODE_BASE, id: 'a1', parentId: 'a', x: 640, y: 0, title: 'A1', cover: { asset: 'tall' } },
+    { ...NODE_BASE, id: 'a2', parentId: 'a', x: 640, y: 0, title: 'A2', cover: { asset: 'tall2' } },
+    { ...NODE_BASE, id: 'a3', parentId: 'a', x: 640, y: 0, title: 'A3', cover: { asset: 'tall3' } }
+  ];
+  return data;
+}
+const OVERLAPS = `(() => {
+  const box = e => ({ x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight });
+  const rects = [...document.querySelectorAll('.vam-node, .vam-text-node')].map((e, i) => ({ id: e.dataset.nodeId || 'text' + i, ...box(e) }));
+  const hits = [];
+  rects.forEach((a, i) => rects.slice(i + 1).forEach(b => { if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) hits.push(a.id + '/' + b.id); }));
+  return { hits, rects, stage: document.querySelector('.vam-stage').style.transform };
+})()`;
+
+test('sharing viewer fold R1: the first expand of covered children ends with no overlap once the covers load, and opening does not move cards (headless Chrome)', async t => {
+  await withChrome(t, 'vam-share-r1-', async (chrome, directory) => {
+    const report = await dumpDomLight(chrome, directory, await pageOf(directory, coverFoldPayload()), 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      await wait(1000);
+      const open = await evaluate(OVERLAPS);
+      await evaluate(`document.querySelector('[data-node-id="a"] .vam-collapse-button').click()`);
+      const sync = await evaluate(OVERLAPS);
+      await wait(1500);
+      const settled = await evaluate(OVERLAPS);
+      const sized = await evaluate(`[...document.querySelectorAll('.vam-card-cover')].map(c => c.classList.contains('is-sized'))`);
+      return { open, sync, settled, sized };
+    });
+    const at = (shot, id) => shot.rects.find(r => r.id === id);
+    assert.deepEqual([at(report.open, 'b').x, at(report.open, 'b').y, at(report.open, 'a').x, at(report.open, 'a').y], [320, 200, 320, 0], 'opening keeps the saved places');
+    assert.equal(report.sized.length, 3);
+    assert.ok(report.sized.every(Boolean), 'the covers are sized');
+    assert.deepEqual(report.settled.hits, [], 'R1: nothing overlaps after the covers are sized');
+  });
+});
+
+test('sharing viewer fold R3: after the reader folds or unfolds, a cover load does not fit the view away (headless Chrome)', async t => {
+  await withChrome(t, 'vam-share-r3-', async (chrome, directory) => {
+    const report = await dumpDomLight(chrome, directory, await pageOf(directory, coverFoldPayload()), 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      await wait(1000);
+      await evaluate(`document.querySelector('[data-node-id="a"] .vam-collapse-button').click()`);
+      const sync = await evaluate(`document.querySelector('.vam-stage').style.transform`);
+      await wait(1500);
+      return { sync, settled: await evaluate(`document.querySelector('.vam-stage').style.transform`) };
+    });
+    assert.equal(report.settled, report.sync, 'the view stays where the click left it');
+  });
+});
+
+test('sharing viewer fold R2: the first click on a folded topic with text blocks leaves no overlap (headless Chrome)', async t => {
+  await withChrome(t, 'vam-share-r2-', async (chrome, directory) => {
+    const data = levelOnePayload();
+    data.textNodes = [
+      { id: 'lead', parentId: 'heat', text: 'A lead-in note that is fairly long for a block', x: 600, y: 80 },
+      { id: 'aside', parentId: 'heat', text: 'An aside that follows no topic', x: 600, y: 140 }
+    ];
+    data.nodes.push(
+      { ...NODE_BASE, id: 'after1', parentId: 'heat', afterTextId: 'lead', title: 'After one' },
+      { ...NODE_BASE, id: 'after2', parentId: 'heat', afterTextId: 'lead', title: 'After two' }
+    );
+    const report = await dumpDomLight(chrome, directory, await pageOf(directory, data), 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      await new Promise(resolve => setTimeout(resolve, 600));
+      await evaluate(`document.querySelector('[data-node-id="heat"] .vam-collapse-button').click()`);
+      return evaluate(OVERLAPS);
+    });
+    assert.equal(report.rects.filter(r => r.id.startsWith('text')).length, 2, 'both blocks are drawn');
+    assert.deepEqual(report.hits, [], 'nothing overlaps right after the first click');
+    const block = report.rects.find(r => r.id.startsWith('text'));
+    for (const id of ['after1', 'after2']) assert.ok(report.rects.find(r => r.id === id).x >= block.x + block.w, `${id} sits after the block`);
+  });
+});

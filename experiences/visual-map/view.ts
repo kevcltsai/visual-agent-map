@@ -24797,7 +24797,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId || this.aimLive())
       return null;
     const node = this.map.nodes.find(item => item.id === block.nodeId);
-    return node && this.cardAcceptsImages(node) && !this.isMerging(node.id) ? node : null;
+    // Not cardAcceptsImages: that is the drop/panel UI check and is false in multi-select mode, the way to pick several cards.
+    return node && !isAimNode(node) && !this.isMerging(node.id) ? node : null;
   }
   /** A cover set by hand (or `topic-cover: none`, or a link that does not resolve now) is the owner's and stays. */
   private chatHasNoCover(node: MapNode): boolean {

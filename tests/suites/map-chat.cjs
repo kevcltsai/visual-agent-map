@@ -4185,7 +4185,7 @@ integrationTest('R1-10 find_images: one action per card (what the model sends) i
   const { h, chat } = await imageHarness(); const gate = deferred(); h.control.search = async query => { await gate.promise; return perQuery(query); };
   const keys = ['a', 'b', 'c', 'root']; const titles = { a: 'Body', b: 'Mind', c: 'REM', root: 'Sleep' };
   const lines = await apply(h, keys.map(k => findAct(h, k, { direction: `espresso ${titles[k]}` }))); chat.finish('Looking.', lines);
-  eq(lines.map(l => l.status), ['done', 'done', 'done', 'done'], 'one line per action for the caller'); eq(resultTexts(h), ['Looking for pictures: 0 of 4 done (label(claude:sonnet))']);
+  eq(lines.map(l => l.status), ['done', 'done', 'done', 'done'], 'one line per action for the caller'); eq(resultTexts(h), [], 'while searching, the block shows the progress and the result row is not drawn a second time'); assert.match(find(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-progress')).text, /0 of 4/, 'the block keeps its progress');
   gate.resolve(); await waitImages(h); await tick();
   eq(resultTexts(h), ['Pictures put into 4 topic(s) (label(claude:sonnet))']); assert.equal(chat.transcript().at(-1).lines.length, 1, 'the saved turn has one line');
   assert.equal(findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images')).length, 1, 'one result block'); assert.equal(imageRows(h).length, 4);
@@ -4364,7 +4364,7 @@ integrationTest('B3-polish P1-2: the result line starts as "Looking for pictures
 integrationTest('B3-polish P1-2: stopping the search rewrites the line; the saved turn carries it', async () => {
   const { h, chat } = await imageHarness(); const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(2); };
   const lines = await apply(h, [findAct(h, 'a')]); chat.finish('Looking.', lines);
-  eq(resultTexts(h), ['Looking for pictures: 0 of 1 done (label(claude:sonnet))']);
+  eq(resultTexts(h), [], 'no result row while the search runs');
   find(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).click();
   eq(resultTexts(h), ['Pictures put into 0 topic(s), 1 not found (label(claude:sonnet))']); assert.equal(chat.transcript().at(-1).lines[0].status, 'skipped'); gate.resolve(); await tick();
 });
@@ -8010,6 +8010,25 @@ integrationTest('counterexample 9 find_images: a card that already has a cover g
   assert.match((await h.note('a')).detail, /!\[Pic /, 'the picture is in the note');
   assert.equal(fetched, 0, 'nothing is downloaded for a cover');
   assert.doesNotMatch(h.contents.get(file), /topic-cover/, 'the cover is left alone');
+});
+integrationTest('D1 find_images: in multi-select mode (the way to pick several cards) a card without a cover still gets the picture as its cover; a card with one keeps it; a merging or AIM card gets none', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; coverStub(h); h.view.selection.mode = true;
+  // The real chatCoverTarget and chatCoverBytes run; only the download and the transaction of the cover write are stood in for.
+  let downloaded = 0; h.view.chatFetchImage = async () => { downloaded++; return pngBytes(); };
+  const written = []; h.view.chatCoverWrite = async (block, cover) => { if (!h.view.chatCoverTarget(block)) return null; written.push(cover.name); return { undo: async () => {}, redo: async () => {}, label: 'cover' }; };
+  await apply(h, [findAct(h, 'a')]); await waitImages(h);
+  assert.match((await h.note('a')).detail, /!\[Pic /, 'the picture is in the note'); assert.equal(downloaded, 1, 'multi-select does not stop the cover download'); assert.equal(written.length, 1, 'and the cover is written');
+  const { h: h2 } = await imageHarness(); h2.control.search = perQuery; h2.view.chatHasNoCover = () => false; h2.view.selection.state.multiSelectMode = true;
+  let fetched = 0; h2.view.chatFetchImage = async () => { fetched++; return pngBytes(); }; const file2 = noteFile(h2, 'a');
+  await apply(h2, [findAct(h2, 'a')]); await waitImages(h2);
+  assert.equal(fetched, 0); assert.doesNotMatch(h2.contents.get(file2), /topic-cover/, 'an existing cover is left alone');
+  const { h: h3 } = await imageHarness(); h3.view.selection.state.multiSelectMode = true;
+  const block = { mapPath: h3.view.path, mapId: h3.view.map.id, nodeId: h3.ids.a };
+  assert.equal(h3.view.chatCoverTarget(block)?.id, h3.ids.a, 'the card is the cover target');
+  h3.view.isMerging = () => true; assert.equal(h3.view.chatCoverTarget(block), null, 'a merging card gets no cover');
+  h3.view.isMerging = () => false; h3.view.aimLive = () => true; assert.equal(h3.view.chatCoverTarget(block), null, 'AIM locks the card');
+  h3.view.aimLive = () => false; h3.view.map.nodes.find(n => n.id === h3.ids.a).aimKind = 'question';
+  assert.equal(h3.view.chatCoverTarget(block), null, 'an AIM card gets no cover');
 });
 const coverStub = h => { h.view.chatHasNoCover = () => true; h.view.chatFetchImage = async () => pngBytes(); };
 const undoLabels = h => h.view.history.past.map(e => e.label);

@@ -39795,7 +39795,11 @@ ${shown}` : t("ui.map_chat_model_label"));
    * happened in words, so the colour is never the only sign.
    */
   buildLines(row, message) {
-    const { results, notes } = splitChatLines(message.lines.map(settledLine), chatNoteTexts());
+    const shownLines = message.lines.filter((line) => {
+      var _a2;
+      return !((_a2 = line.imageGroup) == null ? void 0 : _a2.some((block) => block.state === "searching"));
+    });
+    const { results, notes } = splitChatLines(shownLines.map(settledLine), chatNoteTexts());
     const list = row.createDiv({ cls: "vam-map-chat-lines" });
     const fold2 = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
     const shown = !fold2 || message.linesOpen === true;
@@ -78461,7 +78465,7 @@ ${addition}` : addition },
     if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId || this.aimLive())
       return null;
     const node = this.map.nodes.find((item) => item.id === block.nodeId);
-    return node && this.cardAcceptsImages(node) && !this.isMerging(node.id) ? node : null;
+    return node && !isAimNode(node) && !this.isMerging(node.id) ? node : null;
   }
   /** A cover set by hand (or `topic-cover: none`, or a link that does not resolve now) is the owner's and stays. */
   chatHasNoCover(node) {

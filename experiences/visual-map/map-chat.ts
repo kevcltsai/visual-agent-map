@@ -2712,7 +2712,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    * happened in words, so the colour is never the only sign.
    */
   private buildLines(row: HTMLElement, message: MapChatMessage): void {
-    const { results, notes } = splitChatLines(message.lines.map(settledLine), chatNoteTexts());
+    // While a picture search runs its block shows the progress; the result line returns when every search has ended.
+    const shownLines = message.lines.filter(line => !line.imageGroup?.some(block => block.state === "searching"));
+    const { results, notes } = splitChatLines(shownLines.map(settledLine), chatNoteTexts());
     const list = row.createDiv({ cls: "vam-map-chat-lines" });
     const fold = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
     const shown = !fold || message.linesOpen === true;

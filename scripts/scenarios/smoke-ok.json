@@ -1,0 +1,9 @@
+{
+  "name": "smoke: Obsidian workspace and VAM plugin loaded",
+  "steps": [
+    { "wait": true },
+    { "assert": "workspace is ready", "eval": "!!app.workspace.layoutReady" },
+    { "assert": "VAM plugin is enabled", "eval": "app.plugins.enabledPlugins.has('visual-agent-map')" },
+    { "screenshot": "smoke" }
+  ]
+}

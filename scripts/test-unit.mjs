@@ -11,6 +11,7 @@ export const nodeTestFiles = [
   "tests/compliance-gates.mjs",
   "tests/css-support.mjs",
   "tests/changelog-section.mjs",
+  "tests/run-scenario.mjs",
   "tests/prompt-snapshots.cjs",
   "tests/card-status-consistent.cjs",
   "tests/replay.cjs",

@@ -1,0 +1,9 @@
+{
+  "name": "smoke: expected failure (impossible assertion)",
+  "steps": [
+    { "wait": true },
+    { "assert": "workspace is ready", "eval": "!!app.workspace.layoutReady" },
+    { "assert": "deliberately wrong plugin id count", "eval": "app.plugins.enabledPlugins.has('visual-agent-map')", "equals": "never" },
+    { "screenshot": "smoke-fail" }
+  ]
+}

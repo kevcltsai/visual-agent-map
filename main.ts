@@ -561,8 +561,17 @@ export default class VisualAgentMapPlugin extends Plugin {
         );
   }
   /** Opens the share dialog for a map view (the active one by default), or says why this map cannot be shared. */
-  openShare(source?: VisualAgentMapView): void {
+  private sharePreparing = false;
+  async openShare(source?: VisualAgentMapView): Promise<void> {
+    if (this.sharePreparing) return;
     const view = source ?? this.app.workspace.getActiveViewOfType(VisualAgentMapView) ?? this.views()[0];
+    // Covers load first so the ring heights are the real ones; the snapshot is taken after, never before.
+    this.sharePreparing = true;
+    try {
+      await view?.prepareShare();
+    } finally {
+      this.sharePreparing = false;
+    }
     const snapshot = view?.shareSnapshot();
     if (!snapshot || snapshot === "none") return void new Notice(t("share.unavailable_no_map"));
     if (snapshot === "aim") return void new Notice(t("share.unavailable_aim"));
@@ -833,7 +842,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         }),
         key
       });
-    this.addLocalizedCommand("share-map", "ui.command_share_map", () => this.openShare());
+    this.addLocalizedCommand("share-map", "ui.command_share_map", () => void this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.command_open_topic_outline", () => {
       void this.activateOutline().catch(error => new Notice(String(error)));
     });

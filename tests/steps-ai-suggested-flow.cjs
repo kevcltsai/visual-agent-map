@@ -253,7 +253,8 @@ test('keepDroppedContent: numbers dropped, links dropped, both dropped; a restor
   assert.equal(again.detail.split(translate(lang, 'note.kept_from_earlier_version')).length - 1, 1);
 });
 
-test('keepDroppedContent: source numbers ("來源 1" -> [^1]) are not dropped numbers, in three languages', () => {
+// Decision #16: the older draft's source numbers are never excluded, so a pointer rewritten as [^n] is reported (accepted false alarm).
+test('keepDroppedContent: source numbers ("來源 1" -> [^1]) ARE reported and the original line is put back (decision #16), in three languages', () => {
   const first = noSources.sections[0].name;
   for (const [line, fresh] of [
     ['球桿角度很重要（見來源 1）。另一點（見來源 2）。', '球桿角度很重要[^1]。另一點[^2]。'],
@@ -261,8 +262,8 @@ test('keepDroppedContent: source numbers ("來源 1" -> [^1]) are not dropped nu
     ['Swing plane matters (see source 1). Also (sources 1, 2) and References 3.', 'Swing plane matters[^1]. Also[^2] and[^3].']
   ]) {
     const out = keepDroppedContent({ ...base, template: noSources, oldDetail: `### ${first}\n${line}${SRC}\n`, newDetail: `### ${first}\n${fresh}\n` });
-    assert.equal(out.restored, 0);
-    assert.equal(out.detail, `### ${first}\n${fresh}\n`);
+    assert.ok(out.restored >= 1);
+    assert.ok(out.detail.includes(`> ${line}`));
   }
 });
 
@@ -270,7 +271,7 @@ test('keepDroppedContent: a real number next to a source number is still restore
   const first = noSources.sections[0].name;
   const line = '距離少了 42 公里（見來源 1）。';
   const out = keepDroppedContent({ ...base, template: noSources, oldDetail: `### ${first}\n${line}${SRC}\n`, newDetail: `### ${first}\n距離變短[^1]。\n` });
-  assert.equal(out.restored, 1);
+  assert.equal(out.restored, 2, '42 and the pointer 1 (decision #16)');
   assert.ok(out.detail.includes(`> ${line}`));
   // a year, or a quantity with a unit after "source", is a number
   for (const text of ['來源 2018 年報告', 'source 2018 report', 'source 5 km away', '來源 3 公里']) {
@@ -334,17 +335,17 @@ test('B1: a number after "source" that counts something (a unit, a noun, a glued
   }
 });
 
-test('B1: a source number followed by the end of the line, punctuation, a bracket or a short verb is a pointer, not a dropped number', () => {
+test('B1 (decision #16): a source number followed by the end of the line, punctuation, a bracket or a short verb is reported too (accepted false alarm) and the original line is put back', () => {
   for (const line of [
     '（見來源 1）', '（见来源 2）', '見來源 1、2。', '(see source 1)', 'sources 1, 2.', 'Growth is clear, see source 3', '詳見來源 4；另見出處 3！', '來源 3 指出成長', 'Source 2 says growth'
   ]) {
     const out = keep(line, 'nothing');
-    assert.equal(out.restored, 0, line);
-    assert.equal(out.detail, `### ${noSources.sections[0].name}\nnothing\n`, line);
+    assert.ok(out.restored >= 1, line);
+    assert.ok(out.detail.includes(`> ${line}`), line);
   }
   // 3 is the pointer and 9 is the number: only 9 is restored.
   const mixed = keep('來源 3 指出成長 9 倍', '成長很多');
-  assert.equal(mixed.restored, 1);
+  assert.equal(mixed.restored, 2, '3 and 9 (decision #16)');
   assert.ok(mixed.detail.includes('> 來源 3 指出成長 9 倍'));
   // Ambiguous, decided toward reporting: a three-digit number after "source" at the end of a line stays a number; one or two digits are a pointer.
   // 個 stands before the keyword (a modifier), so the trailing 3 is a count too (stricter older-draft rule, B1-R2).
@@ -354,7 +355,7 @@ test('B1: a source number followed by the end of the line, punctuation, a bracke
 
 test('Medium 1: the new draft is read without its source pointers too, so a pointer cannot hide a dropped number', () => {
   const out = keep('成長 3 倍（見來源 1）', '成長很多（見來源 3）');
-  assert.equal(out.restored, 1);
+  assert.equal(out.restored, 2, '3 hidden by the new pointer is still reported, and the old pointer 1 (decision #16)');
   assert.ok(out.detail.includes('> 成長 3 倍（見來源 1）'));
   const summaryOnly = keepDroppedContent({ ...base, summary: '趨勢（see source 3）', template: noSources, oldDetail: `### ${noSources.sections[0].name}\n成長 3 倍${SRC}\n`, newDetail: `### ${noSources.sections[0].name}\nnothing\n` });
   assert.equal(summaryOnly.restored, 1);
@@ -511,36 +512,37 @@ test('B1-R2: a number after a modified or out-of-range source keyword is a real 
   assert.equal(checkMergePreservation({ sourceTexts: ['收入來源 3，'], mergedTexts: ['nothing'] }).missing.includes('3'), true);
 });
 
-test('B1-R2: a lead-in word, a plain pointer and a number after a pointer verb are not reported', () => {
+test('B1-R2 (decision #16): a lead-in word, a plain pointer and a number after a pointer verb are reported too (accepted false alarm)', () => {
   for (const line of ['（見來源 1）', '（见来源 2）', '見來源 1、2。', '(see source 1)', '來源 3 指出', 'Source 2 says growth']) {
     const out = keep(line, 'nothing');
-    assert.equal(out.restored, 0, line);
-    assert.equal(out.detail, `### ${noSources.sections[0].name}\nnothing\n`, line);
+    assert.ok(out.restored >= 1, line);
+    assert.ok(out.detail.includes(`> ${line}`), line);
   }
   const mixed = keep('來源 3 指出成長 9 倍', '成長很多');
-  assert.equal(mixed.restored, 1);
+  assert.equal(mixed.restored, 2);
 });
 
 test('B1-R2: without a sources section, or past the last item, a source number is a real number', () => {
   assert.equal(keep('（見來源 1）', 'nothing', noSources, '').restored, 1, 'no sources section');
   assert.equal(keep('（見來源 9）', 'nothing').restored, 1, '9 of 4 sources');
-  assert.equal(keep('（見來源 4）', 'nothing').restored, 0, '4 of 4 sources');
+  assert.equal(keep('（見來源 4）', 'nothing').restored, 1, '4 of 4 sources: reported too (decision #16)');
   // footnote definitions and ordered items count as the sources section too
   {
     const defs = '\n\n### Sources\n[^1]: https://a.example/1\n[^2]: https://a.example/2';
     const first = noSources.sections[0].name;
     const out = keepDroppedContent({ ...base, template: noSources, oldDetail: `### ${first}\n（見來源 2）${defs}\n`, newDetail: `### ${first}\nnothing${defs}\n` });
-    assert.equal(out.restored, 0);
+    assert.equal(out.restored, 1, 'decision #16');
   }
-  assert.equal(keep('（見來源 2）', 'nothing', noSources, '\n\n## 參考資料\n1. 甲\n2. 乙').restored, 0);
+  assert.equal(keep('（見來源 2）', 'nothing', noSources, '\n\n## 參考資料\n1. 甲\n2. 乙').restored, 1, 'decision #16');
 });
 
-test('B1-R2 (live golf1 shape): "（見來源 N）" pointers beside the numbered sources section report nothing', () => {
+test('B1-R2 (live golf1 shape, decision #16): "（見來源 N）" rewritten as [^N] is reported and the original lines are put back (accepted false alarm)', () => {
   const old = '### 背景與機制\n- 定義：Shin 等人提出以桿頭運動軌跡求出真實揮桿平面（見來源 1）。\n- 桿身指標：Morrison（2018）檢驗桿身角度（見來源 2）。\n以上為一位 PGA 教練的分類（見來源 3）。\n\n### 來源\n\n1. [A](https://a.example/1)\n2. [B](https://a.example/2)\n3. [C](https://a.example/3)\n4. [D](https://a.example/4)\n';
   const fresh = '### 背景與機制\n- 定義：Shin 等人提出以桿頭運動軌跡求出真實揮桿平面[^1]。\n- 桿身指標：Morrison（2018）檢驗桿身角度[^2]。\n以上為一位 PGA 教練的分類[^3]。\n\n### 來源\n\n1. [A](https://a.example/1)\n2. [B](https://a.example/2)\n3. [C](https://a.example/3)\n4. [D](https://a.example/4)\n';
   const out = keepDroppedContent({ ...base, template: noSources, oldDetail: old, newDetail: fresh });
-  assert.equal(out.restored, 0);
-  assert.equal(out.detail, fresh);
+  assert.equal(out.restored, 3);
+  for (const line of ['定義：Shin 等人提出以桿頭運動軌跡求出真實揮桿平面（見來源 1）。', '桿身指標：Morrison（2018）檢驗桿身角度（見來源 2）。', '以上為一位 PGA 教練的分類（見來源 3）。'])
+    assert.ok(out.detail.includes(`> ${line.startsWith('定義') || line.startsWith('桿身') ? '- ' : ''}${line}`), line);
 });
 
 test('M-R2-1: an unclosed mermaid fence does not hide the text after it; a closed one is still left out', () => {
@@ -573,15 +575,35 @@ test('R3: every restoring case is idempotent (old == new == the output restores 
 
 test('R3: "參與來源 3。" "關於來源 3。" "屬於來源 3。" are modified, not lead-in words; "見來源 3" still is', () => {
   for (const line of ['參與來源 3。', '关于来源 3。', '關於來源 3。', '屬於來源 3。', '属于来源 3。', '给与來源 3。']) assert.equal(keep(line, 'nothing').restored, 1, line);
-  for (const line of ['參見來源 3。', '詳見來源 3。', '見來源 3。']) assert.equal(keep(line, 'nothing').restored, 0, line);
+  for (const line of ['參見來源 3。', '詳見來源 3。', '見來源 3。']) assert.equal(keep(line, 'nothing').restored, 1, `${line} (decision #16: reported too)`);
 });
 
 test('R3: sources are the items at indent 0; only a sources heading starts the section and any heading ends it', () => {
   const sub = '\n\n### 來源\n- 甲\n  - 備註一\n  - 備註二\n  - 備註三\n- 乙\n  - 備註一\n  - 備註二\n  - 備註三\n';
   assert.equal(keep('來源 7。', 'nothing', noSources, sub).restored, 1, '2 sources with 3 sub-items each: 7 is a number');
-  assert.equal(keep('來源 2。', 'nothing', noSources, sub).restored, 0, '2 of 2');
+  assert.equal(keep('來源 2。', 'nothing', noSources, sub).restored, 1, '2 of 2: reported too (decision #16)');
   const body = '\n\n### 收入來源\n- 薪資\n- 股利\n- 租金\n';
   assert.equal(keep('來源 2。', 'nothing', noSources, body).restored, 1, 'a body section is not the sources section');
   const ended = '\n\n### 來源\n1. 甲\n\n#### 附註\n1. 乙\n2. 丙\n';
   assert.equal(keep('來源 2。', 'nothing', noSources, ended).restored, 1, 'a sub-heading ends the section');
+});
+
+test('decision #16: a kept pointer line does not hide a changed real number; the restored block is the right line, never the kept one', () => {
+  const H = `### ${noSources.sections[0].name}\n`;
+  const run = (o, n) => keepDroppedContent({ ...base, template: noSources, oldDetail: H + o, newDetail: H + n });
+  for (const [o, n, want] of [
+    ['（見來源 3）\n營收 3 倍。', '（見來源 3）\n營收很多。', '> 營收 3 倍。'],
+    ['營收 3 倍（見來源 3）\n用戶 3 萬。', '營收 3 倍（見來源 3）\n用戶很多。', '> 用戶 3 萬。']
+  ]) {
+    const out = run(o, n);
+    assert.equal(out.restored, 1, o);
+    assert.ok(out.detail.includes(want), o);
+    assert.equal(out.detail.split('\n').filter(l => l.startsWith('> ')).some(l => l.includes('見來源 3') && !l.includes('[!note]')), false, o);
+  }
+  // an AI line "> 見來源 9。" next to the block does not hide the other dropped line
+  const first = run('營收 9 倍。\n成長 9 成。', '營收 9 倍。\n很多。');
+  const lines = first.detail.split('\n');
+  const edited = lines.map(l => (l.includes('營收') ? l : l)).concat(['> 見來源 9。']);
+  const out = keepDroppedContent({ ...base, template: noSources, oldDetail: H + '營收 9 倍。\n成長 9 成。', newDetail: edited.filter(l => !l.includes('成長 9 成')).join('\n') });
+  assert.ok(out.restored >= 1);
 });

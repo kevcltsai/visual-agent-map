@@ -6,6 +6,14 @@
 - A text block under a topic has its own "+": topics added there follow the block in every layout, with the line drawn from the block. Deleting the block hands those topics back to the topic above, and turning it into a topic card makes them its subtopics; older versions show them under the topic above.
 - The "+" and "Add subtopic" lists show each topic type's shape and colour next to its name, the same as the type picker.
 
+### Note style: AI suggested
+
+General topics can now choose "AI suggested" as their note style, in Settings under Note style or from a topic's right-click menu. The first research lets the AI decide the sections of the note. Research after that keeps the sections the note already has and rewrites the note into them, so the section list does not change from run to run.
+
+- It is only offered for general topics. The other topic types, the AIM row and the research dialogs do not list it, and it cannot be copied or edited.
+- Nothing changes for anyone who does not choose it.
+- Changed behavior: if you already have a style file named "AI suggested", that file is now marked as having a problem and is not used. Rename it to keep using it.
+
 ### Edit the goal in place
 
 The goal now sits in the row above the map, in small text with no frame, and the map no longer sits under it.

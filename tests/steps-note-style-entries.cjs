@@ -235,3 +235,12 @@ test('stylePickerFor: recipes() is the store\'s listRecipes() as it is; builtinR
   assert.equal(withList.recipes(), listed);
   assert.equal(withList.list, undefined);
 });
+
+test('P4 research dialogs: the three that choose a style for one run all go through styleChoiceField, which never lists AI suggested (decisions #6)', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  for (const file of ['multi-research-modal.ts', 'outline-import-modal.ts', 'modals.ts'])
+    assert.match(fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map', file), 'utf8'), /styleChoiceField\(/, file);
+  const h = choice([...recipes, recipe('builtin:ai-suggested', 'AI suggested', { topicOnly: true, noCopy: true })]);
+  assert.ok(!optionValues(h.select).includes('builtin:ai-suggested'));
+});
+

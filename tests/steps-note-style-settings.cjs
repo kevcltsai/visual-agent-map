@@ -682,3 +682,43 @@ test('P3 page: opening the Note style page writes nothing, at the card, the rows
   assert.deepEqual(writes, []);
   assert.equal(JSON.stringify(settings), before);
 });
+
+// ---- AI suggested (P4): offered to the general topic row only ----
+const realBuiltins = language => {
+  const { NoteStyleStore } = S.load('ai/note-style-store.ts', { obsidian });
+  const settings = { language, workspaceFolder: 'WS', noteStylesFolder: 'WS/S', detailTemplates: [], promptPresets: [] };
+  const store = new NoteStyleStore({ settings: () => settings, port: { folderExists: () => false, listFiles: async () => [], readFile: async () => '' }, save: async () => {} });
+  return store.listRecipes();
+};
+
+test('P4 settings: AI suggested is the last built-in of the general topic row only; the other five types and the AIM row do not offer it', async () => {
+  const recipes = realBuiltins('en');
+  for (const kind of KIND_ORDER) {
+    const state = kindRow(kind, { recipes });
+    await flush();
+    const has = optionsOf(state.view).some(option => option[0] === 'builtin:ai-suggested');
+    assert.equal(has, kind === 'topic', kind);
+    if (kind === 'topic') {
+      const builtin = groupsOf(state.view).find(group => group.label === 'Built-in');
+      assert.equal(builtin.options.at(-1), 'AI suggested');
+    }
+  }
+});
+
+test('P4 settings: the AI suggested line reads "AI decides sections · Professional · Standard format · Merge rewrite" in every language, and choosing it saves the ref', async () => {
+  for (const [language, expected] of [['zh-TW', 'AI 決定段落 · 專業 · 標準格式 · 整合改寫'], ['en', null], ['zh-CN', null]]) {
+    const recipes = realBuiltins(language);
+    const state = kindRow('topic', { settings: { language }, recipes });
+    await flush();
+    state.view.dropdown.selectEl.value = 'builtin:ai-suggested';
+    await state.view.dropdown.change('builtin:ai-suggested');
+    assert.deepEqual({ ...state.settings.noteStyleByKind }, { topic: 'builtin:ai-suggested' }, language);
+    const item = recipes.find(entry => entry.ref === 'builtin:ai-suggested');
+    assert.equal(kindStyleLine(item).split(' · ')[0], i18n.translate(language, 'ui.note_style_ai_sections_decide'));
+    // The settings page bundle has its own interface language (English here); the first three parts come from the store in the settings language.
+    if (expected) {
+      assert.equal(kindStyleLine(item).split(' · ').slice(0, 3).join(' · '), expected.split(' · ').slice(0, 3).join(' · '));
+      assert.equal(i18n.translate(language, 'ui.update_mode_merge'), expected.split(' · ')[3]);
+    }
+  }
+});

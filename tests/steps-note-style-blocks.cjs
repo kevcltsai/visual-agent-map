@@ -627,3 +627,27 @@ test('S1b: the hypothesis Evidence table section gives a copyable Markdown heade
     assert.ok(!text.includes('｜'), `${language}: no full-width bar column list`);
   }
 });
+
+// ---- AI suggested (P4): the preview shows the decide text, and only for that style ----
+test('P4 preview: with AI suggested chosen the AI instructions show the decide text; other styles show what they showed (no aiSections leaks)', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const decide = fs.readFileSync(path.join(__dirname, '..', 'core/steps/task/ai-decided-sections.en.md'), 'utf8').split('\n')[0];
+  const follow = fs.readFileSync(path.join(__dirname, '..', 'core/steps/task/ai-followed-sections.en.md'), 'utf8').split('\n')[0];
+  const textOf = patch => {
+    const { store } = makeStore({ noteStyleByKind: { topic: patch } });
+    const { modal, dom } = openPreviewModal(store);
+    const text = dom.texts(modal.contentEl).join('\n');
+    modal.close();
+    return text;
+  };
+  const suggested = textOf('builtin:ai-suggested');
+  assert.ok(suggested.includes(decide), 'the decide fragment is shown');
+  assert.ok(!suggested.includes(follow));
+  for (const ref of ['builtin:general', 'builtin:textbook']) {
+    const other = textOf(ref);
+    assert.ok(!other.includes(decide) && !other.includes(follow), ref);
+  }
+  // Same fields as the store gives for any other style: no aiSections key at all.
+  const { store } = makeStore({ noteStyleByKind: { topic: 'builtin:textbook' } });
+  assert.equal('aiSections' in store.runStyle({ kind: 'topic', detail: '', outputLanguage: 'en' }).contextFields, false);
+});

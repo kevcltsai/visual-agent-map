@@ -331,7 +331,9 @@ export async function openTopicStyleChooser(
   } catch {
     /* an unreadable folder keeps the styles read last */
   }
-  const recipes = (picker ? picker.recipes() : builtinRecipeItems()).filter(item => !item.aimOnly && !item.topicOnly);
+  const recipes = (picker ? picker.recipes() : builtinRecipeItems()).filter(
+    item => !item.aimOnly && (!item.topicOnly || options.kind === "topic")
+  );
   const language = plugin.settings?.language ?? "en";
   const { note } = options;
   const legacy = !note.noteStyle && (!!note.detailTemplateId || !!note.toneId);

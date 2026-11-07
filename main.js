@@ -36454,7 +36454,9 @@ async function openTopicStyleChooser(app, plugin, options) {
     await (picker == null ? void 0 : picker.refresh());
   } catch (e) {
   }
-  const recipes = (picker ? picker.recipes() : builtinRecipeItems()).filter((item) => !item.aimOnly && !item.topicOnly);
+  const recipes = (picker ? picker.recipes() : builtinRecipeItems()).filter(
+    (item) => !item.aimOnly && (!item.topicOnly || options.kind === "topic")
+  );
   const language2 = (_c = (_b2 = plugin.settings) == null ? void 0 : _b2.language) != null ? _c : "en";
   const { note } = options;
   const legacy = !note.noteStyle && (!!note.detailTemplateId || !!note.toneId);
@@ -80957,7 +80959,7 @@ var PromptPreviewModal = class extends import_obsidian39.Modal {
     const body = this.bodyEl;
     if (!body) return;
     body.empty();
-    const style = (_b2 = (_a2 = this.styleOf) == null ? void 0 : _a2.call(this)) != null ? _b2 : this.store.runStyle({ kind: "topic", outputLanguage: this.language });
+    const style = (_b2 = (_a2 = this.styleOf) == null ? void 0 : _a2.call(this)) != null ? _b2 : this.store.runStyle({ kind: "topic", detail: "", outputLanguage: this.language });
     const fields = {
       detailTemplate: style.template,
       ...style.toneText ? { toneText: style.toneText } : {},
@@ -82640,7 +82642,7 @@ function shownStyleRef(plugin, kind) {
   return typeof saved === "string" && saved ? saved : KIND_DEFAULT_RECIPE[kind];
 }
 function offeredStyles(plugin, kind) {
-  return plugin.noteStyles.listRecipes().filter((item) => (kind === "aim" || !item.aimOnly) && !item.topicOnly);
+  return plugin.noteStyles.listRecipes().filter((item) => (kind === "aim" || !item.aimOnly) && (!item.topicOnly || kind === "topic"));
 }
 function missingStyleRef(plugin, kind) {
   var _a2;

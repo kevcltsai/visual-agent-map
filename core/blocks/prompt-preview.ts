@@ -15,7 +15,7 @@ export const PREVIEW_STEPS: readonly { readonly id: PreviewStep; readonly nameKe
 ];
 
 /** The style fields of a request (what the map view spreads into a TaskContext) that the preview takes as they are. */
-export type PreviewStyleFields = Pick<TaskContext, "detailTemplate" | "toneText" | "styleSelection">;
+export type PreviewStyleFields = Pick<TaskContext, "detailTemplate" | "toneText" | "styleSelection" | "aiSections">;
 
 /** Where a part of the prompt belongs in the preview: the group a heading names. */
 export type PreviewGroup = "role" | "template" | "tone" | "fixed" | "input";

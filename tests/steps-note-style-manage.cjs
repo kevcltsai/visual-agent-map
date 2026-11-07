@@ -571,6 +571,8 @@ test('counter 14: the AIM report is listed with its topic type but has no Edit b
   const suggested = rowFor(root, 'AI suggested');
   assert.ok(suggested, 'listed');
   assert.equal(editOf(suggested), undefined, 'no Edit (it would copy a style that is not a text)');
+  assert.equal(dom.findAll(suggested, node => node.tag === 'button').length, 0, 'no View, no Copy and edit, no menu');
+  assert.equal(moreOf(suggested), undefined);
 });
 
 test('counter 5: Edit on a built-in part saves "My <name>" (a new file) and opens it, the list shows it and the focus is on its row; an existing "My ..." file is never overwritten', async () => {

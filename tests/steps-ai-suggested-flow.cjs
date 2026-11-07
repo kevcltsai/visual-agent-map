@@ -283,3 +283,38 @@ test('keepDroppedContent: a line goes to the section of the same name, else the 
   assert.ok(at('> B 22.') > lines.indexOf(`### ${two}`));
   assert.ok(at('> C 33.') > lines.indexOf(`### ${two}`), 'an unknown section goes to the last plain section');
 });
+
+// ---- synthesize mode through the real AiTaskService (P3 gaps) ----
+const synthContext = extra => ({
+  title: 'Swing plane', summary: '', rules: '', detail: '', task: 'combine', ancestors: '', workingFindings: 'finding 1', sourceContext: '',
+  outputLanguage: 'en', mode: 'synthesize', researchMode: 'local', researchDepth: 'normal', visualMode: 'off', ...extra
+});
+async function askSynthesize(context, detail) {
+  const reply = JSON.stringify({ summary: 'S', detail, visualReferences: [], suggestions: [] });
+  const runtime = require('./support-replay.cjs').capturingRuntime([reply]);
+  const result = await makeService(runtime, { language: 'en', reuseModule: true }).askModel(context, 'gpt-6-luna', 'low');
+  return { result, prompts: runtime.calls.map(call => call.prompt) };
+}
+
+test('synthesize + follow: a ### the note does not have becomes ####, the section list stays', async () => {
+  const template = templateFromDetail(FIRST, 'en').template;
+  const reply = [FIRST.replace('### Sources', '### Extra thoughts\nEXTRA-LINE with 9 yards.\n\n### Sources')].join('');
+  const { result, prompts } = await askSynthesize(synthContext({ detail: FIRST, aiSections: 'follow', detailTemplate: template }), reply);
+  assert.equal(prompts.length, 1);
+  assert.deepEqual(sectionsOf(result.detail), sectionsOf(FIRST));
+  assert.ok(headingsOf(result.detail, '####').includes('Extra thoughts'));
+  assert.ok(result.detail.includes('EXTRA-LINE with 9 yards.'));
+  assert.equal(result.decidedTemplate, undefined);
+  assert.equal(result.aiSectionsFallback, undefined);
+});
+
+test('synthesize + decide on an empty note: no decided template, no fallback, and the prompt is the standard one', async () => {
+  const reply = FIRST;
+  const decide = await askSynthesize(synthContext({ aiSections: 'decide', detailTemplate: standardTemplate('en') }), reply);
+  const standard = await askSynthesize(synthContext({ detailTemplate: standardTemplate('en') }), reply);
+  const follow = await askSynthesize(synthContext({ aiSections: 'follow', detailTemplate: templateFromDetail(FIRST, 'en').template }), reply);
+  assert.equal(decide.result.decidedTemplate, undefined);
+  assert.equal(decide.result.aiSectionsFallback, undefined);
+  assert.equal(decide.prompts[0], standard.prompts[0]);
+  assert.notEqual(follow.prompts[0], standard.prompts[0]);
+});

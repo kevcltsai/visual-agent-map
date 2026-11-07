@@ -194,9 +194,11 @@ export function shownStyleRef(plugin: VisualAgentMapPlugin, kind: StyleKind): st
   return typeof saved === "string" && saved ? saved : KIND_DEFAULT_RECIPE[kind];
 }
 
-/** The styles a kind's picker offers: everything, except that only the AIM row offers the AIM report. */
+/** The styles a kind's picker offers: everything, except that only the AIM row offers the AIM report and only the general topic row offers the AI-suggested style. */
 function offeredStyles(plugin: VisualAgentMapPlugin, kind: StyleKind): RecipeListItem[] {
-  return plugin.noteStyles.listRecipes().filter(item => (kind === "aim" || !item.aimOnly) && !item.topicOnly);
+  return plugin.noteStyles
+    .listRecipes()
+    .filter(item => (kind === "aim" || !item.aimOnly) && (!item.topicOnly || kind === "topic"));
 }
 
 /** The style a kind saved when no style of that ref exists any more (renamed or deleted file); else undefined. */

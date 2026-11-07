@@ -166,6 +166,22 @@ test('picker: "Other N styles" expands, moves focus to the first row it revealed
   assert.equal(row.attrs.role, undefined, 'a problem file is not a radio');
 });
 
+test('P4 picker: AI suggested is listed (with its tags) for a general topic only; the other five types and a store-less double follow the kind filter; the AIM report never appears', async () => {
+  const w = await world();
+  const topic = await open(w, { note: {}, kind: 'topic' });
+  const row = rowNamed(topic.modal, 'AI suggested');
+  assert.ok(row, 'a general topic is offered AI suggested');
+  assert.equal(descOf(row), 'AI decides sections · Professional · Standard format · Merge and rewrite');
+  for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion', 'action']) {
+    const other = await open(w, { note: {}, kind });
+    assert.equal(rowNamed(other.modal, 'AI suggested'), undefined, kind);
+    assert.ok(!names(radios(other.modal)).some(label => /AIM/i.test(label)), kind);
+  }
+  const bare = { plugin: { settings: { language: 'en', detailTemplates: [], promptPresets: [] } } };
+  assert.ok(rowNamed((await open(bare, { note: {}, kind: 'topic' })).modal, 'AI suggested'));
+  assert.equal(rowNamed((await open(bare, { note: {}, kind: 'hypothesis' })).modal, 'AI suggested'), undefined);
+});
+
 test('picker without a style store (a plugin test double) still lists the built-ins and opens', async () => {
   const w = { plugin: { settings: { language: 'en', detailTemplates: [], promptPresets: [] } } };
   const { modal } = await open(w, { note: {}, kind: 'topic' });

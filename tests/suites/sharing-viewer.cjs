@@ -1997,3 +1997,71 @@ test('sharing viewer fold R2: the first click on a folded topic with text blocks
     for (const id of ['after1', 'after2']) assert.ok(report.rects.find(r => r.id === id).x >= block.x + block.w, `${id} sits after the block`);
   });
 });
+
+// ---- share-match-map R2-F1/F2/F3 (reviewer round 2): a cover that loads after the reader's action keeps their place, "show all" lasts, opening still does not arrange.
+const SCREEN_RECT = id => `(() => { const b = document.querySelector('[data-node-id="${id}"]').getBoundingClientRect(); return { left: b.left, top: b.top, width: b.width, height: b.height }; })()`;
+const MENU_ITEM = index => `document.querySelector('.vam-layout-button').click(); [...document.querySelectorAll('[role="menuitem"]')][${index}].click();`;
+const drift = (a, b) => Math.max(Math.abs(a.left - b.left), Math.abs(a.top - b.top));
+
+test('sharing viewer fold R2-F1: the clicked card and the selected card keep their place on screen when the covers load (headless Chrome)', async t => {
+  await withChrome(t, 'vam-share-f1-', async (chrome, directory) => {
+    const run = async script => dumpDomLight(chrome, directory, await pageOf(directory, coverFoldPayload()), 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      await wait(1000);
+      return script(evaluate, wait);
+    });
+    const clicked = await run(async (evaluate, wait) => {
+      await evaluate(`document.querySelector('[data-node-id="a"] .vam-collapse-button').click()`);
+      const sync = await evaluate(SCREEN_RECT('a'));
+      await wait(1500);
+      return { sync, settled: await evaluate(SCREEN_RECT('a')), sized: await evaluate(`[...document.querySelectorAll('.vam-card-cover')].every(c => c.classList.contains('is-sized'))`) };
+    });
+    assert.ok(clicked.sized, 'the covers are sized');
+    assert.ok(drift(clicked.sync, clicked.settled) <= 1, `the clicked card stays put: ${JSON.stringify(clicked)}`);
+    const selected = await run(async (evaluate, wait) => {
+      await evaluate(`document.querySelector('[data-node-id="a"]').click(); [...document.querySelectorAll('.vam-subtopics button')].find(b => /A3/.test(b.textContent)).click();`);
+      const sync = await evaluate(SCREEN_RECT('a3'));
+      await wait(1500);
+      return { sync, settled: await evaluate(SCREEN_RECT('a3')), sel: await evaluate(`document.querySelector('.vam-node.is-selected')?.dataset.nodeId`) };
+    });
+    assert.equal(selected.sel, 'a3');
+    assert.ok(drift(selected.sync, selected.settled) <= 1, `the selected card stays put: ${JSON.stringify(selected)}`);
+  });
+});
+
+test('sharing viewer fold R2-F2: "Expand all" and "Level 3" still show every card after the covers load (headless Chrome; one card unfolded stays with R3)', async t => {
+  await withChrome(t, 'vam-share-f2-', async (chrome, directory) => {
+    for (const [label, item] of [['expand all', 1], ['level 3', 4]]) {
+      const report = await dumpDomLight(chrome, directory, await pageOf(directory, coverFoldPayload(), label.replace(' ', '-')), 60000, async send => {
+        const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await evaluate(MENU_ITEM(item));
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return evaluate(`(() => { const v = document.querySelector('.vam-viewport').getBoundingClientRect(); return { sized: [...document.querySelectorAll('.vam-card-cover')].every(c => c.classList.contains('is-sized')), cards: [...document.querySelectorAll('.vam-node')].map(c => { const b = c.getBoundingClientRect(); return { id: c.dataset.nodeId, inside: b.left >= v.left - 1 && b.top >= v.top - 1 && b.right <= v.right + 1 && b.bottom <= v.bottom + 1 }; }) }; })()`);
+      });
+      assert.ok(report.sized, `${label}: covers sized`);
+      assert.equal(report.cards.length, 6, `${label}: every card is drawn`);
+      assert.deepEqual(report.cards.filter(c => !c.inside).map(c => c.id), [], `${label}: every card is inside the viewport`);
+    }
+  });
+});
+
+test('sharing viewer fold R2-F3: opening a file whose expanded covered cards overlap does not arrange them when the covers load (headless Chrome)', async t => {
+  await withChrome(t, 'vam-share-f3-', async (chrome, directory) => {
+    const data = coverFoldPayload();
+    data.nodes.find(n => n.id === 'a').collapsed = false;
+    const report = await dumpDomLight(chrome, directory, await pageOf(directory, data), 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      await wait(300);
+      const first = await evaluate(OVERLAPS);
+      await wait(1500);
+      return { first, settled: await evaluate(OVERLAPS), sized: await evaluate(`[...document.querySelectorAll('.vam-card-cover')].every(c => c.classList.contains('is-sized'))`) };
+    });
+    assert.ok(report.sized, 'the covers are sized');
+    const places = shot => JSON.stringify(shot.rects.map(r => [r.id, r.x, r.y]));
+    assert.ok(report.settled.hits.length > 0, 'the saved places overlap, so there is something an arrangement would move');
+    assert.equal(places(report.settled), places(report.first), 'no card moved when the covers loaded');
+  });
+});

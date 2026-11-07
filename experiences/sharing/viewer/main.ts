@@ -1038,13 +1038,24 @@ export function startViewer(doc: Document): void {
       // Once the reader has folded or unfolded, covers sized after it can overlap what was just arranged: the map's settle pass, once per frame.
       // Opening a file never gets here with a change (it keeps the saved places).
       if (arranged && needsSecondPass()) {
+        // Keep the reader's place: the selected card, else the one last folded or unfolded, stays where it is on screen.
+        const anchorId = selected ?? lastActed;
+        const anchor = anchorId ? cards.get(anchorId) : undefined;
+        const before = anchor?.getBoundingClientRect();
         layout();
         drawEdges();
+        if (anchor && before) {
+          const rect = anchor.getBoundingClientRect();
+          view = { ...view, x: view.x + before.left - rect.left, y: view.y + before.top - rect.top };
+          transform();
+        }
       }
       if (!viewTouched && selected === null && !pointers.size) fit();
     });
   }
   let coverRefit = 0;
+  /** The card the reader last folded or unfolded by itself (a whole-map level action clears it). */
+  let lastActed: string | null = null;
   /** True after the first fold change or Auto layout: until then the saved places are what is drawn. */
   let arranged = false;
   /** The map's one conditional second pass: a card over another card or the centre image needs one more arrangement, with the heights now drawn. */
@@ -1253,6 +1264,7 @@ export function startViewer(doc: Document): void {
   function relayout(focusId?: string, focusButton = false): void {
     const before = focusId ? cards.get(focusId)?.getBoundingClientRect() : undefined;
     arranged = true;
+    lastActed = focusId ?? null;
     // A fold change or level is the reader's doing: a cover that loads later must not fit the view away from it.
     viewTouched = true;
     // The map arranges first and draws after (toggleCollapsed -> arrangeAll), so new cards are laid out with the median height.
@@ -1455,6 +1467,8 @@ export function startViewer(doc: Document): void {
     applyCollapseLevel(nodes, levels);
     relayout();
     fit();
+    // "Show all" is meant to last until the reader moves the view themselves: a cover that loads later fits again.
+    viewTouched = false;
   };
   const closeMenu = (restoreFocus: boolean): void => {
     if (menu.hidden) return;

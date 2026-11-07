@@ -31393,23 +31393,22 @@ var key2 = (value) => value.trim().toLocaleLowerCase();
 var SOURCE_REF_VERB_ZH = ["\u6307\u51FA", "\u63D0\u5230", "\u8868\u660E", "\u8A8D\u70BA", "\u8BA4\u4E3A", "\u6307\u7A31"];
 var SOURCE_REF_VERB_ZH_NOUN = ["\u986F\u793A", "\u663E\u793A", "\u8868\u793A", "\u8AAA\u660E", "\u8BF4\u660E", "\u7A31", "\u79F0"];
 var SOURCE_REF_VERB_EN = ["says?", "said", "states?", "shows?", "indicates?", "suggests?"];
-var SOURCE_REF_VERB_EN_LOOSE = ["reports?", "notes?", "mentions?", "claims?"];
 var SOURCE_REF_KEYWORD = [
   ["\u4F86\u6E90", "\u6765\u6E90"],
   ["\u51FA\u8655", "\u51FA\u5904"]
 ].map((group) => group.join("|")).join("|");
 var SOURCE_REF_JOINER = ["\u53CA", "\u548C"].join("|");
-function sourceRefPattern(strict) {
+function sourceRefPattern() {
   const zh = SOURCE_REF_VERB_ZH.join("|");
   const zhNoun = SOURCE_REF_VERB_ZH_NOUN.join("|");
-  const en2 = [...SOURCE_REF_VERB_EN, ...strict ? [] : SOURCE_REF_VERB_EN_LOOSE].map((verb) => `${verb}\\b`).join("|");
-  const verbs = strict ? `${zh}|(?:${zhNoun})(?!\\p{Script=Han})|${en2}` : `${zh}|${zhNoun}|${en2}`;
+  const en2 = SOURCE_REF_VERB_EN.map((verb) => `${verb}\\b`).join("|");
+  const verbs = `${zh}|(?:${zhNoun})(?!\\p{Script=Han})|${en2}`;
   return new RegExp(
     `(${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*(\\d{1,2}(?:[ \\t]*(?:[,\uFF0C\u3001]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,2})*)(?!\\d|\\.\\d)(?=[ \\t]*(?:$|[\u3002\uFF0C\u3001\uFF1B\uFF1A\uFF01\uFF1F.,;:!?)\uFF09\\]\u3011\u300D\u300F\u201D\u2019\u2026]|${verbs}))(?![ \\t]*[,\uFF0C\u3001][ \\t]*\\d)`,
     "gium"
   );
 }
-var SOURCE_REF_STRICT = sourceRefPattern(true);
+var SOURCE_REF = sourceRefPattern();
 var SOURCE_LEAD_HAN = /[見见據据依參参如另自從从於于與与及和或至]$/;
 var SOURCE_LEAD_EN = /^(?:see|cf|per|from|in|and|to|by|also)$/i;
 var SOURCE_LEAD_NOT = /(?:參與|参与|關於|关于|屬於|属于|給與|给与)$/;
@@ -31442,16 +31441,40 @@ function sourceCount(text12, extraNames) {
   });
   return count2;
 }
-function withoutOldSourceRefs(text12, max) {
+function withoutSourceRefs(text12, max) {
   if (!max) return text12;
-  return text12.replace(
-    SOURCE_REF_STRICT,
-    (match, _keyword, nums, offset, whole) => {
-      var _a2;
-      if (!leadsKeyword(whole.slice(0, offset))) return match;
-      return ((_a2 = nums.match(/\d+/g)) != null ? _a2 : []).every((value) => Number(value) >= 1 && Number(value) <= max) ? "" : match;
+  return text12.replace(SOURCE_REF, (match, _keyword, nums, offset, whole) => {
+    var _a2;
+    if (!leadsKeyword(whole.slice(0, offset))) return match;
+    return ((_a2 = nums.match(/\d+/g)) != null ? _a2 : []).every((value) => Number(value) >= 1 && Number(value) <= max) ? "" : match;
+  });
+}
+var NEW_SIDE_MAX = 99;
+function newSideText(text12) {
+  const titles = keptTitles();
+  const lines = text12.split("\n");
+  const code = fencedLines(lines);
+  const out = [];
+  let plain = [];
+  const flush = () => {
+    if (plain.length) out.push(withoutSourceRefs(plain.join("\n"), NEW_SIDE_MAX));
+    plain = [];
+  };
+  let inBlock = false;
+  lines.forEach((line, index) => {
+    if (inBlock && !/^[ \t]*>/.test(line)) inBlock = false;
+    if (!inBlock && !code[index]) {
+      const head = /^[ \t]*>[ \t]*\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(line);
+      if (head && titles.has(key2(head[1]))) {
+        flush();
+        inBlock = true;
+      }
     }
-  );
+    if (inBlock) out.push(line);
+    else plain.push(line);
+  });
+  flush();
+  return out.join("\n");
 }
 function keepDroppedContent(input2) {
   const { template: template2, language: language2 } = input2;
@@ -31459,10 +31482,9 @@ function keepDroppedContent(input2) {
   const sourceNames = template2.sections.filter((section3) => section3.role === "sources").flatMap((section3) => [section3.name, ...section3.aliases]);
   const sourceMax = sourceCount(oldDetail, sourceNames);
   const logHeadings = template2.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]);
-  const newMax = Math.max(sourceCount(input2.newDetail, sourceNames), sourceMax);
   const check = (detail2, added2 = "") => checkMergePreservation({
-    sourceTexts: [withoutOldSourceRefs(oldDetail, sourceMax)],
-    mergedTexts: [withoutOldSourceRefs(detail2, newMax), withoutOldSourceRefs(input2.summary, newMax), added2],
+    sourceTexts: [oldSideText(oldDetail, input2.newDetail, sourceMax)],
+    mergedTexts: [newSideText(detail2), withoutSourceRefs(input2.summary, NEW_SIDE_MAX), added2],
     mergedLinkTexts: [input2.references],
     logHeadings
   });
@@ -31487,6 +31509,26 @@ function addedLines(base, now) {
     if (n) left.set(line, n - 1);
     return !n;
   });
+}
+function oldSideText(text12, newDetail, max) {
+  const kept = new Set(
+    newDetail.split("\n").map((line) => line.trim()).filter(Boolean)
+  );
+  const out = [];
+  let run = [];
+  let runKept = false;
+  const flush = () => {
+    if (run.length) out.push(withoutSourceRefs(run.join("\n"), runKept ? NEW_SIDE_MAX : max));
+    run = [];
+  };
+  for (const line of text12.split("\n")) {
+    const isKept = kept.has(line.trim());
+    if (run.length && isKept !== runKept) flush();
+    runKept = isKept;
+    run.push(line);
+  }
+  flush();
+  return out.join("\n");
 }
 function keptTitles() {
   return new Set(KEPT_LOCALES.map((locale) => key2(translateNote(locale, "note.kept_from_earlier_version"))));
@@ -31598,7 +31640,7 @@ function quoteMissingLines(oldDetail, detail, missing, template2, language2, log
     }
     if (!text12) return;
     const own2 = checkMergePreservation({
-      sourceTexts: [withoutOldSourceRefs(text12, sourceMax)],
+      sourceTexts: [withoutSourceRefs(text12, sourceMax)],
       mergedTexts: []
     }).missing.filter((item) => missing.has(item));
     if (!own2.some((item) => !covered.has(item))) return;

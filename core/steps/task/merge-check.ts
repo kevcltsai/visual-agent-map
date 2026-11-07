@@ -146,8 +146,6 @@ const key = (value: string): string => value.trim().toLocaleLowerCase();
 const SOURCE_REF_VERB_ZH = ["指出", "提到", "表明", "認為", "认为", "指稱"];
 const SOURCE_REF_VERB_ZH_NOUN = ["顯示", "显示", "表示", "說明", "说明", "稱", "称"];
 const SOURCE_REF_VERB_EN = ["says?", "said", "states?", "shows?", "indicates?", "suggests?"];
-// The loose (new draft) side also keeps these, which can be nouns; the strict (older draft) side drops them.
-const SOURCE_REF_VERB_EN_LOOSE = ["reports?", "notes?", "mentions?", "claims?"];
 const SOURCE_REF_KEYWORD = [
   ["來源", "来源"],
   ["出處", "出处"]
@@ -155,12 +153,12 @@ const SOURCE_REF_KEYWORD = [
   .map(group => group.join("|"))
   .join("|");
 const SOURCE_REF_JOINER = ["及", "和"].join("|");
-function sourceRefPattern(strict: boolean): RegExp {
+function sourceRefPattern(): RegExp {
   const zh = SOURCE_REF_VERB_ZH.join("|");
   const zhNoun = SOURCE_REF_VERB_ZH_NOUN.join("|");
-  const en = [...SOURCE_REF_VERB_EN, ...(strict ? [] : SOURCE_REF_VERB_EN_LOOSE)].map(verb => `${verb}\\b`).join("|");
-  // On the strict side a verb that can start a noun may not run into another Han character ("來源 12 表示法" is a quantity).
-  const verbs = strict ? `${zh}|(?:${zhNoun})(?!\\p{Script=Han})|${en}` : `${zh}|${zhNoun}|${en}`;
+  const en = SOURCE_REF_VERB_EN.map(verb => `${verb}\\b`).join("|");
+  // A verb that can start a noun may not run into another Han character ("來源 12 表示法" is a quantity).
+  const verbs = `${zh}|(?:${zhNoun})(?!\\p{Script=Han})|${en}`;
   return new RegExp(
     `(${SOURCE_REF_KEYWORD}|(?<![A-Za-z])(?:sources?|references?))[ \\t]*(\\d{1,2}` +
       `(?:[ \\t]*(?:[,，、]|${SOURCE_REF_JOINER}|and|&)[ \\t]*\\d{1,2})*)` +
@@ -169,7 +167,7 @@ function sourceRefPattern(strict: boolean): RegExp {
     "gium"
   );
 }
-const SOURCE_REF_STRICT = sourceRefPattern(true);
+const SOURCE_REF = sourceRefPattern();
 // What may stand just before the keyword: a lead-in word (see, per, 見 ...) or nothing. A modifier ("資料來源", "open
 // source", "Data sources") makes the number a count of something.
 const SOURCE_LEAD_HAN = /[見见據据依參参如另自從从於于與与及和或至]$/;
@@ -212,18 +210,49 @@ function sourceCount(text: string, extraNames: string[]): number {
 }
 
 /**
- * Both drafts and the summary are read the same strict way: a number is a pointer only when it is not more than the items of its sources section
- * (none: never), no modifier stands before the keyword, and the character after it fits the whitelist.
+ * Both drafts and the summary are read with the same text rule: a number is a pointer only when it is not more than `max`
+ * (0: never), no modifier stands before the keyword, and the character after it fits the whitelist.
  */
-function withoutOldSourceRefs(text: string, max: number): string {
+function withoutSourceRefs(text: string, max: number): string {
   if (!max) return text;
-  return text.replace(
-    SOURCE_REF_STRICT,
-    (match: string, _keyword: string, nums: string, offset: number, whole: string) => {
-      if (!leadsKeyword(whole.slice(0, offset))) return match;
-      return (nums.match(/\d+/g) ?? []).every(value => Number(value) >= 1 && Number(value) <= max) ? "" : match;
+  return text.replace(SOURCE_REF, (match: string, _keyword: string, nums: string, offset: number, whole: string) => {
+    if (!leadsKeyword(whole.slice(0, offset))) return match;
+    return (nums.match(/\d+/g) ?? []).every(value => Number(value) >= 1 && Number(value) <= max) ? "" : match;
+  });
+}
+
+// The new side has no sources section to count, so any item number may be a pointer (the text rule still decides).
+const NEW_SIDE_MAX = 99;
+
+/**
+ * The new draft read for pointers: a block this feature put back earlier (the callout from its title to its last `> ` line)
+ * is read as it stands, so a second run does not lose what the first one kept.
+ */
+function newSideText(text: string): string {
+  const titles = keptTitles();
+  const lines = text.split("\n");
+  const code = fencedLines(lines);
+  const out: string[] = [];
+  let plain: string[] = [];
+  const flush = () => {
+    if (plain.length) out.push(withoutSourceRefs(plain.join("\n"), NEW_SIDE_MAX));
+    plain = [];
+  };
+  let inBlock = false;
+  lines.forEach((line, index) => {
+    if (inBlock && !/^[ \t]*>/.test(line)) inBlock = false;
+    if (!inBlock && !code[index]) {
+      const head = /^[ \t]*>[ \t]*\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(line);
+      if (head && titles.has(key(head[1]))) {
+        flush();
+        inBlock = true;
+      }
     }
-  );
+    if (inBlock) out.push(line);
+    else plain.push(line);
+  });
+  flush();
+  return out.join("\n");
 }
 
 /**
@@ -254,12 +283,11 @@ export function keepDroppedContent(input: {
   const logHeadings = template.sections
     .filter(section => section.role === "log")
     .flatMap(section => [section.name, ...section.aliases]);
-  const newMax = Math.max(sourceCount(input.newDetail, sourceNames), sourceMax);
   // `added` is what this function put back: it is read as it stands.
   const check = (detail: string, added = "") =>
     checkMergePreservation({
-      sourceTexts: [withoutOldSourceRefs(oldDetail, sourceMax)],
-      mergedTexts: [withoutOldSourceRefs(detail, newMax), withoutOldSourceRefs(input.summary, newMax), added],
+      sourceTexts: [oldSideText(oldDetail, input.newDetail, sourceMax)],
+      mergedTexts: [newSideText(detail), withoutSourceRefs(input.summary, NEW_SIDE_MAX), added],
       mergedLinkTexts: [input.references],
       logHeadings
     });
@@ -284,6 +312,34 @@ function addedLines(base: string, now: string): string[] {
     if (n) left.set(line, n - 1);
     return !n;
   });
+}
+
+/**
+ * The older draft read for pointers: the lines the new draft still has word for word are read like the new draft (any item
+ * number), so a pointer line that was kept as it is does not count as a dropped number.
+ */
+function oldSideText(text: string, newDetail: string, max: number): string {
+  const kept = new Set(
+    newDetail
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean)
+  );
+  const out: string[] = [];
+  let run: string[] = [];
+  let runKept = false;
+  const flush = () => {
+    if (run.length) out.push(withoutSourceRefs(run.join("\n"), runKept ? NEW_SIDE_MAX : max));
+    run = [];
+  };
+  for (const line of text.split("\n")) {
+    const isKept = kept.has(line.trim());
+    if (run.length && isKept !== runKept) flush();
+    runKept = isKept;
+    run.push(line);
+  }
+  flush();
+  return out.join("\n");
 }
 
 /** The title lines this feature writes, in every language, so a second run takes the quoted lines and not the title. */
@@ -425,7 +481,7 @@ function quoteMissingLines(
     }
     if (!text) return;
     const own = checkMergePreservation({
-      sourceTexts: [withoutOldSourceRefs(text, sourceMax)],
+      sourceTexts: [withoutSourceRefs(text, sourceMax)],
       mergedTexts: []
     }).missing.filter(item => missing.has(item));
     if (!own.some(item => !covered.has(item))) return;

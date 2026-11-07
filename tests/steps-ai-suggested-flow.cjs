@@ -378,6 +378,25 @@ test('R4: old and new draft are read the same strict way; a pointer in the new d
   assert.equal((cur.match(/\[!note\]/g) || []).length, 1);
 });
 
+test('R5: with no sources section in either draft, a pointer in the new draft or summary cannot hide a dropped number; reruns stay idempotent', () => {
+  const H = `### ${noSources.sections[0].name}\n`;
+  const run = (o, n, summary = '') => keepDroppedContent({ ...base, summary, template: noSources, oldDetail: H + o + '\n', newDetail: H + n + '\n' });
+  assert.equal(run('營收成長 3 倍。', '（見來源 3）\n營收成長很多。').restored, 1);
+  assert.equal(run('營收成長 3 倍。', '見來源 3。\n營收成長很多。').restored, 1);
+  assert.equal(run('營收成長 3 倍。', '營收成長很多。', '（見來源 3）').restored, 1);
+  // the same pointer line kept as is: nothing to restore
+  assert.equal(run('（見來源 3）', '（見來源 3）').restored, 0);
+  const first = run('（見來源 3）\n營收 3 倍。', 'nothing');
+  assert.ok(first.restored >= 1);
+  let cur = first.detail;
+  for (let i = 0; i < 3; i++) {
+    const again = keepDroppedContent({ ...base, template: noSources, oldDetail: cur, newDetail: cur });
+    assert.equal(again.restored, 0);
+    cur = again.detail;
+  }
+  assert.equal((cur.match(/\[!note\]/g) || []).length, 1);
+});
+
 test('B2: a restored line points at the new footnote that has the same source URL; one with no match loses the marker and carries the URL', () => {
   const sourcesName = withSources.sections.find(section => section.role === 'sources').name;
   const first = withSources.sections[0].name;

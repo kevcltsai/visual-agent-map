@@ -41,7 +41,8 @@ import {
   type ShareLanguage,
   type ShareOriginalLanguage,
   type SharePayload,
-  type ShareNoteInput
+  type ShareNoteInput,
+  type ShareOptions
 } from "./share-format";
 import { renderShareHtml, renderShareShell } from "./share-html";
 import {
@@ -62,6 +63,11 @@ export interface ShareSource {
   goal?: string;
   /** topic id -> vault path of the card's cover picture (`topic-cover` or its first embed); the cover is part of what the card shows, so it travels with the note. */
   covers?: ReadonlyMap<string, string>;
+  /** topic id -> how the card shows its cover (frame, size, position), for the topics in `covers`. Absent means the default look. */
+  coverLooks?: ReadonlyMap<
+    string,
+    { frame?: { x: number; y: number; w: number; h: number } | null; size?: number; position?: string }
+  >;
   /** Vault path of the map file (only used to build the leak scan's forbidden strings; never written out). */
   mapPath: string;
 }
@@ -335,6 +341,9 @@ export class ShareExporter {
   private readonly images = new Map<string, string | null>();
   private readonly registry = createAssetRegistry();
   private readonly ownerPath = new Map<string, string>();
+  /** topic id -> asset name of its cover picture; annotated image id -> asset name of its picture (set by ensureImages). */
+  private readonly coverNames = new Map<string, string>();
+  private readonly imageNames = new Map<string, string>();
   private readonly component = new Component();
   private container: HTMLElement | null = null;
   private disposed = false;
@@ -562,7 +571,8 @@ export class ShareExporter {
     return { html: clean.innerHTML, undrawn, blocked, localRefs, diagrams: placed, unsourced };
   }
 
-  private resolveImage(name: string): { bytes: Promise<ArrayBuffer>; mime: string } | null {
+  /** The vault file a registered image name points at, or null when it cannot be found or is not a known image type. */
+  private resolveImageFile(name: string): { path: string; mime: string } | null {
     const entry = this.registry.entries().find(item => item.name === name);
     const fromPath = this.ownerPath.get(name);
     if (!entry || fromPath === undefined) return null;
@@ -578,14 +588,56 @@ export class ShareExporter {
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getFileByPath(path) : null;
-      if (file) return { bytes: this.app.vault.readBinary(file), mime };
+      if (file) return { path: file.path, mime };
     }
     return null;
   }
 
+  private resolveImage(name: string): { bytes: Promise<ArrayBuffer>; mime: string } | null {
+    const found = this.resolveImageFile(name);
+    const file = found ? this.app.vault.getFileByPath(found.path) : null;
+    return found && file ? { bytes: this.app.vault.readBinary(file), mime: found.mime } : null;
+  }
+
+  /**
+   * The asset name for a picture at a vault path (a cover, an annotated image): the name a note already registered for
+   * the same vault file when there is one, so the picture is encoded and embedded once; otherwise a new name owned by `owner`.
+   */
+  private assetNameFor(path: string, owner: string): string {
+    const target = normalizePath(path);
+    for (const entry of this.registry.entries()) {
+      if (this.ownerPath.has(entry.name) && this.resolveImageFile(entry.name)?.path === target) return entry.name;
+    }
+    const name = this.registry.nameFor(target);
+    if (!this.ownerPath.has(name)) this.ownerPath.set(name, owner);
+    return name;
+  }
+
+  /** Names the cover pictures and annotated images (once), after the notes have registered theirs. */
+  private nameExtraImages(): void {
+    this.coverNames.clear();
+    this.imageNames.clear();
+    for (const node of this.source.map.nodes) {
+      const cover = this.source.covers?.get(node.id);
+      if (cover) this.coverNames.set(node.id, this.assetNameFor(cover, node.path));
+    }
+    for (const item of this.source.map.canvasItems ?? []) {
+      const raw = item as unknown as Record<string, unknown>;
+      if (raw.kind === "annotated-image" && typeof raw.id === "string" && typeof raw.path === "string" && raw.path)
+        this.imageNames.set(raw.id, this.assetNameFor(raw.path, this.source.mapPath));
+    }
+  }
+
   /** Converts every vault image the rendered notes use, once. */
   async ensureImages(ticket: BuildTicket, onProgress: (progress: ShareProgress) => void): Promise<void> {
-    const names = [...new Set([...this.rendered.values()].flatMap(note => note.attachments))];
+    this.nameExtraImages();
+    const names = [
+      ...new Set([
+        ...[...this.rendered.values()].flatMap(note => note.attachments),
+        ...this.coverNames.values(),
+        ...this.imageNames.values()
+      ])
+    ];
     const todo = names.filter(name => !this.images.has(name));
     let done = names.length - todo.length;
     for (const name of todo) {
@@ -692,6 +744,9 @@ export class ShareExporter {
     const assets: Record<string, string> = {};
     if (options.includeDetail && options.includeImages)
       for (const [name, data] of this.images) if (data) assets[name] = data;
+    const covers: NonNullable<ShareOptions["covers"]> = Object.fromEntries(
+      [...this.coverNames].map(([id, asset]) => [id, { asset, ...this.source.coverLooks?.get(id) }])
+    );
     const payload = buildSharePayload(this.source.map, notesById, {
       includeDetail: options.includeDetail,
       includeImages: options.includeImages && options.includeDetail,
@@ -699,7 +754,10 @@ export class ShareExporter {
       vamVersion: this.config.vamVersion,
       exportedAt: (this.config.now?.() ?? new Date()).toISOString(),
       goal: this.source.goal,
-      assets
+      assets,
+      covers,
+      imageAssets: Object.fromEntries(this.imageNames),
+      plainText: plainWikilinks
     });
     return { payload, failed, notesWithContent, undrawn, blocked };
   }

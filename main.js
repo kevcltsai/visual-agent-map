@@ -74701,10 +74701,15 @@ ${note.detail.trim()}` : "",
     workspace.toggleClass("has-map-chat-open", this.chat.isOpen);
     this.focusChatHeroOnce();
   }
-  /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) the user did not ask to start blank. */
+  /**
+   * Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) the user did not ask to start
+   * blank. A map with a picture or a text block on it is not empty: the opening screen would cover them and block their menu.
+   */
   chatHero() {
+    var _a2;
     if (!this.chat || this.chat.hasMessages || !this.map || this.blankMapPaths.has(this.path)) return false;
-    return !this.aimLive() && this.map.nodes.length === 0;
+    if (this.aimLive() || this.map.nodes.length) return false;
+    return !((_a2 = this.map.canvasItems) == null ? void 0 : _a2.some((item) => item.kind === "image" || item.kind === "text" || isAnnotatedImage(item)));
   }
   /** Mounts the panel where it belongs now: the opening screen's place, or the first child of the workspace. */
   placeChatPanel() {
@@ -74747,19 +74752,21 @@ ${note.detail.trim()}` : "",
     this.focusChatHeroOnce();
   }
   focusChatHeroOnce() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const chat = this.chat;
-    if (!(chat == null ? void 0 : chat.isHero) || !this.map || this.chatHeroFocusedFor === this.map.id) return;
+    if (!chat || !this.map) return;
+    if (!chat.isHero && (this.map.nodes.length || ((_a2 = this.map.canvasItems) == null ? void 0 : _a2.length))) this.chatHeroFocusedFor = this.map.id;
+    if (!chat.isHero || this.chatHeroFocusedFor === this.map.id) return;
     if (this.hiddenTab()) return;
     const doc = this.contentEl.ownerDocument;
-    const active = (_a2 = doc == null ? void 0 : doc.activeElement) != null ? _a2 : null;
-    const heldElsewhere = active && active !== (doc == null ? void 0 : doc.body) && !this.contentEl.contains(active) && ((_b2 = active.isShown) == null ? void 0 : _b2.call(active)) !== false;
+    const active = (_b2 = doc == null ? void 0 : doc.activeElement) != null ? _b2 : null;
+    const heldElsewhere = active && active !== (doc == null ? void 0 : doc.body) && !this.contentEl.contains(active) && ((_c = active.isShown) == null ? void 0 : _c.call(active)) !== false;
     if (heldElsewhere) {
       this.chatHeroFocusedFor = this.map.id;
       return;
     }
     chat.focusInput();
-    const now = (_c = doc == null ? void 0 : doc.activeElement) != null ? _c : null;
+    const now = (_d = doc == null ? void 0 : doc.activeElement) != null ? _d : null;
     if (now && this.contentEl.contains(now)) this.chatHeroFocusedFor = this.map.id;
   }
   /** The pane's width and what the topic panel takes of it; null while the pane has no size yet (not shown, or a test). */

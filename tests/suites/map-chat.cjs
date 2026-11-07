@@ -2840,6 +2840,56 @@ integrationTest('B1 ui: an empty map shows the opening screen: the question and 
   const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl); eq(order.map(i => i === chat.heroTitleEl ? 'title' : 'input'), ['title', 'input']);
 });
 
+// A map with something on its canvas is not empty: the opening screen would sit on top of it (first anchor on an image-only map).
+const canvasItemsOnEmptyMap = {
+  'annotated image': { id: 'pic', kind: 'annotated-image', path: 'a.png', x: -200, y: 0, w: 320, h: 237, anchors: [], relations: [] },
+  'plain image': { id: 'pic', kind: 'image', path: 'a.png', x: -200, y: 0, w: 320, h: 237 },
+  'text block': { id: 'txt', kind: 'text', text: 'Note', x: 0, y: 0, w: 120 }
+};
+for (const [label, item] of Object.entries(canvasItemsOnEmptyMap)) {
+  integrationTest(`opening screen: a map with only this on it opens: ${label}, in the usual layout, so the item can be reached`, async () => {
+    const h = await harness({ empty: true }); await h.view.hydrate(); h.view.map.canvasItems = [{ ...item }]; h.repaint(); const chat = h.view.chat;
+    assert.equal(chat.isHero, false, 'no opening screen over the item');
+    assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')), undefined, 'no slot in the middle of the canvas');
+    assert.equal(h.workspace().children[0], chat.el, 'the window is the first child of the workspace, left of the canvas');
+    const box = element('div'); h.view.fillEmptyMap(box);
+    assert.ok(findAll(box, i => i.tag === 'button')[0].classes.includes('vam-empty-add'), 'the canvas offers the add-first button');
+  });
+}
+
+integrationTest('opening screen: the first item on the canvas moves the panel aside, and removing it brings the opening screen back', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const el = chat.el;
+  assert.equal(chat.isHero, true);
+  h.view.map.canvasItems = [{ ...canvasItemsOnEmptyMap['annotated image'] }]; h.repaint();
+  assert.equal(chat.isHero, false, 'the panel left the middle of the canvas');
+  assert.equal(chat.el, el, 'the same panel');
+  assert.equal(h.view.chat.isHero, false); assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')), undefined);
+  h.view.map.canvasItems = []; h.repaint();
+  assert.equal(chat.isHero, true, 'an empty map again: the opening screen is back');
+  assert.ok(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')));
+});
+
+integrationTest('opening screen: a map with only a picture keeps the window closed when the user closed it last time', async () => {
+  const h = await harness({ empty: true }); h.plugin.settings.mapChatOpen = false; await h.view.hydrate(); h.view.map.canvasItems = [{ ...canvasItemsOnEmptyMap['annotated image'] }]; h.repaint();
+  assert.equal(h.view.chat.isHero, false); assert.equal(h.view.chat.isOpen, false, 'still closed'); assert.equal(h.plugin.settings.mapChatOpen, false, 'the remembered choice is untouched');
+});
+
+integrationTest('opening screen: a frame left with no topics draws nothing, so the map is still empty and shows the opening screen', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.view.map.canvasItems = [{ id: 'frame', kind: 'boundary', members: ['gone'] }]; h.repaint();
+  assert.equal(h.view.chat.isHero, true, 'a frame with no topics is not content');
+  assert.ok(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')));
+});
+
+integrationTest('opening screen: removing the only item does not take the keyboard from the map, so Cmd+Z still undoes it; a map that opens empty still starts in the field', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.view.map.canvasItems = [{ ...canvasItemsOnEmptyMap['plain image'] }]; h.repaint();
+  assert.equal(h.view.chat.isHero, false);
+  h.page.doc.activeElement = null; h.view.map.canvasItems = []; h.repaint();
+  assert.equal(h.view.chat.isHero, true, 'back on the opening screen');
+  assert.notEqual(h.page.doc.activeElement, h.view.chat.inputEl, 'the field did not take the keyboard');
+  const blank = await harness({ empty: true }); await blank.view.hydrate(); blank.page.doc.activeElement = null; blank.repaint();
+  assert.equal(blank.page.doc.activeElement, blank.view.chat.inputEl, 'a map that opens empty starts in the field');
+});
+
 integrationTest('UX B6: on the opening screen the model menu is a quiet last line (after the message field and the empty-map button); in the window it is back in the head row', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; assert.equal(chat.isHero, true);
   const body = () => chat.bodyEl.children; const visible = body().filter(c => !c.hidden);

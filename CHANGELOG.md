@@ -2,40 +2,46 @@
 
 ## [Unreleased]
 
-- A map with only a picture or a text block on it now opens in the usual layout, instead of the opening screen covering the picture, so you can place the first anchor on it.
-- A text block under a topic has its own "+": topics added there follow the block in every layout, with the line drawn from the block. Deleting the block hands those topics back to the topic above, and turning it into a topic card makes them its subtopics; older versions show them under the topic above.
-- The "+" and "Add subtopic" lists show each topic type's shape and colour next to its name, the same as the type picker.
+## [0.31.0] - 2026-11-07
 
-### Edit the goal in place
+### Edit the goal, get recommendations
 
-The goal now sits in the row above the map, in small text with no frame, and the map no longer sits under it.
+The goal now sits in the row above the map: click it and type, for example "Pick a beef cut for a dinner party", and one press recommends new cards for it.
 
-- Click the goal to type in it. Enter, or a click elsewhere, saves; Esc cancels. Hover it for the two icons: recommend, and sort.
-- Saving the goal recommends again only when the text changed. Press the recommend icon to recommend again with the same goal.
-- "Hand all back to AI" moved to the map's "..." menu.
-
-### Recommend new cards by your goal
-
-One press recommends new cards for your goal and updates every card's tier in the same go.
-
-- You pick which recommended cards to add; each shows why it is needed and its tier, and nothing is written until you add it.
-- A parent card is never ranked lower than a card under it: it is raised to match, and one undo takes both back.
+- Each recommended card shows why it is needed and its tier, and nothing is written until you add it. Existing cards get new tiers in the same go; a parent is never ranked below a card under it.
 
 ### Mark points on a picture
 
 Turn a picture on the canvas into an annotated image, drop anchors on it such as "the cow's back", and link each anchor to a topic.
 
-- Right-click a picture and choose "Convert to annotated image…", then "Place anchor" and write a note for each point. An anchor links to topics by any of the six relation kinds.
-- The picture is the centre of the map: topics you create from anchors sit in a ring around it, with their lines always shown. Select a card and its lines stand out; move the picture and the ring moves with it.
-- Research and expansion read the image note, anchor notes and relations as text; they do not see the picture. Sharing and OPML or FreeMind export leave anchors out.
+- Topics made from anchors sit in a ring around the picture. Drag an anchor to move it, or right-click it to edit or delete. Research reads the notes as text, not the picture.
+- Select the image and ask the map chat "add anchors for the parts in this picture": the AI looks at it, places anchors and creates the topics. "Show me first" previews the plan; "Apply directly" can be undone.
 
-### Let the map chat look at a picture
+### A map chat that keeps going
 
-Select an annotated image, ask the map chat "add anchors for the parts in this picture", and the AI looks at it, places anchors with notes, creates a topic for each part and links them around the picture.
+Say once "build a full knowledge tree on this topic": the chat researches first, then fills in subtopics over several rounds on its own, and Stop or your next message takes over.
 
-- The selected image shows in the chat references as "Selected: annotated image · <note>", and the reply says "AI looked at this picture". There is no extra parent topic named after the picture.
-- Choose "Show me first" to see a plan with dashed preview points before anything changes, or "Apply directly" and take it back with "Undo this reply". The chat remembers your choice.
-- Works with Claude and Codex. A plain picture is not sent; the AI asks you to convert it to an annotated image first.
+- Add a thought while it is replying: the AI reads it midway, or right after the reply.
+- Ask for pictures on several selected topics and each one found becomes that topic's cover; search often finds none for some topics.
+- The input box is simpler, and turning on "Save map AI conversations" keeps conversations in your vault; it is off by default.
+
+### See what each map reads and uses
+
+A new "Data sources" button holds what this map's research, expansion and synthesis read: drag files, folders or mind maps into it, or search and add them. The token usage icon shows today, this month and this mind map, by action.
+
+### Share a map as it looks
+
+The shared HTML file now shows your map as you saved it, with its annotated pictures and anchors, card covers, card positions and folded branches, instead of a fresh layout. Plain pictures that are not annotated stay out for now.
+
+### Changed
+
+- The task dialog no longer picks sources; every AI task uses the map's "Data sources". The map chat's suggested prompts are gone.
+- One recommend button replaces the old grade, recalibrate and suggest buttons, and "Hand all back to AI" moved to the map's "..." menu.
+- A new map opens in its own tab, so work on the current map keeps running.
+
+### Fixes
+
+- A map with only a picture or text block opens in the usual layout, text blocks read as plain text and have their own "+", "+" lists show each type's shape and colour, "Show all" frames pictures, and card tool rows stay open as you reach them.
 
 ## [0.30.0] - 2026-11-05
 

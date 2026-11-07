@@ -6,14 +6,14 @@
 
 **Start with a question. See the pieces. Follow the ideas worth exploring.** Build a visual research map, or talk through a new idea in Coffee Tables. Everything you keep is editable Markdown in your vault.
 
-[**Get started**](#get-started) · [See the 0.30.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.30.0) · [Installation guide](INSTALL.md)
+[**Get started**](#get-started) · [See the 0.31.0 release](https://github.com/kevcltsai/visual-agent-map/releases/tag/0.31.0) · [Installation guide](INSTALL.md)
 
 ![Example Visual Agent Map research map with connected topic cards in Obsidian](assets/screenshots/map-overview.png)
 
 ## Two ways to explore
 
-- **Visual maps.** Break a question into topics and research any branch with AI. Draft a multi-level outline, review suggestions before adding them, pick a note style for each topic type (section structure, voice, format rules and how a note is updated, such as Textbook; or write your own in Markdown), merge related topics, and research several topics in the background. Manual mapping needs no AI.
-  - **Talk to your map.** Open the AI chat beside the map and say what you want in plain language: build a whole map from one sentence, add, move or rename topics, research or expand a branch, find pictures, or edit the notes you point it to. Large changes are shown as a plan first, and every action gets a result line.
+- **Visual maps.** Break a question into topics and research any branch with AI. Draft a multi-level outline, review suggestions before adding them, pick a note style for each topic type (section structure, voice, format rules and how a note is updated, such as Textbook; or write your own in Markdown), merge related topics, research several topics in the background, give a map its own data sources, and mark points on a picture with anchors linked to topics. Manual mapping needs no AI.
+  - **Talk to your map.** Open the AI chat beside the map and say what you want in plain language: build a whole map from one sentence, add, move or rename topics, research or expand a branch, find pictures, place anchors on a selected annotated image, or edit the notes you point it to. Large changes are shown as a plan first, and every action gets a result line.
   - **Quick or Standard.** Quick answers from the model's own knowledge without the web; Standard searches the web and may add images. Choose per research or expansion.
 - **Coffee Tables.** Bring an unfinished idea to a conversation with simulated AI guests, then revisit the observer's insights.
 
@@ -36,7 +36,7 @@ Setup details, troubleshooting, and known limitations are in [INSTALL.md](INSTAL
 
 ## Privacy
 
-VAM has no telemetry and does not store API keys. AI tasks send relevant content through your local CLI to OpenAI or Anthropic, so your provider allowance or charges may apply. The map AI chat sends the map outline, the titles of your other maps, the cards you select or reference, the note open beside the map (in full, shown as a removable chip), notes or text you drop in, and the last few messages; it can edit those notes and create new ones in your vault. VAM runs the Codex or Claude Code program you installed; when you use Standard research or picture search, that program searches the web for you (Quick mode does not). Thumbnails of picture candidates are loaded directly from the websites that host them. A share file is saved in your vault or the place you choose, and VAM never uploads it; whether to publish it is up to you. Images in a share file that link to the web are loaded by the reader's browser from the original site.
+VAM has no telemetry and does not store API keys. AI tasks send relevant content through your local CLI to OpenAI or Anthropic, so your provider allowance or charges may apply. The map AI chat sends the map outline, the titles of your other maps, the cards you select or reference, an annotated image you select (the picture itself), the note open beside the map (in full, shown as a removable chip), notes or text you drop in, and the last few messages; it can edit those notes and create new ones in your vault. Research, expansion and synthesis also read the items in the map's data sources. Saving map AI conversations is off by default; when turned on, they are stored in your vault. VAM runs the Codex or Claude Code program you installed; when you use Standard research or picture search, that program searches the web for you (Quick mode does not). Thumbnails of picture candidates are loaded directly from the websites that host them. A share file is saved in your vault or the place you choose, and VAM never uploads it; whether to publish it is up to you. Images in a share file that link to the web are loaded by the reader's browser from the original site.
 
 ## Credits and license
 

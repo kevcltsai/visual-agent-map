@@ -1709,3 +1709,82 @@ test('sharing viewer images: covers follow the map card (position, mask window, 
   });
 });
 
+
+// ---- share-match-map F1: a ring keeps the sizes the map measured, so fold changes and Auto layout land where the map puts them.
+const ringFixture = () => {
+  const layoutText = load('map-layout-text.ts');
+  const format = load('experiences/sharing/share-format.ts');
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+  // What the map measured for each ring card (header, tag and relation rows make it taller than the viewer's card).
+  const mapHeight = { a: 425, b: 353, c: 380, d: 425, e: 340, f: 410, g: 353, h: 425 };
+  const heightOf = id => mapHeight[id] ?? 340;
+  const nodes = [];
+  ids.forEach((id, index) => {
+    nodes.push({ id, path: `${id}.md`, parentId: null, x: index * 300, y: -900, collapsed: true });
+    nodes.push({ id: `${id}1`, path: `${id}1.md`, parentId: id, x: index * 300 + 400, y: -900, collapsed: false });
+    nodes.push({ id: `${id}2`, path: `${id}2.md`, parentId: id, x: index * 300 + 400, y: -700, collapsed: false });
+  });
+  const anchors = ids.map((id, index) => ({ id: `an${id}`, at: { kind: 'image-2d', x: (index + 0.5) / ids.length, y: 0.2 + (0.6 * ((index * 3) % 8)) / 8 } }));
+  const items = [{ id: 'img', kind: 'annotated-image', path: 'img.png', x: 0, y: 0, w: 720, h: 540, anchors, relations: ids.map(id => ({ kind: 'related', from: `an${id}`, to: id, ring: true })) }];
+  // The saved map is the map's own arrangement of the ring with its sizes.
+  const saved = layoutText.solveRings(nodes, items, heightOf, undefined, { direction: 'right' });
+  const map = { version: 1, id: 'ring-map', title: 'Ring map', nodes: saved.nodes, canvasItems: saved.items, viewport: { x: 0, y: 0, zoom: 1 } };
+  const options = ringHeights => ({ includeDetail: false, includeImages: false, language: 'en', vamVersion: '1', exportedAt: '2026-11-07T00:00:00.000Z', ...(ringHeights ? { ringHeights } : {}) });
+  const ringHeights = Object.fromEntries(ids.map(id => [id, mapHeight[id]]));
+  // The map's answer to the same action: the whole arrangement again (toggleCollapsed and arrangeAll).
+  const mapAfter = toggled => {
+    const copy = JSON.parse(JSON.stringify(map.nodes));
+    if (toggled) copy.find(node => node.id === toggled).collapsed = false;
+    return layoutText.arrangeMapWithRings(copy, map.canvasItems, undefined, heightOf, { direction: 'right' }, {}).nodes;
+  };
+  return { ids, map, saved, format, options, ringHeights, mapAfter };
+};
+
+test('sharing viewer ring: the payload carries the map\'s card height for ring members only, and a map without a ring is unchanged', () => {
+  const { ids, map, format, options, ringHeights } = ringFixture();
+  const withHeights = format.buildSharePayload(map, {}, options(ringHeights));
+  for (const node of withHeights.nodes) assert.equal(node.ringHeight, ids.includes(node.id) ? ringHeights[node.id] : undefined, node.id);
+  const without = format.buildSharePayload(map, {}, options());
+  assert.ok(without.nodes.every(node => !('ringHeight' in node)), 'no heights given: no key written');
+  const plain = { ...map, canvasItems: undefined };
+  delete plain.canvasItems;
+  assert.equal(format.serializeShareJson(format.buildSharePayload(plain, {}, options())), format.serializeShareJson(format.buildSharePayload(plain, {}, options({}))));
+  const bad = format.buildSharePayload(map, {}, options({ a: Number.NaN, b: -3, c: 1e9, d: 400.4 }));
+  assert.deepEqual(bad.nodes.filter(node => 'ringHeight' in node).map(node => [node.id, node.ringHeight]), [['d', 400]]);
+});
+
+test('sharing viewer ring: expanding a ring root and Auto layout land the ring where the map puts it (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const { ids, map, format, options, ringHeights, mapAfter } = ringFixture();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-ring-'));
+  try {
+    const payloadFile = path.join(directory, 'ring.json');
+    fs.writeFileSync(payloadFile, JSON.stringify(format.buildSharePayload(map, {}, options(ringHeights))));
+    const out = path.join(directory, 'ring.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', payloadFile], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const page = pageTools(send);
+      const ringCards = () => page.evaluate(`Object.fromEntries(${JSON.stringify(ids)}.map(id => { const c = document.querySelector('[data-node-id="' + id + '"]'); return [id, c && [c.offsetLeft, c.offsetTop]]; }))`);
+      const result = {};
+      result.opened = await ringCards();
+      await page.click('[data-node-id="a"] .vam-collapse-button');
+      await settled(send, 400);
+      result.expanded = await ringCards();
+      result.childrenShown = await page.evaluate(`['a1', 'a2'].map(id => !!document.querySelector('[data-node-id="' + id + '"]'))`);
+      // Auto layout from the menu, on the state the map would have after the same fold change.
+      await page.click('.vam-layout-button');
+      await page.evaluate(`Array.from(document.querySelectorAll('.vam-layout-menu button')).at(-1).click()`);
+      await settled(send, 400);
+      result.autoLaid = await ringCards();
+      return result;
+    });
+    const positions = list => Object.fromEntries(ids.map(id => [id, (() => { const node = list.find(item => item.id === id); return [node.x, node.y]; })()]));
+    assert.deepEqual(report.opened, positions(map.nodes), 'opening keeps the saved places');
+    assert.deepEqual(report.childrenShown, [true, true]);
+    assert.deepEqual(report.expanded, positions(mapAfter('a')), 'after expanding one root every ring card stays where the map leaves it');
+    assert.deepEqual(report.autoLaid, positions(mapAfter('a')), 'Auto layout lands the ring where the map does');
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});

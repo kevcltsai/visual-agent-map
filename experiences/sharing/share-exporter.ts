@@ -68,6 +68,8 @@ export interface ShareSource {
     string,
     { frame?: { x: number; y: number; w: number; h: number } | null; size?: number; position?: string }
   >;
+  /** ring member topic id -> its rendered card height in the map; the viewer solves the ring with it. Absent for maps without rings. */
+  ringHeights?: ReadonlyMap<string, number>;
   /** Vault path of the map file (only used to build the leak scan's forbidden strings; never written out). */
   mapPath: string;
 }
@@ -757,6 +759,7 @@ export class ShareExporter {
       assets,
       covers,
       imageAssets: Object.fromEntries(this.imageNames),
+      ...(this.source.ringHeights?.size ? { ringHeights: Object.fromEntries(this.source.ringHeights) } : {}),
       plainText: plainWikilinks
     });
     return { payload, failed, notesWithContent, undrawn, blocked };

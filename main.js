@@ -31413,10 +31413,15 @@ var SOURCE_REF_LOOSE = sourceRefPattern(false);
 var SOURCE_REF_STRICT = sourceRefPattern(true);
 var SOURCE_LEAD_HAN = /[見见據据依參参如另自從从於于與与及和或至]$/;
 var SOURCE_LEAD_EN = /^(?:see|cf|per|from|in|and|to|by|also)$/i;
-var SOURCE_SECTION_NAME = /^(?:\p{Script=Han}{0,4}(?:來源|来源|出處|出处)|參考資料|参考资料|sources?|references?)$/iu;
+var SOURCE_LEAD_NOT = /(?:參與|参与|關於|关于|屬於|属于|給與|给与)$/;
+var SOURCE_SECTION_FIXED = new Set(
+  ["\u4F86\u6E90", "\u6765\u6E90", "\u51FA\u8655", "\u51FA\u5904", "\u53C3\u8003\u8CC7\u6599", "\u53C2\u8003\u8D44\u6599", "Sources", "References"].map(
+    (name2) => name2.toLocaleLowerCase()
+  )
+);
 function leadsKeyword(before) {
   const head = before.replace(/[ \t]+$/, "");
-  if (/\p{Script=Han}$/u.test(head)) return SOURCE_LEAD_HAN.test(head);
+  if (/\p{Script=Han}$/u.test(head)) return SOURCE_LEAD_HAN.test(head) && !SOURCE_LEAD_NOT.test(head);
   const word = /([A-Za-z]+)$/.exec(head);
   return word ? SOURCE_LEAD_EN.test(word[1]) : true;
 }
@@ -31430,18 +31435,22 @@ function sourceCount(text12, extraNames) {
     if (code[index]) return;
     const heading = HEADING_ANY.exec(line);
     if (heading) {
-      const depth = heading[1].length;
-      if (level && depth <= level) level = 0;
-      const name2 = heading[2].trim();
-      if (!level && (names3.has(key2(name2)) || SOURCE_SECTION_NAME.test(name2))) level = depth;
+      const name2 = key2(heading[2]);
+      level = names3.has(name2) || SOURCE_SECTION_FIXED.has(name2) ? heading[1].length : 0;
       return;
     }
-    if (level && /^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+|\[\^[^\]\s]+\]:)/.test(line)) count2++;
+    if (level && /^(?:(?:[-*+]|\d+[.)])[ \t]+|\[\^[^\]\s]+\]:)/.test(line)) count2++;
   });
   return count2;
 }
 function withoutSourceRefs(text12) {
   return text12.replace(SOURCE_REF_LOOSE, "");
+}
+function looseNewDraft(text12, oldDetail) {
+  const same = new Set(
+    oldDetail.replace(/\r\n/g, "\n").split("\n").map((line) => line.trim()).filter(Boolean)
+  );
+  return text12.split("\n").map((line) => /^[ \t]*>/.test(line) || same.has(line.trim()) ? line : withoutSourceRefs(line)).join("\n");
 }
 function withoutOldSourceRefs(text12, max) {
   if (!max) return text12;
@@ -31462,7 +31471,7 @@ function keepDroppedContent(input2) {
   const logHeadings = template2.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]);
   const check = (detail2, added2 = "") => checkMergePreservation({
     sourceTexts: [withoutOldSourceRefs(oldDetail, sourceMax)],
-    mergedTexts: [withoutSourceRefs(detail2), withoutSourceRefs(input2.summary), added2],
+    mergedTexts: [looseNewDraft(detail2, oldDetail), withoutSourceRefs(input2.summary), added2],
     mergedLinkTexts: [input2.references],
     logHeadings
   });

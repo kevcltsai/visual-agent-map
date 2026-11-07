@@ -489,7 +489,12 @@ test('B1-R2: without a sources section, or past the last item, a source number i
   assert.equal(keep('（見來源 9）', 'nothing').restored, 1, '9 of 4 sources');
   assert.equal(keep('（見來源 4）', 'nothing').restored, 0, '4 of 4 sources');
   // footnote definitions and ordered items count as the sources section too
-  assert.equal(keep('（見來源 2）', 'nothing', noSources, '\n\n### Sources\n[^1]: https://a.example/1\n[^2]: https://a.example/2').restored >= 0, true);
+  {
+    const defs = '\n\n### Sources\n[^1]: https://a.example/1\n[^2]: https://a.example/2';
+    const first = noSources.sections[0].name;
+    const out = keepDroppedContent({ ...base, template: noSources, oldDetail: `### ${first}\n（見來源 2）${defs}\n`, newDetail: `### ${first}\nnothing${defs}\n` });
+    assert.equal(out.restored, 0);
+  }
   assert.equal(keep('（見來源 2）', 'nothing', noSources, '\n\n## 參考資料\n1. 甲\n2. 乙').restored, 0);
 });
 
@@ -512,4 +517,34 @@ test('M-R2-1: an unclosed mermaid fence does not hide the text after it; a close
   // Upper-case "Mermaid" is not a chart for noteNumbers either, so its numbers still count.
   const upper = keepDroppedContent({ ...base, template: noSources, oldDetail: `### ${first}\n\`\`\`Mermaid\n成長 78%\n\`\`\`\n`, newDetail: `### ${first}\nnothing\n` });
   assert.equal(upper.restored >= 1, true);
+});
+
+// ---- review round 3: a run on its own output restores nothing again; lead-in words; source counting ----
+test('R3: every restoring case is idempotent (old == new == the output restores nothing and changes nothing)', () => {
+  const first = noSources.sections[0].name;
+  for (const line of ['資料來源 30。', '收入來源 3，', '來源 99。', '來源 12 表示法', 'source 12 reports were read', 'Data sources 25.', '參與來源 3。']) {
+    const once = keep(line, 'nothing');
+    assert.equal(once.restored >= 1, true, line);
+    const again = keepDroppedContent({ ...base, template: noSources, oldDetail: once.detail, newDetail: once.detail });
+    assert.equal(again.restored, 0, line);
+    assert.equal(again.detail, once.detail, line);
+    // the output as the older draft and a fresh rewrite as the new one: restored once, not nested
+    const rewritten = keepDroppedContent({ ...base, template: noSources, oldDetail: once.detail, newDetail: `### ${first}\nnothing\n` });
+    assert.equal((rewritten.detail.match(/\[!note\]/g) ?? []).length, 1, line);
+  }
+});
+
+test('R3: "參與來源 3。" "關於來源 3。" "屬於來源 3。" are modified, not lead-in words; "見來源 3" still is', () => {
+  for (const line of ['參與來源 3。', '关于来源 3。', '關於來源 3。', '屬於來源 3。', '属于来源 3。', '给与來源 3。']) assert.equal(keep(line, 'nothing').restored, 1, line);
+  for (const line of ['參見來源 3。', '詳見來源 3。', '見來源 3。']) assert.equal(keep(line, 'nothing').restored, 0, line);
+});
+
+test('R3: sources are the items at indent 0; only a sources heading starts the section and any heading ends it', () => {
+  const sub = '\n\n### 來源\n- 甲\n  - 備註一\n  - 備註二\n  - 備註三\n- 乙\n  - 備註一\n  - 備註二\n  - 備註三\n';
+  assert.equal(keep('來源 7。', 'nothing', noSources, sub).restored, 1, '2 sources with 3 sub-items each: 7 is a number');
+  assert.equal(keep('來源 2。', 'nothing', noSources, sub).restored, 0, '2 of 2');
+  const body = '\n\n### 收入來源\n- 薪資\n- 股利\n- 租金\n';
+  assert.equal(keep('來源 2。', 'nothing', noSources, body).restored, 1, 'a body section is not the sources section');
+  const ended = '\n\n### 來源\n1. 甲\n\n#### 附註\n1. 乙\n2. 丙\n';
+  assert.equal(keep('來源 2。', 'nothing', noSources, ended).restored, 1, 'a sub-heading ends the section');
 });

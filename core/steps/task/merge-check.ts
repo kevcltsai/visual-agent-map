@@ -175,11 +175,17 @@ const SOURCE_REF_STRICT = sourceRefPattern(true);
 // source", "Data sources") makes the number a count of something.
 const SOURCE_LEAD_HAN = /[見见據据依參参如另自從从於于與与及和或至]$/;
 const SOURCE_LEAD_EN = /^(?:see|cf|per|from|in|and|to|by|also)$/i;
-const SOURCE_SECTION_NAME = /^(?:\p{Script=Han}{0,4}(?:來源|来源|出處|出处)|參考資料|参考资料|sources?|references?)$/iu;
+// Words that end in a lead-in character but are not lead-ins ("參與來源 3": take part in, not "參 + 與").
+const SOURCE_LEAD_NOT = /(?:參與|参与|關於|关于|屬於|属于|給與|给与)$/;
+const SOURCE_SECTION_FIXED = new Set(
+  ["來源", "来源", "出處", "出处", "參考資料", "参考资料", "Sources", "References"].map(name =>
+    name.toLocaleLowerCase()
+  )
+);
 
 function leadsKeyword(before: string): boolean {
   const head = before.replace(/[ \t]+$/, "");
-  if (/\p{Script=Han}$/u.test(head)) return SOURCE_LEAD_HAN.test(head);
+  if (/\p{Script=Han}$/u.test(head)) return SOURCE_LEAD_HAN.test(head) && !SOURCE_LEAD_NOT.test(head);
   const word = /([A-Za-z]+)$/.exec(head);
   return word ? SOURCE_LEAD_EN.test(word[1]) : true;
 }
@@ -195,13 +201,13 @@ function sourceCount(text: string, extraNames: string[]): number {
     if (code[index]) return;
     const heading = HEADING_ANY.exec(line);
     if (heading) {
-      const depth = heading[1].length;
-      if (level && depth <= level) level = 0;
-      const name = heading[2].trim();
-      if (!level && (names.has(key(name)) || SOURCE_SECTION_NAME.test(name))) level = depth;
+      // Any heading ends the sources section (a sub-heading too); only the template's names and a fixed list start one.
+      const name = key(heading[2]);
+      level = names.has(name) || SOURCE_SECTION_FIXED.has(name) ? heading[1].length : 0;
       return;
     }
-    if (level && /^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+|\[\^[^\]\s]+\]:)/.test(line)) count++;
+    // Only the items at indent 0: the sub-items of a source are not sources.
+    if (level && /^(?:(?:[-*+]|\d+[.)])[ \t]+|\[\^[^\]\s]+\]:)/.test(line)) count++;
   });
   return count;
 }
@@ -209,6 +215,24 @@ function sourceCount(text: string, extraNames: string[]): number {
 /** "來源 1", "see source 2", "sources 1, 2": a pointer to a numbered source, not a quantity. Only when the end of the line, punctuation, a bracket or a short verb follows; a unit, a noun or a year stays a number. The new draft is read loosely (skipping more only reports more). */
 function withoutSourceRefs(text: string): string {
   return text.replace(SOURCE_REF_LOOSE, "");
+}
+
+/**
+ * The new draft line by line: a line the older draft has word for word, and a quote line (`> `, what this feature wrote
+ * on an earlier run), stay as written; the rest is read loosely. So a run on its own output restores nothing again.
+ */
+function looseNewDraft(text: string, oldDetail: string): string {
+  const same = new Set(
+    oldDetail
+      .replace(/\r\n/g, "\n")
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean)
+  );
+  return text
+    .split("\n")
+    .map(line => (/^[ \t]*>/.test(line) || same.has(line.trim()) ? line : withoutSourceRefs(line)))
+    .join("\n");
 }
 
 /**
@@ -259,7 +283,7 @@ export function keepDroppedContent(input: {
   const check = (detail: string, added = "") =>
     checkMergePreservation({
       sourceTexts: [withoutOldSourceRefs(oldDetail, sourceMax)],
-      mergedTexts: [withoutSourceRefs(detail), withoutSourceRefs(input.summary), added],
+      mergedTexts: [looseNewDraft(detail, oldDetail), withoutSourceRefs(input.summary), added],
       mergedLinkTexts: [input.references],
       logHeadings
     });

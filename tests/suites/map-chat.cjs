@@ -4120,14 +4120,15 @@ integrationTest('B3 find_images: the target card is deleted while the search run
   assert.equal(lastImages(h, 0).state, 'empty'); assert.match(lastImages(h, 0).reason, /no longer on the map/); assert.equal(h.contents.get(file), before);
   assert.match(visibleText(h.view.chat.logEl), /Put pictures into 1 topic\(s\), 1 not found/);
 });
-integrationTest('B3 find_images: a card that already has a cover keeps it - only the note gets the picture; a card without a cover goes through the cover step with the same picture', async () => {
-  const { h } = await imageHarness(); h.control.search = perQuery; const calls = [];
-  h.view.chatCoverFromPicture = async (block, candidate) => { calls.push([block.nodeId, candidate.url]); };
+integrationTest('B3 find_images: the note gets the picture and, when the cover step has bytes for it, the cover is written inside the same write - and the two are ONE undo step', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; const calls = []; const undone = [];
+  h.view.chatCoverBytes = async (block, candidate) => ({ name: `${block.nodeId}.png`, data: new ArrayBuffer(4), url: candidate.url });
+  h.view.chatCoverWrite = async (block, cover) => { calls.push([block.nodeId, cover.name]); h.view.history.push({ undo: async () => { undone.push(`cover ${block.nodeId}`); }, redo: async () => {}, label: 'cover' }); return false; };
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' }); const detailBefore = (await h.note('a')).detail;
   await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await waitImages(h);
-  eq(calls.map(c => c[0]).sort(), [h.ids.a, h.ids.b].sort()); for (const [, url] of calls) assert.match(url, /^https:\/\/img\.example\//);
-  assert.match((await h.note('a')).detail, /!\[Pic espresso Body\]/);
-  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.ok(source.includes('collapseSince(mark, t("ui.map_chat_images_undo_label"))'), 'the note write and the cover are one undo step');
+  eq(calls.map(c => c[0]).sort(), [h.ids.a, h.ids.b].sort()); assert.match((await h.note('a')).detail, /!\[Pic espresso Body\]/);
+  let steps = 0; while (h.view.history.undoEntry.label !== 'earlier') { const entry = h.view.history.undo(); await entry.undo(); steps++; }
+  assert.equal(steps, 2, 'two cards, one undo step each (the note write and the cover are not two)'); assert.equal(undone.length, 2, 'each step took its cover back too'); assert.equal((await h.note('a')).detail, detailBefore, 'the Detail is back to what it was');
 });
 integrationTest('B3 find_images: a plan is not asked for 16 find_images (or one over 16 cards), but is for create_map or 16 add_child beside it; the plan counts one call per card', async () => {
   const { h } = await imageHarness(); h.control.search = perQuery; h.control.reply = async () => ({ reply: 'pictures', actions: Array.from({ length: 16 }, () => findAct(h, 'a')), rejected: [] });
@@ -4140,6 +4141,54 @@ integrationTest('B3 find_images: a plan is not asked for 16 find_images (or one 
   const { h: h3 } = await imageHarness();
   h3.control.reply = async () => ({ reply: 'plan', actions: [{ kind: 'create_map', title: 'New map' }, findAct(h3, 'a')], rejected: [] });
   h3.view.chat.reset(); h3.type('New map with a picture'); await h3.view.sendMapChat(); assert.ok(planCard(h3).length >= 1, 'create_map still asks');
+});
+const pngBytes = () => { const b = new Uint8Array(33); b.set([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]); new DataView(b.buffer).setUint32(16, 400); new DataView(b.buffer).setUint32(20, 200); return b.buffer; };
+integrationTest('R1-7 place: the cover download is outside the write queue - a slow download holds no other card back, ends after its time limit (the picture stays in the note), and ends at once on Stop (nothing written)', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; const hang = deferred(); h.view.chatHasNoCover = () => true;
+  h.view.chatFetchImage = async url => { if (/Body/.test(decodeURIComponent(url))) await hang.promise; return pngBytes(); };
+  await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await withTimeout(until(() => lastImages(h, 1).state === 'ready'));
+  assert.equal(lastImages(h, 0).state, 'searching', 'Body is still downloading its cover'); assert.match((await h.note('b')).detail, /!\[Pic espresso Mind\]/, 'Mind was written meanwhile');
+  assert.doesNotMatch((await h.note('a')).detail, /!\[/, 'nothing yet for Body'); h.clock.advance(15000); await waitImages(h);
+  assert.equal(lastImages(h, 0).state, 'ready', 'after the time limit the picture goes into the note without a cover'); assert.match((await h.note('a')).detail, /!\[Pic espresso Body\]/);
+  const { h: h2 } = await imageHarness(); h2.control.search = perQuery; h2.view.chatHasNoCover = () => true; h2.view.chatFetchImage = () => new Promise(() => {});
+  const file = noteFile(h2, 'a'); const before = h2.contents.get(file); await apply(h2, [findAct(h2, 'a')]); await withTimeout(until(() => h2.control.searches.length === 1)); await tick(); await tick();
+  find(h2.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).click(); await tick(); await tick();
+  assert.equal(lastImages(h2).state, 'stopped'); assert.equal(h2.contents.get(file), before, 'a stop during the download writes nothing'); h2.clock.advance(15000); await tick(); assert.equal(h2.contents.get(file), before);
+});
+integrationTest('R1-6 place: the cover and the note are written inside ONE mutate, and a reply being applied at that moment (its ownWrites, an open group) cannot split them', async () => {
+  const { h } = await imageHarness(); h.control.search = perQuery; h.view.chatHasNoCover = () => true; h.view.chatFetchImage = async () => pngBytes();
+  const pushed = []; h.view.chatCoverWrite = async block => { h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'cover' }); return false; };
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' }); h.control.mutates = 0;
+  h.view.history.openGroup(); const next = deferred();
+  const reply = h.view.history.ownWrites(async () => { await next.promise; });
+  await apply(h, [findAct(h, 'a')]); await waitImages(h);
+  assert.equal(h.control.mutates >= 1, true); const grouped = h.view.history.closeGroup(); next.resolve(); await reply;
+  assert.ok(grouped.length <= 1, `the group holds the picture whole or nothing of it: ${grouped.length}`);
+  const loose = []; while (h.view.history.undoEntry && h.view.history.undoEntry.label !== 'earlier') loose.push(h.view.history.undo());
+  assert.equal(grouped.length + loose.length, 1, 'one entry for the note and the cover together');
+});
+integrationTest('R1-8 find_images: starting a new conversation stops the picture searches; a late result writes nothing', async () => {
+  const { h } = await imageHarness(); const gate = deferred(); let probed = 0; h.control.search = async () => { await gate.promise; return imageItems(2); }; h.control.probe = async found => { probed++; return found; };
+  const file = noteFile(h, 'a'); const before = h.contents.get(file); await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => h.control.searches.length === 1));
+  h.view.newChatConversation(); assert.equal(h.control.searches[0].signal.aborted, true); assert.equal(h.view.chatImageSearches.size, 0);
+  gate.resolve(); await tick(); await tick(); assert.equal(probed, 0); assert.equal(h.contents.get(file), before);
+});
+integrationTest('R1-9 save: a card that was refused (locked, busy) is written with its own reason, never as "no loadable picture"; the heading no longer says candidates', async () => {
+  const { h, chat } = await imageHarness(); h.control.search = perQuery; h.view.canSelectTopics = () => true; await h.view.setAiLock([h.node('a')], true); await h.view.hydrate();
+  const lines = await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await waitImages(h); chat.finish('Looking.', lines);
+  saveButton(h).click(); await withTimeout(until(() => savedPaths(h).length === 1)); const text = h.contents.get(savedPaths(h)[0]);
+  assert.match(text, /\*\*Pictures for Body\*\*\n\n[^\n]*locked/i); assert.doesNotMatch(text, /Pictures for Body\*\*\n\nNo loadable picture/); assert.doesNotMatch(text, /candidate/i); assert.match(text, /\*\*Pictures for Mind\*\*/);
+  const { h: h2, chat: chat2 } = await imageHarness(); h2.control.probe = async () => []; const l2 = await apply(h2, [findAct(h2, 'a')]); await waitImages(h2); chat2.finish('Looking.', l2);
+  saveButton(h2).click(); await withTimeout(until(() => savedPaths(h2).length === 1)); assert.match(h2.contents.get(savedPaths(h2)[0]), /Pictures for Body\*\*\n\nNo loadable picture was found/, 'a plain miss keeps its sentence');
+});
+integrationTest('R1-10 find_images: one action per card (what the model sends) is ONE result line and one progress line - no row per action, no 0/1 each', async () => {
+  const { h, chat } = await imageHarness(); const gate = deferred(); h.control.search = async query => { await gate.promise; return perQuery(query); };
+  const keys = ['a', 'b', 'c', 'root']; const titles = { a: 'Body', b: 'Mind', c: 'REM', root: 'Sleep' };
+  const lines = await apply(h, keys.map(k => findAct(h, k, { direction: `espresso ${titles[k]}` }))); chat.finish('Looking.', lines);
+  eq(lines.map(l => l.status), ['done', 'done', 'done', 'done'], 'one line per action for the caller'); eq(resultTexts(h), ['Looking for pictures: 0 of 4 done (label(claude:sonnet))']);
+  gate.resolve(); await waitImages(h); await tick();
+  eq(resultTexts(h), ['Pictures put into 4 topic(s) (label(claude:sonnet))']); assert.equal(chat.transcript().at(-1).lines.length, 1, 'the saved turn has one line');
+  assert.equal(findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images')).length, 1, 'one result block'); assert.equal(imageRows(h).length, 4);
 });
 integrationTest('B3 results stay under the reply that asked for them when the next message is sent', async () => {
   const { h, chat } = await imageHarness(); await readyImages(h, 2);
@@ -4176,6 +4225,102 @@ integrationTest('B3 find_images: nothing is written because of what the reply sa
   const { h: h3, chat: chat3 } = await imageHarness(); h3.control.search = async () => []; const before3 = h3.contents.get(noteFile(h3, 'a'));
   const lines3 = await apply(h3, [findAct(h3, 'a')]); chat3.finish(hostile, lines3); await waitImages(h3);
   assert.equal(h3.contents.get(noteFile(h3, 'a')), before3, 'no search result: nothing is written, whatever the reply says');
+});
+// ---- R1 (review round 1) ----
+integrationTest('R1-1 find_images: the search words never carry a link or a domain from the reply; in a research conversation (or a continuation round) the direction is ignored', async () => {
+  const { h } = await imageHarness(); h.control.search = async () => [];
+  await apply(h, [findAct(h, 'a', { direction: 'https://evil.example/x.png?d=secret steak\nsecond\u0007 line' })]); await waitImages(h);
+  assert.equal(h.control.searches.length, 1); assert.equal(h.control.searches[0].query, 'steak second line', 'the URL, the control character and the newline are gone');
+  const { h: h2 } = await imageHarness(); h2.control.search = async () => [];
+  await apply(h2, [findAct(h2, null, { nodeIds: [h2.ids.a, h2.ids.b], direction: 'see evil.example/path and http://x.test/y now ' + 'w'.repeat(200) })]); await waitImages(h2);
+  for (const s of h2.control.searches) { assert.doesNotMatch(s.query, /evil|example|x\.test|:\/\/|http/i); assert.ok(s.query.length <= 80, `limited to 80: ${s.query.length}`); }
+  const { h: h3 } = await imageHarness(); h3.control.search = async () => []; h3.view.chatStartedResearch = true;
+  await apply(h3, [findAct(h3, null, { nodeIds: [h3.ids.c, h3.ids.a, h3.ids.root], direction: 'https://evil.example/x.png?d=secret' })]); await waitImages(h3);
+  eq(h3.control.searches.map(s => s.query).sort(), ['Body REM', 'Sleep', 'Sleep Body'], 'a research conversation: parent title + card title, never the model\'s words');
+  const { h: h4 } = await imageHarness(); h4.control.search = async () => [];
+  const work = { controller: new AbortController(), research: [], researchTargets: 0, researchKeys: new Set(), created: [], expand: [], otherBackground: false };
+  await withTimeout(h4.view.applyMapChatActions({ actions: [findAct(h4, 'c', { direction: 'https://evil.example/x.png' })], rejected: [] }, { mdHashes: {}, topicHashes: topicBaseline(h4) }, undefined, undefined, { work })); await waitImages(h4);
+  eq(h4.control.searches.map(s => s.query), ['Body REM'], 'an automatic continuation round reads research too');
+  const { h: h5 } = await imageHarness(); h5.control.search = async () => [];
+  await apply(h5, [findAct(h5, 'a', { direction: 'https://evil.example/x.png' })]); await waitImages(h5);
+  eq(h5.control.searches.map(s => s.query), ['Body'], 'a cleaned-empty direction falls back to the card title');
+});
+integrationTest('R1-2 find_images: the picture title that goes into the note is a whitelist - no backtick, %, $, =, brackets, <, >, backslash, |, ! or # reaches the note, and the text after it is untouched', async () => {
+  for (const title of ['A `$= dv.x()` tail', '%% hidden %% end', '![[x]] and ![[y|z]] #tag a=b $c', '<img src=x> [b] \\ c | d', '`$=`', '%%']) {
+    const { h } = await imageHarness(); h.control.search = async () => [{ title, url: 'https://img.example/p.jpg', source: 'https://page.example/p' }];
+    await h.repo.updateNote(noteFile(h, 'a'), { detail: 'Body detail text' }); await h.view.hydrate();
+    await apply(h, [findAct(h, 'a')]); await waitImages(h); assert.equal(lastImages(h).state, 'ready', title);
+    const text = h.contents.get(noteFile(h, 'a')); const detail = (await h.note('a')).detail;
+    for (const bad of ['`', '$=', '%%', '![[', ']]', '<img', '\\', '|', '#tag']) assert.ok(!detail.includes(bad), `${JSON.stringify(title)}: the note has "${bad}": ${JSON.stringify(detail)}`);
+    assert.ok(detail.startsWith('Body detail text\n\n!['), title); assert.equal((detail.match(/!\[/g) ?? []).length, 1, title); assert.doesNotMatch(text, /%%|\$=/, title);
+    assert.match(detail, /!\[[^\][\n]*\]\(<https:\/\/img\.example\/p\.jpg>\)\n\n\[[^\][\n]*\]\(<https:\/\/page\.example\/p>\)$/, title);
+  }
+});
+integrationTest('R1-3 find_images: a declined usage notice refuses the whole reply across its actions - four actions of one card each ask once and search nothing', async () => {
+  const { h } = await imageHarness(); h.control.decline = true; h.control.usageAsks = 0;
+  const lines = await apply(h, [findAct(h, 'a'), findAct(h, 'b'), findAct(h, 'c'), findAct(h, 'root')]);
+  eq(lines.map(l => l.status), ['skipped', 'skipped', 'skipped', 'skipped'], JSON.stringify(lines)); assert.equal(h.control.usageAsks, 1, 'the notice appears once'); assert.equal(h.control.searches.length, 0); assert.equal(allImages(h).length, 0);
+  const { h: h2 } = await imageHarness(); h2.control.search = perQuery; h2.control.usageAsks = 0;
+  const ok = await apply(h2, [findAct(h2, 'a'), findAct(h2, 'b'), findAct(h2, 'c')]); eq(ok.map(l => l.status).filter(s => s !== 'skipped').length >= 1, true); await waitImages(h2);
+  assert.equal(h2.control.usageAsks, 1, 'an accepted model is asked once for the reply, not once per action'); assert.equal(h2.control.searches.length, 3);
+});
+integrationTest('R1-4 record: every card that got no picture is written to the conversation record as "topic: reason" in the turn lines, and a restored turn shows them', async () => {
+  const { h, chat } = await imageHarness(); h.control.search = async query => { if (/Mind/.test(query)) throw new Error('quota used up'); if (/REM/.test(query)) return []; return perQuery(query); };
+  h.view.canSelectTopics = () => true; await h.view.setAiLock([h.node('a')], true); await h.view.hydrate();
+  const lines = await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b, h.ids.c, h.ids.root] })]); chat.finish('ok', lines); await waitImages(h);
+  const { MapChatTurnRecord } = load('experiences/visual-map/map-chat-turn-record.ts', { obsidian }); const { restoreConversation } = load('core/map-chat-records.ts'); const written = [];
+  const answer = { ...chat.completedTurns()[0].answer, images: allImages(h) };
+  const record = new MapChatTurnRecord({ conversationId: 'c1', write: line => written.push({ v: 1, at: 'a', ...line }) }, 'c1', 1, answer, () => {});
+  record.end('done', { lines: answer.lines }); record.relines();
+  for (const out of [written.find(l => l.type === 'turn_end').lines, written.find(l => l.type === 'lines').lines]) {
+    const texts = out.map(l => l.text); assert.ok(texts.some(t => /^Body: .*locked/i.test(t)), JSON.stringify(texts)); assert.ok(texts.some(t => /^Mind: .*quota used up/.test(t)), JSON.stringify(texts)); assert.ok(texts.some(t => /^REM: No loadable picture was found/.test(t)), JSON.stringify(texts));
+    assert.ok(!texts.some(t => /^Sleep: /.test(t)), 'the card that got a picture adds no failure row');
+  }
+  const restored = restoreConversation('c1', [{ v: 1, type: 'turn_start', turn: 1, at: 'a', message: 'm' }, ...written]);
+  const shown = restored.turns[0].lines.map(l => l.text); assert.ok(shown.some(t => /^Mind: .*quota used up/.test(t)), JSON.stringify(shown)); assert.ok(shown.some(t => /^Body: .*locked/i.test(t)));
+});
+// The checks of the write itself (restored from the click-to-insert tests of the old candidate list; see the handoff's mapping table).
+const spoilCases = [
+  ['another map', h => { h.view.map = { ...h.view.map, id: 'map-x' }; }, /The map was switched/],
+  ['another path', h => { h.view.path = 'Agent Workspace/Topics/other/Map.md'; }, /The map was switched/],
+  ['card gone', h => { h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.a); }, /no longer on the map/],
+  ['merging', h => { h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' }); }, /being merged/],
+  ['AI running (activeTasks)', h => { h.plugin.activeTasks.set(h.node('a').path, new AbortController()); }, /AI is working on the card/],
+  ['AI running (running)', h => { h.plugin.running.add(h.node('a').path); }, /AI is working on the card/],
+  ['AIM map', h => { h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; }, /cannot be edited/]
+];
+integrationTest('R1-5 place: a found picture is refused at the write, in words and with nothing written, when the map, the card, a merge, an AI task or the map type changed meanwhile; nothing running is aborted', async () => {
+  for (const [label, spoil, reason] of spoilCases) {
+    const { h } = await imageHarness(); const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(2); };
+    const file = noteFile(h, 'a'); const before = h.contents.get(file); const guard = new AbortController(); h.plugin.activeTasks.set('probe', guard);
+    await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => h.control.searches.length === 1));
+    spoil(h); gate.resolve(); await waitImages(h);
+    const block = lastImages(h); assert.match(block.reason, reason, label); assert.equal(block.items.length, 0, label); assert.notEqual(block.state, 'ready', label);
+    assert.equal(h.contents.get(file), before, `${label}: the card is untouched`); assert.equal(guard.signal.aborted, false, `${label}: nothing running was aborted`);
+    for (const task of h.plugin.activeTasks.values()) assert.equal(task.signal.aborted, false, label);
+    assert.match(visibleText(h.view.chat.logEl), reason, `${label}: the reason is on screen`);
+  }
+});
+integrationTest('R1-5 place: the checks run again inside the write, where a merge or an AI task that started in between is seen', async () => {
+  for (const [label, spoil, reason] of [spoilCases[3], spoilCases[4], spoilCases[6]]) {
+    const { h } = await imageHarness(); h.control.search = async () => imageItems(1);
+    const file = noteFile(h, 'a'); const before = h.contents.get(file); const guard = new AbortController(); h.plugin.activeTasks.set('probe', guard); const mutate = h.plugin.mutate.bind(h.plugin);
+    h.plugin.mutate = work => { spoil(h); return mutate(work); };
+    await apply(h, [findAct(h, 'a')]); await waitImages(h);
+    assert.match(lastImages(h).reason, reason, label); assert.equal(lastImages(h).items.length, 0, label); assert.equal(h.contents.get(file), before, `${label}: nothing written`); assert.equal(guard.signal.aborted, false, label);
+  }
+});
+integrationTest('R1-5 place: the picture goes after a blank line at the end of an existing Detail, alone into an empty one, and one undo step takes it out again', async () => {
+  const { h } = await imageHarness(); h.control.search = async () => imageItems(3);
+  await h.repo.updateNote(noteFile(h, 'a'), { detail: 'Body detail text\n' }); await h.repo.updateNote(noteFile(h, 'b'), { detail: '' }); await h.view.hydrate();
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' }); h.control.mutates = 0;
+  await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await waitImages(h);
+  assert.equal((await h.note('a')).detail, 'Body detail text\n\n![Pic 0](<https://img.example/0.jpg>)\n\n[Pic 0](<https://page.example/0>)'); assert.equal((await h.note('b')).detail, imageEmbed(0), 'an empty Detail gets the picture alone');
+  assert.equal(h.view.history.canUndo, true, 'an ordinary edit: the undo history is not cleared');
+  let steps = 0; const noteAfter = h.contents.get(noteFile(h, 'a'));
+  while (h.view.history.canUndo && h.view.history.undoEntry.label !== 'earlier') { const entry = h.view.history.undo(); await entry.undo(); steps++; }
+  assert.equal(steps, 2, 'one undo step per picture (two cards, two steps)'); assert.equal((await h.repo.readNote(h.node('a').path)).detail, 'Body detail text', 'undo puts the Detail back'); assert.equal((await h.repo.readNote(h.node('b').path)).detail, '');
+  assert.notEqual(h.contents.get(noteFile(h, 'a')), noteAfter);
 });
 integrationTest('B3 find_images: the reader hears the result once, when the last search of the reply ends - not while a reply streams', async () => {
   const { h, chat } = await imageHarness(); const gate = deferred();

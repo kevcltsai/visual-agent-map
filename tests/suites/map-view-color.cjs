@@ -40,7 +40,6 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 <div class="view-header vam-goal-host" style="background:var(--background-primary)"><div class="vam-goal-bar"><span class="vam-goal-target"></span><div class="vam-goal-text">Learn the basics</div></div><div class="vam-goal-bar is-empty"><div class="vam-goal-text">What do you want to achieve?</div></div></div>
 <div class="vam-workspace" style="height:620px">
 <div class="vam-map-chat" style="width:300px;height:600px">
-  <div class="vam-map-chat-images-missing">image missing</div>
 </div>
 <div class="vam-viewport" style="height:600px">
   <div class="vam-stage">
@@ -96,7 +95,6 @@ const CASES = [
   ['switcher-icon', '.vam-map-switcher-icon svg', 'color', 3],
   ['ai-explore', '.vam-ai-explore', 'color', 4.5, { buttonEnvelope: true }],
   ['ai-explore-hover', '.vam-ai-explore', 'color', 4.5, { buttonEnvelope: true, hover: true }],
-  ['chat-images-missing', '.vam-map-chat-images-missing', 'color', 4.5],
   ['tools-done-selecting', '.vam-map-tools button.is-active', 'color', 4.5],
   ['tools-done-selecting-hover', '.vam-map-tools button.is-active', 'color', 4.5, { hover: true }],
   ['goal-bar-text', '.vam-goal-bar:not(.is-empty) .vam-goal-text', 'color', 4.5],

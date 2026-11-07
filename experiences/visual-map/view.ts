@@ -1205,6 +1205,22 @@ function researchWebLines(web: ResearchWebTally): MapChatLine[] {
 type ChatOutcome =
   | { status: "done"; images?: MapChatImages[]; skippedCards?: number; basis?: MapChatBasis }
   | { status: "skipped" | "failed"; reason: string; created?: boolean };
+/** What the picture searches of one reply share: the cards already searched, the usage notices answered, and the blocks. */
+interface ChatImageBatch {
+  imageNodes: Set<string>;
+  /** Models whose usage notice was accepted in this reply (asked once for the whole reply). */
+  asked: Set<string>;
+  /** A usage notice was declined: none of this reply's searches starts, whichever action comes next. */
+  declined: boolean;
+  /** The blocks of every find_images action of the reply: their lines are one line (see chatLine). */
+  group: MapChatImages[];
+}
+const newChatImageBatch = (): ChatImageBatch => ({
+  imageNodes: new Set<string>(),
+  asked: new Set<string>(),
+  declined: false,
+  group: []
+});
 /** What the writes of one reply have made so far: the real id behind each `ref`, and the cards created, in order. */
 interface ChatRun {
   refs: Map<string, string>;
@@ -1237,6 +1253,40 @@ const CHAT_TOOLS_GAP = 12;
 const GOAL_SUGGEST_GAP = 6;
 /** Picture searches of one reply that run at the same time; the others wait. */
 const CHAT_IMAGE_SEARCH_PARALLEL = 3;
+/** The longest search words a picture search may carry. */
+const CHAT_IMAGE_QUERY_MAX = 80;
+/** How long the cover picture may take to download before the card keeps only the picture in its Detail. */
+const CHAT_IMAGE_DOWNLOAD_MS = 15000;
+/**
+ * The words of one picture search as they leave the program: a link, a domain, a line break or a control character the model (or
+ * a researched web page) put in the direction never reaches the search engine. Cut to {@link CHAT_IMAGE_QUERY_MAX} characters.
+ */
+function cleanImageQuery(text: string): string {
+  const plain = Array.from(text, char => {
+    const code = char.charCodeAt(0);
+    return code < 32 || (code >= 127 && code <= 159) || code === 0x2028 || code === 0x2029 ? " " : char;
+  }).join("");
+  return plain
+    .replace(/\S*:\/\/\S*/g, " ")
+    .replace(/\bwww\.\S*/gi, " ")
+    .replace(/(?:[\p{L}\p{N}-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?/giu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, CHAT_IMAGE_QUERY_MAX)
+    .trim();
+}
+/**
+ * A found picture's title as it is written into a note: letters, digits, spaces and plain punctuation only. Nothing a Markdown
+ * or Dataview reader would act on (a backtick, `%%`, `$=`, an embed, a table bar, a heading) survives; the rest becomes a space.
+ */
+function cleanImageTitle(text: string): string {
+  return text
+    .replace(/[^\p{L}\p{N}\s.,;:'"()\-_?+，。、：；？（）「」『』《》—…·]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120)
+    .trim();
+}
 /** The size of a chat expand: the Next Step dialog's defaults (levels below the topic, topics in total). */
 const CHAT_EXPAND_LEVELS = 2;
 const CHAT_EXPAND_MAX_TOPICS = 15;
@@ -22470,6 +22520,8 @@ export class VisualAgentMapView extends ItemView {
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
   private newChatConversation(): void {
     this.interruptChain(this.chatChain, "user_took_over");
+    // The searches of the old conversation stop: a late picture is not put into a card for a conversation that is gone.
+    this.abortChatImageSearches();
     this.resetChatResearch();
     this.chatPlanToken++;
     this.chatRecordEpoch++;
@@ -22960,7 +23012,7 @@ export class VisualAgentMapView extends ItemView {
     // the history, and so what was collected for the old map; the new map's writes are collected from there).
     this.history.openGroup();
     // The cards this reply has already started a picture search for (a card is searched once per reply).
-    const laterBatch = { imageNodes: new Set<string>() };
+    const laterBatch = newChatImageBatch();
     // How many cards existed when the last auto_layout of the reply ran: the ones made after it are only roughly placed.
     let laidOutCount = 0;
     let layoutDone = false;
@@ -23273,6 +23325,7 @@ export class VisualAgentMapView extends ItemView {
           line.basis = chatBasisFor(options.context.basis, action.parentId || null, options.context.parents, created);
       }
     }
+    // One line per action (a continuation reads them by position); the chat window says the picture searches of the reply once.
     const all = [...lines];
     if (result.rejected.length)
       all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });
@@ -24148,7 +24201,7 @@ export class VisualAgentMapView extends ItemView {
     /** The user's message: the direction of an integration. */
     message = "",
     /** What the later actions of this reply have started so far. */
-    batch: { imageNodes: Set<string> } = { imageNodes: new Set<string>() },
+    batch: ChatImageBatch = newChatImageBatch(),
     /** The appearance the reply asked for the cards this merge takes: it goes to the merged card. */
     held?: TopicAppearanceChange,
     /** Where the research and expansions this action starts are collected, for a continuation to wait for. */
@@ -24373,7 +24426,7 @@ export class VisualAgentMapView extends ItemView {
         return { status: "done" };
       }
       case "find_images":
-        return this.chatFindImages(action.direction, targets, batch);
+        return this.chatFindImages(action.direction, targets, batch, Boolean(work));
     }
   }
   /**
@@ -24386,7 +24439,9 @@ export class VisualAgentMapView extends ItemView {
   private async chatFindImages(
     direction: string,
     targets: string[],
-    batch: { imageNodes: Set<string> }
+    batch: ChatImageBatch,
+    /** A continuation round of the chat: it reads researched web text like a research conversation. */
+    continuation: boolean
   ): Promise<ChatOutcome> {
     const map = this.map;
     const chat = this.chat;
@@ -24398,16 +24453,27 @@ export class VisualAgentMapView extends ItemView {
     if (!ids.length) return skipped("ui.map_chat_skip_images_dup");
     for (const id of ids) batch.imageNodes.add(id);
     const anchor = { path: this.path, id: map.id };
-    const words = direction.trim();
+    // Web text can reach the model once research ran: the search words then come from the cards' own titles, never from the model.
+    const readsResearch = this.chatStartedResearch || continuation;
+    const words = readsResearch ? "" : cleanImageQuery(direction);
     const jobs: { block: MapChatImages; controller: AbortController; model: string; key?: number }[] = [];
     const blocks: MapChatImages[] = [];
     for (const id of ids) {
       const node = map.nodes.find(item => item.id === id);
       if (!node) continue;
       const note = await this.plugin.repo.readNote(node.path, map);
-      const title = note.title.trim();
-      // One target keeps the words as they are; several are told apart by their card ("牛肋眼 西式做法" style).
-      const query = (ids.length > 1 ? [words, title].filter(Boolean).join(" ") : words || title).trim();
+      const title = cleanImageQuery(note.title);
+      // One target keeps the words as they are; several are told apart by their card ("牛肋眼 西式做法" style). A research
+      // conversation uses the parent card's title and the card's own.
+      const parent = node.parentId ? map.nodes.find(item => item.id === node.parentId) : undefined;
+      const parentTitle =
+        readsResearch && parent ? cleanImageQuery((await this.plugin.repo.readNote(parent.path, map)).title) : "";
+      const joined = cleanImageQuery(
+        (readsResearch ? [parentTitle, title] : ids.length > 1 ? [words, title] : [words || title])
+          .filter(Boolean)
+          .join(" ")
+      );
+      const query = joined || title;
       const block: MapChatImages = {
         query,
         nodeId: node.id,
@@ -24429,15 +24495,22 @@ export class VisualAgentMapView extends ItemView {
       jobs.push({ block, controller: new AbortController(), model: note.model });
     }
     if (!blocks.length) return skipped("ui.map_chat_skip_topic_gone");
-    // The usage notice of each model that is going to be used; a refusal starts none of this reply's searches.
+    // The usage notice of each model that is going to be used, once for the whole reply (all its actions); a refusal starts none
+    // of this reply's searches, in this action or in the ones that follow.
+    if (batch.declined) return skipped("ui.map_chat_skip_not_started");
     for (const model of new Set(jobs.map(job => job.model))) {
+      if (batch.asked.has(model)) continue;
       let ok = false;
       try {
         ok = await this.plugin.confirmAiUsage(model, async () => undefined);
       } catch (error) {
         return { status: "failed", reason: errorMessage(error) };
       }
-      if (!ok) return skipped("ui.map_chat_skip_not_started");
+      if (!ok) {
+        batch.declined = true;
+        return skipped("ui.map_chat_skip_not_started");
+      }
+      batch.asked.add(model);
     }
     if (this.closed || this.chat !== chat || this.path !== anchor.path || this.map?.id !== anchor.id)
       return skipped("ui.map_chat_skip_map_changed");
@@ -24453,6 +24526,7 @@ export class VisualAgentMapView extends ItemView {
         this.settleChatImages(chat, block, { state: "stopped" });
       };
     }
+    batch.group.push(...blocks);
     for (const block of blocks) {
       chat.addImages(block);
       if (this.chatLastRecord) this.chatImageRecords.set(block, this.chatLastRecord);
@@ -24471,7 +24545,7 @@ export class VisualAgentMapView extends ItemView {
             this.chatImageSearches.delete(job.key);
         }
       })();
-    return { status: "done", images: blocks };
+    return { status: "done", images: batch.group };
   }
   private chatImageRunning = 0;
   private chatImageWaiters: (() => void)[] = [];
@@ -24525,7 +24599,7 @@ export class VisualAgentMapView extends ItemView {
       );
       if (!current()) return dropped();
       if (!first) return this.settleChatImages(chat, block, { state: "empty" });
-      const placed = await this.chatPlaceImage(block, first, current);
+      const placed = await this.chatPlaceImage(block, first, current, controller.signal);
       // Written is written, even when a Stop came in while the write ran: the block tells the truth.
       if (placed.ok) {
         this.settleChatImages(chat, block, {
@@ -24563,17 +24637,22 @@ export class VisualAgentMapView extends ItemView {
   /**
    * Puts the found picture at the end of the card's Detail (a blank line before it) and, when the card has no cover, saves it
    * beside the note as the cover: both are one undo step (one ⌘Z takes the picture back out of the note and off the card).
+   * The cover is downloaded first, outside the write queue and with a time limit (a slow download holds no other card back);
+   * then the note and the cover are written inside one `mutate`, and their undo entries are folded before they reach the history.
    * Refused, with the reason in words and nothing written, when the map in view is not the one the search came from, the card is
    * gone, locked, being merged or being worked on by an AI task, the map cannot be edited, or `alive` says the search was stopped.
    * The same checks run again inside the write, where nothing else can change the map.
    */
-  private chatPlaceImage(
+  private async chatPlaceImage(
     block: MapChatImages,
     candidate: ImageCandidate,
-    alive: () => boolean
+    alive: () => boolean,
+    signal: AbortSignal = new AbortController().signal
   ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const cover = await this.chatCoverBytes(block, candidate, signal);
+    if (!alive()) return { ok: false, reason: t("ui.map_chat_images_stale_map") };
     const work = (): Promise<{ ok: true } | { ok: false; reason: string }> =>
-      this.chatPlaceImageNow(block, candidate, alive);
+      this.chatPlaceImageNow(block, candidate, alive, cover);
     const run = this.chatImageWrites.then(work, work);
     this.chatImageWrites = run.catch(() => undefined);
     return run;
@@ -24581,15 +24660,29 @@ export class VisualAgentMapView extends ItemView {
   private async chatPlaceImageNow(
     block: MapChatImages,
     candidate: ImageCandidate,
-    alive: () => boolean
+    alive: () => boolean,
+    cover: { name: string; data: ArrayBuffer } | null
   ): Promise<{ ok: true } | { ok: false; reason: string }> {
     type Result = { ok: true } | { ok: false; reason: string };
     const fence = (): { reason: TranslationKey } | { node: MapNode } =>
       alive() ? this.chatImageFence(block) : { reason: "ui.map_chat_images_stale_map" };
     const first = fence();
     if ("reason" in first) return { ok: false, reason: t(first.reason) };
-    const mark = this.history.mark();
-    const outcome: { result: Result } = { result: { ok: false, reason: t("ui.map_chat_images_stale_map") } };
+    const outcome: { result: Result; coverWritten: boolean } = {
+      result: { ok: false, reason: t("ui.map_chat_images_stale_map") },
+      coverWritten: false
+    };
+    // The undo entries of this write are collected here, not in the history: a reply being applied meanwhile (its ownWrites)
+    // must not take one of the two into its group and leave the other. They reach the history as one entry.
+    const collected = new History<Action>();
+    const startMark = collected.mark();
+    const history = this.history;
+    const own = Object.getOwnPropertyDescriptor(history, "push");
+    Object.defineProperty(history, "push", {
+      value: (entry: Action): void => collected.push(entry),
+      configurable: true,
+      writable: true
+    });
     try {
       await this.plugin.mutate(async () => {
         const again = fence();
@@ -24606,64 +24699,121 @@ export class VisualAgentMapView extends ItemView {
             return;
           }
           const before = note.detail.replace(/\s+$/, "");
-          const addition = imageMarkdown(candidate);
+          // The title is a whitelist (see cleanImageTitle): nothing the search result says becomes Markdown the reader acts on.
+          const addition = imageMarkdown({
+            ...candidate,
+            title: cleanImageTitle(candidate.title) || cleanImageTitle(block.nodeTitle) || t("ui.map_chat_image_alt")
+          });
           await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition });
           outcome.result = { ok: true };
         } catch (error) {
           outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+          return;
         }
+        // The picture is in the Detail now. A remote link never becomes a card cover (covers read local files only), so the
+        // file is also saved beside the note; a failure here leaves the picture in the Detail as it is and says nothing more.
+        if (cover) outcome.coverWritten = await this.chatCoverWrite(block, cover, alive).catch(() => false);
       });
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+    } finally {
+      if (own) Object.defineProperty(history, "push", own);
+      else Reflect.deleteProperty(history, "push");
     }
-    if (!outcome.result.ok) return outcome.result;
-    // The picture is in the Detail now. A remote link never becomes a card cover (covers read local files only), so the file is
-    // also saved beside the note; a failure here leaves the picture in the Detail as it is and says nothing more.
-    await this.chatCoverFromPicture(block, candidate).catch(() => undefined);
     // The note write and the cover are one step to undo.
-    this.history.collapseSince(mark, t("ui.map_chat_images_undo_label"));
+    collected.collapseSince(startMark, t("ui.map_chat_images_undo_label"));
+    const entry = collected.undoEntry;
+    if (entry) this.history.push(entry);
+    if (outcome.coverWritten) await this.refreshAfterSavedChange();
     return outcome.result;
   }
   /** The bytes of a picked picture (a seam: it needs the network). */
   private async chatFetchImage(url: string): Promise<ArrayBuffer> {
     return (await requestUrl({ url, method: "GET", throw: true })).arrayBuffer;
   }
-  /**
-   * Makes a picked web picture the card's cover: only when the card has no cover and has not turned it off (a cover set by hand,
-   * and `topic-cover: none`, stay as they are). The picture is checked by its bytes ({@link acceptImage}), stored beside the note,
-   * embedded in `## User Notes` and set as `topic-cover`, as one undoable step.
-   */
-  private async chatCoverFromPicture(block: MapChatImages, candidate: ImageCandidate): Promise<void> {
-    const sameMap = (): boolean =>
-      !this.closed && !!this.map && this.path === block.mapPath && this.map.id === block.mapId;
-    const target = (): MapNode | null => {
-      if (!sameMap() || this.aimLive()) return null;
-      const node = this.map?.nodes.find(item => item.id === block.nodeId);
-      return node && this.cardAcceptsImages(node) && !this.isMerging(node.id) ? node : null;
-    };
-    const hasNoCover = (node: MapNode): boolean => {
-      const file = this.app.vault.getAbstractFileByPath(node.path);
-      if (!(file instanceof TFile)) return false;
-      const cache = this.app.metadataCache.getFileCache(file);
-      // Any `topic-cover` the owner wrote (even a link that does not resolve now) is theirs and stays.
-      const declared: unknown = cache?.frontmatter?.["topic-cover"];
-      if (declared !== undefined && declared !== null) return false;
-      return (
-        resolveCoverWithFrame(cache, link => this.app.metadataCache.getFirstLinkpathDest(link, node.path)) === null
+  /** A download that ends when the search is stopped or after {@link CHAT_IMAGE_DOWNLOAD_MS}, whichever comes first. */
+  private chatDownload(url: string, signal: AbortSignal): Promise<ArrayBuffer> {
+    return new Promise<ArrayBuffer>((resolve, reject) => {
+      if (signal.aborted) return reject(new Error("aborted"));
+      const end = (): void => {
+        window.clearTimeout(timer);
+        signal.removeEventListener("abort", onAbort);
+      };
+      const onAbort = (): void => {
+        end();
+        reject(new Error("aborted"));
+      };
+      const timer = window.setTimeout(() => {
+        end();
+        reject(new Error("timeout"));
+      }, CHAT_IMAGE_DOWNLOAD_MS);
+      signal.addEventListener("abort", onAbort);
+      this.chatFetchImage(url).then(
+        data => {
+          end();
+          resolve(data);
+        },
+        (error: unknown) => {
+          end();
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
       );
-    };
-    const first = target();
-    if (!first || !hasNoCover(first)) return;
-    const data = await this.chatFetchImage(candidate.url);
-    const node = target();
-    if (!node || !this.map || !hasNoCover(node)) return;
+    });
+  }
+  /** The card of `block` when it may take a cover picture now (same map, not locked by AIM, not merging), else null. */
+  private chatCoverTarget(block: MapChatImages): MapNode | null {
+    if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId || this.aimLive())
+      return null;
+    const node = this.map.nodes.find(item => item.id === block.nodeId);
+    return node && this.cardAcceptsImages(node) && !this.isMerging(node.id) ? node : null;
+  }
+  /** A cover set by hand (or `topic-cover: none`, or a link that does not resolve now) is the owner's and stays. */
+  private chatHasNoCover(node: MapNode): boolean {
+    const file = this.app.vault.getAbstractFileByPath(node.path);
+    if (!(file instanceof TFile)) return false;
+    const cache = this.app.metadataCache.getFileCache(file);
+    const declared: unknown = cache?.frontmatter?.["topic-cover"];
+    if (declared !== undefined && declared !== null) return false;
+    return resolveCoverWithFrame(cache, link => this.app.metadataCache.getFirstLinkpathDest(link, node.path)) === null;
+  }
+  /**
+   * The cover picture of a placed picture, downloaded before the write: only when the card has no cover and has not turned it
+   * off (nothing is downloaded otherwise). The picture is checked by its bytes ({@link acceptImage}). Null when there is none to write.
+   */
+  private async chatCoverBytes(
+    block: MapChatImages,
+    candidate: ImageCandidate,
+    signal: AbortSignal
+  ): Promise<{ name: string; data: ArrayBuffer } | null> {
+    const node = this.chatCoverTarget(block);
+    if (!node || !this.chatHasNoCover(node)) return null;
+    let data: ArrayBuffer;
+    try {
+      data = await this.chatDownload(candidate.url, signal);
+    } catch {
+      return null;
+    }
     const accepted = acceptImage({ mime: "image/*", size: data.byteLength, bytes: data });
-    if (!accepted.ok) return;
+    if (!accepted.ok) return null;
     const name = safeImageName(candidate.title, accepted.mime);
-    if (!name) return;
+    return name ? { name, data } : null;
+  }
+  /**
+   * Makes the downloaded picture the card's cover: stored beside the note, embedded in `## User Notes` and set as `topic-cover`
+   * (one transaction). Runs inside the write of the picture; the card is checked again here, its AI lock too.
+   */
+  private async chatCoverWrite(
+    block: MapChatImages,
+    cover: { name: string; data: ArrayBuffer },
+    alive: () => boolean
+  ): Promise<boolean> {
+    const node = this.chatCoverTarget(block);
+    if (!node || !this.map || !alive() || !this.chatHasNoCover(node)) return false;
+    // AI lock: a locked card gets no new file either.
+    if ((await this.plugin.repo.readNote(node.path, this.map)).aiLocked) return false;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
-      .createAttachment("image", { name, data, sourcePath: node.path })
+      .createAttachment("image", { name: cover.name, data: cover.data, sourcePath: node.path })
       .rewriteNote(node.path, async (path, attachment) => {
         const note = this.app.vault.getAbstractFileByPath(path);
         if (!(note instanceof TFile)) throw new Error(path);
@@ -24675,7 +24825,7 @@ export class VisualAgentMapView extends ItemView {
       })
       .commit({ deferRebuild: true, label: t("ui.topic_cover") });
     this.history.push(entry);
-    await this.refreshAfterSavedChange();
+    return true;
   }
   /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
   private chatTranscriptTurn(turn: MapChatSavedTurn): TranscriptTurn {

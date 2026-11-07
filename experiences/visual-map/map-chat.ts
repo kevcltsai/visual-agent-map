@@ -73,6 +73,20 @@ export function settledLine(line: MapChatLine): MapChatLine {
   };
 }
 
+/**
+ * The picture searches of a reply are one result: every find_images action of the reply shares the reply's blocks (the model
+ * usually sends one action per card), so a line that stands for the same blocks as an earlier line is left out.
+ */
+export function onceImageLines(lines: MapChatLine[]): MapChatLine[] {
+  const seen = new Set<MapChatImages[]>();
+  return lines.filter(line => {
+    if (!line.imageGroup) return true;
+    if (seen.has(line.imageGroup)) return false;
+    seen.add(line.imageGroup);
+    return true;
+  });
+}
+
 /** What a question was sent with, kept so a failed turn can be sent again. */
 export interface MapChatOrigin {
   text: string;
@@ -224,7 +238,7 @@ export interface MapChatMessage {
   choices?: MapChatChoices;
   /** More result lines than fit are folded into a count; true while they are all shown. */
   linesOpen?: boolean;
-  /** Picture candidates the reply asked for (`find_images`), oldest first. */
+  /** The picture searches the reply asked for (`find_images`), one block per card, oldest first. */
   images?: MapChatImages[];
   /** On an assistant message: the name of the model that was current when its question was sent; it never changes afterwards. */
   modelLabel?: string;
@@ -335,7 +349,6 @@ export interface MapChatHost {
   retry?(origin: MapChatOrigin): void;
   /** The conversation's state changed (a turn started or ended, a plan appeared or was settled); the canvas may say so. */
   stateChanged?(): void;
-  /** Inserts a picture candidate into the card it was found for; resolves with why it was refused, if it was. */
   /** The picture the chat is about now, or null (none chosen). */
   image?(): MapChatImageInfo | null;
   /** Calls `changed` whenever the chosen picture changes; the returned function stops listening. */
@@ -484,7 +497,6 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private saveDisabled = true;
   /** What the reader is told once the reply that is streaming now has ended (a picture search can end in the middle of it). */
   private spokenLater: string[] = [];
-  /** The pick button of each picture candidate, to give the keyboard back after a repaint. */
   private built = false;
   private stopWatching: (() => void) | null = null;
   private stopWatchingImage: (() => void) | null = null;
@@ -1367,7 +1379,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     // paint them back as started. The merged lines are returned for the record.
     let shown = lines;
     if (last?.streaming) {
-      shown = last.lateFailures?.length ? settleExpandFailures(lines, last.lateFailures) : lines;
+      shown = onceImageLines(last.lateFailures?.length ? settleExpandFailures(lines, last.lateFailures) : lines);
       last.lateFailures = undefined;
       last.text = reply;
       last.lines = shown;
@@ -1453,7 +1465,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       lines = message.lateFailures?.length ? settleExpandFailures(lines, message.lateFailures) : lines;
       message.lateFailures = undefined;
     } else message.lateFailures = undefined;
-    if (lines) message.lines = lines;
+    if (lines) lines = message.lines = onceImageLines(lines);
     this.renderLog();
     this.renderHint();
     this.host.stateChanged?.();
@@ -1478,7 +1490,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       last.lateFailures = [...(last.lateFailures ?? []), ...lines.map(failure => ({ was: null, next: null, failure }))];
       return;
     }
-    last.lines = [...last.lines, ...lines];
+    last.lines = onceImageLines([...last.lines, ...lines]);
     this.renderLog();
   }
   /**
@@ -2912,12 +2924,13 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       for (const item of block.items) {
         const cell = list.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
         const text = cell.createDiv({ cls: "vam-map-chat-images-text" });
-        text.createDiv({ cls: "vam-map-chat-images-title", text: clip(item.candidate.title, 80) });
+        // A saved picture's `inserted` is "topic: picture title": it is the one line (the title is not said twice).
         if (item.inserted)
           text.createDiv({
             cls: "vam-map-chat-images-state is-inserted",
             text: t("ui.map_chat_images_inserted_0", clip(item.inserted))
           });
+        else text.createDiv({ cls: "vam-map-chat-images-title", text: clip(item.candidate.title, 80) });
       }
   }
   private buildChoices(row: HTMLElement, choices: MapChatChoices): void {

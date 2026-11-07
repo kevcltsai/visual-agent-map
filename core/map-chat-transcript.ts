@@ -331,7 +331,8 @@ function refMarkdown(ref: TranscriptRef): string {
 function imagesMarkdown(block: TranscriptImages, labels: TranscriptLabels): string {
   const head = `**${fill(labels.images, block.nodeTitle)}**`;
   if (block.state === "searching") return `${head}\n\n${fill(labels.imagesSearching, block.query)}`;
-  if (block.state === "empty") return `${head}\n\n${escapeLine(labels.imagesNone)}`;
+  // An empty block that says why (a locked or busy card, a failed write) is written with its own reason, not as "nothing loaded".
+  if (block.state === "empty") return `${head}\n\n${escapeLine(block.reason || labels.imagesNone)}`;
   if (block.state === "stopped") return `${head}\n\n${escapeLine(labels.imagesStopped)}`;
   if (block.state === "failed") return `${head}\n\n${fill(labels.imagesFailed, block.reason ?? "")}`;
   const rows = block.items.map(

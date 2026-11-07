@@ -1,6 +1,7 @@
 import type { RecordEventKind, RecordLineInput, RecordLineItem, RecordTurnStatus } from "../../core/map-chat-records";
 import type { MapChatImages, MapChatLine, MapChatMessage } from "./map-chat";
-import { placedImage, settledLine } from "./map-chat";
+import { onceImageLines, placedImage, settledLine } from "./map-chat";
+import { t } from "../../i18n";
 import type { MapChatRecordWriter } from "./map-chat-record-writer";
 
 /** What a turn's end line carries besides its status. Anything left out is read from the turn's answer message. */
@@ -12,10 +13,26 @@ export interface TurnEndFields {
   error?: { text: string; technical: string };
 }
 
+/** One row per card that got no picture: "topic: reason" (the group line says only how many). */
+const missedImageRows = (blocks: MapChatImages[]): RecordLineItem[] =>
+  blocks.flatMap(block => {
+    if (block.state === "searching" || placedImage(block)) return [];
+    const why =
+      block.state === "stopped"
+        ? t("ui.map_chat_images_stopped")
+        : block.state === "failed"
+          ? t("ui.map_chat_images_failed_0", block.reason ?? "")
+          : (block.reason ?? t("ui.map_chat_images_none"));
+    return [{ status: block.state === "failed" ? "failed" : "skipped", text: `${block.nodeTitle}: ${why}` }];
+  });
+
 const plainLines = (lines: MapChatLine[]): RecordLineItem[] =>
-  lines.map(line => {
+  onceImageLines(lines).flatMap(line => {
     const settled = settledLine(line);
-    return { status: settled.status, text: settled.text, ...(settled.basis ? { basis: settled.basis } : {}) };
+    return [
+      { status: settled.status, text: settled.text, ...(settled.basis ? { basis: settled.basis } : {}) },
+      ...(line.imageGroup ? missedImageRows(line.imageGroup) : [])
+    ];
   });
 
 /**

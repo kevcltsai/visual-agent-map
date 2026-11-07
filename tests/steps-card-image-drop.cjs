@@ -293,14 +293,55 @@ test('chat pick: the picked web picture becomes the card cover (saved file, embe
   assert.match(text, /!\[A picture\]\(<https:\/\/example\.org\/a\.png>\)/, 'the Detail still has the picked link');
 });
 
-test('chat pick: the note embed and the cover are ONE undo step (one Cmd+Z takes the picture back out)', async () => {
+test('chat pick: the note embed and the cover are ONE history entry, and running its undo takes the Detail picture, the cover embed and topic-cover out (the file stays, by design) and redo brings them back', async () => {
   const h = await harness();
+  const before = h.note();
   const result = await chatPick(h);
   assert.equal(result.ok, true);
-  assert.ok(h.entries.length >= 2, 'the note write and the cover were two entries before they were folded: ' + h.entries.length);
+  assert.deepEqual(h.mediaFiles(), [`${MEDIA}/A picture.png`]);
+  assert.equal(h.entries.length, 1, 'the note write and the cover reach the history as one entry: ' + h.entries.length);
+  const after = h.note();
+  assert.match(after, /topic-cover: "\[\[Media\/A picture\.png\]\]"/);
   let steps = 0;
-  while (h.view.history.canUndo) { h.view.history.undo(); steps++; }
+  while (h.view.history.canUndo) { const entry = h.view.history.undo(); await entry.undo(); steps++; }
+  await h.settle();
   assert.equal(steps, 1, 'one undo step for the picture');
+  const stamp = text => text.replace(/^updated: .*\n/m, '');
+  assert.equal(stamp(h.note()), stamp(before), 'the note is what it was, apart from its updated stamp (Detail, cover embed and topic-cover)');
+  assert.doesNotMatch(h.note(), /topic-cover|A picture/);
+  assert.deepEqual(h.mediaFiles(), [`${MEDIA}/A picture.png`], 'the saved file stays on disk (undo never trashes what the step created)');
+  const redo = h.view.history.redo();
+  await redo.redo();
+  await h.settle();
+  assert.equal(stamp(h.note()), stamp(after), 'redo puts the picture and the cover back');
+  assert.deepEqual(h.mediaFiles(), [`${MEDIA}/A picture.png`]);
+});
+
+test('chat pick: a reply being applied at that moment (an open group, ownWrites) does not split the picture into two steps', async () => {
+  const h = await harness();
+  h.view.history.openGroup();
+  const gate = deferred();
+  const reply = h.view.history.ownWrites(() => gate.promise);
+  const result = await chatPick(h);
+  assert.equal(result.ok, true);
+  const grouped = h.view.history.closeGroup();
+  gate.resolve();
+  await reply;
+  let loose = 0;
+  while (h.view.history.canUndo) { h.view.history.undo(); loose++; }
+  assert.equal(grouped.length + loose, 1, 'the note write and the cover are one entry wherever it lands');
+});
+
+test('chat pick: a card locked against AI gets no cover file (the check is made again before the cover is written)', async () => {
+  const h = await harness();
+  const real = h.view.plugin.repo.readNote.bind(h.view.plugin.repo);
+  let reads = 0;
+  // The card is unlocked for the Detail write and locked by the time the cover is about to be written.
+  h.view.plugin.repo.readNote = async (...args) => { const note = await real(...args); reads++; return reads >= 2 ? { ...note, aiLocked: true } : note; };
+  const result = await chatPick(h);
+  assert.equal(result.ok, true);
+  assert.deepEqual(h.mediaFiles(), [], 'no attachment for a locked card');
+  assert.doesNotMatch(h.note(), /topic-cover/);
 });
 
 test('chat pick: a cover set by hand, or turned off, is not replaced and nothing is downloaded', async () => {

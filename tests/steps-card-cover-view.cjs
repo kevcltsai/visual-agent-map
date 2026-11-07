@@ -529,6 +529,7 @@ test('share snapshot: ring heights are read after the covers load, not while the
   const pending = view.prepareShare(2000).then(() => { done = true; });
   await Promise.resolve();
   assert.equal(img.attrs.src, 'app://res/img/share-ring.png', 'the lazy picture is told to load now');
+  assert.equal(img.loading, 'eager', 'loading="lazy" keeps an off-screen picture from loading even with a src, so the wait would always time out');
   assert.equal(done, false, 'it waits for the picture');
   cover.addClass('is-sized'); cardA.offsetHeight = 425; img.fire('load');
   await pending;

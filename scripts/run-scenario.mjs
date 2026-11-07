@@ -49,6 +49,7 @@ function validateStep(step, index) {
     return undefined;
   }
   const actions = keys.filter(key => ACTIONS.includes(key));
+  if ("wait" in step && step.wait !== true) return `${where} wait must be true`;
   if (actions.length !== 1) return `${where} needs exactly one action (${ACTIONS.join("/")}) or assert, got ${actions.length ? actions.join("+") : "none"}`;
   const stray = keys.filter(key => !ACTIONS.includes(key));
   if (stray.length) return `${where} has ${stray.join(", ")} without assert`;
@@ -120,7 +121,7 @@ export async function runScenario(scenario, { logDir, connect = connectCdp, wait
       else if (step.screenshot !== undefined) log(`  => ${await guard(cdp.screenshot(join(logDir, `${String(step.screenshot).replace(/[^\w.-]/g, "_")}.png`)))}`);
     }
     let errors = [];
-    if (cdp) { current = "reading app errors"; await guard(delay(ERRORS_SETTLE_MS)); errors = cdp.errors(); }
+    if (cdp) { current = "reading app errors"; await delay(ERRORS_SETTLE_MS); errors = await guard(Promise.resolve().then(() => cdp.errors())); }
     if (errors.length && scenario.allowErrors) allowed = errors.length;
     if (errors.length && !scenario.allowErrors) { log(errors.join("\n")); fail("no uncaught exceptions in the app", `${errors.length} captured, first: ${errors[0].split("\n")[0].slice(0, 160)}`); }
   } catch (error) {
@@ -135,13 +136,23 @@ export async function runScenario(scenario, { logDir, connect = connectCdp, wait
 
 export const usage = "Usage: node scripts/run-scenario.mjs <scenario.json> [--vault=<path>] [--log-dir=<dir>]";
 
+// Writes the text, then exits once it is flushed. A stuck socket (app froze before it answered) keeps the event loop alive,
+// so the process must end explicitly; the write callback keeps a piped stdout from being cut off.
+function exitAfterWrite(text, code) {
+  process.exitCode = code;
+  const exit = () => process.exit(code);
+  if (!text) return exit();
+  process.stdout.write(text, exit);
+}
+
 async function cli(args) {
   const file = args.find(arg => !arg.startsWith("--"));
-  if (!file) { process.stderr.write(`${usage}\n`); return 2; }
+  if (!file) { process.stderr.write(`${usage}\n`); return { code: 2 }; }
   const option = name => args.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
   let scenario;
   try { scenario = JSON.parse(readFileSync(file, "utf8")); }
-  catch (error) { process.stderr.write(`CRASH cannot read scenario ${file}: ${error.message}\n`); return 2; }
+  catch (error) { process.stderr.write(`CRASH cannot read scenario ${file}: ${error.message}\n`); return { code: 2 }; }
+  if (!scenario || typeof scenario !== "object" || Array.isArray(scenario)) { process.stderr.write(`CRASH cannot read scenario ${file}: not a JSON object\n`); return { code: 2 }; }
   const logDir = resolve(option("log-dir") ?? join(tmpdir(), "vam-scenario", `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`));
   // If the event loop empties before the run returns (socket died with a call pending), exit non-zero and say so.
   process.exitCode = 2;
@@ -153,12 +164,16 @@ async function cli(args) {
     process.stdout.write(`CRASH scenario did not finish (app connection lost?) (${passed}/${(state.results ?? []).length} assertions) full log: ${state.logFile ?? "none"}\n`);
     process.exitCode = 2;
   });
-  const { exitCode, lines } = await runScenario(scenario, { logDir, vault: option("vault") ?? scenario.vault, state });
-  state.done = true;
-  process.stdout.write(`${lines.join("\n")}\n`);
-  return exitCode;
+  try {
+    const { exitCode, lines } = await runScenario(scenario, { logDir, vault: option("vault") ?? scenario.vault, state });
+    state.done = true;
+    return { code: exitCode, text: `${lines.join("\n")}\n` };
+  } catch (error) {
+    state.done = true;
+    return { code: 2, text: `CRASH ${error.message}\n` };
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  cli(process.argv.slice(2)).then(code => { process.exitCode = code; }, error => { process.stderr.write(`CRASH ${error.message}\n`); process.exitCode = 2; });
+  cli(process.argv.slice(2)).then(({ code, text }) => exitAfterWrite(text, code), error => exitAfterWrite(`CRASH ${error.message}\n`, 2));
 }

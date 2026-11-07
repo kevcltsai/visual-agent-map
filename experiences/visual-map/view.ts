@@ -12598,7 +12598,7 @@ export class VisualAgentMapView extends ItemView {
         item
           .setTitle(t("ui.export_share_html"))
           .setIcon("globe")
-          .onClick(() => this.plugin.openShare(this))
+          .onClick(() => void this.plugin.openShare(this))
       );
     }
     this.showMenuUnder(menu, event);
@@ -15480,6 +15480,51 @@ export class VisualAgentMapView extends ItemView {
       if (view instanceof VisualAgentMapView && view !== this) view.paintCutMarks();
     }
   }
+  /**
+   * Before a share snapshot: ring members' covers are lazy placeholders (96 px) until they scroll into view, so a height read now
+   * is wrong. Loads them (waits for load, error or about 3 seconds), then waits for the write queue so a tidy the loading caused
+   * is on the map before it is copied. Never throws; shareSnapshot leaves out ring heights that are still unmeasured.
+   */
+  async prepareShare(timeoutMs = 3000): Promise<void> {
+    if (!this.map) return;
+    const waits: Promise<void>[] = [];
+    for (const id of ringMemberIds(this.map.nodes, this.map.canvasItems ?? [])) {
+      const card = this.cardEls.get(id);
+      const cover = card ? cardCovers.get(card) : undefined;
+      if (!cover || cover.frame.classList.contains("is-sized")) continue;
+      const img = cover.img;
+      this.coverObserver?.unobserve(img);
+      waits.push(
+        new Promise<void>(resolve => {
+          const done = () => {
+            img.removeEventListener("load", done);
+            img.removeEventListener("error", done);
+            resolve();
+          };
+          img.addEventListener("load", done);
+          img.addEventListener("error", done);
+          const real = img.getAttribute("data-src");
+          if (real && !img.getAttribute("src")) img.setAttribute("src", real);
+          else if (img.complete && img.naturalWidth) done();
+        })
+      );
+    }
+    if (waits.length) {
+      let timer: number | undefined;
+      await Promise.race([
+        Promise.all(waits),
+        new Promise<void>(resolve => {
+          timer = window.setTimeout(resolve, timeoutMs);
+        })
+      ]);
+      window.clearTimeout(timer);
+    }
+    try {
+      await this.plugin.mutate(async () => undefined, { sync: false });
+    } catch {
+      // The queue logs its own failures; the snapshot is still taken.
+    }
+  }
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot():
     | {
@@ -15513,11 +15558,17 @@ export class VisualAgentMapView extends ItemView {
       coverLooks.set(node.id, { frame: cover.frame, size: cover.size, position: cover.position });
     }
     // Ring members' rendered heights: the viewer solves the ring with the sizes the map saw.
+    // A member whose cover has no size yet (still a placeholder) would give a wrong height: then no height is written at all.
     const ringHeights = new Map<string, number>();
+    let ringMeasured = true;
     for (const id of ringMemberIds(copy.nodes, copy.canvasItems ?? [])) {
-      const height = this.cardEls.get(id)?.offsetHeight;
+      const card = this.cardEls.get(id);
+      const cover = card ? cardCovers.get(card) : undefined;
+      if (cover && !cover.frame.classList.contains("is-sized")) ringMeasured = false;
+      const height = card?.offsetHeight;
       if (height) ringHeights.set(id, height);
     }
+    if (!ringMeasured) ringHeights.clear();
     return {
       map: copy,
       notes: new Map(this.notes),

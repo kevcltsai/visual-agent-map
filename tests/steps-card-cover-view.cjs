@@ -27,7 +27,7 @@ const { VisualAgentMapView } = replay.load(
     console: { ...console, error: (...a) => errors.push(a), warn: (...a) => errors.push(a) }
   }
 );
-const files = new Set(['img/a.png', 'img/b.jpg', 'img/tall.png', 'img/bad.png', 'img/redraw.png']);
+const files = new Set(['img/a.png', 'img/b.jpg', 'img/tall.png', 'img/bad.png', 'img/redraw.png', 'img/share-ring.png']);
 const make = (cache, extra = {}) => {
   const note = new S.obsidian.TFile('Topics/n.md');
   const view = Object.assign(Object.create(VisualAgentMapView.prototype), {
@@ -496,4 +496,56 @@ test('picture position: a side cover with the default size is the full column wi
   const c = card();
   relay(framed({ 'topic-cover-position': 'left' })).paintCover(c, 'Topics/n.md');
   assert.equal(frames(c)[0].style.width, '100%');
+});
+
+// share-match-map F4: the share snapshot measures ring cards only after their lazy covers are loaded; unmeasured means no heights at all.
+const shareView = () => {
+  const view = make({ embeds: [{ link: 'img/share-ring.png' }] });
+  const ids = ['a', 'b'];
+  const nodes = ids.map((id, index) => ({ id, path: 'Topics/n.md', parentId: null, x: index * 300, y: 0, collapsed: false }));
+  const items = [{ id: 'img', kind: 'annotated-image', path: 'img.png', x: 0, y: 300, w: 400, h: 300,
+    anchors: ids.map((id, index) => ({ id: `an${id}`, at: { kind: 'image-2d', x: 0.2 + index * 0.4, y: 0.5 } })),
+    relations: ids.map(id => ({ kind: 'related', from: `an${id}`, to: id, ring: true })) }];
+  const cardA = card(), cardB = card();
+  Object.assign(cardA, { offsetHeight: 96 });
+  Object.assign(cardB, { offsetHeight: 200 });
+  view.paintCover(cardA, 'Topics/n.md');
+  const cover = dom.findAll(cardA, i => dom.hasCls(i, 'vam-card-cover'))[0];
+  const img = Object.assign(imgs(cardA)[0], { setAttribute(name, value) { this.attrs[name] = value; } });
+  const writes = [];
+  Object.assign(view, {
+    map: { version: 1, id: 'm', title: 'M', nodes, canvasItems: items, viewport: { x: 0, y: 0, zoom: 1 } }, path: 'M/Map.md', notes: new Map(),
+    cardEls: new Map([['a', cardA], ['b', cardB]]), closed: false,
+    plugin: { mutate: async work => { writes.push('queue'); await work(); } }
+  });
+  return { view, cardA, cover, img, writes };
+};
+
+test('share snapshot: ring heights are read after the covers load, not while they are 96 px placeholders', async () => {
+  before();
+  const { view, cardA, cover, img, writes } = shareView();
+  assert.equal(view.shareSnapshot().ringHeights, undefined, 'a ring card still on its placeholder: no heights at all, not a partial set');
+  let done = false;
+  const pending = view.prepareShare(2000).then(() => { done = true; });
+  await Promise.resolve();
+  assert.equal(img.attrs.src, 'app://res/img/share-ring.png', 'the lazy picture is told to load now');
+  assert.equal(done, false, 'it waits for the picture');
+  cover.addClass('is-sized'); cardA.offsetHeight = 425; img.fire('load');
+  await pending;
+  assert.equal(done, true);
+  assert.deepEqual(writes, ['queue'], 'then it waits for the write queue so a tidy the load caused is on the map');
+  assert.equal(JSON.stringify([...view.shareSnapshot().ringHeights]), JSON.stringify([['a', 425], ['b', 200]]));
+});
+
+test('share snapshot: a picture that never arrives times out and writes no ring heights; a failed picture counts as measured', async () => {
+  before();
+  const slow = shareView();
+  await slow.view.prepareShare(30);
+  assert.equal(slow.view.shareSnapshot().ringHeights, undefined);
+  const failed = shareView();
+  const pending = failed.view.prepareShare(2000);
+  await Promise.resolve();
+  failed.img.fire('error');
+  await pending;
+  assert.equal(JSON.stringify([...failed.view.shareSnapshot().ringHeights]), JSON.stringify([['a', 96], ['b', 200]]), 'the error branch removes the frame, its height is final');
 });

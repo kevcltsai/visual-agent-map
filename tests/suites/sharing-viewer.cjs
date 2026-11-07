@@ -1788,3 +1788,128 @@ test('sharing viewer ring: expanding a ring root and Auto layout land the ring w
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+
+// ---- share-match-map F4: the real sample (a 12-card ring whose covers made the map's cards 425 / 414 / 353 / 500 tall, while the share saw 271 / 263 placeholders).
+const RING_ROOT = 'd0fb8c71-6a06-4695-8259-a0f4699bf9d9';
+const ringSample = ringHeightOverride => {
+  const data = JSON.parse(read('tests/fixtures/sharing/viewer-ring-sample.json'));
+  if (ringHeightOverride) for (const node of data.nodes) if (node.ringHeight) node.ringHeight = ringHeightOverride;
+  return data;
+};
+/** Opens the sample, expands the first root, and reports where everything is: the numbers the acceptance (decision #8) is judged on. */
+const runRingSample = async (data, drive) => {
+  const chrome = findChrome();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-ringsample-'));
+  try {
+    const payloadFile = path.join(directory, 'ring.json');
+    fs.writeFileSync(payloadFile, JSON.stringify(data));
+    const out = path.join(directory, 'ring.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', payloadFile], { cwd: root });
+    return await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const page = pageTools(send);
+      const snapshot = () => page.evaluate(`(() => {
+        const cards = Array.from(document.querySelectorAll('.vam-node')).map(c => ({ id: c.dataset.nodeId, x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight }));
+        const img = document.querySelector('.vam-canvas-image');
+        const image = img && { x: img.offsetLeft, y: img.offsetTop, w: img.offsetWidth, h: img.offsetHeight };
+        const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        let stacked = 0, overImage = 0;
+        cards.forEach((a, i) => { if (image && hit(a, image)) overImage++; for (let j = i + 1; j < cards.length; j++) if (hit(a, cards[j])) stacked++; });
+        return { cards, stacked, overImage };
+      })()`);
+      return drive({ page, snapshot, send });
+    });
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+};
+const ringShape = (cards, ringIds, image) => {
+  const members = cards.filter(card => ringIds.includes(card.id));
+  const top = members.filter(c => c.y + c.h <= image.y).length, bottom = members.filter(c => c.y >= image.y + image.h).length;
+  const left = members.filter(c => c.x + c.w <= image.x && c.y + c.h > image.y && c.y < image.y + image.h).length;
+  const right = members.filter(c => c.x >= image.x + image.w && c.y + c.h > image.y && c.y < image.y + image.h).length;
+  return [top, left, right, bottom].join('/');
+};
+const driveRingSample = async ({ page, snapshot, send }) => {
+  const result = {};
+  result.opened = await snapshot();
+  result.image = await page.evaluate(`(() => { const i = document.querySelector('.vam-canvas-image'); return { x: i.offsetLeft, y: i.offsetTop, w: i.offsetWidth, h: i.offsetHeight }; })()`);
+  await page.click(`[data-node-id="${RING_ROOT}"] .vam-collapse-button`);
+  await settled(send, 600);
+  result.expanded = await snapshot();
+  await page.click('.vam-layout-button');
+  await page.evaluate(`Array.from(document.querySelectorAll('.vam-layout-menu button')).find(b => /level 1/.test(b.textContent)).click()`);
+  await settled(send, 600);
+  result.level1 = await snapshot();
+  return result;
+};
+
+/** The map's own answer for the same action, computed outside the viewer: arrange first with the heights of what is drawn now (a ring card keeps the map's height; a card not drawn yet gets the median), as toggleCollapsed -> arrangeAll does. */
+const mapAnswer = (data, drawn, mutate) => {
+  const layoutText = load('map-layout-text.ts');
+  const layout = load('map-layout.ts');
+  const graph = load('map-graph.ts');
+  const ringOf = new Map(data.nodes.filter(node => node.ringHeight).map(node => [node.id, node.ringHeight]));
+  const nodes = data.nodes.map(({ id, parentId, x, y, collapsed }) => ({ id, path: `${id}.md`, parentId: parentId ?? null, x, y, collapsed: !!collapsed }));
+  for (const node of drawn.cards) Object.assign(nodes.find(each => each.id === node.id), { x: node.x, y: node.y });
+  mutate(nodes, graph);
+  const heights = new Map(drawn.cards.map(card => [card.id, ringOf.get(card.id) ?? card.h]));
+  const median = layout.medianHeight([...heights.values()]);
+  const image = data.images[0];
+  const items = [{ id: image.id, kind: 'annotated-image', path: image.id, x: image.x, y: image.y, w: image.w, h: image.h,
+    anchors: image.anchors.map(a => ({ id: a.id, at: { kind: 'image-2d', x: a.x, y: a.y } })),
+    relations: image.links.map(link => ({ kind: 'related', from: link.anchor, to: link.topic, ring: true })) }];
+  const out = layoutText.arrangeMapWithRings(nodes, items, undefined, id => heights.get(id) ?? median, { direction: 'right' }, {});
+  return { positions: new Map(out.nodes.map(node => [node.id, [node.x, node.y]])), median };
+};
+const near = (actual, expected, limit, label) => assert.ok(Math.abs(actual - expected) <= limit, `${label}: ${actual} vs ${expected}`);
+
+const assertRingSample = (data, report) => {
+  const ringIds = data.nodes.filter(node => node.ringHeight).map(node => node.id);
+  const at = (shot, id) => shot.cards.find(card => card.id === id);
+  // The fixture is the real sample: the viewer's cards are as tall as the export's (403-ish, not the 271 placeholder).
+  assert.ok(ringIds.every(id => at(report.opened, id).h >= 340), 'ring cards are drawn tall');
+  // Opening keeps the saved places; expanding one root keeps every ring card where it is and the ring in its shape.
+  for (const id of ringIds) {
+    const was = data.nodes.find(node => node.id === id);
+    assert.deepEqual([at(report.opened, id).x, at(report.opened, id).y], [was.x, was.y], `opened ${id}`);
+    assert.deepEqual([at(report.expanded, id).x, at(report.expanded, id).y], [was.x, was.y], `expanded ${id} did not move`);
+  }
+  assert.equal(ringShape(report.expanded.cards, ringIds, report.image), '5/1/1/5');
+  assert.equal(report.expanded.stacked, 0, 'no cards stacked after expanding');
+  assert.equal(report.expanded.overImage, 0, 'no card over the centre image');
+  assert.equal(report.level1.stacked, 0, 'no cards stacked at level 1');
+  assert.equal(report.level1.overImage, 0);
+  // The child row of the expanded root sits where the map puts it (the real sample: -908).
+  const expected = mapAnswer(data, report.opened, nodes => { nodes.find(node => node.id === RING_ROOT).collapsed = false; });
+  const children = data.nodes.filter(node => node.parentId === RING_ROOT).map(node => node.id);
+  for (const id of children) {
+    assert.equal(at(report.expanded, id).y, -908, `child row y of ${id}`);
+    near(at(report.expanded, id).x, expected.positions.get(id)[0], 1, `child x ${id}`);
+    near(at(report.expanded, id).y, expected.positions.get(id)[1], 1, `child y ${id}`);
+  }
+  // Level 1: cards not drawn before are laid out with the median of the drawn cards (map order), not their real height.
+  const level1 = mapAnswer(data, report.expanded, (nodes, graph) => graph.applyCollapseLevel(nodes, 1));
+  for (const card of report.level1.cards) {
+    if (at(report.expanded, card.id) || card.id === undefined) continue;
+    const want = level1.positions.get(card.id);
+    near(card.x, want[0], 1, `level 1 x ${card.id}`);
+    near(card.y, want[1], 1, `level 1 y ${card.id}`);
+  }
+};
+
+test('sharing viewer ring (real sample): expanding keeps the ring, the shape and the child row; level 1 uses the median row gap (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const data = ringSample();
+  assert.deepEqual([...new Set(data.nodes.map(node => node.ringHeight).filter(Boolean))].sort(), [353, 414, 425, 500]);
+  assertRingSample(data, await runRingSample(data, driveRingSample));
+});
+
+test('sharing viewer ring (real sample): with the placeholder heights (271) the same checks fail (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const data = ringSample(271);
+  const report = await runRingSample(data, driveRingSample);
+  assert.throws(() => assertRingSample(data, report), /expanded .* did not move/, 'a ring solved at 271 moves the ring');
+});

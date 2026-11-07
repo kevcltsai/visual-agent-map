@@ -6,8 +6,16 @@ import {
   descendants,
   type MapNode
 } from "../../../map-graph";
-import { arrangeMap, isLayoutKind, isStoredLayoutSpacing, type LayoutKind, type MapLayout } from "../../../map-layout";
-import { arrangeMapWithRings, ringOutwardDirections } from "../../../map-layout-text";
+import {
+  arrangeMap,
+  cardsOverlapAny,
+  isLayoutKind,
+  medianHeight,
+  isStoredLayoutSpacing,
+  type LayoutKind,
+  type MapLayout
+} from "../../../map-layout";
+import { arrangeMapWithRings, ringImagesInTheWay, ringOutwardDirections } from "../../../map-layout-text";
 import { isBranchDirection } from "../../../layouts/compose";
 import { withTextParents } from "../../../map-graph";
 import type { AnnotatedImageItem, CanvasItem, TextItem } from "../../visual-map/canvas-items";
@@ -705,9 +713,18 @@ export function startViewer(doc: Document): void {
         ...(text.links.length ? { links: text.links } : {})
       };
     });
-  /** The height the layout assumes: a ring member keeps the height the map measured (its card here is shorter, with no header or footer rows), else the drawn card. */
+  /**
+   * The height the layout assumes, in the map's order (view.ts cardHeightOf): a ring member keeps the height the map measured
+   * (its card here is shorter, with no header or footer rows), else the drawn card, else the height the user set, else the
+   * median of the drawn cards (a card not drawn yet, as in the map where a layout runs before the new cards are drawn).
+   */
   const cardHeightOf = (id: string): number | undefined =>
-    ringHeights.get(id) || (cards.get(id) ?? textEls.get(id))?.offsetHeight || undefined;
+    ringHeights.get(id) ||
+    (cards.get(id) ?? textEls.get(id))?.offsetHeight ||
+    byId.get(id)?.height ||
+    (byId.has(id)
+      ? medianHeight([...cards.entries()].map(([key, card]) => ringHeights.get(key) || card.offsetHeight))
+      : undefined);
   /** Draws the tree lines as the map does (view.ts drawEdges): by the direction each branch grows in, then the lines from anchors to topic cards. */
   function drawEdges(): void {
     edges.replaceChildren();
@@ -1210,8 +1227,28 @@ export function startViewer(doc: Document): void {
   /** Rebuilds the cards after a fold change, keeping the card the user acted on where it was on screen. */
   function relayout(focusId?: string, focusButton = false): void {
     const before = focusId ? cards.get(focusId)?.getBoundingClientRect() : undefined;
-    renderCards();
+    // The map arranges first and draws after (toggleCollapsed -> arrangeAll), so new cards are laid out with the median height.
     layout();
+    renderCards();
+    for (const id of cards.keys()) place(id);
+    placeImages();
+    markClipped();
+    // The map's one conditional second pass: a card over another card or the centre image gets one more arrangement, with the heights now drawn.
+    const drawn = new Set(cards.keys());
+    if (
+      cardsOverlapAny(nodes, drawn, cardHeightOf) ||
+      ringImagesInTheWay(
+        nodes,
+        [...imageItems(), ...textItems()] as CanvasItem[],
+        cardHeightOf,
+        id => textEls.get(id)?.offsetWidth || undefined,
+        {
+          cards: drawn,
+          images: new Set(images.map(image => image.id))
+        }
+      ).size
+    )
+      layout();
     drawEdges();
     const after = focusId ? cards.get(focusId) : undefined;
     if (after) {

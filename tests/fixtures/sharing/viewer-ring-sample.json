@@ -1,0 +1,832 @@
+{
+"format": "vam-share",
+"version": 1,
+"title": "牛肉各部位熱量",
+"language": "zh-TW",
+"exportedAt": "2026-11-07T01:16:18.382Z",
+"source": {
+"vamVersion": "0.30.0",
+"mapId": "0d4c31af-f432-4e97-827d-ff90080b332c"
+},
+"viewport": {
+"x": -4.906560878962182,
+"y": 367.9881769087958,
+"zoom": 0.43206663196251954
+},
+"nodes": [
+{
+"id": "d0fb8c71-6a06-4695-8259-a0f4699bf9d9",
+"parentId": null,
+"x": 996,
+"y": -429,
+"collapsed": true,
+"status": "completed",
+"ringHeight": 425,
+"title": "紐約客",
+"summary": "紐約客是牛短腰脊的無骨牛排，常用高溫煎或逆向低溫烤後快速煎，medium-rare 中心約 125–135°F，每100 g 約 133–209 kcal。",
+"cover": {
+"asset": "cover-d0fb8c71"
+}
+},
+{
+"id": "aee58e19-66af-4baa-a43f-c941912b0fb7",
+"parentId": null,
+"x": 1300,
+"y": -429,
+"collapsed": true,
+"status": "completed",
+"ringHeight": 425,
+"title": "牛肋條",
+"summary": "肋條依切法與部位決定烹調：牛肋條英式切適合慢燉，側切適合快煎燒烤；台式豬肋條（腹脅肉）以紅燒、東坡肉、焢肉為代表。",
+"cover": {
+"asset": "cover-aee58e19"
+}
+},
+{
+"id": "cf34ef52-d684-4cf8-9d28-d68623a4f802",
+"parentId": null,
+"x": 1604,
+"y": -429,
+"collapsed": true,
+"status": "completed",
+"ringHeight": 425,
+"title": "牛肋眼",
+"summary": "肋眼經典做法以厚切高溫煎為主，也可反向煎烤或整塊烤成烤肋排；成熟度以中心溫度判斷，Delmonico 名稱與部位定義仍有爭議。",
+"cover": {
+"asset": "cover-cf34ef52"
+}
+},
+{
+"id": "01faed49-5738-4c8f-b356-08ade9592178",
+"parentId": null,
+"x": 1908,
+"y": -429,
+"collapsed": true,
+"status": "completed",
+"ringHeight": 425,
+"title": "牛小排",
+"summary": "牛小排的料理方式取決於切法：薄切適合快烤，厚切帶骨適合紅酒燉煮與低溫烹調，熱量則隨脂肪比例差很大。",
+"cover": {
+"asset": "cover-01faed49"
+}
+},
+{
+"id": "aff11e3b-6b66-4f10-b788-fd8c9b20fbf6",
+"parentId": null,
+"x": 2212,
+"y": -418,
+"collapsed": true,
+"status": "completed",
+"ringHeight": 414,
+"title": "板腱",
+"summary": "板腱（top blade／flat iron）是牛肩胛骨一帶的 infraspinatus 肌，宜大火香煎或燒烤至約五分熟，中央結締組織筋需另外處理。",
+"cover": {
+"asset": "cover-aff11e3b"
+}
+},
+{
+"id": "4139478a-2606-434e-a77d-4e6b976e8c8f",
+"parentId": null,
+"x": 840,
+"y": 355,
+"collapsed": false,
+"status": "completed",
+"ringHeight": 353,
+"title": "牛後腿肉",
+"summary": "後腿肉依部位分工：上腿肉與眼肉偏瘦宜快烤、快煎或薄切，下部肉結締組織多宜慢燉，代表菜為 London broil、pot roast 與斯特羅加諾夫。",
+"cover": {
+"asset": "cover-4139478a"
+}
+},
+{
+"id": "35090088-d64f-43ef-a342-26b286b31771",
+"parentId": null,
+"x": 996,
+"y": 1067,
+"collapsed": true,
+"status": "completed",
+"ringHeight": 425,
+"title": "菲力",
+"summary": "菲力是牛後腰脊內側 psoas major 尖端，最軟嫩、脂肪低；每100g熱量依修脂與烹調約 153–211 kcal，184 kcal 來源仍待核對。",
+"cover": {
+"asset": "cover-35090088"
+}
+},
+{
+"id": "95510897-f7aa-433f-adb3-8d95dc318acc",
+"parentId": null,
+"x": 1300,
+"y": 1067,
+"collapsed": true,
+"status": "completed",
+"ringHeight": 425,
+"title": "牛筋",
+"summary": "牛筋富含膠原蛋白、需長時間燉煮或滷製，才能由韌變軟；各部位烹調法應依結締組織多寡選擇，牛腱資料仍不足。",
+"cover": {
+"asset": "cover-95510897"
+}
+},
+{
+"id": "94511d67-0ba1-49dc-af8a-25f6de8f10b6",
+"parentId": null,
+"x": 1604,
+"y": 1067,
+"collapsed": true,
+"status": "completed",
+"ringHeight": 425,
+"title": "牛腱",
+"summary": "牛腱以滷、燉、清燉等慢煮為主，筋與膠原軟化後口感佳；衛福部條目經次級來源換算約 133 kcal／100 g，與目前理解大致吻合。",
+"cover": {
+"asset": "cover-94511d67"
+}
+},
+{
+"id": "3c033a14-ee60-4b85-860d-a70e4a42fc2d",
+"parentId": null,
+"x": 1908,
+"y": 1067,
+"collapsed": true,
+"status": "completed",
+"ringHeight": 425,
+"title": "牛五花肉",
+"summary": "牛五花多指腹側的「バラ」部位（日本稱カルビ、韓國稱차돌박이與우삼겹），以燒烤與涮煮為主；「肋腹」並非來源中的標準名稱。",
+"cover": {
+"asset": "cover-3c033a14"
+}
+},
+{
+"id": "3b93f1d0-e161-422a-8ed4-b9a2b9e582de",
+"parentId": null,
+"x": 2212,
+"y": 1067,
+"collapsed": true,
+"status": "completed",
+"ringHeight": 425,
+"title": "牛前胸肉",
+"summary": "前胸肉指牛胸前部、前腿之間的結締組織豐富肉塊，適合慢燉、滷與低溫慢烤；熱量隨肥瘦與熟度從155到331千卡不等。",
+"cover": {
+"asset": "cover-3b93f1d0"
+}
+},
+{
+"id": "36174aae-c932-41f2-b40a-f2a266cb4d3b",
+"parentId": null,
+"x": 2368,
+"y": 282,
+"collapsed": false,
+"status": "completed",
+"ringHeight": 500,
+"title": "牛肩胛小排",
+"summary": "肩胛小排（chuck short rib）以紅酒燉等慢燉為主，韓式烤多改用橫切薄片 flanken，烹調前需先確認切法。",
+"cover": {
+"asset": "cover-36174aae"
+}
+},
+{
+"id": "a85daeee-700f-4c93-82ad-4d351468f602",
+"parentId": "4139478a-2606-434e-a77d-4e6b976e8c8f",
+"x": 480,
+"y": 222,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "牛後腿肉的中式經典可選紅燒豬後腿與蒙古牛肉，兩道的分量與火候多為推論，來源只部分支持。"
+},
+{
+"id": "90952957-26c8-47dd-8759-d78820490390",
+"parentId": "4139478a-2606-434e-a77d-4e6b976e8c8f",
+"x": 480,
+"y": 383,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "牛後腿肉適合的日式經典為生薑燒（薄切快炒）與角煮（慢燉），角煮食譜原文允許肩肉或脛肉替代。"
+},
+{
+"id": "f1f52b9e-4432-4125-afa6-b41f4a2ab8a0",
+"parentId": "4139478a-2606-434e-a77d-4e6b976e8c8f",
+"x": 480,
+"y": 544,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "牛後腿肉的韓式經典料理以「우둔」（瘦的後腿內側肉）為主，常見的是육회（生拌）與장조림（醬油燉牛肉）。"
+},
+{
+"id": "65c8cea0-5523-4275-9292-0b90d879bdcf",
+"parentId": "4139478a-2606-434e-a77d-4e6b976e8c8f",
+"x": 480,
+"y": 705,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "西式牛後腿肉經典料理以義式米蘭燉小牛膝、德式脆皮豬腳、英式烤羊腿為主，法式紅酒燉牛肉偏肩胛部位，第二道部分待查。"
+},
+{
+"id": "64891735-0b2d-44cb-9738-26f8de7922e6",
+"parentId": "d0fb8c71-6a06-4695-8259-a0f4699bf9d9",
+"x": 456,
+"y": -626,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "紐約客（牛短腰脊）的中式做法有兩類：港式黑椒牛柳與美式中餐青椒牛排；可查到的食譜來源有限，多為商家或部落格。"
+},
+{
+"id": "62ccb321-160e-44d2-b388-35edffc4ca6a",
+"parentId": "d0fb8c71-6a06-4695-8259-a0f4699bf9d9",
+"x": 816,
+"y": -654,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "紐約客（牛短腰脊）的日式料理查到兩道食譜：醬油清酒大蒜牛排與柚醋和風牛排，來源已確認，但部位與火候仍待校準。"
+},
+{
+"id": "30f546ad-9cda-4e16-af51-db5483cca1bd",
+"parentId": "d0fb8c71-6a06-4695-8259-a0f4699bf9d9",
+"x": 1176,
+"y": -634,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "紐約客（牛短腰脊）的韓式做法以薄切醃漬（梨汁、醬油、糖、芝麻油、蒜）與厚切加辣醬釉兩種為主，部位對應以韓文「채끝」為準。"
+},
+{
+"id": "69e66bdf-39e6-4c33-8889-c86af381a824",
+"parentId": "d0fb8c71-6a06-4695-8259-a0f4699bf9d9",
+"x": 1536,
+"y": -634,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "紐約客西式經典可先列紐約客牛排與 pastrami on rye／Reuben 三明治兩道，食譜以逆向低溫烤牛排與 Reuben 組裝為主。"
+},
+{
+"id": "b2d9eb39-a38f-49d2-aa44-df492d79703f",
+"parentId": "35090088-d64f-43ef-a342-26b286b31771",
+"x": 456,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "菲力的中式經典以「黑胡椒牛柳」與「蔥爆牛柳」為代表，都靠醃料、大火快炒，台式鐵板黑胡椒則是另一脈絡。"
+},
+{
+"id": "984ff639-94ec-4bbb-b900-7edd8534cf7f",
+"parentId": "35090088-d64f-43ef-a342-26b286b31771",
+"x": 816,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "日式菲力以醬油、味醂為底的醬汁為主，常見兩道是大蒜醬油牛排與山葵醬油骰子牛排，火候仍需依厚度實測。"
+},
+{
+"id": "c7140b02-c7bb-449d-af77-5f970cfcce0f",
+"parentId": "35090088-d64f-43ef-a342-26b286b31771",
+"x": 1176,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "韓式牛菲力可選不生食的「不辣」不苦 — 以牛菲力做韓式經典以「불고기」薄片快炒與「육회」生拌最直接，兩者都只需醃料與快速處理。"
+},
+{
+"id": "a3cef2a5-a693-48df-b8cc-794d54d99855",
+"parentId": "35090088-d64f-43ef-a342-26b286b31771",
+"x": 1536,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "菲力的西式經典料理以威靈頓牛排、迪安牛排（Steak Diane）與奧斯卡牛排為代表；每 100 g 熟制熱量依等級與切法約 205–343 kcal。"
+},
+{
+"id": "4e068f44-a2af-4cb6-a745-c1a514d73a4a",
+"parentId": "aee58e19-66af-4baa-a43f-c941912b0fb7",
+"x": 760,
+"y": -914,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "中式牛肋條以紅燒牛肉麵與蘿蔔牛腩為兩道經典，食譜多用小火慢燉約1至3小時，差別在加水與調味時機。"
+},
+{
+"id": "18da0e1c-e20d-431d-b0df-77d31b03613a",
+"parentId": "aee58e19-66af-4baa-a43f-c941912b0fb7",
+"x": 1120,
+"y": -914,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "日式牛肋條以醬油、味醂、酒、糖燉煮或甘辛煮為主，代表做法是牛肉大根甘辛煮與醬油味醂燉牛肋條。"
+},
+{
+"id": "ed126366-1435-4a87-8f39-27093143e346",
+"parentId": "aee58e19-66af-4baa-a43f-c941912b0fb7",
+"x": 1480,
+"y": -914,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "韓式牛肋條兩道經典：烤製的 LA 갈비（橫切薄片、醃後燒烤）與燉煮的 갈비찜（傳統節日宴席菜），切法與醬汁不同。"
+},
+{
+"id": "18d64ad4-e346-41fa-b183-bdcb2079c2e5",
+"parentId": "aee58e19-66af-4baa-a43f-c941912b0fb7",
+"x": 1840,
+"y": -914,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "西式牛肋條兩道經典：法式紅酒慢燉（勃艮第風）與美國德州煙燻牛肋條；食譜以紅酒慢燉為主流。"
+},
+{
+"id": "b818cc69-40af-410d-b060-7d30581351da",
+"parentId": "95510897-f7aa-433f-adb3-8d95dc318acc",
+"x": 1860,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "牛筋中式經典可選蔥燒牛筋與滷牛腱牛筋兩道，關鍵是長時間小火燉至筷子能穿過。"
+},
+{
+"id": "c4020e1e-044e-4946-87ad-5eb3bffcdfd3",
+"parentId": "95510897-f7aa-433f-adb3-8d95dc318acc",
+"x": 2220,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "日式牛筋兩道經典：牛筋煮込み（醤油或味噌慢煮）與兵庫的牛すじの煮物（酒醤油煮），皆需下茹で後長時間加熱。"
+},
+{
+"id": "d77206e3-1f42-484c-9060-0df67205ded2",
+"parentId": "95510897-f7aa-433f-adb3-8d95dc318acc",
+"x": 2580,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "韓式牛筋兩道經典：道家尼湯（도가니탕，膝關節筋膜燉湯）與道家尼水肉（도가니수육，水煮切片沾醬），皆需長時間燉煮。"
+},
+{
+"id": "fb8c36f0-3288-4b50-86be-7e3e86a54bcf",
+"parentId": "95510897-f7aa-433f-adb3-8d95dc318acc",
+"x": 2940,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "西式牛筋料理以紅酒燉牛筋與義式燉牛膝為代表，兩者都靠約2至3小時小火慢燉，讓膠原蛋白轉為明膠。"
+},
+{
+"id": "6d3d2cf0-d9a0-4688-9ed2-3140dc4e6cad",
+"parentId": "cf34ef52-d684-4cf8-9d28-d68623a4f802",
+"x": 1064,
+"y": -626,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "日式牛肋眼兩道：鐵板燒以乾煎配蒜味照燒與白味噌蘸醬，和風醬汁以醬油、味醂、砂糖調味；兩組醬汁配方已有來源，標準比例仍待確認。"
+},
+{
+"id": "7e8ac581-bb4b-444d-a9dc-8c5996b1e53c",
+"parentId": "cf34ef52-d684-4cf8-9d28-d68623a4f802",
+"x": 1424,
+"y": -626,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "韓式牛肉分兩類：薄切的불고기多用肋眼或沙朗，帶骨的갈비用牛短排，肋眼並非갈비的正統部位。"
+},
+{
+"id": "ed5639e7-e32d-462c-be22-31d6bd261306",
+"parentId": "cf34ef52-d684-4cf8-9d28-d68623a4f802",
+"x": 1784,
+"y": -626,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "西式牛肋眼以紐約 Delmonico 厚切牛排與法式 Steak Frites 為代表，食譜多見反向煎烤與整塊烤肋排，USDA 牛排安全下限為 145°F。"
+},
+{
+"id": "497ec174-1d9c-4ed7-8a90-8f45b3038c44",
+"parentId": "94511d67-0ba1-49dc-af8a-25f6de8f10b6",
+"x": 1064,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "牛腱的中式經典做法分兩路：醬滷冷食（醬牛腱）與紅燒、蘿蔔燉等熱食，各有代表食譜。"
+},
+{
+"id": "98521ff0-044f-4d38-90cf-3cad81f591cf",
+"parentId": "94511d67-0ba1-49dc-af8a-25f6de8f10b6",
+"x": 1424,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "日式牛腱多指「牛すじ」（牛筋），經典做法是慢燉成牛すじ煮込み，另有咖啡廳式的カレー與拉麵配料兩種常見用法。"
+},
+{
+"id": "1d2c8388-59cb-439f-9509-9172d4daaed0",
+"parentId": "94511d67-0ba1-49dc-af8a-25f6de8f10b6",
+"x": 1784,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "韓式牛腱的兩類經典做法：長時間熬煮的湯品（설렁탕、곰탕）與甜鹹醬汁慢燉的사태찜，各有可查食譜。"
+},
+{
+"id": "b6763541-4445-47ed-9afd-5434a5051444",
+"parentId": "94511d67-0ba1-49dc-af8a-25f6de8f10b6",
+"x": 2144,
+"y": 1552,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "牛腱西式經典以義式 Ossobuco（燉牛膝）與法式 Pot-au-feu（老火鍋）為代表，皆靠 3 小時以上慢燉軟化膠原。"
+},
+{
+"id": "a3c362e4-03a2-44df-bdcf-e0b93db110a3",
+"parentId": "01faed49-5738-4c8f-b356-08ade9592178",
+"x": 1368,
+"y": -654,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "牛小排中式經典可分兩類：紅燒牛小排（醬油、冰糖、花椒慢燉2.5–3小時）與黑椒牛小排（快炒約25分鐘），兩者耗時與調味差很多。"
+},
+{
+"id": "0eac8a10-2c16-4075-a275-11e4d3122856",
+"parentId": "01faed49-5738-4c8f-b356-08ade9592178",
+"x": 1728,
+"y": -626,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "日式牛小排兩道經典：焼肉カルビ（炭烤後蘸甜醬油タレ）與牛肉甘辛煮物（如肉じゃが、牛バラ大根煮）。"
+},
+{
+"id": "5a8fb2dc-fdd9-4ada-ae38-8305417b0834",
+"parentId": "01faed49-5738-4c8f-b356-08ade9592178",
+"x": 2088,
+"y": -626,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "韓式牛小排兩道經典：烤製的 LA 갈비（梨汁醬油醃薄切）與慢燉的갈비찜（醬油甜鹹底帶骨厚塊），食譜差在切法與醃漬時間。"
+},
+{
+"id": "e4d688dc-32de-435d-a22c-aec1fb3237f0",
+"parentId": "01faed49-5738-4c8f-b356-08ade9592178",
+"x": 2448,
+"y": -626,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "西式牛小排兩道經典：紅酒燉煮（160°C 加蓋約 3 小時）與德州煙燻（225°F 約 6–8 小時），各有可查證的食譜來源。"
+},
+{
+"id": "8812f176-3197-468b-80f7-657bb02a4711",
+"parentId": "3c033a14-ee60-4b85-860d-a70e4a42fc2d",
+"x": 2468,
+"y": 1544,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "牛五花的中式經典以紅燒與水煮為代表：紅燒牛肉多用牛腱或牛肋條燉煮，水煮牛肉則多用里脊或牛肉片，五花僅見於部分牛腩燉菜。"
+},
+{
+"id": "c5cd5a71-3199-4d1d-9c8f-6f4bb6972928",
+"parentId": "3c033a14-ee60-4b85-860d-a70e4a42fc2d",
+"x": 2828,
+"y": 1544,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "日式牛五花經典料理以壽喜燒（甘辛割下煮）與牛丼（洋蔥醬油煮牛肉蓋飯）最具代表性，牛五花（short plate）多用於牛丼。"
+},
+{
+"id": "bccd0de3-eefc-4396-8d0b-d9f80a6a41b2",
+"parentId": "3c033a14-ee60-4b85-860d-a70e4a42fc2d",
+"x": 3188,
+"y": 1544,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "牛五花的韓式經典做法以兩道為代表：차돌박이 숙주볶음（大火快炒）與우삼겹／차돌 된장찌개（先煎後下湯），兩道食譜皆已查證，部位分類仍有出入。"
+},
+{
+"id": "a56ae428-4d00-42c3-9140-f6b2b2394799",
+"parentId": "3c033a14-ee60-4b85-860d-a70e4a42fc2d",
+"x": 3548,
+"y": 1544,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "西式牛五花經典為 Reuben 與德州煙燻牛胸三明治；食譜可做煙燻 pastrami 與自製 corned beef，但來源多用牛胸（brisket）而非五花。"
+},
+{
+"id": "3eacae78-227e-4aa3-b787-eef387b7d1b6",
+"parentId": "aff11e3b-6b66-4f10-b788-fd8c9b20fbf6",
+"x": 1672,
+"y": -903,
+"collapsed": false,
+"status": "idea",
+"title": "中式",
+"summary": "板腱的中式經典料理與食譜，各列兩道。"
+},
+{
+"id": "dc655a5c-3c3b-49a4-9ff9-e953c7da7bec",
+"parentId": "aff11e3b-6b66-4f10-b788-fd8c9b20fbf6",
+"x": 2032,
+"y": -903,
+"collapsed": false,
+"status": "idea",
+"title": "日式",
+"summary": "板腱的日式經典料理與食譜，各列兩道。"
+},
+{
+"id": "9853bda5-2e1f-4c57-b1fa-09ea11a41895",
+"parentId": "aff11e3b-6b66-4f10-b788-fd8c9b20fbf6",
+"x": 2392,
+"y": -903,
+"collapsed": false,
+"status": "idea",
+"title": "韓式",
+"summary": "板腱的韓式經典料理與食譜，各列兩道。"
+},
+{
+"id": "861e45ee-872c-4462-ae2c-4d0dc651f9d4",
+"parentId": "aff11e3b-6b66-4f10-b788-fd8c9b20fbf6",
+"x": 2752,
+"y": -903,
+"collapsed": false,
+"status": "idea",
+"title": "西式",
+"summary": "板腱的西式經典料理與食譜，各列兩道。"
+},
+{
+"id": "e4256cdd-1ac2-4772-b7ce-64ab7b017dfc",
+"parentId": "3b93f1d0-e161-422a-8ed4-b9a2b9e582de",
+"x": 3872,
+"y": 1544,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "牛前胸的中式做法以紅燒與紅油兩路慢燉為主，常見燉煮 1 至 2 小時以上；焯水與時間來源分歧，前胸專屬的壓力鍋資料不足。"
+},
+{
+"id": "c0c37879-3fc6-4de9-8571-cff09b7ef2ec",
+"parentId": "3b93f1d0-e161-422a-8ed4-b9a2b9e582de",
+"x": 4232,
+"y": 1544,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "前胸肉（ブリスケット）在日式料理中多用於咖哩與醬油煮込，以長時間燉煮軟化結締組織。"
+},
+{
+"id": "8cdebc5a-5c72-47f8-b0c4-8a8a141714ea",
+"parentId": "3b93f1d0-e161-422a-8ed4-b9a2b9e582de",
+"x": 4592,
+"y": 1544,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "牛前胸（양지、차돌）的韓式經典做法以辣味湯品陸개장與薄切烤肉車돌박이為主，食譜來源多為英文部落格。"
+},
+{
+"id": "decca123-d6e1-4f17-8c3e-cb31d7043f48",
+"parentId": "3b93f1d0-e161-422a-8ed4-b9a2b9e582de",
+"x": 4952,
+"y": 1544,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "牛前胸肉的西式經典以德州煙燻牛胸與鹽漬牛胸（corned beef）為代表，兩者都靠低溫長時間烹煮。"
+},
+{
+"id": "be6773fa-0c6d-4ffb-911b-157e01b36419",
+"parentId": "36174aae-c932-41f2-b40a-f2a266cb4d3b",
+"x": 2728,
+"y": 227,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "中式牛小排兩道經典：醬油八角薑紅燒慢燉，與台式浸料後烤；未找到以肩胛小排（chuck）為明確對象的食譜。"
+},
+{
+"id": "22166d22-28ea-492a-bd7e-b655df748585",
+"parentId": "36174aae-c932-41f2-b40a-f2a266cb4d3b",
+"x": 2728,
+"y": 388,
+"collapsed": false,
+"status": "completed",
+"title": "日式",
+"summary": "日式牛肩胛小排以醬油、味醂、清酒慢燉的煮込為主，另有肉じゃが式燉煮；可列的「經典」證據仍偏弱。"
+},
+{
+"id": "a2c940d7-df67-4d26-86f2-3605657ccb12",
+"parentId": "36174aae-c932-41f2-b40a-f2a266cb4d3b",
+"x": 2728,
+"y": 549,
+"collapsed": false,
+"status": "completed",
+"title": "韓式",
+"summary": "牛肩胛小排的韓式經典做法有兩種：갈비찜（慢燉）與 LA 갈비（薄切烤），但來源多指向一般牛小排，chuck short rib 本身的資料不足。"
+},
+{
+"id": "3cbed128-f8d3-4640-979c-d5e9b822200d",
+"parentId": "36174aae-c932-41f2-b40a-f2a266cb4d3b",
+"x": 2728,
+"y": 710,
+"collapsed": false,
+"status": "completed",
+"title": "西式",
+"summary": "牛肩胛小排的西式經典有兩條路：法式或美式紅酒慢燉，以及德州式低溫煙燻不加醬。"
+},
+{
+"id": "1ebe8d84-c838-46a8-a710-f054f3ec43f6",
+"parentId": "cf34ef52-d684-4cf8-9d28-d68623a4f802",
+"x": 2144,
+"y": -626,
+"collapsed": false,
+"status": "completed",
+"title": "中式",
+"summary": "中式牛肋眼以快炒黑胡椒牛柳最常見，食譜列肋眼為上里脊替代；紅燒與燉煮多用牛小排或牛腩，肋眼非首選。"
+}
+],
+"images": [
+{
+"id": "img-454a952e",
+"x": 1384,
+"y": 260.375,
+"w": 720,
+"h": 542.25,
+"anchors": [
+{
+"id": "anc-8aba34e8",
+"x": 0.31,
+"y": 0.45,
+"note": "紐約客（上方靠左的背部區域）"
+},
+{
+"id": "anc-3532efb9",
+"x": 0.45,
+"y": 0.475,
+"note": "肋條（背部中段偏前的肋骨區）"
+},
+{
+"id": "anc-403623a1",
+"x": 0.515,
+"y": 0.45,
+"note": "肋眼（背部中段靠後的區域）"
+},
+{
+"id": "anc-327ac90a",
+"x": 0.52,
+"y": 0.51,
+"note": "牛小排（背部中後段偏下的肋骨區）"
+},
+{
+"id": "anc-d36760ca",
+"x": 0.61,
+"y": 0.46,
+"note": "板腱（肩頸上方的牛背區域）"
+},
+{
+"id": "anc-9688c9cf",
+"x": 0.33,
+"y": 0.52,
+"note": "後腿肉（牛身後方的大腿區域）"
+},
+{
+"id": "anc-8d06931e",
+"x": 0.39,
+"y": 0.53,
+"note": "菲力（腰脊內側、靠近腹腔上方的區域）"
+},
+{
+"id": "anc-1bb51dce",
+"x": 0.33,
+"y": 0.72,
+"note": "牛筋（前腿下段靠近蹄部的區域）"
+},
+{
+"id": "anc-2facd876",
+"x": 0.4,
+"y": 0.7,
+"note": "牛腱（前腿中段的小腿肉區域）"
+},
+{
+"id": "anc-c1785410",
+"x": 0.58,
+"y": 0.62,
+"note": "五花肉（腹部下方的肋腹區域）"
+},
+{
+"id": "anc-728b02ff",
+"x": 0.6,
+"y": 0.52,
+"note": "前胸肉（前腿上方的胸口區域）"
+},
+{
+"id": "anc-4a51bcc1",
+"x": 0.66,
+"y": 0.55,
+"note": "肩胛小排（肩胛區前下方的小排區域）"
+},
+{
+"id": "anc-1de39a9e",
+"x": 0.034,
+"y": 0.203,
+"note": "牛肉部位圖片錨點"
+}
+],
+"note": "牛肉各部位的食譜與料理",
+"links": [
+{
+"anchor": "anc-8aba34e8",
+"topic": "d0fb8c71-6a06-4695-8259-a0f4699bf9d9",
+"ring": true
+},
+{
+"anchor": "anc-3532efb9",
+"topic": "aee58e19-66af-4baa-a43f-c941912b0fb7",
+"ring": true
+},
+{
+"anchor": "anc-403623a1",
+"topic": "cf34ef52-d684-4cf8-9d28-d68623a4f802",
+"ring": true
+},
+{
+"anchor": "anc-327ac90a",
+"topic": "01faed49-5738-4c8f-b356-08ade9592178",
+"ring": true
+},
+{
+"anchor": "anc-d36760ca",
+"topic": "aff11e3b-6b66-4f10-b788-fd8c9b20fbf6",
+"ring": true
+},
+{
+"anchor": "anc-9688c9cf",
+"topic": "4139478a-2606-434e-a77d-4e6b976e8c8f",
+"ring": true
+},
+{
+"anchor": "anc-8d06931e",
+"topic": "35090088-d64f-43ef-a342-26b286b31771",
+"ring": true
+},
+{
+"anchor": "anc-1bb51dce",
+"topic": "95510897-f7aa-433f-adb3-8d95dc318acc",
+"ring": true
+},
+{
+"anchor": "anc-2facd876",
+"topic": "94511d67-0ba1-49dc-af8a-25f6de8f10b6",
+"ring": true
+},
+{
+"anchor": "anc-c1785410",
+"topic": "3c033a14-ee60-4b85-860d-a70e4a42fc2d",
+"ring": true
+},
+{
+"anchor": "anc-728b02ff",
+"topic": "3b93f1d0-e161-422a-8ed4-b9a2b9e582de",
+"ring": true
+},
+{
+"anchor": "anc-4a51bcc1",
+"topic": "36174aae-c932-41f2-b40a-f2a266cb4d3b",
+"ring": true
+}
+]
+}
+],
+"assets": {
+"cover-d0fb8c71": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22282%22%3E%3Crect%20width%3D%22280%22%20height%3D%22282%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-aee58e19": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22282%22%3E%3Crect%20width%3D%22280%22%20height%3D%22282%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-cf34ef52": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22282%22%3E%3Crect%20width%3D%22280%22%20height%3D%22282%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-01faed49": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22282%22%3E%3Crect%20width%3D%22280%22%20height%3D%22282%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-aff11e3b": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22271%22%3E%3Crect%20width%3D%22280%22%20height%3D%22271%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-4139478a": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22219%22%3E%3Crect%20width%3D%22280%22%20height%3D%22219%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-35090088": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22282%22%3E%3Crect%20width%3D%22280%22%20height%3D%22282%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-95510897": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22282%22%3E%3Crect%20width%3D%22280%22%20height%3D%22282%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-94511d67": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22282%22%3E%3Crect%20width%3D%22280%22%20height%3D%22282%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-3c033a14": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22282%22%3E%3Crect%20width%3D%22280%22%20height%3D%22282%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-3b93f1d0": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22282%22%3E%3Crect%20width%3D%22280%22%20height%3D%22282%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E",
+"cover-36174aae": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22280%22%20height%3D%22366%22%3E%3Crect%20width%3D%22280%22%20height%3D%22366%22%20fill%3D%22%23c8b8e8%22/%3E%3C/svg%3E"
+}
+}

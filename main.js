@@ -70125,6 +70125,7 @@ ${request.requirements}` : preset.text,
           };
           img.addEventListener("load", done);
           img.addEventListener("error", done);
+          img.loading = "eager";
           const real = img.getAttribute("data-src");
           if (real && !img.getAttribute("src")) img.setAttribute("src", real);
           else if (img.complete && img.naturalWidth) done();

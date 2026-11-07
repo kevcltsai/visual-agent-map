@@ -15561,6 +15561,8 @@ export class VisualAgentMapView extends ItemView {
           };
           img.addEventListener("load", done);
           img.addEventListener("error", done);
+          // A lazy image off screen never loads, whatever its src: without this the wait always runs out.
+          img.loading = "eager";
           const real = img.getAttribute("data-src");
           if (real && !img.getAttribute("src")) img.setAttribute("src", real);
           else if (img.complete && img.naturalWidth) done();

@@ -430,7 +430,11 @@ export function assembleTaskPrompt(
   // Each element is a list of pieces; elements are joined by a blank line, and an empty element still takes its place.
   const elements: Piece[][] = [];
   const add = (...pieces: Piece[]) => elements.push(pieces);
-  add(fixed(outputLanguage(language, topicAnchor), "output-language"));
+  // The AI decides the sections (decide) or keeps the note's own (follow): the six standard headings are not the rule.
+  const sectionsOpen =
+    (context.aiSections === "decide" && isGeneral) ||
+    (context.aiSections === "follow" && (isGeneral || step === "synthesize"));
+  add(fixed(outputLanguage(language, topicAnchor, !sectionsOpen), "output-language"));
   add(fixed(inLanguage(quick ? ROLE_QUICK : ROLE, language), "role"));
   add(fixed(inLanguage(quick ? SOURCE_SAFETY_QUICK : SOURCE_SAFETY, language), "source-safety"));
   add(fixed(context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language) : "", "reference-citations"));

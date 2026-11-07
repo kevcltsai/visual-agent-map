@@ -634,6 +634,32 @@ test('AI suggested follow: the followed rule comes after the sections for resear
   }
 });
 
+// The language rule used to say "the six standard Detail headings ..." in the decide and follow prompts too, against
+// "the sections are yours to decide" and "keep the note's sections". The scan covers the whole prompt, not one segment.
+const SIX_STANDARD = /六個標準|六个标准|six standard/i;
+test('AI suggested decide and follow: no sentence about the six standard headings anywhere in the prompt', () => {
+  for (const language of LANGUAGES) {
+    for (const flag of ['decide', 'follow']) {
+      let opened = 0;
+      for (const [name, context] of stepContexts(language)) {
+        const { text, segments } = aiPrompt({ ...context, aiSections: flag }, language);
+        const open = idsOf(segments).includes(flag === 'decide' ? 'ai-decided-sections' : 'ai-followed-sections');
+        const plain = aiPrompt({ ...context, aiSections: undefined }, language).text;
+        if (open) {
+          opened++;
+          assert.equal(SIX_STANDARD.test(text), false, `${language} ${flag} ${name}`);
+          assert.ok(text.includes(AI().inLanguage(flag === 'decide' ? AI().AI_DECIDED_SECTIONS : AI().AI_FOLLOWED_SECTIONS, language)), `${language} ${flag} ${name}`);
+          // The rest of the language rule stays: the content language and the quote rule.
+          assert.ok(idsOf(segments).includes('output-language'), `${language} ${flag} ${name}`);
+        } else assert.equal(text, plain, `${language} ${flag} ${name}: steps without the fragment stay byte for byte`);
+      }
+      assert.ok(opened > 0, `${language} ${flag}`);
+    }
+    // The positive control: the plain prompt still carries the sentence.
+    assert.ok(SIX_STANDARD.test(aiPrompt({ ...base, detail: '', outputLanguage: language }, language).text), `${language} control`);
+  }
+});
+
 test('AI suggested: general and an absent flag give the same prompt as before (byte for byte)', () => {
   for (const language of LANGUAGES) {
     for (const [, context] of stepContexts(language)) {

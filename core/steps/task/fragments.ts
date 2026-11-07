@@ -136,18 +136,21 @@ const HEADING_RULE_NOTE: FragmentPair = { zh: HeadingRuleNoteZH, en: HeadingRule
  * The output-language paragraph. The standard Detail headings follow the interface language when it is also the note
  * language; when they differ (Simplified Chinese), they stay in the note language and only the content follows the output.
  */
-export function outputLanguage(language: ContentLanguage, anchor?: FollowAnchor): string {
+export function outputLanguage(language: ContentLanguage, anchor?: FollowAnchor, sectionsFixed = true): string {
   const note = verbatimHeadingLanguage(language);
   const names = languageVariables(language, { language: "plain" }, language, undefined, anchor);
   // Following the input has no language to contrast the fixed headings with: they are simply copied as listed.
-  const headingRule = isFollowInputLanguage(language)
-    ? renderTemplate(inLanguage(HEADING_RULE_FOLLOW, language), names)
-    : note
-      ? renderTemplate(inLanguage(HEADING_RULE_NOTE, language), {
-          ...names,
-          ...languageVariables(note, { note: "plain" }, language)
-        })
-      : inLanguage(HEADING_RULE_UI, language);
+  // "AI suggested" styles (decide, follow) do not use the six standard headings: no sentence about them.
+  const headingRule = !sectionsFixed
+    ? ""
+    : isFollowInputLanguage(language)
+      ? renderTemplate(inLanguage(HEADING_RULE_FOLLOW, language), names)
+      : note
+        ? renderTemplate(inLanguage(HEADING_RULE_NOTE, language), {
+            ...names,
+            ...languageVariables(note, { note: "plain" }, language)
+          })
+        : inLanguage(HEADING_RULE_UI, language);
   return renderTemplate(inLanguage(OUTPUT_LANGUAGE, language), { language: names.language, headingRule });
 }
 /** Merge mode: organize only what the sources say (no synthesis of agreements, tradeoffs or open questions). */

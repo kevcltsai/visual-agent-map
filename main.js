@@ -23143,10 +23143,10 @@ var OUTPUT_LANGUAGE = { zh: output_language_zh_default, en: output_language_en_d
 var HEADING_RULE_UI = pair4(heading_rule_ui_zh_default, heading_rule_ui_en_default);
 var HEADING_RULE_FOLLOW = { zh: heading_rule_follow_zh_default, en: heading_rule_follow_en_default };
 var HEADING_RULE_NOTE = { zh: heading_rule_note_zh_default, en: heading_rule_note_en_default };
-function outputLanguage(language2, anchor) {
+function outputLanguage(language2, anchor, sectionsFixed = true) {
   const note = verbatimHeadingLanguage(language2);
   const names3 = languageVariables(language2, { language: "plain" }, language2, void 0, anchor);
-  const headingRule = isFollowInputLanguage(language2) ? renderTemplate(inLanguage(HEADING_RULE_FOLLOW, language2), names3) : note ? renderTemplate(inLanguage(HEADING_RULE_NOTE, language2), {
+  const headingRule = !sectionsFixed ? "" : isFollowInputLanguage(language2) ? renderTemplate(inLanguage(HEADING_RULE_FOLLOW, language2), names3) : note ? renderTemplate(inLanguage(HEADING_RULE_NOTE, language2), {
     ...names3,
     ...languageVariables(note, { note: "plain" }, language2)
   }) : inLanguage(HEADING_RULE_UI, language2);
@@ -32592,7 +32592,8 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
   const format = formatTextOf(selection, language2, options);
   const elements = [];
   const add = (...pieces) => elements.push(pieces);
-  add(fixed(outputLanguage(language2, topicAnchor), "output-language"));
+  const sectionsOpen = context.aiSections === "decide" && isGeneral || context.aiSections === "follow" && (isGeneral || step === "synthesize");
+  add(fixed(outputLanguage(language2, topicAnchor, !sectionsOpen), "output-language"));
   add(fixed(inLanguage(quick ? ROLE_QUICK : ROLE, language2), "role"));
   add(fixed(inLanguage(quick ? SOURCE_SAFETY_QUICK : SOURCE_SAFETY, language2), "source-safety"));
   add(fixed(context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language2) : "", "reference-citations"));

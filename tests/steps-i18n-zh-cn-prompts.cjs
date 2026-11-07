@@ -153,7 +153,7 @@ test('zh-CN prompt snapshots: exactly 103 lines carry a research.* text that dif
   assert.equal(lines.length, 103);
 });
 
-test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 103 output-language sentences and 94 clauses, none in zh-TW', () => {
+test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 101 output-language sentences and 94 clauses, none in zh-TW', () => {
   const total = { rules: 0, clauses: 0 };
   for (const file of fs.readdirSync(directory).filter(name => /\.zh-CN(\.\d+)?\.txt$/.test(name))) {
     const found = stripVerbatim(fs.readFileSync(path.join(directory, file), 'utf8'));
@@ -167,6 +167,7 @@ test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 103 out
   // T4 P1 add 4 sentences and 4 clauses; the four zh-CN snapshots service.reference-groups-{top,fresh}.{1,2} of T4 F1 add 4 sentences and 4 clauses; the two zh-CN snapshots service.{research,decompose}-anchor-context of annotated-image P5a add
   // 2 sentences and 1 clause (the decompose snapshot has the sentence but no detail structure); the two zh-CN snapshots
   // service.task-ai-{decided,followed} of ai-proposed-note-style P2 add 2 sentences and 1 clause (the decided prompt has
-  // no detail structure, so no clause).
-  assert.deepEqual(total, { rules: 103, clauses: 94 });
+  // no detail structure, so no clause). The same two snapshots then lose their sentence again (the AI decides or keeps the
+  // sections, so no six-standard-headings sentence): 103 - 2 = 101; the followed one keeps its clause.
+  assert.deepEqual(total, { rules: 101, clauses: 94 });
 });

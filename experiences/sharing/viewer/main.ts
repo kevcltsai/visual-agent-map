@@ -6,8 +6,20 @@ import {
   descendants,
   type MapNode
 } from "../../../map-graph";
-import { arrangeMap } from "../../../map-layout";
+import { arrangeMap, isLayoutKind, isStoredLayoutSpacing, type LayoutKind, type MapLayout } from "../../../map-layout";
+import { arrangeMapWithRings, ringOutwardDirections } from "../../../map-layout-text";
+import { isBranchDirection } from "../../../layouts/compose";
 import { withTextParents } from "../../../map-graph";
+import type { AnnotatedImageItem, CanvasItem, TextItem } from "../../visual-map/canvas-items";
+import { ringMembers, ringSide } from "../../visual-map/image-ring";
+import {
+  pointToBoxPathData,
+  pointToBoxStraightPathData,
+  treeEdgePathData,
+  fishboneSpinePathData,
+  type RelationBox
+} from "../../visual-map/relation-geometry";
+import { branchDirectionResolver, depthOf as treeDepthOf, lineKind } from "../../visual-map/tree-edge-rules";
 import { fitViewport, focusViewport, insetFromRects, type MapViewport } from "../../visual-map/viewport-inset";
 import type { ShareNodePayload, ShareNodeTranslation, SharePayload } from "../share-format";
 import { SHARE_VIEWER_UI_DEFAULT, type ShareViewerUi } from "../share-viewer-ui";
@@ -18,6 +30,8 @@ import { createViewerElement } from "./dom";
 import { readTopicColor, readTopicStyle, TOPIC_COLORS, type TopicColor } from "../../../topic-colors";
 import { markerSymbol, readTopicMarkers, type TopicMarker } from "../../../topic-markers";
 import { pickShareLanguage, shareLanguageKey } from "./language";
+import { buildCover, placeCardCover, removeCardCover } from "./cover-dom";
+import { readCover, readImages, type ViewerCover, type ViewerImage } from "./image-data";
 
 /** Where "Install VAM" points. The only link the viewer itself carries. */
 export const INSTALL_URL = "https://github.com/kevcltsai/visual-agent-map?ref=share";
@@ -49,6 +63,7 @@ const ICONS: Record<string, string[]> = {
     "path|d=M3 18h.01"
   ],
   chevron: ["path|d=m9 18 6-6-6-6"],
+  pin: ["path|d=M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z", "circle|cx=12|cy=10|r=3"],
   plus: ["path|d=M5 12h14", "path|d=M12 5v14"],
   max: [
     "path|d=M8 3H5a2 2 0 0 0-2 2v3",
@@ -193,11 +208,14 @@ export function startViewer(doc: Document): void {
   const assets: Record<string, string> = data.assets && typeof data.assets === "object" ? data.assets : {};
   const info = new Map<string, ShareNodePayload>();
   const nodes: MapNode[] = [];
+  const covers = new Map<string, ViewerCover>();
+  const coverShapes = new Map<string, number>();
   for (const item of data.nodes) {
     if (!item || typeof item.id !== "string" || info.has(item.id)) continue;
     info.set(item.id, item);
     const width = clampCardWidth(item.width);
     const height = clampCardHeight(item.height);
+    const branch = (item.layout as { direction?: unknown } | undefined)?.direction;
     nodes.push({
       id: item.id,
       path: item.id,
@@ -206,12 +224,23 @@ export function startViewer(doc: Document): void {
       y: Number.isFinite(item.y) ? item.y : 0,
       collapsed: !!item.collapsed,
       ...(width !== undefined && width !== CARD_WIDTH ? { width } : {}),
-      ...(height !== undefined ? { height } : {})
+      ...(height !== undefined ? { height } : {}),
+      ...(isBranchDirection(branch) ? { layout: { direction: branch } } : {})
     });
+    const cover = readCover(item.cover, assets);
+    if (cover) covers.set(item.id, cover);
   }
+  // The map's arrangement (direction and spacing); a file without one, or with a value the viewer does not know, is "right".
+  const mapLayout: MapLayout = (() => {
+    const stored = (data.layout ?? {}) as { direction?: unknown; spacing?: unknown };
+    const direction: LayoutKind = isLayoutKind(stored.direction) ? stored.direction : "right";
+    return isStoredLayoutSpacing(stored.spacing) ? { direction, spacing: stored.spacing } : { direction };
+  })();
   const byId = new Map(nodes.map(node => [node.id, node]));
   for (const node of nodes)
     if (node.parentId && (!byId.has(node.parentId) || node.parentId === node.id)) node.parentId = null;
+  // Annotated images: position, anchors and the lines from anchors to topic cards; the picture only from `assets`.
+  const images: ViewerImage[] = readImages(data.images, new Set(byId.keys()), assets);
   // Text nodes (tree-text-node): plain text only. One hung under a topic keeps its offset from that topic; an orphan stays at its own spot.
   const texts: Array<{ id: string; parentId: string | null; text: string; dx: number; dy: number; links: string[] }> =
     [];
@@ -465,7 +494,8 @@ export function startViewer(doc: Document): void {
   translateNote.hidden = true;
   const workspace = make("div", "vam-workspace");
   const viewport = make("div", "vam-viewport");
-  const stage = make("div", "vam-stage");
+  // `vam-view` is the class the map's own view root carries; the picture, bar and anchor rules taken from styles.css start with it.
+  const stage = make("div", "vam-stage vam-view");
   stage.setAttribute("role", "tree");
   const edges = doc.createElementNS(SVG_NS, "svg");
   edges.setAttribute("class", "vam-edges");
@@ -519,6 +549,11 @@ export function startViewer(doc: Document): void {
   let suppressClick = false;
   let panelWidth = Number(storageGet(PANEL_WIDTH_KEY)) || PANEL_DEFAULT;
   const cards = new Map<string, HTMLElement>();
+  /** Set once the reader has panned, zoomed or dragged: a late change of size (a font, a picture) then no longer moves the view. */
+  let viewTouched = false;
+  const imageEls = new Map<string, HTMLElement>();
+  /** The layer of annotated pictures; it paints behind the cards. A file without pictures has none. */
+  const imageLayer = images.length ? make("div", "vam-canvas-items") : null;
 
   const hiddenIds = (): Set<string> => {
     const hidden = new Set<string>();
@@ -548,6 +583,7 @@ export function startViewer(doc: Document): void {
     zoomLabel.setAttribute("aria-label", fill(ui.zoomReset, percent));
   }
   function zoomBy(factor: number, point?: { x: number; y: number }): void {
+    viewTouched = true;
     const center = point ?? { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 };
     const zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, view.zoom * factor));
     const ratio = zoom / view.zoom;
@@ -557,7 +593,7 @@ export function startViewer(doc: Document): void {
   /** Set when "show all" was asked while the canvas had no size (page opened in a background tab); done once it has one. */
   let fitPending = false;
   function fit(): void {
-    if (!cards.size) return;
+    if (!cards.size && !imageEls.size) return;
     if (!viewport.clientWidth || !viewport.clientHeight) {
       fitPending = true;
       return;
@@ -571,6 +607,14 @@ export function startViewer(doc: Document): void {
       minY = Math.min(minY, card.offsetTop);
       maxX = Math.max(maxX, card.offsetLeft + (card.offsetWidth || CARD_WIDTH));
       maxY = Math.max(maxY, card.offsetTop + card.offsetHeight);
+    }
+    // Annotated pictures count, with the bar above each one.
+    for (const el of imageEls.values()) {
+      const bar = el.querySelector<HTMLElement>(".vam-annotated-bar");
+      minX = Math.min(minX, el.offsetLeft);
+      minY = Math.min(minY, el.offsetTop - (bar ? bar.offsetHeight + 8 : 0));
+      maxX = Math.max(maxX, el.offsetLeft + el.offsetWidth);
+      maxY = Math.max(maxY, el.offsetTop + el.offsetHeight);
     }
     // Free text blocks count too (canvas-text-node decision #8); attached ones follow their topic.
     for (const text of texts) {
@@ -619,25 +663,72 @@ export function startViewer(doc: Document): void {
     );
     transform();
   }
+  const boxOf = (el: HTMLElement): RelationBox => ({
+    x: el.offsetLeft,
+    y: el.offsetTop,
+    width: el.offsetWidth,
+    height: el.offsetHeight
+  });
+  /** The pictures and free text as the layout code reads them (the map's canvas items); `path` is the id, which never reaches the page. */
+  const imageItems = (): AnnotatedImageItem[] =>
+    images.map(image => ({
+      id: image.id,
+      kind: "annotated-image",
+      path: image.id,
+      x: image.x,
+      y: image.y,
+      w: image.w,
+      h: image.h,
+      anchors: image.anchors.map(anchor => ({ id: anchor.id, at: { kind: "image-2d", x: anchor.x, y: anchor.y } })),
+      relations: image.links.map(link => ({
+        kind: "related" as const,
+        from: link.anchor,
+        to: link.topic,
+        ...(link.ring ? { ring: true as const } : {})
+      }))
+    }));
+  const textItems = (): TextItem[] =>
+    texts.map(text => {
+      const parent = text.parentId ? byId.get(text.parentId) : undefined;
+      return {
+        id: text.id,
+        kind: "text",
+        text: text.text,
+        ...(parent ? { parentId: parent.id } : {}),
+        x: parent ? parent.x + text.dx : text.dx,
+        y: parent ? parent.y + text.dy : text.dy,
+        ...(text.links.length ? { links: text.links } : {})
+      };
+    });
+  const cardHeightOf = (id: string): number | undefined =>
+    (cards.get(id) ?? textEls.get(id))?.offsetHeight || undefined;
+  /** Draws the tree lines as the map does (view.ts drawEdges): by the direction each branch grows in, then the lines from anchors to topic cards. */
   function drawEdges(): void {
     edges.replaceChildren();
+    const mapDirection = mapLayout.direction;
+    const rings = images.length ? ringOutwardDirections(nodes, imageItems(), cardHeightOf) : new Map<string, string>();
+    const drawnTexts = new Map<string, string>();
+    for (const text of texts) if (text.parentId && textEls.has(text.id)) drawnTexts.set(text.id, text.parentId);
+    const directionOf = branchDirectionResolver(nodes, mapDirection, drawnTexts, rings);
+    const treeLine = (parent: HTMLElement, child: HTMLElement, direction: string, depth: number): string =>
+      direction === "right"
+        ? edgePathData(
+            parent.offsetLeft + parent.offsetWidth,
+            parent.offsetTop + parent.offsetHeight / 2,
+            child.offsetLeft,
+            child.offsetTop + child.offsetHeight / 2
+          )
+        : treeEdgePathData(boxOf(parent), boxOf(child), direction as LayoutKind, depth);
     for (const node of nodes) {
       // A topic that follows a drawn text block gets its line from the block.
+      const afterText = node.afterTextId && textEls.has(node.afterTextId) ? node.afterTextId : null;
       const parent =
-        (node.afterTextId ? textEls.get(node.afterTextId) : undefined) ??
-        (node.parentId ? cards.get(node.parentId) : undefined);
+        (afterText ? textEls.get(afterText) : undefined) ?? (node.parentId ? cards.get(node.parentId) : undefined);
       const child = cards.get(node.id);
-      if (!parent || !child) continue;
+      if (!parent || !child || !node.parentId) continue;
+      const direction = lineKind(nodes, afterText ?? node.parentId, node.id, directionOf(node.parentId));
       const path = doc.createElementNS(SVG_NS, "path");
-      path.setAttribute(
-        "d",
-        edgePathData(
-          parent.offsetLeft + parent.offsetWidth,
-          parent.offsetTop + parent.offsetHeight / 2,
-          child.offsetLeft,
-          child.offsetTop + child.offsetHeight / 2
-        )
-      );
+      path.setAttribute("d", treeLine(parent, child, direction, treeDepthOf(nodes, node.id)));
       path.setAttribute("class", info.get(node.id)?.tier === "side" ? "vam-edge vam-edge-side" : "vam-edge");
       const childInfo = info.get(node.id);
       if (childInfo && styleOf(childInfo).includes("line-thick")) path.setAttribute("data-line-thick", "");
@@ -646,16 +737,11 @@ export function startViewer(doc: Document): void {
     for (const text of texts) {
       const parent = text.parentId ? cards.get(text.parentId) : undefined;
       const child = textEls.get(text.id);
-      if (!parent || !child) continue;
+      if (!parent || !child || !text.parentId) continue;
       const path = doc.createElementNS(SVG_NS, "path");
       path.setAttribute(
         "d",
-        edgePathData(
-          parent.offsetLeft + parent.offsetWidth,
-          parent.offsetTop + parent.offsetHeight / 2,
-          child.offsetLeft,
-          child.offsetTop + child.offsetHeight / 2
-        )
+        treeLine(parent, child, directionOf(text.parentId), treeDepthOf(nodes, text.parentId) + 1)
       );
       path.setAttribute("class", "vam-edge vam-text-edge");
       edges.append(path);
@@ -682,7 +768,61 @@ export function startViewer(doc: Document): void {
         edges.append(path);
       }
     }
+    // A fishbone also draws the main bone (spine) of each head that has a first-level topic on screen.
+    if (mapDirection === "fishbone") {
+      for (const head of nodes) {
+        const headEl = cards.get(head.id);
+        if (head.parentId || !headEl) continue;
+        const topics = nodes
+          .filter(node => node.parentId === head.id && !node.afterTextId && cards.has(node.id))
+          .map(node => boxOf(cards.get(node.id)!));
+        const d = fishboneSpinePathData(boxOf(headEl), topics);
+        if (!d) continue;
+        const path = doc.createElementNS(SVG_NS, "path");
+        path.setAttribute("class", "vam-edge");
+        path.setAttribute("data-spine", "");
+        path.setAttribute("d", d);
+        edges.append(path);
+      }
+    }
+    drawAnchorLines();
     drawSummaries();
+  }
+  /**
+   * The line from each linked anchor to its topic card, as the map draws it (view.ts anchorPathData): straight to the facing edge
+   * for a card of a picture's ring, a curve for the others. A card that is not drawn gets no line; no name and no arrowhead.
+   */
+  function drawAnchorLines(): void {
+    if (!images.length) return;
+    const ringed = new Set(ringMembers(imageItems(), nodes).map(member => member.imageId));
+    for (const image of images) {
+      for (const link of image.links) {
+        const anchor = image.anchors.find(each => each.id === link.anchor);
+        const card = cards.get(link.topic);
+        if (!anchor || !card) continue;
+        const point = { x: image.x + anchor.x * image.w, y: image.y + anchor.y * image.h };
+        const box = boxOf(card);
+        const inside =
+          box.x + box.width / 2 > image.x &&
+          box.x + box.width / 2 < image.x + image.w &&
+          box.y + box.height / 2 > image.y &&
+          box.y + box.height / 2 < image.y + image.h;
+        const side =
+          ringed.has(image.id) && !inside
+            ? ringSide(
+                { x: image.x, y: image.y, w: image.w, h: image.h },
+                { x: box.x, y: box.y, w: box.width, h: box.height }
+              )
+            : null;
+        const path = doc.createElementNS(SVG_NS, "path");
+        path.setAttribute(
+          "d",
+          side ? pointToBoxStraightPathData(point, box, side, true) : pointToBoxPathData(point, box, true)
+        );
+        path.setAttribute("class", "vam-anchor-line");
+        edges.append(path);
+      }
+    }
   }
   /** One bracket per drawn run, from the cards as laid out now: the brace follows the outer edge of the run and everything shown under it. */
   function drawSummaries(): void {
@@ -818,9 +958,22 @@ export function startViewer(doc: Document): void {
         toggle.title = toggleText;
       }
       button(cardTools, ui.detailsButton, undefined, () => select(node.id));
-      card.append(make("h3", "vam-card-title", String(shown.title ?? "")));
-      if (typeof shown.summary === "string" && shown.summary.trim())
-        card.append(make("p", "vam-card-summary", shown.summary));
+      const title = make("h3", "vam-card-title", String(shown.title ?? ""));
+      card.append(title);
+      let summaryEl: HTMLElement | null = null;
+      if (typeof shown.summary === "string" && shown.summary.trim()) {
+        summaryEl = make("p", "vam-card-summary", shown.summary);
+        card.append(summaryEl);
+      }
+      const cover = covers.get(node.id);
+      if (cover) {
+        // Same order and classes as the map card; a picture that cannot be decoded takes the cover out again.
+        const frame = buildCover(doc, cover, coverShapes, afterCoverSized, () => {
+          removeCardCover(card, frame);
+          afterCoverSized();
+        });
+        placeCardCover(doc, card, frame, cover.position, title, summaryEl);
+      }
       if (node.height) {
         // card-height: a fixed-height card hides what does not fit; the fade and the ellipsis are real elements (the card's ::after is the scan line).
         const fade = make("span", "vam-card-fade");
@@ -849,8 +1002,20 @@ export function startViewer(doc: Document): void {
       place(node.id);
     }
     renderTexts();
+    if (imageLayer) stage.append(imageLayer);
     markClipped();
   }
+  /** A cover's real shape is known: the cards are taller or shorter, so the lines are drawn again and, while the reader has not moved the view, the view shows everything again. */
+  function afterCoverSized(): void {
+    markClipped();
+    scheduleEdges();
+    if (coverRefit) return;
+    coverRefit = window.requestAnimationFrame(() => {
+      coverRefit = 0;
+      if (!viewTouched && selected === null && !pointers.size) fit();
+    });
+  }
+  let coverRefit = 0;
   /** Marks the fixed-height cards whose content does not fit, so the fade and the ellipsis show (read after layout, not at render). */
   function markClipped(): void {
     for (const [id, card] of cards) {
@@ -859,7 +1024,101 @@ export function startViewer(doc: Document): void {
       card.classList.toggle("is-clipped", card.scrollHeight > card.clientHeight + 1);
     }
   }
+  // ---- annotated pictures
+  const imageName = (image: ViewerImage): string => image.note || ui.imageOmitted;
+  /** Draws each picture once (its elements stay across folds and language switches); text is set by `labelImages`. */
+  function renderImages(): void {
+    if (!imageLayer) return;
+    imageLayer.setAttribute("role", "group");
+    for (const image of images) {
+      const el = make("div", "vam-canvas-image is-annotated");
+      el.dataset.itemId = image.id;
+      el.setAttribute("role", "group");
+      const bar = make("div", "vam-annotated-bar");
+      const pill = make("span", "vam-annotated-pill");
+      const pillIcon = make("span", "vam-annotated-pill-icon");
+      pillIcon.append(icon("pin"));
+      pill.append(pillIcon, make("span", "vam-annotated-pill-text"));
+      bar.append(pill, make("span", "vam-annotated-note"), make("span", "vam-annotated-count"));
+      el.append(bar);
+      const placeholder = (): void => {
+        el.querySelector("img")?.remove();
+        el.classList.add("is-missing");
+        if (!el.querySelector(".vam-canvas-image-name")) el.append(make("span", "vam-canvas-image-name"));
+        labelImages();
+      };
+      if (image.src === undefined) placeholder();
+      else {
+        const img = make("img");
+        img.alt = "";
+        img.draggable = false;
+        img.addEventListener("error", placeholder);
+        img.src = image.src;
+        el.append(img);
+      }
+      for (const anchor of image.anchors) {
+        const dot = make("button", anchor.linked ? "vam-anchor is-linked" : "vam-anchor");
+        dot.type = "button";
+        dot.dataset.anchorId = anchor.id;
+        // Only numbers reach the style: the position was clamped to 0-1 when the file was read.
+        dot.style.left = `${Math.round(anchor.x * 1e6) / 1e4}%`;
+        dot.style.top = `${Math.round(anchor.y * 1e6) / 1e4}%`;
+        if (anchor.note) {
+          const tip = make("span", "vam-anchor-tip");
+          tip.id = `vam-anchor-tip-${image.id}-${anchor.id}`;
+          tip.setAttribute("role", "tooltip");
+          tip.append(make("span", "vam-anchor-tip-note", anchor.note));
+          dot.append(tip);
+          dot.setAttribute("aria-describedby", tip.id);
+        }
+        // A press on an anchor never pans the canvas.
+        dot.addEventListener("pointerdown", event => event.stopPropagation());
+        dot.addEventListener("click", event => event.stopPropagation());
+        el.append(dot);
+      }
+      imageEls.set(image.id, el);
+      imageLayer.append(el);
+    }
+    labelImages();
+    placeImages();
+    stage.append(imageLayer);
+  }
+  /** The text of the pictures in the language on screen; the note and the anchor notes are the author's, never translated. */
+  function labelImages(): void {
+    for (const image of images) {
+      const el = imageEls.get(image.id);
+      if (!el) continue;
+      el.setAttribute(
+        "aria-label",
+        image.note ? `${ui.annotatedImage}${cjk() ? "：" : ": "}${image.note}` : ui.annotatedImage
+      );
+      const set = (selector: string, value: string): void => {
+        const target = el.querySelector(selector);
+        if (target) target.textContent = value;
+      };
+      set(".vam-annotated-pill-text", ui.annotatedImage);
+      set(".vam-annotated-note", image.note);
+      set(".vam-annotated-count", fill(ui.annotatedAnchors, image.anchors.length));
+      set(".vam-canvas-image-name", imageName(image));
+      for (const dot of Array.from(el.querySelectorAll<HTMLElement>(".vam-anchor"))) {
+        const anchor = image.anchors.find(each => each.id === dot.dataset.anchorId);
+        if (anchor) dot.setAttribute("aria-label", anchor.note ? fill(ui.anchorNamed, anchor.note) : ui.anchorUnnamed);
+      }
+    }
+  }
+  function placeImages(): void {
+    for (const image of images) {
+      const el = imageEls.get(image.id);
+      if (!el) continue;
+      el.style.left = `${image.x}px`;
+      el.style.top = `${image.y}px`;
+      el.style.width = `${image.w}px`;
+      el.style.height = `${image.h}px`;
+    }
+  }
+  /** Arranges what is on screen the way the map does after a fold change or "Auto layout": the map's direction and spacing, branch layouts, and rings around pictures. */
   function layout(): void {
+    const widthOf = (id: string): number | undefined => textEls.get(id)?.offsetWidth || undefined;
     // A text block that has topics after it takes part as a node (its drawn size), so those topics land after it and clear of it.
     // Under a topic that has such followers, its other text blocks take part too, or the followers could land on them.
     const followed = new Set(
@@ -868,8 +1127,41 @@ export function startViewer(doc: Document): void {
         .map(text => text.parentId)
     );
     const leading = texts.filter(text => text.parentId && textEls.has(text.id) && followed.has(text.parentId));
-    if (!leading.length) {
-      const arranged = arrangeMap(nodes, undefined, id => cards.get(id)?.offsetHeight);
+    if (images.some(image => image.links.some(link => link.ring))) {
+      // A picture with a ring of topics keeps their cards out of the arrangement and solves the ring after it (the map's arrangeAll).
+      const out = arrangeMapWithRings(
+        nodes,
+        [...imageItems(), ...textItems()] as CanvasItem[],
+        undefined,
+        cardHeightOf,
+        mapLayout,
+        {
+          widthOf
+        }
+      );
+      for (const placed of out.nodes) {
+        const node = byId.get(placed.id);
+        if (!node) continue;
+        node.x = placed.x;
+        node.y = placed.y;
+      }
+      for (const item of out.items) {
+        if (item.kind === "annotated-image") {
+          const image = images.find(each => each.id === (item as AnnotatedImageItem).id);
+          if (image) {
+            image.x = (item as AnnotatedImageItem).x;
+            image.y = (item as AnnotatedImageItem).y;
+          }
+        } else if (item.kind === "text") {
+          const text = texts.find(each => each.id === (item as TextItem).id);
+          const parent = text?.parentId ? byId.get(text.parentId) : undefined;
+          if (!text) continue;
+          text.dx = (item as TextItem).x - (parent ? parent.x : 0);
+          text.dy = (item as TextItem).y - (parent ? parent.y : 0);
+        }
+      }
+    } else if (!leading.length) {
+      const arranged = arrangeMap(nodes, undefined, cardHeightOf, mapLayout);
       arranged.forEach((placed, index) => {
         nodes[index].x = placed.x;
         nodes[index].y = placed.y;
@@ -892,8 +1184,7 @@ export function startViewer(doc: Document): void {
         [...nodes, ...leaves],
         new Map(leading.map(text => [text.id, text.parentId as string]))
       );
-      const heightOf = (id: string): number | undefined => (cards.get(id) ?? textEls.get(id))?.offsetHeight;
-      const arranged = arrangeMap(virtual, undefined, heightOf);
+      const arranged = arrangeMap(virtual, undefined, cardHeightOf, mapLayout);
       arranged.slice(0, nodes.length).forEach((placed, index) => {
         nodes[index].x = placed.x;
         nodes[index].y = placed.y;
@@ -907,6 +1198,7 @@ export function startViewer(doc: Document): void {
       });
     }
     for (const id of cards.keys()) place(id);
+    placeImages();
     markClipped();
   }
   /** Rebuilds the cards after a fold change, keeping the card the user acted on where it was on screen. */
@@ -940,6 +1232,7 @@ export function startViewer(doc: Document): void {
       if (!dragging) {
         if (Math.hypot(dx, dy) <= DRAG_THRESHOLD) return;
         dragging = true;
+        viewTouched = true;
         card.classList.add("is-dragging");
         card.setPointerCapture(e.pointerId);
       }
@@ -1215,6 +1508,7 @@ export function startViewer(doc: Document): void {
     outline.setAttribute("aria-label", ui.outline);
     outlineTree.setAttribute("aria-label", ui.outline);
     setLabel(outlineToggle, ui.outline);
+    labelImages();
     resizer.setAttribute("aria-label", ui.resizePanel);
     buildMenu();
     if (isTranslated()) {
@@ -1439,6 +1733,7 @@ export function startViewer(doc: Document): void {
     const dx = event.clientX - previous.x,
       dy = event.clientY - previous.y;
     panMoved ||= Math.abs(dx) + Math.abs(dy) > 0;
+    if (panMoved) viewTouched = true;
     view = { ...view, x: view.x + dx, y: view.y + dy };
     transform();
   });
@@ -1466,6 +1761,7 @@ export function startViewer(doc: Document): void {
           y: event.clientY - rect.top
         });
       else {
+        viewTouched = true;
         view = { ...view, x: view.x - event.deltaX, y: view.y - event.deltaY };
         transform();
       }
@@ -1480,20 +1776,20 @@ export function startViewer(doc: Document): void {
       fit();
     }).observe(viewport);
 
-  // ---- first view: every root and its first level, zoomed to show all
+  // ---- first view: the saved map, zoomed to show all
   applyText();
   buildOutline();
   setOutlineOpen(isNarrow() ? false : outlineWanted(), false);
-  applyCollapseLevel(nodes, 1);
+  // The map as it was saved: cards and pictures where the file puts them, folds as saved. No arrangement and no folding on open;
+  // an arrangement runs only when the reader folds, unfolds or picks "Auto layout".
+  renderImages();
   renderCards();
-  layout();
   drawEdges();
   fit();
   const fonts = (doc as Document & { fonts?: { ready: Promise<unknown> } }).fonts;
   if (fonts)
     void fonts.ready.then(() => {
-      if (selected !== null || pointers.size) return;
-      layout();
+      if (selected !== null || pointers.size || viewTouched) return;
       drawEdges();
       fit();
     });

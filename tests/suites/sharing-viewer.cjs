@@ -24,6 +24,17 @@ const cssTools = import(pathToFileURL(path.join(root, 'scripts', 'viewer-css.mjs
 
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 const payload = () => JSON.parse(read('tests/fixtures/sharing/viewer-payload.json'));
+/** The folds the viewer used to apply on open ("expand to level 1"), now stored in the file: opening keeps the saved folds (owner-approved change, share-match-map). */
+const levelOnePayload = () => {
+  const data = payload();
+  for (const id of ['heat', 'water', 'salt', 'maillard', 'amino']) data.nodes.find(node => node.id === id).collapsed = true;
+  return data;
+};
+const writeLevelOne = directory => {
+  const file = path.join(directory, 'level-one.json');
+  fs.writeFileSync(file, JSON.stringify(levelOnePayload()));
+  return file;
+};
 const LANGUAGES = ['en', 'zh-TW', 'zh-CN'];
 const INSTALL_URL = 'https://github.com/kevcltsai/visual-agent-map?ref=share';
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
@@ -71,7 +82,9 @@ test('sharing viewer: the edge curve is the plugin\'s edgePathData', () => {
 test('sharing viewer: the bundle is built from the plugin\'s own layout and nothing from Obsidian', () => {
   const result = buildSync({ entryPoints: [path.join(root, 'experiences/sharing/viewer/index.ts')], platform: 'browser', format: 'iife', metafile: true, external: [] });
   const inputs = Object.keys(result.metafile.inputs).map(file => path.relative(root, path.resolve(process.cwd(), file)).split(path.sep).join('/')).sort();
-  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
+  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/cover-dom.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/image-data.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/visual-map/canvas-items.ts', 'experiences/visual-map/cover-layout.ts', 'experiences/visual-map/image-ring.ts', 'experiences/visual-map/relation-geometry.ts', 'experiences/visual-map/tree-edge-rules.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout-text.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
+  // share-match-map: the map's own pure layout, ring, line and cover geometry joined the bundle; the view itself (which binds to Obsidian) never does.
+  assert.ok(!inputs.some(file => /obsidian|visual-map\/view\.ts|share-exporter|share-format\.ts/.test(file)), 'no Obsidian-bound module is in the viewer bundle');
   const graph = load('map-graph.ts');
   const model = load('map-model.ts');
   const node = { id: 'a', path: 'a', parentId: 'p', x: 0, y: 0, collapsed: false, aimKind: 'answer', aimConvergesFromNodeIds: ['p', 'q'] };
@@ -106,7 +119,7 @@ test('sharing viewer: the shell loads nothing from the network and holds no exte
 });
 
 test('sharing viewer: the viewer program has no eval and writes titles and summaries with textContent only', () => {
-  const sources = ['main.ts', 'detail.ts', 'edge-path.ts', 'index.ts'].map(name => read(`experiences/sharing/viewer/${name}`));
+  const sources = ['main.ts', 'detail.ts', 'edge-path.ts', 'index.ts', 'cover-dom.ts', 'image-data.ts'].map(name => read(`experiences/sharing/viewer/${name}`));
   const js = bundle.SHARE_VIEWER_JS;
   for (const source of [...sources, js]) {
     assert.doesNotMatch(source, /\beval\s*\(/);
@@ -536,7 +549,7 @@ test('sharing viewer collapse: the fold button is always visible and works by mo
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-fold-'));
   try {
     const out = path.join(directory, 'fold.html');
-    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en'], { cwd: root });
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', writeLevelOne(directory)], { cwd: root });
     const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
       const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
       const nodes = () => evaluate('document.querySelectorAll(".vam-node").length');
@@ -694,7 +707,7 @@ test('sharing viewer outline: the tree mirrors the map, folds on its own, jumps 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-outline-'));
   try {
     const out = path.join(directory, 'outline.html');
-    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en'], { cwd: root });
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', writeLevelOne(directory)], { cwd: root });
     const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 90000, async send => {
       const { evaluate, click, key, reload, row, focusedRow, visibleRows, cardCount, transformOf, current, panelHidden } = pageTools(send);
       const result = {};
@@ -1266,7 +1279,7 @@ test('sharing viewer text-then-topic: topics after a text block hang from it, cl
   if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-after-'));
   try {
-    const data = payload();
+    const data = levelOnePayload();
     // heat has a text block with two topics after it (and a child of the first), plus its two ordinary children.
     const base = { x: 0, y: 0, collapsed: false, status: 'idea', summary: '' };
     // A second block on the same topic has no topic after it, but must not be left for the followers to land on.
@@ -1275,7 +1288,8 @@ test('sharing viewer text-then-topic: topics after a text block hang from it, cl
       { id: 'aside', parentId: 'heat', text: 'An aside that follows no topic', x: 600, y: 140 }
     ];
     data.nodes.push(
-      { ...base, id: 'after1', parentId: 'heat', afterTextId: 'lead', title: 'After one' },
+      // Folded as saved (the viewer used to fold it by opening at level 1): the test opens it by hand.
+      { ...base, id: 'after1', parentId: 'heat', afterTextId: 'lead', title: 'After one', collapsed: true },
       { ...base, id: 'after2', parentId: 'heat', afterTextId: 'lead', title: 'After two' },
       { ...base, id: 'after1kid', parentId: 'after1', title: 'After one child' },
       // A link to a block on another parent is ignored: this one stays an ordinary child of heat.
@@ -1330,3 +1344,368 @@ test('sharing viewer text-then-topic: topics after a text block hang from it, cl
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
 });
+
+// ---- share-match-map P2: the viewer draws the map as it was saved (annotated pictures, anchors, covers, saved places and folds).
+const imageData = load('experiences/sharing/viewer/image-data.ts');
+const zlib = require('node:zlib');
+
+/** A real PNG of the given size and colour as a data URI (no file, no network). */
+function pngDataUri(width, height, [r, g, b]) {
+  const chunk = (type, body) => {
+    const head = Buffer.alloc(4);
+    head.writeUInt32BE(body.length);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(zlib.crc32(Buffer.concat([Buffer.from(type), body])));
+    return Buffer.concat([head, Buffer.from(type), body, crc]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: width }, () => [r, g, b]).flat())]);
+  const raw = Buffer.concat(Array.from({ length: height }, () => row));
+  const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+  return `data:image/png;base64,${png.toString('base64')}`;
+}
+const NODE_BASE = { collapsed: false, status: 'idea', summary: '' };
+/** A map with a picture in the middle, three topics in a ring around it (saved places), and a folded topic whose children carry stale places on top of it. */
+function ringPayload() {
+  const data = payload();
+  data.assets = { chart: pngDataUri(4, 3, [200, 120, 80]) };
+  data.nodes = [
+    { ...NODE_BASE, id: 't1', parentId: null, x: 60, y: 420, title: 'Left cut', collapsed: true },
+    { ...NODE_BASE, id: 't2', parentId: null, x: 1000, y: 420, title: 'Right cut' },
+    { ...NODE_BASE, id: 't3', parentId: null, x: 640, y: 60, title: 'Top cut' },
+    { ...NODE_BASE, id: 'c1', parentId: 't1', x: 60, y: 420, title: 'Child one' },
+    { ...NODE_BASE, id: 'c2', parentId: 't1', x: 60, y: 420, title: 'Child two' }
+  ];
+  data.images = [
+    {
+      id: 'img1', x: 500, y: 400, w: 400, h: 300, asset: 'chart', note: 'Beef chart',
+      anchors: [{ id: 'a1', x: 0.2, y: 0.5 }, { id: 'a2', x: 0.8, y: 0.5 }, { id: 'a3', x: 0.5, y: 0.1 }, { id: 'a4', x: 0.5, y: 0.9, note: 'Fat <b>x</b>' }],
+      links: [{ anchor: 'a1', topic: 't1', ring: true }, { anchor: 'a2', topic: 't2', ring: true }, { anchor: 'a3', topic: 't3', ring: true }]
+    }
+  ];
+  return data;
+}
+const pageOf = async (directory, data, name = 'page') => {
+  const out = path.join(directory, `${name}.html`);
+  fs.writeFileSync(out, html.renderShareHtml(data, text.shareViewerUiFor('en')));
+  return pathToFileURL(out).href;
+};
+const withChrome = async (t, prefix, run) => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  try {
+    await run(chrome, directory);
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+};
+/** In-page: every drawn card and picture as a box, and the pairs that overlap. */
+const BOXES = `(() => {
+  const box = e => ({ x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight });
+  const cards = Object.fromEntries([...document.querySelectorAll('.vam-node')].map(c => [c.dataset.nodeId, box(c)]));
+  const pictures = Object.fromEntries([...document.querySelectorAll('.vam-canvas-image')].map(c => [c.dataset.itemId, box(c)]));
+  const rects = [...Object.entries(cards), ...Object.entries(pictures)].map(([id, r]) => ({ id, ...r }));
+  const hits = [];
+  rects.forEach((a, i) => rects.slice(i + 1).forEach(b => { if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) hits.push(a.id + '/' + b.id); }));
+  return { cards, pictures, hits };
+})()`;
+
+test('sharing viewer images: image-data keeps only what a viewer may draw (assets, frame, size, position, anchors, links)', () => {
+  const good = pngDataUri(2, 1, [1, 2, 3]);
+  const assets = { ok: good, web: 'https://example.com/x.png', script: 'javascript:alert(1)', text: 'data:text/html,<b>x</b>', number: 5 };
+  assert.equal(imageData.assetSource(assets, 'ok'), good);
+  for (const key of ['web', 'script', 'text', 'number', 'absent', '__proto__', 'toString', null, 7]) assert.equal(imageData.assetSource(assets, key), undefined, String(key));
+  // Cover: asset must be a data:image entry; a look that is not valid becomes the default look (frame -> whole picture).
+  assert.equal(imageData.readCover({ asset: 'web' }, assets), undefined);
+  assert.equal(imageData.readCover(null, assets), undefined);
+  assert.deepEqual(plain(imageData.readCover({ asset: 'ok' }, assets)), { asset: 'ok', src: good, frame: null, size: 1, position: 'top' });
+  assert.deepEqual(plain(imageData.readCover({ asset: 'ok', frame: [0.1, 0.2, 0.5, 0.6], size: 0.5, position: 'left' }, assets)), { asset: 'ok', src: good, frame: { x: 0.1, y: 0.2, w: 0.5, h: 0.6 }, size: 0.5, position: 'left' });
+  for (const frame of [[2, 2, 5, 5], [0, 0, 0, 1], [0.6, 0, 0.6, 1], [-0.1, 0, 0.5, 0.5], [0, 0, 1], ['0', 0, 1, 1], [null, 0, 1, 1], [NaN, 0, 1, 1], 'x', {}]) assert.equal(imageData.readCover({ asset: 'ok', frame }, assets).frame, null, JSON.stringify(frame));
+  for (const size of [0.1, 1.5, NaN, '0.5', null]) assert.equal(imageData.readCover({ asset: 'ok', size }, assets).size, 1, String(size));
+  for (const position of ['top', 'weird', 5, null]) assert.equal(imageData.readCover({ asset: 'ok', position }, assets).position, 'top', String(position));
+  // Images: bad numbers drop the picture or the anchor, positions are clamped, links need both ends.
+  const topics = new Set(['t1', 't2']);
+  const read = raw => plain(imageData.readImages(raw, topics, assets));
+  assert.deepEqual(read(undefined), []);
+  assert.deepEqual(read({}), []);
+  const base = { id: 'p', x: 1, y: 2, w: 100, h: 50, anchors: [] };
+  assert.equal(read([{ ...base, x: null }, { ...base, w: 0 }, { ...base, h: -5 }, { ...base, y: '2' }, { ...base, id: '' }, { ...base, x: 1e9 }, null, 'x']).length, 0);
+  assert.equal(read([base, base]).length, 1, 'a repeated id is drawn once');
+  const [image] = read([{ ...base, asset: 'web', note: '  <img src=x onerror=1>\n two ', anchors: [
+    { id: 'a1', x: 0.25, y: 0.75, note: 'N' }, { id: 'a2', x: 5, y: -3 }, { id: 'a3', x: null, y: 0.5 }, { id: 'a4', x: 'x', y: 1 }, { id: 'a1', x: 0.1, y: 0.1 }, { id: '', x: 0, y: 0 }
+  ], links: [
+    { anchor: 'a1', topic: 't1', ring: true }, { anchor: 'a1', topic: 't1' }, { anchor: 'a2', topic: 'gone' }, { anchor: 'gone', topic: 't2' }, { anchor: 'a3', topic: 't2' }, { anchor: 'a2', topic: 't2', ring: 'yes' }, 'x'
+  ] }]);
+  assert.equal(image.src, undefined, 'a web address is not a picture');
+  assert.equal(image.note, '<img src=x onerror=1> two', 'the note stays a plain string');
+  assert.deepEqual(image.anchors.map(a => [a.id, a.x, a.y, a.linked]), [['a1', 0.25, 0.75, true], ['a2', 1, 0, true]]);
+  assert.deepEqual(image.links, [{ anchor: 'a1', topic: 't1', ring: true }, { anchor: 'a2', topic: 't2', ring: false }]);
+});
+
+test('sharing viewer images: only the picture, bar and anchor rules of the map are taken from .vam-view; the viewer stylesheet lets a press pan', async () => {
+  const tools = await cssTools;
+  const styles = read('styles.css');
+  const rules = tools.extractViewerRules(styles).flatMap(item => item.rules);
+  const viewRules = rules.filter(rule => /^(?:\.theme-dark\s+)?\.vam-view\b/.test(rule));
+  assert.ok(viewRules.length >= 10, 'the annotated image, bar and anchor rules are in');
+  for (const rule of viewRules) assert.match(rule, /^(?:\.theme-dark\s+)?\.vam-view\s+\.(?:vam-canvas-image|vam-annotated|vam-anchor)/, `an unrelated .vam-view rule was taken: ${rule.slice(0, 80)}`);
+  for (const start of ['.vam-view .vam-canvas-image.is-annotated {', '.vam-view .vam-annotated-bar {', '.vam-view .vam-anchor {', '.vam-view .vam-anchor.is-linked {']) assert.ok(viewRules.some(rule => rule.startsWith(start)), `${start} must be taken`);
+  // No rule that begins with another .vam-view descendant (placing mode, crosshair of the editor) is taken, and every card rule is still the same text.
+  assert.ok(!rules.some(rule => /\.vam-view\s+\.is-placing/.test(rule)));
+  const css = read('experiences/sharing/viewer/viewer.css');
+  assert.match(css, /\.vam-view \.vam-canvas-image \{[^}]*cursor: inherit/);
+  assert.match(css, /\.vam-view \.vam-canvas-image img \{ pointer-events: none/);
+  assert.equal(bundle.SHARE_VIEWER_CSS.includes('vam-anchor-line'), true);
+});
+
+test('sharing viewer images: new interface text exists in every language and the line rules are shared with the map view', () => {
+  for (const lang of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'es']) {
+    const ui = text.shareViewerUiFor(lang) ?? dictionaries.SHARE_VIEWER_UI_EXTRA[lang];
+    const extra = dictionaries.SHARE_VIEWER_UI_EXTRA[lang] ?? ui;
+    for (const source of [ui, extra]) {
+      for (const key of ['annotatedImage', 'annotatedAnchors', 'anchorNamed', 'anchorUnnamed']) assert.ok(typeof source[key] === 'string' && source[key].trim(), `${lang}.${key}`);
+      assert.match(source.annotatedAnchors, /\{0\}/, `${lang}.annotatedAnchors`);
+      assert.match(source.anchorNamed, /\{0\}/, `${lang}.anchorNamed`);
+    }
+  }
+  assert.equal(text.shareViewerUiFor('zh-TW').annotatedImage, '標註圖');
+  // The tree-line rules (direction per branch, line kind, depth) live in one module that the map view imports, so the two cannot drift.
+  const view = read('experiences/visual-map/view.ts');
+  assert.match(view, /from "\.\/tree-edge-rules"/);
+  for (const name of ['branchDirectionResolver', 'lineKind', 'depthOf']) {
+    assert.equal(new RegExp(`^function ${name}\\b`, 'm').test(view), false, `${name} is no longer defined in view.ts`);
+    assert.match(read('experiences/visual-map/tree-edge-rules.ts'), new RegExp(`export function ${name}\\b`));
+  }
+});
+
+test('sharing viewer images: a file with no pictures, covers or layout draws none of them (headless Chrome)', async t => {
+  await withChrome(t, 'vam-share-noimg-', async (chrome, directory) => {
+    const report = await dumpDomLight(chrome, directory, await pageOf(directory, payload()), 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      return evaluate(`({ images: document.querySelectorAll('.vam-canvas-image').length, layer: document.querySelectorAll('.vam-canvas-items').length, covers: document.querySelectorAll('.vam-card-cover, .vam-card-side').length, lines: document.querySelectorAll('.vam-anchor-line').length, anchors: document.querySelectorAll('.vam-anchor').length, stage: document.querySelector('.vam-stage').className })`);
+    });
+    assert.deepEqual(report, { images: 0, layer: 0, covers: 0, lines: 0, anchors: 0, stage: 'vam-stage vam-view' });
+  });
+});
+
+test('sharing viewer images: opening keeps every saved place and fold, draws the picture and anchors where the map does, and expanding does not stack cards (headless Chrome)', async t => {
+  await withChrome(t, 'vam-share-ring-', async (chrome, directory) => {
+    const data = ringPayload();
+    const report = await dumpDomLight(chrome, directory, await pageOf(directory, data), 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const result = {};
+      await wait(500);
+      result.opened = await evaluate(BOXES);
+      result.t1 = await evaluate(`document.querySelector('[data-node-id="t1"]').getAttribute('aria-expanded')`);
+      result.picture = await evaluate(`(() => { const el = document.querySelector('.vam-canvas-image'); const v = document.querySelector('.vam-viewport').getBoundingClientRect(); const r = el.getBoundingClientRect(); const bar = el.querySelector('.vam-annotated-bar').getBoundingClientRect(); const img = el.querySelector('img'); return { classes: el.className, role: el.getAttribute('role'), label: el.getAttribute('aria-label'), pill: el.querySelector('.vam-annotated-pill').textContent, note: el.querySelector('.vam-annotated-note').textContent, count: el.querySelector('.vam-annotated-count').textContent, src: img?.src.slice(0, 22), missing: el.classList.contains('is-missing'), inView: r.left >= v.left - 1 && r.right <= v.right + 1 && r.top >= v.top - 1 && r.bottom <= v.bottom + 1, barInView: bar.top >= v.top - 1, overStage: !!el.closest('.vam-stage.vam-view'), layerZ: getComputedStyle(el.parentElement).zIndex }; })()`);
+      result.anchors = await evaluate(`[...document.querySelectorAll('.vam-anchor')].map(a => ({ id: a.dataset.anchorId, left: a.style.left, top: a.style.top, linked: a.classList.contains('is-linked'), label: a.getAttribute('aria-label'), tip: a.querySelector('.vam-anchor-tip-note')?.textContent ?? null, tipChildren: a.querySelector('.vam-anchor-tip-note')?.children.length ?? null, tag: a.tagName }))`);
+      result.lines = await evaluate(`[...document.querySelectorAll('.vam-anchor-line')].map(p => p.getAttribute('d'))`);
+      // A press on the picture pans the canvas (it is not an obstacle); a press on an anchor does not; the picture never moves.
+      const centre = await evaluate(`(() => { const r = document.querySelector('.vam-canvas-image').getBoundingClientRect(); return { x: r.left + r.width * 0.35, y: r.top + r.height * 0.3 }; })()`);
+      const drag = async from => {
+        const before = await evaluate('document.querySelector(".vam-stage").style.transform');
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...from });
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...from, button: 'left', clickCount: 1 });
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x + 40, y: from.y + 25, button: 'left' });
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: from.x + 40, y: from.y + 25, button: 'left', clickCount: 1 });
+        return (await evaluate('document.querySelector(".vam-stage").style.transform')) !== before;
+      };
+      result.panFromPicture = await drag(centre);
+      result.pictureAfterPan = await evaluate(`(() => { const e = document.querySelector('.vam-canvas-image'); return [e.offsetLeft, e.offsetTop]; })()`);
+      const dot = await evaluate(`(() => { const r = document.querySelector('.vam-anchor[data-anchor-id="a4"]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+      result.panFromAnchor = await drag(dot);
+      // Expand the folded topic: the arrangement of the map runs; nothing lands on anything else.
+      await evaluate(`document.querySelector('[data-node-id="t1"] .vam-collapse-button').click()`);
+      await wait(400);
+      result.expanded = await evaluate(BOXES);
+      result.lineCountAfter = await evaluate(`document.querySelectorAll('.vam-anchor-line').length`);
+      return result;
+    });
+    // Opening: nothing was arranged or folded; offsetLeft/Top are the saved x/y.
+    for (const node of data.nodes.filter(node => !['c1', 'c2'].includes(node.id))) assert.deepEqual(plain({ x: report.opened.cards[node.id].x, y: report.opened.cards[node.id].y }), { x: node.x, y: node.y }, `${node.id} stays where it was saved`);
+    assert.deepEqual(Object.keys(report.opened.cards).sort(), ['t1', 't2', 't3'], 'the folded topic keeps its children hidden');
+    assert.equal(report.t1, 'false', 'the saved fold is kept (no expand-to-level-1)');
+    assert.deepEqual(plain({ x: report.opened.pictures.img1.x, y: report.opened.pictures.img1.y, w: report.opened.pictures.img1.w, h: report.opened.pictures.img1.h }), { x: 500, y: 400, w: 400, h: 300 });
+    assert.equal(report.picture.classes, 'vam-canvas-image is-annotated');
+    assert.equal(report.picture.role, 'group');
+    assert.equal(report.picture.label, 'Annotated image: Beef chart');
+    assert.deepEqual([report.picture.pill, report.picture.note, report.picture.count], ['Annotated image', 'Beef chart', '4 anchors']);
+    assert.equal(report.picture.src, 'data:image/png;base64,', 'the picture comes from assets');
+    assert.equal(report.picture.missing, false);
+    assert.equal(report.picture.inView, true, 'the first view includes the picture');
+    assert.equal(report.picture.barInView, true, 'and the bar above it');
+    assert.equal(report.picture.overStage, true);
+    assert.equal(report.picture.layerZ, '-1', 'the picture paints behind the cards');
+    assert.deepEqual(report.anchors.map(a => [a.id, a.left, a.top, a.linked, a.tag]), [['a1', '20%', '50%', true, 'BUTTON'], ['a2', '80%', '50%', true, 'BUTTON'], ['a3', '50%', '10%', true, 'BUTTON'], ['a4', '50%', '90%', false, 'BUTTON']]);
+    assert.equal(report.anchors[3].tip, 'Fat <b>x</b>', 'an anchor note is shown as text');
+    assert.equal(report.anchors[3].tipChildren, 0, 'and creates no element');
+    assert.equal(report.anchors[3].label, 'Anchor: Fat <b>x</b>');
+    assert.equal(report.anchors[0].label, 'Anchor (no note)');
+    // A line per link, straight into the middle of the card's edge that faces the picture (ring card), starting on the picture.
+    assert.equal(report.lines.length, 3);
+    const edgeOf = (id, side) => { const c = report.opened.cards[id]; return side === 'right' ? [c.x + c.w, c.y + c.h / 2] : side === 'left' ? [c.x, c.y + c.h / 2] : [c.x + c.w / 2, c.y + c.h]; };
+    const wanted = [edgeOf('t1', 'right'), edgeOf('t2', 'left'), edgeOf('t3', 'bottom')];
+    report.lines.forEach((d, index) => {
+      const m = d.match(/^M (\S+) (\S+) L (\S+) (\S+)$/);
+      assert.ok(m, `a straight line: ${d}`);
+      assert.deepEqual([Number(m[3]), Number(m[4])], wanted[index], `line ${index} ends on the facing edge`);
+      const img = report.opened.pictures.img1;
+      assert.ok(Number(m[1]) >= img.x - 1 && Number(m[1]) <= img.x + img.w + 1 && Number(m[2]) >= img.y - 1 && Number(m[2]) <= img.y + img.h + 1, `line ${index} starts on the picture`);
+    });
+    assert.equal(report.panFromPicture, true, 'a press on the picture pans the canvas');
+    assert.deepEqual(report.pictureAfterPan, [500, 400], 'the picture cannot be dragged');
+    assert.equal(report.panFromAnchor, false, 'a press on an anchor does not pan');
+    // Expanding: the children are there, and no card stands on another card or on the picture.
+    assert.deepEqual(Object.keys(report.expanded.cards).sort(), ['c1', 'c2', 't1', 't2', 't3']);
+    assert.deepEqual(report.expanded.hits, [], 'expanding does not stack cards');
+    assert.equal(report.lineCountAfter, 3);
+  });
+});
+
+test('sharing viewer layout: the map\'s direction decides the tree lines and "Auto layout", and opening does not arrange (headless Chrome)', async t => {
+  await withChrome(t, 'vam-share-direction-', async (chrome, directory) => {
+    const data = payload();
+    data.layout = { direction: 'down', spacing: 'compact' };
+    const report = await dumpDomLight(chrome, directory, await pageOf(directory, data), 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      await wait(500);
+      const result = {};
+      result.opened = await evaluate(`(() => { const r = ${BOXES}; return { cards: r.cards, edges: [...document.querySelectorAll('.vam-edge')].map(p => p.getAttribute('d')) }; })()`);
+      await evaluate(`document.querySelector('.vam-layout-button').click()`);
+      await evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(b => b.textContent === 'Auto layout')?.click()`);
+      await wait(300);
+      result.auto = await evaluate(`(() => { const r = ${BOXES}; return { cards: r.cards, hits: r.hits, edges: [...document.querySelectorAll('.vam-edge')].map(p => p.getAttribute('d')) }; })()`);
+      return result;
+    });
+    for (const node of data.nodes) assert.deepEqual(plain({ x: report.opened.cards[node.id].x, y: report.opened.cards[node.id].y }), { x: node.x, y: node.y }, `${node.id} is where it was saved`);
+    // The first line runs from the bottom edge of the root to the top edge of its child (a "down" map), not the right-to-left curve of a "right" map.
+    const root = report.opened.cards.root, heat = report.opened.cards.heat;
+    assert.ok(report.opened.edges[0].startsWith(`M ${root.x + root.w / 2} ${root.y + root.h} `), report.opened.edges[0]);
+    assert.ok(report.opened.edges[0].endsWith(`${heat.x + heat.w / 2} ${heat.y}`), report.opened.edges[0]);
+    // Auto layout puts every child below its parent and nothing on anything else.
+    for (const node of data.nodes.filter(node => node.parentId)) {
+      const parent = report.auto.cards[node.parentId], child = report.auto.cards[node.id];
+      assert.ok(child.y >= parent.y + parent.h, `${node.id} is below ${node.parentId} after Auto layout`);
+    }
+    assert.deepEqual(report.auto.hits, []);
+    const rootAfter = report.auto.cards.root, heatAfter = report.auto.cards.heat;
+    assert.ok(report.auto.edges[0].startsWith(`M ${rootAfter.x + rootAfter.w / 2} ${rootAfter.y + rootAfter.h} `));
+    assert.ok(report.auto.edges[0].endsWith(`${heatAfter.x + heatAfter.w / 2} ${heatAfter.y}`));
+  });
+});
+
+test('sharing viewer images: a picture that is not in the file is a grey placeholder with the note, hostile pictures, notes and numbers draw nothing unsafe (headless Chrome)', async t => {
+  await withChrome(t, 'vam-share-hostile-', async (chrome, directory) => {
+    const data = payload();
+    data.assets = { web: 'https://evil.example/x.png', js: 'javascript:window.__pwn=1', ok: pngDataUri(4, 3, [10, 20, 30]) };
+    data.nodes = data.nodes.slice(0, 3);
+    data.images = [
+      { id: 'hostile', x: 300, y: 600, w: 300, h: 200, asset: 'web', note: '<img src=x onerror="window.__pwn=1"> secret/Vault/Path.png', anchors: [
+        { id: 'in', x: 0.5, y: 0.5, note: '<script>window.__pwn=1</script>' }, { id: 'far', x: 5, y: -3 }, { id: 'nan', x: null, y: 0.5 }, { id: 'str', x: '0.2', y: 0.2 }
+      ], links: [{ anchor: 'in', topic: 'heat' }, { anchor: 'in', topic: 'no-such-topic' }, { anchor: 'no-such-anchor', topic: 'heat' }, { anchor: 'nan', topic: 'heat' }] },
+      { id: 'absent', x: 700, y: 600, w: 200, h: 100, asset: 'missing-key', anchors: [] },
+      { id: 'proto', x: 1000, y: 600, w: 200, h: 100, asset: '__proto__', note: 'Proto', anchors: [] },
+      { id: 'script', x: 1300, y: 600, w: 200, h: 100, asset: 'js', anchors: [] },
+      { id: 'noasset', x: 1600, y: 600, w: 200, h: 100, note: 'Not included', anchors: [{ id: 'z', x: 0.1, y: 0.1 }] },
+      { id: 'badbox', x: null, y: 0, w: 100, h: 100, asset: 'ok', anchors: [] }
+    ];
+    const report = await dumpDomLight(chrome, directory, await pageOf(directory, data), 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return evaluate(`({
+        pictures: [...document.querySelectorAll('.vam-canvas-image')].map(e => ({ id: e.dataset.itemId, missing: e.classList.contains('is-missing'), img: e.querySelectorAll('img').length, name: e.querySelector('.vam-canvas-image-name')?.textContent ?? null, kids: [...e.querySelectorAll('*')].map(k => k.tagName.toLowerCase()).filter(tag => !['div', 'span', 'button', 'svg', 'path', 'circle'].includes(tag)) })),
+        hostileAnchors: [...document.querySelectorAll('[data-item-id="hostile"] .vam-anchor')].map(a => [a.dataset.anchorId, a.style.left, a.style.top, a.querySelector('.vam-anchor-tip-note')?.textContent ?? null]),
+        lines: document.querySelectorAll('.vam-anchor-line').length,
+        injected: [typeof window.__pwn, document.querySelectorAll('script').length, document.querySelectorAll('.vam-canvas-items img, .vam-canvas-items script').length],
+        requested: performance.getEntriesByType('resource').map(e => e.name).filter(name => /evil\.example/.test(name)),
+        offsets: [...document.querySelectorAll('.vam-canvas-image')].map(e => [e.dataset.itemId, e.offsetLeft, e.offsetTop])
+      })`);
+    });
+    assert.deepEqual(report.pictures.map(p => p.id), ['hostile', 'absent', 'proto', 'script', 'noasset'], 'the picture with a non-number place is dropped');
+    for (const picture of report.pictures) {
+      assert.equal(picture.missing, true, `${picture.id} is a placeholder`);
+      assert.equal(picture.img, 0, `${picture.id} loads no image`);
+      assert.deepEqual(picture.kids, [], `${picture.id} holds no unexpected element`);
+    }
+    const names = Object.fromEntries(report.pictures.map(p => [p.id, p.name]));
+    assert.equal(names.hostile, '<img src=x onerror="window.__pwn=1"> secret/Vault/Path.png', 'the note is shown as text, exactly');
+    assert.equal(names.absent, '[image not included]', 'no note: the "image not included" text, never a file name');
+    assert.equal(names.proto, 'Proto');
+    assert.equal(names.script, '[image not included]');
+    assert.equal(names.noasset, 'Not included');
+    assert.deepEqual(report.hostileAnchors, [['in', '50%', '50%', '<script>window.__pwn=1</script>'], ['far', '100%', '0%', null]], 'out-of-range numbers are clamped, non-numbers dropped, notes are text');
+    assert.equal(report.lines, 1, 'only the link whose anchor and topic both exist is drawn');
+    assert.deepEqual(report.injected, ['undefined', 3, 0], 'nothing ran, and the page has only its own three script blocks');
+    assert.deepEqual(report.requested, [], 'a web address in assets is never requested');
+    assert.deepEqual(report.offsets.slice(0, 2), [['hostile', 300, 600], ['absent', 700, 600]]);
+  });
+});
+
+test('sharing viewer images: covers follow the map card (position, mask window, size), a bad look becomes the whole picture, an undecodable picture is dropped (headless Chrome)', async t => {
+  await withChrome(t, 'vam-share-cover-', async (chrome, directory) => {
+    const data = payload();
+    data.assets = { wide: pngDataUri(8, 4, [200, 50, 50]), tall: pngDataUri(2, 6, [50, 50, 200]), web: 'https://evil.example/x.png', broken: 'data:image/png;base64,AAAA' };
+    const sum = 'A summary line';
+    const ratio = value => Number(String(value).split('/')[0]);
+    data.nodes = [
+      { ...NODE_BASE, id: 'top', parentId: null, x: 80, y: 80, title: 'Top', summary: sum, cover: { asset: 'wide' } },
+      { ...NODE_BASE, id: 'bottom', parentId: null, x: 440, y: 80, title: 'Bottom', summary: sum, cover: { asset: 'wide', position: 'bottom' } },
+      { ...NODE_BASE, id: 'left', parentId: null, x: 800, y: 80, title: 'Left', summary: sum, cover: { asset: 'wide', position: 'left', size: 0.5 } },
+      { ...NODE_BASE, id: 'right', parentId: null, x: 1160, y: 80, title: 'Right', summary: sum, cover: { asset: 'wide', position: 'right' } },
+      { ...NODE_BASE, id: 'framed', parentId: null, x: 80, y: 500, title: 'Framed', summary: sum, cover: { asset: 'tall', frame: [0.5, 0, 0.5, 0.5] } },
+      { ...NODE_BASE, id: 'badframe', parentId: null, x: 440, y: 500, title: 'Bad frame', summary: sum, cover: { asset: 'wide', frame: [2, 2, 5, 5], size: 7, position: 'diagonal' } },
+      { ...NODE_BASE, id: 'web', parentId: null, x: 800, y: 500, title: 'Web', summary: sum, cover: { asset: 'web' } },
+      { ...NODE_BASE, id: 'broken', parentId: null, x: 1160, y: 500, title: 'Broken', summary: sum, cover: { asset: 'broken', position: 'left' } },
+      { ...NODE_BASE, id: 'plain', parentId: null, x: 1520, y: 500, title: 'Plain', summary: sum }
+    ];
+    const report = await dumpDomLight(chrome, directory, await pageOf(directory, data), 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      await new Promise(resolve => setTimeout(resolve, 800));
+      return evaluate(`Object.fromEntries([...document.querySelectorAll('.vam-node')].map(card => {
+        const frame = card.querySelector('.vam-card-cover'), win = card.querySelector('.vam-card-cover-window'), row = card.querySelector('.vam-card-side');
+        const order = [...card.children].map(c => c.classList.contains('vam-card-cover') ? 'cover' : c.classList.contains('vam-card-side') ? 'side' : c.tagName === 'H3' ? 'title' : c.tagName === 'P' ? 'summary' : null).filter(Boolean);
+        return [card.dataset.nodeId, {
+          order, cls: card.className, frame: frame ? { cls: frame.className, aspect: frame.style.aspectRatio, width: frame.style.width, img: !!frame.querySelector('img') } : null,
+          window: win ? { left: win.style.left, width: win.style.width, aspect: win.style.aspectRatio, img: ['width', 'height', 'left', 'top'].map(k => win.querySelector('img').style[k]) } : null,
+          side: row ? [...row.children].map(c => c.className) : null, sideText: row ? [...row.querySelector('.vam-card-side-text').children].map(c => c.tagName) : null,
+          rect: card.getBoundingClientRect().height > 0
+        }];
+      }))`);
+    });
+    assert.deepEqual(report.top.order, ['cover', 'title', 'summary']);
+    assert.equal(report.top.frame.cls, 'vam-card-cover is-sized');
+    assert.equal(ratio(report.top.frame.aspect), 2, 'the box takes the picture\'s shape (8 x 4)');
+    assert.equal(report.top.window, null);
+    assert.deepEqual(report.bottom.order, ['title', 'summary', 'cover']);
+    assert.match(report.bottom.cls, /has-cover-bottom/);
+    assert.deepEqual(report.left.order, ['side']);
+    assert.match(report.left.cls, /has-cover-left/);
+    assert.deepEqual(report.left.side, ['vam-card-cover is-sized', 'vam-card-side-text']);
+    assert.deepEqual(report.left.sideText, ['H3', 'P']);
+    assert.equal(report.left.frame.width, '50%', 'size 0.5 is the picture column width');
+    assert.match(report.right.cls, /has-cover-right/);
+    assert.deepEqual(report.right.side, ['vam-card-cover is-sized', 'vam-card-side-text']);
+    // A mask: the picture sits in a window; the window and the picture are placed by percentages of the frame (same numbers as the map).
+    assert.match(report.framed.frame.cls, /is-framed/);
+    assert.deepEqual({ ...report.framed.window, aspect: undefined }, { left: '50%', width: '50%', aspect: undefined, img: ['200%', '200%', '-100%', '0%'] });
+    assert.ok(Math.abs(ratio(report.framed.window.aspect) - 0.5 / (0.5 * 3)) < 1e-3, 'the window is as tall as the masked region of a 2 x 6 picture');
+    // A look that does not hold up is the whole picture, at full size, on top.
+    assert.deepEqual(report.badframe.order, ['cover', 'title', 'summary']);
+    assert.doesNotMatch(report.badframe.frame.cls, /is-framed|is-resized/);
+    assert.equal(report.badframe.window, null);
+    // Not a data:image picture: no cover; a picture that cannot be decoded is taken out again, side row and class included.
+    assert.equal(report.web.frame, null);
+    assert.deepEqual(report.web.order, ['title', 'summary']);
+    assert.equal(report.broken.frame, null);
+    assert.deepEqual(report.broken.order, ['title', 'summary']);
+    assert.doesNotMatch(report.broken.cls, /has-cover/);
+    assert.equal(report.plain.frame, null);
+  });
+});
+

@@ -133,17 +133,18 @@ export function ringSlotsAt(clearance: Rect, cell: { w: number; h: number }): Ri
   const out: RingSlot[] = [];
   const perRow = Math.floor(clearance.w / (cell.w + RING_GAP)) + 1;
   const rowSpan = (perRow - 1) * (cell.w + RING_GAP);
-  for (const [side, ay] of [
-    ["top", T],
-    ["bottom", B]
+  // Objects, not pairs: a doubled bracket here would end up in the share viewer bundle, which must never contain one.
+  for (const { side, ay } of [
+    { side: "top", ay: T },
+    { side: "bottom", ay: B }
   ] as const)
     for (let i = 0; i < perRow; i++) out.push({ side, ax: (L + Rr) / 2 - rowSpan / 2 + i * (cell.w + RING_GAP), ay });
   // Columns keep a gap from the rows so a corner never has two cards touching.
   const perColumn = Math.max(0, Math.floor((clearance.h - 2 * RING_GAP + RING_GAP) / (cell.h + RING_GAP)));
   const columnSpan = (perColumn - 1) * (cell.h + RING_GAP);
-  for (const [side, ax] of [
-    ["left", L],
-    ["right", Rr]
+  for (const { side, ax } of [
+    { side: "left", ax: L },
+    { side: "right", ax: Rr }
   ] as const)
     for (let i = 0; i < perColumn; i++)
       out.push({ side, ax, ay: (T + B) / 2 - columnSpan / 2 + i * (cell.h + RING_GAP) });
@@ -223,12 +224,12 @@ function segmentHitsRect(s: Segment, r: Rect): boolean {
   let t1 = 1;
   const dx = s.x2 - s.x1;
   const dy = s.y2 - s.y1;
-  for (const [p, q] of [
-    [-dx, s.x1 - r.x],
-    [dx, r.x + r.w - s.x1],
-    [-dy, s.y1 - r.y],
-    [dy, r.y + r.h - s.y1]
-  ] as const) {
+  for (const { p, q } of [
+    { p: -dx, q: s.x1 - r.x },
+    { p: dx, q: r.x + r.w - s.x1 },
+    { p: -dy, q: s.y1 - r.y },
+    { p: dy, q: r.y + r.h - s.y1 }
+  ]) {
     if (p === 0) {
       if (q < 0) return false;
       continue;

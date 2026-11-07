@@ -63,6 +63,14 @@ export interface ShareViewerUi {
   linksLabel: string;
   /** Accessible name of one link; `{0}` is its host. */
   linkOpen: string;
+  /** Pill and accessible name of an annotated image on the canvas. */
+  annotatedImage: string;
+  /** `{0}` is the number of anchors on the picture. */
+  annotatedAnchors: string;
+  /** `{0}` is the anchor's note. */
+  anchorNamed: string;
+  /** Accessible name of an anchor without a note. */
+  anchorUnnamed: string;
   /** The name of each topic marker, read by screen readers instead of the symbol. */
   markerNames: Record<TopicMarker, string>;
   /** Accessible-name part of a topic that has a colour; `{0}` is the colour name (ticket 37). */
@@ -122,6 +130,10 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   markerLabel: "Markers: {0}",
   linksLabel: "Links: {0}",
   linkOpen: "Open link: {0}",
+  annotatedImage: "Annotated image",
+  annotatedAnchors: "{0} anchors",
+  anchorNamed: "Anchor: {0}",
+  anchorUnnamed: "Anchor (no note)",
   markerNames: {
     done: "Done",
     warning: "Warning",

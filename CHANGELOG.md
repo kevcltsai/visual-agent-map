@@ -10,6 +10,10 @@ General topics can now choose "AI suggested" as their note style, in Settings un
 - Nothing changes for anyone who does not choose it.
 - Changed behavior: if you already have a style file named "AI suggested", that file is now marked as having a problem and is not used. Rename it to keep using it.
 
+### Fixed
+
+- Holding Delete or Backspace on a map card, or pressing it again before the card disappears, removes the card once. Before, each extra press added another "Removed … Undo" notice and an empty undo step.
+
 ## [0.31.0] - 2026-11-07
 
 ### Edit the goal, get recommendations

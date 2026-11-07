@@ -63397,7 +63397,8 @@ ${request.requirements}` : preset.text,
   }
   /** The same, handing back the undo step it pushed (undefined when nothing was removed). */
   async removeToUnassignedEntry(node, branch, adopterId) {
-    if (!this.map) return;
+    var _a2;
+    if (!((_a2 = this.map) == null ? void 0 : _a2.nodes.some((item) => item.id === node.id))) return;
     const before = clone(this.map), ids = branch ? /* @__PURE__ */ new Set([node.id, ...descendants(before.nodes, node.id)]) : /* @__PURE__ */ new Set([node.id]);
     if (!this.mergeUnlocked(adopterId ? [...ids, adopterId] : ids)) return;
     const removableQuestions = new Set(
@@ -69714,7 +69715,7 @@ ${request.requirements}` : preset.text,
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
           event.preventDefault();
-          this.removeByKey(node);
+          if (!event.repeat) this.removeByKey(node);
           return;
         }
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {

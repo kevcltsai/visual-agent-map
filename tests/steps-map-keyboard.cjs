@@ -103,6 +103,22 @@ test('A4: Delete on a leaf moves it to Unassigned with one history entry and an 
   assert.equal([...h.contents.keys()].some(p => p.includes('/Unassigned/')), false, 'Unassigned is empty again');
 });
 
+test('A4: a held or doubled Delete removes the card once: one history entry, one Undo notice', async () => {
+  const h = await harness();
+  // One write at a time, like the plugin's own queue: the second press runs after the first removal has landed.
+  let queue = Promise.resolve();
+  h.plugin.mutate = work => (queue = queue.then(async () => { await work(); await h.view.hydrate(); }));
+  const before = h.view.history.past.length, notices = h.Notice.all.length;
+  send(h, 'leaf', 'Delete');
+  // The card stays on screen until the save and repaint, so a key repeat and a second press both reach it.
+  assert.equal(send(h, 'leaf', 'Delete', { repeat: true }).defaultPrevented, true, 'the repeat is still swallowed');
+  send(h, 'leaf', 'Delete');
+  await until(() => !h.map().nodes.some(n => n.id === h.ids.leaf));
+  for (let i = 0; i < 6; i++) await tick();
+  assert.equal(h.view.history.past.length, before + 1, 'exactly one history entry');
+  assert.equal(h.Notice.all.length, notices + 1, 'exactly one Undo notice');
+});
+
 test('A4: Backspace removes the same way; the notice is translated', async () => {
   const h = await harness();
   const event = send(h, 'leaf', 'Backspace');

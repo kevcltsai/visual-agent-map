@@ -7719,7 +7719,8 @@ export class VisualAgentMapView extends ItemView {
     branch: boolean,
     adopterId?: string
   ): Promise<TransactionEntry | undefined> {
-    if (!this.map) return;
+    // Already gone (a second press queued before the first removal landed): no write, no undo step, no notice.
+    if (!this.map?.nodes.some(item => item.id === node.id)) return;
     const before = clone(this.map),
       ids = branch ? new Set([node.id, ...descendants(before.nodes, node.id)]) : new Set([node.id]);
     if (!this.mergeUnlocked(adopterId ? [...ids, adopterId] : ids)) return;
@@ -14655,7 +14656,8 @@ export class VisualAgentMapView extends ItemView {
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
           event.preventDefault();
-          this.removeByKey(node);
+          // A held key repeats while the card is still on screen (it leaves only after the save and repaint).
+          if (!event.repeat) this.removeByKey(node);
           return;
         }
         // Tab stays native: it walks into the card's tools, which have no other keyboard route (collapse, links, AI).

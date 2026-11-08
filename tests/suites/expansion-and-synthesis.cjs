@@ -1533,19 +1533,17 @@ integrationTest('runAgent: a structure file with a comment that never closes, se
   assert.match(String(h.notices[0]), /Bad\.md/); assert.match(String(h.notices[0]), /line 3/);
   assert.match(String(h.notices[0]), /The built-in structure is used instead\./);
 });
-integrationTest('FB1 F1: opening the research or the synthesis dialog raises no Notice for an unreadable template block', async () => {
+integrationTest('FB1 F1: opening the selection synthesis dialog raises no Notice for an unreadable template block', async () => {
   const opened = [], notices = [];
   const h = await templateHarness({ language: 'en', settings: badBlockSettings });
   await installBadBlock(h.plugin);
   const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class { constructor(message) { notices.push(message); } } } });
   const view = new VisualAgentMapView({ app: h.app }, attachTopicRuns(h.plugin)); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
-  view.openNextStep(h.topic);
-  await until(() => opened.length === 1);
   view.selection.replaceMulti([h.topic.id, other.id]);
   view.openSelectionSynthesis(null);
-  await until(() => opened.length === 2); // the styles are read again first (#38), so the dialog opens a moment later
-  assert.equal(opened.length, 2, 'both dialogs opened');
+  await until(() => opened.length === 1); // the styles are read again first (#38), so the dialog opens a moment later
+  assert.equal(opened.length, 1, 'the synthesis dialog opened');
   assert.deepEqual(notices, [], 'a label or a dialog is not a run');
   assert.deepEqual(h.notices, []);
 });
@@ -1862,23 +1860,24 @@ integrationTest('expand without shallow research: the chosen style shapes contri
   assert.match(child.detail, /^### First part\n\nA\n\n### Second part\n\nB$/);
   assert.equal(h.contexts.length, 1, 'no research ran');
 });
-integrationTest('opening the AI dialog for a topic with a deleted template neither notifies nor rewrites the note (the label is the topic type\'s structure, not the map template; grilling Q5/Q15)', async () => {
+integrationTest('opening the selection synthesis dialog for a topic with a deleted template neither notifies nor rewrites the note (the label is the topic type\'s structure, not the map template; grilling Q5/Q15)', async () => {
   const opened = [], notices = [];
   const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() }, mapTemplate: 'B' });
   await h.repo.updateNote(h.topic.path, { detailTemplateId: 'gone' });
   const before = await h.app.vault.read(h.app.vault.getAbstractFileByPath(h.topic.path));
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class { constructor(message) { notices.push(message); } } } });
   const view = new VisualAgentMapView({ app: h.app }, attachTopicRuns(h.plugin)); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
-  view.openNextStep(h.topic);
+  const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
+  view.selection.replaceMulti([h.topic.id, other.id]);
+  view.openSelectionSynthesis(null);
   await until(() => opened.length === 1);
-  assert.equal(opened[0].modelSettings.currentStyle, 'Old setting (Standard six · Professional)', 'the line shows the topic\'s old setting with the fallback structure; the map template B is not read');
-  assert.equal('currentTemplate' in opened[0].modelSettings, false, 'the dialog gets one style name, not template and tone lists');
+  assert.equal('currentTemplate' in opened[0].selectionFlow.fields, false, 'the dialog gets one style name, not template and tone lists');
   opened[0].close();
   assert.deepEqual(notices, []);
   assert.equal(await h.app.vault.read(h.app.vault.getAbstractFileByPath(h.topic.path)), before, 'note file unchanged');
   assert.equal((await h.repo.readNote(h.topic.path)).detailTemplateId, 'gone');
 });
-integrationTest('opening the research or the selection synthesis dialog reads the style files again first, so a style made since the last run is named on the line (#38, counter-example 10)', async () => {
+integrationTest('opening the selection synthesis dialog reads the style files again first, so a style made since the last run is named on the line (#38, counter-example 10)', async () => {
   const opened = [];
   const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteStyleByKind: { topic: 'file:Fresh' } } });
   const files = {};
@@ -1891,14 +1890,16 @@ integrationTest('opening the research or the selection synthesis dialog reads th
   const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
   const view = new VisualAgentMapView({ app: h.app }, attachTopicRuns(h.plugin)); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
-  view.openNextStep(h.topic);
+  // The selection synthesis shows the topic type\'s style (no topic).
+  h.plugin.settings.noteStyleByKind = { topic: 'file:Fresh' };
+  view.selection.replaceMulti([h.topic.id, other.id]);
+  view.openSelectionSynthesis(null);
   await until(() => opened.length === 1);
-  assert.equal(opened[0].modelSettings.currentStyle, 'Fresh', 'the research dialog names the style file, not the topic type default');
-  // The selection synthesis shows the topic type\'s style (no topic): a second file made after the dialog above.
+  assert.equal(opened[0].selectionFlow.fields.currentStyle, 'Fresh', 'the dialog names the style file made since the last refresh');
+  // A second file made after the dialog above is read again on the next open.
   await h.plugin.noteStyles.refresh();
   files['WS/S/Styles/Newer.md'] = '---\nvoice: plain\n---\n';
   h.plugin.settings.noteStyleByKind = { topic: 'file:Newer' };
-  view.selection.replaceMulti([h.topic.id, other.id]);
   view.openSelectionSynthesis(null);
   await until(() => opened.length === 2);
   assert.equal(opened[1].selectionFlow.fields.currentStyle, 'Newer');
@@ -2050,7 +2051,7 @@ integrationTest('counterexample 12 and the Notice action: an unreadable note-sty
   assert.equal(h.modals[0].titleEl.text, 'Note style of this topic');
   assert.equal(await h.app.vault.read(h.app.vault.getAbstractFileByPath(h.topic.path)), before, 'the Notice and the picker write nothing');
 });
-integrationTest('run-style P3: the style line of the research and synthesis dialogs names the style the run really uses (topic type voice, topic override, topic style file; the map tone and the workspace tone block are not read; was: "Keep as is (…)" naming style and tone; grilling Q5/Q10/Q15, D3)', async () => {
+integrationTest('run-style P3: the style line of the synthesis dialog names the style the run really uses (topic type voice, topic override, topic style file; the map tone and the workspace tone block are not read; was: "Keep as is (…)" naming style and tone; grilling Q5/Q10/Q15, D3)', async () => {
   const FILES = { 'WS/S/Voices/Pirate.md': 'Talk like a pirate.', 'WS/S/Styles/Pirated.md': '---\nvoice: Pirate\n---\n', 'WS/S/Styles/Own.md': '---\nvoice: plain\n---\n' };
   const { NoteStyleStore } = load('ai/note-style-store.ts');
   const cases = [
@@ -2068,16 +2069,12 @@ integrationTest('run-style P3: the style line of the research and synthesis dial
     const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
     const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
     const view = new VisualAgentMapView({ app: h.app }, attachTopicRuns(h.plugin)); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
-    view.openNextStep(h.topic);
-    await until(() => opened.length === 1);
-    assert.equal(opened[0].modelSettings.currentStyle, row.style, `${row.name}: research dialog style (one name; the tone is part of the style)`);
-    assert.equal('currentTone' in opened[0].modelSettings, false, `${row.name}: the dialog no longer gets a separate tone`);
     assert.equal(h.view.topicStyle(await h.repo.readNote(h.topic.path), undefined, 'en').label.toneName, row.tone, `${row.name}: the voice the run really uses`);
     view.selection.replaceMulti([h.topic.id, other.id]);
     view.openSelectionSynthesis(null);
-    await until(() => opened.length === 2); // the styles are read again first (#38)
-    assert.equal('currentTone' in opened[1].selectionFlow.fields, false);
-    assert.equal(opened[1].selectionFlow.fields.currentStyle, 'Pirated', `${row.name}: synthesis dialog style (no topic: the topic type style)`);
+    await until(() => opened.length === 1); // the styles are read again first (#38)
+    assert.equal('currentTone' in opened[0].selectionFlow.fields, false);
+    assert.equal(opened[0].selectionFlow.fields.currentStyle, 'Pirated', `${row.name}: synthesis dialog style (no topic: the topic type style)`);
   }
 });
 

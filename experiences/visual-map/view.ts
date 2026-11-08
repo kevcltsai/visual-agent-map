@@ -451,6 +451,7 @@ import {
   isMdStale,
   type MapChatContext,
   type MapChatOutlineNode,
+  type MapChatTurn,
   type MapChatTopicHash,
   type MapChatTopicRef
 } from "../../core/map-chat-context";
@@ -475,6 +476,7 @@ import {
 } from "../../core/map-chat-records";
 import { MapChatRecordWriter, type MapChatRecordTarget } from "./map-chat-record-writer";
 import { TopicChatRecordWriter } from "./topic-chat-record-writer";
+import { judgeTopicScope, topicSubtreeIds } from "./topic-chat-scope";
 import {
   restoreTopicChat,
   isSafeTopicNodeId,
@@ -578,6 +580,7 @@ import {
 import {
   TopicChatWindow,
   type TopicChatHost,
+  type TopicChatButtonKind,
   type TopicChatKind,
   type TopicChatMode,
   type TopicChatTurn
@@ -1098,7 +1101,7 @@ interface TopicChatEntry {
     turns: TopicChatTurn[];
     mode: TopicChatMode;
     running: boolean;
-    draftKind: TopicChatKind | null;
+    draftKind: TopicChatButtonKind | null;
     draftText: string;
   };
   watchers: Set<() => void>;
@@ -1138,6 +1141,14 @@ interface ChatApplyOptions {
   work?: ChatRoundWork;
   /** An automatic continuation round of a chat message (not the first reply, not a plan of the first round): its picture searches read researched text. */
   continuation?: boolean;
+  /**
+   * A topic chat's turn: only the subtree of `rootId` may be written (checked here, at the one place replies are applied).
+   * `run` carries out a research, expansion or integration the reply asked for; the side panel's selection is not used.
+   */
+  topicScope?: {
+    rootId: string;
+    run?: (action: Extract<MapChatAction, { kind: "run_map_action" }>, targets: string[]) => Promise<ChatOutcome>;
+  };
 }
 /** What a finished round hands to its chain: the reply, what was applied, and the work it started. */
 interface ChatRoundEnd {
@@ -16371,8 +16382,12 @@ export class VisualAgentMapView extends ItemView {
     const restored: TopicChatTurn[] = [];
     for (const turn of restoreTopicChat(parsed.lines)) {
       if (turn.id === entry.runningTurnId) continue;
-      restored.push({ role: "user", kind: turn.kind === "ask" ? undefined : turn.kind, text: turn.message });
-      restored.push({ role: "ai", text: turn.result ? turn.result.text : t("ui.topic_chat_result_unknown") });
+      restored.push({ role: "user", kind: turn.kind, text: turn.message });
+      restored.push({
+        role: "ai",
+        text: turn.result ? turn.result.text : t("ui.topic_chat_result_unknown"),
+        ...(turn.kind === "ask" ? { markdown: true } : {})
+      });
     }
     if (!restored.length) return;
     entry.session.turns.splice(0, 0, ...restored);
@@ -16573,6 +16588,10 @@ export class VisualAgentMapView extends ItemView {
         this.outputLanguageMemory().outputLanguage,
         this.map?.title
       );
+      if (kind === "ask") {
+        await this.runTopicChatAsk(entry, node, note, mode, text, controller, language, live, hooks);
+        return;
+      }
       if (kind === "expand") {
         const outcome = await this.chatExpand(node, text, controller.signal);
         // A failure was already told by chatExpand's own Notice; a success with the window closed is told here.
@@ -16746,6 +16765,225 @@ export class VisualAgentMapView extends ItemView {
     if (handle) await handle.finished;
     return { result, failure };
   }
+  /** The request of a free question: the context holds this topic and what is under it, nothing else of the map. */
+  private async buildTopicChatRequest(
+    entry: TopicChatEntry,
+    node: MapNode,
+    note: Note,
+    message: string
+  ): Promise<MapChatRequest> {
+    const map = this.map!;
+    const settings = this.plugin.settings;
+    const scope = topicSubtreeIds(map.nodes, node.id);
+    const byId = new Map(map.nodes.map(item => [item.id, item]));
+    const summaryOf = (id: string): string => this.chatTopicState(id)?.summary ?? "";
+    const titleOf = (item: MapNode): string => this.chatTopicState(item.id)?.title ?? item.path;
+    const depthOf = (item: MapNode): number => {
+      let depth = 0;
+      for (let at: MapNode | undefined = item; at && at.id !== node.id && depth < 200; depth++)
+        at = at.parentId ? byId.get(at.parentId) : undefined;
+      return depth;
+    };
+    const outline: MapChatOutlineNode[] = this.onScreenSiblingOrder(map)
+      .filter(item => scope.has(item.id))
+      .map(item => {
+        const strength = this.hypothesisStrengthOf(item.id),
+          leaning = this.hypothesisLeaningOf(item.id);
+        return {
+          id: item.id,
+          title: titleOf(item),
+          summary: summaryOf(item.id),
+          // The topic is the root of what the model sees: its own parent is outside and is not named.
+          parentId: item.id === node.id ? null : item.parentId,
+          depth: depthOf(item),
+          kind: this.topicKindOf(item.id),
+          ...(leaning ? { leaning } : {}),
+          ...(strength ? { strength } : {}),
+          ...(this.notes.get(item.id)?.aiLocked ? { aiLocked: true } : {})
+        };
+      });
+    const history: MapChatTurn[] = [];
+    const turns = entry.session.turns;
+    for (let i = 0; i + 1 < turns.length; i++)
+      if (turns[i].role === "user" && turns[i].kind === "ask" && turns[i + 1].role === "ai")
+        history.push({ role: "user", text: turns[i].text }, { role: "assistant", text: turns[i + 1].text });
+    const context = buildMapChatContext({
+      mapTitle: map.title,
+      mapTitles: [],
+      noEditableMap: !isManagedMapPath(settings, this.path),
+      outline,
+      selected: [
+        {
+          id: node.id,
+          title: titleOf(node),
+          summary: summaryOf(node.id),
+          detail: note.detail,
+          path: node.path
+        }
+      ],
+      references: [],
+      snippets: [],
+      files: [],
+      aim: !this.relationsEnabled(),
+      relations: this.relationsEnabled()
+        ? (map.topicRelations ?? []).filter(relation => scope.has(relation.from) && scope.has(relation.to))
+        : [],
+      activeFile: null,
+      history
+    });
+    return {
+      message,
+      context,
+      language: settings.language,
+      contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
+      model: settings.cliModel,
+      reasoning: normalizeReasoningLevel(settings.cliReasoning),
+      ...this.usageMapField()
+    };
+  }
+  /** A free question: one map-chat request about the topic; what the reply writes is checked against the subtree where it is applied. */
+  private async runTopicChatAsk(
+    entry: TopicChatEntry,
+    node: MapNode,
+    note: Note,
+    mode: TopicChatMode,
+    text: string,
+    controller: AbortController,
+    language: ContentLanguage,
+    live: () => boolean,
+    hooks: BackgroundHooks
+  ): Promise<void> {
+    const key = `topic-chat-ask:${++mapChatTaskSequence}`;
+    let began = false;
+    const end = (): void => {
+      if (!began) return;
+      began = false;
+      this.plugin.activeTasks?.delete(key);
+      hooks.end();
+    };
+    try {
+      const request = await this.buildTopicChatRequest(entry, node, note, text);
+      began = true;
+      this.plugin.activeTasks?.set(key, controller);
+      hooks.begin(controller);
+      const result = await this.plugin.mapChat.chat(request, controller.signal, () => {});
+      end();
+      if (controller.signal.aborted) {
+        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
+        return;
+      }
+      const map = this.map;
+      if (!live() || !map) {
+        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
+        return;
+      }
+      const verdicts = judgeTopicScope(result.actions, map.nodes, node.id);
+      const allowed = result.actions.filter((_, index) => verdicts[index] === "ok");
+      // A reply that would need the user's yes first (a plan) is not applied here: the side panel has the plan screen.
+      const plan = allowed.length
+        ? planFor(allowed, request.context, {
+            diagrams: this.plugin.settings.addDiagramsAfterResearch,
+            mapAiMode: map.aiMode
+          })
+        : null;
+      if (plan) {
+        this.settleTopicChat(entry, t("ui.topic_chat_too_big"), live, true, "done", true);
+        return;
+      }
+      const lines = allowed.length
+        ? await this.applyMapChatActions(
+            { ...result, message: text },
+            request.context,
+            () => live() && !controller.signal.aborted,
+            { path: this.path, id: map.id },
+            {
+              context: request.context,
+              topicScope: {
+                rootId: node.id,
+                run: (action, targets) =>
+                  this.runTopicChatAction(action, targets, action.mode || mode, language, controller.signal)
+              }
+            }
+          )
+        : [];
+      const refused = verdicts.filter(verdict => verdict === "out").length;
+      let sentence = result.reply.trim() || lines.map(line => line.text).join("\n");
+      if (refused) sentence = [sentence, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");
+      if (!sentence) sentence = t("ui.topic_chat_result_unknown");
+      if (controller.signal.aborted)
+        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
+      else this.settleTopicChat(entry, sentence, live, true, "done", true);
+    } catch (error) {
+      end();
+      const stopped = controller.signal.aborted;
+      this.settleTopicChat(
+        entry,
+        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", this.chatErrorText(error).text),
+        live,
+        !stopped,
+        stopped ? "stopped" : "failed",
+        true
+      );
+    }
+  }
+  /** Carries out a research, expansion or integration a free question asked for, on the topics it names (all inside the subtree). */
+  private async runTopicChatAction(
+    action: Extract<MapChatAction, { kind: "run_map_action" }>,
+    targets: string[],
+    mode: TopicChatMode,
+    language: ContentLanguage,
+    signal: AbortSignal
+  ): Promise<ChatOutcome> {
+    let done = 0;
+    let reason = t("ui.map_chat_skip_unavailable");
+    for (const id of targets) {
+      if (signal.aborted) break;
+      const target = this.map?.nodes.find(item => item.id === id);
+      if (!target) continue;
+      if (this.topicChatBusy(target)) {
+        reason = t("ui.ai_running_ai");
+        continue;
+      }
+      const note = await this.plugin.repo.readNote(target.path, this.map ?? undefined);
+      if (this.aiLockReason("write", [id], new Map([[id, note]]))) {
+        reason = t("ui.ai_locked_notice");
+        continue;
+      }
+      if (action.action === "research_standard") {
+        const run = await this.runTopicChatResearch(target, note, mode, language, action.direction, signal);
+        if (run.result) done++;
+        else if (run.failure) reason = run.failure;
+      } else if (action.action === "expand") {
+        const outcome = await this.chatExpand(target, action.direction, signal);
+        if (outcome.status === "succeeded") done++;
+        else if (outcome.status === "failed") reason = outcome.reason;
+      } else if (action.action === "synthesize") {
+        let written = false;
+        await this.startSynthesis(
+          target,
+          {
+            ...chatSynthesisOptions({ outputLanguage: language }),
+            researchMode: researchModeOf(mode),
+            signal,
+            onProgress: () => {}
+          },
+          action.direction,
+          message => {
+            reason = message;
+          },
+          () => {},
+          {
+            isOpen: () => false,
+            onWritten: () => {
+              written = true;
+            }
+          }
+        );
+        if (written) done++;
+      }
+    }
+    return done ? { status: "done" } : { status: "failed", reason };
+  }
   private topicChatOpenFor(entry: TopicChatEntry): boolean {
     return this.topicChatOpen?.entry === entry;
   }
@@ -16755,7 +16993,8 @@ export class VisualAgentMapView extends ItemView {
     sentence: string,
     live: () => boolean,
     notice: boolean,
-    status: TopicRecordStatus
+    status: TopicRecordStatus,
+    markdown = false
   ): void {
     entry.session.running = false;
     const turnId = entry.runningTurnId;
@@ -16770,7 +17009,7 @@ export class VisualAgentMapView extends ItemView {
         status,
         text: sentence
       });
-    entry.session.turns.push({ role: "ai", text: sentence });
+    entry.session.turns.push({ role: "ai", text: sentence, ...(markdown ? { markdown: true } : {}) });
     this.notifyTopicChat(entry);
     if (notice && !this.topicChatOpenFor(entry)) new Notice(sentence);
   }
@@ -23890,7 +24129,10 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<MapChatLine[]> {
     const touched = new Set<string>([anchor.path]);
     // The turn this reply belongs to (switch on): undo and redo of its writes are noted in that turn's conversation.
-    const record = this.chatLastRecord;
+    const scope = options.topicScope;
+    // A topic chat's turn leaves the side panel's conversation (its record, its undo step, its selection) alone.
+    const record = scope ? null : this.chatLastRecord;
+    const verdicts = scope ? judgeTopicScope(result.actions, this.map?.nodes ?? [], scope.rootId) : null;
     const same = (): boolean => !this.closed && alive() && this.path === anchor.path && this.map?.id === anchor.id;
     /** Why the rest is skipped: the user stopped it, or the map is not the one the reply was about. */
     const lost = (): ChatOutcome =>
@@ -23940,6 +24182,13 @@ export class VisualAgentMapView extends ItemView {
       if (batched) this.holdChatBatch();
       run.deferRebuild = batched;
       for (const [index, action] of result.actions.entries()) {
+        if (verdicts && verdicts[index] !== "ok") {
+          lines[index] = this.chatLine(
+            this.chatActionLabel(action, refTitles),
+            skipped(verdicts[index] === "out" ? "ui.topic_chat_out_of_scope" : "ui.map_chat_skip_unavailable")
+          );
+          continue;
+        }
         if (
           action.kind === "select_topics" ||
           action.kind === "run_map_action" ||
@@ -24010,6 +24259,7 @@ export class VisualAgentMapView extends ItemView {
       // Many cards at once land in a rough spot: one layout for the lot, then the view goes to the new branch.
       let arranged = false;
       if (
+        !scope &&
         run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW &&
         !noNewMap &&
         same() &&
@@ -24036,7 +24286,7 @@ export class VisualAgentMapView extends ItemView {
         }
       }
       // A card that grew (a summary, a longer title) can now cover the one below it: lay out again, only when that happened.
-      if (resized.size && !arranged && !noNewMap && same() && this.map) {
+      if (!scope && resized.size && !arranged && !noNewMap && same() && this.map) {
         // The layout measures the cards, so the held repaint comes first. Looked at before any mutate is taken: a reply whose
         // cards still fit writes nothing more (one mutate per action).
         this.flushChatRender();
@@ -24062,7 +24312,8 @@ export class VisualAgentMapView extends ItemView {
       // Only those cards are placed, each branch beside its parent; nothing else moves, and no other action of the reply runs.
       // A reply that made a ring did not lay the whole map out either, so its other new cards are placed the same way.
       const ringed = run.ringImages?.size ? new Set(run.ringImages) : null;
-      const rough = batched && !arranged && (stopped || layoutDone || !!ringed) ? run.created.slice(laidOutCount) : [];
+      const rough =
+        batched && !arranged && (stopped || layoutDone || !!ringed || !!scope) ? run.created.slice(laidOutCount) : [];
       if ((rough.length || ringed) && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
           await this.plugin.mutate(() =>
@@ -24120,11 +24371,11 @@ export class VisualAgentMapView extends ItemView {
       // so undo checks the files instead of writing an old snapshot over them. Another view of the same map keeps no entry
       // that would not know about these writes: its history is cleared, as for any change made outside it.
       const entries = this.history.closeGroup();
-      this.chatReplyStep = undefined;
+      if (!scope) this.chatReplyStep = undefined;
       if (wrote) {
         try {
-          if (!this.closed && this.path === anchor.path)
-            this.chatReplyStep = await this.pushChatReplyEntry(
+          if (!this.closed && this.path === anchor.path) {
+            const step = await this.pushChatReplyEntry(
               entries,
               anchor.path,
               run.notes ?? new Set(),
@@ -24132,6 +24383,8 @@ export class VisualAgentMapView extends ItemView {
               run.parked ?? new Set(),
               record
             );
+            if (!scope) this.chatReplyStep = step;
+          }
         } catch {
           // The check could not be read: the writes stay, without an undo step (never a half one).
         }
@@ -24141,8 +24394,10 @@ export class VisualAgentMapView extends ItemView {
     }
     // addNode selects each card it makes, which leaves the last one selected; the reply's new branch root is the better start. Done before the later actions so a select_topics or run_map_action of the same reply keeps its selection.
     // A reply that made a ring selects nothing: a selected card would dim every other line of the picture on first sight.
-    const branchRoot = run.ringImages?.size ? undefined : this.chatBranchRoot(run);
-    if (run.ringImages?.size) {
+    const branchRoot = run.ringImages?.size || scope ? undefined : this.chatBranchRoot(run);
+    if (scope) {
+      // A topic chat does not move the user's selection.
+    } else if (run.ringImages?.size) {
       if (same() && !this.closed) this.applySelectionChange(this.selection.clickEmpty());
     } else if (branchRoot && same() && !this.closed)
       this.applySelectionChange(this.selection.setSelected(branchRoot.id));
@@ -24154,7 +24409,10 @@ export class VisualAgentMapView extends ItemView {
       else if (noNewMap) outcome = skipped(noNewMapReason);
       else {
         try {
-          if (action.kind === "open_map") {
+          if (scope && action.kind === "run_map_action") {
+            const targets = action.nodeIds.length ? action.nodeIds : [scope.rootId];
+            outcome = scope.run ? await scope.run(action, targets) : skipped("ui.map_chat_skip_unavailable");
+          } else if (action.kind === "open_map") {
             outcome = await this.chatOpenMap(action.title, anchor, same);
             if (outcome.status === "done") touched.add(anchor.path);
           } else if (action.kind === "ask_topic_kind") {

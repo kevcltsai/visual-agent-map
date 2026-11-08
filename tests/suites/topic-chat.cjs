@@ -73,17 +73,33 @@ test('topic chat counterexample 2: grey text that was not adopted cannot be sent
   assert.deepEqual(f.calls.submit[1], ['research', 'only the risks']);
 });
 
-test('topic chat Tab is native when there is no grey text, and free typing without a button cannot be sent', async () => {
+test('topic chat Tab is native when there is no grey text; typing without a button is an ask, empty text is never sent', async () => {
   const f = fixture();
   assert.equal(f.press('Tab'), false);
-  f.type('a free question');
-  assert.equal(f.send().disabled, true);
+  f.type('   ');
+  assert.equal(f.send().disabled, true, 'blank text cannot be sent');
   f.press('Enter');
   await dom.tick();
   assert.deepEqual(f.calls.submit, []);
+  f.type('a free question');
+  assert.equal(f.send().disabled, false);
+  f.press('Enter');
+  await dom.tick();
+  assert.deepEqual(f.calls.submit, [['ask', 'a free question']]);
+  assert.equal(f.input.value, '', 'a started ask clears the input');
   f.action('research').click();
   f.type('typed');
   assert.equal(f.press('Tab'), false, 'with typed text Tab stays native');
+});
+
+test('topic chat shows an AI answer to a question through the markdown whitelist and the question as plain text', () => {
+  const f = fixture();
+  f.session.turns = [{ role: 'user', kind: 'ask', text: '<b>why</b>' }, { role: 'ai', text: '**yes** <script>x</script>', markdown: true }];
+  f.refresh();
+  const texts = findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-text'));
+  assert.equal(texts[0].text, '<b>why</b>'); assert.equal(texts[0].children.length, 0);
+  assert.ok(texts[1].children.length > 0, 'rendered by renderChatMarkdown');
+  assert.equal(findAll(texts[1], i => i.tag === 'script').length, 0);
 });
 
 test('topic chat has three equal buttons without a suggested mark', () => {
@@ -228,7 +244,7 @@ async function harness({ aim = false } = {}) {
       queue = result.catch(() => {});
       return result;
     },
-    saveSettings: async () => {},
+    saveSettings: async () => {}, modelLabel: model => String(model),
     aiReadyForModel: async () => true,
     confirmAiUsage: async (model, run) => { control.usageAsks++; if (control.decline) return false; await run(); return true; },
     manifest: { version: '9.9.9' }
@@ -254,7 +270,7 @@ async function harness({ aim = false } = {}) {
   view.render = () => { repaint(); };
   await reload(); repaint();
   const h = {
-    repo, files, view, plugin, ids, control, notices, page: p, repaint, overlay: () => overlay,
+    repo, files, app, view, plugin, ids, control, notices, page: p, repaint, overlay: () => overlay,
     node: key => view.map.nodes.find(n => n.id === ids[key]),
     saved: async () => (await repo.readMap(MAP)).nodes,
     entry: key => view.topicChatSessions.get(ids[key]),
@@ -624,4 +640,134 @@ integrationTest('topic chat synthesize: when every subtopic research fails the i
   assert.equal(synthesized, 0);
   assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_failed_0', t('ui.topic_chat_failed_children')));
   assert.equal((await topicLines(h, 'root')).at(-1).status, 'failed');
+});
+
+// ---- P3: a free question (map-chat step, subtree context, subtree-only writes) ----------------------------------------
+const ACT = {
+  runMap: (action, nodeIds, extra = {}) => ({ kind: 'run_map_action', action, nodeIds, title: '', goal: '', direction: '', mode: '', images: false, ...extra })
+};
+const mockChat = (h, make) => {
+  h.requests = [];
+  h.plugin.mapChat = { chat: async (request, signal) => { h.requests.push(request); return typeof make === 'function' ? make(request, signal) : make; } };
+};
+const answer = (actions, reply = 'ok') => ({ reply, actions, rejected: [], remaining: '' });
+const snapshot = async h => {
+  const out = new Map();
+  for (const [p, file] of h.files) if (file.extension === 'md') out.set(p, await h.app.vault.read(file));
+  return out;
+};
+const changedPaths = (before, after) => [...new Set([...before.keys(), ...after.keys()])].filter(p => before.get(p) !== after.get(p));
+
+integrationTest('topic chat ask: the request carries only the subtree, no mapNeedsName or emptyMap, and the record round-trips as kind ask', async () => {
+  const h = await harness(); mockChat(h, answer([], 'The **body** sleeps.'));
+  const host = h.host('a');
+  assert.equal(await host.submit('ask', 'what is here?'), true);
+  await finished(h);
+  const context = JSON.parse(h.requests[0].context.json);
+  const raw = h.requests[0].context.json;
+  assert.deepEqual(Array.from(h.requests[0].context.nodeIds).sort(), [h.ids.a, h.ids.c].sort(), 'only the topic and what is under it');
+  assert.ok(!raw.includes('Mind'), 'siblings are not sent');
+  assert.ok(!('mapNeedsName' in context) && !('emptyMap' in context));
+  assert.equal(h.requests[0].message, 'what is here?');
+  const last = h.entry('a').session.turns;
+  assert.deepEqual([last[0].kind, last[1].text, last[1].markdown], ['ask', 'The **body** sleeps.', true]);
+  const lines = await topicLines(h, 'a');
+  assert.deepEqual([lines[0].kind, lines[1].status, lines[1].text], ['ask', 'done', 'The **body** sleeps.']);
+  // The side panel keeps nothing of it.
+  assert.equal(h.view.chatLastRecord ?? null, null);
+  const { restoreTopicChat } = load('core/topic-chat-records.ts');
+  const turns = restoreTopicChat(lines);
+  assert.equal(turns[0].kind, 'ask'); assert.equal(turns[0].result.text, 'The **body** sleeps.');
+  h.view.closeTopicChatWindow(); h.view.topicChatSessions.clear(); h.view.openTopicChat(h.node('a'));
+  await waitFor(() => h.entry('a')?.session.turns.length === 2);
+  assert.deepEqual([h.entry('a').session.turns[0].kind, h.entry('a').session.turns[1].markdown], ['ask', true]);
+});
+
+integrationTest('topic chat counterexample 3: a reply that reaches outside the subtree is refused item by item; the notes and the map outside stay byte for byte, the item inside is applied', async () => {
+  const h = await harness(); const bNote = h.node('b').path;
+  mockChat(h, answer([
+    { kind: 'rename_topic', nodeId: h.ids.b, title: 'Sibling renamed' },
+    { kind: 'add_child', parentId: h.ids.root, title: 'Under the parent', summary: '' },
+    { kind: 'add_child', parentId: '', title: 'A new root', summary: '' },
+    { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b },
+    { kind: 'add_relation', fromId: h.ids.c, toId: h.ids.b, relationKind: 'related' },
+    { kind: 'delete_topic', nodeId: h.ids.a, branch: true },
+    { kind: 'create_map', title: 'Another map' },
+    { kind: 'open_map', title: 'Sleep map' },
+    { kind: 'rename_map', title: 'New name' },
+    ACT.runMap('expand', [h.ids.b]),
+    { kind: 'edit_md_file', path: bNote, find: 'Mind', replace: 'Hacked' },
+    { kind: 'rename_topic', nodeId: h.ids.c, title: 'REM stage' }
+  ], 'Done.'));
+  const before = await snapshot(h); const mapBefore = (await h.saved()).map(n => ({ id: n.id, parentId: n.parentId, path: n.path }));
+  const host = h.host('a');
+  assert.equal(await host.submit('ask', 'rewrite everything'), true);
+  await finished(h);
+  const after = await snapshot(h);
+  const changed = changedPaths(before, after).filter(p => !p.includes('/Chats/'));
+  assert.ok(changed.every(p => p === h.node('c').path || p.endsWith('/Map.md')), 'only the note inside changed: ' + changed.join(', '));
+  assert.ok(changed.includes(h.node('c').path), 'the inside item was applied');
+  assert.equal(after.get(bNote), before.get(bNote), 'the sibling note is byte for byte the same');
+  assert.equal(after.get(h.node('root').path), before.get(h.node('root').path));
+  assert.equal(after.get(h.node('a').path), before.get(h.node('a').path));
+  const mapAfter = (await h.saved()).map(n => ({ id: n.id, parentId: n.parentId, path: n.path }));
+  assert.deepEqual(mapAfter, mapBefore, 'no card added, moved or removed');
+  assert.equal((await h.repo.readNote(h.node('c').path)).title, 'REM stage');
+  assert.equal((await h.repo.readNote(bNote)).title, 'Mind');
+  assert.equal(h.view.map.title, 'Sleep map');
+  const sentence = h.entry('a').session.turns.at(-1).text;
+  assert.ok(sentence.includes('Done.') && sentence.includes(t('ui.topic_chat_out_of_scope')), sentence);
+});
+
+integrationTest('topic chat ask: inside the subtree a new card and a relation are written; a reply that needs a plan is not applied and says so in one sentence', async () => {
+  const h = await harness();
+  mockChat(h, answer([{ kind: 'add_child', parentId: h.ids.a, title: 'Light', summary: 'S', ref: 'n1' }, { kind: 'add_relation', fromId: 'new:n1', toId: h.ids.c, relationKind: 'related' }], 'Added.'));
+  const before = (await h.saved()).length;
+  await h.host('a').submit('ask', 'add light'); await finished(h);
+  const nodes = await h.saved();
+  assert.equal(nodes.length, before + 1); assert.equal(nodes.find(n => n.path !== undefined && n.parentId === h.ids.a && n.id !== h.ids.c)?.parentId, h.ids.a);
+  assert.ok(!h.entry('a').session.turns.at(-1).text.includes(t('ui.topic_chat_out_of_scope')), 'nothing was refused');
+  // Too big: a new card for every one of 16 actions needs the plan screen; nothing is written.
+  mockChat(h, answer(Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.a, title: 'X' + i, summary: '' })), 'Lots.'));
+  const count = (await h.saved()).length;
+  await h.host('a').submit('ask', 'lots'); await finished(h);
+  assert.equal((await h.saved()).length, count, 'not applied');
+  assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_too_big'));
+});
+
+integrationTest('topic chat ask: a run action in the subtree goes to the topic chat runner, one outside never runs', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  mockChat(h, answer([ACT.runMap('research_standard', [h.ids.a], { direction: 'focus' }), ACT.runMap('research_standard', [h.ids.b])], 'Researching.'));
+  await h.host('a').submit('ask', 'research it');
+  await waitFor(() => calls.length === 1);
+  assert.equal(calls[0].node.id, h.ids.a); assert.match(calls[0].request.task, /focus$/);
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve();
+  await finished(h);
+  assert.equal(calls.length, 1, 'the sibling was not researched');
+  assert.ok(h.entry('a').session.turns.at(-1).text.includes(t('ui.topic_chat_out_of_scope')));
+});
+
+integrationTest('topic chat ask: a declined usage question sends nothing; stop says stopped and writes nothing', async () => {
+  const h = await harness(); mockChat(h, answer([]));
+  h.control.decline = true;
+  assert.equal(await h.host('a').submit('ask', 'hi'), false);
+  assert.equal(h.requests.length, 0); assert.equal(h.entry('a').session.turns.length, 0);
+  h.control.decline = false; const gate = deferred(); let signal;
+  mockChat(h, async (_r, s) => { signal = s; await gate.promise; if (s.aborted) throw new Error('aborted'); return answer([{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Late' }]); });
+  await h.host('a').submit('ask', 'slow'); await waitFor(() => signal);
+  h.view.startingTasks.get(h.node('a').path).abort(); gate.resolve(); await finished(h);
+  assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_stopped'));
+  assert.equal((await h.repo.readNote(h.node('a').path)).title, 'Body');
+});
+
+integrationTest('topic chat synthesize: aborting while the unresearched subtopics are researched does not start the integration', async () => {
+  const h = await harness(); const calls = stubResearch(h); let synthesized = 0;
+  h.view.startSynthesis = async () => { synthesized++; };
+  await h.host('root').submit('synthesize', 'all');
+  await waitFor(() => calls.length === 1);
+  h.view.startingTasks.get(h.node('root').path).abort();
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve();
+  await finished(h).catch(() => {}); await waitFor(() => !h.entry('root').session.running);
+  assert.equal(synthesized, 0, 'no integration after the stop');
+  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_stopped'));
 });

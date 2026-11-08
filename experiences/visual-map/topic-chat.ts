@@ -1,14 +1,19 @@
 import { t } from "../../i18n";
+import { renderChatMarkdown } from "../../core/map-chat-render";
 
-export type TopicChatKind = "research" | "expand" | "synthesize";
+/** The three buttons; a message typed without one is an "ask". */
+export type TopicChatButtonKind = "research" | "expand" | "synthesize";
+export type TopicChatKind = TopicChatButtonKind | "ask";
 export type TopicChatMode = "quick" | "standard";
 
 /** One line of the conversation. The text is always shown as plain text. */
 export interface TopicChatTurn {
   role: "user" | "ai";
-  /** The button the user pressed; only on user turns. */
+  /** The button the user pressed, or "ask" for free typing; only on user turns. */
   kind?: TopicChatKind;
   text: string;
+  /** An AI answer to a free question: shown through the chat's markdown whitelist (every other line is plain text). */
+  markdown?: boolean;
 }
 
 export interface TopicChatSession {
@@ -16,7 +21,7 @@ export interface TopicChatSession {
   mode: TopicChatMode;
   running: boolean;
   /** The button pressed but not yet sent; its suggestion shows as grey text until adopted. */
-  draftKind: TopicChatKind | null;
+  draftKind: TopicChatButtonKind | null;
   draftText: string;
 }
 
@@ -37,22 +42,22 @@ export interface TopicChatHost {
   subscribe(changed: () => void): () => void;
   setMode(mode: TopicChatMode): void;
   /** Remembers the unsent button and text so a repaint keeps them. */
-  setDraft(kind: TopicChatKind | null, text: string): void;
+  setDraft(kind: TopicChatButtonKind | null, text: string): void;
   /** Resolves true when a run started (the input then clears), false when it was declined (the input stays). */
   submit(kind: TopicChatKind, text: string): Promise<boolean>;
   close(): void;
 }
 
-const KINDS: readonly TopicChatKind[] = ["research", "expand", "synthesize"];
+const KINDS: readonly TopicChatButtonKind[] = ["research", "expand", "synthesize"];
 const WIDTH_FALLBACK = 340;
 const NARROW_AREA = 360;
 const GAP = 8;
 
-function kindLabel(kind: TopicChatKind): string {
+function kindLabel(kind: TopicChatButtonKind): string {
   return t(`ui.topic_chat_${kind}`);
 }
 
-function suggestion(kind: TopicChatKind): string {
+function suggestion(kind: TopicChatButtonKind): string {
   return t(`ui.topic_chat_suggest_${kind}`);
 }
 
@@ -64,7 +69,7 @@ export class TopicChatWindow {
   private readonly sendEl: HTMLButtonElement;
   private readonly tabEl: HTMLElement;
   private readonly modeHintEl: HTMLElement;
-  private readonly kindEls = new Map<TopicChatKind, HTMLButtonElement>();
+  private readonly kindEls = new Map<TopicChatButtonKind, HTMLButtonElement>();
   private readonly modeEls = new Map<TopicChatMode, HTMLButtonElement>();
   private readonly cleanups: Array<() => void> = [];
   private submitting = false;
@@ -203,7 +208,7 @@ export class TopicChatWindow {
     this.opener?.focus();
   }
 
-  private pickKind(kind: TopicChatKind): void {
+  private pickKind(kind: TopicChatButtonKind): void {
     if (this.host.session().running) return;
     this.inputEl.value = "";
     this.host.setDraft(kind, "");
@@ -236,13 +241,13 @@ export class TopicChatWindow {
 
   private canSend(): boolean {
     const session = this.host.session();
-    return !this.submitting && !session.running && !!session.draftKind && this.inputEl.value.trim() !== "";
+    // A button pressed but its grey suggestion not adopted leaves the field empty: nothing to send. Typing alone is a question.
+    return !this.submitting && !session.running && this.inputEl.value.trim() !== "";
   }
 
   private async send(): Promise<void> {
     if (!this.canSend()) return;
-    const kind = this.host.session().draftKind;
-    if (!kind) return;
+    const kind: TopicChatKind = this.host.session().draftKind ?? "ask";
     const text = this.inputEl.value.trim();
     this.submitting = true;
     this.refresh();
@@ -294,10 +299,14 @@ export class TopicChatWindow {
       });
       const who =
         turn.role === "user"
-          ? t("ui.topic_chat_you_0", turn.kind ? kindLabel(turn.kind) : "")
+          ? turn.kind && turn.kind !== "ask"
+            ? t("ui.topic_chat_you_0", kindLabel(turn.kind))
+            : t("ui.map_chat_role_you")
           : t("ui.map_chat_role_ai");
       row.createSpan({ cls: "vam-topic-chat-who", text: who });
-      row.createSpan({ cls: "vam-topic-chat-text", text: turn.text });
+      const body = row.createSpan({ cls: "vam-topic-chat-text" });
+      if (turn.markdown) renderChatMarkdown(body, turn.text, t("ui.map_chat_overflow_note"));
+      else body.setText(turn.text);
     }
     if (session.running) {
       this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running", text: t("ui.topic_chat_running") });

@@ -45436,6 +45436,71 @@ ${text12}`;
   }
 };
 
+// experiences/visual-map/topic-chat-scope.ts
+function topicSubtreeIds(nodes, rootId) {
+  const scope = /* @__PURE__ */ new Set([rootId]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const node of nodes)
+      if (node.parentId && scope.has(node.parentId) && !scope.has(node.id)) {
+        scope.add(node.id);
+        grew = true;
+      }
+  }
+  return scope;
+}
+var RUNS_HERE = ["research_standard", "expand", "synthesize"];
+function judgeTopicScope(actions, nodes, rootId) {
+  const scope = topicSubtreeIds(nodes, rootId);
+  const refs = /* @__PURE__ */ new Set();
+  const idOk = (id) => id.startsWith(MAP_CHAT_NEW_PREFIX) ? refs.has(id.slice(MAP_CHAT_NEW_PREFIX.length)) : scope.has(id);
+  const allOk = (ids) => ids.every(idOk);
+  const paths = /* @__PURE__ */ new Map();
+  for (const node of nodes) paths.set(node.path, node.id);
+  return actions.map((action) => {
+    switch (action.kind) {
+      case "add_child":
+        if (!action.parentId || !idOk(action.parentId)) return "out";
+        if (action.ref) refs.add(action.ref);
+        return "ok";
+      case "rename_topic":
+      case "update_summary":
+      case "edit_topic_note":
+      case "collapse_topic":
+      case "expand_topic":
+      case "focus_topic":
+        return idOk(action.nodeId) ? "ok" : "out";
+      case "move_topic":
+        return action.nodeId !== rootId && idOk(action.nodeId) && idOk(action.newParentId) && (!action.beforeId || idOk(action.beforeId)) ? "ok" : "out";
+      case "reorder_topics":
+        return idOk(action.parentId) && allOk(action.nodeIds) ? "ok" : "out";
+      case "delete_topic":
+        return action.nodeId !== rootId && idOk(action.nodeId) ? "ok" : "out";
+      case "edit_md_file": {
+        const key4 = normalizeVaultPath(action.path);
+        const id = key4 ? paths.get(key4) : void 0;
+        return id && scope.has(id) ? "ok" : "out";
+      }
+      case "set_topic_kind":
+      case "set_appearance":
+        return action.nodeIds.length && allOk(action.nodeIds) ? "ok" : "out";
+      case "add_relation":
+      case "remove_relation":
+        return idOk(action.fromId) && idOk(action.toId) ? "ok" : "out";
+      case "run_map_action":
+        if (!allOk(action.nodeIds)) return "out";
+        return RUNS_HERE.includes(action.action) ? "ok" : "ignore";
+      case "select_topics":
+        return allOk(action.nodeIds) && !action.all ? "ignore" : "out";
+      case "auto_layout":
+      case "ask_topic_kind":
+        return "ignore";
+      default:
+        return "out";
+    }
+  });
+}
+
 // experiences/visual-map/map-chat-turn-record.ts
 var missedImageRows = (blocks) => blocks.flatMap((block) => {
   var _a2, _b2;
@@ -51146,12 +51211,12 @@ var TopicChatWindow = class {
   }
   canSend() {
     const session = this.host.session();
-    return !this.submitting && !session.running && !!session.draftKind && this.inputEl.value.trim() !== "";
+    return !this.submitting && !session.running && this.inputEl.value.trim() !== "";
   }
   async send() {
+    var _a2;
     if (!this.canSend()) return;
-    const kind = this.host.session().draftKind;
-    if (!kind) return;
+    const kind = (_a2 = this.host.session().draftKind) != null ? _a2 : "ask";
     const text12 = this.inputEl.value.trim();
     this.submitting = true;
     this.refresh();
@@ -51199,9 +51264,11 @@ var TopicChatWindow = class {
       const row = this.logEl.createDiv({
         cls: turn.role === "user" ? "vam-topic-chat-msg is-me" : "vam-topic-chat-msg"
       });
-      const who = turn.role === "user" ? t("ui.topic_chat_you_0", turn.kind ? kindLabel(turn.kind) : "") : t("ui.map_chat_role_ai");
+      const who = turn.role === "user" ? turn.kind && turn.kind !== "ask" ? t("ui.topic_chat_you_0", kindLabel(turn.kind)) : t("ui.map_chat_role_you") : t("ui.map_chat_role_ai");
       row.createSpan({ cls: "vam-topic-chat-who", text: who });
-      row.createSpan({ cls: "vam-topic-chat-text", text: turn.text });
+      const body = row.createSpan({ cls: "vam-topic-chat-text" });
+      if (turn.markdown) renderChatMarkdown(body, turn.text, t("ui.map_chat_overflow_note"));
+      else body.setText(turn.text);
     }
     if (session.running) {
       this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running", text: t("ui.topic_chat_running") });
@@ -71792,8 +71859,12 @@ ${request.requirements}` : preset.text,
     const restored = [];
     for (const turn of restoreTopicChat(parsed.lines)) {
       if (turn.id === entry.runningTurnId) continue;
-      restored.push({ role: "user", kind: turn.kind === "ask" ? void 0 : turn.kind, text: turn.message });
-      restored.push({ role: "ai", text: turn.result ? turn.result.text : t("ui.topic_chat_result_unknown") });
+      restored.push({ role: "user", kind: turn.kind, text: turn.message });
+      restored.push({
+        role: "ai",
+        text: turn.result ? turn.result.text : t("ui.topic_chat_result_unknown"),
+        ...turn.kind === "ask" ? { markdown: true } : {}
+      });
     }
     if (!restored.length) return;
     entry.session.turns.splice(0, 0, ...restored);
@@ -71993,6 +72064,10 @@ ${request.requirements}` : preset.text,
         this.outputLanguageMemory().outputLanguage,
         (_a2 = this.map) == null ? void 0 : _a2.title
       );
+      if (kind === "ask") {
+        await this.runTopicChatAsk(entry, node, note, mode, text12, controller, language2, live, hooks);
+        return;
+      }
       if (kind === "expand") {
         const outcome = await this.chatExpand(node, text12, controller.signal);
         if (outcome.status === "succeeded")
@@ -72149,12 +72224,213 @@ ${request.requirements}` : preset.text,
     if (handle) await handle.finished;
     return { result, failure };
   }
+  /** The request of a free question: the context holds this topic and what is under it, nothing else of the map. */
+  async buildTopicChatRequest(entry, node, note, message) {
+    var _a2;
+    const map = this.map;
+    const settings = this.plugin.settings;
+    const scope = topicSubtreeIds(map.nodes, node.id);
+    const byId = new Map(map.nodes.map((item) => [item.id, item]));
+    const summaryOf = (id) => {
+      var _a3, _b2;
+      return (_b2 = (_a3 = this.chatTopicState(id)) == null ? void 0 : _a3.summary) != null ? _b2 : "";
+    };
+    const titleOf = (item) => {
+      var _a3, _b2;
+      return (_b2 = (_a3 = this.chatTopicState(item.id)) == null ? void 0 : _a3.title) != null ? _b2 : item.path;
+    };
+    const depthOf2 = (item) => {
+      let depth = 0;
+      for (let at = item; at && at.id !== node.id && depth < 200; depth++)
+        at = at.parentId ? byId.get(at.parentId) : void 0;
+      return depth;
+    };
+    const outline = this.onScreenSiblingOrder(map).filter((item) => scope.has(item.id)).map((item) => {
+      var _a3;
+      const strength = this.hypothesisStrengthOf(item.id), leaning = this.hypothesisLeaningOf(item.id);
+      return {
+        id: item.id,
+        title: titleOf(item),
+        summary: summaryOf(item.id),
+        // The topic is the root of what the model sees: its own parent is outside and is not named.
+        parentId: item.id === node.id ? null : item.parentId,
+        depth: depthOf2(item),
+        kind: this.topicKindOf(item.id),
+        ...leaning ? { leaning } : {},
+        ...strength ? { strength } : {},
+        ...((_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.aiLocked) ? { aiLocked: true } : {}
+      };
+    });
+    const history2 = [];
+    const turns = entry.session.turns;
+    for (let i = 0; i + 1 < turns.length; i++)
+      if (turns[i].role === "user" && turns[i].kind === "ask" && turns[i + 1].role === "ai")
+        history2.push({ role: "user", text: turns[i].text }, { role: "assistant", text: turns[i + 1].text });
+    const context = buildMapChatContext({
+      mapTitle: map.title,
+      mapTitles: [],
+      noEditableMap: !isManagedMapPath(settings, this.path),
+      outline,
+      selected: [
+        {
+          id: node.id,
+          title: titleOf(node),
+          summary: summaryOf(node.id),
+          detail: note.detail,
+          path: node.path
+        }
+      ],
+      references: [],
+      snippets: [],
+      files: [],
+      aim: !this.relationsEnabled(),
+      relations: this.relationsEnabled() ? ((_a2 = map.topicRelations) != null ? _a2 : []).filter((relation) => scope.has(relation.from) && scope.has(relation.to)) : [],
+      activeFile: null,
+      history: history2
+    });
+    return {
+      message,
+      context,
+      language: settings.language,
+      contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
+      model: settings.cliModel,
+      reasoning: normalizeReasoningLevel(settings.cliReasoning),
+      ...this.usageMapField()
+    };
+  }
+  /** A free question: one map-chat request about the topic; what the reply writes is checked against the subtree where it is applied. */
+  async runTopicChatAsk(entry, node, note, mode, text12, controller, language2, live, hooks) {
+    var _a2;
+    const key4 = `topic-chat-ask:${++mapChatTaskSequence}`;
+    let began = false;
+    const end = () => {
+      var _a3;
+      if (!began) return;
+      began = false;
+      (_a3 = this.plugin.activeTasks) == null ? void 0 : _a3.delete(key4);
+      hooks.end();
+    };
+    try {
+      const request = await this.buildTopicChatRequest(entry, node, note, text12);
+      began = true;
+      (_a2 = this.plugin.activeTasks) == null ? void 0 : _a2.set(key4, controller);
+      hooks.begin(controller);
+      const result = await this.plugin.mapChat.chat(request, controller.signal, () => {
+      });
+      end();
+      if (controller.signal.aborted) {
+        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
+        return;
+      }
+      const map = this.map;
+      if (!live() || !map) {
+        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
+        return;
+      }
+      const verdicts = judgeTopicScope(result.actions, map.nodes, node.id);
+      const allowed = result.actions.filter((_, index) => verdicts[index] === "ok");
+      const plan = allowed.length ? planFor(allowed, request.context, {
+        diagrams: this.plugin.settings.addDiagramsAfterResearch,
+        mapAiMode: map.aiMode
+      }) : null;
+      if (plan) {
+        this.settleTopicChat(entry, t("ui.topic_chat_too_big"), live, true, "done", true);
+        return;
+      }
+      const lines = allowed.length ? await this.applyMapChatActions(
+        { ...result, message: text12 },
+        request.context,
+        () => live() && !controller.signal.aborted,
+        { path: this.path, id: map.id },
+        {
+          context: request.context,
+          topicScope: {
+            rootId: node.id,
+            run: (action, targets) => this.runTopicChatAction(action, targets, action.mode || mode, language2, controller.signal)
+          }
+        }
+      ) : [];
+      const refused = verdicts.filter((verdict) => verdict === "out").length;
+      let sentence = result.reply.trim() || lines.map((line) => line.text).join("\n");
+      if (refused) sentence = [sentence, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");
+      if (!sentence) sentence = t("ui.topic_chat_result_unknown");
+      if (controller.signal.aborted)
+        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
+      else this.settleTopicChat(entry, sentence, live, true, "done", true);
+    } catch (error) {
+      end();
+      const stopped = controller.signal.aborted;
+      this.settleTopicChat(
+        entry,
+        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", this.chatErrorText(error).text),
+        live,
+        !stopped,
+        stopped ? "stopped" : "failed",
+        true
+      );
+    }
+  }
+  /** Carries out a research, expansion or integration a free question asked for, on the topics it names (all inside the subtree). */
+  async runTopicChatAction(action, targets, mode, language2, signal) {
+    var _a2, _b2;
+    let done = 0;
+    let reason = t("ui.map_chat_skip_unavailable");
+    for (const id of targets) {
+      if (signal.aborted) break;
+      const target = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+      if (!target) continue;
+      if (this.topicChatBusy(target)) {
+        reason = t("ui.ai_running_ai");
+        continue;
+      }
+      const note = await this.plugin.repo.readNote(target.path, (_b2 = this.map) != null ? _b2 : void 0);
+      if (this.aiLockReason("write", [id], /* @__PURE__ */ new Map([[id, note]]))) {
+        reason = t("ui.ai_locked_notice");
+        continue;
+      }
+      if (action.action === "research_standard") {
+        const run = await this.runTopicChatResearch(target, note, mode, language2, action.direction, signal);
+        if (run.result) done++;
+        else if (run.failure) reason = run.failure;
+      } else if (action.action === "expand") {
+        const outcome = await this.chatExpand(target, action.direction, signal);
+        if (outcome.status === "succeeded") done++;
+        else if (outcome.status === "failed") reason = outcome.reason;
+      } else if (action.action === "synthesize") {
+        let written2 = false;
+        await this.startSynthesis(
+          target,
+          {
+            ...chatSynthesisOptions({ outputLanguage: language2 }),
+            researchMode: researchModeOf(mode),
+            signal,
+            onProgress: () => {
+            }
+          },
+          action.direction,
+          (message) => {
+            reason = message;
+          },
+          () => {
+          },
+          {
+            isOpen: () => false,
+            onWritten: () => {
+              written2 = true;
+            }
+          }
+        );
+        if (written2) done++;
+      }
+    }
+    return done ? { status: "done" } : { status: "failed", reason };
+  }
   topicChatOpenFor(entry) {
     var _a2;
     return ((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry;
   }
   /** Ends a run: the window (if open) shows one sentence; a closed window gets a Notice when `notice` says the task did not tell it. */
-  settleTopicChat(entry, sentence, live, notice, status) {
+  settleTopicChat(entry, sentence, live, notice, status, markdown = false) {
     entry.session.running = false;
     const turnId = entry.runningTurnId;
     entry.runningTurnId = null;
@@ -72167,7 +72443,7 @@ ${request.requirements}` : preset.text,
         status,
         text: sentence
       });
-    entry.session.turns.push({ role: "ai", text: sentence });
+    entry.session.turns.push({ role: "ai", text: sentence, ...markdown ? { markdown: true } : {} });
     this.notifyTopicChat(entry);
     if (notice && !this.topicChatOpenFor(entry)) new import_obsidian37.Notice(sentence);
   }
@@ -78729,9 +79005,11 @@ ${note.detail.trim()}` : "",
    * automatic layout and a move of the view to the new cards.
    */
   async applyMapChatActions(result, baseline, alive = () => true, anchor = { path: this.path, id: ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)() }, options = {}) {
-    var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
+    var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
     const touched = /* @__PURE__ */ new Set([anchor.path]);
-    const record = this.chatLastRecord;
+    const scope = options.topicScope;
+    const record = scope ? null : this.chatLastRecord;
+    const verdicts = scope ? judgeTopicScope(result.actions, (_b2 = (_a3 = this.map) == null ? void 0 : _a3.nodes) != null ? _b2 : [], scope.rootId) : null;
     const same = () => {
       var _a4;
       return !this.closed && alive() && this.path === anchor.path && ((_a4 = this.map) == null ? void 0 : _a4.id) === anchor.id;
@@ -78742,7 +79020,7 @@ ${note.detail.trim()}` : "",
     const run = {
       refs: /* @__PURE__ */ new Map(),
       // Shared with the round's work, which hands the ids to its chain.
-      created: (_b2 = (_a3 = options.work) == null ? void 0 : _a3.created) != null ? _b2 : [],
+      created: (_d = (_c = options.work) == null ? void 0 : _c.created) != null ? _d : [],
       notes: /* @__PURE__ */ new Set(),
       files: /* @__PURE__ */ new Set(),
       parked: /* @__PURE__ */ new Set(),
@@ -78771,6 +79049,13 @@ ${note.detail.trim()}` : "",
       if (batched) this.holdChatBatch();
       run.deferRebuild = batched;
       for (const [index, action] of result.actions.entries()) {
+        if (verdicts && verdicts[index] !== "ok") {
+          lines[index] = this.chatLine(
+            this.chatActionLabel(action, refTitles),
+            skipped(verdicts[index] === "out" ? "ui.topic_chat_out_of_scope" : "ui.map_chat_skip_unavailable")
+          );
+          continue;
+        }
         if (action.kind === "select_topics" || action.kind === "run_map_action" || action.kind === "open_map" || action.kind === "ask_topic_kind") {
           later.push(index);
           continue;
@@ -78827,8 +79112,8 @@ ${note.detail.trim()}` : "",
         lines[index] = this.chatLine(label, box.outcome);
       }
       let arranged = false;
-      if (run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same() && // A reply that made a ring places the ring and the other new cards below, never the whole map again.
-      !((_c = run.ringImages) == null ? void 0 : _c.size) && !result.actions.some((action) => action.kind === "auto_layout")) {
+      if (!scope && run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same() && // A reply that made a ring places the ring and the other new cards below, never the whole map again.
+      !((_e = run.ringImages) == null ? void 0 : _e.size) && !result.actions.some((action) => action.kind === "auto_layout")) {
         try {
           await this.plugin.mutate(
             () => this.history.ownWrites(async () => {
@@ -78844,7 +79129,7 @@ ${note.detail.trim()}` : "",
         } catch (e) {
         }
       }
-      if (resized.size && !arranged && !noNewMap && same() && this.map) {
+      if (!scope && resized.size && !arranged && !noNewMap && same() && this.map) {
         this.flushChatRender();
         if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf) || this.ringTidyNeeded(resized)) {
           try {
@@ -78862,9 +79147,9 @@ ${note.detail.trim()}` : "",
       }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
       if (!same()) stopped = true;
-      const ringed = ((_d = run.ringImages) == null ? void 0 : _d.size) ? new Set(run.ringImages) : null;
-      const rough = batched && !arranged && (stopped || layoutDone || !!ringed) ? run.created.slice(laidOutCount) : [];
-      if ((rough.length || ringed) && !this.closed && this.path === anchor.path && ((_e = this.map) == null ? void 0 : _e.id) === anchor.id) {
+      const ringed = ((_f = run.ringImages) == null ? void 0 : _f.size) ? new Set(run.ringImages) : null;
+      const rough = batched && !arranged && (stopped || layoutDone || !!ringed || !!scope) ? run.created.slice(laidOutCount) : [];
+      if ((rough.length || ringed) && !this.closed && this.path === anchor.path && ((_g = this.map) == null ? void 0 : _g.id) === anchor.id) {
         try {
           await this.plugin.mutate(
             () => this.history.ownWrites(async () => {
@@ -78912,26 +79197,29 @@ ${note.detail.trim()}` : "",
     } finally {
       await this.settleChatBatch(run);
       const entries = this.history.closeGroup();
-      this.chatReplyStep = void 0;
+      if (!scope) this.chatReplyStep = void 0;
       if (wrote) {
         try {
-          if (!this.closed && this.path === anchor.path)
-            this.chatReplyStep = await this.pushChatReplyEntry(
+          if (!this.closed && this.path === anchor.path) {
+            const step = await this.pushChatReplyEntry(
               entries,
               anchor.path,
-              (_f = run.notes) != null ? _f : /* @__PURE__ */ new Set(),
-              (_g = run.files) != null ? _g : /* @__PURE__ */ new Set(),
-              (_h = run.parked) != null ? _h : /* @__PURE__ */ new Set(),
+              (_h = run.notes) != null ? _h : /* @__PURE__ */ new Set(),
+              (_i = run.files) != null ? _i : /* @__PURE__ */ new Set(),
+              (_j = run.parked) != null ? _j : /* @__PURE__ */ new Set(),
               record
             );
+            if (!scope) this.chatReplyStep = step;
+          }
         } catch (e) {
         }
         for (const view of this.plugin.views()) if (view !== this && touched.has(view.path)) view.history.clear();
         this.updateHistoryButtons();
       }
     }
-    const branchRoot = ((_i = run.ringImages) == null ? void 0 : _i.size) ? void 0 : this.chatBranchRoot(run);
-    if ((_j = run.ringImages) == null ? void 0 : _j.size) {
+    const branchRoot = ((_k = run.ringImages) == null ? void 0 : _k.size) || scope ? void 0 : this.chatBranchRoot(run);
+    if (scope) {
+    } else if ((_l = run.ringImages) == null ? void 0 : _l.size) {
       if (same() && !this.closed) this.applySelectionChange(this.selection.clickEmpty());
     } else if (branchRoot && same() && !this.closed)
       this.applySelectionChange(this.selection.setSelected(branchRoot.id));
@@ -78943,7 +79231,10 @@ ${note.detail.trim()}` : "",
       else if (noNewMap) outcome = skipped(noNewMapReason);
       else {
         try {
-          if (action.kind === "open_map") {
+          if (scope && action.kind === "run_map_action") {
+            const targets = action.nodeIds.length ? action.nodeIds : [scope.rootId];
+            outcome = scope.run ? await scope.run(action, targets) : skipped("ui.map_chat_skip_unavailable");
+          } else if (action.kind === "open_map") {
             outcome = await this.chatOpenMap(action.title, anchor, same);
             if (outcome.status === "done") touched.add(anchor.path);
           } else if (action.kind === "ask_topic_kind") {
@@ -78963,22 +79254,22 @@ ${note.detail.trim()}` : "",
               run
             );
             const mergeIds = (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && resolved.action.action === "merge" ? new Set(resolved.action.nodeIds) : void 0;
-            const mine = mergeIds ? ((_k = run.held) != null ? _k : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
+            const mine = mergeIds ? ((_m = run.held) != null ? _m : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
             let asked;
             for (const entry of mine) {
               const change2 = chatAppearanceChange(entry.action);
               asked = {
                 ...asked,
                 ...change2,
-                addMarkers: [...(_l = asked == null ? void 0 : asked.addMarkers) != null ? _l : [], ...(_m = change2.addMarkers) != null ? _m : []],
-                removeMarkers: [...(_n = asked == null ? void 0 : asked.removeMarkers) != null ? _n : [], ...(_o = change2.removeMarkers) != null ? _o : []],
-                addStyles: [...(_p = asked == null ? void 0 : asked.addStyles) != null ? _p : [], ...(_q = change2.addStyles) != null ? _q : []],
-                removeStyles: [...(_r = asked == null ? void 0 : asked.removeStyles) != null ? _r : [], ...(_s = change2.removeStyles) != null ? _s : []]
+                addMarkers: [...(_n = asked == null ? void 0 : asked.addMarkers) != null ? _n : [], ...(_o = change2.addMarkers) != null ? _o : []],
+                removeMarkers: [...(_p = asked == null ? void 0 : asked.removeMarkers) != null ? _p : [], ...(_q = change2.removeMarkers) != null ? _q : []],
+                addStyles: [...(_r = asked == null ? void 0 : asked.addStyles) != null ? _r : [], ...(_s = change2.addStyles) != null ? _s : []],
+                removeStyles: [...(_t = asked == null ? void 0 : asked.removeStyles) != null ? _t : [], ...(_u = change2.removeStyles) != null ? _u : []]
               };
             }
             outcome = resolved ? await this.runChatSelection(
               resolved.action,
-              (_t = result.message) != null ? _t : "",
+              (_v = result.message) != null ? _v : "",
               laterBatch,
               asked,
               options.work,
@@ -78988,7 +79279,7 @@ ${note.detail.trim()}` : "",
               options.work.otherBackground = true;
             if (outcome.status !== "done" && mine.length && same()) {
               const merged = new Set(mine.flatMap((entry) => entry.ids));
-              run.mergeSourceIds = new Set([...(_u = run.mergeSourceIds) != null ? _u : []].filter((id) => !merged.has(id)));
+              run.mergeSourceIds = new Set([...(_w = run.mergeSourceIds) != null ? _w : []].filter((id) => !merged.has(id)));
               for (const entry of mine) {
                 const keep = entry.ids;
                 await this.plugin.mutate(async () => {

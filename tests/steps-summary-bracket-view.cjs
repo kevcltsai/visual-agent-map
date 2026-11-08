@@ -444,7 +444,7 @@ test('C1 card context menu: one topic gets its card actions in groups (AI and ne
   const card = h.view.cardEls.get(h.ids.b);
   const event = () => ({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
   const calls = [];
-  h.view.openNextStep = node => calls.push(['ai', node.id]);
+  h.view.openTopicChat = node => calls.push(['ai', node.id]);
   h.view.addNode = async parent => { calls.push(['add', parent?.id ?? null]); };
   h.view.startCardTitleEdit = node => calls.push(['rename', node.id]);
   h.view.openNodePanel = (node, mode) => calls.push(['panel', node.id, mode]);

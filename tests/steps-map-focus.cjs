@@ -599,22 +599,6 @@ for (const [name, open] of Object.entries(MENU_OPENERS)) {
   });
 }
 
-test('#18-keyboard: the research dialog (next step) closing after a repaint sends focus back to the map, not the body', async () => {
-  const h = await harness();
-  const card = h.card('leaf'); card.focus();
-  h.view.openNextStep(h.view.map.nodes[1]);
-  await timers(50);
-  const dialog = h.modals.at(-1);
-  assert.ok(dialog, 'the next-step dialog opened');
-  const field = h.doc.body.add('div', { cls: 'modal' }).add('button', { text: 'Start' });
-  field.focus();
-  h.view.render(); // research progress / completion repaints the map while the dialog has focus
-  dialog.close(); h.doc.activeElement = h.doc.body; // Obsidian restores focus to the opener card, which the repaint removed
-  await timers(180);
-  assert.equal(h.inMap(), true, 'focus is inside the map so the arrow keys and Esc reach it');
-  assert.notEqual(h.active(), h.doc.body);
-});
-
 test('#18-keyboard: the outline search box jumps to the first topic whose own title matches on Enter', () => {
   const { OutlineView } = load('ui/outline-view.ts', { obsidian: { ...obsidian, ItemView: class { constructor() { this.contentEl = dom.element('div'); } }, Notice: class {} } });
   const opened = [];

@@ -505,7 +505,7 @@ test('q (B1): a card rebuilt in place is locked again, and no card action starts
   await view.steerAim({ nodeId: h.nodes[0].id }, 'x');
   assert.equal(followups, 0);
   // The remaining entry points start with the same guard.
-  for (const name of ['retryAimSubtopics', 'continueAimResearch', 'planAimFromSelection', 'discardSynthesis', 'retrySynthesis', 'openNextStep', 'openSelectionSynthesis', 'retrySelectionSynthesis'])
+  for (const name of ['retryAimSubtopics', 'continueAimResearch', 'planAimFromSelection', 'discardSynthesis', 'retrySynthesis', 'openSelectionSynthesis', 'retrySelectionSynthesis'])
     assert.match(guardSource(name), /\{\n    if \(this\.notesLoading\(\)\) return;/, name);
   await finish();
 });

@@ -179,7 +179,7 @@ test('locking from the view while the AI runs stops the task through Stop: no wr
   assert.equal((await h.repo.readNote(a.path)).aiLocked, true, 'redo locks again');
 });
 
-test('the view entries refuse a locked topic before the AI: re-run Standard, the research dialog and multi research', async () => {
+test('the view entries refuse a locked topic before the AI: re-run Standard, the topic chat and multi research', async () => {
   const h = await harness(['A', 'B']);
   const [a, b] = h.nodes;
   await h.view.setAiLock([a], true);
@@ -189,9 +189,10 @@ test('the view entries refuse a locked topic before the AI: re-run Standard, the
   h.notices.length = 0;
   let pending;
   h.view.enqueue = fn => { pending = fn(); };
-  h.view.openNextStep(a);
+  h.view.openTopicChat(a);
   await pending;
-  assert.match(h.notices.at(-1) ?? '', LOCKED_NOTICE, 'the dialog is not opened');
+  assert.match(h.notices.at(-1) ?? '', LOCKED_NOTICE, 'the topic chat is not opened');
+  assert.equal(h.view.topicChatOpen ?? null, null, 'no topic chat window is open on a locked topic');
   h.view.selection.replaceMulti([a.id, b.id]);
   await h.view.startMultiResearch({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: false });
   await until(() => h.view.plugin.expansionBatches.get(`multi-research:${MAP}`)?.status === 'completed');

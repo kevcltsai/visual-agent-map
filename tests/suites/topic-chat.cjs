@@ -237,6 +237,18 @@ test('topic chat places the window again and scrolls the log to the newest turn 
   assert.equal(log.scrollTop, 5000);
 });
 
+test('topic chat mount after a repaint (window taken out and put back) scrolls the log to the end; a mount that moves nothing leaves the scroll where the reader put it', () => {
+  const f = fixture();
+  const log = findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-log'))[0];
+  Object.defineProperty(log, 'scrollHeight', { value: 5000, configurable: true });
+  log.scrollTop = 120;
+  f.win.mount(f.root, false);
+  assert.equal(log.scrollTop, 120, 'still in the parent: nothing moved, nothing scrolled');
+  f.win.el.remove(); log.scrollTop = 0;
+  f.win.mount(f.root, false);
+  assert.equal(log.scrollTop, 5000, 're-attached: the browser reset the scroll, so it goes back to the newest turn');
+});
+
 test('topic chat lifts its overlay above the controls overlay while mounted and drops it on destroy (class + CSS string check)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /\.has-topic-chat\.vam-canvas-overlay\s*\{[^}]*z-index:\s*5/);

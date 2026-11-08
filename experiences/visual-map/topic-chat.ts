@@ -163,11 +163,14 @@ export class TopicChatWindow {
 
   /** Puts the window in `parent` (again, after a repaint), places it and, unless `focus` is false, moves the focus to the input. */
   mount(parent: HTMLElement, focus = true): void {
-    if (!parent.contains(this.el)) parent.appendChild(this.el);
+    const attached = !parent.contains(this.el);
+    if (attached) parent.appendChild(this.el);
     // JS-toggled (the map stylesheet allows no :has()): lifts this overlay above the controls overlay that follows it.
     parent.addClass("has-topic-chat");
     this.parentEl = parent;
     this.reposition();
+    // Putting the element back resets its scroll to the top: bring the newest turn into view again (a mount that moved nothing keeps the reader's place).
+    if (attached) this.logEl.scrollTop = this.logEl.scrollHeight;
     if (focus) this.inputEl.focus();
   }
 

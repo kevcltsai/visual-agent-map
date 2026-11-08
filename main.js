@@ -50195,10 +50195,12 @@ var TopicChatWindow = class {
   }
   /** Puts the window in `parent` (again, after a repaint), places it and, unless `focus` is false, moves the focus to the input. */
   mount(parent, focus = true) {
-    if (!parent.contains(this.el)) parent.appendChild(this.el);
+    const attached = !parent.contains(this.el);
+    if (attached) parent.appendChild(this.el);
     parent.addClass("has-topic-chat");
     this.parentEl = parent;
     this.reposition();
+    if (attached) this.logEl.scrollTop = this.logEl.scrollHeight;
     if (focus) this.inputEl.focus();
   }
   /** Right of the card when it fits, else left; a narrow canvas puts the window at the bottom. Missing geometry leaves it as is. */

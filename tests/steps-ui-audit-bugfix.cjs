@@ -194,3 +194,13 @@ test('A2: a malformed agent-map block throws a readable translated error, not a 
   const zhTW = Object.values(load('i18n/zh-TW.ts')).find(value => value && typeof value === 'object' && 'ui.map_data_block_invalid' in value);
   assert.equal(zhTW['ui.map_data_block_invalid'], '這張心智圖的資料區塊格式不正確，無法開啟。請修正 agent-map 區塊的內容。');
 });
+
+// A4: the "same topic" banner row is hidden with is-hidden, but `.ct-topic-focus { display: flex }` used to win over it.
+test('A4: .ct-topic-focus.is-hidden hides the row, and the view toggles it only by the topic filter', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const styles = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.match(styles, /\.ct-topic-focus\.is-hidden\s*\{\s*display:\s*none\s*;?\s*\}/);
+  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/coffee-tables/view.ts'), 'utf8');
+  assert.match(view, /createDiv\("ct-topic-focus is-hidden"\)/);
+  assert.match(view, /topicFocusRow\.toggleClass\("is-hidden", !this\.focusedTopic\)/);
+});

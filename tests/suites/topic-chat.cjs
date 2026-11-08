@@ -796,3 +796,30 @@ integrationTest('topic chat integration: the integration is written into the par
   await waitFor(() => h.view.history.canRedo);
   assert.deepEqual(plain(await h.repo.readNote(rootNote.path)), plain(before), 'Undo restores the parent verbatim');
 });
+
+integrationTest('topic chat Escape gives the focus back: to the button that opened it, else to the topic card, never the page body', async () => {
+  const h = await harness();
+  const focused = [];
+  const card = key => ({ focus: () => focused.push('card:' + key) });
+  h.view.cardEls = new Map([[h.ids.a, card('a')], [h.ids.b, card('b')], [h.ids.c, card('c')]]);
+  const escape = () => h.win().el.fire('keydown', { key: 'Escape' });
+  // Button entry: the empty suggestion panel's AI explore button gets the focus back.
+  const panel = element('div'); panel.root = h.page.doc;
+  h.view.renderPendingProposals(panel, h.node('c'), h.view.notes.get(h.ids.c), () => {});
+  const open = find(panel, i => i.tag === 'button' && i.text === t('ui.ai_explore'));
+  open.focus = () => focused.push('button'); open.click(); escape();
+  assert.deepEqual(plain(focused), ['button'], 'the button entry returns to its button');
+  // The button was removed by a repaint meanwhile: the card of the same topic takes the focus.
+  focused.length = 0; h.view.closeTopicChatWindow();
+  open.click(); open.isConnected = false; escape();
+  assert.deepEqual(plain(focused), ['card:c'], 'a removed opener falls back to the topic card');
+  // No-button entries (right-click menu, command): the card of the topic.
+  focused.length = 0; h.view.closeTopicChatWindow();
+  h.view.selection.setSelected(h.ids.b);
+  assert.equal(h.view.mapCommand('ai-explore', false), true); escape();
+  assert.deepEqual(plain(focused), ['card:b'], 'the command entry returns to the card');
+  focused.length = 0; h.view.closeTopicChatWindow();
+  const items = []; const menu = { addItem(cb) { const it = { setTitle(x) { it.title = x; return it; }, setIcon() { return it; }, setSection() { return it; }, setDisabled() { return it; }, onClick(fn) { it.fn = fn; return it; } }; cb(it); items.push(it); return this; }, addSeparator() { return this; } };
+  h.view.addCardMenuActions(menu, h.node('a')); items.find(i => i.title === t('ui.ai_explore')).fn(); escape();
+  assert.deepEqual(plain(focused), ['card:a'], 'the right-click entry returns to the card');
+});

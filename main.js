@@ -69435,11 +69435,14 @@ ${request.requirements}` : preset.text,
         steer.setAttr("title", t("ui.aim_steer_hint"));
       }
     }
-    if (!this.selection.state.multiSelectMode && !this.aimLive())
-      this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openTopicChat(node))).addClass(
-        "vam-node-tool",
-        "vam-ai-explore"
+    if (!this.selection.state.multiSelectMode && !this.aimLive()) {
+      const explore = this.button(
+        tools,
+        t("ui.ai_explore"),
+        () => this.whenEditing(() => this.openTopicChat(node, explore))
       );
+      explore.addClass("vam-node-tool", "vam-ai-explore");
+    }
     const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
     details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
@@ -70906,7 +70909,14 @@ ${request.requirements}` : preset.text,
     if (!overlay) return;
     this.closeTopicChatWindow();
     const entry = this.topicChatEntry(node);
-    const win = new TopicChatWindow(this.topicChatHost(entry), opener != null ? opener : null, overlay);
+    const focusBack = {
+      focus: () => {
+        var _a3, _b3;
+        if (opener && opener.isConnected !== false) opener.focus();
+        else (_b3 = (_a3 = this.cardEls.get(node.id)) == null ? void 0 : _a3.focus) == null ? void 0 : _b3.call(_a3, { preventScroll: true });
+      }
+    };
+    const win = new TopicChatWindow(this.topicChatHost(entry), focusBack, overlay);
     this.topicChatOpen = { entry, win };
     win.mount(overlay);
   }
@@ -71632,9 +71642,10 @@ ${request.requirements}` : preset.text,
       empty.createEl("p", { cls: "vam-hint", text: t("ui.expansion_suggestions_none") });
       const actions2 = (host != null ? host : empty).createDiv("vam-next-actions");
       actions2.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
-      actions2.createEl("button", { text: t("ui.ai_explore"), cls: "mod-cta" }).addEventListener("click", () => {
+      const explore = actions2.createEl("button", { text: t("ui.ai_explore"), cls: "mod-cta" });
+      explore.addEventListener("click", () => {
         close == null ? void 0 : close();
-        this.whenEditing(() => this.openTopicChat(node));
+        this.whenEditing(() => this.openTopicChat(node, explore));
       });
       return;
     }

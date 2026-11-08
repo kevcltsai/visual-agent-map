@@ -14759,11 +14759,12 @@ export class VisualAgentMapView extends ItemView {
         steer.setAttr("title", t("ui.aim_steer_hint"));
       }
     }
-    if (!this.selection.state.multiSelectMode && !this.aimLive())
-      this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openTopicChat(node))).addClass(
-        "vam-node-tool",
-        "vam-ai-explore"
+    if (!this.selection.state.multiSelectMode && !this.aimLive()) {
+      const explore = this.button(tools, t("ui.ai_explore"), () =>
+        this.whenEditing(() => this.openTopicChat(node, explore))
       );
+      explore.addClass("vam-node-tool", "vam-ai-explore");
+    }
     const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
     details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
@@ -16350,7 +16351,7 @@ export class VisualAgentMapView extends ItemView {
     for (const watcher of [...entry.watchers]) watcher();
   }
   /** Opens the topic's chat next to its card; one window at a time (opening another closes this one, its task goes on). */
-  private openTopicChat(node: MapNode, opener?: { focus(): void } | null): void {
+  private openTopicChat(node: MapNode, opener?: { focus(): void; isConnected?: boolean } | null): void {
     if (this.closed || !this.map || this.notesLoading() || this.presentation || this.aimLive()) return;
     if (this.aiLockReason("write", [node.id])) {
       new Notice(t("ui.ai_locked_notice"));
@@ -16361,7 +16362,15 @@ export class VisualAgentMapView extends ItemView {
     if (!overlay) return;
     this.closeTopicChatWindow();
     const entry = this.topicChatEntry(node);
-    const win = new TopicChatWindow(this.topicChatHost(entry), opener ?? null, overlay);
+    // Closing gives the focus back to the control that opened the chat; when it is gone (a menu or command has none, a repaint
+    // replaced the card) the card of the topic takes it, so the focus never falls to the page body.
+    const focusBack = {
+      focus: (): void => {
+        if (opener && opener.isConnected !== false) opener.focus();
+        else this.cardEls.get(node.id)?.focus?.({ preventScroll: true });
+      }
+    };
+    const win = new TopicChatWindow(this.topicChatHost(entry), focusBack, overlay);
     this.topicChatOpen = { entry, win };
     win.mount(overlay);
   }
@@ -17145,9 +17154,10 @@ export class VisualAgentMapView extends ItemView {
       empty.createEl("p", { cls: "vam-hint", text: t("ui.expansion_suggestions_none") });
       const actions = (host ?? empty).createDiv("vam-next-actions");
       actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
-      actions.createEl("button", { text: t("ui.ai_explore"), cls: "mod-cta" }).addEventListener("click", () => {
+      const explore = actions.createEl("button", { text: t("ui.ai_explore"), cls: "mod-cta" });
+      explore.addEventListener("click", () => {
         close?.();
-        this.whenEditing(() => this.openTopicChat(node));
+        this.whenEditing(() => this.openTopicChat(node, explore));
       });
       return;
     }

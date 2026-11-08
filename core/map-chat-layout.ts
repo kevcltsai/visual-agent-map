@@ -16,8 +16,6 @@ export const MAP_CHAT_MIN_CANVAS = 360;
 export const MAP_CHAT_NARROW_HYSTERESIS = 24;
 /** The laid-over window leaves at least this much of the pane visible beside it. */
 export const MAP_CHAT_OVERLAY_MARGIN = 160;
-/** More result lines than this fold into a count. */
-export const MAP_CHAT_LINES_FOLD_ABOVE = 5;
 
 /** A saved or dragged width as a usable one: a whole number from the minimum to the maximum; anything else is the default. */
 export function clampMapChatWidth(value: unknown): number {

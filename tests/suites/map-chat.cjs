@@ -73,6 +73,8 @@ function panelFixture(overrides = {}, windowValues = {}) {
   return { panel, overlay, calls, prefs, page: p, parts, setLanguage: setUiLanguage, setVisible: path => { visibleNote = path; }, showNote: path => { visibleNote = path; panel.refreshNote(); }, select: ids => { selected = ids; panel.refreshSelection(); } };
 }
 const hasClass = (item, name) => dom.hasCls(item, name);
+// Opens every folded "View details" (a plan card and the results of a reply); the row is rebuilt after each press, so it looks again.
+const openDetails = root => { for (let n = 0; n < 20; n++) { const t = find(root, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-lines-toggle') && i.attrs['aria-expanded'] === 'false'); if (!t) return; t.click(); } };
 const key = (input, event) => { let prevented = false; input.fire('keydown', { preventDefault() { prevented = true; }, shiftKey: false, isComposing: false, ...event }); return prevented; };
 const drop = (target, text) => { let prevented = false; target.fire('drop', { preventDefault() { prevented = true; }, dataTransfer: { getData: type => type === 'text/plain' ? text : '', types: ['text/plain'] } }); return prevented; };
 
@@ -226,7 +228,8 @@ test('map chat: while the AI works Stop is shown with a visible status, the repl
   eq(f.panel.turns(), [], 'a turn that is still streaming is not history');
   f.panel.finish('final answer', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B' }]);
   assert.equal(f.parts.status().text, ''); assert.equal(f.parts.send().hidden, false); assert.equal(f.parts.stop().hidden, true);
-  eq(findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-line')).map(i => i.text), ['Done: A', 'Skipped: B']);
+  eq(findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-line')).map(i => i.text), ['Skipped: B'], 'the done line is folded; the skipped one is shown');
+  openDetails(f.parts.log()); eq(findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-line')).map(i => i.text), ['Skipped: B', 'Done: A'], 'View details brings the done line');
   eq(f.panel.turns(), [{ role: 'user', text: 'ask' }, { role: 'assistant', text: 'final answer' }]);
 });
 
@@ -1733,7 +1736,7 @@ test('map chat D4: replies are laid out by the safe renderer as they stream; the
   const done = replyBody(f);
   assert.equal(visibleText(done), 'Done bold Note', 'the last layout is the complete answer, with nothing left of earlier ones');
   eq(findAll(done, i => i.tag === 'a').map(i => i.attrs['data-href']), ['Note']);
-  assert.equal(findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-line'))[0].text, '**line**');
+  openDetails(f.parts.log()); assert.equal(findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-line'))[0].text, '**line**');
   f.panel.begin('two'); f.panel.fail('Broke **hard**');
   const failed = findAll(f.parts.log(), i => hasClass(i, 'is-assistant')).at(-1).children.find(c => hasClass(c, 'vam-map-chat-text'));
   assert.equal(failed.text, 'Broke **hard**'); assert.equal(failed.children.length, 0, 'an error text is not laid out');
@@ -2513,7 +2516,7 @@ integrationTest('B1 plan: 16 actions wait for Apply; until then the map, the not
   h.type('add many'); await h.view.sendMapChat();
   assert.equal(planCard(h).length, 1, 'the plan card is in the conversation'); assert.equal(chat.pendingPlan().state, 'pending');
   assert.equal(chat.isBusy, false); assert.equal(h.control.mutates, 0, 'no write was queued'); assert.equal(vaultState(h), before, 'the vault is byte for byte as it was');
-  assert.match(visibleText(planCard(h)[0]), /16 actions/); assert.match(visibleText(planCard(h)[0]), /No extra AI calls/);
+  assert.match(visibleText(planCard(h)[0]), /Add or create \(16\)/); openDetails(h.view.chat.logEl); assert.match(visibleText(planCard(h)[0]), /16 actions/); assert.match(visibleText(planCard(h)[0]), /No extra AI calls/);
   assert.equal(findAll(planCard(h)[0], i => i.tag === 'li' && /Add subtopic/.test(visibleText(i))).length, 16, 'every action is listed');
   assert.equal(planButton(h, 'apply').attrs.type, 'button'); assert.equal(planButton(h, 'cancel').attrs.type, 'button');
   planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
@@ -2625,7 +2628,7 @@ integrationTest('B1 map: create_map waits for Apply, then opens the new map, bui
   const topicsBefore = (await h.repo.topics()).length;
   h.type('new map on quantum'); await h.view.sendMapChat();
   assert.equal((await h.repo.topics()).length, topicsBefore, 'no map was made before Apply'); assert.equal(h.view.path, oldPath);
-  assert.match(visibleText(planCard(h)[0]), /new map/);
+  openDetails(h.view.chat.logEl); assert.match(visibleText(planCard(h)[0]), /new map/);
   planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.pendingPlan() === null && chat.transcript().at(-1).lines.length > 0);
   assert.notEqual(h.view.path, oldPath); assert.equal(h.view.map.title, 'Quantum computing'); assert.equal((await h.repo.topics()).length, topicsBefore + 1);
   assert.equal(h.view.map.nodes.length, 3); const root = h.view.map.nodes.find(n => !n.parentId); assert.equal(children(h, root.id).length, 2);
@@ -2890,19 +2893,18 @@ integrationTest('opening screen: removing the only item does not take the keyboa
   assert.equal(blank.page.doc.activeElement, blank.view.chat.inputEl, 'a map that opens empty starts in the field');
 });
 
-integrationTest('UX B6: on the opening screen the model menu is a quiet last line (after the message field and the empty-map button); in the window it is back in the head row', async () => {
+integrationTest('UX B6: on the opening screen the model menu is in the composer after the message field (never in the head row); the head row is hidden there and shows again in the window', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; assert.equal(chat.isHero, true);
   const body = () => chat.bodyEl.children; const visible = body().filter(c => !c.hidden);
-  assert.equal(visible.at(-1), chat.headEl, 'the head row (only the model menu shows there) is last'); assert.ok(chat.headEl.hasClass('is-hero'));
+  assert.ok(chat.headEl.hasClass('is-hero'), 'the head row is hidden on the opening screen'); assert.equal(find(chat.headEl, i => i === chat.modelEl), undefined, 'the model menu is not in the head row');
   const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.modelEl).map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : 'model');
   eq(order, ['title', 'input', 'model'], 'reading and Tab order: the question, the field, then the model');
-  if (chat.emptyMapEl.hidden === false) assert.equal(body().at(-2), chat.emptyMapEl, 'the empty-map button stays last in the body');
-  const tag = find(chat.headEl, i => hasClass(i, 'vam-map-chat-model-tag')); assert.equal(tag.text, 'Model'); assert.equal(tag.attrs['aria-hidden'], 'true');
+  assert.equal(find(chat.headEl, i => hasClass(i, 'vam-map-chat-model-tag')), undefined, 'no "Model" tag any more');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = sel => css.split('\n').find(line => line.startsWith(`${sel} {`)) ?? '';
-  assert.match(rule('.vam-map-chat-head.is-hero .vam-map-chat-model'), /border: 0; background-color: transparent;.*color: var\(--text-muted\); font-size: var\(--font-ui-smaller\)/, 'a small, borderless, muted menu');
-  assert.match(rule('.vam-map-chat-model-tag'), /display: none/, 'the tag is only shown on the opening screen');
+  assert.match(rule('.vam-map-chat-composer .vam-map-chat-model'), /border: 0; background-color: transparent;.*color: var\(--text-muted\); font-size: var\(--font-ui-smaller\)/, 'a small, borderless, muted menu');
+  assert.equal(rule('.vam-map-chat-model-tag'), '', 'the tag rule is gone');
   h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] }); h.type('Coffee'); await h.view.sendMapChat();
-  assert.equal(chat.isHero, false); assert.equal(body()[0], chat.headEl, 'in the window the head row is on top again'); assert.equal(chat.headEl.hasClass('is-hero'), false);
+  assert.equal(chat.isHero, false); assert.equal(chat.bodyEl.children[0], chat.headEl, 'in the window the head row is on top again'); assert.equal(chat.headEl.hasClass('is-hero'), false);
 });
 
 integrationTest('map chat composer: neither the opening screen nor the window has example or suggestion buttons', async () => {
@@ -3070,7 +3072,7 @@ test('map chat composer: the styles put the keys inside the box with theme varia
   assert.match(rule('.vam-map-chat-composer button.vam-map-chat-send'), /background: transparent/, 'idle: no fill');
   // The shared key rule sets display at (0,2,1); the hide rule must match it, or both keys paint on the same spot.
   assert.match(rule('.vam-map-chat-composer button.vam-map-chat-send.is-hidden, .vam-map-chat-composer button.vam-map-chat-stop.is-hidden, .vam-map-chat-composer button.vam-map-chat-send[hidden], .vam-map-chat-composer button.vam-map-chat-stop[hidden]'), /display: none/, 'a hidden key is not drawn');
-  assert.match(rule('.vam-map-chat-composer button.vam-map-chat-stop'), /background: var\(--interactive-accent\)/, 'working: a filled circle');
+  assert.match(rule('.vam-map-chat-composer button.vam-map-chat-stop'), /background: transparent; color: var\(--text-muted\)/, 'working: the stop key has no accent disc (chat layout)');
   for (const line of lines.filter(l => l.includes('.vam-map-chat-composer'))) assert.doesNotMatch(line, /#[0-9a-fA-F]{3,8}\b|rgb\(/, 'theme variables only');
   for (const gone of ['.vam-map-chat-suggest', '.vam-map-chat-suggestion', '.vam-map-chat-example', '.vam-map-chat-side']) assert.equal(css.includes(gone), false, `${gone} is gone`);
 });
@@ -3124,7 +3126,7 @@ integrationTest('B1 ui: Tab order follows the document: the reference chips, the
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.addTopicReference(h.ids.a);
   const focusable = findAll(chat.bodyEl, i => (i.tag === 'button' || i.tag === 'textarea' || i.tag === 'select') && !i.hidden && i.attrs.tabindex !== '-1');
   const names = focusable.map(i => hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : i.tag === 'select' ? 'model' : 'other');
-  const tail = names.slice(names.indexOf('chip')).filter(n => n !== 'stop'); eq(tail, ['chip', 'input', 'send']);
+  const tail = names.slice(names.indexOf('chip')).filter(n => n !== 'stop'); eq(tail, ['chip', 'input', 'model', 'send'], 'the model menu is in the composer, between the field and Send');
   assert.ok(!focusable.some(i => i.attrs.tabindex && Number(i.attrs.tabindex) > 0), 'no positive tabindex');
 });
 
@@ -3156,7 +3158,7 @@ integrationTest('B1 ui: a saved closed state starts the window closed', async ()
 integrationTest('B1 ui: the plan card has a one-sentence description, actions grouped by kind and folded, the call estimate, and Apply / Cancel as real buttons', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 14 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), { kind: 'rename_topic', nodeId: h.ids.a, title: 'Body!' }, { kind: 'delete_topic', nodeId: h.ids.b, branch: false }, { kind: 'collapse_topic', nodeId: h.ids.root }], rejected: [] });
-  h.type('many'); await h.view.sendMapChat(); const card = planCard(h)[0];
+  h.type('many'); await h.view.sendMapChat(); openDetails(h.view.chat.logEl); const card = planCard(h)[0];
   assert.match(visibleText(find(card, i => hasClass(i, 'vam-map-chat-plan-sentence'))), /^This plan needs your confirmation: 17 actions\.$/);
   const groups = findAll(card, i => i.tag === 'details'); eq(groups.map(g => find(g, i => i.tag === 'summary').text), ['Add or create (14)', 'Edit or move (1)', 'Delete (1)', 'Map and view (1)']);
   assert.ok(groups.every(g => g.open === false && g.attrs.open === undefined), 'every group starts folded'); assert.equal(findAll(card, i => i.tag === 'li').length, 17);
@@ -3172,7 +3174,7 @@ integrationTest('persona-07 ui: an applied plan no longer says it needs confirma
   h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
   h.type('many'); await h.view.sendMapChat(); planButton(h, 'apply').click();
   await until(() => h.view.chat.pendingPlan() === null && !h.view.chatApplying);
-  const text = visibleText(planCard(h)[0]); assert.doesNotMatch(text, /needs your confirmation/); assert.match(text, /Plan applied/);
+  openDetails(h.view.chat.logEl); const text = visibleText(planCard(h)[0]); assert.doesNotMatch(text, /needs your confirmation/); assert.match(text, /Plan applied/);
 });
 
 integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the card says nothing changed', async () => {
@@ -3185,8 +3187,9 @@ integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the ca
 integrationTest('B1 ui: result lines name their status in words; five or fewer are all shown; the closing "cannot be undone" line is always last', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
   chat.finish('r', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B (the topic is no longer on the map)' }, { status: 'failed', text: 'Failed: C (boom)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.' }]);
-  const lines = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')); eq(lines.map(l => l.text.split(':')[0].split(' ')[0]), ['Done:', 'Skipped:', 'Failed:', 'Undo'].map(s => s.replace(':', ''))); assert.ok(hasClass(lines.at(-1), 'is-note'));
-  assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')).length, 0);
+  const lines = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')); eq(lines.map(l => l.text.split(':')[0].split(' ')[0]), ['Skipped', 'Failed', 'Undo'], 'the done line is folded; skipped, failed and the closing note are shown'); assert.ok(hasClass(lines.at(-1), 'is-note'));
+  assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')).length, 1);
+  openDetails(chat.logEl); eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(l => l.text.split(':')[0].split(' ')[0]), ['Skipped', 'Failed', 'Done', 'Undo'], 'View details brings the done line; the closing note stays last');
 });
 
 integrationTest('B1 ui: the auto-layout line is a note: it is neither spoken in the counts nor counted toward folding', async () => {
@@ -3194,20 +3197,19 @@ integrationTest('B1 ui: the auto-layout line is a note: it is neither spoken in 
   const note = 'Arranged the map automatically after adding many topics';
   chat.begin('q'); chat.finish('r', [...Array.from({ length: 5 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'done', text: note }]);
   assert.match(writes.at(-1), /Results: 5 done$/, 'spoken count leaves the auto-layout line out');
-  assert.equal(find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')), undefined, 'five results plus the note do not fold');
+  assert.match(visibleText(find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-counts'))), /^5 done$/, 'the counts say 5 done: the note is not counted'); eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(l => l.text), [note], 'done lines fold; the note stays shown');
 });
 integrationTest('B1 ui: more than five result lines fold into a count; the toggle shows them all and back; the closing line stays last; focus stays on the toggle', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
   const lines = [...Array.from({ length: 18 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'skipped', text: 'Skipped: x (y)' }, { status: 'skipped', text: 'Skipped: z (w)' }, { status: 'failed', text: 'Failed: q (r)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.' }];
   chat.finish('r', lines);
   const text = () => visibleText(find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines'))); const shown = () => findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line'));
-  assert.match(text(), /18 done, 2 skipped, 1 failed/); eq(shown().map(l => l.text), ['Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.'], 'folded: only the closing line');
-  let toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.text, 'Show all 21 results'); assert.equal(toggle.attrs['aria-expanded'], 'false'); toggle.click();
+  assert.match(text(), /18 done/); eq(shown().map(l => l.text.split(':')[0].split(' ')[0]), ['Skipped', 'Skipped', 'Failed', 'Undo'], 'folded: failed and skipped lines and the closing line stay shown'); eq(shown().slice(-1).map(l => l.text), ['Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.'], 'the closing line is last');
+  let toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.text, 'View details'); assert.equal(toggle.attrs['aria-expanded'], 'false'); toggle.click();
   assert.equal(shown().length, 22); assert.ok(hasClass(shown().at(-1), 'is-note'), 'still last'); toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.attrs['aria-expanded'], 'true'); assert.equal(h.page.doc.activeElement, toggle);
-  toggle.click(); assert.equal(shown().length, 1);
-  // Exactly five results do not fold; six do.
-  const five = await harness(); await five.view.hydrate(); const c5 = five.open(); c5.begin('q'); c5.finish('r', Array.from({ length: 5 }, (_, i) => ({ status: 'done', text: `Done: ${i}` }))); assert.equal(findAll(c5.logEl, i => hasClass(i, 'vam-map-chat-line')).length, 5);
-  c5.begin('q2'); c5.finish('r', Array.from({ length: 6 }, (_, i) => ({ status: 'done', text: `Done: ${i}` }))); assert.equal(findAll(c5.logEl, i => hasClass(i, 'vam-map-chat-line')).length, 5, 'the second message is folded: only the first one\'s five remain');
+  toggle.click(); assert.equal(shown().length, 4);
+  // Done lines always fold, however few.
+  const five = await harness(); await five.view.hydrate(); const c5 = five.open(); c5.begin('q'); c5.finish('r', Array.from({ length: 5 }, (_, i) => ({ status: 'done', text: `Done: ${i}` }))); assert.equal(findAll(c5.logEl, i => hasClass(i, 'vam-map-chat-line')).length, 0, 'five done lines are folded too'); assert.equal(findAll(c5.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')).length, 1);
 });
 
 integrationTest('B1 ui: a failed turn stays in the conversation with a Retry button, no Notice is shown, and Retry sends the same question again and applies its actions', async () => {
@@ -3364,8 +3366,8 @@ integrationTest('B1 fix 8: the plan card names the same research count as the pl
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const ids = Array.from({ length: 12 }, (_, i) => `x${i}`);
   h.control.reply = async () => ({ reply: 'I will research.', actions: [{ kind: 'select_topics', nodeIds: ids, all: false }, { kind: 'run_map_action', action: 'research_standard', nodeIds: [] }], rejected: [] });
   h.type('research'); await h.view.sendMapChat();
-  assert.match(visibleText(planCard(h)[0]), /Starts research on 12 topics/);
-  const live = findAll(chat.el, i => hasClass(i, 'vam-sr-only'))[0].text; assert.match(live, /I will research\./); assert.match(live, /A plan is waiting for you: This plan needs your confirmation/);
+  openDetails(h.view.chat.logEl); assert.match(visibleText(planCard(h)[0]), /Starts research on 12 topics/);
+  const live = chat.liveEl.text; assert.match(live, /I will research\./); assert.match(live, /A plan is waiting for you: This plan needs your confirmation/);
 });
 
 integrationTest('B1 fix 11: a map that was made but could not be opened says so, and the rest of the reply says the same', async () => {
@@ -3475,7 +3477,7 @@ integrationTest('UX B1: while the usage notice is open the empty canvas waits fo
 integrationTest('B1 fix 16 / chat 04: a plan card without AI work has no undo warning; it marks the group that removes cards in words, and its title follows what became of it', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'plan', actions: [...planActions(h, 15), { kind: 'delete_topic', nodeId: h.ids.a, branch: true }], rejected: [] });
-  h.type('many'); await h.view.sendMapChat(); const title = () => find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-title')).text;
+  h.type('many'); await h.view.sendMapChat(); const title = () => { openDetails(chat.logEl); return find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-title')).text; };
   assert.equal(title(), 'Plan to review'); const buttons = find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-buttons'));
   assert.equal(findAll(buttons, i => hasClass(i, 'vam-map-chat-plan-warning')).length, 0, 'everything in it is undone by Undo: no warning');
   const danger = findAll(planCard(h)[0], i => i.tag === 'details' && hasClass(i, 'is-danger')); assert.equal(danger.length, 1, 'only the delete group');
@@ -3496,13 +3498,13 @@ integrationTest('B1 fix 3 (Primary 3): while a plan waits the field is not locke
 });
 
 test('B1 fix 18: a failure is announced once: a text that already says the chat failed is not prefixed again', () => {
-  const f = panelFixture(); f.panel.setOpen(true); const live = () => findAll(f.panel.el, i => hasClass(i, 'vam-sr-only'))[0].text;
+  const f = panelFixture(); f.panel.setOpen(true); const live = () => f.panel.liveEl.text;
   f.panel.begin('a'); f.panel.fail('The AI chat failed: boom', 'The AI chat failed: boom'); assert.equal(live(), 'The AI chat failed: boom');
   f.panel.begin('b'); f.panel.fail('The references are too large to send.'); assert.equal(live(), 'AI chat failed: The references are too large to send.', 'a plain reason still gets its prefix, once');
 });
 integrationTest('B1 fix 18: the view announces a service failure once', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); h.control.reply = async () => { throw new Error('boom'); };
-  h.type('hi'); await h.view.sendMapChat(); const live = findAll(chat.el, i => hasClass(i, 'vam-sr-only'))[0].text; assert.match(live, /^The AI chat did not finish: boom\. Your map was not changed\./); assert.equal((live.match(/did not finish/g) ?? []).length, 1);
+  h.type('hi'); await h.view.sendMapChat(); const live = chat.liveEl.text; assert.match(live, /^The AI chat did not finish: boom\. Your map was not changed\./); assert.equal((live.match(/did not finish/g) ?? []).length, 1);
 });
 
 integrationTest('B1 fix 20 and 24: the opening screen asks for a topic and hides the old empty hint; a map with content opens the window onto one line of guidance, not a blank log', async () => {
@@ -3511,7 +3513,7 @@ integrationTest('B1 fix 20 and 24: the opening screen asks for a topic and hides
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); assert.match(css, /\.has-chat-hero \.vam-empty \{ display: none; \}/);
   hero.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] }); hero.type('Coffee'); await hero.view.sendMapChat(); assert.match(chat.inputEl.attrs.placeholder, /^Ask a question, or ask the AI to change the map/);
   const h = await harness(); await h.view.hydrate(); const side = h.open();
-  assert.equal(side.guideEl.hidden, false); assert.equal(side.guideEl.text, 'No messages yet. The AI can build or extend this map, research its topics, or rearrange it.'); assert.equal(side.logEl.hidden, true);
+  assert.equal(side.guideEl.hidden, false); assert.equal(visibleText(side.guideEl), 'No messages yet. The AI can build or extend this map, research its topics, or rearrange it.'); assert.equal(side.logEl.hidden, true);
   side.begin('q'); assert.equal(side.guideEl.hidden, true); assert.equal(side.logEl.hidden, false);
 });
 
@@ -3519,9 +3521,9 @@ integrationTest('B1 fix 22: the failed count in a folded summary is set apart in
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
   chat.finish('done', [...Array.from({ length: 6 }, (_, i) => ({ status: 'done', text: `Done ${i}` })), { status: 'skipped', text: 'Skipped x' }, { status: 'failed', text: 'Failed y' }]);
   const summary = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-summary')); const failed = find(summary, i => hasClass(i, 'vam-map-chat-count-failed'));
-  assert.equal(failed.text, '1 failed'); assert.equal(visibleText(summary), '6 done, 1 skipped, 1 failed');
-  chat.begin('r'); chat.finish('done', Array.from({ length: 6 }, (_, i) => ({ status: 'done', text: `D${i}` })));
-  assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-count-failed')).length, 1, 'no failed element when nothing failed');
+  assert.equal(failed, undefined, 'a failure is no longer a count: its line is always shown'); assert.equal(visibleText(find(summary, i => hasClass(i, 'vam-map-chat-lines-counts'))), '6 done');
+  eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(l => l.text), ['Skipped x', 'Failed y'], 'skipped and failed lines are shown with their word, folded or not');
+  assert.ok(find(chat.logEl, i => hasClass(i, 'is-failed')), 'the failed line carries its own state class');
 });
 
 test('B1 fix 14 and 26: opening the window onto an unread reply lands on the newest message; a repaint keeps the log where it was (at the end stays at the end)', () => {
@@ -3561,7 +3563,7 @@ test('B1 fix 17: retry and "show all" each get their own look, with enough weigh
 
 test('UX B4: the chat title is short in every language and is never cut with an ellipsis (it may wrap instead)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')) ?? '';
-  assert.doesNotMatch(rule, /text-overflow: ellipsis|white-space: nowrap/); assert.match(rule, /flex: 0 0 auto/, 'the title does not shrink; the model menu gives way');
+  assert.equal(rule, '', 'the head has no title element or rule any more (chat layout)');
   for (const id of ['en', 'zh-TW', 'zh-CN']) { const text = load(`i18n/${id}.ts`)[id.replace('-', '')]['ui.map_chat_title']; assert.ok(text.length <= 8, `${id}: "${text}" is short`); }
 });
 
@@ -3624,10 +3626,9 @@ test('B2-0 F1: the deferred scroll is dropped when the window is folded again be
 // ---- B2-0 F3: the model menu keeps its width at 340px --------------------------------------------------------------------
 integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and every entry shows its full label (MS-02: no follow-default entry, no shortened default label)', async () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
-  const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-model {')); assert.ok(rule);
-  // UX B4 rule change: the title is short and keeps its width (no ellipsis); the model menu (basis 146px, min-width 0) gives way instead.
-  assert.match(rule, /flex: 1 1 146px;/); assert.match(rule, /min-width: 0;/);
-  const title = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')); assert.match(title, /flex: 0 0 auto;/); assert.doesNotMatch(rule, /min-width: 120px/);
+  const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-composer .vam-map-chat-model {')); assert.ok(rule);
+  // Chat layout: the menu sits in the composer; it gives way (max-width, ellipsis) to the send key instead of taking the head's width.
+  assert.match(rule, /max-width: calc\(100% - \d+px\);/); assert.match(rule, /text-overflow: ellipsis/);
   const h = await harness(); await h.view.hydrate(); h.plugin.settings.cliModel = 'gpt-6-luna'; h.plugin.modelLabel = id => id.startsWith('claude:') ? 'Claude Sonnet' : `OpenAI Codex · ${id}`;
   const choices = h.view.chatModelChoices(); const current = choices.find(c => c.value === 'gpt-6-luna');
   assert.equal(current.label, 'OpenAI Codex · gpt-6-luna', 'the full name is the label'); assert.equal(current.short, undefined); assert.equal(choices.some(c => c.value === ''), false);
@@ -3799,7 +3800,7 @@ integrationTest('B2 shallow research: researching 12 new cards waits as a plan; 
   h.control.reply = async () => ({ reply: 'I will build and research.', actions: [...refs.map(newCard), researchAct({ nodeIds: refs.map(r => `new:${r}`) })], rejected: [] });
   h.type('build and research'); await h.view.sendMapChat();
   assert.equal(started.length, 0, 'nothing runs before Apply'); assert.equal(h.view.map.nodes.length, 4);
-  assert.match(visibleText(planCard(h)[0]), /Starts research on 12 topics/); assert.match(visibleText(planCard(h)[0]), /At least 12 AI calls/, 'Quick (no map mode): 12 research calls, no diagram call');
+  openDetails(h.view.chat.logEl); assert.match(visibleText(planCard(h)[0]), /Starts research on 12 topics/); assert.match(visibleText(planCard(h)[0]), /At least 12 AI calls/, 'Quick (no map mode): 12 research calls, no diagram call');
   planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying); await tick();
   assert.equal(started.length, 1); assert.equal(started[0].selected.length, 12); eq(started[0].request, quickRequest); assert.equal(h.view.map.nodes.length, 16);
 });
@@ -3955,7 +3956,7 @@ integrationTest('B2 synthesize: the plan card keeps the user\'s message as the i
   h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), { kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a], title: '', goal: '', direction: 'ignored model words', mode: '', images: false }], rejected: [] });
   h.type('Integrate Body around sleep debt'); await h.view.sendMapChat();
   assert.equal(chat.pendingPlan().state, 'pending'); assert.equal(calls.length, 0);
-  assert.match(visibleText(planCard(h)[0]), /At least 2 AI calls/);
+  openDetails(h.view.chat.logEl); assert.match(visibleText(planCard(h)[0]), /At least 2 AI calls/);
   planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
   assert.equal(calls.length, 1); assert.equal(calls[0].id, h.ids.a); assert.equal(calls[0].direction, 'Integrate Body around sleep debt', 'the message, not the model\'s direction');
   const o = calls[0].options; eq([o.researchMode, o.visualMode, o.synthesisContent, 'depth' in o && o.depth !== undefined], ['local', 'off', 'full', false], 'an integration from the chat is always Quick (D-2026-10-229)');
@@ -4186,7 +4187,7 @@ integrationTest('B3 find_images: a plan is not asked for 16 find_images (or one 
   const { h: h2 } = await imageHarness();
   h2.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h2.ids.root, title: `Card ${i}`, summary: '' })), findAct(h2, null, { nodeIds: [h2.ids.a, h2.ids.b] })], rejected: [] });
   h2.view.chat.reset(); h2.type('Add cards and find pictures'); await h2.view.sendMapChat();
-  assert.match(visibleText(planCard(h2)[0]), /At least 2 AI calls/, 'two cards, two searches'); assert.equal(h2.control.searches.length, 0, 'nothing started before the plan is applied');
+  openDetails(h2.view.chat.logEl); assert.match(visibleText(planCard(h2)[0]), /At least 2 AI calls/, 'two cards, two searches'); assert.equal(h2.control.searches.length, 0, 'nothing started before the plan is applied');
   const { h: h3 } = await imageHarness();
   h3.control.reply = async () => ({ reply: 'plan', actions: [{ kind: 'create_map', title: 'New map' }, findAct(h3, 'a')], rejected: [] });
   h3.view.chat.reset(); h3.type('New map with a picture'); await h3.view.sendMapChat(); assert.ok(planCard(h3).length >= 1, 'create_map still asks');
@@ -4387,7 +4388,8 @@ integrationTest('B3 find_images: the reader hears the result once, when the last
   chat.begin('next'); chat.finish('ok', []); assert.doesNotMatch(chat.liveEl.text, /Put pictures into/, 'said once');
 });
 // ---- B3-polish P1-2: the result line follows the blocks ----
-const resultTexts = h => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(i => i.text);
+// Result lines as a reader sees them after pressing View details (a done line is folded until then; see the chat layout tests).
+const resultTexts = h => (openDetails(h.view.chat.logEl), findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(i => i.text));
 integrationTest('B3-polish P1-2: the result line starts as "Looking for pictures" and ends as the blocks end (placed / none / failed / stopped), never "Pictures put into 1" for a failure, on screen and in the saved turn', async () => {
   const cases = [
     ['ready', async h => { h.control.search = async () => imageItems(3); }, /^Pictures put into 1 topic\(s\) \(label\(claude:sonnet\)\)$/, 'done'],
@@ -4423,8 +4425,8 @@ integrationTest('B3-polish P1-2: writing the line back moves no focus and the re
   const lines = await apply(h, [findAct(h, 'a')]); chat.finish('Looking.', lines);
   input.focus(); input.fire('compositionstart'); input.value = 'ni hao';
   gate.resolve(); await withTimeout(until(() => lastImages(h).state === 'ready'));
+  assert.equal(h.page.doc.activeElement, input); assert.equal(chat.isComposing, true); assert.equal(input.value, 'ni hao'); // before View details is pressed: pressing it would move the focus itself
   eq(resultTexts(h), ['Pictures put into 1 topic(s) (label(claude:sonnet))']);
-  assert.equal(h.page.doc.activeElement, input); assert.equal(chat.isComposing, true); assert.equal(input.value, 'ni hao');
   assert.equal(chat.liveEl.text.match(/Put pictures into 1 topic\(s\)/g).length, 1); assert.doesNotMatch(chat.liveEl.text, /Pictures put into/);
 });
 integrationTest('B3-polish P1-2: save as a note writes the final line, not a made-up success for a failed search', async () => {
@@ -4457,9 +4459,9 @@ integrationTest('B3 record: the pictures that were put in are written to the con
 const savedPaths = h => [...h.files.keys()].filter(p => p.includes('/Chats/') && p.endsWith('.md'));
 const saveButton = h => find(h.view.chat.headEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-save'));
 const today = () => localDate(new Date());
-integrationTest('B3 save: a button between the model list and Close; hidden on the opening screen; disabled with a reason until a turn is finished', async () => {
+integrationTest('B3 save: a button before Close in the head strip; hidden on the opening screen; disabled with a reason until a turn is finished', async () => {
   const { h, chat } = await imageHarness();
-  const order = chat.headEl.children.map(c => c.cls.split(' ')[0]); eq(order, ['vam-map-chat-title', 'vam-map-chat-model-tag', 'vam-map-chat-model', 'vam-map-chat-save', 'vam-map-chat-close'], 'the model tag (UX B6) is only shown on the opening screen');
+  const order = chat.headEl.children.map(c => c.cls.split(' ')[0]); eq(order, ['vam-map-chat-save', 'vam-map-chat-close'], 'the head holds only Save and Close (chat layout: no title, tag or model menu)');
   const button = saveButton(h); assert.equal(button.attrs['aria-label'], 'There is no finished chat to save yet.', 'bug bash #28: the reason is the accessible name while disabled'); assert.ok(button.attrs.title);
   assert.equal(button.attrs['aria-disabled'], 'true'); assert.equal(button.attrs.title, 'There is no finished chat to save yet.', 'a turn that is still streaming does not count');
   button.click(); await tick(); eq(savedPaths(h), []);
@@ -5210,7 +5212,7 @@ test('bug bash #10: a language change sets the chat window\'s fixed words again,
   assert.equal(chat.sendEl.attrs['aria-label'], 'Send');
   await plugin.changeLanguage('zh-TW');
   assert.ok(chat.el === el, 'not rebuilt');
-  assert.equal(visibleText(chat.headEl.children[0]), '問 AI');
+  assert.equal(visibleText(chat.guideEl), '還沒有對話。AI 可以建立或擴充這張心智圖、研究其中的議題，或重新整理版面。', 'the guidance a screen reader reads follows the language (the head has no title any more)');
   assert.equal(chat.sendEl.attrs['aria-label'], '送出');
   assert.equal(chat.stopEl.attrs['aria-label'], '停止'); assert.equal(chat.inputEl.attrs['aria-label'], '傳給 AI 的訊息');
   assert.equal(chat.bodyEl.attrs['aria-label'], '問 AI');
@@ -5281,7 +5283,7 @@ integrationTest('bug bash #31: the plan card lists an add_child without a parent
     { kind: 'add_child', title: 'Rootling', summary: '' }, { kind: 'add_child', parentId: null, title: 'Nullroot', summary: '' },
     { kind: 'rename_topic', nodeId: h.ids.a, title: 'Body!' }, { kind: 'delete_topic', nodeId: h.ids.b, branch: false }
   ], rejected: [] });
-  h.type('many'); await h.view.sendMapChat();
+  h.type('many'); await h.view.sendMapChat(); openDetails(h.view.chat.logEl);
   const lines = findAll(planCard(h)[0], i => i.tag === 'li').map(i => i.text);
   assert.ok(lines.includes('Add root topic “Rootling”'), JSON.stringify(lines));
   assert.ok(lines.includes('Add root topic “Nullroot”'), JSON.stringify(lines));
@@ -5415,8 +5417,9 @@ integrationTest('chat 04: a plan card that starts AI work says, next to the butt
   h.view.startMultiResearch = async () => {};
   h.control.reply = async () => ({ reply: 'plan', actions: [...planActions(h, 15), { kind: 'run_map_action', action: 'research_standard', nodeIds: [h.ids.a], title: '', goal: '', direction: '', mode: '', images: false }], rejected: [] });
   h.type('many'); await h.view.sendMapChat();
-  const buttons = find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-buttons'));
-  eq(findAll(buttons, i => hasClass(i, 'vam-map-chat-plan-warning')).map(i => i.text), ['Undo takes back the changes, but not the AI work this plan starts. Once that work writes to these cards, this reply can no longer be undone.']);
+  const card = planCard(h)[0]; const kids = card.children.map(c => c.cls.split(' ')[0]);
+  eq(findAll(card, i => hasClass(i, 'vam-map-chat-plan-warning')).map(i => i.text), ['Undo takes back the changes, but not the AI work this plan starts. Once that work writes to these cards, this reply can no longer be undone.'], 'the warning is on the card, folded or not');
+  assert.ok(kids.indexOf('vam-map-chat-plan-summary') < kids.indexOf('vam-map-chat-plan-warning') && kids.indexOf('vam-map-chat-plan-warning') < kids.indexOf('vam-map-chat-plan-buttons'), 'between the summary and the buttons');
 });
 
 // ---- chat 04: one reply is one undo step -------------------------------------------------------------------------------
@@ -6312,7 +6315,7 @@ const stalePress = (el, calls) => { el.click(); key(el, { key: 'Enter' }); key(e
 test('map chat records: the New conversation button exists only while records are on, and the title row is unchanged otherwise', () => {
   const off = panelFixture(); off.panel.setOpen(true);
   assert.equal(newButton(off), undefined);
-  eq(off.panel.headEl.children.map(c => c.cls.split(' ')[0]), ['vam-map-chat-title', 'vam-map-chat-model-tag', 'vam-map-chat-model', 'vam-map-chat-save', 'vam-map-chat-close']);
+  eq(off.panel.headEl.children.map(c => c.cls.split(' ')[0]), ['vam-map-chat-save', 'vam-map-chat-close']);
   const falsy = panelFixture({ recordsEnabled: () => false, newConversation() {} }); falsy.panel.setOpen(true);
   assert.equal(newButton(falsy), undefined);
   let on = true; const calls = [];
@@ -6320,7 +6323,7 @@ test('map chat records: the New conversation button exists only while records ar
   const button = newButton(f);
   assert.ok(button); assert.equal(button.attrs['aria-label'], 'New conversation'); assert.equal(button.attrs.title, 'New conversation');
   assert.equal(button.attrs.type, 'button', 'a real button: Tab, Enter and Space work');
-  eq(f.panel.headEl.children.map(c => c.cls.split(' ')[0]), ['vam-map-chat-title', 'vam-map-chat-model-tag', 'vam-map-chat-model', 'vam-map-chat-new', 'vam-map-chat-save', 'vam-map-chat-close']);
+  eq(f.panel.headEl.children.map(c => c.cls.split(' ')[0]), ['vam-map-chat-new', 'vam-map-chat-save', 'vam-map-chat-close']);
   on = false; f.panel.refreshNote(); f.panel.begin('q'); f.panel.finish('a', []);
   assert.equal(newButton(f), undefined, 'switching records off removes the button');
 });
@@ -6351,7 +6354,7 @@ test('map chat records: restore shows the finished turns, the restored line, and
   assert.equal(f.panel.restoredEl.text, 'Restored the conversation from 11/5 21:40');
   assert.equal(f.panel.restoredEl.hidden, false);
   eq(f.panel.turns(), [{ role: 'user', text: 'split pricing' }, { role: 'assistant', text: 'Done **now**.' }, { role: 'user', text: 'research all' }, { role: 'assistant', text: 'Plan ready.' }]);
-  assert.match(visibleText(f.parts.log()), /Added A/);
+  assert.doesNotMatch(visibleText(f.parts.log()), /Added A/, 'the done line is folded'); openDetails(f.parts.log()); assert.match(visibleText(f.parts.log()), /Added A/);
   assert.equal(f.panel.pendingPlan(), null, 'a restored plan never waits for an answer');
   assert.equal(f.panel.hintEl.hidden, true);
   f.panel.restore({ id: '20261105-134000-abcdef', restoredAt: new Date(2026, 0, 3, 4, 5).toISOString(), turns: restoredConversation().turns });
@@ -6409,9 +6412,9 @@ test('map chat records: F2 a restored plan card shows what became of it: waiting
   check({}, 'is-pending', 'Plan to review');
   check({ planState: 'cancelled', planLines: [] }, 'is-cancelled', 'Cancelled plan');
   check({ planState: 'applied', planLines: [{ status: 'done', text: 'Researched A' }, { status: 'failed', text: 'B failed' }] }, 'is-applied', 'Applied plan');
-  assert.match(visibleText(f.parts.log()), /Researched A/); assert.match(visibleText(f.parts.log()), /B failed/, 'the results of the applied plan are listed');
+  openDetails(f.parts.log()); assert.match(visibleText(f.parts.log()), /Researched A/); assert.match(visibleText(f.parts.log()), /B failed/, 'the results of the applied plan are listed');
   check({ planState: 'stopped', planLines: [{ status: 'done', text: 'Half done' }] }, 'is-applied', 'Applied plan');
-  assert.match(visibleText(f.parts.log()), /Half done/);
+  openDetails(f.parts.log()); assert.match(visibleText(f.parts.log()), /Half done/);
 });
 
 test('map chat records: F3 restore replaces only the messages; the draft, the dropped references and the note chip stay', () => {
@@ -7042,7 +7045,7 @@ test('F-b M6 plan: a plan card with an image reason opens its groups at once; a 
   const f = imageHostFixture(); const groups = () => findAll(f.panel.logEl, i => i.tag === 'details');
   const card = open => ({ reasons: ['r'], items: ['i'], groups: [{ label: 'Add (1)', items: ['i'] }, { label: 'Delete (1)', items: ['j'], danger: { mark: 'x' } }], estimate: 'e', state: 'pending', ...(open ? { openGroups: true } : {}), apply() {}, cancel() {} });
   f.panel.begin('a'); f.panel.finish('plan', []); f.panel.showPlan(card(false));
-  assert.deepEqual(groups().map(d => !!d.open), [false, false]);
+  assert.deepEqual(groups().length, 0, 'folded: no group is built'); openDetails(f.panel.logEl); assert.deepEqual(groups().map(d => !!d.open), [false, false]);
   f.panel.begin('b'); f.panel.finish('plan', []); f.panel.showPlan(card(true));
   assert.deepEqual(groups().slice(2).map(d => !!d.open), [true, true]);
 });
@@ -7294,7 +7297,7 @@ integrationTest('P3 A9: from round 2 a reply of only safe actions is applied wit
   chainReplies(h, say('Start.', [addRoot('s', 'Start')], 'Many more'), say('Twenty.', cards(20), 'Delete one'), say('Delete.', [{ kind: 'delete_topic', nodeId: h.ids.c }], 'And more'), say('Last.', [], ''));
   h.type('go'); await h.view.sendMapChat(); await until(() => chat.pendingPlan()); assert.equal(h.control.requests.length, 3); assert.equal(h.view.map.nodes.length, 4 + 1 + 20, 'twenty safe cards went in without a card');
   const before = h.view.map.nodes.length; assert.ok(h.view.map.nodes.some(n => n.id === h.ids.c)); assert.equal(h.view.chatChain.state.phase, 'plan');
-  assert.match(visibleText(planCard(h)[0]), /The automatic continuation wants to delete or rewrite things; it waits for your confirmation/, 'P4: the plan card of round 2 on says why in its own words'); planButton(h, 'apply').click(); await until(() => h.control.requests.length === 4); await until(() => h.view.chatChain === null);
+  openDetails(h.view.chat.logEl); assert.match(visibleText(planCard(h)[0]), /The automatic continuation wants to delete or rewrite things; it waits for your confirmation/, 'P4: the plan card of round 2 on says why in its own words'); planButton(h, 'apply').click(); await until(() => h.control.requests.length === 4); await until(() => h.view.chatChain === null);
   assert.equal(h.view.map.nodes.some(n => n.id === h.ids.c), false, 'the delete ran after Apply'); assert.ok(h.view.map.nodes.length < before); eq(spy.reasons(), ['done'], 'only the quiet done of the chain was told; the last round had nothing left');
   const c = await harness(); await c.view.hydrate(); const cchat = c.open(); const cspy = chainSpy(cchat);
   chainReplies(c, say('Start.', [addRoot('s', 'Start')], 'Delete'), say('Delete.', [{ kind: 'delete_topic', nodeId: c.ids.c }], 'More'));
@@ -7304,7 +7307,7 @@ integrationTest('P3 A9: from round 2 a reply of only safe actions is applied wit
   const six = Array.from({ length: 6 }, (_, i) => `a${i}`); const five = Array.from({ length: 5 }, (_, i) => `b${i}`);
   chainReplies(r, say('Six.', [...six.map(ref => addRoot(ref, ref)), researchAct({ nodeIds: six.map(ref => `new:${ref}`) })], 'Five more'), say('Five.', [...five.map(ref => addRoot(ref, ref)), researchAct({ nodeIds: five.map(ref => `new:${ref}`) })], ''));
   r.type('go'); await r.view.sendMapChat(); settleRun(runs[0]); await until(() => rchat.pendingPlan());
-  assert.match(visibleText(planCard(r)[0]), /Starts research/, 'five targets alone would not ask: the six of round 1 are counted'); assert.match(visibleText(planCard(r)[0]), /Starts research on 11 topics/, 'P4: the card shows the count of the whole chain (6 + 5), not the 5 of this round'); assert.equal(runs.length, 1, 'the second research waits for the card'); eq(rspy.rounds(), [2]);
+  openDetails(r.view.chat.logEl); assert.match(visibleText(planCard(r)[0]), /Starts research/, 'five targets alone would not ask: the six of round 1 are counted'); assert.match(visibleText(planCard(r)[0]), /Starts research on 11 topics/, 'P4: the card shows the count of the whole chain (6 + 5), not the 5 of this round'); assert.equal(runs.length, 1, 'the second research waits for the card'); eq(rspy.rounds(), [2]);
 });
 integrationTest('P3 A10: every round is one undo step and Undo takes back the newest round only; the follow-up goes into the chain\'s message; the image is for round 1 only; nothing is written twice', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); const base = h.view.map.nodes.length;
@@ -7364,6 +7367,8 @@ integrationTest('P3 records: an automatic round is written with auto and its rou
 // ---- P4: what the user sees of the automatic continuation and of the basis ----------------------------------------------------
 const { summarizeBasis } = load('core/map-chat-basis.ts');
 const classTexts = (root, name) => findAll(root, i => hasClass(i, name)).map(visibleText);
+// The basis lines after pressing View details (the basis is detail; only a note the AI could not read is always shown).
+const basisOf = root => (openDetails(root), classTexts(root, 'vam-map-chat-basis-line'));
 const noteOf = (f, name = 'vam-map-chat-chain-note') => classTexts(f.parts.log(), name);
 const autoOrigin = () => ({ text: 'go', chips: [], selectedIds: [] });
 const REMAINING = 'Fill in the review skills';
@@ -7389,14 +7394,16 @@ test('P4 basis: the summary stands under the results, also when the list is shor
     [1, 2].map(i => ({ ...done(`Bare ${i}`), basis: { kind: 'outline_only', alsoRead: [{ path: 'Notes/Hidden.md', title: 'Hidden title' }] } })));
   f.panel.finish('Built.', lines);
   const basis = () => classTexts(f.parts.log(), 'vam-map-chat-basis-line');
-  eq(basis(), ['Based on research note “pstack <b>skills</b>” (cards: 26)', 'Based on note “Browser tools” (cards: 3)', 'Titles only (cards: 2) (no note was read for these)'], 'folded (31 results): the summary is still there');
+  eq(basis(), [], 'folded (31 results): the basis is behind View details');
   eq(classTexts(f.parts.log(), 'vam-map-chat-line'), [], 'the long list is folded');
+  findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-lines-toggle'))[0].click();
+  eq(basis(), ['Based on research note “pstack <b>skills</b>” (cards: 26)', 'Based on note “Browser tools” (cards: 3)', 'Titles only (cards: 2) (no note was read for these)'], 'open: the summary');
   const bold = findAll(f.parts.log(), i => i.tag === 'strong'); eq(bold.map(visibleText), ['Titles only (cards: 2)'], 'titles only is bold, not a colour');
   assert.doesNotMatch(visibleText(f.parts.log()), /Hidden title/); assert.equal(findAll(f.parts.log(), i => i.tag === 'b').length, 0, 'a title is text, never markup');
-  findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-lines-toggle'))[0].click();
   assert.equal(classTexts(f.parts.log(), 'vam-map-chat-line').length, 31, 'open: every result'); eq(basis().length, 3, 'open: the same three lines');
   const g = panelFixture(); g.panel.setOpen(true); g.panel.begin('q'); g.panel.finish('Two cards.', [{ ...done('Added A'), basis: researchBasis('Notes') }, { ...done('Added B'), basis: researchBasis('Notes') }]);
-  eq(classTexts(g.parts.log(), 'vam-map-chat-line'), ['Added A', 'Added B']); eq(classTexts(g.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 2)'], 'two lines, not folded: the summary is there too');
+  eq(classTexts(g.parts.log(), 'vam-map-chat-line'), [], 'two done lines fold too'); eq(classTexts(g.parts.log(), 'vam-map-chat-basis-line'), []); openDetails(g.parts.log());
+  eq(classTexts(g.parts.log(), 'vam-map-chat-line'), ['Added A', 'Added B']); eq(classTexts(g.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 2)'], 'open: the summary is there too');
   const none = panelFixture(); none.panel.setOpen(true); none.panel.begin('q'); none.panel.finish('Nothing built.', [done('Selected A')]);
   eq(classTexts(none.parts.log(), 'vam-map-chat-basis'), [], 'no basis, no block');
 });
@@ -7404,20 +7411,20 @@ test('P4 basis: the summary stands under the results, also when the list is shor
 test('P4 basis: an expanded card says its note and its existing subtopics, or only the title; Traditional Chinese reads as the mockup', () => {
   const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q');
   f.panel.finish('Expanded.', [{ status: 'done', text: 'Expand A', basis: { kind: 'note', sources: [{ id: 'c', title: 'Course design' }], existingChildren: 2 } }, { status: 'done', text: 'Expand B', basis: { kind: 'outline_only', alsoRead: [], existingChildren: 3 } }, { status: 'done', text: 'Expand C', basis: { kind: 'outline_only', alsoRead: [], existingChildren: 0 } }]);
-  eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), ['Based on note “Course design” and 2 existing subtopics', 'Titles only and 3 existing subtopics', 'Titles only']);
+  eq(basisOf(f.parts.log()), ['Based on note “Course design” and 2 existing subtopics', 'Titles only and 3 existing subtopics', 'Titles only']);
   const z = panelFixture(); z.setLanguage('zh-TW'); z.panel.setOpen(true); z.panel.begin('q');
   z.panel.finish('好了', [...Array(26)].map(() => ({ status: 'done', text: 'x', basis: researchBasis('pstack 技能解析') })).concat([...Array(3)].map(() => ({ status: 'done', text: 'x', basis: { kind: 'note', sources: [{ id: 't', title: '瀏覽器工具' }] } })), [{ status: 'done', text: 'x', basis: { kind: 'note', sources: [{ id: 'c', title: '課程設計' }], existingChildren: 2 } }, ...[1, 2, 3, 4, 5].map(() => ({ status: 'done', text: 'x', basis: { kind: 'outline_only', alsoRead: [] } }))]));
-  eq(classTexts(z.parts.log(), 'vam-map-chat-basis-line'), ['依據：研究筆記「pstack 技能解析」26 張', '依據：筆記「瀏覽器工具」3 張', '依據：筆記「課程設計」、2 個現有子議題', '只有標題：5 張（沒有讀到這支的筆記）']);
+  eq(basisOf(z.parts.log()), ['依據：研究筆記「pstack 技能解析」26 張', '依據：筆記「瀏覽器工具」3 張', '依據：筆記「課程設計」、2 個現有子議題', '只有標題：5 張（沒有讀到這支的筆記）']);
   z.setLanguage('en');
 });
 
 test('P4 unread research: a note that did not fit is told as read next round, one too long as not read; they stay under the results and are plain text', () => {
   const f = panelFixture(); f.panel.setOpen(true); const turn = f.panel.begin('q'); f.panel.finish('Built.', [{ status: 'done', text: 'Added A', basis: researchBasis('Notes') }]);
   f.panel.setUnreadNotes(turn, [{ title: 'Browser tools', oversize: false }, { title: 'Full manual <i>x</i>', oversize: true }]);
-  eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 1)', '“Browser tools” did not fit this round and is read in the next one.', '“Full manual <i>x</i>” is too long, so it was not read.']);
-  f.panel.setUnreadNotes(turn, []); eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 1)']);
+  eq(basisOf(f.parts.log()), ['Based on research note “Notes” (cards: 1)', '“Browser tools” did not fit this round and is read in the next one.', '“Full manual <i>x</i>” is too long, so it was not read.']);
+  f.panel.setUnreadNotes(turn, []); eq(basisOf(f.parts.log()), ['Based on research note “Notes” (cards: 1)']);
   const z = panelFixture(); z.setLanguage('zh-TW'); z.panel.setOpen(true); const zt = z.panel.begin('q'); z.panel.finish('好', []); z.panel.setUnreadNotes(zt, [{ title: '瀏覽器工具', oversize: false }, { title: '完整手冊', oversize: true }]);
-  eq(classTexts(z.parts.log(), 'vam-map-chat-basis-line'), ['「瀏覽器工具」這輪放不下，下一輪讀。', '「完整手冊」太長，沒有讀。']); z.setLanguage('en');
+  eq(basisOf(z.parts.log()), ['「瀏覽器工具」這輪放不下，下一輪讀。', '「完整手冊」太長，沒有讀。']); z.setLanguage('en');
 });
 
 test('P4 round: an automatic round shows a separator with the round and what is left (also in Traditional Chinese), the reader hears the round once, and a restored round shows its separator too', () => {
@@ -7433,13 +7440,13 @@ test('P4 round: an automatic round shows a separator with the round and what is 
   const r = panelFixture(); r.panel.setOpen(true);
   r.panel.restore({ id: 'x', restoredAt: null, turns: [{ message: 'go', reply: 'One', lines: [], modelLabel: '', stalePlan: false }, { message: 'go', reply: 'Two', lines: [{ status: 'done', text: 'Added', basis: researchBasis('Notes') }], modelLabel: '', stalePlan: false, auto: true, round: 3 }, { message: 'go', reply: 'Three', lines: [], modelLabel: '', stalePlan: false, auto: true }] });
   eq(classTexts(r.parts.log(), 'vam-map-chat-auto-title'), ['Automatic continuation · round 3 of 8', 'Automatic continuation'], 'a record with no round names no round'); assert.equal(findAll(r.parts.log(), i => hasClass(i, 'is-auto')).every(row => !row.hidden), true);
-  eq(classTexts(r.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 1)'], 'the basis comes back with the lines');
+  eq(basisOf(r.parts.log()), ['Based on research note “Notes” (cards: 1)'], 'the basis comes back with the lines');
 });
 
 test('R7 F5: a plan card applied before the record closed keeps the basis of its result lines on restore', () => {
   const r = panelFixture(); r.panel.setOpen(true);
   r.panel.restore({ id: 'x', restoredAt: null, turns: [{ message: 'go', reply: 'One', lines: [], modelLabel: '', stalePlan: true, planState: 'applied', planLines: [{ status: 'done', text: 'Added', basis: researchBasis('Notes') }] }] });
-  eq(classTexts(r.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 1)'], 'the basis of a plan result line comes back');
+  eq(basisOf(r.parts.log()), ['Based on research note “Notes” (cards: 1)'], 'the basis of a plan result line comes back');
 });
 
 test('P4 wait: the row says how far, what is left and the seconds (hidden from readers); Send stays, Stop appears, Enter takes over; the reader hears the wait once and the seconds never', async () => {
@@ -7524,7 +7531,7 @@ integrationTest('P4 view: the full flow is on screen - the wait row, Stop, the s
   settleRun(runs[0]); await until(() => h.view.chatChain === null && h.control.requests.length === 2);
   assert.equal(waitRow(), undefined, 'the wait row is gone'); assert.equal(chat.stopEl.hidden, true);
   eq(classTexts(log(), 'vam-map-chat-auto-title'), ['Automatic continuation · round 2 of 8']); eq(classTexts(log(), 'vam-map-chat-auto-left'), ['Left to do: Add the subtopics from the research']);
-  eq(classTexts(log(), 'vam-map-chat-basis-line'), ['Titles only (cards: 1) (no note was read for these)', 'Based on research note “Pstack” (cards: 2)']); eq(noteOf({ parts: { log } }), ['Done after 2 rounds.']);
+  eq(basisOf(log()), ['Titles only (cards: 1) (no note was read for these)', 'Based on research note “Pstack” (cards: 2)']); eq(noteOf({ parts: { log } }), ['Done after 2 rounds.']);
   const one = await harness(); await one.view.hydrate(); const ochat = one.open(); chainReplies(one, say('Built it.', [addRoot('q', 'Quick')], '')); one.type('go'); await one.view.sendMapChat();
   eq(noteOf({ parts: { log: () => ochat.logEl } }), [], 'one round that finished adds no closing line'); eq(classTexts(ochat.logEl, 'vam-map-chat-auto-title'), []);
 });
@@ -7554,7 +7561,7 @@ integrationTest('P4 view: research notes that did not fit or are too long are to
   await h.repo.updateNote(h.view.map.nodes.find(n => n.id === rootId).path, { detail: 'x'.repeat(80_001) });
   settleRun(runs[0]); await until(() => h.control.requests.length === 2 && h.view.chatChain === null);
   eq(contextOf(h.control.requests[1]).researchDeferred.map(d => d.oversize === true), [true]);
-  eq(classTexts(chat.logEl, 'vam-map-chat-basis-line'), ['Titles only (cards: 1) (no note was read for these)', '“Pstack” is too long, so it was not read.']);
+  eq(basisOf(chat.logEl), ['Titles only (cards: 1) (no note was read for these)', '“Pstack” is too long, so it was not read.']);
 });
 
 test('P4 expand: a note too long to expand has its own sentence in every language, and the saved note carries the result line as it reads', () => {
@@ -7577,15 +7584,15 @@ test('P6 F1/F2: a failed expansion is not a basis and replaces its start line; a
   const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('expand');
   const start = expandBasisOf(cards.slice(0, 1));
   f.panel.finish('Started.', [{ status: 'done', text: 'Done: expand subtopics for 1 topic', basis: start }]);
-  eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), ['Based on note “Biology” and 9 existing subtopics']);
+  eq(basisOf(f.parts.log()), ['Based on note “Biology” and 9 existing subtopics']);
   const mod = loadPanelModule(); const { expandFailureLine, setUiLanguage } = mod;
   const left = f.panel.settleExpandFailure(start, null, expandFailureLine('Biology', 'simulated'));
-  assert.equal(left, null); eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), [], 'no basis for work that built nothing');
+  assert.equal(left, null); eq(basisOf(f.parts.log()), [], 'no basis for work that built nothing');
   eq(f.panel.transcript().at(-1).lines.map(l => l.text), ['Failed: Expand “Biology” (simulated)'], 'the failure replaces the start line, no "done" left');
   const g = panelFixture(); g.panel.setOpen(true); g.panel.begin('expand'); const both = expandBasisOf(cards);
   g.panel.finish('Started.', [{ status: 'done', text: 'Done: expand subtopics for 2 topics', basis: both }]);
   const rest = g.panel.settleExpandFailure(both, expandBasisOf(cards.slice(1)), expandFailureLine('Biology', 'simulated'));
-  eq(rest, expandBasisOf(cards.slice(1))); eq(classTexts(g.parts.log(), 'vam-map-chat-basis-line'), ['Based on note “Chem” and 2 existing subtopics']);
+  eq(rest, expandBasisOf(cards.slice(1))); eq(basisOf(g.parts.log()), ['Based on note “Chem” and 2 existing subtopics']);
   eq(g.panel.transcript().at(-1).lines.map(l => l.status), ['done', 'failed']);
   setUiLanguage('zh-TW'); const failure = expandFailureLine('高中生物必修課', '模擬失敗'); setUiLanguage('en');
   assert.equal(failure.text, '失敗：展開「高中生物必修課」（模擬失敗）'); assert.equal(failure.status, 'failed');
@@ -7610,7 +7617,7 @@ test('P6 F4: result lines for the next round leave out the explanation notes', (
 });
 
 // ---- R3: integration review findings, wired through the view ---------------------------------------------------------------
-const planReasons = h => visibleText(planCard(h)[0]);
+const planReasons = h => (openDetails(h.view.chat.logEl), visibleText(planCard(h)[0]));
 integrationTest('R3 B5: research that never starts ends the chain even though the round built the root card; there is no second round (decision 15)', async () => {
   const h = await harness(); await h.view.hydrate(); const { chat, spy, runs } = await researchChain(h);
   assert.equal((await textOf(h, runs[0].ids[0])).title, 'Pstack', 'the round did write the root card');
@@ -8131,4 +8138,150 @@ integrationTest('R2-L find_images: a bare IP address never reaches the search wo
 integrationTest('R2-L place: a combining mark in the picture title survives the whitelist', async () => {
   const { h } = await imageHarness(); h.control.search = async () => [{ title: 'Caf\u0065\u0301 \u0e01\u0e34\u0e19', url: 'https://img.example/p.jpg', source: 'https://page.example/p' }];
   await apply(h, [findAct(h, 'a')]); await waitImages(h); assert.ok((await h.note('a')).detail.includes('Caf\u0065\u0301 \u0e01\u0e34\u0e19'));
+});
+
+// ---- chat layout: the model menu in the composer, a quiet top strip, folded plan and result detail -------------------------
+const cssRule = sel => fs.readFileSync(path.join(root, 'styles.css'), 'utf8').split('\n').find(line => line.startsWith(`${sel} {`)) ?? '';
+const cls0 = c => c.cls.split(' ')[0];
+const toggleOf = el => find(el, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-lines-toggle'));
+const planOf = (aiWork, extra = {}) => ({ reasons: ['r'], items: ['i1', 'i2'], groups: [{ label: 'Add (3)', items: ['i1'] }, { label: 'Move (12)', items: ['i2'] }, { label: 'Delete (1)', items: ['j'], danger: { mark: 'Removes' } }], estimate: 'No extra AI calls.', state: 'pending', ...(aiWork ? { aiWork: true } : {}), ...extra, apply() {}, cancel() {} });
+
+test('chat layout: the model menu is in the composer after the message field and before Send (Tab order), never in the head row; the head has no title or tag', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  assert.equal(find(f.panel.headEl, i => i === f.panel.modelEl), undefined, 'the model select is not in headEl');
+  eq(f.panel.headEl.children.map(cls0), ['vam-map-chat-new', 'vam-map-chat-save', 'vam-map-chat-close'], 'only the icons are left in the head row');
+  assert.equal(findAll(f.panel.el, i => hasClass(i, 'vam-map-chat-title') || hasClass(i, 'vam-map-chat-model-tag')).length, 0, 'no title text and no model tag');
+  const composer = find(f.panel.bodyEl, i => hasClass(i, 'vam-map-chat-composer'));
+  const order = composer.children.filter(c => [f.panel.inputEl, f.panel.modelEl, f.panel.sendEl].includes(c)).map(c => c === f.panel.inputEl ? 'input' : c === f.panel.modelEl ? 'model' : 'send');
+  eq(order, ['input', 'model', 'send'], 'Tab order: the field, the model, then Send');
+  assert.equal(f.panel.modelEl.attrs['aria-label'], 'Current model: chat and new AI tasks use this one', 'the select keeps its accessible name');
+  const plain = panelFixture(); plain.panel.setOpen(true); eq(plain.panel.headEl.children.map(cls0), ['vam-map-chat-save', 'vam-map-chat-close']);
+});
+
+test('chat layout: the model menu is plain text at the bottom left of the composer and gives way to the steer hint, the stop key and the chain-waiting controls', () => {
+  const model = cssRule('.vam-map-chat-composer .vam-map-chat-model');
+  assert.match(model, /position: absolute; left: 6px; bottom: 6px;/); assert.match(model, /border: 0; background-color: transparent;/); assert.match(model, /text-overflow: ellipsis;/);
+  assert.match(model, /max-width: calc\(100% - 52px\);/, 'room kept for the Send key');
+  assert.match(cssRule('.vam-map-chat.has-steer-hint .vam-map-chat-composer .vam-map-chat-model'), /max-width: calc\(100% - 160px\);/, 'room for the hint beside Stop');
+  assert.match(cssRule('.vam-map-chat.is-chain-waiting .vam-map-chat-composer .vam-map-chat-model'), /max-width: calc\(100% - 90px\);/, 'room for Stop beside Send');
+  assert.match(cssRule('.vam-map-chat.is-chain-waiting.has-steer-hint .vam-map-chat-composer .vam-map-chat-model'), /max-width: calc\(100% - 194px\);/, 'room for the hint, Stop and Send');
+  assert.match(cssRule('.vam-map-chat-composer .vam-map-chat-steer-hint'), /max-width: 108px; white-space: normal; text-align: right;/, 'the hint has a fixed width the model can leave room for');
+  const f = panelFixture(); f.panel.setOpen(true); const hint = () => f.panel.el.hasClass('has-steer-hint');
+  assert.equal(hint(), false); f.panel.inputEl.value = 'x'; f.panel.inputEl.fire('input'); assert.equal(hint(), false, 'idle: no hint');
+  f.panel.begin('q'); f.panel.inputEl.value = 'more'; f.panel.inputEl.fire('input'); assert.equal(hint(), true, 'working with text: the hint shows');
+  f.panel.inputEl.value = ''; f.panel.inputEl.fire('input'); assert.equal(hint(), false);
+});
+
+test('chat layout: the head row is a thin faint strip that clears on hover or focus, and is gone on the opening screen; the stop key has no accent disc', () => {
+  assert.match(cssRule('.vam-map-chat-head'), /justify-content: flex-end;/); assert.match(cssRule('.vam-map-chat-head'), /opacity: 0\.55;/);
+  assert.match(cssRule('.vam-map-chat:hover .vam-map-chat-head, .vam-map-chat-head:focus-within'), /opacity: 1;/);
+  assert.match(cssRule('.vam-map-chat-head.is-hero'), /display: none;/, 'no empty row on the opening screen');
+  const stop = cssRule('.vam-map-chat-composer button.vam-map-chat-stop'); assert.match(stop, /background: transparent;/); assert.doesNotMatch(stop, /interactive-accent/);
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /vam-map-chat-stop \{[^}]*background: var\(--interactive-accent\)/);
+});
+
+test('chat layout: an empty conversation is a dashed box with a faint chat icon; screen readers still read the guidance and it follows the language', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const guide = f.panel.guideEl;
+  const icon = find(guide, i => hasClass(i, 'vam-map-chat-guide-icon')); assert.ok(icon); assert.equal(icon.attrs['aria-hidden'], 'true'); assert.equal(icon.iconName, 'message-square');
+  assert.equal(findAll(guide, i => hasClass(i, 'vam-sr-only')).map(visibleText)[0], 'No messages yet. The AI can build or extend this map, research its topics, or rearrange it.');
+  assert.match(cssRule('.vam-map-chat-guide'), /border: 1px dashed var\(--background-modifier-border\);/);
+  f.setLanguage('zh-TW'); f.panel.relabel(); assert.match(findAll(guide, i => hasClass(i, 'vam-sr-only')).map(visibleText)[0], /^還沒有對話/); f.setLanguage('en');
+});
+
+test('chat layout: a waiting plan is one summary line (every group label, the delete group too) with Apply, Cancel and View details; the lists wait behind the toggle and focus stays on it', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish('plan', []); f.panel.showPlan(planOf(false));
+  const card = () => find(f.panel.logEl, i => hasClass(i, 'vam-map-chat-plan'));
+  const summary = find(card(), i => hasClass(i, 'vam-map-chat-plan-summary')); assert.match(visibleText(summary), /Add \(3\).*Move \(12\).*Delete \(1\).*Removes/);
+  eq(findAll(card(), i => i.tag === 'button').map(b => b.text), ['Apply', 'Cancel', 'View details']);
+  assert.equal(findAll(card(), i => i.tag === 'details' || i.tag === 'li' || hasClass(i, 'vam-map-chat-plan-estimate') || hasClass(i, 'vam-map-chat-plan-sentence') || hasClass(i, 'vam-map-chat-plan-note') || hasClass(i, 'vam-map-chat-plan-title')).length, 0, 'nothing of the detail is built while folded');
+  assert.equal(findAll(card(), i => hasClass(i, 'vam-map-chat-plan-warning')).length, 0, 'no AI work: no warning');
+  const t = toggleOf(card()); assert.equal(t.attrs['aria-expanded'], 'false'); t.click();
+  const open = toggleOf(card()); assert.equal(open.attrs['aria-expanded'], 'true'); assert.equal(f.page.doc.activeElement, open, 'focus stays on the new toggle');
+  eq(findAll(card(), i => i.tag === 'summary').map(s => s.text), ['Add (3)', 'Move (12)', 'Delete (1)']); assert.equal(findAll(card(), i => i.tag === 'li').length, 3);
+  assert.match(visibleText(find(card(), i => hasClass(i, 'vam-map-chat-plan-estimate'))), /No extra AI calls/); assert.equal(find(card(), i => hasClass(i, 'vam-map-chat-plan-title')).text, 'Plan to review');
+  open.click(); assert.equal(findAll(card(), i => i.tag === 'li').length, 0, 'folds back');
+});
+
+test('chat layout: a plan that starts AI work shows the undo warning under the summary and above the buttons without opening anything; a plan that does not has none', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish('plan', []); f.panel.showPlan(planOf(true));
+  const card = find(f.panel.logEl, i => hasClass(i, 'vam-map-chat-plan')); const kids = card.children.map(cls0);
+  const warn = findAll(card, i => hasClass(i, 'vam-map-chat-plan-warning')); assert.equal(warn.length, 1);
+  assert.equal(warn[0].text, 'Undo takes back the changes, but not the AI work this plan starts. Once that work writes to these cards, this reply can no longer be undone.');
+  assert.ok(kids.indexOf('vam-map-chat-plan-summary') < kids.indexOf('vam-map-chat-plan-warning') && kids.indexOf('vam-map-chat-plan-warning') < kids.indexOf('vam-map-chat-plan-buttons'), `summary, warning, buttons: ${kids}`);
+  assert.equal(findAll(find(card, i => hasClass(i, 'vam-map-chat-plan-buttons')), i => hasClass(i, 'vam-map-chat-plan-warning')).length, 0, 'not beside the buttons any more');
+  const g = panelFixture(); g.panel.setOpen(true); g.panel.begin('q'); g.panel.finish('plan', []); g.panel.showPlan(planOf(false));
+  assert.equal(findAll(g.panel.logEl, i => hasClass(i, 'vam-map-chat-plan-warning')).length, 0);
+  const also = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); assert.doesNotMatch(also, /\.vam-map-chat-plan-warning \{[^}]*display: none/);
+});
+
+test('chat layout: a plan with open groups (a picture plan) is not folded: the groups are open and there is no toggle to press', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish('plan', []); f.panel.showPlan(planOf(false, { openGroups: true }));
+  const card = find(f.panel.logEl, i => hasClass(i, 'vam-map-chat-plan')); const groups = findAll(card, i => i.tag === 'details');
+  assert.equal(groups.length, 3); assert.ok(groups.every(d => d.open === true), 'every group is open'); assert.equal(toggleOf(card), undefined);
+  assert.ok(find(card, i => hasClass(i, 'vam-map-chat-plan-summary')), 'the one-line summary is still there');
+});
+
+test('chat layout: results fold only the done lines into the counts and View details; failed, skipped, stopped and the closing notes are always shown', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q');
+  const note = 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.';
+  f.panel.finish('r', [{ status: 'done', text: 'Done: A' }, { status: 'done', text: 'Done: B' }, { status: 'done', text: 'Done: C' }, { status: 'failed', text: 'Failed: Q (boom)' }, { status: 'skipped', text: 'Skipped: S (gone)' }, { status: 'done', text: note }]);
+  const shown = () => findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-line')); const lines = () => find(f.panel.logEl, i => hasClass(i, 'vam-map-chat-lines'));
+  eq(shown().map(l => l.text), ['Failed: Q (boom)', 'Skipped: S (gone)', note], 'the failure, the skip and the note are not hidden by default');
+  assert.match(visibleText(find(lines(), i => hasClass(i, 'vam-map-chat-lines-summary'))), /3 done/); assert.doesNotMatch(visibleText(find(lines(), i => hasClass(i, 'vam-map-chat-lines-summary'))), /failed|skipped/);
+  assert.ok(hasClass(shown().at(-1), 'is-note')); assert.ok(hasClass(shown()[0], 'is-failed'));
+  const t = toggleOf(lines()); assert.equal(t.text, 'View details'); t.click();
+  eq(shown().map(l => l.text), ['Failed: Q (boom)', 'Skipped: S (gone)', 'Done: A', 'Done: B', 'Done: C', note], 'open: the done lines join, the note stays last');
+  assert.equal(toggleOf(lines()).attrs['aria-expanded'], 'true'); assert.equal(f.page.doc.activeElement, toggleOf(lines()));
+  const none = panelFixture(); none.panel.setOpen(true); none.panel.begin('q'); none.panel.finish('r', [{ status: 'failed', text: 'Failed: Z (x)' }]);
+  assert.equal(toggleOf(none.panel.logEl), undefined, 'nothing to fold: no toggle'); eq(findAll(none.panel.logEl, i => hasClass(i, 'vam-map-chat-line')).map(l => l.text), ['Failed: Z (x)']);
+});
+
+test('chat layout: a picture line that still needs a look (some card got no picture) stays shown; one that placed every picture folds with the done lines', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q');
+  const placed = title => ({ state: 'ready', nodeTitle: title, query: 'q', items: [{ candidate: { url: 'https://i/x.png', title: 't' }, inserted: title }] });
+  const lost = { state: 'failed', nodeTitle: 'B', query: 'q', reason: 'x', items: [] };
+  f.panel.finish('r', [{ status: 'done', text: 'x', imageGroup: [placed('A'), lost] }, { status: 'done', text: 'y', imageGroup: [placed('C')] }, { status: 'done', text: 'Done: A' }]);
+  const shown = () => findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-line')).map(l => l.text);
+  assert.equal(shown().length, 1, 'only the picture line with a miss'); assert.match(shown()[0], /1/); assert.match(visibleText(find(f.panel.logEl, i => hasClass(i, 'vam-map-chat-lines-summary'))), /2 done/);
+});
+
+test('chat layout: Undo this reply sits beside the summary (same text, same condition) and not as a separate row', async () => {
+  const f = imageHostFixture(); const undo = () => findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-undo-reply'));
+  f.panel.begin('direct'); f.panel.finish('placed', [{ status: 'done', text: 'Done: y' }, { status: 'done', text: 'Done: z' }]); f.panel.markTurn({ replyUndo: { token: f.token } });
+  assert.equal(undo().length, 1); assert.equal(undo()[0].text, 'Undo this reply'); assert.ok(hasClass(undo()[0].parent, 'vam-map-chat-lines-summary'), 'inside the summary row');
+  const t = toggleOf(undo()[0].parent); assert.ok(t, 'the summary row also holds View details');
+  undo()[0].click(); await tick(); await tick(); assert.deepEqual(f.state.undone, [f.token]); assert.equal(undo()[0].disabled, true);
+  f.panel.begin('plain'); f.panel.finish('answer', [{ status: 'done', text: 'Done: q' }]); assert.equal(undo().length, 1, 'a reply without an undo step still has no button');
+  f.panel.begin('failonly'); f.panel.finish('answer', [{ status: 'failed', text: 'Failed: q (x)' }]); f.panel.markTurn({ replyUndo: { token: f.token } });
+  assert.equal(undo().length, 2, 'a reply with only a failure still offers Undo'); assert.equal(undo()[1].text, 'Undo this reply');
+});
+
+test('chat layout: the basis moves behind View details, but a note the AI could not read stays shown', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const turn = f.panel.begin('q');
+  f.panel.finish('r', [{ status: 'done', text: 'Added A', basis: researchBasis('Notes') }, { status: 'done', text: 'Added B', basis: researchBasis('Notes') }]);
+  eq(classTexts(f.panel.logEl, 'vam-map-chat-basis-line'), [], 'folded: no basis line');
+  f.panel.setUnreadNotes(turn, [{ title: 'Big', oversize: true }]);
+  eq(classTexts(f.panel.logEl, 'vam-map-chat-basis-line'), ['“Big” is too long, so it was not read.'], 'the unread line is an exception: it stays');
+  assert.ok(find(f.panel.logEl, i => hasClass(i, 'is-unread')));
+  toggleOf(f.panel.logEl).click();
+  eq(classTexts(f.panel.logEl, 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 2)', '“Big” is too long, so it was not read.'], 'open: the basis joins');
+});
+
+test('chat layout: an applied plan card has no card of its own; its content is behind the same View details as the results, with the counts as the summary', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish('plan', []); const plan = planOf(false); f.panel.showPlan(plan);
+  f.panel.settlePlan(plan, 'applied', [{ status: 'done', text: 'Added A' }, { status: 'done', text: 'Added B' }]);
+  const cards = () => findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-plan'));
+  assert.equal(cards().length, 0, 'folded: no plan card'); assert.match(visibleText(find(f.panel.logEl, i => hasClass(i, 'vam-map-chat-lines-summary'))), /2 done/);
+  assert.equal(findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-plan-apply')).length, 0);
+  toggleOf(f.panel.logEl).click();
+  assert.equal(cards().length, 1); assert.equal(cards()[0].attrs['aria-label'], 'Applied plan'); assert.match(visibleText(cards()[0]), /Plan applied/); assert.equal(findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-toggle-x') || (i.tag === 'button' && hasClass(i, 'vam-map-chat-lines-toggle'))).length, 1, 'one toggle for both');
+  eq(findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-line')).map(l => l.text), ['Added A', 'Added B']);
+  const early = panelFixture(); early.panel.setOpen(true); early.panel.begin('q'); early.panel.finish('plan', []); const p2 = planOf(false); early.panel.showPlan(p2); early.panel.settlePlan(p2, 'applied');
+  assert.match(visibleText(find(early.panel.logEl, i => hasClass(i, 'vam-map-chat-lines-summary'))), /Add \(3\)/, 'applying: no results yet, the plan summary stands in');
+});
+
+test('chat layout: a cancelled plan card is unchanged (title, sentence, lists, state)', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish('plan', []); const plan = planOf(true); f.panel.showPlan(plan); f.panel.settlePlan(plan, 'cancelled');
+  const card = find(f.panel.logEl, i => hasClass(i, 'vam-map-chat-plan')); assert.equal(find(card, i => hasClass(i, 'vam-map-chat-plan-title')).text, 'Cancelled plan');
+  assert.equal(findAll(card, i => i.tag === 'details').length, 3); assert.match(visibleText(card), /Nothing was changed/); assert.equal(toggleOf(card), undefined);
 });

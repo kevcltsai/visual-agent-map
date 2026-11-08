@@ -8043,7 +8043,9 @@ export class VisualAgentMapView extends ItemView {
     const removed = before.nodes.filter(item => ids.has(item.id)),
       parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned");
     const tx = this.beginMapTransaction();
-    for (const item of removed) tx.park(item.path, parkFolder, before.id, "unassigned");
+    // A card whose note file is already gone is only taken off the map: there is nothing to park.
+    for (const item of removed)
+      if (this.app.vault.getAbstractFileByPath(item.path)) tx.park(item.path, parkFolder, before.id, "unassigned");
     const entry = await tx
       .editMap(this.path, map => {
         const prior = clone(map);

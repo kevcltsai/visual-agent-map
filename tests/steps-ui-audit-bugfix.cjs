@@ -65,3 +65,15 @@ test('S1: dragging onto an EARLIER card in map order finds that card, not the dr
   // Only the dragged card under the pointer: no target.
   assert.equal(h.view.reparentTargetAt(380, 220, [c], c.id), null);
 });
+
+test('S2: removing a card whose note file is gone still removes it from the map (one undo step, no "file not found")', async () => {
+  const h = await harness();
+  const gone = h.node('B');
+  h.files.delete(gone.path); h.contents.delete(gone.path);
+  await h.view.hydrate();
+  const past = h.view.history.past.length;
+  await h.view.removeToUnassigned(gone, false);
+  assert.equal(h.view.map.nodes.some(n => n.id === gone.id), false, 'card is off the map');
+  assert.equal((await h.disk()).nodes.some(n => n.id === gone.id), false, 'and off Map.md');
+  assert.equal(h.view.history.past.length, past + 1);
+});

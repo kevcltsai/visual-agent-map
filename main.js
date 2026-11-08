@@ -58157,10 +58157,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     }
     for (const fit of fits) fit();
     this.drawEdges();
+    this.lockWhileLoading();
   }
   /** Reading: only look and move (pan, zoom, drag a card, select) are left; every button but the map switcher and the zoom row is off. */
   lockWhileLoading() {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d, _e, _f;
     if (!this.noteLoad) return;
     const keep = [
       ".vam-map-chat",
@@ -58170,13 +58171,15 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       ".vam-zoom-controls"
     ].join(", ");
     const lock = (host) => {
-      var _a3, _b3, _c, _d;
+      var _a3, _b3, _c2, _d2;
       for (const button of Array.from((_b3 = (_a3 = host == null ? void 0 : host.querySelectorAll) == null ? void 0 : _a3.call(host, "button")) != null ? _b3 : []))
-        if (!((_c = button.closest) == null ? void 0 : _c.call(button, keep)) || ((_d = button.classList) == null ? void 0 : _d.contains("vam-layout-button"))) button.disabled = true;
+        if (!((_c2 = button.closest) == null ? void 0 : _c2.call(button, keep)) || ((_d2 = button.classList) == null ? void 0 : _d2.contains("vam-layout-button"))) button.disabled = true;
     };
     lock(this.contentEl);
     lock(this.relevanceBarEl);
-    (_b2 = (_a2 = this.contentEl).addClass) == null ? void 0 : _b2.call(_a2, "is-notes-loading");
+    for (const el of Array.from((_c = (_b2 = (_a2 = this.relevanceBarEl) == null ? void 0 : _a2.querySelectorAll) == null ? void 0 : _b2.call(_a2, ".vam-goal-text")) != null ? _c : []))
+      (_d = el.setAttr) == null ? void 0 : _d.call(el, "aria-disabled", "true");
+    (_f = (_e = this.contentEl).addClass) == null ? void 0 : _f.call(_e, "is-notes-loading");
     this.syncLoadStatus();
   }
   /** The small "N / M" line at the bottom left while notes are read and the cards are drawn; it is recreated after a repaint. */
@@ -59402,6 +59405,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
    * It goes through the usual usage notice and writes with the usual undo step, so the Quick result can be restored.
    */
   rerunStandard(node) {
+    if (this.notesLoading()) return;
     void (async () => {
       var _a2;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
@@ -60465,7 +60469,8 @@ ${request.requirements}` : preset.text,
   /** The goal text becomes a field, caret where it was clicked (the end for the keyboard). */
   startGoalEdit(at) {
     var _a2, _b2, _c, _d;
-    if (this.closed || this.goalEdit || !this.relevanceGradeable() || !this.relevanceBarEl || !this.goalBarHost) return;
+    if (this.closed || this.notesLoading() || this.goalEdit || !this.relevanceGradeable() || !this.relevanceBarEl || !this.goalBarHost)
+      return;
     if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") {
       new import_obsidian37.Notice(t("ui.relevance_goal_unavailable_grading"));
       return;
@@ -60528,6 +60533,10 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d;
     const edit = this.goalEdit;
     if (!edit) return;
+    if (this.notesLoading()) {
+      this.closeGoalEdit({ redraw: false });
+      return;
+    }
     if (this.closed || edit.path !== this.path) {
       this.closeGoalEdit({ redraw: false });
       return;
@@ -61149,7 +61158,7 @@ ${request.requirements}` : preset.text,
     const goal = normalizeRelevanceGoal(raw);
     const context = contextRaw === void 0 ? void 0 : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
-    if (!goal || !this.relevanceGradeable()) return;
+    if (!goal || !this.relevanceGradeable() || this.notesLoading()) return;
     if (((_a2 = this.plugin.relevanceGrades.get(mapPath)) == null ? void 0 : _a2.status) === "running") return;
     if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
     const run = {
@@ -62607,6 +62616,7 @@ ${request.requirements}` : preset.text,
   }
   async retryAimSubtopics(branchId, timeoutMs) {
     var _a2, _b2, _c, _d, _e, _f, _g;
+    if (this.notesLoading()) return;
     const branch = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.aim) == null ? void 0 : _b2.branches.find((item) => item.id === branchId), question = branch && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === branch.questionNodeId));
     const note = question && this.notes.get(question.id);
     if (this.closed || !this.path || !branch || !question || !note || this.aimBusy) return;
@@ -62688,6 +62698,7 @@ ${request.requirements}` : preset.text,
     return outcome;
   }
   async correctAimAssumption(nodeId, assumption, correction) {
+    if (this.notesLoading()) return;
     await this.runAimFollowup(
       nodeId,
       (mapPath, model, reasoning, signal) => this.aimManual.correctAssumption(mapPath, nodeId, assumption, correction, model, reasoning, signal)
@@ -62696,6 +62707,7 @@ ${request.requirements}` : preset.text,
   /** Change direction: during a run it stops that run first (finished research stays), then follows the new focus. */
   async steerAim(from, direction) {
     var _a2, _b2;
+    if (this.notesLoading()) return;
     if (this.aimBusy) {
       (_a2 = this.aimController) == null ? void 0 : _a2.abort();
       for (let waited = 0; this.aimBusy && waited < 3e4; waited += 100)
@@ -62755,6 +62767,7 @@ ${request.requirements}` : preset.text,
   }
   async planAimFromSelection(nodeId = this.selection.state.selected) {
     var _a2, _b2, _c, _d, _e, _f;
+    if (this.notesLoading()) return;
     const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === nodeId);
     if (this.closed || !node || !this.path || !((_b2 = this.map) == null ? void 0 : _b2.aim) || this.aimBusy) return;
     const epoch = this.aimViewEpoch, mapPath = this.path, controller = new AbortController();
@@ -62903,6 +62916,7 @@ ${request.requirements}` : preset.text,
   }
   async continueAimResearch(questionNodeId, runId, timeoutMs) {
     var _a2, _b2, _c;
+    if (this.notesLoading()) return;
     const mapPath = this.path, epoch = this.aimViewEpoch;
     if (this.closed || !mapPath || !((_a2 = this.map) == null ? void 0 : _a2.aim) || this.aimBusy) return;
     const run = this.map.aim.runs.find((item) => item.id === runId);
@@ -67384,14 +67398,14 @@ ${request.requirements}` : preset.text,
       sessionFor(this.plugin).cancelCut();
       this.refreshCutMarks();
     }
-    if (!this.map || !event.clipboardData) return;
+    if (!this.map || !event.clipboardData || this.notesLoading()) return;
     if (!inClipboardScope(event.target, this.contentEl)) return;
     if (kind === "paste") this.pasteFromClipboard(event);
     else this.copyToClipboard(event, kind);
   }
   /** True when branches cannot be changed here: integration mode, AIM, or no saved map. */
   clipboardReadOnly() {
-    return this.selection.state.multiSelectMode || !!this.aimLive() || this.outlineImportTarget().map !== "editable";
+    return this.notesLoading() || this.selection.state.multiSelectMode || !!this.aimLive() || this.outlineImportTarget().map !== "editable";
   }
   copyToClipboard(event, mode) {
     var _a2, _b2, _c;
@@ -70821,7 +70835,7 @@ ${request.requirements}` : preset.text,
    */
   async prepareShare(timeoutMs = 3e3) {
     var _a2, _b2;
-    if (!this.map) return;
+    if (!this.map || this.notesLoading()) return;
     const waits = [];
     for (const id of ringMemberIds(this.map.nodes, (_a2 = this.map.canvasItems) != null ? _a2 : [])) {
       const card = this.cardEls.get(id);
@@ -70863,7 +70877,7 @@ ${request.requirements}` : preset.text,
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot() {
     var _a2;
-    if (!this.map || !this.path) return "none";
+    if (!this.map || !this.path || this.notesLoading()) return "none";
     if (aimEnabled() && (this.map.aim || this.map.nodes.some((node) => node.aimKind !== void 0))) return "aim";
     if (!this.map.nodes.length) return "empty";
     const copy = JSON.parse(JSON.stringify(this.map));
@@ -71171,6 +71185,7 @@ ${request.requirements}` : preset.text,
     return `selection:${this.path}`;
   }
   openNextStep(node) {
+    if (this.notesLoading()) return;
     if (this.presentation) return;
     this.enqueue(async () => {
       var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
@@ -73937,6 +73952,7 @@ ${request.requirements}` : preset.text,
   }
   /** Retries `nodes` with `model` for this run only (through the batch's run-once model): no setting or frontmatter is written. */
   async retryWithOtherProvider(nodes, model, retryBatchKey) {
+    if (this.notesLoading()) return;
     this.selection.replaceMulti(nodes.map((node) => node.id));
     await this.startMultiResearch({ requirements: "", model }, retryBatchKey);
   }
@@ -74487,6 +74503,7 @@ ${request.requirements}` : preset.text,
     this.openNextStep(node);
   }
   discardSynthesis(node) {
+    if (this.notesLoading()) return;
     const task = this.synthesisTasks.get(node.path);
     if (!task || task.state === "running") return;
     this.synthesisTasks.delete(node.path);
@@ -74494,6 +74511,7 @@ ${request.requirements}` : preset.text,
   }
   retrySynthesis(node) {
     var _a2;
+    if (this.notesLoading()) return;
     const task = this.synthesisTasks.get(node.path);
     if (!task || task.state !== "failed" && task.state !== "cancelled") return;
     void this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0).then(
@@ -74528,6 +74546,7 @@ ${request.requirements}` : preset.text,
   /** Opens the synthesis dialog for the selected topics, or for the waiting task's topics with its directions. */
   openSelectionSynthesis(pending2) {
     var _a2;
+    if (this.notesLoading()) return;
     if (!this.map) return;
     const nodes = (_a2 = pending2 == null ? void 0 : pending2.sources) != null ? _a2 : [...this.selection.state.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     const names3 = nodes.map((node) => {
@@ -74869,6 +74888,7 @@ ${request.requirements}` : preset.text,
     this.render();
   }
   retrySelectionSynthesis(task) {
+    if (this.notesLoading()) return;
     if (task.state !== "failed" && task.state !== "cancelled") return;
     const { signal: _staleSignal, onProgress: _staleProgress, ...retained } = task.options;
     void this.selectionModel(task.sources).then(
@@ -75242,6 +75262,10 @@ ${note.detail.trim()}` : "",
     if (!this.map) return;
     const inset = this.canvasInset();
     const viewport = initialViewport(this.map.viewport, inset);
+    if (this.notesLoading()) {
+      this.map.viewport = viewport;
+      return;
+    }
     if (this.toolbarClearedFor === this.path) {
       this.map.viewport = viewport;
       return;

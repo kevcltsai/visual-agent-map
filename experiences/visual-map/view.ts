@@ -2091,6 +2091,8 @@ export class VisualAgentMapView extends ItemView {
     }
     for (const fit of fits) fit();
     this.drawEdges();
+    // The rebuilt cards come with live buttons: lock them like the first frame's.
+    this.lockWhileLoading();
   }
   /** Reading: only look and move (pan, zoom, drag a card, select) are left; every button but the map switcher and the zoom row is off. */
   private lockWhileLoading(): void {
@@ -2108,6 +2110,9 @@ export class VisualAgentMapView extends ItemView {
     };
     lock(this.contentEl);
     lock(this.relevanceBarEl);
+    // The goal title is a div with role=button, not a <button>: mark it off too.
+    for (const el of Array.from(this.relevanceBarEl?.querySelectorAll?.<HTMLElement>(".vam-goal-text") ?? []))
+      el.setAttr?.("aria-disabled", "true");
     this.contentEl.addClass?.("is-notes-loading");
     this.syncLoadStatus();
   }
@@ -3467,6 +3472,7 @@ export class VisualAgentMapView extends ItemView {
    * It goes through the usual usage notice and writes with the usual undo step, so the Quick result can be restored.
    */
   private rerunStandard(node: MapNode): void {
+    if (this.notesLoading()) return;
     void (async () => {
       const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
       if (this.plugin.topicRuns.isBusy(node.path)) {
@@ -4591,7 +4597,15 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The goal text becomes a field, caret where it was clicked (the end for the keyboard). */
   private startGoalEdit(at: { caret?: number | null }): void {
-    if (this.closed || this.goalEdit || !this.relevanceGradeable() || !this.relevanceBarEl || !this.goalBarHost) return;
+    if (
+      this.closed ||
+      this.notesLoading() ||
+      this.goalEdit ||
+      !this.relevanceGradeable() ||
+      !this.relevanceBarEl ||
+      !this.goalBarHost
+    )
+      return;
     if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
       new Notice(t("ui.relevance_goal_unavailable_grading"));
       return;
@@ -4653,6 +4667,11 @@ export class VisualAgentMapView extends ItemView {
   private commitGoalEdit(how: "enter" | "outside" | "tab"): void {
     const edit = this.goalEdit;
     if (!edit) return;
+    // Reading: the goal is not saved or graded from partial notes; the draft is dropped.
+    if (this.notesLoading()) {
+      this.closeGoalEdit({ redraw: false });
+      return;
+    }
     // The view closed or moved to another map since the edit began: the draft is not this map's, so the edit ends without saving.
     if (this.closed || edit.path !== this.path) {
       this.closeGoalEdit({ redraw: false });
@@ -5278,7 +5297,7 @@ export class VisualAgentMapView extends ItemView {
     const goal = normalizeRelevanceGoal(raw);
     const context = contextRaw === undefined ? undefined : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
-    if (!goal || !this.relevanceGradeable()) return;
+    if (!goal || !this.relevanceGradeable() || this.notesLoading()) return;
     if (this.plugin.relevanceGrades.get(mapPath)?.status === "running") return;
     // The run takes over the spot under the bar: an open list or a waiting suggestion call is dropped.
     if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
@@ -6885,6 +6904,7 @@ export class VisualAgentMapView extends ItemView {
   }
 
   private async retryAimSubtopics(branchId: string, timeoutMs?: number): Promise<void> {
+    if (this.notesLoading()) return;
     const branch = this.map?.aim?.branches.find(item => item.id === branchId),
       question = branch && this.map?.nodes.find(item => item.id === branch.questionNodeId);
     const note = question && this.notes.get(question.id);
@@ -6978,12 +6998,14 @@ export class VisualAgentMapView extends ItemView {
     return outcome;
   }
   private async correctAimAssumption(nodeId: string, assumption: string, correction: string): Promise<void> {
+    if (this.notesLoading()) return;
     await this.runAimFollowup(nodeId, (mapPath, model, reasoning, signal) =>
       this.aimManual.correctAssumption(mapPath, nodeId, assumption, correction, model, reasoning, signal)
     );
   }
   /** Change direction: during a run it stops that run first (finished research stays), then follows the new focus. */
   private async steerAim(from: { nodeId?: string | null; branchId?: string | null }, direction: string): Promise<void> {
+    if (this.notesLoading()) return;
     if (this.aimBusy) {
       this.aimController?.abort();
       for (let waited = 0; this.aimBusy && waited < 30_000; waited += 100)
@@ -7045,6 +7067,7 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private async planAimFromSelection(nodeId = this.selection.state.selected): Promise<void> {
+    if (this.notesLoading()) return;
     const node = this.map?.nodes.find(item => item.id === nodeId);
     if (this.closed || !node || !this.path || !this.map?.aim || this.aimBusy) return;
     const epoch = this.aimViewEpoch,
@@ -7199,6 +7222,7 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private async continueAimResearch(questionNodeId: string, runId: string, timeoutMs?: number): Promise<void> {
+    if (this.notesLoading()) return;
     const mapPath = this.path,
       epoch = this.aimViewEpoch;
     if (this.closed || !mapPath || !this.map?.aim || this.aimBusy) return;
@@ -12033,14 +12057,19 @@ export class VisualAgentMapView extends ItemView {
       sessionFor(this.plugin).cancelCut();
       this.refreshCutMarks();
     }
-    if (!this.map || !event.clipboardData) return;
+    if (!this.map || !event.clipboardData || this.notesLoading()) return;
     if (!inClipboardScope(event.target, this.contentEl)) return;
     if (kind === "paste") this.pasteFromClipboard(event);
     else this.copyToClipboard(event, kind);
   }
   /** True when branches cannot be changed here: integration mode, AIM, or no saved map. */
   private clipboardReadOnly(): boolean {
-    return this.selection.state.multiSelectMode || !!this.aimLive() || this.outlineImportTarget().map !== "editable";
+    return (
+      this.notesLoading() ||
+      this.selection.state.multiSelectMode ||
+      !!this.aimLive() ||
+      this.outlineImportTarget().map !== "editable"
+    );
   }
   private copyToClipboard(event: ClipboardEvent, mode: "copy" | "cut"): void {
     const map = this.map;
@@ -15850,7 +15879,7 @@ export class VisualAgentMapView extends ItemView {
    * is on the map before it is copied. Never throws; shareSnapshot leaves out ring heights that are still unmeasured.
    */
   async prepareShare(timeoutMs = 3000): Promise<void> {
-    if (!this.map) return;
+    if (!this.map || this.notesLoading()) return;
     const waits: Promise<void>[] = [];
     for (const id of ringMemberIds(this.map.nodes, this.map.canvasItems ?? [])) {
       const card = this.cardEls.get(id);
@@ -15905,7 +15934,7 @@ export class VisualAgentMapView extends ItemView {
     | "none"
     | "aim"
     | "empty" {
-    if (!this.map || !this.path) return "none";
+    if (!this.map || !this.path || this.notesLoading()) return "none";
     if (aimEnabled() && (this.map.aim || this.map.nodes.some(node => node.aimKind !== undefined))) return "aim";
     if (!this.map.nodes.length) return "empty";
     const copy = JSON.parse(JSON.stringify(this.map)) as MapDocument;
@@ -16239,6 +16268,7 @@ export class VisualAgentMapView extends ItemView {
     return `selection:${this.path}`;
   }
   private openNextStep(node: MapNode): void {
+    if (this.notesLoading()) return;
     if (this.presentation) return;
     this.enqueue(async () => {
       const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
@@ -19214,6 +19244,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Retries `nodes` with `model` for this run only (through the batch's run-once model): no setting or frontmatter is written. */
   private async retryWithOtherProvider(nodes: MapNode[], model: string, retryBatchKey?: string): Promise<void> {
+    if (this.notesLoading()) return;
     this.selection.replaceMulti(nodes.map(node => node.id));
     await this.startMultiResearch({ requirements: "", model }, retryBatchKey);
   }
@@ -19785,12 +19816,14 @@ export class VisualAgentMapView extends ItemView {
     this.openNextStep(node);
   }
   private discardSynthesis(node: MapNode): void {
+    if (this.notesLoading()) return;
     const task = this.synthesisTasks.get(node.path);
     if (!task || task.state === "running") return;
     this.synthesisTasks.delete(node.path);
     this.render();
   }
   private retrySynthesis(node: MapNode): void {
+    if (this.notesLoading()) return;
     const task = this.synthesisTasks.get(node.path);
     if (!task || (task.state !== "failed" && task.state !== "cancelled")) return;
     void this.plugin.repo.readNote(node.path, this.map ?? undefined).then(note =>
@@ -19820,6 +19853,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Opens the synthesis dialog for the selected topics, or for the waiting task's topics with its directions. */
   private openSelectionSynthesis(pending: NonNullable<VisualAgentMapView["integrationTask"]> | null): void {
+    if (this.notesLoading()) return;
     if (!this.map) return;
     const nodes =
       pending?.sources ??
@@ -20197,6 +20231,7 @@ export class VisualAgentMapView extends ItemView {
     this.render();
   }
   private retrySelectionSynthesis(task: NonNullable<VisualAgentMapView["integrationTask"]>): void {
+    if (this.notesLoading()) return;
     if (task.state !== "failed" && task.state !== "cancelled") return;
     // The stored options may carry the stopped run's aborted signal; a retry must start with its own.
     const { signal: _staleSignal, onProgress: _staleProgress, ...retained } = task.options;
@@ -20608,6 +20643,11 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map) return;
     const inset = this.canvasInset();
     const viewport = initialViewport(this.map.viewport, inset);
+    // Reading: the cards still have placeholder heights, so the clearing waits for the final render (in memory lift only).
+    if (this.notesLoading()) {
+      this.map.viewport = viewport;
+      return;
+    }
     // Only the first paint of a map clears the toolbar: a later render must not move a view the user panned to.
     if (this.toolbarClearedFor === this.path) {
       this.map.viewport = viewport;

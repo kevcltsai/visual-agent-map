@@ -1923,6 +1923,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 @media (prefers-reduced-motion: reduce) { .vam-view .vam-loading-bar { animation: none; } }
 /* While notes are read only look and move are left: tools, resize handles and the add button are not shown (and so not reachable by keyboard). */
 .vam-view.is-notes-loading .vam-node-tools, .vam-view.is-notes-loading .vam-card-resize, .vam-view.is-notes-loading .vam-card-resize-y, .vam-view.is-notes-loading .vam-card-resize-corner, .vam-view.is-notes-loading .vam-add-child { display: none; }
+/* The first-use hint shares the bottom edge with the progress line: it waits until the notes are read. */
+.vam-view.is-notes-loading .vam-canvas-hint { display: none; }
+.vam-view .vam-goal-text[aria-disabled="true"] { cursor: default; opacity: 0.7; }
 
 /* Progress line while the notes of an opened map are read: bottom left, above any status bar, never wider than the canvas. */
 .vam-view .vam-map-load-status { position: absolute; left: 12px; bottom: calc(10px + var(--vam-status-clearance, 0px)); z-index: 2; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-ui-smaller); color: var(--text-accent); pointer-events: none; }

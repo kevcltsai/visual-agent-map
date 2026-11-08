@@ -465,3 +465,132 @@ test('p: a fast open never creates the progress line', async () => {
   assert.equal(statusEls(h).length, 0);
   assert.equal(h.view.loadStatusEl, null);
 });
+
+// ---- Fix batch 1: nothing edits, runs AI or writes while the notes are read -----------------------------------------
+const loadingHarness = async () => {
+  const h = await harness();
+  const done = h.open();
+  await tick(); fireFrame();
+  assert.equal(h.view.notesLoading(), true);
+  return { h, done, finish: async () => { h.release(0, 1, 2); await done; } };
+};
+const guardSource = name => {
+  const source = fs.readFileSync(nodePath.join(__dirname, '..', 'experiences', 'visual-map', 'view.ts'), 'utf8');
+  const at = source.search(new RegExp(`\\n  (private )?(async )?${name}\\(`));
+  assert.ok(at > 0, name);
+  return source.slice(at, at + 400);
+};
+
+test('q (B1): a card rebuilt in place is locked again, and no card action starts AI while reading', async () => {
+  const { h, finish } = await loadingHarness();
+  const { view } = h;
+  let locks = 0;
+  const lock = view.lockWhileLoading.bind(view);
+  view.lockWhileLoading = () => { locks++; lock(); };
+  h.release(0);
+  await flush();
+  assert.ok(locks > 0, 'the rebuild re-applies the lock');
+  const readsBefore = h.reads.length;
+  view.rerunStandard(h.nodes[0]);
+  await tick();
+  assert.equal(h.reads.length, readsBefore, 'rerun reads and runs nothing');
+  let multi = 0;
+  view.startMultiResearch = async () => { multi++; };
+  await view.retryWithOtherProvider([h.nodes[0]], 'gpt-6-luna');
+  assert.equal(multi, 0);
+  assert.equal(view.selection.state.multiSelected.size, 0);
+  let followups = 0;
+  view.runAimFollowup = async () => { followups++; };
+  await view.correctAimAssumption(h.nodes[0].id, 'a', 'b');
+  await view.steerAim({ nodeId: h.nodes[0].id }, 'x');
+  assert.equal(followups, 0);
+  // The remaining entry points start with the same guard.
+  for (const name of ['retryAimSubtopics', 'continueAimResearch', 'planAimFromSelection', 'discardSynthesis', 'retrySynthesis', 'openNextStep', 'openSelectionSynthesis', 'retrySelectionSynthesis'])
+    assert.match(guardSource(name), /\{\n    if \(this\.notesLoading\(\)\) return;/, name);
+  await finish();
+});
+
+test('q2 (B1): lockWhileLoading disables card buttons and marks the goal title off', async () => {
+  const { h, finish } = await loadingHarness();
+  const { view } = h;
+  const card = view.contentEl.createDiv('vam-node');
+  const button = card.createEl('button', { text: 'Rerun' });
+  button.closest = () => null;
+  const bar = dom.element('div');
+  const goal = bar.createDiv({ cls: 'vam-goal-text' });
+  view.relevanceBarEl = bar;
+  view.lockWhileLoading();
+  assert.equal(button.disabled, true);
+  assert.equal(goal.attrs['aria-disabled'], 'true');
+  await finish();
+});
+
+test('r (B2): the goal cannot be edited, saved or graded while reading', async () => {
+  const { h, finish } = await loadingHarness();
+  const { view } = h;
+  view.relevanceBarEl = dom.element('div');
+  view.goalBarHost = dom.element('div');
+  view.startGoalEdit({});
+  assert.equal(view.goalEdit, null);
+  view.goalEdit = { path: view.path, draft: 'x' };
+  view.commitGoalEdit('enter');
+  assert.equal(view.goalEdit, null, 'the draft is dropped');
+  assert.equal(h.mutateCalls(), 0);
+  assert.deepEqual(h.writes, []);
+  await finish();
+});
+
+test('s (B3): copy, cut and paste do nothing while reading', async () => {
+  const { h, finish } = await loadingHarness();
+  const { view } = h;
+  view.selection.state.selected = h.nodes[0].id;
+  let set = 0, prevented = 0, pasted = 0;
+  view.pasteFromClipboard = () => { pasted++; };
+  view.copyToClipboard = () => { set++; };
+  const target = view.contentEl.createDiv('vam-node');
+  target.closest = () => null;
+  const event = { defaultPrevented: false, target, clipboardData: { setData() { set++; }, getData: () => 'text', items: [], files: [] }, preventDefault() { prevented++; } };
+  for (const kind of ['copy', 'cut', 'paste']) view.onClipboardEvent(kind, event);
+  assert.deepEqual([set, prevented, pasted], [0, 0, 0]);
+  assert.equal(view.clipboardReadOnly(), true);
+  assert.equal(h.mutateCalls(), 0);
+  await finish();
+});
+
+test('t (M1): the share snapshot is "none" while reading', async () => {
+  const { h, finish } = await loadingHarness();
+  assert.equal(h.view.shareSnapshot(), 'none');
+  await h.view.prepareShare();
+  await finish();
+  assert.notEqual(h.view.shareSnapshot(), 'none');
+});
+
+test('u (M2): the toolbar clearing waits for the final render, so the viewport equals a non-progressive open', async () => {
+  const { h, finish } = await loadingHarness();
+  const { view } = h;
+  let real = false;
+  view.canvasInset = () => 50;
+  view.topsUnderToolbar = () => (real ? [10] : []);
+  view.applyInitialViewport();
+  assert.notEqual(view.toolbarClearedFor, view.path, 'the loading frame does not mark the clearing done');
+  await finish();
+  real = true;
+  view.applyInitialViewport();
+  assert.equal(view.toolbarClearedFor, view.path);
+  assert.equal(view.map.viewport.y, 40, 'cleared once with real heights, as a non-progressive open does (inset 50 minus the card top 10)');
+});
+
+test('v (M3): a repaint when reading ends during a drag waits for the drop', async () => {
+  const { h, finish } = await loadingHarness();
+  const { view } = h;
+  await finish();
+  assert.equal(view.notesLoading(), false);
+  view.dragging = true; view.dragOrigin = { id: view.map.id, path: view.path };
+  let cleaned = 0;
+  view.dragCleanup = () => { cleaned++; };
+  const paints = view.paintCount;
+  VisualAgentMapView.prototype.paint.call(view);
+  assert.equal(view.renderAfterDrag, true);
+  assert.equal(cleaned, 0, 'the drag is not cancelled');
+  assert.equal(view.paintCount, paints);
+});

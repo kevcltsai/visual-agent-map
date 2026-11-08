@@ -125,7 +125,7 @@ async function harness({ count = 3, running = [], gate = true, heights = 100 } =
   return { repo, app, plugin, view, nodes, doc, open, release, log, reads, writes, marks, snapshot, cards, setHeights, stage,
     mutateCalls: () => mutateCalls, edgeDraws: () => edgeDraws, opened: () => opened, menus: () => menus, chainDone: () => chain };
 }
-const flush = async h => { await tick(); flushRaf(); await tick(); };
+const flush = async () => { await tick(); flushRaf(); await tick(); };
 
 test('a: no frame before the delay; then unread cards are grey placeholders titled from the cache or the file name', async () => {
   const h = await harness();
@@ -161,7 +161,7 @@ test('b: a note arriving rebuilds only its own card in place; the lines are draw
   const before = h.cards();
   const draws = h.edgeDraws();
   h.release(1);
-  await flush(h);
+  await flush();
   assert.equal(h.view.renders.length, 1, 'no full repaint');
   const after = h.cards();
   assert.equal(after[0], before[0]); assert.equal(after[2], before[2]); assert.equal(after[3], before[3]);
@@ -172,7 +172,7 @@ test('b: a note arriving rebuilds only its own card in place; the lines are draw
   assert.equal(h.edgeDraws(), draws + 1);
   assert.equal(h.view.noteLoad.read, 1);
   h.release(0, 2);
-  await flush(h);
+  await flush();
   assert.equal(h.edgeDraws(), draws + 2, 'two notes in one frame batch redraw the lines once');
   assert.equal(h.cards().filter(c => c.classes.has('vam-node-loading')).length, 1);
   assert.equal(h.view.noteLoad.read, 3);
@@ -185,7 +185,7 @@ test('c: nothing is written before the last note is read (settle, cover resize, 
   const done = h.open();
   await tick(); fireFrame();
   h.release(0, 1);
-  await flush(h);
+  await flush();
   // Cards grow and overlap while the notes are still being read: nothing may tidy or save.
   h.setHeights(300);
   h.view.afterCoverSized(h.cards()[0]);
@@ -244,7 +244,7 @@ test('e: after the last note the loading state is gone, one full render follows,
   await tick(); fireFrame();
   assert.equal(h.view.heightsSeenMap, null);
   h.release(0, 1, 2);
-  await flush(h);
+  await flush();
   // The cards were first drawn short (grey bars) and end up tall and overlapping: opening still moves nothing.
   h.setHeights(300);
   await done;
@@ -315,12 +315,12 @@ test('h: a note left at running is a grey placeholder in every frame, never "AI 
   await tick(); fireFrame();
   const seen = [...h.snapshot()];
   h.release(1);
-  await flush(h);
+  await flush();
   seen.push(...h.snapshot());
   const runningCard = h.snapshot()[1];
   assert.equal(runningCard.loading, true, 'still a placeholder although its note is read');
   h.release(0, 2);
-  await flush(h);
+  await flush();
   seen.push(...h.snapshot());
   for (const card of seen) {
     assert.notEqual(card.status, 'running');

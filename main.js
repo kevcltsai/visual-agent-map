@@ -58080,7 +58080,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     return aimEnabled() && !!(map == null ? void 0 : map.aim);
   }
   notesLoading() {
-    return this.noteLoad !== null;
+    return !!this.noteLoad;
   }
   /** A card whose note is not read yet, or a note left at "running" by a closed Obsidian that nobody runs (recovery has not run yet). */
   cardLoading(node) {
@@ -58157,7 +58157,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   lockWhileLoading() {
     var _a2, _b2;
     if (!this.noteLoad) return;
-    const keep = ".vam-map-chat, .vam-map-title-button, .vam-map-switch-button, .vam-new-map, .vam-zoom-controls";
+    const keep = [".vam-map-chat", ".vam-map-title-button", ".vam-map-switch-button", ".vam-new-map", ".vam-zoom-controls"].join(", ");
     const lock = (host) => {
       var _a3, _b3, _c, _d;
       for (const button of Array.from((_b3 = (_a3 = host == null ? void 0 : host.querySelectorAll) == null ? void 0 : _a3.call(host, "button")) != null ? _b3 : []))

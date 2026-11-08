@@ -2017,7 +2017,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private noteLoad: NoteLoadState | null = null;
   private notesLoading(): boolean {
-    return this.noteLoad !== null;
+    return !!this.noteLoad;
   }
   /** A card whose note is not read yet, or a note left at "running" by a closed Obsidian that nobody runs (recovery has not run yet). */
   private cardLoading(node: MapNode): boolean {
@@ -2094,7 +2094,7 @@ export class VisualAgentMapView extends ItemView {
   /** Reading: only look and move (pan, zoom, drag a card, select) are left; every button but the map switcher and the zoom row is off. */
   private lockWhileLoading(): void {
     if (!this.noteLoad) return;
-    const keep = ".vam-map-chat, .vam-map-title-button, .vam-map-switch-button, .vam-new-map, .vam-zoom-controls";
+    const keep = [".vam-map-chat", ".vam-map-title-button", ".vam-map-switch-button", ".vam-new-map", ".vam-zoom-controls"].join(", ");
     const lock = (host: ParentNode | null | undefined): void => {
       for (const button of Array.from(host?.querySelectorAll?.<HTMLButtonElement>("button") ?? []))
         if (!button.closest?.(keep) || button.classList?.contains("vam-layout-button")) button.disabled = true;

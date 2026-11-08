@@ -3098,7 +3098,37 @@ export const en = {
   "ui.settings_repair_desc": "Only recreates missing folders; notes and mind maps are untouched.",
   "ui.settings_rebuild_name": "Rebuild VAM data",
   "ui.settings_rebuild_desc": "Rescans and rebuilds the index; originals are not overwritten.",
-  "ui.settings_reconnect_desc": "Reconnects only after you confirm."
+  "ui.settings_reconnect_desc": "Reconnects only after you confirm.",
+  "ui.topic_chat_label_0": "Topic chat: {0}",
+  "ui.topic_chat_placeholder": "Ask about this topic, or press a button above…",
+  "ui.topic_chat_send": "Send",
+  "ui.topic_chat_tab_adopt": "Tab to use",
+  "ui.topic_chat_close": "Close topic chat",
+  "ui.topic_chat_research": "Research",
+  "ui.topic_chat_expand": "Expand",
+  "ui.topic_chat_synthesize": "Synthesize",
+  "ui.topic_chat_you_0": "You · {0}",
+  "ui.topic_chat_suggest_research":
+    "Research this topic in depth: add viewpoints, counterexamples and recent data it does not cover yet.",
+  "ui.topic_chat_suggest_expand":
+    "Break this topic into subtopics to explore further; each subtopic should be researchable on its own.",
+  "ui.topic_chat_suggest_synthesize":
+    "Synthesize the findings of the subtopics below: which conclusions agree, which conflict, and what is still missing.",
+  "ui.topic_chat_mode_quick_hint": "Quick: uses only the model's own knowledge, no web search.",
+  "ui.topic_chat_mode_standard_hint": "Standard: searches the web to fill in recent or niche information.",
+  "ui.topic_chat_research_done": "Research finished; the result was written back to this topic.",
+  "ui.topic_chat_expand_done_0_1": "Created {0} subtopics: {1}.",
+  "ui.topic_chat_synthesis_done_0": "Synthesized the findings of {0} subtopics and wrote them back to this topic.",
+  "ui.topic_chat_synthesis_researched_first_0_1":
+    "Researched {0} unresearched subtopics first, then synthesized the findings of {1} subtopics and wrote them back to this topic.",
+  "ui.topic_chat_running": "Running…",
+  "ui.topic_chat_stopped": "Stopped.",
+  "ui.topic_chat_failed_0": "Did not finish: {0}",
+  "ui.topic_chat_no_children": "This topic has no subtopics to synthesize yet.",
+  "ui.topic_chat_out_of_scope": "Parts outside this topic were skipped.",
+  "ui.topic_chat_too_big": "This request touches too much; please use the AI chat in the left sidebar.",
+  "ui.topic_chat_result_unknown": "See the topic itself for this result.",
+  "ui.topic_chat_record_failed": "The topic chat record was not saved."
 } as const;
 
 export type TranslationKey = keyof typeof en;

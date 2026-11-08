@@ -2035,3 +2035,31 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .is-placing .vam-canvas-image { cursor: crosshair; }
 .vam-view .vam-place-hint { position: absolute; left: 50%; bottom: 16px; z-index: 20; max-width: calc(100% - 32px); transform: translateX(-50%); padding: 6px 12px; font-size: var(--font-ui-small); text-align: center; color: var(--background-primary); background: var(--text-normal); border-radius: 6px; box-shadow: var(--shadow-s); }
 .vam-view .vam-place-hint .vam-place-hint-esc { margin-left: 10px; opacity: 0.8; }
+
+/* Topic chat: the small conversation window next to a topic card */
+.vam-topic-chat { position: absolute; z-index: 6; box-sizing: border-box; width: 340px; max-width: calc(100% - 16px); display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-l); background: var(--background-primary); box-shadow: var(--shadow-l); color: var(--text-normal); font-size: var(--font-ui-small); }
+.vam-topic-chat.is-bottom { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-width: none; }
+.vam-topic-chat-head { display: flex; align-items: center; gap: 8px; }
+.vam-topic-chat-title { min-width: 0; overflow-wrap: anywhere; font-weight: var(--font-semibold); }
+.vam-topic-chat-close { margin-left: auto; flex: 0 0 auto; color: var(--text-faint); }
+.vam-topic-chat-log { display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow-y: auto; }
+.vam-topic-chat-log:empty { display: none; }
+.vam-topic-chat-msg { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); overflow-wrap: anywhere; white-space: pre-wrap; }
+.vam-topic-chat-msg.is-me { background: var(--background-modifier-hover); }
+.vam-topic-chat-msg.is-running { color: var(--text-muted); }
+.vam-topic-chat-who { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-topic-chat-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.vam-topic-chat-action { padding: 3px 10px; border: 1px solid var(--background-modifier-border); border-radius: 999px; background: var(--background-primary); color: var(--text-normal); font-size: var(--font-ui-small); cursor: pointer; }
+.vam-topic-chat-action.is-active, .vam-topic-chat-mode.is-active { border-color: var(--interactive-accent); background: var(--interactive-accent); color: var(--text-on-accent); }
+.vam-topic-chat-action:disabled, .vam-topic-chat-mode:disabled, .vam-topic-chat-send:disabled { opacity: 0.5; cursor: default; }
+.vam-topic-chat-composer { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 6px; border: 1px solid var(--interactive-accent); border-radius: var(--radius-m); }
+.vam-topic-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; border: 0; background: transparent; box-shadow: none; caret-color: var(--text-accent); }
+.vam-topic-chat-input::placeholder { color: var(--text-faint); }
+.vam-topic-chat-tab { align-self: flex-start; padding: 0 5px; border: 1px solid var(--background-modifier-border); border-bottom-width: 2px; border-radius: var(--radius-s); color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-topic-chat-tab[hidden] { display: none; }
+.vam-topic-chat-foot { display: flex; align-items: center; gap: 6px; }
+.vam-topic-chat-modes { display: inline-flex; gap: 2px; }
+.vam-topic-chat-mode { padding: 0 6px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: transparent; color: var(--text-muted); font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-topic-chat-send { margin-left: auto; width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--interactive-accent); color: var(--text-on-accent); cursor: pointer; }
+.vam-topic-chat-mode-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-topic-chat button:focus-visible, .vam-topic-chat-input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }

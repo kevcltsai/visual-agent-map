@@ -16,6 +16,7 @@ function element(tag, options = {}) {
     createDiv(value) { return this.child('div', value); },
     createEl(name, value) { return this.child(name, value); },
     createSpan(value) { return this.child('span', value); },
+    setCssProps(props) { for (const [name, value] of Object.entries(props)) this.style.setProperty(name, value); },
     setText(value) { this.text = String(value); }, setAttr(name, value) { this.attrs[name] = String(value); this[name] = String(value); },
     getAttr(name) { return this.attrs[name]; },
     removeAttribute(name) { delete this.attrs[name]; delete this[name]; },

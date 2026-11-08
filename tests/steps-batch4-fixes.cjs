@@ -292,7 +292,7 @@ test('F-4 a cut shows in every window that shows the map, and goes away everywhe
   assert.deepEqual(cutMarked(h.view), []); assert.deepEqual(cutMarked(pop), []);
 });
 
-test('F-4 counter-example: with no cut pending a copy leaves the other windows alone, and a valid cut keeps its mark through a matching paste check', async () => {
+test('F-4 counter-example: with no cut pending a copy leaves the other windows alone, and a refused paste of a cut clears its mark in every window', async () => {
   const h = await clipHarness();
   const pop = await popoutOf(h);
   h.view.selection.setSelected(h.ids.leaf); h.view.selection.replaceMulti([]);
@@ -300,11 +300,12 @@ test('F-4 counter-example: with no cut pending a copy leaves the other windows a
   assert.deepEqual(cutMarked(pop), []);
   const raw = cutIn(h, h.view, 'branch');
   assert.deepEqual(cutMarked(pop), [h.ids.branch, h.ids.kid].sort());
-  // A paste of the exact string into a topic of this very branch is refused, but the cut itself is still valid.
+  // A paste of the exact string into a topic of this very branch is refused; a refused paste is a failed check, which
+  // cancels the cut (FLOWS: any failed copy/cut/paste check clears the cut mark), so the mark goes in the popout too.
   pop.selection.setSelected(h.ids.kid); pop.selection.replaceMulti([]);
   pop.onClipboardEvent('paste', clipboardEvent(card, { [MIME]: raw }));
   await tick(); await tick();
-  assert.equal(h.sessionFor(h.plugin).get()?.mode, 'cut', 'the cut is still pending');
-  assert.deepEqual(cutMarked(pop), [h.ids.branch, h.ids.kid].sort(), 'its mark stays in the popout');
-  assert.deepEqual(cutMarked(h.view), [h.ids.branch, h.ids.kid].sort(), 'and in the first window');
+  assert.notEqual(h.sessionFor(h.plugin).get()?.mode, 'cut', 'the refused paste cancels the cut');
+  assert.deepEqual(cutMarked(pop), [], 'the mark is gone from the popout');
+  assert.deepEqual(cutMarked(h.view), [], 'and in the first window');
 });

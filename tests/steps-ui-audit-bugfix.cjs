@@ -1,7 +1,7 @@
 // UI audit bugfix batch (full-20261107): drag re-parent target order, removing a card whose note file is gone, summary range change in selection mode.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { load, fixture, DEFAULT_SETTINGS, obsidian, core, withExpansionCoordinator } = require('./support.cjs');
+const { load, fixture, DEFAULT_SETTINGS, obsidian, core, withExpansionCoordinator, until, node: supportNode } = require('./support.cjs');
 const dom = require('./support-dom.cjs');
 const { element } = dom;
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -10,7 +10,7 @@ const MAP = `${TOPICS}/map-t/Map.md`;
 
 // Root with three children (A, B, C) in a map; the view is wired the way tests/steps-after-text-view.cjs does it.
 async function harness() {
-  const { repo, app, contents, files } = fixture('en', { linkIndex: true });
+  const { repo, app, contents, files, trashed } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
   const doc = { id: 'map-t', title: 'T', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -45,7 +45,7 @@ async function harness() {
   view.announcer = element('div');
   view.announcer.setText = text => { view.announced = text; };
   const node = title => view.map.nodes.find(n => n.path.includes(`${title}.md`));
-  return { repo, app, view, contents, files, notices, node, disk: async () => plain(await repo.readMap(MAP)) };
+  return { repo, app, view, contents, files, trashed, notices, node, disk: async () => plain(await repo.readMap(MAP)) };
 }
 
 test('S1: dragging onto an EARLIER card in map order finds that card, not the dragged card that sorts later', async () => {
@@ -218,4 +218,51 @@ test('A5: the unreadable table row has its own badge text and reason line, and t
   assert.equal(zh['coffee.unreadable_reason'], '檔案內容無法讀取，請檢查或手動移除這個檔案。');
   const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/coffee-tables/view.ts'), 'utf8');
   assert.match(view, /if \(item\.unreadable\) \{[^}]*ct-list-unreadable[^}]*button\.disabled = true;[^}]*coffee\.unreadable_reason/s);
+});
+
+// UI audit bugfix-2 (add-topic-esc-keeps-card, vm-empty-esc-creates-topic): a new topic is created before it is named;
+// Esc in its name field takes the creation back (no card, no Map.md node, no note), Enter with a name keeps it.
+for (const [label, parentOf] of [['a child topic', h => h.node('Root')], ['the first topic of an empty map', () => null]]) {
+  test(`Esc in the name field of ${label} creates nothing; a typed name is kept`, async () => {
+    const h = await harness();
+    const before = h.view.map.nodes.length;
+    await h.view.addNode(parentOf(h), undefined, true, true);
+    const node = h.view.map.nodes.at(-1);
+    assert.equal(h.view.map.nodes.length, before + 1, 'the topic exists while its name is open');
+    const path = node.path;
+    const card = element('div');
+    const input = h.view.paintCardNameEdit(card, node, h.view.notes.get(node.id));
+    input.keydown({ key: 'Escape', isComposing: false, preventDefault() {}, stopPropagation() {} });
+    await until(() => h.view.map.nodes.length === before);
+    assert.equal(h.view.map.nodes.some(n => n.id === node.id), false, 'the card is gone from the view');
+    assert.equal((await h.disk()).nodes.some(n => n.id === node.id), false, 'and from Map.md');
+    // Undo parks the new note in Unassigned (its Notes path is empty); the cancel then trashes that parked note, and only it.
+    assert.equal(h.files.has(path), false, 'the note is no longer at its Notes path');
+    assert.deepEqual(h.trashed.filter(p => p.startsWith(`${TOPICS}/map-t/Unassigned/`)).length, 1, 'the parked note is trashed');
+    assert.equal(h.trashed.length, 1, 'nothing else is trashed');
+    assert.equal(h.view.inlineName, null, 'the name field is closed');
+  });
+}
+
+test('a new topic whose name is typed and saved with Enter stays, with that name', async () => {
+  const h = await harness();
+  const before = h.view.map.nodes.length;
+  await h.view.addNode(h.node('Root'), undefined, true, true);
+  const node = h.view.map.nodes.at(-1);
+  const input = h.view.paintCardNameEdit(element('div'), node, h.view.notes.get(node.id));
+  input.value = 'Named topic';
+  input.keydown({ key: 'Enter', isComposing: false, preventDefault() {}, stopPropagation() {} });
+  await until(() => h.view.notes.get(node.id)?.title === 'Named topic');
+  assert.equal(h.view.map.nodes.length, before + 1, 'the topic is kept');
+});
+
+// UI audit bugfix-2 (topic-tree-initial-focus-not-cancel): the move/copy window opens with the focus on Cancel.
+test('the move-to topic tree opens with the focus on Cancel, not on the first topic row', async () => {
+  const modalDom = require('./support-dom.cjs');
+  const { TopicTreeModal } = load('ui/modals/topic-tree-modal.ts', { obsidian: { ...obsidian, Modal: modalDom.makeModal({ focusFirst: true }) } });
+  const modal = new TopicTreeModal({}, 'Move to', 'Pick a topic', [supportNode('a', null), supportNode('b', 'a')], n => n.id, () => true, () => {});
+  modal.open();
+  const cancel = modalDom.button(modal.modalEl, 'Cancel');
+  assert.ok(cancel, 'a Cancel button exists');
+  assert.equal(modalDom.focusedNow(), cancel, 'focus is on Cancel');
 });

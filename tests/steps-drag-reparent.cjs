@@ -194,3 +194,35 @@ test('group drag: empty space still moves the whole group, and a timeline group 
   t.drag('a', 450, 450); t.drop('a', 450, 450);
   assert.equal(t.saved().a.parentId, 'd'); assert.deepEqual(t.notes, []);
 });
+
+// UI audit bugfix-2 (card-drag-esc-ignored): Esc while the pointer is down puts the card back; the release then saves nothing.
+test('Esc during a card drag cancels it: the card goes back, the release saves nothing, the key listener is removed', async () => {
+  const h = harness();
+  const listeners = [];
+  const doc = { addEventListener(name, fn) { listeners.push([name, fn]); }, removeEventListener(name, fn) { const at = listeners.findIndex(item => item[1] === fn); if (at >= 0) listeners.splice(at, 1); } };
+  h.view.contentEl = { ownerDocument: doc };
+  h.drag('d', 450, 250);
+  const esc = listeners.find(([name]) => name === 'keydown');
+  assert.ok(esc, 'Esc is listened to while a card is dragged');
+  esc[1]({ key: 'Escape', preventDefault() {}, stopPropagation() {} });
+  assert.equal(h.cards.d.style.left, '400px', 'the card is back at its origin');
+  assert.equal(h.cards.d.style.top, '400px', 'the card is back at its origin');
+  h.drop('d', 450, 250);
+  await Promise.resolve();
+  assert.equal(h.changes.length, 0, 'the release after Esc saves nothing');
+  assert.deepEqual(h.lit(), [], 'no highlight is left');
+  assert.equal(listeners.length, 0, 'the key listener is removed with the drag');
+});
+
+test('counter-example: a card dragged and released WITHOUT Esc still saves its new position', async () => {
+  const h = harness();
+  const listeners = [];
+  h.view.contentEl = { ownerDocument: { addEventListener(name, fn) { listeners.push([name, fn]); }, removeEventListener() {} } };
+  // The press is at (410, 410) on Card d (400, 400); the pointer moves to (700, 650): the card follows by (290, 240).
+  h.drag('d', 700, 650);
+  h.drop('d', 700, 650);
+  await Promise.resolve();
+  assert.equal(h.changes.length, 1, 'the drop is one change');
+  assert.equal(h.saved().d.x, 690, 'the new x is saved');
+  assert.equal(h.saved().d.y, 640, 'the new y is saved');
+});

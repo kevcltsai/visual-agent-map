@@ -21563,6 +21563,10 @@ var History = class {
     }
     this.future = [];
   }
+  /** Forgets the step redo would bring back (one cancelled for good, so redo must not replay it). */
+  dropRedo() {
+    this.future.pop();
+  }
   undo() {
     const entry = this.past.pop();
     if (entry) this.future.push(entry);
@@ -21967,6 +21971,7 @@ function begin(deps) {
       undo: () => apply("undo"),
       redo: () => apply("redo"),
       parkedPaths: () => ops.filter((op) => op.kind === "move" && op.target).map((op) => op.target),
+      createdParkPaths: () => ops.filter((op) => op.kind === "create" && op.target).map((op) => op.target),
       ...label === void 0 ? {} : { label }
     };
   }
@@ -50271,6 +50276,13 @@ var TopicTreeModal = class extends import_obsidian32.Modal {
     this.title = title;
     this.selectable = selectable;
     this.choose = choose;
+    __publicField(this, "cancelEl", null);
+  }
+  /** Obsidian's open() moves the focus to the first topic row after onOpen; Cancel takes it back, so a stray Enter never moves topics. */
+  open() {
+    var _a2;
+    super.open();
+    (_a2 = this.cancelEl) == null ? void 0 : _a2.focus();
   }
   onOpen() {
     this.titleEl.setText(this.titleText);
@@ -50289,6 +50301,7 @@ var TopicTreeModal = class extends import_obsidian32.Modal {
     });
     const cancel = modalActions(this).createEl("button", { text: t("ui.cancel") });
     cancel.addEventListener("click", () => this.close());
+    this.cancelEl = cancel;
     cancel.focus();
   }
 };
@@ -58921,9 +58934,32 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
     text12.id = id;
     field.setAttr("aria-labelledby", id);
   }
+  /** Esc in a new topic's name field: the step that made the topic is undone (as Undo would), so nothing is left behind. */
+  discardNewTopic(step) {
+    if (this.history.undoEntry !== step) {
+      this.render();
+      return;
+    }
+    this.enqueue(async () => {
+      var _a2, _b2;
+      await this.travel(false);
+      if (this.history.redoEntry !== step) return;
+      this.history.dropRedo();
+      for (const path of (_b2 = (_a2 = step.createdParkPaths) == null ? void 0 : _a2.call(step)) != null ? _b2 : []) {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file instanceof import_obsidian39.TFile) await this.app.fileManager.trashFile(file);
+      }
+      this.render();
+    });
+  }
   /** Draws the card title's field in place of the title text. */
   paintCardNameEdit(card, node, note) {
+    const edit = this.inlineName;
     const input2 = this.createInlineNameInput(card, "vam-card-title-input", "", (value) => {
+      if (value === null && (edit == null ? void 0 : edit.created) && edit.createdStep) {
+        this.discardNewTopic(edit.createdStep);
+        return;
+      }
       const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
       if (!name2 || name2 === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name2 }));
@@ -67593,6 +67629,8 @@ ${request.requirements}` : preset.text,
         );
         if (!check.ok) {
           new import_obsidian39.Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
+          sessionFor(this.plugin).cancelCut();
+          this.refreshCutMarks();
           return;
         }
         await this.moveBranches(roots, target);
@@ -73731,7 +73769,7 @@ ${request.requirements}` : preset.text,
    * callers (the structure review dialog stays open) must not pull focus out from under their own UI.
    */
   async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true, kind = "topic", keyboardFocus = false, hypothesisStart = {}, afterTextId) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
@@ -73814,13 +73852,14 @@ ${request.requirements}` : preset.text,
         rebuildDerivedData,
         [node.path]
       );
+      if (((_g = this.inlineName) == null ? void 0 : _g.id) === node.id) this.inlineName.createdStep = this.history.undoEntry;
     } catch (error) {
-      if (((_g = this.inlineName) == null ? void 0 : _g.id) === node.id) this.inlineName = null;
+      if (((_h = this.inlineName) == null ? void 0 : _h.id) === node.id) this.inlineName = null;
       throw error;
     }
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    const placed = (_i = (_h = this.map) == null ? void 0 : _h.nodes.find((n) => n.id === node.id)) != null ? _i : node;
+    const placed = (_j = (_i = this.map) == null ? void 0 : _i.nodes.find((n) => n.id === node.id)) != null ? _j : node;
     this.focusNode(placed);
     if (keyboardFocus && !this.inlineName && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
     this.focusInlineName();
@@ -80507,7 +80546,7 @@ ${addition}` : addition },
   }
   enableDrag(card, node, onPlainClick) {
     card.addEventListener("pointerdown", (event) => {
-      var _a2, _b2, _c;
+      var _a2, _b2, _c, _d;
       if (event.target.closest("button, .vam-card-title-input, .vam-card-summary-input") || event.button !== 0 || !this.map)
         return;
       const selecting = this.selection.state.multiSelectMode;
@@ -80587,7 +80626,7 @@ ${addition}` : addition },
       let warned = false;
       let overChat = false;
       const move = (e) => {
-        var _a3, _b3, _c2, _d;
+        var _a3, _b3, _c2, _d2;
         if (this.dragStale()) {
           this.endStaleDrag();
           return;
@@ -80621,7 +80660,22 @@ ${addition}` : addition },
           x: origin.x + (e.clientX - start.x) / this.map.viewport.zoom,
           y: origin.y + (e.clientY - start.y) / this.map.viewport.zoom
         };
-        (_d = this.dragFrame) != null ? _d : this.dragFrame = window.requestAnimationFrame(paint);
+        (_d2 = this.dragFrame) != null ? _d2 : this.dragFrame = window.requestAnimationFrame(paint);
+      };
+      const doc = (_d = this.contentEl) == null ? void 0 : _d.ownerDocument;
+      const esc = (e) => {
+        if (e.key !== "Escape" || !(moved || travelled)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        settle();
+        try {
+          drop({ type: "pointercancel" }, null);
+        } finally {
+          if (this.renderAfterDrag && !this.dragging) {
+            this.renderAfterDrag = false;
+            if (!this.closed) this.render();
+          }
+        }
       };
       const settle = () => {
         var _a3;
@@ -80635,6 +80689,7 @@ ${addition}` : addition },
         card.removeEventListener("pointerup", finish);
         card.removeEventListener("pointercancel", finish);
         card.removeEventListener("lostpointercapture", finish);
+        doc == null ? void 0 : doc.removeEventListener("keydown", esc, true);
         this.dragCleanup = null;
       };
       const finish = (e) => {
@@ -80651,7 +80706,7 @@ ${addition}` : addition },
         }
       };
       const drop = (e, landed) => {
-        var _a3, _b3, _c2, _d;
+        var _a3, _b3, _c2, _d2;
         if (selecting && !travelled) return;
         this.suppressClickUntil = Date.now() + 250;
         const putBack = () => {
@@ -80731,7 +80786,7 @@ ${addition}` : addition },
         } else {
           this.applySelectionChange(this.selection.click(node.id));
           if (this.notesLoading()) return;
-          if (aimEnabled() && ((_d = this.map) == null ? void 0 : _d.aim) && node.aimKind === "question") this.openAimAnswer(node);
+          if (aimEnabled() && ((_d2 = this.map) == null ? void 0 : _d2.aim) && node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
           onPlainClick == null ? void 0 : onPlainClick(e, wasSelected);
         }
@@ -80741,6 +80796,7 @@ ${addition}` : addition },
       card.addEventListener("pointerup", finish);
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
+      doc == null ? void 0 : doc.addEventListener("keydown", esc, true);
     });
   }
   /**

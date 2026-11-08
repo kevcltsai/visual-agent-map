@@ -1808,6 +1808,8 @@ export class VisualAgentMapView extends ItemView {
     draft: string;
     fresh: boolean;
     created: boolean;
+    /** For a new topic: the history step that made it. Esc in its name field takes exactly this step back. */
+    createdStep?: TransactionEntry;
     /** Where the caret goes on the next focus (a click in the text puts it there); cleared by typing. */
     caret?: number | null;
   } | null = null;
@@ -3033,9 +3035,35 @@ export class VisualAgentMapView extends ItemView {
     text.id = id;
     field.setAttr("aria-labelledby", id);
   }
+  /** Esc in a new topic's name field: the step that made the topic is undone (as Undo would), so nothing is left behind. */
+  private discardNewTopic(step: TransactionEntry): void {
+    if (this.history.undoEntry !== step) {
+      // Something else was recorded since the topic was made: it stays (no silent undo of another change).
+      this.render();
+      return;
+    }
+    this.enqueue(async () => {
+      await this.travel(false);
+      // A conflict window may have come up instead of the undo: then the topic stays as it was.
+      if (this.history.redoEntry !== step) return;
+      // Undo parks the new note in Unassigned; the cancelled topic leaves no note behind, and redo must not bring it back.
+      this.history.dropRedo();
+      for (const path of step.createdParkPaths?.() ?? []) {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+      }
+      this.render();
+    });
+  }
   /** Draws the card title's field in place of the title text. */
   private paintCardNameEdit(card: HTMLElement, node: MapNode, note: Note): HTMLInputElement {
+    const edit = this.inlineName;
     const input = this.createInlineNameInput(card, "vam-card-title-input", "", value => {
+      // Esc on a topic that this field's own add just made: the add is cancelled, so no card and no note are left.
+      if (value === null && edit?.created && edit.createdStep) {
+        this.discardNewTopic(edit.createdStep);
+        return;
+      }
       const name = sanitizeGeneratedTitle(value ?? "").trim();
       if (!name || name === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name }));
@@ -12360,6 +12388,9 @@ export class VisualAgentMapView extends ItemView {
         );
         if (!check.ok) {
           new Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
+          // A refused paste is a failed cut check: the pending cut and its dashed marks go with the refusal (FLOWS).
+          sessionFor(this.plugin).cancelCut();
+          this.refreshCutMarks();
           return;
         }
         await this.moveBranches(roots, target);
@@ -19146,6 +19177,8 @@ export class VisualAgentMapView extends ItemView {
         rebuildDerivedData,
         [node.path]
       );
+      // The step that made the topic (pushed by the change above): Esc in its name field takes it back.
+      if (this.inlineName?.id === node.id) this.inlineName.createdStep = this.history.undoEntry;
     } catch (error) {
       if (this.inlineName?.id === node.id) this.inlineName = null;
       throw error;
@@ -26689,6 +26722,23 @@ export class VisualAgentMapView extends ItemView {
         };
         this.dragFrame ??= window.requestAnimationFrame(paint);
       };
+      // Esc is a document key while the pointer is down (the card may not hold the focus): it cancels a drag that has begun.
+      const doc = this.contentEl?.ownerDocument;
+      const esc = (e: KeyboardEvent): void => {
+        if (e.key !== "Escape" || !(moved || travelled)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        // The card goes back where it was (as after a lost pointer); the release that follows saves nothing.
+        settle();
+        try {
+          drop({ type: "pointercancel" } as PointerEvent, null);
+        } finally {
+          if (this.renderAfterDrag && !this.dragging) {
+            this.renderAfterDrag = false;
+            if (!this.closed) this.render();
+          }
+        }
+      };
       const settle = (): void => {
         setHover(null);
         this.chat?.setDropHighlight(false);
@@ -26700,6 +26750,7 @@ export class VisualAgentMapView extends ItemView {
         card.removeEventListener("pointerup", finish);
         card.removeEventListener("pointercancel", finish);
         card.removeEventListener("lostpointercapture", finish);
+        doc?.removeEventListener("keydown", esc, true);
         this.dragCleanup = null;
       };
       // The drop's own work comes first; a repaint that was asked for during the drag then runs once.
@@ -26822,6 +26873,7 @@ export class VisualAgentMapView extends ItemView {
       card.addEventListener("pointerup", finish);
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
+      doc?.addEventListener("keydown", esc, true);
     });
   }
   /**

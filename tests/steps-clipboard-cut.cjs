@@ -203,6 +203,8 @@ test('P5 cut: pasting into its own branch or a descendant is refused and the map
     assert.equal(JSON.stringify(h.map().nodes), before, `${target}: map unchanged`);
     assert.equal(h.history(), 0, `${target}: no history`);
     assert.equal(h.notices.at(-1), 'A branch cannot be pasted into itself or its own sub-topics, so nothing was moved.');
+    // A refused paste is a failed cut check: the dashed mark goes with the refusal, no Esc needed (UI audit bugfix-2).
+    assert.deepEqual(marked(h), [], `${target}: the cut mark is cleared by the refusal`);
   }
 });
 

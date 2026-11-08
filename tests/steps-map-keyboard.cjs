@@ -389,17 +389,32 @@ test('21: typing in the field and Enter renames the card (one more undo step); t
   assert.equal(nameField(h, fresh.id), undefined);
 });
 
-test('21: Esc, a blank name and leaving the field keep the default name and add no card', async () => {
-  for (const finish of [f => press(f, 'Escape'), f => { f.value = '   '; press(f, 'Enter'); }]) {
-    const h = await harness(); realAdd(h);
-    await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
-    const fresh = freshCard(h), past = h.view.history.past.length, notes = noteCount(h);
-    const field = nameField(h, fresh.id); field.value = field.value === 'New topic' ? 'Typed then dropped' : field.value;
-    finish(field); await tick(); await tick();
-    assert.equal(h.view.notes.get(fresh.id).title, 'New topic', 'the default name stays, no empty card');
-    assert.equal(h.map().nodes.length, 5); assert.equal(noteCount(h), notes); assert.equal(h.view.history.past.length, past, 'no history entry for the ended edit');
-    assert.equal(h.view.inlineName, null); assert.equal(nameField(h, fresh.id), undefined);
-  }
+// A blank name is not a cancel: it keeps the default name and the card (unchanged).
+test('21: a blank name keeps the default name and adds no empty card', async () => {
+  const h = await harness(); realAdd(h);
+  await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
+  const fresh = freshCard(h), past = h.view.history.past.length, notes = noteCount(h);
+  const field = nameField(h, fresh.id); field.value = '   '; press(field, 'Enter'); await tick(); await tick();
+  assert.equal(h.view.notes.get(fresh.id).title, 'New topic', 'the default name stays');
+  assert.equal(h.map().nodes.length, 5); assert.equal(noteCount(h), notes); assert.equal(h.view.history.past.length, past, 'no history entry for the ended edit');
+  assert.equal(h.view.inlineName, null); assert.equal(nameField(h, fresh.id), undefined);
+});
+
+// UI audit bugfix-2 (add-topic-esc-keeps-card): Esc cancels the add, so the new topic leaves the map and its note is gone.
+test('21: Esc in the name field of a new topic takes the add back: no card, no Map.md node, no note', async () => {
+  const h = await harness(); realAdd(h);
+  await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
+  const fresh = freshCard(h), notes = noteCount(h);
+  // The fixture's trashFile only records the path; Obsidian also removes the file, so the trash here does too.
+  const trashed = [], trashFile = h.app.fileManager.trashFile;
+  h.app.fileManager.trashFile = async file => { trashed.push(file.path); await trashFile(file); h.contents.delete(file.path); };
+  press(nameField(h, fresh.id), 'Escape');
+  await until(() => h.map().nodes.length === 4); await tick(); await tick();
+  assert.equal(h.view.notes.get(fresh.id), undefined, 'the card is gone');
+  assert.equal(noteCount(h), notes - 1, 'the note is gone');
+  assert.equal(trashed.length, 1, 'only the new note is trashed');
+  assert.match(trashed[0], /\/Unassigned\//, 'it is the note undo had parked in Unassigned');
+  assert.equal(h.view.inlineName, null);
 });
 
 test('21: Enter while an input method is composing does not end the edit', async () => {

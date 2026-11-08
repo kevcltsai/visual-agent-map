@@ -17,6 +17,12 @@ export class TopicTreeModal extends Modal {
   ) {
     super(app);
   }
+  private cancelEl: HTMLButtonElement | null = null;
+  /** Obsidian's open() moves the focus to the first topic row after onOpen; Cancel takes it back, so a stray Enter never moves topics. */
+  open(): void {
+    super.open();
+    this.cancelEl?.focus();
+  }
   onOpen(): void {
     this.titleEl.setText(this.titleText);
     this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
@@ -35,6 +41,7 @@ export class TopicTreeModal extends Modal {
     const cancel = modalActions(this).createEl("button", { text: t("ui.cancel") });
     cancel.addEventListener("click", () => this.close());
     // Start on Cancel, so a stray Enter never moves topics.
+    this.cancelEl = cancel;
     cancel.focus();
   }
 }

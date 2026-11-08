@@ -557,11 +557,7 @@ import {
   goalRecommendFailureDetail,
   goalRecommendTitleKey
 } from "../../core/goal-recommend-service";
-import {
-  ancestorTrail,
-  createCardSearchField,
-  type CardSearchSource
-} from "../../ui/card-search-field";
+import { ancestorTrail, createCardSearchField, type CardSearchSource } from "../../ui/card-search-field";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
 import { aiModeOptions, DEFAULT_MAP_AI_MODE, hasKnowledgeGapMarker, noteAiMode, type MapAiMode } from "./ai-mode";
@@ -16872,18 +16868,19 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /** Rows for a card search: the cards `include` keeps, each with its title and the titles above it. */
-  private cardSearchSources(include: (node: MapNode) => boolean, enabled?: (node: MapNode) => boolean): CardSearchSource[] {
+  private cardSearchSources(
+    include: (node: MapNode) => boolean,
+    enabled?: (node: MapNode) => boolean
+  ): CardSearchSource[] {
     const nodes = this.map?.nodes ?? [];
     const titleOf = (id: string): string =>
       this.notes.get(id)?.title ?? nodes.find(candidate => candidate.id === id)?.path ?? "";
-    return nodes
-      .filter(include)
-      .map(item => ({
-        id: item.id,
-        title: titleOf(item.id),
-        trail: ancestorTrail(nodes, item.id, titleOf),
-        enabled: enabled ? enabled(item) : true
-      }));
+    return nodes.filter(include).map(item => ({
+      id: item.id,
+      title: titleOf(item.id),
+      trail: ancestorTrail(nodes, item.id, titleOf),
+      enabled: enabled ? enabled(item) : true
+    }));
   }
   /** Only a map the user may edit takes anchor relations: not AIM, not while picking topics (the same rule as the image itself). */
   private anchorRelationsEditable(): boolean {

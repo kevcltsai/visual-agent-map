@@ -50619,7 +50619,11 @@ function matchesTitle(title, query) {
 }
 function buildRows(sources, query, options) {
   const text12 = query.trim();
-  const rows2 = sources.filter((source) => matchesTitle(source.title, text12)).map((source) => ({ kind: "card", ...source, current: options.currentId != null && source.id === options.currentId }));
+  const rows2 = sources.filter((source) => matchesTitle(source.title, text12)).map((source) => ({
+    kind: "card",
+    ...source,
+    current: options.currentId != null && source.id === options.currentId
+  }));
   if (options.rootChoice !== void 0)
     rows2.push({
       kind: "root",
@@ -50629,7 +50633,8 @@ function buildRows(sources, query, options) {
       enabled: true,
       current: options.currentId === null
     });
-  else if (!rows2.length) rows2.push({ kind: "none", id: "", title: t("ui.card_search_no_match_0", text12), trail: [], enabled: false });
+  else if (!rows2.length)
+    rows2.push({ kind: "none", id: "", title: t("ui.card_search_no_match_0", text12), trail: [], enabled: false });
   return rows2;
 }
 var suggestClass = null;

@@ -86,7 +86,11 @@ export function buildRows(
   const text = query.trim();
   const rows: CardSearchItem[] = sources
     .filter(source => matchesTitle(source.title, text))
-    .map(source => ({ kind: "card", ...source, current: options.currentId != null && source.id === options.currentId }));
+    .map(source => ({
+      kind: "card",
+      ...source,
+      current: options.currentId != null && source.id === options.currentId
+    }));
   if (options.rootChoice !== undefined)
     rows.push({
       kind: "root",
@@ -96,7 +100,8 @@ export function buildRows(
       enabled: true,
       current: options.currentId === null
     });
-  else if (!rows.length) rows.push({ kind: "none", id: "", title: t("ui.card_search_no_match_0", text), trail: [], enabled: false });
+  else if (!rows.length)
+    rows.push({ kind: "none", id: "", title: t("ui.card_search_no_match_0", text), trail: [], enabled: false });
   return rows;
 }
 

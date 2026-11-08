@@ -123,8 +123,6 @@ var en = {
   "ui.integration_running": "Integrating selected topics\u2026",
   "ui.background_view": "View",
   "ui.background_review": "Review",
-  "ui.background_outline_ready_0": "Quick outline is ready: {0}",
-  "ui.review_outline_0": "Review outline ({0})",
   "ui.structure_review_ready_0": "Structure review finished: {0} suggestions.",
   "ui.structure_review_view_0": "View {0} suggestions",
   "ui.outline_ai_ready": "The AI outline is ready.",
@@ -309,30 +307,16 @@ var en = {
   "ui.outline_ai_running": "AI is writing the outline\u2026",
   "ui.outline_ai_stopped": "Outline generation stopped.",
   "ui.outline_ai_filled": "{0} headings filled in below. Edit them before adding.",
-  "ui.quick_outline_hint": "AI writes an outline for this topic with the chosen preset. You review it here before any subtopic is created.",
-  "ui.quick_outline_mode_hint": "AI drafts a whole tree of subtopics at once; set the levels and size below. Review and edit it here before anything is created.",
-  "ui.quick_outline_review": "AI outline",
-  "ui.number_of_levels": "Levels",
-  "ui.quick_outline_max_topics": "Most subtopics",
-  "ui.quick_outline_trimmed_0": "Left out beyond the chosen levels or size: {0} heading(s).",
-  "ui.quick_outline_review_hint": "Uncheck what you don't need and edit names, then create the subtopics.",
   "ui.ai_mode": "AI mode",
   "ui.ai_mode_hint": "Quick answers from the model's own knowledge without the web. Use Standard once the structure is settled, or when the topic is new or obscure.",
   "ui.ai_mode_hint_standard": "Standard searches the web and may add images, so it takes longer. Use it once the structure is settled, or when the topic is new or obscure.",
-  "ui.expand_summary_one_level_0": "1 level \xB7 up to {0}",
-  "ui.number_field_at_most_0": "At most {0}; a bigger number is brought back to {0}.",
   "ui.ai_mode_quick_desc": "a short overview from the model's knowledge and your sources, without the web",
-  "ui.ai_mode_standard_desc": "a short overview that searches the web and may add images",
-  "ui.expand_summary_0_1": "{0} levels \xB7 up to {1}",
-  "ui.review_ai_subtopic_suggestions_0": "Review AI subtopic suggestions ({0})",
   "ui.synthesis_standard_first_hint": "If information is thin, run a Standard research on the topic first.",
-  "ui.ai_mode_value_0": "{0} mode",
   "ui.rerun_standard_other_map": "Go back to the map this research ran on, then re-run with Standard.",
   "ui.rerun_standard": "Re-run with Standard",
   "ui.rerun_standard_0": "Re-run with Standard: {0}",
   "ui.background_research_gap_0": "Research finished, but the model's knowledge was not enough: {0}",
   "research.knowledge_gap_marker": "Model knowledge is insufficient",
-  "ui.quick_outline_empty": "The AI outline has no headings under the topic.",
   "ui.outline_ai_not_started": "Outline generation did not start.",
   "ui.aim_create_map": "New AIM",
   "ui.aim_start_title": "Create an Adaptive Inquiry Map (AIM)",
@@ -554,7 +538,6 @@ var en = {
   "ui.synthesis_content_scope": "Applies only to the topics below; extra Markdown sources are read in full. Fixed once started.",
   "ui.synthesis_source_topics": "Source topics included",
   "ui.synthesis_no_source_topics": "No source topics. Select extra Markdown sources below.",
-  "ui.legacy_rules_not_applied": "The note\u2019s old Rules are not applied automatically. Enter any conditions AI must follow for this run in Additional requirements above.",
   "ui.requirements_this_task_only": "Only used for this task. Leave blank to proceed with the selected action.",
   "ui.selected_mind_map_notes": "Selected mind map notes",
   "ui.reference_time_and_citations_hint": "When you add a folder, archived VAM notes are excluded. More material takes longer to process. Results cite the source files used.",
@@ -1050,7 +1033,6 @@ var en = {
   "ui.relevance_other_changes": "Other changes",
   "ui.relevance_conflicts_title": "Your settings disagree",
   "ui.relevance_conflict_0_1_2_3": "You set \u201C{0}\u201D to {1}, but \u201C{2}\u201D under it to {3}. Both were kept as you set them.",
-  "ui.suggested": "Suggested",
   "ui.output_settings": "Output",
   "ui.topic_card_label_0_1": "{0}, {1}",
   "ui.researching_0": "Researching {0}",
@@ -1109,10 +1091,8 @@ var en = {
   "ui.selected_branches_leave_the_map_their_notes_move_to_unassign": "Selected branches leave the map; their notes move to Unassigned and can be restored.",
   "ui.confirm_removal": "Confirm removal",
   "ui.choose_a_new_parent_topic": "Choose a new parent topic",
-  "ui.how_would_you_like_to_explore_next": "How would you like to explore next?",
   "ui.choose_another_note_source_first": "Nothing to synthesize yet.",
   "ui.the_selected_sources_contain_no_markdown_content_to_synthesi": "The selected sources contain no Markdown content to synthesize.",
-  "ui.review_ai_suggested_subtopics": "Review AI-suggested subtopics.",
   "ui.select_at_least_one_subtopic": "Select at least one subtopic.",
   "ui.some_subtopics_were_created_reopen_this_window_and_check_the": "Some subtopics were created. Reopen this window and check the map before continuing.",
   "ui.review_the_synthesis_draft": "Review the synthesis draft.",
@@ -1121,12 +1101,9 @@ var en = {
   "ui.synthesis_direction": "Synthesis direction",
   "ui.get_synthesis_draft": "Start synthesis",
   "ui.get_synthesis_suggestions_first": "Get synthesis suggestions first",
-  "ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes": "AI suggests synthesis angles first. The parent topic is updated directly once the synthesis finishes, and you can undo it.",
   "ui.ai_did_not_suggest_a_synthesis_direction_please_retry": "AI did not suggest a synthesis direction. Please retry.",
   "ui.run_shallow_research_on_each_created_subtopic": "Run short research on each created subtopic",
   "ui.subtopic_names_must_be_unique": "Subtopic names must be unique.",
-  "ui.create_subtopics_without_research": "Create subtopics without research",
-  "ui.research_each_subtopic_after_creation_and_use_codex_quota": "Each new subtopic gets a short research pass, using AI quota",
   "ui.layout_direction_right": "Lay out to the right",
   "ui.layout_direction_left": "Lay out to the left",
   "ui.layout_direction_down": "Lay out downward",
@@ -1159,17 +1136,7 @@ var en = {
   "ui.usage_footer_estimates": "Values marked ~ are estimates.",
   "ui.expansion_failed": "Expansion failed",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "The map or parent topic changed while AI was running. No subtopics were created.",
-  "ui.create_subtopics_after_confirmation_without_running_research": "Create subtopics after confirmation without running research",
   "ui.creating_subtopics": "Creating subtopics\u2026",
-  "ui.subtopics_created": "Subtopics created.",
-  "ui.current_topic_0": "Current topic: {0}",
-  "ui.research_deeper": "Research deeper",
-  "ui.find_answers_for_this_topic_at_your_chosen_depth": "Dig into this topic",
-  "ui.expand_the_map": "Expand the map",
-  "ui.discuss_directions_or_explore_multiple_levels_with_shallow_r": "Break it into subtopics",
-  "ui.synthesize_findings": "Synthesize findings",
-  "ui.find_shared_conclusions_differences_and_next_steps_across_su": "Combine what the subtopics found",
-  "ui.start_from_this_node_s_question_update_only_this_node": "Results update only this topic.",
   "ui.quick": "Quick",
   "ui.standard": "Standard",
   "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first": "This mind map has no topics yet.",
@@ -1190,7 +1157,6 @@ var en = {
   "ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from": "The file was moved or deleted. You can remove this node from the map.",
   "ui.remove_from_map": "Remove from map",
   "ui.no_preview_content_yet": "No preview content yet",
-  "ui.confirm_research_task": "Confirm research task",
   "ui.add_subtopic_manually": "Add subtopic manually",
   "ui.card_menu_add_sibling": "Add sibling topic",
   "ui.card_menu_open_note_tab": "Open note in new tab",
@@ -1206,18 +1172,12 @@ var en = {
   "ui.ai_locked_suggestions_skipped_0": "{0} suggestions touch locked topics and were skipped",
   "ui.ai_unlock_selected": "Unlock for AI",
   "ui.ai_locked_some_0_1": "{0} of {1} locked",
-  "ui.model_and_advanced_settings": "Model and advanced settings",
   "ui.model": "Model",
   "ui.codex_provider_label": "Codex",
   "ui.workspace_default": "Workspace default",
-  "ui.inherited_at_creation": "Follows upper topic",
-  "ui.manually_selected": "Manually selected",
   "ui.follow_default_model": "Follow default (now: {0})",
   "ui.follow_current_model_0": "Follow current model ({0})",
   "ui.follow_parent_topic_0": "Follow upper topic ({0})",
-  "ui.model_scope": "Apply to",
-  "ui.model_scope_once": "This run only",
-  "ui.model_scope_pin": "Pin to this topic",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "This node's note is missing. Relink an unassigned note or remove it from the map.",
   "ui.relink_note": "Relink note",
   "ui.use_this_note": "Use this note",
@@ -1271,7 +1231,6 @@ var en = {
   "ui.multi_research_current_model": "Current model (overridden topics keep their own)",
   "ui.expand_0": "Expand {0}",
   "ui.0_moved": "{0} (moved)",
-  "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} \xB7 {1}; reasoning can be adjusted per topic.",
   "ui.workspace_location_0_legacy_topics_1": "Workspace: {0} \xB7 Legacy Topics folder (still readable): {1}",
   "ui.legacy_map_view_only": "This map uses the pre-0.4 structure and is view-only.",
   "error.organize_aim_busy": "An AIM research attempt is still running or saving. Wait for it to finish before organizing workspace folders. Nothing was moved.",
@@ -1666,10 +1625,6 @@ var en = {
   "ui.map_chat_note_basis_research_0": "Basis: research notes read: {0}",
   "ui.map_chat_note_basis_note_0": "Basis: notes read: {0}",
   "ui.map_chat_note_basis_outline": "Basis: card titles only",
-  "ui.structure_review_entry_label": "AI structure suggestions:",
-  "ui.structure_review_entry_map": "What to strengthen or cut? (whole map)",
-  "ui.structure_review_entry_branch": "What to strengthen or cut? (this branch)",
-  "ui.structure_review_entry_hint": "AI reads only titles, summaries and status, then suggests topics to add, cut, move or merge; apply each one on its own, and undo any.",
   "ui.discard_confirm": "Discard draft?",
   "ui.discard_confirm_hint": "Press again within 5 seconds to discard this AI draft. It cannot be recovered.",
   "ui.ai_draft": "AI draft",
@@ -1679,7 +1634,6 @@ var en = {
   "ui.draft_detail": "Details",
   "ui.current_summary": "Current summary",
   "ui.not_set": "Not set",
-  "ui.task_started_in_background_0": "Started \u201C{0}\u201D in the background; progress shows on its card.",
   "ui.model_status_idle": "not checked",
   "ui.model_status_loading": "checking\u2026",
   "ui.model_status_ready": "ready",
@@ -1754,12 +1708,10 @@ var en = {
   "ui.stop_expand": "Stop expanding",
   "ui.research_stopped_existing_content_was_preserved": "Research stopped. Existing content was preserved.",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "The AI result was not saved: this card was edited while AI was working, and saving would overwrite that edit. Your map was not changed. Run it again; it uses 1 more AI call.",
-  "ui.shallow_research_for_expanded_subtopics_0": "Subtopic research: {0}",
   "ui.select_the_parent_topic_before_its_child": "Select the parent topic before its child.",
   "ui.first_level_topic_names_must_be_unique": "First-level topic names must be unique.",
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa": "AI proposed duplicate first-level names. Generate the proposals again.",
   "ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev": "Specify an expansion direction or ask AI to suggest one. Preview before creating nodes.",
-  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "This topic has no direct subtopics yet.",
   "ui.review_synthesis_draft": "Review synthesis draft",
   "ui.choose_synthesis_direction": "Choose synthesis direction",
   "ui.discard_synthesis": "Discard",
@@ -2939,8 +2891,6 @@ var zhCN = {
   "ui.integration_running": "\u6B63\u5728\u6574\u5408\u5DF2\u9009\u8BAE\u9898\u2026",
   "ui.background_view": "\u67E5\u770B",
   "ui.background_review": "\u68C0\u9605",
-  "ui.background_outline_ready_0": "\u5FEB\u901F\u5927\u7EB2\u5DF2\u5C31\u7EEA\uFF1A{0}",
-  "ui.review_outline_0": "\u68C0\u9605\u5927\u7EB2 ({0})",
   "ui.structure_review_ready_0": "\u7ED3\u6784\u67E5\u770B\u5B8C\u6210\uFF1A{0} \u6761\u5EFA\u8BAE\u3002",
   "ui.structure_review_view_0": "\u67E5\u770B {0} \u6761\u5EFA\u8BAE",
   "ui.outline_ai_ready": "AI \u5927\u7EB2\u5DF2\u5C31\u7EEA\u3002",
@@ -3125,30 +3075,16 @@ var zhCN = {
   "ui.outline_ai_running": "AI \u6B63\u5728\u64B0\u5199\u5927\u7EB2\u2026",
   "ui.outline_ai_stopped": "\u5927\u7EB2\u751F\u6210\u5DF2\u505C\u6B62\u3002",
   "ui.outline_ai_filled": "\u5DF2\u5728\u4E0B\u65B9\u586B\u5165 {0} \u4E2A\u6807\u9898\uFF0C\u52A0\u5165\u524D\u53EF\u4EE5\u4FEE\u6539\u3002",
-  "ui.quick_outline_hint": "AI \u4F9D\u6240\u9009\u9884\u8BBE\u4E3A\u8FD9\u4E2A\u8BAE\u9898\u5199\u4E00\u4EFD\u5927\u7EB2\uFF0C\u521B\u5EFA\u4EFB\u4F55\u5B50\u8BAE\u9898\u524D\u4F1A\u5148\u5728\u8FD9\u91CC\u67E5\u770B\u3002",
-  "ui.quick_outline_mode_hint": "AI \u4E00\u6B21\u4EA7\u751F\u6574\u68F5\u591A\u5C42\u5B50\u8BAE\u9898\uFF0C\u5C42\u6570\u4E0E\u6570\u91CF\u5728\u4E0B\u65B9\u8BBE\u7F6E\uFF1B\u521B\u5EFA\u524D\u53EF\u4EE5\u5728\u8FD9\u91CC\u67E5\u770B\u4E0E\u4FEE\u6539\u3002",
-  "ui.quick_outline_review": "AI \u5927\u7EB2",
-  "ui.number_of_levels": "\u5C55\u5F00\u51E0\u5C42",
-  "ui.quick_outline_max_topics": "\u6700\u591A\u51E0\u4E2A\u5B50\u8BAE\u9898",
-  "ui.quick_outline_trimmed_0": "AI \u591A\u5199\u4E86 {0} \u4E2A\u8D85\u51FA\u5C42\u6570\u6216\u6570\u91CF\u7684\u6807\u9898\uFF0C\u5DF2\u7565\u8FC7\u3002",
-  "ui.quick_outline_review_hint": "\u53D6\u6D88\u4E0D\u9700\u8981\u7684\u9879\u76EE\u3001\u4FEE\u6539\u540D\u79F0\uFF0C\u518D\u521B\u5EFA\u5B50\u8BAE\u9898\u3002",
   "ui.ai_mode": "AI \u6A21\u5F0F",
   "ui.ai_mode_hint": "\u5FEB\u901F\u4E0D\u4E0A\u7F51\uFF0C\u7528\u6A21\u578B\u81EA\u5DF1\u7684\u77E5\u8BC6\u56DE\u7B54\u3002\u67B6\u6784\u7A33\u5B9A\u540E\u3001\u6216\u9898\u76EE\u8F83\u65B0\u8F83\u51B7\u95E8\u65F6\u7528\u6807\u51C6\u3002",
   "ui.ai_mode_hint_standard": "\u6807\u51C6\u4F1A\u4E0A\u7F51\u641C\u7D22\u3001\u53EF\u80FD\u52A0\u56FE\u7247\uFF0C\u6BD4\u8F83\u4E45\u3002\u67B6\u6784\u7A33\u5B9A\u540E\u3001\u6216\u9898\u76EE\u8F83\u65B0\u8F83\u51B7\u95E8\u65F6\u7528\u3002",
-  "ui.expand_summary_one_level_0": "1 \u5C42\u30FB\u6700\u591A {0} \u4E2A",
-  "ui.number_field_at_most_0": "\u6700\u591A {0}\uFF1B\u586B\u66F4\u5927\u7684\u6570\u5B57\u4F1A\u6539\u56DE {0}\u3002",
   "ui.ai_mode_quick_desc": "\u4F9D\u6A21\u578B\u77E5\u8BC6\u4E0E\u4F60\u63D0\u4F9B\u7684\u6765\u6E90\u505A\u7B80\u77ED\u6982\u89C8\uFF0C\u4E0D\u641C\u7D22\u7F51\u7EDC",
-  "ui.ai_mode_standard_desc": "\u641C\u7D22\u7F51\u7EDC\u5E76\u53EF\u914D\u56FE\u7684\u7B80\u77ED\u6982\u89C8",
-  "ui.expand_summary_0_1": "{0} \u5C42\u30FB\u6700\u591A {1} \u4E2A",
-  "ui.review_ai_subtopic_suggestions_0": "\u68C0\u9605 AI \u5B50\u8BAE\u9898\u5EFA\u8BAE ({0})",
   "ui.synthesis_standard_first_hint": "\u8D44\u6599\u4E0D\u8DB3\u65F6\u5148\u5BF9\u8BAE\u9898\u8DD1\u6807\u51C6\u7814\u7A76",
-  "ui.ai_mode_value_0": "{0}\u6A21\u5F0F",
   "ui.rerun_standard_other_map": "\u8BF7\u56DE\u5230\u8FD9\u6B21\u7814\u7A76\u6240\u5728\u7684\u5FC3\u667A\u56FE\uFF0C\u518D\u7528\u6807\u51C6\u91CD\u8DD1\u3002",
   "ui.rerun_standard": "\u7528\u6807\u51C6\u91CD\u8DD1",
   "ui.rerun_standard_0": "\u7528\u6807\u51C6\u91CD\u8DD1\uFF1A{0}",
   "ui.background_research_gap_0": "\u7814\u7A76\u5B8C\u6210\uFF0C\u4F46\u6A21\u578B\u77E5\u8BC6\u4E0D\u8DB3\uFF1A{0}",
   "research.knowledge_gap_marker": "\u6A21\u578B\u77E5\u8BC6\u4E0D\u8DB3",
-  "ui.quick_outline_empty": "AI \u7684\u5927\u7EB2\u5728\u4E3B\u9898\u5E95\u4E0B\u6CA1\u6709\u4EFB\u4F55\u6807\u9898\u3002",
   "ui.outline_ai_not_started": "\u5927\u7EB2\u751F\u6210\u6CA1\u6709\u5F00\u59CB\u3002",
   "ui.aim_create_map": "\u6DFB\u52A0 AIM",
   "ui.aim_start_title": "\u521B\u5EFA Adaptive Inquiry Map\uFF08AIM\uFF09",
@@ -3370,7 +3306,6 @@ var zhCN = {
   "ui.synthesis_content_scope": "\u53EA\u5F71\u54CD\u4E0B\u5217\u8BAE\u9898\uFF0C\u989D\u5916 Markdown \u4E00\u5F8B\u5B8C\u6574\u8BFB\u53D6\uFF1B\u5F00\u59CB\u540E\u4E0D\u80FD\u66F4\u6362\u3002",
   "ui.synthesis_source_topics": "\u672C\u6B21\u5305\u542B\u7684\u6765\u6E90\u8BAE\u9898",
   "ui.synthesis_no_source_topics": "\u6CA1\u6709\u6765\u6E90\u8BAE\u9898\uFF0C\u8BF7\u5728\u4E0B\u65B9\u9009\u62E9\u5176\u4ED6 Markdown \u6765\u6E90\u3002",
-  "ui.legacy_rules_not_applied": "\u7B14\u8BB0\u4E2D\u7684\u65E7 Rules \u4E0D\u4F1A\u81EA\u52A8\u5E94\u7528\u3002\u8FD9\u6B21\u9700\u8981\u9075\u5B88\u7684\u6761\u4EF6\uFF0C\u8BF7\u586B\u5165\u4E0A\u65B9\u9644\u52A0\u8981\u6C42\u3002",
   "ui.requirements_this_task_only": "\u4EC5\u7528\u4E8E\u8FD9\u6B21\u4EFB\u52A1\uFF1B\u7559\u7A7A\u5373\u53EF\u4F9D\u6240\u9009\u529F\u80FD\u8FD0\u884C\u3002",
   "ui.selected_mind_map_notes": "\u6240\u9009\u5FC3\u667A\u56FE\u7684\u8BAE\u9898\u7B14\u8BB0",
   "ui.reference_time_and_citations_hint": "\u653E\u5165\u6587\u4EF6\u5939\u65F6\u4F1A\u6392\u9664 VAM \u5F52\u6863\u7B14\u8BB0\u3002\u6570\u636E\u8D8A\u591A\uFF0C\u5904\u7406\u65F6\u95F4\u8D8A\u957F\uFF1B\u7ED3\u679C\u4F1A\u6807\u793A\u5B9E\u9645\u4F7F\u7528\u7684\u6765\u6E90\u6587\u4EF6\u3002",
@@ -3866,7 +3801,6 @@ var zhCN = {
   "ui.relevance_other_changes": "\u5176\u4ED6\u8C03\u6574",
   "ui.relevance_conflicts_title": "\u4F60\u7684\u8BBE\u7F6E\u5F7C\u6B64\u4E0D\u4E00\u81F4",
   "ui.relevance_conflict_0_1_2_3": "\u4F60\u628A\u201C{0}\u201D\u8BBE\u4E3A{1}\uFF0C\u4F46\u5B83\u5E95\u4E0B\u7684\u201C{2}\u201D\u8BBE\u4E3A{3}\u3002\u4E24\u8005\u90FD\u7167\u4F60\u7684\u8BBE\u7F6E\u4FDD\u7559\u3002",
-  "ui.suggested": "\u5EFA\u8BAE",
   "ui.output_settings": "\u8F93\u51FA\u8BBE\u7F6E",
   "ui.topic_card_label_0_1": "{0}\uFF0C{1}",
   "ui.researching_0": "\u7814\u7A76\u4E2D {0}",
@@ -3925,10 +3859,8 @@ var zhCN = {
   "ui.selected_branches_leave_the_map_their_notes_move_to_unassign": "\u9009\u62E9\u7684\u5206\u652F\u4F1A\u4ECE\u56FE\u4E2D\u79FB\u9664\uFF0C\u7B14\u8BB0\u79FB\u5230 Unassigned\uFF0C\u53EF\u64A4\u9500\u3002",
   "ui.confirm_removal": "\u786E\u8BA4\u79FB\u9664",
   "ui.choose_a_new_parent_topic": "\u9009\u62E9\u65B0\u7684\u7236\u8BAE\u9898",
-  "ui.how_would_you_like_to_explore_next": "\u63A5\u4E0B\u6765\u60F3\u600E\u4E48\u63A2\u7D22\uFF1F",
   "ui.choose_another_note_source_first": "\u76EE\u524D\u6CA1\u6709\u53EF\u6574\u5408\u7684\u5185\u5BB9\u3002",
   "ui.the_selected_sources_contain_no_markdown_content_to_synthesi": "\u6240\u9009\u6765\u6E90\u6CA1\u6709\u53EF\u6574\u5408\u7684 Markdown \u5185\u5BB9\u3002",
-  "ui.review_ai_suggested_subtopics": "\u8BF7\u786E\u8BA4 AI \u5EFA\u8BAE\u7684\u5B50\u8BAE\u9898\u3002",
   "ui.select_at_least_one_subtopic": "\u8BF7\u81F3\u5C11\u9009\u62E9\u4E00\u4E2A\u5B50\u8BAE\u9898\u3002",
   "ui.some_subtopics_were_created_reopen_this_window_and_check_the": "\u90E8\u5206\u5B50\u8BAE\u9898\u5DF2\u521B\u5EFA\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u7A97\u53E3\u786E\u8BA4\u5F53\u524D\u5FC3\u667A\u56FE\uFF0C\u518D\u7EE7\u7EED\u64CD\u4F5C\u3002",
   "ui.review_the_synthesis_draft": "\u8BF7\u68C0\u9605\u6574\u5408\u8349\u7A3F\u3002",
@@ -3937,12 +3869,9 @@ var zhCN = {
   "ui.synthesis_direction": "\u6574\u5408\u65B9\u5411",
   "ui.get_synthesis_draft": "\u5F00\u59CB\u6574\u5408",
   "ui.get_synthesis_suggestions_first": "\u5148\u53D6\u5F97\u6574\u5408\u5EFA\u8BAE",
-  "ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes": "AI \u5148\u63D0\u51FA\u6574\u5408\u89D2\u5EA6\uFF1B\u9009\u5B9A\u65B9\u5411\u5E76\u5B8C\u6210\u6574\u5408\u540E\uFF0C\u4F1A\u76F4\u63A5\u66F4\u65B0\u7236\u8BAE\u9898\uFF0C\u53EF\u64A4\u9500\u3002",
   "ui.ai_did_not_suggest_a_synthesis_direction_please_retry": "AI \u672A\u63D0\u51FA\u6574\u5408\u65B9\u5411\uFF0C\u8BF7\u91CD\u8BD5\u3002",
   "ui.run_shallow_research_on_each_created_subtopic": "\u521B\u5EFA\u540E\u9010\u4E00\u5BF9\u5B50\u8BAE\u9898\u505A\u7B80\u77ED\u7814\u7A76",
   "ui.subtopic_names_must_be_unique": "\u5B50\u8BAE\u9898\u540D\u79F0\u4E0D\u80FD\u91CD\u590D\u3002",
-  "ui.create_subtopics_without_research": "\u53EA\u521B\u5EFA\u5B50\u8BAE\u9898\uFF0C\u4E0D\u8FD0\u884C\u7814\u7A76",
-  "ui.research_each_subtopic_after_creation_and_use_codex_quota": "\u521B\u5EFA\u540E\u4F1A\u9010\u4E00\u505A\u7B80\u77ED\u7814\u7A76\uFF0C\u4F1A\u4F7F\u7528 AI \u989D\u5EA6",
   "ui.layout_direction_right": "\u5411\u53F3\u6392\u5217",
   "ui.layout_direction_left": "\u5411\u5DE6\u6392\u5217",
   "ui.layout_direction_down": "\u5411\u4E0B\u6392\u5217",
@@ -3975,17 +3904,7 @@ var zhCN = {
   "ui.usage_footer_estimates": "\u6807\u201C\u7EA6\u201D\u7684\u662F\u4F30\u7B97\u503C\u3002",
   "ui.expansion_failed": "\u5C55\u5F00\u5931\u8D25",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "\u5FC3\u667A\u56FE\u6216\u7236\u8BAE\u9898\u5728 AI \u8FD0\u884C\u671F\u95F4\u5DF2\u53D8\u66F4\uFF0C\u672A\u521B\u5EFA\u5B50\u8BAE\u9898\u3002",
-  "ui.create_subtopics_after_confirmation_without_running_research": "\u786E\u8BA4\u540E\u53EA\u521B\u5EFA\u5B50\u8BAE\u9898\uFF0C\u4E0D\u8FD0\u884C\u7814\u7A76",
   "ui.creating_subtopics": "\u6B63\u5728\u521B\u5EFA\u5B50\u8BAE\u9898\u2026",
-  "ui.subtopics_created": "\u5DF2\u521B\u5EFA\u5B50\u8BAE\u9898\u3002",
-  "ui.current_topic_0": "\u5F53\u524D\u8BAE\u9898\uFF1A{0}",
-  "ui.research_deeper": "\u7814\u7A76\u66F4\u6DF1",
-  "ui.find_answers_for_this_topic_at_your_chosen_depth": "\u6DF1\u5165\u7814\u7A76\u8FD9\u4E2A\u8BAE\u9898",
-  "ui.expand_the_map": "\u5C55\u5F00\u5FC3\u667A\u56FE",
-  "ui.discuss_directions_or_explore_multiple_levels_with_shallow_r": "\u62C6\u51FA\u5B50\u8BAE\u9898\uFF0C\u5F80\u4E0B\u63A2\u7D22",
-  "ui.synthesize_findings": "\u6574\u5408\u53D1\u73B0",
-  "ui.find_shared_conclusions_differences_and_next_steps_across_su": "\u6574\u5408\u5B50\u8BAE\u9898\u7684\u7ED3\u8BBA\u4E0E\u5206\u6B67",
-  "ui.start_from_this_node_s_question_update_only_this_node": "\u7ED3\u679C\u53EA\u66F4\u65B0\u8FD9\u4E2A\u8BAE\u9898\u3002",
   "ui.quick": "\u5FEB\u901F",
   "ui.standard": "\u6807\u51C6",
   "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u8FD8\u6CA1\u6709\u8BAE\u9898\u3002",
@@ -4006,7 +3925,6 @@ var zhCN = {
   "ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from": "\u6587\u4EF6\u5DF2\u79FB\u52A8\u6216\u5220\u9664\uFF0C\u53EF\u4ECE\u56FE\u4E2D\u79FB\u9664\u6B64\u8BAE\u9898\u3002",
   "ui.remove_from_map": "\u4ECE\u56FE\u4E2D\u79FB\u9664",
   "ui.no_preview_content_yet": "\u5C1A\u672A\u52A0\u5165\u9884\u89C8\u5185\u5BB9",
-  "ui.confirm_research_task": "\u786E\u8BA4\u7814\u7A76\u4EFB\u52A1",
   "ui.add_subtopic_manually": "\u624B\u52A8\u6DFB\u52A0\u5B50\u8BAE\u9898",
   "ui.card_menu_add_sibling": "\u6DFB\u52A0\u540C\u5C42\u8BAE\u9898",
   "ui.card_menu_open_note_tab": "\u5728\u65B0\u6807\u7B7E\u9875\u6253\u5F00\u7B14\u8BB0",
@@ -4022,18 +3940,12 @@ var zhCN = {
   "ui.ai_locked_suggestions_skipped_0": "{0} \u6761\u5EFA\u8BAE\u6D89\u53CA\u9501\u5B9A\u7684\u8BAE\u9898\uFF0C\u5DF2\u8DF3\u8FC7",
   "ui.ai_unlock_selected": "\u89E3\u9664 AI \u9501\u5B9A",
   "ui.ai_locked_some_0_1": "{1} \u4E2A\u4E2D\u6709 {0} \u4E2A\u5DF2\u9501\u5B9A",
-  "ui.model_and_advanced_settings": "\u6A21\u578B\u4E0E\u9AD8\u7EA7\u8BBE\u7F6E",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
   "ui.codex_provider_label": "Codex",
   "ui.workspace_default": "\u5DE5\u4F5C\u533A\u9ED8\u8BA4",
-  "ui.inherited_at_creation": "\u8DDF\u968F\u4E0A\u5C42\u8BAE\u9898",
-  "ui.manually_selected": "\u624B\u52A8\u6307\u5B9A",
   "ui.follow_default_model": "\u8DDF\u968F\u9ED8\u8BA4\uFF08\u5F53\u524D\uFF1A{0}\uFF09",
   "ui.follow_current_model_0": "\u8DDF\u968F\u5F53\u524D\u6A21\u578B\uFF08{0}\uFF09",
   "ui.follow_parent_topic_0": "\u6CBF\u7528\u4E0A\u5C42\u8BAE\u9898\uFF08{0}\uFF09",
-  "ui.model_scope": "\u5E94\u7528\u8303\u56F4",
-  "ui.model_scope_once": "\u53EA\u7528\u8FD9\u6B21",
-  "ui.model_scope_pin": "\u8FD9\u4E2A\u8BAE\u9898\u56FA\u5B9A\u7528\u5B83",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "\u6B64\u8BAE\u9898\u7684\u7B14\u8BB0\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u94FE\u63A5\u672A\u5F52\u7C7B\u7B14\u8BB0\u6216\u4ECE\u56FE\u4E2D\u79FB\u9664\u3002",
   "ui.relink_note": "\u91CD\u65B0\u94FE\u63A5\u7B14\u8BB0",
   "ui.use_this_note": "\u4F7F\u7528\u8FD9\u4EFD\u7B14\u8BB0",
@@ -4087,7 +3999,6 @@ var zhCN = {
   "ui.multi_research_current_model": "\u5F53\u524D\u6A21\u578B\uFF08\u6709\u8986\u5199\u7684\u8BAE\u9898\u7528\u81EA\u5DF1\u7684\u6A21\u578B\uFF09",
   "ui.expand_0": "\u5C55\u5F00 {0}",
   "ui.0_moved": "{0}\uFF08\u5DF2\u79FB\u52A8\uFF09",
-  "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} \xB7 {1}\uFF1B\u63A8\u7406\u7B49\u7EA7\u53EF\u4F9D\u8BAE\u9898\u8C03\u6574\u3002",
   "ui.workspace_location_0_legacy_topics_1": "\u5DE5\u4F5C\u533A\uFF1A{0}\u3000\u65E7\u4E3B\u9898\u6587\u4EF6\u5939\uFF08\u4ECD\u53EF\u8BFB\u53D6\uFF09\uFF1A{1}",
   "ui.legacy_map_view_only": "\u6B64\u5FC3\u667A\u56FE\u4F7F\u7528 0.4 \u524D\u7684\u65E7\u7ED3\u6784\uFF0C\u53EA\u80FD\u67E5\u770B\u3002",
   "error.organize_aim_busy": "\u6709 AIM \u7814\u7A76\u4ECD\u5728\u8FD0\u884C\u6216\u4FDD\u5B58\u4E2D\u3002\u8BF7\u7B49\u5B83\u5B8C\u6210\u540E\u518D\u6574\u7406\u5DE5\u4F5C\u533A\u6587\u4EF6\u5939\u3002\u5C1A\u672A\u79FB\u52A8\u4EFB\u4F55\u9879\u76EE\u3002",
@@ -4482,10 +4393,6 @@ var zhCN = {
   "ui.map_chat_note_basis_research_0": "\u4F9D\u636E\uFF1A\u5DF2\u8BFB\u7684\u7814\u7A76\u7B14\u8BB0\uFF1A{0}",
   "ui.map_chat_note_basis_note_0": "\u4F9D\u636E\uFF1A\u5DF2\u8BFB\u7684\u7B14\u8BB0\uFF1A{0}",
   "ui.map_chat_note_basis_outline": "\u4F9D\u636E\uFF1A\u53EA\u6709\u8BAE\u9898\u6807\u9898",
-  "ui.structure_review_entry_label": "AI \u7ED3\u6784\u5EFA\u8BAE\uFF1A",
-  "ui.structure_review_entry_map": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u6574\u5F20\u56FE\uFF09",
-  "ui.structure_review_entry_branch": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u8FD9\u4E2A\u5206\u652F\uFF09",
-  "ui.structure_review_entry_hint": "AI \u53EA\u8BFB\u6807\u9898\u3001\u6458\u8981\u4E0E\u72B6\u6001\uFF0C\u5EFA\u8BAE\u6DFB\u52A0\u3001\u5220\u51CF\u3001\u79FB\u52A8\u6216\u5408\u5E76\u8BAE\u9898\uFF1B\u6BCF\u6761\u53EF\u5355\u72EC\u5E94\u7528\u3001\u53EF\u64A4\u9500\u3002",
   "ui.discard_confirm": "\u786E\u5B9A\u653E\u5F03\uFF1F",
   "ui.discard_confirm_hint": "5 \u79D2\u5185\u518D\u6309\u4E00\u6B21\u5C31\u4F1A\u653E\u5F03\u8FD9\u4EFD AI \u8349\u7A3F\uFF0C\u653E\u5F03\u540E\u65E0\u6CD5\u6062\u590D\u3002",
   "ui.ai_draft": "AI \u8349\u7A3F",
@@ -4495,7 +4402,6 @@ var zhCN = {
   "ui.draft_detail": "\u8BE6\u7EC6\u5185\u5BB9",
   "ui.current_summary": "\u5F53\u524D\u7684\u6458\u8981",
   "ui.not_set": "\u672A\u586B",
-  "ui.task_started_in_background_0": "\u5DF2\u5728\u80CC\u666F\u5F00\u59CB\u201C{0}\u201D\uFF0C\u8FDB\u5EA6\u4F1A\u663E\u793A\u5728\u5361\u7247\u4E0A\u3002",
   "ui.model_status_idle": "\u5C1A\u672A\u68C0\u67E5",
   "ui.model_status_loading": "\u68C0\u67E5\u4E2D\u2026",
   "ui.model_status_ready": "\u53EF\u7528",
@@ -4570,12 +4476,10 @@ var zhCN = {
   "ui.stop_expand": "\u505C\u6B62\u5C55\u5F00",
   "ui.research_stopped_existing_content_was_preserved": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u539F\u6709\u5185\u5BB9\u4FDD\u7559\u3002",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "AI \u7ED3\u679C\u6CA1\u6709\u4FDD\u5B58\uFF1AAI \u4F5C\u4E1A\u671F\u95F4\u8FD9\u5F20\u5361\u88AB\u4FEE\u6539\u8FC7\uFF0C\u4FDD\u5B58\u4F1A\u76D6\u6389\u4FEE\u6539\u3002\u5FC3\u667A\u56FE\u6CA1\u6709\u88AB\u6539\u52A8\u3002\u53EF\u4EE5\u91CD\u65B0\u6267\u884C\uFF1B\u4F1A\u518D\u7528 1 \u6B21 AI\u3002",
-  "ui.shallow_research_for_expanded_subtopics_0": "\u5B50\u9898\u7814\u7A76\uFF1A{0}",
   "ui.select_the_parent_topic_before_its_child": "\u8BF7\u5148\u52FE\u9009\u5B50\u8BAE\u9898\u7684\u7236\u8BAE\u9898\u3002",
   "ui.first_level_topic_names_must_be_unique": "\u7B2C\u4E00\u5C42\u5B50\u8BAE\u9898\u540D\u79F0\u4E0D\u80FD\u91CD\u590D\u3002",
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa": "AI \u63D0\u6848\u7684\u7B2C\u4E00\u5C42\u540D\u79F0\u91CD\u590D\uFF0C\u8BF7\u91CD\u65B0\u4EA7\u751F\u63D0\u6848\u3002",
   "ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev": "\u53EF\u6307\u5B9A\u5C55\u5F00\u65B9\u5411\uFF0C\u6216\u8BA9 AI \u5EFA\u8BAE\uFF1B\u7ED3\u679C\u5148\u9884\u89C8\uFF0C\u786E\u8BA4\u540E\u624D\u521B\u5EFA\u8BAE\u9898\u3002",
-  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "\u8FD9\u4E2A\u8BAE\u9898\u76EE\u524D\u6CA1\u6709\u76F4\u5C5E\u5B50\u8BAE\u9898\u3002",
   "ui.review_synthesis_draft": "\u68C0\u9605\u6574\u5408\u8349\u7A3F",
   "ui.choose_synthesis_direction": "\u9009\u62E9\u6574\u5408\u65B9\u5411",
   "ui.discard_synthesis": "\u653E\u5F03",
@@ -5755,8 +5659,6 @@ var zhTW = {
   "ui.integration_running": "\u6B63\u5728\u6574\u5408\u5DF2\u9078\u8B70\u984C\u2026",
   "ui.background_view": "\u6AA2\u8996",
   "ui.background_review": "\u6AA2\u95B1",
-  "ui.background_outline_ready_0": "\u5FEB\u901F\u5927\u7DB1\u5DF2\u5C31\u7DD2\uFF1A{0}",
-  "ui.review_outline_0": "\u6AA2\u95B1\u5927\u7DB1 ({0})",
   "ui.structure_review_ready_0": "\u7D50\u69CB\u6AA2\u8996\u5B8C\u6210\uFF1A{0} \u689D\u5EFA\u8B70\u3002",
   "ui.structure_review_view_0": "\u6AA2\u8996 {0} \u689D\u5EFA\u8B70",
   "ui.outline_ai_ready": "AI \u5927\u7DB1\u5DF2\u5C31\u7DD2\u3002",
@@ -5941,30 +5843,16 @@ var zhTW = {
   "ui.outline_ai_running": "AI \u6B63\u5728\u64B0\u5BEB\u5927\u7DB1\u2026",
   "ui.outline_ai_stopped": "\u5927\u7DB1\u751F\u6210\u5DF2\u505C\u6B62\u3002",
   "ui.outline_ai_filled": "\u5DF2\u5728\u4E0B\u65B9\u586B\u5165 {0} \u500B\u6A19\u984C\uFF0C\u52A0\u5165\u524D\u53EF\u4EE5\u4FEE\u6539\u3002",
-  "ui.quick_outline_hint": "AI \u4F9D\u6240\u9078\u9810\u8A2D\u70BA\u9019\u500B\u8B70\u984C\u5BEB\u4E00\u4EFD\u5927\u7DB1\uFF0C\u5EFA\u7ACB\u4EFB\u4F55\u5B50\u8B70\u984C\u524D\u6703\u5148\u5728\u9019\u88E1\u6AA2\u8996\u3002",
-  "ui.quick_outline_mode_hint": "AI \u4E00\u6B21\u7522\u751F\u6574\u68F5\u591A\u5C64\u5B50\u8B70\u984C\uFF0C\u5C64\u6578\u8207\u6578\u91CF\u5728\u4E0B\u65B9\u8A2D\u5B9A\uFF1B\u5EFA\u7ACB\u524D\u53EF\u4EE5\u5728\u9019\u88E1\u6AA2\u8996\u8207\u4FEE\u6539\u3002",
-  "ui.quick_outline_review": "AI \u5927\u7DB1",
-  "ui.number_of_levels": "\u5C55\u958B\u5E7E\u5C64",
-  "ui.quick_outline_max_topics": "\u6700\u591A\u5E7E\u500B\u5B50\u8B70\u984C",
-  "ui.quick_outline_trimmed_0": "AI \u591A\u5BEB\u4E86 {0} \u500B\u8D85\u51FA\u5C64\u6578\u6216\u6578\u91CF\u7684\u6A19\u984C\uFF0C\u5DF2\u7565\u904E\u3002",
-  "ui.quick_outline_review_hint": "\u53D6\u6D88\u4E0D\u9700\u8981\u7684\u9805\u76EE\u3001\u4FEE\u6539\u540D\u7A31\uFF0C\u518D\u5EFA\u7ACB\u5B50\u8B70\u984C\u3002",
   "ui.ai_mode": "AI \u6A21\u5F0F",
   "ui.ai_mode_hint": "\u5FEB\u901F\u4E0D\u4E0A\u7DB2\uFF0C\u7528\u6A21\u578B\u81EA\u5DF1\u7684\u77E5\u8B58\u56DE\u7B54\u3002\u67B6\u69CB\u7A69\u5B9A\u5F8C\u3001\u6216\u984C\u76EE\u8F03\u65B0\u8F03\u51B7\u9580\u6642\u7528\u6A19\u6E96\u3002",
   "ui.ai_mode_hint_standard": "\u6A19\u6E96\u6703\u4E0A\u7DB2\u641C\u5C0B\u3001\u53EF\u80FD\u52A0\u5716\u7247\uFF0C\u6BD4\u8F03\u4E45\u3002\u67B6\u69CB\u7A69\u5B9A\u5F8C\u3001\u6216\u984C\u76EE\u8F03\u65B0\u8F03\u51B7\u9580\u6642\u7528\u3002",
-  "ui.expand_summary_one_level_0": "1 \u5C64\u30FB\u6700\u591A {0} \u500B",
-  "ui.number_field_at_most_0": "\u6700\u591A {0}\uFF1B\u586B\u66F4\u5927\u7684\u6578\u5B57\u6703\u6539\u56DE {0}\u3002",
   "ui.ai_mode_quick_desc": "\u4F9D\u6A21\u578B\u77E5\u8B58\u8207\u4F60\u63D0\u4F9B\u7684\u4F86\u6E90\u505A\u7C21\u77ED\u6982\u89BD\uFF0C\u4E0D\u641C\u5C0B\u7DB2\u8DEF",
-  "ui.ai_mode_standard_desc": "\u641C\u5C0B\u7DB2\u8DEF\u4E26\u53EF\u914D\u5716\u7684\u7C21\u77ED\u6982\u89BD",
-  "ui.expand_summary_0_1": "{0} \u5C64\u30FB\u6700\u591A {1} \u500B",
-  "ui.review_ai_subtopic_suggestions_0": "\u6AA2\u95B1 AI \u5B50\u8B70\u984C\u5EFA\u8B70 ({0})",
   "ui.synthesis_standard_first_hint": "\u8CC7\u6599\u4E0D\u8DB3\u6642\u5148\u5C0D\u8B70\u984C\u8DD1\u6A19\u6E96\u7814\u7A76",
-  "ui.ai_mode_value_0": "{0}\u6A21\u5F0F",
   "ui.rerun_standard_other_map": "\u8ACB\u56DE\u5230\u9019\u6B21\u7814\u7A76\u6240\u5728\u7684\u5FC3\u667A\u5716\uFF0C\u518D\u7528\u6A19\u6E96\u91CD\u8DD1\u3002",
   "ui.rerun_standard": "\u7528\u6A19\u6E96\u91CD\u8DD1",
   "ui.rerun_standard_0": "\u7528\u6A19\u6E96\u91CD\u8DD1\uFF1A{0}",
   "ui.background_research_gap_0": "\u7814\u7A76\u5B8C\u6210\uFF0C\u4F46\u6A21\u578B\u77E5\u8B58\u4E0D\u8DB3\uFF1A{0}",
   "research.knowledge_gap_marker": "\u6A21\u578B\u77E5\u8B58\u4E0D\u8DB3",
-  "ui.quick_outline_empty": "AI \u7684\u5927\u7DB1\u5728\u4E3B\u984C\u5E95\u4E0B\u6C92\u6709\u4EFB\u4F55\u6A19\u984C\u3002",
   "ui.outline_ai_not_started": "\u5927\u7DB1\u751F\u6210\u6C92\u6709\u958B\u59CB\u3002",
   "ui.aim_create_map": "\u65B0\u589E AIM",
   "ui.aim_start_title": "\u5EFA\u7ACB Adaptive Inquiry Map\uFF08AIM\uFF09",
@@ -6186,7 +6074,6 @@ var zhTW = {
   "ui.synthesis_content_scope": "\u53EA\u5F71\u97FF\u4E0B\u5217\u8B70\u984C\uFF0C\u984D\u5916 Markdown \u4E00\u5F8B\u5B8C\u6574\u8B80\u53D6\uFF1B\u958B\u59CB\u5F8C\u4E0D\u80FD\u66F4\u63DB\u3002",
   "ui.synthesis_source_topics": "\u672C\u6B21\u5305\u542B\u7684\u4F86\u6E90\u8B70\u984C",
   "ui.synthesis_no_source_topics": "\u6C92\u6709\u4F86\u6E90\u8B70\u984C\uFF0C\u8ACB\u5728\u4E0B\u65B9\u9078\u53D6\u5176\u4ED6 Markdown \u4F86\u6E90\u3002",
-  "ui.legacy_rules_not_applied": "\u7B46\u8A18\u4E2D\u7684\u820A Rules \u4E0D\u6703\u81EA\u52D5\u5957\u7528\u3002\u9019\u6B21\u9700\u8981\u9075\u5B88\u7684\u689D\u4EF6\uFF0C\u8ACB\u586B\u5165\u4E0A\u65B9\u9644\u52A0\u8981\u6C42\u3002",
   "ui.requirements_this_task_only": "\u50C5\u7528\u65BC\u9019\u6B21\u4EFB\u52D9\uFF1B\u7559\u7A7A\u5373\u53EF\u4F9D\u6240\u9078\u529F\u80FD\u57F7\u884C\u3002",
   "ui.selected_mind_map_notes": "\u6240\u9078\u5FC3\u667A\u5716\u7684\u8B70\u984C\u7B46\u8A18",
   "ui.reference_time_and_citations_hint": "\u653E\u5165\u8CC7\u6599\u593E\u6642\u6703\u6392\u9664 VAM \u5C01\u5B58\u7B46\u8A18\u3002\u8CC7\u6599\u8D8A\u591A\uFF0C\u8655\u7406\u6642\u9593\u8D8A\u9577\uFF1B\u7D50\u679C\u6703\u6A19\u793A\u5BE6\u969B\u4F7F\u7528\u7684\u4F86\u6E90\u6A94\u6848\u3002",
@@ -6682,7 +6569,6 @@ var zhTW = {
   "ui.relevance_other_changes": "\u5176\u4ED6\u8ABF\u6574",
   "ui.relevance_conflicts_title": "\u4F60\u7684\u8A2D\u5B9A\u5F7C\u6B64\u4E0D\u4E00\u81F4",
   "ui.relevance_conflict_0_1_2_3": "\u4F60\u628A\u300C{0}\u300D\u8A2D\u70BA{1}\uFF0C\u4F46\u5B83\u5E95\u4E0B\u7684\u300C{2}\u300D\u8A2D\u70BA{3}\u3002\u5169\u8005\u90FD\u7167\u4F60\u7684\u8A2D\u5B9A\u4FDD\u7559\u3002",
-  "ui.suggested": "\u5EFA\u8B70",
   "ui.output_settings": "\u8F38\u51FA\u8A2D\u5B9A",
   "ui.topic_card_label_0_1": "{0}\uFF0C{1}",
   "ui.researching_0": "\u7814\u7A76\u4E2D {0}",
@@ -6741,10 +6627,8 @@ var zhTW = {
   "ui.selected_branches_leave_the_map_their_notes_move_to_unassign": "\u9078\u53D6\u7684\u5206\u652F\u6703\u5F9E\u5716\u4E2D\u79FB\u9664\uFF0C\u7B46\u8A18\u79FB\u5230 Unassigned\uFF0C\u53EF\u5FA9\u539F\u3002",
   "ui.confirm_removal": "\u78BA\u8A8D\u79FB\u9664",
   "ui.choose_a_new_parent_topic": "\u9078\u64C7\u65B0\u7684\u6BCD\u8B70\u984C",
-  "ui.how_would_you_like_to_explore_next": "\u63A5\u4E0B\u4F86\u60F3\u600E\u9EBC\u63A2\u7D22\uFF1F",
   "ui.choose_another_note_source_first": "\u76EE\u524D\u6C92\u6709\u53EF\u6574\u5408\u7684\u5167\u5BB9\u3002",
   "ui.the_selected_sources_contain_no_markdown_content_to_synthesi": "\u6240\u9078\u4F86\u6E90\u6C92\u6709\u53EF\u6574\u5408\u7684 Markdown \u5167\u5BB9\u3002",
-  "ui.review_ai_suggested_subtopics": "\u8ACB\u78BA\u8A8D AI \u5EFA\u8B70\u7684\u5B50\u8B70\u984C\u3002",
   "ui.select_at_least_one_subtopic": "\u8ACB\u81F3\u5C11\u9078\u53D6\u4E00\u500B\u5B50\u8B70\u984C\u3002",
   "ui.some_subtopics_were_created_reopen_this_window_and_check_the": "\u90E8\u5206\u5B50\u8B70\u984C\u5DF2\u5EFA\u7ACB\uFF0C\u8ACB\u91CD\u65B0\u958B\u555F\u8996\u7A97\u78BA\u8A8D\u76EE\u524D\u5FC3\u667A\u5716\uFF0C\u518D\u7E7C\u7E8C\u64CD\u4F5C\u3002",
   "ui.review_the_synthesis_draft": "\u8ACB\u6AA2\u95B1\u6574\u5408\u8349\u7A3F\u3002",
@@ -6753,12 +6637,9 @@ var zhTW = {
   "ui.synthesis_direction": "\u6574\u5408\u65B9\u5411",
   "ui.get_synthesis_draft": "\u958B\u59CB\u6574\u5408",
   "ui.get_synthesis_suggestions_first": "\u5148\u53D6\u5F97\u6574\u5408\u5EFA\u8B70",
-  "ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes": "AI \u5148\u63D0\u51FA\u6574\u5408\u89D2\u5EA6\uFF1B\u9078\u5B9A\u65B9\u5411\u4E26\u5B8C\u6210\u6574\u5408\u5F8C\uFF0C\u6703\u76F4\u63A5\u66F4\u65B0\u6BCD\u8B70\u984C\uFF0C\u53EF\u5FA9\u539F\u3002",
   "ui.ai_did_not_suggest_a_synthesis_direction_please_retry": "AI \u672A\u63D0\u51FA\u6574\u5408\u65B9\u5411\uFF0C\u8ACB\u91CD\u8A66\u3002",
   "ui.run_shallow_research_on_each_created_subtopic": "\u5EFA\u7ACB\u5F8C\u9010\u4E00\u5C0D\u5B50\u8B70\u984C\u505A\u7C21\u77ED\u7814\u7A76",
   "ui.subtopic_names_must_be_unique": "\u5B50\u8B70\u984C\u540D\u7A31\u4E0D\u80FD\u91CD\u8907\u3002",
-  "ui.create_subtopics_without_research": "\u53EA\u5EFA\u7ACB\u5B50\u8B70\u984C\uFF0C\u4E0D\u57F7\u884C\u7814\u7A76",
-  "ui.research_each_subtopic_after_creation_and_use_codex_quota": "\u5EFA\u7ACB\u5F8C\u6703\u9010\u4E00\u505A\u7C21\u77ED\u7814\u7A76\uFF0C\u6703\u4F7F\u7528 AI \u984D\u5EA6",
   "ui.layout_direction_right": "\u5F80\u53F3\u6392\u5217",
   "ui.layout_direction_left": "\u5F80\u5DE6\u6392\u5217",
   "ui.layout_direction_down": "\u5F80\u4E0B\u6392\u5217",
@@ -6791,17 +6672,7 @@ var zhTW = {
   "ui.usage_footer_estimates": "\u6A19\u300C\u7D04\u300D\u7684\u662F\u4F30\u7B97\u503C\u3002",
   "ui.expansion_failed": "\u5C55\u958B\u5931\u6557",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "\u5FC3\u667A\u5716\u6216\u6BCD\u8B70\u984C\u5728 AI \u57F7\u884C\u671F\u9593\u5DF2\u8B8A\u66F4\uFF0C\u672A\u5EFA\u7ACB\u5B50\u8B70\u984C\u3002",
-  "ui.create_subtopics_after_confirmation_without_running_research": "\u78BA\u8A8D\u5F8C\u53EA\u5EFA\u7ACB\u5B50\u8B70\u984C\uFF0C\u4E0D\u57F7\u884C\u7814\u7A76",
   "ui.creating_subtopics": "\u6B63\u5728\u5EFA\u7ACB\u5B50\u8B70\u984C\u2026",
-  "ui.subtopics_created": "\u5DF2\u5EFA\u7ACB\u5B50\u8B70\u984C\u3002",
-  "ui.current_topic_0": "\u76EE\u524D\u8B70\u984C\uFF1A{0}",
-  "ui.research_deeper": "\u7814\u7A76\u66F4\u6DF1",
-  "ui.find_answers_for_this_topic_at_your_chosen_depth": "\u6DF1\u5165\u7814\u7A76\u9019\u500B\u8B70\u984C",
-  "ui.expand_the_map": "\u5C55\u958B\u5FC3\u667A\u5716",
-  "ui.discuss_directions_or_explore_multiple_levels_with_shallow_r": "\u62C6\u51FA\u5B50\u8B70\u984C\uFF0C\u5F80\u4E0B\u63A2\u7D22",
-  "ui.synthesize_findings": "\u6574\u5408\u767C\u73FE",
-  "ui.find_shared_conclusions_differences_and_next_steps_across_su": "\u6574\u5408\u5B50\u8B70\u984C\u7684\u7D50\u8AD6\u8207\u5206\u6B67",
-  "ui.start_from_this_node_s_question_update_only_this_node": "\u7D50\u679C\u53EA\u66F4\u65B0\u9019\u500B\u8B70\u984C\u3002",
   "ui.quick": "\u5FEB\u901F",
   "ui.standard": "\u6A19\u6E96",
   "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first": "\u9019\u5F35\u5FC3\u667A\u5716\u9084\u6C92\u6709\u8B70\u984C\u3002",
@@ -6822,7 +6693,6 @@ var zhTW = {
   "ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from": "\u6A94\u6848\u5DF2\u79FB\u52D5\u6216\u522A\u9664\uFF0C\u53EF\u5F9E\u5716\u4E2D\u79FB\u9664\u6B64\u8B70\u984C\u3002",
   "ui.remove_from_map": "\u5F9E\u5716\u4E2D\u79FB\u9664",
   "ui.no_preview_content_yet": "\u5C1A\u672A\u52A0\u5165\u9810\u89BD\u5167\u5BB9",
-  "ui.confirm_research_task": "\u78BA\u8A8D\u7814\u7A76\u4EFB\u52D9",
   "ui.add_subtopic_manually": "\u624B\u52D5\u65B0\u589E\u5B50\u8B70\u984C",
   "ui.card_menu_add_sibling": "\u65B0\u589E\u540C\u5C64\u8B70\u984C",
   "ui.card_menu_open_note_tab": "\u5728\u65B0\u5206\u9801\u958B\u555F\u7B46\u8A18",
@@ -6838,18 +6708,12 @@ var zhTW = {
   "ui.ai_locked_suggestions_skipped_0": "{0} \u5247\u5EFA\u8B70\u6D89\u53CA\u9396\u5B9A\u7684\u8B70\u984C\uFF0C\u5DF2\u7565\u904E",
   "ui.ai_unlock_selected": "\u89E3\u9664 AI \u9396\u5B9A",
   "ui.ai_locked_some_0_1": "{1} \u500B\u4E2D\u6709 {0} \u500B\u5DF2\u9396\u5B9A",
-  "ui.model_and_advanced_settings": "\u6A21\u578B\u8207\u9032\u968E\u8A2D\u5B9A",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
   "ui.codex_provider_label": "Codex",
   "ui.workspace_default": "\u5DE5\u4F5C\u5340\u9810\u8A2D",
-  "ui.inherited_at_creation": "\u8DDF\u96A8\u4E0A\u5C64\u8B70\u984C",
-  "ui.manually_selected": "\u624B\u52D5\u6307\u5B9A",
   "ui.follow_default_model": "\u8DDF\u96A8\u9810\u8A2D\uFF08\u76EE\u524D\uFF1A{0}\uFF09",
   "ui.follow_current_model_0": "\u8DDF\u96A8\u76EE\u524D\u6A21\u578B\uFF08{0}\uFF09",
   "ui.follow_parent_topic_0": "\u6CBF\u7528\u4E0A\u5C64\u8B70\u984C\uFF08{0}\uFF09",
-  "ui.model_scope": "\u5957\u7528\u7BC4\u570D",
-  "ui.model_scope_once": "\u53EA\u7528\u9019\u6B21",
-  "ui.model_scope_pin": "\u9019\u500B\u8B70\u984C\u56FA\u5B9A\u7528\u5B83",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "\u6B64\u8B70\u984C\u7684\u7B46\u8A18\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u9023\u7D50\u672A\u6B78\u985E\u7B46\u8A18\u6216\u5F9E\u5716\u4E2D\u79FB\u9664\u3002",
   "ui.relink_note": "\u91CD\u65B0\u9023\u7D50\u7B46\u8A18",
   "ui.use_this_note": "\u4F7F\u7528\u9019\u4EFD\u7B46\u8A18",
@@ -6903,7 +6767,6 @@ var zhTW = {
   "ui.multi_research_current_model": "\u76EE\u524D\u6A21\u578B\uFF08\u8986\u5BEB\u7684\u8B70\u984C\u7528\u81EA\u5DF1\u7684\u6A21\u578B\uFF09",
   "ui.expand_0": "\u5C55\u958B {0}",
   "ui.0_moved": "{0}\uFF08\u5DF2\u79FB\u52D5\uFF09",
-  "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} \xB7 {1}\uFF1B\u63A8\u7406\u7B49\u7D1A\u53EF\u4F9D\u8B70\u984C\u8ABF\u6574\u3002",
   "ui.workspace_location_0_legacy_topics_1": "\u5DE5\u4F5C\u5340\uFF1A{0}\u3000\u820A\u4E3B\u984C\u8CC7\u6599\u593E\uFF08\u4ECD\u53EF\u8B80\u53D6\uFF09\uFF1A{1}",
   "ui.legacy_map_view_only": "\u6B64\u5FC3\u667A\u5716\u4F7F\u7528 0.4 \u524D\u7684\u820A\u7D50\u69CB\uFF0C\u53EA\u80FD\u6AA2\u8996\u3002",
   "error.organize_aim_busy": "\u6709 AIM \u7814\u7A76\u4ECD\u5728\u57F7\u884C\u6216\u5132\u5B58\u4E2D\u3002\u8ACB\u7B49\u5B83\u5B8C\u6210\u5F8C\u518D\u6574\u7406\u5DE5\u4F5C\u5340\u8CC7\u6599\u593E\u3002\u5C1A\u672A\u642C\u79FB\u4EFB\u4F55\u9805\u76EE\u3002",
@@ -7298,10 +7161,6 @@ var zhTW = {
   "ui.map_chat_note_basis_research_0": "\u4F9D\u64DA\uFF1A\u5DF2\u8B80\u7684\u7814\u7A76\u7B46\u8A18\uFF1A{0}",
   "ui.map_chat_note_basis_note_0": "\u4F9D\u64DA\uFF1A\u5DF2\u8B80\u7684\u7B46\u8A18\uFF1A{0}",
   "ui.map_chat_note_basis_outline": "\u4F9D\u64DA\uFF1A\u53EA\u6709\u8B70\u984C\u6A19\u984C",
-  "ui.structure_review_entry_label": "AI \u7D50\u69CB\u5EFA\u8B70\uFF1A",
-  "ui.structure_review_entry_map": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u6574\u5F35\u5716\uFF09",
-  "ui.structure_review_entry_branch": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u9019\u500B\u5206\u652F\uFF09",
-  "ui.structure_review_entry_hint": "AI \u53EA\u8B80\u6A19\u984C\u3001\u6458\u8981\u8207\u72C0\u614B\uFF0C\u5EFA\u8B70\u65B0\u589E\u3001\u522A\u6E1B\u3001\u79FB\u52D5\u6216\u5408\u4F75\u8B70\u984C\uFF1B\u6BCF\u689D\u53EF\u55AE\u7368\u5957\u7528\u3001\u53EF\u5FA9\u539F\u3002",
   "ui.discard_confirm": "\u78BA\u5B9A\u6368\u68C4\uFF1F",
   "ui.discard_confirm_hint": "5 \u79D2\u5167\u518D\u6309\u4E00\u6B21\u5C31\u6703\u6368\u68C4\u9019\u4EFD AI \u8349\u7A3F\uFF0C\u6368\u68C4\u5F8C\u7121\u6CD5\u5FA9\u539F\u3002",
   "ui.ai_draft": "AI \u8349\u7A3F",
@@ -7311,7 +7170,6 @@ var zhTW = {
   "ui.draft_detail": "\u8A73\u7D30\u5167\u5BB9",
   "ui.current_summary": "\u76EE\u524D\u7684\u6458\u8981",
   "ui.not_set": "\u672A\u586B",
-  "ui.task_started_in_background_0": "\u5DF2\u5728\u80CC\u666F\u958B\u59CB\u300C{0}\u300D\uFF0C\u9032\u5EA6\u6703\u986F\u793A\u5728\u5361\u7247\u4E0A\u3002",
   "ui.model_status_idle": "\u5C1A\u672A\u6AA2\u67E5",
   "ui.model_status_loading": "\u6AA2\u67E5\u4E2D\u2026",
   "ui.model_status_ready": "\u53EF\u7528",
@@ -7386,12 +7244,10 @@ var zhTW = {
   "ui.stop_expand": "\u505C\u6B62\u5C55\u958B",
   "ui.research_stopped_existing_content_was_preserved": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u539F\u6709\u5167\u5BB9\u4FDD\u7559\u3002",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "AI \u7D50\u679C\u6C92\u6709\u5132\u5B58\uFF1AAI \u4F5C\u696D\u671F\u9593\u9019\u5F35\u5361\u88AB\u4FEE\u6539\u904E\uFF0C\u5B58\u6A94\u6703\u84CB\u6389\u4FEE\u6539\u3002\u5FC3\u667A\u5716\u6C92\u6709\u88AB\u6539\u52D5\u3002\u53EF\u4EE5\u91CD\u65B0\u57F7\u884C\uFF1B\u6703\u518D\u7528 1 \u6B21 AI\u3002",
-  "ui.shallow_research_for_expanded_subtopics_0": "\u5B50\u984C\u7814\u7A76\uFF1A{0}",
   "ui.select_the_parent_topic_before_its_child": "\u8ACB\u5148\u52FE\u9078\u5B50\u8B70\u984C\u7684\u6BCD\u8B70\u984C\u3002",
   "ui.first_level_topic_names_must_be_unique": "\u7B2C\u4E00\u5C64\u5B50\u8B70\u984C\u540D\u7A31\u4E0D\u80FD\u91CD\u8907\u3002",
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa": "AI \u63D0\u6848\u7684\u7B2C\u4E00\u5C64\u540D\u7A31\u91CD\u8907\uFF0C\u8ACB\u91CD\u65B0\u7522\u751F\u63D0\u6848\u3002",
   "ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev": "\u53EF\u6307\u5B9A\u5C55\u958B\u65B9\u5411\uFF0C\u6216\u8B93 AI \u5EFA\u8B70\uFF1B\u7D50\u679C\u5148\u9810\u89BD\uFF0C\u78BA\u8A8D\u5F8C\u624D\u5EFA\u7ACB\u8B70\u984C\u3002",
-  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "\u9019\u500B\u8B70\u984C\u76EE\u524D\u6C92\u6709\u76F4\u5C6C\u5B50\u8B70\u984C\u3002",
   "ui.review_synthesis_draft": "\u6AA2\u95B1\u6574\u5408\u8349\u7A3F",
   "ui.choose_synthesis_direction": "\u9078\u64C7\u6574\u5408\u65B9\u5411",
   "ui.discard_synthesis": "\u6368\u68C4",
@@ -46351,8 +46207,6 @@ async function addOutlineToMap(repository, map, mapPath, model, nodes, source, p
   );
   return { created, total: nodes.length, ...failure ? { failure } : {} };
 }
-var QUICK_OUTLINE_MAX_LEVELS = 6;
-var QUICK_OUTLINE_MAX_TOPICS = 30;
 function limitOutline(nodes, limits) {
   const singleRoot = nodes.filter((node) => node.parent === null).length === 1;
   const depth = /* @__PURE__ */ new Map();
@@ -48385,72 +48239,35 @@ function imageReferencesFromMarkdown(markdown) {
   );
   return [...new Set(blocks)].join("\n\n");
 }
-function reasoningLabel(level) {
-  const labels = {
-    auto: t("ui.auto"),
-    low: t("ui.low"),
-    medium: t("ui.medium"),
-    high: t("ui.high")
-  };
-  return labels[normalizeReasoningLevel(level)];
-}
 var PartialChildBatchError = class extends Error {
 };
 var NextStepModal = class extends import_obsidian29.Modal {
-  constructor(app, topic, childrenCount, pendingCount, plugin, research, expand2, synthesize, modelSettings, selectionFlow) {
+  constructor(app, plugin, synthesize, selectionFlow) {
     super(app);
-    this.topic = topic;
-    this.childrenCount = childrenCount;
-    this.pendingCount = pendingCount;
     this.plugin = plugin;
-    this.research = research;
-    this.expand = expand2;
     this.synthesize = synthesize;
-    this.modelSettings = modelSettings;
     this.selectionFlow = selectionFlow;
     __publicField(this, "closed", false);
-    /** AI started and this dialog hid itself; closing no longer stops the run (Stop is on the card or bar). */
+    /** AI started and this dialog hid itself; closing no longer stops the run (Stop is on the selection bar). */
     __publicField(this, "detached", false);
     __publicField(this, "backgroundBegan", false);
     __publicField(this, "runPending", false);
-    /**
-     * The model and level menus' state (MS-06): what this run uses once, and what a run start writes to the topic (only
-     * an explicit "follow" or "pin"; never when the dialog is cancelled).
-     */
-    __publicField(this, "modelMenu");
     /** The output language the person picked in this dialog; saved on the map when a run starts. */
     __publicField(this, "manualOutputLanguage");
-    __publicField(this, "taskSignal");
     __publicField(this, "taskController");
-    __publicField(this, "unsubscribeModels");
     __publicField(this, "requirementsInput");
   }
-  /** Where the shared fields (data sources, template, tone) come from: the topic's settings, or the selection's. */
-  get info() {
-    var _a2, _b2;
-    return (_b2 = this.modelSettings) != null ? _b2 : (_a2 = this.selectionFlow) == null ? void 0 : _a2.fields;
-  }
-  /** Suggests the next step from where the topic stands: frontier → research, settled leaf → expand, settled branch → synthesize. */
-  suggestedMode() {
-    const settings = this.modelSettings;
-    if (settings == null ? void 0 : settings.synthesisPending) return "synthesize";
-    if (settings == null ? void 0 : settings.pendingOutline) return "expand";
-    if ((settings == null ? void 0 : settings.topicStatus) !== "completed") return "research";
-    if (!this.childrenCount) return "expand";
-    return settings.childrenCompleted === this.childrenCount ? "synthesize" : "research";
-  }
   /**
-   * The map's saved data sources, read under the task signal when a run starts. Sources that cannot be read are
+   * The selection's saved data sources, read under the task signal when a run starts. Sources that cannot be read are
    * skipped: the run goes on with the rest and the dialog shows nothing about them.
    */
   async mapSourceGroups(signal) {
-    var _a2, _b2, _c, _d;
-    const groups = (_d = await ((_c = (_b2 = (_a2 = this.info) == null ? void 0 : _a2.sources) == null ? void 0 : _b2.mapSources) == null ? void 0 : _c.call(_b2, signal != null ? signal : new AbortController().signal))) != null ? _d : [];
+    var _a2, _b2, _c;
+    const groups = (_c = await ((_b2 = (_a2 = this.selectionFlow.fields.sources) == null ? void 0 : _a2.mapSources) == null ? void 0 : _b2.call(_a2, signal != null ? signal : new AbortController().signal))) != null ? _c : [];
     if (signal == null ? void 0 : signal.aborted) throw Object.assign(new Error("Aborted"), { name: "AbortError" });
     return groups;
   }
   renderRequirements(parent) {
-    var _a2, _b2;
     const disclosure = parent.createEl("details", { cls: "vam-next-requirements" });
     disclosure.open = false;
     const summary = disclosure.createEl("summary", { text: t("ui.additional_requirements") });
@@ -48464,278 +48281,65 @@ var NextStepModal = class extends import_obsidian29.Modal {
       value.setText(text12 ? text12.length > 24 ? `${text12.slice(0, 24)}\u2026` : text12 : t("ui.not_set"));
     });
     disclosure.createEl("p", { text: t("ui.requirements_this_task_only"), cls: "vam-hint" });
-    if ((_b2 = (_a2 = this.modelSettings) == null ? void 0 : _a2.rules) == null ? void 0 : _b2.trim())
-      parent.createEl("p", { text: t("ui.legacy_rules_not_applied"), cls: "vam-hint" });
   }
   requirements() {
     var _a2, _b2;
     return (_b2 = (_a2 = this.requirementsInput) == null ? void 0 : _a2.value.trim()) != null ? _b2 : "";
   }
-  /** This dialog's one-run model choice for a run's options; nothing when the topic's own resolution applies. */
-  runOnceOptions() {
-    var _a2;
-    const runOnce = (_a2 = this.modelMenu) == null ? void 0 : _a2.runOnce();
-    return runOnce ? { runOnce } : {};
-  }
-  get background() {
-    var _a2, _b2, _c;
-    return (_c = (_a2 = this.modelSettings) == null ? void 0 : _a2.background) != null ? _c : (_b2 = this.selectionFlow) == null ? void 0 : _b2.background;
-  }
   /**
    * Hides the dialog once AI starts: usage confirmed, settings saved and sources ready (so a validation error still
    * shows in the dialog). The view takes over Stop for `controller` until the provider accepts the request.
    */
-  detach(controller, kind = "research") {
+  detach(controller) {
     var _a2;
     this.detached = true;
-    controller.signal.addEventListener("abort", () => {
-      var _a3, _b2;
-      return (_b2 = (_a3 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a3);
-    }, { once: true });
     this.backgroundBegan = true;
-    (_a2 = this.background) == null ? void 0 : _a2.begin(controller, kind);
+    (_a2 = this.selectionFlow.background) == null ? void 0 : _a2.begin(controller);
     this.close();
   }
   endBackground() {
     var _a2;
     if (!this.backgroundBegan) return;
     this.backgroundBegan = false;
-    (_a2 = this.background) == null ? void 0 : _a2.end();
+    (_a2 = this.selectionFlow.background) == null ? void 0 : _a2.end();
   }
   /** True when a started run should stop: it was aborted, or its dialog closed before AI started. */
   dead(controller) {
     return controller.signal.aborted || this.closed && !this.detached;
   }
-  /** Pre-starts the Claude CLI for the research step (no model call); a run that does not use it kills it. */
-  prewarmAi(webSearch = true, mode) {
-    var _a2, _b2, _c, _d, _e;
-    if (this.selectionFlow || this.closed) return;
-    (_e = (_d = this.plugin).prewarmClaude) == null ? void 0 : _e.call(
-      _d,
-      (_b2 = (_a2 = this.modelSettings) == null ? void 0 : _a2.model) != null ? _b2 : this.plugin.settings.cliModel,
-      (_c = this.modelSettings) == null ? void 0 : _c.reasoning,
-      webSearch,
-      mode
-    );
-  }
   onClose() {
-    var _a2, _b2, _c, _d;
+    var _a2;
     this.closed = true;
-    if (!this.detached) (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
-    if (!this.detached) (_c = this.taskController) == null ? void 0 : _c.abort();
-    (_d = this.unsubscribeModels) == null ? void 0 : _d.call(this);
+    if (!this.detached) (_a2 = this.taskController) == null ? void 0 : _a2.abort();
   }
-  /** Records the AI mode on the map when a research or expansion starts (before AI runs; a cancelled dialog never gets here). */
-  async rememberMode(mode) {
-    var _a2, _b2;
-    await ((_b2 = (_a2 = this.modelSettings) == null ? void 0 : _a2.rememberAiMode) == null ? void 0 : _b2.call(_a2, mode));
-  }
-  /** Saves the model and effort chosen in this dialog, once, at the moment a run actually starts. */
+  /** The output language picked by hand is remembered on the map, once, at the moment a run actually starts. */
   async flushSettings() {
-    var _a2, _b2, _c, _d, _e;
-    const patch = (_b2 = (_a2 = this.modelMenu) == null ? void 0 : _a2.patch()) != null ? _b2 : {};
-    if (Object.keys(patch).length && this.modelSettings) {
-      await this.modelSettings.save(patch);
-      (_c = this.modelMenu) == null ? void 0 : _c.saved();
-    }
+    var _a2;
     const manual = this.manualOutputLanguage;
-    const remember = (_d = this.info) == null ? void 0 : _d.rememberOutputLanguage;
+    const remember = this.selectionFlow.fields.rememberOutputLanguage;
     if (manual !== void 0 && remember) {
       this.manualOutputLanguage = void 0;
       try {
         await remember(manual);
       } catch (error) {
-        (_e = this.manualOutputLanguage) != null ? _e : this.manualOutputLanguage = manual;
+        (_a2 = this.manualOutputLanguage) != null ? _a2 : this.manualOutputLanguage = manual;
         throw error;
       }
     }
   }
-  /**
-   * The model and level menus. A choice here is for this run only unless the scope menu says "pin" (MS-06); only an
-   * explicit "pin", or "follow" on a topic, is written, and only when a run starts (`flushSettings`).
-   */
-  renderModelSettings(parent) {
-    var _a2, _b2;
-    if (!this.modelSettings) return;
-    const settings = this.modelSettings;
-    const advanced = parent.createEl("details", { cls: "vam-advanced vam-next-model" });
-    const advancedValue = advanced.createEl("summary", { text: t("ui.model_and_advanced_settings") }).createSpan({ cls: "vam-next-disclosure-value" });
-    const { field: modelLabel, head: modelHead } = linkedField(advanced, t("ui.model"));
-    const model = modelLabel.createEl("select");
-    model.setAttr("aria-label", t("ui.model"));
-    model.add(new Option(this.plugin.modelLabel(settings.model), settings.model));
-    model.value = settings.model;
-    const optionList = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : this.plugin.settings.models.split(/[\n,]/).map((value) => value.trim()).filter(Boolean);
-    const options = new Set(optionList);
-    const follow = (_a2 = settings.followDefault) != null ? _a2 : {
-      source: "workspace",
-      model: this.plugin.settings.cliModel,
-      overridden: false
-    };
-    const initial = {
-      model: settings.model,
-      source: settings.modelSource,
-      reasoning: normalizeReasoningLevel(settings.reasoning)
-    };
-    const currentReasoning = () => normalizeReasoningLevel(this.plugin.settings.cliReasoning);
-    let menu = initial.source === "manual" ? initial.model : FOLLOW_DEFAULT_MODEL;
-    let followPicked = false;
-    let scope = "once";
-    const base = () => followPicked ? { model: follow.model, reasoning: currentReasoning() } : initial;
-    const explicit = () => !followPicked && menu !== FOLLOW_DEFAULT_MODEL && !(initial.source === "manual" && menu === initial.model);
-    const differs = () => {
-      const level = normalizeReasoningLevel(settings.reasoning) !== base().reasoning;
-      return followPicked ? level : explicit() || settings.model !== base().model || level;
-    };
-    this.modelMenu = {
-      runOnce: () => {
-        if (!differs() || !followPicked && scope === "pin") return void 0;
-        return { model: settings.model, reasoning: normalizeReasoningLevel(settings.reasoning) };
-      },
-      patch: () => {
-        if (followPicked) return { modelSource: follow.source };
-        if (differs() && scope === "pin")
-          return {
-            model: settings.model,
-            modelSource: "manual",
-            reasoning: normalizeReasoningLevel(settings.reasoning)
-          };
-        return {};
-      },
-      saved: () => {
-        if (followPicked)
-          Object.assign(initial, { model: follow.model, source: follow.source, reasoning: currentReasoning() });
-        else if (differs() && scope === "pin")
-          Object.assign(initial, {
-            model: settings.model,
-            source: "manual",
-            reasoning: normalizeReasoningLevel(settings.reasoning)
-          });
-        else return;
-        menu = initial.source === "manual" ? initial.model : FOLLOW_DEFAULT_MODEL;
-        followPicked = false;
-        scope = "once";
-        refresh();
-      }
-    };
-    const followLabel = () => t(
-      follow.overridden ? "ui.follow_parent_topic_0" : "ui.follow_current_model_0",
-      this.plugin.modelLabel(follow.model)
-    );
-    const syncModels = () => {
-      const chosen = menu;
-      if (chosen === FOLLOW_DEFAULT_MODEL) model.value = "";
-      syncModelSelect(
-        model,
-        this.plugin.availableModels(),
-        (id) => this.plugin.modelLabel(id),
-        t("ui.current_model_is_unavailable")
-      );
-      model.insertBefore(new Option(followLabel(), FOLLOW_DEFAULT_MODEL), model.firstChild);
-      model.value = chosen;
-      options.clear();
-      this.plugin.availableModels().forEach((id) => options.add(id));
-    };
-    syncModels();
-    fieldLink(
-      modelHead,
-      t("ui.connection_repair"),
-      () => this.plugin.repairConnection(model.value === FOLLOW_DEFAULT_MODEL ? follow.model : model.value)
-    );
-    const discovery = advanced.createDiv("vam-model-discovery-status");
-    const discoveryText = discovery.createSpan({ cls: "vam-hint" });
-    const updateDiscovery = () => {
-      const codex = this.plugin.modelDiscoveryState("codex"), claude = this.plugin.modelDiscoveryState("claude");
-      discoveryText.setText(
-        `Codex: ${t(`ui.model_status_${codex.status}`)}${codex.error ? ` \xB7 ${codex.error}` : ""} | Claude: ${t(`ui.model_status_${claude.status}`)}`
-      );
-      syncModels();
-    };
-    (_b2 = this.unsubscribeModels) == null ? void 0 : _b2.call(this);
-    this.unsubscribeModels = this.plugin.subscribeModelDiscovery(() => {
-      if (!this.closed) updateDiscovery();
-    });
-    updateDiscovery();
-    void this.plugin.refreshModelDiscovery("codex");
-    void this.plugin.refreshModelDiscovery("claude");
-    const sourceLabels = {
-      workspace: t("ui.workspace_default"),
-      inherited: t("ui.inherited_at_creation"),
-      manual: t("ui.manually_selected")
-    };
-    const summaryText2 = () => t(
-      "ui.0_1_reasoning_can_be_adjusted_per_topic",
-      this.plugin.modelLabel(settings.model),
-      followPicked ? sourceLabels[follow.source] : differs() ? scope === "pin" ? sourceLabels.manual : t("ui.model_scope_once") : sourceLabels[initial.source]
-    );
-    const modelSummary = advanced.createEl("p", { cls: "vam-hint", text: summaryText2() });
-    model.value = menu;
-    model.addEventListener("change", () => {
-      if (model.value === FOLLOW_DEFAULT_MODEL) {
-        menu = FOLLOW_DEFAULT_MODEL;
-        followPicked = true;
-        settings.model = follow.model;
-        settings.reasoning = currentReasoning();
-        reasoning.value = settings.reasoning;
-        refresh();
-        return;
-      }
-      if (!options.has(model.value)) return;
-      menu = model.value;
-      followPicked = false;
-      settings.model = model.value;
-      refresh();
-    });
-    const reasoningField = advanced.createEl("label", { cls: "vam-field" });
-    reasoningField.createSpan({ text: t("ui.reasoning_level") });
-    const reasoning = reasoningField.createEl("select");
-    reasoning.setAttr("aria-label", t("ui.reasoning_level"));
-    for (const value of ["auto", "low", "medium", "high"])
-      reasoning.createEl("option", { value, text: reasoningLabel(value) });
-    reasoning.value = normalizeReasoningLevel(settings.reasoning);
-    reasoning.addEventListener("change", () => {
-      settings.reasoning = normalizeReasoningLevel(reasoning.value);
-      refresh();
-    });
-    const scopeField = advanced.createEl("label", { cls: "vam-field vam-next-model-scope" });
-    scopeField.createSpan({ text: t("ui.model_scope") });
-    const scopeSelect = scopeField.createEl("select");
-    scopeSelect.setAttr("aria-label", t("ui.model_scope"));
-    scopeSelect.createEl("option", { value: "once", text: t("ui.model_scope_once") });
-    scopeSelect.createEl("option", { value: "pin", text: t("ui.model_scope_pin") });
-    scopeSelect.value = "once";
-    scopeSelect.addEventListener("change", () => {
-      scope = scopeSelect.value === "pin" ? "pin" : "once";
-      refresh();
-    });
-    const refresh = () => {
-      const visible = differs() && !followPicked;
-      if (!visible) {
-        scope = "once";
-        scopeSelect.value = "once";
-      }
-      scopeField.hidden = scopeSelect.hidden = !visible;
-      modelSummary.setText(summaryText2());
-      advancedValue.setText(`${this.plugin.modelLabel(settings.model)} \xB7 ${reasoningLabel(settings.reasoning)}`);
-    };
-    refresh();
-    return advanced;
-  }
   async run(panel, button, work, needsUsage = true) {
-    var _a2, _b2;
     if (button.disabled || this.runPending || this.taskController && !this.taskController.signal.aborted) return;
     this.runPending = true;
     button.disabled = true;
     const start = async () => {
-      var _a3, _b3, _c, _d, _e, _f;
+      var _a2, _b2, _c, _d, _e, _f;
       if (this.closed) return;
       button.disabled = true;
       const failureHelp = panel.querySelector(".vam-ai-failure-help");
       if (failureHelp) failureHelp.hidden = true;
       const controller = new AbortController();
       this.taskController = controller;
-      this.taskSignal = controller.signal;
-      const tasksBefore = new Set((_c = (_b3 = (_a3 = this.plugin.activeTasks) == null ? void 0 : _a3.keys) == null ? void 0 : _b3.call(_a3)) != null ? _c : []);
+      const tasksBefore = new Set((_c = (_b2 = (_a2 = this.plugin.activeTasks) == null ? void 0 : _a2.keys) == null ? void 0 : _b2.call(_a2)) != null ? _c : []);
       const status = panel.querySelector(".vam-next-status");
       status == null ? void 0 : status.setText(t("ui.ai_running_ai"));
       let cancel = panel.querySelector(".vam-task-cancel");
@@ -48760,16 +48364,13 @@ var NextStepModal = class extends import_obsidian29.Modal {
         );
         const release2 = () => {
           if (!this.closed) cancel.hidden = true;
-          if (this.taskController === controller) {
-            this.taskSignal = void 0;
-            this.taskController = void 0;
-          }
+          if (this.taskController === controller) this.taskController = void 0;
         };
         if (backgroundTaskRunning) {
           const waitForTasks = () => {
-            var _a4, _b4, _c2;
+            var _a3, _b3, _c2;
             if (this.taskController !== controller) return;
-            if ([...(_c2 = (_b4 = (_a4 = this.plugin.activeTasks) == null ? void 0 : _a4.keys) == null ? void 0 : _b4.call(_a4)) != null ? _c2 : []].some((path) => !tasksBefore.has(path)))
+            if ([...(_c2 = (_b3 = (_a3 = this.plugin.activeTasks) == null ? void 0 : _a3.keys) == null ? void 0 : _b3.call(_a3)) != null ? _c2 : []].some((path) => !tasksBefore.has(path)))
               window.setTimeout(waitForTasks, 250);
             else release2();
           };
@@ -48778,7 +48379,7 @@ var NextStepModal = class extends import_obsidian29.Modal {
       }
     };
     try {
-      const model = (_b2 = (_a2 = this.modelSettings) == null ? void 0 : _a2.model) != null ? _b2 : this.plugin.settings.cliModel;
+      const model = this.plugin.settings.cliModel;
       const started = needsUsage ? await this.plugin.confirmAiUsage(model, start) : await this.plugin.aiReadyForModel(model) && (await start(), true);
       if (!started) button.disabled = false;
     } catch (error) {
@@ -48808,10 +48409,7 @@ var NextStepModal = class extends import_obsidian29.Modal {
       const observer = {
         isOpen: () => !this.closed,
         accepted: (stop) => {
-          if (this.taskController === controller) {
-            this.taskSignal = void 0;
-            this.taskController = void 0;
-          }
+          if (this.taskController === controller) this.taskController = void 0;
           this.endBackground();
           if (cancel && !this.closed) {
             cancel.hidden = false;
@@ -48861,10 +48459,6 @@ var NextStepModal = class extends import_obsidian29.Modal {
     (_a2 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a2.setText(message);
     button.disabled = false;
   }
-  startedInBackground() {
-    new import_obsidian29.Notice(t("ui.task_started_in_background_0", this.topic));
-    this.close();
-  }
   failedAi(panel, button, message) {
     this.failed(panel, button, message);
     if (this.closed) return;
@@ -48884,486 +48478,31 @@ var NextStepModal = class extends import_obsidian29.Modal {
     }
     help.hidden = false;
   }
-  proposals(panel, suggestions, create, button, consumed, options) {
-    var _a2;
-    if (this.closed) return;
-    const result = panel.querySelector(".vam-next-result");
-    result.empty();
-    result.createEl("h4", { text: t("ui.ai_subtopic_proposals") });
-    result.createEl("p", { text: t("ui.select_subtopics_to_create_you_can_edit_their_names_and_task") });
-    let showCount = (_count) => {
-    };
-    const list = renderProposalList(result, suggestions, (count2) => showCount(count2));
-    const confirm = result.createEl("button", { text: t("ui.create_0_subtopics", list.count()), cls: "mod-cta" });
-    showCount = (count2) => {
-      confirm.setText(t("ui.create_0_subtopics", count2));
-      if (!this.runPending) confirm.disabled = count2 === 0;
-      const status = panel.querySelector(".vam-next-status");
-      if (status && status.textContent !== t("ui.review_ai_suggested_subtopics")) status.setText("");
-    };
-    button.classList.toggle("mod-cta", false);
-    confirm.addEventListener("click", () => {
-      void (async () => {
-        var _a3;
-        const picked = list.selected();
-        if (typeof picked === "string") {
-          if (picked === t("ui.select_at_least_one_subtopic"))
-            (_a3 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a3.setText(picked);
-          else this.failed(panel, button, picked);
-          return;
-        }
-        void this.run(
-          panel,
-          confirm,
-          async () => {
-            var _a4;
-            options.signal = this.taskSignal;
-            (_a4 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a4.setText(t("ui.creating_subtopics"));
-            try {
-              await create(picked);
-              if (options.shallowResearch) {
-                this.taskSignal = void 0;
-                this.taskController = void 0;
-                this.startedInBackground();
-                return;
-              }
-              consumed();
-              new import_obsidian29.Notice(t("ui.subtopics_created"));
-              this.taskSignal = void 0;
-              this.taskController = void 0;
-              this.close();
-            } catch (error) {
-              if (error instanceof PartialChildBatchError) {
-                result.empty();
-                button.classList.toggle("mod-cta", true);
-                consumed();
-                button.disabled = true;
-              }
-              throw error;
-            }
-          },
-          false
-        );
-      })();
-    });
-    (_a2 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a2.setText(t("ui.review_ai_suggested_subtopics"));
-  }
-  /** The generated outline, reviewed here; nothing is created until the user confirms. */
-  outlineReview(panel, nodes, button, create, options, dropped = 0) {
-    var _a2;
-    if (this.closed) return;
-    const result = panel.querySelector(".vam-next-result");
-    result.empty();
-    const status = () => panel.querySelector(".vam-next-status");
-    const items = outlineProposals(nodes);
-    if (!items.length) {
-      this.failed(panel, button, t("ui.quick_outline_empty"));
-      return;
-    }
-    result.createEl("h4", { text: t("ui.quick_outline_review") });
-    if (dropped) result.createEl("p", { cls: "vam-hint", text: t("ui.quick_outline_trimmed_0", dropped) });
-    let showCount = (_count) => {
-    };
-    const list = renderProposalList(result, items, (count2) => showCount(count2), { compact: true });
-    const confirm = result.createEl("button", { text: t("ui.create_0_subtopics", list.count()), cls: "mod-cta" });
-    showCount = (count2) => {
-      confirm.setText(t("ui.create_0_subtopics", count2));
-      if (!this.runPending) confirm.disabled = count2 === 0;
-    };
-    button.classList.toggle("mod-cta", false);
-    confirm.addEventListener("click", () => {
-      var _a3;
-      const picked = list.selected();
-      if (typeof picked === "string") {
-        (_a3 = status()) == null ? void 0 : _a3.setText(picked);
-        return;
-      }
-      void this.run(
-        panel,
-        confirm,
-        async () => {
-          var _a4, _b2, _c;
-          options.signal = this.taskSignal;
-          (_a4 = status()) == null ? void 0 : _a4.setText(t("ui.creating_subtopics"));
-          await create(proposalOutline(picked), options);
-          this.taskSignal = void 0;
-          this.taskController = void 0;
-          (_c = (_b2 = this.modelSettings) == null ? void 0 : _b2.pendingOutline) == null ? void 0 : _c.discard();
-          if (options.shallowResearch) {
-            this.startedInBackground();
-            return;
-          }
-          new import_obsidian29.Notice(t("ui.subtopics_created"));
-          this.close();
-        },
-        false
-      );
-    });
-    (_a2 = status()) == null ? void 0 : _a2.setText(t("ui.quick_outline_review_hint"));
-  }
   onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
+    var _a2, _b2;
     this.modalEl.addClass("vam-next-modal");
     const selection = this.selectionFlow;
-    this.titleEl.setText(t(selection ? "ui.confirm_topic_synthesis" : "ui.how_would_you_like_to_explore_next"));
-    const intro = this.contentEl.createEl("p", { cls: "vam-modal-intro vam-next-topic" });
-    if (!selection) intro.createSpan({ text: t("ui.current_topic_0", this.topic) });
-    const topicStatus = (_a2 = this.modelSettings) == null ? void 0 : _a2.topicStatus;
-    if (topicStatus)
-      intro.createSpan({
-        cls: `vam-status vam-status-${topicStatus}`,
-        text: t(
-          topicStatus === "completed" ? "ui.researched" : topicStatus === "running" ? "ui.ai_running" : topicStatus === "error" ? "ui.task_error" : "ui.to_research"
-        )
-      });
-    const initialMode = selection ? "synthesize" : this.suggestedMode();
-    let currentMode = initialMode;
+    this.titleEl.setText(t("ui.confirm_topic_synthesis"));
     const actions = modalActions(this);
     const closeButton = actions.createEl("button", { text: t("ui.close"), cls: "vam-next-close" });
     closeButton.addEventListener("click", () => this.close());
-    const confirm = actions.createEl("button", { text: t("ui.confirm_research_task"), cls: "mod-cta" });
-    confirm.dataset.topicRun = t("ui.confirm_research_task");
-    confirm.disabled = !!((_b2 = this.modelSettings) == null ? void 0 : _b2.running);
-    let synthesisContentSelect;
-    const cards = this.contentEl.createDiv("vam-next-cards");
-    cards.setAttr("role", "radiogroup");
-    cards.setAttr("aria-label", t("ui.how_would_you_like_to_explore_next"));
-    let show;
-    const card = (title, description, mode) => {
-      const button = cards.createEl("button", { cls: "vam-next-card" });
-      const copy = button.createSpan();
-      copy.createEl("strong", { text: t(title) });
-      copy.createSpan({ text: t(description) });
-      button.setAttr("role", "radio");
-      button.setAttr("aria-checked", mode === initialMode ? "true" : "false");
-      button.tabIndex = mode === initialMode ? 0 : -1;
-      button.addEventListener("click", () => show(mode));
-      button.addEventListener("keydown", (event) => {
-        const order = ["research", "expand", "synthesize"];
-        const step = ["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : ["ArrowLeft", "ArrowUp"].includes(event.key) ? -1 : 0;
-        if (!step) return;
-        event.preventDefault();
-        const next = order[(order.indexOf(mode) + step + order.length) % order.length];
-        show(next);
-        cardFor[next].focus();
-      });
-      if (mode === initialMode) {
-        button.addClass("is-active");
-        button.createSpan({ text: t("ui.suggested"), cls: "vam-next-suggested" });
-      }
-      return button;
-    };
-    const researchCard = card("ui.research_deeper", "ui.find_answers_for_this_topic_at_your_chosen_depth", "research");
-    const expandCard = card(
-      "ui.expand_the_map",
-      "ui.discuss_directions_or_explore_multiple_levels_with_shallow_r",
-      "expand"
-    );
-    const synthesizeCard = card(
-      "ui.synthesize_findings",
-      "ui.find_shared_conclusions_differences_and_next_steps_across_su",
-      "synthesize"
-    );
-    const cardFor = { research: researchCard, expand: expandCard, synthesize: synthesizeCard };
-    const aiMode = aiModeField(this.contentEl, {
-      initial: (_d = (_c = this.modelSettings) == null ? void 0 : _c.aiMode) != null ? _d : DEFAULT_MAP_AI_MODE,
-      onChange: () => {
-        shallowHint.setText(shallowHintText());
-        warmForMode();
-        refreshSummary();
-      }
-    });
-    const structureReview = selection ? void 0 : (_e = this.modelSettings) == null ? void 0 : _e.structureReview;
-    if (structureReview) {
-      const row = this.contentEl.createDiv("vam-next-structure");
-      row.createSpan({ cls: "vam-next-structure-label", text: t("ui.structure_review_entry_label") });
-      row.createEl("button", { text: structureReview.label, cls: "vam-next-structure-open" }).addEventListener("click", () => {
-        this.close();
-        structureReview.open();
-      });
-      this.contentEl.createEl("p", {
-        cls: "vam-hint vam-next-structure-hint",
-        text: t("ui.structure_review_entry_hint")
-      });
-    }
-    if (selection) cards.addClass("is-hidden");
-    if ((_f = this.modelSettings) == null ? void 0 : _f.running) {
-      const running = this.contentEl.createDiv("vam-next-running");
-      running.createSpan({ text: t("ui.ai_running_ai") });
-      if (this.modelSettings.stop)
-        running.createEl("button", { text: t((_i = (_h = (_g = this.modelSettings).stopKey) == null ? void 0 : _h.call(_g)) != null ? _i : "ui.stop_research") }).addEventListener("click", () => {
-          var _a3, _b3;
-          return (_b3 = (_a3 = this.modelSettings) == null ? void 0 : _a3.stop) == null ? void 0 : _b3.call(_a3);
-        });
-    }
     const summaryEl = this.contentEl.createEl("p", { cls: "vam-next-summary", attr: { "aria-live": "polite" } });
-    const research = this.contentEl.createDiv("vam-next-research");
-    const expandPanel = this.contentEl.createDiv("vam-next-research vam-next-choice");
     const synthesizePanel = this.contentEl.createDiv("vam-next-research vam-next-choice");
     const adjust = this.contentEl.createEl("details", { cls: "vam-next-adjust" });
     adjust.open = false;
     adjust.createEl("summary", { text: t("ui.adjust") });
     const adjustBody = adjust.createDiv("vam-next-adjust-body");
-    const adjustFor = {
-      research: adjustBody.createDiv("vam-next-adjust-section"),
-      expand: adjustBody.createDiv("vam-next-adjust-section"),
-      synthesize: adjustBody.createDiv("vam-next-adjust-section")
-    };
-    research.createEl("p", { text: t("ui.start_from_this_node_s_question_update_only_this_node") });
-    research.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
-    confirm.addEventListener("click", () => {
-      void this.run(research, confirm, async () => {
-        const controller = this.taskController;
-        const referenceGroups = controller ? await this.mapSourceGroups(controller.signal) : [];
-        if (!controller || this.dead(controller)) return;
-        const mode = aiMode.value();
-        const options = {
-          referenceGroups,
-          outputLanguage: languageSelect.value,
-          ...aiModeOptions(mode, "research"),
-          requirements: this.requirements(),
-          ...this.runOnceOptions(),
-          ...noteStyle() ? { noteStyle: noteStyle() } : {},
-          signal: controller.signal,
-          onProgress: (message) => {
-            var _a3;
-            if (!this.closed && !controller.signal.aborted)
-              (_a3 = research.querySelector(".vam-next-status")) == null ? void 0 : _a3.setText(message);
-          }
-        };
-        await this.rememberMode(mode);
-        if (this.dead(controller)) return;
-        this.detach(controller);
-        let launchAccepted = false;
-        let launchFailed = false;
-        const release2 = () => {
-          if (this.taskController === controller) {
-            this.taskSignal = void 0;
-            this.taskController = void 0;
-          }
-          if (!this.closed) {
-            const cancel = research.querySelector(".vam-task-cancel");
-            if (cancel) cancel.hidden = true;
-          }
-        };
-        const accepted = () => {
-          if (controller.signal.aborted || this.taskController !== controller) return;
-          this.taskSignal = void 0;
-          this.taskController = void 0;
-          launchAccepted = true;
-          this.endBackground();
-          if (this.closed) return;
-          const cancel = research.querySelector(".vam-task-cancel");
-          if (cancel) cancel.hidden = true;
-          this.startedInBackground();
-        };
-        await this.research(
-          options,
-          "",
-          (result) => {
-            var _a3, _b3;
-            if (this.closed) {
-              (_b3 = (_a3 = this.background) == null ? void 0 : _a3.completed) == null ? void 0 : _b3.call(_a3, "research", options.mapAiMode === "quick" ? result : void 0);
-              return;
-            }
-            release2();
-            this.close();
-          },
-          (message) => {
-            if (this.closed) {
-              new import_obsidian29.Notice(message);
-              return;
-            }
-            release2();
-            launchFailed = true;
-            this.failedAi(research, confirm, message);
-          },
-          accepted
-        );
-        if (!this.closed && !launchAccepted && !launchFailed) {
-          release2();
-          this.failed(research, confirm, t("ui.ai_task_cancelled"));
-        }
-      });
-    });
-    const quickOutline = (_j = this.modelSettings) == null ? void 0 : _j.quickOutline;
-    expandPanel.createEl("p", { text: t("ui.quick_outline_mode_hint") });
-    const limits = expandPanel.createDiv("vam-quick-limits");
-    const numberField = (label, initial, max) => {
-      const field = limits.createEl("label", { cls: "vam-field" });
-      field.createSpan({ text: label });
-      const input2 = field.createEl("input", { type: "number", attr: { min: "1", max: String(max), step: "1" } });
-      input2.value = String(initial);
-      input2.setAttr("aria-label", label);
-      const note = field.createSpan({ cls: "vam-field-note", text: t("ui.number_field_at_most_0", max) });
-      note.setAttr("role", "status");
-      note.hidden = true;
-      const read = () => Math.min(max, Math.max(1, Math.round(Number(input2.value)) || 1));
-      input2.addEventListener("focus", () => input2.select());
-      input2.addEventListener("input", () => {
-        note.hidden = !(Math.round(Number(input2.value)) > max);
-      });
-      input2.addEventListener("change", () => {
-        if (Math.round(Number(input2.value)) <= max) note.hidden = true;
-        input2.value = String(read());
-        refreshSummary();
-      });
-      return {
-        read,
-        set: (value) => {
-          input2.value = String(Math.min(max, Math.max(1, value)));
-        }
-      };
-    };
-    const quickLevelsField = numberField(t("ui.number_of_levels"), 2, QUICK_OUTLINE_MAX_LEVELS);
-    const quickTopicsField = numberField(t("ui.quick_outline_max_topics"), 15, QUICK_OUTLINE_MAX_TOPICS);
-    const quickLevels = quickLevelsField.read;
-    const quickTopics = quickTopicsField.read;
-    limits.createEl("p", { text: t("ui.quick_outline_hint"), cls: "vam-hint" });
-    const presetLabel = adjustFor.expand.createEl("label", { cls: "vam-field" });
-    presetLabel.createSpan({ text: t("ui.outline_ai_preset") });
-    const presetSelect = presetLabel.createEl("select");
-    presetSelect.setAttr("aria-label", t("ui.outline_ai_preset"));
-    for (const preset of (_k = quickOutline == null ? void 0 : quickOutline.presets) != null ? _k : [])
-      presetSelect.createEl("option", { value: preset.id, text: preset.name });
-    const shallowLabel = adjustFor.expand.createEl("label", { cls: "vam-field vam-next-toggle" });
-    const shallow = shallowLabel.createEl("input", { type: "checkbox" });
-    shallow.checked = false;
-    shallowLabel.createSpan({ text: t("ui.run_shallow_research_on_each_created_subtopic") });
-    const shallowHintText = () => t(
-      "ui.shallow_research_for_expanded_subtopics_0",
-      t(aiMode.value() === "standard" ? "ui.ai_mode_standard_desc" : "ui.ai_mode_quick_desc")
-    );
-    const shallowHint = adjustFor.expand.createEl("p", { cls: "vam-hint" });
-    shallowHint.hidden = true;
-    shallowHint.setText(shallowHintText());
-    const expandFooterText = actions.createSpan({
-      text: t("ui.create_subtopics_after_confirmation_without_running_research"),
-      cls: "vam-next-actions-note"
-    });
-    const reviewButton = actions.createEl("button", { text: "" });
-    const expandButton = actions.createEl("button", { text: t("ui.expand"), cls: "mod-cta" });
-    expandButton.dataset.topicRun = (_l = expandButton.textContent) != null ? _l : "";
-    expandButton.disabled = !!((_m = this.modelSettings) == null ? void 0 : _m.running) || !quickOutline;
-    expandPanel.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
-    expandPanel.createDiv("vam-next-result");
-    const syncExpand = () => {
-      expandFooterText.setText(
-        shallow.checked ? t("ui.research_each_subtopic_after_creation_and_use_codex_quota") : t("ui.create_subtopics_without_research")
-      );
-      reviewButton.setText(t("ui.review_ai_subtopic_suggestions_0", this.pendingCount));
-      reviewButton.dataset.pendingReview = String(this.pendingCount);
-      reviewButton.hidden = currentMode !== "expand" || !this.pendingCount;
-      refreshSummary();
-    };
-    const consumed = () => {
-      this.pendingCount = 0;
-      syncExpand();
-    };
-    shallow.addEventListener("change", () => {
-      shallowHint.hidden = !shallow.checked;
-      syncExpand();
-    });
-    const expandOptions = (signal) => ({
-      referenceGroups: [],
-      outputLanguage: languageSelect.value,
-      requirements: this.requirements(),
-      ...this.runOnceOptions(),
-      ...aiModeOptions(aiMode.value(), "subtopic"),
-      shallowResearch: shallow.checked,
-      ...noteStyle() ? { noteStyle: noteStyle() } : {},
-      signal,
-      onProgress: (message) => {
-        var _a3;
-        if (!this.closed) (_a3 = expandPanel.querySelector(".vam-next-status")) == null ? void 0 : _a3.setText(message);
-      }
-    });
-    reviewButton.addEventListener("click", () => {
-      void this.run(
-        expandPanel,
-        reviewButton,
-        async () => {
-          const referenceGroups = await this.mapSourceGroups(this.taskSignal);
-          const options = { ...expandOptions(this.taskSignal), referenceGroups };
-          await this.expand(
-            options,
-            "",
-            (items, create) => {
-              var _a3, _b3;
-              if (this.closed) (_b3 = (_a3 = this.background) == null ? void 0 : _a3.completed) == null ? void 0 : _b3.call(_a3, "expand");
-              else this.proposals(expandPanel, items, create, expandButton, consumed, options);
-            },
-            (message, retryable) => {
-              if (this.closed) {
-                new import_obsidian29.Notice(message);
-                return;
-              }
-              consumed();
-              if (retryable === false) this.failed(expandPanel, expandButton, message);
-              else this.failedAi(expandPanel, expandButton, message);
-              if (retryable === false) expandButton.disabled = true;
-            },
-            () => {
-            }
-          );
-        },
-        false
-      );
-    });
-    expandButton.addEventListener("click", () => {
-      void this.run(expandPanel, expandButton, async () => {
-        var _a3, _b3, _c2;
-        if (!quickOutline) return;
-        const signal = this.taskSignal;
-        const controller = this.taskController;
-        if (!signal || !controller) return;
-        const referenceGroups = await this.mapSourceGroups(signal);
-        const mode = aiMode.value();
-        const options = { ...expandOptions(signal), referenceGroups };
-        const bounds = { levels: quickLevels(), maxTopics: quickTopics() };
-        const request = {
-          presetId: presetSelect.value,
-          requirements: this.requirements(),
-          language: (_a3 = options.outputLanguage) != null ? _a3 : this.plugin.settings.language,
-          limits: bounds,
-          ...this.runOnceOptions()
-        };
-        await this.rememberMode(mode);
-        if (this.dead(controller)) return;
-        this.detach(controller, "expand");
-        const generated = await quickOutline.generate(request, signal);
-        if (signal.aborted || this.closed && !this.detached) return;
-        const { nodes, dropped } = limitOutline(generated, bounds);
-        if (this.closed) {
-          (_c2 = (_b3 = this.background) == null ? void 0 : _b3.outlineReady) == null ? void 0 : _c2.call(_b3, {
-            nodes,
-            dropped,
-            bounds,
-            options: { ...options, signal: void 0, onProgress: void 0 }
-          });
-          return;
-        }
-        this.outlineReview(expandPanel, nodes, expandButton, quickOutline.create, options, dropped);
-      });
-    });
-    const pendingDirections = selection ? selection.pending : (_n = this.modelSettings) == null ? void 0 : _n.synthesisPending;
+    const adjustSynthesize = adjustBody.createDiv("vam-next-adjust-section");
+    const pendingDirections = selection.pending;
     synthesizePanel.createEl("p", {
-      text: selection ? t("ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and", selection.names.length) : this.childrenCount ? t("ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes") : t("ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note")
+      text: t("ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and", selection.names.length)
     });
-    let titleInput;
-    let titleField;
-    if (selection) {
-      const titleLabel = synthesizePanel.createEl("label", { cls: "vam-field vam-next-synth-setup" });
-      titleField = titleLabel;
-      titleLabel.createSpan({ text: t("ui.new_topic_name") });
-      titleInput = titleLabel.createEl("input", { type: "text", value: selection.initialTitle });
-      titleInput.setAttr("aria-label", t("ui.new_topic_name"));
-    }
-    synthesisContentSelect = renderSynthesisContent(
-      adjustFor.synthesize,
-      (_r = (_q = selection == null ? void 0 : selection.names) != null ? _q : (_p = (_o = this.modelSettings) == null ? void 0 : _o.sources) == null ? void 0 : _p.synthesisTopics) != null ? _r : []
-    );
-    const stageTwoHint = adjustFor.synthesize.createEl("p", {
+    const titleField = synthesizePanel.createEl("label", { cls: "vam-field vam-next-synth-setup" });
+    titleField.createSpan({ text: t("ui.new_topic_name") });
+    const titleInput = titleField.createEl("input", { type: "text", value: selection.initialTitle });
+    titleInput.setAttr("aria-label", t("ui.new_topic_name"));
+    const synthesisContentSelect = renderSynthesisContent(adjustSynthesize, selection.names);
+    const stageTwoHint = adjustSynthesize.createEl("p", {
       cls: "vam-hint vam-next-synth-fixed",
       text: t("ui.synthesis_stage_two_fixed")
     });
@@ -49372,22 +48511,20 @@ var NextStepModal = class extends import_obsidian29.Modal {
     const synthStatus = synthesizePanel.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
     const synthResult = synthesizePanel.createDiv("vam-next-result");
     const suggestButton = actions.createEl("button", { text: t("ui.get_synthesis_suggestions_first"), cls: "mod-cta" });
-    suggestButton.dataset.topicRun = (_s = suggestButton.textContent) != null ? _s : "";
+    suggestButton.dataset.topicRun = (_a2 = suggestButton.textContent) != null ? _a2 : "";
     const skipButton = actions.createEl("button", { text: t("ui.synthesis_skip_suggestions") });
     const draftButton = actions.createEl("button", { text: t("ui.get_synthesis_draft"), cls: "mod-cta" });
-    for (const button of [suggestButton, skipButton, draftButton]) button.disabled = !!((_t = this.modelSettings) == null ? void 0 : _t.running);
     let stage = pendingDirections ? "directions" : "setup";
     let frozenSummary = "";
     const syncSynthesisStage = () => {
       const locked = stage === "directions";
-      const here = currentMode === "synthesize";
-      suggestButton.hidden = !here || locked;
-      skipButton.hidden = !here || locked;
-      draftButton.hidden = !here || !locked;
-      adjustFor.synthesize.toggleClass("is-fixed", locked);
+      suggestButton.hidden = locked;
+      skipButton.hidden = locked;
+      draftButton.hidden = !locked;
+      adjustSynthesize.toggleClass("is-fixed", locked);
       stageTwoHint.hidden = !locked;
-      output.hidden = here && locked;
-      titleField == null ? void 0 : titleField.toggleClass("is-hidden", locked);
+      output.hidden = locked;
+      titleField.toggleClass("is-hidden", locked);
     };
     let directionBox;
     const showDirections = (items) => {
@@ -49410,62 +48547,56 @@ var NextStepModal = class extends import_obsidian29.Modal {
       box.setAttr("aria-label", t("ui.synthesis_direction"));
       directionBox = box;
       synthResult.createEl("button", { text: t("ui.discard_synthesis") }).addEventListener("click", () => {
-        var _a4, _b4;
-        (_b4 = selection ? selection.pending : (_a4 = this.modelSettings) == null ? void 0 : _a4.synthesisPending) == null ? void 0 : _b4.discard();
+        var _a4;
+        (_a4 = selection.pending) == null ? void 0 : _a4.discard();
         this.close();
       });
       synthStatus.setText(t("ui.choose_or_edit_a_synthesis_direction_then_get_a_draft"));
       syncSynthesisStage();
       refreshSummary();
-      warmForMode();
     };
     const flow = { directions: showDirections, written: () => this.close() };
-    const nameProblem = () => titleInput ? titleProblemText(titleInput.value) : "";
-    const needsName = () => !!titleInput && (!titleInput.value.trim() || !!nameProblem());
+    const nameProblem = () => titleProblemText(titleInput.value);
+    const needsName = () => !titleInput.value.trim() || !!nameProblem();
     const checkName = () => {
-      var _a3;
-      if (!titleInput || stage !== "setup") return;
+      if (stage !== "setup") return;
       const missing = needsName();
-      suggestButton.disabled = skipButton.disabled = missing || !!((_a3 = this.modelSettings) == null ? void 0 : _a3.running);
+      suggestButton.disabled = skipButton.disabled = missing;
       synthStatus.setText(missing ? nameProblem() || t("ui.synthesis_needs_name") : "");
     };
-    titleInput == null ? void 0 : titleInput.addEventListener("input", checkName);
+    titleInput.addEventListener("input", checkName);
     const setupOptions = async (signal) => {
-      var _a3, _b3;
-      const content = (synthesisContentSelect == null ? void 0 : synthesisContentSelect.value) === "summary" ? "summary" : "full";
-      if (synthesisContentSelect) synthesisContentSelect.disabled = true;
+      var _a3;
+      const content = synthesisContentSelect.value === "summary" ? "summary" : "full";
+      synthesisContentSelect.disabled = true;
       const referenceGroups = await this.mapSourceGroups(signal);
       const options = {
         synthesisContent: content,
         referenceGroups,
         outputLanguage: languageSelect.value,
         requirements: this.requirements(),
-        ...this.runOnceOptions(),
+        ...noteStyle() ? { noteStyle: noteStyle() } : {},
         // A synthesis arranges what the topics already hold: Quick policy text, no web (D-2026-10-229).
         researchMode: "local",
         researchDepth: "normal",
         visualMode: "off",
-        ...noteStyle() ? { noteStyle: noteStyle() } : {},
-        ...titleInput ? { synthesisTitle: titleInput.value.trim() } : {},
+        synthesisTitle: titleInput.value.trim(),
         signal,
         onProgress: (message) => {
           if (!this.closed) synthStatus.setText(message);
         }
       };
-      if (!selection && !this.childrenCount && !((_a3 = options.referenceGroups) == null ? void 0 : _a3.some((group) => group.documents.length)))
-        throw new Error(t("ui.choose_another_note_source_first"));
-      frozenSummary = (_b3 = summaryEl.textContent) != null ? _b3 : "";
+      frozenSummary = (_a3 = summaryEl.textContent) != null ? _a3 : "";
       return options;
     };
     const draftOptions = (signal) => ({
       continuesDirections: true,
       outputLanguage: languageSelect.value,
       requirements: this.requirements(),
-      ...this.runOnceOptions(),
       researchMode: "local",
       researchDepth: "normal",
       visualMode: "off",
-      ...titleInput ? { synthesisTitle: titleInput.value.trim() } : {},
+      synthesisTitle: titleInput.value.trim(),
       signal,
       onProgress: (message) => {
         if (!this.closed) synthStatus.setText(message);
@@ -49480,14 +48611,7 @@ var NextStepModal = class extends import_obsidian29.Modal {
       if (guard()) this.launchSynthesis(synthesizePanel, suggestButton, null, setupOptions, flow);
     });
     skipButton.addEventListener("click", () => {
-      if (guard())
-        this.launchSynthesis(
-          synthesizePanel,
-          skipButton,
-          selection ? selection.defaultDirection : "",
-          setupOptions,
-          flow
-        );
+      if (guard()) this.launchSynthesis(synthesizePanel, skipButton, selection.defaultDirection, setupOptions, flow);
     });
     draftButton.addEventListener(
       "click",
@@ -49502,35 +48626,6 @@ var NextStepModal = class extends import_obsidian29.Modal {
         );
       }
     );
-    const warmForMode = () => {
-      var _a3, _b3;
-      if (currentMode === "research") this.prewarmAi(aiMode.value() === "standard");
-      else if (currentMode === "expand" && shallow.checked) this.prewarmAi(aiMode.value() === "standard");
-      else if (currentMode === "synthesize") this.prewarmAi(false, "synthesize");
-      else if (!this.detached) (_b3 = (_a3 = this.plugin).releaseWarmClaude) == null ? void 0 : _b3.call(_a3);
-    };
-    show = (mode) => {
-      currentMode = mode;
-      for (const [name2, button, panel] of [
-        ["research", researchCard, research],
-        ["expand", expandCard, expandPanel],
-        ["synthesize", synthesizeCard, synthesizePanel]
-      ]) {
-        button.classList.toggle("is-active", name2 === mode);
-        button.setAttr("aria-checked", name2 === mode ? "true" : "false");
-        button.tabIndex = name2 === mode ? 0 : -1;
-        panel.style.display = name2 === mode ? "" : "none";
-        adjustFor[name2].hidden = name2 !== mode;
-      }
-      warmForMode();
-      confirm.hidden = mode !== "research";
-      expandButton.hidden = mode !== "expand";
-      expandFooterText.hidden = mode !== "expand";
-      reviewButton.hidden = mode !== "expand" || !this.pendingCount;
-      aiMode.element.hidden = mode === "synthesize";
-      syncSynthesisStage();
-      refreshSummary();
-    };
     this.renderRequirements(adjustBody);
     const output = adjustBody.createEl("details", { cls: "vam-next-output" });
     output.open = false;
@@ -49549,10 +48644,10 @@ var NextStepModal = class extends import_obsidian29.Modal {
       moreLanguages.createEl("option", { value: option.id, text: option.label });
     languageSelect.value = defaultOutputLanguage(
       this.plugin.settings.language,
-      this.topic,
-      (_u = this.modelSettings) == null ? void 0 : _u.contentLanguage,
-      (_v = this.info) == null ? void 0 : _v.outputLanguage,
-      (_w = this.info) == null ? void 0 : _w.mapTitle
+      "",
+      void 0,
+      selection.fields.outputLanguage,
+      selection.fields.mapTitle
     );
     languageSelect.setAttr("aria-label", t("ui.output_language"));
     languageSelect.addEventListener("change", () => {
@@ -49560,77 +48655,35 @@ var NextStepModal = class extends import_obsidian29.Modal {
     });
     const style = styleChoiceField(compactSettings, {
       styles: stylePickerFor(this.app, this.plugin),
-      current: (_y = (_x = this.info) == null ? void 0 : _x.currentStyle) != null ? _y : "",
+      current: (_b2 = selection.fields.currentStyle) != null ? _b2 : "",
       changed: () => refreshSummary()
     });
     const noteStyle = style.style;
     const describeOutput = () => {
       outputValue.setText([supportedLanguageLabel(languageSelect.value), style.label()].filter(Boolean).join(" \xB7 "));
     };
-    const modeName = () => t("ui.ai_mode_value_0", t(aiMode.value() === "standard" ? "ui.standard" : "ui.quick"));
     const refreshSummary = () => {
       describeOutput();
-      if (currentMode === "synthesize" && stage === "directions") {
+      if (stage === "directions") {
         summaryEl.setText(frozenSummary);
         return;
       }
-      const parts = [];
-      if (currentMode === "research") parts.push(modeName());
-      else if (currentMode === "expand") {
-        const levels = quickLevels();
-        parts.push(
-          levels === 1 ? t("ui.expand_summary_one_level_0", quickTopics()) : t("ui.expand_summary_0_1", levels, quickTopics())
-        );
-        if (shallow.checked) parts.push(modeName());
-      } else
-        parts.push(
-          t(
-            (synthesisContentSelect == null ? void 0 : synthesisContentSelect.value) === "summary" ? "ui.next_summary_synth_summary" : "ui.next_summary_synth_full"
-          )
-        );
-      parts.push(supportedLanguageLabel(languageSelect.value));
+      const parts = [
+        t(synthesisContentSelect.value === "summary" ? "ui.next_summary_synth_summary" : "ui.next_summary_synth_full"),
+        supportedLanguageLabel(languageSelect.value)
+      ];
       const styleName = style.name();
       if (styleName) parts.push(styleName);
       summaryEl.setText(parts.join(" \xB7 "));
     };
     void style.reload();
     this.contentEl.addEventListener("change", refreshSummary);
-    this.contentEl.addEventListener("change", () => {
-      warmForMode();
-    });
     if (pendingDirections) showDirections(pendingDirections.directions);
     else checkName();
-    syncExpand();
-    show(initialMode);
-    const waitingOutline = (_z = this.modelSettings) == null ? void 0 : _z.pendingOutline;
-    if (waitingOutline && quickOutline) {
-      shallow.checked = !!waitingOutline.options.shallowResearch;
-      if (waitingOutline.bounds) {
-        quickLevelsField.set(waitingOutline.bounds.levels);
-        quickTopicsField.set(waitingOutline.bounds.maxTopics);
-      }
-      if (waitingOutline.options.mapAiMode) aiMode.set(waitingOutline.options.mapAiMode);
-      shallowHint.hidden = !shallow.checked;
-      shallowHint.setText(shallowHintText());
-      syncExpand();
-      const reviewOptions = {
-        ...waitingOutline.options,
-        onProgress: (message) => {
-          var _a3;
-          return (_a3 = expandPanel.querySelector(".vam-next-status")) == null ? void 0 : _a3.setText(message);
-        }
-      };
-      this.outlineReview(
-        expandPanel,
-        waitingOutline.nodes,
-        expandButton,
-        quickOutline.create,
-        reviewOptions,
-        waitingOutline.dropped
-      );
-    }
-    (titleInput != null ? titleInput : cardFor[initialMode]).focus();
-    ((_A = this.renderModelSettings(adjustBody)) != null ? _A : adjustBody).createEl("p", {
+    syncSynthesisStage();
+    refreshSummary();
+    titleInput.focus();
+    adjustBody.createEl("p", {
       text: t("ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it"),
       cls: "vam-hint"
     });
@@ -51416,9 +50469,9 @@ var AimStartModal = class extends import_obsidian32.Modal {
         }
       })();
     });
-    const reasoningLabel2 = this.contentEl.createEl("label", { cls: "vam-field" });
-    reasoningLabel2.createSpan({ text: t("ui.reasoning_level") });
-    const reasoning = reasoningLabel2.createEl("select");
+    const reasoningLabel = this.contentEl.createEl("label", { cls: "vam-field" });
+    reasoningLabel.createSpan({ text: t("ui.reasoning_level") });
+    const reasoning = reasoningLabel.createEl("select");
     reasoning.setAttr("aria-label", t("ui.reasoning_level"));
     for (const [value, label] of [
       ["auto", t("ui.auto")],
@@ -57780,7 +56833,6 @@ var ARROW_OFFSETS = /* @__PURE__ */ new Map([
 ]);
 var TASK_PROGRESS_PREFIX = "vam-task:";
 var MERGE_DONE_NOTICE_MS = 15e3;
-var STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
 var cardCutLabels = /* @__PURE__ */ new WeakMap();
@@ -58199,8 +57251,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     /** The one topic chat window that is open (not whether it is attached: a repaint takes it out for a moment). */
     __publicField(this, "topicChatOpen", null);
     __publicField(this, "disclosureSeq", 0);
-    /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
-    __publicField(this, "quickOutlines", /* @__PURE__ */ new Map());
     /** The AI structure review that hid its window. The view owns it: Stop, the result and the highlights. */
     __publicField(this, "structureReviewTask", null);
     /** The AI outline generation that hid the import window, with the window's inputs so it can be reopened. */
@@ -60133,7 +59183,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
   dropMapBackground() {
     var _a2;
-    this.quickOutlines.clear();
     this.quickOutlineSummaries.clear();
     const review = this.structureReviewTask;
     const draft = this.outlineDraftTask;
@@ -60674,19 +59723,6 @@ ${request.requirements}` : preset.text,
         });
       }
     };
-  }
-  /** 「檢視整張圖」 on a root topic, 「檢視這個分支」 on a subtopic with subtopics; nothing on a leaf or an AIM map. */
-  structureReviewEntry(node) {
-    if (!this.map || this.outlineImportTarget().map !== "editable") return void 0;
-    if (node.parentId === null)
-      return { label: t("ui.structure_review_entry_map"), open: () => this.openStructureReview(null) };
-    if (this.map.nodes.some((item) => item.parentId === node.id))
-      return { label: t("ui.structure_review_entry_branch"), open: () => this.openStructureReview(node.id) };
-    return void 0;
-  }
-  /** What the Next Step dialog offers; nothing while the entry is hidden (`STRUCTURE_REVIEW_ENTRY_SHOWN`). */
-  nextStepStructureReview(node) {
-    return STRUCTURE_REVIEW_ENTRY_SHOWN ? this.structureReviewEntry(node) : void 0;
   }
   /** The AI sees each card's title, summary and status only; never a note body. */
   describeForReview(id) {
@@ -70310,23 +69346,12 @@ ${request.requirements}` : preset.text,
       );
     if ((note == null ? void 0 : note.status) === "error" && !this.selection.state.multiSelectMode && !isAimNode(node) && !active && !queued && !research && !merging)
       this.renderOtherProviderButton(header, [node]);
-    const waitingOutline = this.quickOutlines.get(node.path);
-    if (waitingOutline && waitingOutline.mapPath === this.path && !this.selection.state.multiSelectMode && !this.aimLive())
-      this.button(
-        header,
-        t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length),
-        () => this.openNextStep(node)
-      ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
     if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !this.aimLive()) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
-      } else if (synthesis.state === "directions")
-        this.button(header, t("ui.choose_synthesis_direction"), () => this.openNextStep(node)).addClass(
-          "vam-badge-new"
-        );
-      else {
+      } else if (synthesis.state !== "directions") {
         header.createSpan({
           cls: "vam-status vam-status-error",
           text: synthesis.state === "cancelled" ? t("ui.ai_task_cancelled") : t("ui.failed"),
@@ -71774,18 +70799,6 @@ ${request.requirements}` : preset.text,
         own2 = void 0;
         if (!this.closed) this.render();
       },
-      outlineReady: (outline) => {
-        var _a2, _b2;
-        if (!node || this.closed || this.path !== mapPath) return;
-        this.quickOutlines.set(node.path, { mapPath, ...outline });
-        const title = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : node.path;
-        const count2 = outlineProposals(outline.nodes).length;
-        backgroundResultNotice(t("ui.background_outline_ready_0", title), {
-          label: t("ui.review_outline_0", count2),
-          open: () => this.openNextStep(node)
-        });
-        this.render();
-      },
       completed: (kind, result) => {
         var _a2, _b2, _c, _d;
         if (!node || this.closed || this.path !== mapPath) return;
@@ -72449,123 +71462,6 @@ ${request.requirements}` : preset.text,
   }
   selectionTaskKey() {
     return `selection:${this.path}`;
-  }
-  openNextStep(node) {
-    if (this.notesLoading()) return;
-    if (this.presentation) return;
-    this.enqueue(async () => {
-      var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
-      const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
-      if (this.aiLockReason("write", [node.id], /* @__PURE__ */ new Map([[node.id, note]]))) {
-        new import_obsidian37.Notice(t("ui.ai_locked_notice"));
-        return;
-      }
-      const sources = this.taskSourceSettings();
-      await this.refreshNoteStyles();
-      const current = this.topicStyle(note);
-      sources.synthesisTopics = (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.filter((item) => item.parentId === node.id).map((item) => {
-        var _a3, _b3;
-        return (_b3 = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.title) != null ? _b3 : item.path;
-      })) != null ? _c : [];
-      const dialog = new NextStepModal(
-        this.app,
-        note.title,
-        (_e = (_d = this.map) == null ? void 0 : _d.nodes.filter((item) => item.parentId === node.id).length) != null ? _e : 0,
-        (_g = (_f = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _f.length) != null ? _g : 0,
-        this.plugin,
-        async (options, focus, done, failed, accepted) => {
-          var _a3, _b3, _c2;
-          const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
-          const taskLanguage = (_b3 = options.outputLanguage) != null ? _b3 : cardOutputLanguage(this.map, this.plugin.settings.language, latest.title);
-          const task = researchTopicTask(taskLanguage, latest.title);
-          const runStyle = await this.detailTemplateFor(
-            node,
-            options.noteStyle,
-            void 0,
-            (_c2 = options.outputLanguage) != null ? _c2 : this.plugin.settings.language
-          );
-          await this.runAgent(
-            node,
-            done,
-            failed,
-            {
-              runStyle,
-              task: [task, options.requirements].filter(Boolean).join("\n\n"),
-              referenceGroups: options.referenceGroups,
-              onProgress: options.onProgress,
-              signal: options.signal,
-              outputLanguage: options.outputLanguage,
-              rules: "",
-              researchMode: options.researchMode,
-              researchDepth: options.researchDepth,
-              visualMode: options.visualMode,
-              mapAiMode: options.mapAiMode,
-              addCharts: options.mapAiMode !== "quick"
-            },
-            accepted,
-            // The dialog's model for this run only; a pinned choice was already saved on the topic.
-            options.runOnce
-          );
-        },
-        (options, direction, found, failed, accepted) => this.proposeChildren(node, options, direction, found, failed, accepted),
-        (options, direction, failed, accepted, observer) => this.startSynthesis(node, options, direction, failed, accepted, observer),
-        {
-          model: note.model,
-          modelSource: note.modelSource,
-          followDefault: await this.plugin.repo.followDefaultModel(node.path, (_h = this.map) != null ? _h : void 0),
-          reasoning: (_i = note.reasoning) != null ? _i : this.plugin.settings.cliReasoning,
-          rules: note.rules,
-          path: node.path,
-          save: (patch) => this.plugin.mutate(() => this.noteChange(node, patch)),
-          running: this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending.has(node.path) || this.startingTasks.has(node.path),
-          stop: this.startingTasks.has(node.path) || this.plugin.topicRuns.hasTask(node.path) ? () => {
-            var _a3, _b3;
-            return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.topicRuns.taskController(node.path)) == null ? void 0 : _b3.abort();
-          } : void 0,
-          background: this.backgroundHooks(node.path, node),
-          stopKey: () => {
-            var _a3;
-            return stopLabelKey(
-              this.plugin.topicRuns.runKind(node.path),
-              !!((_a3 = this.plugin.quickExpandPending) == null ? void 0 : _a3.has(node.path)),
-              this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
-            );
-          },
-          quickOutline: this.quickOutline(node),
-          pendingOutline: (() => {
-            const waiting = this.quickOutlines.get(node.path);
-            if (!waiting || waiting.mapPath !== this.path) return void 0;
-            return {
-              nodes: waiting.nodes,
-              dropped: waiting.dropped,
-              bounds: waiting.bounds,
-              options: waiting.options,
-              discard: () => {
-                if (this.quickOutlines.get(node.path) === waiting) this.quickOutlines.delete(node.path);
-                if (!this.closed) this.render();
-              }
-            };
-          })(),
-          structureReview: this.nextStepStructureReview(node),
-          sources,
-          currentStyle: current.recipe.name,
-          currentSummary: note.summary,
-          ...existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {},
-          ...this.outputLanguageMemory(),
-          ...this.aiModeMemory(),
-          ...showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id)) ? { topicStatus: note.status } : {},
-          childrenCompleted: (_k = (_j = this.map) == null ? void 0 : _j.nodes.filter((item) => {
-            var _a3;
-            return item.parentId === node.id && ((_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.status) === "completed";
-          }).length) != null ? _k : 0,
-          synthesisPending: (() => {
-            const pending2 = this.synthesisTasks.get(node.path);
-            return (pending2 == null ? void 0 : pending2.state) === "directions" && pending2.mapPath === this.path ? { directions: pending2.directions, discard: () => this.discardSynthesis(node) } : void 0;
-          })()
-        }
-      );
-      this.openMapModal(dialog);
-    });
   }
   openNodePanel(node, mode) {
     const render = (content, close, host) => this.renderInspector(content, node, mode, close, host);
@@ -74542,6 +73438,7 @@ ${request.requirements}` : preset.text,
     if (keyboardFocus && !this.inlineName && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
     this.focusInlineName();
   }
+  /** No production caller since the topic chat (expand there goes through `chatExpand`); kept public for the proposal engine's tests and prompt snapshots. */
   async proposeChildren(parent, options, direction = "", found, failed, acceptedCallback) {
     var _a2;
     if (this.plugin.expansionCoordinator.isRunning(parent.path)) {
@@ -75726,11 +74623,6 @@ ${request.requirements}` : preset.text,
             task.state = "directions";
             task.directions = items;
             if ((observer == null ? void 0 : observer.isOpen()) && observer.directions) observer.directions(items);
-            else
-              backgroundResultNotice(t("ui.background_synthesis_directions_ready"), {
-                label: t("ui.choose_synthesis_direction"),
-                open: () => this.openSynthesisDirections(node, task)
-              });
           },
           fail2,
           markAccepted
@@ -75762,12 +74654,6 @@ ${request.requirements}` : preset.text,
       this.plugin.topicRuns.releaseTask(path, controller);
       this.render();
     }
-  }
-  /** Reopens the synthesis dialog at its waiting directions (from the Notice button), if they are still waiting. */
-  openSynthesisDirections(node, task) {
-    const current = this.synthesisTasks.get(node.path);
-    if (current !== task || (current == null ? void 0 : current.state) !== "directions" || current.mapPath !== this.path) return;
-    this.openNextStep(node);
   }
   discardSynthesis(node) {
     if (this.notesLoading()) return;
@@ -75827,16 +74713,8 @@ ${request.requirements}` : preset.text,
       const current = await this.mapStyle(settings.language, { kind: "topic" });
       const dialog = new NextStepModal(
         this.app,
-        "",
-        0,
-        0,
         this.plugin,
-        async () => {
-        },
-        async () => {
-        },
         (options, direction, failed, accepted, observer) => this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer),
-        void 0,
         {
           names: names3,
           initialTitle: (_a3 = pending2 == null ? void 0 : pending2.title) != null ? _a3 : synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), names3),

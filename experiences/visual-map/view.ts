@@ -11083,10 +11083,21 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     this.focusItemId = id;
-    await this.changeCanvasItems(id, items => {
-      const result = setSummaryMembers(items, id, check.members, this.map?.nodes ?? []);
-      return result.ok ? result.items : [...items];
-    });
+    // Written with mapChange, not changeCanvasItems: that one refuses while topics are being picked, which is when this is used.
+    try {
+      await this.mapChange(map => {
+        const result = setSummaryMembers(map.canvasItems ?? [], id, check.members, map.nodes);
+        if (!result.ok) throw new Error(t(this.summaryRefusalKey(result.reason)));
+        map.canvasItems = result.items;
+      }, false);
+    } catch (error) {
+      this.focusItemId = null;
+      this.render();
+      const message = error instanceof Error ? error.message : String(error);
+      this.announcer?.setText(message);
+      new Notice(message);
+      return;
+    }
     this.announcer?.setText(t("ui.summary_range_changed"));
   }
   /** Asks for a frame's label (blank is allowed) and writes it as one undo step. */

@@ -77,3 +77,26 @@ test('S2: removing a card whose note file is gone still removes it from the map 
   assert.equal((await h.disk()).nodes.some(n => n.id === gone.id), false, 'and off Map.md');
   assert.equal(h.view.history.past.length, past + 1);
 });
+
+test('A3: changing a summary range in selection mode writes the new range; a refusal is shown and not announced as success', async () => {
+  const h = await harness();
+  const [a, b, c] = ['A', 'B', 'C'].map(h.node);
+  h.view.map.canvasItems = [{ id: 'sum-1', kind: 'summary', parentId: a.parentId, members: [a.id], text: 'Sum' }];
+  await h.view.plugin.repo.saveMap(MAP, h.view.map);
+  h.view.selection.toggleMultiSelect();
+  assert.equal(h.view.selection.state.multiSelectMode, true);
+  h.view.selection.replaceMulti([b.id, c.id]);
+  await h.view.changeSummaryRange('sum-1');
+  assert.deepEqual(plain(h.view.map.canvasItems.find(i => i.id === 'sum-1').members), [b.id, c.id], 'range changed in memory');
+  assert.deepEqual((await h.disk()).canvasItems.find(i => i.id === 'sum-1').members, [b.id, c.id], 'and in Map.md');
+  assert.equal(h.view.announced, 'Summary bracket range changed.');
+  // A selection that passes the entry check but is refused by setSummaryMembers must not say success.
+  h.view.announced = '';
+  h.view.summaryEntryCheck = () => ({ ok: true, parentId: a.parentId, members: [a.id, c.id] });
+  const before = JSON.stringify(h.view.map.canvasItems);
+  const noticesBefore = h.notices.length;
+  await h.view.changeSummaryRange('sum-1');
+  assert.equal(JSON.stringify(h.view.map.canvasItems), before, 'unchanged');
+  assert.notEqual(h.view.announced, 'Summary bracket range changed.');
+  assert.ok(h.notices.length > noticesBefore, 'a reason is shown');
+});

@@ -244,14 +244,15 @@ test('F2, the title double-click and the rename command all open the inline titl
   assert.deepEqual(modalNames(h), [], 'no rename dialog at all');
 });
 
-test('the card right-click menu and the "More" tool menu no longer list Rename', async () => {
+test('the card right-click menu and the floating card tools no longer list Rename (the tools have no More menu)', async () => {
   const h = await harness(); const items = [];
   const menu = { addItem(cb) { const it = { setTitle(t) { this.title = t; return this; }, setIcon() { return this; }, onClick() { return this; }, setDisabled() { return this; }, setSection() { return this; } }; cb(it); items.push(it.title); return menu; }, addSeparator() { return menu; } };
   h.view.addCardMenuActions(menu, h.view.map.nodes.find(n => n.id === h.ids.leaf));
   assert.ok(items.length > 3 && !items.includes('Rename'), `right-click items: ${items.join(', ')}`);
-  let more = null; h.view.openCardMoreMenu = (_event, _node, entries) => { more = entries; };
-  const tool = findAll(h.card('leaf'), i => i.classes.has('vam-more-tool'))[0]; tool.handlers.get('click')({ stopPropagation() {} });
-  assert.ok(more && more.length > 0 && !more.some(m => m.title === 'Rename'), 'More has no Rename');
+  const tools = findAll(h.card('leaf'), i => i.tag === 'button' && i.classes.has('vam-node-tool'));
+  const labels = tools.map(i => i.attrs['aria-label']);
+  assert.ok(labels.length > 0 && !labels.includes('Rename'), `floating tools have no Rename: ${labels.join(', ')}`);
+  assert.equal(tools.some(i => i.classes.has('vam-more-tool') || i.attrs['aria-haspopup']), false, 'no More button or menu on the card');
 });
 
 // Accessible name of an edit field: aria-label, or the text of the element aria-labelledby points to.

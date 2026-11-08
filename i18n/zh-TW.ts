@@ -1079,7 +1079,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.select_subtopics": "選取子議題",
   "ui.select_subtopics_hint": "選取這個議題底下所有直屬子議題",
   "ui.card_more": "⋯ 更多",
-  "ui.card_more_hint": "這個議題的更多動作",
   "ui.selection_more_hint": "已選議題的更多動作",
   "ui.selection_help": "?",
   "ui.selection_help_hint": "選取議題的操作說明",

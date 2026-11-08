@@ -391,13 +391,10 @@ test('V4: in a left map new, moved and copied topics and a fold re-layout go to 
   const stage = stub('div');
   h.view.stageEl = stage;
   h.view.renderNode(h.named('Target'));
-  // The fold action lives in the card's More menu.
-  const more = findAll(stage, item => item.tag === 'button' && item.classes.has('vam-more-tool'))[0];
-  assert.ok(more, 'the card has a More tool');
-  let entries = [];
-  h.view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); entries.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
-  more.handlers.get('click')({ stopPropagation() {} });
-  entries.find(item => item.title === 'Collapse').fn(); await h.settled(); await h.settled();
+  // The fold action is its own icon button on the card (no More menu).
+  const fold = findAll(stage, item => item.tag === 'button' && item.attrs['aria-label'] === 'Collapse' && item.classes.has('vam-node-tool'))[0];
+  assert.ok(fold, 'the card has a Collapse tool');
+  fold.handlers.get('click')({ stopPropagation() {} }); await h.settled(); await h.settled();
   assert.equal(h.named('Target').collapsed, true);
   for (const child of h.view.map.nodes.filter(n => n.parentId === h.named('Root').id)) assert.ok(child.x < h.named('Root').x, `${child.id} after the fold`);
 });

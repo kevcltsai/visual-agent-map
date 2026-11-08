@@ -1151,7 +1151,6 @@ var en = {
   "ui.select_subtopics": "Select subtopics",
   "ui.select_subtopics_hint": "Select every direct subtopic of this topic",
   "ui.card_more": "\u22EF More",
-  "ui.card_more_hint": "More actions for this topic",
   "ui.selection_more_hint": "More actions for the selected topics",
   "ui.selection_help": "?",
   "ui.selection_help_hint": "How to select topics",
@@ -3920,7 +3919,6 @@ var zhCN = {
   "ui.select_subtopics": "\u9009\u62E9\u5B50\u8BAE\u9898",
   "ui.select_subtopics_hint": "\u9009\u62E9\u8FD9\u4E2A\u8BAE\u9898\u5E95\u4E0B\u6240\u6709\u76F4\u5C5E\u5B50\u8BAE\u9898",
   "ui.card_more": "\u22EF \u66F4\u591A",
-  "ui.card_more_hint": "\u8FD9\u4E2A\u8BAE\u9898\u7684\u66F4\u591A\u64CD\u4F5C",
   "ui.selection_more_hint": "\u5DF2\u9009\u8BAE\u9898\u7684\u66F4\u591A\u64CD\u4F5C",
   "ui.selection_help": "?",
   "ui.selection_help_hint": "\u9009\u62E9\u8BAE\u9898\u7684\u64CD\u4F5C\u8BF4\u660E",
@@ -6689,7 +6687,6 @@ var zhTW = {
   "ui.select_subtopics": "\u9078\u53D6\u5B50\u8B70\u984C",
   "ui.select_subtopics_hint": "\u9078\u53D6\u9019\u500B\u8B70\u984C\u5E95\u4E0B\u6240\u6709\u76F4\u5C6C\u5B50\u8B70\u984C",
   "ui.card_more": "\u22EF \u66F4\u591A",
-  "ui.card_more_hint": "\u9019\u500B\u8B70\u984C\u7684\u66F4\u591A\u52D5\u4F5C",
   "ui.selection_more_hint": "\u5DF2\u9078\u8B70\u984C\u7684\u66F4\u591A\u52D5\u4F5C",
   "ui.selection_help": "?",
   "ui.selection_help_hint": "\u9078\u53D6\u8B70\u984C\u7684\u64CD\u4F5C\u8AAA\u660E",
@@ -69628,7 +69625,6 @@ ${request.requirements}` : preset.text,
     }
     const tools = card.createDiv("vam-node-tools");
     const count2 = this.paintChildIndex ? branchSize(this.paintChildIndex, node.id) : descendants(this.map.nodes, node.id).size;
-    const more = [];
     if (count2) {
       if (node.collapsed) {
         const collapse = this.button(
@@ -69638,34 +69634,10 @@ ${request.requirements}` : preset.text,
         );
         collapse.addClass("vam-collapse-button", "is-collapsed");
         collapse.setAttr("aria-expanded", "false");
-      } else
-        more.push({
-          title: t("ui.collapse"),
-          icon: "chevrons-down-up",
-          action: () => this.whenEditing(() => this.toggleCollapsed(node))
-        });
+      }
     }
     if (!this.selection.state.multiSelectMode) {
-      if (!this.aimLive()) {
-        more.push({
-          title: t("ui.structure_and_links"),
-          icon: "git-fork",
-          action: () => this.whenEditing(() => this.openNodePanel(node, "structure"))
-        });
-        if (!node.collapsed && this.map.nodes.some((item) => item.parentId === node.id))
-          more.push({
-            title: t("ui.select_subtopics"),
-            icon: "list-checks",
-            action: () => this.whenEditing(() => this.selectSubtopics(node))
-          });
-      }
-      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "question")
-        more.push({
-          title: t("ui.remove_from_map"),
-          icon: "trash",
-          action: () => this.whenEditing(() => this.confirmRemoveNode(node))
-        });
-      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
           t("ui.aim_new_question"),
@@ -69677,7 +69649,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && assumptions.length) {
+      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -69689,7 +69661,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "conclusion") {
+      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -69701,24 +69673,51 @@ ${request.requirements}` : preset.text,
       }
     }
     if (!this.selection.state.multiSelectMode && !this.aimLive()) {
-      const explore = this.button(
-        tools,
-        t("ui.ai_explore"),
-        () => this.whenEditing(() => this.openTopicChat(node, explore))
-      );
+      const exploreName = t("ui.ai_explore");
+      const explore = this.button(tools, "", () => this.whenEditing(() => this.openTopicChat(node, explore)));
       explore.addClass("vam-node-tool", "vam-ai-explore");
+      explore.setAttr("aria-label", exploreName);
     }
-    const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
+    const details = this.button(tools, "", () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
-    details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (more.length) {
-      const moreButton = this.button(tools, t("ui.card_more"), () => {
-      });
-      moreButton.addClass("vam-node-tool", "vam-more-tool");
-      moreButton.setAttr("aria-label", t("ui.card_more_hint"));
-      moreButton.setAttr("aria-haspopup", "menu");
-      moreButton.addEventListener("click", (event) => this.openCardMoreMenu(event, node, more));
+    (0, import_obsidian39.setIcon)(details, "panel-right");
+    details.setAttr("aria-label", t("ui.node_tool_details"));
+    const iconTool = (title2, icon, cls, action) => {
+      const button = this.button(tools, "", action);
+      button.addClass("vam-node-tool", cls);
+      (0, import_obsidian39.setIcon)(button, icon);
+      button.setAttr("aria-label", title2);
+      return button;
+    };
+    if (count2 && !node.collapsed)
+      iconTool(
+        t("ui.collapse"),
+        "chevrons-down-up",
+        "vam-fold-tool",
+        () => this.whenEditing(() => this.toggleCollapsed(node))
+      );
+    if (!this.selection.state.multiSelectMode && !this.aimLive()) {
+      iconTool(
+        t("ui.structure_and_links"),
+        "git-fork",
+        "vam-structure-tool",
+        () => this.whenEditing(() => this.openNodePanel(node, "structure"))
+      );
+      if (!node.collapsed && this.map.nodes.some((item) => item.parentId === node.id))
+        iconTool(
+          t("ui.select_subtopics"),
+          "list-checks",
+          "vam-select-subtopics-tool",
+          () => this.whenEditing(() => this.selectSubtopics(node))
+        );
     }
+    if (!this.selection.state.multiSelectMode && aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "question")
+      iconTool(
+        t("ui.remove_from_map"),
+        "trash",
+        "vam-remove-tool",
+        () => this.whenEditing(() => this.confirmRemoveNode(node))
+      );
     if (!this.selection.state.multiSelectMode && !this.aimLive()) {
       const add = this.button(card, "+", () => {
       });
@@ -69762,10 +69761,10 @@ ${request.requirements}` : preset.text,
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
       if (technicalDetails.length) {
-        const more2 = card.createEl("details", { cls: "vam-card-error-details" });
-        more2.createEl("summary", { text: t("ui.technical_details") });
-        more2.createEl("pre", { text: technicalDetails.join("\n\n") });
-        this.button(more2, t("ui.copy_technical_details"), () => {
+        const more = card.createEl("details", { cls: "vam-card-error-details" });
+        more.createEl("summary", { text: t("ui.technical_details") });
+        more.createEl("pre", { text: technicalDetails.join("\n\n") });
+        this.button(more, t("ui.copy_technical_details"), () => {
           var _a3;
           void ((_a3 = navigator.clipboard) == null ? void 0 : _a3.writeText(technicalDetails.join("\n\n")));
         });
@@ -70220,13 +70219,6 @@ ${request.requirements}` : preset.text,
       parent = (_c = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === parent)) == null ? void 0 : _b2.parentId) != null ? _c : null;
     }
     return depth;
-  }
-  /** The card's "More" menu: the tools that do not float over the map. Focus returns to the card when it closes. */
-  openCardMoreMenu(event, node, items) {
-    const menu = this.newMenu(node.id);
-    for (const entry of items)
-      menu.addItem((item) => item.setTitle(entry.title).setIcon(entry.icon).onClick(entry.action));
-    menu.showAtMouseEvent(event);
   }
   /**
    * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window
@@ -86649,6 +86641,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }
+.vam-node-tools > .vam-node-tool { width: 26px; padding-left: 0; padding-right: 0; display: inline-flex; align-items: center; justify-content: center; }
+.vam-node-tools > .vam-node-tool .svg-icon { width: 14px; height: 14px; }
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
 .vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }
 .vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }

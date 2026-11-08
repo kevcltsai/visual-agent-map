@@ -377,14 +377,14 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   const before = bytes();
   h.view.selection.setSelected(h.ids.root);
   h.view.startPresentation();
-  const tools = [byClass('root', 'vam-add-child'), byClass('root', 'vam-ai-explore'), byClass('root', 'vam-more-tool')];
-  assert.ok(tools.every(Boolean), 'every tool exists on the card');
+  const named = label => find(h.card('root'), n => n.tag === 'button' && n.attrs?.['aria-label'] === label)[0];
+  const tools = [byClass('root', 'vam-add-child'), named('AI explore'), named('Collapse'), named('This card'), named('Select subtopics')];
+  assert.ok(tools.every(Boolean), 'every tool exists on the card as its own button');
+  assert.equal(byClass('root', 'vam-more-tool'), undefined, 'no More tool');
+  // Fold, structure and select subtopics are direct buttons now: each does nothing while presenting.
   for (const el of tools) click(el);
-  // The "More" menu holds fold, structure and add text: each entry does nothing while presenting.
-  assert.equal(menus.length, 1, 'only More opens a list; the "+" does not');
-  assert.ok(menus[0].items.length >= 3, 'More lists the other tools');
-  for (const item of menus[0].items) item.fn();
   await h.settle();
+  assert.equal(menus.length, 0, 'no tool and not the "+" opens a list while presenting');
   assert.deepEqual(h.modals, [], 'no dialog opens');
   assert.equal(bytes(), before, 'Map.md is unchanged');
   assert.deepEqual((await h.saved()).nodes.map(n => ({ id: n.id, collapsed: n.collapsed })), mapBefore, 'nothing was folded');
@@ -395,7 +395,7 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   assert.equal(h.view.map.nodes.length, count + 1, 'the internal path (AI write-back) still creates a node during a presentation');
   h.view.exitPresentation();
   click(byClass('root', 'vam-add-child')); await h.settle();
-  assert.equal(menus.length, 2, 'after leaving, the "+" opens its type list again');
+  assert.equal(menus.length, 1, 'after leaving, the "+" opens its type list again');
 });
 
 // Overlaps the tools test above on purpose: there the stylesheet assertion fails first on the old code, so this one shows the undo assertion failing on its own.
@@ -405,10 +405,8 @@ test('bug bash #05: during a presentation a collapse click leaves no undo step a
   const find = (root, pred) => { const out = []; const walk = n => { if (pred(n)) out.push(n); (n.children ?? []).forEach(walk); }; walk(root); return out; };
   const menus = [];
   h.view.newMenu = () => { const m = { items: [], addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, setDisabled() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); m.items.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() { menus.push(m); } }; return m; };
-  const more = find(h.card('root'), n => n.classes?.has('vam-more-tool'))[0];
-  assert.ok(more, 'the root card has a More tool');
-  more.handlers.get('click')({ stopPropagation() {}, preventDefault() {} });
-  const collapse = { handlers: new Map([['click', () => menus[0].items.find(i => i.title === 'Collapse').fn()]]) };
+  const collapse = find(h.card('root'), n => n.tag === 'button' && n.attrs?.['aria-label'] === 'Collapse')[0];
+  assert.ok(collapse, 'the root card has a Collapse tool button');
   assert.equal(h.view.history.canUndo, false, 'nothing to undo before');
   h.view.selection.setSelected(h.ids.root);
   h.view.startPresentation();

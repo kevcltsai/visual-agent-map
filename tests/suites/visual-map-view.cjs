@@ -4806,7 +4806,7 @@ integrationTest('map sources toolbar: the button follows the select icon (the go
   const hidden = source.slice(source.indexOf('private renderHiddenAimMapTools'), source.indexOf('private renderHiddenAimMapTools') + 1500);
   assert.equal(hidden.includes('renderMapSourcesControl'), false, 'the hidden-AIM tools do not draw it');
 });
-integrationTest('map sources toolbar: an unreadable source puts ⚠ before the label and an aria-description, keeping the count', () => {
+integrationTest('map sources toolbar: an unreadable source turns the badge into a red ! and adds an aria-description, keeping the count', () => {
   const fx = msViewFixture({ stored: [{ kind: 'folder', path: 'Research' }, { kind: 'file', path: 'Gone/missing.md' }, { kind: 'file', path: 'Gone/two.md' }] }); fx.draw();
   const button = msButton(fx.tools);
   assert.equal(button.attrs['aria-label'], 'Data sources · 3', 'the count in the accessible name is unchanged'); assert.equal(dom.find(button, c => c.iconName === 'alert-triangle'), undefined);

@@ -2019,12 +2019,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-place-hint .vam-place-hint-esc { margin-left: 10px; opacity: 0.8; }
 
 /* Topic chat: the small conversation window next to a topic card */
-.vam-topic-chat { position: absolute; z-index: 6; box-sizing: border-box; width: 340px; max-width: calc(100% - 16px); display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-l); background: var(--background-primary); box-shadow: var(--shadow-l); color: var(--text-normal); font-size: var(--font-ui-small); }
+.vam-topic-chat { max-height: var(--vam-topic-chat-max, none); position: absolute; z-index: 6; box-sizing: border-box; width: 340px; max-width: calc(100% - 16px); display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-l); background: var(--background-primary); box-shadow: var(--shadow-l); color: var(--text-normal); font-size: var(--font-ui-small); }
 .vam-topic-chat.is-bottom { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-width: none; }
 .vam-topic-chat-head { display: flex; align-items: center; gap: 8px; }
 .vam-topic-chat-title { min-width: 0; overflow-wrap: anywhere; font-weight: var(--font-semibold); }
 .vam-topic-chat-close { margin-left: auto; flex: 0 0 auto; color: var(--text-faint); }
-.vam-topic-chat-log { display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow-y: auto; }
+.vam-topic-chat-log { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; gap: 6px; max-height: 40vh; overflow-y: auto; }
 .vam-topic-chat-log:empty { display: none; }
 .vam-topic-chat-msg { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); overflow-wrap: anywhere; white-space: pre-wrap; }
 .vam-topic-chat-msg.is-me { background: var(--background-modifier-hover); }

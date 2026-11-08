@@ -207,6 +207,36 @@ test('topic chat side placement stops above the zoom/layout controls and ignores
   assert.equal(f.win.el.style.top, '500px', 'controls in other columns do not push it up (800-300)');
 });
 
+test('topic chat window stays inside the canvas: a window taller than the space is capped (the log shrinks), side and bottom placement alike', () => {
+  const rects = {};
+  const f = fixture({ anchor: () => rects.value });
+  const area = { left: 0, top: 0, right: 1000, bottom: 800 };
+  Object.defineProperty(f.win.el, 'offsetHeight', { value: 1032, configurable: true });
+  Object.defineProperty(f.win.el, 'offsetWidth', { value: 340, configurable: true });
+  rects.value = { card: { left: 100, top: 300, right: 270, bottom: 360 }, area };
+  f.win.reposition();
+  assert.equal(f.win.el.style.top, '0px'); assert.equal(f.win.el.style['--vam-topic-chat-max'], '800px', 'cannot be taller than the canvas');
+  rects.value = { card: { left: 100, top: 300, right: 270, bottom: 360 }, area, controls: { left: 0, top: 740, right: 990, bottom: 790 } };
+  f.win.reposition();
+  assert.equal(f.win.el.style['--vam-topic-chat-max'], '732px', 'stops 8px above the controls');
+  rects.value = { card: { left: 10, top: 50, right: 100, bottom: 120 }, area: { left: 0, top: 0, right: 300, bottom: 600 } };
+  f.win.reposition();
+  assert.ok(hasClass(f.win.el, 'is-bottom')); assert.equal(f.win.el.style['--vam-topic-chat-max'], '584px', 'bottom placement keeps its 8px margins');
+});
+
+test('topic chat places the window again and scrolls the log to the newest turn whenever the session changes', () => {
+  let anchors = 0;
+  const f = fixture({ anchor: () => { anchors++; return { card: { left: 100, top: 50, right: 270, bottom: 120 }, area: { left: 0, top: 0, right: 1000, bottom: 600 } }; } });
+  const log = findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-log'))[0];
+  Object.defineProperty(log, 'scrollHeight', { value: 5000, configurable: true });
+  log.scrollTop = 0;
+  const before = anchors;
+  f.session.turns = [{ role: 'user', kind: 'ask', text: 'q' }, { role: 'ai', text: 'a' }];
+  f.refresh();
+  assert.ok(anchors > before, 'content changed, so the window is placed again');
+  assert.equal(log.scrollTop, 5000);
+});
+
 test('topic chat lifts its overlay above the controls overlay while mounted and drops it on destroy (class + CSS string check)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /\.has-topic-chat\.vam-canvas-overlay\s*\{[^}]*z-index:\s*5/);

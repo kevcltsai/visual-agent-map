@@ -182,12 +182,16 @@ export class TopicChatWindow {
     if (!(areaWidth > 0)) return;
     if (areaWidth < NARROW_AREA) {
       this.el.addClass("is-bottom");
-      this.el.setCssProps({ left: "0px", top: "" });
+      // The bottom placement keeps its 8px margins; a taller window gives the room back from its log.
+      this.el.setCssProps({
+        left: "0px",
+        top: "",
+        "--vam-topic-chat-max": areaHeight > 16 ? `${areaHeight - 16}px` : ""
+      });
       return;
     }
     this.el.removeClass("is-bottom");
     const width = this.el.offsetWidth || WIDTH_FALLBACK;
-    const height = this.el.offsetHeight || 0;
     let left = card.right - area.left + GAP;
     if (left + width > areaWidth) left = card.left - area.left - width - GAP;
     left = Math.max(0, Math.min(left, areaWidth - width));
@@ -197,8 +201,10 @@ export class TopicChatWindow {
     if (controls && controls.left < area.left + left + width && controls.right > area.left + left) {
       floor = Math.min(floor, controls.top - area.top - GAP);
     }
+    // The window never grows past the space it has: only its log gives way (it scrolls), so the input and buttons stay reachable.
+    const height = floor > 0 ? Math.min(this.el.offsetHeight || 0, floor) : this.el.offsetHeight || 0;
     if (floor > 0) top = Math.max(0, Math.min(top, floor - height));
-    this.el.setCssProps({ left: `${left}px`, top: `${top}px` });
+    this.el.setCssProps({ left: `${left}px`, top: `${top}px`, "--vam-topic-chat-max": floor > 0 ? `${floor}px` : "" });
   }
 
   /** Releases every listener and removes the window. Does not tell the host. */
@@ -308,6 +314,9 @@ export class TopicChatWindow {
     this.ghostTextEl.setText(ghost);
     this.sendEl.disabled = !this.canSend();
     this.paintLog(session);
+    // The log changed height, so the window may no longer fit where it was put; then the newest turn is brought into view again.
+    this.reposition();
+    this.logEl.scrollTop = this.logEl.scrollHeight;
   }
 
   private paintLog(session: TopicChatSession): void {

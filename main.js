@@ -50212,12 +50212,15 @@ var TopicChatWindow = class {
     if (!(areaWidth > 0)) return;
     if (areaWidth < NARROW_AREA) {
       this.el.addClass("is-bottom");
-      this.el.setCssProps({ left: "0px", top: "" });
+      this.el.setCssProps({
+        left: "0px",
+        top: "",
+        "--vam-topic-chat-max": areaHeight > 16 ? `${areaHeight - 16}px` : ""
+      });
       return;
     }
     this.el.removeClass("is-bottom");
     const width = this.el.offsetWidth || WIDTH_FALLBACK;
-    const height = this.el.offsetHeight || 0;
     let left = card.right - area.left + GAP;
     if (left + width > areaWidth) left = card.left - area.left - width - GAP;
     left = Math.max(0, Math.min(left, areaWidth - width));
@@ -50226,8 +50229,9 @@ var TopicChatWindow = class {
     if (controls && controls.left < area.left + left + width && controls.right > area.left + left) {
       floor = Math.min(floor, controls.top - area.top - GAP);
     }
+    const height = floor > 0 ? Math.min(this.el.offsetHeight || 0, floor) : this.el.offsetHeight || 0;
     if (floor > 0) top = Math.max(0, Math.min(top, floor - height));
-    this.el.setCssProps({ left: `${left}px`, top: `${top}px` });
+    this.el.setCssProps({ left: `${left}px`, top: `${top}px`, "--vam-topic-chat-max": floor > 0 ? `${floor}px` : "" });
   }
   /** Releases every listener and removes the window. Does not tell the host. */
   destroy() {
@@ -50326,6 +50330,8 @@ var TopicChatWindow = class {
     this.ghostTextEl.setText(ghost);
     this.sendEl.disabled = !this.canSend();
     this.paintLog(session);
+    this.reposition();
+    this.logEl.scrollTop = this.logEl.scrollHeight;
   }
   paintLog(session) {
     this.logEl.empty();

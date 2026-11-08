@@ -2094,7 +2094,13 @@ export class VisualAgentMapView extends ItemView {
   /** Reading: only look and move (pan, zoom, drag a card, select) are left; every button but the map switcher and the zoom row is off. */
   private lockWhileLoading(): void {
     if (!this.noteLoad) return;
-    const keep = [".vam-map-chat", ".vam-map-title-button", ".vam-map-switch-button", ".vam-new-map", ".vam-zoom-controls"].join(", ");
+    const keep = [
+      ".vam-map-chat",
+      ".vam-map-title-button",
+      ".vam-map-switch-button",
+      ".vam-new-map",
+      ".vam-zoom-controls"
+    ].join(", ");
     const lock = (host: ParentNode | null | undefined): void => {
       for (const button of Array.from(host?.querySelectorAll?.<HTMLButtonElement>("button") ?? []))
         if (!button.closest?.(keep) || button.classList?.contains("vam-layout-button")) button.disabled = true;

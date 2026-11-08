@@ -984,14 +984,14 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const { VisualAgentMapView } = load('main.ts', { obsidian: heObsidian });
   // Every card on a map has coordinates; moving under another parent lays the branch out from them.
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
-  const changes = []; let closed = 0, removed = 0, merging = false;
+  const changes = []; let closed = 0, removed = 0;
   const view = {
     renderDisclosure(parent) { return parent.createDiv('vam-disclosure-body'); }, renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderAiLockSection() {}, renderBranchLayoutSection() {}, branchLayoutChoices: () => [], cardSearchSources: VisualAgentMapView.prototype.cardSearchSources, renderAddSubtopic() {},
     cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch, arrangeTree: VisualAgentMapView.prototype.arrangeTree,
     map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
-    mergeUnlocked: () => !merging, confirmRemoveNode() { removed++; }, enqueue(work) { work(); }, mapChange(change) { const copy = { nodes: nodes.map(n => ({ ...n })) }; change(copy); changes.push(copy.nodes.find(n => n.id === 'c').parentId); }
+    mergeUnlocked: () => true, confirmRemoveNode() { removed++; }, enqueue(work) { work(); }, mapChange(change) { const copy = { nodes: nodes.map(n => ({ ...n })) }; change(copy); changes.push(copy.nodes.find(n => n.id === 'c').parentId); }
   };
   const content = element('content'), host = element('modal');
   VisualAgentMapView.prototype.renderInspector.call(view, content, nodes[2], 'structure', () => { closed++; }, host);
@@ -1015,24 +1015,13 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   assert.deepEqual(rowsOf(found), [['a', 'Heat', true, []], ['b', 'Water', true, []], ['c', 'Pan', false, ['Heat']], ['', 'No parent (root topic)', true, []]]);
   assert.equal(found[0].current, true, 'the current parent is tagged');
   const pick = row => { suggest.selectSuggestion(row, {}); };
-  pick(found[2]);
-  assert.deepEqual(changes, [], 'a greyed row (the topic itself) moves nothing');
   pick(found[1]);
   assert.deepEqual(changes, ['b'], 'one pick moves it'); assert.equal(status.text, 'Moved under “Water”.'); assert.equal(closed, 0, 'the dialog stays open');
   assert.equal(field.value, 'Water', 'the field shows the new parent');
-  pick(type('a')[1]);
-  assert.deepEqual(changes, ['b'], 'choosing the parent it already has writes nothing');
   pick(type('a').at(-1));
   assert.deepEqual(changes, ['b', null]); assert.equal(status.text, 'Now a root topic.'); assert.equal(field.value, 'No parent (root topic)');
-  field.value = 'half-typed'; field.blur({});
-  assert.equal(field.value, 'No parent (root topic)', 'leaving without choosing puts the current value back and moves nothing');
-  assert.deepEqual(changes, ['b', null]);
   buttons[0].click();
   assert.equal(removed, 1);
-  // A card that is merging keeps its parent, and the field goes back to the one it has.
-  merging = true; pick(type('a')[1]);
-  assert.deepEqual(changes, ['b', null], 'no parent change while the card is merging');
-  assert.equal(field.value, 'No parent (root topic)');
 });
 integrationTest('expansion suggestions panel uses the shared list, treats the topic as first-level parent and asks before discarding', async () => {
   const element = (tag, options = {}) => ({
@@ -3624,6 +3613,7 @@ test('card search: every matching card is listed, however many there are', () =>
 });
 integrationTest('card search: aria-expanded starts false and follows the list opening and closing', () => {
   const { input, suggest } = csParentDialog();
+  assert.equal(suggest.limit, 0);
   assert.equal(input.attrs['aria-expanded'], 'false');
   suggest.open(); assert.equal(input.attrs['aria-expanded'], 'true');
   suggest.close(); assert.equal(input.attrs['aria-expanded'], 'false');

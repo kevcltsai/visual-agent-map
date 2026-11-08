@@ -14692,13 +14692,12 @@ export class VisualAgentMapView extends ItemView {
     }
     // Hover-only tools float beside the card (above its top edge unless that covers a neighbour), so showing them (hover,
     // focus, selection) never moves the card's content. What must always show (status, stop and review actions, a folded
-    // branch's count) stays in the header. Only three tools float: AI explore, Details and "More", which holds the rest
-    // (fold, structure, rename, select subtopics, remove). Add text is in the card's + menu only.
+    // branch's count) stays in the header. The floating tools are icon-only buttons: AI explore, Details, fold, this card
+    // (structure), select subtopics and remove. Add text is in the card's + menu only.
     const tools = card.createDiv("vam-node-tools");
     const count = this.paintChildIndex
       ? branchSize(this.paintChildIndex, node.id)
       : descendants(this.map!.nodes, node.id).size;
-    const more: Array<{ title: string; icon: string; action: () => void }> = [];
     if (count) {
       if (node.collapsed) {
         // A folded branch keeps its count on the card; expanding is a header button.
@@ -14707,34 +14706,9 @@ export class VisualAgentMapView extends ItemView {
         );
         collapse.addClass("vam-collapse-button", "is-collapsed");
         collapse.setAttr("aria-expanded", "false");
-      } else
-        more.push({
-          title: t("ui.collapse"),
-          icon: "chevrons-down-up",
-          action: () => this.whenEditing(() => this.toggleCollapsed(node))
-        });
+      }
     }
     if (!this.selection.state.multiSelectMode) {
-      if (!this.aimLive()) {
-        more.push({
-          title: t("ui.structure_and_links"),
-          icon: "git-fork",
-          action: () => this.whenEditing(() => this.openNodePanel(node, "structure"))
-        });
-        // Select every direct subtopic in one press. A folded card hides them, so it offers Expand instead.
-        if (!node.collapsed && this.map!.nodes.some(item => item.parentId === node.id))
-          more.push({
-            title: t("ui.select_subtopics"),
-            icon: "list-checks",
-            action: () => this.whenEditing(() => this.selectSubtopics(node))
-          });
-      }
-      if (aimEnabled() && this.map?.aim && node.aimKind === "question")
-        more.push({
-          title: t("ui.remove_from_map"),
-          icon: "trash",
-          action: () => this.whenEditing(() => this.confirmRemoveNode(node))
-        });
       if (
         aimEnabled() &&
         this.map?.aim &&
@@ -14777,21 +14751,41 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     if (!this.selection.state.multiSelectMode && !this.aimLive()) {
-      const explore = this.button(tools, t("ui.ai_explore"), () =>
-        this.whenEditing(() => this.openTopicChat(node, explore))
-      );
+      const exploreName = t("ui.ai_explore");
+      const explore = this.button(tools, "", () => this.whenEditing(() => this.openTopicChat(node, explore)));
       explore.addClass("vam-node-tool", "vam-ai-explore");
+      explore.setAttr("aria-label", exploreName);
     }
-    const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
+    const details = this.button(tools, "", () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
-    details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (more.length) {
-      const moreButton = this.button(tools, t("ui.card_more"), () => {});
-      moreButton.addClass("vam-node-tool", "vam-more-tool");
-      moreButton.setAttr("aria-label", t("ui.card_more_hint"));
-      moreButton.setAttr("aria-haspopup", "menu");
-      moreButton.addEventListener("click", event => this.openCardMoreMenu(event, node, more));
+    setIcon(details, "panel-right");
+    details.setAttr("aria-label", t("ui.node_tool_details"));
+    const iconTool = (title: string, icon: string, cls: string, action: () => void): HTMLButtonElement => {
+      const button = this.button(tools, "", action);
+      button.addClass("vam-node-tool", cls);
+      setIcon(button, icon);
+      // Obsidian shows aria-label as the hover tooltip, so one string is the name and the tooltip.
+      button.setAttr("aria-label", title);
+      return button;
+    };
+    if (count && !node.collapsed)
+      iconTool(t("ui.collapse"), "chevrons-down-up", "vam-fold-tool", () =>
+        this.whenEditing(() => this.toggleCollapsed(node))
+      );
+    if (!this.selection.state.multiSelectMode && !this.aimLive()) {
+      iconTool(t("ui.structure_and_links"), "git-fork", "vam-structure-tool", () =>
+        this.whenEditing(() => this.openNodePanel(node, "structure"))
+      );
+      // Select every direct subtopic in one press. A folded card hides them, so it offers Expand instead.
+      if (!node.collapsed && this.map!.nodes.some(item => item.parentId === node.id))
+        iconTool(t("ui.select_subtopics"), "list-checks", "vam-select-subtopics-tool", () =>
+          this.whenEditing(() => this.selectSubtopics(node))
+        );
     }
+    if (!this.selection.state.multiSelectMode && aimEnabled() && this.map?.aim && node.aimKind === "question")
+      iconTool(t("ui.remove_from_map"), "trash", "vam-remove-tool", () =>
+        this.whenEditing(() => this.confirmRemoveNode(node))
+      );
     if (!this.selection.state.multiSelectMode && !this.aimLive()) {
       const add = this.button(card, "+", () => {});
       add.addEventListener("click", event => this.openAddMenu(event, node));
@@ -15366,17 +15360,6 @@ export class VisualAgentMapView extends ItemView {
       parent = this.map?.nodes.find(item => item.id === parent)?.parentId ?? null;
     }
     return depth;
-  }
-  /** The card's "More" menu: the tools that do not float over the map. Focus returns to the card when it closes. */
-  private openCardMoreMenu(
-    event: MouseEvent,
-    node: MapNode,
-    items: Array<{ title: string; icon: string; action: () => void }>
-  ): void {
-    const menu = this.newMenu(node.id);
-    for (const entry of items)
-      menu.addItem(item => item.setTitle(entry.title).setIcon(entry.icon).onClick(entry.action));
-    menu.showAtMouseEvent(event);
   }
   /**
    * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window

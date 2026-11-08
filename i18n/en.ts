@@ -1145,7 +1145,6 @@ export const en = {
   "ui.select_subtopics": "Select subtopics",
   "ui.select_subtopics_hint": "Select every direct subtopic of this topic",
   "ui.card_more": "⋯ More",
-  "ui.card_more_hint": "More actions for this topic",
   "ui.selection_more_hint": "More actions for the selected topics",
   "ui.selection_help": "?",
   "ui.selection_help_hint": "How to select topics",

@@ -33,10 +33,13 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   assert.equal(added, 1);
   const badge = buttons.find(button => button.text === 'View 1 expansion suggestions');
   badge.click({ stopPropagation() {} });
-  buttons.find(button => button.text === 'AI explore').click({ stopPropagation() {} });
-  const listed = []; view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); listed.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
-  buttons.find(button => button['aria-label'] === 'More actions for this topic').click({ stopPropagation() {} });
-  listed.find(item => item.title === 'This card').fn();
+  buttons.find(button => button['aria-label'] === 'AI explore').click({ stopPropagation() {} });
+  // The structure action is its own icon button now (no More menu in between): one click runs it.
+  view.newMenu = () => { throw new Error('the card tools open no menu'); };
+  buttons.find(button => button['aria-label'] === 'This card').click({ stopPropagation() {} });
+  buttons.find(button => button['aria-label'] === 'Details').click({ stopPropagation() {} });
+  assert.deepEqual(details, [topic.id], 'the icon-only Details button opens the details');
+  details.length = 0;
   assert.deepEqual(opened, [[topic.id, 'proposals'], [topic.id, 'structure']]); assert.deepEqual(next, [topic.id]);
   assert.equal(view.selection.state.selected, null);
   events.get('div:click')({ target: { closest: () => null }, metaKey: false, ctrlKey: false });
@@ -86,16 +89,17 @@ integrationTest('AIM cards hide generic map actions while ordinary map cards ret
     view.renderNode(topic); return buttons;
   };
   const ordinaryButtons = render(map([topic]));
-  assert.ok(ordinaryButtons.some(button => button.text === '⋯ More' && button['aria-label'] === 'More actions for this topic'), 'Structure, Rename and the rest live in More');
+  assert.equal(ordinaryButtons.some(button => button.text === '⋯ More' || button['aria-haspopup']), false, 'no More button or menu on the card tools');
+  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'This card' && button.iconName === 'git-fork' && !button.text), 'Structure is an icon-only button with a tooltip');
   assert.equal(ordinaryButtons.some(button => button.text === 'Structure' || button.text === 'Rename'), false, 'they no longer float over the map');
-  assert.ok(ordinaryButtons.some(button => button.text === 'AI explore'), 'every card shows a labelled AI explore action');
-  assert.ok(ordinaryButtons.some(button => button.text === 'Details' && button['aria-label'] === 'Open details in right sidebar'));
+  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'AI explore' && !button.text), 'every card shows an icon-only AI explore action with a name');
+  assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'Details' && button.iconName === 'panel-right' && !button.text));
   assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'Add subtopic manually'));
   const aim = map([topic]); aim.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
   const aimButtons = render(aim);
-  for (const label of ['AI explore', 'Structure', 'Rename', '⋯ More']) assert.equal(aimButtons.some(button => button.text === label), false, `${label} is hidden in AIM`);
+  for (const label of ['AI explore', 'This card', 'Select subtopics', 'Structure', 'Rename', '⋯ More']) assert.equal(aimButtons.some(button => button.text === label || button['aria-label'] === label), false, `${label} is hidden in AIM`);
   assert.equal(aimButtons.some(button => button['aria-label'] === 'Add subtopic manually'), false, 'Add subtopic manually is hidden in AIM');
-  assert.ok(aimButtons.some(button => button.text === 'Details'), 'AIM cards keep Details');
+  assert.ok(aimButtons.some(button => button['aria-label'] === 'Details'), 'AIM cards keep Details');
   const resultNode = node('saved-synthesis', topic.id); resultNode.aimKind = 'synthesis';
   const resultMap = map([topic, resultNode]);
   resultMap.aim = { version: 1, branches: [{ id: 'saved-branch', questionNodeId: topic.id, parentBranchId: null, answerSnapshot: { selections: [], freeText: '' }, inputSnapshot: { topic: 'Fixture', conditions: {}, upstreamResults: [] }, createdAt: '2026-10-09T00:00:00.000Z', results: [{ nodeId: resultNode.id, notePath: resultNode.path, version: 1, kind: 'synthesis' }] }], runs: [], pendingCommits: [] };
@@ -1144,36 +1148,49 @@ integrationTest('topic outline: switching to another map tab re-syncs the outlin
   state.views = []; plugin.releaseOutline(a);
   assert.equal(plugin.outlineMap, null, 'no map left: the outline empties');
 });
-integrationTest('card tools: only AI explore, Details and More float; More holds Collapse, This card and Select subtopics (the title is edited in place, so no Rename)', () => {
+integrationTest('card tools: AI explore, Details, Collapse, This card and Select subtopics are icon-only buttons with no More menu (the title is edited in place, so no Rename)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   // The tools float over the card's top edge, hidden until hover, focus or selection, and take no space.
   assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; visibility: hidden;[^}]*width: max-content;/m);
   assert.match(css, /\.vam-node:hover > \.vam-node-tools, \.vam-node:focus-within > \.vam-node-tools, \.vam-viewport:not\(\.is-selecting\) \.vam-node\.is-selected > \.vam-node-tools \{ opacity: 1; visibility: visible;/);
   assert.equal(/vam-ai-slot|vam-ai-tool/.test(css), false, 'no selected-only swap remains');
   assert.match(css, /\.vam-node-tools > \.vam-ai-explore::before \{ content: "✦" \/ "";/, 'the sparkle is decoration, not part of the name');
-  const toolsOf = (setup = () => {}) => {
+  assert.match(css, /\.vam-node-tools > \.vam-node-tool \{[^}]*width: 26px;[^}]*padding-left: 0; padding-right: 0;/, 'icon-only tools are 26px wide with no side padding');
+  assert.match(css, /\.vam-node-tools > \.vam-node-tool \.svg-icon \{ width: 14px; height: 14px; \}/);
+  assert.doesNotMatch(css, /\.vam-ai-explore::before \{[^}]*margin-right/, 'the icon-only sparkle needs no gap');
+  const toolsOf = (setup = () => {}, id = 'a') => {
     const fixture = selectionView(load);
     setup(fixture);
     fixture.build();
-    const tools = fixture.cards().a.children.find(child => child.classes.has('vam-node-tools'));
-    const buttons = tools.children.filter(child => child.tag === 'button');
-    const open = recordMenus(fixture.view);
-    const more = buttons.find(button => button.classes.has('vam-more-tool'));
-    return Object.assign(buttons, { menu: more ? open(more).map(entry => entry.title) : [] });
+    const tools = fixture.cards()[id].children.find(child => child.classes.has('vam-node-tools'));
+    return tools.children.filter(child => child.tag === 'button');
   };
+  const names = buttons => buttons.map(button => button.attrs['aria-label']);
+  const noMore = (buttons, why) => assert.equal(buttons.some(button => button.classes.has('vam-more-tool') || button.attrs['aria-haspopup'] || button.attrs['aria-label'] === 'More actions for this topic' || /More/.test(button.text ?? '')), false, `no More button or menu: ${why}`);
+  // Unfolded card with a subtopic: five icon-only buttons, one press each (no More menu in between).
   const buttons = toolsOf();
-  assert.deepEqual(buttons.map(button => button.text), ['AI explore', 'Details', '⋯ More'], 'three floating buttons');
-  assert.deepEqual(buttons.menu, ['Collapse', 'This card', 'Select subtopics'], 'every other action is in More; Add text is only in the + menu');
+  assert.deepEqual(names(buttons), ['AI explore', 'Details', 'Collapse', 'This card', 'Select subtopics'], 'five floating buttons in order');
+  assert.deepEqual(buttons.map(button => button.iconName), [undefined, 'panel-right', 'chevrons-down-up', 'git-fork', 'list-checks'], 'AI explore keeps the sparkle pseudo-element, the rest set an icon');
+  assert.ok(buttons.every(button => !button.text), 'icon only: no visible text');
+  noMore(buttons, 'unfolded card');
   const explore = buttons[0];
-  assert.ok(explore.classes.has('vam-ai-explore')); assert.equal(explore.attrs['aria-label'], undefined, 'the visible text is the accessible name (WCAG 2.5.3)');
+  assert.ok(explore.classes.has('vam-ai-explore'));
   assert.equal(buttons.filter(button => button.classes.has('vam-ai-explore')).length, 1, 'one AI button');
-  assert.equal(buttons[1].attrs['aria-label'], 'Open details in right sidebar');
-  assert.equal(buttons[2].attrs['aria-label'], 'More actions for this topic'); assert.equal(buttons[2].attrs['aria-haspopup'], 'menu');
-  // A leaf has no Collapse; select mode keeps Details and a More with only Collapse.
+  assert.ok(!buttons[2].classes.has('vam-collapse-button'), 'the fold tool is not the header fold button');
+  // A leaf has no Collapse and no Select subtopics.
   const leaf = toolsOf(({ view }) => { view.map.nodes = view.map.nodes.filter(item => item.id !== 'c'); });
-  assert.deepEqual(leaf.map(button => button.text), ['AI explore', 'Details', '⋯ More']); assert.deepEqual(leaf.menu, ['This card']);
+  assert.deepEqual(names(leaf), ['AI explore', 'Details', 'This card']); noMore(leaf, 'leaf');
+  // A folded card keeps its Expand in the header: no Collapse and no Select subtopics in the tools.
+  const folded = toolsOf(({ doc }) => { doc.nodes.find(n => n.id === 'a').collapsed = true; });
+  assert.deepEqual(names(folded), ['AI explore', 'Details', 'This card']); noMore(folded, 'folded card');
+  // Select mode with a subtopic: Details and Collapse only; without one: Details only.
   const selecting = toolsOf(({ view }) => { view.selection.toggleMultiSelect(); });
-  assert.deepEqual(selecting.map(button => button.text), ['Details', '⋯ More']); assert.deepEqual(selecting.menu, ['Collapse']);
+  assert.deepEqual(names(selecting), ['Details', 'Collapse']); noMore(selecting, 'select mode');
+  const selectingLeaf = toolsOf(({ view }) => { view.selection.toggleMultiSelect(); }, 'b');
+  assert.deepEqual(names(selectingLeaf), ['Details']); noMore(selectingLeaf, 'select mode, leaf');
+  // AIM map: no AI explore, This card or Select subtopics; Details and the fold stay.
+  const aim = toolsOf(({ view }) => { view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; });
+  assert.deepEqual(names(aim), ['Details', 'Collapse']); noMore(aim, 'AIM map');
   const { translate } = load('i18n.ts');
   assert.deepEqual(['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_details', 'ui.ai_explore'].map(key => translate('zh-TW', key)), ['收合', '這張卡', '詳情', 'AI 探索']);
 });
@@ -1483,9 +1500,7 @@ integrationTest('Select subtopics: shown only for an unfolded, non-AIM card that
   const toolTexts = (setup = () => {}, id = 'a') => {
     const fixture = selectionView(load); setup(fixture); fixture.build();
     const tools = fixture.cards()[id].children.find(child => child.classes.has('vam-node-tools'));
-    const more = tools.children.find(child => child.classes.has('vam-more-tool'));
-    const entries = more ? recordMenus(fixture.view)(more) : [];
-    return { fixture, buttons: entries.map(entry => ({ text: entry.title, handlers: new Map([['click', () => entry.fn()]]) })) };
+    return { fixture, buttons: tools.children.filter(child => child.tag === 'button').map(button => ({ text: button.attrs['aria-label'], handlers: button.handlers })) };
   };
   const has = (setup, id) => toolTexts(setup, id).buttons.some(button => button.text === 'Select subtopics');
   assert.equal(has(), true, 'a has the direct subtopic c');

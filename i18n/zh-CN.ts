@@ -1078,7 +1078,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.select_subtopics": "选择子议题",
   "ui.select_subtopics_hint": "选择这个议题底下所有直属子议题",
   "ui.card_more": "⋯ 更多",
-  "ui.card_more_hint": "这个议题的更多操作",
   "ui.selection_more_hint": "已选议题的更多操作",
   "ui.selection_help": "?",
   "ui.selection_help_hint": "选择议题的操作说明",

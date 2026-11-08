@@ -216,16 +216,13 @@ test('aim-hidden: E1 the card of an AIM node has the generic tools and none of t
     const buttons = [], view = viewOf(loader, doc);
     view.stageEl = element('stage', buttons);
     view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
-    const listed = [];
-    view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, onClick() { return chain; } }; build(chain); listed.push(it.title); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
     view.renderNode(conclusion);
-    // The Structure, Rename and similar tools sit in the card's More menu: open it and count its entries as the card's tools.
-    buttons.find(button => button.text === '⋯ More')?.click({ stopPropagation() {} });
-    return [...buttons.map(button => button['aria-label'] ?? button.text), ...listed];
+    // The card tools are icon-only buttons named by aria-label (no More menu).
+    return buttons.map(button => button['aria-label'] ?? button.text);
   };
   const shown = render(load), hidden = render(loadHidden);
   assert.equal(shown.includes('AI explore'), false, 'AIM on: generic tools are hidden on an AIM map');
-  assert.ok(hidden.includes('Open details in right sidebar'));
+  assert.ok(hidden.includes('Details'));
   assert.ok(shown.includes('Continue exploring'), 'AIM on: the AIM action is there');
   for (const label of ['AI explore', 'This card', 'Add subtopic manually']) assert.ok(hidden.includes(label), label);
   assert.equal(hidden.includes('Continue exploring'), false);

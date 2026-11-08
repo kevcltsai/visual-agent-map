@@ -808,12 +808,14 @@ test('a repaint gives the new stage its viewport before any card is drawn or foc
   assert.match(view, /private applyStageTransform\(\): void \{[\s\S]*?style\.transform = `translate\(\$\{x\}px, \$\{y\}px\) scale\(\$\{zoom\}\)`/);
   assert.match(view, /private applyStageTransform\(\): void \{[\s\S]*?--vam-zoom/, 'the tool row counter-scale is measured right too');
 });
-test('card tools: only AI explore, Details and More float; More holds fold, structure, rename, select subtopics and add text', () => {
+test('card tools: AI explore, Details, fold, this card, select subtopics and remove float as icon-only buttons; there is no More menu on the card', () => {
   const view = read('experiences/visual-map/view.ts');
-  assert.match(view, /private openCardMoreMenu\(/);
+  assert.doesNotMatch(view, /openCardMoreMenu|vam-more-tool|ui\.card_more_hint/, 'the card More menu is gone');
+  for (const icon of ['panel-right', 'chevrons-down-up', 'git-fork', 'list-checks', 'trash']) assert.match(view, new RegExp(`"${icon}"`), `${icon} tool`);
+  assert.match(view, /private openSelectionMoreMenu\(/, 'the selection bar keeps its More');
   assert.match(view, /alignCardTools\(card: HTMLElement\)[\s\S]*placeCardTools\(card, tools/);
   const { translate } = load('i18n.ts');
-  for (const lang of ['en', 'zh-TW', 'zh-CN']) for (const key of ['ui.card_more', 'ui.card_more_hint', 'ui.selection_more_hint', 'ui.selection_help_hint']) {
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) for (const key of ['ui.card_more', 'ui.selection_more_hint', 'ui.selection_help_hint']) {
     assert.notEqual(translate(lang, key), key, `${lang} ${key}`);
   }
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');

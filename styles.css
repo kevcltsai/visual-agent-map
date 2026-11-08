@@ -315,7 +315,9 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }
 .vam-node-tools > .vam-ai-explore { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-weight: 600; }
-.vam-node-tools > .vam-ai-explore::before { content: "✦" / ""; margin-right: 4px; }
+.vam-node-tools > .vam-ai-explore::before { content: "✦" / ""; }
+.vam-node-tools > .vam-node-tool { width: 26px; padding-left: 0; padding-right: 0; display: inline-flex; align-items: center; justify-content: center; }
+.vam-node-tools > .vam-node-tool .svg-icon { width: 14px; height: 14px; }
 .vam-node:hover > .vam-add-child, .vam-node:focus-within > .vam-add-child, .vam-node.is-selected > .vam-add-child { opacity: 1; pointer-events: auto; }
 /* One line per status: a long progress label ends in an ellipsis instead of running past the card. */
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }

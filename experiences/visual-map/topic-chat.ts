@@ -36,7 +36,7 @@ export interface TopicChatRect {
 export interface TopicChatHost {
   topicTitle(): string;
   /** The topic card and the canvas area, both in the same (client) coordinates; null while the card is not drawn. */
-  anchor(): { card: TopicChatRect; area: TopicChatRect } | null;
+  anchor(): { card: TopicChatRect; area: TopicChatRect; controls?: TopicChatRect | null } | null;
   session(): TopicChatSession;
   /** Calls `changed` whenever the session changes; returns the unsubscribe function. */
   subscribe(changed: () => void): () => void;
@@ -68,10 +68,13 @@ export class TopicChatWindow {
   private readonly inputEl: HTMLTextAreaElement;
   private readonly sendEl: HTMLButtonElement;
   private readonly tabEl: HTMLElement;
+  private readonly ghostEl: HTMLElement;
+  private readonly ghostTextEl: HTMLElement;
   private readonly modeHintEl: HTMLElement;
   private readonly kindEls = new Map<TopicChatButtonKind, HTMLButtonElement>();
   private readonly modeEls = new Map<TopicChatMode, HTMLButtonElement>();
   private readonly cleanups: Array<() => void> = [];
+  private parentEl: HTMLElement | null = null;
   private submitting = false;
   private destroyed = false;
 
@@ -112,7 +115,11 @@ export class TopicChatWindow {
     });
     this.on(this.inputEl, "input", () => this.typed());
     this.on(this.inputEl, "keydown", event => this.keydown(event));
-    this.tabEl = composer.createSpan({ cls: "vam-topic-chat-tab", text: t("ui.topic_chat_tab_adopt") });
+    // The grey suggestion and its Tab chip share one line (the chip follows the text, also when the text wraps), so both live in
+    // an overlay that lays out like the input; the placeholder stays for assistive tech but is drawn transparent while this shows.
+    this.ghostEl = composer.createDiv({ cls: "vam-topic-chat-ghost", attr: { "aria-hidden": "true" } });
+    this.ghostTextEl = this.ghostEl.createSpan({ cls: "vam-topic-chat-ph" });
+    this.tabEl = this.ghostEl.createSpan({ cls: "vam-topic-chat-tab", text: t("ui.topic_chat_tab_adopt") });
     this.tabEl.hidden = true;
     const foot = composer.createDiv("vam-topic-chat-foot");
     const modes = foot.createDiv({
@@ -157,6 +164,9 @@ export class TopicChatWindow {
   /** Puts the window in `parent` (again, after a repaint), places it and, unless `focus` is false, moves the focus to the input. */
   mount(parent: HTMLElement, focus = true): void {
     if (!parent.contains(this.el)) parent.appendChild(this.el);
+    // JS-toggled (the map stylesheet allows no :has()): lifts this overlay above the controls overlay that follows it.
+    parent.addClass("has-topic-chat");
+    this.parentEl = parent;
     this.reposition();
     if (focus) this.inputEl.focus();
   }
@@ -166,7 +176,7 @@ export class TopicChatWindow {
     if (this.destroyed) return;
     const anchor = this.host.anchor();
     if (!anchor) return;
-    const { card, area } = anchor;
+    const { card, area, controls } = anchor;
     const areaWidth = area.right - area.left;
     const areaHeight = area.bottom - area.top;
     if (!(areaWidth > 0)) return;
@@ -182,7 +192,12 @@ export class TopicChatWindow {
     if (left + width > areaWidth) left = card.left - area.left - width - GAP;
     left = Math.max(0, Math.min(left, areaWidth - width));
     let top = card.top - area.top;
-    if (areaHeight > 0) top = Math.max(0, Math.min(top, areaHeight - height));
+    let floor = areaHeight;
+    // Keep the window off the zoom/layout controls in the bottom corner: its lower edge stops above them when they share columns.
+    if (controls && controls.left < area.left + left + width && controls.right > area.left + left) {
+      floor = Math.min(floor, controls.top - area.top - GAP);
+    }
+    if (floor > 0) top = Math.max(0, Math.min(top, floor - height));
     this.el.setCssProps({ left: `${left}px`, top: `${top}px` });
   }
 
@@ -191,6 +206,7 @@ export class TopicChatWindow {
     if (this.destroyed) return;
     this.destroyed = true;
     for (const cleanup of this.cleanups.splice(0)) cleanup();
+    this.parentEl?.removeClass("has-topic-chat");
     this.el.remove();
   }
 
@@ -287,6 +303,9 @@ export class TopicChatWindow {
     const ghost = session.draftKind && empty ? suggestion(session.draftKind) : "";
     this.inputEl.setAttr("placeholder", ghost || t("ui.topic_chat_placeholder"));
     this.tabEl.hidden = !ghost || busy;
+    this.ghostEl.hidden = !ghost;
+    this.inputEl.toggleClass("is-ghost", !!ghost);
+    this.ghostTextEl.setText(ghost);
     this.sendEl.disabled = !this.canSend();
     this.paintLog(session);
   }

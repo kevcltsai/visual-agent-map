@@ -191,6 +191,44 @@ test('topic chat reposition: right when it fits, left when not, bottom on a narr
   assert.ok(!hasClass(f.win.el, 'is-bottom'));
 });
 
+test('topic chat side placement stops above the zoom/layout controls and ignores controls it does not share columns with', () => {
+  const rects = {};
+  const f = fixture({ anchor: () => rects.value });
+  const area = { left: 0, top: 0, right: 1000, bottom: 800 };
+  const controls = { left: 600, top: 750, right: 990, bottom: 790 };
+  Object.defineProperty(f.win.el, 'offsetHeight', { value: 300, configurable: true });
+  Object.defineProperty(f.win.el, 'offsetWidth', { value: 340, configurable: true });
+  rects.value = { card: { left: 700, top: 700, right: 870, bottom: 760 }, area, controls };
+  f.win.reposition();
+  assert.equal(f.win.el.style.left, '352px');
+  assert.equal(f.win.el.style.top, '442px', 'bottom edge sits 8px above the controls (750-8-300)');
+  rects.value = { card: { left: 100, top: 700, right: 270, bottom: 760 }, area, controls: { ...controls, left: 700 } };
+  f.win.reposition();
+  assert.equal(f.win.el.style.top, '500px', 'controls in other columns do not push it up (800-300)');
+});
+
+test('topic chat lifts its overlay above the controls overlay while mounted and drops it on destroy (class + CSS string check)', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.has-topic-chat\.vam-canvas-overlay\s*\{[^}]*z-index:\s*5/);
+  const f = fixture();
+  assert.ok(hasClass(f.root, 'has-topic-chat'));
+  f.win.destroy();
+  assert.ok(!hasClass(f.root, 'has-topic-chat'));
+});
+
+test('topic chat puts the Tab chip in the same grey-text line, not in its own row', () => {
+  const f = fixture();
+  f.action('expand').click();
+  const tab = find(f.win.el, i => hasClass(i, 'vam-topic-chat-tab'));
+  assert.ok(tab && !tab.hidden);
+  assert.ok(hasClass(tab.parent, 'vam-topic-chat-ghost'), 'chip is inside the ghost line');
+  const text = find(tab.parent, i => hasClass(i, 'vam-topic-chat-ph'));
+  assert.equal(text.text, t('ui.topic_chat_suggest_expand'));
+  assert.ok(find(f.win.el, i => hasClass(i, 'vam-topic-chat-composer')).children.includes(tab.parent));
+  f.press('Tab');
+  assert.ok(tab.hidden && tab.parent.hidden, 'adopted: grey line and chip go away');
+});
+
 test('topic chat destroy releases every listener and the host subscription', () => {
   const f = fixture();
   const all = findAll(f.win.el, () => true);

@@ -50112,10 +50112,13 @@ var TopicChatWindow = class {
     __publicField(this, "inputEl");
     __publicField(this, "sendEl");
     __publicField(this, "tabEl");
+    __publicField(this, "ghostEl");
+    __publicField(this, "ghostTextEl");
     __publicField(this, "modeHintEl");
     __publicField(this, "kindEls", /* @__PURE__ */ new Map());
     __publicField(this, "modeEls", /* @__PURE__ */ new Map());
     __publicField(this, "cleanups", []);
+    __publicField(this, "parentEl", null);
     __publicField(this, "submitting", false);
     __publicField(this, "destroyed", false);
     this.el = parent.createDiv({ cls: "vam-topic-chat" });
@@ -50147,7 +50150,9 @@ var TopicChatWindow = class {
     });
     this.on(this.inputEl, "input", () => this.typed());
     this.on(this.inputEl, "keydown", (event) => this.keydown(event));
-    this.tabEl = composer.createSpan({ cls: "vam-topic-chat-tab", text: t("ui.topic_chat_tab_adopt") });
+    this.ghostEl = composer.createDiv({ cls: "vam-topic-chat-ghost", attr: { "aria-hidden": "true" } });
+    this.ghostTextEl = this.ghostEl.createSpan({ cls: "vam-topic-chat-ph" });
+    this.tabEl = this.ghostEl.createSpan({ cls: "vam-topic-chat-tab", text: t("ui.topic_chat_tab_adopt") });
     this.tabEl.hidden = true;
     const foot = composer.createDiv("vam-topic-chat-foot");
     const modes = foot.createDiv({
@@ -50191,6 +50196,8 @@ var TopicChatWindow = class {
   /** Puts the window in `parent` (again, after a repaint), places it and, unless `focus` is false, moves the focus to the input. */
   mount(parent, focus = true) {
     if (!parent.contains(this.el)) parent.appendChild(this.el);
+    parent.addClass("has-topic-chat");
+    this.parentEl = parent;
     this.reposition();
     if (focus) this.inputEl.focus();
   }
@@ -50199,7 +50206,7 @@ var TopicChatWindow = class {
     if (this.destroyed) return;
     const anchor = this.host.anchor();
     if (!anchor) return;
-    const { card, area } = anchor;
+    const { card, area, controls } = anchor;
     const areaWidth = area.right - area.left;
     const areaHeight = area.bottom - area.top;
     if (!(areaWidth > 0)) return;
@@ -50215,14 +50222,20 @@ var TopicChatWindow = class {
     if (left + width > areaWidth) left = card.left - area.left - width - GAP;
     left = Math.max(0, Math.min(left, areaWidth - width));
     let top = card.top - area.top;
-    if (areaHeight > 0) top = Math.max(0, Math.min(top, areaHeight - height));
+    let floor = areaHeight;
+    if (controls && controls.left < area.left + left + width && controls.right > area.left + left) {
+      floor = Math.min(floor, controls.top - area.top - GAP);
+    }
+    if (floor > 0) top = Math.max(0, Math.min(top, floor - height));
     this.el.setCssProps({ left: `${left}px`, top: `${top}px` });
   }
   /** Releases every listener and removes the window. Does not tell the host. */
   destroy() {
+    var _a2;
     if (this.destroyed) return;
     this.destroyed = true;
     for (const cleanup of this.cleanups.splice(0)) cleanup();
+    (_a2 = this.parentEl) == null ? void 0 : _a2.removeClass("has-topic-chat");
     this.el.remove();
   }
   on(target, name2, handler) {
@@ -50308,6 +50321,9 @@ var TopicChatWindow = class {
     const ghost = session.draftKind && empty ? suggestion(session.draftKind) : "";
     this.inputEl.setAttr("placeholder", ghost || t("ui.topic_chat_placeholder"));
     this.tabEl.hidden = !ghost || busy;
+    this.ghostEl.hidden = !ghost;
+    this.inputEl.toggleClass("is-ghost", !!ghost);
+    this.ghostTextEl.setText(ghost);
     this.sendEl.disabled = !this.canSend();
     this.paintLog(session);
   }
@@ -70959,11 +70975,12 @@ ${request.requirements}` : preset.text,
         return (_d = (_c = (_a2 = this.notes.get(entry.nodeId)) == null ? void 0 : _a2.title) != null ? _c : (_b2 = node()) == null ? void 0 : _b2.path) != null ? _d : "";
       },
       anchor: () => {
-        var _a2, _b2;
+        var _a2, _b2, _c, _d, _e, _f, _g;
         const card = this.cardEls.get(entry.nodeId);
         const overlay = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-canvas-overlay");
         if (!(card == null ? void 0 : card.getBoundingClientRect) || !(overlay == null ? void 0 : overlay.getBoundingClientRect)) return null;
-        return { card: card.getBoundingClientRect(), area: overlay.getBoundingClientRect() };
+        const controls = (_g = (_f = (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector) == null ? void 0 : _d.call(_c, ".vam-zoom-controls")) == null ? void 0 : _e.getBoundingClientRect) == null ? void 0 : _f.call(_e)) != null ? _g : null;
+        return { card: card.getBoundingClientRect(), area: overlay.getBoundingClientRect(), controls };
       },
       session: () => entry.session,
       subscribe: (changed) => {

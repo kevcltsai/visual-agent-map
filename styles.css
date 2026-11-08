@@ -2036,8 +2036,14 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-action:disabled, .vam-topic-chat-mode:disabled, .vam-topic-chat-send:disabled { opacity: 0.5; cursor: default; }
 .vam-topic-chat-composer { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 6px; border: 1px solid var(--interactive-accent); border-radius: var(--radius-m); }
 .vam-topic-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; border: 0; background: transparent; box-shadow: none; caret-color: var(--text-accent); }
+/* The window lives in the first canvas overlay; the controls overlay (zoom, layout) comes later in the DOM at the same level and would cover it. */
+.has-topic-chat.vam-canvas-overlay { z-index: 5; }
+.vam-topic-chat-input, .vam-topic-chat-ghost { padding: 0; font: inherit; line-height: var(--line-height-normal); }
+.vam-topic-chat-input.is-ghost::placeholder { color: transparent; }
 .vam-topic-chat-input::placeholder { color: var(--text-faint); }
-.vam-topic-chat-tab { align-self: flex-start; padding: 0 5px; border: 1px solid var(--background-modifier-border); border-bottom-width: 2px; border-radius: var(--radius-s); color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-topic-chat-ghost { position: absolute; top: 8px; left: 8px; right: 8px; color: var(--text-faint); overflow-wrap: anywhere; pointer-events: none; }
+.vam-topic-chat-ghost[hidden] { display: none; }
+.vam-topic-chat-tab { margin-left: 6px; padding: 0 5px; border: 1px solid var(--background-modifier-border); border-bottom-width: 2px; border-radius: var(--radius-s); color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-topic-chat-tab[hidden] { display: none; }
 .vam-topic-chat-foot { display: flex; align-items: center; gap: 6px; }
 .vam-topic-chat-modes { display: inline-flex; gap: 2px; }

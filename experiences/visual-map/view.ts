@@ -16408,7 +16408,8 @@ export class VisualAgentMapView extends ItemView {
         const card = this.cardEls.get(entry.nodeId);
         const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
         if (!card?.getBoundingClientRect || !overlay?.getBoundingClientRect) return null;
-        return { card: card.getBoundingClientRect(), area: overlay.getBoundingClientRect() };
+        const controls = this.contentEl?.querySelector?.<HTMLElement>(".vam-zoom-controls")?.getBoundingClientRect?.() ?? null;
+        return { card: card.getBoundingClientRect(), area: overlay.getBoundingClientRect(), controls };
       },
       session: () => entry.session,
       subscribe: changed => {

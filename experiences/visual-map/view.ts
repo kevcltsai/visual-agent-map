@@ -630,7 +630,6 @@ import {
   type OutputLanguageMemory,
   type AiModeMemory,
   type BackgroundHooks,
-  type PendingOutline,
   outlineProposals,
   proposalOutline,
   type QuickOutline,
@@ -789,8 +788,6 @@ const ARROW_OFFSETS = new Map<string, -1 | 1>([
 const TASK_PROGRESS_PREFIX = "vam-task:";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
-/** Owner 2026-10-28: the AI structure review stays in the code but the Next Step dialog no longer offers it; flip to show it again. */
-const STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 /**
  * Writes an AI synthesis result into the parent topic. `save` re-checks the map, sources and parent note and throws
  * (writing nothing) when anything changed; the caller decides whether the run may still write before calling it.
@@ -1595,17 +1592,6 @@ export class VisualAgentMapView extends ItemView {
   /** The one topic chat window that is open (not whether it is attached: a repaint takes it out for a moment). */
   private topicChatOpen: { entry: TopicChatEntry; win: TopicChatWindow } | null = null;
   private disclosureSeq = 0;
-  /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
-  private quickOutlines = new Map<
-    string,
-    {
-      mapPath: string;
-      nodes: OutlineNode[];
-      dropped: number;
-      bounds?: { levels: number; maxTopics: number };
-      options: TaskOptions;
-    }
-  >();
   /** The AI structure review that hid its window. The view owns it: Stop, the result and the highlights. */
   private structureReviewTask: {
     mapPath: string;
@@ -3644,7 +3630,6 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
   private dropMapBackground(): void {
-    this.quickOutlines.clear();
     this.quickOutlineSummaries.clear();
     const review = this.structureReviewTask;
     const draft = this.outlineDraftTask;
@@ -4223,19 +4208,6 @@ export class VisualAgentMapView extends ItemView {
           ...(options.noteStyle ? { noteStyle: options.noteStyle } : {})
         })
     };
-  }
-  /** 「檢視整張圖」 on a root topic, 「檢視這個分支」 on a subtopic with subtopics; nothing on a leaf or an AIM map. */
-  private structureReviewEntry(node: MapNode): { label: string; open: () => void } | undefined {
-    if (!this.map || this.outlineImportTarget().map !== "editable") return undefined;
-    if (node.parentId === null)
-      return { label: t("ui.structure_review_entry_map"), open: () => this.openStructureReview(null) };
-    if (this.map.nodes.some(item => item.parentId === node.id))
-      return { label: t("ui.structure_review_entry_branch"), open: () => this.openStructureReview(node.id) };
-    return undefined;
-  }
-  /** What the Next Step dialog offers; nothing while the entry is hidden (`STRUCTURE_REVIEW_ENTRY_SHOWN`). */
-  private nextStepStructureReview(node: MapNode): { label: string; open: () => void } | undefined {
-    return STRUCTURE_REVIEW_ENTRY_SHOWN ? this.structureReviewEntry(node) : undefined;
   }
   /** The AI sees each card's title, summary and status only; never a note body. */
   private describeForReview(id: string): { title: string; summary: string; status: string } | undefined {
@@ -14686,26 +14658,12 @@ export class VisualAgentMapView extends ItemView {
       !merging
     )
       this.renderOtherProviderButton(header, [node]);
-    const waitingOutline = this.quickOutlines.get(node.path);
-    if (
-      waitingOutline &&
-      waitingOutline.mapPath === this.path &&
-      !this.selection.state.multiSelectMode &&
-      !this.aimLive()
-    )
-      this.button(header, t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length), () =>
-        this.openNextStep(node)
-      ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
     if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !this.aimLive()) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
-      } else if (synthesis.state === "directions")
-        this.button(header, t("ui.choose_synthesis_direction"), () => this.openNextStep(node)).addClass(
-          "vam-badge-new"
-        );
-      else {
+      } else if (synthesis.state !== "directions") {
         header.createSpan({
           cls: "vam-status vam-status-error",
           text: synthesis.state === "cancelled" ? t("ui.ai_task_cancelled") : t("ui.failed"),
@@ -16298,17 +16256,6 @@ export class VisualAgentMapView extends ItemView {
         own = undefined;
         if (!this.closed) this.render();
       },
-      outlineReady: outline => {
-        if (!node || this.closed || this.path !== mapPath) return;
-        this.quickOutlines.set(node.path, { mapPath, ...outline });
-        const title = this.notes.get(node.id)?.title ?? node.path;
-        const count = outlineProposals(outline.nodes).length;
-        backgroundResultNotice(t("ui.background_outline_ready_0", title), {
-          label: t("ui.review_outline_0", count),
-          open: () => this.openNextStep(node)
-        });
-        this.render();
-      },
       completed: (kind, result) => {
         if (!node || this.closed || this.path !== mapPath) return;
         const title = this.notes.get(node.id)?.title ?? node.path;
@@ -17015,129 +16962,6 @@ export class VisualAgentMapView extends ItemView {
   }
   private selectionTaskKey(): string {
     return `selection:${this.path}`;
-  }
-  private openNextStep(node: MapNode): void {
-    if (this.notesLoading()) return;
-    if (this.presentation) return;
-    this.enqueue(async () => {
-      const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-      if (this.aiLockReason("write", [node.id], new Map([[node.id, note]]))) {
-        new Notice(t("ui.ai_locked_notice"));
-        return;
-      }
-      const sources = this.taskSourceSettings();
-      // Read the styles again first (#38): a style file made since the last run is what `note-style` may point at.
-      await this.refreshNoteStyles();
-      const current = this.topicStyle(note);
-      sources.synthesisTopics =
-        this.map?.nodes
-          .filter(item => item.parentId === node.id)
-          .map(item => this.notes.get(item.id)?.title ?? item.path) ?? [];
-      const dialog = new NextStepModal(
-        this.app,
-        note.title,
-        this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0,
-        this.plugin.topicRuns.pending(node.path)?.length ?? 0,
-        this.plugin,
-        async (options, focus, done, failed, accepted) => {
-          const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          const taskLanguage =
-            options.outputLanguage ?? cardOutputLanguage(this.map, this.plugin.settings.language, latest.title);
-          const task = researchTopicTask(taskLanguage, latest.title);
-          const runStyle = await this.detailTemplateFor(
-            node,
-            options.noteStyle,
-            undefined,
-            options.outputLanguage ?? this.plugin.settings.language
-          );
-          await this.runAgent(
-            node,
-            done,
-            failed,
-            {
-              runStyle,
-              task: [task, options.requirements].filter(Boolean).join("\n\n"),
-              referenceGroups: options.referenceGroups,
-              onProgress: options.onProgress,
-              signal: options.signal,
-              outputLanguage: options.outputLanguage,
-              rules: "",
-              researchMode: options.researchMode,
-              researchDepth: options.researchDepth,
-              visualMode: options.visualMode,
-              mapAiMode: options.mapAiMode,
-              addCharts: options.mapAiMode !== "quick"
-            },
-            accepted,
-            // The dialog's model for this run only; a pinned choice was already saved on the topic.
-            options.runOnce
-          );
-        },
-        (options, direction, found, failed, accepted) =>
-          this.proposeChildren(node, options, direction, found, failed, accepted),
-        (options, direction, failed, accepted, observer) =>
-          this.startSynthesis(node, options, direction, failed, accepted, observer),
-        {
-          model: note.model,
-          modelSource: note.modelSource,
-          followDefault: await this.plugin.repo.followDefaultModel(node.path, this.map ?? undefined),
-          reasoning: note.reasoning ?? this.plugin.settings.cliReasoning,
-          rules: note.rules,
-          path: node.path,
-          save: patch => this.plugin.mutate(() => this.noteChange(node, patch)),
-          running:
-            this.plugin.topicRuns.isBusy(node.path) ||
-            this.plugin.quickExpandPending.has(node.path) ||
-            this.startingTasks.has(node.path),
-          stop:
-            this.startingTasks.has(node.path) || this.plugin.topicRuns.hasTask(node.path)
-              ? () => (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
-              : undefined,
-          background: this.backgroundHooks(node.path, node),
-          stopKey: () =>
-            stopLabelKey(
-              this.plugin.topicRuns.runKind(node.path),
-              !!this.plugin.quickExpandPending?.has(node.path),
-              this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
-            ),
-          quickOutline: this.quickOutline(node),
-          pendingOutline: ((): PendingOutline | undefined => {
-            const waiting = this.quickOutlines.get(node.path);
-            if (!waiting || waiting.mapPath !== this.path) return undefined;
-            return {
-              nodes: waiting.nodes,
-              dropped: waiting.dropped,
-              bounds: waiting.bounds,
-              options: waiting.options,
-              discard: () => {
-                if (this.quickOutlines.get(node.path) === waiting) this.quickOutlines.delete(node.path);
-                if (!this.closed) this.render();
-              }
-            };
-          })(),
-          structureReview: this.nextStepStructureReview(node),
-          sources,
-          currentStyle: current.recipe.name,
-          currentSummary: note.summary,
-          ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
-          ...this.outputLanguageMemory(),
-          ...this.aiModeMemory(),
-          ...(showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id))
-            ? { topicStatus: note.status }
-            : {}),
-          childrenCompleted:
-            this.map?.nodes.filter(item => item.parentId === node.id && this.notes.get(item.id)?.status === "completed")
-              .length ?? 0,
-          synthesisPending: (() => {
-            const pending = this.synthesisTasks.get(node.path);
-            return pending?.state === "directions" && pending.mapPath === this.path
-              ? { directions: pending.directions, discard: () => this.discardSynthesis(node) }
-              : undefined;
-          })()
-        }
-      );
-      this.openMapModal(dialog);
-    });
   }
   private openNodePanel(node: MapNode, mode: "structure" | "proposals"): void {
     const render = (content: HTMLElement, close: () => void, host: HTMLElement): void =>
@@ -19238,7 +19062,8 @@ export class VisualAgentMapView extends ItemView {
     if (keyboardFocus && !this.inlineName && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
     this.focusInlineName();
   }
-  private async proposeChildren(
+  /** No production caller since the topic chat (expand there goes through `chatExpand`); kept public for the proposal engine's tests and prompt snapshots. */
+  async proposeChildren(
     parent: MapNode,
     options?: TaskOptions,
     direction = "",
@@ -20520,13 +20345,8 @@ export class VisualAgentMapView extends ItemView {
             outcome = "found";
             task.state = "directions";
             task.directions = items;
-            // Shown in the dialog when it is still open; otherwise the node badge and one Notice carry it.
+            // Shown in the dialog that started the step.
             if (observer?.isOpen() && observer.directions) observer.directions(items);
-            else
-              backgroundResultNotice(t("ui.background_synthesis_directions_ready"), {
-                label: t("ui.choose_synthesis_direction"),
-                open: () => this.openSynthesisDirections(node, task)
-              });
           },
           fail,
           markAccepted
@@ -20558,12 +20378,6 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.topicRuns.releaseTask(path, controller);
       this.render();
     }
-  }
-  /** Reopens the synthesis dialog at its waiting directions (from the Notice button), if they are still waiting. */
-  private openSynthesisDirections(node: MapNode, task: unknown): void {
-    const current = this.synthesisTasks.get(node.path);
-    if (current !== task || current?.state !== "directions" || current.mapPath !== this.path) return;
-    this.openNextStep(node);
   }
   private discardSynthesis(node: MapNode): void {
     if (this.notesLoading()) return;
@@ -20618,15 +20432,9 @@ export class VisualAgentMapView extends ItemView {
       const current = await this.mapStyle(settings.language, { kind: "topic" });
       const dialog = new NextStepModal(
         this.app,
-        "",
-        0,
-        0,
         this.plugin,
-        async () => {},
-        async () => {},
         (options, direction, failed, accepted, observer) =>
           this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer),
-        undefined,
         {
           names,
           initialTitle:

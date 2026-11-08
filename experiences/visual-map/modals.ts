@@ -7,9 +7,7 @@ import {
   supportedLanguageLabel,
   SUPPORTED_LANGUAGES,
   t,
-  type ContentLanguage,
-  type NoteLanguage,
-  type TranslationKey
+  type ContentLanguage
 } from "../../i18n";
 import { App, Component, MarkdownRenderer, Modal, Notice, Setting, TFile } from "obsidian";
 import { type ReferenceGroup } from "../../ai/reference-materials";
@@ -20,25 +18,17 @@ export { armDiscard };
 import { clone, type MapDocument, parseMap, serializeMap } from "../../map-model";
 import {
   normalizeReasoningLevel,
-  type ModelSource,
-  type NotePatch,
   type ResearchDepth,
   type ResearchMode,
   type TopicInfo,
   type VisualMode
 } from "../../repository";
 import type { AiResult, ReasoningLevel, Suggestion } from "../../ai/types";
-import {
-  limitOutline,
-  QUICK_OUTLINE_MAX_LEVELS,
-  QUICK_OUTLINE_MAX_TOPICS,
-  type OutlineLimits,
-  type OutlineNode
-} from "./outline-import";
-import { FOLLOW_DEFAULT_MODEL, syncModelSelect } from "../../core/model-discovery";
-import { aiModeField, fieldLink, linkedField, styleChoiceField } from "./research-fields";
+import { type OutlineLimits, type OutlineNode } from "./outline-import";
+import { FOLLOW_DEFAULT_MODEL } from "../../core/model-discovery";
+import { styleChoiceField } from "./research-fields";
 import { errorNotice, stylePickerFor } from "./note-style-picker";
-import { aiModeOptions, DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
+import { type MapAiMode } from "./ai-mode";
 import { titleProblemText } from "../../ui/modals/title-check";
 
 export type SynthesisContent = "full" | "summary";
@@ -104,19 +94,6 @@ export interface BackgroundHooks {
    * its result so the notice can offer "Re-run with Standard" when the answer says the model's knowledge was not enough.
    */
   completed?: (kind: "research" | "expand", result?: AiResult) => void;
-  /** A quick outline finished while the dialog is closed: the view keeps it for review and announces it. */
-  outlineReady?: (outline: Omit<PendingOutline, "discard">) => void;
-}
-/** A generated quick outline waiting for review: the dialog reopens straight at its review with these. */
-export interface PendingOutline {
-  nodes: OutlineNode[];
-  /** Headings the AI wrote beyond the chosen levels or size; they were left out. */
-  dropped: number;
-  /** The levels and size the outline was generated with: the reopened dialog shows them again. */
-  bounds?: { levels: number; maxTopics: number };
-  options: TaskOptions;
-  /** Called once the reviewed outline was created: drops the waiting result. */
-  discard: () => void;
 }
 /** The map's remembered output language and how to record a manual choice (D-2026-10-88). */
 export interface OutputLanguageMemory {
@@ -135,45 +112,6 @@ export interface AiModeMemory {
   rememberAiMode?: (mode: MapAiMode) => Promise<void>;
 }
 export { FOLLOW_DEFAULT_MODEL };
-export interface NextStepSettings extends OutputLanguageMemory, AiModeMemory {
-  /**
-   * The note language the topic note already uses: its stored `content-language`, or the language of its standard Detail
-   * headings when it has none (D-2026-10-84). A detected output language with another note language is not preselected.
-   */
-  contentLanguage?: NoteLanguage;
-  model: string;
-  modelSource: ModelSource;
-  /**
-   * What "follow the default" means for this topic: a root follows the workspace model, a child follows its upper
-   * topic. `model` is the model that choice would run on now; `overridden` tells whether a manual ancestor supplies it
-   * (the menu then says "upper topic", otherwise "current model"). Absent: the dialog assumes a root and the plugin setting.
-   */
-  followDefault?: { source: Exclude<ModelSource, "manual">; model: string; overridden?: boolean };
-  reasoning: string;
-  rules?: string;
-  path?: string;
-  save: (patch: NotePatch) => Promise<void>;
-  running?: boolean;
-  stop?: () => void;
-  sources?: TaskSourceSettings;
-  synthesisPending?: { directions: Suggestion[]; discard: () => void };
-  /** Name of the note style the topic resolves to today ("Old setting (…)" for an implicit one): the X of "Note style: X". */
-  currentStyle?: string;
-  /** The topic's summary today, shown beside a draft that would replace it. */
-  currentSummary?: string;
-  /** The topic's research state and how many of its direct children are researched, for the suggested mode. */
-  topicStatus?: "idea" | "running" | "completed" | "error";
-  childrenCompleted?: number;
-  /** Quick explore: an AI outline from a preset, reviewed in this dialog before any subtopic is created. */
-  quickOutline?: QuickOutline;
-  /** A quick outline generated while the dialog was closed; opening the dialog goes straight to its review. */
-  pendingOutline?: PendingOutline;
-  /** 「檢視整張圖」 (root topic) or 「檢視這個分支」 (subtopic): opens the AI structure review instead of a step. */
-  structureReview?: { label: string; open: () => void };
-  background?: BackgroundHooks;
-  /** The i18n key of this dialog's Stop while a run is going (expanding reads "Stop expanding"). */
-  stopKey?: () => "ui.stop_expand" | "ui.stop_research";
-}
 export interface QuickOutline {
   presets: { id: string; name: string }[];
   /** Generates the outline for this topic; the outline's root is the topic itself. */
@@ -230,7 +168,7 @@ export interface SelectionSynthesis {
   initialTitle: string;
   /** The direction used when the AI suggestions are skipped. */
   defaultDirection: string;
-  fields: Pick<NextStepSettings, "sources" | "currentStyle" | "outputLanguage" | "mapTitle" | "rememberOutputLanguage">;
+  fields: OutputLanguageMemory & { sources?: TaskSourceSettings; currentStyle?: string };
   /** Reopened from the selection bar with directions waiting. */
   pending?: { directions: Suggestion[]; discard: () => void };
   background?: BackgroundHooks;
@@ -291,39 +229,19 @@ export interface TaskSourceSettings {
 }
 export { defaultOutputLanguage };
 
+/** The multi-select synthesis dialog: setup, directions, draft and review all happen here. */
 export class NextStepModal extends Modal {
   private closed = false;
-  /** AI started and this dialog hid itself; closing no longer stops the run (Stop is on the card or bar). */
+  /** AI started and this dialog hid itself; closing no longer stops the run (Stop is on the selection bar). */
   private detached = false;
   private backgroundBegan = false;
   private runPending = false;
-  /**
-   * The model and level menus' state (MS-06): what this run uses once, and what a run start writes to the topic (only
-   * an explicit "follow" or "pin"; never when the dialog is cancelled).
-   */
-  private modelMenu?: { runOnce: () => RunOnceModel | undefined; patch: () => NotePatch; saved: () => void };
   /** The output language the person picked in this dialog; saved on the map when a run starts. */
   private manualOutputLanguage?: ContentLanguage;
+  private taskController?: AbortController;
   constructor(
     app: App,
-    private topic: string,
-    private childrenCount: number,
-    private pendingCount: number,
     private plugin: VisualAgentMapPlugin,
-    private research: (
-      options: TaskOptions,
-      focus: string,
-      done: (result: AiResult) => void,
-      failed: (message: string) => void,
-      accepted: () => void
-    ) => Promise<void>,
-    private expand: (
-      options: TaskOptions,
-      direction: string,
-      found: (items: Suggestion[], create: (items: Suggestion[]) => Promise<void>) => void,
-      failed: (message: string, retryable?: boolean) => void,
-      accepted: () => void
-    ) => Promise<void>,
     private synthesize: (
       options: TaskOptions,
       direction: string | null,
@@ -331,36 +249,17 @@ export class NextStepModal extends Modal {
       accepted: () => void,
       observer?: SynthesisObserver
     ) => Promise<void>,
-    private modelSettings?: NextStepSettings,
-    /** Not `selection`: Obsidian's Modal keeps the page's text selection in that field when it opens. */
-    private selectionFlow?: SelectionSynthesis
+    private selectionFlow: SelectionSynthesis
   ) {
     super(app);
   }
-  /** Where the shared fields (data sources, template, tone) come from: the topic's settings, or the selection's. */
-  private get info():
-    | Pick<NextStepSettings, "sources" | "currentStyle" | "outputLanguage" | "mapTitle" | "rememberOutputLanguage">
-    | undefined {
-    return this.modelSettings ?? this.selectionFlow?.fields;
-  }
-  /** Suggests the next step from where the topic stands: frontier → research, settled leaf → expand, settled branch → synthesize. */
-  private suggestedMode(): "research" | "expand" | "synthesize" {
-    const settings = this.modelSettings;
-    if (settings?.synthesisPending) return "synthesize";
-    if (settings?.pendingOutline) return "expand";
-    if (settings?.topicStatus !== "completed") return "research";
-    if (!this.childrenCount) return "expand";
-    return settings.childrenCompleted === this.childrenCount ? "synthesize" : "research";
-  }
-  private taskSignal?: AbortSignal;
-  private taskController?: AbortController;
-  private unsubscribeModels?: () => void;
   /**
-   * The map's saved data sources, read under the task signal when a run starts. Sources that cannot be read are
+   * The selection's saved data sources, read under the task signal when a run starts. Sources that cannot be read are
    * skipped: the run goes on with the rest and the dialog shows nothing about them.
    */
   private async mapSourceGroups(signal: AbortSignal | undefined): Promise<ReferenceGroup[]> {
-    const groups = (await this.info?.sources?.mapSources?.(signal ?? new AbortController().signal)) ?? [];
+    const groups =
+      (await this.selectionFlow.fields.sources?.mapSources?.(signal ?? new AbortController().signal)) ?? [];
     if (signal?.aborted) throw Object.assign(new Error("Aborted"), { name: "AbortError" });
     return groups;
   }
@@ -379,74 +278,39 @@ export class NextStepModal extends Modal {
       value.setText(text ? (text.length > 24 ? `${text.slice(0, 24)}…` : text) : t("ui.not_set"));
     });
     disclosure.createEl("p", { text: t("ui.requirements_this_task_only"), cls: "vam-hint" });
-    if (this.modelSettings?.rules?.trim())
-      parent.createEl("p", { text: t("ui.legacy_rules_not_applied"), cls: "vam-hint" });
   }
   private requirements(): string {
     return this.requirementsInput?.value.trim() ?? "";
-  }
-  /** This dialog's one-run model choice for a run's options; nothing when the topic's own resolution applies. */
-  private runOnceOptions(): { runOnce?: RunOnceModel } {
-    const runOnce = this.modelMenu?.runOnce();
-    return runOnce ? { runOnce } : {};
-  }
-  private get background(): BackgroundHooks | undefined {
-    return this.modelSettings?.background ?? this.selectionFlow?.background;
   }
   /**
    * Hides the dialog once AI starts: usage confirmed, settings saved and sources ready (so a validation error still
    * shows in the dialog). The view takes over Stop for `controller` until the provider accepts the request.
    */
-  private detach(controller: AbortController, kind: "research" | "expand" = "research"): void {
+  private detach(controller: AbortController): void {
     this.detached = true;
-    // Stop before the provider took the pre-started process leaves nothing waiting.
-    controller.signal.addEventListener("abort", () => this.plugin.releaseWarmClaude?.(), { once: true });
     this.backgroundBegan = true;
-    this.background?.begin(controller, kind);
+    this.selectionFlow.background?.begin(controller);
     this.close();
   }
   private endBackground(): void {
     if (!this.backgroundBegan) return;
     this.backgroundBegan = false;
-    this.background?.end();
+    this.selectionFlow.background?.end();
   }
   /** True when a started run should stop: it was aborted, or its dialog closed before AI started. */
   private dead(controller: AbortController): boolean {
     return controller.signal.aborted || (this.closed && !this.detached);
   }
-  /** Pre-starts the Claude CLI for the research step (no model call); a run that does not use it kills it. */
-  private prewarmAi(webSearch = true, mode?: "synthesize"): void {
-    if (this.selectionFlow || this.closed) return;
-    this.plugin.prewarmClaude?.(
-      this.modelSettings?.model ?? this.plugin.settings.cliModel,
-      this.modelSettings?.reasoning,
-      webSearch,
-      mode
-    );
-  }
   onClose(): void {
     this.closed = true;
-    // Closed without starting AI: the pre-started process is no longer needed. A started run took (or will take) it.
-    if (!this.detached) this.plugin.releaseWarmClaude?.();
     // A run that the provider already accepted, or that hid this dialog, keeps going in the background; one still
     // starting is stopped.
     if (!this.detached) this.taskController?.abort();
-    this.unsubscribeModels?.();
   }
-  /** Records the AI mode on the map when a research or expansion starts (before AI runs; a cancelled dialog never gets here). */
-  private async rememberMode(mode: MapAiMode): Promise<void> {
-    await this.modelSettings?.rememberAiMode?.(mode);
-  }
-  /** Saves the model and effort chosen in this dialog, once, at the moment a run actually starts. */
+  /** The output language picked by hand is remembered on the map, once, at the moment a run actually starts. */
   private async flushSettings(): Promise<void> {
-    const patch = this.modelMenu?.patch() ?? {};
-    if (Object.keys(patch).length && this.modelSettings) {
-      await this.modelSettings.save(patch);
-      this.modelMenu?.saved();
-    }
-    // The output language picked by hand is remembered on the map (never when the dialog is cancelled).
     const manual = this.manualOutputLanguage;
-    const remember = this.info?.rememberOutputLanguage;
+    const remember = this.selectionFlow.fields.rememberOutputLanguage;
     if (manual !== undefined && remember) {
       this.manualOutputLanguage = undefined;
       try {
@@ -456,200 +320,6 @@ export class NextStepModal extends Modal {
         throw error;
       }
     }
-  }
-  /**
-   * The model and level menus. A choice here is for this run only unless the scope menu says "pin" (MS-06); only an
-   * explicit "pin", or "follow" on a topic, is written, and only when a run starts (`flushSettings`).
-   */
-  private renderModelSettings(parent: HTMLElement): HTMLElement | undefined {
-    if (!this.modelSettings) return;
-    const settings = this.modelSettings;
-    const advanced = parent.createEl("details", { cls: "vam-advanced vam-next-model" });
-    const advancedValue = advanced
-      .createEl("summary", { text: t("ui.model_and_advanced_settings") })
-      .createSpan({ cls: "vam-next-disclosure-value" });
-    const { field: modelLabel, head: modelHead } = linkedField(advanced, t("ui.model"));
-    const model = modelLabel.createEl("select");
-    model.setAttr("aria-label", t("ui.model"));
-    model.add(new Option(this.plugin.modelLabel(settings.model), settings.model));
-    model.value = settings.model;
-    const optionList =
-      typeof this.plugin.availableModels === "function"
-        ? this.plugin.availableModels()
-        : this.plugin.settings.models
-            .split(/[\n,]/)
-            .map((value: string) => value.trim())
-            .filter(Boolean);
-    const options = new Set<string>(optionList);
-    const follow = settings.followDefault ?? {
-      source: "workspace" as const,
-      model: this.plugin.settings.cliModel,
-      overridden: false
-    };
-    // What the topic is now. It changes only when a "follow" or a "pin" is saved.
-    const initial = {
-      model: settings.model,
-      source: settings.modelSource,
-      reasoning: normalizeReasoningLevel(settings.reasoning)
-    };
-    const currentReasoning = (): ReasoningLevel => normalizeReasoningLevel(this.plugin.settings.cliReasoning);
-    let menu = initial.source === "manual" ? initial.model : FOLLOW_DEFAULT_MODEL;
-    let followPicked = false;
-    let scope: "once" | "pin" = "once";
-    const base = (): { model: string; reasoning: ReasoningLevel } =>
-      followPicked ? { model: follow.model, reasoning: currentReasoning() } : initial;
-    // A specific model counts as a choice unless it is the override the topic already has.
-    const explicit = (): boolean =>
-      !followPicked && menu !== FOLLOW_DEFAULT_MODEL && !(initial.source === "manual" && menu === initial.model);
-    const differs = (): boolean => {
-      const level = normalizeReasoningLevel(settings.reasoning) !== base().reasoning;
-      return followPicked ? level : explicit() || settings.model !== base().model || level;
-    };
-    this.modelMenu = {
-      runOnce: () => {
-        if (!differs() || (!followPicked && scope === "pin")) return undefined;
-        return { model: settings.model, reasoning: normalizeReasoningLevel(settings.reasoning) };
-      },
-      patch: () => {
-        if (followPicked) return { modelSource: follow.source };
-        if (differs() && scope === "pin")
-          return {
-            model: settings.model,
-            modelSource: "manual",
-            reasoning: normalizeReasoningLevel(settings.reasoning)
-          };
-        return {};
-      },
-      saved: () => {
-        // The written choice is what the topic is now; the next run starts from it.
-        if (followPicked)
-          Object.assign(initial, { model: follow.model, source: follow.source, reasoning: currentReasoning() });
-        else if (differs() && scope === "pin")
-          Object.assign(initial, {
-            model: settings.model,
-            source: "manual" as const,
-            reasoning: normalizeReasoningLevel(settings.reasoning)
-          });
-        else return;
-        menu = initial.source === "manual" ? initial.model : FOLLOW_DEFAULT_MODEL;
-        followPicked = false;
-        scope = "once";
-        refresh();
-      }
-    };
-    const followLabel = (): string =>
-      t(
-        follow.overridden ? "ui.follow_parent_topic_0" : "ui.follow_current_model_0",
-        this.plugin.modelLabel(follow.model)
-      );
-    const syncModels = (): void => {
-      const chosen = menu;
-      if (chosen === FOLLOW_DEFAULT_MODEL) model.value = "";
-      syncModelSelect(
-        model,
-        this.plugin.availableModels(),
-        id => this.plugin.modelLabel(id),
-        t("ui.current_model_is_unavailable")
-      );
-      model.insertBefore(new Option(followLabel(), FOLLOW_DEFAULT_MODEL), model.firstChild);
-      model.value = chosen;
-      options.clear();
-      this.plugin.availableModels().forEach(id => options.add(id));
-    };
-    syncModels();
-    // One way to recover: the link opens the setup guide when the CLI is missing, otherwise checks again.
-    fieldLink(modelHead, t("ui.connection_repair"), () =>
-      this.plugin.repairConnection(model.value === FOLLOW_DEFAULT_MODEL ? follow.model : model.value)
-    );
-    const discovery = advanced.createDiv("vam-model-discovery-status");
-    const discoveryText = discovery.createSpan({ cls: "vam-hint" });
-    const updateDiscovery = (): void => {
-      const codex = this.plugin.modelDiscoveryState("codex"),
-        claude = this.plugin.modelDiscoveryState("claude");
-      discoveryText.setText(
-        `Codex: ${t(`ui.model_status_${codex.status}`)}${codex.error ? ` · ${codex.error}` : ""} | Claude: ${t(`ui.model_status_${claude.status}`)}`
-      );
-      syncModels();
-    };
-    this.unsubscribeModels?.();
-    this.unsubscribeModels = this.plugin.subscribeModelDiscovery(() => {
-      if (!this.closed) updateDiscovery();
-    });
-    updateDiscovery();
-    void this.plugin.refreshModelDiscovery("codex");
-    void this.plugin.refreshModelDiscovery("claude");
-    const sourceLabels: Record<ModelSource, string> = {
-      workspace: t("ui.workspace_default"),
-      inherited: t("ui.inherited_at_creation"),
-      manual: t("ui.manually_selected")
-    };
-    const summaryText = (): string =>
-      t(
-        "ui.0_1_reasoning_can_be_adjusted_per_topic",
-        this.plugin.modelLabel(settings.model),
-        followPicked
-          ? sourceLabels[follow.source]
-          : differs()
-            ? scope === "pin"
-              ? sourceLabels.manual
-              : t("ui.model_scope_once")
-            : sourceLabels[initial.source]
-      );
-    const modelSummary = advanced.createEl("p", { cls: "vam-hint", text: summaryText() });
-    model.value = menu;
-    model.addEventListener("change", () => {
-      if (model.value === FOLLOW_DEFAULT_MODEL) {
-        menu = FOLLOW_DEFAULT_MODEL;
-        followPicked = true;
-        // Follow pins nothing: a specific model or level picked earlier in this dialog is dropped, and the level shown
-        // goes back to the current setting (what a topic that is not an override runs on).
-        settings.model = follow.model;
-        settings.reasoning = currentReasoning();
-        reasoning.value = settings.reasoning;
-        refresh();
-        return;
-      }
-      if (!options.has(model.value)) return;
-      menu = model.value;
-      followPicked = false;
-      settings.model = model.value;
-      refresh();
-    });
-    const reasoningField = advanced.createEl("label", { cls: "vam-field" });
-    reasoningField.createSpan({ text: t("ui.reasoning_level") });
-    const reasoning = reasoningField.createEl("select");
-    reasoning.setAttr("aria-label", t("ui.reasoning_level"));
-    for (const value of ["auto", "low", "medium", "high"])
-      reasoning.createEl("option", { value, text: reasoningLabel(value) });
-    reasoning.value = normalizeReasoningLevel(settings.reasoning);
-    reasoning.addEventListener("change", () => {
-      settings.reasoning = normalizeReasoningLevel(reasoning.value);
-      refresh();
-    });
-    // Offered only when the dialog differs from the topic. "This run only" is the default; pinning is deliberate.
-    const scopeField = advanced.createEl("label", { cls: "vam-field vam-next-model-scope" });
-    scopeField.createSpan({ text: t("ui.model_scope") });
-    const scopeSelect = scopeField.createEl("select");
-    scopeSelect.setAttr("aria-label", t("ui.model_scope"));
-    scopeSelect.createEl("option", { value: "once", text: t("ui.model_scope_once") });
-    scopeSelect.createEl("option", { value: "pin", text: t("ui.model_scope_pin") });
-    scopeSelect.value = "once";
-    scopeSelect.addEventListener("change", () => {
-      scope = scopeSelect.value === "pin" ? "pin" : "once";
-      refresh();
-    });
-    const refresh = (): void => {
-      const visible = differs() && !followPicked;
-      if (!visible) {
-        scope = "once";
-        scopeSelect.value = "once";
-      }
-      scopeField.hidden = scopeSelect.hidden = !visible;
-      modelSummary.setText(summaryText());
-      advancedValue.setText(`${this.plugin.modelLabel(settings.model)} · ${reasoningLabel(settings.reasoning)}`);
-    };
-    refresh();
-    return advanced;
   }
   private async run(
     panel: HTMLElement,
@@ -667,7 +337,6 @@ export class NextStepModal extends Modal {
       if (failureHelp) failureHelp.hidden = true;
       const controller = new AbortController();
       this.taskController = controller;
-      this.taskSignal = controller.signal;
       const tasksBefore = new Set(this.plugin.activeTasks?.keys?.() ?? []);
       const status = panel.querySelector<HTMLElement>(".vam-next-status");
       status?.setText(t("ui.ai_running_ai"));
@@ -694,10 +363,7 @@ export class NextStepModal extends Modal {
         );
         const release = (): void => {
           if (!this.closed) cancel.hidden = true;
-          if (this.taskController === controller) {
-            this.taskSignal = undefined;
-            this.taskController = undefined;
-          }
+          if (this.taskController === controller) this.taskController = undefined;
         };
         if (backgroundTaskRunning) {
           const waitForTasks = (): void => {
@@ -711,7 +377,7 @@ export class NextStepModal extends Modal {
       }
     };
     try {
-      const model = this.modelSettings?.model ?? this.plugin.settings.cliModel;
+      const model = this.plugin.settings.cliModel;
       const started = needsUsage
         ? await this.plugin.confirmAiUsage(model, start)
         : (await this.plugin.aiReadyForModel(model)) && (await start(), true);
@@ -750,10 +416,7 @@ export class NextStepModal extends Modal {
         isOpen: () => !this.closed,
         accepted: stop => {
           // From here the run has its own controller: closing this dialog must not stop it, Cancel does.
-          if (this.taskController === controller) {
-            this.taskSignal = undefined;
-            this.taskController = undefined;
-          }
+          if (this.taskController === controller) this.taskController = undefined;
           this.endBackground();
           if (cancel && !this.closed) {
             cancel.hidden = false;
@@ -801,10 +464,6 @@ export class NextStepModal extends Modal {
     panel.querySelector<HTMLElement>(".vam-next-status")?.setText(message);
     button.disabled = false;
   }
-  private startedInBackground(): void {
-    new Notice(t("ui.task_started_in_background_0", this.topic));
-    this.close();
-  }
   private failedAi(panel: HTMLElement, button: HTMLButtonElement, message: string): void {
     this.failed(panel, button, message);
     if (this.closed) return;
@@ -825,538 +484,33 @@ export class NextStepModal extends Modal {
     }
     help.hidden = false;
   }
-  private proposals(
-    panel: HTMLElement,
-    suggestions: Suggestion[],
-    create: (items: Suggestion[]) => Promise<void>,
-    button: HTMLButtonElement,
-    consumed: () => void,
-    options: TaskOptions
-  ): void {
-    if (this.closed) return;
-    const result = panel.querySelector<HTMLElement>(".vam-next-result")!;
-    result.empty();
-    result.createEl("h4", { text: t("ui.ai_subtopic_proposals") });
-    result.createEl("p", { text: t("ui.select_subtopics_to_create_you_can_edit_their_names_and_task") });
-    let showCount = (_count: number): void => {};
-    const list = renderProposalList(result, suggestions, count => showCount(count));
-    const confirm = result.createEl("button", { text: t("ui.create_0_subtopics", list.count()), cls: "mod-cta" });
-    showCount = count => {
-      confirm.setText(t("ui.create_0_subtopics", count));
-      if (!this.runPending) confirm.disabled = count === 0;
-      // A changed selection clears an old error, but keeps the review hint.
-      const status = panel.querySelector<HTMLElement>(".vam-next-status");
-      if (status && status.textContent !== t("ui.review_ai_suggested_subtopics")) status.setText("");
-    };
-    // While proposals are open, "Create subtopics" is the one primary action.
-    button.classList.toggle("mod-cta", false);
-    confirm.addEventListener("click", () => {
-      void (async () => {
-        const picked = list.selected();
-        if (typeof picked === "string") {
-          if (picked === t("ui.select_at_least_one_subtopic"))
-            panel.querySelector<HTMLElement>(".vam-next-status")?.setText(picked);
-          else this.failed(panel, button, picked);
-          return;
-        }
-        void this.run(
-          panel,
-          confirm,
-          async () => {
-            options.signal = this.taskSignal;
-            panel.querySelector<HTMLElement>(".vam-next-status")?.setText(t("ui.creating_subtopics"));
-            try {
-              await create(picked);
-              if (options.shallowResearch) {
-                this.taskSignal = undefined;
-                this.taskController = undefined;
-                this.startedInBackground();
-                return;
-              }
-              // Guided expansion ends here: the subtopics exist, so say so and close instead of leaving a spent dialog.
-              consumed();
-              new Notice(t("ui.subtopics_created"));
-              this.taskSignal = undefined;
-              this.taskController = undefined;
-              this.close();
-            } catch (error) {
-              if (error instanceof PartialChildBatchError) {
-                result.empty();
-                button.classList.toggle("mod-cta", true);
-                consumed();
-                button.disabled = true;
-              }
-              throw error;
-            }
-          },
-          false
-        );
-      })();
-    });
-    panel.querySelector<HTMLElement>(".vam-next-status")?.setText(t("ui.review_ai_suggested_subtopics"));
-  }
-  /** The generated outline, reviewed here; nothing is created until the user confirms. */
-  private outlineReview(
-    panel: HTMLElement,
-    nodes: OutlineNode[],
-    button: HTMLButtonElement,
-    create: (nodes: OutlineNode[], options: TaskOptions) => Promise<void>,
-    options: TaskOptions,
-    /** Headings the AI wrote beyond the chosen levels or size; they are left out of the review. */
-    dropped = 0
-  ): void {
-    if (this.closed) return;
-    const result = panel.querySelector<HTMLElement>(".vam-next-result")!;
-    result.empty();
-    const status = (): HTMLElement | null => panel.querySelector<HTMLElement>(".vam-next-status");
-    const items = outlineProposals(nodes);
-    if (!items.length) {
-      this.failed(panel, button, t("ui.quick_outline_empty"));
-      return;
-    }
-    result.createEl("h4", { text: t("ui.quick_outline_review") });
-    if (dropped) result.createEl("p", { cls: "vam-hint", text: t("ui.quick_outline_trimmed_0", dropped) });
-    let showCount = (_count: number): void => {};
-    const list = renderProposalList(result, items, count => showCount(count), { compact: true });
-    const confirm = result.createEl("button", { text: t("ui.create_0_subtopics", list.count()), cls: "mod-cta" });
-    showCount = count => {
-      confirm.setText(t("ui.create_0_subtopics", count));
-      if (!this.runPending) confirm.disabled = count === 0;
-    };
-    button.classList.toggle("mod-cta", false);
-    confirm.addEventListener("click", () => {
-      const picked = list.selected();
-      if (typeof picked === "string") {
-        status()?.setText(picked);
-        return;
-      }
-      void this.run(
-        panel,
-        confirm,
-        async () => {
-          options.signal = this.taskSignal;
-          status()?.setText(t("ui.creating_subtopics"));
-          await create(proposalOutline(picked), options);
-          this.taskSignal = undefined;
-          this.taskController = undefined;
-          this.modelSettings?.pendingOutline?.discard();
-          if (options.shallowResearch) {
-            this.startedInBackground();
-            return;
-          }
-          new Notice(t("ui.subtopics_created"));
-          this.close();
-        },
-        false
-      );
-    });
-    status()?.setText(t("ui.quick_outline_review_hint"));
-  }
   onOpen(): void {
     this.modalEl.addClass("vam-next-modal");
     const selection = this.selectionFlow;
-    this.titleEl.setText(t(selection ? "ui.confirm_topic_synthesis" : "ui.how_would_you_like_to_explore_next"));
-    // The decision comes first: where the topic stands, the next step and one summary line; every option sits under Adjust.
-    const intro = this.contentEl.createEl("p", { cls: "vam-modal-intro vam-next-topic" });
-    if (!selection) intro.createSpan({ text: t("ui.current_topic_0", this.topic) });
-    const topicStatus = this.modelSettings?.topicStatus;
-    if (topicStatus)
-      intro.createSpan({
-        cls: `vam-status vam-status-${topicStatus}`,
-        text: t(
-          topicStatus === "completed"
-            ? "ui.researched"
-            : topicStatus === "running"
-              ? "ui.ai_running"
-              : topicStatus === "error"
-                ? "ui.task_error"
-                : "ui.to_research"
-        )
-      });
-    const initialMode = selection ? "synthesize" : this.suggestedMode();
-    let currentMode: "research" | "expand" | "synthesize" = initialMode;
-    // One action bar below the scrolling content: Close plus the current step's primary action.
+    this.titleEl.setText(t("ui.confirm_topic_synthesis"));
+    // One action bar below the scrolling content: Close plus the current stage's primary actions.
     const actions = modalActions(this);
     const closeButton = actions.createEl("button", { text: t("ui.close"), cls: "vam-next-close" });
     closeButton.addEventListener("click", () => this.close());
-    const confirm = actions.createEl("button", { text: t("ui.confirm_research_task"), cls: "mod-cta" });
-    confirm.dataset.topicRun = t("ui.confirm_research_task");
-    confirm.disabled = !!this.modelSettings?.running;
-    let synthesisContentSelect: HTMLSelectElement | undefined;
-    // The three steps are one choice: a radio group with arrow-key movement, not three toggles.
-    const cards = this.contentEl.createDiv("vam-next-cards");
-    cards.setAttr("role", "radiogroup");
-    cards.setAttr("aria-label", t("ui.how_would_you_like_to_explore_next"));
-    let show: (mode: "research" | "expand" | "synthesize") => void;
-    const card = (
-      title: TranslationKey,
-      description: TranslationKey,
-      mode: "research" | "expand" | "synthesize"
-    ): HTMLButtonElement => {
-      const button = cards.createEl("button", { cls: "vam-next-card" });
-      const copy = button.createSpan();
-      copy.createEl("strong", { text: t(title) });
-      copy.createSpan({ text: t(description) });
-      button.setAttr("role", "radio");
-      button.setAttr("aria-checked", mode === initialMode ? "true" : "false");
-      button.tabIndex = mode === initialMode ? 0 : -1;
-      button.addEventListener("click", () => show(mode));
-      button.addEventListener("keydown", event => {
-        const order = ["research", "expand", "synthesize"] as const;
-        const step = ["ArrowRight", "ArrowDown"].includes(event.key)
-          ? 1
-          : ["ArrowLeft", "ArrowUp"].includes(event.key)
-            ? -1
-            : 0;
-        if (!step) return;
-        event.preventDefault();
-        const next = order[(order.indexOf(mode) + step + order.length) % order.length];
-        show(next);
-        cardFor[next].focus();
-      });
-      if (mode === initialMode) {
-        button.addClass("is-active");
-        button.createSpan({ text: t("ui.suggested"), cls: "vam-next-suggested" });
-      }
-      return button;
-    };
-    const researchCard = card("ui.research_deeper", "ui.find_answers_for_this_topic_at_your_chosen_depth", "research");
-    const expandCard = card(
-      "ui.expand_the_map",
-      "ui.discuss_directions_or_explore_multiple_levels_with_shallow_r",
-      "expand"
-    );
-    const synthesizeCard = card(
-      "ui.synthesize_findings",
-      "ui.find_shared_conclusions_differences_and_next_steps_across_su",
-      "synthesize"
-    );
-    const cardFor = { research: researchCard, expand: expandCard, synthesize: synthesizeCard };
-    // The AI mode switch sits at the top level of the dialog: Quick (no web, the model's own knowledge) or Standard (web,
-    // images). It applies to a research and to an expansion, and the map remembers the last one that was run.
-    const aiMode = aiModeField(this.contentEl, {
-      initial: this.modelSettings?.aiMode ?? DEFAULT_MAP_AI_MODE,
-      onChange: () => {
-        shallowHint.setText(shallowHintText());
-        // A different mode changes the command: pre-start again (the old process is killed).
-        warmForMode();
-        refreshSummary();
-      }
-    });
-    const structureReview = selection ? undefined : this.modelSettings?.structureReview;
-    if (structureReview) {
-      const row = this.contentEl.createDiv("vam-next-structure");
-      row.createSpan({ cls: "vam-next-structure-label", text: t("ui.structure_review_entry_label") });
-      row
-        .createEl("button", { text: structureReview.label, cls: "vam-next-structure-open" })
-        .addEventListener("click", () => {
-          this.close();
-          structureReview.open();
-        });
-      this.contentEl.createEl("p", {
-        cls: "vam-hint vam-next-structure-hint",
-        text: t("ui.structure_review_entry_hint")
-      });
-    }
-    // Multi-select synthesis is this same dialog with only its synthesis step.
-    if (selection) cards.addClass("is-hidden");
-    if (this.modelSettings?.running) {
-      const running = this.contentEl.createDiv("vam-next-running");
-      running.createSpan({ text: t("ui.ai_running_ai") });
-      if (this.modelSettings.stop)
-        running
-          .createEl("button", { text: t(this.modelSettings.stopKey?.() ?? "ui.stop_research") })
-          .addEventListener("click", () => this.modelSettings?.stop?.());
-    }
     // What this run will do, in one line; the details are under Adjust.
     const summaryEl = this.contentEl.createEl("p", { cls: "vam-next-summary", attr: { "aria-live": "polite" } });
-    const research = this.contentEl.createDiv("vam-next-research");
-    const expandPanel = this.contentEl.createDiv("vam-next-research vam-next-choice");
     const synthesizePanel = this.contentEl.createDiv("vam-next-research vam-next-choice");
-    // Every option for every step lives here, in one disclosure; each step shows only its own section.
+    // Every option lives here, in one disclosure.
     const adjust = this.contentEl.createEl("details", { cls: "vam-next-adjust" });
     adjust.open = false;
     adjust.createEl("summary", { text: t("ui.adjust") });
     const adjustBody = adjust.createDiv("vam-next-adjust-body");
-    const adjustFor = {
-      research: adjustBody.createDiv("vam-next-adjust-section"),
-      expand: adjustBody.createDiv("vam-next-adjust-section"),
-      synthesize: adjustBody.createDiv("vam-next-adjust-section")
-    };
-    // --- Research: one confirm; the AI mode is the switch above (Quick or Standard).
-    research.createEl("p", { text: t("ui.start_from_this_node_s_question_update_only_this_node") });
-    research.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
-    confirm.addEventListener("click", () => {
-      void this.run(research, confirm, async () => {
-        const controller = this.taskController;
-        const referenceGroups = controller ? await this.mapSourceGroups(controller.signal) : [];
-        if (!controller || this.dead(controller)) return;
-        const mode = aiMode.value();
-        const options: TaskOptions = {
-          referenceGroups,
-          outputLanguage: languageSelect.value as ContentLanguage,
-          ...aiModeOptions(mode, "research"),
-          requirements: this.requirements(),
-          ...this.runOnceOptions(),
-          ...(noteStyle() ? { noteStyle: noteStyle() } : {}),
-          signal: controller.signal,
-          onProgress: message => {
-            if (!this.closed && !controller.signal.aborted)
-              research.querySelector<HTMLElement>(".vam-next-status")?.setText(message);
-          }
-        };
-        await this.rememberMode(mode);
-        if (this.dead(controller)) return;
-        this.detach(controller);
-        let launchAccepted = false;
-        let launchFailed = false;
-        const release = (): void => {
-          if (this.taskController === controller) {
-            this.taskSignal = undefined;
-            this.taskController = undefined;
-          }
-          if (!this.closed) {
-            const cancel = research.querySelector<HTMLButtonElement>(".vam-task-cancel");
-            if (cancel) cancel.hidden = true;
-          }
-        };
-        const accepted = (): void => {
-          if (controller.signal.aborted || this.taskController !== controller) return;
-          this.taskSignal = undefined;
-          this.taskController = undefined;
-          launchAccepted = true;
-          // The dialog already hid itself when AI started; the card shows the running state and Stop from here.
-          this.endBackground();
-          if (this.closed) return;
-          const cancel = research.querySelector<HTMLButtonElement>(".vam-task-cancel");
-          if (cancel) cancel.hidden = true;
-          this.startedInBackground();
-        };
-        await this.research(
-          options,
-          "",
-          result => {
-            if (this.closed) {
-              this.background?.completed?.("research", options.mapAiMode === "quick" ? result : undefined);
-              return;
-            }
-            release();
-            this.close();
-          },
-          message => {
-            if (this.closed) {
-              new Notice(message);
-              return;
-            }
-            release();
-            launchFailed = true;
-            this.failedAi(research, confirm, message);
-          },
-          accepted
-        );
-        if (!this.closed && !launchAccepted && !launchFailed) {
-          release();
-          this.failed(research, confirm, t("ui.ai_task_cancelled"));
-        }
-      });
-    });
-    // --- Expand: one path. The AI writes a multi-level outline (levels and size are on this panel), reviewed here
-    // before any subtopic is created. Saved suggestions that still wait for review open through their own button.
-    const quickOutline = this.modelSettings?.quickOutline;
-    expandPanel.createEl("p", { text: t("ui.quick_outline_mode_hint") });
-    const limits = expandPanel.createDiv("vam-quick-limits");
-    // How deep and how big the tree may grow: told to the AI, then enforced on its reply before the review.
-    const numberField = (
-      label: string,
-      initial: number,
-      max: number
-    ): { read: () => number; set: (value: number) => void } => {
-      const field = limits.createEl("label", { cls: "vam-field" });
-      field.createSpan({ text: label });
-      const input = field.createEl("input", { type: "number", attr: { min: "1", max: String(max), step: "1" } });
-      input.value = String(initial);
-      input.setAttr("aria-label", label);
-      // Told, never silently clamped: an over-limit entry keeps this note after it is brought back to the limit.
-      const note = field.createSpan({ cls: "vam-field-note", text: t("ui.number_field_at_most_0", max) });
-      note.setAttr("role", "status");
-      note.hidden = true;
-      const read = (): number => Math.min(max, Math.max(1, Math.round(Number(input.value)) || 1));
-      // Focus selects the old value, so the next keystroke replaces it instead of landing after it ("2" + "1" = 21).
-      input.addEventListener("focus", () => input.select());
-      input.addEventListener("input", () => {
-        note.hidden = !(Math.round(Number(input.value)) > max);
-      });
-      input.addEventListener("change", () => {
-        if (Math.round(Number(input.value)) <= max) note.hidden = true;
-        input.value = String(read());
-        refreshSummary();
-      });
-      return {
-        read,
-        set: value => {
-          input.value = String(Math.min(max, Math.max(1, value)));
-        }
-      };
-    };
-    const quickLevelsField = numberField(t("ui.number_of_levels"), 2, QUICK_OUTLINE_MAX_LEVELS);
-    const quickTopicsField = numberField(t("ui.quick_outline_max_topics"), 15, QUICK_OUTLINE_MAX_TOPICS);
-    const quickLevels = quickLevelsField.read;
-    const quickTopics = quickTopicsField.read;
-    limits.createEl("p", { text: t("ui.quick_outline_hint"), cls: "vam-hint" });
-    // The outline preset stays under Adjust.
-    const presetLabel = adjustFor.expand.createEl("label", { cls: "vam-field" });
-    presetLabel.createSpan({ text: t("ui.outline_ai_preset") });
-    const presetSelect = presetLabel.createEl("select");
-    presetSelect.setAttr("aria-label", t("ui.outline_ai_preset"));
-    for (const preset of quickOutline?.presets ?? [])
-      presetSelect.createEl("option", { value: preset.id, text: preset.name });
-    const shallowLabel = adjustFor.expand.createEl("label", { cls: "vam-field vam-next-toggle" });
-    const shallow = shallowLabel.createEl("input", { type: "checkbox" });
-    shallow.checked = false;
-    shallowLabel.createSpan({ text: t("ui.run_shallow_research_on_each_created_subtopic") });
-    // The research of the new subtopics is always the short overview; the AI mode only decides where it gets its facts.
-    const shallowHintText = (): string =>
-      t(
-        "ui.shallow_research_for_expanded_subtopics_0",
-        t(aiMode.value() === "standard" ? "ui.ai_mode_standard_desc" : "ui.ai_mode_quick_desc")
-      );
-    const shallowHint = adjustFor.expand.createEl("p", { cls: "vam-hint" });
-    shallowHint.hidden = true;
-    shallowHint.setText(shallowHintText());
-    const expandFooterText = actions.createSpan({
-      text: t("ui.create_subtopics_after_confirmation_without_running_research"),
-      cls: "vam-next-actions-note"
-    });
-    // Saved suggestions (a research's, or an older guided expansion's): reviewed through the existing path, no AI call.
-    const reviewButton = actions.createEl("button", { text: "" });
-    const expandButton = actions.createEl("button", { text: t("ui.expand"), cls: "mod-cta" });
-    expandButton.dataset.topicRun = expandButton.textContent ?? "";
-    expandButton.disabled = !!this.modelSettings?.running || !quickOutline;
-    expandPanel.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
-    expandPanel.createDiv("vam-next-result");
-    const syncExpand = (): void => {
-      expandFooterText.setText(
-        shallow.checked
-          ? t("ui.research_each_subtopic_after_creation_and_use_codex_quota")
-          : t("ui.create_subtopics_without_research")
-      );
-      reviewButton.setText(t("ui.review_ai_subtopic_suggestions_0", this.pendingCount));
-      reviewButton.dataset.pendingReview = String(this.pendingCount);
-      reviewButton.hidden = currentMode !== "expand" || !this.pendingCount;
-      refreshSummary();
-    };
-    const consumed = (): void => {
-      this.pendingCount = 0;
-      syncExpand();
-    };
-    shallow.addEventListener("change", () => {
-      shallowHint.hidden = !shallow.checked;
-      syncExpand();
-    });
-    const expandOptions = (signal: AbortSignal | undefined): TaskOptions => ({
-      referenceGroups: [],
-      outputLanguage: languageSelect.value as ContentLanguage,
-      requirements: this.requirements(),
-      ...this.runOnceOptions(),
-      ...aiModeOptions(aiMode.value(), "subtopic"),
-      shallowResearch: shallow.checked,
-      ...(noteStyle() ? { noteStyle: noteStyle() } : {}),
-      signal,
-      onProgress: message => {
-        if (!this.closed) expandPanel.querySelector<HTMLElement>(".vam-next-status")?.setText(message);
-      }
-    });
-    reviewButton.addEventListener("click", () => {
-      void this.run(
-        expandPanel,
-        reviewButton,
-        async () => {
-          const referenceGroups = await this.mapSourceGroups(this.taskSignal);
-          const options: TaskOptions = { ...expandOptions(this.taskSignal), referenceGroups };
-          await this.expand(
-            options,
-            "",
-            (items, create) => {
-              if (this.closed) this.background?.completed?.("expand");
-              else this.proposals(expandPanel, items, create, expandButton, consumed, options);
-            },
-            (message, retryable) => {
-              if (this.closed) {
-                new Notice(message);
-                return;
-              }
-              consumed();
-              if (retryable === false) this.failed(expandPanel, expandButton, message);
-              else this.failedAi(expandPanel, expandButton, message);
-              if (retryable === false) expandButton.disabled = true;
-            },
-            () => {}
-          );
-        },
-        false
-      );
-    });
-    expandButton.addEventListener("click", () => {
-      void this.run(expandPanel, expandButton, async () => {
-        if (!quickOutline) return;
-        const signal = this.taskSignal;
-        const controller = this.taskController;
-        if (!signal || !controller) return;
-        const referenceGroups = await this.mapSourceGroups(signal);
-        const mode = aiMode.value();
-        const options: TaskOptions = { ...expandOptions(signal), referenceGroups };
-        const bounds = { levels: quickLevels(), maxTopics: quickTopics() };
-        const request = {
-          presetId: presetSelect.value,
-          requirements: this.requirements(),
-          language: options.outputLanguage ?? this.plugin.settings.language,
-          limits: bounds,
-          ...this.runOnceOptions()
-        };
-        await this.rememberMode(mode);
-        if (this.dead(controller)) return;
-        // Usage confirmed, settings saved and sources ready: hide the dialog; the card shows running and Stop.
-        this.detach(controller, "expand");
-        const generated = await quickOutline.generate(request, signal);
-        if (signal.aborted || (this.closed && !this.detached)) return;
-        const { nodes, dropped } = limitOutline(generated, bounds);
-        if (this.closed) {
-          // Hidden while it ran: the card badge keeps the outline for review and a Notice says it is ready.
-          // The closed dialog's signal and progress callback must not outlive it in the stored options.
-          this.background?.outlineReady?.({
-            nodes,
-            dropped,
-            bounds,
-            options: { ...options, signal: undefined, onProgress: undefined }
-          });
-          return;
-        }
-        this.outlineReview(expandPanel, nodes, expandButton, quickOutline.create, options, dropped);
-      });
-    });
-    // --- Synthesize: setup, directions, draft and review all happen in this one dialog.
-    const pendingDirections = selection ? selection.pending : this.modelSettings?.synthesisPending;
+    const adjustSynthesize = adjustBody.createDiv("vam-next-adjust-section");
+    const pendingDirections = selection.pending;
     synthesizePanel.createEl("p", {
-      text: selection
-        ? t("ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and", selection.names.length)
-        : this.childrenCount
-          ? t("ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes")
-          : t("ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note")
+      text: t("ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and", selection.names.length)
     });
-    let titleInput: HTMLInputElement | undefined;
-    let titleField: HTMLElement | undefined;
-    if (selection) {
-      const titleLabel = synthesizePanel.createEl("label", { cls: "vam-field vam-next-synth-setup" });
-      titleField = titleLabel;
-      titleLabel.createSpan({ text: t("ui.new_topic_name") });
-      titleInput = titleLabel.createEl("input", { type: "text", value: selection.initialTitle });
-      titleInput.setAttr("aria-label", t("ui.new_topic_name"));
-    }
-    synthesisContentSelect = renderSynthesisContent(
-      adjustFor.synthesize,
-      selection?.names ?? this.modelSettings?.sources?.synthesisTopics ?? []
-    );
-    const stageTwoHint = adjustFor.synthesize.createEl("p", {
+    const titleField = synthesizePanel.createEl("label", { cls: "vam-field vam-next-synth-setup" });
+    titleField.createSpan({ text: t("ui.new_topic_name") });
+    const titleInput = titleField.createEl("input", { type: "text", value: selection.initialTitle });
+    titleInput.setAttr("aria-label", t("ui.new_topic_name"));
+    const synthesisContentSelect = renderSynthesisContent(adjustSynthesize, selection.names);
+    const stageTwoHint = adjustSynthesize.createEl("p", {
       cls: "vam-hint vam-next-synth-fixed",
       text: t("ui.synthesis_stage_two_fixed")
     });
@@ -1368,20 +522,18 @@ export class NextStepModal extends Modal {
     suggestButton.dataset.topicRun = suggestButton.textContent ?? "";
     const skipButton = actions.createEl("button", { text: t("ui.synthesis_skip_suggestions") });
     const draftButton = actions.createEl("button", { text: t("ui.get_synthesis_draft"), cls: "mod-cta" });
-    for (const button of [suggestButton, skipButton, draftButton]) button.disabled = !!this.modelSettings?.running;
     let stage: "setup" | "directions" = pendingDirections ? "directions" : "setup";
     // Language, template, sources and content are fixed once the directions are requested; the draft step ignores them.
     let frozenSummary = "";
     const syncSynthesisStage = (): void => {
       const locked = stage === "directions";
-      const here = currentMode === "synthesize";
-      suggestButton.hidden = !here || locked;
-      skipButton.hidden = !here || locked;
-      draftButton.hidden = !here || !locked;
-      adjustFor.synthesize.toggleClass("is-fixed", locked);
+      suggestButton.hidden = locked;
+      skipButton.hidden = locked;
+      draftButton.hidden = !locked;
+      adjustSynthesize.toggleClass("is-fixed", locked);
       stageTwoHint.hidden = !locked;
-      output.hidden = here && locked;
-      titleField?.toggleClass("is-hidden", locked);
+      output.hidden = locked;
+      titleField.toggleClass("is-hidden", locked);
     };
     let directionBox: HTMLTextAreaElement | undefined;
     const showDirections = (items: Suggestion[]): void => {
@@ -1403,50 +555,45 @@ export class NextStepModal extends Modal {
       box.setAttr("aria-label", t("ui.synthesis_direction"));
       directionBox = box;
       synthResult.createEl("button", { text: t("ui.discard_synthesis") }).addEventListener("click", () => {
-        (selection ? selection.pending : this.modelSettings?.synthesisPending)?.discard();
+        selection.pending?.discard();
         this.close();
       });
       synthStatus.setText(t("ui.choose_or_edit_a_synthesis_direction_then_get_a_draft"));
       syncSynthesisStage();
       refreshSummary();
-      // The suggestions call took the pre-started process; the draft is the next call.
-      warmForMode();
     };
     // The result is written by the view (no draft review step); the dialog has nothing left to show.
     const flow = { directions: showDirections, written: () => this.close() };
-    const nameProblem = (): string => (titleInput ? titleProblemText(titleInput.value) : "");
-    const needsName = (): boolean => !!titleInput && (!titleInput.value.trim() || !!nameProblem());
+    const nameProblem = (): string => titleProblemText(titleInput.value);
+    const needsName = (): boolean => !titleInput.value.trim() || !!nameProblem();
     const checkName = (): void => {
-      if (!titleInput || stage !== "setup") return;
+      if (stage !== "setup") return;
       const missing = needsName();
-      suggestButton.disabled = skipButton.disabled = missing || !!this.modelSettings?.running;
+      suggestButton.disabled = skipButton.disabled = missing;
       synthStatus.setText(missing ? nameProblem() || t("ui.synthesis_needs_name") : "");
     };
-    titleInput?.addEventListener("input", checkName);
+    titleInput.addEventListener("input", checkName);
     // Setup and draft options: the setup step reads every field; the draft step reads only the extra requirements.
     const setupOptions = async (signal: AbortSignal): Promise<TaskOptions> => {
-      const content: SynthesisContent = synthesisContentSelect?.value === "summary" ? "summary" : "full";
-      if (synthesisContentSelect) synthesisContentSelect.disabled = true;
+      const content: SynthesisContent = synthesisContentSelect.value === "summary" ? "summary" : "full";
+      synthesisContentSelect.disabled = true;
       const referenceGroups = await this.mapSourceGroups(signal);
       const options: TaskOptions = {
         synthesisContent: content,
         referenceGroups,
         outputLanguage: languageSelect.value as ContentLanguage,
         requirements: this.requirements(),
-        ...this.runOnceOptions(),
+        ...(noteStyle() ? { noteStyle: noteStyle() } : {}),
         // A synthesis arranges what the topics already hold: Quick policy text, no web (D-2026-10-229).
         researchMode: "local",
         researchDepth: "normal",
         visualMode: "off",
-        ...(noteStyle() ? { noteStyle: noteStyle() } : {}),
-        ...(titleInput ? { synthesisTitle: titleInput.value.trim() } : {}),
+        synthesisTitle: titleInput.value.trim(),
         signal,
         onProgress: message => {
           if (!this.closed) synthStatus.setText(message);
         }
       };
-      if (!selection && !this.childrenCount && !options.referenceGroups?.some(group => group.documents.length))
-        throw new Error(t("ui.choose_another_note_source_first"));
       frozenSummary = summaryEl.textContent ?? "";
       return options;
     };
@@ -1454,11 +601,10 @@ export class NextStepModal extends Modal {
       continuesDirections: true,
       outputLanguage: languageSelect.value as ContentLanguage,
       requirements: this.requirements(),
-      ...this.runOnceOptions(),
       researchMode: "local",
       researchDepth: "normal",
       visualMode: "off",
-      ...(titleInput ? { synthesisTitle: titleInput.value.trim() } : {}),
+      synthesisTitle: titleInput.value.trim(),
       signal,
       onProgress: message => {
         if (!this.closed) synthStatus.setText(message);
@@ -1473,14 +619,7 @@ export class NextStepModal extends Modal {
       if (guard()) this.launchSynthesis(synthesizePanel, suggestButton, null, setupOptions, flow);
     });
     skipButton.addEventListener("click", () => {
-      if (guard())
-        this.launchSynthesis(
-          synthesizePanel,
-          skipButton,
-          selection ? selection.defaultDirection : "",
-          setupOptions,
-          flow
-        );
+      if (guard()) this.launchSynthesis(synthesizePanel, skipButton, selection.defaultDirection, setupOptions, flow);
     });
     draftButton.addEventListener("click", () =>
       this.launchSynthesis(
@@ -1492,39 +631,6 @@ export class NextStepModal extends Modal {
       )
     );
     // --- Shared options, all under Adjust.
-    // The research step runs with the web tools of the chosen AI mode (Standard searches, Quick does not). Expansion
-    // pre-starts one process only when subtopics are researched afterwards; children run in parallel, so only the first
-    // one finds it waiting. A synthesis never uses the web.
-    const warmForMode = (): void => {
-      if (currentMode === "research") this.prewarmAi(aiMode.value() === "standard");
-      else if (currentMode === "expand" && shallow.checked) this.prewarmAi(aiMode.value() === "standard");
-      else if (currentMode === "synthesize") this.prewarmAi(false, "synthesize");
-      else if (!this.detached) this.plugin.releaseWarmClaude?.();
-    };
-    show = mode => {
-      currentMode = mode;
-      for (const [name, button, panel] of [
-        ["research", researchCard, research],
-        ["expand", expandCard, expandPanel],
-        ["synthesize", synthesizeCard, synthesizePanel]
-      ] as const) {
-        button.classList.toggle("is-active", name === mode);
-        button.setAttr("aria-checked", name === mode ? "true" : "false");
-        button.tabIndex = name === mode ? 0 : -1;
-        panel.style.display = name === mode ? "" : "none";
-        adjustFor[name].hidden = name !== mode;
-      }
-      warmForMode();
-      confirm.hidden = mode !== "research";
-      expandButton.hidden = mode !== "expand";
-      expandFooterText.hidden = mode !== "expand";
-      reviewButton.hidden = mode !== "expand" || !this.pendingCount;
-      // The AI mode applies to a research and to an expansion; a synthesis has no choice to make.
-      aiMode.element.hidden = mode === "synthesize";
-      // Once directions are requested, the synthesis step has no sources, language or template left to choose.
-      syncSynthesisStage();
-      refreshSummary();
-    };
     this.renderRequirements(adjustBody);
     const output = adjustBody.createEl("details", { cls: "vam-next-output" });
     output.open = false;
@@ -1545,10 +651,10 @@ export class NextStepModal extends Modal {
       moreLanguages.createEl("option", { value: option.id, text: option.label });
     languageSelect.value = defaultOutputLanguage(
       this.plugin.settings.language,
-      this.topic,
-      this.modelSettings?.contentLanguage,
-      this.info?.outputLanguage,
-      this.info?.mapTitle
+      "",
+      undefined,
+      selection.fields.outputLanguage,
+      selection.fields.mapTitle
     );
     languageSelect.setAttr("aria-label", t("ui.output_language"));
     languageSelect.addEventListener("change", () => {
@@ -1556,38 +662,23 @@ export class NextStepModal extends Modal {
     });
     const style = styleChoiceField(compactSettings, {
       styles: stylePickerFor(this.app, this.plugin),
-      current: this.info?.currentStyle ?? "",
+      current: selection.fields.currentStyle ?? "",
       changed: () => refreshSummary()
     });
     const noteStyle = style.style;
     const describeOutput = (): void => {
       outputValue.setText([supportedLanguageLabel(languageSelect.value), style.label()].filter(Boolean).join(" · "));
     };
-    const modeName = (): string =>
-      t("ui.ai_mode_value_0", t(aiMode.value() === "standard" ? "ui.standard" : "ui.quick"));
     const refreshSummary = (): void => {
       describeOutput();
-      if (currentMode === "synthesize" && stage === "directions") {
+      if (stage === "directions") {
         summaryEl.setText(frozenSummary);
         return;
       }
-      const parts: string[] = [];
-      if (currentMode === "research") parts.push(modeName());
-      else if (currentMode === "expand") {
-        const levels = quickLevels();
-        parts.push(
-          levels === 1
-            ? t("ui.expand_summary_one_level_0", quickTopics())
-            : t("ui.expand_summary_0_1", levels, quickTopics())
-        );
-        if (shallow.checked) parts.push(modeName());
-      } else
-        parts.push(
-          t(
-            synthesisContentSelect?.value === "summary" ? "ui.next_summary_synth_summary" : "ui.next_summary_synth_full"
-          )
-        );
-      parts.push(supportedLanguageLabel(languageSelect.value));
+      const parts: string[] = [
+        t(synthesisContentSelect.value === "summary" ? "ui.next_summary_synth_summary" : "ui.next_summary_synth_full"),
+        supportedLanguageLabel(languageSelect.value)
+      ];
       const styleName = style.name();
       if (styleName) parts.push(styleName);
       summaryEl.setText(parts.join(" · "));
@@ -1596,44 +687,12 @@ export class NextStepModal extends Modal {
     void style.reload();
     // Select, checkbox and radio changes bubble up, so one listener keeps the summary current.
     this.contentEl.addEventListener("change", refreshSummary);
-    // A changed model or reasoning level changes the command: pre-start again (the old process is killed).
-    this.contentEl.addEventListener("change", () => {
-      warmForMode();
-    });
     if (pendingDirections) showDirections(pendingDirections.directions);
     else checkName();
-    syncExpand();
-    show(initialMode);
-    const waitingOutline = this.modelSettings?.pendingOutline;
-    if (waitingOutline && quickOutline) {
-      // Reopened from the card badge or the Notice: straight into the review of the outline generated in the background.
-      shallow.checked = !!waitingOutline.options.shallowResearch;
-      // The review shows the levels and size the outline was generated with, not the defaults.
-      if (waitingOutline.bounds) {
-        quickLevelsField.set(waitingOutline.bounds.levels);
-        quickTopicsField.set(waitingOutline.bounds.maxTopics);
-      }
-      // The review shows the switch the outline was generated with.
-      if (waitingOutline.options.mapAiMode) aiMode.set(waitingOutline.options.mapAiMode);
-      shallowHint.hidden = !shallow.checked;
-      shallowHint.setText(shallowHintText());
-      syncExpand();
-      const reviewOptions: TaskOptions = {
-        ...waitingOutline.options,
-        onProgress: message => expandPanel.querySelector<HTMLElement>(".vam-next-status")?.setText(message)
-      };
-      this.outlineReview(
-        expandPanel,
-        waitingOutline.nodes,
-        expandButton,
-        quickOutline.create,
-        reviewOptions,
-        waitingOutline.dropped
-      );
-    }
-    // A selection shows no mode cards, so its name field takes the focus.
-    (titleInput ?? cardFor[initialMode]).focus();
-    (this.renderModelSettings(adjustBody) ?? adjustBody).createEl("p", {
+    syncSynthesisStage();
+    refreshSummary();
+    titleInput.focus();
+    adjustBody.createEl("p", {
       text: t("ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it"),
       cls: "vam-hint"
     });

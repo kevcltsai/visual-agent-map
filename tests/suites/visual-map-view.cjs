@@ -889,6 +889,47 @@ integrationTest('select mode toggles cards in place, keeps checkboxes out of the
   assert.equal(again.c.classes.has('is-selected'), true); assert.equal(again.c.attrs['aria-selected'], 'true'); assert.equal(again.a.classes.has('is-selected'), false);
   assert.equal(renders(), 0);
 });
+integrationTest('Space on a card with subtopics folds or unfolds it on key-up (focus stays on the card); every counterexample leaves it alone', () => {
+  const fixture = selectionView(load); const { view } = fixture; fixture.build();
+  const cards = fixture.cards(); const folded = [];
+  view.toggleCollapsed = node => folded.push(node.id);
+  const down = (id, init = {}) => { const event = { code: 'Space', key: ' ', target: cards[id], prevented: false, preventDefault() { this.prevented = true; }, ...init }; cards[id].handlers.get('keydown')(event); return event; };
+  const up = () => view.onSpaceKeyUp();
+  // plain press and release: one fold, focus named before the repaint
+  assert.equal(down('a').prevented, true); assert.deepEqual(folded, [], 'nothing folds on key-down'); up();
+  assert.deepEqual(folded, ['a']); assert.equal(view.focusNodeId, 'a'); up(); assert.deepEqual(folded, ['a'], 'a second key-up does not fold again');
+  folded.length = 0;
+  // key held: repeats arm once only
+  down('a'); down('a', { repeat: true }); down('a', { repeat: true }); up(); assert.deepEqual(folded, ['a']);
+  folded.length = 0;
+  // a pan began while Space was down
+  down('a'); view.spaceHeld = true; view.viewportEl = selectionDom()('viewport'); view.transform = () => {}; view.saveViewport = () => {}; view.setupPan();
+  view.viewportEl.handlers.get('pointerdown')({ target: { closest: () => null }, button: 0, clientX: 0, clientY: 0, pointerId: 1, altKey: false, shiftKey: false, preventDefault() {} });
+  view.spaceHeld = false; up(); assert.deepEqual(folded, [], 'pan then release: no fold');
+  // window blur clears the pending fold (same statement the blur listener runs)
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /"blur", \(\) => \{\s*this\.spaceHeld = false;\s*this\.spacePendingNodeId = null;/, 'blur clears the pending fold');
+  assert.match(source, /if \(event\.code === "Space"\) \{\s*this\.spaceHeld = false;\s*this\.onSpaceKeyUp\(\);/, 'the window key-up carries out the fold');
+  down('a'); view.spacePendingNodeId = null; up(); assert.deepEqual(folded, []);
+  // no subtopics: no fold and no preventDefault (the key keeps its normal meaning)
+  const leaf = down('c'); assert.equal(leaf.prevented, false); up(); assert.deepEqual(folded, []);
+  // composing, any modifier, target other than the card
+  for (const init of [{ isComposing: true }, { ctrlKey: true }, { metaKey: true }, { altKey: true }, { shiftKey: true }, { target: { closest: () => null } }, { code: 'Enter' }]) { const event = down('a', init); assert.equal(event.prevented, false, JSON.stringify(init)); up(); }
+  assert.deepEqual(folded, [], 'no guarded press folds');
+  // select mode, AIM, notes loading, presentation
+  view.selection.toggleMultiSelect(); fixture.build(); const multi = fixture.cards(); { const e = { code: 'Space', target: multi.a, preventDefault() { this.prevented = true; } }; multi.a.handlers.get('keydown')(e); up(); assert.equal(e.prevented, undefined); }
+  view.selection.toggleMultiSelect(); fixture.build(); Object.assign(cards, fixture.cards());
+  view.map.aim = { branches: [] }; assert.equal(down('a').prevented, false); up(); delete view.map.aim;
+  view.notesLoading = () => true; assert.equal(down('a').prevented, false); up(); delete view.notesLoading;
+  view.presentation = { order: [], currentId: 'x' }; assert.equal(down('a').prevented, false); up(); view.presentation = null;
+  assert.deepEqual(folded, [], 'multi-select, AIM, loading and presentation never fold');
+});
+integrationTest('the toggle-collapse command does not apply without a selection or on a card with no subtopics', () => {
+  const { view } = selectionView(load); view.selection.setSelected(null);
+  assert.equal(view.mapCommand('toggle-collapse', true), false, 'no selection');
+  view.selection.setSelected('c'); assert.equal(view.mapCommand('toggle-collapse', true), false, 'no subtopics');
+  view.selection.setSelected('a'); assert.equal(view.mapCommand('toggle-collapse', true), true);
+});
 integrationTest('F2 starts the in-place title edit, Enter opens details, and the collapse button reports aria-expanded', () => {
   const dialogs = [];
   class Modal { open() { dialogs.push(this); } close() {} }
@@ -4310,7 +4351,7 @@ test('bug bash #12: a tool row wider than the whole visible canvas wraps and eve
 integrationTest('C5: the map commands apply only to an active map view (topic ones only with a selected card, editing ones never on an AIM map or in a presentation) and run the same actions as the card tools', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   const tuples = [...source.matchAll(/\["(map-[a-z-]+)", "(ui\.command_map_[a-z_]+)", "([a-z-]+)"\]/g)].map(m => [m[1], m[2], m[3]]);
-  assert.ok(tuples.length >= 6 && tuples.length <= 10, `${tuples.length} map commands`);
+  assert.ok(tuples.length >= 6 && tuples.length <= 11, `${tuples.length} map commands`);
   assert.match(source, /checkCallback: checking =>\s*this\.app\.workspace\.getActiveViewOfType\(VisualAgentMapView\)\?\.mapCommand\(action, checking\) \?\? false/, 'no map view: the command does not apply');
   const { translate } = load('i18n.ts');
   for (const [, key] of tuples) for (const language of ['en', 'zh-TW', 'zh-CN']) assert.ok(translate(language, key) && translate(language, key) !== key, `${language} ${key}`);
@@ -4321,6 +4362,7 @@ integrationTest('C5: the map commands apply only to an active map view (topic on
   view.openTopicChat = node => calls.push(['ai', node.id]);
   view.startCardTitleEdit = node => calls.push(['rename', node.id, view.notes.get(node.id).title]);
   view.openDetails = node => calls.push(['details', node.id]);
+  view.toggleCollapsed = node => calls.push(['collapse', node.id]);
   view.fit = () => calls.push(['fit']);
   view.zoomBy = factor => calls.push(['zoom', factor]);
   view.openMapSearch = () => calls.push(['search']);
@@ -4329,12 +4371,12 @@ integrationTest('C5: the map commands apply only to an active map view (topic on
   const actions = tuples.map(t => t[2]);
   view.selection.setSelected(null);
   const none = Object.fromEntries(actions.map(action => [action, view.mapCommand(action, true)]));
-  assert.deepEqual(plain(none), { 'add-topic': true, 'add-subtopic': false, 'add-sibling': false, 'ai-explore': false, rename: false, 'open-details': false, 'zoom-fit': true, 'zoom-reset': true, search: true, shortcuts: true }, 'no selected card: only the map-wide commands');
+  assert.deepEqual(plain(none), { 'add-topic': true, 'add-subtopic': false, 'add-sibling': false, 'ai-explore': false, rename: false, 'open-details': false, 'toggle-collapse': false, 'zoom-fit': true, 'zoom-reset': true, search: true, shortcuts: true }, 'no selected card: only the map-wide commands');
   assert.deepEqual(calls, [], 'checking runs nothing');
   const target = view.map.nodes.find(node => node.parentId);
   view.selection.setSelected(target.id);
   for (const action of actions) assert.equal(view.mapCommand(action, false), true, action);
-  assert.deepEqual(plain(calls), [['add', null], ['add', target.id], ['add', target.parentId], ['ai', target.id], ['rename', target.id, view.notes.get(target.id).title], ['details', target.id], ['fit'], ['zoom', 1 / view.map.viewport.zoom], ['search'], ['keys']]);
+  assert.deepEqual(plain(calls), [['add', null], ['add', target.id], ['add', target.parentId], ['ai', target.id], ['rename', target.id, view.notes.get(target.id).title], ['details', target.id], ['collapse', target.id], ['fit'], ['zoom', 1 / view.map.viewport.zoom], ['search'], ['keys']]);
   view.map.aim = { branches: [] };
   for (const action of ['add-topic', 'add-subtopic', 'add-sibling', 'ai-explore', 'rename']) assert.equal(view.mapCommand(action, true), false, `AIM map: ${action}`);
   assert.equal(view.mapCommand('open-details', true), true, 'reading still works on an AIM map');

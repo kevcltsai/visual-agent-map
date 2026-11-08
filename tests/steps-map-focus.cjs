@@ -625,7 +625,7 @@ test('#18-keyboard: the outline search box jumps to the first topic whose own ti
 test('#18-keyboard: the shortcuts window lists copy, cut and paste in every language', () => {
   const { MAP_KEYBOARD_SHORTCUTS } = load('ui/modals/keyboard-shortcuts-modal.ts', { obsidian: { ...obsidian, Platform: { isMacOS: false } } });
   const { translate } = load('i18n.ts');
-  for (const key of ['Mod+C', 'Mod+X', 'Mod+V']) {
+  for (const key of ['Mod+C', 'Mod+X', 'Mod+V', 'Space']) {
     const entry = MAP_KEYBOARD_SHORTCUTS.find(item => item.keys.includes(key));
     assert.ok(entry, key);
     for (const language of ['en', 'zh-TW', 'zh-CN']) assert.notEqual(translate(language, entry.action), entry.action);

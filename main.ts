@@ -837,6 +837,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       ["map-ai-explore-selected", "ui.command_map_ai_explore", "ai-explore"],
       ["map-rename-selected", "ui.command_map_rename", "rename"],
       ["map-open-selected-details", "ui.command_map_open_details", "open-details"],
+      ["map-toggle-collapse-selected", "ui.command_map_toggle_collapse", "toggle-collapse"],
       ["map-zoom-to-fit", "ui.command_map_zoom_fit", "zoom-fit"],
       ["map-zoom-reset", "ui.command_map_zoom_reset", "zoom-reset"],
       ["map-search", "ui.command_map_search", "search"],

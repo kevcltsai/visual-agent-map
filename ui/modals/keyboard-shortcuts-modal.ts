@@ -9,6 +9,7 @@ export const MAP_KEYBOARD_SHORTCUTS: readonly { keys: readonly string[]; action:
   { keys: ["Mod+Enter"], action: "ui.shortcut_add_subtopic" },
   { keys: ["Shift+Enter"], action: "ui.shortcut_add_sibling" },
   { keys: ["Alt+↑", "Alt+↓"], action: "ui.shortcut_reorder_sibling" },
+  { keys: ["Space"], action: "ui.shortcut_toggle_collapse" },
   { keys: ["Delete", "Backspace"], action: "ui.shortcut_remove" },
   { keys: ["Tab"], action: "ui.shortcut_card_tools" },
   { keys: ["Shift+F10"], action: "ui.shortcut_context_menu" },

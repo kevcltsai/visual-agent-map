@@ -166,6 +166,7 @@ var en = {
   "ui.command_map_ai_explore": "AI explore selected topic",
   "ui.command_map_rename": "Rename selected topic",
   "ui.command_map_open_details": "Open selected topic details",
+  "ui.command_map_toggle_collapse": "Collapse or expand the selected topic",
   "ui.command_map_zoom_fit": "Zoom to show all",
   "ui.command_map_zoom_reset": "Zoom to 100%",
   "ui.command_map_search": "Search this map",
@@ -178,6 +179,7 @@ var en = {
   "ui.shortcut_add_subtopic": "Add a subtopic",
   "ui.shortcut_add_sibling": "Add a sibling topic",
   "ui.shortcut_reorder_sibling": "Move the card earlier or later among its siblings",
+  "ui.shortcut_toggle_collapse": "Collapse or expand the card",
   "ui.shortcut_remove": "Remove the card from the map",
   "ui.shortcut_card_tools": "Reach the card's tools",
   "ui.shortcut_context_menu": "Open the card's menu",
@@ -2939,6 +2941,7 @@ var zhCN = {
   "ui.command_map_ai_explore": "AI \u63A2\u7D22\u9009\u53D6\u7684\u8BAE\u9898",
   "ui.command_map_rename": "\u91CD\u547D\u540D\u9009\u53D6\u7684\u8BAE\u9898",
   "ui.command_map_open_details": "\u6253\u5F00\u9009\u53D6\u8BAE\u9898\u7684\u8BE6\u60C5",
+  "ui.command_map_toggle_collapse": "\u6298\u53E0\u6216\u5C55\u5F00\u9009\u53D6\u7684\u8BAE\u9898",
   "ui.command_map_zoom_fit": "\u7F29\u653E\u5230\u663E\u793A\u5168\u90E8",
   "ui.command_map_zoom_reset": "\u7F29\u653E\u5230 100%",
   "ui.command_map_search": "\u641C\u7D22\u8FD9\u5F20\u5FC3\u667A\u56FE",
@@ -2951,6 +2954,7 @@ var zhCN = {
   "ui.shortcut_add_subtopic": "\u6DFB\u52A0\u5B50\u8BAE\u9898",
   "ui.shortcut_add_sibling": "\u6DFB\u52A0\u540C\u5C42\u8BAE\u9898",
   "ui.shortcut_reorder_sibling": "\u5C06\u5361\u7247\u5728\u540C\u5C42\u4E2D\u524D\u79FB\u6216\u540E\u79FB",
+  "ui.shortcut_toggle_collapse": "\u6298\u53E0\u6216\u5C55\u5F00\u5361\u7247",
   "ui.shortcut_remove": "\u628A\u5361\u7247\u4ECE\u56FE\u4E2D\u79FB\u9664",
   "ui.shortcut_card_tools": "\u79FB\u5230\u5361\u7247\u7684\u5DE5\u5177",
   "ui.shortcut_context_menu": "\u6253\u5F00\u5361\u7247\u83DC\u5355",
@@ -5712,6 +5716,7 @@ var zhTW = {
   "ui.command_map_ai_explore": "AI \u63A2\u7D22\u9078\u53D6\u7684\u8B70\u984C",
   "ui.command_map_rename": "\u91CD\u65B0\u547D\u540D\u9078\u53D6\u7684\u8B70\u984C",
   "ui.command_map_open_details": "\u958B\u555F\u9078\u53D6\u8B70\u984C\u7684\u8A73\u60C5",
+  "ui.command_map_toggle_collapse": "\u6536\u5408\u6216\u5C55\u958B\u9078\u53D6\u7684\u8B70\u984C",
   "ui.command_map_zoom_fit": "\u7E2E\u653E\u5230\u986F\u793A\u5168\u90E8",
   "ui.command_map_zoom_reset": "\u7E2E\u653E\u5230 100%",
   "ui.command_map_search": "\u641C\u5C0B\u9019\u5F35\u5FC3\u667A\u5716",
@@ -5724,6 +5729,7 @@ var zhTW = {
   "ui.shortcut_add_subtopic": "\u65B0\u589E\u5B50\u8B70\u984C",
   "ui.shortcut_add_sibling": "\u65B0\u589E\u540C\u5C64\u8B70\u984C",
   "ui.shortcut_reorder_sibling": "\u5C07\u5361\u7247\u5728\u540C\u5C64\u4E2D\u524D\u79FB\u6216\u5F8C\u79FB",
+  "ui.shortcut_toggle_collapse": "\u6536\u5408\u6216\u5C55\u958B\u5361\u7247",
   "ui.shortcut_remove": "\u628A\u5361\u7247\u5F9E\u5716\u4E2D\u79FB\u9664",
   "ui.shortcut_card_tools": "\u79FB\u5230\u5361\u7247\u7684\u5DE5\u5177",
   "ui.shortcut_context_menu": "\u958B\u555F\u5361\u7247\u9078\u55AE",
@@ -30061,6 +30067,7 @@ var MAP_KEYBOARD_SHORTCUTS = [
   { keys: ["Mod+Enter"], action: "ui.shortcut_add_subtopic" },
   { keys: ["Shift+Enter"], action: "ui.shortcut_add_sibling" },
   { keys: ["Alt+\u2191", "Alt+\u2193"], action: "ui.shortcut_reorder_sibling" },
+  { keys: ["Space"], action: "ui.shortcut_toggle_collapse" },
   { keys: ["Delete", "Backspace"], action: "ui.shortcut_remove" },
   { keys: ["Tab"], action: "ui.shortcut_card_tools" },
   { keys: ["Shift+F10"], action: "ui.shortcut_context_menu" },
@@ -57635,6 +57642,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
     __publicField(this, "focusResizeAxis", "width");
     /** Space held down: a drag pans the map even while selecting topics. */
     __publicField(this, "spaceHeld", false);
+    /** The card a plain Space press on it will fold or unfold when the key comes up (no pan started meanwhile). */
+    __publicField(this, "spacePendingNodeId", null);
     /** The single card in the tab order (roving tabindex); arrows move between the rest. */
     /** Card element per topic id, rebuilt on every render, so a selection change touches only the affected cards. */
     __publicField(this, "cardEls", /* @__PURE__ */ new Map());
@@ -58294,10 +58303,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
         this.spaceHeld = true;
     });
     this.registerDomEvent((_m = this.contentEl.win) != null ? _m : window, "keyup", (event) => {
-      if (event.code === "Space") this.spaceHeld = false;
+      if (event.code === "Space") {
+        this.spaceHeld = false;
+        this.onSpaceKeyUp();
+      }
     });
     this.registerDomEvent((_n = this.contentEl.win) != null ? _n : window, "blur", () => {
       this.spaceHeld = false;
+      this.spacePendingNodeId = null;
     });
     this.registerDomEvent((_p = (_o = this.contentEl.ownerDocument) == null ? void 0 : _o.defaultView) != null ? _p : window, "focus", () => this.onMapWindowFocus());
     this.bindClipboard();
@@ -66897,6 +66910,31 @@ ${request.requirements}` : preset.text,
       })
     );
   }
+  /** Keyboard and command route of the fold: focus stays on the card through the repaint. */
+  collapseByKey(node) {
+    this.whenEditing(() => {
+      this.focusNodeId = node.id;
+      this.toggleCollapsed(node);
+    });
+  }
+  /** Space down on a focused card: a plain press arms a fold that the key-up carries out unless a pan began. */
+  onCardSpaceDown(event, node) {
+    var _a2;
+    if (event.code !== "Space" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.isComposing)
+      return false;
+    if (this.selection.state.multiSelectMode || this.aimLive() || this.notesLoading() || this.presentation || !((_a2 = this.map) == null ? void 0 : _a2.nodes.some((item) => item.parentId === node.id)))
+      return false;
+    event.preventDefault();
+    if (!event.repeat) this.spacePendingNodeId = node.id;
+    return true;
+  }
+  onSpaceKeyUp() {
+    var _a2;
+    const id = this.spacePendingNodeId;
+    this.spacePendingNodeId = null;
+    const node = id ? (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id) : void 0;
+    if (node) this.collapseByKey(node);
+  }
   onCanvasContextMenu(event) {
     var _a2, _b2, _c, _d, _e, _f;
     const hit = event.target;
@@ -68561,6 +68599,11 @@ ${request.requirements}` : preset.text,
         return run(editable && !!note, () => this.startCardTitleEdit(selected, { select: true }));
       case "open-details":
         return run(!!selected, () => this.openDetails(selected));
+      case "toggle-collapse":
+        return run(
+          editable && !!selected && map.nodes.some((item) => item.parentId === selected.id),
+          () => this.collapseByKey(selected)
+        );
       case "zoom-fit":
         return run(!!this.viewportEl, () => this.fit());
       case "zoom-reset":
@@ -69950,6 +69993,7 @@ ${request.requirements}` : preset.text,
         this.moveKeyboardFocus(target);
         return;
       }
+      if (this.onCardSpaceDown(event, node)) return;
       const editable = !this.selection.state.multiSelectMode && !this.aimLive() && !this.notesLoading();
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
@@ -75910,6 +75954,7 @@ ${note.detail.trim()}` : "",
       const target = event.target;
       if (target.closest(".vam-node") || target.closest(".vam-text-node") || target.closest(".vam-boundary-label") || target.closest(".vam-summary") || target.closest(".vam-summary-text") || target.closest(INTERACTIVE_SELECTOR) || !this.map)
         return;
+      if (this.spaceHeld) this.spacePendingNodeId = null;
       const intent = canvasPointerIntent({
         button: event.button,
         integrationMode: this.selection.state.multiSelectMode,
@@ -91576,6 +91621,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       ["map-ai-explore-selected", "ui.command_map_ai_explore", "ai-explore"],
       ["map-rename-selected", "ui.command_map_rename", "rename"],
       ["map-open-selected-details", "ui.command_map_open_details", "open-details"],
+      ["map-toggle-collapse-selected", "ui.command_map_toggle_collapse", "toggle-collapse"],
       ["map-zoom-to-fit", "ui.command_map_zoom_fit", "zoom-fit"],
       ["map-zoom-reset", "ui.command_map_zoom_reset", "zoom-reset"],
       ["map-search", "ui.command_map_search", "search"],

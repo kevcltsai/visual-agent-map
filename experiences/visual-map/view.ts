@@ -1325,6 +1325,7 @@ export type MapCommandAction =
   | "ai-explore"
   | "rename"
   | "open-details"
+  | "toggle-collapse"
   | "zoom-fit"
   | "zoom-reset"
   | "search"
@@ -1721,6 +1722,8 @@ export class VisualAgentMapView extends ItemView {
   private focusResizeAxis: "width" | "height" = "width";
   /** Space held down: a drag pans the map even while selecting topics. */
   private spaceHeld = false;
+  /** The card a plain Space press on it will fold or unfold when the key comes up (no pan started meanwhile). */
+  private spacePendingNodeId: string | null = null;
   /** The single card in the tab order (roving tabindex); arrows move between the rest. */
   /** Card element per topic id, rebuilt on every render, so a selection change touches only the affected cards. */
   private cardEls = new Map<string, HTMLElement>();
@@ -2387,10 +2390,14 @@ export class VisualAgentMapView extends ItemView {
         this.spaceHeld = true;
     });
     this.registerDomEvent(this.contentEl.win ?? window, "keyup", event => {
-      if (event.code === "Space") this.spaceHeld = false;
+      if (event.code === "Space") {
+        this.spaceHeld = false;
+        this.onSpaceKeyUp();
+      }
     });
     this.registerDomEvent(this.contentEl.win ?? window, "blur", () => {
       this.spaceHeld = false;
+      this.spacePendingNodeId = null;
     });
     this.registerDomEvent(this.contentEl.ownerDocument?.defaultView ?? window, "focus", () => this.onMapWindowFocus());
     // Copy and paste of branches: on the document, popout windows included (decision #29, evidence/clipboard-mime.md).
@@ -11562,6 +11569,35 @@ export class VisualAgentMapView extends ItemView {
       })
     );
   }
+  /** Keyboard and command route of the fold: focus stays on the card through the repaint. */
+  private collapseByKey(node: MapNode): void {
+    this.whenEditing(() => {
+      this.focusNodeId = node.id;
+      this.toggleCollapsed(node);
+    });
+  }
+  /** Space down on a focused card: a plain press arms a fold that the key-up carries out unless a pan began. */
+  private onCardSpaceDown(event: KeyboardEvent, node: MapNode): boolean {
+    if (event.code !== "Space" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.isComposing)
+      return false;
+    if (
+      this.selection.state.multiSelectMode ||
+      this.aimLive() ||
+      this.notesLoading() ||
+      this.presentation ||
+      !this.map?.nodes.some(item => item.parentId === node.id)
+    )
+      return false;
+    event.preventDefault();
+    if (!event.repeat) this.spacePendingNodeId = node.id;
+    return true;
+  }
+  private onSpaceKeyUp(): void {
+    const id = this.spacePendingNodeId;
+    this.spacePendingNodeId = null;
+    const node = id ? this.map?.nodes.find(item => item.id === id) : undefined;
+    if (node) this.collapseByKey(node);
+  }
   private onCanvasContextMenu(event: MouseEvent): void {
     const hit = event.target as Element | null;
     const card = hit?.closest?.<HTMLElement>(".vam-node");
@@ -13461,6 +13497,10 @@ export class VisualAgentMapView extends ItemView {
         return run(editable && !!note, () => this.startCardTitleEdit(selected!, { select: true }));
       case "open-details":
         return run(!!selected, () => this.openDetails(selected!));
+      case "toggle-collapse":
+        return run(editable && !!selected && map.nodes.some(item => item.parentId === selected.id), () =>
+          this.collapseByKey(selected!)
+        );
       case "zoom-fit":
         return run(!!this.viewportEl, () => this.fit());
       case "zoom-reset":
@@ -15025,6 +15065,7 @@ export class VisualAgentMapView extends ItemView {
         this.moveKeyboardFocus(target);
         return;
       }
+      if (this.onCardSpaceDown(event, node)) return;
       const editable = !this.selection.state.multiSelectMode && !this.aimLive() && !this.notesLoading();
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
@@ -21448,6 +21489,8 @@ export class VisualAgentMapView extends ItemView {
         return;
       // Normal mode: a drag pans, Shift+drag draws a selection box. Topic selection mode: a drag adds to the selection,
       // Option (Alt)+drag removes from it, and Space+drag or the middle button pans.
+      // A Space press that turns into a pan is not a fold.
+      if (this.spaceHeld) this.spacePendingNodeId = null;
       const intent = canvasPointerIntent({
         button: event.button,
         integrationMode: this.selection.state.multiSelectMode,

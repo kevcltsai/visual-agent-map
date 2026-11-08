@@ -482,9 +482,13 @@ integrationTest('topic chat research: Quick is local without charts, Standard se
   calls[1].failed(t('ui.research_stopped_existing_content_was_preserved')); calls[1].gate.resolve(); await finished(h);
   assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_stopped'));
   // A Quick result that lacks knowledge, with the window closed, also offers the Standard run; a Standard one does not.
-  h.view.openTopicChat(h.node('a')); host.setMode('quick'); await host.submit('research', 'third');
+  h.view.openTopicChat(h.node('a')); host.setMode('standard'); await host.submit('research', 'std gap');
   await waitFor(() => calls.length === 3); host.close();
   calls[2].done({ summary: 'S', detail: 'Note: model knowledge is insufficient here.' }); calls[2].gate.resolve(); await finished(h);
+  assert.ok(!h.Notice.all.flatMap(n => n.actions ?? []).some(b => b.text === t('ui.rerun_standard')), 'Standard gap does not offer the Standard run');
+  h.view.openTopicChat(h.node('a')); host.setMode('quick'); await host.submit('research', 'third');
+  await waitFor(() => calls.length === 4); host.close();
+  calls[3].done({ summary: 'S', detail: 'Note: model knowledge is insufficient here.' }); calls[3].gate.resolve(); await finished(h);
   assert.ok(h.Notice.all.flatMap(n => n.actions ?? []).some(b => b.text === t('ui.rerun_standard')), 'Quick gap offers the Standard run');
 });
 
@@ -763,6 +767,26 @@ integrationTest('topic chat ask: a non-root topic can be renamed and re-summaris
   const sentence = h.entry('a').session.turns.at(-1).text;
   assert.ok(!sentence.includes(t('ui.map_chat_skip_topic_changed')), sentence);
   assert.ok(!h.requests[0].context.json.includes(h.ids.root), 'the parent topic is still not shown to the model');
+});
+
+integrationTest('topic chat ask: ignored and refused actions are not problems - only the reply and one out-of-scope sentence, status done; a real skip of an allowed action still shows', async () => {
+  const count = (text, part) => text.split(part).length - 1;
+  const h = await harness();
+  mockChat(h, answer([{ kind: 'rename_topic', nodeId: h.ids.c, title: 'REM one' }, { kind: 'auto_layout' }], 'Reply only.'));
+  await h.host('a').submit('ask', 'x'); await finished(h);
+  assert.equal((await h.repo.readNote(h.node('c').path)).title, 'REM one');
+  assert.equal(h.entry('a').session.turns.at(-1).text, 'Reply only.');
+  assert.equal((await topicLines(h, 'a')).at(-1).status, 'done');
+  mockChat(h, answer([{ kind: 'rename_topic', nodeId: h.ids.c, title: 'REM two' }, { kind: 'rename_topic', nodeId: h.ids.b, title: 'Out' }], 'Reply.'));
+  await h.host('a').submit('ask', 'y'); await finished(h);
+  const text = h.entry('a').session.turns.at(-1).text;
+  assert.equal(count(text, t('ui.topic_chat_out_of_scope')), 1, text);
+  assert.equal((await topicLines(h, 'a')).at(-1).status, 'done');
+  const h2 = await harness();
+  mockChat(h2, request => { h2.view.map.nodes.find(x => x.id === h2.ids.a).parentId = h2.ids.b; return answer([{ kind: 'rename_topic', nodeId: h2.ids.a, title: 'Late' }, { kind: 'auto_layout' }], 'Reply.'); });
+  await h2.host('a').submit('ask', 'z'); await finished(h2);
+  assert.ok(h2.entry('a').session.turns.at(-1).text.includes(t('ui.map_chat_skip_topic_changed')));
+  assert.equal((await topicLines(h2, 'a')).at(-1).status, 'failed');
 });
 
 integrationTest('topic chat ask: a topic moved to another parent after sending is still refused as changed', async () => {

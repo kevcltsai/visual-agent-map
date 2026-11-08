@@ -71397,7 +71397,9 @@ ${request.requirements}` : preset.text,
         }
       ) : [];
       const refused = verdicts.filter((verdict) => verdict === "out").length;
-      const problems = lines.filter((line) => line.status !== "done");
+      const problems = lines.filter(
+        (line, index) => line.status !== "done" && (index >= result.actions.length || verdicts[index] === "ok")
+      );
       let sentence = result.reply.trim() || lines.map((line) => line.text).join("\n");
       if (problems.length) sentence = [sentence, ...problems.map((line) => line.text)].filter(Boolean).join("\n\n");
       if (refused) sentence = [sentence, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");

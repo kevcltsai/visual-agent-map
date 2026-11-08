@@ -16876,7 +16876,10 @@ export class VisualAgentMapView extends ItemView {
         : [];
       const refused = verdicts.filter(verdict => verdict === "out").length;
       // A reply that says it is done cannot hide an action that failed or was skipped: those lines are shown with it.
-      const problems = lines.filter(line => line.status !== "done");
+      // Refused or ignored actions already have their say (the out-of-scope sentence, or silence), so only allowed ones and the lines added after the actions count.
+      const problems = lines.filter(
+        (line, index) => line.status !== "done" && (index >= result.actions.length || verdicts[index] === "ok")
+      );
       let sentence = result.reply.trim() || lines.map(line => line.text).join("\n");
       if (problems.length) sentence = [sentence, ...problems.map(line => line.text)].filter(Boolean).join("\n\n");
       if (refused) sentence = [sentence, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");

@@ -1351,7 +1351,7 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
   .vam-context-ai-preset.is-active .vam-context-ai-preset-icon, .vam-context-ai-status.is-running::before { animation: none; }
 }
 
-.vam-image-action { position: fixed; z-index: var(--layer-popover); }
+.vam-image-action { position: fixed; z-index: var(--layer-notice); }
 .vam-image-action-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 10px; border-radius: 999px; box-shadow: var(--shadow-s); font-size: var(--font-ui-small); }
 .vam-image-action-icon { display: inline-flex; color: var(--text-accent); }
 .vam-image-action-icon svg { width: 15px; height: 15px; }

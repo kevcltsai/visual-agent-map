@@ -124,3 +124,18 @@ test('S4: in the stacked Coffee Table layout the chat panel may shrink below its
   // The scroller inside still scrolls and the room still clips; nothing else is needed for the chat to be the one that scrolls.
   assert.match(css, /\.ct-chat-scroll\s*\{[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/);
 });
+
+// Obsidian's layer scale (app.css): the built-in image viewer (lightbox) sits at 50, the same level as modals.
+const OBSIDIAN_LAYERS = { 'layer-cover': 5, 'layer-sidedock': 10, 'layer-status-bar': 15, 'layer-popover': 30, 'layer-slides': 45, 'layer-modal': 50, 'layer-notice': 60, 'layer-menu': 65, 'layer-tooltip': 70 };
+const LIGHTBOX_Z = 50;
+const zOf = value => {
+  const named = value.match(/^var\(--([\w-]+)\)$/);
+  return named ? OBSIDIAN_LAYERS[named[1]] : Number(value);
+};
+
+test('S3: the image translate pill is drawn above Obsidian\'s image viewer (lightbox), not under it', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  const z = css.match(/^\.vam-image-action\s*\{[^}]*z-index:\s*([^;}\s]+)/m);
+  assert.ok(z, '.vam-image-action sets a z-index');
+  assert.ok(zOf(z[1]) > LIGHTBOX_Z, `z-index ${z[1]} must be above the lightbox (${LIGHTBOX_Z})`);
+});

@@ -58373,6 +58373,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
     const card = active ? [...this.cardEls.entries()].find(([, el]) => el === active || el.contains(active)) : void 0;
     this.closeMapSearch(false);
+    this.closeTopicChatWindow();
     this.clearHoverTimer();
     (_c = this.hoverCard) == null ? void 0 : _c.remove();
     this.hoverCard = null;
@@ -70866,7 +70867,9 @@ ${request.requirements}` : preset.text,
   }
   /** The managed folder the topic chat records of this map live in (null: kept in memory only). */
   topicChatRoot(entry) {
-    return isManagedMapPath(this.plugin.settings, entry.mapPath) ? this.plugin.repo.topicRoot(entry.mapPath) : null;
+    var _a2;
+    const mapPath = ((_a2 = this.map) == null ? void 0 : _a2.id) === entry.mapId ? this.path : entry.mapPath;
+    return isManagedMapPath(this.plugin.settings, mapPath) ? this.plugin.repo.topicRoot(mapPath) : null;
   }
   topicChatWriter() {
     if (this.closed) return null;
@@ -71018,9 +71021,8 @@ ${request.requirements}` : preset.text,
    * (busy, locked, usage not confirmed: nothing started and the input stays). The task itself is not awaited here.
    */
   async submitTopicChat(entry, node, kind, text12) {
-    var _a2, _b2;
     const map = this.map;
-    if (this.closed || !map || map.id !== entry.mapId || this.aimLive()) return false;
+    if (this.closed || !map || map.id !== entry.mapId || this.aimLive() || this.presentation) return false;
     if (entry.session.running || this.topicChatBusy(node)) {
       new import_obsidian37.Notice(t("ui.ai_running_ai"));
       return false;
@@ -71054,15 +71056,18 @@ ${request.requirements}` : preset.text,
       return true;
     }
     const mode = entry.session.mode;
-    try {
-      await ((_b2 = (_a2 = this.aiModeMemory()).rememberAiMode) == null ? void 0 : _b2.call(_a2, mode));
-    } catch (error) {
-      errorNotice(error);
-      return false;
-    }
     const controller = new AbortController();
     let started = false;
     const went = await this.plugin.confirmAiUsage(note.model, async () => {
+      var _a2, _b2;
+      if (kind === "research" || kind === "expand") {
+        try {
+          await ((_b2 = (_a2 = this.aiModeMemory()).rememberAiMode) == null ? void 0 : _b2.call(_a2, mode));
+        } catch (error) {
+          errorNotice(error);
+          return;
+        }
+      }
       started = true;
       entry.session.turns.push(userTurn);
       entry.session.running = true;
@@ -71083,11 +71088,10 @@ ${request.requirements}` : preset.text,
   /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
   async runTopicChatTask(entry, node, note, kind, mode, text12, controller) {
     var _a2, _b2, _c, _d, _e, _f, _g;
-    const mapPath = this.path;
     const mapId = entry.mapId;
     const live = () => {
       var _a3;
-      return !this.closed && this.path === mapPath && ((_a3 = this.map) == null ? void 0 : _a3.id) === mapId;
+      return !this.closed && ((_a3 = this.map) == null ? void 0 : _a3.id) === mapId;
     };
     const hooks = this.backgroundHooks(node.path, node);
     let began = false;
@@ -71391,12 +71395,14 @@ ${request.requirements}` : preset.text,
         }
       ) : [];
       const refused = verdicts.filter((verdict) => verdict === "out").length;
+      const problems = lines.filter((line) => line.status !== "done");
       let sentence = result.reply.trim() || lines.map((line) => line.text).join("\n");
+      if (problems.length) sentence = [sentence, ...problems.map((line) => line.text)].filter(Boolean).join("\n\n");
       if (refused) sentence = [sentence, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");
       if (!sentence) sentence = t("ui.topic_chat_result_unknown");
       if (controller.signal.aborted)
         this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
-      else this.settleTopicChat(entry, sentence, live, true, "done", true);
+      else this.settleTopicChat(entry, sentence, live, true, problems.length ? "failed" : "done", true);
     } catch (error) {
       end();
       const stopped = controller.signal.aborted;
@@ -77911,7 +77917,7 @@ ${note.detail.trim()}` : "",
    * automatic layout and a move of the view to the new cards.
    */
   async applyMapChatActions(result, baseline, alive = () => true, anchor = { path: this.path, id: ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)() }, options = {}) {
-    var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
+    var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
     const touched = /* @__PURE__ */ new Set([anchor.path]);
     const scope = options.topicScope;
     const record = scope ? null : this.chatLastRecord;
@@ -78138,8 +78144,10 @@ ${note.detail.trim()}` : "",
       else {
         try {
           if (scope && action.kind === "run_map_action") {
-            const targets = action.nodeIds.length ? action.nodeIds : [scope.rootId];
-            outcome = scope.run ? await scope.run(action, targets) : skipped("ui.map_chat_skip_unavailable");
+            const resolved = this.chatResolveTargets(action, run);
+            const ids = (_m = resolved == null ? void 0 : resolved.action.nodeIds) != null ? _m : [];
+            const targets = ids.length ? ids : [scope.rootId];
+            outcome = !resolved ? skipped("ui.map_chat_skip_parent_missing") : scope.run ? await scope.run(action, targets) : skipped("ui.map_chat_skip_unavailable");
           } else if (action.kind === "open_map") {
             outcome = await this.chatOpenMap(action.title, anchor, same);
             if (outcome.status === "done") touched.add(anchor.path);
@@ -78160,22 +78168,22 @@ ${note.detail.trim()}` : "",
               run
             );
             const mergeIds = (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && resolved.action.action === "merge" ? new Set(resolved.action.nodeIds) : void 0;
-            const mine = mergeIds ? ((_m = run.held) != null ? _m : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
+            const mine = mergeIds ? ((_n = run.held) != null ? _n : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
             let asked;
             for (const entry of mine) {
               const change2 = chatAppearanceChange(entry.action);
               asked = {
                 ...asked,
                 ...change2,
-                addMarkers: [...(_n = asked == null ? void 0 : asked.addMarkers) != null ? _n : [], ...(_o = change2.addMarkers) != null ? _o : []],
-                removeMarkers: [...(_p = asked == null ? void 0 : asked.removeMarkers) != null ? _p : [], ...(_q = change2.removeMarkers) != null ? _q : []],
-                addStyles: [...(_r = asked == null ? void 0 : asked.addStyles) != null ? _r : [], ...(_s = change2.addStyles) != null ? _s : []],
-                removeStyles: [...(_t = asked == null ? void 0 : asked.removeStyles) != null ? _t : [], ...(_u = change2.removeStyles) != null ? _u : []]
+                addMarkers: [...(_o = asked == null ? void 0 : asked.addMarkers) != null ? _o : [], ...(_p = change2.addMarkers) != null ? _p : []],
+                removeMarkers: [...(_q = asked == null ? void 0 : asked.removeMarkers) != null ? _q : [], ...(_r = change2.removeMarkers) != null ? _r : []],
+                addStyles: [...(_s = asked == null ? void 0 : asked.addStyles) != null ? _s : [], ...(_t = change2.addStyles) != null ? _t : []],
+                removeStyles: [...(_u = asked == null ? void 0 : asked.removeStyles) != null ? _u : [], ...(_v = change2.removeStyles) != null ? _v : []]
               };
             }
             outcome = resolved ? await this.runChatSelection(
               resolved.action,
-              (_v = result.message) != null ? _v : "",
+              (_w = result.message) != null ? _w : "",
               laterBatch,
               asked,
               options.work,
@@ -78185,7 +78193,7 @@ ${note.detail.trim()}` : "",
               options.work.otherBackground = true;
             if (outcome.status !== "done" && mine.length && same()) {
               const merged = new Set(mine.flatMap((entry) => entry.ids));
-              run.mergeSourceIds = new Set([...(_w = run.mergeSourceIds) != null ? _w : []].filter((id) => !merged.has(id)));
+              run.mergeSourceIds = new Set([...(_x = run.mergeSourceIds) != null ? _x : []].filter((id) => !merged.has(id)));
               for (const entry of mine) {
                 const keep = entry.ids;
                 await this.plugin.mutate(async () => {

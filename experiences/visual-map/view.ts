@@ -2753,6 +2753,8 @@ export class VisualAgentMapView extends ItemView {
       ? [...this.cardEls.entries()].find(([, el]) => el === active || el.contains(active))
       : undefined;
     this.closeMapSearch(false);
+    // The small window closes (a task it started keeps running and tells its result by Notice).
+    this.closeTopicChatWindow();
     this.clearHoverTimer();
     this.hoverCard?.remove();
     this.hoverCard = null;
@@ -16305,7 +16307,9 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The managed folder the topic chat records of this map live in (null: kept in memory only). */
   private topicChatRoot(entry: TopicChatEntry): string | null {
-    return isManagedMapPath(this.plugin.settings, entry.mapPath) ? this.plugin.repo.topicRoot(entry.mapPath) : null;
+    // The map's current path (a rename or Organize moves it); the path from creation is only the fallback for a map that is no longer open.
+    const mapPath = this.map?.id === entry.mapId ? this.path : entry.mapPath;
+    return isManagedMapPath(this.plugin.settings, mapPath) ? this.plugin.repo.topicRoot(mapPath) : null;
   }
   private topicChatWriter(): TopicChatRecordWriter | null {
     if (this.closed) return null;
@@ -16457,7 +16461,7 @@ export class VisualAgentMapView extends ItemView {
     text: string
   ): Promise<boolean> {
     const map = this.map;
-    if (this.closed || !map || map.id !== entry.mapId || this.aimLive()) return false;
+    if (this.closed || !map || map.id !== entry.mapId || this.aimLive() || this.presentation) return false;
     if (entry.session.running || this.topicChatBusy(node)) {
       new Notice(t("ui.ai_running_ai"));
       return false;
@@ -16491,15 +16495,18 @@ export class VisualAgentMapView extends ItemView {
       return true;
     }
     const mode = entry.session.mode;
-    try {
-      await this.aiModeMemory().rememberAiMode?.(mode);
-    } catch (error) {
-      errorNotice(error);
-      return false;
-    }
     const controller = new AbortController();
     let started = false;
     const went = await this.plugin.confirmAiUsage(note.model, async () => {
+      // Only a confirmed research or expand remembers the mode on the map (an integration or a free question does not).
+      if (kind === "research" || kind === "expand") {
+        try {
+          await this.aiModeMemory().rememberAiMode?.(mode);
+        } catch (error) {
+          errorNotice(error);
+          return;
+        }
+      }
       started = true;
       entry.session.turns.push(userTurn);
       entry.session.running = true;
@@ -16527,9 +16534,9 @@ export class VisualAgentMapView extends ItemView {
     text: string,
     controller: AbortController
   ): Promise<void> {
-    const mapPath = this.path;
     const mapId = entry.mapId;
-    const live = (): boolean => !this.closed && this.path === mapPath && this.map?.id === mapId;
+    // The map id, not its path: a rename or Organize meanwhile moves the file but the result still belongs here.
+    const live = (): boolean => !this.closed && this.map?.id === mapId;
     const hooks = this.backgroundHooks(node.path, node);
     let began = false;
     const endHooks = (): void => {
@@ -16864,12 +16871,15 @@ export class VisualAgentMapView extends ItemView {
           )
         : [];
       const refused = verdicts.filter(verdict => verdict === "out").length;
+      // A reply that says it is done cannot hide an action that failed or was skipped: those lines are shown with it.
+      const problems = lines.filter(line => line.status !== "done");
       let sentence = result.reply.trim() || lines.map(line => line.text).join("\n");
+      if (problems.length) sentence = [sentence, ...problems.map(line => line.text)].filter(Boolean).join("\n\n");
       if (refused) sentence = [sentence, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");
       if (!sentence) sentence = t("ui.topic_chat_result_unknown");
       if (controller.signal.aborted)
         this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
-      else this.settleTopicChat(entry, sentence, live, true, "done", true);
+      else this.settleTopicChat(entry, sentence, live, true, problems.length ? "failed" : "done", true);
     } catch (error) {
       end();
       const stopped = controller.signal.aborted;
@@ -24229,8 +24239,15 @@ export class VisualAgentMapView extends ItemView {
       else {
         try {
           if (scope && action.kind === "run_map_action") {
-            const targets = action.nodeIds.length ? action.nodeIds : [scope.rootId];
-            outcome = scope.run ? await scope.run(action, targets) : skipped("ui.map_chat_skip_unavailable");
+            // `new:<ref>` names a card this reply made: swap in its real id (a card that was never made is skipped).
+            const resolved = this.chatResolveTargets(action, run);
+            const ids = resolved?.action.nodeIds ?? [];
+            const targets = ids.length ? ids : [scope.rootId];
+            outcome = !resolved
+              ? skipped("ui.map_chat_skip_parent_missing")
+              : scope.run
+                ? await scope.run(action, targets)
+                : skipped("ui.map_chat_skip_unavailable");
           } else if (action.kind === "open_map") {
             outcome = await this.chatOpenMap(action.title, anchor, same);
             if (outcome.status === "done") touched.add(anchor.path);

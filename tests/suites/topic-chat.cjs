@@ -407,7 +407,7 @@ integrationTest('topic chat counterexample 1: Standard integration is not Local 
   assert.equal(seen[0].options.researchMode, 'research'); assert.equal(seen[1].options.researchMode, 'local');
   assert.equal(seen[0].direction, 'Integrate sleep');
   assert.equal(seen[0].options.visualMode, 'off'); assert.equal(seen[0].options.researchDepth, 'normal'); assert.deepEqual(plain(seen[0].options.referenceGroups), []);
-  assert.equal(h.view.map.aiMode, 'quick', 'the last picked mode is remembered on the map');
+  assert.equal(h.view.map.aiMode, undefined, 'an integration does not remember the mode on the map (only research and expand do)');
   assert.equal(chatSynthesisOptions({ outputLanguage: 'en' }).researchMode, 'local', 'the sidebar integration is still Quick');
   // The task service turns the Standard value into a web search, Quick into none.
   const { default: Plugin } = load('main.ts', { obsidian });
@@ -492,16 +492,6 @@ integrationTest('topic chat busy topic: submit is refused with a Notice and noth
   h.view.startingTasks.clear(); h.view.synthesisTasks.set(h.node('a').path, { state: 'running' });
   assert.equal(await h.host('a').submit('research', 'x'), false);
   assert.equal(calls.length, 0); assert.equal(h.control.usageAsks, 0); assert.equal(h.notices.at(-1), t('ui.ai_running_ai'));
-});
-
-integrationTest('topic chat late result: a view that closed meanwhile is not written to', async () => {
-  const h = await harness(); const gate = deferred();
-  h.plugin.outlineGeneration = { generate: async () => { await gate.promise; return outlineOf('# Body\n## Light'); } };
-  const host = h.host('a'); await host.submit('expand', 'x');
-  const turns = h.entry('a').session.turns.length;
-  h.view.closed = true; gate.resolve();
-  await waitFor(() => h.plugin.running.size === 0 && !h.entry('a').session.running);
-  assert.equal(h.entry('a').session.turns.length, turns, 'no sentence written after the view closed');
 });
 
 integrationTest('topic chat counterexample 8: a declined usage question starts nothing and the typed text stays in the window', async () => {
@@ -605,12 +595,14 @@ integrationTest('topic chat counterexample 9: a node id with a slash or dots wri
   }
 });
 
-integrationTest('topic chat late result: a view that closed meanwhile writes no result, and reopening says the result is unknown', async () => {
+integrationTest('topic chat late result: a view that closed meanwhile is not written to (no sentence in the session, no result line), and reopening says the result is unknown', async () => {
   const h = await harness(); const gate = deferred();
   h.plugin.outlineGeneration = { generate: async () => { await gate.promise; return outlineOf('# Body\n## Light'); } };
   const host = h.host('a'); await host.submit('expand', 'x');
+  const turns = h.entry('a').session.turns.length;
   h.view.closed = true; gate.resolve();
   await waitFor(() => h.plugin.running.size === 0 && !h.entry('a').session.running);
+  assert.equal(h.entry('a').session.turns.length, turns, 'no sentence written after the view closed');
   assert.deepEqual(plain((await topicLines(h, 'a')).map(l => l.type)), ['turn'], 'the turn is saved, the result is not');
   h.view.closed = false; h.view.closeTopicChatWindow(); h.view.topicChatSessions.clear(); h.view.openTopicChat(h.node('a'));
   await waitFor(() => h.entry('a').session.turns.length === 2);
@@ -860,4 +852,129 @@ integrationTest('topic chat Escape gives the focus back: to the button that open
   const items = []; const menu = { addItem(cb) { const it = { setTitle(x) { it.title = x; return it; }, setIcon() { return it; }, setSection() { return it; }, setDisabled() { return it; }, onClick(fn) { it.fn = fn; return it; } }; cb(it); items.push(it); return this; }, addSeparator() { return this; } };
   h.view.addCardMenuActions(menu, h.node('a')); items.find(i => i.title === t('ui.ai_explore')).fn(); escape();
   assert.deepEqual(plain(focused), ['card:a'], 'the right-click entry returns to the card');
+});
+
+// ---- Review round 1 ---------------------------------------------------------------------------------------------------
+
+const RENAMED = 'Agent Workspace/Topics/map-b/Map.md';
+const lineTexts = async (h, root, id) => { await h.view.topicChatRecords?.idle(); const p = `${root}/Chats/topics/${id}.jsonl`; return (await h.repo.app.vault.adapter.exists(p)) ? (await h.repo.app.vault.adapter.read(p)).split('\n').filter(Boolean).map(l => JSON.parse(l)) : null; };
+
+integrationTest('topic chat B1: after a map rename or Organize the next turn is written into the new folder and the old folder is not made again; a task running through the rename still tells its result', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  const oldRoot = h.repo.topicRoot(MAP), newRoot = h.repo.topicRoot(RENAMED);
+  assert.notEqual(oldRoot, newRoot);
+  h.view.openTopicChat(h.node('a')); // the entry is made on the old path
+  await h.repo.ensureTopicFolders('Agent Workspace/Topics/map-b'); // the renamed map file (same content)
+  await h.app.vault.create(RENAMED, await h.app.vault.read(h.app.vault.getAbstractFileByPath(MAP)));
+  h.view.relocate(new Map([[MAP, RENAMED]]));
+  const went = await h.host('a').submit('research', 'after the rename'); assert.equal(went, true, JSON.stringify(h.notices)); await waitFor(() => calls.length === 1);
+  // The rename happens again in the middle of the task: the result still lands in the conversation.
+  h.view.relocate(new Map([[RENAMED, MAP]]));
+  h.view.relocate(new Map([[MAP, RENAMED]]));
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_research_done'), 'the result sentence is not dropped');
+  const lines = await lineTexts(h, newRoot, h.ids.a);
+  assert.deepEqual(plain(lines.map(l => l.type)), ['turn', 'result']);
+  assert.equal(lines[0].message, 'after the rename');
+  assert.equal(await lineTexts(h, oldRoot, h.ids.a), null, 'the old folder has no record file');
+  assert.ok(![...h.files.keys()].some(p => p.startsWith(`${oldRoot}/Chats`)), 'the old folder was not made again');
+});
+
+integrationTest('topic chat B1: a rename in the middle of a task keeps the result sentence (the task is bound to the map, not to its path)', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  await h.host('a').submit('research', 'x'); await waitFor(() => calls.length === 1);
+  await h.repo.ensureTopicFolders('Agent Workspace/Topics/map-b');
+  await h.app.vault.create(RENAMED, await h.app.vault.read(h.app.vault.getAbstractFileByPath(MAP)));
+  h.view.relocate(new Map([[MAP, RENAMED]]));
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_research_done'));
+  const lines = await lineTexts(h, h.repo.topicRoot(RENAMED), h.ids.a);
+  assert.deepEqual(plain(lines.map(l => l.type)), ['result'], 'the result goes to the folder the map has now');
+});
+
+integrationTest('topic chat B2: the map remembers aiMode only after the usage question is confirmed, and only for research and expand', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  h.plugin.outlineGeneration = { generate: async () => outlineOf('# Body\n## Light') };
+  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { accepted(); observer.onWritten(); };
+  mockChat(h, answer([], 'hi')); await researched(h);
+  assert.equal(h.view.map.aiMode, undefined);
+  const host = h.host('a'); host.setMode('standard');
+  h.control.decline = true;
+  for (const kind of ['research', 'expand']) assert.equal(await host.submit(kind, 'go'), false, kind);
+  assert.equal(h.view.map.aiMode, undefined, 'a declined question writes nothing');
+  assert.equal((await h.saved()).length, 4); assert.equal((await core.parseMap(await h.app.vault.read(h.app.vault.getAbstractFileByPath(MAP)))).aiMode, undefined, 'nor on disk');
+  h.control.decline = false;
+  const root = h.host('root'); root.setMode('standard');
+  await root.submit('synthesize', 'all'); await waitFor(() => !h.entry('root').session.running);
+  await host.submit('ask', 'hi'); await finished(h);
+  assert.equal(h.view.map.aiMode, undefined, 'an integration and a free question do not remember the mode');
+  await host.submit('research', 'go'); await waitFor(() => calls.length === 1);
+  assert.equal(h.view.map.aiMode, 'standard', 'a confirmed research remembers it');
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  host.setMode('quick'); await host.submit('expand', 'split'); await finished(h);
+  assert.equal(h.view.map.aiMode, 'quick', 'a confirmed expand remembers it');
+});
+
+integrationTest('topic chat B3: the parent topic edited while the integration was made keeps the edit, leaves no history or Undo, and one failure sentence is told', async () => {
+  const h = await harness(); await researched(h);
+  const rootNote = h.node('root');
+  await h.repo.updateNote(rootNote.path, { status: 'completed', summary: 'Existing conclusion', detail: 'Existing knowledge' });
+  await h.view.hydrate();
+  h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
+  h.plugin.askModel = async (_context, _model, _reasoning, _signal, _onExchange, onAccepted) => {
+    onAccepted?.();
+    await h.repo.updateNote(rootNote.path, { summary: 'Edited meanwhile' });
+    return { summary: 'Draft summary', detail: 'Draft detail', visualReferences: [], suggestions: [] };
+  };
+  const host = h.host('root'); const historyBefore = h.view.history.canUndo;
+  await host.submit('synthesize', 'Integrate'); await waitFor(() => !h.entry('root').session.running);
+  const after = await h.repo.readNote(rootNote.path);
+  assert.deepEqual([after.summary, after.detail], ['Edited meanwhile', 'Existing knowledge'], 'the edit stays, nothing of the integration is written');
+  assert.equal(h.view.history.canUndo, historyBefore, 'no history entry'); assert.equal(h.view.history.canRedo, false);
+  assert.equal(h.Notice.all.flatMap(n => n.actions ?? []).some(b => b.text === t('ui.undo')), false, 'no Undo button');
+  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_failed_0', t('log.child_integration_failed')));
+  assert.equal((await topicLines(h, 'root')).at(-1).status, 'failed');
+});
+
+integrationTest('topic chat M1: starting a presentation closes the small window (a running task keeps going) and nothing can be sent during it', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  const host = h.host('a'); await host.submit('research', 'x'); await waitFor(() => calls.length === 1);
+  assert.ok(h.win(), 'the window is open');
+  h.view.canPresent = () => true; h.view.presentationOrder = () => [h.ids.a]; h.view.startPresentation();
+  assert.ok(h.view.presentation, 'the presentation started');
+  assert.equal(h.view.topicChatOpen, null, 'the window was closed');
+  assert.equal(h.entry('a').session.running, true, 'the task goes on');
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_research_done'));
+  const asks = h.control.usageAsks;
+  assert.equal(await h.view.submitTopicChat(h.entry('a'), h.node('a'), 'research', 'again'), false, 'no send while presenting');
+  assert.equal(h.control.usageAsks, asks); assert.equal(calls.length, 1);
+});
+
+integrationTest('topic chat M2: a run action on a card this reply made (new:<ref>) researches that card', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  mockChat(h, answer([{ kind: 'add_child', parentId: h.ids.a, title: 'Light', summary: 'S', ref: 'n1' }, ACT.runMap('research_standard', ['new:n1'])], 'Added and researching.'));
+  await h.host('a').submit('ask', 'add light and research it');
+  await waitFor(() => calls.length === 1);
+  assert.equal((await h.repo.readNote(calls[0].node.path)).title, 'Light'); assert.notEqual(calls[0].node.id, h.ids.a);
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  // A reference that was never made is skipped, not turned into the topic itself.
+  mockChat(h, answer([ACT.runMap('research_standard', ['new:nope'])], 'Researching.'));
+  await h.host('a').submit('ask', 'research a ghost'); await finished(h);
+  assert.equal(calls.length, 1, 'nothing ran for a card that was never made');
+});
+
+integrationTest('topic chat M3: a failed or skipped action is shown with the AI sentence and the record says failed', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  mockChat(h, answer([ACT.runMap('research_standard', [h.ids.a])], 'All done!'));
+  await h.host('a').submit('ask', 'research it'); await waitFor(() => calls.length === 1);
+  calls[0].failed('model unavailable'); calls[0].gate.resolve(); await finished(h);
+  const text = h.entry('a').session.turns.at(-1).text;
+  assert.ok(text.includes('All done!'), 'the AI sentence stays'); assert.ok(text.includes('model unavailable'), 'the failure is shown with it');
+  assert.match(text, /^All done!\n\n.*Failed:.*model unavailable/s);
+  assert.equal((await topicLines(h, 'a')).at(-1).status, 'failed');
+  // Everything went well: only the AI sentence, status done.
+  mockChat(h, answer([{ kind: 'add_child', parentId: h.ids.b, title: 'Calm', summary: 'S' }], 'Added.'));
+  await h.host('b').submit('ask', 'rename'); await waitFor(() => !h.entry('b').session.running);
+  assert.equal(h.entry('b').session.turns.at(-1).text, 'Added.'); assert.equal((await topicLines(h, 'b')).at(-1).status, 'done');
 });

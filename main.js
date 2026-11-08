@@ -594,6 +594,7 @@ var en = {
   "ui.confirm_new_synthesis_topic": "Create synthesis topic",
   "ui.mind_map_data_was_not_found_keep_the_agent_map_block": "Mind map data was not found. Keep the agent-map block.",
   "ui.invalid_mind_map_format": "Invalid mind map format.",
+  "ui.map_data_block_invalid": "The data block of this mind map is malformed, so it cannot be opened. Fix the contents of the agent-map block.",
   "ui.invalid_node_data_or_duplicate_id": "Invalid node data or duplicate ID.",
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "A link contains a cycle or points to a missing parent topic.",
   "ui.ai_task_cancelled": "AI task cancelled",
@@ -1243,6 +1244,7 @@ var en = {
   "error.move_undo_failed_0": "Move failed ({0}); undoing it also failed ({1}).",
   "error.move_not_applied": "A folder move did not take effect on disk, so the operation was stopped and restored.",
   "error.plugin_unloaded": "Visual Agent Map was unloaded, so the operation stopped before its next step.",
+  "error.unloaded_write_not_performed": "Visual Agent Map was reloaded and this write was not performed. Close this window and try again.",
   "error.legacy_map_view_only": "This map uses the pre-0.4 structure and is view-only.",
   "ui.fix_math_formulas": "Fix math formulas in VAM notes",
   "ui.fix_math_none": "No VAM note needs its math formulas fixed.",
@@ -1266,6 +1268,7 @@ var en = {
   "ui.aim_maps_folder": "AIM folder",
   "ui.map_folder_name_desc": "Folder name inside {0} where new maps are created. Changing it renames the existing folder, so its maps move with it. Settings closes while it runs, and Obsidian may ask about links for each map.",
   "ui.synced_0_subtopic_filenames_with_their_names": "Synced {0} subtopic filenames with their names.",
+  "ui.subtopic_filename_sync_failed_will_retry": "Subtopic filename sync failed (the folder cannot be written). Other mind maps still open; it will be tried again at the next start.",
   "ui.synced_0_topic_filenames": "Synced {0} topic filenames.",
   "ui.topic_note_display_repaired": "Topic note display repaired.",
   "ui.map_saved_but_reference_update_failed_0": "Map saved, but reference update failed: {0}",
@@ -2063,6 +2066,8 @@ var en = {
   "coffee.generating": "Generating",
   "coffee.complete": "Complete",
   "coffee.interrupted": "Interrupted",
+  "coffee.unreadable": "Unreadable",
+  "coffee.unreadable_reason": "The file content cannot be read. Check it or remove this file by hand.",
   "coffee.draft": "Draft",
   "coffee.select_table": "Select {0}",
   "coffee.last_updated": "Last updated",
@@ -3363,6 +3368,7 @@ var zhCN = {
   "ui.confirm_new_synthesis_topic": "\u521B\u5EFA\u6574\u5408\u8BAE\u9898",
   "ui.mind_map_data_was_not_found_keep_the_agent_map_block": "\u627E\u4E0D\u5230\u5FC3\u667A\u56FE\u6570\u636E\u533A\u5757\uFF0C\u8BF7\u4FDD\u7559 agent-map \u533A\u5757\u3002",
   "ui.invalid_mind_map_format": "\u5FC3\u667A\u56FE\u683C\u5F0F\u4E0D\u6B63\u786E\u3002",
+  "ui.map_data_block_invalid": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u7684\u6570\u636E\u5757\u683C\u5F0F\u4E0D\u6B63\u786E\uFF0C\u65E0\u6CD5\u6253\u5F00\u3002\u8BF7\u4FEE\u6B63 agent-map \u5757\u7684\u5185\u5BB9\u3002",
   "ui.invalid_node_data_or_duplicate_id": "\u8BAE\u9898\u6570\u636E\u4E0D\u6B63\u786E\u6216 ID \u91CD\u590D\u3002",
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "\u94FE\u63A5\u6709\u5FAA\u73AF\u6216\u6307\u5411\u4E0D\u5B58\u5728\u7684\u7236\u8BAE\u9898\u3002",
   "ui.ai_task_cancelled": "AI \u4EFB\u52A1\u5DF2\u53D6\u6D88",
@@ -4012,6 +4018,7 @@ var zhCN = {
   "error.move_undo_failed_0": "\u79FB\u52A8\u5931\u8D25\uFF08{0}\uFF09\uFF1B\u8FD8\u539F\u79FB\u52A8\u4E5F\u5931\u8D25\uFF08{1}\uFF09\u3002",
   "error.move_not_applied": "\u6587\u4EF6\u5939\u79FB\u52A8\u6CA1\u6709\u5B9E\u9645\u751F\u6548\uFF0C\u64CD\u4F5C\u5DF2\u505C\u6B62\u5E76\u8FD8\u539F\u3002",
   "error.plugin_unloaded": "Visual Agent Map \u5DF2\u5378\u8F7D\uFF0C\u64CD\u4F5C\u5728\u4E0B\u4E00\u6B65\u4E4B\u524D\u505C\u6B62\u3002",
+  "error.unloaded_write_not_performed": "Visual Agent Map \u5DF2\u91CD\u65B0\u52A0\u8F7D\uFF0C\u8FD9\u6B21\u6CA1\u6709\u5199\u5165\u3002\u8BF7\u5173\u95ED\u8FD9\u4E2A\u7A97\u53E3\u540E\u91CD\u8BD5\u3002",
   "error.legacy_map_view_only": "\u6B64\u5FC3\u667A\u56FE\u4F7F\u7528 0.4 \u524D\u7684\u65E7\u7ED3\u6784\uFF0C\u53EA\u80FD\u67E5\u770B\u3002",
   "ui.fix_math_formulas": "\u4FEE\u6B63 VAM \u7B14\u8BB0\u91CC\u7684\u6570\u5B66\u516C\u5F0F",
   "ui.fix_math_none": "\u6CA1\u6709\u9700\u8981\u4FEE\u6B63\u6570\u5B66\u516C\u5F0F\u7684 VAM \u7B14\u8BB0\u3002",
@@ -4035,6 +4042,7 @@ var zhCN = {
   "ui.aim_maps_folder": "AIM \u6587\u4EF6\u5939",
   "ui.map_folder_name_desc": "\u65B0\u7684\u9879\u76EE\u4F1A\u521B\u5EFA\u5728 {0} \u5185\u7684\u8FD9\u4E2A\u6587\u4EF6\u5939\u3002\u4FEE\u6539\u540D\u79F0\u4F1A\u4E00\u5E76\u91CD\u547D\u540D\u65E2\u6709\u6587\u4EF6\u5939\uFF0C\u91CC\u9762\u7684\u9879\u76EE\u4F1A\u8DDF\u7740\u79FB\u52A8\u3002\u8FD0\u884C\u65F6\u8BBE\u7F6E\u7A97\u53E3\u4F1A\u5173\u95ED\uFF0CObsidian \u53EF\u80FD\u4F1A\u9010\u4EFD\u8BE2\u95EE\u94FE\u63A5\u5904\u7406\u65B9\u5F0F\u3002",
   "ui.synced_0_subtopic_filenames_with_their_names": "\u5DF2\u5C06 {0} \u4EFD\u5B50\u8BAE\u9898\u6587\u4EF6\u540D\u540C\u6B65\u4E3A\u8BAE\u9898\u540D\u79F0\u3002",
+  "ui.subtopic_filename_sync_failed_will_retry": "\u5B50\u8BAE\u9898\u6587\u4EF6\u540D\u540C\u6B65\u5931\u8D25\uFF08\u6587\u4EF6\u5939\u65E0\u6CD5\u5199\u5165\uFF09\u3002\u5176\u4ED6\u5FC3\u667A\u56FE\u4ECD\u53EF\u6253\u5F00\uFF0C\u4E0B\u6B21\u542F\u52A8\u4F1A\u518D\u8BD5\u4E00\u6B21\u3002",
   "ui.synced_0_topic_filenames": "\u5DF2\u540C\u6B65 {0} \u4EFD\u8BAE\u9898\u6587\u4EF6\u540D\u3002",
   "ui.topic_note_display_repaired": "\u5DF2\u4FEE\u590D\u8BAE\u9898\u7B14\u8BB0\u663E\u793A\u3002",
   "ui.map_saved_but_reference_update_failed_0": "\u5FC3\u667A\u56FE\u5DF2\u4FDD\u5B58\uFF0C\u4F46 reference \u66F4\u65B0\u5931\u8D25\uFF1A{0}",
@@ -4832,6 +4840,8 @@ var zhCN = {
   "coffee.generating": "\u751F\u6210\u4E2D",
   "coffee.complete": "\u5DF2\u5B8C\u6210",
   "coffee.interrupted": "\u4E2D\u65AD",
+  "coffee.unreadable": "\u8BFB\u4E0D\u5230",
+  "coffee.unreadable_reason": "\u6587\u4EF6\u5185\u5BB9\u65E0\u6CD5\u8BFB\u53D6\uFF0C\u8BF7\u68C0\u67E5\u6216\u624B\u52A8\u79FB\u9664\u8FD9\u4E2A\u6587\u4EF6\u3002",
   "coffee.draft": "\u8349\u7A3F",
   "coffee.select_table": "\u9009\u62E9 {0}",
   "coffee.last_updated": "\u6700\u540E\u66F4\u65B0",
@@ -6132,6 +6142,7 @@ var zhTW = {
   "ui.confirm_new_synthesis_topic": "\u5EFA\u7ACB\u6574\u5408\u8B70\u984C",
   "ui.mind_map_data_was_not_found_keep_the_agent_map_block": "\u627E\u4E0D\u5230\u5FC3\u667A\u5716\u8CC7\u6599\u5340\u584A\uFF0C\u8ACB\u4FDD\u7559 agent-map \u5340\u584A\u3002",
   "ui.invalid_mind_map_format": "\u5FC3\u667A\u5716\u683C\u5F0F\u4E0D\u6B63\u78BA\u3002",
+  "ui.map_data_block_invalid": "\u9019\u5F35\u5FC3\u667A\u5716\u7684\u8CC7\u6599\u5340\u584A\u683C\u5F0F\u4E0D\u6B63\u78BA\uFF0C\u7121\u6CD5\u958B\u555F\u3002\u8ACB\u4FEE\u6B63 agent-map \u5340\u584A\u7684\u5167\u5BB9\u3002",
   "ui.invalid_node_data_or_duplicate_id": "\u8B70\u984C\u8CC7\u6599\u4E0D\u6B63\u78BA\u6216 ID \u91CD\u8907\u3002",
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "\u9023\u7D50\u6709\u5FAA\u74B0\u6216\u6307\u5411\u4E0D\u5B58\u5728\u7684\u6BCD\u8B70\u984C\u3002",
   "ui.ai_task_cancelled": "AI \u4EFB\u52D9\u5DF2\u53D6\u6D88",
@@ -6781,6 +6792,7 @@ var zhTW = {
   "error.move_undo_failed_0": "\u642C\u79FB\u5931\u6557\uFF08{0}\uFF09\uFF1B\u9084\u539F\u642C\u79FB\u4E5F\u5931\u6557\uFF08{1}\uFF09\u3002",
   "error.move_not_applied": "\u8CC7\u6599\u593E\u642C\u79FB\u6C92\u6709\u5BE6\u969B\u751F\u6548\uFF0C\u64CD\u4F5C\u5DF2\u505C\u6B62\u4E26\u9084\u539F\u3002",
   "error.plugin_unloaded": "Visual Agent Map \u5DF2\u5378\u8F09\uFF0C\u64CD\u4F5C\u5728\u4E0B\u4E00\u6B65\u4E4B\u524D\u505C\u6B62\u3002",
+  "error.unloaded_write_not_performed": "Visual Agent Map \u5DF2\u91CD\u65B0\u8F09\u5165\uFF0C\u9019\u6B21\u6C92\u6709\u5BEB\u5165\u3002\u8ACB\u95DC\u9589\u9019\u500B\u8996\u7A97\u5F8C\u91CD\u8A66\u3002",
   "error.legacy_map_view_only": "\u6B64\u5FC3\u667A\u5716\u4F7F\u7528 0.4 \u524D\u7684\u820A\u7D50\u69CB\uFF0C\u53EA\u80FD\u6AA2\u8996\u3002",
   "ui.fix_math_formulas": "\u4FEE\u6B63 VAM \u7B46\u8A18\u88E1\u7684\u6578\u5B78\u516C\u5F0F",
   "ui.fix_math_none": "\u6C92\u6709\u9700\u8981\u4FEE\u6B63\u6578\u5B78\u516C\u5F0F\u7684 VAM \u7B46\u8A18\u3002",
@@ -6804,6 +6816,7 @@ var zhTW = {
   "ui.aim_maps_folder": "AIM \u8CC7\u6599\u593E",
   "ui.map_folder_name_desc": "\u65B0\u7684\u9805\u76EE\u6703\u5EFA\u7ACB\u5728 {0} \u5167\u7684\u9019\u500B\u8CC7\u6599\u593E\u3002\u4FEE\u6539\u540D\u7A31\u6703\u4E00\u4F75\u91CD\u65B0\u547D\u540D\u65E2\u6709\u8CC7\u6599\u593E\uFF0C\u88E1\u9762\u7684\u9805\u76EE\u6703\u8DDF\u8457\u79FB\u52D5\u3002\u57F7\u884C\u6642\u8A2D\u5B9A\u8996\u7A97\u6703\u95DC\u9589\uFF0CObsidian \u53EF\u80FD\u6703\u9010\u4EFD\u8A62\u554F\u9023\u7D50\u8655\u7406\u65B9\u5F0F\u3002",
   "ui.synced_0_subtopic_filenames_with_their_names": "\u5DF2\u5C07 {0} \u4EFD\u5B50\u8B70\u984C\u6A94\u540D\u540C\u6B65\u70BA\u8B70\u984C\u540D\u7A31\u3002",
+  "ui.subtopic_filename_sync_failed_will_retry": "\u5B50\u8B70\u984C\u6A94\u540D\u540C\u6B65\u5931\u6557\uFF08\u8CC7\u6599\u593E\u7121\u6CD5\u5BEB\u5165\uFF09\u3002\u5176\u4ED6\u5FC3\u667A\u5716\u4ECD\u53EF\u958B\u555F\uFF0C\u4E0B\u6B21\u555F\u52D5\u6703\u518D\u8A66\u4E00\u6B21\u3002",
   "ui.synced_0_topic_filenames": "\u5DF2\u540C\u6B65 {0} \u4EFD\u8B70\u984C\u6A94\u540D\u3002",
   "ui.topic_note_display_repaired": "\u5DF2\u4FEE\u5FA9\u8B70\u984C\u7B46\u8A18\u986F\u793A\u3002",
   "ui.map_saved_but_reference_update_failed_0": "\u5FC3\u667A\u5716\u5DF2\u5132\u5B58\uFF0C\u4F46 reference \u66F4\u65B0\u5931\u6557\uFF1A{0}",
@@ -7601,6 +7614,8 @@ var zhTW = {
   "coffee.generating": "\u751F\u6210\u4E2D",
   "coffee.complete": "\u5DF2\u5B8C\u6210",
   "coffee.interrupted": "\u4E2D\u65B7",
+  "coffee.unreadable": "\u8B80\u4E0D\u5230",
+  "coffee.unreadable_reason": "\u6A94\u6848\u5167\u5BB9\u7121\u6CD5\u8B80\u53D6\uFF0C\u8ACB\u6AA2\u67E5\u6216\u624B\u52D5\u79FB\u9664\u9019\u500B\u6A94\u6848\u3002",
   "coffee.draft": "\u8349\u7A3F",
   "coffee.select_table": "\u9078\u53D6 {0}",
   "coffee.last_updated": "\u6700\u5F8C\u66F4\u65B0",
@@ -14973,6 +14988,10 @@ function topicTableCount(topic, items) {
   const exactTopic = topic.trim();
   return items.filter((item) => item.topic.trim() === exactTopic).length;
 }
+function tableStatusKey(item) {
+  if (item.unreadable) return "coffee.unreadable";
+  return item.status === "generating" ? "coffee.generating" : item.status === "completed" ? "coffee.complete" : item.status === "error" ? "coffee.interrupted" : "coffee.draft";
+}
 function tableTime(item) {
   if (item.status === "completed") return { value: completeTime(item), isFallback: !item.lastCompletedAt };
   if (item.lastGenerationStartedAt) return { value: startTime(item), isFallback: false };
@@ -16724,7 +16743,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       for (const path of selectedTables.keys()) if (!visiblePaths.has(path)) selectedTables.delete(path);
       updateSelection();
       for (const item of visible) {
-        const time = tableTime(item), timestamp = new Date(time.value), status = item.status === "generating" ? this.t("coffee.generating") : item.status === "completed" ? this.t("coffee.complete") : item.status === "error" ? this.t("coffee.interrupted") : this.t("coffee.draft");
+        const time = tableTime(item), timestamp = new Date(time.value), status = this.t(tableStatusKey(item));
         const entry = list.createDiv("ct-list-entry"), button = this.button(entry, "", () => {
           if (item.status === "generating") void this.loadSession(item.path);
           else void showPreview(item.path);
@@ -16752,6 +16771,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
         if (item.unreadable) {
           button.addClass("ct-list-unreadable");
           button.disabled = true;
+          button.createDiv({ cls: "ct-list-reason", text: this.t("coffee.unreadable_reason") });
         }
         if (this.selectedPath === item.path) button.addClass("is-selected");
         button.setAttribute("aria-current", this.selectedPath === item.path ? "true" : "false");
@@ -21268,7 +21288,12 @@ function parseMap(content, log) {
   var _a2, _b2;
   const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
   if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
-  const parsed = JSON.parse(block[1]);
+  let parsed;
+  try {
+    parsed = JSON.parse(block[1]);
+  } catch (e) {
+    throw new Error(t("ui.map_data_block_invalid"));
+  }
   const map = aimEnabled() ? upgradeLegacyAimData(parsed) : parsed;
   const checkAim = aimEnabled() || map.aim === void 0;
   if (map.version !== 1 || typeof map.id !== "string" || typeof map.title !== "string" || !Array.isArray(map.nodes))
@@ -25772,7 +25797,7 @@ function guardWrites(target, writes, disposed, message) {
       if (typeof property !== "string" || typeof value !== "function") return value;
       const call = value;
       return writes.has(property) ? (...args) => {
-        if (disposed()) return Promise.reject(new Error(message));
+        if (disposed()) return Promise.reject(new Error(message()));
         return Reflect.apply(call, object2, args);
       } : (...args) => Reflect.apply(call, object2, args);
     }
@@ -25796,7 +25821,7 @@ var Repository = class {
     /** Called once per vault-wide scan that skipped unreadable maps. */
     __publicField(this, "onUnreadableMaps");
     const stopped = () => this.disposed;
-    const message = "Visual Agent Map was unloaded; this write was not performed.";
+    const message = () => this.message("error.unloaded_write_not_performed");
     this.app = new Proxy(app, {
       get(object2, property) {
         const value = Reflect.get(object2, property, object2);
@@ -63571,7 +63596,8 @@ ${request.requirements}` : preset.text,
     this.assertAimReferencesRemain(before, ids, false, removableQuestions);
     const removed = before.nodes.filter((item) => ids.has(item.id)), parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned");
     const tx = this.beginMapTransaction();
-    for (const item of removed) tx.park(item.path, parkFolder, before.id, "unassigned");
+    for (const item of removed)
+      if (this.app.vault.getAbstractFileByPath(item.path)) tx.park(item.path, parkFolder, before.id, "unassigned");
     const entry = await tx.editMap(this.path, (map) => {
       const prior = clone(map);
       const adopted = /* @__PURE__ */ new Set();
@@ -66415,7 +66441,7 @@ ${request.requirements}` : preset.text,
   }
   /** Replaces a bracket's range with the selected topics (same rules as creating one); one undo step. */
   async changeSummaryRange(id) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     if (!this.map) return;
     const check = this.summaryEntryCheck(this.summaryTargets());
     if (!check.ok) {
@@ -66424,12 +66450,22 @@ ${request.requirements}` : preset.text,
       return;
     }
     this.focusItemId = id;
-    await this.changeCanvasItems(id, (items) => {
-      var _a3, _b3;
-      const result = setSummaryMembers(items, id, check.members, (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes) != null ? _b3 : []);
-      return result.ok ? result.items : [...items];
-    });
-    (_b2 = this.announcer) == null ? void 0 : _b2.setText(t("ui.summary_range_changed"));
+    try {
+      await this.mapChange((map) => {
+        var _a3;
+        const result = setSummaryMembers((_a3 = map.canvasItems) != null ? _a3 : [], id, check.members, map.nodes);
+        if (!result.ok) throw new Error(t(this.summaryRefusalKey(result.reason)));
+        map.canvasItems = result.items;
+      }, false);
+    } catch (error) {
+      this.focusItemId = null;
+      this.render();
+      const message = error instanceof Error ? error.message : String(error);
+      (_b2 = this.announcer) == null ? void 0 : _b2.setText(message);
+      new import_obsidian39.Notice(message);
+      return;
+    }
+    (_c = this.announcer) == null ? void 0 : _c.setText(t("ui.summary_range_changed"));
   }
   /** Asks for a frame's label (blank is allowed) and writes it as one undo step. */
   editBoundaryLabel(id) {
@@ -80680,12 +80716,12 @@ ${addition}` : addition },
     if (!nodes || !roots.length) return null;
     let found = null;
     for (const [id, el] of this.cardEls) {
+      if (id === selfId) continue;
       if (px < el.offsetLeft || px >= el.offsetLeft + el.offsetWidth) continue;
       if (py < el.offsetTop || py >= el.offsetTop + el.offsetHeight) continue;
       found = (_b2 = nodes.find((item) => item.id === id)) != null ? _b2 : found;
     }
     if (!found) return null;
-    if (found.id === selfId) return null;
     const target = found;
     if (roots.every((root) => root.parentId === target.id && !root.afterTextId)) return null;
     const inside2 = roots.some((root) => root.id === target.id || descendants(nodes, root.id).has(target.id));
@@ -91422,10 +91458,16 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     })).then(async () => {
       await this.initializeFirstInstall(!!saved);
       if (this.settings.structureVersion < 2) {
-        const count2 = await this.repo.normalizeGeneratedNoteFilenames();
-        this.settings.structureVersion = 2;
-        await this.saveSettings();
-        if (count2) new import_obsidian52.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count2));
+        try {
+          const count2 = await this.repo.normalizeGeneratedNoteFilenames();
+          this.settings.structureVersion = 2;
+          await this.saveSettings();
+          if (count2) new import_obsidian52.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count2));
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          this.logs.appendLog("warn", `${t("ui.subtopic_filename_sync_failed_will_retry")} ${detail}`);
+          new import_obsidian52.Notice(t("ui.subtopic_filename_sync_failed_will_retry"));
+        }
       }
     });
     this.ready = initialize;

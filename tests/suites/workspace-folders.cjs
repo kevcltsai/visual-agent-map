@@ -560,7 +560,7 @@ integrationTest('after onunload an in-flight Organize performs zero further writ
   assert.deepEqual(writes, [], 'nothing was written after onunload');
   assert.equal(renames, 1, 'no second topic was started');
   assert.ok(repo.isDisposed());
-  await assert.rejects(repo.createMap('Late'), /unloaded/);
+  await assert.rejects(repo.createMap('Late'), /reloaded/);
 });
 
 integrationTest('a move that Obsidian reports as done but that did not happen on disk is stopped and restored', async () => {

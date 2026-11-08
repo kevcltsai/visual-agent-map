@@ -704,10 +704,18 @@ export default class VisualAgentMapPlugin extends Plugin {
     ).then(async () => {
       await this.initializeFirstInstall(!!saved);
       if (this.settings.structureVersion < 2) {
-        const count = await this.repo.normalizeGeneratedNoteFilenames();
-        this.settings.structureVersion = 2;
-        await this.saveSettings();
-        if (count) new Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
+        // A failure here (a read-only folder, EACCES) must not reject `ready`: other maps keep opening, and structureVersion
+        // stays below 2 so the next start tries again.
+        try {
+          const count = await this.repo.normalizeGeneratedNoteFilenames();
+          this.settings.structureVersion = 2;
+          await this.saveSettings();
+          if (count) new Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          this.logs.appendLog("warn", `${t("ui.subtopic_filename_sync_failed_will_retry")} ${detail}`);
+          new Notice(t("ui.subtopic_filename_sync_failed_will_retry"));
+        }
       }
     });
     this.ready = initialize;

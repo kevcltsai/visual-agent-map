@@ -1207,6 +1207,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_folder_name_desc":
     "新的项目会创建在 {0} 内的这个文件夹。修改名称会一并重命名既有文件夹，里面的项目会跟着移动。运行时设置窗口会关闭，Obsidian 可能会逐份询问链接处理方式。",
   "ui.synced_0_subtopic_filenames_with_their_names": "已将 {0} 份子议题文件名同步为议题名称。",
+  "ui.subtopic_filename_sync_failed_will_retry":
+    "子议题文件名同步失败（文件夹无法写入）。其他心智图仍可打开，下次启动会再试一次。",
   "ui.synced_0_topic_filenames": "已同步 {0} 份议题文件名。",
   "ui.topic_note_display_repaired": "已修复议题笔记显示。",
   "ui.map_saved_but_reference_update_failed_0": "心智图已保存，但 reference 更新失败：{0}",

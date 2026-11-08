@@ -1278,6 +1278,8 @@ export const en = {
   "ui.map_folder_name_desc":
     "Folder name inside {0} where new maps are created. Changing it renames the existing folder, so its maps move with it. Settings closes while it runs, and Obsidian may ask about links for each map.",
   "ui.synced_0_subtopic_filenames_with_their_names": "Synced {0} subtopic filenames with their names.",
+  "ui.subtopic_filename_sync_failed_will_retry":
+    "Subtopic filename sync failed (the folder cannot be written). Other mind maps still open; it will be tried again at the next start.",
   "ui.synced_0_topic_filenames": "Synced {0} topic filenames.",
   "ui.topic_note_display_repaired": "Topic note display repaired.",
   "ui.map_saved_but_reference_update_failed_0": "Map saved, but reference update failed: {0}",

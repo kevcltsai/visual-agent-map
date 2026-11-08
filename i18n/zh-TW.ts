@@ -1209,6 +1209,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_folder_name_desc":
     "新的項目會建立在 {0} 內的這個資料夾。修改名稱會一併重新命名既有資料夾，裡面的項目會跟著移動。執行時設定視窗會關閉，Obsidian 可能會逐份詢問連結處理方式。",
   "ui.synced_0_subtopic_filenames_with_their_names": "已將 {0} 份子議題檔名同步為議題名稱。",
+  "ui.subtopic_filename_sync_failed_will_retry":
+    "子議題檔名同步失敗（資料夾無法寫入）。其他心智圖仍可開啟，下次啟動會再試一次。",
   "ui.synced_0_topic_filenames": "已同步 {0} 份議題檔名。",
   "ui.topic_note_display_repaired": "已修復議題筆記顯示。",
   "ui.map_saved_but_reference_update_failed_0": "心智圖已儲存，但 reference 更新失敗：{0}",

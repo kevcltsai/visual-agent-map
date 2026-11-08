@@ -139,3 +139,39 @@ test('S3: the image translate pill is drawn above Obsidian\'s image viewer (ligh
   assert.ok(z, '.vam-image-action sets a z-index');
   assert.ok(zOf(z[1]) > LIGHTBOX_Z, `z-index ${z[1]} must be above the lightbox (${LIGHTBOX_Z})`);
 });
+
+// S5: the startup subtopic-filename sync fails (EACCES): the ready promise still resolves, a Notice says so, and the next start retries.
+async function startPlugin(saved, saves, options = {}) {
+  const notices = [];
+  const Main = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices) } });
+  const Plugin = Main.default;
+  const noop = () => Promise.resolve();
+  const vault = {
+    adapter: { exists: async () => false, list: async () => ({ files: [], folders: [] }), read: async () => '', write: noop, mkdir: noop },
+    getAbstractFileByPath: () => null, read: async () => '', getMarkdownFiles: () => { if (options.eacces) throw new Error('EACCES: permission denied'); return []; }, getFiles: () => [], getAllLoadedFiles: () => [], getRoot: () => ({ children: [] }),
+    on: name => ({ name }), create: noop, createFolder: noop, modify: noop, process: noop, rename: noop, trash: noop, delete: noop
+  };
+  const bare = new Plugin();
+  const plugin = new Proxy(bare, { get: (target, key, receiver) => key in target || typeof key !== 'string' || !/^(register|add)/.test(key) ? Reflect.get(target, key, receiver) : () => ({ setAttribute() {}, addClass() {}, addEventListener() {} }) });
+  plugin.manifest = { id: 'visual-agent-map', version: '0.0.0-test', dir: '' };
+  plugin.app = { vault, fileManager: { trashFile: noop, renameFile: noop }, metadataCache: { on: () => ({}), getFileCache: () => null },
+    workspace: { onLayoutReady: callback => callback(), on: () => ({}), getLeavesOfType: () => [], getActiveFile: () => null, getActiveViewOfType: () => null, layoutReady: true }, loadLocalStorage: () => null, saveLocalStorage() {} };
+  plugin.loadData = async () => saved;
+  plugin.saveData = async data => { saves.push(JSON.parse(JSON.stringify(data))); };
+  plugin.addCommand = command => command;
+  await plugin.onload();
+  return { plugin, notices };
+}
+
+test('S5: a failing startup filename sync does not reject ready, shows a Notice, and structureVersion stays so the next start retries', async () => {
+  const saved = { migrated: true, structureVersion: 1, workspaceInitialized: true, language: 'zh-TW' };
+  const saves = [];
+  const { plugin, notices } = await startPlugin(saved, saves, { eacces: true });
+  await assert.doesNotReject(plugin.ready);
+  assert.ok(notices.some(text => text.includes('子議題檔名同步失敗')), `notices: ${JSON.stringify(notices)}`);
+  assert.ok(!saves.some(data => data.structureVersion >= 2), 'structureVersion is not advanced after a failure');
+  // Control: the same start without the failure advances it (so the assertion above is not a blind spot).
+  const ok = [];
+  await (await startPlugin(saved, ok)).plugin.ready;
+  assert.ok(ok.some(data => data.structureVersion >= 2));
+});

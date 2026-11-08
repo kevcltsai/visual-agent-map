@@ -26799,12 +26799,13 @@ export class VisualAgentMapView extends ItemView {
     if (!nodes || !roots.length) return null;
     let found: MapNode | null = null;
     for (const [id, el] of this.cardEls) {
+      // The dragged card is under its own pointer and can sort after the card behind it: it never hides that card.
+      if (id === selfId) continue;
       if (px < el.offsetLeft || px >= el.offsetLeft + el.offsetWidth) continue;
       if (py < el.offsetTop || py >= el.offsetTop + el.offsetHeight) continue;
       found = nodes.find(item => item.id === id) ?? found;
     }
     if (!found) return null;
-    if (found.id === selfId) return null;
     const target = found;
     // A topic that follows a text block can be dropped on its own topic: that makes it a direct child.
     if (roots.every(root => root.parentId === target.id && !root.afterTextId)) return null;

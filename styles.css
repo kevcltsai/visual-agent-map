@@ -1192,6 +1192,7 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .ct-status-badge { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 999px; background: var(--background-modifier-hover); color: var(--text-normal); font-size: var(--font-ui-smaller); }
 .ct-status-generating { color: var(--text-accent); }
 .ct-status-error { color: var(--text-error); }
+.ct-list-reason { margin-top: 2px; color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
 .ct-list-fallback { font-size: var(--font-ui-smaller); }
 .ct-same-topic-link { grid-column: 1; justify-self: start; width: auto; height: auto; min-height: 0; margin: 0 0 1px 9px; padding: 2px 0; border: 0; background: transparent; color: var(--text-accent); font-size: var(--font-ui-smaller); text-align: left; }
 .ct-list-entry .ct-row-menu-trigger { grid-column: 2; grid-row: 1; align-self: start; margin-top: 2px; }

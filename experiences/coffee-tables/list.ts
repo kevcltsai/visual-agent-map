@@ -1,4 +1,4 @@
-import { instructionLanguageOf, intlLocaleOf, translate, uiLocale } from "../../i18n";
+import { instructionLanguageOf, intlLocaleOf, translate, uiLocale, type TranslationKey } from "../../i18n";
 import type { CoffeeSession } from "./types";
 
 export interface TableListItem {
@@ -64,6 +64,18 @@ export function selectTables(
 export function topicTableCount(topic: string, items: TableListItem[]): number {
   const exactTopic = topic.trim();
   return items.filter(item => item.topic.trim() === exactTopic).length;
+}
+
+/** The badge text key of a list row: a file that cannot be read says so, instead of showing the "Interrupted" its placeholder status maps to. */
+export function tableStatusKey(item: TableListItem): TranslationKey {
+  if (item.unreadable) return "coffee.unreadable";
+  return item.status === "generating"
+    ? "coffee.generating"
+    : item.status === "completed"
+      ? "coffee.complete"
+      : item.status === "error"
+        ? "coffee.interrupted"
+        : "coffee.draft";
 }
 
 export function tableTime(item: TableListItem): { value: number; isFallback: boolean } {

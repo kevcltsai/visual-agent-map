@@ -2044,6 +2044,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "coffee.generating": "生成中",
   "coffee.complete": "已完成",
   "coffee.interrupted": "中斷",
+  "coffee.unreadable": "讀不到",
+  "coffee.unreadable_reason": "檔案內容無法讀取，請檢查或手動移除這個檔案。",
   "coffee.draft": "草稿",
   "coffee.select_table": "選取 {0}",
   "coffee.last_updated": "最後更新",

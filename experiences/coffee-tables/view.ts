@@ -63,6 +63,7 @@ import {
   effectiveTableStatus,
   formatTableTime,
   selectTables,
+  tableStatusKey,
   tableTime,
   topicTableCount,
   type TableListFilter,
@@ -1687,14 +1688,7 @@ export class CoffeeTablesView extends ItemView {
       for (const item of visible) {
         const time = tableTime(item),
           timestamp = new Date(time.value),
-          status =
-            item.status === "generating"
-              ? this.t("coffee.generating")
-              : item.status === "completed"
-                ? this.t("coffee.complete")
-                : item.status === "error"
-                  ? this.t("coffee.interrupted")
-                  : this.t("coffee.draft");
+          status = this.t(tableStatusKey(item));
         const entry = list.createDiv("ct-list-entry"),
           button = this.button(entry, "", () => {
             if (item.status === "generating") void this.loadSession(item.path);
@@ -1723,6 +1717,7 @@ export class CoffeeTablesView extends ItemView {
         if (item.unreadable) {
           button.addClass("ct-list-unreadable");
           button.disabled = true;
+          button.createDiv({ cls: "ct-list-reason", text: this.t("coffee.unreadable_reason") });
         }
         if (this.selectedPath === item.path) button.addClass("is-selected");
         button.setAttribute("aria-current", this.selectedPath === item.path ? "true" : "false");

@@ -2044,6 +2044,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "coffee.generating": "生成中",
   "coffee.complete": "已完成",
   "coffee.interrupted": "中断",
+  "coffee.unreadable": "读不到",
+  "coffee.unreadable_reason": "文件内容无法读取，请检查或手动移除这个文件。",
   "coffee.draft": "草稿",
   "coffee.select_table": "选择 {0}",
   "coffee.last_updated": "最后更新",

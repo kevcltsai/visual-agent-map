@@ -2169,6 +2169,8 @@ export const en = {
   "coffee.generating": "Generating",
   "coffee.complete": "Complete",
   "coffee.interrupted": "Interrupted",
+  "coffee.unreadable": "Unreadable",
+  "coffee.unreadable_reason": "The file content cannot be read. Check it or remove this file by hand.",
   "coffee.draft": "Draft",
   "coffee.select_table": "Select {0}",
   "coffee.last_updated": "Last updated",

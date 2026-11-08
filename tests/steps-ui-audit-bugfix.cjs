@@ -204,3 +204,18 @@ test('A4: .ct-topic-focus.is-hidden hides the row, and the view toggles it only 
   assert.match(view, /createDiv\("ct-topic-focus is-hidden"\)/);
   assert.match(view, /topicFocusRow\.toggleClass\("is-hidden", !this\.focusedTopic\)/);
 });
+
+// A5: an unreadable table row says it cannot be read (not "Interrupted") and explains why; it stays disabled.
+test('A5: the unreadable table row has its own badge text and reason line, and the row stays disabled', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const list = load('experiences/coffee-tables/list.ts');
+  const base = { id: 'x', path: 'a.md', topic: 'T', createdAt: '', updatedAt: '', model: '' };
+  assert.equal(list.tableStatusKey({ ...base, status: 'error', unreadable: true }), 'coffee.unreadable');
+  assert.equal(list.tableStatusKey({ ...base, status: 'error' }), 'coffee.interrupted', 'a readable interrupted table keeps its label');
+  assert.equal(list.tableStatusKey({ ...base, status: 'completed' }), 'coffee.complete');
+  const zh = Object.values(load('i18n/zh-TW.ts')).find(value => value && typeof value === 'object' && 'coffee.unreadable' in value);
+  assert.equal(zh['coffee.unreadable'], '讀不到');
+  assert.equal(zh['coffee.unreadable_reason'], '檔案內容無法讀取，請檢查或手動移除這個檔案。');
+  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/coffee-tables/view.ts'), 'utf8');
+  assert.match(view, /if \(item\.unreadable\) \{[^}]*ct-list-unreadable[^}]*button\.disabled = true;[^}]*coffee\.unreadable_reason/s);
+});

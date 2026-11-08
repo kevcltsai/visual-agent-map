@@ -481,6 +481,11 @@ integrationTest('topic chat research: Quick is local without charts, Standard se
   assert.equal(calls[1].request.researchMode, 'local'); assert.equal(calls[1].request.addCharts, false);
   calls[1].failed(t('ui.research_stopped_existing_content_was_preserved')); calls[1].gate.resolve(); await finished(h);
   assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_stopped'));
+  // A Quick result that lacks knowledge, with the window closed, also offers the Standard run; a Standard one does not.
+  h.view.openTopicChat(h.node('a')); host.setMode('quick'); await host.submit('research', 'third');
+  await waitFor(() => calls.length === 3); host.close();
+  calls[2].done({ summary: 'S', detail: 'Note: model knowledge is insufficient here.' }); calls[2].gate.resolve(); await finished(h);
+  assert.ok(h.Notice.all.flatMap(n => n.actions ?? []).some(b => b.text === t('ui.rerun_standard')), 'Quick gap offers the Standard run');
 });
 
 integrationTest('topic chat busy topic: submit is refused with a Notice and nothing starts', async () => {

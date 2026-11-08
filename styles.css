@@ -1229,7 +1229,7 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
   .ct-pane-tabs { display: flex; flex: 0 0 auto; gap: 8px; }
   .ct-room-columns[data-pane="chat"] .ct-insight-panel, .ct-room-columns[data-pane="insight"] .ct-chat-panel { display: none; }
   .ct-insight-panel { flex: 1 1 auto; min-width: 0; width: 100%; border-left: 0; }
-  .ct-chat-panel { flex: 1 1 auto; }
+  .ct-chat-panel { flex: 1 1 auto; min-height: 0; }
   .ct-home-tabs { display: flex; grid-row: 1; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--background-modifier-border); }
   .ct-home-shell[data-pane="main"] .ct-home-main { display: block; }
   .ct-home-main .ct-count-row { grid-template-columns: minmax(0, 1fr) auto; }

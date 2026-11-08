@@ -100,3 +100,27 @@ test('A3: changing a summary range in selection mode writes the new range; a ref
   assert.notEqual(h.view.announced, 'Summary bracket range changed.');
   assert.ok(h.notices.length > noticesBefore, 'a reason is shown');
 });
+
+// Every `@container (max-width: 899px) { ... }` block of the stylesheet (the stacked Coffee Table room is styled in one of them).
+const fs = require('node:fs');
+const path = require('node:path');
+const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+const stackedBlocks = () => {
+  const out = [];
+  for (let at = css.indexOf('@container (max-width: 899px) {'); at >= 0; at = css.indexOf('@container (max-width: 899px) {', at + 1)) {
+    let depth = 0;
+    for (let i = css.indexOf('{', at); i < css.length; i++) {
+      if (css[i] === '{') depth++;
+      if (css[i] === '}' && --depth === 0) { out.push(css.slice(at, i + 1)); break; }
+    }
+  }
+  return out;
+};
+
+test('S4: in the stacked Coffee Table layout the chat panel may shrink below its content (min-height 0), so the chat scrolls', () => {
+  const rules = stackedBlocks().map(block => block.match(/^\s*\.ct-chat-panel\s*\{([^}]*)\}/m)).filter(Boolean);
+  assert.ok(rules.length, 'the stacked layout styles .ct-chat-panel');
+  assert.ok(rules.some(rule => /min-height:\s*0\b/.test(rule[1])));
+  // The scroller inside still scrolls and the room still clips; nothing else is needed for the chat to be the one that scrolls.
+  assert.match(css, /\.ct-chat-scroll\s*\{[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/);
+});

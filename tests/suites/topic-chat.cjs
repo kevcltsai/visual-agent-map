@@ -250,8 +250,8 @@ async function harness({ aim = false } = {}) {
     manifest: { version: '9.9.9' }
   });
   app.workspace = { getLeavesOfType: () => [], getActiveViewOfType: () => null, requestSaveLayout() {}, on() { return {}; } };
-  class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(a) { this.app = a; } open() { control.modals.push(this); } close() {} }, Component: class { load() {} unload() {} } } }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, CSS: { escape: v => String(v) } });
+  const Notice = dom.makeNotice(notices);
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(a) { this.app = a; } open() { control.modals.push(this); } close() {} }, Component: class { load() {} unload() {} } } }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, createFragment: dom.createFragment, CSS: { escape: v => String(v) } });
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
   const p = page();
@@ -270,7 +270,7 @@ async function harness({ aim = false } = {}) {
   view.render = () => { repaint(); };
   await reload(); repaint();
   const h = {
-    repo, files, app, view, plugin, ids, control, notices, page: p, repaint, overlay: () => overlay,
+    repo, files, app, view, plugin, ids, control, notices, Notice, page: p, repaint, overlay: () => overlay,
     node: key => view.map.nodes.find(n => n.id === ids[key]),
     saved: async () => (await repo.readMap(MAP)).nodes,
     entry: key => view.topicChatSessions.get(ids[key]),
@@ -333,12 +333,12 @@ integrationTest('topic chat entries: the empty suggestion panel and the card too
   const panel = element('div'); panel.root = h.page.doc;
   h.view.renderPendingProposals(panel, h.node('c'), h.view.notes.get(h.ids.c), () => {});
   const open = find(panel, i => i.tag === 'button' && i.text === t('ui.ai_explore')); assert.ok(open, 'the empty panel has the button');
-  h.view.openNextStep = () => assert.fail('the old dialog must not open'); open.click();
+  const before = h.view.topicChatOpen; assert.equal(before?.entry.nodeId, undefined, 'no window before the click'); open.click();
   assert.equal(h.view.topicChatOpen?.entry.nodeId, h.ids.c, 'the panel button opens the topic chat');
   // The card tool is built by renderNode, which needs the full page; its source is checked instead (the tester sees the real button).
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   const sites = [...source.matchAll(/t\("ui\.ai_explore"\)/g)].map(m => source.slice(m.index, m.index + 170));
-  assert.ok(sites.length >= 3); assert.ok(sites.every(site => site.includes('openTopicChat') && !site.includes('openNextStep')), sites.join('\n'));
+  assert.ok(sites.length >= 3); assert.ok(sites.every(site => site.includes('openTopicChat') && !/NextStep|Modal/.test(site)), sites.join('\n'));
 });
 
 integrationTest('topic chat opens one window at a time: opening B closes A, A keeps its conversation, a repaint keeps the window and its draft', async () => {
@@ -770,4 +770,29 @@ integrationTest('topic chat synthesize: aborting while the unresearched subtopic
   await finished(h).catch(() => {}); await waitFor(() => !h.entry('root').session.running);
   assert.equal(synthesized, 0, 'no integration after the stop');
   assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_stopped'));
+});
+
+integrationTest('topic chat integration: the integration is written into the parent topic and the Undo button of its Notice puts the old content back', async () => {
+  const h = await harness(); await researched(h);
+  const rootNote = h.node('root');
+  await h.repo.updateNote(rootNote.path, { status: 'completed', summary: 'Existing conclusion', detail: 'Existing knowledge' });
+  await h.view.hydrate();
+  const before = await h.repo.readNote(rootNote.path);
+  let call = 0;
+  h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
+  h.plugin.askModel = async (_context, _model, _reasoning, _signal, _onExchange, onAccepted) => {
+    onAccepted?.(); call++;
+    return call === 1 ? { summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Common ground', task: 'Find shared constraints', contribution: 'A shared view', parentTitle: '' }] }
+      : { summary: 'Draft summary', detail: 'Draft detail', visualReferences: [], suggestions: [] };
+  };
+  const options = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] };
+  const fail = message => assert.fail(message);
+  await h.view.startSynthesis(h.node('root'), options, null, fail, () => {});
+  await h.view.startSynthesis(h.node('root'), options, 'Find shared constraints', fail, () => {});
+  assert.equal((await h.repo.readNote(rootNote.path)).summary, 'Draft summary', 'the result is written into the parent');
+  const undo = h.Notice.all.flatMap(n => n.actions).find(b => b.text === t('ui.undo'));
+  assert.ok(undo, 'the done Notice has an Undo button');
+  undo.click();
+  await waitFor(() => h.view.history.canRedo);
+  assert.deepEqual(plain(await h.repo.readNote(rootNote.path)), plain(before), 'Undo restores the parent verbatim');
 });

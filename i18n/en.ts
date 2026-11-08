@@ -1226,7 +1226,6 @@ export const en = {
   "ui.use_this_note": "Use this note",
   "ui.structure_and_links": "This card",
   "ui.parent_topic": "Parent topic",
-  "ui.parent_topic_link": "Parent topic / link",
   "ui.no_parent_root_topic": "No parent (root topic)",
   "ui.circular_links_are_not_allowed": "Circular links are not allowed.",
   "ui.changing_the_parent_affects_context_for_the_next_ai_task_the":

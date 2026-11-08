@@ -51,7 +51,6 @@ export interface CardSearchField {
   setDisabled: (disabled: boolean, placeholder?: string) => void;
 }
 
-const MAX_CARDS = 100;
 export const TRAIL_SEPARATOR = " › ";
 
 /** The titles of the ancestors of `id`, root first. Safe on a hierarchy that loops back on itself. */
@@ -87,7 +86,6 @@ export function buildRows(
   const text = query.trim();
   const rows: CardSearchItem[] = sources
     .filter(source => matchesTitle(source.title, text))
-    .slice(0, MAX_CARDS)
     .map(source => ({ kind: "card", ...source, current: options.currentId != null && source.id === options.currentId }));
   if (options.rootChoice !== undefined)
     rows.push({
@@ -106,6 +104,7 @@ interface SuggestHost {
   suggestions: (query: string) => CardSearchItem[];
   render: (item: CardSearchItem, el: HTMLElement) => void;
   choose: (item: CardSearchItem, evt: MouseEvent | KeyboardEvent) => void;
+  setExpanded: (open: boolean) => void;
 }
 type SuggestConstructor = new (app: App, input: HTMLInputElement, host: SuggestHost) => unknown;
 let suggestClass: SuggestConstructor | null = null;
@@ -128,6 +127,14 @@ function suggestConstructor(): SuggestConstructor {
     }
     selectSuggestion(item: CardSearchItem, evt: MouseEvent | KeyboardEvent): void {
       this.host.choose(item, evt);
+    }
+    open(): void {
+      super.open();
+      this.host.setExpanded(true);
+    }
+    close(): void {
+      super.close();
+      this.host.setExpanded(false);
     }
   };
   return suggestClass;
@@ -161,7 +168,8 @@ export function createCardSearchField(options: CardSearchOptions): CardSearchFie
       autocomplete: "off",
       spellcheck: "false",
       placeholder: options.placeholder,
-      "aria-label": options.ariaLabel
+      "aria-label": options.ariaLabel,
+      "aria-expanded": "false"
     }
   });
   if (options.value !== undefined) input.value = options.value;
@@ -189,6 +197,7 @@ export function createCardSearchField(options: CardSearchOptions): CardSearchFie
     if (options.restoreValue) input.value = options.restoreValue();
   });
   const host: SuggestHost = {
+    setExpanded: open => input.setAttr("aria-expanded", String(open)),
     suggestions: query => {
       lastQuery = query;
       if (options.typeFirst && (!typed || !query.trim())) return [];

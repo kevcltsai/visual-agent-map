@@ -1155,7 +1155,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.use_this_note": "使用這份筆記",
   "ui.structure_and_links": "這張卡",
   "ui.parent_topic": "所屬母議題",
-  "ui.parent_topic_link": "母議題／連結",
   "ui.no_parent_root_topic": "無母議題（根議題）",
   "ui.circular_links_are_not_allowed": "不能建立循環連結。",
   "ui.changing_the_parent_affects_context_for_the_next_ai_task_the":

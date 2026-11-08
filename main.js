@@ -1225,7 +1225,6 @@ var en = {
   "ui.use_this_note": "Use this note",
   "ui.structure_and_links": "This card",
   "ui.parent_topic": "Parent topic",
-  "ui.parent_topic_link": "Parent topic / link",
   "ui.no_parent_root_topic": "No parent (root topic)",
   "ui.circular_links_are_not_allowed": "Circular links are not allowed.",
   "ui.changing_the_parent_affects_context_for_the_next_ai_task_the": "Changing the parent affects context for the next AI task. The model stays the same.",
@@ -4016,7 +4015,6 @@ var zhCN = {
   "ui.use_this_note": "\u4F7F\u7528\u8FD9\u4EFD\u7B14\u8BB0",
   "ui.structure_and_links": "\u8FD9\u5F20\u5361",
   "ui.parent_topic": "\u6240\u5C5E\u7236\u8BAE\u9898",
-  "ui.parent_topic_link": "\u7236\u8BAE\u9898\uFF0F\u94FE\u63A5",
   "ui.no_parent_root_topic": "\u65E0\u7236\u8BAE\u9898\uFF08\u6839\u8BAE\u9898\uFF09",
   "ui.circular_links_are_not_allowed": "\u4E0D\u80FD\u521B\u5EFA\u5FAA\u73AF\u94FE\u63A5\u3002",
   "ui.changing_the_parent_affects_context_for_the_next_ai_task_the": "\u66F4\u6362\u7236\u8BAE\u9898\u4F1A\u5F71\u54CD\u4E0B\u6B21 AI \u4EFB\u52A1\u53D6\u5F97\u7684\u80CC\u666F\uFF0C\u4E0D\u4F1A\u66F4\u52A8\u6A21\u578B\u3002",
@@ -6807,7 +6805,6 @@ var zhTW = {
   "ui.use_this_note": "\u4F7F\u7528\u9019\u4EFD\u7B46\u8A18",
   "ui.structure_and_links": "\u9019\u5F35\u5361",
   "ui.parent_topic": "\u6240\u5C6C\u6BCD\u8B70\u984C",
-  "ui.parent_topic_link": "\u6BCD\u8B70\u984C\uFF0F\u9023\u7D50",
   "ui.no_parent_root_topic": "\u7121\u6BCD\u8B70\u984C\uFF08\u6839\u8B70\u984C\uFF09",
   "ui.circular_links_are_not_allowed": "\u4E0D\u80FD\u5EFA\u7ACB\u5FAA\u74B0\u9023\u7D50\u3002",
   "ui.changing_the_parent_affects_context_for_the_next_ai_task_the": "\u66F4\u63DB\u6BCD\u8B70\u984C\u6703\u5F71\u97FF\u4E0B\u6B21 AI \u4EFB\u52D9\u53D6\u5F97\u7684\u80CC\u666F\uFF0C\u4E0D\u6703\u66F4\u52D5\u6A21\u578B\u3002",
@@ -50602,7 +50599,6 @@ var GoalRecommendService = class {
 
 // ui/card-search-field.ts
 var import_obsidian31 = require("obsidian");
-var MAX_CARDS = 100;
 var TRAIL_SEPARATOR = " \u203A ";
 function ancestorTrail(nodes, id, titleOf) {
   var _a2, _b2, _c, _d;
@@ -50623,7 +50619,7 @@ function matchesTitle(title, query) {
 }
 function buildRows(sources, query, options) {
   const text12 = query.trim();
-  const rows2 = sources.filter((source) => matchesTitle(source.title, text12)).slice(0, MAX_CARDS).map((source) => ({ kind: "card", ...source, current: options.currentId != null && source.id === options.currentId }));
+  const rows2 = sources.filter((source) => matchesTitle(source.title, text12)).map((source) => ({ kind: "card", ...source, current: options.currentId != null && source.id === options.currentId }));
   if (options.rootChoice !== void 0)
     rows2.push({
       kind: "root",
@@ -50653,6 +50649,14 @@ function suggestConstructor() {
     selectSuggestion(item, evt) {
       this.host.choose(item, evt);
     }
+    open() {
+      super.open();
+      this.host.setExpanded(true);
+    }
+    close() {
+      super.close();
+      this.host.setExpanded(false);
+    }
   };
   return suggestClass;
 }
@@ -50678,7 +50682,8 @@ function createCardSearchField(options) {
       autocomplete: "off",
       spellcheck: "false",
       placeholder: options.placeholder,
-      "aria-label": options.ariaLabel
+      "aria-label": options.ariaLabel,
+      "aria-expanded": "false"
     }
   });
   if (options.value !== void 0) input2.value = options.value;
@@ -50704,6 +50709,7 @@ function createCardSearchField(options) {
     if (options.restoreValue) input2.value = options.restoreValue();
   });
   const host = {
+    setExpanded: (open) => input2.setAttr("aria-expanded", String(open)),
     suggestions: (query) => {
       lastQuery = query;
       if (options.typeFirst && (!typed || !query.trim())) return [];

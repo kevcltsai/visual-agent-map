@@ -1153,7 +1153,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.use_this_note": "使用这份笔记",
   "ui.structure_and_links": "这张卡",
   "ui.parent_topic": "所属父议题",
-  "ui.parent_topic_link": "父议题／链接",
   "ui.no_parent_root_topic": "无父议题（根议题）",
   "ui.circular_links_are_not_allowed": "不能创建循环链接。",
   "ui.changing_the_parent_affects_context_for_the_next_ai_task_the":

@@ -3616,6 +3616,18 @@ test('card search: rows match the title ignoring case, keep the root row last, a
   assert.equal(withRoot[1].current, true, 'no parent: the root row is the current one');
   assert.deepEqual(plain(buildRows(sources, 'zz', { rootChoice: 'R' }).map(r => r.kind)), ['root'], 'the root row stays when nothing matches');
 });
+test('card search: every matching card is listed, however many there are', () => {
+  const { buildRows } = load('ui/card-search-field.ts', { obsidian });
+  const sources = Array.from({ length: 150 }, (_, i) => ({ id: 'c' + i, title: 'Card ' + i, trail: [], enabled: true }));
+  assert.equal(buildRows(sources, '', {}).length, 150);
+  assert.equal(buildRows(sources, 'card', {}).length, 150);
+});
+integrationTest('card search: aria-expanded starts false and follows the list opening and closing', () => {
+  const { input, suggest } = csParentDialog();
+  assert.equal(input.attrs['aria-expanded'], 'false');
+  suggest.open(); assert.equal(input.attrs['aria-expanded'], 'true');
+  suggest.close(); assert.equal(input.attrs['aria-expanded'], 'false');
+});
 integrationTest('card search (relations): switching the relation type drops a card that was legal only under the old type, and brings it back', () => {
   const topics = [node('a'), node('b'), node('c')];
   const relations = [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'c' }];
@@ -3713,7 +3725,9 @@ integrationTest('card search: texts exist in all three languages, the old picker
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.vam-topic-kinds'), /repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.vam-branch-layout'), /grid-auto-flow: column/);
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.vam-topic-kinds button, .vam-topic-modal .vam-choice-group.vam-branch-layout button'), /white-space: normal/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.vam-topic-kinds button, .vam-topic-modal .vam-choice-group.vam-branch-layout button'), /height: auto/);
   assert.match(heRuleBody(css, '.vam-topic-modal button.vam-relation-add-anchor'), /background: transparent/);
+  assert.match(heRuleBody(css, '.vam-topic-modal button.vam-relation-add-anchor:focus-visible'), /outline: 2px solid/);
 });
 integrationTest('card settings (ticket 41): the AI lock row names the state it is in and the text follows a switch', async () => {
   const fx = heDialog({}, 0);

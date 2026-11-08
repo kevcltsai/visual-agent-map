@@ -1809,6 +1809,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       attr: { type: "button", "aria-label": t("ui.map_chat_stop") }
     });
     setIcon(this.stopEl, "square");
+    // The bottom strip is part of the box: pressing on its empty part (not on a control) puts the cursor in the field.
+    box.addEventListener("click", event => {
+      if (event.target === box) this.inputEl.focus();
+    });
     this.sendEl.addEventListener("click", () => this.sendPressed());
     this.stopEl.addEventListener("click", () => this.host.stop());
     this.inputEl.addEventListener("compositionstart", () => {
@@ -2811,6 +2815,14 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     // A plan about a picture keeps its lists open: the user checks the anchors before they apply them, so nothing folds.
     const folds = !plan.openGroups;
     const open = !folds || message.linesOpen === true;
+    const addDetail = (): void => {
+      if (!open) return;
+      const detail = card.createDiv("vam-map-chat-plan-detail");
+      this.buildPlanBody(detail, plan, title);
+      detail.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
+    };
+    // A picture plan lists what it will do first, then asks; other plans put the buttons first and fold the detail after them.
+    if (!folds) addDetail();
     const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
     const apply = buttons.createEl("button", {
       cls: "mod-cta vam-map-chat-plan-apply",
@@ -2823,11 +2835,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       attr: { type: "button" }
     });
     if (folds) this.buildDetailToggle(buttons, message, open);
-    if (open) {
-      const detail = card.createDiv("vam-map-chat-plan-detail");
-      this.buildPlanBody(detail, plan, title);
-      detail.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
-    }
+    if (folds) addDetail();
     // A second press does nothing: the buttons stop working as soon as one is used. They disappear with the repaint, so the
     // keyboard goes back to the message field instead of falling to the page.
     apply.addEventListener("click", () => {

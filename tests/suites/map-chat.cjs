@@ -8221,6 +8221,25 @@ test('chat layout: a plan with open groups (a picture plan) is not folded: the g
   assert.ok(find(card, i => hasClass(i, 'vam-map-chat-plan-summary')), 'the one-line summary is still there');
 });
 
+test('chat layout: a picture plan card keeps its original order: summary, warning, detail, buttons; other plans keep summary, warning, buttons, detail', () => {
+  const kinds = card => card.children.map(c => hasClass(c, 'vam-map-chat-plan-summary') ? 'summary' : hasClass(c, 'vam-map-chat-plan-warning') ? 'warning' : hasClass(c, 'vam-map-chat-plan-buttons') ? 'buttons' : hasClass(c, 'vam-map-chat-plan-detail') || c.tag === 'details' || hasClass(c, 'vam-map-chat-plan-title') || hasClass(c, 'vam-map-chat-plan-estimate') ? 'detail' : 'other').filter((k, i, a) => k !== a[i - 1]);
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish('plan', []); f.panel.showPlan(planOf(false, { openGroups: true, aiWork: true }));
+  const pic = find(f.panel.logEl, i => hasClass(i, 'vam-map-chat-plan')); eq(kinds(pic).filter(k => k !== 'other'), ['summary', 'warning', 'detail', 'buttons'], 'picture plan: buttons come last');
+  const g = panelFixture(); g.panel.setOpen(true); g.panel.begin('q'); g.panel.finish('plan', []); g.panel.showPlan(planOf(false, { aiWork: true })); toggleOf(g.panel.logEl).click();
+  const other = find(g.panel.logEl, i => hasClass(i, 'vam-map-chat-plan')); eq(kinds(other).filter(k => k !== 'other'), ['summary', 'warning', 'buttons', 'detail'], 'other plan: detail after the buttons');
+});
+
+test('chat layout: the composer box (not the textarea) holds the bottom room, so scrolled text never runs behind the model, hint, stop or send; the undo-reply button beside the summary is tall enough to click; the hint is centred on the keys', () => {
+  const composer = cssRule('.vam-map-chat-composer'); assert.match(composer, /padding-bottom: 36px;/, 'the composer keeps the bottom room'); assert.match(composer, /border: 1px solid/, 'the composer draws the frame');
+  const input = cssRule('.vam-map-chat-composer .vam-map-chat-input'); assert.doesNotMatch(input, /padding-bottom: 36px/, 'the scrolling textarea ends above the controls'); assert.match(input, /border: 0;/); assert.match(input, /box-shadow: none;/);
+  assert.match(cssRule('.vam-map-chat-composer:focus-within'), /border-color: var\(--interactive-accent\)/, 'focus ring on the frame');
+  const hero = cssRule('.vam-map-chat.is-hero .vam-map-chat-input'); assert.doesNotMatch(hero, /36px/, 'hero: no bottom room on the textarea');
+  assert.match(cssRule('.vam-map-chat.is-hero .vam-map-chat-composer'), /padding-bottom: 36px;/);
+  const hint = cssRule('.vam-map-chat-composer .vam-map-chat-steer-hint'); assert.match(hint, /min-height: 28px; display: flex; align-items: center; justify-content: flex-end;/, 'the hint is centred on the 28px keys'); assert.match(hint, /bottom: 6px;/);
+  assert.match(cssRule('.vam-view .vam-map-chat .vam-map-chat-lines-summary button.vam-map-chat-undo-reply'), /min-height: 20px;/, 'a click target of at least 20px');
+  const f = panelFixture(); f.panel.setOpen(true); const box = f.panel.inputEl.parent; let focused = 0; f.panel.inputEl.focus = () => { focused++; }; box.fire('click', { target: f.panel.modelEl }); assert.equal(focused, 0, 'a click on a control does not steal focus'); box.fire('click', { target: box }); assert.equal(focused, 1, 'a click on the empty bottom strip focuses the field');
+});
+
 test('chat layout: opening View details on a waiting plan and then applying it leaves the applied result folded to one sentence; View details opens it again', () => {
   const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish('plan', []); const plan = planOf(false); f.panel.showPlan(plan);
   const root = () => f.panel.logEl; toggleOf(root()).click(); assert.equal(toggleOf(root()).attrs['aria-expanded'], 'true', 'opened while waiting');

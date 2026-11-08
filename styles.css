@@ -804,8 +804,9 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-msg { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); }
 .vam-map-chat-form { display: flex; flex-direction: column; gap: 6px; }
 .vam-map-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; caret-color: var(--text-accent); }
-.vam-map-chat-composer { position: relative; }
-.vam-map-chat-composer .vam-map-chat-input { padding-bottom: 36px; }
+.vam-map-chat-composer { position: relative; padding-bottom: 36px; border: 1px solid var(--background-modifier-border); border-radius: var(--input-radius); background: var(--background-modifier-form-field); cursor: text; }
+.vam-map-chat-composer:focus-within { border-color: var(--interactive-accent); box-shadow: 0 0 0 2px var(--background-modifier-border-focus); }
+.vam-map-chat-composer .vam-map-chat-input { padding-bottom: 4px; border: 0; background: transparent; box-shadow: none; }
 .vam-map-chat-composer button.vam-map-chat-send, .vam-map-chat-composer button.vam-map-chat-stop { position: absolute; right: 6px; bottom: 6px; display: inline-flex; align-items: center; justify-content: center; width: 28px; min-width: 24px; height: 28px; min-height: 24px; padding: 0; border: 0; border-radius: 50%; box-shadow: none; cursor: pointer; }
 .vam-map-chat-composer button.vam-map-chat-send.is-hidden, .vam-map-chat-composer button.vam-map-chat-stop.is-hidden, .vam-map-chat-composer button.vam-map-chat-send[hidden], .vam-map-chat-composer button.vam-map-chat-stop[hidden] { display: none; }
 .vam-map-chat-composer button.vam-map-chat-send { background: transparent; color: var(--text-muted); }
@@ -847,7 +848,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-view .vam-map-chat button.vam-map-chat-undo-reply:hover { background: var(--background-modifier-hover); }
 .vam-view .vam-map-chat button.vam-map-chat-undo-reply:disabled { color: var(--text-faint); cursor: default; }
 /* Beside the summary it is a small quiet button like "View details". */
-.vam-view .vam-map-chat .vam-map-chat-lines-summary button.vam-map-chat-undo-reply { margin-top: 0; padding: 0 6px; border: 0; background: transparent; color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-size: var(--font-ui-smaller); font-weight: normal; }
+.vam-view .vam-map-chat .vam-map-chat-lines-summary button.vam-map-chat-undo-reply { margin-top: 0; min-height: 20px; padding: 0 6px; border: 0; background: transparent; color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-size: var(--font-ui-smaller); font-weight: normal; }
 .vam-view .vam-map-chat .vam-map-chat-lines-summary button.vam-map-chat-undo-reply:disabled { color: var(--text-faint); }
 .vam-map-chat-plan { flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); }
 .vam-map-chat-plan-title { font-weight: var(--font-semibold); }
@@ -892,7 +893,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat.is-hero { width: min(560px, 100%); max-height: 100%; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-l); box-shadow: var(--shadow-s); pointer-events: auto; animation: vam-chat-hero-in 240ms cubic-bezier(0.16, 1, 0.3, 1); }
 .vam-map-chat.is-hero .vam-map-chat-body { gap: 12px; padding: 16px 20px 20px; }
 .vam-map-chat.is-hero .vam-map-chat-log { display: none; }
-.vam-map-chat.is-hero .vam-map-chat-input { padding: 10px 12px 36px; }
+.vam-map-chat.is-hero .vam-map-chat-composer { padding-bottom: 36px; }
+.vam-map-chat.is-hero .vam-map-chat-input { padding: 10px 12px 4px; }
 @keyframes vam-chat-hero-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .vam-map-chat.is-hero { animation: none; } .vam-map-chat-resizer::after { transition: none; } }
 .has-chat-hero .vam-empty { display: none; }
@@ -920,7 +922,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-steer.is-queued { border-style: dashed; }
 .vam-map-chat-steer.is-queued .vam-map-chat-steer-tag { color: var(--text-muted); }
 .vam-map-chat-steer-text { overflow-wrap: anywhere; white-space: pre-wrap; }
-.vam-map-chat-composer .vam-map-chat-steer-hint { position: absolute; right: 40px; bottom: 6px; max-width: 108px; white-space: normal; text-align: right; line-height: var(--line-height-tight); font-size: var(--font-ui-smaller); color: var(--text-muted); pointer-events: none; }
+.vam-map-chat-composer .vam-map-chat-steer-hint { position: absolute; right: 40px; bottom: 6px; max-width: 108px; white-space: normal; text-align: right; min-height: 28px; display: flex; align-items: center; justify-content: flex-end; line-height: var(--line-height-tight); font-size: var(--font-ui-smaller); color: var(--text-muted); pointer-events: none; }
 .vam-map-chat-composer .vam-map-chat-steer-hint.is-hidden, .vam-map-chat-composer .vam-map-chat-steer-hint[hidden] { display: none; }
 .vam-map-chat-msg.is-error .vam-map-chat-text { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-map-chat-role { color: var(--text-muted); font-size: var(--font-ui-smaller); }

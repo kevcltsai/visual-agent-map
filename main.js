@@ -39413,6 +39413,9 @@ ${typed}` : draft;
       attr: { type: "button", "aria-label": t("ui.map_chat_stop") }
     });
     (0, import_obsidian24.setIcon)(this.stopEl, "square");
+    box.addEventListener("click", (event) => {
+      if (event.target === box) this.inputEl.focus();
+    });
     this.sendEl.addEventListener("click", () => this.sendPressed());
     this.stopEl.addEventListener("click", () => this.host.stop());
     this.inputEl.addEventListener("compositionstart", () => {
@@ -40347,6 +40350,13 @@ ${shown}` : t("ui.map_chat_model_label"));
       card.createDiv({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
     const folds = !plan.openGroups;
     const open = !folds || message.linesOpen === true;
+    const addDetail = () => {
+      if (!open) return;
+      const detail = card.createDiv("vam-map-chat-plan-detail");
+      this.buildPlanBody(detail, plan, title);
+      detail.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
+    };
+    if (!folds) addDetail();
     const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
     const apply = buttons.createEl("button", {
       cls: "mod-cta vam-map-chat-plan-apply",
@@ -40359,11 +40369,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       attr: { type: "button" }
     });
     if (folds) this.buildDetailToggle(buttons, message, open);
-    if (open) {
-      const detail = card.createDiv("vam-map-chat-plan-detail");
-      this.buildPlanBody(detail, plan, title);
-      detail.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
-    }
+    if (folds) addDetail();
     apply.addEventListener("click", () => {
       if (plan.state !== "pending") return;
       apply.disabled = cancel.disabled = true;

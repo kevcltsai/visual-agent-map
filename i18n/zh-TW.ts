@@ -2916,5 +2916,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.topic_chat_out_of_scope": "超出這個議題的部分已略過。",
   "ui.topic_chat_too_big": "這個要求動到的地方太多，請改用左側欄的 AI 對話。",
   "ui.topic_chat_result_unknown": "這次的結果請看議題本身。",
+  "ui.topic_chat_failed_children": "沒有子議題研究成功。",
   "ui.topic_chat_record_failed": "議題對話紀錄沒有存成功。"
 };

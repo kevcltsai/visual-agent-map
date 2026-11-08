@@ -2919,6 +2919,7 @@ var en = {
   "ui.topic_chat_out_of_scope": "Parts outside this topic were skipped.",
   "ui.topic_chat_too_big": "This request touches too much; please use the AI chat in the left sidebar.",
   "ui.topic_chat_result_unknown": "See the topic itself for this result.",
+  "ui.topic_chat_failed_children": "No subtopic could be researched.",
   "ui.topic_chat_record_failed": "The topic chat record was not saved."
 };
 
@@ -5734,6 +5735,7 @@ var zhCN = {
   "ui.topic_chat_out_of_scope": "\u8D85\u51FA\u8FD9\u4E2A\u8BAE\u9898\u7684\u90E8\u5206\u5DF2\u7565\u8FC7\u3002",
   "ui.topic_chat_too_big": "\u8FD9\u4E2A\u8981\u6C42\u52A8\u5230\u7684\u5730\u65B9\u592A\u591A\uFF0C\u8BF7\u6539\u7528\u5DE6\u4FA7\u680F\u7684 AI \u5BF9\u8BDD\u3002",
   "ui.topic_chat_result_unknown": "\u8FD9\u6B21\u7684\u7ED3\u679C\u8BF7\u770B\u8BAE\u9898\u672C\u8EAB\u3002",
+  "ui.topic_chat_failed_children": "\u6CA1\u6709\u5B50\u8BAE\u9898\u7814\u7A76\u6210\u529F\u3002",
   "ui.topic_chat_record_failed": "\u8BAE\u9898\u5BF9\u8BDD\u8BB0\u5F55\u6CA1\u6709\u5B58\u6210\u529F\u3002"
 };
 
@@ -8549,6 +8551,7 @@ var zhTW = {
   "ui.topic_chat_out_of_scope": "\u8D85\u51FA\u9019\u500B\u8B70\u984C\u7684\u90E8\u5206\u5DF2\u7565\u904E\u3002",
   "ui.topic_chat_too_big": "\u9019\u500B\u8981\u6C42\u52D5\u5230\u7684\u5730\u65B9\u592A\u591A\uFF0C\u8ACB\u6539\u7528\u5DE6\u5074\u6B04\u7684 AI \u5C0D\u8A71\u3002",
   "ui.topic_chat_result_unknown": "\u9019\u6B21\u7684\u7D50\u679C\u8ACB\u770B\u8B70\u984C\u672C\u8EAB\u3002",
+  "ui.topic_chat_failed_children": "\u6C92\u6709\u5B50\u8B70\u984C\u7814\u7A76\u6210\u529F\u3002",
   "ui.topic_chat_record_failed": "\u8B70\u984C\u5C0D\u8A71\u7D00\u9304\u6C92\u6709\u5B58\u6210\u529F\u3002"
 };
 
@@ -25327,8 +25330,8 @@ function safeName(title) {
 function foldName(value) {
   return value.normalize("NFC").toLowerCase().replace(/ς/g, "\u03C3");
 }
-function foldEntryName(name2, isFile2) {
-  const dot = isFile2 ? name2.lastIndexOf(".") : -1;
+function foldEntryName(name2, isFile3) {
+  const dot = isFile3 ? name2.lastIndexOf(".") : -1;
   return dot > 0 ? `${foldName(name2.slice(0, dot))}.${name2.slice(dot + 1).toLowerCase()}` : foldName(name2);
 }
 function linkAlias(title, fallback) {
@@ -45210,6 +45213,229 @@ var MapChatRecordWriter = class {
 };
 var errorText = (error) => error instanceof Error ? error.message : String(error);
 
+// core/topic-chat-records.ts
+var TOPIC_CHAT_RECORD_VERSION = 1;
+var TOPIC_CHAT_SUBPATH = "Chats/topics";
+var KINDS2 = ["research", "expand", "synthesize", "ask"];
+var MODES = ["quick", "standard"];
+var STATUSES = ["done", "failed", "stopped"];
+var NODE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+var isSafeTopicNodeId = (id) => typeof id === "string" && NODE_ID_PATTERN.test(id);
+function topicChatDir(root, configDir) {
+  return `${assertRecordRoot(root, configDir)}/${TOPIC_CHAT_SUBPATH}`;
+}
+function topicChatPath(root, nodeId, configDir) {
+  if (!isSafeTopicNodeId(nodeId)) throw new RecordPathError(`Bad topic id: ${String(nodeId)}`);
+  return `${topicChatDir(root, configDir)}/${nodeId}.jsonl`;
+}
+function serializeTopicChatLine(line) {
+  const { v: _ignored, ...rest } = line;
+  return `${JSON.stringify({ v: TOPIC_CHAT_RECORD_VERSION, ...rest })}
+`;
+}
+var isText2 = (value) => typeof value === "string";
+function validLine(value) {
+  if (!isText2(value.id) || !value.id || !isText2(value.at)) return null;
+  if (value.type === "turn") {
+    if (!isText2(value.kind) || !KINDS2.includes(value.kind) || !isText2(value.mode) || !MODES.includes(value.mode))
+      return null;
+    if (!isText2(value.message)) return null;
+    return value;
+  }
+  if (value.type === "result") {
+    if (!isText2(value.status) || !STATUSES.includes(value.status) || !isText2(value.text)) return null;
+    return value;
+  }
+  return null;
+}
+function parseTopicChat(text12) {
+  const lines = [];
+  let skipped2 = 0;
+  let unrecoverable = false;
+  for (const part of text12.split("\n")) {
+    const trimmed2 = part.trim();
+    if (!trimmed2) continue;
+    let value;
+    try {
+      value = JSON.parse(trimmed2);
+    } catch (e) {
+      skipped2++;
+      continue;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      skipped2++;
+      continue;
+    }
+    const version = value.v;
+    if (version !== void 0 && version !== TOPIC_CHAT_RECORD_VERSION) {
+      unrecoverable = true;
+      continue;
+    }
+    const line = version === TOPIC_CHAT_RECORD_VERSION ? validLine(value) : null;
+    if (line) lines.push(line);
+    else skipped2++;
+  }
+  return { lines, skipped: skipped2, unrecoverable, cleanEnd: text12 === "" || text12.endsWith("\n") };
+}
+function restoreTopicChat(lines) {
+  const turns = [];
+  const byId = /* @__PURE__ */ new Map();
+  for (const line of lines) {
+    if (line.type === "turn") {
+      if (byId.has(line.id)) continue;
+      const turn = {
+        id: line.id,
+        kind: line.kind,
+        mode: line.mode,
+        message: line.message,
+        result: null
+      };
+      byId.set(line.id, turn);
+      turns.push(turn);
+    } else {
+      const turn = byId.get(line.id);
+      if (turn && !turn.result) turn.result = { status: line.status, text: line.text };
+    }
+  }
+  return turns;
+}
+
+// experiences/visual-map/topic-chat-record-writer.ts
+var isFile2 = (item) => !!item && !("children" in item);
+var errorText2 = (error) => error instanceof Error ? error.message : String(error);
+var TopicChatRecordWriter = class {
+  constructor(deps) {
+    this.deps = deps;
+    __publicField(this, "closed", false);
+    __publicField(this, "killed", false);
+    __publicField(this, "notified", false);
+    __publicField(this, "chain", Promise.resolve());
+    /** Per file: what the first look found (`blocked`: another schema version; `cleanEnd`: no break needed before the next line). */
+    __publicField(this, "known", /* @__PURE__ */ new Map());
+  }
+  /** A write failed and was reported. */
+  get failed() {
+    return this.notified;
+  }
+  /** Reads one topic's record (null: no file, an unsafe id or root, or the read failed). */
+  async read(root, nodeId) {
+    if (!root || !isSafeTopicNodeId(nodeId) || this.dead()) return null;
+    try {
+      const path = topicChatPath(root, nodeId, this.deps.configDir);
+      const text12 = await this.readText(path);
+      if (text12 === null) return null;
+      const parsed = parseTopicChat(text12);
+      this.known.set(path, { blocked: parsed.unrecoverable, cleanEnd: parsed.cleanEnd });
+      return parsed;
+    } catch (error) {
+      this.deps.log("error", `Topic chat record read: ${errorText2(error)}`);
+      return null;
+    }
+  }
+  /** Takes one line. Dropped when closed or disposed, for an unsafe id, or without a managed folder. */
+  write(root, nodeId, line) {
+    if (this.dead() || this.closed || !root || !isSafeTopicNodeId(nodeId)) return;
+    let path;
+    try {
+      path = topicChatPath(root, nodeId, this.deps.configDir);
+    } catch (e) {
+      return;
+    }
+    const text12 = serializeTopicChatLine(line);
+    void this.enqueue(() => this.append(root, path, text12));
+  }
+  /** Resolves when everything queued so far has run. */
+  async idle() {
+    let seen;
+    do {
+      seen = this.chain;
+      await seen;
+    } while (seen !== this.chain);
+  }
+  close() {
+    this.closed = true;
+  }
+  dispose() {
+    this.killed = true;
+    this.closed = true;
+  }
+  dead() {
+    return this.killed || this.deps.disposed();
+  }
+  enqueue(task) {
+    const run = this.chain.then(() => this.dead() ? void 0 : task());
+    const safe = run.catch((error) => this.fail(error));
+    this.chain = safe;
+    return safe;
+  }
+  fail(error) {
+    this.deps.log("error", `Topic chat record write failed: ${errorText2(error)}`);
+    if (this.notified) return;
+    this.notified = true;
+    try {
+      this.deps.onFailure();
+    } catch (callbackError) {
+      this.deps.log("error", `Topic chat record notice failed: ${errorText2(callbackError)}`);
+    }
+  }
+  /** The file's text: through the Vault, then (a file type the Vault index does not list) through the adapter. */
+  async readText(path) {
+    const vault = this.deps.app.vault;
+    const file = vault.getAbstractFileByPath(path);
+    if (isFile2(file)) return vault.read(file);
+    if (await vault.adapter.exists(path)) return vault.adapter.read(path);
+    return null;
+  }
+  async append(root, path, text12) {
+    let lastError = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await this.appendOnce(root, path, text12);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  }
+  async appendOnce(root, path, text12) {
+    const vault = this.deps.app.vault;
+    let state = this.known.get(path);
+    if (!state) {
+      const existing = await this.readText(path);
+      if (existing !== null) {
+        const parsed = parseTopicChat(existing);
+        state = { blocked: parsed.unrecoverable, cleanEnd: parsed.cleanEnd };
+      } else state = { blocked: false, cleanEnd: true };
+      this.known.set(path, state);
+    }
+    if (state.blocked || this.dead()) return;
+    const body = state.cleanEnd ? text12 : `
+${text12}`;
+    const file = vault.getAbstractFileByPath(path);
+    if (isFile2(file)) await vault.append(file, body);
+    else if (await vault.adapter.exists(path)) await vault.adapter.append(path, body);
+    else {
+      await this.ensureFolders(root);
+      if (this.dead()) return;
+      await vault.create(path, text12);
+    }
+    state.cleanEnd = true;
+  }
+  async ensureFolders(root) {
+    const configDir = this.deps.configDir;
+    const vault = this.deps.app.vault;
+    for (const folder of [`${assertRecordRoot(root, configDir)}/Chats`, topicChatDir(root, configDir)]) {
+      if (vault.getAbstractFileByPath(folder)) continue;
+      try {
+        await vault.createFolder(folder);
+      } catch (error) {
+        if (!vault.getAbstractFileByPath(folder)) throw error;
+      }
+    }
+  }
+};
+
 // experiences/visual-map/map-chat-turn-record.ts
 var missedImageRows = (blocks) => blocks.flatMap((block) => {
   var _a2, _b2;
@@ -45957,7 +46183,7 @@ function applyOutlineSummaries(nodes, bank) {
     return summary ? { ...node, summary } : node;
   });
 }
-function errorText2(error) {
+function errorText3(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
@@ -45999,7 +46225,7 @@ async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDe
       const summary = cleanOutlineSummary(node.summary);
       if (summary) await repository.updateNote(note.path, { summary });
     } catch (error) {
-      return { created, failure: errorText2(error) };
+      return { created, failure: errorText3(error) };
     }
   }
   return { created };
@@ -46013,7 +46239,7 @@ async function createOutlineMap(repository, model, nodes, source, now = /* @__PU
   try {
     map = await repository.readMap(mapPath);
   } catch (error) {
-    throw Object.assign(new Error(errorText2(error)), { mapCreated: true });
+    throw Object.assign(new Error(errorText3(error)), { mapCreated: true });
   }
   const rootDetail = outlineRootDetail(language2, detailTemplate, source, now);
   const { created, failure } = await createOutlineNotes(
@@ -46030,7 +46256,7 @@ async function createOutlineMap(repository, model, nodes, source, now = /* @__PU
   try {
     await repository.saveMap(mapPath, map);
   } catch (error) {
-    const message = errorText2(error);
+    const message = errorText3(error);
     throw Object.assign(
       new Error(
         translate(
@@ -50749,7 +50975,7 @@ var TopicTreeModal = class extends import_obsidian31.Modal {
 };
 
 // experiences/visual-map/topic-chat.ts
-var KINDS2 = ["research", "expand", "synthesize"];
+var KINDS3 = ["research", "expand", "synthesize"];
 var WIDTH_FALLBACK = 340;
 var NARROW_AREA = 360;
 var GAP = 8;
@@ -50787,7 +51013,7 @@ var TopicChatWindow = class {
     this.on(close, "click", () => this.requestClose());
     this.logEl = this.el.createDiv("vam-topic-chat-log");
     const actions = this.el.createDiv("vam-topic-chat-actions");
-    for (const kind of KINDS2) {
+    for (const kind of KINDS3) {
       const button = actions.createEl("button", {
         cls: "vam-topic-chat-action",
         text: kindLabel(kind),
@@ -52032,7 +52258,7 @@ var clarificationRequiredRationale = (language2) => language2 ? renderTemplate(i
 // experiences/aim/planner-review.ts
 var AIM_MAX_RESEARCH_TURNS = DEFAULT_AIM_FLOW_LIMITS.maxResearchTurns;
 var GAP_KINDS = ["searchable", "user_only", "not_decisive"];
-var errorText3 = (error) => error instanceof Error ? error.message : String(error);
+var errorText4 = (error) => error instanceof Error ? error.message : String(error);
 var marker4 = /^\s*<!--\s*aim-review\s+(\{[^\n]*\})\s*-->\s*/;
 function readMarker(detail) {
   const match = detail.match(marker4);
@@ -52185,7 +52411,7 @@ async function parseAimPlannerReviewWithRecovery(original, context, recover) {
           originalSummary,
           preservedBody,
           originalSuggestions: JSON.stringify(original.suggestions),
-          formatError: errorText3(formatError)
+          formatError: errorText4(formatError)
         });
         stated = await recover(task2);
         const statedMarker = readMarker(stated.detail);
@@ -52206,7 +52432,7 @@ async function parseAimPlannerReviewWithRecovery(original, context, recover) {
           originalSummary,
           preservedBody,
           originalSuggestions: JSON.stringify(original.suggestions),
-          formatError: errorText3(formatError)
+          formatError: errorText4(formatError)
         });
         const repaired2 = await recover(task2);
         const repairedMarker = readMarker(repaired2.detail);
@@ -52245,7 +52471,7 @@ ${preservedBody}`,
         originalRationale,
         originalSummary,
         originalBody,
-        formatError: errorText3(formatError),
+        formatError: errorText4(formatError),
         originalSuggestions: JSON.stringify(original.suggestions)
       });
       const repaired2 = await recover(task2);
@@ -52267,7 +52493,7 @@ ${preservedBody}`,
     const preserveDecision = !answeredWithoutTarget && isDecision(originalDecision) ? originalDecision : void 0;
     const task = renderGeneralRepair({
       variant: answeredWithoutTarget ? { kind: "answered-without-target" } : preserveDecision ? { kind: "preserve-decision", decision: preserveDecision } : { kind: "no-decision" },
-      formatError: errorText3(formatError),
+      formatError: errorText4(formatError),
       ...preserveDecision ? {} : {
         context: {
           question: context.question,
@@ -57879,6 +58105,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
      * (send, open); with the switch off nothing here runs.
      */
     __publicField(this, "chatRecords", null);
+    __publicField(this, "topicChatRecords", null);
     __publicField(this, "chatRecordsUnregister", null);
     /** The highest turn number used in the conversation's record. */
     __publicField(this, "chatRecordTurnSeq", 0);
@@ -59422,34 +59649,36 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     return true;
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     this.closeTopicLinkMenu();
     this.closed = true;
     this.closeTopicChatWindow();
     this.topicChatSessions.clear();
+    if (this.plugin.repo.isDisposed()) (_a2 = this.topicChatRecords) == null ? void 0 : _a2.dispose();
+    else (_b2 = this.topicChatRecords) == null ? void 0 : _b2.close();
     this.closeMapSearch(false);
     this.exitPresentation(false);
     this.cancelLinking(false);
-    (_a2 = this.suspendSummaryEdit) == null ? void 0 : _a2.call(this);
+    (_c = this.suspendSummaryEdit) == null ? void 0 : _c.call(this);
     this.pendingSummary = null;
     this.summaryEditDraft = null;
     this.releaseCovers();
-    (_b2 = this.unbindClipboard) == null ? void 0 : _b2.call(this);
+    (_d = this.unbindClipboard) == null ? void 0 : _d.call(this);
     this.unbindClipboard = null;
-    (_c = this.statusBarObserver) == null ? void 0 : _c.disconnect();
+    (_e = this.statusBarObserver) == null ? void 0 : _e.disconnect();
     this.statusBarObserver = null;
-    (_d = this.goalBarObserver) == null ? void 0 : _d.disconnect();
+    (_f = this.goalBarObserver) == null ? void 0 : _f.disconnect();
     this.goalBarObserver = null;
     this.goalBarObserved = [];
     this.removeGoalBar();
     this.statusBarObserved = null;
     this.renderAfterDrag = false;
-    (_e = this.announcer) == null ? void 0 : _e.remove();
+    (_g = this.announcer) == null ? void 0 : _g.remove();
     this.announcer = null;
     this.announcedStages.clear();
-    (_f = this.unsubscribeResearch) == null ? void 0 : _f.call(this);
+    (_h = this.unsubscribeResearch) == null ? void 0 : _h.call(this);
     this.unsubscribeResearch = null;
-    (_g = this.usageControl) == null ? void 0 : _g.stop();
+    (_i = this.usageControl) == null ? void 0 : _i.stop();
     this.usageControl = null;
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
@@ -59459,14 +59688,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
-    if (((_h = this.chat) == null ? void 0 : _h.hasUnsavedTurns) && !this.chatRecordSaved()) new import_obsidian37.Notice(t("ui.map_chat_unsaved_on_close"));
+    if (((_j = this.chat) == null ? void 0 : _j.hasUnsavedTurns) && !this.chatRecordSaved()) new import_obsidian37.Notice(t("ui.map_chat_unsaved_on_close"));
     this.endChatRecord("aborted", { reason: "view_closed" });
     this.closeChatRecords();
     this.abortMapChat();
-    (_i = this.chat) == null ? void 0 : _i.dispose();
-    (_j = this.goalSuggestCleanup) == null ? void 0 : _j.call(this);
+    (_k = this.chat) == null ? void 0 : _k.dispose();
+    (_l = this.goalSuggestCleanup) == null ? void 0 : _l.call(this);
     this.goalSuggestCleanup = null;
-    (_k = this.mapSourcesPanelCleanup) == null ? void 0 : _k.call(this);
+    (_m = this.mapSourcesPanelCleanup) == null ? void 0 : _m.call(this);
     this.mapSourcesPanelCleanup = null;
     this.dropGoalEdit();
     this.abortRelevanceGrade();
@@ -59490,9 +59719,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_l = this.hoverCard) == null ? void 0 : _l.remove();
-    (_m = this.dragCleanup) == null ? void 0 : _m.call(this);
-    (_n = this.anchorDragCancel) == null ? void 0 : _n.call(this, false);
+    (_n = this.hoverCard) == null ? void 0 : _n.remove();
+    (_o = this.dragCleanup) == null ? void 0 : _o.call(this);
+    (_p = this.anchorDragCancel) == null ? void 0 : _p.call(this, false);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -71529,10 +71758,53 @@ ${request.requirements}` : preset.text,
       mapId: (_a2 = map == null ? void 0 : map.id) != null ? _a2 : "",
       mapPath: this.path,
       session: { turns: [], mode: (_b2 = map == null ? void 0 : map.aiMode) != null ? _b2 : DEFAULT_MAP_AI_MODE, running: false, draftKind: null, draftText: "" },
-      watchers: /* @__PURE__ */ new Set()
+      watchers: /* @__PURE__ */ new Set(),
+      runningTurnId: null
     };
     this.topicChatSessions.set(node.id, entry);
+    void this.restoreTopicChat(entry);
     return entry;
+  }
+  /** The managed folder the topic chat records of this map live in (null: kept in memory only). */
+  topicChatRoot(entry) {
+    return isManagedMapPath(this.plugin.settings, entry.mapPath) ? this.plugin.repo.topicRoot(entry.mapPath) : null;
+  }
+  topicChatWriter() {
+    if (this.closed) return null;
+    if (!this.topicChatRecords)
+      this.topicChatRecords = new TopicChatRecordWriter({
+        app: this.plugin.repo.app,
+        log: (level, message) => this.plugin.logs.appendLog(level, message),
+        disposed: () => this.plugin.repo.isDisposed(),
+        onFailure: () => {
+          new import_obsidian37.Notice(t("ui.topic_chat_record_failed"));
+        },
+        configDir: this.app.vault.configDir
+      });
+    return this.topicChatRecords;
+  }
+  /** Reads the saved conversation of a topic back in front of what this session already has. A turn without a result says so. */
+  async restoreTopicChat(entry) {
+    const writer = this.topicChatWriter();
+    if (!writer || !isSafeTopicNodeId(entry.nodeId)) return;
+    const parsed = await writer.read(this.topicChatRoot(entry), entry.nodeId);
+    if (!parsed || this.closed || this.topicChatSessions.get(entry.nodeId) !== entry) return;
+    const restored = [];
+    for (const turn of restoreTopicChat(parsed.lines)) {
+      if (turn.id === entry.runningTurnId) continue;
+      restored.push({ role: "user", kind: turn.kind === "ask" ? void 0 : turn.kind, text: turn.message });
+      restored.push({ role: "ai", text: turn.result ? turn.result.text : t("ui.topic_chat_result_unknown") });
+    }
+    if (!restored.length) return;
+    entry.session.turns.splice(0, 0, ...restored);
+    this.notifyTopicChat(entry);
+  }
+  writeTopicChatLine(entry, line) {
+    var _a2;
+    (_a2 = this.topicChatWriter()) == null ? void 0 : _a2.write(this.topicChatRoot(entry), entry.nodeId, line);
+  }
+  newTopicTurnId() {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   }
   notifyTopicChat(entry) {
     for (const watcher of [...entry.watchers]) watcher();
@@ -71650,6 +71922,23 @@ ${request.requirements}` : preset.text,
     const userTurn = { role: "user", kind, text: text12 };
     if (kind === "synthesize" && !map.nodes.some((item) => item.parentId === node.id)) {
       entry.session.turns.push(userTurn, { role: "ai", text: t("ui.topic_chat_no_children") });
+      const quickId = this.newTopicTurnId();
+      const quickAt = (/* @__PURE__ */ new Date()).toISOString();
+      this.writeTopicChatLine(entry, {
+        type: "turn",
+        id: quickId,
+        at: quickAt,
+        kind,
+        mode: entry.session.mode,
+        message: text12
+      });
+      this.writeTopicChatLine(entry, {
+        type: "result",
+        id: quickId,
+        at: quickAt,
+        status: "done",
+        text: t("ui.topic_chat_no_children")
+      });
       this.notifyTopicChat(entry);
       return true;
     }
@@ -71666,6 +71955,15 @@ ${request.requirements}` : preset.text,
       started = true;
       entry.session.turns.push(userTurn);
       entry.session.running = true;
+      entry.runningTurnId = this.newTopicTurnId();
+      this.writeTopicChatLine(entry, {
+        type: "turn",
+        id: entry.runningTurnId,
+        at: (/* @__PURE__ */ new Date()).toISOString(),
+        kind,
+        mode,
+        message: text12
+      });
       this.notifyTopicChat(entry);
       void this.runTopicChatTask(entry, node, note, kind, mode, text12, controller);
     });
@@ -71673,7 +71971,7 @@ ${request.requirements}` : preset.text,
   }
   /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
   async runTopicChatTask(entry, node, note, kind, mode, text12, controller) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     const mapPath = this.path;
     const mapId = entry.mapId;
     const live = () => {
@@ -71702,51 +72000,70 @@ ${request.requirements}` : preset.text,
             entry,
             t("ui.topic_chat_expand_done_0_1", outcome.titles.length, outcome.titles.join(t("ui.list_separator"))),
             live,
-            true
+            true,
+            "done"
           );
-        else if (outcome.status === "stopped") this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
-        else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", outcome.reason), live, false);
+        else if (outcome.status === "stopped")
+          this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
+        else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", outcome.reason), live, false, "failed");
         return;
       }
       began = true;
       hooks.begin(controller, kind === "research" ? "research" : void 0);
       if (kind === "research") {
-        let result;
-        let failure2;
-        const referenceGroups = await this.taskSourceSettings().mapSources(controller.signal).catch(() => []);
-        const runStyle = await this.detailTemplateFor(node, void 0, void 0, language2);
-        const handle = await this.runAgent(
+        const { result, failure: failure2 } = await this.runTopicChatResearch(
           node,
-          (done) => {
-            result = done;
-          },
-          (message) => {
-            failure2 = message;
-          },
-          {
-            runStyle,
-            task: [researchTopicTask(language2, note.title), text12].filter(Boolean).join("\n\n"),
-            referenceGroups,
-            signal: controller.signal,
-            outputLanguage: language2,
-            rules: "",
-            ...aiModeOptions(mode, "research"),
-            addCharts: mode !== "quick"
-          },
+          note,
+          mode,
+          language2,
+          text12,
+          controller.signal,
+          endHooks,
           endHooks
         );
         endHooks();
-        if (handle) await handle.finished;
         const stopped = controller.signal.aborted || failure2 === t("ui.research_stopped_existing_content_was_preserved") || failure2 === t("ui.ai_task_cancelled");
         if (result) {
           if (!this.topicChatOpenFor(entry)) (_b2 = hooks.completed) == null ? void 0 : _b2.call(hooks, "research", mode === "quick" ? result : void 0);
-          this.settleTopicChat(entry, t("ui.topic_chat_research_done"), live, false);
-        } else if (stopped) this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
-        else if (failure2) this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure2), live, true);
-        else this.settleTopicChat(entry, t("ui.topic_chat_result_unknown"), live, true);
+          this.settleTopicChat(entry, t("ui.topic_chat_research_done"), live, false, "done");
+        } else if (stopped) this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
+        else if (failure2) this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure2), live, true, "failed");
+        else this.settleTopicChat(entry, t("ui.topic_chat_result_unknown"), live, true, "failed");
         return;
       }
       const children = (_d = (_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === node.id).length) != null ? _d : 0;
+      const toResearch = ((_f = (_e = this.map) == null ? void 0 : _e.nodes) != null ? _f : []).filter((item) => {
+        var _a3;
+        if (item.parentId !== node.id) return false;
+        const status = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.status;
+        return (status === "idea" || status === "error") && !this.topicChatBusy(item);
+      });
+      let researchedFirst = 0;
+      if (toResearch.length) {
+        for (const child of toResearch) {
+          if (controller.signal.aborted || !live()) break;
+          const childNote = await this.plugin.repo.readNote(child.path, (_g = this.map) != null ? _g : void 0);
+          const done = await this.runTopicChatResearch(child, childNote, mode, language2, "", controller.signal);
+          if (done.result) researchedFirst++;
+        }
+        if (controller.signal.aborted) {
+          endHooks();
+          this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
+          return;
+        }
+        if (!researchedFirst) {
+          endHooks();
+          this.settleTopicChat(
+            entry,
+            t("ui.topic_chat_failed_0", t("ui.topic_chat_failed_children")),
+            live,
+            true,
+            "failed"
+          );
+          return;
+        }
+        await this.hydrate();
+      }
       let written2 = false;
       let failure;
       await this.startSynthesis(
@@ -71772,10 +72089,24 @@ ${request.requirements}` : preset.text,
         }
       );
       endHooks();
-      if (written2) this.settleTopicChat(entry, t("ui.topic_chat_synthesis_done_0", children), live, false);
+      if (written2)
+        this.settleTopicChat(
+          entry,
+          researchedFirst ? t("ui.topic_chat_synthesis_researched_first_0_1", researchedFirst, children) : t("ui.topic_chat_synthesis_done_0", children),
+          live,
+          false,
+          "done"
+        );
       else if (controller.signal.aborted || failure === t("ui.ai_task_cancelled"))
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
-      else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure != null ? failure : t("ui.ai_task_cancelled")), live, true);
+        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
+      else
+        this.settleTopicChat(
+          entry,
+          t("ui.topic_chat_failed_0", failure != null ? failure : t("ui.ai_task_cancelled")),
+          live,
+          true,
+          "failed"
+        );
     } catch (error) {
       endHooks();
       const stopped = controller.signal.aborted;
@@ -71783,18 +72114,59 @@ ${request.requirements}` : preset.text,
         entry,
         stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage(error)),
         live,
-        !stopped
+        !stopped,
+        stopped ? "stopped" : "failed"
       );
     }
+  }
+  /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
+  async runTopicChatResearch(node, note, mode, language2, text12, signal, accepted, launched) {
+    let result;
+    let failure;
+    const referenceGroups = await this.taskSourceSettings().mapSources(signal).catch(() => []);
+    const runStyle = await this.detailTemplateFor(node, void 0, void 0, language2);
+    const handle = await this.runAgent(
+      node,
+      (done) => {
+        result = done;
+      },
+      (message) => {
+        failure = message;
+      },
+      {
+        runStyle,
+        task: [researchTopicTask(language2, note.title), text12].filter(Boolean).join("\n\n"),
+        referenceGroups,
+        signal,
+        outputLanguage: language2,
+        rules: "",
+        ...aiModeOptions(mode, "research"),
+        addCharts: mode !== "quick"
+      },
+      accepted
+    );
+    launched == null ? void 0 : launched();
+    if (handle) await handle.finished;
+    return { result, failure };
   }
   topicChatOpenFor(entry) {
     var _a2;
     return ((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry;
   }
   /** Ends a run: the window (if open) shows one sentence; a closed window gets a Notice when `notice` says the task did not tell it. */
-  settleTopicChat(entry, sentence, live, notice) {
+  settleTopicChat(entry, sentence, live, notice, status) {
     entry.session.running = false;
+    const turnId = entry.runningTurnId;
+    entry.runningTurnId = null;
     if (!live()) return;
+    if (turnId)
+      this.writeTopicChatLine(entry, {
+        type: "result",
+        id: turnId,
+        at: (/* @__PURE__ */ new Date()).toISOString(),
+        status,
+        text: sentence
+      });
     entry.session.turns.push({ role: "ai", text: sentence });
     this.notifyTopicChat(entry);
     if (notice && !this.topicChatOpenFor(entry)) new import_obsidian37.Notice(sentence);
@@ -81591,14 +81963,14 @@ ${addition}` : addition },
   noticeTopicStyleMissing(node, note, missing) {
     const messages = [];
     const named = (ref) => `${ref.replace(/^(?:builtin|file|style):/, "")}.md`;
-    const isFile2 = (ref) => ref.startsWith("style:") || ref.startsWith("file:");
+    const isFile3 = (ref) => ref.startsWith("style:") || ref.startsWith("file:");
     if (note.noteStyle && missing.includes(note.noteStyle))
       messages.push(
-        isFile2(note.noteStyle) ? t("ui.note_style_file_missing_0", named(note.noteStyle)) : t("ui.detail_template_missing_0", note.noteStyle)
+        isFile3(note.noteStyle) ? t("ui.note_style_file_missing_0", named(note.noteStyle)) : t("ui.detail_template_missing_0", note.noteStyle)
       );
     if (note.detailTemplateId && missing.includes(note.detailTemplateId))
       messages.push(
-        isFile2(note.detailTemplateId) ? t("ui.note_style_file_missing_0", named(note.detailTemplateId)) : t("ui.detail_template_missing_0", note.detailTemplateId)
+        isFile3(note.detailTemplateId) ? t("ui.note_style_file_missing_0", named(note.detailTemplateId)) : t("ui.detail_template_missing_0", note.detailTemplateId)
       );
     if (note.toneId && missing.includes(note.toneId)) messages.push(t("ui.note_style_tone_missing_0", note.toneId));
     if (messages.length)
@@ -82229,10 +82601,10 @@ var NoteStyleEditorModal = class extends import_obsidian40.Modal {
     const byRef = (ref) => recipes.find((item) => item.ref === ref);
     const base = (_c = (_b2 = byRef((_a2 = source != null ? source : options.from) != null ? _a2 : void 0)) != null ? _b2 : byRef(KIND_DEFAULT_RECIPE.topic)) != null ? _c : recipes[0];
     const sourceItem = byRef(source);
-    const isFile2 = (sourceItem == null ? void 0 : sourceItem.kind) === "file";
-    this.existing = isFile2 ? { ref: sourceItem.ref, text: (_d = store.recipeText(sourceItem.ref)) != null ? _d : "" } : void 0;
+    const isFile3 = (sourceItem == null ? void 0 : sourceItem.kind) === "file";
+    this.existing = isFile3 ? { ref: sourceItem.ref, text: (_d = store.recipeText(sourceItem.ref)) != null ? _d : "" } : void 0;
     this.builtinSource = (sourceItem == null ? void 0 : sourceItem.kind) === "builtin" ? sourceItem.ref : void 0;
-    const name2 = isFile2 ? sourceItem.name : (_e = options.name) != null ? _e : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
+    const name2 = isFile3 ? sourceItem.name : (_e = options.name) != null ? _e : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
     this.structureRef = (_f = base == null ? void 0 : base.structure.ref) != null ? _f : "builtin:standard";
     const language2 = plugin.settings.language;
     try {

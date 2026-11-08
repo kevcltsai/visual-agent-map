@@ -3128,6 +3128,7 @@ export const en = {
   "ui.topic_chat_out_of_scope": "Parts outside this topic were skipped.",
   "ui.topic_chat_too_big": "This request touches too much; please use the AI chat in the left sidebar.",
   "ui.topic_chat_result_unknown": "See the topic itself for this result.",
+  "ui.topic_chat_failed_children": "No subtopic could be researched.",
   "ui.topic_chat_record_failed": "The topic chat record was not saved."
 } as const;
 

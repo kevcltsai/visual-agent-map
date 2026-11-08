@@ -200,7 +200,7 @@ function page() {
 
 /** A trimmed copy of the map-chat harness: the real view and repository, a fake render() that repaints the overlay like render() does. */
 async function harness({ aim = false } = {}) {
-  const { repo, app } = repoFixture('en');
+  const { repo, app, files } = repoFixture('en');
   app.vault.configDir = '.obsidian';
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'claude:sonnet' };
   repo.settings = settings;
@@ -254,7 +254,7 @@ async function harness({ aim = false } = {}) {
   view.render = () => { repaint(); };
   await reload(); repaint();
   const h = {
-    repo, view, plugin, ids, control, notices, page: p, repaint, overlay: () => overlay,
+    repo, files, view, plugin, ids, control, notices, page: p, repaint, overlay: () => overlay,
     node: key => view.map.nodes.find(n => n.id === ids[key]),
     saved: async () => (await repo.readMap(MAP)).nodes,
     entry: key => view.topicChatSessions.get(ids[key]),
@@ -267,6 +267,8 @@ async function harness({ aim = false } = {}) {
 const outlineOf = markdown => ({ markdown, nodes: outlineApi.parseOutline(markdown).nodes });
 const waitFor = async predicate => { for (let i = 0; i < 800; i++) { if (predicate()) return; await new Promise(r => setTimeout(r, 5)); } throw new Error('condition not reached'); };
 const finished = h => waitFor(() => h.plugin.running.size === 0 && h.plugin.activeTasks.size === 0 && !h.entry('a').session.running);
+// Subtopics that count as researched, so a synthesis goes straight to the integration.
+const researched = async h => { const load0 = h.view.hydrate; h.view.hydrate = async () => { await load0(); for (const note of h.view.notes.values()) note.status = 'completed'; }; await h.view.hydrate(); };
 const stubResearch = h => {
   const calls = [];
   h.view.runAgent = async (node, done, failed, request, accepted) => {
@@ -339,7 +341,7 @@ integrationTest('topic chat opens one window at a time: opening B closes A, A ke
 });
 
 integrationTest('topic chat counterexample 1: Standard integration is not Local (web search on), Quick is Local; the sidebar integration stays Local', async () => {
-  const h = await harness(); const seen = [];
+  const h = await harness(); const seen = []; await researched(h);
   h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push({ id: node.id, options, direction, observer }); accepted(); };
   const host = h.host('root');
   host.setMode('standard');
@@ -364,7 +366,7 @@ integrationTest('topic chat counterexample 1: Standard integration is not Local 
 });
 
 integrationTest('topic chat integration: a written result reaches the window even though the observer says closed; a topic without subtopics answers at once without a usage question', async () => {
-  const h = await harness();
+  const h = await harness(); await researched(h);
   h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { accepted(); observer.onWritten(); };
   const host = h.host('root');
   await host.submit('synthesize', 'x'); await waitFor(() => !h.entry('root').session.running);
@@ -465,4 +467,161 @@ integrationTest('topic chat counterexample 8: a declined usage question starts n
   byLabel(win.el, t('ui.topic_chat_send')).click(); await tick(); await tick();
   assert.equal(input.value, 'dig deeper'); assert.equal(h.entry('a').session.draftKind, 'research');
   assert.equal(calls.length, 0);
+});
+
+// ---- P2: records on disk --------------------------------------------------------------------------------------------
+
+const records = load('core/topic-chat-records.ts');
+const chatRecords = load('core/map-chat-records.ts');
+const vaultFiles = h => [...h.files.values()].filter(f => f instanceof obsidian.TFile);
+const topicPath = (h, key, id) => `${h.repo.topicRoot(MAP)}/Chats/topics/${id ?? h.ids[key]}.jsonl`;
+const topicText = async (h, key, id) => { const p = topicPath(h, key, id); return (await h.repo.app.vault.adapter.exists(p)) ? h.repo.app.vault.adapter.read(p) : null; };
+const topicLines = async (h, key, id) => { await h.view.topicChatRecords?.idle(); const text = await topicText(h, key, id); return text === null ? null : text.split('\n').filter(Boolean).map(l => JSON.parse(l)); };
+const settled = h => waitFor(() => h.plugin.running.size === 0 && h.plugin.activeTasks.size === 0 && !h.view.topicChatSessions.get(h.ids.a)?.session.running);
+
+test('topic chat record format: path whitelist, cut last line, broken lines, unknown version, pairing', () => {
+  assert.equal(records.isSafeTopicNodeId('abc_DEF-1'), true);
+  for (const bad of ['', 'a/b', '..', '../x', 'a.b', 'x'.repeat(65), 'a b', 7, null]) assert.equal(records.isSafeTopicNodeId(bad), false, String(bad));
+  assert.equal(records.topicChatPath('Agent Workspace/Topics/m', 'n1'), 'Agent Workspace/Topics/m/Chats/topics/n1.jsonl');
+  assert.throws(() => records.topicChatPath('Agent Workspace/Topics/m', '../n1'));
+  assert.throws(() => records.topicChatPath('../m', 'n1'));
+  const turn = { type: 'turn', id: 't1', at: '2026-11-08T00:00:00.000Z', kind: 'research', mode: 'quick', message: 'hi' };
+  const result = { type: 'result', id: 't1', at: '2026-11-08T00:00:01.000Z', status: 'done', text: 'ok' };
+  const text = records.serializeTopicChatLine(turn) + records.serializeTopicChatLine(result);
+  assert.deepEqual(Object.keys(JSON.parse(text.split('\n')[0]))[0], 'v');
+  // A cut last line and a broken line are skipped; the rest is read.
+  const damaged = text + 'not json\n' + '{"v":1,"type":"turn","id":"x","at":"a","kind":"bogus","mode":"quick","message":"m"}\n' + '{"v":1,"type":"result","id":"t2","at":"a","sta';
+  const parsed = records.parseTopicChat(damaged);
+  assert.equal(parsed.lines.length, 2); assert.equal(parsed.skipped, 3); assert.equal(parsed.cleanEnd, false); assert.equal(parsed.unrecoverable, false);
+  assert.equal(records.parseTopicChat(text).cleanEnd, true);
+  assert.equal(records.parseTopicChat(text + '{"v":2,"type":"turn"}\n').unrecoverable, true);
+  const restored = records.restoreTopicChat(parsed.lines.concat([{ ...turn, id: 't3' }, { ...result, id: 'orphan' }]));
+  assert.deepEqual(plain(restored.map(r => [r.id, r.result?.text ?? null])), [['t1', 'ok'], ['t3', null]]);
+});
+
+integrationTest('topic chat counterexample 5 (reload): the conversation is saved and comes back after the sessions are gone', async () => {
+  const h = await harness(); h.view.plugin.settings.mapChatRecords = false; // saved whatever the sidebar switch says
+  h.plugin.outlineGeneration = { generate: async () => outlineOf('# Body\n## Light') };
+  const host = h.host('a'); await host.submit('expand', 'split by cause'); await finished(h);
+  const lines = await topicLines(h, 'a');
+  assert.deepEqual(plain(lines.map(l => [l.v, l.type])), [[1, 'turn'], [1, 'result']]);
+  assert.equal(lines[0].kind, 'expand'); assert.equal(lines[0].mode, 'quick'); assert.equal(lines[0].message, 'split by cause');
+  assert.equal(lines[1].id, lines[0].id); assert.equal(lines[1].status, 'done');
+  assert.equal(lines[1].text, t('ui.topic_chat_expand_done_0_1', 1, 'Light'));
+  assert.ok(!JSON.stringify(lines).includes('prompt'), 'no prompt or context stored');
+  // Reload: a new session for the same topic reads the file back.
+  h.view.closeTopicChatWindow(); h.view.topicChatSessions.clear();
+  h.view.openTopicChat(h.node('a'));
+  await waitFor(() => h.entry('a').session.turns.length === 2);
+  assert.deepEqual(plain(h.entry('a').session.turns.map(x => [x.role, x.text])), [['user', 'split by cause'], ['ai', t('ui.topic_chat_expand_done_0_1', 1, 'Light')]]);
+  assert.ok(h.texts().includes('split by cause'), 'the window shows it');
+});
+
+integrationTest('topic chat counterexample 6: the sidebar switch count and delete leave Chats/topics alone; the sidebar record has no topic chat turn', async () => {
+  const { turnMapChatRecordsOff } = load('ui/modals/map-chat-records-off-modal.ts', { obsidian });
+  const h = await harness(); const calls = stubResearch(h);
+  await h.host('a').submit('research', 'dig'); await waitFor(() => calls.length === 1);
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  assert.equal((await topicLines(h, 'a')).length, 2);
+  const file = topicPath(h, 'a');
+  assert.equal(chatRecords.isRecordFilePath(file), false); assert.equal(records.isTopicChatFilePath(file), true);
+  assert.equal(chatRecords.isRecordFilePath(`${h.repo.topicRoot(MAP)}/Chats/records/20261108-000000-abcdef.jsonl`), true);
+  assert.equal(records.isTopicChatFilePath(`${h.repo.topicRoot(MAP)}/Chats/records/20261108-000000-abcdef.jsonl`), false);
+  assert.deepEqual(chatRecords.recordFilesIn(vaultFiles(h)).map(f => f.path), []);
+  let asked = 0; const trashed = [];
+  const app = { vault: Object.assign(Object.create(h.repo.app.vault), { getFiles: () => vaultFiles(h) }), fileManager: { trashFile: async f => { trashed.push(f.path); } } };
+  const res = await turnMapChatRecordsOff({ app, writers: [], ask: async () => { asked++; return true; } });
+  assert.deepEqual([res.deleted, res.failed, asked, trashed.length], [0, 0, 0, 0], 'nothing counted, nothing deleted');
+  assert.ok(await topicText(h, 'a'), 'the topic chat file is still there');
+  assert.equal(h.view.chatRecords, null, 'the sidebar writer was never made by a topic chat');
+});
+
+integrationTest('topic chat counterexample 9: a node id with a slash or dots writes no file, the conversation stays in memory', async () => {
+  for (const bad of ['../evil', 'a/b', '..']) {
+    const h = await harness(); const calls = stubResearch(h);
+    const target = h.node('a'); h.view.openTopicChat(target);
+    const entry = h.entry('a'); entry.nodeId = bad; // the id the records are keyed by
+    const went = await h.view.submitTopicChat(entry, target, 'research', 'x'); assert.equal(went, true, JSON.stringify(h.notices)); await waitFor(() => calls.length === 1);
+    calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve();
+    await waitFor(() => !entry.session.running);
+    await h.view.topicChatRecords.idle();
+    assert.equal(entry.session.turns.length, 2, 'kept in memory');
+    const stray = [...h.files.keys()].filter(p => p.includes('/Chats/'));
+    assert.deepEqual(plain(stray), [], bad);
+  }
+});
+
+integrationTest('topic chat late result: a view that closed meanwhile writes no result, and reopening says the result is unknown', async () => {
+  const h = await harness(); const gate = deferred();
+  h.plugin.outlineGeneration = { generate: async () => { await gate.promise; return outlineOf('# Body\n## Light'); } };
+  const host = h.host('a'); await host.submit('expand', 'x');
+  h.view.closed = true; gate.resolve();
+  await waitFor(() => h.plugin.running.size === 0 && !h.entry('a').session.running);
+  assert.deepEqual(plain((await topicLines(h, 'a')).map(l => l.type)), ['turn'], 'the turn is saved, the result is not');
+  h.view.closed = false; h.view.closeTopicChatWindow(); h.view.topicChatSessions.clear(); h.view.openTopicChat(h.node('a'));
+  await waitFor(() => h.entry('a').session.turns.length === 2);
+  assert.deepEqual(plain(h.entry('a').session.turns.map(x => x.text)), ['x', t('ui.topic_chat_result_unknown')]);
+});
+
+integrationTest('topic chat record writer: a cut file gets a line break first, another schema version is never written, a failure notices once, a disposed writer writes nothing', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  const p = topicPath(h, 'a'); await h.repo.ensureTopicFolders?.(h.repo.topicRoot(MAP));
+  await h.repo.app.vault.createFolder(`${h.repo.topicRoot(MAP)}/Chats`).catch(() => {}); await h.repo.app.vault.createFolder(`${h.repo.topicRoot(MAP)}/Chats/topics`).catch(() => {});
+  const cut = records.serializeTopicChatLine({ type: 'turn', id: 'old', at: 'a', kind: 'research', mode: 'quick', message: 'older' }) + '{"v":1,"type":"res';
+  await h.repo.app.vault.create(p, cut);
+  await h.host('a').submit('research', 'new'); await waitFor(() => calls.length === 1);
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  await h.view.topicChatWriter().idle(); const parsed = records.parseTopicChat(await topicText(h, 'a'));
+  assert.deepEqual(plain(parsed.lines.map(l => [l.type, l.id === 'old' ? 'old' : 'new'])), [['turn', 'old'], ['turn', 'new'], ['result', 'new']]);
+  // Unknown version: untouched.
+  const h2 = await harness(); const calls2 = stubResearch(h2);
+  await h2.repo.app.vault.createFolder(`${h2.repo.topicRoot(MAP)}/Chats`).catch(() => {}); await h2.repo.app.vault.createFolder(`${h2.repo.topicRoot(MAP)}/Chats/topics`).catch(() => {});
+  const future = '{"v":2,"type":"turn","x":1}\n'; await h2.repo.app.vault.create(topicPath(h2, 'a'), future);
+  await h2.host('a').submit('research', 'new'); await waitFor(() => calls2.length === 1);
+  calls2[0].done({ summary: 'S', detail: 'D' }); calls2[0].gate.resolve(); await finished(h2); await h2.view.topicChatWriter().idle();
+  assert.equal(await topicText(h2, 'a'), future, 'not overwritten, not appended to');
+  assert.equal(h2.entry('a').session.turns.length, 2, 'the chat itself goes on');
+  // Failure: one Notice for several writes.
+  const h3 = await harness(); const calls3 = stubResearch(h3);
+  h3.repo.app.vault.create = async () => { throw new Error('disk busy'); };
+  await h3.host('a').submit('research', 'z'); await waitFor(() => calls3.length === 1);
+  calls3[0].done({ summary: 'S', detail: 'D' }); calls3[0].gate.resolve(); await finished(h3); await h3.view.topicChatWriter().idle();
+  assert.equal(h3.notices.filter(n => n === t('ui.topic_chat_record_failed')).length, 1);
+  // Closed or disposed writers take no line.
+  const h4 = await harness(); const w = h4.view.topicChatWriter(); w.dispose();
+  w.write(h4.repo.topicRoot(MAP), 'abc', { type: 'turn', id: 'q', at: 'a', kind: 'research', mode: 'quick', message: 'm' }); await w.idle();
+  assert.equal(await topicText(h4, null, 'abc'), null);
+});
+
+integrationTest('topic chat synthesize researches only idea or error subtopics first (same mode), then integrates; the sentence says so', async () => {
+  const h = await harness(); const calls = stubResearch(h); const seen = [];
+  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push(node.id); accepted(); observer.onWritten(); };
+  const statuses = { a: 'completed', b: 'error' }; const load0 = h.view.hydrate;
+  h.view.hydrate = async () => { await load0(); for (const [k, v] of Object.entries(statuses)) h.view.notes.get(h.ids[k]).status = v; };
+  await h.view.hydrate();
+  const host = h.host('root'); host.setMode('standard');
+  await host.submit('synthesize', 'all'); await waitFor(() => calls.length === 1);
+  assert.equal(calls[0].node.id, h.ids.b, 'only the unresearched subtopic'); assert.equal(calls[0].request.researchMode, 'research');
+  assert.equal(seen.length, 0, 'integration waits for the research');
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve();
+  await waitFor(() => !h.entry('root').session.running);
+  assert.deepEqual(seen, [h.ids.root]);
+  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_synthesis_researched_first_0_1', 1, 2));
+  assert.equal(h.view.selection.selectedId ?? null, null, 'selection untouched');
+  // Nothing to research: straight to the integration with the plain sentence.
+  statuses.b = 'completed'; await h.view.hydrate(); calls.length = 0;
+  await host.submit('synthesize', 'again'); await waitFor(() => !h.entry('root').session.running && seen.length === 2);
+  assert.equal(calls.length, 0); assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_synthesis_done_0', 2));
+});
+
+integrationTest('topic chat synthesize: when every subtopic research fails the integration does not start and one sentence says so', async () => {
+  const h = await harness(); const calls = stubResearch(h); let synthesized = 0;
+  h.view.startSynthesis = async () => { synthesized++; };
+  const host = h.host('root');
+  await host.submit('synthesize', 'all');
+  for (let i = 0; i < 2; i++) { await waitFor(() => calls.length === i + 1); calls[i].failed('boom'); calls[i].gate.resolve(); }
+  await waitFor(() => !h.entry('root').session.running);
+  assert.equal(synthesized, 0);
+  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_failed_0', t('ui.topic_chat_failed_children')));
+  assert.equal((await topicLines(h, 'root')).at(-1).status, 'failed');
 });

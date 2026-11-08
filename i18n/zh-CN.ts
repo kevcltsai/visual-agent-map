@@ -2915,5 +2915,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.topic_chat_out_of_scope": "超出这个议题的部分已略过。",
   "ui.topic_chat_too_big": "这个要求动到的地方太多，请改用左侧栏的 AI 对话。",
   "ui.topic_chat_result_unknown": "这次的结果请看议题本身。",
+  "ui.topic_chat_failed_children": "没有子议题研究成功。",
   "ui.topic_chat_record_failed": "议题对话记录没有存成功。"
 };

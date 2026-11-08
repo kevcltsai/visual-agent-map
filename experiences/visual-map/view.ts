@@ -474,6 +474,13 @@ import {
   type RecordTurnStatus
 } from "../../core/map-chat-records";
 import { MapChatRecordWriter, type MapChatRecordTarget } from "./map-chat-record-writer";
+import { TopicChatRecordWriter } from "./topic-chat-record-writer";
+import {
+  restoreTopicChat,
+  isSafeTopicNodeId,
+  type TopicChatLineInput,
+  type TopicRecordStatus
+} from "../../core/topic-chat-records";
 import { MapChatTurnRecord, type TurnEndFields } from "./map-chat-turn-record";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
@@ -1095,6 +1102,8 @@ interface TopicChatEntry {
     draftText: string;
   };
   watchers: Set<() => void>;
+  /** The id of the turn whose result is not written yet (null when idle). */
+  runningTurnId: string | null;
 }
 /** How one expansion the chat started came out. */
 type ChatExpandOutcome =
@@ -1547,6 +1556,7 @@ export class VisualAgentMapView extends ItemView {
    * (send, open); with the switch off nothing here runs.
    */
   private chatRecords: MapChatRecordWriter | null = null;
+  private topicChatRecords: TopicChatRecordWriter | null = null;
   private chatRecordsUnregister: (() => void) | null = null;
   /** The highest turn number used in the conversation's record. */
   private chatRecordTurnSeq = 0;
@@ -3187,6 +3197,8 @@ export class VisualAgentMapView extends ItemView {
     this.closed = true;
     this.closeTopicChatWindow();
     this.topicChatSessions.clear();
+    if (this.plugin.repo.isDisposed()) this.topicChatRecords?.dispose();
+    else this.topicChatRecords?.close();
     this.closeMapSearch(false);
     this.exitPresentation(false);
     this.cancelLinking(false);
@@ -16325,10 +16337,52 @@ export class VisualAgentMapView extends ItemView {
       mapId: map?.id ?? "",
       mapPath: this.path,
       session: { turns: [], mode: map?.aiMode ?? DEFAULT_MAP_AI_MODE, running: false, draftKind: null, draftText: "" },
-      watchers: new Set()
+      watchers: new Set(),
+      runningTurnId: null
     };
     this.topicChatSessions.set(node.id, entry);
+    void this.restoreTopicChat(entry);
     return entry;
+  }
+  /** The managed folder the topic chat records of this map live in (null: kept in memory only). */
+  private topicChatRoot(entry: TopicChatEntry): string | null {
+    return isManagedMapPath(this.plugin.settings, entry.mapPath) ? this.plugin.repo.topicRoot(entry.mapPath) : null;
+  }
+  private topicChatWriter(): TopicChatRecordWriter | null {
+    if (this.closed) return null;
+    if (!this.topicChatRecords)
+      this.topicChatRecords = new TopicChatRecordWriter({
+        app: this.plugin.repo.app,
+        log: (level, message) => this.plugin.logs.appendLog(level, message),
+        disposed: () => this.plugin.repo.isDisposed(),
+        onFailure: () => {
+          new Notice(t("ui.topic_chat_record_failed"));
+        },
+        configDir: this.app.vault.configDir
+      });
+    return this.topicChatRecords;
+  }
+  /** Reads the saved conversation of a topic back in front of what this session already has. A turn without a result says so. */
+  private async restoreTopicChat(entry: TopicChatEntry): Promise<void> {
+    const writer = this.topicChatWriter();
+    if (!writer || !isSafeTopicNodeId(entry.nodeId)) return;
+    const parsed = await writer.read(this.topicChatRoot(entry), entry.nodeId);
+    if (!parsed || this.closed || this.topicChatSessions.get(entry.nodeId) !== entry) return;
+    const restored: TopicChatTurn[] = [];
+    for (const turn of restoreTopicChat(parsed.lines)) {
+      if (turn.id === entry.runningTurnId) continue;
+      restored.push({ role: "user", kind: turn.kind === "ask" ? undefined : turn.kind, text: turn.message });
+      restored.push({ role: "ai", text: turn.result ? turn.result.text : t("ui.topic_chat_result_unknown") });
+    }
+    if (!restored.length) return;
+    entry.session.turns.splice(0, 0, ...restored);
+    this.notifyTopicChat(entry);
+  }
+  private writeTopicChatLine(entry: TopicChatEntry, line: TopicChatLineInput): void {
+    this.topicChatWriter()?.write(this.topicChatRoot(entry), entry.nodeId, line);
+  }
+  private newTopicTurnId(): string {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   }
   private notifyTopicChat(entry: TopicChatEntry): void {
     for (const watcher of [...entry.watchers]) watcher();
@@ -16444,6 +16498,23 @@ export class VisualAgentMapView extends ItemView {
     const userTurn: TopicChatTurn = { role: "user", kind, text };
     if (kind === "synthesize" && !map.nodes.some(item => item.parentId === node.id)) {
       entry.session.turns.push(userTurn, { role: "ai", text: t("ui.topic_chat_no_children") });
+      const quickId = this.newTopicTurnId();
+      const quickAt = new Date().toISOString();
+      this.writeTopicChatLine(entry, {
+        type: "turn",
+        id: quickId,
+        at: quickAt,
+        kind,
+        mode: entry.session.mode,
+        message: text
+      });
+      this.writeTopicChatLine(entry, {
+        type: "result",
+        id: quickId,
+        at: quickAt,
+        status: "done",
+        text: t("ui.topic_chat_no_children")
+      });
       this.notifyTopicChat(entry);
       return true;
     }
@@ -16460,6 +16531,15 @@ export class VisualAgentMapView extends ItemView {
       started = true;
       entry.session.turns.push(userTurn);
       entry.session.running = true;
+      entry.runningTurnId = this.newTopicTurnId();
+      this.writeTopicChatLine(entry, {
+        type: "turn",
+        id: entry.runningTurnId,
+        at: new Date().toISOString(),
+        kind,
+        mode,
+        message: text
+      });
       this.notifyTopicChat(entry);
       void this.runTopicChatTask(entry, node, note, kind, mode, text, controller);
     });
@@ -16501,43 +16581,28 @@ export class VisualAgentMapView extends ItemView {
             entry,
             t("ui.topic_chat_expand_done_0_1", outcome.titles.length, outcome.titles.join(t("ui.list_separator"))),
             live,
-            true
+            true,
+            "done"
           );
-        else if (outcome.status === "stopped") this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
-        else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", outcome.reason), live, false);
+        else if (outcome.status === "stopped")
+          this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
+        else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", outcome.reason), live, false, "failed");
         return;
       }
       began = true;
       hooks.begin(controller, kind === "research" ? "research" : undefined);
       if (kind === "research") {
-        let result: AiResult | undefined;
-        let failure: string | undefined;
-        const referenceGroups = await this.taskSourceSettings()
-          .mapSources(controller.signal)
-          .catch(() => []);
-        const runStyle = await this.detailTemplateFor(node, undefined, undefined, language);
-        const handle = await this.runAgent(
+        const { result, failure } = await this.runTopicChatResearch(
           node,
-          done => {
-            result = done;
-          },
-          message => {
-            failure = message;
-          },
-          {
-            runStyle,
-            task: [researchTopicTask(language, note.title), text].filter(Boolean).join("\n\n"),
-            referenceGroups,
-            signal: controller.signal,
-            outputLanguage: language,
-            rules: "",
-            ...aiModeOptions(mode, "research"),
-            addCharts: mode !== "quick"
-          },
+          note,
+          mode,
+          language,
+          text,
+          controller.signal,
+          endHooks,
           endHooks
         );
         endHooks();
-        if (handle) await handle.finished;
         const stopped =
           controller.signal.aborted ||
           failure === t("ui.research_stopped_existing_content_was_preserved") ||
@@ -16545,14 +16610,45 @@ export class VisualAgentMapView extends ItemView {
         if (result) {
           // The window is closed: the usual Notice tells it (a Quick answer that lacked knowledge also offers Standard).
           if (!this.topicChatOpenFor(entry)) hooks.completed?.("research", mode === "quick" ? result : undefined);
-          this.settleTopicChat(entry, t("ui.topic_chat_research_done"), live, false);
-        } else if (stopped) this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
-        else if (failure) this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure), live, true);
-        else this.settleTopicChat(entry, t("ui.topic_chat_result_unknown"), live, true);
+          this.settleTopicChat(entry, t("ui.topic_chat_research_done"), live, false, "done");
+        } else if (stopped) this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
+        else if (failure) this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure), live, true, "failed");
+        else this.settleTopicChat(entry, t("ui.topic_chat_result_unknown"), live, true, "failed");
         return;
       }
-      // synthesize
+      // synthesize: subtopics that were never researched are researched first (same mode), then everything is integrated.
       const children = this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0;
+      const toResearch = (this.map?.nodes ?? []).filter(item => {
+        if (item.parentId !== node.id) return false;
+        const status = this.notes.get(item.id)?.status;
+        return (status === "idea" || status === "error") && !this.topicChatBusy(item);
+      });
+      let researchedFirst = 0;
+      if (toResearch.length) {
+        for (const child of toResearch) {
+          if (controller.signal.aborted || !live()) break;
+          const childNote = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
+          const done = await this.runTopicChatResearch(child, childNote, mode, language, "", controller.signal);
+          if (done.result) researchedFirst++;
+        }
+        if (controller.signal.aborted) {
+          endHooks();
+          this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
+          return;
+        }
+        if (!researchedFirst) {
+          endHooks();
+          this.settleTopicChat(
+            entry,
+            t("ui.topic_chat_failed_0", t("ui.topic_chat_failed_children")),
+            live,
+            true,
+            "failed"
+          );
+          return;
+        }
+        await this.hydrate();
+      }
       let written = false;
       let failure: string | undefined;
       await this.startSynthesis(
@@ -16577,10 +16673,26 @@ export class VisualAgentMapView extends ItemView {
         }
       );
       endHooks();
-      if (written) this.settleTopicChat(entry, t("ui.topic_chat_synthesis_done_0", children), live, false);
+      if (written)
+        this.settleTopicChat(
+          entry,
+          researchedFirst
+            ? t("ui.topic_chat_synthesis_researched_first_0_1", researchedFirst, children)
+            : t("ui.topic_chat_synthesis_done_0", children),
+          live,
+          false,
+          "done"
+        );
       else if (controller.signal.aborted || failure === t("ui.ai_task_cancelled"))
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
-      else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure ?? t("ui.ai_task_cancelled")), live, true);
+        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
+      else
+        this.settleTopicChat(
+          entry,
+          t("ui.topic_chat_failed_0", failure ?? t("ui.ai_task_cancelled")),
+          live,
+          true,
+          "failed"
+        );
     } catch (error) {
       endHooks();
       const stopped = controller.signal.aborted;
@@ -16588,17 +16700,76 @@ export class VisualAgentMapView extends ItemView {
         entry,
         stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage(error)),
         live,
-        !stopped
+        !stopped,
+        stopped ? "stopped" : "failed"
       );
     }
+  }
+  /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
+  private async runTopicChatResearch(
+    node: MapNode,
+    note: Note,
+    mode: TopicChatMode,
+    language: ContentLanguage,
+    text: string,
+    signal: AbortSignal,
+    accepted?: () => void,
+    launched?: () => void
+  ): Promise<{ result?: AiResult; failure?: string }> {
+    let result: AiResult | undefined;
+    let failure: string | undefined;
+    const referenceGroups = await this.taskSourceSettings()
+      .mapSources(signal)
+      .catch(() => []);
+    const runStyle = await this.detailTemplateFor(node, undefined, undefined, language);
+    const handle = await this.runAgent(
+      node,
+      done => {
+        result = done;
+      },
+      message => {
+        failure = message;
+      },
+      {
+        runStyle,
+        task: [researchTopicTask(language, note.title), text].filter(Boolean).join("\n\n"),
+        referenceGroups,
+        signal,
+        outputLanguage: language,
+        rules: "",
+        ...aiModeOptions(mode, "research"),
+        addCharts: mode !== "quick"
+      },
+      accepted
+    );
+    launched?.();
+    if (handle) await handle.finished;
+    return { result, failure };
   }
   private topicChatOpenFor(entry: TopicChatEntry): boolean {
     return this.topicChatOpen?.entry === entry;
   }
   /** Ends a run: the window (if open) shows one sentence; a closed window gets a Notice when `notice` says the task did not tell it. */
-  private settleTopicChat(entry: TopicChatEntry, sentence: string, live: () => boolean, notice: boolean): void {
+  private settleTopicChat(
+    entry: TopicChatEntry,
+    sentence: string,
+    live: () => boolean,
+    notice: boolean,
+    status: TopicRecordStatus
+  ): void {
     entry.session.running = false;
+    const turnId = entry.runningTurnId;
+    entry.runningTurnId = null;
+    // Late-result fence: a view that closed or moved to another map writes nothing (its next open says the result is unknown).
     if (!live()) return;
+    if (turnId)
+      this.writeTopicChatLine(entry, {
+        type: "result",
+        id: turnId,
+        at: new Date().toISOString(),
+        status,
+        text: sentence
+      });
     entry.session.turns.push({ role: "ai", text: sentence });
     this.notifyTopicChat(entry);
     if (notice && !this.topicChatOpenFor(entry)) new Notice(sentence);

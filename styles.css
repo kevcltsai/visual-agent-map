@@ -2077,6 +2077,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-mode-label { flex: 1 1 auto; text-align: left; }
 .vam-topic-chat-mode-check { visibility: hidden; display: inline-flex; color: var(--text-accent); }
 .vam-topic-chat-mode[aria-checked="true"] .vam-topic-chat-mode-check { visibility: visible; }
-.vam-topic-chat-send { margin-left: auto; width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--interactive-accent); color: var(--text-on-accent); cursor: pointer; }
+.vam-topic-chat-send { margin-left: auto; width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; }
+.vam-topic-chat-foot button.vam-topic-chat-send:not(:disabled) { background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-topic-chat-mode-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-topic-chat button:focus-visible, .vam-topic-chat-input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }

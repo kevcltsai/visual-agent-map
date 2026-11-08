@@ -374,6 +374,16 @@ test('topic chat lifts its overlay above the controls overlay while mounted and 
   assert.ok(!hasClass(f.root, 'has-topic-chat'));
 });
 
+test('topic chat send key is accent-filled when it can send, with a selector that outweighs the app button rule', () => {
+  const lines = fs.readFileSync(path.join(root, 'styles.css'), 'utf8').split('\n');
+  // Obsidian's `button:not(.clickable-icon)` is (0,1,1) and sets the grey fill; a bare class is (0,1,0) and loses to it.
+  const ready = lines.find(line => line.startsWith('.vam-topic-chat-foot button.vam-topic-chat-send:not(:disabled) {')) ?? '';
+  assert.match(ready, /background: var\(--interactive-accent\)/);
+  assert.match(ready, /color: var\(--text-on-accent\)/);
+  const base = lines.find(line => line.startsWith('.vam-topic-chat-send {')) ?? '';
+  assert.doesNotMatch(base, /background|[; ]color:/, 'a disabled key keeps the grey fill');
+});
+
 test('topic chat counterexample 5: the grey text shows with no Tab label on screen, and Tab still adopts it', () => {
   const f = fixture();
   f.action('expand').click();

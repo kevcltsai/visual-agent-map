@@ -1915,9 +1915,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-anchor-choices { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .vam-anchor-choice { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .vam-anchor-note-input { width: 100%; }
-.vam-topic-modal button.vam-relation-add-anchor { display: block; height: auto; margin-top: 6px; padding: 0; border: 0; border-bottom: 1px solid currentcolor; border-radius: 0; background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-small); cursor: pointer; }
+.vam-topic-modal button.vam-relation-add-anchor { display: block; height: auto; margin-top: 6px; margin-inline-start: 2px; padding: 0; border: 0; border-bottom: 1px solid currentcolor; border-radius: 0; background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-small); cursor: pointer; }
 .vam-topic-modal button.vam-relation-add-anchor:hover { background: transparent; color: var(--text-normal); }
-.vam-topic-modal button.vam-relation-add-anchor:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-topic-modal button.vam-relation-add-anchor:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 0; }
 .vam-anchor-pick-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .vam-anchor-pick-row { display: flex; align-items: center; gap: 10px; }
 .vam-anchor-pick-row button { flex: 1 1 auto; min-width: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

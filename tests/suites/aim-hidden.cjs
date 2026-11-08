@@ -216,11 +216,9 @@ test('aim-hidden: E1 the card of an AIM node has the generic tools and none of t
     const buttons = [], view = viewOf(loader, doc);
     view.stageEl = element('stage', buttons);
     view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
-    const listed = [];
-    view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, onClick() { return chain; } }; build(chain); listed.push(it.title); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
     view.renderNode(conclusion);
     // The card tools are icon-only buttons named by aria-label (no More menu).
-    return [...buttons.map(button => button['aria-label'] ?? button.text), ...listed];
+    return buttons.map(button => button['aria-label'] ?? button.text);
   };
   const shown = render(load), hidden = render(loadHidden);
   assert.equal(shown.includes('AI explore'), false, 'AIM on: generic tools are hidden on an AIM map');

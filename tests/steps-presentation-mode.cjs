@@ -385,6 +385,8 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   for (const el of tools) click(el);
   await h.settle();
   assert.equal(menus.length, 0, 'no tool and not the "+" opens a list while presenting');
+  assert.equal(h.view.selection.state.multiSelectMode, false, 'Select subtopics did not enter selection mode while presenting');
+  assert.equal(h.view.selection.state.multiSelected.size ?? h.view.selection.state.multiSelected.length, 0, 'Select subtopics selected nothing while presenting');
   assert.deepEqual(h.modals, [], 'no dialog opens');
   assert.equal(bytes(), before, 'Map.md is unchanged');
   assert.deepEqual((await h.saved()).nodes.map(n => ({ id: n.id, collapsed: n.collapsed })), mapBefore, 'nothing was folded');

@@ -37,6 +37,9 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   // The structure action is its own icon button now (no More menu in between): one click runs it.
   view.newMenu = () => { throw new Error('the card tools open no menu'); };
   buttons.find(button => button['aria-label'] === 'This card').click({ stopPropagation() {} });
+  buttons.find(button => button['aria-label'] === 'Details').click({ stopPropagation() {} });
+  assert.deepEqual(details, [topic.id], 'the icon-only Details button opens the details');
+  details.length = 0;
   assert.deepEqual(opened, [[topic.id, 'proposals'], [topic.id, 'structure']]); assert.deepEqual(next, [topic.id]);
   assert.equal(view.selection.state.selected, null);
   events.get('div:click')({ target: { closest: () => null }, metaKey: false, ctrlKey: false });
@@ -1145,7 +1148,7 @@ integrationTest('topic outline: switching to another map tab re-syncs the outlin
   state.views = []; plugin.releaseOutline(a);
   assert.equal(plugin.outlineMap, null, 'no map left: the outline empties');
 });
-integrationTest('card tools: only AI explore, Details and More float; More holds Collapse, This card and Select subtopics (the title is edited in place, so no Rename)', () => {
+integrationTest('card tools: AI explore, Details, Collapse, This card and Select subtopics are icon-only buttons with no More menu (the title is edited in place, so no Rename)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   // The tools float over the card's top edge, hidden until hover, focus or selection, and take no space.
   assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; visibility: hidden;[^}]*width: max-content;/m);

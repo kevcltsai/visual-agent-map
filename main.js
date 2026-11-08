@@ -562,6 +562,7 @@ var en = {
   "ui.reference_processing_empty_result": "A selected source batch returned no readable findings. No partial result was saved.",
   "ui.reference_processing_could_not_reduce": "The selected material could not be condensed while preserving traceable evidence. No partial result was saved.",
   "ui.reference_remove": "Remove",
+  "ui.map_notes_loading_0_1": "Reading topic notes {0} / {1}",
   "ui.map_sources_button": "Data sources",
   "ui.map_sources_button_count_0": "Data sources \xB7 {0}",
   "ui.map_sources_unreadable_description_0": "{0} unreadable",
@@ -3350,6 +3351,7 @@ var zhCN = {
   "ui.reference_processing_empty_result": "\u6709\u4E00\u6279\u9009\u62E9\u6570\u636E\u65E0\u6CD5\u4EA7\u751F\u53EF\u8BFB\u5185\u5BB9\uFF0C\u672A\u4FDD\u5B58\u90E8\u5206\u7ED3\u679C\u3002",
   "ui.reference_processing_could_not_reduce": "\u9009\u62E9\u6570\u636E\u91CF\u8FC7\u5927\uFF0C\u65E0\u6CD5\u5728\u4FDD\u7559\u6765\u6E90\u5F15\u7528\u7684\u60C5\u51B5\u4E0B\u6574\u7406\uFF1B\u672A\u4FDD\u5B58\u90E8\u5206\u7ED3\u679C\u3002",
   "ui.reference_remove": "\u79FB\u9664",
+  "ui.map_notes_loading_0_1": "\u6B63\u5728\u8BFB\u53D6\u8BAE\u9898\u5185\u5BB9 {0} / {1}",
   "ui.map_sources_button": "\u6570\u636E\u6E90",
   "ui.map_sources_button_count_0": "\u6570\u636E\u6E90 \xB7 {0} \u4EFD",
   "ui.map_sources_unreadable_description_0": "{0} \u4EFD\u8BFB\u4E0D\u5230",
@@ -6138,6 +6140,7 @@ var zhTW = {
   "ui.reference_processing_empty_result": "\u6709\u4E00\u6279\u9078\u53D6\u8CC7\u6599\u7121\u6CD5\u7522\u751F\u53EF\u8B80\u5167\u5BB9\uFF0C\u672A\u5132\u5B58\u90E8\u5206\u7D50\u679C\u3002",
   "ui.reference_processing_could_not_reduce": "\u9078\u53D6\u8CC7\u6599\u91CF\u904E\u5927\uFF0C\u7121\u6CD5\u5728\u4FDD\u7559\u4F86\u6E90\u5F15\u7528\u7684\u60C5\u6CC1\u4E0B\u6574\u7406\uFF1B\u672A\u5132\u5B58\u90E8\u5206\u7D50\u679C\u3002",
   "ui.reference_remove": "\u79FB\u9664",
+  "ui.map_notes_loading_0_1": "\u6B63\u5728\u8B80\u53D6\u8B70\u984C\u5167\u5BB9 {0} / {1}",
   "ui.map_sources_button": "\u8CC7\u6599\u4F86\u6E90",
   "ui.map_sources_button_count_0": "\u8CC7\u6599\u4F86\u6E90 \xB7 {0} \u4EFD",
   "ui.map_sources_unreadable_description_0": "{0} \u4EFD\u8B80\u4E0D\u5230",
@@ -57787,6 +57790,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
      * read yet shows grey bars, and nothing is written. null in every other moment (including the fast open that paints once).
      */
     __publicField(this, "noteLoad", null);
+    __publicField(this, "loadStatusEl", null);
     __publicField(this, "headerTitle", "");
     /** Raised by the header title refresh: the setState it causes asks the workspace to redraw the window title too. */
     __publicField(this, "titleRefresh", false);
@@ -58110,6 +58114,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     if (current.frameTimer !== null) window.clearTimeout(current.frameTimer);
     if (current.raf !== null) window.cancelAnimationFrame(current.raf);
     this.noteLoad = null;
+    this.removeLoadStatus();
   }
   scheduleLoadBatch(load) {
     if (load.raf !== null) return;
@@ -58172,6 +58177,29 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     lock(this.contentEl);
     lock(this.relevanceBarEl);
     (_b2 = (_a2 = this.contentEl).addClass) == null ? void 0 : _b2.call(_a2, "is-notes-loading");
+    this.syncLoadStatus();
+  }
+  /** The small "N / M" line at the bottom left while notes are read and the cards are drawn; it is recreated after a repaint. */
+  syncLoadStatus() {
+    var _a2, _b2, _c;
+    const load = this.noteLoad;
+    if (!(load == null ? void 0 : load.framed) || this.closed) {
+      this.removeLoadStatus();
+      return;
+    }
+    let el = this.loadStatusEl;
+    if (!(el == null ? void 0 : el.isConnected)) {
+      const host = (_c = (_b2 = (_a2 = this.contentEl).querySelector) == null ? void 0 : _b2.call(_a2, ".vam-canvas")) != null ? _c : this.contentEl;
+      el = host.createDiv({ cls: "vam-map-load-status" });
+      el.setAttr("role", "status");
+      this.loadStatusEl = el;
+    }
+    el.setText(t("ui.map_notes_loading_0_1", load.read, load.total));
+  }
+  removeLoadStatus() {
+    var _a2;
+    (_a2 = this.loadStatusEl) == null ? void 0 : _a2.remove();
+    this.loadStatusEl = null;
   }
   getViewType() {
     return VIEW_TYPE;
@@ -59586,6 +59614,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
           const node = map.nodes[index];
           if (note && node) this.notes.set(node.id, note);
           load.read++;
+          if (load.framed) this.syncLoadStatus();
           if (note && node && load.framed) {
             load.pending.add(node.id);
             this.scheduleLoadBatch(load);

@@ -519,6 +519,7 @@ export const en = {
   "ui.reference_processing_could_not_reduce":
     "The selected material could not be condensed while preserving traceable evidence. No partial result was saved.",
   "ui.reference_remove": "Remove",
+  "ui.map_notes_loading_0_1": "Reading topic notes {0} / {1}",
   "ui.map_sources_button": "Data sources",
   "ui.map_sources_button_count_0": "Data sources · {0}",
   "ui.map_sources_unreadable_description_0": "{0} unreadable",

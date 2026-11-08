@@ -410,3 +410,58 @@ test('m: wiring: the outline waits, settle returns first, the open clears its st
   const close = source.slice(source.indexOf('async onClose('), source.indexOf('async onClose(') + 5000);
   assert.match(close, /this\.mapOpenEpoch\+\+;\s*this\.endNoteLoad\(\);/);
 });
+
+// contentEl is the support-dom element: give the status line the connected flag Obsidian's elements have.
+const trackConnected = h => {
+  const host = h.view.contentEl, base = host.createDiv.bind(host);
+  host.createDiv = value => { const el = base(value); el.isConnected = true; const remove = el.remove.bind(el); el.remove = () => { el.isConnected = false; el.removed = true; remove(); }; return el; };
+};
+const statusEls = h => { const out = []; const walk = el => { if (String(el.cls ?? '').split(/\s+/).includes('vam-map-load-status')) out.push(el); el.children.forEach(walk); }; walk(h.view.contentEl); return out; };
+
+test('n: the progress line shows N / M as reads arrive (failed reads count), is role=status, and is gone after the load', async () => {
+  const h = await harness();
+  trackConnected(h);
+  const done = h.open();
+  await tick();
+  assert.equal(statusEls(h).length, 0, 'no line before the loading frame (fast open shows none)');
+  fireFrame();
+  let [el] = statusEls(h);
+  assert.equal(el.text, 'Reading topic notes 0 / 3');
+  assert.equal(el.attrs.role, 'status');
+  h.release(1);
+  await flush();
+  assert.equal(statusEls(h).length, 1);
+  assert.equal(statusEls(h)[0].text, 'Reading topic notes 1 / 3');
+  h.release(0, 2);
+  await done;
+  assert.equal(statusEls(h).filter(e => !e.removed).length, 0);
+  assert.equal(h.view.loadStatusEl, null);
+});
+
+test('o: a repaint during the load recreates the line; closing mid-load removes it', async () => {
+  const h = await harness();
+  trackConnected(h);
+  const done = h.open();
+  await tick(); fireFrame();
+  h.release(0);
+  await flush();
+  h.view.loadStatusEl.isConnected = false; h.view.contentEl.children = [];
+  h.view.render();
+  const els = statusEls(h);
+  assert.equal(els.length, 1);
+  assert.equal(els[0].text, 'Reading topic notes 1 / 3');
+  const shown = h.view.loadStatusEl;
+  await h.view.onClose();
+  assert.equal(shown.removed, true);
+  assert.equal(h.view.loadStatusEl, null);
+  h.release(1, 2);
+  await done;
+});
+
+test('p: a fast open never creates the progress line', async () => {
+  const h = await harness({ gate: false });
+  trackConnected(h);
+  await h.open();
+  assert.equal(statusEls(h).length, 0);
+  assert.equal(h.view.loadStatusEl, null);
+});

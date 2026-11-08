@@ -471,6 +471,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.reference_processing_empty_result": "有一批選取資料無法產生可讀內容，未儲存部分結果。",
   "ui.reference_processing_could_not_reduce": "選取資料量過大，無法在保留來源引用的情況下整理；未儲存部分結果。",
   "ui.reference_remove": "\u79fb\u9664",
+  "ui.map_notes_loading_0_1": "正在讀取議題內容 {0} / {1}",
   "ui.map_sources_button": "資料來源",
   "ui.map_sources_button_count_0": "資料來源 · {0} 份",
   "ui.map_sources_unreadable_description_0": "{0} 份讀不到",

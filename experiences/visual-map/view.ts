@@ -2046,6 +2046,7 @@ export class VisualAgentMapView extends ItemView {
     if (current.frameTimer !== null) window.clearTimeout(current.frameTimer);
     if (current.raf !== null) window.cancelAnimationFrame(current.raf);
     this.noteLoad = null;
+    this.removeLoadStatus();
   }
   private scheduleLoadBatch(load: NoteLoadState): void {
     if (load.raf !== null) return;
@@ -2108,6 +2109,28 @@ export class VisualAgentMapView extends ItemView {
     lock(this.contentEl);
     lock(this.relevanceBarEl);
     this.contentEl.addClass?.("is-notes-loading");
+    this.syncLoadStatus();
+  }
+  private loadStatusEl: HTMLElement | null = null;
+  /** The small "N / M" line at the bottom left while notes are read and the cards are drawn; it is recreated after a repaint. */
+  private syncLoadStatus(): void {
+    const load = this.noteLoad;
+    if (!load?.framed || this.closed) {
+      this.removeLoadStatus();
+      return;
+    }
+    let el = this.loadStatusEl;
+    if (!el?.isConnected) {
+      const host = this.contentEl.querySelector?.<HTMLElement>(".vam-canvas") ?? this.contentEl;
+      el = host.createDiv({ cls: "vam-map-load-status" });
+      el.setAttr("role", "status");
+      this.loadStatusEl = el;
+    }
+    el.setText(t("ui.map_notes_loading_0_1", load.read, load.total));
+  }
+  private removeLoadStatus(): void {
+    this.loadStatusEl?.remove();
+    this.loadStatusEl = null;
   }
   private headerTitle = "";
   /** Raised by the header title refresh: the setState it causes asks the workspace to redraw the window title too. */
@@ -3666,6 +3689,7 @@ export class VisualAgentMapView extends ItemView {
               const node = map.nodes[index];
               if (note && node) this.notes.set(node.id, note);
               load.read++;
+              if (load.framed) this.syncLoadStatus();
               if (note && node && load.framed) {
                 load.pending.add(node.id);
                 this.scheduleLoadBatch(load);

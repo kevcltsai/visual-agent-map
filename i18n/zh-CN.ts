@@ -471,6 +471,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.reference_processing_empty_result": "有一批选择数据无法产生可读内容，未保存部分结果。",
   "ui.reference_processing_could_not_reduce": "选择数据量过大，无法在保留来源引用的情况下整理；未保存部分结果。",
   "ui.reference_remove": "移除",
+  "ui.map_notes_loading_0_1": "正在读取议题内容 {0} / {1}",
   "ui.map_sources_button": "数据源",
   "ui.map_sources_button_count_0": "数据源 · {0} 份",
   "ui.map_sources_unreadable_description_0": "{0} 份读不到",

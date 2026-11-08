@@ -566,7 +566,23 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 /* Card settings (ticket 41): the add-relation sentence, the folded groups and the AI lock state. Classes below are not collected by the share viewer. */
 .vam-topic-modal .vam-relation-list { max-height: 9em; overflow-y: auto; }
 .vam-topic-modal .vam-relation-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
-.vam-topic-modal .vam-relation-add-target { flex: 1 1 10em; min-width: 0; }
+/* Card search field (relation target, parent topic): the input; its list is Obsidian's body-level suggest popover. */
+.vam-card-search { position: relative; flex: 1 1 10em; min-width: 0; }
+.vam-card-search-icon { position: absolute; inset-inline-start: 10px; top: 50%; display: flex; color: var(--text-muted); pointer-events: none; transform: translateY(-50%); }
+.vam-card-search-icon .svg-icon { width: 16px; height: 16px; }
+.vam-card-search .vam-card-search-input { box-sizing: border-box; width: 100%; padding-inline-start: 32px; }
+.vam-card-search-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.vam-card-search-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-card-search-title mark { border-radius: 2px; background: color-mix(in srgb, var(--interactive-accent) 18%, transparent); color: inherit; }
+.vam-card-search-trail { flex: 0 1 auto; min-width: 0; overflow: hidden; color: var(--text-muted); font-size: var(--font-ui-smaller); text-overflow: ellipsis; white-space: nowrap; }
+.vam-card-search-current { flex: none; color: var(--interactive-accent); font-size: var(--font-ui-smaller); }
+.vam-card-search-row.is-disabled { color: var(--text-faint); cursor: not-allowed; }
+.vam-card-search-none { color: var(--text-muted); font-size: var(--font-ui-small); }
+/* Topic type: six in one row; branch layout: one row for however many are offered. Labels wrap rather than clip. */
+.vam-topic-modal .vam-choice-group.vam-topic-kinds { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.vam-topic-modal .vam-choice-group.vam-branch-layout { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.vam-topic-modal .vam-choice-group.vam-topic-kinds button, .vam-topic-modal .vam-choice-group.vam-branch-layout button { flex-wrap: wrap; justify-content: center; height: auto; padding: 4px 6px; text-align: center; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
+@media (max-width: 480px) { .vam-topic-modal .vam-choice-group.vam-topic-kinds { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .vam-topic-modal .vam-relation-add-arrow { color: var(--text-muted); }
 .vam-topic-modal .vam-disclosure { margin-top: 8px; border-top: 1px solid var(--background-modifier-border); }
 .vam-topic-modal .vam-disclosure-toggle { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 6px; background: transparent; box-shadow: none; font-weight: 600; justify-content: flex-start; }
@@ -1881,7 +1897,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-anchor-choices { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .vam-anchor-choice { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .vam-anchor-note-input { width: 100%; }
-.vam-relation-add .vam-relation-add-anchor { flex: 0 0 auto; }
+.vam-topic-modal button.vam-relation-add-anchor { display: block; height: auto; margin-top: 6px; margin-inline-start: 2px; padding: 0; border: 0; border-bottom: 1px solid currentcolor; border-radius: 0; background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-small); cursor: pointer; }
+.vam-topic-modal button.vam-relation-add-anchor:hover { background: transparent; color: var(--text-normal); }
+.vam-topic-modal button.vam-relation-add-anchor:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 0; }
 .vam-anchor-pick-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .vam-anchor-pick-row { display: flex; align-items: center; gap: 10px; }
 .vam-anchor-pick-row button { flex: 1 1 auto; min-width: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

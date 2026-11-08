@@ -466,7 +466,7 @@ async function real(items) {
     setName(text) { this.el.createSpan({ text }); return this; } setDesc(text) { this.el.createSpan({ text }); return this; }
     addButton(cb) { const b = this.el.createEl('button'); cb({ setButtonText(t) { b.text = t; return this; }, onClick(fn) { b.addEventListener('click', fn); return this; } }); return this; }
   }
-  const { VisualAgentMapView } = loadMain('main.ts', { obsidian: { ...obsidian, Modal, Setting, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment, createSvg });
+  const { VisualAgentMapView } = loadMain('main.ts', { obsidian: { ...obsidian, AbstractInputSuggest: class { constructor(app, input) { this.inputEl = input; } close() {} }, Modal, Setting, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment, createSvg });
   let pending = Promise.resolve();
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,

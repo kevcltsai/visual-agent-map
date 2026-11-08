@@ -3,6 +3,8 @@
 // Also a child batch (camera framing) and the re-space of quick-research cards against measured heights.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+// Obsidian's AbstractInputSuggest stand-in for the parent search field: tests call the subclass's own getSuggestions / selectSuggestion.
+const suggests = [];
 const { load, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, core, topicNote } = require('./support.cjs');
 const replay = require('./support-replay.cjs');
 const dom = require('./support-dom.cjs');
@@ -34,7 +36,7 @@ async function harness(spec = [['Root', null, 80, 80]], heights = {}) {
   await repo.rebuildDerivedData();
   const Base = dom.makeModal();
   class Modal extends Base { open() { super.open(); this.close(); } }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg: tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } }) });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, AbstractInputSuggest: class { constructor(app, input) { this.inputEl = input; suggests.push(this); } close() {} }, Modal, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg: tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } }) });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false
   });
@@ -182,11 +184,13 @@ test('FG20-07: This card > choosing a parent re-lays out the moved subtree at on
   h.view.mergeUnlocked = () => true;
   h.view.enqueue = fn => fn();
   h.view.renderInspector(panel, h.node('L4'), 'structure');
-  const rows = dom.findAll ? dom.findAll(panel, i => i.tag === 'button') : [];
-  const row = rows.find(b => b.dataset?.id === h.node('R2').id);
-  assert.ok(row, 'the topic tree lists R2');
+  const field = dom.findAll(panel, i => i.tag === 'input' && i.attrs['aria-label'] === 'Parent topic')[0];
+  const suggest = suggests.find(item => item.inputEl === field);
+  field.value = 'R2'; field.fire('input');
+  const row = suggest.getSuggestions('R2').find(item => item.id === h.node('R2').id);
+  assert.ok(row, 'the parent search lists R2');
   assert.equal(dom.findAll(panel, i => i.tag === 'button').find(b => b.text === 'Apply'), undefined, 'there is no Apply button');
-  row.click();
+  suggest.selectSuggestion(row, {});
   await dom.tick();
   await dom.tick();
   assert.equal(h.node('L4').parentId, h.node('R2').id);
@@ -204,8 +208,10 @@ test('FG20-07: choosing no parent makes the branch a new tree below everything a
   h.view.mergeUnlocked = () => true;
   h.view.enqueue = fn => fn();
   h.view.renderInspector(panel, h.node('A'), 'structure');
-  const rows = dom.findAll(panel, i => i.tag === 'button');
-  rows.find(b => b.dataset?.id === '').click();
+  const field = dom.findAll(panel, i => i.tag === 'input' && i.attrs['aria-label'] === 'Parent topic')[0];
+  const suggest = suggests.find(item => item.inputEl === field);
+  field.value = 'A'; field.fire('input');
+  suggest.selectSuggestion(suggest.getSuggestions('A').at(-1), {});
   await dom.tick(); await dom.tick();
   assert.equal(h.node('A').parentId, null);
   assert.deepEqual(h.overlaps(), []);

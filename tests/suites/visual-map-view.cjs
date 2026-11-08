@@ -3,6 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { attachTopicRuns, test, integrationTest, root, load, core, node, map, plain, obsidian, DEFAULT_SETTINGS, until } = require('../support.cjs');
 const dom = require('../support-dom.cjs');
+// Obsidian's AbstractInputSuggest, minimal: remembers which input it is on; tests call the subclass's own getSuggestions / renderSuggestion / selectSuggestion.
+const heSuggests = [];
+class HeInputSuggest { constructor(app, input) { this.app = app; this.inputEl = input; this.closed = 0; heSuggests.push(this); } close() { this.closed++; } open() {} setValue(v) { this.inputEl.value = v; } getValue() { return this.inputEl.value; } }
+const heObsidian = { ...obsidian, AbstractInputSuggest: HeInputSuggest };
 integrationTest('node plus adds a child without opening a duplicate right-click menu', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
   const events = new Map(), buttons = [];
@@ -532,17 +536,17 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   });
   const all = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(child => all(child, predicate))];
   const find = (root, predicate) => all(root, predicate)[0];
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: heObsidian });
   // Every card on a map has coordinates; moving under another parent lays the branch out from them.
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
-  const changes = []; let closed = 0, removed = 0, merging = false;
+  const changes = []; let closed = 0, removed = 0;
   const view = {
-    renderDisclosure(parent) { return parent.createDiv('vam-disclosure-body'); }, renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderAiLockSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
+    renderDisclosure(parent) { return parent.createDiv('vam-disclosure-body'); }, renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderAiLockSection() {}, renderBranchLayoutSection() {}, branchLayoutChoices: () => [], cardSearchSources: VisualAgentMapView.prototype.cardSearchSources, renderAddSubtopic() {},
     cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch, arrangeTree: VisualAgentMapView.prototype.arrangeTree,
     map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
-    mergeUnlocked: () => !merging, confirmRemoveNode() { removed++; }, enqueue(work) { work(); }, mapChange(change) { const copy = { nodes: nodes.map(n => ({ ...n })) }; change(copy); changes.push(copy.nodes.find(n => n.id === 'c').parentId); }
+    mergeUnlocked: () => true, confirmRemoveNode() { removed++; }, enqueue(work) { work(); }, mapChange(change) { const copy = { nodes: nodes.map(n => ({ ...n })) }; change(copy); changes.push(copy.nodes.find(n => n.id === 'c').parentId); }
   };
   const content = element('content'), host = element('modal');
   VisualAgentMapView.prototype.renderInspector.call(view, content, nodes[2], 'structure', () => { closed++; }, host);
@@ -554,25 +558,25 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   assert.ok(buttons[0].cls.includes('vam-discard'));
   const status = find(actions, item => item.cls.includes('vam-next-status'));
   assert.equal(status.text, undefined, 'nothing moved yet');
-  // The parent picker is an indented tree like the outline; the topic itself cannot be its own parent.
-  const tree = find(content, item => item.cls === 'vam-topic-tree');
-  const rows = tree.children.map(row => [row.dataset.id, row.text, row.style.paddingLeft, row.disabled]);
-  assert.deepEqual(rows, [['', 'No parent (root topic)', '8px', false], ['a', 'Heat', '8px', false], ['c', 'Pan', '24px', true], ['b', 'Water', '8px', false]]);
-  const row = id => tree.children.find(item => item.dataset.id === id);
-  assert.ok(row('a').cls.includes('is-selected'), 'current parent starts selected');
-  row('b').click();
-  assert.ok(row('b').cls.includes('is-selected')); assert.ok(!row('a').cls.includes('is-selected'));
-  assert.deepEqual(changes, ['b'], 'one click moves it'); assert.equal(status.text, 'Moved under “Water”.'); assert.equal(closed, 0, 'the dialog stays open');
-  row('b').click();
-  assert.deepEqual(changes, ['b'], 'choosing the parent it already has writes nothing');
-  row('').click();
-  assert.deepEqual(changes, ['b', null]); assert.equal(status.text, 'Now a root topic.');
+  // The parent picker is a search field that shows the current parent; typing lists matches with their upper path, the topic itself is greyed, the root row is last.
+  const field = find(content, item => item.tag === 'input' && item.attr['aria-label'] === 'Parent topic');
+  const suggest = heSuggests.find(item => item.inputEl === field);
+  assert.equal(field.value, 'Heat', 'the field shows the current parent');
+  assert.equal(find(content, item => item.cls === 'vam-topic-tree'), undefined, 'no tree is expanded');
+  const type = text => { field.value = text; field.input({}); return suggest.getSuggestions(text); };
+  const rowsOf = items => plain(items.map(row => [row.id, row.title, row.enabled, row.trail]));
+  assert.deepEqual(plain(suggest.getSuggestions('Heat')), [], 'focusing the field with the current name typed in does not open a list (owner: no expansion before typing)');
+  const found = type('a');
+  assert.deepEqual(rowsOf(found), [['a', 'Heat', true, []], ['b', 'Water', true, []], ['c', 'Pan', false, ['Heat']], ['', 'No parent (root topic)', true, []]]);
+  assert.equal(found[0].current, true, 'the current parent is tagged');
+  const pick = row => { suggest.selectSuggestion(row, {}); };
+  pick(found[1]);
+  assert.deepEqual(changes, ['b'], 'one pick moves it'); assert.equal(status.text, 'Moved under “Water”.'); assert.equal(closed, 0, 'the dialog stays open');
+  assert.equal(field.value, 'Water', 'the field shows the new parent');
+  pick(type('a').at(-1));
+  assert.deepEqual(changes, ['b', null]); assert.equal(status.text, 'Now a root topic.'); assert.equal(field.value, 'No parent (root topic)');
   buttons[0].click();
   assert.equal(removed, 1);
-  // A card that is merging keeps its parent, and the tree goes back to the one it has.
-  merging = true; row('b').click();
-  assert.deepEqual(changes, ['b', null], 'no parent change while the card is merging');
-  assert.ok(row('').cls.includes('is-selected')); assert.ok(!row('b').cls.includes('is-selected'));
 });
 integrationTest('expansion suggestions panel uses the shared list, treats the topic as first-level parent and asks before discarding', async () => {
   const element = (tag, options = {}) => ({
@@ -1740,7 +1744,7 @@ function heFixture(options = {}) {
   const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } };
   const svgCreated = [];
   const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], get textContent() { return this.text; }, set textContent(v) { this.text = String(v); this.children = []; }, setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); }, listeners: {}, addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }, fire(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
-  const { VisualAgentMapView } = options.shared ?? load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, open: (...args) => { opened.push(args); } });
+  const { VisualAgentMapView } = options.shared ?? load('main.ts', { obsidian: { ...heObsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, open: (...args) => { opened.push(args); } });
   const topics = options.topics ?? [node('fact'), node('hyp'), node('other')];
   const doc = { ...map(topics), ...(options.aim ? { aim: { mode: 'x' } } : {}), ...(options.relations ? { topicRelations: options.relations } : {}) };
   const plugin = { pendingSuggestions: new Map(), expansionBatches: new Map(), logs: { appendLog: (level, message) => logs.push([level, message]) }, repo: { writeHypothesisStrength: async (path, strength) => undone.push([path, strength]) }, detailsShown: () => false, setOutlineActive() {}, settings: { ...DEFAULT_SETTINGS } };
@@ -1751,12 +1755,15 @@ function heFixture(options = {}) {
   return { VisualAgentMapView, view, doc, opened, modals, notices, menus, logs, svgCreated, writes: undone, Notice };
 }
 // ticket 41: the add-relation sentence "This card [relation] -> [another card] [Add]".
-const heKindSelect = panel => dom.byLabel(panel, 'Relation type'), heTargetSelect = panel => dom.byLabel(panel, 'Other card');
-const heTargetIds = (panel, kind) => { const k = heKindSelect(panel); k.value = kind; k.change(); return dom.findAll(heTargetSelect(panel), c => c.tag === 'option').map(o => o.optionValue).filter(Boolean); };
+// The target is a search field (an input with a suggest list): `heTargetRows` is what the list shows for the typed text.
+const heKindSelect = panel => dom.byLabel(panel, 'Relation type'), heTargetInput = panel => dom.byLabel(panel, 'Other card');
+const heTargetSuggest = panel => heSuggests.find(s => s.inputEl === heTargetInput(panel));
+const heTargetRows = (panel, text = '') => heTargetSuggest(panel).getSuggestions(text);
+const heTargetIds = (panel, kind) => { const k = heKindSelect(panel); k.value = kind; k.change(); return heTargetRows(panel).filter(r => r.kind === 'card').map(r => r.id); };
 const heAddRelation = async (panel, kind, toId) => {
   const k = heKindSelect(panel); k.value = kind; k.change();
-  const t = heTargetSelect(panel); t.value = toId; t.change();
-  dom.find(panel, c => (c.cls ?? '').includes('vam-relation-add')).children.find(c => c.tag === 'button').click(); await dom.tick();
+  const row = heTargetRows(panel).find(r => r.id === toId); assert.ok(row, `${toId} is offered`);
+  heTargetSuggest(panel).selectSuggestion(row, {}); await dom.tick();
 };
 const heTargetsOf = (fx, kind, fromId) => { const panel = dom.element('panel'); fx.view.renderHypothesisSection(panel, fx.view.map.nodes.find(n => n.id === fromId)); return heTargetIds(panel, kind); };
 const heDrawn = (view, boxes) => {
@@ -2041,8 +2048,8 @@ integrationTest('hypothesis-evidence: the supports picker offers every topic tha
   const two = [node('a'), node('b')];
   const none = heFixture({ topics: two, notes: heNotes([['a', {}], ['b', {}]]), relations: [{ kind: 'supports', from: 'a', to: 'b' }] });
   const nonePanel = dom.element('panel'); none.view.renderHypothesisSection(nonePanel, none.view.map.nodes[0]);
-  assert.deepEqual(heTargetIds(nonePanel, 'supports'), []); assert.equal(heTargetSelect(nonePanel).disabled, true, 'nothing to pick: the list is off');
-  assert.equal(dom.findAll(heTargetSelect(nonePanel), c => c.tag === 'option')[0].text, 'There is no topic this one can be linked to with “Supports”.');
+  assert.deepEqual(heTargetIds(nonePanel, 'supports'), []); assert.equal(heTargetInput(nonePanel).disabled, true, 'nothing to pick: the field is off');
+  assert.equal(heTargetInput(nonePanel).attrs.placeholder, 'There is no topic this one can be linked to with “Supports”.');
 });
 integrationTest('hypothesis-evidence: a hypothesis card shows "Hypothesis · strength" and carries it in its accessible name; an ordinary topic and an AIM map do not', () => {
   const render = (options, id) => {
@@ -2576,9 +2583,9 @@ integrationTest('card settings (ticket 41): the other-card list never holds the 
   fx.view.enqueue = work => work(); fx.view.mapChange = async change => { change(fx.view.map); };
   const panel = dom.element('panel'); fx.view.renderHypothesisSection(panel, fx.view.map.nodes[0]);
   for (const kind of ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite']) assert.equal(heTargetIds(panel, kind).includes('a'), false, `${kind}: this card is not offered`);
-  assert.deepEqual(dom.findAll(heTargetSelect(panel), c => c.tag === 'option').map(o => o.text), ['Choose another card…', 'B', 'C']);
-  const add = dom.find(panel, c => (c.cls ?? '').includes('vam-relation-add')).children.find(c => c.tag === 'button');
-  assert.equal(add.disabled, true, 'nothing chosen yet: Add is off');
+  assert.deepEqual(heTargetRows(panel).map(r => r.title), ['B', 'C'], 'untyped, the field lists every legal card');
+  assert.equal(heTargetInput(panel).attrs.placeholder, 'Search for a card to link…');
+  assert.equal(dom.find(panel, c => (c.cls ?? '').includes('vam-relation-add')).children.find(c => c.tag === 'button'), undefined, 'there is no Add button: choosing a result adds the relation');
   await heAddRelation(panel, 'contradicts', 'b');
   const viaRow = core.serializeMap(fx.view.map);
   const reference = heFixture({ topics, notes: heNotes(topics.map(n => [n.id, {}])) });
@@ -2619,9 +2626,9 @@ integrationTest('hypothesis-evidence: with no legal target the list says so for 
   const fx = heFixture({ topics, notes: heNotes(topics.map(n => [n.id, {}])), relations: [{ kind: 'related', from: 'b', to: 'a' }] });
   const panel = dom.element('panel'); fx.view.renderHypothesisSection(panel, fx.view.map.nodes[0]);
   assert.deepEqual(heTargetIds(panel, 'related'), []);
-  assert.equal(dom.findAll(heTargetSelect(panel), c => c.tag === 'option')[0].text, 'There is no topic this one can be linked to with “Related”.');
+  assert.equal(heTargetInput(panel).attrs.placeholder, 'There is no topic this one can be linked to with “Related”.');
   assert.deepEqual(heTargetIds(panel, 'supports'), [], 'a different kind on the same pair is refused too (decision #37)');
-  assert.equal(heTargetSelect(panel).disabled, true);
+  assert.equal(heTargetInput(panel).disabled, true);
 });
 integrationTest('hypothesis-evidence: panel rows read "Name → B" going out, "A → Name" coming in and "Name — X" for related, with the note, a focusable row and Edit/Remove labels', () => {
   const relations = [{ kind: 'supports', from: 'fact', to: 'hyp', description: 'measured twice' }, { kind: 'derives_from', from: 'other', to: 'fact' }, { kind: 'related', from: 'extra', to: 'fact' }]; // decision #37: one relation per pair, so the related one comes from a fourth topic
@@ -3068,14 +3075,14 @@ const heDialog = (options = {}, index = 1) => {
 };
 const heCss = () => fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
 const heRuleBody = (css, selector) => { const hit = css.split('\n').find(line => line.startsWith(`${selector} {`)); assert.ok(hit, `rule ${selector}`); return hit.slice(hit.indexOf('{') + 1, hit.lastIndexOf('}')); };
-integrationTest('hypothesis-evidence: the dialog reads type, strength (hypothesis only), relations, then the parent topic, with the same heading class on each (C1, C2)', () => {
+integrationTest('hypothesis-evidence: the dialog reads type, strength (hypothesis only), relations, the parent topic search, then the folded groups, with the same heading class on each (C1, C2)', () => {
   const hyp = heDialog({}, 1);
   const headings = f => dom.findAll(f.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading'));
-  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Leaning', 'Strength', 'Relations', 'Markers', 'Links', 'Color', 'Style', 'Topic cover', 'Parent topic', 'AI lock'], 'ticket 41: the AI lock now sits after the folded Layout group; the marker section sits after the relations (ticket 33), the colour section after the markers (ticket 37), the style section after the colour (card-style), the cover switch after the style (decision 0.28-triage#36), the AI lock after the cover');
+  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Leaning', 'Strength', 'Relations', 'Parent topic', 'Markers', 'Links', 'Color', 'Style', 'Topic cover', 'AI lock'], 'ticket 41: the AI lock now sits after the folded Layout group; the marker section sits after the relations (ticket 33), the colour section after the markers (ticket 37), the style section after the colour (card-style), the cover switch after the style (decision 0.28-triage#36), the AI lock after the cover');
   const plain = heDialog({}, 0);
-  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Links', 'Color', 'Style', 'Topic cover', 'Parent topic', 'AI lock'], 'no strength for an ordinary topic');
-  const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-leanings') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-topic-tree' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
-  assert.deepEqual(order.slice(0, 5), ['vam-topic-kinds', 'vam-hypothesis-leanings', 'vam-hypothesis-strengths', 'vam-topic-tree', 'vam-hint'], 'type, leaning, strength, then the parent tree and its hint (the relations note is a different class)');
+  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Parent topic', 'Markers', 'Links', 'Color', 'Style', 'Topic cover', 'AI lock'], 'no strength for an ordinary topic');
+  const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-leanings') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-card-search' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
+  assert.deepEqual(order.slice(0, 6), ['vam-topic-kinds', 'vam-hypothesis-leanings', 'vam-hypothesis-strengths', 'vam-card-search', 'vam-card-search', 'vam-hint'], 'type, leaning, strength, the relation search, then the parent search and its hint (the relations note is a different class)');
   const css = heCss();
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-section-heading'), /margin: 16px 0 8px;[^}]*font-size: var\(--font-ui-small\); font-weight: 600;/);
 });
@@ -3084,7 +3091,7 @@ integrationTest('card settings (ticket 41): the dialog is "This card" with the c
   assert.equal(dom.find(hyp.content, c => c.tag === 'strong' && !(c.cls ?? '').includes('section-heading')).text, 'This card');
   assert.equal(dom.find(hyp.content, c => (c.cls ?? '').includes('vam-inspector-topic')).text, 'HYP', 'the subtitle is the card name');
   const toggles = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-disclosure-toggle'));
-  assert.deepEqual(toggles.map(b => b.text), ['Appearance', 'Layout']);
+  assert.deepEqual(toggles.map(b => b.text), ['Appearance'], 'a root card has no arrangement to choose, so no Layout fold');
   const bodyOf = toggle => toggle.parent.children.find(c => (c.cls ?? '').includes('vam-disclosure-body'));
   for (const toggle of toggles) { assert.equal(toggle.attrs['aria-expanded'], 'false', 'folded at first'); assert.equal(bodyOf(toggle).hidden, true); assert.equal(toggle.attrs['aria-controls'], bodyOf(toggle).id); assert.equal(toggle.tag, 'button', 'a real button: Enter and Space work'); }
   const headingTexts = () => dom.findAll(hyp.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading')).map(c => c.text);
@@ -3092,12 +3099,180 @@ integrationTest('card settings (ticket 41): the dialog is "This card" with the c
   const all = dom.findAll(hyp.content, () => true);
   for (const heading of ['Topic type', 'Strength', 'Relations']) assert.ok(all.indexOf(dom.find(hyp.content, c => c.text === heading)) < firstFold, `${heading} is before the folded groups`);
   for (const heading of ['Markers', 'Links', 'Color', 'Style', 'Topic cover']) assert.ok(dom.findAll(bodyOf(toggles[0]), c => c.text === heading).length, `${heading} is inside Appearance`);
-  for (const heading of ['Parent topic']) assert.ok(dom.findAll(bodyOf(toggles[1]), c => c.text === heading).length, `${heading} is inside Layout`);
-  assert.ok(headingTexts().includes('AI lock') && !dom.findAll(bodyOf(toggles[1]), c => c.text === 'AI lock').length, 'the AI lock is not folded');
+  const parentHeading = dom.find(hyp.content, c => c.text === 'Parent topic');
+  assert.ok(all.indexOf(parentHeading) < firstFold && all.indexOf(dom.find(hyp.content, c => c.text === 'Relations')) < all.indexOf(parentHeading), 'the parent search is after Relations and before the folded groups');
+  assert.equal(dom.findAll(bodyOf(toggles[0]), c => c.text === 'Parent topic').length, 0, 'the parent search is not inside Appearance');
+  assert.ok(headingTexts().includes('AI lock') && !dom.findAll(bodyOf(toggles[0]), c => c.text === 'AI lock').length, 'the AI lock is not folded');
   toggles[0].click(); assert.equal(toggles[0].attrs['aria-expanded'], 'true'); assert.equal(bodyOf(toggles[0]).hidden, false);
   toggles[0].click(); assert.equal(toggles[0].attrs['aria-expanded'], 'false'); assert.equal(bodyOf(toggles[0]).hidden, true);
   assert.equal(JSON.stringify(Object.values(toggles.map(t => t.text))).includes('Structure'), false);
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.doesNotMatch(load('i18n.ts').translate(lang, 'ui.structure_and_links'), /Structure|結構|结构/, lang);
+});
+integrationTest('card dialog search: a card with a parent shows the Layout fold with the branch layout only; the parent search is never inside a fold', () => {
+  const fx = heFixture();
+  fx.view.map.nodes.forEach(n => { n.parentId = null; }); fx.view.map.nodes[1].parentId = 'fact';
+  fx.view.referenceSourcePaths = () => []; fx.view.enqueue = work => work();
+  const content = dom.element('content'), host = dom.element('modal');
+  fx.view.renderInspector(content, fx.view.map.nodes[1], 'structure', () => {}, host);
+  const toggles = dom.findAll(content, c => (c.cls ?? '').includes('vam-disclosure-toggle'));
+  assert.deepEqual(toggles.map(b => b.text), ['Appearance', 'Layout']);
+  const layoutBody = toggles[1].parent.children.find(c => (c.cls ?? '').includes('vam-disclosure-body'));
+  assert.ok(dom.find(layoutBody, c => (c.cls ?? '').includes('vam-branch-layout')), 'Layout holds the branch arrangement');
+  assert.equal(dom.findAll(layoutBody, c => c.text === 'Parent topic').length, 0, 'the parent search moved out of Layout');
+  const groups = dom.findAll(layoutBody, c => (c.cls ?? '').includes('vam-choice-group'));
+  assert.equal(groups.length, 1);
+});
+// ---- card dialog search (2026-11-08): the relation target and the parent topic are search fields ----
+const csParentDialog = ({ parents = {}, locked = false } = {}) => {
+  const topics = [node('a'), node('b'), node('c'), node('d')];
+  const fx = heFixture({ topics, notes: heNotes(topics.map(n => [n.id, {}])) });
+  const { view } = fx;
+  view.map.nodes.forEach(n => { n.parentId = parents[n.id] ?? null; });
+  view.referenceSourcePaths = () => []; view.enqueue = work => work(); view.mergeUnlocked = () => !locked;
+  const moves = []; view.mapChange = async () => { moves.push(1); };
+  const content = dom.element('content'), host = dom.element('modal');
+  view.renderInspector(content, view.map.nodes.find(n => n.id === 'c'), 'structure', () => {}, host);
+  const input = dom.byLabel(content, 'Parent topic'); const suggest = heSuggests.find(s => s.inputEl === input);
+  const type = text => { input.value = text; input.fire('input'); return plain(suggest.getSuggestions(text)); };
+  const status = dom.find(host, c => (c.cls ?? '').includes('vam-next-status'));
+  return { ...fx, content, host, input, suggest, type, moves, status };
+};
+test('card search: the trail of ancestors is finite on a hierarchy that loops and joins titles top-down', () => {
+  const { ancestorTrail } = load('ui/card-search-field.ts', { obsidian });
+  const nodes = [{ id: 'a', parentId: 'b' }, { id: 'b', parentId: 'c' }, { id: 'c', parentId: 'a' }, { id: 'r' }, { id: 'k', parentId: 'r' }, { id: 'x', parentId: 'k' }, { id: 'lost', parentId: 'gone' }];
+  const title = id => id.toUpperCase();
+  assert.deepEqual(plain(ancestorTrail(nodes, 'a', title)), ['C', 'B'], 'a loop stops where it comes back to the start');
+  assert.deepEqual(plain(ancestorTrail(nodes, 'x', title)), ['R', 'K']);
+  assert.deepEqual(plain(ancestorTrail(nodes, 'lost', title)), [], 'a missing parent ends the walk');
+  assert.deepEqual(plain(ancestorTrail([{ id: 's', parentId: 's' }], 's', title)), [], 'a card that is its own parent');
+});
+test('card search: rows match the title ignoring case, keep the root row last, and say when nothing matches', () => {
+  const { buildRows } = load('ui/card-search-field.ts', { obsidian });
+  const sources = [{ id: '1', title: 'Heat Pan', trail: [], enabled: true }, { id: '2', title: 'water', trail: ['Heat Pan'], enabled: false }, { id: '3', title: '原則 A/B & C？', trail: [], enabled: true }];
+  assert.deepEqual(plain(buildRows(sources, 'HEAT', {}).map(r => r.id)), ['1']);
+  assert.deepEqual(plain(buildRows(sources, '  ', {}).map(r => r.id)), ['1', '2', '3'], 'empty text lists every card');
+  assert.deepEqual(plain(buildRows(sources, '原則', {}).map(r => r.id)), ['3']);
+  assert.deepEqual(plain(buildRows(sources, '/b &', {}).map(r => r.id)), ['3'], 'slash, ampersand and full-width marks are plain text, not patterns');
+  const none = plain(buildRows(sources, 'zz', {}));
+  assert.deepEqual(none.map(r => [r.kind, r.title, r.enabled]), [['none', 'No card matches “zz”', false]]);
+  const withRoot = plain(buildRows(sources, 'water', { rootChoice: 'No parent (root topic)', currentId: null }));
+  assert.deepEqual(withRoot.map(r => [r.id, r.kind, r.enabled]), [['2', 'card', false], ['', 'root', true]]);
+  assert.equal(withRoot[1].current, true, 'no parent: the root row is the current one');
+  assert.deepEqual(plain(buildRows(sources, 'zz', { rootChoice: 'R' }).map(r => r.kind)), ['root'], 'the root row stays when nothing matches');
+});
+test('card search: every matching card is listed, however many there are', () => {
+  const { buildRows } = load('ui/card-search-field.ts', { obsidian });
+  const sources = Array.from({ length: 150 }, (_, i) => ({ id: 'c' + i, title: 'Card ' + i, trail: [], enabled: true }));
+  assert.equal(buildRows(sources, '', {}).length, 150);
+  assert.equal(buildRows(sources, 'card', {}).length, 150);
+});
+integrationTest('card search: aria-expanded starts false and follows the list opening and closing', () => {
+  const { input, suggest } = csParentDialog();
+  assert.equal(suggest.limit, 0);
+  assert.equal(input.attrs['aria-expanded'], 'false');
+  suggest.open(); assert.equal(input.attrs['aria-expanded'], 'true');
+  suggest.close(); assert.equal(input.attrs['aria-expanded'], 'false');
+});
+integrationTest('card search (relations): switching the relation type drops a card that was legal only under the old type, and brings it back', () => {
+  const topics = [node('a'), node('b'), node('c')];
+  const relations = [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'c' }];
+  const fx = heFixture({ topics, notes: heNotes(topics.map(n => [n.id, {}])), relations });
+  const panel = dom.element('panel'); fx.view.renderHypothesisSection(panel, fx.view.map.nodes[2]);
+  assert.deepEqual(plain(heTargetIds(panel, 'supports')), ['a'], 'supports from C to A is fine');
+  assert.deepEqual(plain(heTargetIds(panel, 'prerequisite')), [], 'prerequisite C to A would close a loop, so A is gone');
+  assert.equal(heTargetInput(panel).disabled, true);
+  assert.deepEqual(plain(heTargetIds(panel, 'supports')), ['a'], 'and it is back when the type is switched back');
+  assert.equal(heTargetInput(panel).disabled, false);
+});
+integrationTest('card search (relations): typing filters by title with the upper path on the right, no match says so and is not selectable, a row is built with dir=auto and a marked match', async () => {
+  const topics = [node('a'), node('b'), node('c')]; topics[2].parentId = 'b'; topics[1].parentId = 'a';
+  const fx = heFixture({ topics, notes: new Map([['a', { title: 'Install', summary: '', status: 'completed' }], ['b', { title: 'Heat & Pan?', summary: '', status: 'completed' }], ['c', { title: 'heat/water', summary: '', status: 'completed' }]]) });
+  fx.view.enqueue = work => work(); fx.view.mapChange = async change => { change(fx.view.map); };
+  const panel = dom.element('panel'); fx.view.renderHypothesisSection(panel, fx.view.map.nodes[0]);
+  const rows = plain(heTargetRows(panel, 'HEAT'));
+  assert.deepEqual(rows.map(r => [r.title, r.trail]), [['Heat & Pan?', ['Install']], ['heat/water', ['Install', 'Heat & Pan?']]]);
+  const el = dom.element('div'); heTargetSuggest(panel).renderSuggestion(heTargetRows(panel, 'HEAT')[1], el);
+  const title = dom.find(el, c => (c.cls ?? '').includes('vam-card-search-title'));
+  assert.equal(title.attrs.dir, 'auto'); assert.deepEqual(dom.findAll(title, c => c.tag === 'mark').map(m => m.text), ['heat'], 'the typed part is marked');
+  assert.equal(dom.find(el, c => (c.cls ?? '').includes('vam-card-search-trail')).text, 'Install › Heat & Pan?');
+  const none = heTargetRows(panel, 'zzz'); assert.equal(none.length, 1);
+  const noneEl = dom.element('div'); heTargetSuggest(panel).renderSuggestion(none[0], noneEl); assert.equal(noneEl.text, 'No card matches “zzz”'); assert.ok(noneEl.hasClass('is-disabled'));
+  heTargetSuggest(panel).selectSuggestion(none[0], {}); await dom.tick();
+  assert.deepEqual(plain(fx.doc.topicRelations ?? []), [], 'the message row adds nothing');
+});
+integrationTest('card search (relations): choosing a result adds the relation at once, clears the field and repaints; there is no Add button; the anchor link sits below the row', async () => {
+  const fx = heFixture(); fx.view.enqueue = work => work(); fx.view.mapChange = async change => { change(fx.view.map); };
+  fx.view.anchorRelationsEditable = () => true;
+  const panel = dom.element('panel'); fx.view.renderHypothesisSection(panel, fx.view.map.nodes[0]);
+  heTargetInput(panel).value = 'oth';
+  await heAddRelation(panel, 'related', 'other');
+  assert.equal(plain(fx.doc.topicRelations).length, 1);
+  const again = dom.find(panel, c => (c.cls ?? '').includes('vam-relation-add'));
+  assert.equal(dom.findAll(again, c => c.tag === 'button').length, 0, 'the row holds no button at all');
+  const row = dom.find(panel, c => c.cls === 'vam-relation-add'); const anchor = dom.find(panel, c => (c.cls ?? '').includes('vam-relation-add-anchor'));
+  assert.ok(anchor && !dom.contains?.(row, anchor), 'the "point on an image" link follows the row');
+  assert.equal(anchor.parent, row.parent); assert.ok(row.parent.children.indexOf(anchor) > row.parent.children.indexOf(row));
+});
+integrationTest('card search (parent): untyped, focusing lists nothing, so the hierarchy is not expanded (owner exclusion)', () => {
+  const d = csParentDialog({ parents: { c: 'b', b: 'a' } });
+  assert.equal(d.input.value, 'B', 'the field shows the current parent');
+  assert.deepEqual(plain(d.suggest.getSuggestions('B')), [], 'the shown name is not a query');
+  assert.deepEqual(plain(d.suggest.getSuggestions('')), []);
+  d.input.fire('focus');
+  assert.deepEqual(plain(d.suggest.getSuggestions('B')), [], 'focus alone opens nothing');
+  assert.equal(dom.find(d.content, c => String(c.cls ?? '').split(/\s+/).includes('vam-topic-tree')), undefined, 'no tree list is drawn');
+  assert.ok(d.type('b').length > 0, 'typing lists matches');
+  d.input.fire('blur'); assert.deepEqual(plain(d.suggest.getSuggestions('B')), [], 'after leaving, the list is shut again');
+});
+integrationTest('card search (parent): a card that cannot be a parent is greyed and choosing it moves nothing; the last row makes a root topic', () => {
+  const d = csParentDialog({ parents: { c: 'a', d: 'c' } });
+  const rows = d.type('d');
+  assert.deepEqual(rows.map(r => [r.id, r.enabled]), [['d', false], ['', true]], 'its own child would close a loop');
+  const el = dom.element('div'); d.suggest.renderSuggestion(d.suggest.getSuggestions('d')[0], el); assert.ok(el.hasClass('is-disabled'));
+  d.suggest.selectSuggestion(d.suggest.getSuggestions('d')[0], {});
+  assert.deepEqual(d.moves, []); assert.equal(d.status.text, '', 'no message either'); d.input.fire('blur'); assert.equal(d.input.value, 'A', 'leaving the field puts the current parent back');
+  const self = d.type('c'); assert.deepEqual(self.map(r => [r.id, r.enabled]), [['c', false], ['', true]], 'the card itself is greyed too');
+  d.suggest.selectSuggestion(d.suggest.getSuggestions('c').at(-1), {});
+  assert.equal(d.moves.length, 1); assert.equal(d.status.text, 'Now a root topic.'); assert.equal(d.input.value, 'No parent (root topic)');
+});
+integrationTest('card search (parent): while the card is merging, choosing a parent puts the field back and writes nothing', () => {
+  const d = csParentDialog({ parents: { c: 'a' }, locked: true });
+  d.suggest.selectSuggestion(d.type('b')[0], {});
+  assert.deepEqual(d.moves, [], 'Map.md is untouched'); assert.equal(d.input.value, 'A'); assert.equal(d.status.text, '');
+});
+integrationTest('card search (parent): leaving the field without choosing puts the current value back and moves nothing; choosing the same parent writes nothing', () => {
+  const d = csParentDialog({ parents: { c: 'a' } });
+  d.input.value = 'half typed'; d.input.fire('input'); d.input.fire('blur');
+  assert.equal(d.input.value, 'A'); assert.deepEqual(d.moves, []);
+  d.suggest.selectSuggestion(plain(d.type('a')).length ? d.suggest.getSuggestions('a')[0] : null, {});
+  assert.deepEqual(d.moves, [], 'the parent it already has'); assert.equal(d.input.value, 'A');
+});
+integrationTest('card search: Enter that picks a composed character does not choose a row; the row is chosen after the composition ends', () => {
+  const d = csParentDialog({ parents: { c: 'a' } });
+  d.input.dispatchEvent = event => d.input.fire(event.type);
+  const rows = () => d.suggest.getSuggestions('b');
+  d.input.value = 'b'; d.input.fire('compositionstart'); d.input.fire('input');
+  assert.deepEqual(plain(rows()), [], 'while composing nothing is listed yet');
+  d.suggest.selectSuggestion({ kind: 'card', id: 'b', title: 'B', trail: [], enabled: true }, { isComposing: true });
+  assert.deepEqual(d.moves, [], 'selecting during the composition does nothing');
+  d.input.fire('compositionend');
+  assert.ok(rows().some(r => r.id === 'b'), 'after the composition the typed text is a query');
+  d.suggest.selectSuggestion({ kind: 'card', id: 'b', title: 'B', trail: [], enabled: true }, { isComposing: true });
+  assert.deepEqual(d.moves, [], 'a key event that is still a composition key does nothing');
+  d.suggest.selectSuggestion({ kind: 'card', id: 'b', title: 'B', trail: [], enabled: true }, {});
+  assert.equal(d.moves.length, 1);
+});
+integrationTest('card search: texts exist in all three languages, the old picker texts are gone, and the layout rules keep six types and the branch layout on one row', () => {
+  const { translate } = load('i18n.ts');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) for (const key of ['ui.relation_search_placeholder', 'ui.parent_search_placeholder', 'ui.card_search_no_match_0', 'ui.card_search_current']) assert.notEqual(translate(lang, key, 'x'), key, `${lang} ${key}`);
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) { const src = fs.readFileSync(path.join(root, 'i18n', `${lang}.ts`), 'utf8'); for (const gone of ['relation_pick' + '_card', 'relation_add' + '_submit']) assert.equal(src.includes('ui.' + gone), false, `${lang} ${gone}`); }
+  const css = heCss();
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.vam-topic-kinds'), /repeat\(6, minmax\(0, 1fr\)\)/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.vam-branch-layout'), /grid-auto-flow: column/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.vam-topic-kinds button, .vam-topic-modal .vam-choice-group.vam-branch-layout button'), /white-space: normal/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.vam-topic-kinds button, .vam-topic-modal .vam-choice-group.vam-branch-layout button'), /height: auto/);
+  assert.match(heRuleBody(css, '.vam-topic-modal button.vam-relation-add-anchor'), /background: transparent/);
+  assert.match(heRuleBody(css, '.vam-topic-modal button.vam-relation-add-anchor:focus-visible'), /outline: 2px solid/);
 });
 integrationTest('card settings (ticket 41): the AI lock row names the state it is in and the text follows a switch', async () => {
   const fx = heDialog({}, 0);

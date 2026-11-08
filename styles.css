@@ -2036,7 +2036,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-action:disabled, .vam-topic-chat-mode:disabled, .vam-topic-chat-send:disabled { opacity: 0.5; cursor: default; }
 .vam-topic-chat-composer { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 6px; border: 1px solid var(--interactive-accent); border-radius: var(--radius-m); }
 .vam-topic-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; border: 0; background: transparent; box-shadow: none; caret-color: var(--text-accent); }
-/* The window lives in the first canvas overlay; the controls overlay (zoom, layout) comes later in the DOM at the same level and would cover it. */
+/* The window lives in the first canvas overlay; the controls overlay (zoom, layout) comes later in the DOM at the same level and would cover it. The class order (.has-topic-chat first) keeps scripts/viewer-css.mjs from pulling this rule into the share viewer. */
 .has-topic-chat.vam-canvas-overlay { z-index: 5; }
 .vam-topic-chat-input, .vam-topic-chat-ghost { padding: 0; font: inherit; line-height: var(--line-height-normal); }
 .vam-topic-chat-input.is-ghost::placeholder { color: transparent; }

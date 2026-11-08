@@ -2067,8 +2067,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-mode-toggle svg, .vam-topic-chat-send svg { width: 13px; height: 13px; }
 .vam-topic-chat-mode-menu { position: absolute; bottom: calc(100% + 4px); left: 0; z-index: 1; box-sizing: border-box; width: 92px; display: flex; flex-direction: column; padding: 2px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }
 .vam-topic-chat-mode-menu[hidden] { display: none; }
-.vam-topic-chat-mode { height: 26px; padding: 0 6px; display: flex; align-items: center; gap: 6px; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-smaller); cursor: pointer; }
-.vam-topic-chat-mode:hover, .vam-topic-chat-mode:focus-visible { background: var(--background-modifier-hover); }
+.vam-topic-chat-mode-menu button.vam-topic-chat-mode { height: 26px; padding: 0 6px; display: flex; align-items: center; gap: 6px; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-smaller); cursor: pointer; }
+.vam-topic-chat-mode-menu button.vam-topic-chat-mode:hover, .vam-topic-chat-mode-menu button.vam-topic-chat-mode:focus-visible { background: var(--background-modifier-hover); }
 .vam-topic-chat-mode-icon svg, .vam-topic-chat-mode-check svg { width: 13px; height: 13px; }
 .vam-topic-chat-mode-label { flex: 1 1 auto; text-align: left; }
 .vam-topic-chat-mode-check { visibility: hidden; display: inline-flex; color: var(--text-accent); }

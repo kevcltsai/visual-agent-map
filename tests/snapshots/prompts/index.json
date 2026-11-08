@@ -1971,6 +1971,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.synthesize-standard.en": {
+      "builder": "AiTaskService instructions: mode synthesize, Standard (web research), visual off",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-standard.zh": {
+      "builder": "AiTaskService instructions: mode synthesize, Standard (web research), visual off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-standard.zh-CN": {
+      "builder": "AiTaskService instructions: mode synthesize, Standard (web research), visual off",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.synthesize-style-file-callout-map.en.1": {
       "builder": "AiTaskService instructions: mode synthesize with a note style file that remaps callouts",
       "language": "en",

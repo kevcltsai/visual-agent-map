@@ -49864,10 +49864,10 @@ var StructureReviewModal = class extends import_obsidian30.Modal {
     if (this.host.initial) (_c = (_b2 = this.host).consumed) == null ? void 0 : _c.call(_b2);
   }
   targets() {
-    return this.entries.filter((entry) => !entry.applied && !this.host.staleReason(entry.suggestion)).flatMap(({ suggestion }) => [
-      suggestion.targetId,
-      ...suggestion.newParentId ? [suggestion.newParentId] : [],
-      ...suggestion.mergeIntoId ? [suggestion.mergeIntoId] : []
+    return this.entries.filter((entry) => !entry.applied && !this.host.staleReason(entry.suggestion)).flatMap(({ suggestion: suggestion2 }) => [
+      suggestion2.targetId,
+      ...suggestion2.newParentId ? [suggestion2.newParentId] : [],
+      ...suggestion2.mergeIntoId ? [suggestion2.mergeIntoId] : []
     ]);
   }
   showSuggestions(parent, review) {
@@ -49879,21 +49879,21 @@ var StructureReviewModal = class extends import_obsidian30.Modal {
       return;
     }
     parent.createEl("p", { cls: "vam-hint", text: t("ui.structure_review_apply_hint") });
-    this.entries = review.suggestions.map((suggestion) => ({ suggestion, applied: false }));
+    this.entries = review.suggestions.map((suggestion2) => ({ suggestion: suggestion2, applied: false }));
     const refreshers = [];
     const refreshAll = () => {
       for (const refresh of refreshers) refresh();
       this.host.highlight(this.targets());
     };
-    const items = review.suggestions.map((suggestion) => {
+    const items = review.suggestions.map((suggestion2) => {
       var _a2;
-      const destination = suggestion.kind === "strengthen" ? suggestion.targetId : suggestion.kind === "move" ? suggestion.newParentId : suggestion.kind === "merge" ? suggestion.mergeIntoId : void 0;
+      const destination = suggestion2.kind === "strengthen" ? suggestion2.targetId : suggestion2.kind === "move" ? suggestion2.newParentId : suggestion2.kind === "merge" ? suggestion2.mergeIntoId : void 0;
       return {
-        kind: KIND[suggestion.kind],
-        title: suggestion.kind === "strengthen" ? (_a2 = suggestion.title) != null ? _a2 : "" : this.host.titleOf(suggestion.targetId),
+        kind: KIND[suggestion2.kind],
+        title: suggestion2.kind === "strengthen" ? (_a2 = suggestion2.title) != null ? _a2 : "" : this.host.titleOf(suggestion2.targetId),
         task: "",
         contribution: "",
-        reason: suggestion.reason,
+        reason: suggestion2.reason,
         ...destination ? { destination: this.host.titleOf(destination) } : {}
       };
     });
@@ -50197,17 +50197,17 @@ function parseStructureReview(raw, tree, language2 = "en") {
   });
   return { suggestions, rejected };
 }
-function isSuggestionStale(suggestion, currentTree) {
+function isSuggestionStale(suggestion2, currentTree) {
   const byId = new Map(currentTree.map((node) => [node.id, node]));
-  const target = byId.get(suggestion.targetId);
+  const target = byId.get(suggestion2.targetId);
   if (!target) return true;
-  if (target.parentId !== suggestion.basis.targetParentId) return true;
-  if (clip3(target.title, TITLE_LIMIT2) !== suggestion.basis.targetTitle) return true;
-  if (suggestion.kind === "move" || suggestion.kind === "merge") {
-    const destinationId = suggestion.kind === "move" ? suggestion.newParentId : suggestion.mergeIntoId;
+  if (target.parentId !== suggestion2.basis.targetParentId) return true;
+  if (clip3(target.title, TITLE_LIMIT2) !== suggestion2.basis.targetTitle) return true;
+  if (suggestion2.kind === "move" || suggestion2.kind === "merge") {
+    const destinationId = suggestion2.kind === "move" ? suggestion2.newParentId : suggestion2.mergeIntoId;
     if (!destinationId || !byId.has(destinationId)) return true;
     if (destinationId === target.id || descendantIds(currentTree, target.id).has(destinationId)) return true;
-    if (suggestion.kind === "move" && target.parentId === destinationId) return true;
+    if (suggestion2.kind === "move" && target.parentId === destinationId) return true;
   }
   return false;
 }
@@ -50487,27 +50487,27 @@ function parseGoalRecommend(raw, request) {
   body.suggestions.forEach((entry, index) => {
     const where = `suggestion #${index + 1}`;
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw invalid3(locale, where);
-    const suggestion = entry;
-    const keys = Object.keys(suggestion);
+    const suggestion2 = entry;
+    const keys = Object.keys(suggestion2);
     if (keys.length !== 4 || !["parentId", "title", "summary", "suggestedTier"].every((key5) => keys.includes(key5)))
       throw invalid3(locale, `${where} keys`);
-    if (typeof suggestion.parentId !== "string") throw invalid3(locale, `${where} parentId`);
-    if (typeof suggestion.title !== "string") throw invalid3(locale, `${where} title`);
-    if (typeof suggestion.summary !== "string") throw invalid3(locale, `${where} summary`);
-    const suggestedTier = suggestion.suggestedTier;
+    if (typeof suggestion2.parentId !== "string") throw invalid3(locale, `${where} parentId`);
+    if (typeof suggestion2.title !== "string") throw invalid3(locale, `${where} title`);
+    if (typeof suggestion2.summary !== "string") throw invalid3(locale, `${where} summary`);
+    const suggestedTier = suggestion2.suggestedTier;
     if (typeof suggestedTier !== "string" || !GOAL_RECOMMEND_TIERS.includes(suggestedTier))
       throw invalid3(locale, `${where} suggestedTier`);
     const drop = (code) => {
       dropped.push({ index, code });
     };
-    const parentId = ids.real(suggestion.parentId.trim());
+    const parentId = ids.real(suggestion2.parentId.trim());
     if (parentId === void 0) return drop("unknown_parent");
-    const title = suggestion.title.trim();
+    const title = suggestion2.title.trim();
     if (!title) return drop("empty_title");
     if ([...title].length > GOAL_RECOMMEND_TITLE_LIMIT || /[\r\n]/.test(title)) return drop("title_too_long");
     const key4 = goalRecommendTitleKey(title);
     if (taken.has(key4)) return drop("duplicate_title");
-    const summary = sanitizeGeneratedTitle(suggestion.summary.replace(/\s+/g, " ").trim()).trim();
+    const summary = sanitizeGeneratedTitle(suggestion2.summary.replace(/\s+/g, " ").trim()).trim();
     if (!summary) return drop("empty_summary");
     if (suggestedTier === "side") return drop("side_tier");
     taken.add(key4);
@@ -50745,6 +50745,242 @@ var TopicTreeModal = class extends import_obsidian31.Modal {
     const cancel = modalActions(this).createEl("button", { text: t("ui.cancel") });
     cancel.addEventListener("click", () => this.close());
     cancel.focus();
+  }
+};
+
+// experiences/visual-map/topic-chat.ts
+var KINDS2 = ["research", "expand", "synthesize"];
+var WIDTH_FALLBACK = 340;
+var NARROW_AREA = 360;
+var GAP = 8;
+function kindLabel(kind) {
+  return t(`ui.topic_chat_${kind}`);
+}
+function suggestion(kind) {
+  return t(`ui.topic_chat_suggest_${kind}`);
+}
+var TopicChatWindow = class {
+  constructor(host, opener, parent) {
+    this.host = host;
+    this.opener = opener;
+    __publicField(this, "el");
+    __publicField(this, "logEl");
+    __publicField(this, "inputEl");
+    __publicField(this, "sendEl");
+    __publicField(this, "tabEl");
+    __publicField(this, "modeHintEl");
+    __publicField(this, "kindEls", /* @__PURE__ */ new Map());
+    __publicField(this, "modeEls", /* @__PURE__ */ new Map());
+    __publicField(this, "cleanups", []);
+    __publicField(this, "submitting", false);
+    __publicField(this, "destroyed", false);
+    this.el = parent.createDiv({ cls: "vam-topic-chat" });
+    this.el.setAttr("role", "dialog");
+    this.el.setAttr("aria-label", t("ui.topic_chat_label_0", host.topicTitle()));
+    const head = this.el.createDiv("vam-topic-chat-head");
+    head.createSpan({ cls: "vam-topic-chat-title", text: host.topicTitle() });
+    const close = head.createEl("button", {
+      cls: "vam-topic-chat-close clickable-icon",
+      text: "\xD7",
+      attr: { type: "button", "aria-label": t("ui.topic_chat_close") }
+    });
+    this.on(close, "click", () => this.requestClose());
+    this.logEl = this.el.createDiv("vam-topic-chat-log");
+    const actions = this.el.createDiv("vam-topic-chat-actions");
+    for (const kind of KINDS2) {
+      const button = actions.createEl("button", {
+        cls: "vam-topic-chat-action",
+        text: kindLabel(kind),
+        attr: { type: "button", "aria-pressed": "false" }
+      });
+      this.kindEls.set(kind, button);
+      this.on(button, "click", () => this.pickKind(kind));
+    }
+    const composer = this.el.createDiv("vam-topic-chat-composer");
+    this.inputEl = composer.createEl("textarea", {
+      cls: "vam-topic-chat-input",
+      attr: { rows: "3", "aria-label": t("ui.topic_chat_label_0", host.topicTitle()) }
+    });
+    this.on(this.inputEl, "input", () => this.typed());
+    this.on(this.inputEl, "keydown", (event) => this.keydown(event));
+    this.tabEl = composer.createSpan({ cls: "vam-topic-chat-tab", text: t("ui.topic_chat_tab_adopt") });
+    this.tabEl.hidden = true;
+    const foot = composer.createDiv("vam-topic-chat-foot");
+    const modes = foot.createDiv({
+      cls: "vam-topic-chat-modes",
+      attr: { role: "group", "aria-label": t("ui.ai_mode") }
+    });
+    for (const mode of ["quick", "standard"]) {
+      const button = modes.createEl("button", {
+        cls: "vam-topic-chat-mode",
+        text: mode === "quick" ? t("ui.quick") : t("ui.standard"),
+        attr: { type: "button", "aria-pressed": "false" }
+      });
+      this.modeEls.set(mode, button);
+      this.on(button, "click", () => {
+        if (this.host.session().running) return;
+        this.host.setMode(mode);
+      });
+    }
+    this.sendEl = foot.createEl("button", {
+      cls: "vam-topic-chat-send",
+      text: "\u2191",
+      attr: { type: "button", "aria-label": t("ui.topic_chat_send") }
+    });
+    this.on(this.sendEl, "click", () => void this.send());
+    this.modeHintEl = composer.createDiv({
+      cls: "vam-topic-chat-mode-hint",
+      attr: { "aria-live": "polite" }
+    });
+    this.on(this.el, "keydown", (event) => {
+      var _a2, _b2;
+      if (event.key !== "Escape") return;
+      (_a2 = event.preventDefault) == null ? void 0 : _a2.call(event);
+      (_b2 = event.stopPropagation) == null ? void 0 : _b2.call(event);
+      this.requestClose();
+    });
+    this.cleanups.push(host.subscribe(() => this.refresh()));
+    const draft = host.session();
+    this.inputEl.value = draft.draftText;
+    this.refresh();
+  }
+  /** Puts the window in `parent` (again, after a repaint), places it and, unless `focus` is false, moves the focus to the input. */
+  mount(parent, focus = true) {
+    if (!parent.contains(this.el)) parent.appendChild(this.el);
+    this.reposition();
+    if (focus) this.inputEl.focus();
+  }
+  /** Right of the card when it fits, else left; a narrow canvas puts the window at the bottom. Missing geometry leaves it as is. */
+  reposition() {
+    if (this.destroyed) return;
+    const anchor = this.host.anchor();
+    if (!anchor) return;
+    const { card, area } = anchor;
+    const areaWidth = area.right - area.left;
+    const areaHeight = area.bottom - area.top;
+    if (!(areaWidth > 0)) return;
+    if (areaWidth < NARROW_AREA) {
+      this.el.addClass("is-bottom");
+      this.el.setCssProps({ left: "0px", top: "" });
+      return;
+    }
+    this.el.removeClass("is-bottom");
+    const width = this.el.offsetWidth || WIDTH_FALLBACK;
+    const height = this.el.offsetHeight || 0;
+    let left = card.right - area.left + GAP;
+    if (left + width > areaWidth) left = card.left - area.left - width - GAP;
+    left = Math.max(0, Math.min(left, areaWidth - width));
+    let top = card.top - area.top;
+    if (areaHeight > 0) top = Math.max(0, Math.min(top, areaHeight - height));
+    this.el.setCssProps({ left: `${left}px`, top: `${top}px` });
+  }
+  /** Releases every listener and removes the window. Does not tell the host. */
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    for (const cleanup of this.cleanups.splice(0)) cleanup();
+    this.el.remove();
+  }
+  on(target, name2, handler) {
+    target.addEventListener(name2, handler);
+    this.cleanups.push(() => target.removeEventListener(name2, handler));
+  }
+  requestClose() {
+    var _a2;
+    this.host.close();
+    (_a2 = this.opener) == null ? void 0 : _a2.focus();
+  }
+  pickKind(kind) {
+    if (this.host.session().running) return;
+    this.inputEl.value = "";
+    this.host.setDraft(kind, "");
+    this.refresh();
+    this.inputEl.focus();
+  }
+  typed() {
+    const { draftKind } = this.host.session();
+    this.host.setDraft(draftKind, this.inputEl.value);
+    this.refresh();
+  }
+  keydown(event) {
+    if (event.key === "Tab" && !event.shiftKey) {
+      const { draftKind, running } = this.host.session();
+      if (draftKind && !running && this.inputEl.value === "") {
+        event.preventDefault();
+        this.inputEl.value = suggestion(draftKind);
+        this.host.setDraft(draftKind, this.inputEl.value);
+        this.refresh();
+      }
+      return;
+    }
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      void this.send();
+    }
+  }
+  canSend() {
+    const session = this.host.session();
+    return !this.submitting && !session.running && !!session.draftKind && this.inputEl.value.trim() !== "";
+  }
+  async send() {
+    if (!this.canSend()) return;
+    const kind = this.host.session().draftKind;
+    if (!kind) return;
+    const text12 = this.inputEl.value.trim();
+    this.submitting = true;
+    this.refresh();
+    let started = false;
+    try {
+      started = await this.host.submit(kind, text12);
+    } finally {
+      this.submitting = false;
+    }
+    if (this.destroyed) return;
+    if (started) {
+      this.inputEl.value = "";
+      this.host.setDraft(null, "");
+    }
+    this.refresh();
+  }
+  /** Repaints everything from the session; cheap enough to run on every change. */
+  refresh() {
+    if (this.destroyed) return;
+    const session = this.host.session();
+    const busy = session.running || this.submitting;
+    const empty = this.inputEl.value === "";
+    for (const [kind, button] of this.kindEls) {
+      button.setAttr("aria-pressed", String(session.draftKind === kind));
+      button.toggleClass("is-active", session.draftKind === kind);
+      button.disabled = busy;
+    }
+    for (const [mode, button] of this.modeEls) {
+      button.setAttr("aria-pressed", String(session.mode === mode));
+      button.toggleClass("is-active", session.mode === mode);
+      button.disabled = session.running;
+    }
+    this.modeHintEl.setText(
+      session.mode === "quick" ? t("ui.topic_chat_mode_quick_hint") : t("ui.topic_chat_mode_standard_hint")
+    );
+    const ghost = session.draftKind && empty ? suggestion(session.draftKind) : "";
+    this.inputEl.setAttr("placeholder", ghost || t("ui.topic_chat_placeholder"));
+    this.tabEl.hidden = !ghost || busy;
+    this.sendEl.disabled = !this.canSend();
+    this.paintLog(session);
+  }
+  paintLog(session) {
+    this.logEl.empty();
+    for (const turn of session.turns) {
+      const row = this.logEl.createDiv({
+        cls: turn.role === "user" ? "vam-topic-chat-msg is-me" : "vam-topic-chat-msg"
+      });
+      const who = turn.role === "user" ? t("ui.topic_chat_you_0", turn.kind ? kindLabel(turn.kind) : "") : t("ui.map_chat_role_ai");
+      row.createSpan({ cls: "vam-topic-chat-who", text: who });
+      row.createSpan({ cls: "vam-topic-chat-text", text: turn.text });
+    }
+    if (session.running) {
+      this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running", text: t("ui.topic_chat_running") });
+    }
+    this.logEl.scrollTop = this.logEl.scrollHeight;
   }
 };
 
@@ -57664,6 +57900,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "startingTasks", /* @__PURE__ */ new Map());
     /** Keys in `startingTasks` whose run is an expansion (its Stop reads "Stop expanding"). */
     __publicField(this, "startingExpand", /* @__PURE__ */ new Set());
+    /** Topic chat conversations by topic id: they outlive the small window (a task goes on when it is closed). */
+    __publicField(this, "topicChatSessions", /* @__PURE__ */ new Map());
+    /** The one topic chat window that is open (not whether it is attached: a repaint takes it out for a moment). */
+    __publicField(this, "topicChatOpen", null);
     __publicField(this, "disclosureSeq", 0);
     /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
     __publicField(this, "quickOutlines", /* @__PURE__ */ new Map());
@@ -59185,6 +59425,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     this.closeTopicLinkMenu();
     this.closed = true;
+    this.closeTopicChatWindow();
+    this.topicChatSessions.clear();
     this.closeMapSearch(false);
     this.exitPresentation(false);
     this.cancelLinking(false);
@@ -60177,15 +60419,15 @@ ${request.requirements}` : preset.text,
     const tree = () => this.path === mapPath && this.map ? buildStructureReviewNodes(this.map.nodes, (id) => this.describeForReview(id), scopeId) : [];
     const nodes = tree();
     const rootQuestion = scopeId ? (_b2 = (_a2 = this.describeForReview(scopeId)) == null ? void 0 : _a2.title) != null ? _b2 : "" : this.map.title;
-    const staleReason = (suggestion) => {
+    const staleReason = (suggestion2) => {
       var _a3;
       const current = tree();
-      if (!isSuggestionStale(suggestion, current)) return null;
+      if (!isSuggestionStale(suggestion2, current)) return null;
       const byId = new Map(current.map((item) => [item.id, item]));
-      const target = byId.get(suggestion.targetId);
-      const destination = (_a3 = suggestion.newParentId) != null ? _a3 : suggestion.mergeIntoId;
+      const target = byId.get(suggestion2.targetId);
+      const destination = (_a3 = suggestion2.newParentId) != null ? _a3 : suggestion2.mergeIntoId;
       if (!target || destination && !byId.has(destination)) return t("ui.structure_review_stale_missing");
-      if (target.title !== suggestion.basis.targetTitle || target.parentId !== suggestion.basis.targetParentId)
+      if (target.title !== suggestion2.basis.targetTitle || target.parentId !== suggestion2.basis.targetParentId)
         return t("ui.structure_review_stale_changed");
       return t("ui.structure_review_stale_structure");
     };
@@ -60196,7 +60438,7 @@ ${request.requirements}` : preset.text,
         return (_b3 = (_a3 = this.describeForReview(id)) == null ? void 0 : _a3.title) != null ? _b3 : "";
       },
       staleReason,
-      apply: (suggestion, title) => this.applyStructureSuggestion(suggestion, title, staleReason),
+      apply: (suggestion2, title) => this.applyStructureSuggestion(suggestion2, title, staleReason),
       highlight: (ids) => this.highlightStructure(ids),
       ...extra
     }).open();
@@ -61721,16 +61963,16 @@ ${request.requirements}` : preset.text,
    * Applies one structure suggestion as one undo step, after checking again that it still fits the map. Remove and
    * merge go through the delete confirmation; resolves false when it is cancelled.
    */
-  applyStructureSuggestion(suggestion, title, staleReason) {
+  applyStructureSuggestion(suggestion2, title, staleReason) {
     const guard = () => {
-      const reason = staleReason(suggestion);
+      const reason = staleReason(suggestion2);
       if (reason) throw new Error(reason);
-      const touched = [suggestion.targetId, suggestion.newParentId, suggestion.mergeIntoId];
+      const touched = [suggestion2.targetId, suggestion2.newParentId, suggestion2.mergeIntoId];
       if (touched.some((id) => !!id && this.isMerging(id))) {
         new import_obsidian37.Notice(t("ui.merge_locked"));
         throw new Error(t("ui.merge_locked"));
       }
-      if (this.structureLockReason(suggestion)) throw new Error(t("ui.ai_locked_notice"));
+      if (this.structureLockReason(suggestion2)) throw new Error(t("ui.ai_locked_notice"));
     };
     const nodeOf = (id) => {
       var _a2;
@@ -61745,15 +61987,15 @@ ${request.requirements}` : preset.text,
     }
     const write = (work) => this.plugin.mutate(async () => {
       guard();
-      if (this.structureLockReason(suggestion, await this.freshNotes())) throw new Error(t("ui.ai_locked_notice"));
+      if (this.structureLockReason(suggestion2, await this.freshNotes())) throw new Error(t("ui.ai_locked_notice"));
       await work();
     });
-    if (suggestion.kind === "strengthen")
-      return write(() => this.addNode(nodeOf(suggestion.targetId), title)).then(() => true);
-    if (suggestion.kind === "move")
+    if (suggestion2.kind === "strengthen")
+      return write(() => this.addNode(nodeOf(suggestion2.targetId), title)).then(() => true);
+    if (suggestion2.kind === "move")
       return write(() => {
         var _a2;
-        return this.moveTopic(nodeOf(suggestion.targetId), nodeOf((_a2 = suggestion.newParentId) != null ? _a2 : ""));
+        return this.moveTopic(nodeOf(suggestion2.targetId), nodeOf((_a2 = suggestion2.newParentId) != null ? _a2 : ""));
       }).then(
         () => true
       );
@@ -61762,12 +62004,12 @@ ${request.requirements}` : preset.text,
       const run = (work) => {
         write(work).then(() => resolve(true), reject2);
       };
-      const node = nodeOf(suggestion.targetId);
-      if (suggestion.kind === "reduce") {
+      const node = nodeOf(suggestion2.targetId);
+      if (suggestion2.kind === "reduce") {
         this.confirmRemoveNode(node, { run, dismissed: () => resolve(false) });
         return;
       }
-      const into = nodeOf((_a2 = suggestion.mergeIntoId) != null ? _a2 : "");
+      const into = nodeOf((_a2 = suggestion2.mergeIntoId) != null ? _a2 : "");
       const name2 = (item) => {
         var _a3, _b2;
         return (_b2 = (_a3 = this.describeForReview(item.id)) == null ? void 0 : _a3.title) != null ? _b2 : item.path;
@@ -61788,22 +62030,22 @@ ${request.requirements}` : preset.text,
     });
   }
   /** Why a structure suggestion may not be applied (AI lock), or null: what it adds, moves or removes, and where. */
-  structureLockReason(suggestion, fresh) {
+  structureLockReason(suggestion2, fresh) {
     var _a2, _b2;
-    switch (suggestion.kind) {
+    switch (suggestion2.kind) {
       case "strengthen":
-        return this.aiLockReason("addChild", [suggestion.targetId], fresh);
+        return this.aiLockReason("addChild", [suggestion2.targetId], fresh);
       case "move":
-        return this.aiLockReason("move", [suggestion.targetId], fresh, { to: (_a2 = suggestion.newParentId) != null ? _a2 : null });
+        return this.aiLockReason("move", [suggestion2.targetId], fresh, { to: (_a2 = suggestion2.newParentId) != null ? _a2 : null });
       case "reduce":
-        return this.aiLockReason("remove", [suggestion.targetId], fresh);
+        return this.aiLockReason("remove", [suggestion2.targetId], fresh);
       default:
-        return (_b2 = this.aiLockReason("remove", [suggestion.targetId], fresh)) != null ? _b2 : suggestion.mergeIntoId ? this.aiLockReason("addChild", [suggestion.mergeIntoId], fresh) : null;
+        return (_b2 = this.aiLockReason("remove", [suggestion2.targetId], fresh)) != null ? _b2 : suggestion2.mergeIntoId ? this.aiLockReason("addChild", [suggestion2.mergeIntoId], fresh) : null;
     }
   }
   /** The review without the suggestions that touch a locked topic, and how many were dropped. */
   dropAiLockedSuggestions(result) {
-    const suggestions = result.suggestions.filter((suggestion) => !this.structureLockReason(suggestion));
+    const suggestions = result.suggestions.filter((suggestion2) => !this.structureLockReason(suggestion2));
     return { kept: { ...result, suggestions }, skipped: result.suggestions.length - suggestions.length };
   }
   /** Moves one topic and its branch under a new parent, in one undo step. */
@@ -66971,7 +67213,7 @@ ${request.requirements}` : preset.text,
         (item) => item.setTitle(title).setIcon(icon).onClick(() => this.whenEditing(action))
       );
     };
-    add(t("ui.ai_explore"), "sparkles", () => this.openNextStep(node));
+    if (!this.aimLive()) add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
     add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
     add(
       t("ui.card_menu_add_sibling"),
@@ -68681,7 +68923,7 @@ ${request.requirements}` : preset.text,
           })
         );
       case "ai-explore":
-        return run(editable && !!selected, () => this.openNextStep(selected));
+        return run(editable && !!selected, () => this.openTopicChat(selected));
       case "rename":
         return run(editable && !!note, () => this.startCardTitleEdit(selected, { select: true }));
       case "open-details":
@@ -69042,6 +69284,7 @@ ${request.requirements}` : preset.text,
     const keepMapFocus = this.holdMapFocus();
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
+    const topicChatHeld = this.detachTopicChat();
     const restoreSearch = this.holdMapSearch();
     this.captureGoalEdit();
     (_i = this.mapSourcesPanelCleanup) == null ? void 0 : _i.call(this);
@@ -69442,6 +69685,7 @@ ${request.requirements}` : preset.text,
     this.drawEdges();
     restoreRelevanceFocus();
     restoreChatFocus();
+    this.remountTopicChat(topicChatHeld);
     keepMapFocus();
     this.focusInlineName();
     this.focusInlineSummary();
@@ -69871,7 +70115,7 @@ ${request.requirements}` : preset.text,
       }
     }
     if (!this.selection.state.multiSelectMode && !this.aimLive())
-      this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openNextStep(node))).addClass(
+      this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openTopicChat(node))).addClass(
         "vam-node-tool",
         "vam-ai-explore"
       );
@@ -71274,6 +71518,287 @@ ${request.requirements}` : preset.text,
       }
     };
   }
+  // ---- Topic chat (the small window next to a card) ------------------------------------------------------------
+  topicChatEntry(node) {
+    var _a2, _b2;
+    const map = this.map;
+    const existing = this.topicChatSessions.get(node.id);
+    if (existing && existing.mapId === (map == null ? void 0 : map.id)) return existing;
+    const entry = {
+      nodeId: node.id,
+      mapId: (_a2 = map == null ? void 0 : map.id) != null ? _a2 : "",
+      mapPath: this.path,
+      session: { turns: [], mode: (_b2 = map == null ? void 0 : map.aiMode) != null ? _b2 : DEFAULT_MAP_AI_MODE, running: false, draftKind: null, draftText: "" },
+      watchers: /* @__PURE__ */ new Set()
+    };
+    this.topicChatSessions.set(node.id, entry);
+    return entry;
+  }
+  notifyTopicChat(entry) {
+    for (const watcher of [...entry.watchers]) watcher();
+  }
+  /** Opens the topic's chat next to its card; one window at a time (opening another closes this one, its task goes on). */
+  openTopicChat(node, opener) {
+    var _a2, _b2, _c;
+    if (this.closed || !this.map || this.notesLoading() || this.presentation || this.aimLive()) return;
+    if (this.aiLockReason("write", [node.id])) {
+      new import_obsidian37.Notice(t("ui.ai_locked_notice"));
+      return;
+    }
+    if (((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry.nodeId) === node.id && this.topicChatOpen.entry.mapId === this.map.id) return;
+    const overlay = (_c = (_b2 = this.contentEl) == null ? void 0 : _b2.querySelector) == null ? void 0 : _c.call(_b2, ".vam-canvas-overlay");
+    if (!overlay) return;
+    this.closeTopicChatWindow();
+    const entry = this.topicChatEntry(node);
+    const win = new TopicChatWindow(this.topicChatHost(entry), opener != null ? opener : null, overlay);
+    this.topicChatOpen = { entry, win };
+    win.mount(overlay);
+  }
+  closeTopicChatWindow() {
+    const open = this.topicChatOpen;
+    this.topicChatOpen = null;
+    open == null ? void 0 : open.win.destroy();
+  }
+  /** Before a repaint: takes the window out of the page; true when it held the focus. */
+  detachTopicChat() {
+    var _a2, _b2, _c, _d, _e;
+    const open = this.topicChatOpen;
+    if (!open) return false;
+    const active = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.activeElement) != null ? _c : null;
+    const held = !!active && !!((_e = (_d = open.win.el).contains) == null ? void 0 : _e.call(_d, active));
+    open.win.el.remove();
+    return held;
+  }
+  /** After a repaint: puts the window back next to its card, or closes it when its card or map is gone. */
+  remountTopicChat(held) {
+    var _a2, _b2;
+    const open = this.topicChatOpen;
+    if (!open) return;
+    const map = this.map;
+    if (!map || map.id !== open.entry.mapId || this.aimLive() || !map.nodes.some((n) => n.id === open.entry.nodeId)) {
+      this.closeTopicChatWindow();
+      return;
+    }
+    const overlay = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-canvas-overlay");
+    if (overlay) open.win.mount(overlay, held);
+  }
+  topicChatHost(entry) {
+    const node = () => {
+      var _a2;
+      return (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === entry.nodeId);
+    };
+    return {
+      topicTitle: () => {
+        var _a2, _b2, _c, _d;
+        return (_d = (_c = (_a2 = this.notes.get(entry.nodeId)) == null ? void 0 : _a2.title) != null ? _c : (_b2 = node()) == null ? void 0 : _b2.path) != null ? _d : "";
+      },
+      anchor: () => {
+        var _a2, _b2;
+        const card = this.cardEls.get(entry.nodeId);
+        const overlay = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-canvas-overlay");
+        if (!(card == null ? void 0 : card.getBoundingClientRect) || !(overlay == null ? void 0 : overlay.getBoundingClientRect)) return null;
+        return { card: card.getBoundingClientRect(), area: overlay.getBoundingClientRect() };
+      },
+      session: () => entry.session,
+      subscribe: (changed) => {
+        entry.watchers.add(changed);
+        return () => {
+          entry.watchers.delete(changed);
+        };
+      },
+      setMode: (mode) => {
+        if (entry.session.running) return;
+        entry.session.mode = mode;
+        this.notifyTopicChat(entry);
+      },
+      setDraft: (kind, text12) => {
+        entry.session.draftKind = kind;
+        entry.session.draftText = text12;
+      },
+      submit: (kind, text12) => {
+        const target = node();
+        return target ? this.submitTopicChat(entry, target, kind, text12) : Promise.resolve(false);
+      },
+      close: () => {
+        var _a2;
+        if (((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry) this.closeTopicChatWindow();
+      }
+    };
+  }
+  topicChatBusy(node) {
+    var _a2;
+    const path = node.path;
+    return this.plugin.topicRuns.isBusy(path) || this.plugin.quickExpandPending.has(path) || this.startingTasks.has(path) || ((_a2 = this.synthesisTasks.get(path)) == null ? void 0 : _a2.state) === "running" || this.plugin.running.has(path);
+  }
+  /**
+   * Sends one button's request. Resolves true when it started (the window clears its input), false when it was declined
+   * (busy, locked, usage not confirmed: nothing started and the input stays). The task itself is not awaited here.
+   */
+  async submitTopicChat(entry, node, kind, text12) {
+    var _a2, _b2;
+    const map = this.map;
+    if (this.closed || !map || map.id !== entry.mapId || this.aimLive()) return false;
+    if (entry.session.running || this.topicChatBusy(node)) {
+      new import_obsidian37.Notice(t("ui.ai_running_ai"));
+      return false;
+    }
+    const note = await this.plugin.repo.readNote(node.path, map);
+    if (this.aiLockReason("write", [node.id], /* @__PURE__ */ new Map([[node.id, note]]))) {
+      new import_obsidian37.Notice(t("ui.ai_locked_notice"));
+      return false;
+    }
+    const userTurn = { role: "user", kind, text: text12 };
+    if (kind === "synthesize" && !map.nodes.some((item) => item.parentId === node.id)) {
+      entry.session.turns.push(userTurn, { role: "ai", text: t("ui.topic_chat_no_children") });
+      this.notifyTopicChat(entry);
+      return true;
+    }
+    const mode = entry.session.mode;
+    try {
+      await ((_b2 = (_a2 = this.aiModeMemory()).rememberAiMode) == null ? void 0 : _b2.call(_a2, mode));
+    } catch (error) {
+      errorNotice(error);
+      return false;
+    }
+    const controller = new AbortController();
+    let started = false;
+    const went = await this.plugin.confirmAiUsage(note.model, async () => {
+      started = true;
+      entry.session.turns.push(userTurn);
+      entry.session.running = true;
+      this.notifyTopicChat(entry);
+      void this.runTopicChatTask(entry, node, note, kind, mode, text12, controller);
+    });
+    return went !== false && started;
+  }
+  /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
+  async runTopicChatTask(entry, node, note, kind, mode, text12, controller) {
+    var _a2, _b2, _c, _d;
+    const mapPath = this.path;
+    const mapId = entry.mapId;
+    const live = () => {
+      var _a3;
+      return !this.closed && this.path === mapPath && ((_a3 = this.map) == null ? void 0 : _a3.id) === mapId;
+    };
+    const hooks = this.backgroundHooks(node.path, node);
+    let began = false;
+    const endHooks = () => {
+      if (!began) return;
+      began = false;
+      hooks.end();
+    };
+    try {
+      const language2 = defaultOutputLanguage(
+        this.plugin.settings.language,
+        note.title,
+        existingNoteLanguage(note),
+        this.outputLanguageMemory().outputLanguage,
+        (_a2 = this.map) == null ? void 0 : _a2.title
+      );
+      if (kind === "expand") {
+        const outcome = await this.chatExpand(node, text12, controller.signal);
+        if (outcome.status === "succeeded")
+          this.settleTopicChat(
+            entry,
+            t("ui.topic_chat_expand_done_0_1", outcome.titles.length, outcome.titles.join(t("ui.list_separator"))),
+            live,
+            true
+          );
+        else if (outcome.status === "stopped") this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
+        else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", outcome.reason), live, false);
+        return;
+      }
+      began = true;
+      hooks.begin(controller, kind === "research" ? "research" : void 0);
+      if (kind === "research") {
+        let result;
+        let failure2;
+        const referenceGroups = await this.taskSourceSettings().mapSources(controller.signal).catch(() => []);
+        const runStyle = await this.detailTemplateFor(node, void 0, void 0, language2);
+        const handle = await this.runAgent(
+          node,
+          (done) => {
+            result = done;
+          },
+          (message) => {
+            failure2 = message;
+          },
+          {
+            runStyle,
+            task: [researchTopicTask(language2, note.title), text12].filter(Boolean).join("\n\n"),
+            referenceGroups,
+            signal: controller.signal,
+            outputLanguage: language2,
+            rules: "",
+            ...aiModeOptions(mode, "research"),
+            addCharts: mode !== "quick"
+          },
+          endHooks
+        );
+        endHooks();
+        if (handle) await handle.finished;
+        const stopped = controller.signal.aborted || failure2 === t("ui.research_stopped_existing_content_was_preserved") || failure2 === t("ui.ai_task_cancelled");
+        if (result) {
+          if (!this.topicChatOpenFor(entry)) (_b2 = hooks.completed) == null ? void 0 : _b2.call(hooks, "research", mode === "quick" ? result : void 0);
+          this.settleTopicChat(entry, t("ui.topic_chat_research_done"), live, false);
+        } else if (stopped) this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
+        else if (failure2) this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure2), live, true);
+        else this.settleTopicChat(entry, t("ui.topic_chat_result_unknown"), live, true);
+        return;
+      }
+      const children = (_d = (_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === node.id).length) != null ? _d : 0;
+      let written2 = false;
+      let failure;
+      await this.startSynthesis(
+        node,
+        {
+          ...chatSynthesisOptions({ outputLanguage: language2 }),
+          researchMode: researchModeOf(mode),
+          signal: controller.signal,
+          onProgress: () => {
+          }
+        },
+        text12,
+        (message) => {
+          failure = message;
+          endHooks();
+        },
+        endHooks,
+        {
+          isOpen: () => false,
+          onWritten: () => {
+            written2 = true;
+          }
+        }
+      );
+      endHooks();
+      if (written2) this.settleTopicChat(entry, t("ui.topic_chat_synthesis_done_0", children), live, false);
+      else if (controller.signal.aborted || failure === t("ui.ai_task_cancelled"))
+        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
+      else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure != null ? failure : t("ui.ai_task_cancelled")), live, true);
+    } catch (error) {
+      endHooks();
+      const stopped = controller.signal.aborted;
+      this.settleTopicChat(
+        entry,
+        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage(error)),
+        live,
+        !stopped
+      );
+    }
+  }
+  topicChatOpenFor(entry) {
+    var _a2;
+    return ((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry;
+  }
+  /** Ends a run: the window (if open) shows one sentence; a closed window gets a Notice when `notice` says the task did not tell it. */
+  settleTopicChat(entry, sentence, live, notice) {
+    entry.session.running = false;
+    if (!live()) return;
+    entry.session.turns.push({ role: "ai", text: sentence });
+    this.notifyTopicChat(entry);
+    if (notice && !this.topicChatOpenFor(entry)) new import_obsidian37.Notice(sentence);
+  }
   selectionTaskKey() {
     return `selection:${this.path}`;
   }
@@ -71565,7 +72090,7 @@ ${request.requirements}` : preset.text,
       actions2.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
       actions2.createEl("button", { text: t("ui.ai_explore"), cls: "mod-cta" }).addEventListener("click", () => {
         close == null ? void 0 : close();
-        this.whenEditing(() => this.openNextStep(node));
+        this.whenEditing(() => this.openTopicChat(node));
       });
       return;
     }
@@ -74568,7 +75093,7 @@ ${request.requirements}` : preset.text,
           runOptions,
           direction != null ? direction : "",
           async (_result, save, summary, detail) => {
-            var _a2, _b2, _c;
+            var _a2, _b2, _c, _d;
             if (controller.signal.aborted || this.synthesisTasks.get(path) !== task) return;
             const previous = this.history.undoEntry;
             await save(summary, detail);
@@ -74576,6 +75101,7 @@ ${request.requirements}` : preset.text,
             if (this.synthesisTasks.get(path) === task) this.synthesisTasks.delete(path);
             this.undoNotice(t("ui.synthesis_written_0", (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : ""), previous);
             if (observer == null ? void 0 : observer.isOpen()) (_c = observer.written) == null ? void 0 : _c.call(observer);
+            (_d = observer == null ? void 0 : observer.onWritten) == null ? void 0 : _d.call(observer);
           },
           fail2,
           markAccepted
@@ -75170,20 +75696,21 @@ ${note.detail.trim()}` : "",
     this.stageEl.style.setProperty("--vam-zoom", String(zoom));
   }
   transform() {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     if (!this.map || !this.stageEl) return;
     this.applyStageTransform();
+    (_a2 = this.topicChatOpen) == null ? void 0 : _a2.win.reposition();
     const { zoom } = this.map.viewport;
     if (zoom !== this.toolsZoom) {
       this.toolsZoom = zoom;
-      const selected = (_a2 = this.selection) == null ? void 0 : _a2.state.selected;
-      const card = selected ? (_b2 = this.cardEls) == null ? void 0 : _b2.get(selected) : void 0;
+      const selected = (_b2 = this.selection) == null ? void 0 : _b2.state.selected;
+      const card = selected ? (_c = this.cardEls) == null ? void 0 : _c.get(selected) : void 0;
       if (card) this.alignCardTools(card);
     }
     if (zoom < RELATION_LABEL_MIN_ZOOM) this.stageEl.setAttribute("data-relation-labels", "hidden");
     else this.stageEl.removeAttribute("data-relation-labels");
-    (_c = this.zoomLabel) == null ? void 0 : _c.setText(`${Math.round(zoom * 100)}%`);
-    (_d = this.zoomLabel) == null ? void 0 : _d.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
+    (_d = this.zoomLabel) == null ? void 0 : _d.setText(`${Math.round(zoom * 100)}%`);
+    (_e = this.zoomLabel) == null ? void 0 : _e.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
   saveViewport() {
     var _a2;
@@ -79008,7 +79535,8 @@ ${note.detail.trim()}` : "",
                   return;
                 }
                 const outcome = (_a3 = await this.chatExpand(parent, action.direction, work == null ? void 0 : work.controller.signal)) != null ? _a3 : {
-                  status: "succeeded"
+                  status: "succeeded",
+                  titles: []
                 };
                 resolve(outcome);
               })
@@ -79610,7 +80138,7 @@ ${addition}` : addition },
           (_c = this.map) == null ? void 0 : _c.title
         )
       });
-      return { status: "succeeded" };
+      return { status: "succeeded", titles: items.map((item) => item.title) };
     } catch (error) {
       if (controller.signal.aborted) return { status: "stopped" };
       new import_obsidian37.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
@@ -83942,8 +84470,8 @@ var PendingSuggestions = class extends Map {
           throw new Error(t("error.pending_suggestions_fields_invalid"));
         const suggestions = item[1].filter((value) => {
           if (!value || typeof value !== "object") return false;
-          const suggestion = value;
-          return typeof suggestion.title === "string" && typeof suggestion.task === "string" && typeof suggestion.contribution === "string" && (suggestion.parentTitle === void 0 || typeof suggestion.parentTitle === "string") && (suggestion.thinkingOriginBaseline === void 0 || typeof suggestion.thinkingOriginBaseline === "string");
+          const suggestion2 = value;
+          return typeof suggestion2.title === "string" && typeof suggestion2.task === "string" && typeof suggestion2.contribution === "string" && (suggestion2.parentTitle === void 0 || typeof suggestion2.parentTitle === "string") && (suggestion2.thinkingOriginBaseline === void 0 || typeof suggestion2.thinkingOriginBaseline === "string");
         });
         if (suggestions.length !== item[1].length) throw new Error(t("error.pending_suggestions_fields_invalid"));
         entries.push([item[0], suggestions]);

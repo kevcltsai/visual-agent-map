@@ -1,8 +1,10 @@
 // Topic chat window (P1a): the component alone, driven through a fake host.
 const assert = require('node:assert/strict');
-const { test, load } = require('../support.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
+const { test, integrationTest, root, load, core, plain, DEFAULT_SETTINGS, fixture: repoFixture, withExpansionCoordinator, until, deferred, obsidian } = require('../support.cjs');
 const dom = require('../support-dom.cjs');
-const { element, find, findAll, byLabel } = dom;
+const { element, find, findAll, byLabel, tick } = dom;
 
 const { TopicChatWindow } = load('experiences/visual-map/topic-chat.ts');
 const { t } = load('i18n.ts');
@@ -180,4 +182,287 @@ test('topic chat destroy releases every listener and the host subscription', () 
   assert.equal(f.watchers.length, 0);
   assert.ok(all.every(el => Object.values(el.listeners).every(list => list.length === 0)));
   assert.equal(f.root.children.includes(f.win.el), false);
+});
+
+
+// ---- the view: entries, submit, background -------------------------------------------------------------------------
+
+const MAP = 'Agent Workspace/Topics/map-a/Map.md';
+const outlineApi = load('experiences/visual-map/outline-import.ts', { obsidian });
+const { chatSynthesisOptions } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, MarkdownView: class {} } });
+class MarkdownView {}
+
+function page() {
+  const doc = { activeElement: null };
+  const rootEl = element('div'); rootEl.root = doc; rootEl.ownerDocument = doc;
+  return { doc, root: rootEl };
+}
+
+/** A trimmed copy of the map-chat harness: the real view and repository, a fake render() that repaints the overlay like render() does. */
+async function harness({ aim = false } = {}) {
+  const { repo, app } = repoFixture('en');
+  app.vault.configDir = '.obsidian';
+  const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'claude:sonnet' };
+  repo.settings = settings;
+  const mapDoc = { id: 'map-a', title: 'Sleep map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-a');
+  const ids = {};
+  const add = async (key, title, parent) => {
+    const created = await repo.createNote(title, 'gpt-6-luna', mapDoc, MAP, parent ? 'inherited' : 'workspace');
+    Object.assign(created, { parentId: parent ? ids[parent] : null, x: parent ? 400 : 80, y: 80 + mapDoc.nodes.length * 200 });
+    mapDoc.nodes.push(created); ids[key] = created.id;
+  };
+  await add('root', 'Sleep'); await add('a', 'Body', 'root'); await add('b', 'Mind', 'root'); await add('c', 'REM', 'a');
+  await app.vault.create(MAP, core.serializeMap(mapDoc));
+  await repo.rebuildDerivedData();
+  const notices = [];
+  const control = { usageAsks: 0, decline: false, nested: 0, depth: 0, modals: [] };
+  let queue = Promise.resolve();
+  const ctx = {};
+  const plugin = withExpansionCoordinator({
+    repo, settings, running: new Set(), views: () => [], logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), closeStaleDetails() {}, releaseOutline() {}, syncOutline() {}, setOutlineActive() {},
+    pendingSuggestions: new Map(), pendingResearchOptions: new Map(), detailsShown: () => false, activeTasks: new Map(), quickExpandPending: new Set(), recordFailure: error => String(error?.message ?? error),
+    mutate(work) {
+      control.depth > 0 && control.nested++;
+      const result = queue.then(async () => { control.depth++; try { await work(); await ctx.view?.hydrate(); } finally { control.depth--; } });
+      queue = result.catch(() => {});
+      return result;
+    },
+    saveSettings: async () => {},
+    aiReadyForModel: async () => true,
+    confirmAiUsage: async (model, run) => { control.usageAsks++; if (control.decline) return false; await run(); return true; },
+    manifest: { version: '9.9.9' }
+  });
+  app.workspace = { getLeavesOfType: () => [], getActiveViewOfType: () => null, requestSaveLayout() {}, on() { return {}; } };
+  class Notice { constructor(message) { notices.push(message); } hide() {} }
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(a) { this.app = a; } open() { control.modals.push(this); } close() {} }, Component: class { load() {} unload() {} } } }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, CSS: { escape: v => String(v) } });
+  const view = new VisualAgentMapView({ app }, plugin);
+  ctx.view = view;
+  const p = page();
+  Object.assign(view, { path: MAP, contentEl: p.root, focusNode() {}, fit() {}, closed: false });
+  view.map = await repo.readMap(MAP);
+  if (aim) view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
+  const reload = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
+  view.hydrate = reload;
+  let overlay = null;
+  // What render() does around the topic chat window: take it out first, put it into the new overlay last.
+  const repaint = () => {
+    const held = view.detachTopicChat();
+    p.root.empty(); overlay = p.root.createDiv('vam-canvas-overlay');
+    view.remountTopicChat(held);
+  };
+  view.render = () => { repaint(); };
+  await reload(); repaint();
+  const h = {
+    repo, view, plugin, ids, control, notices, page: p, repaint, overlay: () => overlay,
+    node: key => view.map.nodes.find(n => n.id === ids[key]),
+    saved: async () => (await repo.readMap(MAP)).nodes,
+    entry: key => view.topicChatSessions.get(ids[key]),
+    host: key => view.topicChatHost(h.entry(key) ?? (view.openTopicChat(h.node(key)), h.entry(key))),
+    win: () => view.topicChatOpen?.win,
+    texts: () => findAll(h.win().el, () => true).map(i => i.text).join('|')
+  };
+  return h;
+}
+const outlineOf = markdown => ({ markdown, nodes: outlineApi.parseOutline(markdown).nodes });
+const waitFor = async predicate => { for (let i = 0; i < 800; i++) { if (predicate()) return; await new Promise(r => setTimeout(r, 5)); } throw new Error('condition not reached'); };
+const finished = h => waitFor(() => h.plugin.running.size === 0 && h.plugin.activeTasks.size === 0 && !h.entry('a').session.running);
+const stubResearch = h => {
+  const calls = [];
+  h.view.runAgent = async (node, done, failed, request, accepted) => {
+    const call = { node, request, done, failed, gate: deferred() };
+    calls.push(call); accepted?.();
+    return { finished: call.gate.promise };
+  };
+  h.view.detailTemplateFor = async () => undefined;
+  return calls;
+};
+
+integrationTest('topic chat counterexample 7: openTopicChat does not open while notes load, in presentation, on AIM or on a locked topic', async () => {
+  const h = await harness();
+  h.view.noteLoad = {}; h.view.openTopicChat(h.node('a')); assert.equal(h.win(), undefined, 'notes loading');
+  h.view.noteLoad = null; h.view.presentation = {}; h.view.openTopicChat(h.node('a')); assert.equal(h.win(), undefined, 'presentation');
+  h.view.presentation = null;
+  h.view.notes.get(h.ids.a).aiLocked = true; h.view.openTopicChat(h.node('a'));
+  assert.equal(h.win(), undefined, 'AI lock'); assert.equal(h.notices.at(-1), t('ui.ai_locked_notice'));
+  h.view.notes.get(h.ids.a).aiLocked = false; h.view.openTopicChat(h.node('a'));
+  assert.ok(h.win(), 'a plain topic opens'); assert.ok(find(h.overlay(), i => hasClass(i, 'vam-topic-chat')), 'in the canvas overlay');
+  const aim = await harness({ aim: true });
+  aim.view.openTopicChat(aim.node('a')); assert.equal(aim.win(), undefined, 'AIM');
+});
+
+integrationTest('topic chat counterexample 7: AIM offers no AI explore on the card menu or the command; the plain map offers both', async () => {
+  const item = () => { const it = { setTitle(title) { it.title = title; return it; }, setIcon() { return it; }, setSection() { return it; }, setDisabled() { return it; }, onClick(fn) { it.fn = fn; return it; } }; return it; };
+  const menuOf = (h) => { const items = []; return { items, menu: { addItem(cb) { const it = item(); cb(it); items.push(it); return this; }, addSeparator() { return this; } } }; };
+  const aim = await harness({ aim: true });
+  const a = menuOf(aim); aim.view.addCardMenuActions(a.menu, aim.node('a'));
+  assert.equal(a.items.some(i => i.title === t('ui.ai_explore')), false, 'no menu entry on AIM');
+  aim.view.selection.setSelected(aim.ids.a);
+  assert.equal(aim.view.mapCommand('ai-explore', true), false, 'no command on AIM');
+  const h = await harness();
+  const m = menuOf(h); h.view.addCardMenuActions(m.menu, h.node('a'));
+  const entry = m.items.find(i => i.title === t('ui.ai_explore'));
+  assert.ok(entry, 'the plain map has the menu entry'); entry.fn();
+  assert.equal(h.view.topicChatOpen?.entry.nodeId, h.ids.a, 'the right-click entry opens the topic chat');
+  h.view.closeTopicChatWindow();
+  h.view.selection.setSelected(h.ids.b);
+  assert.equal(h.view.mapCommand('ai-explore', false), true);
+  assert.equal(h.view.topicChatOpen?.entry.nodeId, h.ids.b, 'the command opens the topic chat');
+});
+
+integrationTest('topic chat entries: the empty suggestion panel and the card tool open the topic chat; no entry opens the old dialog', async () => {
+  const h = await harness();
+  const panel = element('div'); panel.root = h.page.doc;
+  h.view.renderPendingProposals(panel, h.node('c'), h.view.notes.get(h.ids.c), () => {});
+  const open = find(panel, i => i.tag === 'button' && i.text === t('ui.ai_explore')); assert.ok(open, 'the empty panel has the button');
+  h.view.openNextStep = () => assert.fail('the old dialog must not open'); open.click();
+  assert.equal(h.view.topicChatOpen?.entry.nodeId, h.ids.c, 'the panel button opens the topic chat');
+  // The card tool is built by renderNode, which needs the full page; its source is checked instead (the tester sees the real button).
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  const sites = [...source.matchAll(/t\("ui\.ai_explore"\)/g)].map(m => source.slice(m.index, m.index + 170));
+  assert.ok(sites.length >= 3); assert.ok(sites.every(site => site.includes('openTopicChat') && !site.includes('openNextStep')), sites.join('\n'));
+});
+
+integrationTest('topic chat opens one window at a time: opening B closes A, A keeps its conversation, a repaint keeps the window and its draft', async () => {
+  const h = await harness();
+  const a = h.host('a'); a.setDraft('expand', 'my draft');
+  const first = h.win(); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a);
+  h.repaint(); assert.equal(h.win(), first); assert.ok(h.overlay().children.includes(first.el), 'put into the new overlay');
+  assert.equal(h.entry('a').session.draftText, 'my draft');
+  h.view.openTopicChat(h.node('b'));
+  assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.b); assert.equal(h.overlay().children.filter(i => hasClass(i, 'vam-topic-chat')).length, 1);
+  assert.equal(h.entry('a').session.draftText, 'my draft', 'A kept its draft');
+  h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.b); h.repaint();
+  assert.equal(h.win(), undefined, 'the window closes when its topic is gone');
+  h.view.openTopicChat(h.node('a')); await h.view.onClose();
+  assert.equal(h.win(), undefined); assert.equal(h.view.topicChatSessions.size, 0, 'view close releases the sessions');
+});
+
+integrationTest('topic chat counterexample 1: Standard integration is not Local (web search on), Quick is Local; the sidebar integration stays Local', async () => {
+  const h = await harness(); const seen = [];
+  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push({ id: node.id, options, direction, observer }); accepted(); };
+  const host = h.host('root');
+  host.setMode('standard');
+  assert.equal(await host.submit('synthesize', 'Integrate sleep'), true);
+  host.setMode('quick');
+  await waitFor(() => !h.entry('root').session.running);
+  assert.equal(await host.submit('synthesize', 'Again'), true);
+  await waitFor(() => seen.length === 2 && !h.entry('root').session.running);
+  assert.equal(seen[0].options.researchMode, 'research'); assert.equal(seen[1].options.researchMode, 'local');
+  assert.equal(seen[0].direction, 'Integrate sleep');
+  assert.equal(seen[0].options.visualMode, 'off'); assert.equal(seen[0].options.researchDepth, 'normal'); assert.deepEqual(plain(seen[0].options.referenceGroups), []);
+  assert.equal(h.view.map.aiMode, 'quick', 'the last picked mode is remembered on the map');
+  assert.equal(chatSynthesisOptions({ outputLanguage: 'en' }).researchMode, 'local', 'the sidebar integration is still Quick');
+  // The task service turns the Standard value into a web search, Quick into none.
+  const { default: Plugin } = load('main.ts', { obsidian });
+  for (const [mode, web] of [['research', true], ['local', false]]) {
+    const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
+    let call; plugin.claudeCli = () => ({ runTask: async (...args) => { call = args; return JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] }); } });
+    await plugin.askModel({ title: 'T', summary: '', rules: '', detail: '', task: 'x', ancestors: '', mode: 'synthesize', researchMode: mode, researchDepth: 'normal', visualMode: 'off' }, 'claude:sonnet', 'low');
+    assert.equal(call[4].webSearch, web, mode);
+  }
+});
+
+integrationTest('topic chat integration: a written result reaches the window even though the observer says closed; a topic without subtopics answers at once without a usage question', async () => {
+  const h = await harness();
+  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { accepted(); observer.onWritten(); };
+  const host = h.host('root');
+  await host.submit('synthesize', 'x'); await waitFor(() => !h.entry('root').session.running);
+  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_synthesis_done_0', 2));
+  const asks = h.control.usageAsks;
+  const leaf = h.host('b');
+  assert.equal(await leaf.submit('synthesize', 'x'), true);
+  assert.equal(h.control.usageAsks, asks, 'no usage question');
+  assert.equal(h.entry('b').session.turns.at(-1).text, t('ui.topic_chat_no_children'));
+});
+
+integrationTest('topic chat counterexample 4: expand makes the subtopics at once - no dialog, no proposal step, one undo step, one sentence with the titles', async () => {
+  const h = await harness();
+  h.view.proposeChildren = () => assert.fail('the guided proposal path is not used'); h.view.openChildSuggestions = () => assert.fail('no review window');
+  h.plugin.outlineGeneration = { generate: async () => outlineOf('# Body\n## Light\n## Noise\n## Heat') };
+  await h.view.aiModeMemory().rememberAiMode('quick'); // an unchanged mode adds no undo step of its own
+  const before = (await h.saved()).length; const steps = h.view.history.past.length;
+  const host = h.host('a');
+  assert.equal(await host.submit('expand', 'split by cause'), true);
+  await finished(h).catch(e => { throw new Error(e.message + JSON.stringify([h.notices, h.entry('a').session, [...h.plugin.running]])); });
+  const created = (await h.saved()).length - before;
+  assert.equal(created, 3, 'created directly');
+  assert.equal(h.control.modals.length, 0, 'no modal');
+  assert.equal(h.view.history.past.length, steps + 1, 'one undo step');
+  assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_expand_done_0_1', 3, ['Light', 'Noise', 'Heat'].join(t('ui.list_separator'))));
+  assert.equal(h.entry('a').session.turns[0].kind, 'expand');
+  await h.plugin.mutate(() => h.view.travel(false));
+  assert.equal((await h.saved()).length, before, 'one undo removes all of them');
+});
+
+integrationTest('topic chat counterexample 5: closing the window does not stop the task; the result lands in the conversation and a Notice tells it; reopening shows it', async () => {
+  const h = await harness(); const gate = deferred(); let signal;
+  h.plugin.outlineGeneration = { generate: async (_r, s) => { signal = s; await gate.promise; return outlineOf('# Body\n## Light'); } };
+  const host = h.host('a');
+  await host.submit('expand', 'x');
+  await waitFor(() => signal);
+  host.close(); assert.equal(h.win(), undefined, 'closed');
+  assert.equal(signal.aborted, false, 'closing does not abort'); assert.equal(h.entry('a').session.running, true);
+  gate.resolve(); await finished(h);
+  const sentence = t('ui.topic_chat_expand_done_0_1', 1, 'Light');
+  assert.equal(h.entry('a').session.turns.at(-1).text, sentence);
+  assert.ok(h.notices.includes(sentence), 'the Notice tells the result');
+  h.view.openTopicChat(h.node('a')); assert.ok(h.texts().includes(sentence), 'visible after reopening');
+});
+
+integrationTest('topic chat research: Quick is local without charts, Standard searches the web; a result with the window closed goes through the usual completed Notice; stop says stopped', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  const host = h.host('a');
+  host.setMode('standard'); await host.submit('research', 'dig deeper');
+  await waitFor(() => calls.length === 1);
+  assert.equal(calls[0].request.researchMode, 'research'); assert.equal(calls[0].request.addCharts, true); assert.match(calls[0].request.task, /dig deeper$/);
+  host.close();
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  assert.ok(h.notices.some(n => n.includes('Body')), 'completed Notice: ' + h.notices.join('|'));
+  assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_research_done'));
+  h.view.openTopicChat(h.node('a')); host.setMode('quick'); await host.submit('research', 'again');
+  await waitFor(() => calls.length === 2);
+  assert.equal(calls[1].request.researchMode, 'local'); assert.equal(calls[1].request.addCharts, false);
+  calls[1].failed(t('ui.research_stopped_existing_content_was_preserved')); calls[1].gate.resolve(); await finished(h);
+  assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_stopped'));
+});
+
+integrationTest('topic chat busy topic: submit is refused with a Notice and nothing starts', async () => {
+  const h = await harness(); const calls = stubResearch(h);
+  h.plugin.quickExpandPending.add(h.node('a').path);
+  assert.equal(await h.host('a').submit('research', 'x'), false);
+  h.plugin.quickExpandPending.clear(); h.view.startingTasks.set(h.node('a').path, new AbortController());
+  assert.equal(await h.host('a').submit('research', 'x'), false);
+  h.view.startingTasks.clear(); h.view.synthesisTasks.set(h.node('a').path, { state: 'running' });
+  assert.equal(await h.host('a').submit('research', 'x'), false);
+  assert.equal(calls.length, 0); assert.equal(h.control.usageAsks, 0); assert.equal(h.notices.at(-1), t('ui.ai_running_ai'));
+});
+
+integrationTest('topic chat late result: a view that closed meanwhile is not written to', async () => {
+  const h = await harness(); const gate = deferred();
+  h.plugin.outlineGeneration = { generate: async () => { await gate.promise; return outlineOf('# Body\n## Light'); } };
+  const host = h.host('a'); await host.submit('expand', 'x');
+  const turns = h.entry('a').session.turns.length;
+  h.view.closed = true; gate.resolve();
+  await waitFor(() => h.plugin.running.size === 0 && !h.entry('a').session.running);
+  assert.equal(h.entry('a').session.turns.length, turns, 'no sentence written after the view closed');
+});
+
+integrationTest('topic chat counterexample 8: a declined usage question starts nothing and the typed text stays in the window', async () => {
+  const h = await harness(); const calls = stubResearch(h); let generated = 0; let synthesized = 0;
+  h.plugin.outlineGeneration = { generate: async () => { generated++; return outlineOf('# Body\n## X'); } };
+  h.view.startSynthesis = async () => { synthesized++; };
+  h.control.decline = true;
+  const host = h.host('a');
+  for (const kind of ['research', 'expand', 'synthesize']) assert.equal(await host.submit(kind, 'go'), false, kind);
+  assert.deepEqual([calls.length, generated, synthesized], [0, 0, 0]);
+  assert.equal(h.entry('a').session.running, false); assert.equal(h.entry('a').session.turns.length, 0);
+  assert.equal(h.plugin.running.size, 0); assert.equal(h.plugin.activeTasks.size, 0);
+  // Through the real window: the text and the pressed button stay.
+  const win = h.win(); const input = find(win.el, i => i.tag === 'textarea');
+  find(win.el, i => i.tag === 'button' && i.text === t('ui.topic_chat_research')).click();
+  input.value = 'dig deeper'; input.input();
+  byLabel(win.el, t('ui.topic_chat_send')).click(); await tick(); await tick();
+  assert.equal(input.value, 'dig deeper'); assert.equal(h.entry('a').session.draftKind, 'research');
+  assert.equal(calls.length, 0);
 });

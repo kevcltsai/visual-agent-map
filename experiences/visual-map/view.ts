@@ -560,7 +560,21 @@ import {
 import { renderTopicTree } from "../../ui/topic-tree";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
-import { aiModeOptions, DEFAULT_MAP_AI_MODE, hasKnowledgeGapMarker, noteAiMode, type MapAiMode } from "./ai-mode";
+import {
+  aiModeOptions,
+  DEFAULT_MAP_AI_MODE,
+  hasKnowledgeGapMarker,
+  noteAiMode,
+  researchModeOf,
+  type MapAiMode
+} from "./ai-mode";
+import {
+  TopicChatWindow,
+  type TopicChatHost,
+  type TopicChatKind,
+  type TopicChatMode,
+  type TopicChatTurn
+} from "./topic-chat";
 import type { ResearchObserver } from "../../ai/research-observer";
 import type { ResearchProgress } from "./research-progress";
 import type { ExpansionBatchState } from "./expansion-batch";
@@ -1068,8 +1082,23 @@ interface ChatWorkTopic {
 export type ChatResearchOutcome =
   | { kind: "not_started" }
   | { kind: "settled"; succeeded: number; failed: number; stopped: number; topics: ChatWorkTopic[] };
+/** One topic's chat: the conversation lives here (not in the window), so a task that outlives a closed window can still tell its result. */
+interface TopicChatEntry {
+  nodeId: string;
+  mapId: string;
+  mapPath: string;
+  session: {
+    turns: TopicChatTurn[];
+    mode: TopicChatMode;
+    running: boolean;
+    draftKind: TopicChatKind | null;
+    draftText: string;
+  };
+  watchers: Set<() => void>;
+}
 /** How one expansion the chat started came out. */
-type ChatExpandOutcome = { status: "succeeded" } | { status: "failed"; reason: string } | { status: "stopped" };
+type ChatExpandOutcome =
+  { status: "succeeded"; titles: string[] } | { status: "failed"; reason: string } | { status: "stopped" };
 /** The work one reply started that a continuation may wait for, and the handle that stops it. */
 interface ChatRoundWork {
   /** Aborted by Stop: work not started yet is not started, and a running expansion stops. */
@@ -1540,6 +1569,10 @@ export class VisualAgentMapView extends ItemView {
   private startingTasks = new Map<string, AbortController>();
   /** Keys in `startingTasks` whose run is an expansion (its Stop reads "Stop expanding"). */
   private startingExpand = new Set<string>();
+  /** Topic chat conversations by topic id: they outlive the small window (a task goes on when it is closed). */
+  private topicChatSessions = new Map<string, TopicChatEntry>();
+  /** The one topic chat window that is open (not whether it is attached: a repaint takes it out for a moment). */
+  private topicChatOpen: { entry: TopicChatEntry; win: TopicChatWindow } | null = null;
   private disclosureSeq = 0;
   /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
   private quickOutlines = new Map<
@@ -3152,6 +3185,8 @@ export class VisualAgentMapView extends ItemView {
   async onClose(): Promise<void> {
     this.closeTopicLinkMenu();
     this.closed = true;
+    this.closeTopicChatWindow();
+    this.topicChatSessions.clear();
     this.closeMapSearch(false);
     this.exitPresentation(false);
     this.cancelLinking(false);
@@ -11458,7 +11493,7 @@ export class VisualAgentMapView extends ItemView {
           .onClick(() => this.whenEditing(action))
       );
     };
-    add(t("ui.ai_explore"), "sparkles", () => this.openNextStep(node));
+    if (!this.aimLive()) add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
     add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
     add(t("ui.card_menu_add_sibling"), "list-plus", () =>
       this.enqueue(() => this.addNode(map.nodes.find(item => item.id === node.parentId) ?? null))
@@ -13408,7 +13443,7 @@ export class VisualAgentMapView extends ItemView {
           this.enqueue(() => this.addNode(map.nodes.find(node => node.id === selected!.parentId) ?? null))
         );
       case "ai-explore":
-        return run(editable && !!selected, () => this.openNextStep(selected!));
+        return run(editable && !!selected, () => this.openTopicChat(selected!));
       case "rename":
         return run(editable && !!note, () => this.startCardTitleEdit(selected!, { select: true }));
       case "open-details":
@@ -13777,6 +13812,7 @@ export class VisualAgentMapView extends ItemView {
     const keepMapFocus = this.holdMapFocus();
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
+    const topicChatHeld = this.detachTopicChat();
     const restoreSearch = this.holdMapSearch();
     // The goal editor's fields go with the repaint: their draft, caret and keyboard are kept in the edit state, which draws them again.
     this.captureGoalEdit();
@@ -14209,6 +14245,7 @@ export class VisualAgentMapView extends ItemView {
     this.drawEdges();
     restoreRelevanceFocus();
     restoreChatFocus();
+    this.remountTopicChat(topicChatHeld);
     keepMapFocus();
     this.focusInlineName();
     this.focusInlineSummary();
@@ -14742,7 +14779,7 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     if (!this.selection.state.multiSelectMode && !this.aimLive())
-      this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openNextStep(node))).addClass(
+      this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openTopicChat(node))).addClass(
         "vam-node-tool",
         "vam-ai-explore"
       );
@@ -16278,6 +16315,294 @@ export class VisualAgentMapView extends ItemView {
       }
     };
   }
+  // ---- Topic chat (the small window next to a card) ------------------------------------------------------------
+  private topicChatEntry(node: MapNode): TopicChatEntry {
+    const map = this.map;
+    const existing = this.topicChatSessions.get(node.id);
+    if (existing && existing.mapId === map?.id) return existing;
+    const entry: TopicChatEntry = {
+      nodeId: node.id,
+      mapId: map?.id ?? "",
+      mapPath: this.path,
+      session: { turns: [], mode: map?.aiMode ?? DEFAULT_MAP_AI_MODE, running: false, draftKind: null, draftText: "" },
+      watchers: new Set()
+    };
+    this.topicChatSessions.set(node.id, entry);
+    return entry;
+  }
+  private notifyTopicChat(entry: TopicChatEntry): void {
+    for (const watcher of [...entry.watchers]) watcher();
+  }
+  /** Opens the topic's chat next to its card; one window at a time (opening another closes this one, its task goes on). */
+  private openTopicChat(node: MapNode, opener?: { focus(): void } | null): void {
+    if (this.closed || !this.map || this.notesLoading() || this.presentation || this.aimLive()) return;
+    if (this.aiLockReason("write", [node.id])) {
+      new Notice(t("ui.ai_locked_notice"));
+      return;
+    }
+    if (this.topicChatOpen?.entry.nodeId === node.id && this.topicChatOpen.entry.mapId === this.map.id) return;
+    const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
+    if (!overlay) return;
+    this.closeTopicChatWindow();
+    const entry = this.topicChatEntry(node);
+    const win = new TopicChatWindow(this.topicChatHost(entry), opener ?? null, overlay);
+    this.topicChatOpen = { entry, win };
+    win.mount(overlay);
+  }
+  private closeTopicChatWindow(): void {
+    const open = this.topicChatOpen;
+    this.topicChatOpen = null;
+    open?.win.destroy();
+  }
+  /** Before a repaint: takes the window out of the page; true when it held the focus. */
+  private detachTopicChat(): boolean {
+    const open = this.topicChatOpen;
+    if (!open) return false;
+    const active = this.contentEl?.ownerDocument?.activeElement ?? null;
+    const held = !!active && !!open.win.el.contains?.(active);
+    open.win.el.remove();
+    return held;
+  }
+  /** After a repaint: puts the window back next to its card, or closes it when its card or map is gone. */
+  private remountTopicChat(held: boolean): void {
+    const open = this.topicChatOpen;
+    if (!open) return;
+    const map = this.map;
+    if (!map || map.id !== open.entry.mapId || this.aimLive() || !map.nodes.some(n => n.id === open.entry.nodeId)) {
+      this.closeTopicChatWindow();
+      return;
+    }
+    const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
+    if (overlay) open.win.mount(overlay, held);
+  }
+  private topicChatHost(entry: TopicChatEntry): TopicChatHost {
+    const node = (): MapNode | undefined => this.map?.nodes.find(item => item.id === entry.nodeId);
+    return {
+      topicTitle: () => this.notes.get(entry.nodeId)?.title ?? node()?.path ?? "",
+      anchor: () => {
+        const card = this.cardEls.get(entry.nodeId);
+        const overlay = this.contentEl?.querySelector?.<HTMLElement>(".vam-canvas-overlay");
+        if (!card?.getBoundingClientRect || !overlay?.getBoundingClientRect) return null;
+        return { card: card.getBoundingClientRect(), area: overlay.getBoundingClientRect() };
+      },
+      session: () => entry.session,
+      subscribe: changed => {
+        entry.watchers.add(changed);
+        return () => {
+          entry.watchers.delete(changed);
+        };
+      },
+      setMode: mode => {
+        if (entry.session.running) return;
+        entry.session.mode = mode;
+        this.notifyTopicChat(entry);
+      },
+      setDraft: (kind, text) => {
+        entry.session.draftKind = kind;
+        entry.session.draftText = text;
+      },
+      submit: (kind, text) => {
+        const target = node();
+        return target ? this.submitTopicChat(entry, target, kind, text) : Promise.resolve(false);
+      },
+      close: () => {
+        if (this.topicChatOpen?.entry === entry) this.closeTopicChatWindow();
+      }
+    };
+  }
+  private topicChatBusy(node: MapNode): boolean {
+    const path = node.path;
+    return (
+      this.plugin.topicRuns.isBusy(path) ||
+      this.plugin.quickExpandPending.has(path) ||
+      this.startingTasks.has(path) ||
+      this.synthesisTasks.get(path)?.state === "running" ||
+      this.plugin.running.has(path)
+    );
+  }
+  /**
+   * Sends one button's request. Resolves true when it started (the window clears its input), false when it was declined
+   * (busy, locked, usage not confirmed: nothing started and the input stays). The task itself is not awaited here.
+   */
+  private async submitTopicChat(
+    entry: TopicChatEntry,
+    node: MapNode,
+    kind: TopicChatKind,
+    text: string
+  ): Promise<boolean> {
+    const map = this.map;
+    if (this.closed || !map || map.id !== entry.mapId || this.aimLive()) return false;
+    if (entry.session.running || this.topicChatBusy(node)) {
+      new Notice(t("ui.ai_running_ai"));
+      return false;
+    }
+    const note = await this.plugin.repo.readNote(node.path, map);
+    if (this.aiLockReason("write", [node.id], new Map([[node.id, note]]))) {
+      new Notice(t("ui.ai_locked_notice"));
+      return false;
+    }
+    const userTurn: TopicChatTurn = { role: "user", kind, text };
+    if (kind === "synthesize" && !map.nodes.some(item => item.parentId === node.id)) {
+      entry.session.turns.push(userTurn, { role: "ai", text: t("ui.topic_chat_no_children") });
+      this.notifyTopicChat(entry);
+      return true;
+    }
+    const mode = entry.session.mode;
+    try {
+      await this.aiModeMemory().rememberAiMode?.(mode);
+    } catch (error) {
+      errorNotice(error);
+      return false;
+    }
+    const controller = new AbortController();
+    let started = false;
+    const went = await this.plugin.confirmAiUsage(note.model, async () => {
+      started = true;
+      entry.session.turns.push(userTurn);
+      entry.session.running = true;
+      this.notifyTopicChat(entry);
+      void this.runTopicChatTask(entry, node, note, kind, mode, text, controller);
+    });
+    return went !== false && started;
+  }
+  /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
+  private async runTopicChatTask(
+    entry: TopicChatEntry,
+    node: MapNode,
+    note: Note,
+    kind: TopicChatKind,
+    mode: TopicChatMode,
+    text: string,
+    controller: AbortController
+  ): Promise<void> {
+    const mapPath = this.path;
+    const mapId = entry.mapId;
+    const live = (): boolean => !this.closed && this.path === mapPath && this.map?.id === mapId;
+    const hooks = this.backgroundHooks(node.path, node);
+    let began = false;
+    const endHooks = (): void => {
+      if (!began) return;
+      began = false;
+      hooks.end();
+    };
+    try {
+      const language = defaultOutputLanguage(
+        this.plugin.settings.language,
+        note.title,
+        existingNoteLanguage(note),
+        this.outputLanguageMemory().outputLanguage,
+        this.map?.title
+      );
+      if (kind === "expand") {
+        const outcome = await this.chatExpand(node, text, controller.signal);
+        // A failure was already told by chatExpand's own Notice; a success with the window closed is told here.
+        if (outcome.status === "succeeded")
+          this.settleTopicChat(
+            entry,
+            t("ui.topic_chat_expand_done_0_1", outcome.titles.length, outcome.titles.join(t("ui.list_separator"))),
+            live,
+            true
+          );
+        else if (outcome.status === "stopped") this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
+        else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", outcome.reason), live, false);
+        return;
+      }
+      began = true;
+      hooks.begin(controller, kind === "research" ? "research" : undefined);
+      if (kind === "research") {
+        let result: AiResult | undefined;
+        let failure: string | undefined;
+        const referenceGroups = await this.taskSourceSettings()
+          .mapSources(controller.signal)
+          .catch(() => []);
+        const runStyle = await this.detailTemplateFor(node, undefined, undefined, language);
+        const handle = await this.runAgent(
+          node,
+          done => {
+            result = done;
+          },
+          message => {
+            failure = message;
+          },
+          {
+            runStyle,
+            task: [researchTopicTask(language, note.title), text].filter(Boolean).join("\n\n"),
+            referenceGroups,
+            signal: controller.signal,
+            outputLanguage: language,
+            rules: "",
+            ...aiModeOptions(mode, "research"),
+            addCharts: mode !== "quick"
+          },
+          endHooks
+        );
+        endHooks();
+        if (handle) await handle.finished;
+        const stopped =
+          controller.signal.aborted ||
+          failure === t("ui.research_stopped_existing_content_was_preserved") ||
+          failure === t("ui.ai_task_cancelled");
+        if (result) {
+          // The window is closed: the usual Notice tells it (a Quick answer that lacked knowledge also offers Standard).
+          if (!this.topicChatOpenFor(entry)) hooks.completed?.("research", mode === "quick" ? result : undefined);
+          this.settleTopicChat(entry, t("ui.topic_chat_research_done"), live, false);
+        } else if (stopped) this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
+        else if (failure) this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure), live, true);
+        else this.settleTopicChat(entry, t("ui.topic_chat_result_unknown"), live, true);
+        return;
+      }
+      // synthesize
+      const children = this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0;
+      let written = false;
+      let failure: string | undefined;
+      await this.startSynthesis(
+        node,
+        {
+          ...chatSynthesisOptions({ outputLanguage: language }),
+          researchMode: researchModeOf(mode),
+          signal: controller.signal,
+          onProgress: () => {}
+        },
+        text,
+        message => {
+          failure = message;
+          endHooks();
+        },
+        endHooks,
+        {
+          isOpen: () => false,
+          onWritten: () => {
+            written = true;
+          }
+        }
+      );
+      endHooks();
+      if (written) this.settleTopicChat(entry, t("ui.topic_chat_synthesis_done_0", children), live, false);
+      else if (controller.signal.aborted || failure === t("ui.ai_task_cancelled"))
+        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false);
+      else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure ?? t("ui.ai_task_cancelled")), live, true);
+    } catch (error) {
+      endHooks();
+      const stopped = controller.signal.aborted;
+      this.settleTopicChat(
+        entry,
+        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage(error)),
+        live,
+        !stopped
+      );
+    }
+  }
+  private topicChatOpenFor(entry: TopicChatEntry): boolean {
+    return this.topicChatOpen?.entry === entry;
+  }
+  /** Ends a run: the window (if open) shows one sentence; a closed window gets a Notice when `notice` says the task did not tell it. */
+  private settleTopicChat(entry: TopicChatEntry, sentence: string, live: () => boolean, notice: boolean): void {
+    entry.session.running = false;
+    if (!live()) return;
+    entry.session.turns.push({ role: "ai", text: sentence });
+    this.notifyTopicChat(entry);
+    if (notice && !this.topicChatOpenFor(entry)) new Notice(sentence);
+  }
   private selectionTaskKey(): string {
     return `selection:${this.path}`;
   }
@@ -16589,7 +16914,7 @@ export class VisualAgentMapView extends ItemView {
       actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
       actions.createEl("button", { text: t("ui.ai_explore"), cls: "mod-cta" }).addEventListener("click", () => {
         close?.();
-        this.whenEditing(() => this.openNextStep(node));
+        this.whenEditing(() => this.openTopicChat(node));
       });
       return;
     }
@@ -19681,7 +20006,7 @@ export class VisualAgentMapView extends ItemView {
     direction: string | null,
     failed: (message: string) => void,
     accepted: () => void,
-    observer?: SynthesisObserver
+    observer?: SynthesisObserver & { onWritten?: () => void }
   ): Promise<void> {
     const path = node.path;
     const existing = this.synthesisTasks.get(path);
@@ -19810,6 +20135,7 @@ export class VisualAgentMapView extends ItemView {
             if (this.synthesisTasks.get(path) === task) this.synthesisTasks.delete(path);
             this.undoNotice(t("ui.synthesis_written_0", this.notes.get(node.id)?.title ?? ""), previous);
             if (observer?.isOpen()) observer.written?.();
+            observer?.onWritten?.();
           },
           fail,
           markAccepted
@@ -20459,6 +20785,7 @@ export class VisualAgentMapView extends ItemView {
   private transform(): void {
     if (!this.map || !this.stageEl) return;
     this.applyStageTransform();
+    this.topicChatOpen?.win.reposition();
     const { zoom } = this.map.viewport;
     if (zoom !== this.toolsZoom) {
       this.toolsZoom = zoom;
@@ -24752,7 +25079,8 @@ export class VisualAgentMapView extends ItemView {
                   return;
                 }
                 const outcome = (await this.chatExpand(parent, action.direction, work?.controller.signal)) ?? {
-                  status: "succeeded" as const
+                  status: "succeeded" as const,
+                  titles: []
                 };
                 resolve(outcome);
               })
@@ -25432,7 +25760,7 @@ export class VisualAgentMapView extends ItemView {
           this.map?.title
         )
       });
-      return { status: "succeeded" };
+      return { status: "succeeded", titles: items.map(item => item.title) };
     } catch (error) {
       if (controller.signal.aborted) return { status: "stopped" };
       new Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));

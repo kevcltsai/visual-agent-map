@@ -149,11 +149,11 @@ export class TopicChatWindow {
     this.refresh();
   }
 
-  /** Puts the window in `parent` (again, after a repaint), places it and moves the focus to the input. */
-  mount(parent: HTMLElement): void {
+  /** Puts the window in `parent` (again, after a repaint), places it and, unless `focus` is false, moves the focus to the input. */
+  mount(parent: HTMLElement, focus = true): void {
     if (!parent.contains(this.el)) parent.appendChild(this.el);
     this.reposition();
-    this.inputEl.focus();
+    if (focus) this.inputEl.focus();
   }
 
   /** Right of the card when it fits, else left; a narrow canvas puts the window at the bottom. Missing geometry leaves it as is. */

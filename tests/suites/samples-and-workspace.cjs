@@ -53,7 +53,6 @@ test('the first AI task shows a provider-specific usage acknowledgement only onc
 test('Obsidian 1.13 declarative settings expose workspace recovery and App Server diagnostics', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   const settingsSource = fs.readFileSync(path.join(root, 'ui/settings-tab.ts'), 'utf8');
-  const mapSource = ['view.ts', 'modals.ts'].map(file => fs.readFileSync(path.join(root, 'experiences/visual-map', file), 'utf8')).join('\n');
   const definitions = settingsSource.slice(settingsSource.indexOf('getSettingDefinitions()'), settingsSource.indexOf('async setControlValue'));
   assert.match(definitions, /ui\.settings_workspace_location/);
   assert.match(definitions, /ui\.settings_repair_name/);
@@ -69,12 +68,6 @@ test('Obsidian 1.13 declarative settings expose workspace recovery and App Serve
   assert.match(definitions, /ui\.check_again/);
   assert.match(definitions, /ui\.installation_guide/);
   assert.match(source, /this\.settingTab\?\.refreshAfterLanguageChange\(\)/);
-  assert.match(mapSource, /setAttr\("aria-label", t\("ui\.reasoning_level"\)\)/);
-  // MS-06 replaces MS-04 D1 here: the level menu only changes what this run uses; the topic is written only by "pin".
-  const reasoningHandler = mapSource.slice(mapSource.indexOf('reasoning.addEventListener("change"'));
-  assert.match(reasoningHandler.slice(0, 400), /settings\.reasoning = normalizeReasoningLevel\(reasoning\.value\);\s*refresh\(\);/);
-  assert.doesNotMatch(reasoningHandler.slice(0, 400), /save\(/, 'a level change writes nothing by itself');
-  assert.match(mapSource, /modelSource: "manual",\s*reasoning: normalizeReasoningLevel\(settings\.reasoning\)/, 'pin stores model, manual and the level shown');
 });
 integrationTest('full rebuild refreshes derived data and open views', async () => {
   const { default: Plugin } = load('main.ts', { obsidian }); let rebuilds = 0, refreshes = 0;

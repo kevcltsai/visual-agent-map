@@ -16432,8 +16432,7 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.topicRuns.isBusy(path) ||
       this.plugin.quickExpandPending.has(path) ||
       this.startingTasks.has(path) ||
-      this.synthesisTasks.get(path)?.state === "running" ||
-      this.plugin.running.has(path)
+      this.synthesisTasks.get(path)?.state === "running"
     );
   }
   /**

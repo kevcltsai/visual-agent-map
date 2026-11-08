@@ -51,7 +51,7 @@ test('MS-06: "overridden" is true only when a manual ancestor supplies the model
   assert.deepEqual(support.plain(follow), { source: 'inherited', model: 'claude:sonnet', overridden: false });
 });
 
-test('the dialog wiring and strings exist', () => {
-  assert.match(read('experiences/visual-map/view.ts'), /followDefault: await this\.plugin\.repo\.followDefaultModel\(/);
+test('the follow-default model strings exist, and the share dialog still offers the choice', () => {
+  assert.match(read('experiences/sharing/share-modal.ts'), /FOLLOW_DEFAULT_MODEL, t\("ui\.follow_default_model", host\.modelLabel\(host\.defaultModel\(\)\)\)/);
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.match(read(`i18n/${lang}.ts`), /"ui\.follow_default_model": ".*\{0\}/);
 });

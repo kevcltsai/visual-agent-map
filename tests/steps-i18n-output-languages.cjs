@@ -448,12 +448,13 @@ test('output languages: the menu offers the follow-input row first, then registr
 test('output languages: a manual choice in the task menu is saved on the map when a run starts, from the dialog and the selection dialog', () => {
   const modals = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/modals.ts'), 'utf8');
   assert.match(modals, /this\.manualOutputLanguage = languageSelect\.value as ContentLanguage/);
-  assert.match(modals, /this\.info\?\.rememberOutputLanguage/);
-  assert.match(modals, /defaultOutputLanguage\(\s*this\.plugin\.settings\.language,\s*this\.topic,\s*this\.modelSettings\?\.contentLanguage,\s*this\.info\?\.outputLanguage,\s*this\.info\?\.mapTitle\s*\)/);
+  assert.match(modals, /this\.selectionFlow\.fields\.rememberOutputLanguage/);
+  assert.match(modals, /defaultOutputLanguage\(\s*this\.plugin\.settings\.language,\s*"",\s*undefined,\s*selection\.fields\.outputLanguage,\s*selection\.fields\.mapTitle\s*\)/);
   const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
-  assert.equal((view.match(/\.\.\.this\.outputLanguageMemory\(\)/g) ?? []).length, 2, 'topic dialog and selection synthesis dialog');
+  assert.equal((view.match(/\.\.\.this\.outputLanguageMemory\(\)/g) ?? []).length, 1, 'selection synthesis dialog (the topic chat window has no language control, D-2026-11-08 decision 4)');
   assert.match(view, /map\.outputLanguage = language/);
-  assert.match(view, /contentLanguage: existingNoteLanguage\(note\)/);
+  // The topic chat turn takes the language the same way (the note's language, else the map's remembered one), with no control in its window.
+  assert.match(view, /const language = defaultOutputLanguage\(\s*this\.plugin\.settings\.language,\s*note\.title,\s*existingNoteLanguage\(note\),\s*this\.outputLanguageMemory\(\)\.outputLanguage,\s*this\.map\?\.title\s*\);\s*if \(kind === "ask"\)/);
   for (const call of ['request.topic', 'rootQuestion']) assert.ok(view.includes(`outputLanguageForMap(this.map, settings.language, ${call})`), `map-level run: ${call}`);
 });
 
@@ -476,7 +477,7 @@ test('output languages: no existing prompt snapshot changed (the new languages a
 test('output languages: the single-card task line and the selection AI use the resolved output language and the selected text (D-2026-10-94)', () => {
   const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   // Single card (B2): the dialog's language, else the map's, never the interface language (the batch path reads the same way).
-  assert.match(view, /const taskLanguage =\s+options\.outputLanguage \?\? cardOutputLanguage\(this\.map, this\.plugin\.settings\.language, latest\.title\);\s+const task = researchTopicTask\(taskLanguage, latest\.title\);/);
+  assert.match(view, /const outputLanguage = cardOutputLanguage\(this\.map, this\.plugin\.settings\.language, note\.title\);\s+await this\.runAgent\(node, undefined, message => new Notice\(message\), \{\s+task: researchTopicTask\(outputLanguage, note\.title\),/);
   assert.equal(view.includes('researchTopicTask(this.plugin.settings.language'), false);
   // The "no conclusion yet" summary placeholder of the synthesis prompts is written in the output language's note language.
   // The selection synthesis's two steps (directions and draft) both build their context from the run options (04b).
@@ -672,10 +673,10 @@ test('card output language follows the map title when the card title is Latin (d
 
 test('card output language call sites use cardOutputLanguage with the map title', () => {
   const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
-  assert.equal((view.match(/cardOutputLanguage\(this\.map, this\.plugin\.settings\.language, (?:note|latest)\.title\)/g) ?? []).length, 2);
+  assert.equal((view.match(/cardOutputLanguage\(this\.map, this\.plugin\.settings\.language, (?:note|latest)\.title\)/g) ?? []).length, 1, 'rerunStandard; the old dialog call site is gone');
   assert.equal((view.match(/cardOutputLanguage\(\s*languageSource \?\? this\.map,\s*this\.plugin\.settings\.language,\s*note\.title\s*\)/g) ?? []).length, 1, 'researchChild uses the batch snapshot');
-  assert.equal((view.match(/outputLanguageForMap\(/g) ?? []).length, 4);
-  assert.equal((view.match(/defaultOutputLanguage\(\s*this\.plugin\.settings\.language,\s*note\.title,\s*existingNoteLanguage\(note\),\s*this\.outputLanguageMemory\(\)\.outputLanguage,\s*this\.map\?\.title\s*\)/g) ?? []).length, 2, 'both chat-expand calls pass the map title');
+  assert.equal((view.match(/outputLanguageForMap\(/g) ?? []).length, 5, 'the topic chat request adds one map-level use');
+  assert.equal((view.match(/defaultOutputLanguage\(\s*this\.plugin\.settings\.language,\s*note\.title,\s*existingNoteLanguage\(note\),\s*this\.outputLanguageMemory\(\)\.outputLanguage,\s*this\.map\?\.title\s*\)/g) ?? []).length, 3, 'both chat-expand calls and the topic chat turn pass the map title');
   assert.equal((view.match(/defaultOutputLanguage\(\s*settings\.language,\s*note\.title,\s*existingNoteLanguage\(note\),\s*remembered,\s*map\.title\s*\)/g) ?? []).length, 1, 'chat synthesis passes the map title');
   assert.match(view, /outputLanguageMemory\(\): OutputLanguageMemory \{[^]*?\.\.\.\(this\.map\?\.title \? \{ mapTitle: this\.map\.title \} : \{\}\)/, 'the dialog memory carries the map title');
 });

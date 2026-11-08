@@ -25,9 +25,9 @@ test("a conclusion card never says To research; other types still do", () => {
   assert.equal(showsToResearch("hypothesis", "idea"), true);
 });
 
-test("the card view routes its status label and the next-step dialog through showsToResearch", () => {
+test("the card view routes its status label (both card label sites) through showsToResearch", () => {
   const view = read("experiences/visual-map/view.ts");
-  assert.equal((view.match(/showsToResearch\(/g) || []).length >= 3, true);
+  assert.equal((view.match(/showsToResearch\(/g) || []).length >= 2, true);
 });
 
 test("research prompts remove outdated no-source statements and keep strength on the card only", () => {

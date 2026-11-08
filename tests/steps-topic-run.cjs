@@ -682,7 +682,7 @@ test('proposal: a run once model is resolved through the repository; a started r
 
 test('the view proposal entry no longer touches the running set; it goes through the run module', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
-  const body = src.slice(src.indexOf('private async proposeChildren('), src.indexOf('private async assertSuggestionOrigin'));
+  const body = src.slice(src.indexOf('async proposeChildren('), src.indexOf('private async assertSuggestionOrigin'));
   assert.doesNotMatch(body, /running\.(add|delete)/); assert.match(body, /topicRuns\.start\(parent\.path, "proposeChildren"/);
 });
 

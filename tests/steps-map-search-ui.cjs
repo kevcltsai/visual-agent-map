@@ -282,7 +282,7 @@ test('34: wiring in view.ts: render() restores the search after painting; the se
   const paint = source.slice(source.indexOf('private paint(): void'), source.indexOf('/** What the empty canvas says'));
   assert.match(paint, /const restoreSearch = this\.holdMapSearch\(\);/);
   assert.ok(paint.trimEnd().endsWith('restoreSearch();\n  }'), 'called at the very end of the paint');
-  assert.match(source.slice(source.indexOf('async onClose()'), source.indexOf('async onClose()') + 200), /closeMapSearch\(false\)/);
+  assert.match(source.slice(source.indexOf('async onClose()'), source.indexOf('async onClose()') + 600), /closeMapSearch\(false\)/);
   assert.match(source.slice(source.indexOf('private async openMapInMutation'), source.indexOf('private async openMapInMutation') + 700), /closeMapSearch\(false\)/);
   const renderNode = source.slice(source.indexOf('private renderNode('), source.indexOf('private renderNode(') + 4000);
   assert.equal(/is-search/.test(renderNode), false, 'renderNode knows nothing about the search');
@@ -290,7 +290,8 @@ test('34: wiring in view.ts: render() restores the search after painting; the se
 
 test('34: the new CSS stays out of the share viewer: every rule starts with .vam-view', () => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
-  const block = css.slice(css.indexOf('/* Map search (Mod+F)'));
+  const block = css.slice(css.indexOf('/* Map search (Mod+F)'), css.indexOf('/* Topic chat:'));
+  // The topic chat window's own block is appended after these and is not part of this check.
   const rules = block.split('\n').filter(l => l.trim() && !l.startsWith('/*'));
   assert.ok(rules.length >= 5);
   for (const rule of rules) assert.ok(rule.startsWith('.vam-view '), rule);

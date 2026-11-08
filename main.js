@@ -70984,7 +70984,7 @@ ${request.requirements}` : preset.text,
   topicChatBusy(node) {
     var _a2;
     const path = node.path;
-    return this.plugin.topicRuns.isBusy(path) || this.plugin.quickExpandPending.has(path) || this.startingTasks.has(path) || ((_a2 = this.synthesisTasks.get(path)) == null ? void 0 : _a2.state) === "running" || this.plugin.running.has(path);
+    return this.plugin.topicRuns.isBusy(path) || this.plugin.quickExpandPending.has(path) || this.startingTasks.has(path) || ((_a2 = this.synthesisTasks.get(path)) == null ? void 0 : _a2.state) === "running";
   }
   /**
    * Sends one button's request. Resolves true when it started (the window clears its input), false when it was declined

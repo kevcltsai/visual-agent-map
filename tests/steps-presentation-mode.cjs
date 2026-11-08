@@ -344,7 +344,7 @@ test('42: wiring in view.ts: capture keydown, toolbar button, hover guard, paint
   assert.match(paint, /"presentation", t\("ui\.presentation_start"\)/);
   const hover = source.slice(source.indexOf('private showHoverCard('), source.indexOf('private showHoverCard(') + 300);
   assert.match(hover, /if \(this\.presentation\) return;/);
-  assert.match(source.slice(source.indexOf('async onClose()'), source.indexOf('async onClose()') + 200), /exitPresentation\(false\)/);
+  assert.match(source.slice(source.indexOf('async onClose()'), source.indexOf('async onClose()') + 600), /exitPresentation\(false\)/);
   assert.match(source.slice(source.indexOf('private async openMapInMutation'), source.indexOf('private async openMapInMutation') + 800), /exitPresentation\(false\)/);
   const renderNode = source.slice(source.indexOf('private renderNode('), source.indexOf('private renderNode(') + 4000);
   assert.equal(/presenting|presentation/i.test(renderNode), false, 'renderNode knows nothing about the presentation');
@@ -352,7 +352,8 @@ test('42: wiring in view.ts: capture keydown, toolbar button, hover guard, paint
 
 test('42: the new CSS stays out of the share viewer (every rule starts with .vam-view) and dims the other cards to 0.35', () => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
-  const block = css.slice(css.indexOf('/* Presentation mode'));
+  const block = css.slice(css.indexOf('/* Presentation mode'), css.indexOf('/* Topic chat:'));
+  // The topic chat window's own block is appended after these and is not part of this check.
   assert.ok(block.length > 20, 'the block exists');
   const rules = block.split('\n').filter(l => l.trim() && !l.startsWith('/*'));
   assert.ok(rules.length >= 4);

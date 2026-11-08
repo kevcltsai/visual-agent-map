@@ -554,6 +554,8 @@ export const en = {
   "ui.confirm_new_synthesis_topic": "Create synthesis topic",
   "ui.mind_map_data_was_not_found_keep_the_agent_map_block": "Mind map data was not found. Keep the agent-map block.",
   "ui.invalid_mind_map_format": "Invalid mind map format.",
+  "ui.map_data_block_invalid":
+    "The data block of this mind map is malformed, so it cannot be opened. Fix the contents of the agent-map block.",
   "ui.invalid_node_data_or_duplicate_id": "Invalid node data or duplicate ID.",
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic":
     "A link contains a cycle or points to a missing parent topic.",

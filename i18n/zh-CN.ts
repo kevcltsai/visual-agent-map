@@ -506,6 +506,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.confirm_new_synthesis_topic": "创建整合议题",
   "ui.mind_map_data_was_not_found_keep_the_agent_map_block": "找不到心智图数据区块，请保留 agent-map 区块。",
   "ui.invalid_mind_map_format": "心智图格式不正确。",
+  "ui.map_data_block_invalid": "这张心智图的数据块格式不正确，无法打开。请修正 agent-map 块的内容。",
   "ui.invalid_node_data_or_duplicate_id": "议题数据不正确或 ID 重复。",
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "链接有循环或指向不存在的父议题。",
   "ui.ai_task_cancelled": "AI 任务已取消",

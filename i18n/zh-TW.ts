@@ -507,6 +507,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.confirm_new_synthesis_topic": "建立整合議題",
   "ui.mind_map_data_was_not_found_keep_the_agent_map_block": "找不到心智圖資料區塊，請保留 agent-map 區塊。",
   "ui.invalid_mind_map_format": "心智圖格式不正確。",
+  "ui.map_data_block_invalid": "這張心智圖的資料區塊格式不正確，無法開啟。請修正 agent-map 區塊的內容。",
   "ui.invalid_node_data_or_duplicate_id": "議題資料不正確或 ID 重複。",
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "連結有循環或指向不存在的母議題。",
   "ui.ai_task_cancelled": "AI 任務已取消",

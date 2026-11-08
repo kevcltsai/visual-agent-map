@@ -185,3 +185,12 @@ test('A1: a write after the plugin unloaded is refused with a translated message
     await assert.rejects(repo.app.vault.create('x.md', ''), error => error.message === expected, language);
   }
 });
+
+// A2: an agent-map block that is not valid JSON gives a readable, translated error instead of a raw SyntaxError.
+test('A2: a malformed agent-map block throws a readable translated error, not a raw SyntaxError', () => {
+  const bad = '```agent-map\n{ "version": 1, \n```\n';
+  assert.throws(() => core.parseMap(bad), error => !(error instanceof SyntaxError) && error.message === 'The data block of this mind map is malformed, so it cannot be opened. Fix the contents of the agent-map block.');
+  // The message comes from the dictionary of the interface language (map-model has its own language state in this bundle).
+  const zhTW = Object.values(load('i18n/zh-TW.ts')).find(value => value && typeof value === 'object' && 'ui.map_data_block_invalid' in value);
+  assert.equal(zhTW['ui.map_data_block_invalid'], '這張心智圖的資料區塊格式不正確，無法開啟。請修正 agent-map 區塊的內容。');
+});

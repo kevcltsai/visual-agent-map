@@ -632,7 +632,12 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
   if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
   // While AIM is hidden an old AIM map is kept exactly as saved: no legacy-name rewrite, and (below) no AIM validation, so a
   // reference left dangling by an ordinary edit cannot make the map unopenable. A map without `aim` is validated as always.
-  const parsed = JSON.parse(block[1]) as MapDocument;
+  let parsed: MapDocument;
+  try {
+    parsed = JSON.parse(block[1]) as MapDocument;
+  } catch {
+    throw new Error(t("ui.map_data_block_invalid"));
+  }
   const map = aimEnabled() ? upgradeLegacyAimData(parsed) : parsed;
   const checkAim = aimEnabled() || map.aim === undefined;
   if (map.version !== 1 || typeof map.id !== "string" || typeof map.title !== "string" || !Array.isArray(map.nodes))

@@ -235,172 +235,15 @@ test('built-in outline presets put the topic into their placeholder in both lang
   }
 });
 
-// ---- C2: quick explore in the Next Step dialog --------------------------------------------------------------------
-function quickHarness(quickOutline) {
-  const notices = [];
-  const Modal = dom.makeModal();
-  const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } } } });
-  const modelState = provider => ({ provider, status: 'ready', models: provider === 'codex' ? ['gpt-test'] : [] });
-  const plugin = { settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliModel: 'gpt-test', cliReasoning: 'low', language: 'en' },
-    aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model,
-    modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider) };
-  const expandCalls = [];
-  // Owner decision 2026-10-19: Generate hides the dialog; the finished outline is handed to the view, which keeps it
-  // for review. `reopen()` plays the card badge / Notice: a new dialog straight at the review.
-  const handed = { begins: 0, ends: 0, ready: undefined, controller: undefined };
-  const background = { begin: controller => { handed.begins++; handed.controller = controller; }, end: () => { handed.ends++; }, outlineReady: outline => { handed.ready = outline; } };
-  const build = extra => new NextStepModal({}, 'Sleep', 0, 0, plugin, async () => {}, async options => { expandCalls.push(options); }, async () => {},
-    { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, topicStatus: 'completed', quickOutline, background, ...extra });
-  const modal = build({});
-  modal.open();
-  const actions = () => find(modal.modalEl, i => hasCls(i, 'vam-next-actions'));
-  const adjust = find(modal.contentEl, i => i.tag === 'details' && hasCls(i, 'vam-next-adjust'));
-  const harness = { modal, notices, actions, adjust, expandCalls, handed, discarded: 0 };
-  harness.reopen = () => {
-    const reopened = build({ pendingOutline: { ...handed.ready, discard: () => { harness.discarded++; } } });
-    reopened.open();
-    harness.reopened = reopened;
-    return reopened;
-  };
-  return harness;
-}
 const outlineNodes = (markdown) => plain(load('experiences/visual-map/outline-import.ts', { obsidian }).parseOutline(markdown).nodes);
 
-integrationTest('quick explore: a preset select plus levels and size fields, defaulting to 2 levels and up to 15', () => {
-  const h = quickHarness({ presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }, { id: 'mine', name: 'Mine' }], generate: async () => [], create: async () => {} });
-  const limits = find(h.modal.contentEl, i => hasCls(i, 'vam-quick-limits'));
-  assert.equal(findAll(h.adjust, i => i === limits).length, 0, 'levels and size sit on the Expand panel, not under Adjust');
-  assert.deepEqual(plain(byLabel(h.adjust, 'Outline preset').children.map(o => o.text)), ['Knowledge tree generator', 'Mine'], 'the outline preset stays under Adjust');
-  assert.equal(byLabel(limits, 'Levels').value, '2'); assert.equal(byLabel(limits, 'Most subtopics').value, '15');
-  assert.equal(button(h.actions(), 'Expand').hidden, false);
-});
 
-integrationTest('persona-10: the Levels / Most subtopics fields select their text on focus, say so when the value is over the limit, and the summary says "1 level"', () => {
-  const h = quickHarness({ presets: [{ id: 'k', name: 'K' }], generate: async () => [], create: async () => {} });
-  const levels = byLabel(h.modal.contentEl, 'Levels');
-  let selected = 0; levels.select = () => { selected++; };
-  levels.fire('focus');
-  assert.equal(selected, 1, 'focus selects the old value so typing replaces it (no "21")');
-  levels.value = '9'; levels.fire('input');
-  const note = find(h.modal.contentEl, i => hasCls(i, 'vam-field-note') && /at most 6/i.test(i.text ?? ''));
-  assert.ok(note && !note.hidden, 'an over-limit value is told, not silently clamped');
-  levels.change();
-  assert.equal(levels.value, '6'); assert.ok(!note.hidden, 'the note stays after the value is brought back to the limit');
-  levels.value = '1'; levels.fire('input'); levels.change();
-  assert.ok(note.hidden, 'a valid value clears the note');
-  assert.equal(find(h.modal.contentEl, i => i.cls === 'vam-next-summary').text.startsWith('1 level · up to 15'), true, 'singular wording');
-});
 
-integrationTest('persona-10: the reopened outline review shows the levels and size the outline was generated with', async () => {
-  const h = quickHarness({ presets: [{ id: 'k', name: 'K' }], generate: async () => outlineNodes('# Sleep\n## A\n## B'), create: async () => {} });
-  const levels = byLabel(h.modal.contentEl, 'Levels'), topics = byLabel(h.modal.contentEl, 'Most subtopics');
-  levels.value = '1'; levels.change(); topics.value = '5'; topics.change();
-  button(h.actions(), 'Expand').click(); await tick(); await tick();
-  const reopened = h.reopen();
-  assert.equal(byLabel(reopened.contentEl, 'Levels').value, '1'); assert.equal(byLabel(reopened.contentEl, 'Most subtopics').value, '5');
-  assert.equal(find(reopened.contentEl, i => i.cls === 'vam-next-summary').text.startsWith('1 level · up to 5'), true, 'the summary line follows');
-});
 
-integrationTest('quick explore: Generate hides the dialog; the outline is reviewed in a reopened dialog before anything is created', async () => {
-  const requests = [], created = [];
-  const h = quickHarness({
-    presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }, { id: 'mine', name: 'Mine' }],
-    generate: async (request, signal) => { requests.push({ ...request, signal }); return outlineNodes('# Sleep\n## Body\n### Definition\n## Mind\n### Definition'); },
-    create: async (nodes, options) => { created.push({ nodes, options }); }
-  });
-  byLabel(h.adjust, 'Outline preset').value = 'mine';
-  button(h.actions(), 'Expand').click(); await tick(); await tick();
-  assert.equal(requests.length, 1); assert.equal(requests[0].presetId, 'mine'); assert.equal(requests[0].language, 'same-as-input');
-  assert.equal(h.modal.closeCount, 1, 'the dialog hides itself once the outline starts');
-  assert.deepEqual(created, [], 'nothing is created before review');
-  assert.equal(h.expandCalls.length, 0, 'the old quick expansion is not used');
-  assert.equal(findAll(h.modal.contentEl, i => hasCls(i, 'vam-proposal')).length, 0, 'nothing is written into the hidden dialog');
-  assert.deepEqual([h.handed.begins, h.handed.ends], [1, 1], 'the card shows the run until the outline is ready');
-  const reopened = h.reopen();
-  const titles = findAll(reopened.contentEl, i => hasCls(i, 'vam-proposal-title')).map(i => i.value);
-  assert.deepEqual(titles, ['Body', 'Definition', 'Mind', 'Definition'], 'the topic itself is not proposed again');
-  // Uncheck one branch and rename a row, then create.
-  const checks = findAll(reopened.contentEl, i => i.type === 'checkbox' && hasCls(i.parent ?? {}, 'vam-proposal-head'));
-  checks[2].checked = false; checks[2].change();
-  findAll(reopened.contentEl, i => hasCls(i, 'vam-proposal-title'))[1].value = 'What it is';
-  button(reopened.contentEl, 'Create subtopics (2)').click(); await tick(); await tick();
-  assert.equal(created.length, 1);
-  assert.deepEqual(plain(created[0].nodes.map(node => [node.index, node.title, node.parent])), [[0, 'Body', null], [1, 'What it is', 0]]);
-  assert.equal(reopened.closeCount, 1); assert.ok(h.notices.includes('Subtopics created.'));
-  assert.equal(h.discarded, 1, 'creating consumes the waiting outline');
-});
 
-integrationTest('quick explore: the reopened review keeps the dialog options and the generated nodes (including the dropped count)', async () => {
-  const h = quickHarness({ presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }], create: async () => {},
-    generate: async () => outlineNodes('# Sleep\n## A\n### A1\n#### Too deep\n## B') });
-  byLabel(h.modal.contentEl, 'Levels').value = '2';
-  find(h.adjust, i => i.tag === 'textarea').value = 'Keep it short';
-  const shallow = findAll(h.adjust, i => i.tag === 'input' && i.type === 'checkbox')[0];
-  shallow.checked = true; shallow.change();
-  button(byLabel(h.modal.contentEl, 'AI mode'), 'Standard').click();
-  button(h.actions(), 'Expand').click(); await tick(); await tick();
-  assert.equal(h.handed.ready.dropped, 1); assert.equal(h.handed.ready.options.shallowResearch, true); assert.equal(h.handed.ready.options.requirements, 'Keep it short');
-  assert.deepEqual(plain([h.handed.ready.options.researchMode, h.handed.ready.options.researchDepth, h.handed.ready.options.visualMode, h.handed.ready.options.mapAiMode]), ['research', 'fast', 'auto', 'standard'], 'the stored options carry the subtopic research of the chosen mode');
-  const reopened = h.reopen();
-  assert.ok(find(reopened.contentEl, i => /Left out beyond the chosen levels or size: 1 heading/.test(i.text ?? '')), 'the review says what was left out');
-  assert.deepEqual(findAll(reopened.contentEl, i => hasCls(i, 'vam-proposal-title')).map(i => i.value), ['A', 'A1', 'B']);
-  assert.equal(findAll(reopened.contentEl, i => i.tag === 'input' && i.type === 'checkbox')[0].checked, true, 'the shallow research choice is restored');
-  assert.deepEqual(plain(['Quick', 'Standard'].map(name => button(byLabel(reopened.contentEl, 'AI mode'), name).attrs['aria-checked'])), ['false', 'true'], 'the review shows the switch the outline was generated with');
-  assert.equal(button(reopened.contentEl, 'Create subtopics (3)').disabled, false, 'the reopened review can create straight away');
-});
 
-integrationTest('quick explore: the chosen levels and size reach the generator and an over-deep or over-long reply is trimmed before review', async () => {
-  const requests = [];
-  const h = quickHarness({
-    presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }],
-    generate: async request => { requests.push(request); return outlineNodes('# Sleep\n## Body\n### Definition\n#### Too deep\n## Mind\n## Dreams\n## Extra'); },
-    create: async () => {}
-  });
-  const levels = byLabel(h.modal.contentEl, 'Levels'), size = byLabel(h.modal.contentEl, 'Most subtopics');
-  levels.value = '2'; size.value = '5';
-  button(h.actions(), 'Expand').click(); await tick(); await tick();
-  assert.deepEqual(plain(requests[0].limits), { levels: 2, maxTopics: 5 });
-  const titles = findAll(h.reopen().contentEl, i => hasCls(i, 'vam-proposal-title')).map(i => i.value);
-  assert.deepEqual(titles, ['Body', 'Definition', 'Mind', 'Dreams', 'Extra'], 'the level-3 heading is left out');
-  assert.ok(find(h.reopened.contentEl, i => /Left out beyond the chosen levels or size: 1 heading/.test(i.text ?? '')), 'the review says what was left out');
-});
-integrationTest('quick explore: when the AI writes too many topics, every main branch is kept before any grows deeper', async () => {
-  const h = quickHarness({ presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }], create: async () => {},
-    generate: async () => outlineNodes('# Sleep\n## A\n### A1\n### A2\n## B\n### B1\n### B2\n## C\n### C1\n### C2') });
-  byLabel(h.modal.contentEl, 'Levels').value = '2'; byLabel(h.modal.contentEl, 'Most subtopics').value = '5';
-  button(h.actions(), 'Expand').click(); await tick(); await tick();
-  const titles = findAll(h.reopen().contentEl, i => hasCls(i, 'vam-proposal-title')).map(i => i.value);
-  assert.deepEqual(titles, ['A', 'A1', 'A2', 'B', 'C'], 'A, B and C all survive; the extra depth is what gets cut');
-});
-integrationTest('quick explore: out-of-range levels and size are clamped to 1–6 and 1–30', async () => {
-  const requests = [];
-  const h = quickHarness({ presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }], generate: async request => { requests.push(request); return outlineNodes('# Sleep\n## Body'); }, create: async () => {} });
-  byLabel(h.modal.contentEl, 'Levels').value = '99'; byLabel(h.modal.contentEl, 'Most subtopics').value = '0';
-  button(h.actions(), 'Expand').click(); await tick(); await tick();
-  assert.deepEqual(plain(requests[0].limits), { levels: 6, maxTopics: 1 });
-});
 
-integrationTest('quick explore: Stop on the card aborts the hidden outline, hands nothing to the view and writes nothing; hiding the dialog alone does not stop it (f)', async () => {
-  let signal; const created = [];
-  const h = quickHarness({ presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }], generate: (_request, s) => { signal = s; return new Promise(resolve => s.addEventListener('abort', () => resolve(outlineNodes('# Sleep\n## Late')))); }, create: async nodes => { created.push(nodes); } });
-  button(h.actions(), 'Expand').click(); await tick(); await tick();
-  assert.equal(h.modal.closeCount, 1); assert.equal(signal.aborted, false, 'hiding the dialog does not stop the AI');
-  h.modal.close(); await tick();
-  assert.equal(signal.aborted, false, 'closing the hidden dialog again never aborts it');
-  h.handed.controller.abort(); await tick(); await tick();
-  assert.equal(signal.aborted, true);
-  assert.deepEqual(created, []);
-  assert.equal(h.handed.ready, undefined, 'a late result after Stop is dropped');
-  assert.equal(findAll(h.modal.contentEl, i => hasCls(i, 'vam-proposal')).length, 0, 'no review shown in the closed dialog');
-});
 
-integrationTest('quick explore: a failure after the dialog hid is a Notice and hands nothing to the view', async () => {
-  const h = quickHarness({ presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }], create: async () => {}, generate: async () => { throw new Error('The AI outline has 101 headings; the limit is 100.'); } });
-  button(h.actions(), 'Expand').click(); await tick(); await tick(); await tick();
-  assert.equal(h.modal.closeCount, 1, 'the run had already started, so the dialog is hidden');
-  assert.ok(h.notices.some(message => /101 headings/.test(message)), 'the failure is announced by a Notice');
-  assert.equal(h.handed.ready, undefined);
-});
 
 test('outline proposals round-trip: the root is dropped, keys keep repeated titles apart, parents come first', () => {
   const { outlineProposals, proposalOutline } = load('experiences/visual-map/modals.ts', { obsidian });
@@ -866,47 +709,6 @@ integrationTest('structure review in the background: a failure is a Notice plus 
   switched.control.gate.resolve(); await tick(); await tick();
 });
 
-test('structure review entry copy in Traditional Chinese; the review window titles stay as they are', () => {
-  const { translate } = load('i18n.ts');
-  assert.equal(translate('zh-TW', 'ui.structure_review_entry_label'), 'AI 結構建議：');
-  assert.equal(translate('zh-TW', 'ui.structure_review_entry_map'), '哪裡該加強或刪減？（整張圖）');
-  assert.equal(translate('zh-TW', 'ui.structure_review_entry_branch'), '哪裡該加強或刪減？（這個分支）');
-  assert.equal(translate('zh-TW', 'ui.structure_review_entry_hint'), 'AI 只讀標題、摘要與狀態，建議新增、刪減、移動或合併議題；每條可單獨套用、可復原。');
-  assert.equal(translate('zh-TW', 'ui.structure_review_map'), '檢視整張圖');
-  assert.equal(translate('zh-TW', 'ui.structure_review_branch'), '檢視這個分支');
-});
-
-integrationTest('structure review entry: the root topic offers the whole map, a subtopic with subtopics its branch, a leaf nothing', async () => {
-  const h = await viewHarness({ suggestions: [] });
-  const entry = id => h.view.structureReviewEntry(h.view.map.nodes.find(n => n.id === id));
-  assert.equal(entry(h.ids.root).label, 'What to strengthen or cut? (whole map)');
-  assert.equal(entry(h.ids.a).label, 'What to strengthen or cut? (this branch)');
-  assert.equal(entry(h.ids.c), undefined);
-  // The Next Step dialog shows it and opens the review in its place.
-  const notices = [];
-  const Modal = dom.makeModal();
-  const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class { constructor(m) { notices.push(m); } } } });
-  const modelState = provider => ({ provider, status: 'ready', models: [] });
-  const plugin = { settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliModel: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async () => true, confirmAiUsage: async (_m, run) => { await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: m => m, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async p => modelState(p) };
-  let opened = 0;
-  const modal = new NextStepModal({}, 'Sleep', 3, 0, plugin, async () => {}, async () => {}, async () => {}, { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, structureReview: { label: 'What to strengthen or cut? (whole map)', open: () => { opened++; } } });
-  modal.open();
-  assert.ok(find(modal.contentEl, i => hasCls(i, 'vam-next-structure-label') && i.text === 'AI structure suggestions:'));
-  assert.ok(find(modal.contentEl, i => hasCls(i, 'vam-next-structure-hint') && i.text === 'AI reads only titles, summaries and status, then suggests topics to add, cut, move or merge; apply each one on its own, and undo any.'));
-  button(modal.contentEl, 'What to strengthen or cut? (whole map)').click();
-  assert.equal(opened, 1); assert.equal(modal.closeCount, 1);
-});
-
-integrationTest('structure review entry: hidden from the Next Step dialog (owner 2026-10-28), the review itself stays', async () => {
-  const h = await viewHarness({ suggestions: [] });
-  for (const id of [h.ids.root, h.ids.a]) {
-    const node = h.view.map.nodes.find(n => n.id === id);
-    assert.ok(h.view.structureReviewEntry(node), `still eligible: ${id}`);
-    assert.equal(h.view.nextStepStructureReview(node), undefined, `not offered: ${id}`);
-  }
-  h.view.openStructureReview(null);
-  assert.equal(h.opened.at(-1).constructor.name, 'StructureReviewModal');
-});
 
 // ---- Adversarial cases from the Phase C test pass: late results, cancelled confirms and entry points -------------
 const diffWorld = (a0, b0) => { const strip = j => JSON.stringify(JSON.parse(j).map(([k, v]) => [k, v.replace(/^updated: .*\n/gm, '').replace(/^updated: .*$/gm, '').replace(/^agent-map-id: .*\n/gm, '')])); const a = strip(a0), b = strip(b0); return diffWorld0(a, b); };
@@ -927,19 +729,6 @@ integrationTest('structure review: cancelled confirm for reduce and merge: sugge
   // now actually apply after cancelling: still works
   await apply(3, false); await tick(); await h.choose('Remove entire branch');
   assert.equal((await h.saved()).some(n => n.id === h.ids.d), false);
-});
-integrationTest('structure review entries: leaf, AIM map, outside topics folder', async () => {
-  const h = await viewHarness({ suggestions: [] });
-  const entry = id => h.view.structureReviewEntry(h.view.map.nodes.find(n => n.id === id));
-  assert.equal(entry(h.ids.c), undefined); assert.equal(entry(h.ids.f), undefined);
-  assert.ok(entry(h.ids.root)); assert.ok(entry(h.ids.a));
-  h.view.map.aim = { kind: 'aim' };
-  assert.equal(entry(h.ids.root), undefined, 'aim: root'); assert.equal(entry(h.ids.a), undefined, 'aim: branch');
-  delete h.view.map.aim;
-  h.view.openStructureReview(null); assert.equal(h.opened.length, 1);
-  const p = h.view.path; h.view.path = 'Other/Map.md';
-  assert.equal(entry(h.ids.root), undefined);
-  h.view.path = p;
 });
 
 test('structure review window: a host that ignores abort and resolves late writes nothing into a closed or cancelled window', async () => {

@@ -4782,18 +4782,23 @@ function msViewFixture({ aim = false, nodes = 1, stored = [], items = [] } = {})
   return { view, tree, state, tools, draw, plugin };
 }
 const msButton = tools => dom.find(tools, c => c.tag === 'button' && (c.cls ?? '').includes('vam-sources-button'));
-const msLabel = tools => dom.find(msButton(tools), c => c.cls === 'vam-sources-button-label').text;
+const msLabel = tools => msButton(tools).attrs['aria-label'];
+const msBadge = tools => dom.find(msButton(tools), c => (c.cls ?? '').split(' ').includes('vam-sources-button-badge'));
 integrationTest('map sources toolbar: the button follows the select icon (the goal now lives in the goal bar), reads 資料來源 with and without a count, and is absent on AIM and empty maps', () => {
   const none = msViewFixture(); none.draw();
   const buttons = none.tools.children.filter(c => c.tag === 'button');
   assert.equal(buttons.at(-1), msButton(none.tools), 'right after the select icon');
   assert.ok(buttons.at(-2).cls.includes('vam-tools-select'));
   assert.equal(buttons.some(b => (b.cls ?? '').includes('vam-relevance-goal')), false, 'no goal button in the toolbar any more');
-  assert.equal(msLabel(none.tools), 'Data sources');
+  assert.equal(msLabel(none.tools), 'Data sources'); assert.equal(msBadge(none.tools), undefined, 'no sources: no badge');
+  assert.equal(dom.find(msButton(none.tools), c => c.cls === 'vam-sources-button-label'), undefined, 'no text label node');
+  assert.equal(dom.find(msButton(none.tools), c => c.cls === 'vam-sources-button-icon').iconName, 'files'); assert.equal(dom.find(msButton(none.tools), c => c.cls === 'vam-sources-button-icon').attrs['aria-hidden'], 'true');
   const three = msViewFixture({ stored: [{ kind: 'folder', path: 'Research' }, { kind: 'file', path: 'Notes/interview.md' }, { kind: 'map', path: 'Old plan/Map.md' }] }); three.draw();
   assert.equal(msLabel(three.tools), 'Data sources · 3'); assert.equal(dom.find(msButton(three.tools), c => c.iconName === 'alert-triangle'), undefined);
+  assert.equal(msBadge(three.tools).text, '3'); assert.equal(msBadge(three.tools).attrs['aria-hidden'], 'true'); assert.equal(msBadge(three.tools).classes.includes('is-bad'), false);
   assert.equal(msButton(three.tools).attrs['aria-haspopup'], 'dialog'); assert.equal(msButton(three.tools).attrs['aria-expanded'], 'false'); assert.ok(msButton(three.tools).attrs['aria-controls']);
   assert.equal(msViewFixture({ aim: true }).draw().children.length, 0, 'no tools at all on an AIM map');
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /vam-sources-button-label|vam-map-sources-warning|vam-tools-select-label/, 'the removed label and warning rules are gone');
   const empty = msViewFixture({ nodes: 0 }).draw();
   assert.equal(msButton(empty), undefined, 'an empty map has no data sources button');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
@@ -4804,11 +4809,12 @@ integrationTest('map sources toolbar: the button follows the select icon (the go
 integrationTest('map sources toolbar: an unreadable source puts ⚠ before the label and an aria-description, keeping the count', () => {
   const fx = msViewFixture({ stored: [{ kind: 'folder', path: 'Research' }, { kind: 'file', path: 'Gone/missing.md' }, { kind: 'file', path: 'Gone/two.md' }] }); fx.draw();
   const button = msButton(fx.tools);
-  assert.equal(button.children[0].children.length === 0 && button.children[0].iconName, 'alert-triangle'); assert.equal(button.children[1].text, 'Data sources · 3', 'the warning comes before the label; the count is unchanged');
+  assert.equal(button.attrs['aria-label'], 'Data sources · 3', 'the count in the accessible name is unchanged'); assert.equal(dom.find(button, c => c.iconName === 'alert-triangle'), undefined);
+  assert.equal(msBadge(fx.tools).text, '!'); assert.ok(msBadge(fx.tools).classes.includes('is-bad'));
   assert.equal(button.attrs['aria-description'], '2 unreadable'); assert.ok(button.hasClass('has-unreadable'));
   button.removeAttribute = name => { delete button.attrs[name]; };
   fx.view.mapSources = [{ kind: 'folder', path: 'Research' }]; fx.view.paintMapSourcesButton();
-  assert.equal(dom.find(button, c => c.iconName === 'alert-triangle'), undefined); assert.equal(button.attrs['aria-description'], undefined);
+  assert.equal(msBadge(fx.tools).text, '1'); assert.equal(msBadge(fx.tools).classes.includes('is-bad'), false); assert.equal(button.attrs['aria-description'], undefined); assert.equal(button.hasClass('has-unreadable'), false);
 });
 // Like a browser: moving focus fires focusout (with relatedTarget) on the element that held it. Applied to every element created later.
 const withRealFocus = el => {
@@ -4865,7 +4871,7 @@ integrationTest('map sources in the view: deleting a source note repaints the bu
   msButton(fx.tools).click();
   assert.equal(dom.find(fx.tools, c => c.cls === 'vam-map-sources-meta').text, 'Markdown');
   fx.tree.items.delete('Notes/interview.md'); fx.view.refreshMapSourcesUi();
-  assert.ok(dom.find(msButton(fx.tools), c => c.iconName === 'alert-triangle')); assert.equal(dom.find(fx.tools, c => c.cls === 'vam-map-sources-meta').text, 'Unreadable; tasks skip it');
+  assert.equal(msBadge(fx.tools).text, '!'); assert.ok(msBadge(fx.tools).classes.includes('is-bad')); assert.equal(dom.find(fx.tools, c => c.cls === 'vam-map-sources-meta').text, 'Unreadable; tasks skip it');
   assert.ok(dom.find(fx.tools, c => (c.cls ?? '').includes('vam-map-sources-remove')), 'the unreadable row keeps Remove');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /this\.registerEvent\(vault\.on\("delete"[\s\S]*this\.registerEvent\(vault\.on\("rename"/);

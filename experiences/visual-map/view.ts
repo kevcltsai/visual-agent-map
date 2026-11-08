@@ -5122,19 +5122,22 @@ export class VisualAgentMapView extends ItemView {
     this.mapSourcesButtonEl = button;
     this.paintMapSourcesButton();
   }
-  /** Label, ⚠ and accessible text from the current sources; also run when a vault event changes what is readable. */
+  /** Icon, count/! badge and accessible text from the current sources; also run when a vault event changes what is readable. */
   private paintMapSourcesButton(): void {
     const button = this.mapSourcesButtonEl;
     if (!button) return;
     const label = mapSourcesButtonLabel(this.mapSources.length);
     const unreadable = unreadableMapSources(this.app, this.mapSources);
     button.empty();
-    if (unreadable) {
-      const warn = button.createSpan({ cls: "vam-map-sources-warning" });
-      warn.setAttr("aria-hidden", "true");
-      setIcon(warn, "alert-triangle");
+    const icon = button.createSpan({ cls: "vam-sources-button-icon" });
+    icon.setAttr("aria-hidden", "true");
+    setIcon(icon, "files");
+    const count = this.mapSources.length;
+    if (unreadable || count > 0) {
+      const badge = button.createSpan({ cls: "vam-sources-button-badge", text: unreadable ? "!" : String(count) });
+      badge.setAttr("aria-hidden", "true");
+      if (unreadable) badge.addClass("is-bad");
     }
-    button.createSpan({ cls: "vam-sources-button-label", text: label });
     button.setAttr("aria-label", label);
     button.setAttr("aria-expanded", String(this.mapSourcesOpen));
     if (unreadable) button.setAttr("aria-description", t("ui.map_sources_unreadable_description_0", unreadable));
@@ -14325,7 +14328,7 @@ export class VisualAgentMapView extends ItemView {
     this.renderSelectTool(tools);
     // No goal control: goal grading is off for an AIM map (see renderMapTools).
   }
-  /** The one toolbar control: a button that is just its icon until the pointer or the keyboard is on the toolbar. */
+  /** The one toolbar control: an icon-only button; the name shows as the aria-label tooltip. */
   private renderSelectTool(tools: HTMLElement): void {
     if (!this.map?.nodes.length) return;
     const selecting = this.selection.state.multiSelectMode;
@@ -14339,7 +14342,6 @@ export class VisualAgentMapView extends ItemView {
     const icon = integrate.createSpan("vam-tools-select-icon");
     icon.setAttr("aria-hidden", "true");
     appendGoalSvg(icon, "select");
-    integrate.createSpan({ cls: "vam-tools-select-label", text: label });
     integrate.addEventListener("click", event => {
       event.stopPropagation();
       this.applySelectionChange(this.selection.toggleMultiSelect());

@@ -2132,6 +2132,19 @@ export class VisualAgentMapView extends ItemView {
       this.loadStatusEl = el;
     }
     el.setText(t("ui.map_notes_loading_0_1", load.read, load.total));
+    this.liftLoadStatus(el);
+  }
+  /** On a narrow canvas the zoom controls would cover the line: it then sits just above them (both stay at the canvas bottom otherwise). */
+  private liftLoadStatus(el: HTMLElement): void {
+    const zoom = this.contentEl.querySelector?.<HTMLElement>(".vam-zoom-controls");
+    // Measured at the bottom, so a lifted line is put down first (else it would flip back and forth).
+    el.removeClass?.("is-lifted");
+    const own = el.getBoundingClientRect?.();
+    const box = zoom?.getBoundingClientRect?.();
+    const clash =
+      !!own && !!box && own.left < box.right && own.right > box.left && own.top < box.bottom && own.bottom > box.top;
+    el.toggleClass?.("is-lifted", clash);
+    el.style?.setProperty?.("--vam-load-lift", clash ? `${Math.ceil(box.height) + 4}px` : "0px");
   }
   private removeLoadStatus(): void {
     this.loadStatusEl?.remove();
@@ -13815,7 +13828,8 @@ export class VisualAgentMapView extends ItemView {
     switchMap.setAttr("title", t("ui.switch_mind_map"));
     setIcon(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switchMap.addEventListener("click", () => this.openMapSwitcher());
-    if (this.map && !this.aimLive() && this.map.nodes.length) this.renderResearchProgress(toolbar);
+    if (this.map && !this.aimLive() && this.map.nodes.length && !this.notesLoading())
+      this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
@@ -20460,6 +20474,11 @@ export class VisualAgentMapView extends ItemView {
     this.zoomLabel?.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
   private saveViewport(): void {
+    // The user moved the view while the notes were read: the final render must not clear the toolbar and shift it again.
+    const frame = this.loadFrameViewport;
+    const now = this.map?.viewport;
+    if (this.notesLoading() && frame && now && (now.x !== frame.x || now.y !== frame.y || now.zoom !== frame.zoom))
+      this.toolbarClearedFor = this.path;
     // A hidden pane measures 0: nothing is requested from it (a camera move asked meanwhile is replayed when the tab is shown).
     // A save scheduled while the pane was shown was computed from a sized pane, so it is written even if the tab hides within the wait.
     if (this.hiddenTab()) return;
@@ -20646,8 +20665,10 @@ export class VisualAgentMapView extends ItemView {
     // Reading: the cards still have placeholder heights, so the clearing waits for the final render (in memory lift only).
     if (this.notesLoading()) {
       this.map.viewport = viewport;
+      this.loadFrameViewport ??= { ...viewport };
       return;
     }
+    this.loadFrameViewport = null;
     // Only the first paint of a map clears the toolbar: a later render must not move a view the user panned to.
     if (this.toolbarClearedFor === this.path) {
       this.map.viewport = viewport;
@@ -20663,6 +20684,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
   private toolbarClearedFor: string | null = null;
+  /** The viewport of the loading frame: a different one at the next save means the user moved the view while reading. */
+  private loadFrameViewport: { x: number; y: number; zoom: number } | null = null;
   /**
    * Screen tops (canvas coordinates) of the cards the saved viewport would draw under the toolbar. Computed from the
    * saved positions, as the stage is not transformed yet when this runs; a card's height is its laid-out height.

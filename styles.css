@@ -1929,6 +1929,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 
 /* Progress line while the notes of an opened map are read: bottom left, above any status bar, never wider than the canvas. */
 .vam-view .vam-map-load-status { position: absolute; left: 12px; bottom: calc(10px + var(--vam-status-clearance, 0px)); z-index: 2; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-ui-smaller); color: var(--text-accent); pointer-events: none; }
+.vam-view .vam-map-load-status.is-lifted { bottom: calc(10px + var(--vam-load-lift, 0px) + var(--vam-status-clearance, 0px)); }
 
 /* Map search (Mod+F). Every rule starts with .vam-view so the share viewer never collects it. */
 .vam-view .vam-map-search { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 24px); padding: 4px 6px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }

@@ -57834,6 +57834,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "toolsZoom", null);
     /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
     __publicField(this, "toolbarClearedFor", null);
+    /** The viewport of the loading frame: a different one at the next save means the user moved the view while reading. */
+    __publicField(this, "loadFrameViewport", null);
     __publicField(this, "fitNotice", null);
     /** True while a framing action (fit) applies its viewport: tool-row placement must not pan the canvas then. */
     __publicField(this, "framingViewport", false);
@@ -58198,6 +58200,18 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       this.loadStatusEl = el;
     }
     el.setText(t("ui.map_notes_loading_0_1", load.read, load.total));
+    this.liftLoadStatus(el);
+  }
+  /** On a narrow canvas the zoom controls would cover the line: it then sits just above them (both stay at the canvas bottom otherwise). */
+  liftLoadStatus(el) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    const zoom = (_b2 = (_a2 = this.contentEl).querySelector) == null ? void 0 : _b2.call(_a2, ".vam-zoom-controls");
+    (_c = el.removeClass) == null ? void 0 : _c.call(el, "is-lifted");
+    const own2 = (_d = el.getBoundingClientRect) == null ? void 0 : _d.call(el);
+    const box = (_e = zoom == null ? void 0 : zoom.getBoundingClientRect) == null ? void 0 : _e.call(zoom);
+    const clash = !!own2 && !!box && own2.left < box.right && own2.right > box.left && own2.top < box.bottom && own2.bottom > box.top;
+    (_f = el.toggleClass) == null ? void 0 : _f.call(el, "is-lifted", clash);
+    (_h = (_g = el.style) == null ? void 0 : _g.setProperty) == null ? void 0 : _h.call(_g, "--vam-load-lift", clash ? `${Math.ceil(box.height) + 4}px` : "0px");
   }
   removeLoadStatus() {
     var _a2;
@@ -69004,7 +69018,8 @@ ${request.requirements}` : preset.text,
     switchMap.setAttr("title", t("ui.switch_mind_map"));
     (0, import_obsidian37.setIcon)(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switchMap.addEventListener("click", () => this.openMapSwitcher());
-    if (this.map && !this.aimLive() && this.map.nodes.length) this.renderResearchProgress(toolbar);
+    if (this.map && !this.aimLive() && this.map.nodes.length && !this.notesLoading())
+      this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
@@ -75093,6 +75108,11 @@ ${note.detail.trim()}` : "",
     (_d = this.zoomLabel) == null ? void 0 : _d.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
   saveViewport() {
+    var _a2;
+    const frame = this.loadFrameViewport;
+    const now = (_a2 = this.map) == null ? void 0 : _a2.viewport;
+    if (this.notesLoading() && frame && now && (now.x !== frame.x || now.y !== frame.y || now.zoom !== frame.zoom))
+      this.toolbarClearedFor = this.path;
     if (this.hiddenTab()) return;
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
     this.viewportTimer = window.setTimeout(() => {
@@ -75259,13 +75279,16 @@ ${note.detail.trim()}` : "",
   }
   /** Lifts a never-moved default viewport below the toolbar. In memory only; it is saved with the next real pan or zoom. */
   applyInitialViewport() {
+    var _a2;
     if (!this.map) return;
     const inset = this.canvasInset();
     const viewport = initialViewport(this.map.viewport, inset);
     if (this.notesLoading()) {
       this.map.viewport = viewport;
+      (_a2 = this.loadFrameViewport) != null ? _a2 : this.loadFrameViewport = { ...viewport };
       return;
     }
+    this.loadFrameViewport = null;
     if (this.toolbarClearedFor === this.path) {
       this.map.viewport = viewport;
       return;

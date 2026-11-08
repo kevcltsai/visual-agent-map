@@ -594,3 +594,45 @@ test('v (M3): a repaint when reading ends during a drag waits for the drop', asy
   assert.equal(cleaned, 0, 'the drag is not cancelled');
   assert.equal(view.paintCount, paints);
 });
+
+test('w (M4): a pan or zoom while reading marks the clearing done, so the final render does not shift the view; no move still clears once', async () => {
+  const { h, finish } = await loadingHarness();
+  const { view } = h;
+  view.canvasInset = () => 50;
+  view.topsUnderToolbar = () => [10];
+  view.applyInitialViewport();
+  view.saveViewport();
+  assert.notEqual(view.toolbarClearedFor, view.path, 'a save without a move leaves the clearing for the final render');
+  view.map.viewport = { x: -40, y: -10, zoom: 1 };
+  view.saveViewport();
+  assert.equal(view.toolbarClearedFor, view.path, 'the user moved the view while reading');
+  await finish();
+  view.applyInitialViewport();
+  assert.deepEqual({ ...view.map.viewport }, { x: -40, y: -10, zoom: 1 }, 'the final render leaves the panned view alone');
+});
+
+test('x (D1): the progress line is lifted above the zoom controls only when they would cover it', async () => {
+  const { h, finish } = await loadingHarness();
+  const { view } = h;
+  const props = new Map(), classes = new Set();
+  const el = { getBoundingClientRect: () => ({ left: 396, right: 532, top: 749, bottom: 765 }), removeClass: n => classes.delete(n), toggleClass: (n, on) => (on ? classes.add(n) : classes.delete(n)), style: { setProperty: (k, v) => props.set(k, v) } };
+  let zoom = { getBoundingClientRect: () => ({ left: 462, right: 748, top: 723, bottom: 763, height: 40 }) };
+  view.contentEl.querySelector = sel => (sel === '.vam-zoom-controls' ? zoom : null);
+  view.liftLoadStatus(el);
+  assert.equal(classes.has('is-lifted'), true);
+  assert.equal(props.get('--vam-load-lift'), '44px');
+  zoom = { getBoundingClientRect: () => ({ left: 560, right: 748, top: 723, bottom: 763, height: 40 }) };
+  view.liftLoadStatus(el);
+  assert.equal(classes.has('is-lifted'), false, 'a wide canvas keeps the line at the bottom');
+  assert.equal(props.get('--vam-load-lift'), '0px');
+  const css = fs.readFileSync(nodePath.join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.ok(css.indexOf('.vam-view .vam-map-load-status.is-lifted') > 0 && css.indexOf('.vam-view .vam-map-load-status.is-lifted') < css.indexOf('/* Map search'));
+  await finish();
+});
+
+test('y (P1): the research progress in the header is not drawn while reading', async () => {
+  const source = fs.readFileSync(nodePath.join(__dirname, '..', 'experiences', 'visual-map', 'view.ts'), 'utf8');
+  const call = source.indexOf('this.renderResearchProgress(toolbar)');
+  assert.ok(call > 0);
+  assert.match(source.slice(call - 160, call), /!this\.notesLoading\(\)/);
+});

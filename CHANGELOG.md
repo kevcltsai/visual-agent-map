@@ -2,19 +2,32 @@
 
 ## [Unreleased]
 
-### Note style: AI suggested
+## [0.32.0] - 2026-11-08
 
-General topics can now choose "AI suggested" as their note style, in Settings under Note style or from a topic's right-click menu. The first research lets the AI decide the sections of the note. Research after that keeps the sections the note already has and rewrites the note into them, so the section list does not change from run to run.
+### Let the AI pick a note's sections
 
-- It is only offered for general topics. The other topic types, the AIM row and the research dialogs do not list it, and it cannot be copied or edited.
-- Nothing changes for anyone who does not choose it.
-- Changed behavior: if you already have a style file named "AI suggested", that file is now marked as having a problem and is not used. Rename it to keep using it.
+General topics can use the "AI suggested" note style: pick it in Settings under Note style, or from a topic's right-click menu, and the first research decides the note's sections for that topic.
 
-### Fixed
+- Later research keeps the sections the note already has, so they do not change from run to run.
+- It is only offered for general topics; nothing changes if you do not choose it.
 
-- Opening a mind map with many topic notes now shows the cards right away, with grey bars where a note is still being read and a "Reading topic notes N / M" line at the bottom left, instead of a blank map until every note is read.
-- Holding Delete or Backspace on a map card, or pressing it again before the card disappears, removes the card once. Before, each extra press added another "Removed … Undo" notice and an empty undo step.
-- Deleting several map cards in a row with Delete or Backspace now shows one notice with the number of cards and an "Undo all" button that brings them all back, instead of a stack of notices where only the newest Undo worked. Mod+Z still undoes one card at a time.
+### Big maps open right away
+
+Opening a mind map with many topic notes now shows the cards at once, with grey bars where a note is still being read and a "Reading topic notes N / M" line at the bottom left, instead of a blank map until every note is read.
+
+- Notes are read several at a time, so the whole map fills in sooner.
+
+### Undo a run of deletions
+
+Delete several map cards in a row and one notice shows how many were removed, with an "Undo all" button that brings them all back. Mod+Z still undoes one card at a time.
+
+### Changed
+
+- If you already have your own style file named "AI suggested", it is now marked as having a problem and is not used. Rename it to keep using it.
+
+### Fixes
+
+- Holding Delete or Backspace on a card removes it once instead of adding empty undo steps, and repair, rebuild and reconnect messages in Settings now show inside the settings window.
 
 ## [0.31.0] - 2026-11-07
 

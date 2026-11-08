@@ -71332,6 +71332,8 @@ ${request.requirements}` : preset.text,
       activeFile: null,
       history: history2
     });
+    if (context.topicHashes[node.id])
+      context.topicHashes[node.id] = { ...context.topicHashes[node.id], parentId: node.parentId };
     return {
       message,
       context,

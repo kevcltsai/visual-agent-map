@@ -38129,7 +38129,6 @@ var MapChatPanel = class {
     __publicField(this, "modelEl");
     __publicField(this, "guideIconEl");
     __publicField(this, "guideTextEl");
-    /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
     __publicField(this, "stopEl");
     __publicField(this, "steerHintEl");
     __publicField(this, "saveEl");
@@ -39065,6 +39064,7 @@ ${typed}` : draft;
     var _a2, _b2, _c;
     const message = this.messages.find((item) => item.plan === plan);
     if (!message) return lines;
+    if (state === "applied" && plan.state !== "applied") message.linesOpen = false;
     plan.state = state;
     if (state === "applied" && !lines) message.lateFailures = [];
     else if (lines) {
@@ -40136,7 +40136,8 @@ ${shown}` : t("ui.map_chat_model_label"));
    */
   buildBasis(row, message) {
     var _a2;
-    const entries = message.linesOpen ? summarizeBasis(message.lines.flatMap((line) => line.basis ? [line.basis] : [])) : [];
+    const all = summarizeBasis(message.lines.flatMap((line) => line.basis ? [line.basis] : []));
+    const entries = message.linesOpen ? all : all.filter((entry) => entry.kind === "outline_only");
     const unread = (_a2 = message.unread) != null ? _a2 : [];
     if (!entries.length && !unread.length) return;
     const box = row.createDiv({ cls: "vam-map-chat-basis" });

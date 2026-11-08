@@ -479,7 +479,6 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private modelEl!: HTMLSelectElement;
   private guideIconEl!: HTMLElement;
   private guideTextEl!: HTMLElement;
-  /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
   private stopEl!: HTMLButtonElement;
   private steerHintEl!: HTMLElement;
   private saveEl!: HTMLButtonElement;
@@ -1456,6 +1455,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   settlePlan(plan: MapChatPlanCard, state: "applied" | "cancelled", lines?: MapChatLine[]): MapChatLine[] | undefined {
     const message = this.messages.find(item => item.plan === plan);
     if (!message) return lines;
+    // Applying folds the card back to one sentence, also when "View details" was opened while it waited (the lines come in a second call; it keeps what the reader opened by then).
+    if (state === "applied" && plan.state !== "applied") message.linesOpen = false;
     plan.state = state;
     // An applied plan without lines yet is being applied: expansion failures that come in meanwhile wait (like a streaming reply's)
     // and are settled into the result lines when they arrive, so they are not written over. The merged lines are returned.
@@ -2583,10 +2584,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    * left unread. Plain text only (titles are untrusted); "read", never "checked". The program decides it, not the model.
    */
   private buildBasis(row: HTMLElement, message: MapChatMessage): void {
-    // The basis is detail (behind "View details"); a note the AI could not read is an exception and always shows.
-    const entries = message.linesOpen
-      ? summarizeBasis(message.lines.flatMap(line => (line.basis ? [line.basis] : [])))
-      : [];
+    // The basis is detail (behind "View details"); a note the AI could not read is an exception and always shows:
+    // the unread research notes, and a card built from its title only.
+    const all = summarizeBasis(message.lines.flatMap(line => (line.basis ? [line.basis] : [])));
+    const entries = message.linesOpen ? all : all.filter(entry => entry.kind === "outline_only");
     const unread = message.unread ?? [];
     if (!entries.length && !unread.length) return;
     const box = row.createDiv({ cls: "vam-map-chat-basis" });

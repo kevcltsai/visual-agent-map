@@ -2895,7 +2895,8 @@ integrationTest('opening screen: removing the only item does not take the keyboa
 
 integrationTest('UX B6: on the opening screen the model menu is in the composer after the message field (never in the head row); the head row is hidden there and shows again in the window', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; assert.equal(chat.isHero, true);
-  const body = () => chat.bodyEl.children; const visible = body().filter(c => !c.hidden);
+  const body = () => chat.bodyEl.children;
+  if (chat.emptyMapEl.hidden === false) assert.equal(body().at(-2), chat.emptyMapEl, 'the empty-map button is second to last in the body');
   assert.ok(chat.headEl.hasClass('is-hero'), 'the head row is hidden on the opening screen'); assert.equal(find(chat.headEl, i => i === chat.modelEl), undefined, 'the model menu is not in the head row');
   const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.modelEl).map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : 'model');
   eq(order, ['title', 'input', 'model'], 'reading and Tab order: the question, the field, then the model');
@@ -3184,7 +3185,7 @@ integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the ca
   assert.equal(h.page.doc.activeElement, chat.inputEl); assert.match(visibleText(planCard(h)[0]), /Nothing was changed/);
 });
 
-integrationTest('B1 ui: result lines name their status in words; five or fewer are all shown; the closing "cannot be undone" line is always last', async () => {
+integrationTest('B1 ui: result lines name their status in words; done lines fold behind View details however few; skipped and failed lines stay shown and the closing "cannot be undone" line is always last', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
   chat.finish('r', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B (the topic is no longer on the map)' }, { status: 'failed', text: 'Failed: C (boom)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.' }]);
   const lines = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')); eq(lines.map(l => l.text.split(':')[0].split(' ')[0]), ['Skipped', 'Failed', 'Undo'], 'the done line is folded; skipped, failed and the closing note are shown'); assert.ok(hasClass(lines.at(-1), 'is-note'));
@@ -3199,7 +3200,7 @@ integrationTest('B1 ui: the auto-layout line is a note: it is neither spoken in 
   assert.match(writes.at(-1), /Results: 5 done$/, 'spoken count leaves the auto-layout line out');
   assert.match(visibleText(find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-counts'))), /^5 done$/, 'the counts say 5 done: the note is not counted'); eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(l => l.text), [note], 'done lines fold; the note stays shown');
 });
-integrationTest('B1 ui: more than five result lines fold into a count; the toggle shows them all and back; the closing line stays last; focus stays on the toggle', async () => {
+integrationTest('B1 ui: done result lines fold into a count however many; the toggle shows them all and back; the closing line stays last; focus stays on the toggle', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
   const lines = [...Array.from({ length: 18 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'skipped', text: 'Skipped: x (y)' }, { status: 'skipped', text: 'Skipped: z (w)' }, { status: 'failed', text: 'Failed: q (r)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.' }];
   chat.finish('r', lines);
@@ -3478,8 +3479,7 @@ integrationTest('B1 fix 16 / chat 04: a plan card without AI work has no undo wa
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'plan', actions: [...planActions(h, 15), { kind: 'delete_topic', nodeId: h.ids.a, branch: true }], rejected: [] });
   h.type('many'); await h.view.sendMapChat(); const title = () => { openDetails(chat.logEl); return find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-title')).text; };
-  assert.equal(title(), 'Plan to review'); const buttons = find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-buttons'));
-  assert.equal(findAll(buttons, i => hasClass(i, 'vam-map-chat-plan-warning')).length, 0, 'everything in it is undone by Undo: no warning');
+  assert.equal(title(), 'Plan to review'); assert.equal(findAll(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-warning')).length, 0, 'everything in it is undone by Undo: no warning');
   const danger = findAll(planCard(h)[0], i => i.tag === 'details' && hasClass(i, 'is-danger')); assert.equal(danger.length, 1, 'only the delete group');
   assert.match(visibleText(danger[0]), /Delete \(1\)/); assert.equal(findAll(danger[0], i => hasClass(i, 'vam-map-chat-plan-mark'))[0].text, 'Removes');
   assert.equal(findAll(planCard(h)[0], i => i.tag === 'details' && !hasClass(i, 'is-danger')).length >= 1, true);
@@ -3624,7 +3624,7 @@ test('B2-0 F1: the deferred scroll is dropped when the window is folded again be
 });
 
 // ---- B2-0 F3: the model menu keeps its width at 340px --------------------------------------------------------------------
-integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and every entry shows its full label (MS-02: no follow-default entry, no shortened default label)', async () => {
+integrationTest('B2-0 F3: the model select in the composer gives way to the send key (max-width, ellipsis), and every entry shows its full label (MS-02: no follow-default entry, no shortened default label)', async () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-composer .vam-map-chat-model {')); assert.ok(rule);
   // Chat layout: the menu sits in the composer; it gives way (max-width, ellipsis) to the send key instead of taking the head's width.
@@ -7394,7 +7394,7 @@ test('P4 basis: the summary stands under the results, also when the list is shor
     [1, 2].map(i => ({ ...done(`Bare ${i}`), basis: { kind: 'outline_only', alsoRead: [{ path: 'Notes/Hidden.md', title: 'Hidden title' }] } })));
   f.panel.finish('Built.', lines);
   const basis = () => classTexts(f.parts.log(), 'vam-map-chat-basis-line');
-  eq(basis(), [], 'folded (31 results): the basis is behind View details');
+  eq(basis(), ['Titles only (cards: 2) (no note was read for these)'], 'folded (31 results): the basis is behind View details, but titles only is an exception (no note was read) and stays');
   eq(classTexts(f.parts.log(), 'vam-map-chat-line'), [], 'the long list is folded');
   findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-lines-toggle'))[0].click();
   eq(basis(), ['Based on research note “pstack <b>skills</b>” (cards: 26)', 'Based on note “Browser tools” (cards: 3)', 'Titles only (cards: 2) (no note was read for these)'], 'open: the summary');
@@ -8221,6 +8221,17 @@ test('chat layout: a plan with open groups (a picture plan) is not folded: the g
   assert.ok(find(card, i => hasClass(i, 'vam-map-chat-plan-summary')), 'the one-line summary is still there');
 });
 
+test('chat layout: opening View details on a waiting plan and then applying it leaves the applied result folded to one sentence; View details opens it again', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish('plan', []); const plan = planOf(false); f.panel.showPlan(plan);
+  const root = () => f.panel.logEl; toggleOf(root()).click(); assert.equal(toggleOf(root()).attrs['aria-expanded'], 'true', 'opened while waiting');
+  f.panel.settlePlan(plan, 'applied', [{ status: 'done', text: 'Done: A' }, { status: 'done', text: 'Done: B' }]);
+  const t = toggleOf(root()); assert.equal(t.attrs['aria-expanded'], 'false', 'applied: the toggle is folded again');
+  eq(findAll(root(), i => hasClass(i, 'vam-map-chat-line')).map(l => l.text), [], 'no done line is shown'); assert.equal(findAll(root(), i => i.tag === 'li' || i.tag === 'details').length, 0, 'no plan detail is shown');
+  t.click(); assert.equal(toggleOf(root()).attrs['aria-expanded'], 'true', 'View details can open it'); eq(findAll(root(), i => hasClass(i, 'vam-map-chat-line')).map(l => l.text), ['Done: A', 'Done: B']);
+  const g = panelFixture(); g.panel.setOpen(true); g.panel.begin('q'); g.panel.finish('plan', []); const other = planOf(false); g.panel.showPlan(other); toggleOf(g.panel.logEl).click();
+  g.panel.settlePlan(other, 'cancelled'); assert.equal(find(g.panel.logEl, i => hasClass(i, 'vam-map-chat-plan-state')) !== undefined, true, 'cancelled still shows its state');
+});
+
 test('chat layout: results fold only the done lines into the counts and View details; failed, skipped, stopped and the closing notes are always shown', () => {
   const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q');
   const note = 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.';
@@ -8265,6 +8276,15 @@ test('chat layout: the basis moves behind View details, but a note the AI could 
   assert.ok(find(f.panel.logEl, i => hasClass(i, 'is-unread')));
   toggleOf(f.panel.logEl).click();
   eq(classTexts(f.panel.logEl, 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 2)', '“Big” is too long, so it was not read.'], 'open: the basis joins');
+});
+
+test('chat layout: a title-only basis (no note was read) stays shown while folded, an ordinary basis does not; open shows both', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q');
+  f.panel.finish('r', [{ status: 'done', text: 'Added A', basis: researchBasis('Notes') }, { status: 'done', text: 'Added B', basis: { kind: 'outline_only', alsoRead: [] } }, { status: 'done', text: 'Expand C', basis: { kind: 'outline_only', alsoRead: [], existingChildren: 3 } }]);
+  const basis = () => classTexts(f.panel.logEl, 'vam-map-chat-basis-line');
+  eq(basis().length, 2, 'folded: only the two title-only lines'); assert.ok(basis().every(t => /^Titles only/.test(t)), `folded: ${basis()}`); assert.ok(!basis().some(t => /research note/.test(t)), 'the ordinary basis is folded');
+  assert.ok(findAll(f.panel.logEl, i => i.tag === 'strong').length >= 1, 'in bold words, not colour');
+  toggleOf(f.panel.logEl).click(); assert.ok(basis().some(t => /research note “Notes”/.test(t)), 'open: the ordinary basis joins'); assert.equal(basis().filter(t => /^Titles only/.test(t)).length, 2);
 });
 
 test('chat layout: an applied plan card has no card of its own; its content is behind the same View details as the results, with the counts as the summary', () => {

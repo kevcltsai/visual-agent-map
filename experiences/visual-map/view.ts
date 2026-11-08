@@ -557,7 +557,11 @@ import {
   goalRecommendFailureDetail,
   goalRecommendTitleKey
 } from "../../core/goal-recommend-service";
-import { renderTopicTree } from "../../ui/topic-tree";
+import {
+  ancestorTrail,
+  createCardSearchField,
+  type CardSearchSource
+} from "../../ui/card-search-field";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
 import { aiModeOptions, DEFAULT_MAP_AI_MODE, hasKnowledgeGapMarker, noteAiMode, type MapAiMode } from "./ai-mode";
@@ -16475,10 +16479,43 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     if (mode !== "structure") return;
-    // Order (ticket 41): what it is (type), where the evidence points and how much there is (leaning, strength),
-    // who it relates to; then the folded
-    // "Appearance" and "Layout" groups; then the AI lock; then the footer.
+    // Order (ticket 41, card-dialog-search): what it is (type), where the evidence points and how much there is
+    // (leaning, strength), who it relates to; then the parent topic search; then the folded "Appearance" and
+    // "Layout" groups (Layout only when the card has an arrangement to choose); then the AI lock; then the footer.
     if (note) this.renderHypothesisSection(panel, node, close);
+    // Choosing a parent moves the topic at once, one undo step (decision 40); the line under the footer says where it went.
+    let currentParent = node.parentId ?? null;
+    let moveTo = (_parentId: string | null): void => {};
+    const titleOf = (id: string): string =>
+      this.notes.get(id)?.title ?? this.map?.nodes.find(candidate => candidate.id === id)?.path ?? "";
+    const parentLabel = (): string => (currentParent ? titleOf(currentParent) : t("ui.no_parent_root_topic"));
+    const relationship = panel.createDiv("vam-inspector-section vam-parent-section");
+    relationship.createEl("strong", {
+      text: t("ui.parent_topic"),
+      cls: "vam-topic-tree-heading vam-section-heading"
+    });
+    const parentField = createCardSearchField({
+      app: this.app,
+      parent: relationship,
+      placeholder: t("ui.parent_search_placeholder"),
+      ariaLabel: t("ui.parent_topic"),
+      candidates: () =>
+        this.cardSearchSources(
+          () => true,
+          candidate => canParent(this.map!.nodes, node.id, candidate.id)
+        ),
+      typeFirst: true,
+      rootChoice: t("ui.no_parent_root_topic"),
+      value: parentLabel(),
+      currentId: () => currentParent,
+      selectOnFocus: true,
+      restoreValue: parentLabel,
+      onSelect: item => moveTo(item.id || null)
+    });
+    relationship.createEl("p", {
+      cls: "vam-hint",
+      text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
+    });
     if (note) {
       const look = this.renderDisclosure(panel, t("ui.card_group_appearance"));
       this.renderMarkerSection(look, node);
@@ -16487,29 +16524,10 @@ export class VisualAgentMapView extends ItemView {
       this.renderStyleSection(look, node);
       this.renderCoverSection(look, node);
     }
-    const layout = this.renderDisclosure(panel, t("ui.card_group_layout"));
-    this.renderBranchLayoutSection(layout, node);
-    const relationship = layout.createDiv("vam-inspector-section");
-    relationship.createEl("strong", {
-      text: t("ui.parent_topic"),
-      cls: "vam-topic-tree-heading vam-section-heading"
-    });
-    // Choosing a parent moves the topic at once, one undo step (decision 40); the line under the footer says where it went.
-    let currentParent = node.parentId ?? null;
-    let moveTo = (_parentId: string | null): void => {};
-    const parentTree = renderTopicTree(relationship, {
-      nodes: this.map!.nodes,
-      title: candidate => this.notes.get(candidate.id)?.title ?? candidate.path,
-      label: t("ui.parent_topic_link"),
-      selectable: candidate => canParent(this.map!.nodes, node.id, candidate.id),
-      rootChoice: t("ui.no_parent_root_topic"),
-      value: currentParent ?? "",
-      onChoose: id => moveTo(id || null)
-    });
-    relationship.createEl("p", {
-      cls: "vam-hint",
-      text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
-    });
+    if (this.branchLayoutChoices(node).length) {
+      const layout = this.renderDisclosure(panel, t("ui.card_group_layout"));
+      this.renderBranchLayoutSection(layout, node);
+    }
     if (note) this.renderAiLockSection(panel, node);
     const actions = (host ?? panel).createDiv("vam-next-actions");
     if (note) this.renderAddSubtopic(actions, node, close);
@@ -16524,14 +16542,17 @@ export class VisualAgentMapView extends ItemView {
     });
     actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
     moveTo = parentId => {
-      if (parentId === currentParent) return;
-      // A merging card keeps its parent: the tree goes back to the one it has.
+      if (parentId === currentParent) {
+        parentField.setValue(parentLabel());
+        return;
+      }
+      // A merging card keeps its parent: the field goes back to the one it has.
       if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) {
-        parentTree.select(currentParent ?? "");
+        parentField.setValue(parentLabel());
         return;
       }
       currentParent = parentId;
-      parentTree.select(parentId ?? "");
+      parentField.setValue(parentLabel());
       status.setText(
         parentId ? t("ui.moved_under_0", this.notes.get(parentId)?.title ?? "") : t("ui.became_root_topic")
       );
@@ -16809,50 +16830,60 @@ export class VisualAgentMapView extends ItemView {
     for (const kind of RELATION_KINDS) kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
     exposeFirst(kindSelect);
     row.createSpan({ text: "→", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
-    const targetSelect = row.createEl("select", { cls: "dropdown vam-relation-add-target" });
-    targetSelect.setAttr("aria-label", t("ui.relation_target_label"));
-    const add = row.createEl("button", { text: t("ui.relation_add_submit"), cls: "mod-cta" });
-    add.type = "button";
     const currentKind = (): TopicRelationKind => (kindSelect.value as TopicRelationKind) || RELATION_KINDS[0];
-    const fill = (): void => {
-      targetSelect.empty();
+    // The list holds only the cards this card may be linked to with the chosen relation; it is read when the list opens.
+    const legalSources = (): CardSearchSource[] => {
       const legal = this.map ? new Set(legalRelationTargets(this.map, currentKind(), node.id)) : new Set<string>();
-      const targets = (this.map?.nodes ?? []).filter(item => item.id !== node.id && legal.has(item.id));
-      targetSelect.createEl("option", {
-        text: targets.length
-          ? t("ui.relation_pick_card")
-          : t("ui.no_relation_target_0", t(RELATION_NAME_KEY[currentKind()])),
-        value: ""
-      });
-      for (const target of targets)
-        targetSelect.createEl("option", { text: this.notes.get(target.id)?.title ?? target.path, value: target.id });
-      targetSelect.value = "";
-      targetSelect.disabled = !targets.length;
-      add.disabled = true;
+      return this.cardSearchSources(item => item.id !== node.id && legal.has(item.id));
     };
-    fill();
-    kindSelect.addEventListener("change", fill);
-    targetSelect.addEventListener("change", () => {
-      add.disabled = !targetSelect.value;
+    const field = createCardSearchField({
+      app: this.app,
+      parent: row,
+      placeholder: t("ui.relation_search_placeholder"),
+      ariaLabel: t("ui.relation_target_label"),
+      candidates: legalSources,
+      onSelect: item => {
+        const kind = currentKind();
+        field.setValue("");
+        this.enqueue(async () => {
+          await this.addRelation(node.id, item.id, kind);
+          onAdded();
+        });
+      }
     });
-    add.addEventListener("click", () => {
-      const toId = targetSelect.value;
-      if (!toId) return;
-      const kind = currentKind();
-      this.enqueue(async () => {
-        await this.addRelation(node.id, toId, kind);
-        onAdded();
-      });
-    });
-    // A second way to add: a point on an annotated image (a button after "Add", so the keyboard reaches it in order).
+    const refresh = (): void => {
+      field.setValue("");
+      const none = !legalSources().length;
+      field.setDisabled(
+        none,
+        none ? t("ui.no_relation_target_0", t(RELATION_NAME_KEY[currentKind()])) : t("ui.relation_search_placeholder")
+      );
+    };
+    refresh();
+    kindSelect.addEventListener("change", refresh);
+    // A second way to add: a point on an annotated image, a quiet link under the row (after the search, so the keyboard reaches it in order).
     if (this.anchorRelationsEditable()) {
-      const point = row.createEl("button", {
+      const point = parent.createEl("button", {
         text: t("ui.anchor_relation_add_button"),
         cls: "vam-relation-add-anchor"
       });
       point.type = "button";
       point.addEventListener("click", () => this.openAnchorPick(node, currentKind, onAdded, close));
     }
+  }
+  /** Rows for a card search: the cards `include` keeps, each with its title and the titles above it. */
+  private cardSearchSources(include: (node: MapNode) => boolean, enabled?: (node: MapNode) => boolean): CardSearchSource[] {
+    const nodes = this.map?.nodes ?? [];
+    const titleOf = (id: string): string =>
+      this.notes.get(id)?.title ?? nodes.find(candidate => candidate.id === id)?.path ?? "";
+    return nodes
+      .filter(include)
+      .map(item => ({
+        id: item.id,
+        title: titleOf(item.id),
+        trail: ancestorTrail(nodes, item.id, titleOf),
+        enabled: enabled ? enabled(item) : true
+      }));
   }
   /** Only a map the user may edit takes anchor relations: not AIM, not while picking topics (the same rule as the image itself). */
   private anchorRelationsEditable(): boolean {

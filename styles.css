@@ -56,7 +56,7 @@
 .vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }
 .vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-zoom-controls { right: 12px; bottom: 12px; }
-/* The in-app toolbar is one faint icon; it opens into its label on hover or keyboard focus, and stays open while selecting. It floats over the goal bar when open. */
+/* The in-app toolbar is one faint icon; it brightens on hover or keyboard focus, and stays bright while selecting. It floats over the goal bar when open. */
 .vam-map-tools.has-panel { z-index: 4; }
 .vam-tools-mini { z-index: 3; padding: 2px; opacity: .75; }
 .vam-tools-mini:hover, .vam-tools-mini:focus-within, .vam-tools-mini.is-open { opacity: 1; }
@@ -64,8 +64,6 @@
 .vam-tools-mini .vam-tools-select:hover, .vam-tools-mini .vam-tools-select.is-active, .vam-tools-mini:focus-within .vam-tools-select { color: var(--text-normal); }
 .vam-tools-select-icon { display: inline-flex; flex: none; }
 .vam-tools-select-icon svg { width: 18px; height: 18px; }
-.vam-tools-select-label { display: none; white-space: nowrap; }
-.vam-tools-mini:hover .vam-tools-select-label, .vam-tools-mini:focus-within .vam-tools-select-label, .vam-tools-mini.is-open .vam-tools-select-label { display: inline; }
 /* Obsidian's floating status bar covers the bottom-right corner; the view writes how far it reaches into the canvas. */
 .vam-zoom-controls { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-zoom-controls { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
@@ -976,10 +974,12 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-task-cancel { margin: 6px 0; }
 
 /* Data sources: a toolbar button right after the goal button, and a panel under it (max about 440px, wraps in a narrow pane). */
-.vam-map-tools .vam-sources-button { display: inline-flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 0; max-width: 16em; white-space: nowrap; }
-.vam-sources-button-label { overflow: hidden; text-overflow: ellipsis; }
-.vam-map-sources-warning { display: inline-flex; flex: 0 0 auto; color: var(--text-error); }
-.vam-map-sources-warning .svg-icon { width: 14px; height: 14px; }
+.vam-map-tools .vam-sources-button { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 30px; width: 30px; height: 30px; padding: 0; color: var(--text-muted); }
+.vam-map-tools .vam-sources-button:hover, .vam-map-tools .vam-sources-button[aria-expanded="true"] { color: var(--text-normal); }
+.vam-sources-button-icon { display: inline-flex; flex: none; }
+.vam-sources-button-icon svg { width: 18px; height: 18px; }
+.vam-sources-button-badge { position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box; border-radius: 7px; font-size: 10px; line-height: 14px; font-weight: 700; text-align: center; background: var(--interactive-accent); color: var(--text-on-accent); pointer-events: none; }
+.vam-sources-button-badge.is-bad { background: var(--text-error); }
 .vam-map-sources-panel { position: absolute; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-width: min(440px, calc(100vw - 32px)); padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); max-height: var(--vam-sources-max, none); overflow-y: auto; animation: vam-goal-panel-in 150ms ease-out; }
 .vam-map-sources-title { margin: 0; font-size: var(--font-ui-medium); }
 .vam-map-sources-panel p { margin: 0; }

@@ -60870,7 +60870,7 @@ ${request.requirements}` : preset.text,
     this.mapSourcesButtonEl = button;
     this.paintMapSourcesButton();
   }
-  /** Label, ⚠ and accessible text from the current sources; also run when a vault event changes what is readable. */
+  /** Icon, count/! badge and accessible text from the current sources; also run when a vault event changes what is readable. */
   paintMapSourcesButton() {
     var _a2;
     const button = this.mapSourcesButtonEl;
@@ -60878,12 +60878,15 @@ ${request.requirements}` : preset.text,
     const label = mapSourcesButtonLabel(this.mapSources.length);
     const unreadable = unreadableMapSources(this.app, this.mapSources);
     button.empty();
-    if (unreadable) {
-      const warn = button.createSpan({ cls: "vam-map-sources-warning" });
-      warn.setAttr("aria-hidden", "true");
-      (0, import_obsidian39.setIcon)(warn, "alert-triangle");
+    const icon = button.createSpan({ cls: "vam-sources-button-icon" });
+    icon.setAttr("aria-hidden", "true");
+    (0, import_obsidian39.setIcon)(icon, "files");
+    const count2 = this.mapSources.length;
+    if (unreadable || count2 > 0) {
+      const badge = button.createSpan({ cls: "vam-sources-button-badge", text: unreadable ? "!" : String(count2) });
+      badge.setAttr("aria-hidden", "true");
+      if (unreadable) badge.addClass("is-bad");
     }
-    button.createSpan({ cls: "vam-sources-button-label", text: label });
     button.setAttr("aria-label", label);
     button.setAttr("aria-expanded", String(this.mapSourcesOpen));
     if (unreadable) button.setAttr("aria-description", t("ui.map_sources_unreadable_description_0", unreadable));
@@ -69351,7 +69354,7 @@ ${request.requirements}` : preset.text,
     if (!this.map) return;
     this.renderSelectTool(tools);
   }
-  /** The one toolbar control: a button that is just its icon until the pointer or the keyboard is on the toolbar. */
+  /** The one toolbar control: an icon-only button; the name shows as the aria-label tooltip. */
   renderSelectTool(tools) {
     var _a2;
     if (!((_a2 = this.map) == null ? void 0 : _a2.nodes.length)) return;
@@ -69366,7 +69369,6 @@ ${request.requirements}` : preset.text,
     const icon = integrate.createSpan("vam-tools-select-icon");
     icon.setAttr("aria-hidden", "true");
     appendGoalSvg(icon, "select");
-    integrate.createSpan({ cls: "vam-tools-select-label", text: label });
     integrate.addEventListener("click", (event) => {
       event.stopPropagation();
       this.applySelectionChange(this.selection.toggleMultiSelect());
@@ -86750,7 +86752,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
   .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }
   .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }
 }
-.vam-map-tools .vam-sources-button { display: inline-flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 0; max-width: 16em; white-space: nowrap; }
+.vam-map-tools .vam-sources-button { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 30px; width: 30px; height: 30px; padding: 0; color: var(--text-muted); }
+.vam-map-tools .vam-sources-button:hover, .vam-map-tools .vam-sources-button[aria-expanded="true"] { color: var(--text-normal); }
 .vam-node[data-topic-color="red"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
 .vam-node[data-topic-color="orange"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
 .vam-node[data-topic-color="yellow"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }

@@ -2993,22 +2993,21 @@ integrationTest('goal banner P3: both toolbar renderers drop "+ Topic" and its c
     assert.equal(b.attrs['aria-label'], 'Select several topics', `${method}: the icon button has an accessible name`);
     assert.equal(b.attrs.tabindex, undefined, `${method}: reachable with Tab`); assert.equal(b.attrs['aria-pressed'], 'false');
     assert.ok(findAll(b, i => i.tag === 'span' && i.attrs['aria-hidden'] === 'true').length >= 1, `${method}: the icon is decorative`);
-    assert.equal(findAll(b, i => (i.cls ?? '').includes('vam-tools-select-label'))[0].text, 'Select several topics', `${method}: the label that opens on hover/focus`);
+    assert.equal(findAll(b, i => (i.cls ?? '').includes('vam-tools-select-label')).length, 0, `${method}: icon only, no text label node`); assert.equal(b.children.length, 1, `${method}: the icon is the only child`);
     assert.ok(box.classes.includes('vam-tools-mini')); assert.equal(box.classes.includes('is-open'), false, `${method}: collapsed while idle`);
     b.click();
     assert.equal(h.view.selection.state.multiSelectMode, true);
     const again = draw(h, method); const done = findAll(again, i => i.tag === 'button')[0];
     assert.ok(again.classes.includes('is-open'), `${method}: stays open while selecting`);
     assert.equal(done.attrs['aria-label'], 'Done selecting'); assert.equal(done.attrs['aria-pressed'], 'true'); assert.ok(done.classes.includes('is-active'));
-    assert.equal(findAll(done, i => (i.cls ?? '').includes('vam-tools-select-label'))[0].text, 'Done selecting');
+    assert.equal(findAll(done, i => (i.cls ?? '').includes('vam-tools-select-label')).length, 0, 'still icon only while selecting'); assert.equal(done.children.length, 1);
   }
   const empty = await harness({ empty: true }); await empty.view.hydrate();
   for (const method of ['renderMapTools', 'renderHiddenAimMapTools']) assert.equal(findAll(draw(empty, method), i => i.tag === 'button').length, 0, `${method}: an empty map has no toolbar control`);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.doesNotMatch(source, /openTopicMenu|ui\.topic"|ui\.topic_more_options|ui\.paste_outline_add_many|vam-topic-more/, 'the removed toolbar entries leave no code behind');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
-  assert.match(css, /^\.vam-tools-select-label \{ display: none;/m, 'the label is hidden while collapsed');
-  assert.match(css, /\.vam-tools-mini:hover \.vam-tools-select-label, \.vam-tools-mini:focus-within \.vam-tools-select-label, \.vam-tools-mini\.is-open \.vam-tools-select-label \{ display: inline; \}/, 'hover, focus or selecting opens it');
+  assert.doesNotMatch(css, /vam-tools-select-label/, 'the select label rules are gone');
   assert.match(css, /^\.vam-tools-mini \{[^}]*padding: 2px; opacity: \.75;/m);
   assert.match(css, /^\.vam-tools-mini \{[^}]*z-index: 3;/m, 'the opened toolbar keeps its own z-index');
   const goal = css.split('\n').find(l => l.startsWith('.vam-goal-bar {'));

@@ -175,3 +175,13 @@ test('S5: a failing startup filename sync does not reject ready, shows a Notice,
   await (await startPlugin(saved, ok)).plugin.ready;
   assert.ok(ok.some(data => data.structureVersion >= 2));
 });
+
+// A1: a write after unload is refused with a message in the UI language, not a hardcoded English one.
+test('A1: a write after the plugin unloaded is refused with a translated message', async () => {
+  for (const [language, expected] of [['zh-TW', 'Visual Agent Map 已重新載入，這次沒有寫入。請關閉這個視窗後重試。'], ['zh-CN', 'Visual Agent Map 已重新加载，这次没有写入。请关闭这个窗口后重试。'], ['en', 'Visual Agent Map was reloaded and this write was not performed. Close this window and try again.']]) {
+    const { repo } = fixture(language, { linkIndex: true });
+    repo.settings.language = language;
+    repo.dispose();
+    await assert.rejects(repo.app.vault.create('x.md', ''), error => error.message === expected, language);
+  }
+});

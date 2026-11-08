@@ -1234,7 +1234,12 @@ const VAULT_WRITES = new Set([
 const FILE_MANAGER_WRITES = new Set(["renameFile", "trashFile", "processFrontMatter"]);
 
 /** A view of `target` whose write methods throw once `disposed()` is true; reads and everything else pass through. */
-function guardWrites<T extends object>(target: T, writes: Set<string>, disposed: () => boolean, message: string): T {
+function guardWrites<T extends object>(
+  target: T,
+  writes: Set<string>,
+  disposed: () => boolean,
+  message: () => string
+): T {
   return new Proxy(target, {
     get(object, property) {
       const value = Reflect.get(object, property, object) as unknown;
@@ -1242,7 +1247,7 @@ function guardWrites<T extends object>(target: T, writes: Set<string>, disposed:
       const call = value as (this: object, ...args: unknown[]) => unknown;
       return writes.has(property)
         ? (...args: unknown[]) => {
-            if (disposed()) return Promise.reject(new Error(message));
+            if (disposed()) return Promise.reject(new Error(message()));
             return Reflect.apply(call, object, args);
           }
         : (...args: unknown[]): unknown => Reflect.apply(call, object, args);
@@ -1270,7 +1275,7 @@ export class Repository {
     readonly settings: Settings
   ) {
     const stopped = (): boolean => this.disposed;
-    const message = "Visual Agent Map was unloaded; this write was not performed.";
+    const message = (): string => this.message("error.unloaded_write_not_performed");
     this.app = new Proxy(app, {
       get(object, property) {
         const value = Reflect.get(object, property, object) as unknown;

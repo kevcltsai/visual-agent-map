@@ -1179,6 +1179,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "error.move_undo_failed_0": "移动失败（{0}）；还原移动也失败（{1}）。",
   "error.move_not_applied": "文件夹移动没有实际生效，操作已停止并还原。",
   "error.plugin_unloaded": "Visual Agent Map 已卸载，操作在下一步之前停止。",
+  "error.unloaded_write_not_performed": "Visual Agent Map 已重新加载，这次没有写入。请关闭这个窗口后重试。",
   "error.legacy_map_view_only": "此心智图使用 0.4 前的旧结构，只能查看。",
   "ui.fix_math_formulas": "修正 VAM 笔记里的数学公式",
   "ui.fix_math_none": "没有需要修正数学公式的 VAM 笔记。",

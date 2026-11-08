@@ -1181,6 +1181,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "error.move_undo_failed_0": "搬移失敗（{0}）；還原搬移也失敗（{1}）。",
   "error.move_not_applied": "資料夾搬移沒有實際生效，操作已停止並還原。",
   "error.plugin_unloaded": "Visual Agent Map 已卸載，操作在下一步之前停止。",
+  "error.unloaded_write_not_performed": "Visual Agent Map 已重新載入，這次沒有寫入。請關閉這個視窗後重試。",
   "error.legacy_map_view_only": "此心智圖使用 0.4 前的舊結構，只能檢視。",
   "ui.fix_math_formulas": "修正 VAM 筆記裡的數學公式",
   "ui.fix_math_none": "沒有需要修正數學公式的 VAM 筆記。",

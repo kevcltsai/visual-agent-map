@@ -1250,6 +1250,8 @@ export const en = {
   "error.move_undo_failed_0": "Move failed ({0}); undoing it also failed ({1}).",
   "error.move_not_applied": "A folder move did not take effect on disk, so the operation was stopped and restored.",
   "error.plugin_unloaded": "Visual Agent Map was unloaded, so the operation stopped before its next step.",
+  "error.unloaded_write_not_performed":
+    "Visual Agent Map was reloaded and this write was not performed. Close this window and try again.",
   "error.legacy_map_view_only": "This map uses the pre-0.4 structure and is view-only.",
   "ui.fix_math_formulas": "Fix math formulas in VAM notes",
   "ui.fix_math_none": "No VAM note needs its math formulas fixed.",

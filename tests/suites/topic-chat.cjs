@@ -6,12 +6,15 @@ const { test, integrationTest, root, load, core, plain, DEFAULT_SETTINGS, fixtur
 const dom = require('../support-dom.cjs');
 const { element, find, findAll, byLabel, tick } = dom;
 
-const { TopicChatWindow } = load('experiences/visual-map/topic-chat.ts');
+const { TopicChatWindow } = load('experiences/visual-map/topic-chat.ts', { obsidian });
 const { t } = load('i18n.ts');
 const hasClass = (item, name) => dom.hasCls(item, name);
 
 function fixture({ anchor, submit } = {}) {
-  const doc = { activeElement: null };
+  const docListeners = {};
+  const doc = { activeElement: null, listeners: docListeners,
+    addEventListener(name, fn) { (docListeners[name] ??= []).push(fn); },
+    removeEventListener(name, fn) { docListeners[name] = (docListeners[name] ?? []).filter(f => f !== fn); } };
   const root = element('div'); root.root = doc; root.ownerDocument = doc;
   const session = { turns: [], mode: 'quick', running: false, draftKind: null, draftText: '' };
   const watchers = [];
@@ -35,7 +38,11 @@ function fixture({ anchor, submit } = {}) {
   const type = text => { input.value = text; input.input(); };
   const press = (key, extra = {}) => { let prevented = false; input.keydown({ key, preventDefault() { prevented = true; }, ...extra }); return prevented; };
   const refresh = () => watchers.slice().forEach(fn => fn());
-  return { win, root, session, calls, input, action, send, type, press, refresh, watchers, doc };
+  const toggle = () => find(win.el, i => hasClass(i, 'vam-topic-chat-mode-toggle'));
+  const menu = () => find(win.el, i => hasClass(i, 'vam-topic-chat-mode-menu'));
+  const options = () => findAll(win.el, i => hasClass(i, 'vam-topic-chat-mode'));
+  const outside = target => (docListeners.mousedown ?? []).slice().forEach(fn => fn({ target }));
+  return { win, root, session, calls, input, action, send, type, press, refresh, watchers, doc, toggle, menu, options, outside };
 }
 const ghost = f => f.input.attrs.placeholder;
 
@@ -112,19 +119,87 @@ test('topic chat has three equal buttons without a suggested mark', () => {
   assert.deepEqual(buttons.map(b => b.attrs['aria-pressed']), ['false', 'false', 'true']);
 });
 
-test('topic chat mode switch sets aria-pressed and a polite one-line note for the current choice only', () => {
+test('topic chat mode picker: an icon button opens a menu; picking sets the mode, closes the menu and updates the note', () => {
   const f = fixture();
-  const group = find(f.win.el, i => i.attrs.role === 'group');
-  assert.equal(group.attrs['aria-label'], t('ui.ai_mode'));
-  const [quick, standard] = findAll(group, i => i.tag === 'button');
-  assert.deepEqual([quick.text, standard.text], [t('ui.quick'), t('ui.standard')]);
-  assert.deepEqual([quick.attrs['aria-pressed'], standard.attrs['aria-pressed']], ['true', 'false']);
+  const toggle = f.toggle(), menu = f.menu();
+  assert.equal(toggle.attrs['aria-haspopup'], 'menu');
+  assert.equal(toggle.attrs['aria-expanded'], 'false');
+  assert.equal(toggle.text, '', 'icon only');
+  assert.equal(toggle.iconName, 'zap');
+  assert.equal(toggle.attrs['aria-label'], t('ui.topic_chat_mode_button_0', t('ui.quick')));
+  assert.equal(menu.attrs.role, 'menu');
+  assert.equal(menu.attrs['aria-label'], t('ui.ai_mode'));
+  assert.equal(menu.hidden, true);
+  const [quick, standard] = f.options();
+  assert.deepEqual([quick.attrs.role, standard.attrs.role], ['menuitemradio', 'menuitemradio']);
+  assert.deepEqual([quick.attrs['aria-checked'], standard.attrs['aria-checked']], ['true', 'false']);
+  assert.deepEqual(f.options().map(b => findAll(b, i => i.tag === 'span' && i.text).map(i => i.text)), [[t('ui.quick')], [t('ui.standard')]]);
   const note = find(f.win.el, i => i.attrs['aria-live'] === 'polite');
   assert.equal(note.text, t('ui.topic_chat_mode_quick_hint'));
+  toggle.click();
+  assert.equal(menu.hidden, false);
+  assert.equal(toggle.attrs['aria-expanded'], 'true');
+  assert.notEqual(f.doc.activeElement, quick, 'a mouse click does not move the focus into the menu');
   standard.click();
   assert.deepEqual(f.calls.modes, ['standard']);
-  assert.deepEqual([quick.attrs['aria-pressed'], standard.attrs['aria-pressed']], ['false', 'true']);
+  assert.equal(menu.hidden, true);
+  assert.equal(toggle.attrs['aria-expanded'], 'false');
+  assert.equal(f.doc.activeElement, toggle, 'the focus returns to the trigger');
+  assert.equal(toggle.iconName, 'globe');
+  assert.equal(toggle.attrs['aria-label'], t('ui.topic_chat_mode_button_0', t('ui.standard')));
+  assert.deepEqual([quick.attrs['aria-checked'], standard.attrs['aria-checked']], ['false', 'true']);
   assert.equal(note.text, t('ui.topic_chat_mode_standard_hint'));
+  toggle.click(); toggle.click();
+  assert.equal(menu.hidden, true, 'the trigger toggles the menu');
+});
+
+test('topic chat mode picker keyboard: Enter/Space (detail 0) and arrows open on the current option, arrows cycle', () => {
+  const f = fixture();
+  const [quick, standard] = f.options();
+  f.toggle().fire('click', { detail: 0 });
+  assert.equal(f.menu().hidden, false);
+  assert.equal(f.doc.activeElement, quick, 'the focus goes to the current option');
+  f.menu().fire('keydown', { key: 'ArrowDown', target: quick });
+  assert.equal(f.doc.activeElement, standard);
+  f.menu().fire('keydown', { key: 'ArrowDown', target: standard });
+  assert.equal(f.doc.activeElement, quick, 'wraps around');
+  f.menu().fire('keydown', { key: 'ArrowUp', target: quick });
+  assert.equal(f.doc.activeElement, standard, 'wraps backwards');
+  f.session.mode = 'standard'; f.refresh();
+  f.menu().hidden = true;
+  f.toggle().fire('keydown', { key: 'ArrowUp' });
+  assert.equal(f.menu().hidden, false);
+  assert.equal(f.doc.activeElement, standard);
+});
+
+test('topic chat counterexample 1: Escape with the mode menu open only closes the menu; the next Escape closes the window', () => {
+  const f = fixture();
+  f.toggle().click();
+  let stopped = false;
+  f.win.el.fire('keydown', { key: 'Escape', stopPropagation() { stopped = true; } });
+  assert.equal(f.menu().hidden, true);
+  assert.equal(f.calls.close, 0);
+  assert.equal(f.calls.opener, 0);
+  assert.equal(stopped, true);
+  assert.equal(f.doc.activeElement, f.toggle());
+  f.win.el.fire('keydown', { key: 'Escape' });
+  assert.equal(f.calls.close, 1);
+});
+
+test('topic chat mode menu closes on a click outside (document) and when the focus leaves the picker', () => {
+  const f = fixture();
+  f.toggle().click();
+  f.outside(f.options()[0]);
+  assert.equal(f.menu().hidden, false, 'a press inside the picker keeps it open');
+  f.outside(f.input);
+  assert.equal(f.menu().hidden, true);
+  f.toggle().click();
+  f.win.el.fire('keydown', { key: 'x' });
+  f.menu().parent.fire('focusout', { relatedTarget: f.input });
+  assert.equal(f.menu().hidden, true, 'focus left the picker');
+  f.toggle().click();
+  f.menu().parent.fire('focusout', { relatedTarget: f.options()[1] });
+  assert.equal(f.menu().hidden, false, 'focus moving inside the picker keeps it open');
 });
 
 test('topic chat Escape closes and gives the focus back to the opener', () => {
@@ -157,8 +232,49 @@ test('topic chat while running: shows the running line and disables the buttons 
   assert.equal(f.send().disabled, true);
   assert.equal(f.press('Enter'), true);
   assert.deepEqual(f.calls.submit, []);
-  const modes = findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-mode'));
-  assert.ok(modes.every(b => b.disabled));
+  assert.ok(f.options().every(b => b.disabled));
+  assert.equal(f.toggle().disabled, true);
+});
+
+test('topic chat counterexample 2b: when a run starts the open mode menu closes, the trigger is disabled and no mode is set', () => {
+  const f = fixture();
+  f.toggle().click();
+  assert.equal(f.menu().hidden, false);
+  f.session.running = true; f.refresh();
+  assert.equal(f.menu().hidden, true);
+  assert.equal(f.toggle().attrs['aria-expanded'], 'false');
+  assert.equal(f.toggle().disabled, true);
+  f.toggle().fire('click', { detail: 0 });
+  assert.equal(f.menu().hidden, true, 'a disabled trigger cannot reopen it');
+  f.options()[1].fire('click');
+  assert.deepEqual(f.calls.modes, []);
+});
+
+test('topic chat counterexample 3: refresh with the mode menu open keeps it open, on the same option elements, without moving the focus', () => {
+  const f = fixture();
+  const before = f.options();
+  f.toggle().fire('click', { detail: 0 });
+  const focused = f.doc.activeElement;
+  f.session.mode = 'standard'; f.refresh(); f.refresh();
+  assert.equal(f.menu().hidden, false);
+  assert.equal(f.doc.activeElement, focused);
+  const after = f.options();
+  assert.equal(after.length, 2);
+  assert.ok(after.every((b, i) => b === before[i]), 'same elements');
+  assert.equal(after[1].attrs['aria-checked'], 'true');
+});
+
+test('topic chat send button is an Enter icon without text; the keyboard still sends on Enter, not Shift+Enter or while composing', async () => {
+  const f = fixture();
+  assert.equal(f.send().iconName, 'corner-down-left');
+  assert.equal(f.send().text, '');
+  f.type('hello');
+  assert.equal(f.press('Enter', { shiftKey: true }), false);
+  assert.equal(f.press('Enter', { isComposing: true }), false);
+  assert.deepEqual(f.calls.submit, []);
+  assert.equal(f.press('Enter'), true);
+  await dom.tick();
+  assert.deepEqual(f.calls.submit, [['ask', 'hello']]);
 });
 
 test('topic chat lists turns as plain text', () => {
@@ -258,17 +374,19 @@ test('topic chat lifts its overlay above the controls overlay while mounted and 
   assert.ok(!hasClass(f.root, 'has-topic-chat'));
 });
 
-test('topic chat puts the Tab chip in the same grey-text line, not in its own row', () => {
+test('topic chat counterexample 5: the grey text shows with no Tab label on screen, and Tab still adopts it', () => {
   const f = fixture();
   f.action('expand').click();
-  const tab = find(f.win.el, i => hasClass(i, 'vam-topic-chat-tab'));
-  assert.ok(tab && !tab.hidden);
-  assert.ok(hasClass(tab.parent, 'vam-topic-chat-ghost'), 'chip is inside the ghost line');
-  const text = find(tab.parent, i => hasClass(i, 'vam-topic-chat-ph'));
+  assert.equal(findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-tab')).length, 0);
+  assert.equal(findAll(f.win.el, i => /Tab/.test(i.text)).length, 0, 'no Tab label anywhere');
+  const ghostEl = find(f.win.el, i => hasClass(i, 'vam-topic-chat-ghost'));
+  const text = find(ghostEl, i => hasClass(i, 'vam-topic-chat-ph'));
   assert.equal(text.text, t('ui.topic_chat_suggest_expand'));
-  assert.ok(find(f.win.el, i => hasClass(i, 'vam-topic-chat-composer')).children.includes(tab.parent));
-  f.press('Tab');
-  assert.ok(tab.hidden && tab.parent.hidden, 'adopted: grey line and chip go away');
+  assert.equal(ghostEl.hidden, false);
+  assert.ok(find(f.win.el, i => hasClass(i, 'vam-topic-chat-composer')).children.includes(ghostEl));
+  assert.equal(f.press('Tab'), true);
+  assert.equal(f.input.value, t('ui.topic_chat_suggest_expand'));
+  assert.equal(ghostEl.hidden, true, 'adopted: the grey line goes away');
 });
 
 test('topic chat destroy releases every listener and the host subscription', () => {
@@ -277,6 +395,7 @@ test('topic chat destroy releases every listener and the host subscription', () 
   f.win.destroy();
   assert.equal(f.watchers.length, 0);
   assert.ok(all.every(el => Object.values(el.listeners).every(list => list.length === 0)));
+  assert.ok(Object.values(f.doc.listeners).every(list => list.length === 0), 'counterexample 4: the document listener is removed too');
   assert.equal(f.root.children.includes(f.win.el), false);
 });
 

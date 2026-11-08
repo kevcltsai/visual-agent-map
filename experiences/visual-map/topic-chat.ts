@@ -1,3 +1,4 @@
+import { setIcon } from "obsidian";
 import { t } from "../../i18n";
 import { renderChatMarkdown } from "../../core/map-chat-render";
 
@@ -48,6 +49,7 @@ export interface TopicChatHost {
   close(): void;
 }
 
+const MODES: readonly TopicChatMode[] = ["quick", "standard"];
 const KINDS: readonly TopicChatButtonKind[] = ["research", "expand", "synthesize"];
 const WIDTH_FALLBACK = 340;
 const NARROW_AREA = 360;
@@ -55,6 +57,14 @@ const GAP = 8;
 
 function kindLabel(kind: TopicChatButtonKind): string {
   return t(`ui.topic_chat_${kind}`);
+}
+
+function modeName(mode: TopicChatMode): string {
+  return mode === "quick" ? t("ui.quick") : t("ui.standard");
+}
+
+function modeIcon(mode: TopicChatMode): string {
+  return mode === "quick" ? "zap" : "globe";
 }
 
 function suggestion(kind: TopicChatButtonKind): string {
@@ -67,12 +77,15 @@ export class TopicChatWindow {
   private readonly logEl: HTMLElement;
   private readonly inputEl: HTMLTextAreaElement;
   private readonly sendEl: HTMLButtonElement;
-  private readonly tabEl: HTMLElement;
   private readonly ghostEl: HTMLElement;
   private readonly ghostTextEl: HTMLElement;
   private readonly modeHintEl: HTMLElement;
   private readonly kindEls = new Map<TopicChatButtonKind, HTMLButtonElement>();
   private readonly modeEls = new Map<TopicChatMode, HTMLButtonElement>();
+  private readonly modePickerEl: HTMLElement;
+  private readonly modeToggleEl: HTMLButtonElement;
+  private readonly modeMenuEl: HTMLElement;
+  private iconMode: TopicChatMode | null = null;
   private readonly cleanups: Array<() => void> = [];
   private parentEl: HTMLElement | null = null;
   private submitting = false;
@@ -115,34 +128,67 @@ export class TopicChatWindow {
     });
     this.on(this.inputEl, "input", () => this.typed());
     this.on(this.inputEl, "keydown", event => this.keydown(event));
-    // The grey suggestion and its Tab chip share one line (the chip follows the text, also when the text wraps), so both live in
-    // an overlay that lays out like the input; the placeholder stays for assistive tech but is drawn transparent while this shows.
+    // The grey suggestion lives in an overlay that lays out like the input (it wraps the same way); the placeholder stays for
+    // assistive tech but is drawn transparent while this shows. Tab adopts it (see keydown); no on-screen label says so.
     this.ghostEl = composer.createDiv({ cls: "vam-topic-chat-ghost", attr: { "aria-hidden": "true" } });
     this.ghostTextEl = this.ghostEl.createSpan({ cls: "vam-topic-chat-ph" });
-    this.tabEl = this.ghostEl.createSpan({ cls: "vam-topic-chat-tab", text: t("ui.topic_chat_tab_adopt") });
-    this.tabEl.hidden = true;
     const foot = composer.createDiv("vam-topic-chat-foot");
-    const modes = foot.createDiv({
-      cls: "vam-topic-chat-modes",
-      attr: { role: "group", "aria-label": t("ui.ai_mode") }
+    // The AI mode is one small icon button; its menu is built once and only its attributes change afterwards.
+    this.modePickerEl = foot.createSpan("vam-topic-chat-mode-picker");
+    this.modeToggleEl = this.modePickerEl.createEl("button", {
+      cls: "vam-topic-chat-mode-toggle",
+      attr: { type: "button", "aria-haspopup": "menu", "aria-expanded": "false" }
     });
-    for (const mode of ["quick", "standard"] as const) {
-      const button = modes.createEl("button", {
+    this.modeMenuEl = this.modePickerEl.createDiv({
+      cls: "vam-topic-chat-mode-menu",
+      attr: { role: "menu", "aria-label": t("ui.ai_mode") }
+    });
+    this.modeMenuEl.hidden = true;
+    for (const mode of MODES) {
+      const button = this.modeMenuEl.createEl("button", {
         cls: "vam-topic-chat-mode",
-        text: mode === "quick" ? t("ui.quick") : t("ui.standard"),
-        attr: { type: "button", "aria-pressed": "false" }
+        attr: { type: "button", role: "menuitemradio", "aria-checked": "false" }
       });
+      setIcon(button.createSpan("vam-topic-chat-mode-icon"), modeIcon(mode));
+      button.createSpan({ cls: "vam-topic-chat-mode-label", text: modeName(mode) });
+      setIcon(button.createSpan("vam-topic-chat-mode-check"), "check");
       this.modeEls.set(mode, button);
-      this.on(button, "click", () => {
-        if (this.host.session().running) return;
-        this.host.setMode(mode);
-      });
+      this.on(button, "click", () => this.pickMode(mode));
+    }
+    this.on(this.modeToggleEl, "click", event => {
+      if (this.modeMenuEl.hidden) this.openModeMenu(event.detail === 0);
+      else this.closeModeMenu(true);
+    });
+    this.on(this.modeToggleEl, "keydown", event => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      if (this.modeMenuEl.hidden) this.openModeMenu(true);
+    });
+    this.on(this.modeMenuEl, "keydown", event => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      const buttons = MODES.map(mode => this.modeEls.get(mode)!);
+      const at = buttons.findIndex(button => button === event.target);
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      buttons[(Math.max(at, 0) + step + buttons.length) % buttons.length].focus();
+    });
+    this.on(this.modePickerEl, "focusout", event => {
+      const next = event.relatedTarget as Node | null;
+      if (!next || !this.modePickerEl.contains(next)) this.closeModeMenu(false);
+    });
+    const doc = parent.ownerDocument;
+    if (doc?.addEventListener) {
+      const outside = (event: MouseEvent): void => {
+        if (!this.modeMenuEl.hidden && !this.modePickerEl.contains(event.target as Node)) this.closeModeMenu(false);
+      };
+      doc.addEventListener("mousedown", outside);
+      this.cleanups.push(() => doc.removeEventListener("mousedown", outside));
     }
     this.sendEl = foot.createEl("button", {
       cls: "vam-topic-chat-send",
-      text: "↑",
       attr: { type: "button", "aria-label": t("ui.topic_chat_send") }
     });
+    setIcon(this.sendEl, "corner-down-left");
     this.on(this.sendEl, "click", () => void this.send());
     this.modeHintEl = composer.createDiv({
       cls: "vam-topic-chat-mode-hint",
@@ -153,7 +199,9 @@ export class TopicChatWindow {
       if (event.key !== "Escape") return;
       event.preventDefault?.();
       event.stopPropagation?.();
-      this.requestClose();
+      // An open mode menu takes the first Escape; only a second one closes the window.
+      if (!this.modeMenuEl.hidden) this.closeModeMenu(true);
+      else this.requestClose();
     });
     this.cleanups.push(host.subscribe(() => this.refresh()));
     const draft = host.session();
@@ -233,6 +281,26 @@ export class TopicChatWindow {
     this.opener?.focus();
   }
 
+  private openModeMenu(focusCurrent: boolean): void {
+    if (this.host.session().running) return;
+    this.modeMenuEl.hidden = false;
+    this.modeToggleEl.setAttr("aria-expanded", "true");
+    if (focusCurrent) this.modeEls.get(this.host.session().mode)?.focus();
+  }
+
+  private closeModeMenu(focusToggle: boolean): void {
+    if (this.modeMenuEl.hidden) return;
+    this.modeMenuEl.hidden = true;
+    this.modeToggleEl.setAttr("aria-expanded", "false");
+    if (focusToggle) this.modeToggleEl.focus();
+  }
+
+  private pickMode(mode: TopicChatMode): void {
+    if (this.host.session().running) return;
+    this.host.setMode(mode);
+    this.closeModeMenu(true);
+  }
+
   private pickKind(kind: TopicChatButtonKind): void {
     if (this.host.session().running) return;
     this.inputEl.value = "";
@@ -301,17 +369,23 @@ export class TopicChatWindow {
       button.toggleClass("is-active", session.draftKind === kind);
       button.disabled = busy;
     }
+    if (session.running) this.closeModeMenu(false);
     for (const [mode, button] of this.modeEls) {
-      button.setAttr("aria-pressed", String(session.mode === mode));
+      button.setAttr("aria-checked", String(session.mode === mode));
       button.toggleClass("is-active", session.mode === mode);
       button.disabled = session.running;
+    }
+    this.modeToggleEl.disabled = session.running;
+    this.modeToggleEl.setAttr("aria-label", t("ui.topic_chat_mode_button_0", modeName(session.mode)));
+    if (this.iconMode !== session.mode) {
+      this.iconMode = session.mode;
+      setIcon(this.modeToggleEl, modeIcon(session.mode));
     }
     this.modeHintEl.setText(
       session.mode === "quick" ? t("ui.topic_chat_mode_quick_hint") : t("ui.topic_chat_mode_standard_hint")
     );
     const ghost = session.draftKind && empty ? suggestion(session.draftKind) : "";
     this.inputEl.setAttr("placeholder", ghost || t("ui.topic_chat_placeholder"));
-    this.tabEl.hidden = !ghost || busy;
     this.ghostEl.hidden = !ghost;
     this.inputEl.toggleClass("is-ghost", !!ghost);
     this.ghostTextEl.setText(ghost);

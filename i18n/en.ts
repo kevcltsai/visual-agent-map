@@ -3048,7 +3048,6 @@ export const en = {
   "ui.topic_chat_label_0": "Topic chat: {0}",
   "ui.topic_chat_placeholder": "Ask about this topic, or press a button above…",
   "ui.topic_chat_send": "Send",
-  "ui.topic_chat_tab_adopt": "Tab to use",
   "ui.topic_chat_close": "Close topic chat",
   "ui.topic_chat_research": "Research",
   "ui.topic_chat_expand": "Expand",
@@ -3060,6 +3059,7 @@ export const en = {
     "Break this topic into subtopics to explore further; each subtopic should be researchable on its own.",
   "ui.topic_chat_suggest_synthesize":
     "Synthesize the findings of the subtopics below: which conclusions agree, which conflict, and what is still missing.",
+  "ui.topic_chat_mode_button_0": "AI mode: {0}",
   "ui.topic_chat_mode_quick_hint": "Quick: uses only the model's own knowledge, no web search.",
   "ui.topic_chat_mode_standard_hint": "Standard: searches the web to fill in recent or niche information.",
   "ui.topic_chat_research_done": "Research finished; the result was written back to this topic.",

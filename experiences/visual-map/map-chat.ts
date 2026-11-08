@@ -2750,7 +2750,12 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const list = row.createDiv({ cls: "vam-map-chat-lines" });
     if (hasDetail || undo) {
       const summary = list.createDiv("vam-map-chat-lines-summary");
-      if (folded.length) this.buildCounts(summary.createSpan("vam-map-chat-lines-counts"), { done: folded.length, skipped: 0, failed: 0 });
+      if (folded.length)
+        this.buildCounts(summary.createSpan("vam-map-chat-lines-counts"), {
+          done: folded.length,
+          skipped: 0,
+          failed: 0
+        });
       else if (applied) this.buildPlanSummary(summary.createSpan("vam-map-chat-lines-counts"), applied);
       if (hasDetail) this.buildDetailToggle(summary, message, open);
       if (undo) this.buildReplyUndo(summary, undo.token);
@@ -2810,8 +2815,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.buildPlanSummary(card.createDiv("vam-map-chat-plan-summary"), plan);
     // Said before the button is pressed, not after: undo takes the plan's changes back, but not the AI work it starts. Always
     // shown (never behind "View details") and only for a plan that does start AI work.
-    if (plan.aiWork)
-      card.createDiv({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
+    if (plan.aiWork) card.createDiv({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
     // A plan about a picture keeps its lists open: the user checks the anchors before they apply them, so nothing folds.
     const folds = !plan.openGroups;
     const open = !folds || message.linesOpen === true;

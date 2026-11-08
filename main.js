@@ -40295,7 +40295,12 @@ ${shown}` : t("ui.map_chat_model_label"));
     const list = row.createDiv({ cls: "vam-map-chat-lines" });
     if (hasDetail || undo) {
       const summary = list.createDiv("vam-map-chat-lines-summary");
-      if (folded2.length) this.buildCounts(summary.createSpan("vam-map-chat-lines-counts"), { done: folded2.length, skipped: 0, failed: 0 });
+      if (folded2.length)
+        this.buildCounts(summary.createSpan("vam-map-chat-lines-counts"), {
+          done: folded2.length,
+          skipped: 0,
+          failed: 0
+        });
       else if (applied) this.buildPlanSummary(summary.createSpan("vam-map-chat-lines-counts"), applied);
       if (hasDetail) this.buildDetailToggle(summary, message, open);
       if (undo) this.buildReplyUndo(summary, undo.token);
@@ -40346,8 +40351,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       return;
     }
     this.buildPlanSummary(card.createDiv("vam-map-chat-plan-summary"), plan);
-    if (plan.aiWork)
-      card.createDiv({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
+    if (plan.aiWork) card.createDiv({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
     const folds = !plan.openGroups;
     const open = !folds || message.linesOpen === true;
     const addDetail = () => {

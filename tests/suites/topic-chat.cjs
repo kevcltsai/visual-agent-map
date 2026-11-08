@@ -754,6 +754,25 @@ integrationTest('topic chat counterexample 3: a reply that reaches outside the s
   assert.ok(sentence.includes('Done.') && sentence.includes(t('ui.topic_chat_out_of_scope')), sentence);
 });
 
+integrationTest('topic chat ask: a non-root topic can be renamed and re-summarised by its own free question (its real parent is the baseline, not null)', async () => {
+  const h = await harness();
+  mockChat(h, answer([{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body renamed' }, { kind: 'update_summary', nodeId: h.ids.a, summary: 'New summary' }], 'Renamed.'));
+  await h.host('a').submit('ask', 'rename this'); await finished(h);
+  const note = await h.repo.readNote(h.node('a').path);
+  assert.equal(note.title, 'Body renamed'); assert.equal(note.summary, 'New summary');
+  const sentence = h.entry('a').session.turns.at(-1).text;
+  assert.ok(!sentence.includes(t('ui.map_chat_skip_topic_changed')), sentence);
+  assert.ok(!h.requests[0].context.json.includes(h.ids.root), 'the parent topic is still not shown to the model');
+});
+
+integrationTest('topic chat ask: a topic moved to another parent after sending is still refused as changed', async () => {
+  const h = await harness();
+  mockChat(h, request => { const n = h.view.map.nodes.find(x => x.id === h.ids.a); n.parentId = h.ids.b; return answer([{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Late' }], 'Renamed.'); });
+  await h.host('a').submit('ask', 'rename this'); await finished(h);
+  assert.notEqual((await h.repo.readNote(h.node('a').path)).title, 'Late');
+  assert.ok(h.entry('a').session.turns.at(-1).text.includes(t('ui.map_chat_skip_topic_changed')), h.entry('a').session.turns.at(-1).text);
+});
+
 integrationTest('topic chat ask: inside the subtree a new card and a relation are written; a reply that needs a plan is not applied and says so in one sentence', async () => {
   const h = await harness();
   mockChat(h, answer([{ kind: 'add_child', parentId: h.ids.a, title: 'Light', summary: 'S', ref: 'n1' }, { kind: 'add_relation', fromId: 'new:n1', toId: h.ids.c, relationKind: 'related' }], 'Added.'));

@@ -16795,6 +16795,9 @@ export class VisualAgentMapView extends ItemView {
       activeFile: null,
       history
     });
+    // The prompt hides the topic's parent (outline parentId null), but the stale check compares against the real one:
+    // keep the baseline true so a topic that is not the map root is not judged moved. `topicHashes` is never sent to the model.
+    if (context.topicHashes[node.id]) context.topicHashes[node.id] = { ...context.topicHashes[node.id], parentId: node.parentId };
     return {
       message,
       context,

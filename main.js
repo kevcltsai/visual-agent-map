@@ -58308,10 +58308,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
         this.onSpaceKeyUp();
       }
     });
-    this.registerDomEvent((_n = this.contentEl.win) != null ? _n : window, "blur", () => {
-      this.spaceHeld = false;
-      this.spacePendingNodeId = null;
-    });
+    this.registerDomEvent((_n = this.contentEl.win) != null ? _n : window, "blur", () => this.onWindowBlur());
     this.registerDomEvent((_p = (_o = this.contentEl.ownerDocument) == null ? void 0 : _o.defaultView) != null ? _p : window, "focus", () => this.onMapWindowFocus());
     this.bindClipboard();
     (_r = (_q = this.contentEl).onWindowMigrated) == null ? void 0 : _r.call(_q, () => this.bindClipboard());
@@ -66927,6 +66924,10 @@ ${request.requirements}` : preset.text,
     event.preventDefault();
     if (!event.repeat) this.spacePendingNodeId = node.id;
     return true;
+  }
+  onWindowBlur() {
+    this.spaceHeld = false;
+    this.spacePendingNodeId = null;
   }
   onSpaceKeyUp() {
     var _a2;
@@ -75951,10 +75952,10 @@ ${note.detail.trim()}` : "",
     );
     viewport.addEventListener("pointerdown", (event) => {
       var _a2;
+      if (this.spaceHeld) this.spacePendingNodeId = null;
       const target = event.target;
       if (target.closest(".vam-node") || target.closest(".vam-text-node") || target.closest(".vam-boundary-label") || target.closest(".vam-summary") || target.closest(".vam-summary-text") || target.closest(INTERACTIVE_SELECTOR) || !this.map)
         return;
-      if (this.spaceHeld) this.spacePendingNodeId = null;
       const intent = canvasPointerIntent({
         button: event.button,
         integrationMode: this.selection.state.multiSelectMode,

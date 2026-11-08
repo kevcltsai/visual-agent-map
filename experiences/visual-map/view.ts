@@ -2395,10 +2395,7 @@ export class VisualAgentMapView extends ItemView {
         this.onSpaceKeyUp();
       }
     });
-    this.registerDomEvent(this.contentEl.win ?? window, "blur", () => {
-      this.spaceHeld = false;
-      this.spacePendingNodeId = null;
-    });
+    this.registerDomEvent(this.contentEl.win ?? window, "blur", () => this.onWindowBlur());
     this.registerDomEvent(this.contentEl.ownerDocument?.defaultView ?? window, "focus", () => this.onMapWindowFocus());
     // Copy and paste of branches: on the document, popout windows included (decision #29, evidence/clipboard-mime.md).
     this.bindClipboard();
@@ -11591,6 +11588,10 @@ export class VisualAgentMapView extends ItemView {
     event.preventDefault();
     if (!event.repeat) this.spacePendingNodeId = node.id;
     return true;
+  }
+  private onWindowBlur(): void {
+    this.spaceHeld = false;
+    this.spacePendingNodeId = null;
   }
   private onSpaceKeyUp(): void {
     const id = this.spacePendingNodeId;
@@ -21475,6 +21476,8 @@ export class VisualAgentMapView extends ItemView {
       { passive: false }
     );
     viewport.addEventListener("pointerdown", event => {
+      // Any press while Space is down (on a card too) turns the Space press into a drag, not a fold.
+      if (this.spaceHeld) this.spacePendingNodeId = null;
       const target = event.target as Element;
       // A frame's label chip is its own target: panning would capture the pointer and retarget its double-click.
       if (
@@ -21489,8 +21492,6 @@ export class VisualAgentMapView extends ItemView {
         return;
       // Normal mode: a drag pans, Shift+drag draws a selection box. Topic selection mode: a drag adds to the selection,
       // Option (Alt)+drag removes from it, and Space+drag or the middle button pans.
-      // A Space press that turns into a pan is not a fold.
-      if (this.spaceHeld) this.spacePendingNodeId = null;
       const intent = canvasPointerIntent({
         button: event.button,
         integrationMode: this.selection.state.multiSelectMode,

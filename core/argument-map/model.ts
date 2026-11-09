@@ -192,6 +192,25 @@ export function readArgumentMap(map: { nodes: readonly { id: string }[]; argumen
   return { kind: "usable", data: map.argumentMap as ArgumentMapData };
 }
 
+/**
+ * The node ids the flow owns (the five role nodes, every hypothesis and every need card), read tolerantly from the raw
+ * key so an unusable key still protects what it names. Empty when the map has no `argumentMap` key. The AI lock
+ * treats these as locked; the runner never asks the lock.
+ */
+export function managedNodeIds(map: { argumentMap?: unknown } | null | undefined): Set<string> {
+  const ids = new Set<string>();
+  const raw = map?.argumentMap;
+  if (!isRec(raw)) return ids;
+  if (isRec(raw.roles)) for (const id of Object.values(raw.roles)) if (isStr(id)) ids.add(id);
+  if (Array.isArray(raw.hypotheses))
+    for (const h of raw.hypotheses) {
+      if (!isRec(h)) continue;
+      if (isStr(h.id)) ids.add(h.id);
+      if (Array.isArray(h.needs)) for (const need of h.needs) if (isRec(need) && isStr(need.id)) ids.add(need.id);
+    }
+  return ids;
+}
+
 // ---- selectors ---------------------------------------------------------------------------------------------------------
 
 /** The verdict shown and used: the user's value first, then the AI's, else undecided. */

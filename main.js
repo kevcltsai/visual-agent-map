@@ -25252,6 +25252,130 @@ function mapSourceStatus(app, source) {
   return { exists: item instanceof import_obsidian12.TFile };
 }
 
+// core/argument-map/model.ts
+var ARGUMENT_MAP_VERSION = 1;
+var MAX_ROUND = 3;
+var MAX_HYPOTHESES = 6;
+var MAX_NEEDS = 6;
+var MAX_ROUND_NEEDS = 3;
+var MAX_RESEARCH_CALLS = 66;
+var MAX_SITUATION_DATA = 6;
+var MAX_SITUATION_ATTEMPTS = 2;
+var MIN_VERIFIED = 3;
+var ROLE_KEYS = ["proposition", "situation", "conclusion", "verified", "eliminated"];
+var RUN_PHASES = ["situation", "analysis", "concluded", "stopped_mismatch", "stopped_limit"];
+var RUN_STATUSES = ["running", "paused", "finished"];
+var STOP_REASONS = ["mismatch", "data_missing", "limit", "user", "interrupted", "error"];
+var ITEM_STATES = ["pending", "searching", "found", "not_found"];
+var DATA_STANCES = ["supports", "opposes"];
+var NEED_STANCES = ["supports", "contradicts", "uncertain"];
+var PROOF_CHECKS = ["page_match", "provider_read"];
+var GATE_STATES = ["pending", "matched", "unmatched"];
+var GATE_KINDS = ["not_matching", "data_missing"];
+var VERDICTS = ["supported", "refuted", "undecided"];
+var LOCATIONS = ["verifying", "eliminated"];
+var CONCLUSION_STATES = ["pending", "concluded", "stopped"];
+var isRec = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isStr = (value) => typeof value === "string" && value !== "";
+var oneOf = (list2, value) => typeof value === "string" && list2.includes(value);
+var optOneOf = (list2, value) => value === void 0 || oneOf(list2, value);
+var count = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0;
+var strList = (value) => Array.isArray(value) && value.every(isStr);
+var optStr = (value) => value === void 0 || typeof value === "string";
+function badProof(value) {
+  if (value === void 0) return false;
+  return !isRec(value) || !isStr(value.url) || !isStr(value.quote) || !isStr(value.claim) || !oneOf(PROOF_CHECKS, value.check) || !isStr(value.checkedAt);
+}
+function problem(raw, nodeIds) {
+  if (!isRec(raw)) return "not an object";
+  if (raw.v !== ARGUMENT_MAP_VERSION) return "unsupported version";
+  if (!isRec(raw.roles)) return "roles missing";
+  for (const key4 of ROLE_KEYS) {
+    const id = raw.roles[key4];
+    if (!isStr(id)) return `role ${key4} missing`;
+    if (!nodeIds.has(id)) return `role ${key4} points to a missing node`;
+  }
+  const run = raw.run;
+  if (!isRec(run)) return "run missing";
+  if (!isStr(run.runId) || !count(run.researchCalls)) return "run malformed";
+  if (!oneOf(RUN_PHASES, run.phase) || !oneOf(RUN_STATUSES, run.status) || !optOneOf(STOP_REASONS, run.stopReason))
+    return "unknown run enum";
+  const situation = raw.situation;
+  if (!isRec(situation) || !Array.isArray(situation.data) || !isRec(situation.gate)) return "situation malformed";
+  const ids = /* @__PURE__ */ new Set();
+  for (const datum of situation.data) {
+    if (!isRec(datum) || !isStr(datum.id) || !isStr(datum.need) || !count(datum.attempts) || ids.has(datum.id))
+      return "situation data malformed";
+    ids.add(datum.id);
+    if (!oneOf(ITEM_STATES, datum.state) || !optOneOf(DATA_STANCES, datum.stance)) return "unknown situation enum";
+    if (badProof(datum.proof) || !optStr(datum.reason)) return "situation data malformed";
+  }
+  const gate = situation.gate;
+  if (!oneOf(GATE_STATES, gate.state) || !optOneOf(GATE_KINDS, gate.kind)) return "unknown gate enum";
+  if (!strList(gate.citedData) || !optStr(gate.reason)) return "gate malformed";
+  if (!Array.isArray(raw.hypotheses)) return "hypotheses malformed";
+  for (const hypothesis of raw.hypotheses) {
+    if (!isRec(hypothesis) || !isStr(hypothesis.id) || ids.has(hypothesis.id)) return "hypothesis malformed";
+    ids.add(hypothesis.id);
+    if (!strList(hypothesis.citedData) || !count(hypothesis.round) || !Array.isArray(hypothesis.needs))
+      return "hypothesis malformed";
+    if (!oneOf(LOCATIONS, hypothesis.location) || !optOneOf(VERDICTS, hypothesis.aiVerdict))
+      return "unknown hypothesis enum";
+    if (!optOneOf(VERDICTS, hypothesis.userVerdict) || !optStr(hypothesis.eliminationReason))
+      return "hypothesis malformed";
+    for (const need of hypothesis.needs) {
+      if (!isRec(need) || !isStr(need.id) || !isStr(need.text) || !count(need.addedRound) || ids.has(need.id))
+        return "need malformed";
+      ids.add(need.id);
+      if (!oneOf(ITEM_STATES, need.state) || !optOneOf(NEED_STANCES, need.stance)) return "unknown need enum";
+      if (badProof(need.proof) || !optStr(need.reason)) return "need malformed";
+    }
+  }
+  const conclusion = raw.conclusion;
+  if (!isRec(conclusion) || !oneOf(CONCLUSION_STATES, conclusion.state)) return "conclusion malformed";
+  if (!strList(conclusion.basedOn) || !strList(conclusion.missing)) return "conclusion malformed";
+  return null;
+}
+function readArgumentMap(map) {
+  if (map.argumentMap === void 0) return { kind: "absent" };
+  const found = problem(map.argumentMap, new Set(map.nodes.map((node) => node.id)));
+  if (found) return { kind: "unusable", reason: found, raw: map.argumentMap };
+  return { kind: "usable", data: map.argumentMap };
+}
+function managedNodeIds(map) {
+  const ids = /* @__PURE__ */ new Set();
+  const raw = map == null ? void 0 : map.argumentMap;
+  if (!isRec(raw)) return ids;
+  if (isRec(raw.roles)) {
+    for (const id of Object.values(raw.roles)) if (isStr(id)) ids.add(id);
+  }
+  if (Array.isArray(raw.hypotheses))
+    for (const h of raw.hypotheses) {
+      if (!isRec(h)) continue;
+      if (isStr(h.id)) ids.add(h.id);
+      if (Array.isArray(h.needs)) {
+        for (const need of h.needs) if (isRec(need) && isStr(need.id)) ids.add(need.id);
+      }
+    }
+  return ids;
+}
+function effectiveVerdict(h) {
+  var _a2, _b2;
+  return (_b2 = (_a2 = h.userVerdict) != null ? _a2 : h.aiVerdict) != null ? _b2 : "undecided";
+}
+function foundNeeds(h) {
+  return h.needs.filter((need) => need.state === "found");
+}
+function allNeedsFound(h) {
+  return h.needs.length > 0 && h.needs.every((need) => need.state === "found");
+}
+function isVerified(h) {
+  return allNeedsFound(h) && h.location === "verifying" && effectiveVerdict(h) === "supported";
+}
+function verifiedHypotheses(state) {
+  return state.hypotheses.filter(isVerified);
+}
+
 // repository.ts
 function normalizeMapChatWidth(value) {
   return clampMapChatWidth(value);
@@ -26255,6 +26379,7 @@ var Repository = class {
     return { source: "inherited", model: effective.model, overridden: effective.overridden };
   }
   async readNote(path, map) {
+    var _a2, _b2;
     const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))), fm = frontmatter(content);
     const status = text5(fm.status, "idea");
     const normalized2 = status === "review" || status === "accepted" ? "completed" : status;
@@ -26290,7 +26415,7 @@ var Repository = class {
       ...typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {},
       ...noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {},
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
-      ...readAiLocked(fm) ? { aiLocked: true } : {},
+      ...readAiLocked(fm) || managedNodeIds(map).has((_b2 = (_a2 = map == null ? void 0 : map.nodes.find((item) => item.path === path)) == null ? void 0 : _a2.id) != null ? _b2 : "") ? { aiLocked: true } : {},
       ...readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) } : {},
       ...readTopicKind(fm) === "hypothesis" ? { hypothesisLeaning: readHypothesisLeaning(fm), hypothesisStrength: readHypothesisStrength(fm) } : {},
       ...readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {},
@@ -37433,7 +37558,7 @@ function expandBasisOf(cards) {
 var BASIS_TEXT_LIMIT = 200;
 var BASIS_LIST_LIMIT = 50;
 var text7 = (value) => typeof value === "string" ? [...value].slice(0, BASIS_TEXT_LIMIT).join("") : null;
-var count = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? { existingChildren: value } : {};
+var count2 = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? { existingChildren: value } : {};
 function parseChatBasis(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
   const raw = value;
@@ -37445,7 +37570,7 @@ function parseChatBasis(value) {
       const title = text7(entry.title);
       return id !== null && title !== null ? [{ id, title }] : [];
     });
-    return { kind: raw.kind, sources, ...count(raw.existingChildren) };
+    return { kind: raw.kind, sources, ...count2(raw.existingChildren) };
   }
   if (raw.kind === "outline_only") {
     const alsoRead = (Array.isArray(raw.alsoRead) ? raw.alsoRead : []).slice(0, BASIS_LIST_LIMIT).flatMap((item) => {
@@ -37454,7 +37579,7 @@ function parseChatBasis(value) {
       const title = text7(entry.title);
       return path !== null && title !== null ? [{ path, title }] : [];
     });
-    return { kind: "outline_only", alsoRead, ...count(raw.existingChildren) };
+    return { kind: "outline_only", alsoRead, ...count2(raw.existingChildren) };
   }
   return void 0;
 }
@@ -44594,113 +44719,6 @@ ${value}`).join("\n\n");
     }
   }
 };
-
-// core/argument-map/model.ts
-var ARGUMENT_MAP_VERSION = 1;
-var MAX_ROUND = 3;
-var MAX_HYPOTHESES = 6;
-var MAX_NEEDS = 6;
-var MAX_ROUND_NEEDS = 3;
-var MAX_RESEARCH_CALLS = 66;
-var MAX_SITUATION_DATA = 6;
-var MAX_SITUATION_ATTEMPTS = 2;
-var MIN_VERIFIED = 3;
-var ROLE_KEYS = ["proposition", "situation", "conclusion", "verified", "eliminated"];
-var RUN_PHASES = ["situation", "analysis", "concluded", "stopped_mismatch", "stopped_limit"];
-var RUN_STATUSES = ["running", "paused", "finished"];
-var STOP_REASONS = ["mismatch", "data_missing", "limit", "user", "interrupted", "error"];
-var ITEM_STATES = ["pending", "searching", "found", "not_found"];
-var DATA_STANCES = ["supports", "opposes"];
-var NEED_STANCES = ["supports", "contradicts", "uncertain"];
-var PROOF_CHECKS = ["page_match", "provider_read"];
-var GATE_STATES = ["pending", "matched", "unmatched"];
-var GATE_KINDS = ["not_matching", "data_missing"];
-var VERDICTS = ["supported", "refuted", "undecided"];
-var LOCATIONS = ["verifying", "eliminated"];
-var CONCLUSION_STATES = ["pending", "concluded", "stopped"];
-var isRec = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var isStr = (value) => typeof value === "string" && value !== "";
-var oneOf = (list2, value) => typeof value === "string" && list2.includes(value);
-var optOneOf = (list2, value) => value === void 0 || oneOf(list2, value);
-var count2 = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0;
-var strList = (value) => Array.isArray(value) && value.every(isStr);
-var optStr = (value) => value === void 0 || typeof value === "string";
-function badProof(value) {
-  if (value === void 0) return false;
-  return !isRec(value) || !isStr(value.url) || !isStr(value.quote) || !isStr(value.claim) || !oneOf(PROOF_CHECKS, value.check) || !isStr(value.checkedAt);
-}
-function problem(raw, nodeIds) {
-  if (!isRec(raw)) return "not an object";
-  if (raw.v !== ARGUMENT_MAP_VERSION) return "unsupported version";
-  if (!isRec(raw.roles)) return "roles missing";
-  for (const key4 of ROLE_KEYS) {
-    const id = raw.roles[key4];
-    if (!isStr(id)) return `role ${key4} missing`;
-    if (!nodeIds.has(id)) return `role ${key4} points to a missing node`;
-  }
-  const run = raw.run;
-  if (!isRec(run)) return "run missing";
-  if (!isStr(run.runId) || !count2(run.researchCalls)) return "run malformed";
-  if (!oneOf(RUN_PHASES, run.phase) || !oneOf(RUN_STATUSES, run.status) || !optOneOf(STOP_REASONS, run.stopReason))
-    return "unknown run enum";
-  const situation = raw.situation;
-  if (!isRec(situation) || !Array.isArray(situation.data) || !isRec(situation.gate)) return "situation malformed";
-  const ids = /* @__PURE__ */ new Set();
-  for (const datum of situation.data) {
-    if (!isRec(datum) || !isStr(datum.id) || !isStr(datum.need) || !count2(datum.attempts) || ids.has(datum.id))
-      return "situation data malformed";
-    ids.add(datum.id);
-    if (!oneOf(ITEM_STATES, datum.state) || !optOneOf(DATA_STANCES, datum.stance)) return "unknown situation enum";
-    if (badProof(datum.proof) || !optStr(datum.reason)) return "situation data malformed";
-  }
-  const gate = situation.gate;
-  if (!oneOf(GATE_STATES, gate.state) || !optOneOf(GATE_KINDS, gate.kind)) return "unknown gate enum";
-  if (!strList(gate.citedData) || !optStr(gate.reason)) return "gate malformed";
-  if (!Array.isArray(raw.hypotheses)) return "hypotheses malformed";
-  for (const hypothesis of raw.hypotheses) {
-    if (!isRec(hypothesis) || !isStr(hypothesis.id) || ids.has(hypothesis.id)) return "hypothesis malformed";
-    ids.add(hypothesis.id);
-    if (!strList(hypothesis.citedData) || !count2(hypothesis.round) || !Array.isArray(hypothesis.needs))
-      return "hypothesis malformed";
-    if (!oneOf(LOCATIONS, hypothesis.location) || !optOneOf(VERDICTS, hypothesis.aiVerdict))
-      return "unknown hypothesis enum";
-    if (!optOneOf(VERDICTS, hypothesis.userVerdict) || !optStr(hypothesis.eliminationReason))
-      return "hypothesis malformed";
-    for (const need of hypothesis.needs) {
-      if (!isRec(need) || !isStr(need.id) || !isStr(need.text) || !count2(need.addedRound) || ids.has(need.id))
-        return "need malformed";
-      ids.add(need.id);
-      if (!oneOf(ITEM_STATES, need.state) || !optOneOf(NEED_STANCES, need.stance)) return "unknown need enum";
-      if (badProof(need.proof) || !optStr(need.reason)) return "need malformed";
-    }
-  }
-  const conclusion = raw.conclusion;
-  if (!isRec(conclusion) || !oneOf(CONCLUSION_STATES, conclusion.state)) return "conclusion malformed";
-  if (!strList(conclusion.basedOn) || !strList(conclusion.missing)) return "conclusion malformed";
-  return null;
-}
-function readArgumentMap(map) {
-  if (map.argumentMap === void 0) return { kind: "absent" };
-  const found = problem(map.argumentMap, new Set(map.nodes.map((node) => node.id)));
-  if (found) return { kind: "unusable", reason: found, raw: map.argumentMap };
-  return { kind: "usable", data: map.argumentMap };
-}
-function effectiveVerdict(h) {
-  var _a2, _b2;
-  return (_b2 = (_a2 = h.userVerdict) != null ? _a2 : h.aiVerdict) != null ? _b2 : "undecided";
-}
-function foundNeeds(h) {
-  return h.needs.filter((need) => need.state === "found");
-}
-function allNeedsFound(h) {
-  return h.needs.length > 0 && h.needs.every((need) => need.state === "found");
-}
-function isVerified(h) {
-  return allNeedsFound(h) && h.location === "verifying" && effectiveVerdict(h) === "supported";
-}
-function verifiedHypotheses(state) {
-  return state.hypotheses.filter(isVerified);
-}
 
 // core/argument-map/machine.ts
 var GateError = class extends Error {
@@ -71955,6 +71973,12 @@ ${request.requirements}` : preset.text,
     if (!this.relationsEnabled() || !node || isAimNode(node) || !this.isHypothesis(id)) return void 0;
     return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.hypothesisStrength) != null ? _c : "none";
   }
+  /** The verdict of a hypothesis of an argument map (the user's, else the AI's, else undecided); undefined on any other map. */
+  argumentVerdictOf(id) {
+    const read = this.map ? readArgumentMap(this.map) : null;
+    const entry = (read == null ? void 0 : read.kind) === "usable" ? read.data.hypotheses.find((item) => item.id === id) : void 0;
+    return entry ? effectiveVerdict(entry) : void 0;
+  }
   /** The leaning to show on a card: only a hypothesis on an ordinary map has one. */
   hypothesisLeaningOf(id) {
     var _a2, _b2, _c;
@@ -73820,6 +73844,9 @@ ${request.requirements}` : preset.text,
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeHypothesisLeaning(path, leaning)).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
+      const read = readArgumentMap(map);
+      const entry2 = read.kind === "usable" ? read.data.hypotheses.find((item) => item.id === node.id) : void 0;
+      if (entry2) entry2.userVerdict = leaning;
     }).commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
@@ -74822,10 +74849,18 @@ ${request.requirements}` : preset.text,
    * read from disk) win over the view's.
    */
   aiLockReason(op, ids, fresh, options) {
-    return aiLockBlock(op, ids, this.map, (id) => {
-      var _a2, _b2;
-      return ((_b2 = (_a2 = fresh == null ? void 0 : fresh.get(id)) != null ? _a2 : this.notes.get(id)) == null ? void 0 : _b2.aiLocked) === true;
-    }, options);
+    var _a2;
+    const managed = ((_a2 = this.map) == null ? void 0 : _a2.argumentMap) === void 0 ? null : managedNodeIds(this.map);
+    return aiLockBlock(
+      op,
+      ids,
+      this.map,
+      (id) => {
+        var _a3, _b2;
+        return (managed == null ? void 0 : managed.has(id)) === true || ((_b2 = (_a3 = fresh == null ? void 0 : fresh.get(id)) != null ? _a3 : this.notes.get(id)) == null ? void 0 : _b2.aiLocked) === true;
+      },
+      options
+    );
   }
   /**
    * Why the AI may not merge these topics (AI lock), or null: the sources leave the map (their subtree, their parent's
@@ -75251,7 +75286,7 @@ ${request.requirements}` : preset.text,
     const anchorEdit = /* @__PURE__ */ new Map();
     let addRelationControl = null;
     const paint = (focusStrength = false, focusKind = false, focusAdd = false, focusLeaning) => {
-      var _a2, _b2, _c, _d, _e, _f, _g, _h;
+      var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
       body.empty();
       const currentKind = this.topicKindOf(node.id);
       body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
@@ -75274,7 +75309,7 @@ ${request.requirements}` : preset.text,
         }
       }
       if (currentKind === "hypothesis") {
-        const current = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.hypothesisStrength) != null ? _b2 : "none", currentLeaning = (_d = (_c = this.notes.get(node.id)) == null ? void 0 : _c.hypothesisLeaning) != null ? _d : "undecided";
+        const current = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.hypothesisStrength) != null ? _b2 : "none", currentLeaning = (_e = (_d = this.argumentVerdictOf(node.id)) != null ? _d : (_c = this.notes.get(node.id)) == null ? void 0 : _c.hypothesisLeaning) != null ? _e : "undecided";
         body.createEl("strong", {
           text: t("ui.hypothesis_leaning"),
           cls: "vam-topic-tree-heading vam-section-heading"
@@ -75327,9 +75362,9 @@ ${request.requirements}` : preset.text,
       }
       editByPair.clear();
       anchorEdit.clear();
-      const links = ((_f = (_e = this.map) == null ? void 0 : _e.topicRelations) != null ? _f : []).filter((r) => r.from === node.id || r.to === node.id);
+      const links = ((_g = (_f = this.map) == null ? void 0 : _f.topicRelations) != null ? _g : []).filter((r) => r.from === node.id || r.to === node.id);
       body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
-      const anchored = anchorRelationsForTopic((_h = (_g = this.map) == null ? void 0 : _g.canvasItems) != null ? _h : [], node.id);
+      const anchored = anchorRelationsForTopic((_i = (_h = this.map) == null ? void 0 : _h.canvasItems) != null ? _i : [], node.id);
       if (links.length || anchored.length) {
         const list2 = body.createEl("ul", { cls: "vam-relation-list" });
         for (const link of links) {

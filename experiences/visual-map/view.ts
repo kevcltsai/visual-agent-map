@@ -459,7 +459,7 @@ import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCo
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
 import { GateError, applyPause } from "../../core/argument-map/machine";
-import { readArgumentMap } from "../../core/argument-map/model";
+import { effectiveVerdict, managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
   MAP_CHAT_ANCHOR_PREFIX,
@@ -15707,6 +15707,12 @@ export class VisualAgentMapView extends ItemView {
     if (!this.relationsEnabled() || !node || isAimNode(node) || !this.isHypothesis(id)) return undefined;
     return this.notes.get(id)?.hypothesisStrength ?? "none";
   }
+  /** The verdict of a hypothesis of an argument map (the user's, else the AI's, else undecided); undefined on any other map. */
+  private argumentVerdictOf(id: string): HypothesisLeaning | undefined {
+    const read = this.map ? readArgumentMap(this.map) : null;
+    const entry = read?.kind === "usable" ? read.data.hypotheses.find(item => item.id === id) : undefined;
+    return entry ? effectiveVerdict(entry) : undefined;
+  }
   /** The leaning to show on a card: only a hypothesis on an ordinary map has one. */
   private hypothesisLeaningOf(id: string): HypothesisLeaning | undefined {
     const node = this.map?.nodes.find(item => item.id === id);
@@ -17734,6 +17740,10 @@ export class VisualAgentMapView extends ItemView {
       .rewriteNote(node.path, path => this.plugin.repo.writeHypothesisLeaning(path, leaning))
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
+        // On an argument map the same step records the user's verdict; `aiVerdict` stays the runner's.
+        const read = readArgumentMap(map);
+        const entry = read.kind === "usable" ? read.data.hypotheses.find(item => item.id === node.id) : undefined;
+        if (entry) entry.userVerdict = leaning;
       })
       .commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);
@@ -18797,7 +18807,15 @@ export class VisualAgentMapView extends ItemView {
     fresh?: ReadonlyMap<string, Note>,
     options?: { to?: string | null }
   ): AiLockReason | null {
-    return aiLockBlock(op, ids, this.map, id => (fresh?.get(id) ?? this.notes.get(id))?.aiLocked === true, options);
+    // The flow's own nodes (argument map roles, hypotheses, needs) are locked for every AI entry; none on other maps.
+    const managed = this.map?.argumentMap === undefined ? null : managedNodeIds(this.map);
+    return aiLockBlock(
+      op,
+      ids,
+      this.map,
+      id => managed?.has(id) === true || (fresh?.get(id) ?? this.notes.get(id))?.aiLocked === true,
+      options
+    );
   }
   /**
    * Why the AI may not merge these topics (AI lock), or null: the sources leave the map (their subtree, their parent's
@@ -19270,7 +19288,7 @@ export class VisualAgentMapView extends ItemView {
       }
       if (currentKind === "hypothesis") {
         const current = this.notes.get(node.id)?.hypothesisStrength ?? "none",
-          currentLeaning = this.notes.get(node.id)?.hypothesisLeaning ?? "undecided";
+          currentLeaning = this.argumentVerdictOf(node.id) ?? this.notes.get(node.id)?.hypothesisLeaning ?? "undecided";
         body.createEl("strong", {
           text: t("ui.hypothesis_leaning"),
           cls: "vam-topic-tree-heading vam-section-heading"

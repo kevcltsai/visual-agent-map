@@ -72,6 +72,7 @@ import {
 } from "./experiences/visual-map/map-sources";
 import { upgradeLegacyAimText } from "./experiences/aim/legacy-names";
 import { aimEnabled } from "./experiences/aim/availability";
+import { managedNodeIds } from "./core/argument-map/model";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
 export { normalizeReasoningLevel } from "./ai/task-policy";
 
@@ -1588,7 +1589,9 @@ export class Repository {
       ...(typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {}),
       ...(noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {}),
       ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
-      ...(readAiLocked(fm) ? { aiLocked: true as const } : {}),
+      ...(readAiLocked(fm) || managedNodeIds(map).has(map?.nodes.find(item => item.path === path)?.id ?? "")
+        ? { aiLocked: true as const }
+        : {}),
       ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
       ...(readTopicKind(fm) === "hypothesis"
         ? { hypothesisLeaning: readHypothesisLeaning(fm), hypothesisStrength: readHypothesisStrength(fm) }

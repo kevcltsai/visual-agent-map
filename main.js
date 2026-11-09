@@ -581,6 +581,7 @@ var en = {
   "ui.map_sources_search": "Search and add\u2026",
   "ui.map_sources_search_placeholder": "Type a mind map, folder or Markdown name\u2026",
   "ui.map_sources_search_empty": "There is nothing to add in this vault.",
+  "ui.map_sources_search_no_match": "Nothing matches your search.",
   "ui.map_sources_reject_title_0": "{0} not added",
   "ui.map_sources_reject_line_0": '"{0}": {1}',
   "ui.map_sources_reject_current": "The current mind map cannot be added",
@@ -830,6 +831,7 @@ var en = {
   "ui.switch_mind_map": "Switch mind map",
   "ui.map_switcher_placeholder": "Type a mind map name\u2026",
   "ui.map_switcher_empty": "No mind map matches.",
+  "ui.map_switcher_empty_none": "No mind maps yet. Create one with \u201CCreate a new mind map\u201D.",
   "ui.map_switcher_one_topic": "1 topic",
   "ui.map_switcher_topics_0": "{0} topics",
   "ui.map_switcher_edited_0": "edited {0}",
@@ -3380,6 +3382,7 @@ var zhCN = {
   "ui.map_sources_search": "\u641C\u7D22\u5E76\u52A0\u5165\u2026",
   "ui.map_sources_search_placeholder": "\u8F93\u5165\u5FC3\u667A\u56FE\u3001\u6587\u4EF6\u5939\u6216 Markdown \u540D\u79F0\u2026",
   "ui.map_sources_search_empty": "\u8FD9\u4E2A Vault \u6CA1\u6709\u53EF\u52A0\u5165\u7684\u9879\u76EE\u3002",
+  "ui.map_sources_search_no_match": "\u6CA1\u6709\u7B26\u5408\u641C\u7D22\u7684\u9879\u76EE\u3002",
   "ui.map_sources_reject_title_0": "\u6709 {0} \u4E2A\u6CA1\u6709\u52A0\u5165",
   "ui.map_sources_reject_line_0": "\u3008{0}\u3009\uFF1A{1}",
   "ui.map_sources_reject_current": "\u4E0D\u80FD\u52A0\u5165\u5F53\u524D\u8FD9\u5F20\u5FC3\u667A\u56FE",
@@ -3629,6 +3632,7 @@ var zhCN = {
   "ui.switch_mind_map": "\u5207\u6362\u5FC3\u667A\u56FE",
   "ui.map_switcher_placeholder": "\u8F93\u5165\u5FC3\u667A\u56FE\u540D\u79F0\u641C\u7D22\u2026",
   "ui.map_switcher_empty": "\u6CA1\u6709\u7B26\u5408\u7684\u5FC3\u667A\u56FE\u3002",
+  "ui.map_switcher_empty_none": "\u8FD8\u6CA1\u6709\u5FC3\u667A\u56FE\u3002\u8BF7\u7528\u201C\u521B\u5EFA\u65B0\u5FC3\u667A\u56FE\u201D\u6DFB\u52A0\u7B2C\u4E00\u5F20\u3002",
   "ui.map_switcher_one_topic": "1 \u4E2A\u8BAE\u9898",
   "ui.map_switcher_topics_0": "{0} \u4E2A\u8BAE\u9898",
   "ui.map_switcher_edited_0": "\u4FEE\u6539\u4E8E {0}",
@@ -6179,6 +6183,7 @@ var zhTW = {
   "ui.map_sources_search": "\u641C\u5C0B\u4E26\u52A0\u5165\u2026",
   "ui.map_sources_search_placeholder": "\u8F38\u5165\u5FC3\u667A\u5716\u3001\u8CC7\u6599\u593E\u6216 Markdown \u540D\u7A31\u2026",
   "ui.map_sources_search_empty": "\u9019\u500B Vault \u6C92\u6709\u53EF\u52A0\u5165\u7684\u9805\u76EE\u3002",
+  "ui.map_sources_search_no_match": "\u6C92\u6709\u7B26\u5408\u641C\u5C0B\u7684\u9805\u76EE\u3002",
   "ui.map_sources_reject_title_0": "\u6709 {0} \u500B\u6C92\u6709\u52A0\u5165",
   "ui.map_sources_reject_line_0": "\u3008{0}\u3009\uFF1A{1}",
   "ui.map_sources_reject_current": "\u4E0D\u80FD\u52A0\u5165\u76EE\u524D\u9019\u5F35\u5FC3\u667A\u5716",
@@ -6428,6 +6433,7 @@ var zhTW = {
   "ui.switch_mind_map": "\u5207\u63DB\u5FC3\u667A\u5716",
   "ui.map_switcher_placeholder": "\u8F38\u5165\u5FC3\u667A\u5716\u540D\u7A31\u641C\u5C0B\u2026",
   "ui.map_switcher_empty": "\u6C92\u6709\u7B26\u5408\u7684\u5FC3\u667A\u5716\u3002",
+  "ui.map_switcher_empty_none": "\u9084\u6C92\u6709\u5FC3\u667A\u5716\u3002\u8ACB\u7528\u300C\u5EFA\u7ACB\u65B0\u5FC3\u667A\u5716\u300D\u65B0\u589E\u7B2C\u4E00\u5F35\u3002",
   "ui.map_switcher_one_topic": "1 \u500B\u8B70\u984C",
   "ui.map_switcher_topics_0": "{0} \u500B\u8B70\u984C",
   "ui.map_switcher_edited_0": "\u4FEE\u6539\u65BC {0}",
@@ -29358,12 +29364,14 @@ function drawMapSourcesPanel(parent, host, focus) {
   return panel;
 }
 async function openSearch(host, returnFocus, choose) {
+  const items = await searchItems(host);
   const modal = new MapSourcePickerModal(
     host.app,
-    await searchItems(host),
+    items,
     (item) => `${item.title} ${item.detail}`.trim(),
     t("ui.map_sources_search_placeholder"),
-    t("ui.map_sources_search_empty"),
+    // Nothing addable at all vs. items that just do not match the typed text.
+    items.length ? t("ui.map_sources_search_no_match") : t("ui.map_sources_search_empty"),
     (item) => choose([{ path: item.path, name: item.title }]),
     (item, el) => {
       el.addClass("mod-complex");
@@ -30258,7 +30266,7 @@ var MapSwitcherModal = class extends import_obsidian19.FuzzySuggestModal {
     __publicField(this, "showFolder");
     this.showFolder = new Set(items.map((item) => item.folder)).size > 1;
     this.setPlaceholder(t("ui.map_switcher_placeholder"));
-    this.emptyStateText = t("ui.map_switcher_empty");
+    this.emptyStateText = items.length ? t("ui.map_switcher_empty") : t("ui.map_switcher_empty_none");
     this.setInstructions([
       { command: "\u2191\u2193", purpose: t("ui.map_switcher_hint_navigate") },
       { command: "\u21B5", purpose: t("ui.map_switcher_hint_open") },

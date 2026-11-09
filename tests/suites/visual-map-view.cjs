@@ -4146,6 +4146,14 @@ integrationTest('C3: the map switcher is a fuzzy search list; rows say topic cou
   modal.onChooseItem(items[1]);
   assert.deepEqual(plain(chosen), ['P/New/Map.md']);
 });
+integrationTest('P6: the map switcher says no mind map exists yet and how to add one; "no match" only when maps exist and the search finds none', () => {
+  class FuzzySuggestModal { constructor(app) { this.app = app; } setPlaceholder() {} setInstructions() {} open() {} close() {} }
+  const { MapSwitcherModal } = load('ui/modals/map-switcher-modal.ts', { obsidian: { ...obsidian, FuzzySuggestModal } });
+  const none = new MapSwitcherModal({}, [], '', () => {});
+  assert.equal(none.emptyStateText, 'No mind maps yet. Create one with “Create a new mind map”.');
+  const some = new MapSwitcherModal({}, [{ title: 'Alpha', mapPath: 'A/Map.md', topicCount: 1, modified: 1, folder: 'W' }], '', () => {});
+  assert.equal(some.emptyStateText, 'No mind map matches.');
+});
 // ---- bug bash A #01: dragging a card's own cover image must never be taken for a dropped file ----
 function coverDragHarness() {
   const { VisualAgentMapView } = require('../support-replay.cjs').load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } }, {
@@ -4717,6 +4725,16 @@ test('map sources panel: focus after a redraw goes to the search button, or to t
   assert.equal(dom.focusedNow().children[1].text, 'Search and add…', 'no next row: the search button');
   api.drawMapSourcesPanel(dom.element('tools'), host, { search: true });
   assert.equal(dom.focusedNow().children[1].text, 'Search and add…');
+});
+test('map sources picker (P6): an empty vault says there is nothing to add; a vault with items but no match says nothing matches', async () => {
+  const modals = [], api = load('ui/map-sources-panel.ts', { obsidian: msObsidian(modals) });
+  const empty = { vault: { getAbstractFileByPath: () => null, getAllLoadedFiles: () => [{ path: '/' }], getMarkdownFiles: () => [], on() { return {}; } }, metadataCache: { getFileCache: () => null } };
+  const emptyPanel = api.drawMapSourcesPanel(dom.element('tools'), msHost(empty).host, null);
+  dom.find(emptyPanel, c => dom.hasCls(c, 'vam-map-sources-search')).click(); await dom.tick(); await dom.tick();
+  assert.equal(modals.at(-1).emptyStateText, 'There is nothing to add in this vault.');
+  const fullPanel = api.drawMapSourcesPanel(dom.element('tools'), msHost(msTree().app).host, null);
+  dom.find(fullPanel, c => dom.hasCls(c, 'vam-map-sources-search')).click(); await dom.tick(); await dom.tick();
+  assert.equal(modals.at(-1).emptyStateText, 'Nothing matches your search.');
 });
 
 // Drop zone. The zone's drop handler is async (it reads the other maps first), so every drop is followed by a tick.

@@ -811,7 +811,9 @@ export class ArgumentRuns {
       const node = map.nodes.find(n => n.id === itemId);
       // A card the user deleted cannot hold a finding: the item closes as a miss instead of a found item with no card.
       const settled: EvidenceResult = node || !result.found ? result : { found: false, reason: "card_deleted" };
-      const next = isNeed ? applyEvidence(s, hypothesisId, itemId, settled) : applySituationEvidence(s, itemId, settled);
+      const next = isNeed
+        ? applyEvidence(s, hypothesisId, itemId, settled)
+        : applySituationEvidence(s, itemId, settled);
       const proof = result.found ? result.proof : undefined;
       const lines = proof ? [this.ports.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
       const notes = async (): Promise<void> => {

@@ -3134,7 +3134,40 @@ export const en = {
   "ui.argument_source_0_1_2": '- {0} "{1}" ({2})',
   "ui.argument_reason": "Reason",
   "ui.argument_not_found_0": "Not found: {0}",
-  "ui.argument_eliminated_0": "Eliminated: {0}"
+  "ui.argument_eliminated_0": "Eliminated: {0}",
+  "ui.argument_conclusion_state_progress": "Conclusion · in progress",
+  "ui.argument_conclusion_state_concluded": "Conclusion · concluded",
+  "ui.argument_conclusion_state_limit": "Conclusion · limit reached",
+  "ui.argument_conclusion_state_mismatch": "Conclusion · situation mismatch",
+  "ui.argument_conclusion_pending_0_1": "Not concluded {0}/{1}",
+  "ui.argument_conclusion_pending_hint_0":
+    "{0} more hypotheses must be verified. No answer is shown before the conclusion.",
+  "ui.argument_conclusion_done_hint": "{0} hypotheses verified.",
+  "ui.argument_conclusion_limit": "Not concluded. Stopped.",
+  "ui.argument_conclusion_limit_hint":
+    "Every hypothesis was tried. The missing evidence is listed; no conclusion is written.",
+  "ui.argument_mismatch_hint": "The data that do not match are named. No hypothesis analysis is run.",
+  "ui.argument_data_count_0_1": "{0}/{1} data found",
+  "ui.argument_data_item": "Data",
+  "ui.argument_data_opposes": "✕ Opposite direction",
+  "ui.argument_gate_matched_0_1": "✓ Matches the proposition · {0}/{1} data found",
+  "ui.argument_gate_pending": "Checking the situation",
+  "ui.argument_gate_unmatched": "✕ Does not match the proposition",
+  "ui.argument_eliminated_chip": "Eliminated",
+  "ui.argument_evidence": "Evidence",
+  "ui.argument_group_label": "Group",
+  "ui.argument_group_verified_count_0_1": "{0}/{1} verified",
+  "ui.argument_group_eliminated_count_0": "{0} eliminated",
+  "ui.argument_hypothesis_0": "Hypothesis {0}",
+  "ui.argument_missing_not_found": "Missing · not found",
+  "ui.argument_missing_pending": "Missing · to find",
+  "ui.argument_missing_searching": "Missing · searching",
+  "ui.argument_progress_0_1_2": "Evidence needs {0}/{1} found · round {2}/3",
+  "ui.argument_stance_supports": "✓ Supports",
+  "ui.argument_stance_contradicts": "✕ Opposes",
+  "ui.argument_stance_uncertain": "? Uncertain",
+  "ui.argument_verified_done": "✓ Verified",
+  "ui.argument_verifying": "Verifying"
 } as const;
 
 export type TranslationKey = keyof typeof en;

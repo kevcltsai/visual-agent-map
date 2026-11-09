@@ -33047,9 +33047,11 @@ var builtinRef = (id) => `builtin:${id}`;
 var fileRef = (base) => `file:${base}`;
 var lower = (value) => value.toLocaleLowerCase();
 var UNSAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
+var RESERVED_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
 function cleanBlockName(name2) {
   const cleaned = name2.replace(UNSAFE_NAME, " ").replace(/\s+/g, " ").trim();
-  return /^\.+$/.test(cleaned) ? "" : cleaned;
+  if (/^\.+$/.test(cleaned)) return "";
+  return RESERVED_NAME.test(cleaned) ? `_${cleaned}` : cleaned;
 }
 function blockFolderNames(role) {
   return [...new Set(CANONICAL_LANGUAGES.map((language2) => translate(language2, FOLDER_KEYS[role])))];

@@ -34,10 +34,16 @@ export const stripMd = (name: string): string => name.replace(/\.md$/i, "");
 
 /** Characters a vault file name cannot carry (and the ones that break links), as the style files already clean them. */
 const UNSAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
-/** A file base name made safe: unsafe characters become spaces, runs of spaces collapse, dots-only names are dropped. */
+/** Windows device names (any case), alone or before a dot: Windows cannot create a file with such a base name. */
+const RESERVED_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+/**
+ * A file base name made safe: unsafe characters become spaces, runs of spaces collapse, dots-only names are dropped,
+ * and a Windows reserved name gets a leading "_" ("NUL" becomes "_NUL").
+ */
 export function cleanBlockName(name: string): string {
   const cleaned = name.replace(UNSAFE_NAME, " ").replace(/\s+/g, " ").trim();
-  return /^\.+$/.test(cleaned) ? "" : cleaned;
+  if (/^\.+$/.test(cleaned)) return "";
+  return RESERVED_NAME.test(cleaned) ? `_${cleaned}` : cleaned;
 }
 
 /** Every distinct spelling of a folder's name, in the order of the registered languages. */

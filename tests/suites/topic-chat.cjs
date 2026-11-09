@@ -1521,3 +1521,187 @@ test('steer records: a file from before steer lines reads as before; duplicate t
   assert.equal(restored.length, 1, 'a duplicate turn id adds no turn');
   assert.deepEqual(plain([restored[0].message, restored[0].result.text, restored[0].steers]), ['hi', 'ok', ['s1']]);
 });
+
+// ---- P3: steer through the view (additions typed while a task runs, the gap after the reply, the automatic follow-up) ----
+const refuse = async () => { throw new Error('turn ended'); };
+/** Runs `fn` once, when the first reply sentence has just been pushed (inside settleTopicChat, before the entry is freed or sent on). */
+const atFirstReply = (entry, fn) => { let done = false; entry.watchers.add(() => { if (!done && entry.session.turns.some(x => x.role === 'ai')) { done = true; fn(); } }); };
+const kinds = entry => entry.session.turns.map(x => x.role + ':' + (x.kind ?? ''));
+/** A first ask that stays open until `gate` resolves and takes no addition (every one is queued); later asks answer at once. */
+const gappedChat = (h, gate, extra) => {
+  h.requests = [];
+  h.plugin.mapChat = { chat: async (request, signal, _reply, _progress, onSteer) => {
+    h.requests.push(request);
+    if (h.requests.length === 1) { onSteer?.(refuse); await gate.promise; }
+    return extra ? extra(request, h.requests.length) : answer([], 'r' + h.requests.length);
+  } };
+};
+
+integrationTest('topic chat steer: the gap after the reply keeps running on, a second Enter only adds, and the waiting additions are asked exactly once as one new turn', async () => {
+  const h = await harness(); const host = h.host('a'); const entry = h.entry('a'); const gate = deferred(); const gate2 = deferred();
+  gappedChat(h, gate);
+  let asks = 0; h.plugin.confirmAiUsage = async (_m, run) => { asks++; if (asks === 2) await gate2.promise; await run(); return true; };
+  let tasks = 0; const runTask = h.view.runTopicChatTask.bind(h.view); h.view.runTopicChatTask = (...args) => { tasks++; return runTask(...args); };
+  const samples = []; entry.watchers.add(() => samples.push([entry.session.running, entry.session.turns.length]));
+  assert.equal(await host.submit('ask', 'q'), true); await waitFor(() => h.requests.length === 1);
+  assert.equal(host.steer('s1'), true);
+  assert.equal(h.entry('a').steers.entries[0].state !== 'delivered', true);
+  gate.resolve(); await waitFor(() => asks === 2);
+  assert.equal(entry.session.running, true, 'the usage question of the follow-up is open: still running');
+  assert.equal(host.steer('s2'), true, 'a second Enter in the gap adds, it cannot start a run');
+  gate2.resolve(); await finished(h);
+  assert.equal(h.requests.length, 2, 'asked exactly once more'); assert.equal(tasks, 2, 'no third run');
+  assert.equal(h.requests[1].message, 's1\n\ns2', 'one message, in typed order, with the one typed while the usage question was open');
+  assert.deepEqual(plain(kinds(entry)), ['user:ask', 'ai:', 'user:ask', 'ai:']);
+  assert.equal(entry.session.turns[2].text, 's1\n\ns2'); assert.deepEqual(plain(entry.session.turns[0].steers ?? []), [], 'taken out of the old turn');
+  assert.deepEqual(samples.filter(([running, turns]) => !running && turns < 4), [], 'running never dropped over the gap');
+  const lines = await topicLines(h, 'a'); assert.deepEqual(lines.map(x => x.type), ['turn', 'result', 'turn', 'result'], 'queued additions write no steer line');
+});
+
+integrationTest('topic chat steer: an addition the reply took in is shown, written after close, applied with the question and part of the next request history', async () => {
+  const h = await harness(); const host = h.host('a'); const entry = h.entry('a'); const gate = deferred(); const slow = deferred(); const sent = []; let message;
+  h.requests = [];
+  h.plugin.mapChat = { chat: async (request, signal, _r, _p, onSteer) => {
+    h.requests.push(request);
+    if (h.requests.length === 1) { onSteer(async text => { sent.push(text); await slow.promise; }); await gate.promise; return answer([{ kind: 'add_child', parentId: h.ids.a, title: 'Light', summary: 'S' }], 'ok'); }
+    return answer([], 'second');
+  } };
+  h.view.applyMapChatActions = async result => { message = result.message; return []; };
+  await host.submit('ask', 'q'); await waitFor(() => h.requests.length === 1);
+  host.steer('s1'); await tick(); assert.deepEqual(sent, ['s1']);
+  assert.deepEqual(plain(entry.session.turns[0].steers), [{ text: 's1', state: 'live' }]);
+  gate.resolve(); await tick(); await tick(); await tick();
+  assert.equal(entry.session.running, true); assert.equal(entry.session.turns.length, 1, 'the reply waits for the hand-over to settle');
+  assert.equal(message, undefined, 'nothing is applied before close');
+  slow.resolve(); await finished(h);
+  assert.equal(message, 'q\n\ns1', 'the actions are applied with the question and what went in');
+  const lines = await topicLines(h, 'a'); const steerLines = lines.filter(x => x.type === 'steer');
+  assert.deepEqual(steerLines.map(x => [x.id, x.text]), [[lines[0].id, 's1']]); assert.equal(lines.at(-1).type, 'steer');
+  await host.submit('ask', 'next'); await finished(h);
+  assert.deepEqual(plain(JSON.parse(h.requests[1].context.json).earlierTurns)[0], { role: 'user', text: 'q\n\ns1' }, 'history carries what went in');
+  // Reopened (sessions gone): the taken-in addition is shown again.
+  h.view.closeTopicChatWindow(); h.view.topicChatSessions.clear();
+  h.view.openTopicChat(h.node('a')); await waitFor(() => h.entry('a').session.turns.length >= 4);
+  assert.deepEqual(plain(h.entry('a').session.turns[0].steers), [{ text: 's1', state: 'live' }]);
+});
+
+const outcomes = [
+  ['declined usage question', { hook: h => { h.control.decline = true; }, notice: true }],
+  ['AI lock', { hook: h => { h.view.aiLockReason = () => ({}); }, notice: true }],
+  ['busy card', { hook: h => { h.plugin.quickExpandPending.add(h.node('a').path); }, notice: true }],
+  ['AIM', { hook: h => { h.view.aimLive = () => true; }, notice: true }],
+  ['presentation', { hook: h => { h.view.presentation = {}; }, notice: true }],
+  ['deleted card', { hook: h => { h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.a); }, notice: true }],
+  ['view closed', { hook: h => { h.view.closed = true; }, notice: false }],
+  ['map changed', { hook: h => { h.view.map = { ...h.view.map, id: 'other-map' }; }, notice: false }]
+];
+for (const [name, { hook, notice }] of outcomes) for (const windowOpen of [true, false]) {
+  integrationTest(`topic chat steer follow-up not sent (${name}, window ${windowOpen ? 'open' : 'closed'}): nothing is asked, the text goes back in front of the draft, running is freed`, async () => {
+    const h = await harness(); const host = h.host('a'); const entry = h.entry('a'); const gate = deferred(); gappedChat(h, gate);
+    await host.submit('ask', 'q'); await waitFor(() => h.requests.length === 1);
+    host.steer('first'); host.steer('second'); host.setDraft(null, 'mine');
+    atFirstReply(entry, () => { if (!windowOpen) h.view.closeTopicChatWindow(); hook(h); });
+    const before = h.notices.length; gate.resolve();
+    await waitFor(() => !entry.session.running && entry.session.turns.length >= 2);
+    assert.equal(h.requests.length, 1, 'no second question'); assert.equal(entry.submitting, false);
+    assert.equal(entry.session.draftText, 'first\n\nsecond\n\nmine');
+    const sentence = h.notices.slice(before).includes(t('ui.map_chat_not_sent_draft'));
+    if (!notice) assert.equal(sentence, false, 'a view that is gone says nothing');
+    else if (windowOpen && h.win()) assert.equal(find(h.win().el, i => i.tag === 'textarea').value, 'first\n\nsecond\n\nmine');
+    else if (!h.win()) assert.equal(sentence, true, 'a window that is not there says it');
+    assert.deepEqual(plain(entry.session.turns[0].steers ?? []), [], 'the waiting ones left the turn');
+  });
+}
+
+const stoppedOrFailed = [
+  ['stopped', (h, gate) => { h.plugin.mapChat.chat = async (request, signal, _r, _p, onSteer) => { h.requests.push(request); onSteer(refuse); await new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('x')))); }; }, h => [...h.plugin.activeTasks.values()][0].abort(), t('ui.topic_chat_stopped')],
+  ['failed', (h, gate) => { h.plugin.mapChat.chat = async (request, signal, _r, _p, onSteer) => { h.requests.push(request); onSteer(refuse); await gate.promise; throw new Error('boom'); }; }, (h, gate) => gate.resolve(), null],
+  ['needs a plan', (h, gate) => { h.plugin.mapChat.chat = async (request, signal, _r, _p, onSteer) => { h.requests.push(request); onSteer(refuse); await gate.promise; return answer(Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.a, title: 'X' + i, summary: '' }))); }; }, (h, gate) => gate.resolve(), t('ui.topic_chat_too_big')]
+];
+for (const [name, setup, trigger, sentence] of stoppedOrFailed)
+  integrationTest(`topic chat steer ${name}: the waiting addition is not sent, it is back in the box, running is freed`, async () => {
+    const h = await harness(); const host = h.host('a'); const entry = h.entry('a'); const gate = deferred(); h.requests = []; h.plugin.mapChat = {}; setup(h, gate);
+    await host.submit('ask', 'q'); await waitFor(() => h.requests.length === 1);
+    host.steer('late'); trigger(h, gate);
+    await waitFor(() => !entry.session.running && entry.session.turns.length === 2);
+    assert.equal(h.requests.length, 1); assert.equal(entry.session.draftText, 'late'); assert.equal(find(h.win().el, i => i.tag === 'textarea').value, 'late');
+    if (sentence) assert.equal(entry.session.turns.at(-1).text, sentence);
+    assert.deepEqual(plain(entry.session.turns[0].steers ?? []), []);
+  });
+
+integrationTest('topic chat steer: startSynthesis hands the steer to the run of a kept task (and keeps none in the stored options); a fresh task stores none either', async () => {
+  const h = await harness(); const seen = []; const steer = { bind() {}, live() {} };
+  h.plugin.topicRuns.start = async (_path, kind, options) => { seen.push([kind, options.steer]); return null; };
+  const node = h.node('root'); const path = node.path;
+  h.view.synthesisTasks.set(path, { mapPath: h.view.path, mapId: h.view.map.id, state: 'directions', step: 'directions', controller: new AbortController(), progress: '', options: { requirements: 'r' }, directions: [{ id: 'd' }], direction: '' });
+  await h.view.startSynthesis(node, { steer, continuesDirections: true, onProgress() {} }, 'go', () => {}, () => {});
+  assert.deepEqual(seen.map(x => x[0]), ['integrateChildren']); assert.equal(seen[0][1], steer, 'a task kept from the first step still gets the steer');
+  assert.equal(h.view.synthesisTasks.get(path).options.steer, undefined);
+  h.view.synthesisTasks.delete(path);
+  await h.view.startSynthesis(node, { steer, onProgress() {} }, 'go', () => {}, () => {});
+  assert.equal(seen[1][1], steer); assert.equal(h.view.synthesisTasks.get(path).options.steer, undefined, 'the stored options carry no steer (a retry must not)');
+});
+
+integrationTest('topic chat steer: an addition typed while the subtopics are researched first rides in the integration text once, shows as taken in, and is written', async () => {
+  const h = await harness(); const calls = stubResearch(h); const seen = [];
+  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push({ direction, steer: options.steer }); accepted(); observer.onWritten(); };
+  const statuses = { a: 'completed', b: 'error' }; const load0 = h.view.hydrate;
+  h.view.hydrate = async () => { await load0(); for (const [k, v] of Object.entries(statuses)) h.view.notes.get(h.ids[k]).status = v; };
+  await h.view.hydrate();
+  const host = h.host('root'); const entry = h.entry('root');
+  await host.submit('synthesize', 'all'); await waitFor(() => calls.length === 1);
+  assert.equal(calls[0].request && true, true); assert.equal(host.steer('early'), true);
+  assert.equal(entry.steers.entries[0].state, 'queued', 'the subtopic research takes none');
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve();
+  await waitFor(() => !entry.session.running);
+  assert.equal(seen.length, 1); assert.equal(seen[0].direction, 'all\n\nearly', 'folded in once');
+  assert.deepEqual(plain(seen[0].steer.entries), [], 'and not again as a waiting one');
+  assert.deepEqual(plain(entry.session.turns[0].steers), [{ text: 'early', state: 'live' }]); assert.equal(h.requests?.length ?? 0, 0, 'no follow-up');
+  const lines = await topicLines(h, 'root'); assert.deepEqual(lines.filter(x => x.type === 'steer').map(x => x.text), ['early']);
+  assert.equal(entry.session.turns.length, 2);
+});
+
+integrationTest('topic chat steer: research and expand hand the steer on; a synthesis without researching first passes the same one', async () => {
+  const h = await harness(); const entry0 = () => h.entry('a'); const got = {};
+  h.view.runAgent = async (node, done, failed, request, accepted, runOnce, steer) => { got.research = steer; accepted?.(); done({ summary: 'S', detail: 'D' }); return { finished: Promise.resolve() }; };
+  h.view.detailTemplateFor = async () => undefined;
+  h.plugin.outlineGeneration = { generate: async (_r, _s, steer) => { got.expand = steer; return outlineOf('# Body\n## Light'); } };
+  await h.host('a').submit('research', 'x'); await finished(h);
+  await h.host('a').submit('expand', 'x'); await finished(h);
+  assert.equal(got.research, got.research && entry0().steers && got.research); assert.ok(got.research && typeof got.research.bind === 'function' && typeof got.research.live === 'function');
+  assert.ok(got.expand && typeof got.expand.bind === 'function');
+  await researched(h); let option;
+  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { option = options; accepted(); observer.onWritten(); };
+  await h.host('root').submit('synthesize', 'go'); await waitFor(() => !h.entry('root').session.running);
+  assert.equal(option.steer, h.entry('root').steers);
+});
+
+integrationTest('topic chat steer (real window): Enter while running adds the text, the box clears, a live bubble shows under the turn; the buttons stay disabled; switching cards keeps it and the draft', async () => {
+  const h = await harness(); const calls = stubResearch(h); const host = h.host('a'); const entry = h.entry('a');
+  await host.submit('research', 'dig'); await waitFor(() => calls.length === 1);
+  const win = h.win(); const input = find(win.el, i => i.tag === 'textarea');
+  input.value = 'also the code'; input.input(); byLabel(win.el, t('ui.topic_chat_send')).click(); await tick();
+  assert.equal(input.value, ''); assert.equal(findAll(win.el, i => hasClass(i, 'vam-topic-chat-steer-text')).map(i => i.text).join(), 'also the code');
+  assert.ok(['research', 'expand', 'synthesize'].every(k => find(win.el, i => i.tag === 'button' && i.text === t('ui.topic_chat_' + k)).disabled));
+  assert.equal(calls.length, 1, 'not a second run');
+  input.value = 'typing'; input.input();
+  h.view.openTopicChat(h.node('b')); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.b);
+  h.view.openTopicChat(h.node('a'));
+  const win2 = h.win(); assert.notEqual(win2, win);
+  assert.equal(find(win2.el, i => i.tag === 'textarea').value, 'typing'); assert.equal(findAll(win2.el, i => hasClass(i, 'vam-topic-chat-steer-text')).length, 1, 'the addition is still shown');
+  assert.equal(entry.steers.entries.length, 1);
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  assert.equal(entry.session.running, false);
+});
+
+integrationTest('topic chat steer: with no addition the entry is freed in the same step as the sentence (running timing as before); an addition typed with running false and a busy card still gets the Notice', async () => {
+  const h = await harness(); const calls = stubResearch(h); const entry = h.host('a') && h.entry('a'); const seen = [];
+  entry.watchers.add(() => seen.push([entry.session.turns.at(-1)?.role, entry.session.running]));
+  await h.host('a').submit('research', 'x'); await waitFor(() => calls.length === 1);
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  assert.ok(seen.some(([role]) => role === 'ai')); assert.deepEqual(seen.filter(([role, running]) => role === 'ai' && running), [], 'the sentence never shows with running still on');
+  assert.ok(entry.session.turns.every(x => x.steers === undefined), 'no steers field without additions');
+  h.plugin.quickExpandPending.add(h.node('a').path); const before = h.notices.length;
+  assert.equal(h.host('a').steer('x'), false, 'not running: no addition'); assert.equal(await h.host('a').submit('ask', 'x'), false);
+  assert.equal(h.notices.slice(before).at(-1), t('ui.ai_running_ai'));
+});

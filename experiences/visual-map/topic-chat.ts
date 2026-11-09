@@ -48,8 +48,8 @@ export interface TopicChatHost {
   setDraft(kind: TopicChatButtonKind | null, text: string): void;
   /** Resolves true when a run started (the input then clears), false when it was declined (the input stays). */
   submit(kind: TopicChatKind, text: string): Promise<boolean>;
-  /** An addition typed while a task runs; true when it was taken (the input then clears), false when it was not (the input stays). Optional until the view implements it (P3); absent counts as not taken. */
-  steer?(text: string): boolean;
+  /** An addition typed while a task runs; true when it was taken (the input then clears), false when it was not (the input stays). */
+  steer(text: string): boolean;
   close(): void;
 }
 
@@ -363,7 +363,7 @@ export class TopicChatWindow {
     const text = this.inputEl.value.trim();
     if (session.running) {
       // A task is running: the text is an addition to it (the buttons and mode stay as they are).
-      if (!this.host.steer?.(text)) return;
+      if (!this.host.steer(text)) return;
       this.host.setDraft(session.draftKind, "");
       if (this.destroyed) return;
       this.inputEl.value = "";

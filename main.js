@@ -50946,19 +50946,19 @@ var TopicChatWindow = class {
     return !this.submitting && this.inputEl.value.trim() !== "";
   }
   async send() {
-    var _a2, _b2, _c;
+    var _a2;
     if (!this.canSend()) return;
     const session = this.host.session();
     const text12 = this.inputEl.value.trim();
     if (session.running) {
-      if (!((_b2 = (_a2 = this.host).steer) == null ? void 0 : _b2.call(_a2, text12))) return;
+      if (!this.host.steer(text12)) return;
       this.host.setDraft(session.draftKind, "");
       if (this.destroyed) return;
       this.inputEl.value = "";
       this.refresh();
       return;
     }
-    const kind = (_c = session.draftKind) != null ? _c : "ask";
+    const kind = (_a2 = session.draftKind) != null ? _a2 : "ask";
     this.submitting = true;
     this.refresh();
     let started = false;
@@ -51038,6 +51038,106 @@ var TopicChatWindow = class {
       this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running", text: t("ui.topic_chat_running") });
     }
     this.logEl.scrollTop = this.logEl.scrollHeight;
+  }
+};
+
+// experiences/visual-map/topic-chat-steer.ts
+var TopicChatSteers = class {
+  constructor(options = {}) {
+    this.options = options;
+    __publicField(this, "entries", []);
+    __publicField(this, "handler", null);
+    __publicField(this, "gen", 0);
+    __publicField(this, "chain", Promise.resolve());
+    __publicField(this, "noLive", false);
+    __publicField(this, "closed", false);
+  }
+  /** Takes an addition; returns its entry. After `close` or on a run that cannot take one it waits (queued) at once. */
+  add(text12) {
+    const entry = { text: text12, state: this.closed || this.noLive ? "queued" : "pending" };
+    this.entries.push(entry);
+    this.changed();
+    this.pump();
+    return entry;
+  }
+  /** `null`: a new attempt starts, the old handler and every answer still on its way are dropped. A function: the new attempt's way in. */
+  bind(send) {
+    if (this.closed || !this.isAlive()) return;
+    this.gen++;
+    this.chain = Promise.resolve();
+    this.handler = send;
+    for (const entry of this.entries) if (entry.state === "sending" || entry.state === "delivered") entry.state = "pending";
+    this.changed();
+    this.pump();
+  }
+  live(on) {
+    this.setLive(on);
+  }
+  /** `false`: the request cannot take an addition as it runs; everything not queued yet waits for the end. */
+  setLive(on) {
+    if (this.closed || !this.isAlive()) return;
+    this.noLive = !on;
+    if (on) return;
+    this.gen++;
+    this.handler = null;
+    for (const entry of this.entries) if (entry.state !== "queued") entry.state = "queued";
+    this.changed();
+  }
+  /** The reply is in: hand-overs still running settle, then what has not gone in waits. Later additions are queued. */
+  async close() {
+    await this.chain;
+    this.closed = true;
+    for (const entry of this.entries) if (entry.state !== "delivered") entry.state = "queued";
+    this.handler = null;
+    this.changed();
+  }
+  /** The texts of the additions the task took in, in typed order (what a request or record should carry). */
+  delivered() {
+    return this.entries.filter((entry) => entry.state === "delivered").map((entry) => entry.text);
+  }
+  /** Removes and returns the waiting additions, in typed order. */
+  takeQueued() {
+    const texts2 = this.entries.filter((entry) => entry.state === "queued").map((entry) => entry.text);
+    if (!texts2.length) return texts2;
+    this.entries.splice(0, this.entries.length, ...this.entries.filter((entry) => entry.state !== "queued"));
+    this.changed();
+    return texts2;
+  }
+  /** What the window shows, in typed order. */
+  views() {
+    return this.entries.map((entry) => ({ text: entry.text, state: entry.state === "queued" ? "queued" : "live" }));
+  }
+  isAlive() {
+    return this.options.alive ? this.options.alive() : true;
+  }
+  changed() {
+    var _a2, _b2;
+    (_b2 = (_a2 = this.options).onChange) == null ? void 0 : _b2.call(_a2);
+  }
+  pump() {
+    const handler = this.handler;
+    if (!handler || this.noLive || this.closed) return;
+    const gen = this.gen;
+    for (const entry of this.entries) {
+      if (entry.state !== "pending") continue;
+      entry.state = "sending";
+      this.chain = this.chain.then(async () => {
+        const current = () => gen === this.gen && entry.state === "sending" && this.isAlive();
+        if (!current()) return;
+        try {
+          await handler(entry.text);
+        } catch (e) {
+          if (!current()) return;
+          entry.state = "queued";
+          this.changed();
+          return;
+        }
+        if (!current()) return;
+        entry.state = "delivered";
+        this.changed();
+      });
+    }
+    this.changed();
   }
 };
 
@@ -60425,7 +60525,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
     const settings = this.plugin.settings;
     return {
       presets: listPresets(settings.promptPresets, "outline", settings.language).map(({ id, name: name2 }) => ({ id, name: name2 })),
-      generate: async (request, signal) => {
+      generate: async (request, signal, steer) => {
         var _a2, _b2, _c, _d;
         const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
         if (note.aiLocked) throw new Error(t("ui.ai_locked_notice"));
@@ -60449,7 +60549,8 @@ ${request.requirements}` : preset.text,
               return (_b3 = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.title) != null ? _b3 : "";
             })
           },
-          signal
+          signal,
+          steer
         );
         this.quickOutlineSummaries.set(node.id, outlineSummaryBank(result.nodes, true));
         return result.nodes;
@@ -71695,7 +71796,12 @@ ${request.requirements}` : preset.text,
     const restored = [];
     for (const turn of restoreTopicChat(parsed.lines)) {
       if (turn.id === entry.runningTurnId) continue;
-      restored.push({ role: "user", kind: turn.kind, text: turn.message });
+      restored.push({
+        role: "user",
+        kind: turn.kind,
+        text: turn.message,
+        ...turn.steers.length ? { steers: turn.steers.map((text12) => ({ text: text12, state: "live" })) } : {}
+      });
       restored.push({
         role: "ai",
         text: turn.result ? turn.result.text : t("ui.topic_chat_result_unknown"),
@@ -71829,6 +71935,11 @@ ${request.requirements}` : preset.text,
         const target = node();
         return target ? this.submitTopicChat(entry, target, kind, text12) : Promise.resolve(false);
       },
+      steer: (text12) => {
+        if (!entry.session.running || !entry.steers) return false;
+        entry.steers.add(text12);
+        return true;
+      },
       close: () => {
         var _a2;
         if (((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry) this.closeTopicChatWindow();
@@ -71853,10 +71964,15 @@ ${request.requirements}` : preset.text,
       entry.submitting = false;
     }
   }
-  async submitTopicChatNow(entry, node, kind, text12) {
+  /**
+   * `followUp`: the additions that waited for the reply to end go out as one new question. The entry is still `running`
+   * (it stayed so over the gap), so that guard is skipped; every other guard is as for a typed send. The text is taken from
+   * `followUp` only once the usage question is confirmed, so an addition typed while it was open rides along.
+   */
+  async submitTopicChatNow(entry, node, kind, text12, followUp) {
     const map = this.map;
     if (this.closed || !map || map.id !== entry.mapId || this.aimLive() || this.presentation) return false;
-    if (entry.session.running || this.topicChatBusy(node)) {
+    if (!followUp && entry.session.running || this.topicChatBusy(node)) {
       new import_obsidian39.Notice(t("ui.ai_running_ai"));
       return false;
     }
@@ -71901,10 +72017,29 @@ ${request.requirements}` : preset.text,
           return;
         }
       }
+      if (followUp) {
+        text12 = followUp.takeQueued().join("\n\n");
+        if (!text12) return;
+        userTurn.text = text12;
+      }
       started = true;
       entry.session.turns.push(userTurn);
       entry.session.running = true;
       entry.runningTurnId = this.newTopicTurnId();
+      const folded2 = [];
+      const steers = new TopicChatSteers({
+        onChange: () => {
+          this.syncTopicSteerTurn(userTurn, folded2, steers);
+          this.notifyTopicChat(entry);
+        },
+        alive: () => {
+          var _a3;
+          return !this.closed && ((_a3 = this.map) == null ? void 0 : _a3.id) === entry.mapId;
+        }
+      });
+      entry.steers = steers;
+      entry.steerFolded = folded2;
+      entry.steerEnd = null;
       this.writeTopicChatLine(entry, {
         type: "turn",
         id: entry.runningTurnId,
@@ -71914,13 +72049,88 @@ ${request.requirements}` : preset.text,
         message: text12
       });
       this.notifyTopicChat(entry);
-      void this.runTopicChatTask(entry, node, note, kind, mode, text12, controller);
+      void this.runTopicChatTask(entry, node, note, kind, mode, text12, controller, steers, userTurn);
     });
     return went !== false && started;
   }
+  /** The turn shows the additions it took (and those that wait), under its text; folded ones went in with the synthesis text. */
+  syncTopicSteerTurn(turn, folded2, steers) {
+    const views = [...folded2.map((text12) => ({ text: text12, state: "live" })), ...steers.views()];
+    if (views.length || turn.steers) turn.steers = views;
+  }
+  /** True when the task has additions of any kind: then `running` stays on until they are settled (the gap after the reply). */
+  holdsTopicSteers(entry) {
+    var _a2, _b2;
+    return !!((_a2 = entry.steers) == null ? void 0 : _a2.entries.length) || !!((_b2 = entry.steerFolded) == null ? void 0 : _b2.length);
+  }
+  /** Puts additions that were not sent back in front of the draft; a closed window (nothing shows it) says so when `notice`. */
+  returnTopicSteers(entry, texts2, notice) {
+    var _a2;
+    if (!texts2.length) return;
+    const draft = [...texts2, entry.session.draftText].filter(Boolean).join("\n\n");
+    entry.session.draftText = draft;
+    const open = ((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry ? this.topicChatOpen.win : null;
+    if (open) open.setInputText(draft);
+    else if (notice) new import_obsidian39.Notice(t("ui.map_chat_not_sent_draft"));
+  }
+  /**
+   * After the task has settled with additions: wait for hand-overs to end (`close`), write the ones that went in, then either
+   * send the waiting ones as one new question (the reply was done and the view is the same) or put them back in the box.
+   * `running` stays true over all of it, so a second Enter can only add (queued), never start a run.
+   */
+  async endTopicChatSteers(entry, steers, turnId, live) {
+    var _a2, _b2, _c;
+    const end = (_a2 = entry.steerEnd) != null ? _a2 : null;
+    const done = !!end && end.status === "done" && !end.plan;
+    const folded2 = (_b2 = entry.steerFolded) != null ? _b2 : [];
+    const finish = () => {
+      entry.session.running = false;
+      this.notifyTopicChat(entry);
+    };
+    try {
+      await steers.close();
+      if (live() && turnId)
+        for (const text12 of [...done ? folded2 : [], ...steers.delivered()])
+          this.writeTopicChatLine(entry, { type: "steer", id: turnId, at: (/* @__PURE__ */ new Date()).toISOString(), text: text12 });
+      const node = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === entry.nodeId);
+      if (done && live() && steers.entries.some((item) => item.state === "queued")) {
+        if (node) {
+          entry.submitting = true;
+          try {
+            if (await this.submitTopicChatNow(entry, node, "ask", "", steers)) return;
+          } finally {
+            entry.submitting = false;
+          }
+        }
+        this.returnTopicSteers(entry, steers.takeQueued(), true);
+        finish();
+        return;
+      }
+      this.returnTopicSteers(entry, [...done ? [] : folded2, ...steers.takeQueued()], false);
+      finish();
+    } catch (e) {
+      if (entry.runningTurnId) return;
+      this.returnTopicSteers(entry, steers.takeQueued(), true);
+      finish();
+    }
+  }
   /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
-  async runTopicChatTask(entry, node, note, kind, mode, text12, controller) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+  async runTopicChatTask(entry, node, note, kind, mode, text12, controller, steers, userTurn) {
+    var _a2;
+    const turnId = entry.runningTurnId;
+    const live = () => {
+      var _a3;
+      return !this.closed && ((_a3 = this.map) == null ? void 0 : _a3.id) === entry.mapId;
+    };
+    try {
+      await this.runTopicChatBody(entry, node, note, kind, mode, text12, controller, steers, userTurn);
+    } finally {
+      if (entry.steers === steers && (steers.entries.length || ((_a2 = entry.steerFolded) == null ? void 0 : _a2.length)) && entry.session.running)
+        await this.endTopicChatSteers(entry, steers, turnId, live);
+    }
+  }
+  async runTopicChatBody(entry, node, note, kind, mode, text12, controller, steers, userTurn) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     const mapId = entry.mapId;
     const live = () => {
       var _a3;
@@ -71942,11 +72152,11 @@ ${request.requirements}` : preset.text,
         (_a2 = this.map) == null ? void 0 : _a2.title
       );
       if (kind === "ask") {
-        await this.runTopicChatAsk(entry, node, note, mode, text12, controller, language2, live, hooks);
+        await this.runTopicChatAsk(entry, node, note, mode, text12, controller, language2, live, hooks, steers);
         return;
       }
       if (kind === "expand") {
-        const outcome = await this.chatExpand(node, text12, controller.signal);
+        const outcome = await this.chatExpand(node, text12, controller.signal, steers);
         if (outcome.status === "succeeded")
           this.settleTopicChat(
             entry,
@@ -71971,7 +72181,8 @@ ${request.requirements}` : preset.text,
           text12,
           controller.signal,
           endHooks,
-          endHooks
+          endHooks,
+          steers
         );
         endHooks();
         const stopped = controller.signal.aborted || failure2 === t("ui.research_stopped_existing_content_was_preserved") || failure2 === t("ui.ai_task_cancelled");
@@ -71992,6 +72203,7 @@ ${request.requirements}` : preset.text,
       });
       let researchedFirst = 0;
       if (toResearch.length) {
+        steers.live(false);
         for (const child of toResearch) {
           if (controller.signal.aborted || !live()) break;
           const childNote = await this.plugin.repo.readNote(child.path, (_g = this.map) != null ? _g : void 0);
@@ -72016,6 +72228,17 @@ ${request.requirements}` : preset.text,
         }
         await this.hydrate();
       }
+      let direction = text12;
+      if (toResearch.length) {
+        const early = steers.takeQueued();
+        steers.live(true);
+        if (early.length) {
+          (_h = entry.steerFolded) == null ? void 0 : _h.push(...early);
+          this.syncTopicSteerTurn(userTurn, (_i = entry.steerFolded) != null ? _i : [], steers);
+          this.notifyTopicChat(entry);
+          direction = [text12, ...early].join("\n\n");
+        }
+      }
       let written2 = false;
       let failure;
       await this.startSynthesis(
@@ -72025,9 +72248,10 @@ ${request.requirements}` : preset.text,
           researchMode: researchModeOf(mode),
           signal: controller.signal,
           onProgress: () => {
-          }
+          },
+          steer: steers
         },
-        text12,
+        direction,
         (message) => {
           failure = message;
           endHooks();
@@ -72072,7 +72296,7 @@ ${request.requirements}` : preset.text,
     }
   }
   /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
-  async runTopicChatResearch(node, note, mode, language2, text12, signal, accepted, launched) {
+  async runTopicChatResearch(node, note, mode, language2, text12, signal, accepted, launched, steer) {
     let result;
     let failure;
     const referenceGroups = await this.taskSourceSettings().mapSources(signal).catch(() => []);
@@ -72095,7 +72319,9 @@ ${request.requirements}` : preset.text,
         ...aiModeOptions(mode, "research"),
         addCharts: mode !== "quick"
       },
-      accepted
+      accepted,
+      void 0,
+      steer
     );
     launched == null ? void 0 : launched();
     if (handle) await handle.finished;
@@ -72103,18 +72329,18 @@ ${request.requirements}` : preset.text,
   }
   /** The request of a free question: the context holds this topic and what is under it, nothing else of the map. */
   async buildTopicChatRequest(entry, node, note, message) {
-    var _a2;
+    var _a2, _b2;
     const map = this.map;
     const settings = this.plugin.settings;
     const scope = topicSubtreeIds(map.nodes, node.id);
     const byId = new Map(map.nodes.map((item) => [item.id, item]));
     const summaryOf = (id) => {
-      var _a3, _b2;
-      return (_b2 = (_a3 = this.chatTopicState(id)) == null ? void 0 : _a3.summary) != null ? _b2 : "";
+      var _a3, _b3;
+      return (_b3 = (_a3 = this.chatTopicState(id)) == null ? void 0 : _a3.summary) != null ? _b3 : "";
     };
     const titleOf = (item) => {
-      var _a3, _b2;
-      return (_b2 = (_a3 = this.chatTopicState(item.id)) == null ? void 0 : _a3.title) != null ? _b2 : item.path;
+      var _a3, _b3;
+      return (_b3 = (_a3 = this.chatTopicState(item.id)) == null ? void 0 : _a3.title) != null ? _b3 : item.path;
     };
     const depthOf2 = (item) => {
       let depth = 0;
@@ -72142,7 +72368,16 @@ ${request.requirements}` : preset.text,
     const turns = entry.session.turns;
     for (let i = 0; i + 1 < turns.length; i++)
       if (turns[i].role === "user" && turns[i].kind === "ask" && turns[i + 1].role === "ai")
-        history2.push({ role: "user", text: turns[i].text }, { role: "assistant", text: turns[i + 1].text });
+        history2.push(
+          {
+            role: "user",
+            // What the task took in while it ran is part of what was asked.
+            text: [turns[i].text, ...((_a2 = turns[i].steers) != null ? _a2 : []).filter((item) => item.state === "live").map((item) => item.text)].join(
+              "\n\n"
+            )
+          },
+          { role: "assistant", text: turns[i + 1].text }
+        );
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapTitles: [],
@@ -72161,7 +72396,7 @@ ${request.requirements}` : preset.text,
       snippets: [],
       files: [],
       aim: !this.relationsEnabled(),
-      relations: this.relationsEnabled() ? ((_a2 = map.topicRelations) != null ? _a2 : []).filter((relation) => scope.has(relation.from) && scope.has(relation.to)) : [],
+      relations: this.relationsEnabled() ? ((_b2 = map.topicRelations) != null ? _b2 : []).filter((relation) => scope.has(relation.from) && scope.has(relation.to)) : [],
       activeFile: null,
       history: history2
     });
@@ -72178,7 +72413,7 @@ ${request.requirements}` : preset.text,
     };
   }
   /** A free question: one map-chat request about the topic; what the reply writes is checked against the subtree where it is applied. */
-  async runTopicChatAsk(entry, node, note, mode, text12, controller, language2, live, hooks) {
+  async runTopicChatAsk(entry, node, note, mode, text12, controller, language2, live, hooks, steers) {
     var _a2;
     const key4 = `topic-chat-ask:${++mapChatTaskSequence}`;
     let began = false;
@@ -72194,9 +72429,18 @@ ${request.requirements}` : preset.text,
       began = true;
       (_a2 = this.plugin.activeTasks) == null ? void 0 : _a2.set(key4, controller);
       hooks.begin(controller);
-      const result = await this.plugin.mapChat.chat(request, controller.signal, () => {
-      });
+      const result = await this.plugin.mapChat.chat(
+        request,
+        controller.signal,
+        () => {
+        },
+        (event) => {
+          if (event.kind === "stream-mode" && event.mode !== "stream-json") steers.live(false);
+        },
+        (send) => steers.bind(send)
+      );
       end();
+      if (steers.entries.length) await steers.close();
       if (controller.signal.aborted) {
         this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
         return;
@@ -72213,11 +72457,11 @@ ${request.requirements}` : preset.text,
         mapAiMode: map.aiMode
       }) : null;
       if (plan) {
-        this.settleTopicChat(entry, t("ui.topic_chat_too_big"), live, true, "done", true);
+        this.settleTopicChat(entry, t("ui.topic_chat_too_big"), live, true, "done", true, true);
         return;
       }
       const lines = allowed.length ? await this.applyMapChatActions(
-        { ...result, message: text12 },
+        { ...result, message: [text12, ...steers.delivered()].join("\n\n") },
         request.context,
         () => live() && !controller.signal.aborted,
         { path: this.path, id: map.id },
@@ -72313,8 +72557,9 @@ ${request.requirements}` : preset.text,
     return ((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry;
   }
   /** Ends a run: the window (if open) shows one sentence; a closed window gets a Notice when `notice` says the task did not tell it. */
-  settleTopicChat(entry, sentence, live, notice, status, markdown = false) {
-    entry.session.running = false;
+  settleTopicChat(entry, sentence, live, notice, status, markdown = false, plan = false) {
+    if (!this.holdsTopicSteers(entry)) entry.session.running = false;
+    entry.steerEnd = { status, plan };
     const turnId = entry.runningTurnId;
     entry.runningTurnId = null;
     if (!live()) return;
@@ -75319,6 +75564,7 @@ ${request.requirements}` : preset.text,
       runOnce: options == null ? void 0 : options.runOnce,
       signal: options == null ? void 0 : options.signal,
       outputLanguage: options == null ? void 0 : options.outputLanguage,
+      steer: options == null ? void 0 : options.steer,
       prepare: async (note) => {
         var _a3;
         if (!children.length && !selectedSources.some((group) => group.documents.length))
@@ -75461,7 +75707,7 @@ ${request.requirements}` : preset.text,
     const abortBeforeAcceptance = () => controller.abort();
     if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
     else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    const stored = { ...options, signal: void 0, onProgress: void 0 };
+    const stored = { ...options, signal: void 0, onProgress: void 0, steer: void 0 };
     const task = step === "draft" && (existing == null ? void 0 : existing.directions.length) && (existing.state === "directions" || options.continuesDirections) ? existing : {
       mapPath: this.path,
       mapId: this.map.id,
@@ -75484,6 +75730,7 @@ ${request.requirements}` : preset.text,
       ...step === "draft" ? { ...task.options, requirements: options.requirements || task.options.requirements } : options,
       // The model of this step is the dialog's choice now, not the one the first step was started with.
       runOnce: options.runOnce,
+      steer: options.steer,
       signal: controller.signal,
       onProgress: (message) => {
         var _a2;
@@ -80535,7 +80782,7 @@ ${addition}` : addition },
    * written without a research (`research-mode: local`, no task text). Like the dialog's run, the card shows running and Stop
    * while the outline is generated.
    */
-  async chatExpand(parent, direction, signal) {
+  async chatExpand(parent, direction, signal, steer) {
     var _a2, _b2, _c;
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
       new import_obsidian39.Notice(t("ui.ai_running_ai"));
@@ -80570,7 +80817,8 @@ ${addition}` : addition },
           ),
           limits
         },
-        controller.signal
+        controller.signal,
+        steer
       );
       if (controller.signal.aborted || this.closed) return { status: "stopped" };
       const { nodes } = limitOutline(generated, limits);
@@ -82190,10 +82438,11 @@ ${addition}` : addition },
    * check and the write; this supplies what only the view knows: the map, the ancestors, the style notices, the redraw
    * and the undo step.
    */
-  runAgent(node, done, failed, request, onLaunchAccepted, runOnce) {
+  runAgent(node, done, failed, request, onLaunchAccepted, runOnce, steer) {
     var _a2;
     return this.plugin.topicRuns.start(node.path, "research", {
       ...this.writebackHooks(),
+      ...steer ? { steer } : {},
       origin: this,
       map: (_a2 = this.map) != null ? _a2 : void 0,
       usageMapPath: this.path || void 0,

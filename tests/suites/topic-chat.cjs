@@ -10,7 +10,7 @@ const { TopicChatWindow } = load('experiences/visual-map/topic-chat.ts', { obsid
 const { t } = load('i18n.ts');
 const hasClass = (item, name) => dom.hasCls(item, name);
 
-function fixture({ anchor, submit } = {}) {
+function fixture({ anchor, submit, steer } = {}) {
   const docListeners = {};
   const doc = { activeElement: null, listeners: docListeners,
     addEventListener(name, fn) { (docListeners[name] ??= []).push(fn); },
@@ -18,7 +18,7 @@ function fixture({ anchor, submit } = {}) {
   const root = element('div'); root.root = doc; root.ownerDocument = doc;
   const session = { turns: [], mode: 'quick', running: false, draftKind: null, draftText: '' };
   const watchers = [];
-  const calls = { submit: [], close: 0, modes: [], opener: 0 };
+  const calls = { submit: [], steer: [], close: 0, modes: [], opener: 0 };
   const host = {
     topicTitle: () => 'Premise',
     anchor: anchor ?? (() => null),
@@ -27,6 +27,7 @@ function fixture({ anchor, submit } = {}) {
     setMode: mode => { calls.modes.push(mode); session.mode = mode; watchers.slice().forEach(fn => fn()); },
     setDraft: (kind, text) => { session.draftKind = kind; session.draftText = text; },
     submit: async (kind, text) => { calls.submit.push([kind, text]); return submit ? submit(kind, text) : true; },
+    steer: text => { calls.steer.push(text); return steer ? steer(text) : true; },
     close: () => { calls.close++; }
   };
   const opener = { focus: () => { calls.opener++; } };
@@ -235,11 +236,68 @@ test('topic chat while running: shows the running line and disables the buttons 
   f.refresh();
   assert.ok(findAll(f.win.el, i => i.text === t('ui.topic_chat_running')).length === 1);
   assert.ok(['research', 'expand', 'synthesize'].every(k => f.action(k).disabled));
-  assert.equal(f.send().disabled, true);
+  // Text in the box is an addition to the running task (A1), but never a new run, a task button or a mode change.
+  assert.equal(f.send().disabled, false);
+  f.type('');
+  assert.equal(f.send().disabled, true, 'an empty box has nothing to add');
   assert.equal(f.press('Enter'), true);
   assert.deepEqual(f.calls.submit, []);
+  assert.deepEqual(f.calls.steer, []);
+  assert.ok(['research', 'expand', 'synthesize'].every(k => f.action(k).disabled));
   assert.ok(f.options().every(b => b.disabled));
   assert.equal(f.toggle().disabled, true);
+});
+
+test('topic chat steer A1/A2: while running a typed text enables send, Enter adds it, the box clears and the hint and placeholder change', () => {
+  const f = fixture();
+  f.session.running = true; f.refresh();
+  const hint = () => find(f.win.el, i => hasClass(i, 'vam-topic-chat-mode-hint')).text;
+  assert.equal(f.send().disabled, true);
+  assert.equal(ghost(f), t('ui.map_chat_steer_placeholder'));
+  assert.equal(hint(), t('ui.topic_chat_mode_quick_hint'), 'an empty box keeps the mode hint');
+  f.type('add the code');
+  assert.equal(f.send().disabled, false);
+  assert.equal(hint(), t('ui.map_chat_steer_hint'));
+  assert.equal(f.press('Enter'), true);
+  assert.deepEqual(f.calls.steer, ['add the code']);
+  assert.deepEqual(f.calls.submit, [], 'not a new run');
+  assert.equal(f.input.value, ''); assert.equal(f.session.draftText, '');
+  assert.equal(hint(), t('ui.topic_chat_mode_quick_hint'));
+  f.type('more'); f.send().click();
+  assert.deepEqual(f.calls.steer, ['add the code', 'more']);
+  assert.ok(['research', 'expand', 'synthesize'].every(k => f.action(k).disabled));
+  assert.equal(f.toggle().disabled, true);
+});
+
+test('topic chat steer: a refused addition stays in the box; a not running window still asks', async () => {
+  const f = fixture({ steer: () => false });
+  f.session.running = true; f.refresh();
+  f.type('too late'); f.press('Enter');
+  assert.deepEqual(f.calls.steer, ['too late']); assert.equal(f.input.value, 'too late'); assert.equal(f.session.draftText, 'too late');
+  f.session.running = false; f.refresh();
+  f.press('Enter'); await tick();
+  assert.deepEqual(f.calls.submit, [['ask', 'too late']]); assert.equal(f.calls.steer.length, 1, 'idle goes through submit, not steer');
+  assert.equal(ghost(f), t('ui.topic_chat_placeholder'));
+});
+
+test('topic chat steer A3: steer bubbles sit under their turn in typed order, live or queued, as plain text; setInputText writes the box', () => {
+  const f = fixture();
+  f.session.turns = [
+    { role: 'user', kind: 'research', text: 'dig', steers: [{ text: 'first', state: 'live' }, { text: '<b>second</b>', state: 'queued' }] },
+    { role: 'ai', text: 'done' }
+  ];
+  f.session.running = true; f.refresh();
+  const bubbles = findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-steer'));
+  assert.equal(bubbles.length, 2);
+  assert.equal(hasClass(bubbles[0], 'is-queued'), false); assert.equal(hasClass(bubbles[1], 'is-queued'), true);
+  const tags = findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-steer-tag')).map(i => i.text);
+  assert.deepEqual(tags, [t('ui.map_chat_steer_tag_live'), t('ui.map_chat_steer_tag_queued')]);
+  const texts = findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-steer-text')).map(i => i.text);
+  assert.deepEqual(texts, ['first', '<b>second</b>']);
+  const rows = findAll(f.win.el, i => hasClass(i, 'vam-topic-chat-msg') || hasClass(i, 'vam-topic-chat-steer'));
+  assert.ok(hasClass(rows[0], 'vam-topic-chat-msg') && hasClass(rows[1], 'vam-topic-chat-steer') && hasClass(rows[2], 'vam-topic-chat-steer') && hasClass(rows[3], 'vam-topic-chat-msg'));
+  f.refresh(); assert.equal(f.input.value, '', 'a repaint never writes the box');
+  f.win.setInputText('back'); assert.equal(f.input.value, 'back'); assert.equal(f.send().disabled, false);
 });
 
 test('topic chat counterexample 2b: when a run starts the open mode menu closes, the trigger is disabled and no mode is set', () => {
@@ -1336,4 +1394,130 @@ integrationTest('topic chat switch (real pointer path): window closed, drag, Cmd
     h.view.suppressClickUntil = 0;
     press('b', { target: field, clickOnly: true }); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, cls || tag); if (tag !== 'button') assert.equal(edits.at(-1)?.[0].target, field, 'the real editor gets the field as target and ignores it');
   }
+});
+
+// ---- steer state machine (P2): pure class, no DOM ----
+const { TopicChatSteers } = load('experiences/visual-map/topic-chat-steer.ts');
+const states = s => plain(s.entries.map(e => e.state));
+const handlerLog = () => { const log = { sent: [], gates: [] }; log.send = text => { log.sent.push(text); let resolve; let reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); const g = { promise, resolve, reject }; log.gates.push(g); return g.promise; }; return log; };
+
+test('steer state: pending until a handler binds, then delivered in typed order, one at a time', async () => {
+  const s = new TopicChatSteers(); const log = handlerLog();
+  s.add('a'); s.add('b');
+  assert.deepEqual(states(s), ['pending', 'pending']); assert.deepEqual(log.sent, []);
+  s.bind(log.send);
+  assert.deepEqual(states(s), ['sending', 'sending']);
+  await tick(); assert.deepEqual(log.sent, ['a'], 'b waits for a');
+  log.gates[0].resolve(); await tick(); await tick();
+  assert.deepEqual(log.sent, ['a', 'b']); log.gates[1].resolve();
+  await s.close();
+  assert.deepEqual(states(s), ['delivered', 'delivered']); assert.deepEqual(plain(s.delivered()), ['a', 'b']);
+  assert.deepEqual(plain(s.views().map(v => v.state)), ['live', 'live']);
+});
+
+test('steer state: a handler that rejects leaves the addition queued, the next still goes in', async () => {
+  const s = new TopicChatSteers(); const sent = [];
+  s.bind(async text => { sent.push(text); if (text === 'late') throw new Error('turn ended'); });
+  s.add('late'); s.add('ok');
+  await s.close();
+  assert.deepEqual(sent, ['late', 'ok']); assert.deepEqual(states(s), ['queued', 'delivered']);
+  assert.deepEqual(plain(s.takeQueued()), ['late']); assert.deepEqual(plain(s.takeQueued()), [], 'taken once');
+  assert.deepEqual(plain(s.entries.map(e => e.text)), ['ok'], 'delivered stays');
+});
+
+test('steer state: an answer from an older attempt (gen fence) changes nothing', async () => {
+  const s = new TopicChatSteers(); const old = handlerLog(); const fresh = handlerLog();
+  s.bind(old.send); s.add('x'); await tick();
+  assert.deepEqual(states(s), ['sending']);
+  s.bind(null); s.bind(fresh.send); await tick();
+  assert.deepEqual(old.sent, ['x']); assert.deepEqual(fresh.sent, ['x'], 'handed to the new attempt');
+  old.gates[0].resolve(); await tick();
+  assert.deepEqual(states(s), ['sending'], 'the old answer is ignored');
+  fresh.gates[0].resolve(); await s.close();
+  assert.deepEqual(states(s), ['delivered']);
+  // A late reject of the old handler does not queue it either.
+  const t2 = new TopicChatSteers(); const o2 = handlerLog(); const n2 = handlerLog();
+  t2.bind(o2.send); t2.add('y'); await tick(); t2.bind(null); t2.bind(n2.send); await tick();
+  o2.gates[0].reject(new Error('old')); await tick();
+  assert.deepEqual(states(t2), ['sending']);
+  n2.gates[0].resolve(); await t2.close(); assert.deepEqual(states(t2), ['delivered']);
+});
+
+test('steer state: setLive(false) turns pending, sending and delivered into queued, and later additions wait too', async () => {
+  const s = new TopicChatSteers(); const log = handlerLog();
+  s.bind(log.send); s.add('d'); await tick(); log.gates[0].resolve(); await tick();
+  s.add('s'); await tick(); s.add('p');
+  assert.deepEqual(states(s), ['delivered', 'sending', 'sending']);
+  s.live(false);
+  assert.deepEqual(states(s), ['queued', 'queued', 'queued']);
+  log.gates[1].resolve(); await tick();
+  assert.deepEqual(states(s), ['queued', 'queued', 'queued'], 'the answer of the dropped handler changes nothing');
+  s.add('after'); assert.equal(s.entries.at(-1).state, 'queued');
+  await s.close(); assert.deepEqual(plain(s.takeQueued()), ['d', 's', 'p', 'after']); assert.deepEqual(plain(s.delivered()), []);
+});
+
+test('steer state: every new attempt gets each addition once (rebind)', async () => {
+  const s = new TopicChatSteers(); const a1 = []; const a2 = []; const a3 = [];
+  s.add('one');
+  s.bind(async t => { a1.push(t); }); s.add('two'); await tick(); await tick();
+  assert.deepEqual(a1, ['one', 'two']); assert.deepEqual(states(s), ['delivered', 'delivered']);
+  s.bind(null); s.bind(async t => { a2.push(t); }); await tick(); await tick();
+  assert.deepEqual(a2, ['one', 'two'], 'once each'); assert.deepEqual(states(s), ['delivered', 'delivered']);
+  s.bind(null); assert.deepEqual(a2, ['one', 'two'], 'dropping the handler sends nothing');
+  s.bind(async t => { a3.push(t); }); await tick(); await tick(); await s.close();
+  assert.deepEqual(a3, ['one', 'two']); assert.deepEqual(a1, ['one', 'two']);
+  // No new handler by the end: what the dead attempt took is not in the reply, so it waits.
+  const u = new TopicChatSteers(); u.bind(async () => {}); u.add('z'); await tick(); await tick();
+  u.bind(null); await u.close(); assert.deepEqual(states(u), ['queued']);
+});
+
+test('steer state: after close an addition is queued at once and never handed over; close waits for hand-overs under way', async () => {
+  const s = new TopicChatSteers(); const log = handlerLog();
+  s.bind(log.send); s.add('x'); await tick();
+  let closed = false; const closing = s.close().then(() => { closed = true; });
+  await tick(); assert.equal(closed, false, 'waits for the chain');
+  log.gates[0].resolve(); await closing;
+  assert.deepEqual(states(s), ['delivered']);
+  s.bind(log.send); s.add('y');
+  assert.equal(s.entries[1].state, 'queued'); await tick(); assert.deepEqual(log.sent, ['x']);
+  assert.deepEqual(plain(s.takeQueued()), ['y']);
+});
+
+test('steer state: a dead owner (alive false) ignores late answers and binds', async () => {
+  let alive = true; const s = new TopicChatSteers({ alive: () => alive }); const log = handlerLog();
+  s.bind(log.send); s.add('x'); await tick(); alive = false; log.gates[0].resolve(); await tick();
+  assert.deepEqual(states(s), ['sending']);
+  const changes = []; const c = new TopicChatSteers({ onChange: () => changes.push(1) }); c.add('q'); assert.ok(changes.length > 0);
+});
+
+test('steer records: a steer line is written, read back in order, paired by id', () => {
+  const turn = { type: 'turn', id: 't1', at: 'a', kind: 'research', mode: 'quick', message: 'hi' };
+  const text = records.serializeTopicChatLine(turn)
+    + records.serializeTopicChatLine({ type: 'result', id: 't1', at: 'b', status: 'done', text: 'ok' })
+    + records.serializeTopicChatLine({ type: 'steer', id: 't1', at: 'c', text: 'one' })
+    + records.serializeTopicChatLine({ type: 'steer', id: 't1', at: 'd', text: 'two' })
+    + records.serializeTopicChatLine({ type: 'steer', id: 'orphan', at: 'e', text: 'lost' });
+  assert.equal(JSON.parse(text.split('\n')[2]).v, 1);
+  const parsed = records.parseTopicChat(text);
+  assert.equal(parsed.skipped, 0); assert.equal(parsed.unrecoverable, false);
+  const restored = records.restoreTopicChat(parsed.lines);
+  assert.deepEqual(plain(restored.map(r => [r.id, r.result?.text, r.steers])), [['t1', 'ok', ['one', 'two']]]);
+});
+
+test('steer records: a file from before steer lines reads as before; duplicate turn ids and unknown types do not disturb a turn', () => {
+  const old = '{"v":1,"type":"turn","id":"t1","at":"a","kind":"ask","mode":"quick","message":"hi"}\n{"v":1,"type":"result","id":"t1","at":"b","status":"done","text":"ok"}\n';
+  const restoredOld = records.restoreTopicChat(records.parseTopicChat(old).lines);
+  assert.deepEqual(plain(restoredOld), [{ id: 't1', kind: 'ask', mode: 'quick', message: 'hi', result: { status: 'done', text: 'ok' }, steers: [] }]);
+  const mixed = old
+    + '{"v":1,"type":"turn","id":"t1","at":"c","kind":"research","mode":"standard","message":"dup"}\n'
+    + '{"v":1,"type":"steer","id":"t1","at":"d","text":"s1"}\n'
+    + '{"v":1,"type":"future","id":"t1","at":"e","text":"???"}\n'
+    + '{"v":1,"type":"steer","id":"t1","at":"f"}\n'
+    + '{"v":1,"type":"steer","id":"","at":"g","text":"no id"}\n';
+  const parsed = records.parseTopicChat(mixed);
+  assert.equal(parsed.skipped, 3, 'unknown type, steer without text, steer without id');
+  assert.equal(parsed.unrecoverable, false);
+  const restored = records.restoreTopicChat(parsed.lines);
+  assert.equal(restored.length, 1, 'a duplicate turn id adds no turn');
+  assert.deepEqual(plain([restored[0].message, restored[0].result.text, restored[0].steers]), ['hi', 'ok', ['s1']]);
 });

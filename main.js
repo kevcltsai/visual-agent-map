@@ -45493,6 +45493,10 @@ function validLine(value) {
     if (!isText2(value.status) || !STATUSES.includes(value.status) || !isText2(value.text)) return null;
     return value;
   }
+  if (value.type === "steer") {
+    if (!isText2(value.text)) return null;
+    return value;
+  }
   return null;
 }
 function parseTopicChat(text12) {
@@ -45525,6 +45529,7 @@ function parseTopicChat(text12) {
   return { lines, skipped: skipped2, unrecoverable, cleanEnd: text12 === "" || text12.endsWith("\n") };
 }
 function restoreTopicChat(lines) {
+  var _a2;
   const turns = [];
   const byId = /* @__PURE__ */ new Map();
   for (const line of lines) {
@@ -45535,10 +45540,13 @@ function restoreTopicChat(lines) {
         kind: line.kind,
         mode: line.mode,
         message: line.message,
-        result: null
+        result: null,
+        steers: []
       };
       byId.set(line.id, turn);
       turns.push(turn);
+    } else if (line.type === "steer") {
+      (_a2 = byId.get(line.id)) == null ? void 0 : _a2.steers.push(line.text);
     } else {
       const turn = byId.get(line.id);
       if (turn && !turn.result) turn.result = { status: line.status, text: line.text };
@@ -50822,6 +50830,12 @@ var TopicChatWindow = class {
     this.inputEl.value = draft.draftText;
     this.refresh();
   }
+  /** Puts `text` in the input (a draft handed back); a repaint alone never writes the input's value. */
+  setInputText(text12) {
+    if (this.destroyed) return;
+    this.inputEl.value = text12;
+    this.refresh();
+  }
   /** Puts the window in `parent` (again, after a repaint), places it and, unless `focus` is false, moves the focus to the input. */
   mount(parent, focus = true) {
     const attached = !parent.contains(this.el);
@@ -50929,14 +50943,22 @@ var TopicChatWindow = class {
     }
   }
   canSend() {
-    const session = this.host.session();
-    return !this.submitting && !session.running && this.inputEl.value.trim() !== "";
+    return !this.submitting && this.inputEl.value.trim() !== "";
   }
   async send() {
-    var _a2;
+    var _a2, _b2, _c;
     if (!this.canSend()) return;
-    const kind = (_a2 = this.host.session().draftKind) != null ? _a2 : "ask";
+    const session = this.host.session();
     const text12 = this.inputEl.value.trim();
+    if (session.running) {
+      if (!((_b2 = (_a2 = this.host).steer) == null ? void 0 : _b2.call(_a2, text12))) return;
+      this.host.setDraft(session.draftKind, "");
+      if (this.destroyed) return;
+      this.inputEl.value = "";
+      this.refresh();
+      return;
+    }
+    const kind = (_c = session.draftKind) != null ? _c : "ask";
     this.submitting = true;
     this.refresh();
     let started = false;
@@ -50974,10 +50996,13 @@ var TopicChatWindow = class {
       (0, import_obsidian33.setIcon)(this.modeToggleEl, modeIcon(session.mode));
     }
     this.modeHintEl.setText(
-      session.mode === "quick" ? t("ui.topic_chat_mode_quick_hint") : t("ui.topic_chat_mode_standard_hint")
+      session.running && !empty ? t("ui.map_chat_steer_hint") : session.mode === "quick" ? t("ui.topic_chat_mode_quick_hint") : t("ui.topic_chat_mode_standard_hint")
     );
     const ghost = session.draftKind && empty ? suggestion(session.draftKind) : "";
-    this.inputEl.setAttr("placeholder", ghost || t("ui.topic_chat_placeholder"));
+    this.inputEl.setAttr(
+      "placeholder",
+      ghost || (session.running ? t("ui.map_chat_steer_placeholder") : t("ui.topic_chat_placeholder"))
+    );
     this.ghostEl.hidden = !ghost;
     this.inputEl.toggleClass("is-ghost", !!ghost);
     this.ghostTextEl.setText(ghost);
@@ -50987,6 +51012,7 @@ var TopicChatWindow = class {
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }
   paintLog(session) {
+    var _a2;
     this.logEl.empty();
     for (const turn of session.turns) {
       const row = this.logEl.createDiv({
@@ -50997,6 +51023,16 @@ var TopicChatWindow = class {
       const body = row.createSpan({ cls: "vam-topic-chat-text" });
       if (turn.markdown) renderChatMarkdown(body, turn.text, t("ui.map_chat_overflow_note"));
       else body.setText(turn.text);
+      for (const steer of (_a2 = turn.steers) != null ? _a2 : []) {
+        const bubble = this.logEl.createDiv({
+          cls: steer.state === "queued" ? "vam-topic-chat-steer is-queued" : "vam-topic-chat-steer"
+        });
+        bubble.createSpan({
+          cls: "vam-topic-chat-steer-tag",
+          text: t(steer.state === "queued" ? "ui.map_chat_steer_tag_queued" : "ui.map_chat_steer_tag_live")
+        });
+        bubble.createSpan({ cls: "vam-topic-chat-steer-text", text: steer.text });
+      }
     }
     if (session.running) {
       this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running", text: t("ui.topic_chat_running") });

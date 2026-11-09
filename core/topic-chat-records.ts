@@ -31,9 +31,20 @@ export interface TopicChatResultLine {
   status: TopicRecordStatus;
   text: string;
 }
-export type TopicChatLine = TopicChatTurnLine | TopicChatResultLine;
+/** An addition the running task took in; `id` is the turn it belongs to. Only taken-in ones are written. */
+export interface TopicChatSteerLine {
+  v: 1;
+  type: "steer";
+  id: string;
+  at: string;
+  text: string;
+}
+export type TopicChatLine = TopicChatTurnLine | TopicChatResultLine | TopicChatSteerLine;
 /** A line as the caller hands it over: no `v`. */
-export type TopicChatLineInput = Omit<TopicChatTurnLine, "v"> | Omit<TopicChatResultLine, "v">;
+export type TopicChatLineInput =
+  | Omit<TopicChatTurnLine, "v">
+  | Omit<TopicChatResultLine, "v">
+  | Omit<TopicChatSteerLine, "v">;
 
 const KINDS: readonly string[] = ["research", "expand", "synthesize", "ask"];
 const MODES: readonly string[] = ["quick", "standard"];
@@ -97,6 +108,10 @@ function validLine(value: Record<string, unknown>): TopicChatLine | null {
     if (!isText(value.status) || !STATUSES.includes(value.status) || !isText(value.text)) return null;
     return value as unknown as TopicChatResultLine;
   }
+  if (value.type === "steer") {
+    if (!isText(value.text)) return null;
+    return value as unknown as TopicChatSteerLine;
+  }
   return null;
 }
 
@@ -138,6 +153,8 @@ export interface RestoredTopicTurn {
   message: string;
   /** Null when the file has the turn but no result (the view closed before it ended). */
   result: { status: TopicRecordStatus; text: string } | null;
+  /** The additions the task took in, in file order (a steer line without its turn is dropped). */
+  steers: string[];
 }
 
 /** Pairs each turn with its result (the first result of an id wins; a result without a turn is dropped). */
@@ -152,10 +169,13 @@ export function restoreTopicChat(lines: readonly TopicChatLine[]): RestoredTopic
         kind: line.kind,
         mode: line.mode,
         message: line.message,
-        result: null
+        result: null,
+        steers: []
       };
       byId.set(line.id, turn);
       turns.push(turn);
+    } else if (line.type === "steer") {
+      byId.get(line.id)?.steers.push(line.text);
     } else {
       const turn = byId.get(line.id);
       if (turn && !turn.result) turn.result = { status: line.status, text: line.text };

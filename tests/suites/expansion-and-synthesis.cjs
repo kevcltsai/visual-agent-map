@@ -2521,6 +2521,85 @@ test('R2 M2: one persistent announcer speaks a stage only when it changes; the s
   const chip = source.slice(source.indexOf('const stageEl = chip.createSpan'), source.indexOf('const elapsedEl'));
   assert.doesNotMatch(chip, /aria-live|"role"/);
 });
+test('R2 M3: a stage or query change in a running research patches the card chip instead of redrawing the map', () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const { ResearchProgressStore } = load('experiences/visual-map/research-progress.ts');
+  class El {
+    constructor(cls) { this.cls = new Set(cls ? [cls] : []); this.kids = []; this.attrs = {}; this.textContent = ''; this.offsetHeight = 100; }
+    setText(v) { this.textContent = v; } setAttr(k, v) { this.attrs[k] = v; }
+    createSpan(o = {}) { const e = new El(o.cls); e.textContent = o.text ?? ''; this.kids.push(e); return e; }
+    querySelector(sel) { const c = sel.slice(1); for (const k of this.kids) { if (k.cls.has(c)) return k; const d = k.querySelector(sel); if (d) return d; } return null; }
+  }
+  const make = ({ drawn = true, chip = true, label = true } = {}) => {
+    const view = new VisualAgentMapView({ app: {} }, attachTopicRuns({ settings: { ...DEFAULT_SETTINGS, language: 'en' } }));
+    const store = new ResearchProgressStore();
+    view.plugin = { researchProgress: store, settings: { ...DEFAULT_SETTINGS, language: 'en' }, modelLabel: m => m };
+    view.map = { nodes: [{ id: 'n1', path: 'a.md' }] }; view.notes = new Map([['n1', { title: 'Topic A', summary: 'S' }]]);
+    view.announcer = { setText() {} }; view.announcedStages = new Map(); view.closed = false; view.stageEl = {};
+    view.paintHoverResearch = () => {}; view.paintCardPreview = () => {}; view.topicKindOf = () => 'topic';
+    const card = new El('vam-card'); view.cardEls = new Map(drawn ? [['n1', card]] : []);
+    const log = { renders: 0, edges: 0, settles: 0, fits: 0 }; let growTo = null;
+    view.scheduleResearchRender = () => { log.renders++; };
+    view.drawEdges = () => { log.edges++; }; view.settleCardHeights = () => { log.settles++; };
+    view.fitKindShape = () => { log.fits++; };
+    store.begin('a.md', 'x', 1);
+    let stage = null;
+    if (chip) { const c = card.createSpan({ cls: 'vam-status' }); stage = c.createSpan({ cls: 'vam-research-stage', text: 'Waiting for the model' }); }
+    // The height follows the chip text (a wrapping header), so it changes at setText time, before any fitKindShape.
+    Object.defineProperty(card, 'offsetHeight', { get: () => (growTo !== null && stage && stage.textContent !== 'Waiting for the model' ? growTo : 100) });
+    if (label) view.labelCard(card, 'Topic A: Waiting for the model, Researched');
+    view.researchSigs.set('a.md', view.researchSig(store.get('a.md')));
+    return { view, store, card, stage, log, grow: h => { growTo = h; } };
+  };
+  const label = c => c.querySelector('.vam-card-label').textContent;
+  // Stage and query changes: patched in place, no redraw.
+  for (const [name, apply, text] of [
+    ['stage', s => s.stage('a.md', 'x', 'reading', 2), 'Reading sources'],
+    ['query', s => { s.stage('a.md', 'x', 'searching', 2, 'plain'); }, 'Searching: plain'],
+    ['query with a pipe', s => { s.stage('a.md', 'x', 'searching', 2, 'a|b|0|1'); }, 'Searching: a|b|0|1']
+  ]) {
+    const h = make(); apply(h.store); h.view.onResearchProgress('a.md');
+    assert.equal(h.log.renders, 0, `${name}: no full redraw`);
+    assert.equal(h.stage.textContent, text, `${name}: chip text`); assert.equal(h.stage.attrs.title, text, `${name}: chip title`);
+    assert.equal(label(h.card), `Topic A: ${text}, Researched`, `${name}: label`);
+    assert.equal(h.view.researchSigs.get('a.md'), h.view.researchSig(h.store.get('a.md')), `${name}: stored signature`);
+    assert.equal(h.log.edges, 0, `${name}: height unchanged leaves the edges`); assert.equal(h.log.settles, 0);
+  }
+  { // a query with a pipe, then a second change: the flags are still read from the end
+    const h = make(); h.store.stage('a.md', 'x', 'searching', 2, 'a|b'); h.view.onResearchProgress('a.md');
+    h.store.stage('a.md', 'x', 'searching', 3, 'c|d|1|1'); h.view.onResearchProgress('a.md');
+    assert.equal(h.log.renders, 0); assert.equal(h.stage.textContent, 'Searching: c|d|1|1');
+  }
+  { // height change redraws the edges once
+    const h = make(); h.grow(140); h.store.stage('a.md', 'x', 'reading', 2); h.view.onResearchProgress('a.md');
+    assert.equal(h.log.renders, 0); assert.equal(h.log.edges, 1); assert.equal(h.log.settles, 1);
+  }
+  // Transitions that keep the full redraw: end, slow, charts, and a stage leaving charts.
+  for (const [name, apply] of [
+    ['end', s => s.end('a.md')],
+    ['slow', s => s.markSlow('a.md', 'x', true, () => {})],
+    ['charts', s => s.stage('a.md', 'x', 'charts', 2)]
+  ]) {
+    const h = make(); apply(h.store); h.view.onResearchProgress('a.md');
+    assert.equal(h.log.renders, 1, `${name}: still a full redraw`); assert.equal(h.stage.textContent, 'Waiting for the model', `${name}: chip untouched`);
+  }
+  { const h = make(); h.store.stage('a.md', 'x', 'charts', 2); h.view.researchSigs.set('a.md', h.view.researchSig(h.store.get('a.md')));
+    h.store.stage('a.md', 'x', 'writing', 3); h.view.onResearchProgress('a.md'); assert.equal(h.log.renders, 1, 'leaving charts redraws'); }
+  { // begin: nothing drawn yet
+    const h = make(); h.view.researchSigs.delete('a.md'); h.view.onResearchProgress('a.md'); assert.equal(h.log.renders, 1, 'begin redraws'); }
+  { // resend
+    const h = make(); h.store.stage('a.md', 'x', 'reading', 2); h.view.researchSigs.set('a.md', 'reading||0|1'); h.view.onResearchProgress('a.md');
+    assert.equal(h.log.renders, 1, 'a resend flag change redraws'); }
+  { // card not drawn: no redraw, no throw, signature untouched
+    const h = make({ drawn: false }); h.store.stage('a.md', 'x', 'reading', 2); assert.doesNotThrow(() => h.view.onResearchProgress('a.md'));
+    assert.equal(h.log.renders, 0); assert.equal(h.log.fits, 0); }
+  { // chip missing: fall back to the scheduled redraw
+    const h = make({ chip: false }); h.store.stage('a.md', 'x', 'reading', 2); h.view.onResearchProgress('a.md');
+    assert.equal(h.log.renders, 1); assert.equal(h.view.researchSigs.get('a.md'), 'waiting||0|0'); }
+  { // view closed: nothing happens
+    const h = make(); h.view.closed = true; h.store.stage('a.md', 'x', 'reading', 2); h.view.onResearchProgress('a.md');
+    assert.equal(h.log.renders, 0); assert.equal(h.stage.textContent, 'Waiting for the model'); }
+});
 integrationTest('R1: local shallow child research gets no chart job; web shallow research and ordinary runs keep theirs', async () => {
   for (const [researchMode, expected] of [['local', 0], ['research', 1]]) {
     const h = await templateHarness({ language: 'en', reply: () => ({ summary: 'Sum', detail: 'Body paragraph.', visualReferences: [], suggestions: [] }) });

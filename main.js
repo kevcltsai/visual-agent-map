@@ -63983,8 +63983,45 @@ ${request.requirements}` : preset.text,
     this.paintHoverResearch();
     this.paintCardPreview(path);
     this.announceResearchStage(path);
-    if (this.researchSig(this.plugin.researchProgress.get(path)) !== ((_b2 = this.researchSigs.get(path)) != null ? _b2 : ""))
-      this.scheduleResearchRender();
+    const progress = this.plugin.researchProgress.get(path);
+    const sig = this.researchSig(progress);
+    const drawn = (_b2 = this.researchSigs.get(path)) != null ? _b2 : "";
+    if (sig !== drawn && !this.paintCardStage(path, progress, drawn, sig)) this.scheduleResearchRender();
+  }
+  /**
+   * A stage or query change inside a running research only changes the chip text, so the card is patched in place
+   * instead of redrawing the map. Returns false when the full redraw is still needed (begin, end, slow, resend, charts,
+   * or no chip to patch).
+   */
+  paintCardStage(path, progress, drawn, sig) {
+    var _a2, _b2, _c;
+    if (!progress || !drawn || !sig) return false;
+    const flags = (value) => value.split("|").slice(-2).join("|");
+    const stageOf = (value) => value.split("|")[0];
+    if (flags(drawn) !== flags(sig) || stageOf(drawn) === "charts" || stageOf(sig) === "charts") return false;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === path);
+    const card = node && ((_b2 = this.cardEls) == null ? void 0 : _b2.get(node.id));
+    if (!node || !card) return true;
+    const stageEl = card.querySelector(".vam-research-stage");
+    if (!stageEl) return false;
+    const oldText = (_c = stageEl.textContent) != null ? _c : "";
+    const before = card.offsetHeight;
+    const text12 = this.researchStageText(progress);
+    stageEl.setText(text12);
+    stageEl.setAttr("title", text12);
+    const label = cardLabels.get(card);
+    const named = label == null ? void 0 : label.textContent;
+    if (label && named && oldText) {
+      const at = named.lastIndexOf(oldText);
+      if (at >= 0) this.labelCard(card, named.slice(0, at) + text12 + named.slice(at + oldText.length));
+    }
+    this.fitKindShape(card, this.topicKindOf(node.id));
+    if (card.offsetHeight !== before) {
+      this.drawEdges();
+      this.settleCardHeights();
+    }
+    this.researchSigs.set(path, sig);
+    return true;
   }
   scheduleResearchRender() {
     if (this.researchRenderTimer !== null) return;

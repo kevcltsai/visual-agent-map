@@ -2906,5 +2906,20 @@ export const zhTW: Record<TranslationKey, string> = {
     "已同步 {0} 份議題檔名，{1} 份失敗。請確認失敗議題所在的資料夾可寫入（未唯讀、未被其他程式鎖定），再執行一次。",
   "ui.repair_workspace_blocked_0":
     "修復失敗：「{0}」是檔案，佔住了資料夾的位置。請先改名或移走這個檔案，再按一次修復。",
-  "ui.outline_import_done_0_1": "已加入 {0} 個議題到{1}。"
+  "ui.outline_import_done_0_1": "已加入 {0} 個議題到{1}。",
+  "ui.argument_proposition": "命題",
+  "ui.argument_situation": "現況",
+  "ui.argument_conclusion": "結論",
+  "ui.argument_group_verified": "驗證完成的假設",
+  "ui.argument_group_eliminated": "已淘汰的假設",
+  "ui.argument_stopped_mismatch": "現況不符合命題，已停止",
+  "ui.argument_stopped_missing": "找不到所需的現況資料，已停止",
+  "ui.argument_stopped_limit_0": "限制內未能驗證 3 個假設，已停止。{0}",
+  "ui.argument_in_progress": "研究進行中，尚無結論",
+  "ui.argument_situation_data": "依據的現況數據",
+  "ui.argument_sources": "來源",
+  "ui.argument_source_0_1_2": "- {0}「{1}」（{2}）",
+  "ui.argument_reason": "理由",
+  "ui.argument_not_found_0": "未找到：{0}",
+  "ui.argument_eliminated_0": "已淘汰：{0}"
 };

@@ -3119,7 +3119,22 @@ export const en = {
     "Synced {0} topic filenames; {1} failed. Make sure the folder holding them is writable (not read-only or locked by another program), then run this again.",
   "ui.repair_workspace_blocked_0":
     "Repair failed: “{0}” is a file where a folder should be. Rename or move that file, then repair again.",
-  "ui.outline_import_done_0_1": "Added {0} topics to {1}."
+  "ui.outline_import_done_0_1": "Added {0} topics to {1}.",
+  "ui.argument_proposition": "Proposition",
+  "ui.argument_situation": "Current situation",
+  "ui.argument_conclusion": "Conclusion",
+  "ui.argument_group_verified": "Verified hypotheses",
+  "ui.argument_group_eliminated": "Eliminated hypotheses",
+  "ui.argument_stopped_mismatch": "The current situation does not match the proposition. Stopped.",
+  "ui.argument_stopped_missing": "The situation data could not be found. Stopped.",
+  "ui.argument_stopped_limit_0": "Fewer than 3 hypotheses were verified within the limits. Stopped. {0}",
+  "ui.argument_in_progress": "Research is in progress. No conclusion yet.",
+  "ui.argument_situation_data": "Situation data relied on",
+  "ui.argument_sources": "Sources",
+  "ui.argument_source_0_1_2": '- {0} "{1}" ({2})',
+  "ui.argument_reason": "Reason",
+  "ui.argument_not_found_0": "Not found: {0}",
+  "ui.argument_eliminated_0": "Eliminated: {0}"
 } as const;
 
 export type TranslationKey = keyof typeof en;

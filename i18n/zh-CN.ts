@@ -2904,5 +2904,20 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.synced_0_topic_filenames_failed_1":
     "已同步 {0} 份议题文件名，{1} 份失败。请确认失败议题所在的文件夹可写入（未只读、未被其他程序锁定），再执行一次。",
   "ui.repair_workspace_blocked_0": "修复失败：“{0}”是文件，占住了文件夹的位置。请先改名或移走这个文件，再点一次修复。",
-  "ui.outline_import_done_0_1": "已加入 {0} 个议题到{1}。"
+  "ui.outline_import_done_0_1": "已加入 {0} 个议题到{1}。",
+  "ui.argument_proposition": "命题",
+  "ui.argument_situation": "现况",
+  "ui.argument_conclusion": "结论",
+  "ui.argument_group_verified": "验证完成的假设",
+  "ui.argument_group_eliminated": "已淘汰的假设",
+  "ui.argument_stopped_mismatch": "现况不符合命题，已停止",
+  "ui.argument_stopped_missing": "找不到所需的现况数据，已停止",
+  "ui.argument_stopped_limit_0": "限制内未能验证 3 个假设，已停止。{0}",
+  "ui.argument_in_progress": "研究进行中，尚无结论",
+  "ui.argument_situation_data": "依据的现况数据",
+  "ui.argument_sources": "来源",
+  "ui.argument_source_0_1_2": "- {0}“{1}”（{2}）",
+  "ui.argument_reason": "理由",
+  "ui.argument_not_found_0": "未找到：{0}",
+  "ui.argument_eliminated_0": "已淘汰：{0}"
 };

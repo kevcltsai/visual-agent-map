@@ -2903,7 +2903,22 @@ var en = {
   "ui.note_style_folder_open_failed": "The note style folder could not be opened: a file with the same name may be in the way, or the folder cannot be written. Rename or move that file, then try again.",
   "ui.synced_0_topic_filenames_failed_1": "Synced {0} topic filenames; {1} failed. Make sure the folder holding them is writable (not read-only or locked by another program), then run this again.",
   "ui.repair_workspace_blocked_0": "Repair failed: \u201C{0}\u201D is a file where a folder should be. Rename or move that file, then repair again.",
-  "ui.outline_import_done_0_1": "Added {0} topics to {1}."
+  "ui.outline_import_done_0_1": "Added {0} topics to {1}.",
+  "ui.argument_proposition": "Proposition",
+  "ui.argument_situation": "Current situation",
+  "ui.argument_conclusion": "Conclusion",
+  "ui.argument_group_verified": "Verified hypotheses",
+  "ui.argument_group_eliminated": "Eliminated hypotheses",
+  "ui.argument_stopped_mismatch": "The current situation does not match the proposition. Stopped.",
+  "ui.argument_stopped_missing": "The situation data could not be found. Stopped.",
+  "ui.argument_stopped_limit_0": "Fewer than 3 hypotheses were verified within the limits. Stopped. {0}",
+  "ui.argument_in_progress": "Research is in progress. No conclusion yet.",
+  "ui.argument_situation_data": "Situation data relied on",
+  "ui.argument_sources": "Sources",
+  "ui.argument_source_0_1_2": '- {0} "{1}" ({2})',
+  "ui.argument_reason": "Reason",
+  "ui.argument_not_found_0": "Not found: {0}",
+  "ui.argument_eliminated_0": "Eliminated: {0}"
 };
 
 // i18n/zh-CN.ts
@@ -5702,7 +5717,22 @@ var zhCN = {
   "ui.note_style_folder_open_failed": "\u65E0\u6CD5\u6253\u5F00\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939\uFF1A\u540C\u540D\u6587\u4EF6\u53EF\u80FD\u5360\u4F4F\u4E86\u8FD9\u4E2A\u4F4D\u7F6E\uFF0C\u6216\u6587\u4EF6\u5939\u65E0\u6CD5\u5199\u5165\u3002\u8BF7\u6539\u540D\u6216\u79FB\u8D70\u8BE5\u6587\u4EF6\uFF0C\u518D\u8BD5\u4E00\u6B21\u3002",
   "ui.synced_0_topic_filenames_failed_1": "\u5DF2\u540C\u6B65 {0} \u4EFD\u8BAE\u9898\u6587\u4EF6\u540D\uFF0C{1} \u4EFD\u5931\u8D25\u3002\u8BF7\u786E\u8BA4\u5931\u8D25\u8BAE\u9898\u6240\u5728\u7684\u6587\u4EF6\u5939\u53EF\u5199\u5165\uFF08\u672A\u53EA\u8BFB\u3001\u672A\u88AB\u5176\u4ED6\u7A0B\u5E8F\u9501\u5B9A\uFF09\uFF0C\u518D\u6267\u884C\u4E00\u6B21\u3002",
   "ui.repair_workspace_blocked_0": "\u4FEE\u590D\u5931\u8D25\uFF1A\u201C{0}\u201D\u662F\u6587\u4EF6\uFF0C\u5360\u4F4F\u4E86\u6587\u4EF6\u5939\u7684\u4F4D\u7F6E\u3002\u8BF7\u5148\u6539\u540D\u6216\u79FB\u8D70\u8FD9\u4E2A\u6587\u4EF6\uFF0C\u518D\u70B9\u4E00\u6B21\u4FEE\u590D\u3002",
-  "ui.outline_import_done_0_1": "\u5DF2\u52A0\u5165 {0} \u4E2A\u8BAE\u9898\u5230{1}\u3002"
+  "ui.outline_import_done_0_1": "\u5DF2\u52A0\u5165 {0} \u4E2A\u8BAE\u9898\u5230{1}\u3002",
+  "ui.argument_proposition": "\u547D\u9898",
+  "ui.argument_situation": "\u73B0\u51B5",
+  "ui.argument_conclusion": "\u7ED3\u8BBA",
+  "ui.argument_group_verified": "\u9A8C\u8BC1\u5B8C\u6210\u7684\u5047\u8BBE",
+  "ui.argument_group_eliminated": "\u5DF2\u6DD8\u6C70\u7684\u5047\u8BBE",
+  "ui.argument_stopped_mismatch": "\u73B0\u51B5\u4E0D\u7B26\u5408\u547D\u9898\uFF0C\u5DF2\u505C\u6B62",
+  "ui.argument_stopped_missing": "\u627E\u4E0D\u5230\u6240\u9700\u7684\u73B0\u51B5\u6570\u636E\uFF0C\u5DF2\u505C\u6B62",
+  "ui.argument_stopped_limit_0": "\u9650\u5236\u5185\u672A\u80FD\u9A8C\u8BC1 3 \u4E2A\u5047\u8BBE\uFF0C\u5DF2\u505C\u6B62\u3002{0}",
+  "ui.argument_in_progress": "\u7814\u7A76\u8FDB\u884C\u4E2D\uFF0C\u5C1A\u65E0\u7ED3\u8BBA",
+  "ui.argument_situation_data": "\u4F9D\u636E\u7684\u73B0\u51B5\u6570\u636E",
+  "ui.argument_sources": "\u6765\u6E90",
+  "ui.argument_source_0_1_2": "- {0}\u201C{1}\u201D\uFF08{2}\uFF09",
+  "ui.argument_reason": "\u7406\u7531",
+  "ui.argument_not_found_0": "\u672A\u627E\u5230\uFF1A{0}",
+  "ui.argument_eliminated_0": "\u5DF2\u6DD8\u6C70\uFF1A{0}"
 };
 
 // i18n/zh-TW.ts
@@ -8501,7 +8531,22 @@ var zhTW = {
   "ui.note_style_folder_open_failed": "\u7121\u6CD5\u958B\u555F\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E\uFF1A\u540C\u540D\u6A94\u6848\u53EF\u80FD\u4F54\u4F4F\u4E86\u9019\u500B\u4F4D\u7F6E\uFF0C\u6216\u8CC7\u6599\u593E\u7121\u6CD5\u5BEB\u5165\u3002\u8ACB\u6539\u540D\u6216\u79FB\u8D70\u8A72\u6A94\u6848\uFF0C\u518D\u8A66\u4E00\u6B21\u3002",
   "ui.synced_0_topic_filenames_failed_1": "\u5DF2\u540C\u6B65 {0} \u4EFD\u8B70\u984C\u6A94\u540D\uFF0C{1} \u4EFD\u5931\u6557\u3002\u8ACB\u78BA\u8A8D\u5931\u6557\u8B70\u984C\u6240\u5728\u7684\u8CC7\u6599\u593E\u53EF\u5BEB\u5165\uFF08\u672A\u552F\u8B80\u3001\u672A\u88AB\u5176\u4ED6\u7A0B\u5F0F\u9396\u5B9A\uFF09\uFF0C\u518D\u57F7\u884C\u4E00\u6B21\u3002",
   "ui.repair_workspace_blocked_0": "\u4FEE\u5FA9\u5931\u6557\uFF1A\u300C{0}\u300D\u662F\u6A94\u6848\uFF0C\u4F54\u4F4F\u4E86\u8CC7\u6599\u593E\u7684\u4F4D\u7F6E\u3002\u8ACB\u5148\u6539\u540D\u6216\u79FB\u8D70\u9019\u500B\u6A94\u6848\uFF0C\u518D\u6309\u4E00\u6B21\u4FEE\u5FA9\u3002",
-  "ui.outline_import_done_0_1": "\u5DF2\u52A0\u5165 {0} \u500B\u8B70\u984C\u5230{1}\u3002"
+  "ui.outline_import_done_0_1": "\u5DF2\u52A0\u5165 {0} \u500B\u8B70\u984C\u5230{1}\u3002",
+  "ui.argument_proposition": "\u547D\u984C",
+  "ui.argument_situation": "\u73FE\u6CC1",
+  "ui.argument_conclusion": "\u7D50\u8AD6",
+  "ui.argument_group_verified": "\u9A57\u8B49\u5B8C\u6210\u7684\u5047\u8A2D",
+  "ui.argument_group_eliminated": "\u5DF2\u6DD8\u6C70\u7684\u5047\u8A2D",
+  "ui.argument_stopped_mismatch": "\u73FE\u6CC1\u4E0D\u7B26\u5408\u547D\u984C\uFF0C\u5DF2\u505C\u6B62",
+  "ui.argument_stopped_missing": "\u627E\u4E0D\u5230\u6240\u9700\u7684\u73FE\u6CC1\u8CC7\u6599\uFF0C\u5DF2\u505C\u6B62",
+  "ui.argument_stopped_limit_0": "\u9650\u5236\u5167\u672A\u80FD\u9A57\u8B49 3 \u500B\u5047\u8A2D\uFF0C\u5DF2\u505C\u6B62\u3002{0}",
+  "ui.argument_in_progress": "\u7814\u7A76\u9032\u884C\u4E2D\uFF0C\u5C1A\u7121\u7D50\u8AD6",
+  "ui.argument_situation_data": "\u4F9D\u64DA\u7684\u73FE\u6CC1\u6578\u64DA",
+  "ui.argument_sources": "\u4F86\u6E90",
+  "ui.argument_source_0_1_2": "- {0}\u300C{1}\u300D\uFF08{2}\uFF09",
+  "ui.argument_reason": "\u7406\u7531",
+  "ui.argument_not_found_0": "\u672A\u627E\u5230\uFF1A{0}",
+  "ui.argument_eliminated_0": "\u5DF2\u6DD8\u6C70\uFF1A{0}"
 };
 
 // i18n/languages.ts

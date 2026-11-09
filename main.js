@@ -65316,14 +65316,14 @@ ${request.requirements}` : preset.text,
     if (!stageEl) return false;
     const oldText = (_c = stageEl.textContent) != null ? _c : "";
     const before = card.offsetHeight;
-    const text12 = this.researchStageText(progress);
-    stageEl.setText(text12);
-    stageEl.setAttr("title", text12);
+    const text13 = this.researchStageText(progress);
+    stageEl.setText(text13);
+    stageEl.setAttr("title", text13);
     const label = cardLabels.get(card);
     const named = label == null ? void 0 : label.textContent;
     if (label && named && oldText) {
       const at = named.lastIndexOf(oldText);
-      if (at >= 0) this.labelCard(card, named.slice(0, at) + text12 + named.slice(at + oldText.length));
+      if (at >= 0) this.labelCard(card, named.slice(0, at) + text13 + named.slice(at + oldText.length));
     }
     this.fitKindShape(card, this.topicKindOf(node.id));
     if (card.offsetHeight !== before) {

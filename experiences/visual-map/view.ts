@@ -26863,6 +26863,44 @@ export class VisualAgentMapView extends ItemView {
       this.enqueue(() => this.resizeCard(node.id, change));
     });
   }
+  /**
+   * The map edit for one dropped card. Built here, not inside enableDrag: the undo history keeps every edit, and a closure made
+   * inside the drag shares its scope (the card, the edge helpers) and would keep all of that off-screen after each drop.
+   */
+  private cardDropEdit(
+    nodeId: string,
+    position: { x: number; y: number },
+    centerX: number
+  ): (map: MapDocument) => void {
+    return map => {
+      const current = map.nodes.find(n => n.id === nodeId);
+      if (!current) return;
+      // A first-level topic dragged in a timeline map is a change of order: re-order, then lay the map out again.
+      const root = current.parentId ? map.nodes.find(n => n.id === current.parentId) : undefined;
+      if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId && !current.afterTextId) {
+        map.nodes = reorderTopLevel(map.nodes, root.id, current.id, centerX);
+        this.arrangeAll(map);
+        return;
+      }
+      this.placeDroppedCard(map, current, position);
+    };
+  }
+  /** The map edit for a dropped group of cards (one undo step); built outside enableDrag for the reason of cardDropEdit. */
+  private groupDropEdit(
+    origins: Map<string, { x: number; y: number }>,
+    dx: number,
+    dy: number
+  ): (map: MapDocument) => void {
+    const from = new Map(origins);
+    return map => {
+      for (const [id, origin] of from) {
+        const current = map.nodes.find(n => n.id === id);
+        if (!current) continue;
+        current.x = Math.round(origin.x + dx);
+        current.y = Math.round(origin.y + dy);
+      }
+    };
+  }
   private enableDrag(
     card: HTMLElement,
     node: MapNode,
@@ -27099,16 +27137,8 @@ export class VisualAgentMapView extends ItemView {
           placeGroup(delta.x, delta.y);
           const { x: dx, y: dy } = delta;
           // One change for the whole group, so one undo puts every card back.
-          this.enqueueDrop(() =>
-            this.mapChange(map => {
-              for (const [id, from] of groupOrigins) {
-                const current = map.nodes.find(n => n.id === id);
-                if (!current) continue;
-                current.x = Math.round(from.x + dx);
-                current.y = Math.round(from.y + dy);
-              }
-            })
-          );
+          const edit = this.groupDropEdit(groupOrigins, dx, dy);
+          this.enqueueDrop(() => this.mapChange(edit));
           return;
         }
         if (moved && locked) {
@@ -27122,27 +27152,8 @@ export class VisualAgentMapView extends ItemView {
             this.enqueue(() => this.moveBranches([dragged], landed.node, false));
         } else if (moved) {
           paint();
-          this.enqueueDrop(() =>
-            this.mapChange(map => {
-              const current = map.nodes.find(n => n.id === node.id);
-              if (!current) return;
-              // A first-level topic dragged in a timeline map is a change of order: re-order, then lay the map out again.
-              const root = current.parentId ? map.nodes.find(n => n.id === current.parentId) : undefined;
-              if (
-                !map.aim &&
-                layoutOf(map).direction === "timeline" &&
-                root &&
-                !root.parentId &&
-                !current.afterTextId
-              ) {
-                const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
-                map.nodes = reordered;
-                this.arrangeAll(map);
-                return;
-              }
-              this.placeDroppedCard(map, current, position);
-            })
-          );
+          const edit = this.cardDropEdit(node.id, { ...position }, position.x + card.offsetWidth / 2);
+          this.enqueueDrop(() => this.mapChange(edit));
         } else if (e.metaKey || e.ctrlKey) {
           // "Click A, then Cmd+click B" selects both; two or more picked cards is topic selection (the module decides).
           this.applySelectionChange(this.selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));

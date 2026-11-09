@@ -213,3 +213,48 @@ test('fishbone: a picked head and topic move the spine with them', () => {
   h.down('a'); h.fire('a', 'pointermove', 0, 50); h.flush();
   assert.equal(spine.attrs.d, geometry.fishboneSpinePathData(box(0, 0), [box(400, 50), box(400, 250), box(400, 400)]));
 });
+
+// The undo history keeps every saved change for the life of the map. A change built inside the drag shared its scope with the
+// card, so each drop kept the whole replaced card tree (about 2,300 nodes on a 72-card map) in memory until the map was closed.
+// Everything the view or the loaded module could hold on to is defined here at the top level, so only the saved change can
+// keep a card alive (the harness above shares one scope between its cards and the closures it hands to the view).
+const idle = () => {};
+const noFrame = run => { run(); return 1; };
+const leakModule = support.load('main.ts', { obsidian: support.obsidian }, { setTimeout: noFrame, clearTimeout: idle, requestAnimationFrame: noFrame, cancelAnimationFrame: idle });
+const leakPlugin = { settings: { ...support.DEFAULT_SETTINGS }, pendingSuggestions: new Map(), expansionBatches: new Map(), detailsShown: idle, setOutlineActive: idle };
+const savedChanges = [];
+const keepChange = async change => { savedChanges.push(change); };
+const runNow = work => work();
+function dropOneCard(multi) {
+  const nodes = [['root', null, 0, 0], ['a', 'root', 400, 0], ['b', 'root', 400, 200]].map(([id, parentId, x, y]) => Object.assign(support.node(id, parentId), { x, y }));
+  const view = new leakModule.VisualAgentMapView({ app: {} }, leakPlugin);
+  view.map = support.map(nodes); view.path = 'm/Map.md';
+  const cards = {};
+  for (const n of nodes) {
+    const handlers = new Map();
+    cards[n.id] = { handlers, style: {}, offsetLeft: n.x, offsetTop: n.y, offsetWidth: 280, offsetHeight: 100,
+      addEventListener(name, handler) { handlers.set(name, handler); }, removeEventListener(name) { handlers.delete(name); }, setPointerCapture: idle };
+  }
+  view.cardEls = new Map(Object.entries(cards));
+  view.edgeEls = new Map(); view.relationEls = new Map(); view.relationHitEls = new Map(); view.relationGapEls = new Map();
+  view.enqueue = runNow; view.mapChange = keepChange;
+  for (const n of nodes) view.enableDrag(cards[n.id], n);
+  if (multi) setSelection(view, true, ['a', 'b']);
+  const id = 'a';
+  cards[id].handlers.get('pointerdown')({ target: { closest: () => null }, button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+  cards[id].handlers.get('pointermove')({ type: 'pointermove', clientX: 50, clientY: 30 });
+  cards[id].handlers.get('pointerup')({ type: 'pointerup', clientX: 50, clientY: 30 });
+  view.cardEls = new Map(); // a repaint replaces the cards
+  return Object.values(cards).map(card => new WeakRef(card));
+}
+const collect = () => { require('node:v8').setFlagsFromString('--expose-gc'); require('node:vm').runInNewContext('gc')(); };
+for (const multi of [false, true]) {
+  test(`a saved ${multi ? 'group' : 'single-card'} drop keeps no card element alive through the undo history`, async () => {
+    savedChanges.length = 0;
+    const refs = dropOneCard(multi);
+    assert.equal(savedChanges.length, 1);
+    for (let i = 0; i < 4; i++) { await new Promise(resolve => setImmediate(resolve)); collect(); }
+    assert.equal(refs.filter(ref => ref.deref()).length, 0);
+    assert.equal(savedChanges.length, 1);
+  });
+}

@@ -119,6 +119,9 @@ import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery
 import { ShallowExpansionCoordinator, type ExpansionBatchState } from "./experiences/visual-map/expansion-batch";
 import { ResearchProgressStore } from "./experiences/visual-map/research-progress";
 import { TopicRuns, type ChartJob } from "./experiences/visual-map/topic-run";
+import { ArgumentRuns } from "./experiences/visual-map/argument-run";
+import { inertHtmlText } from "./core/argument-map/source-proof";
+import { askArgumentStep, providerArgumentRunner } from "./core/steps/argument-map/runner";
 import type { ResearchObserver } from "./ai/research-observer";
 import { AiTaskService } from "./core/ai-task-service";
 import { mermaidSyntaxCheck } from "./ai/mermaid-safety";
@@ -361,6 +364,61 @@ export default class VisualAgentMapPlugin extends Plugin {
   });
   readonly expansionBatches = new Map<string, ExpansionBatchState>();
   readonly expansionCoordinator = new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches);
+  /**
+   * Hypothesis research runner, keyed by map path. Test entry only (reachable from `app.plugins.plugins[id].argumentRuns`
+   * over CDP): there is no command, menu, ribbon or button for it. Ports are lazy getters, so `repo` may be built later.
+   */
+  readonly argumentRuns = new ArgumentRuns({
+    mutate: work => this.mutate(work),
+    readMap: path => this.repo.readMap(path),
+    updateMap: (path, change) => this.repo.updateMap(path, change),
+    createNote: (input, map, mapPath) =>
+      this.repo.createNote(input.title, this.currentModelChoice().model, map, mapPath, "workspace", {
+        summary: input.summary,
+        detail: input.detail,
+        topicKind:
+          input.kind === "hypothesis"
+            ? "hypothesis"
+            : input.kind === "need"
+              ? "evidence"
+              : input.kind === "conclusion"
+                ? "conclusion"
+                : "topic"
+      }),
+    readNote: async path => {
+      const note = await this.repo.readNote(path);
+      return { title: note.title, summary: note.summary };
+    },
+    updateNote: async (path, patch) => {
+      await this.repo.updateNote(path, patch);
+    },
+    askModel: (context, model, reasoning, signal) => this.askModel(context, model, reasoning, signal),
+    runStep: (step, request, signal) => askArgumentStep(step, request, providerArgumentRunner(this.aiCalls), signal),
+    // requestUrl has no abort: verifySource races its own 15 s timeout and the runner's fence drops a late result.
+    fetch: async request => {
+      const response = await requestUrl(request);
+      return {
+        status: response.status,
+        headers: response.headers,
+        text: response.text,
+        arrayBuffer: response.arrayBuffer
+      };
+    },
+    parseHtml: html => inertHtmlText(html),
+    now: () => new Date().toISOString(),
+    newId: () => crypto.randomUUID(),
+    config: () => ({
+      ...this.currentModelChoice(),
+      language: selectionOutputLanguage(this.settings.language, "")
+    }),
+    begin: path => this.topicRuns.begin(path, "research"),
+    clearUndo: path => {
+      for (const view of this.views()) if (view.mapPath === path) view.clearUndoHistory();
+    },
+    log: line => this.logs.appendLog("info", line),
+    t: (key, ...values) => t(key, ...values),
+    confirmUsage: () => this.confirmAiUsage(this.currentModelChoice().model, async () => {})
+  });
   /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
   readonly pendingResearchOptions = new Map<string, TaskOptions>();
@@ -1479,6 +1537,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   onunload(): void {
     // Background diagram jobs stop before the repository does, so none can apply a result after the vault is released.
     this.topicRuns.dispose();
+    this.argumentRuns.dispose();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();
     void this.coffeeManager?.stop();

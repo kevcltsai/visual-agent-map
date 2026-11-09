@@ -458,6 +458,8 @@ import {
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
+import { GateError, applyPause } from "../../core/argument-map/machine";
+import { readArgumentMap } from "../../core/argument-map/model";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
   MAP_CHAT_ANCHOR_PREFIX,
@@ -3529,6 +3531,10 @@ export class VisualAgentMapView extends ItemView {
   clearUndoHistory(): void {
     this.history.clear();
   }
+  /** The path of the map this view shows ("" before one is open). */
+  get mapPath(): string {
+    return this.path;
+  }
   /** An AI run settled: reload and redraw once the queue is free. */
   reloadAfterAiRun(): void {
     this.enqueue(async () => {
@@ -3821,6 +3827,8 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
       await this.recoverInterruptedNotes(isCurrent);
       if (!isCurrent()) return;
+      await this.recoverArgumentRun(isCurrent);
+      if (!isCurrent()) return;
       this.endNoteLoad(load);
       this.render();
       this.app.workspace.requestSaveLayout();
@@ -3855,6 +3863,31 @@ export class VisualAgentMapView extends ItemView {
       } catch (error) {
         console.warn("Visual Agent Map interrupted run", error);
       }
+    }
+  }
+  /**
+   * A hypothesis-research run left `running` by a reload has no owner: it is paused in this same mutation (items back to pending, no
+   * provider call), like an interrupted note. A map without the `argumentMap` key never reaches the write.
+   */
+  private async recoverArgumentRun(isCurrent: () => boolean): Promise<void> {
+    const map = this.map;
+    if (!map || map.argumentMap === undefined) return;
+    const read = readArgumentMap(map);
+    if (read.kind !== "usable" || read.data.run.status !== "running" || this.plugin.argumentRuns.isRunning(this.path))
+      return;
+    try {
+      const updated = await this.plugin.repo.updateMap(this.path, doc => {
+        const current = readArgumentMap(doc);
+        if (current.kind !== "usable" || current.data.run.status !== "running") return;
+        try {
+          doc.argumentMap = applyPause(current.data, "interrupted");
+        } catch (error) {
+          if (!(error instanceof GateError)) throw error; // a finished run is left as it is
+        }
+      });
+      if (isCurrent() && this.map === map) map.argumentMap = updated.argumentMap;
+    } catch (error) {
+      console.warn("Visual Agent Map argument run recovery", error);
     }
   }
   openAimStart(): void {

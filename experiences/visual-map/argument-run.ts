@@ -101,7 +101,7 @@ export interface ArgumentRunPorts {
   readMap(path: string): Promise<MapDocument>;
   updateMap(path: string, change: (map: MapDocument) => void): Promise<MapDocument>;
   /** Creates a note file and returns its node (not yet in the map). */
-  createNote(input: NoteInput, map: MapDocument): Promise<MapNode>;
+  createNote(input: NoteInput, map: MapDocument, mapPath: string): Promise<MapNode>;
   readNote(path: string): Promise<{ title: string; summary: string }>;
   updateNote(path: string, patch: { summary?: string; detail?: string }): Promise<void>;
   askModel(context: TaskContext, model: string, reasoning: unknown, signal: AbortSignal): Promise<AiResult>;
@@ -195,7 +195,8 @@ export class ArgumentRuns {
         const read = readArgumentMap(map);
         if (read.kind !== "absent") throw new ArgumentRunError(read.kind === "usable" ? "exists" : "unusable");
         const p = this.ports;
-        const make = (kind: NoteKind, title: string, summary?: string) => p.createNote({ kind, title, summary }, map);
+        const make = (kind: NoteKind, title: string, summary?: string) =>
+          p.createNote({ kind, title, summary }, map, mapPath);
         const proposed = await make("proposition", shorten(text, 80), text);
         const situation = await make("situation", p.t("ui.argument_situation"));
         const conclusion = await make("conclusion", p.t("ui.argument_conclusion"), p.t("ui.argument_in_progress"));
@@ -535,7 +536,11 @@ export class ArgumentRuns {
       const nodes: Plan["nodes"] = [];
       const items: { id: string; citedData: string[] }[] = [];
       for (const h of result.hypotheses) {
-        const node = await this.ports.createNote({ kind: "hypothesis", title: h.title, summary: h.statement }, map);
+        const node = await this.ports.createNote(
+          { kind: "hypothesis", title: h.title, summary: h.statement },
+          map,
+          drive.mapPath
+        );
         nodes.push({ node, parentId: s.roles.verified });
         items.push({ id: node.id, citedData: h.citedData });
       }
@@ -569,7 +574,11 @@ export class ArgumentRuns {
       const nodes: Plan["nodes"] = [];
       const items: { id: string; text: string }[] = [];
       for (const n of result.needs) {
-        const node = await this.ports.createNote({ kind: "need", title: shorten(n.text, 80), summary: n.text }, map);
+        const node = await this.ports.createNote(
+          { kind: "need", title: shorten(n.text, 80), summary: n.text },
+          map,
+          drive.mapPath
+        );
         nodes.push({ node, parentId: hypothesisId });
         items.push({ id: node.id, text: n.text });
       }

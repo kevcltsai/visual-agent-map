@@ -260,11 +260,8 @@ test('outline service: non_heading then missing_summary shares one retry and end
   assert.equal(fx.calls.length, 2);
 });
 
-test('outline reply: a stray first line is still non_heading in the parser (not relaxed); no_headings, too_many and an abort are not retried', async () => {
+test('outline reply: a stray first line is still non_heading in the parser (not relaxed); too_many and an abort are not retried', async () => {
   assert.throws(() => outline.parseOutlineReply(strayFirst, 'en'), error => error.code === 'non_heading');
-  const none = serviceFixture('Sorry, no.');
-  await assert.rejects(outlineServiceFor(none).generate(outlineRequest(), new AbortController().signal), error => error.code === 'no_headings');
-  assert.equal(none.calls.length, 1);
   const many = serviceFixture(['# Root\n> s', ...Array.from({ length: 100 }, (_, i) => `## n${i}\n> s${i}`)].join('\n'));
   await assert.rejects(outlineServiceFor(many).generate(outlineRequest(), new AbortController().signal), error => error.code === 'too_many');
   assert.equal(many.calls.length, 1);

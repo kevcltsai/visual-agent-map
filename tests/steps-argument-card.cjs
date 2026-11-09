@@ -117,3 +117,12 @@ test('renderArgumentCardBody writes text only (no markup is parsed) and sets the
   assert.ok(flat.some(n => n.text === '<img src=x onerror=1>'));
   assert.equal(flat.some(n => 'innerHTML' in n), false);
 });
+
+test('shapeKindFor: an argument map card is always the rectangle ("action"); an ordinary card keeps its own kind', () => {
+  const shape = S.load('experiences/visual-map/topic-kind-shape.ts');
+  for (const kind of ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion']) {
+    assert.equal(shape.shapeKindFor(kind, true), 'action', kind);
+    assert.equal(shape.shapeKindFor(kind, false), kind, kind);
+  }
+  assert.equal(shape.TOPIC_KIND_SHAPES.action.shape, 'rect');
+});

@@ -18,6 +18,14 @@ export const TOPIC_KIND_SHAPES: Record<TopicKind, { shape: TopicShape; labelKey:
   conclusion: { shape: "hexagon", labelKey: "ui.topic_kind_conclusion" }
 };
 
+/**
+ * The kind whose SHAPE a card gets. Every card of an argument map is a plain rectangle (the "action" shape), whatever its
+ * saved type; an ordinary map's cards keep the shape of their own type.
+ */
+export function shapeKindFor(kind: TopicKind, argument: boolean): TopicKind {
+  return argument ? "action" : kind;
+}
+
 /** The SVG is drawn in a 100 x 100 box stretched to the card, on the card's own edge; it does not clip, so the stroke can straddle it. */
 const EDGE = 0;
 const FAR = 100;

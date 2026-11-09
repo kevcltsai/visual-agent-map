@@ -81,6 +81,21 @@ test('managedNodeIds includes situation data ids (the data are leaf cards the fl
   assert.equal(h.view.aiLockReason('write', [h.nodes[7].id]), null);
 });
 
+test('shapeKindOf: the flow\'s cards are rectangles on an argument map; a free card and every card of a plain map keep their kind', async () => {
+  const h = await harness();
+  const [p, , , , , hy, , free] = h.nodes;
+  for (const id of [p.id, hy.id]) h.view.notes.get(id).topicKind = 'hypothesis';
+  h.view.notes.get(free.id).topicKind = 'hypothesis';
+  assert.equal(h.view.shapeKindOf(hy.id), 'action');
+  assert.equal(h.view.shapeKindOf(p.id), 'action');
+  assert.equal(h.view.shapeKindOf(free.id), 'hypothesis');
+  const plain = await harness(undefined, {}, false);
+  for (const node of plain.nodes) {
+    plain.view.notes.get(node.id).topicKind = 'hypothesis';
+    assert.equal(plain.view.shapeKindOf(node.id), 'hypothesis');
+  }
+});
+
 test('aiLockReason: every managed node is locked for every op; the free node and a map without the key are not', async () => {
   const h = await harness();
   for (const node of managedOf(h)) for (const op of ['write', 'addChild', 'remove', 'move']) assert.equal(h.view.aiLockReason(op, [node.id], undefined, { to: null }), 'locked', `${node.id} ${op}`);

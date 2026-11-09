@@ -178,6 +178,7 @@ import {
   kindIconId,
   renderShapeBackground,
   shapeInsets,
+  shapeKindFor,
   showsToResearch
 } from "./topic-kind-shape";
 import { randomUUID } from "node:crypto";
@@ -460,6 +461,7 @@ import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service"
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
 import { GateError, applyPause } from "../../core/argument-map/machine";
 import { effectiveVerdict, managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
+import { describeArgumentCard } from "./argument-card";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
   MAP_CHAT_ANCHOR_PREFIX,
@@ -7990,7 +7992,7 @@ export class VisualAgentMapView extends ItemView {
         summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
         summary.title = text;
       }
-      this.fitKindShape(card, this.topicKindOf(node.id));
+      this.fitKindShape(card, this.shapeKindOf(node.id));
       return;
     }
     if (!summary?.hasClass("is-preview")) return;
@@ -8001,7 +8003,7 @@ export class VisualAgentMapView extends ItemView {
       summary.setText(note.summary);
       summary.title = note.summary;
     }
-    this.fitKindShape(card, this.topicKindOf(node.id));
+    this.fitKindShape(card, this.shapeKindOf(node.id));
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   private paintHoverResearch(): void {
@@ -14577,7 +14579,7 @@ export class VisualAgentMapView extends ItemView {
     }
     // The type's SVG shape goes behind the text (an AIM card has none: its kind is always an ordinary topic).
     const kind = this.topicKindOf(node.id);
-    renderShapeBackground(card, kind);
+    renderShapeBackground(card, this.shapeKindOf(node.id));
     card.dataset.nodeId = node.id;
     // Research state drives the card's frame: frontier (idea), running, concluded, or failed.
     const queued = this.isResearchQueued(node);
@@ -14719,7 +14721,14 @@ export class VisualAgentMapView extends ItemView {
     }
     // A hypothesis: quiet "Hypothesis · strength" tag; every non-ordinary type sets `data-topic-kind` and is named in the card's accessible name.
     if (kind !== "topic") {
-      card.dataset.topicKind = kind;
+      // The flow's cards carry their own role (styled in a later part), not a type, so no type shape or colour rule matches them.
+      const read = this.map ? readArgumentMap(this.map) : null;
+      const argumentRole =
+        read?.kind === "usable" && this.isArgumentCard(node.id)
+          ? describeArgumentCard(read.data, node.id, t)?.role
+          : undefined;
+      if (argumentRole) card.dataset.argumentRole = argumentRole;
+      else card.dataset.topicKind = kind;
       const strength = this.hypothesisStrengthOf(node.id),
         leaning = this.hypothesisLeaningOf(node.id);
       const kindText =
@@ -15277,8 +15286,9 @@ export class VisualAgentMapView extends ItemView {
     if (shownNode.height && !typingSummary) this.ensureClipParts(card);
     // During a paint every card is built first and measured afterwards: measuring each card as it is added would make the
     // browser lay out the whole stage once per card.
-    if (this.pendingCardFits) this.pendingCardFits.push(() => this.fitKindShape(card, kind));
-    else this.fitKindShape(card, kind);
+    const shapeKind = this.shapeKindOf(node.id);
+    if (this.pendingCardFits) this.pendingCardFits.push(() => this.fitKindShape(card, shapeKind));
+    else this.fitKindShape(card, shapeKind);
   }
   /**
    * Sizes an SVG-shaped card's padding so its text sits inside the shape: the side padding comes from the width, then the
@@ -15349,7 +15359,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.stageEl) return;
     for (const node of this.map?.nodes ?? []) {
       const card = this.cardEls.get(node.id);
-      if (card) this.fitKindShape(card, this.topicKindOf(node.id));
+      if (card) this.fitKindShape(card, this.shapeKindOf(node.id));
     }
   }
   /** What the canvas draws: visible nodes minus interim AIM results already superseded by their run's conclusion. */
@@ -15701,6 +15711,15 @@ export class VisualAgentMapView extends ItemView {
     if (!this.relationsEnabled() || !node || isAimNode(node)) return "topic";
     return this.notes.get(id)?.topicKind ?? "topic";
   }
+  /** True for a card the argument flow owns on a map whose `argumentMap` key is usable (those cards are plain rectangles). */
+  private isArgumentCard(id: string): boolean {
+    if (!this.map || this.map.argumentMap === undefined || readArgumentMap(this.map).kind !== "usable") return false;
+    return managedNodeIds(this.map).has(id);
+  }
+  /** The kind whose shape the card is drawn with: the type's own, except an argument map's cards, which are all rectangles. */
+  private shapeKindOf(id: string): TopicKind {
+    return shapeKindFor(this.topicKindOf(id), this.isArgumentCard(id));
+  }
   /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
   private hypothesisStrengthOf(id: string): HypothesisStrength | undefined {
     const node = this.map?.nodes.find(item => item.id === id);
@@ -15738,7 +15757,7 @@ export class VisualAgentMapView extends ItemView {
   private afterCoverSized(card: HTMLElement): void {
     const id = card.dataset?.nodeId;
     if (!id || !this.map) return;
-    this.fitKindShape(card, this.topicKindOf(id));
+    this.fitKindShape(card, this.shapeKindOf(id));
     this.drawEdges();
     this.settleCardHeights();
   }
@@ -16382,7 +16401,7 @@ export class VisualAgentMapView extends ItemView {
     this.paintCardStyle(card, note, isAimNode(node));
     if (header) this.paintAiLock(card, header, node);
     // A new title or summary changes the text's height, and the shape's padding follows it.
-    this.fitKindShape(card, kind);
+    this.fitKindShape(card, this.shapeKindOf(node.id));
     if (redrawEdges) this.drawEdges();
   }
   /** The map's saved sources, read from the map the dialog opened on (not the one open when the task starts). */

@@ -1547,6 +1547,21 @@ export class Repository {
     return { source: "inherited", model: effective.model, overridden: effective.overridden };
   }
 
+  /** True when `path` is a card note an argument map owns (found through the map in its topic folder); an unreadable map names nothing. */
+  async isArgumentManagedNote(path: string): Promise<boolean> {
+    for (const file of await this.mapFiles()) {
+      if (!path.startsWith(`${this.topicRoot(file.path)}/`)) continue;
+      try {
+        const map = await this.readMap(file.path);
+        const node = map.nodes.find(item => item.path === path);
+        if (node && managedNodeIds(map).has(node.id)) return true;
+      } catch {
+        /* An unreadable map cannot supply cards. */
+      }
+    }
+    return false;
+  }
+
   async readNote(path: string, map?: MapDocument): Promise<Note> {
     const file = this.file(path),
       content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))),

@@ -699,6 +699,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       translateTarget: () => languagePromptName(this.settings.language, "en", "plain"),
       run: (prepared, model, signal, image, webSearch, generateImage) =>
         this.runConfirmedMarkdownContextAi(prepared, model, signal, image, webSearch, generateImage),
+      isManagedNote: notePath => this.repo.isArgumentManagedNote(notePath),
       saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name)
     }));
     this.addChild(markdownSelectionAi);

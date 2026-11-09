@@ -64,6 +64,8 @@ interface SelectionAiOptions {
     webSearch?: boolean,
     generateImage?: boolean
   ) => Promise<string>;
+  /** True when `notePath` is a card an argument map owns (such a note is AI-locked whatever its frontmatter says). */
+  isManagedNote?: (notePath: string) => Promise<boolean>;
   /** Saves a generated image as an attachment of `notePath`; returns its vault path. */
   saveImage: (dataUrl: string, notePath: string, name: string) => Promise<string>;
 }
@@ -322,7 +324,8 @@ export class MarkdownSelectionAi extends Component {
       this.options.modelLabel ?? (model => model),
       this.options.language(snapshot.text),
       this.options.translateTarget?.() ?? this.options.language(snapshot.text),
-      this.options.run
+      this.options.run,
+      this.options.isManagedNote
     );
     this.panel.open();
   }
@@ -362,9 +365,22 @@ class SelectionAiPanel extends Component {
     private readonly modelLabel: (model: string) => string,
     private readonly language: string,
     private readonly translateTarget: string,
-    private readonly run: SelectionAiOptions["run"]
+    private readonly run: SelectionAiOptions["run"],
+    private readonly isManagedNote?: SelectionAiOptions["isManagedNote"]
   ) {
     super();
+  }
+
+  /** Whether an argument map owns the note, asked once on first use; the answer holds for the life of the panel. */
+  private managedNote: boolean | null = null;
+  private async resolveManaged(): Promise<void> {
+    if (!this.isManagedNote || this.managedNote !== null) return;
+    try {
+      this.managedNote = await this.isManagedNote(this.snapshot.path);
+    } catch {
+      /* An unreadable map cannot name its cards; the note's own frontmatter decides. */
+      this.managedNote = false;
+    }
   }
 
   open(): void {
@@ -627,6 +643,8 @@ class SelectionAiPanel extends Component {
     trigger?: HTMLElement
   ): Promise<void> {
     if (this.controller) return;
+    await this.resolveManaged();
+    if (this.controller) return;
     // AI lock: a locked note gets no AI draft (nothing could be written back into it).
     if (this.noteLocked()) {
       this.status.setText(t("ui.ai_locked_notice"));
@@ -830,8 +848,9 @@ class SelectionAiPanel extends Component {
     this.applyResult(this.output.value, action, this.status);
   }
 
-  /** True when the note the panel works on is locked for AI (`ai-locked: true`), read from the editor as it is now. */
+  /** True when the note the panel works on is locked for AI (`ai-locked: true`, or a card an argument map owns), read from the editor as it is now. */
   private noteLocked(): boolean {
+    if (this.managedNote === true) return true;
     const { view, markdown } = this.snapshot;
     let current = markdown;
     try {

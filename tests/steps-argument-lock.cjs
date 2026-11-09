@@ -321,10 +321,29 @@ test('entry map chat: a free card keeps working when added under another free ca
   assert.match(guard, /map_file/);
 });
 
-test('entry selection AI and chart queue: a managed note is not an AI target', async () => {
+test('entry chart queue and topic runs: readNote(path, map) reports a managed note as aiLocked', async () => {
   const h = await harness();
   const note = await h.repo.readNote(h.nodes[H].path, h.view.map);
-  assert.equal(note.aiLocked, true, 'every direct note.aiLocked check (selection AI, image translate, charts, topic runs) sees the lock');
+  assert.equal(note.aiLocked, true, 'readNote with the owning map sees the lock (the checks that hold the map: charts, topic runs)');
+});
+
+test('entry markdown selection AI: the repository names a managed note, and only a managed one', async () => {
+  const h = await harness();
+  for (const index of [P, S_, C, V, E, H, N]) assert.equal(await h.repo.isArgumentManagedNote(h.nodes[index].path), true, `node ${index}`);
+  assert.equal(await h.repo.isArgumentManagedNote(h.nodes[F].path), false, 'a free card stays an AI target');
+  const plain = await harness(['A', 'B'], {}, false);
+  assert.equal(await plain.repo.isArgumentManagedNote(plain.nodes[0].path), false, 'a map without argumentMap behaves as before');
+});
+
+test('entry markdown selection AI: a managed note opened in the editor gets no model call and no write', async () => {
+  const { runPanel } = require('./support-selection-ai.cjs');
+  const notices = [];
+  const outcome = await runPanel({ markdown: 'A note\n\ntext to rewrite\n', selected: 'text to rewrite', replies: ['Rewritten'], outcome: true, notices, isManagedNote: async () => true });
+  assert.deepEqual(outcome.sent, [], 'no model call for a managed note');
+  assert.deepEqual(outcome.replaced, []);
+  assert.match(notices.join('|'), LOCKED_NOTICE);
+  const free = await runPanel({ markdown: 'A note\n\ntext to rewrite\n', selected: 'text to rewrite', replies: ['Rewritten'], outcome: true, isManagedNote: async () => false });
+  assert.equal(free.sent.length, 1, 'an ordinary note still reaches the model');
 });
 
 // ---- the runner is not an AI entry --------------------------------------------------------------------------------------

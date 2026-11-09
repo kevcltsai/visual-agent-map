@@ -173,6 +173,7 @@ type ClaudeRecord = {
       type?: unknown;
       id?: unknown;
       name?: unknown;
+      input?: unknown;
       text?: unknown;
       tool_use_id?: unknown;
       is_error?: unknown;
@@ -182,7 +183,7 @@ type ClaudeRecord = {
 
 /** Translates the main agent's WebSearch/WebFetch calls into provider-neutral web events and counts successful retrievals. */
 export class ClaudeWebActivity {
-  private readonly pending = new Map<string, "search" | "openPage">();
+  private readonly pending = new Map<string, { action: "search" | "openPage"; url?: string }>();
   retrievals = 0;
   constructor(private readonly emit?: (event: WebSearchEvent) => void) {}
 
@@ -196,7 +197,12 @@ export class ClaudeWebActivity {
         typeof item.id === "string" &&
         (item.name === "WebSearch" || item.name === "WebFetch")
       ) {
-        this.pending.set(item.id, item.name === "WebSearch" ? "search" : "openPage");
+        // A WebFetch's requested URL is kept so the completed event says which page was opened (source proof, argument map).
+        const requested = (item.input as { url?: unknown } | undefined)?.url;
+        this.pending.set(item.id, {
+          action: item.name === "WebSearch" ? "search" : "openPage",
+          ...(item.name === "WebFetch" && typeof requested === "string" && requested ? { url: requested } : {})
+        });
         this.send({ method: "item/started", params: { item: { id: item.id, type: "webSearch", action: null } } });
       } else if (
         record.type === "user" &&
@@ -204,13 +210,19 @@ export class ClaudeWebActivity {
         typeof item.tool_use_id === "string" &&
         this.pending.has(item.tool_use_id)
       ) {
-        const action = this.pending.get(item.tool_use_id)!;
+        const opened = this.pending.get(item.tool_use_id)!;
         this.pending.delete(item.tool_use_id);
         if (item.is_error === true) continue;
         this.retrievals++;
         this.send({
           method: "item/completed",
-          params: { item: { id: item.tool_use_id, type: "webSearch", action: { type: action } } }
+          params: {
+            item: {
+              id: item.tool_use_id,
+              type: "webSearch",
+              action: { type: opened.action, ...(opened.url ? { url: opened.url } : {}) }
+            }
+          }
         });
       }
     }

@@ -338,6 +338,31 @@ integrationTest('a web-search-only turn accepts a directly opened page but rejec
   assert.equal(await run([{ id: 'open-1', type: 'webSearch', action: { type: 'openPage', url: 'https://obsidian.md/changelog/' } }]), 'answer');
   await assert.rejects(run([]), /did not perform web search|沒有實際執行網路搜尋/);
 });
+integrationTest('Codex forwards the opened page url in its web events (argument map source proof reads action.url)', async () => {
+  const { EventEmitter } = require('node:events');
+  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+  const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
+  child.stdin = { write: line => {
+    const message = JSON.parse(line.trim());
+    if (message.method === 'initialize') emit({ id: message.id, result: {} });
+    else if (message.method === 'config/read') emit({ id: message.id, result: { config: {} } });
+    else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
+    else if (message.method === 'turn/start') {
+      emit({ id: message.id, result: { turn: { id: 'turn-1' } } });
+      emit({ method: 'item/completed', params: { threadId: 'thread-1', item: { id: 'open-1', type: 'webSearch', action: { type: 'openPage', url: 'https://example.org/source' } } } });
+      emit({ method: 'item/completed', params: { threadId: 'thread-1', item: { type: 'agentMessage', text: 'answer' } } });
+      emit({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { status: 'completed' } } });
+    } else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: {} });
+  } };
+  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
+  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
+  const events = [];
+  try {
+    await runtime.runTask('research', 'model', 'low', {}, { webSearchOnly: true, onWebSearchEvent: event => events.push(JSON.parse(JSON.stringify(event))) });
+    const source = load('core/argument-map/source-proof.ts');
+    assert.deepEqual(JSON.parse(JSON.stringify(source.openedUrlsFromEvents(events))), ['https://example.org/source']);
+  } finally { runtime.stop(); }
+});
 integrationTest('an image generation turn enables only the image tool and resolves to the generated image as a data URL', async () => {
   const run = async items => {
     const { EventEmitter } = require('node:events'); const sent = [];

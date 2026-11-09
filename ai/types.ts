@@ -126,6 +126,11 @@ export interface AiResult {
    * 0 means it answered without the web. Absent on every other result.
    */
   retrievals?: number;
+  /**
+   * Source-proof input for the argument map: the URLs the provider's tool log shows it opened successfully during this call
+   * (from the web events' `action.url`). Additive and optional; no existing consumer reads it. Absent when not collected.
+   */
+  evidence?: { openedUrls: string[] };
   /** Sections still off their template count after the repair request; present only when the context had counts. */
   formatIssues?: CountIssue[];
   /**

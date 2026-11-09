@@ -42323,21 +42323,31 @@ var ClaudeWebActivity = class {
     __publicField(this, "retrievals", 0);
   }
   read(value) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const record = value;
     if (!record || typeof record !== "object" || record.parent_tool_use_id) return;
     for (const item of (_b2 = (_a2 = record.message) == null ? void 0 : _a2.content) != null ? _b2 : []) {
       if (record.type === "assistant" && item.type === "tool_use" && typeof item.id === "string" && (item.name === "WebSearch" || item.name === "WebFetch")) {
-        this.pending.set(item.id, item.name === "WebSearch" ? "search" : "openPage");
+        const requested = (_c = item.input) == null ? void 0 : _c.url;
+        this.pending.set(item.id, {
+          action: item.name === "WebSearch" ? "search" : "openPage",
+          ...item.name === "WebFetch" && typeof requested === "string" && requested ? { url: requested } : {}
+        });
         this.send({ method: "item/started", params: { item: { id: item.id, type: "webSearch", action: null } } });
       } else if (record.type === "user" && item.type === "tool_result" && typeof item.tool_use_id === "string" && this.pending.has(item.tool_use_id)) {
-        const action = this.pending.get(item.tool_use_id);
+        const opened = this.pending.get(item.tool_use_id);
         this.pending.delete(item.tool_use_id);
         if (item.is_error === true) continue;
         this.retrievals++;
         this.send({
           method: "item/completed",
-          params: { item: { id: item.tool_use_id, type: "webSearch", action: { type: action } } }
+          params: {
+            item: {
+              id: item.tool_use_id,
+              type: "webSearch",
+              action: { type: opened.action, ...opened.url ? { url: opened.url } : {} }
+            }
+          }
         });
       }
     }

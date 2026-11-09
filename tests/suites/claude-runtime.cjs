@@ -22,6 +22,13 @@ test('Claude isolated research reports web activity in the Codex event shape and
   // A fetched page larger than the former 4 MB stdout tail must not break parsing.
   assert.equal(JSON.parse(await runWith([use('s1', 'WebSearch'), done('s1'), use('f1', 'WebFetch'), done('f1', { content: 'x'.repeat(5_000_000) })], { onWebSearchEvent: event => { events.push(JSON.parse(JSON.stringify(event))); } })).summary, 'S');
   assert.deepEqual(events.map(event => [event.method, event.params.item.action?.type ?? null]), [['item/started', null], ['item/completed', 'search'], ['item/started', null], ['item/completed', 'openPage']]);
+  // The WebFetch url rides on the completed event as action.url; searches and url-less fetches keep the old shape.
+  const withUrl = (id, url) => ({ type: 'assistant', parent_tool_use_id: null, message: { content: [{ type: 'tool_use', id, name: 'WebFetch', input: { url } }] } });
+  const urlEvents = [];
+  await runWith([use('s1', 'WebSearch'), done('s1'), withUrl('f1', 'https://example.org/a'), done('f1'), withUrl('f2', 'https://example.org/failed'), done('f2', { is_error: true }), use('f3', 'WebFetch'), done('f3')], { onWebSearchEvent: event => { urlEvents.push(JSON.parse(JSON.stringify(event))); } });
+  assert.deepEqual(urlEvents.filter(event => event.method === 'item/completed').map(event => event.params.item.action), [{ type: 'search' }, { type: 'openPage', url: 'https://example.org/a' }, { type: 'openPage' }]);
+  assert.deepEqual(urlEvents.filter(event => event.method === 'item/started').every(event => event.params.item.action === null), true, 'started events are unchanged');
+  assert.deepEqual(JSON.parse(JSON.stringify(load('core/argument-map/source-proof.ts').openedUrlsFromEvents(urlEvents))), ['https://example.org/a'], 'a failed fetch is not an opened page');
   await assert.rejects(runWith([]), /did not perform web search|沒有實際執行網路搜尋/);
   await assert.rejects(runWith([use('s1', 'WebSearch'), done('s1', { is_error: true })]), /did not perform web search|沒有實際執行網路搜尋/, 'a denied or failed tool call is not a retrieval');
   const subagent = { ...use('s2', 'WebSearch'), parent_tool_use_id: 'task-1' };

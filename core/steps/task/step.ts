@@ -17,6 +17,8 @@ export interface TaskStepInput {
   strictGapAudit: boolean;
   webResearch: boolean;
   contract?: AimContract;
+  /** Argument-evidence contract: the need ids the reply may cite. Absent for every other request. */
+  argumentEvidenceNeedIds?: readonly string[];
   /** Selects provider-specific output instructions; Codex prompts stay as they were. Absent: Codex. */
   provider?: AiProviderId;
 }
@@ -43,6 +45,14 @@ export function createTaskStep(id: string, schema: unknown): StepDefinition<Task
     schema,
     render: ({ context, language, provider }) => taskPrompt(context, language, provider),
     parse: (raw, input) =>
-      parseAiResult(raw, input.providerLabel, input.language, input.strictGapAudit, input.webResearch, input.contract)
+      parseAiResult(
+        raw,
+        input.providerLabel,
+        input.language,
+        input.strictGapAudit,
+        input.webResearch,
+        input.contract,
+        input.argumentEvidenceNeedIds
+      )
   };
 }

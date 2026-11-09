@@ -28,6 +28,7 @@ import { AiCalls, type AiCallExchange } from "./ai-calls";
 import { aiRuntimeForModel } from "./ai-runtime-service";
 import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
+import { openedUrlsFromEvents } from "./argument-map/source-proof";
 import { repairCounts, sourceRegistry } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -196,7 +197,8 @@ export class AiTaskService {
       providerLabel: provider === "claude" ? "Claude Code" : "Codex App Server",
       strictGapAudit: shape.isAimGapAudit,
       webResearch: shape.isIsolatedWebResearch,
-      contract: shape.contract
+      contract: shape.contract,
+      argumentEvidenceNeedIds: shape.argumentEvidenceNeedIds
     });
 
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
@@ -211,9 +213,13 @@ export class AiTaskService {
       !input.countRepair;
     const requiresWeb = countsWeb;
     let retrievals = 0;
+    // Argument-evidence only: this call's web events, kept so the pages the provider opened can back a source proof.
+    const webEvents: CodexWebSearchEvent[] = [];
+    const keepsEvents = shape.argumentEvidenceNeedIds !== undefined;
     const webHook: ((event: CodexWebSearchEvent) => void) | undefined = countsWeb
       ? event => {
           if (event.method === "item/completed") retrievals++;
+          if (keepsEvents) webEvents.push(event);
           onWebSearchEvent?.(event);
         }
       : onWebSearchEvent;
@@ -293,6 +299,7 @@ export class AiTaskService {
       let raw = "";
       for (let attempt = 1; ; attempt++) {
         retrievals = 0;
+        webEvents.length = 0;
         try {
           ({ raw } =
             observer && role === undefined && !input.countRepair
@@ -309,6 +316,7 @@ export class AiTaskService {
       stage = t("log.stage_parsing_reply");
       let result = step.parse(raw);
       if (countsWeb) result.retrievals = retrievals;
+      if (keepsEvents) result.evidence = { openedUrls: openedUrlsFromEvents(webEvents) };
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);

@@ -29,7 +29,26 @@ export interface Suggestion {
 }
 export type AiTaskKind = "task" | "decompose" | "synthesize" | "merge";
 export type PromptProfile = "aim";
-export type AiResponseContract = "aim-gap-audit" | "aim-delivery-acceptance";
+export type AiResponseContract = "aim-gap-audit" | "aim-delivery-acceptance" | "argument-evidence";
+/** One evidence need the argument map asks a research call to look up; `id` is the key the reply must cite. */
+export interface ArgumentEvidenceNeed {
+  id: string;
+  text: string;
+}
+/**
+ * One reply entry of the argument-evidence contract, parsed and shape-checked only: a found entry has a claim, a quote of 12 to
+ * 200 characters and an http(s) url, which the program must still prove with `verifySource`; a not-found entry carries nothing else.
+ */
+export type ArgumentEvidenceItem =
+  | {
+      need: string;
+      status: "found";
+      stance: "supports" | "contradicts" | "uncertain";
+      claim: string;
+      quote: string;
+      url: string;
+    }
+  | { need: string; status: "not_found" };
 export interface TaskContext {
   title: string;
   summary: string;
@@ -89,6 +108,11 @@ export interface TaskContext {
   promptProfile?: PromptProfile;
   /** Selects a narrow trusted response schema for the AIM gap audit only. */
   responseContract?: AiResponseContract;
+  /**
+   * Required with `responseContract: "argument-evidence"` (plus `researchMode: "research"`, no AIM profile): the needs this one
+   * research call must answer, shown in the prompt as JSON; the reply may only cite these ids. Trusted, never serialized elsewhere.
+   */
+  argumentEvidenceNeeds?: readonly ArgumentEvidenceNeed[];
   /** Provider-enforced AIM control payload for this phase; folded back into the canonical marker form. */
   aimContract?: AimContract;
   /** Lets the AIM payload request full evidence reports by ID (trusted workflow flag; never serialized). */
@@ -131,6 +155,8 @@ export interface AiResult {
    * (from the web events' `action.url`). Additive and optional; no existing consumer reads it. Absent when not collected.
    */
   evidence?: { openedUrls: string[] };
+  /** Argument-evidence contract only: the reply's per-need entries (ids already checked against the request). Absent otherwise. */
+  argumentEvidence?: ArgumentEvidenceItem[];
   /** Sections still off their template count after the repair request; present only when the context had counts. */
   formatIssues?: CountIssue[];
   /**

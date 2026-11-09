@@ -60,6 +60,8 @@ import LabelDetailTopZH from "./label-detail-top.zh.md";
 import LabelDetailTopEN from "./label-detail-top.en.md";
 import JsonZH from "./json.zh.md";
 import JsonEN from "./json.en.md";
+import ArgumentEvidenceZH from "./argument-evidence.zh.md";
+import ArgumentEvidenceEN from "./argument-evidence.en.md";
 import LabelDetailZH from "./label-detail.zh.md";
 import LabelDetailEN from "./label-detail.en.md";
 import LabelFindingsZH from "./label-findings.zh.md";
@@ -125,6 +127,8 @@ export const SYNTHESIZE_TOP: FragmentPair = pair(SynthesizeTopZH, SynthesizeTopE
 export const SYNTHESIZE_FRESH: FragmentPair = pair(SynthesizeFreshZH, SynthesizeFreshEN);
 export const LABEL_DETAIL_TOP: FragmentPair = pair(LabelDetailTopZH, LabelDetailTopEN);
 export const JSON_CONTRACT: FragmentPair = pair(JsonZH, JsonEN);
+/** The argument-map evidence research reply contract; a template with a `<<needs>>` placeholder (see assemble.ts). */
+export const ARGUMENT_EVIDENCE_CONTRACT: FragmentPair = pair(ArgumentEvidenceZH, ArgumentEvidenceEN);
 export const LABEL_DETAIL: FragmentPair = pair(LabelDetailZH, LabelDetailEN);
 export const LABEL_FINDINGS: FragmentPair = pair(LabelFindingsZH, LabelFindingsEN);
 /** A template, not text: {@link outputLanguage} fills its `{{language}}` and `{{headingRule}}` placeholders. */

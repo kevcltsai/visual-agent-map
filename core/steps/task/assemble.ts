@@ -48,6 +48,7 @@ import {
 } from "../_shared/fragments";
 import {
   ADAPTIVE_DETAIL_STRUCTURE,
+  ARGUMENT_EVIDENCE_CONTRACT,
   AI_DECIDED_SECTIONS,
   AI_FOLLOWED_SECTIONS,
   customDetailCallout,
@@ -444,7 +445,14 @@ export function assembleTaskPrompt(
       "local-first"
     )
   );
-  add(fixed(withProviderOutput(inLanguage(JSON_CONTRACT, language), provider, language), "json-contract"));
+  // The argument-map evidence research answers in its own structured form; every other request keeps the standard contract.
+  const jsonContract =
+    context.responseContract === "argument-evidence"
+      ? inLanguage(ARGUMENT_EVIDENCE_CONTRACT, language).replace("<<needs>>", () =>
+          JSON.stringify((context.argumentEvidenceNeeds ?? []).map(({ id, text }) => ({ id, text })))
+        )
+      : inLanguage(JSON_CONTRACT, language);
+  add(fixed(withProviderOutput(jsonContract, provider, language), "json-contract"));
   {
     const body = selection.tone.body ?? bodyOf("tone", selection.tone.id);
     // An empty tone body (academic rigor) adds nothing, not even the tone rule sentence.

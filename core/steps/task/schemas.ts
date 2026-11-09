@@ -13,6 +13,37 @@ export interface TaskResponseShape {
   isAimGapAudit: boolean;
   isIsolatedWebResearch: boolean;
   contract?: AimContract;
+  /** Argument-evidence contract: the need ids the reply may cite (from the request, never from the reply). */
+  argumentEvidenceNeedIds?: string[];
+}
+
+/** Reply schema of the argument-evidence contract: the usual summary and detail plus one entry per answered need. */
+function argumentEvidenceSchema(responseSchema: typeof baseResponseSchema, needIds: readonly string[]): unknown {
+  return {
+    ...responseSchema,
+    properties: {
+      ...responseSchema.properties,
+      argumentEvidence: {
+        type: "array",
+        minItems: 1,
+        maxItems: needIds.length,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            need: { type: "string", enum: [...needIds] },
+            status: { type: "string", enum: ["found", "not_found"] },
+            stance: { type: "string", enum: ["supports", "contradicts", "uncertain"] },
+            claim: { type: "string" },
+            quote: { type: "string", maxLength: 200 },
+            url: { type: "string" }
+          },
+          required: ["need", "status", "stance", "claim", "quote", "url"]
+        }
+      }
+    },
+    required: [...responseSchema.required, "argumentEvidence"]
+  };
 }
 
 /**
@@ -45,6 +76,24 @@ export function localizedResponseSchema(language: ContentLanguage): typeof baseR
 
 export function taskResponseShape(context: TaskContext, language: ContentLanguage): TaskResponseShape {
   const responseSchema = localizedResponseSchema(language);
+  if (context.responseContract === "argument-evidence") {
+    const needIds = (context.argumentEvidenceNeeds ?? []).map(need => need.id);
+    if (
+      !needIds.length ||
+      new Set(needIds).size !== needIds.length ||
+      needIds.some(id => !id) ||
+      context.researchMode !== "research" ||
+      context.promptProfile === "aim" ||
+      context.aimIsolatedResearch
+    )
+      throw new Error("The argument-evidence contract needs distinct need ids and a plain research request.");
+    return {
+      schema: argumentEvidenceSchema(responseSchema, needIds),
+      isAimGapAudit: false,
+      isIsolatedWebResearch: false,
+      argumentEvidenceNeedIds: needIds
+    };
+  }
   const isAimGapAudit =
     context.responseContract === "aim-gap-audit" && context.promptProfile === "aim" && context.researchMode === "local";
   const isDeliveryAcceptance =

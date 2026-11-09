@@ -1416,6 +1416,21 @@
       "language": "zh-CN",
       "schema": false
     },
+    "service.argument-evidence.en": {
+      "builder": "AiTaskService instructions: mode task, web research, argument-evidence response contract (two needs)",
+      "language": "en",
+      "schema": true
+    },
+    "service.argument-evidence.zh": {
+      "builder": "AiTaskService instructions: mode task, web research, argument-evidence response contract (two needs)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.argument-evidence.zh-CN": {
+      "builder": "AiTaskService instructions: mode task, web research, argument-evidence response contract (two needs)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.decompose-anchor-context.en": {
       "builder": "AiTaskService instructions: mode decompose (expand) with an annotated-image anchorContext",
       "language": "en",

@@ -651,3 +651,18 @@ test('P4 preview: with AI suggested chosen the AI instructions show the decide t
   const { store } = makeStore({ noteStyleByKind: { topic: 'builtin:textbook' } });
   assert.equal('aiSections' in store.runStyle({ kind: 'topic', detail: '', outputLanguage: 'en' }).contextFields, false);
 });
+
+test('cleanBlockName: a Windows reserved device name (alone or before a dot, any case) gets a leading "_"; names that only start with those letters stay', () => {
+  const { cleanBlockName } = B();
+  const reserved = {
+    CON: '_CON', PRN: '_PRN', AUX: '_AUX', NUL: '_NUL', nul: '_nul', Con: '_Con', aUx: '_aUx',
+    COM1: '_COM1', com9: '_com9', LPT1: '_LPT1', Lpt9: '_Lpt9',
+    'con.notes': '_con.notes', 'NUL.txt': '_NUL.txt', 'com3.a.b': '_com3.a.b', 'lpt5.': '_lpt5.',
+    '  CON  ': '_CON', 'CON?': '_CON'
+  };
+  for (const [input, expected] of Object.entries(reserved)) assert.equal(cleanBlockName(input), expected, input);
+  for (const name of ['Console', 'null island', 'Auxiliary', 'COM10', 'LPT0', 'COM', 'LPT', 'CONS', 'PRN notes', 'my CON', '_NUL', 'NULL', 'com1x'])
+    assert.equal(cleanBlockName(name), name, name);
+  // Idempotent, so the "cleanBlockName(name) !== name" checks accept a cleaned reserved name.
+  assert.equal(cleanBlockName(cleanBlockName('NUL')), '_NUL');
+});

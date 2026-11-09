@@ -51066,7 +51066,8 @@ var TopicChatSteers = class {
     this.gen++;
     this.chain = Promise.resolve();
     this.handler = send;
-    for (const entry of this.entries) if (entry.state === "sending" || entry.state === "delivered") entry.state = "pending";
+    for (const entry of this.entries)
+      if (entry.state === "sending" || entry.state === "delivered") entry.state = "pending";
     this.changed();
     this.pump();
   }
@@ -72372,9 +72373,10 @@ ${request.requirements}` : preset.text,
           {
             role: "user",
             // What the task took in while it ran is part of what was asked.
-            text: [turns[i].text, ...((_a2 = turns[i].steers) != null ? _a2 : []).filter((item) => item.state === "live").map((item) => item.text)].join(
-              "\n\n"
-            )
+            text: [
+              turns[i].text,
+              ...((_a2 = turns[i].steers) != null ? _a2 : []).filter((item) => item.state === "live").map((item) => item.text)
+            ].join("\n\n")
           },
           { role: "assistant", text: turns[i + 1].text }
         );

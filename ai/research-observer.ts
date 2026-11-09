@@ -45,7 +45,10 @@ export interface ResearchObserver {
  * is bound, a run that cannot stream is marked not live. Events of an attempt that is no longer the latest are ignored.
  * No `observer` (a progress entry the topic already has): none is made up, because an observer would change the stream mode.
  */
-export function steerObserver(observer: ResearchObserver | undefined, steer: ResearchSteer | undefined): ResearchObserver | undefined {
+export function steerObserver(
+  observer: ResearchObserver | undefined,
+  steer: ResearchSteer | undefined
+): ResearchObserver | undefined {
   if (!observer || !steer) return observer;
   let current = "";
   return {

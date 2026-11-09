@@ -42,9 +42,7 @@ export interface TopicChatSteerLine {
 export type TopicChatLine = TopicChatTurnLine | TopicChatResultLine | TopicChatSteerLine;
 /** A line as the caller hands it over: no `v`. */
 export type TopicChatLineInput =
-  | Omit<TopicChatTurnLine, "v">
-  | Omit<TopicChatResultLine, "v">
-  | Omit<TopicChatSteerLine, "v">;
+  Omit<TopicChatTurnLine, "v"> | Omit<TopicChatResultLine, "v"> | Omit<TopicChatSteerLine, "v">;
 
 const KINDS: readonly string[] = ["research", "expand", "synthesize", "ask"];
 const MODES: readonly string[] = ["quick", "standard"];

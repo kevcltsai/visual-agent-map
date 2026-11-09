@@ -17084,9 +17084,10 @@ export class VisualAgentMapView extends ItemView {
           {
             role: "user",
             // What the task took in while it ran is part of what was asked.
-            text: [turns[i].text, ...(turns[i].steers ?? []).filter(item => item.state === "live").map(item => item.text)].join(
-              "\n\n"
-            )
+            text: [
+              turns[i].text,
+              ...(turns[i].steers ?? []).filter(item => item.state === "live").map(item => item.text)
+            ].join("\n\n")
           },
           { role: "assistant", text: turns[i + 1].text }
         );

@@ -53,7 +53,8 @@ export class TopicChatSteers implements ResearchSteer {
     this.chain = Promise.resolve();
     this.handler = send;
     // What the earlier attempt took, or was taking, is not in this one: hand it over again (once) when there is a way in.
-    for (const entry of this.entries) if (entry.state === "sending" || entry.state === "delivered") entry.state = "pending";
+    for (const entry of this.entries)
+      if (entry.state === "sending" || entry.state === "delivered") entry.state = "pending";
     this.changed();
     this.pump();
   }

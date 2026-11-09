@@ -66,7 +66,14 @@ interface AttemptSetup {
   extraMilestones: () => AiMilestones;
   hooks: Pick<
     RuntimeTaskControls,
-    "onAccepted" | "stream" | "onStreamMode" | "onFirstEvent" | "onStage" | "onStructuredDelta" | "onActivity" | "onSteer"
+    | "onAccepted"
+    | "stream"
+    | "onStreamMode"
+    | "onFirstEvent"
+    | "onStage"
+    | "onStructuredDelta"
+    | "onActivity"
+    | "onSteer"
   >;
   onExchange: (id: string) => void;
   /** Runs when the reply arrives; throws for a superseded attempt so its entry is not flipped from failed back to received. */

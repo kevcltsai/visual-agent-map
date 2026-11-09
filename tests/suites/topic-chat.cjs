@@ -49,7 +49,13 @@ const ghost = f => f.input.attrs.placeholder;
 test('topic chat is a labelled dialog and the focus goes to the input', () => {
   const f = fixture();
   assert.equal(f.win.el.attrs.role, 'dialog');
-  assert.equal(f.win.el.attrs['aria-label'], t('ui.topic_chat_label_0', 'Premise'));
+  const label = find(f.win.el, i => i.attrs?.id && i.attrs.id === f.win.el.attrs['aria-labelledby']);
+  assert.equal(label?.text, t('ui.topic_chat_label_0', 'Premise'));
+  assert.equal(f.input.attrs['aria-labelledby'], f.win.el.attrs['aria-labelledby'], 'the input has the same label');
+  assert.ok(hasClass(label, 'vam-sr-only'));
+  assert.equal(f.win.el.attrs['aria-label'], undefined, 'no aria-label: Obsidian would show it as a tooltip over the hint line');
+  assert.equal(f.input.attrs['aria-label'], undefined);
+  assert.ok(byLabel(f.win.el, t('ui.topic_chat_close')) && byLabel(f.win.el, t('ui.topic_chat_send')), 'icon buttons keep their aria-label');
   assert.equal(f.doc.activeElement, f.input);
 });
 
@@ -1196,4 +1202,92 @@ integrationTest('topic chat M3: a failed or skipped action is shown with the AI 
   mockChat(h, answer([{ kind: 'add_child', parentId: h.ids.b, title: 'Calm', summary: 'S' }], 'Added.'));
   await h.host('b').submit('ask', 'rename'); await waitFor(() => !h.entry('b').session.running);
   assert.equal(h.entry('b').session.turns.at(-1).text, 'Added.'); assert.equal((await topicLines(h, 'b')).at(-1).status, 'done');
+});
+
+test('topic chat send: a started send clears the draft even when the window was destroyed meanwhile; a declined one keeps it', async () => {
+  const gate = deferred();
+  const f = fixture({ submit: () => gate.promise });
+  f.type('moving on'); f.session.draftText = 'moving on';
+  f.send().click(); await tick();
+  f.win.destroy(); gate.resolve(true); await tick(); await tick();
+  assert.equal(f.session.draftText, '', 'the sent text is not left as a draft');
+  const gate2 = deferred();
+  const g = fixture({ submit: () => gate2.promise });
+  g.type('keep me'); g.session.draftText = 'keep me';
+  g.send().click(); await tick();
+  g.win.destroy(); gate2.resolve(false); await tick(); await tick();
+  assert.equal(g.session.draftText, 'keep me', 'declined: the draft stays');
+});
+
+// Card click switching: onCardClick is the body of the card click listener.
+const clickOf = (extra = {}) => ({ target: { closest: () => null }, metaKey: false, ctrlKey: false, ...extra });
+async function switching() {
+  const h = await harness();
+  const edits = [];
+  h.view.openCardTextEditor = (...args) => { edits.push(args); };
+  h.view.cardEls = new Map();
+  const click = (key, extra) => h.view.onCardClick(clickOf(extra), {}, h.node(key));
+  return { h, edits, click };
+}
+
+integrationTest('topic chat switch: a click on another card moves the window; the old topic keeps its running task and draft; no card text editor', async () => {
+  const { h, edits, click } = await switching(); const calls = stubResearch(h);
+  const hostA = h.host('a'); hostA.setMode('quick'); hostA.setDraft('research', 'draft A');
+  await hostA.submit('research', 'go'); await waitFor(() => calls.length === 1);
+  hostA.setDraft('ask', 'unsent A');
+  const winA = h.win();
+  click('b');
+  assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.b); assert.notEqual(h.win(), winA);
+  assert.equal(h.entry('a').session.running, true); assert.equal(h.entry('a').session.draftText, 'unsent A');
+  assert.equal(edits.length, 0, 'the switching click does not open the card text editor');
+  // Task completes while the window shows B: Notice, B's window untouched.
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
+  assert.ok(h.notices.some(n => n.includes('Body')), 'Notice for A: ' + h.notices.join('|'));
+  assert.ok(!h.texts().includes(t('ui.topic_chat_research_done')), 'B shows nothing of A');
+  click('a');
+  assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a);
+  assert.equal(h.entry('a').session.draftText, 'unsent A'); assert.ok(h.texts().includes(t('ui.topic_chat_research_done')));
+});
+
+integrationTest('topic chat switch: running A shows running again after switching back', async () => {
+  const { h, click } = await switching(); const calls = stubResearch(h);
+  const hostA = h.host('a'); await hostA.submit('research', 'go'); await waitFor(() => calls.length === 1);
+  click('b'); click('a');
+  assert.equal(h.entry('a').session.running, true);
+  assert.equal(find(h.win().el, i => i.tag === 'button' && i.text === t('ui.topic_chat_research')).disabled, true, 'buttons disabled while running');
+  calls[0].gate.resolve(); calls[0].done({ summary: 'S', detail: 'D' }); await finished(h);
+});
+
+integrationTest('topic chat switch: nothing moves with the window closed, in multi-select, with Cmd/Ctrl, on a locked card, on the same card; the editor opens when nothing switched', async () => {
+  const { h, edits, click } = await switching();
+  click('b'); assert.equal(h.win(), undefined, 'window closed: no opening'); assert.equal(edits.length, 1, 'editor as before');
+  h.view.openTopicChat(h.node('a')); const winA = h.win();
+  click('a'); assert.equal(h.win(), winA, 'same card: same window object'); assert.equal(edits.length, 2);
+  click('b', { metaKey: true }); click('b', { ctrlKey: true }); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a);
+  click('b', { target: { closest: () => ({}) } }); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'button click');
+  h.view.suppressClickUntil = Date.now() + 10000; click('b'); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'drag');
+  h.view.suppressClickUntil = 0;
+  const before = h.notices.length; h.view.notes.get(h.ids.b).aiLocked = true; click('b');
+  assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'locked'); assert.equal(h.notices.length, before, 'no Notice'); assert.equal(edits.length, 3);
+  h.view.notes.get(h.ids.b).aiLocked = false;
+  h.view.selection.mode = true; click('b');
+  assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'multi-select'); h.view.selection.mode = false;
+  click('b'); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.b, 'a plain click moves it');
+});
+
+integrationTest('topic chat switch: keyboard selection (selectMapNode) never switches', async () => {
+  const { h } = await switching();
+  h.view.openTopicChat(h.node('a')); h.view.selectMapNode(h.node('b'));
+  assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a);
+});
+
+integrationTest('topic chat switch: a second submit of one entry during the first await is refused and starts nothing', async () => {
+  const h = await harness(); const calls = stubResearch(h); const gate = deferred();
+  h.plugin.confirmAiUsage = async (_m, run) => { await gate.promise; await run(); return true; };
+  const host = h.host('a');
+  const first = host.submit('research', 'one'); const second = await host.submit('research', 'two');
+  assert.equal(second, false); gate.resolve(); assert.equal(await first, true);
+  await waitFor(() => calls.length === 1); assert.equal(calls.length, 1);
+  calls[0].gate.resolve(); calls[0].done({ summary: 'S', detail: 'D' }); await finished(h);
+  assert.equal(h.entry('a').submitting, false, 'the flag is released');
 });

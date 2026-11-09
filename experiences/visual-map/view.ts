@@ -1104,6 +1104,8 @@ interface TopicChatEntry {
   watchers: Set<() => void>;
   /** The id of the turn whose result is not written yet (null when idle). */
   runningTurnId: string | null;
+  /** True while a submit is between its checks and its start; a second window of this entry cannot send twice. */
+  submitting?: boolean;
 }
 /** How one expansion the chat started came out. */
 type ChatExpandOutcome =
@@ -15114,21 +15116,7 @@ export class VisualAgentMapView extends ItemView {
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
     }
-    card.addEventListener("click", event => {
-      if (Date.now() < this.suppressClickUntil) return;
-      if ((event.target as Element).closest("button")) return;
-      // Outside selection mode, Cmd/Ctrl+click is handled on pointerup (enableDrag); inside it a click just toggles.
-      if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
-      if (this.selection.state.multiSelectMode) {
-        this.applySelectionChange(this.selection.toggleByClick(node.id));
-        return;
-      }
-      // A click selects; an already open details sidebar follows the selection, a closed one stays closed.
-      const wasSelected = this.selection.state.selected === node.id;
-      this.selectMapNode(node);
-      if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node);
-      this.openCardTextEditor(event, card, node, wasSelected);
-    });
+    card.addEventListener("click", event => this.onCardClick(event, card, node));
     card.addEventListener("keydown", event => {
       if (event.target !== card) return;
       // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
@@ -16480,6 +16468,30 @@ export class VisualAgentMapView extends ItemView {
   private notifyTopicChat(entry: TopicChatEntry): void {
     for (const watcher of [...entry.watchers]) watcher();
   }
+  private onCardClick(event: MouseEvent, card: HTMLElement, node: MapNode): void {
+    if (Date.now() < this.suppressClickUntil) return;
+    if ((event.target as Element).closest("button")) return;
+    // Outside selection mode, Cmd/Ctrl+click is handled on pointerup (enableDrag); inside it a click just toggles.
+    if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
+    if (this.selection.state.multiSelectMode) {
+      this.applySelectionChange(this.selection.toggleByClick(node.id));
+      return;
+    }
+    // A click selects; an already open details sidebar follows the selection, a closed one stays closed.
+    const wasSelected = this.selection.state.selected === node.id;
+    this.selectMapNode(node);
+    if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node);
+    // A click that moved the open topic chat to this card is done; the card text editor would take the input focus from it.
+    if (!this.switchTopicChat(node)) this.openCardTextEditor(event, card, node, wasSelected);
+  }
+  /** A plain click on another card moves the open chat window to it (the old topic's task and draft stay with its entry). True when it moved. */
+  private switchTopicChat(node: MapNode): boolean {
+    const open = this.topicChatOpen;
+    if (!open || !this.map || open.entry.mapId !== this.map.id || open.entry.nodeId === node.id) return false;
+    if (this.aiLockReason("write", [node.id])) return false;
+    this.openTopicChat(node);
+    return this.topicChatOpen?.entry.nodeId === node.id;
+  }
   /** Opens the topic's chat next to its card; one window at a time (opening another closes this one, its task goes on). */
   private openTopicChat(node: MapNode, opener?: { focus(): void; isConnected?: boolean } | null): void {
     if (this.closed || !this.map || this.notesLoading() || this.presentation || this.aimLive()) return;
@@ -16581,6 +16593,20 @@ export class VisualAgentMapView extends ItemView {
    * (busy, locked, usage not confirmed: nothing started and the input stays). The task itself is not awaited here.
    */
   private async submitTopicChat(
+    entry: TopicChatEntry,
+    node: MapNode,
+    kind: TopicChatKind,
+    text: string
+  ): Promise<boolean> {
+    if (entry.submitting) return false;
+    entry.submitting = true;
+    try {
+      return await this.submitTopicChatNow(entry, node, kind, text);
+    } finally {
+      entry.submitting = false;
+    }
+  }
+  private async submitTopicChatNow(
     entry: TopicChatEntry,
     node: MapNode,
     kind: TopicChatKind,

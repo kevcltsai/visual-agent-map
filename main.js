@@ -50650,6 +50650,7 @@ function modeIcon(mode) {
 function suggestion(kind) {
   return t(`ui.topic_chat_suggest_${kind}`);
 }
+var labelSeq2 = 0;
 var TopicChatWindow = class {
   constructor(host, opener, parent) {
     this.host = host;
@@ -50673,7 +50674,9 @@ var TopicChatWindow = class {
     __publicField(this, "destroyed", false);
     this.el = parent.createDiv({ cls: "vam-topic-chat" });
     this.el.setAttr("role", "dialog");
-    this.el.setAttr("aria-label", t("ui.topic_chat_label_0", host.topicTitle()));
+    const labelId = `vam-topic-chat-label-${++labelSeq2}`;
+    this.el.createSpan({ cls: "vam-sr-only", text: t("ui.topic_chat_label_0", host.topicTitle()), attr: { id: labelId } });
+    this.el.setAttr("aria-labelledby", labelId);
     const head = this.el.createDiv("vam-topic-chat-head");
     head.createSpan({ cls: "vam-topic-chat-title", text: host.topicTitle() });
     const close = head.createEl("button", {
@@ -50696,7 +50699,7 @@ var TopicChatWindow = class {
     const composer = this.el.createDiv("vam-topic-chat-composer");
     this.inputEl = composer.createEl("textarea", {
       cls: "vam-topic-chat-input",
-      attr: { rows: "3", "aria-label": t("ui.topic_chat_label_0", host.topicTitle()) }
+      attr: { rows: "3", "aria-labelledby": labelId }
     });
     this.on(this.inputEl, "input", () => this.typed());
     this.on(this.inputEl, "keydown", (event) => this.keydown(event));
@@ -50899,11 +50902,9 @@ var TopicChatWindow = class {
     } finally {
       this.submitting = false;
     }
+    if (started) this.host.setDraft(null, "");
     if (this.destroyed) return;
-    if (started) {
-      this.inputEl.value = "";
-      this.host.setDraft(null, "");
-    }
+    if (started) this.inputEl.value = "";
     this.refresh();
   }
   /** Repaints everything from the session; cheap enough to run on every change. */
@@ -70373,19 +70374,7 @@ ${request.requirements}` : preset.text,
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
     }
-    card.addEventListener("click", (event) => {
-      if (Date.now() < this.suppressClickUntil) return;
-      if (event.target.closest("button")) return;
-      if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
-      if (this.selection.state.multiSelectMode) {
-        this.applySelectionChange(this.selection.toggleByClick(node.id));
-        return;
-      }
-      const wasSelected = this.selection.state.selected === node.id;
-      this.selectMapNode(node);
-      if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node);
-      this.openCardTextEditor(event, card, node, wasSelected);
-    });
+    card.addEventListener("click", (event) => this.onCardClick(event, card, node));
     card.addEventListener("keydown", (event) => {
       var _a3, _b3, _c2;
       if (event.target !== card) return;
@@ -71644,6 +71633,28 @@ ${request.requirements}` : preset.text,
   notifyTopicChat(entry) {
     for (const watcher of [...entry.watchers]) watcher();
   }
+  onCardClick(event, card, node) {
+    if (Date.now() < this.suppressClickUntil) return;
+    if (event.target.closest("button")) return;
+    if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
+    if (this.selection.state.multiSelectMode) {
+      this.applySelectionChange(this.selection.toggleByClick(node.id));
+      return;
+    }
+    const wasSelected = this.selection.state.selected === node.id;
+    this.selectMapNode(node);
+    if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node);
+    if (!this.switchTopicChat(node)) this.openCardTextEditor(event, card, node, wasSelected);
+  }
+  /** A plain click on another card moves the open chat window to it (the old topic's task and draft stay with its entry). True when it moved. */
+  switchTopicChat(node) {
+    var _a2;
+    const open = this.topicChatOpen;
+    if (!open || !this.map || open.entry.mapId !== this.map.id || open.entry.nodeId === node.id) return false;
+    if (this.aiLockReason("write", [node.id])) return false;
+    this.openTopicChat(node);
+    return ((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry.nodeId) === node.id;
+  }
   /** Opens the topic's chat next to its card; one window at a time (opening another closes this one, its task goes on). */
   openTopicChat(node, opener) {
     var _a2, _b2, _c;
@@ -71750,6 +71761,15 @@ ${request.requirements}` : preset.text,
    * (busy, locked, usage not confirmed: nothing started and the input stays). The task itself is not awaited here.
    */
   async submitTopicChat(entry, node, kind, text12) {
+    if (entry.submitting) return false;
+    entry.submitting = true;
+    try {
+      return await this.submitTopicChatNow(entry, node, kind, text12);
+    } finally {
+      entry.submitting = false;
+    }
+  }
+  async submitTopicChatNow(entry, node, kind, text12) {
     const map = this.map;
     if (this.closed || !map || map.id !== entry.mapId || this.aimLive() || this.presentation) return false;
     if (entry.session.running || this.topicChatBusy(node)) {

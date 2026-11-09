@@ -15112,7 +15112,8 @@ export class VisualAgentMapView extends ItemView {
     this.enableDrag(
       card,
       node,
-      (point, wasSelected) => this.switchTopicChat(node, point.target) || this.openCardTextEditor(point, card, node, wasSelected)
+      (point, wasSelected) =>
+        this.switchTopicChat(node, point.target) || this.openCardTextEditor(point, card, node, wasSelected)
     );
     // Built during a presentation too: the stylesheet hides them and every handler returns early while presenting, so ending it needs no repaint.
     // Left as it was while AIM is hidden: an AIM card keeps no resize handles (a source-text test pins this condition).

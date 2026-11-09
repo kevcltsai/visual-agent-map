@@ -102,7 +102,11 @@ export class TopicChatWindow {
     this.el.setAttr("role", "dialog");
     // aria-labelledby, not aria-label: Obsidian shows an aria-label as a hover tooltip that covers the line under the input.
     const labelId = `vam-topic-chat-label-${++labelSeq}`;
-    this.el.createSpan({ cls: "vam-sr-only", text: t("ui.topic_chat_label_0", host.topicTitle()), attr: { id: labelId } });
+    this.el.createSpan({
+      cls: "vam-sr-only",
+      text: t("ui.topic_chat_label_0", host.topicTitle()),
+      attr: { id: labelId }
+    });
     this.el.setAttr("aria-labelledby", labelId);
     const head = this.el.createDiv("vam-topic-chat-head");
     head.createSpan({ cls: "vam-topic-chat-title", text: host.topicTitle() });

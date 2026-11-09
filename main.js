@@ -250,6 +250,12 @@ var en = {
   "ui.exchange_export_freemind": "Export as FreeMind (.mm)",
   "ui.exchange_exported": "Exported to {0}",
   "ui.exchange_export_failed": "Export failed: {0}",
+  "ui.ai_status_preparing": "Preparing",
+  "ui.ai_status_sent": "Sent",
+  "ui.ai_status_received": "Received",
+  "ui.ai_status_parsed": "Parsed",
+  "ui.ai_status_completed": "Completed",
+  "ui.ai_status_failed": "Failed",
   "ui.exchange_export_no_name": "No free file name was found",
   "ui.outline_import_hint": "Paste a heading-only Markdown outline, or generate one with AI from a topic. Each heading becomes a topic.",
   "ui.outline_import_text_label": "Outline",
@@ -532,6 +538,8 @@ var en = {
   "ui.context_ai_result_empty": "Enter or generate a result before applying it.",
   "ui.context_ai_replaced": "Selected text replaced.",
   "ui.context_ai_appended": "Draft appended to the page.",
+  "ui.context_ai_inserted_after": "Draft inserted after the selected paragraph.",
+  "ui.context_ai_accept_unavailable": "The selected text cannot be located safely in the note, so Accept and Insert here are not offered. You can copy the draft or append it to the page.",
   "ui.synthesis_content": "Topic synthesis content",
   "ui.synthesis_content_full": "Full-content synthesis (default)",
   "ui.synthesis_content_summary": "Quick summary synthesis",
@@ -1128,6 +1136,7 @@ var en = {
   "ui.usage_button_unavailable": "Token usage: unavailable",
   "ui.usage_panel_title": "Token usage",
   "ui.usage_filter_label": "Filter by provider",
+  "ui.usage_filter_total": "Total",
   "ui.usage_totals": "TOTALS",
   "ui.usage_this_map": "This mind map",
   "ui.usage_today": "Today",
@@ -2032,6 +2041,8 @@ var en = {
   "coffee.rename": "Rename",
   "coffee.choose_a_saved_style_first": "Choose a saved style first.",
   "coffee.delete_style": "Delete",
+  "coffee.delete_style_confirm_title": "Delete style?",
+  "coffee.delete_style_confirm_body": "\u201C{0}\u201D will be removed from the list. This cannot be undone.",
   "coffee.default_for_new_tables": "Default for new tables",
   "coffee.saved_for_new_tables_existing_tables_keep_their_settings": "Saved for new tables. Existing tables keep their settings.",
   "coffee.restore_built_in_text": "Restore built-in text",
@@ -2704,6 +2715,7 @@ var en = {
   "ui.note_style_format_desc_rich": "At least one callout, table or diagram per section.",
   "ui.note_style_format_desc_skim": "All bullet points, quick to scan.",
   "ui.note_style_format_other_0": "The current format is \u201C{0}\u201D, which is not one of the choices above.",
+  "ui.note_style_part_unknown_0": "{0} (not found)",
   "ui.note_style_set_apart_0": "{0} (set apart)",
   "ui.note_style_voice_retired_0": "{0} (retired)",
   "ui.note_style_tag_voice_retired": "Voice retired",
@@ -2789,6 +2801,7 @@ var en = {
   "ui.editor_section_add": "Add a section",
   "ui.editor_section_new_name_0": "New section {0}",
   "ui.editor_sections_problem_0": "The sections cannot be saved: {0}",
+  "ui.editor_sections_none": "At least one section is needed.",
   "ui.editor_apply_all": "Also use this voice for the other 5 topic types",
   "ui.editor_apply_notice_0": "The voice for all topic types is now \u201C{0}\u201D.",
   "ui.editor_apply_kept_0": "These types keep the voice set for them: {0}.",
@@ -3036,6 +3049,12 @@ var zhCN = {
   "ui.exchange_export_freemind": "\u5BFC\u51FA\u4E3A FreeMind\uFF08.mm\uFF09",
   "ui.exchange_exported": "\u5DF2\u5BFC\u51FA\u5230 {0}",
   "ui.exchange_export_failed": "\u5BFC\u51FA\u5931\u8D25\uFF1A{0}",
+  "ui.ai_status_preparing": "\u51C6\u5907\u4E2D",
+  "ui.ai_status_sent": "\u5DF2\u53D1\u9001",
+  "ui.ai_status_received": "\u5DF2\u6536\u5230",
+  "ui.ai_status_parsed": "\u5DF2\u89E3\u6790",
+  "ui.ai_status_completed": "\u5DF2\u5B8C\u6210",
+  "ui.ai_status_failed": "\u5931\u8D25",
   "ui.exchange_export_no_name": "\u627E\u4E0D\u5230\u53EF\u7528\u7684\u6587\u4EF6\u540D",
   "ui.outline_import_hint": "\u7C98\u8D34\u53EA\u6709\u6807\u9898\u7684 Markdown \u5927\u7EB2\uFF0C\u6216\u7528 AI \u4F9D\u4E3B\u9898\u751F\u6210\u3002\u6BCF\u4E2A\u6807\u9898\u4F1A\u53D8\u6210\u4E00\u4E2A\u8BAE\u9898\u3002",
   "ui.outline_import_text_label": "\u5927\u7EB2",
@@ -3318,11 +3337,13 @@ var zhCN = {
   "ui.context_ai_result_empty": "\u8BF7\u5148\u8F93\u5165\u6216\u4EA7\u751F\u7ED3\u679C\uFF0C\u518D\u5E94\u7528\u3002",
   "ui.context_ai_replaced": "\u5DF2\u53D6\u4EE3\u9009\u62E9\u6587\u5B57\u3002",
   "ui.context_ai_appended": "\u8349\u7A3F\u5DF2\u9644\u52A0\u5230\u9875\u811A\u3002",
+  "ui.context_ai_inserted_after": "\u8349\u7A3F\u5DF2\u63D2\u5165\u9009\u53D6\u6BB5\u843D\u540E\u9762\u3002",
+  "ui.context_ai_accept_unavailable": "\u65E0\u6CD5\u5B89\u5168\u5B9A\u4F4D\u9009\u53D6\u7684\u6587\u5B57\uFF0C\u6240\u4EE5\u6CA1\u6709\u201C\u63A5\u53D7\u4FEE\u6539\u201D\u4E0E\u201C\u63D2\u5165\u8FD9\u91CC\u201D\uFF0C\u53EF\u4EE5\u590D\u5236\u8349\u7A3F\u6216\u9644\u52A0\u5230\u9875\u811A\u3002",
   "ui.synthesis_content": "\u8BAE\u9898\u6574\u5408\u5185\u5BB9",
   "ui.synthesis_content_full": "\u5B8C\u6574\u5185\u5BB9\u6574\u5408\uFF08\u9ED8\u8BA4\uFF09",
   "ui.synthesis_content_summary": "\u6458\u8981\u5FEB\u901F\u6574\u5408",
-  "ui.synthesis_content_full_hint": "\u7EB3\u5165\u4E0B\u5217\u8BAE\u9898\u7684\u5B8C\u6574 Detail\u3001\u6458\u8981\u4E0E\u76F8\u5173\u53D1\u73B0\u3002\u6570\u636E\u8F83\u591A\u65F6\u4F1A\u5206\u6279\u5904\u7406\uFF0C\u53EF\u80FD\u9700\u8981\u8F83\u4E45\u3002",
-  "ui.synthesis_content_summary_hint": "\u4F7F\u7528\u4E0B\u5217\u8BAE\u9898\u7684\u6458\u8981\u4E0E\u76F8\u5173\u53D1\u73B0\uFF0C\u4E0D\u7EB3\u5165\u5B8C\u6574 Detail\uFF0C\u53EF\u80FD\u7701\u7565\u6B63\u6587\u4E2D\u7684\u91CD\u8981\u6761\u4EF6\u3002",
+  "ui.synthesis_content_full_hint": "\u7EB3\u5165\u4E0B\u5217\u8BAE\u9898\u7684\u5B8C\u6574\u5185\u5BB9\u3001\u6458\u8981\u4E0E\u76F8\u5173\u53D1\u73B0\u3002\u6570\u636E\u8F83\u591A\u65F6\u4F1A\u5206\u6279\u5904\u7406\uFF0C\u53EF\u80FD\u9700\u8981\u8F83\u4E45\u3002",
+  "ui.synthesis_content_summary_hint": "\u4F7F\u7528\u4E0B\u5217\u8BAE\u9898\u7684\u6458\u8981\u4E0E\u76F8\u5173\u53D1\u73B0\uFF0C\u4E0D\u7EB3\u5165\u5B8C\u6574\u5185\u5BB9\uFF0C\u53EF\u80FD\u7701\u7565\u6B63\u6587\u4E2D\u7684\u91CD\u8981\u6761\u4EF6\u3002",
   "ui.synthesis_content_scope": "\u53EA\u5F71\u54CD\u4E0B\u5217\u8BAE\u9898\uFF0C\u989D\u5916 Markdown \u4E00\u5F8B\u5B8C\u6574\u8BFB\u53D6\uFF1B\u5F00\u59CB\u540E\u4E0D\u80FD\u66F4\u6362\u3002",
   "ui.synthesis_source_topics": "\u672C\u6B21\u5305\u542B\u7684\u6765\u6E90\u8BAE\u9898",
   "ui.synthesis_no_source_topics": "\u6CA1\u6709\u6765\u6E90\u8BAE\u9898\uFF0C\u8BF7\u5728\u4E0B\u65B9\u9009\u62E9\u5176\u4ED6 Markdown \u6765\u6E90\u3002",
@@ -3914,6 +3935,7 @@ var zhCN = {
   "ui.usage_button_unavailable": "Token \u7528\u91CF\uFF1A\u65E0\u6CD5\u8BFB\u53D6",
   "ui.usage_panel_title": "Token \u7528\u91CF",
   "ui.usage_filter_label": "\u6309\u670D\u52A1\u7B5B\u9009",
+  "ui.usage_filter_total": "\u5168\u90E8",
   "ui.usage_totals": "\u603B\u91CF",
   "ui.usage_this_map": "\u8FD9\u5F20\u5FC3\u667A\u56FE",
   "ui.usage_today": "\u4ECA\u5929",
@@ -3999,9 +4021,9 @@ var zhCN = {
   "ui.current_model_description": "\u804A\u5929\u4E0E\u6240\u6709\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A\u6A21\u578B\uFF1B\u6709\u6A21\u578B\u8986\u5199\u7684\u8BAE\u9898\u9664\u5916\u3002\u804A\u5929\u9762\u677F\u4E0A\u65B9\u7684\u83DC\u5355\u6539\u7684\u4E5F\u662F\u8FD9\u91CC\u3002",
   "ui.ai_reasoning_level": "AI \u63A8\u7406\u7B49\u7EA7",
   "ui.reasoning_level": "\u63A8\u7406\u7B49\u7EA7",
-  "ui.low": "\u4F4E (Low)",
-  "ui.medium": "\u4E2D (Medium)",
-  "ui.high": "\u9AD8 (High)",
+  "ui.low": "\u4F4E",
+  "ui.medium": "\u4E2D",
+  "ui.high": "\u9AD8",
   "ui.rescan_maps_and_topic_notes_then_rebuild_references_and_deri": "\u91CD\u65B0\u626B\u63CF\u5FC3\u667A\u56FE\u4E0E\u8BAE\u9898\u7B14\u8BB0\uFF0C\u91CD\u5EFA reference \u4E0E\u884D\u751F\u6570\u636E\u3002\u539F\u59CB\u5185\u5BB9\u4E0D\u4F1A\u88AB\u8986\u5199\u3002",
   "ui.full_rebuild": "\u5B8C\u6574\u91CD\u5EFA",
   "ui.vam_data_has_been_refreshed": "VAM \u6570\u636E\u5DF2\u5237\u65B0\u3002",
@@ -4493,7 +4515,7 @@ var zhCN = {
   "ui.ai_not_ready_unknown_0": "{0} \u8FD8\u6CA1\u51C6\u5907\u597D\u3002\u53EF\u80FD\u5C1A\u672A\u767B\u5F55\uFF0C\u6216\u6CA1\u6709\u62A5\u544A\u53EF\u7528\u7684\u6A21\u578B\u3002",
   "ui.ai_not_ready_where": "\u53EF\u5728\u201C\u8BBE\u7F6E \u2192 Visual Agent Map \u2192 AI \u8FDE\u63A5\u201D\u67E5\u770B\u72B6\u6001\u3002",
   "ui.current_model_is_unavailable": "\u5F53\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528",
-  "ui.auto": "\u81EA\u52A8 (Auto)",
+  "ui.auto": "\u81EA\u52A8",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "\u81EA\u52A8\u6A21\u5F0F\u4F1A\u5BF9\u7B80\u5355\u4EFB\u52A1\u4F7F\u7528 Low\u3001\u5BF9\u590D\u6742\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52A8\u9009\u62E9\u4E0D\u4F1A\u88AB\u8986\u76D6\u3002",
   "ui.stop_research": "\u505C\u6B62\u7814\u7A76",
   "ui.stop_expand": "\u505C\u6B62\u5C55\u5F00",
@@ -4818,6 +4840,8 @@ var zhCN = {
   "coffee.rename": "\u91CD\u547D\u540D",
   "coffee.choose_a_saved_style_first": "\u8BF7\u5148\u9009\u62E9\u5DF2\u4FDD\u5B58\u7684\u98CE\u683C\u3002",
   "coffee.delete_style": "\u5220\u9664\u98CE\u683C",
+  "coffee.delete_style_confirm_title": "\u5220\u9664\u98CE\u683C\uFF1F",
+  "coffee.delete_style_confirm_body": "\u201C{0}\u201D\u4F1A\u4ECE\u5217\u8868\u79FB\u9664\uFF0C\u65E0\u6CD5\u6062\u590D\u3002",
   "coffee.default_for_new_tables": "\u8BBE\u4E3A\u65B0\u804A\u5929\u5BA4\u7684\u9ED8\u8BA4\u8BBE\u7F6E",
   "coffee.saved_for_new_tables_existing_tables_keep_their_settings": "\u5DF2\u8BBE\u4E3A\u65B0\u804A\u5929\u5BA4\u7684\u9ED8\u8BA4\u8BBE\u7F6E\uFF1B\u65E2\u6709\u804A\u5929\u5BA4\u4ECD\u4F7F\u7528\u539F\u8BBE\u7F6E\u3002",
   "coffee.restore_built_in_text": "\u8FD8\u539F\u5185\u7F6E\u6587\u5B57",
@@ -5490,6 +5514,7 @@ var zhCN = {
   "ui.note_style_format_desc_rich": "\u6BCF\u6BB5\u81F3\u5C11\u4E00\u4E2A\u63D0\u793A\u6846\u3001\u8868\u683C\u6216\u56FE\u3002",
   "ui.note_style_format_desc_skim": "\u5168\u90E8\u6761\u5217\uFF0C\u4E00\u773C\u626B\u5B8C\u3002",
   "ui.note_style_format_other_0": "\u76EE\u524D\u7684\u683C\u5F0F\u662F\u201C{0}\u201D\uFF0C\u4E0D\u5728\u4E0A\u9762\u7684\u9009\u9879\u4E2D\u3002",
+  "ui.note_style_part_unknown_0": "{0}\uFF08\u627E\u4E0D\u5230\uFF09",
   "ui.note_style_set_apart_0": "{0}\uFF08\u53E6\u5916\u6307\u5B9A\uFF09",
   "ui.note_style_voice_retired_0": "{0}\uFF08\u5DF2\u505C\u7528\uFF09",
   "ui.note_style_tag_voice_retired": "\u53E3\u543B\u5DF2\u505C\u7528",
@@ -5575,6 +5600,7 @@ var zhCN = {
   "ui.editor_section_add": "\u52A0\u4E00\u6BB5",
   "ui.editor_section_new_name_0": "\u65B0\u6BB5\u843D {0}",
   "ui.editor_sections_problem_0": "\u6BB5\u843D\u65E0\u6CD5\u4FDD\u5B58\uFF1A{0}",
+  "ui.editor_sections_none": "\u81F3\u5C11\u9700\u8981\u4E00\u4E2A\u6BB5\u843D\u3002",
   "ui.editor_apply_all": "\u53E3\u543B\u4E5F\u5957\u7528\u5230\u5176\u4ED6 5 \u79CD\u7C7B\u578B",
   "ui.editor_apply_notice_0": "\u6240\u6709\u8BAE\u9898\u7C7B\u578B\u7684\u53E3\u543B\u5DF2\u6539\u4E3A\u201C{0}\u201D\u3002",
   "ui.editor_apply_kept_0": "\u8FD9\u4E9B\u7C7B\u578B\u6709\u53E6\u5916\u6307\u5B9A\u53E3\u543B\uFF0C\u6CA1\u6709\u6539\uFF1A{0}\u3002",
@@ -5822,6 +5848,12 @@ var zhTW = {
   "ui.exchange_export_freemind": "\u532F\u51FA\u70BA FreeMind\uFF08.mm\uFF09",
   "ui.exchange_exported": "\u5DF2\u532F\u51FA\u5230 {0}",
   "ui.exchange_export_failed": "\u532F\u51FA\u5931\u6557\uFF1A{0}",
+  "ui.ai_status_preparing": "\u6E96\u5099\u4E2D",
+  "ui.ai_status_sent": "\u5DF2\u9001\u51FA",
+  "ui.ai_status_received": "\u5DF2\u6536\u5230",
+  "ui.ai_status_parsed": "\u5DF2\u89E3\u6790",
+  "ui.ai_status_completed": "\u5DF2\u5B8C\u6210",
+  "ui.ai_status_failed": "\u5931\u6557",
   "ui.exchange_export_no_name": "\u627E\u4E0D\u5230\u53EF\u7528\u7684\u6A94\u540D",
   "ui.outline_import_hint": "\u8CBC\u4E0A\u53EA\u6709\u6A19\u984C\u7684 Markdown \u5927\u7DB1\uFF0C\u6216\u7528 AI \u4F9D\u4E3B\u984C\u751F\u6210\u3002\u6BCF\u500B\u6A19\u984C\u6703\u8B8A\u6210\u4E00\u500B\u8B70\u984C\u3002",
   "ui.outline_import_text_label": "\u5927\u7DB1",
@@ -6104,11 +6136,13 @@ var zhTW = {
   "ui.context_ai_result_empty": "\u8ACB\u5148\u8F38\u5165\u6216\u7522\u751F\u7D50\u679C\uFF0C\u518D\u5957\u7528\u3002",
   "ui.context_ai_replaced": "\u5DF2\u53D6\u4EE3\u9078\u53D6\u6587\u5B57\u3002",
   "ui.context_ai_appended": "\u8349\u7A3F\u5DF2\u9644\u52A0\u5230\u9801\u5C3E\u3002",
+  "ui.context_ai_inserted_after": "\u8349\u7A3F\u5DF2\u63D2\u5165\u9078\u53D6\u6BB5\u843D\u5F8C\u9762\u3002",
+  "ui.context_ai_accept_unavailable": "\u7121\u6CD5\u5B89\u5168\u5B9A\u4F4D\u9078\u53D6\u7684\u6587\u5B57\uFF0C\u6240\u4EE5\u6C92\u6709\u300C\u63A5\u53D7\u4FEE\u6539\u300D\u8207\u300C\u63D2\u5165\u9019\u88E1\u300D\uFF0C\u53EF\u4EE5\u8907\u88FD\u8349\u7A3F\u6216\u9644\u52A0\u5230\u9801\u5C3E\u3002",
   "ui.synthesis_content": "\u8B70\u984C\u6574\u5408\u5167\u5BB9",
   "ui.synthesis_content_full": "\u5B8C\u6574\u5167\u5BB9\u6574\u5408\uFF08\u9810\u8A2D\uFF09",
   "ui.synthesis_content_summary": "\u6458\u8981\u5FEB\u901F\u6574\u5408",
-  "ui.synthesis_content_full_hint": "\u7D0D\u5165\u4E0B\u5217\u8B70\u984C\u7684\u5B8C\u6574 Detail\u3001\u6458\u8981\u8207\u76F8\u95DC\u767C\u73FE\u3002\u8CC7\u6599\u8F03\u591A\u6642\u6703\u5206\u6279\u8655\u7406\uFF0C\u53EF\u80FD\u9700\u8981\u8F03\u4E45\u3002",
-  "ui.synthesis_content_summary_hint": "\u4F7F\u7528\u4E0B\u5217\u8B70\u984C\u7684\u6458\u8981\u8207\u76F8\u95DC\u767C\u73FE\uFF0C\u4E0D\u7D0D\u5165\u5B8C\u6574 Detail\uFF0C\u53EF\u80FD\u7701\u7565\u6B63\u6587\u4E2D\u7684\u91CD\u8981\u689D\u4EF6\u3002",
+  "ui.synthesis_content_full_hint": "\u7D0D\u5165\u4E0B\u5217\u8B70\u984C\u7684\u5B8C\u6574\u5167\u5BB9\u3001\u6458\u8981\u8207\u76F8\u95DC\u767C\u73FE\u3002\u8CC7\u6599\u8F03\u591A\u6642\u6703\u5206\u6279\u8655\u7406\uFF0C\u53EF\u80FD\u9700\u8981\u8F03\u4E45\u3002",
+  "ui.synthesis_content_summary_hint": "\u4F7F\u7528\u4E0B\u5217\u8B70\u984C\u7684\u6458\u8981\u8207\u76F8\u95DC\u767C\u73FE\uFF0C\u4E0D\u7D0D\u5165\u5B8C\u6574\u5167\u5BB9\uFF0C\u53EF\u80FD\u7701\u7565\u6B63\u6587\u4E2D\u7684\u91CD\u8981\u689D\u4EF6\u3002",
   "ui.synthesis_content_scope": "\u53EA\u5F71\u97FF\u4E0B\u5217\u8B70\u984C\uFF0C\u984D\u5916 Markdown \u4E00\u5F8B\u5B8C\u6574\u8B80\u53D6\uFF1B\u958B\u59CB\u5F8C\u4E0D\u80FD\u66F4\u63DB\u3002",
   "ui.synthesis_source_topics": "\u672C\u6B21\u5305\u542B\u7684\u4F86\u6E90\u8B70\u984C",
   "ui.synthesis_no_source_topics": "\u6C92\u6709\u4F86\u6E90\u8B70\u984C\uFF0C\u8ACB\u5728\u4E0B\u65B9\u9078\u53D6\u5176\u4ED6 Markdown \u4F86\u6E90\u3002",
@@ -6700,6 +6734,7 @@ var zhTW = {
   "ui.usage_button_unavailable": "Token \u7528\u91CF\uFF1A\u7121\u6CD5\u8B80\u53D6",
   "ui.usage_panel_title": "Token \u7528\u91CF",
   "ui.usage_filter_label": "\u4F9D\u670D\u52D9\u7BE9\u9078",
+  "ui.usage_filter_total": "\u5168\u90E8",
   "ui.usage_totals": "\u7E3D\u91CF",
   "ui.usage_this_map": "\u9019\u5F35\u5FC3\u667A\u5716",
   "ui.usage_today": "\u4ECA\u5929",
@@ -6785,9 +6820,9 @@ var zhTW = {
   "ui.current_model_description": "\u804A\u5929\u8207\u6240\u6709\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B\u6A21\u578B\uFF1B\u6709\u6A21\u578B\u8986\u5BEB\u7684\u8B70\u984C\u9664\u5916\u3002\u804A\u5929\u9762\u677F\u4E0A\u65B9\u7684\u9078\u55AE\u6539\u7684\u4E5F\u662F\u9019\u88E1\u3002",
   "ui.ai_reasoning_level": "AI \u63A8\u7406\u7B49\u7D1A",
   "ui.reasoning_level": "\u63A8\u7406\u7B49\u7D1A",
-  "ui.low": "\u4F4E (Low)",
-  "ui.medium": "\u4E2D (Medium)",
-  "ui.high": "\u9AD8 (High)",
+  "ui.low": "\u4F4E",
+  "ui.medium": "\u4E2D",
+  "ui.high": "\u9AD8",
   "ui.rescan_maps_and_topic_notes_then_rebuild_references_and_deri": "\u91CD\u65B0\u6383\u63CF\u5FC3\u667A\u5716\u8207\u8B70\u984C\u7B46\u8A18\uFF0C\u91CD\u5EFA reference \u8207\u884D\u751F\u8CC7\u6599\u3002\u539F\u59CB\u5167\u5BB9\u4E0D\u6703\u88AB\u8986\u5BEB\u3002",
   "ui.full_rebuild": "\u5B8C\u6574\u91CD\u5EFA",
   "ui.vam_data_has_been_refreshed": "VAM \u8CC7\u6599\u5DF2\u91CD\u65B0\u6574\u7406\u3002",
@@ -7279,7 +7314,7 @@ var zhTW = {
   "ui.ai_not_ready_unknown_0": "{0} \u9084\u6C92\u6E96\u5099\u597D\u3002\u53EF\u80FD\u5C1A\u672A\u767B\u5165\uFF0C\u6216\u6C92\u6709\u56DE\u5831\u53EF\u7528\u7684\u6A21\u578B\u3002",
   "ui.ai_not_ready_where": "\u53EF\u5728\u300C\u8A2D\u5B9A \u2192 Visual Agent Map \u2192 AI \u9023\u7DDA\u300D\u67E5\u770B\u72C0\u614B\u3002",
   "ui.current_model_is_unavailable": "\u76EE\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528",
-  "ui.auto": "\u81EA\u52D5 (Auto)",
+  "ui.auto": "\u81EA\u52D5",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "\u81EA\u52D5\u6A21\u5F0F\u6703\u5C0D\u7C21\u55AE\u4EFB\u52D9\u4F7F\u7528 Low\u3001\u5C0D\u8907\u96DC\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52D5\u9078\u64C7\u4E0D\u6703\u88AB\u8986\u84CB\u3002",
   "ui.stop_research": "\u505C\u6B62\u7814\u7A76",
   "ui.stop_expand": "\u505C\u6B62\u5C55\u958B",
@@ -7604,6 +7639,8 @@ var zhTW = {
   "coffee.rename": "\u91CD\u65B0\u547D\u540D",
   "coffee.choose_a_saved_style_first": "\u8ACB\u5148\u9078\u64C7\u5DF2\u4FDD\u5B58\u7684\u98A8\u683C\u3002",
   "coffee.delete_style": "\u522A\u9664\u98A8\u683C",
+  "coffee.delete_style_confirm_title": "\u522A\u9664\u98A8\u683C\uFF1F",
+  "coffee.delete_style_confirm_body": "\u300C{0}\u300D\u6703\u5F9E\u6E05\u55AE\u79FB\u9664\uFF0C\u7121\u6CD5\u5FA9\u539F\u3002",
   "coffee.default_for_new_tables": "\u8A2D\u70BA\u65B0\u804A\u5929\u5BA4\u9810\u8A2D",
   "coffee.saved_for_new_tables_existing_tables_keep_their_settings": "\u5DF2\u8A2D\u70BA\u65B0\u804A\u5929\u5BA4\u9810\u8A2D\uFF1B\u65E2\u6709\u804A\u5929\u5BA4\u4ECD\u4F7F\u7528\u539F\u8A2D\u5B9A\u3002",
   "coffee.restore_built_in_text": "\u9084\u539F\u5167\u5EFA\u6587\u5B57",
@@ -8276,6 +8313,7 @@ var zhTW = {
   "ui.note_style_format_desc_rich": "\u6BCF\u6BB5\u81F3\u5C11\u4E00\u500B\u63D0\u793A\u6846\u3001\u8868\u683C\u6216\u5716\u3002",
   "ui.note_style_format_desc_skim": "\u5168\u90E8\u689D\u5217\uFF0C\u4E00\u773C\u6383\u5B8C\u3002",
   "ui.note_style_format_other_0": "\u76EE\u524D\u7684\u683C\u5F0F\u662F\u300C{0}\u300D\uFF0C\u4E0D\u5728\u4E0A\u9762\u7684\u9078\u9805\u4E2D\u3002",
+  "ui.note_style_part_unknown_0": "{0}\uFF08\u627E\u4E0D\u5230\uFF09",
   "ui.note_style_set_apart_0": "{0}\uFF08\u53E6\u5916\u6307\u5B9A\uFF09",
   "ui.note_style_voice_retired_0": "{0}\uFF08\u5DF2\u505C\u7528\uFF09",
   "ui.note_style_tag_voice_retired": "\u53E3\u543B\u5DF2\u505C\u7528",
@@ -8361,6 +8399,7 @@ var zhTW = {
   "ui.editor_section_add": "\u52A0\u4E00\u6BB5",
   "ui.editor_section_new_name_0": "\u65B0\u6BB5\u843D {0}",
   "ui.editor_sections_problem_0": "\u6BB5\u843D\u7121\u6CD5\u5132\u5B58\uFF1A{0}",
+  "ui.editor_sections_none": "\u81F3\u5C11\u9700\u8981\u4E00\u500B\u6BB5\u843D\u3002",
   "ui.editor_apply_all": "\u53E3\u543B\u4E5F\u5957\u7528\u5230\u5176\u4ED6 5 \u7A2E\u985E\u578B",
   "ui.editor_apply_notice_0": "\u6240\u6709\u8B70\u984C\u985E\u578B\u7684\u53E3\u543B\u5DF2\u6539\u70BA\u300C{0}\u300D\u3002",
   "ui.editor_apply_kept_0": "\u9019\u4E9B\u985E\u578B\u6709\u53E6\u5916\u6307\u5B9A\u53E3\u543B\uFF0C\u6C92\u6709\u6539\uFF1A{0}\u3002",
@@ -15333,6 +15372,42 @@ var CoffeeDeleteModal = class extends import_obsidian8.Modal {
     this.resolveResult = void 0;
   }
 };
+var CoffeeStyleDeleteModal = class extends import_obsidian8.Modal {
+  constructor(app, styleName, locale) {
+    super(app);
+    this.styleName = styleName;
+    this.locale = locale;
+    __publicField(this, "result");
+    __publicField(this, "confirmed", false);
+  }
+  t(key4, ...values) {
+    return translate(this.locale, key4, ...values);
+  }
+  confirm() {
+    return new Promise((resolve) => {
+      this.result = resolve;
+      this.open();
+    });
+  }
+  onOpen() {
+    this.contentEl.createEl("h2", { text: this.t("coffee.delete_style_confirm_title") });
+    this.contentEl.createEl("p", { text: this.t("coffee.delete_style_confirm_body", this.styleName) });
+    const actions = this.contentEl.createDiv("modal-button-container");
+    actions.createEl("button", { text: this.t("ui.cancel") }).onclick = () => this.close();
+    const remove = actions.createEl("button", { text: this.t("coffee.delete_style") });
+    remove.addClass("mod-warning");
+    remove.onclick = () => {
+      this.confirmed = true;
+      this.close();
+    };
+  }
+  onClose() {
+    var _a2;
+    (_a2 = this.result) == null ? void 0 : _a2.call(this, this.confirmed);
+    this.result = void 0;
+    this.contentEl.empty();
+  }
+};
 var CoffeeSummaryConfirmModal = class extends import_obsidian8.Modal {
   constructor(app, model, locale) {
     super(app);
@@ -16343,6 +16418,8 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       var _a3;
       const items = (_a3 = this.plugin.settings.coffeeStyles) != null ? _a3 : [], index = items.findIndex((style) => style.id === styleSelect.value);
       if (index < 0) throw new Error(this.t("coffee.choose_a_saved_style_first"));
+      if (!await new CoffeeStyleDeleteModal(this.app, items[index].name, this.plugin.settings.language).confirm())
+        return;
       await this.changeCoffeeStyles(() => {
         this.plugin.settings.coffeeStyles = items.filter((_, at) => at !== index);
         if (this.plugin.settings.defaultCoffeeStyleId === items[index].id)
@@ -29806,7 +29883,7 @@ function formatTokens(count2) {
 var sum = (tokens2) => tokens2.inputTokens + tokens2.outputTokens;
 var mark = (count2, estimated) => estimated ? t("ui.usage_estimated_0", formatTokens(count2)) : formatTokens(count2);
 var FILTERS = ["total", "claude", "codex"];
-var FILTER_LABEL = { total: "Total", claude: "Claude", codex: "Codex" };
+var FILTER_LABEL = { claude: "Claude", codex: "Codex" };
 var UsageControl = class {
   constructor(store, mapPath) {
     this.store = store;
@@ -29957,7 +30034,10 @@ var UsageControl = class {
     group.setAttr("aria-label", t("ui.usage_filter_label"));
     const filters = /* @__PURE__ */ new Map();
     for (const value of FILTERS) {
-      const radio = group.createEl("button", { cls: "vam-usage-filter-option", text: FILTER_LABEL[value] });
+      const radio = group.createEl("button", {
+        cls: "vam-usage-filter-option",
+        text: value === "total" ? t("ui.usage_filter_total") : FILTER_LABEL[value]
+      });
       radio.setAttr("type", "button");
       radio.setAttr("role", "radio");
       radio.addEventListener("click", () => this.select(value, false));
@@ -34291,7 +34371,10 @@ var NoteStyleStore = class {
       try {
         return { ref, name: partNameOfRef(category, ref, language2) };
       } catch (e) {
-        return { ref, name: ref };
+        return {
+          ref,
+          name: translate(language2, "ui.note_style_part_unknown_0", ref.replace(/^(?:file|builtin):/, ""))
+        };
       }
     };
     const items = BUILTIN_RECIPES.map((recipe) => {
@@ -48226,6 +48309,14 @@ var import_obsidian29 = require("obsidian");
 
 // ui/modals/debug-log-modal.ts
 var import_obsidian28 = require("obsidian");
+var EXCHANGE_STATUS_KEYS = {
+  preparing: "ui.ai_status_preparing",
+  sent: "ui.ai_status_sent",
+  received: "ui.ai_status_received",
+  parsed: "ui.ai_status_parsed",
+  completed: "ui.ai_status_completed",
+  failed: "ui.ai_status_failed"
+};
 var DebugLogModal = class extends import_obsidian28.Modal {
   constructor(app, logs, exchanges, exchangeEnabled, setExchangeEnabled) {
     super(app);
@@ -48277,7 +48368,7 @@ var DebugLogModal = class extends import_obsidian28.Modal {
       const row = list.createDiv("vam-debug-log-entry");
       const metadata = row.createDiv("vam-debug-log-meta");
       metadata.createEl("time", {
-        text: new Date(entry.timestamp).toLocaleString(),
+        text: new Date(entry.timestamp).toLocaleString(getUiLanguage()),
         attr: { datetime: entry.timestamp }
       });
       metadata.createSpan({ cls: `vam-debug-log-level is-${entry.level}`, text: entry.level.toUpperCase() });
@@ -48334,7 +48425,7 @@ var DebugLogModal = class extends import_obsidian28.Modal {
       const metric = promptMetrics(exchange);
       const item = exchangeList.createEl("details", { cls: "vam-debug-log-entry" });
       item.createEl("summary", {
-        text: `${new Date(exchange.startedAt).toLocaleString()} \xB7 ${exchange.topic} \xB7 ${metric.phase} \xB7 ${exchange.status}`
+        text: `${new Date(exchange.startedAt).toLocaleString(getUiLanguage())} \xB7 ${exchange.topic} \xB7 ${metric.phase} \xB7 ${t(EXCHANGE_STATUS_KEYS[exchange.status])}`
       });
       item.createEl("p", {
         text: `${exchange.mode} \xB7 ${exchange.model} \xB7 ${exchange.effort}`,
@@ -82602,8 +82693,9 @@ var NoteStyleEditorModal = class extends import_obsidian42.Modal {
   sectionProblem() {
     if (!this.sectionsEdited()) return "";
     const rows2 = this.cleanRows();
-    const parsed = parseTemplateBlock(composeStructure(this.chunks, rows2), { id: "file:draft", name: "draft" });
     const say = (text12) => t("ui.editor_sections_problem_0", text12);
+    if (!rows2.length) return say(t("ui.editor_sections_none"));
+    const parsed = parseTemplateBlock(composeStructure(this.chunks, rows2), { id: "file:draft", name: "draft" });
     if (!parsed.ok) {
       const first = parsed.issues[0];
       if (!first.code.startsWith("ui.")) return say(first.message);
@@ -82843,6 +82935,10 @@ var NoteStyleEditorModal = class extends import_obsidian42.Modal {
     const host = this.exampleEl;
     if (!host || this.closed) return;
     const token = ++this.renderToken;
+    if (this.sectionsEdited() && this.cleanRows().length === 0) {
+      host.empty();
+      return;
+    }
     const markdown = this.exampleMarkdown();
     const next = host.createDiv({ cls: "vam-editor-example-body" });
     const child = new import_obsidian42.Component();
@@ -83768,7 +83864,7 @@ function renderNoteStyleCard(setting, plugin) {
   const partName = (category, ref) => {
     var _a2;
     const found = plugin.noteStyles.listParts(category).find((item) => item.ref === ref);
-    return (_a2 = found == null ? void 0 : found.name) != null ? _a2 : ref;
+    return (_a2 = found == null ? void 0 : found.name) != null ? _a2 : t("ui.note_style_part_unknown_0", ref.replace(/^(?:file|builtin):/, ""));
   };
   const draw = (focus) => {
     body.empty();
@@ -90761,6 +90857,7 @@ var SelectionAiPanel = class extends import_obsidian50.Component {
     __publicField(this, "output");
     __publicField(this, "result");
     __publicField(this, "before");
+    __publicField(this, "unavailableHint");
     __publicField(this, "presets");
     __publicField(this, "resultActions");
     __publicField(this, "accept");
@@ -90898,6 +90995,10 @@ var SelectionAiPanel = class extends import_obsidian50.Component {
     this.preview = this.contentEl.createDiv({ cls: "vam-context-ai-preview" });
     this.result = this.contentEl.createDiv({ cls: "vam-context-ai-result" });
     this.result.hidden = true;
+    this.unavailableHint = this.result.createDiv({
+      cls: "vam-hint vam-context-ai-unavailable",
+      text: t("ui.context_ai_accept_unavailable")
+    });
     this.before = this.result.createDiv({ cls: "vam-context-ai-diff" });
     this.before.createSpan({ cls: "vam-context-ai-label", text: t("ui.context_ai_before") });
     this.before.createEl("del", { cls: "vam-context-ai-before", text: this.snapshot.text });
@@ -90984,6 +91085,7 @@ var SelectionAiPanel = class extends import_obsidian50.Component {
     this.resultActions.hidden = !visible;
     const replaceable = this.snapshot.matchAt >= 0 && !!this.snapshot.text && !this.insertAfter;
     this.before.hidden = !replaceable;
+    this.unavailableHint.hidden = !visible || this.snapshot.matchAt >= 0;
     this.accept.hidden = !replaceable;
     this.insertHere.hidden = this.snapshot.matchAt < 0;
     const insertable = this.snapshot.matchAt >= 0;
@@ -91234,7 +91336,9 @@ ${value}
       editor.replaceRange(addition, end, end);
     }
     this.close();
-    new import_obsidian50.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
+    const message = action === "replace" ? t("ui.context_ai_replaced") : action === "after" ? t("ui.context_ai_inserted_after") : t("ui.context_ai_appended");
+    if (view.getMode() === "source") new import_obsidian50.Notice(message);
+    else void view.save().then(() => new import_obsidian50.Notice(message));
   }
 };
 

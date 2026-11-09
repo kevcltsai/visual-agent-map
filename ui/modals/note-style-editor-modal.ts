@@ -361,8 +361,10 @@ export class NoteStyleEditorModal extends Modal {
   private sectionProblem(): string {
     if (!this.sectionsEdited()) return "";
     const rows = this.cleanRows();
-    const parsed = parseTemplateBlock(composeStructure(this.chunks, rows), { id: "file:draft", name: "draft" });
     const say = (text: string): string => t("ui.editor_sections_problem_0", text);
+    // Every section removed: say so in plain words (the parser would otherwise report the file as having no ## section).
+    if (!rows.length) return say(t("ui.editor_sections_none"));
+    const parsed = parseTemplateBlock(composeStructure(this.chunks, rows), { id: "file:draft", name: "draft" });
     if (!parsed.ok) {
       const first = parsed.issues[0];
       if (!first.code.startsWith("ui.")) return say(first.message);
@@ -626,6 +628,11 @@ export class NoteStyleEditorModal extends Modal {
     const host = this.exampleEl;
     if (!host || this.closed) return;
     const token = ++this.renderToken;
+    // No sections left: the sample stays empty (the structure would otherwise fall back to a built-in one).
+    if (this.sectionsEdited() && this.cleanRows().length === 0) {
+      host.empty();
+      return;
+    }
     const markdown = this.exampleMarkdown();
     // The new picture is drawn beside the old one and replaces it when it is ready, so the sample never flashes empty.
     const next = host.createDiv({ cls: "vam-editor-example-body" });

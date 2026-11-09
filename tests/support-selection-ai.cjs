@@ -38,7 +38,7 @@ class Setting {
  * Select `selected` inside `markdown`, open the panel, press the first preset button and answer every model call
  * with the next entry of `replies`. Returns the prompts of the prepared steps the panel passed to `run`, in order.
  */
-async function runPanel({ markdown, selected, replies, steps = false, outcome = false, notices = [], lockDuring = null, applyAfter = null, parse = null }) {
+async function runPanel({ markdown, selected, replies, steps = false, outcome = false, notices = [], lockDuring = null, applyAfter = null, parse = null, readingAfter = null }) {
   // `parse`: the runtime Mermaid parser's `parse` (Obsidian's `loadMermaid` result); without it the parser is unavailable.
   const obsidian = { ...(parse ? { loadMermaid: async () => ({ parse }) } : {}), Component, MarkdownView, MarkdownRenderer: { render: async () => {} }, Notice: class { constructor(message) { notices.push(message); } }, Setting, setIcon() {}, Platform: { isMacOS: true }, requestUrl: async () => ({ json: {} }), parseYaml: text => require('yaml').parse(text) };
   const globals = {
@@ -48,10 +48,12 @@ async function runPanel({ markdown, selected, replies, steps = false, outcome = 
   };
   const { MarkdownSelectionAi } = load('experiences/markdown-context/selection-ai.ts', { obsidian }, globals);
   // `lockDuring`: the note text the editor holds from the moment the model call starts (a lock set while the draft is made).
-  const state = { markdown, replaced: [] };
+  // `readingAfter`: the view's mode from the moment the result is applied (the panel opens on source; reading view is switched on after).
+  const state = { markdown, replaced: [], saves: 0, mode: 'source' };
   const view = Object.assign(new MarkdownView(), {
-    file: { path: 'Note.md' }, containerEl: new FakeElement(), getMode: () => 'source',
-    editor: { getValue: () => state.markdown, getSelection: () => selected, getCursor: () => ({ line: 0, ch: 0 }), posToOffset: () => markdown.indexOf(selected), replaceRange(...args) { state.replaced.push(args); } }
+    file: { path: 'Note.md' }, containerEl: new FakeElement(), getMode: () => state.mode,
+    editor: { getValue: () => state.markdown, getSelection: () => selected, getCursor: () => ({ line: 0, ch: 0 }), posToOffset: () => markdown.indexOf(selected), replaceRange(...args) { state.replaced.push(args); } },
+    async save() { state.saves++; }
   });
   const app = { workspace: { containerEl: new FakeElement(), getLeavesOfType: () => [{ view }], getActiveViewOfType: () => view } };
   const sent = [];
@@ -63,9 +65,10 @@ async function runPanel({ markdown, selected, replies, steps = false, outcome = 
   presets.children[0].listeners.click[0]();
   for (let turn = 0; turn < 50 && sent.length < replies.length; turn++) await new Promise(resolve => setImmediate(resolve));
   await new Promise(resolve => setImmediate(resolve));
+  if (applyAfter && readingAfter) state.mode = readingAfter;
   if (applyAfter) panel.descendants().find(item => item.cls === 'vam-context-ai-result-actions').children.find(item => item.textContent === applyAfter).listeners.click[0]();
   if (!outcome) return sent;
-  return { sent, replaced: state.replaced, output: panel.descendants().find(item => item.cls === 'vam-context-ai-output')?.value, status: panel.descendants().filter(item => item.cls.split(' ').includes('vam-context-ai-status')).map(item => item.textContent).join('|') };
+  return { sent, replaced: state.replaced, saves: state.saves, output: panel.descendants().find(item => item.cls === 'vam-context-ai-output')?.value, status: panel.descendants().filter(item => item.cls.split(' ').includes('vam-context-ai-status')).map(item => item.textContent).join('|') };
 }
 function assert(value, message) { if (!value) throw new Error(message); }
 

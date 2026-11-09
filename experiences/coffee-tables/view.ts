@@ -138,6 +138,44 @@ class CoffeeDeleteModal extends Modal {
     this.resolveResult = undefined;
   }
 }
+/** Asks before a saved chat style is removed: the removal cannot be undone. */
+class CoffeeStyleDeleteModal extends Modal {
+  private result?: (confirmed: boolean) => void;
+  private confirmed = false;
+  constructor(
+    app: App,
+    private styleName: string,
+    private locale: UiLanguage
+  ) {
+    super(app);
+  }
+  private t(key: TranslationKey, ...values: unknown[]): string {
+    return translate(this.locale, key, ...values);
+  }
+  confirm(): Promise<boolean> {
+    return new Promise(resolve => {
+      this.result = resolve;
+      this.open();
+    });
+  }
+  onOpen(): void {
+    this.contentEl.createEl("h2", { text: this.t("coffee.delete_style_confirm_title") });
+    this.contentEl.createEl("p", { text: this.t("coffee.delete_style_confirm_body", this.styleName) });
+    const actions = this.contentEl.createDiv("modal-button-container");
+    actions.createEl("button", { text: this.t("ui.cancel") }).onclick = () => this.close();
+    const remove = actions.createEl("button", { text: this.t("coffee.delete_style") });
+    remove.addClass("mod-warning");
+    remove.onclick = () => {
+      this.confirmed = true;
+      this.close();
+    };
+  }
+  onClose(): void {
+    this.result?.(this.confirmed);
+    this.result = undefined;
+    this.contentEl.empty();
+  }
+}
 class CoffeeSummaryConfirmModal extends Modal {
   private result?: (confirmed: boolean) => void;
   private confirmed = false;
@@ -1201,6 +1239,8 @@ export class CoffeeTablesView extends ItemView {
       const items = this.plugin.settings.coffeeStyles ?? [],
         index = items.findIndex(style => style.id === styleSelect.value);
       if (index < 0) throw new Error(this.t("coffee.choose_a_saved_style_first"));
+      if (!(await new CoffeeStyleDeleteModal(this.app, items[index].name, this.plugin.settings.language).confirm()))
+        return;
       await this.changeCoffeeStyles(() => {
         this.plugin.settings.coffeeStyles = items.filter((_, at) => at !== index);
         if (this.plugin.settings.defaultCoffeeStyleId === items[index].id)

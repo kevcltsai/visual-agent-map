@@ -56,7 +56,7 @@ export function renderNoteStyleCard(setting: Setting, plugin: VisualAgentMapPlug
   const body = setting.settingEl.createDiv({ cls: "vam-style-card-body" });
   const partName = (category: "voice" | "format", ref: string): string => {
     const found = plugin.noteStyles.listParts(category).find(item => item.ref === ref);
-    return found?.name ?? ref;
+    return found?.name ?? t("ui.note_style_part_unknown_0", ref.replace(/^(?:file|builtin):/, ""));
   };
   const draw = (focus?: { category: "voice" | "format"; value: string }): void => {
     body.empty();

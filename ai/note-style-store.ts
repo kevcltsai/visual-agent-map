@@ -1147,7 +1147,10 @@ export class NoteStyleStore {
       try {
         return { ref, name: partNameOfRef(category, ref, language) };
       } catch {
-        return { ref, name: ref };
+        return {
+          ref,
+          name: translate(language, "ui.note_style_part_unknown_0", ref.replace(/^(?:file|builtin):/, ""))
+        };
       }
     };
     const items: RecipeListItem[] = BUILTIN_RECIPES.map(recipe => {

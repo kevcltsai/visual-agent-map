@@ -174,7 +174,8 @@ test('P3 card: the sample sentence follows the chosen voice (one sentence per bu
   assert.deepEqual(checkedOf(radiosOf(file.view, 'Voice')), []);
   const box = sampleOf(file.view);
   assert.equal(box.children.length, 1);
-  assert.equal(box.children[0].text, 'The current voice is “file:Calm”, which is not one of the choices above.');
+  // UI audit bugfix-2 bug 5 requires the human-readable name here (the raw "file:Calm" string leaked into the summary); this assertion used to lock the raw string, so it is updated to the new behavior.
+  assert.equal(box.children[0].text, 'The current voice is “Calm (not found)”, which is not one of the choices above.');
 });
 
 test('P3 card: the chips are a keyboard radio group: Tab lands on the checked chip, the arrow keys pick the next or previous one (wrapping) and keep the focus on the new chip', async () => {

@@ -445,3 +445,32 @@ test('sanitize on write: ordinary text is written byte-identical', async () => {
   assert.equal(plainLine('a\r\nb\nc'), 'a b c');
   assert.equal(plainLine('```mermaid'), '` ` `mermaid');
 });
+
+const INLINE = ['![](https://evil.example/p.png)', '![[Secret Note]]', '[[Secret Note]]', '<img src=x onerror=1>', '<script>alert(1)</script>', '\\[[Secret Note]]', '~~~\nx\n~~~', 'a\u2028b\r\nc'];
+const inert = text => !/!\[|\[\[|\]\]|[<>]|[\u2028\u2029]/.test(text) && !/~{3,}|`{3,}/.test(text);
+const oneLine = text => !/[\r\n]/.test(text);
+
+test('sanitize inline Markdown: plainLine neutralizes images, wikilinks, embeds, html and keeps ordinary text', () => {
+  const { plainLine } = S.load('experiences/visual-map/argument-run.ts');
+  for (const bad of INLINE) assert.ok(inert(plainLine(`x ${bad} y`)) && oneLine(plainLine(bad)), JSON.stringify(plainLine(bad)));
+  for (const text of ['GDP grew 3.2% in 2020 (see Table 1)', 'see [x] and a & b', 'https://stats.example.org/report?a=1&b=2', 'list [1] [2]', 'ok]']) assert.equal(plainLine(text), text);
+  assert.ok(plainLine('![[Secret Note]]').includes('Secret Note'));
+});
+
+test('sanitize inline Markdown on write: claim/quote/reason/point and note title/summary stay inert', async () => {
+  for (const bad of INLINE.filter(b => !b.includes('\n'))) {
+    const r = await rig({ script: { step: steps({
+      judge_gate: request => ({ matches: false, reason: `reason ${bad}`, citedData: [request.data[0].id] }),
+      conclude: request => ({ summary: `sum ${bad}`, points: [{ text: `point ${bad}`, hypothesisIds: request.input.hypotheses.map(h => h.id) }], basedOn: request.input.hypotheses.map(h => h.id) })
+    }) } });
+    await r.runs.start(r.mapPath, 'p');
+    const state = await r.state();
+    const ids = (await r.repo.readMap(r.mapPath)).nodes.map(n => n.id);
+    for (const id of ids) {
+      const note = await r.text(id).catch(() => null);
+      if (!note) continue;
+      assert.ok(inert(note.summary ?? '') && oneLine(note.summary ?? ''), `${bad} summary ${note.summary}`);
+      assert.ok(inert(note.detail ?? ''), `${bad} detail ${note.detail}`);
+    }
+  }
+});

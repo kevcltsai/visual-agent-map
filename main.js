@@ -91986,7 +91986,7 @@ function topicKindOfNote(kind) {
   return kind === "hypothesis" ? "hypothesis" : kind === "need" || kind === "datum" ? "evidence" : kind === "conclusion" ? "conclusion" : "topic";
 }
 function plainLine2(text13) {
-  return text13.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" "));
+  return text13.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/!\[|\[(?=\[)/g, (m) => m.replace("[", "&#91;")).replace(/\](?=\])/g, "&#93;");
 }
 var shorten = (text13, max) => Array.from(text13.trim()).slice(0, max).join("");
 var domainOf = (url) => {

@@ -107,9 +107,15 @@ export interface RunConfig {
   language: ArgumentStepBase["language"];
 }
 
-/** Model/web text as plain single-line text: line breaks become a space and a run of 3+ backticks or tildes cannot form a fence. Ordinary text is unchanged. */
+/** Model/web text as inert plain single-line text: line breaks become a space, 3+ backtick/tilde runs cannot form a fence, and Markdown inline constructs that load or link things (`![` images/embeds, `[[` `]]` wikilinks, `<` `>` raw HTML) are entity-encoded. Ordinary text is unchanged. */
 export function plainLine(text: string): string {
-  return text.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, m => [...m].join(" "));
+  return text
+    .replace(/[\r\n\u2028\u2029]+/g, " ")
+    .replace(/`{3,}|~{3,}/g, m => [...m].join(" "))
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/!\[|\[(?=\[)/g, m => m.replace("[", "&#91;"))
+    .replace(/\](?=\])/g, "&#93;");
 }
 
 /** Everything the runner touches. `mutate` is the plugin's serialized write queue; the others are repository/model/network seams. */

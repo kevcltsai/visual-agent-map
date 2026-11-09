@@ -43,6 +43,7 @@ import {
   type Hypothesis,
   type RoleKey
 } from "../../core/argument-map/model";
+import { arrangeArgumentMap } from "../../core/argument-map/layout";
 import { verifySource, type FetchPage } from "../../core/argument-map/source-proof";
 import {
   ARGUMENT_STEPS,
@@ -423,6 +424,9 @@ export class ArgumentRuns {
           if (node) this.place(doc, node, move.parentId);
         }
         doc.argumentMap = plan.next;
+        // Every checkpoint that adds or moves cards leaves the map arranged (same write), so opening it never shows a stack.
+        const arranged = readArgumentMap(doc);
+        if (arranged.kind === "usable") doc.nodes = arrangeArgumentMap(doc.nodes, arranged.data);
         wrote = true;
       });
       if (!wrote) return;

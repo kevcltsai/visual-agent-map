@@ -467,7 +467,7 @@ import {
   renderArgumentKind,
   type ArgumentCardView
 } from "./argument-card";
-import { arrangeArgumentMap } from "../../core/argument-map/layout";
+import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
   MAP_CHAT_ANCHOR_PREFIX,
@@ -3792,6 +3792,15 @@ export class VisualAgentMapView extends ItemView {
     const clearedQuestionEdges = aimEnabled() && clearQuestionConvergenceEdges(map);
     const repairedResultEdges = aimEnabled() && repairAimResultConvergence(map);
     if (clearedQuestionEdges || repairedResultEdges) {
+      await this.plugin.repo.saveMap(path, map);
+      if (!isCurrent()) return;
+    }
+    // A usable argument map whose cards are still stacked (the flow placed them) is arranged once, here, with no provider call.
+    const argumentOnOpen = map.argumentMap === undefined ? null : readArgumentMap(map);
+    const arranged =
+      argumentOnOpen?.kind === "usable" ? arrangeUnarrangedArgumentMap(map.nodes, argumentOnOpen.data) : null;
+    if (arranged) {
+      map.nodes = arranged;
       await this.plugin.repo.saveMap(path, map);
       if (!isCurrent()) return;
     }
@@ -19090,15 +19099,26 @@ export class VisualAgentMapView extends ItemView {
       cardAiLockButtons.delete(card);
       delete card.dataset.aiLocked;
     }
-    if (!this.map || this.aimLive() || isAimNode(node) || this.notes.get(node.id)?.aiLocked !== true) return;
+    const managed = this.isArgumentCard(node.id);
+    if (!this.map || this.aimLive() || isAimNode(node) || (!managed && this.notes.get(node.id)?.aiLocked !== true))
+      return;
     card.dataset.aiLocked = "true";
     const button = header.createEl("button", { cls: "vam-card-ai-lock" });
     cardAiLockButtons.set(card, button);
     button.type = "button";
     setIcon(button, "lock");
     button.tabIndex = -1;
-    button.setAttr("aria-label", t("ui.ai_unlock_card"));
-    button.setAttr("title", t("ui.ai_unlock_card"));
+    if (managed) {
+      // The argument flow owns this card: always locked, and the button offers nothing to unlock.
+      button.disabled = true;
+      button.setAttr("aria-disabled", "true");
+      button.setAttr("aria-pressed", "true");
+      button.setAttr("aria-label", t("ui.ai_lock_state_managed"));
+      button.setAttr("title", t("ui.ai_lock_state_managed"));
+    } else {
+      button.setAttr("aria-label", t("ui.ai_unlock_card"));
+      button.setAttr("title", t("ui.ai_unlock_card"));
+    }
     button.addEventListener("pointerdown", event => event.stopPropagation());
     button.addEventListener("dblclick", event => event.stopPropagation());
     button.addEventListener("click", event => {

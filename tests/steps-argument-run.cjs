@@ -98,9 +98,14 @@ test('happy path: runs to a conclusion; begin is written before each dispatch; o
   const log = r.stat.logs.join('\n');
   assert.ok(log.includes('stats.example.org') && !log.includes(QUOTE) && !log.includes(URL_OK) && log.includes('runId=id-1'));
   assert.equal(r.runs.isRunning(r.mapPath), false);
-  // fixed positions are deterministic: x = parent.x + 320
+  // every checkpoint leaves the map arranged: deeper layers sit to the right, no two cards share a spot, and arranging again moves nothing
   const byId = new Map(doc.nodes.map(n => [n.id, n]));
-  for (const n of doc.nodes.filter(n => n.parentId)) assert.equal(n.x, byId.get(n.parentId).x + 320);
+  for (const n of doc.nodes.filter(n => n.parentId)) assert.ok(n.x > byId.get(n.parentId).x, n.id);
+  assert.equal(new Set(doc.nodes.map(n => `${n.x},${n.y}`)).size, doc.nodes.length);
+  const layoutModule = S.load('core/argument-map/layout.ts');
+  const again = layoutModule.arrangeArgumentMap(doc.nodes, doc.argumentMap);
+  assert.deepEqual(again.map(n => [n.id, n.x, n.y]), doc.nodes.map(n => [n.id, n.x, n.y]));
+  assert.equal(layoutModule.arrangeUnarrangedArgumentMap(doc.nodes, doc.argumentMap), null);
 });
 
 test('layers: the eliminated group hangs under the conclusion; each situation datum is a leaf card (node id == datum id) under the situation card', async () => {

@@ -10,8 +10,9 @@ const MODULES = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotic
 const { VisualAgentMapView } = MODULES;
 const Plugin = MODULES.default;
 const machine = load('core/argument-map/machine.ts');
+const layout = load('core/argument-map/layout.ts');
 
-async function harness({ withKey = true, running = true, phase } = {}) {
+async function harness({ withKey = true, running = true, phase, stacked = false } = {}) {
   const { repo, app } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -30,7 +31,10 @@ async function harness({ withKey = true, running = true, phase } = {}) {
     if (!running) state = machine.applyPause(state, 'user');
     if (phase) state.run.phase = phase;
     doc.argumentMap = state;
+    // The flow leaves its map arranged; `stacked` is a map whose cards were never arranged.
+    if (!stacked) doc.nodes = layout.arrangeArgumentMap(doc.nodes, state);
   }
+  if (stacked) doc.nodes.forEach(n => { n.x = 80; n.y = 80; });
   await repo.saveMap(mapPath, doc);
   let owners = new Set();
   const calls = { provider: 0 };
@@ -70,6 +74,27 @@ test('a map without the argumentMap key is not rewritten', async () => {
   await h.open();
   assert.equal(await h.text(), before);
   assert.equal(h.view.map.argumentMap, undefined);
+});
+
+test('open: a stacked argument map is arranged once (no overlap, no provider call); opening again writes nothing', async () => {
+  const h = await harness({ stacked: true, running: false });
+  const before = (await h.repo.readMap(h.mapPath)).nodes;
+  assert.equal(new Set(before.map(n => `${n.x},${n.y}`)).size, 1);
+  await h.open();
+  const after = (await h.repo.readMap(h.mapPath)).nodes;
+  assert.ok(new Set(after.map(n => `${n.x},${n.y}`)).size > 1);
+  assert.deepEqual(after.map(n => n.id), before.map(n => n.id));
+  assert.equal(h.calls.provider, 0);
+  const once = await h.text();
+  await h.open();
+  assert.equal(await h.text(), once);
+});
+
+test('open: an ordinary map with stacked cards is not arranged', async () => {
+  const h = await harness({ withKey: false, stacked: true });
+  const before = await h.text();
+  await h.open();
+  assert.equal(await h.text(), before);
 });
 
 test('a run this instance owns, a paused run and a finished run are left as they are', async () => {

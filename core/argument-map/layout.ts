@@ -5,7 +5,7 @@
  * is stored: a map without a usable `argumentMap` never comes here.
  */
 import type { MapNode } from "../../map-graph";
-import { arrangeMap, type HeightOf } from "../../map-layout";
+import { arrangeMap, cardsOverlapAny, type HeightOf } from "../../map-layout";
 import { isVerified, type ArgumentMapData, type Hypothesis, type Need, type SituationDatum } from "./model";
 
 const GROUP_STANCE = { supports: 0, contradicts: 1, opposes: 1, uncertain: 2 } as const;
@@ -76,4 +76,18 @@ export function arrangeArgumentMap(
     const at = placed.get(node.id);
     return at ? { ...node, x: at.x, y: at.y } : node;
   });
+}
+
+/** Cards this short still overlap only when they are stacked (nothing was ever arranged), so a saved arrangement is left alone. */
+const UNARRANGED_PROBE_HEIGHT = 40;
+
+/**
+ * A usable argument map whose cards overlap (the flow placed them, nobody arranged them) is arranged once, with the default card
+ * height so the result does not depend on what is drawn. Returns the arranged nodes, or null when nothing needs to move; the result
+ * overlaps nothing, so arranging it again returns null (no endless writes).
+ */
+export function arrangeUnarrangedArgumentMap(nodes: MapNode[], state: ArgumentMapData): MapNode[] | null {
+  const all = new Set(nodes.map(node => node.id));
+  if (!cardsOverlapAny(nodes, all, () => UNARRANGED_PROBE_HEIGHT)) return null;
+  return arrangeArgumentMap(nodes, state);
 }

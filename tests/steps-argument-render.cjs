@@ -115,6 +115,25 @@ test('lock panel: a managed card shows locked and disabled with the managed text
   assert.equal(plainButton.attrs['aria-disabled'], undefined);
 });
 
+test('card lock button: a managed card always shows a disabled, pressed lock that offers no unlock; a free unlocked card has none', async () => {
+  const h = await harness({ argument: true });
+  const node = id => h.view.map.nodes.find(n => n.id === id);
+  const card = dom.element('div');
+  const header = dom.element('div');
+  h.view.paintAiLock(card, header, node(h.id('H')));
+  const button = dom.find(header, i => i.tag === 'button');
+  assert.ok(button, 'managed card has the lock button even if the note is not locked');
+  assert.equal(button.disabled, true);
+  assert.equal(button.attrs['aria-disabled'], 'true');
+  assert.equal(button.attrs['aria-pressed'], 'true');
+  assert.ok(/research flow/.test(button.attrs['aria-label']));
+  assert.equal(/Unlock|unlock/.test(button.attrs['aria-label']), false);
+  const free = await harness({ argument: false });
+  const freeHeader = dom.element('div');
+  free.view.paintAiLock(dom.element('div'), freeHeader, free.view.map.nodes[0]);
+  assert.equal(dom.find(freeHeader, i => i.tag === 'button'), undefined);
+});
+
 test('setAiLock: managed nodes are filtered out and nothing is written; an ordinary map still locks', async () => {
   const h = await harness({ argument: true });
   const before = new Map(h.view.map.nodes.map(n => [n.id, JSON.stringify(h.view.notes.get(n.id))]));

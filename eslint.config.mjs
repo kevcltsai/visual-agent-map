@@ -80,7 +80,8 @@ export default defineConfig([
     ignores: [
       "main.js",
       "visual-agent-map/main.js",
-      "tests/**"
+      "tests/**",
+      ".claude/worktrees/**"
     ]
   }
 ]);

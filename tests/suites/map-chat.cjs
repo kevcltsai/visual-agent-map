@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { test, integrationTest, root, load, core, plain, DEFAULT_SETTINGS, fixture, withExpansionCoordinator, until, deferred, obsidian } = require('../support.cjs');
 const dom = require('../support-dom.cjs');
+const { repoFiles } = require('../support-repo-scan.cjs');
 const { element, find, findAll, byLabel, tick } = dom;
 
 // A send is busy from the press (the "Preparing" bubble); this waits until its request has really gone out to the model.
@@ -3255,8 +3256,8 @@ integrationTest('B1 ui: stopping a turn and applying a plan each say one thing; 
 // ---- what must not change --------------------------------------------------------------------------------------------
 
 test('B1 ui: single sources stay single: one typingInField (5 mentions: the definition and its 4 callers), the same 7 renderChatMarkdown mentions in code (the topic chat window is a second user of the one renderer: import and call), one definition each of the focus capture and the detach', () => {
-  const walk = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? (['node_modules', 'tests', 'samples', 'scripts'].includes(entry.name) ? [] : walk(path.join(dir, entry.name))) : entry.name.endsWith('.ts') ? [path.join(dir, entry.name)] : []);
-  const sources = walk('.').map(file => fs.readFileSync(path.join(root, file), 'utf8'));
+  const files = repoFiles(root, { skipDirectories: ['node_modules', 'tests', 'samples', 'scripts'] }).filter(file => file.endsWith('.ts'));
+  const sources = files.map(file => fs.readFileSync(path.join(root, file), 'utf8'));
   const total = pattern => sources.reduce((sum, text) => sum + (text.match(new RegExp(pattern, 'g')) ?? []).length, 0);
   assert.equal(total('typingInField'), 5, 'typingInField'); assert.equal(total('active\\?\\.matches\\("input, textarea, select"\\)'), 1, 'the typing check is written once'); assert.equal(total('renderChatMarkdown'), 7, 'renderChatMarkdown');
   assert.equal(total('captureFocus\\(\\): \\(\\) => void \\{'), 1, 'one capture'); assert.equal(total('private detachMapChat\\(\\)'), 1, 'one detach');

@@ -8,3 +8,4 @@ scripts
 *.mjs
 *.cjs
 i18n.ts
+.claude/worktrees

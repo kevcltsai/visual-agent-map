@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { integrationTest, test, root, load, loadHidden, obsidian, fixture, plain, node, map, DEFAULT_SETTINGS } = require('../support.cjs');
+const { repoFiles } = require('../support-repo-scan.cjs');
 const hiddenCore = loadHidden('map-model.ts');
 const hiddenRepository = loadHidden('repository.ts', { obsidian });
 const { createAimMap } = load('experiences/aim/create-map.ts');
@@ -147,9 +148,7 @@ integrationTest('aim-hidden: N3 an AIM map imported outside the AIM folder opens
 });
 
 test('aim-hidden: the flag is the single switch', () => {
-  const files = [];
-  const walk = dir => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { if (['node_modules', '.git', 'tests', 'scripts', 'docs', 'vaults', '.scratch'].includes(entry.name)) continue; const full = path.join(dir, entry.name); if (entry.isDirectory()) walk(full); else if (/\.ts$/.test(entry.name)) files.push(full); } };
-  walk(root);
+  const files = repoFiles(root, { skipDirectories: ['node_modules', '.git', 'tests', 'scripts', 'docs', 'vaults', '.scratch'] }).filter(relative => /\.ts$/.test(relative)).map(relative => path.join(root, relative));
   const defining = files.filter(file => /export const AIM_ENABLED\b/.test(fs.readFileSync(file, 'utf8'))).map(file => path.relative(root, file));
   assert.deepEqual(defining, ['experiences/aim/availability.ts']);
   const reading = files.filter(file => /\bAIM_ENABLED\b/.test(fs.readFileSync(file, 'utf8'))).map(file => path.relative(root, file));

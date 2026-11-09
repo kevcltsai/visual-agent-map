@@ -217,6 +217,9 @@ export function describeArgumentCard(state: ArgumentMapData, id: string, t: Tran
   }
   const datum = state.situation.data.find(item => item.id === id);
   if (datum) return datumCard(datum, t);
+  // A stopped mismatch ran no hypothesis research: the groups carry no "0 / 3" count, only their label.
+  if ((id === roles.verified || id === roles.eliminated) && state.run.phase === "stopped_mismatch")
+    return plain("group", t("ui.argument_group_label"));
   if (id === roles.verified) {
     const verifying = state.hypotheses.filter(h => h.location === "verifying").length;
     return plain("group", t("ui.argument_group_label"), [

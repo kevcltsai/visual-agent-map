@@ -126,3 +126,17 @@ test('shapeKindFor: an argument map card is always the rectangle ("action"); an 
   }
   assert.equal(shape.TOPIC_KIND_SHAPES.action.shape, 'rect');
 });
+
+test('stopped mismatch: the conclusion card says only the stop sentence and its hint; the groups show no "0 / 3" count', () => {
+  const state = make('stopped_mismatch');
+  const view = card.describeArgumentCard(state, 'c', t);
+  assert.equal(view.title, t('ui.argument_stopped_mismatch'));
+  same(view.lines, [t('ui.argument_mismatch_hint')]);
+  for (const id of ['v', 'e']) {
+    const group = card.describeArgumentCard(state, id, t);
+    same(group.lines, [], id);
+    assert.equal(JSON.stringify(group).includes('0 / 3'), false, id);
+  }
+  // other phases keep the counts
+  assert.ok(card.describeArgumentCard(make('verifying'), 'v', t).lines.length === 1);
+});

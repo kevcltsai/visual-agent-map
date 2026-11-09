@@ -55,6 +55,12 @@ export interface MapDocument {
   topicRelations?: TopicRelation[];
   /** Free images and boundary frames drawn on the canvas. Absent when there are none. */
   canvasItems?: CanvasItem[];
+  /**
+   * Hypothesis-research (argument map) state, written only by that flow. parseMap and serializeMap carry it through untouched,
+   * whatever its content, so a key this version cannot read (`v` other than 1, an unknown enum, a role pointing to a missing node)
+   * is saved back exactly as it was; core/argument-map/model.ts `readArgumentMap` decides whether it is usable. Absent on every other map.
+   */
+  argumentMap?: unknown;
 }
 /**
  * Semantic links between topics; none of them changes the parent/child tree. `from` is A and `to` is B for every kind

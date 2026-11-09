@@ -40,8 +40,8 @@ The model menu now sits in the message box, and finished plans fold up so the co
 
 ### Known issues
 
-- The Stop button on a card can sit under the topic chat window or the map chat panel. Move the window or fold the panel to reach it.
-- In a very narrow window the map gets squeezed while the sidebar is open. Collapse the sidebar.
+- The Stop button on a card can sit under the topic chat window or the map chat panel. Close the window or fold the panel to reach it.
+- In a very narrow window the map gets squeezed while the sidebar is open. Collapse the sidebar and fold the map chat.
 
 ## [0.32.0] - 2026-11-08
 

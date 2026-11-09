@@ -1350,7 +1350,6 @@ var en = {
   "ui.map_chat_input_placeholder": "Ask a question, or ask the AI to change the map. Drag a topic card or a note here to add it as a reference.",
   "ui.map_chat_send": "Send",
   "ui.map_chat_stop": "Stop",
-  "ui.map_chat_model_short": "Model",
   "ui.map_chat_model_label": "Current model: chat and new AI tasks use this one",
   "ui.map_chat_steer_placeholder": "What do you want to add? The AI reads it midway through this reply.",
   "ui.map_chat_steer_hint": "Enter to add",
@@ -1557,7 +1556,7 @@ var en = {
   "ui.map_chat_count_skipped_0": "{0} skipped",
   "ui.map_chat_count_failed_0": "{0} failed",
   "ui.map_chat_count_separator": ", ",
-  "ui.map_chat_lines_show_0": "Show all {0} results",
+  "ui.map_chat_details_show": "View details",
   "ui.map_chat_lines_hide": "Show the summary only",
   "ui.map_chat_retry": "Retry",
   "ui.map_chat_plan_summary_0": "This plan needs your confirmation: {0}.",
@@ -4151,7 +4150,6 @@ var zhCN = {
   "ui.map_chat_input_placeholder": "\u63D0\u95EE\uFF0C\u6216\u8BF7 AI \u4FEE\u6539\u8FD9\u5F20\u56FE\u3002\u628A\u8BAE\u9898\u5361\u6216\u7B14\u8BB0\u62D6\u5230\u8FD9\u91CC\u5C31\u80FD\u5F15\u7528\u3002",
   "ui.map_chat_send": "\u53D1\u9001",
   "ui.map_chat_stop": "\u505C\u6B62",
-  "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u5F53\u524D\u6A21\u578B\uFF1A\u804A\u5929\u4E0E\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A",
   "ui.map_chat_steer_placeholder": "\u8981\u8865\u5145\u4EC0\u4E48\uFF1FAI \u4F1A\u5728\u8FD9\u4E00\u8F6E\u4E2D\u9014\u8BFB\u5230\u3002",
   "ui.map_chat_steer_hint": "Enter \u8865\u5145",
@@ -4358,7 +4356,7 @@ var zhCN = {
   "ui.map_chat_count_skipped_0": "\u7565\u8FC7 {0}",
   "ui.map_chat_count_failed_0": "\u5931\u8D25 {0}",
   "ui.map_chat_count_separator": "\u3001",
-  "ui.map_chat_lines_show_0": "\u663E\u793A\u5168\u90E8 {0} \u6761\u7ED3\u679C",
+  "ui.map_chat_details_show": "\u770B\u5185\u5BB9",
   "ui.map_chat_lines_hide": "\u53EA\u663E\u793A\u6458\u8981",
   "ui.map_chat_retry": "\u91CD\u8BD5",
   "ui.map_chat_plan_summary_0": "\u8FD9\u4EFD\u8BA1\u5212\u9700\u8981\u4F60\u786E\u8BA4\uFF1A{0}\u3002",
@@ -6952,7 +6950,6 @@ var zhTW = {
   "ui.map_chat_input_placeholder": "\u63D0\u554F\uFF0C\u6216\u8ACB AI \u4FEE\u6539\u9019\u5F35\u5716\u3002\u628A\u8B70\u984C\u5361\u6216\u7B46\u8A18\u62D6\u5230\u9019\u88E1\u5C31\u80FD\u5F15\u7528\u3002",
   "ui.map_chat_send": "\u9001\u51FA",
   "ui.map_chat_stop": "\u505C\u6B62",
-  "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u76EE\u524D\u6A21\u578B\uFF1A\u804A\u5929\u8207\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B",
   "ui.map_chat_steer_placeholder": "\u8981\u88DC\u5145\u4EC0\u9EBC\uFF1FAI \u6703\u5728\u9019\u4E00\u8F2A\u4E2D\u9014\u8B80\u5230\u3002",
   "ui.map_chat_steer_hint": "Enter \u88DC\u5145",
@@ -7159,7 +7156,7 @@ var zhTW = {
   "ui.map_chat_count_skipped_0": "\u7565\u904E {0}",
   "ui.map_chat_count_failed_0": "\u5931\u6557 {0}",
   "ui.map_chat_count_separator": "\u3001",
-  "ui.map_chat_lines_show_0": "\u986F\u793A\u5168\u90E8 {0} \u7B46\u7D50\u679C",
+  "ui.map_chat_details_show": "\u770B\u5167\u5BB9",
   "ui.map_chat_lines_hide": "\u53EA\u986F\u793A\u6458\u8981",
   "ui.map_chat_retry": "\u91CD\u8A66",
   "ui.map_chat_plan_summary_0": "\u9019\u4EFD\u8A08\u756B\u9700\u8981\u4F60\u78BA\u8A8D\uFF1A{0}\u3002",
@@ -23885,7 +23882,6 @@ var MAP_CHAT_WIDTH_STEP = 16;
 var MAP_CHAT_MIN_CANVAS = 360;
 var MAP_CHAT_NARROW_HYSTERESIS = 24;
 var MAP_CHAT_OVERLAY_MARGIN = 160;
-var MAP_CHAT_LINES_FOLD_ABOVE = 5;
 function clampMapChatWidth(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return MAP_CHAT_WIDTH_DEFAULT;
   return Math.min(MAP_CHAT_WIDTH_MAX, Math.max(MAP_CHAT_WIDTH_MIN, Math.round(value)));
@@ -38373,7 +38369,6 @@ var MapChatPanel = class {
     __publicField(this, "bodyEl");
     __publicField(this, "headEl");
     __publicField(this, "heroTitleEl");
-    __publicField(this, "titleEl");
     __publicField(this, "closeEl");
     __publicField(this, "logLabelEl");
     __publicField(this, "guideEl");
@@ -38388,8 +38383,8 @@ var MapChatPanel = class {
     __publicField(this, "inputEl");
     __publicField(this, "sendEl");
     __publicField(this, "modelEl");
-    /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
-    __publicField(this, "modelTagEl");
+    __publicField(this, "guideIconEl");
+    __publicField(this, "guideTextEl");
     __publicField(this, "stopEl");
     __publicField(this, "steerHintEl");
     __publicField(this, "saveEl");
@@ -39325,6 +39320,7 @@ ${typed}` : draft;
     var _a2, _b2, _c;
     const message = this.messages.find((item) => item.plan === plan);
     if (!message) return lines;
+    if (state === "applied" && plan.state !== "applied") message.linesOpen = false;
     plan.state = state;
     if (state === "applied" && !lines) message.lateFailures = [];
     else if (lines) {
@@ -39581,20 +39577,6 @@ ${typed}` : draft;
       attr: { id: this.id, role: "region", "aria-label": t("ui.map_chat_title") }
     });
     this.headEl = this.bodyEl.createDiv("vam-map-chat-head");
-    this.titleEl = this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
-    this.modelTagEl = this.headEl.createSpan({
-      cls: "vam-map-chat-model-tag",
-      text: t("ui.map_chat_model_short"),
-      attr: { "aria-hidden": "true" }
-    });
-    this.modelEl = this.headEl.createEl("select", {
-      cls: "vam-map-chat-model dropdown",
-      attr: { "aria-label": t("ui.map_chat_model_label") }
-    });
-    this.modelEl.addEventListener("change", () => {
-      this.host.setModel(this.modelEl.value);
-      this.refreshControls();
-    });
     this.saveEl = this.headEl.createEl("button", {
       cls: "vam-map-chat-save clickable-icon",
       attr: { type: "button", "aria-label": t("ui.map_chat_save"), title: t("ui.map_chat_save") }
@@ -39612,7 +39594,10 @@ ${typed}` : draft;
       text: t("ui.map_chat_hero_title"),
       attr: { role: "heading", "aria-level": "2" }
     });
-    this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
+    this.guideEl = this.bodyEl.createDiv("vam-map-chat-guide");
+    this.guideIconEl = this.guideEl.createSpan({ cls: "vam-map-chat-guide-icon", attr: { "aria-hidden": "true" } });
+    (0, import_obsidian24.setIcon)(this.guideIconEl, "message-square");
+    this.guideTextEl = this.guideEl.createSpan({ cls: "vam-sr-only", text: t("ui.map_chat_empty_log") });
     this.restoredEl = this.bodyEl.createDiv({ cls: "vam-map-chat-restored" });
     this.restoredEl.hidden = true;
     const logLabelId = `${this.id}-log-label`;
@@ -39664,6 +39649,14 @@ ${typed}` : draft;
       cls: "vam-map-chat-input",
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
+    this.modelEl = box.createEl("select", {
+      cls: "vam-map-chat-model dropdown",
+      attr: { "aria-label": t("ui.map_chat_model_label") }
+    });
+    this.modelEl.addEventListener("change", () => {
+      this.host.setModel(this.modelEl.value);
+      this.refreshControls();
+    });
     this.steerHintEl = box.createSpan({ cls: "vam-map-chat-steer-hint", attr: { id: "vam-map-chat-steer-hint" } });
     this.steerHintEl.hidden = true;
     this.sendEl = box.createEl("button", {
@@ -39676,6 +39669,9 @@ ${typed}` : draft;
       attr: { type: "button", "aria-label": t("ui.map_chat_stop") }
     });
     (0, import_obsidian24.setIcon)(this.stopEl, "square");
+    box.addEventListener("click", (event) => {
+      if (event.target === box) this.inputEl.focus();
+    });
     this.sendEl.addEventListener("click", () => this.sendPressed());
     this.stopEl.addEventListener("click", () => this.host.stop());
     this.inputEl.addEventListener("compositionstart", () => {
@@ -39779,12 +39775,10 @@ ${typed}` : draft;
   relabel() {
     if (!this.built) return;
     this.bodyEl.setAttr("aria-label", t("ui.map_chat_title"));
-    this.titleEl.setText(t("ui.map_chat_title"));
     this.modelEl.setAttr("aria-label", t("ui.map_chat_model_label"));
-    this.modelTagEl.setText(t("ui.map_chat_model_short"));
     this.closeEl.setAttr("aria-label", t("ui.map_chat_close"));
     this.heroTitleEl.setText(t("ui.map_chat_hero_title"));
-    this.guideEl.setText(t("ui.map_chat_empty_log"));
+    this.guideTextEl.setText(t("ui.map_chat_empty_log"));
     this.logLabelEl.setText(t("ui.map_chat_log_label"));
     this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
@@ -39959,8 +39953,8 @@ ${typed}` : draft;
   }
   /** A reply came in while the window is folded to its edge: the edge shows a dot. */
   /**
-   * On the opening screen the message field and the examples come first: the model menu is a quiet last line, after the "empty
-   * map" button (so reading and Tab order match what is seen). In the window the head row (title, model, save, close) is on top.
+   * On the opening screen the message field and the examples come first: the head row is a last, hidden line, after the "empty
+   * map" button (so reading and Tab order match what is seen); the head row (icons only) is hidden there. In the window it is on top.
    * Elements are moved only when they are out of place, so a control that has the keyboard is not moved for nothing.
    */
   placeHeadAndEmptyMap(hero, showEmptyMap) {
@@ -40266,6 +40260,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_steer_tag_queued"),
       t("ui.map_chat_retry"),
       t("ui.map_chat_lines_hide"),
+      t("ui.map_chat_details_show"),
       t("ui.map_chat_plan_summary_0", ""),
       t("ui.map_chat_plan_title"),
       t("ui.map_chat_plan_title_applied"),
@@ -40276,7 +40271,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
       message.lines.map(settledLine).map((line) => `${line.status}:${line.text}`).join("\n"),
-      message.plan ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_m = (_l = message.plan.groups) == null ? void 0 : _l.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _m : ""}` : "",
+      message.plan ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.aiWork ? "ai:" : ""}${message.plan.openGroups ? "open:" : ""}${message.plan.items.length}:${message.plan.estimate}:${(_m = (_l = message.plan.groups) == null ? void 0 : _l.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _m : ""}` : "",
       message.choices ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
       ((_n = message.images) != null ? _n : []).map(
         (block) => {
@@ -40353,9 +40348,10 @@ ${shown}` : t("ui.map_chat_model_label"));
     for (const steer of (_b2 = message.steers) != null ? _b2 : []) this.buildSteer(row, steer);
     if (message.error && message.technical) this.buildTechnical(row, message.technical);
     if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
-    if (message.plan) this.buildPlan(row, message.plan);
+    const applied = message.plan && message.plan.state === "applied" && !message.plan.stale ? message.plan : null;
+    if (message.plan && !applied) this.buildPlan(row, message.plan, message);
     if (message.choices) this.buildChoices(row, message.choices);
-    if (message.lines.length) this.buildLines(row, message);
+    const undoPlaced = message.lines.length > 0 || applied ? this.buildOutcome(row, message, applied) : false;
     this.buildBasis(row, message);
     if ((_c = message.images) == null ? void 0 : _c.length) this.buildImages(row, message.images);
     if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row);
@@ -40371,7 +40367,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     }
     if (message.chainNote)
       row.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
-    if (message.replyUndo) this.buildReplyUndo(row, message.replyUndo.token);
+    if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row, message.replyUndo.token);
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
     if (this.canRetry(message, asked) && (asked == null ? void 0 : asked.origin)) {
@@ -40399,7 +40395,8 @@ ${shown}` : t("ui.map_chat_model_label"));
    */
   buildBasis(row, message) {
     var _a2;
-    const entries = summarizeBasis(message.lines.flatMap((line) => line.basis ? [line.basis] : []));
+    const all = summarizeBasis(message.lines.flatMap((line) => line.basis ? [line.basis] : []));
+    const entries = message.linesOpen ? all : all.filter((entry) => entry.kind === "outline_only");
     const unread = (_a2 = message.unread) != null ? _a2 : [];
     if (!entries.length && !unread.length) return;
     const box = row.createDiv({ cls: "vam-map-chat-basis" });
@@ -40459,9 +40456,9 @@ ${shown}` : t("ui.map_chat_model_label"));
     this.paintWait();
   }
   /** "Undo this reply" under an "apply directly" reply. Nothing of it is saved with the conversation. */
-  buildReplyUndo(row, token) {
+  buildReplyUndo(parent, token) {
     var _a2, _b2;
-    const button = row.createEl("button", {
+    const button = parent.createEl("button", {
       cls: "vam-map-chat-undo-reply",
       text: t("ui.map_chat_undo_reply"),
       attr: { type: "button" }
@@ -40514,44 +40511,72 @@ ${shown}` : t("ui.map_chat_model_label"));
     this.stageEls = { box, label, elapsed, slow: null };
     this.paintStage();
   }
+  /** A result the reader still has to look at: anything not done, and a picture line where some card got no picture. */
+  needsLook(line) {
+    var _a2;
+    return line.status !== "done" || !!((_a2 = line.imageGroup) == null ? void 0 : _a2.some((block) => !placedImage(block)));
+  }
+  /** The toggle of "View details": one per reply, for the plan card and the results alike. Focus follows the rebuilt button. */
+  buildDetailToggle(parent, message, open) {
+    const toggle = parent.createEl("button", {
+      cls: "vam-map-chat-lines-toggle",
+      text: open ? t("ui.map_chat_lines_hide") : t("ui.map_chat_details_show"),
+      attr: { type: "button", "aria-expanded": String(open) }
+    });
+    toggle.addEventListener("click", () => {
+      var _a2, _b2;
+      message.linesOpen = !open;
+      this.renderLog();
+      (_b2 = (_a2 = this.rows.get(message)) == null ? void 0 : _a2.row.querySelector(".vam-map-chat-lines-toggle")) == null ? void 0 : _b2.focus();
+    });
+  }
   /**
-   * One line per action. More than five fold into a count (the closing "cannot be undone" note stays); each line says what
-   * happened in words, so the colour is never the only sign.
+   * What a reply did: only what the reader has to act on is shown (failed, skipped, a picture search that missed, the closing
+   * notes). Done lines fold into a count, and with the applied plan card and the basis they sit behind "View details". Each
+   * line says what happened in words, so the colour is never the only sign. Returns whether Undo was put in the summary row.
    */
-  buildLines(row, message) {
+  buildOutcome(row, message, applied) {
     const shownLines = message.lines.filter((line) => {
       var _a2;
       return !((_a2 = line.imageGroup) == null ? void 0 : _a2.some((block) => block.state === "searching"));
     });
     const { results, notes } = splitChatLines(shownLines.map(settledLine), chatNoteTexts());
+    const folded2 = results.filter((line) => !this.needsLook(line));
+    const loud = results.filter((line) => this.needsLook(line));
+    const hasBasis = message.lines.some((line) => line.basis);
+    const hasDetail = folded2.length > 0 || !!applied || hasBasis;
+    const open = hasDetail && message.linesOpen === true;
+    const undo = message.replyUndo;
+    if (!hasDetail && !loud.length && !notes.length && !undo) return false;
     const list = row.createDiv({ cls: "vam-map-chat-lines" });
-    const fold2 = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
-    const shown = !fold2 || message.linesOpen === true;
-    if (fold2) {
-      this.buildCounts(list.createDiv("vam-map-chat-lines-summary"), countChatLines(results));
-      const toggle = list.createEl("button", {
-        cls: "vam-map-chat-lines-toggle",
-        text: shown ? t("ui.map_chat_lines_hide") : t("ui.map_chat_lines_show_0", results.length),
-        attr: { type: "button", "aria-expanded": String(shown) }
-      });
-      toggle.addEventListener("click", () => {
-        var _a2, _b2;
-        message.linesOpen = !shown;
-        this.renderLog();
-        (_b2 = (_a2 = this.rows.get(message)) == null ? void 0 : _a2.row.querySelector(".vam-map-chat-lines-toggle")) == null ? void 0 : _b2.focus();
-      });
+    if (hasDetail || undo) {
+      const summary = list.createDiv("vam-map-chat-lines-summary");
+      if (folded2.length)
+        this.buildCounts(summary.createSpan("vam-map-chat-lines-counts"), {
+          done: folded2.length,
+          skipped: 0,
+          failed: 0
+        });
+      else if (applied) this.buildPlanSummary(summary.createSpan("vam-map-chat-lines-counts"), applied);
+      if (hasDetail) this.buildDetailToggle(summary, message, open);
+      if (undo) this.buildReplyUndo(summary, undo.token);
     }
-    if (shown)
-      for (const line of results) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    for (const line of loud) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    if (open) {
+      if (applied) this.buildPlan(list, applied, message);
+      for (const line of folded2) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    }
     for (const note of notes) list.createDiv({ cls: "vam-map-chat-line is-note", text: note.text });
+    return !!undo;
   }
   /**
-   * The plan card: one sentence, the actions folded by kind of work, the estimate, and Apply / Cancel. All plain elements
-   * (buttons, details), so Tab, Enter and Space work without any script.
+   * The plan card. Waiting: one summary line, the undo warning when the plan starts AI work, and Apply / Cancel / View details;
+   * the title, sentence, lists, estimate and intro sit behind "View details". Cancelled (and a restored one): the whole card as
+   * before. An applied card is built here too, but only inside the "View details" of its reply. All plain elements (buttons,
+   * details), so Tab, Enter and Space work without any script.
    */
-  buildPlan(row, plan) {
-    var _a2, _b2;
-    const card = row.createDiv({ cls: `vam-map-chat-plan is-${plan.state}` });
+  buildPlan(parent, plan, message) {
+    const card = parent.createDiv({ cls: `vam-map-chat-plan is-${plan.state}` });
     const title = t(
       plan.state === "applied" ? "ui.map_chat_plan_title_applied" : plan.state === "cancelled" ? "ui.map_chat_plan_title_cancelled" : "ui.map_chat_plan_title"
     );
@@ -40573,33 +40598,25 @@ ${shown}` : t("ui.map_chat_model_label"));
         this.makeInert(dead.createEl("button", { text: text12, attr: { type: "button" } }));
       return;
     }
-    card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
-    card.createDiv({
-      cls: "vam-map-chat-plan-sentence",
-      // Only a plan still waiting says it needs confirmation; an applied or cancelled one just names what it was.
-      text: (_a2 = plan.summary) != null ? _a2 : plan.state === "pending" ? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator"))) : plan.reasons.join(t("ui.map_chat_count_separator"))
-    });
-    const groups = (_b2 = plan.groups) != null ? _b2 : plan.items.length ? [{ label: "", items: plan.items }] : [];
-    for (const group of groups) {
-      const danger = "danger" in group ? group.danger : void 0;
-      const list = group.label ? card.createEl("details", { cls: `vam-map-chat-plan-group${danger ? " is-danger" : ""}` }) : card.createDiv("vam-map-chat-plan-group");
-      if (plan.openGroups && group.label) list.open = true;
-      if (group.label) {
-        const summary = list.createEl("summary", { cls: "vam-map-chat-plan-group-title", text: group.label });
-        if (danger) summary.createSpan({ cls: "vam-map-chat-plan-mark", text: danger.mark });
-      }
-      const items = list.createEl("ol", { cls: "vam-map-chat-plan-items" });
-      for (const item of group.items) items.createEl("li", { text: item });
-    }
-    card.createDiv({ cls: "vam-map-chat-plan-estimate", text: plan.estimate });
     if (plan.state !== "pending") {
+      this.buildPlanBody(card, plan, title);
       card.createDiv({
         cls: "vam-map-chat-plan-state",
         text: t(plan.state === "applied" ? "ui.map_chat_plan_applied" : "ui.map_chat_plan_cancelled")
       });
       return;
     }
-    card.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
+    this.buildPlanSummary(card.createDiv("vam-map-chat-plan-summary"), plan);
+    if (plan.aiWork) card.createDiv({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
+    const folds = !plan.openGroups;
+    const open = !folds || message.linesOpen === true;
+    const addDetail = () => {
+      if (!open) return;
+      const detail = card.createDiv("vam-map-chat-plan-detail");
+      this.buildPlanBody(detail, plan, title);
+      detail.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
+    };
+    if (!folds) addDetail();
     const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
     const apply = buttons.createEl("button", {
       cls: "mod-cta vam-map-chat-plan-apply",
@@ -40611,7 +40628,8 @@ ${shown}` : t("ui.map_chat_model_label"));
       text: t("ui.map_chat_plan_cancel"),
       attr: { type: "button" }
     });
-    if (plan.aiWork) buttons.createSpan({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
+    if (folds) this.buildDetailToggle(buttons, message, open);
+    if (folds) addDetail();
     apply.addEventListener("click", () => {
       if (plan.state !== "pending") return;
       apply.disabled = cancel.disabled = true;
@@ -40624,6 +40642,51 @@ ${shown}` : t("ui.map_chat_model_label"));
       plan.cancel();
       this.focusInput();
     });
+  }
+  /** The plan's one sentence: its own summary, or the reasons (a waiting plan says it needs the user's yes). */
+  planSentence(plan) {
+    var _a2;
+    return (_a2 = plan.summary) != null ? _a2 : plan.state === "pending" ? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator"))) : plan.reasons.join(t("ui.map_chat_count_separator"));
+  }
+  /** One line for a plan: its group labels (the group that removes cards says so in words); the sentence when none has a label. */
+  buildPlanSummary(parent, plan) {
+    var _a2;
+    const labelled = ((_a2 = plan.groups) != null ? _a2 : []).filter((group) => group.label);
+    if (!labelled.length) {
+      parent.setText(this.planSentence(plan));
+      return;
+    }
+    labelled.forEach((group, index) => {
+      if (index) parent.createSpan({ text: t("ui.map_chat_count_separator") });
+      const part = parent.createSpan({
+        cls: `vam-map-chat-plan-summary-part${group.danger ? " is-danger" : ""}`,
+        text: group.label
+      });
+      if (group.danger) part.createSpan({ cls: "vam-map-chat-plan-mark", text: group.danger.mark });
+    });
+  }
+  /** Title, sentence, the actions folded by kind of work, and the estimate. */
+  buildPlanBody(card, plan, title) {
+    var _a2;
+    card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
+    card.createDiv({
+      cls: "vam-map-chat-plan-sentence",
+      // Only a plan still waiting says it needs confirmation; an applied or cancelled one just names what it was.
+      text: this.planSentence(plan)
+    });
+    const groups = (_a2 = plan.groups) != null ? _a2 : plan.items.length ? [{ label: "", items: plan.items }] : [];
+    for (const group of groups) {
+      const danger = "danger" in group ? group.danger : void 0;
+      const list = group.label ? card.createEl("details", { cls: `vam-map-chat-plan-group${danger ? " is-danger" : ""}` }) : card.createDiv("vam-map-chat-plan-group");
+      if (plan.openGroups && group.label) list.open = true;
+      if (group.label) {
+        const summary = list.createEl("summary", { cls: "vam-map-chat-plan-group-title", text: group.label });
+        if (danger) summary.createSpan({ cls: "vam-map-chat-plan-mark", text: danger.mark });
+      }
+      const items = list.createEl("ol", { cls: "vam-map-chat-plan-items" });
+      for (const item of group.items) items.createEl("li", { text: item });
+    }
+    card.createDiv({ cls: "vam-map-chat-plan-estimate", text: plan.estimate });
   }
   /**
    * The pictures one reply put into its cards, as one result block: a summary, then a row per card (thumbnail, card, picture
@@ -40767,6 +40830,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     const show = (this.working || taking) && this.inputEl.value.trim().length > 0;
     this.steerHintEl.setText(show ? t(taking ? "ui.map_chat_chain_wait_hint" : "ui.map_chat_steer_hint") : "");
     this.steerHintEl.hidden = !show;
+    this.el.toggleClass("has-steer-hint", show);
     this.steerHintEl.toggleClass("is-hidden", !show);
     if (this.working) this.inputEl.setAttr("aria-keyshortcuts", "Enter");
     else (_b2 = (_a2 = this.inputEl).removeAttribute) == null ? void 0 : _b2.call(_a2, "aria-keyshortcuts");

@@ -17,7 +17,6 @@ import {
   clampMapChatWidth,
   countChatLines,
   splitChatLines,
-  MAP_CHAT_LINES_FOLD_ABOVE,
   MAP_CHAT_WIDTH_DEFAULT,
   MAP_CHAT_WIDTH_MAX,
   MAP_CHAT_WIDTH_MIN,
@@ -464,7 +463,6 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private bodyEl!: HTMLElement;
   private headEl!: HTMLElement;
   private heroTitleEl!: HTMLElement;
-  private titleEl!: HTMLElement;
   private closeEl!: HTMLButtonElement;
   private logLabelEl!: HTMLElement;
   private guideEl!: HTMLElement;
@@ -479,8 +477,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private inputEl!: HTMLTextAreaElement;
   private sendEl!: HTMLButtonElement;
   private modelEl!: HTMLSelectElement;
-  /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
-  private modelTagEl!: HTMLElement;
+  private guideIconEl!: HTMLElement;
+  private guideTextEl!: HTMLElement;
   private stopEl!: HTMLButtonElement;
   private steerHintEl!: HTMLElement;
   private saveEl!: HTMLButtonElement;
@@ -1457,6 +1455,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   settlePlan(plan: MapChatPlanCard, state: "applied" | "cancelled", lines?: MapChatLine[]): MapChatLine[] | undefined {
     const message = this.messages.find(item => item.plan === plan);
     if (!message) return lines;
+    // Applying folds the card back to one sentence, also when "View details" was opened while it waited (the lines come in a second call; it keeps what the reader opened by then).
+    if (state === "applied" && plan.state !== "applied") message.linesOpen = false;
     plan.state = state;
     // An applied plan without lines yet is being applied: expansion failures that come in meanwhile wait (like a streaming reply's)
     // and are settled into the result lines when they arrive, so they are not written over. The merged lines are returned.
@@ -1710,23 +1710,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       cls: "vam-map-chat-body",
       attr: { id: this.id, role: "region", "aria-label": t("ui.map_chat_title") }
     });
-    // Top row: the title, the model for this chat, and the button that folds the window.
+    // Top strip: only the quiet icons (new conversation, save, close). The model menu lives in the message box.
     this.headEl = this.bodyEl.createDiv("vam-map-chat-head");
-    this.titleEl = this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
-    // Hidden from screen readers: the menu's own label says the same, in full.
-    this.modelTagEl = this.headEl.createSpan({
-      cls: "vam-map-chat-model-tag",
-      text: t("ui.map_chat_model_short"),
-      attr: { "aria-hidden": "true" }
-    });
-    this.modelEl = this.headEl.createEl("select", {
-      cls: "vam-map-chat-model dropdown",
-      attr: { "aria-label": t("ui.map_chat_model_label") }
-    });
-    this.modelEl.addEventListener("change", () => {
-      this.host.setModel(this.modelEl.value);
-      this.refreshControls();
-    });
     this.saveEl = this.headEl.createEl("button", {
       cls: "vam-map-chat-save clickable-icon",
       attr: { type: "button", "aria-label": t("ui.map_chat_save"), title: t("ui.map_chat_save") }
@@ -1745,7 +1730,11 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       attr: { role: "heading", "aria-level": "2" }
     });
     // A map that has content opens the window onto an empty log: one line says what it is for.
-    this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
+    // A dashed box with a faint chat icon; the words stay for screen readers only.
+    this.guideEl = this.bodyEl.createDiv("vam-map-chat-guide");
+    this.guideIconEl = this.guideEl.createSpan({ cls: "vam-map-chat-guide-icon", attr: { "aria-hidden": "true" } });
+    setIcon(this.guideIconEl, "message-square");
+    this.guideTextEl = this.guideEl.createSpan({ cls: "vam-sr-only", text: t("ui.map_chat_empty_log") });
     this.restoredEl = this.bodyEl.createDiv({ cls: "vam-map-chat-restored" });
     this.restoredEl.hidden = true;
     // The log is not a live region: a streaming reply would be read out word by word. `liveEl` says each progress stage name once as it changes, then the whole turn once when it ends.
@@ -1799,6 +1788,15 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       cls: "vam-map-chat-input",
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
+    // Second in the box, so Tab goes: the field, the model, Send. Plain text at the bottom left, beside the keys on the right.
+    this.modelEl = box.createEl("select", {
+      cls: "vam-map-chat-model dropdown",
+      attr: { "aria-label": t("ui.map_chat_model_label") }
+    });
+    this.modelEl.addEventListener("change", () => {
+      this.host.setModel(this.modelEl.value);
+      this.refreshControls();
+    });
     this.steerHintEl = box.createSpan({ cls: "vam-map-chat-steer-hint", attr: { id: "vam-map-chat-steer-hint" } });
     this.steerHintEl.hidden = true;
     this.sendEl = box.createEl("button", {
@@ -1811,6 +1809,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       attr: { type: "button", "aria-label": t("ui.map_chat_stop") }
     });
     setIcon(this.stopEl, "square");
+    // The bottom strip is part of the box: pressing on its empty part (not on a control) puts the cursor in the field.
+    box.addEventListener("click", event => {
+      if (event.target === box) this.inputEl.focus();
+    });
     this.sendEl.addEventListener("click", () => this.sendPressed());
     this.stopEl.addEventListener("click", () => this.host.stop());
     this.inputEl.addEventListener("compositionstart", () => {
@@ -1916,12 +1918,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   relabel(): void {
     if (!this.built) return;
     this.bodyEl.setAttr("aria-label", t("ui.map_chat_title"));
-    this.titleEl.setText(t("ui.map_chat_title"));
     this.modelEl.setAttr("aria-label", t("ui.map_chat_model_label"));
-    this.modelTagEl.setText(t("ui.map_chat_model_short"));
     this.closeEl.setAttr("aria-label", t("ui.map_chat_close"));
     this.heroTitleEl.setText(t("ui.map_chat_hero_title"));
-    this.guideEl.setText(t("ui.map_chat_empty_log"));
+    this.guideTextEl.setText(t("ui.map_chat_empty_log"));
     this.logLabelEl.setText(t("ui.map_chat_log_label"));
     this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
@@ -2117,8 +2117,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
   /** A reply came in while the window is folded to its edge: the edge shows a dot. */
   /**
-   * On the opening screen the message field and the examples come first: the model menu is a quiet last line, after the "empty
-   * map" button (so reading and Tab order match what is seen). In the window the head row (title, model, save, close) is on top.
+   * On the opening screen the message field and the examples come first: the head row is a last, hidden line, after the "empty
+   * map" button (so reading and Tab order match what is seen); the head row (icons only) is hidden there. In the window it is on top.
    * Elements are moved only when they are out of place, so a control that has the keyboard is not moved for nothing.
    */
   private placeHeadAndEmptyMap(hero: boolean, showEmptyMap: boolean): void {
@@ -2439,6 +2439,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       t("ui.map_chat_steer_tag_queued"),
       t("ui.map_chat_retry"),
       t("ui.map_chat_lines_hide"),
+      t("ui.map_chat_details_show"),
       t("ui.map_chat_plan_summary_0", ""),
       t("ui.map_chat_plan_title"),
       t("ui.map_chat_plan_title_applied"),
@@ -2453,7 +2454,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         .map(line => `${line.status}:${line.text}`)
         .join("\n"),
       message.plan
-        ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${message.plan.groups?.map(group => `${group.label}${group.danger ? "!" : ""}`).join("|") ?? ""}`
+        ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.aiWork ? "ai:" : ""}${message.plan.openGroups ? "open:" : ""}${message.plan.items.length}:${message.plan.estimate}:${message.plan.groups?.map(group => `${group.label}${group.danger ? "!" : ""}`).join("|") ?? ""}`
         : "",
       message.choices
         ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map(o => o.label).join("|")}`
@@ -2540,9 +2541,11 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     for (const steer of message.steers ?? []) this.buildSteer(row, steer);
     if (message.error && message.technical) this.buildTechnical(row, message.technical);
     if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
-    if (message.plan) this.buildPlan(row, message.plan);
+    // An applied plan has no card of its own: its content is behind the same "View details" as the results.
+    const applied = message.plan && message.plan.state === "applied" && !message.plan.stale ? message.plan : null;
+    if (message.plan && !applied) this.buildPlan(row, message.plan, message);
     if (message.choices) this.buildChoices(row, message.choices);
-    if (message.lines.length) this.buildLines(row, message);
+    const undoPlaced = message.lines.length > 0 || applied ? this.buildOutcome(row, message, applied) : false;
     this.buildBasis(row, message);
     if (message.images?.length) this.buildImages(row, message.images);
     if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row);
@@ -2559,7 +2562,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     }
     if (message.chainNote)
       row.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
-    if (message.replyUndo) this.buildReplyUndo(row, message.replyUndo.token);
+    if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row, message.replyUndo.token);
     // What the AI actually did comes straight after what it said; the buttons that act on the answer come last.
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more: HTMLButtonElement | null = null;
@@ -2585,7 +2588,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    * left unread. Plain text only (titles are untrusted); "read", never "checked". The program decides it, not the model.
    */
   private buildBasis(row: HTMLElement, message: MapChatMessage): void {
-    const entries = summarizeBasis(message.lines.flatMap(line => (line.basis ? [line.basis] : [])));
+    // The basis is detail (behind "View details"); a note the AI could not read is an exception and always shows:
+    // the unread research notes, and a card built from its title only.
+    const all = summarizeBasis(message.lines.flatMap(line => (line.basis ? [line.basis] : [])));
+    const entries = message.linesOpen ? all : all.filter(entry => entry.kind === "outline_only");
     const unread = message.unread ?? [];
     if (!entries.length && !unread.length) return;
     const box = row.createDiv({ cls: "vam-map-chat-basis" });
@@ -2651,8 +2657,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
 
   /** "Undo this reply" under an "apply directly" reply. Nothing of it is saved with the conversation. */
-  private buildReplyUndo(row: HTMLElement, token: object): void {
-    const button = row.createEl("button", {
+  private buildReplyUndo(parent: HTMLElement, token: object): void {
+    const button = parent.createEl("button", {
       cls: "vam-map-chat-undo-reply",
       text: t("ui.map_chat_undo_reply"),
       attr: { type: "button" }
@@ -2707,42 +2713,70 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.paintStage();
   }
 
+  /** A result the reader still has to look at: anything not done, and a picture line where some card got no picture. */
+  private needsLook(line: MapChatLine): boolean {
+    return line.status !== "done" || !!line.imageGroup?.some(block => !placedImage(block));
+  }
+  /** The toggle of "View details": one per reply, for the plan card and the results alike. Focus follows the rebuilt button. */
+  private buildDetailToggle(parent: HTMLElement, message: MapChatMessage, open: boolean): void {
+    const toggle = parent.createEl("button", {
+      cls: "vam-map-chat-lines-toggle",
+      text: open ? t("ui.map_chat_lines_hide") : t("ui.map_chat_details_show"),
+      attr: { type: "button", "aria-expanded": String(open) }
+    });
+    toggle.addEventListener("click", () => {
+      message.linesOpen = !open;
+      this.renderLog();
+      // The row was rebuilt, and the button with it: the keyboard goes to its successor.
+      this.rows.get(message)?.row.querySelector<HTMLElement>(".vam-map-chat-lines-toggle")?.focus();
+    });
+  }
   /**
-   * One line per action. More than five fold into a count (the closing "cannot be undone" note stays); each line says what
-   * happened in words, so the colour is never the only sign.
+   * What a reply did: only what the reader has to act on is shown (failed, skipped, a picture search that missed, the closing
+   * notes). Done lines fold into a count, and with the applied plan card and the basis they sit behind "View details". Each
+   * line says what happened in words, so the colour is never the only sign. Returns whether Undo was put in the summary row.
    */
-  private buildLines(row: HTMLElement, message: MapChatMessage): void {
+  private buildOutcome(row: HTMLElement, message: MapChatMessage, applied: MapChatPlanCard | null): boolean {
     // While a picture search runs its block shows the progress; the result line returns when every search has ended.
     const shownLines = message.lines.filter(line => !line.imageGroup?.some(block => block.state === "searching"));
     const { results, notes } = splitChatLines(shownLines.map(settledLine), chatNoteTexts());
+    const folded = results.filter(line => !this.needsLook(line));
+    const loud = results.filter(line => this.needsLook(line));
+    const hasBasis = message.lines.some(line => line.basis);
+    const hasDetail = folded.length > 0 || !!applied || hasBasis;
+    const open = hasDetail && message.linesOpen === true;
+    const undo = message.replyUndo;
+    if (!hasDetail && !loud.length && !notes.length && !undo) return false;
     const list = row.createDiv({ cls: "vam-map-chat-lines" });
-    const fold = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
-    const shown = !fold || message.linesOpen === true;
-    if (fold) {
-      this.buildCounts(list.createDiv("vam-map-chat-lines-summary"), countChatLines(results));
-      const toggle = list.createEl("button", {
-        cls: "vam-map-chat-lines-toggle",
-        text: shown ? t("ui.map_chat_lines_hide") : t("ui.map_chat_lines_show_0", results.length),
-        attr: { type: "button", "aria-expanded": String(shown) }
-      });
-      toggle.addEventListener("click", () => {
-        message.linesOpen = !shown;
-        this.renderLog();
-        // The row was rebuilt, and the button with it: the keyboard goes to its successor.
-        this.rows.get(message)?.row.querySelector<HTMLElement>(".vam-map-chat-lines-toggle")?.focus();
-      });
+    if (hasDetail || undo) {
+      const summary = list.createDiv("vam-map-chat-lines-summary");
+      if (folded.length)
+        this.buildCounts(summary.createSpan("vam-map-chat-lines-counts"), {
+          done: folded.length,
+          skipped: 0,
+          failed: 0
+        });
+      else if (applied) this.buildPlanSummary(summary.createSpan("vam-map-chat-lines-counts"), applied);
+      if (hasDetail) this.buildDetailToggle(summary, message, open);
+      if (undo) this.buildReplyUndo(summary, undo.token);
     }
-    if (shown)
-      for (const line of results) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    for (const line of loud) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    if (open) {
+      if (applied) this.buildPlan(list, applied, message);
+      for (const line of folded) list.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    }
     for (const note of notes) list.createDiv({ cls: "vam-map-chat-line is-note", text: note.text });
+    return !!undo;
   }
 
   /**
-   * The plan card: one sentence, the actions folded by kind of work, the estimate, and Apply / Cancel. All plain elements
-   * (buttons, details), so Tab, Enter and Space work without any script.
+   * The plan card. Waiting: one summary line, the undo warning when the plan starts AI work, and Apply / Cancel / View details;
+   * the title, sentence, lists, estimate and intro sit behind "View details". Cancelled (and a restored one): the whole card as
+   * before. An applied card is built here too, but only inside the "View details" of its reply. All plain elements (buttons,
+   * details), so Tab, Enter and Space work without any script.
    */
-  private buildPlan(row: HTMLElement, plan: MapChatPlanCard): void {
-    const card = row.createDiv({ cls: `vam-map-chat-plan is-${plan.state}` });
+  private buildPlan(parent: HTMLElement, plan: MapChatPlanCard, message: MapChatMessage): void {
+    const card = parent.createDiv({ cls: `vam-map-chat-plan is-${plan.state}` });
     // The title follows what became of the plan, so a card read again later does not look as if it still waits.
     const title = t(
       plan.state === "applied"
@@ -2770,15 +2804,90 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         this.makeInert(dead.createEl("button", { text, attr: { type: "button" } }));
       return;
     }
+    if (plan.state !== "pending") {
+      this.buildPlanBody(card, plan, title);
+      card.createDiv({
+        cls: "vam-map-chat-plan-state",
+        text: t(plan.state === "applied" ? "ui.map_chat_plan_applied" : "ui.map_chat_plan_cancelled")
+      });
+      return;
+    }
+    this.buildPlanSummary(card.createDiv("vam-map-chat-plan-summary"), plan);
+    // Said before the button is pressed, not after: undo takes the plan's changes back, but not the AI work it starts. Always
+    // shown (never behind "View details") and only for a plan that does start AI work.
+    if (plan.aiWork) card.createDiv({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
+    // A plan about a picture keeps its lists open: the user checks the anchors before they apply them, so nothing folds.
+    const folds = !plan.openGroups;
+    const open = !folds || message.linesOpen === true;
+    const addDetail = (): void => {
+      if (!open) return;
+      const detail = card.createDiv("vam-map-chat-plan-detail");
+      this.buildPlanBody(detail, plan, title);
+      detail.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
+    };
+    // A picture plan lists what it will do first, then asks; other plans put the buttons first and fold the detail after them.
+    if (!folds) addDetail();
+    const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
+    const apply = buttons.createEl("button", {
+      cls: "mod-cta vam-map-chat-plan-apply",
+      text: t("ui.map_chat_plan_apply"),
+      attr: { type: "button" }
+    });
+    const cancel = buttons.createEl("button", {
+      cls: "vam-map-chat-plan-cancel",
+      text: t("ui.map_chat_plan_cancel"),
+      attr: { type: "button" }
+    });
+    if (folds) this.buildDetailToggle(buttons, message, open);
+    if (folds) addDetail();
+    // A second press does nothing: the buttons stop working as soon as one is used. They disappear with the repaint, so the
+    // keyboard goes back to the message field instead of falling to the page.
+    apply.addEventListener("click", () => {
+      if (plan.state !== "pending") return;
+      apply.disabled = cancel.disabled = true;
+      plan.apply();
+      this.focusInput();
+    });
+    cancel.addEventListener("click", () => {
+      if (plan.state !== "pending") return;
+      apply.disabled = cancel.disabled = true;
+      plan.cancel();
+      this.focusInput();
+    });
+  }
+  /** The plan's one sentence: its own summary, or the reasons (a waiting plan says it needs the user's yes). */
+  private planSentence(plan: MapChatPlanCard): string {
+    return (
+      plan.summary ??
+      (plan.state === "pending"
+        ? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator")))
+        : plan.reasons.join(t("ui.map_chat_count_separator")))
+    );
+  }
+  /** One line for a plan: its group labels (the group that removes cards says so in words); the sentence when none has a label. */
+  private buildPlanSummary(parent: HTMLElement, plan: MapChatPlanCard): void {
+    const labelled = (plan.groups ?? []).filter(group => group.label);
+    if (!labelled.length) {
+      parent.setText(this.planSentence(plan));
+      return;
+    }
+    labelled.forEach((group, index) => {
+      if (index) parent.createSpan({ text: t("ui.map_chat_count_separator") });
+      const part = parent.createSpan({
+        cls: `vam-map-chat-plan-summary-part${group.danger ? " is-danger" : ""}`,
+        text: group.label
+      });
+      // Text as well as colour: a group that removes cards says so in words.
+      if (group.danger) part.createSpan({ cls: "vam-map-chat-plan-mark", text: group.danger.mark });
+    });
+  }
+  /** Title, sentence, the actions folded by kind of work, and the estimate. */
+  private buildPlanBody(card: HTMLElement, plan: MapChatPlanCard, title: string): void {
     card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
     card.createDiv({
       cls: "vam-map-chat-plan-sentence",
       // Only a plan still waiting says it needs confirmation; an applied or cancelled one just names what it was.
-      text:
-        plan.summary ??
-        (plan.state === "pending"
-          ? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator")))
-          : plan.reasons.join(t("ui.map_chat_count_separator")))
+      text: this.planSentence(plan)
     });
     const groups = plan.groups ?? (plan.items.length ? [{ label: "", items: plan.items }] : []);
     for (const group of groups) {
@@ -2796,41 +2905,6 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       for (const item of group.items) items.createEl("li", { text: item });
     }
     card.createDiv({ cls: "vam-map-chat-plan-estimate", text: plan.estimate });
-    if (plan.state !== "pending") {
-      card.createDiv({
-        cls: "vam-map-chat-plan-state",
-        text: t(plan.state === "applied" ? "ui.map_chat_plan_applied" : "ui.map_chat_plan_cancelled")
-      });
-      return;
-    }
-    card.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
-    const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
-    const apply = buttons.createEl("button", {
-      cls: "mod-cta vam-map-chat-plan-apply",
-      text: t("ui.map_chat_plan_apply"),
-      attr: { type: "button" }
-    });
-    const cancel = buttons.createEl("button", {
-      cls: "vam-map-chat-plan-cancel",
-      text: t("ui.map_chat_plan_cancel"),
-      attr: { type: "button" }
-    });
-    // Said before the button is pressed, not after: undo takes the plan's changes back, but not the AI work it starts.
-    if (plan.aiWork) buttons.createSpan({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
-    // A second press does nothing: the buttons stop working as soon as one is used. They disappear with the repaint, so the
-    // keyboard goes back to the message field instead of falling to the page.
-    apply.addEventListener("click", () => {
-      if (plan.state !== "pending") return;
-      apply.disabled = cancel.disabled = true;
-      plan.apply();
-      this.focusInput();
-    });
-    cancel.addEventListener("click", () => {
-      if (plan.state !== "pending") return;
-      apply.disabled = cancel.disabled = true;
-      plan.cancel();
-      this.focusInput();
-    });
   }
   /**
    * The pictures one reply put into its cards, as one result block: a summary, then a row per card (thumbnail, card, picture
@@ -2990,6 +3064,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const show = (this.working || taking) && this.inputEl.value.trim().length > 0;
     this.steerHintEl.setText(show ? t(taking ? "ui.map_chat_chain_wait_hint" : "ui.map_chat_steer_hint") : "");
     this.steerHintEl.hidden = !show;
+    // The model menu in the same box gives way to the hint (its width is set by this class).
+    this.el.toggleClass("has-steer-hint", show);
     this.steerHintEl.toggleClass("is-hidden", !show);
     if (this.working) this.inputEl.setAttr("aria-keyshortcuts", "Enter");
     else this.inputEl.removeAttribute?.("aria-keyshortcuts");

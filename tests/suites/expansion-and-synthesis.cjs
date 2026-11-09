@@ -2541,10 +2541,12 @@ test('R2 M3: a stage or query change in a running research patches the card chip
     const log = { renders: 0, edges: 0, settles: 0, fits: 0 }; let growTo = null;
     view.scheduleResearchRender = () => { log.renders++; };
     view.drawEdges = () => { log.edges++; }; view.settleCardHeights = () => { log.settles++; };
-    view.fitKindShape = c => { log.fits++; if (growTo !== null) c.offsetHeight = growTo; };
+    view.fitKindShape = () => { log.fits++; };
     store.begin('a.md', 'x', 1);
     let stage = null;
     if (chip) { const c = card.createSpan({ cls: 'vam-status' }); stage = c.createSpan({ cls: 'vam-research-stage', text: 'Waiting for the model' }); }
+    // The height follows the chip text (a wrapping header), so it changes at setText time, before any fitKindShape.
+    Object.defineProperty(card, 'offsetHeight', { get: () => (growTo !== null && stage && stage.textContent !== 'Waiting for the model' ? growTo : 100) });
     if (label) view.labelCard(card, 'Topic A: Waiting for the model, Researched');
     view.researchSigs.set('a.md', view.researchSig(store.get('a.md')));
     return { view, store, card, stage, log, grow: h => { growTo = h; } };

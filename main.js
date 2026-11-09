@@ -64003,6 +64003,7 @@ ${request.requirements}` : preset.text,
     const stageEl = card.querySelector(".vam-research-stage");
     if (!stageEl) return false;
     const oldText = (_c = stageEl.textContent) != null ? _c : "";
+    const before = card.offsetHeight;
     const text12 = this.researchStageText(progress);
     stageEl.setText(text12);
     stageEl.setAttr("title", text12);
@@ -64012,7 +64013,6 @@ ${request.requirements}` : preset.text,
       const at = named.lastIndexOf(oldText);
       if (at >= 0) this.labelCard(card, named.slice(0, at) + text12 + named.slice(at + oldText.length));
     }
-    const before = card.offsetHeight;
     this.fitKindShape(card, this.topicKindOf(node.id));
     if (card.offsetHeight !== before) {
       this.drawEdges();

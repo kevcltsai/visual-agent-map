@@ -7934,6 +7934,7 @@ export class VisualAgentMapView extends ItemView {
     const stageEl = card.querySelector<HTMLElement>(".vam-research-stage");
     if (!stageEl) return false;
     const oldText = stageEl.textContent ?? "";
+    const before = card.offsetHeight; // before the chip text changes: the header may wrap to another height
     const text = this.researchStageText(progress);
     stageEl.setText(text);
     stageEl.setAttr("title", text);
@@ -7943,7 +7944,6 @@ export class VisualAgentMapView extends ItemView {
       const at = named.lastIndexOf(oldText);
       if (at >= 0) this.labelCard(card, named.slice(0, at) + text + named.slice(at + oldText.length));
     }
-    const before = card.offsetHeight;
     this.fitKindShape(card, this.topicKindOf(node.id));
     if (card.offsetHeight !== before) {
       this.drawEdges();

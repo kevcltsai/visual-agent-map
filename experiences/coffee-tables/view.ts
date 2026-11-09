@@ -57,12 +57,14 @@ import {
   cleanChatStyle,
   tablePrompt
 } from "./prompts";
-import { COFFEE_SAMPLE_EN, COFFEE_SAMPLE_ZH } from "./samples";
+import { COFFEE_SAMPLE_EN, COFFEE_SAMPLE_ZH, isSampleSessionId } from "./samples";
 import { coffeeContentLocale, coffeeInstruction } from "./language";
 import {
   effectiveTableStatus,
+  formatTableDateTime,
   formatTableTime,
   selectTables,
+  tableDeleteLines,
   tableStatusKey,
   tableTime,
   topicTableCount,
@@ -93,7 +95,8 @@ class CoffeeDeleteModal extends Modal {
   constructor(
     app: App,
     private topic: string,
-    private locale: UiLanguage
+    private locale: UiLanguage,
+    private lines: string[] = []
   ) {
     super(app);
   }
@@ -110,9 +113,15 @@ class CoffeeDeleteModal extends Modal {
     const content = this.contentEl;
     content.empty();
     content.createEl("h2", { text: this.t("coffee.delete_this_table") });
-    content.createEl("p", {
-      text: this.t("coffee.will_be_backed_up_and_moved_to_the_vault_trash", this.topic)
-    });
+    if (this.lines.length) {
+      content.createEl("p", { text: this.t("coffee.delete_many_tables_intro") });
+      const list = content.createEl("ul");
+      for (const line of this.lines) list.createEl("li", { text: line });
+    } else {
+      content.createEl("p", {
+        text: this.t("coffee.will_be_backed_up_and_moved_to_the_vault_trash", this.topic)
+      });
+    }
     const buttons = content.createDiv({ cls: "modal-button-container" });
     const cancel = buttons.createEl("button", { text: this.t("ui.cancel") });
     cancel.onclick = () => this.close();
@@ -504,6 +513,10 @@ export class CoffeeTablesView extends ItemView {
   async confirmFillSummaries(): Promise<void> {
     const engine = this.engine;
     if (!engine || engine.busy) return;
+    if (isSampleSessionId(engine.session.id)) {
+      new Notice(this.t("coffee.engine_sample_read_only"));
+      return;
+    }
     const confirmed = await new CoffeeSummaryConfirmModal(
       this.app,
       this.plugin.modelLabel(engine.session.model),
@@ -816,7 +829,10 @@ export class CoffeeTablesView extends ItemView {
     this.modelUnsubscribe = this.plugin.subscribeModelDiscovery(state => {
       if (this.closed || generation !== this.generation) return;
       setModels(this.plugin.availableModels());
-      modelStatus.setText(`${state.provider}: ${state.status}${state.error ? ` · ${state.error}` : ""}`);
+      const providerName = state.provider === "codex" ? "Codex" : "Claude CLI";
+      modelStatus.setText(
+        `${this.t("coffee.model_provider_status", providerName, this.t(`ui.model_status_${state.status}` as TranslationKey))}${state.error ? ` · ${state.error}` : ""}`
+      );
       retryModels.disabled = state.status === "loading";
       start.disabled = !this.plugin.availableModels().includes(model.value);
     });
@@ -1098,16 +1114,25 @@ export class CoffeeTablesView extends ItemView {
     renderReferences();
     fileInput.addEventListener("change", () => {
       void (async () => {
-        const selected = Array.from(fileInput.files ?? []);
+        const selected = Array.from(fileInput.files ?? []),
+          skipped: string[] = [];
         for (const file of selected) {
-          if (!/\.(txt|md)$/i.test(file.name)) throw new Error(this.t("coffee.unsupported_reference_file", file.name));
+          // One bad file must not stop the batch: the usable files are kept and each skipped one is named.
+          if (!/\.(txt|md)$/i.test(file.name)) {
+            skipped.push(this.t("coffee.unsupported_reference_file", file.name));
+            continue;
+          }
           const content = await file.text();
-          if (!content.trim()) throw new Error(this.t("coffee.the_reference_file_is_empty", file.name));
+          if (!content.trim()) {
+            skipped.push(this.t("coffee.the_reference_file_is_empty", file.name));
+            continue;
+          }
           referenceFiles.push({ name: file.name, content });
         }
         renderReferences();
         snapshotForm();
         fileInput.value = "";
+        if (skipped.length) new Notice(skipped.join("\n"));
       })().catch(error => {
         fileInput.value = "";
         new Notice(error instanceof Error ? error.message : String(error));
@@ -1436,8 +1461,8 @@ export class CoffeeTablesView extends ItemView {
       deletingTables = true;
       updateSelection();
       try {
-        const topics = this.t("coffee.tables_count_list", targets.length, targets.map(item => item.topic).join("\n"));
-        if (!(await new CoffeeDeleteModal(this.app, topics, this.plugin.settings.language).confirm())) return;
+        const lines = tableDeleteLines(targets, this.plugin.settings.language);
+        if (!(await new CoffeeDeleteModal(this.app, "", this.plugin.settings.language, lines).confirm())) return;
         let removed = 0;
         const failures: string[] = [];
         for (const item of targets) {
@@ -1607,7 +1632,7 @@ export class CoffeeTablesView extends ItemView {
         body.createEl("h2", { text: session.topic });
         body.createEl("p", {
           cls: "ct-muted",
-          text: `${this.t("coffee.latest_update")} · ${new Date(session.lastCompletedAt || session.updatedAt || session.createdAt).toLocaleString()}`
+          text: `${this.t("coffee.latest_update")} · ${formatTableDateTime(Date.parse(session.lastCompletedAt || session.updatedAt || session.createdAt), this.plugin.settings.language)}`
         });
         if (session.dirtyNotes)
           body.createEl("p", {
@@ -1724,7 +1749,7 @@ export class CoffeeTablesView extends ItemView {
         if (Number.isFinite(timestamp.getTime()))
           button.setAttribute(
             "title",
-            `${item.topic}\n${timestamp.toLocaleString()}${item.model ? ` · ${item.model}` : ""}`
+            `${item.topic}\n${formatTableDateTime(timestamp.getTime(), this.plugin.settings.language)}${item.model ? ` · ${item.model}` : ""}`
           );
         const sameCount = topicTableCount(item.topic, entries);
         if (!item.unreadable && sameCount > 1) {
@@ -1748,7 +1773,7 @@ export class CoffeeTablesView extends ItemView {
         list.createEl("p", {
           cls: "ct-muted",
           text:
-            this.homeQuery || this.focusedTopic
+            this.homeQuery || this.focusedTopic || this.tableFilter !== "all"
               ? this.t("coffee.no_matching_tables")
               : this.t("coffee.your_tables_will_appear_here")
         });
@@ -2007,7 +2032,7 @@ export class CoffeeTablesView extends ItemView {
     this.button(actions, this.t("coffee.open_new_table"), () => this.returnHome());
     header.createEl("p", {
       cls: "ct-muted",
-      text: `${this.plugin.modelLabel(engine.session.model)} · ${this.t("coffee.ai_simulated_perspectives")} · ${this.t("coffee.conversation_language", languagePromptName(coffeeContentLocale(engine.session.language), instructionLanguageOf(uiLocale(this.plugin.settings.language)), "plain"))}`
+      text: `${isSampleSessionId(engine.session.id) ? this.t("coffee.built_in_sample") : this.plugin.modelLabel(engine.session.model)} · ${this.t("coffee.ai_simulated_perspectives")} · ${this.t("coffee.conversation_language", languagePromptName(coffeeContentLocale(engine.session.language), instructionLanguageOf(uiLocale(this.plugin.settings.language)), "plain"))}`
     });
     const roster = fixed.createDiv("ct-roster"),
       status = fixed.createDiv({ cls: "ct-status", attr: { role: "status", "aria-live": "polite" } });
@@ -2109,9 +2134,14 @@ export class CoffeeTablesView extends ItemView {
       latest.classList.toggle("is-hidden", scrolling.scrollHeight - scrolling.scrollTop - scrolling.clientHeight < 100);
     });
     const composer = chatPanel.createDiv("ct-composer");
-    if (engine.session.status === "completed") {
+    // A built-in sample is read-only: the only action is to copy it into the user's own tables.
+    const sampleRoom = isSampleSessionId(engine.session.id);
+    if (sampleRoom && engine.session.status === "completed") {
+      this.button(composer, this.t("coffee.copy_sample_to_my_table"), async () => this.copySample()).addClass(
+        "mod-cta"
+      );
+    } else if (engine.session.status === "completed") {
       this.button(composer, this.t("coffee.continue_chatting"), async () => {
-        if (engine.session.id.startsWith("sample-")) await this.copySample();
         const current = this.engine;
         if (current) await this.plugin.confirmAiUsage(current.session.model, () => current.continueTable());
       }).addClass("mod-cta");
@@ -2150,7 +2180,6 @@ export class CoffeeTablesView extends ItemView {
             name: item.name.trim(),
             description: item.description.trim()
           }));
-          if (engine.session.id.startsWith("sample-")) await this.copySample();
           const current = this.engine,
             questionId = crypto.randomUUID();
           if (current)

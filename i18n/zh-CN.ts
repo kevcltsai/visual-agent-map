@@ -1933,7 +1933,14 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.preset_copy_suffix": " 副本",
   // coffee:begin (keep every coffee.* key in this one contiguous block)
   "coffee.delete_this_table": "删除这场桌聊？",
-  "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "“{0}”的 Markdown 与设置会先备份，再移入垃圾桶。",
+  "coffee.will_be_backed_up_and_moved_to_the_vault_trash":
+    "“{0}”的 Markdown 移入垃圾桶。设置备份在 .sessions/trash（不在垃圾桶）。",
+  "coffee.delete_many_tables_intro": "以下桌聊的 Markdown 移入垃圾桶。设置备份在 .sessions/trash（不在垃圾桶）。",
+  "coffee.copy_sample_to_my_table": "复制成我的桌",
+  "coffee.markdown_note_missing": "找不到桌聊的 Markdown 笔记。",
+  "coffee.model_provider_status": "{0}：{1}",
+  "coffee.built_in_sample": "内置示范",
+  "coffee.engine_generation_stopped_obsidian_closed": "Obsidian 关闭时生成中断；已保存的草稿可用。",
   "coffee.fill_segment_summaries": "补齐段落摘要",
   "coffee.use_this_tables_model_in_one_ai_request_to_summarize":
     "将使用这桌的模型 {0}，以一次 AI 调用摘要所有缺少摘要且有文字的段落。既有对话与洞见保持原样。",
@@ -2023,7 +2030,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "coffee.select_all_shown": "全选当前列表",
   "coffee.clear_selection": "取消选择",
   "coffee.delete_selected": "删除所选聊天室",
-  "coffee.tables_count_list": "{0} 个聊天室：\n{1}",
   "coffee.this_table_changed_reload_and_try_again": "聊天室已变更，请重新加载后再试。",
   "coffee.deleted_tables": "已删除 {0} 个聊天室。",
   "coffee.could_not_delete": "以下聊天室未能删除：\n{0}",

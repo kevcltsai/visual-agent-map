@@ -1213,7 +1213,7 @@ export class CoffeeStorage {
   }
   async openMarkdown(id: string): Promise<TFile> {
     const file = this.vault.getAbstractFileByPath(id.includes("/") ? id : (this.locations.get(id) ?? this.path(id)));
-    if (!(file instanceof TFile)) throw new Error("Coffee Tables Markdown note is missing");
+    if (!(file instanceof TFile)) throw new Error(t("coffee.markdown_note_missing"));
     return file;
   }
   async organizeExisting(busyIds: Set<string> = new Set()): Promise<{ moved: number; skipped: number }> {

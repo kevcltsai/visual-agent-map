@@ -2052,7 +2052,16 @@ export const en = {
   "ui.preset_copy_suffix": " copy",
   // coffee:begin (keep every coffee.* key in this one contiguous block)
   "coffee.delete_this_table": "Delete this table?",
-  "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "“{0}” will be backed up and moved to the vault trash.",
+  "coffee.will_be_backed_up_and_moved_to_the_vault_trash":
+    "“{0}” Markdown moves to the vault trash. Settings are backed up to .sessions/trash, not the vault trash.",
+  "coffee.delete_many_tables_intro":
+    "The Markdown of these tables moves to the vault trash. Settings are backed up to .sessions/trash, not the vault trash.",
+  "coffee.copy_sample_to_my_table": "Copy to my tables",
+  "coffee.markdown_note_missing": "The Coffee Tables Markdown note is missing",
+  "coffee.model_provider_status": "{0}: {1}",
+  "coffee.built_in_sample": "Built-in sample",
+  "coffee.engine_generation_stopped_obsidian_closed":
+    "Generation stopped when Obsidian closed; saved draft is available.",
   "coffee.fill_segment_summaries": "Fill segment summaries",
   "coffee.use_this_tables_model_in_one_ai_request_to_summarize":
     "Use this table’s model {0} in one AI request to summarize all text segments missing summaries. Existing dialogue and insights are preserved.",
@@ -2148,7 +2157,6 @@ export const en = {
   "coffee.select_all_shown": "Select all shown",
   "coffee.clear_selection": "Clear selection",
   "coffee.delete_selected": "Delete selected",
-  "coffee.tables_count_list": "{0} tables:\n{1}",
   "coffee.this_table_changed_reload_and_try_again": "This table changed. Reload and try again.",
   "coffee.deleted_tables": "Deleted {0} tables.",
   "coffee.could_not_delete": "Could not delete:\n{0}",

@@ -264,7 +264,7 @@ integrationTest('provider failure keeps its original AI log stage during node er
   assert.equal((await repo.readNote(n.path)).status, 'error');
   assert.equal(entry.error, '等待 AI 回覆：provider timeout');
 });
-integrationTest('proposal persistence failure does not erase completed shallow research', async () => {
+integrationTest('shallow research with reply suggestions never touches the pending store, even one that would fail, and completes', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Research result');
   await repo.updateNote(n.path, { prompt: 'Research' });
   const pending = new Map(); pending.flush = async () => { throw new Error('disk unavailable'); };
@@ -277,7 +277,7 @@ integrationTest('proposal persistence failure does not erase completed shallow r
   await startResearch(plugin, n, { map: view.map }); await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal((await repo.readNote(n.path)).status, 'completed');
   assert.equal((await repo.readNote(n.path)).summary, 'Researched');
-  assert.equal(exchangeStatus, 'completed'); assert.equal(reported, 'disk unavailable');
+  assert.equal(exchangeStatus, 'completed'); assert.equal(reported, ''); assert.equal(pending.has(n.path), false);
 });
 integrationTest('a completed but stale answer cannot overwrite an edited note', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Stale');

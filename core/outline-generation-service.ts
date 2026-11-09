@@ -42,8 +42,9 @@ export class OutlineGenerationService {
       outlineGenerateStep,
       request
     );
-    // A reply with a heading that has no summary is asked for once more; any other failure goes straight out. The
-    // provider runner already parses the reply (a refusal is thrown from `run`), so both calls sit in one guard.
+    // A reply with a heading that has no summary, or with a stray non-heading line (such as a `>` line before the root), is
+    // asked for once more (one shared retry, at most 2 calls); any other failure goes straight out. The provider runner
+    // already parses the reply (a refusal is thrown from `run`), so both calls sit in one guard.
     for (let attempt = 1; ; attempt++) {
       let raw: string;
       try {
@@ -53,7 +54,12 @@ export class OutlineGenerationService {
       } catch (error) {
         if (signal.aborted && !(error instanceof OutlineGenerateError)) throw stopped();
         if (error instanceof OutlineGenerateError && error.code === "stopped") throw stopped();
-        if (!signal.aborted && attempt < 2 && error instanceof OutlineGenerateError && error.code === "missing_summary")
+        if (
+          !signal.aborted &&
+          attempt < 2 &&
+          error instanceof OutlineGenerateError &&
+          (error.code === "missing_summary" || error.code === "non_heading")
+        )
           continue;
         throw error;
       }

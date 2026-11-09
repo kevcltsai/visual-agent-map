@@ -140,7 +140,7 @@ test('outline service: provider path sends the prompt with no schema, logs the s
   assert.equal(prompt, outline.buildOutlineGeneratePrompt(outlineRequest())); assert.equal(model, 'gpt-6-luna'); assert.equal(effort, 'low');
   assert.equal(schema, undefined); assert.equal(controls.textOnly, true); assert.equal(controls.searchBudget, 0);
   const [entry] = fx.log.getEntries();
-  assert.equal(entry.step, 'outline-generate@3'); assert.equal(entry.status, 'completed');
+  assert.equal(entry.step, 'outline-generate@4'); assert.equal(entry.status, 'completed');
 });
 
 test('outline service: invalid reply rejects with the typed error and nothing is returned; empty topic never reaches the provider', async () => {
@@ -237,6 +237,43 @@ test('outline service: two replies missing a summary give the error after exactl
   assert.equal(fx.calls.length, 2); assert.equal(fx.active.size, 0);
 });
 
+const strayFirst = '> x\n# Root\n> r';
+const outlineServiceFor = fx => new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, fx.options, fx.active)));
+
+test('outline service: a stray > line before the root heading is asked for once more; a valid second reply succeeds', async () => {
+  const replies = [strayFirst, withSummaries];
+  const fx = serviceFixture(() => replies.shift());
+  const result = await outlineServiceFor(fx).generate(outlineRequest(), new AbortController().signal);
+  assert.equal(fx.calls.length, 2); assert.equal(result.nodes.length, 2);
+});
+
+test('outline service: two replies with a stray first line give non_heading after exactly two calls', async () => {
+  const fx = serviceFixture(strayFirst);
+  await assert.rejects(outlineServiceFor(fx).generate(outlineRequest(), new AbortController().signal), error => error.code === 'non_heading');
+  assert.equal(fx.calls.length, 2); assert.equal(fx.active.size, 0);
+});
+
+test('outline service: non_heading then missing_summary shares one retry and ends with missing_summary', async () => {
+  const replies = [strayFirst, '# Root\n> r\n## A'];
+  const fx = serviceFixture(() => replies.shift());
+  await assert.rejects(outlineServiceFor(fx).generate(outlineRequest(), new AbortController().signal), error => error.code === 'missing_summary');
+  assert.equal(fx.calls.length, 2);
+});
+
+test('outline reply: a stray first line is still non_heading in the parser (not relaxed); no_headings, too_many and an abort are not retried', async () => {
+  assert.throws(() => outline.parseOutlineReply(strayFirst, 'en'), error => error.code === 'non_heading');
+  const none = serviceFixture('Sorry, no.');
+  await assert.rejects(outlineServiceFor(none).generate(outlineRequest(), new AbortController().signal), error => error.code === 'no_headings');
+  assert.equal(none.calls.length, 1);
+  const many = serviceFixture(['# Root\n> s', ...Array.from({ length: 100 }, (_, i) => `## n${i}\n> s${i}`)].join('\n'));
+  await assert.rejects(outlineServiceFor(many).generate(outlineRequest(), new AbortController().signal), error => error.code === 'too_many');
+  assert.equal(many.calls.length, 1);
+  const controller = new AbortController();
+  const stopped = serviceFixture(() => { controller.abort(); return strayFirst; });
+  await assert.rejects(outlineServiceFor(stopped).generate(outlineRequest(), controller.signal), error => error.code === 'stopped');
+  assert.equal(stopped.calls.length, 1);
+});
+
 test('outline service: other bad replies are not retried; a stop during the first call is not retried', async () => {
   const prose = serviceFixture('Sorry, no.');
   await assert.rejects(new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, prose.options, prose.active))).generate(outlineRequest(), new AbortController().signal), error => error.code === 'no_headings');
@@ -252,7 +289,7 @@ test('outline prompt: the summary contract comes after the preset and overrides 
   assert.ok(prompt.indexOf('Output contract') > prompt.indexOf('只輸出 Markdown 標題'));
   assert.match(prompt, /overrides any output-format wording in the preset/);
   assert.match(prompt, /EVERY heading line, including the root/);
-  assert.equal(outlineGenerateStep.version, 3);
+  assert.equal(outlineGenerateStep.version, 4);
 });
 
 test('outline summaries: the bank finds each summary again by heading path; edited or typed headings stay empty', () => {

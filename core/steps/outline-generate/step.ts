@@ -197,7 +197,7 @@ export function parseOutlineReply(raw: string, language: ContentLanguage): Outli
  */
 export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, OutlineGenerateResult> = {
   id: "outline-generate",
-  version: 3,
+  version: 4,
   render: request => {
     const content = request.contentLanguage ?? request.language;
     const hasSource = !!noteSection(request);

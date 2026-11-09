@@ -7,6 +7,7 @@
   --vam-status-clearance: 0px;
   --background-primary: #ffffff;
   --background-secondary: #f6f6f6;
+  --background-primary-alt: #fafafa;
   --background-modifier-border: #e0e0e0;
   --background-modifier-border-hover: #cfcfcf;
   --background-modifier-border-focus: #8a5cf5;
@@ -45,6 +46,7 @@
     color-scheme: dark;
     --background-primary: #1e1e1e;
     --background-secondary: #262626;
+    --background-primary-alt: #232323;
     --background-modifier-border: #363636;
     --background-modifier-border-hover: #4a4a4a;
     --background-modifier-border-focus: #a88bfa;

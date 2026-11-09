@@ -45383,6 +45383,8 @@ function describeArgumentCard(state, id, t2) {
   }
   const datum = state.situation.data.find((item) => item.id === id);
   if (datum) return datumCard(datum, t2);
+  if ((id === roles.verified || id === roles.eliminated) && state.run.phase === "stopped_mismatch")
+    return plain("group", t2("ui.argument_group_label"));
   if (id === roles.verified) {
     const verifying = state.hypotheses.filter((h) => h.location === "verifying").length;
     return plain("group", t2("ui.argument_group_label"), [
@@ -45471,6 +45473,12 @@ function arrangeArgumentMap(nodes, state, heightOf, options = {}) {
     const at = placed.get(node.id);
     return at ? { ...node, x: at.x, y: at.y } : node;
   });
+}
+var UNARRANGED_PROBE_HEIGHT = 40;
+function arrangeUnarrangedArgumentMap(nodes, state) {
+  const all = new Set(nodes.map((node) => node.id));
+  if (!cardsOverlapAny(nodes, all, () => UNARRANGED_PROBE_HEIGHT)) return null;
+  return arrangeArgumentMap(nodes, state);
 }
 
 // core/steps/map-chat/language.en.md
@@ -61364,6 +61372,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
       await this.plugin.repo.saveMap(path, map);
       if (!isCurrent()) return;
     }
+    const argumentOnOpen = map.argumentMap === void 0 ? null : readArgumentMap(map);
+    const arranged = (argumentOnOpen == null ? void 0 : argumentOnOpen.kind) === "usable" ? arrangeUnarrangedArgumentMap(map.nodes, argumentOnOpen.data) : null;
+    if (arranged) {
+      map.nodes = arranged;
+      await this.plugin.repo.saveMap(path, map);
+      if (!isCurrent()) return;
+    }
     const progressive = map.nodes.length > 0 && (this.path !== path || this.paintCount === 0);
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
@@ -75458,15 +75473,25 @@ ${request.requirements}` : preset.text,
       cardAiLockButtons.delete(card);
       delete card.dataset.aiLocked;
     }
-    if (!this.map || this.aimLive() || isAimNode(node) || ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) !== true) return;
+    const managed = this.isArgumentCard(node.id);
+    if (!this.map || this.aimLive() || isAimNode(node) || !managed && ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) !== true)
+      return;
     card.dataset.aiLocked = "true";
     const button = header2.createEl("button", { cls: "vam-card-ai-lock" });
     cardAiLockButtons.set(card, button);
     button.type = "button";
     (0, import_obsidian39.setIcon)(button, "lock");
     button.tabIndex = -1;
-    button.setAttr("aria-label", t("ui.ai_unlock_card"));
-    button.setAttr("title", t("ui.ai_unlock_card"));
+    if (managed) {
+      button.disabled = true;
+      button.setAttr("aria-disabled", "true");
+      button.setAttr("aria-pressed", "true");
+      button.setAttr("aria-label", t("ui.ai_lock_state_managed"));
+      button.setAttr("title", t("ui.ai_lock_state_managed"));
+    } else {
+      button.setAttr("aria-label", t("ui.ai_unlock_card"));
+      button.setAttr("title", t("ui.ai_unlock_card"));
+    }
     button.addEventListener("pointerdown", (event) => event.stopPropagation());
     button.addEventListener("dblclick", (event) => event.stopPropagation());
     button.addEventListener("click", (event) => {
@@ -88732,6 +88757,7 @@ var SHARE_VIEWER_CSS = `/* Share viewer styles. Order: tokens and base (this par
   --vam-status-clearance: 0px;
   --background-primary: #ffffff;
   --background-secondary: #f6f6f6;
+  --background-primary-alt: #fafafa;
   --background-modifier-border: #e0e0e0;
   --background-modifier-border-hover: #cfcfcf;
   --background-modifier-border-focus: #8a5cf5;
@@ -88770,6 +88796,7 @@ var SHARE_VIEWER_CSS = `/* Share viewer styles. Order: tokens and base (this par
     color-scheme: dark;
     --background-primary: #1e1e1e;
     --background-secondary: #262626;
+    --background-primary-alt: #232323;
     --background-modifier-border: #363636;
     --background-modifier-border-hover: #4a4a4a;
     --background-modifier-border-focus: #a88bfa;
@@ -89033,7 +89060,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node[data-argument-role] .vam-argument-body { display: grid; gap: 4px; margin-top: 4px; }
 .vam-node[data-argument-role] .vam-argument-line { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.45; overflow-wrap: anywhere; }
 .vam-node[data-argument-role] .vam-argument-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-.vam-node[data-argument-role="group"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--background-secondary); border-color: var(--background-secondary); }
+.vam-node[data-argument-role="group"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--background-primary-alt); border-color: var(--background-modifier-border-hover); }
 .vam-node[data-argument-missing="true"][data-status]:not([data-aim-kind]) { border: 1.5px dashed var(--background-modifier-border-hover); }
 .vam-node[data-argument-role="need"], .vam-node[data-argument-role="datum"] { border-radius: 6px; }
 @keyframes vam-pulse { 50% { opacity: 0.35; } }
@@ -92195,6 +92222,8 @@ var ArgumentRuns = class {
           if (node) this.place(doc, node, move.parentId);
         }
         doc.argumentMap = plan.next;
+        const arranged = readArgumentMap(doc);
+        if (arranged.kind === "usable") doc.nodes = arrangeArgumentMap(doc.nodes, arranged.data);
         wrote = true;
       });
       if (!wrote) return;

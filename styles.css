@@ -2116,7 +2116,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-argument-chip.is-maybe { background: color-mix(in srgb, var(--color-yellow) 22%, var(--background-primary)); color: color-mix(in srgb, var(--color-yellow) 55%, var(--text-normal)); }
 .vam-argument-chip.is-gap, .vam-argument-chip.is-open { background: var(--background-modifier-hover); color: var(--text-muted); }
 /* Group cards (verified, eliminated hypotheses) sit quietly under the conclusion. */
-.vam-node[data-argument-role="group"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--background-secondary); border-color: var(--background-secondary); }
+.vam-node[data-argument-role="group"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--background-primary-alt); border-color: var(--background-modifier-border-hover); }
 /* The conclusion: waiting has a strong frame, concluded is the one dark card, the two stopped states are plain. */
 .vam-node[data-argument-role="conclusion"][data-argument-state="in_progress"][data-status]:not([data-aim-kind]) { border: 2px solid var(--interactive-accent); }
 .vam-node[data-argument-role="conclusion"][data-argument-state="concluded"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--interactive-accent); border-color: var(--interactive-accent); }
@@ -2125,4 +2125,4 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-node[data-argument-missing="true"][data-status]:not([data-aim-kind]) { border: 1.5px dashed var(--background-modifier-border-hover); }
 .vam-node[data-argument-role="need"], .vam-node[data-argument-role="datum"] { border-radius: 6px; }
 /* The arrowhead of a tree edge: on the parent's right edge, pointing at the parent. */
-.vam-argument-tip { fill: var(--interactive-accent); stroke: none; }
+.vam-argument-tip { fill: var(--text-muted); stroke: none; }

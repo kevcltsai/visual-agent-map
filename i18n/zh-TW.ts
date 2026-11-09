@@ -2461,7 +2461,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "log.ai_split_failed": "AI 拆解失敗",
   "log.integration_directions_failed": "整合方向建議失敗",
   "log.child_integration_failed": "子議題整合失敗",
-  "log.expansion_suggestions_save_failed": "展開建議儲存失敗",
   "log.ai_task_failed": "AI 任務失敗",
   "log.stale_result_not_written": "議題內容已變更，過時的 AI 結果未寫入。",
   "log.stopped_result_not_written": "研究已停止，結果未寫入。",

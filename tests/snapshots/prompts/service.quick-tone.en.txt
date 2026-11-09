@@ -15,7 +15,7 @@ Tone: example voice. Write warmly.
 
 Writing baseline (applies to every voice): do not use filler transitions or wrap-ups such as "First", "Second", "In conclusion" or "To sum up"; do not exaggerate or use hype words such as "revolutionary" or "unprecedented"; state numbers concretely, with the value, unit, year and range, and never write "many", "significantly" or "recently".
 
-General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.
+General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Always return an empty suggestions array.
 
 When the new sources settle an earlier statement that said no source was provided or that the point was not verified, delete that statement instead of keeping both. When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the "Open questions to check" section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
 

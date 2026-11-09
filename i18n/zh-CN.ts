@@ -2460,7 +2460,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "log.ai_split_failed": "AI 拆解失败",
   "log.integration_directions_failed": "整合方向建议失败",
   "log.child_integration_failed": "子议题整合失败",
-  "log.expansion_suggestions_save_failed": "展开建议保存失败",
   "log.ai_task_failed": "AI 任务失败",
   "log.stale_result_not_written": "议题内容已变更，过时的 AI 结果未写入。",
   "log.stopped_result_not_written": "研究已停止，结果未写入。",

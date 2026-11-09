@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Research no longer creates new topic suggestions when it finishes. To add subtopics, use Expand.
+
 ## [0.32.0] - 2026-11-08
 
 ### Let the AI pick a note's sections

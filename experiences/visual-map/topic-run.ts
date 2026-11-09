@@ -1362,19 +1362,6 @@ export class TopicRuns {
             template: writeContext.detailTemplate,
             ...(mode === "top" ? this.chartGuard(mode, composed.record) : {})
           });
-          if (result.suggestions.length) {
-            this.pendingSuggestions.set(
-              path,
-              result.suggestions
-                .slice(0, 7)
-                .map(item => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
-            );
-            try {
-              await (this.pendingSuggestions as { flush?: () => Promise<void> }).flush?.();
-            } catch (error) {
-              options.notify?.(this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
-            }
-          }
           options.done?.(result);
         })
       )

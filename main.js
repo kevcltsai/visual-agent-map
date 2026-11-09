@@ -2471,7 +2471,6 @@ var en = {
   "log.ai_split_failed": "AI split failed",
   "log.integration_directions_failed": "Integration direction suggestions failed",
   "log.child_integration_failed": "Subtopic integration failed",
-  "log.expansion_suggestions_save_failed": "Saving expansion suggestions failed",
   "log.ai_task_failed": "AI task failed",
   "log.stale_result_not_written": "The topic changed; the stale AI result was not written.",
   "log.stopped_result_not_written": "Research stopped; the result was not written.",
@@ -5271,7 +5270,6 @@ var zhCN = {
   "log.ai_split_failed": "AI \u62C6\u89E3\u5931\u8D25",
   "log.integration_directions_failed": "\u6574\u5408\u65B9\u5411\u5EFA\u8BAE\u5931\u8D25",
   "log.child_integration_failed": "\u5B50\u8BAE\u9898\u6574\u5408\u5931\u8D25",
-  "log.expansion_suggestions_save_failed": "\u5C55\u5F00\u5EFA\u8BAE\u4FDD\u5B58\u5931\u8D25",
   "log.ai_task_failed": "AI \u4EFB\u52A1\u5931\u8D25",
   "log.stale_result_not_written": "\u8BAE\u9898\u5185\u5BB9\u5DF2\u53D8\u66F4\uFF0C\u8FC7\u65F6\u7684 AI \u7ED3\u679C\u672A\u5199\u5165\u3002",
   "log.stopped_result_not_written": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u7ED3\u679C\u672A\u5199\u5165\u3002",
@@ -8071,7 +8069,6 @@ var zhTW = {
   "log.ai_split_failed": "AI \u62C6\u89E3\u5931\u6557",
   "log.integration_directions_failed": "\u6574\u5408\u65B9\u5411\u5EFA\u8B70\u5931\u6557",
   "log.child_integration_failed": "\u5B50\u8B70\u984C\u6574\u5408\u5931\u6557",
-  "log.expansion_suggestions_save_failed": "\u5C55\u958B\u5EFA\u8B70\u5132\u5B58\u5931\u6557",
   "log.ai_task_failed": "AI \u4EFB\u52D9\u5931\u6557",
   "log.stale_result_not_written": "\u8B70\u984C\u5167\u5BB9\u5DF2\u8B8A\u66F4\uFF0C\u904E\u6642\u7684 AI \u7D50\u679C\u672A\u5BEB\u5165\u3002",
   "log.stopped_result_not_written": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u7D50\u679C\u672A\u5BEB\u5165\u3002",
@@ -23122,22 +23119,22 @@ var detail_structure_zh_default = "detail \u5FC5\u9808\u4E14\u53EA\u80FD\u4F9D\u
 var detail_structure_en_default = "The detail must use exactly these six level-three headings in order: {{headings}}. Add only one line summarizing this update in Update log; do not repeat the full answer. Write 'No new content this time' in sections with nothing applicable. Follow any requested count for the core conclusions.\n";
 
 // core/steps/task/general-task.zh.md
-var general_task_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u6703\u76F4\u63A5\u53D6\u4EE3\u820A Detail \u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u5FC5\u9808\u5438\u6536\u820A\u5167\u5BB9\u8207\u672C\u6B21\u767C\u73FE\u3001\u53BB\u9664\u91CD\u8907\u3001\u4FDD\u7559\u4ECD\u6709\u6548\u7684\u4F86\u6E90\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
+var general_task_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u6703\u76F4\u63A5\u53D6\u4EE3\u820A Detail \u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u5FC5\u9808\u5438\u6536\u820A\u5167\u5BB9\u8207\u672C\u6B21\u767C\u73FE\u3001\u53BB\u9664\u91CD\u8907\u3001\u4FDD\u7559\u4ECD\u6709\u6548\u7684\u4F86\u6E90\u3002suggestions \u4E00\u5F8B\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
 
 // core/steps/task/general-task.en.md
-var general_task_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+var general_task_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Always return an empty suggestions array.\n";
 
 // core/steps/task/general-task-top.zh.md
-var general_task_top_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u53EA\u56DE\u50B3\u672C\u6B21\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\uFF1B\u4E0D\u8981\u91CD\u5BEB\u6216\u91CD\u8907\u73FE\u6709\u7B46\u8A18\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
+var general_task_top_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u53EA\u56DE\u50B3\u672C\u6B21\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\uFF1B\u4E0D\u8981\u91CD\u5BEB\u6216\u91CD\u8907\u73FE\u6709\u7B46\u8A18\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002suggestions \u4E00\u5F8B\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
 
 // core/steps/task/general-task-top.en.md
-var general_task_top_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail returns only what this research newly found, split by section heading (###); omit sections with nothing new. Do not rewrite or repeat the existing note, and do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+var general_task_top_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail returns only what this research newly found, split by section heading (###); omit sections with nothing new. Do not rewrite or repeat the existing note, and do not write an update log section (the plugin writes it). Always return an empty suggestions array.\n";
 
 // core/steps/task/general-task-fresh.zh.md
-var general_task_fresh_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u4E00\u4EFD\u6839\u64DA\u672C\u6B21\u7814\u7A76\u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u53BB\u9664\u91CD\u8907\u4E26\u4FDD\u7559\u6709\u6548\u7684\u4F86\u6E90\uFF1B\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
+var general_task_fresh_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u4E00\u4EFD\u6839\u64DA\u672C\u6B21\u7814\u7A76\u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u53BB\u9664\u91CD\u8907\u4E26\u4FDD\u7559\u6709\u6548\u7684\u4F86\u6E90\uFF1B\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002suggestions \u4E00\u5F8B\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
 
 // core/steps/task/general-task-fresh.en.md
-var general_task_fresh_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail is a complete knowledge page based on this research, without duplication and keeping valid sources; do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+var general_task_fresh_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail is a complete knowledge page based on this research, without duplication and keeping valid sources; do not write an update log section (the plugin writes it). Always return an empty suggestions array.\n";
 
 // core/steps/task/conflict-rule.zh.md
 var conflict_rule_zh_default = "\u73FE\u6709 Detail \u82E5\u5BEB\u8457\u300C\u6C92\u6709\u63D0\u4F9B\u4F86\u6E90\u300D\u6216\u300C\u5C1A\u672A\u67E5\u8B49\u300D\uFF0C\u800C\u672C\u6B21\u4F86\u6E90\u5DF2\u89E3\u6C7A\u8A72\u9EDE\uFF0C\u5C31\u522A\u9664\u90A3\u53E5\u820A\u8AAA\u6CD5\uFF0C\u4E0D\u8981\u4E26\u5217\u4FDD\u7559\u3002\u672C\u6B21\u767C\u73FE\u8207\u73FE\u6709 Detail \u4E0D\u4E00\u81F4\u6642\uFF0C\u5169\u7A2E\u8AAA\u6CD5\u90FD\u4FDD\u7559\u4E26\u5404\u6A19\u65E5\u671F\u8207\u4F86\u6E90\uFF0C\u5BEB\u4E00\u53E5\u76EE\u524D\u5224\u65B7\uFF08\u4F9D\u4F86\u6E90\u65B0\u820A\u8207\u5F37\u5F31\uFF09\uFF1B\u628A\u9019\u4E00\u9EDE\u52A0\u5165\u5F85\u78BA\u8A8D\u554F\u984C\u6BB5\uFF0C\u6C92\u6709\u8A72\u6BB5\u5C31\u5728\u76F8\u95DC\u6BB5\u843D\u4E26\u5217\uFF1B\u66F4\u65B0\u7D00\u9304\u5BEB\u4E00\u884C\u300C\u8207\u5148\u524D\u7D50\u8AD6\u4E0D\u4E00\u81F4\uFF1A\u2026\u300D\u3002\n";
@@ -36275,7 +36272,7 @@ var TopicRuns = class {
       observer
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -36356,18 +36353,7 @@ var TopicRuns = class {
           template: writeContext.detailTemplate,
           ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });
-        if (result.suggestions.length) {
-          this.pendingSuggestions.set(
-            path,
-            result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
-          );
-          try {
-            await ((_o = (_n = this.pendingSuggestions).flush) == null ? void 0 : _o.call(_n));
-          } catch (error) {
-            (_p = options.notify) == null ? void 0 : _p.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
-          }
-        }
-        (_q = options.done) == null ? void 0 : _q.call(options, result);
+        (_n = options.done) == null ? void 0 : _n.call(options, result);
       })
     ).catch(
       (error) => this.ports.mutate()(async () => {

@@ -119,6 +119,66 @@ test('public hosts and public IPv4 literals are allowed', async () => {
   }
 });
 
+test('hardening: single-label hosts, internal suffixes and every private IPv6 form never reach fetch', async () => {
+  const bad = [
+    'http://intranet/', 'http://router/a', 'http://myhost:8080/', 'https://wiki/page',
+    'http://app.internal/', 'http://INTERNAL./', 'http://a.b.intranet/', 'http://nas.lan/', 'http://box.home/', 'http://printer.home.arpa/', 'http://home.arpa/', 'http://db.corp/', 'http://x.corp./',
+    'http://[::127.0.0.1]/', 'http://[::10.0.0.1]/', 'http://[::192.168.1.1]/', 'http://[::ffff:c0a8:0101]/', 'http://[::ffff:0:0]/',
+    'http://[64:ff9b::7f00:1]/', 'http://[64:ff9b::a00:1]/', 'http://[64:ff9b::169.254.169.254]/', 'http://[64:ff9b::c0a8:1]/',
+    'http://[2002:7f00:1::]/', 'http://[2002:a00:1::1]/', 'http://[2002:c0a8:101::1]/', 'http://[2002:a9fe:a9fe::1]/',
+    'http://[fec0::1]/', 'http://[feff::1]/', 'http://[fe80::1%25eth0]/', 'http://[febf::1]/', 'http://[fc00::1]/', 'http://[fdff::1]/',
+    'http://[ff02::1]/', 'http://[ff00::1]/', 'http://[ffff::1]/', 'http://[0:0:0:0:0:0:0:1]/', 'http://[0::0]/'
+  ];
+  for (const url of bad) {
+    const { run, calls } = make(reply(200, PAGE));
+    notFound(await run({ url, openedUrls: [url] }), 'rejected_url');
+    assert.equal(calls.length, 0, `fetch must not be called for ${url}`);
+  }
+});
+
+test('hardening: public lookalikes stay allowed (embedded public IPv4, similar suffixes, dotted hosts)', async () => {
+  for (const url of ['http://[64:ff9b::808:808]/', 'http://[64:ff9b:1:2:3:4:a00:1]/', 'http://[2002:808:808::1]/', 'http://[2606:4700::1]/', 'http://[2a00:1450::1]/', 'http://[fb00::1]/', 'http://[fe00::1]/', 'http://home.example.org/', 'http://internal.example.org/', 'http://lan.example.org/', 'http://corp.example.com/', 'http://a.arpa.example/']) {
+    const { run, calls } = make(reply(200, PAGE));
+    assert.equal((await run({ url })).ok, true, url);
+    assert.equal(calls.length, 1, url);
+  }
+});
+
+test('hardening: a final url that is not allowed or has another host fails closed, even when the tool log lists the page', async () => {
+  const opened = ['https://stats.example.org/report'];
+  for (const final of ['http://169.254.169.254/latest', 'http://localhost/x', 'http://nas.lan/x', 'https://other.example.net/report', 'https://stats.example.org:8443/report', 'file:///etc/passwd', 'not a url', 'http://intranet/']) {
+    const { run } = make(reply(200, PAGE, 'text/html', { url: final }));
+    notFound(await run({ openedUrls: opened }), 'rejected_url');
+  }
+  // 403 with a bad final url must not be rescued as provider_read either
+  notFound(await make(reply(403, 'no', 'text/html', { url: 'http://10.0.0.1/' })).run({ openedUrls: opened }), 'rejected_url');
+});
+
+test('hardening: the same host (any path, fragment or case) and a missing or empty final url are accepted', async () => {
+  for (const extra of [{}, { url: '' }, { url: 'https://stats.example.org/report' }, { url: 'https://STATS.example.org/other/path?x=1#frag' }, { url: 'https://stats.example.org./report' }]) {
+    const { run } = make(reply(200, PAGE, 'text/html', extra));
+    assert.equal((await run()).ok, true, JSON.stringify(extra));
+  }
+});
+
+test('hardening: a content-length above the cap is blocked before the body is read; at or under it is read', async () => {
+  const opened = ['https://stats.example.org/report'];
+  let reads = 0;
+  const lazy = len => ({ status: 200, headers: { 'Content-Length': String(len), 'Content-Type': 'text/html' }, get text() { reads++; return PAGE; }, get arrayBuffer() { reads++; return undefined; } });
+  const over = make(lazy(2 * 1024 * 1024 + 1));
+  notFound(await over.run(), 'blocked_unverified');
+  assert.equal((await make(lazy(2 * 1024 * 1024 + 1)).run({ openedUrls: opened })).proof.check, 'provider_read');
+  assert.equal(reads, 0, 'the body must not be read');
+  assert.equal((await make(lazy(2 * 1024 * 1024)).run()).ok, true);
+  assert.ok(reads > 0);
+  const lower = { status: 200, headers: { 'content-length': '99999999' }, get text() { reads += 100; return PAGE; } };
+  const before = reads;
+  notFound(await make(lower).run(), 'blocked_unverified');
+  assert.equal(reads, before);
+  // an unparsable content-length is ignored, not trusted
+  assert.equal((await make(reply(200, PAGE, 'text/html', { headers: { 'Content-Length': 'abc', 'Content-Type': 'text/html' } })).run()).ok, true);
+});
+
 test('quote length: under 12 or over 200 characters, or empty after folding, is not_found and fetch is skipped', async () => {
   for (const quote of ['', 'short quote', 'x'.repeat(201), '.,;:!? .,;:!? .,;:!?', ' \n\t '.repeat(5), '- - - - - - - - - - - -']) {
     const { run, calls } = make(reply(200, PAGE));

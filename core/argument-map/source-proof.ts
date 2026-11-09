@@ -40,6 +40,8 @@ export interface FetchResponse {
   status: number;
   headers: Record<string, string>;
   text: string;
+  /** Where the request ended up, when the transport says (after redirects). */
+  url?: string;
   arrayBuffer?: { byteLength: number };
 }
 export type FetchPage = (request: FetchRequest) => Promise<FetchResponse>;
@@ -72,7 +74,46 @@ function ipv4Blocked(a: number, b: number): boolean {
   );
 }
 
-/** The parsed URL when it may be fetched: http(s), no credentials, no local name, no private/loopback/link-local literal. */
+const PRIVATE_SUFFIXES = [".localhost", ".local", ".internal", ".intranet", ".lan", ".home", ".home.arpa", ".corp"];
+
+/** The eight 16-bit groups of a normalized IPv6 literal (as `URL` prints it, so no dotted tail), or null when malformed. */
+function ipv6Groups(literal: string): number[] | null {
+  const parts = literal.split("::");
+  if (parts.length > 2) return null;
+  const read = (text: string): number[] | null => {
+    if (!text) return [];
+    const groups = text.split(":").map(g => (/^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN));
+    return groups.some(Number.isNaN) ? null : groups;
+  };
+  const head = read(parts[0] ?? "");
+  const tail = parts.length === 2 ? read(parts[1] ?? "") : [];
+  if (!head || !tail) return null;
+  if (parts.length === 1) return head.length === 8 ? head : null;
+  const fill = 8 - head.length - tail.length;
+  return fill < 1 ? null : [...head, ...new Array<number>(fill).fill(0), ...tail];
+}
+
+const embeddedBlocked = (high: number): boolean => ipv4Blocked(high >> 8, high & 0xff);
+
+function ipv6Blocked(literal: string): boolean {
+  const g = ipv6Groups(literal);
+  if (!g) return true;
+  const first = g[0];
+  const rest = g.slice(1);
+  if (first >= 0xff00) return true; // multicast ff00::/8
+  if ((first & 0xfe00) === 0xfc00) return true; // unique local fc00::/7
+  if ((first & 0xffc0) === 0xfe80 || (first & 0xffc0) === 0xfec0) return true; // link-local and site-local
+  if (g.slice(0, 5).every(x => x === 0) && g[5] === 0xffff) return true; // IPv4-mapped
+  if (g.slice(0, 6).every(x => x === 0)) return embeddedBlocked(g[6]); // IPv4-compatible, ::, ::1
+  if (first === 0x64 && g[1] === 0xff9b && rest.slice(1, 5).every(x => x === 0)) return embeddedBlocked(g[6]); // NAT64
+  if (first === 0x2002) return embeddedBlocked(g[1]); // 6to4
+  return false;
+}
+
+/**
+ * The parsed URL when it may be fetched: http(s), no credentials, no single-label or local-suffix name, no private, loopback,
+ * link-local, multicast or embedded-private address literal. DNS names that resolve to a private address cannot be seen here.
+ */
 export function allowedUrl(raw: string): URL | null {
   let url: URL;
   try {
@@ -83,15 +124,10 @@ export function allowedUrl(raw: string): URL | null {
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
   if (url.username || url.password) return null;
   const host = url.hostname.toLowerCase().replace(/\.$/, "");
-  if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return null;
-  if (host.startsWith("[")) {
-    const first = host.slice(1, -1).split(":")[0] ?? "";
-    const hextet = first ? parseInt(first, 16) : 0;
-    if (host === "[::]" || host === "[::1]" || host.startsWith("[::ffff:")) return null;
-    if (hextet >= 0xfc00 && hextet <= 0xfdff) return null;
-    if (hextet >= 0xfe80 && hextet <= 0xfebf) return null;
-    return url;
-  }
+  if (!host || host === "localhost" || host === "home.arpa") return null;
+  if (PRIVATE_SUFFIXES.some(suffix => host.endsWith(suffix))) return null;
+  if (host.startsWith("[")) return ipv6Blocked(host.slice(1, -1)) ? null : url;
+  if (!host.includes(".")) return null;
   const octets = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
   if (octets && ipv4Blocked(Number(octets[1]), Number(octets[2]))) return null;
   return url;
@@ -200,10 +236,19 @@ export async function verifySource(input: VerifySourceInput): Promise<SourceChec
   }
   if (response === TIMED_OUT) return blocked();
 
+  // A redirect that left the requested host, or landed anywhere not allowed, is not the page that was asked for: fail closed.
+  if (typeof response.url === "string" && response.url) {
+    const final = allowedUrl(response.url);
+    if (!final || final.host.toLowerCase().replace(/\.$/, "") !== requested.host.toLowerCase().replace(/\.$/, ""))
+      return fail("rejected_url");
+  }
   const { status } = response;
   if (status === 401 || status === 403 || status === 429 || (status >= 500 && status <= 599)) return blocked();
   if (status < 200 || status > 299) return fail("http_status");
 
+  // Declared size first: an oversize body is never read or parsed.
+  const declared = Number(header(response.headers, "content-length"));
+  if (Number.isFinite(declared) && declared > MAX_PAGE_BYTES) return blocked();
   const type = header(response.headers, "content-type").toLowerCase();
   if (type.includes("application/pdf")) return blocked();
   const size = response.arrayBuffer?.byteLength ?? response.text.length;

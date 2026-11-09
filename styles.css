@@ -2101,3 +2101,28 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-foot button.vam-topic-chat-send:not(:disabled) { background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-topic-chat-mode-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-topic-chat button:focus-visible, .vam-topic-chat-input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+
+/* Argument map (hypothesis research flow): the flow's cards carry data-argument-role (set in view.ts) and are plain rectangles on a neutral surface. Theme variables only, so light and dark both follow Obsidian. */
+.vam-node[data-argument-role][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 8px; box-shadow: none; cursor: default; }
+.vam-node[data-argument-role]:not([data-aim-kind]):focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }
+.vam-node[data-argument-role] .vam-argument-kind { color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: 600; }
+.vam-node[data-argument-role] .vam-card-title { display: block; -webkit-line-clamp: unset; overflow: visible; margin: 2px 0 0; font-size: var(--font-ui-medium); line-height: 1.35; }
+.vam-node[data-argument-role] .vam-argument-body { display: grid; gap: 4px; margin-top: 4px; }
+.vam-node[data-argument-role] .vam-argument-line { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.45; overflow-wrap: anywhere; }
+.vam-node[data-argument-role] .vam-argument-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.vam-argument-chip { display: inline-block; padding: 0 6px; border-radius: 3px; font-size: var(--font-ui-smaller); font-weight: 700; line-height: 20px; background: var(--background-modifier-hover); color: var(--text-muted); }
+.vam-argument-chip.is-yes { background: color-mix(in srgb, var(--color-green) 18%, var(--background-primary)); color: color-mix(in srgb, var(--color-green) 75%, var(--text-normal)); }
+.vam-argument-chip.is-no { background: color-mix(in srgb, var(--color-red) 16%, var(--background-primary)); color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }
+.vam-argument-chip.is-maybe { background: color-mix(in srgb, var(--color-yellow) 22%, var(--background-primary)); color: color-mix(in srgb, var(--color-yellow) 55%, var(--text-normal)); }
+.vam-argument-chip.is-gap, .vam-argument-chip.is-open { background: var(--background-modifier-hover); color: var(--text-muted); }
+/* Group cards (verified, eliminated hypotheses) sit quietly under the conclusion. */
+.vam-node[data-argument-role="group"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--background-secondary); border-color: var(--background-secondary); }
+/* The conclusion: waiting has a strong frame, concluded is the one dark card, the two stopped states are plain. */
+.vam-node[data-argument-role="conclusion"][data-argument-state="in_progress"][data-status]:not([data-aim-kind]) { border: 2px solid var(--interactive-accent); }
+.vam-node[data-argument-role="conclusion"][data-argument-state="concluded"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--interactive-accent); border-color: var(--interactive-accent); }
+.vam-node[data-argument-role="conclusion"][data-argument-state="concluded"] :is(.vam-card-title, .vam-argument-kind, .vam-argument-line) { color: var(--text-on-accent); }
+/* A missing need or datum is a dashed placeholder; an eliminated hypothesis is dashed too. */
+.vam-node[data-argument-missing="true"][data-status]:not([data-aim-kind]) { border: 1.5px dashed var(--background-modifier-border-hover); }
+.vam-node[data-argument-role="need"], .vam-node[data-argument-role="datum"] { border-radius: 6px; }
+/* The arrowhead of a tree edge: on the parent's right edge, pointing at the parent. */
+.vam-argument-tip { fill: var(--interactive-accent); stroke: none; }

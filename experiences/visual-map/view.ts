@@ -461,7 +461,12 @@ import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service"
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
 import { GateError, applyPause } from "../../core/argument-map/machine";
 import { effectiveVerdict, managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
-import { describeArgumentCard } from "./argument-card";
+import {
+  describeArgumentCard,
+  renderArgumentCardBody,
+  renderArgumentKind,
+  type ArgumentCardView
+} from "./argument-card";
 import { arrangeArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
@@ -928,6 +933,13 @@ function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
   const run = x2 - x1;
   const bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
+}
+/** The arrowhead of an argument map's tree edge: a small triangle on the parent's right edge, its point toward the parent (mockup `.tip`). */
+function argumentTipPath(x: number, y: number): SVGPathElement {
+  const tip = createSvg("path");
+  tip.setAttribute("d", `M ${x + 1} ${y} L ${x + 8} ${y - 5} L ${x + 8} ${y + 5} Z`);
+  tip.addClass("vam-argument-tip");
+  return tip;
 }
 /** Unique ids for the arrowhead `<marker>`s: two map tabs share one document, so an id must belong to one view. */
 let relationMarkerSequence = 0;
@@ -14619,6 +14631,8 @@ export class VisualAgentMapView extends ItemView {
     card.addEventListener("dragleave", event => this.onCardDragLeave(event, card));
     card.addEventListener("drop", event => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
+    // An argument map's managed card says what the flow's state says (never the note body); any other card is null here.
+    const argumentView = loading ? null : this.argumentCardView(node.id);
     this.labelCard(card, loading ? this.preReadTitle(node) : (note?.title ?? t("ui.note_missing")));
     if (this.selection.state.multiSelectMode) {
       const select = header.createEl("input", { type: "checkbox" });
@@ -14733,15 +14747,13 @@ export class VisualAgentMapView extends ItemView {
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     // A hypothesis: quiet "Hypothesis · strength" tag; every non-ordinary type sets `data-topic-kind` and is named in the card's accessible name.
-    if (kind !== "topic") {
-      // The flow's cards carry their own role (styled in a later part), not a type, so no type shape or colour rule matches them.
-      const read = this.map ? readArgumentMap(this.map) : null;
-      const argumentRole =
-        read?.kind === "usable" && this.isArgumentCard(node.id)
-          ? describeArgumentCard(read.data, node.id, t)?.role
-          : undefined;
-      if (argumentRole) card.dataset.argumentRole = argumentRole;
-      else card.dataset.topicKind = kind;
+    if (argumentView) {
+      // The flow's cards carry their own role and kind line, not a type tag, so no type shape or colour rule matches them.
+      card.dataset.argumentRole = argumentView.role;
+      renderArgumentKind(header, argumentView);
+      this.labelCard(card, t("ui.topic_card_label_0_1", this.argumentTitleOf(argumentView, note), argumentView.label));
+    } else if (kind !== "topic") {
+      card.dataset.topicKind = kind;
       const strength = this.hypothesisStrengthOf(node.id),
         leaning = this.hypothesisLeaningOf(node.id);
       const kindText =
@@ -14984,7 +14996,11 @@ export class VisualAgentMapView extends ItemView {
     }
     // The cover frame sits above the title; it adds nothing when the topic has no local image.
     if (note) this.paintCover(card, node.path);
-    const shownTitle = loading ? this.preReadTitle(node) : (note?.title ?? node.path);
+    const shownTitle = loading
+      ? this.preReadTitle(node)
+      : argumentView
+        ? this.argumentTitleOf(argumentView, note)
+        : (note?.title ?? node.path);
     const title = card.createEl("h3", { text: shownTitle, cls: "vam-card-title" });
     title.setAttr("title", shownTitle);
     title.setAttr("dir", "auto");
@@ -15002,7 +15018,8 @@ export class VisualAgentMapView extends ItemView {
     // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
     // The summary text (and, for a card with none, the faint "add a summary" line) opens its field on a plain click.
     const textEditable = !!note && this.cardTextEditable();
-    if (textEditable && this.inlineSummary?.id === node.id) this.paintCardSummaryEdit(card, node);
+    if (argumentView) renderArgumentCardBody(card, argumentView);
+    else if (textEditable && this.inlineSummary?.id === node.id) this.paintCardSummaryEdit(card, node);
     else if (research?.preview?.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (loading) {
@@ -15020,6 +15037,7 @@ export class VisualAgentMapView extends ItemView {
     }
     // Shown (by the stylesheet) only while the card is selected.
     if (
+      !argumentView &&
       textEditable &&
       !research?.preview?.summary &&
       this.inlineSummary?.id !== node.id &&
@@ -15729,6 +15747,20 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || this.map.argumentMap === undefined || readArgumentMap(this.map).kind !== "usable") return false;
     return managedNodeIds(this.map).has(id);
   }
+  /** What the flow says on a managed card of a usable argument map, or null (an ordinary card, or a map without the key). */
+  private argumentCardView(id: string): ArgumentCardView | null {
+    if (!this.map || this.map.argumentMap === undefined) return null;
+    const read = readArgumentMap(this.map);
+    if (read.kind !== "usable" || !managedNodeIds(this.map).has(id)) return null;
+    return describeArgumentCard(read.data, id, t);
+  }
+  /** The heading of a managed card: its note's title, the note's summary (a concluded conclusion only), or the flow's own text. */
+  private argumentTitleOf(view: ArgumentCardView, note: Note | undefined): string {
+    if (view.titleFrom === "text") return view.title ?? "";
+    if (view.titleFrom === "summary")
+      return note?.summary && !isPlaceholder(note.summary) ? note.summary : (note?.title ?? "");
+    return note?.title ?? "";
+  }
   /** The kind whose shape the card is drawn with: the type's own, except an argument map's cards, which are all rectangles. */
   private shapeKindOf(id: string): TopicKind {
     return shapeKindFor(this.topicKindOf(id), this.isArgumentCard(id));
@@ -16334,14 +16366,20 @@ export class VisualAgentMapView extends ItemView {
       note = this.notes.get(node.id);
     if (!card || !note) return;
     const title = card.querySelector<HTMLElement>(".vam-card-title");
-    title?.setAttr("title", note.title);
-    title?.setText(note.title);
+    // A managed argument card keeps what renderNode drew: its heading and body come from the flow's state, not the note's summary.
+    const argumentView = this.argumentCardView(node.id);
+    const shownTitle = argumentView ? this.argumentTitleOf(argumentView, note) : note.title;
+    title?.setAttr("title", shownTitle);
+    title?.setText(shownTitle);
     // Same summary rule as renderNode: a placeholder summary is not shown.
     let summary = card.querySelector<HTMLElement>(".vam-card-summary");
     const addLine = card.querySelector<HTMLElement>(".vam-card-summary-add");
     const typing = this.inlineSummary?.id === node.id;
     const editable = this.cardTextEditable();
-    if (isPlaceholder(note.summary)) {
+    if (argumentView) {
+      summary?.remove();
+      addLine?.remove();
+    } else if (isPlaceholder(note.summary)) {
       summary?.remove();
       // The faint "add a summary" line takes the summary's place (and goes again once a summary exists).
       if (!addLine && !typing && editable && title) {
@@ -16397,7 +16435,9 @@ export class VisualAgentMapView extends ItemView {
     }
     // The label above was rewritten from the title and status; a typed topic keeps its type (a hypothesis its strength) in the accessible name.
     const kind = this.topicKindOf(node.id);
-    if (kind !== "topic") {
+    if (argumentView) {
+      this.labelCard(card, t("ui.topic_card_label_0_1", shownTitle, argumentView.label));
+    } else if (kind !== "topic") {
       const strength = this.hypothesisStrengthOf(node.id),
         leaning = this.hypothesisLeaningOf(node.id);
       const kindText =
@@ -18971,8 +19011,13 @@ export class VisualAgentMapView extends ItemView {
    */
   async setAiLock(nodes: readonly MapNode[], locked: boolean): Promise<void> {
     if (!this.map || this.aimLive()) return;
+    // The flow's managed cards are locked by the flow itself; the user's switch never touches them.
     const targets = nodes.filter(
-      node => !isAimNode(node) && !!this.notes.get(node.id) && (this.notes.get(node.id)?.aiLocked === true) !== locked
+      node =>
+        !isAimNode(node) &&
+        !this.isArgumentCard(node.id) &&
+        !!this.notes.get(node.id) &&
+        (this.notes.get(node.id)?.aiLocked === true) !== locked
     );
     if (!targets.length) return;
     if (locked) for (const node of targets) this.stopAiOn(node.path);
@@ -18996,6 +19041,20 @@ export class VisualAgentMapView extends ItemView {
     const group = section.createDiv("vam-topic-markers vam-choice-group");
     group.setAttr("role", "group");
     group.setAttr("aria-label", t("ui.ai_lock"));
+    if (this.isArgumentCard(node.id)) {
+      // Managed by the argument flow: shown as locked, and the switch does nothing.
+      const choice = this.button(group, t("ui.ai_unlock_selected"), () => {}, true);
+      choice.setAttr("aria-pressed", "true");
+      choice.setAttr("aria-disabled", "true");
+      choice.addClass("is-pressed");
+      group.createSpan({
+        cls: "vam-ai-lock-state",
+        text: t("ui.ai_lock_state_managed"),
+        attr: { role: "status", "aria-live": "polite" }
+      });
+      section.createEl("p", { cls: "vam-hint vam-ai-lock-hint", text: t("ui.ai_lock_hint_managed") });
+      return;
+    }
     // The metadata cache may lag behind the write, so the state after a click is tracked here.
     let locked = this.notes.get(node.id)?.aiLocked === true;
     const paint = (focus = false): void => {
@@ -20418,7 +20477,10 @@ export class VisualAgentMapView extends ItemView {
       add(t("ui.summary_add"), "brackets", () => this.addSummaryOver());
       const nodes = [...this.selection.state.multiSelected]
         .map(id => this.map?.nodes.find(node => node.id === id))
-        .filter((node): node is MapNode => !!node && !isAimNode(node) && !!this.notes.get(node.id));
+        .filter(
+          (node): node is MapNode =>
+            !!node && !isAimNode(node) && !this.isArgumentCard(node.id) && !!this.notes.get(node.id)
+        );
       const all = nodes.length > 0 && nodes.every(node => this.notes.get(node.id)?.aiLocked === true);
       const locked = nodes.filter(node => this.notes.get(node.id)?.aiLocked === true).length;
       // A mixed selection says how many are locked; a click locks the rest (all locked: unlocks all).
@@ -27578,6 +27640,14 @@ export class VisualAgentMapView extends ItemView {
     // Lines are collected first and added after every position is read: adding each one before reading the next card's
     // position would make the browser lay out the stage again for every line.
     const lines: SVGPathElement[] = [];
+    // An argument map's tree edges end in an arrowhead on the parent's right edge (one per parent, none for the proposition
+    // and the eliminated group); every other map draws none.
+    const argumentRead = this.map.argumentMap === undefined ? null : readArgumentMap(this.map);
+    const tipSkip =
+      argumentRead?.kind === "usable"
+        ? new Set([argumentRead.data.roles.proposition, argumentRead.data.roles.eliminated])
+        : null;
+    const tipped = new Set<string>();
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
@@ -27612,6 +27682,14 @@ export class VisualAgentMapView extends ItemView {
         // A mind map's own parent line is drawn lighter than the semantic lines (decision 35); AIM and the share viewer keep the accent line.
         else if (!this.map.aim && parentId === node.parentId) path.setAttribute("data-parent-line", "");
         lines.push(path);
+        if (tipSkip && direction === "right" && parentId === node.parentId && !afterText && !tipSkip.has(parentId)) {
+          if (!tipped.has(parentId)) {
+            tipped.add(parentId);
+            lines.push(
+              argumentTipPath(parent.offsetLeft + parent.offsetWidth, parent.offsetTop + parent.offsetHeight / 2)
+            );
+          }
+        }
         this.edgeEls.set(`${sourceId}\u0000${node.id}`, path);
       }
     }

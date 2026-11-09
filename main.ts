@@ -119,7 +119,7 @@ import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery
 import { ShallowExpansionCoordinator, type ExpansionBatchState } from "./experiences/visual-map/expansion-batch";
 import { ResearchProgressStore } from "./experiences/visual-map/research-progress";
 import { TopicRuns, type ChartJob } from "./experiences/visual-map/topic-run";
-import { ArgumentRuns } from "./experiences/visual-map/argument-run";
+import { ArgumentRuns, topicKindOfNote } from "./experiences/visual-map/argument-run";
 import { inertHtmlText } from "./core/argument-map/source-proof";
 import { askArgumentStep, providerArgumentRunner } from "./core/steps/argument-map/runner";
 import type { ResearchObserver } from "./ai/research-observer";
@@ -376,14 +376,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.repo.createNote(input.title, this.currentModelChoice().model, map, mapPath, "workspace", {
         summary: input.summary,
         detail: input.detail,
-        topicKind:
-          input.kind === "hypothesis"
-            ? "hypothesis"
-            : input.kind === "need"
-              ? "evidence"
-              : input.kind === "conclusion"
-                ? "conclusion"
-                : "topic"
+        topicKind: topicKindOfNote(input.kind)
       }),
     readNote: async path => {
       const note = await this.repo.readNote(path);

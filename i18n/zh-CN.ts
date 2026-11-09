@@ -639,6 +639,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.card_search_current": "当前",
   "ui.ai_lock_state_off": "关闭：AI 可以修改这张卡",
   "ui.ai_lock_state_on": "开启：AI 不会修改这张卡",
+  "ui.ai_lock_state_managed": "由研究流程锁定：AI 不能修改这张卡",
+  "ui.ai_lock_hint_managed": "这张卡属于论证思维导图，只有研究流程能写入，所以无法在此解除锁定。",
   "ui.relation_name_supports": "支持",
   "ui.relation_name_contradicts": "反驳",
   "ui.relation_name_verifies": "验证",

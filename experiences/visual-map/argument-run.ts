@@ -79,6 +79,16 @@ export class ArgumentRunError extends Error {
 }
 
 export type NoteKind = "proposition" | "situation" | "datum" | "conclusion" | "group" | "hypothesis" | "need";
+/** The `topic-kind` a managed note is created with: a hypothesis, evidence (needs and situation data) or the conclusion; the rest are ordinary. */
+export function topicKindOfNote(kind: NoteKind): "hypothesis" | "evidence" | "conclusion" | "topic" {
+  return kind === "hypothesis"
+    ? "hypothesis"
+    : kind === "need" || kind === "datum"
+      ? "evidence"
+      : kind === "conclusion"
+        ? "conclusion"
+        : "topic";
+}
 export interface NoteInput {
   title: string;
   summary?: string;

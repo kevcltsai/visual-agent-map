@@ -690,6 +690,9 @@ export const en = {
   "ui.card_search_current": "Current",
   "ui.ai_lock_state_off": "Off: AI can change this card",
   "ui.ai_lock_state_on": "On: AI will not change this card",
+  "ui.ai_lock_state_managed": "Locked by the research flow: AI cannot change this card",
+  "ui.ai_lock_hint_managed":
+    "This card belongs to the argument map. Only the research flow writes it, so the lock cannot be turned off here.",
   "ui.relation_name_supports": "Supports",
   "ui.relation_name_contradicts": "Contradicts",
   "ui.relation_name_verifies": "Verifies",

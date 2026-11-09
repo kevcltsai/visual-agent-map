@@ -640,6 +640,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.card_search_current": "目前",
   "ui.ai_lock_state_off": "關閉：AI 可以修改這張卡",
   "ui.ai_lock_state_on": "開啟：AI 不會修改這張卡",
+  "ui.ai_lock_state_managed": "由研究流程鎖定：AI 不能修改這張卡",
+  "ui.ai_lock_hint_managed": "這張卡屬於論證心智圖，只有研究流程能寫入，所以無法在此解除鎖定。",
   "ui.relation_name_supports": "支持",
   "ui.relation_name_contradicts": "反駁",
   "ui.relation_name_verifies": "驗證",

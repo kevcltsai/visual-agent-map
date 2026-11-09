@@ -16,7 +16,7 @@ export const MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
 /** A reply that adds this many cards or more is followed by one automatic layout and a move of the view to the new cards. */
 export const MAP_CHAT_AUTO_LAYOUT_MIN_NEW = 5;
 
-/** One expand card is at most this many outline calls: the outline call, and one more when the model leaves a summary out and is asked again. */
+/** One expand card is at most this many outline calls: the outline call, and one more when the model leaves a summary out or writes a non-heading line and is asked again. */
 export const MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
 
 /**

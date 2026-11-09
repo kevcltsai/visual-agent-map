@@ -1705,3 +1705,26 @@ integrationTest('topic chat steer: with no addition the entry is freed in the sa
   assert.equal(h.host('a').steer('x'), false, 'not running: no addition'); assert.equal(await h.host('a').submit('ask', 'x'), false);
   assert.equal(h.notices.slice(before).at(-1), t('ui.ai_running_ai'));
 });
+
+integrationTest('topic chat steer: a retried attempt (a new handler through the view) gets each addition once, and the reply is applied with it once', async () => {
+  const h = await harness(); const host = h.host('a'); const gate = deferred(); const a1 = []; const a2 = []; let message; let applied = 0;
+  h.requests = [];
+  h.plugin.mapChat = { chat: async (request, signal, _r, _p, onSteer) => {
+    h.requests.push(request);
+    if (h.requests.length === 1) {
+      onSteer(async text => { a1.push(text); });
+      await gate.promise;
+      onSteer(null); onSteer(async text => { a2.push(text); }); await tick(); await tick();
+      return answer([{ kind: 'add_child', parentId: h.ids.a, title: 'Light', summary: 'S' }], 'ok');
+    }
+    return answer([], 'second');
+  } };
+  h.view.applyMapChatActions = async result => { applied++; message = result.message; return []; };
+  await host.submit('ask', 'q'); await waitFor(() => h.requests.length === 1);
+  host.steer('s1'); host.steer('s2'); await tick(); await tick();
+  assert.deepEqual(a1, ['s1', 's2']);
+  gate.resolve(); await finished(h);
+  assert.deepEqual(a2, ['s1', 's2'], 'the new attempt gets each addition exactly once');
+  assert.deepEqual(a1, ['s1', 's2'], 'the old one is not sent again');
+  assert.equal(applied, 1); assert.equal(message, 'q\n\ns1\n\ns2', 'each addition once in the applied question');
+});

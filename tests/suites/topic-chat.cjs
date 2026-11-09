@@ -1291,3 +1291,46 @@ integrationTest('topic chat switch: a second submit of one entry during the firs
   calls[0].gate.resolve(); calls[0].done({ summary: 'S', detail: 'D' }); await finished(h);
   assert.equal(h.entry('a').submitting, false, 'the flag is released');
 });
+
+// Real wiring: a card drawn by renderNode, pressed with pointer events that enableDrag listens to.
+const withClosest = el => { el.closest = sel => { const parts = sel.split(',').map(x => x.trim()); for (let n = el; n; n = n.parent) if (parts.some(x => x.startsWith('.') ? hasClass(n, x.slice(1)) : n.tag === x)) return n; return null; }; return el; };
+async function pointing() {
+  const h = await harness();
+  const edits = [];
+  h.view.openCardTextEditor = (...args) => { edits.push(args); return false; };
+  h.view.stageEl = h.page.root.createDiv('vam-stage');
+  Object.assign(h.page.doc, { addEventListener() {}, removeEventListener() {} });
+  h.view.labelCard = () => {}; // display-only text; the fake DOM has no textContent setter
+  for (const key of ['a', 'b']) h.view.renderNode(h.node(key));
+  const press = (key, { dx = 0, target, ...mods } = {}) => {
+    const card = h.view.cardEls.get(h.ids[key]);
+    Object.assign(card, { setPointerCapture() {}, releasePointerCapture() {}, hasPointerCapture: () => false });
+    const at = withClosest(target ?? card);
+    card.fire('pointerdown', { target: at, button: 0, clientX: 10, clientY: 10, ...mods });
+    if (dx) card.fire('pointermove', { target: at, button: 0, buttons: 1, clientX: 10 + dx, clientY: 10, ...mods });
+    card.fire('pointerup', { target: at, button: 0, clientX: 10 + dx, clientY: 10, ...mods });
+    card.fire('click', { target: at, ...mods });
+  };
+  return { h, edits, press };
+}
+integrationTest('topic chat switch (real pointer path): a single press on another card moves the window and skips the editor', async () => {
+  const { h, edits, press } = await pointing();
+  h.view.openTopicChat(h.node('a'));
+  press('b');
+  assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.b); assert.equal(edits.length, 0);
+  press('a'); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'a selected card elsewhere also switches');
+  press('a'); press('b'); press('b');
+  assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.b, 'an already selected card switches too');
+  const win = h.win(); const seen = edits.length; press('b'); assert.equal(h.win(), win, 'same card: same window'); assert.equal(edits.length, seen + 1, 'editor opens when nothing switched');
+});
+integrationTest('topic chat switch (real pointer path): window closed, drag, Cmd/Ctrl and editor fields do not switch', async () => {
+  const { h, edits, press } = await pointing();
+  press('b'); assert.equal(h.win(), undefined); assert.equal(edits.length, 1, 'closed window: editor as before');
+  h.view.openTopicChat(h.node('a'));
+  const seen = edits.length; press('b', { dx: 60 }); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'drag'); assert.equal(edits.length, seen, 'a drag is not a click');
+  press('b', { metaKey: true }); press('b', { ctrlKey: true }); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'Cmd/Ctrl');
+  for (const tag of ['input', 'textarea', 'button']) {
+    const field = element(tag); h.view.cardEls.get(h.ids.b).appendChild?.(field); field.parent = h.view.cardEls.get(h.ids.b); withClosest(field);
+    press('b', { target: field }); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, tag);
+  }
+});

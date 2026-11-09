@@ -15108,7 +15108,12 @@ export class VisualAgentMapView extends ItemView {
         });
       }
     }
-    this.enableDrag(card, node, (point, wasSelected) => this.openCardTextEditor(point, card, node, wasSelected));
+    // A real press is handled by enableDrag's pointerup (which then holds back the click that follows), so the switch lives here too.
+    this.enableDrag(
+      card,
+      node,
+      (point, wasSelected) => this.switchTopicChat(node, point.target) || this.openCardTextEditor(point, card, node, wasSelected)
+    );
     // Built during a presentation too: the stylesheet hides them and every handler returns early while presenting, so ending it needs no repaint.
     // Left as it was while AIM is hidden: an AIM card keeps no resize handles (a source-text test pins this condition).
     if (!this.selection.state.multiSelectMode && !this.map?.aim && !node.aimKind) {
@@ -16482,10 +16487,12 @@ export class VisualAgentMapView extends ItemView {
     this.selectMapNode(node);
     if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node);
     // A click that moved the open topic chat to this card is done; the card text editor would take the input focus from it.
-    if (!this.switchTopicChat(node)) this.openCardTextEditor(event, card, node, wasSelected);
+    if (!this.switchTopicChat(node, event.target)) this.openCardTextEditor(event, card, node, wasSelected);
   }
   /** A plain click on another card moves the open chat window to it (the old topic's task and draft stay with its entry). True when it moved. */
-  private switchTopicChat(node: MapNode): boolean {
+  private switchTopicChat(node: MapNode, target: EventTarget | null): boolean {
+    // A click inside an editing field only moves its caret: no switch, no blur.
+    if ((target as Element | null)?.closest?.("input, textarea, button")) return false;
     const open = this.topicChatOpen;
     if (!open || !this.map || open.entry.mapId !== this.map.id || open.entry.nodeId === node.id) return false;
     if (this.aiLockReason("write", [node.id])) return false;

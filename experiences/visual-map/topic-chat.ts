@@ -71,9 +71,9 @@ function suggestion(kind: TopicChatButtonKind): string {
   return t(`ui.topic_chat_suggest_${kind}`);
 }
 
-/** The small conversation window next to a topic card. Pure DOM; geometry comes from the host. */
 let labelSeq = 0;
 
+/** The small conversation window next to a topic card. Pure DOM; geometry comes from the host. */
 export class TopicChatWindow {
   readonly el: HTMLElement;
   private readonly logEl: HTMLElement;

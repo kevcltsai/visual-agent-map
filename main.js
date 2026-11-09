@@ -70368,7 +70368,11 @@ ${request.requirements}` : preset.text,
         });
       }
     }
-    this.enableDrag(card, node, (point, wasSelected) => this.openCardTextEditor(point, card, node, wasSelected));
+    this.enableDrag(
+      card,
+      node,
+      (point, wasSelected) => this.switchTopicChat(node, point.target) || this.openCardTextEditor(point, card, node, wasSelected)
+    );
     if (!this.selection.state.multiSelectMode && !((_S = this.map) == null ? void 0 : _S.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
@@ -71644,16 +71648,17 @@ ${request.requirements}` : preset.text,
     const wasSelected = this.selection.state.selected === node.id;
     this.selectMapNode(node);
     if (this.plugin.detailsShown() && !this.notesLoading()) this.openDetails(node);
-    if (!this.switchTopicChat(node)) this.openCardTextEditor(event, card, node, wasSelected);
+    if (!this.switchTopicChat(node, event.target)) this.openCardTextEditor(event, card, node, wasSelected);
   }
   /** A plain click on another card moves the open chat window to it (the old topic's task and draft stay with its entry). True when it moved. */
-  switchTopicChat(node) {
-    var _a2;
+  switchTopicChat(node, target) {
+    var _a2, _b2;
+    if ((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "input, textarea, button")) return false;
     const open = this.topicChatOpen;
     if (!open || !this.map || open.entry.mapId !== this.map.id || open.entry.nodeId === node.id) return false;
     if (this.aiLockReason("write", [node.id])) return false;
     this.openTopicChat(node);
-    return ((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry.nodeId) === node.id;
+    return ((_b2 = this.topicChatOpen) == null ? void 0 : _b2.entry.nodeId) === node.id;
   }
   /** Opens the topic's chat next to its card; one window at a time (opening another closes this one, its task goes on). */
   openTopicChat(node, opener) {

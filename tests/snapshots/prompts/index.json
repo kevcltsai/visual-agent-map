@@ -2806,6 +2806,11 @@
       "language": "zh-CN",
       "schema": true
     },
+    "task-steer.en": {
+      "builder": "core/steps/task-steer/steer.ts renderTaskSteer",
+      "language": "en",
+      "schema": false
+    },
     "view.guided-empty-direction.en": {
       "builder": "VisualAgentMapView guided-empty-direction TaskContext through AiTaskService",
       "language": "en",

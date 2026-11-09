@@ -34,6 +34,7 @@ import { chartStep, ChartRejected } from "./steps/chart/step";
 import { applyCharts, existingDiagrams, type ChartCode } from "./steps/chart/insert";
 import { readerFacingDetail } from "./steps/task/render";
 import { chartsWanted, selectionFromContext } from "./steps/task/assemble";
+import { renderTaskSteer } from "./steps/task-steer/steer";
 
 export { extractJsonObject } from "./steps/task/parse";
 
@@ -65,7 +66,7 @@ interface AttemptSetup {
   extraMilestones: () => AiMilestones;
   hooks: Pick<
     RuntimeTaskControls,
-    "onAccepted" | "stream" | "onStreamMode" | "onFirstEvent" | "onStage" | "onStructuredDelta" | "onActivity"
+    "onAccepted" | "stream" | "onStreamMode" | "onFirstEvent" | "onStage" | "onStructuredDelta" | "onActivity" | "onSteer"
   >;
   onExchange: (id: string) => void;
   /** Runs when the reply arrives; throws for a superseded attempt so its entry is not flipped from failed back to received. */
@@ -503,7 +504,23 @@ export class AiTaskService {
               watching = false;
               disarm();
             }
+            if (live()) safe(() => observer.onStreamMode?.(attemptId, mode));
           },
+          // Only when the observer can take additions: a hook here makes Claude open stdin for them (a different input format).
+          ...(observer.onSteer
+            ? {
+                onSteer: (steer: (text: string) => Promise<void>): void => {
+                  if (!live()) return;
+                  safe(() =>
+                    observer.onSteer?.(attemptId, async text => {
+                      // An attempt the user replaced or stopped takes nothing: the text never reaches its process.
+                      if (!live()) throw cancelled();
+                      await steer(renderTaskSteer(text));
+                    })
+                  );
+                }
+              }
+            : {}),
           onFirstEvent: () => {
             seen();
           },

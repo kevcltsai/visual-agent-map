@@ -11,6 +11,7 @@ import {
 } from "../../i18n";
 import { App, Component, MarkdownRenderer, Modal, Notice, Setting, TFile } from "obsidian";
 import { type ReferenceGroup } from "../../ai/reference-materials";
+import type { ResearchSteer } from "../../ai/research-observer";
 import { DebugLogModal } from "../../ui/modals/debug-log-modal";
 import { actionStatus, armDiscard, modalActions } from "../../ui/modals/action-bar";
 
@@ -62,6 +63,8 @@ export interface TaskOptions {
    * (ADR-021). Absent: the topic's own resolution applies.
    */
   runOnce?: RunOnceModel;
+  /** Takes user additions while the run's main call is going (the topic chat window). Absent: the run takes none. */
+  steer?: ResearchSteer;
 }
 /** A model chosen for one run. Absent reasoning means the current model's. */
 export interface RunOnceModel {
@@ -124,7 +127,9 @@ export interface QuickOutline {
       /** The dialog's one-run model; absent: the topic's own. */
       runOnce?: RunOnceModel;
     },
-    signal: AbortSignal
+    signal: AbortSignal,
+    /** Takes user additions while the outline is generated (the topic chat window); absent: none. */
+    steer?: ResearchSteer
   ) => Promise<OutlineNode[]>;
   /** Adds the reviewed outline under this topic. */
   create: (nodes: OutlineNode[], options: TaskOptions) => Promise<void>;

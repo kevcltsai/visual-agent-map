@@ -35465,6 +35465,31 @@ function isAiLockedError(error) {
   return error instanceof Error && error.name === "AiLockedError";
 }
 
+// ai/research-observer.ts
+function steerObserver(observer, steer) {
+  if (!observer || !steer) return observer;
+  let current = "";
+  return {
+    ...observer,
+    onAttempt: (id, attempt) => {
+      var _a2;
+      current = id;
+      steer.bind(null);
+      (_a2 = observer.onAttempt) == null ? void 0 : _a2.call(observer, id, attempt);
+    },
+    onSteer: (id, send) => {
+      var _a2;
+      if (id === current) steer.bind(send);
+      (_a2 = observer.onSteer) == null ? void 0 : _a2.call(observer, id, send);
+    },
+    onStreamMode: (id, mode) => {
+      var _a2;
+      if (id === current && mode !== "stream-json") steer.live(false);
+      (_a2 = observer.onStreamMode) == null ? void 0 : _a2.call(observer, id, mode);
+    }
+  };
+}
+
 // ai/note-style-label.ts
 function runStyleLabelText(label, language2) {
   const bracket = label.templateSource === "kind" && label.aiSectionsMode !== "decide" && label.aiSectionsMode !== "follow";
@@ -35840,7 +35865,8 @@ var TopicRuns = class {
         void 0,
         options.accepted,
         void 0,
-        progress.observer
+        // No progress entry, no observer: one is not made up for the steer, it would change the stream mode.
+        steerObserver(progress.observer, options.steer)
       );
       progress.end();
       (_e = options.accepted) == null ? void 0 : _e.call(options);
@@ -36269,7 +36295,7 @@ var TopicRuns = class {
       },
       markAccepted,
       void 0,
-      observer
+      steerObserver(observer, options.steer)
     ).then(
       (result) => this.ports.mutate()(async () => {
         var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n;
@@ -43574,6 +43600,14 @@ ${inLanguage(CLAUDE_STRUCTURED_OUTPUT, request.language)}` : "",
   parse: (raw) => parseChartReply(raw)
 };
 
+// core/steps/task-steer/steer.en.md
+var steer_en_default = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same output format as the original request: your reply must cover the original request and every addition made so far in this turn, not only this one. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
+
+// core/steps/task-steer/steer.ts
+function renderTaskSteer(text12) {
+  return renderTemplate(steer_en_default, { text: JSON.stringify(text12) });
+}
+
 // core/ai-task-service.ts
 var FIRST_EVENT_WAIT_MS = 2e4;
 function cancelled() {
@@ -43919,7 +43953,26 @@ var AiTaskService = class {
               watching = false;
               disarm();
             }
+            if (live()) safe(() => {
+              var _a3;
+              return (_a3 = observer.onStreamMode) == null ? void 0 : _a3.call(observer, attemptId, mode);
+            });
           },
+          // Only when the observer can take additions: a hook here makes Claude open stdin for them (a different input format).
+          ...observer.onSteer ? {
+            onSteer: (steer) => {
+              if (!live()) return;
+              safe(
+                () => {
+                  var _a3;
+                  return (_a3 = observer.onSteer) == null ? void 0 : _a3.call(observer, attemptId, async (text12) => {
+                    if (!live()) throw cancelled();
+                    await steer(renderTaskSteer(text12));
+                  });
+                }
+              );
+            }
+          } : {},
           onFirstEvent: () => {
             seen();
           },
@@ -44193,7 +44246,7 @@ var language_en_default2 = "Write the reply, and every title, summary, note text
 var language_zh_default2 = "\u56DE\u8986\uFF0C\u4EE5\u53CA\u4F60\u7522\u751F\u7684\u6240\u6709\u6A19\u984C\u3001\u6458\u8981\u3001\u7B46\u8A18\u6587\u5B57\u8207\u65B0\u6A94\u6848\u6587\u5B57\uFF0C\u8ACB\u4EE5{{language}}\u64B0\u5BEB\u3002\n";
 
 // core/steps/map-chat/steer.en.md
-var steer_en_default = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same JSON format as before: `reply` and `actions` must cover the original message and every addition made so far in this turn, not only this one. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
+var steer_en_default2 = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same JSON format as before: `reply` and `actions` must cover the original message and every addition made so far in this turn, not only this one. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
 
 // core/steps/map-chat/prompt.en.md
 var prompt_en_default6 = `You are the assistant inside a research mind map. The user is talking to you about the map. Answer the user's message in "reply", and, only when the user asked for a change or an action, list actions in "actions". Actions are applied for the user after your reply, in the order you list them: the user's message is the confirmation, except that a long list, a new map or research on many cards is first shown to the user as a plan to approve. Never ask the user in "reply" to approve, confirm or apply anything: the app shows its own Apply and Cancel buttons when a plan is needed, and otherwise the actions simply run. Never say a change has already been made: "reply" only says what you are going to do; the result list the user sees afterwards says what was done. Use future or intention wording ("I'll add ...", "Here is what I will do: ..."), not "I added" or "done". When the user only asks a question, return an empty "actions" list.
@@ -44820,7 +44873,7 @@ function parseMapChat(raw, context) {
   return { reply: body.reply, actions, rejected, remaining: normalizeRemaining(body.remaining) };
 }
 function renderMapChatSteer(text12) {
-  return renderTemplate(steer_en_default, { text: JSON.stringify(text12) });
+  return renderTemplate(steer_en_default2, { text: JSON.stringify(text12) });
 }
 var mapChatStep = {
   id: "map-chat",
@@ -89996,18 +90049,39 @@ var OutlineGenerationService = class {
   /**
    * Generate a outline (each heading with a one-line summary) for `request.topic`. Throws {@link OutlineGenerateError} (localized message,
    * `code` for the reason) for an empty topic, an over-budget request, a stop, or a reply that is not a valid outline.
+   *
+   * `steer` (the topic chat window) takes user additions while the call runs. Codex takes them into the running turn, and
+   * each attempt (the retry below is a new one) binds again. Claude cannot: the outline is plain text, which the stream
+   * mode that carries additions would not return as one reply, so `steer.live(false)` is called and every addition waits.
    */
-  async generate(request, signal) {
+  async generate(request, signal, steer) {
     const stopped = () => new OutlineGenerateError("stopped", translate(uiLocale(request.language), "error.outline_generate_stopped"));
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(
       outlineGenerateStep,
       request
     );
+    const claude = CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model);
+    if (steer && claude) steer.live(false);
+    let generation = 0;
     for (let attempt = 1; ; attempt++) {
       let raw;
+      let hooks;
+      if (steer && !claude) {
+        steer.bind(null);
+        const mine = ++generation;
+        hooks = {
+          onSteer: (send) => {
+            if (signal.aborted || mine !== generation) return;
+            steer.bind(async (text12) => {
+              if (signal.aborted || mine !== generation) throw stopped();
+              await send(renderTaskSteer(text12));
+            });
+          }
+        };
+      }
       try {
-        raw = await this.run(request, signal, prepared);
+        raw = await this.run(request, signal, prepared, void 0, hooks);
         if (signal.aborted) throw stopped();
         return prepared.parse(raw);
       } catch (error) {

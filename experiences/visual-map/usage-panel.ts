@@ -28,7 +28,7 @@ const mark = (count: number, estimated: boolean | undefined): string =>
 /** The panel's provider filter; every panel opens on "total" (never remembered). */
 type UsageFilter = "total" | UsageProvider;
 const FILTERS: readonly UsageFilter[] = ["total", "claude", "codex"];
-const FILTER_LABEL: Record<UsageFilter, string> = { total: "Total", claude: "Claude", codex: "Codex" };
+const FILTER_LABEL: Record<Exclude<UsageFilter, "total">, string> = { claude: "Claude", codex: "Codex" };
 
 interface TotalCell {
   strong: HTMLElement;
@@ -206,7 +206,10 @@ export class UsageControl {
     group.setAttr("aria-label", t("ui.usage_filter_label"));
     const filters = new Map<UsageFilter, HTMLElement>();
     for (const value of FILTERS) {
-      const radio = group.createEl("button", { cls: "vam-usage-filter-option", text: FILTER_LABEL[value] });
+      const radio = group.createEl("button", {
+        cls: "vam-usage-filter-option",
+        text: value === "total" ? t("ui.usage_filter_total") : FILTER_LABEL[value]
+      });
       radio.setAttr("type", "button");
       radio.setAttr("role", "radio");
       radio.addEventListener("click", () => this.select(value, false));

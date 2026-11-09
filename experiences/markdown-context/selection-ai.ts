@@ -345,6 +345,7 @@ class SelectionAiPanel extends Component {
   private output!: HTMLTextAreaElement;
   private result!: HTMLElement;
   private before!: HTMLElement;
+  private unavailableHint!: HTMLElement;
   private presets!: HTMLElement;
   private resultActions!: HTMLElement;
   private accept!: HTMLButtonElement;
@@ -506,6 +507,11 @@ class SelectionAiPanel extends Component {
     // The draft: a before/after pair for a replaceable selection, otherwise just the editable draft.
     this.result = this.contentEl.createDiv({ cls: "vam-context-ai-result" });
     this.result.hidden = true;
+    // Shown when the selection cannot be found in the source (no accept, no insert here): says why, and what is left.
+    this.unavailableHint = this.result.createDiv({
+      cls: "vam-hint vam-context-ai-unavailable",
+      text: t("ui.context_ai_accept_unavailable")
+    });
     this.before = this.result.createDiv({ cls: "vam-context-ai-diff" });
     this.before.createSpan({ cls: "vam-context-ai-label", text: t("ui.context_ai_before") });
     this.before.createEl("del", { cls: "vam-context-ai-before", text: this.snapshot.text });
@@ -600,6 +606,7 @@ class SelectionAiPanel extends Component {
     this.resultActions.hidden = !visible;
     const replaceable = this.snapshot.matchAt >= 0 && !!this.snapshot.text && !this.insertAfter;
     this.before.hidden = !replaceable;
+    this.unavailableHint.hidden = !visible || this.snapshot.matchAt >= 0;
     this.accept.hidden = !replaceable;
     this.insertHere.hidden = this.snapshot.matchAt < 0;
     const insertable = this.snapshot.matchAt >= 0;
@@ -875,6 +882,14 @@ class SelectionAiPanel extends Component {
       editor.replaceRange(addition, end, end);
     }
     this.close();
-    new Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
+    const message =
+      action === "replace"
+        ? t("ui.context_ai_replaced")
+        : action === "after"
+          ? t("ui.context_ai_inserted_after")
+          : t("ui.context_ai_appended");
+    // Reading view: the change is made in the hidden editor, so it is saved to the note before the notice says it is there.
+    if (view.getMode() === "source") new Notice(message);
+    else void view.save().then(() => new Notice(message));
   }
 }

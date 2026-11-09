@@ -26,7 +26,8 @@ const realPlugin = load('main.ts', { obsidian: { ...obsidian, MarkdownView: clas
 
 /** A document stand-in: `activeElement` follows focus(), like the real one, and is cleared when the focused element is removed. */
 function page() {
-  const doc = { activeElement: null };
+  // A document takes listeners as in Obsidian (a drag listens for Esc on it while the pointer is down).
+  const doc = { activeElement: null, listeners: {}, addEventListener(name, fn) { (this.listeners[name] ??= []).push(fn); }, removeEventListener(name, fn) { this.listeners[name] = (this.listeners[name] ?? []).filter(f => f !== fn); } };
   const root = element('div'); root.root = doc; root.ownerDocument = doc;
   const attach = parent => { parent.appendChild = node => { node.parent?.children.splice(node.parent.children.indexOf(node), 1); node.parent = parent; parent.children.push(node); return node; }; return parent; };
   attach(root);

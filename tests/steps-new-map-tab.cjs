@@ -250,6 +250,8 @@ each('N3 switcher: running work opens a new tab; idle swaps in place; a target a
     w = makeWorld({ focusNewTab }); a = w.makeView('Maps/A/Map.md'); const b = w.makeView('Maps/B/Map.md');
     if (busy) a.view.chatController = new AbortController();
     await pickInSwitcher(a.view, 'Maps/B/Map.md');
+    // The reveal of an open pane is deferred with setTimeout(0) (P2: the switcher closes first); let that timer run.
+    await new Promise(resolve => setTimeout(resolve, 5));
     assert.deepEqual(w.getLeafCalls, [], 'no new tab'); assert.deepEqual(a.calls.openInPlace, []);
     assert.deepEqual(w.revealed, [b.leaf]);
     assert.equal(w.activeLeaf(), b.leaf, 'B1: the tab jumped to is the active leaf'); assert.deepEqual(plain(w.active.at(-1)[1]), { focus: true });

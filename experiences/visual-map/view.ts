@@ -351,7 +351,7 @@ import {
   styleIssueText
 } from "./note-style-picker";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
-import { placeHoverPreview, previewMetrics } from "../../ui/preview-utils";
+import { placeHoverPreview, previewMetrics, shrinkHoverPreview } from "../../ui/preview-utils";
 import { fitImageForInput } from "../../ui/fit-image-input";
 import {
   normalizeRelevanceContext,
@@ -1808,6 +1808,8 @@ export class VisualAgentMapView extends ItemView {
     draft: string;
     fresh: boolean;
     created: boolean;
+    /** For a new topic: the history step that made it. Esc in its name field takes exactly this step back. */
+    createdStep?: TransactionEntry;
     /** Where the caret goes on the next focus (a click in the text puts it there); cleared by typing. */
     caret?: number | null;
   } | null = null;
@@ -3033,10 +3035,52 @@ export class VisualAgentMapView extends ItemView {
     text.id = id;
     field.setAttr("aria-labelledby", id);
   }
+  /** Esc in a new topic's name field: the step that made the topic is undone (as Undo would), so nothing is left behind. */
+  private discardNewTopic(step: TransactionEntry): void {
+    if (this.history.undoEntry !== step) {
+      // Something else was recorded since the topic was made: it stays (no silent undo of another change).
+      this.render();
+      return;
+    }
+    this.enqueue(async () => {
+      await this.travel(false);
+      // A conflict window may have come up instead of the undo: then the topic stays as it was.
+      if (this.history.redoEntry !== step) return;
+      // Undo parks the new note in Unassigned; the cancelled topic leaves no note behind, and redo must not bring it back.
+      this.history.dropRedo();
+      for (const path of step.createdParkPaths?.() ?? []) {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+      }
+      this.render();
+    });
+  }
   /** Draws the card title's field in place of the title text. */
   private paintCardNameEdit(card: HTMLElement, node: MapNode, note: Note): HTMLInputElement {
+    const edit = this.inlineName;
     const input = this.createInlineNameInput(card, "vam-card-title-input", "", value => {
-      const name = sanitizeGeneratedTitle(value ?? "").trim();
+      // Esc on a topic that this field's own add just made: the add is cancelled, so no card and no note are left.
+      if (value === null && edit?.created && edit.createdStep) {
+        this.discardNewTopic(edit.createdStep);
+        return;
+      }
+      // A title that would break the note is refused, not rewritten: the field stays open with the typed text and says why.
+      const problem = titleProblemText(value ?? "");
+      if (problem) {
+        this.inlineName = {
+          target: "card",
+          id: node.id,
+          draft: value ?? "",
+          fresh: false,
+          created: edit?.created ?? false,
+          createdStep: edit?.createdStep,
+          caret: null
+        };
+        new Notice(problem);
+        this.render();
+        return;
+      }
+      const name = (value ?? "").trim();
       if (!name || name === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name }));
     });
@@ -6772,6 +6816,16 @@ export class VisualAgentMapView extends ItemView {
     if (state.rejection) throw state.rejection;
     const outcome = state.result;
     if (!outcome) return;
+    // The result notice says where the topics went and how many there are.
+    if (!state.saveFailed && written && outcome.created.length) {
+      const where =
+        placement.kind === "tree"
+          ? t("ui.outline_import_placement_tree")
+          : this.notes.get(placement.parentId)?.title
+            ? t("ui.outline_import_placement_under_named", this.notes.get(placement.parentId)?.title ?? "")
+            : t("ui.outline_import_placement_under");
+      new Notice(t("ui.outline_import_done_0_1", outcome.created.length, where));
+    }
     if (state.saveFailed || !written || !request.shallowResearch || !outcome.created.length) return;
     // An outline with several top headings, or one without a root of its own (quick explore drops the topic's root),
     // is researched under the parent.
@@ -7515,7 +7569,8 @@ export class VisualAgentMapView extends ItemView {
    */
   private switchToMap(path: string): void {
     const open = path === this.path ? undefined : this.plugin.findMapLeaf(path);
-    if (open) void this.plugin.showLeaf(open);
+    // Deferred: the switcher is still closing and would take the focus back from the pane it is about to show.
+    if (open) window.setTimeout(() => void this.plugin.showLeaf(open), 0);
     else if (path !== this.path && this.hasRunningWork())
       void this.plugin.openMapInNewTab(path).catch(error => errorNotice(error));
     else this.enqueue(() => this.openMapInMutation(path));
@@ -8685,8 +8740,21 @@ export class VisualAgentMapView extends ItemView {
       throw this.mergeError(error);
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
-    this.history.push(this.mergeEntry(entry));
+    const mergeStep = this.mergeEntry(entry);
+    this.history.push(mergeStep);
     this.selection.afterMerge(created.id);
+    // A merge by hand has no result notice of its own (the AI merge shows one): say it is done and offer the undo.
+    if (!content)
+      backgroundResultNotice(
+        t("ui.merge_done_0", sanitizeGeneratedTitle(title)),
+        {
+          label: t("ui.undo"),
+          open: () => {
+            if (this.history.undoEntry === mergeStep && !this.closed) this.enqueue(() => this.travel(false));
+          }
+        },
+        MERGE_DONE_NOTICE_MS
+      );
     await this.finishMerge(created.id);
   }
   /**
@@ -8772,8 +8840,21 @@ export class VisualAgentMapView extends ItemView {
       throw this.mergeError(error);
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
-    this.history.push(this.mergeEntry(entry));
+    const mergeStep = this.mergeEntry(entry);
+    this.history.push(mergeStep);
     this.selection.afterMerge(target.id);
+    // Same as the plain merge: a merge by hand says it is done and offers the undo.
+    if (!content)
+      backgroundResultNotice(
+        t("ui.merge_done_0", sanitizeGeneratedTitle(name || sourceNotes[0].title)),
+        {
+          label: t("ui.undo"),
+          open: () => {
+            if (this.history.undoEntry === mergeStep && !this.closed) this.enqueue(() => this.travel(false));
+          }
+        },
+        MERGE_DONE_NOTICE_MS
+      );
     await this.finishMerge(target.id);
   }
   /** Keeps what a merge's relation retargeting dropped, for the notice that follows the save. */
@@ -12360,6 +12441,9 @@ export class VisualAgentMapView extends ItemView {
         );
         if (!check.ok) {
           new Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
+          // A refused paste is a failed cut check: the pending cut and its dashed marks go with the refusal (FLOWS).
+          sessionFor(this.plugin).cancelCut();
+          this.refreshCutMarks();
           return;
         }
         await this.moveBranches(roots, target);
@@ -16156,19 +16240,21 @@ export class VisualAgentMapView extends ItemView {
       .filter(other => other !== card && other.classList.contains("is-selected"))
       .flatMap(other => [other, other.querySelector<HTMLElement>(".vam-node-tools")])
       .flatMap(el => (el ? [local(el.getBoundingClientRect())] : []));
-    const spot = placeHoverPreview(host, local(rect), { width, height: visibleHeight }, 12, {
-      keepClear: tools && tools.width > 0 ? [local(tools)] : [],
-      avoid: selected
-    });
-    if (!spot) {
+    const placement = { keepClear: tools && tools.width > 0 ? [local(tools)] : [], avoid: selected };
+    // No full-size side clear (a narrow pane with a large preview size): the preview is narrowed to fit beside the card.
+    const spot = placeHoverPreview(host, local(rect), { width, height: visibleHeight }, 12, placement);
+    const fitted = spot
+      ? { ...spot, width }
+      : shrinkHoverPreview(host, local(rect), { width, height: visibleHeight }, 12, placement);
+    if (!fitted) {
       preview.remove();
       this.hoverCard = null;
       this.hoverResearch = null;
       return;
     }
-    preview.style.width = `${width}px`;
-    preview.style.left = `${spot.left}px`;
-    preview.style.top = `${spot.top}px`;
+    preview.style.width = `${fitted.width}px`;
+    preview.style.left = `${fitted.left}px`;
+    preview.style.top = `${fitted.top}px`;
   }
   private refreshCard(node: MapNode, redrawEdges = true): void {
     const card = this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(node.id)}"]`),
@@ -17270,7 +17356,15 @@ export class VisualAgentMapView extends ItemView {
           status.setText(items);
           return;
         }
+        // Disabled before the lock check awaits, so a second click cannot start a second create; a locked topic re-enables it below.
         create.disabled = true;
+        // AI lock: a locked topic gets no subtopics. The reason and the next step go in the status line, and the button keeps the focus.
+        if (this.aiLockReason("addChild", [node.id], await this.freshNotesOf([node.id]))) {
+          create.disabled = false;
+          create.focus();
+          status.setText(t("ui.ai_locked_create_next_step"));
+          return;
+        }
         status.setText(t("ui.creating_subtopics"));
         try {
           let createdNodes: MapNode[] = [];
@@ -17305,6 +17399,8 @@ export class VisualAgentMapView extends ItemView {
           this.render();
         } catch (error) {
           create.disabled = false;
+          // Disabling the button dropped the focus; it goes back so Tab keeps its place.
+          create.focus();
           status.setText(error instanceof Error ? error.message : String(error));
         }
       })();
@@ -19146,6 +19242,8 @@ export class VisualAgentMapView extends ItemView {
         rebuildDerivedData,
         [node.path]
       );
+      // The step that made the topic (pushed by the change above): Esc in its name field takes it back.
+      if (this.inlineName?.id === node.id) this.inlineName.createdStep = this.history.undoEntry;
     } catch (error) {
       if (this.inlineName?.id === node.id) this.inlineName = null;
       throw error;
@@ -20612,6 +20710,11 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<void> {
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
+      return;
+    }
+    // AI lock: a locked source refuses the synthesis before any AI call (synchronous, so the starting guard below still holds).
+    if (sources.some(node => this.aiLockReason("write", [node.id]))) {
+      failed(t("ui.ai_locked_notice"));
       return;
     }
     const existing = this.integrationTask && this.integrationTask.mapPath === this.path ? this.integrationTask : null;
@@ -26689,6 +26792,23 @@ export class VisualAgentMapView extends ItemView {
         };
         this.dragFrame ??= window.requestAnimationFrame(paint);
       };
+      // Esc is a document key while the pointer is down (the card may not hold the focus): it cancels a drag that has begun.
+      const doc = this.contentEl?.ownerDocument;
+      const esc = (e: KeyboardEvent): void => {
+        if (e.key !== "Escape" || !(moved || travelled)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        // The card goes back where it was (as after a lost pointer); the release that follows saves nothing.
+        settle();
+        try {
+          drop({ type: "pointercancel" } as PointerEvent, null);
+        } finally {
+          if (this.renderAfterDrag && !this.dragging) {
+            this.renderAfterDrag = false;
+            if (!this.closed) this.render();
+          }
+        }
+      };
       const settle = (): void => {
         setHover(null);
         this.chat?.setDropHighlight(false);
@@ -26700,6 +26820,7 @@ export class VisualAgentMapView extends ItemView {
         card.removeEventListener("pointerup", finish);
         card.removeEventListener("pointercancel", finish);
         card.removeEventListener("lostpointercapture", finish);
+        doc?.removeEventListener("keydown", esc, true);
         this.dragCleanup = null;
       };
       // The drop's own work comes first; a repaint that was asked for during the drag then runs once.
@@ -26822,6 +26943,7 @@ export class VisualAgentMapView extends ItemView {
       card.addEventListener("pointerup", finish);
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
+      doc?.addEventListener("keydown", esc, true);
     });
   }
   /**

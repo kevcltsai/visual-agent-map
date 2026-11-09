@@ -707,10 +707,14 @@ export default class VisualAgentMapPlugin extends Plugin {
         // A failure here (a read-only folder, EACCES) must not reject `ready`: other maps keep opening, and structureVersion
         // stays below 2 so the next start tries again.
         try {
-          const count = await this.repo.normalizeGeneratedNoteFilenames();
-          this.settings.structureVersion = 2;
-          await this.saveSettings();
-          if (count) new Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
+          const { renamed, failed } = await this.repo.normalizeGeneratedNoteFilenames();
+          // A note that could not be renamed keeps the version below 2, so the next start tries it again.
+          if (!failed) {
+            this.settings.structureVersion = 2;
+            await this.saveSettings();
+          } else this.logs.appendLog("warn", `${t("ui.subtopic_filename_sync_failed_will_retry")} ${failed}`);
+          if (renamed) new Notice(t("ui.synced_0_subtopic_filenames_with_their_names", renamed));
+          if (failed) new Notice(t("ui.subtopic_filename_sync_failed_will_retry"));
         } catch (error) {
           const detail = error instanceof Error ? error.message : String(error);
           this.logs.appendLog("warn", `${t("ui.subtopic_filename_sync_failed_will_retry")} ${detail}`);
@@ -862,8 +866,14 @@ export default class VisualAgentMapPlugin extends Plugin {
     });
     this.addLocalizedCommand("normalize-note-filenames", "ui.command_sync_filenames", () => {
       this.runMutation(async () => {
-        const count = await this.repo.normalizeGeneratedNoteFilenames();
-        new Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
+        const { renamed, failed } = await this.repo.normalizeGeneratedNoteFilenames();
+        new Notice(
+          failed
+            ? t("ui.synced_0_topic_filenames_failed_1", renamed, failed)
+            : renamed
+              ? t("ui.synced_0_topic_filenames", renamed)
+              : t("ui.topic_filenames_are_up_to_date")
+        );
       });
     });
     this.addLocalizedCommand("repair-note-presentation", "ui.command_repair_note_display", () => {
@@ -1225,6 +1235,14 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   /** `anchor` is the button that asked; its window gets the notice (the settings page may be a popout window). */
   async repairWorkspace(anchor?: HTMLElement): Promise<void> {
+    // A file where a folder belongs cannot be repaired here: say so instead of reporting the workspace ready.
+    const blocked =
+      this.repo.blockingFile(this.settings.mindMapsFolder) ??
+      (aimEnabled() ? this.repo.blockingFile(this.settings.aimFolder) : null);
+    if (blocked) {
+      noticeInWindowOf(t("ui.repair_workspace_blocked_0", blocked), anchor);
+      return;
+    }
     await this.repo.ensureWorkspace();
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
@@ -1549,7 +1567,12 @@ export default class VisualAgentMapPlugin extends Plugin {
       }
       return folder;
     } catch (error) {
-      new Notice(error instanceof Error ? error.message : String(error));
+      // The raw system error goes to the log; the Notice says what to do.
+      this.logs.appendLog(
+        "warn",
+        `${t("ui.note_style_folder_open_failed")} ${error instanceof Error ? error.message : String(error)}`
+      );
+      new Notice(t("ui.note_style_folder_open_failed"));
       return null;
     }
   }

@@ -279,8 +279,8 @@ integrationTest('generated child filenames are migrated to their topic titles an
   const { repo, app } = fixture(), mapPath = await repo.createMap('Filename migration'), mapDoc = await repo.readMap(mapPath);
   const child = await repo.createNote('新的子議題', 'a', mapDoc, mapPath, 'workspace');
   await repo.updateNote(child.path, { title: '清楚的子議題名稱' }); mapDoc.nodes.push(child); await repo.saveMap(mapPath, mapDoc);
-  const count = await repo.normalizeGeneratedNoteFilenames(), updated = await repo.readMap(mapPath);
-  assert.equal(count, 1); assert.match(updated.nodes[0].path, /清楚的子議題名稱\.md$/); assert.ok(app.vault.getAbstractFileByPath(updated.nodes[0].path));
+  const { renamed: count, failed } = await repo.normalizeGeneratedNoteFilenames(), updated = await repo.readMap(mapPath);
+  assert.equal(count, 1); assert.equal(failed, 0); assert.match(updated.nodes[0].path, /清楚的子議題名稱\.md$/); assert.ok(app.vault.getAbstractFileByPath(updated.nodes[0].path));
 });
 integrationTest('map topic sources retain every selected summary and working finding', async () => {
   const { repo, app } = fixture(), first = await topicNote(repo, 'Recipe A', 'a'), second = await topicNote(repo, 'Recipe B', 'a');

@@ -21,11 +21,6 @@
       "reason": "banner written into a migrated legacy transcript, not a prompt"
     },
     {
-      "file": "experiences/coffee-tables/engine.ts",
-      "text": "Generation stopped when Obsidian closed",
-      "reason": "user-facing status or error message shown in the UI; never sent to a model"
-    },
-    {
       "file": "experiences/coffee-tables/prompt-parts.ts",
       "text": "觀察者整理整桌不斷發展的洞見",
       "reason": "must equal the observer paragraph of the built-in style so cleanChatStyle can strip it; matching constant, not prompt text"

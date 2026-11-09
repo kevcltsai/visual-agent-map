@@ -84,6 +84,22 @@ export function tableTime(item: TableListItem): { value: number; isFallback: boo
   return { value: activityTime(item), isFallback: true };
 }
 
+/** A full date and time in the interface language (not the host's US-style default). */
+export function formatTableDateTime(timestamp: number, language = "en"): string {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return "";
+  return new Intl.DateTimeFormat(intlLocaleOf(uiLocale(language)), { dateStyle: "medium", timeStyle: "short" }).format(
+    date
+  );
+}
+
+/** One numbered line per table for the delete confirmation; the number and time tell same-topic tables apart. */
+export function tableDeleteLines(targets: TableListItem[], language = "en"): string[] {
+  return targets.map(
+    (item, index) => `${index + 1}. ${item.topic} · ${formatTableDateTime(Date.parse(item.createdAt), language)}`
+  );
+}
+
 export function formatTableTime(timestamp: number, now = Date.now(), language = "en"): string {
   const date = new Date(timestamp),
     today = new Date(now);

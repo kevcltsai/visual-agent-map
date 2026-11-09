@@ -1,7 +1,16 @@
 import { App, Modal, Notice, Setting } from "obsidian";
-import { t } from "../../i18n";
+import { getUiLanguage, t, type TranslationKey } from "../../i18n";
 import { formatDebugLogs, LogManager } from "../../log-manager";
-import { AiExchangeLog, formatAiExchange, promptMetrics } from "../../ai-exchange-log";
+import { AiExchange, AiExchangeLog, formatAiExchange, promptMetrics } from "../../ai-exchange-log";
+
+const EXCHANGE_STATUS_KEYS: Record<AiExchange["status"], TranslationKey> = {
+  preparing: "ui.ai_status_preparing",
+  sent: "ui.ai_status_sent",
+  received: "ui.ai_status_received",
+  parsed: "ui.ai_status_parsed",
+  completed: "ui.ai_status_completed",
+  failed: "ui.ai_status_failed"
+};
 
 export class DebugLogModal extends Modal {
   private unsubscribe: (() => void) | null = null;
@@ -65,7 +74,7 @@ export class DebugLogModal extends Modal {
       const row = list.createDiv("vam-debug-log-entry");
       const metadata = row.createDiv("vam-debug-log-meta");
       metadata.createEl("time", {
-        text: new Date(entry.timestamp).toLocaleString(),
+        text: new Date(entry.timestamp).toLocaleString(getUiLanguage()),
         attr: { datetime: entry.timestamp }
       });
       metadata.createSpan({ cls: `vam-debug-log-level is-${entry.level}`, text: entry.level.toUpperCase() });
@@ -123,7 +132,7 @@ export class DebugLogModal extends Modal {
       const metric = promptMetrics(exchange);
       const item = exchangeList.createEl("details", { cls: "vam-debug-log-entry" });
       item.createEl("summary", {
-        text: `${new Date(exchange.startedAt).toLocaleString()} · ${exchange.topic} · ${metric.phase} · ${exchange.status}`
+        text: `${new Date(exchange.startedAt).toLocaleString(getUiLanguage())} · ${exchange.topic} · ${metric.phase} · ${t(EXCHANGE_STATUS_KEYS[exchange.status])}`
       });
       item.createEl("p", {
         text: `${exchange.mode} · ${exchange.model} · ${exchange.effort}`,

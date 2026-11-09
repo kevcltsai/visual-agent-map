@@ -41,7 +41,8 @@ export class MapSwitcherModal extends FuzzySuggestModal<MapSwitcherItem> {
     super(app);
     this.showFolder = new Set(items.map(item => item.folder)).size > 1;
     this.setPlaceholder(t("ui.map_switcher_placeholder"));
-    this.emptyStateText = t("ui.map_switcher_empty");
+    // No maps at all: say so and how to add one. Maps exist but the typed text finds none: a plain "no match".
+    this.emptyStateText = items.length ? t("ui.map_switcher_empty") : t("ui.map_switcher_empty_none");
     this.setInstructions([
       { command: "↑↓", purpose: t("ui.map_switcher_hint_navigate") },
       { command: "↵", purpose: t("ui.map_switcher_hint_open") },

@@ -477,12 +477,14 @@ async function openSearch(
   returnFocus: HTMLElement,
   choose: (items: DragEntry[]) => void
 ): Promise<void> {
+  const items = await searchItems(host);
   const modal = new MapSourcePickerModal<SearchItem>(
     host.app,
-    await searchItems(host),
+    items,
     item => `${item.title} ${item.detail}`.trim(),
     t("ui.map_sources_search_placeholder"),
-    t("ui.map_sources_search_empty"),
+    // Nothing addable at all vs. items that just do not match the typed text.
+    items.length ? t("ui.map_sources_search_no_match") : t("ui.map_sources_search_empty"),
     item => choose([{ path: item.path, name: item.title }]),
     (item, el) => {
       el.addClass("mod-complex");

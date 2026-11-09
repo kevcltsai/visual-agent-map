@@ -244,12 +244,18 @@ var en = {
   "ui.exchange_reason_too_large": "the file is larger than {0} MB",
   "ui.exchange_reason_unsafe": "it contains a DOCTYPE, entity or processing instruction, which are not accepted",
   "ui.exchange_reason_too_big": "it has too many topics, elements or levels",
-  "ui.exchange_reason_invalid": "it is not a valid OPML or FreeMind outline ({0})",
+  "ui.exchange_reason_invalid": "it is not a valid OPML or FreeMind outline",
   "ui.exchange_reason_unreadable": "the file could not be read",
   "ui.exchange_export_opml": "Export as OPML",
   "ui.exchange_export_freemind": "Export as FreeMind (.mm)",
   "ui.exchange_exported": "Exported to {0}",
   "ui.exchange_export_failed": "Export failed: {0}",
+  "ui.ai_status_preparing": "Preparing",
+  "ui.ai_status_sent": "Sent",
+  "ui.ai_status_received": "Received",
+  "ui.ai_status_parsed": "Parsed",
+  "ui.ai_status_completed": "Completed",
+  "ui.ai_status_failed": "Failed",
   "ui.exchange_export_no_name": "No free file name was found",
   "ui.outline_import_hint": "Paste a heading-only Markdown outline, or generate one with AI from a topic. Each heading becomes a topic.",
   "ui.outline_import_text_label": "Outline",
@@ -532,6 +538,8 @@ var en = {
   "ui.context_ai_result_empty": "Enter or generate a result before applying it.",
   "ui.context_ai_replaced": "Selected text replaced.",
   "ui.context_ai_appended": "Draft appended to the page.",
+  "ui.context_ai_inserted_after": "Draft inserted after the selected paragraph.",
+  "ui.context_ai_accept_unavailable": "The selected text cannot be located safely in the note, so Accept and Insert here are not offered. You can copy the draft or append it to the page.",
   "ui.synthesis_content": "Topic synthesis content",
   "ui.synthesis_content_full": "Full-content synthesis (default)",
   "ui.synthesis_content_summary": "Quick summary synthesis",
@@ -573,6 +581,7 @@ var en = {
   "ui.map_sources_search": "Search and add\u2026",
   "ui.map_sources_search_placeholder": "Type a mind map, folder or Markdown name\u2026",
   "ui.map_sources_search_empty": "There is nothing to add in this vault.",
+  "ui.map_sources_search_no_match": "Nothing matches your search.",
   "ui.map_sources_reject_title_0": "{0} not added",
   "ui.map_sources_reject_line_0": '"{0}": {1}',
   "ui.map_sources_reject_current": "The current mind map cannot be added",
@@ -764,7 +773,7 @@ var en = {
   "ui.save_merged_contents": "Save merged contents",
   "ui.mind_map_changed_externally": "Mind map changed externally",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi": "Both the map and Map.md have changed. Choose which version to keep.",
-  "ui.invalid_merged_contents": "Invalid merged contents.",
+  "ui.invalid_merged_contents": "The merged contents do not match the map format. Fix them, then save again.",
   "ui.no_notes_yet": "No notes yet.",
   "ui.topic_outline": "Topic outline",
   "ui.open_topic_outline": "Open topic outline",
@@ -822,6 +831,7 @@ var en = {
   "ui.switch_mind_map": "Switch mind map",
   "ui.map_switcher_placeholder": "Type a mind map name\u2026",
   "ui.map_switcher_empty": "No mind map matches.",
+  "ui.map_switcher_empty_none": "No mind maps yet. Create one with \u201CCreate a new mind map\u201D.",
   "ui.map_switcher_one_topic": "1 topic",
   "ui.map_switcher_topics_0": "{0} topics",
   "ui.map_switcher_edited_0": "edited {0}",
@@ -1128,6 +1138,7 @@ var en = {
   "ui.usage_button_unavailable": "Token usage: unavailable",
   "ui.usage_panel_title": "Token usage",
   "ui.usage_filter_label": "Filter by provider",
+  "ui.usage_filter_total": "Total",
   "ui.usage_totals": "TOTALS",
   "ui.usage_this_map": "This mind map",
   "ui.usage_today": "Today",
@@ -1166,6 +1177,7 @@ var en = {
   "ui.card_menu_open_note_tab": "Open note in new tab",
   "ui.ai_running_ai": "AI running\u2026",
   "ui.ai_locked_notice": "Topic is locked; AI will not change it",
+  "ui.ai_locked_create_next_step": "Topic is locked; AI will not change it. To create subtopics, first unlock AI on this card.",
   "ui.ai_lock": "AI lock",
   "ui.ai_lock_toggle": "Lock from AI",
   "ui.ai_lock_hint": "AI research, merge, expand and chat will not change this topic, its children or its relations. Your own edits still work.",
@@ -1226,7 +1238,6 @@ var en = {
   "ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it": "If an AI task exceeds 3 minutes, VAM attempts to interrupt it to avoid prolonged resource use. Incomplete results are not applied.",
   "ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it": "The AI task exceeded 3 minutes. VAM attempts to interrupt it to avoid prolonged resource use. Incomplete results are not applied; try a smaller task.",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and": "Synthesize {0} selected topics. Choose full content or summaries below in this window; the new root topic is created directly and you can undo it.",
-  "ui.invalid_merged_contents_0": "Invalid merged contents: {0}",
   "ui.delete_0": "Delete \u201C{0}\u201D",
   "ui.unassigned_0": "Unassigned ({0})",
   "ui.archived_0": "Archived ({0})",
@@ -1961,7 +1972,13 @@ var en = {
   "ui.preset_copy_suffix": " copy",
   // coffee:begin (keep every coffee.* key in this one contiguous block)
   "coffee.delete_this_table": "Delete this table?",
-  "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "\u201C{0}\u201D will be backed up and moved to the vault trash.",
+  "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "\u201C{0}\u201D Markdown moves to the vault trash. Settings are backed up to .sessions/trash, not the vault trash.",
+  "coffee.delete_many_tables_intro": "The Markdown of these tables moves to the vault trash. Settings are backed up to .sessions/trash, not the vault trash.",
+  "coffee.copy_sample_to_my_table": "Copy to my tables",
+  "coffee.markdown_note_missing": "The Coffee Tables Markdown note is missing",
+  "coffee.model_provider_status": "{0}: {1}",
+  "coffee.built_in_sample": "Built-in sample",
+  "coffee.engine_generation_stopped_obsidian_closed": "Generation stopped when Obsidian closed; saved draft is available.",
   "coffee.fill_segment_summaries": "Fill segment summaries",
   "coffee.use_this_tables_model_in_one_ai_request_to_summarize": "Use this table\u2019s model {0} in one AI request to summarize all text segments missing summaries. Existing dialogue and insights are preserved.",
   "coffee.generate_summaries": "Generate summaries",
@@ -2025,6 +2042,8 @@ var en = {
   "coffee.rename": "Rename",
   "coffee.choose_a_saved_style_first": "Choose a saved style first.",
   "coffee.delete_style": "Delete",
+  "coffee.delete_style_confirm_title": "Delete style?",
+  "coffee.delete_style_confirm_body": "\u201C{0}\u201D will be removed from the list. This cannot be undone.",
   "coffee.default_for_new_tables": "Default for new tables",
   "coffee.saved_for_new_tables_existing_tables_keep_their_settings": "Saved for new tables. Existing tables keep their settings.",
   "coffee.restore_built_in_text": "Restore built-in text",
@@ -2044,7 +2063,6 @@ var en = {
   "coffee.select_all_shown": "Select all shown",
   "coffee.clear_selection": "Clear selection",
   "coffee.delete_selected": "Delete selected",
-  "coffee.tables_count_list": "{0} tables:\n{1}",
   "coffee.this_table_changed_reload_and_try_again": "This table changed. Reload and try again.",
   "coffee.deleted_tables": "Deleted {0} tables.",
   "coffee.could_not_delete": "Could not delete:\n{0}",
@@ -2591,7 +2609,7 @@ var en = {
   "share.mermaid_undrawn_warning_0": "{0} diagrams did not finish drawing in time and are shown as source text.",
   "share.mermaid_blocked_note": "[Diagram not drawn: Mermaid was not allowed when this file was made. Source shown instead.]",
   "share.mermaid_undrawn_note": "[Diagram did not finish drawing. Source shown instead.]",
-  "share.leak_blocked_0": "Not saved: the file would contain private information ({0}). Nothing was written.",
+  "share.leak_blocked_0": "Not saved: the file would contain private information ({0}). Remove that content from the source notes, or turn off the option that includes full notes, then share again.",
   "share.leak_category_vault-path": "the vault's location on this computer",
   "share.leak_category_map-folder": "the map's folder name",
   "share.leak_category_note-path": "a note's file path",
@@ -2606,7 +2624,7 @@ var en = {
   "share.saving": "Saving\u2026",
   "share.saved_0_1": "Saved {0} ({1})",
   "share.downloaded_0_1": "Save requested for {0} ({1}). If a save window appears, choose where to keep the file.",
-  "share.save_failed": "The file could not be saved.",
+  "share.save_failed": "The file could not be saved. Check that the save location is writable, or choose another location and try again.",
   "share.publish_copy": "Copy the GitHub publishing instructions",
   "share.publish_done": "Instructions copied. Paste them into your own Claude Code or Codex.",
   "share.publish_fail": "Could not copy automatically. Select the text below and copy it yourself.",
@@ -2698,6 +2716,7 @@ var en = {
   "ui.note_style_format_desc_rich": "At least one callout, table or diagram per section.",
   "ui.note_style_format_desc_skim": "All bullet points, quick to scan.",
   "ui.note_style_format_other_0": "The current format is \u201C{0}\u201D, which is not one of the choices above.",
+  "ui.note_style_part_unknown_0": "{0} (not found)",
   "ui.note_style_set_apart_0": "{0} (set apart)",
   "ui.note_style_voice_retired_0": "{0} (retired)",
   "ui.note_style_tag_voice_retired": "Voice retired",
@@ -2783,6 +2802,7 @@ var en = {
   "ui.editor_section_add": "Add a section",
   "ui.editor_section_new_name_0": "New section {0}",
   "ui.editor_sections_problem_0": "The sections cannot be saved: {0}",
+  "ui.editor_sections_none": "At least one section is needed.",
   "ui.editor_apply_all": "Also use this voice for the other 5 topic types",
   "ui.editor_apply_notice_0": "The voice for all topic types is now \u201C{0}\u201D.",
   "ui.editor_apply_kept_0": "These types keep the voice set for them: {0}.",
@@ -2878,7 +2898,13 @@ var en = {
   "ui.topic_chat_too_big": "This request touches too much; please use the AI chat in the left sidebar.",
   "ui.topic_chat_result_unknown": "See the topic itself for this result.",
   "ui.topic_chat_failed_children": "No subtopic could be researched.",
-  "ui.topic_chat_record_failed": "The topic chat record was not saved."
+  "ui.topic_chat_record_failed": "The topic chat record was not saved.",
+  "ui.exchange_reason_invalid_line_0": "it is not a valid OPML or FreeMind outline (line {0})",
+  "ui.invalid_merged_json": "The merged contents are not valid JSON: check the quotes, commas and braces, then save again.",
+  "ui.note_style_folder_open_failed": "The note style folder could not be opened: a file with the same name may be in the way, or the folder cannot be written. Rename or move that file, then try again.",
+  "ui.synced_0_topic_filenames_failed_1": "Synced {0} topic filenames; {1} failed. Make sure the folder holding them is writable (not read-only or locked by another program), then run this again.",
+  "ui.repair_workspace_blocked_0": "Repair failed: \u201C{0}\u201D is a file where a folder should be. Rename or move that file, then repair again.",
+  "ui.outline_import_done_0_1": "Added {0} topics to {1}."
 };
 
 // i18n/zh-CN.ts
@@ -3018,12 +3044,18 @@ var zhCN = {
   "ui.exchange_reason_too_large": "\u6587\u4EF6\u8D85\u8FC7 {0} MB",
   "ui.exchange_reason_unsafe": "\u6587\u4EF6\u542B\u6709 DOCTYPE\u3001\u5B9E\u4F53\u6216\u5904\u7406\u6307\u4EE4\uFF0C\u8FD9\u4E9B\u4E00\u5F8B\u4E0D\u63A5\u53D7",
   "ui.exchange_reason_too_big": "\u8BAE\u9898\u3001\u5143\u7D20\u6216\u5C42\u6570\u592A\u591A",
-  "ui.exchange_reason_invalid": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7EB2\uFF08{0}\uFF09",
+  "ui.exchange_reason_invalid": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7EB2",
   "ui.exchange_reason_unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u6587\u4EF6",
   "ui.exchange_export_opml": "\u5BFC\u51FA\u4E3A OPML",
   "ui.exchange_export_freemind": "\u5BFC\u51FA\u4E3A FreeMind\uFF08.mm\uFF09",
   "ui.exchange_exported": "\u5DF2\u5BFC\u51FA\u5230 {0}",
   "ui.exchange_export_failed": "\u5BFC\u51FA\u5931\u8D25\uFF1A{0}",
+  "ui.ai_status_preparing": "\u51C6\u5907\u4E2D",
+  "ui.ai_status_sent": "\u5DF2\u53D1\u9001",
+  "ui.ai_status_received": "\u5DF2\u6536\u5230",
+  "ui.ai_status_parsed": "\u5DF2\u89E3\u6790",
+  "ui.ai_status_completed": "\u5DF2\u5B8C\u6210",
+  "ui.ai_status_failed": "\u5931\u8D25",
   "ui.exchange_export_no_name": "\u627E\u4E0D\u5230\u53EF\u7528\u7684\u6587\u4EF6\u540D",
   "ui.outline_import_hint": "\u7C98\u8D34\u53EA\u6709\u6807\u9898\u7684 Markdown \u5927\u7EB2\uFF0C\u6216\u7528 AI \u4F9D\u4E3B\u9898\u751F\u6210\u3002\u6BCF\u4E2A\u6807\u9898\u4F1A\u53D8\u6210\u4E00\u4E2A\u8BAE\u9898\u3002",
   "ui.outline_import_text_label": "\u5927\u7EB2",
@@ -3306,11 +3338,13 @@ var zhCN = {
   "ui.context_ai_result_empty": "\u8BF7\u5148\u8F93\u5165\u6216\u4EA7\u751F\u7ED3\u679C\uFF0C\u518D\u5E94\u7528\u3002",
   "ui.context_ai_replaced": "\u5DF2\u53D6\u4EE3\u9009\u62E9\u6587\u5B57\u3002",
   "ui.context_ai_appended": "\u8349\u7A3F\u5DF2\u9644\u52A0\u5230\u9875\u811A\u3002",
+  "ui.context_ai_inserted_after": "\u8349\u7A3F\u5DF2\u63D2\u5165\u9009\u53D6\u6BB5\u843D\u540E\u9762\u3002",
+  "ui.context_ai_accept_unavailable": "\u65E0\u6CD5\u5B89\u5168\u5B9A\u4F4D\u9009\u53D6\u7684\u6587\u5B57\uFF0C\u6240\u4EE5\u6CA1\u6709\u201C\u63A5\u53D7\u4FEE\u6539\u201D\u4E0E\u201C\u63D2\u5165\u8FD9\u91CC\u201D\uFF0C\u53EF\u4EE5\u590D\u5236\u8349\u7A3F\u6216\u9644\u52A0\u5230\u9875\u811A\u3002",
   "ui.synthesis_content": "\u8BAE\u9898\u6574\u5408\u5185\u5BB9",
   "ui.synthesis_content_full": "\u5B8C\u6574\u5185\u5BB9\u6574\u5408\uFF08\u9ED8\u8BA4\uFF09",
   "ui.synthesis_content_summary": "\u6458\u8981\u5FEB\u901F\u6574\u5408",
-  "ui.synthesis_content_full_hint": "\u7EB3\u5165\u4E0B\u5217\u8BAE\u9898\u7684\u5B8C\u6574 Detail\u3001\u6458\u8981\u4E0E\u76F8\u5173\u53D1\u73B0\u3002\u6570\u636E\u8F83\u591A\u65F6\u4F1A\u5206\u6279\u5904\u7406\uFF0C\u53EF\u80FD\u9700\u8981\u8F83\u4E45\u3002",
-  "ui.synthesis_content_summary_hint": "\u4F7F\u7528\u4E0B\u5217\u8BAE\u9898\u7684\u6458\u8981\u4E0E\u76F8\u5173\u53D1\u73B0\uFF0C\u4E0D\u7EB3\u5165\u5B8C\u6574 Detail\uFF0C\u53EF\u80FD\u7701\u7565\u6B63\u6587\u4E2D\u7684\u91CD\u8981\u6761\u4EF6\u3002",
+  "ui.synthesis_content_full_hint": "\u7EB3\u5165\u4E0B\u5217\u8BAE\u9898\u7684\u5B8C\u6574\u5185\u5BB9\u3001\u6458\u8981\u4E0E\u76F8\u5173\u53D1\u73B0\u3002\u6570\u636E\u8F83\u591A\u65F6\u4F1A\u5206\u6279\u5904\u7406\uFF0C\u53EF\u80FD\u9700\u8981\u8F83\u4E45\u3002",
+  "ui.synthesis_content_summary_hint": "\u4F7F\u7528\u4E0B\u5217\u8BAE\u9898\u7684\u6458\u8981\u4E0E\u76F8\u5173\u53D1\u73B0\uFF0C\u4E0D\u7EB3\u5165\u5B8C\u6574\u5185\u5BB9\uFF0C\u53EF\u80FD\u7701\u7565\u6B63\u6587\u4E2D\u7684\u91CD\u8981\u6761\u4EF6\u3002",
   "ui.synthesis_content_scope": "\u53EA\u5F71\u54CD\u4E0B\u5217\u8BAE\u9898\uFF0C\u989D\u5916 Markdown \u4E00\u5F8B\u5B8C\u6574\u8BFB\u53D6\uFF1B\u5F00\u59CB\u540E\u4E0D\u80FD\u66F4\u6362\u3002",
   "ui.synthesis_source_topics": "\u672C\u6B21\u5305\u542B\u7684\u6765\u6E90\u8BAE\u9898",
   "ui.synthesis_no_source_topics": "\u6CA1\u6709\u6765\u6E90\u8BAE\u9898\uFF0C\u8BF7\u5728\u4E0B\u65B9\u9009\u62E9\u5176\u4ED6 Markdown \u6765\u6E90\u3002",
@@ -3347,6 +3381,7 @@ var zhCN = {
   "ui.map_sources_search": "\u641C\u7D22\u5E76\u52A0\u5165\u2026",
   "ui.map_sources_search_placeholder": "\u8F93\u5165\u5FC3\u667A\u56FE\u3001\u6587\u4EF6\u5939\u6216 Markdown \u540D\u79F0\u2026",
   "ui.map_sources_search_empty": "\u8FD9\u4E2A Vault \u6CA1\u6709\u53EF\u52A0\u5165\u7684\u9879\u76EE\u3002",
+  "ui.map_sources_search_no_match": "\u6CA1\u6709\u7B26\u5408\u641C\u7D22\u7684\u9879\u76EE\u3002",
   "ui.map_sources_reject_title_0": "\u6709 {0} \u4E2A\u6CA1\u6709\u52A0\u5165",
   "ui.map_sources_reject_line_0": "\u3008{0}\u3009\uFF1A{1}",
   "ui.map_sources_reject_current": "\u4E0D\u80FD\u52A0\u5165\u5F53\u524D\u8FD9\u5F20\u5FC3\u667A\u56FE",
@@ -3538,7 +3573,7 @@ var zhCN = {
   "ui.save_merged_contents": "\u4FDD\u5B58\u5408\u5E76\u5185\u5BB9",
   "ui.mind_map_changed_externally": "\u5FC3\u667A\u56FE\u6709\u5916\u90E8\u4FEE\u6539",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi": "\u753B\u9762\u4E0E Map.md \u7684\u7ED3\u6784\u90FD\u5DF2\u6539\u53D8\u3002\u8BF7\u9009\u62E9\u8981\u4FDD\u7559\u54EA\u4E00\u7248\u3002",
-  "ui.invalid_merged_contents": "\u5408\u5E76\u5185\u5BB9\u65E0\u6548\u3002",
+  "ui.invalid_merged_contents": "\u5408\u5E76\u5185\u5BB9\u65E0\u6548\uFF1A\u7ED3\u6784\u4E0D\u7B26\u5408\u5730\u56FE\u683C\u5F0F\uFF0C\u8BF7\u4FEE\u6B63\u540E\u518D\u4FDD\u5B58\u3002",
   "ui.no_notes_yet": "\u5F53\u524D\u6CA1\u6709\u7B14\u8BB0\u3002",
   "ui.topic_outline": "\u8BAE\u9898\u5927\u7EB2",
   "ui.open_topic_outline": "\u6253\u5F00\u8BAE\u9898\u5927\u7EB2",
@@ -3596,6 +3631,7 @@ var zhCN = {
   "ui.switch_mind_map": "\u5207\u6362\u5FC3\u667A\u56FE",
   "ui.map_switcher_placeholder": "\u8F93\u5165\u5FC3\u667A\u56FE\u540D\u79F0\u641C\u7D22\u2026",
   "ui.map_switcher_empty": "\u6CA1\u6709\u7B26\u5408\u7684\u5FC3\u667A\u56FE\u3002",
+  "ui.map_switcher_empty_none": "\u8FD8\u6CA1\u6709\u5FC3\u667A\u56FE\u3002\u8BF7\u7528\u201C\u521B\u5EFA\u65B0\u5FC3\u667A\u56FE\u201D\u6DFB\u52A0\u7B2C\u4E00\u5F20\u3002",
   "ui.map_switcher_one_topic": "1 \u4E2A\u8BAE\u9898",
   "ui.map_switcher_topics_0": "{0} \u4E2A\u8BAE\u9898",
   "ui.map_switcher_edited_0": "\u4FEE\u6539\u4E8E {0}",
@@ -3902,6 +3938,7 @@ var zhCN = {
   "ui.usage_button_unavailable": "Token \u7528\u91CF\uFF1A\u65E0\u6CD5\u8BFB\u53D6",
   "ui.usage_panel_title": "Token \u7528\u91CF",
   "ui.usage_filter_label": "\u6309\u670D\u52A1\u7B5B\u9009",
+  "ui.usage_filter_total": "\u5168\u90E8",
   "ui.usage_totals": "\u603B\u91CF",
   "ui.usage_this_map": "\u8FD9\u5F20\u5FC3\u667A\u56FE",
   "ui.usage_today": "\u4ECA\u5929",
@@ -3940,6 +3977,7 @@ var zhCN = {
   "ui.card_menu_open_note_tab": "\u5728\u65B0\u6807\u7B7E\u9875\u6253\u5F00\u7B14\u8BB0",
   "ui.ai_running_ai": "AI \u8FD0\u884C\u4E2D\u2026",
   "ui.ai_locked_notice": "\u8BAE\u9898\u5DF2\u9501\u5B9A\uFF0CAI \u4E0D\u4F1A\u4FEE\u6539",
+  "ui.ai_locked_create_next_step": "\u8BAE\u9898\u5DF2\u9501\u5B9A\uFF0CAI \u4E0D\u4F1A\u4FEE\u6539\u3002\u8981\u5EFA\u7ACB\u5B50\u8BAE\u9898\uFF0C\u8BF7\u5148\u5230\u8FD9\u5F20\u5361\u89E3\u9664 AI \u9501\u5B9A\u3002",
   "ui.ai_lock": "AI \u9501\u5B9A",
   "ui.ai_lock_toggle": "\u9501\u5B9A\uFF0C\u4E0D\u8BA9 AI \u4FEE\u6539",
   "ui.ai_lock_hint": "AI \u7814\u7A76\u3001\u5408\u5E76\u3001\u5C55\u5F00\u4E0E\u5BF9\u8BDD\u90FD\u4E0D\u4F1A\u4FEE\u6539\u6B64\u8BAE\u9898\u3001\u5B83\u7684\u5B50\u8BAE\u9898\u6216\u5173\u8054\uFF1B\u4F60\u81EA\u5DF1\u7684\u7F16\u8F91\u4E0D\u53D7\u5F71\u54CD\u3002",
@@ -3986,9 +4024,9 @@ var zhCN = {
   "ui.current_model_description": "\u804A\u5929\u4E0E\u6240\u6709\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A\u6A21\u578B\uFF1B\u6709\u6A21\u578B\u8986\u5199\u7684\u8BAE\u9898\u9664\u5916\u3002\u804A\u5929\u9762\u677F\u4E0A\u65B9\u7684\u83DC\u5355\u6539\u7684\u4E5F\u662F\u8FD9\u91CC\u3002",
   "ui.ai_reasoning_level": "AI \u63A8\u7406\u7B49\u7EA7",
   "ui.reasoning_level": "\u63A8\u7406\u7B49\u7EA7",
-  "ui.low": "\u4F4E (Low)",
-  "ui.medium": "\u4E2D (Medium)",
-  "ui.high": "\u9AD8 (High)",
+  "ui.low": "\u4F4E",
+  "ui.medium": "\u4E2D",
+  "ui.high": "\u9AD8",
   "ui.rescan_maps_and_topic_notes_then_rebuild_references_and_deri": "\u91CD\u65B0\u626B\u63CF\u5FC3\u667A\u56FE\u4E0E\u8BAE\u9898\u7B14\u8BB0\uFF0C\u91CD\u5EFA reference \u4E0E\u884D\u751F\u6570\u636E\u3002\u539F\u59CB\u5185\u5BB9\u4E0D\u4F1A\u88AB\u8986\u5199\u3002",
   "ui.full_rebuild": "\u5B8C\u6574\u91CD\u5EFA",
   "ui.vam_data_has_been_refreshed": "VAM \u6570\u636E\u5DF2\u5237\u65B0\u3002",
@@ -4000,7 +4038,6 @@ var zhCN = {
   "ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it": "AI \u4EFB\u52A1\u8D85\u8FC7 3 \u5206\u949F\u65F6\uFF0C\u4E3A\u907F\u514D\u957F\u65F6\u95F4\u5360\u7528\u8D44\u6E90\uFF0CVAM \u4F1A\u5C1D\u8BD5\u4E2D\u65AD\uFF1B\u672A\u5B8C\u6210\u7684\u7ED3\u679C\u4E0D\u4F1A\u5E94\u7528\u3002",
   "ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it": "AI \u4EFB\u52A1\u8D85\u8FC7 3 \u5206\u949F\uFF0C\u4E3A\u907F\u514D\u957F\u65F6\u95F4\u5360\u7528\u8D44\u6E90\uFF0CVAM \u4F1A\u5C1D\u8BD5\u4E2D\u65AD\u3002\u672A\u5B8C\u6210\u7684\u7ED3\u679C\u4E0D\u4F1A\u5E94\u7528\uFF1B\u8BF7\u7F29\u5C0F\u4EFB\u52A1\u8303\u56F4\u540E\u91CD\u8BD5\u3002",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and": "\u6574\u5408 {0} \u4E2A\u5DF2\u9009\u8BAE\u9898\u3002\u53EF\u5728\u4E0B\u65B9\u9009\u62E9\u5B8C\u6574\u5185\u5BB9\u6216\u6458\u8981\uFF1BAI \u5B8C\u6210\u540E\u4F1A\u76F4\u63A5\u521B\u5EFA\u65B0\u6839\u8BAE\u9898\uFF0C\u53EF\u64A4\u9500\u3002",
-  "ui.invalid_merged_contents_0": "\u5408\u5E76\u5185\u5BB9\u65E0\u6548\uFF1A{0}",
   "ui.delete_0": "\u5220\u9664\u201C{0}\u201D",
   "ui.unassigned_0": "\u672A\u5F52\u7C7B\uFF08{0}\uFF09",
   "ui.archived_0": "\u5F52\u6863\uFF08{0}\uFF09",
@@ -4480,7 +4517,7 @@ var zhCN = {
   "ui.ai_not_ready_unknown_0": "{0} \u8FD8\u6CA1\u51C6\u5907\u597D\u3002\u53EF\u80FD\u5C1A\u672A\u767B\u5F55\uFF0C\u6216\u6CA1\u6709\u62A5\u544A\u53EF\u7528\u7684\u6A21\u578B\u3002",
   "ui.ai_not_ready_where": "\u53EF\u5728\u201C\u8BBE\u7F6E \u2192 Visual Agent Map \u2192 AI \u8FDE\u63A5\u201D\u67E5\u770B\u72B6\u6001\u3002",
   "ui.current_model_is_unavailable": "\u5F53\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528",
-  "ui.auto": "\u81EA\u52A8 (Auto)",
+  "ui.auto": "\u81EA\u52A8",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "\u81EA\u52A8\u6A21\u5F0F\u4F1A\u5BF9\u7B80\u5355\u4EFB\u52A1\u4F7F\u7528 Low\u3001\u5BF9\u590D\u6742\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52A8\u9009\u62E9\u4E0D\u4F1A\u88AB\u8986\u76D6\u3002",
   "ui.stop_research": "\u505C\u6B62\u7814\u7A76",
   "ui.stop_expand": "\u505C\u6B62\u5C55\u5F00",
@@ -4735,7 +4772,13 @@ var zhCN = {
   "ui.preset_copy_suffix": " \u526F\u672C",
   // coffee:begin (keep every coffee.* key in this one contiguous block)
   "coffee.delete_this_table": "\u5220\u9664\u8FD9\u573A\u684C\u804A\uFF1F",
-  "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "\u201C{0}\u201D\u7684 Markdown \u4E0E\u8BBE\u7F6E\u4F1A\u5148\u5907\u4EFD\uFF0C\u518D\u79FB\u5165\u5783\u573E\u6876\u3002",
+  "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "\u201C{0}\u201D\u7684 Markdown \u79FB\u5165\u5783\u573E\u6876\u3002\u8BBE\u7F6E\u5907\u4EFD\u5728 .sessions/trash\uFF08\u4E0D\u5728\u5783\u573E\u6876\uFF09\u3002",
+  "coffee.delete_many_tables_intro": "\u4EE5\u4E0B\u684C\u804A\u7684 Markdown \u79FB\u5165\u5783\u573E\u6876\u3002\u8BBE\u7F6E\u5907\u4EFD\u5728 .sessions/trash\uFF08\u4E0D\u5728\u5783\u573E\u6876\uFF09\u3002",
+  "coffee.copy_sample_to_my_table": "\u590D\u5236\u6210\u6211\u7684\u684C",
+  "coffee.markdown_note_missing": "\u627E\u4E0D\u5230\u684C\u804A\u7684 Markdown \u7B14\u8BB0\u3002",
+  "coffee.model_provider_status": "{0}\uFF1A{1}",
+  "coffee.built_in_sample": "\u5185\u7F6E\u793A\u8303",
+  "coffee.engine_generation_stopped_obsidian_closed": "Obsidian \u5173\u95ED\u65F6\u751F\u6210\u4E2D\u65AD\uFF1B\u5DF2\u4FDD\u5B58\u7684\u8349\u7A3F\u53EF\u7528\u3002",
   "coffee.fill_segment_summaries": "\u8865\u9F50\u6BB5\u843D\u6458\u8981",
   "coffee.use_this_tables_model_in_one_ai_request_to_summarize": "\u5C06\u4F7F\u7528\u8FD9\u684C\u7684\u6A21\u578B {0}\uFF0C\u4EE5\u4E00\u6B21 AI \u8C03\u7528\u6458\u8981\u6240\u6709\u7F3A\u5C11\u6458\u8981\u4E14\u6709\u6587\u5B57\u7684\u6BB5\u843D\u3002\u65E2\u6709\u5BF9\u8BDD\u4E0E\u6D1E\u89C1\u4FDD\u6301\u539F\u6837\u3002",
   "coffee.generate_summaries": "\u8865\u9F50\u6458\u8981",
@@ -4799,6 +4842,8 @@ var zhCN = {
   "coffee.rename": "\u91CD\u547D\u540D",
   "coffee.choose_a_saved_style_first": "\u8BF7\u5148\u9009\u62E9\u5DF2\u4FDD\u5B58\u7684\u98CE\u683C\u3002",
   "coffee.delete_style": "\u5220\u9664\u98CE\u683C",
+  "coffee.delete_style_confirm_title": "\u5220\u9664\u98CE\u683C\uFF1F",
+  "coffee.delete_style_confirm_body": "\u201C{0}\u201D\u4F1A\u4ECE\u5217\u8868\u79FB\u9664\uFF0C\u65E0\u6CD5\u6062\u590D\u3002",
   "coffee.default_for_new_tables": "\u8BBE\u4E3A\u65B0\u804A\u5929\u5BA4\u7684\u9ED8\u8BA4\u8BBE\u7F6E",
   "coffee.saved_for_new_tables_existing_tables_keep_their_settings": "\u5DF2\u8BBE\u4E3A\u65B0\u804A\u5929\u5BA4\u7684\u9ED8\u8BA4\u8BBE\u7F6E\uFF1B\u65E2\u6709\u804A\u5929\u5BA4\u4ECD\u4F7F\u7528\u539F\u8BBE\u7F6E\u3002",
   "coffee.restore_built_in_text": "\u8FD8\u539F\u5185\u7F6E\u6587\u5B57",
@@ -4818,7 +4863,6 @@ var zhCN = {
   "coffee.select_all_shown": "\u5168\u9009\u5F53\u524D\u5217\u8868",
   "coffee.clear_selection": "\u53D6\u6D88\u9009\u62E9",
   "coffee.delete_selected": "\u5220\u9664\u6240\u9009\u804A\u5929\u5BA4",
-  "coffee.tables_count_list": "{0} \u4E2A\u804A\u5929\u5BA4\uFF1A\n{1}",
   "coffee.this_table_changed_reload_and_try_again": "\u804A\u5929\u5BA4\u5DF2\u53D8\u66F4\uFF0C\u8BF7\u91CD\u65B0\u52A0\u8F7D\u540E\u518D\u8BD5\u3002",
   "coffee.deleted_tables": "\u5DF2\u5220\u9664 {0} \u4E2A\u804A\u5929\u5BA4\u3002",
   "coffee.could_not_delete": "\u4EE5\u4E0B\u804A\u5929\u5BA4\u672A\u80FD\u5220\u9664\uFF1A\n{0}",
@@ -5365,7 +5409,7 @@ var zhCN = {
   "share.mermaid_undrawn_warning_0": "\u6709 {0} \u5F20\u56FE\u8868\u672A\u80FD\u5728\u65F6\u9650\u5185\u753B\u5B8C\uFF0C\u53EA\u4EE5\u6E90\u7801\u5448\u73B0\u3002",
   "share.mermaid_blocked_note": "\uFF3B\u56FE\u8868\u672A\u7ED8\u5236\uFF1A\u5236\u4F5C\u6B64\u6587\u4EF6\u65F6\u5C1A\u672A\u5141\u8BB8 Mermaid\uFF0C\u6539\u663E\u793A\u6E90\u7801\u3002\uFF3D",
   "share.mermaid_undrawn_note": "\uFF3B\u56FE\u8868\u672A\u80FD\u753B\u5B8C\uFF0C\u6539\u663E\u793A\u6E90\u7801\u3002\uFF3D",
-  "share.leak_blocked_0": "\u672A\u4FDD\u5B58\uFF1A\u6587\u4EF6\u4F1A\u542B\u6709\u79C1\u4EBA\u4FE1\u606F\uFF08{0}\uFF09\uFF0C\u6CA1\u6709\u5199\u5165\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "share.leak_blocked_0": "\u672A\u4FDD\u5B58\uFF1A\u6587\u4EF6\u4F1A\u542B\u6709\u79C1\u4EBA\u4FE1\u606F\uFF08{0}\uFF09\u3002\u8BF7\u4ECE\u6765\u6E90\u7B14\u8BB0\u79FB\u9664\u8FD9\u4E9B\u5185\u5BB9\uFF0C\u6216\u5173\u95ED\u4F1A\u5E26\u5165\u5B8C\u6574\u7B14\u8BB0\u7684\u9009\u9879\uFF0C\u518D\u91CD\u65B0\u5206\u4EAB\u3002",
   "share.leak_category_vault-path": "\u8FD9\u53F0\u7535\u8111\u4E0A\u7684\u77E5\u8BC6\u5E93\u4F4D\u7F6E",
   "share.leak_category_map-folder": "\u601D\u7EF4\u5BFC\u56FE\u7684\u6587\u4EF6\u5939\u540D\u79F0",
   "share.leak_category_note-path": "\u7B14\u8BB0\u7684\u6587\u4EF6\u8DEF\u5F84",
@@ -5380,7 +5424,7 @@ var zhCN = {
   "share.saving": "\u4FDD\u5B58\u4E2D\u2026",
   "share.saved_0_1": "\u5DF2\u4FDD\u5B58 {0}\uFF08{1}\uFF09",
   "share.downloaded_0_1": "\u5DF2\u9001\u51FA\u5B58\u6863 {0}\uFF08{1}\uFF09\u3002\u82E5\u51FA\u73B0\u5B58\u6863\u7A97\u53E3\uFF0C\u8BF7\u9009\u62E9\u8981\u5B58\u653E\u7684\u4F4D\u7F6E\u3002",
-  "share.save_failed": "\u65E0\u6CD5\u4FDD\u5B58\u6587\u4EF6\u3002",
+  "share.save_failed": "\u65E0\u6CD5\u4FDD\u5B58\u6587\u4EF6\u3002\u8BF7\u786E\u8BA4\u4FDD\u5B58\u4F4D\u7F6E\u53EF\u5199\u5165\uFF0C\u6216\u6362\u4E00\u4E2A\u4F4D\u7F6E\u518D\u8BD5\u4E00\u6B21\u3002",
   "share.publish_copy": "\u590D\u5236\u53D1\u5E03\u5230 GitHub \u7684\u6307\u4EE4",
   "share.publish_done": "\u5DF2\u590D\u5236\u6307\u4EE4\uFF0C\u8BF7\u8D34\u5230\u4F60\u81EA\u5DF1\u7684 Claude Code \u6216 Codex\u3002",
   "share.publish_fail": "\u65E0\u6CD5\u81EA\u52A8\u590D\u5236\uFF0C\u8BF7\u9009\u53D6\u4E0B\u65B9\u6587\u5B57\u81EA\u884C\u590D\u5236\u3002",
@@ -5472,6 +5516,7 @@ var zhCN = {
   "ui.note_style_format_desc_rich": "\u6BCF\u6BB5\u81F3\u5C11\u4E00\u4E2A\u63D0\u793A\u6846\u3001\u8868\u683C\u6216\u56FE\u3002",
   "ui.note_style_format_desc_skim": "\u5168\u90E8\u6761\u5217\uFF0C\u4E00\u773C\u626B\u5B8C\u3002",
   "ui.note_style_format_other_0": "\u76EE\u524D\u7684\u683C\u5F0F\u662F\u201C{0}\u201D\uFF0C\u4E0D\u5728\u4E0A\u9762\u7684\u9009\u9879\u4E2D\u3002",
+  "ui.note_style_part_unknown_0": "{0}\uFF08\u627E\u4E0D\u5230\uFF09",
   "ui.note_style_set_apart_0": "{0}\uFF08\u53E6\u5916\u6307\u5B9A\uFF09",
   "ui.note_style_voice_retired_0": "{0}\uFF08\u5DF2\u505C\u7528\uFF09",
   "ui.note_style_tag_voice_retired": "\u53E3\u543B\u5DF2\u505C\u7528",
@@ -5557,6 +5602,7 @@ var zhCN = {
   "ui.editor_section_add": "\u52A0\u4E00\u6BB5",
   "ui.editor_section_new_name_0": "\u65B0\u6BB5\u843D {0}",
   "ui.editor_sections_problem_0": "\u6BB5\u843D\u65E0\u6CD5\u4FDD\u5B58\uFF1A{0}",
+  "ui.editor_sections_none": "\u81F3\u5C11\u9700\u8981\u4E00\u4E2A\u6BB5\u843D\u3002",
   "ui.editor_apply_all": "\u53E3\u543B\u4E5F\u5957\u7528\u5230\u5176\u4ED6 5 \u79CD\u7C7B\u578B",
   "ui.editor_apply_notice_0": "\u6240\u6709\u8BAE\u9898\u7C7B\u578B\u7684\u53E3\u543B\u5DF2\u6539\u4E3A\u201C{0}\u201D\u3002",
   "ui.editor_apply_kept_0": "\u8FD9\u4E9B\u7C7B\u578B\u6709\u53E6\u5916\u6307\u5B9A\u53E3\u543B\uFF0C\u6CA1\u6709\u6539\uFF1A{0}\u3002",
@@ -5652,7 +5698,13 @@ var zhCN = {
   "ui.topic_chat_too_big": "\u8FD9\u4E2A\u8981\u6C42\u52A8\u5230\u7684\u5730\u65B9\u592A\u591A\uFF0C\u8BF7\u6539\u7528\u5DE6\u4FA7\u680F\u7684 AI \u5BF9\u8BDD\u3002",
   "ui.topic_chat_result_unknown": "\u8FD9\u6B21\u7684\u7ED3\u679C\u8BF7\u770B\u8BAE\u9898\u672C\u8EAB\u3002",
   "ui.topic_chat_failed_children": "\u6CA1\u6709\u5B50\u8BAE\u9898\u7814\u7A76\u6210\u529F\u3002",
-  "ui.topic_chat_record_failed": "\u8BAE\u9898\u5BF9\u8BDD\u8BB0\u5F55\u6CA1\u6709\u5B58\u6210\u529F\u3002"
+  "ui.topic_chat_record_failed": "\u8BAE\u9898\u5BF9\u8BDD\u8BB0\u5F55\u6CA1\u6709\u5B58\u6210\u529F\u3002",
+  "ui.exchange_reason_invalid_line_0": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7EB2\uFF0C\u7B2C {0} \u884C\u9644\u8FD1\u683C\u5F0F\u6709\u8BEF",
+  "ui.invalid_merged_json": "\u5408\u5E76\u5185\u5BB9\u4E0D\u662F\u6709\u6548\u7684 JSON\uFF1A\u8BF7\u68C0\u67E5\u5F15\u53F7\u3001\u9017\u53F7\u4E0E\u5927\u62EC\u53F7\u662F\u5426\u6210\u5BF9\uFF0C\u4FEE\u6B63\u540E\u518D\u4FDD\u5B58\u3002",
+  "ui.note_style_folder_open_failed": "\u65E0\u6CD5\u6253\u5F00\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939\uFF1A\u540C\u540D\u6587\u4EF6\u53EF\u80FD\u5360\u4F4F\u4E86\u8FD9\u4E2A\u4F4D\u7F6E\uFF0C\u6216\u6587\u4EF6\u5939\u65E0\u6CD5\u5199\u5165\u3002\u8BF7\u6539\u540D\u6216\u79FB\u8D70\u8BE5\u6587\u4EF6\uFF0C\u518D\u8BD5\u4E00\u6B21\u3002",
+  "ui.synced_0_topic_filenames_failed_1": "\u5DF2\u540C\u6B65 {0} \u4EFD\u8BAE\u9898\u6587\u4EF6\u540D\uFF0C{1} \u4EFD\u5931\u8D25\u3002\u8BF7\u786E\u8BA4\u5931\u8D25\u8BAE\u9898\u6240\u5728\u7684\u6587\u4EF6\u5939\u53EF\u5199\u5165\uFF08\u672A\u53EA\u8BFB\u3001\u672A\u88AB\u5176\u4ED6\u7A0B\u5E8F\u9501\u5B9A\uFF09\uFF0C\u518D\u6267\u884C\u4E00\u6B21\u3002",
+  "ui.repair_workspace_blocked_0": "\u4FEE\u590D\u5931\u8D25\uFF1A\u201C{0}\u201D\u662F\u6587\u4EF6\uFF0C\u5360\u4F4F\u4E86\u6587\u4EF6\u5939\u7684\u4F4D\u7F6E\u3002\u8BF7\u5148\u6539\u540D\u6216\u79FB\u8D70\u8FD9\u4E2A\u6587\u4EF6\uFF0C\u518D\u70B9\u4E00\u6B21\u4FEE\u590D\u3002",
+  "ui.outline_import_done_0_1": "\u5DF2\u52A0\u5165 {0} \u4E2A\u8BAE\u9898\u5230{1}\u3002"
 };
 
 // i18n/zh-TW.ts
@@ -5792,12 +5844,18 @@ var zhTW = {
   "ui.exchange_reason_too_large": "\u6A94\u6848\u8D85\u904E {0} MB",
   "ui.exchange_reason_unsafe": "\u6A94\u6848\u542B\u6709 DOCTYPE\u3001\u5BE6\u9AD4\u6216\u8655\u7406\u6307\u4EE4\uFF0C\u9019\u4E9B\u4E00\u5F8B\u4E0D\u63A5\u53D7",
   "ui.exchange_reason_too_big": "\u8B70\u984C\u3001\u5143\u7D20\u6216\u5C64\u6578\u592A\u591A",
-  "ui.exchange_reason_invalid": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7DB1\uFF08{0}\uFF09",
+  "ui.exchange_reason_invalid": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7DB1",
   "ui.exchange_reason_unreadable": "\u7121\u6CD5\u8B80\u53D6\u6A94\u6848",
   "ui.exchange_export_opml": "\u532F\u51FA\u70BA OPML",
   "ui.exchange_export_freemind": "\u532F\u51FA\u70BA FreeMind\uFF08.mm\uFF09",
   "ui.exchange_exported": "\u5DF2\u532F\u51FA\u5230 {0}",
   "ui.exchange_export_failed": "\u532F\u51FA\u5931\u6557\uFF1A{0}",
+  "ui.ai_status_preparing": "\u6E96\u5099\u4E2D",
+  "ui.ai_status_sent": "\u5DF2\u9001\u51FA",
+  "ui.ai_status_received": "\u5DF2\u6536\u5230",
+  "ui.ai_status_parsed": "\u5DF2\u89E3\u6790",
+  "ui.ai_status_completed": "\u5DF2\u5B8C\u6210",
+  "ui.ai_status_failed": "\u5931\u6557",
   "ui.exchange_export_no_name": "\u627E\u4E0D\u5230\u53EF\u7528\u7684\u6A94\u540D",
   "ui.outline_import_hint": "\u8CBC\u4E0A\u53EA\u6709\u6A19\u984C\u7684 Markdown \u5927\u7DB1\uFF0C\u6216\u7528 AI \u4F9D\u4E3B\u984C\u751F\u6210\u3002\u6BCF\u500B\u6A19\u984C\u6703\u8B8A\u6210\u4E00\u500B\u8B70\u984C\u3002",
   "ui.outline_import_text_label": "\u5927\u7DB1",
@@ -6080,11 +6138,13 @@ var zhTW = {
   "ui.context_ai_result_empty": "\u8ACB\u5148\u8F38\u5165\u6216\u7522\u751F\u7D50\u679C\uFF0C\u518D\u5957\u7528\u3002",
   "ui.context_ai_replaced": "\u5DF2\u53D6\u4EE3\u9078\u53D6\u6587\u5B57\u3002",
   "ui.context_ai_appended": "\u8349\u7A3F\u5DF2\u9644\u52A0\u5230\u9801\u5C3E\u3002",
+  "ui.context_ai_inserted_after": "\u8349\u7A3F\u5DF2\u63D2\u5165\u9078\u53D6\u6BB5\u843D\u5F8C\u9762\u3002",
+  "ui.context_ai_accept_unavailable": "\u7121\u6CD5\u5B89\u5168\u5B9A\u4F4D\u9078\u53D6\u7684\u6587\u5B57\uFF0C\u6240\u4EE5\u6C92\u6709\u300C\u63A5\u53D7\u4FEE\u6539\u300D\u8207\u300C\u63D2\u5165\u9019\u88E1\u300D\uFF0C\u53EF\u4EE5\u8907\u88FD\u8349\u7A3F\u6216\u9644\u52A0\u5230\u9801\u5C3E\u3002",
   "ui.synthesis_content": "\u8B70\u984C\u6574\u5408\u5167\u5BB9",
   "ui.synthesis_content_full": "\u5B8C\u6574\u5167\u5BB9\u6574\u5408\uFF08\u9810\u8A2D\uFF09",
   "ui.synthesis_content_summary": "\u6458\u8981\u5FEB\u901F\u6574\u5408",
-  "ui.synthesis_content_full_hint": "\u7D0D\u5165\u4E0B\u5217\u8B70\u984C\u7684\u5B8C\u6574 Detail\u3001\u6458\u8981\u8207\u76F8\u95DC\u767C\u73FE\u3002\u8CC7\u6599\u8F03\u591A\u6642\u6703\u5206\u6279\u8655\u7406\uFF0C\u53EF\u80FD\u9700\u8981\u8F03\u4E45\u3002",
-  "ui.synthesis_content_summary_hint": "\u4F7F\u7528\u4E0B\u5217\u8B70\u984C\u7684\u6458\u8981\u8207\u76F8\u95DC\u767C\u73FE\uFF0C\u4E0D\u7D0D\u5165\u5B8C\u6574 Detail\uFF0C\u53EF\u80FD\u7701\u7565\u6B63\u6587\u4E2D\u7684\u91CD\u8981\u689D\u4EF6\u3002",
+  "ui.synthesis_content_full_hint": "\u7D0D\u5165\u4E0B\u5217\u8B70\u984C\u7684\u5B8C\u6574\u5167\u5BB9\u3001\u6458\u8981\u8207\u76F8\u95DC\u767C\u73FE\u3002\u8CC7\u6599\u8F03\u591A\u6642\u6703\u5206\u6279\u8655\u7406\uFF0C\u53EF\u80FD\u9700\u8981\u8F03\u4E45\u3002",
+  "ui.synthesis_content_summary_hint": "\u4F7F\u7528\u4E0B\u5217\u8B70\u984C\u7684\u6458\u8981\u8207\u76F8\u95DC\u767C\u73FE\uFF0C\u4E0D\u7D0D\u5165\u5B8C\u6574\u5167\u5BB9\uFF0C\u53EF\u80FD\u7701\u7565\u6B63\u6587\u4E2D\u7684\u91CD\u8981\u689D\u4EF6\u3002",
   "ui.synthesis_content_scope": "\u53EA\u5F71\u97FF\u4E0B\u5217\u8B70\u984C\uFF0C\u984D\u5916 Markdown \u4E00\u5F8B\u5B8C\u6574\u8B80\u53D6\uFF1B\u958B\u59CB\u5F8C\u4E0D\u80FD\u66F4\u63DB\u3002",
   "ui.synthesis_source_topics": "\u672C\u6B21\u5305\u542B\u7684\u4F86\u6E90\u8B70\u984C",
   "ui.synthesis_no_source_topics": "\u6C92\u6709\u4F86\u6E90\u8B70\u984C\uFF0C\u8ACB\u5728\u4E0B\u65B9\u9078\u53D6\u5176\u4ED6 Markdown \u4F86\u6E90\u3002",
@@ -6121,6 +6181,7 @@ var zhTW = {
   "ui.map_sources_search": "\u641C\u5C0B\u4E26\u52A0\u5165\u2026",
   "ui.map_sources_search_placeholder": "\u8F38\u5165\u5FC3\u667A\u5716\u3001\u8CC7\u6599\u593E\u6216 Markdown \u540D\u7A31\u2026",
   "ui.map_sources_search_empty": "\u9019\u500B Vault \u6C92\u6709\u53EF\u52A0\u5165\u7684\u9805\u76EE\u3002",
+  "ui.map_sources_search_no_match": "\u6C92\u6709\u7B26\u5408\u641C\u5C0B\u7684\u9805\u76EE\u3002",
   "ui.map_sources_reject_title_0": "\u6709 {0} \u500B\u6C92\u6709\u52A0\u5165",
   "ui.map_sources_reject_line_0": "\u3008{0}\u3009\uFF1A{1}",
   "ui.map_sources_reject_current": "\u4E0D\u80FD\u52A0\u5165\u76EE\u524D\u9019\u5F35\u5FC3\u667A\u5716",
@@ -6312,7 +6373,7 @@ var zhTW = {
   "ui.save_merged_contents": "\u5132\u5B58\u5408\u4F75\u5167\u5BB9",
   "ui.mind_map_changed_externally": "\u5FC3\u667A\u5716\u6709\u5916\u90E8\u4FEE\u6539",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi": "\u756B\u9762\u8207 Map.md \u7684\u7D50\u69CB\u90FD\u5DF2\u6539\u8B8A\u3002\u8ACB\u9078\u64C7\u8981\u4FDD\u7559\u54EA\u4E00\u7248\u3002",
-  "ui.invalid_merged_contents": "\u5408\u4F75\u5167\u5BB9\u7121\u6548\u3002",
+  "ui.invalid_merged_contents": "\u5408\u4F75\u5167\u5BB9\u7121\u6548\uFF1A\u7D50\u69CB\u4E0D\u7B26\u5408\u5FC3\u667A\u5716\u683C\u5F0F\uFF0C\u8ACB\u4FEE\u6B63\u5F8C\u518D\u5132\u5B58\u3002",
   "ui.no_notes_yet": "\u76EE\u524D\u6C92\u6709\u7B46\u8A18\u3002",
   "ui.topic_outline": "\u8B70\u984C\u5927\u7DB1",
   "ui.open_topic_outline": "\u958B\u555F\u8B70\u984C\u5927\u7DB1",
@@ -6370,6 +6431,7 @@ var zhTW = {
   "ui.switch_mind_map": "\u5207\u63DB\u5FC3\u667A\u5716",
   "ui.map_switcher_placeholder": "\u8F38\u5165\u5FC3\u667A\u5716\u540D\u7A31\u641C\u5C0B\u2026",
   "ui.map_switcher_empty": "\u6C92\u6709\u7B26\u5408\u7684\u5FC3\u667A\u5716\u3002",
+  "ui.map_switcher_empty_none": "\u9084\u6C92\u6709\u5FC3\u667A\u5716\u3002\u8ACB\u7528\u300C\u5EFA\u7ACB\u65B0\u5FC3\u667A\u5716\u300D\u65B0\u589E\u7B2C\u4E00\u5F35\u3002",
   "ui.map_switcher_one_topic": "1 \u500B\u8B70\u984C",
   "ui.map_switcher_topics_0": "{0} \u500B\u8B70\u984C",
   "ui.map_switcher_edited_0": "\u4FEE\u6539\u65BC {0}",
@@ -6676,6 +6738,7 @@ var zhTW = {
   "ui.usage_button_unavailable": "Token \u7528\u91CF\uFF1A\u7121\u6CD5\u8B80\u53D6",
   "ui.usage_panel_title": "Token \u7528\u91CF",
   "ui.usage_filter_label": "\u4F9D\u670D\u52D9\u7BE9\u9078",
+  "ui.usage_filter_total": "\u5168\u90E8",
   "ui.usage_totals": "\u7E3D\u91CF",
   "ui.usage_this_map": "\u9019\u5F35\u5FC3\u667A\u5716",
   "ui.usage_today": "\u4ECA\u5929",
@@ -6714,6 +6777,7 @@ var zhTW = {
   "ui.card_menu_open_note_tab": "\u5728\u65B0\u5206\u9801\u958B\u555F\u7B46\u8A18",
   "ui.ai_running_ai": "AI \u57F7\u884C\u4E2D\u2026",
   "ui.ai_locked_notice": "\u8B70\u984C\u5DF2\u9396\u5B9A\uFF0CAI \u4E0D\u6703\u4FEE\u6539",
+  "ui.ai_locked_create_next_step": "\u8B70\u984C\u5DF2\u9396\u5B9A\uFF0CAI \u4E0D\u6703\u4FEE\u6539\u3002\u8981\u5EFA\u7ACB\u5B50\u8B70\u984C\uFF0C\u8ACB\u5148\u5230\u9019\u5F35\u5361\u89E3\u9664 AI \u9396\u5B9A\u3002",
   "ui.ai_lock": "AI \u9396\u5B9A",
   "ui.ai_lock_toggle": "\u9396\u5B9A\uFF0C\u4E0D\u8B93 AI \u4FEE\u6539",
   "ui.ai_lock_hint": "AI \u7814\u7A76\u3001\u5408\u4F75\u3001\u5C55\u958B\u8207\u5C0D\u8A71\u90FD\u4E0D\u6703\u4FEE\u6539\u6B64\u8B70\u984C\u3001\u5B83\u7684\u5B50\u8B70\u984C\u6216\u95DC\u806F\uFF1B\u4F60\u81EA\u5DF1\u7684\u7DE8\u8F2F\u4E0D\u53D7\u5F71\u97FF\u3002",
@@ -6760,9 +6824,9 @@ var zhTW = {
   "ui.current_model_description": "\u804A\u5929\u8207\u6240\u6709\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B\u6A21\u578B\uFF1B\u6709\u6A21\u578B\u8986\u5BEB\u7684\u8B70\u984C\u9664\u5916\u3002\u804A\u5929\u9762\u677F\u4E0A\u65B9\u7684\u9078\u55AE\u6539\u7684\u4E5F\u662F\u9019\u88E1\u3002",
   "ui.ai_reasoning_level": "AI \u63A8\u7406\u7B49\u7D1A",
   "ui.reasoning_level": "\u63A8\u7406\u7B49\u7D1A",
-  "ui.low": "\u4F4E (Low)",
-  "ui.medium": "\u4E2D (Medium)",
-  "ui.high": "\u9AD8 (High)",
+  "ui.low": "\u4F4E",
+  "ui.medium": "\u4E2D",
+  "ui.high": "\u9AD8",
   "ui.rescan_maps_and_topic_notes_then_rebuild_references_and_deri": "\u91CD\u65B0\u6383\u63CF\u5FC3\u667A\u5716\u8207\u8B70\u984C\u7B46\u8A18\uFF0C\u91CD\u5EFA reference \u8207\u884D\u751F\u8CC7\u6599\u3002\u539F\u59CB\u5167\u5BB9\u4E0D\u6703\u88AB\u8986\u5BEB\u3002",
   "ui.full_rebuild": "\u5B8C\u6574\u91CD\u5EFA",
   "ui.vam_data_has_been_refreshed": "VAM \u8CC7\u6599\u5DF2\u91CD\u65B0\u6574\u7406\u3002",
@@ -6774,7 +6838,6 @@ var zhTW = {
   "ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it": "AI \u4EFB\u52D9\u8D85\u904E 3 \u5206\u9418\u6642\uFF0C\u70BA\u907F\u514D\u9577\u6642\u9593\u4F54\u7528\u8CC7\u6E90\uFF0CVAM \u6703\u5617\u8A66\u4E2D\u65B7\uFF1B\u672A\u5B8C\u6210\u7684\u7D50\u679C\u4E0D\u6703\u5957\u7528\u3002",
   "ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it": "AI \u4EFB\u52D9\u8D85\u904E 3 \u5206\u9418\uFF0C\u70BA\u907F\u514D\u9577\u6642\u9593\u4F54\u7528\u8CC7\u6E90\uFF0CVAM \u6703\u5617\u8A66\u4E2D\u65B7\u3002\u672A\u5B8C\u6210\u7684\u7D50\u679C\u4E0D\u6703\u5957\u7528\uFF1B\u8ACB\u7E2E\u5C0F\u4EFB\u52D9\u7BC4\u570D\u5F8C\u91CD\u8A66\u3002",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and": "\u6574\u5408 {0} \u500B\u5DF2\u9078\u8B70\u984C\u3002\u53EF\u5728\u4E0B\u65B9\u9078\u64C7\u5B8C\u6574\u5167\u5BB9\u6216\u6458\u8981\uFF1BAI \u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u5EFA\u7ACB\u65B0\u6839\u8B70\u984C\uFF0C\u53EF\u5FA9\u539F\u3002",
-  "ui.invalid_merged_contents_0": "\u5408\u4F75\u5167\u5BB9\u7121\u6548\uFF1A{0}",
   "ui.delete_0": "\u522A\u9664\u300C{0}\u300D",
   "ui.unassigned_0": "\u672A\u6B78\u985E\uFF08{0}\uFF09",
   "ui.archived_0": "\u5C01\u5B58\uFF08{0}\uFF09",
@@ -7254,7 +7317,7 @@ var zhTW = {
   "ui.ai_not_ready_unknown_0": "{0} \u9084\u6C92\u6E96\u5099\u597D\u3002\u53EF\u80FD\u5C1A\u672A\u767B\u5165\uFF0C\u6216\u6C92\u6709\u56DE\u5831\u53EF\u7528\u7684\u6A21\u578B\u3002",
   "ui.ai_not_ready_where": "\u53EF\u5728\u300C\u8A2D\u5B9A \u2192 Visual Agent Map \u2192 AI \u9023\u7DDA\u300D\u67E5\u770B\u72C0\u614B\u3002",
   "ui.current_model_is_unavailable": "\u76EE\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528",
-  "ui.auto": "\u81EA\u52D5 (Auto)",
+  "ui.auto": "\u81EA\u52D5",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "\u81EA\u52D5\u6A21\u5F0F\u6703\u5C0D\u7C21\u55AE\u4EFB\u52D9\u4F7F\u7528 Low\u3001\u5C0D\u8907\u96DC\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52D5\u9078\u64C7\u4E0D\u6703\u88AB\u8986\u84CB\u3002",
   "ui.stop_research": "\u505C\u6B62\u7814\u7A76",
   "ui.stop_expand": "\u505C\u6B62\u5C55\u958B",
@@ -7509,7 +7572,13 @@ var zhTW = {
   "ui.preset_copy_suffix": " \u526F\u672C",
   // coffee:begin (keep every coffee.* key in this one contiguous block)
   "coffee.delete_this_table": "\u522A\u9664\u9019\u5834\u684C\u804A\uFF1F",
-  "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "\u300C{0}\u300D\u7684 Markdown \u8207\u8A2D\u5B9A\u6703\u5148\u5099\u4EFD\uFF0C\u518D\u79FB\u5165\u5783\u573E\u6876\u3002",
+  "coffee.will_be_backed_up_and_moved_to_the_vault_trash": "\u300C{0}\u300D\u7684 Markdown \u79FB\u5165\u5783\u573E\u6876\u3002\u8A2D\u5B9A\u5099\u4EFD\u5728 .sessions/trash\uFF08\u4E0D\u5728\u5783\u573E\u6876\uFF09\u3002",
+  "coffee.delete_many_tables_intro": "\u4EE5\u4E0B\u684C\u804A\u7684 Markdown \u79FB\u5165\u5783\u573E\u6876\u3002\u8A2D\u5B9A\u5099\u4EFD\u5728 .sessions/trash\uFF08\u4E0D\u5728\u5783\u573E\u6876\uFF09\u3002",
+  "coffee.copy_sample_to_my_table": "\u8907\u88FD\u6210\u6211\u7684\u684C",
+  "coffee.markdown_note_missing": "\u627E\u4E0D\u5230\u684C\u804A\u7684 Markdown \u7B46\u8A18\u3002",
+  "coffee.model_provider_status": "{0}\uFF1A{1}",
+  "coffee.built_in_sample": "\u5167\u5EFA\u793A\u7BC4",
+  "coffee.engine_generation_stopped_obsidian_closed": "Obsidian \u95DC\u9589\u6642\u7522\u751F\u4E2D\u65B7\uFF1B\u5DF2\u5B58\u8349\u7A3F\u53EF\u7528\u3002",
   "coffee.fill_segment_summaries": "\u88DC\u9F4A\u6BB5\u843D\u6458\u8981",
   "coffee.use_this_tables_model_in_one_ai_request_to_summarize": "\u5C07\u4F7F\u7528\u9019\u684C\u7684\u6A21\u578B {0}\uFF0C\u4EE5\u4E00\u6B21 AI \u547C\u53EB\u6458\u8981\u6240\u6709\u7F3A\u5C11\u6458\u8981\u4E14\u6709\u6587\u5B57\u7684\u6BB5\u843D\u3002\u65E2\u6709\u5C0D\u8AC7\u8207\u6D1E\u898B\u4FDD\u6301\u539F\u6A23\u3002",
   "coffee.generate_summaries": "\u88DC\u9F4A\u6458\u8981",
@@ -7573,6 +7642,8 @@ var zhTW = {
   "coffee.rename": "\u91CD\u65B0\u547D\u540D",
   "coffee.choose_a_saved_style_first": "\u8ACB\u5148\u9078\u64C7\u5DF2\u4FDD\u5B58\u7684\u98A8\u683C\u3002",
   "coffee.delete_style": "\u522A\u9664\u98A8\u683C",
+  "coffee.delete_style_confirm_title": "\u522A\u9664\u98A8\u683C\uFF1F",
+  "coffee.delete_style_confirm_body": "\u300C{0}\u300D\u6703\u5F9E\u6E05\u55AE\u79FB\u9664\uFF0C\u7121\u6CD5\u5FA9\u539F\u3002",
   "coffee.default_for_new_tables": "\u8A2D\u70BA\u65B0\u804A\u5929\u5BA4\u9810\u8A2D",
   "coffee.saved_for_new_tables_existing_tables_keep_their_settings": "\u5DF2\u8A2D\u70BA\u65B0\u804A\u5929\u5BA4\u9810\u8A2D\uFF1B\u65E2\u6709\u804A\u5929\u5BA4\u4ECD\u4F7F\u7528\u539F\u8A2D\u5B9A\u3002",
   "coffee.restore_built_in_text": "\u9084\u539F\u5167\u5EFA\u6587\u5B57",
@@ -7592,7 +7663,6 @@ var zhTW = {
   "coffee.select_all_shown": "\u5168\u9078\u76EE\u524D\u6E05\u55AE",
   "coffee.clear_selection": "\u53D6\u6D88\u9078\u53D6",
   "coffee.delete_selected": "\u522A\u9664\u6240\u9078\u804A\u5929\u5BA4",
-  "coffee.tables_count_list": "{0} \u500B\u804A\u5929\u5BA4\uFF1A\n{1}",
   "coffee.this_table_changed_reload_and_try_again": "\u804A\u5929\u5BA4\u5DF2\u8B8A\u66F4\uFF0C\u8ACB\u91CD\u65B0\u8F09\u5165\u5F8C\u518D\u8A66\u3002",
   "coffee.deleted_tables": "\u5DF2\u522A\u9664 {0} \u500B\u804A\u5929\u5BA4\u3002",
   "coffee.could_not_delete": "\u4EE5\u4E0B\u804A\u5929\u5BA4\u672A\u80FD\u522A\u9664\uFF1A\n{0}",
@@ -8139,7 +8209,7 @@ var zhTW = {
   "share.mermaid_undrawn_warning_0": "\u6709 {0} \u5F35\u5716\u8868\u672A\u80FD\u5728\u6642\u9650\u5167\u756B\u5B8C\uFF0C\u53EA\u4EE5\u539F\u59CB\u78BC\u5448\u73FE\u3002",
   "share.mermaid_blocked_note": "\uFF3B\u5716\u8868\u672A\u7E6A\u88FD\uFF1A\u88FD\u4F5C\u6B64\u6A94\u6642\u5C1A\u672A\u5141\u8A31 Mermaid\uFF0C\u6539\u986F\u793A\u539F\u59CB\u78BC\u3002\uFF3D",
   "share.mermaid_undrawn_note": "\uFF3B\u5716\u8868\u672A\u80FD\u756B\u5B8C\uFF0C\u6539\u986F\u793A\u539F\u59CB\u78BC\u3002\uFF3D",
-  "share.leak_blocked_0": "\u672A\u5B58\u6A94\uFF1A\u6A94\u6848\u6703\u542B\u6709\u79C1\u4EBA\u8CC7\u8A0A\uFF08{0}\uFF09\uFF0C\u6C92\u6709\u5BEB\u5165\u4EFB\u4F55\u6771\u897F\u3002",
+  "share.leak_blocked_0": "\u672A\u5B58\u6A94\uFF1A\u6A94\u6848\u6703\u542B\u6709\u79C1\u4EBA\u8CC7\u8A0A\uFF08{0}\uFF09\u3002\u8ACB\u56DE\u5230\u4F86\u6E90\u7B46\u8A18\u79FB\u9664\u9019\u4E9B\u5167\u5BB9\uFF0C\u6216\u95DC\u9589\u6703\u5E36\u5165\u5B8C\u6574\u7B46\u8A18\u7684\u9078\u9805\uFF0C\u518D\u91CD\u65B0\u5206\u4EAB\u3002",
   "share.leak_category_vault-path": "\u9019\u53F0\u96FB\u8166\u4E0A\u7684 Vault \u4F4D\u7F6E",
   "share.leak_category_map-folder": "\u5FC3\u667A\u5716\u7684\u8CC7\u6599\u593E\u540D\u7A31",
   "share.leak_category_note-path": "\u7B46\u8A18\u7684\u6A94\u6848\u8DEF\u5F91",
@@ -8154,7 +8224,7 @@ var zhTW = {
   "share.saving": "\u5132\u5B58\u4E2D\u2026",
   "share.saved_0_1": "\u5DF2\u5132\u5B58 {0}\uFF08{1}\uFF09",
   "share.downloaded_0_1": "\u5DF2\u9001\u51FA\u5B58\u6A94 {0}\uFF08{1}\uFF09\u3002\u82E5\u51FA\u73FE\u5B58\u6A94\u8996\u7A97\uFF0C\u8ACB\u9078\u64C7\u8981\u5B58\u653E\u7684\u4F4D\u7F6E\u3002",
-  "share.save_failed": "\u7121\u6CD5\u5132\u5B58\u6A94\u6848\u3002",
+  "share.save_failed": "\u7121\u6CD5\u5132\u5B58\u6A94\u6848\u3002\u8ACB\u78BA\u8A8D\u5132\u5B58\u4F4D\u7F6E\u53EF\u5BEB\u5165\uFF0C\u6216\u63DB\u4E00\u500B\u4F4D\u7F6E\u518D\u8A66\u4E00\u6B21\u3002",
   "share.publish_copy": "\u8907\u88FD\u767C\u4F48\u5230 GitHub \u7684\u6307\u4EE4",
   "share.publish_done": "\u5DF2\u8907\u88FD\u6307\u4EE4\uFF0C\u8ACB\u8CBC\u5230\u4F60\u81EA\u5DF1\u7684 Claude Code \u6216 Codex\u3002",
   "share.publish_fail": "\u7121\u6CD5\u81EA\u52D5\u8907\u88FD\uFF0C\u8ACB\u9078\u53D6\u4E0B\u65B9\u6587\u5B57\u81EA\u884C\u8907\u88FD\u3002",
@@ -8246,6 +8316,7 @@ var zhTW = {
   "ui.note_style_format_desc_rich": "\u6BCF\u6BB5\u81F3\u5C11\u4E00\u500B\u63D0\u793A\u6846\u3001\u8868\u683C\u6216\u5716\u3002",
   "ui.note_style_format_desc_skim": "\u5168\u90E8\u689D\u5217\uFF0C\u4E00\u773C\u6383\u5B8C\u3002",
   "ui.note_style_format_other_0": "\u76EE\u524D\u7684\u683C\u5F0F\u662F\u300C{0}\u300D\uFF0C\u4E0D\u5728\u4E0A\u9762\u7684\u9078\u9805\u4E2D\u3002",
+  "ui.note_style_part_unknown_0": "{0}\uFF08\u627E\u4E0D\u5230\uFF09",
   "ui.note_style_set_apart_0": "{0}\uFF08\u53E6\u5916\u6307\u5B9A\uFF09",
   "ui.note_style_voice_retired_0": "{0}\uFF08\u5DF2\u505C\u7528\uFF09",
   "ui.note_style_tag_voice_retired": "\u53E3\u543B\u5DF2\u505C\u7528",
@@ -8331,6 +8402,7 @@ var zhTW = {
   "ui.editor_section_add": "\u52A0\u4E00\u6BB5",
   "ui.editor_section_new_name_0": "\u65B0\u6BB5\u843D {0}",
   "ui.editor_sections_problem_0": "\u6BB5\u843D\u7121\u6CD5\u5132\u5B58\uFF1A{0}",
+  "ui.editor_sections_none": "\u81F3\u5C11\u9700\u8981\u4E00\u500B\u6BB5\u843D\u3002",
   "ui.editor_apply_all": "\u53E3\u543B\u4E5F\u5957\u7528\u5230\u5176\u4ED6 5 \u7A2E\u985E\u578B",
   "ui.editor_apply_notice_0": "\u6240\u6709\u8B70\u984C\u985E\u578B\u7684\u53E3\u543B\u5DF2\u6539\u70BA\u300C{0}\u300D\u3002",
   "ui.editor_apply_kept_0": "\u9019\u4E9B\u985E\u578B\u6709\u53E6\u5916\u6307\u5B9A\u53E3\u543B\uFF0C\u6C92\u6709\u6539\uFF1A{0}\u3002",
@@ -8426,7 +8498,13 @@ var zhTW = {
   "ui.topic_chat_too_big": "\u9019\u500B\u8981\u6C42\u52D5\u5230\u7684\u5730\u65B9\u592A\u591A\uFF0C\u8ACB\u6539\u7528\u5DE6\u5074\u6B04\u7684 AI \u5C0D\u8A71\u3002",
   "ui.topic_chat_result_unknown": "\u9019\u6B21\u7684\u7D50\u679C\u8ACB\u770B\u8B70\u984C\u672C\u8EAB\u3002",
   "ui.topic_chat_failed_children": "\u6C92\u6709\u5B50\u8B70\u984C\u7814\u7A76\u6210\u529F\u3002",
-  "ui.topic_chat_record_failed": "\u8B70\u984C\u5C0D\u8A71\u7D00\u9304\u6C92\u6709\u5B58\u6210\u529F\u3002"
+  "ui.topic_chat_record_failed": "\u8B70\u984C\u5C0D\u8A71\u7D00\u9304\u6C92\u6709\u5B58\u6210\u529F\u3002",
+  "ui.exchange_reason_invalid_line_0": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7DB1\uFF0C\u7B2C {0} \u884C\u9644\u8FD1\u683C\u5F0F\u6709\u8AA4",
+  "ui.invalid_merged_json": "\u5408\u4F75\u5167\u5BB9\u4E0D\u662F\u6709\u6548\u7684 JSON\uFF1A\u8ACB\u6AA2\u67E5\u5F15\u865F\u3001\u9017\u865F\u8207\u5927\u62EC\u865F\u662F\u5426\u6210\u5C0D\uFF0C\u4FEE\u6B63\u5F8C\u518D\u5132\u5B58\u3002",
+  "ui.note_style_folder_open_failed": "\u7121\u6CD5\u958B\u555F\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E\uFF1A\u540C\u540D\u6A94\u6848\u53EF\u80FD\u4F54\u4F4F\u4E86\u9019\u500B\u4F4D\u7F6E\uFF0C\u6216\u8CC7\u6599\u593E\u7121\u6CD5\u5BEB\u5165\u3002\u8ACB\u6539\u540D\u6216\u79FB\u8D70\u8A72\u6A94\u6848\uFF0C\u518D\u8A66\u4E00\u6B21\u3002",
+  "ui.synced_0_topic_filenames_failed_1": "\u5DF2\u540C\u6B65 {0} \u4EFD\u8B70\u984C\u6A94\u540D\uFF0C{1} \u4EFD\u5931\u6557\u3002\u8ACB\u78BA\u8A8D\u5931\u6557\u8B70\u984C\u6240\u5728\u7684\u8CC7\u6599\u593E\u53EF\u5BEB\u5165\uFF08\u672A\u552F\u8B80\u3001\u672A\u88AB\u5176\u4ED6\u7A0B\u5F0F\u9396\u5B9A\uFF09\uFF0C\u518D\u57F7\u884C\u4E00\u6B21\u3002",
+  "ui.repair_workspace_blocked_0": "\u4FEE\u5FA9\u5931\u6557\uFF1A\u300C{0}\u300D\u662F\u6A94\u6848\uFF0C\u4F54\u4F4F\u4E86\u8CC7\u6599\u593E\u7684\u4F4D\u7F6E\u3002\u8ACB\u5148\u6539\u540D\u6216\u79FB\u8D70\u9019\u500B\u6A94\u6848\uFF0C\u518D\u6309\u4E00\u6B21\u4FEE\u5FA9\u3002",
+  "ui.outline_import_done_0_1": "\u5DF2\u52A0\u5165 {0} \u500B\u8B70\u984C\u5230{1}\u3002"
 };
 
 // i18n/languages.ts
@@ -11754,7 +11832,18 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     updateModels();
     void this.plugin.refreshModelDiscovery("codex");
     void this.plugin.refreshModelDiscovery("claude");
-    this.reasoning = this.select(choices, this.t("coffee.reasoning"), ["low", "medium", "high", "auto"]);
+    const reasoningLabels = {
+      auto: "coffee.reasoning_auto",
+      low: "coffee.reasoning_low",
+      medium: "coffee.reasoning_medium",
+      high: "coffee.reasoning_high"
+    };
+    this.reasoning = this.select(
+      choices,
+      this.t("coffee.reasoning"),
+      ["low", "medium", "high", "auto"],
+      (value) => this.t(reasoningLabels[value])
+    );
     this.reasoning.value = normalizeReasoningLevel(this.snapshot.session.reasoning);
     this.language = this.select(choices, this.t("coffee.output_language"), [...NOTE_LANGUAGES], supportedLanguageLabel);
     this.language.value = noteLanguageOf(this.plugin.settings.language);
@@ -13387,7 +13476,7 @@ var CoffeeManager = class {
       session = {
         ...session,
         status: "error",
-        error: "Generation stopped when Obsidian closed; saved draft is available."
+        error: translate(coffeeContentLocale(session.language), "coffee.engine_generation_stopped_obsidian_closed")
       };
     const engine = new CoffeeEngine(session, this.runtime, this.saveSession);
     this.engines.set(session.id, engine);
@@ -14636,7 +14725,7 @@ ${session.observerDraftMarkdown}`);
   async openMarkdown(id) {
     var _a2;
     const file = this.vault.getAbstractFileByPath(id.includes("/") ? id : (_a2 = this.locations.get(id)) != null ? _a2 : this.path(id));
-    if (!(file instanceof import_obsidian7.TFile)) throw new Error("Coffee Tables Markdown note is missing");
+    if (!(file instanceof import_obsidian7.TFile)) throw new Error(t("coffee.markdown_note_missing"));
     return file;
   }
   async organizeExisting(busyIds = /* @__PURE__ */ new Set()) {
@@ -14945,7 +15034,7 @@ var COFFEE_SAMPLE_ZH = {
   topic: "\u8981\u5982\u4F55\u5728\u516C\u53F8\u5167\u90E8\u63A8\u884CAI, \u6BCF\u500B\u4EBA\u90FD\u64D4\u5FC3AI\u6703\u53D6\u4EE3\u81EA\u5DF1\u800C\u4E0D\u9858\u610F\u8A8D\u771F\u63A8\u884C",
   language: "zh-TW",
   labelKey: "coffee.traditional_chinese_sample_should_our_company_adopt_ai",
-  markdown: "**\u4EBA\u7269**\n\n- **\u4E3B\u6301\u4EBA \u7532\uFF5C\u6797\u5C91**\uFF1A\u7280\u5229\uFF0C\u5C08\u6293\u77DB\u76FE  \n- **\u4E3B\u6301\u4EBA \u4E59\uFF5C\u5468\u6600**\uFF1A\u597D\u5947\uFF0C\u559C\u6B61\u8FFD\u554F\u5230\u5E95  \n- **\u89C0\u5BDF\u8005\uFF5C\u6C88\u9ED8**\uFF1A\u4E0D\u7AD9\u968A\uFF0C\u8A18\u9304\u5047\u8A2D\u8207\u8F49\u6298  \n- **\u5C08\u5BB6\u4E00\uFF5C\u9673\u6021\u5B89**\uFF1A\u4EBA\u8CC7\u4E3B\u7BA1\uFF0C\u95DC\u5FC3\u7D44\u7E54\u8207\u54E1\u5DE5\u5B89\u5168\u611F  \n- **\u5C08\u5BB6\u4E8C\uFF5C\u9AD8\u5B50\u8B19**\uFF1AAI \u7522\u54C1\u9867\u554F\uFF0C\u5354\u52A9\u4F01\u696D\u5C0E\u5165\u5DE5\u5177  \n- **\u5C08\u5BB6\u4E09\uFF5C\u8A31\u6587\u54F2**\uFF1A\u88FD\u9020\u696D\u73FE\u5834\u4E3B\u7BA1\uFF0C\u91CD\u8996\u6D41\u7A0B\u8207\u98A8\u96AA  \n- **\u5C08\u5BB6\u56DB\uFF5C\u8607\u96C5\u96EF**\uFF1A\u52DE\u52D5\u8207\u8077\u6DAF\u7814\u7A76\u8005\uFF0C\u7814\u7A76\u5DE5\u4F5C\u5982\u4F55\u6539\u8B8A  \n- **\u8DE8\u9818\u57DF\u5C08\u5BB6\uFF5C\u8449\u66FC**\uFF1A\u6025\u8A3A\u8B77\u7406\u5E2B  \n- **\u85DD\u4EBA\uFF0FGeneralist\uFF5C\u963F\u9054**\uFF1A\u4E3B\u6301\u904E\u7BC0\u76EE\uFF0C\u4EC0\u9EBC\u90FD\u6562\u554F  \n- **\u7576\u4E8B\u4EBA\uFF5C\u5C0F\u82B8**\uFF1A\u5BA2\u670D\u4E2D\u5FC3\u7D44\u9577\uFF0C\u5DE5\u4F5C\u6B63\u53D7\u5230 AI \u5F71\u97FF  \n- **\u89C0\u773E**\uFF1A\u73FE\u5834\u54E1\u5DE5\uFF0C\u4E0D\u5B9A\u6642\u63D0\u554F  \n\n---\n\n## \u5C0D\u8AC7\u958B\u59CB\n\n### \u6797\u5C91\uFF5C\u4E3B\u6301\u4EBA\n\n\u4ECA\u5929\u7684\u984C\u76EE\u807D\u8D77\u4F86\u5F88\u76F4\u63A5\uFF1A\u516C\u53F8\u8981\u600E\u9EBC\u63A8 AI\uFF0C\u800C\u54E1\u5DE5\u53C8\u6015 AI \u53D6\u4EE3\u81EA\u5DF1\u3002\n\n\u4F46\u6211\u60F3\u5148\u628A\u4E00\u53E5\u5F88\u5E38\u898B\u7684\u8A71\u653E\u684C\u4E0A\uFF1A\n\n> \u300C\u5927\u5BB6\u4E0D\u662F\u53CD\u5C0D AI\uFF0C\u53EA\u662F\u5BB3\u6015\u5931\u53BB\u5DE5\u4F5C\u3002\u300D\n\n\u9019\u53E5\u8A71\u53EF\u80FD\u662F\u771F\u7684\uFF0C\u4E5F\u53EF\u80FD\u53EA\u662F\u516C\u53F8\u65B9\u4FBF\u62FF\u4F86\u89E3\u91CB\u54E1\u5DE5\u4E0D\u914D\u5408\u7684\u8AAA\u6CD5\u3002\n\n### \u5468\u6600\uFF5C\u4E3B\u6301\u4EBA\n\n\u90A3\u6211\u5011\u5148\u4E0D\u8981\u6025\u8457\u60F3\u8FA6\u6CD5\u300C\u6D88\u9664\u6050\u61FC\u300D\u3002\n\n\u5C0F\u82B8\uFF0C\u59B3\u662F\u5BA2\u670D\u4E2D\u5FC3\u7D44\u9577\u3002\u516C\u53F8\u6700\u8FD1\u5C0E\u5165 AI\uFF0C\u59B3\u7B2C\u4E00\u500B\u60F3\u5230\u7684\u662F\u4EC0\u9EBC\uFF1F\n\n### \u5C0F\u82B8\uFF5C\u7576\u4E8B\u4EBA\n\n\u6211\u7B2C\u4E00\u500B\u60F3\u5230\u7684\u662F\uFF1A\u90A3\u6211\u9084\u6709\u6C92\u6709\u5FC5\u8981\u5B58\u5728\uFF1F\n\n\u4E0D\u662F\u5F88\u62BD\u8C61\u7684\u90A3\u7A2E\u300C\u672A\u4F86\u5DE5\u4F5C\u6703\u6539\u8B8A\u300D\u3002\u662F\u6211\u6BCF\u5929\u5728\u505A\u7684\u4E8B\u60C5\uFF0CAI \u5DF2\u7D93\u53EF\u4EE5\u505A\u4E00\u534A\u4E86\u3002\n\n\u5B83\u53EF\u4EE5\u5148\u56DE\u7B54\u5BA2\u6236\u554F\u984C\u3001\u5206\u985E\u6848\u4EF6\u3001\u5E6B\u5FD9\u6574\u7406\u7D00\u9304\u3002\u516C\u53F8\u8DDF\u6211\u5011\u8AAA\uFF1A\u300C\u59B3\u5011\u4E4B\u5F8C\u53EF\u4EE5\u628A\u6642\u9593\u653E\u5728\u66F4\u6709\u50F9\u503C\u7684\u4E8B\u60C5\u4E0A\u3002\u300D\n\n\u4F46\u8001\u5BE6\u8AAA\uFF0C\u6211\u807D\u5230\u7684\u662F\uFF1A\u300C\u59B3\u5011\u73FE\u5728\u505A\u7684\u4E8B\u60C5\uFF0C\u50F9\u503C\u4E0D\u9AD8\u3002\u300D\n\n### \u9AD8\u5B50\u8B19\uFF5CAI \u9867\u554F\n\n\u6211\u89BA\u5F97\u9019\u88E1\u6709\u4E00\u500B\u8AA4\u6703\u3002AI \u4E0D\u4E00\u5B9A\u662F\u62FF\u4F86\u53D6\u4EE3\u4EBA\uFF0C\u4E5F\u53EF\u4EE5\u62FF\u4F86\u6E1B\u5C11\u91CD\u8907\u5DE5\u4F5C\u3002\n\n### \u6797\u5C91\n\n\u300C\u8AA4\u6703\u300D\uFF1F\n\n\u5C0F\u82B8\u525B\u525B\u8AAA\u516C\u53F8\u5DF2\u7D93\u8B93 AI \u505A\u6389\u4E00\u534A\u5DE5\u4F5C\u3002\u59B3\u89BA\u5F97\u5979\u8AA4\u6703\u4E86\u4EC0\u9EBC\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u7684\u610F\u601D\u4E0D\u662F\u5979\u7684\u611F\u53D7\u4E0D\u5C0D\uFF0C\u800C\u662F\u300C\u5DE5\u4F5C\u88AB AI \u505A\u6389\u300D\u4E0D\u7B49\u65BC\u300C\u4EBA\u88AB AI \u53D6\u4EE3\u300D\u3002\u5F88\u591A\u6642\u5019\uFF0C\u5DE5\u4F5C\u5167\u5BB9\u6703\u91CD\u65B0\u5206\u914D\u3002\n\n### \u5C0F\u82B8\n\n\u53EF\u662F\u5982\u679C\u539F\u672C\u5341\u500B\u4EBA\u8655\u7406\u4E00\u5343\u4EF6\u6848\u4EF6\uFF0C\u73FE\u5728 AI \u53EF\u4EE5\u8655\u7406\u4E03\u767E\u4EF6\uFF0C\u516C\u53F8\u70BA\u4EC0\u9EBC\u9084\u9700\u8981\u5341\u500B\u4EBA\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u8981\u770B\u516C\u53F8\u600E\u9EBC\u8A2D\u8A08\u3002\n\n### \u5C0F\u82B8\n\n\u4E0D\uFF0C\u9019\u8981\u770B\u516C\u53F8\u600E\u9EBC\u7B97\u9322\u3002\n\n\u73FE\u5834\u6709\u4EBA\u7B11\u4E86\u4E00\u4E0B\u3002\n\n### \u6797\u5C91\n\n\u5F88\u597D\uFF0C\u9019\u5C31\u51FA\u73FE\u7B2C\u4E00\u500B\u77DB\u76FE\u4E86\u3002\n\n\u5C08\u5BB6\u8AAA\uFF1A\u300C\u6280\u8853\u4E0A\u53EF\u4EE5\u91CD\u65B0\u5206\u5DE5\u3002\u300D\n\n\u7576\u4E8B\u4EBA\u8AAA\uFF1A\u300C\u4F46\u516C\u53F8\u6709\u7D93\u6FDF\u8A98\u56E0\u76F4\u63A5\u5C11\u8ACB\u4EBA\u3002\u300D\n\n\u6021\u5B89\uFF0C\u59B3\u662F\u4EBA\u8CC7\uFF0C\u59B3\u6703\u600E\u9EBC\u56DE\uFF1F\n\n### \u9673\u6021\u5B89\uFF5C\u4EBA\u8CC7\u4E3B\u7BA1\n\n\u5C0F\u82B8\u8B1B\u5F97\u5F88\u5BE6\u969B\u3002\u516C\u53F8\u4E0D\u80FD\u53EA\u8AAA\u300CAI \u662F\u4F86\u5E6B\u52A9\u5927\u5BB6\u7684\u300D\uFF0C\u537B\u4E0D\u56DE\u7B54\u4E00\u500B\u554F\u984C\uFF1A\n\n\u5982\u679C\u6548\u7387\u771F\u7684\u63D0\u9AD8\u4E86\uFF0C\u7701\u4E0B\u4F86\u7684\u4EBA\u529B\u6210\u672C\u8981\u53BB\u54EA\u88E1\uFF1F\n\n\u662F\u62FF\u4F86\u88C1\u54E1\uFF1F\u52A0\u85AA\uFF1F\u7E2E\u77ED\u5DE5\u6642\uFF1F\u9084\u662F\u63A5\u66F4\u591A\u5DE5\u4F5C\uFF1F\n\n\u5982\u679C\u9019\u500B\u554F\u984C\u6C92\u6709\u7B54\u6848\uFF0C\u54E1\u5DE5\u4E0D\u76F8\u4FE1\u516C\u53F8\u5F88\u5408\u7406\u3002\n\n### \u963F\u9054\uFF5C\u85DD\u4EBA\uFF0FGeneralist\n\n\u6211\u60F3\u554F\u4E00\u500B\u5F88\u767D\u7661\u4F46\u53EF\u80FD\u5F88\u91CD\u8981\u7684\u554F\u984C\u3002\n\n\u516C\u53F8\u8AAA AI \u8B93\u5927\u5BB6\u505A\u66F4\u6709\u50F9\u503C\u7684\u5DE5\u4F5C\uFF0C\u9019\u500B\u300C\u66F4\u6709\u50F9\u503C\u300D\u662F\u8AB0\u5B9A\u7FA9\u7684\uFF1F\n\n\u56E0\u70BA\u6211\u4EE5\u524D\u62CD\u7BC0\u76EE\uFF0C\u88FD\u4F5C\u4EBA\u4E5F\u5E38\u8AAA\uFF1A\u300C\u9019\u4E00\u6BB5\u6211\u5011\u6539\u5F97\u66F4\u6709\u6DF1\u5EA6\u3002\u300D\n\n\u7D50\u679C\u5C31\u662F\u628A\u539F\u672C\u4E09\u5206\u9418\u7684\u5167\u5BB9\uFF0C\u6539\u6210\u5927\u5BB6\u90FD\u770B\u4E0D\u61C2\u7684\u5341\u5206\u9418\u3002\n\n### \u5468\u6600\n\n\u5C0D\uFF0C\u9019\u5F88\u6709\u610F\u601D\u3002\n\n\u300C\u66F4\u6709\u50F9\u503C\u300D\u53EF\u80FD\u53EA\u662F\u628A\u539F\u672C\u7684\u5DE5\u4F5C\u8B8A\u5F97\u66F4\u8907\u96DC\u3002\n\n\u5C0F\u82B8\uFF0C\u59B3\u5011\u5C0E\u5165 AI \u4E4B\u5F8C\uFF0C\u5DE5\u4F5C\u771F\u7684\u8B8A\u6709\u50F9\u503C\u4E86\u55CE\uFF1F\n\n### \u5C0F\u82B8\n\n\u6709\u4E9B\u8B8A\u597D\u4E86\uFF0C\u6709\u4E9B\u8B8A\u7CDF\u3002\n\nAI \u5E6B\u6211\u6574\u7406\u5BA2\u670D\u7D00\u9304\uFF0C\u9019\u90E8\u5206\u5F88\u597D\uFF0C\u539F\u672C\u6211\u8981\u82B1\u4E8C\u5341\u5206\u9418\u6574\u7406\uFF0C\u73FE\u5728\u4E94\u5206\u9418\u5C31\u597D\u3002\n\n\u4F46\u516C\u53F8\u6C92\u6709\u56E0\u6B64\u8B93\u6211\u5C11\u63A5\u96FB\u8A71\uFF0C\u53CD\u800C\u8AAA\uFF1A\u300C\u65E2\u7136\u59B3\u7701\u4E0B\u5341\u4E94\u5206\u9418\uFF0C\u5C31\u53EF\u4EE5\u591A\u63A5\u5E7E\u901A\u3002\u300D\n\n\u6240\u4EE5\u6211\u6C92\u6709\u8B8A\u8F15\u9B06\uFF0C\u53EA\u662F\u5DE5\u4F5C\u901F\u5EA6\u8B8A\u5FEB\u3002\n\n### \u8A31\u6587\u54F2\uFF5C\u88FD\u9020\u696D\u4E3B\u7BA1\n\n\u9019\u5728\u5DE5\u5EE0\u5F88\u5E38\u898B\u3002\n\n\u6A5F\u5668\u8B8A\u5FEB\u4E4B\u5F8C\uFF0C\u4E0D\u4E00\u5B9A\u8B93\u4EBA\u4F11\u606F\uFF0C\u800C\u662F\u7522\u91CF\u76EE\u6A19\u4E00\u8D77\u63D0\u9AD8\u3002\n\n### \u6797\u5C91\n\n\u90A3\u59B3\u5011\u6240\u8B02\u7684\u300C\u63A8 AI\u300D\uFF0C\u662F\u4E0D\u662F\u5176\u5BE6\u662F\uFF1A\n\n> \u7528\u65B0\u5DE5\u5177\uFF0C\u628A\u4EBA\u69A8\u5F97\u66F4\u4E7E\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u6A23\u8B1B\u592A\u60B2\u89C0\u4E86\u3002\u4F01\u696D\u672C\u4F86\u5C31\u8981\u63D0\u9AD8\u6548\u7387\uFF0C\u4E0D\u7136\u6210\u672C\u4E0A\u5347\u3001\u7AF6\u722D\u4E0D\u904E\u5225\u4EBA\uFF0C\u6700\u5F8C\u5DE5\u4F5C\u9084\u662F\u4FDD\u4E0D\u4F4F\u3002\n\n### \u8607\u96C5\u96EF\uFF5C\u8077\u6DAF\u7814\u7A76\u8005\n\n\u53EF\u662F\u300C\u4E0D\u63D0\u9AD8\u6548\u7387\uFF0C\u516C\u53F8\u5C31\u6703\u5012\u300D\u9019\u53E5\u8A71\uFF0C\u4E5F\u5E38\u5E38\u88AB\u7576\u6210\u842C\u7528\u7406\u7531\u3002\n\n\u6548\u7387\u63D0\u9AD8\u4E4B\u5F8C\uFF0C\u8AB0\u7372\u5F97\u597D\u8655\uFF1F\u9019\u4E0D\u662F\u6280\u8853\u554F\u984C\uFF0C\u662F\u5206\u914D\u554F\u984C\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5982\u679C\u4E0D\u63A8\uFF0C\u5225\u7684\u516C\u53F8\u63A8\u4E86\uFF0C\u5E02\u5834\u6703\u6DD8\u6C70\u6211\u5011\u3002\n\n### \u6797\u5C91\n\n\u9019\u53E5\u8A71\u6211\u4E5F\u5F88\u719F\u3002\n\n\u300C\u5225\u4EBA\u90FD\u5728\u505A\uFF0C\u6240\u4EE5\u6211\u5011\u53EA\u80FD\u505A\u3002\u300D\n\n\u53EF\u662F\u5982\u679C\u5927\u5BB6\u90FD\u7528 AI \u628A\u5BA2\u670D\u7E2E\u6E1B\u4E00\u534A\uFF0C\u6700\u5F8C\u6574\u500B\u7522\u696D\u7684\u5BA2\u6236\u90FD\u66F4\u96E3\u627E\u5230\u771F\u4EBA\uFF0C\u90A3\u6211\u5011\u5230\u5E95\u662F\u5728\u9032\u6B65\uFF0C\u9084\u662F\u5728\u4E00\u8D77\u628A\u670D\u52D9\u8B8A\u5DEE\uFF1F\n\n### \u5468\u6600\n\n\u5B50\u8B19\uFF0C\u4F60\u525B\u525B\u8AAA\u4F01\u696D\u8981\u63A8\uFF0C\u4E0D\u7136\u6703\u88AB\u6DD8\u6C70\u3002\u90A3\u6709\u6C92\u6709\u53EF\u80FD\u771F\u6B63\u8A72\u554F\u7684\u662F\uFF1A\n\n\u300C\u54EA\u4E9B\u5DE5\u4F5C\u9069\u5408\u7528 AI\uFF1F\u300D\n\n\u800C\u4E0D\u662F\u300C\u516C\u53F8\u8981\u4E0D\u8981\u5168\u9762\u5C0E\u5165 AI\uFF1F\u300D\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u540C\u610F\u4E0D\u80FD\u5168\u9762\u4E82\u63A8\u3002\u4F46\u516C\u53F8\u9700\u8981\u4E00\u500B\u65B9\u5411\uFF0C\u4E0D\u53EF\u80FD\u6BCF\u500B\u90E8\u9580\u90FD\u81EA\u5DF1\u6C7A\u5B9A\u3002\n\n### \u8A31\u6587\u54F2\n\n\u5176\u5BE6\u73FE\u5834\u6700\u6015\u7684\u5C31\u662F\u7E3D\u90E8\u8AAA\u300C\u8ACB\u5404\u55AE\u4F4D\u7A4D\u6975\u64C1\u62B1 AI\u300D\u3002\n\n\u9019\u53E5\u8A71\u807D\u8D77\u4F86\u5F88\u6709\u65B9\u5411\uFF0C\u5BE6\u969B\u4E0A\u7B49\u65BC\u6C92\u6709\u65B9\u5411\u3002\n\n\u6211\u5011\u5DE5\u5EE0\u6709\u4E00\u6B21\u5C0E\u5165\u9810\u6E2C\u7DAD\u4FEE\u7CFB\u7D71\uFF0C\u7E3D\u90E8\u8AAA\u53EF\u4EE5\u63D0\u524D\u767C\u73FE\u8A2D\u5099\u6545\u969C\u3002\u7D50\u679C\u73FE\u5834\u4E3B\u7BA1\u6BCF\u5929\u591A\u4E86\u4E00\u5806\u8B66\u5831\uFF0C\u771F\u6B63\u91CD\u8981\u7684\u6545\u969C\u53CD\u800C\u88AB\u6DF9\u6C92\u3002\n\n### \u963F\u9054\n\n\u9019\u807D\u8D77\u4F86\u5F88\u50CF\u624B\u6A5F\u901A\u77E5\u3002\n\n\u4E00\u958B\u59CB\u662F\u6015\u6F0F\u6389\u8A0A\u606F\uFF0C\u6240\u4EE5\u6BCF\u500B App \u90FD\u958B\u901A\u77E5\u3002\u6700\u5F8C\u624B\u6A5F\u4E00\u76F4\u97FF\uFF0C\u4F46\u4F60\u4E0D\u77E5\u9053\u54EA\u500B\u662F\u771F\u7684\u91CD\u8981\u3002\n\n### \u8449\u66FC\uFF5C\u6025\u8A3A\u8B77\u7406\u5E2B\n\n\u6025\u8A3A\u4E5F\u5F88\u50CF\u3002\n\n\u5982\u679C\u6211\u5011\u628A\u6240\u6709\u75C5\u4EBA\u90FD\u6A19\u6210\u300C\u53EF\u80FD\u6709\u5371\u96AA\u300D\uFF0C\u90A3\u7B49\u65BC\u6C92\u6709\u5206\u7D1A\u3002\n\nAI \u6709\u6642\u5019\u4E0D\u662F\u5E6B\u4F60\u505A\u6C7A\u5B9A\uFF0C\u800C\u662F\u628A\u66F4\u591A\u6771\u897F\u4E1F\u7D66\u4F60\u6C7A\u5B9A\u3002\n\n### \u5468\u6600\n\n\u6240\u4EE5 AI \u53EF\u80FD\u4E0D\u662F\u6E1B\u5C11\u5DE5\u4F5C\uFF0C\u800C\u662F\u628A\u5DE5\u4F5C\u5F9E\u300C\u57F7\u884C\u300D\u8B8A\u6210\u300C\u5224\u65B7\u300D\u3002\n\n### \u8449\u66FC\n\n\u5C0D\uFF0C\u800C\u4E14\u5224\u65B7\u901A\u5E38\u66F4\u7D2F\u3002\n\n\u4EE5\u524D\u4F60\u7167\u6D41\u7A0B\u505A\u5B8C\u4E00\u4EF6\u4E8B\uFF0C\u8CAC\u4EFB\u6BD4\u8F03\u6E05\u695A\u3002\u73FE\u5728\u7CFB\u7D71\u5EFA\u8B70\u4E00\u500B\u7B54\u6848\uFF0C\u4F60\u8981\u6C7A\u5B9A\u8981\u4E0D\u8981\u76F8\u4FE1\u5B83\u3002\u505A\u5C0D\u4E86\uFF0C\u5927\u5BB6\u8AAA\u7CFB\u7D71\u5F88\u68D2\uFF1B\u505A\u932F\u4E86\uFF0C\u5927\u5BB6\u554F\u4F60\u70BA\u4EC0\u9EBC\u6C92\u6709\u767C\u73FE\u7CFB\u7D71\u932F\u3002\n\n### \u6797\u5C91\n\n\u9019\u5F88\u95DC\u9375\u3002\n\n\u516C\u53F8\u8AAA AI \u5E6B\u4F60\u505A\u6C7A\u5B9A\uFF0C\u4F46\u8CAC\u4EFB\u9084\u662F\u4F60\u7684\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u662F\u5C0E\u5165\u8A2D\u8A08\u7684\u554F\u984C\u3002\u53EF\u4EE5\u5EFA\u7ACB\u5BE9\u6838\u6D41\u7A0B\u3002\n\n### \u5C0F\u82B8\n\n\u300C\u5BE9\u6838\u6D41\u7A0B\u300D\u807D\u8D77\u4F86\u5F88\u597D\uFF0C\u4F46\u5BA2\u670D\u73FE\u5834\u901A\u5E38\u662F\u4E00\u500B\u4EBA\u540C\u6642\u8655\u7406\u597D\u5E7E\u500B\u5BA2\u6236\u3002\n\n\u5982\u679C AI \u6BCF\u4E00\u5247\u56DE\u7B54\u90FD\u8981\u6211\u91CD\u65B0\u6AA2\u67E5\uFF0C\u90A3\u6211\u6839\u672C\u6C92\u6709\u7701\u6642\u9593\u3002\n\n### \u9673\u6021\u5B89\n\n\u800C\u4E14\u5982\u679C\u54E1\u5DE5\u88AB\u8981\u6C42\u300C\u4F7F\u7528 AI\uFF0C\u4F46\u51FA\u4E86\u932F\u7B97\u4F60\u7684\u300D\uFF0C\u5927\u5BB6\u7576\u7136\u6703\u5F88\u4FDD\u5B88\u3002\n\n### \u6797\u5C91\n\n\u6240\u4EE5\u6211\u5011\u73FE\u5728\u53C8\u9047\u5230\u4E00\u500B\u77DB\u76FE\uFF1A\n\n\u516C\u53F8\u5E0C\u671B\u54E1\u5DE5\u6562\u7528\uFF0C\u4F46\u54E1\u5DE5\u77E5\u9053\u51FA\u4E8B\u8981\u81EA\u5DF1\u625B\u3002\n\n\u9019\u7A2E\u60C5\u6CC1\u4E0B\uFF0C\u516C\u53F8\u662F\u4E0D\u662F\u5176\u5BE6\u4E0D\u662F\u5728\u9F13\u52F5\u4F7F\u7528\uFF0C\u800C\u662F\u5728\u628A\u98A8\u96AA\u5F80\u4E0B\u4E1F\uFF1F\n\n### \u6C88\u9ED8\uFF5C\u89C0\u5BDF\u8005\n\n\u6211\u60F3\u63D2\u4E00\u53E5\u3002\n\n\u5230\u76EE\u524D\u70BA\u6B62\uFF0C\u5927\u5BB6\u4E00\u76F4\u8AAA\u300C\u54E1\u5DE5\u5BB3\u6015 AI\u300D\uFF0C\u4F46\u6211\u807D\u5230\u7684\u5167\u5BB9\u6BD4\u8F03\u50CF\u662F\uFF1A\n\n\u54E1\u5DE5\u5BB3\u6015\u7684\u4E0D\u662F AI \u672C\u8EAB\uFF0C\u800C\u662F\u516C\u53F8\u7528 AI \u91CD\u65B0\u5206\u914D\u5229\u76CA\u3001\u8CAC\u4EFB\u548C\u5DE5\u4F5C\u91CF\uFF0C\u537B\u4E0D\u628A\u898F\u5247\u8AAA\u6E05\u695A\u3002\n\n\u4E5F\u8A31\u4E00\u958B\u59CB\u7684\u554F\u984C\u554F\u932F\u4E86\u3002\n\n\u4E0D\u662F\u300C\u5982\u4F55\u8B93\u54E1\u5DE5\u4E0D\u6015 AI\u300D\uFF0C\u800C\u662F\uFF1A\n\n> \u300C\u516C\u53F8\u662F\u5426\u9858\u610F\u8B93\u54E1\u5DE5\u53C3\u8207\u6C7A\u5B9A AI \u5E36\u4F86\u7684\u597D\u8655\u8207\u98A8\u96AA\u600E\u9EBC\u5206\u914D\uFF1F\u300D\n\n### \u6797\u5C91\n\n\u5F88\u597D\u3002\u6021\u5B89\uFF0C\u9019\u5C0D\u4EBA\u8CC7\u4F86\u8AAA\u6703\u4E0D\u6703\u592A\u7406\u60F3\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u4E0D\u6703\uFF0C\u4F46\u5F88\u96E3\u3002\n\n\u516C\u53F8\u5E38\u5E38\u5E0C\u671B\u54E1\u5DE5\u53C3\u8207\u8A0E\u8AD6\uFF0C\u524D\u63D0\u662F\u6700\u5F8C\u4E0D\u8981\u771F\u7684\u5F71\u97FF\u6C7A\u5B9A\u3002\n\n### \u963F\u9054\n\n\u90A3\u53EB\u4EC0\u9EBC\uFF1F\u53C3\u8207\u5F0F\u88DD\u98FE\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u6709\u9EDE\u50CF\u3002\n\n\u4F8B\u5982\u516C\u53F8\u627E\u5BA2\u670D\u4EBA\u54E1\u4F86\u6E2C\u8A66 AI\uFF0C\u554F\u5927\u5BB6\uFF1A\u300C\u4F60\u5011\u89BA\u5F97\u597D\u4E0D\u597D\u7528\uFF1F\u300D\n\n\u4F46\u6C92\u6709\u4EBA\u554F\uFF1A\u300C\u5982\u679C\u5B83\u597D\u7528\u5230\u53EF\u4EE5\u5C11\u4E09\u500B\u4EBA\uFF0C\u9019\u4E09\u500B\u4EBA\u7684\u672A\u4F86\u600E\u9EBC\u8FA6\uFF1F\u300D\n\n### \u5C0F\u82B8\n\n\u5C0D\u3002\u516C\u53F8\u53EB\u6211\u5011\u5E6B\u5FD9\u8A13\u7DF4 AI\uFF0C\u537B\u4E0D\u8AAA AI \u5B78\u6703\u4E4B\u5F8C\uFF0C\u6211\u5011\u6703\u8B8A\u6210\u4EC0\u9EBC\u3002\n\n\u6211\u5011\u63D0\u4F9B\u6700\u719F\u6089\u5BA2\u6236\u7684\u7D93\u9A57\u3001\u5E38\u898B\u554F\u984C\u3001\u8655\u7406\u65B9\u5F0F\u3002\u53EF\u662F\u90A3\u4E9B\u6771\u897F\u4E00\u65E6\u88AB\u6574\u7406\u9032\u7CFB\u7D71\uFF0C\u5C31\u597D\u50CF\u4E0D\u518D\u5C6C\u65BC\u6211\u5011\u4E86\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5982\u679C\u4E0D\u628A\u9019\u4E9B\u7D93\u9A57\u6574\u7406\u51FA\u4F86\uFF0CAI \u5C31\u4E0D\u6703\u597D\u7528\u3002\u9019\u4E9B\u77E5\u8B58\u61C9\u8A72\u88AB\u4FDD\u5B58\uFF0C\u4E0D\u662F\u53EA\u653E\u5728\u67D0\u5E7E\u500B\u4EBA\u7684\u8166\u888B\u88E1\u3002\n\n### \u5C0F\u82B8\n\n\u6211\u6C92\u6709\u8AAA\u4E0D\u8981\u4FDD\u5B58\u3002\n\n\u6211\u662F\u5728\u554F\uFF1A\u4FDD\u5B58\u4E4B\u5F8C\uFF0C\u539F\u672C\u7D2F\u7A4D\u9019\u4E9B\u7D93\u9A57\u7684\u4EBA\uFF0C\u6709\u6C92\u6709\u5F97\u5230\u4EC0\u9EBC\uFF1F\n\n### \u8607\u96C5\u96EF\n\n\u9019\u88E1\u5176\u5BE6\u6D89\u53CA\u4E00\u500B\u5F88\u6DF1\u7684\u554F\u984C\uFF1A\u516C\u53F8\u628A\u500B\u4EBA\u7684\u719F\u7DF4\u5EA6\uFF0C\u8F49\u6210\u7D44\u7E54\u7684\u8CC7\u6599\u4E4B\u5F8C\uFF0C\u500B\u4EBA\u7684\u8AC7\u5224\u529B\u6703\u4E0D\u6703\u4E0B\u964D\uFF1F\n\n\u4EE5\u524D\u53EA\u6709\u5C0F\u82B8\u77E5\u9053\u600E\u9EBC\u8655\u7406\u6700\u96E3\u7E8F\u7684\u5BA2\u6236\uFF0C\u6240\u4EE5\u5979\u5F88\u91CD\u8981\u3002\u73FE\u5728\u516C\u53F8\u628A\u5979\u7684\u65B9\u6CD5\u6559\u7D66 AI\uFF0C\u7406\u8AD6\u4E0A\u5927\u5BB6\u90FD\u53D7\u76CA\uFF1B\u4F46\u5C0F\u82B8\u4E5F\u53EF\u80FD\u8B8A\u5F97\u6BD4\u8F03\u5BB9\u6613\u88AB\u66FF\u4EE3\u3002\n\n### \u8A31\u6587\u54F2\n\n\u5DE5\u5EE0\u4E5F\u4E00\u6A23\u3002\u8001\u54E1\u5DE5\u77E5\u9053\u6A5F\u53F0\u54EA\u7A2E\u8072\u97F3\u4E0D\u5C0D\u3001\u54EA\u500B\u6EAB\u5EA6\u4EE3\u8868\u5FEB\u58DE\u4E86\u3002\u4EE5\u524D\u9019\u662F\u4ED6\u7684\u7D93\u9A57\u548C\u5730\u4F4D\u3002\n\n\u5982\u679C\u516C\u53F8\u628A\u7D93\u9A57\u505A\u6210\u7CFB\u7D71\uFF0C\u537B\u6C92\u6709\u8B93\u8001\u54E1\u5DE5\u53C3\u8207\u8A2D\u8A08\uFF0C\u4ED6\u6703\u89BA\u5F97\u81EA\u5DF1\u5728\u8A13\u7DF4\u4E00\u53F0\u53D6\u4EE3\u81EA\u5DF1\u7684\u6A5F\u5668\u3002\n\n### \u8449\u66FC\n\n\u6211\u60F3\u5230\u6025\u8A3A\u88E1\u7684\u5B78\u5F92\u5236\u5EA6\u3002\n\n\u5E74\u8F15\u8B77\u7406\u5E2B\u6703\u8DDF\u8457\u8CC7\u6DF1\u7684\u4EBA\u5B78\uFF0C\u4E0D\u53EA\u662F\u5B78\u6A19\u6E96\u6D41\u7A0B\uFF0C\u9084\u5B78\u600E\u9EBC\u89C0\u5BDF\u4E00\u500B\u4EBA\u300C\u770B\u8D77\u4F86\u4E0D\u592A\u5C0D\u300D\u3002\n\n\u5982\u679C\u6211\u5011\u628A\u9019\u4E9B\u90FD\u5BEB\u6210\u6A19\u6E96\u7B54\u6848\uFF0C\u53EF\u80FD\u6703\u5931\u53BB\u90A3\u4E9B\u8AAA\u4E0D\u6E05\u695A\u3001\u4F46\u5F88\u91CD\u8981\u7684\u76F4\u89BA\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u662F AI \u4E5F\u53EF\u4EE5\u5E6B\u5FD9\u4FDD\u5B58\u9019\u4E9B\u76F4\u89BA\uFF0C\u8B93\u65B0\u4EBA\u66F4\u5FEB\u4E0A\u624B\u3002\n\n### \u8449\u66FC\n\n\u53EF\u4EE5\uFF0C\u4F46\u524D\u63D0\u662F\u4F60\u627F\u8A8D\u5B83\u4E0D\u4E00\u5B9A\u61C2\u3002\n\n### \u9AD8\u5B50\u8B19\n\nAI \u672C\u4F86\u5C31\u4E0D\u61C9\u8A72\u88AB\u7576\u6210\u5B8C\u5168\u6B63\u78BA\u3002\n\n### \u6797\u5C91\n\n\u53EF\u662F\u5E02\u5834\u7C21\u5831\u901A\u5E38\u4E0D\u662F\u9019\u6A23\u8B1B\u7684\u3002\n\n\u7C21\u5831\u6703\u8AAA\uFF1A\u300CAI \u53EF\u4EE5\u5927\u5E45\u63D0\u5347\u6E96\u78BA\u7387\u3001\u964D\u4F4E\u932F\u8AA4\u7387\u3001\u7E2E\u77ED\u65B0\u4EBA\u8A13\u7DF4\u6642\u9593\u3002\u300D\n\n\u6C92\u6709\u4EBA\u5728\u7C21\u5831\u6700\u5F8C\u8AAA\uFF1A\u300C\u53E6\u5916\uFF0C\u5B83\u6709\u6642\u5019\u6703\u81EA\u4FE1\u5730\u8B1B\u932F\uFF0C\u8ACB\u5927\u5BB6\u4FDD\u6301\u8B66\u89BA\u3002\u300D\n\n### \u963F\u9054\n\n\u9019\u5C31\u50CF\u8ACB\u4E00\u500B\u5F88\u6703\u8B1B\u8A71\u3001\u4F46\u5076\u723E\u4E82\u63B0\u7684\u4EBA\u7576\u540C\u4E8B\u3002\n\n\u4E00\u958B\u59CB\u5927\u5BB6\u89BA\u5F97\u4ED6\u53CD\u61C9\u597D\u5FEB\uFF0C\u5F8C\u4F86\u767C\u73FE\u4ED6\u8B1B\u932F\u6642\u4E5F\u5F88\u6709\u81EA\u4FE1\u3002\n\n### \u5468\u6600\n\n\u90A3\u54E1\u5DE5\u8981\u600E\u9EBC\u77E5\u9053\u4EC0\u9EBC\u6642\u5019\u8A72\u76F8\u4FE1 AI\uFF1F\n\n### \u8A31\u6587\u54F2\n\n\u4E0D\u80FD\u53EA\u9760\u54E1\u5DE5\u81EA\u5DF1\u5B78\u6703\u61F7\u7591\u3002\n\n\u8981\u8B93\u4ED6\u5011\u77E5\u9053\uFF0C\u54EA\u4E9B\u4E8B\u60C5 AI \u53EF\u4EE5\u76F4\u63A5\u8655\u7406\uFF0C\u54EA\u4E9B\u4E8B\u60C5\u4E00\u5B9A\u8981\u4EA4\u7D66\u4EBA\u3002\n\n### \u5C0F\u82B8\n\n\u9019\u53E5\u8A71\u8AAA\u8D77\u4F86\u5BB9\u6613\u3002\n\n\u5728\u5BA2\u670D\u73FE\u5834\uFF0C\u6700\u9EBB\u7169\u7684\u4E0D\u662F\u6A19\u6E96\u554F\u984C\uFF0C\u800C\u662F\u90A3\u4E9B\u4ECB\u65BC\u6A19\u6E96\u548C\u4F8B\u5916\u4E4B\u9593\u7684\u554F\u984C\u3002AI \u6700\u5BB9\u6613\u5728\u9019\u7A2E\u5730\u65B9\u8B1B\u5F97\u5F88\u50CF\u771F\u7684\u3002\n\n### \u9673\u6021\u5B89\n\n\u6240\u4EE5\u8A13\u7DF4\u4E0D\u53EA\u662F\u6559\u5927\u5BB6\u6309\u54EA\u500B\u6309\u9215\uFF0C\u800C\u662F\u8B93\u5927\u5BB6\u77E5\u9053\u600E\u9EBC\u6311\u6230 AI\u3002\n\n### \u6797\u5C91\n\n\u4F46\u6211\u61F7\u7591\uFF0C\u5F88\u591A\u516C\u53F8\u771F\u6B63\u60F3\u8981\u7684\u4E0D\u662F\u300C\u6703\u6311\u6230 AI \u7684\u54E1\u5DE5\u300D\uFF0C\u800C\u662F\u300C\u9858\u610F\u7167\u8457 AI \u505A\u7684\u54E1\u5DE5\u300D\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u6709\u9EDE\u4E0D\u516C\u5E73\u3002\u4F01\u696D\u4E5F\u4E0D\u53EF\u80FD\u8B93\u6BCF\u500B\u4EBA\u90FD\u7121\u9650\u8CEA\u7591\u7CFB\u7D71\uFF0C\u9019\u6A23\u6548\u7387\u6703\u6D88\u5931\u3002\n\n### \u8607\u96C5\u96EF\n\n\u6548\u7387\u4E0D\u662F\u552F\u4E00\u6307\u6A19\u3002\n\n\u5982\u679C\u54E1\u5DE5\u56E0\u70BA\u5BB3\u6015\u88AB\u8FFD\u8E64\uFF0C\u958B\u59CB\u6545\u610F\u4E0D\u7559\u4E0B\u7D00\u9304\uFF1B\u56E0\u70BA\u5BB3\u6015\u8868\u73FE\u88AB\u6BD4\u8F03\uFF0C\u958B\u59CB\u53EA\u63A5\u5BB9\u6613\u7684\u6848\u4EF6\uFF1B\u56E0\u70BA\u5BB3\u6015\u72AF\u932F\uFF0C\u958B\u59CB\u5B8C\u5168\u4F9D\u8CF4 AI\u2014\u2014\u90A3\u5E33\u9762\u4E0A\u7684\u6548\u7387\u53EF\u80FD\u4E0A\u5347\uFF0C\u5BE6\u969B\u7684\u7D44\u7E54\u80FD\u529B\u537B\u4E0B\u964D\u3002\n\n### \u6C88\u9ED8\n\n\u6211\u60F3\u8A18\u4E0B\u9019\u500B\u8F49\u6298\u3002\n\n\u525B\u624D\u5927\u5BB6\u8AC7\u7684\u662F\u300C\u5982\u4F55\u8B93\u54E1\u5DE5\u9858\u610F\u4F7F\u7528 AI\u300D\uFF0C\u73FE\u5728\u8B8A\u6210\u300C\u516C\u53F8\u7528\u4EC0\u9EBC\u65B9\u5F0F\u8861\u91CF\u4F7F\u7528 AI \u7684\u4EBA\u300D\u3002\n\n\u54E1\u5DE5\u6015\u7684\u53EF\u80FD\u4E0D\u53EA\u662F\u5931\u696D\uFF0C\u4E5F\u5305\u62EC\uFF1A\n\n- \u88AB\u7CFB\u7D71\u76E3\u63A7\n- \u88AB\u62FF\u4F86\u6392\u540D\n- \u88AB\u8981\u6C42\u66F4\u5FEB\n- \u88AB\u8FFD\u7A76 AI \u9020\u6210\u7684\u932F\u8AA4\n- \u81EA\u5DF1\u7684\u7D93\u9A57\u88AB\u62FF\u8D70\u5F8C\u5931\u53BB\u50F9\u503C\n\n### \u89C0\u773E\u4E00\uFF5C\u73FE\u5834\u54E1\u5DE5\n\n\u6211\u60F3\u554F\u4E00\u500B\u6BD4\u8F03\u73FE\u5BE6\u7684\u3002\n\n\u5982\u679C\u516C\u53F8\u8AAA\u4E0D\u6703\u88C1\u54E1\uFF0C\u4F46\u6C92\u6709\u767D\u7D19\u9ED1\u5B57\uFF0C\u5927\u5BB6\u600E\u9EBC\u76F8\u4FE1\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u4E0D\u80FD\u53EA\u53EB\u54E1\u5DE5\u76F8\u4FE1\u3002\n\n\u516C\u53F8\u53EF\u4EE5\u627F\u8AFE\u4E00\u6BB5\u6642\u9593\u5167\u4E0D\u56E0 AI \u76F4\u63A5\u88C1\u54E1\uFF0C\u4E26\u4E14\u8AAA\u660E\u5982\u679C\u5DE5\u4F5C\u6E1B\u5C11\uFF0C\u6703\u600E\u9EBC\u5B89\u6392\u8F49\u8ABF\u6216\u8A13\u7DF4\u3002\n\n### \u6797\u5C91\n\n\u300C\u4E00\u6BB5\u6642\u9593\u300D\u662F\u591A\u4E45\uFF1F\n\n\u4E09\u500B\u6708\uFF1F\u4E00\u5E74\uFF1F\u4E94\u5E74\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u9019\u8981\u770B\u516C\u53F8\u72C0\u6CC1\u3002\n\n### \u5C0F\u82B8\n\n\u90A3\u54E1\u5DE5\u9084\u662F\u6703\u89BA\u5F97\u9019\u662F\u66AB\u7DE9\uFF0C\u4E0D\u662F\u4FDD\u969C\u3002\n\n### \u8607\u96C5\u96EF\n\n\u800C\u4E14\u627F\u8AFE\u4E0D\u88C1\u54E1\uFF0C\u4E5F\u4E0D\u4EE3\u8868\u5DE5\u4F5C\u4E0D\u6703\u8B8A\u5F97\u4E0D\u53EF\u5FCD\u53D7\u3002\n\n\u516C\u53F8\u53EF\u4EE5\u4E0D\u88C1\u59B3\uFF0C\u4F46\u628A\u76EE\u6A19\u63D0\u9AD8\u5230\u59B3\u505A\u4E0D\u5B8C\uFF0C\u6700\u5F8C\u59B3\u81EA\u5DF1\u96E2\u8077\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u662F\u5982\u679C\u516C\u53F8\u9023\u9019\u7A2E\u627F\u8AFE\u90FD\u4E0D\u6562\u7D66\uFF0CAI \u5C0E\u5165\u6703\u5B8C\u5168\u505C\u6EEF\u3002\n\n### \u6797\u5C91\n\n\u4E5F\u8A31\u505C\u6EEF\u4E0D\u4E00\u5B9A\u662F\u58DE\u4E8B\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5E02\u5834\u4E0D\u6703\u7B49\u6211\u5011\u3002\n\n### \u6797\u5C91\n\n\u4F60\u4E00\u76F4\u8AAA\u5E02\u5834\u4E0D\u6703\u7B49\u3002\u90A3\u5982\u679C\u5E02\u5834\u903C\u5927\u5BB6\u505A\u4E00\u4EF6\u54E1\u5DE5\u4E0D\u4FE1\u4EFB\u3001\u5BA2\u6236\u4E5F\u4E0D\u559C\u6B61\u7684\u4E8B\uFF0C\u6211\u5011\u5C31\u53EA\u80FD\u7167\u505A\u55CE\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u4E0D\u662F\u53EA\u80FD\u7167\u505A\uFF0C\u4F46\u4E0D\u80FD\u628A\u6050\u61FC\u7576\u6210\u4E0D\u6539\u8B8A\u7684\u7406\u7531\u3002\n\n### \u5C0F\u82B8\n\n\u4E5F\u4E0D\u80FD\u628A\u7AF6\u722D\u7576\u6210\u4E0D\u8CA0\u8CAC\u4EFB\u7684\u7406\u7531\u3002\n\n\u73FE\u5834\u5B89\u975C\u4E86\u4E00\u4E0B\u3002\n\n### \u5468\u6600\n\n\u5C0F\u82B8\uFF0C\u59B3\u525B\u624D\u597D\u50CF\u4E0D\u662F\u55AE\u7D14\u53CD\u5C0D AI\u3002\n\n### \u5C0F\u82B8\n\n\u6211\u4E0D\u53CD\u5C0D\u3002\n\n\u6211\u6BCF\u5929\u90FD\u5E0C\u671B\u6709\u5DE5\u5177\u5E6B\u6211\u8655\u7406\u90A3\u4E9B\u6C92\u4EBA\u60F3\u505A\u7684\u4E8B\u60C5\u3002\u771F\u6B63\u8B93\u6211\u4E0D\u8212\u670D\u7684\u662F\uFF0C\u516C\u53F8\u8981\u6211\u76F8\u4FE1 AI \u6703\u8B93\u6211\u66F4\u91CD\u8981\uFF0C\u4F46\u5F9E\u4F86\u6C92\u6709\u554F\u904E\u6211\uFF1A\u4EC0\u9EBC\u4E8B\u60C5\u624D\u662F\u6211\u60F3\u82B1\u6642\u9593\u505A\u7684\u3002\n\n### \u963F\u9054\n\n\u9019\u53E5\u6211\u807D\u61C2\u4E86\u3002\n\n\u4E0D\u662F\u300CAI \u6703\u4E0D\u6703\u6436\u8D70\u4F60\u7684\u5DE5\u4F5C\u300D\uFF0C\u800C\u662F\u300C\u5982\u679C AI \u62FF\u8D70\u4E00\u90E8\u5206\u5DE5\u4F5C\uFF0C\u8AB0\u4F86\u6C7A\u5B9A\u5269\u4E0B\u7684\u5DE5\u4F5C\u503C\u4E0D\u503C\u5F97\u505A\u300D\u3002\n\n### \u8449\u66FC\n\n\u800C\u4E14\u6709\u4E9B\u5DE5\u4F5C\u672C\u4F86\u5C31\u4E0D\u8A72\u88AB\u5B8C\u5168\u6D88\u9664\u3002\n\n\u6025\u8A3A\u88E1\uFF0C\u75C5\u4EBA\u6709\u6642\u5019\u9700\u8981\u7684\u4E0D\u662F\u6700\u5FEB\u7684\u7B54\u6848\uFF0C\u800C\u662F\u6709\u4EBA\u770B\u8457\u4ED6\uFF0C\u77E5\u9053\u4ED6\u5176\u5BE6\u5F88\u5BB3\u6015\u3002\n\n\u5BA2\u670D\u4E5F\u53EF\u80FD\u4E00\u6A23\u3002\u5BA2\u6236\u4E0D\u4E00\u5B9A\u53EA\u662F\u8981\u9000\u8CA8\u6D41\u7A0B\uFF0C\u4ED6\u53EF\u80FD\u662F\u60F3\u78BA\u8A8D\u81EA\u5DF1\u6C92\u6709\u88AB\u6577\u884D\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u4E9B\u53EF\u4EE5\u4FDD\u7559\u7D66\u771F\u4EBA\u8655\u7406\u3002\n\n### \u5C0F\u82B8\n\n\u8AB0\u6C7A\u5B9A\u4EC0\u9EBC\u6642\u5019\u300C\u503C\u5F97\u771F\u4EBA\u8655\u7406\u300D\uFF1F\n\n\u5982\u679C\u7CFB\u7D71\u5224\u65B7\u9019\u500B\u5BA2\u6236\u53EA\u503C\u4E09\u5206\u9418\uFF0C\u800C\u6211\u89BA\u5F97\u4ED6\u9700\u8981\u4E8C\u5341\u5206\u9418\uFF0C\u6700\u5F8C\u807D\u8AB0\u7684\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u4EE5\u8A2D\u8A08\u5347\u7D1A\u898F\u5247\u3002\n\n### \u6797\u5C91\n\n\u53C8\u56DE\u5230\u898F\u5247\u3002\n\n\u898F\u5247\u8AB0\u8A02\uFF1F\u8CC7\u6599\u5F9E\u54EA\u88E1\u4F86\uFF1F\u932F\u4E86\u8AB0\u8CA0\u8CAC\uFF1F\u7701\u4E0B\u4F86\u7684\u6642\u9593\u7D66\u8AB0\uFF1F\u9019\u4E9B\u5982\u679C\u6C92\u8B1B\uFF0C\u5DE5\u5177\u518D\u6F02\u4EAE\u90FD\u53EA\u662F\u628A\u554F\u984C\u85CF\u8D77\u4F86\u3002\n\n### \u89C0\u773E\u4E8C\uFF5C\u73FE\u5834\u54E1\u5DE5\n\n\u6211\u60F3\u88DC\u5145\u4E00\u500B\u6211\u5011\u516C\u53F8\u7684\u60C5\u6CC1\u3002\n\n\u4E3B\u7BA1\u6BCF\u5929\u53EB\u6211\u5011\u4F7F\u7528 AI\uFF0C\u9084\u6703\u770B\u8AB0\u7528\u5F97\u5C11\u3002\u4F46\u5F88\u591A\u4EBA\u5176\u5BE6\u662F\u5148\u81EA\u5DF1\u505A\u597D\uFF0C\u518D\u628A\u5167\u5BB9\u4E1F\u7D66 AI \u6539\u5BEB\uFF0C\u9019\u6A23\u7CFB\u7D71\u770B\u8D77\u4F86\u6709\u4F7F\u7528\u7387\uFF0C\u5BE6\u969B\u4E0A\u6C92\u6709\u5E6B\u5FD9\u3002\n\n### \u963F\u9054\n\n\u9019\u53EB\u4E0D\u53EB\u516C\u53F8\u7248\u7684\u6253\u5361\uFF1F\n\n### \u8A31\u6587\u54F2\n\n\u5DE5\u5EE0\u4E5F\u6709\u3002\u7CFB\u7D71\u8981\u6C42\u5927\u5BB6\u586B\u6578\u4F4D\u8868\u55AE\uFF0C\u73FE\u5834\u5C31\u5148\u5728\u7D19\u4E0A\u8A18\uFF0C\u665A\u4E0A\u518D\u4E00\u6B21\u8F38\u5165\u3002\u8868\u55AE\u5B8C\u6210\u7387\u5F88\u597D\u770B\uFF0C\u4F46\u73FE\u5834\u6C92\u6709\u8B8A\u597D\u3002\n\n### \u6C88\u9ED8\n\n\u9019\u662F\u53E6\u4E00\u500B\u8F49\u6298\u3002\n\n\u300C\u63A8\u884C AI\u300D\u53EF\u80FD\u88AB\u8AA4\u89E3\u6210\u300C\u63D0\u9AD8 AI \u4F7F\u7528\u7387\u300D\u3002\n\n\u4F46\u4F7F\u7528\u7387\u4E0D\u4EE3\u8868\u6709\u7528\uFF0C\u66F4\u4E0D\u4EE3\u8868\u4FE1\u4EFB\u3002\n\n### \u5468\u6600\n\n\u90A3\u5982\u679C\u4E0D\u770B\u4F7F\u7528\u7387\uFF0C\u516C\u53F8\u8981\u770B\u4EC0\u9EBC\uFF1F\n\n### \u8607\u96C5\u96EF\n\n\u770B\u554F\u984C\u6709\u6C92\u6709\u6539\u5584\u3002\n\n\u4F8B\u5982\u5BA2\u670D\u662F\u4E0D\u662F\u5C11\u4E86\u91CD\u8907\u8F38\u5165\uFF1F\u65B0\u4EBA\u662F\u4E0D\u662F\u6BD4\u8F03\u5FEB\u627E\u5230\u7B54\u6848\uFF1F\u5BA2\u6236\u662F\u4E0D\u662F\u6BD4\u8F03\u5BB9\u6613\u5F97\u5230\u771F\u6B63\u7684\u5E6B\u52A9\uFF1F\u54E1\u5DE5\u662F\u4E0D\u662F\u6709\u66F4\u591A\u6642\u9593\u8655\u7406\u8907\u96DC\u554F\u984C\uFF1F\n\n### \u6797\u5C91\n\n\u9019\u807D\u8D77\u4F86\u5F88\u5408\u7406\uFF0C\u4F46\u6BCF\u500B\u6307\u6A19\u90FD\u53EF\u80FD\u88AB\u64CD\u5F04\u3002\n\n### \u963F\u9054\n\n\u90A3\u662F\u4E0D\u662F\u6240\u6709\u7BA1\u7406\u90FD\u6703\u88AB\u64CD\u5F04\uFF1F\u5305\u542B\u300C\u5927\u5BB6\u90FD\u5F88\u6709\u5411\u5FC3\u529B\u300D\u9019\u7A2E\u554F\u5377\u3002\n\n### \u9673\u6021\u5B89\n\n\u6240\u4EE5\u4E0D\u80FD\u53EA\u9760\u4E00\u500B\u6578\u5B57\u3002\u8981\u628A\u54E1\u5DE5\u7684\u56DE\u994B\u4E5F\u653E\u9032\u53BB\u3002\n\n### \u5C0F\u82B8\n\n\u4F46\u56DE\u994B\u771F\u7684\u6703\u5F71\u97FF\u6C7A\u7B56\u55CE\uFF1F\n\n\u6211\u5011\u4EE5\u524D\u586B\u904E\u5F88\u591A\u554F\u5377\uFF0C\u6700\u5F8C\u53EA\u6536\u5230\u4E00\u5C01\u4FE1\uFF1A\u300C\u611F\u8B1D\u5927\u5BB6\u5BF6\u8CB4\u610F\u898B\u3002\u300D\n\n### \u9673\u6021\u5B89\n\n\u9019\u662F\u4FE1\u4EFB\u5DF2\u7D93\u88AB\u6D88\u8017\u7684\u554F\u984C\u3002\n\n### \u5C0F\u82B8\n\n\u6240\u4EE5\u4E0D\u8981\u518D\u53EB\u6211\u5011\u76F8\u4FE1\u3002\u5148\u8B93\u6211\u5011\u770B\u5230\u4E00\u6B21\uFF0C\u516C\u53F8\u771F\u7684\u56E0\u70BA\u73FE\u5834\u7684\u610F\u898B\u6539\u4E86\u4EC0\u9EBC\u3002\n\n### \u8449\u66FC\n\n\u9019\u5F88\u50CF\u91AB\u9662\u63A8\u65B0\u6D41\u7A0B\u3002\n\n\u5927\u5BB6\u4E0D\u6703\u56E0\u70BA\u9662\u9577\u8AAA\u300C\u9019\u662F\u70BA\u4E86\u75C5\u4EBA\u597D\u300D\u5C31\u76F8\u4FE1\u3002\u901A\u5E38\u662F\u5148\u5728\u4E00\u500B\u5C0F\u7BC4\u570D\u8A66\uFF0C\u8B93\u7B2C\u4E00\u7DDA\u7684\u4EBA\u53EF\u4EE5\u558A\u505C\uFF0C\u51FA\u932F\u6642\u4E0D\u6703\u88AB\u7F75\uFF0C\u7136\u5F8C\u771F\u7684\u6839\u64DA\u7D50\u679C\u4FEE\u6539\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u5C0F\u898F\u6A21\u8A66\u9EDE\u6211\u540C\u610F\u3002\u4F46\u4F01\u696D\u4E0D\u80FD\u6C38\u9060\u8A66\u9EDE\uFF0C\u7E3D\u8981\u64F4\u5927\u3002\n\n### \u8449\u66FC\n\n\u7576\u7136\u3002\u4F46\u4F60\u4E0D\u80FD\u56E0\u70BA\u624B\u8853\u5BA4 A \u6210\u529F\uFF0C\u5C31\u76F4\u63A5\u628A\u540C\u4E00\u5957\u6D41\u7A0B\u642C\u5230\u6025\u8A3A\u3001\u5152\u79D1\u548C\u9577\u7167\u75C5\u623F\u3002\n\n### \u8A31\u6587\u54F2\n\n\u9019\u9EDE\u975E\u5E38\u91CD\u8981\u3002\u4E0D\u540C\u90E8\u9580\u7684\u300C\u932F\u8AA4\u6210\u672C\u300D\u4E0D\u4E00\u6A23\u3002\n\n\u5BA2\u670D\u56DE\u7B54\u932F\uFF0C\u53EF\u80FD\u662F\u5BA2\u8A34\uFF1B\u88FD\u9020\u7DDA\u5224\u65B7\u932F\uFF0C\u53EF\u80FD\u662F\u5B89\u5168\u4E8B\u6545\u3002\n\n### \u6797\u5C91\n\n\u6240\u4EE5\u300C\u5168\u516C\u53F8 AI \u7B56\u7565\u300D\u53EF\u80FD\u672C\u8EAB\u5C31\u6709\u554F\u984C\u3002\n\n### \u5468\u6600\n\n\u59B3\u7684\u610F\u601D\u662F\uFF1F\n\n### \u6797\u5C91\n\n\u516C\u53F8\u7E3D\u90E8\u60F3\u8981\u4E00\u500B\u7D71\u4E00\u7B54\u6848\uFF0C\u4F46\u4E0D\u540C\u5DE5\u4F5C\u9700\u8981\u7684\u662F\u4E0D\u540C\u7A0B\u5EA6\u7684\u81EA\u52D5\u5316\u3001\u5BE9\u6838\u548C\u8CAC\u4EFB\u5B89\u6392\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u662F\u6C92\u6709\u7D71\u4E00\u7B56\u7565\uFF0C\u5404\u90E8\u9580\u6703\u5404\u81EA\u8CB7\u5DE5\u5177\uFF0C\u8CC7\u6599\u4E5F\u6703\u6563\u6389\u3002\n\n### \u8607\u96C5\u96EF\n\n\u7D71\u4E00\u7684\u53EF\u4EE5\u662F\u5E95\u7DDA\uFF0C\u4E0D\u4E00\u5B9A\u662F\u505A\u6CD5\u3002\n\n\u4F8B\u5982\u516C\u53F8\u53EF\u4EE5\u7D71\u4E00\u898F\u5B9A\uFF1A\u4E0D\u80FD\u7528 AI \u505A\u54EA\u4E9B\u6C7A\u7B56\u3001\u54E1\u5DE5\u8CC7\u6599\u600E\u9EBC\u4FDD\u8B77\u3001\u932F\u8AA4\u600E\u9EBC\u56DE\u5831\u3001\u8AB0\u6709\u6B0A\u505C\u7528\u7CFB\u7D71\u3002\n\n\u81F3\u65BC\u6BCF\u5929\u600E\u9EBC\u7528\uFF0C\u53EF\u4EE5\u8B93\u73FE\u5834\u53C3\u8207\u8A2D\u8A08\u3002\n\n### \u6C88\u9ED8\n\n\u6211\u807D\u5230\u4E00\u500B\u65B0\u7684\u5340\u5206\uFF1A\n\n\u4E0D\u662F\u300C\u4E2D\u592E\u63A7\u5236\u300D\u6216\u300C\u5B8C\u5168\u653E\u4EFB\u300D\u4E8C\u9078\u4E00\uFF0C\u800C\u662F\uFF1A\n\n- \u516C\u53F8\u7D71\u4E00\u5B88\u4F4F\u5E95\u7DDA\n- \u73FE\u5834\u5171\u540C\u6C7A\u5B9A\u600E\u9EBC\u4F7F\u7528\n- \u54E1\u5DE5\u5206\u4EAB\u6548\u7387\u6210\u679C\uFF0C\u4E5F\u53C3\u8207\u627F\u64D4\u98A8\u96AA\n\n### \u963F\u9054\n\n\u53EF\u662F\u6211\u9084\u662F\u60F3\u554F\u4E00\u500B\u6700\u76F4\u63A5\u7684\u3002\n\n\u5982\u679C\u6700\u5F8C AI \u771F\u7684\u8B93\u516C\u53F8\u5C11\u9700\u8981\u5F88\u591A\u4EBA\uFF0C\u90A3\u600E\u9EBC\u8FA6\uFF1F\n\n\u5927\u5BB6\u525B\u525B\u8AC7\u4E86\u5F88\u591A\u53C3\u8207\u3001\u8A13\u7DF4\u3001\u4FE1\u4EFB\uFF0C\u4F46\u9019\u500B\u6700\u96E3\u770B\u7684\u7D50\u679C\u9084\u662F\u5728\u3002\n\n### \u73FE\u5834\u518D\u6B21\u5B89\u975C\u3002\n\n### \u9673\u6021\u5B89\n\n\u90A3\u516C\u53F8\u5C31\u5FC5\u9808\u8AA0\u5BE6\u627F\u8A8D\uFF0CAI \u5C0E\u5165\u53EF\u80FD\u6703\u6539\u8B8A\u4EBA\u6578\uFF0C\u800C\u4E0D\u662F\u7528\u300C\u5347\u7D1A\u8F49\u578B\u300D\u5305\u88DD\u3002\n\n### \u5C0F\u82B8\n\n\u5982\u679C\u771F\u7684\u6703\u5C11\u4EBA\uFF0C\u8ACB\u65E9\u9EDE\u8B1B\u3002\n\n\u6700\u7CDF\u7CD5\u7684\u662F\uFF0C\u516C\u53F8\u4E00\u908A\u8AAA\u4E0D\u6703\u53D6\u4EE3\uFF0C\u4E00\u908A\u628A\u62DB\u52DF\u51CD\u7D50\u3001\u628A\u96E2\u8077\u7684\u4EBA\u4E0D\u88DC\u3001\u628A\u5DE5\u4F5C\u6162\u6162\u5206\u7D66\u5269\u4E0B\u7684\u4EBA\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5982\u679C\u4E00\u958B\u59CB\u5C31\u8AAA\u53EF\u80FD\u6E1B\u5C11\u4EBA\u529B\uFF0C\u54E1\u5DE5\u4E00\u5B9A\u6703\u62B5\u5236\uFF0C\u5C0E\u5165\u6839\u672C\u505A\u4E0D\u4E0B\u53BB\u3002\n\n### \u6797\u5C91\n\n\u6240\u4EE5\u4F60\u7684\u610F\u601D\u662F\uFF0C\u516C\u53F8\u61C9\u8A72\u5148\u4E0D\u8981\u8B1B\u771F\u8A71\uFF0C\u7B49\u5927\u5BB6\u7FD2\u6163\u4E4B\u5F8C\u518D\u8AAA\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u4E0D\u662F\u9019\u500B\u610F\u601D\u3002\n\n### \u6797\u5C91\n\n\u4F46\u6548\u679C\u53EF\u80FD\u5C31\u662F\u90A3\u6A23\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u53EA\u662F\u8AAA\uFF0C\u4F01\u696D\u9700\u8981\u4FDD\u7559\u8ABF\u6574\u7A7A\u9593\u3002\n\n### \u8607\u96C5\u96EF\n\n\u54E1\u5DE5\u4E5F\u9700\u8981\u4FDD\u7559\u9078\u64C7\u7A7A\u9593\u3002\n\n\u5982\u679C\u516C\u53F8\u8981\u4FDD\u7559\u300C\u8ABF\u6574\u7A7A\u9593\u300D\uFF0C\u54E1\u5DE5\u537B\u88AB\u8981\u6C42\u5168\u5FC3\u6295\u5165\u3001\u5206\u4EAB\u77E5\u8B58\u3001\u63A5\u53D7\u91CD\u65B0\u8A13\u7DF4\uFF0C\u90A3\u9019\u500B\u95DC\u4FC2\u4E26\u4E0D\u5C0D\u7B49\u3002\n\n### \u5468\u6600\n\n\u90A3\u6709\u6C92\u6709\u53EF\u80FD\uFF0C\u54E1\u5DE5\u4E5F\u80FD\u62FF\u5230\u4E00\u90E8\u5206 AI \u5E36\u4F86\u7684\u6536\u76CA\uFF1F\n\n\u4F8B\u5982\u5C11\u52A0\u73ED\u3001\u7E2E\u77ED\u5DE5\u6642\u3001\u589E\u52A0\u734E\u91D1\uFF0C\u6216\u662F\u628A\u7701\u4E0B\u7684\u6642\u9593\u62FF\u4F86\u5B78\u65B0\u6280\u80FD\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u7406\u8AD6\u4E0A\u53EF\u4EE5\uFF0C\u4F46\u8981\u770B\u7522\u696D\u3002\n\n### \u8A31\u6587\u54F2\n\n\u4E0D\u8981\u6BCF\u6B21\u90FD\u8AAA\u300C\u770B\u7522\u696D\u300D\u3002\u6211\u5011\u53EF\u4EE5\u5148\u554F\u4E00\u500B\u5C0F\u554F\u984C\uFF1A\n\n\u5982\u679C AI \u5E6B\u6211\u6BCF\u5929\u7701\u4E00\u5C0F\u6642\uFF0C\u9019\u4E00\u5C0F\u6642\u80FD\u4E0D\u80FD\u771F\u7684\u9084\u7D66\u6211\uFF1F\n\n### \u5C0F\u82B8\n\n\u6216\u81F3\u5C11\u4E0D\u8981\u7ACB\u523B\u585E\u9032\u66F4\u591A\u6848\u4EF6\u3002\n\n### \u963F\u9054\n\n\u9019\u61C9\u8A72\u662F\u6240\u6709\u4E0A\u73ED\u65CF\u6700\u60F3\u77E5\u9053\u7684\u3002\n\n### \u8449\u66FC\n\n\u800C\u4E14\u300C\u7701\u4E0B\u6642\u9593\u300D\u4E0D\u4E00\u5B9A\u8981\u62FF\u4F86\u505A\u66F4\u591A\u5DE5\u4F5C\u3002\u5B83\u53EF\u80FD\u62FF\u4F86\u4F11\u606F\u3001\u4EA4\u63A5\u3001\u5B78\u7FD2\uFF0C\u751A\u81F3\u53EA\u662F\u8B93\u4EBA\u4E0D\u8981\u6BCF\u5929\u90FD\u5728\u5FEB\u7206\u70B8\u7684\u908A\u7DE3\u3002\n\n### \u6C88\u9ED8\n\n\u9019\u88E1\u7684\u554F\u984C\u5DF2\u7D93\u5F9E\u300C\u5982\u4F55\u63A8 AI\u300D\u8B8A\u6210\u300C\u6211\u5011\u8A8D\u70BA\u5DE5\u4F5C\u61C9\u8A72\u670D\u52D9\u4EC0\u9EBC\u300D\u3002\n\n\u5982\u679C\u6548\u7387\u63D0\u9AD8\uFF0C\u537B\u6C92\u6709\u8B93\u4EBA\u66F4\u5B89\u5168\u3001\u66F4\u6709\u5224\u65B7\u529B\u3001\u66F4\u6709\u6642\u9593\u7167\u9867\u91CD\u8981\u7684\u4E8B\uFF0C\u90A3\u6548\u7387\u5230\u5E95\u6539\u5584\u4E86\u4EC0\u9EBC\uFF1F\n\n### \u6797\u5C91\n\n\u6211\u60F3\u8ACB\u6BCF\u500B\u4EBA\u4E0D\u8981\u7E3D\u7D50\u7ACB\u5834\uFF0C\u53EA\u56DE\u7B54\u4E00\u500B\u554F\u984C\uFF1A\n\n\u4ECA\u5929\u8AC7\u5230\u73FE\u5728\uFF0C\u54EA\u4E00\u500B\u81EA\u5DF1\u7684\u60F3\u6CD5\u88AB\u52D5\u6416\u4E86\uFF1F\n\n\u5B50\u8B19\uFF0C\u4F60\u5148\u4F86\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u539F\u672C\u6BD4\u8F03\u76F8\u4FE1\uFF0C\u53EA\u8981\u628A AI \u7684\u597D\u8655\u8B1B\u6E05\u695A\uFF0C\u54E1\u5DE5\u5C31\u6703\u6BD4\u8F03\u9858\u610F\u63A5\u53D7\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\u4E0D\u5920\u3002\u54E1\u5DE5\u4E0D\u662F\u6C92\u807D\u61C2\u597D\u8655\uFF0C\u800C\u662F\u4ED6\u5011\u4E5F\u770B\u5F97\u5230\u516C\u53F8\u53EF\u80FD\u62FF AI \u4F86\u505A\u4EC0\u9EBC\u3002\n\n\u6240\u4EE5\u4E0D\u80FD\u53EA\u5C55\u793A\u5DE5\u5177\u591A\u53B2\u5BB3\uFF0C\u8981\u5148\u8AAA\u6E05\u695A\u6B0A\u529B\u548C\u5229\u76CA\u600E\u9EBC\u8B8A\u3002\n\n### \u9673\u6021\u5B89\n\n\u6211\u539F\u672C\u4EE5\u70BA\u4EBA\u8CC7\u7684\u5DE5\u4F5C\u662F\u964D\u4F4E\u6050\u61FC\u3001\u5354\u52A9\u8F49\u578B\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\uFF0C\u4EBA\u8CC7\u6709\u6642\u5019\u61C9\u8A72\u628A\u6050\u61FC\u4FDD\u7559\u4E0B\u4F86\u3002\u56E0\u70BA\u6050\u61FC\u53EF\u80FD\u662F\u5728\u63D0\u9192\u516C\u53F8\uFF0C\u6709\u4E9B\u627F\u8AFE\u9084\u6C92\u60F3\u6E05\u695A\u3002\n\n### \u8A31\u6587\u54F2\n\n\u6211\u539F\u672C\u89BA\u5F97\u73FE\u5834\u6700\u5927\u7684\u963B\u529B\u662F\u8001\u54E1\u5DE5\u4E0D\u60F3\u5B78\u65B0\u5DE5\u5177\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\u5F88\u591A\u4EBA\u4E0D\u662F\u4E0D\u60F3\u5B78\uFF0C\u662F\u4E0D\u60F3\u628A\u81EA\u5DF1\u5E7E\u5341\u5E74\u7684\u7D93\u9A57\u4EA4\u51FA\u53BB\u4E4B\u5F8C\uFF0C\u8B8A\u6210\u4E00\u500B\u53EF\u4EE5\u88AB\u522A\u6389\u7684\u6210\u672C\u3002\n\n### \u8607\u96C5\u96EF\n\n\u6211\u539F\u672C\u60F3\u8AC7\u7684\u662F\u8077\u80FD\u8F49\u63DB\u3002\u73FE\u5728\u89BA\u5F97\u300C\u8F49\u63DB\u300D\u9019\u500B\u8A5E\u592A\u4E2D\u6027\u4E86\uFF0C\u597D\u50CF\u6BCF\u500B\u4EBA\u90FD\u6709\u76F8\u540C\u80FD\u529B\u3001\u6642\u9593\u548C\u6A5F\u6703\u3002\n\n\u5176\u5BE6\u6709\u4EBA\u8F49\u5F97\u904E\u53BB\uFF0C\u6709\u4EBA\u8F49\u4E0D\u904E\u53BB\u3002\u8AB0\u8CA0\u8CAC\u627F\u64D4\u90A3\u500B\u843D\u5DEE\uFF0C\u4E0D\u80FD\u88AB\u85CF\u5728\u6F02\u4EAE\u7684\u8A5E\u88E1\u3002\n\n### \u8449\u66FC\n\n\u6211\u539F\u672C\u4EE5\u70BA\u53EF\u4EE5\u7528\u91AB\u7642\u7684\u6848\u4F8B\u63D0\u9192\u5927\u5BB6\u4FDD\u7559\u4EBA\u7684\u5224\u65B7\u3002\n\n\u4F46\u6211\u73FE\u5728\u89BA\u5F97\uFF0C\u91CD\u9EDE\u4E0D\u53EA\u662F\u300C\u4EBA\u8981\u7559\u5728\u8FF4\u8DEF\u88E1\u300D\u3002\u6709\u6642\u5019\u4EBA\u7559\u5728\u8FF4\u8DEF\u88E1\uFF0C\u53EA\u662F\u8CA0\u8CAC\u66FF\u6A5F\u5668\u80CC\u934B\u3002\n\n\u771F\u6B63\u8981\u554F\u7684\u662F\uFF0C\u4EBA\u6709\u6C92\u6709\u6B0A\u529B\u5426\u6C7A\u6A5F\u5668\u3002\n\n### \u963F\u9054\n\n\u6211\u539F\u672C\u4EE5\u70BA\u5927\u5BB6\u53EA\u662F\u6015\u5931\u696D\u3002\n\n\u73FE\u5728\u89BA\u5F97\u5927\u5BB6\u4E5F\u6015\u53E6\u4E00\u4EF6\u4E8B\uFF1A\u6D3B\u8457\u4E0A\u73ED\uFF0C\u4F46\u5DE5\u4F5C\u8B8A\u5F97\u5B8C\u5168\u4E0D\u50CF\u81EA\u5DF1\u60F3\u505A\u7684\u4E8B\u3002\n\n### \u5C0F\u82B8\n\n\u6211\u539F\u672C\u4EE5\u70BA\u81EA\u5DF1\u9700\u8981\u516C\u53F8\u4FDD\u8B49\u4E0D\u6703\u88C1\u54E1\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\uFF0C\u4FDD\u8B49\u53EF\u80FD\u6C38\u9060\u4E0D\u5920\u3002\u6211\u8981\u7684\u662F\u516C\u53F8\u627F\u8A8D\uFF0C\u9019\u4E0D\u662F\u55AE\u7D14\u7684\u5DE5\u5177\u5347\u7D1A\uFF0C\u800C\u662F\u6211\u5011\u4E00\u8D77\u91CD\u65B0\u8AC7\u5DE5\u4F5C\u7684\u898F\u5247\u3002\n\n\u800C\u4E14\u9019\u6B21\u4E0D\u80FD\u53EA\u6709\u4E3B\u7BA1\u5728\u8AC7\u3002\n\n### \u5468\u6600\n\n\u6211\u539F\u672C\u4EE5\u70BA\u6211\u5011\u4ECA\u5929\u6703\u8A0E\u8AD6\u600E\u9EBC\u8B93\u54E1\u5DE5\u63A5\u53D7 AI\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\uFF0C\u66F4\u503C\u5F97\u554F\u7684\u662F\uFF1A\n\n\u5982\u679C\u54E1\u5DE5\u5B8C\u5168\u5408\u7406\u5730\u4E0D\u4FE1\u4EFB\u516C\u53F8\uFF0C\u516C\u53F8\u8981\u5148\u6539\u8B8A\u4EC0\u9EBC\uFF0C\u624D\u6709\u8CC7\u683C\u8981\u6C42\u54E1\u5DE5\u6539\u8B8A\uFF1F\n\n### \u6797\u5C91\n\n\u6211\u539F\u672C\u60F3\u6293\u51FA\u8AB0\u5728\u963B\u64CB AI\u3002\n\n\u73FE\u5728\u6211\u61F7\u7591\uFF0C\u771F\u6B63\u7684\u963B\u529B\u53EF\u80FD\u4E0D\u662F\u54E1\u5DE5\uFF0C\u800C\u662F\u516C\u53F8\u4E0D\u60F3\u9762\u5C0D AI \u6703\u628A\u539F\u672C\u5C31\u5B58\u5728\u7684\u4E0D\u516C\u5E73\u653E\u5927\u3002\n\n### \u6C88\u9ED8\n\n\u6211\u4E5F\u88DC\u4E00\u53E5\u3002\n\n\u6211\u5011\u4ECA\u5929\u6C92\u6709\u5F97\u5230\u4E00\u500B\u300C\u63A8 AI \u7684\u6700\u4F73\u505A\u6CD5\u300D\u3002\u4F46\u9019\u53EF\u80FD\u662F\u56E0\u70BA\u539F\u672C\u5C31\u6C92\u6709\u4E00\u500B\u55AE\u7D14\u7684\u300CAI \u5C0E\u5165\u554F\u984C\u300D\u3002\n\n\u684C\u4E0A\u5176\u5BE6\u6709\u597D\u5E7E\u500B\u554F\u984C\u758A\u5728\u4E00\u8D77\uFF1A\n\n- \u5DE5\u4F5C\u6703\u4E0D\u6703\u6D88\u5931\uFF1F\n- \u5DE5\u4F5C\u6703\u4E0D\u6703\u8B8A\u5F97\u66F4\u5FEB\u3001\u66F4\u7D2F\uFF1F\n- \u8AB0\u64C1\u6709\u54E1\u5DE5\u7D2F\u7A4D\u7684\u7D93\u9A57\uFF1F\n- AI \u51FA\u932F\u6642\u8AB0\u8CA0\u8CAC\uFF1F\n- \u6548\u7387\u5E36\u4F86\u7684\u6536\u76CA\u600E\u9EBC\u5206\uFF1F\n- \u54E1\u5DE5\u6709\u6C92\u6709\u5426\u6C7A\u6B0A\uFF1F\n- \u516C\u53F8\u60F3\u8981\u7684\u662F\u6539\u5584\u5DE5\u4F5C\uFF0C\u9084\u662F\u964D\u4F4E\u6210\u672C\uFF1F\n\n\u5982\u679C\u9019\u4E9B\u554F\u984C\u4E0D\u62C6\u958B\uFF0C\u6240\u6709\u300C\u5982\u4F55\u63A8\u884C AI\u300D\u7684\u7B54\u6848\uFF0C\u90FD\u53EF\u80FD\u53EA\u662F\u6559\u516C\u53F8\u600E\u9EBC\u8B93\u54E1\u5DE5\u66F4\u9806\u5229\u5730\u63A5\u53D7\u4E00\u500B\u5DF2\u7D93\u6C7A\u5B9A\u597D\u7684\u7D50\u679C\u3002\n\n---\n\n# \u89C0\u5BDF\u8005\u6574\u7406\uFF5C\u6C88\u9ED8\n\n## 1. \u6700\u5927\u7684\u5E7E\u500B\u8A0E\u8AD6\u8F49\u6298\n\n### \u5F9E\u300C\u54E1\u5DE5\u6015 AI\u300D\u8F49\u5411\u300C\u54E1\u5DE5\u6015\u516C\u53F8\u600E\u9EBC\u7528 AI\u300D\n\n\u4E00\u958B\u59CB\u5927\u5BB6\u628A\u963B\u529B\u7406\u89E3\u6210\u54E1\u5DE5\u7684\u5FC3\u7406\u554F\u984C\uFF0C\u597D\u50CF\u53EA\u8981\u52A0\u5F37\u6E9D\u901A\u3001\u5B89\u6392\u8A13\u7DF4\uFF0C\u54E1\u5DE5\u5C31\u6703\u653E\u5FC3\u3002\n\n\u4F46\u5C0F\u82B8\u6307\u51FA\uFF0C\u54E1\u5DE5\u771F\u6B63\u64D4\u5FC3\u7684\u662F\uFF1A\n\n- AI \u7701\u4E0B\u7684\u6642\u9593\u6703\u4E0D\u6703\u8B8A\u6210\u66F4\u591A\u5DE5\u4F5C\uFF1F\n- \u81EA\u5DF1\u7684\u7D93\u9A57\u88AB\u62FF\u53BB\u8A13\u7DF4\u7CFB\u7D71\u5F8C\uFF0C\u6703\u4E0D\u6703\u5931\u53BB\u50F9\u503C\uFF1F\n- AI \u51FA\u932F\u6642\uFF0C\u8CAC\u4EFB\u662F\u4E0D\u662F\u4ECD\u7136\u7531\u4EBA\u627F\u64D4\uFF1F\n- \u516C\u53F8\u662F\u4E0D\u662F\u8AAA\u4E0D\u88C1\u54E1\uFF0C\u5BE6\u969B\u4E0A\u537B\u7528\u5225\u7684\u65B9\u6CD5\u6E1B\u5C11\u4EBA\u529B\uFF1F\n\n\u8A0E\u8AD6\u56E0\u6B64\u5F9E\u300C\u600E\u9EBC\u5B89\u64AB\u54E1\u5DE5\u300D\u8F49\u6210\u300C\u516C\u53F8\u662F\u5426\u503C\u5F97\u88AB\u4FE1\u4EFB\u300D\u3002\n\n### \u5F9E\u300C\u4F7F\u7528 AI\u300D\u8F49\u5411\u300C\u8AB0\u6C7A\u5B9A\u4F7F\u7528\u898F\u5247\u300D\n\n\u5927\u5BB6\u539F\u672C\u8AC7\u7684\u662F\u5DE5\u5177\u597D\u4E0D\u597D\u7528\uFF0C\u5F8C\u4F86\u767C\u73FE\u771F\u6B63\u91CD\u8981\u7684\u662F\uFF1A\n\n- \u4EC0\u9EBC\u4E8B\u60C5\u53EF\u4EE5\u4EA4\u7D66 AI\uFF1F\n- \u4EC0\u9EBC\u4E8B\u60C5\u4E00\u5B9A\u8981\u7531\u4EBA\u5224\u65B7\uFF1F\n- \u4EBA\u80FD\u4E0D\u80FD\u5426\u6C7A AI\uFF1F\n- \u8AB0\u53EF\u4EE5\u66AB\u505C\u7CFB\u7D71\uFF1F\n- \u5931\u8AA4\u7531\u8AB0\u8CA0\u8CAC\uFF1F\n\nAI \u4E0D\u53EA\u662F\u6548\u7387\u5DE5\u5177\uFF0C\u4E5F\u6703\u6539\u8B8A\u6B0A\u529B\u548C\u8CAC\u4EFB\u7684\u5206\u914D\u3002\n\n### \u5F9E\u300C\u63D0\u9AD8\u6548\u7387\u300D\u8F49\u5411\u300C\u6548\u7387\u7684\u6210\u679C\u6B78\u8AB0\u300D\n\n\u516C\u53F8\u5E38\u8AAA AI \u53EF\u4EE5\u7701\u6642\u9593\u3001\u63D0\u9AD8\u6548\u7387\uFF0C\u4F46\u73FE\u5834\u7D93\u9A57\u986F\u793A\uFF0C\u7701\u4E0B\u4F86\u7684\u6642\u9593\u53EF\u80FD\u88AB\u62FF\u53BB\u63A5\u66F4\u591A\u5DE5\u4F5C\u3002\n\n\u56E0\u6B64\uFF0C\u300C\u6548\u7387\u63D0\u5347\u300D\u4E26\u4E0D\u81EA\u52D5\u7B49\u65BC\u300C\u5DE5\u4F5C\u8B8A\u597D\u300D\u3002\u9084\u8981\u554F\uFF1A\n\n- \u54E1\u5DE5\u80FD\u4E0D\u80FD\u5C11\u52A0\u73ED\uFF1F\n- \u5DE5\u4F5C\u91CF\u6703\u4E0D\u6703\u540C\u6B65\u589E\u52A0\uFF1F\n- \u516C\u53F8\u662F\u5426\u9858\u610F\u5206\u4EAB\u6536\u76CA\uFF1F\n- \u662F\u5426\u6709\u66F4\u591A\u6642\u9593\u5B78\u7FD2\u3001\u4F11\u606F\u6216\u8655\u7406\u8907\u96DC\u554F\u984C\uFF1F\n\n### \u5F9E\u300C\u5168\u9762\u5C0E\u5165\u300D\u8F49\u5411\u300C\u4F9D\u5DE5\u4F5C\u98A8\u96AA\u5206\u7D1A\u300D\n\n\u88FD\u9020\u696D\u3001\u5BA2\u670D\u3001\u91AB\u7642\u7684\u932F\u8AA4\u6210\u672C\u4E0D\u540C\uFF0C\u4E0D\u53EF\u80FD\u53EA\u7528\u4E00\u5957\u898F\u5247\u3002\n\n\u6BD4\u8F03\u5408\u7406\u7684\u65B9\u5411\u53EF\u80FD\u662F\uFF1A\n\n- \u516C\u53F8\u8A02\u5171\u540C\u5E95\u7DDA\n- \u5404\u90E8\u9580\u4F9D\u98A8\u96AA\u8A2D\u8A08\u4F7F\u7528\u65B9\u5F0F\n- \u7B2C\u4E00\u7DDA\u54E1\u5DE5\u53C3\u8207\u6E2C\u8A66\n- \u5141\u8A31\u54E1\u5DE5\u56DE\u5831\u3001\u6311\u6230\u751A\u81F3\u66AB\u505C\u7CFB\u7D71\n\n---\n\n## 2. \u88AB\u63A8\u7FFB\u7684\u5047\u8A2D\n\n### \u5047\u8A2D\u4E00\uFF1A\u54E1\u5DE5\u53CD\u5C0D AI\uFF0C\u662F\u56E0\u70BA\u4E0D\u4E86\u89E3 AI\n\n\u5C0D\u8AC7\u4E2D\u6C92\u6709\u5B8C\u5168\u5426\u5B9A\u300C\u4E0D\u4E86\u89E3\u300D\u53EF\u80FD\u9020\u6210\u963B\u529B\uFF0C\u4F46\u66F4\u5927\u7684\u554F\u984C\u662F\uFF1A\u54E1\u5DE5\u5F80\u5F80\u6BD4\u516C\u53F8\u66F4\u6E05\u695A AI \u53EF\u80FD\u88AB\u62FF\u4F86\u505A\u4EC0\u9EBC\u3002\n\n\u4ED6\u5011\u4E0D\u662F\u6C92\u770B\u898B AI \u7684\u597D\u8655\uFF0C\u800C\u662F\u4E5F\u770B\u898B\u4E86\u98A8\u96AA\u3002\n\n### \u5047\u8A2D\u4E8C\uFF1AAI \u7701\u4E0B\u7684\u6642\u9593\uFF0C\u81EA\u7136\u6703\u8B8A\u6210\u66F4\u6709\u50F9\u503C\u7684\u5DE5\u4F5C\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u5B83\u53EF\u80FD\u8B8A\u6210\u66F4\u591A\u6848\u4EF6\u3001\u66F4\u9AD8\u76EE\u6A19\u3001\u66F4\u5BC6\u96C6\u7684\u76E3\u63A7\uFF0C\u751A\u81F3\u66F4\u5927\u7684\u5FC3\u7406\u58D3\u529B\u3002\n\n### \u5047\u8A2D\u4E09\uFF1A\u53EA\u8981\u4EBA\u9084\u5728\u6700\u5F8C\u5BE9\u6838\uFF0C\u5C31\u6709\u4EBA\u985E\u63A7\u5236\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u5982\u679C\u4EBA\u6C92\u6709\u8DB3\u5920\u6642\u9593\u3001\u8CC7\u8A0A\u6216\u5426\u6C7A\u6B0A\uFF0C\u53EA\u662F\u88AB\u8981\u6C42\u66FF AI \u7684\u932F\u8AA4\u8CA0\u8CAC\uFF0C\u90A3\u300C\u4EBA\u5728\u8FF4\u8DEF\u4E2D\u300D\u53EF\u80FD\u53EA\u662F\u8CAC\u4EFB\u8F49\u5AC1\u3002\n\n### \u5047\u8A2D\u56DB\uFF1A\u516C\u53F8\u627F\u8AFE\u4E0D\u88C1\u54E1\uFF0C\u5C31\u80FD\u6D88\u9664\u54E1\u5DE5\u7684\u4E0D\u5B89\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u5373\u4F7F\u4E0D\u6B63\u5F0F\u88C1\u54E1\uFF0C\u516C\u53F8\u4ECD\u53EF\u80FD\u51CD\u7D50\u62DB\u52DF\u3001\u589E\u52A0\u5DE5\u4F5C\u91CF\u3001\u8B93\u4EBA\u81EA\u7136\u96E2\u8077\uFF0C\u6216\u8B93\u5DE5\u4F5C\u8B8A\u5F97\u4E0D\u53EF\u6301\u7E8C\u3002\n\n### \u5047\u8A2D\u4E94\uFF1A\u63D0\u9AD8 AI \u4F7F\u7528\u7387\uFF0C\u5C31\u4EE3\u8868\u5C0E\u5165\u6210\u529F\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u54E1\u5DE5\u53EF\u80FD\u70BA\u4E86\u9054\u6210\u6307\u6A19\u800C\u8868\u9762\u4F7F\u7528\uFF0C\u5BE6\u969B\u4E0A\u4ECD\u7528\u539F\u672C\u7684\u65B9\u6CD5\u5DE5\u4F5C\u3002\n\n\u771F\u6B63\u8A72\u770B\u7684\u662F\u554F\u984C\u6709\u6C92\u6709\u6539\u5584\uFF0C\u800C\u4E0D\u662F\u5DE5\u5177\u88AB\u6309\u4E86\u5E7E\u6B21\u3002\n\n### \u5047\u8A2D\u516D\uFF1AAI \u5C0E\u5165\u53EA\u662F\u6280\u8853\u5347\u7D1A\n\n\u5C0D\u8AC7\u986F\u793A\uFF0C\u5B83\u540C\u6642\u662F\uFF1A\n\n- \u5DE5\u4F5C\u8A2D\u8A08\u7684\u6539\u8B8A\n- \u77E5\u8B58\u6240\u6709\u6B0A\u7684\u6539\u8B8A\n- \u8CAC\u4EFB\u5206\u914D\u7684\u6539\u8B8A\n- \u8B70\u50F9\u80FD\u529B\u7684\u6539\u8B8A\n- \u5229\u76CA\u5206\u914D\u7684\u6539\u8B8A\n\n---\n\n## 3. \u65B0\u7522\u751F\u3001\u6BD4\u539F\u984C\u66F4\u503C\u5F97\u554F\u7684\u554F\u984C\n\n- \u5982\u679C AI \u771F\u7684\u63D0\u9AD8\u6548\u7387\uFF0C\u7701\u4E0B\u4F86\u7684\u6642\u9593\u548C\u6536\u76CA\u8981\u5206\u7D66\u8AB0\uFF1F\n- \u54E1\u5DE5\u80FD\u4E0D\u80FD\u53C3\u8207\u6C7A\u5B9A AI \u5C0E\u5165\u5F8C\uFF0C\u54EA\u4E9B\u5DE5\u4F5C\u7559\u4E0B\u3001\u54EA\u4E9B\u5DE5\u4F5C\u6D88\u5931\uFF1F\n- \u516C\u53F8\u662F\u5426\u9858\u610F\u516C\u958B AI \u5C0E\u5165\u53EF\u80FD\u9020\u6210\u7684\u4EBA\u529B\u8B8A\u5316\uFF1F\n- \u7B2C\u4E00\u7DDA\u54E1\u5DE5\u662F\u5426\u6709\u6B0A\u62D2\u7D55\u3001\u66AB\u505C\u6216\u63A8\u7FFB AI \u7684\u5EFA\u8B70\uFF1F\n- \u54EA\u4E9B\u5DE5\u4F5C\u5373\u4F7F AI \u505A\u5F97\u5230\uFF0C\u4E5F\u4E0D\u61C9\u8A72\u5B8C\u5168\u4EA4\u7D66 AI\uFF1F\n- \u516C\u53F8\u8981\u7684\u662F\u66F4\u597D\u7684\u5DE5\u4F5C\uFF0C\u9084\u662F\u66F4\u5C11\u7684\u4EBA\u529B\u6210\u672C\uFF1F\n- \u5982\u679C\u54E1\u5DE5\u4E0D\u4FE1\u4EFB\u516C\u53F8\uFF0C\u516C\u53F8\u8981\u5148\u6539\u8B8A\u4EC0\u9EBC\uFF0C\u624D\u6709\u8CC7\u683C\u8981\u6C42\u54E1\u5DE5\u6539\u8B8A\uFF1F\n- \u4E00\u500B\u771F\u6B63\u516C\u5E73\u7684 AI \u5C0E\u5165\uFF0C\u9664\u4E86\u8A13\u7DF4\u54E1\u5DE5\u4F7F\u7528\u5DE5\u5177\uFF0C\u9084\u61C9\u8A72\u63D0\u4F9B\u4EC0\u9EBC\u4FDD\u969C\uFF1F\n- \u6211\u5011\u662F\u5426\u628A\u300C\u4E0D\u9858\u610F\u5C0E\u5165 AI\u300D\u8AA4\u89E3\u6210\u963B\u529B\uFF0C\u800C\u5B83\u5176\u5BE6\u53EF\u80FD\u662F\u4E00\u7A2E\u98A8\u96AA\u8B66\u5831\uFF1F\n- \u5982\u679C AI \u8B93\u67D0\u4E9B\u5DE5\u4F5C\u6D88\u5931\uFF0C\u6211\u5011\u9858\u4E0D\u9858\u610F\u627F\u8A8D\u9019\u662F\u4E00\u500B\u9700\u8981\u5171\u540C\u8AC7\u5224\u7684\u793E\u6703\u9078\u64C7\uFF0C\u800C\u4E0D\u662F\u55AE\u7D14\u7684\u6280\u8853\u7D50\u679C\uFF1F\n\n---\n\n## 4. \u5C1A\u672A\u89E3\u6C7A\u7684\u6838\u5FC3\u885D\u7A81\n\n### \u4F01\u696D\u9700\u8981\u901F\u5EA6\uFF0C\u54E1\u5DE5\u9700\u8981\u5B89\u5168\u611F\n\n\u4F01\u696D\u64D4\u5FC3\u843D\u5F8C\u7AF6\u722D\uFF0C\u54E1\u5DE5\u64D4\u5FC3\u81EA\u5DF1\u88AB\u72A7\u7272\u3002\u9019\u5169\u7A2E\u7126\u616E\u90FD\u662F\u771F\u7684\uFF0C\u4F46\u76EE\u524D\u6C92\u6709\u81EA\u52D5\u76F8\u5BB9\u7684\u89E3\u6CD5\u3002\n\n### \u516C\u53F8\u60F3\u4FDD\u7559\u5F48\u6027\uFF0C\u54E1\u5DE5\u9700\u8981\u660E\u78BA\u627F\u8AFE\n\n\u516C\u53F8\u5E0C\u671B\u4E0D\u8981\u904E\u65E9\u627F\u8AFE\uFF0C\u4FDD\u7559\u8ABF\u6574\u7A7A\u9593\uFF1B\u54E1\u5DE5\u5247\u8A8D\u70BA\uFF0C\u5728\u98A8\u96AA\u4E0D\u5C0D\u7B49\u7684\u60C5\u6CC1\u4E0B\uFF0C\u6C92\u6709\u627F\u8AFE\u5C31\u4E0D\u53EF\u80FD\u771F\u6B63\u6295\u5165\u3002\n\n### AI \u53EF\u4EE5\u63D0\u9AD8\u6548\u7387\uFF0C\u4F46\u6548\u7387\u7684\u6210\u679C\u5982\u4F55\u5206\u914D\u4ECD\u672A\u89E3\u6C7A\n\n\u5982\u679C\u6548\u7387\u53EA\u8F49\u5316\u6210\u66F4\u591A\u7522\u91CF\u548C\u66F4\u5C11\u4EBA\u529B\uFF0C\u54E1\u5DE5\u81EA\u7136\u6703\u628A AI \u8996\u70BA\u5A01\u8105\u3002\n\n### \u54E1\u5DE5\u88AB\u8981\u6C42\u63D0\u4F9B\u77E5\u8B58\uFF0C\u537B\u4E0D\u4E00\u5B9A\u80FD\u5206\u4EAB\u77E5\u8B58\u88AB\u5546\u54C1\u5316\u5F8C\u7684\u50F9\u503C\n\n\u516C\u53F8\u9700\u8981\u628A\u500B\u4EBA\u7D93\u9A57\u8F49\u6210\u7D44\u7E54\u80FD\u529B\uFF0C\u4F46\u54E1\u5DE5\u4E5F\u9700\u8981\u4FDD\u8B77\u81EA\u5DF1\u7684\u5C08\u696D\u50F9\u503C\u8207\u8AC7\u5224\u80FD\u529B\u3002\n\n### \u4EBA\u88AB\u4FDD\u7559\u5728\u6D41\u7A0B\u4E2D\uFF0C\u537B\u672A\u5FC5\u64C1\u6709\u771F\u6B63\u7684\u6B0A\u529B\n\n\u300C\u6700\u5F8C\u7531\u4EBA\u5BE9\u6838\u300D\u807D\u8D77\u4F86\u5B89\u5168\uFF0C\u4F46\u5982\u679C\u4EBA\u6C92\u6709\u6642\u9593\u3001\u8CC7\u6E90\u548C\u5426\u6C7A\u6B0A\uFF0C\u90A3\u53EA\u662F\u5F62\u5F0F\u4E0A\u7684\u4EBA\u985E\u53C3\u8207\u3002\n\n### \u6700\u6839\u672C\u7684\u885D\u7A81\u53EF\u80FD\u4E0D\u662F\u300C\u8981\u4E0D\u8981\u7528 AI\u300D\n\n\u800C\u662F\uFF1A\n\n> \u516C\u53F8\u662F\u5426\u9858\u610F\u628A AI \u5C0E\u5165\u7576\u6210\u4E00\u6B21\u91CD\u65B0\u8AC7\u5224\u5DE5\u4F5C\u898F\u5247\u7684\u6A5F\u6703\uFF0C\u800C\u4E0D\u662F\u53EA\u628A\u5B83\u7576\u6210\u4E00\u500B\u964D\u4F4E\u6210\u672C\u7684\u5DE5\u5177\uFF1F",
+  markdown: "**\u4EBA\u7269**\n\n- **\u4E3B\u6301\u4EBA \u7532\uFF5C\u6797\u5C91**\uFF1A\u7280\u5229\uFF0C\u5C08\u6293\u77DB\u76FE  \n- **\u4E3B\u6301\u4EBA \u4E59\uFF5C\u5468\u6600**\uFF1A\u597D\u5947\uFF0C\u559C\u6B61\u8FFD\u554F\u5230\u5E95  \n- **\u89C0\u5BDF\u8005\uFF5C\u6C88\u9ED8**\uFF1A\u4E0D\u7AD9\u968A\uFF0C\u8A18\u9304\u5047\u8A2D\u8207\u8F49\u6298  \n- **\u5C08\u5BB6\u4E00\uFF5C\u9673\u6021\u5B89**\uFF1A\u4EBA\u8CC7\u4E3B\u7BA1\uFF0C\u95DC\u5FC3\u7D44\u7E54\u8207\u54E1\u5DE5\u5B89\u5168\u611F  \n- **\u5C08\u5BB6\u4E8C\uFF5C\u9AD8\u5B50\u8B19**\uFF1AAI \u7522\u54C1\u9867\u554F\uFF0C\u5354\u52A9\u4F01\u696D\u5C0E\u5165\u5DE5\u5177  \n- **\u5C08\u5BB6\u4E09\uFF5C\u8A31\u6587\u54F2**\uFF1A\u88FD\u9020\u696D\u73FE\u5834\u4E3B\u7BA1\uFF0C\u91CD\u8996\u6D41\u7A0B\u8207\u98A8\u96AA  \n- **\u5C08\u5BB6\u56DB\uFF5C\u8607\u96C5\u96EF**\uFF1A\u52DE\u52D5\u8207\u8077\u6DAF\u7814\u7A76\u8005\uFF0C\u7814\u7A76\u5DE5\u4F5C\u5982\u4F55\u6539\u8B8A  \n- **\u8DE8\u9818\u57DF\u5C08\u5BB6\uFF5C\u8449\u66FC**\uFF1A\u6025\u8A3A\u8B77\u7406\u5E2B  \n- **\u85DD\u4EBA\uFF0F\u597D\u5947\u7684\u901A\u624D\uFF5C\u963F\u9054**\uFF1A\u4E3B\u6301\u904E\u7BC0\u76EE\uFF0C\u4EC0\u9EBC\u90FD\u6562\u554F  \n- **\u7576\u4E8B\u4EBA\uFF5C\u5C0F\u82B8**\uFF1A\u5BA2\u670D\u4E2D\u5FC3\u7D44\u9577\uFF0C\u5DE5\u4F5C\u6B63\u53D7\u5230 AI \u5F71\u97FF  \n- **\u89C0\u773E**\uFF1A\u73FE\u5834\u54E1\u5DE5\uFF0C\u4E0D\u5B9A\u6642\u63D0\u554F  \n\n---\n\n## \u5C0D\u8AC7\u958B\u59CB\n\n### \u6797\u5C91\uFF5C\u4E3B\u6301\u4EBA\n\n\u4ECA\u5929\u7684\u984C\u76EE\u807D\u8D77\u4F86\u5F88\u76F4\u63A5\uFF1A\u516C\u53F8\u8981\u600E\u9EBC\u63A8 AI\uFF0C\u800C\u54E1\u5DE5\u53C8\u6015 AI \u53D6\u4EE3\u81EA\u5DF1\u3002\n\n\u4F46\u6211\u60F3\u5148\u628A\u4E00\u53E5\u5F88\u5E38\u898B\u7684\u8A71\u653E\u684C\u4E0A\uFF1A\n\n> \u300C\u5927\u5BB6\u4E0D\u662F\u53CD\u5C0D AI\uFF0C\u53EA\u662F\u5BB3\u6015\u5931\u53BB\u5DE5\u4F5C\u3002\u300D\n\n\u9019\u53E5\u8A71\u53EF\u80FD\u662F\u771F\u7684\uFF0C\u4E5F\u53EF\u80FD\u53EA\u662F\u516C\u53F8\u65B9\u4FBF\u62FF\u4F86\u89E3\u91CB\u54E1\u5DE5\u4E0D\u914D\u5408\u7684\u8AAA\u6CD5\u3002\n\n### \u5468\u6600\uFF5C\u4E3B\u6301\u4EBA\n\n\u90A3\u6211\u5011\u5148\u4E0D\u8981\u6025\u8457\u60F3\u8FA6\u6CD5\u300C\u6D88\u9664\u6050\u61FC\u300D\u3002\n\n\u5C0F\u82B8\uFF0C\u59B3\u662F\u5BA2\u670D\u4E2D\u5FC3\u7D44\u9577\u3002\u516C\u53F8\u6700\u8FD1\u5C0E\u5165 AI\uFF0C\u59B3\u7B2C\u4E00\u500B\u60F3\u5230\u7684\u662F\u4EC0\u9EBC\uFF1F\n\n### \u5C0F\u82B8\uFF5C\u7576\u4E8B\u4EBA\n\n\u6211\u7B2C\u4E00\u500B\u60F3\u5230\u7684\u662F\uFF1A\u90A3\u6211\u9084\u6709\u6C92\u6709\u5FC5\u8981\u5B58\u5728\uFF1F\n\n\u4E0D\u662F\u5F88\u62BD\u8C61\u7684\u90A3\u7A2E\u300C\u672A\u4F86\u5DE5\u4F5C\u6703\u6539\u8B8A\u300D\u3002\u662F\u6211\u6BCF\u5929\u5728\u505A\u7684\u4E8B\u60C5\uFF0CAI \u5DF2\u7D93\u53EF\u4EE5\u505A\u4E00\u534A\u4E86\u3002\n\n\u5B83\u53EF\u4EE5\u5148\u56DE\u7B54\u5BA2\u6236\u554F\u984C\u3001\u5206\u985E\u6848\u4EF6\u3001\u5E6B\u5FD9\u6574\u7406\u7D00\u9304\u3002\u516C\u53F8\u8DDF\u6211\u5011\u8AAA\uFF1A\u300C\u59B3\u5011\u4E4B\u5F8C\u53EF\u4EE5\u628A\u6642\u9593\u653E\u5728\u66F4\u6709\u50F9\u503C\u7684\u4E8B\u60C5\u4E0A\u3002\u300D\n\n\u4F46\u8001\u5BE6\u8AAA\uFF0C\u6211\u807D\u5230\u7684\u662F\uFF1A\u300C\u59B3\u5011\u73FE\u5728\u505A\u7684\u4E8B\u60C5\uFF0C\u50F9\u503C\u4E0D\u9AD8\u3002\u300D\n\n### \u9AD8\u5B50\u8B19\uFF5CAI \u9867\u554F\n\n\u6211\u89BA\u5F97\u9019\u88E1\u6709\u4E00\u500B\u8AA4\u6703\u3002AI \u4E0D\u4E00\u5B9A\u662F\u62FF\u4F86\u53D6\u4EE3\u4EBA\uFF0C\u4E5F\u53EF\u4EE5\u62FF\u4F86\u6E1B\u5C11\u91CD\u8907\u5DE5\u4F5C\u3002\n\n### \u6797\u5C91\n\n\u300C\u8AA4\u6703\u300D\uFF1F\n\n\u5C0F\u82B8\u525B\u525B\u8AAA\u516C\u53F8\u5DF2\u7D93\u8B93 AI \u505A\u6389\u4E00\u534A\u5DE5\u4F5C\u3002\u59B3\u89BA\u5F97\u5979\u8AA4\u6703\u4E86\u4EC0\u9EBC\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u7684\u610F\u601D\u4E0D\u662F\u5979\u7684\u611F\u53D7\u4E0D\u5C0D\uFF0C\u800C\u662F\u300C\u5DE5\u4F5C\u88AB AI \u505A\u6389\u300D\u4E0D\u7B49\u65BC\u300C\u4EBA\u88AB AI \u53D6\u4EE3\u300D\u3002\u5F88\u591A\u6642\u5019\uFF0C\u5DE5\u4F5C\u5167\u5BB9\u6703\u91CD\u65B0\u5206\u914D\u3002\n\n### \u5C0F\u82B8\n\n\u53EF\u662F\u5982\u679C\u539F\u672C\u5341\u500B\u4EBA\u8655\u7406\u4E00\u5343\u4EF6\u6848\u4EF6\uFF0C\u73FE\u5728 AI \u53EF\u4EE5\u8655\u7406\u4E03\u767E\u4EF6\uFF0C\u516C\u53F8\u70BA\u4EC0\u9EBC\u9084\u9700\u8981\u5341\u500B\u4EBA\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u8981\u770B\u516C\u53F8\u600E\u9EBC\u8A2D\u8A08\u3002\n\n### \u5C0F\u82B8\n\n\u4E0D\uFF0C\u9019\u8981\u770B\u516C\u53F8\u600E\u9EBC\u7B97\u9322\u3002\n\n\u73FE\u5834\u6709\u4EBA\u7B11\u4E86\u4E00\u4E0B\u3002\n\n### \u6797\u5C91\n\n\u5F88\u597D\uFF0C\u9019\u5C31\u51FA\u73FE\u7B2C\u4E00\u500B\u77DB\u76FE\u4E86\u3002\n\n\u5C08\u5BB6\u8AAA\uFF1A\u300C\u6280\u8853\u4E0A\u53EF\u4EE5\u91CD\u65B0\u5206\u5DE5\u3002\u300D\n\n\u7576\u4E8B\u4EBA\u8AAA\uFF1A\u300C\u4F46\u516C\u53F8\u6709\u7D93\u6FDF\u8A98\u56E0\u76F4\u63A5\u5C11\u8ACB\u4EBA\u3002\u300D\n\n\u6021\u5B89\uFF0C\u59B3\u662F\u4EBA\u8CC7\uFF0C\u59B3\u6703\u600E\u9EBC\u56DE\uFF1F\n\n### \u9673\u6021\u5B89\uFF5C\u4EBA\u8CC7\u4E3B\u7BA1\n\n\u5C0F\u82B8\u8B1B\u5F97\u5F88\u5BE6\u969B\u3002\u516C\u53F8\u4E0D\u80FD\u53EA\u8AAA\u300CAI \u662F\u4F86\u5E6B\u52A9\u5927\u5BB6\u7684\u300D\uFF0C\u537B\u4E0D\u56DE\u7B54\u4E00\u500B\u554F\u984C\uFF1A\n\n\u5982\u679C\u6548\u7387\u771F\u7684\u63D0\u9AD8\u4E86\uFF0C\u7701\u4E0B\u4F86\u7684\u4EBA\u529B\u6210\u672C\u8981\u53BB\u54EA\u88E1\uFF1F\n\n\u662F\u62FF\u4F86\u88C1\u54E1\uFF1F\u52A0\u85AA\uFF1F\u7E2E\u77ED\u5DE5\u6642\uFF1F\u9084\u662F\u63A5\u66F4\u591A\u5DE5\u4F5C\uFF1F\n\n\u5982\u679C\u9019\u500B\u554F\u984C\u6C92\u6709\u7B54\u6848\uFF0C\u54E1\u5DE5\u4E0D\u76F8\u4FE1\u516C\u53F8\u5F88\u5408\u7406\u3002\n\n### \u963F\u9054\uFF5C\u85DD\u4EBA\uFF0F\u597D\u5947\u7684\u901A\u624D\n\n\u6211\u60F3\u554F\u4E00\u500B\u5F88\u767D\u7661\u4F46\u53EF\u80FD\u5F88\u91CD\u8981\u7684\u554F\u984C\u3002\n\n\u516C\u53F8\u8AAA AI \u8B93\u5927\u5BB6\u505A\u66F4\u6709\u50F9\u503C\u7684\u5DE5\u4F5C\uFF0C\u9019\u500B\u300C\u66F4\u6709\u50F9\u503C\u300D\u662F\u8AB0\u5B9A\u7FA9\u7684\uFF1F\n\n\u56E0\u70BA\u6211\u4EE5\u524D\u62CD\u7BC0\u76EE\uFF0C\u88FD\u4F5C\u4EBA\u4E5F\u5E38\u8AAA\uFF1A\u300C\u9019\u4E00\u6BB5\u6211\u5011\u6539\u5F97\u66F4\u6709\u6DF1\u5EA6\u3002\u300D\n\n\u7D50\u679C\u5C31\u662F\u628A\u539F\u672C\u4E09\u5206\u9418\u7684\u5167\u5BB9\uFF0C\u6539\u6210\u5927\u5BB6\u90FD\u770B\u4E0D\u61C2\u7684\u5341\u5206\u9418\u3002\n\n### \u5468\u6600\n\n\u5C0D\uFF0C\u9019\u5F88\u6709\u610F\u601D\u3002\n\n\u300C\u66F4\u6709\u50F9\u503C\u300D\u53EF\u80FD\u53EA\u662F\u628A\u539F\u672C\u7684\u5DE5\u4F5C\u8B8A\u5F97\u66F4\u8907\u96DC\u3002\n\n\u5C0F\u82B8\uFF0C\u59B3\u5011\u5C0E\u5165 AI \u4E4B\u5F8C\uFF0C\u5DE5\u4F5C\u771F\u7684\u8B8A\u6709\u50F9\u503C\u4E86\u55CE\uFF1F\n\n### \u5C0F\u82B8\n\n\u6709\u4E9B\u8B8A\u597D\u4E86\uFF0C\u6709\u4E9B\u8B8A\u7CDF\u3002\n\nAI \u5E6B\u6211\u6574\u7406\u5BA2\u670D\u7D00\u9304\uFF0C\u9019\u90E8\u5206\u5F88\u597D\uFF0C\u539F\u672C\u6211\u8981\u82B1\u4E8C\u5341\u5206\u9418\u6574\u7406\uFF0C\u73FE\u5728\u4E94\u5206\u9418\u5C31\u597D\u3002\n\n\u4F46\u516C\u53F8\u6C92\u6709\u56E0\u6B64\u8B93\u6211\u5C11\u63A5\u96FB\u8A71\uFF0C\u53CD\u800C\u8AAA\uFF1A\u300C\u65E2\u7136\u59B3\u7701\u4E0B\u5341\u4E94\u5206\u9418\uFF0C\u5C31\u53EF\u4EE5\u591A\u63A5\u5E7E\u901A\u3002\u300D\n\n\u6240\u4EE5\u6211\u6C92\u6709\u8B8A\u8F15\u9B06\uFF0C\u53EA\u662F\u5DE5\u4F5C\u901F\u5EA6\u8B8A\u5FEB\u3002\n\n### \u8A31\u6587\u54F2\uFF5C\u88FD\u9020\u696D\u4E3B\u7BA1\n\n\u9019\u5728\u5DE5\u5EE0\u5F88\u5E38\u898B\u3002\n\n\u6A5F\u5668\u8B8A\u5FEB\u4E4B\u5F8C\uFF0C\u4E0D\u4E00\u5B9A\u8B93\u4EBA\u4F11\u606F\uFF0C\u800C\u662F\u7522\u91CF\u76EE\u6A19\u4E00\u8D77\u63D0\u9AD8\u3002\n\n### \u6797\u5C91\n\n\u90A3\u59B3\u5011\u6240\u8B02\u7684\u300C\u63A8 AI\u300D\uFF0C\u662F\u4E0D\u662F\u5176\u5BE6\u662F\uFF1A\n\n> \u7528\u65B0\u5DE5\u5177\uFF0C\u628A\u4EBA\u69A8\u5F97\u66F4\u4E7E\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u6A23\u8B1B\u592A\u60B2\u89C0\u4E86\u3002\u4F01\u696D\u672C\u4F86\u5C31\u8981\u63D0\u9AD8\u6548\u7387\uFF0C\u4E0D\u7136\u6210\u672C\u4E0A\u5347\u3001\u7AF6\u722D\u4E0D\u904E\u5225\u4EBA\uFF0C\u6700\u5F8C\u5DE5\u4F5C\u9084\u662F\u4FDD\u4E0D\u4F4F\u3002\n\n### \u8607\u96C5\u96EF\uFF5C\u8077\u6DAF\u7814\u7A76\u8005\n\n\u53EF\u662F\u300C\u4E0D\u63D0\u9AD8\u6548\u7387\uFF0C\u516C\u53F8\u5C31\u6703\u5012\u300D\u9019\u53E5\u8A71\uFF0C\u4E5F\u5E38\u5E38\u88AB\u7576\u6210\u842C\u7528\u7406\u7531\u3002\n\n\u6548\u7387\u63D0\u9AD8\u4E4B\u5F8C\uFF0C\u8AB0\u7372\u5F97\u597D\u8655\uFF1F\u9019\u4E0D\u662F\u6280\u8853\u554F\u984C\uFF0C\u662F\u5206\u914D\u554F\u984C\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5982\u679C\u4E0D\u63A8\uFF0C\u5225\u7684\u516C\u53F8\u63A8\u4E86\uFF0C\u5E02\u5834\u6703\u6DD8\u6C70\u6211\u5011\u3002\n\n### \u6797\u5C91\n\n\u9019\u53E5\u8A71\u6211\u4E5F\u5F88\u719F\u3002\n\n\u300C\u5225\u4EBA\u90FD\u5728\u505A\uFF0C\u6240\u4EE5\u6211\u5011\u53EA\u80FD\u505A\u3002\u300D\n\n\u53EF\u662F\u5982\u679C\u5927\u5BB6\u90FD\u7528 AI \u628A\u5BA2\u670D\u7E2E\u6E1B\u4E00\u534A\uFF0C\u6700\u5F8C\u6574\u500B\u7522\u696D\u7684\u5BA2\u6236\u90FD\u66F4\u96E3\u627E\u5230\u771F\u4EBA\uFF0C\u90A3\u6211\u5011\u5230\u5E95\u662F\u5728\u9032\u6B65\uFF0C\u9084\u662F\u5728\u4E00\u8D77\u628A\u670D\u52D9\u8B8A\u5DEE\uFF1F\n\n### \u5468\u6600\n\n\u5B50\u8B19\uFF0C\u4F60\u525B\u525B\u8AAA\u4F01\u696D\u8981\u63A8\uFF0C\u4E0D\u7136\u6703\u88AB\u6DD8\u6C70\u3002\u90A3\u6709\u6C92\u6709\u53EF\u80FD\u771F\u6B63\u8A72\u554F\u7684\u662F\uFF1A\n\n\u300C\u54EA\u4E9B\u5DE5\u4F5C\u9069\u5408\u7528 AI\uFF1F\u300D\n\n\u800C\u4E0D\u662F\u300C\u516C\u53F8\u8981\u4E0D\u8981\u5168\u9762\u5C0E\u5165 AI\uFF1F\u300D\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u540C\u610F\u4E0D\u80FD\u5168\u9762\u4E82\u63A8\u3002\u4F46\u516C\u53F8\u9700\u8981\u4E00\u500B\u65B9\u5411\uFF0C\u4E0D\u53EF\u80FD\u6BCF\u500B\u90E8\u9580\u90FD\u81EA\u5DF1\u6C7A\u5B9A\u3002\n\n### \u8A31\u6587\u54F2\n\n\u5176\u5BE6\u73FE\u5834\u6700\u6015\u7684\u5C31\u662F\u7E3D\u90E8\u8AAA\u300C\u8ACB\u5404\u55AE\u4F4D\u7A4D\u6975\u64C1\u62B1 AI\u300D\u3002\n\n\u9019\u53E5\u8A71\u807D\u8D77\u4F86\u5F88\u6709\u65B9\u5411\uFF0C\u5BE6\u969B\u4E0A\u7B49\u65BC\u6C92\u6709\u65B9\u5411\u3002\n\n\u6211\u5011\u5DE5\u5EE0\u6709\u4E00\u6B21\u5C0E\u5165\u9810\u6E2C\u7DAD\u4FEE\u7CFB\u7D71\uFF0C\u7E3D\u90E8\u8AAA\u53EF\u4EE5\u63D0\u524D\u767C\u73FE\u8A2D\u5099\u6545\u969C\u3002\u7D50\u679C\u73FE\u5834\u4E3B\u7BA1\u6BCF\u5929\u591A\u4E86\u4E00\u5806\u8B66\u5831\uFF0C\u771F\u6B63\u91CD\u8981\u7684\u6545\u969C\u53CD\u800C\u88AB\u6DF9\u6C92\u3002\n\n### \u963F\u9054\n\n\u9019\u807D\u8D77\u4F86\u5F88\u50CF\u624B\u6A5F\u901A\u77E5\u3002\n\n\u4E00\u958B\u59CB\u662F\u6015\u6F0F\u6389\u8A0A\u606F\uFF0C\u6240\u4EE5\u6BCF\u500B App \u90FD\u958B\u901A\u77E5\u3002\u6700\u5F8C\u624B\u6A5F\u4E00\u76F4\u97FF\uFF0C\u4F46\u4F60\u4E0D\u77E5\u9053\u54EA\u500B\u662F\u771F\u7684\u91CD\u8981\u3002\n\n### \u8449\u66FC\uFF5C\u6025\u8A3A\u8B77\u7406\u5E2B\n\n\u6025\u8A3A\u4E5F\u5F88\u50CF\u3002\n\n\u5982\u679C\u6211\u5011\u628A\u6240\u6709\u75C5\u4EBA\u90FD\u6A19\u6210\u300C\u53EF\u80FD\u6709\u5371\u96AA\u300D\uFF0C\u90A3\u7B49\u65BC\u6C92\u6709\u5206\u7D1A\u3002\n\nAI \u6709\u6642\u5019\u4E0D\u662F\u5E6B\u4F60\u505A\u6C7A\u5B9A\uFF0C\u800C\u662F\u628A\u66F4\u591A\u6771\u897F\u4E1F\u7D66\u4F60\u6C7A\u5B9A\u3002\n\n### \u5468\u6600\n\n\u6240\u4EE5 AI \u53EF\u80FD\u4E0D\u662F\u6E1B\u5C11\u5DE5\u4F5C\uFF0C\u800C\u662F\u628A\u5DE5\u4F5C\u5F9E\u300C\u57F7\u884C\u300D\u8B8A\u6210\u300C\u5224\u65B7\u300D\u3002\n\n### \u8449\u66FC\n\n\u5C0D\uFF0C\u800C\u4E14\u5224\u65B7\u901A\u5E38\u66F4\u7D2F\u3002\n\n\u4EE5\u524D\u4F60\u7167\u6D41\u7A0B\u505A\u5B8C\u4E00\u4EF6\u4E8B\uFF0C\u8CAC\u4EFB\u6BD4\u8F03\u6E05\u695A\u3002\u73FE\u5728\u7CFB\u7D71\u5EFA\u8B70\u4E00\u500B\u7B54\u6848\uFF0C\u4F60\u8981\u6C7A\u5B9A\u8981\u4E0D\u8981\u76F8\u4FE1\u5B83\u3002\u505A\u5C0D\u4E86\uFF0C\u5927\u5BB6\u8AAA\u7CFB\u7D71\u5F88\u68D2\uFF1B\u505A\u932F\u4E86\uFF0C\u5927\u5BB6\u554F\u4F60\u70BA\u4EC0\u9EBC\u6C92\u6709\u767C\u73FE\u7CFB\u7D71\u932F\u3002\n\n### \u6797\u5C91\n\n\u9019\u5F88\u95DC\u9375\u3002\n\n\u516C\u53F8\u8AAA AI \u5E6B\u4F60\u505A\u6C7A\u5B9A\uFF0C\u4F46\u8CAC\u4EFB\u9084\u662F\u4F60\u7684\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u662F\u5C0E\u5165\u8A2D\u8A08\u7684\u554F\u984C\u3002\u53EF\u4EE5\u5EFA\u7ACB\u5BE9\u6838\u6D41\u7A0B\u3002\n\n### \u5C0F\u82B8\n\n\u300C\u5BE9\u6838\u6D41\u7A0B\u300D\u807D\u8D77\u4F86\u5F88\u597D\uFF0C\u4F46\u5BA2\u670D\u73FE\u5834\u901A\u5E38\u662F\u4E00\u500B\u4EBA\u540C\u6642\u8655\u7406\u597D\u5E7E\u500B\u5BA2\u6236\u3002\n\n\u5982\u679C AI \u6BCF\u4E00\u5247\u56DE\u7B54\u90FD\u8981\u6211\u91CD\u65B0\u6AA2\u67E5\uFF0C\u90A3\u6211\u6839\u672C\u6C92\u6709\u7701\u6642\u9593\u3002\n\n### \u9673\u6021\u5B89\n\n\u800C\u4E14\u5982\u679C\u54E1\u5DE5\u88AB\u8981\u6C42\u300C\u4F7F\u7528 AI\uFF0C\u4F46\u51FA\u4E86\u932F\u7B97\u4F60\u7684\u300D\uFF0C\u5927\u5BB6\u7576\u7136\u6703\u5F88\u4FDD\u5B88\u3002\n\n### \u6797\u5C91\n\n\u6240\u4EE5\u6211\u5011\u73FE\u5728\u53C8\u9047\u5230\u4E00\u500B\u77DB\u76FE\uFF1A\n\n\u516C\u53F8\u5E0C\u671B\u54E1\u5DE5\u6562\u7528\uFF0C\u4F46\u54E1\u5DE5\u77E5\u9053\u51FA\u4E8B\u8981\u81EA\u5DF1\u625B\u3002\n\n\u9019\u7A2E\u60C5\u6CC1\u4E0B\uFF0C\u516C\u53F8\u662F\u4E0D\u662F\u5176\u5BE6\u4E0D\u662F\u5728\u9F13\u52F5\u4F7F\u7528\uFF0C\u800C\u662F\u5728\u628A\u98A8\u96AA\u5F80\u4E0B\u4E1F\uFF1F\n\n### \u6C88\u9ED8\uFF5C\u89C0\u5BDF\u8005\n\n\u6211\u60F3\u63D2\u4E00\u53E5\u3002\n\n\u5230\u76EE\u524D\u70BA\u6B62\uFF0C\u5927\u5BB6\u4E00\u76F4\u8AAA\u300C\u54E1\u5DE5\u5BB3\u6015 AI\u300D\uFF0C\u4F46\u6211\u807D\u5230\u7684\u5167\u5BB9\u6BD4\u8F03\u50CF\u662F\uFF1A\n\n\u54E1\u5DE5\u5BB3\u6015\u7684\u4E0D\u662F AI \u672C\u8EAB\uFF0C\u800C\u662F\u516C\u53F8\u7528 AI \u91CD\u65B0\u5206\u914D\u5229\u76CA\u3001\u8CAC\u4EFB\u548C\u5DE5\u4F5C\u91CF\uFF0C\u537B\u4E0D\u628A\u898F\u5247\u8AAA\u6E05\u695A\u3002\n\n\u4E5F\u8A31\u4E00\u958B\u59CB\u7684\u554F\u984C\u554F\u932F\u4E86\u3002\n\n\u4E0D\u662F\u300C\u5982\u4F55\u8B93\u54E1\u5DE5\u4E0D\u6015 AI\u300D\uFF0C\u800C\u662F\uFF1A\n\n> \u300C\u516C\u53F8\u662F\u5426\u9858\u610F\u8B93\u54E1\u5DE5\u53C3\u8207\u6C7A\u5B9A AI \u5E36\u4F86\u7684\u597D\u8655\u8207\u98A8\u96AA\u600E\u9EBC\u5206\u914D\uFF1F\u300D\n\n### \u6797\u5C91\n\n\u5F88\u597D\u3002\u6021\u5B89\uFF0C\u9019\u5C0D\u4EBA\u8CC7\u4F86\u8AAA\u6703\u4E0D\u6703\u592A\u7406\u60F3\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u4E0D\u6703\uFF0C\u4F46\u5F88\u96E3\u3002\n\n\u516C\u53F8\u5E38\u5E38\u5E0C\u671B\u54E1\u5DE5\u53C3\u8207\u8A0E\u8AD6\uFF0C\u524D\u63D0\u662F\u6700\u5F8C\u4E0D\u8981\u771F\u7684\u5F71\u97FF\u6C7A\u5B9A\u3002\n\n### \u963F\u9054\n\n\u90A3\u53EB\u4EC0\u9EBC\uFF1F\u53C3\u8207\u5F0F\u88DD\u98FE\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u6709\u9EDE\u50CF\u3002\n\n\u4F8B\u5982\u516C\u53F8\u627E\u5BA2\u670D\u4EBA\u54E1\u4F86\u6E2C\u8A66 AI\uFF0C\u554F\u5927\u5BB6\uFF1A\u300C\u4F60\u5011\u89BA\u5F97\u597D\u4E0D\u597D\u7528\uFF1F\u300D\n\n\u4F46\u6C92\u6709\u4EBA\u554F\uFF1A\u300C\u5982\u679C\u5B83\u597D\u7528\u5230\u53EF\u4EE5\u5C11\u4E09\u500B\u4EBA\uFF0C\u9019\u4E09\u500B\u4EBA\u7684\u672A\u4F86\u600E\u9EBC\u8FA6\uFF1F\u300D\n\n### \u5C0F\u82B8\n\n\u5C0D\u3002\u516C\u53F8\u53EB\u6211\u5011\u5E6B\u5FD9\u8A13\u7DF4 AI\uFF0C\u537B\u4E0D\u8AAA AI \u5B78\u6703\u4E4B\u5F8C\uFF0C\u6211\u5011\u6703\u8B8A\u6210\u4EC0\u9EBC\u3002\n\n\u6211\u5011\u63D0\u4F9B\u6700\u719F\u6089\u5BA2\u6236\u7684\u7D93\u9A57\u3001\u5E38\u898B\u554F\u984C\u3001\u8655\u7406\u65B9\u5F0F\u3002\u53EF\u662F\u90A3\u4E9B\u6771\u897F\u4E00\u65E6\u88AB\u6574\u7406\u9032\u7CFB\u7D71\uFF0C\u5C31\u597D\u50CF\u4E0D\u518D\u5C6C\u65BC\u6211\u5011\u4E86\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5982\u679C\u4E0D\u628A\u9019\u4E9B\u7D93\u9A57\u6574\u7406\u51FA\u4F86\uFF0CAI \u5C31\u4E0D\u6703\u597D\u7528\u3002\u9019\u4E9B\u77E5\u8B58\u61C9\u8A72\u88AB\u4FDD\u5B58\uFF0C\u4E0D\u662F\u53EA\u653E\u5728\u67D0\u5E7E\u500B\u4EBA\u7684\u8166\u888B\u88E1\u3002\n\n### \u5C0F\u82B8\n\n\u6211\u6C92\u6709\u8AAA\u4E0D\u8981\u4FDD\u5B58\u3002\n\n\u6211\u662F\u5728\u554F\uFF1A\u4FDD\u5B58\u4E4B\u5F8C\uFF0C\u539F\u672C\u7D2F\u7A4D\u9019\u4E9B\u7D93\u9A57\u7684\u4EBA\uFF0C\u6709\u6C92\u6709\u5F97\u5230\u4EC0\u9EBC\uFF1F\n\n### \u8607\u96C5\u96EF\n\n\u9019\u88E1\u5176\u5BE6\u6D89\u53CA\u4E00\u500B\u5F88\u6DF1\u7684\u554F\u984C\uFF1A\u516C\u53F8\u628A\u500B\u4EBA\u7684\u719F\u7DF4\u5EA6\uFF0C\u8F49\u6210\u7D44\u7E54\u7684\u8CC7\u6599\u4E4B\u5F8C\uFF0C\u500B\u4EBA\u7684\u8AC7\u5224\u529B\u6703\u4E0D\u6703\u4E0B\u964D\uFF1F\n\n\u4EE5\u524D\u53EA\u6709\u5C0F\u82B8\u77E5\u9053\u600E\u9EBC\u8655\u7406\u6700\u96E3\u7E8F\u7684\u5BA2\u6236\uFF0C\u6240\u4EE5\u5979\u5F88\u91CD\u8981\u3002\u73FE\u5728\u516C\u53F8\u628A\u5979\u7684\u65B9\u6CD5\u6559\u7D66 AI\uFF0C\u7406\u8AD6\u4E0A\u5927\u5BB6\u90FD\u53D7\u76CA\uFF1B\u4F46\u5C0F\u82B8\u4E5F\u53EF\u80FD\u8B8A\u5F97\u6BD4\u8F03\u5BB9\u6613\u88AB\u66FF\u4EE3\u3002\n\n### \u8A31\u6587\u54F2\n\n\u5DE5\u5EE0\u4E5F\u4E00\u6A23\u3002\u8001\u54E1\u5DE5\u77E5\u9053\u6A5F\u53F0\u54EA\u7A2E\u8072\u97F3\u4E0D\u5C0D\u3001\u54EA\u500B\u6EAB\u5EA6\u4EE3\u8868\u5FEB\u58DE\u4E86\u3002\u4EE5\u524D\u9019\u662F\u4ED6\u7684\u7D93\u9A57\u548C\u5730\u4F4D\u3002\n\n\u5982\u679C\u516C\u53F8\u628A\u7D93\u9A57\u505A\u6210\u7CFB\u7D71\uFF0C\u537B\u6C92\u6709\u8B93\u8001\u54E1\u5DE5\u53C3\u8207\u8A2D\u8A08\uFF0C\u4ED6\u6703\u89BA\u5F97\u81EA\u5DF1\u5728\u8A13\u7DF4\u4E00\u53F0\u53D6\u4EE3\u81EA\u5DF1\u7684\u6A5F\u5668\u3002\n\n### \u8449\u66FC\n\n\u6211\u60F3\u5230\u6025\u8A3A\u88E1\u7684\u5B78\u5F92\u5236\u5EA6\u3002\n\n\u5E74\u8F15\u8B77\u7406\u5E2B\u6703\u8DDF\u8457\u8CC7\u6DF1\u7684\u4EBA\u5B78\uFF0C\u4E0D\u53EA\u662F\u5B78\u6A19\u6E96\u6D41\u7A0B\uFF0C\u9084\u5B78\u600E\u9EBC\u89C0\u5BDF\u4E00\u500B\u4EBA\u300C\u770B\u8D77\u4F86\u4E0D\u592A\u5C0D\u300D\u3002\n\n\u5982\u679C\u6211\u5011\u628A\u9019\u4E9B\u90FD\u5BEB\u6210\u6A19\u6E96\u7B54\u6848\uFF0C\u53EF\u80FD\u6703\u5931\u53BB\u90A3\u4E9B\u8AAA\u4E0D\u6E05\u695A\u3001\u4F46\u5F88\u91CD\u8981\u7684\u76F4\u89BA\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u662F AI \u4E5F\u53EF\u4EE5\u5E6B\u5FD9\u4FDD\u5B58\u9019\u4E9B\u76F4\u89BA\uFF0C\u8B93\u65B0\u4EBA\u66F4\u5FEB\u4E0A\u624B\u3002\n\n### \u8449\u66FC\n\n\u53EF\u4EE5\uFF0C\u4F46\u524D\u63D0\u662F\u4F60\u627F\u8A8D\u5B83\u4E0D\u4E00\u5B9A\u61C2\u3002\n\n### \u9AD8\u5B50\u8B19\n\nAI \u672C\u4F86\u5C31\u4E0D\u61C9\u8A72\u88AB\u7576\u6210\u5B8C\u5168\u6B63\u78BA\u3002\n\n### \u6797\u5C91\n\n\u53EF\u662F\u5E02\u5834\u7C21\u5831\u901A\u5E38\u4E0D\u662F\u9019\u6A23\u8B1B\u7684\u3002\n\n\u7C21\u5831\u6703\u8AAA\uFF1A\u300CAI \u53EF\u4EE5\u5927\u5E45\u63D0\u5347\u6E96\u78BA\u7387\u3001\u964D\u4F4E\u932F\u8AA4\u7387\u3001\u7E2E\u77ED\u65B0\u4EBA\u8A13\u7DF4\u6642\u9593\u3002\u300D\n\n\u6C92\u6709\u4EBA\u5728\u7C21\u5831\u6700\u5F8C\u8AAA\uFF1A\u300C\u53E6\u5916\uFF0C\u5B83\u6709\u6642\u5019\u6703\u81EA\u4FE1\u5730\u8B1B\u932F\uFF0C\u8ACB\u5927\u5BB6\u4FDD\u6301\u8B66\u89BA\u3002\u300D\n\n### \u963F\u9054\n\n\u9019\u5C31\u50CF\u8ACB\u4E00\u500B\u5F88\u6703\u8B1B\u8A71\u3001\u4F46\u5076\u723E\u4E82\u63B0\u7684\u4EBA\u7576\u540C\u4E8B\u3002\n\n\u4E00\u958B\u59CB\u5927\u5BB6\u89BA\u5F97\u4ED6\u53CD\u61C9\u597D\u5FEB\uFF0C\u5F8C\u4F86\u767C\u73FE\u4ED6\u8B1B\u932F\u6642\u4E5F\u5F88\u6709\u81EA\u4FE1\u3002\n\n### \u5468\u6600\n\n\u90A3\u54E1\u5DE5\u8981\u600E\u9EBC\u77E5\u9053\u4EC0\u9EBC\u6642\u5019\u8A72\u76F8\u4FE1 AI\uFF1F\n\n### \u8A31\u6587\u54F2\n\n\u4E0D\u80FD\u53EA\u9760\u54E1\u5DE5\u81EA\u5DF1\u5B78\u6703\u61F7\u7591\u3002\n\n\u8981\u8B93\u4ED6\u5011\u77E5\u9053\uFF0C\u54EA\u4E9B\u4E8B\u60C5 AI \u53EF\u4EE5\u76F4\u63A5\u8655\u7406\uFF0C\u54EA\u4E9B\u4E8B\u60C5\u4E00\u5B9A\u8981\u4EA4\u7D66\u4EBA\u3002\n\n### \u5C0F\u82B8\n\n\u9019\u53E5\u8A71\u8AAA\u8D77\u4F86\u5BB9\u6613\u3002\n\n\u5728\u5BA2\u670D\u73FE\u5834\uFF0C\u6700\u9EBB\u7169\u7684\u4E0D\u662F\u6A19\u6E96\u554F\u984C\uFF0C\u800C\u662F\u90A3\u4E9B\u4ECB\u65BC\u6A19\u6E96\u548C\u4F8B\u5916\u4E4B\u9593\u7684\u554F\u984C\u3002AI \u6700\u5BB9\u6613\u5728\u9019\u7A2E\u5730\u65B9\u8B1B\u5F97\u5F88\u50CF\u771F\u7684\u3002\n\n### \u9673\u6021\u5B89\n\n\u6240\u4EE5\u8A13\u7DF4\u4E0D\u53EA\u662F\u6559\u5927\u5BB6\u6309\u54EA\u500B\u6309\u9215\uFF0C\u800C\u662F\u8B93\u5927\u5BB6\u77E5\u9053\u600E\u9EBC\u6311\u6230 AI\u3002\n\n### \u6797\u5C91\n\n\u4F46\u6211\u61F7\u7591\uFF0C\u5F88\u591A\u516C\u53F8\u771F\u6B63\u60F3\u8981\u7684\u4E0D\u662F\u300C\u6703\u6311\u6230 AI \u7684\u54E1\u5DE5\u300D\uFF0C\u800C\u662F\u300C\u9858\u610F\u7167\u8457 AI \u505A\u7684\u54E1\u5DE5\u300D\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u6709\u9EDE\u4E0D\u516C\u5E73\u3002\u4F01\u696D\u4E5F\u4E0D\u53EF\u80FD\u8B93\u6BCF\u500B\u4EBA\u90FD\u7121\u9650\u8CEA\u7591\u7CFB\u7D71\uFF0C\u9019\u6A23\u6548\u7387\u6703\u6D88\u5931\u3002\n\n### \u8607\u96C5\u96EF\n\n\u6548\u7387\u4E0D\u662F\u552F\u4E00\u6307\u6A19\u3002\n\n\u5982\u679C\u54E1\u5DE5\u56E0\u70BA\u5BB3\u6015\u88AB\u8FFD\u8E64\uFF0C\u958B\u59CB\u6545\u610F\u4E0D\u7559\u4E0B\u7D00\u9304\uFF1B\u56E0\u70BA\u5BB3\u6015\u8868\u73FE\u88AB\u6BD4\u8F03\uFF0C\u958B\u59CB\u53EA\u63A5\u5BB9\u6613\u7684\u6848\u4EF6\uFF1B\u56E0\u70BA\u5BB3\u6015\u72AF\u932F\uFF0C\u958B\u59CB\u5B8C\u5168\u4F9D\u8CF4 AI\u2014\u2014\u90A3\u5E33\u9762\u4E0A\u7684\u6548\u7387\u53EF\u80FD\u4E0A\u5347\uFF0C\u5BE6\u969B\u7684\u7D44\u7E54\u80FD\u529B\u537B\u4E0B\u964D\u3002\n\n### \u6C88\u9ED8\n\n\u6211\u60F3\u8A18\u4E0B\u9019\u500B\u8F49\u6298\u3002\n\n\u525B\u624D\u5927\u5BB6\u8AC7\u7684\u662F\u300C\u5982\u4F55\u8B93\u54E1\u5DE5\u9858\u610F\u4F7F\u7528 AI\u300D\uFF0C\u73FE\u5728\u8B8A\u6210\u300C\u516C\u53F8\u7528\u4EC0\u9EBC\u65B9\u5F0F\u8861\u91CF\u4F7F\u7528 AI \u7684\u4EBA\u300D\u3002\n\n\u54E1\u5DE5\u6015\u7684\u53EF\u80FD\u4E0D\u53EA\u662F\u5931\u696D\uFF0C\u4E5F\u5305\u62EC\uFF1A\n\n- \u88AB\u7CFB\u7D71\u76E3\u63A7\n- \u88AB\u62FF\u4F86\u6392\u540D\n- \u88AB\u8981\u6C42\u66F4\u5FEB\n- \u88AB\u8FFD\u7A76 AI \u9020\u6210\u7684\u932F\u8AA4\n- \u81EA\u5DF1\u7684\u7D93\u9A57\u88AB\u62FF\u8D70\u5F8C\u5931\u53BB\u50F9\u503C\n\n### \u89C0\u773E\u4E00\uFF5C\u73FE\u5834\u54E1\u5DE5\n\n\u6211\u60F3\u554F\u4E00\u500B\u6BD4\u8F03\u73FE\u5BE6\u7684\u3002\n\n\u5982\u679C\u516C\u53F8\u8AAA\u4E0D\u6703\u88C1\u54E1\uFF0C\u4F46\u6C92\u6709\u767D\u7D19\u9ED1\u5B57\uFF0C\u5927\u5BB6\u600E\u9EBC\u76F8\u4FE1\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u4E0D\u80FD\u53EA\u53EB\u54E1\u5DE5\u76F8\u4FE1\u3002\n\n\u516C\u53F8\u53EF\u4EE5\u627F\u8AFE\u4E00\u6BB5\u6642\u9593\u5167\u4E0D\u56E0 AI \u76F4\u63A5\u88C1\u54E1\uFF0C\u4E26\u4E14\u8AAA\u660E\u5982\u679C\u5DE5\u4F5C\u6E1B\u5C11\uFF0C\u6703\u600E\u9EBC\u5B89\u6392\u8F49\u8ABF\u6216\u8A13\u7DF4\u3002\n\n### \u6797\u5C91\n\n\u300C\u4E00\u6BB5\u6642\u9593\u300D\u662F\u591A\u4E45\uFF1F\n\n\u4E09\u500B\u6708\uFF1F\u4E00\u5E74\uFF1F\u4E94\u5E74\uFF1F\n\n### \u9673\u6021\u5B89\n\n\u9019\u8981\u770B\u516C\u53F8\u72C0\u6CC1\u3002\n\n### \u5C0F\u82B8\n\n\u90A3\u54E1\u5DE5\u9084\u662F\u6703\u89BA\u5F97\u9019\u662F\u66AB\u7DE9\uFF0C\u4E0D\u662F\u4FDD\u969C\u3002\n\n### \u8607\u96C5\u96EF\n\n\u800C\u4E14\u627F\u8AFE\u4E0D\u88C1\u54E1\uFF0C\u4E5F\u4E0D\u4EE3\u8868\u5DE5\u4F5C\u4E0D\u6703\u8B8A\u5F97\u4E0D\u53EF\u5FCD\u53D7\u3002\n\n\u516C\u53F8\u53EF\u4EE5\u4E0D\u88C1\u59B3\uFF0C\u4F46\u628A\u76EE\u6A19\u63D0\u9AD8\u5230\u59B3\u505A\u4E0D\u5B8C\uFF0C\u6700\u5F8C\u59B3\u81EA\u5DF1\u96E2\u8077\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u662F\u5982\u679C\u516C\u53F8\u9023\u9019\u7A2E\u627F\u8AFE\u90FD\u4E0D\u6562\u7D66\uFF0CAI \u5C0E\u5165\u6703\u5B8C\u5168\u505C\u6EEF\u3002\n\n### \u6797\u5C91\n\n\u4E5F\u8A31\u505C\u6EEF\u4E0D\u4E00\u5B9A\u662F\u58DE\u4E8B\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5E02\u5834\u4E0D\u6703\u7B49\u6211\u5011\u3002\n\n### \u6797\u5C91\n\n\u4F60\u4E00\u76F4\u8AAA\u5E02\u5834\u4E0D\u6703\u7B49\u3002\u90A3\u5982\u679C\u5E02\u5834\u903C\u5927\u5BB6\u505A\u4E00\u4EF6\u54E1\u5DE5\u4E0D\u4FE1\u4EFB\u3001\u5BA2\u6236\u4E5F\u4E0D\u559C\u6B61\u7684\u4E8B\uFF0C\u6211\u5011\u5C31\u53EA\u80FD\u7167\u505A\u55CE\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u4E0D\u662F\u53EA\u80FD\u7167\u505A\uFF0C\u4F46\u4E0D\u80FD\u628A\u6050\u61FC\u7576\u6210\u4E0D\u6539\u8B8A\u7684\u7406\u7531\u3002\n\n### \u5C0F\u82B8\n\n\u4E5F\u4E0D\u80FD\u628A\u7AF6\u722D\u7576\u6210\u4E0D\u8CA0\u8CAC\u4EFB\u7684\u7406\u7531\u3002\n\n\u73FE\u5834\u5B89\u975C\u4E86\u4E00\u4E0B\u3002\n\n### \u5468\u6600\n\n\u5C0F\u82B8\uFF0C\u59B3\u525B\u624D\u597D\u50CF\u4E0D\u662F\u55AE\u7D14\u53CD\u5C0D AI\u3002\n\n### \u5C0F\u82B8\n\n\u6211\u4E0D\u53CD\u5C0D\u3002\n\n\u6211\u6BCF\u5929\u90FD\u5E0C\u671B\u6709\u5DE5\u5177\u5E6B\u6211\u8655\u7406\u90A3\u4E9B\u6C92\u4EBA\u60F3\u505A\u7684\u4E8B\u60C5\u3002\u771F\u6B63\u8B93\u6211\u4E0D\u8212\u670D\u7684\u662F\uFF0C\u516C\u53F8\u8981\u6211\u76F8\u4FE1 AI \u6703\u8B93\u6211\u66F4\u91CD\u8981\uFF0C\u4F46\u5F9E\u4F86\u6C92\u6709\u554F\u904E\u6211\uFF1A\u4EC0\u9EBC\u4E8B\u60C5\u624D\u662F\u6211\u60F3\u82B1\u6642\u9593\u505A\u7684\u3002\n\n### \u963F\u9054\n\n\u9019\u53E5\u6211\u807D\u61C2\u4E86\u3002\n\n\u4E0D\u662F\u300CAI \u6703\u4E0D\u6703\u6436\u8D70\u4F60\u7684\u5DE5\u4F5C\u300D\uFF0C\u800C\u662F\u300C\u5982\u679C AI \u62FF\u8D70\u4E00\u90E8\u5206\u5DE5\u4F5C\uFF0C\u8AB0\u4F86\u6C7A\u5B9A\u5269\u4E0B\u7684\u5DE5\u4F5C\u503C\u4E0D\u503C\u5F97\u505A\u300D\u3002\n\n### \u8449\u66FC\n\n\u800C\u4E14\u6709\u4E9B\u5DE5\u4F5C\u672C\u4F86\u5C31\u4E0D\u8A72\u88AB\u5B8C\u5168\u6D88\u9664\u3002\n\n\u6025\u8A3A\u88E1\uFF0C\u75C5\u4EBA\u6709\u6642\u5019\u9700\u8981\u7684\u4E0D\u662F\u6700\u5FEB\u7684\u7B54\u6848\uFF0C\u800C\u662F\u6709\u4EBA\u770B\u8457\u4ED6\uFF0C\u77E5\u9053\u4ED6\u5176\u5BE6\u5F88\u5BB3\u6015\u3002\n\n\u5BA2\u670D\u4E5F\u53EF\u80FD\u4E00\u6A23\u3002\u5BA2\u6236\u4E0D\u4E00\u5B9A\u53EA\u662F\u8981\u9000\u8CA8\u6D41\u7A0B\uFF0C\u4ED6\u53EF\u80FD\u662F\u60F3\u78BA\u8A8D\u81EA\u5DF1\u6C92\u6709\u88AB\u6577\u884D\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u9019\u4E9B\u53EF\u4EE5\u4FDD\u7559\u7D66\u771F\u4EBA\u8655\u7406\u3002\n\n### \u5C0F\u82B8\n\n\u8AB0\u6C7A\u5B9A\u4EC0\u9EBC\u6642\u5019\u300C\u503C\u5F97\u771F\u4EBA\u8655\u7406\u300D\uFF1F\n\n\u5982\u679C\u7CFB\u7D71\u5224\u65B7\u9019\u500B\u5BA2\u6236\u53EA\u503C\u4E09\u5206\u9418\uFF0C\u800C\u6211\u89BA\u5F97\u4ED6\u9700\u8981\u4E8C\u5341\u5206\u9418\uFF0C\u6700\u5F8C\u807D\u8AB0\u7684\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u4EE5\u8A2D\u8A08\u5347\u7D1A\u898F\u5247\u3002\n\n### \u6797\u5C91\n\n\u53C8\u56DE\u5230\u898F\u5247\u3002\n\n\u898F\u5247\u8AB0\u8A02\uFF1F\u8CC7\u6599\u5F9E\u54EA\u88E1\u4F86\uFF1F\u932F\u4E86\u8AB0\u8CA0\u8CAC\uFF1F\u7701\u4E0B\u4F86\u7684\u6642\u9593\u7D66\u8AB0\uFF1F\u9019\u4E9B\u5982\u679C\u6C92\u8B1B\uFF0C\u5DE5\u5177\u518D\u6F02\u4EAE\u90FD\u53EA\u662F\u628A\u554F\u984C\u85CF\u8D77\u4F86\u3002\n\n### \u89C0\u773E\u4E8C\uFF5C\u73FE\u5834\u54E1\u5DE5\n\n\u6211\u60F3\u88DC\u5145\u4E00\u500B\u6211\u5011\u516C\u53F8\u7684\u60C5\u6CC1\u3002\n\n\u4E3B\u7BA1\u6BCF\u5929\u53EB\u6211\u5011\u4F7F\u7528 AI\uFF0C\u9084\u6703\u770B\u8AB0\u7528\u5F97\u5C11\u3002\u4F46\u5F88\u591A\u4EBA\u5176\u5BE6\u662F\u5148\u81EA\u5DF1\u505A\u597D\uFF0C\u518D\u628A\u5167\u5BB9\u4E1F\u7D66 AI \u6539\u5BEB\uFF0C\u9019\u6A23\u7CFB\u7D71\u770B\u8D77\u4F86\u6709\u4F7F\u7528\u7387\uFF0C\u5BE6\u969B\u4E0A\u6C92\u6709\u5E6B\u5FD9\u3002\n\n### \u963F\u9054\n\n\u9019\u53EB\u4E0D\u53EB\u516C\u53F8\u7248\u7684\u6253\u5361\uFF1F\n\n### \u8A31\u6587\u54F2\n\n\u5DE5\u5EE0\u4E5F\u6709\u3002\u7CFB\u7D71\u8981\u6C42\u5927\u5BB6\u586B\u6578\u4F4D\u8868\u55AE\uFF0C\u73FE\u5834\u5C31\u5148\u5728\u7D19\u4E0A\u8A18\uFF0C\u665A\u4E0A\u518D\u4E00\u6B21\u8F38\u5165\u3002\u8868\u55AE\u5B8C\u6210\u7387\u5F88\u597D\u770B\uFF0C\u4F46\u73FE\u5834\u6C92\u6709\u8B8A\u597D\u3002\n\n### \u6C88\u9ED8\n\n\u9019\u662F\u53E6\u4E00\u500B\u8F49\u6298\u3002\n\n\u300C\u63A8\u884C AI\u300D\u53EF\u80FD\u88AB\u8AA4\u89E3\u6210\u300C\u63D0\u9AD8 AI \u4F7F\u7528\u7387\u300D\u3002\n\n\u4F46\u4F7F\u7528\u7387\u4E0D\u4EE3\u8868\u6709\u7528\uFF0C\u66F4\u4E0D\u4EE3\u8868\u4FE1\u4EFB\u3002\n\n### \u5468\u6600\n\n\u90A3\u5982\u679C\u4E0D\u770B\u4F7F\u7528\u7387\uFF0C\u516C\u53F8\u8981\u770B\u4EC0\u9EBC\uFF1F\n\n### \u8607\u96C5\u96EF\n\n\u770B\u554F\u984C\u6709\u6C92\u6709\u6539\u5584\u3002\n\n\u4F8B\u5982\u5BA2\u670D\u662F\u4E0D\u662F\u5C11\u4E86\u91CD\u8907\u8F38\u5165\uFF1F\u65B0\u4EBA\u662F\u4E0D\u662F\u6BD4\u8F03\u5FEB\u627E\u5230\u7B54\u6848\uFF1F\u5BA2\u6236\u662F\u4E0D\u662F\u6BD4\u8F03\u5BB9\u6613\u5F97\u5230\u771F\u6B63\u7684\u5E6B\u52A9\uFF1F\u54E1\u5DE5\u662F\u4E0D\u662F\u6709\u66F4\u591A\u6642\u9593\u8655\u7406\u8907\u96DC\u554F\u984C\uFF1F\n\n### \u6797\u5C91\n\n\u9019\u807D\u8D77\u4F86\u5F88\u5408\u7406\uFF0C\u4F46\u6BCF\u500B\u6307\u6A19\u90FD\u53EF\u80FD\u88AB\u64CD\u5F04\u3002\n\n### \u963F\u9054\n\n\u90A3\u662F\u4E0D\u662F\u6240\u6709\u7BA1\u7406\u90FD\u6703\u88AB\u64CD\u5F04\uFF1F\u5305\u542B\u300C\u5927\u5BB6\u90FD\u5F88\u6709\u5411\u5FC3\u529B\u300D\u9019\u7A2E\u554F\u5377\u3002\n\n### \u9673\u6021\u5B89\n\n\u6240\u4EE5\u4E0D\u80FD\u53EA\u9760\u4E00\u500B\u6578\u5B57\u3002\u8981\u628A\u54E1\u5DE5\u7684\u56DE\u994B\u4E5F\u653E\u9032\u53BB\u3002\n\n### \u5C0F\u82B8\n\n\u4F46\u56DE\u994B\u771F\u7684\u6703\u5F71\u97FF\u6C7A\u7B56\u55CE\uFF1F\n\n\u6211\u5011\u4EE5\u524D\u586B\u904E\u5F88\u591A\u554F\u5377\uFF0C\u6700\u5F8C\u53EA\u6536\u5230\u4E00\u5C01\u4FE1\uFF1A\u300C\u611F\u8B1D\u5927\u5BB6\u5BF6\u8CB4\u610F\u898B\u3002\u300D\n\n### \u9673\u6021\u5B89\n\n\u9019\u662F\u4FE1\u4EFB\u5DF2\u7D93\u88AB\u6D88\u8017\u7684\u554F\u984C\u3002\n\n### \u5C0F\u82B8\n\n\u6240\u4EE5\u4E0D\u8981\u518D\u53EB\u6211\u5011\u76F8\u4FE1\u3002\u5148\u8B93\u6211\u5011\u770B\u5230\u4E00\u6B21\uFF0C\u516C\u53F8\u771F\u7684\u56E0\u70BA\u73FE\u5834\u7684\u610F\u898B\u6539\u4E86\u4EC0\u9EBC\u3002\n\n### \u8449\u66FC\n\n\u9019\u5F88\u50CF\u91AB\u9662\u63A8\u65B0\u6D41\u7A0B\u3002\n\n\u5927\u5BB6\u4E0D\u6703\u56E0\u70BA\u9662\u9577\u8AAA\u300C\u9019\u662F\u70BA\u4E86\u75C5\u4EBA\u597D\u300D\u5C31\u76F8\u4FE1\u3002\u901A\u5E38\u662F\u5148\u5728\u4E00\u500B\u5C0F\u7BC4\u570D\u8A66\uFF0C\u8B93\u7B2C\u4E00\u7DDA\u7684\u4EBA\u53EF\u4EE5\u558A\u505C\uFF0C\u51FA\u932F\u6642\u4E0D\u6703\u88AB\u7F75\uFF0C\u7136\u5F8C\u771F\u7684\u6839\u64DA\u7D50\u679C\u4FEE\u6539\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u5C0F\u898F\u6A21\u8A66\u9EDE\u6211\u540C\u610F\u3002\u4F46\u4F01\u696D\u4E0D\u80FD\u6C38\u9060\u8A66\u9EDE\uFF0C\u7E3D\u8981\u64F4\u5927\u3002\n\n### \u8449\u66FC\n\n\u7576\u7136\u3002\u4F46\u4F60\u4E0D\u80FD\u56E0\u70BA\u624B\u8853\u5BA4 A \u6210\u529F\uFF0C\u5C31\u76F4\u63A5\u628A\u540C\u4E00\u5957\u6D41\u7A0B\u642C\u5230\u6025\u8A3A\u3001\u5152\u79D1\u548C\u9577\u7167\u75C5\u623F\u3002\n\n### \u8A31\u6587\u54F2\n\n\u9019\u9EDE\u975E\u5E38\u91CD\u8981\u3002\u4E0D\u540C\u90E8\u9580\u7684\u300C\u932F\u8AA4\u6210\u672C\u300D\u4E0D\u4E00\u6A23\u3002\n\n\u5BA2\u670D\u56DE\u7B54\u932F\uFF0C\u53EF\u80FD\u662F\u5BA2\u8A34\uFF1B\u88FD\u9020\u7DDA\u5224\u65B7\u932F\uFF0C\u53EF\u80FD\u662F\u5B89\u5168\u4E8B\u6545\u3002\n\n### \u6797\u5C91\n\n\u6240\u4EE5\u300C\u5168\u516C\u53F8 AI \u7B56\u7565\u300D\u53EF\u80FD\u672C\u8EAB\u5C31\u6709\u554F\u984C\u3002\n\n### \u5468\u6600\n\n\u59B3\u7684\u610F\u601D\u662F\uFF1F\n\n### \u6797\u5C91\n\n\u516C\u53F8\u7E3D\u90E8\u60F3\u8981\u4E00\u500B\u7D71\u4E00\u7B54\u6848\uFF0C\u4F46\u4E0D\u540C\u5DE5\u4F5C\u9700\u8981\u7684\u662F\u4E0D\u540C\u7A0B\u5EA6\u7684\u81EA\u52D5\u5316\u3001\u5BE9\u6838\u548C\u8CAC\u4EFB\u5B89\u6392\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u53EF\u662F\u6C92\u6709\u7D71\u4E00\u7B56\u7565\uFF0C\u5404\u90E8\u9580\u6703\u5404\u81EA\u8CB7\u5DE5\u5177\uFF0C\u8CC7\u6599\u4E5F\u6703\u6563\u6389\u3002\n\n### \u8607\u96C5\u96EF\n\n\u7D71\u4E00\u7684\u53EF\u4EE5\u662F\u5E95\u7DDA\uFF0C\u4E0D\u4E00\u5B9A\u662F\u505A\u6CD5\u3002\n\n\u4F8B\u5982\u516C\u53F8\u53EF\u4EE5\u7D71\u4E00\u898F\u5B9A\uFF1A\u4E0D\u80FD\u7528 AI \u505A\u54EA\u4E9B\u6C7A\u7B56\u3001\u54E1\u5DE5\u8CC7\u6599\u600E\u9EBC\u4FDD\u8B77\u3001\u932F\u8AA4\u600E\u9EBC\u56DE\u5831\u3001\u8AB0\u6709\u6B0A\u505C\u7528\u7CFB\u7D71\u3002\n\n\u81F3\u65BC\u6BCF\u5929\u600E\u9EBC\u7528\uFF0C\u53EF\u4EE5\u8B93\u73FE\u5834\u53C3\u8207\u8A2D\u8A08\u3002\n\n### \u6C88\u9ED8\n\n\u6211\u807D\u5230\u4E00\u500B\u65B0\u7684\u5340\u5206\uFF1A\n\n\u4E0D\u662F\u300C\u4E2D\u592E\u63A7\u5236\u300D\u6216\u300C\u5B8C\u5168\u653E\u4EFB\u300D\u4E8C\u9078\u4E00\uFF0C\u800C\u662F\uFF1A\n\n- \u516C\u53F8\u7D71\u4E00\u5B88\u4F4F\u5E95\u7DDA\n- \u73FE\u5834\u5171\u540C\u6C7A\u5B9A\u600E\u9EBC\u4F7F\u7528\n- \u54E1\u5DE5\u5206\u4EAB\u6548\u7387\u6210\u679C\uFF0C\u4E5F\u53C3\u8207\u627F\u64D4\u98A8\u96AA\n\n### \u963F\u9054\n\n\u53EF\u662F\u6211\u9084\u662F\u60F3\u554F\u4E00\u500B\u6700\u76F4\u63A5\u7684\u3002\n\n\u5982\u679C\u6700\u5F8C AI \u771F\u7684\u8B93\u516C\u53F8\u5C11\u9700\u8981\u5F88\u591A\u4EBA\uFF0C\u90A3\u600E\u9EBC\u8FA6\uFF1F\n\n\u5927\u5BB6\u525B\u525B\u8AC7\u4E86\u5F88\u591A\u53C3\u8207\u3001\u8A13\u7DF4\u3001\u4FE1\u4EFB\uFF0C\u4F46\u9019\u500B\u6700\u96E3\u770B\u7684\u7D50\u679C\u9084\u662F\u5728\u3002\n\n### \u73FE\u5834\u518D\u6B21\u5B89\u975C\u3002\n\n### \u9673\u6021\u5B89\n\n\u90A3\u516C\u53F8\u5C31\u5FC5\u9808\u8AA0\u5BE6\u627F\u8A8D\uFF0CAI \u5C0E\u5165\u53EF\u80FD\u6703\u6539\u8B8A\u4EBA\u6578\uFF0C\u800C\u4E0D\u662F\u7528\u300C\u5347\u7D1A\u8F49\u578B\u300D\u5305\u88DD\u3002\n\n### \u5C0F\u82B8\n\n\u5982\u679C\u771F\u7684\u6703\u5C11\u4EBA\uFF0C\u8ACB\u65E9\u9EDE\u8B1B\u3002\n\n\u6700\u7CDF\u7CD5\u7684\u662F\uFF0C\u516C\u53F8\u4E00\u908A\u8AAA\u4E0D\u6703\u53D6\u4EE3\uFF0C\u4E00\u908A\u628A\u62DB\u52DF\u51CD\u7D50\u3001\u628A\u96E2\u8077\u7684\u4EBA\u4E0D\u88DC\u3001\u628A\u5DE5\u4F5C\u6162\u6162\u5206\u7D66\u5269\u4E0B\u7684\u4EBA\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u4F46\u5982\u679C\u4E00\u958B\u59CB\u5C31\u8AAA\u53EF\u80FD\u6E1B\u5C11\u4EBA\u529B\uFF0C\u54E1\u5DE5\u4E00\u5B9A\u6703\u62B5\u5236\uFF0C\u5C0E\u5165\u6839\u672C\u505A\u4E0D\u4E0B\u53BB\u3002\n\n### \u6797\u5C91\n\n\u6240\u4EE5\u4F60\u7684\u610F\u601D\u662F\uFF0C\u516C\u53F8\u61C9\u8A72\u5148\u4E0D\u8981\u8B1B\u771F\u8A71\uFF0C\u7B49\u5927\u5BB6\u7FD2\u6163\u4E4B\u5F8C\u518D\u8AAA\uFF1F\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u4E0D\u662F\u9019\u500B\u610F\u601D\u3002\n\n### \u6797\u5C91\n\n\u4F46\u6548\u679C\u53EF\u80FD\u5C31\u662F\u90A3\u6A23\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u53EA\u662F\u8AAA\uFF0C\u4F01\u696D\u9700\u8981\u4FDD\u7559\u8ABF\u6574\u7A7A\u9593\u3002\n\n### \u8607\u96C5\u96EF\n\n\u54E1\u5DE5\u4E5F\u9700\u8981\u4FDD\u7559\u9078\u64C7\u7A7A\u9593\u3002\n\n\u5982\u679C\u516C\u53F8\u8981\u4FDD\u7559\u300C\u8ABF\u6574\u7A7A\u9593\u300D\uFF0C\u54E1\u5DE5\u537B\u88AB\u8981\u6C42\u5168\u5FC3\u6295\u5165\u3001\u5206\u4EAB\u77E5\u8B58\u3001\u63A5\u53D7\u91CD\u65B0\u8A13\u7DF4\uFF0C\u90A3\u9019\u500B\u95DC\u4FC2\u4E26\u4E0D\u5C0D\u7B49\u3002\n\n### \u5468\u6600\n\n\u90A3\u6709\u6C92\u6709\u53EF\u80FD\uFF0C\u54E1\u5DE5\u4E5F\u80FD\u62FF\u5230\u4E00\u90E8\u5206 AI \u5E36\u4F86\u7684\u6536\u76CA\uFF1F\n\n\u4F8B\u5982\u5C11\u52A0\u73ED\u3001\u7E2E\u77ED\u5DE5\u6642\u3001\u589E\u52A0\u734E\u91D1\uFF0C\u6216\u662F\u628A\u7701\u4E0B\u7684\u6642\u9593\u62FF\u4F86\u5B78\u65B0\u6280\u80FD\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u7406\u8AD6\u4E0A\u53EF\u4EE5\uFF0C\u4F46\u8981\u770B\u7522\u696D\u3002\n\n### \u8A31\u6587\u54F2\n\n\u4E0D\u8981\u6BCF\u6B21\u90FD\u8AAA\u300C\u770B\u7522\u696D\u300D\u3002\u6211\u5011\u53EF\u4EE5\u5148\u554F\u4E00\u500B\u5C0F\u554F\u984C\uFF1A\n\n\u5982\u679C AI \u5E6B\u6211\u6BCF\u5929\u7701\u4E00\u5C0F\u6642\uFF0C\u9019\u4E00\u5C0F\u6642\u80FD\u4E0D\u80FD\u771F\u7684\u9084\u7D66\u6211\uFF1F\n\n### \u5C0F\u82B8\n\n\u6216\u81F3\u5C11\u4E0D\u8981\u7ACB\u523B\u585E\u9032\u66F4\u591A\u6848\u4EF6\u3002\n\n### \u963F\u9054\n\n\u9019\u61C9\u8A72\u662F\u6240\u6709\u4E0A\u73ED\u65CF\u6700\u60F3\u77E5\u9053\u7684\u3002\n\n### \u8449\u66FC\n\n\u800C\u4E14\u300C\u7701\u4E0B\u6642\u9593\u300D\u4E0D\u4E00\u5B9A\u8981\u62FF\u4F86\u505A\u66F4\u591A\u5DE5\u4F5C\u3002\u5B83\u53EF\u80FD\u62FF\u4F86\u4F11\u606F\u3001\u4EA4\u63A5\u3001\u5B78\u7FD2\uFF0C\u751A\u81F3\u53EA\u662F\u8B93\u4EBA\u4E0D\u8981\u6BCF\u5929\u90FD\u5728\u5FEB\u7206\u70B8\u7684\u908A\u7DE3\u3002\n\n### \u6C88\u9ED8\n\n\u9019\u88E1\u7684\u554F\u984C\u5DF2\u7D93\u5F9E\u300C\u5982\u4F55\u63A8 AI\u300D\u8B8A\u6210\u300C\u6211\u5011\u8A8D\u70BA\u5DE5\u4F5C\u61C9\u8A72\u670D\u52D9\u4EC0\u9EBC\u300D\u3002\n\n\u5982\u679C\u6548\u7387\u63D0\u9AD8\uFF0C\u537B\u6C92\u6709\u8B93\u4EBA\u66F4\u5B89\u5168\u3001\u66F4\u6709\u5224\u65B7\u529B\u3001\u66F4\u6709\u6642\u9593\u7167\u9867\u91CD\u8981\u7684\u4E8B\uFF0C\u90A3\u6548\u7387\u5230\u5E95\u6539\u5584\u4E86\u4EC0\u9EBC\uFF1F\n\n### \u6797\u5C91\n\n\u6211\u60F3\u8ACB\u6BCF\u500B\u4EBA\u4E0D\u8981\u7E3D\u7D50\u7ACB\u5834\uFF0C\u53EA\u56DE\u7B54\u4E00\u500B\u554F\u984C\uFF1A\n\n\u4ECA\u5929\u8AC7\u5230\u73FE\u5728\uFF0C\u54EA\u4E00\u500B\u81EA\u5DF1\u7684\u60F3\u6CD5\u88AB\u52D5\u6416\u4E86\uFF1F\n\n\u5B50\u8B19\uFF0C\u4F60\u5148\u4F86\u3002\n\n### \u9AD8\u5B50\u8B19\n\n\u6211\u539F\u672C\u6BD4\u8F03\u76F8\u4FE1\uFF0C\u53EA\u8981\u628A AI \u7684\u597D\u8655\u8B1B\u6E05\u695A\uFF0C\u54E1\u5DE5\u5C31\u6703\u6BD4\u8F03\u9858\u610F\u63A5\u53D7\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\u4E0D\u5920\u3002\u54E1\u5DE5\u4E0D\u662F\u6C92\u807D\u61C2\u597D\u8655\uFF0C\u800C\u662F\u4ED6\u5011\u4E5F\u770B\u5F97\u5230\u516C\u53F8\u53EF\u80FD\u62FF AI \u4F86\u505A\u4EC0\u9EBC\u3002\n\n\u6240\u4EE5\u4E0D\u80FD\u53EA\u5C55\u793A\u5DE5\u5177\u591A\u53B2\u5BB3\uFF0C\u8981\u5148\u8AAA\u6E05\u695A\u6B0A\u529B\u548C\u5229\u76CA\u600E\u9EBC\u8B8A\u3002\n\n### \u9673\u6021\u5B89\n\n\u6211\u539F\u672C\u4EE5\u70BA\u4EBA\u8CC7\u7684\u5DE5\u4F5C\u662F\u964D\u4F4E\u6050\u61FC\u3001\u5354\u52A9\u8F49\u578B\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\uFF0C\u4EBA\u8CC7\u6709\u6642\u5019\u61C9\u8A72\u628A\u6050\u61FC\u4FDD\u7559\u4E0B\u4F86\u3002\u56E0\u70BA\u6050\u61FC\u53EF\u80FD\u662F\u5728\u63D0\u9192\u516C\u53F8\uFF0C\u6709\u4E9B\u627F\u8AFE\u9084\u6C92\u60F3\u6E05\u695A\u3002\n\n### \u8A31\u6587\u54F2\n\n\u6211\u539F\u672C\u89BA\u5F97\u73FE\u5834\u6700\u5927\u7684\u963B\u529B\u662F\u8001\u54E1\u5DE5\u4E0D\u60F3\u5B78\u65B0\u5DE5\u5177\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\u5F88\u591A\u4EBA\u4E0D\u662F\u4E0D\u60F3\u5B78\uFF0C\u662F\u4E0D\u60F3\u628A\u81EA\u5DF1\u5E7E\u5341\u5E74\u7684\u7D93\u9A57\u4EA4\u51FA\u53BB\u4E4B\u5F8C\uFF0C\u8B8A\u6210\u4E00\u500B\u53EF\u4EE5\u88AB\u522A\u6389\u7684\u6210\u672C\u3002\n\n### \u8607\u96C5\u96EF\n\n\u6211\u539F\u672C\u60F3\u8AC7\u7684\u662F\u8077\u80FD\u8F49\u63DB\u3002\u73FE\u5728\u89BA\u5F97\u300C\u8F49\u63DB\u300D\u9019\u500B\u8A5E\u592A\u4E2D\u6027\u4E86\uFF0C\u597D\u50CF\u6BCF\u500B\u4EBA\u90FD\u6709\u76F8\u540C\u80FD\u529B\u3001\u6642\u9593\u548C\u6A5F\u6703\u3002\n\n\u5176\u5BE6\u6709\u4EBA\u8F49\u5F97\u904E\u53BB\uFF0C\u6709\u4EBA\u8F49\u4E0D\u904E\u53BB\u3002\u8AB0\u8CA0\u8CAC\u627F\u64D4\u90A3\u500B\u843D\u5DEE\uFF0C\u4E0D\u80FD\u88AB\u85CF\u5728\u6F02\u4EAE\u7684\u8A5E\u88E1\u3002\n\n### \u8449\u66FC\n\n\u6211\u539F\u672C\u4EE5\u70BA\u53EF\u4EE5\u7528\u91AB\u7642\u7684\u6848\u4F8B\u63D0\u9192\u5927\u5BB6\u4FDD\u7559\u4EBA\u7684\u5224\u65B7\u3002\n\n\u4F46\u6211\u73FE\u5728\u89BA\u5F97\uFF0C\u91CD\u9EDE\u4E0D\u53EA\u662F\u300C\u4EBA\u8981\u7559\u5728\u8FF4\u8DEF\u88E1\u300D\u3002\u6709\u6642\u5019\u4EBA\u7559\u5728\u8FF4\u8DEF\u88E1\uFF0C\u53EA\u662F\u8CA0\u8CAC\u66FF\u6A5F\u5668\u80CC\u934B\u3002\n\n\u771F\u6B63\u8981\u554F\u7684\u662F\uFF0C\u4EBA\u6709\u6C92\u6709\u6B0A\u529B\u5426\u6C7A\u6A5F\u5668\u3002\n\n### \u963F\u9054\n\n\u6211\u539F\u672C\u4EE5\u70BA\u5927\u5BB6\u53EA\u662F\u6015\u5931\u696D\u3002\n\n\u73FE\u5728\u89BA\u5F97\u5927\u5BB6\u4E5F\u6015\u53E6\u4E00\u4EF6\u4E8B\uFF1A\u6D3B\u8457\u4E0A\u73ED\uFF0C\u4F46\u5DE5\u4F5C\u8B8A\u5F97\u5B8C\u5168\u4E0D\u50CF\u81EA\u5DF1\u60F3\u505A\u7684\u4E8B\u3002\n\n### \u5C0F\u82B8\n\n\u6211\u539F\u672C\u4EE5\u70BA\u81EA\u5DF1\u9700\u8981\u516C\u53F8\u4FDD\u8B49\u4E0D\u6703\u88C1\u54E1\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\uFF0C\u4FDD\u8B49\u53EF\u80FD\u6C38\u9060\u4E0D\u5920\u3002\u6211\u8981\u7684\u662F\u516C\u53F8\u627F\u8A8D\uFF0C\u9019\u4E0D\u662F\u55AE\u7D14\u7684\u5DE5\u5177\u5347\u7D1A\uFF0C\u800C\u662F\u6211\u5011\u4E00\u8D77\u91CD\u65B0\u8AC7\u5DE5\u4F5C\u7684\u898F\u5247\u3002\n\n\u800C\u4E14\u9019\u6B21\u4E0D\u80FD\u53EA\u6709\u4E3B\u7BA1\u5728\u8AC7\u3002\n\n### \u5468\u6600\n\n\u6211\u539F\u672C\u4EE5\u70BA\u6211\u5011\u4ECA\u5929\u6703\u8A0E\u8AD6\u600E\u9EBC\u8B93\u54E1\u5DE5\u63A5\u53D7 AI\u3002\n\n\u73FE\u5728\u6211\u89BA\u5F97\uFF0C\u66F4\u503C\u5F97\u554F\u7684\u662F\uFF1A\n\n\u5982\u679C\u54E1\u5DE5\u5B8C\u5168\u5408\u7406\u5730\u4E0D\u4FE1\u4EFB\u516C\u53F8\uFF0C\u516C\u53F8\u8981\u5148\u6539\u8B8A\u4EC0\u9EBC\uFF0C\u624D\u6709\u8CC7\u683C\u8981\u6C42\u54E1\u5DE5\u6539\u8B8A\uFF1F\n\n### \u6797\u5C91\n\n\u6211\u539F\u672C\u60F3\u6293\u51FA\u8AB0\u5728\u963B\u64CB AI\u3002\n\n\u73FE\u5728\u6211\u61F7\u7591\uFF0C\u771F\u6B63\u7684\u963B\u529B\u53EF\u80FD\u4E0D\u662F\u54E1\u5DE5\uFF0C\u800C\u662F\u516C\u53F8\u4E0D\u60F3\u9762\u5C0D AI \u6703\u628A\u539F\u672C\u5C31\u5B58\u5728\u7684\u4E0D\u516C\u5E73\u653E\u5927\u3002\n\n### \u6C88\u9ED8\n\n\u6211\u4E5F\u88DC\u4E00\u53E5\u3002\n\n\u6211\u5011\u4ECA\u5929\u6C92\u6709\u5F97\u5230\u4E00\u500B\u300C\u63A8 AI \u7684\u6700\u4F73\u505A\u6CD5\u300D\u3002\u4F46\u9019\u53EF\u80FD\u662F\u56E0\u70BA\u539F\u672C\u5C31\u6C92\u6709\u4E00\u500B\u55AE\u7D14\u7684\u300CAI \u5C0E\u5165\u554F\u984C\u300D\u3002\n\n\u684C\u4E0A\u5176\u5BE6\u6709\u597D\u5E7E\u500B\u554F\u984C\u758A\u5728\u4E00\u8D77\uFF1A\n\n- \u5DE5\u4F5C\u6703\u4E0D\u6703\u6D88\u5931\uFF1F\n- \u5DE5\u4F5C\u6703\u4E0D\u6703\u8B8A\u5F97\u66F4\u5FEB\u3001\u66F4\u7D2F\uFF1F\n- \u8AB0\u64C1\u6709\u54E1\u5DE5\u7D2F\u7A4D\u7684\u7D93\u9A57\uFF1F\n- AI \u51FA\u932F\u6642\u8AB0\u8CA0\u8CAC\uFF1F\n- \u6548\u7387\u5E36\u4F86\u7684\u6536\u76CA\u600E\u9EBC\u5206\uFF1F\n- \u54E1\u5DE5\u6709\u6C92\u6709\u5426\u6C7A\u6B0A\uFF1F\n- \u516C\u53F8\u60F3\u8981\u7684\u662F\u6539\u5584\u5DE5\u4F5C\uFF0C\u9084\u662F\u964D\u4F4E\u6210\u672C\uFF1F\n\n\u5982\u679C\u9019\u4E9B\u554F\u984C\u4E0D\u62C6\u958B\uFF0C\u6240\u6709\u300C\u5982\u4F55\u63A8\u884C AI\u300D\u7684\u7B54\u6848\uFF0C\u90FD\u53EF\u80FD\u53EA\u662F\u6559\u516C\u53F8\u600E\u9EBC\u8B93\u54E1\u5DE5\u66F4\u9806\u5229\u5730\u63A5\u53D7\u4E00\u500B\u5DF2\u7D93\u6C7A\u5B9A\u597D\u7684\u7D50\u679C\u3002\n\n---\n\n# \u89C0\u5BDF\u8005\u6574\u7406\uFF5C\u6C88\u9ED8\n\n## 1. \u6700\u5927\u7684\u5E7E\u500B\u8A0E\u8AD6\u8F49\u6298\n\n### \u5F9E\u300C\u54E1\u5DE5\u6015 AI\u300D\u8F49\u5411\u300C\u54E1\u5DE5\u6015\u516C\u53F8\u600E\u9EBC\u7528 AI\u300D\n\n\u4E00\u958B\u59CB\u5927\u5BB6\u628A\u963B\u529B\u7406\u89E3\u6210\u54E1\u5DE5\u7684\u5FC3\u7406\u554F\u984C\uFF0C\u597D\u50CF\u53EA\u8981\u52A0\u5F37\u6E9D\u901A\u3001\u5B89\u6392\u8A13\u7DF4\uFF0C\u54E1\u5DE5\u5C31\u6703\u653E\u5FC3\u3002\n\n\u4F46\u5C0F\u82B8\u6307\u51FA\uFF0C\u54E1\u5DE5\u771F\u6B63\u64D4\u5FC3\u7684\u662F\uFF1A\n\n- AI \u7701\u4E0B\u7684\u6642\u9593\u6703\u4E0D\u6703\u8B8A\u6210\u66F4\u591A\u5DE5\u4F5C\uFF1F\n- \u81EA\u5DF1\u7684\u7D93\u9A57\u88AB\u62FF\u53BB\u8A13\u7DF4\u7CFB\u7D71\u5F8C\uFF0C\u6703\u4E0D\u6703\u5931\u53BB\u50F9\u503C\uFF1F\n- AI \u51FA\u932F\u6642\uFF0C\u8CAC\u4EFB\u662F\u4E0D\u662F\u4ECD\u7136\u7531\u4EBA\u627F\u64D4\uFF1F\n- \u516C\u53F8\u662F\u4E0D\u662F\u8AAA\u4E0D\u88C1\u54E1\uFF0C\u5BE6\u969B\u4E0A\u537B\u7528\u5225\u7684\u65B9\u6CD5\u6E1B\u5C11\u4EBA\u529B\uFF1F\n\n\u8A0E\u8AD6\u56E0\u6B64\u5F9E\u300C\u600E\u9EBC\u5B89\u64AB\u54E1\u5DE5\u300D\u8F49\u6210\u300C\u516C\u53F8\u662F\u5426\u503C\u5F97\u88AB\u4FE1\u4EFB\u300D\u3002\n\n### \u5F9E\u300C\u4F7F\u7528 AI\u300D\u8F49\u5411\u300C\u8AB0\u6C7A\u5B9A\u4F7F\u7528\u898F\u5247\u300D\n\n\u5927\u5BB6\u539F\u672C\u8AC7\u7684\u662F\u5DE5\u5177\u597D\u4E0D\u597D\u7528\uFF0C\u5F8C\u4F86\u767C\u73FE\u771F\u6B63\u91CD\u8981\u7684\u662F\uFF1A\n\n- \u4EC0\u9EBC\u4E8B\u60C5\u53EF\u4EE5\u4EA4\u7D66 AI\uFF1F\n- \u4EC0\u9EBC\u4E8B\u60C5\u4E00\u5B9A\u8981\u7531\u4EBA\u5224\u65B7\uFF1F\n- \u4EBA\u80FD\u4E0D\u80FD\u5426\u6C7A AI\uFF1F\n- \u8AB0\u53EF\u4EE5\u66AB\u505C\u7CFB\u7D71\uFF1F\n- \u5931\u8AA4\u7531\u8AB0\u8CA0\u8CAC\uFF1F\n\nAI \u4E0D\u53EA\u662F\u6548\u7387\u5DE5\u5177\uFF0C\u4E5F\u6703\u6539\u8B8A\u6B0A\u529B\u548C\u8CAC\u4EFB\u7684\u5206\u914D\u3002\n\n### \u5F9E\u300C\u63D0\u9AD8\u6548\u7387\u300D\u8F49\u5411\u300C\u6548\u7387\u7684\u6210\u679C\u6B78\u8AB0\u300D\n\n\u516C\u53F8\u5E38\u8AAA AI \u53EF\u4EE5\u7701\u6642\u9593\u3001\u63D0\u9AD8\u6548\u7387\uFF0C\u4F46\u73FE\u5834\u7D93\u9A57\u986F\u793A\uFF0C\u7701\u4E0B\u4F86\u7684\u6642\u9593\u53EF\u80FD\u88AB\u62FF\u53BB\u63A5\u66F4\u591A\u5DE5\u4F5C\u3002\n\n\u56E0\u6B64\uFF0C\u300C\u6548\u7387\u63D0\u5347\u300D\u4E26\u4E0D\u81EA\u52D5\u7B49\u65BC\u300C\u5DE5\u4F5C\u8B8A\u597D\u300D\u3002\u9084\u8981\u554F\uFF1A\n\n- \u54E1\u5DE5\u80FD\u4E0D\u80FD\u5C11\u52A0\u73ED\uFF1F\n- \u5DE5\u4F5C\u91CF\u6703\u4E0D\u6703\u540C\u6B65\u589E\u52A0\uFF1F\n- \u516C\u53F8\u662F\u5426\u9858\u610F\u5206\u4EAB\u6536\u76CA\uFF1F\n- \u662F\u5426\u6709\u66F4\u591A\u6642\u9593\u5B78\u7FD2\u3001\u4F11\u606F\u6216\u8655\u7406\u8907\u96DC\u554F\u984C\uFF1F\n\n### \u5F9E\u300C\u5168\u9762\u5C0E\u5165\u300D\u8F49\u5411\u300C\u4F9D\u5DE5\u4F5C\u98A8\u96AA\u5206\u7D1A\u300D\n\n\u88FD\u9020\u696D\u3001\u5BA2\u670D\u3001\u91AB\u7642\u7684\u932F\u8AA4\u6210\u672C\u4E0D\u540C\uFF0C\u4E0D\u53EF\u80FD\u53EA\u7528\u4E00\u5957\u898F\u5247\u3002\n\n\u6BD4\u8F03\u5408\u7406\u7684\u65B9\u5411\u53EF\u80FD\u662F\uFF1A\n\n- \u516C\u53F8\u8A02\u5171\u540C\u5E95\u7DDA\n- \u5404\u90E8\u9580\u4F9D\u98A8\u96AA\u8A2D\u8A08\u4F7F\u7528\u65B9\u5F0F\n- \u7B2C\u4E00\u7DDA\u54E1\u5DE5\u53C3\u8207\u6E2C\u8A66\n- \u5141\u8A31\u54E1\u5DE5\u56DE\u5831\u3001\u6311\u6230\u751A\u81F3\u66AB\u505C\u7CFB\u7D71\n\n---\n\n## 2. \u88AB\u63A8\u7FFB\u7684\u5047\u8A2D\n\n### \u5047\u8A2D\u4E00\uFF1A\u54E1\u5DE5\u53CD\u5C0D AI\uFF0C\u662F\u56E0\u70BA\u4E0D\u4E86\u89E3 AI\n\n\u5C0D\u8AC7\u4E2D\u6C92\u6709\u5B8C\u5168\u5426\u5B9A\u300C\u4E0D\u4E86\u89E3\u300D\u53EF\u80FD\u9020\u6210\u963B\u529B\uFF0C\u4F46\u66F4\u5927\u7684\u554F\u984C\u662F\uFF1A\u54E1\u5DE5\u5F80\u5F80\u6BD4\u516C\u53F8\u66F4\u6E05\u695A AI \u53EF\u80FD\u88AB\u62FF\u4F86\u505A\u4EC0\u9EBC\u3002\n\n\u4ED6\u5011\u4E0D\u662F\u6C92\u770B\u898B AI \u7684\u597D\u8655\uFF0C\u800C\u662F\u4E5F\u770B\u898B\u4E86\u98A8\u96AA\u3002\n\n### \u5047\u8A2D\u4E8C\uFF1AAI \u7701\u4E0B\u7684\u6642\u9593\uFF0C\u81EA\u7136\u6703\u8B8A\u6210\u66F4\u6709\u50F9\u503C\u7684\u5DE5\u4F5C\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u5B83\u53EF\u80FD\u8B8A\u6210\u66F4\u591A\u6848\u4EF6\u3001\u66F4\u9AD8\u76EE\u6A19\u3001\u66F4\u5BC6\u96C6\u7684\u76E3\u63A7\uFF0C\u751A\u81F3\u66F4\u5927\u7684\u5FC3\u7406\u58D3\u529B\u3002\n\n### \u5047\u8A2D\u4E09\uFF1A\u53EA\u8981\u4EBA\u9084\u5728\u6700\u5F8C\u5BE9\u6838\uFF0C\u5C31\u6709\u4EBA\u985E\u63A7\u5236\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u5982\u679C\u4EBA\u6C92\u6709\u8DB3\u5920\u6642\u9593\u3001\u8CC7\u8A0A\u6216\u5426\u6C7A\u6B0A\uFF0C\u53EA\u662F\u88AB\u8981\u6C42\u66FF AI \u7684\u932F\u8AA4\u8CA0\u8CAC\uFF0C\u90A3\u300C\u4EBA\u5728\u8FF4\u8DEF\u4E2D\u300D\u53EF\u80FD\u53EA\u662F\u8CAC\u4EFB\u8F49\u5AC1\u3002\n\n### \u5047\u8A2D\u56DB\uFF1A\u516C\u53F8\u627F\u8AFE\u4E0D\u88C1\u54E1\uFF0C\u5C31\u80FD\u6D88\u9664\u54E1\u5DE5\u7684\u4E0D\u5B89\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u5373\u4F7F\u4E0D\u6B63\u5F0F\u88C1\u54E1\uFF0C\u516C\u53F8\u4ECD\u53EF\u80FD\u51CD\u7D50\u62DB\u52DF\u3001\u589E\u52A0\u5DE5\u4F5C\u91CF\u3001\u8B93\u4EBA\u81EA\u7136\u96E2\u8077\uFF0C\u6216\u8B93\u5DE5\u4F5C\u8B8A\u5F97\u4E0D\u53EF\u6301\u7E8C\u3002\n\n### \u5047\u8A2D\u4E94\uFF1A\u63D0\u9AD8 AI \u4F7F\u7528\u7387\uFF0C\u5C31\u4EE3\u8868\u5C0E\u5165\u6210\u529F\n\n\u4E0D\u4E00\u5B9A\u3002\n\n\u54E1\u5DE5\u53EF\u80FD\u70BA\u4E86\u9054\u6210\u6307\u6A19\u800C\u8868\u9762\u4F7F\u7528\uFF0C\u5BE6\u969B\u4E0A\u4ECD\u7528\u539F\u672C\u7684\u65B9\u6CD5\u5DE5\u4F5C\u3002\n\n\u771F\u6B63\u8A72\u770B\u7684\u662F\u554F\u984C\u6709\u6C92\u6709\u6539\u5584\uFF0C\u800C\u4E0D\u662F\u5DE5\u5177\u88AB\u6309\u4E86\u5E7E\u6B21\u3002\n\n### \u5047\u8A2D\u516D\uFF1AAI \u5C0E\u5165\u53EA\u662F\u6280\u8853\u5347\u7D1A\n\n\u5C0D\u8AC7\u986F\u793A\uFF0C\u5B83\u540C\u6642\u662F\uFF1A\n\n- \u5DE5\u4F5C\u8A2D\u8A08\u7684\u6539\u8B8A\n- \u77E5\u8B58\u6240\u6709\u6B0A\u7684\u6539\u8B8A\n- \u8CAC\u4EFB\u5206\u914D\u7684\u6539\u8B8A\n- \u8B70\u50F9\u80FD\u529B\u7684\u6539\u8B8A\n- \u5229\u76CA\u5206\u914D\u7684\u6539\u8B8A\n\n---\n\n## 3. \u65B0\u7522\u751F\u3001\u6BD4\u539F\u984C\u66F4\u503C\u5F97\u554F\u7684\u554F\u984C\n\n- \u5982\u679C AI \u771F\u7684\u63D0\u9AD8\u6548\u7387\uFF0C\u7701\u4E0B\u4F86\u7684\u6642\u9593\u548C\u6536\u76CA\u8981\u5206\u7D66\u8AB0\uFF1F\n- \u54E1\u5DE5\u80FD\u4E0D\u80FD\u53C3\u8207\u6C7A\u5B9A AI \u5C0E\u5165\u5F8C\uFF0C\u54EA\u4E9B\u5DE5\u4F5C\u7559\u4E0B\u3001\u54EA\u4E9B\u5DE5\u4F5C\u6D88\u5931\uFF1F\n- \u516C\u53F8\u662F\u5426\u9858\u610F\u516C\u958B AI \u5C0E\u5165\u53EF\u80FD\u9020\u6210\u7684\u4EBA\u529B\u8B8A\u5316\uFF1F\n- \u7B2C\u4E00\u7DDA\u54E1\u5DE5\u662F\u5426\u6709\u6B0A\u62D2\u7D55\u3001\u66AB\u505C\u6216\u63A8\u7FFB AI \u7684\u5EFA\u8B70\uFF1F\n- \u54EA\u4E9B\u5DE5\u4F5C\u5373\u4F7F AI \u505A\u5F97\u5230\uFF0C\u4E5F\u4E0D\u61C9\u8A72\u5B8C\u5168\u4EA4\u7D66 AI\uFF1F\n- \u516C\u53F8\u8981\u7684\u662F\u66F4\u597D\u7684\u5DE5\u4F5C\uFF0C\u9084\u662F\u66F4\u5C11\u7684\u4EBA\u529B\u6210\u672C\uFF1F\n- \u5982\u679C\u54E1\u5DE5\u4E0D\u4FE1\u4EFB\u516C\u53F8\uFF0C\u516C\u53F8\u8981\u5148\u6539\u8B8A\u4EC0\u9EBC\uFF0C\u624D\u6709\u8CC7\u683C\u8981\u6C42\u54E1\u5DE5\u6539\u8B8A\uFF1F\n- \u4E00\u500B\u771F\u6B63\u516C\u5E73\u7684 AI \u5C0E\u5165\uFF0C\u9664\u4E86\u8A13\u7DF4\u54E1\u5DE5\u4F7F\u7528\u5DE5\u5177\uFF0C\u9084\u61C9\u8A72\u63D0\u4F9B\u4EC0\u9EBC\u4FDD\u969C\uFF1F\n- \u6211\u5011\u662F\u5426\u628A\u300C\u4E0D\u9858\u610F\u5C0E\u5165 AI\u300D\u8AA4\u89E3\u6210\u963B\u529B\uFF0C\u800C\u5B83\u5176\u5BE6\u53EF\u80FD\u662F\u4E00\u7A2E\u98A8\u96AA\u8B66\u5831\uFF1F\n- \u5982\u679C AI \u8B93\u67D0\u4E9B\u5DE5\u4F5C\u6D88\u5931\uFF0C\u6211\u5011\u9858\u4E0D\u9858\u610F\u627F\u8A8D\u9019\u662F\u4E00\u500B\u9700\u8981\u5171\u540C\u8AC7\u5224\u7684\u793E\u6703\u9078\u64C7\uFF0C\u800C\u4E0D\u662F\u55AE\u7D14\u7684\u6280\u8853\u7D50\u679C\uFF1F\n\n---\n\n## 4. \u5C1A\u672A\u89E3\u6C7A\u7684\u6838\u5FC3\u885D\u7A81\n\n### \u4F01\u696D\u9700\u8981\u901F\u5EA6\uFF0C\u54E1\u5DE5\u9700\u8981\u5B89\u5168\u611F\n\n\u4F01\u696D\u64D4\u5FC3\u843D\u5F8C\u7AF6\u722D\uFF0C\u54E1\u5DE5\u64D4\u5FC3\u81EA\u5DF1\u88AB\u72A7\u7272\u3002\u9019\u5169\u7A2E\u7126\u616E\u90FD\u662F\u771F\u7684\uFF0C\u4F46\u76EE\u524D\u6C92\u6709\u81EA\u52D5\u76F8\u5BB9\u7684\u89E3\u6CD5\u3002\n\n### \u516C\u53F8\u60F3\u4FDD\u7559\u5F48\u6027\uFF0C\u54E1\u5DE5\u9700\u8981\u660E\u78BA\u627F\u8AFE\n\n\u516C\u53F8\u5E0C\u671B\u4E0D\u8981\u904E\u65E9\u627F\u8AFE\uFF0C\u4FDD\u7559\u8ABF\u6574\u7A7A\u9593\uFF1B\u54E1\u5DE5\u5247\u8A8D\u70BA\uFF0C\u5728\u98A8\u96AA\u4E0D\u5C0D\u7B49\u7684\u60C5\u6CC1\u4E0B\uFF0C\u6C92\u6709\u627F\u8AFE\u5C31\u4E0D\u53EF\u80FD\u771F\u6B63\u6295\u5165\u3002\n\n### AI \u53EF\u4EE5\u63D0\u9AD8\u6548\u7387\uFF0C\u4F46\u6548\u7387\u7684\u6210\u679C\u5982\u4F55\u5206\u914D\u4ECD\u672A\u89E3\u6C7A\n\n\u5982\u679C\u6548\u7387\u53EA\u8F49\u5316\u6210\u66F4\u591A\u7522\u91CF\u548C\u66F4\u5C11\u4EBA\u529B\uFF0C\u54E1\u5DE5\u81EA\u7136\u6703\u628A AI \u8996\u70BA\u5A01\u8105\u3002\n\n### \u54E1\u5DE5\u88AB\u8981\u6C42\u63D0\u4F9B\u77E5\u8B58\uFF0C\u537B\u4E0D\u4E00\u5B9A\u80FD\u5206\u4EAB\u77E5\u8B58\u88AB\u5546\u54C1\u5316\u5F8C\u7684\u50F9\u503C\n\n\u516C\u53F8\u9700\u8981\u628A\u500B\u4EBA\u7D93\u9A57\u8F49\u6210\u7D44\u7E54\u80FD\u529B\uFF0C\u4F46\u54E1\u5DE5\u4E5F\u9700\u8981\u4FDD\u8B77\u81EA\u5DF1\u7684\u5C08\u696D\u50F9\u503C\u8207\u8AC7\u5224\u80FD\u529B\u3002\n\n### \u4EBA\u88AB\u4FDD\u7559\u5728\u6D41\u7A0B\u4E2D\uFF0C\u537B\u672A\u5FC5\u64C1\u6709\u771F\u6B63\u7684\u6B0A\u529B\n\n\u300C\u6700\u5F8C\u7531\u4EBA\u5BE9\u6838\u300D\u807D\u8D77\u4F86\u5B89\u5168\uFF0C\u4F46\u5982\u679C\u4EBA\u6C92\u6709\u6642\u9593\u3001\u8CC7\u6E90\u548C\u5426\u6C7A\u6B0A\uFF0C\u90A3\u53EA\u662F\u5F62\u5F0F\u4E0A\u7684\u4EBA\u985E\u53C3\u8207\u3002\n\n### \u6700\u6839\u672C\u7684\u885D\u7A81\u53EF\u80FD\u4E0D\u662F\u300C\u8981\u4E0D\u8981\u7528 AI\u300D\n\n\u800C\u662F\uFF1A\n\n> \u516C\u53F8\u662F\u5426\u9858\u610F\u628A AI \u5C0E\u5165\u7576\u6210\u4E00\u6B21\u91CD\u65B0\u8AC7\u5224\u5DE5\u4F5C\u898F\u5247\u7684\u6A5F\u6703\uFF0C\u800C\u4E0D\u662F\u53EA\u628A\u5B83\u7576\u6210\u4E00\u500B\u964D\u4F4E\u6210\u672C\u7684\u5DE5\u5177\uFF1F",
   question: "\u6709\u4EBA\u8AAA, \u7B2C\u4E00\u500B\u5728\u516C\u53F8\u5B78\u6703AI\u7684\u4EBA, \u5C31\u6703\u6709\u66F4\u591A\u7684\u5DE5\u4F5C\u843D\u5728\u81EA\u5DF1\u982D\u4E0A. \u9019\u6A23\u5B50\u672C\u696D\u7167\u9867\u4E0D\u5230, \u65B0\u7684AI\u5C08\u6848\u4E5F\u505A\u4E0D\u597D, \u8A72\u600E\u9EBC\u8FA6",
   answer: "**\u5C0F\u82B8\uFF5C\u7576\u4E8B\u4EBA**\uFF1A\u9019\u500B\u6211\u5F88\u6709\u611F\u3002\u6703\u7528\u7684\u4EBA\u5E38\u5E38\u4E0D\u662F\u5C11\u505A\u672C\u696D\uFF0C\u800C\u662F\u88AB\u53EB\u53BB\u6559\u5225\u4EBA\u3001\u6E2C\u5DE5\u5177\u3001\u6574\u7406\u8CC7\u6599\uFF0C\u6700\u5F8C\u5169\u908A\u90FD\u8981\u8CA0\u8CAC\u3002\u516C\u53F8\u4E0D\u80FD\u628A\u300C\u6700\u5148\u5B78\u6703\u300D\u7576\u6210\u514D\u8CBB\u52A0\u73ED\u7684\u7406\u7531\u3002\n\n**\u9AD8\u5B50\u8B19\uFF5CAI \u9867\u554F**\uFF1A\u6240\u4EE5\u4E0D\u80FD\u53EA\u734E\u52F5\u4F7F\u7528\u7387\uFF0C\u61C9\u8A72\u628A AI \u5C08\u6848\u7576\u6210\u6B63\u5F0F\u5DE5\u4F5C\uFF0C\u660E\u78BA\u632A\u51FA\u6642\u9593\u3001\u8ABF\u6574\u539F\u672C\u7684\u76EE\u6A19\uFF0C\u4E5F\u8981\u6709\u4EBA\u63A5\u624B\u672C\u696D\u3002\u5426\u5247\u300C\u5C0E\u5165 AI\u300D\u53EA\u662F\u628A\u8CAC\u4EFB\u4E1F\u7D66\u6700\u7A4D\u6975\u7684\u4EBA\u3002\n\n**\u8A31\u6587\u54F2\uFF5C\u88FD\u9020\u696D\u4E3B\u7BA1**\uFF1A\u73FE\u5834\u6700\u5BE6\u969B\u7684\u505A\u6CD5\u662F\u5148\u9650\u5B9A\u7BC4\u570D\u3002\u4E0D\u8981\u4E00\u500B\u4EBA\u540C\u6642\u7576\u7A2E\u5B50\u6559\u7DF4\u3001\u5C08\u6848\u7D93\u7406\uFF0C\u9084\u8981\u7DAD\u6301\u539F\u672C\u7522\u91CF\u3002\u5148\u9078\u4E00\u9805\u6D41\u7A0B\u8A66\uFF0C\u78BA\u8A8D\u7701\u4E0B\u7684\u6642\u9593\u771F\u7684\u88AB\u4FDD\u7559\u4E0B\u4F86\uFF0C\u800C\u4E0D\u662F\u7ACB\u523B\u585E\u66F4\u591A\u5DE5\u4F5C\u3002\n\n**\u9673\u6021\u5B89\uFF5C\u4EBA\u8CC7\u4E3B\u7BA1**\uFF1A\u800C\u4E14\u9019\u7A2E\u984D\u5916\u8CA2\u737B\u8981\u88AB\u770B\u898B\uFF1A\u7B97\u9032\u7E3E\u6548\u3001\u7D66\u8A13\u7DF4\u6642\u9593\uFF0C\u751A\u81F3\u8ABF\u6574\u8077\u8CAC\u6216\u85AA\u916C\u3002\u4E4B\u524D\u5927\u5BB6\u5DF2\u7D93\u8B1B\u904E\uFF0C\u6548\u7387\u63D0\u9AD8\u5F8C\uFF0C\u7701\u4E0B\u4F86\u7684\u6642\u9593\u4E0D\u80FD\u81EA\u52D5\u8B8A\u6210\u66F4\u591A\u6848\u4EF6\u3002\n\n**\u6797\u5C91\uFF5C\u4E3B\u6301\u4EBA**\uFF1A\u6240\u4EE5\u554F\u984C\u4E0D\u53EA\u662F\u300C\u8AB0\u5148\u5B78\u6703 AI\u300D\uFF0C\u800C\u662F\u516C\u53F8\u6709\u6C92\u6709\u628A\u5B78\u7FD2\u3001\u8A66\u932F\u548C\u63A8\u52D5\u8B8A\u6210\u6B63\u5F0F\u5DE5\u4F5C\u3002\u5426\u5247\u6700\u5148\u5B78\u6703\u7684\u4EBA\uFF0C\u78BA\u5BE6\u53EF\u80FD\u53EA\u662F\u6700\u5148\u88AB\u69A8\u4E7E\u7684\u4EBA\u3002"
 };
@@ -14958,6 +15047,7 @@ var COFFEE_SAMPLE_EN = {
   question: "The first person at work to learn AI may get more work piled on. Then they cannot do their regular job or the AI project well. What should happen?",
   answer: "**Xiao Yun\uFF5CCustomer-support lead:** I have seen that happen. People who learn first get asked to train others, test tools and organize data while keeping all their regular work. The company should not treat initiative as free overtime.\n\n**Gao Zi-qian\uFF5CAI consultant:** Make the AI project part of the actual job. Reserve time, adjust existing targets and arrange coverage for the person's regular duties. Otherwise adopting AI just moves responsibility to the most willing person.\n\n**Xu Wen-zhe\uFF5CManufacturing manager:** Keep the first experiment small. Do not make one person the trainer, project manager and production owner at once.\n\n**Chen Yi-an\uFF5CHR leader:** Count this contribution in workload, evaluation and training time.\n\n**Lin Cen\uFF5CHost:** The question is whether the company makes learning and testing real work. Otherwise the first learner may simply be the first one to burn out."
 };
+var isSampleSessionId = (id) => typeof id === "string" && id.startsWith("sample-");
 
 // experiences/coffee-tables/list.ts
 var activityTime = (item) => Date.parse(item.lastGenerationStartedAt || item.updatedAt || item.createdAt) || 0;
@@ -14996,6 +15086,18 @@ function tableTime(item) {
   if (item.status === "completed") return { value: completeTime(item), isFallback: !item.lastCompletedAt };
   if (item.lastGenerationStartedAt) return { value: startTime(item), isFallback: false };
   return { value: activityTime(item), isFallback: true };
+}
+function formatTableDateTime(timestamp, language2 = "en") {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return "";
+  return new Intl.DateTimeFormat(intlLocaleOf(uiLocale(language2)), { dateStyle: "medium", timeStyle: "short" }).format(
+    date
+  );
+}
+function tableDeleteLines(targets, language2 = "en") {
+  return targets.map(
+    (item, index) => `${index + 1}. ${item.topic} \xB7 ${formatTableDateTime(Date.parse(item.createdAt), language2)}`
+  );
 }
 function formatTableTime(timestamp, now = Date.now(), language2 = "en") {
   const date = new Date(timestamp), today = new Date(now);
@@ -15226,10 +15328,11 @@ function reasoningChoiceState(selected, efforts, discoveryStatus) {
   return { values, selected: values.includes(selected) ? selected : "auto" };
 }
 var CoffeeDeleteModal = class extends import_obsidian8.Modal {
-  constructor(app, topic, locale) {
+  constructor(app, topic, locale, lines = []) {
     super(app);
     this.topic = topic;
     this.locale = locale;
+    this.lines = lines;
     __publicField(this, "resolveResult");
     __publicField(this, "confirmed", false);
   }
@@ -15246,9 +15349,15 @@ var CoffeeDeleteModal = class extends import_obsidian8.Modal {
     const content = this.contentEl;
     content.empty();
     content.createEl("h2", { text: this.t("coffee.delete_this_table") });
-    content.createEl("p", {
-      text: this.t("coffee.will_be_backed_up_and_moved_to_the_vault_trash", this.topic)
-    });
+    if (this.lines.length) {
+      content.createEl("p", { text: this.t("coffee.delete_many_tables_intro") });
+      const list = content.createEl("ul");
+      for (const line of this.lines) list.createEl("li", { text: line });
+    } else {
+      content.createEl("p", {
+        text: this.t("coffee.will_be_backed_up_and_moved_to_the_vault_trash", this.topic)
+      });
+    }
     const buttons = content.createDiv({ cls: "modal-button-container" });
     const cancel = buttons.createEl("button", { text: this.t("ui.cancel") });
     cancel.onclick = () => this.close();
@@ -15264,6 +15373,42 @@ var CoffeeDeleteModal = class extends import_obsidian8.Modal {
     this.contentEl.empty();
     (_a2 = this.resolveResult) == null ? void 0 : _a2.call(this, this.confirmed);
     this.resolveResult = void 0;
+  }
+};
+var CoffeeStyleDeleteModal = class extends import_obsidian8.Modal {
+  constructor(app, styleName, locale) {
+    super(app);
+    this.styleName = styleName;
+    this.locale = locale;
+    __publicField(this, "result");
+    __publicField(this, "confirmed", false);
+  }
+  t(key4, ...values) {
+    return translate(this.locale, key4, ...values);
+  }
+  confirm() {
+    return new Promise((resolve) => {
+      this.result = resolve;
+      this.open();
+    });
+  }
+  onOpen() {
+    this.contentEl.createEl("h2", { text: this.t("coffee.delete_style_confirm_title") });
+    this.contentEl.createEl("p", { text: this.t("coffee.delete_style_confirm_body", this.styleName) });
+    const actions = this.contentEl.createDiv("modal-button-container");
+    actions.createEl("button", { text: this.t("ui.cancel") }).onclick = () => this.close();
+    const remove = actions.createEl("button", { text: this.t("coffee.delete_style") });
+    remove.addClass("mod-warning");
+    remove.onclick = () => {
+      this.confirmed = true;
+      this.close();
+    };
+  }
+  onClose() {
+    var _a2;
+    (_a2 = this.result) == null ? void 0 : _a2.call(this, this.confirmed);
+    this.result = void 0;
+    this.contentEl.empty();
   }
 };
 var CoffeeSummaryConfirmModal = class extends import_obsidian8.Modal {
@@ -15615,6 +15760,10 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
   async confirmFillSummaries() {
     const engine = this.engine;
     if (!engine || engine.busy) return;
+    if (isSampleSessionId(engine.session.id)) {
+      new import_obsidian8.Notice(this.t("coffee.engine_sample_read_only"));
+      return;
+    }
     const confirmed = await new CoffeeSummaryConfirmModal(
       this.app,
       this.plugin.modelLabel(engine.session.model),
@@ -15911,7 +16060,10 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
     this.modelUnsubscribe = this.plugin.subscribeModelDiscovery((state) => {
       if (this.closed || generation !== this.generation) return;
       setModels(this.plugin.availableModels());
-      modelStatus.setText(`${state.provider}: ${state.status}${state.error ? ` \xB7 ${state.error}` : ""}`);
+      const providerName = state.provider === "codex" ? "Codex" : "Claude CLI";
+      modelStatus.setText(
+        `${this.t("coffee.model_provider_status", providerName, this.t(`ui.model_status_${state.status}`))}${state.error ? ` \xB7 ${state.error}` : ""}`
+      );
       retryModels.disabled = state.status === "loading";
       start.disabled = !this.plugin.availableModels().includes(model.value);
     });
@@ -16180,16 +16332,23 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
     fileInput.addEventListener("change", () => {
       void (async () => {
         var _a3;
-        const selected = Array.from((_a3 = fileInput.files) != null ? _a3 : []);
+        const selected = Array.from((_a3 = fileInput.files) != null ? _a3 : []), skipped2 = [];
         for (const file of selected) {
-          if (!/\.(txt|md)$/i.test(file.name)) throw new Error(this.t("coffee.unsupported_reference_file", file.name));
+          if (!/\.(txt|md)$/i.test(file.name)) {
+            skipped2.push(this.t("coffee.unsupported_reference_file", file.name));
+            continue;
+          }
           const content = await file.text();
-          if (!content.trim()) throw new Error(this.t("coffee.the_reference_file_is_empty", file.name));
+          if (!content.trim()) {
+            skipped2.push(this.t("coffee.the_reference_file_is_empty", file.name));
+            continue;
+          }
           referenceFiles.push({ name: file.name, content });
         }
         renderReferences();
         snapshotForm();
         fileInput.value = "";
+        if (skipped2.length) new import_obsidian8.Notice(skipped2.join("\n"));
       })().catch((error) => {
         fileInput.value = "";
         new import_obsidian8.Notice(error instanceof Error ? error.message : String(error));
@@ -16262,6 +16421,8 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       var _a3;
       const items = (_a3 = this.plugin.settings.coffeeStyles) != null ? _a3 : [], index = items.findIndex((style) => style.id === styleSelect.value);
       if (index < 0) throw new Error(this.t("coffee.choose_a_saved_style_first"));
+      if (!await new CoffeeStyleDeleteModal(this.app, items[index].name, this.plugin.settings.language).confirm())
+        return;
       await this.changeCoffeeStyles(() => {
         this.plugin.settings.coffeeStyles = items.filter((_, at) => at !== index);
         if (this.plugin.settings.defaultCoffeeStyleId === items[index].id)
@@ -16502,8 +16663,8 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       deletingTables = true;
       updateSelection();
       try {
-        const topics = this.t("coffee.tables_count_list", targets.length, targets.map((item) => item.topic).join("\n"));
-        if (!await new CoffeeDeleteModal(this.app, topics, this.plugin.settings.language).confirm()) return;
+        const lines = tableDeleteLines(targets, this.plugin.settings.language);
+        if (!await new CoffeeDeleteModal(this.app, "", this.plugin.settings.language, lines).confirm()) return;
         let removed = 0;
         const failures = [];
         for (const item of targets) {
@@ -16668,7 +16829,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
         body.createEl("h2", { text: session.topic });
         body.createEl("p", {
           cls: "ct-muted",
-          text: `${this.t("coffee.latest_update")} \xB7 ${new Date(session.lastCompletedAt || session.updatedAt || session.createdAt).toLocaleString()}`
+          text: `${this.t("coffee.latest_update")} \xB7 ${formatTableDateTime(Date.parse(session.lastCompletedAt || session.updatedAt || session.createdAt), this.plugin.settings.language)}`
         });
         if (session.dirtyNotes)
           body.createEl("p", {
@@ -16779,7 +16940,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
           button.setAttribute(
             "title",
             `${item.topic}
-${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
+${formatTableDateTime(timestamp.getTime(), this.plugin.settings.language)}${item.model ? ` \xB7 ${item.model}` : ""}`
           );
         const sameCount = topicTableCount(item.topic, entries);
         if (!item.unreadable && sameCount > 1) {
@@ -16802,7 +16963,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       if (!visible.length)
         list.createEl("p", {
           cls: "ct-muted",
-          text: this.homeQuery || this.focusedTopic ? this.t("coffee.no_matching_tables") : this.t("coffee.your_tables_will_appear_here")
+          text: this.homeQuery || this.focusedTopic || this.tableFilter !== "all" ? this.t("coffee.no_matching_tables") : this.t("coffee.your_tables_will_appear_here")
         });
       listScroller.scrollTop = oldTop;
     };
@@ -17030,7 +17191,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     this.button(actions, this.t("coffee.open_new_table"), () => this.returnHome());
     header.createEl("p", {
       cls: "ct-muted",
-      text: `${this.plugin.modelLabel(engine.session.model)} \xB7 ${this.t("coffee.ai_simulated_perspectives")} \xB7 ${this.t("coffee.conversation_language", languagePromptName(coffeeContentLocale(engine.session.language), instructionLanguageOf(uiLocale(this.plugin.settings.language)), "plain"))}`
+      text: `${isSampleSessionId(engine.session.id) ? this.t("coffee.built_in_sample") : this.plugin.modelLabel(engine.session.model)} \xB7 ${this.t("coffee.ai_simulated_perspectives")} \xB7 ${this.t("coffee.conversation_language", languagePromptName(coffeeContentLocale(engine.session.language), instructionLanguageOf(uiLocale(this.plugin.settings.language)), "plain"))}`
     });
     const roster = fixed2.createDiv("ct-roster"), status = fixed2.createDiv({ cls: "ct-status", attr: { role: "status", "aria-live": "polite" } });
     if (engine.busy) this.button(fixed2, this.t("coffee.stop_generation"), () => engine.cancel());
@@ -17127,9 +17288,13 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       latest.classList.toggle("is-hidden", scrolling.scrollHeight - scrolling.scrollTop - scrolling.clientHeight < 100);
     });
     const composer = chatPanel.createDiv("ct-composer");
-    if (engine.session.status === "completed") {
+    const sampleRoom = isSampleSessionId(engine.session.id);
+    if (sampleRoom && engine.session.status === "completed") {
+      this.button(composer, this.t("coffee.copy_sample_to_my_table"), async () => this.copySample()).addClass(
+        "mod-cta"
+      );
+    } else if (engine.session.status === "completed") {
       this.button(composer, this.t("coffee.continue_chatting"), async () => {
-        if (engine.session.id.startsWith("sample-")) await this.copySample();
         const current = this.engine;
         if (current) await this.plugin.confirmAiUsage(current.session.model, () => current.continueTable());
       }).addClass("mod-cta");
@@ -17169,7 +17334,6 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
             name: item.name.trim(),
             description: item.description.trim()
           }));
-          if (engine.session.id.startsWith("sample-")) await this.copySample();
           const current = this.engine, questionId = crypto.randomUUID();
           if (current)
             await this.plugin.confirmAiUsage(current.session.model, () => current.ask(value, questionId, invites));
@@ -21560,6 +21724,10 @@ var History = class {
     }
     this.future = [];
   }
+  /** Forgets the step redo would bring back (one cancelled for good, so redo must not replay it). */
+  dropRedo() {
+    this.future.pop();
+  }
   undo() {
     const entry = this.past.pop();
     if (entry) this.future.push(entry);
@@ -21964,6 +22132,7 @@ function begin(deps) {
       undo: () => apply("undo"),
       redo: () => apply("redo"),
       parkedPaths: () => ops.filter((op) => op.kind === "move" && op.target).map((op) => op.target),
+      createdParkPaths: () => ops.filter((op) => op.kind === "create" && op.target).map((op) => op.target),
       ...label === void 0 ? {} : { label }
     };
   }
@@ -25876,6 +26045,16 @@ var Repository = class {
       if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
     }
   }
+  /** The first part of `path` that is a file rather than a folder (it blocks the folder), or null when none does. */
+  blockingFile(path) {
+    let current = "";
+    for (const part of (0, import_obsidian13.normalizePath)(path).split("/").filter(Boolean)) {
+      current = current ? `${current}/${part}` : part;
+      const entry = this.app.vault.getAbstractFileByPath(current);
+      if (entry && !(entry instanceof import_obsidian13.TFolder)) return current;
+    }
+    return null;
+  }
   workspaceExists() {
     return this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder) instanceof import_obsidian13.TFolder;
   }
@@ -26688,8 +26867,30 @@ ${body}`);
         failures.push({ path: file.path, error: error instanceof Error ? error.message : String(error) });
       }
     }
+    failures.push(...await this.unreadableFrontmatterMaps());
     if (failures.length) (_a2 = this.onUnreadableMaps) == null ? void 0 : _a2.call(this, failures);
     return { readable, skippedRoots: failures.map((item) => this.topicRoot(item.path)) };
+  }
+  /**
+   * Maps whose frontmatter does not parse. Obsidian keeps no `frontmatter` for such a note, so markedFiles never sees it,
+   * but it still reports where the block is: only those notes are read, and only the ones that name the marker.
+   */
+  async unreadableFrontmatterMaps() {
+    var _a2, _b2;
+    const failures = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const cache = this.app.metadataCache.getFileCache(file);
+      if (!(cache == null ? void 0 : cache.frontmatterPosition) || cache.frontmatter) continue;
+      const content = await this.app.vault.cachedRead(file);
+      const block = (_b2 = (_a2 = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+      if (!/^["']?visual-agent-map["']?\s*:/m.test(block)) continue;
+      try {
+        frontmatter(content);
+      } catch (error) {
+        failures.push({ path: file.path, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return failures;
   }
   /**
    * Whether a rename of `file` (previously at `oldPath`) can affect VAM data, decided from the metadata cache without
@@ -26999,33 +27200,62 @@ ${body}`);
     const content = await this.app.vault.read(file), fm = frontmatter(content);
     return marker2(fm["agent-map-node"]) ? this.readNote(file.path) : null;
   }
+  /**
+   * Renames generated subtopic notes to their titles. A note that cannot be renamed (a read-only folder, say) is counted
+   * in `failed` and skipped, so the rest still go. When a map cannot be saved, its renames are counted as failed: the
+   * files moved but the map still points at the old paths.
+   */
   async normalizeGeneratedNoteFilenames() {
-    let renamed = 0;
+    let renamed = 0, failed = 0;
+    const failedPaths = /* @__PURE__ */ new Set();
     for (const { file: mapFile, map } of await this.readableMaps()) {
-      let changed = false;
+      let changed = false, mapRenamed = 0;
       for (const node of map.nodes) {
         const file = this.app.vault.getAbstractFileByPath(node.path);
         if (!(file instanceof import_obsidian13.TFile) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
         const note = await this.readNote(node.path);
         if (!note.title.trim() || safeName(note.title) === file.basename) continue;
-        const oldPath = node.path, newPath = await this.renameNote(oldPath, note.title);
+        const oldPath = node.path;
+        let newPath;
+        try {
+          newPath = await this.renameNote(oldPath, note.title);
+        } catch (e) {
+          failed++;
+          failedPaths.add(oldPath);
+          continue;
+        }
         rebaseMapNotePaths(map, moveNotePath(oldPath, newPath));
         changed = true;
+        mapRenamed++;
         renamed++;
         await this.replaceSourcePath(oldPath, newPath);
       }
-      if (changed) await this.saveMap(mapFile.path, map);
+      if (!changed) continue;
+      try {
+        await this.saveMap(mapFile.path, map);
+      } catch (e) {
+        renamed -= mapRenamed;
+        failed += mapRenamed;
+      }
     }
     for (const file of await this.markedFiles("agent-map-node")) {
-      if (!/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
+      if (failedPaths.has(file.path) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
       const note = await this.readNoteIfManaged(file);
       if (!note || !note.title.trim() || safeName(note.title) === file.basename) continue;
-      const oldPath = file.path, newPath = await this.renameNote(oldPath, note.title);
+      const oldPath = file.path;
+      let newPath;
+      try {
+        newPath = await this.renameNote(oldPath, note.title);
+      } catch (e) {
+        failed++;
+        failedPaths.add(oldPath);
+        continue;
+      }
       await this.replaceSourcePath(oldPath, newPath);
       renamed++;
     }
     if (renamed) await this.rebuildDerivedData();
-    return renamed;
+    return { renamed, failed };
   }
   async setLifecycle(path, topicId, mapId, state) {
     await this.updateNote(path, { topicId, mapId, topicState: state });
@@ -29130,12 +29360,14 @@ function drawMapSourcesPanel(parent, host, focus) {
   return panel;
 }
 async function openSearch(host, returnFocus, choose) {
+  const items = await searchItems(host);
   const modal = new MapSourcePickerModal(
     host.app,
-    await searchItems(host),
+    items,
     (item) => `${item.title} ${item.detail}`.trim(),
     t("ui.map_sources_search_placeholder"),
-    t("ui.map_sources_search_empty"),
+    // Nothing addable at all vs. items that just do not match the typed text.
+    items.length ? t("ui.map_sources_search_no_match") : t("ui.map_sources_search_empty"),
     (item) => choose([{ path: item.path, name: item.title }]),
     (item, el) => {
       el.addClass("mod-complex");
@@ -29655,7 +29887,7 @@ function formatTokens(count2) {
 var sum = (tokens2) => tokens2.inputTokens + tokens2.outputTokens;
 var mark = (count2, estimated) => estimated ? t("ui.usage_estimated_0", formatTokens(count2)) : formatTokens(count2);
 var FILTERS = ["total", "claude", "codex"];
-var FILTER_LABEL = { total: "Total", claude: "Claude", codex: "Codex" };
+var FILTER_LABEL = { claude: "Claude", codex: "Codex" };
 var UsageControl = class {
   constructor(store, mapPath) {
     this.store = store;
@@ -29806,7 +30038,10 @@ var UsageControl = class {
     group.setAttr("aria-label", t("ui.usage_filter_label"));
     const filters = /* @__PURE__ */ new Map();
     for (const value of FILTERS) {
-      const radio = group.createEl("button", { cls: "vam-usage-filter-option", text: FILTER_LABEL[value] });
+      const radio = group.createEl("button", {
+        cls: "vam-usage-filter-option",
+        text: value === "total" ? t("ui.usage_filter_total") : FILTER_LABEL[value]
+      });
       radio.setAttr("type", "button");
       radio.setAttr("role", "radio");
       radio.addEventListener("click", () => this.select(value, false));
@@ -30027,7 +30262,7 @@ var MapSwitcherModal = class extends import_obsidian19.FuzzySuggestModal {
     __publicField(this, "showFolder");
     this.showFolder = new Set(items.map((item) => item.folder)).size > 1;
     this.setPlaceholder(t("ui.map_switcher_placeholder"));
-    this.emptyStateText = t("ui.map_switcher_empty");
+    this.emptyStateText = items.length ? t("ui.map_switcher_empty") : t("ui.map_switcher_empty_none");
     this.setInstructions([
       { command: "\u2191\u2193", purpose: t("ui.map_switcher_hint_navigate") },
       { command: "\u21B5", purpose: t("ui.map_switcher_hint_open") },
@@ -34140,7 +34375,10 @@ var NoteStyleStore = class {
       try {
         return { ref, name: partNameOfRef(category, ref, language2) };
       } catch (e) {
-        return { ref, name: ref };
+        return {
+          ref,
+          name: translate(language2, "ui.note_style_part_unknown_0", ref.replace(/^(?:file|builtin):/, ""))
+        };
       }
     };
     const items = BUILTIN_RECIPES.map((recipe) => {
@@ -36639,6 +36877,24 @@ function placeHoverPreview(host, card, preview, margin = 12, options = {}) {
     return inside2 && !keepClear.some((box) => overlaps2(spot, box));
   });
   return (_d = (_c = clear.find((spot) => !avoid.some((box) => overlaps2(spot, box)))) != null ? _c : clear[0]) != null ? _d : null;
+}
+var MIN_SHRUNK_PREVIEW_WIDTH = 180;
+function shrinkHoverPreview(host, card, preview, margin = 12, options = {}) {
+  var _a2, _b2, _c, _d;
+  const keepClear = [card, ...(_a2 = options.keepClear) != null ? _a2 : []];
+  const avoid = (_b2 = options.avoid) != null ? _b2 : [];
+  const clamp2 = (value, low, high) => Math.max(low, Math.min(value, Math.max(low, high)));
+  const top = clamp2(card.top, margin, host.height - preview.height - margin);
+  const sharesRows = keepClear.filter((box) => top < box.bottom && box.top < top + preview.height);
+  const rightEdge = Math.max(card.right, ...sharesRows.map((box) => box.right));
+  const leftEdge = Math.min(card.left, ...sharesRows.map((box) => box.left));
+  const sides = [
+    { left: rightEdge + margin, room: host.width - margin - (rightEdge + margin) },
+    { left: margin, room: leftEdge - margin - margin }
+  ];
+  const overlaps2 = (spot, box) => spot.left < box.right && box.left < spot.left + spot.width && top < box.bottom && box.top < top + preview.height;
+  const fits = sides.map((side) => ({ left: side.left, top, width: Math.min(preview.width, side.room) })).filter((spot) => spot.width >= MIN_SHRUNK_PREVIEW_WIDTH).map((spot) => ({ spot, blocked: avoid.some((box) => overlaps2(spot, box)) })).sort((a, b) => Number(a.blocked) - Number(b.blocked) || b.spot.width - a.spot.width);
+  return (_d = (_c = fits[0]) == null ? void 0 : _c.spot) != null ? _d : null;
 }
 function markdownImages(markdown, limit = 4) {
   const images = [];
@@ -47965,7 +48221,7 @@ function exchangeRefusal(reason, line) {
     case "too-deep":
       return t("ui.exchange_reason_too_big");
     default:
-      return t("ui.exchange_reason_invalid", line === void 0 ? reason : `${reason}, ${line}`);
+      return line === void 0 ? t("ui.exchange_reason_invalid") : t("ui.exchange_reason_invalid_line_0", line);
   }
 }
 async function importExchangeFile(host, file) {
@@ -48125,6 +48381,14 @@ var import_obsidian29 = require("obsidian");
 
 // ui/modals/debug-log-modal.ts
 var import_obsidian28 = require("obsidian");
+var EXCHANGE_STATUS_KEYS = {
+  preparing: "ui.ai_status_preparing",
+  sent: "ui.ai_status_sent",
+  received: "ui.ai_status_received",
+  parsed: "ui.ai_status_parsed",
+  completed: "ui.ai_status_completed",
+  failed: "ui.ai_status_failed"
+};
 var DebugLogModal = class extends import_obsidian28.Modal {
   constructor(app, logs, exchanges, exchangeEnabled, setExchangeEnabled) {
     super(app);
@@ -48176,7 +48440,7 @@ var DebugLogModal = class extends import_obsidian28.Modal {
       const row = list.createDiv("vam-debug-log-entry");
       const metadata = row.createDiv("vam-debug-log-meta");
       metadata.createEl("time", {
-        text: new Date(entry.timestamp).toLocaleString(),
+        text: new Date(entry.timestamp).toLocaleString(getUiLanguage()),
         attr: { datetime: entry.timestamp }
       });
       metadata.createSpan({ cls: `vam-debug-log-level is-${entry.level}`, text: entry.level.toUpperCase() });
@@ -48233,7 +48497,7 @@ var DebugLogModal = class extends import_obsidian28.Modal {
       const metric = promptMetrics(exchange);
       const item = exchangeList.createEl("details", { cls: "vam-debug-log-entry" });
       item.createEl("summary", {
-        text: `${new Date(exchange.startedAt).toLocaleString()} \xB7 ${exchange.topic} \xB7 ${metric.phase} \xB7 ${exchange.status}`
+        text: `${new Date(exchange.startedAt).toLocaleString(getUiLanguage())} \xB7 ${exchange.topic} \xB7 ${metric.phase} \xB7 ${t(EXCHANGE_STATUS_KEYS[exchange.status])}`
       });
       item.createEl("p", {
         text: `${exchange.mode} \xB7 ${exchange.model} \xB7 ${exchange.effort}`,
@@ -48334,6 +48598,10 @@ function imageReferencesFromMarkdown(markdown) {
     ] : []
   );
   return [...new Set(blocks)].join("\n\n");
+}
+function invalidMergedContentsText(error) {
+  const syntax = typeof error === "object" && error !== null && error.name === "SyntaxError";
+  return syntax ? t("ui.invalid_merged_json") : t("ui.invalid_merged_contents");
 }
 var PartialChildBatchError = class extends Error {
 };
@@ -49160,9 +49428,7 @@ var MapConflictModal = class extends import_obsidian29.Modal {
       try {
         finish(parseMap(serializeMap(JSON.parse(input2.value))));
       } catch (error) {
-        status.setText(
-          error instanceof Error ? t("ui.invalid_merged_contents_0", error.message) : t("ui.invalid_merged_contents")
-        );
+        status.setText(invalidMergedContentsText(error));
       }
     });
   }
@@ -50335,6 +50601,13 @@ var TopicTreeModal = class extends import_obsidian32.Modal {
     this.title = title;
     this.selectable = selectable;
     this.choose = choose;
+    __publicField(this, "cancelEl", null);
+  }
+  /** Obsidian's open() moves the focus to the first topic row after onOpen; Cancel takes it back, so a stray Enter never moves topics. */
+  open() {
+    var _a2;
+    super.open();
+    (_a2 = this.cancelEl) == null ? void 0 : _a2.focus();
   }
   onOpen() {
     this.titleEl.setText(this.titleText);
@@ -50353,6 +50626,7 @@ var TopicTreeModal = class extends import_obsidian32.Modal {
     });
     const cancel = modalActions(this).createEl("button", { text: t("ui.cancel") });
     cancel.addEventListener("click", () => this.close());
+    this.cancelEl = cancel;
     cancel.focus();
   }
 };
@@ -58985,10 +59259,49 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
     text12.id = id;
     field.setAttr("aria-labelledby", id);
   }
+  /** Esc in a new topic's name field: the step that made the topic is undone (as Undo would), so nothing is left behind. */
+  discardNewTopic(step) {
+    if (this.history.undoEntry !== step) {
+      this.render();
+      return;
+    }
+    this.enqueue(async () => {
+      var _a2, _b2;
+      await this.travel(false);
+      if (this.history.redoEntry !== step) return;
+      this.history.dropRedo();
+      for (const path of (_b2 = (_a2 = step.createdParkPaths) == null ? void 0 : _a2.call(step)) != null ? _b2 : []) {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file instanceof import_obsidian39.TFile) await this.app.fileManager.trashFile(file);
+      }
+      this.render();
+    });
+  }
   /** Draws the card title's field in place of the title text. */
   paintCardNameEdit(card, node, note) {
+    const edit = this.inlineName;
     const input2 = this.createInlineNameInput(card, "vam-card-title-input", "", (value) => {
-      const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
+      var _a2;
+      if (value === null && (edit == null ? void 0 : edit.created) && edit.createdStep) {
+        this.discardNewTopic(edit.createdStep);
+        return;
+      }
+      const problem = titleProblemText(value != null ? value : "");
+      if (problem) {
+        this.inlineName = {
+          target: "card",
+          id: node.id,
+          draft: value != null ? value : "",
+          fresh: false,
+          created: (_a2 = edit == null ? void 0 : edit.created) != null ? _a2 : false,
+          createdStep: edit == null ? void 0 : edit.createdStep,
+          caret: null
+        };
+        new import_obsidian39.Notice(problem);
+        this.render();
+        return;
+      }
+      const name2 = (value != null ? value : "").trim();
       if (!name2 || name2 === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name2 }));
     });
@@ -62337,7 +62650,7 @@ ${request.requirements}` : preset.text,
   }
   /** Adds the outline to the open map, as a new top-level tree or under the selected topic; existing nodes stay put. */
   async importOutlineIntoMap(request, placement) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e, _f;
     const settings = this.plugin.settings;
     const repo = this.plugin.repo;
     const noticeGate = { shown: false };
@@ -62481,13 +62794,17 @@ ${request.requirements}` : preset.text,
     if (state.rejection) throw state.rejection;
     const outcome = state.result;
     if (!outcome) return;
+    if (!state.saveFailed && written2 && outcome.created.length) {
+      const where = placement.kind === "tree" ? t("ui.outline_import_placement_tree") : ((_a2 = this.notes.get(placement.parentId)) == null ? void 0 : _a2.title) ? t("ui.outline_import_placement_under_named", (_c = (_b2 = this.notes.get(placement.parentId)) == null ? void 0 : _b2.title) != null ? _c : "") : t("ui.outline_import_placement_under");
+      new import_obsidian39.Notice(t("ui.outline_import_done_0_1", outcome.created.length, where));
+    }
     if (state.saveFailed || !written2 || !request.shallowResearch || !outcome.created.length) return;
     const owner = placement.kind === "under" ? placement.parentId : null;
     const several = owner !== null && (!!request.researchEveryTopic || request.nodes.filter((node) => node.parent === null).length > 1);
-    const top = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === (several ? owner : outcome.created[0].id));
+    const top = (_d = this.map) == null ? void 0 : _d.nodes.find((node) => node.id === (several ? owner : outcome.created[0].id));
     if (!top) return;
     const ids = new Set((several ? outcome.created : outcome.created.slice(1)).map((node) => node.id));
-    const children = ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : []).filter((node) => ids.has(node.id));
+    const children = ((_f = (_e = this.map) == null ? void 0 : _e.nodes) != null ? _f : []).filter((node) => ids.has(node.id));
     if (!children.length) return;
     void this.plugin.confirmAiUsage(
       model,
@@ -63165,7 +63482,7 @@ ${request.requirements}` : preset.text,
    */
   switchToMap(path) {
     const open = path === this.path ? void 0 : this.plugin.findMapLeaf(path);
-    if (open) void this.plugin.showLeaf(open);
+    if (open) window.setTimeout(() => void this.plugin.showLeaf(open), 0);
     else if (path !== this.path && this.hasRunningWork())
       void this.plugin.openMapInNewTab(path).catch((error) => errorNotice(error));
     else this.enqueue(() => this.openMapInMutation(path));
@@ -64227,8 +64544,20 @@ ${request.requirements}` : preset.text,
       throw this.mergeError(error);
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
-    this.history.push(this.mergeEntry(entry));
+    const mergeStep = this.mergeEntry(entry);
+    this.history.push(mergeStep);
     this.selection.afterMerge(created.id);
+    if (!content)
+      backgroundResultNotice(
+        t("ui.merge_done_0", sanitizeGeneratedTitle(title)),
+        {
+          label: t("ui.undo"),
+          open: () => {
+            if (this.history.undoEntry === mergeStep && !this.closed) this.enqueue(() => this.travel(false));
+          }
+        },
+        MERGE_DONE_NOTICE_MS
+      );
     await this.finishMerge(created.id);
   }
   /**
@@ -64289,8 +64618,20 @@ ${request.requirements}` : preset.text,
       throw this.mergeError(error);
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
-    this.history.push(this.mergeEntry(entry));
+    const mergeStep = this.mergeEntry(entry);
+    this.history.push(mergeStep);
     this.selection.afterMerge(target.id);
+    if (!content)
+      backgroundResultNotice(
+        t("ui.merge_done_0", sanitizeGeneratedTitle(name2 || sourceNotes[0].title)),
+        {
+          label: t("ui.undo"),
+          open: () => {
+            if (this.history.undoEntry === mergeStep && !this.closed) this.enqueue(() => this.travel(false));
+          }
+        },
+        MERGE_DONE_NOTICE_MS
+      );
     await this.finishMerge(target.id);
   }
   /** Keeps what a merge's relation retargeting dropped, for the notice that follows the save. */
@@ -67657,6 +67998,8 @@ ${request.requirements}` : preset.text,
         );
         if (!check.ok) {
           new import_obsidian39.Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
+          sessionFor(this.plugin).cancelCut();
+          this.refreshCutMarks();
           return;
         }
         await this.moveBranches(roots, target);
@@ -71078,19 +71421,18 @@ ${request.requirements}` : preset.text,
     });
     const tools = (_f = card.querySelector(".vam-node-tools")) == null ? void 0 : _f.getBoundingClientRect();
     const selected = [...this.cardEls.values()].filter((other) => other !== card && other.classList.contains("is-selected")).flatMap((other) => [other, other.querySelector(".vam-node-tools")]).flatMap((el) => el ? [local(el.getBoundingClientRect())] : []);
-    const spot = placeHoverPreview(host, local(rect2), { width, height: visibleHeight }, 12, {
-      keepClear: tools && tools.width > 0 ? [local(tools)] : [],
-      avoid: selected
-    });
-    if (!spot) {
+    const placement = { keepClear: tools && tools.width > 0 ? [local(tools)] : [], avoid: selected };
+    const spot = placeHoverPreview(host, local(rect2), { width, height: visibleHeight }, 12, placement);
+    const fitted = spot ? { ...spot, width } : shrinkHoverPreview(host, local(rect2), { width, height: visibleHeight }, 12, placement);
+    if (!fitted) {
       preview.remove();
       this.hoverCard = null;
       this.hoverResearch = null;
       return;
     }
-    preview.style.width = `${width}px`;
-    preview.style.left = `${spot.left}px`;
-    preview.style.top = `${spot.top}px`;
+    preview.style.width = `${fitted.width}px`;
+    preview.style.left = `${fitted.left}px`;
+    preview.style.top = `${fitted.top}px`;
   }
   refreshCard(node, redrawEdges = true) {
     var _a2, _b2, _c, _d;
@@ -72113,6 +72455,12 @@ ${request.requirements}` : preset.text,
           return;
         }
         create.disabled = true;
+        if (this.aiLockReason("addChild", [node.id], await this.freshNotesOf([node.id]))) {
+          create.disabled = false;
+          create.focus();
+          status.setText(t("ui.ai_locked_create_next_step"));
+          return;
+        }
         status.setText(t("ui.creating_subtopics"));
         try {
           let createdNodes = [];
@@ -72146,6 +72494,7 @@ ${request.requirements}` : preset.text,
           this.render();
         } catch (error) {
           create.disabled = false;
+          create.focus();
           status.setText(error instanceof Error ? error.message : String(error));
         }
       })();
@@ -73795,7 +74144,7 @@ ${request.requirements}` : preset.text,
    * callers (the structure review dialog stays open) must not pull focus out from under their own UI.
    */
   async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true, kind = "topic", keyboardFocus = false, hypothesisStart = {}, afterTextId) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
@@ -73878,13 +74227,14 @@ ${request.requirements}` : preset.text,
         rebuildDerivedData,
         [node.path]
       );
+      if (((_g = this.inlineName) == null ? void 0 : _g.id) === node.id) this.inlineName.createdStep = this.history.undoEntry;
     } catch (error) {
-      if (((_g = this.inlineName) == null ? void 0 : _g.id) === node.id) this.inlineName = null;
+      if (((_h = this.inlineName) == null ? void 0 : _h.id) === node.id) this.inlineName = null;
       throw error;
     }
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    const placed = (_i = (_h = this.map) == null ? void 0 : _h.nodes.find((n) => n.id === node.id)) != null ? _i : node;
+    const placed = (_j = (_i = this.map) == null ? void 0 : _i.nodes.find((n) => n.id === node.id)) != null ? _j : node;
     this.focusNode(placed);
     if (keyboardFocus && !this.inlineName && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
     this.focusInlineName();
@@ -75226,6 +75576,10 @@ ${request.requirements}` : preset.text,
     var _a2;
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
+      return;
+    }
+    if (sources.some((node) => this.aiLockReason("write", [node.id]))) {
+      failed(t("ui.ai_locked_notice"));
       return;
     }
     const existing = this.integrationTask && this.integrationTask.mapPath === this.path ? this.integrationTask : null;
@@ -80571,7 +80925,7 @@ ${addition}` : addition },
   }
   enableDrag(card, node, onPlainClick) {
     card.addEventListener("pointerdown", (event) => {
-      var _a2, _b2, _c;
+      var _a2, _b2, _c, _d;
       if (event.target.closest("button, .vam-card-title-input, .vam-card-summary-input") || event.button !== 0 || !this.map)
         return;
       const selecting = this.selection.state.multiSelectMode;
@@ -80651,7 +81005,7 @@ ${addition}` : addition },
       let warned = false;
       let overChat = false;
       const move = (e) => {
-        var _a3, _b3, _c2, _d;
+        var _a3, _b3, _c2, _d2;
         if (this.dragStale()) {
           this.endStaleDrag();
           return;
@@ -80685,7 +81039,22 @@ ${addition}` : addition },
           x: origin.x + (e.clientX - start.x) / this.map.viewport.zoom,
           y: origin.y + (e.clientY - start.y) / this.map.viewport.zoom
         };
-        (_d = this.dragFrame) != null ? _d : this.dragFrame = window.requestAnimationFrame(paint);
+        (_d2 = this.dragFrame) != null ? _d2 : this.dragFrame = window.requestAnimationFrame(paint);
+      };
+      const doc = (_d = this.contentEl) == null ? void 0 : _d.ownerDocument;
+      const esc = (e) => {
+        if (e.key !== "Escape" || !(moved || travelled)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        settle();
+        try {
+          drop({ type: "pointercancel" }, null);
+        } finally {
+          if (this.renderAfterDrag && !this.dragging) {
+            this.renderAfterDrag = false;
+            if (!this.closed) this.render();
+          }
+        }
       };
       const settle = () => {
         var _a3;
@@ -80699,6 +81068,7 @@ ${addition}` : addition },
         card.removeEventListener("pointerup", finish);
         card.removeEventListener("pointercancel", finish);
         card.removeEventListener("lostpointercapture", finish);
+        doc == null ? void 0 : doc.removeEventListener("keydown", esc, true);
         this.dragCleanup = null;
       };
       const finish = (e) => {
@@ -80715,7 +81085,7 @@ ${addition}` : addition },
         }
       };
       const drop = (e, landed) => {
-        var _a3, _b3, _c2, _d;
+        var _a3, _b3, _c2, _d2;
         if (selecting && !travelled) return;
         this.suppressClickUntil = Date.now() + 250;
         const putBack = () => {
@@ -80795,7 +81165,7 @@ ${addition}` : addition },
         } else {
           this.applySelectionChange(this.selection.click(node.id));
           if (this.notesLoading()) return;
-          if (aimEnabled() && ((_d = this.map) == null ? void 0 : _d.aim) && node.aimKind === "question") this.openAimAnswer(node);
+          if (aimEnabled() && ((_d2 = this.map) == null ? void 0 : _d2.aim) && node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
           onPlainClick == null ? void 0 : onPlainClick(e, wasSelected);
         }
@@ -80805,6 +81175,7 @@ ${addition}` : addition },
       card.addEventListener("pointerup", finish);
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
+      doc == null ? void 0 : doc.addEventListener("keydown", esc, true);
     });
   }
   /**
@@ -82394,8 +82765,9 @@ var NoteStyleEditorModal = class extends import_obsidian42.Modal {
   sectionProblem() {
     if (!this.sectionsEdited()) return "";
     const rows2 = this.cleanRows();
-    const parsed = parseTemplateBlock(composeStructure(this.chunks, rows2), { id: "file:draft", name: "draft" });
     const say = (text12) => t("ui.editor_sections_problem_0", text12);
+    if (!rows2.length) return say(t("ui.editor_sections_none"));
+    const parsed = parseTemplateBlock(composeStructure(this.chunks, rows2), { id: "file:draft", name: "draft" });
     if (!parsed.ok) {
       const first = parsed.issues[0];
       if (!first.code.startsWith("ui.")) return say(first.message);
@@ -82635,6 +83007,10 @@ var NoteStyleEditorModal = class extends import_obsidian42.Modal {
     const host = this.exampleEl;
     if (!host || this.closed) return;
     const token = ++this.renderToken;
+    if (this.sectionsEdited() && this.cleanRows().length === 0) {
+      host.empty();
+      return;
+    }
     const markdown = this.exampleMarkdown();
     const next = host.createDiv({ cls: "vam-editor-example-body" });
     const child = new import_obsidian42.Component();
@@ -83560,7 +83936,7 @@ function renderNoteStyleCard(setting, plugin) {
   const partName = (category, ref) => {
     var _a2;
     const found = plugin.noteStyles.listParts(category).find((item) => item.ref === ref);
-    return (_a2 = found == null ? void 0 : found.name) != null ? _a2 : ref;
+    return (_a2 = found == null ? void 0 : found.name) != null ? _a2 : t("ui.note_style_part_unknown_0", ref.replace(/^(?:file|builtin):/, ""));
   };
   const draw = (focus) => {
     body.empty();
@@ -90553,6 +90929,7 @@ var SelectionAiPanel = class extends import_obsidian50.Component {
     __publicField(this, "output");
     __publicField(this, "result");
     __publicField(this, "before");
+    __publicField(this, "unavailableHint");
     __publicField(this, "presets");
     __publicField(this, "resultActions");
     __publicField(this, "accept");
@@ -90690,6 +91067,10 @@ var SelectionAiPanel = class extends import_obsidian50.Component {
     this.preview = this.contentEl.createDiv({ cls: "vam-context-ai-preview" });
     this.result = this.contentEl.createDiv({ cls: "vam-context-ai-result" });
     this.result.hidden = true;
+    this.unavailableHint = this.result.createDiv({
+      cls: "vam-hint vam-context-ai-unavailable",
+      text: t("ui.context_ai_accept_unavailable")
+    });
     this.before = this.result.createDiv({ cls: "vam-context-ai-diff" });
     this.before.createSpan({ cls: "vam-context-ai-label", text: t("ui.context_ai_before") });
     this.before.createEl("del", { cls: "vam-context-ai-before", text: this.snapshot.text });
@@ -90776,6 +91157,7 @@ var SelectionAiPanel = class extends import_obsidian50.Component {
     this.resultActions.hidden = !visible;
     const replaceable = this.snapshot.matchAt >= 0 && !!this.snapshot.text && !this.insertAfter;
     this.before.hidden = !replaceable;
+    this.unavailableHint.hidden = !visible || this.snapshot.matchAt >= 0;
     this.accept.hidden = !replaceable;
     this.insertHere.hidden = this.snapshot.matchAt < 0;
     const insertable = this.snapshot.matchAt >= 0;
@@ -91026,7 +91408,9 @@ ${value}
       editor.replaceRange(addition, end, end);
     }
     this.close();
-    new import_obsidian50.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
+    const message = action === "replace" ? t("ui.context_ai_replaced") : action === "after" ? t("ui.context_ai_inserted_after") : t("ui.context_ai_appended");
+    if (view.getMode() === "source") new import_obsidian50.Notice(message);
+    else void view.save().then(() => new import_obsidian50.Notice(message));
   }
 };
 
@@ -91563,10 +91947,13 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       await this.initializeFirstInstall(!!saved);
       if (this.settings.structureVersion < 2) {
         try {
-          const count2 = await this.repo.normalizeGeneratedNoteFilenames();
-          this.settings.structureVersion = 2;
-          await this.saveSettings();
-          if (count2) new import_obsidian52.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count2));
+          const { renamed, failed } = await this.repo.normalizeGeneratedNoteFilenames();
+          if (!failed) {
+            this.settings.structureVersion = 2;
+            await this.saveSettings();
+          } else this.logs.appendLog("warn", `${t("ui.subtopic_filename_sync_failed_will_retry")} ${failed}`);
+          if (renamed) new import_obsidian52.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", renamed));
+          if (failed) new import_obsidian52.Notice(t("ui.subtopic_filename_sync_failed_will_retry"));
         } catch (error) {
           const detail = error instanceof Error ? error.message : String(error);
           this.logs.appendLog("warn", `${t("ui.subtopic_filename_sync_failed_will_retry")} ${detail}`);
@@ -91713,8 +92100,10 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     });
     this.addLocalizedCommand("normalize-note-filenames", "ui.command_sync_filenames", () => {
       this.runMutation(async () => {
-        const count2 = await this.repo.normalizeGeneratedNoteFilenames();
-        new import_obsidian52.Notice(count2 ? t("ui.synced_0_topic_filenames", count2) : t("ui.topic_filenames_are_up_to_date"));
+        const { renamed, failed } = await this.repo.normalizeGeneratedNoteFilenames();
+        new import_obsidian52.Notice(
+          failed ? t("ui.synced_0_topic_filenames_failed_1", renamed, failed) : renamed ? t("ui.synced_0_topic_filenames", renamed) : t("ui.topic_filenames_are_up_to_date")
+        );
       });
     });
     this.addLocalizedCommand("repair-note-presentation", "ui.command_repair_note_display", () => {
@@ -92055,6 +92444,12 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   /** `anchor` is the button that asked; its window gets the notice (the settings page may be a popout window). */
   async repairWorkspace(anchor) {
+    var _a2;
+    const blocked = (_a2 = this.repo.blockingFile(this.settings.mindMapsFolder)) != null ? _a2 : aimEnabled() ? this.repo.blockingFile(this.settings.aimFolder) : null;
+    if (blocked) {
+      noticeInWindowOf(t("ui.repair_workspace_blocked_0", blocked), anchor);
+      return;
+    }
     await this.repo.ensureWorkspace();
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
@@ -92353,7 +92748,11 @@ ${t("ui.organize_link_wait_hint")}`;
       }
       return folder;
     } catch (error) {
-      new import_obsidian52.Notice(error instanceof Error ? error.message : String(error));
+      this.logs.appendLog(
+        "warn",
+        `${t("ui.note_style_folder_open_failed")} ${error instanceof Error ? error.message : String(error)}`
+      );
+      new import_obsidian52.Notice(t("ui.note_style_folder_open_failed"));
       return null;
     }
   }

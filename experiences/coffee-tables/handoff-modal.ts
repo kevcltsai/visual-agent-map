@@ -281,7 +281,15 @@ export class CoffeeHandoffModal extends Modal {
     updateModels();
     void this.plugin.refreshModelDiscovery("codex");
     void this.plugin.refreshModelDiscovery("claude");
-    this.reasoning = this.select(choices, this.t("coffee.reasoning"), ["low", "medium", "high", "auto"]);
+    const reasoningLabels: Record<string, TranslationKey> = {
+      auto: "coffee.reasoning_auto",
+      low: "coffee.reasoning_low",
+      medium: "coffee.reasoning_medium",
+      high: "coffee.reasoning_high"
+    };
+    this.reasoning = this.select(choices, this.t("coffee.reasoning"), ["low", "medium", "high", "auto"], value =>
+      this.t(reasoningLabels[value])
+    );
     this.reasoning.value = normalizeReasoningLevel(this.snapshot.session.reasoning);
     this.language = this.select(choices, this.t("coffee.output_language"), [...NOTE_LANGUAGES], supportedLanguageLabel);
     this.language.value = noteLanguageOf(this.plugin.settings.language);

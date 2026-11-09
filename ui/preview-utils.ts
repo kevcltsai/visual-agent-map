@@ -93,6 +93,43 @@ export function placeHoverPreview(
   return clear.find(spot => !avoid.some(box => overlaps(spot, box))) ?? clear[0] ?? null;
 }
 
+/** Narrowest preview width the shrink path accepts: the same floor the view gives a preview (180px). */
+export const MIN_SHRUNK_PREVIEW_WIDTH = 180;
+
+/**
+ * Used when `placeHoverPreview` finds no full-size side (a narrow pane with a large preview size): the preview is made
+ * narrower, beside the card on whichever side has more room, and never covers the card or `keepClear`. Null when even
+ * the narrower preview would not fit beside the card, so the caller shows no preview (as before).
+ */
+export function shrinkHoverPreview(
+  host: { width: number; height: number },
+  card: PreviewBox,
+  preview: { width: number; height: number },
+  margin = 12,
+  options: { keepClear?: PreviewBox[]; avoid?: PreviewBox[] } = {}
+): { left: number; top: number; width: number } | null {
+  const keepClear = [card, ...(options.keepClear ?? [])];
+  const avoid = options.avoid ?? [];
+  const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(value, Math.max(low, high)));
+  const top = clamp(card.top, margin, host.height - preview.height - margin);
+  // As in placeHoverPreview: beside spots start beyond whatever shares their rows (a wider tool row).
+  const sharesRows = keepClear.filter(box => top < box.bottom && box.top < top + preview.height);
+  const rightEdge = Math.max(card.right, ...sharesRows.map(box => box.right));
+  const leftEdge = Math.min(card.left, ...sharesRows.map(box => box.left));
+  const sides = [
+    { left: rightEdge + margin, room: host.width - margin - (rightEdge + margin) },
+    { left: margin, room: leftEdge - margin - margin }
+  ];
+  const overlaps = (spot: { left: number; width: number }, box: PreviewBox) =>
+    spot.left < box.right && box.left < spot.left + spot.width && top < box.bottom && box.top < top + preview.height;
+  const fits = sides
+    .map(side => ({ left: side.left, top, width: Math.min(preview.width, side.room) }))
+    .filter(spot => spot.width >= MIN_SHRUNK_PREVIEW_WIDTH)
+    .map(spot => ({ spot, blocked: avoid.some(box => overlaps(spot, box)) }))
+    .sort((a, b) => Number(a.blocked) - Number(b.blocked) || b.spot.width - a.spot.width);
+  return fits[0]?.spot ?? null;
+}
+
 export function markdownImages(markdown: string, limit = 4): { alt: string; url: string }[] {
   const images: { alt: string; url: string }[] = [];
   for (const match of markdown.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi)) {

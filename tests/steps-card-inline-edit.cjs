@@ -359,3 +359,31 @@ test('the summary field reads like the summary text: same font size and line hei
   for (const decl of ['font-size: var(--font-ui-small)', 'line-height: 1.55']) { assert.ok(text.includes(decl), `summary has ${decl}`); assert.ok(field.includes(decl), `field has ${decl}`); }
   assert.ok(!/font:\s*inherit/.test(field), 'not the editor font');
 });
+// UI audit bugfix-2 P2: a card title with [[ ]] or a fence is refused with its reason (never rewritten), and a map that is open in another pane is brought forward.
+test('P2: a card title with [[ ]] or a fence is refused with a reason; the field stays open with the typed text and nothing is saved', async () => {
+  const h = await harness(); place(h, 'leaf');
+  press(h, 'leaf', centre(TITLE));
+  const field = titleField(h, 'leaf');
+  assert.ok(field, 'the title became a field');
+  const before = (await noteOf(h, 'leaf')).title, past = h.view.history.past.length;
+  const typed = 'Bad [[x]] ``` ';
+  field.value = typed; keys(field, 'Enter');
+  await tick(); await tick();
+  assert.equal((await noteOf(h, 'leaf')).title, before, 'nothing saved to the note or its H1');
+  assert.equal(h.view.history.past.length, past, 'no undo step');
+  assert.equal(h.view.inlineName?.draft, typed, 'the field stays open with the typed text');
+  assert.ok(titleField(h, 'leaf'), 'the field is still on the card');
+  assert.match(h.notices.map(String).join('\n'), /\[\[|```|backtick|反引號/, 'a notice says why');
+});
+
+test('P2: switching to a map open in another pane brings that pane forward once the switcher has closed', async () => {
+  const h = await harness();
+  const leaf = { id: 'other-pane' }, shown = [];
+  h.plugin.findMapLeaf = () => leaf;
+  h.plugin.showLeaf = async item => { shown.push(item); };
+  h.view.switchToMap('Agent Workspace/Topics/map-b/Map.md');
+  assert.deepEqual(shown, [], 'not yet: the closing switcher would take the focus back');
+  // The show is deferred with setTimeout(0), which is not ordered against setImmediate (tick): wait for it.
+  await new Promise(resolve => setTimeout(resolve, 5));
+  assert.deepEqual(shown, [leaf]);
+});

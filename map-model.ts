@@ -1207,6 +1207,10 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
     }
     this.future = [];
   }
+  /** Forgets the step redo would bring back (one cancelled for good, so redo must not replay it). */
+  dropRedo(): void {
+    this.future.pop();
+  }
   undo(): T | undefined {
     const entry = this.past.pop();
     if (entry) this.future.push(entry);

@@ -204,3 +204,19 @@ test('the diagram action refuses a block the runtime parser rejects, and lets it
   assert.equal(unavailable.output, reply);
   assert.equal(warns.length, 1, 'an unusable parser is logged once');
 });
+
+const PANEL_OPEN_NOTE = 'Intro.\nSelected words here.\nOutro.';
+test('fix P5-1: selection AI reading view: "append to the page" writes the draft to the note, then the notice says so', async () => {
+  const notices = [];
+  const result = await runPanel({ markdown: PANEL_OPEN_NOTE, selected: 'Selected words here.', replies: [JSON.stringify({ action: 'transform', query: '', instruction: 'Shorter', placement: 'after', captionInstruction: '' }), 'Drafted.'], outcome: true, notices, applyAfter: t('ui.context_ai_append'), readingAfter: 'preview' });
+  assert.equal(result.replaced.length, 1, 'the draft is added to the editor buffer');
+  assert.equal(result.saves, 1, 'the reading view saves the note, so the draft is on disk and in the reading view');
+  assert.deepEqual(notices, [t('ui.context_ai_appended')]);
+});
+
+test('fix P5-2: selection AI "insert here" says the draft went after the selected paragraph, not to the page end', async () => {
+  const notices = [];
+  await runPanel({ markdown: PANEL_OPEN_NOTE, selected: 'Selected words here.', replies: [JSON.stringify({ action: 'transform', query: '', instruction: 'Shorter', placement: 'after', captionInstruction: '' }), 'Drafted.'], notices, applyAfter: t('ui.context_ai_insert_here') });
+  assert.deepEqual(notices, [t('ui.context_ai_inserted_after')]);
+  assert.notEqual(t('ui.context_ai_inserted_after'), t('ui.context_ai_appended'));
+});

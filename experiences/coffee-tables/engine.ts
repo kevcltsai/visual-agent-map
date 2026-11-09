@@ -1243,7 +1243,7 @@ export class CoffeeManager {
       session = {
         ...session,
         status: "error",
-        error: "Generation stopped when Obsidian closed; saved draft is available."
+        error: translate(coffeeContentLocale(session.language), "coffee.engine_generation_stopped_obsidian_closed")
       };
     const engine = new CoffeeEngine(session, this.runtime, this.saveSession);
     this.engines.set(session.id, engine);

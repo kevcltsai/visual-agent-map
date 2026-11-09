@@ -398,7 +398,7 @@ test('share dialog: a leak hit blocks saving, names only the category, and shows
   const h = modalHarness({ exporter });
   h.modal.open();
   await tick(); await tick();
-  assert.match(h.text(), /Not saved: the file would contain private information \(the vault's location on this computer, a note's file path\)\. Nothing was written\./);
+  assert.match(h.text(), /Not saved: the file would contain private information \(the vault's location on this computer, a note's file path\)\. Remove that content from the source notes/, 'the reason, and the next step (the copy changed with share-error-no-reason-no-next-step)');
   assert.doesNotMatch(h.text(), /vault-path|note-path/, 'category ids are localized, never shown raw');
   assert.doesNotMatch(h.text(), /File size/);
   assert.equal(h.button('Save…').disabled, true);

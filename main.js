@@ -2918,7 +2918,38 @@ var en = {
   "ui.argument_source_0_1_2": '- {0} "{1}" ({2})',
   "ui.argument_reason": "Reason",
   "ui.argument_not_found_0": "Not found: {0}",
-  "ui.argument_eliminated_0": "Eliminated: {0}"
+  "ui.argument_eliminated_0": "Eliminated: {0}",
+  "ui.argument_conclusion_state_progress": "Conclusion \xB7 in progress",
+  "ui.argument_conclusion_state_concluded": "Conclusion \xB7 concluded",
+  "ui.argument_conclusion_state_limit": "Conclusion \xB7 limit reached",
+  "ui.argument_conclusion_state_mismatch": "Conclusion \xB7 situation mismatch",
+  "ui.argument_conclusion_pending_0_1": "Not concluded {0}/{1}",
+  "ui.argument_conclusion_pending_hint_0": "{0} more hypotheses must be verified. No answer is shown before the conclusion.",
+  "ui.argument_conclusion_done_hint": "{0} hypotheses verified.",
+  "ui.argument_conclusion_limit": "Not concluded. Stopped.",
+  "ui.argument_conclusion_limit_hint": "Every hypothesis was tried. The missing evidence is listed; no conclusion is written.",
+  "ui.argument_mismatch_hint": "The data that do not match are named. No hypothesis analysis is run.",
+  "ui.argument_data_count_0_1": "{0}/{1} data found",
+  "ui.argument_data_item": "Data",
+  "ui.argument_data_opposes": "\u2715 Opposite direction",
+  "ui.argument_gate_matched_0_1": "\u2713 Matches the proposition \xB7 {0}/{1} data found",
+  "ui.argument_gate_pending": "Checking the situation",
+  "ui.argument_gate_unmatched": "\u2715 Does not match the proposition",
+  "ui.argument_eliminated_chip": "Eliminated",
+  "ui.argument_evidence": "Evidence",
+  "ui.argument_group_label": "Group",
+  "ui.argument_group_verified_count_0_1": "{0}/{1} verified",
+  "ui.argument_group_eliminated_count_0": "{0} eliminated",
+  "ui.argument_hypothesis_0": "Hypothesis {0}",
+  "ui.argument_missing_not_found": "Missing \xB7 not found",
+  "ui.argument_missing_pending": "Missing \xB7 to find",
+  "ui.argument_missing_searching": "Missing \xB7 searching",
+  "ui.argument_progress_0_1_2": "Evidence needs {0}/{1} found \xB7 round {2}/3",
+  "ui.argument_stance_supports": "\u2713 Supports",
+  "ui.argument_stance_contradicts": "\u2715 Opposes",
+  "ui.argument_stance_uncertain": "? Uncertain",
+  "ui.argument_verified_done": "\u2713 Verified",
+  "ui.argument_verifying": "Verifying"
 };
 
 // i18n/zh-CN.ts
@@ -5732,7 +5763,38 @@ var zhCN = {
   "ui.argument_source_0_1_2": "- {0}\u201C{1}\u201D\uFF08{2}\uFF09",
   "ui.argument_reason": "\u7406\u7531",
   "ui.argument_not_found_0": "\u672A\u627E\u5230\uFF1A{0}",
-  "ui.argument_eliminated_0": "\u5DF2\u6DD8\u6C70\uFF1A{0}"
+  "ui.argument_eliminated_0": "\u5DF2\u6DD8\u6C70\uFF1A{0}",
+  "ui.argument_conclusion_state_progress": "\u7ED3\u8BBA\u30FB\u8FDB\u884C\u4E2D",
+  "ui.argument_conclusion_state_concluded": "\u7ED3\u8BBA\u30FB\u5DF2\u7ED3\u6848",
+  "ui.argument_conclusion_state_limit": "\u7ED3\u8BBA\u30FB\u5DF2\u5230\u4E0A\u9650",
+  "ui.argument_conclusion_state_mismatch": "\u7ED3\u8BBA\u30FB\u73B0\u51B5\u4E0D\u7B26",
+  "ui.argument_conclusion_pending_0_1": "\u672A\u7ED3\u6848 {0}\uFF0F{1}",
+  "ui.argument_conclusion_pending_hint_0": "\u8FD8\u5DEE {0} \u4E2A\u5047\u8BBE\u9A8C\u8BC1\u5B8C\u6210\uFF0C\u7ED3\u6848\u524D\u4E0D\u663E\u793A\u7B54\u6848\u3002",
+  "ui.argument_conclusion_done_hint": "{0} \u4E2A\u5047\u8BBE\u9A8C\u8BC1\u5B8C\u6210\u3002",
+  "ui.argument_conclusion_limit": "\u672A\u7ED3\u6848\uFF0C\u5DF2\u505C\u6B62",
+  "ui.argument_conclusion_limit_hint": "\u5047\u8BBE\u90FD\u8BD5\u8FC7\u4E86\uFF0C\u5217\u51FA\u8FD8\u7F3A\u54EA\u4E9B\u8BC1\u636E\uFF0C\u4E0D\u5199\u7ED3\u8BBA\u3002",
+  "ui.argument_mismatch_hint": "\u5199\u660E\u54EA\u4E9B\u6570\u636E\u4E0D\u7B26\uFF0C\u4E0D\u8DD1\u5047\u8BBE\u5206\u6790\u3002",
+  "ui.argument_data_count_0_1": "{0}\uFF0F{1} \u9879\u6570\u636E\u627E\u5230",
+  "ui.argument_data_item": "\u6570\u636E",
+  "ui.argument_data_opposes": "\u2715 \u65B9\u5411\u76F8\u53CD",
+  "ui.argument_gate_matched_0_1": "\u2713 \u7B26\u5408\u547D\u9898\u30FB{0}\uFF0F{1} \u9879\u6570\u636E\u627E\u5230",
+  "ui.argument_gate_pending": "\u73B0\u51B5\u5224\u65AD\u4E2D",
+  "ui.argument_gate_unmatched": "\u2715 \u4E0D\u7B26\u5408\u547D\u9898",
+  "ui.argument_eliminated_chip": "\u5DF2\u6DD8\u6C70",
+  "ui.argument_evidence": "\u8BC1\u636E",
+  "ui.argument_group_label": "\u5206\u7EC4",
+  "ui.argument_group_verified_count_0_1": "{0}\uFF0F{1} \u9A8C\u8BC1\u5B8C\u6210",
+  "ui.argument_group_eliminated_count_0": "{0} \u4E2A",
+  "ui.argument_hypothesis_0": "\u5047\u8BBE {0}",
+  "ui.argument_missing_not_found": "\u8FD8\u7F3A\u30FB\u627E\u4E0D\u5230",
+  "ui.argument_missing_pending": "\u8FD8\u7F3A\u30FB\u5F85\u627E",
+  "ui.argument_missing_searching": "\u8FD8\u7F3A\u30FB\u641C\u7D22\u4E2D",
+  "ui.argument_progress_0_1_2": "\u8BC1\u636E\u9700\u6C42 {0}\uFF0F{1} \u627E\u5230\u30FB\u7B2C {2}\uFF0F3 \u8F6E",
+  "ui.argument_stance_supports": "\u2713 \u652F\u6301",
+  "ui.argument_stance_contradicts": "\u2715 \u53CD\u5BF9",
+  "ui.argument_stance_uncertain": "\uFF1F\u4E0D\u786E\u5B9A",
+  "ui.argument_verified_done": "\u2713 \u9A8C\u8BC1\u5B8C\u6210",
+  "ui.argument_verifying": "\u9A8C\u8BC1\u4E2D"
 };
 
 // i18n/zh-TW.ts
@@ -8546,7 +8608,38 @@ var zhTW = {
   "ui.argument_source_0_1_2": "- {0}\u300C{1}\u300D\uFF08{2}\uFF09",
   "ui.argument_reason": "\u7406\u7531",
   "ui.argument_not_found_0": "\u672A\u627E\u5230\uFF1A{0}",
-  "ui.argument_eliminated_0": "\u5DF2\u6DD8\u6C70\uFF1A{0}"
+  "ui.argument_eliminated_0": "\u5DF2\u6DD8\u6C70\uFF1A{0}",
+  "ui.argument_conclusion_state_progress": "\u7D50\u8AD6\u30FB\u9032\u884C\u4E2D",
+  "ui.argument_conclusion_state_concluded": "\u7D50\u8AD6\u30FB\u5DF2\u7D50\u6848",
+  "ui.argument_conclusion_state_limit": "\u7D50\u8AD6\u30FB\u5DF2\u5230\u4E0A\u9650",
+  "ui.argument_conclusion_state_mismatch": "\u7D50\u8AD6\u30FB\u73FE\u6CC1\u4E0D\u7B26",
+  "ui.argument_conclusion_pending_0_1": "\u672A\u7D50\u6848 {0}\uFF0F{1}",
+  "ui.argument_conclusion_pending_hint_0": "\u9084\u5DEE {0} \u500B\u5047\u8A2D\u9A57\u8B49\u5B8C\u6210\uFF0C\u7D50\u6848\u524D\u4E0D\u986F\u793A\u7B54\u6848\u3002",
+  "ui.argument_conclusion_done_hint": "{0} \u500B\u5047\u8A2D\u9A57\u8B49\u5B8C\u6210\u3002",
+  "ui.argument_conclusion_limit": "\u672A\u7D50\u6848\uFF0C\u5DF2\u505C\u6B62",
+  "ui.argument_conclusion_limit_hint": "\u5047\u8A2D\u90FD\u8A66\u904E\u4E86\uFF0C\u5217\u51FA\u9084\u7F3A\u54EA\u4E9B\u8B49\u64DA\uFF0C\u4E0D\u5BEB\u7D50\u8AD6\u3002",
+  "ui.argument_mismatch_hint": "\u5BEB\u660E\u54EA\u4E9B\u6578\u64DA\u4E0D\u7B26\uFF0C\u4E0D\u8DD1\u5047\u8A2D\u5206\u6790\u3002",
+  "ui.argument_data_count_0_1": "{0}\uFF0F{1} \u9805\u6578\u64DA\u627E\u5230",
+  "ui.argument_data_item": "\u6578\u64DA",
+  "ui.argument_data_opposes": "\u2715 \u65B9\u5411\u76F8\u53CD",
+  "ui.argument_gate_matched_0_1": "\u2713 \u7B26\u5408\u547D\u984C\u30FB{0}\uFF0F{1} \u9805\u6578\u64DA\u627E\u5230",
+  "ui.argument_gate_pending": "\u73FE\u6CC1\u5224\u65B7\u4E2D",
+  "ui.argument_gate_unmatched": "\u2715 \u4E0D\u7B26\u5408\u547D\u984C",
+  "ui.argument_eliminated_chip": "\u5DF2\u6DD8\u6C70",
+  "ui.argument_evidence": "\u8B49\u64DA",
+  "ui.argument_group_label": "\u5206\u7D44",
+  "ui.argument_group_verified_count_0_1": "{0}\uFF0F{1} \u9A57\u8B49\u5B8C\u6210",
+  "ui.argument_group_eliminated_count_0": "{0} \u500B",
+  "ui.argument_hypothesis_0": "\u5047\u8A2D {0}",
+  "ui.argument_missing_not_found": "\u9084\u7F3A\u30FB\u627E\u4E0D\u5230",
+  "ui.argument_missing_pending": "\u9084\u7F3A\u30FB\u5F85\u627E",
+  "ui.argument_missing_searching": "\u9084\u7F3A\u30FB\u641C\u5C0B\u4E2D",
+  "ui.argument_progress_0_1_2": "\u8B49\u64DA\u9700\u6C42 {0}\uFF0F{1} \u627E\u5230\u30FB\u7B2C {2}\uFF0F3 \u8F2A",
+  "ui.argument_stance_supports": "\u2713 \u652F\u6301",
+  "ui.argument_stance_contradicts": "\u2715 \u53CD\u5C0D",
+  "ui.argument_stance_uncertain": "\uFF1F\u4E0D\u78BA\u5B9A",
+  "ui.argument_verified_done": "\u2713 \u9A57\u8B49\u5B8C\u6210",
+  "ui.argument_verifying": "\u9A57\u8B49\u4E2D"
 };
 
 // i18n/languages.ts
@@ -25349,6 +25442,9 @@ function managedNodeIds(map) {
   if (isRec(raw.roles)) {
     for (const id of Object.values(raw.roles)) if (isStr(id)) ids.add(id);
   }
+  if (isRec(raw.situation) && Array.isArray(raw.situation.data)) {
+    for (const datum of raw.situation.data) if (isRec(datum) && isStr(datum.id)) ids.add(datum.id);
+  }
   if (Array.isArray(raw.hypotheses))
     for (const h of raw.hypotheses) {
       if (!isRec(h)) continue;
@@ -25374,6 +25470,19 @@ function isVerified(h) {
 }
 function verifiedHypotheses(state) {
   return state.hypotheses.filter(isVerified);
+}
+function verifiedCount(state) {
+  return verifiedHypotheses(state).length;
+}
+function displayVerdict(h) {
+  return allNeedsFound(h) ? effectiveVerdict(h) : "verifying";
+}
+function conclusionView(state) {
+  const { phase } = state.run;
+  if (phase === "stopped_mismatch") return "stopped_mismatch";
+  if (phase === "stopped_limit") return "stopped_limit";
+  if (phase === "concluded" && verifiedCount(state) >= MIN_VERIFIED) return "concluded";
+  return "in_progress";
 }
 
 // repository.ts
@@ -28879,6 +28988,9 @@ var TOPIC_KIND_SHAPES = {
   evidence: { shape: "folded", labelKey: "ui.topic_kind_evidence" },
   conclusion: { shape: "hexagon", labelKey: "ui.topic_kind_conclusion" }
 };
+function shapeKindFor(kind, argument) {
+  return argument ? "action" : kind;
+}
 var EDGE = 0;
 var FAR = 100;
 var HEXAGON = `25,${EDGE} 75,${EDGE} ${FAR},50 75,${FAR} 25,${FAR} ${EDGE},50`;
@@ -45118,6 +45230,226 @@ function applyResume(state) {
   return next;
 }
 
+// experiences/visual-map/argument-card.ts
+var STANCE_KEY = {
+  supports: "ui.argument_stance_supports",
+  contradicts: "ui.argument_stance_contradicts",
+  uncertain: "ui.argument_stance_uncertain"
+};
+var STANCE_TONE = { supports: "yes", contradicts: "no", uncertain: "maybe" };
+var VERDICT_KEY = {
+  supported: "ui.hypothesis_supported",
+  refuted: "ui.hypothesis_refuted",
+  undecided: "ui.hypothesis_undecided"
+};
+var CONCLUSION_KIND = {
+  in_progress: "ui.argument_conclusion_state_progress",
+  concluded: "ui.argument_conclusion_state_concluded",
+  stopped_limit: "ui.argument_conclusion_state_limit",
+  stopped_mismatch: "ui.argument_conclusion_state_mismatch"
+};
+function sourceHost(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch (e) {
+    return "";
+  }
+}
+function missingChip(item, t2) {
+  const key4 = item.state === "not_found" ? "ui.argument_missing_not_found" : item.state === "searching" ? "ui.argument_missing_searching" : "ui.argument_missing_pending";
+  return { tone: "gap", text: t2(key4) };
+}
+function datumChip(datum, t2) {
+  if (datum.state !== "found") return missingChip(datum, t2);
+  return datum.stance === "opposes" ? { tone: "no", text: t2("ui.argument_data_opposes") } : { tone: "yes", text: t2("ui.argument_stance_supports") };
+}
+function conclusionCard(state, t2) {
+  const view = conclusionView(state);
+  const base = {
+    role: "conclusion",
+    kind: t2(CONCLUSION_KIND[view]),
+    titleFrom: "text",
+    state: view,
+    chips: [],
+    lines: [],
+    label: t2(CONCLUSION_KIND[view])
+  };
+  const verified = verifiedCount(state);
+  if (view === "concluded")
+    return { ...base, titleFrom: "summary", lines: [t2("ui.argument_conclusion_done_hint", verified)] };
+  if (view === "stopped_mismatch")
+    return { ...base, title: t2("ui.argument_stopped_mismatch"), lines: [t2("ui.argument_mismatch_hint")] };
+  if (view === "stopped_limit")
+    return { ...base, title: t2("ui.argument_conclusion_limit"), lines: [t2("ui.argument_conclusion_limit_hint")] };
+  return {
+    ...base,
+    title: t2("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
+    lines: [t2("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
+  };
+}
+function hypothesisCard(state, h, t2) {
+  const index = state.hypotheses.indexOf(h) + 1;
+  const shown = displayVerdict(h);
+  const chips = h.location === "eliminated" ? [{ tone: "gap", text: t2("ui.argument_eliminated_chip") }] : [
+    shown === "verifying" ? { tone: "open", text: t2("ui.argument_verifying") } : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t2(VERDICT_KEY[shown]) }
+  ];
+  if (isVerified(h)) chips.push({ tone: "yes", text: t2("ui.argument_verified_done") });
+  const kind = t2("ui.argument_hypothesis_0", index);
+  const progress = t2("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
+  const lines = [progress];
+  if (h.location === "eliminated" && h.eliminationReason)
+    lines.push(t2("ui.argument_eliminated_0", h.eliminationReason));
+  const status = chips.map((chip) => chip.text).join(" ");
+  return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: `${kind}, ${status}, ${progress}` };
+}
+function needCard(need, t2) {
+  var _a2;
+  const kind = t2("ui.argument_evidence");
+  if (need.state === "found") {
+    const stance = (_a2 = need.stance) != null ? _a2 : "uncertain";
+    const chip2 = { tone: STANCE_TONE[stance], text: t2(STANCE_KEY[stance]) };
+    const host = need.proof ? sourceHost(need.proof.url) : "";
+    return {
+      role: "need",
+      kind: host ? `${kind} \xB7 ${host}` : kind,
+      titleFrom: "note",
+      chips: [chip2],
+      lines: need.proof ? [need.proof.claim] : [],
+      label: `${kind}, ${chip2.text}${host ? `, ${host}` : ""}`
+    };
+  }
+  const chip = missingChip(need, t2);
+  return {
+    role: "need",
+    kind,
+    titleFrom: "note",
+    dashed: true,
+    chips: [chip],
+    lines: need.reason ? [need.reason] : [],
+    label: `${kind}, ${chip.text}`
+  };
+}
+function datumCard(datum, t2) {
+  const kind = t2("ui.argument_data_item");
+  const chip = datumChip(datum, t2);
+  if (datum.state === "found") {
+    const host = datum.proof ? sourceHost(datum.proof.url) : "";
+    return {
+      role: "datum",
+      kind: host ? `${kind} \xB7 ${host}` : kind,
+      titleFrom: "note",
+      chips: [chip],
+      lines: datum.proof ? [datum.proof.claim] : [],
+      label: `${kind}, ${chip.text}${host ? `, ${host}` : ""}`
+    };
+  }
+  return {
+    role: "datum",
+    kind,
+    titleFrom: "note",
+    dashed: true,
+    chips: [chip],
+    lines: datum.reason ? [datum.reason] : [],
+    label: `${kind}, ${chip.text}`
+  };
+}
+function describeArgumentCard(state, id, t2) {
+  const { roles } = state;
+  const plain = (role, kind, lines = [], chips = []) => ({
+    role,
+    kind,
+    titleFrom: "note",
+    chips,
+    lines,
+    label: [kind, ...chips.map((chip) => chip.text), ...lines].join(", ")
+  });
+  if (id === roles.proposition) return plain("proposition", t2("ui.argument_proposition"));
+  if (id === roles.conclusion) return conclusionCard(state, t2);
+  if (id === roles.situation) {
+    const data = state.situation.data;
+    const found = data.filter((datum2) => datum2.state === "found").length;
+    const count3 = t2("ui.argument_data_count_0_1", found, data.length);
+    const gate = state.situation.gate.state;
+    if (gate === "matched")
+      return plain("situation", t2("ui.argument_situation"), [t2("ui.argument_gate_matched_0_1", found, data.length)]);
+    const chip = gate === "unmatched" ? { tone: "no", text: t2("ui.argument_gate_unmatched") } : { tone: "open", text: t2("ui.argument_gate_pending") };
+    return plain("situation", t2("ui.argument_situation"), [count3], [chip]);
+  }
+  const datum = state.situation.data.find((item) => item.id === id);
+  if (datum) return datumCard(datum, t2);
+  if (id === roles.verified) {
+    const verifying = state.hypotheses.filter((h) => h.location === "verifying").length;
+    return plain("group", t2("ui.argument_group_label"), [
+      t2("ui.argument_group_verified_count_0_1", verifiedCount(state), Math.max(verifying, MIN_VERIFIED))
+    ]);
+  }
+  if (id === roles.eliminated) {
+    const count3 = state.hypotheses.filter((h) => h.location === "eliminated").length;
+    return plain("group", t2("ui.argument_group_label"), [t2("ui.argument_group_eliminated_count_0", count3)]);
+  }
+  for (const h of state.hypotheses) {
+    if (h.id === id) return hypothesisCard(state, h, t2);
+    const need = h.needs.find((item) => item.id === id);
+    if (need) return needCard(need, t2);
+  }
+  return null;
+}
+
+// core/argument-map/layout.ts
+var GROUP_STANCE = { supports: 0, contradicts: 1, opposes: 1, uncertain: 2 };
+function itemRank(item) {
+  var _a2;
+  if (item.state === "found") return GROUP_STANCE[(_a2 = item.stance) != null ? _a2 : "uncertain"];
+  return 3 + (item.state === "searching" ? 0 : item.state === "pending" ? 1 : 2);
+}
+function hypothesisRank(h) {
+  return isVerified(h) ? 0 : 1;
+}
+function siblingRanks(state) {
+  const rank = /* @__PURE__ */ new Map();
+  const { roles } = state;
+  rank.set(roles.situation, 0);
+  rank.set(roles.conclusion, 1);
+  rank.set(roles.verified, 0);
+  rank.set(roles.eliminated, 1);
+  const key4 = (group, index) => group * 1e3 + index;
+  state.hypotheses.forEach((h, index) => {
+    rank.set(h.id, key4(hypothesisRank(h), index));
+    h.needs.forEach((need, at) => rank.set(need.id, key4(itemRank(need), at)));
+  });
+  state.situation.data.forEach((datum, index) => rank.set(datum.id, key4(itemRank(datum), index)));
+  return rank;
+}
+function orderArgumentNodes(nodes, state) {
+  const rank = siblingRanks(state);
+  const slots = /* @__PURE__ */ new Map();
+  nodes.forEach((node, index) => {
+    var _a2, _b2, _c;
+    return slots.set((_a2 = node.parentId) != null ? _a2 : "", [...(_c = slots.get((_b2 = node.parentId) != null ? _b2 : "")) != null ? _c : [], index]);
+  });
+  const out = [...nodes];
+  for (const indexes of slots.values()) {
+    const sorted = indexes.map((i) => nodes[i]).sort((a, b) => {
+      var _a2, _b2;
+      return ((_a2 = rank.get(a.id)) != null ? _a2 : 0) - ((_b2 = rank.get(b.id)) != null ? _b2 : 0);
+    });
+    indexes.forEach((slot, i) => out[slot] = sorted[i]);
+  }
+  return out;
+}
+function arrangeArgumentMap(nodes, state, heightOf, options = {}) {
+  const ordered = orderArgumentNodes(nodes, state).map((node) => {
+    const copy = { ...node };
+    delete copy.layout;
+    return copy;
+  });
+  const placed = new Map(arrangeMap(ordered, options.hidden, heightOf, "right", { reset: true }).map((n) => [n.id, n]));
+  return nodes.map((node) => {
+    const at = placed.get(node.id);
+    return at ? { ...node, x: at.x, y: at.y } : node;
+  });
+}
+
 // core/steps/map-chat/language.en.md
 var language_en_default2 = "Write the reply, and every title, summary, note text and new file text you produce, in {{language}}.\n";
 
@@ -59294,6 +59626,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
   /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
   arrangeAll(map, options = {}) {
     var _a2;
+    const argument = readArgumentMap(map);
+    if (argument.kind === "usable") {
+      map.nodes = arrangeArgumentMap(map.nodes, argument.data, this.cardHeightOf, {
+        hidden: supersededAimNodeIds(map)
+      });
+      return;
+    }
     const out = arrangeMapWithRings(
       map.nodes,
       (_a2 = map.canvasItems) != null ? _a2 : [],
@@ -59439,6 +59778,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
    */
   aimLive(map = this.map) {
     return aimEnabled() && !!(map == null ? void 0 : map.aim);
+  }
+  /** Whether `map` is a usable argument map: its arrangement is fixed by the flow, so the layout controls are off (like AIM's). */
+  argumentLive(map = this.map) {
+    return !!map && map.argumentMap !== void 0 && readArgumentMap(map).kind === "usable";
   }
   notesLoading() {
     return !!this.noteLoad;
@@ -63571,7 +63914,7 @@ ${request.requirements}` : preset.text,
   setLayout(patch) {
     this.enqueue(async () => {
       var _a2, _b2, _c;
-      if (!this.map || this.aimLive()) return;
+      if (!this.map || this.aimLive() || this.argumentLive()) return;
       const before = layoutOf(this.map);
       const direction = (_a2 = patch.direction) != null ? _a2 : before.direction;
       const spacing = (_c = (_b2 = patch.spacing) != null ? _b2 : before.spacing) != null ? _c : "standard";
@@ -63598,7 +63941,7 @@ ${request.requirements}` : preset.text,
         (item) => item.setTitle(choice2.title).setIcon(choice2.icon).onClick(() => this.collapseTo(choice2.levels))
       );
     menu.addSeparator();
-    if (this.map && !this.map.aim) {
+    if (this.map && !this.map.aim && !this.argumentLive()) {
       const current = layoutOf(this.map);
       const directions = [
         { direction: "right", title: t("ui.layout_direction_right"), icon: "arrow-right" },
@@ -64936,7 +65279,7 @@ ${request.requirements}` : preset.text,
         (_e = summary.querySelector(".vam-card-preview-text")) == null ? void 0 : _e.setText(text13);
         summary.title = text13;
       }
-      this.fitKindShape(card, this.topicKindOf(node.id));
+      this.fitKindShape(card, this.shapeKindOf(node.id));
       return;
     }
     if (!(summary == null ? void 0 : summary.hasClass("is-preview"))) return;
@@ -64947,7 +65290,7 @@ ${request.requirements}` : preset.text,
       summary.setText(note.summary);
       summary.title = note.summary;
     }
-    this.fitKindShape(card, this.topicKindOf(node.id));
+    this.fitKindShape(card, this.shapeKindOf(node.id));
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   paintHoverResearch() {
@@ -70962,7 +71305,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const loading = this.cardLoading(node);
@@ -70998,7 +71341,7 @@ ${request.requirements}` : preset.text,
       card.appendChild(background);
     }
     const kind = this.topicKindOf(node.id);
-    renderShapeBackground(card, kind);
+    renderShapeBackground(card, this.shapeKindOf(node.id));
     card.dataset.nodeId = node.id;
     const queued = this.isResearchQueued(node);
     const merging = this.isMerging(node.id);
@@ -71094,12 +71437,15 @@ ${request.requirements}` : preset.text,
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     if (kind !== "topic") {
-      card.dataset.topicKind = kind;
+      const read = this.map ? readArgumentMap(this.map) : null;
+      const argumentRole = (read == null ? void 0 : read.kind) === "usable" && this.isArgumentCard(node.id) ? (_n = describeArgumentCard(read.data, node.id, t)) == null ? void 0 : _n.role : void 0;
+      if (argumentRole) card.dataset.argumentRole = argumentRole;
+      else card.dataset.topicKind = kind;
       const strength = this.hypothesisStrengthOf(node.id), leaning = this.hypothesisLeaningOf(node.id);
       const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength && leaning) renderHypothesisTag(header2, leaning, strength, kindText);
       else header2.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
-      const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
+      const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header2, node.id);
@@ -71109,7 +71455,7 @@ ${request.requirements}` : preset.text,
     this.paintCardStyle(card, note, isAimNode(node));
     if (header2) this.paintAiLock(card, header2, node);
     const errorDetails = [];
-    if ((_o = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _o.length) {
+    if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
       const issue2 = header2.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
@@ -71121,8 +71467,8 @@ ${request.requirements}` : preset.text,
       if (failure.technical) technicalDetails.push(failure.technical);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_p = this.map) == null ? void 0 : _p.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_q = this.notes.get(currentNode.id)) == null ? void 0 : _q.title : void 0;
+      const currentNode = batch.currentPath ? (_q = this.map) == null ? void 0 : _q.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_r = this.notes.get(currentNode.id)) == null ? void 0 : _r.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -71149,16 +71495,16 @@ ${request.requirements}` : preset.text,
       this.renderRetryFailedButton(header2, node.path, batch);
     }
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.id === node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_s = this.plugin.expansionCoordinator) == null ? void 0 : _s.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
+    const parentNode = node.parentId ? (_s = this.map) == null ? void 0 : _s.nodes.find((item) => item.id === node.parentId) : void 0;
+    const batchChild = !!parentNode && !!((_t = this.plugin.expansionCoordinator) == null ? void 0 : _t.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header2,
         t(
           stopLabelKey(
             this.plugin.topicRuns.runKind(node.path),
-            !!((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)),
+            !!((_v = this.plugin.quickExpandPending) == null ? void 0 : _v.has(node.path)),
             this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
           )
         ),
@@ -71175,7 +71521,7 @@ ${request.requirements}` : preset.text,
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header2, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_w = (_v = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _v.length) != null ? _w : 0;
+    const pendingCount = (_x = (_w = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _w.length) != null ? _x : 0;
     if (pendingCount && !this.selection.state.multiSelectMode && !this.aimLive())
       this.button(
         header2,
@@ -71218,7 +71564,7 @@ ${request.requirements}` : preset.text,
       }
     }
     if (!this.selection.state.multiSelectMode) {
-      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header2,
           t("ui.aim_new_question"),
@@ -71230,7 +71576,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && assumptions.length) {
+      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && assumptions.length) {
         const correct = this.button(
           header2,
           t("ui.aim_correct_assumption"),
@@ -71242,7 +71588,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && node.aimKind === "conclusion") {
+      if (aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header2,
           t("ui.aim_steer"),
@@ -71292,7 +71638,7 @@ ${request.requirements}` : preset.text,
           () => this.whenEditing(() => this.selectSubtopics(node))
         );
     }
-    if (!this.selection.state.multiSelectMode && aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "question")
+    if (!this.selection.state.multiSelectMode && aimEnabled() && ((_B = this.map) == null ? void 0 : _B.aim) && node.aimKind === "question")
       iconTool(
         t("ui.remove_from_map"),
         "trash",
@@ -71307,19 +71653,19 @@ ${request.requirements}` : preset.text,
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const shownTitle = loading ? this.preReadTitle(node) : (_B = note == null ? void 0 : note.title) != null ? _B : node.path;
+    const shownTitle = loading ? this.preReadTitle(node) : (_C = note == null ? void 0 : note.title) != null ? _C : node.path;
     const title = card.createEl("h3", { text: shownTitle, cls: "vam-card-title" });
     title.setAttr("title", shownTitle);
     title.setAttr("dir", "auto");
-    if (note && ((_C = this.inlineName) == null ? void 0 : _C.target) === "card" && this.inlineName.id === node.id) {
+    if (note && ((_D = this.inlineName) == null ? void 0 : _D.target) === "card" && this.inlineName.id === node.id) {
       title.addClass("vam-sr-only");
       this.paintCardNameEdit(card, node, note);
     }
     if (note && !this.selection.state.multiSelectMode && !this.aimLive())
       card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node));
     const textEditable = !!note && this.cardTextEditable();
-    if (textEditable && ((_D = this.inlineSummary) == null ? void 0 : _D.id) === node.id) this.paintCardSummaryEdit(card, node);
-    else if ((_E = research == null ? void 0 : research.preview) == null ? void 0 : _E.summary)
+    if (textEditable && ((_E = this.inlineSummary) == null ? void 0 : _E.id) === node.id) this.paintCardSummaryEdit(card, node);
+    else if ((_F = research == null ? void 0 : research.preview) == null ? void 0 : _F.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (loading) {
       const bars = card.createDiv({ cls: "vam-card-loading-bars" });
@@ -71329,14 +71675,14 @@ ${request.requirements}` : preset.text,
     } else if (!note || !isPlaceholder(note.summary)) {
       const summaryText2 = card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_F = note == null ? void 0 : note.summary) != null ? _F : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_G = note == null ? void 0 : note.summary) != null ? _G : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_G = note == null ? void 0 : note.summary) != null ? _G : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_H = note == null ? void 0 : note.summary) != null ? _H : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
       if (textEditable) summaryText2.addClass("is-inline-editable");
     }
-    if (textEditable && !((_H = research == null ? void 0 : research.preview) == null ? void 0 : _H.summary) && ((_I = this.inlineSummary) == null ? void 0 : _I.id) !== node.id && isPlaceholder(note.summary))
+    if (textEditable && !((_I = research == null ? void 0 : research.preview) == null ? void 0 : _I.summary) && ((_J = this.inlineSummary) == null ? void 0 : _J.id) !== node.id && isPlaceholder(note.summary))
       card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
-    else if (((_J = this.inlineSummary) == null ? void 0 : _J.id) === node.id && !textEditable) this.inlineSummary = null;
+    else if (((_K = this.inlineSummary) == null ? void 0 : _K.id) === node.id && !textEditable) this.inlineSummary = null;
     this.paintCardImageRelations(card, node.id);
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
@@ -71351,7 +71697,7 @@ ${request.requirements}` : preset.text,
         });
       }
     }
-    if (node.aimKind === "conclusion" && aimEnabled() && ((_K = this.map) == null ? void 0 : _K.aim)) {
+    if (node.aimKind === "conclusion" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -71364,7 +71710,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && aimEnabled() && ((_M = this.map) == null ? void 0 : _M.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -71400,11 +71746,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && aimEnabled() && ((_M = this.map) == null ? void 0 : _M.aim)) {
+    if (node.aimKind === "question" && aimEnabled() && ((_N = this.map) == null ? void 0 : _N.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_O = (_N = node.aimQuestion) == null ? void 0 : _N.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _O : branch.answerSnapshot.selections;
+        const labels = (_P = (_O = node.aimQuestion) == null ? void 0 : _O.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _P : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -71447,11 +71793,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && aimEnabled() && ((_P = this.map) == null ? void 0 : _P.aim)) {
+    if (node.aimKind === "answer" && aimEnabled() && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_R = (_Q = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _Q.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _R : branch.answerSnapshot.selections;
+        const labels = (_S = (_R = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _R.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _S : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -71464,7 +71810,7 @@ ${request.requirements}` : preset.text,
       node,
       (point, wasSelected) => this.switchTopicChat(node, point.target) || this.openCardTextEditor(point, card, node, wasSelected)
     );
-    if (!this.selection.state.multiSelectMode && !((_S = this.map) == null ? void 0 : _S.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !((_T = this.map) == null ? void 0 : _T.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -71564,8 +71910,9 @@ ${request.requirements}` : preset.text,
     });
     this.arrangeCardCover(card);
     if (shownNode.height && !typingSummary) this.ensureClipParts(card);
-    if (this.pendingCardFits) this.pendingCardFits.push(() => this.fitKindShape(card, kind));
-    else this.fitKindShape(card, kind);
+    const shapeKind = this.shapeKindOf(node.id);
+    if (this.pendingCardFits) this.pendingCardFits.push(() => this.fitKindShape(card, shapeKind));
+    else this.fitKindShape(card, shapeKind);
   }
   /**
    * Sizes an SVG-shaped card's padding so its text sits inside the shape: the side padding comes from the width, then the
@@ -71637,7 +71984,7 @@ ${request.requirements}` : preset.text,
     if (!this.stageEl) return;
     for (const node of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []) {
       const card = this.cardEls.get(node.id);
-      if (card) this.fitKindShape(card, this.topicKindOf(node.id));
+      if (card) this.fitKindShape(card, this.shapeKindOf(node.id));
     }
   }
   /** What the canvas draws: visible nodes minus interim AIM results already superseded by their run's conclusion. */
@@ -71966,6 +72313,15 @@ ${request.requirements}` : preset.text,
     if (!this.relationsEnabled() || !node || isAimNode(node)) return "topic";
     return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.topicKind) != null ? _c : "topic";
   }
+  /** True for a card the argument flow owns on a map whose `argumentMap` key is usable (those cards are plain rectangles). */
+  isArgumentCard(id) {
+    if (!this.map || this.map.argumentMap === void 0 || readArgumentMap(this.map).kind !== "usable") return false;
+    return managedNodeIds(this.map).has(id);
+  }
+  /** The kind whose shape the card is drawn with: the type's own, except an argument map's cards, which are all rectangles. */
+  shapeKindOf(id) {
+    return shapeKindFor(this.topicKindOf(id), this.isArgumentCard(id));
+  }
   /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
   hypothesisStrengthOf(id) {
     var _a2, _b2, _c;
@@ -72005,7 +72361,7 @@ ${request.requirements}` : preset.text,
     var _a2;
     const id = (_a2 = card.dataset) == null ? void 0 : _a2.nodeId;
     if (!id || !this.map) return;
-    this.fitKindShape(card, this.topicKindOf(id));
+    this.fitKindShape(card, this.shapeKindOf(id));
     this.drawEdges();
     this.settleCardHeights();
   }
@@ -72595,7 +72951,7 @@ ${request.requirements}` : preset.text,
     this.paintCardColor(card, note, isAimNode(node));
     this.paintCardStyle(card, note, isAimNode(node));
     if (header2) this.paintAiLock(card, header2, node);
-    this.fitKindShape(card, kind);
+    this.fitKindShape(card, this.shapeKindOf(node.id));
     if (redrawEdges) this.drawEdges();
   }
   /** The map's saved sources, read from the map the dialog opened on (not the one open when the task starts). */
@@ -74575,7 +74931,7 @@ ${request.requirements}` : preset.text,
   /** The directions this branch may take of its own: those the parse keeps (never the one opposite its parent's). */
   branchLayoutChoices(node) {
     const map = this.map;
-    if (!map || this.aimLive(map) || !node.parentId) return [];
+    if (!map || this.aimLive(map) || this.argumentLive(map) || !node.parentId) return [];
     const mapDirection = layoutOf(map).direction;
     if (!allowsBranchLayout(mapDirection)) return [];
     return BRANCH_DIRECTIONS.filter((direction) => {
@@ -74590,7 +74946,7 @@ ${request.requirements}` : preset.text,
   /** One undo step: sets or clears this branch's own arrangement (null follows the map), then re-arranges. */
   async changeBranchLayout(node, direction) {
     var _a2;
-    if (!this.map || this.aimLive()) return;
+    if (!this.map || this.aimLive() || this.argumentLive()) return;
     const latest = this.map.nodes.find((item) => item.id === node.id);
     if (!latest) return;
     if (direction && !this.branchLayoutChoices(latest).includes(direction)) return;
@@ -91560,7 +91916,7 @@ var ArgumentRuns = class {
           [situation, proposed.id],
           [conclusion, proposed.id],
           [verified, conclusion.id],
-          [eliminated, proposed.id]
+          [eliminated, conclusion.id]
         ];
         if (this.dead(drive)) return;
         await p.updateMap(mapPath, (doc) => {
@@ -91790,12 +92146,24 @@ var ArgumentRuns = class {
       case "plan_situation": {
         const request = { ...base, proposition, max: MAX_SITUATION_DATA };
         const result = await this.ask(drive, ARGUMENT_STEPS.plan_situation, request);
-        await this.checkpoint(drive, async (s) => ({
-          next: applySituationData(
+        await this.checkpoint(drive, async (s, map) => {
+          applySituationData(
             s,
-            result.data.map((d) => ({ id: this.ports.newId(), need: d.need }))
-          )
-        }));
+            result.data.map((d, i) => ({ id: `dry-${i}`, need: d.need }))
+          );
+          const nodes = [];
+          const items = [];
+          for (const d of result.data) {
+            const node = await this.ports.createNote(
+              { kind: "datum", title: shorten(d.need, 80), summary: d.need },
+              map,
+              drive.mapPath
+            );
+            nodes.push({ node, parentId: s.roles.situation });
+            items.push({ id: node.id, need: d.need });
+          }
+          return { next: applySituationData(s, items), nodes };
+        });
         return;
       }
       case "gate_missing": {
@@ -92006,7 +92374,7 @@ var ArgumentRuns = class {
     let busy = null;
     try {
       if (this.dead(drive)) return;
-      if (isNeed && node) {
+      if (node) {
         busy = this.ports.begin(node.path);
         if (!busy) return;
       }
@@ -92092,8 +92460,9 @@ var ArgumentRuns = class {
   /** The stale fence: the run id (checkpoint) and the item still `searching` (the reducers throw otherwise); a deleted node gets no note. */
   async commitEvidence(drive, isNeed, hypothesisId, itemId, result) {
     await this.checkpoint(drive, async (s, map) => {
-      const next = isNeed ? applyEvidence(s, hypothesisId, itemId, result) : applySituationEvidence(s, itemId, result);
       const node = map.nodes.find((n) => n.id === itemId);
+      const settled2 = node || !result.found ? result : { found: false, reason: "card_deleted" };
+      const next = isNeed ? applyEvidence(s, hypothesisId, itemId, settled2) : applySituationEvidence(s, itemId, settled2);
       const proof = result.found ? result.proof : void 0;
       const lines = proof ? [this.ports.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
       const notes = async () => {

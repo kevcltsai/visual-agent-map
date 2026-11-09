@@ -462,6 +462,7 @@ import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
 import { GateError, applyPause } from "../../core/argument-map/machine";
 import { effectiveVerdict, managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
 import { describeArgumentCard } from "./argument-card";
+import { arrangeArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
   MAP_CHAT_ANCHOR_PREFIX,
@@ -1867,6 +1868,14 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
   private arrangeAll(map: MapDocument, options: { reset?: boolean } = {}): void {
+    // An argument map is arranged by its roles and stances (always to the right); any other map takes the ordinary path below.
+    const argument = readArgumentMap(map);
+    if (argument.kind === "usable") {
+      map.nodes = arrangeArgumentMap(map.nodes, argument.data, this.cardHeightOf, {
+        hidden: supersededAimNodeIds(map)
+      });
+      return;
+    }
     // Pictures with a ring of topics keep their cards out of the arrangement and solve the ring after it.
     const out = arrangeMapWithRings(
       map.nodes,
@@ -2067,6 +2076,10 @@ export class VisualAgentMapView extends ItemView {
    */
   private aimLive(map: MapDocument | null | undefined = this.map): boolean {
     return aimEnabled() && !!map?.aim;
+  }
+  /** Whether `map` is a usable argument map: its arrangement is fixed by the flow, so the layout controls are off (like AIM's). */
+  private argumentLive(map: MapDocument | null | undefined = this.map): boolean {
+    return !!map && map.argumentMap !== undefined && readArgumentMap(map).kind === "usable";
   }
   private mapOpenEpoch = 0;
   /**
@@ -6491,7 +6504,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private setLayout(patch: { direction?: LayoutKind; spacing?: LayoutSpacing }): void {
     this.enqueue(async () => {
-      if (!this.map || this.aimLive()) return;
+      if (!this.map || this.aimLive() || this.argumentLive()) return;
       const before = layoutOf(this.map);
       const direction = patch.direction ?? before.direction;
       const spacing = patch.spacing ?? before.spacing ?? "standard";
@@ -6524,8 +6537,8 @@ export class VisualAgentMapView extends ItemView {
           .onClick(() => this.collapseTo(choice.levels))
       );
     menu.addSeparator();
-    // An AIM map always grows to the right.
-    if (this.map && !this.map.aim) {
+    // An AIM map always grows to the right, and so does an argument map.
+    if (this.map && !this.map.aim && !this.argumentLive()) {
       const current = layoutOf(this.map);
       const directions: { direction: LayoutKind; title: string; icon: string }[] = [
         { direction: "right", title: t("ui.layout_direction_right"), icon: "arrow-right" },
@@ -18539,7 +18552,7 @@ export class VisualAgentMapView extends ItemView {
   /** The directions this branch may take of its own: those the parse keeps (never the one opposite its parent's). */
   private branchLayoutChoices(node: MapNode): BranchDirection[] {
     const map = this.map;
-    if (!map || this.aimLive(map) || !node.parentId) return [];
+    if (!map || this.aimLive(map) || this.argumentLive(map) || !node.parentId) return [];
     const mapDirection = layoutOf(map).direction;
     if (!allowsBranchLayout(mapDirection)) return [];
     // Offer only what `cleanBranchLayouts` keeps: a value it would delete on parse must never be written.
@@ -18554,7 +18567,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** One undo step: sets or clears this branch's own arrangement (null follows the map), then re-arranges. */
   private async changeBranchLayout(node: MapNode, direction: BranchDirection | null): Promise<void> {
-    if (!this.map || this.aimLive()) return;
+    if (!this.map || this.aimLive() || this.argumentLive()) return;
     const latest = this.map.nodes.find(item => item.id === node.id);
     if (!latest) return;
     if (direction && !this.branchLayoutChoices(latest).includes(direction)) return;

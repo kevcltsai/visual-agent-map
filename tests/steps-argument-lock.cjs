@@ -96,6 +96,37 @@ test('shapeKindOf: the flow\'s cards are rectangles on an argument map; a free c
   }
 });
 
+test('arrangeAll: an argument map is arranged by role (situation above conclusion); a map without the key takes the ordinary path; layout controls are off', async () => {
+  const layoutHarness = async argument => {
+    const h = await harness(undefined, {}, argument);
+    const [p, s, c, v, e, hy, n] = h.nodes;
+    for (const [node, parent] of [[s, p], [c, p], [v, c], [e, c], [hy, v], [n, hy]]) node.parentId = parent.id;
+    // saved order puts the conclusion before the situation: only the argument path reorders them
+    h.view.map.nodes = [p, c, s, v, e, hy, n, h.nodes[7]];
+    return h;
+  };
+  const arranged = await layoutHarness(true);
+  arranged.view.arrangeAll(arranged.view.map);
+  const at = (h, i) => h.view.map.nodes.find(node => node.id === h.nodes[i].id);
+  assert.ok(at(arranged, 1).y < at(arranged, 2).y, 'situation above conclusion');
+  assert.ok(at(arranged, 3).y <= at(arranged, 4).y, 'verified group before eliminated group');
+  assert.equal(at(arranged, 4).parentId, at(arranged, 2).id);
+  const plain = await layoutHarness(false);
+  plain.view.arrangeAll(plain.view.map);
+  assert.ok(at(plain, 2).y < at(plain, 1).y, 'the ordinary path keeps the saved order');
+  let changes = 0;
+  for (const h of [arranged, plain]) h.view.mapChange = async () => { changes++; };
+  arranged.view.setLayout({ direction: 'down' });
+  await arranged.view.changeBranchLayout(at(arranged, 6), 'down');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(changes, 0, 'an argument map takes no layout direction or branch layout');
+  plain.view.setLayout({ direction: 'down' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(changes, 1, 'a plain map still does');
+  assert.deepEqual([...arranged.view.branchLayoutChoices(at(arranged, 6))], []);
+  assert.ok(plain.view.branchLayoutChoices(at(plain, 6)).length > 0);
+});
+
 test('aiLockReason: every managed node is locked for every op; the free node and a map without the key are not', async () => {
   const h = await harness();
   for (const node of managedOf(h)) for (const op of ['write', 'addChild', 'remove', 'move']) assert.equal(h.view.aiLockReason(op, [node.id], undefined, { to: null }), 'locked', `${node.id} ${op}`);

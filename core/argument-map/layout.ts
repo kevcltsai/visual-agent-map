@@ -11,7 +11,7 @@ import { isVerified, type ArgumentMapData, type Hypothesis, type Need, type Situ
 const GROUP_STANCE = { supports: 0, contradicts: 1, opposes: 1, uncertain: 2 } as const;
 /** Found items first (supports, then contradicts, then uncertain), then the dashed missing ones (searching, pending, not found). */
 function itemRank(item: Need | SituationDatum): number {
-  if (item.state === "found") return GROUP_STANCE[(item.stance ?? "uncertain")];
+  if (item.state === "found") return GROUP_STANCE[item.stance ?? "uncertain"];
   return 3 + (item.state === "searching" ? 0 : item.state === "pending" ? 1 : 2);
 }
 

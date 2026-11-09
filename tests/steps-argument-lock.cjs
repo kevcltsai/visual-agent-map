@@ -27,6 +27,7 @@ async function harness(titles = ['P', 'S', 'C', 'V', 'E', 'H', 'N', 'F'], plugin
     const [p, s, c, v, e, hy, need] = nodes;
     const state = machine.newArgumentMap({ proposition: p.id, situation: s.id, conclusion: c.id, verified: v.id, eliminated: e.id }, 'run-1');
     state.hypotheses.push({ id: hy.id, citedData: [], round: 1, location: 'verifying', needs: [{ id: need.id, text: 'n', addedRound: 1, state: 'pending' }] });
+    if (nodes[8]) state.situation.data.push({ id: nodes[8].id, need: 'd', attempts: 0, state: 'pending' });
     mapDoc.argumentMap = state;
   }
   await repo.saveMap(MAP, mapDoc);
@@ -70,6 +71,14 @@ test('managedNodeIds: roles, hypotheses and needs; empty without the key; tolera
   assert.equal(model.managedNodeIds({}).size, 0);
   assert.equal(model.managedNodeIds({ argumentMap: 'junk' }).size, 0);
   assert.deepEqual([...model.managedNodeIds({ argumentMap: { v: 2, roles: { proposition: 'x' }, hypotheses: [{ id: 'h', needs: [{ id: 'n' }] }] } })].sort(), ['h', 'n', 'x']);
+});
+
+test('managedNodeIds includes situation data ids (the data are leaf cards the flow owns); tolerant of junk entries', async () => {
+  assert.deepEqual([...model.managedNodeIds({ argumentMap: { v: 2, roles: {}, situation: { data: [{ id: 'd1' }, { id: 7 }, 'x', null, {}] } } })].sort(), ['d1']);
+  assert.equal(model.managedNodeIds({ argumentMap: { situation: 'junk' } }).size, 0);
+  const h = await harness([...'PSCVEHNF'].concat('D'));
+  for (const op of ['write', 'addChild', 'remove', 'move']) assert.equal(h.view.aiLockReason(op, [h.nodes[8].id], undefined, { to: null }), 'locked', op);
+  assert.equal(h.view.aiLockReason('write', [h.nodes[7].id]), null);
 });
 
 test('aiLockReason: every managed node is locked for every op; the free node and a map without the key are not', async () => {

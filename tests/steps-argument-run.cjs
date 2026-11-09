@@ -89,7 +89,7 @@ test('happy path: runs to a conclusion; begin is written before each dispatch; o
   const doc = await r.repo.readMap(r.mapPath);
   const ids = doc.nodes.map(n => n.id);
   assert.equal(new Set(ids).size, ids.length);
-  assert.equal(doc.nodes.length, 5 + 3 + 6);
+  assert.equal(doc.nodes.length, 5 + 2 + 3 + 6);
   const conclusion = await r.text(state.roles.conclusion);
   assert.equal(conclusion.summary, 'final answer');
   assert.ok(conclusion.detail.includes('依據的現況數據'));
@@ -103,6 +103,50 @@ test('happy path: runs to a conclusion; begin is written before each dispatch; o
   for (const n of doc.nodes.filter(n => n.parentId)) assert.equal(n.x, byId.get(n.parentId).x + 320);
 });
 
+test('layers: the eliminated group hangs under the conclusion; each situation datum is a leaf card (node id == datum id) under the situation card', async () => {
+  const r = await rig({ script: { step: steps() } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  const doc = await r.repo.readMap(r.mapPath);
+  const byId = new Map(doc.nodes.map(n => [n.id, n]));
+  assert.equal(byId.get(state.roles.eliminated).parentId, state.roles.conclusion);
+  assert.equal(byId.get(state.roles.verified).parentId, state.roles.conclusion);
+  assert.equal(byId.get(state.roles.situation).parentId, state.roles.proposition);
+  assert.equal(state.situation.data.length, 2);
+  for (const datum of state.situation.data) {
+    const node = byId.get(datum.id);
+    assert.ok(node, 'datum has a node');
+    assert.equal(node.parentId, state.roles.situation);
+    const note = await r.repo.readNote(node.path);
+    assert.equal(note.summary, 'Rate rose');
+    assert.ok(note.detail.includes(URL_OK));
+  }
+  assert.ok(model.managedNodeIds(doc).has(state.situation.data[0].id));
+});
+
+test('situation data: a deleted datum card is a miss with no note and no duplicate node', async () => {
+  const holder = {};
+  const r = await rig({ script: { step: steps(), ask: async ctx => {
+    const id = ctx.argumentEvidenceNeeds[0].id;
+    const isDatum = (await holder.r.state()).situation.data.some(d => d.id === id);
+    if (isDatum && !holder.deleted) {
+      holder.deleted = id;
+      await holder.r.repo.updateMap(holder.r.mapPath, map => { map.nodes = map.nodes.filter(node => node.id !== id); });
+    }
+    return { summary: 's', detail: 'd', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [foundEntry(id)] };
+  } } });
+  holder.r = r;
+  await r.runs.start(r.mapPath, 'p');
+  const doc = await r.repo.readMap(r.mapPath);
+  assert.ok(holder.deleted);
+  assert.equal(doc.nodes.some(n => n.id === holder.deleted), false);
+  const ids = doc.nodes.map(n => n.id);
+  assert.equal(new Set(ids).size, ids.length);
+  const state = await r.state();
+  const gone = state.situation.data.find(d => d.id === holder.deleted);
+  assert.notEqual(gone.state, 'found', 'a deleted card never counts as found');
+});
+
 test('matches:false: 0 hypotheses, 0 research dispatches after, researchCalls unchanged, fixed sentence, resume refused', async () => {
   const r = await rig({ script: { step: steps({ judge_gate: request => ({ matches: false, reason: 'rate fell', citedData: [request.data[0].id] }) }) } });
   await r.runs.start(r.mapPath, 'Youth unemployment is rising');
@@ -113,7 +157,7 @@ test('matches:false: 0 hypotheses, 0 research dispatches after, researchCalls un
   assert.equal(state.run.researchCalls, dispatchesAtGate);
   assert.equal(r.stat.steps.includes('propose_hypotheses'), false);
   assert.equal((await r.text(state.roles.conclusion)).summary, '現況不符合命題，已停止');
-  assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 5);
+  assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 5 + 2, 'five fixed cards and the two data cards; no hypothesis note');
   await assert.rejects(() => r.runs.resume(r.mapPath), e => e instanceof ArgumentRunError && e.code === 'finished');
   assert.equal(r.stat.ask.length, dispatchesAtGate);
   assert.equal(r.runs.isRunning(r.mapPath), false);
@@ -202,7 +246,7 @@ test('caps: a 7th hypothesis is refused (no notes left behind) and the run pause
   assert.equal(state.run.status, 'paused');
   assert.equal(state.run.stopReason, 'error');
   assert.equal(state.hypotheses.length, 0);
-  assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 5);
+  assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 5 + 2, 'five fixed cards and the two data cards; no hypothesis note');
 });
 
 test('one corrective retry: a refused step succeeds the second time; failing twice pauses with error', async () => {

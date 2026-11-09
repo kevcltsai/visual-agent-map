@@ -78,7 +78,7 @@ export class ArgumentRunError extends Error {
   }
 }
 
-export type NoteKind = "proposition" | "situation" | "conclusion" | "group" | "hypothesis" | "need";
+export type NoteKind = "proposition" | "situation" | "datum" | "conclusion" | "group" | "hypothesis" | "need";
 export interface NoteInput {
   title: string;
   summary?: string;
@@ -214,7 +214,7 @@ export class ArgumentRuns {
           [situation, proposed.id],
           [conclusion, proposed.id],
           [verified, conclusion.id],
-          [eliminated, proposed.id]
+          [eliminated, conclusion.id]
         ];
         if (this.dead(drive)) return;
         await p.updateMap(mapPath, doc => {
@@ -464,12 +464,26 @@ export class ArgumentRuns {
       case "plan_situation": {
         const request: PlanSituationRequest = { ...base, proposition, max: MAX_SITUATION_DATA };
         const result: PlanSituationResult = await this.ask(drive, ARGUMENT_STEPS.plan_situation, request);
-        await this.checkpoint(drive, async s => ({
-          next: applySituationData(
+        await this.checkpoint(drive, async (s, map) => {
+          // Dry run with placeholder ids first: a refused batch must not leave notes behind.
+          applySituationData(
             s,
-            result.data.map(d => ({ id: this.ports.newId(), need: d.need }))
-          )
-        }));
+            result.data.map((d, i) => ({ id: `dry-${i}`, need: d.need }))
+          );
+          // Each datum is a leaf card under the situation card; the card's id is the datum's id (like a need).
+          const nodes: Plan["nodes"] = [];
+          const items: { id: string; need: string }[] = [];
+          for (const d of result.data) {
+            const node = await this.ports.createNote(
+              { kind: "datum", title: shorten(d.need, 80), summary: d.need },
+              map,
+              drive.mapPath
+            );
+            nodes.push({ node, parentId: s.roles.situation });
+            items.push({ id: node.id, need: d.need });
+          }
+          return { next: applySituationData(s, items), nodes };
+        });
         return;
       }
       case "gate_missing": {
@@ -698,7 +712,7 @@ export class ArgumentRuns {
     let busy: BusyHandle | null = null;
     try {
       if (this.dead(drive)) return;
-      if (isNeed && node) {
+      if (node) {
         busy = this.ports.begin(node.path);
         if (!busy) return;
       }
@@ -794,8 +808,10 @@ export class ArgumentRuns {
     result: EvidenceResult
   ): Promise<void> {
     await this.checkpoint(drive, async (s, map) => {
-      const next = isNeed ? applyEvidence(s, hypothesisId, itemId, result) : applySituationEvidence(s, itemId, result);
       const node = map.nodes.find(n => n.id === itemId);
+      // A card the user deleted cannot hold a finding: the item closes as a miss instead of a found item with no card.
+      const settled: EvidenceResult = node || !result.found ? result : { found: false, reason: "card_deleted" };
+      const next = isNeed ? applyEvidence(s, hypothesisId, itemId, settled) : applySituationEvidence(s, itemId, settled);
       const proof = result.found ? result.proof : undefined;
       const lines = proof ? [this.ports.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
       const notes = async (): Promise<void> => {

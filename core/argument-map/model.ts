@@ -193,7 +193,7 @@ export function readArgumentMap(map: { nodes: readonly { id: string }[]; argumen
 }
 
 /**
- * The node ids the flow owns (the five role nodes, every hypothesis and every need card), read tolerantly from the raw
+ * The node ids the flow owns (the five role nodes, every situation datum card, every hypothesis and every need card), read tolerantly from the raw
  * key so an unusable key still protects what it names. Empty when the map has no `argumentMap` key. The AI lock
  * treats these as locked; the runner never asks the lock.
  */
@@ -202,6 +202,8 @@ export function managedNodeIds(map: { argumentMap?: unknown } | null | undefined
   const raw = map?.argumentMap;
   if (!isRec(raw)) return ids;
   if (isRec(raw.roles)) for (const id of Object.values(raw.roles)) if (isStr(id)) ids.add(id);
+  if (isRec(raw.situation) && Array.isArray(raw.situation.data))
+    for (const datum of raw.situation.data) if (isRec(datum) && isStr(datum.id)) ids.add(datum.id);
   if (Array.isArray(raw.hypotheses))
     for (const h of raw.hypotheses) {
       if (!isRec(h)) continue;

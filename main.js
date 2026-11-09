@@ -1166,6 +1166,7 @@ var en = {
   "ui.card_menu_open_note_tab": "Open note in new tab",
   "ui.ai_running_ai": "AI running\u2026",
   "ui.ai_locked_notice": "Topic is locked; AI will not change it",
+  "ui.ai_locked_create_next_step": "Topic is locked; AI will not change it. To create subtopics, first unlock AI on this card.",
   "ui.ai_lock": "AI lock",
   "ui.ai_lock_toggle": "Lock from AI",
   "ui.ai_lock_hint": "AI research, merge, expand and chat will not change this topic, its children or its relations. Your own edits still work.",
@@ -3941,6 +3942,7 @@ var zhCN = {
   "ui.card_menu_open_note_tab": "\u5728\u65B0\u6807\u7B7E\u9875\u6253\u5F00\u7B14\u8BB0",
   "ui.ai_running_ai": "AI \u8FD0\u884C\u4E2D\u2026",
   "ui.ai_locked_notice": "\u8BAE\u9898\u5DF2\u9501\u5B9A\uFF0CAI \u4E0D\u4F1A\u4FEE\u6539",
+  "ui.ai_locked_create_next_step": "\u8BAE\u9898\u5DF2\u9501\u5B9A\uFF0CAI \u4E0D\u4F1A\u4FEE\u6539\u3002\u8981\u5EFA\u7ACB\u5B50\u8BAE\u9898\uFF0C\u8BF7\u5148\u5230\u8FD9\u5F20\u5361\u89E3\u9664 AI \u9501\u5B9A\u3002",
   "ui.ai_lock": "AI \u9501\u5B9A",
   "ui.ai_lock_toggle": "\u9501\u5B9A\uFF0C\u4E0D\u8BA9 AI \u4FEE\u6539",
   "ui.ai_lock_hint": "AI \u7814\u7A76\u3001\u5408\u5E76\u3001\u5C55\u5F00\u4E0E\u5BF9\u8BDD\u90FD\u4E0D\u4F1A\u4FEE\u6539\u6B64\u8BAE\u9898\u3001\u5B83\u7684\u5B50\u8BAE\u9898\u6216\u5173\u8054\uFF1B\u4F60\u81EA\u5DF1\u7684\u7F16\u8F91\u4E0D\u53D7\u5F71\u54CD\u3002",
@@ -6716,6 +6718,7 @@ var zhTW = {
   "ui.card_menu_open_note_tab": "\u5728\u65B0\u5206\u9801\u958B\u555F\u7B46\u8A18",
   "ui.ai_running_ai": "AI \u57F7\u884C\u4E2D\u2026",
   "ui.ai_locked_notice": "\u8B70\u984C\u5DF2\u9396\u5B9A\uFF0CAI \u4E0D\u6703\u4FEE\u6539",
+  "ui.ai_locked_create_next_step": "\u8B70\u984C\u5DF2\u9396\u5B9A\uFF0CAI \u4E0D\u6703\u4FEE\u6539\u3002\u8981\u5EFA\u7ACB\u5B50\u8B70\u984C\uFF0C\u8ACB\u5148\u5230\u9019\u5F35\u5361\u89E3\u9664 AI \u9396\u5B9A\u3002",
   "ui.ai_lock": "AI \u9396\u5B9A",
   "ui.ai_lock_toggle": "\u9396\u5B9A\uFF0C\u4E0D\u8B93 AI \u4FEE\u6539",
   "ui.ai_lock_hint": "AI \u7814\u7A76\u3001\u5408\u4F75\u3001\u5C55\u958B\u8207\u5C0D\u8A71\u90FD\u4E0D\u6703\u4FEE\u6539\u6B64\u8B70\u984C\u3001\u5B83\u7684\u5B50\u8B70\u984C\u6216\u95DC\u806F\uFF1B\u4F60\u81EA\u5DF1\u7684\u7DE8\u8F2F\u4E0D\u53D7\u5F71\u97FF\u3002",
@@ -26697,8 +26700,30 @@ ${body}`);
         failures.push({ path: file.path, error: error instanceof Error ? error.message : String(error) });
       }
     }
+    failures.push(...await this.unreadableFrontmatterMaps());
     if (failures.length) (_a2 = this.onUnreadableMaps) == null ? void 0 : _a2.call(this, failures);
     return { readable, skippedRoots: failures.map((item) => this.topicRoot(item.path)) };
+  }
+  /**
+   * Maps whose frontmatter does not parse. Obsidian keeps no `frontmatter` for such a note, so markedFiles never sees it,
+   * but it still reports where the block is: only those notes are read, and only the ones that name the marker.
+   */
+  async unreadableFrontmatterMaps() {
+    var _a2, _b2;
+    const failures = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const cache = this.app.metadataCache.getFileCache(file);
+      if (!(cache == null ? void 0 : cache.frontmatterPosition) || cache.frontmatter) continue;
+      const content = await this.app.vault.cachedRead(file);
+      const block = (_b2 = (_a2 = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+      if (!/^["']?visual-agent-map["']?\s*:/m.test(block)) continue;
+      try {
+        frontmatter(content);
+      } catch (error) {
+        failures.push({ path: file.path, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return failures;
   }
   /**
    * Whether a rename of `file` (previously at `oldPath`) can affect VAM data, decided from the metadata cache without
@@ -36648,6 +36673,24 @@ function placeHoverPreview(host, card, preview, margin = 12, options = {}) {
     return inside2 && !keepClear.some((box) => overlaps2(spot, box));
   });
   return (_d = (_c = clear.find((spot) => !avoid.some((box) => overlaps2(spot, box)))) != null ? _c : clear[0]) != null ? _d : null;
+}
+var MIN_SHRUNK_PREVIEW_WIDTH = 180;
+function shrinkHoverPreview(host, card, preview, margin = 12, options = {}) {
+  var _a2, _b2, _c, _d;
+  const keepClear = [card, ...(_a2 = options.keepClear) != null ? _a2 : []];
+  const avoid = (_b2 = options.avoid) != null ? _b2 : [];
+  const clamp2 = (value, low, high) => Math.max(low, Math.min(value, Math.max(low, high)));
+  const top = clamp2(card.top, margin, host.height - preview.height - margin);
+  const sharesRows = keepClear.filter((box) => top < box.bottom && box.top < top + preview.height);
+  const rightEdge = Math.max(card.right, ...sharesRows.map((box) => box.right));
+  const leftEdge = Math.min(card.left, ...sharesRows.map((box) => box.left));
+  const sides = [
+    { left: rightEdge + margin, room: host.width - margin - (rightEdge + margin) },
+    { left: margin, room: leftEdge - margin - margin }
+  ];
+  const overlaps2 = (spot, box) => spot.left < box.right && box.left < spot.left + spot.width && top < box.bottom && box.top < top + preview.height;
+  const fits = sides.map((side) => ({ left: side.left, top, width: Math.min(preview.width, side.room) })).filter((spot) => spot.width >= MIN_SHRUNK_PREVIEW_WIDTH).map((spot) => ({ spot, blocked: avoid.some((box) => overlaps2(spot, box)) })).sort((a, b) => Number(a.blocked) - Number(b.blocked) || b.spot.width - a.spot.width);
+  return (_d = (_c = fits[0]) == null ? void 0 : _c.spot) != null ? _d : null;
 }
 function markdownImages(markdown, limit = 4) {
   const images = [];
@@ -58956,11 +58999,27 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
   paintCardNameEdit(card, node, note) {
     const edit = this.inlineName;
     const input2 = this.createInlineNameInput(card, "vam-card-title-input", "", (value) => {
+      var _a2;
       if (value === null && (edit == null ? void 0 : edit.created) && edit.createdStep) {
         this.discardNewTopic(edit.createdStep);
         return;
       }
-      const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
+      const problem = titleProblemText(value != null ? value : "");
+      if (problem) {
+        this.inlineName = {
+          target: "card",
+          id: node.id,
+          draft: value != null ? value : "",
+          fresh: false,
+          created: (_a2 = edit == null ? void 0 : edit.created) != null ? _a2 : false,
+          createdStep: edit == null ? void 0 : edit.createdStep,
+          caret: null
+        };
+        new import_obsidian39.Notice(problem);
+        this.render();
+        return;
+      }
+      const name2 = (value != null ? value : "").trim();
       if (!name2 || name2 === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name2 }));
     });
@@ -63137,7 +63196,7 @@ ${request.requirements}` : preset.text,
    */
   switchToMap(path) {
     const open = path === this.path ? void 0 : this.plugin.findMapLeaf(path);
-    if (open) void this.plugin.showLeaf(open);
+    if (open) window.setTimeout(() => void this.plugin.showLeaf(open), 0);
     else if (path !== this.path && this.hasRunningWork())
       void this.plugin.openMapInNewTab(path).catch((error) => errorNotice(error));
     else this.enqueue(() => this.openMapInMutation(path));
@@ -71052,19 +71111,18 @@ ${request.requirements}` : preset.text,
     });
     const tools = (_f = card.querySelector(".vam-node-tools")) == null ? void 0 : _f.getBoundingClientRect();
     const selected = [...this.cardEls.values()].filter((other) => other !== card && other.classList.contains("is-selected")).flatMap((other) => [other, other.querySelector(".vam-node-tools")]).flatMap((el) => el ? [local(el.getBoundingClientRect())] : []);
-    const spot = placeHoverPreview(host, local(rect2), { width, height: visibleHeight }, 12, {
-      keepClear: tools && tools.width > 0 ? [local(tools)] : [],
-      avoid: selected
-    });
-    if (!spot) {
+    const placement = { keepClear: tools && tools.width > 0 ? [local(tools)] : [], avoid: selected };
+    const spot = placeHoverPreview(host, local(rect2), { width, height: visibleHeight }, 12, placement);
+    const fitted = spot ? { ...spot, width } : shrinkHoverPreview(host, local(rect2), { width, height: visibleHeight }, 12, placement);
+    if (!fitted) {
       preview.remove();
       this.hoverCard = null;
       this.hoverResearch = null;
       return;
     }
-    preview.style.width = `${width}px`;
-    preview.style.left = `${spot.left}px`;
-    preview.style.top = `${spot.top}px`;
+    preview.style.width = `${fitted.width}px`;
+    preview.style.left = `${fitted.left}px`;
+    preview.style.top = `${fitted.top}px`;
   }
   refreshCard(node, redrawEdges = true) {
     var _a2, _b2, _c, _d;
@@ -72087,6 +72145,12 @@ ${request.requirements}` : preset.text,
           return;
         }
         create.disabled = true;
+        if (this.aiLockReason("addChild", [node.id], await this.freshNotesOf([node.id]))) {
+          create.disabled = false;
+          create.focus();
+          status.setText(t("ui.ai_locked_create_next_step"));
+          return;
+        }
         status.setText(t("ui.creating_subtopics"));
         try {
           let createdNodes = [];
@@ -72120,6 +72184,7 @@ ${request.requirements}` : preset.text,
           this.render();
         } catch (error) {
           create.disabled = false;
+          create.focus();
           status.setText(error instanceof Error ? error.message : String(error));
         }
       })();
@@ -75201,6 +75266,10 @@ ${request.requirements}` : preset.text,
     var _a2;
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
+      return;
+    }
+    if (sources.some((node) => this.aiLockReason("write", [node.id]))) {
+      failed(t("ui.ai_locked_notice"));
       return;
     }
     const existing = this.integrationTask && this.integrationTask.mapPath === this.path ? this.integrationTask : null;

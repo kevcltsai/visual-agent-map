@@ -401,18 +401,20 @@ test('04 charts: a chart result for a topic locked meanwhile is not written; loc
   assert.equal(jobs.length, 0, 'a locked topic gets no chart job at all');
 });
 
-test('04 integrate selection: locked sources may be read; the new topic is written and the sources stay as they were', async () => {
+// UI audit bugfix-2 P2 (FLOWS.md AI 任務): a synthesis that picks a locked topic is refused before any AI call, with the reason.
+test('04 integrate selection: a locked source refuses the synthesis before any AI call; no topic is added or written', async () => {
   const h = await harness(['A', 'B']);
   const [a, b] = h.nodes;
   for (const node of h.nodes) await h.repo.updateNote(node.path, { summary: 'S', detail: 'Source detail', status: 'completed' });
-  await h.view.setAiLock([a, b], true);
+  await h.view.setAiLock([a], true);
   const sources = [h.raw(a), h.raw(b)];
   const failures = [];
+  const callsBefore = h.calls.length;
   await h.view.startSelectionSynthesis([a, b], { ...synthesis, synthesisTitle: 'Synth' }, 'Compare them', message => failures.push(message), () => {});
-  await until(() => h.view.map.nodes.length === 3 || failures.length);
-  assert.deepEqual(failures, []);
-  assert.equal(h.calls.length >= 1, true);
-  assert.deepEqual([h.raw(a), h.raw(b)], sources, 'locked sources are read, never written');
+  assert.match(failures.join('\n'), LOCKED_NOTICE, 'the refusal says why');
+  assert.equal(h.calls.length, callsBefore, 'no AI call');
+  assert.equal(h.view.map.nodes.length, 2, 'no new topic');
+  assert.deepEqual([h.raw(a), h.raw(b)], sources, 'sources stay as they were');
 });
 
 // ---- ticket 05: merge -----------------------------------------------------------------------------------------------
@@ -929,4 +931,26 @@ test('review count: creating an orphan row builds it under the current topic and
   const kids = (await Promise.all(kidNodes.map(node => h.repo.readNote(node.path, h.view.map)))).map(note => note.title).sort();
   assert.deepEqual(kids, ['X', 'Y']);
   assert.equal(h.host.pendingSuggestions.has(p.path), false, 'pending cleared');
+});
+
+// UI audit bugfix-2 P2: the suggestions dialog refuses creating subtopics under a locked topic and says how to proceed; its button keeps the focus.
+test('P2: creating suggested subtopics under a locked topic says how to proceed and keeps the focus on the button', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  await h.view.setAiLock([p], true);
+  h.host.pendingSuggestions.set(p.path, [sug('X', ''), sug('Y', 'P')]);
+  const note = await h.repo.readNote(p.path, h.view.map);
+  const panel = dom.element('panel');
+  h.view.renderPendingProposals(panel, p, note, () => {});
+  const create = dom.findAll(panel, el => el.tag === 'button' && /子議題|subtopic/i.test(el.text))[0];
+  assert.ok(create, 'the create button is drawn');
+  create.focus();
+  create.listeners.click[0]();
+  const status = () => dom.findAll(panel, el => el.cls.includes('vam-next-status'))[0];
+  await until(() => status()?.text);
+  assert.match(status().text, LOCKED_NOTICE, 'the reason');
+  assert.match(status().text, /解除 AI 鎖定|unlock AI/i, 'the next step');
+  assert.equal(create.disabled, false, 'the button is not disabled by the refusal');
+  assert.equal(dom.focusedNow(), create, 'the focus stays on the button');
+  assert.equal(h.view.map.nodes.length, 1, 'no subtopic is created');
 });

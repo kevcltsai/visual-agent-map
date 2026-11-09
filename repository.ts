@@ -2310,8 +2310,30 @@ export class Repository {
         failures.push({ path: file.path, error: error instanceof Error ? error.message : String(error) });
       }
     }
+    failures.push(...(await this.unreadableFrontmatterMaps()));
     if (failures.length) this.onUnreadableMaps?.(failures);
     return { readable, skippedRoots: failures.map(item => this.topicRoot(item.path)) };
+  }
+
+  /**
+   * Maps whose frontmatter does not parse. Obsidian keeps no `frontmatter` for such a note, so markedFiles never sees it,
+   * but it still reports where the block is: only those notes are read, and only the ones that name the marker.
+   */
+  private async unreadableFrontmatterMaps(): Promise<{ path: string; error: string }[]> {
+    const failures: { path: string; error: string }[] = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const cache = this.app.metadataCache.getFileCache(file);
+      if (!cache?.frontmatterPosition || cache.frontmatter) continue;
+      const content = await this.app.vault.cachedRead(file);
+      const block = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1] ?? "";
+      if (!/^["']?visual-agent-map["']?\s*:/m.test(block)) continue;
+      try {
+        frontmatter(content);
+      } catch (error) {
+        failures.push({ path: file.path, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return failures;
   }
 
   /**

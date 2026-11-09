@@ -602,7 +602,9 @@ integrationTest('expansion suggestions panel uses the shared list, treats the to
   const view = {
     map: { nodes: [node] }, render() { rendered++; },
     plugin: attachTopicRuns({ pendingSuggestions, pendingResearchOptions: new Map(), expansionCoordinator: { isRunning: () => false }, mutate: async work => work() }),
-    assertSuggestionOrigin: async () => {}, createChildBatch: async (_parent, items) => { created = items; return []; }, startShallowResearch: async () => {}
+    assertSuggestionOrigin: async () => {}, createChildBatch: async (_parent, items) => { created = items; return []; }, startShallowResearch: async () => {},
+    // The create button checks the addChild AI lock first (P2); this topic is unlocked, so the lock check returns no reason.
+    freshNotesOf: async () => new Map(), aiLockReason: () => null
   };
   const panel = element('panel'), host = element('modal');
   VisualAgentMapView.prototype.renderPendingProposals.call(view, panel, node, { title: 'Parent' }, () => { closed++; }, host);
@@ -4231,7 +4233,7 @@ test('bug bash #03: the add-child button sits above the width handle when visibl
   assert.doesNotMatch(cssRules(css, /^\.vam-card-resize-y$|^\.vam-card-resize-corner$/).map(r => r.body).join(''), /pointer-events:\s*none/, 'height and corner handles are untouched');
 });
 // ---- bug bash A #04: the hover preview never covers the card it describes ----
-function hoverHarness(hostWidth, hostHeight, cardRect, { tools = null, selectedNeighbours = [] } = {}) {
+function hoverHarness(hostWidth, hostHeight, cardRect, { tools = null, selectedNeighbours = [], previewScale = 120 } = {}) {
   const { VisualAgentMapView } = require('../support-replay.cjs').load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {}, MarkdownRenderer: { render() { return Promise.resolve(); } } } }, {
     window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o)
   });
@@ -4239,7 +4241,7 @@ function hoverHarness(hostWidth, hostHeight, cardRect, { tools = null, selectedN
   host.getBoundingClientRect = () => ({ left: 0, top: 0, right: hostWidth, bottom: hostHeight, width: hostWidth, height: hostHeight });
   host.createDiv = cls => { const el = dom.element('div', { cls }); el.style = { setProperty() {} }; host.children.push(el); return el; };
   const view = Object.create(VisualAgentMapView.prototype);
-  Object.assign(view, { contentEl: { querySelector: () => host }, plugin: { settings: { previewScale: 120 }, researchProgress: null }, map: { nodes: [{ id: 'a', path: 'a.md' }] }, presentation: null, hoverCard: null });
+  Object.assign(view, { contentEl: { querySelector: () => host }, plugin: { settings: { previewScale }, researchProgress: null }, map: { nodes: [{ id: 'a', path: 'a.md' }] }, presentation: null, hoverCard: null });
   const box = rect => ({ ...rect, width: rect.right - rect.left, height: rect.bottom - rect.top });
   const card = { dataset: { nodeId: 'a' }, getBoundingClientRect: () => cardRect, querySelector: selector => (selector === '.vam-node-tools' && tools ? { getBoundingClientRect: () => box(tools) } : null) };
   const neighbour = (rect, selected) => ({ classList: { contains: name => name === 'is-selected' && selected }, getBoundingClientRect: () => box(rect), querySelector: () => null });
@@ -4263,6 +4265,15 @@ test('bug bash #04: a narrow canvas puts the preview beside, above or below the 
   assert.ok(box.left >= 12 && box.right <= 400 - 12 && box.top >= 12 && box.bottom <= 900 - 12, 'and it lies inside the canvas');
   const cramped = hoverHarness(300, 300, { left: 20, top: 20, right: 280, bottom: 280 });
   assert.equal(cramped.shown, false, 'no place that clears the card: no preview');
+});
+// UI audit P2 (preview-size-large-hides-preview): a 160 preview in a 640px pane fits no side at full width; it is narrowed beside the card, not dropped and not over the card.
+test('UI audit P2: a large preview size in a normal-width pane is narrowed beside the card, never hidden and never over the card', () => {
+  const card = { left: 300, top: 300, right: 420, bottom: 380 };
+  const large = hoverHarness(640, 775, card, { previewScale: 160 });
+  assert.equal(large.shown, true, 'the preview is shown');
+  assert.ok(large.width >= 180 && large.width < 427, `narrowed to the room beside the card (got ${large.width})`);
+  assert.equal(intersects(boxOf(large), card), false, 'the narrowed preview does not cover the card');
+  assert.ok(large.left >= 12 && large.top >= 12 && large.left + large.width <= 640 - 12 && large.top + large.maxHeight <= 775 - 12, 'and it lies inside the pane');
 });
 const boxOf = spot => ({ left: spot.left, top: spot.top, right: spot.left + spot.width, bottom: spot.top + Math.min(spot.maxHeight, 900 - 24) });
 // A card's tool row hangs above the card (bottom: calc(100% - 6px)); a preview above the card used to start 12px over the card and cover it.

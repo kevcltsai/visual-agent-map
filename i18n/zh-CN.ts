@@ -1092,6 +1092,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.card_menu_open_note_tab": "在新标签页打开笔记",
   "ui.ai_running_ai": "AI 运行中…",
   "ui.ai_locked_notice": "议题已锁定，AI 不会修改",
+  "ui.ai_locked_create_next_step": "议题已锁定，AI 不会修改。要建立子议题，请先到这张卡解除 AI 锁定。",
   "ui.ai_lock": "AI 锁定",
   "ui.ai_lock_toggle": "锁定，不让 AI 修改",
   "ui.ai_lock_hint": "AI 研究、合并、展开与对话都不会修改此议题、它的子议题或关联；你自己的编辑不受影响。",

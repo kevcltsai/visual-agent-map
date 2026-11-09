@@ -1094,6 +1094,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.card_menu_open_note_tab": "在新分頁開啟筆記",
   "ui.ai_running_ai": "AI 執行中…",
   "ui.ai_locked_notice": "議題已鎖定，AI 不會修改",
+  "ui.ai_locked_create_next_step": "議題已鎖定，AI 不會修改。要建立子議題，請先到這張卡解除 AI 鎖定。",
   "ui.ai_lock": "AI 鎖定",
   "ui.ai_lock_toggle": "鎖定，不讓 AI 修改",
   "ui.ai_lock_hint": "AI 研究、合併、展開與對話都不會修改此議題、它的子議題或關聯；你自己的編輯不受影響。",

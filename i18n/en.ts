@@ -1160,6 +1160,8 @@ export const en = {
   "ui.card_menu_open_note_tab": "Open note in new tab",
   "ui.ai_running_ai": "AI running…",
   "ui.ai_locked_notice": "Topic is locked; AI will not change it",
+  "ui.ai_locked_create_next_step":
+    "Topic is locked; AI will not change it. To create subtopics, first unlock AI on this card.",
   "ui.ai_lock": "AI lock",
   "ui.ai_lock_toggle": "Lock from AI",
   "ui.ai_lock_hint":

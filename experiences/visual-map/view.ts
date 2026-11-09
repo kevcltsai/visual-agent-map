@@ -351,7 +351,7 @@ import {
   styleIssueText
 } from "./note-style-picker";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
-import { placeHoverPreview, previewMetrics } from "../../ui/preview-utils";
+import { placeHoverPreview, previewMetrics, shrinkHoverPreview } from "../../ui/preview-utils";
 import { fitImageForInput } from "../../ui/fit-image-input";
 import {
   normalizeRelevanceContext,
@@ -3064,7 +3064,23 @@ export class VisualAgentMapView extends ItemView {
         this.discardNewTopic(edit.createdStep);
         return;
       }
-      const name = sanitizeGeneratedTitle(value ?? "").trim();
+      // A title that would break the note is refused, not rewritten: the field stays open with the typed text and says why.
+      const problem = titleProblemText(value ?? "");
+      if (problem) {
+        this.inlineName = {
+          target: "card",
+          id: node.id,
+          draft: value ?? "",
+          fresh: false,
+          created: edit?.created ?? false,
+          createdStep: edit?.createdStep,
+          caret: null
+        };
+        new Notice(problem);
+        this.render();
+        return;
+      }
+      const name = (value ?? "").trim();
       if (!name || name === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name }));
     });
@@ -7543,7 +7559,8 @@ export class VisualAgentMapView extends ItemView {
    */
   private switchToMap(path: string): void {
     const open = path === this.path ? undefined : this.plugin.findMapLeaf(path);
-    if (open) void this.plugin.showLeaf(open);
+    // Deferred: the switcher is still closing and would take the focus back from the pane it is about to show.
+    if (open) window.setTimeout(() => void this.plugin.showLeaf(open), 0);
     else if (path !== this.path && this.hasRunningWork())
       void this.plugin.openMapInNewTab(path).catch(error => errorNotice(error));
     else this.enqueue(() => this.openMapInMutation(path));
@@ -16187,19 +16204,21 @@ export class VisualAgentMapView extends ItemView {
       .filter(other => other !== card && other.classList.contains("is-selected"))
       .flatMap(other => [other, other.querySelector<HTMLElement>(".vam-node-tools")])
       .flatMap(el => (el ? [local(el.getBoundingClientRect())] : []));
-    const spot = placeHoverPreview(host, local(rect), { width, height: visibleHeight }, 12, {
-      keepClear: tools && tools.width > 0 ? [local(tools)] : [],
-      avoid: selected
-    });
-    if (!spot) {
+    const placement = { keepClear: tools && tools.width > 0 ? [local(tools)] : [], avoid: selected };
+    // No full-size side clear (a narrow pane with a large preview size): the preview is narrowed to fit beside the card.
+    const spot = placeHoverPreview(host, local(rect), { width, height: visibleHeight }, 12, placement);
+    const fitted = spot
+      ? { ...spot, width }
+      : shrinkHoverPreview(host, local(rect), { width, height: visibleHeight }, 12, placement);
+    if (!fitted) {
       preview.remove();
       this.hoverCard = null;
       this.hoverResearch = null;
       return;
     }
-    preview.style.width = `${width}px`;
-    preview.style.left = `${spot.left}px`;
-    preview.style.top = `${spot.top}px`;
+    preview.style.width = `${fitted.width}px`;
+    preview.style.left = `${fitted.left}px`;
+    preview.style.top = `${fitted.top}px`;
   }
   private refreshCard(node: MapNode, redrawEdges = true): void {
     const card = this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(node.id)}"]`),
@@ -17301,7 +17320,15 @@ export class VisualAgentMapView extends ItemView {
           status.setText(items);
           return;
         }
+        // Disabled before the lock check awaits, so a second click cannot start a second create; a locked topic re-enables it below.
         create.disabled = true;
+        // AI lock: a locked topic gets no subtopics. The reason and the next step go in the status line, and the button keeps the focus.
+        if (this.aiLockReason("addChild", [node.id], await this.freshNotesOf([node.id]))) {
+          create.disabled = false;
+          create.focus();
+          status.setText(t("ui.ai_locked_create_next_step"));
+          return;
+        }
         status.setText(t("ui.creating_subtopics"));
         try {
           let createdNodes: MapNode[] = [];
@@ -17336,6 +17363,8 @@ export class VisualAgentMapView extends ItemView {
           this.render();
         } catch (error) {
           create.disabled = false;
+          // Disabling the button dropped the focus; it goes back so Tab keeps its place.
+          create.focus();
           status.setText(error instanceof Error ? error.message : String(error));
         }
       })();
@@ -20645,6 +20674,11 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<void> {
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
+      return;
+    }
+    // AI lock: a locked source refuses the synthesis before any AI call (synchronous, so the starting guard below still holds).
+    if (sources.some(node => this.aiLockReason("write", [node.id]))) {
+      failed(t("ui.ai_locked_notice"));
       return;
     }
     const existing = this.integrationTask && this.integrationTask.mapPath === this.path ? this.integrationTask : null;

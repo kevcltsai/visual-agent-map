@@ -80938,6 +80938,35 @@ ${addition}` : addition },
       this.enqueue(() => this.resizeCard(node.id, change2));
     });
   }
+  /**
+   * The map edit for one dropped card. Built here, not inside enableDrag: the undo history keeps every edit, and a closure made
+   * inside the drag shares its scope (the card, the edge helpers) and would keep all of that off-screen after each drop.
+   */
+  cardDropEdit(nodeId, position, centerX) {
+    return (map) => {
+      const current = map.nodes.find((n) => n.id === nodeId);
+      if (!current) return;
+      const root = current.parentId ? map.nodes.find((n) => n.id === current.parentId) : void 0;
+      if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId && !current.afterTextId) {
+        map.nodes = reorderTopLevel(map.nodes, root.id, current.id, centerX);
+        this.arrangeAll(map);
+        return;
+      }
+      this.placeDroppedCard(map, current, position);
+    };
+  }
+  /** The map edit for a dropped group of cards (one undo step); built outside enableDrag for the reason of cardDropEdit. */
+  groupDropEdit(origins, dx, dy) {
+    const from = new Map(origins);
+    return (map) => {
+      for (const [id, origin] of from) {
+        const current = map.nodes.find((n) => n.id === id);
+        if (!current) continue;
+        current.x = Math.round(origin.x + dx);
+        current.y = Math.round(origin.y + dy);
+      }
+    };
+  }
   enableDrag(card, node, onPlainClick) {
     card.addEventListener("pointerdown", (event) => {
       var _a2, _b2, _c, _d;
@@ -81140,16 +81169,8 @@ ${addition}` : addition },
           }
           placeGroup(delta.x, delta.y);
           const { x: dx, y: dy } = delta;
-          this.enqueueDrop(
-            () => this.mapChange((map) => {
-              for (const [id, from] of groupOrigins) {
-                const current = map.nodes.find((n) => n.id === id);
-                if (!current) continue;
-                current.x = Math.round(from.x + dx);
-                current.y = Math.round(from.y + dy);
-              }
-            })
-          );
+          const edit = this.groupDropEdit(groupOrigins, dx, dy);
+          this.enqueueDrop(() => this.mapChange(edit));
           return;
         }
         if (moved && locked) {
@@ -81161,20 +81182,8 @@ ${addition}` : addition },
             this.enqueue(() => this.moveBranches([dragged], landed.node, false));
         } else if (moved) {
           paint();
-          this.enqueueDrop(
-            () => this.mapChange((map) => {
-              const current = map.nodes.find((n) => n.id === node.id);
-              if (!current) return;
-              const root = current.parentId ? map.nodes.find((n) => n.id === current.parentId) : void 0;
-              if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId && !current.afterTextId) {
-                const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
-                map.nodes = reordered;
-                this.arrangeAll(map);
-                return;
-              }
-              this.placeDroppedCard(map, current, position);
-            })
-          );
+          const edit = this.cardDropEdit(node.id, { ...position }, position.x + card.offsetWidth / 2);
+          this.enqueueDrop(() => this.mapChange(edit));
         } else if (e.metaKey || e.ctrlKey) {
           this.applySelectionChange(this.selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
         } else {

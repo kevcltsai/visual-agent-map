@@ -8,14 +8,11 @@ const path = require('node:path');
 const ts = require('typescript');
 const { root } = require('./support.cjs');
 const { load } = require('./support-replay.cjs');
+const { repoFiles } = require('./support-repo-scan.cjs');
 
 const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'tests', 'i18n', 'samples', 'assets', 'scripts']);
-function sourceFiles(directory = '') {
-  return fs.readdirSync(path.join(root, directory), { withFileTypes: true }).flatMap(entry => {
-    const relative = path.posix.join(directory, entry.name);
-    if (entry.isDirectory()) return SKIPPED_DIRECTORIES.has(entry.name) ? [] : sourceFiles(relative);
-    return entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts') && relative !== 'i18n.ts' ? [relative] : [];
-  });
+function sourceFiles() {
+  return repoFiles(root, { skipDirectories: SKIPPED_DIRECTORIES }).filter(relative => relative.endsWith('.ts') && !relative.endsWith('.d.ts') && relative !== 'i18n.ts');
 }
 const FILES = sourceFiles();
 

@@ -10,6 +10,7 @@ const os = require('node:os');
 const path = require('node:path');
 const ts = require('typescript');
 const { load, root } = require('./support-replay.cjs');
+const { repoFiles, isAgentWorktree } = require('./support-repo-scan.cjs');
 
 const { prepareStep, StepRunner } = load('core/step-runner.ts');
 
@@ -173,11 +174,9 @@ test('Coffee shared fragments: every language pair exists and each fragment is u
 
 // ---- AiCalls call-site boundary and i18n guards (S2 integration guards: every model call goes through AiCalls, and no prompt text is left in i18n.ts) ----
 function sourceFiles(directory) {
-  return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
-    if (['node_modules', 'tests', '.git', 'samples', 'scripts'].includes(entry.name)) return [];
-    const full = path.join(directory, entry.name);
-    return entry.isDirectory() ? sourceFiles(full) : entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts') ? [full] : [];
-  });
+  const from = path.relative(root, directory).split(path.sep).join('/');
+  return repoFiles(root, { from, skipDirectories: ['node_modules', 'tests', '.git', 'samples', 'scripts'] })
+    .filter(relative => relative.endsWith('.ts') && !relative.endsWith('.d.ts')).map(relative => path.join(root, relative));
 }
 
 // ---- AiCalls call-site boundary pins -------------------------------------------------------------------
@@ -372,4 +371,26 @@ test('runCoffeeRequest is a thin wiring over AiCalls.runCall', () => {
 
 test('i18n.ts holds no prompt.* keys', () => {
   assert.deepEqual(require('./support.cjs').i18nSource().match(/["']prompt\.[a-z0-9_]+["']/g) ?? [], []);
+});
+
+// ---- repo scans skip agent worktrees kept inside the repo ------------------------------------------------------------
+test('repo scans: .claude/worktrees is skipped, everything else (violations, other .claude paths, nested look-alikes) is still scanned', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-repo-scan-'));
+  try {
+    for (const file of ['.claude/worktrees/agent-x/core/bad.ts', 'core/bad.ts', '.claude/other/keep.ts', 'experiences/.claude/worktrees/x/keep.ts', '.claude/worktrees-old/keep.ts']) {
+      fs.mkdirSync(path.dirname(path.join(temp, file)), { recursive: true });
+      fs.writeFileSync(path.join(temp, file), '');
+    }
+    const files = repoFiles(temp);
+    assert.ok(!files.some(file => file.startsWith('.claude/worktrees/')), 'agent worktree copies are not returned');
+    assert.ok(files.includes('core/bad.ts'), 'a normal path is still scanned');
+    assert.ok(files.includes('.claude/other/keep.ts'), 'only worktrees is excluded from .claude');
+    assert.ok(files.includes('experiences/.claude/worktrees/x/keep.ts'), 'only the repo root is matched');
+    assert.ok(files.includes('.claude/worktrees-old/keep.ts'), 'a similar prefix is not a worktree');
+    assert.equal(isAgentWorktree(temp, path.join(path.dirname(temp), 'worktrees', 'foo.ts')), false, 'a worktree outside the repo is not an agent worktree');
+    assert.equal(isAgentWorktree(temp, path.join(temp, '.claude/worktrees')), true);
+    assert.deepEqual(repoFiles(temp, { skipDirectories: ['core'] }).filter(file => file.startsWith('core/')), [], 'the caller skip list still applies');
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
 });

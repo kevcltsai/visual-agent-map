@@ -8,6 +8,7 @@
  * dispose abort everything and nothing is written after dispose; a failed step gets one corrective retry, then the run pauses.
  */
 import type { TranslationKey } from "../../i18n";
+import { neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
 import type { AiResult, TaskContext } from "../../ai/types";
 import {
   GateError,
@@ -106,6 +107,11 @@ export interface RunConfig {
   language: ArgumentStepBase["language"];
 }
 
+/** Model/web text as plain single-line text: line breaks become a space and a run of 3+ backticks or tildes cannot form a fence. Ordinary text is unchanged. */
+export function plainLine(text: string): string {
+  return text.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, m => [...m].join(" "));
+}
+
 /** Everything the runner touches. `mutate` is the plugin's serialized write queue; the others are repository/model/network seams. */
 export interface ArgumentRunPorts {
   mutate(work: () => Promise<void>): Promise<void>;
@@ -188,6 +194,24 @@ export class ArgumentRuns {
 
   constructor(private readonly ports: ArgumentRunPorts) {}
 
+  // ---- note writes: every model/web-derived string passes here before it reaches a Markdown note ----------------------------------
+  /** Translation with every string argument treated as plain single-line text. */
+  private t(key: TranslationKey, ...values: unknown[]): string {
+    return this.ports.t(key, ...values.map(v => (typeof v === "string" ? plainLine(v) : v)));
+  }
+  private makeNote(input: NoteInput, map: MapDocument, mapPath: string): Promise<MapNode> {
+    const safe: NoteInput = { ...input, title: plainLine(input.title) };
+    if (input.summary !== undefined) safe.summary = plainLine(input.summary);
+    if (input.detail !== undefined) safe.detail = neutralizeUnsafeMermaid(input.detail);
+    return this.ports.createNote(safe, map, mapPath);
+  }
+  private writeNote(path: string, patch: { summary?: string; detail?: string }): Promise<void> {
+    const safe: { summary?: string; detail?: string } = {};
+    if (patch.summary !== undefined) safe.summary = plainLine(patch.summary);
+    if (patch.detail !== undefined) safe.detail = neutralizeUnsafeMermaid(patch.detail);
+    return this.ports.updateNote(path, safe);
+  }
+
   isRunning(mapPath: string): boolean {
     return this.drives.has(mapPath);
   }
@@ -207,7 +231,7 @@ export class ArgumentRuns {
         if (read.kind !== "absent") throw new ArgumentRunError(read.kind === "usable" ? "exists" : "unusable");
         const p = this.ports;
         const make = (kind: NoteKind, title: string, summary?: string) =>
-          p.createNote({ kind, title, summary }, map, mapPath);
+          this.makeNote({ kind, title, summary }, map, mapPath);
         const proposed = await make("proposition", shorten(text, 80), text);
         const situation = await make("situation", p.t("ui.argument_situation"));
         const conclusion = await make("conclusion", p.t("ui.argument_conclusion"), p.t("ui.argument_in_progress"));
@@ -488,7 +512,7 @@ export class ArgumentRuns {
           const nodes: Plan["nodes"] = [];
           const items: { id: string; need: string }[] = [];
           for (const d of result.data) {
-            const node = await this.ports.createNote(
+            const node = await this.makeNote(
               { kind: "datum", title: shorten(d.need, 80), summary: d.need },
               map,
               drive.mapPath
@@ -528,7 +552,7 @@ export class ArgumentRuns {
             next,
             reparent: [{ id: h.id, parentId: next.roles.eliminated }],
             notes: () =>
-              this.noteDetail(map, h.id, drive, this.ports.t("ui.argument_eliminated_0", h.eliminationReason ?? ""))
+              this.noteDetail(map, h.id, drive, this.t("ui.argument_eliminated_0", h.eliminationReason ?? ""))
           };
         });
         return;
@@ -564,7 +588,7 @@ export class ArgumentRuns {
       const nodes: Plan["nodes"] = [];
       const items: { id: string; citedData: string[] }[] = [];
       for (const h of result.hypotheses) {
-        const node = await this.ports.createNote(
+        const node = await this.makeNote(
           { kind: "hypothesis", title: h.title, summary: h.statement },
           map,
           drive.mapPath
@@ -602,7 +626,7 @@ export class ArgumentRuns {
       const nodes: Plan["nodes"] = [];
       const items: { id: string; text: string }[] = [];
       for (const n of result.needs) {
-        const node = await this.ports.createNote(
+        const node = await this.makeNote(
           { kind: "need", title: shorten(n.text, 80), summary: n.text },
           map,
           drive.mapPath
@@ -623,7 +647,7 @@ export class ArgumentRuns {
     const result: VerdictResult = await this.ask(drive, ARGUMENT_STEPS.verdict, request);
     await this.checkpoint(drive, async (s, map) => ({
       next: applyVerdict(s, hypothesisId, result),
-      notes: () => this.noteDetail(map, hypothesisId, drive, `${this.ports.t("ui.argument_reason")}: ${result.reason}`)
+      notes: () => this.noteDetail(map, hypothesisId, drive, `${this.t("ui.argument_reason")}: ${plainLine(result.reason)}`)
     }));
   }
 
@@ -635,7 +659,7 @@ export class ArgumentRuns {
     const result: ConclusionResult = await this.ask(drive, ARGUMENT_STEPS.conclude, request);
     await this.checkpoint(drive, async (s, map) => {
       const next = applyConclusion(s, result);
-      const pointLines = result.points.map(p => `- ${p.text}`);
+      const pointLines = result.points.map(p => `- ${plainLine(p.text)}`);
       const detail = [
         ...pointLines,
         "",
@@ -648,7 +672,7 @@ export class ArgumentRuns {
       return {
         next,
         notes: async () => {
-          if (path) await this.ports.updateNote(path, { summary: result.summary, detail });
+          if (path) await this.writeNote(path, { summary: result.summary, detail });
         }
       };
     });
@@ -659,19 +683,19 @@ export class ArgumentRuns {
     const cited = new Set(state.hypotheses.filter(h => hypothesisIds.includes(h.id)).flatMap(h => h.citedData));
     const lines = state.situation.data
       .filter(d => cited.has(d.id) && d.proof)
-      .map(d => this.ports.t("ui.argument_source_0_1_2", d.proof!.claim, d.proof!.quote, d.proof!.url));
-    return [`## ${this.ports.t("ui.argument_situation_data")}`, ...lines];
+      .map(d => this.t("ui.argument_source_0_1_2", d.proof!.claim, d.proof!.quote, d.proof!.url));
+    return [`## ${this.t("ui.argument_situation_data")}`, ...lines];
   }
   private sourceSection(state: ArgumentMapData, hypothesisIds: string[]): string[] {
     const lines = state.hypotheses
       .filter(h => hypothesisIds.includes(h.id))
       .flatMap(h => foundNeeds(h))
-      .map(n => this.ports.t("ui.argument_source_0_1_2", n.proof!.claim, n.proof!.quote, n.proof!.url));
-    return [`## ${this.ports.t("ui.argument_sources")}`, ...lines];
+      .map(n => this.t("ui.argument_source_0_1_2", n.proof!.claim, n.proof!.quote, n.proof!.url));
+    return [`## ${this.t("ui.argument_sources")}`, ...lines];
   }
   /** The terminal conclusion card of a stopped run: a fixed sentence, never a model answer. */
   private async stopPlan(drive: Drive, next: ArgumentMapData): Promise<Plan> {
-    const t = (key: TranslationKey, ...values: unknown[]): string => this.ports.t(key, ...values);
+    const t = (key: TranslationKey, ...values: unknown[]): string => this.t(key, ...values);
     const { gate } = next.situation;
     let summary: string;
     if (next.run.phase === "stopped_limit")
@@ -679,7 +703,7 @@ export class ArgumentRuns {
     else summary = gate.kind === "data_missing" ? t("ui.argument_stopped_missing") : t("ui.argument_stopped_mismatch");
     const detail =
       next.run.phase === "stopped_mismatch"
-        ? [`${t("ui.argument_reason")}: ${gate.reason ?? ""}`, "", ...this.dataSection(next, [])].join("\n")
+        ? [`${t("ui.argument_reason")}: ${plainLine(gate.reason ?? "")}`, "", ...this.dataSection(next, [])].join("\n")
         : "";
     const path = (await this.ports.readMap(drive.mapPath)).nodes.find(n => n.id === next.roles.conclusion)?.path;
     this.ports.log(
@@ -688,13 +712,13 @@ export class ArgumentRuns {
     return {
       next,
       notes: async () => {
-        if (path) await this.ports.updateNote(path, { summary, detail });
+        if (path) await this.writeNote(path, { summary, detail });
       }
     };
   }
   private async noteDetail(map: MapDocument, id: string, drive: Drive, line: string): Promise<void> {
     const path = map.nodes.find(n => n.id === id)?.path ?? (await this.notePath(drive, id));
-    if (path) await this.ports.updateNote(path, { detail: line });
+    if (path) await this.writeNote(path, { detail: line });
   }
 
   // ---- research ----------------------------------------------------------------------------------------------------------------
@@ -829,16 +853,16 @@ export class ArgumentRuns {
         ? applyEvidence(s, hypothesisId, itemId, settled)
         : applySituationEvidence(s, itemId, settled);
       const proof = result.found ? result.proof : undefined;
-      const lines = proof ? [this.ports.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
+      const lines = proof ? [this.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
       const notes = async (): Promise<void> => {
         if (!node) return; // the user deleted the card: skip it, keep the state consistent
         if (proof) {
-          await this.ports.updateNote(node.path, {
+          await this.writeNote(node.path, {
             summary: proof.claim,
-            detail: [`## ${this.ports.t("ui.argument_sources")}`, ...lines].join("\n")
+            detail: [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n")
           });
         } else if (!result.found)
-          await this.ports.updateNote(node.path, { detail: this.ports.t("ui.argument_not_found_0", result.reason) });
+          await this.writeNote(node.path, { detail: this.t("ui.argument_not_found_0", result.reason) });
       };
       return { next, notes };
     });

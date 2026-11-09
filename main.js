@@ -91985,6 +91985,9 @@ var ArgumentRunError = class extends Error {
 function topicKindOfNote(kind) {
   return kind === "hypothesis" ? "hypothesis" : kind === "need" || kind === "datum" ? "evidence" : kind === "conclusion" ? "conclusion" : "topic";
 }
+function plainLine2(text13) {
+  return text13.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" "));
+}
 var shorten = (text13, max) => Array.from(text13.trim()).slice(0, max).join("");
 var domainOf = (url) => {
   try {
@@ -92017,6 +92020,23 @@ var ArgumentRuns = class {
     __publicField(this, "inFlight", 0);
     __publicField(this, "disposed", false);
   }
+  // ---- note writes: every model/web-derived string passes here before it reaches a Markdown note ----------------------------------
+  /** Translation with every string argument treated as plain single-line text. */
+  t(key4, ...values) {
+    return this.ports.t(key4, ...values.map((v) => typeof v === "string" ? plainLine2(v) : v));
+  }
+  makeNote(input2, map, mapPath) {
+    const safe = { ...input2, title: plainLine2(input2.title) };
+    if (input2.summary !== void 0) safe.summary = plainLine2(input2.summary);
+    if (input2.detail !== void 0) safe.detail = neutralizeUnsafeMermaid(input2.detail);
+    return this.ports.createNote(safe, map, mapPath);
+  }
+  writeNote(path, patch) {
+    const safe = {};
+    if (patch.summary !== void 0) safe.summary = plainLine2(patch.summary);
+    if (patch.detail !== void 0) safe.detail = neutralizeUnsafeMermaid(patch.detail);
+    return this.ports.updateNote(path, safe);
+  }
   isRunning(mapPath) {
     return this.drives.has(mapPath);
   }
@@ -92034,7 +92054,7 @@ var ArgumentRuns = class {
         const read = readArgumentMap(map);
         if (read.kind !== "absent") throw new ArgumentRunError(read.kind === "usable" ? "exists" : "unusable");
         const p = this.ports;
-        const make = (kind, title, summary) => p.createNote({ kind, title, summary }, map, mapPath);
+        const make = (kind, title, summary) => this.makeNote({ kind, title, summary }, map, mapPath);
         const proposed = await make("proposition", shorten(text13, 80), text13);
         const situation = await make("situation", p.t("ui.argument_situation"));
         const conclusion = await make("conclusion", p.t("ui.argument_conclusion"), p.t("ui.argument_in_progress"));
@@ -92292,7 +92312,7 @@ var ArgumentRuns = class {
           const nodes = [];
           const items = [];
           for (const d of result.data) {
-            const node = await this.ports.createNote(
+            const node = await this.makeNote(
               { kind: "datum", title: shorten(d.need, 80), summary: d.need },
               map,
               drive.mapPath
@@ -92333,7 +92353,7 @@ var ArgumentRuns = class {
             reparent: [{ id: h.id, parentId: next.roles.eliminated }],
             notes: () => {
               var _a2;
-              return this.noteDetail(map, h.id, drive, this.ports.t("ui.argument_eliminated_0", (_a2 = h.eliminationReason) != null ? _a2 : ""));
+              return this.noteDetail(map, h.id, drive, this.t("ui.argument_eliminated_0", (_a2 = h.eliminationReason) != null ? _a2 : ""));
             }
           };
         });
@@ -92368,7 +92388,7 @@ var ArgumentRuns = class {
       const nodes = [];
       const items = [];
       for (const h of result.hypotheses) {
-        const node = await this.ports.createNote(
+        const node = await this.makeNote(
           { kind: "hypothesis", title: h.title, summary: h.statement },
           map,
           drive.mapPath
@@ -92399,7 +92419,7 @@ var ArgumentRuns = class {
       const nodes = [];
       const items = [];
       for (const n of result.needs) {
-        const node = await this.ports.createNote(
+        const node = await this.makeNote(
           { kind: "need", title: shorten(n.text, 80), summary: n.text },
           map,
           drive.mapPath
@@ -92419,7 +92439,7 @@ var ArgumentRuns = class {
     const result = await this.ask(drive, ARGUMENT_STEPS.verdict, request);
     await this.checkpoint(drive, async (s, map) => ({
       next: applyVerdict(s, hypothesisId, result),
-      notes: () => this.noteDetail(map, hypothesisId, drive, `${this.ports.t("ui.argument_reason")}: ${result.reason}`)
+      notes: () => this.noteDetail(map, hypothesisId, drive, `${this.t("ui.argument_reason")}: ${plainLine2(result.reason)}`)
     }));
   }
   async conclude(drive, state, proposition) {
@@ -92431,7 +92451,7 @@ var ArgumentRuns = class {
     await this.checkpoint(drive, async (s, map) => {
       var _a2;
       const next = applyConclusion(s, result);
-      const pointLines = result.points.map((p) => `- ${p.text}`);
+      const pointLines = result.points.map((p) => `- ${plainLine2(p.text)}`);
       const detail = [
         ...pointLines,
         "",
@@ -92444,7 +92464,7 @@ var ArgumentRuns = class {
       return {
         next,
         notes: async () => {
-          if (path) await this.ports.updateNote(path, { summary: result.summary, detail });
+          if (path) await this.writeNote(path, { summary: result.summary, detail });
         }
       };
     });
@@ -92452,23 +92472,23 @@ var ArgumentRuns = class {
   // ---- program-written text ----------------------------------------------------------------------------------------------------
   dataSection(state, hypothesisIds) {
     const cited = new Set(state.hypotheses.filter((h) => hypothesisIds.includes(h.id)).flatMap((h) => h.citedData));
-    const lines = state.situation.data.filter((d) => cited.has(d.id) && d.proof).map((d) => this.ports.t("ui.argument_source_0_1_2", d.proof.claim, d.proof.quote, d.proof.url));
-    return [`## ${this.ports.t("ui.argument_situation_data")}`, ...lines];
+    const lines = state.situation.data.filter((d) => cited.has(d.id) && d.proof).map((d) => this.t("ui.argument_source_0_1_2", d.proof.claim, d.proof.quote, d.proof.url));
+    return [`## ${this.t("ui.argument_situation_data")}`, ...lines];
   }
   sourceSection(state, hypothesisIds) {
-    const lines = state.hypotheses.filter((h) => hypothesisIds.includes(h.id)).flatMap((h) => foundNeeds(h)).map((n) => this.ports.t("ui.argument_source_0_1_2", n.proof.claim, n.proof.quote, n.proof.url));
-    return [`## ${this.ports.t("ui.argument_sources")}`, ...lines];
+    const lines = state.hypotheses.filter((h) => hypothesisIds.includes(h.id)).flatMap((h) => foundNeeds(h)).map((n) => this.t("ui.argument_source_0_1_2", n.proof.claim, n.proof.quote, n.proof.url));
+    return [`## ${this.t("ui.argument_sources")}`, ...lines];
   }
   /** The terminal conclusion card of a stopped run: a fixed sentence, never a model answer. */
   async stopPlan(drive, next) {
     var _a2, _b2, _c;
-    const t2 = (key4, ...values) => this.ports.t(key4, ...values);
+    const t2 = (key4, ...values) => this.t(key4, ...values);
     const { gate } = next.situation;
     let summary;
     if (next.run.phase === "stopped_limit")
       summary = t2("ui.argument_stopped_limit_0", next.conclusion.missing.join("; "));
     else summary = gate.kind === "data_missing" ? t2("ui.argument_stopped_missing") : t2("ui.argument_stopped_mismatch");
-    const detail = next.run.phase === "stopped_mismatch" ? [`${t2("ui.argument_reason")}: ${(_a2 = gate.reason) != null ? _a2 : ""}`, "", ...this.dataSection(next, [])].join("\n") : "";
+    const detail = next.run.phase === "stopped_mismatch" ? [`${t2("ui.argument_reason")}: ${plainLine2((_a2 = gate.reason) != null ? _a2 : "")}`, "", ...this.dataSection(next, [])].join("\n") : "";
     const path = (_b2 = (await this.ports.readMap(drive.mapPath)).nodes.find((n) => n.id === next.roles.conclusion)) == null ? void 0 : _b2.path;
     this.ports.log(
       `argument-run stopped runId=${next.run.runId} phase=${next.run.phase} stopReason=${(_c = next.run.stopReason) != null ? _c : "-"}`
@@ -92476,14 +92496,14 @@ var ArgumentRuns = class {
     return {
       next,
       notes: async () => {
-        if (path) await this.ports.updateNote(path, { summary, detail });
+        if (path) await this.writeNote(path, { summary, detail });
       }
     };
   }
   async noteDetail(map, id, drive, line) {
     var _a2, _b2;
     const path = (_b2 = (_a2 = map.nodes.find((n) => n.id === id)) == null ? void 0 : _a2.path) != null ? _b2 : await this.notePath(drive, id);
-    if (path) await this.ports.updateNote(path, { detail: line });
+    if (path) await this.writeNote(path, { detail: line });
   }
   // ---- research ----------------------------------------------------------------------------------------------------------------
   async slot() {
@@ -92602,16 +92622,16 @@ var ArgumentRuns = class {
       const settled2 = node || !result.found ? result : { found: false, reason: "card_deleted" };
       const next = isNeed ? applyEvidence(s, hypothesisId, itemId, settled2) : applySituationEvidence(s, itemId, settled2);
       const proof = result.found ? result.proof : void 0;
-      const lines = proof ? [this.ports.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
+      const lines = proof ? [this.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
       const notes = async () => {
         if (!node) return;
         if (proof) {
-          await this.ports.updateNote(node.path, {
+          await this.writeNote(node.path, {
             summary: proof.claim,
-            detail: [`## ${this.ports.t("ui.argument_sources")}`, ...lines].join("\n")
+            detail: [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n")
           });
         } else if (!result.found)
-          await this.ports.updateNote(node.path, { detail: this.ports.t("ui.argument_not_found_0", result.reason) });
+          await this.writeNote(node.path, { detail: this.t("ui.argument_not_found_0", result.reason) });
       };
       return { next, notes };
     });

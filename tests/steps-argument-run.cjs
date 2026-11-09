@@ -396,3 +396,52 @@ test('dispose between the map write and the note write: the notes are skipped; d
   await creating.runs.start(creating.mapPath, 'p').catch(() => undefined);
   assert.equal((await creating.state()).hypotheses.length, 0);
 });
+
+// Security: model/web text is written to Markdown notes as plain text; a fence or line break cannot open a diagram or a code block.
+const EVIL = '\n```mermaid\nflowchart LR\nA-->B\nstyle A fill:red\n```\n';
+const fenceLines = text => text.split(/\r\n?|\n/).filter(line => /^\s*(`{3,}|~{3,})/.test(line));
+
+test('sanitize on write: claim/reason/point with a mermaid fence and newlines never reach a note as a fence; summaries stay single-line', async () => {
+  const r = await rig({ script: { step: steps({
+    verdict: request => ({ verdict: 'supported', citedNeeds: [request.input.evidence[0].id], reason: `ok${EVIL}done` }),
+    conclude: request => ({ summary: `final${EVIL}answer`, points: [{ text: `point${EVIL}more`, hypothesisIds: request.input.hypotheses.map(h => h.id) }], basedOn: request.input.hypotheses.map(h => h.id) })
+  }), ask: ctx => ({ summary: 's', detail: 'd', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [foundEntry(ctx.argumentEvidenceNeeds[0].id, { claim: `Rate rose${EVIL}x` })] }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(state.run.phase, 'concluded');
+  const doc = await r.repo.readMap(r.mapPath);
+  let checked = 0;
+  for (const node of doc.nodes) {
+    const note = await r.repo.readNote(node.path);
+    assert.deepEqual(fenceLines(note.detail ?? ''), [], `detail of ${node.id}`);
+    assert.ok(!/[\r\n]/.test(note.summary ?? ''), `summary of ${node.id}`);
+    assert.ok(!/mermaid/i.test((note.detail ?? '').split(/\r\n?|\n/).filter(l => /^\s*`/.test(l)).join('')), 'no mermaid fence line');
+    checked++;
+  }
+  assert.ok(checked > 5);
+  const conclusion = await r.text(state.roles.conclusion);
+  assert.ok(conclusion.detail.includes('point') && conclusion.detail.includes('more'));
+});
+
+test('sanitize on write: a mismatch reason and a not-found reason with a fence are plain text', async () => {
+  const mismatch = await rig({ script: { step: steps({ judge_gate: request => ({ matches: false, reason: `rate fell${EVIL}end`, citedData: [request.data[0].id] }) }) } });
+  await mismatch.runs.start(mismatch.mapPath, 'p');
+  const state = await mismatch.state();
+  const note = await mismatch.text(state.roles.conclusion);
+  assert.deepEqual(fenceLines(note.detail), []);
+  assert.ok(note.detail.includes('rate fell'));
+});
+
+test('sanitize on write: ordinary text is written byte-identical', async () => {
+  const r = await rig({ script: { step: steps({ conclude: request => ({ summary: 'final answer', points: [{ text: 'point `code` and a-b', hypothesisIds: request.input.hypotheses.map(h => h.id) }], basedOn: request.input.hypotheses.map(h => h.id) }) }) } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  const note = await r.text(state.roles.conclusion);
+  assert.equal(note.summary, 'final answer');
+  assert.ok(note.detail.startsWith('- point `code` and a-b\n'));
+  assert.ok(note.detail.includes(`Rate rose`) && note.detail.includes(QUOTE) && note.detail.includes(URL_OK));
+  const { plainLine } = S.load('experiences/visual-map/argument-run.ts');
+  for (const text of ['plain', 'a `b` c', 'x ``y`` z', '中文 text: 1.5%', '']) assert.equal(plainLine(text), text);
+  assert.equal(plainLine('a\r\nb\nc'), 'a b c');
+  assert.equal(plainLine('```mermaid'), '` ` `mermaid');
+});

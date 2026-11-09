@@ -15,6 +15,8 @@ export interface TopicChatTurn {
   text: string;
   /** An AI answer to a free question: shown through the chat's markdown whitelist (every other line is plain text). */
   markdown?: boolean;
+  /** Additions typed while this turn's task ran, in typed order; shown under the turn. "live" went into the task, "queued" waits for it to end. */
+  steers?: ReadonlyArray<{ text: string; state: "live" | "queued" }>;
 }
 
 export interface TopicChatSession {
@@ -46,6 +48,8 @@ export interface TopicChatHost {
   setDraft(kind: TopicChatButtonKind | null, text: string): void;
   /** Resolves true when a run started (the input then clears), false when it was declined (the input stays). */
   submit(kind: TopicChatKind, text: string): Promise<boolean>;
+  /** An addition typed while a task runs; true when it was taken (the input then clears), false when it was not (the input stays). */
+  steer(text: string): boolean;
   close(): void;
 }
 
@@ -218,6 +222,13 @@ export class TopicChatWindow {
     this.refresh();
   }
 
+  /** Puts `text` in the input (a draft handed back); a repaint alone never writes the input's value. */
+  setInputText(text: string): void {
+    if (this.destroyed) return;
+    this.inputEl.value = text;
+    this.refresh();
+  }
+
   /** Puts the window in `parent` (again, after a repaint), places it and, unless `focus` is false, moves the focus to the input. */
   mount(parent: HTMLElement, focus = true): void {
     const attached = !parent.contains(this.el);
@@ -342,15 +353,24 @@ export class TopicChatWindow {
   }
 
   private canSend(): boolean {
-    const session = this.host.session();
     // A button pressed but its grey suggestion not adopted leaves the field empty: nothing to send. Typing alone is a question.
-    return !this.submitting && !session.running && this.inputEl.value.trim() !== "";
+    return !this.submitting && this.inputEl.value.trim() !== "";
   }
 
   private async send(): Promise<void> {
     if (!this.canSend()) return;
-    const kind: TopicChatKind = this.host.session().draftKind ?? "ask";
+    const session = this.host.session();
     const text = this.inputEl.value.trim();
+    if (session.running) {
+      // A task is running: the text is an addition to it (the buttons and mode stay as they are).
+      if (!this.host.steer(text)) return;
+      this.host.setDraft(session.draftKind, "");
+      if (this.destroyed) return;
+      this.inputEl.value = "";
+      this.refresh();
+      return;
+    }
+    const kind: TopicChatKind = session.draftKind ?? "ask";
     this.submitting = true;
     this.refresh();
     let started = false;
@@ -390,10 +410,17 @@ export class TopicChatWindow {
       setIcon(this.modeToggleEl, modeIcon(session.mode));
     }
     this.modeHintEl.setText(
-      session.mode === "quick" ? t("ui.topic_chat_mode_quick_hint") : t("ui.topic_chat_mode_standard_hint")
+      session.running && !empty
+        ? t("ui.map_chat_steer_hint")
+        : session.mode === "quick"
+          ? t("ui.topic_chat_mode_quick_hint")
+          : t("ui.topic_chat_mode_standard_hint")
     );
     const ghost = session.draftKind && empty ? suggestion(session.draftKind) : "";
-    this.inputEl.setAttr("placeholder", ghost || t("ui.topic_chat_placeholder"));
+    this.inputEl.setAttr(
+      "placeholder",
+      ghost || (session.running ? t("ui.map_chat_steer_placeholder") : t("ui.topic_chat_placeholder"))
+    );
     this.ghostEl.hidden = !ghost;
     this.inputEl.toggleClass("is-ghost", !!ghost);
     this.ghostTextEl.setText(ghost);
@@ -420,6 +447,16 @@ export class TopicChatWindow {
       const body = row.createSpan({ cls: "vam-topic-chat-text" });
       if (turn.markdown) renderChatMarkdown(body, turn.text, t("ui.map_chat_overflow_note"));
       else body.setText(turn.text);
+      for (const steer of turn.steers ?? []) {
+        const bubble = this.logEl.createDiv({
+          cls: steer.state === "queued" ? "vam-topic-chat-steer is-queued" : "vam-topic-chat-steer"
+        });
+        bubble.createSpan({
+          cls: "vam-topic-chat-steer-tag",
+          text: t(steer.state === "queued" ? "ui.map_chat_steer_tag_queued" : "ui.map_chat_steer_tag_live")
+        });
+        bubble.createSpan({ cls: "vam-topic-chat-steer-text", text: steer.text });
+      }
     }
     if (session.running) {
       this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running", text: t("ui.topic_chat_running") });

@@ -331,13 +331,13 @@ test('research: the check and the write happen inside one mutate call', async ()
   assert.equal(h.log.writes.filter(([, patch]) => patch.status === 'completed').length, 1);
 });
 
-test('research: suggestions are stored (at most 7) with the origin baseline and flushed; a new run clears the old ones first', async () => {
+test('research: reply suggestions are not stored and nothing is flushed; a new run clears the old ones first', async () => {
   const suggestions = Array.from({ length: 9 }, (_, i) => ({ title: 'c' + i, task: 't', contribution: '', parentTitle: '' }));
   const h = researchRuns({ reply: { suggestions } });
   h.pending.set('A.md', [{ title: 'old' }]);
   const handle = await h.runs.start('A.md', 'research', h.options());
   await handle.finished;
-  assert.equal(h.pending.get('A.md').length, 7); assert.ok(h.pending.get('A.md')[0].thinkingOriginBaseline); assert.equal(h.log.flushed, 1);
+  assert.equal(h.pending.has('A.md'), false); assert.equal(h.log.flushed, 0);
 });
 
 test('research: a new run on a topic aborts that topic chart step first', async () => {

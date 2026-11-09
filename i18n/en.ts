@@ -2642,7 +2642,6 @@ export const en = {
   "log.ai_split_failed": "AI split failed",
   "log.integration_directions_failed": "Integration direction suggestions failed",
   "log.child_integration_failed": "Subtopic integration failed",
-  "log.expansion_suggestions_save_failed": "Saving expansion suggestions failed",
   "log.ai_task_failed": "AI task failed",
   "log.stale_result_not_written": "The topic changed; the stale AI result was not written.",
   "log.stopped_result_not_written": "Research stopped; the result was not written.",

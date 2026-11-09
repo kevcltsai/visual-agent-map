@@ -2471,7 +2471,6 @@ var en = {
   "log.ai_split_failed": "AI split failed",
   "log.integration_directions_failed": "Integration direction suggestions failed",
   "log.child_integration_failed": "Subtopic integration failed",
-  "log.expansion_suggestions_save_failed": "Saving expansion suggestions failed",
   "log.ai_task_failed": "AI task failed",
   "log.stale_result_not_written": "The topic changed; the stale AI result was not written.",
   "log.stopped_result_not_written": "Research stopped; the result was not written.",
@@ -5271,7 +5270,6 @@ var zhCN = {
   "log.ai_split_failed": "AI \u62C6\u89E3\u5931\u8D25",
   "log.integration_directions_failed": "\u6574\u5408\u65B9\u5411\u5EFA\u8BAE\u5931\u8D25",
   "log.child_integration_failed": "\u5B50\u8BAE\u9898\u6574\u5408\u5931\u8D25",
-  "log.expansion_suggestions_save_failed": "\u5C55\u5F00\u5EFA\u8BAE\u4FDD\u5B58\u5931\u8D25",
   "log.ai_task_failed": "AI \u4EFB\u52A1\u5931\u8D25",
   "log.stale_result_not_written": "\u8BAE\u9898\u5185\u5BB9\u5DF2\u53D8\u66F4\uFF0C\u8FC7\u65F6\u7684 AI \u7ED3\u679C\u672A\u5199\u5165\u3002",
   "log.stopped_result_not_written": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u7ED3\u679C\u672A\u5199\u5165\u3002",
@@ -8071,7 +8069,6 @@ var zhTW = {
   "log.ai_split_failed": "AI \u62C6\u89E3\u5931\u6557",
   "log.integration_directions_failed": "\u6574\u5408\u65B9\u5411\u5EFA\u8B70\u5931\u6557",
   "log.child_integration_failed": "\u5B50\u8B70\u984C\u6574\u5408\u5931\u6557",
-  "log.expansion_suggestions_save_failed": "\u5C55\u958B\u5EFA\u8B70\u5132\u5B58\u5931\u6557",
   "log.ai_task_failed": "AI \u4EFB\u52D9\u5931\u6557",
   "log.stale_result_not_written": "\u8B70\u984C\u5167\u5BB9\u5DF2\u8B8A\u66F4\uFF0C\u904E\u6642\u7684 AI \u7D50\u679C\u672A\u5BEB\u5165\u3002",
   "log.stopped_result_not_written": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u7D50\u679C\u672A\u5BEB\u5165\u3002",
@@ -23122,22 +23119,22 @@ var detail_structure_zh_default = "detail \u5FC5\u9808\u4E14\u53EA\u80FD\u4F9D\u
 var detail_structure_en_default = "The detail must use exactly these six level-three headings in order: {{headings}}. Add only one line summarizing this update in Update log; do not repeat the full answer. Write 'No new content this time' in sections with nothing applicable. Follow any requested count for the core conclusions.\n";
 
 // core/steps/task/general-task.zh.md
-var general_task_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u6703\u76F4\u63A5\u53D6\u4EE3\u820A Detail \u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u5FC5\u9808\u5438\u6536\u820A\u5167\u5BB9\u8207\u672C\u6B21\u767C\u73FE\u3001\u53BB\u9664\u91CD\u8907\u3001\u4FDD\u7559\u4ECD\u6709\u6548\u7684\u4F86\u6E90\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
+var general_task_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u6703\u76F4\u63A5\u53D6\u4EE3\u820A Detail \u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u5FC5\u9808\u5438\u6536\u820A\u5167\u5BB9\u8207\u672C\u6B21\u767C\u73FE\u3001\u53BB\u9664\u91CD\u8907\u3001\u4FDD\u7559\u4ECD\u6709\u6548\u7684\u4F86\u6E90\u3002suggestions \u4E00\u5F8B\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
 
 // core/steps/task/general-task.en.md
-var general_task_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+var general_task_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Always return an empty suggestions array.\n";
 
 // core/steps/task/general-task-top.zh.md
-var general_task_top_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u53EA\u56DE\u50B3\u672C\u6B21\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\uFF1B\u4E0D\u8981\u91CD\u5BEB\u6216\u91CD\u8907\u73FE\u6709\u7B46\u8A18\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
+var general_task_top_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u53EA\u56DE\u50B3\u672C\u6B21\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\uFF1B\u4E0D\u8981\u91CD\u5BEB\u6216\u91CD\u8907\u73FE\u6709\u7B46\u8A18\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002suggestions \u4E00\u5F8B\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
 
 // core/steps/task/general-task-top.en.md
-var general_task_top_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail returns only what this research newly found, split by section heading (###); omit sections with nothing new. Do not rewrite or repeat the existing note, and do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+var general_task_top_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail returns only what this research newly found, split by section heading (###); omit sections with nothing new. Do not rewrite or repeat the existing note, and do not write an update log section (the plugin writes it). Always return an empty suggestions array.\n";
 
 // core/steps/task/general-task-fresh.zh.md
-var general_task_fresh_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u4E00\u4EFD\u6839\u64DA\u672C\u6B21\u7814\u7A76\u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u53BB\u9664\u91CD\u8907\u4E26\u4FDD\u7559\u6709\u6548\u7684\u4F86\u6E90\uFF1B\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
+var general_task_fresh_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u4E00\u4EFD\u6839\u64DA\u672C\u6B21\u7814\u7A76\u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u53BB\u9664\u91CD\u8907\u4E26\u4FDD\u7559\u6709\u6548\u7684\u4F86\u6E90\uFF1B\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002suggestions \u4E00\u5F8B\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
 
 // core/steps/task/general-task-fresh.en.md
-var general_task_fresh_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail is a complete knowledge page based on this research, without duplication and keeping valid sources; do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+var general_task_fresh_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail is a complete knowledge page based on this research, without duplication and keeping valid sources; do not write an update log section (the plugin writes it). Always return an empty suggestions array.\n";
 
 // core/steps/task/conflict-rule.zh.md
 var conflict_rule_zh_default = "\u73FE\u6709 Detail \u82E5\u5BEB\u8457\u300C\u6C92\u6709\u63D0\u4F9B\u4F86\u6E90\u300D\u6216\u300C\u5C1A\u672A\u67E5\u8B49\u300D\uFF0C\u800C\u672C\u6B21\u4F86\u6E90\u5DF2\u89E3\u6C7A\u8A72\u9EDE\uFF0C\u5C31\u522A\u9664\u90A3\u53E5\u820A\u8AAA\u6CD5\uFF0C\u4E0D\u8981\u4E26\u5217\u4FDD\u7559\u3002\u672C\u6B21\u767C\u73FE\u8207\u73FE\u6709 Detail \u4E0D\u4E00\u81F4\u6642\uFF0C\u5169\u7A2E\u8AAA\u6CD5\u90FD\u4FDD\u7559\u4E26\u5404\u6A19\u65E5\u671F\u8207\u4F86\u6E90\uFF0C\u5BEB\u4E00\u53E5\u76EE\u524D\u5224\u65B7\uFF08\u4F9D\u4F86\u6E90\u65B0\u820A\u8207\u5F37\u5F31\uFF09\uFF1B\u628A\u9019\u4E00\u9EDE\u52A0\u5165\u5F85\u78BA\u8A8D\u554F\u984C\u6BB5\uFF0C\u6C92\u6709\u8A72\u6BB5\u5C31\u5728\u76F8\u95DC\u6BB5\u843D\u4E26\u5217\uFF1B\u66F4\u65B0\u7D00\u9304\u5BEB\u4E00\u884C\u300C\u8207\u5148\u524D\u7D50\u8AD6\u4E0D\u4E00\u81F4\uFF1A\u2026\u300D\u3002\n";
@@ -33050,9 +33047,11 @@ var builtinRef = (id) => `builtin:${id}`;
 var fileRef = (base) => `file:${base}`;
 var lower = (value) => value.toLocaleLowerCase();
 var UNSAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
+var RESERVED_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
 function cleanBlockName(name2) {
   const cleaned = name2.replace(UNSAFE_NAME, " ").replace(/\s+/g, " ").trim();
-  return /^\.+$/.test(cleaned) ? "" : cleaned;
+  if (/^\.+$/.test(cleaned)) return "";
+  return RESERVED_NAME.test(cleaned) ? `_${cleaned}` : cleaned;
 }
 function blockFolderNames(role) {
   return [...new Set(CANONICAL_LANGUAGES.map((language2) => translate(language2, FOLDER_KEYS[role])))];
@@ -35468,6 +35467,31 @@ function isAiLockedError(error) {
   return error instanceof Error && error.name === "AiLockedError";
 }
 
+// ai/research-observer.ts
+function steerObserver(observer, steer) {
+  if (!observer || !steer) return observer;
+  let current = "";
+  return {
+    ...observer,
+    onAttempt: (id, attempt) => {
+      var _a2;
+      current = id;
+      steer.bind(null);
+      (_a2 = observer.onAttempt) == null ? void 0 : _a2.call(observer, id, attempt);
+    },
+    onSteer: (id, send) => {
+      var _a2;
+      if (id === current) steer.bind(send);
+      (_a2 = observer.onSteer) == null ? void 0 : _a2.call(observer, id, send);
+    },
+    onStreamMode: (id, mode) => {
+      var _a2;
+      if (id === current && mode !== "stream-json") steer.live(false);
+      (_a2 = observer.onStreamMode) == null ? void 0 : _a2.call(observer, id, mode);
+    }
+  };
+}
+
 // ai/note-style-label.ts
 function runStyleLabelText(label, language2) {
   const bracket = label.templateSource === "kind" && label.aiSectionsMode !== "decide" && label.aiSectionsMode !== "follow";
@@ -35843,7 +35867,8 @@ var TopicRuns = class {
         void 0,
         options.accepted,
         void 0,
-        progress.observer
+        // No progress entry, no observer: one is not made up for the steer, it would change the stream mode.
+        steerObserver(progress.observer, options.steer)
       );
       progress.end();
       (_e = options.accepted) == null ? void 0 : _e.call(options);
@@ -36272,10 +36297,10 @@ var TopicRuns = class {
       },
       markAccepted,
       void 0,
-      observer
+      steerObserver(observer, options.steer)
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -36356,18 +36381,7 @@ var TopicRuns = class {
           template: writeContext.detailTemplate,
           ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });
-        if (result.suggestions.length) {
-          this.pendingSuggestions.set(
-            path,
-            result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
-          );
-          try {
-            await ((_o = (_n = this.pendingSuggestions).flush) == null ? void 0 : _o.call(_n));
-          } catch (error) {
-            (_p = options.notify) == null ? void 0 : _p.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
-          }
-        }
-        (_q = options.done) == null ? void 0 : _q.call(options, result);
+        (_n = options.done) == null ? void 0 : _n.call(options, result);
       })
     ).catch(
       (error) => this.ports.mutate()(async () => {
@@ -43588,6 +43602,14 @@ ${inLanguage(CLAUDE_STRUCTURED_OUTPUT, request.language)}` : "",
   parse: (raw) => parseChartReply(raw)
 };
 
+// core/steps/task-steer/steer.en.md
+var steer_en_default = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same output format as the original request: your reply must cover the original request and every addition made so far in this turn, not only this one. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
+
+// core/steps/task-steer/steer.ts
+function renderTaskSteer(text12) {
+  return renderTemplate(steer_en_default, { text: JSON.stringify(text12) });
+}
+
 // core/ai-task-service.ts
 var FIRST_EVENT_WAIT_MS = 2e4;
 function cancelled() {
@@ -43933,7 +43955,26 @@ var AiTaskService = class {
               watching = false;
               disarm();
             }
+            if (live()) safe(() => {
+              var _a3;
+              return (_a3 = observer.onStreamMode) == null ? void 0 : _a3.call(observer, attemptId, mode);
+            });
           },
+          // Only when the observer can take additions: a hook here makes Claude open stdin for them (a different input format).
+          ...observer.onSteer ? {
+            onSteer: (steer) => {
+              if (!live()) return;
+              safe(
+                () => {
+                  var _a3;
+                  return (_a3 = observer.onSteer) == null ? void 0 : _a3.call(observer, attemptId, async (text12) => {
+                    if (!live()) throw cancelled();
+                    await steer(renderTaskSteer(text12));
+                  });
+                }
+              );
+            }
+          } : {},
           onFirstEvent: () => {
             seen();
           },
@@ -44207,7 +44248,7 @@ var language_en_default2 = "Write the reply, and every title, summary, note text
 var language_zh_default2 = "\u56DE\u8986\uFF0C\u4EE5\u53CA\u4F60\u7522\u751F\u7684\u6240\u6709\u6A19\u984C\u3001\u6458\u8981\u3001\u7B46\u8A18\u6587\u5B57\u8207\u65B0\u6A94\u6848\u6587\u5B57\uFF0C\u8ACB\u4EE5{{language}}\u64B0\u5BEB\u3002\n";
 
 // core/steps/map-chat/steer.en.md
-var steer_en_default = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same JSON format as before: `reply` and `actions` must cover the original message and every addition made so far in this turn, not only this one. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
+var steer_en_default2 = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same JSON format as before: `reply` and `actions` must cover the original message and every addition made so far in this turn, not only this one. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
 
 // core/steps/map-chat/prompt.en.md
 var prompt_en_default6 = `You are the assistant inside a research mind map. The user is talking to you about the map. Answer the user's message in "reply", and, only when the user asked for a change or an action, list actions in "actions". Actions are applied for the user after your reply, in the order you list them: the user's message is the confirmation, except that a long list, a new map or research on many cards is first shown to the user as a plan to approve. Never ask the user in "reply" to approve, confirm or apply anything: the app shows its own Apply and Cancel buttons when a plan is needed, and otherwise the actions simply run. Never say a change has already been made: "reply" only says what you are going to do; the result list the user sees afterwards says what was done. Use future or intention wording ("I'll add ...", "Here is what I will do: ..."), not "I added" or "done". When the user only asks a question, return an empty "actions" list.
@@ -44834,7 +44875,7 @@ function parseMapChat(raw, context) {
   return { reply: body.reply, actions, rejected, remaining: normalizeRemaining(body.remaining) };
 }
 function renderMapChatSteer(text12) {
-  return renderTemplate(steer_en_default, { text: JSON.stringify(text12) });
+  return renderTemplate(steer_en_default2, { text: JSON.stringify(text12) });
 }
 var mapChatStep = {
   id: "map-chat",
@@ -45454,6 +45495,10 @@ function validLine(value) {
     if (!isText2(value.status) || !STATUSES.includes(value.status) || !isText2(value.text)) return null;
     return value;
   }
+  if (value.type === "steer") {
+    if (!isText2(value.text)) return null;
+    return value;
+  }
   return null;
 }
 function parseTopicChat(text12) {
@@ -45486,6 +45531,7 @@ function parseTopicChat(text12) {
   return { lines, skipped: skipped2, unrecoverable, cleanEnd: text12 === "" || text12.endsWith("\n") };
 }
 function restoreTopicChat(lines) {
+  var _a2;
   const turns = [];
   const byId = /* @__PURE__ */ new Map();
   for (const line of lines) {
@@ -45496,10 +45542,13 @@ function restoreTopicChat(lines) {
         kind: line.kind,
         mode: line.mode,
         message: line.message,
-        result: null
+        result: null,
+        steers: []
       };
       byId.set(line.id, turn);
       turns.push(turn);
+    } else if (line.type === "steer") {
+      (_a2 = byId.get(line.id)) == null ? void 0 : _a2.steers.push(line.text);
     } else {
       const turn = byId.get(line.id);
       if (turn && !turn.result) turn.result = { status: line.status, text: line.text };
@@ -50783,6 +50832,12 @@ var TopicChatWindow = class {
     this.inputEl.value = draft.draftText;
     this.refresh();
   }
+  /** Puts `text` in the input (a draft handed back); a repaint alone never writes the input's value. */
+  setInputText(text12) {
+    if (this.destroyed) return;
+    this.inputEl.value = text12;
+    this.refresh();
+  }
   /** Puts the window in `parent` (again, after a repaint), places it and, unless `focus` is false, moves the focus to the input. */
   mount(parent, focus = true) {
     const attached = !parent.contains(this.el);
@@ -50890,14 +50945,22 @@ var TopicChatWindow = class {
     }
   }
   canSend() {
-    const session = this.host.session();
-    return !this.submitting && !session.running && this.inputEl.value.trim() !== "";
+    return !this.submitting && this.inputEl.value.trim() !== "";
   }
   async send() {
     var _a2;
     if (!this.canSend()) return;
-    const kind = (_a2 = this.host.session().draftKind) != null ? _a2 : "ask";
+    const session = this.host.session();
     const text12 = this.inputEl.value.trim();
+    if (session.running) {
+      if (!this.host.steer(text12)) return;
+      this.host.setDraft(session.draftKind, "");
+      if (this.destroyed) return;
+      this.inputEl.value = "";
+      this.refresh();
+      return;
+    }
+    const kind = (_a2 = session.draftKind) != null ? _a2 : "ask";
     this.submitting = true;
     this.refresh();
     let started = false;
@@ -50935,10 +50998,13 @@ var TopicChatWindow = class {
       (0, import_obsidian33.setIcon)(this.modeToggleEl, modeIcon(session.mode));
     }
     this.modeHintEl.setText(
-      session.mode === "quick" ? t("ui.topic_chat_mode_quick_hint") : t("ui.topic_chat_mode_standard_hint")
+      session.running && !empty ? t("ui.map_chat_steer_hint") : session.mode === "quick" ? t("ui.topic_chat_mode_quick_hint") : t("ui.topic_chat_mode_standard_hint")
     );
     const ghost = session.draftKind && empty ? suggestion(session.draftKind) : "";
-    this.inputEl.setAttr("placeholder", ghost || t("ui.topic_chat_placeholder"));
+    this.inputEl.setAttr(
+      "placeholder",
+      ghost || (session.running ? t("ui.map_chat_steer_placeholder") : t("ui.topic_chat_placeholder"))
+    );
     this.ghostEl.hidden = !ghost;
     this.inputEl.toggleClass("is-ghost", !!ghost);
     this.ghostTextEl.setText(ghost);
@@ -50948,6 +51014,7 @@ var TopicChatWindow = class {
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }
   paintLog(session) {
+    var _a2;
     this.logEl.empty();
     for (const turn of session.turns) {
       const row = this.logEl.createDiv({
@@ -50958,11 +51025,122 @@ var TopicChatWindow = class {
       const body = row.createSpan({ cls: "vam-topic-chat-text" });
       if (turn.markdown) renderChatMarkdown(body, turn.text, t("ui.map_chat_overflow_note"));
       else body.setText(turn.text);
+      for (const steer of (_a2 = turn.steers) != null ? _a2 : []) {
+        const bubble = this.logEl.createDiv({
+          cls: steer.state === "queued" ? "vam-topic-chat-steer is-queued" : "vam-topic-chat-steer"
+        });
+        bubble.createSpan({
+          cls: "vam-topic-chat-steer-tag",
+          text: t(steer.state === "queued" ? "ui.map_chat_steer_tag_queued" : "ui.map_chat_steer_tag_live")
+        });
+        bubble.createSpan({ cls: "vam-topic-chat-steer-text", text: steer.text });
+      }
     }
     if (session.running) {
       this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running", text: t("ui.topic_chat_running") });
     }
     this.logEl.scrollTop = this.logEl.scrollHeight;
+  }
+};
+
+// experiences/visual-map/topic-chat-steer.ts
+var TopicChatSteers = class {
+  constructor(options = {}) {
+    this.options = options;
+    __publicField(this, "entries", []);
+    __publicField(this, "handler", null);
+    __publicField(this, "gen", 0);
+    __publicField(this, "chain", Promise.resolve());
+    __publicField(this, "noLive", false);
+    __publicField(this, "closed", false);
+  }
+  /** Takes an addition; returns its entry. After `close` or on a run that cannot take one it waits (queued) at once. */
+  add(text12) {
+    const entry = { text: text12, state: this.closed || this.noLive ? "queued" : "pending" };
+    this.entries.push(entry);
+    this.changed();
+    this.pump();
+    return entry;
+  }
+  /** `null`: a new attempt starts, the old handler and every answer still on its way are dropped. A function: the new attempt's way in. */
+  bind(send) {
+    if (this.closed || !this.isAlive()) return;
+    this.gen++;
+    this.chain = Promise.resolve();
+    this.handler = send;
+    for (const entry of this.entries)
+      if (entry.state === "sending" || entry.state === "delivered") entry.state = "pending";
+    this.changed();
+    this.pump();
+  }
+  live(on) {
+    this.setLive(on);
+  }
+  /** `false`: the request cannot take an addition as it runs; everything not queued yet waits for the end. */
+  setLive(on) {
+    if (this.closed || !this.isAlive()) return;
+    this.noLive = !on;
+    if (on) return;
+    this.gen++;
+    this.handler = null;
+    for (const entry of this.entries) if (entry.state !== "queued") entry.state = "queued";
+    this.changed();
+  }
+  /** The reply is in: hand-overs still running settle, then what has not gone in waits. Later additions are queued. */
+  async close() {
+    await this.chain;
+    this.closed = true;
+    for (const entry of this.entries) if (entry.state !== "delivered") entry.state = "queued";
+    this.handler = null;
+    this.changed();
+  }
+  /** The texts of the additions the task took in, in typed order (what a request or record should carry). */
+  delivered() {
+    return this.entries.filter((entry) => entry.state === "delivered").map((entry) => entry.text);
+  }
+  /** Removes and returns the waiting additions, in typed order. */
+  takeQueued() {
+    const texts2 = this.entries.filter((entry) => entry.state === "queued").map((entry) => entry.text);
+    if (!texts2.length) return texts2;
+    this.entries.splice(0, this.entries.length, ...this.entries.filter((entry) => entry.state !== "queued"));
+    this.changed();
+    return texts2;
+  }
+  /** What the window shows, in typed order. */
+  views() {
+    return this.entries.map((entry) => ({ text: entry.text, state: entry.state === "queued" ? "queued" : "live" }));
+  }
+  isAlive() {
+    return this.options.alive ? this.options.alive() : true;
+  }
+  changed() {
+    var _a2, _b2;
+    (_b2 = (_a2 = this.options).onChange) == null ? void 0 : _b2.call(_a2);
+  }
+  pump() {
+    const handler = this.handler;
+    if (!handler || this.noLive || this.closed) return;
+    const gen = this.gen;
+    for (const entry of this.entries) {
+      if (entry.state !== "pending") continue;
+      entry.state = "sending";
+      this.chain = this.chain.then(async () => {
+        const current = () => gen === this.gen && entry.state === "sending" && this.isAlive();
+        if (!current()) return;
+        try {
+          await handler(entry.text);
+        } catch (e) {
+          if (!current()) return;
+          entry.state = "queued";
+          this.changed();
+          return;
+        }
+        if (!current()) return;
+        entry.state = "delivered";
+        this.changed();
+      });
+    }
+    this.changed();
   }
 };
 
@@ -60350,7 +60528,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
     const settings = this.plugin.settings;
     return {
       presets: listPresets(settings.promptPresets, "outline", settings.language).map(({ id, name: name2 }) => ({ id, name: name2 })),
-      generate: async (request, signal) => {
+      generate: async (request, signal, steer) => {
         var _a2, _b2, _c, _d;
         const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
         if (note.aiLocked) throw new Error(t("ui.ai_locked_notice"));
@@ -60374,7 +60552,8 @@ ${request.requirements}` : preset.text,
               return (_b3 = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.title) != null ? _b3 : "";
             })
           },
-          signal
+          signal,
+          steer
         );
         this.quickOutlineSummaries.set(node.id, outlineSummaryBank(result.nodes, true));
         return result.nodes;
@@ -71620,7 +71799,12 @@ ${request.requirements}` : preset.text,
     const restored = [];
     for (const turn of restoreTopicChat(parsed.lines)) {
       if (turn.id === entry.runningTurnId) continue;
-      restored.push({ role: "user", kind: turn.kind, text: turn.message });
+      restored.push({
+        role: "user",
+        kind: turn.kind,
+        text: turn.message,
+        ...turn.steers.length ? { steers: turn.steers.map((text12) => ({ text: text12, state: "live" })) } : {}
+      });
       restored.push({
         role: "ai",
         text: turn.result ? turn.result.text : t("ui.topic_chat_result_unknown"),
@@ -71754,6 +71938,11 @@ ${request.requirements}` : preset.text,
         const target = node();
         return target ? this.submitTopicChat(entry, target, kind, text12) : Promise.resolve(false);
       },
+      steer: (text12) => {
+        if (!entry.session.running || !entry.steers) return false;
+        entry.steers.add(text12);
+        return true;
+      },
       close: () => {
         var _a2;
         if (((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry) this.closeTopicChatWindow();
@@ -71778,10 +71967,15 @@ ${request.requirements}` : preset.text,
       entry.submitting = false;
     }
   }
-  async submitTopicChatNow(entry, node, kind, text12) {
+  /**
+   * `followUp`: the additions that waited for the reply to end go out as one new question. The entry is still `running`
+   * (it stayed so over the gap), so that guard is skipped; every other guard is as for a typed send. The text is taken from
+   * `followUp` only once the usage question is confirmed, so an addition typed while it was open rides along.
+   */
+  async submitTopicChatNow(entry, node, kind, text12, followUp) {
     const map = this.map;
     if (this.closed || !map || map.id !== entry.mapId || this.aimLive() || this.presentation) return false;
-    if (entry.session.running || this.topicChatBusy(node)) {
+    if (!followUp && entry.session.running || this.topicChatBusy(node)) {
       new import_obsidian39.Notice(t("ui.ai_running_ai"));
       return false;
     }
@@ -71826,10 +72020,29 @@ ${request.requirements}` : preset.text,
           return;
         }
       }
+      if (followUp) {
+        text12 = followUp.takeQueued().join("\n\n");
+        if (!text12) return;
+        userTurn.text = text12;
+      }
       started = true;
       entry.session.turns.push(userTurn);
       entry.session.running = true;
       entry.runningTurnId = this.newTopicTurnId();
+      const folded2 = [];
+      const steers = new TopicChatSteers({
+        onChange: () => {
+          this.syncTopicSteerTurn(userTurn, folded2, steers);
+          this.notifyTopicChat(entry);
+        },
+        alive: () => {
+          var _a3;
+          return !this.closed && ((_a3 = this.map) == null ? void 0 : _a3.id) === entry.mapId;
+        }
+      });
+      entry.steers = steers;
+      entry.steerFolded = folded2;
+      entry.steerEnd = null;
       this.writeTopicChatLine(entry, {
         type: "turn",
         id: entry.runningTurnId,
@@ -71839,13 +72052,88 @@ ${request.requirements}` : preset.text,
         message: text12
       });
       this.notifyTopicChat(entry);
-      void this.runTopicChatTask(entry, node, note, kind, mode, text12, controller);
+      void this.runTopicChatTask(entry, node, note, kind, mode, text12, controller, steers, userTurn);
     });
     return went !== false && started;
   }
+  /** The turn shows the additions it took (and those that wait), under its text; folded ones went in with the synthesis text. */
+  syncTopicSteerTurn(turn, folded2, steers) {
+    const views = [...folded2.map((text12) => ({ text: text12, state: "live" })), ...steers.views()];
+    if (views.length || turn.steers) turn.steers = views;
+  }
+  /** True when the task has additions of any kind: then `running` stays on until they are settled (the gap after the reply). */
+  holdsTopicSteers(entry) {
+    var _a2, _b2;
+    return !!((_a2 = entry.steers) == null ? void 0 : _a2.entries.length) || !!((_b2 = entry.steerFolded) == null ? void 0 : _b2.length);
+  }
+  /** Puts additions that were not sent back in front of the draft; a closed window (nothing shows it) says so when `notice`. */
+  returnTopicSteers(entry, texts2, notice) {
+    var _a2;
+    if (!texts2.length) return;
+    const draft = [...texts2, entry.session.draftText].filter(Boolean).join("\n\n");
+    entry.session.draftText = draft;
+    const open = ((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry ? this.topicChatOpen.win : null;
+    if (open) open.setInputText(draft);
+    else if (notice) new import_obsidian39.Notice(t("ui.map_chat_not_sent_draft"));
+  }
+  /**
+   * After the task has settled with additions: wait for hand-overs to end (`close`), write the ones that went in, then either
+   * send the waiting ones as one new question (the reply was done and the view is the same) or put them back in the box.
+   * `running` stays true over all of it, so a second Enter can only add (queued), never start a run.
+   */
+  async endTopicChatSteers(entry, steers, turnId, live) {
+    var _a2, _b2, _c;
+    const end = (_a2 = entry.steerEnd) != null ? _a2 : null;
+    const done = !!end && end.status === "done" && !end.plan;
+    const folded2 = (_b2 = entry.steerFolded) != null ? _b2 : [];
+    const finish = () => {
+      entry.session.running = false;
+      this.notifyTopicChat(entry);
+    };
+    try {
+      await steers.close();
+      if (live() && turnId)
+        for (const text12 of [...done ? folded2 : [], ...steers.delivered()])
+          this.writeTopicChatLine(entry, { type: "steer", id: turnId, at: (/* @__PURE__ */ new Date()).toISOString(), text: text12 });
+      const node = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === entry.nodeId);
+      if (done && live() && steers.entries.some((item) => item.state === "queued")) {
+        if (node) {
+          entry.submitting = true;
+          try {
+            if (await this.submitTopicChatNow(entry, node, "ask", "", steers)) return;
+          } finally {
+            entry.submitting = false;
+          }
+        }
+        this.returnTopicSteers(entry, steers.takeQueued(), true);
+        finish();
+        return;
+      }
+      this.returnTopicSteers(entry, [...done ? [] : folded2, ...steers.takeQueued()], false);
+      finish();
+    } catch (e) {
+      if (entry.runningTurnId) return;
+      this.returnTopicSteers(entry, steers.takeQueued(), true);
+      finish();
+    }
+  }
   /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
-  async runTopicChatTask(entry, node, note, kind, mode, text12, controller) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+  async runTopicChatTask(entry, node, note, kind, mode, text12, controller, steers, userTurn) {
+    var _a2;
+    const turnId = entry.runningTurnId;
+    const live = () => {
+      var _a3;
+      return !this.closed && ((_a3 = this.map) == null ? void 0 : _a3.id) === entry.mapId;
+    };
+    try {
+      await this.runTopicChatBody(entry, node, note, kind, mode, text12, controller, steers, userTurn);
+    } finally {
+      if (entry.steers === steers && (steers.entries.length || ((_a2 = entry.steerFolded) == null ? void 0 : _a2.length)) && entry.session.running)
+        await this.endTopicChatSteers(entry, steers, turnId, live);
+    }
+  }
+  async runTopicChatBody(entry, node, note, kind, mode, text12, controller, steers, userTurn) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     const mapId = entry.mapId;
     const live = () => {
       var _a3;
@@ -71867,11 +72155,11 @@ ${request.requirements}` : preset.text,
         (_a2 = this.map) == null ? void 0 : _a2.title
       );
       if (kind === "ask") {
-        await this.runTopicChatAsk(entry, node, note, mode, text12, controller, language2, live, hooks);
+        await this.runTopicChatAsk(entry, node, note, mode, text12, controller, language2, live, hooks, steers);
         return;
       }
       if (kind === "expand") {
-        const outcome = await this.chatExpand(node, text12, controller.signal);
+        const outcome = await this.chatExpand(node, text12, controller.signal, steers);
         if (outcome.status === "succeeded")
           this.settleTopicChat(
             entry,
@@ -71896,7 +72184,8 @@ ${request.requirements}` : preset.text,
           text12,
           controller.signal,
           endHooks,
-          endHooks
+          endHooks,
+          steers
         );
         endHooks();
         const stopped = controller.signal.aborted || failure2 === t("ui.research_stopped_existing_content_was_preserved") || failure2 === t("ui.ai_task_cancelled");
@@ -71917,6 +72206,7 @@ ${request.requirements}` : preset.text,
       });
       let researchedFirst = 0;
       if (toResearch.length) {
+        steers.live(false);
         for (const child of toResearch) {
           if (controller.signal.aborted || !live()) break;
           const childNote = await this.plugin.repo.readNote(child.path, (_g = this.map) != null ? _g : void 0);
@@ -71941,6 +72231,17 @@ ${request.requirements}` : preset.text,
         }
         await this.hydrate();
       }
+      let direction = text12;
+      if (toResearch.length) {
+        const early = steers.takeQueued();
+        steers.live(true);
+        if (early.length) {
+          (_h = entry.steerFolded) == null ? void 0 : _h.push(...early);
+          this.syncTopicSteerTurn(userTurn, (_i = entry.steerFolded) != null ? _i : [], steers);
+          this.notifyTopicChat(entry);
+          direction = [text12, ...early].join("\n\n");
+        }
+      }
       let written2 = false;
       let failure;
       await this.startSynthesis(
@@ -71950,9 +72251,10 @@ ${request.requirements}` : preset.text,
           researchMode: researchModeOf(mode),
           signal: controller.signal,
           onProgress: () => {
-          }
+          },
+          steer: steers
         },
-        text12,
+        direction,
         (message) => {
           failure = message;
           endHooks();
@@ -71997,7 +72299,7 @@ ${request.requirements}` : preset.text,
     }
   }
   /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
-  async runTopicChatResearch(node, note, mode, language2, text12, signal, accepted, launched) {
+  async runTopicChatResearch(node, note, mode, language2, text12, signal, accepted, launched, steer) {
     let result;
     let failure;
     const referenceGroups = await this.taskSourceSettings().mapSources(signal).catch(() => []);
@@ -72020,7 +72322,9 @@ ${request.requirements}` : preset.text,
         ...aiModeOptions(mode, "research"),
         addCharts: mode !== "quick"
       },
-      accepted
+      accepted,
+      void 0,
+      steer
     );
     launched == null ? void 0 : launched();
     if (handle) await handle.finished;
@@ -72028,18 +72332,18 @@ ${request.requirements}` : preset.text,
   }
   /** The request of a free question: the context holds this topic and what is under it, nothing else of the map. */
   async buildTopicChatRequest(entry, node, note, message) {
-    var _a2;
+    var _a2, _b2;
     const map = this.map;
     const settings = this.plugin.settings;
     const scope = topicSubtreeIds(map.nodes, node.id);
     const byId = new Map(map.nodes.map((item) => [item.id, item]));
     const summaryOf = (id) => {
-      var _a3, _b2;
-      return (_b2 = (_a3 = this.chatTopicState(id)) == null ? void 0 : _a3.summary) != null ? _b2 : "";
+      var _a3, _b3;
+      return (_b3 = (_a3 = this.chatTopicState(id)) == null ? void 0 : _a3.summary) != null ? _b3 : "";
     };
     const titleOf = (item) => {
-      var _a3, _b2;
-      return (_b2 = (_a3 = this.chatTopicState(item.id)) == null ? void 0 : _a3.title) != null ? _b2 : item.path;
+      var _a3, _b3;
+      return (_b3 = (_a3 = this.chatTopicState(item.id)) == null ? void 0 : _a3.title) != null ? _b3 : item.path;
     };
     const depthOf2 = (item) => {
       let depth = 0;
@@ -72067,7 +72371,17 @@ ${request.requirements}` : preset.text,
     const turns = entry.session.turns;
     for (let i = 0; i + 1 < turns.length; i++)
       if (turns[i].role === "user" && turns[i].kind === "ask" && turns[i + 1].role === "ai")
-        history2.push({ role: "user", text: turns[i].text }, { role: "assistant", text: turns[i + 1].text });
+        history2.push(
+          {
+            role: "user",
+            // What the task took in while it ran is part of what was asked.
+            text: [
+              turns[i].text,
+              ...((_a2 = turns[i].steers) != null ? _a2 : []).filter((item) => item.state === "live").map((item) => item.text)
+            ].join("\n\n")
+          },
+          { role: "assistant", text: turns[i + 1].text }
+        );
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapTitles: [],
@@ -72086,7 +72400,7 @@ ${request.requirements}` : preset.text,
       snippets: [],
       files: [],
       aim: !this.relationsEnabled(),
-      relations: this.relationsEnabled() ? ((_a2 = map.topicRelations) != null ? _a2 : []).filter((relation) => scope.has(relation.from) && scope.has(relation.to)) : [],
+      relations: this.relationsEnabled() ? ((_b2 = map.topicRelations) != null ? _b2 : []).filter((relation) => scope.has(relation.from) && scope.has(relation.to)) : [],
       activeFile: null,
       history: history2
     });
@@ -72103,7 +72417,7 @@ ${request.requirements}` : preset.text,
     };
   }
   /** A free question: one map-chat request about the topic; what the reply writes is checked against the subtree where it is applied. */
-  async runTopicChatAsk(entry, node, note, mode, text12, controller, language2, live, hooks) {
+  async runTopicChatAsk(entry, node, note, mode, text12, controller, language2, live, hooks, steers) {
     var _a2;
     const key4 = `topic-chat-ask:${++mapChatTaskSequence}`;
     let began = false;
@@ -72119,9 +72433,18 @@ ${request.requirements}` : preset.text,
       began = true;
       (_a2 = this.plugin.activeTasks) == null ? void 0 : _a2.set(key4, controller);
       hooks.begin(controller);
-      const result = await this.plugin.mapChat.chat(request, controller.signal, () => {
-      });
+      const result = await this.plugin.mapChat.chat(
+        request,
+        controller.signal,
+        () => {
+        },
+        (event) => {
+          if (event.kind === "stream-mode" && event.mode !== "stream-json") steers.live(false);
+        },
+        (send) => steers.bind(send)
+      );
       end();
+      if (steers.entries.length) await steers.close();
       if (controller.signal.aborted) {
         this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
         return;
@@ -72138,11 +72461,11 @@ ${request.requirements}` : preset.text,
         mapAiMode: map.aiMode
       }) : null;
       if (plan) {
-        this.settleTopicChat(entry, t("ui.topic_chat_too_big"), live, true, "done", true);
+        this.settleTopicChat(entry, t("ui.topic_chat_too_big"), live, true, "done", true, true);
         return;
       }
       const lines = allowed.length ? await this.applyMapChatActions(
-        { ...result, message: text12 },
+        { ...result, message: [text12, ...steers.delivered()].join("\n\n") },
         request.context,
         () => live() && !controller.signal.aborted,
         { path: this.path, id: map.id },
@@ -72238,8 +72561,9 @@ ${request.requirements}` : preset.text,
     return ((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry;
   }
   /** Ends a run: the window (if open) shows one sentence; a closed window gets a Notice when `notice` says the task did not tell it. */
-  settleTopicChat(entry, sentence, live, notice, status, markdown = false) {
-    entry.session.running = false;
+  settleTopicChat(entry, sentence, live, notice, status, markdown = false, plan = false) {
+    if (!this.holdsTopicSteers(entry)) entry.session.running = false;
+    entry.steerEnd = { status, plan };
     const turnId = entry.runningTurnId;
     entry.runningTurnId = null;
     if (!live()) return;
@@ -75244,6 +75568,7 @@ ${request.requirements}` : preset.text,
       runOnce: options == null ? void 0 : options.runOnce,
       signal: options == null ? void 0 : options.signal,
       outputLanguage: options == null ? void 0 : options.outputLanguage,
+      steer: options == null ? void 0 : options.steer,
       prepare: async (note) => {
         var _a3;
         if (!children.length && !selectedSources.some((group) => group.documents.length))
@@ -75386,7 +75711,7 @@ ${request.requirements}` : preset.text,
     const abortBeforeAcceptance = () => controller.abort();
     if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
     else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    const stored = { ...options, signal: void 0, onProgress: void 0 };
+    const stored = { ...options, signal: void 0, onProgress: void 0, steer: void 0 };
     const task = step === "draft" && (existing == null ? void 0 : existing.directions.length) && (existing.state === "directions" || options.continuesDirections) ? existing : {
       mapPath: this.path,
       mapId: this.map.id,
@@ -75409,6 +75734,7 @@ ${request.requirements}` : preset.text,
       ...step === "draft" ? { ...task.options, requirements: options.requirements || task.options.requirements } : options,
       // The model of this step is the dialog's choice now, not the one the first step was started with.
       runOnce: options.runOnce,
+      steer: options.steer,
       signal: controller.signal,
       onProgress: (message) => {
         var _a2;
@@ -80460,7 +80786,7 @@ ${addition}` : addition },
    * written without a research (`research-mode: local`, no task text). Like the dialog's run, the card shows running and Stop
    * while the outline is generated.
    */
-  async chatExpand(parent, direction, signal) {
+  async chatExpand(parent, direction, signal, steer) {
     var _a2, _b2, _c;
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
       new import_obsidian39.Notice(t("ui.ai_running_ai"));
@@ -80495,7 +80821,8 @@ ${addition}` : addition },
           ),
           limits
         },
-        controller.signal
+        controller.signal,
+        steer
       );
       if (controller.signal.aborted || this.closed) return { status: "stopped" };
       const { nodes } = limitOutline(generated, limits);
@@ -80952,6 +81279,35 @@ ${addition}` : addition },
       this.enqueue(() => this.resizeCard(node.id, change2));
     });
   }
+  /**
+   * The map edit for one dropped card. Built here, not inside enableDrag: the undo history keeps every edit, and a closure made
+   * inside the drag shares its scope (the card, the edge helpers) and would keep all of that off-screen after each drop.
+   */
+  cardDropEdit(nodeId, position, centerX) {
+    return (map) => {
+      const current = map.nodes.find((n) => n.id === nodeId);
+      if (!current) return;
+      const root = current.parentId ? map.nodes.find((n) => n.id === current.parentId) : void 0;
+      if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId && !current.afterTextId) {
+        map.nodes = reorderTopLevel(map.nodes, root.id, current.id, centerX);
+        this.arrangeAll(map);
+        return;
+      }
+      this.placeDroppedCard(map, current, position);
+    };
+  }
+  /** The map edit for a dropped group of cards (one undo step); built outside enableDrag for the reason of cardDropEdit. */
+  groupDropEdit(origins, dx, dy) {
+    const from = new Map(origins);
+    return (map) => {
+      for (const [id, origin] of from) {
+        const current = map.nodes.find((n) => n.id === id);
+        if (!current) continue;
+        current.x = Math.round(origin.x + dx);
+        current.y = Math.round(origin.y + dy);
+      }
+    };
+  }
   enableDrag(card, node, onPlainClick) {
     card.addEventListener("pointerdown", (event) => {
       var _a2, _b2, _c, _d;
@@ -81154,16 +81510,8 @@ ${addition}` : addition },
           }
           placeGroup(delta.x, delta.y);
           const { x: dx, y: dy } = delta;
-          this.enqueueDrop(
-            () => this.mapChange((map) => {
-              for (const [id, from] of groupOrigins) {
-                const current = map.nodes.find((n) => n.id === id);
-                if (!current) continue;
-                current.x = Math.round(from.x + dx);
-                current.y = Math.round(from.y + dy);
-              }
-            })
-          );
+          const edit = this.groupDropEdit(groupOrigins, dx, dy);
+          this.enqueueDrop(() => this.mapChange(edit));
           return;
         }
         if (moved && locked) {
@@ -81175,20 +81523,8 @@ ${addition}` : addition },
             this.enqueue(() => this.moveBranches([dragged], landed.node, false));
         } else if (moved) {
           paint();
-          this.enqueueDrop(
-            () => this.mapChange((map) => {
-              const current = map.nodes.find((n) => n.id === node.id);
-              if (!current) return;
-              const root = current.parentId ? map.nodes.find((n) => n.id === current.parentId) : void 0;
-              if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId && !current.afterTextId) {
-                const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
-                map.nodes = reordered;
-                this.arrangeAll(map);
-                return;
-              }
-              this.placeDroppedCard(map, current, position);
-            })
-          );
+          const edit = this.cardDropEdit(node.id, { ...position }, position.x + card.offsetWidth / 2);
+          this.enqueueDrop(() => this.mapChange(edit));
         } else if (e.metaKey || e.ctrlKey) {
           this.applySelectionChange(this.selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
         } else {
@@ -82115,10 +82451,11 @@ ${addition}` : addition },
    * check and the write; this supplies what only the view knows: the map, the ancestors, the style notices, the redraw
    * and the undo step.
    */
-  runAgent(node, done, failed, request, onLaunchAccepted, runOnce) {
+  runAgent(node, done, failed, request, onLaunchAccepted, runOnce, steer) {
     var _a2;
     return this.plugin.topicRuns.start(node.path, "research", {
       ...this.writebackHooks(),
+      ...steer ? { steer } : {},
       origin: this,
       map: (_a2 = this.map) != null ? _a2 : void 0,
       usageMapPath: this.path || void 0,
@@ -90010,18 +90347,39 @@ var OutlineGenerationService = class {
   /**
    * Generate a outline (each heading with a one-line summary) for `request.topic`. Throws {@link OutlineGenerateError} (localized message,
    * `code` for the reason) for an empty topic, an over-budget request, a stop, or a reply that is not a valid outline.
+   *
+   * `steer` (the topic chat window) takes user additions while the call runs. Codex takes them into the running turn, and
+   * each attempt (the retry below is a new one) binds again. Claude cannot: the outline is plain text, which the stream
+   * mode that carries additions would not return as one reply, so `steer.live(false)` is called and every addition waits.
    */
-  async generate(request, signal) {
+  async generate(request, signal, steer) {
     const stopped = () => new OutlineGenerateError("stopped", translate(uiLocale(request.language), "error.outline_generate_stopped"));
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(
       outlineGenerateStep,
       request
     );
+    const claude = CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model);
+    if (steer && claude) steer.live(false);
+    let generation = 0;
     for (let attempt = 1; ; attempt++) {
       let raw;
+      let hooks;
+      if (steer && !claude) {
+        steer.bind(null);
+        const mine = ++generation;
+        hooks = {
+          onSteer: (send) => {
+            if (signal.aborted || mine !== generation) return;
+            steer.bind(async (text12) => {
+              if (signal.aborted || mine !== generation) throw stopped();
+              await send(renderTaskSteer(text12));
+            });
+          }
+        };
+      }
       try {
-        raw = await this.run(request, signal, prepared);
+        raw = await this.run(request, signal, prepared, void 0, hooks);
         if (signal.aborted) throw stopped();
         return prepared.parse(raw);
       } catch (error) {

@@ -2068,6 +2068,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-msg.is-me { background: var(--background-modifier-hover); }
 .vam-topic-chat-msg.is-running { color: var(--text-muted); }
 .vam-topic-chat-who { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-topic-chat-steer { align-self: flex-end; display: flex; flex-direction: column; gap: 2px; max-width: 85%; padding: 5px 8px; border-left: 2px solid var(--interactive-accent); border-radius: var(--radius-s); background: var(--background-modifier-hover); overflow-wrap: anywhere; white-space: pre-wrap; }
+.vam-topic-chat-steer-tag { font-size: var(--font-ui-smaller); color: var(--text-accent); }
+.vam-topic-chat-steer.is-queued { border-left-style: dashed; border-left-color: var(--text-muted); }
+.vam-topic-chat-steer.is-queued .vam-topic-chat-steer-tag { color: var(--text-muted); }
 .vam-topic-chat-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .vam-topic-chat-action { padding: 3px 10px; border: 1px solid var(--background-modifier-border); border-radius: 999px; background: var(--background-primary); color: var(--text-normal); font-size: var(--font-ui-small); cursor: pointer; }
 .vam-topic-chat-action.is-active { border-color: var(--interactive-accent); background: var(--interactive-accent); color: var(--text-on-accent); }

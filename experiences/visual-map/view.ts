@@ -585,7 +585,8 @@ import {
   type TopicChatMode,
   type TopicChatTurn
 } from "./topic-chat";
-import type { ResearchObserver } from "../../ai/research-observer";
+import type { ResearchObserver, ResearchSteer } from "../../ai/research-observer";
+import { TopicChatSteers } from "./topic-chat-steer";
 import type { ResearchProgress } from "./research-progress";
 import type { ExpansionBatchState } from "./expansion-batch";
 import { AimStartModal } from "../../ui/modals/aim-start-modal";
@@ -1106,6 +1107,12 @@ interface TopicChatEntry {
   runningTurnId: string | null;
   /** True while a submit is between its checks and its start; a second window of this entry cannot send twice. */
   submitting?: boolean;
+  /** The additions typed while the current task runs. Created with `running = true`, in the same tick. */
+  steers?: TopicChatSteers;
+  /** Additions typed while a synthesis researched its subtopics first: they ride along in the integration's text (shown as taken in). */
+  steerFolded?: string[];
+  /** How the current task ended (set by `settleTopicChat`); `plan`: the reply needs a plan, so nothing is sent on. */
+  steerEnd?: { status: TopicRecordStatus; plan: boolean } | null;
 }
 /** How one expansion the chat started came out. */
 type ChatExpandOutcome =
@@ -4212,7 +4219,7 @@ export class VisualAgentMapView extends ItemView {
     const settings = this.plugin.settings;
     return {
       presets: listPresets(settings.promptPresets, "outline", settings.language).map(({ id, name }) => ({ id, name })),
-      generate: async (request, signal): Promise<OutlineNode[]> => {
+      generate: async (request, signal, steer): Promise<OutlineNode[]> => {
         const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
         if (note.aiLocked) throw new Error(t("ui.ai_locked_notice"));
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
@@ -4232,7 +4239,8 @@ export class VisualAgentMapView extends ItemView {
               .filter(item => item.parentId === node.id)
               .map(item => this.notes.get(item.id)?.title ?? "")
           },
-          signal
+          signal,
+          steer
         );
         this.quickOutlineSummaries.set(node.id, outlineSummaryBank(result.nodes, true));
         return result.nodes;
@@ -16454,7 +16462,12 @@ export class VisualAgentMapView extends ItemView {
     const restored: TopicChatTurn[] = [];
     for (const turn of restoreTopicChat(parsed.lines)) {
       if (turn.id === entry.runningTurnId) continue;
-      restored.push({ role: "user", kind: turn.kind, text: turn.message });
+      restored.push({
+        role: "user",
+        kind: turn.kind,
+        text: turn.message,
+        ...(turn.steers.length ? { steers: turn.steers.map(text => ({ text, state: "live" as const })) } : {})
+      });
       restored.push({
         role: "ai",
         text: turn.result ? turn.result.text : t("ui.topic_chat_result_unknown"),
@@ -16582,6 +16595,12 @@ export class VisualAgentMapView extends ItemView {
         const target = node();
         return target ? this.submitTopicChat(entry, target, kind, text) : Promise.resolve(false);
       },
+      steer: text => {
+        // Only while this entry's task runs (the window asks only then). In the gap after the reply the steers are closed: queued.
+        if (!entry.session.running || !entry.steers) return false;
+        entry.steers.add(text);
+        return true;
+      },
       close: () => {
         if (this.topicChatOpen?.entry === entry) this.closeTopicChatWindow();
       }
@@ -16614,15 +16633,21 @@ export class VisualAgentMapView extends ItemView {
       entry.submitting = false;
     }
   }
+  /**
+   * `followUp`: the additions that waited for the reply to end go out as one new question. The entry is still `running`
+   * (it stayed so over the gap), so that guard is skipped; every other guard is as for a typed send. The text is taken from
+   * `followUp` only once the usage question is confirmed, so an addition typed while it was open rides along.
+   */
   private async submitTopicChatNow(
     entry: TopicChatEntry,
     node: MapNode,
     kind: TopicChatKind,
-    text: string
+    text: string,
+    followUp?: TopicChatSteers
   ): Promise<boolean> {
     const map = this.map;
     if (this.closed || !map || map.id !== entry.mapId || this.aimLive() || this.presentation) return false;
-    if (entry.session.running || this.topicChatBusy(node)) {
+    if ((!followUp && entry.session.running) || this.topicChatBusy(node)) {
       new Notice(t("ui.ai_running_ai"));
       return false;
     }
@@ -16667,10 +16692,27 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
       }
+      if (followUp) {
+        text = followUp.takeQueued().join("\n\n");
+        if (!text) return;
+        userTurn.text = text;
+      }
       started = true;
       entry.session.turns.push(userTurn);
       entry.session.running = true;
       entry.runningTurnId = this.newTopicTurnId();
+      // The owner of this run's additions, made in the same tick as `running = true`.
+      const folded: string[] = [];
+      const steers = new TopicChatSteers({
+        onChange: () => {
+          this.syncTopicSteerTurn(userTurn, folded, steers);
+          this.notifyTopicChat(entry);
+        },
+        alive: () => !this.closed && this.map?.id === entry.mapId
+      });
+      entry.steers = steers;
+      entry.steerFolded = folded;
+      entry.steerEnd = null;
       this.writeTopicChatLine(entry, {
         type: "turn",
         id: entry.runningTurnId,
@@ -16680,9 +16722,75 @@ export class VisualAgentMapView extends ItemView {
         message: text
       });
       this.notifyTopicChat(entry);
-      void this.runTopicChatTask(entry, node, note, kind, mode, text, controller);
+      void this.runTopicChatTask(entry, node, note, kind, mode, text, controller, steers, userTurn);
     });
     return went !== false && started;
+  }
+  /** The turn shows the additions it took (and those that wait), under its text; folded ones went in with the synthesis text. */
+  private syncTopicSteerTurn(turn: TopicChatTurn, folded: readonly string[], steers: TopicChatSteers): void {
+    const views = [...folded.map(text => ({ text, state: "live" as const })), ...steers.views()];
+    if (views.length || turn.steers) turn.steers = views;
+  }
+  /** True when the task has additions of any kind: then `running` stays on until they are settled (the gap after the reply). */
+  private holdsTopicSteers(entry: TopicChatEntry): boolean {
+    return !!entry.steers?.entries.length || !!entry.steerFolded?.length;
+  }
+  /** Puts additions that were not sent back in front of the draft; a closed window (nothing shows it) says so when `notice`. */
+  private returnTopicSteers(entry: TopicChatEntry, texts: string[], notice: boolean): void {
+    if (!texts.length) return;
+    const draft = [...texts, entry.session.draftText].filter(Boolean).join("\n\n");
+    entry.session.draftText = draft;
+    const open = this.topicChatOpen?.entry === entry ? this.topicChatOpen.win : null;
+    if (open) open.setInputText(draft);
+    else if (notice) new Notice(t("ui.map_chat_not_sent_draft"));
+  }
+  /**
+   * After the task has settled with additions: wait for hand-overs to end (`close`), write the ones that went in, then either
+   * send the waiting ones as one new question (the reply was done and the view is the same) or put them back in the box.
+   * `running` stays true over all of it, so a second Enter can only add (queued), never start a run.
+   */
+  private async endTopicChatSteers(
+    entry: TopicChatEntry,
+    steers: TopicChatSteers,
+    turnId: string | null,
+    live: () => boolean
+  ): Promise<void> {
+    const end = entry.steerEnd ?? null;
+    const done = !!end && end.status === "done" && !end.plan;
+    const folded = entry.steerFolded ?? [];
+    const finish = (): void => {
+      entry.session.running = false;
+      this.notifyTopicChat(entry);
+    };
+    try {
+      await steers.close();
+      if (live() && turnId)
+        for (const text of [...(done ? folded : []), ...steers.delivered()])
+          this.writeTopicChatLine(entry, { type: "steer", id: turnId, at: new Date().toISOString(), text });
+      const node = this.map?.nodes.find(item => item.id === entry.nodeId);
+      if (done && live() && steers.entries.some(item => item.state === "queued")) {
+        if (node) {
+          entry.submitting = true;
+          try {
+            if (await this.submitTopicChatNow(entry, node, "ask", "", steers)) return;
+          } finally {
+            entry.submitting = false;
+          }
+        }
+        // Declined (usage question, lock, busy, a presentation, a deleted card, ...): the waiting texts are back in the box.
+        this.returnTopicSteers(entry, steers.takeQueued(), true);
+        finish();
+        return;
+      }
+      // Stopped, failed, a plan, a view that is gone, a deleted card, or nothing waiting.
+      this.returnTopicSteers(entry, [...(done ? [] : folded), ...steers.takeQueued()], false);
+      finish();
+    } catch {
+      // A follow-up that already started owns `running` now; otherwise the texts are back in the box and the entry is free.
+      if (entry.runningTurnId) return;
+      this.returnTopicSteers(entry, steers.takeQueued(), true);
+      finish();
+    }
   }
   /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
   private async runTopicChatTask(
@@ -16692,7 +16800,30 @@ export class VisualAgentMapView extends ItemView {
     kind: TopicChatKind,
     mode: TopicChatMode,
     text: string,
-    controller: AbortController
+    controller: AbortController,
+    steers: TopicChatSteers,
+    userTurn: TopicChatTurn
+  ): Promise<void> {
+    const turnId = entry.runningTurnId;
+    const live = (): boolean => !this.closed && this.map?.id === entry.mapId;
+    try {
+      await this.runTopicChatBody(entry, node, note, kind, mode, text, controller, steers, userTurn);
+    } finally {
+      // No additions: `settleTopicChat` already freed the entry, exactly as before.
+      if (entry.steers === steers && (steers.entries.length || entry.steerFolded?.length) && entry.session.running)
+        await this.endTopicChatSteers(entry, steers, turnId, live);
+    }
+  }
+  private async runTopicChatBody(
+    entry: TopicChatEntry,
+    node: MapNode,
+    note: Note,
+    kind: TopicChatKind,
+    mode: TopicChatMode,
+    text: string,
+    controller: AbortController,
+    steers: TopicChatSteers,
+    userTurn: TopicChatTurn
   ): Promise<void> {
     const mapId = entry.mapId;
     // The map id, not its path: a rename or Organize meanwhile moves the file but the result still belongs here.
@@ -16713,11 +16844,11 @@ export class VisualAgentMapView extends ItemView {
         this.map?.title
       );
       if (kind === "ask") {
-        await this.runTopicChatAsk(entry, node, note, mode, text, controller, language, live, hooks);
+        await this.runTopicChatAsk(entry, node, note, mode, text, controller, language, live, hooks, steers);
         return;
       }
       if (kind === "expand") {
-        const outcome = await this.chatExpand(node, text, controller.signal);
+        const outcome = await this.chatExpand(node, text, controller.signal, steers);
         // A failure was already told by chatExpand's own Notice; a success with the window closed is told here.
         if (outcome.status === "succeeded")
           this.settleTopicChat(
@@ -16743,7 +16874,8 @@ export class VisualAgentMapView extends ItemView {
           text,
           controller.signal,
           endHooks,
-          endHooks
+          endHooks,
+          steers
         );
         endHooks();
         const stopped =
@@ -16768,6 +16900,9 @@ export class VisualAgentMapView extends ItemView {
       });
       let researchedFirst = 0;
       if (toResearch.length) {
+        // The subtopic researches take no additions (they are not this request): what is typed meanwhile waits, and goes
+        // into the integration's text below, once.
+        steers.live(false);
         for (const child of toResearch) {
           if (controller.signal.aborted || !live()) break;
           const childNote = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
@@ -16792,6 +16927,17 @@ export class VisualAgentMapView extends ItemView {
         }
         await this.hydrate();
       }
+      let direction = text;
+      if (toResearch.length) {
+        const early = steers.takeQueued();
+        steers.live(true);
+        if (early.length) {
+          entry.steerFolded?.push(...early);
+          this.syncTopicSteerTurn(userTurn, entry.steerFolded ?? [], steers);
+          this.notifyTopicChat(entry);
+          direction = [text, ...early].join("\n\n");
+        }
+      }
       let written = false;
       let failure: string | undefined;
       await this.startSynthesis(
@@ -16800,9 +16946,10 @@ export class VisualAgentMapView extends ItemView {
           ...chatSynthesisOptions({ outputLanguage: language }),
           researchMode: researchModeOf(mode),
           signal: controller.signal,
-          onProgress: () => {}
+          onProgress: () => {},
+          steer: steers
         },
-        text,
+        direction,
         message => {
           failure = message;
           endHooks();
@@ -16857,7 +17004,8 @@ export class VisualAgentMapView extends ItemView {
     text: string,
     signal: AbortSignal,
     accepted?: () => void,
-    launched?: () => void
+    launched?: () => void,
+    steer?: ResearchSteer
   ): Promise<{ result?: AiResult; failure?: string }> {
     let result: AiResult | undefined;
     let failure: string | undefined;
@@ -16883,7 +17031,9 @@ export class VisualAgentMapView extends ItemView {
         ...aiModeOptions(mode, "research"),
         addCharts: mode !== "quick"
       },
-      accepted
+      accepted,
+      undefined,
+      steer
     );
     launched?.();
     if (handle) await handle.finished;
@@ -16930,7 +17080,17 @@ export class VisualAgentMapView extends ItemView {
     const turns = entry.session.turns;
     for (let i = 0; i + 1 < turns.length; i++)
       if (turns[i].role === "user" && turns[i].kind === "ask" && turns[i + 1].role === "ai")
-        history.push({ role: "user", text: turns[i].text }, { role: "assistant", text: turns[i + 1].text });
+        history.push(
+          {
+            role: "user",
+            // What the task took in while it ran is part of what was asked.
+            text: [
+              turns[i].text,
+              ...(turns[i].steers ?? []).filter(item => item.state === "live").map(item => item.text)
+            ].join("\n\n")
+          },
+          { role: "assistant", text: turns[i + 1].text }
+        );
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapTitles: [],
@@ -16979,7 +17139,8 @@ export class VisualAgentMapView extends ItemView {
     controller: AbortController,
     language: ContentLanguage,
     live: () => boolean,
-    hooks: BackgroundHooks
+    hooks: BackgroundHooks,
+    steers: TopicChatSteers
   ): Promise<void> {
     const key = `topic-chat-ask:${++mapChatTaskSequence}`;
     let began = false;
@@ -16994,8 +17155,19 @@ export class VisualAgentMapView extends ItemView {
       began = true;
       this.plugin.activeTasks?.set(key, controller);
       hooks.begin(controller);
-      const result = await this.plugin.mapChat.chat(request, controller.signal, () => {});
+      const result = await this.plugin.mapChat.chat(
+        request,
+        controller.signal,
+        () => {},
+        event => {
+          // Claude without a live stream (json, json-fallback) cannot take additions: they all wait for the end.
+          if (event.kind === "stream-mode" && event.mode !== "stream-json") steers.live(false);
+        },
+        send => steers.bind(send)
+      );
       end();
+      // Hand-overs still on their way settle first: what the reply took in is final before it is applied or put in the history.
+      if (steers.entries.length) await steers.close();
       if (controller.signal.aborted) {
         this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
         return;
@@ -17015,12 +17187,12 @@ export class VisualAgentMapView extends ItemView {
           })
         : null;
       if (plan) {
-        this.settleTopicChat(entry, t("ui.topic_chat_too_big"), live, true, "done", true);
+        this.settleTopicChat(entry, t("ui.topic_chat_too_big"), live, true, "done", true, true);
         return;
       }
       const lines = allowed.length
         ? await this.applyMapChatActions(
-            { ...result, message: text },
+            { ...result, message: [text, ...steers.delivered()].join("\n\n") },
             request.context,
             () => live() && !controller.signal.aborted,
             { path: this.path, id: map.id },
@@ -17128,9 +17300,12 @@ export class VisualAgentMapView extends ItemView {
     live: () => boolean,
     notice: boolean,
     status: TopicRecordStatus,
-    markdown = false
+    markdown = false,
+    plan = false
   ): void {
-    entry.session.running = false;
+    // With additions the entry stays running over the gap until they are settled (`endTopicChatSteers` frees it).
+    if (!this.holdsTopicSteers(entry)) entry.session.running = false;
+    entry.steerEnd = { status, plan };
     const turnId = entry.runningTurnId;
     entry.runningTurnId = null;
     // Late-result fence: a view that closed or moved to another map writes nothing (its next open says the result is unknown).
@@ -20345,6 +20520,7 @@ export class VisualAgentMapView extends ItemView {
       runOnce: options?.runOnce,
       signal: options?.signal,
       outputLanguage: options?.outputLanguage,
+      steer: options?.steer,
       prepare: async note => {
         if (!children.length && !selectedSources.some(group => group.documents.length))
           return t("ui.choose_another_note_source_first");
@@ -20499,7 +20675,8 @@ export class VisualAgentMapView extends ItemView {
     const abortBeforeAcceptance = (): void => controller.abort();
     if (modalSignal?.aborted) controller.abort();
     else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    const stored = { ...options, signal: undefined, onProgress: undefined };
+    // `steer` belongs to this run only: a task kept for the next step must not carry it (and the next step brings its own).
+    const stored = { ...options, signal: undefined, onProgress: undefined, steer: undefined };
     const task: NonNullable<ReturnType<VisualAgentMapView["synthesisTasks"]["get"]>> =
       step === "draft" &&
       existing?.directions.length &&
@@ -20529,6 +20706,7 @@ export class VisualAgentMapView extends ItemView {
         : options),
       // The model of this step is the dialog's choice now, not the one the first step was started with.
       runOnce: options.runOnce,
+      steer: options.steer,
       signal: controller.signal,
       onProgress: message => {
         task.progress = message;
@@ -26182,7 +26360,12 @@ export class VisualAgentMapView extends ItemView {
    * written without a research (`research-mode: local`, no task text). Like the dialog's run, the card shows running and Stop
    * while the outline is generated.
    */
-  private async chatExpand(parent: MapNode, direction: string, signal?: AbortSignal): Promise<ChatExpandOutcome> {
+  private async chatExpand(
+    parent: MapNode,
+    direction: string,
+    signal?: AbortSignal,
+    steer?: ResearchSteer
+  ): Promise<ChatExpandOutcome> {
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
       new Notice(t("ui.ai_running_ai"));
       return { status: "failed", reason: t("ui.ai_running_ai") };
@@ -26217,7 +26400,8 @@ export class VisualAgentMapView extends ItemView {
           ),
           limits
         },
-        controller.signal
+        controller.signal,
+        steer
       );
       if (controller.signal.aborted || this.closed) return { status: "stopped" };
       const { nodes } = limitOutline(generated, limits);
@@ -26680,6 +26864,44 @@ export class VisualAgentMapView extends ItemView {
       this.enqueue(() => this.resizeCard(node.id, change));
     });
   }
+  /**
+   * The map edit for one dropped card. Built here, not inside enableDrag: the undo history keeps every edit, and a closure made
+   * inside the drag shares its scope (the card, the edge helpers) and would keep all of that off-screen after each drop.
+   */
+  private cardDropEdit(
+    nodeId: string,
+    position: { x: number; y: number },
+    centerX: number
+  ): (map: MapDocument) => void {
+    return map => {
+      const current = map.nodes.find(n => n.id === nodeId);
+      if (!current) return;
+      // A first-level topic dragged in a timeline map is a change of order: re-order, then lay the map out again.
+      const root = current.parentId ? map.nodes.find(n => n.id === current.parentId) : undefined;
+      if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId && !current.afterTextId) {
+        map.nodes = reorderTopLevel(map.nodes, root.id, current.id, centerX);
+        this.arrangeAll(map);
+        return;
+      }
+      this.placeDroppedCard(map, current, position);
+    };
+  }
+  /** The map edit for a dropped group of cards (one undo step); built outside enableDrag for the reason of cardDropEdit. */
+  private groupDropEdit(
+    origins: Map<string, { x: number; y: number }>,
+    dx: number,
+    dy: number
+  ): (map: MapDocument) => void {
+    const from = new Map(origins);
+    return map => {
+      for (const [id, origin] of from) {
+        const current = map.nodes.find(n => n.id === id);
+        if (!current) continue;
+        current.x = Math.round(origin.x + dx);
+        current.y = Math.round(origin.y + dy);
+      }
+    };
+  }
   private enableDrag(
     card: HTMLElement,
     node: MapNode,
@@ -26916,16 +27138,8 @@ export class VisualAgentMapView extends ItemView {
           placeGroup(delta.x, delta.y);
           const { x: dx, y: dy } = delta;
           // One change for the whole group, so one undo puts every card back.
-          this.enqueueDrop(() =>
-            this.mapChange(map => {
-              for (const [id, from] of groupOrigins) {
-                const current = map.nodes.find(n => n.id === id);
-                if (!current) continue;
-                current.x = Math.round(from.x + dx);
-                current.y = Math.round(from.y + dy);
-              }
-            })
-          );
+          const edit = this.groupDropEdit(groupOrigins, dx, dy);
+          this.enqueueDrop(() => this.mapChange(edit));
           return;
         }
         if (moved && locked) {
@@ -26939,27 +27153,8 @@ export class VisualAgentMapView extends ItemView {
             this.enqueue(() => this.moveBranches([dragged], landed.node, false));
         } else if (moved) {
           paint();
-          this.enqueueDrop(() =>
-            this.mapChange(map => {
-              const current = map.nodes.find(n => n.id === node.id);
-              if (!current) return;
-              // A first-level topic dragged in a timeline map is a change of order: re-order, then lay the map out again.
-              const root = current.parentId ? map.nodes.find(n => n.id === current.parentId) : undefined;
-              if (
-                !map.aim &&
-                layoutOf(map).direction === "timeline" &&
-                root &&
-                !root.parentId &&
-                !current.afterTextId
-              ) {
-                const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
-                map.nodes = reordered;
-                this.arrangeAll(map);
-                return;
-              }
-              this.placeDroppedCard(map, current, position);
-            })
-          );
+          const edit = this.cardDropEdit(node.id, { ...position }, position.x + card.offsetWidth / 2);
+          this.enqueueDrop(() => this.mapChange(edit));
         } else if (e.metaKey || e.ctrlKey) {
           // "Click A, then Cmd+click B" selects both; two or more picked cards is topic selection (the module decides).
           this.applySelectionChange(this.selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
@@ -28024,10 +28219,12 @@ export class VisualAgentMapView extends ItemView {
     failed?: (message: string) => void,
     request?: Partial<TaskContext> & { runStyle?: RunStyle },
     onLaunchAccepted?: () => void,
-    runOnce?: RunOnceModel
+    runOnce?: RunOnceModel,
+    steer?: ResearchSteer
   ): Promise<AgentTaskHandle | null> {
     return this.plugin.topicRuns.start(node.path, "research", {
       ...this.writebackHooks(),
+      ...(steer ? { steer } : {}),
       origin: this,
       map: this.map ?? undefined,
       usageMapPath: this.path || undefined,

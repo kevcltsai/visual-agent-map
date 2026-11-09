@@ -8,7 +8,13 @@ import { noteLanguageOf, t, type ContentLanguage, type NoteLanguage, type UiLang
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import type { DetailTemplate } from "../../ai/detail-templates";
 import type { ReferenceGroup } from "../../ai/reference-materials";
-import type { ResearchObserver, ResearchPreviewFields, ResearchStageName } from "../../ai/research-observer";
+import {
+  steerObserver,
+  type ResearchObserver,
+  type ResearchPreviewFields,
+  type ResearchStageName,
+  type ResearchSteer
+} from "../../ai/research-observer";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
 import { checkCounts, standardTemplate } from "../../ai/detail-templates";
 import { carryForwardSources } from "../../core/steps/task/carry-sources";
@@ -199,6 +205,8 @@ export interface ResearchStart extends WritebackHooks {
   onWritten?: (change: { before: Note; after: Note }) => void;
   /** Queues the background chart step for the note that was just written. */
   queueCharts?: (job: QueuedCharts) => void;
+  /** Takes user additions while the main call runs (the topic chat window). Absent: the run is exactly as before. */
+  steer?: ResearchSteer;
 }
 
 /** What a child-topic proposal run needs from the entry that starts it (the view). */
@@ -290,6 +298,8 @@ export interface IntegrateChildrenStart extends WritebackHooks {
   notify?: (message: string) => void;
   /** Runs after the topic was freed, before the run settles (the view reloads and redraws). */
   onSettled?: () => Promise<void>;
+  /** Takes user additions while the main call runs. Absent: the run is exactly as before. */
+  steer?: ResearchSteer;
 }
 
 /**
@@ -757,7 +767,8 @@ export class TopicRuns {
         undefined,
         options.accepted,
         undefined,
-        progress.observer
+        // No progress entry, no observer: one is not made up for the steer, it would change the stream mode.
+        steerObserver(progress.observer, options.steer)
       );
       // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
       progress.end();
@@ -1250,7 +1261,7 @@ export class TopicRuns {
         },
         markAccepted,
         undefined,
-        observer
+        steerObserver(observer, options.steer)
       )
       .then(result =>
         this.ports.mutate()(async () => {
@@ -1362,19 +1373,6 @@ export class TopicRuns {
             template: writeContext.detailTemplate,
             ...(mode === "top" ? this.chartGuard(mode, composed.record) : {})
           });
-          if (result.suggestions.length) {
-            this.pendingSuggestions.set(
-              path,
-              result.suggestions
-                .slice(0, 7)
-                .map(item => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
-            );
-            try {
-              await (this.pendingSuggestions as { flush?: () => Promise<void> }).flush?.();
-            } catch (error) {
-              options.notify?.(this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
-            }
-          }
           options.done?.(result);
         })
       )

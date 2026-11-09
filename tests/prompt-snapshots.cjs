@@ -363,6 +363,9 @@ test('collect snapshots: Coffee Tables, Reframe, Markdown context', async () => 
   // The steer template is English for every UI language (like Coffee Tables' steering lines).
   const { renderMapChatSteer } = support.load('core/steps/map-chat/step.ts', { obsidian: support.obsidian });
   record('map-chat-steer.en', 'core/steps/map-chat/step.ts renderMapChatSteer', 'en', renderMapChatSteer('Also rename the child topic'));
+  // The neutral steer of research, expansion and topic chat: no output field is named, the format is the original request's.
+  const { renderTaskSteer } = support.load('core/steps/task-steer/steer.ts', { obsidian: support.obsidian });
+  record('task-steer.en', 'core/steps/task-steer/steer.ts renderTaskSteer', 'en', renderTaskSteer('Also compare it with last year'));
   for (const [language, tag] of LANGUAGES) {
     record(`outline-generate.${tag}`, 'core/outline-generation-service.ts buildOutlineGeneratePrompt (preset with topic placeholder)', language, buildOutlineGeneratePrompt({ language, topic: 'Topic under study', presetText: 'Build a knowledge tree for {填入研究主題} in three levels.', model: 'm', reasoning: 'low' }));
     record(`outline-generate-appended.${tag}`, 'core/outline-generation-service.ts buildOutlineGeneratePrompt (preset without placeholder)', language, buildOutlineGeneratePrompt({ language, topic: 'Topic under study', presetText: 'Build a knowledge tree in three levels.', model: 'm', reasoning: 'low' }));

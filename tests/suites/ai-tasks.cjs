@@ -264,7 +264,7 @@ integrationTest('provider failure keeps its original AI log stage during node er
   assert.equal((await repo.readNote(n.path)).status, 'error');
   assert.equal(entry.error, '等待 AI 回覆：provider timeout');
 });
-integrationTest('proposal persistence failure does not erase completed shallow research', async () => {
+integrationTest('shallow research with reply suggestions never touches the pending store, even one that would fail, and completes', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Research result');
   await repo.updateNote(n.path, { prompt: 'Research' });
   const pending = new Map(); pending.flush = async () => { throw new Error('disk unavailable'); };
@@ -277,7 +277,7 @@ integrationTest('proposal persistence failure does not erase completed shallow r
   await startResearch(plugin, n, { map: view.map }); await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal((await repo.readNote(n.path)).status, 'completed');
   assert.equal((await repo.readNote(n.path)).summary, 'Researched');
-  assert.equal(exchangeStatus, 'completed'); assert.equal(reported, 'disk unavailable');
+  assert.equal(exchangeStatus, 'completed'); assert.equal(reported, ''); assert.equal(pending.has(n.path), false);
 });
 integrationTest('a completed but stale answer cannot overwrite an edited note', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Stale');
@@ -597,7 +597,7 @@ function observedHarness({ attempts, logging = true } = {}) {
   const context = { title: 'Synthetic topic', summary: '', rules: '', detail: '', task: 'Research the synthetic topic', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' };
   const ask = (signal, accepted) => service.askModel(context, 'claude:sonnet', 'low', signal, undefined, accepted, undefined, observer);
   const waitFor = async predicate => { for (let i = 0; i < 200 && !predicate(); i++) await new Promise(resolve => setImmediate(resolve)); assert.ok(predicate(), 'condition reached'); };
-  return { clock, calls, events, entries, observer, ask, answer, waitFor };
+  return { clock, calls, events, entries, observer, ask, answer, waitFor, service, context };
 }
 const abortOn = (signal, ignore = false) => new Promise((resolve, reject) => { if (!ignore) signal.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }))); });
 
@@ -728,6 +728,134 @@ test('S3: there is no automatic re-send and only the main call is observed', asy
   const plain = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => { throw new Error('x'); }, claudeRuntime: () => ({ runTask: async (_p, _m, _e, _s, c) => { controls = c; return h.answer; } }) });
   await plain.askModel({ title: 'T', summary: '', rules: '', detail: '', task: 'Research', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' }, 'claude:sonnet', 'low');
   assert.equal(controls.stream, undefined);
+});
+
+// ---- Topic chat steer: user additions into a running request (P1 plumbing) ----------------------------------------------------
+const steerReply = () => JSON.stringify({ summary: 'Synthetic summary', detail: 'Synthetic detail', suggestions: [], visualReferences: [] });
+function steerFake() {
+  const log = [];
+  return { log, last: null, bind(send) { log.push(['bind', send ? 'fn' : null]); if (send) this.last = send; }, live(on) { log.push(['live', on]); } };
+}
+
+test('steer: an attempt the user replaced takes no addition and nothing reaches its process', async () => {
+  const { renderTaskSteer } = load('core/steps/task-steer/steer.ts', { obsidian });
+  const written = [];
+  const senders = new Map();
+  const h = observedHarness({ attempts: call => {
+    call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted();
+    call.controls.onSteer?.(async text => { written.push([call.number, text]); });
+    if (call.number === 1) return abortOn(call.controls.signal);
+    return Promise.resolve(h.answer);
+  } });
+  const offers = [];
+  h.observer.onSteer = (id, send) => { offers.push(id); senders.set(h.calls.length, send); };
+  const done = h.ask();
+  await h.waitFor(() => h.calls.length === 1);
+  await senders.get(1)('first');
+  assert.deepEqual(written, [[1, renderTaskSteer('first')]], 'a live attempt writes the wrapped text');
+  h.clock.advance(20_000); h.observer.resend();
+  await done;
+  assert.equal(h.calls.length, 2);
+  await assert.rejects(senders.get(1)('late'), error => error.name === 'AbortError');
+  assert.deepEqual(written.map(entry => entry[0]), [1], 'the replaced attempt wrote nothing more');
+  await senders.get(2)('again');
+  assert.deepEqual(written.map(entry => entry[0]), [1, 2]);
+  // A hook the old attempt calls after the replacement is not offered to the observer.
+  const offered = offers.length;
+  h.calls[0].controls.onSteer(async () => {});
+  assert.equal(offers.length, offered);
+});
+
+test('steer: every new attempt binds again through steerObserver, and a json run is marked not live', async () => {
+  const { steerObserver } = load('ai/research-observer.ts');
+  const fake = steerFake();
+  const written = [];
+  const h = observedHarness({ attempts: call => {
+    call.controls.onStreamMode?.('stream-json'); call.controls.onAccepted();
+    call.controls.onSteer?.(async text => { written.push([call.number, text]); });
+    return call.number === 1 ? abortOn(call.controls.signal) : Promise.resolve(h.answer);
+  } });
+  const base = h.observer;
+  const wrapped = steerObserver(base, fake);
+  const done = h.service.askModel(h.context, 'claude:sonnet', 'low', undefined, undefined, undefined, undefined, wrapped);
+  await h.waitFor(() => fake.log.some(e => e[0] === 'bind' && e[1]));
+  await fake.last('one');
+  h.clock.advance(20_000); base.resend();
+  await done;
+  assert.deepEqual(fake.log, [['bind', null], ['bind', 'fn'], ['bind', null], ['bind', 'fn']], 'each attempt clears, then binds its own handler');
+  await fake.last('two');
+  assert.deepEqual(written.map(entry => entry[0]), [1, 2], 'one addition per attempt, each to its own process');
+  assert.ok(!fake.log.some(e => e[0] === 'live'), 'stream-json stays live');
+  // json mode: the steer hook is never offered by the runtime, and the run is marked not live.
+  const json = steerFake();
+  const jsonObserver = steerObserver({}, json);
+  jsonObserver.onAttempt('a1', 1); jsonObserver.onStreamMode('a1', 'json');
+  jsonObserver.onAttempt('a2', 2); jsonObserver.onStreamMode('a1', 'json-fallback');
+  assert.deepEqual(json.log, [['bind', null], ['live', false], ['bind', null]], 'only the current attempt decides');
+});
+
+test('steer: no onSteer on the observer means no onSteer control; count repair and chart never carry one', async () => {
+  const { AiTaskService } = load('core/ai-task-service.ts');
+  const seen = [];
+  const reply = steerReply();
+  const make = () => new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, diagramsEnabled: () => true,
+    codexRuntime: () => { throw new Error('x'); }, claudeRuntime: () => ({ runTask: async (prompt, _m, _e, _s, controls) => { seen.push({ prompt, controls }); controls.onStreamMode?.('stream-json'); controls.onAccepted?.(); return reply; } }) });
+  const context = { title: 'T', summary: '', rules: '', detail: '', task: 'Research', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' };
+  const events = [];
+  const withSteer = { onAttempt: () => events.push('attempt'), onSteer: () => events.push('steer'), onStreamMode: (id, mode) => events.push(mode) };
+  await make().askModel(context, 'claude:sonnet', 'low', undefined, undefined, undefined, undefined, { onAttempt: () => {} });
+  assert.equal(seen.at(-1).controls.onSteer, undefined, 'an observer without onSteer leaves the request as it was');
+  await make().askModel(context, 'claude:sonnet', 'low', undefined, undefined, undefined, undefined, withSteer);
+  assert.equal(typeof seen.at(-1).controls.onSteer, 'function', 'an observer with onSteer opens the hook');
+  seen.at(-1).controls.onSteer(async () => {});
+  assert.deepEqual(events, ['attempt', 'stream-json', 'steer']);
+  // Count repair is a plain call even when an observer is given.
+  seen.length = 0; events.length = 0;
+  await make().askModel({ ...context, countRepair: true }, 'claude:sonnet', 'low', undefined, undefined, undefined, undefined, withSteer);
+  assert.equal(seen.length, 1); assert.equal(seen[0].controls.onSteer, undefined); assert.equal(seen[0].controls.stream, undefined); assert.deepEqual(events, []);
+  // The chart step has no observer at all.
+  seen.length = 0;
+  await make().addDiagramsToDetail({ title: 'T', detail: '### Core\n\nText', language: 'en', model: 'claude:sonnet' }).catch(() => undefined);
+  assert.ok(seen.length >= 1, 'the chart call ran'); assert.equal(seen[0].controls.onSteer, undefined); assert.equal(seen[0].controls.stream, undefined);
+});
+
+test('steer: outline generation on Codex binds per attempt and renders the neutral template; on Claude it is marked not live', async () => {
+  const { OutlineGenerationService } = load('core/outline-generation-service.ts', { obsidian });
+  const { renderTaskSteer } = load('core/steps/task-steer/steer.ts', { obsidian });
+  const good = '# Root\n> About root.\n## A\n> About A.\n';
+  const bad = '# Root\n## A\n> About A.\n';
+  const request = model => ({ topic: 'Sleep', presetText: 'Make a tree for {research topic}.', language: 'en', model, reasoning: 'low' });
+  const makeSteer = () => { const log = []; return { log, handler: null, bind(send) { log.push(['bind', send ? 'fn' : null]); this.handler = send; }, live(on) { log.push(['live', on]); } }; };
+  // Codex: attempt 1 has a heading without a summary, so a second call follows; each call binds its own handler.
+  const codex = makeSteer(); const sent = []; const hooksSeen = [];
+  let call = 0, firstHandler;
+  const run = async (_request, _signal, _prepared, _json, hooks) => {
+    call++; hooksSeen.push(hooks);
+    hooks.onSteer(async text => { sent.push([call, text]); });
+    if (call === 1) { firstHandler = codex.handler; await codex.handler('during one'); return bad; }
+    await assert.rejects(firstHandler('late from one'), error => error.name === 'OutlineGenerateError' && error.code === 'stopped');
+    await codex.handler('during two');
+    return good;
+  };
+  const result = await new OutlineGenerationService(run).generate(request('gpt-6-luna'), new AbortController().signal, codex);
+  assert.equal(result.nodes.length, 2);
+  assert.deepEqual(codex.log, [['bind', null], ['bind', 'fn'], ['bind', null], ['bind', 'fn']], 'the retry binds again');
+  assert.deepEqual(sent, [[1, renderTaskSteer('during one')], [2, renderTaskSteer('during two')]], 'each attempt took its own addition once');
+  // A hook that fires late from attempt 1 does not bind over attempt 2, and its handler no longer sends.
+  const staleLog = codex.log.length; hooksSeen[0].onSteer(async () => { sent.push(['stale']); });
+  assert.equal(codex.log.length, staleLog); assert.equal(sent.length, 2);
+  // A stopped call: the handler throws and sends nothing.
+  const stop = new AbortController(); const stopped = makeSteer(); let handler;
+  await assert.rejects(new OutlineGenerationService(async (_r, signal, _p, _j, hooks) => { hooks.onSteer(async text => { sent.push(['after stop', text]); }); handler = stopped.handler; stop.abort(); await assert.rejects(handler('x')); throw new Error('stopped'); }).generate(request('gpt-6-luna'), stop.signal, stopped));
+  assert.ok(!sent.some(entry => entry[0] === 'after stop'));
+  // Claude: live(false) once, no hook, no bind.
+  const claude = makeSteer(); let claudeHooks = 'unset';
+  await new OutlineGenerationService(async (_r, _s, _p, _j, hooks) => { claudeHooks = hooks; return good; }).generate(request('claude:sonnet'), new AbortController().signal, claude);
+  assert.deepEqual(claude.log, [['live', false]]); assert.equal(claudeHooks, undefined);
+  // No steer: the runner gets no hooks at all (nothing changes for the other callers).
+  let plainHooks = 'unset';
+  await new OutlineGenerationService(async (_r, _s, _p, _j, hooks) => { plainHooks = hooks; return good; }).generate(request('gpt-6-luna'), new AbortController().signal);
+  assert.equal(plainHooks, undefined);
 });
 
 // ---- AI mode Quick / Standard (D-2026-10-228..233, 239..248) --------------------------------------------------------

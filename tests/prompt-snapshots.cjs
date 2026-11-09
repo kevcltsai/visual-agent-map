@@ -428,6 +428,24 @@ test('collect snapshots: chart step (chart.add@1)', () => {
     const detail = language === 'en' ? 'Larvae hatch in 3 days.\n\n```mermaid\nflowchart TD\nA["Egg"] --> B["Larva"]\n```\n\nThe pupa stage lasts 5 days.' : '幼蟲 3 天孵化。\n\n```mermaid\nflowchart TD\nA["卵"] --> B["幼蟲"]\n```\n\n蛹期持續 5 天。';
     record(`chart.add.${tag}`, 'core/steps/chart/step.ts chartStep (one existing diagram, two remaining)', language, chartStep.render({ title: 'Topic T', detail, language, existingCount: 1, existingTypes: ['flowchart'], remaining: 2 }), chartStep.schema);
   }
+  // Argument map (hypothesis research): the five steps that never browse. Fixed inputs; no existing snapshot is touched.
+  const argumentSteps = support.load('core/steps/argument-map/runner.ts', { obsidian: support.obsidian });
+  const argumentDatum = (id, stance) => ({ id, need: `Need of ${id}`, claim: `Claim of ${id}`, quote: `Quote of ${id} reports 9.2 percent`, url: `https://stats.example.org/${id}`, stance });
+  const argumentEvidence = (id, stance) => ({ id, claim: `Claim of ${id}`, quote: `Quote of ${id} reports 9.2 percent`, url: `https://example.org/${id}`, stance });
+  const argumentBase = { model: 'm', reasoning: 'low' };
+  const argumentProposition = 'Youth unemployment rose';
+  const argumentData = [argumentDatum('d1', 'supports'), argumentDatum('d2', 'opposes')];
+  for (const [language, tag] of LANGUAGES) {
+    const request = { ...argumentBase, language, proposition: argumentProposition };
+    const steps = [
+      ['situation-gate', 'situationGateStep', { ...request, data: argumentData }],
+      ['hypotheses', 'hypothesesStep', { ...request, data: argumentData, count: 3, existing: ['Earlier hypothesis title'] }],
+      ['needs', 'needsStep', { ...request, hypothesis: { title: 'Hiring slowed', statement: 'Firms hired fewer juniors', round: 1 }, data: [argumentData[0]], existing: [{ text: 'Monthly junior hiring counts', state: 'found' }], max: 2 }],
+      ['verdict', 'verdictStep', { ...argumentBase, language, hypothesis: 'Firms hired fewer juniors', input: { hypothesisId: 'h1', round: 1, evidence: [argumentEvidence('n1', 'supports'), argumentEvidence('n2', 'uncertain')] } }],
+      ['conclusion', 'conclusionStep', { ...request, input: { hypotheses: [{ id: 'h1', round: 1, evidence: [argumentEvidence('n1', 'supports')] }, { id: 'h2', round: 1, evidence: [argumentEvidence('n2', 'supports')] }, { id: 'h3', round: 2, evidence: [argumentEvidence('n3', 'supports')] }] }, statements: { h1: 'Hiring slowed', h2: 'Entry jobs automated', h3: 'Wages stalled' } }]
+    ];
+    for (const [name, key, input] of steps) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'situation-gate' ? 'gate' : name}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
+  }
   for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);
 });
 

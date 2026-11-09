@@ -856,6 +856,81 @@
       "language": "zh-CN",
       "schema": true
     },
+    "argument-map-conclusion.en": {
+      "builder": "core/steps/argument-map/conclusion.ts conclusionStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-conclusion.zh": {
+      "builder": "core/steps/argument-map/conclusion.ts conclusionStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-conclusion.zh-CN": {
+      "builder": "core/steps/argument-map/conclusion.ts conclusionStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-hypotheses.en": {
+      "builder": "core/steps/argument-map/hypotheses.ts hypothesesStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-hypotheses.zh": {
+      "builder": "core/steps/argument-map/hypotheses.ts hypothesesStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-hypotheses.zh-CN": {
+      "builder": "core/steps/argument-map/hypotheses.ts hypothesesStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-needs.en": {
+      "builder": "core/steps/argument-map/needs.ts needsStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-needs.zh": {
+      "builder": "core/steps/argument-map/needs.ts needsStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-needs.zh-CN": {
+      "builder": "core/steps/argument-map/needs.ts needsStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-situation-gate.en": {
+      "builder": "core/steps/argument-map/gate.ts situationGateStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-situation-gate.zh": {
+      "builder": "core/steps/argument-map/gate.ts situationGateStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-situation-gate.zh-CN": {
+      "builder": "core/steps/argument-map/gate.ts situationGateStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-verdict.en": {
+      "builder": "core/steps/argument-map/verdict.ts verdictStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-verdict.zh": {
+      "builder": "core/steps/argument-map/verdict.ts verdictStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-verdict.zh-CN": {
+      "builder": "core/steps/argument-map/verdict.ts verdictStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "chart.add-none.en": {
       "builder": "core/steps/chart/step.ts chartStep (no existing diagram)",
       "language": "en",

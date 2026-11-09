@@ -98,7 +98,7 @@ test('oversize page (> 2 MB) is not parsed', async () => {
 test('rejected URLs never reach fetch (0 calls) and are not_found even if the tool log lists them', async () => {
   const bad = [
     'file:///etc/passwd', 'ftp://example.org/a', 'javascript:alert(1)', 'data:text/html,hi', 'not a url', '',
-    'http://localhost/a', 'http://localhost:8080/', 'http://LOCALHOST./', 'http://api.localhost/', 'http://printer.local/', 'http://nas.local./',
+    'http://localhost/a', 'http://localhost:8080/', 'http://LOCALHOST./', 'http://api.localhost/', 'http://printer.local/', 'http://nas.local./', 'http://localhost.localdomain/', 'http://box.localdomain/', 'http://1.0.0.127.in-addr.arpa/', 'http://x.ip6.arpa/', 'http://arpa/',
     'http://127.0.0.1/', 'http://127.1/', 'http://2130706433/', 'http://0x7f000001/', 'http://10.0.0.5/', 'http://172.16.0.1/', 'http://172.31.255.255/',
     'http://192.168.1.1/', 'http://169.254.169.254/latest/meta-data', 'http://100.64.0.1/', 'http://0.0.0.0/', 'http://224.0.0.1/',
     'http://[::1]/', 'http://[::]/', 'http://[fc00::1]/', 'http://[fd12:3456::1]/', 'http://[fe80::1]/', 'http://[::ffff:127.0.0.1]/', 'http://[::ffff:10.0.0.1]/',
@@ -146,7 +146,7 @@ test('hardening: public lookalikes stay allowed (embedded public IPv4, similar s
 
 test('hardening: a final url that is not allowed or has another host fails closed, even when the tool log lists the page', async () => {
   const opened = ['https://stats.example.org/report'];
-  for (const final of ['http://169.254.169.254/latest', 'http://localhost/x', 'http://nas.lan/x', 'https://other.example.net/report', 'https://stats.example.org:8443/report', 'file:///etc/passwd', 'not a url', 'http://intranet/']) {
+  for (const final of ['http://169.254.169.254/latest', 'http://localhost/x', 'http://nas.lan/x', 'https://other.example.net/report', 'https://stats.example.org:8443/report', 'file:///etc/passwd', 'not a url', 'http://intranet/', 'http://stats.example.org/report', 'http://localhost.localdomain/x']) {
     const { run } = make(reply(200, PAGE, 'text/html', { url: final }));
     notFound(await run({ openedUrls: opened }), 'rejected_url');
   }

@@ -74,7 +74,18 @@ function ipv4Blocked(a: number, b: number): boolean {
   );
 }
 
-const PRIVATE_SUFFIXES = [".localhost", ".local", ".internal", ".intranet", ".lan", ".home", ".home.arpa", ".corp"];
+const PRIVATE_SUFFIXES = [
+  ".localhost",
+  ".local",
+  ".internal",
+  ".intranet",
+  ".lan",
+  ".home",
+  ".home.arpa",
+  ".corp",
+  ".localdomain",
+  ".arpa"
+];
 
 /** The eight 16-bit groups of a normalized IPv6 literal (as `URL` prints it, so no dotted tail), or null when malformed. */
 function ipv6Groups(literal: string): number[] | null {
@@ -124,7 +135,7 @@ export function allowedUrl(raw: string): URL | null {
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
   if (url.username || url.password) return null;
   const host = url.hostname.toLowerCase().replace(/\.$/, "");
-  if (!host || host === "localhost" || host === "home.arpa") return null;
+  if (!host || host === "localhost" || host === "home.arpa" || host === "arpa" || host === "localdomain") return null;
   if (PRIVATE_SUFFIXES.some(suffix => host.endsWith(suffix))) return null;
   if (host.startsWith("[")) return ipv6Blocked(host.slice(1, -1)) ? null : url;
   if (!host.includes(".")) return null;
@@ -239,7 +250,11 @@ export async function verifySource(input: VerifySourceInput): Promise<SourceChec
   // A redirect that left the requested host, or landed anywhere not allowed, is not the page that was asked for: fail closed.
   if (typeof response.url === "string" && response.url) {
     const final = allowedUrl(response.url);
-    if (!final || final.host.toLowerCase().replace(/\.$/, "") !== requested.host.toLowerCase().replace(/\.$/, ""))
+    if (
+      !final ||
+      final.protocol !== requested.protocol ||
+      final.host.toLowerCase().replace(/\.$/, "") !== requested.host.toLowerCase().replace(/\.$/, "")
+    )
       return fail("rejected_url");
   }
   const { status } = response;

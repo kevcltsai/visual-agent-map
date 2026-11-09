@@ -1302,10 +1302,11 @@ async function pointing() {
   Object.assign(h.page.doc, { addEventListener() {}, removeEventListener() {} });
   h.view.labelCard = () => {}; // display-only text; the fake DOM has no textContent setter
   for (const key of ['a', 'b']) h.view.renderNode(h.node(key));
-  const press = (key, { dx = 0, target, ...mods } = {}) => {
+  const press = (key, { dx = 0, target, clickOnly, ...mods } = {}) => {
     const card = h.view.cardEls.get(h.ids[key]);
     Object.assign(card, { setPointerCapture() {}, releasePointerCapture() {}, hasPointerCapture: () => false });
     const at = withClosest(target ?? card);
+    if (clickOnly) { card.fire('click', { target: at, ...mods }); return; } // a press on a field or button ends at pointerdown, only the click reaches the card
     card.fire('pointerdown', { target: at, button: 0, clientX: 10, clientY: 10, ...mods });
     if (dx) card.fire('pointermove', { target: at, button: 0, buttons: 1, clientX: 10 + dx, clientY: 10, ...mods });
     card.fire('pointerup', { target: at, button: 0, clientX: 10 + dx, clientY: 10, ...mods });
@@ -1318,9 +1319,10 @@ integrationTest('topic chat switch (real pointer path): a single press on anothe
   h.view.openTopicChat(h.node('a'));
   press('b');
   assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.b); assert.equal(edits.length, 0);
-  press('a'); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'a selected card elsewhere also switches');
-  press('a'); press('b'); press('b');
-  assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.b, 'an already selected card switches too');
+  press('a'); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'back to a');
+  h.view.selectMapNode(h.node('b')); assert.equal(h.view.selection.state.selected, h.ids.b, 'b is selected while the window is on a');
+  const before = edits.length; press('b');
+  assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.b, 'an already selected card switches too'); assert.equal(edits.length, before, 'no editor');
   const win = h.win(); const seen = edits.length; press('b'); assert.equal(h.win(), win, 'same card: same window'); assert.equal(edits.length, seen + 1, 'editor opens when nothing switched');
 });
 integrationTest('topic chat switch (real pointer path): window closed, drag, Cmd/Ctrl and editor fields do not switch', async () => {
@@ -1329,8 +1331,9 @@ integrationTest('topic chat switch (real pointer path): window closed, drag, Cmd
   h.view.openTopicChat(h.node('a'));
   const seen = edits.length; press('b', { dx: 60 }); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'drag'); assert.equal(edits.length, seen, 'a drag is not a click');
   press('b', { metaKey: true }); press('b', { ctrlKey: true }); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, 'Cmd/Ctrl');
-  for (const tag of ['input', 'textarea', 'button']) {
-    const field = element(tag); h.view.cardEls.get(h.ids.b).appendChild?.(field); field.parent = h.view.cardEls.get(h.ids.b); withClosest(field);
-    press('b', { target: field }); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, tag);
+  for (const [tag, cls] of [['input', 'vam-card-title-input'], ['textarea', 'vam-card-summary-input'], ['button', '']]) {
+    const field = element(tag, { cls }); h.view.cardEls.get(h.ids.b).appendChild?.(field); field.parent = h.view.cardEls.get(h.ids.b); withClosest(field);
+    h.view.suppressClickUntil = 0;
+    press('b', { target: field, clickOnly: true }); assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a, cls || tag); if (tag !== 'button') assert.equal(edits.at(-1)?.[0].target, field, 'the real editor gets the field as target and ignores it');
   }
 });

@@ -151,7 +151,7 @@ export function mermaidSyntaxCheck(load: () => Promise<unknown>): MermaidSyntaxC
       const engine = (await load()) as { parse?: unknown } | null | undefined;
       if (!engine || typeof engine.parse !== "function") return "unavailable";
       const method = engine.parse as (this: unknown, text: string) => Promise<unknown>;
-      parse = async text => (await method.call(engine, text)) as unknown;
+      parse = async (text): Promise<unknown> => await method.call(engine, text);
     } catch {
       return "unavailable";
     }

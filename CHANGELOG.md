@@ -2,7 +2,46 @@
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-11-09
+
+### Chat with one topic
+
+Every topic now has its own small chat window: open it from the sparkle button on the card and ask "what is still missing here?", or press Research, Expand or Synthesize.
+
+- Typed requests can change this topic and its subtopics; anything outside it is skipped.
+- Pick Quick or Standard from the window's AI mode menu.
+- The conversation is saved and stays with the map, even after you rename it.
+
+### Add more while the AI is working
+
+While a topic chat is running, type one more instruction, for example "focus on costs". The AI reads it midway when it can; otherwise it sends right after the reply ends.
+
+- Each addition is marked as added midway or waiting for the reply to end.
+
+### Quicker map editing
+
+Press Space on a focused card to fold or unfold it.
+
+- Card actions are now icons on the card, and Select and Data sources are icon buttons with a count.
+- Choosing a relation target or parent topic in the card dialog now has a search box that lists every match.
+
+### A tidier map chat
+
+The model menu now sits in the message box, and finished plans fold up so the conversation stays short.
+
+### Changed
+
+- The old explore dialog is gone; the topic chat replaces it. Selecting several topics still opens the synthesis dialog.
 - Research no longer creates new topic suggestions when it finishes. To add subtopics, use Expand.
+
+### Fixes
+
+- Error messages and empty-state text are clearer across the map, Coffee Tables show why a row cannot be read, and dragging a card can now target earlier cards.
+
+### Known issues
+
+- The Stop button on a card can sit under the topic chat window or the map chat panel. Move the window or fold the panel to reach it.
+- In a very narrow window the map gets squeezed while the sidebar is open. Collapse the sidebar.
 
 ## [0.32.0] - 2026-11-08
 

@@ -2,13 +2,29 @@
 // The `obsidian` CLI talks through a single per-user socket that the most recently launched instance takes over, so it
 // cannot address several test instances. Each harness-launched profile instead exposes its own DevTools port, which
 // Chromium records in <vault>/.vam-app/DevToolsActivePort. Nothing here focuses a window or touches the screen.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
 export const devToolsPortFile = vault => join(resolve(vault), ".vam-app", "DevToolsActivePort");
 
+const canonicalPath = path => { try { return realpathSync(path); } catch { return resolve(path); } };
+
+// Asks a window which vault it has open, changing nothing in it. Null when it is still loading or does not answer.
+function windowVaultPath(page, timeoutMs = 5000) {
+  return new Promise(answer => {
+    const socket = new WebSocket(page.webSocketDebuggerUrl);
+    const finish = path => { socket.close(); answer(typeof path === "string" ? canonicalPath(path) : null); };
+    delay(timeoutMs, undefined, { ref: false }).then(() => finish(null));
+    socket.onerror = () => finish(null);
+    socket.onopen = () => socket.send(JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression: "globalThis.app?.vault?.adapter?.basePath", returnByValue: true } }));
+    socket.onmessage = event => { const message = JSON.parse(event.data); if (message.id === 1) finish(message.result?.result?.value); };
+  });
+}
+
+// One Obsidian process can hold windows for several vaults, in any order, so only the window that has this vault open
+// qualifies. Throwing here is what keeps a command from ever reaching another vault.
 async function pageTarget(vault) {
   const file = devToolsPortFile(vault);
   if (!existsSync(file)) throw new Error(`No DevTools port for ${vault}. Launch it with the test harness (it adds --remote-debugging-port).`);
@@ -17,9 +33,13 @@ async function pageTarget(vault) {
   let targets;
   try { targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json(); }
   catch { throw new Error(`Obsidian for ${vault} is not answering on DevTools port ${port}; it may have quit.`); }
-  const page = targets.find(target => target.type === "page" && target.url.startsWith("app://obsidian.md/index.html"));
-  if (!page) throw new Error(`No Obsidian main window on DevTools port ${port}.`);
-  return page;
+  const pages = targets.filter(target => target.type === "page" && target.url.startsWith("app://obsidian.md/index.html"));
+  if (!pages.length) throw new Error(`No Obsidian main window on DevTools port ${port}.`);
+  const expected = canonicalPath(vault);
+  const open = await Promise.all(pages.map(page => windowVaultPath(page)));
+  const index = open.indexOf(expected);
+  if (index < 0) throw new Error(`No Obsidian window for ${expected} on DevTools port ${port}; nothing was run. Windows found: ${open.map(path => path ?? "(loading or not answering)").join(", ")}.`);
+  return pages[index];
 }
 
 // Waits until the instance answers and the vault's workspace has loaded.

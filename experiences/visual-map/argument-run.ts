@@ -653,7 +653,8 @@ export class ArgumentRuns {
     const result: VerdictResult = await this.ask(drive, ARGUMENT_STEPS.verdict, request);
     await this.checkpoint(drive, async (s, map) => ({
       next: applyVerdict(s, hypothesisId, result),
-      notes: () => this.noteDetail(map, hypothesisId, drive, `${this.t("ui.argument_reason")}: ${plainLine(result.reason)}`)
+      notes: () =>
+        this.noteDetail(map, hypothesisId, drive, `${this.t("ui.argument_reason")}: ${plainLine(result.reason)}`)
     }));
   }
 

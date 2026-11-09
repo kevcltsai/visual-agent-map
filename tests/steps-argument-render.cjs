@@ -93,7 +93,8 @@ test('renderNode and refreshCard: managed cards skip the summary, the add-summar
   assert.match(view, /!argumentView &&\n\s+textEditable &&/);
   assert.match(view, /if \(argumentView\) \{\n\s+summary\?\.remove\(\);\n\s+addLine\?\.remove\(\);/);
   assert.match(view, /if \(argumentView\) \{\n[^\n]*\n[^\n]*\n\s+renderArgumentKind\(header, argumentView\);/);
-  assert.equal(view.split('\n').filter(line => line.includes('drawEdges')).length, 11, 'no new drawEdges call sites');
+  // Baseline 11 on 4728cbcd; main's partial-repaint commit ffd32778 added one call site, this feature adds none.
+  assert.equal(view.split('\n').filter(line => line.includes('drawEdges')).length, 12, 'no new drawEdges call sites');
   assert.equal(view.split('\n').filter(line => line.includes('aiLockReason(')).length, 23);
 });
 

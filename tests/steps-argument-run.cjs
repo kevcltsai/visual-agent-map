@@ -13,7 +13,6 @@ const URL_OK = 'https://stats.example.org/report';
 const PAGE = `<html><body><p>${QUOTE}, the highest in a decade.</p></body></html>`;
 const STEP_NAME = { 'argument-map.plan-situation': 'plan_situation', 'argument-map.situation-gate': 'judge_gate', 'argument-map.hypotheses': 'propose_hypotheses', 'argument-map.verdict': 'verdict', 'argument-map.conclusion': 'conclude' };
 const stepName = (step, request) => (step.id === ARGUMENT_STEPS.add_needs.id ? (request.existing.length ? 'revise' : 'add_needs') : STEP_NAME[step.id]);
-const plain = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const defer = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const foundEntry = (id, over = {}) => ({ need: id, status: 'found', stance: 'supports', claim: 'Rate rose', quote: QUOTE, url: URL_OK, ...over });
@@ -33,7 +32,7 @@ async function rig(over = {}) {
     createNote: (input, map) => repo.createNote(input.title, 'model-a', map, mapPath, 'workspace', { summary: input.summary, detail: input.detail, topicKind: input.kind === 'hypothesis' ? 'hypothesis' : input.kind === 'need' ? 'evidence' : input.kind === 'conclusion' ? 'conclusion' : 'topic' }),
     readNote: path => repo.readNote(path),
     updateNote: (path, patch) => repo.updateNote(path, patch),
-    askModel: async (ctx, modelName, reasoning, signal) => {
+    askModel: async (ctx, _model, _reasoning, signal) => {
       stat.ask.push(ctx); stat.active++; stat.maxActive = Math.max(stat.maxActive, stat.active);
       try {
         stat.beginSeen = stat.beginSeen ?? [];
@@ -208,7 +207,7 @@ test('caps: a 7th hypothesis is refused (no notes left behind) and the run pause
 
 test('one corrective retry: a refused step succeeds the second time; failing twice pauses with error', async () => {
   const flaky = { ...steps() };
-  flaky.plan_situation = (request, n) => { if (n === 1) throw new ArgumentStepError('bad reply'); return { data: [{ need: 'a' }] }; };
+  flaky.plan_situation = (_request, n) => { if (n === 1) throw new ArgumentStepError('bad reply'); return { data: [{ need: 'a' }] }; };
   const r = await rig({ script: { step: flaky } });
   await r.runs.start(r.mapPath, 'p');
   assert.equal(r.stat.steps.filter(n => n === 'plan_situation').length, 2);
@@ -243,7 +242,7 @@ test('limits: refuted hypotheses stop at round 3, never 4; <3 verified never con
 test('stale fence: a card the user deleted gets no note and no node, and the item is closed as a miss', async () => {
   const gate = defer();
   const holder = {};
-  const r = await rig({ script: { step: steps(), ask: async (ctx, n) => {
+  const r = await rig({ script: { step: steps(), ask: async ctx => {
     const id = ctx.argumentEvidenceNeeds[0].id;
     const isNeed = !(await holder.r.state()).situation.data.some(d => d.id === id);
     if (isNeed && !holder.deleted) {

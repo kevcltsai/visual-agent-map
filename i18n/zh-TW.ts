@@ -143,7 +143,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.exchange_reason_too_large": "檔案超過 {0} MB",
   "ui.exchange_reason_unsafe": "檔案含有 DOCTYPE、實體或處理指令，這些一律不接受",
   "ui.exchange_reason_too_big": "議題、元素或層數太多",
-  "ui.exchange_reason_invalid": "不是有效的 OPML 或 FreeMind 大綱（{0}）",
+  "ui.exchange_reason_invalid": "不是有效的 OPML 或 FreeMind 大綱",
   "ui.exchange_reason_unreadable": "無法讀取檔案",
   "ui.exchange_export_opml": "匯出為 OPML",
   "ui.exchange_export_freemind": "匯出為 FreeMind（.mm）",
@@ -679,7 +679,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.mind_map_changed_externally": "心智圖有外部修改",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi":
     "畫面與 Map.md 的結構都已改變。請選擇要保留哪一版。",
-  "ui.invalid_merged_contents": "合併內容無效。",
+  "ui.invalid_merged_contents": "合併內容無效：結構不符合心智圖格式，請修正後再儲存。",
   "ui.no_notes_yet": "目前沒有筆記。",
   "ui.topic_outline": "議題大綱",
   "ui.open_topic_outline": "開啟議題大綱",
@@ -1164,7 +1164,6 @@ export const zhTW: Record<TranslationKey, string> = {
     "AI 任務超過 3 分鐘，為避免長時間佔用資源，VAM 會嘗試中斷。未完成的結果不會套用；請縮小任務範圍後重試。",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and":
     "整合 {0} 個已選議題。可在下方選擇完整內容或摘要；AI 完成後會直接建立新根議題，可復原。",
-  "ui.invalid_merged_contents_0": "合併內容無效：{0}",
   "ui.delete_0": "刪除「{0}」",
   "ui.unassigned_0": "未歸類（{0}）",
   "ui.archived_0": "封存（{0}）",
@@ -2583,7 +2582,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.mermaid_undrawn_warning_0": "有 {0} 張圖表未能在時限內畫完，只以原始碼呈現。",
   "share.mermaid_blocked_note": "［圖表未繪製：製作此檔時尚未允許 Mermaid，改顯示原始碼。］",
   "share.mermaid_undrawn_note": "［圖表未能畫完，改顯示原始碼。］",
-  "share.leak_blocked_0": "未存檔：檔案會含有私人資訊（{0}），沒有寫入任何東西。",
+  "share.leak_blocked_0":
+    "未存檔：檔案會含有私人資訊（{0}）。請回到來源筆記移除這些內容，或關閉會帶入完整筆記的選項，再重新分享。",
   "share.leak_category_vault-path": "這台電腦上的 Vault 位置",
   "share.leak_category_map-folder": "心智圖的資料夾名稱",
   "share.leak_category_note-path": "筆記的檔案路徑",
@@ -2598,7 +2598,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.saving": "儲存中…",
   "share.saved_0_1": "已儲存 {0}（{1}）",
   "share.downloaded_0_1": "已送出存檔 {0}（{1}）。若出現存檔視窗，請選擇要存放的位置。",
-  "share.save_failed": "無法儲存檔案。",
+  "share.save_failed": "無法儲存檔案。請確認儲存位置可寫入，或換一個位置再試一次。",
   "share.publish_copy": "複製發佈到 GitHub 的指令",
   "share.publish_done": "已複製指令，請貼到你自己的 Claude Code 或 Codex。",
   "share.publish_fail": "無法自動複製，請選取下方文字自行複製。",
@@ -2877,5 +2877,14 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.topic_chat_too_big": "這個要求動到的地方太多，請改用左側欄的 AI 對話。",
   "ui.topic_chat_result_unknown": "這次的結果請看議題本身。",
   "ui.topic_chat_failed_children": "沒有子議題研究成功。",
-  "ui.topic_chat_record_failed": "議題對話紀錄沒有存成功。"
+  "ui.topic_chat_record_failed": "議題對話紀錄沒有存成功。",
+  "ui.exchange_reason_invalid_line_0": "不是有效的 OPML 或 FreeMind 大綱，第 {0} 行附近格式有誤",
+  "ui.invalid_merged_json": "合併內容不是有效的 JSON：請檢查引號、逗號與大括號是否成對，修正後再儲存。",
+  "ui.note_style_folder_open_failed":
+    "無法開啟筆記風格資料夾：同名檔案可能佔住了這個位置，或資料夾無法寫入。請改名或移走該檔案，再試一次。",
+  "ui.synced_0_topic_filenames_failed_1":
+    "已同步 {0} 份議題檔名，{1} 份失敗。請確認失敗議題所在的資料夾可寫入（未唯讀、未被其他程式鎖定），再執行一次。",
+  "ui.repair_workspace_blocked_0":
+    "修復失敗：「{0}」是檔案，佔住了資料夾的位置。請先改名或移走這個檔案，再按一次修復。",
+  "ui.outline_import_done_0_1": "已加入 {0} 個議題到{1}。"
 };

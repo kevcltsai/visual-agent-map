@@ -119,7 +119,9 @@ for (const kind of ['tree', 'under']) {
     h.spy.updateNote = async (...args) => { updates++; return update(...args); };
     await h.view.importOutlineIntoMap(request(tree4, { shallowResearch: true, noteStyle: 'builtin:textbook' }), placementOf(h, kind));
     assert.equal(updates, 0, 'the style is not recorded on any created topic');
-    assert.deepEqual(h.notices, []);
+    // The done notice ("Added N topics to …") is the only notice; a failure would add a second one.
+    assert.equal(h.notices.length, 1, `only the done notice: ${JSON.stringify(h.notices)}`);
+    assert.match(h.notices[0], /^Added 4 topics to /);
   });
 }
 

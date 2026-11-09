@@ -203,9 +203,14 @@ test('openNoteStylesFolder (D15) creates the block folders, shows their path and
   assert.deepEqual(revealed, [target]);
   const bare = await Plugin.prototype.openNoteStylesFolder.call({ noteStyles: { ensureBlockFolder: async () => 'WS/Styles/Blocks' }, app: { vault: { getAbstractFileByPath: () => null }, workspace: {} } });
   assert.equal(bare, 'WS/Styles/Blocks', 'a vault without the file explorer still gets the Notice');
-  const failing = await Plugin.prototype.openNoteStylesFolder.call({ noteStyles: { ensureBlockFolder: async () => { throw new Error('disk full'); } }, app: {} });
+  // A failure: the Notice says what to do and carries no system error; the raw error goes to the log.
+  shown.length = 0;
+  const logged = [];
+  const failing = await Plugin.prototype.openNoteStylesFolder.call({ noteStyles: { ensureBlockFolder: async () => { throw new Error('disk full'); } }, app: {}, logs: { appendLog: (level, text) => logged.push(text) } });
   assert.equal(failing, null);
-  assert.ok(shown.some(text => /disk full/.test(String(text))));
+  assert.equal(shown.length, 1, 'one Notice');
+  assert.ok(!/disk full/.test(String(shown[0])), 'the Notice shows no raw system error');
+  assert.ok(logged.some(text => /disk full/.test(text)), 'the raw error stays in the log');
 });
 
 test('picker: the folded group stays folded - a display rule on .vam-picker-group must not beat the hidden attribute (was failing first)', () => {

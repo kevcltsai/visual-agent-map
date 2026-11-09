@@ -36,7 +36,8 @@ export function exchangeRefusal(reason: ExchangeRejection, line?: number): strin
     case "too-deep":
       return t("ui.exchange_reason_too_big");
     default:
-      return t("ui.exchange_reason_invalid", line === undefined ? reason : `${reason}, ${line}`);
+      // The parser's reason code stays internal: the person gets the line, when there is one.
+      return line === undefined ? t("ui.exchange_reason_invalid") : t("ui.exchange_reason_invalid_line_0", line);
   }
 }
 

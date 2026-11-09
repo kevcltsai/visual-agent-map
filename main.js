@@ -244,7 +244,7 @@ var en = {
   "ui.exchange_reason_too_large": "the file is larger than {0} MB",
   "ui.exchange_reason_unsafe": "it contains a DOCTYPE, entity or processing instruction, which are not accepted",
   "ui.exchange_reason_too_big": "it has too many topics, elements or levels",
-  "ui.exchange_reason_invalid": "it is not a valid OPML or FreeMind outline ({0})",
+  "ui.exchange_reason_invalid": "it is not a valid OPML or FreeMind outline",
   "ui.exchange_reason_unreadable": "the file could not be read",
   "ui.exchange_export_opml": "Export as OPML",
   "ui.exchange_export_freemind": "Export as FreeMind (.mm)",
@@ -764,7 +764,7 @@ var en = {
   "ui.save_merged_contents": "Save merged contents",
   "ui.mind_map_changed_externally": "Mind map changed externally",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi": "Both the map and Map.md have changed. Choose which version to keep.",
-  "ui.invalid_merged_contents": "Invalid merged contents.",
+  "ui.invalid_merged_contents": "The merged contents do not match the map format. Fix them, then save again.",
   "ui.no_notes_yet": "No notes yet.",
   "ui.topic_outline": "Topic outline",
   "ui.open_topic_outline": "Open topic outline",
@@ -1227,7 +1227,6 @@ var en = {
   "ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it": "If an AI task exceeds 3 minutes, VAM attempts to interrupt it to avoid prolonged resource use. Incomplete results are not applied.",
   "ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it": "The AI task exceeded 3 minutes. VAM attempts to interrupt it to avoid prolonged resource use. Incomplete results are not applied; try a smaller task.",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and": "Synthesize {0} selected topics. Choose full content or summaries below in this window; the new root topic is created directly and you can undo it.",
-  "ui.invalid_merged_contents_0": "Invalid merged contents: {0}",
   "ui.delete_0": "Delete \u201C{0}\u201D",
   "ui.unassigned_0": "Unassigned ({0})",
   "ui.archived_0": "Archived ({0})",
@@ -2593,7 +2592,7 @@ var en = {
   "share.mermaid_undrawn_warning_0": "{0} diagrams did not finish drawing in time and are shown as source text.",
   "share.mermaid_blocked_note": "[Diagram not drawn: Mermaid was not allowed when this file was made. Source shown instead.]",
   "share.mermaid_undrawn_note": "[Diagram did not finish drawing. Source shown instead.]",
-  "share.leak_blocked_0": "Not saved: the file would contain private information ({0}). Nothing was written.",
+  "share.leak_blocked_0": "Not saved: the file would contain private information ({0}). Remove that content from the source notes, or turn off the option that includes full notes, then share again.",
   "share.leak_category_vault-path": "the vault's location on this computer",
   "share.leak_category_map-folder": "the map's folder name",
   "share.leak_category_note-path": "a note's file path",
@@ -2608,7 +2607,7 @@ var en = {
   "share.saving": "Saving\u2026",
   "share.saved_0_1": "Saved {0} ({1})",
   "share.downloaded_0_1": "Save requested for {0} ({1}). If a save window appears, choose where to keep the file.",
-  "share.save_failed": "The file could not be saved.",
+  "share.save_failed": "The file could not be saved. Check that the save location is writable, or choose another location and try again.",
   "share.publish_copy": "Copy the GitHub publishing instructions",
   "share.publish_done": "Instructions copied. Paste them into your own Claude Code or Codex.",
   "share.publish_fail": "Could not copy automatically. Select the text below and copy it yourself.",
@@ -2880,7 +2879,13 @@ var en = {
   "ui.topic_chat_too_big": "This request touches too much; please use the AI chat in the left sidebar.",
   "ui.topic_chat_result_unknown": "See the topic itself for this result.",
   "ui.topic_chat_failed_children": "No subtopic could be researched.",
-  "ui.topic_chat_record_failed": "The topic chat record was not saved."
+  "ui.topic_chat_record_failed": "The topic chat record was not saved.",
+  "ui.exchange_reason_invalid_line_0": "it is not a valid OPML or FreeMind outline (line {0})",
+  "ui.invalid_merged_json": "The merged contents are not valid JSON: check the quotes, commas and braces, then save again.",
+  "ui.note_style_folder_open_failed": "The note style folder could not be opened: a file with the same name may be in the way, or the folder cannot be written. Rename or move that file, then try again.",
+  "ui.synced_0_topic_filenames_failed_1": "Synced {0} topic filenames; {1} failed. Make sure the folder holding them is writable (not read-only or locked by another program), then run this again.",
+  "ui.repair_workspace_blocked_0": "Repair failed: \u201C{0}\u201D is a file where a folder should be. Rename or move that file, then repair again.",
+  "ui.outline_import_done_0_1": "Added {0} topics to {1}."
 };
 
 // i18n/zh-CN.ts
@@ -3020,7 +3025,7 @@ var zhCN = {
   "ui.exchange_reason_too_large": "\u6587\u4EF6\u8D85\u8FC7 {0} MB",
   "ui.exchange_reason_unsafe": "\u6587\u4EF6\u542B\u6709 DOCTYPE\u3001\u5B9E\u4F53\u6216\u5904\u7406\u6307\u4EE4\uFF0C\u8FD9\u4E9B\u4E00\u5F8B\u4E0D\u63A5\u53D7",
   "ui.exchange_reason_too_big": "\u8BAE\u9898\u3001\u5143\u7D20\u6216\u5C42\u6570\u592A\u591A",
-  "ui.exchange_reason_invalid": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7EB2\uFF08{0}\uFF09",
+  "ui.exchange_reason_invalid": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7EB2",
   "ui.exchange_reason_unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u6587\u4EF6",
   "ui.exchange_export_opml": "\u5BFC\u51FA\u4E3A OPML",
   "ui.exchange_export_freemind": "\u5BFC\u51FA\u4E3A FreeMind\uFF08.mm\uFF09",
@@ -3540,7 +3545,7 @@ var zhCN = {
   "ui.save_merged_contents": "\u4FDD\u5B58\u5408\u5E76\u5185\u5BB9",
   "ui.mind_map_changed_externally": "\u5FC3\u667A\u56FE\u6709\u5916\u90E8\u4FEE\u6539",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi": "\u753B\u9762\u4E0E Map.md \u7684\u7ED3\u6784\u90FD\u5DF2\u6539\u53D8\u3002\u8BF7\u9009\u62E9\u8981\u4FDD\u7559\u54EA\u4E00\u7248\u3002",
-  "ui.invalid_merged_contents": "\u5408\u5E76\u5185\u5BB9\u65E0\u6548\u3002",
+  "ui.invalid_merged_contents": "\u5408\u5E76\u5185\u5BB9\u65E0\u6548\uFF1A\u7ED3\u6784\u4E0D\u7B26\u5408\u5730\u56FE\u683C\u5F0F\uFF0C\u8BF7\u4FEE\u6B63\u540E\u518D\u4FDD\u5B58\u3002",
   "ui.no_notes_yet": "\u5F53\u524D\u6CA1\u6709\u7B14\u8BB0\u3002",
   "ui.topic_outline": "\u8BAE\u9898\u5927\u7EB2",
   "ui.open_topic_outline": "\u6253\u5F00\u8BAE\u9898\u5927\u7EB2",
@@ -4003,7 +4008,6 @@ var zhCN = {
   "ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it": "AI \u4EFB\u52A1\u8D85\u8FC7 3 \u5206\u949F\u65F6\uFF0C\u4E3A\u907F\u514D\u957F\u65F6\u95F4\u5360\u7528\u8D44\u6E90\uFF0CVAM \u4F1A\u5C1D\u8BD5\u4E2D\u65AD\uFF1B\u672A\u5B8C\u6210\u7684\u7ED3\u679C\u4E0D\u4F1A\u5E94\u7528\u3002",
   "ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it": "AI \u4EFB\u52A1\u8D85\u8FC7 3 \u5206\u949F\uFF0C\u4E3A\u907F\u514D\u957F\u65F6\u95F4\u5360\u7528\u8D44\u6E90\uFF0CVAM \u4F1A\u5C1D\u8BD5\u4E2D\u65AD\u3002\u672A\u5B8C\u6210\u7684\u7ED3\u679C\u4E0D\u4F1A\u5E94\u7528\uFF1B\u8BF7\u7F29\u5C0F\u4EFB\u52A1\u8303\u56F4\u540E\u91CD\u8BD5\u3002",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and": "\u6574\u5408 {0} \u4E2A\u5DF2\u9009\u8BAE\u9898\u3002\u53EF\u5728\u4E0B\u65B9\u9009\u62E9\u5B8C\u6574\u5185\u5BB9\u6216\u6458\u8981\uFF1BAI \u5B8C\u6210\u540E\u4F1A\u76F4\u63A5\u521B\u5EFA\u65B0\u6839\u8BAE\u9898\uFF0C\u53EF\u64A4\u9500\u3002",
-  "ui.invalid_merged_contents_0": "\u5408\u5E76\u5185\u5BB9\u65E0\u6548\uFF1A{0}",
   "ui.delete_0": "\u5220\u9664\u201C{0}\u201D",
   "ui.unassigned_0": "\u672A\u5F52\u7C7B\uFF08{0}\uFF09",
   "ui.archived_0": "\u5F52\u6863\uFF08{0}\uFF09",
@@ -5369,7 +5373,7 @@ var zhCN = {
   "share.mermaid_undrawn_warning_0": "\u6709 {0} \u5F20\u56FE\u8868\u672A\u80FD\u5728\u65F6\u9650\u5185\u753B\u5B8C\uFF0C\u53EA\u4EE5\u6E90\u7801\u5448\u73B0\u3002",
   "share.mermaid_blocked_note": "\uFF3B\u56FE\u8868\u672A\u7ED8\u5236\uFF1A\u5236\u4F5C\u6B64\u6587\u4EF6\u65F6\u5C1A\u672A\u5141\u8BB8 Mermaid\uFF0C\u6539\u663E\u793A\u6E90\u7801\u3002\uFF3D",
   "share.mermaid_undrawn_note": "\uFF3B\u56FE\u8868\u672A\u80FD\u753B\u5B8C\uFF0C\u6539\u663E\u793A\u6E90\u7801\u3002\uFF3D",
-  "share.leak_blocked_0": "\u672A\u4FDD\u5B58\uFF1A\u6587\u4EF6\u4F1A\u542B\u6709\u79C1\u4EBA\u4FE1\u606F\uFF08{0}\uFF09\uFF0C\u6CA1\u6709\u5199\u5165\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "share.leak_blocked_0": "\u672A\u4FDD\u5B58\uFF1A\u6587\u4EF6\u4F1A\u542B\u6709\u79C1\u4EBA\u4FE1\u606F\uFF08{0}\uFF09\u3002\u8BF7\u4ECE\u6765\u6E90\u7B14\u8BB0\u79FB\u9664\u8FD9\u4E9B\u5185\u5BB9\uFF0C\u6216\u5173\u95ED\u4F1A\u5E26\u5165\u5B8C\u6574\u7B14\u8BB0\u7684\u9009\u9879\uFF0C\u518D\u91CD\u65B0\u5206\u4EAB\u3002",
   "share.leak_category_vault-path": "\u8FD9\u53F0\u7535\u8111\u4E0A\u7684\u77E5\u8BC6\u5E93\u4F4D\u7F6E",
   "share.leak_category_map-folder": "\u601D\u7EF4\u5BFC\u56FE\u7684\u6587\u4EF6\u5939\u540D\u79F0",
   "share.leak_category_note-path": "\u7B14\u8BB0\u7684\u6587\u4EF6\u8DEF\u5F84",
@@ -5384,7 +5388,7 @@ var zhCN = {
   "share.saving": "\u4FDD\u5B58\u4E2D\u2026",
   "share.saved_0_1": "\u5DF2\u4FDD\u5B58 {0}\uFF08{1}\uFF09",
   "share.downloaded_0_1": "\u5DF2\u9001\u51FA\u5B58\u6863 {0}\uFF08{1}\uFF09\u3002\u82E5\u51FA\u73B0\u5B58\u6863\u7A97\u53E3\uFF0C\u8BF7\u9009\u62E9\u8981\u5B58\u653E\u7684\u4F4D\u7F6E\u3002",
-  "share.save_failed": "\u65E0\u6CD5\u4FDD\u5B58\u6587\u4EF6\u3002",
+  "share.save_failed": "\u65E0\u6CD5\u4FDD\u5B58\u6587\u4EF6\u3002\u8BF7\u786E\u8BA4\u4FDD\u5B58\u4F4D\u7F6E\u53EF\u5199\u5165\uFF0C\u6216\u6362\u4E00\u4E2A\u4F4D\u7F6E\u518D\u8BD5\u4E00\u6B21\u3002",
   "share.publish_copy": "\u590D\u5236\u53D1\u5E03\u5230 GitHub \u7684\u6307\u4EE4",
   "share.publish_done": "\u5DF2\u590D\u5236\u6307\u4EE4\uFF0C\u8BF7\u8D34\u5230\u4F60\u81EA\u5DF1\u7684 Claude Code \u6216 Codex\u3002",
   "share.publish_fail": "\u65E0\u6CD5\u81EA\u52A8\u590D\u5236\uFF0C\u8BF7\u9009\u53D6\u4E0B\u65B9\u6587\u5B57\u81EA\u884C\u590D\u5236\u3002",
@@ -5656,7 +5660,13 @@ var zhCN = {
   "ui.topic_chat_too_big": "\u8FD9\u4E2A\u8981\u6C42\u52A8\u5230\u7684\u5730\u65B9\u592A\u591A\uFF0C\u8BF7\u6539\u7528\u5DE6\u4FA7\u680F\u7684 AI \u5BF9\u8BDD\u3002",
   "ui.topic_chat_result_unknown": "\u8FD9\u6B21\u7684\u7ED3\u679C\u8BF7\u770B\u8BAE\u9898\u672C\u8EAB\u3002",
   "ui.topic_chat_failed_children": "\u6CA1\u6709\u5B50\u8BAE\u9898\u7814\u7A76\u6210\u529F\u3002",
-  "ui.topic_chat_record_failed": "\u8BAE\u9898\u5BF9\u8BDD\u8BB0\u5F55\u6CA1\u6709\u5B58\u6210\u529F\u3002"
+  "ui.topic_chat_record_failed": "\u8BAE\u9898\u5BF9\u8BDD\u8BB0\u5F55\u6CA1\u6709\u5B58\u6210\u529F\u3002",
+  "ui.exchange_reason_invalid_line_0": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7EB2\uFF0C\u7B2C {0} \u884C\u9644\u8FD1\u683C\u5F0F\u6709\u8BEF",
+  "ui.invalid_merged_json": "\u5408\u5E76\u5185\u5BB9\u4E0D\u662F\u6709\u6548\u7684 JSON\uFF1A\u8BF7\u68C0\u67E5\u5F15\u53F7\u3001\u9017\u53F7\u4E0E\u5927\u62EC\u53F7\u662F\u5426\u6210\u5BF9\uFF0C\u4FEE\u6B63\u540E\u518D\u4FDD\u5B58\u3002",
+  "ui.note_style_folder_open_failed": "\u65E0\u6CD5\u6253\u5F00\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939\uFF1A\u540C\u540D\u6587\u4EF6\u53EF\u80FD\u5360\u4F4F\u4E86\u8FD9\u4E2A\u4F4D\u7F6E\uFF0C\u6216\u6587\u4EF6\u5939\u65E0\u6CD5\u5199\u5165\u3002\u8BF7\u6539\u540D\u6216\u79FB\u8D70\u8BE5\u6587\u4EF6\uFF0C\u518D\u8BD5\u4E00\u6B21\u3002",
+  "ui.synced_0_topic_filenames_failed_1": "\u5DF2\u540C\u6B65 {0} \u4EFD\u8BAE\u9898\u6587\u4EF6\u540D\uFF0C{1} \u4EFD\u5931\u8D25\u3002\u8BF7\u786E\u8BA4\u5931\u8D25\u8BAE\u9898\u6240\u5728\u7684\u6587\u4EF6\u5939\u53EF\u5199\u5165\uFF08\u672A\u53EA\u8BFB\u3001\u672A\u88AB\u5176\u4ED6\u7A0B\u5E8F\u9501\u5B9A\uFF09\uFF0C\u518D\u6267\u884C\u4E00\u6B21\u3002",
+  "ui.repair_workspace_blocked_0": "\u4FEE\u590D\u5931\u8D25\uFF1A\u201C{0}\u201D\u662F\u6587\u4EF6\uFF0C\u5360\u4F4F\u4E86\u6587\u4EF6\u5939\u7684\u4F4D\u7F6E\u3002\u8BF7\u5148\u6539\u540D\u6216\u79FB\u8D70\u8FD9\u4E2A\u6587\u4EF6\uFF0C\u518D\u70B9\u4E00\u6B21\u4FEE\u590D\u3002",
+  "ui.outline_import_done_0_1": "\u5DF2\u52A0\u5165 {0} \u4E2A\u8BAE\u9898\u5230{1}\u3002"
 };
 
 // i18n/zh-TW.ts
@@ -5796,7 +5806,7 @@ var zhTW = {
   "ui.exchange_reason_too_large": "\u6A94\u6848\u8D85\u904E {0} MB",
   "ui.exchange_reason_unsafe": "\u6A94\u6848\u542B\u6709 DOCTYPE\u3001\u5BE6\u9AD4\u6216\u8655\u7406\u6307\u4EE4\uFF0C\u9019\u4E9B\u4E00\u5F8B\u4E0D\u63A5\u53D7",
   "ui.exchange_reason_too_big": "\u8B70\u984C\u3001\u5143\u7D20\u6216\u5C64\u6578\u592A\u591A",
-  "ui.exchange_reason_invalid": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7DB1\uFF08{0}\uFF09",
+  "ui.exchange_reason_invalid": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7DB1",
   "ui.exchange_reason_unreadable": "\u7121\u6CD5\u8B80\u53D6\u6A94\u6848",
   "ui.exchange_export_opml": "\u532F\u51FA\u70BA OPML",
   "ui.exchange_export_freemind": "\u532F\u51FA\u70BA FreeMind\uFF08.mm\uFF09",
@@ -6316,7 +6326,7 @@ var zhTW = {
   "ui.save_merged_contents": "\u5132\u5B58\u5408\u4F75\u5167\u5BB9",
   "ui.mind_map_changed_externally": "\u5FC3\u667A\u5716\u6709\u5916\u90E8\u4FEE\u6539",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi": "\u756B\u9762\u8207 Map.md \u7684\u7D50\u69CB\u90FD\u5DF2\u6539\u8B8A\u3002\u8ACB\u9078\u64C7\u8981\u4FDD\u7559\u54EA\u4E00\u7248\u3002",
-  "ui.invalid_merged_contents": "\u5408\u4F75\u5167\u5BB9\u7121\u6548\u3002",
+  "ui.invalid_merged_contents": "\u5408\u4F75\u5167\u5BB9\u7121\u6548\uFF1A\u7D50\u69CB\u4E0D\u7B26\u5408\u5FC3\u667A\u5716\u683C\u5F0F\uFF0C\u8ACB\u4FEE\u6B63\u5F8C\u518D\u5132\u5B58\u3002",
   "ui.no_notes_yet": "\u76EE\u524D\u6C92\u6709\u7B46\u8A18\u3002",
   "ui.topic_outline": "\u8B70\u984C\u5927\u7DB1",
   "ui.open_topic_outline": "\u958B\u555F\u8B70\u984C\u5927\u7DB1",
@@ -6779,7 +6789,6 @@ var zhTW = {
   "ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it": "AI \u4EFB\u52D9\u8D85\u904E 3 \u5206\u9418\u6642\uFF0C\u70BA\u907F\u514D\u9577\u6642\u9593\u4F54\u7528\u8CC7\u6E90\uFF0CVAM \u6703\u5617\u8A66\u4E2D\u65B7\uFF1B\u672A\u5B8C\u6210\u7684\u7D50\u679C\u4E0D\u6703\u5957\u7528\u3002",
   "ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it": "AI \u4EFB\u52D9\u8D85\u904E 3 \u5206\u9418\uFF0C\u70BA\u907F\u514D\u9577\u6642\u9593\u4F54\u7528\u8CC7\u6E90\uFF0CVAM \u6703\u5617\u8A66\u4E2D\u65B7\u3002\u672A\u5B8C\u6210\u7684\u7D50\u679C\u4E0D\u6703\u5957\u7528\uFF1B\u8ACB\u7E2E\u5C0F\u4EFB\u52D9\u7BC4\u570D\u5F8C\u91CD\u8A66\u3002",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and": "\u6574\u5408 {0} \u500B\u5DF2\u9078\u8B70\u984C\u3002\u53EF\u5728\u4E0B\u65B9\u9078\u64C7\u5B8C\u6574\u5167\u5BB9\u6216\u6458\u8981\uFF1BAI \u5B8C\u6210\u5F8C\u6703\u76F4\u63A5\u5EFA\u7ACB\u65B0\u6839\u8B70\u984C\uFF0C\u53EF\u5FA9\u539F\u3002",
-  "ui.invalid_merged_contents_0": "\u5408\u4F75\u5167\u5BB9\u7121\u6548\uFF1A{0}",
   "ui.delete_0": "\u522A\u9664\u300C{0}\u300D",
   "ui.unassigned_0": "\u672A\u6B78\u985E\uFF08{0}\uFF09",
   "ui.archived_0": "\u5C01\u5B58\uFF08{0}\uFF09",
@@ -8145,7 +8154,7 @@ var zhTW = {
   "share.mermaid_undrawn_warning_0": "\u6709 {0} \u5F35\u5716\u8868\u672A\u80FD\u5728\u6642\u9650\u5167\u756B\u5B8C\uFF0C\u53EA\u4EE5\u539F\u59CB\u78BC\u5448\u73FE\u3002",
   "share.mermaid_blocked_note": "\uFF3B\u5716\u8868\u672A\u7E6A\u88FD\uFF1A\u88FD\u4F5C\u6B64\u6A94\u6642\u5C1A\u672A\u5141\u8A31 Mermaid\uFF0C\u6539\u986F\u793A\u539F\u59CB\u78BC\u3002\uFF3D",
   "share.mermaid_undrawn_note": "\uFF3B\u5716\u8868\u672A\u80FD\u756B\u5B8C\uFF0C\u6539\u986F\u793A\u539F\u59CB\u78BC\u3002\uFF3D",
-  "share.leak_blocked_0": "\u672A\u5B58\u6A94\uFF1A\u6A94\u6848\u6703\u542B\u6709\u79C1\u4EBA\u8CC7\u8A0A\uFF08{0}\uFF09\uFF0C\u6C92\u6709\u5BEB\u5165\u4EFB\u4F55\u6771\u897F\u3002",
+  "share.leak_blocked_0": "\u672A\u5B58\u6A94\uFF1A\u6A94\u6848\u6703\u542B\u6709\u79C1\u4EBA\u8CC7\u8A0A\uFF08{0}\uFF09\u3002\u8ACB\u56DE\u5230\u4F86\u6E90\u7B46\u8A18\u79FB\u9664\u9019\u4E9B\u5167\u5BB9\uFF0C\u6216\u95DC\u9589\u6703\u5E36\u5165\u5B8C\u6574\u7B46\u8A18\u7684\u9078\u9805\uFF0C\u518D\u91CD\u65B0\u5206\u4EAB\u3002",
   "share.leak_category_vault-path": "\u9019\u53F0\u96FB\u8166\u4E0A\u7684 Vault \u4F4D\u7F6E",
   "share.leak_category_map-folder": "\u5FC3\u667A\u5716\u7684\u8CC7\u6599\u593E\u540D\u7A31",
   "share.leak_category_note-path": "\u7B46\u8A18\u7684\u6A94\u6848\u8DEF\u5F91",
@@ -8160,7 +8169,7 @@ var zhTW = {
   "share.saving": "\u5132\u5B58\u4E2D\u2026",
   "share.saved_0_1": "\u5DF2\u5132\u5B58 {0}\uFF08{1}\uFF09",
   "share.downloaded_0_1": "\u5DF2\u9001\u51FA\u5B58\u6A94 {0}\uFF08{1}\uFF09\u3002\u82E5\u51FA\u73FE\u5B58\u6A94\u8996\u7A97\uFF0C\u8ACB\u9078\u64C7\u8981\u5B58\u653E\u7684\u4F4D\u7F6E\u3002",
-  "share.save_failed": "\u7121\u6CD5\u5132\u5B58\u6A94\u6848\u3002",
+  "share.save_failed": "\u7121\u6CD5\u5132\u5B58\u6A94\u6848\u3002\u8ACB\u78BA\u8A8D\u5132\u5B58\u4F4D\u7F6E\u53EF\u5BEB\u5165\uFF0C\u6216\u63DB\u4E00\u500B\u4F4D\u7F6E\u518D\u8A66\u4E00\u6B21\u3002",
   "share.publish_copy": "\u8907\u88FD\u767C\u4F48\u5230 GitHub \u7684\u6307\u4EE4",
   "share.publish_done": "\u5DF2\u8907\u88FD\u6307\u4EE4\uFF0C\u8ACB\u8CBC\u5230\u4F60\u81EA\u5DF1\u7684 Claude Code \u6216 Codex\u3002",
   "share.publish_fail": "\u7121\u6CD5\u81EA\u52D5\u8907\u88FD\uFF0C\u8ACB\u9078\u53D6\u4E0B\u65B9\u6587\u5B57\u81EA\u884C\u8907\u88FD\u3002",
@@ -8432,7 +8441,13 @@ var zhTW = {
   "ui.topic_chat_too_big": "\u9019\u500B\u8981\u6C42\u52D5\u5230\u7684\u5730\u65B9\u592A\u591A\uFF0C\u8ACB\u6539\u7528\u5DE6\u5074\u6B04\u7684 AI \u5C0D\u8A71\u3002",
   "ui.topic_chat_result_unknown": "\u9019\u6B21\u7684\u7D50\u679C\u8ACB\u770B\u8B70\u984C\u672C\u8EAB\u3002",
   "ui.topic_chat_failed_children": "\u6C92\u6709\u5B50\u8B70\u984C\u7814\u7A76\u6210\u529F\u3002",
-  "ui.topic_chat_record_failed": "\u8B70\u984C\u5C0D\u8A71\u7D00\u9304\u6C92\u6709\u5B58\u6210\u529F\u3002"
+  "ui.topic_chat_record_failed": "\u8B70\u984C\u5C0D\u8A71\u7D00\u9304\u6C92\u6709\u5B58\u6210\u529F\u3002",
+  "ui.exchange_reason_invalid_line_0": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7DB1\uFF0C\u7B2C {0} \u884C\u9644\u8FD1\u683C\u5F0F\u6709\u8AA4",
+  "ui.invalid_merged_json": "\u5408\u4F75\u5167\u5BB9\u4E0D\u662F\u6709\u6548\u7684 JSON\uFF1A\u8ACB\u6AA2\u67E5\u5F15\u865F\u3001\u9017\u865F\u8207\u5927\u62EC\u865F\u662F\u5426\u6210\u5C0D\uFF0C\u4FEE\u6B63\u5F8C\u518D\u5132\u5B58\u3002",
+  "ui.note_style_folder_open_failed": "\u7121\u6CD5\u958B\u555F\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E\uFF1A\u540C\u540D\u6A94\u6848\u53EF\u80FD\u4F54\u4F4F\u4E86\u9019\u500B\u4F4D\u7F6E\uFF0C\u6216\u8CC7\u6599\u593E\u7121\u6CD5\u5BEB\u5165\u3002\u8ACB\u6539\u540D\u6216\u79FB\u8D70\u8A72\u6A94\u6848\uFF0C\u518D\u8A66\u4E00\u6B21\u3002",
+  "ui.synced_0_topic_filenames_failed_1": "\u5DF2\u540C\u6B65 {0} \u4EFD\u8B70\u984C\u6A94\u540D\uFF0C{1} \u4EFD\u5931\u6557\u3002\u8ACB\u78BA\u8A8D\u5931\u6557\u8B70\u984C\u6240\u5728\u7684\u8CC7\u6599\u593E\u53EF\u5BEB\u5165\uFF08\u672A\u552F\u8B80\u3001\u672A\u88AB\u5176\u4ED6\u7A0B\u5F0F\u9396\u5B9A\uFF09\uFF0C\u518D\u57F7\u884C\u4E00\u6B21\u3002",
+  "ui.repair_workspace_blocked_0": "\u4FEE\u5FA9\u5931\u6557\uFF1A\u300C{0}\u300D\u662F\u6A94\u6848\uFF0C\u4F54\u4F4F\u4E86\u8CC7\u6599\u593E\u7684\u4F4D\u7F6E\u3002\u8ACB\u5148\u6539\u540D\u6216\u79FB\u8D70\u9019\u500B\u6A94\u6848\uFF0C\u518D\u6309\u4E00\u6B21\u4FEE\u5FA9\u3002",
+  "ui.outline_import_done_0_1": "\u5DF2\u52A0\u5165 {0} \u500B\u8B70\u984C\u5230{1}\u3002"
 };
 
 // i18n/languages.ts
@@ -25888,6 +25903,16 @@ var Repository = class {
       if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
     }
   }
+  /** The first part of `path` that is a file rather than a folder (it blocks the folder), or null when none does. */
+  blockingFile(path) {
+    let current = "";
+    for (const part of (0, import_obsidian13.normalizePath)(path).split("/").filter(Boolean)) {
+      current = current ? `${current}/${part}` : part;
+      const entry = this.app.vault.getAbstractFileByPath(current);
+      if (entry && !(entry instanceof import_obsidian13.TFolder)) return current;
+    }
+    return null;
+  }
   workspaceExists() {
     return this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder) instanceof import_obsidian13.TFolder;
   }
@@ -27033,33 +27058,62 @@ ${body}`);
     const content = await this.app.vault.read(file), fm = frontmatter(content);
     return marker2(fm["agent-map-node"]) ? this.readNote(file.path) : null;
   }
+  /**
+   * Renames generated subtopic notes to their titles. A note that cannot be renamed (a read-only folder, say) is counted
+   * in `failed` and skipped, so the rest still go. When a map cannot be saved, its renames are counted as failed: the
+   * files moved but the map still points at the old paths.
+   */
   async normalizeGeneratedNoteFilenames() {
-    let renamed = 0;
+    let renamed = 0, failed = 0;
+    const failedPaths = /* @__PURE__ */ new Set();
     for (const { file: mapFile, map } of await this.readableMaps()) {
-      let changed = false;
+      let changed = false, mapRenamed = 0;
       for (const node of map.nodes) {
         const file = this.app.vault.getAbstractFileByPath(node.path);
         if (!(file instanceof import_obsidian13.TFile) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
         const note = await this.readNote(node.path);
         if (!note.title.trim() || safeName(note.title) === file.basename) continue;
-        const oldPath = node.path, newPath = await this.renameNote(oldPath, note.title);
+        const oldPath = node.path;
+        let newPath;
+        try {
+          newPath = await this.renameNote(oldPath, note.title);
+        } catch (e) {
+          failed++;
+          failedPaths.add(oldPath);
+          continue;
+        }
         rebaseMapNotePaths(map, moveNotePath(oldPath, newPath));
         changed = true;
+        mapRenamed++;
         renamed++;
         await this.replaceSourcePath(oldPath, newPath);
       }
-      if (changed) await this.saveMap(mapFile.path, map);
+      if (!changed) continue;
+      try {
+        await this.saveMap(mapFile.path, map);
+      } catch (e) {
+        renamed -= mapRenamed;
+        failed += mapRenamed;
+      }
     }
     for (const file of await this.markedFiles("agent-map-node")) {
-      if (!/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
+      if (failedPaths.has(file.path) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
       const note = await this.readNoteIfManaged(file);
       if (!note || !note.title.trim() || safeName(note.title) === file.basename) continue;
-      const oldPath = file.path, newPath = await this.renameNote(oldPath, note.title);
+      const oldPath = file.path;
+      let newPath;
+      try {
+        newPath = await this.renameNote(oldPath, note.title);
+      } catch (e) {
+        failed++;
+        failedPaths.add(oldPath);
+        continue;
+      }
       await this.replaceSourcePath(oldPath, newPath);
       renamed++;
     }
     if (renamed) await this.rebuildDerivedData();
-    return renamed;
+    return { renamed, failed };
   }
   async setLifecycle(path, topicId, mapId, state) {
     await this.updateNote(path, { topicId, mapId, topicState: state });
@@ -47949,7 +48003,7 @@ function exchangeRefusal(reason, line) {
     case "too-deep":
       return t("ui.exchange_reason_too_big");
     default:
-      return t("ui.exchange_reason_invalid", line === void 0 ? reason : `${reason}, ${line}`);
+      return line === void 0 ? t("ui.exchange_reason_invalid") : t("ui.exchange_reason_invalid_line_0", line);
   }
 }
 async function importExchangeFile(host, file) {
@@ -48318,6 +48372,10 @@ function imageReferencesFromMarkdown(markdown) {
     ] : []
   );
   return [...new Set(blocks)].join("\n\n");
+}
+function invalidMergedContentsText(error) {
+  const syntax = typeof error === "object" && error !== null && error.name === "SyntaxError";
+  return syntax ? t("ui.invalid_merged_json") : t("ui.invalid_merged_contents");
 }
 var PartialChildBatchError = class extends Error {
 };
@@ -49144,9 +49202,7 @@ var MapConflictModal = class extends import_obsidian29.Modal {
       try {
         finish(parseMap(serializeMap(JSON.parse(input2.value))));
       } catch (error) {
-        status.setText(
-          error instanceof Error ? t("ui.invalid_merged_contents_0", error.message) : t("ui.invalid_merged_contents")
-        );
+        status.setText(invalidMergedContentsText(error));
       }
     });
   }
@@ -62368,7 +62424,7 @@ ${request.requirements}` : preset.text,
   }
   /** Adds the outline to the open map, as a new top-level tree or under the selected topic; existing nodes stay put. */
   async importOutlineIntoMap(request, placement) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e, _f;
     const settings = this.plugin.settings;
     const repo = this.plugin.repo;
     const noticeGate = { shown: false };
@@ -62512,13 +62568,17 @@ ${request.requirements}` : preset.text,
     if (state.rejection) throw state.rejection;
     const outcome = state.result;
     if (!outcome) return;
+    if (!state.saveFailed && written2 && outcome.created.length) {
+      const where = placement.kind === "tree" ? t("ui.outline_import_placement_tree") : ((_a2 = this.notes.get(placement.parentId)) == null ? void 0 : _a2.title) ? t("ui.outline_import_placement_under_named", (_c = (_b2 = this.notes.get(placement.parentId)) == null ? void 0 : _b2.title) != null ? _c : "") : t("ui.outline_import_placement_under");
+      new import_obsidian39.Notice(t("ui.outline_import_done_0_1", outcome.created.length, where));
+    }
     if (state.saveFailed || !written2 || !request.shallowResearch || !outcome.created.length) return;
     const owner = placement.kind === "under" ? placement.parentId : null;
     const several = owner !== null && (!!request.researchEveryTopic || request.nodes.filter((node) => node.parent === null).length > 1);
-    const top = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === (several ? owner : outcome.created[0].id));
+    const top = (_d = this.map) == null ? void 0 : _d.nodes.find((node) => node.id === (several ? owner : outcome.created[0].id));
     if (!top) return;
     const ids = new Set((several ? outcome.created : outcome.created.slice(1)).map((node) => node.id));
-    const children = ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : []).filter((node) => ids.has(node.id));
+    const children = ((_f = (_e = this.map) == null ? void 0 : _e.nodes) != null ? _f : []).filter((node) => ids.has(node.id));
     if (!children.length) return;
     void this.plugin.confirmAiUsage(
       model,
@@ -64258,8 +64318,20 @@ ${request.requirements}` : preset.text,
       throw this.mergeError(error);
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
-    this.history.push(this.mergeEntry(entry));
+    const mergeStep = this.mergeEntry(entry);
+    this.history.push(mergeStep);
     this.selection.afterMerge(created.id);
+    if (!content)
+      backgroundResultNotice(
+        t("ui.merge_done_0", sanitizeGeneratedTitle(title)),
+        {
+          label: t("ui.undo"),
+          open: () => {
+            if (this.history.undoEntry === mergeStep && !this.closed) this.enqueue(() => this.travel(false));
+          }
+        },
+        MERGE_DONE_NOTICE_MS
+      );
     await this.finishMerge(created.id);
   }
   /**
@@ -64320,8 +64392,20 @@ ${request.requirements}` : preset.text,
       throw this.mergeError(error);
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
-    this.history.push(this.mergeEntry(entry));
+    const mergeStep = this.mergeEntry(entry);
+    this.history.push(mergeStep);
     this.selection.afterMerge(target.id);
+    if (!content)
+      backgroundResultNotice(
+        t("ui.merge_done_0", sanitizeGeneratedTitle(name2 || sourceNotes[0].title)),
+        {
+          label: t("ui.undo"),
+          open: () => {
+            if (this.history.undoEntry === mergeStep && !this.closed) this.enqueue(() => this.travel(false));
+          }
+        },
+        MERGE_DONE_NOTICE_MS
+      );
     await this.finishMerge(target.id);
   }
   /** Keeps what a merge's relation retargeting dropped, for the notice that follows the save. */
@@ -91624,10 +91708,13 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       await this.initializeFirstInstall(!!saved);
       if (this.settings.structureVersion < 2) {
         try {
-          const count2 = await this.repo.normalizeGeneratedNoteFilenames();
-          this.settings.structureVersion = 2;
-          await this.saveSettings();
-          if (count2) new import_obsidian52.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count2));
+          const { renamed, failed } = await this.repo.normalizeGeneratedNoteFilenames();
+          if (!failed) {
+            this.settings.structureVersion = 2;
+            await this.saveSettings();
+          } else this.logs.appendLog("warn", `${t("ui.subtopic_filename_sync_failed_will_retry")} ${failed}`);
+          if (renamed) new import_obsidian52.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", renamed));
+          if (failed) new import_obsidian52.Notice(t("ui.subtopic_filename_sync_failed_will_retry"));
         } catch (error) {
           const detail = error instanceof Error ? error.message : String(error);
           this.logs.appendLog("warn", `${t("ui.subtopic_filename_sync_failed_will_retry")} ${detail}`);
@@ -91774,8 +91861,10 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     });
     this.addLocalizedCommand("normalize-note-filenames", "ui.command_sync_filenames", () => {
       this.runMutation(async () => {
-        const count2 = await this.repo.normalizeGeneratedNoteFilenames();
-        new import_obsidian52.Notice(count2 ? t("ui.synced_0_topic_filenames", count2) : t("ui.topic_filenames_are_up_to_date"));
+        const { renamed, failed } = await this.repo.normalizeGeneratedNoteFilenames();
+        new import_obsidian52.Notice(
+          failed ? t("ui.synced_0_topic_filenames_failed_1", renamed, failed) : renamed ? t("ui.synced_0_topic_filenames", renamed) : t("ui.topic_filenames_are_up_to_date")
+        );
       });
     });
     this.addLocalizedCommand("repair-note-presentation", "ui.command_repair_note_display", () => {
@@ -92116,6 +92205,12 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   /** `anchor` is the button that asked; its window gets the notice (the settings page may be a popout window). */
   async repairWorkspace(anchor) {
+    var _a2;
+    const blocked = (_a2 = this.repo.blockingFile(this.settings.mindMapsFolder)) != null ? _a2 : aimEnabled() ? this.repo.blockingFile(this.settings.aimFolder) : null;
+    if (blocked) {
+      noticeInWindowOf(t("ui.repair_workspace_blocked_0", blocked), anchor);
+      return;
+    }
     await this.repo.ensureWorkspace();
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
@@ -92414,7 +92509,11 @@ ${t("ui.organize_link_wait_hint")}`;
       }
       return folder;
     } catch (error) {
-      new import_obsidian52.Notice(error instanceof Error ? error.message : String(error));
+      this.logs.appendLog(
+        "warn",
+        `${t("ui.note_style_folder_open_failed")} ${error instanceof Error ? error.message : String(error)}`
+      );
+      new import_obsidian52.Notice(t("ui.note_style_folder_open_failed"));
       return null;
     }
   }

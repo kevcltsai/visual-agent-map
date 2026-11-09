@@ -388,13 +388,14 @@ integrationTest('hypothesis-evidence: a merge that drops a cycle-closing prerequ
   await h.relate([heRel('prerequisite', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.x, h.ids.hyp), heRel('prerequisite', h.ids.hyp, h.ids.f2)]);
   const original = await h.relations();
   await h.mergeKeys(['f1', 'f2']);
-  assert.deepEqual(h.notices, ['Removed 1 derives-from or prerequisite link(s) that would form a cycle']);
+  assert.deepEqual(h.notices.filter(text => text.startsWith('Removed')), ['Removed 1 derives-from or prerequisite link(s) that would form a cycle']);
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original, 'undo restores the dropped link too');
   const quiet = await heHarness();
   await quiet.relate([heRel('prerequisite', quiet.ids.f1, quiet.ids.x)]);
   await quiet.mergeKeys(['f1', 'f2']);
-  assert.deepEqual(quiet.notices, [], 'nothing dropped: no Notice');
+  assert.deepEqual(quiet.notices.filter(text => text.startsWith('Removed')), [], 'nothing dropped: no removal Notice');
+  assert.equal(quiet.notices.length, 1, 'only the done notice of the merge by hand');
 });
 integrationTest('hypothesis-evidence: merging subtopics into a parent re-points their links to the parent and dedupes', async () => {
   const h = await heHarness();
@@ -417,7 +418,7 @@ integrationTest('hypothesis-evidence: mergeSelected with two hypotheses merges t
   assert.equal(h.view.mergeCheck([h.ids.hyp, h.ids.hyp2]).ok, true);
   await h.mergeKeys(['hyp', 'hyp2']);
   const merged = await h.mergedId(), note = await h.repo.readNote((await h.saved()).nodes.find(n => n.id === merged).path, await h.saved());
-  assert.equal(h.notices.length, 0);
+  assert.equal(h.notices.length, 1, 'only the done notice of the merge by hand');
   assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'strong');
   assert.deepEqual(await h.relations(), [heRel('supports', h.ids.f1, merged), heRel('verifies', h.ids.f2, merged)]);
   await h.view.travel(false);
@@ -524,7 +525,7 @@ integrationTest('hypothesis-evidence: a derives-from merge that closes a cycle d
   const merged = await h.mergedId();
   assert.deepEqual(await h.relations(), [heRel('derives_from', merged, h.ids.x), heRel('derives_from', h.ids.x, h.ids.hyp), heRel('prerequisite', merged, h.ids.hyp2), heRel('prerequisite', h.ids.hyp2, h.ids.root)]);
   assert.equal(h.view.droppedCyclesOfLastMerge(), 2);
-  assert.deepEqual(h.notices, ['Removed 2 derives-from or prerequisite link(s) that would form a cycle']);
+  assert.deepEqual(h.notices.filter(text => text.startsWith('Removed')), ['Removed 2 derives-from or prerequisite link(s) that would form a cycle']);
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
   const map = await h.saved();

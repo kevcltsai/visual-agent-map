@@ -151,7 +151,7 @@ export const en = {
   "ui.exchange_reason_too_large": "the file is larger than {0} MB",
   "ui.exchange_reason_unsafe": "it contains a DOCTYPE, entity or processing instruction, which are not accepted",
   "ui.exchange_reason_too_big": "it has too many topics, elements or levels",
-  "ui.exchange_reason_invalid": "it is not a valid OPML or FreeMind outline ({0})",
+  "ui.exchange_reason_invalid": "it is not a valid OPML or FreeMind outline",
   "ui.exchange_reason_unreadable": "the file could not be read",
   "ui.exchange_export_opml": "Export as OPML",
   "ui.exchange_export_freemind": "Export as FreeMind (.mm)",
@@ -731,7 +731,7 @@ export const en = {
   "ui.mind_map_changed_externally": "Mind map changed externally",
   "ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi":
     "Both the map and Map.md have changed. Choose which version to keep.",
-  "ui.invalid_merged_contents": "Invalid merged contents.",
+  "ui.invalid_merged_contents": "The merged contents do not match the map format. Fix them, then save again.",
   "ui.no_notes_yet": "No notes yet.",
   "ui.topic_outline": "Topic outline",
   "ui.open_topic_outline": "Open topic outline",
@@ -1233,7 +1233,6 @@ export const en = {
     "The AI task exceeded 3 minutes. VAM attempts to interrupt it to avoid prolonged resource use. Incomplete results are not applied; try a smaller task.",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and":
     "Synthesize {0} selected topics. Choose full content or summaries below in this window; the new root topic is created directly and you can undo it.",
-  "ui.invalid_merged_contents_0": "Invalid merged contents: {0}",
   "ui.delete_0": "Delete “{0}”",
   "ui.unassigned_0": "Unassigned ({0})",
   "ui.archived_0": "Archived ({0})",
@@ -2768,7 +2767,8 @@ export const en = {
   "share.mermaid_blocked_note":
     "[Diagram not drawn: Mermaid was not allowed when this file was made. Source shown instead.]",
   "share.mermaid_undrawn_note": "[Diagram did not finish drawing. Source shown instead.]",
-  "share.leak_blocked_0": "Not saved: the file would contain private information ({0}). Nothing was written.",
+  "share.leak_blocked_0":
+    "Not saved: the file would contain private information ({0}). Remove that content from the source notes, or turn off the option that includes full notes, then share again.",
   "share.leak_category_vault-path": "the vault's location on this computer",
   "share.leak_category_map-folder": "the map's folder name",
   "share.leak_category_note-path": "a note's file path",
@@ -2783,7 +2783,8 @@ export const en = {
   "share.saving": "Saving…",
   "share.saved_0_1": "Saved {0} ({1})",
   "share.downloaded_0_1": "Save requested for {0} ({1}). If a save window appears, choose where to keep the file.",
-  "share.save_failed": "The file could not be saved.",
+  "share.save_failed":
+    "The file could not be saved. Check that the save location is writable, or choose another location and try again.",
   "share.publish_copy": "Copy the GitHub publishing instructions",
   "share.publish_done": "Instructions copied. Paste them into your own Claude Code or Codex.",
   "share.publish_fail": "Could not copy automatically. Select the text below and copy it yourself.",
@@ -3086,7 +3087,17 @@ export const en = {
   "ui.topic_chat_too_big": "This request touches too much; please use the AI chat in the left sidebar.",
   "ui.topic_chat_result_unknown": "See the topic itself for this result.",
   "ui.topic_chat_failed_children": "No subtopic could be researched.",
-  "ui.topic_chat_record_failed": "The topic chat record was not saved."
+  "ui.topic_chat_record_failed": "The topic chat record was not saved.",
+  "ui.exchange_reason_invalid_line_0": "it is not a valid OPML or FreeMind outline (line {0})",
+  "ui.invalid_merged_json":
+    "The merged contents are not valid JSON: check the quotes, commas and braces, then save again.",
+  "ui.note_style_folder_open_failed":
+    "The note style folder could not be opened: a file with the same name may be in the way, or the folder cannot be written. Rename or move that file, then try again.",
+  "ui.synced_0_topic_filenames_failed_1":
+    "Synced {0} topic filenames; {1} failed. Make sure the folder holding them is writable (not read-only or locked by another program), then run this again.",
+  "ui.repair_workspace_blocked_0":
+    "Repair failed: “{0}” is a file where a folder should be. Rename or move that file, then repair again.",
+  "ui.outline_import_done_0_1": "Added {0} topics to {1}."
 } as const;
 
 export type TranslationKey = keyof typeof en;

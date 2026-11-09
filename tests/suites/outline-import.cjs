@@ -660,7 +660,7 @@ integrationTest('importOutline as a new tree: a new top-level topic in the open 
   assert.ok(a.includes(`Parent topic: [[${top.path.replace(/\.md$/, '')}]]`), a);
   assert.ok(a.includes(`Child topics: [[${byTitle.get('A1').path.replace(/\.md$/, '')}]]`), a);
   assert.equal(saved.title, 'Existing'); assert.equal(saved.detailTemplateId, undefined);
-  assert.equal(h.researched.length, 0); assert.deepEqual(h.notices, []);
+  assert.equal(h.researched.length, 0); assert.equal(h.notices.length, 1, 'only the done notice'); assert.match(h.notices[0], /^Added \d+ topics to /);
   assert.equal(h.view.history.canUndo, true);
   await h.view.history.undo().undo();
   assert.deepEqual(plain((await h.repo.readMap(h.mapPath)).nodes.map(item => item.id)), plain(before.map(item => item.id)));

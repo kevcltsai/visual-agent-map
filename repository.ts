@@ -1348,6 +1348,17 @@ export class Repository {
     }
   }
 
+  /** The first part of `path` that is a file rather than a folder (it blocks the folder), or null when none does. */
+  blockingFile(path: string): string | null {
+    let current = "";
+    for (const part of normalizePath(path).split("/").filter(Boolean)) {
+      current = current ? `${current}/${part}` : part;
+      const entry = this.app.vault.getAbstractFileByPath(current);
+      if (entry && !(entry instanceof TFolder)) return current;
+    }
+    return null;
+  }
+
   workspaceExists(): boolean {
     return this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder) instanceof TFolder;
   }
@@ -2680,35 +2691,65 @@ export class Repository {
     return marker(fm["agent-map-node"]) ? this.readNote(file.path) : null;
   }
 
-  async normalizeGeneratedNoteFilenames(): Promise<number> {
-    let renamed = 0;
+  /**
+   * Renames generated subtopic notes to their titles. A note that cannot be renamed (a read-only folder, say) is counted
+   * in `failed` and skipped, so the rest still go. When a map cannot be saved, its renames are counted as failed: the
+   * files moved but the map still points at the old paths.
+   */
+  async normalizeGeneratedNoteFilenames(): Promise<{ renamed: number; failed: number }> {
+    let renamed = 0,
+      failed = 0;
+    // Notes that failed in the map pass: the marked-file pass below must not count them a second time.
+    const failedPaths = new Set<string>();
     for (const { file: mapFile, map } of await this.readableMaps()) {
-      let changed = false;
+      let changed = false,
+        mapRenamed = 0;
       for (const node of map.nodes) {
         const file = this.app.vault.getAbstractFileByPath(node.path);
         if (!(file instanceof TFile) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
         const note = await this.readNote(node.path);
         if (!note.title.trim() || safeName(note.title) === file.basename) continue;
-        const oldPath = node.path,
+        const oldPath = node.path;
+        let newPath: string;
+        try {
           newPath = await this.renameNote(oldPath, note.title);
+        } catch {
+          failed++;
+          failedPaths.add(oldPath);
+          continue;
+        }
         rebaseMapNotePaths(map, moveNotePath(oldPath, newPath));
         changed = true;
+        mapRenamed++;
         renamed++;
         await this.replaceSourcePath(oldPath, newPath);
       }
-      if (changed) await this.saveMap(mapFile.path, map);
+      if (!changed) continue;
+      try {
+        await this.saveMap(mapFile.path, map);
+      } catch {
+        renamed -= mapRenamed;
+        failed += mapRenamed;
+      }
     }
     for (const file of await this.markedFiles("agent-map-node")) {
-      if (!/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
+      if (failedPaths.has(file.path) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
       const note = await this.readNoteIfManaged(file);
       if (!note || !note.title.trim() || safeName(note.title) === file.basename) continue;
-      const oldPath = file.path,
+      const oldPath = file.path;
+      let newPath: string;
+      try {
         newPath = await this.renameNote(oldPath, note.title);
+      } catch {
+        failed++;
+        failedPaths.add(oldPath);
+        continue;
+      }
       await this.replaceSourcePath(oldPath, newPath);
       renamed++;
     }
     if (renamed) await this.rebuildDerivedData();
-    return renamed;
+    return { renamed, failed };
   }
 
   async setLifecycle(path: string, topicId: string, mapId: string, state: TopicState): Promise<void> {

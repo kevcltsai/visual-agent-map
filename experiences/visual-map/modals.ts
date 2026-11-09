@@ -218,6 +218,14 @@ export function reasoningLabel(level: string): string {
   };
   return labels[normalizeReasoningLevel(level)];
 }
+
+/** What the manual merge says for a bad edit: a JSON syntax slip, or a structure the map cannot take. */
+export function invalidMergedContentsText(error: unknown): string {
+  // Checked by name: `instanceof SyntaxError` fails for an error from another realm (a vm bundle, a worker).
+  const syntax = typeof error === "object" && error !== null && (error as { name?: unknown }).name === "SyntaxError";
+  return syntax ? t("ui.invalid_merged_json") : t("ui.invalid_merged_contents");
+}
+
 export class PartialChildBatchError extends Error {}
 export interface AgentTaskHandle {
   finished: Promise<void>;
@@ -1147,10 +1155,8 @@ export class MapConflictModal extends Modal {
       try {
         finish(parseMap(serializeMap(JSON.parse(input.value) as MapDocument)));
       } catch (error) {
-        // Keep the edited JSON and say what is wrong next to the button.
-        status.setText(
-          error instanceof Error ? t("ui.invalid_merged_contents_0", error.message) : t("ui.invalid_merged_contents")
-        );
+        // Keep the edited JSON and say what is wrong next to the button (never the parser's English message).
+        status.setText(invalidMergedContentsText(error));
       }
     });
   }

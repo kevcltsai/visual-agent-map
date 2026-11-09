@@ -6816,6 +6816,16 @@ export class VisualAgentMapView extends ItemView {
     if (state.rejection) throw state.rejection;
     const outcome = state.result;
     if (!outcome) return;
+    // The result notice says where the topics went and how many there are.
+    if (!state.saveFailed && written && outcome.created.length) {
+      const where =
+        placement.kind === "tree"
+          ? t("ui.outline_import_placement_tree")
+          : this.notes.get(placement.parentId)?.title
+            ? t("ui.outline_import_placement_under_named", this.notes.get(placement.parentId)?.title ?? "")
+            : t("ui.outline_import_placement_under");
+      new Notice(t("ui.outline_import_done_0_1", outcome.created.length, where));
+    }
     if (state.saveFailed || !written || !request.shallowResearch || !outcome.created.length) return;
     // An outline with several top headings, or one without a root of its own (quick explore drops the topic's root),
     // is researched under the parent.
@@ -8730,8 +8740,21 @@ export class VisualAgentMapView extends ItemView {
       throw this.mergeError(error);
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
-    this.history.push(this.mergeEntry(entry));
+    const mergeStep = this.mergeEntry(entry);
+    this.history.push(mergeStep);
     this.selection.afterMerge(created.id);
+    // A merge by hand has no result notice of its own (the AI merge shows one): say it is done and offer the undo.
+    if (!content)
+      backgroundResultNotice(
+        t("ui.merge_done_0", sanitizeGeneratedTitle(title)),
+        {
+          label: t("ui.undo"),
+          open: () => {
+            if (this.history.undoEntry === mergeStep && !this.closed) this.enqueue(() => this.travel(false));
+          }
+        },
+        MERGE_DONE_NOTICE_MS
+      );
     await this.finishMerge(created.id);
   }
   /**
@@ -8817,8 +8840,21 @@ export class VisualAgentMapView extends ItemView {
       throw this.mergeError(error);
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
-    this.history.push(this.mergeEntry(entry));
+    const mergeStep = this.mergeEntry(entry);
+    this.history.push(mergeStep);
     this.selection.afterMerge(target.id);
+    // Same as the plain merge: a merge by hand says it is done and offers the undo.
+    if (!content)
+      backgroundResultNotice(
+        t("ui.merge_done_0", sanitizeGeneratedTitle(name || sourceNotes[0].title)),
+        {
+          label: t("ui.undo"),
+          open: () => {
+            if (this.history.undoEntry === mergeStep && !this.closed) this.enqueue(() => this.travel(false));
+          }
+        },
+        MERGE_DONE_NOTICE_MS
+      );
     await this.finishMerge(target.id);
   }
   /** Keeps what a merge's relation retargeting dropped, for the notice that follows the save. */

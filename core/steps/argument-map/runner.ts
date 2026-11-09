@@ -5,6 +5,7 @@ import { conclusionStep } from "./conclusion";
 import { situationGateStep } from "./gate";
 import { hypothesesStep } from "./hypotheses";
 import { needsStep } from "./needs";
+import { planSituationStep } from "./plan";
 import { ArgumentStepError, type ArgumentStepBase } from "./shared";
 import { verdictStep } from "./verdict";
 
@@ -12,15 +13,16 @@ export * from "./conclusion";
 export * from "./gate";
 export * from "./hypotheses";
 export * from "./needs";
+export * from "./plan";
 export { ArgumentStepError, type ArgumentStepBase } from "./shared";
 export * from "./verdict";
 
 /**
- * The five steps and the machine actions they serve. `plan_situation` (listing the situation data to look up) is not one of
- * the five: it is not part of this packet. `revise` runs `needsStep` again for the same hypothesis; `research_situation` and
+ * The six steps and the machine actions they serve. `revise` runs `needsStep` again for the same hypothesis; `research_situation` and
  * `research_need` are the browsing research path, not steps here.
  */
 export const ARGUMENT_STEPS = {
+  plan_situation: planSituationStep,
   judge_gate: situationGateStep,
   propose_hypotheses: hypothesesStep,
   add_needs: needsStep,
@@ -32,7 +34,7 @@ export const ARGUMENT_STEPS = {
 export type ArgumentStepRunner<Request extends ArgumentStepBase, Output> = ProviderStepRunner<Request, Output>;
 
 /**
- * A runner for any of the five steps over `providerStepRunner`, which always sends `textOnly: true, searchBudget: 0`: Claude
+ * A runner for any of the six steps over `providerStepRunner`, which always sends `textOnly: true, searchBudget: 0`: Claude
  * runs with `--tools ""`, Codex with web search disabled. There is no way to switch search on through this runner.
  */
 export function providerArgumentRunner<Request extends ArgumentStepBase, Output>(

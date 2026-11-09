@@ -8,7 +8,7 @@ import languageEn from "./language.en.md";
 import languageZh from "./language.zh.md";
 
 /**
- * Shared parts of the five argument-map steps (situation gate, hypotheses, evidence needs, verdict, conclusion). None of them
+ * Shared parts of the six argument-map steps (situation plan, situation gate, hypotheses, evidence needs, verdict, conclusion). None of them
  * browses: each runs text-only with a search budget of 0 (see `runner.ts`), its request type holds exactly the fields the
  * prompt may show, and its parser refuses any id, number or URL the request did not contain.
  */

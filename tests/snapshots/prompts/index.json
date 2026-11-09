@@ -901,6 +901,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "argument-map-plan-situation.en": {
+      "builder": "core/steps/argument-map/plan.ts planSituationStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-plan-situation.zh": {
+      "builder": "core/steps/argument-map/plan.ts planSituationStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-plan-situation.zh-CN": {
+      "builder": "core/steps/argument-map/plan.ts planSituationStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "argument-map-situation-gate.en": {
       "builder": "core/steps/argument-map/gate.ts situationGateStep",
       "language": "en",

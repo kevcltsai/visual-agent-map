@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "need": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "need"
+        ]
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "data"
+  ]
+}

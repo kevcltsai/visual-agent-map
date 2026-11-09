@@ -4,7 +4,7 @@
  * each card's children and then lets the ordinary "right" engine place them. `LayoutKind` is not touched and nothing
  * is stored: a map without a usable `argumentMap` never comes here.
  */
-import type { MapNode } from "../map-graph";
+import type { MapNode } from "../../map-graph";
 import { arrangeMap, type HeightOf } from "../../map-layout";
 import { isVerified, type ArgumentMapData, type Hypothesis, type Need, type SituationDatum } from "./model";
 

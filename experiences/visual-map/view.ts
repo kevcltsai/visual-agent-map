@@ -26684,7 +26684,11 @@ export class VisualAgentMapView extends ItemView {
    * The map edit for one dropped card. Built here, not inside enableDrag: the undo history keeps every edit, and a closure made
    * inside the drag shares its scope (the card, the edge helpers) and would keep all of that off-screen after each drop.
    */
-  private cardDropEdit(nodeId: string, position: { x: number; y: number }, centerX: number): (map: MapDocument) => void {
+  private cardDropEdit(
+    nodeId: string,
+    position: { x: number; y: number },
+    centerX: number
+  ): (map: MapDocument) => void {
     return map => {
       const current = map.nodes.find(n => n.id === nodeId);
       if (!current) return;

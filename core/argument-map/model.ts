@@ -122,6 +122,9 @@ export interface Hypothesis {
   round: number;
   location: Location;
   needs: Need[];
+  /** Facet-judged maps: "from datum X we observe Y, so we guess Z", and whether it explains the proposition by a cause other than the one it names. */
+  basis?: string;
+  alternative?: boolean;
   aiVerdict?: Verdict;
   userVerdict?: Verdict;
   eliminationReason?: string;
@@ -250,6 +253,8 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
     if (!oneOf(LOCATIONS, hypothesis.location) || !optOneOf(VERDICTS, hypothesis.aiVerdict))
       return "unknown hypothesis enum";
     if (!optOneOf(VERDICTS, hypothesis.userVerdict) || !optStr(hypothesis.eliminationReason))
+      return "hypothesis malformed";
+    if (!optStr(hypothesis.basis) || (hypothesis.alternative !== undefined && typeof hypothesis.alternative !== "boolean"))
       return "hypothesis malformed";
     for (const need of hypothesis.needs as unknown[]) {
       if (!isRec(need) || !isStr(need.id) || !isStr(need.text) || !count(need.addedRound) || ids.has(need.id))

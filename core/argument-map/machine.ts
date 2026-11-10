@@ -629,7 +629,10 @@ export function applySituationGate(
 }
 
 // ---- hypotheses and needs ----------------------------------------------------------------------------------------------------
-export function applyHypotheses(state: ArgumentMapData, items: { id: string; citedData: string[] }[]): ArgumentMapData {
+export function applyHypotheses(
+  state: ArgumentMapData,
+  items: { id: string; citedData: string[]; basis?: string; alternative?: boolean }[]
+): ArgumentMapData {
   inAnalysis(state);
   if (!items.length) throw new GateError("no hypotheses");
   if (state.hypotheses.length + items.length > MAX_HYPOTHESES) throw new GateError("hypothesis limit reached");
@@ -640,12 +643,20 @@ export function applyHypotheses(state: ArgumentMapData, items: { id: string; cit
     const cited = Array.isArray(item.citedData) ? item.citedData : [];
     if (!cited.length || cited.some(id => !foundData.has(id)))
       throw new GateError("a hypothesis must cite found situation data");
+    // A facet map (decision #50): every hypothesis states its basis and rests on data that support the proposition only.
+    const facetMap = next.situation.facets !== undefined;
+    if (facetMap) {
+      if (blank(item.basis)) throw new GateError("a hypothesis needs a basis");
+      if (cited.some(id => next.situation.data.find(d => d.id === id)?.propStance !== "supports"))
+        throw new GateError("a hypothesis may cite only data that support the proposition");
+    }
     next.hypotheses.push({
       id: newId(ids, item.id),
       citedData: [...cited],
       round: 1,
       location: "verifying",
-      needs: []
+      needs: [],
+      ...(facetMap ? { basis: item.basis, alternative: item.alternative === true } : {})
     });
   }
   return next;

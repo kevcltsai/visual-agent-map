@@ -349,9 +349,10 @@ test('collect snapshots: chart step (chart.add@1)', () => {
     for (const [name, key, input] of [
       ['facet-judge', 'facetJudgeStep', { ...request, round: 1, facets: judgeFacets }],
       ['facet-judge-round2', 'facetJudgeStep', { ...request, round: 2, facets: judgeFacets.slice(1, 2) }],
+      ['facet-hypotheses', 'facetHypothesesStep', { ...request, data: argumentData.map(d => ({ ...d, propStance: 'supports' })), count: 3, existing: [], causalQuestions: ['Did automation drive the rise?'] }],
       ['facet-plan', 'facetPlanStep', request],
       ['hypotheses-causal', 'hypothesesStep', { ...request, data: argumentData, count: 3, existing: ['Earlier hypothesis title'], causalQuestions: ['Did automation drive the rise?'] }]
-    ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name.startsWith('facet-judge') ? 'facet-judge' : name === 'facet-plan' ? 'facet-plan' : 'hypotheses'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
+    ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name.startsWith('facet-judge') ? 'facet-judge' : name === 'facet-hypotheses' ? 'facet-hypotheses' : name === 'facet-plan' ? 'facet-plan' : 'hypotheses'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
     for (const [name, key, input] of steps) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'situation-gate' ? 'gate' : name === 'plan-situation' ? 'plan' : name}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
   }
   for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);

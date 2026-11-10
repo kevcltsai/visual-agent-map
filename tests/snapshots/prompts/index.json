@@ -16,6 +16,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "argument-map-facet-hypotheses.en": {
+      "builder": "core/steps/argument-map/facet-hypotheses.ts facetHypothesesStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-facet-hypotheses.zh": {
+      "builder": "core/steps/argument-map/facet-hypotheses.ts facetHypothesesStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-facet-hypotheses.zh-CN": {
+      "builder": "core/steps/argument-map/facet-hypotheses.ts facetHypothesesStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "argument-map-facet-judge-round2.en": {
       "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
       "language": "en",

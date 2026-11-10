@@ -697,7 +697,7 @@ test('facet boost: 2 of 4 supports and no refutes goes to analysis, and hypothes
   assert.equal(s.run.phase, 'analysis');
   assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'supports', 'insufficient', 'insufficient']);
   assert.ok(s.situation.gate.citedData.length >= 1);
-  assert.equal(m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'] }]).hypotheses.length, 1);
+  assert.equal(m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'], basis: 'from f1d1 we observe the rate, so we guess a cause' }]).hypotheses.length, 1);
 });
 test('facet boost: 1 of 4 supports: retry round, then still short: data_insufficient (stopReason data_missing)', () => {
   let s = researchAll(planned([1, 1, 1, 1]), ['f2d1', 'f3d1']);
@@ -891,4 +891,23 @@ test('facet summary: the judgement stores each facet summary; a blank or missing
   j.facets.find(v => v.id === empty.id).summary = '';
   assert.throws(() => m.applyFacetVerdicts(nodata, j), e => e.name === 'GateError' && /summary/.test(e.message));
   assert.equal(judged(nodata).situation.facets.find(f => f.id === empty.id).summary, `summary of ${empty.id}`);
+});
+
+// ---- V1 boost P4 (decision #50): basis, alternative and the supports-only citation on a facet map ----
+const matchedFacets = () => judged(researchAll(planned([1, 1, 1, 1])), { f3d1: 'irrelevant', f4d1: 'refutes' }, { f3: 'insufficient', f4: 'insufficient' });
+test('facet hypotheses: basis and alternative are stored; a blank basis is refused; only data that support the proposition can be cited', () => {
+  const s = matchedFacets();
+  assert.equal(s.situation.gate.state, 'matched');
+  const h = m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'], basis: 'from f1d1 we observe a rise, so we guess hiring slowed', alternative: true }]).hypotheses[0];
+  assert.equal(h.basis, 'from f1d1 we observe a rise, so we guess hiring slowed');
+  assert.equal(h.alternative, true);
+  for (const basis of ['', '  ', undefined]) refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'], basis }]));
+  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f3d1'], basis: 'b' }]));
+  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f4d1'], basis: 'b' }]));
+  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1', 'f4d1'], basis: 'b' }]));
+});
+test('facet hypotheses: an old map (no facets) accepts the old item shape and stores no basis or alternative', () => {
+  const h = withHypotheses(["h1"]).hypotheses[0];
+  assert.equal('basis' in h, false);
+  assert.equal('alternative' in h, false);
 });

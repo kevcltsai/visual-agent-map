@@ -245,16 +245,16 @@ test('conclusion: a number or URL outside the input throws; below 3 verified hyp
 
 // ---- schemas and registry ----
 test('every step has a strict schema and the registry maps the machine actions', () => {
-  for (const step of [mod.planSituationStep, mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.needsStep, mod.verdictStep, mod.conclusionStep]) {
+  for (const step of [mod.planSituationStep, mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.conclusionStep]) {
     assert.equal(step.schema.additionalProperties, false);
     assert.deepEqual([...step.schema.required].sort(), Object.keys(step.schema.properties).sort());
   }
-  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_facets', 'judge_gate', 'plan_facets', 'plan_situation', 'propose_hypotheses', 'revise', 'verdict']);
+  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_facets', 'judge_gate', 'plan_facets', 'plan_situation', 'propose_facet_hypotheses', 'propose_hypotheses', 'revise', 'verdict']);
   assert.equal(mod.ARGUMENT_STEPS.plan_facets, mod.facetPlanStep);
   assert.equal(mod.ARGUMENT_STEPS.plan_situation, mod.planSituationStep);
   assert.equal(mod.ARGUMENT_STEPS.revise, mod.needsStep);
   const ids = new Set(Object.values(mod.ARGUMENT_STEPS).map(step => step.id));
-  assert.equal(ids.size, 8);
+  assert.equal(ids.size, 9);
 });
 
 // ---- text-only through the real runtimes ----
@@ -357,6 +357,45 @@ test('facet judge: the prompt shows only the proposition and the facets; a secre
   assert.throws(() => sr.prepareStep(mod.facetJudgeStep, fjReq({ facets: [] })), error => error.name === 'ArgumentStepError');
 });
 
+// ---- V1 boost P4 (decision #50): hypotheses of a facet map ----
+const fhReq = (over = {}) => ({ ...base, proposition: PROP, count: 3, existing: [], causalQuestions: ['Did automation drive the rise?'],
+  data: [datum('d1', { propStance: 'supports' }), datum('d2', { propStance: 'supports' }), datum('d3', { propStance: 'irrelevant' }), datum('d4', { propStance: 'refutes' })], ...over });
+const fh = (title, over = {}) => ({ title, statement: `${title} statement`, basis: `From d1 we observe the rate, so we guess ${title}`, alternative: false, citedData: ['d1'], ...over });
+const fhOk = () => ({ hypotheses: [fh('Hiring slowed'), fh('Entry jobs automated'), fh('Wages stalled', { alternative: true, citedData: ['d1', 'd2'] })] });
+const fhWith = fn => { const v = fhOk(); fn(v); return v; };
+test('facet hypotheses: a well formed reply parses with basis and alternative; the old step keeps its V1 schema and parser', () => {
+  assert.deepEqual(plain(ok(mod.facetHypothesesStep, fhReq(), fhOk())), fhOk());
+  assert.deepEqual(Object.keys(mod.hypothesesStep.schema.properties.hypotheses.items.properties), ['title', 'statement', 'citedData']);
+  assert.deepEqual(plain(ok(mod.hypothesesStep, hypReq, hypOk)), hypOk);
+  bad(mod.hypothesesStep, hypReq, { hypotheses: hypOk.hypotheses.map(h => ({ ...h, basis: 'x' })) });
+  assert.deepEqual(Object.keys(mod.facetHypothesesStep.schema.properties.hypotheses.items.properties), ['title', 'statement', 'basis', 'alternative', 'citedData']);
+  assert.equal(mod.ARGUMENT_STEPS.propose_facet_hypotheses, mod.facetHypothesesStep);
+});
+test('facet hypotheses: an empty or missing basis, or a non-boolean alternative, is refused', () => {
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = ''; }), /basis/);
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = '  '; }), /basis/);
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { delete v.hypotheses[0].basis; }));
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].alternative = 'yes'; }), /alternative/);
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = 'we guess 11.4 percent'; }), /number 11.4/);
+});
+test('facet hypotheses: citing irrelevant or refuting data is refused', () => {
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d3']; }), /support/);
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d4']; }), /support/);
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d1', 'd4']; }), /support/);
+});
+test('facet hypotheses: the first batch needs one alternative; a later (replacement) batch does not', () => {
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[2].alternative = false; }), /alternative/);
+  assert.ok(ok(mod.facetHypothesesStep, fhReq({ existing: ['Earlier hypothesis'], count: 1 }), { hypotheses: [fh('Replacement idea')] }));
+});
+test('facet hypotheses: a title equal to a causal question (after folding) is refused; the question is shown as a question, not a hypothesis', () => {
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].title = 'did AUTOMATION drive the rise'; }), /causal question/);
+  const prompt = mod.facetHypothesesStep.render(fhReq());
+  assert.match(prompt, /Did automation drive the rise\?/);
+  assert.match(prompt, /not candidate hypotheses/);
+  assert.match(prompt, /"propStance":"supports"/);
+  assert.match(prompt, /one hypothesis whose alternative is true/);
+});
+
 const stepCases = () => {
   const f = conclusionFixture();
   const v = verdictFixture();
@@ -364,6 +403,7 @@ const stepCases = () => {
     ['plan', mod.planSituationStep, planReq, { data: [{ need: 'Official rate series' }] }],
     ['gate', mod.situationGateStep, gateReq, gateOk],
     ['facet-judge', mod.facetJudgeStep, fjReq(), fjOk()],
+    ['facet-hypotheses', mod.facetHypothesesStep, fhReq(), fhOk()],
     ['hypotheses', mod.hypothesesStep, hypReq, hypOk],
     ['needs', mod.needsStep, needReq, { needs: [{ text: 'Job posting trends for juniors' }] }],
     ['verdict', mod.verdictStep, vReq(v.input), { verdict: 'supported', citedNeeds: ['h1-n1'], reason: 'The claim of h1 is backed' }],

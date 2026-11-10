@@ -154,6 +154,18 @@ test('facet boost model: facets, assumptions, facetId, propStance, round and dat
   assert.equal(model.readArgumentMap(facetMapDoc()).kind, 'usable');
   assert.equal(model.UNCERTAIN_RESEARCH_STANCE, 'irrelevant');
 });
+test('facet hypotheses model: basis and alternative are optional, read as usable and round-trip; a wrong type is unusable', () => {
+  const doc = facetMapDoc();
+  doc.argumentMap.hypotheses.push({ id: 'h1', citedData: [], round: 1, location: 'verifying', needs: [], basis: 'from d1 we observe x, so we guess y', alternative: true });
+  const text = core.serializeMap(doc);
+  assert.equal(roundTrip(text), text);
+  assert.equal(model.readArgumentMap(core.parseMap(text)).kind, 'usable');
+  for (const over of [{ basis: 5 }, { alternative: 'yes' }]) {
+    const d = facetMapDoc();
+    d.argumentMap.hypotheses.push({ id: 'h1', citedData: [], round: 1, location: 'verifying', needs: [], ...over });
+    assert.notEqual(model.readArgumentMap(core.parseMap(core.serializeMap(d))).kind, 'usable');
+  }
+});
 const badFacets = {
   'datum with a facetId that is not a facet': d => { d.situation.data[0].facetId = 'ghost'; },
   'datum without a facetId on a facet map': d => { delete d.situation.data[0].facetId; },

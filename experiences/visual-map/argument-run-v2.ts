@@ -40,7 +40,13 @@ import {
   type EvidenceResult
 } from "../../core/argument-map/machine-v2";
 import type { ArgumentMapData, ArgumentRoles, Framing } from "../../core/argument-map/model";
-import { MAX_FRAMING_CALLS, MAX_HYPOTHESES, MAX_ROUND_NEEDS, WORST_CASE_AI_CALLS, readArgumentMap } from "../../core/argument-map/model";
+import {
+  MAX_FRAMING_CALLS,
+  MAX_HYPOTHESES,
+  MAX_ROUND_NEEDS,
+  WORST_CASE_AI_CALLS,
+  readArgumentMap
+} from "../../core/argument-map/model";
 import { unverifiedQuoteLog, verifySourceV2 } from "../../core/argument-map/source-proof";
 import {
   ARGUMENT_STEPS_V2,
@@ -235,7 +241,14 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
   private t(key: TranslationKey, ...values: unknown[]): string {
     return this.ports.t(key, ...values.map(v => (typeof v === "string" ? plainLine(v) : v)));
   }
-  private makeNote(kind: Kind, title: string, summary: string | undefined, map: MapDocument, mapPath: string, id?: string): Promise<MapNode> {
+  private makeNote(
+    kind: Kind,
+    title: string,
+    summary: string | undefined,
+    map: MapDocument,
+    mapPath: string,
+    id?: string
+  ): Promise<MapNode> {
     const input: NoteInput = { kind, title: plainLine(title) };
     if (summary !== undefined) input.summary = plainLine(summary);
     return this.ports.createNote(input, map, mapPath).then(node => {
@@ -258,7 +271,8 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
   async frame(original: string, options: FrameOptions): Promise<FramingResult> {
     if (this.disposed) throw new ArgumentRunV2Error("disposed");
     const attempt = options.attempt;
-    if (!Number.isInteger(attempt) || attempt < 1 || attempt > MAX_FRAMING_CALLS) throw new ArgumentRunV2Error("framing_limit");
+    if (!Number.isInteger(attempt) || attempt < 1 || attempt > MAX_FRAMING_CALLS)
+      throw new ArgumentRunV2Error("framing_limit");
     // No map exists yet: the port is asked for the global configuration with an empty path, and no usage path is sent.
     const config = this.ports.config("");
     const controller = new AbortController();
@@ -267,7 +281,14 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
     try {
       return await this.ports.runStep(
         ARGUMENT_STEPS_V2.frame,
-        { language: config.language, model: config.model, reasoning: config.reasoning, original, note: options.note ?? "", attempt },
+        {
+          language: config.language,
+          model: config.model,
+          reasoning: config.reasoning,
+          original,
+          note: options.note ?? "",
+          attempt
+        },
         signal
       );
     } finally {
@@ -299,7 +320,12 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
           newArgumentMap(locked.framing, {
             runId,
             roles: { proposition: "r-p", premises: "r-r", conclusion: "r-c" },
-            claims: this.drafts(locked, label => label, (label, i) => `${label}-d${i}`, label => `${label}-cmp`)
+            claims: this.drafts(
+              locked,
+              label => label,
+              (label, i) => `${label}-d${i}`,
+              label => `${label}-cmp`
+            )
           });
         } catch (error) {
           if (!(error instanceof GateError)) throw error;
@@ -307,9 +333,21 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
           return;
         }
         const p = this.ports;
-        const proposition = await this.makeNote("proposition", shorten(locked.framing.restatement, 80), locked.framing.restatement, map, mapPath);
+        const proposition = await this.makeNote(
+          "proposition",
+          shorten(locked.framing.restatement, 80),
+          locked.framing.restatement,
+          map,
+          mapPath
+        );
         const premises = await this.makeNote("group", p.t("ui.argument_situation"), undefined, map, mapPath);
-        const conclusion = await this.makeNote("conclusion", p.t("ui.argument_conclusion"), p.t("ui.argument_in_progress"), map, mapPath);
+        const conclusion = await this.makeNote(
+          "conclusion",
+          p.t("ui.argument_conclusion"),
+          p.t("ui.argument_in_progress"),
+          map,
+          mapPath
+        );
         const roles: ArgumentRoles = { proposition: proposition.id, premises: premises.id, conclusion: conclusion.id };
         const parents: [MapNode, string | null][] = [
           [proposition, null],
@@ -317,16 +355,31 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
           [conclusion, proposition.id]
         ];
         const labels = new Map(locked.claims.map(c => [c.id, p.newId()]));
-        const drafts = this.drafts(locked, label => labels.get(label) ?? label, () => p.newId(), () => p.newId());
+        const drafts = this.drafts(
+          locked,
+          label => labels.get(label) ?? label,
+          () => p.newId(),
+          () => p.newId()
+        );
         for (const claim of drafts) {
           const premise = claim.role === "premise";
           const card = await this.makeNote("group", shorten(claim.text, 80), claim.text, map, mapPath, claim.id);
           parents.push([card, premise ? premises.id : proposition.id]);
           for (const datum of claim.data ?? [])
-            parents.push([await this.makeNote("datum", shorten(datum.need, 80), datum.need, map, mapPath, datum.id), claim.id]);
+            parents.push([
+              await this.makeNote("datum", shorten(datum.need, 80), datum.need, map, mapPath, datum.id),
+              claim.id
+            ]);
           if (claim.comparisonNodeId !== undefined)
             parents.push([
-              await this.makeNote("group", `${p.t("ui.argument_conclusion")} · ${shorten(claim.text, 60)}`, undefined, map, mapPath, claim.comparisonNodeId),
+              await this.makeNote(
+                "group",
+                `${p.t("ui.argument_conclusion")} · ${shorten(claim.text, 60)}`,
+                undefined,
+                map,
+                mapPath,
+                claim.comparisonNodeId
+              ),
               claim.id
             ]);
         }
@@ -337,7 +390,9 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
           doc.argumentMap = newArgumentMap(locked.framing, { runId, roles, claims: drafts });
         });
         p.clearUndo(mapPath);
-        this.ports.log(`argument-run start runId=${runId} phase=${drafts.some(d => d.role === "premise") ? "premises" : "analysis"}`);
+        this.ports.log(
+          `argument-run start runId=${runId} phase=${drafts.some(d => d.role === "premise") ? "premises" : "analysis"}`
+        );
       });
     });
     await drive.done;
@@ -372,7 +427,8 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
     if (read.kind === "legacy") return { ok: false, refusal: "legacy" };
     if (read.kind === "unusable") return { ok: false, refusal: "unusable" };
     if (read.kind === "absent") return { ok: false, refusal: "missing" };
-    if (TERMINAL.includes(read.data.run.phase) || read.data.run.status === "finished") return { ok: false, refusal: "finished" };
+    if (TERMINAL.includes(read.data.run.phase) || read.data.run.status === "finished")
+      return { ok: false, refusal: "finished" };
     if (read.data.run.status !== "paused") return { ok: false, refusal: "not_paused" };
     const drive = this.open(mapPath, read.data.run.runId);
     drive.done = this.go(drive, async () => {
@@ -401,7 +457,8 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
     await this.ports.mutate(async () => {
       if (this.disposed) return;
       const read = readArgumentMap(await this.ports.readMap(mapPath));
-      if (read.kind !== "usable" || read.data.run.status !== "running" || TERMINAL.includes(read.data.run.phase)) return;
+      if (read.kind !== "usable" || read.data.run.status !== "running" || TERMINAL.includes(read.data.run.phase))
+        return;
       const before = read.data;
       await this.ports.updateMap(mapPath, doc => {
         const now = readArgumentMap(doc);
@@ -620,19 +677,29 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
     const base = this.base(drive);
     switch (action.type) {
       case "premise_missing":
-        await this.checkpoint(drive, async (s, map) => this.afterPremise(applyPremiseMissing(s, action.claimId), action.claimId, map));
+        await this.checkpoint(drive, async (s, map) =>
+          this.afterPremise(applyPremiseMissing(s, action.claimId), action.claimId, map)
+        );
         return;
       case "assess_premise": {
         const claim = this.claimOf(state, action.claimId);
-        const result = await this.ask(drive, ARGUMENT_STEPS_V2.assess_premise, { ...base, ...premiseAssessmentParts(claim) });
-        await this.checkpoint(drive, async s => ({ next: applyPremiseAssessments(s, action.claimId, premiseAssessmentItems(result)) }));
+        const result = await this.ask(drive, ARGUMENT_STEPS_V2.assess_premise, {
+          ...base,
+          ...premiseAssessmentParts(claim)
+        });
+        await this.checkpoint(drive, async s => ({
+          next: applyPremiseAssessments(s, action.claimId, premiseAssessmentItems(result))
+        }));
         return;
       }
       case "judge_premise": {
         const claim = this.claimOf(state, action.claimId);
         const result = await this.ask(drive, ARGUMENT_STEPS_V2.judge_premise, {
           ...base,
-          premise: { text: claim.text, definitions: claim.definitions.map(d => ({ term: d.term, meaning: d.meaning })) },
+          premise: {
+            text: claim.text,
+            definitions: claim.definitions.map(d => ({ term: d.term, meaning: d.meaning }))
+          },
           data: premiseVerdictData(claim)
         });
         await this.checkpoint(drive, async (s, map) => {
@@ -652,16 +719,29 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
       case "next_round":
         return this.needs(drive, state, action.hypothesisId, action.type === "next_round");
       case "assess_evidence": {
-        const result = await this.ask(drive, ARGUMENT_STEPS_V2.assess_evidence, { ...base, ...needAssessmentParts(state, action.hypothesisId) });
-        await this.checkpoint(drive, async s => ({ next: applyEvidenceAssessment(s, action.hypothesisId, needAssessmentItems(result)) }));
+        const result = await this.ask(drive, ARGUMENT_STEPS_V2.assess_evidence, {
+          ...base,
+          ...needAssessmentParts(state, action.hypothesisId)
+        });
+        await this.checkpoint(drive, async s => ({
+          next: applyEvidenceAssessment(s, action.hypothesisId, needAssessmentItems(result))
+        }));
         return;
       }
       case "program_verdict":
         await this.checkpoint(drive, async (s, map) => {
           const next = applyProgramVerdict(s, action.hypothesisId);
           const verdict = next.hypotheses.find(h => h.id === action.hypothesisId)?.verdict;
-          this.ports.log(`argument-run verdict runId=${s.run.runId} phase=${s.run.phase} by=${verdict?.by ?? "-"} value=${verdict?.value ?? "-"}`);
-          return { next, notes: () => this.cardNote(map, action.hypothesisId, { detail: `${this.t("ui.argument_reason")}: ${verdict?.reason ?? ""}` }) };
+          this.ports.log(
+            `argument-run verdict runId=${s.run.runId} phase=${s.run.phase} by=${verdict?.by ?? "-"} value=${verdict?.value ?? "-"}`
+          );
+          return {
+            next,
+            notes: () =>
+              this.cardNote(map, action.hypothesisId, {
+                detail: `${this.t("ui.argument_reason")}: ${verdict?.reason ?? ""}`
+              })
+          };
         });
         return;
       case "no_hypotheses":
@@ -675,15 +755,23 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
   /** A premise closed: its card says why; a run that stopped on a premise says so on the conclusion card (fixed text, never a model answer). */
   private afterPremise(next: ArgumentMapData, claimId: string, map: MapDocument): Plan {
     const claim = this.claimOf(next, claimId);
-    this.ports.log(`argument-run premise runId=${next.run.runId} phase=${next.run.phase} result=${claim.result ?? "-"}`);
+    this.ports.log(
+      `argument-run premise runId=${next.run.runId} phase=${next.run.phase} result=${claim.result ?? "-"}`
+    );
     const stopped = next.run.phase === "stopped_premise";
-    if (stopped) this.ports.log(`argument-run stopped runId=${next.run.runId} phase=${next.run.phase} stopReason=${next.run.stopReason ?? "-"}`);
+    if (stopped)
+      this.ports.log(
+        `argument-run stopped runId=${next.run.runId} phase=${next.run.phase} stopReason=${next.run.stopReason ?? "-"}`
+      );
     return {
       next,
       notes: async () => {
         if (stopped)
           await this.cardNote(map, next.roles.conclusion, {
-            summary: next.run.stopReason === "data_missing" ? this.t("ui.argument_stopped_missing") : this.t("ui.argument_reason") + ": " + claim.text
+            summary:
+              next.run.stopReason === "data_missing"
+                ? this.t("ui.argument_stopped_missing")
+                : this.t("ui.argument_reason") + ": " + claim.text
           });
       }
     };
@@ -692,7 +780,13 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
   /** Room for this claim's first batch: the cap minus what the other live claims still need for their own floor. */
   private proposeIds(state: ArgumentMapData, claimId: string): string[] {
     const reserve = state.claims
-      .filter(c => c.role === "testable" && c.id !== claimId && c.status !== "not_evaluated" && !state.hypotheses.some(h => h.claimId === c.id))
+      .filter(
+        c =>
+          c.role === "testable" &&
+          c.id !== claimId &&
+          c.status !== "not_evaluated" &&
+          !state.hypotheses.some(h => h.claimId === c.id)
+      )
       .reduce((sum, c) => sum + (c.type === "fact" ? 2 : 3), 0);
     const count = Math.max(1, MAX_HYPOTHESES - state.hypotheses.length - reserve);
     return Array.from({ length: count }, () => this.ports.newId());
@@ -700,14 +794,28 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
 
   private async propose(drive: Drive, state: ArgumentMapData, claimId: string): Promise<void> {
     const ids = this.proposeIds(state, claimId);
-    const request = { ...this.base(drive), restatement: state.framing.restatement, ...hypothesesParts(state, claimId, "first", ids) };
+    const request = {
+      ...this.base(drive),
+      restatement: state.framing.restatement,
+      ...hypothesesParts(state, claimId, "first", ids)
+    };
     const result = await this.ask(drive, ARGUMENT_STEPS_V2.propose_hypotheses, request);
     await this.checkpoint(drive, async (s, map) => {
       const next = applyHypotheses(s, claimId, result.hypotheses);
       const nodes: Plan["nodes"] = [];
       for (const h of result.hypotheses) {
         const text = h.predictions.map(p => p.text).join(" / ");
-        nodes.push({ node: await this.makeNote("hypothesis", `${h.role}: ${shorten(h.predictions[0]?.text ?? "", 60)}`, text, map, drive.mapPath, h.id), parentId: claimId });
+        nodes.push({
+          node: await this.makeNote(
+            "hypothesis",
+            `${h.role}: ${shorten(h.predictions[0]?.text ?? "", 60)}`,
+            text,
+            map,
+            drive.mapPath,
+            h.id
+          ),
+          parentId: claimId
+        });
       }
       return { next, nodes };
     });
@@ -722,7 +830,10 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
       const next = round ? startNextRound(s, hypothesisId, result.needs) : applyNeeds(s, hypothesisId, result.needs);
       const nodes: Plan["nodes"] = [];
       for (const n of result.needs)
-        nodes.push({ node: await this.makeNote("need", shorten(n.text, 80), n.text, map, drive.mapPath, n.id), parentId: hypothesisId });
+        nodes.push({
+          node: await this.makeNote("need", shorten(n.text, 80), n.text, map, drive.mapPath, n.id),
+          parentId: hypothesisId
+        });
       return { next, nodes };
     });
   }
@@ -824,8 +935,11 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
           });
           code = check.ok ? check.proof.check : check.reason;
           const stance = entry.stance === "contradicts" ? "opposes" : entry.stance;
-          result = check.ok ? { found: true, stance, proof: check.proof } : { found: false, reason: `source_${check.reason}` };
-          if (check.ok && check.proof.check === "unverified_quote") this.ports.log(unverifiedQuoteLog(state.run.runId, [{ id: itemId, domain }]));
+          result = check.ok
+            ? { found: true, stance, proof: check.proof }
+            : { found: false, reason: `source_${check.reason}` };
+          if (check.ok && check.proof.check === "unverified_quote")
+            this.ports.log(unverifiedQuoteLog(state.run.runId, [{ id: itemId, domain }]));
         }
       } catch (error) {
         if (this.dead(drive)) return;
@@ -855,7 +969,14 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
   }
 
   /** A provider failure is not a try: the item goes back to pending (no note) and the failure is counted for this drive. */
-  private async releaseFailed(drive: Drive, state: ArgumentMapData, isNeed: boolean, owner: string, itemId: string, error: unknown): Promise<void> {
+  private async releaseFailed(
+    drive: Drive,
+    state: ArgumentMapData,
+    isNeed: boolean,
+    owner: string,
+    itemId: string,
+    error: unknown
+  ): Promise<void> {
     this.ports.log(
       `argument-run proof runId=${state.run.runId} phase=${state.run.phase} result=provider_failure proof=${error instanceof Error ? error.name : "error"} domain=-`
     );
@@ -870,7 +991,14 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
     drive.failures.set(itemId, (drive.failures.get(itemId) ?? 0) + 1);
   }
 
-  private async commitEvidence(drive: Drive, phase: string, isNeed: boolean, owner: string, itemId: string, result: EvidenceResult): Promise<void> {
+  private async commitEvidence(
+    drive: Drive,
+    phase: string,
+    isNeed: boolean,
+    owner: string,
+    itemId: string,
+    result: EvidenceResult
+  ): Promise<void> {
     await this.checkpoint(drive, async (s, map) => {
       if (s.run.phase !== phase) throw new GateError("the phase moved on"); // a late result of an earlier phase is dropped
       const node = map.nodes.find(n => n.id === itemId);
@@ -883,9 +1011,13 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
         if (proof)
           await this.writeNote(node.path, {
             summary: proof.claim,
-            detail: [`## ${this.t("ui.argument_sources")}`, this.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)].join("\n")
+            detail: [
+              `## ${this.t("ui.argument_sources")}`,
+              this.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)
+            ].join("\n")
           });
-        else if (!result.found) await this.writeNote(node.path, { detail: this.t("ui.argument_not_found_0", result.reason) });
+        else if (!result.found)
+          await this.writeNote(node.path, { detail: this.t("ui.argument_not_found_0", result.reason) });
       };
       return { next, notes };
     });

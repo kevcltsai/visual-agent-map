@@ -1,5 +1,5 @@
 import { linksOf } from "../task/merge-check";
-import { ArgumentStepError, list, text, type Rec } from "./shared";
+import { ArgumentStepError, grounded, list, text, type Rec } from "./shared";
 
 /**
  * Helpers of the five methodology-6 steps (framing, premise verdict, hypotheses, needs, assessment). They sit beside `shared.ts` and do
@@ -99,3 +99,37 @@ export const S = {
     required: Object.keys(properties)
   })
 };
+
+// ---- helpers of the four judging steps (verdict, comparison, conclusion, inference check): the request carries the machine's own `prepare*` output ----
+/** The reply, parsed. Anything that is not JSON is a step error. */
+export function parseReply(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fail("The reply is not JSON");
+  }
+}
+
+/** A `prepare*` output as a plain record: the steps read ids and enums from it, never trust it as typed. */
+export function asRec(value: unknown): Rec {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Rec) : {};
+}
+export function asArr(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+export const idsOf = (value: unknown, key: string): string[] =>
+  asArr(value)
+    .map(item => asRec(item)[key])
+    .filter((id): id is string => typeof id === "string");
+
+/** Does this input carry a key anywhere (used to prove a user mark never reaches a prompt)? */
+export function hasKey(value: unknown, key: string): boolean {
+  if (Array.isArray(value)) return value.some(v => hasKey(v, key));
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(([k, v]) => k === key || hasKey(v, key));
+}
+
+/** The numbers and links of a reply text must appear in the request input, exactly as the machine's own guard reads it. */
+export function groundedIn(texts: string[], input: unknown): void {
+  grounded(texts, [JSON.stringify(input)]);
+}

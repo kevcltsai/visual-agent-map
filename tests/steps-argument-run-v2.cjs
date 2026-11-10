@@ -143,7 +143,7 @@ test('research limit: when the call budget runs out the program decides (AI = 0)
   for (const h of s.hypotheses) { assert.equal(h.verdict.by, 'program'); assert.equal(h.verdict.value, 'insufficient'); }
   assert.ok(!r.stat.steps.includes('verdict'));
   assert.ok(r.log().includes('by=program'));
-  assert.equal(r.stat.ask.length, 1, 'only the call that fit the budget went out');
+  assert.equal(r.stat.ask.length, 2, 'the premise call and the one need call that fit the budget; nothing after');
 });
 
 test('unverified_quote (tool log only, page blocked) is kept but never satisfies a need; the premise cannot rest on it', async () => {

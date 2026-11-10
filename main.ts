@@ -1204,6 +1204,8 @@ export default class VisualAgentMapPlugin extends Plugin {
         );
       });
       if (changed || vamFile) await this.rebuildDerivedData();
+      // Only one error can be thrown; the other is logged so it is not lost.
+      if (sourceError && error) this.logs.appendLog("error", t("log.operation_failed_0", error.message));
       if (sourceError) throw sourceError;
       if (error) throw error;
     } catch (batchError) {

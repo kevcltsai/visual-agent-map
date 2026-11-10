@@ -225,7 +225,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "research.knowledge_gap_marker": "模型知识不足",
   "ui.outline_ai_not_started": "大纲生成没有开始。",
   "ui.aim_removed_notice": "这张图是用 AIM 建的。此功能已移除，地图仍可作一般地图使用。",
-  "ui.aim_research_saved": "这个答案分支及研究报告已保存。",
   "ui.aim_stage_with_elapsed_0_1": "{0}・{1}",
   "ui.ai_task_exceeded_0_minutes": "AI 任务超过 {0} 分钟，已中断。未完成的结果不会应用。",
   "ui.coffee_generation_timed_out": "Coffee Tables：生成超时；已收到的文字已存成草稿。",

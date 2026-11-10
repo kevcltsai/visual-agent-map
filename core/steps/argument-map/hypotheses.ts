@@ -103,7 +103,7 @@ export const hypothesesStep: StepDefinition<HypothesesRequest, HypothesesResult>
       data: JSON.stringify(request.data.map(pick)),
       existing: JSON.stringify(request.existing),
       causal: request.causalQuestions?.length
-        ? renderTemplate(causalTemplate, { questions: JSON.stringify(request.causalQuestions) })
+        ? "\n\n" + renderTemplate(causalTemplate, { questions: JSON.stringify(request.causalQuestions) })
         : ""
     }),
   schema: HYPOTHESES_SCHEMA,

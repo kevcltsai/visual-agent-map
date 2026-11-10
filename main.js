@@ -325,7 +325,6 @@ var en = {
   "research.knowledge_gap_marker": "Model knowledge is insufficient",
   "ui.outline_ai_not_started": "Outline generation did not start.",
   "ui.aim_removed_notice": "This map was built with AIM. This feature has been removed; the map can still be used as an ordinary map.",
-  "ui.aim_research_saved": "This answer branch and its research report were saved.",
   "ui.aim_stage_with_elapsed_0_1": "{0} \xB7 {1}",
   "ui.ai_task_exceeded_0_minutes": "The AI task exceeded {0} minutes and was interrupted. Incomplete results are not applied.",
   "ui.coffee_generation_timed_out": "Coffee Tables: generation timed out; received text is saved as a draft.",
@@ -3012,7 +3011,6 @@ var zhCN = {
   "research.knowledge_gap_marker": "\u6A21\u578B\u77E5\u8BC6\u4E0D\u8DB3",
   "ui.outline_ai_not_started": "\u5927\u7EB2\u751F\u6210\u6CA1\u6709\u5F00\u59CB\u3002",
   "ui.aim_removed_notice": "\u8FD9\u5F20\u56FE\u662F\u7528 AIM \u5EFA\u7684\u3002\u6B64\u529F\u80FD\u5DF2\u79FB\u9664\uFF0C\u5730\u56FE\u4ECD\u53EF\u4F5C\u4E00\u822C\u5730\u56FE\u4F7F\u7528\u3002",
-  "ui.aim_research_saved": "\u8FD9\u4E2A\u7B54\u6848\u5206\u652F\u53CA\u7814\u7A76\u62A5\u544A\u5DF2\u4FDD\u5B58\u3002",
   "ui.aim_stage_with_elapsed_0_1": "{0}\u30FB{1}",
   "ui.ai_task_exceeded_0_minutes": "AI \u4EFB\u52A1\u8D85\u8FC7 {0} \u5206\u949F\uFF0C\u5DF2\u4E2D\u65AD\u3002\u672A\u5B8C\u6210\u7684\u7ED3\u679C\u4E0D\u4F1A\u5E94\u7528\u3002",
   "ui.coffee_generation_timed_out": "Coffee Tables\uFF1A\u751F\u6210\u8D85\u65F6\uFF1B\u5DF2\u6536\u5230\u7684\u6587\u5B57\u5DF2\u5B58\u6210\u8349\u7A3F\u3002",
@@ -5699,7 +5697,6 @@ var zhTW = {
   "research.knowledge_gap_marker": "\u6A21\u578B\u77E5\u8B58\u4E0D\u8DB3",
   "ui.outline_ai_not_started": "\u5927\u7DB1\u751F\u6210\u6C92\u6709\u958B\u59CB\u3002",
   "ui.aim_removed_notice": "\u9019\u5F35\u5716\u662F\u7528 AIM \u5EFA\u7684\u3002\u6B64\u529F\u80FD\u5DF2\u79FB\u9664\uFF0C\u5730\u5716\u4ECD\u53EF\u4F5C\u4E00\u822C\u5730\u5716\u4F7F\u7528\u3002",
-  "ui.aim_research_saved": "\u9019\u500B\u7B54\u6848\u5206\u652F\u53CA\u7814\u7A76\u5831\u544A\u5DF2\u4FDD\u5B58\u3002",
   "ui.aim_stage_with_elapsed_0_1": "{0}\u30FB{1}",
   "ui.ai_task_exceeded_0_minutes": "AI \u4EFB\u52D9\u8D85\u904E {0} \u5206\u9418\uFF0C\u5DF2\u4E2D\u65B7\u3002\u672A\u5B8C\u6210\u7684\u7D50\u679C\u4E0D\u6703\u5957\u7528\u3002",
   "ui.coffee_generation_timed_out": "Coffee Tables\uFF1A\u751F\u6210\u903E\u6642\uFF1B\u5DF2\u6536\u5230\u7684\u6587\u5B57\u5DF2\u5B58\u6210\u8349\u7A3F\u3002",
@@ -53290,7 +53287,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian35.Ite
     __publicField(this, "closed", false);
     /** The map a state change is opening: a new tab's default map must not race it (see onOpen). */
     __publicField(this, "requestedFile", null);
-    __publicField(this, "aimViewEpoch", 0);
+    __publicField(this, "viewEpoch", 0);
     __publicField(this, "mapOpenEpoch", 0);
     /**
      * Set while opening a map reads its notes one by one: the cards are drawn from the map file alone, a card whose note is not
@@ -53826,7 +53823,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian35.Ite
     (_j = this.usageControl) == null ? void 0 : _j.stop();
     this.usageControl = this.plugin.usage ? new UsageControl(this.plugin.usage, () => this.path) : null;
     (_k = this.usageControl) == null ? void 0 : _k.start();
-    const epoch = ++this.aimViewEpoch;
+    const epoch = ++this.viewEpoch;
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
@@ -53849,12 +53846,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian35.Ite
     this.registerDomEvent(this.contentEl, "keydown", (event) => this.onMapKeydown(event));
     this.registerDomEvent(this.contentEl, "focusin", (event) => this.trackMapFocus(event.target));
     await this.plugin.ready;
-    if (this.closed || this.aimViewEpoch !== epoch) return;
+    if (this.closed || this.viewEpoch !== epoch) return;
     if (!this.path && !this.mapOpenPending()) {
       if (!this.plugin.repo.workspaceExists()) this.render();
       else {
         const files = await this.plugin.repo.mapFiles();
-        if (this.closed || this.aimViewEpoch !== epoch) return;
+        if (this.closed || this.viewEpoch !== epoch) return;
         if (files.length) {
           let defaultPath = files[0].path;
           for (const file of files) {
@@ -53864,7 +53861,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian35.Ite
             } catch (e) {
               continue;
             }
-            if (this.closed || this.aimViewEpoch !== epoch) return;
+            if (this.closed || this.viewEpoch !== epoch) return;
             if (this.mapOpenPending()) return;
             if (!candidate.aim) {
               defaultPath = file.path;
@@ -54690,7 +54687,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian35.Ite
     for (const task of this.mergeTasks.values()) task.controller.abort();
     this.mergeTasks.clear();
     this.dropMapBackground();
-    this.aimViewEpoch++;
+    this.viewEpoch++;
     this.mapOpenEpoch++;
     this.endNoteLoad();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
@@ -55030,8 +55027,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian35.Ite
     await this.plugin.mutate(() => this.openMapInMutation(path));
   }
   async openMapInMutation(path) {
-    const viewEpoch = this.aimViewEpoch, openEpoch = ++this.mapOpenEpoch;
-    const isCurrent = () => !this.closed && this.aimViewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
+    const viewEpoch = this.viewEpoch, openEpoch = ++this.mapOpenEpoch;
+    const isCurrent = () => !this.closed && this.viewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
     if (path !== this.path) {
       this.closeMapSearch(false);
@@ -86855,6 +86852,7 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
         );
       });
       if (changed || vamFile) await this.rebuildDerivedData();
+      if (sourceError && error) this.logs.appendLog("error", t("log.operation_failed_0", error.message));
       if (sourceError) throw sourceError;
       if (error) throw error;
     } catch (batchError) {

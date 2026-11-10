@@ -13,6 +13,7 @@ import {
   parseReply,
   pick,
   short,
+  strOf,
   strOf
 } from "./v2-shared";
 import template from "./v2-inference-check.md";

@@ -20,7 +20,8 @@ import {
   idsOf,
   parseReply,
   pick,
-  short
+  short,
+  strOf
 } from "./v2-shared";
 import template from "./v2-verdict.md";
 

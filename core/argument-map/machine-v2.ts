@@ -1117,7 +1117,8 @@ export function prepareVerdict(state: ArgumentMapData, hypothesisId: string): Re
 }
 
 const rankOf = (c: Confidence): number => CONFIDENCES.indexOf(c);
-const lowerOf = (a: Confidence, b: Confidence): Confidence => (rankOf(a) <= rankOf(b) ? a : b);
+// CONFIDENCES runs high -> low, so the lower confidence has the larger index
+const lowerOf = (a: Confidence, b: Confidence): Confidence => (rankOf(a) >= rankOf(b) ? a : b);
 
 /**
  * The AI's verdict on one hypothesis. Nothing outside `prepareVerdict`'s evidence is adopted (an id, a number or a URL that is not in the
@@ -1292,6 +1293,7 @@ export function applyNoHypotheses(state: ArgumentMapData, claimId: string): Argu
   inAnalysis(state);
   const next = clone(state);
   const claim = liveTestable(next, claimId);
+  if (closedClaim(claim)) throw new GateError("the claim is already closed");
   if (claimHypotheses(next, claimId).length) throw new GateError("the claim has hypotheses");
   if (canPropose(next, claim)) throw new GateError("hypotheses can still be proposed");
   const c = claim.comparison as NonNullable<Claim["comparison"]>;

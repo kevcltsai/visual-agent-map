@@ -24,7 +24,7 @@ const png = (w = 40, h = 20) => {
 const style = values => ({ getPropertyValue: name => values[name] ?? '', ...values });
 const THEME = { '--background-primary': '#ffffff', '--text-normal': '#222222', '--background-modifier-border': '#cccccc' };
 
-async function harness({ aim = false } = {}) {
+async function harness({ aim = false, attachmentSetting = MEDIA } = {}) {
   const { repo, app, contents, files } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -43,6 +43,8 @@ async function harness({ aim = false } = {}) {
   app.vault.createBinary = async (p, data) => { counts.createBinary++; return createBinary(p, data); };
   app.vault.readBinary = async f => { counts.readBinary++; return contents.get(f.path); };
   const asked = [];
+  // Obsidian's attachmentFolderPath; the fake getAvailablePathForAttachment below stands for this fixed folder.
+  app.vault.getConfig = key => (key === 'attachmentFolderPath' ? attachmentSetting : undefined);
   app.fileManager.getAvailablePathForAttachment = async (name, source) => {
     asked.push([name, source]);
     if (!files.has(MEDIA)) await app.vault.createFolder(MEDIA);
@@ -629,4 +631,18 @@ test('annotated image (P3a): exported as a plain picture, with no title bar, pil
   const svg = ex.buildMapSvg(scene);
   assert.equal([...svg.matchAll(/<image /g)].length, 2, 'cover + the annotated image drawn as a picture');
   assert.doesNotMatch(svg, /SECRET|Annotated image|map-pin/);
+});
+
+test('default attachment setting (vault root): saving to the Vault writes into the map folder\'s Attachments, a second save gets " 1"', async () => {
+  const h = await harness({ attachmentSetting: '' });
+  const folder = `${TOPICS}/map-x/Attachments`;
+  await h.view.exportMap('svg', 'vault');
+  await h.settle();
+  await h.view.exportMap('svg', 'vault');
+  await h.settle();
+  assert.deepEqual(h.asked, [], 'Obsidian is not asked for the vault root');
+  assert.equal(h.counts.createBinary, 2);
+  assert.match(new TextDecoder().decode(h.contents.get(`${folder}/Export- Map-.svg`)), /^<svg /);
+  assert.match(new TextDecoder().decode(h.contents.get(`${folder}/Export- Map- 1.svg`)), /^<svg /);
+  assert.deepEqual(created(h), []);
 });

@@ -10,6 +10,7 @@ import { plainFailure } from "./ai/plain-error";
 import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-picker";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
 import type { TaskOptions } from "./experiences/visual-map/modals";
+import { attachmentPath } from "./experiences/visual-map/attachment-store";
 import { selectionOutputLanguage } from "./experiences/aim/content-language";
 import {
   t,
@@ -2171,12 +2172,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     return `data:${mime};base64,${buffer.toString("base64")}`;
   }
 
-  /** Writes a generated image where the vault keeps attachments for `notePath`; returns the new file's path. */
+  /** Writes a generated image where `attachmentPath` puts attachments for `notePath`; returns the new file's path. */
   private async saveGeneratedImage(dataUrl: string, notePath: string, name: string): Promise<string> {
     const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(dataUrl);
     if (!match) throw new Error(t("ui.context_ai_image_not_generated"));
     const extension = match[1] === "jpeg" ? "jpg" : match[1];
-    const path = await this.app.fileManager.getAvailablePathForAttachment(`${name}.${extension}`, notePath);
+    const path = await attachmentPath(this.app, `${name}.${extension}`, notePath);
     const bytes = Buffer.from(match[2], "base64");
     await this.app.vault.createBinary(path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     return path;

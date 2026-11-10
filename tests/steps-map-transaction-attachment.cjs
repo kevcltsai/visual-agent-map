@@ -1,5 +1,5 @@
 // MapTransaction 29: createAttachment puts a binary attachment into the same undoable step as the note and Map.md writes.
-// Real Repository (link index on); the fake vault gets readBinary, getAvailablePathForAttachment and a recording trashFile
+// Real Repository (link index on); the fake vault gets readBinary, getConfig, getAvailablePathForAttachment and a recording trashFile
 // here (tests/support.cjs stays as it is). vault.delete, vault.trash and adapter.remove throw and must never be called.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -17,7 +17,7 @@ const bytes = (...values) => new Uint8Array(values).buffer;
 const PNG = () => bytes(137, 80, 78, 71, 1, 2, 3, 4);
 const folderOf = path => path.slice(0, path.lastIndexOf('/'));
 
-async function harness({ attachmentFolder = 'fixed' } = {}) {
+async function harness({ attachmentFolder = 'fixed', setting } = {}) {
   const { repo, app, contents, files } = fixture('en', { linkIndex: true });
   repo.settings = { ...DEFAULT_SETTINGS, language: 'en' };
   const doc = { id: 'map-u', title: 'map-u', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -59,8 +59,19 @@ async function harness({ attachmentFolder = 'fixed' } = {}) {
     if (fail.trashFile?.(counts.trashFile)) throw new Error(`injected trashFile ${counts.trashFile}`);
     remove(file.path);
   };
+  // Obsidian's attachmentFolderPath for each fake setting: a fixed folder, "./" (same folder) and "./assets" (subfolder).
+  // 'default' is the vault root (unset), where a map's note keeps attachments in <map>/Attachments instead.
+  const config = setting ?? { fixed: MEDIA, same: './', sub: './assets', default: undefined }[attachmentFolder];
+  app.vault.getConfig = key => (key === 'attachmentFolderPath' ? config : undefined);
   app.fileManager.getAvailablePathForAttachment = async (name, sourcePath) => {
     placed.push([name, sourcePath]);
+    if (attachmentFolder === 'default') {
+      // The vault root, as Obsidian names a free file there.
+      const dot = name.lastIndexOf('.');
+      let path = name;
+      for (let n = 1; files.has(path); n++) path = `${name.slice(0, dot)} ${n}${name.slice(dot)}`;
+      return path;
+    }
     const folder = attachmentFolder === 'fixed' ? MEDIA : attachmentFolder === 'same' ? folderOf(sourcePath) : `${folderOf(sourcePath)}/assets`;
     if (!files.has(folder)) await app.vault.createFolder(folder);
     const dot = name.lastIndexOf('.');
@@ -360,6 +371,67 @@ test('A18: two different files in one step and the second createBinary throws: o
   assert.deepEqual(h.trashed, [`${MEDIA}/one.png`]);
   assert.deepEqual(h.inFolder(MEDIA), []);
   assert.equal(h.contents.get(h.parent), before.get(h.parent));
+});
+
+const ATTACHMENTS = `${TOPICS}/map-u/Attachments`;
+
+test('A19: default attachment setting (unset, "" or "/"): a card note under Notes/ stores in <map>/Attachments, created on demand; Obsidian is not asked', async () => {
+  for (const setting of [undefined, '', '/']) {
+    const h = await harness({ attachmentFolder: 'default', setting });
+    assert.equal(h.parent.startsWith(`${TOPICS}/map-u/Notes/`), true);
+    assert.equal(h.files.has(ATTACHMENTS), false, 'no folder before the first attachment');
+    await h.step().commit();
+    assert.deepEqual(h.placed, [], String(setting));
+    assert.equal(h.seen.at(-1), `${ATTACHMENTS}/pic.png`, String(setting));
+    assert.deepEqual(h.inFolder(ATTACHMENTS), [`${ATTACHMENTS}/pic.png`]);
+    assert.equal(h.exists('pic.png'), false, 'nothing at the vault root');
+  }
+});
+
+test('A20: default setting: Map.md and a card note share one Attachments folder; same content is reused, a clash gets " 1"', async () => {
+  const h = await harness({ attachmentFolder: 'default' });
+  await begin(h.deps).createAttachment('img', { name: 'pic.png', data: PNG(), sourcePath: MAP }).editMap(MAP, (map, _r, attachment) => { map.title = attachment('img'); }).commit();
+  assert.equal(await h.mapTitle(), `${ATTACHMENTS}/pic.png`);
+  await h.step().commit();
+  assert.equal(h.seen.at(-1), `${ATTACHMENTS}/pic.png`, 'same bytes from a card note reuse the Map.md file');
+  assert.equal(h.counts.createBinary, 1);
+  await h.step(bytes(9, 9, 9, 9, 9, 9, 9, 9), { park: false }).commit();
+  assert.equal(h.seen.at(-1), `${ATTACHMENTS}/pic 1.png`);
+  assert.deepEqual(h.inFolder(ATTACHMENTS), [`${ATTACHMENTS}/pic 1.png`, `${ATTACHMENTS}/pic.png`]);
+  assert.deepEqual(h.placed, []);
+});
+
+test('A21: default setting: a failed commit trashes the file it wrote in <map>/Attachments and restores note and Map.md', async () => {
+  const h = await harness({ attachmentFolder: 'default' });
+  const before = h.snapshot();
+  h.fail.saveMap = () => true;
+  assert.equal((await h.rejected(h.step().commit())).message, 'injected saveMap 1');
+  assert.deepEqual(h.trashed, [`${ATTACHMENTS}/pic.png`]);
+  assert.deepEqual(h.inFolder(ATTACHMENTS), []);
+  h.restored(before);
+});
+
+test('A22: default setting: a note outside any map still gets getAvailablePathForAttachment', async () => {
+  const h = await harness({ attachmentFolder: 'default' });
+  await h.app.vault.create('Loose.md', 'loose');
+  await begin(h.deps).createAttachment('img', { name: 'pic.png', data: PNG(), sourcePath: 'Loose.md' }).editMap(MAP, (map, _r, attachment) => { map.title = attachment('img'); }).commit();
+  assert.deepEqual(h.placed, [['pic.png', 'Loose.md']]);
+  assert.equal(await h.mapTitle(), 'pic.png', 'at the vault root, as before');
+  assert.equal(h.exists('pic.png'), true);
+  assert.equal(h.files.has(ATTACHMENTS), false);
+});
+
+test('A23: default setting: two first writes racing to create <map>/Attachments both succeed; another createFolder failure still throws', async () => {
+  const { attachmentPath } = load('experiences/visual-map/attachment-store.ts', { obsidian });
+  const h = await harness({ attachmentFolder: 'default' });
+  const createFolder = h.app.vault.createFolder;
+  // Each call yields first, so both see no folder before either creates it.
+  h.app.vault.createFolder = async p => { await Promise.resolve(); return createFolder(p); };
+  const paths = await Promise.all([attachmentPath(h.app, 'a.png', MAP), attachmentPath(h.app, 'b.png', h.parent)]);
+  assert.deepEqual(paths, [`${ATTACHMENTS}/a.png`, `${ATTACHMENTS}/b.png`]);
+  const other = await harness({ attachmentFolder: 'default' });
+  other.app.vault.createFolder = async () => { throw new Error('disk full'); };
+  await assert.rejects(attachmentPath(other.app, 'a.png', MAP), /disk full/);
 });
 
 test('A12: no test called vault.delete, vault.trash or adapter.remove', () => {

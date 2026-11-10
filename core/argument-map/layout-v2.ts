@@ -11,7 +11,8 @@ import type { ArgumentMapData, Need, PremiseDatum } from "./model";
 
 /** Found evidence first (supports, refutes, then the rest), then the dashed missing ones (searching, pending, not found). */
 function needRank(need: Need): number {
-  if (need.state === "found") return need.assessment?.stance === "supports" ? 0 : need.assessment?.stance === "refutes" ? 1 : 2;
+  if (need.state === "found")
+    return need.assessment?.stance === "supports" ? 0 : need.assessment?.stance === "refutes" ? 1 : 2;
   return 3 + (need.state === "searching" ? 0 : need.state === "pending" ? 1 : 2);
 }
 function datumRank(datum: PremiseDatum): number {

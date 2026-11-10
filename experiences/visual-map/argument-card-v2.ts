@@ -24,7 +24,8 @@ import type { ArgumentMapData as ArgumentMapDataV1 } from "../../core/argument-m
 import { describeArgumentCard, sourceHost, type ArgumentCardView } from "./argument-card";
 
 type Translate = (key: TranslationKey, ...values: unknown[]) => string;
-export type ArgumentRoleV2 = "proposition" | "group" | "claim" | "datum" | "comparison" | "hypothesis" | "need" | "conclusion";
+export type ArgumentRoleV2 =
+  "proposition" | "group" | "claim" | "datum" | "comparison" | "hypothesis" | "need" | "conclusion";
 export type ChipToneV2 = "yes" | "no" | "maybe" | "gap" | "open" | "run";
 export interface ArgumentChipV2 {
   tone: ChipToneV2;
@@ -124,7 +125,15 @@ function datumCard(datum: PremiseDatum, t: Translate): ArgumentCardViewV2 {
   if (datum.state !== "found") {
     const chip = missingChip(datum, t);
     const lines = datum.reason ? [datum.reason] : [];
-    return { role: "datum", kind, titleFrom: "note", dashed: true, chips: [chip], lines, label: labelOf(kind, [chip], []) };
+    return {
+      role: "datum",
+      kind,
+      titleFrom: "note",
+      dashed: true,
+      chips: [chip],
+      lines,
+      label: labelOf(kind, [chip], [])
+    };
   }
   const host = datum.proof ? sourceHost(datum.proof.url) : "";
   const shown = [host, checkedText(datum.proof?.check, t)].filter(Boolean).join(" · ");
@@ -133,7 +142,8 @@ function datumCard(datum: PremiseDatum, t: Translate): ArgumentCardViewV2 {
       ? { tone: "no", text: t("ui.argument_data_opposes") }
       : { tone: "yes", text: t("ui.argument_stance_supports") }
   ];
-  if (datum.assessment && !datum.assessment.scopeFit) chips.push({ tone: "gap", text: t("ui.argument_v2_scope_mismatch") });
+  if (datum.assessment && !datum.assessment.scopeFit)
+    chips.push({ tone: "gap", text: t("ui.argument_v2_scope_mismatch") });
   const kindLine = `${kind} · ${shown}`;
   return {
     role: "datum",
@@ -186,7 +196,10 @@ function needCard(state: ArgumentMapData, h: Hypothesis, need: Need, t: Translat
   } else chips.push({ tone: "gap", text: t("ui.argument_v2_irrelevant") });
   if (assessment && !assessment.scopeFit) chips.push({ tone: "gap", text: t("ui.argument_v2_scope_mismatch") });
   if (need.registered === "post")
-    chips.push({ tone: "open", text: t(need.replaces === undefined ? "ui.argument_v2_exploratory" : "ui.argument_v2_post") });
+    chips.push({
+      tone: "open",
+      text: t(need.replaces === undefined ? "ui.argument_v2_exploratory" : "ui.argument_v2_post")
+    });
   return {
     role: "need",
     kind: kindLine,
@@ -237,9 +250,7 @@ function hypothesisCard(h: Hypothesis, t: Translate): ArgumentCardViewV2 {
     lines.push(
       t(
         "ui.argument_v2_causal_line_0",
-        verdict.causal === "conditional"
-          ? t(CAUSAL_KEY.conditional, assumptions)
-          : t(CAUSAL_KEY[verdict.causal])
+        verdict.causal === "conditional" ? t(CAUSAL_KEY.conditional, assumptions) : t(CAUSAL_KEY[verdict.causal])
       )
     );
   }
@@ -338,7 +349,15 @@ function claimCard(state: ArgumentMapData, claim: Claim, t: Translate): Argument
   const lines = [claimAnswer(state, claim, t)];
   const count = state.hypotheses.filter(h => h.claimId === claim.id).length;
   if (count) lines.push(t("ui.argument_v2_claim_hypotheses_0", count));
-  return { role: "claim", kind, titleFrom: "note", state: claim.status, chips: [], lines, label: labelOf(kind, [], lines) };
+  return {
+    role: "claim",
+    kind,
+    titleFrom: "note",
+    state: claim.status,
+    chips: [],
+    lines,
+    label: labelOf(kind, [], lines)
+  };
 }
 
 // ---- conclusion ---------------------------------------------------------------------------------------------------------------------
@@ -360,7 +379,11 @@ const CONCLUSION_KIND: Record<ConclusionViewV2, TranslationKey> = {
 function conclusionCard(state: ArgumentMapData, t: Translate): ArgumentCardViewV2 {
   const view = conclusionViewV2(state);
   const kind = t(CONCLUSION_KIND[view]);
-  const card = (titleFrom: ArgumentCardShape["titleFrom"], title: string | undefined, hint: string): ArgumentCardViewV2 => ({
+  const card = (
+    titleFrom: ArgumentCardShape["titleFrom"],
+    title: string | undefined,
+    hint: string
+  ): ArgumentCardViewV2 => ({
     role: "conclusion",
     kind,
     state: view,
@@ -403,16 +426,25 @@ export function describeArgumentCardV2(state: ArgumentMapData, id: string, t: Tr
   });
   if (id === roles.proposition) {
     const asked = state.framing.candidates.find(candidate => candidate.id === state.framing.chosen)?.question;
-    return plain("proposition", t("ui.argument_v2_proposition_kind"), asked ? [t("ui.argument_v2_asked_0", asked)] : []);
+    return plain(
+      "proposition",
+      t("ui.argument_v2_proposition_kind"),
+      asked ? [t("ui.argument_v2_asked_0", asked)] : []
+    );
   }
   if (id === roles.conclusion) return conclusionCard(state, t);
   if (id === roles.premises) {
     const premises = state.claims.filter(claim => claim.role === "premise");
     const holds = premises.filter(claim => claim.result === "holds").length;
-    return plain("group", t("ui.argument_group_label"), [t("ui.argument_v2_premises_count_0_1", holds, premises.length)], {
-      titleFrom: "text",
-      title: t("ui.argument_v2_premises_title")
-    });
+    return plain(
+      "group",
+      t("ui.argument_group_label"),
+      [t("ui.argument_v2_premises_count_0_1", holds, premises.length)],
+      {
+        titleFrom: "text",
+        title: t("ui.argument_v2_premises_title")
+      }
+    );
   }
   for (const claim of state.claims) {
     if (claim.id === id) return claimCard(state, claim, t);

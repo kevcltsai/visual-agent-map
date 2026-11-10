@@ -3262,13 +3262,15 @@ export const en = {
   "ui.argument_v2_concl_concluded": "Conclusion · concluded",
   "ui.argument_v2_concl_concluded_hint": "Every hypothesis has a verdict and every comparison is done.",
   "ui.argument_v2_concl_pending": "Conclusion · in progress",
-  "ui.argument_v2_concl_pending_hint_0_1": "{0} of {1} hypotheses judged; the comparison is not finished. No answer is shown yet.",
+  "ui.argument_v2_concl_pending_hint_0_1":
+    "{0} of {1} hypotheses judged; the comparison is not finished. No answer is shown yet.",
   "ui.argument_v2_concl_pending_title": "Not concluded",
   "ui.argument_v2_concl_stopped_hint": "Every claim to test depends on it, so no hypotheses were made.",
   "ui.argument_v2_concl_stopped_premise": "Conclusion · premise failed",
   "ui.argument_v2_concl_stopped_title": "The premise does not hold. Stopped.",
   "ui.argument_v2_concl_undecidable": "Conclusion · blocked",
-  "ui.argument_v2_concl_undecidable_hint": "A comparison found issues it could not resolve. They are listed in the note.",
+  "ui.argument_v2_concl_undecidable_hint":
+    "A comparison found issues it could not resolve. They are listed in the note.",
   "ui.argument_v2_concl_undecidable_title": "Cannot decide",
   "ui.argument_v2_conditional": "Conditional refutation",
   "ui.argument_v2_confidence_0": "Confidence: {0}",

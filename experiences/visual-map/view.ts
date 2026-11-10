@@ -15885,7 +15885,9 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || this.map.argumentMap === undefined) return null;
     const read = readArgumentMap(this.map);
     if ((read.kind !== "usable" && read.kind !== "legacy") || !managedNodeIds(this.map).has(id)) return null;
-    return read.kind === "usable" ? describeArgumentCardV2(read.data, id, t) : describeLegacyArgumentCard(read.data, id, t);
+    return read.kind === "usable"
+      ? describeArgumentCardV2(read.data, id, t)
+      : describeLegacyArgumentCard(read.data, id, t);
   }
   /** The heading of a managed card: its note's title, the note's summary (a concluded conclusion only), or the flow's own text. */
   private argumentTitleOf(view: ArgumentCardShape, note: Note | undefined): string {

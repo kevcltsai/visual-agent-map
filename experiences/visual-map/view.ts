@@ -555,7 +555,8 @@ import {
   type OutlinePlacement
 } from "./outline-import-modal";
 import { exportMapWithNotice } from "./outline-exchange-io";
-import { MultiResearchModal, type MultiResearchRequest } from "./multi-research-modal";
+import { MultiResearchModal } from "./multi-research-modal";
+import { chatResearchReferenceGroups, type ResearchRequestWithReferences } from "./chat-research-sources";
 import { StructureReviewModal } from "./structure-review-modal";
 import {
   buildStructureReviewNodes,
@@ -1490,6 +1491,8 @@ export class VisualAgentMapView extends ItemView {
   private goalSuggestPanelEl: HTMLElement | null = null;
   /** This map's saved data sources (`map-sources`), loaded with the map; the toolbar button and its panel draw from it. */
   private mapSources: MapSource[] = [];
+  /** The attachments of the latest chat turn, as reference documents for a research the chat starts. */
+  private chatTurnReferences: ReferenceGroup[] = [];
   private readonly mapSourcesPanelId = `vam-map-sources-panel-${++relevancePanelSeq}`;
   private mapSourcesOpen = false;
   private mapSourcesPickerOpen = false;
@@ -20256,7 +20259,7 @@ export class VisualAgentMapView extends ItemView {
    * runs is stopped through its key, see `stopMultiResearch`).
    */
   async startMultiResearch(
-    request: MultiResearchRequest,
+    request: ResearchRequestWithReferences,
     retryBatchKey?: string,
     onSettled?: (web: ResearchWebTally) => void,
     onOutcome?: (outcome: ChatResearchOutcome) => void,
@@ -20283,7 +20286,7 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private async runMultiResearch(
-    request: MultiResearchRequest,
+    request: ResearchRequestWithReferences,
     retryBatchKey: string | undefined,
     onSettled: ((web: ResearchWebTally) => void) | undefined,
     tell: (outcome: ChatResearchOutcome) => void,
@@ -20345,7 +20348,7 @@ export class VisualAgentMapView extends ItemView {
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         const shared = {
-          referenceGroups: [],
+          referenceGroups: request.referenceGroups ?? [],
           requirements: request.requirements,
           // The picked model is for this batch only (D4): it never becomes a topic's own model.
           ...(request.model ? { runOnce: { model: request.model } } : {}),
@@ -23142,6 +23145,12 @@ export class VisualAgentMapView extends ItemView {
     // Only the note the chip shows is sent; with the chip taken off nothing is, so no edit of it has a baseline.
     const activePath = chat.currentNote();
     const activeSource = activePath ? await this.readChatFile(activePath) : null;
+    // A research this turn starts gets the same attachments (read once, here); a later turn replaces them.
+    this.chatTurnReferences = chatResearchReferenceGroups({
+      files,
+      activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
+      snippets
+    });
     // Titles let the model tell "make a new map" from "go to that one"; a failure to list them only leaves the list empty.
     const mapTitles = await Promise.resolve()
       .then(() => this.plugin.repo.topics())
@@ -26015,6 +26024,11 @@ export class VisualAgentMapView extends ItemView {
         const researchIds = [...this.selection.state.multiSelected];
         const conversation = this.chatConversation;
         const key = this.multiResearchKey();
+        // The map's own source files (as a single research gets them) plus what this turn attached; read before the batch starts.
+        const mapSourceGroups = await this.taskSourceSettings()
+          .mapSources(work?.controller.signal ?? new AbortController().signal)
+          .catch(() => [] as ReferenceGroup[]);
+        const referenceGroups = [...mapSourceGroups, ...this.chatTurnReferences];
         // From here on any turn of this conversation may read web text (decision #17): set before the first card is written, and
         // kept in the record so a reopened conversation keeps it.
         this.chatStartedResearch = true;
@@ -26037,7 +26051,8 @@ export class VisualAgentMapView extends ItemView {
             this.startMultiResearch(
               {
                 ...chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
-                ...(retryModel ? { model: retryModel } : {})
+                ...(retryModel ? { model: retryModel } : {}),
+                ...(referenceGroups.length ? { referenceGroups } : {})
               },
               undefined,
               web => {

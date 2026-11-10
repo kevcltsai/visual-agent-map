@@ -7,6 +7,7 @@ Restate and break down the user's original claim so it can later be tested with 
    - type: "fact" (is X so), "causal" (does Y cause X), "main_cause" (is X mainly because of Y), "comparison" (is A more than B).
    - role: "premise" or "testable". Only a fact can be a premise. A cause the original takes for granted is still "testable". Premises are checked first; testable claims are judged later and may depend on premises.
    - dependsOn: the ids of the premises a claim relies on (empty for none; only premises may be listed; no claim depends on itself).
+   - dependsOn rule: list only ids of claims whose role is "premise". A testable claim must never depend on another testable claim; when a testable claim relies on no premise, give an empty array []. Right: c3 (testable) has dependsOn ["c1"] where c1 is a premise. Wrong: c3 (testable) has dependsOn ["c2"] where c2 is also testable; write [] or a premise id instead.
    - Keep the original's logic (and, or, if, the same object, all, some) in the claims and in composition: a sentence such as "one policy improves both A and B" must not become two claims proved by two different policies.
    - composition: write how the claims' answers combine into an answer to the original. Leave it empty when they cannot be combined; then only each claim is answered and the original gets no overall answer.
    - definitions: at least one {term, meaning} for each claim, covering subject, region, period and measure. For a main_cause claim define "mainly" as a comparable causal contribution with a common baseline, not explained variance. For a comparison claim define the common scale and how large a difference counts.
@@ -14,7 +15,7 @@ Restate and break down the user's original claim so it can later be tested with 
    There are at most 3 premises and 1 or 2 testable claims.
 5. settings: assumptions or choices the user may want to confirm (for example a period), as short phrases; empty when none. These are the user's settings, not facts.
 
-Return only JSON with exactly the fields restatement, presuppositions, loadedTerms, vagueTerms, outOfScope, candidates, chosen, claims, settings and composition (a string, empty when the answers cannot be combined). Do not add other fields, paths or links. Use only numbers that appear in the original or in the user's note, except inside definitions and settings. Do not write any link or URL. All context is supplied; do not inspect files, use tools or search the web.
+Return only JSON with exactly the fields restatement, presuppositions, loadedTerms, vagueTerms, outOfScope, candidates, chosen, claims, settings and composition (a string, empty when the answers cannot be combined). Do not add other fields, paths or links. Every number anywhere in the reply (including years, percentages and statistics, also inside definitions and settings) must be a number that appears in the original claim or in the user's note; never add an outside year, percentage or statistic, and describe it in words instead of digits when needed. If definitions or settings need a time range, use only the words the original already has (for example "since then" or the period as the original states it). Do not write any link or URL. All context is supplied; do not inspect files, use tools or search the web.
 
 {{languageInstruction}}
 

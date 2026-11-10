@@ -118,6 +118,14 @@ test('framing: a well formed reply parses and its request carries only the allow
   assert.doesNotMatch(prompt, /LEAKED/);
   assert.ok(prompt.includes(JSON.stringify(ORIGINAL)));
 });
+test('framing: the prompt states the premise-only dependsOn rule and the no-outside-numbers rule in every language', () => {
+  for (const language of ['zh-TW', 'zh-CN', 'en']) {
+    const prompt = fr.render(framingReq({ language }));
+    assert.match(prompt, /A testable claim must never depend on another testable claim/);
+    assert.match(prompt, /never add an outside year, percentage or statistic/);
+  }
+});
+
 test('framing: missing, extra and non-object replies throw, nested objects too', () => {
   exactKeys(fr, framingReq(), framingOk());
   for (const key of ['id', 'text', 'type', 'role', 'dependsOn', 'definitions', 'dataNeeds']) { const v = framingOk(); delete v.claims[0][key]; bad(fr, framingReq(), v, /unexpected fields/); }

@@ -469,7 +469,8 @@ import {
   renderArgumentKindV2,
   type ArgumentCardShape
 } from "./argument-card-v2";
-import { ArgumentRunError, WORST_CASE_AI_CALLS } from "./argument-run";
+import { ArgumentRunError } from "./argument-run";
+import { lockFraming, MAX_FRAMING_CALLS, WORST_CASE_AI_CALLS, type ArgumentRunV2Api } from "./argument-run-v2";
 import { describeArgumentProgressV2, describeLegacyProgress } from "./argument-progress-v2";
 import { ArgumentStartModal } from "../../ui/modals/argument-start-modal";
 import { arrangeArgumentMap } from "../../core/argument-map/layout";
@@ -22635,6 +22636,13 @@ export class VisualAgentMapView extends ItemView {
   private openArgumentStart(draft: string): void {
     const map = this.map;
     if (this.closed || !map || !this.chatHero()) return;
+    // main.ts wires `argumentRunsV2` in a later packet; until then the window cannot run, so it does not open.
+    const runs = (this.plugin as { argumentRunsV2?: Pick<ArgumentRunV2Api, "frame" | "start" | "isRunning"> })
+      .argumentRunsV2;
+    if (!runs) {
+      new Notice(t("ui.argument_start_refused"));
+      return;
+    }
     const path = this.path;
     const mapId = map.id;
     const stale = (): boolean =>
@@ -22643,30 +22651,43 @@ export class VisualAgentMapView extends ItemView {
       this.map?.id !== mapId ||
       this.map.argumentMap !== undefined ||
       this.map.nodes.length > 0 ||
-      this.plugin.argumentRuns.isRunning(path);
+      runs.isRunning(path);
     const models = this.chatModelChoices().map(choice => ({ id: choice.value, label: choice.label }));
-    new ArgumentStartModal(
-      this.app,
+    new ArgumentStartModal(this.app, {
       draft,
       models,
-      this.plugin.settings.cliModel,
-      WORST_CASE_AI_CALLS,
-      async ({ claim, model }) => {
-        if (!claim.trim() || stale()) return;
+      defaultModel: this.plugin.settings.cliModel,
+      calls: WORST_CASE_AI_CALLS,
+      maxFraming: MAX_FRAMING_CALLS,
+      framer: runs,
+      beforeFrame: async model => {
+        if (stale()) return false;
         // The window's model is the current model, the same as picking it in the opening screen's model menu.
         if (model !== this.plugin.settings.cliModel) {
           await this.plugin.setCurrentModel(model);
-          if (stale()) return;
+          if (stale()) return false;
         }
+        return true;
+      },
+      onConfirm: ({ claim, result, chosen, attempts }) => {
+        if (!claim.trim() || stale()) return;
         this.chat?.clearDraft();
         this.argumentFocusMapId = mapId;
-        // The run is not awaited: its first checkpoint replaces the opening screen with the argument map.
-        void this.plugin.argumentRuns.start(path, claim).catch((error: unknown) => {
-          this.argumentFocusMapId = null;
-          if (error instanceof ArgumentRunError) new Notice(t("ui.argument_start_refused"));
-        });
+        const locked = lockFraming(claim, result, attempts, new Date().toISOString(), chosen);
+        // The run is not awaited: its first checkpoint (one mutate) replaces the opening screen with the argument map.
+        void runs
+          .start(path, locked)
+          .then(outcome => {
+            if (outcome.ok) return;
+            this.argumentFocusMapId = null;
+            new Notice(t("ui.argument_start_refused"));
+          })
+          .catch(() => {
+            this.argumentFocusMapId = null;
+            new Notice(t("ui.argument_start_refused"));
+          });
       }
-    ).open();
+    }).open();
   }
   private chatHost(): MapChatHost {
     return {

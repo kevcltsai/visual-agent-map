@@ -2067,7 +2067,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-msg { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); overflow-wrap: anywhere; white-space: pre-wrap; }
 .vam-topic-chat-msg.is-me { background: var(--background-modifier-hover); }
 .vam-topic-chat-msg.is-running { color: var(--text-muted); }
-.vam-topic-chat-msg.is-running { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vam-topic-chat-msg.is-running { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
 .vam-topic-chat-stop { flex: 0 0 auto; margin-left: auto; padding: 0 10px; height: auto; min-height: 20px; font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-error); background: transparent; border: 1px solid var(--text-error); border-radius: 999px; box-shadow: none; cursor: pointer; }
 .vam-topic-chat-stop:hover { background: var(--background-modifier-hover); }
 .vam-topic-chat-stop:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }

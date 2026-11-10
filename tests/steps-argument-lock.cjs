@@ -456,3 +456,18 @@ test('v2 verdict: the Inspector setter writes the note leaning and the key userV
   await h.view.changeHypothesisLeaning(H1, 'undecided');
   assert.equal(core.parseMap(h.contents.get(MAP)).argumentMap.hypotheses[0].userVerdict, 'undecided');
 });
+
+test('v2 verdict: a hypothesis note that is not in the key (user-added or old note) saves only the note; no key write, no error, the save still succeeds', async () => {
+  const h = await harness([...'PRCQDTMHNF'], {}, false);
+  Object.assign(h.view, { history: { push() {} }, refreshAfterSavedChange: async () => {}, relationsEnabled: () => true, isHypothesis: () => true });
+  const [P_, PR, C_, Q1, D1, Q2, CMP, H1, N1] = h.nodes;
+  await h.repo.writeTopicKind(H1.path, 'hypothesis');
+  const state = v2State({ P: P_.id, PR: PR.id, C: C_.id, Q1: Q1.id, D1: D1.id, Q2: Q2.id, CMP: CMP.id, H1: H1.id, N1: N1.id });
+  h.view.map.argumentMap = state;
+  await h.repo.saveMap(MAP, h.view.map);
+  const keyBefore = JSON.stringify(core.parseMap(h.contents.get(MAP)).argumentMap);
+  const stranger = { ...H1, id: 'user-added-node-not-in-key' };
+  await h.view.changeHypothesisLeaning(stranger, 'refuted');
+  assert.equal(JSON.stringify(core.parseMap(h.contents.get(MAP)).argumentMap), keyBefore, 'the key is byte-identical');
+  assert.equal((await h.repo.readNote(H1.path)).hypothesisLeaning, 'refuted', 'the note leaning is still written');
+});

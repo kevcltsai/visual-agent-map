@@ -17963,7 +17963,9 @@ export class VisualAgentMapView extends ItemView {
         // A legacy (`"v": 1`) argument map is read-only, so its key is not written here; a usable (version 2) one records the user's mark
         // (a mark only: no step reads it) in the same save. A map with no key is left as it is.
         const argument = map.argumentMap === undefined ? null : readArgumentMap(map);
-        if (argument?.kind === "usable") map.argumentMap = applyUserVerdict(argument.data, node.id, leaning);
+        // A hypothesis note the key does not list (added by the user, or an older note) keeps only its note leaning: no key write, no error.
+        if (argument?.kind === "usable" && argument.data.hypotheses.some(h => h.id === node.id))
+          map.argumentMap = applyUserVerdict(argument.data, node.id, leaning);
       })
       .commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);

@@ -81321,7 +81321,8 @@ ${request.requirements}` : preset.text,
     const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeHypothesisLeaning(path, leaning)).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
       const argument = map.argumentMap === void 0 ? null : readArgumentMap2(map);
-      if ((argument == null ? void 0 : argument.kind) === "usable") map.argumentMap = applyUserVerdict(argument.data, node.id, leaning);
+      if ((argument == null ? void 0 : argument.kind) === "usable" && argument.data.hypotheses.some((h) => h.id === node.id))
+        map.argumentMap = applyUserVerdict(argument.data, node.id, leaning);
     }).commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();

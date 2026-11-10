@@ -3017,7 +3017,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.argument_v2_bar_searching_premise_0": "找 {0} 项前提数据",
   "ui.argument_v2_bar_stopped_premise": "已停止：前提不成立",
   "ui.argument_v2_causal_compatible": "只是相容",
-  "ui.argument_v2_causal_conditional_0": "在「{0}」假设下成立",
+  "ui.argument_v2_causal_conditional_0": "在“{0}”假设下成立",
   "ui.argument_v2_causal_established": "已确立",
   "ui.argument_v2_causal_line_0": "因果：{0}",
   "ui.argument_v2_causal_not_applicable": "不适用",

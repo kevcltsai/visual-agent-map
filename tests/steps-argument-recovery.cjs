@@ -132,3 +132,64 @@ test('counterexample: opening a legacy map never starts, resumes or writes (star
   assert.deepEqual(runs, [], 'nothing was started or resumed by opening');
   assert.equal(h.calls.provider, 0);
 });
+
+// ---- version 2: open-map recovery goes through the runner (packet V7) --------------------------------------------------------------
+const { v2State } = require('./fixtures/argument-map-v2-state.cjs');
+async function harnessV2() {
+  const h = await harness({ withKey: false });
+  const doc = await h.repo.readMap(h.mapPath);
+  const ids = ['p', 'pr', 'c', 'q1', 'd1', 'q2', 'cmp', 'h1', 'n1'];
+  const created = {};
+  for (const name of ids) {
+    const node = await h.repo.createNote(name, 'gpt-6-luna', doc, h.mapPath, 'workspace');
+    doc.nodes.push(node);
+    created[name.toUpperCase()] = node.id;
+  }
+  doc.argumentMap = v2State(created);
+  await h.repo.saveMap(h.mapPath, doc);
+  return { ...h, created };
+}
+
+test('version 2 map: opening asks the runner to recover once with the map path; no provider call', async () => {
+  const h = await harnessV2();
+  const recovered = [];
+  h.view.plugin.argumentRunsV2 = { recover: async path => { recovered.push(path); return false; } };
+  await h.open();
+  assert.deepEqual(recovered, [h.mapPath]);
+  assert.equal(h.calls.provider, 0);
+  assert.equal(h.view.map.argumentMap.v, 2);
+});
+
+test('version 2 map: when recovery changed the map, the view shows the saved result', async () => {
+  const h = await harnessV2();
+  h.view.plugin.argumentRunsV2 = {
+    recover: async path => {
+      await h.repo.updateMap(path, doc => { doc.argumentMap.run.stopReason = 'interrupted'; });
+      return true;
+    }
+  };
+  await h.open();
+  assert.equal(h.view.map.argumentMap.run.stopReason, 'interrupted');
+});
+
+test('counterexample: a legacy map and an ordinary map never reach the version 2 runner', async () => {
+  for (const withKey of [true, false]) {
+    const h = await harness({ withKey });
+    let calls = 0;
+    h.view.plugin.argumentRunsV2 = { recover: async () => { calls++; return true; } };
+    const before = await h.text();
+    await h.open();
+    assert.equal(calls, 0, withKey ? 'legacy' : 'no key');
+    assert.equal(await h.text(), before);
+  }
+});
+
+test('counterexample: a recovery that fails, or a plugin without the runner, still opens the version 2 map as saved', async () => {
+  const failing = await harnessV2();
+  failing.view.plugin.argumentRunsV2 = { recover: () => Promise.reject(new Error('boom')) };
+  await failing.open();
+  assert.equal(failing.view.map.argumentMap.v, 2);
+  const missing = await harnessV2();
+  await missing.open();
+  assert.equal(missing.view.map.argumentMap.v, 2);
+});

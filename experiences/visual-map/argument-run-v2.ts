@@ -16,9 +16,13 @@ import { neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
 import type { AiResult } from "../../ai/types";
 import {
   GateError,
+  applyAlternativeHypotheses,
+  applyComparison,
+  applyConclusion,
   applyEvidence,
   applyEvidenceAssessment,
   applyHypotheses,
+  applyInferenceCheck,
   applyNeeds,
   applyNoHypotheses,
   applyPause,
@@ -28,10 +32,15 @@ import {
   applyPremiseResult,
   applyProgramVerdict,
   applyResume,
+  applyVerdict,
   beginPremiseResearch,
   beginResearch,
   newArgumentMap,
   nextActions,
+  prepareComparison,
+  prepareConclusion,
+  prepareInferenceCheck,
+  prepareVerdict,
   releaseNeedResearch,
   releasePremiseResearch,
   startNextRound,
@@ -149,7 +158,7 @@ export const MAX_RESEARCH_CONCURRENCY = 3;
 const X_STEP = 320;
 const Y_STEP = 160;
 
-/** Raised (never returned) for a `nextActions` action stage 3 (V5b) has not implemented yet. The run pauses as `error`, resumable. */
+/** Raised (never returned) for a `nextActions` action this runner does not know. The run pauses as `error`, resumable. */
 export class ArgumentRunV2Pending extends Error {
   constructor(readonly action: ArgumentAction["type"]) {
     super(`argument run: action ${action} is not implemented yet (TODO V5b)`);
@@ -157,14 +166,7 @@ export class ArgumentRunV2Pending extends Error {
   }
 }
 
-/**
- * The actions this runner executes. TODO V5b (next packet) adds, each as one `case` in `ArgumentRunsV2.textStep`:
- * - `propose_alternatives`: `hypothesesParts(state, claimId, "alternatives", ids, gap)` -> `ARGUMENT_STEPS_V2.propose_alternatives` -> `applyAlternativeHypotheses`
- * - `verdict`: `prepareVerdict` -> `ARGUMENT_STEPS_V2.verdict` -> `applyVerdict`
- * - `compare`: `prepareComparison` -> `ARGUMENT_STEPS_V2.compare` -> `applyComparison`
- * - `conclude`: `prepareConclusion` -> `ARGUMENT_STEPS_V2.conclude` -> `applyConclusion`
- * - `inference_check`: `prepareInferenceCheck` -> `ARGUMENT_STEPS_V2.inference_check` -> `applyInferenceCheck`
- */
+/** The actions this runner executes (every `nextActions` action; an unknown one pauses the run as `error` through `ArgumentRunV2Pending`). */
 const IMPLEMENTED: ReadonlySet<ArgumentAction["type"]> = new Set<ArgumentAction["type"]>([
   "research_premise",
   "premise_missing",
@@ -176,7 +178,12 @@ const IMPLEMENTED: ReadonlySet<ArgumentAction["type"]> = new Set<ArgumentAction[
   "assess_evidence",
   "next_round",
   "program_verdict",
-  "no_hypotheses"
+  "no_hypotheses",
+  "propose_alternatives",
+  "verdict",
+  "compare",
+  "conclude",
+  "inference_check"
 ]);
 const isResearch = (a: ArgumentAction): boolean => a.type === "research_premise" || a.type === "research_need";
 
@@ -534,7 +541,7 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
     await this.pause(drive, "user", true);
   }
   private async fail(drive: Drive, error: unknown): Promise<void> {
-    if (error instanceof ArgumentRunV2Pending) this.ports.log(`argument-run pending action=${error.action} (TODO V5b)`);
+    if (error instanceof ArgumentRunV2Pending) this.ports.log(`argument-run pending action=${error.action} `);
     else this.ports.log(`argument-run error message=${error instanceof Error ? error.name : "unknown"}`);
     await this.pause(drive, "error", false).catch(() => undefined);
   }
@@ -579,7 +586,7 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
           return;
         }
       } else if (ready) await this.guarded(drive, () => this.textStep(drive, state, ready));
-      else throw new ArgumentRunV2Pending(actions[0].type); // TODO V5b: every remaining action is stage 3's
+      else throw new ArgumentRunV2Pending(actions[0].type);
       if (drive.stopRequested) return;
     }
   }
@@ -714,7 +721,17 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
         return;
       }
       case "propose_hypotheses":
-        return this.propose(drive, state, action.claimId);
+        return this.propose(drive, state, action.claimId, false);
+      case "propose_alternatives":
+        return this.propose(drive, state, action.claimId, true);
+      case "verdict":
+        return this.verdict(drive, state, action.hypothesisId);
+      case "compare":
+        return this.compare(drive, state, action.claimId);
+      case "conclude":
+        return this.conclude(drive, state);
+      case "inference_check":
+        return this.inferenceCheck(drive, state);
       case "add_needs":
       case "next_round":
         return this.needs(drive, state, action.hypothesisId, action.type === "next_round");
@@ -731,24 +748,14 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
       case "program_verdict":
         await this.checkpoint(drive, async (s, map) => {
           const next = applyProgramVerdict(s, action.hypothesisId);
-          const verdict = next.hypotheses.find(h => h.id === action.hypothesisId)?.verdict;
-          this.ports.log(
-            `argument-run verdict runId=${s.run.runId} phase=${s.run.phase} by=${verdict?.by ?? "-"} value=${verdict?.value ?? "-"}`
-          );
-          return {
-            next,
-            notes: () =>
-              this.cardNote(map, action.hypothesisId, {
-                detail: `${this.t("ui.argument_reason")}: ${verdict?.reason ?? ""}`
-              })
-          };
+          return this.verdictPlan(next, action.hypothesisId, map);
         });
         return;
       case "no_hypotheses":
         await this.checkpoint(drive, async s => ({ next: applyNoHypotheses(s, action.claimId) }));
         return;
       default:
-        throw new ArgumentRunV2Pending(action.type); // TODO V5b: propose_alternatives, verdict, compare, conclude, inference_check
+        throw new ArgumentRunV2Pending(action.type);
     }
   }
 
@@ -792,16 +799,29 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
     return Array.from({ length: count }, () => this.ports.newId());
   }
 
-  private async propose(drive: Drive, state: ArgumentMapData, claimId: string): Promise<void> {
-    const ids = this.proposeIds(state, claimId);
+  private async propose(drive: Drive, state: ArgumentMapData, claimId: string, late: boolean): Promise<void> {
+    const gap = this.claimOf(state, claimId).comparison?.vetoes.find(
+      v => !v.resolved && v.kind === "missed_alternative"
+    )?.detail;
+    const ids = late
+      ? Array.from({ length: Math.max(1, MAX_HYPOTHESES - state.hypotheses.length) }, () => this.ports.newId())
+      : this.proposeIds(state, claimId);
     const request = {
       ...this.base(drive),
       restatement: state.framing.restatement,
-      ...hypothesesParts(state, claimId, "first", ids)
+      ...hypothesesParts(state, claimId, late ? "alternatives" : "first", ids, late ? (gap ?? "") : "")
     };
-    const result = await this.ask(drive, ARGUMENT_STEPS_V2.propose_hypotheses, request);
+    const phase = state.run.phase;
+    const result = await this.ask(
+      drive,
+      late ? ARGUMENT_STEPS_V2.propose_alternatives : ARGUMENT_STEPS_V2.propose_hypotheses,
+      request
+    );
     await this.checkpoint(drive, async (s, map) => {
-      const next = applyHypotheses(s, claimId, result.hypotheses);
+      if (s.run.phase !== phase) return null; // a late reply of an earlier phase writes nothing
+      const next = late
+        ? applyAlternativeHypotheses(s, claimId, result.hypotheses)
+        : applyHypotheses(s, claimId, result.hypotheses);
       const nodes: Plan["nodes"] = [];
       for (const h of result.hypotheses) {
         const text = h.predictions.map(p => p.text).join(" / ");
@@ -818,6 +838,92 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
         });
       }
       return { next, nodes };
+    });
+  }
+
+  private verdictPlan(next: ArgumentMapData, hypothesisId: string, map: MapDocument): Plan {
+    const verdict = next.hypotheses.find(h => h.id === hypothesisId)?.verdict;
+    this.ports.log(
+      `argument-run verdict runId=${next.run.runId} phase=${next.run.phase} by=${verdict?.by ?? "-"} value=${verdict?.value ?? "-"}`
+    );
+    return {
+      next,
+      notes: () =>
+        this.cardNote(map, hypothesisId, { detail: `${this.t("ui.argument_reason")}: ${verdict?.reason ?? ""}` })
+    };
+  }
+
+  /** One AI verdict. The reply is applied only to the state it was asked about (same run phase and same prepared input), else nothing is written. */
+  private async verdict(drive: Drive, state: ArgumentMapData, hypothesisId: string): Promise<void> {
+    const input = prepareVerdict(state, hypothesisId);
+    const result = await this.ask(drive, ARGUMENT_STEPS_V2.verdict, { ...this.base(drive), input });
+    await this.checkpoint(drive, async (s, map) => {
+      if (s.run.phase !== state.run.phase || !same(prepareVerdict(s, hypothesisId), input)) return null;
+      return this.verdictPlan(applyVerdict(s, hypothesisId, result), hypothesisId, map);
+    });
+  }
+
+  private async compare(drive: Drive, state: ArgumentMapData, claimId: string): Promise<void> {
+    const input = prepareComparison(state, claimId);
+    const result = await this.ask(drive, ARGUMENT_STEPS_V2.compare, { ...this.base(drive), input });
+    await this.checkpoint(drive, async s => {
+      if (s.run.phase !== state.run.phase || !same(prepareComparison(s, claimId), input)) return null;
+      const next = applyComparison(s, claimId, result);
+      const c = this.claimOf(next, claimId).comparison;
+      this.ports.log(
+        `argument-run compare runId=${next.run.runId} phase=${next.run.phase} claim=${claimId} state=${c?.state ?? "-"} attempts=${c?.attempts ?? 0} vetoes=${(c?.vetoes ?? []).map(v => v.kind).join(",") || "-"} answer=${c?.answer ?? "-"}`
+      );
+      return { next };
+    });
+  }
+
+  /** The conclusion card: its summary says where the conclusion is and its text lists each answer's sentence (claim text from the state, sentences plain lines). */
+  private conclusionNotes(map: MapDocument, next: ArgumentMapData): () => Promise<void> {
+    return async () => {
+      const path = this.pathOf(map, next.roles.conclusion);
+      if (!path) return;
+      const done = next.run.status === "finished";
+      const summary = !done
+        ? this.ports.t("ui.argument_in_progress")
+        : next.conclusion.state === "concluded"
+          ? this.ports.t("ui.argument_conclusion_state_concluded")
+          : this.ports.t("ui.argument_conclusion_limit");
+      const lines: string[] = [];
+      for (const a of next.conclusion.answers) {
+        const claim = next.claims.find(c => c.id === a.claimId);
+        if (a.sentence) lines.push(`- ${plainLine(claim?.text ?? "")}: ${plainLine(a.sentence)}`);
+      }
+      if (next.conclusion.overall) lines.push(`- ${plainLine(next.conclusion.overall)}`);
+      await this.ports.updateNote(path, {
+        summary: plainLine(summary),
+        detail: lines.map(l => neutralizeUnsafeMermaid(l)).join("\n")
+      });
+    };
+  }
+
+  private async conclude(drive: Drive, state: ArgumentMapData): Promise<void> {
+    const input = prepareConclusion(state);
+    const result = await this.ask(drive, ARGUMENT_STEPS_V2.conclude, { ...this.base(drive), input });
+    await this.checkpoint(drive, async (s, map) => {
+      if (s.run.phase !== state.run.phase || !same(prepareConclusion(s), input)) return null;
+      const next = applyConclusion(s, result);
+      this.ports.log(
+        `argument-run conclusion runId=${next.run.runId} phase=${next.run.phase} state=${next.conclusion.state} answers=${next.conclusion.answers.map(a => a.answer).join(",") || "-"}`
+      );
+      return { next, notes: this.conclusionNotes(map, next) };
+    });
+  }
+
+  private async inferenceCheck(drive: Drive, state: ArgumentMapData): Promise<void> {
+    const input = prepareInferenceCheck(state);
+    const result = await this.ask(drive, ARGUMENT_STEPS_V2.inference_check, { ...this.base(drive), input });
+    await this.checkpoint(drive, async (s, map) => {
+      if (s.run.phase !== state.run.phase || !same(prepareInferenceCheck(s), input)) return null;
+      const next = applyInferenceCheck(s, result);
+      this.ports.log(
+        `argument-run inference runId=${next.run.runId} phase=${next.run.phase} check=${next.run.inferenceChecks ?? 0} deleted=${next.conclusion.deleted.length} state=${next.conclusion.state}`
+      );
+      return { next, notes: this.conclusionNotes(map, next) };
     });
   }
 

@@ -133,3 +133,6 @@ export function hasKey(value: unknown, key: string): boolean {
 export function groundedIn(texts: string[], input: unknown): void {
   grounded(texts, [JSON.stringify(input)]);
 }
+
+/** A string field of an input record, or an empty string. */
+export const strOf = (value: unknown): string => (typeof value === "string" ? value : "");

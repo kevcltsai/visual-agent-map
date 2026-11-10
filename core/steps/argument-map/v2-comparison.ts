@@ -108,7 +108,7 @@ export const comparisonStep: StepDefinition<ComparisonRequest, ComparisonDraft> 
   version: 1,
   render: request =>
     renderTemplate(template, {
-      languageInstruction: languageInstruction(request.language, String(asRec(request.input.claim).text ?? "")),
+      languageInstruction: languageInstruction(request.language, strOf(asRec(request.input.claim).text)),
       input: JSON.stringify(request.input)
     }),
   schema: COMPARISON_SCHEMA,

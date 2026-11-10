@@ -1,7 +1,20 @@
 import type { InferenceItem } from "../../argument-map/machine-v2";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import { ArgumentStepError, languageInstruction, list, overBudget, type ArgumentStepBase } from "./shared";
-import { S, asArr, asRec, exact, groundedIn, hasKey, idsOf, maybeText, parseReply, pick, short } from "./v2-shared";
+import {
+  S,
+  asArr,
+  asRec,
+  exact,
+  groundedIn,
+  hasKey,
+  idsOf,
+  maybeText,
+  parseReply,
+  pick,
+  short,
+  strOf
+} from "./v2-shared";
 import template from "./v2-inference-check.md";
 
 /** `input` is exactly `prepareInferenceCheck(state)` of machine-v2: the sentences and the conclusion's own input. */
@@ -57,7 +70,7 @@ export const inferenceCheckStep: StepDefinition<InferenceCheckRequest, Inference
     renderTemplate(template, {
       languageInstruction: languageInstruction(
         request.language,
-        String(asRec(asRec(asRec(request.input.basis).framing)).original ?? "")
+        strOf(asRec(asRec(request.input.basis).framing).original)
       ),
       input: JSON.stringify(request.input)
     }),

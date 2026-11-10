@@ -83,7 +83,7 @@ export const conclusionV2Step: StepDefinition<ConclusionV2Request, ConclusionDra
     renderTemplate(template, {
       languageInstruction: languageInstruction(
         request.language,
-        String(asRec(request.input.framing).original ?? asRec(request.input.framing).restatement ?? "")
+        strOf(asRec(request.input.framing).original) || strOf(asRec(request.input.framing).restatement)
       ),
       input: JSON.stringify(request.input)
     }),

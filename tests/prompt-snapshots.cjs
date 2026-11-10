@@ -339,6 +339,11 @@ test('collect snapshots: chart step (chart.add@1)', () => {
       ['verdict', 'verdictStep', { ...argumentBase, language, hypothesis: 'Firms hired fewer juniors', input: { hypothesisId: 'h1', round: 1, evidence: [argumentEvidence('n1', 'supports'), argumentEvidence('n2', 'uncertain')] } }],
       ['conclusion', 'conclusionStep', { ...request, input: { hypotheses: [{ id: 'h1', round: 1, evidence: [argumentEvidence('n1', 'supports')] }, { id: 'h2', round: 1, evidence: [argumentEvidence('n2', 'supports')] }, { id: 'h3', round: 2, evidence: [argumentEvidence('n3', 'supports')] }] }, statements: { h1: 'Hiring slowed', h2: 'Entry jobs automated', h3: 'Wages stalled' } }]
     ];
+    // V1 boost: the facet plan step and the hypotheses step with causal questions (new snapshots only)
+    for (const [name, key, input] of [
+      ['facet-plan', 'facetPlanStep', request],
+      ['hypotheses-causal', 'hypothesesStep', { ...request, data: argumentData, count: 3, existing: ['Earlier hypothesis title'], causalQuestions: ['Did automation drive the rise?'] }]
+    ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'facet-plan' ? 'facet-plan' : 'hypotheses'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
     for (const [name, key, input] of steps) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'situation-gate' ? 'gate' : name === 'plan-situation' ? 'plan' : name}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
   }
   for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);

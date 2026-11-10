@@ -16,6 +16,36 @@
       "language": "zh-CN",
       "schema": true
     },
+    "argument-map-facet-plan.en": {
+      "builder": "core/steps/argument-map/facet-plan.ts facetPlanStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-facet-plan.zh": {
+      "builder": "core/steps/argument-map/facet-plan.ts facetPlanStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-facet-plan.zh-CN": {
+      "builder": "core/steps/argument-map/facet-plan.ts facetPlanStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-hypotheses-causal.en": {
+      "builder": "core/steps/argument-map/hypotheses.ts hypothesesStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-hypotheses-causal.zh": {
+      "builder": "core/steps/argument-map/hypotheses.ts hypothesesStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-hypotheses-causal.zh-CN": {
+      "builder": "core/steps/argument-map/hypotheses.ts hypothesesStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "argument-map-hypotheses.en": {
       "builder": "core/steps/argument-map/hypotheses.ts hypothesesStep",
       "language": "en",

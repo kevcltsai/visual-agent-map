@@ -109,3 +109,10 @@ export const normalized = (value: string): string =>
     .trim();
 
 export const idSchema = { type: "array", items: { type: "string", minLength: 1 }, minItems: 1 };
+
+/** `grounded` for a free text that may carry its own years and quantities (an assumption value): only links must come from the sources. */
+export function groundedLinks(replyTexts: string[], sources: string[]): void {
+  const knownLinks = linksOf(sources);
+  for (const [key, shown] of linksOf(replyTexts))
+    if (!knownLinks.has(key)) fail(`The reply uses the link ${shown}, which the request does not have`);
+}

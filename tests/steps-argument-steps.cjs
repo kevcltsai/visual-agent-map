@@ -245,15 +245,16 @@ test('conclusion: a number or URL outside the input throws; below 3 verified hyp
 
 // ---- schemas and registry ----
 test('every step has a strict schema and the registry maps the machine actions', () => {
-  for (const step of [mod.planSituationStep, mod.situationGateStep, mod.hypothesesStep, mod.needsStep, mod.verdictStep, mod.conclusionStep]) {
+  for (const step of [mod.planSituationStep, mod.facetPlanStep, mod.situationGateStep, mod.hypothesesStep, mod.needsStep, mod.verdictStep, mod.conclusionStep]) {
     assert.equal(step.schema.additionalProperties, false);
     assert.deepEqual([...step.schema.required].sort(), Object.keys(step.schema.properties).sort());
   }
-  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_gate', 'plan_situation', 'propose_hypotheses', 'revise', 'verdict']);
+  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_gate', 'plan_facets', 'plan_situation', 'propose_hypotheses', 'revise', 'verdict']);
+  assert.equal(mod.ARGUMENT_STEPS.plan_facets, mod.facetPlanStep);
   assert.equal(mod.ARGUMENT_STEPS.plan_situation, mod.planSituationStep);
   assert.equal(mod.ARGUMENT_STEPS.revise, mod.needsStep);
   const ids = new Set(Object.values(mod.ARGUMENT_STEPS).map(step => step.id));
-  assert.equal(ids.size, 6);
+  assert.equal(ids.size, 7);
 });
 
 // ---- text-only through the real runtimes ----
@@ -330,4 +331,97 @@ test('a reply that cites outside the input fails inside the runner (nothing is a
   const runtime = new claude.ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn: claudeChild(spawned, answer) });
   const calls = new mod.AiCalls({ runtimeFor: model => mod.aiRuntimeForModel(model, { claude: () => runtime, codex: () => { throw new Error('x'); } }), exchanges: () => null });
   await assert.rejects(mod.askArgumentStep(mod.situationGateStep, gateReq, mod.providerArgumentRunner(calls), new AbortController().signal), error => error.name === 'ArgumentStepError');
+});
+
+
+// ---- V1 boost P2: facet plan step and the causal input of the hypotheses step ----
+const fpReq = { ...base, proposition: PROP };
+const fneed = (need, kind = 'fact') => ({ need, kind });
+const fpOk = () => ({
+  assumptions: { items: [{ label: 'Age band', value: 'ages 16 to 24 for the years 2023 to 2024', reason: 'the proposition names young people' }] },
+  facets: [
+    { title: 'Level of the rate', needs: [fneed('Official youth unemployment rate series'), fneed('Survey notes on the rate')] },
+    { title: 'Direction of change', needs: [fneed('Year on year change in the youth rate')] },
+    { title: 'Who is counted', needs: [fneed('Definition of unemployed used by the agency'), fneed('Why the labour force survey changed', 'cause')] }
+  ],
+  causalQuestions: ['Did automation drive the rise?']
+});
+const fpWith = fn => { const v = fpOk(); fn(v); return v; };
+
+test('facet plan: a well formed reply parses; ids are not in the output; cause needs move to causalQuestions and build no data', () => {
+  const out = plain(ok(mod.facetPlanStep, fpReq, fpOk()));
+  assert.deepEqual(Object.keys(out).sort(), ['assumptions', 'causalQuestions', 'facets']);
+  assert.equal(out.facets.length, 3);
+  assert.deepEqual(out.facets[2].needs, [{ need: 'Definition of unemployed used by the agency' }]);
+  assert.deepEqual(out.causalQuestions, ['Why the labour force survey changed', 'Did automation drive the rise?'], 'cause needs first, then the explicit questions');
+  assert.equal(out.facets.reduce((n, f) => n + f.needs.length, 0), 4, 'the cause need is not a datum');
+  assert.equal(out.assumptions.items.length, 1);
+  assert.deepEqual(plain(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions = { items: [] }; }))).assumptions, { items: [] });
+});
+test('facet plan: the output feeds applySituationPlan (the ids come from the program)', () => {
+  const out = ok(mod.facetPlanStep, fpReq, fpOk());
+  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions };
+  assert.equal(m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan).situation.data.length, 4);
+});
+test('facet plan: after the cause needs leave, a facet without a fact need or fewer than 3 facets throws', () => {
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs = [fneed('Why did it change', 'cause')]; }), /at least one|1 to 3/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets.pop(); }), /3 to 5/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets = []; }), /3 to 5/);
+});
+test('facet plan: 6 facets, 16 fact needs, and 0 or 4 fact needs in one facet are refused', () => {
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { for (const t of ['Fourth', 'Fifth', 'Sixth']) v.facets.push({ title: t, needs: [fneed(`need of ${t}`)] }); }), /3 to 5/);
+  const W = ['alpha', 'bravo', 'charlie', 'delta', 'echo'];
+  const many = i => Array.from({ length: 3 }, (_, k) => fneed(`distinct need ${W[i]} ${W[k]}`));
+  const five = extra => ({ ...fpOk(), facets: Array.from({ length: 5 }, (_, i) => ({ title: `Title ${W[i]}`, needs: i === 4 ? many(i).slice(0, extra) : many(i) })) });
+  assert.ok(ok(mod.facetPlanStep, fpReq, five(3)), '15 needs are fine');
+  const sixteen = five(3); sixteen.facets[4].needs.push(fneed('one more need'));
+  bad(mod.facetPlanStep, fpReq, sixteen, /1 to 3|at most 15/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].needs = []; }), /1 to 3/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].needs = W.slice(0, 4).map(i => fneed(`extra need ${i}`)); }), /1 to 3/);
+});
+test('facet plan: an unknown kind, a repeated title or need, a blank text, extra fields and non JSON throw', () => {
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].needs[0].kind = 'opinion'; }), /kind/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].title = 'level of the RATE!'; }), /repeats/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs[0].need = 'official youth unemployment rate series.'; }), /repeats/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].title = ' '; }));
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions.items[0].label = ''; }));
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.extra = 1; }));
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].id = 'f1'; }));
+  bad(mod.facetPlanStep, fpReq, 'not json');
+});
+test('facet plan: an assumption value may carry years (not checked) but not a link; needs, titles and causal questions are checked as before', () => {
+  assert.ok(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions.items[0].value = 'ages 16 to 24 in 2019'; })));
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions.items[0].value = 'per https://memory.example.com/a'; }), /link/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].needs[0].need = 'Rate series for 2019'; }), /number 2019/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].title = 'Rate in 2019'; }), /number 2019/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.causalQuestions = ['Did the 2008 crisis do it?']; }), /number 2008/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs[0].need = 'see https://x.example.com'; }), /link/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs.push(fneed('Why in 2008', 'cause')); }), /number 2008/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions.items[0].reason = 'because of 2008'; }), /number 2008/);
+});
+test('facet plan: the prompt shows only the proposition; the secret field of a richer request never appears', () => {
+  const prompt = mod.facetPlanStep.render({ ...fpReq, secret: 'LEAKED-X' });
+  assert.doesNotMatch(prompt, /LEAKED/);
+  assert.match(prompt, /Youth unemployment rose in 2024/);
+  assert.match(prompt, /"kind"/);
+  assert.equal(sr.prepareStep(mod.facetPlanStep, fpReq).prompt.length > 100, true);
+});
+
+const causalReq = { ...hypReq, causalQuestions: ['Did automation drive the rise?'] };
+test('hypotheses: causal questions render only when given, and the prompt without them is byte-identical to before', () => {
+  const without = mod.hypothesesStep.render(hypReq);
+  assert.equal(mod.hypothesesStep.render({ ...hypReq, causalQuestions: [] }), without);
+  assert.equal(mod.hypothesesStep.render({ ...hypReq, causalQuestions: undefined }), without);
+  assert.ok(!without.includes('ausal'));
+  const withCausal = mod.hypothesesStep.render(causalReq);
+  assert.ok(withCausal.startsWith(without), 'the causal part is appended after the existing list');
+  assert.match(withCausal, /Did automation drive the rise\?/);
+  assert.ok(withCausal.length > without.length);
+});
+test('hypotheses: the words of a causal question may be reused, but numbers and links of it still must come from the request', () => {
+  assert.ok(ok(mod.hypothesesStep, causalReq, { hypotheses: [hyp('Automation drove the rise'), hyp('B'), hyp('C')] }));
+  bad(mod.hypothesesStep, hypReq, { hypotheses: [hyp('Automation drove the rise 7'), hyp('B'), hyp('C')] }, /number 7/);
+  const numbered = { ...hypReq, causalQuestions: ['Did the 2008 crisis do it?'] };
+  assert.ok(ok(mod.hypothesesStep, numbered, { hypotheses: [{ ...hyp('A'), statement: 'The 2008 crisis mattered' }, hyp('B'), hyp('C')] }));
+  bad(mod.hypothesesStep, hypReq, { hypotheses: [{ ...hyp('A'), statement: 'The 2008 crisis mattered' }, hyp('B'), hyp('C')] }, /number 2008/);
 });

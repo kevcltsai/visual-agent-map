@@ -2457,7 +2457,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "note.earlier_research_sources": "先前研究的來源",
   "note.no_new_information": "本次無新增內容。",
   "note.writeback_fresh_replaced_0": "已用新研究取代，舊版備份在 {0}",
-  "note.callout_titles": "摘要:summary,abstract,tldr|筆記:note|資訊:info|待辦:todo|提示:tip,hint|重要:important|成功:success,check,done|問題:question,help,faq|注意:warning,caution,attention|失敗:failure,fail,missing|危險:danger,error|錯誤:bug|範例:example|引述:quote,cite",
+  "note.callout_titles":
+    "摘要:summary,abstract,tldr|筆記:note|資訊:info|待辦:todo|提示:tip,hint|重要:important|成功:success,check,done|問題:question,help,faq|注意:warning,caution,attention|失敗:failure,fail,missing|危險:danger,error|錯誤:bug|範例:example|引述:quote,cite",
   "note.visual_reference": "視覺參考",
   "ui.aim_preparing_clarification": "正在準備開始前的條件釐清…",
   "ui.aim_answered_not_started": "已回答・研究尚未開始",

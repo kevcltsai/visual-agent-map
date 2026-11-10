@@ -461,6 +461,7 @@ import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCo
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
 import { effectiveVerdict } from "../../core/argument-map/model-v1";
+import { applyUserVerdict } from "../../core/argument-map/machine-v2";
 import { managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
 import {
   describeArgumentCardV2,
@@ -17959,7 +17960,10 @@ export class VisualAgentMapView extends ItemView {
       .rewriteNote(node.path, path => this.plugin.repo.writeHypothesisLeaning(path, leaning))
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
-        // A legacy (`"v": 1`) argument map is read-only, so its key is not written here (version 2 records a mark only: packet V7).
+        // A legacy (`"v": 1`) argument map is read-only, so its key is not written here; a usable (version 2) one records the user's mark
+        // (a mark only: no step reads it) in the same save. A map with no key is left as it is.
+        const argument = map.argumentMap === undefined ? null : readArgumentMap(map);
+        if (argument?.kind === "usable") map.argumentMap = applyUserVerdict(argument.data, node.id, leaning);
       })
       .commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);

@@ -431,3 +431,28 @@ test('legacy verdict: no verdict reads as undecided, the AI value shows; the use
   assert.equal(core.parseMap(plain.contents.get(MAP)).argumentMap, undefined);
   assert.equal(plain.view.argumentVerdictOf(plain.nodes[H].id), undefined);
 });
+
+test('v2 verdict: the Inspector setter writes the note leaning and the key userVerdict in one save; the card shows the mark chip; the mark never reaches a step input; no-key maps get none', async () => {
+  const h = await harness([...'PRCQDTMHNF'], {}, false);
+  Object.assign(h.view, { history: { push() {} }, refreshAfterSavedChange: async () => {}, relationsEnabled: () => true, isHypothesis: () => true });
+  const [P_, PR, C_, Q1, D1, Q2, CMP, H1, N1] = h.nodes;
+  await h.repo.writeTopicKind(H1.path, 'hypothesis');
+  const state = v2State({ P: P_.id, PR: PR.id, C: C_.id, Q1: Q1.id, D1: D1.id, Q2: Q2.id, CMP: CMP.id, H1: H1.id, N1: N1.id });
+  delete state.hypotheses[0].userVerdict;
+  h.view.map.argumentMap = state;
+  await h.repo.saveMap(MAP, h.view.map);
+  await h.view.changeHypothesisLeaning(H1, 'refuted');
+  const saved = core.parseMap(h.contents.get(MAP)).argumentMap;
+  assert.equal(saved.hypotheses[0].userVerdict, 'refuted', 'the key records the user mark');
+  assert.equal(saved.hypotheses[0].verdict.value, 'supported', 'the AI verdict is untouched');
+  assert.equal((await h.repo.readNote(H1.path)).hypothesisLeaning, 'refuted', 'the note is saved as before');
+  const cardModule = S.load('experiences/visual-map/argument-card-v2.ts');
+  const { translate } = S.load('i18n.ts');
+  const shown = cardModule.describeArgumentCardV2(model.readArgumentMap(core.parseMap(h.contents.get(MAP))).data, H1.id, (k, ...v) => translate('en', k, ...v));
+  assert.ok(shown.chips.some(chip => /refuted/i.test(chip.text) && chip.text !== 'Refuted'), 'the mark chip appears after a redraw');
+  // The mark is a mark only (machine layer: steps-argument-machine-v2-verdict 使用者標記不影響輸入); here the write changes nothing but that field.
+  const rest = JSON.parse(JSON.stringify(saved)); delete rest.hypotheses[0].userVerdict;
+  assert.deepEqual(rest, JSON.parse(JSON.stringify({ ...state, hypotheses: [{ ...state.hypotheses[0] }] })), 'only userVerdict changed in the key');
+  await h.view.changeHypothesisLeaning(H1, 'undecided');
+  assert.equal(core.parseMap(h.contents.get(MAP)).argumentMap.hypotheses[0].userVerdict, 'undecided');
+});

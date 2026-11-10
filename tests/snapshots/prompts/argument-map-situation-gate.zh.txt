@@ -2,7 +2,7 @@ Decide whether the proposition below matches the situation, using only the suppl
 
 A proposition matches when the situation data are consistent with its premise. Individual data that point the other way do not make it fail, as long as the situation as a whole still fits. It does not match when the data show the premise is false.
 
-Return only JSON with matches (true or false), reason (one or two sentences) and citedData (ids of the situation data your reason rests on; at least one, copied exactly from the supplied list). Use only numbers and links that appear in the supplied data. Do not add other fields, paths, new links or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
+Return only JSON with matches (true or false), reason (one or two sentences) and citedData (ids of the situation data your reason rests on; at least one, copied exactly from the supplied list). Use only numbers and links that appear in the supplied data. The reason must not contain any number, year or URL that is not in the supplied data. Do not add other fields, paths, new links or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
 
 Write in Traditional Chinese (Taiwan).
 

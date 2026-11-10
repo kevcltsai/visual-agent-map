@@ -237,3 +237,98 @@ test('verdict: the policy refuses a user mark in the input, missing evidence and
   const fat = { ...request, input: { ...request.input, claim: { ...request.input.claim, text: 'x'.repeat(200_000) } } };
   assert.throws(() => run(fat), isStepError(/over the token budget/));
 });
+
+// ---- comparison ----
+const cReq = (s = allJudged(), claimId = 'T1', over = {}) => ({ ...base, input: plain(m.prepareComparison(s, claimId)), ...over });
+const cOk = (over = {}) => ({ decision: 'complete', vetoes: [], allocations: [], rejudge: [], answer: 'causal_established', contributors: null, largest: null, basis: null, ...over });
+const cVeto = (over = {}) => cOk({ decision: 'rejudge', vetoes: [{ kind: 'contradiction', detail: 'two verdicts clash' }], rejudge: ['H1'], answer: null, ...over });
+test('comparison: the request shows verdicts, evidence and shared sources only (no mark, no page text); a complete reply applies', () => {
+  const s = allJudged();
+  let marked = s; for (const h of s.hypotheses) marked = m.applyUserVerdict(marked, h.id, 'undecided');
+  const request = cReq(marked);
+  const prompt = cp.render(request);
+  assert.doesNotMatch(prompt, /userVerdict|F1|F2|"T2"/, 'nothing of the other claim');
+  assert.equal(JSON.stringify(request.input), JSON.stringify(m.prepareComparison(s, 'T1')));
+  const draft = cp.parse(JSON.stringify(cOk()), request);
+  eq(draft, { decision: 'complete', vetoes: [], allocations: [], answer: 'causal_established' });
+  const next = valid(m.applyComparison(s, 'T1', draft));
+  assert.equal(next.claims.find(c => c.id === 'T1').comparison.answer, 'causal_established');
+  cp.policy(prompt, request);
+});
+test('comparison: a veto with a rejudge, an alternative or a give-up parses and applies; the remedy and the veto must agree', () => {
+  const s = allJudged(); const request = cReq(s);
+  const sent = valid(m.applyComparison(s, 'T1', cp.parse(JSON.stringify(cVeto()), request)));
+  assert.equal(sent.hypotheses.find(h => h.id === 'H1').verdict, undefined, 'H1 was sent back');
+  const alt = cVeto({ decision: 'add_alternative', vetoes: [{ kind: 'missed_alternative', detail: 'a wage explanation is absent' }], rejudge: [] });
+  valid(m.applyComparison(s, 'T1', cp.parse(JSON.stringify(alt), request)));
+  const giveUp = cVeto({ decision: 'undecidable', rejudge: [] });
+  assert.equal(valid(m.applyComparison(s, 'T1', cp.parse(JSON.stringify(giveUp), request))).claims.find(c => c.id === 'T1').comparison.state, 'undecidable');
+  bad(cp, request, cVeto({ vetoes: [] }), /every remedy needs one/);
+  bad(cp, request, cOk({ vetoes: [{ kind: 'contradiction', detail: 'x' }] }), /no veto/);
+  bad(cp, request, cVeto({ rejudge: [] }), /only a rejudge/);
+  bad(cp, request, cVeto({ decision: 'undecidable' }), /only a rejudge/);
+  bad(cp, request, cVeto({ decision: 'add_alternative', rejudge: [] }), /missed_alternative/);
+  bad(cp, request, cVeto({ answer: 'causal_established' }), /only a complete/);
+  bad(cp, request, cOk({ answer: null }), /gives an answer/);
+});
+test('comparison: missing, extra and non-enum fields, a program-owned veto kind and a non-JSON reply throw', () => {
+  const request = cReq();
+  exactKeys(cp, request, cOk());
+  bad(cp, request, cVeto({ vetoes: [{ kind: 'contradiction' }] }), /unexpected fields/);
+  bad(cp, request, cVeto({ vetoes: [{ kind: 'contradiction', detail: 'x', extra: 1 }] }), /unexpected fields/);
+  bad(cp, request, cVeto({ allocations: [{ needId: 'H2-n2' }] }), /unexpected fields/);
+  for (const [key, v] of [['decision', 'abort'], ['decision', 1], ['answer', 'maybe'], ['answer', 5]]) bad(cp, request, cOk({ [key]: v }), /not allowed/);
+  bad(cp, request, cVeto({ vetoes: [{ kind: 'unhandled_counter', detail: 'x' }] }), /not allowed/);
+  bad(cp, request, cVeto({ vetoes: [{ kind: 'bias', detail: 'x' }] }), /not allowed/);
+  bad(cp, request, 'oops', /not JSON/); bad(cp, request, '[]', /must be an object/);
+});
+test('comparison: ids outside the request (rejudge, allocation, contributors) throw; a hypothesis that cannot be sent back is refused', () => {
+  const request = cReq();
+  bad(cp, request, cVeto({ rejudge: ['H9'] }), /outside the request/);
+  bad(cp, request, cVeto({ rejudge: ['H1', 'H1'] }), /repeats/);
+  bad(cp, request, cVeto({ rejudge: ['F1'] }), /outside the request/);
+  bad(cp, request, cVeto({ allocations: [{ needId: 'F1-n2', hypothesisId: 'H1' }] }), /outside the request/);
+  bad(cp, request, cVeto({ allocations: [{ needId: 'H2-n2', hypothesisId: 'H9' }] }), /outside the request/);
+  const noRoom = cReq(); noRoom.input.comparison.room.canSendBack = [];
+  bad(cp, noRoom, cVeto(), /sent back once/);
+  const noAlt = cReq(); noAlt.input.comparison.room.canAddAlternative = false;
+  bad(cp, noAlt, cVeto({ decision: 'add_alternative', vetoes: [{ kind: 'missed_alternative', detail: 'x' }], rejudge: [] }), /room/);
+  eq(ok(cp, request, cVeto({ allocations: [{ needId: 'H2-n2', hypothesisId: 'H1' }] })).allocations, [{ needId: 'H2-n2', hypothesisId: 'H1' }]);
+});
+test('comparison: only a main-cause claim gives contributors, largest and basis, from its own hypotheses; the answer applies', () => {
+  const request = cReq();
+  for (const extra of [{ contributors: ['H1'] }, { largest: 'H1' }, { basis: 'none' }]) bad(cp, request, cOk(extra), /belong to a complete main-cause/);
+  const mcs = m.applyHypotheses(m.applyHypotheses(analysis(claimDrafts('main_cause')), 'T1', causalSet()), 'T2', [facet('F1'), facet('F2')]);
+  let t = judged(mcs, 'H1', {}, supportedDraft()); t = judged(t, 'H2', {}, supportedDraft({ citedNeeds: ['H2-n1'] })); t = judged(t, 'H3', { stance: 'refutes' }, refutedDraft('H3'));
+  t = judged(t, 'F1', {}, factSupported('F1')); t = judged(t, 'F2', {}, factSupported('F2'));
+  const mc = cReq(t);
+  assert.equal(mc.input.claim.type, 'main_cause');
+  const reply = cOk({ answer: 'main_cause_undecidable', contributors: ['H1', 'H2'], basis: 'point_estimates' });
+  const draft = cp.parse(JSON.stringify(reply), mc);
+  eq(draft.contributors, ['H1', 'H2']); assert.equal(draft.basis, 'point_estimates'); assert.equal(draft.largest, undefined);
+  eq(m.applyComparison(t, 'T1', draft).claims.find(c => c.id === 'T1').comparison.contributors, ['H1', 'H2']);
+  bad(cp, mc, { ...reply, contributors: ['H1', 'F1'] }, /outside the request/);
+  bad(cp, mc, { ...reply, contributors: ['H1', 'H1'] }, /repeats/);
+  bad(cp, mc, { ...reply, largest: 'H3' }, /outside the request/);
+  bad(cp, mc, { ...reply, basis: 'guess' }, /not allowed/);
+  assert.equal(cp.parse(JSON.stringify({ ...reply, largest: 'H2', basis: 'difference_with_uncertainty' }), mc).largest, 'H2');
+  // a ranking on point estimates, or a contributor that is only compatible, is the machine's refusal
+  gateError(() => m.applyComparison(t, 'T1', cp.parse(JSON.stringify({ ...reply, answer: 'main_cause_largest', largest: 'H1' }), mc)));
+});
+test('comparison: a veto detail may use only the numbers and links of the input; empty and overlong text throw', () => {
+  const request = cReq();
+  bad(cp, request, cVeto({ vetoes: [{ kind: 'contradiction', detail: 'off by 4242' }] }), /number 4242/);
+  bad(cp, request, cVeto({ vetoes: [{ kind: 'contradiction', detail: 'see https://evil.example' }] }), /link/);
+  for (const detail of ['', '  ', long, 3]) bad(cp, request, cVeto({ vetoes: [{ kind: 'contradiction', detail }] }), /./);
+  const url = request.input.hypotheses[0].evidence[0].source.url;
+  assert.equal(ok(cp, request, cVeto({ vetoes: [{ kind: 'double_count', detail: `both rest on ${url}` }] })).vetoes[0].detail, `both rest on ${url}`);
+  assert.equal(ok(cp, request, cVeto({ vetoes: [{ kind: 'contradiction', detail: '青年失業率\r\n上升' }] })).vetoes[0].detail, '青年失業率\r\n上升');
+});
+test('comparison: the policy refuses a user mark, an empty hypothesis list and an over-budget request', () => {
+  const request = cReq();
+  const run = r => cp.policy(cp.render(r), r);
+  run(request);
+  assert.throws(() => run({ ...request, input: { ...request.input, userVerdict: 'x' } }), isStepError(/user mark/));
+  assert.throws(() => run({ ...request, input: { ...request.input, hypotheses: [] } }), isStepError(/hypotheses/));
+  assert.throws(() => run({ ...request, input: { ...request.input, claim: { ...request.input.claim, text: 'x'.repeat(200_000) } } }), isStepError(/token budget/));
+});

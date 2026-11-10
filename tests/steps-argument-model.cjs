@@ -112,6 +112,8 @@ test('dead need reader: a valid replaces is usable and round-trips; forgeries ma
     'unknown id': [need('a', 1, 'not_found'), need('b', 2, 'found', { replaces: 'zzz' })],
     'same round': [need('a', 1, 'not_found'), need('b', 1, 'found', { replaces: 'a' })],
     'earlier round': [need('a', 2, 'not_found'), need('b', 1, 'found', { replaces: 'a' })],
+    'points to found': [need('a', 1, 'found'), need('b', 2, 'found', { replaces: 'a' })],
+    'points to pending': [need('a', 1, 'pending'), need('b', 2, 'found', { replaces: 'a' })],
     'self': [need('a', 1, 'not_found', { replaces: 'a' })],
     'empty string': [need('a', 1, 'not_found'), need('b', 2, 'found', { replaces: '' })],
     'not a string': [need('a', 1, 'not_found'), need('b', 2, 'found', { replaces: 7 })],

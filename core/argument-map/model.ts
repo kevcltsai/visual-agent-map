@@ -186,6 +186,7 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
       const target = (hypothesis.needs as Rec[]).find(other => other.id === need.replaces);
       if (
         !target ||
+        target.state !== "not_found" ||
         (target.addedRound as number) >= (need.addedRound as number) ||
         replaced.has(need.replaces as string)
       )

@@ -25434,7 +25434,7 @@ function problem(raw, nodeIds) {
     for (const need of hypothesis.needs) {
       if (need.replaces === void 0) continue;
       const target = hypothesis.needs.find((other) => other.id === need.replaces);
-      if (!target || target.addedRound >= need.addedRound || replaced.has(need.replaces))
+      if (!target || target.state !== "not_found" || target.addedRound >= need.addedRound || replaced.has(need.replaces))
         return "need malformed";
       replaced.add(need.replaces);
     }

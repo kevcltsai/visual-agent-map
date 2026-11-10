@@ -68,7 +68,8 @@ test('evidence cards: stance chips for found needs; dashed with a missing chip f
   assert.ok(of('na').kind.includes('stats.example.org') && !of('na').kind.includes('www.'));
   assert.equal(of('na').dashed, undefined);
   for (const id of ['nd', 'ne', 'nf']) assert.equal(of(id).dashed, true, id);
-  same(['nd', 'ne', 'nf'].map(id => of(id).chips[0].text), ['還缺・待找', '還缺・搜尋中', '還缺・找不到']);
+  same(['nd', 'ne', 'nf'].map(id => of(id).chips[0].text), ['還缺・待找', '找資料中', '還缺・找不到']);
+  same(['nd', 'ne', 'nf'].map(id => of(id).chips[0].tone), ['gap', 'run', 'gap']);
   assert.ok(of('nf').lines.includes('nothing'));
 });
 

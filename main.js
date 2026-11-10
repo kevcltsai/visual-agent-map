@@ -2912,6 +2912,24 @@ var en = {
   "ui.argument_start_usage_0": "Up to about {0} AI calls. Research connects to web pages the AI finds.",
   "ui.argument_start_confirm": "Start research",
   "ui.argument_start_refused": "Could not start hypothesis research on this mind map.",
+  "ui.argument_bar_label": "Hypothesis research progress",
+  "ui.argument_bar_situation": "Checking the situation",
+  "ui.argument_bar_round_0": "Testing hypotheses \xB7 round {0}",
+  "ui.argument_bar_searching_data_0": "Looking for {0} data points",
+  "ui.argument_bar_searching_evidence_0": "Looking for {0} pieces of evidence",
+  "ui.argument_bar_used_0_1": "{0}/{1} research calls used",
+  "ui.argument_bar_stop": "Stop",
+  "ui.argument_bar_paused": "Paused",
+  "ui.argument_bar_verified_0_1": "{0}/{1} hypotheses verified",
+  "ui.argument_bar_resume": "Resume",
+  "ui.argument_bar_interrupted": "Interrupted last time, paused",
+  "ui.argument_bar_no_auto_rerun": "It will not run again on its own",
+  "ui.argument_bar_error": "The AI reply could not be used; a retry also failed",
+  "ui.argument_bar_finished": "Finished",
+  "ui.argument_bar_see_conclusion": "See the conclusion card for the result",
+  "ui.argument_bar_total_0": "{0} research calls in total",
+  "ui.argument_resume_refused_finished": "This research has ended and cannot be resumed.",
+  "ui.argument_resume_refused": "Could not resume this research.",
   "ui.argument_situation": "Current situation",
   "ui.argument_conclusion": "Conclusion",
   "ui.argument_group_verified": "Verified hypotheses",
@@ -2950,7 +2968,7 @@ var en = {
   "ui.argument_hypothesis_0": "Hypothesis {0}",
   "ui.argument_missing_not_found": "Missing \xB7 not found",
   "ui.argument_missing_pending": "Missing \xB7 to find",
-  "ui.argument_missing_searching": "Missing \xB7 searching",
+  "ui.argument_missing_searching": "Searching",
   "ui.argument_progress_0_1_2": "Evidence needs {0}/{1} found \xB7 round {2}/3",
   "ui.argument_stance_supports": "\u2713 Supports",
   "ui.argument_stance_contradicts": "\u2715 Opposes",
@@ -5764,6 +5782,24 @@ var zhCN = {
   "ui.argument_start_usage_0": "\u6700\u591A\u7EA6 {0} \u6B21 AI \u8C03\u7528\u3002\u7814\u7A76\u65F6\u4F1A\u8FDE\u63A5\u5230 AI \u627E\u5230\u7684\u7F51\u9875\u3002",
   "ui.argument_start_confirm": "\u5F00\u59CB\u7814\u7A76",
   "ui.argument_start_refused": "\u65E0\u6CD5\u5728\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u4E0A\u5F00\u59CB\u5047\u8BBE\u7814\u7A76\u3002",
+  "ui.argument_bar_label": "\u5047\u8BBE\u7814\u7A76\u8FDB\u5EA6",
+  "ui.argument_bar_situation": "\u786E\u8BA4\u73B0\u72B6",
+  "ui.argument_bar_round_0": "\u9A8C\u8BC1\u5047\u8BBE\u30FB\u7B2C {0} \u8F6E",
+  "ui.argument_bar_searching_data_0": "\u6B63\u5728\u627E {0} \u6761\u6570\u636E",
+  "ui.argument_bar_searching_evidence_0": "\u6B63\u5728\u627E {0} \u6761\u8BC1\u636E",
+  "ui.argument_bar_used_0_1": "\u5DF2\u7528 {0}\uFF0F{1} \u6B21\u7814\u7A76",
+  "ui.argument_bar_stop": "\u505C\u6B62",
+  "ui.argument_bar_paused": "\u5DF2\u6682\u505C",
+  "ui.argument_bar_verified_0_1": "\u9A8C\u8BC1\u5B8C\u6210 {0}\uFF0F{1} \u4E2A\u5047\u8BBE",
+  "ui.argument_bar_resume": "\u7EE7\u7EED",
+  "ui.argument_bar_interrupted": "\u4E0A\u6B21\u4E2D\u65AD\uFF0C\u5DF2\u6682\u505C",
+  "ui.argument_bar_no_auto_rerun": "\u4E0D\u4F1A\u81EA\u52A8\u91CD\u8DD1",
+  "ui.argument_bar_error": "AI \u56DE\u590D\u65E0\u6CD5\u4F7F\u7528\uFF0C\u91CD\u8BD5\u4E00\u6B21\u4ECD\u5931\u8D25",
+  "ui.argument_bar_finished": "\u5DF2\u7ED3\u675F",
+  "ui.argument_bar_see_conclusion": "\u7ED3\u679C\u770B\u7ED3\u8BBA\u5361",
+  "ui.argument_bar_total_0": "\u5171\u7528 {0} \u6B21\u7814\u7A76",
+  "ui.argument_resume_refused_finished": "\u8FD9\u6B21\u7814\u7A76\u5DF2\u7ED3\u675F\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u3002",
+  "ui.argument_resume_refused": "\u65E0\u6CD5\u7EE7\u7EED\u8FD9\u6B21\u7814\u7A76\u3002",
   "ui.argument_situation": "\u73B0\u51B5",
   "ui.argument_conclusion": "\u7ED3\u8BBA",
   "ui.argument_group_verified": "\u9A8C\u8BC1\u5B8C\u6210\u7684\u5047\u8BBE",
@@ -5802,7 +5838,7 @@ var zhCN = {
   "ui.argument_hypothesis_0": "\u5047\u8BBE {0}",
   "ui.argument_missing_not_found": "\u8FD8\u7F3A\u30FB\u627E\u4E0D\u5230",
   "ui.argument_missing_pending": "\u8FD8\u7F3A\u30FB\u5F85\u627E",
-  "ui.argument_missing_searching": "\u8FD8\u7F3A\u30FB\u641C\u7D22\u4E2D",
+  "ui.argument_missing_searching": "\u627E\u8D44\u6599\u4E2D",
   "ui.argument_progress_0_1_2": "\u8BC1\u636E\u9700\u6C42 {0}\uFF0F{1} \u627E\u5230\u30FB\u7B2C {2}\uFF0F3 \u8F6E",
   "ui.argument_stance_supports": "\u2713 \u652F\u6301",
   "ui.argument_stance_contradicts": "\u2715 \u53CD\u5BF9",
@@ -8616,6 +8652,24 @@ var zhTW = {
   "ui.argument_start_usage_0": "\u6700\u591A\u7D04 {0} \u6B21 AI \u547C\u53EB\u3002\u7814\u7A76\u6642\u6703\u9023\u7DDA\u5230 AI \u627E\u5230\u7684\u7DB2\u9801\u3002",
   "ui.argument_start_confirm": "\u958B\u59CB\u7814\u7A76",
   "ui.argument_start_refused": "\u7121\u6CD5\u5728\u9019\u5F35\u5FC3\u667A\u5716\u4E0A\u958B\u59CB\u5047\u8A2D\u7814\u7A76\u3002",
+  "ui.argument_bar_label": "\u5047\u8A2D\u7814\u7A76\u9032\u5EA6",
+  "ui.argument_bar_situation": "\u78BA\u8A8D\u73FE\u6CC1",
+  "ui.argument_bar_round_0": "\u9A57\u8B49\u5047\u8A2D\u30FB\u7B2C {0} \u8F2A",
+  "ui.argument_bar_searching_data_0": "\u6B63\u5728\u627E {0} \u7B46\u6578\u64DA",
+  "ui.argument_bar_searching_evidence_0": "\u6B63\u5728\u627E {0} \u689D\u8B49\u64DA",
+  "ui.argument_bar_used_0_1": "\u5DF2\u7528 {0}\uFF0F{1} \u6B21\u7814\u7A76",
+  "ui.argument_bar_stop": "\u505C\u6B62",
+  "ui.argument_bar_paused": "\u5DF2\u66AB\u505C",
+  "ui.argument_bar_verified_0_1": "\u9A57\u8B49\u5B8C\u6210 {0}\uFF0F{1} \u500B\u5047\u8A2D",
+  "ui.argument_bar_resume": "\u63A5\u7E8C",
+  "ui.argument_bar_interrupted": "\u4E0A\u6B21\u4E2D\u65B7\uFF0C\u5DF2\u66AB\u505C",
+  "ui.argument_bar_no_auto_rerun": "\u4E0D\u6703\u81EA\u52D5\u91CD\u8DD1",
+  "ui.argument_bar_error": "AI \u56DE\u8986\u7121\u6CD5\u4F7F\u7528\uFF0C\u91CD\u8A66\u4E00\u6B21\u4ECD\u5931\u6557",
+  "ui.argument_bar_finished": "\u5DF2\u7D50\u675F",
+  "ui.argument_bar_see_conclusion": "\u7D50\u679C\u770B\u7D50\u8AD6\u5361",
+  "ui.argument_bar_total_0": "\u5171\u7528 {0} \u6B21\u7814\u7A76",
+  "ui.argument_resume_refused_finished": "\u9019\u6B21\u7814\u7A76\u5DF2\u7D50\u675F\uFF0C\u7121\u6CD5\u63A5\u7E8C\u3002",
+  "ui.argument_resume_refused": "\u7121\u6CD5\u63A5\u7E8C\u9019\u6B21\u7814\u7A76\u3002",
   "ui.argument_situation": "\u73FE\u6CC1",
   "ui.argument_conclusion": "\u7D50\u8AD6",
   "ui.argument_group_verified": "\u9A57\u8B49\u5B8C\u6210\u7684\u5047\u8A2D",
@@ -8654,7 +8708,7 @@ var zhTW = {
   "ui.argument_hypothesis_0": "\u5047\u8A2D {0}",
   "ui.argument_missing_not_found": "\u9084\u7F3A\u30FB\u627E\u4E0D\u5230",
   "ui.argument_missing_pending": "\u9084\u7F3A\u30FB\u5F85\u627E",
-  "ui.argument_missing_searching": "\u9084\u7F3A\u30FB\u641C\u5C0B\u4E2D",
+  "ui.argument_missing_searching": "\u627E\u8CC7\u6599\u4E2D",
   "ui.argument_progress_0_1_2": "\u8B49\u64DA\u9700\u6C42 {0}\uFF0F{1} \u627E\u5230\u30FB\u7B2C {2}\uFF0F3 \u8F2A",
   "ui.argument_stance_supports": "\u2713 \u652F\u6301",
   "ui.argument_stance_contradicts": "\u2715 \u53CD\u5C0D",
@@ -45337,7 +45391,8 @@ function sourceHost(url) {
   }
 }
 function missingChip(item, t2) {
-  const key4 = item.state === "not_found" ? "ui.argument_missing_not_found" : item.state === "searching" ? "ui.argument_missing_searching" : "ui.argument_missing_pending";
+  if (item.state === "searching") return { tone: "run", text: t2("ui.argument_missing_searching") };
+  const key4 = item.state === "not_found" ? "ui.argument_missing_not_found" : "ui.argument_missing_pending";
   return { tone: "gap", text: t2(key4) };
 }
 function datumChip(datum, t2) {
@@ -46766,6 +46821,65 @@ var ArgumentRuns = class {
     });
   }
 };
+
+// experiences/visual-map/argument-progress.ts
+function describeArgumentProgress(state, owned, t2) {
+  const run = state.run;
+  const used = t2("ui.argument_bar_used_0_1", run.researchCalls, MAX_RESEARCH_CALLS);
+  if (run.status === "finished" || run.phase === "concluded" || run.phase === "stopped_mismatch" || run.phase === "stopped_limit")
+    return {
+      tone: "done",
+      title: t2("ui.argument_bar_finished"),
+      detail: t2("ui.argument_bar_see_conclusion"),
+      count: t2("ui.argument_bar_total_0", run.researchCalls),
+      action: null
+    };
+  if (run.status === "running") {
+    if (!owned)
+      return {
+        tone: "warn",
+        title: t2("ui.argument_bar_interrupted"),
+        detail: t2("ui.argument_bar_no_auto_rerun"),
+        action: null
+      };
+    if (run.phase === "situation") {
+      const searching2 = state.situation.data.filter((datum) => datum.state === "searching").length;
+      return {
+        tone: "run",
+        title: t2("ui.argument_bar_situation"),
+        ...searching2 ? { detail: t2("ui.argument_bar_searching_data_0", searching2) } : {},
+        count: used,
+        action: "stop"
+      };
+    }
+    const verifying = state.hypotheses.filter((h) => h.location === "verifying");
+    const round3 = verifying.reduce((most, h) => Math.max(most, h.round), 1);
+    const searching = verifying.reduce((sum2, h) => sum2 + h.needs.filter((need) => need.state === "searching").length, 0);
+    return {
+      tone: "run",
+      title: t2("ui.argument_bar_round_0", round3),
+      ...searching ? { detail: t2("ui.argument_bar_searching_evidence_0", searching) } : {},
+      count: used,
+      action: "stop"
+    };
+  }
+  if (run.stopReason === "interrupted")
+    return {
+      tone: "warn",
+      title: t2("ui.argument_bar_interrupted"),
+      detail: t2("ui.argument_bar_no_auto_rerun"),
+      action: "resume"
+    };
+  if (run.stopReason === "error")
+    return { tone: "warn", title: t2("ui.argument_bar_paused"), detail: t2("ui.argument_bar_error"), action: "resume" };
+  return {
+    tone: "paused",
+    title: t2("ui.argument_bar_paused"),
+    detail: t2("ui.argument_bar_verified_0_1", verifiedCount(state), MIN_VERIFIED),
+    count: used,
+    action: "resume"
+  };
+}
 
 // ui/modals/argument-start-modal.ts
 var import_obsidian25 = require("obsidian");
@@ -60828,6 +60942,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     __publicField(this, "aimAnswerRequestIds", /* @__PURE__ */ new Map());
     /** True only while refreshFromPlugin repaints (synchronously: every restorer it triggers runs inside that call). */
     __publicField(this, "externalRefresh", false);
+    /** The status bars for background AI work on the open map: structure review and AI outline generation. */
+    /** Which button of the progress bar was pressed last ("stop" or "resume"): the focus waits for the other one to appear. */
+    __publicField(this, "argumentBarPressed", null);
     /** The run of key removals the showing Notice reports; a removal inside it replaces that Notice. */
     __publicField(this, "removalRun", null);
     /** True while a drag that started inside this view (for example a card's own cover image) is under way. */
@@ -63049,7 +63166,69 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       task.summaries
     );
   }
-  /** The status bars for background AI work on the open map: structure review and AI outline generation. */
+  /**
+   * The hypothesis research progress bar, derived on every paint from the saved run state and whether this session drives the run
+   * (nothing else is stored). A map without a usable argument key gets no element at all. Only fixed words and counts the program
+   * computes are shown, never text from the model.
+   */
+  renderArgumentRunBar(parent) {
+    const map = this.map;
+    if (!map || map.argumentMap === void 0) return;
+    const read = readArgumentMap(map);
+    if (read.kind !== "usable") return;
+    const path = this.path;
+    const view = describeArgumentProgress(read.data, this.plugin.argumentRuns.isRunning(path), t);
+    const bar = parent.createDiv({
+      cls: "vam-argument-bar",
+      attr: {
+        role: "region",
+        "aria-label": t("ui.argument_bar_label"),
+        "data-state": view.tone,
+        tabindex: "-1"
+      }
+    });
+    const status = bar.createSpan({
+      cls: "vam-argument-bar-status",
+      attr: { role: "status", "aria-live": "polite" }
+    });
+    status.createEl("b", { text: view.title });
+    if (view.detail) status.createSpan({ text: view.detail });
+    if (view.count) bar.createSpan({ cls: "vam-argument-bar-count", text: view.count });
+    bar.createSpan({ cls: "vam-argument-bar-spacer" });
+    let button = null;
+    if (view.action === "stop") {
+      const stop = bar.createEl("button", { text: t("ui.argument_bar_stop"), attr: { type: "button" } });
+      stop.addEventListener("click", () => {
+        stop.disabled = true;
+        this.argumentBarPressed = "stop";
+        void this.plugin.argumentRuns.stop(path);
+      });
+      button = stop;
+    } else if (view.action === "resume") {
+      const resume = bar.createEl("button", {
+        text: t("ui.argument_bar_resume"),
+        cls: "mod-cta",
+        attr: { type: "button" }
+      });
+      resume.addEventListener("click", () => {
+        resume.disabled = true;
+        this.argumentBarPressed = "resume";
+        this.plugin.argumentRuns.resume(path).catch((error) => {
+          this.argumentBarPressed = null;
+          resume.disabled = false;
+          if (!(error instanceof ArgumentRunError) || error.code === "busy") return;
+          new import_obsidian40.Notice(
+            t(error.code === "finished" ? "ui.argument_resume_refused_finished" : "ui.argument_resume_refused")
+          );
+        });
+      });
+      button = resume;
+    }
+    if (this.argumentBarPressed && view.action !== this.argumentBarPressed) {
+      this.argumentBarPressed = null;
+      (button != null ? button : bar).focus();
+    }
+  }
   renderBackgroundBars(parent) {
     var _a2, _b2, _c, _d;
     const review = this.structureReviewTask;
@@ -72450,6 +72629,7 @@ ${request.requirements}` : preset.text,
     if (!this.aimLive()) this.renderMultiResearchStatus(this.contentEl);
     if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
     if (!this.aimLive()) this.renderBackgroundBars(this.contentEl);
+    this.renderArgumentRunBar(this.contentEl);
     if (!this.map.nodes.length) {
       this.selection.exitMultiSelect("emptyMap");
     }

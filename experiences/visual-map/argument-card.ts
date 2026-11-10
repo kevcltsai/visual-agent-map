@@ -21,7 +21,7 @@ import {
 
 type Translate = (key: TranslationKey, ...values: unknown[]) => string;
 export type ArgumentRole = "proposition" | "situation" | "datum" | "conclusion" | "group" | "hypothesis" | "need";
-export type ChipTone = "yes" | "no" | "maybe" | "gap" | "open";
+export type ChipTone = "yes" | "no" | "maybe" | "gap" | "open" | "run";
 
 export interface ArgumentChip {
   tone: ChipTone;
@@ -71,12 +71,9 @@ export function sourceHost(url: string): string {
   }
 }
 function missingChip(item: Need | SituationDatum, t: Translate): ArgumentChip {
+  if (item.state === "searching") return { tone: "run", text: t("ui.argument_missing_searching") };
   const key: TranslationKey =
-    item.state === "not_found"
-      ? "ui.argument_missing_not_found"
-      : item.state === "searching"
-        ? "ui.argument_missing_searching"
-        : "ui.argument_missing_pending";
+    item.state === "not_found" ? "ui.argument_missing_not_found" : "ui.argument_missing_pending";
   return { tone: "gap", text: t(key) };
 }
 function datumChip(datum: SituationDatum, t: Translate): ArgumentChip {

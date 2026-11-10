@@ -468,6 +468,7 @@ import {
   type ArgumentCardView
 } from "./argument-card";
 import { ArgumentRunError, WORST_CASE_AI_CALLS } from "./argument-run";
+import { describeArgumentProgress } from "./argument-progress";
 import { ArgumentStartModal } from "../../ui/modals/argument-start-modal";
 import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
@@ -4214,6 +4215,72 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   /** The status bars for background AI work on the open map: structure review and AI outline generation. */
+  /** Which button of the progress bar was pressed last ("stop" or "resume"): the focus waits for the other one to appear. */
+  private argumentBarPressed: "stop" | "resume" | null = null;
+  /**
+   * The hypothesis research progress bar, derived on every paint from the saved run state and whether this session drives the run
+   * (nothing else is stored). A map without a usable argument key gets no element at all. Only fixed words and counts the program
+   * computes are shown, never text from the model.
+   */
+  private renderArgumentRunBar(parent: HTMLElement): void {
+    const map = this.map;
+    if (!map || map.argumentMap === undefined) return;
+    const read = readArgumentMap(map);
+    if (read.kind !== "usable") return;
+    const path = this.path;
+    const view = describeArgumentProgress(read.data, this.plugin.argumentRuns.isRunning(path), t);
+    const bar = parent.createDiv({
+      cls: "vam-argument-bar",
+      attr: {
+        role: "region",
+        "aria-label": t("ui.argument_bar_label"),
+        "data-state": view.tone,
+        tabindex: "-1"
+      }
+    });
+    const status = bar.createSpan({
+      cls: "vam-argument-bar-status",
+      attr: { role: "status", "aria-live": "polite" }
+    });
+    status.createEl("b", { text: view.title });
+    if (view.detail) status.createSpan({ text: view.detail });
+    if (view.count) bar.createSpan({ cls: "vam-argument-bar-count", text: view.count });
+    bar.createSpan({ cls: "vam-argument-bar-spacer" });
+    let button: HTMLButtonElement | null = null;
+    if (view.action === "stop") {
+      const stop = bar.createEl("button", { text: t("ui.argument_bar_stop"), attr: { type: "button" } });
+      stop.addEventListener("click", () => {
+        stop.disabled = true;
+        this.argumentBarPressed = "stop";
+        void this.plugin.argumentRuns.stop(path);
+      });
+      button = stop;
+    } else if (view.action === "resume") {
+      const resume = bar.createEl("button", {
+        text: t("ui.argument_bar_resume"),
+        cls: "mod-cta",
+        attr: { type: "button" }
+      });
+      resume.addEventListener("click", () => {
+        resume.disabled = true;
+        this.argumentBarPressed = "resume";
+        this.plugin.argumentRuns.resume(path).catch((error: unknown) => {
+          this.argumentBarPressed = null;
+          resume.disabled = false;
+          if (!(error instanceof ArgumentRunError) || error.code === "busy") return;
+          new Notice(
+            t(error.code === "finished" ? "ui.argument_resume_refused_finished" : "ui.argument_resume_refused")
+          );
+        });
+      });
+      button = resume;
+    }
+    // After a press the pressed button is gone (stop and resume swap): the keyboard goes to the one that replaced it, or to the bar.
+    if (this.argumentBarPressed && view.action !== this.argumentBarPressed) {
+      this.argumentBarPressed = null;
+      (button ?? bar).focus();
+    }
+  }
   private renderBackgroundBars(parent: HTMLElement): void {
     const review = this.structureReviewTask;
     if (review && review.mapPath === this.path) {
@@ -14357,6 +14424,7 @@ export class VisualAgentMapView extends ItemView {
     // Goal grading stays off for an old AIM map while AIM is hidden (a source-text test pins this condition).
     if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
     if (!this.aimLive()) this.renderBackgroundBars(this.contentEl);
+    this.renderArgumentRunBar(this.contentEl);
     // An empty map has nothing to select: leave topic selection (undo can empty a map while the bar is open).
     if (!this.map.nodes.length) {
       this.selection.exitMultiSelect("emptyMap");

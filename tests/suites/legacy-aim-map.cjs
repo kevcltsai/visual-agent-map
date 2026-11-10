@@ -189,7 +189,7 @@ integrationTest('legacy-aim-map: Organize workspace folders sees no busy AIM wor
   assert.ok(aimBlockOf(contents.get(mapPath)).runs.some(run => run.attempts.some(attempt => attempt.status === 'running')), 'the fixture has a running attempt');
   const before = contents.get(mapPath);
   const plan = await repo.planOrganizeWorkspaceFolders();
-  assert.deepEqual(plain(plan.busy), [], 'no run counts as active');
+  assert.equal('busy' in plan, false, 'no run counts as active: the plan has no busy list at all');
   assert.deepEqual(plain(plan.skipped), [], 'the map is read without error');
   assert.deepEqual(plain(plan.moves), [], 'an AIM map in the legacy Topics folder stays there while AIM is hidden');
   assert.deepEqual([...(await repo.organizeWorkspaceFolders(plan)).entries()], [], 'organizing does not refuse and moves nothing');
@@ -429,10 +429,13 @@ test('legacy-aim-map: M1 an AIM card paints its colour and style choices', () =>
   const { doc, conclusion } = aimDoc();
   const calls = [], view = viewOf(doc);
   view.stageEl = element('stage', []);
-  view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
-  for (const name of ['paintCardColor', 'paintCardStyle']) { const original = view[name].bind(view); view[name] = (card, note, aim) => { calls.push([name, aim]); return original(card, note, aim); }; }
+  view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '', color: 'red', style: ['bold'] }]));
+  for (const name of ['paintCardColor', 'paintCardStyle']) { const original = view[name].bind(view); view[name] = (card, note) => { calls.push([name, card]); return original(card, note); }; }
   view.renderNode(conclusion);
-  assert.deepEqual(calls, [['paintCardColor', false], ['paintCardStyle', false]], 'colour and style are painted');
+  assert.deepEqual(calls.map(([name]) => name), ['paintCardColor', 'paintCardStyle'], 'colour and style are painted');
+  const card = calls[0][1];
+  assert.equal(card.dataset.topicColor, 'red', 'the colour choice is on the card');
+  assert.equal(card.dataset.topicStyleBold, 'true', 'the style choice is on the card');
 });
 
 test('legacy-aim-map: M2 a question card shows no AIM status chip, whatever its run state', () => {
@@ -544,11 +547,39 @@ test('legacy-aim-map: N1 the note style manager lists no AIM report and names no
   assert.equal(JSON.stringify(entries).includes('AIM'), false, 'the used-by list does not name the AIM kind');
 });
 
-test('legacy-aim-map: E4 the notice line for an old AIM map has the agreed text in three languages', () => {
+test('legacy-aim-map: E4 the notice line for an old AIM map says AIM was removed and the map works as an ordinary map, in three languages', () => {
   const { translate } = load('i18n.ts');
-  assert.equal(translate('zh-TW', 'ui.aim_paused_notice'), '這張圖是用 AIM 建的。AIM 這一版先暫停，未完成的研究會停在這裡；內容都能照常編輯。');
-  assert.equal(translate('zh-CN', 'ui.aim_paused_notice'), '这张图是用 AIM 建的。AIM 这一版先暂停，未完成的研究会停在这里；内容都能照常编辑。');
-  assert.match(translate('en', 'ui.aim_paused_notice'), /^This map was built with AIM\. AIM is paused in this version;/);
+  assert.equal(translate('zh-TW', 'ui.aim_removed_notice'), '這張圖是用 AIM 建的。此功能已移除，地圖仍可作一般地圖使用。');
+  assert.equal(translate('zh-CN', 'ui.aim_removed_notice'), '这张图是用 AIM 建的。此功能已移除，地图仍可作一般地图使用。');
+  assert.equal(translate('en', 'ui.aim_removed_notice'), 'This map was built with AIM. This feature has been removed; the map can still be used as an ordinary map.');
+  for (const language of ['en', 'zh-TW', 'zh-CN']) assert.doesNotMatch(translate(language, 'ui.aim_removed_notice'), /paused|暫停|暂停|resume|恢復|恢复/i, `${language}: nothing promises AIM comes back`);
+  const en = fs.readFileSync(path.join(root, 'i18n/en.ts'), 'utf8');
+  assert.equal(en.includes('ui.aim_paused_notice'), false, 'the old paused notice is gone');
+});
+
+/** Paints the real header of a view on `doc` up to the status bars (the stub ends the paint there) and returns its notice lines. */
+function paintedNotices(doc) {
+  const dom = require('../support-dom.cjs');
+  const stop = new Error('the paint ends here: only the header and its notice line are under test');
+  const { VisualAgentMapView } = loadHidden('main.ts', { obsidian: { ...obsidian, Notice: class {} } }, { activeDocument: { activeElement: null }, createSvg: () => dom.element('svg'), CSS: { escape: value => value } });
+  const view = new VisualAgentMapView({ app: {} }, { repo: {}, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), running: new Set(), quickExpandPending: new Set(), pendingSuggestions: new Map(), relevanceGrades: new Map(), syncOutline() {}, detailsShown: () => false });
+  view.map = doc; view.path = 'Agent Workspace/AIM/Old/Map.md';
+  view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
+  view.contentEl = dom.element('div');
+  view.leaf = { setViewState: async () => {} };
+  view.renderMultiResearchStatus = () => { throw stop; };
+  try { view.paint(); } catch (error) { if (error !== stop) throw error; }
+  return dom.findAll(view.contentEl, el => el.hasClass?.('vam-aim-attribution')).map(el => ({ text: el.text, role: el.attrs.role }));
+}
+
+test('legacy-aim-map: E4 an old AIM map shows the one "AIM was removed" notice line; a plain map shows none', () => {
+  const { translate } = load('i18n.ts');
+  const old = paintedNotices(aimDoc().doc);
+  assert.deepEqual(old, [{ text: translate('en', 'ui.aim_removed_notice'), role: 'note' }], 'one notice line, read as a note, no button');
+  const plainDoc = map([node('topic'), node('child', 'topic')]);
+  assert.deepEqual(paintedNotices(plainDoc), [], 'a plain map has no notice');
+  const fieldsOnly = aimDoc().doc; delete fieldsOnly.aim; // AIM node fields without the aim block: an ordinary map
+  assert.deepEqual(paintedNotices(fieldsOnly), [], 'AIM node fields alone are not an old AIM map');
 });
 
 test('legacy-aim-map: N1 the hidden-variant strings a new user can reach carry no AIM wording', () => {

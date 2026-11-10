@@ -1,1 +1,0 @@
-Below the floor, choose research_more only for a material evidence gap in the original goal itself; if the reports already answer the goal, choose ask_user. Never pick research_more to satisfy the floor.

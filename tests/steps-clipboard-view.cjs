@@ -21,7 +21,7 @@ const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, a
   setPointerCapture() {}, focus() { this.focused++; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
   querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {} });
 
-async function harness({ aim = false, layout = null } = {}) {
+async function harness({ layout = null } = {}) {
   const { repo, app, contents } = fixture('en');
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings; app.scope = { appScope: true };
@@ -35,7 +35,6 @@ async function harness({ aim = false, layout = null } = {}) {
   };
   await add('root', 'Root'); await add('leaf', 'Leaf', 'root', { detail: 'Leaf detail text' }); await add('branch', 'Branch', 'root'); await add('kid', 'Kid', 'branch');
   await add('other', 'Other');
-  if (aim) mapDoc.aim = { version: 1 };
   if (layout) mapDoc.layout = layout;
   await app.vault.create(MAP, core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
@@ -105,7 +104,7 @@ test('P4 copy: a selected branch joins its selected descendant; several roots ke
   assert.equal(event.clipboardData.store.get('text/plain'), '- Leaf\n- Branch\n\t- Kid');
 });
 
-test('P4 copy: a read-only map (AIM) can still be copied (D4)', async () => {
+test('P4 copy: an old AIM map can be copied (D4)', async () => {
   const h = await harness();
   h.view.map.aim = { version: 1 };
   const event = copyOf(h, ['leaf']);
@@ -256,13 +255,12 @@ test('P4 paste: an external payload makes new notes with kind, strength and body
   assert.equal(h.history(), 1);
 });
 
-test('P4 paste: read-only situations (AIM map, topic selection mode) write nothing and say so, for a private payload and for plain text', async () => {
+test('P4 paste: read-only situations (topic selection mode) write nothing and say so, for a private payload and for plain text', async () => {
   const payloads = {
     private: { [MIME]: payloadText([{ id: 'a', parent: null, title: 'Claim', kind: 'topic', body: '' }]) },
     text: { 'text/plain': 'Alpha\n\tBeta' }
   };
   const cases = {
-    aim: h => { h.view.map.aim = { version: 1 }; },
     integration: h => { h.view.selection.toggleMultiSelect(); }
   };
   for (const [kind, data] of Object.entries(payloads)) for (const [name, arrange] of Object.entries(cases)) {

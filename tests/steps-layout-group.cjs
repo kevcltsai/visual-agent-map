@@ -1417,7 +1417,7 @@ test('PV2-V8: a branch set to down then back to Follow the map loses the field a
   assert.deepEqual(plainJson(h.named('A').layout), { direction: 'down' });
 });
 
-test('PV2-V9: no branch layout section for a root, a radial/timeline/fishbone map, an AIM map or the sample', async () => {
+test('PV2-V9: no branch layout section for a root, a radial/timeline/fishbone map or the sample', async () => {
   const h = await harness(tree4);
   assert.deepEqual(plainJson(branchPanel(h, 'A').labels), [FOLLOW, 'Lay out to the right', 'Lay out downward', 'Lay out upward'], 'right map: no opposite (left)');
   assert.equal(branchPanel(h, 'Root').group, undefined, 'a root has none');
@@ -1427,8 +1427,6 @@ test('PV2-V9: no branch layout section for a root, a radial/timeline/fishbone ma
   }
   h.view.map.layout = { direction: 'balanced' };
   assert.deepEqual(plainJson(branchPanel(h, 'A').labels), [FOLLOW, 'Lay out to the right', 'Lay out downward', 'Lay out upward'], 'balanced: a topic on the right side is not offered left');
-  h.view.map.layout = undefined; h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
-  assert.equal(branchPanel(h, 'A').group, undefined, 'AIM');
 });
 
 test('PV2-V10: the choices leave out the direction opposite to where the parent grows (left map, down branch, balanced side) and every offered one survives the parse', async () => {

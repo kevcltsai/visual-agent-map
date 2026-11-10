@@ -555,26 +555,6 @@ test('P3: each row names the item (built-ins marked), says "Used in: ..." or tha
   assert.equal(rowTexts(rowFor(root, 'Textbook'))[0], 'No topic type uses it now');
 });
 
-test('counter 14: the AIM report is listed with its topic type but has no Edit button, and is not offered as the start of a new style', async () => {
-  const setup = await manageSetup();
-  const { root } = await openManage(setup, 'recipe');
-  const aim = rowFor(root, 'AIM report');
-  assert.ok(aim);
-  assert.equal(rowTexts(aim)[0], 'Used in: AIM conclusion note');
-  assert.equal(editOf(aim), undefined);
-  assert.ok(editOf(rowFor(root, 'General research')));
-  newButton(root, 'recipe').click();
-  const options = dom.findAll(sourceOf(formOf(root, 'recipe')), node => node.tag === 'option').map(node => node.text);
-  assert.equal(options.includes('AIM report'), false);
-  assert.equal(options.includes('AI suggested'), false);
-  assert.equal(options.length, 7);
-  const suggested = rowFor(root, 'AI suggested');
-  assert.ok(suggested, 'listed');
-  assert.equal(editOf(suggested), undefined, 'no Edit (it would copy a style that is not a text)');
-  assert.equal(dom.findAll(suggested, node => node.tag === 'button').length, 0, 'no View, no Copy and edit, no menu');
-  assert.equal(moreOf(suggested), undefined);
-});
-
 test('counter 5: Edit on a built-in part saves "My <name>" (a new file) and opens it, the list shows it and the focus is on its row; an existing "My ..." file is never overwritten', async () => {
   const taken = '## Taken\nkeep me\n';
   const setup = await manageSetup({ [`${dirOf('en', 'template')}/My Standard six.md`]: taken });
@@ -1196,13 +1176,13 @@ test('P5a clean-up never trashes a part a style, the global setting or the legac
   assert.equal(plainVoice.usedBy.includes('General research'), false, 'the built-in default is not used by a style that follows another global voice');
 });
 
-test('P5a built-in rows: "View" then "Copy and edit"; View shows the text or the four settings in a read-only window and writes nothing; the AIM report has neither', async () => {
+test('P5a built-in rows: "View" then "Copy and edit"; View shows the text or the four settings in a read-only window and writes nothing; the AIM report is not listed', async () => {
   const setup = await manageSetup();
   const { root } = await openManage(setup, 'recipe');
   const row = rowFor(root, 'Hypothesis test');
   assert.deepEqual(dom.findAll(row, node => node.tag === 'button').map(node => node.text), ['View', 'Copy and edit']);
   assert.equal(moreOf(row), undefined, 'a built-in has no menu');
-  assert.equal(dom.findAll(rowFor(root, 'AIM report'), node => node.tag === 'button').length, 0);
+  assert.equal(rowFor(root, 'AIM report'), undefined);
   dom.button(row, 'View').click();
   await settle();
   assert.equal(windows.length, 2);

@@ -1,1 +1,0 @@
-Use the original goal, known user conditions and outcome preferences. Resolve important contradictions before concluding. Preserve evidence attribution and uncertainty. Do only the current phase; a research report is not the final deliverable.

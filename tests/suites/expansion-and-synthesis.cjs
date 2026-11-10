@@ -1359,12 +1359,9 @@ integrationTest('a failing topic is recorded and does not stop the others', asyn
   assert.equal(state.completed, 3); assert.equal(state.failures.length, 1); assert.match(state.failures[0], /model exploded/);
   assert.ok(h.notices.some(m => /1 failed/.test(m)), h.notices.join('|'));
 });
-integrationTest('multi research is not offered on AIM maps and needs at least one topic', async () => {
+integrationTest('multi research needs at least one topic', async () => {
   const h = await multiResearchHarness(['A']);
   h.view.selection.replaceMulti([]); await h.view.startMultiResearch(h.request);
-  assert.equal(h.plugin.expansionBatches.size, 0);
-  h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; h.view.selection.replaceMulti([h.nodes[0].id]);
-  await h.view.startMultiResearch(h.request);
   assert.equal(h.plugin.expansionBatches.size, 0); assert.equal(h.runs.length, 0);
 });
 integrationTest('selection bar shows Research; starting leaves selection mode and the top status bar shows progress and Stop', async () => {
@@ -1380,7 +1377,6 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
   let items = bar(); const research = () => items.find(i => i.tag === 'button' && /^Research( 1 topic)?$/.test(i.text));
   items = bar(); assert.equal(research(), undefined, 'no topic picked: no bar yet');
   h.view.selection.replaceMulti([h.nodes[0].id]); items = bar(); assert.equal(research().disabled, false); assert.equal(research().text, 'Research'); assert.equal(research().attrs['aria-label'], 'Research 1 topic');
-  h.view.map.aim = {}; items = bar(); assert.equal(research(), undefined); delete h.view.map.aim;
   assert.equal(toolbar().length, 1);
   h.view.selection.chatSelect([h.nodes[0].id]);
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 1);
@@ -2007,11 +2003,9 @@ integrationTest('topic style picker: choosing alone writes nothing; the row in f
   bare.pick(second, 'Textbook').click(); second.close();
   assert.equal(bare.processes(), 0); assert.equal(bare.view.history.past.length, 0);
 });
-integrationTest('topic style chooser: refuses an AIM map, presentation mode and an AIM conclusion card, and re-reads the style folder before it opens (counterexample 15; the new style file is listed)', async () => {
+integrationTest('topic style chooser: refuses presentation mode, and re-reads the style folder before it opens (counterexample 15; the new style file is listed)', async () => {
   const h = await chooserHarness();
   h.view.presentation = { order: [], currentId: 'x' }; await h.view.chooseTopicStyle(h.topic); assert.equal(h.modals.length, 0); h.view.presentation = null;
-  await h.view.chooseTopicStyle({ ...h.topic, aimKind: 'conclusion' }); assert.equal(h.modals.length, 0);
-  h.view.map.aim = { branches: [] }; await h.view.chooseTopicStyle(h.topic); assert.equal(h.modals.length, 0); delete h.view.map.aim;
   const files = {}; const { NoteStyleStore } = load('ai/note-style-store.ts');
   const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => {}, trash: async () => {} };
   h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} }); await h.plugin.noteStyles.refresh();

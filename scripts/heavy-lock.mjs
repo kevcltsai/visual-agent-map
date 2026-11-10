@@ -1,8 +1,8 @@
-// Machine-wide queue lock for the heavy test entries (npm test, test:unit, test:integration, test:affected --run, test:runtime, test:aim),
+// Machine-wide queue lock for the heavy test entries (npm test, test:unit, test:integration, test:affected --run, test:runtime),
 // plus an end-of-run check that stops the test processes (headless Chrome, test Obsidian) this run left behind.
 //
 //   import { enterHeavy } from "./heavy-lock.mjs";  await enterHeavy("test:unit");
-//   node scripts/heavy-lock.mjs <label> -- <command> [args...]      (wraps a shell-level script such as test:aim)
+//   node scripts/heavy-lock.mjs <label> -- <command> [args...]      (wraps a shell-level script)
 //
 // The lock is one file, <VAM_HEAVY_LOCK_DIR or ~/Library/Caches/vam>/heavy-test.lock, created atomically with link(2); it holds
 // {token, pid, worktree, command, startedAt}. VAM_HEAVY_LOCK_DIR only moves the file, nothing skips the lock.
@@ -358,7 +358,7 @@ export async function enterHeavy(label, { env = process.env, dir = lockDir(env),
 async function cli(argv) {
   if (argv[0] === "--require-held") {
     if (isReentrant(process.env, lockDir())) return;
-    process.stderr.write("heavy-lock: 這個 script 只能在重量級鎖內執行；請用會排隊的入口（例如 npm run test:aim）。\n");
+    process.stderr.write("heavy-lock: 這個 script 只能在重量級鎖內執行；請用會排隊的入口（例如 npm test）。\n");
     process.exit(1);
   }
   const split = argv.indexOf("--");

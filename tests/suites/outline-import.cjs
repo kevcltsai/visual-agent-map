@@ -558,12 +558,6 @@ test('outline modal: "Put it in" offers only places in the open map, a new tree 
   assert.deepEqual(none.hints(), ['No editable mind map is open.', 'No editable mind map is open.']);
 });
 
-test('outline modal: an AIM map disables both in-map places with its own reason', () => {
-  const m = placementModal({ map: 'aim', selected: { id: 'n1', title: 'Q' } });
-  assert.deepEqual(plain(m.radios.map(radio => radio.disabled)), [true, true]);
-  assert.deepEqual(m.hints(), ["AIM maps don't support imports.", "AIM maps don't support imports."]);
-});
-
 test('outline modal: an editable map allows a new tree; under needs a selected topic', async () => {
   const m = placementModal({ map: 'editable' });
   assert.deepEqual(plain(m.radios.map(radio => radio.disabled)), [false, true]);
@@ -589,7 +583,6 @@ test('outline modal: placement labels in Traditional Chinese', () => {
   assert.equal(translate('zh-TW', 'ui.outline_import_placement_under'), '選取的議題底下');
   assert.equal(translate('zh-TW', 'ui.outline_import_placement_under_named', 'X'), '選取的議題底下（X）');
   assert.equal(translate('zh-TW', 'ui.outline_import_placement_no_map'), '目前沒有開啟可加入的心智圖。');
-  assert.equal(translate('zh-TW', 'ui.outline_import_placement_aim'), 'AIM 心智圖不支援匯入。');
   assert.equal(translate('zh-TW', 'ui.outline_import_placement_no_selection'), '先在心智圖上選一個議題。');
   assert.equal(translate('zh-TW', 'ui.outline_import_selected_missing'), '選取的議題已不在心智圖上。');
 });
@@ -785,13 +778,13 @@ integrationTest('importOutline under a topic that is no longer on the map reject
   assert.deepEqual(h.notesInFolder(), files);
 });
 
-integrationTest('the import window gets its target from the open view: editable map, selection title, AIM', async () => {
+integrationTest('the import window gets its target from the open view: editable map, selection title, an old AIM map', async () => {
   const h = await placementHarness();
   assert.deepEqual(plain(h.view.outlineImportTarget()), { map: 'editable' });
   h.view.selection.setSelected(h.oldChild.id); h.view.notes.set(h.oldChild.id, await h.repo.readNote(h.oldChild.path));
   assert.deepEqual(plain(h.view.outlineImportTarget()), { map: 'editable', selected: { id: h.oldChild.id, title: 'Old child' } });
   h.view.map = { ...h.view.map, aim: { version: 1 } };
-  assert.equal(h.view.outlineImportTarget().map, 'aim');
+  assert.equal(h.view.outlineImportTarget().map, 'editable', 'an old AIM map takes an import like any map');
   h.view.map = null;
   assert.deepEqual(plain(h.view.outlineImportTarget()), { map: 'none' });
 });

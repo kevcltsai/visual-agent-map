@@ -145,7 +145,7 @@ test('setAiLock: managed nodes are filtered out and nothing is written; an ordin
 
 test('multi-select lock menu item excludes managed nodes (source)', () => {
   const view = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(view, /!isAimNode\(node\) && !this\.isArgumentCard\(node\.id\) && !!this\.notes\.get\(node\.id\)/);
+  assert.match(view, /!!node && !this\.isArgumentCard\(node\.id\) && !!this\.notes\.get\(node\.id\)/);
 });
 
 test('production createNote port: datum and need become evidence, hypothesis and conclusion keep theirs, the rest are topics', () => {

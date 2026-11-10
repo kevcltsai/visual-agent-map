@@ -73,7 +73,7 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   assert.deepEqual(details, [topic.id], 'Enter remains the keyboard path to the sidebar note');
   assert.equal(events.has('div:contextmenu'), false);
 });
-integrationTest('AIM cards hide generic map actions while ordinary map cards retain them', () => {
+integrationTest('map cards keep the generic map actions; no card exposes an AIM action', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const makeElement = (tag, buttons) => ({ tag, children: [], dataset: {}, style: {},
     createDiv(options) { const child = makeElement('div', buttons); child.cls = options?.cls ?? options; this.children.push(child); return child; },
@@ -95,49 +95,12 @@ integrationTest('AIM cards hide generic map actions while ordinary map cards ret
   assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'AI explore' && !button.text), 'every card shows an icon-only AI explore action with a name');
   assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'Details' && button.iconName === 'panel-right' && !button.text));
   assert.ok(ordinaryButtons.some(button => button['aria-label'] === 'Add subtopic manually'));
-  const aim = map([topic]); aim.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
-  const aimButtons = render(aim);
-  for (const label of ['AI explore', 'This card', 'Select subtopics', 'Structure', 'Rename', '⋯ More']) assert.equal(aimButtons.some(button => button.text === label || button['aria-label'] === label), false, `${label} is hidden in AIM`);
-  assert.equal(aimButtons.some(button => button['aria-label'] === 'Add subtopic manually'), false, 'Add subtopic manually is hidden in AIM');
-  assert.ok(aimButtons.some(button => button['aria-label'] === 'Details'), 'AIM cards keep Details');
-  const resultNode = node('saved-synthesis', topic.id); resultNode.aimKind = 'synthesis';
-  const resultMap = map([topic, resultNode]);
-  resultMap.aim = { version: 1, branches: [{ id: 'saved-branch', questionNodeId: topic.id, parentBranchId: null, answerSnapshot: { selections: [], freeText: '' }, inputSnapshot: { topic: 'Fixture', conditions: {}, upstreamResults: [] }, createdAt: '2026-10-09T00:00:00.000Z', results: [{ nodeId: resultNode.id, notePath: resultNode.path, version: 1, kind: 'synthesis' }] }], runs: [], pendingCommits: [] };
-  const resultButtons = [], resultView = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map(), expansionBatches: new Map() });
-  resultView.stageEl = makeElement('stage', resultButtons); resultView.map = resultMap; resultView.notes = new Map([[resultNode.id, { title: 'Saved synthesis', summary: 'A saved result.', status: 'completed' }]]);
-  resultView.renderNode(resultNode);
-  const newQuestion = resultButtons.find(button => button['aria-label'] === 'Generate another question from this research, keeping existing branches');
-  assert.ok(newQuestion, 'a saved synthesis exposes the new-question action'); assert.equal(newQuestion.disabled, false);
-  resultView.aimBusy = true;
-  const busyButtons = [], busyView = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map(), expansionBatches: new Map() });
-  busyView.stageEl = makeElement('stage', busyButtons); busyView.map = resultMap; busyView.notes = resultView.notes; busyView.aimBusy = true;
-  busyView.renderNode(resultNode);
-  assert.equal(busyButtons.find(button => button['aria-label'] === 'Generate another question from this research, keeping existing branches').disabled, true, 'the action is disabled while another AIM operation is active');
   const ordinaryResult = node('ordinary-synthesis'); ordinaryResult.aimKind = 'synthesis';
   const ordinaryButtonsForResult = [], ordinaryResultView = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map(), expansionBatches: new Map() });
   ordinaryResultView.stageEl = makeElement('stage', ordinaryButtonsForResult); ordinaryResultView.map = map([ordinaryResult]); ordinaryResultView.notes = new Map([[ordinaryResult.id, { title: 'Ordinary note', summary: '', status: 'completed' }]]);
   ordinaryResultView.renderNode(ordinaryResult);
   assert.equal(ordinaryButtonsForResult.some(button => button['aria-label'] === 'Generate another question from this research, keeping existing branches'), false, 'ordinary maps do not expose the AIM action');
   assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /private renderMapTools\(tools: HTMLElement\): void \{\s*if \(!this\.map \|\| this\.map\.aim\) return;\s*this\.renderSelectTool\(tools\);/);
-});
-integrationTest('AIM question cards show branch progress instead of note lifecycle status', () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const element = tag => ({ tag, children: [], dataset: {}, style: {},
-    createDiv(options) { const child = element('div'); child.cls = options?.cls ?? options; this.children.push(child); return child; },
-    createEl(name, options) { const child = element(name); child.text = options?.text; this.children.push(child); return child; },
-    createSpan(options) { const child = element('span'); child.text = options?.text; this.children.push(child); return child; },
-    setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; },
-    addEventListener() {}, removeEventListener() {}, setPointerCapture() {}
-  });
-  const question = node('question'); question.aimKind = 'question';
-  const branch = { id: 'branch', questionNodeId: question.id, parentBranchId: null, answerSnapshot: { selections: [], freeText: '已回答' }, inputSnapshot: { topic: '測試', conditions: {}, upstreamResults: [] }, createdAt: '2026-10-09T00:00:00.000Z', results: [{ kind: 'conclusion', runId: 'run', attemptId: 'attempt' }] };
-  const doc = map([question]); doc.aim = { version: 1, branches: [branch], runs: [{ id: 'run', branchId: branch.id, currentAttemptId: 'attempt', attempts: [{ id: 'attempt', inputSnapshotHash: 'hash', status: 'completed' }] }], pendingCommits: [] };
-  const plugin = { repo: {}, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), running: new Map(), quickExpandPending: new Set(), pendingSuggestions: new Map() };
-  const view = new VisualAgentMapView({ app: {} }, plugin); view.stageEl = element('stage'); view.map = doc; view.notes = new Map([[question.id, { title: 'Question', summary: 'Question', status: 'idea' }]]);
-  view.renderNode(question);
-  assert.equal(view.stageEl.children[0].children[0].children[0].text, 'Research complete');
-  doc.aim.runs[0].attempts[0].status = 'running'; view.stageEl = element('stage'); view.renderNode(question);
-  assert.equal(view.stageEl.children[0].children[0].children[0].text, 'Researching');
 });
 integrationTest('a topic waiting in a research batch shows a scheduled frame and status, and has no aria-label tooltip', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -974,13 +937,12 @@ integrationTest('Space on a card with subtopics folds or unfolds it on key-up (f
   // composing, any modifier, target other than the card
   for (const init of [{ isComposing: true }, { ctrlKey: true }, { metaKey: true }, { altKey: true }, { shiftKey: true }, { target: { closest: () => null } }, { code: 'Enter' }]) { const event = down('a', init); assert.equal(event.prevented, false, JSON.stringify(init)); up(); }
   assert.deepEqual(folded, [], 'no guarded press folds');
-  // select mode, AIM, notes loading, presentation
+  // select mode, notes loading, presentation
   view.selection.toggleMultiSelect(); fixture.build(); const multi = fixture.cards(); { const e = { code: 'Space', target: multi.a, preventDefault() { this.prevented = true; } }; multi.a.handlers.get('keydown')(e); up(); assert.equal(e.prevented, undefined); }
   view.selection.toggleMultiSelect(); fixture.build(); Object.assign(cards, fixture.cards());
-  view.map.aim = { branches: [] }; assert.equal(down('a').prevented, false); up(); delete view.map.aim;
   view.notesLoading = () => true; assert.equal(down('a').prevented, false); up(); delete view.notesLoading;
   view.presentation = { order: [], currentId: 'x' }; assert.equal(down('a').prevented, false); up(); view.presentation = null;
-  assert.deepEqual(folded, [], 'multi-select, AIM, loading and presentation never fold');
+  assert.deepEqual(folded, [], 'multi-select, loading and presentation never fold');
 });
 integrationTest('F2 starts the in-place title edit, Enter opens details, and the collapse button reports aria-expanded', () => {
   const dialogs = [];
@@ -1283,9 +1245,6 @@ integrationTest('card tools: AI explore, Details, Collapse, This card and Select
   assert.deepEqual(names(selecting), ['Details', 'Collapse']); noMore(selecting, 'select mode');
   const selectingLeaf = toolsOf(({ view }) => { view.selection.toggleMultiSelect(); }, 'b');
   assert.deepEqual(names(selectingLeaf), ['Details']); noMore(selectingLeaf, 'select mode, leaf');
-  // AIM map: no AI explore, This card or Select subtopics; Details and the fold stay.
-  const aim = toolsOf(({ view }) => { view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; });
-  assert.deepEqual(names(aim), ['Details', 'Collapse']); noMore(aim, 'AIM map');
   const { translate } = load('i18n.ts');
   assert.deepEqual(['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_details', 'ui.ai_explore'].map(key => translate('zh-TW', key)), ['收合', '這張卡', '詳情', 'AI 探索']);
 });
@@ -1387,15 +1346,17 @@ test('applyCollapseLevel: collapse all, expand all and expand to level N set the
   const cyclic = [node('x', 'y'), node('y', 'x')]; core.applyCollapseLevel(cyclic, 1);
   assert.equal(cyclic.length, 2, 'a corrupt parent cycle does not hang');
 });
-integrationTest('the New map menu no longer imports outlines; the toolbar has no topic menu; the palette command adds to the open map only', () => {
+integrationTest('the New map button no longer imports outlines; the toolbar has no topic menu; the palette command adds to the open map only', () => {
   const opened = [], menus = [];
   class Modal { constructor(app) { this.app = app; } open() { opened.push(this); } close() {} }
   class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { title: '', icon: '', click: null, setTitle(value) { this.title = value; return this; }, setIcon(value) { this.icon = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } showAtMouseEvent() { return this; } }
   const { view } = selectionView(load, {}, { ...obsidian, Modal, Menu });
+  let made = 0; view.openNewMindMapModal = () => { made++; };
   view.openNewMapMenu({});
-  assert.deepEqual(menus[0].items.map(item => item.title), ['New mind map', 'New AIM'], 'the menu has no outline import');
+  assert.equal(made, 1, 'the New map button makes a mind map at once');
+  assert.equal(menus.length, 0, 'it opens no menu, so it has no outline import');
   view.path = `${DEFAULT_SETTINGS.topicsFolder}/Topic/Map.md`;
-  assert.equal(menus.length, 1, 'the toolbar has no topic menu any more; the palette command is the way to paste an outline');
+  assert.equal(menus.length, 0, 'the toolbar has no topic menu any more; the palette command is the way to paste an outline');
   const placement = modal => modal.placementRequest();
   view.openOutlineImport();
   assert.deepEqual(plain(placement(opened.at(-1))), { kind: 'tree' }, 'no selection: add to the current map');
@@ -1495,10 +1456,10 @@ integrationTest('outline toggles report aria-expanded and the open topic row rep
   assert.deepEqual(current.map(item => item.text), ['Child'], 'the active topic row is aria-current');
   assert.equal(all(view.contentEl).filter(item => item.cls === 'vam-outline-note' && item['aria-current'] === 'true' && item.text !== 'Child').length, 0, 'no other row is');
 });
-test('dead code is gone: no unreachable TaskModal confirmation branches and a single AIM status chip block', () => {
+test('dead code is gone: no unreachable TaskModal confirmation branches and no AIM status chip block', () => {
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.equal(/confirmed = false/.test(source), false); assert.equal(/if \(!confirmed\)/.test(source), false);
-  assert.equal((source.match(/ui\.aim_answered_not_started/g) ?? []).length, 1, 'the AIM chip is built once');
+  assert.equal((source.match(/ui\.aim_answered_not_started|vam-aim-question-status"/g) ?? []).length, 0, 'the AIM chip left with AIM');
 });
 
 integrationTest('AIM map: arrow keys keep moving focus across full renders instead of snapping back to the old card', () => {
@@ -1591,7 +1552,7 @@ integrationTest('AIM canvas treats superseded interim results as hidden (behavio
 });
 
 // ---- Merge topics, Phase 1: quick selection (select subtopics, Shift-drag, Cmd-click, Option-drag) ----
-integrationTest('Select subtopics: shown only for an unfolded, non-AIM card that has direct subtopics, and it picks exactly those', () => {
+integrationTest('Select subtopics: shown only for an unfolded card that has direct subtopics, and it picks exactly those', () => {
   const toolTexts = (setup = () => {}, id = 'a') => {
     const fixture = selectionView(load); setup(fixture); fixture.build();
     const tools = fixture.cards()[id].children.find(child => child.classes.has('vam-node-tools'));
@@ -1602,7 +1563,6 @@ integrationTest('Select subtopics: shown only for an unfolded, non-AIM card that
   assert.equal(has(undefined, 'b'), false, 'a leaf has none');
   assert.equal(has(({ doc, view }) => { doc.nodes.find(n => n.id === 'a').collapsed = true; }), false, 'a folded card hides its subtopics and offers Expand instead');
   assert.equal(has(({ view }) => { view.selection.toggleMultiSelect(); }), false, 'not while selecting');
-  assert.equal(has(({ view }) => { view.map.aim = { branches: [] }; }), false, 'not in an AIM map');
   // Root has direct children a and b but not grandchild c; the button replaces any earlier selection.
   const { fixture, buttons } = toolTexts(undefined, 'root');
   const { view } = fixture;
@@ -1728,8 +1688,6 @@ integrationTest('select mode: the Merge button stays focusable, names the reason
   assert.equal(bar(['root', 'c']).attrs.title, translate('en', 'ui.merge_parent_direct_only'));
   view.plugin.running = new Set(['b.md']);
   assert.equal(bar(['a', 'b']).attrs.title, translate('en', 'ui.merge_busy'));
-  view.map.aim = {}; const aim = view.renderSelectionBar(selectionDom()('div'));
-  assert.equal(aim.children.some(child => child.tag === 'button' && /^Merge/.test(child.text)), false, 'AIM maps have no merge button');
 });
 integrationTest('merge dialog: Enter confirms once and is consumed; a second Merge press while it is open or queued does nothing', () => {
   const make = selectionDom(); const opened = [];
@@ -1767,26 +1725,6 @@ integrationTest('merge dialog offers AI only when a selected card has Detail, an
   // A running merge on this map only reports itself; its sources stay locked after it fails or finishes a draft.
   view.mergeTasks.set(view.path, { mapPath: view.path, state: 'running', sources: [{ id: 'a', path: 'a' }, { id: 'b', path: 'b' }], controller: new AbortController() });
   view.openMerge(); assert.equal(opened.length, 2, 'no second dialog while a merge is running');
-});
-integrationTest('AIM maps never enter selection mode from Shift+drag or Cmd/Ctrl+click', () => {
-  for (const [name, setup] of [['AIM', view => { view.map.aim = { branches: [] }; }]]) {
-    const fixture = selectionView(load); const { view } = fixture; setup(view);
-    fixture.build();
-    const cards = fixture.cards(); const target = { closest: () => null };
-    // Cards of these maps may not be draggable at all; the click handler must not start the mode either.
-    const tap = (id, extra = {}) => { const down = cards[id].handlers.get('pointerdown'); if (down) { down({ target, button: 0, clientX: 0, clientY: 0, pointerId: 1 }); cards[id].handlers.get('pointerup')({ type: 'pointerup', ...extra }); } view.suppressClickUntil = 0; cards[id].handlers.get('click')({ target, metaKey: false, ctrlKey: false, ...extra }); };
-    tap('a'); tap('b', { metaKey: true }); tap('c', { ctrlKey: true });
-    assert.equal(view.selection.state.multiSelectMode, false, `${name}: Cmd/Ctrl+click does not start selection mode`);
-    for (const [id, [left, top, right, bottom]] of Object.entries({ root: [0, 0, 100, 50], a: [200, 0, 300, 50], b: [200, 100, 300, 150], c: [400, 0, 500, 50] })) cards[id].getBoundingClientRect = () => ({ left, top, right, bottom });
-    view.stageEl.querySelectorAll = () => Object.values(cards);
-    const viewport = selectionDom()('viewport'); viewport.clientWidth = 800; viewport.clientHeight = 600;
-    view.viewportEl = viewport; view.transform = () => {}; view.saveViewport = () => {}; view.plugin.saveSettings = async () => {}; view.setupPan();
-    viewport.handlers.get('pointerdown')({ target, button: 0, clientX: 150, clientY: -10, pointerId: 1, altKey: false, shiftKey: true, preventDefault() {} });
-    assert.equal(viewport.classes.has('is-marquee'), false, `${name}: Shift+drag draws no box`);
-    assert.equal(viewport.classes.has('is-panning'), true, `${name}: Shift+drag pans like a plain drag`);
-    viewport.handlers.get('pointermove')({ clientX: 350, clientY: 200 }); viewport.handlers.get('pointerup')({});
-    assert.equal(view.selection.state.multiSelectMode, false);
-  }
 });
 
 // ---- AI mode Quick / Standard ----------------------------------------------------------------------------------------
@@ -1837,7 +1775,6 @@ integrationTest('Re-run with Standard on the card: only for an idle Quick topic 
     ['a Standard note', { note: { researchMode: 'research' } }],
     ['no marker', { note: { detail: 'A complete answer.' } }],
     ['topic is running', { plugin: { running: new Set(['topic.md']) } }],
-    ['an AIM map', { doc: Object.assign(map([topic]), { aim: { version: 1, branches: [], runs: [], pendingCommits: [] } }) }],
     ['topic selection mode', { integrationMode: true }]
   ];
   for (const [name, options] of none) assert.equal(render(options).button, undefined, `no button: ${name}`);
@@ -1917,13 +1854,13 @@ integrationTest('hypothesis-evidence: the card "+" opens the type list for its c
 });
 integrationTest('hypothesis-evidence: addNode hands createNote a topicKind only for a typed topic on an ordinary map', async () => {
   const seen = [];
-  for (const [kind, options] of [['topic', {}], ['hypothesis', {}], ['conclusion', {}], ['action', { aim: true }]]) {
+  for (const [kind, options] of [['topic', {}], ['hypothesis', {}], ['conclusion', {}]]) {
     const f = heFixture(options);
     f.view.path = 'Agent Workspace/Topics/map-a/Map.md';
     f.view.plugin.repo.createNote = async (...args) => { seen.push([kind, args[args.length - 1]]); throw new Error('stop'); };
     await f.view.addNode(null, 'Title', true, false, kind).catch(error => assert.equal(error.message, 'stop'));
   }
-  assert.deepEqual(plain(seen), [['topic', { researchMode: 'local' }], ['hypothesis', { researchMode: 'local', topicKind: 'hypothesis' }], ['conclusion', { researchMode: 'local', topicKind: 'conclusion' }], ['action', { researchMode: 'local' }]]);
+  assert.deepEqual(plain(seen), [['topic', { researchMode: 'local' }], ['hypothesis', { researchMode: 'local', topicKind: 'hypothesis' }], ['conclusion', { researchMode: 'local', topicKind: 'conclusion' }]]);
 });
 integrationTest('hypothesis-evidence: switching the type is one undoable step; undo and redo leave id, parentId and relations as they were, and the strength stays in the file', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
@@ -2073,7 +2010,7 @@ test('hypothesis-leaning: i18n has the leaning, strength none and tag keys in al
     for (const key of ['ui.hypothesis_tag_undecided', 'ui.hypothesis_tag_0_1', 'ui.hypothesis_none_disabled']) assert.ok(text.includes(`"${key}"`), `${lang} ${key}`);
   }
 });
-integrationTest('hypothesis-evidence: a non-ordinary topic sets data-topic-kind and names its type on the card; an ordinary topic sets nothing; AIM shows neither', () => {
+integrationTest('hypothesis-evidence: a non-ordinary topic sets data-topic-kind and names its type on the card; an ordinary topic sets nothing', () => {
   const render = (options, id) => {
     const f = heFixture(options); f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === id));
     const card = f.view.stageEl.children[0]; return { card, label: dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label')) };
@@ -2090,20 +2027,6 @@ integrationTest('hypothesis-evidence: a non-ordinary topic sets data-topic-kind 
   }
   const plainCard = render({ notes }, 'other');
   assert.equal('topicKind' in plainCard.card.dataset, false, 'an ordinary topic has no data-topic-kind'); assert.doesNotMatch(plainCard.label.text, /Evidence|Hypothesis|Action|Conclusion|Atomic/);
-  const aim = render({ aim: true, notes }, 'fact');
-  assert.equal('topicKind' in aim.card.dataset, false); assert.doesNotMatch(aim.label.text, /Evidence/);
-});
-integrationTest('hypothesis-evidence: an AIM map has no type menu, no add-subtopic entry, no type control, and refuse a switch', async () => {
-  for (const options of [{ aim: true }]) {
-    const { view, menus, writes } = heFixture(options);
-    const tools = dom.element('tools'); view.renderMapTools(tools);
-    assert.deepEqual(dom.buttons(tools), [], `toolbar ${JSON.stringify(options)}`);
-    const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[2]);
-    assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
-    view.beginMapTransaction = () => assert.fail('no transaction');
-    await view.changeTopicKind(view.map.nodes[2], 'evidence');
-    assert.deepEqual(writes, []);
-  }
 });
 integrationTest('hypothesis-evidence: the panel type control is a labelled group with aria-pressed, shows strength only for a hypothesis, and keeps focus on the pressed type after a switch', async () => {
   const { view } = heFixture();
@@ -2161,7 +2084,7 @@ integrationTest('hypothesis-evidence: the supports picker offers every topic tha
   assert.deepEqual(heTargetIds(nonePanel, 'supports'), []); assert.equal(heTargetInput(nonePanel).disabled, true, 'nothing to pick: the field is off');
   assert.equal(heTargetInput(nonePanel).attrs.placeholder, 'There is no topic this one can be linked to with “Supports”.');
 });
-integrationTest('hypothesis-evidence: a hypothesis card shows "Hypothesis · strength" and carries it in its accessible name; an ordinary topic and an AIM map do not', () => {
+integrationTest('hypothesis-evidence: a hypothesis card shows "Hypothesis · strength" and carries it in its accessible name; an ordinary topic does not', () => {
   const render = (options, id) => {
     const f = heFixture(options); f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === id));
     const card = f.view.stageEl.children[0]; return { card, text: dom.texts(card), label: dom.find(card, c => hasLabel(c)) };
@@ -2175,8 +2098,6 @@ integrationTest('hypothesis-evidence: a hypothesis card shows "Hypothesis · str
   assert.ok(render({}, 'hyp').text.includes('Hypothesis · Undecided · Weak'), 'a stored weak under no leaning');
   const plain = render({}, 'fact');
   assert.equal(plain.card.dataset.topicKind, undefined); assert.equal(plain.text.some(t => /Hypothesis/.test(t)), false);
-  const aim = render({ aim: true }, 'hyp');
-  assert.equal(aim.card.dataset.topicKind, undefined, 'no hypothesis styling on an AIM map'); assert.equal(aim.text.some(t => /Hypothesis/.test(t)), false);
 });
 integrationTest('hypothesis-evidence: styles.css gives a hypothesis no 2px card frame any more (its shape outline replaces it) and the evidence line its own dash pattern', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -2187,7 +2108,7 @@ integrationTest('hypothesis-evidence: styles.css gives a hypothesis no 2px card 
   assert.match(css, /\.vam-edge \{[^}]*\}/); assert.doesNotMatch(rule('.vam-edge'), /dasharray/);
   assert.match(rule('.vam-edges'), /pointer-events:\s*none/); assert.match(rule('.vam-relation'), /pointer-events:\s*none/);
 });
-integrationTest('hypothesis-evidence: a parent and child that also hold a relation draw only the relation line; other parent lines, AIM maps and the sample keep theirs (decision 39)', () => {
+integrationTest('hypothesis-evidence: a parent and child that also hold a relation draw only the relation line; other parent lines and the sample keep theirs (decision 39)', () => {
   const topics = [node('root'), node('kid', 'root'), node('other', 'root')], boxes = { root: [0, 0], kid: [500, 0], other: [500, 200] };
   const fx = heFixture({ topics, relations: [{ kind: 'contradicts', from: 'root', to: 'kid' }], notes: heNotes([['root', {}], ['kid', {}], ['other', {}]]) });
   const kids = heDrawn(fx.view, boxes), edges = kids.filter(k => (k.classes ?? []).includes('vam-edge'));
@@ -2196,8 +2117,6 @@ integrationTest('hypothesis-evidence: a parent and child that also hold a relati
   assert.equal(heDrawn(fx.view, boxes).filter(k => (k.classes ?? []).includes('vam-edge')).length, 1, 'either direction and any kind hide the parent line');
   fx.view.map.topicRelations = [];
   assert.equal(heDrawn(fx.view, boxes).filter(k => (k.classes ?? []).includes('vam-edge')).length, 2, 'without a relation both parent lines are drawn');
-  fx.view.map.topicRelations = [{ kind: 'supports', from: 'root', to: 'kid' }]; fx.view.map.aim = { mode: 'x' };
-  assert.equal(heDrawn(fx.view, boxes).filter(k => (k.classes ?? []).includes('vam-edge')).length, 2, 'an AIM map draws no relation, so it keeps every parent line');
 });
 integrationTest('hypothesis-evidence: an evidence line is drawn from the fact to the hypothesis with an arrowhead whose marker id is unique per view', () => {
   const relations = [{ kind: 'supports', from: 'fact', to: 'hyp' }];
@@ -2211,8 +2130,6 @@ integrationTest('hypothesis-evidence: an evidence line is drawn from the fact to
   const lineB = kidsB.find(k => k.classes.includes('vam-relation-supports')), markerB = kidsB.find(k => k.tag === 'defs').children[0];
   assert.notEqual(marker.attrs.id, markerB.attrs.id, 'two views never share a marker id'); assert.equal(lineB.attrs['marker-end'], `url(#${markerB.attrs.id})`);
   assert.equal(kidsA.filter(k => k.classes.includes('vam-edge')).length, 0, 'the parent-child edges are not touched');
-  a.view.map.aim = { mode: 'x' };
-  assert.equal(heDrawn(a.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0, 'an AIM map draws no evidence');
   assert.equal(a.view.map.topicRelations.length, 1, 'and the file keeps the key');
 });
 integrationTest('hypothesis-evidence: a supports link is drawn whatever the type of either end (no type rule, nothing logged); an off-screen end is skipped quietly', () => {
@@ -2425,14 +2342,12 @@ integrationTest('hypothesis-evidence: a prerequisite line runs from A to B along
   const drag = view.dragEdges('other', view.cardEls.get('other')); drag.update(0, 400);
   assert.match(aToB.attrs.d, /^M 140 400 C /, 'dragging A moves the prerequisite line');
 });
-integrationTest('hypothesis-evidence: a hand-written prerequisite cycle is drawn as it is, and an AIM map draws no prerequisite', () => {
+integrationTest('hypothesis-evidence: a hand-written prerequisite cycle is drawn as it is', () => {
   const relations = [{ kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'prerequisite', from: 'hyp', to: 'fact' }]; // a three-topic cycle: a two-topic one is a same pair (decision #37)
   const { view, logs } = heFixture({ relations });
   const kids = heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
   assert.equal(kids.filter(k => k.classes.includes('vam-relation-prerequisite')).length, 3, 'every link of the cycle is drawn'); assert.deepEqual(logs, [], 'and nothing is logged or dropped');
   assert.equal(view.map.topicRelations.length, 3);
-  view.map.aim = { mode: 'x' };
-  assert.equal(heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0);
   const collapsed = heFixture({ relations }); assert.equal(heDrawn(collapsed.view, { fact: [0, 0], hyp: [500, 40] }).filter(k => k.classes.includes('vam-relation-prerequisite')).length, 1, 'an off-screen end is skipped: only hyp -> fact has both ends on screen');
 });
 integrationTest('hypothesis-evidence: styles.css gives the prerequisite line its long-short pattern, unlike contradicts, AIM and the solid parent line', () => {
@@ -2608,7 +2523,7 @@ integrationTest('hypothesis-evidence: renderShapeBackground draws a stretchable,
   }
   assert.equal(mod.draw('evidence').drawn.children.length, 2, 'evidence has the fold line too'); assert.equal(mod.draw('conclusion').drawn.attrs.viewBox && mod.draw('conclusion').drawn.children[0].attrs.points, '25,0 75,0 100,50 75,100 25,100 0,50', 'the AIM conclusion hexagon points');
 });
-integrationTest('hypothesis-evidence: a card draws its type shape as its first child; an ordinary topic, an AIM card draw none', () => {
+integrationTest('hypothesis-evidence: a card draws its type shape as its first child; an ordinary topic draws none', () => {
   const draws = (options, id) => {
     const f = heFixture(options); f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === id));
     return { shapes: f.svgCreated.filter(el => el.classes.includes('vam-kind-shape')), card: f.view.stageEl.children[0] };
@@ -2619,7 +2534,6 @@ integrationTest('hypothesis-evidence: a card draws its type shape as its first c
   }
   for (const kind of ['action', 'topic']) assert.equal(draws({ notes: heNotes([['fact', kind === 'topic' ? {} : { topicKind: kind }], ['hyp', {}], ['other', {}]]) }, 'fact').shapes.length, 0, `${kind} draws none`);
   const typed = heNotes([['fact', { topicKind: 'hypothesis' }], ['hyp', {}], ['other', {}]]);
-  assert.equal(draws({ aim: true, notes: typed }, 'fact').shapes.length, 0, 'an AIM map draws no type shape (no vam-kind-shape)');
 });
 integrationTest('hypothesis-evidence: fitKindShape sets the side padding from the width, then top and bottom from the measured text height; a hidden card is left alone', () => {
   const f = heFixture({}), mod = heShapeModule();
@@ -2914,15 +2828,6 @@ integrationTest('hypothesis-evidence: a note like <img src=x onerror=alert(1)> i
   const editor = src.slice(src.indexOf('private renderRelationEditor'), src.indexOf('/** `focus` false leaves the camera'));
   assert.equal(/innerHTML|outerHTML|insertAdjacentHTML/.test(editor), false, 'the editor and the panel rows never parse markup');
 });
-integrationTest('hypothesis-evidence: an AIM map has no relation section, no add entry and no editor', () => {
-  for (const options of [{ aim: true, relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] }]) {
-    const fx = heFixture(options);
-    const panel = dom.element('panel'); fx.view.renderHypothesisSection(panel, fx.view.map.nodes[0]);
-    assert.equal(panel.children.length, 0, 'nothing is rendered');
-    fx.view.openRelationEditor(options.relations[0]);
-    assert.equal(fx.modals.length, 0); assert.deepEqual(fx.notices, []);
-  }
-});
 integrationTest('hypothesis-evidence: the V1.5 evidence and prerequisite panel keys are gone and the six relation names exist in all three languages', () => {
   const read = lang => fs.readFileSync(path.join(root, 'i18n', `${lang}.ts`), 'utf8');
   const names = { en: ['Supports', 'Contradicts', 'Verifies', 'Derives from', 'Related', 'Prerequisite'], 'zh-TW': ['支持', '反駁', '驗證', '推導', '相關', '前置知識'], 'zh-CN': ['支持', '反驳', '验证', '推导', '相关', '前置知识'] };
@@ -3121,7 +3026,7 @@ integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries
   assert.match(css, /^path\[data-parent-line\] \{ stroke: color-mix\(in srgb, var\(--interactive-accent\) 35%, var\(--text-muted\)\); stroke-width: 1\.5px; \}/m);
   assert.match(css, /^\.vam-edge \{ fill: none; stroke: var\(--interactive-accent\); stroke-width: 2; opacity: 1; \}/m, 'the shared .vam-edge rule is untouched');
 });
-integrationTest('hypothesis-evidence: atomic, evidence, conclusion and action cards carry a type tag in the header, a hypothesis keeps "Hypothesis · strength", an ordinary topic and AIM show none (B1)', () => {
+integrationTest('hypothesis-evidence: atomic, evidence, conclusion and action cards carry a type tag in the header, a hypothesis keeps "Hypothesis · strength", an ordinary topic shows none (B1)', () => {
   const render = (kind, options = {}) => {
     const f = heFixture({ notes: heNotes([['fact', kind === 'topic' ? {} : kind === 'hypothesis' ? heHyp('medium') : { topicKind: kind }], ['hyp', {}], ['other', {}]]), ...options });
     f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === 'fact'));
@@ -3134,7 +3039,6 @@ integrationTest('hypothesis-evidence: atomic, evidence, conclusion and action ca
   }
   const hyp = render('hypothesis'); assert.equal(hyp.length, 1); assert.equal(hyp[0].text, 'Hypothesis · Undecided · Medium'); assert.doesNotMatch(hyp[0].cls, /vam-kind-tag/, 'the hypothesis tag is the existing one');
   assert.equal(render('topic').length, 0, 'an ordinary topic has no tag');
-  assert.equal(render('evidence', { aim: true }).length, 0, 'AIM has no tag');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion', 'action']) assert.ok(css.includes(`[data-topic-kind="${kind}"].vam-node .vam-hypothesis-tag`), `${kind} tag rule`);
   assert.match(css, /\.vam-hypothesis-tag \{ color: color-mix\(in srgb, var\(--vam-kind-hue\) \d+%, var\(--text-normal\)\); \}/, 'the tag takes the type hue');
@@ -3405,8 +3309,6 @@ integrationTest('hypothesis-evidence: "Add subtopic…" sits in the footer left 
   buttons[0].click(); assert.deepEqual(menus.at(-1).titles, heKindNames, 'it still opens the six-type menu');
   const css = heCss(), order = selector => Number(heRuleBody(css, selector).match(/order: (-?\d)/)[1]);
   assert.ok(order('.vam-next-actions > .vam-add-subtopic') < order('.vam-next-actions > .vam-discard'), 'the CSS order puts it before Remove');
-  const aim = heDialog({ aim: true }, 1);
-  assert.deepEqual(aim.footer.children.filter(c => c.tag === 'button').map(b => b.text), ['Remove from map', 'Close'], 'an AIM map has no add-subtopic entry');
 });
 integrationTest('hypothesis-evidence: the type and strength options are quiet segmented buttons: no mod-cta, aria-pressed on the current one, a swatch of the type shape on each type, three columns (C4, C5)', () => {
   const { content } = heDialog({}, 1);
@@ -3582,8 +3484,8 @@ integrationTest('topic-markers: refreshing a card replaces its symbols and its n
   f.view.refreshCard(node, false);
   assert.doesNotMatch(label.text, /Markers/);
 });
-integrationTest('status pill: an AIM idea card has the same pill after a full render and after refreshCard; a plain idea card has none after either', () => {
-  for (const [aimKind, expected] of [['research', ['Not started']], [undefined, []]]) {
+integrationTest('status pill: an old AIM idea card, like a plain idea card, has no pill after a full render or after refreshCard', () => {
+  for (const [aimKind, expected] of [['research', []], [undefined, []]]) {
     const f = heFixture({ notes: heNotes([['fact', { status: 'idea' }], ['hyp', {}], ['other', {}]]), aim: !!aimKind });
     if (aimKind) f.view.map.nodes[0].aimKind = aimKind;
     f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map(); f.view.renderNode(f.view.map.nodes[0]);
@@ -3622,13 +3524,13 @@ integrationTest('topic-markers: refreshCard keeps the marker row where it was (a
   f.view.refreshCard(node, false);
   assert.ok(order().indexOf('vam-card-markers') > order().indexOf('vam-kind-tag'), 'a row added later goes after the type tag');
 });
-integrationTest('topic-markers, topic-color and topic-style: an AIM map and select mode have no marker, colour or style menu and refuse a change', async () => {
+integrationTest('topic-markers, topic-color and topic-style: select mode has no marker, colour or style menu and refuse a change', async () => {
   const sections = [
     ['markers', (view, panel, n) => view.renderMarkerSection(panel, n), (view, n) => view.changeTopicMarker(n, 'done')],
     ['color', (view, panel, n) => view.renderColorSection(panel, n), (view, n) => view.changeTopicColor(n, 'red', true)],
     ['style', (view, panel, n) => view.renderStyleSection(panel, n), (view, n) => view.changeTopicStyle(n, ['bold'], true)],
   ];
-  for (const [name, render, change] of sections) for (const options of [{ aim: true }, { integration: true }]) {
+  for (const [name, render, change] of sections) for (const options of [{ integration: true }]) {
     const { view, writes } = heFixture(options);
     if (options.integration) view.selection.toggleMultiSelect();
     const panel = dom.element('panel'); render(view, panel, view.map.nodes[2]);
@@ -3723,7 +3625,7 @@ integrationTest('topic-markers: a toggle is one transaction; one undo restores t
 });
 // ---- topic colour (ticket 37, P2b) ----
 const tcLabel = card => dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
-integrationTest('topic-color: a card carries data-topic-color and "Color: Red" in its accessible name; no colour, a hostile value and an AIM card add nothing', () => {
+integrationTest('topic-color: a card carries data-topic-color and "Color: Red" in its accessible name; no colour and a hostile value add nothing', () => {
   const notes = heNotes([['fact', { color: 'red' }], ['hyp', { color: 'red; background:url(x)' }], ['other', {}]]);
   const red = tmRender({ notes }, 'fact');
   assert.equal(red.card.dataset.topicColor, 'red'); assert.match(tcLabel(red.card).text, /^FACT, Researched, Color: Red$/); assert.equal(red.card.attrs['aria-labelledby'], tcLabel(red.card).id);
@@ -3732,8 +3634,6 @@ integrationTest('topic-color: a card carries data-topic-color and "Color: Red" i
     assert.equal('topicColor' in shown.card.dataset, false, id); assert.doesNotMatch(tcLabel(shown.card).text, /Color/, id);
     assert.match(tcLabel(shown.card).text, new RegExp('^' + id.toUpperCase() + ', Researched'), 'a card without a valid colour keeps its old name'); assert.equal((tcLabel(shown.card).text.match(/,/g) ?? []).length, 1, id);
   }
-  const aim = tmRender({ aim: true, topics: [{ ...node('fact'), aimKind: 'research' }], notes }, 'fact');
-  assert.equal('topicColor' in aim.card.dataset, false, 'an AIM card has its own look and shows no topic colour'); assert.doesNotMatch(tcLabel(aim.card).text, /Color/);
 });
 integrationTest('topic-color: the colour name sits with the marker and model parts without duplicating or disturbing them, on first draw and after every refresh', () => {
   const f = heFixture({ notes: heNotes([['fact', { markers: ['done'], color: 'blue' }], ['hyp', {}], ['other', {}]]) });
@@ -3868,7 +3768,7 @@ integrationTest('topic-color: applying to a branch is one transaction that write
   assert.doesNotMatch(contents.get(root.path), /topic-color/, 'clearing removes the key');
 });
 // ---- topic style (card-style P2) ----
-integrationTest('topic-style: a card carries only whitelisted data-topic-style-* values and "Style: ..." in its name; hostile values and an AIM card add nothing; redraws never double it', () => {
+integrationTest('topic-style: a card carries only whitelisted data-topic-style-* values and "Style: ..." in its name; hostile values add nothing; redraws never double it', () => {
   const notes = heNotes([['fact', { style: ['bold', 'text-large', 'border-thick', 'line-thick'] }], ['hyp', { style: ['"><script>', 'BOLD'] }], ['other', {}]]);
   const f = tmRender({ notes }, 'fact');
   assert.equal(f.card.dataset.topicStyleBold, 'true'); assert.equal(f.card.dataset.topicStyleSize, 'large'); assert.equal(f.card.dataset.topicStyleBorder, 'thick');
@@ -3878,9 +3778,6 @@ integrationTest('topic-style: a card carries only whitelisted data-topic-style-*
     for (const key of ['topicStyleBold', 'topicStyleSize', 'topicStyleBorder', 'styleText']) assert.equal(key in shown.card.dataset, false, `${id} ${key}`);
     assert.doesNotMatch(tcLabel(shown.card).text, /Style/, id);
   }
-  const aim = tmRender({ aim: true, topics: [{ ...node('fact'), aimKind: 'research' }], notes }, 'fact');
-  for (const key of ['topicStyleBold', 'topicStyleSize', 'topicStyleBorder']) assert.equal(key in aim.card.dataset, false, `AIM ${key}`);
-  assert.doesNotMatch(tcLabel(aim.card).text, /Style/);
   const g = heFixture({ notes: heNotes([['fact', { color: 'blue', style: ['bold'] }], ['hyp', {}], ['other', {}]]) });
   g.view.stageEl = hePatch(dom.element('stage')); g.view.cardEls = new Map(); g.view.renderNode(g.view.map.nodes[0]);
   const node0 = g.view.map.nodes[0], card = g.view.stageEl.children[0], note = g.view.notes.get('fact');
@@ -4014,7 +3911,7 @@ integrationTest('topic-links: the card header shows a button whose label lists t
 });
 integrationTest('topic-links: the panel section lists and opens links in read-only cases, hides editing, and shows errors in an aria-live region', async () => {
   {
-    for (const options of [{ aim: true }, { integration: true }]) {
+    for (const options of [{ integration: true }]) {
       const f = heFixture({ ...options, notes: heNotes([['fact', { links: ['https://a.example/x'] }], ['hyp', {}], ['other', {}]]) });
       if (options.integration) f.view.selection.toggleMultiSelect();
       const panel = dom.element('panel'); f.view.renderLinkSection(panel, f.view.map.nodes[0]);
@@ -4419,7 +4316,7 @@ test('bug bash #12: a tool row wider than the whole visible canvas wraps and eve
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /\.vam-node > \.vam-node-tools\.is-wrapped\s*\{[^}]*flex-wrap:\s*wrap/);
 });
-integrationTest('C5: the map commands apply only to an active map view (topic ones only with a selected card, editing ones never on an AIM map or in a presentation) and run the same actions as the card tools', () => {
+integrationTest('C5: the map commands apply only to an active map view (topic ones only with a selected card, editing ones never in a presentation) and run the same actions as the card tools', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   const tuples = [...source.matchAll(/\["(map-[a-z-]+)", "(ui\.command_map_[a-z_]+)", "([a-z-]+)"\]/g)].map(m => [m[1], m[2], m[3]]);
   assert.ok(tuples.length >= 6 && tuples.length <= 11, `${tuples.length} map commands`);
@@ -4449,10 +4346,6 @@ integrationTest('C5: the map commands apply only to an active map view (topic on
   view.selection.setSelected(target.id);
   for (const action of actions) assert.equal(view.mapCommand(action, false), true, action);
   assert.deepEqual(plain(calls), [['add', null], ['add', target.id], ['add', target.parentId], ['ai', target.id], ['rename', target.id, view.notes.get(target.id).title], ['details', target.id], ['collapse', target.id], ['fit'], ['zoom', 1 / view.map.viewport.zoom], ['search'], ['keys']]);
-  view.map.aim = { branches: [] };
-  for (const action of ['add-topic', 'add-subtopic', 'add-sibling', 'ai-explore', 'rename', 'toggle-collapse']) assert.equal(view.mapCommand(action, true), false, `AIM map: ${action}`);
-  assert.equal(view.mapCommand('open-details', true), true, 'reading still works on an AIM map');
-  delete view.map.aim;
   view.presentation = { order: [], currentId: 'x' };
   for (const action of ['add-topic', 'rename', 'search', 'toggle-collapse']) assert.equal(view.mapCommand(action, true), false, `presentation: ${action}`);
   view.presentation = null;

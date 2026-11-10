@@ -209,13 +209,7 @@ test('renameBoundary changes only the label, one undo step; blank removes the la
   assert.equal('label' in (await h.onDisk())[0], false);
 });
 
-test('frames cannot be changed on an AIM map; in selection mode they are drawn but only added, not edited', async () => {
-  const aim = await harness(ids => [frame([ids.root])]);
-  aim.view.map.aim = { version: 1 };
-  const before = await aim.onDisk();
-  await aim.view.addBoundary([aim.ids.root], 'x');
-  await aim.view.removeCanvasItem('b1');
-  assert.deepEqual(await aim.onDisk(), before, 'aim');
+test('in selection mode frames are drawn but only added, not edited', async () => {
   const sel = await harness(ids => [frame([ids.root])], { mode: 'integrationMode' });
   sel.view.render();
   assert.equal(frames(sel).length, 1, 'drawn in selection mode');

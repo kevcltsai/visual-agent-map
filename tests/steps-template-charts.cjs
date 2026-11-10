@@ -121,7 +121,6 @@ test('chartEligible keeps its existing conditions first and does not throw on ot
   assert.equal(service.chartEligible({ ...base('decompose') }), false);
   assert.equal(service.chartEligible({ ...base(undefined), mode: undefined }), false);
   assert.equal(service.chartEligible({ ...base('task'), countRepair: true }), false);
-  assert.equal(service.chartEligible({ ...base('task'), promptProfile: 'aim' }), false);
   assert.equal(service.chartEligible({ ...base('task'), addCharts: false }), false);
   const custom = { id: 'x', name: 'X', sections: [{ id: 's1', name: 'A', description: 'text', role: 'none', aliases: [] }] };
   assert.doesNotThrow(() => service.chartEligible({ ...base('task'), detailTemplate: custom }));

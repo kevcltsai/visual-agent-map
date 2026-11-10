@@ -4,8 +4,7 @@ import {
   existingNoteLanguage,
   mapChatLanguageSources,
   outputLanguageForMap,
-  rememberedOutputLanguage,
-  resolveAimContentLanguage
+  rememberedOutputLanguage
 } from "../../core/content-language";
 import {
   addFreeTextNode,
@@ -123,7 +122,6 @@ import {
 } from "./map-transaction";
 import { TopicSelection, type SelectionChange } from "./topic-selection";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
-import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
 import { formatIssuesPatch, originBaseline, summaryForPrompt } from "./note-write-helpers";
 
@@ -240,8 +238,6 @@ import { KeyboardShortcutsModal } from "../../ui/modals/keyboard-shortcuts-modal
 import {
   applyCollapseLevel,
   canParent,
-  clearQuestionConvergenceEdges,
-  repairAimResultConvergence,
   clone,
   branchSize,
   childIndex,
@@ -523,8 +519,6 @@ import {
   isChatNarrow
 } from "../../core/map-chat-layout";
 import { raiseParents, type RelevancePin } from "./relevance-pins";
-import { createAimMap } from "../aim/create-map";
-import { aimEnabled } from "../aim/availability";
 import {
   addOutlineToMap,
   applyOutlineSummaries,
@@ -608,23 +602,6 @@ import type { ResearchObserver, ResearchSteer } from "../../ai/research-observer
 import { TopicChatSteers } from "./topic-chat-steer";
 import type { ResearchProgress } from "./research-progress";
 import type { ExpansionBatchState } from "./expansion-batch";
-import { AimStartModal } from "../../ui/modals/aim-start-modal";
-import { AimAnswerModal } from "../../ui/modals/aim-answer-modal";
-import { AimAssumptionModal } from "../../ui/modals/aim-assumption-modal";
-import { AimSteerModal } from "../../ui/modals/aim-steer-modal";
-import {
-  AimManualFlow,
-  readOpenItems,
-  countAimAnsweredQuestions,
-  MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION,
-  type ManualResearchResult,
-  type PlannerQuestionResult
-} from "../aim/manual-flow";
-import { AimRunStore } from "../aim/research-run-store";
-import type { AimProgressEvent } from "../aim/manual-flow-support";
-import { AIM_MAX_SECTIONS } from "../aim/aim-note-style";
-import { matchAimFailedReportTargets } from "../aim/retry-targets";
-import { aimRepairHint, aimTimedOut } from "../aim/failure-hint";
 import { canvasPointerIntent } from "./canvas-gestures";
 import {
   hasMergeContent,
@@ -706,10 +683,7 @@ function errorMessage(error: unknown): string {
   return typeof message === "string" ? message : String(error);
 }
 
-/** An AIM card that keeps its AIM-only treatment (no appearance, topic type or AI lock) while AIM is available. */
-const isAimNode = (node: MapNode | null | undefined): boolean => aimEnabled() && !!node?.aimKind;
-
-/** A copy of `node` without any AIM field: what an old AIM map shares while AIM is hidden. */
+/** A copy of `node` without any AIM field: what an old AIM map shares. */
 function withoutAimFields(node: MapNode): MapNode {
   const copy = { ...node };
   delete copy.aimKind;
@@ -717,51 +691,6 @@ function withoutAimFields(node: MapNode): MapNode {
   delete copy.aimConvergesFromNodeIds;
   delete copy.aimDismissedQuestionRequestIds;
   return copy;
-}
-
-/** What resolving a note style gives a view: the template, the ids that could not be used and, for a block, why. */
-type AimQuestionStatus = "running" | "completed" | "partial" | "failed" | "cancelled" | "not_started";
-function aimQuestionStatus(
-  map: MapDocument,
-  questionNodeId: string,
-  activeQuestionNodeId: string | null
-): AimQuestionStatus {
-  if (activeQuestionNodeId === questionNodeId) return "running";
-  const branches = map.aim?.branches.filter(branch => branch.questionNodeId === questionNodeId) ?? [];
-  const statuses = branches.map(branch => {
-    if (branch.researchPlanError && !branch.researchPlan) return "failed" as const;
-    const runs = (map.aim?.runs ?? []).filter(item => item.branchId === branch.id);
-    if (
-      runs.some(run => {
-        const attempt = run.attempts.find(item => item.id === run.currentAttemptId);
-        return attempt?.status === "running" || attempt?.status === "saving";
-      })
-    )
-      return "running" as const;
-    const terminal = [...branch.results].reverse().find(result => result.kind !== "research");
-    if (terminal) {
-      const terminalRun = runs.find(item => item.id === terminal.runId),
-        terminalAttempt = terminalRun?.attempts.find(item => item.id === terminal.attemptId);
-      const latestRun = [...runs].reverse()[0],
-        latestAttempt = latestRun?.attempts.find(item => item.id === latestRun.currentAttemptId);
-      if (latestAttempt?.status === "failed") return "failed" as const;
-      if (latestAttempt?.status === "cancelled") return "cancelled" as const;
-      return terminalAttempt?.status === "partial" ? ("partial" as const) : ("completed" as const);
-    }
-    const latest = [...runs].reverse().find(run => run.attempts.some(item => item.id === run.currentAttemptId));
-    const status = latest?.attempts.find(item => item.id === latest.currentAttemptId)?.status;
-    if (status === "failed") return "failed" as const;
-    if (status === "cancelled") return "cancelled" as const;
-    return branch.researchPlan || branch.results.length || status === "completed"
-      ? ("partial" as const)
-      : ("not_started" as const);
-  });
-  if (statuses.includes("running")) return "running";
-  if (statuses.includes("failed")) return "failed";
-  if (statuses.includes("partial")) return "partial";
-  if (statuses.includes("completed")) return "completed";
-  if (statuses.includes("cancelled")) return "cancelled";
-  return "not_started";
 }
 /** The AI merge that hid its dialog: owned by the view, one per map. It writes nothing until the draft is confirmed. */
 /** A chat reply's undo step, still open to the one AI merge the reply started (it lands later and joins the step). */
@@ -1027,14 +956,6 @@ const boxOf = (card: HTMLElement): CardBox => ({
   height: card.offsetHeight
 });
 
-/** One planned subtopic of the running AIM branch, as the map shows it before its research note exists. */
-type AimTargetProgress = {
-  title: string;
-  state: "queued" | "searching" | "done" | "skipped";
-  searches: number;
-  startedAt?: number;
-};
-
 const RELATION_KINDS: readonly TopicRelationKind[] = [
   "supports",
   "contradicts",
@@ -1062,23 +983,6 @@ const RELATION_NAME_KEY: Record<TopicRelationKind, Parameters<typeof t>[0]> = {
 /** The key a relation line is known by (view state only): `from`, `to` and kind. */
 const relationIdentity = (r: Pick<TopicRelation, "kind" | "from" | "to">): string =>
   `${r.from}\u0000${r.to}\u0000${r.kind}`;
-const AIM_STAGE_KEYS: Record<string, Parameters<typeof t>[0]> = {
-  "research-plan": "ui.aim_stage_research-plan",
-  "report-review": "ui.aim_stage_report-review",
-  "targeted-research": "ui.aim_stage_targeted-research",
-  "delivery-outline": "ui.aim_stage_delivery-outline",
-  "delivery-research": "ui.aim_stage_delivery-research",
-  "delivery-writing": "ui.aim_stage_delivery-writing",
-  "delivery-acceptance": "ui.aim_stage_delivery-acceptance",
-  "add-diagrams": "ui.aim_stage_add-diagrams"
-};
-
-/** One "document ready" notice at a time: a new one replaces the last, and it closes itself after a minute. */
-let documentReadyNotice: Notice | null = null;
-function showDocumentReady(): void {
-  documentReadyNotice?.hide();
-  documentReadyNotice = new Notice(t("ui.aim_document_ready"), 60_000);
-}
 
 /**
  * The options a chat integration runs with: what the integration dialog hands over when its fields are left as they come up
@@ -2108,13 +2012,6 @@ export class VisualAgentMapView extends ItemView {
   /** The map a state change is opening: a new tab's default map must not race it (see onOpen). */
   private requestedFile: string | null = null;
   private aimViewEpoch = 0;
-  /**
-   * Whether `map` is an AIM map this view treats as one: its AIM controls, status bar and edit locks apply. While AIM is hidden
-   * (experiences/aim/availability.ts) an old AIM map is an ordinary map: all its data stays as saved, only the AIM parts are off.
-   */
-  private aimLive(map: MapDocument | null | undefined = this.map): boolean {
-    return aimEnabled() && !!map?.aim;
-  }
   /** Whether `map` is a usable argument map: its arrangement is fixed by the flow, so the layout controls are off (like AIM's). */
   private argumentLive(map: MapDocument | null | undefined = this.map): boolean {
     return !!map && map.argumentMap !== undefined && readArgumentMap(map).kind === "usable";
@@ -2264,31 +2161,8 @@ export class VisualAgentMapView extends ItemView {
   private headerTitle = "";
   /** Raised by the header title refresh: the setState it causes asks the workspace to redraw the window title too. */
   private titleRefresh = false;
-  private readonly aimRuns: AimRunStore;
-  private readonly aimManual: AimManualFlow;
-  private readonly aimRecovery: AimManualFlow;
-  private aimBusy = false;
-  private aimController: AbortController | null = null;
-  private aimActiveQuestionNodeId: string | null = null;
-  private aimActivityKind: "planning" | "research" | "clarifying" | null = null;
-  /** Live progress of the running AIM branch; in memory only and dropped when the run ends. */
-  private aimProgress: {
-    branchId: string;
-    stage: string;
-    startedAt: number;
-    targets: Map<string, AimTargetProgress>;
-  } | null = null;
-  /** Text spans the one-second tick rewrites in place, so progress never re-renders the whole map. */
-  private aimProgressEls = new Map<string, HTMLElement>();
   /** Token-usage button and panel in the zoom controls; null when the plugin has no usage store. */
   private usageControl: UsageControl | null = null;
-  /** Model of each AIM branch's root topic, resolved once when its first progress event arrives; dropped when the run ends. */
-  private aimBranchModels = new Map<string, string>();
-  private aimBranchModelPending = new Set<string>();
-  private aimProgressTimer: number | null = null;
-  private aimProgressRenderTimer: number | null = null;
-  private aimFailedReports = new Map<string, { runId: string; diagnosticNotePath: string }>();
-  private aimAnswerRequestIds = new Map<string, string>();
   constructor(
     leaf: WorkspaceLeaf,
     private plugin: VisualAgentMapPlugin
@@ -2296,34 +2170,6 @@ export class VisualAgentMapView extends ItemView {
     super(leaf);
     // Once, here: Obsidian pushes view.scope when the leaf becomes active, which can be before onOpen() finishes.
     this.installUndoScope();
-    this.aimRuns = new AimRunStore(plugin.repo);
-    this.aimManual = new AimManualFlow(
-      plugin.repo,
-      this.aimRuns,
-      (context, model, reasoning, signal, onWebSearchEvent) =>
-        plugin.askModel(context, model, reasoning, signal, undefined, undefined, onWebSearchEvent),
-      undefined,
-      async <T>(operation: () => Promise<T>): Promise<T> => {
-        let result!: T;
-        await plugin.mutate(async () => {
-          result = await operation();
-        });
-        return result;
-      }
-    );
-    this.aimManual.onProgress = event => this.onAimProgress(event);
-    this.aimManual.addDiagrams = request => plugin.addAimDiagrams(request);
-    this.aimManual.noteStyle = language => this.aimNoteStyle(language);
-    // openMapInMutation already owns the repository queue. Startup recovery must persist
-    // directly within that scope instead of attempting to enqueue the same operation again.
-    this.aimRecovery = new AimManualFlow(
-      plugin.repo,
-      this.aimRuns,
-      (context, model, reasoning, signal, onWebSearchEvent) =>
-        plugin.askModel(context, model, reasoning, signal, undefined, undefined, onWebSearchEvent)
-    );
-    this.aimRecovery.addDiagrams = request => plugin.addAimDiagrams(request);
-    this.aimRecovery.noteStyle = language => this.aimNoteStyle(language);
   }
   getViewType(): string {
     return VIEW_TYPE;
@@ -2355,7 +2201,6 @@ export class VisualAgentMapView extends ItemView {
     if (this.chat?.isBusy || this.chatPrepAbandon) return true;
     for (const task of this.synthesisTasks.values()) if (task.state === "running") return true;
     if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
-    if (this.aimBusy || this.aimController) return true;
     if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
     if (this.startedRelevance && this.path) {
       const run = this.plugin.relevanceGrades.get(this.path);
@@ -2583,7 +2428,7 @@ export class VisualAgentMapView extends ItemView {
     scope.register([], "F2", (event: KeyboardEvent): boolean => {
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
       if (this.presentation) return false;
-      if (this.selection.state.multiSelectMode || this.aimLive()) return true;
+      if (this.selection.state.multiSelectMode) return true;
       const active = this.contentEl.ownerDocument?.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
       const node = entry && this.map?.nodes.find(item => item.id === entry[0]);
@@ -2600,7 +2445,7 @@ export class VisualAgentMapView extends ItemView {
       (event: KeyboardEvent): boolean => {
         if (this.closed || event.isComposing || event.defaultPrevented) return true;
         if (this.presentation || this.notesLoading()) return false;
-        if (this.selection.state.multiSelectMode || this.aimLive()) return true;
+        if (this.selection.state.multiSelectMode) return true;
         const active = this.contentEl.ownerDocument?.activeElement;
         const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
         const node = entry && this.map?.nodes.find(item => item.id === entry[0]);
@@ -3085,10 +2930,6 @@ export class VisualAgentMapView extends ItemView {
   /** The map title becomes a field; Enter saves, Esc leaves the name as it was. */
   private startMapTitleEdit(): void {
     if (!this.map || this.inlineName || this.presentation) return;
-    if (this.aimActiveForPath(this.path)) {
-      new Notice(t("ui.aim_research_already_running"));
-      return;
-    }
     this.inlineName = { target: "map", id: "", draft: this.map.title, fresh: true, created: false };
     this.render();
   }
@@ -3155,13 +2996,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** True while a card's title or summary may be typed in place: not presenting, not picking cards, not in a live AIM run. */
   private cardTextEditable(): boolean {
-    return (
-      !this.closed &&
-      !this.notesLoading() &&
-      !this.presentation &&
-      !this.selection.state.multiSelectMode &&
-      !this.aimLive()
-    );
+    return !this.closed && !this.notesLoading() && !this.presentation && !this.selection.state.multiSelectMode;
   }
   /** The caret offset inside `el`'s text at a screen point, or null when the browser cannot say. */
   private caretOffsetAt(el: Element, x: number, y: number): number | null {
@@ -3370,13 +3205,6 @@ export class VisualAgentMapView extends ItemView {
     this.aimViewEpoch++;
     this.mapOpenEpoch++;
     this.endNoteLoad();
-    const controller = this.aimController;
-    this.aimController = null;
-    this.aimBusy = false;
-    this.aimActiveQuestionNodeId = null;
-    this.aimActivityKind = null;
-    controller?.abort();
-    this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
     this.hoverCard?.remove();
@@ -3387,14 +3215,6 @@ export class VisualAgentMapView extends ItemView {
       this.viewportTimer = null;
       await this.persistViewport();
     }
-  }
-  /** The user switched to another map while AIM kept running: the document-ready notice still tells them it is done. */
-  private noticeDocumentReadyElsewhere(status: string | undefined, epoch: number, mapPath: string): void {
-    if (status === "completed" && !this.closed && this.aimViewEpoch === epoch && this.path !== mapPath)
-      showDocumentReady();
-  }
-  private aimViewIsCurrent(epoch: number, mapPath: string): boolean {
-    return !this.closed && this.aimViewEpoch === epoch && this.path === mapPath;
   }
   async refreshFromPlugin(): Promise<void> {
     await this.hydrate();
@@ -3681,7 +3501,6 @@ export class VisualAgentMapView extends ItemView {
     onRead?: (index: number, note: Note | undefined) => void,
     meta?: { goal: string | undefined; context: string | undefined; sources: MapSource[] }
   ): Promise<{ failedPaths: string[] }> {
-    this.aimFailedReports.clear();
     let goal: string | undefined;
     let context: string | undefined;
     let sources: MapSource[] = [];
@@ -3729,32 +3548,7 @@ export class VisualAgentMapView extends ItemView {
     this.relevanceGoal = goal;
     this.relevanceContext = context;
     this.mapSources = sources;
-    await this.hydrateFailedReportTargets(isCurrent);
     return { failedPaths: Array.from(ctx.failedPaths) };
-  }
-  private async hydrateFailedReportTargets(isCurrent: () => boolean): Promise<void> {
-    const map = this.map,
-      mapPath = this.path;
-    if (!mapPath || !aimEnabled() || !map?.aim) return;
-    const failed = map.aim.runs.some(
-      run => run.attempts.find(item => item.id === run.currentAttemptId)?.status === "failed"
-    );
-    if (!failed) return;
-    const notesFolder = this.plugin.repo.topicFolder(mapPath, "Notes"),
-      candidates: Array<{ path: string; note: Note }> = [];
-    for (const file of this.plugin.repo.app.vault.getMarkdownFiles()) {
-      if (!file.path.startsWith(`${notesFolder}/`)) continue;
-      if (!isCurrent()) return;
-      try {
-        candidates.push({ path: file.path, note: await this.plugin.repo.readNote(file.path, this.map ?? undefined) });
-      } catch {
-        /* Unreadable notes cannot authorize a retry action. */
-      }
-    }
-    if (!isCurrent()) return;
-    this.aimFailedReports.clear();
-    for (const [questionNodeId, target] of matchAimFailedReportTargets(map, candidates))
-      this.aimFailedReports.set(questionNodeId, target);
   }
   /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
   private dropMapBackground(): void {
@@ -3789,48 +3583,12 @@ export class VisualAgentMapView extends ItemView {
     }
     if (path !== this.path) {
       this.cameraWhenShown = null;
-      this.stopAimProgress();
       this.mapSourcesOpen = false;
       this.dropGoalEdit();
       this.abortRelevanceGrade();
     }
     let map = await this.plugin.repo.readMap(path);
     if (!isCurrent()) return;
-    if (aimEnabled() && map.aim?.creationId && map.aim.rootDraft) {
-      // The draft is compared with the current model and reasoning at this moment (plan D9); createAimMap decides
-      // workspace or manual, so no field is added to the map data.
-      const resumed = await createAimMap(this.plugin.repo, this.plugin.settings.cliModel, {
-        requestId: map.aim.creationId,
-        topic: map.title,
-        context: map.aim.rootDraft.context,
-        model: map.aim.rootDraft.model,
-        reasoning: map.aim.rootDraft.reasoning
-      });
-      if (!isCurrent()) return;
-      map = resumed.map;
-    }
-    if (aimEnabled() && map.aim?.questionDraft) {
-      await this.aimRecovery.recoverQuestionDraft(path);
-      if (!isCurrent()) return;
-      map = await this.plugin.repo.readMap(path);
-      if (!isCurrent()) return;
-    }
-    if (aimEnabled() && map.aim) {
-      await this.aimRuns.recoverPending(path);
-      if (!isCurrent()) return;
-      await this.aimRuns.failInterrupted(path);
-      if (!isCurrent()) return;
-      await this.aimRecovery.recoverPostReportQuestions(path);
-      if (!isCurrent()) return;
-      map = await this.plugin.repo.readMap(path);
-      if (!isCurrent()) return;
-    }
-    const clearedQuestionEdges = aimEnabled() && clearQuestionConvergenceEdges(map);
-    const repairedResultEdges = aimEnabled() && repairAimResultConvergence(map);
-    if (clearedQuestionEdges || repairedResultEdges) {
-      await this.plugin.repo.saveMap(path, map);
-      if (!isCurrent()) return;
-    }
     // A usable argument map whose cards are still stacked (the flow placed them) is arranged once, here, with no provider call.
     const argumentOnOpen = map.argumentMap === undefined ? null : readArgumentMap(map);
     const arranged =
@@ -3858,7 +3616,6 @@ export class VisualAgentMapView extends ItemView {
       this.relevanceGoal = undefined;
       this.relevanceContext = undefined;
       this.mapSources = [];
-      this.aimFailedReports.clear();
       const state: NoteLoadState = {
         epoch: openEpoch,
         read: 0,
@@ -3962,82 +3719,6 @@ export class VisualAgentMapView extends ItemView {
       console.warn("Visual Agent Map argument run recovery", error);
     }
   }
-  openAimStart(): void {
-    if (this.closed) return;
-    const epoch = this.aimViewEpoch;
-    const isCurrent = () => !this.closed && this.aimViewEpoch === epoch;
-    const availableModels = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
-    const configuredModel = this.plugin.settings.cliModel?.trim() || FALLBACK_MODEL;
-    const configuredReasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
-    const defaultReasoning = configuredReasoning;
-    const modelIds = [...new Set([configuredModel, ...availableModels].filter(Boolean))];
-    const modelChoices = modelIds.map(id => ({
-      id,
-      label: typeof this.plugin.modelLabel === "function" ? this.plugin.modelLabel(id) : id
-    }));
-    new AimStartModal(
-      this.app,
-      async input => {
-        const pending: { created: Awaited<ReturnType<typeof createAimMap>> | null } = { created: null };
-        await this.plugin.mutate(async () => {
-          if (!isCurrent()) return;
-          await this.plugin.repo.ensureWorkspace();
-          if (!isCurrent()) return;
-          const created = await createAimMap(this.plugin.repo, input.model, input);
-          await this.plugin.rebuildDerivedData();
-          if (!isCurrent()) return;
-          const hasMap = Boolean(this.map);
-          if (hasMap) {
-            // A map is open: the new one gets its own tab, opened after this mutation (the tab opens its map through mutate).
-            pending.created = created;
-            return;
-          }
-          await this.openMapInMutation(created.mapPath);
-          if (!isCurrent() || this.path !== created.mapPath || this.map?.id !== created.map.id) return;
-          this.selection.setSelected(created.root.id);
-          this.render();
-          this.focusNode(created.root);
-        });
-        const created = pending.created;
-        if (!created) return;
-        const view = await this.plugin.openMapInNewTab(created.mapPath);
-        if (!view || view.closed || view.path !== created.mapPath || view.map?.id !== created.map.id) return;
-        view.selection.setSelected(created.root.id);
-        view.render();
-        view.focusNode(created.root);
-      },
-      modelChoices,
-      configuredModel,
-      defaultReasoning,
-      async () => {
-        const states = await Promise.all([
-          this.plugin.refreshModelDiscovery("codex"),
-          this.plugin.refreshModelDiscovery("claude")
-        ]);
-        const ready = states.filter(state => state.status === "ready");
-        const models = [...new Set(ready.flatMap(state => state.models))];
-        if (!ready.length || !models.length)
-          throw new Error(
-            states
-              .map(state => state.error)
-              .filter(Boolean)
-              .join("; ") || t("ui.aim_no_models_found")
-          );
-        const choices = models.map(id => ({ id, label: this.plugin.modelLabel(id) }));
-        const errors = states
-          .filter(state => state.status === "error")
-          .map(state => state.error)
-          .filter(Boolean);
-        return errors.length
-          ? {
-              models: choices,
-              message: t("ui.aim_models_refreshed_partial_0", errors.join("; ")),
-              preserveSelection: true
-            }
-          : choices;
-      }
-    ).open();
-  }
   private modelChoices(): ModelChoices {
     return {
       list: () => this.plugin.availableModels().map(id => ({ id, label: this.plugin.modelLabel(id) })),
@@ -4089,7 +3770,7 @@ export class VisualAgentMapView extends ItemView {
   openOutlineImport(prefill?: OutlineDraftPrefill, summaries?: ReadonlyMap<string, string[]>): void {
     const target = prefill ? this.reopenedImportTarget(prefill.inputs) : this.outlineImportTarget();
     if (target.map !== "editable") {
-      new Notice(target.map === "aim" ? t("ui.outline_import_placement_aim") : t("ui.outline_import_placement_no_map"));
+      new Notice(t("ui.outline_import_placement_no_map"));
       return;
     }
     const placement = prefill ? prefill.inputs.placement : target.selected ? "under" : "tree";
@@ -4607,7 +4288,7 @@ export class VisualAgentMapView extends ItemView {
     this.structureHighlight = next;
   }
   // ---- Relevance grading: goal chip, status bar and change summary ----------------------------------------------
-  /** Mind maps only: not an AIM map. An old AIM map stays off while AIM is hidden too (goal grading has no visible UI there). */
+  /** Mind maps only: goal grading stays off for an old AIM map (it has no visible UI there). */
   private relevanceGradeable(): boolean {
     return !!this.map && !this.map.aim && !!this.path;
   }
@@ -6648,7 +6329,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private setLayout(patch: { direction?: LayoutKind; spacing?: LayoutSpacing }): void {
     this.enqueue(async () => {
-      if (!this.map || this.aimLive() || this.argumentLive()) return;
+      if (!this.map || this.argumentLive()) return;
       const before = layoutOf(this.map);
       const direction = patch.direction ?? before.direction;
       const spacing = patch.spacing ?? before.spacing ?? "standard";
@@ -6750,7 +6431,6 @@ export class VisualAgentMapView extends ItemView {
   /** Whether the open map can take an imported outline, and the selected topic for "under the selected topic". */
   private outlineImportTarget(): OutlineImportTarget {
     if (!this.map || !isManagedMapPath(this.plugin.settings, this.path)) return { map: "none" };
-    if (this.aimLive()) return { map: "aim" };
     const node = this.map.nodes.find(item => item.id === this.selection.state.selected);
     if (!node) return { map: "editable" };
     return { map: "editable", selected: { id: node.id, title: this.notes.get(node.id)?.title ?? node.path } };
@@ -6852,10 +6532,7 @@ export class VisualAgentMapView extends ItemView {
     // Checked against the map as it is when the work runs; a rejection keeps the import window open.
     const target = (): { map: MapDocument; path: string; parent: MapNode | null } => {
       const where = this.outlineImportTarget();
-      if (!this.map || where.map !== "editable")
-        throw new Error(
-          where.map === "aim" ? t("ui.outline_import_placement_aim") : t("ui.outline_import_placement_no_map")
-        );
+      if (!this.map || where.map !== "editable") throw new Error(t("ui.outline_import_placement_no_map"));
       if (placement.kind === "tree") return { map: this.map, path: this.path, parent: null };
       const parent = this.map.nodes.find(node => node.id === placement.parentId);
       if (!parent) throw new Error(t("ui.outline_import_selected_missing"));
@@ -7072,610 +6749,6 @@ export class VisualAgentMapView extends ItemView {
       .then(() => (created ? this.plugin.openMapInNewTab(created) : undefined))
       .catch(error => errorNotice(error));
   }
-  async planAimQuestion(
-    parentNodeId: string,
-    requestId: string,
-    parentBranchId: string | null = null,
-    signal?: AbortSignal
-  ): Promise<PlannerQuestionResult> {
-    if (this.closed || !this.map || !this.path)
-      throw new Error("Open a saved AIM map before planning its next question.");
-    const mapPath = this.path,
-      epoch = this.aimViewEpoch;
-    const parent = this.notes.get(parentNodeId);
-    if (!parent) throw new Error("The selected Planner question parent is unavailable.");
-    const planned: PlannerQuestionResult = await this.aimManual.planNextQuestion(
-      mapPath,
-      parentNodeId,
-      parent.model,
-      parent.reasoning,
-      requestId,
-      parentBranchId,
-      signal
-    );
-    const isCurrent = () => this.aimViewIsCurrent(epoch, mapPath) && !signal?.aborted;
-    if (isCurrent()) {
-      const latest = await this.plugin.repo.readMap(mapPath);
-      if (isCurrent()) {
-        this.map = latest;
-        await this.hydrate(isCurrent);
-        if (isCurrent()) {
-          this.render();
-          this.syncOutline();
-        }
-      }
-    }
-    return planned;
-  }
-  async submitAimAnswer(
-    questionNodeId: string,
-    input: { requestId: string; selections: string[]; freeText: string },
-    signal?: AbortSignal
-  ): Promise<ManualResearchResult> {
-    if (this.closed || !this.map || !this.path) throw new Error("Open a saved AIM map before submitting an answer.");
-    const mapPath = this.path,
-      epoch = this.aimViewEpoch;
-    const isCurrent = () => this.aimViewIsCurrent(epoch, mapPath) && !signal?.aborted;
-    const question = this.notes.get(questionNodeId);
-    if (!question) throw new Error("The selected Planner question is unavailable.");
-    signal?.throwIfAborted();
-    let recoveredBranches = 0;
-    await this.plugin.mutate(async () => {
-      recoveredBranches = await this.aimRuns.recoverAnswerBranches(mapPath);
-    });
-    if (recoveredBranches) {
-      if (!isCurrent()) return { status: "stale", branchId: "" };
-      this.map = await this.plugin.repo.readMap(mapPath);
-      await this.hydrate(isCurrent);
-      if (!isCurrent()) return { status: "stale", branchId: "" };
-      this.render();
-      this.syncOutline();
-    }
-    try {
-      const outcome = await this.aimManual.answerAndResearch(
-        mapPath,
-        questionNodeId,
-        input,
-        question.model,
-        question.reasoning,
-        signal,
-        async activeQuestionNodeId => {
-          if (!isCurrent()) return;
-          this.aimActiveQuestionNodeId = activeQuestionNodeId;
-          this.map = await this.plugin.repo.readMap(mapPath);
-          await this.hydrate(isCurrent);
-          if (isCurrent()) this.render();
-        }
-      );
-      if (isCurrent()) {
-        const latest = await this.plugin.repo.readMap(mapPath);
-        if (isCurrent()) {
-          this.map = latest;
-          await this.hydrate(isCurrent);
-          if (isCurrent()) {
-            this.render();
-            this.syncOutline();
-          }
-        }
-      }
-      return outcome;
-    } catch (error) {
-      if (isCurrent()) {
-        const latest = await this.plugin.repo.readMap(mapPath);
-        if (isCurrent()) {
-          this.map = latest;
-          await this.hydrate(isCurrent);
-          if (isCurrent()) {
-            this.render();
-            this.syncOutline();
-          }
-        }
-      }
-      throw error;
-    }
-  }
-  private renderAimFailure(card: HTMLElement, branch: import("../../map-model").AimBranchRecord): void {
-    const runs = this.map?.aim?.runs.filter(run => run.branchId === branch.id) ?? [];
-    const latest = runs.at(-1),
-      attempt = latest?.attempts.find(item => item.id === latest.currentAttemptId);
-    if (attempt?.status !== "failed" && !branch.researchPlanError) return;
-    const box = card.createDiv({ cls: "vam-aim-failure" });
-    box.createEl("p", {
-      text: t("ui.aim_failure_reason", attempt?.stopReason || branch.researchPlanError || t("ui.expansion_failed"))
-    });
-    const phase =
-      attempt?.phase ?? branch.deliveryRecovery?.phase ?? (branch.researchPlanError ? "research-plan" : undefined);
-    const labels: Record<string, string> = {
-      "subtopic-research": t("ui.aim_stage_subtopic"),
-      "report-review": t("ui.aim_stage_review"),
-      "research-plan": t("ui.aim_stage_plan"),
-      "delivery-outline": t("ui.aim_stage_delivery_outline"),
-      "delivery-research": t("ui.aim_stage_delivery_research"),
-      "delivery-writing": t("ui.aim_stage_delivery_writing"),
-      "delivery-acceptance": t("ui.aim_stage_delivery_acceptance")
-    };
-    if (phase && labels[phase]) box.createEl("p", { text: t("ui.aim_failure_stage", labels[phase]) });
-    const reason = attempt?.stopReason ?? branch.researchPlanError ?? "";
-    const timedOut = aimTimedOut(reason);
-    box.createEl("p", { text: t(aimRepairHint(reason)) });
-    if (timedOut)
-      this.button(
-        box,
-        t("ui.aim_repair_timeout"),
-        () => {
-          const terminal = [...branch.results].reverse().find(result => result.kind !== "research");
-          if (terminal) void this.continueAimResearch(branch.questionNodeId, terminal.runId, 600_000);
-          else void this.retryAimSubtopics(branch.id, 600_000);
-        },
-        this.aimBusy
-      ).addClass("mod-cta");
-  }
-
-  private async retryAimSubtopics(branchId: string, timeoutMs?: number): Promise<void> {
-    if (this.notesLoading()) return;
-    const branch = this.map?.aim?.branches.find(item => item.id === branchId),
-      question = branch && this.map?.nodes.find(item => item.id === branch.questionNodeId);
-    const note = question && this.notes.get(question.id);
-    if (this.closed || !this.path || !branch || !question || !note || this.aimBusy) return;
-    const branchRuns = (this.map?.aim?.runs ?? []).filter(item => item.branchId === branch.id);
-    if (
-      branchRuns.some(run => {
-        const attempt = run.attempts.find(item => item.id === run.currentAttemptId);
-        return attempt?.status === "running" || attempt?.status === "saving";
-      })
-    )
-      return;
-    const terminal = branch.results.some(result => result.kind !== "research");
-    if (terminal) return;
-    const epoch = this.aimViewEpoch,
-      mapPath = this.path,
-      controller = new AbortController();
-    this.aimBusy = true;
-    this.aimController = controller;
-    this.aimActiveQuestionNodeId = question.id;
-    this.aimActivityKind = "research";
-    this.render();
-    try {
-      if (timeoutMs) await this.plugin.mutate(() => this.aimRuns.configureRetryTimeout(mapPath, branch.id, timeoutMs));
-      const result = branch.researchPlan
-        ? await this.aimManual.resumeAnswerResearch(mapPath, branch.id, note.model, note.reasoning, controller.signal)
-        : await this.aimManual.retryAnswerResearch(mapPath, branch.id, note.model, note.reasoning, controller.signal);
-      this.noticeDocumentReadyElsewhere(result.status, epoch, mapPath);
-      if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      const latest = await this.plugin.repo.readMap(mapPath);
-      if (this.aimViewIsCurrent(epoch, mapPath)) {
-        this.map = latest;
-        await this.hydrate(() => this.aimViewIsCurrent(epoch, mapPath));
-        this.render();
-        this.syncOutline();
-      }
-      if (result.status === "waiting-user") {
-        const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
-        if (question) {
-          this.selection.setSelected(question.id);
-          this.render();
-          this.focusNode(question);
-        }
-        new Notice(t("ui.aim_waiting_user"));
-      } else if (result.status === "partial") new Notice(t("ui.aim_research_partial"));
-      else if (result.status === "completed") showDocumentReady();
-      else if (result.status === "in-progress") new Notice(t("ui.aim_research_already_running"));
-    } catch (error) {
-      if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new Notice(error instanceof Error ? error.message : String(error));
-      const latest = await this.plugin.repo.readMap(mapPath);
-      if (this.aimViewIsCurrent(epoch, mapPath)) {
-        this.map = latest;
-        await this.hydrate(() => this.aimViewIsCurrent(epoch, mapPath));
-        this.render();
-        this.syncOutline();
-      }
-    } finally {
-      if (this.aimController === controller) {
-        this.aimBusy = false;
-        this.aimController = null;
-        this.aimActiveQuestionNodeId = null;
-        this.aimActivityKind = null;
-        if (this.aimViewIsCurrent(epoch, mapPath)) this.render();
-      }
-    }
-  }
-  async reviewAimFailedReport(
-    runId: string,
-    diagnosticNotePath: string,
-    signal?: AbortSignal
-  ): Promise<ManualResearchResult> {
-    if (this.closed || !this.map || !this.path)
-      throw new Error("Open the saved AIM map before reviewing a failed report.");
-    const mapPath = this.path,
-      epoch = this.aimViewEpoch;
-    const outcome = await this.aimManual.reviewFailedAttemptReport(mapPath, runId, diagnosticNotePath, signal);
-    const isCurrent = () => this.aimViewIsCurrent(epoch, mapPath) && !signal?.aborted;
-    if (isCurrent()) {
-      const latest = await this.plugin.repo.readMap(mapPath);
-      if (isCurrent()) {
-        this.map = latest;
-        await this.hydrate(isCurrent);
-        if (isCurrent()) {
-          this.render();
-          this.syncOutline();
-        }
-      }
-    }
-    return outcome;
-  }
-  private async correctAimAssumption(nodeId: string, assumption: string, correction: string): Promise<void> {
-    if (this.notesLoading()) return;
-    await this.runAimFollowup(nodeId, (mapPath, model, reasoning, signal) =>
-      this.aimManual.correctAssumption(mapPath, nodeId, assumption, correction, model, reasoning, signal)
-    );
-  }
-  /** Change direction: during a run it stops that run first (finished research stays), then follows the new focus. */
-  private async steerAim(from: { nodeId?: string | null; branchId?: string | null }, direction: string): Promise<void> {
-    if (this.notesLoading()) return;
-    if (this.aimBusy) {
-      this.aimController?.abort();
-      for (let waited = 0; this.aimBusy && waited < 30_000; waited += 100)
-        await new Promise(resolve => window.setTimeout(resolve, 100));
-      if (this.aimBusy) {
-        new Notice(t("ui.aim_research_already_running"));
-        return;
-      }
-    }
-    await this.runAimFollowup(from.nodeId ?? null, (mapPath, model, reasoning, signal) =>
-      this.aimManual.steer(mapPath, from, direction, model, reasoning, signal)
-    );
-  }
-  /** Runs one AIM follow-up from a node (or the topic) with the usual busy state, notices and refresh. */
-  private async runAimFollowup(
-    nodeId: string | null,
-    run: (mapPath: string, model: string, reasoning: unknown, signal: AbortSignal) => Promise<ManualResearchResult>
-  ): Promise<void> {
-    const topic = this.map?.nodes.find(item => item.aimKind === "topic");
-    const node = this.map?.nodes.find(item => item.id === nodeId) ?? topic;
-    const note = (node && this.notes.get(node.id)) ?? (topic && this.notes.get(topic.id));
-    if (this.closed || !node || !note || !this.path || !this.map?.aim) return;
-    if (this.aimBusy) {
-      new Notice(t("ui.aim_research_already_running"));
-      return;
-    }
-    const epoch = this.aimViewEpoch,
-      mapPath = this.path,
-      controller = new AbortController();
-    this.aimBusy = true;
-    this.aimController = controller;
-    this.aimActiveQuestionNodeId = node.id;
-    this.aimActivityKind = "research";
-    this.render();
-    try {
-      const outcome = await run(mapPath, note.model, note.reasoning, controller.signal);
-      this.noticeDocumentReadyElsewhere(outcome.status, epoch, mapPath);
-      if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      this.map = await this.plugin.repo.readMap(mapPath);
-      await this.hydrate(() => this.aimViewIsCurrent(epoch, mapPath));
-      if (outcome.status === "completed") showDocumentReady();
-      else if (outcome.status === "partial") new Notice(t("ui.aim_research_partial"));
-      else if (outcome.status === "waiting-user") new Notice(t("ui.aim_waiting_user"));
-    } catch (error) {
-      if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new Notice(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (this.aimController === controller) {
-        this.aimBusy = false;
-        this.aimController = null;
-        this.aimActiveQuestionNodeId = null;
-        this.aimActivityKind = null;
-        if (this.aimViewIsCurrent(epoch, mapPath)) {
-          this.render();
-          this.syncOutline();
-        }
-      }
-    }
-  }
-  private async planAimFromSelection(nodeId = this.selection.state.selected): Promise<void> {
-    if (this.notesLoading()) return;
-    const node = this.map?.nodes.find(item => item.id === nodeId);
-    if (this.closed || !node || !this.path || !this.map?.aim || this.aimBusy) return;
-    const epoch = this.aimViewEpoch,
-      mapPath = this.path,
-      controller = new AbortController();
-    const contentLanguage = resolveAimContentLanguage(this.map, this.plugin.settings.language);
-    const parentBranchId =
-      this.map.aim.branches.find(branch => branch.results.some(result => result.nodeId === node.id))?.id ?? null;
-    this.aimBusy = true;
-    this.aimController = controller;
-    this.aimActiveQuestionNodeId = node.id;
-    this.aimActivityKind = "planning";
-    this.render();
-    try {
-      const rootNote = this.notes.get(node.id);
-      if (node.aimKind === "topic" && rootNote && !rootNote.detail.includes("<!-- aim-intake-complete -->")) {
-        this.aimActivityKind = "clarifying";
-        this.render();
-        const questions = await this.aimManual.prepareClarification(rootNote, contentLanguage, controller.signal);
-        if (!this.aimViewIsCurrent(epoch, mapPath) || controller.signal.aborted) return;
-        if (questions.length) {
-          new AimClarificationModal(
-            this.app,
-            questions,
-            async answers => {
-              if (!this.aimViewIsCurrent(epoch, mapPath)) throw new Error("Reopen the original AIM map to continue.");
-              await this.plugin.mutate(async () => {
-                const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-                if (!latest.detail.includes("<!-- aim-intake-complete -->")) {
-                  await this.plugin.repo.updateNote(
-                    node.path,
-                    {
-                      detail:
-                        latest.detail +
-                        "\n\n<!-- aim-intake-complete -->\n## " +
-                        translateNote(contentLanguage, "note.aim_initial_clarification") +
-                        "\n\n" +
-                        answers
-                    },
-                    { contentLanguage: noteLanguageOf(contentLanguage) }
-                  );
-                }
-              });
-              await this.hydrate();
-              void this.planAimFromSelection(node.id);
-            },
-            this.plugin.settings.language,
-            contentLanguage
-          ).open();
-          return;
-        }
-        await this.plugin.mutate(async () => {
-          const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          await this.plugin.repo.updateNote(
-            node.path,
-            { detail: latest.detail + "\n\n<!-- aim-intake-complete -->" },
-            { contentLanguage: noteLanguageOf(contentLanguage) }
-          );
-        });
-        await this.hydrate();
-      }
-      this.aimActivityKind = "planning";
-      this.render();
-      const result = await this.planAimQuestion(node.id, randomUUID(), parentBranchId, controller.signal);
-      this.noticeDocumentReadyElsewhere(
-        result.status === "question" ? undefined : result.outcome?.status,
-        epoch,
-        mapPath
-      );
-      if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (result.status === "question") {
-        this.selection.setSelected(result.node.id);
-        this.render();
-        this.focusNode(result.node);
-        new Notice(t("ui.aim_question_ready"));
-      } else if (result.outcome) {
-        const outcome = result.outcome;
-        if (outcome.status === "partial") new Notice(t("ui.aim_research_partial"));
-        else if (outcome.status === "waiting-user") {
-          const question = this.map?.nodes.find(item => item.id === outcome.questionNodeId);
-          if (question) {
-            this.selection.setSelected(question.id);
-            this.render();
-            this.focusNode(question);
-          }
-          new Notice(t("ui.aim_waiting_user"));
-        } else if (outcome.status === "completed") showDocumentReady();
-        else if (outcome.status === "in-progress") new Notice(t("ui.aim_research_already_running"));
-        else new Notice(t("ui.aim_research_result_stale"));
-      } else new Notice(t("ui.aim_no_question_needed"));
-    } catch (error) {
-      if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new Notice(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (this.aimController === controller) {
-        this.aimBusy = false;
-        this.aimController = null;
-        this.aimActiveQuestionNodeId = null;
-        this.aimActivityKind = null;
-        if (this.aimViewIsCurrent(epoch, mapPath)) this.render();
-      }
-    }
-  }
-  private async retryAimFromSavedReport(questionNodeId: string): Promise<void> {
-    const target = this.aimFailedReports.get(questionNodeId),
-      mapPath = this.path,
-      epoch = this.aimViewEpoch;
-    if (this.closed || !target || !mapPath || !this.map?.aim || this.aimBusy) return;
-    const run = this.map.aim.runs.find(item => item.id === target.runId);
-    const currentAttempt = run?.attempts.find(item => item.id === run.currentAttemptId);
-    const branch = run && this.map.aim.branches.find(item => item.id === run.branchId);
-    if (!run || currentAttempt?.status !== "failed" || branch?.questionNodeId !== questionNodeId) {
-      this.aimFailedReports.delete(questionNodeId);
-      this.render();
-      return;
-    }
-    const controller = new AbortController();
-    this.aimBusy = true;
-    this.aimController = controller;
-    this.aimActiveQuestionNodeId = questionNodeId;
-    this.aimActivityKind = "research";
-    this.render();
-    try {
-      const result = await this.reviewAimFailedReport(target.runId, target.diagnosticNotePath, controller.signal);
-      this.noticeDocumentReadyElsewhere(result.status, epoch, mapPath);
-      if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (result.status === "waiting-user") {
-        const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
-        if (question) {
-          this.selection.setSelected(question.id);
-          this.render();
-          this.focusNode(question);
-        }
-        new Notice(t("ui.aim_waiting_user"));
-      } else if (result.status === "partial") new Notice(t("ui.aim_research_partial"));
-      else if (result.status === "completed") showDocumentReady();
-      else if (result.status === "in-progress") new Notice(t("ui.aim_research_already_running"));
-      else new Notice(t("ui.aim_research_result_stale"));
-    } catch (error) {
-      if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new Notice(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (this.aimController === controller) {
-        this.aimBusy = false;
-        this.aimController = null;
-        this.aimActiveQuestionNodeId = null;
-        this.aimActivityKind = null;
-        if (this.aimViewIsCurrent(epoch, mapPath)) this.render();
-      }
-    }
-  }
-  private async continueAimResearch(questionNodeId: string, runId: string, timeoutMs?: number): Promise<void> {
-    if (this.notesLoading()) return;
-    const mapPath = this.path,
-      epoch = this.aimViewEpoch;
-    if (this.closed || !mapPath || !this.map?.aim || this.aimBusy) return;
-    const run = this.map.aim.runs.find(item => item.id === runId);
-    const branch = run && this.map.aim.branches.find(item => item.id === run.branchId);
-    if (!run || branch?.questionNodeId !== questionNodeId) return;
-    const controller = new AbortController();
-    this.aimBusy = true;
-    this.aimController = controller;
-    this.aimActiveQuestionNodeId = questionNodeId;
-    this.aimActivityKind = "research";
-    this.render();
-    const isCurrent = () => this.aimViewIsCurrent(epoch, mapPath) && this.aimController === controller;
-    try {
-      if (timeoutMs && branch)
-        await this.plugin.mutate(() => this.aimRuns.configureRetryTimeout(mapPath, branch.id, timeoutMs));
-      const result = await this.aimManual.continuePartial(
-        mapPath,
-        runId,
-        this.notes.get(questionNodeId)?.model,
-        this.notes.get(questionNodeId)?.reasoning,
-        controller.signal
-      );
-      this.noticeDocumentReadyElsewhere(result.status, epoch, mapPath);
-      if (!isCurrent()) return;
-      // Select the new question so the toolbar answers it, not the previously selected one; the finally block re-renders after reloading the map.
-      if (result.status === "waiting-user") {
-        this.selection.setSelected(result.questionNodeId);
-        new Notice(t("ui.aim_waiting_user"));
-      } else if (result.status === "partial") new Notice(t("ui.aim_research_partial"));
-      else if (result.status === "completed") showDocumentReady();
-      else if (result.status === "in-progress") new Notice(t("ui.aim_research_already_running"));
-    } catch (error) {
-      if (!isCurrent()) return;
-      new Notice(
-        controller.signal.aborted
-          ? t("ui.research_stopped_existing_content_was_preserved")
-          : error instanceof Error
-            ? error.message
-            : String(error)
-      );
-    } finally {
-      if (this.aimController === controller) {
-        try {
-          if (this.aimViewIsCurrent(epoch, mapPath)) {
-            const latest = await this.plugin.repo.readMap(mapPath);
-            if (isCurrent()) {
-              this.map = latest;
-              await this.hydrate(isCurrent);
-            }
-          }
-        } catch (error) {
-          if (isCurrent()) new Notice(error instanceof Error ? error.message : String(error));
-        } finally {
-          if (this.aimController === controller) {
-            this.aimBusy = false;
-            this.aimController = null;
-            this.aimActiveQuestionNodeId = null;
-            this.aimActivityKind = null;
-            if (this.aimViewIsCurrent(epoch, mapPath)) {
-              this.render();
-              this.syncOutline();
-            }
-          }
-        }
-      }
-    }
-  }
-  private openAimAnswer(node: MapNode): void {
-    const contract = node.aimQuestion,
-      note = this.notes.get(node.id);
-    if (this.closed || !contract || !note || this.aimBusy) return;
-    const epoch = this.aimViewEpoch,
-      mapPath = this.path,
-      requestId = contract.requestId;
-    if (mapPath && (this.map?.aim?.branches.filter(branch => branch.questionNodeId === node.id).length ?? 0) > 1) {
-      void this.plugin
-        .mutate(async () => {
-          const repaired = await this.aimRuns.recoverAnswerBranches(mapPath);
-          if (!repaired || !this.aimViewIsCurrent(epoch, mapPath)) return;
-          this.map = await this.plugin.repo.readMap(mapPath);
-          await this.hydrate(() => this.aimViewIsCurrent(epoch, mapPath));
-          if (!this.aimViewIsCurrent(epoch, mapPath)) return;
-          this.render();
-          const current = this.map?.nodes.find(item => item.id === node.id);
-          if (current) this.openAimAnswer(current);
-        })
-        .catch(error => {
-          if (this.aimViewIsCurrent(epoch, mapPath)) new Notice(error instanceof Error ? error.message : String(error));
-        });
-      return;
-    }
-    new AimAnswerModal(
-      this.app,
-      note.summary,
-      contract.options,
-      async input => {
-        const currentQuestion = this.map?.nodes.find(item => item.id === node.id);
-        if (
-          !this.aimViewIsCurrent(epoch, mapPath) ||
-          currentQuestion?.aimQuestion?.requestId !== requestId ||
-          this.aimBusy
-        )
-          return;
-        const controller = new AbortController();
-        this.aimBusy = true;
-        this.aimController = controller;
-        this.aimActiveQuestionNodeId = node.id;
-        this.aimActivityKind = "research";
-        this.render();
-        try {
-          const result = await this.submitAimAnswer(node.id, input, controller.signal);
-          if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-          this.aimAnswerRequestIds.delete(node.id);
-          if (result.status === "waiting-user") {
-            const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
-            if (question) {
-              this.selection.setSelected(question.id);
-              this.render();
-              this.focusNode(question);
-            }
-            new Notice(t("ui.aim_waiting_user"));
-          } else if (result.status === "partial") new Notice(t("ui.aim_research_partial"));
-          else if (result.status === "completed") showDocumentReady();
-          else if (result.status === "in-progress") new Notice(t("ui.aim_research_already_running"));
-          else new Notice(t("ui.aim_research_result_stale"));
-        } catch (error) {
-          if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) throw error;
-          this.aimAnswerRequestIds.set(node.id, input.requestId);
-          if (controller.signal.aborted) new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-          else new Notice(error instanceof Error ? error.message : String(error));
-          throw error;
-        } finally {
-          if (this.aimController === controller) {
-            this.aimBusy = false;
-            this.aimController = null;
-            this.aimActiveQuestionNodeId = null;
-            this.aimActivityKind = null;
-            if (this.aimViewIsCurrent(epoch, mapPath)) this.render();
-          }
-        }
-      },
-      this.aimAnswerRequestIds.get(node.id) ?? randomUUID()
-    ).open();
-  }
   changed(file: TFile): void {
     if (file.path !== this.path && !this.map?.nodes.some(node => node.path === file.path)) return;
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
@@ -7701,18 +6774,6 @@ export class VisualAgentMapView extends ItemView {
         this.render();
       });
     }, 400);
-  }
-  /** Whether this view is running or saving AIM work for the map at `path`. */
-  hasActiveAimWork(path: string): boolean {
-    return (
-      this.path === path &&
-      aimEnabled() &&
-      !!this.map?.aim &&
-      (this.aimBusy ||
-        this.map.aim.runs.some(run =>
-          run.attempts.some(attempt => attempt.status === "running" || attempt.status === "saving")
-        ))
-    );
   }
   /**
    * After "Organize workspace folders" or a file-explorer rename moved maps: follow the open map to its new path (the
@@ -7791,62 +6852,9 @@ export class VisualAgentMapView extends ItemView {
       void this.plugin.openMapInNewTab(path).catch(error => errorNotice(error));
     else this.enqueue(() => this.openMapInMutation(path));
   }
-  /** The three ways to start a map sit together, so none reads as the only or the hidden option. */
-  private openNewMapMenu(event: MouseEvent): void {
-    // One entry would be a menu with one row: the button itself makes the map.
-    if (!aimEnabled()) {
-      this.openNewMindMapModal();
-      return;
-    }
-    const menu = this.newMenu();
-    menu.addItem(item =>
-      item
-        .setTitle(t("ui.new_mind_map"))
-        .setIcon("file-plus")
-        .onClick(() => this.openNewMindMapModal())
-    );
-    menu.addItem(item =>
-      item
-        .setTitle(t("ui.aim_create_map"))
-        .setIcon("route")
-        .onClick(() => this.openAimStart())
-    );
-    menu.showAtMouseEvent(event);
-  }
-  /** Research coverage is the map's headline fact: how much of the frontier already has a conclusion. */
-  private onAimProgress(event: AimProgressEvent): void {
-    if (this.closed || event.mapPath !== this.path) return;
-    this.ensureAimBranchModel(event.branchId);
-    let structural = false;
-    if (event.kind === "plan") {
-      this.aimProgress = {
-        branchId: event.branchId,
-        stage: "research",
-        startedAt: this.aimProgress?.branchId === event.branchId ? this.aimProgress.startedAt : Date.now(),
-        targets: new Map(
-          event.targets.map(target => [target.id, { title: target.title, state: "queued", searches: 0 }])
-        )
-      };
-      structural = true;
-    } else if (!this.aimProgress || this.aimProgress.branchId !== event.branchId) {
-      if (event.kind !== "stage") return;
-      this.aimProgress = { branchId: event.branchId, stage: event.stage, startedAt: Date.now(), targets: new Map() };
-      structural = true;
-    } else if (event.kind === "subtopic") {
-      const target = this.aimProgress.targets.get(event.subtopicId);
-      if (!target) return;
-      if (target.state !== event.state) {
-        structural = true;
-        target.state = event.state;
-        if (event.state === "searching") target.startedAt = Date.now();
-      }
-      if (event.searches !== undefined) target.searches = event.searches;
-      this.aimProgress.stage = "research";
-    } else {
-      this.aimProgress.stage = event.stage;
-    }
-    if (this.aimProgressTimer === null) this.aimProgressTimer = window.setInterval(() => this.paintAimProgress(), 1000);
-    if (structural) this.scheduleAimProgressRender();
+  /** The New map button: one way to start a map, so the button makes it at once (no one-row menu). */
+  private openNewMapMenu(_event: MouseEvent): void {
+    this.openNewMindMapModal();
   }
   /** True while the user is typing in a text field of the view. The chat field counts only during IME composition (as in changed()). */
   private typingInField(): boolean {
@@ -7854,107 +6862,6 @@ export class VisualAgentMapView extends ItemView {
     return this.chat?.isInput(active)
       ? this.chat.isComposing
       : this.contentEl.contains(active) && !!active?.matches("input, textarea, select");
-  }
-  private scheduleAimProgressRender(): void {
-    if (this.aimProgressRenderTimer !== null) return;
-    this.aimProgressRenderTimer = window.setTimeout(() => {
-      this.aimProgressRenderTimer = null;
-      if (this.closed) return;
-      // Like changed(): never interrupt a drag or an open input; try again shortly instead.
-      const typing = this.typingInField();
-      if (this.dragging || typing) this.scheduleAimProgressRender();
-      else this.renderPreservingFocus();
-    }, 300);
-  }
-  private stopAimProgress(): void {
-    this.aimProgress = null;
-    this.aimBranchModels.clear();
-    this.aimProgressEls.clear();
-    if (this.aimProgressTimer !== null) window.clearInterval(this.aimProgressTimer);
-    if (this.aimProgressRenderTimer !== null) window.clearTimeout(this.aimProgressRenderTimer);
-    this.aimProgressTimer = this.aimProgressRenderTimer = null;
-  }
-  private aimTargetText(target: AimTargetProgress): string {
-    if (target.state === "queued") return t("ui.aim_progress_queued");
-    if (target.state === "done") return t("ui.aim_progress_done");
-    if (target.state === "skipped") return t("ui.aim_progress_skipped");
-    return t(
-      "ui.aim_progress_searching_0_1",
-      target.searches,
-      Math.round((Date.now() - (target.startedAt ?? Date.now())) / 1000)
-    );
-  }
-  /** The branch root topic's resolved model, read once per branch (the cache answers every later event and tick). */
-  private ensureAimBranchModel(branchId: string): void {
-    if (this.aimBranchModels.has(branchId) || this.aimBranchModelPending.has(branchId)) return;
-    const branches = this.map?.aim?.branches ?? [];
-    let root = branches.find(item => item.id === branchId);
-    for (let depth = 0; root?.parentBranchId && depth < branches.length; depth++)
-      root = branches.find(item => item.id === root?.parentBranchId) ?? root;
-    const node = root && this.map?.nodes.find(item => item.id === root.questionNodeId);
-    if (!node) return;
-    this.aimBranchModelPending.add(branchId);
-    void this.plugin.repo
-      .resolveTopicModel(node.path, this.map ?? undefined)
-      .then(resolved => {
-        if (!this.closed && this.aimProgress) this.aimBranchModels.set(branchId, resolved.model);
-      })
-      .catch(() => {})
-      .finally(() => this.aimBranchModelPending.delete(branchId));
-  }
-  private aimStageText(): string {
-    const progress = this.aimProgress;
-    if (!progress) return "";
-    const elapsed = Math.round((Date.now() - progress.startedAt) / 1000);
-    const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
-    const targets = [...progress.targets.values()];
-    const stage =
-      progress.stage === "research" && targets.length
-        ? t(
-            "ui.aim_stage_research_0_1",
-            targets.filter(item => item.state === "done" || item.state === "skipped").length,
-            targets.length
-          )
-        : t(AIM_STAGE_KEYS[progress.stage] ?? "ui.aim_stage_research");
-    const model = this.aimBranchModels.get(progress.branchId);
-    const shown = model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(model)) : stage;
-    return t("ui.aim_stage_with_elapsed_0_1", shown, clock);
-  }
-  /** One-second tick: rewrite only the progress texts; stop when the run is over. */
-  private paintAimProgress(): void {
-    if (this.closed || !this.aimBusy || !this.aimProgress) {
-      if (!this.aimBusy) this.stopAimProgress();
-      return;
-    }
-    this.aimProgressEls.get("status")?.setText(this.aimStageText());
-    for (const [id, target] of this.aimProgress.targets)
-      this.aimProgressEls.get(id)?.setText(this.aimTargetText(target));
-  }
-  /** Cards for the planned subtopics whose research notes do not exist yet, beside their question. */
-  private renderAimPendingCards(shown: MapNode[]): void {
-    const progress = this.aimProgress;
-    if (!progress || !this.aimBusy || !this.stageEl || !aimEnabled() || !this.map?.aim) return;
-    const branch = this.map.aim.branches.find(item => item.id === progress.branchId);
-    const question = branch && shown.find(node => node.id === branch.questionNodeId);
-    if (!branch || !question) return;
-    const saved = new Set(branch.results.filter(item => item.kind === "research").map(item => item.subtopicId));
-    const children = shown.filter(node => node.parentId === question.id);
-    const x = children.length ? Math.max(...children.map(node => node.x)) : question.x + 420;
-    let y = children.length ? Math.max(...children.map(node => node.y)) + 150 : question.y;
-    for (const [id, target] of progress.targets) {
-      if (saved.has(id)) continue;
-      const card = this.stageEl.createDiv("vam-node vam-aim-pending");
-      card.dataset.status = target.state === "searching" ? "running" : target.state;
-      card.style.left = `${x}px`;
-      card.style.top = `${y}px`;
-      card.setAttr("aria-hidden", "true");
-      card.createEl("strong", { text: target.title });
-      this.aimProgressEls.set(
-        id,
-        card.createEl("p", { cls: "vam-aim-pending-state", text: this.aimTargetText(target) })
-      );
-      y += 120;
-    }
   }
   /** Speaks a stage (or the slow notice) once, when it changes. The streaming preview never goes through here. */
   private announceResearchStage(path: string): void {
@@ -8346,12 +7253,6 @@ export class VisualAgentMapView extends ItemView {
     const before = clone(this.map),
       ids = branch ? new Set([node.id, ...descendants(before.nodes, node.id)]) : new Set([node.id]);
     if (!this.mergeUnlocked(adopterId ? [...ids, adopterId] : ids)) return;
-    const removableQuestions = new Set(
-      node.aimKind === "question"
-        ? before.nodes.filter(item => ids.has(item.id) && item.aimKind === "question").map(item => item.id)
-        : []
-    );
-    this.assertAimReferencesRemain(before, ids, false, removableQuestions);
     const removed = before.nodes.filter(item => ids.has(item.id)),
       parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned");
     const tx = this.beginMapTransaction();
@@ -8360,7 +7261,6 @@ export class VisualAgentMapView extends ItemView {
       if (this.app.vault.getAbstractFileByPath(item.path)) tx.park(item.path, parkFolder, before.id, "unassigned");
     const entry = await tx
       .editMap(this.path, map => {
-        const prior = clone(map);
         const adopted = new Set<string>();
         if (adopterId)
           for (const item of map.nodes)
@@ -8383,7 +7283,6 @@ export class VisualAgentMapView extends ItemView {
           if (adopter) adopter.collapsed = false;
           this.arrangeBranch(map, adopterId, adopted, undefined);
         }
-        this.removeAimReferences(map, ids, prior.nodes);
       })
       .commit();
     this.selection.afterRemove();
@@ -8434,7 +7333,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
   private openMerge(): void {
-    if (!this.map || this.aimLive() || this.mergeOpen || !this.selection.state.multiSelected.size) return;
+    if (!this.map || this.mergeOpen || !this.selection.state.multiSelected.size) return;
     // One AI merge per map: a running one is only reported.
     if (this.mergeTasks.has(this.path)) {
       new Notice(t("ui.merge_locked"));
@@ -8831,7 +7730,7 @@ export class VisualAgentMapView extends ItemView {
     const stale = (): never => {
       throw new Error(t("ui.merge_draft_stale"));
     };
-    if (this.closed || !this.map || this.aimLive() || this.path !== snapshot.path || this.map.id !== snapshot.mapId) {
+    if (this.closed || !this.map || this.path !== snapshot.path || this.map.id !== snapshot.mapId) {
       if (content) stale();
       return;
     }
@@ -9175,7 +8074,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private removeByKey(node: MapNode): void {
     const map = this.map;
-    if (!map || this.aimLive(map)) return;
+    if (!map) return;
     if (map.nodes.some(item => item.parentId === node.id)) {
       this.confirmRemoveNode(node);
       return;
@@ -9213,15 +8112,11 @@ export class VisualAgentMapView extends ItemView {
       t("ui.remove_from_map"),
       t("ui.the_note_will_move_to_this_topic_s_unassigned_folder_you_can"),
       [
-        ...(!this.aimLive() || node.aimKind !== "question"
-          ? [
-              {
-                label: t("ui.remove_only_this_node_children_become_roots"),
-                warning: true,
-                action: () => run(() => this.removeToUnassigned(node, false))
-              }
-            ]
-          : []),
+        {
+          label: t("ui.remove_only_this_node_children_become_roots"),
+          warning: true,
+          action: () => run(() => this.removeToUnassigned(node, false))
+        },
         {
           label: t("ui.remove_entire_branch"),
           warning: true,
@@ -9233,7 +8128,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Free images only change on a map the user may edit: not AIM, not while picking topics. */
   private canEditCanvasItems(): boolean {
-    return !this.notesLoading() && !this.selection.state.multiSelectMode && !this.aimLive();
+    return !this.notesLoading() && !this.selection.state.multiSelectMode;
   }
   /**
    * Draws the map's free images in one layer at the end of the stage, so Tab reaches them after the topic cards and
@@ -10207,7 +9102,7 @@ export class VisualAgentMapView extends ItemView {
       promote.addEventListener("keydown", event => event.stopPropagation());
       promote.addEventListener("dblclick", event => event.stopPropagation());
       // A block that hangs on a topic has a + like a card: it adds a topic that follows the block (not on a free block).
-      if (!free && !this.selection.state.multiSelectMode && !this.aimLive()) {
+      if (!free && !this.selection.state.multiSelectMode) {
         const add = el.createEl("button", {
           cls: "vam-text-add",
           text: "+",
@@ -10821,7 +9716,7 @@ export class VisualAgentMapView extends ItemView {
    * item goes away. Built from the normal add-subtopic flow; the whole thing is one undo step.
    */
   private async promoteTextNode(id: string): Promise<void> {
-    if (!this.map || !this.canEditText() || this.aimLive()) return;
+    if (!this.map || !this.canEditText()) return;
     const text = (this.map.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === id);
     if (!text) return;
     const parent = this.map.nodes.find(node => node.id === text.parentId) ?? null;
@@ -11067,7 +9962,7 @@ export class VisualAgentMapView extends ItemView {
   // ---- Summary brackets (summary-bracket plan, decisions #1, #2, #4) -------------------------------------------------
   /** Brackets change on a map the user may edit (topic selection mode included, where they are created), never while presenting. */
   private canEditSummary(): boolean {
-    return !!this.map && !this.notesLoading() && !this.aimLive() && !this.presentation;
+    return !!this.map && !this.notesLoading() && !this.presentation;
   }
   /** The rectangles of the cards drawn for a run of siblings and everything shown under them; null when none is drawn (folded away). */
   private summaryGeometry(parentId: string, range: readonly string[], text?: string): BracketResult | null {
@@ -11461,7 +10356,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Frames the given topics (ids that are cards of this map, deduplicated) with an optional label; one undo step. Returns the new id. */
   private async addBoundary(ids: readonly string[], label: string): Promise<string | null> {
-    if (!this.map || this.aimLive()) return null;
+    if (!this.map) return null;
     const known = new Set(this.map.nodes.map(node => node.id)),
       members = [...new Set(ids)].filter(id => known.has(id));
     if (!members.length) return null;
@@ -11478,7 +10373,7 @@ export class VisualAgentMapView extends ItemView {
   /** The selection bar's "Add frame": asks for the optional label, then frames the selected topics. */
   private openAddBoundary(): void {
     const ids = [...this.selection.state.multiSelected];
-    if (!this.map || this.aimLive() || !ids.length) return;
+    if (!this.map || !ids.length) return;
     new NameModal(
       this.app,
       t("ui.canvas_boundary_name"),
@@ -11837,7 +10732,7 @@ export class VisualAgentMapView extends ItemView {
           .onClick(() => this.whenEditing(action))
       );
     };
-    if (!this.aimLive()) add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
+    add(t("ui.ai_explore"), "sparkles", () => this.openTopicChat(node));
     add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
     add(t("ui.card_menu_add_sibling"), "list-plus", () =>
       this.enqueue(() => this.addNode(map.nodes.find(item => item.id === node.parentId) ?? null))
@@ -11906,7 +10801,6 @@ export class VisualAgentMapView extends ItemView {
       return false;
     if (
       this.selection.state.multiSelectMode ||
-      this.aimLive() ||
       this.notesLoading() ||
       this.presentation ||
       !this.map?.nodes.some(item => item.parentId === node.id)
@@ -11937,7 +10831,7 @@ export class VisualAgentMapView extends ItemView {
         const menu = this.newMenu(cardId);
         // One topic outside topic selection: the card's own actions come first, in groups (the toolbar's actions).
         const topic = ids.length === 1 ? this.map?.nodes.find(item => item.id === cardId) : undefined;
-        const single = topic && !isAimNode(topic) && !this.selection.state.multiSelectMode ? topic : undefined;
+        const single = topic && !this.selection.state.multiSelectMode ? topic : undefined;
         if (single) this.addCardMenuActions(menu, single);
         menu.addItem(item =>
           item
@@ -11946,7 +10840,7 @@ export class VisualAgentMapView extends ItemView {
             .onClick(() => this.addSummaryOver(ids))
         );
         // One topic only; the AIM conclusion cards have their own style row in the settings.
-        if (topic && !isAimNode(topic))
+        if (topic)
           menu.addItem(item =>
             item
               .setTitle(t("ui.note_style_menu"))
@@ -12121,17 +11015,12 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map) return;
     const before = clone(this.map),
       ids = new Set<string>();
-    const roots = this.selectedRoots(),
-      removableQuestions = new Set<string>();
+    const roots = this.selectedRoots();
     for (const root of roots) {
       const branchIds = new Set([root.id, ...descendants(before.nodes, root.id)]);
       for (const id of branchIds) ids.add(id);
-      if (root.aimKind === "question")
-        for (const item of before.nodes)
-          if (branchIds.has(item.id) && item.aimKind === "question") removableQuestions.add(item.id);
     }
     if (!this.mergeUnlocked(ids)) return;
-    this.assertAimReferencesRemain(before, ids, false, removableQuestions);
     const removed = before.nodes.filter(node => ids.has(node.id)),
       parkFolder = this.plugin.repo.topicFolder(this.path, "Unassigned"),
       viewport = clone(this.map.viewport);
@@ -12143,11 +11032,9 @@ export class VisualAgentMapView extends ItemView {
         .editMap(this.path, map => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen.
           map.viewport = clone(viewport);
-          const prior = clone(map);
           map.nodes = map.nodes.filter(node => !ids.has(node.id));
           removeRelationsForTopics(map, ids);
           this.dropTextLinks(map, ids);
-          this.removeAimReferences(map, ids, prior.nodes);
         })
         .commit();
     } catch (error) {
@@ -12188,7 +11075,6 @@ export class VisualAgentMapView extends ItemView {
   private async moveBranches(roots: MapNode[], target: MapNode | null, clearSelection = true): Promise<void> {
     if (!this.map) return;
     if (!this.mergeUnlocked([...(target ? [target.id] : []), ...roots.map(root => root.id)])) return;
-    this.assertAimReferencesRemain(this.map, new Set(roots.map(root => root.id)), true);
     await this.mapChange(map => {
       const moved = new Set<string>();
       const branchOf = new Map<string, Set<string>>();
@@ -12212,91 +11098,6 @@ export class VisualAgentMapView extends ItemView {
     });
     this.selection.afterMove(clearSelection);
     this.render();
-  }
-  private assertAimReferencesRemain(
-    map: MapDocument,
-    ids: Set<string>,
-    moving = false,
-    removableQuestionNodeIds = new Set<string>()
-  ): void {
-    const data = map.aim;
-    if (!data || !aimEnabled()) return;
-    const protectedIds = new Set<string>();
-    const removableBranchIds = new Set(
-      data.branches.filter(branch => removableQuestionNodeIds.has(branch.questionNodeId)).map(branch => branch.id)
-    );
-    for (const branch of data.branches) {
-      if (!removableBranchIds.has(branch.id)) {
-        protectedIds.add(branch.questionNodeId);
-        for (const result of branch.results) protectedIds.add(result.nodeId);
-      }
-    }
-    for (const draft of data.resultDrafts ?? [])
-      if (!removableBranchIds.has(draft.branchId)) protectedIds.add(draft.nodeId);
-    for (const pending of data.pendingCommits)
-      if (!removableBranchIds.has(pending.branchId)) protectedIds.add(pending.nodeId);
-    if (
-      data.questionDraft &&
-      (ids.has(data.questionDraft.parentId) || removableBranchIds.has(data.questionDraft.parentBranchId ?? ""))
-    )
-      throw new Error("A AIM question is still being saved and cannot be removed yet.");
-    if (
-      (data.resultDrafts ?? []).some(draft => removableBranchIds.has(draft.branchId)) ||
-      data.pendingCommits.some(commit => removableBranchIds.has(commit.branchId))
-    )
-      throw new Error("A AIM result is still being saved and cannot be removed yet.");
-    if ([...ids].some(id => protectedIds.has(id)))
-      throw new Error(
-        moving
-          ? "AIM question and result nodes referenced by saved branches cannot be moved."
-          : "AIM question and result nodes referenced by saved branches cannot be removed."
-      );
-    for (const run of data.runs)
-      if (
-        removableBranchIds.has(run.branchId) &&
-        run.attempts.some(attempt => attempt.status === "running" || attempt.status === "saving")
-      )
-        throw new Error("A AIM branch is still running and cannot be removed yet.");
-  }
-  private removeAimReferences(
-    map: MapDocument,
-    removedNodeIds: Set<string>,
-    originalNodes: MapNode[] = map.nodes
-  ): void {
-    const data = map.aim;
-    if (!data || !aimEnabled()) return;
-    for (const question of originalNodes.filter(node => removedNodeIds.has(node.id) && node.aimQuestion)) {
-      const parent = map.nodes.find(node => node.id === question.parentId && !removedNodeIds.has(node.id));
-      if (parent)
-        parent.aimDismissedQuestionRequestIds = [
-          ...new Set([...(parent.aimDismissedQuestionRequestIds ?? []), question.aimQuestion!.requestId])
-        ];
-    }
-    const removedBranchIds = new Set(
-      data.branches.filter(branch => removedNodeIds.has(branch.questionNodeId)).map(branch => branch.id)
-    );
-    data.branches = data.branches.filter(branch => !removedBranchIds.has(branch.id));
-    for (const branch of data.branches)
-      if (branch.parentBranchId && removedBranchIds.has(branch.parentBranchId)) branch.parentBranchId = null;
-    data.runs = data.runs.filter(run => !removedBranchIds.has(run.branchId));
-    if (data.resultDrafts)
-      data.resultDrafts = data.resultDrafts.filter(
-        draft => !removedBranchIds.has(draft.branchId) && !removedNodeIds.has(draft.nodeId)
-      );
-    data.pendingCommits = data.pendingCommits.filter(
-      commit => !removedBranchIds.has(commit.branchId) && !removedNodeIds.has(commit.nodeId)
-    );
-    if (
-      data.questionDraft &&
-      (removedNodeIds.has(data.questionDraft.parentId) || removedBranchIds.has(data.questionDraft.parentBranchId ?? ""))
-    )
-      delete data.questionDraft;
-    for (const node of map.nodes) {
-      if (node.aimConvergesFromNodeIds)
-        node.aimConvergesFromNodeIds = node.aimConvergesFromNodeIds.filter(id => !removedNodeIds.has(id));
-      if (node.aimQuestion?.parentBranchId && removedBranchIds.has(node.aimQuestion.parentBranchId))
-        node.aimQuestion.parentBranchId = null;
-    }
   }
   private async copySelected(target: MapNode): Promise<void> {
     await this.copyBranches(this.selectedRoots(), target, {});
@@ -12489,12 +11290,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** True when branches cannot be changed here: integration mode, AIM, or no saved map. */
   private clipboardReadOnly(): boolean {
-    return (
-      this.notesLoading() ||
-      this.selection.state.multiSelectMode ||
-      !!this.aimLive() ||
-      this.outlineImportTarget().map !== "editable"
-    );
+    return this.notesLoading() || this.selection.state.multiSelectMode || this.outlineImportTarget().map !== "editable";
   }
   private copyToClipboard(event: ClipboardEvent, mode: "copy" | "cut"): void {
     const map = this.map;
@@ -12858,7 +11654,6 @@ export class VisualAgentMapView extends ItemView {
     const found = resolveCrossSource(payload, record, sourceMap);
     const problem = cutSourceProblem(sourceMap, record, found);
     if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
-    if (problem === "aim") return refuse("ui.clipboard_cut_cross_unsupported");
     if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
     if (found.branch.some(node => this.plugin.topicRuns.isBusy(node.path))) return refuse("ui.merge_locked");
     return found;
@@ -12877,15 +11672,7 @@ export class VisualAgentMapView extends ItemView {
     const assertSource = (sourceMap: MapDocument): void => {
       const problem = cutSourceProblem(sourceMap, record, resolveCrossSource(payload, record, sourceMap));
       if (problem)
-        throw new Error(
-          t(
-            problem === "aim"
-              ? "ui.clipboard_cut_cross_unsupported"
-              : problem === "gone"
-                ? "ui.clipboard_cut_missing"
-                : "ui.clipboard_cut_cross_changed"
-          )
-        );
+        throw new Error(t(problem === "gone" ? "ui.clipboard_cut_missing" : "ui.clipboard_cut_cross_changed"));
     };
     return {
       snapshot: async () => {
@@ -13416,7 +12203,7 @@ export class VisualAgentMapView extends ItemView {
     add(t("ui.export_md_vault"), "file-down", "md", "vault");
     add(t("ui.export_md_download"), "download", "md", "download");
     // The one place for export and sharing (the command palette's "Share map as HTML" opens the same dialog).
-    if (this.map && !this.aimLive()) {
+    if (this.map) {
       menu.addSeparator();
       menu.addItem(item =>
         item
@@ -13835,7 +12622,7 @@ export class VisualAgentMapView extends ItemView {
   mapCommand(action: MapCommandAction, checking: boolean): boolean {
     const map = this.map;
     if (!map || this.closed) return false;
-    const editable = !this.aimLive(map) && !this.presentation && !this.selection.state.multiSelectMode;
+    const editable = !this.presentation && !this.selection.state.multiSelectMode;
     const selected = map.nodes.find(node => node.id === this.selection.state.selected);
     const note = selected ? this.notes.get(selected.id) : undefined;
     const run = (applies: boolean, work: () => void): boolean => {
@@ -13887,8 +12674,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
     if (this.map && !this.map.aim && isManagedMapPath(this.plugin.settings, this.path))
       add(t("ui.duplicate_current_mind_map"), "copy", () => this.duplicateCurrentMap());
-    if (this.map && !this.aimLive())
-      add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
+    if (this.map) add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
     // Hand every hand-set tier back to the AI: only for a gradable map that has pins, and not while it is being graded.
     const pins = this.relevanceGradeable() ? this.relevancePinList().length : 0;
@@ -13913,25 +12699,8 @@ export class VisualAgentMapView extends ItemView {
       menu.showAtPosition({ x: rect?.right ?? 0, y: rect?.top ?? 0 });
     }
   }
-  private aimActiveForPath(path: string): boolean {
-    return this.app.workspace.getLeavesOfType(VIEW_TYPE).some(leaf => {
-      const view = leaf.view;
-      if (!(view instanceof VisualAgentMapView) || view.path !== path || !aimEnabled() || !view.map?.aim) return false;
-      return (
-        view.aimBusy ||
-        view.map.aim.runs.some(run => {
-          const attempt = run.attempts.find(item => item.id === run.currentAttemptId);
-          return attempt?.status === "running" || attempt?.status === "saving";
-        })
-      );
-    });
-  }
   private renameCurrentMap(): void {
     if (!this.map) return;
-    if (this.aimActiveForPath(this.path)) {
-      new Notice(t("ui.aim_research_already_running"));
-      return;
-    }
     new NameModal(this.app, t("ui.rename_mind_map"), this.map.title, title =>
       this.enqueue(() => this.renameMapTo(title))
     ).open();
@@ -13959,10 +12728,6 @@ export class VisualAgentMapView extends ItemView {
   /** Renames the open map (Map.md title and folder) as one undo step; shared by the dialog, the title field and the chat. */
   private async renameMapTo(title: string): Promise<void> {
     if (!this.map) return;
-    if (this.aimActiveForPath(this.path)) {
-      new Notice(t("ui.aim_research_already_running"));
-      return;
-    }
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
       new Notice(t("ui.legacy_map_view_only"));
       return;
@@ -14192,7 +12957,6 @@ export class VisualAgentMapView extends ItemView {
     this.anchorDragCancel?.(false);
     this.paintCount++;
     this.emptyMapEl = null;
-    this.aimProgressEls.clear();
     // The dragged card is about to be replaced, so its pointer events would never arrive and the drag would stay "on".
     this.dragCleanup?.();
     // A repaint replaces the text editor's textarea: keep what was typed and reopen it afterwards (not a blur commit).
@@ -14281,8 +13045,7 @@ export class VisualAgentMapView extends ItemView {
     switchMap.setAttr("title", t("ui.switch_mind_map"));
     setIcon(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switchMap.addEventListener("click", () => this.openMapSwitcher());
-    if (this.map && !this.aimLive() && this.map.nodes.length && !this.notesLoading())
-      this.renderResearchProgress(toolbar);
+    if (this.map && this.map.nodes.length && !this.notesLoading()) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
@@ -14307,120 +13070,13 @@ export class VisualAgentMapView extends ItemView {
         this.openMapActions(event)
       ).addClass("vam-map-actions-button");
     }
-    const selectedNode = this.map?.nodes.find(node => node.id === this.selection.state.selected);
-    if (aimEnabled() && this.map?.aim) {
-      const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
-      statusbar.setAttr("aria-live", "polite");
-      const data = this.map.aim;
-      const questions = this.map.nodes.filter(node => node.aimKind === "question");
-      const pendingQuestion = questions.find(
-        question => !data.branches.some(branch => branch.questionNodeId === question.id)
-      );
-      const runningBranch = data.branches.find(branch => {
-        const run = data.runs.find(item => item.branchId === branch.id);
-        const attempt = run?.attempts.find(item => item.id === run.currentAttemptId);
-        return attempt?.status === "running" || attempt?.status === "saving";
+    // The one line an old AIM map shows: AIM was removed, the map is an ordinary map now (no button, nothing to resume).
+    if (this.map?.aim)
+      this.contentEl.createDiv({
+        cls: "vam-aim-attribution",
+        text: t("ui.aim_removed_notice"),
+        attr: { role: "note" }
       });
-      let stateText: string;
-      let stateClass: string;
-      if (this.aimBusy) {
-        const activeTitle = this.notes.get(this.aimActiveQuestionNodeId ?? "")?.title ?? this.map.title;
-        const planning = this.aimActivityKind === "planning";
-        stateText =
-          this.aimActivityKind === "clarifying"
-            ? t("ui.aim_preparing_clarification")
-            : this.aimProgress
-              ? this.aimStageText()
-              : t(planning ? "ui.aim_status_planning_0" : "ui.aim_status_researching_0", activeTitle);
-        stateClass = "running";
-      } else if (runningBranch) {
-        const activeTitle = this.notes.get(runningBranch.questionNodeId)?.title ?? this.map.title;
-        stateText = t("ui.aim_status_researching_0", activeTitle);
-        stateClass = "running";
-      } else if (!questions.length) {
-        stateText = t("ui.aim_status_ready");
-        stateClass = "idea";
-      } else if (pendingQuestion) {
-        stateText = t("ui.aim_status_waiting_answer_0", this.notes.get(pendingQuestion.id)?.title ?? "");
-        stateClass = "idea";
-      } else if (data.branches.some(branch => branch.results.some(result => result.kind === "conclusion"))) {
-        stateText = t("ui.aim_status_complete");
-        stateClass = "completed";
-      } else {
-        stateText = t("ui.aim_status_exploring");
-        stateClass = "idea";
-      }
-      statusbar.createSpan({ cls: "vam-aim-status-title", text: "AIM" });
-      const stateEl = statusbar.createSpan({ cls: `vam-aim-status-value vam-status-${stateClass}`, text: stateText });
-      if (this.aimBusy && this.aimProgress) {
-        this.aimProgressEls.set("status", stateEl);
-        statusbar.createSpan({ cls: "vam-hint vam-aim-eta", text: t("ui.aim_eta_hint") });
-      }
-      if (this.aimBusy) {
-        this.button(statusbar, t("ui.stop_research"), () => {
-          this.aimController?.abort();
-        });
-        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: this.aimProgress?.branchId ?? null };
-        const steer = this.button(statusbar, t("ui.aim_steer"), () =>
-          new AimSteerModal(this.app, direction => void this.steerAim(from, direction)).open()
-        );
-        steer.setAttr("title", t("ui.aim_steer_hint"));
-      }
-      const attribution = this.contentEl.createDiv("vam-aim-attribution");
-      attribution.createSpan({ text: t("ui.aim_attribution") });
-      attribution.createEl("a", {
-        text: t("ui.aim_source_project"),
-        href: "https://github.com/InternLM/MindSearch",
-        attr: { target: "_blank", rel: "noopener noreferrer" }
-      });
-      attribution.createEl("a", {
-        text: t("ui.aim_source_paper"),
-        href: "https://arxiv.org/abs/2407.20183",
-        attr: { target: "_blank", rel: "noopener noreferrer" }
-      });
-    }
-    // The one line an old AIM map shows while AIM is hidden: no button, nothing to resume.
-    if (!aimEnabled() && this.map?.aim)
-      this.contentEl.createDiv({ cls: "vam-aim-attribution", text: t("ui.aim_paused_notice"), attr: { role: "note" } });
-    if (aimEnabled() && this.map?.aim) {
-      const data = this.map.aim;
-      const isAnswered = (node: MapNode) => data.branches.some(branch => branch.questionNodeId === node.id);
-      const pending = this.map.nodes.find(node => node.aimKind === "question" && node.aimQuestion && !isAnswered(node));
-      const selectedQuestion =
-        selectedNode?.aimKind === "question" && selectedNode.aimQuestion ? selectedNode : undefined;
-      if (selectedQuestion || pending) {
-        const actions = toolbar.createDiv("vam-aim-actions");
-        // Answering an already answered question opens an alternative branch; label it so it is never mistaken for the pending question.
-        if (pending && pending.id !== selectedQuestion?.id)
-          this.button(
-            actions,
-            t("ui.aim_answer_pending_question"),
-            () => {
-              this.selection.setSelected(pending.id);
-              this.render();
-              this.focusNode(pending);
-              this.openAimAnswer(pending);
-            },
-            this.aimBusy
-          );
-        if (selectedQuestion)
-          this.button(
-            actions,
-            t(isAnswered(selectedQuestion) ? "ui.aim_answer_again_new_branch" : "ui.aim_answer_question"),
-            () => this.openAimAnswer(selectedQuestion),
-            this.aimBusy
-          );
-        if (selectedQuestion && this.aimFailedReports.has(selectedQuestion.id))
-          this.button(
-            actions,
-            t("ui.aim_retry_saved_report"),
-            () => {
-              void this.retryAimFromSavedReport(selectedQuestion.id);
-            },
-            this.aimBusy
-          );
-      }
-    }
     if (!this.map && (this.history.canUndo || this.history.canRedo)) {
       const undo = this.button(
         toolbar,
@@ -14506,24 +13162,23 @@ export class VisualAgentMapView extends ItemView {
         this.button(actions, t("ui.repair_agent_workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
-      if (aimEnabled()) this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
       if (this.deletedMap?.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       // Nothing to grade: an edit left open belongs to the map that is gone.
       this.dropGoalEdit();
       return;
     }
-    if (!this.aimLive()) this.renderMultiResearchStatus(this.contentEl);
-    // Goal grading stays off for an old AIM map while AIM is hidden (a source-text test pins this condition).
+    this.renderMultiResearchStatus(this.contentEl);
+    // Goal grading stays off for an old AIM map (a source-text test pins this condition).
     if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
-    if (!this.aimLive()) this.renderBackgroundBars(this.contentEl);
+    this.renderBackgroundBars(this.contentEl);
     this.renderArgumentRunBar(this.contentEl);
     // An empty map has nothing to select: leave topic selection (undo can empty a map while the bar is open).
     if (!this.map.nodes.length) {
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    if (this.map?.aim && !aimEnabled()) this.renderHiddenAimMapTools(tools);
+    if (this.map?.aim) this.renderHiddenAimMapTools(tools);
     else this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     // The workspace is a row: the chat window (put in first by mountMapChat) and the canvas.
@@ -14627,7 +13282,6 @@ export class VisualAgentMapView extends ItemView {
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();
-    this.renderAimPendingCards(shown);
     this.renderCanvasItems();
     if (this.focusNodeId) {
       this.restoringFocus = true;
@@ -14678,7 +13332,7 @@ export class VisualAgentMapView extends ItemView {
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   private emptyCanvasState(): "idle" | "building" | "consent" | "plan" {
     const chat = this.chat;
-    if (!chat || this.aimLive()) return "idle";
+    if (!chat) return "idle";
     // The usage notice is open (or about to open, while the request is prepared): nothing is built until the user agrees.
     if (
       chat.awaitingConsent ||
@@ -14693,7 +13347,7 @@ export class VisualAgentMapView extends ItemView {
     const state = this.emptyCanvasState();
     box.toggleClass("is-building", state === "building");
     box.toggleClass("is-waiting", state === "plan" || state === "consent");
-    box.toggleClass("is-add-first", state === "idle" && !this.aimLive());
+    box.toggleClass("is-add-first", state === "idle");
     if (state === "building") {
       // Three faint card outlines, no motion: the map is on its way.
       box.createSpan({ text: t("ui.map_chat_canvas_building") });
@@ -14707,10 +13361,6 @@ export class VisualAgentMapView extends ItemView {
     }
     if (state === "consent") {
       box.createSpan({ text: t("ui.map_chat_canvas_consent") });
-      return;
-    }
-    if (this.aimLive()) {
-      box.createSpan({ text: t("ui.aim_empty_map_hint") });
       return;
     }
     // The toolbar no longer adds topics, so the empty canvas carries the one button for it, in the top-left corner: a picture
@@ -14741,8 +13391,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.map.nodes.length) this.renderMapSourcesControl(tools);
   }
   /**
-   * The same tools on an old AIM map while AIM is hidden: it is an ordinary map then. A separate method so renderMapTools keeps
-   * its AIM guard for the day AIM comes back (a source-text test pins that guard).
+   * The tools on an old AIM map (AIM was removed): the select tool only, no goal or sources control. A separate method so
+   * renderMapTools keeps its AIM guard (a source-text test pins that guard).
    */
   private renderHiddenAimMapTools(tools: HTMLElement): void {
     if (!this.map) return;
@@ -14801,8 +13451,8 @@ export class VisualAgentMapView extends ItemView {
       String(node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id))
     );
     if (node.aimKind) card.setAttr("data-aim-kind", node.aimKind);
-    // AIM is hidden: the card keeps its AIM shape (data-aim-kind) but takes the ordinary card's colour and style (styles.css, .vam-aim-hidden).
-    if (node.aimKind && !aimEnabled()) card.addClass("vam-aim-hidden");
+    // An old AIM card keeps its AIM shape (data-aim-kind) but takes the ordinary card's colour and style (styles.css, .vam-aim-hidden).
+    if (node.aimKind) card.addClass("vam-aim-hidden");
     if (node.aimKind === "conclusion") {
       const background = createSvg("svg");
       background.addClass("vam-conclusion-background");
@@ -14869,33 +13519,7 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.topicRuns.isBusy(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
       this.startingTasks.has(node.path);
-    const doc = this.map,
-      aimData = doc?.aim;
-    // An AIM question, and the AIM root topic that owns the first branch, show the branch progress instead of note state.
-    const aimProgress =
-      aimEnabled() &&
-      !!aimData &&
-      (node.aimKind === "question" ||
-        (node.aimKind === "topic" &&
-          aimData.branches.some(branch => branch.questionNodeId === node.id && !branch.parentBranchId)));
-    if (doc && aimData && aimProgress) {
-      const status = aimQuestionStatus(doc, node.id, this.aimActiveQuestionNodeId);
-      const key: Record<AimQuestionStatus, TranslationKey> = {
-        running: "ui.aim_branch_running",
-        completed: "ui.aim_branch_completed",
-        partial: "ui.aim_branch_partial",
-        failed: "ui.aim_branch_failed",
-        cancelled: "ui.aim_branch_cancelled",
-        not_started: "ui.aim_branch_not_started"
-      };
-      header.createSpan({
-        cls: `vam-status vam-aim-question-status vam-status-${status === "running" ? "running" : status === "completed" ? "completed" : status === "not_started" ? "idea" : "error"}`,
-        text:
-          status === "not_started" && aimData.branches.some(branch => branch.questionNodeId === node.id)
-            ? t("ui.aim_answered_not_started")
-            : t(key[status])
-      });
-    } else if (!loading && (!isAimNode(node) || active || queued || !note || note.status !== "completed" || research)) {
+    if (!loading) {
       const statusText = research
         ? this.researchStageText(research)
         : merging
@@ -14924,7 +13548,7 @@ export class VisualAgentMapView extends ItemView {
         this.trackResearchElapsed(elapsedEl, research.startedAt);
         if (research.slow)
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
-      } else if (!note || note.status !== (isAimNode(node) ? "completed" : "idea") || active || queued) {
+      } else if (!note || note.status !== "idea" || active || queued) {
         const chip = header.createSpan({
           cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (note?.status ?? "error")}`,
           text: statusText
@@ -14984,8 +13608,8 @@ export class VisualAgentMapView extends ItemView {
     // The model tag follows the marker row (see paintModelTag).
     this.paintModelTag(card, header, note);
     // The topic colour comes last: its attribute and its name part (see paintCardColor).
-    this.paintCardColor(card, note, isAimNode(node));
-    this.paintCardStyle(card, note, isAimNode(node));
+    this.paintCardColor(card, note);
+    this.paintCardStyle(card, note);
     if (header) this.paintAiLock(card, header, node);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
@@ -15059,7 +13683,7 @@ export class VisualAgentMapView extends ItemView {
     if (research?.stage === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
     const pendingCount = this.plugin.topicRuns.pending(node.path)?.length ?? 0;
-    if (pendingCount && !this.selection.state.multiSelectMode && !this.aimLive())
+    if (pendingCount && !this.selection.state.multiSelectMode)
       this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () =>
         this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
@@ -15068,8 +13692,6 @@ export class VisualAgentMapView extends ItemView {
       note &&
       note.researchMode === "local" &&
       !this.selection.state.multiSelectMode &&
-      !this.aimLive() &&
-      !isAimNode(node) &&
       !active &&
       !queued &&
       !research &&
@@ -15084,7 +13706,6 @@ export class VisualAgentMapView extends ItemView {
     if (
       note?.status === "error" &&
       !this.selection.state.multiSelectMode &&
-      !isAimNode(node) &&
       !active &&
       !queued &&
       !research &&
@@ -15092,7 +13713,7 @@ export class VisualAgentMapView extends ItemView {
     )
       this.renderOtherProviderButton(header, [node]);
     const synthesis = this.synthesisTasks.get(node.path);
-    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !this.aimLive()) {
+    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
@@ -15125,48 +13746,6 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     if (!this.selection.state.multiSelectMode) {
-      if (
-        aimEnabled() &&
-        this.map?.aim &&
-        node.aimKind === "synthesis" &&
-        this.map.aim.branches.some(branch => branch.results.some(result => result.nodeId === node.id))
-      ) {
-        const next = this.button(
-          header,
-          t("ui.aim_new_question"),
-          () => void this.planAimFromSelection(node.id),
-          this.aimBusy
-        );
-        next.addClass("vam-node-tool", "vam-pinned-tool");
-        next.setAttr("aria-label", t("ui.aim_new_question_hint"));
-        next.setAttr("title", t("ui.aim_new_question_hint"));
-      }
-      const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (aimEnabled() && this.map?.aim && assumptions.length) {
-        const correct = this.button(
-          header,
-          t("ui.aim_correct_assumption"),
-          () =>
-            new AimAssumptionModal(this.app, assumptions, (assumption, correction) => {
-              void this.correctAimAssumption(node.id, assumption, correction);
-            }).open(),
-          this.aimBusy
-        );
-        correct.addClass("vam-node-tool", "vam-pinned-tool");
-        correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
-      }
-      if (aimEnabled() && this.map?.aim && node.aimKind === "conclusion") {
-        const steer = this.button(
-          header,
-          t("ui.aim_steer"),
-          () => new AimSteerModal(this.app, direction => void this.steerAim({ nodeId: node.id }, direction)).open(),
-          this.aimBusy
-        );
-        steer.addClass("vam-node-tool", "vam-pinned-tool");
-        steer.setAttr("title", t("ui.aim_steer_hint"));
-      }
-    }
-    if (!this.selection.state.multiSelectMode && !this.aimLive()) {
       const exploreName = t("ui.ai_explore");
       const explore = this.button(tools, "", () => this.whenEditing(() => this.openTopicChat(node, explore)));
       explore.addClass("vam-node-tool", "vam-ai-explore");
@@ -15188,7 +13767,7 @@ export class VisualAgentMapView extends ItemView {
       iconTool(t("ui.collapse"), "chevrons-down-up", "vam-fold-tool", () =>
         this.whenEditing(() => this.toggleCollapsed(node))
       );
-    if (!this.selection.state.multiSelectMode && !this.aimLive()) {
+    if (!this.selection.state.multiSelectMode) {
       iconTool(t("ui.structure_and_links"), "git-fork", "vam-structure-tool", () =>
         this.whenEditing(() => this.openNodePanel(node, "structure"))
       );
@@ -15198,11 +13777,7 @@ export class VisualAgentMapView extends ItemView {
           this.whenEditing(() => this.selectSubtopics(node))
         );
     }
-    if (!this.selection.state.multiSelectMode && aimEnabled() && this.map?.aim && node.aimKind === "question")
-      iconTool(t("ui.remove_from_map"), "trash", "vam-remove-tool", () =>
-        this.whenEditing(() => this.confirmRemoveNode(node))
-      );
-    if (!this.selection.state.multiSelectMode && !this.aimLive()) {
+    if (!this.selection.state.multiSelectMode) {
       const add = this.button(card, "+", () => {});
       add.addEventListener("click", event => this.openAddMenu(event, node));
       add.addClass("vam-add-child");
@@ -15226,7 +13801,7 @@ export class VisualAgentMapView extends ItemView {
     // Double-click on the title opens the inline title field, as F2 does; on the cover picture it opens "Edit card".
     // It is handled on the card: enableDrag captures the pointer on the card, so a real mouse reports the card (not the
     // title or the picture) as the dblclick target.
-    if (note && !this.selection.state.multiSelectMode && !this.aimLive())
+    if (note && !this.selection.state.multiSelectMode)
       card.addEventListener("dblclick", event => this.onCardDoubleClick(event, card, title, node));
     // An unresearched topic's placeholder summary repeats its status, so the frontier card stays quiet.
     // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
@@ -15272,137 +13847,6 @@ export class VisualAgentMapView extends ItemView {
         });
       }
     }
-    if (node.aimKind === "conclusion" && aimEnabled() && this.map?.aim) {
-      const branch = this.map.aim.branches.find(item => item.results.some(result => result.nodeId === node.id));
-      const hasFollowup = this.map.nodes.some(item => item.parentId === node.id && item.aimKind === "question");
-      if (
-        branch &&
-        !hasFollowup &&
-        countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION
-      ) {
-        card.createEl("p", { cls: "vam-hint", text: t("ui.aim_early_conclusion_hint") });
-        this.button(
-          card,
-          t("ui.aim_resume_early_conclusion"),
-          () => void this.planAimFromSelection(node.id),
-          this.aimBusy
-        ).addClass("mod-cta");
-      }
-    }
-    if (
-      node.aimKind === "topic" &&
-      aimEnabled() &&
-      this.map?.aim &&
-      !this.map.nodes.some(item => item.aimKind === "question")
-    ) {
-      const initialBranch = this.map.aim.branches.find(item => item.questionNodeId === node.id && !item.parentBranchId);
-      const initialRuns = initialBranch ? this.map.aim.runs.filter(item => item.branchId === initialBranch.id) : [];
-      const activeInitialRun = initialRuns.some(run => {
-        const attempt = run.attempts.find(item => item.id === run.currentAttemptId);
-        return attempt?.status === "running" || attempt?.status === "saving";
-      });
-      const terminalResult = initialBranch
-        ? [...initialBranch.results].reverse().find(result => result.kind !== "research")
-        : undefined;
-      const terminalRun = terminalResult ? initialRuns.find(item => item.id === terminalResult.runId) : undefined;
-      const terminalAttempt =
-        terminalResult && terminalRun
-          ? terminalRun.attempts.find(item => item.id === terminalResult.attemptId)
-          : undefined;
-      if (!initialBranch) {
-        const start = this.button(
-          card,
-          t("ui.aim_start_exploration"),
-          () => {
-            void this.planAimFromSelection(node.id);
-          },
-          this.aimBusy
-        );
-        start.addClass("mod-cta");
-        start.addClass("vam-aim-start");
-      } else if (!activeInitialRun && terminalAttempt?.status === "partial" && terminalRun) {
-        this.button(
-          card,
-          t("ui.aim_continue_research"),
-          () => void this.continueAimResearch(node.id, terminalRun.id),
-          this.aimBusy
-        ).addClass("vam-aim-retry");
-      } else if (!activeInitialRun && !terminalResult) {
-        this.renderAimFailure(card, initialBranch);
-        const label =
-          initialBranch.researchPlan || initialBranch.results.length
-            ? t("ui.aim_continue_research")
-            : t("ui.aim_retry_subtopics");
-        this.button(card, label, () => void this.retryAimSubtopics(initialBranch.id), this.aimBusy).addClass(
-          "vam-aim-retry"
-        );
-      }
-    }
-    if (node.aimKind === "question" && aimEnabled() && this.map?.aim) {
-      const branch = this.map.aim.branches.find(item => item.questionNodeId === node.id);
-      if (branch) {
-        this.renderAimFailure(card, branch);
-        const labels =
-          node.aimQuestion?.options
-            .filter(option => branch.answerSnapshot.selections.includes(option.id))
-            .map(option => option.label) ?? branch.answerSnapshot.selections;
-        const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" — ");
-        card.createEl("p", {
-          cls: "vam-aim-answer-snapshot",
-          text: `${t("ui.aim_answer_snapshot")}: ${answer || t("ui.aim_unknown_answer")}`
-        });
-        const branchRuns = this.map.aim.runs.filter(item => item.branchId === branch.id);
-        const activeBranchRun = branchRuns.some(run => {
-          const current = run.attempts.find(item => item.id === run.currentAttemptId);
-          return current?.status === "running" || current?.status === "saving";
-        });
-        const terminalResult = [...branch.results].reverse().find(result => result.kind !== "research");
-        const terminalRun = terminalResult && branchRuns.find(item => item.id === terminalResult.runId);
-        const terminalAttempt = terminalRun?.attempts.find(item => item.id === terminalResult?.attemptId);
-        if (!activeBranchRun && terminalAttempt?.status === "partial" && terminalRun) {
-          this.button(
-            card,
-            t("ui.aim_continue_research"),
-            () => void this.continueAimResearch(node.id, terminalRun.id),
-            this.aimBusy
-          ).addClass("vam-aim-retry");
-        }
-        if (!branch.researchPlan && branch.results.length === 0) {
-          const status = card.createEl("p", {
-            cls: "vam-aim-plan-error",
-            text: t("ui.aim_research_not_generated")
-          });
-          if (branch.researchPlanError) status.setAttr("title", branch.researchPlanError);
-          if (!activeBranchRun && !terminalResult) {
-            const retry = this.button(card, t("ui.aim_retry_subtopics"), () => void this.retryAimSubtopics(branch.id));
-            retry.addClass("vam-aim-retry");
-            retry.disabled = this.aimBusy;
-          }
-        } else if (!activeBranchRun && !terminalResult) {
-          this.button(
-            card,
-            t(branch.deliveryRecovery ? "ui.aim_resume_stage" : "ui.aim_continue_research"),
-            () => void this.retryAimSubtopics(branch.id),
-            this.aimBusy
-          ).addClass("vam-aim-retry");
-        }
-      }
-    }
-    if (node.aimKind === "answer" && aimEnabled() && this.map?.aim) {
-      const branch = this.map.aim.branches.find(item => item.answerNodeId === node.id);
-      const question = branch && this.map.nodes.find(item => item.id === branch.questionNodeId);
-      if (branch) {
-        const labels =
-          question?.aimQuestion?.options
-            .filter(option => branch.answerSnapshot.selections.includes(option.id))
-            .map(option => option.label) ?? branch.answerSnapshot.selections;
-        const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" — ");
-        card.createEl("p", {
-          cls: "vam-aim-answer-snapshot",
-          text: `${t("ui.aim_answer_snapshot")}: ${answer || t("ui.aim_unknown_answer")}`
-        });
-      }
-    }
     // A real press is handled by enableDrag's pointerup (which then holds back the click that follows), so the switch lives here too.
     this.enableDrag(
       card,
@@ -15411,7 +13855,7 @@ export class VisualAgentMapView extends ItemView {
         this.switchTopicChat(node, point.target) || this.openCardTextEditor(point, card, node, wasSelected)
     );
     // Built during a presentation too: the stylesheet hides them and every handler returns early while presenting, so ending it needs no repaint.
-    // Left as it was while AIM is hidden: an AIM card keeps no resize handles (a source-text test pins this condition).
+    // Left as it was: an old AIM card keeps no resize handles (a source-text test pins this condition).
     if (!this.selection.state.multiSelectMode && !this.map?.aim && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
@@ -15423,13 +13867,7 @@ export class VisualAgentMapView extends ItemView {
       // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
       if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
         event.preventDefault();
-        if (
-          !event.isComposing &&
-          !this.selection.state.multiSelectMode &&
-          !this.aimLive() &&
-          !this.presentation &&
-          !this.notesLoading()
-        )
+        if (!event.isComposing && !this.selection.state.multiSelectMode && !this.presentation && !this.notesLoading())
           this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)!));
         return;
       }
@@ -15440,7 +13878,7 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       if (this.onCardSpaceDown(event, node)) return;
-      const editable = !this.selection.state.multiSelectMode && !this.aimLive() && !this.notesLoading();
+      const editable = !this.selection.state.multiSelectMode && !this.notesLoading();
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
@@ -15464,7 +13902,7 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
       }
-      if (event.key === "F2" && note && !this.selection.state.multiSelectMode && !this.aimLive()) {
+      if (event.key === "F2" && note && !this.selection.state.multiSelectMode) {
         if (event.defaultPrevented) return; // the view scope already handled this F2
         event.preventDefault();
         this.startCardTitleEdit(node, { select: true });
@@ -15476,8 +13914,7 @@ export class VisualAgentMapView extends ItemView {
         } else {
           this.selectMapNode(node);
           if (this.notesLoading()) return;
-          if (aimEnabled() && this.map?.aim && node.aimKind === "question") this.openAimAnswer(node);
-          else this.openDetails(node);
+          this.openDetails(node);
         }
       }
     });
@@ -15934,7 +14371,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Hypothesis and evidence features exist on ordinary maps only: not AIM. */
   private relationsEnabled(): boolean {
-    return !!this.map && !this.aimLive();
+    return !!this.map;
   }
   private isHypothesis(id: string): boolean {
     return this.notes.get(id)?.topicKind === "hypothesis";
@@ -15942,7 +14379,7 @@ export class VisualAgentMapView extends ItemView {
   /** The type to show: only a topic on an ordinary map has one other than "topic" (AIM shows none). */
   private topicKindOf(id: string): TopicKind {
     const node = this.mapNodeById(id);
-    if (!this.relationsEnabled() || !node || isAimNode(node)) return "topic";
+    if (!this.relationsEnabled() || !node) return "topic";
     return this.notes.get(id)?.topicKind ?? "topic";
   }
   /** True for a card the argument flow owns on a map whose `argumentMap` key is usable (those cards are plain rectangles). */
@@ -15971,7 +14408,7 @@ export class VisualAgentMapView extends ItemView {
   /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
   private hypothesisStrengthOf(id: string): HypothesisStrength | undefined {
     const node = this.map?.nodes.find(item => item.id === id);
-    if (!this.relationsEnabled() || !node || isAimNode(node) || !this.isHypothesis(id)) return undefined;
+    if (!this.relationsEnabled() || !node || !this.isHypothesis(id)) return undefined;
     return this.notes.get(id)?.hypothesisStrength ?? "none";
   }
   /** The verdict of a hypothesis of an argument map (the user's, else the AI's, else undecided); undefined on any other map. */
@@ -15983,7 +14420,7 @@ export class VisualAgentMapView extends ItemView {
   /** The leaning to show on a card: only a hypothesis on an ordinary map has one. */
   private hypothesisLeaningOf(id: string): HypothesisLeaning | undefined {
     const node = this.map?.nodes.find(item => item.id === id);
-    if (!this.relationsEnabled() || !node || isAimNode(node) || !this.isHypothesis(id)) return undefined;
+    if (!this.relationsEnabled() || !node || !this.isHypothesis(id)) return undefined;
     return this.notes.get(id)?.hypothesisLeaning ?? "undecided";
   }
   /** The markers to show for a topic: only whitelisted ids, in the fixed order (an AIM card shows them too). */
@@ -16032,7 +14469,7 @@ export class VisualAgentMapView extends ItemView {
     const grew = cardsChangedHeight(first ? new Map() : previous, now);
     this.heightsSeenMap = this.map.id;
     this.heightsSeen = now;
-    if (!grew.size || this.settling || this.dragging || this.aimLive()) return;
+    if (!grew.size || this.settling || this.dragging) return;
     if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf) && !this.ringTidyNeeded(grew)) return;
     this.settling = true;
     const mapId = this.map.id;
@@ -16243,14 +14680,14 @@ export class VisualAgentMapView extends ItemView {
    * to the card's accessible name, like the marker and model parts: the old part is taken out first, so a redraw replaces
    * it in place and never doubles it. An AIM card has its own look and shows no topic colour. Safe to call again.
    */
-  private paintCardColor(card: HTMLElement, note: Note | undefined, aim: boolean): void {
+  private paintCardColor(card: HTMLElement, note: Note | undefined): void {
     const previous = card.dataset.colorText ?? "";
     let named = cardLabels.get(card)?.textContent;
     if (named && previous && named.includes(previous)) {
       const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
       named = stripped === named ? named.replace(previous, "") : stripped;
     }
-    const id = aim ? undefined : TOPIC_COLORS.find(color => color === note?.color);
+    const id = TOPIC_COLORS.find(color => color === note?.color);
     if (id) {
       const text = t("share.viewer_color_0", t(colorLabelKey(id)));
       card.dataset.topicColor = id;
@@ -16267,14 +14704,14 @@ export class VisualAgentMapView extends ItemView {
    * to the card's accessible name, replacing the old part in place so a redraw never doubles it. Only whitelisted tokens
    * are written, never the note's own text. An AIM card shows no topic style. Safe to call again.
    */
-  private paintCardStyle(card: HTMLElement, note: Note | undefined, aim: boolean): void {
+  private paintCardStyle(card: HTMLElement, note: Note | undefined): void {
     const previous = card.dataset.styleText ?? "";
     let named = cardLabels.get(card)?.textContent;
     if (named && previous && named.includes(previous)) {
       const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
       named = stripped === named ? named.replace(previous, "") : stripped;
     }
-    const ids = aim ? [] : TOPIC_STYLES.filter(id => note?.style?.includes(id));
+    const ids = TOPIC_STYLES.filter(id => note?.style?.includes(id));
     const flag = (name: "topicStyleBold" | "topicStyleBorder", value: string | undefined): void => {
       if (value) card.dataset[name] = value;
       else delete card.dataset[name];
@@ -16399,14 +14836,12 @@ export class VisualAgentMapView extends ItemView {
         mapPath: string;
       }
     | "none"
-    | "aim"
     | "empty" {
     if (!this.map || !this.path || this.notesLoading()) return "none";
-    if (aimEnabled() && (this.map.aim || this.map.nodes.some(node => node.aimKind !== undefined))) return "aim";
     if (!this.map.nodes.length) return "empty";
     const copy = JSON.parse(JSON.stringify(this.map)) as MapDocument;
-    if (!aimEnabled() && copy.aim) {
-      // An old AIM map shares like any map (AIM is hidden): without its interim results and without any AIM data.
+    if (copy.aim) {
+      // An old AIM map shares like any map (AIM was removed): without its interim results and without any AIM data.
       const superseded = supersededAimNodeIds(copy);
       delete copy.aim;
       copy.nodes = copy.nodes.filter(node => !superseded.has(node.id)).map(node => withoutAimFields(node));
@@ -16603,18 +15038,7 @@ export class VisualAgentMapView extends ItemView {
     }
     const header = card.querySelector<HTMLElement>(".vam-node-header");
     const status = card.querySelector<HTMLElement>(".vam-node-header > .vam-status:not(.vam-aim-question-status)");
-    if (node.aimKind) {
-      this.labelCard(card, note.title);
-      if (note.status === "completed") status?.remove();
-      else if (status) {
-        status.className = `vam-status vam-status-${note.status}`;
-        status.setText(topicStatusLabel(note.status, this.plugin.settings.language));
-      } else
-        header?.createSpan({
-          cls: `vam-status vam-status-${note.status}`,
-          text: topicStatusLabel(note.status, this.plugin.settings.language)
-        });
-    } else if (
+    if (
       !this.isMerging(node.id) &&
       !this.plugin.topicRuns.isBusy(node.path) &&
       !this.plugin.quickExpandPending?.has(node.path) &&
@@ -16653,8 +15077,8 @@ export class VisualAgentMapView extends ItemView {
       this.paintCardLinks(card, header, node.id);
       this.paintModelTag(card, header, note);
     }
-    this.paintCardColor(card, note, isAimNode(node));
-    this.paintCardStyle(card, note, isAimNode(node));
+    this.paintCardColor(card, note);
+    this.paintCardStyle(card, note);
     if (header) this.paintAiLock(card, header, node);
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, this.shapeKindOf(node.id));
@@ -16829,7 +15253,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Opens the topic's chat next to its card; one window at a time (opening another closes this one, its task goes on). */
   private openTopicChat(node: MapNode, opener?: { focus(): void; isConnected?: boolean } | null): void {
-    if (this.closed || !this.map || this.notesLoading() || this.presentation || this.aimLive()) return;
+    if (this.closed || !this.map || this.notesLoading() || this.presentation) return;
     if (this.aiLockReason("write", [node.id])) {
       new Notice(t("ui.ai_locked_notice"));
       return;
@@ -16870,7 +15294,7 @@ export class VisualAgentMapView extends ItemView {
     const open = this.topicChatOpen;
     if (!open) return;
     const map = this.map;
-    if (!map || map.id !== open.entry.mapId || this.aimLive() || !map.nodes.some(n => n.id === open.entry.nodeId)) {
+    if (!map || map.id !== open.entry.mapId || !map.nodes.some(n => n.id === open.entry.nodeId)) {
       this.closeTopicChatWindow();
       return;
     }
@@ -16964,7 +15388,7 @@ export class VisualAgentMapView extends ItemView {
     followUp?: TopicChatSteers
   ): Promise<boolean> {
     const map = this.map;
-    if (this.closed || !map || map.id !== entry.mapId || this.aimLive() || this.presentation) return false;
+    if (this.closed || !map || map.id !== entry.mapId || this.presentation) return false;
     if ((!followUp && entry.session.running) || this.topicChatBusy(node)) {
       new Notice(t("ui.ai_running_ai"));
       return false;
@@ -18031,7 +16455,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Sets a topic's type: the note's `topic-kind` and Map.md (viewport only) in one undoable step. Id, parent and relations are not touched. */
   private async changeTopicKind(node: MapNode, kind: TopicKind): Promise<void> {
-    if (!this.map || !this.relationsEnabled() || isAimNode(node) || this.topicKindOf(node.id) === kind) return;
+    if (!this.map || !this.relationsEnabled() || this.topicKindOf(node.id) === kind) return;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
       .rewriteNote(node.path, path => this.plugin.repo.writeTopicKind(path, kind))
@@ -18682,7 +17106,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
   private renderAddSubtopic(actions: HTMLElement, node: MapNode, close?: () => void): void {
-    if (!this.relationsEnabled() || isAimNode(node)) return;
+    if (!this.relationsEnabled()) return;
     const addChild = actions.createEl("button", { text: t("ui.add_subtopic_menu"), cls: "vam-add-subtopic" });
     addChild.addEventListener("click", event => {
       event.stopPropagation();
@@ -18752,7 +17176,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Markers can be edited only on an ordinary editable map: not an AIM map or the select mode. */
   private markersEditable(node: MapNode): boolean {
-    return this.relationsEnabled() && !isAimNode(node) && !this.selection.state.multiSelectMode;
+    return this.relationsEnabled() && !this.selection.state.multiSelectMode;
   }
   /** The marker toggles of the topic panel: one `aria-pressed` button per marker; priority is one of three. */
   private renderMarkerSection(panel: HTMLElement, node: MapNode): void {
@@ -18800,7 +17224,7 @@ export class VisualAgentMapView extends ItemView {
   /** The directions this branch may take of its own: those the parse keeps (never the one opposite its parent's). */
   private branchLayoutChoices(node: MapNode): BranchDirection[] {
     const map = this.map;
-    if (!map || this.aimLive(map) || this.argumentLive(map) || !node.parentId) return [];
+    if (!map || this.argumentLive(map) || !node.parentId) return [];
     const mapDirection = layoutOf(map).direction;
     if (!allowsBranchLayout(mapDirection)) return [];
     // Offer only what `cleanBranchLayouts` keeps: a value it would delete on parse must never be written.
@@ -18815,7 +17239,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** One undo step: sets or clears this branch's own arrangement (null follows the map), then re-arranges. */
   private async changeBranchLayout(node: MapNode, direction: BranchDirection | null): Promise<void> {
-    if (!this.map || this.aimLive() || this.argumentLive()) return;
+    if (!this.map || this.argumentLive()) return;
     const latest = this.map.nodes.find(item => item.id === node.id);
     if (!latest) return;
     if (direction && !this.branchLayoutChoices(latest).includes(direction)) return;
@@ -19218,11 +17642,10 @@ export class VisualAgentMapView extends ItemView {
    * Locking first stops the AI runs on them; their late results are fenced at write time. Not on AIM maps.
    */
   async setAiLock(nodes: readonly MapNode[], locked: boolean): Promise<void> {
-    if (!this.map || this.aimLive()) return;
+    if (!this.map) return;
     // The flow's managed cards are locked by the flow itself; the user's switch never touches them.
     const targets = nodes.filter(
       node =>
-        !isAimNode(node) &&
         !this.isArgumentCard(node.id) &&
         !!this.notes.get(node.id) &&
         (this.notes.get(node.id)?.aiLocked === true) !== locked
@@ -19243,7 +17666,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
   private renderAiLockSection(panel: HTMLElement, node: MapNode): void {
-    if (!this.map || this.aimLive() || isAimNode(node) || this.selection.state.multiSelectMode) return;
+    if (!this.map || this.selection.state.multiSelectMode) return;
     const section = panel.createDiv("vam-inspector-section vam-ai-lock-section");
     section.createEl("strong", { text: t("ui.ai_lock"), cls: "vam-topic-tree-heading vam-section-heading" });
     const group = section.createDiv("vam-topic-markers vam-choice-group");
@@ -19299,8 +17722,7 @@ export class VisualAgentMapView extends ItemView {
       delete card.dataset.aiLocked;
     }
     const managed = this.isArgumentCard(node.id);
-    if (!this.map || this.aimLive() || isAimNode(node) || (!managed && this.notes.get(node.id)?.aiLocked !== true))
-      return;
+    if (!this.map || (!managed && this.notes.get(node.id)?.aiLocked !== true)) return;
     card.dataset.aiLocked = "true";
     const button = header.createEl("button", { cls: "vam-card-ai-lock" });
     cardAiLockButtons.set(card, button);
@@ -19436,7 +17858,7 @@ export class VisualAgentMapView extends ItemView {
     const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
     const targets = ids
       .map(id => this.map!.nodes.find(item => item.id === id))
-      .filter((item): item is MapNode => !!item && !isAimNode(item) && !!this.notes.get(item.id))
+      .filter((item): item is MapNode => !!item && !!this.notes.get(item.id))
       .filter(item => (TOPIC_COLORS.find(id => id === this.notes.get(item.id)?.color) ?? null) !== color);
     if (!targets.length) return;
     const viewport = clone(this.map.viewport);
@@ -19543,7 +17965,7 @@ export class VisualAgentMapView extends ItemView {
     const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
     const targets = ids
       .map(id => this.map!.nodes.find(item => item.id === id))
-      .filter((item): item is MapNode => !!item && !isAimNode(item) && !!this.notes.get(item.id))
+      .filter((item): item is MapNode => !!item && !!this.notes.get(item.id))
       .filter(item => this.styleOf(item.id).join() !== wanted.join());
     if (!targets.length) return;
     const viewport = clone(this.map.viewport);
@@ -19562,7 +17984,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
   private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
-    if (!this.relationsEnabled() || isAimNode(node)) return;
+    if (!this.relationsEnabled()) return;
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section.createDiv("vam-hypothesis-body");
     const editByPair = new Map<string, HTMLElement>();
@@ -20270,7 +18692,7 @@ export class VisualAgentMapView extends ItemView {
     return `multi-research:${this.path}`;
   }
   private openMultiResearch(retryBatchKey?: string): void {
-    if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
+    if (!this.map || !this.selection.state.multiSelected.size) return;
     const shown = [...this.selection.state.multiSelected].flatMap(id => {
       const note = this.notes.get(id);
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
@@ -20350,7 +18772,7 @@ export class VisualAgentMapView extends ItemView {
     signal: AbortSignal | undefined,
     markStarted: () => void
   ): Promise<void> {
-    if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
+    if (!this.map || !this.selection.state.multiSelected.size) return;
     const languageSource = this.batchLanguageSource();
     const key = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key)) {
@@ -20539,7 +18961,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Failed topics of a finished batch that still exist on the current map. */
   private retryableFailures(batch: ExpansionBatchState): MapNode[] {
-    if (batch.status === "running" || !this.map || this.aimLive()) return [];
+    if (batch.status === "running" || !this.map) return [];
     return batch.failedPaths
       .map(path => this.map!.nodes.find(node => node.path === path))
       .filter((node): node is MapNode => !!node);
@@ -20571,7 +18993,6 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "Retry with <other provider>": only when {@link otherProviderTarget} has one. Never an automatic switch. */
   private renderOtherProviderButton(parent: HTMLElement, nodes: MapNode[], retryBatchKey?: string): void {
-    if (this.aimLive()) return;
     const target = this.otherProviderTarget(nodes);
     if (!target) return;
     this.button(
@@ -20644,21 +19065,19 @@ export class VisualAgentMapView extends ItemView {
       text: t("ui.selected_0_1_2", count, names.slice(0, 2).join(t("ui.list_separator")), names.length > 2 ? "…" : "")
     });
     // The main action follows the count: Merge for two or more, Research for one.
-    if (!this.aimLive()) {
-      // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
-      const check = this.mergeCheck(),
-        merge = this.button(selection, t("ui.merge"), () => this.openMerge());
-      if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
-      if (count > 1) merge.addClass("mod-cta");
-      if (!check.ok) {
-        merge.setAttr("aria-disabled", "true");
-        merge.setAttr("title", t(check.reason));
-      }
-      const running = this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running";
-      const research = this.button(selection, t("ui.multi_research"), () => this.openMultiResearch(), running);
-      research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
-      if (count === 1) research.addClass("mod-cta");
+    // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
+    const check = this.mergeCheck(),
+      merge = this.button(selection, t("ui.merge"), () => this.openMerge());
+    if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
+    if (count > 1) merge.addClass("mod-cta");
+    if (!check.ok) {
+      merge.setAttr("aria-disabled", "true");
+      merge.setAttr("title", t(check.reason));
     }
+    const running = this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running";
+    const research = this.button(selection, t("ui.multi_research"), () => this.openMultiResearch(), running);
+    research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
+    if (count === 1) research.addClass("mod-cta");
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false));
     const more = this.button(selection, t("ui.card_more"), () => {});
     more.setAttr("aria-label", t("ui.selection_more_hint"));
@@ -20691,25 +19110,20 @@ export class VisualAgentMapView extends ItemView {
       count < 2
     );
     add(t("ui.copy_to"), "copy", () => this.chooseSelectedParent(true));
-    if (!this.aimLive()) {
-      add(t("ui.canvas_boundary_add"), "square-dashed", () => this.openAddBoundary());
-      add(t("ui.summary_add"), "brackets", () => this.addSummaryOver());
-      const nodes = [...this.selection.state.multiSelected]
-        .map(id => this.map?.nodes.find(node => node.id === id))
-        .filter(
-          (node): node is MapNode =>
-            !!node && !isAimNode(node) && !this.isArgumentCard(node.id) && !!this.notes.get(node.id)
-        );
-      const all = nodes.length > 0 && nodes.every(node => this.notes.get(node.id)?.aiLocked === true);
-      const locked = nodes.filter(node => this.notes.get(node.id)?.aiLocked === true).length;
-      // A mixed selection says how many are locked; a click locks the rest (all locked: unlocks all).
-      add(
-        `${t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle")}${locked && !all ? ` (${t("ui.ai_locked_some_0_1", locked, nodes.length)})` : ""}`,
-        all ? "unlock" : "lock",
-        () => this.enqueue(() => this.setAiLock(nodes, !all)),
-        !nodes.length
-      );
-    }
+    add(t("ui.canvas_boundary_add"), "square-dashed", () => this.openAddBoundary());
+    add(t("ui.summary_add"), "brackets", () => this.addSummaryOver());
+    const nodes = [...this.selection.state.multiSelected]
+      .map(id => this.map?.nodes.find(node => node.id === id))
+      .filter((node): node is MapNode => !!node && !this.isArgumentCard(node.id) && !!this.notes.get(node.id));
+    const all = nodes.length > 0 && nodes.every(node => this.notes.get(node.id)?.aiLocked === true);
+    const locked = nodes.filter(node => this.notes.get(node.id)?.aiLocked === true).length;
+    // A mixed selection says how many are locked; a click locks the rest (all locked: unlocks all).
+    add(
+      `${t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle")}${locked && !all ? ` (${t("ui.ai_locked_some_0_1", locked, nodes.length)})` : ""}`,
+      all ? "unlock" : "lock",
+      () => this.enqueue(() => this.setAiLock(nodes, !all)),
+      !nodes.length
+    );
     menu.addSeparator();
     add(t("ui.clear"), "x", () => this.applySelectionChange(this.selection.clearMulti()));
     add(t("ui.remove"), "trash", () => this.confirmRemoveSelected());
@@ -22280,7 +20694,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private chatHero(): boolean {
     if (!this.chat || this.chat.hasMessages || !this.map || this.blankMapPaths.has(this.path)) return false;
-    if (this.aimLive() || this.map.nodes.length) return false;
+    if (this.map.nodes.length) return false;
     // Only what the canvas draws counts: a frame whose topics are gone stays in the file until the next canvas write, and draws nothing.
     return !this.map.canvasItems?.some(item => item.kind === "image" || item.kind === "text" || isAnnotatedImage(item));
   }
@@ -23132,14 +21546,10 @@ export class VisualAgentMapView extends ItemView {
         kind: this.topicKindOf(node.id),
         ...(leaning ? { leaning } : {}),
         ...(strength ? { strength } : {}),
-        // The appearance the card shows (whitelisted values only); the context leaves it out on an AIM map.
-        ...(isAimNode(node)
-          ? {}
-          : {
-              color: this.notes.get(node.id)?.color,
-              markers: this.notes.get(node.id)?.markers,
-              styles: this.notes.get(node.id)?.style
-            }),
+        // The appearance the card shows (whitelisted values only).
+        color: this.notes.get(node.id)?.color,
+        markers: this.notes.get(node.id)?.markers,
+        styles: this.notes.get(node.id)?.style,
         ...(this.notes.get(node.id)?.aiLocked ? { aiLocked: true } : {}),
         ...failureOf(node.id)
       };
@@ -24680,12 +23090,7 @@ export class VisualAgentMapView extends ItemView {
         ...(outcome.basis ? { basis: outcome.basis } : {}),
         text:
           t("ui.map_chat_line_done_0", label) +
-          (outcome.skippedCards
-            ? t(
-                aimEnabled() ? "ui.map_chat_line_cards_skipped_0" : "ui.map_chat_line_cards_skipped_hidden_0",
-                outcome.skippedCards
-              )
-            : "")
+          (outcome.skippedCards ? t("ui.map_chat_line_cards_skipped_hidden_0", outcome.skippedCards) : "")
       };
     return {
       status: outcome.status,
@@ -25640,7 +24045,7 @@ export class VisualAgentMapView extends ItemView {
       .map(id => (id ? this.map?.nodes.find(node => node.id === id) : undefined))
       .filter((node): node is MapNode => !!node);
     if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
-    const editableAll = nodes.filter(node => !isAimNode(node) && this.notes.get(node.id));
+    const editableAll = nodes.filter(node => this.notes.get(node.id));
     if (!editableAll.length) return skipped("ui.map_chat_skip_unavailable");
     if (editableAll.some(node => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
     // A card this reply merges is not coloured itself (the merge moves it to Unassigned): the merge applies the change to the
@@ -25695,7 +24100,6 @@ export class VisualAgentMapView extends ItemView {
     if (fromId === null || toId === null) return skipped("ui.map_chat_skip_parent_missing");
     const ends = [fromId, toId].map(id => this.map?.nodes.find(node => node.id === id));
     if (ends.some(node => !node)) return skipped("ui.map_chat_skip_topic_gone");
-    if (ends.some(node => isAimNode(node))) return skipped("ui.map_chat_skip_unavailable");
     const pair = (link: TopicRelation): boolean =>
       (link.from === fromId && link.to === toId) || (link.from === toId && link.to === fromId);
     const link: TopicRelation = {
@@ -25844,8 +24248,7 @@ export class VisualAgentMapView extends ItemView {
       .map(id => (id ? this.map?.nodes.find(node => node.id === id) : undefined))
       .filter((node): node is MapNode => !!node);
     if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
-    const typed = nodes.filter(node => !isAimNode(node));
-    if (!typed.length) return skipped("ui.map_chat_skip_unavailable");
+    const typed = nodes;
     if (typed.some(node => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
     const kind = action.topicKind;
     const transaction = this.beginMapTransaction();
@@ -26450,7 +24853,6 @@ export class VisualAgentMapView extends ItemView {
   private chatImageFence(block: MapChatImages): { reason: TranslationKey } | { node: MapNode } {
     if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
       return { reason: "ui.map_chat_images_stale_map" };
-    if (this.aimLive()) return { reason: "ui.map_chat_images_stale_locked" };
     const node = this.map.nodes.find(candidate => candidate.id === block.nodeId);
     if (!node) return { reason: "ui.map_chat_images_stale_gone" };
     if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
@@ -26607,11 +25009,10 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The card of `block` when it may take a cover picture now (same map, not locked by AIM, not merging), else null. */
   private chatCoverTarget(block: MapChatImages): MapNode | null {
-    if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId || this.aimLive())
-      return null;
+    if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId) return null;
     const node = this.map.nodes.find(item => item.id === block.nodeId);
     // Not cardAcceptsImages: that is the drop/panel UI check and is false in multi-select mode, the way to pick several cards.
-    return node && !isAimNode(node) && !this.isMerging(node.id) ? node : null;
+    return node && !this.isMerging(node.id) ? node : null;
   }
   /** A cover set by hand (or `topic-cover: none`, or a link that does not resolve now) is the owner's and stays. */
   private chatHasNoCover(node: MapNode): boolean {
@@ -26958,7 +25359,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Topic selection (remove, move, copy, synthesize, merge) exists only on editable, non-AIM maps. */
   private canSelectTopics(): boolean {
-    return !!this.map && !this.aimLive();
+    return !!this.map;
   }
   /** Starts topic selection with exactly the card's direct subtopics picked (replacing any earlier selection). */
   private selectSubtopics(node: MapNode): void {
@@ -27593,8 +25994,7 @@ export class VisualAgentMapView extends ItemView {
         } else {
           this.applySelectionChange(this.selection.click(node.id));
           if (this.notesLoading()) return;
-          if (aimEnabled() && this.map?.aim && node.aimKind === "question") this.openAimAnswer(node);
-          else if (this.plugin.detailsShown()) this.openDetails(node);
+          if (this.plugin.detailsShown()) this.openDetails(node);
           // A press that never moved is a click: on the title or summary text it opens that text for typing.
           onPlainClick?.(e, wasSelected);
         }
@@ -28479,33 +26879,6 @@ export class VisualAgentMapView extends ItemView {
     if (gate) gate.shown = true;
     new Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
   }
-  /**
-   * The note style of the AIM conclusion note (the "aim" row). A row that cannot be read, or whose structure the AIM
-   * outline cannot hold (0 or more than 12 sections), falls back to the AIM report; the user is told once per map in
-   * this view. Nothing is written.
-   */
-  private async aimNoteStyle(language: ContentLanguage): Promise<RunStyle | undefined> {
-    // A plugin test double without settings has no styles: the AIM report.
-    if (!this.plugin.settings) return undefined;
-    // The store only knows the style folder as of its last refresh; read it now, like the other note-style run entries (import, topic run) do.
-    try {
-      await this.noteStyles.refresh();
-    } catch {
-      /* an unreadable folder reads as "style not found": the stale snapshot answers and the Notice below tells the user */
-    }
-    const style = this.noteStyles.runStyle({ kind: "aim", outputLanguage: language });
-    const ref = this.plugin.settings.noteStyleByKind?.aim;
-    const sections = style.template.sections.length;
-    const unusable = !style.recipe.aimDelivery && (sections === 0 || sections > AIM_MAX_SECTIONS);
-    if (ref && (style.issues.missing.includes(ref) || unusable) && !this.aimStyleNoticed.has(this.path)) {
-      this.aimStyleNoticed.add(this.path);
-      new Notice(
-        t("ui.note_style_kind_missing_0_1", t("ui.note_style_kind_aim"), ref.replace(/^(?:builtin|file):/, ""))
-      );
-    }
-    return style;
-  }
-  private readonly aimStyleNoticed = new Set<string>();
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   private get noteStyles(): NoteStyleStore {
     return (
@@ -28545,7 +26918,7 @@ export class VisualAgentMapView extends ItemView {
    * Cancel and Esc write nothing.
    */
   private async chooseTopicStyle(node: MapNode): Promise<void> {
-    if (!this.map || this.aimLive() || this.presentation || isAimNode(node)) return;
+    if (!this.map || this.presentation) return;
     const path = node.path;
     const note = await this.plugin.repo.readNote(path, this.map);
     const refocus = (): void => this.cardEls.get(node.id)?.focus?.();

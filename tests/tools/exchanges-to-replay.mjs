@@ -107,7 +107,7 @@ export function convertExchanges(exchanges, { manifest = {}, sequential = false,
     });
 }
 
-/** One ordered case for one flow run (for example one AIM flow): every exchange keeps its `step` and its log order. */
+/** One ordered case for one flow run: every exchange keeps its `step` and its log order. */
 function convertFlow(entries, { manifest, sequential, name }) {
   if (!entries.length) throw new Error("A flow case needs at least one exchange that carries a prompt.");
   const flowExtra = manifest["@flow"] ?? {};

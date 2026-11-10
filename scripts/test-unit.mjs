@@ -19,7 +19,6 @@ export const nodeTestFiles = [
   "tests/step-runner.cjs",
   "tests/relevance-offline.cjs",
   "tests/steps-*.cjs",
-  "tests/aim-*.cjs",
   "tests/codex-parallel-runtime.cjs",
   "tests/prompt-monitor-timing.cjs",
   "tests/coffee-customization-storage.cjs",

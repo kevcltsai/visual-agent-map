@@ -462,7 +462,7 @@ export function assembleTaskPrompt(
       add(fixed(before ?? "", "tone-rule"), [body, block], fixed(after ?? "", "tone-rule"));
     }
   }
-  // The writing baseline every voice shares follows the voice text (the AIM report is built by core/steps/aim/shell.ts, not here).
+  // The writing baseline every voice shares follows the voice text.
   add(fixed(voiceBaseline(language), "voice-baseline"));
   // Only a merge update adds the conflict rule; top and fresh have their own mode text (the rest is unchanged).
   if ((isGeneral || step === "synthesize") && updateMode === "merge")

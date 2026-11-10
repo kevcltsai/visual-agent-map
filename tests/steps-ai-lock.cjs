@@ -236,12 +236,6 @@ test('inspector: an aria-pressed lock toggle; the card shows a lock button only 
   const panel2 = dom.element('div');
   h.view.renderAiLockSection(panel2, a);
   assert.equal(dom.findAll(panel2, i => i.tag === 'button' && i.attrs['aria-pressed'] !== undefined)[0].attrs['aria-pressed'], 'true');
-  // Not on AIM maps.
-  h.view.map.aim = { version: 1, branches: [] };
-  const aimPanel = dom.element('div'), aimHeader = dom.element('div');
-  h.view.renderAiLockSection(aimPanel, a);
-  h.view.paintAiLock(dom.element('div'), aimHeader, a);
-  assert.equal(dom.findAll(aimPanel, i => i.tag === 'button').length + dom.findAll(aimHeader, i => i.tag === 'button').length, 0);
 });
 
 test('34 inspector: the lock button label follows the state like the selection bar (Lock -> Unlock)', async () => {
@@ -323,11 +317,9 @@ test('03 bulk: a mixed selection says how many are locked and the click locks th
   assert.equal((await h.repo.readNote(b.path)).aiLocked, undefined);
 });
 
-test('03 bulk: no selection disables it; AIM maps get no button; the bar wires it in', async () => {
+test('03 bulk: no selection disables it; the bar wires it in', async () => {
   const h = await harness(['A']);
   assert.equal(selectionButton(h).disabled, true);
-  h.view.map.aim = { version: 1, branches: [] };
-  assert.equal(selectionButton(h), undefined);
   assert.match(read('experiences/visual-map/view.ts'), /openSelectionMoreMenu\(event: MouseEvent, count: number\)[\s\S]*?ui\.ai_lock_toggle/, 'the bar\'s More menu wires it in');
 });
 

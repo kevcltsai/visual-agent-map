@@ -328,13 +328,13 @@ integrationTest('AI task timeout override reaches both providers with accurate n
     assert.equal(seen.timeoutMs, undefined);
   }
 });
-integrationTest('AIM task timeout text follows the interface language while the prompt follows the content language', async () => {
+integrationTest('A task timeout text follows the interface language while the prompt follows the content language', async () => {
   const { AiTaskService } = load('core/ai-task-service.ts');
   for (const [ui, content, pattern] of [['en', 'zh-TW', /exceeded 10 minutes/], ['zh-TW', 'en', /超過 10 分鐘/]]) {
     let seen;
     const runtime = { runTask: async (_p, _m, _e, _s, controls) => { seen = controls; return JSON.stringify({summary:'S',detail:'D',suggestions:[],visualReferences:[]}); } };
     const service = new AiTaskService({ pluginDirectory:()=>'/plugin', language:()=> ui, defaultReasoning:()=> 'low', exchangeLoggingEnabled:()=>false, exchanges:()=>null, codexRuntime:()=>runtime, claudeRuntime:()=>runtime });
-    await service.askModel({ title:'Goal', summary:'', rules:'', detail:'', task:'Write', ancestors:'', mode:'task', researchMode:'local', timeoutMs:600_000, outputLanguage: content, promptProfile: 'aim' }, 'gpt-6-luna', 'low');
+    await service.askModel({ title:'Goal', summary:'', rules:'', detail:'', task:'Write', ancestors:'', mode:'task', researchMode:'local', timeoutMs:600_000, outputLanguage: content }, 'gpt-6-luna', 'low');
     assert.match(seen.timeoutMessage, pattern);
   }
 });
@@ -367,52 +367,6 @@ test('summary truncation measures display width: English keeps 100-150 chars, Ch
   assert.equal(truncateSummary(chinese), chinese, 'Chinese within 80 and ending a sentence is unchanged');
   assert.equal(Array.from(truncateSummary('字'.repeat(81))).length, 80);
   assert.equal(truncateSummary(`中文${'a'.repeat(200)}`).length <= 159, true);
-});
-test('search failure detection uses the structured status and still honours legacy wording', () => {
-  const { reportedSearchFailure } = load('ai/result-utils.ts');
-  assert.equal(reportedSearchFailure({ summary: '摘要', detail: '研究狀態：未搜尋', searchStatus: 'not_attempted' }), true);
-  assert.equal(reportedSearchFailure({ summary: 's', detail: 'Findings https://example.org', searchStatus: 'failed' }), true);
-  assert.equal(reportedSearchFailure({ summary: 's', detail: 'Findings https://example.org', searchStatus: 'completed' }), false);
-  assert.equal(reportedSearchFailure({ summary: 's', detail: 'Source B — Research status: unavailable; Source A answered it.', searchStatus: 'completed' }), false);
-  assert.equal(reportedSearchFailure({ summary: 's', detail: 'Research status: not searched' }), true);
-  assert.equal(reportedSearchFailure({ summary: 's', detail: 'Research status: search completed' }), false);
-});
-integrationTest('isolated web research requests a structured search status and returns a trimmed summary', async () => {
-  const { default: Plugin } = load('main.ts', { obsidian });
-  const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
-  let call;
-  plugin.claudeCli = () => ({ runTask: async (...args) => { call = args; return JSON.stringify({ summary: `${'a'.repeat(79)} trailing words beyond the limit`, detail: 'Detail', suggestions: [], visualReferences: [], searchStatus: 'not_attempted' }); } });
-  plugin.runtime = () => { assert.fail('Claude selection must not fall back to Codex'); };
-  const result = await plugin.askModel({ title: 'AIM', summary: '', rules: '', detail: '', task: 'Search', ancestors: '', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'off', aimIsolatedResearch: true }, 'claude:sonnet', 'low');
-  assert.ok(call[3].required.includes('searchStatus'));
-  assert.deepEqual(plain(call[3].properties.searchStatus.enum), ['completed', 'failed', 'not_attempted']);
-  assert.equal(result.searchStatus, 'not_attempted');
-  assert.equal(result.summary, result.summary.trimEnd()); assert.ok(Array.from(result.summary).length <= 160);
-  let localCall;
-  plugin.claudeCli = () => ({ runTask: async (...args) => { localCall = args; return JSON.stringify({ summary: 'Local', detail: 'Local detail', suggestions: [], visualReferences: [] }); } });
-  const local = await plugin.askModel({ title: 'Topic', summary: '', rules: '', detail: '', task: 'Plan', ancestors: '', mode: 'task', researchMode: 'local', visualMode: 'off', aimIsolatedResearch: true }, 'claude:sonnet', 'low');
-  assert.equal(localCall[3].required.includes('searchStatus'), false);
-  assert.equal('searchStatus' in local, false);
-});
-integrationTest('result draft readback accepts the Repository whitespace normalization', async () => {
-  const { repo } = fixture('en');
-  const { createAimMap } = load('experiences/aim/create-map.ts');
-  const { AimRunStore } = load('experiences/aim/research-run-store.ts');
-  const created = await createAimMap(repo, 'gpt-6-luna', { requestId: 'readback-normalization-map', topic: 'Readback normalization', context: 'Synthetic.' });
-  const store = new AimRunStore(repo);
-  const mapDoc = await repo.readMap(created.mapPath);
-  const question = await repo.createNote('Readback question', 'gpt-6-luna', mapDoc, created.mapPath, 'workspace');
-  question.aimKind = 'question';
-  question.aimQuestion = { requestId: 'readback-question', parentBranchId: null, options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], allowMultiple: false, allowFreeText: false };
-  mapDoc.nodes.push(question); await repo.saveMap(created.mapPath, mapDoc);
-  const branch = await store.createAnswerBranch(created.mapPath, { requestId: 'readback-answer', questionNodeId: question.id, parentBranchId: null, answerSnapshot: { selections: ['a'], freeText: '' }, inputSnapshot: { topic: mapDoc.title, conditions: {}, upstreamResults: [] } });
-  const attempt = await store.startAttempt(created.mapPath, branch.id, 'readback-run');
-  const draft = (await store.createResultDraft(created.mapPath, attempt, 'Readback draft', 'gpt-6-luna', undefined, { kind: 'research' })).draft;
-  assert.equal(await store.updateResultDraftReport(created.mapPath, attempt, draft.id, `${'a'.repeat(79)} `, '\nResearch status: search completed\nDetail with surrounding whitespace.\n\n'), true);
-  const saved = await repo.readNote(draft.notePath);
-  assert.equal(saved.summary, 'a'.repeat(79));
-  assert.equal(saved.detail, 'Research status: search completed\nDetail with surrounding whitespace.');
-  assert.equal(await store.updateResultDraftPresentation(created.mapPath, attempt, draft.id, ' Final synthesis title ', 'synthesis'), true);
 });
 integrationTest('task prompt uses the context template; no template keeps the Standard text', async () => {
   const { AiTaskService } = load('core/ai-task-service.ts');
@@ -815,7 +769,7 @@ test('steer: no onSteer on the observer means no onSteer control; count repair a
   assert.equal(seen.length, 1); assert.equal(seen[0].controls.onSteer, undefined); assert.equal(seen[0].controls.stream, undefined); assert.deepEqual(events, []);
   // The chart step has no observer at all.
   seen.length = 0;
-  await make().addDiagramsToDetail({ title: 'T', detail: '### Core\n\nText', language: 'en', model: 'claude:sonnet' }).catch(() => undefined);
+  await make().chartDetail({ input: { ...context, addCharts: true }, detail: '### Core\n\nText', model: 'claude:sonnet' }).catch(() => undefined);
   assert.ok(seen.length >= 1, 'the chart call ran'); assert.equal(seen[0].controls.onSteer, undefined); assert.equal(seen[0].controls.stream, undefined);
 });
 
@@ -882,7 +836,7 @@ integrationTest('Quick prompt: the Quick source-safety and knowledge texts repla
   const fast = promptOf({ ...quickBase, mapAiMode: 'quick', researchDepth: 'fast' }, 'en');
   assert.ok(fast.includes(load('i18n.ts').translate('en', 'research.fast'))); assert.equal(fast.includes(load('i18n.ts').translate('en', 'research.normal')), false);
 });
-integrationTest('Quick prompt guards: a helper request, an AIM prompt, a count repair or an intermediate extraction keeps the original source-safety and local-research text even with mapAiMode quick', () => {
+integrationTest('Quick prompt guards: a helper request, a count repair or an intermediate extraction keeps the original source-safety and local-research text even with mapAiMode quick', () => {
   const cases = {
     synthesize: { mode: 'synthesize' }, merge: { mode: 'merge' }, decompose: { mode: 'decompose' },
     countRepair: { countRepair: true }, intermediateDetail: { intermediateDetail: true }
@@ -909,16 +863,12 @@ integrationTest('Quick prompt guards: a helper request, an AIM prompt, a count r
       assert.equal(/web search|網路搜尋|网络搜索/.test(roleQuick), false, `${language}: no permission to search the web`);
     }
   }
-  // AIM goes through its own shell, which never reads mapAiMode.
-  const { taskPrompt } = load('core/steps/task/render.ts', { obsidian });
-  const aim = { ...quickBase, promptProfile: 'aim', task: 'Research the subtopic', researchMode: 'research' };
-  assert.equal(taskPrompt({ ...aim, mapAiMode: 'quick' }, 'en', 'codex'), taskPrompt(aim, 'en', 'codex'));
   // The only requests a Quick map research is allowed to change: a plain task, and it must be local.
   assert.equal(promptOf({ ...quickBase, researchMode: 'research', mapAiMode: 'quick' }, 'en'), promptOf({ ...quickBase, researchMode: 'research' }, 'en'), 'a web request with a stray quick flag is not Quick');
   const gate = load('core/steps/task/render.ts', { obsidian }).isQuickTask;
   assert.equal(gate({ ...quickBase, mapAiMode: 'quick' }), true);
   assert.equal(gate({ ...quickBase, mode: undefined, mapAiMode: 'quick' }), true, 'no mode means a task');
-  for (const patch of [{ mapAiMode: 'standard' }, { mapAiMode: undefined }, { researchMode: 'research' }, { mode: 'synthesize' }, { promptProfile: 'aim' }, { countRepair: true }, { intermediateDetail: true }])
+  for (const patch of [{ mapAiMode: 'standard' }, { mapAiMode: undefined }, { researchMode: 'research' }, { mode: 'synthesize' }, { countRepair: true }, { intermediateDetail: true }])
     assert.equal(gate({ ...quickBase, mapAiMode: 'quick', ...patch }), false, JSON.stringify(patch));
 });
 integrationTest('Quick research reaches the providers without any web tool; a Standard research from the dialog still hits the forced-web gate', async () => {

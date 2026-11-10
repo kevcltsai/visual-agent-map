@@ -1,1 +1,0 @@
-Make one local format-repair review using only the same saved report and answer snapshot below. Do not search, repeat research, add evidence, or invent facts. The original decision marker is unusable, so determine a decision from the supplied evidence; do not claim the original decision is known.

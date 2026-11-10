@@ -248,10 +248,9 @@ test('A4: F2 on the view scope edits the focused card title in place and passes 
   assert.equal(h.view.inlineName, null, 'the card handler does not start a second edit when the scope already handled F2');
 });
 
-test('A4: an AIM map and selection mode ignore the new keys and the title double-click', async () => {
-  for (const mode of ['aim', 'select']) {
+test('A4: selection mode ignores the new keys and the title double-click', async () => {
+  for (const mode of ['select']) {
     const h = await harness();
-    if (mode === 'aim') h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
     if (mode === 'select') setSelection(h.view, true);
     h.build();
     for (const [key, init] of [['Delete', {}], ['Backspace', {}], ['Enter', { ctrlKey: true }], ['Enter', { shiftKey: true }]]) {
@@ -323,7 +322,6 @@ test('0.25 retest: Mod+Enter and Shift+Enter live on the view scope (Obsidian ea
   doc.activeElement = h.card('leaf');
   assert.equal(fire(['Mod'], { isComposing: true }), true, 'IME composition'); assert.equal(fire(['Mod'], { defaultPrevented: true }), true, 'already handled');
   for (const mode of ['integrationMode']) { h.view.selection.toggleMultiSelect(); assert.equal(fire(['Mod']), true, mode); h.view.selection.exitMultiSelect('emptyMap'); }
-  h.view.map.aim = {}; assert.equal(fire(['Mod']), true, 'AIM map'); delete h.view.map.aim;
   h.view.closed = true; assert.equal(fire(['Mod']), true, 'closed view'); h.view.closed = false;
   await tick(); assert.deepEqual(h.added, [], 'no pass-through branch added anything');
   // Handled branches.

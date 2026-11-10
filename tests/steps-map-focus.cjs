@@ -469,22 +469,13 @@ test('#11 real order: the menu is already closed (onHide fired, .menu gone) when
   }
 });
 
-test('#11 real order for other menus: the new-map menu counts as closed by the Escape that hid it; every menu goes through newMenu', () => {
+test('#11 real order for other menus: every menu goes through newMenu', () => {
   const fs = require('node:fs'), path = require('node:path');
   const source = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   assert.equal((source.match(/new Menu\(\)/g) ?? []).length, 1, 'only newMenu itself builds a Menu');
-  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 15, 'the other fifteen menus use it (the card More menu was removed when the card tools became icon-only buttons; anchor right-click menu added; goal banner P3 removed the toolbar topic menu; annotated-image P3a added the image right-click menu; ticket 21 added the add-type list; ticket 39 added the card More and selection More menus) (C2 made More mind map actions one; ticket 41 removed openRelationKindMenu, the relation kind is now a select in the card window)');
+  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 14, 'the other fourteen menus use it (ticket 07 removed the new-map menu with AIM; the card More menu was removed when the card tools became icon-only buttons; anchor right-click menu added; goal banner P3 removed the toolbar topic menu; annotated-image P3a added the image right-click menu; ticket 21 added the add-type list; ticket 39 added the card More and selection More menus) (C2 made More mind map actions one; ticket 41 removed openRelationKindMenu, the relation kind is now a select in the card window)');
   const card = source.slice(source.indexOf('private onCanvasContextMenu'), source.indexOf('private openCanvasImagePicker'));
   assert.match(card, /this\.newMenu\(cardId\)/, 'the card right-click menu keeps its card as the focus fallback');
-});
-
-test('#11 real order for other menus (behavior): the new-map menu hides before the Escape reaches the map', async () => {
-  const h = await harness();
-  h.view.selection.setSelected(h.ids.leaf);
-  h.view.openNewMapMenu({ stopPropagation() {} });
-  h.menus.at(-1).hide();
-  h.view.onMapKeydown(keydown(h, h.card('leaf')));
-  assert.equal(h.view.selection.state.selected, h.ids.leaf);
 });
 
 // ---- Behavioral coverage for the dialog and menu paths (the regex wiring checks above stay) ----
@@ -555,7 +546,6 @@ const MENU_OPENERS = {
     h.view.openUnlinkMenu('t1', h.card('leaf'));
   },
   openExportMenu: h => h.view.openExportMenu({}),
-  openNewMapMenu: h => h.view.openNewMapMenu({ stopPropagation() {} }),
   openMapActions: h => h.view.openMapActions({}),
   openLayoutMenu: h => h.view.openLayoutMenu({}),
   onCanvasContextMenu_card: h => h.view.onCanvasContextMenu({ target: h.card('leaf'), clientX: 5, clientY: 5, preventDefault() {} }),

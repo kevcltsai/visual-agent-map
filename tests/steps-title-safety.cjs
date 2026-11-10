@@ -1,7 +1,7 @@
 // FG20-13b: titles that would break the note (``` , [[ , ]]) are refused in dialogs and cleaned when the AI wrote them (D-2026-10-92).
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { load, obsidian, fixture } = require('./support.cjs');
+const { load, obsidian } = require('./support.cjs');
 const { titleProblem, sanitizeGeneratedTitle } = load('core/title-safety.ts', { obsidian });
 
 test('titleProblem refuses ```, [[ and ]] and allows #, single brackets and plain text', () => {
@@ -72,19 +72,4 @@ test('outline import refuses a pasted title that would break the note, with the 
   assert.equal(cleaned, '```markdown\n# Fence  and L [\n## child  fence\n## [[Note|Alias]] kept\nplain ``` text\n```');
   assert.equal(parseOutline(cleaned).errors.length, 0);
   assert.equal(parseOutline(sanitizeOutlineDraft('# a [[ b')).errors.length, 0);
-});
-
-test('AIM start refuses an unsafe topic before anything is written (D-2026-10-95)', async () => {
-  const { createAimMap } = load('experiences/aim/create-map.ts', { obsidian });
-  const { repo } = fixture('en');
-  const before = (await repo.mapFiles()).length;
-  await assert.rejects(
-    createAimMap(repo, 'gpt-6-luna', { topic: 'Topic ``` x', context: '', requestId: 'r1' }),
-    /three backticks/
-  );
-  await assert.rejects(
-    createAimMap(repo, 'gpt-6-luna', { topic: 'Topic [[x]]', context: '', requestId: 'r2' }),
-    /\[\[ or \]\]/
-  );
-  assert.equal((await repo.mapFiles()).length, before);
 });

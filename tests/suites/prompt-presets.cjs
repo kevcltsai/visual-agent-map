@@ -73,9 +73,9 @@ test('preset CRUD helpers are pure; built-ins are immutable', () => {
   assert.ok(presets.isBuiltinPreset('auto') && !presets.isBuiltinPreset('mine'));
 });
 
-test('tone prompt: absent or academic is byte-identical; a tone adds the rule block after the JSON contract (task and AIM)', () => {
+test('tone prompt: absent or academic is byte-identical; a tone adds the rule block after the JSON contract', () => {
   for (const language of ['en', 'zh-TW']) {
-    for (const context of [base, { ...base, promptProfile: 'aim', researchMode: 'local' }]) {
+    for (const context of [base]) {
       const plainPrompt = taskPrompt(context, language);
       assert.equal(taskPrompt({ ...context, toneText: undefined }, language), plainPrompt);
       assert.equal(taskPrompt({ ...context, toneText: presets.resolveToneText(custom, ['academic'], language) }, language), plainPrompt);

@@ -1,5 +1,4 @@
-// Shared harness of the byte-exact prompt snapshot files: tests/prompt-snapshots.cjs (every prompt except AIM, in
-// tests/snapshots/prompts) and tests/aim-prompt-snapshots.cjs (the AIM prompts, in tests/snapshots/prompts-aim).
+// Harness of the byte-exact prompt snapshot file tests/prompt-snapshots.cjs (every prompt, in tests/snapshots/prompts).
 // Compare mode is the default: any difference fails. UPDATE_PROMPT_SNAPSHOTS=1 rewrites the collector's directory.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

@@ -36,7 +36,7 @@ const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, a
   setPointerCapture() {}, focus() { this.focused++; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
   querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {} });
 
-async function harness({ aim = false } = {}) {
+async function harness() {
   const { repo, app, contents } = fixture('en');
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings; app.scope = { appScope: true };
@@ -50,7 +50,6 @@ async function harness({ aim = false } = {}) {
   };
   await add('root', 'Root'); await add('leaf', 'Leaf', 'root', { detail: 'Leaf detail text' }); await add('branch', 'Branch', 'root'); await add('kid', 'Kid', 'branch');
   await add('other', 'Other');
-  if (aim) mapDoc.aim = { version: 1 };
   await app.vault.create(MAP, core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
   const notices = [];
@@ -208,9 +207,8 @@ test('P5 cut: pasting into its own branch or a descendant is refused and the map
   }
 });
 
-test('P5 cut: a read-only map (AIM, topic selection mode) cannot be cut', async () => {
+test('P5 cut: a read-only map (topic selection mode) cannot be cut', async () => {
   const cases = {
-    aim: h => { h.view.map.aim = { version: 1 }; },
     integration: h => { h.view.selection.toggleMultiSelect(); }
   };
   for (const [name, arrange] of Object.entries(cases)) {

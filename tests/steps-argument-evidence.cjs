@@ -6,7 +6,6 @@ const S = require('./support.cjs');
 const { load, makeService, capturingRuntime, EMPTY_RESULT } = require('./support-replay.cjs');
 const parse = S.load('core/steps/task/parse.ts');
 const schemas = S.load('core/steps/task/schemas.ts');
-const diag = S.load('experiences/aim/search-diagnostic.ts');
 const sp = S.load('core/argument-map/source-proof.ts');
 
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -79,11 +78,11 @@ test('a not_found entry may not carry a source or a stance other than uncertain'
 
 test('the reply is read through the task parser only when need ids are passed; other requests are untouched', () => {
   const items = [found('n1')];
-  const withIds = parse.parseAiResult(body(items), 'T', 'en', false, false, undefined, IDS);
+  const withIds = parse.parseAiResult(body(items), 'T', 'en', IDS);
   assert.equal(withIds.argumentEvidence.length, 1);
   assert.equal(withIds.summary, 'S');
-  assert.throws(() => parse.parseAiResult(body([found('n9')]), 'T', 'en', false, false, undefined, IDS), /not usable/);
-  assert.throws(() => parse.parseAiResult(EMPTY_RESULT, 'T', 'en', false, false, undefined, IDS), /not usable/);
+  assert.throws(() => parse.parseAiResult(body([found('n9')]), 'T', 'en', IDS), /not usable/);
+  assert.throws(() => parse.parseAiResult(EMPTY_RESULT, 'T', 'en', IDS), /not usable/);
   // Existing contracts: the same reply parses to exactly what it did, with no new key, whatever extra field it carries.
   const old = parse.parseAiResult(body(items), 'T', 'en');
   assert.deepEqual(plain(old), { summary: 'S', detail: 'D', suggestions: [], visualReferences: [] });
@@ -104,13 +103,12 @@ test('response shape: strict per-need schema; contract misuse throws; other cont
   assert.equal(schema.properties.argumentEvidence.maxItems, 2);
   assert.deepEqual(item.required, ['need', 'status', 'stance', 'claim', 'quote', 'url']);
   assert.equal(item.additionalProperties, false);
-  for (const bad of [{ argumentEvidenceNeeds: undefined }, { argumentEvidenceNeeds: [] }, { researchMode: 'local' }, { promptProfile: 'aim' }, { aimIsolatedResearch: true }, { argumentEvidenceNeeds: [{ id: 'a', text: '' }, { id: 'a', text: '' }] }, { argumentEvidenceNeeds: [{ id: '', text: 'x' }] }])
+  for (const bad of [{ argumentEvidenceNeeds: undefined }, { argumentEvidenceNeeds: [] }, { researchMode: 'local' }, { argumentEvidenceNeeds: [{ id: 'a', text: '' }, { id: 'a', text: '' }] }, { argumentEvidenceNeeds: [{ id: '', text: 'x' }] }])
     assert.throws(() => schemas.taskResponseShape(context(bad), 'en'), /argument-evidence contract/);
   // Existing contexts: the argument fields do not appear, and the schema is the response schema exactly as before.
   const base = schemas.taskResponseShape(context({ responseContract: undefined, argumentEvidenceNeeds: undefined }), 'en');
   assert.equal('argumentEvidenceNeedIds' in base, false);
   assert.deepEqual(plain(base.schema), plain(schemas.localizedResponseSchema('en')));
-  assert.equal(schemas.taskResponseShape(context({ responseContract: 'aim-gap-audit', promptProfile: 'aim', researchMode: 'local' }), 'en').isAimGapAudit, true);
 });
 
 function runtimeEmitting(events, reply) {
@@ -154,15 +152,8 @@ test('AiTaskService: an existing research request gets no argumentEvidence and n
   assert.doesNotMatch(rt.calls[0].prompt, /argumentEvidence/);
 });
 
-test('AiTaskService: only pages from this call count, and a web event url never reaches the AIM diagnostic', () => {
+test('AiTaskService: only pages from this call count', () => {
   assert.deepEqual(plain(sp.openedUrlsFromEvents([searched, opened('https://a.example.org/x'), { method: 'item/started', params: { item: { type: 'webSearch', action: { type: 'openPage', url: 'https://b.example.org' } } } }])), ['https://a.example.org/x']);
-  // The AIM consumer reads only method and action.type: an event with a url counts like one without, and the url is not in its output.
-  const withUrl = diag.createSearchDiagnostic(1);
-  const without = diag.createSearchDiagnostic(1);
-  for (const event of [searched, opened('https://secret.example.org/p')]) withUrl.onEvent(event);
-  for (const event of [searched, { method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'openPage' } } } }]) without.onEvent(event);
-  assert.deepEqual(plain(withUrl.diagnostic), plain(without.diagnostic));
-  assert.doesNotMatch(JSON.stringify(withUrl.diagnostic), /secret\.example/);
 });
 
 test('AiTaskService: a page opened in a failed first attempt is not counted for the retried call', async () => {

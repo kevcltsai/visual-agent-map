@@ -384,16 +384,14 @@ test('k: a failing read ends the loading state, draws what is known and passes t
   assert.equal(h.view.renders.length, 1, 'the map is drawn once, not left half read');
 });
 
-test('l: the previous map\'s goal, sources and failed reports are gone before the first frame', async () => {
+test('l: the previous map\'s goal and sources are gone before the first frame', async () => {
   const h = await harness();
   Object.assign(h.view, { relevanceGoal: 'old goal', relevanceContext: 'old context', mapSources: [{ id: 'x' }], path: 'Agent Workspace/Topics/other/Map.md' });
-  h.view.aimFailedReports.set('q', { path: 'p' });
   const done = h.open();
   await tick(); fireFrame();
   assert.equal(h.view.relevanceGoal, undefined);
   assert.equal(h.view.relevanceContext, undefined);
   assert.equal(h.view.mapSources.length, 0);
-  assert.equal(h.view.aimFailedReports.size, 0);
   h.release(0, 1, 2);
   await done;
 });
@@ -499,13 +497,8 @@ test('q (B1): a card rebuilt in place is locked again, and no card action starts
   await view.retryWithOtherProvider([h.nodes[0]], 'gpt-6-luna');
   assert.equal(multi, 0);
   assert.equal(view.selection.state.multiSelected.size, 0);
-  let followups = 0;
-  view.runAimFollowup = async () => { followups++; };
-  await view.correctAimAssumption(h.nodes[0].id, 'a', 'b');
-  await view.steerAim({ nodeId: h.nodes[0].id }, 'x');
-  assert.equal(followups, 0);
   // The remaining entry points start with the same guard.
-  for (const name of ['retryAimSubtopics', 'continueAimResearch', 'planAimFromSelection', 'discardSynthesis', 'retrySynthesis', 'openSelectionSynthesis', 'retrySelectionSynthesis'])
+  for (const name of ['discardSynthesis', 'retrySynthesis', 'openSelectionSynthesis', 'retrySelectionSynthesis'])
     assert.match(guardSource(name), /\{\n    if \(this\.notesLoading\(\)\) return;/, name);
   await finish();
 });

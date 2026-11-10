@@ -17,13 +17,7 @@ import { actionStatus, armDiscard, modalActions } from "../../ui/modals/action-b
 
 export { armDiscard };
 import { clone, type MapDocument, parseMap, serializeMap } from "../../map-model";
-import {
-  normalizeReasoningLevel,
-  type ResearchDepth,
-  type ResearchMode,
-  type TopicInfo,
-  type VisualMode
-} from "../../repository";
+import { type ResearchDepth, type ResearchMode, type TopicInfo, type VisualMode } from "../../repository";
 import type { AiResult, ReasoningLevel, Suggestion } from "../../ai/types";
 import { type OutlineLimits, type OutlineNode } from "./outline-import";
 import { FOLLOW_DEFAULT_MODEL } from "../../core/model-discovery";
@@ -212,16 +206,6 @@ export function imageReferencesFromMarkdown(markdown: string): string {
       : []
   );
   return [...new Set(blocks)].join("\n\n");
-}
-/** Localized name of a reasoning level, for summaries; unknown values normalize the way the settings do. */
-export function reasoningLabel(level: string): string {
-  const labels: Record<string, string> = {
-    auto: t("ui.auto"),
-    low: t("ui.low"),
-    medium: t("ui.medium"),
-    high: t("ui.high")
-  };
-  return labels[normalizeReasoningLevel(level)];
 }
 
 /** What the manual merge says for a bad edit: a JSON syntax slip, or a structure the map cannot take. */

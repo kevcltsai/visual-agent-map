@@ -3,7 +3,6 @@
  * In memory only, FIFO with a fixed size, one ledger per plugin instance. It holds the undo and redo functions of the
  * change, never a view. Imports nothing from obsidian or from a view.
  */
-import { aimEnabled } from "../aim/availability";
 export const CROSS_MAP_HISTORY_LIMIT = 20;
 
 export type LedgerStatus = "applied" | "undone" | "broken";
@@ -113,33 +112,27 @@ export function ledgerFor(plugin: object): CrossMapLedger {
 }
 
 /** What stops a cross-map cut at the source map; `gone` drops the cut mark, the others keep it so the paste can be retried. */
-export type CutSourceProblem = "gone" | "changed" | "aim";
+export type CutSourceProblem = "gone" | "changed";
 interface CutSourceNode {
   id: string;
   parentId: string | null;
-  aimKind?: unknown;
-  aimQuestion?: unknown;
 }
 /**
  * Decides, from the source map as it is stored now, whether the recorded branches may still be cut out of it. `found`
  * is `resolveCrossSource` run on that same map (null: a topic, its note path or the tree shape no longer matches). A
- * map with AIM data, an AIM topic in the branch, or a new topic under the branch (it would be cut off from its parent)
- * is refused. Pure; the caller runs it again on the freshest copy it can read right before it writes.
+ * new topic under the branch (it would be cut off from its parent) is refused; an old AIM map is cut like any map. Pure; the caller runs it again on the freshest copy it can read right before it writes.
  */
 export function cutSourceProblem(
-  sourceMap: { id: string; aim?: unknown; nodes: readonly CutSourceNode[] },
+  sourceMap: { id: string; nodes: readonly CutSourceNode[] },
   record: { sourceMapId: string; nodeIds: readonly string[] },
   found: { branch: readonly CutSourceNode[] } | null
 ): CutSourceProblem | null {
   const present = new Set(sourceMap.nodes.map(node => node.id));
   if (sourceMap.id !== record.sourceMapId || record.nodeIds.every(id => !present.has(id))) return "gone";
-  if (aimEnabled() && sourceMap.aim) return "aim";
   if (!found) return "changed";
   const ids = new Set(record.nodeIds);
   if (sourceMap.nodes.some(node => node.parentId !== null && ids.has(node.parentId) && !ids.has(node.id)))
     return "changed";
-  if (aimEnabled() && found.branch.some(node => node.aimKind !== undefined || node.aimQuestion !== undefined))
-    return "aim";
   return null;
 }
 

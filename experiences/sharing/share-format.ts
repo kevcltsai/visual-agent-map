@@ -7,7 +7,6 @@ import { branchDirectionOf, layoutDirectionFor, type BranchDirection } from "../
 import { layoutOf, type MapLayout } from "../../map-layout";
 import { readTopicMarkers, type TopicMarker } from "../../topic-markers";
 import { readTopicLinks } from "../../topic-links";
-import { aimEnabled } from "../aim/availability";
 
 /** The `vam-share` v1 file format: one self-contained HTML file carrying this payload in `<script id="vam-map">`. */
 export const SHARE_FORMAT = "vam-share";
@@ -254,7 +253,7 @@ export interface ShareOptions {
 
 export class ShareError extends Error {
   constructor(
-    readonly code: "aim-map" | "unsupported-version",
+    readonly code: "unsupported-version",
     message: string
   ) {
     super(message);
@@ -405,16 +404,14 @@ function shareImages(
 }
 
 /**
- * Builds the share payload. Throws ShareError for AIM maps, which cannot be shared while AIM is available. While AIM is hidden
- * an old AIM map shares like any map: the payload is a whitelist of node fields, so it never carries `aim` or an `aim*` field.
+ * Builds the share payload. An old AIM map shares like any map: the payload is a whitelist of node fields, so it never
+ * carries `aim` or an `aim*` field.
  */
 export function buildSharePayload(
   map: MapDocument,
   notesById: Readonly<Record<string, ShareNoteInput | undefined>>,
   options: ShareOptions
 ): SharePayload {
-  if (aimEnabled() && (map.aim || map.nodes.some(node => node.aimKind !== undefined)))
-    throw new ShareError("aim-map", "AIM maps cannot be shared.");
   // Pictures travel only with the notes and only when images are on (decision #3); an asset must really be in the file.
   const withImages = options.includeImages && options.includeDetail;
   const assets: Record<string, string> = options.includeImages ? { ...options.assets } : {};

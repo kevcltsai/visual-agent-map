@@ -2,24 +2,7 @@
   "dirs": [
     "core/steps",
     "core/ai-task-service.ts",
-    "ai/aim-prompt.ts",
     "ai/visual-guidance.ts"
   ],
-  "allow": [
-    {
-      "file": "core/steps/task/schemas.ts",
-      "text": "A short plain-language preview. Never put machine-readable r",
-      "reason": "JSON response-schema description of the summary field, sent as part of the schema and pinned by the .schema.json snapshots; not a prompt template"
-    },
-    {
-      "file": "core/steps/task/schemas.ts",
-      "text": "Begin with the COMPLETE first-line AIM review marker contain",
-      "reason": "JSON response-schema description of the detail field, sent as part of the schema and pinned by the .schema.json snapshots; not a prompt template"
-    },
-    {
-      "file": "core/steps/task/schemas.ts",
-      "text": "completed only when at least one web search or page fetch re",
-      "reason": "JSON response-schema description of the search-status field, sent as part of the schema and pinned by the .schema.json snapshots; not a prompt template"
-    }
-  ]
+  "allow": []
 }

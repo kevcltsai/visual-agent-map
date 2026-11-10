@@ -393,7 +393,7 @@ test('AIM and integration mode can all export', async () => {
   assert.equal(h.counts.createBinary, 1, 'integration');
 });
 
-test('C6: the header has one export and share button; its menu holds the six exports and, set apart, Share as HTML page (not for an AIM map), which opens the share dialog', async () => {
+test('C6: the header has one export and share button; its menu holds the six exports and, set apart, Share as HTML page (an old AIM map too), which opens the share dialog', async () => {
   const h = await harness();
   const bar = element('div');
   const button = h.view.addExportButton(bar);
@@ -409,7 +409,7 @@ test('C6: the header has one export and share button; its menu holds the six exp
   h.menuTitles.length = 0;
   h.view.map.aim = { branches: [] };
   h.view.addExportButton(element('div')).click();
-  assert.deepEqual(h.menuTitles, exports, 'an AIM map cannot be shared, so the entry is not offered');
+  assert.deepEqual(h.menuTitles, [...exports, 'Share as HTML page…'], 'an old AIM map shares like any map, so the entry is offered');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.doesNotMatch(source, /iconButton\(headerActions, "share-2"/, 'no second share button in the header');
 });

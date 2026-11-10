@@ -1,7 +1,7 @@
-// Replay provider tests. Recorded raw replies are fed through the real AiTaskService parsing path (and, for AIM
-// review cases, the real Planner-review parser) at the single runtime.runTask seam. No live provider is involved.
-// Case kinds: (default) one raw reply through AiTaskService; "flow" an ordered list of raw replies (one AIM flow run, each exchange
-// keeps its step stepId@version); "aim-flow-result-layer" historical PARSED results fed through the AimManualFlow ask seam.
+// Replay provider tests. Recorded raw replies are fed through the real AiTaskService parsing path at the single
+// runtime.runTask seam. No live provider is involved.
+// Case kinds: (default) one raw reply through AiTaskService; "flow" an ordered list of raw replies (one flow run, each exchange
+// keeps its step stepId@version).
 // "parse" (exchanges-to-replay.mjs --parse-layer): raw replies from a live ai-exchanges.json replayed through the step's own parser only.
 // Set VAM_REPLAY_CORPUS=<dir> to also run every *.replay.json case in that directory (private corpus, optional layer).
 const { test } = require('node:test');
@@ -12,56 +12,11 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
-const { load, makeService, replayRuntime, replayAsk, ReplayMiss, readJson, sha256 } = require('./support-replay.cjs');
-const { fixture, AimManualFlow } = require('./support-aim-fixture.cjs');
+const { load, makeService, replayRuntime, ReplayMiss, readJson, sha256 } = require('./support-replay.cjs');
 
 const fixtures = path.join(__dirname, 'fixtures', 'replay');
 const plain = value => JSON.parse(JSON.stringify(value));
-const { parseAimPlannerReview } = load('experiences/aim/planner-review.ts');
 const { parseAiResult, extractJsonObject } = load('core/steps/task/parse.ts');
-
-/** Neutral, NON-historical stand-ins that let the flow reach the phase under test. They are never presented as recorded output. */
-const aimReview = (decision, extra = {}) => ({ summary: 'Neutral review', detail: `<!-- aim-review ${JSON.stringify({ decision, ...extra })} -->\nNeutral review`, suggestions: [], visualReferences: [] });
-const aimFills = headings => ({
-  'subtopic-research': { summary: 'Neutral research', detail: 'Research status: search completed\nNeutral evidence https://example.org/neutral', suggestions: [], visualReferences: [] },
-  'report-review': aimReview('conclude', { rationale: 'Neutral rationale.', stopReason: 'Neutral stop reason.' }),
-  'delivery-outline': { summary: 'Neutral outline', detail: `<!-- aim-delivery-outline ${JSON.stringify({ sections: (headings ?? ['Section A']).map(heading => ({ heading, purpose: 'Neutral purpose.', searchTask: '' })) })} -->`, suggestions: [], visualReferences: [] },
-  'delivery-writing': { summary: 'Neutral draft', detail: 'Neutral draft text.', suggestions: [], visualReferences: [] },
-  'delivery-acceptance': aimReview('conclude', { rationale: 'Neutral rationale.', stopReason: 'Neutral stop reason.' })
-});
-
-/**
- * Result-layer replay. The historical values are already-parsed AiResult objects (old mindsearch-* marker contract); they enter
- * at the ask seam, AFTER AiTaskService has folded a structured aim payload. So this asserts what CURRENT code does with those
- * historical outputs; it does not reproduce the original failure layer.
- */
-async function runResultLayerCase(replayCase) {
-  assert.ok(replayCase.historical?.length && replayCase.scenarios?.length, `${replayCase.name}: result-layer case needs historical[] and scenarios[]`);
-  for (const step of replayCase.historical) assert.equal(step.context.promptProfile, 'mindsearch', `${replayCase.name}: historical call carries the old mindsearch profile`);
-  const outcomes = [];
-  for (const scenario of replayCase.scenarios) {
-    const label = `${replayCase.name} / ${scenario.name}`;
-    const feed = scenario.feed.map(index => ({ phase: replayCase.historical[index].phase, result: replayCase.historical[index].result }));
-    const all = aimFills(scenario.outlineHeadings);
-    const fills = Object.fromEntries(scenario.fills.map(phase => [phase, all[phase]]));
-    const subject = fixture({ depth: 1 });
-    const replay = replayAsk(feed, fills);
-    let next = 0;
-    const flow = new AimManualFlow(subject.repository, subject.store, replay.ask, () => `replay-${++next}`);
-    let failure;
-    try { await flow.resumeAnswerResearch('Map.md', 'current', 'test', 'low'); } catch (error) { failure = error; }
-    const { expect } = scenario;
-    if (expect.phases) assert.deepEqual(replay.phases(), expect.phases, `${label}: phases the current flow requested`);
-    if (expect.neverRequested) assert.ok(!replay.phases().includes(expect.neverRequested), `${label}: current flow never requests ${expect.neverRequested}`);
-    assert.equal(replay.consumed(), expect.consumed, `${label}: historical results consumed`);
-    if (expect.error === null) assert.ifError(failure);
-    else { assert.ok(failure, `${label}: expected the current flow to reject`); assert.match(failure.message, new RegExp(expect.error), `${label}: rejection`); }
-    if (expect.recoveryPhase !== undefined) assert.equal(subject.getMap().aim.branches.find(branch => branch.id === 'current').deliveryRecovery?.phase ?? null, expect.recoveryPhase, `${label}: saved delivery recovery phase`);
-    for (const { phase, context } of replay.observed) assert.equal(context.promptProfile, 'aim', `${label}: current ${phase} context uses the aim profile, not the historical mindsearch profile`);
-    outcomes.push({ scenario: scenario.name, failure, replay });
-  }
-  return outcomes;
-}
 
 /** A "flow" case: ordered raw exchanges for one flow run, replayed through one AiTaskService in order. */
 async function runFlowCase(replayCase) {
@@ -84,44 +39,27 @@ async function runFlowCase(replayCase) {
   return { observed, runtime };
 }
 
-const KNOWN_TASK_STEP = /^(?:task\.(?:run|reference-extract|reference-reduce)|aim\.[a-z][a-z-]*)@1$/;
+const KNOWN_TASK_STEP = /^task\.(?:run|reference-extract|reference-reduce)@1$/;
+// An AIM exchange recorded before AIM was removed (ticket 07): its parser and contract are gone, so it replays as schema-only.
+const LEGACY_AIM_STEP = /^aim\.[a-z][a-z-]*@1$/;
 const STAGE_PREFIX = /^(?:Starting AI|Waiting for the AI reply|Parsing the AI reply|啟動 AI|等待 AI 回覆|解析 AI 回覆)\s*[:：]\s*/;
 const PARSING_STAGE = /^(?:Parsing the AI reply|解析 AI 回覆)\s*[:：]/;
 const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-/** The contract a recorded `aim` payload schema was built from (see ai/aim-contracts.ts payloadSchema), or undefined. */
-function contractFromAimSchema(aim) {
-  const keys = Object.keys(aim?.properties ?? {});
-  const has = key => keys.includes(key);
-  if (has('subtopics')) return { kind: 'plan' };
-  if (has('sections')) return { kind: 'outline' };
-  if (has('usable')) return { kind: 'reuse' };
-  if (has('goalAnswered') && aim.properties.decision?.enum) return { kind: 'review', decisions: aim.properties.decision.enum };
-  if (has('questions')) return { kind: 'intake' };
-  if (has('status') && !has('decision')) return { kind: 'delivery-research' };
-  if (has('decision') && has('question') && has('answerOptions') && aim.properties.decision.enum) return { kind: 'question', requireQuestion: aim.properties.decision.enum.length === 1 };
-  return undefined;
-}
-
 /**
  * Parse options for one recorded exchange, derived from its step id and the schema its request carried. This mirrors
- * taskResponseShape: an `aim` property means an AIM contract; the gap-audit summary enum means strict gap audit; a required
- * searchStatus means isolated web research. Anything it cannot derive is "schema-only", never a guess.
+ * taskResponseShape: only the plain response schema is parsed; a schema for a removed AIM contract (an `aim` payload, the
+ * gap-audit summary enum, a required searchStatus) and a legacy AIM step are "schema-only", never a guess.
  */
 function parseOptionsFor(entry) {
-  if (typeof entry.step !== 'string' || !KNOWN_TASK_STEP.test(entry.step)) throw new Error(`${entry.exchangeId}: unknown step id ${JSON.stringify(entry.step)}; replay knows task.run, task.reference-extract, task.reference-reduce and aim.<phase> at version 1`);
+  if (typeof entry.step === 'string' && LEGACY_AIM_STEP.test(entry.step)) return { schemaOnly: 'legacy AIM exchange (AIM was removed)' };
+  if (typeof entry.step !== 'string' || !KNOWN_TASK_STEP.test(entry.step)) throw new Error(`${entry.exchangeId}: unknown step id ${JSON.stringify(entry.step)}; replay knows task.run, task.reference-extract and task.reference-reduce at version 1`);
   const schema = entry.responseSchema;
   if (!schema || typeof schema !== 'object') return { schemaOnly: 'no response schema in the logged request' };
   const required = Array.isArray(schema.required) ? schema.required : [];
-  const aim = schema.properties?.aim;
-  const base = { strictGapAudit: false, webResearch: required.includes('searchStatus') };
-  if (aim) {
-    const contract = contractFromAimSchema(aim);
-    return contract ? { ...base, contract } : { schemaOnly: 'aim payload schema matches no known contract', requiredKeys: required };
-  }
-  if (sameJson(schema.properties?.summary?.enum, ['user_condition', 'external_evidence'])) return { ...base, strictGapAudit: true };
+  if (schema.properties?.aim || required.includes('searchStatus') || sameJson(schema.properties?.summary?.enum, ['user_condition', 'external_evidence'])) return { schemaOnly: 'schema of a removed AIM contract', requiredKeys: required };
   for (const key of ['summary', 'detail', 'suggestions', 'visualReferences']) if (!required.includes(key)) return { schemaOnly: `schema does not require ${key}`, requiredKeys: required };
-  return base;
+  return {};
 }
 
 /** Run one parse-layer entry. Returns "parsed", "parse-failure", "schema-only", "provider-error" or "unfinished". */
@@ -144,7 +82,7 @@ function checkParseEntry(entry, language) {
     return 'schema-only';
   }
   let result, failure;
-  try { result = parseAiResult(entry.raw, providerLabel, language, options.strictGapAudit, options.webResearch, options.contract); } catch (error) { failure = error; }
+  try { result = parseAiResult(entry.raw, providerLabel, language); } catch (error) { failure = error; }
   if (parseFailure) {
     assert.ok(failure, `${label}: recorded as a parse failure but current code parsed it`);
     const expected = recordedError.replace(STAGE_PREFIX, '');
@@ -186,7 +124,6 @@ async function runParseCase(replayCase, context) {
 /** Run any case kind. */
 async function runAnyCase(replayCase, context) {
   if (replayCase.kind === 'parse') return runParseCase(replayCase, context);
-  if (replayCase.kind === 'aim-flow-result-layer') return runResultLayerCase(replayCase);
   if (replayCase.kind === 'flow') return runFlowCase(replayCase);
   return runCase(replayCase);
 }
@@ -200,20 +137,13 @@ async function runCase(replayCase) {
   const service = makeService(runtime, { language: replayCase.language ?? 'en' });
   let result, failure;
   try { result = plain(await service.askModel(plain(replayCase.context), replayCase.model, replayCase.effort)); } catch (error) { failure = error; }
-  const { askModel, plannerReview } = replayCase.expect;
+  const { askModel } = replayCase.expect;
   if (askModel.error !== undefined) {
     assert.ok(failure, `${replayCase.name}: expected askModel to reject`);
     assert.match(failure.message, new RegExp(askModel.error), `${replayCase.name}: rejection message`);
   } else {
     assert.ifError(failure);
     assert.deepEqual(result, askModel.result, `${replayCase.name}: parsed AiResult`);
-  }
-  if (askModel.schemaRequiresAim !== undefined) assert.equal(runtime.calls[0].schema.required.includes('aim'), askModel.schemaRequiresAim, `${replayCase.name}: provider schema requires the aim payload`);
-  if (askModel.responseHasAim !== undefined) assert.equal('aim' in JSON.parse(replayCase.exchanges[0].response), askModel.responseHasAim, `${replayCase.name}: recorded reply carries an aim payload`);
-  if (plannerReview) {
-    assert.ok(result, `${replayCase.name}: Planner review needs a parsed result`);
-    if (plannerReview.error !== undefined) assert.throws(() => parseAimPlannerReview(result), new RegExp(plannerReview.error), `${replayCase.name}: Planner review parser`);
-    else assert.deepEqual(plain(parseAimPlannerReview(result)), plannerReview.review);
   }
   if (askModel.error === undefined || runtime.calls.length) assert.deepEqual(runtime.unused(), [], `${replayCase.name}: every recorded reply was consumed`);
   return { result, failure, runtime };
@@ -231,32 +161,6 @@ test('replay provider answers by prompt hash or in order, supports recorded erro
   assert.equal(sha256('a 2031-02-03T04:05:06.789Z b 12345678-1234-4123-8123-123456789abc'), sha256('a 2030-01-01T00:00:00Z b ffffffff-ffff-ffff-ffff-ffffffffffff'), 'time and UUID are normalized');
 });
 
-test('Round7 native ask_user response (de-identified): provider schema requires aim, reply has none, parser rejects it', async () => {
-  const replayCase = readJson(path.join(fixtures, 'round7-native-ask-user.replay.json'));
-  const { result } = await runCase(replayCase);
-  // Current behavior is REJECT, not repair: AiTaskService passes the reply through unchanged (no aim payload to fold,
-  // so no aim-review marker is produced) and parseAimPlannerReview refuses it. Nothing repairs the missing payload here.
-  assert.equal(/aim-review/.test(result.detail), false);
-  assert.equal(result.suggestions.length, 3);
-});
-
-test('Round6 failed exchange (de-identified) converts with the script and replays; current code rejects it at the Planner review parser (the recorded failure was in AiTaskService parsing)', async () => {
-  const { convertExchanges } = await import(pathToFileURL(path.join(__dirname, 'tools', 'exchanges-to-replay.mjs')).href);
-  const exchanges = readJson(path.join(fixtures, 'round6-failed-exchange.exchanges.json'));
-  const manifest = readJson(path.join(fixtures, 'round6-failed-exchange.manifest.json'));
-  assert.equal(exchanges[0].status, 'failed');
-  assert.match(exchanges[0].error, /structured control response was invalid/);
-  const [sequential] = convertExchanges(exchanges, { manifest, sequential: true });
-  assert.equal(sequential.exchanges[0].promptSha256, sha256(exchanges[0].prompt), 'converter and test helper hash identically');
-  assert.equal(sequential.source.status, 'failed');
-  assert.equal(sequential.exchanges[0].error, undefined, 'a parse-stage failure replays the raw reply, not a provider error');
-  const { result } = await runCase(sequential);
-  assert.equal(result.suggestions.length, 3);
-  // Hash-bound replay refuses a prompt that current code no longer builds: it must not silently answer.
-  const [bound] = convertExchanges(exchanges, { manifest, sequential: false });
-  await assert.rejects(runCase(bound), /no recorded response for prompt sha256/);
-});
-
 test('record once, convert, replay: the replayed run reproduces the live parsed result and failure', async () => {
   const { AiExchangeLog } = load('ai-exchange-log.ts');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-replay-'));
@@ -266,62 +170,57 @@ test('record once, convert, replay: the replayed run reproduces the live parsed 
     const log = new AiExchangeLog(nodeFsAdapter, logFile, error => errors.push(error));
     const raw = {
       ok: JSON.stringify({ summary: 'Live summary', detail: 'Live detail with [S1]', suggestions: [{ title: 'Next', task: 'Do next', contribution: 'Why' }], visualReferences: [] }),
-      review: JSON.stringify({ summary: 'Which option fits?', detail: 'Interim answer.', suggestions: [{ title: 'Option A', task: '', contribution: '' }, { title: 'Option B', task: '', contribution: '' }], visualReferences: [], aim: { goalAnswered: false, decision: 'ask_user', rationale: 'Needs one condition.', stopReason: '', question: 'Which option fits?', answerOptions: ['Option A', 'Option B'], researchTarget: null } })
+      broken: 'this is not json at all'
     };
     const live = {
       runTask: async (prompt, _model, _effort, _schema, controls) => {
         controls.onRequest({ input: [{ type: 'text', text: prompt }] });
         if (prompt.includes('Failing topic')) throw new Error('provider boom');
-        return prompt.includes('Review topic') ? raw.review : raw.ok;
+        return prompt.includes('Broken topic') ? raw.broken : raw.ok;
       }
     };
     const contexts = {
       ok: { title: 'Ok topic', summary: '', rules: '', detail: '', task: 'Plain task', ancestors: '', sourceContext: 'Source [S1]: a fact', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' },
-      review: { title: 'Review topic', summary: '', rules: '', detail: 'Reports', task: '<!-- aim-phase: report-review -->\nReview', ancestors: '', mode: 'task', promptProfile: 'aim', researchMode: 'local', researchDepth: 'fast', visualMode: 'off', aimContract: { kind: 'review', decisions: ['research_more', 'ask_user'] } },
+      broken: { title: 'Broken topic', summary: '', rules: '', detail: '', task: 'Plain task', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' },
       failing: { title: 'Failing topic', summary: '', rules: '', detail: '', task: 'Plain task', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' }
     };
     const liveService = makeService(live, { logging: true, exchanges: log });
     const liveResults = {};
-    for (const key of ['ok', 'review']) liveResults[key] = plain(await liveService.askModel(contexts[key], 'gpt-6-luna', 'low'));
+    liveResults.ok = plain(await liveService.askModel(contexts.ok, 'gpt-6-luna', 'low'));
+    const brokenFailure = await liveService.askModel(contexts.broken, 'gpt-6-luna', 'low').then(() => null, error => error);
+    assert.ok(brokenFailure, 'the unparsable reply fails live');
     await assert.rejects(liveService.askModel(contexts.failing, 'gpt-6-luna', 'low'), /provider boom/);
     await log.flush();
     assert.deepEqual(errors, []);
     const recorded = readJson(logFile);
     assert.equal(recorded.length, 3);
-    assert.deepEqual(recorded.map(item => item.status), ['parsed', 'parsed', 'failed']);
+    assert.deepEqual(recorded.map(item => item.status), ['parsed', 'failed', 'failed']);
 
-    const manifest = { 'Ok topic': { name: 'roundtrip-ok', context: contexts.ok, expect: { askModel: { result: liveResults.ok } } }, 'Review topic': { name: 'roundtrip-review', context: contexts.review, expect: { askModel: { result: liveResults.review }, plannerReview: { review: plain(parseAimPlannerReview(liveResults.review)) } } }, 'Failing topic': { name: 'roundtrip-failing', context: contexts.failing, expect: { askModel: { error: 'provider boom' } } } };
+    const manifest = { 'Ok topic': { name: 'roundtrip-ok', context: contexts.ok, expect: { askModel: { result: liveResults.ok } } }, 'Broken topic': { name: 'roundtrip-broken', context: contexts.broken, expect: { askModel: { error: brokenFailure.message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') } } }, 'Failing topic': { name: 'roundtrip-failing', context: contexts.failing, expect: { askModel: { error: 'provider boom' } } } };
     const manifestFile = path.join(directory, 'manifest.json');
     fs.writeFileSync(manifestFile, JSON.stringify(manifest));
     const corpus = path.join(directory, 'corpus');
     const output = execFileSync(process.execPath, [path.join(__dirname, 'tools', 'exchanges-to-replay.mjs'), logFile, corpus, '--manifest', manifestFile], { encoding: 'utf8' });
     assert.match(output, /3 replay case\(s\) written/);
     const files = fs.readdirSync(corpus).sort();
-    assert.deepEqual(files, ['roundtrip-failing.replay.json', 'roundtrip-ok.replay.json', 'roundtrip-review.replay.json']);
+    assert.deepEqual(files, ['roundtrip-broken.replay.json', 'roundtrip-failing.replay.json', 'roundtrip-ok.replay.json']);
     for (const file of files) {
       const replayCase = readJson(path.join(corpus, file));
       assert.equal(replayCase.matchPrompt, true);
       const { result } = await runCase(replayCase); // hash-bound: current code must rebuild the very same prompt
-      if (file.includes('ok')) assert.deepEqual(result, liveResults.ok);
-      if (file.includes('review')) assert.deepEqual(result, liveResults.review);
+      if (file === 'roundtrip-ok.replay.json') assert.deepEqual(result, liveResults.ok);
     }
+    // A parse-stage failure replays the raw reply, not a provider error; hash-bound replay refuses a prompt current code does not build.
+    const { convertExchanges } = await import(pathToFileURL(path.join(__dirname, 'tools', 'exchanges-to-replay.mjs')).href);
+    const [sequential] = convertExchanges([recorded[1]], { manifest, sequential: true });
+    assert.equal(sequential.exchanges[0].error, undefined, 'a parse-stage failure keeps its raw reply');
+    assert.equal(sequential.exchanges[0].promptSha256, sha256(recorded[1].prompt), 'converter and test helper hash identically');
+    const replayedBroken = await runCase(sequential);
+    assert.match(replayedBroken.failure.message, new RegExp(sequential.expect.askModel.error), 'the replayed raw reply fails to parse as it did live');
+    const [bound] = convertExchanges([recorded[0]], { manifest });
+    await assert.rejects(runCase({ ...bound, context: { ...bound.context, title: 'A title current code did not record' } }), /no recorded response for prompt sha256/);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
-
-for (const round of ['r4', 'r5']) {
-  const file = path.join(fixtures, `${round}-result-layer.replay.json`);
-  test(`${round.toUpperCase()} result-layer replay (de-identified): CURRENT code handling of historical parsed outputs (old mindsearch-* marker contract), not a reproduction of the original failure layer`, async () => {
-    await runResultLayerCase(readJson(file));
-  });
-  test(`${round.toUpperCase()} public replay fixture is de-identified (no ids, paths, timestamps, research or user text from the evidence)`, () => {
-    const text = fs.readFileSync(file, 'utf8');
-    for (const [name, pattern] of Object.entries({
-      uuid: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i, hex: /[0-9a-f]{16,}/i, time: /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/, path: /\/Users\/|[A-Za-z]:\\\\|\.md\b/,
-      topic: /venv|powershell|unittest|python|windows|\.venv|Scripts/i, cjk: /[\u3040-\u30ff\u3400-\u9fff]/
-    })) assert.equal(pattern.test(text), false, `${round}: fixture must not contain ${name}`);
-    for (const url of text.match(/https?:\/\/[^\s"\\)]+/g) ?? []) assert.match(url, /^https:\/\/example\.org\/neutral$/, `${round}: only the neutral URL may appear`);
-  });
-}
 
 test('flow case: converter keeps AiExchange step and order, and the ordered raw exchanges replay to the live parsed results', async () => {
   const { AiExchangeLog } = load('ai-exchange-log.ts');
@@ -339,13 +238,13 @@ test('flow case: converter keeps AiExchange step and order, and the ordered raw 
     await log.flush();
     const recorded = readJson(logFile);
     assert.equal(recorded.length, 2);
-    recorded[0].step = 'aim.outline@1'; recorded[1].step = 'aim.write@2'; // a Step Runner call stamps stepId@version on its exchange
-    const manifest = { '@flow': { language: 'en', expect: { stepOrder: ['aim.outline@1', 'aim.write@2'] } } };
+    recorded[0].step = 'flow.first@1'; recorded[1].step = 'flow.second@2'; // a Step Runner call stamps stepId@version on its exchange
+    const manifest = { '@flow': { language: 'en', expect: { stepOrder: ['flow.first@1', 'flow.second@2'] } } };
     recorded.forEach((entry, index) => { manifest[entry.id] = { context: contexts[index], expect: { askModel: { result: results[index] } } }; });
     const [flow, ...rest] = convertExchanges(recorded, { manifest, flow: 'live-flow' });
     assert.equal(rest.length, 0, 'a flow converts to exactly one case');
     assert.equal(flow.kind, 'flow');
-    assert.deepEqual(flow.exchanges.map(item => item.step), ['aim.outline@1', 'aim.write@2']);
+    assert.deepEqual(flow.exchanges.map(item => item.step), ['flow.first@1', 'flow.second@2']);
     assert.deepEqual(flow.exchanges.map(item => item.exchangeId), recorded.map(item => item.id));
     assert.equal(flow.matchPrompt, true);
     const { observed } = await runFlowCase(JSON.parse(JSON.stringify(flow)));
@@ -358,7 +257,7 @@ test('flow case: converter keeps AiExchange step and order, and the ordered raw 
     assert.deepEqual(fs.readdirSync(out), ['live-flow.replay.json']);
     const written = readJson(path.join(out, 'live-flow.replay.json'));
     await runAnyCase(written);
-    await assert.rejects(runFlowCase({ ...written, expect: { stepOrder: ['aim.write@2', 'aim.outline@1'] } }), /recorded step order/);
+    await assert.rejects(runFlowCase({ ...written, expect: { stepOrder: ['flow.second@2', 'flow.first@1'] } }), /recorded step order/);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
@@ -369,11 +268,8 @@ async function recordSyntheticExchanges(directory) {
   const logFile = path.join(directory, 'ai-exchanges.json');
   const log = new AiExchangeLog(nodeFsAdapter, logFile, error => { throw error; });
   const base = { summary: '', rules: '', detail: '', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' };
-  const reviewReply = JSON.stringify({ summary: 'Review', detail: 'Interim.', suggestions: [], visualReferences: [], aim: { goalAnswered: true, decision: 'conclude', rationale: 'Enough evidence.', stopReason: 'Goal answered.', question: '', answerOptions: [], researchTarget: null } });
-  const auditReply = JSON.stringify({ summary: 'external_evidence', detail: 'A web search can answer it.', suggestions: [], visualReferences: [] });
   const replies = {
-    'Review topic': reviewReply,
-    'Audit topic': auditReply,
+    'Ok topic': JSON.stringify({ summary: 'Ok summary', detail: 'Ok detail', suggestions: [], visualReferences: [] }),
     'Claude topic': JSON.stringify({ summary: 'Claude summary', detail: 'Claude detail', suggestions: [], visualReferences: [] }),
     'Broken topic': 'this is not json at all'
   };
@@ -386,10 +282,8 @@ async function recordSyntheticExchanges(directory) {
     }
   };
   const service = makeService(runtime, { logging: true, exchanges: log });
-  const aim = { ...base, promptProfile: 'aim', ancestors: '' };
   const contexts = [
-    ['gpt-6-luna', { ...aim, title: 'Review topic', detail: 'Reports', task: '<!-- aim-phase: report-review -->\nReview', aimContract: { kind: 'review', decisions: ['research_more', 'ask_user', 'conclude'] } }],
-    ['gpt-6-luna', { ...aim, title: 'Audit topic', task: '<!-- aim-phase: research-gap-audit -->\nAudit', responseContract: 'aim-gap-audit' }],
+    ['gpt-6-luna', { ...base, title: 'Ok topic', task: 'Plain task' }],
     ['claude:sonnet', { ...base, title: 'Claude topic', task: 'Plain task' }],
     ['gpt-6-luna', { ...base, title: 'Broken topic', task: 'Plain task' }],
     ['gpt-6-luna', { ...base, title: 'Provider topic', task: 'Plain task' }]
@@ -403,30 +297,25 @@ test('parse-layer replay: a recorded live log converts without a manifest and re
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-parse-layer-'));
   try {
     const { logFile, recorded } = await recordSyntheticExchanges(directory);
-    assert.deepEqual(recorded.map(item => item.status), ['parsed', 'parsed', 'parsed', 'failed', 'failed']);
-    assert.deepEqual(recorded.map(item => item.step), ['aim.report-review@1', 'aim.research-gap-audit@1', 'task.run@1', 'task.run@1', 'task.run@1']);
+    assert.deepEqual(recorded.map(item => item.status), ['parsed', 'parsed', 'failed', 'failed']);
+    assert.deepEqual(recorded.map(item => item.step), ['task.run@1', 'task.run@1', 'task.run@1', 'task.run@1']);
     const corpus = path.join(directory, 'corpus');
     const output = execFileSync(process.execPath, [path.join(__dirname, 'tools', 'exchanges-to-replay.mjs'), logFile, corpus, '--parse-layer', 'synthetic-live'], { encoding: 'utf8' });
     assert.match(output, /1 replay case\(s\) written/);
     assert.deepEqual(fs.readdirSync(corpus), ['synthetic-live.replay.json']);
     const replayCase = readJson(path.join(corpus, 'synthetic-live.replay.json'));
     assert.equal(replayCase.kind, 'parse');
-    assert.equal(replayCase.entries.length, 5);
-    assert.deepEqual(replayCase.entries.map(item => item.responseSchema !== null), [true, true, true, true, true].map((_value, index) => index !== 2), 'Codex requests carry the schema; the Claude request log does not');
-    assert.equal(replayCase.entries[0].responseSchema.properties.aim.properties.decision.enum.includes('conclude'), true);
-    assert.equal(replayCase.entries[4].raw, null, 'a provider failure keeps no raw reply');
+    assert.equal(replayCase.entries.length, 4);
+    assert.deepEqual(replayCase.entries.map(item => item.responseSchema !== null), [true, false, true, true], 'Codex requests carry the schema; the Claude request log does not');
+    assert.equal(replayCase.entries[3].raw, null, 'a provider failure keeps no raw reply');
     assert.equal(replayCase.entries[0].promptSha256, sha256(recorded[0].prompt));
     const modes = await runParseCase(replayCase);
-    assert.deepEqual(modes, ['parsed', 'parsed', 'schema-only', 'parse-failure', 'provider-error']);
-    // The AIM entry really goes through the contract fold (the aim payload becomes the review marker); the gap audit is checked strictly.
-    const mutatedAudit = JSON.parse(JSON.stringify(replayCase));
-    mutatedAudit.entries[1].raw = JSON.stringify({ summary: 'something_else', detail: 'x', suggestions: [], visualReferences: [] });
-    await assert.rejects(runParseCase(mutatedAudit), /invalid structured classification/);
-    const mutatedAim = JSON.parse(JSON.stringify(replayCase));
-    mutatedAim.entries[0].raw = 'not json at all';
-    await assert.rejects(runParseCase(mutatedAim), /No complete JSON object/);
+    assert.deepEqual(modes, ['parsed', 'schema-only', 'parse-failure', 'provider-error']);
+    const mutated = JSON.parse(JSON.stringify(replayCase));
+    mutated.entries[0].raw = 'not json at all';
+    await assert.rejects(runParseCase(mutated), /No complete JSON object/);
     const mutatedFailure = JSON.parse(JSON.stringify(replayCase));
-    mutatedFailure.entries[3].raw = JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] });
+    mutatedFailure.entries[2].raw = JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] });
     await assert.rejects(runParseCase(mutatedFailure), /recorded as a parse failure but current code parsed it/);
     const unknownStep = JSON.parse(JSON.stringify(replayCase));
     unknownStep.entries[0].step = 'mystery.step@1';
@@ -434,9 +323,13 @@ test('parse-layer replay: a recorded live log converts without a manifest and re
     const noStep = JSON.parse(JSON.stringify(replayCase));
     noStep.entries[0].step = null;
     await assert.rejects(runParseCase(noStep), /unknown step id/);
+    // An exchange logged by the removed AIM engine (an aim.<phase> step, or an aim payload schema) replays as schema-only.
+    const [ok] = JSON.parse(JSON.stringify(replayCase.entries));
+    const legacy = { ...replayCase, entries: [{ ...ok, step: 'aim.report-review@1' }, { ...ok, responseSchema: { ...ok.responseSchema, properties: { ...ok.responseSchema.properties, aim: { type: 'object' } } } }] };
+    assert.deepEqual(await runParseCase(legacy), ['schema-only', 'schema-only']);
     // Through the corpus dispatcher with node:test subtests, schema-only entries are named as such.
     await runAnyCase(replayCase);
-    assert.equal(isSchemaOnly(replayCase.entries[2]), true);
+    assert.equal(isSchemaOnly(replayCase.entries[1]), true);
     assert.equal(isSchemaOnly(replayCase.entries[0]), false);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });

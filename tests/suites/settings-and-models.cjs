@@ -103,57 +103,6 @@ test('general tasks retain existing Detail while decompose uses lightweight cont
   assert.deepEqual(JSON.parse(extractJsonObject('我會先查核。\n{"summary":"ok","detail":"brace } in string"}\n完成。')), { summary: 'ok', detail: 'brace } in string' });
   assert.throws(() => extractJsonObject('沒有結構化回應'), /JSON object/);
 });
-test('AIM model refresh updates choices, preserves selection, and reports failures', async () => {
-  class Element {
-    constructor(tag, options = {}) { this.tag = tag; this.children = []; this.attributes = {}; this.text = options.text ?? ''; this.value = options.value ?? ''; this.disabled = false; this.checked = false; this.isConnected = true; this.handlers = {}; }
-    createDiv(options) { const child = new Element('div', options); this.children.push(child); return child; }
-    createEl(tag, options) { const child = new Element(tag, options); this.children.push(child); return child; }
-    createSpan(options) { return this.createEl('span', options); }
-    setAttr(name, value) { this.attributes[name] = value; }
-    setText(value) { this.text = value; }
-    addClass() {}
-    toggleClass() {}
-    addEventListener(name, handler) { this.handlers[name] = handler; }
-    replaceChildren() { this.children = []; }
-    focus() {}
-    querySelector(selector) { return selector === 'button:last-child' ? this.children.filter(child => child.tag === 'button').at(-1) : null; }
-    click() { return this.handlers.click?.(); }
-  }
-  class Modal { constructor() { this.contentEl = new Element('div'); this.titleEl = new Element('h2'); } close() { this.contentEl.isConnected = false; } }
-  class Setting {
-    constructor(parent) { this.controlEl = parent.createDiv(); }
-    addButton(configure) { const button = this.controlEl.createEl('button'); configure({ setButtonText(text) { button.text = text; return this; }, setCta() { return this; }, onClick(handler) { button.handlers.click = handler; return this; } }); return this; }
-  }
-  const { AimStartModal } = load('ui/modals/aim-start-modal.ts', { obsidian: { ...obsidian, Modal, Setting } });
-  const open = refreshModels => {
-    const modal = new AimStartModal({}, async () => {}, [{ id: 'old-model', label: 'Old model' }], 'old-model', 'low', refreshModels);
-    modal.onOpen();
-    const all = []; const visit = el => { all.push(el); for (const child of el.children) visit(child); }; visit(modal.contentEl);
-    return { modal, all };
-  };
-  let calls = 0;
-  const success = open(async () => { calls++; return [{ id: 'old-model', label: 'Old model' }, { id: 'new-model', label: 'New model' }]; });
-  const refresh = success.all.find(el => el.tag === 'button' && el.text === 'Refresh model list');
-  const model = success.all.find(el => el.tag === 'select' && el.attributes['aria-label'] === 'Model');
-  refresh.click(); await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(calls, 1); assert.equal(model.value, 'old-model');
-  assert.deepEqual(model.children.map(option => option.value), ['old-model', 'new-model']);
-  const changedSelection = open(async () => ({ models: [{ id: 'new-model', label: 'New model' }], message: 'partial provider error', preserveSelection: true }));
-  const changedModel = changedSelection.all.find(el => el.tag === 'select' && el.attributes['aria-label'] === 'Model');
-  const initialRequestId = changedSelection.modal.requestId;
-  changedSelection.all.find(el => el.tag === 'button' && el.text === 'Refresh model list').click(); await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(changedModel.value, 'old-model'); assert.equal(changedSelection.modal.requestId, initialRequestId);
-  assert.deepEqual(changedModel.children.map(option => option.value), ['new-model', 'old-model']);
-  assert.ok(changedSelection.all.some(el => el.text === 'partial provider error'));
-  const removedSelection = open(async () => [{ id: 'new-model', label: 'New model' }]);
-  const removedModel = removedSelection.all.find(el => el.tag === 'select' && el.attributes['aria-label'] === 'Model');
-  const removedRequestId = removedSelection.modal.requestId;
-  removedSelection.all.find(el => el.tag === 'button' && el.text === 'Refresh model list').click(); await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(removedModel.value, 'new-model'); assert.notEqual(removedSelection.modal.requestId, removedRequestId);
-  const failed = open(async () => { throw new Error('provider unavailable'); });
-  failed.all.find(el => el.tag === 'button' && el.text === 'Refresh model list').click(); await new Promise(resolve => setTimeout(resolve, 0));
-  assert.ok(failed.all.some(el => el.text.includes('provider unavailable')));
-});
 
 test('saved content templates are normalized with the same call onload uses', () => {
   // Plugin.onload needs a full Obsidian workspace (editor extensions, views), so this exercises the exact
@@ -289,20 +238,16 @@ integrationTest('MS-04: changing the current reasoning changes the next read of 
   repo.settings.cliReasoning = 'auto';
   assert.equal((await repo.readNote(root.path)).reasoning, 'auto');
 });
-integrationTest('MS-04: createNote and createNoteAt write reasoning-level only for a manual topic', async () => {
+integrationTest('MS-04: createNote writes reasoning-level only for a manual topic', async () => {
   const { repo, contents, map, mapPath } = await reasoningFixture();
   for (const source of ['workspace', 'inherited']) {
     const n = await repo.createNote(`N ${source}`, 'm', map, mapPath, source, { reasoning: 'high' });
     assert.equal(rawLevel(contents, n.path), undefined, `createNote ${source}`);
-    const at = await repo.createNoteAt(`A ${source}`, 'm', map, mapPath, source, `${repo.topicFolder(mapPath, 'Notes')}/A ${source}.md`, `id-${source}`, { reasoning: 'high' });
-    assert.equal(rawLevel(contents, at.path), undefined, `createNoteAt ${source}`);
   }
   const m = await repo.createNote('N manual', 'm', map, mapPath, 'manual', { reasoning: 'high' });
   assert.equal(rawLevel(contents, m.path), 'high');
   const mDefault = await repo.createNote('N manual2', 'm', map, mapPath, 'manual');
   assert.equal(rawLevel(contents, mDefault.path), 'low');
-  const mAt = await repo.createNoteAt('A manual', 'm', map, mapPath, 'manual', `${repo.topicFolder(mapPath, 'Notes')}/A manual.md`, 'id-manual', { reasoning: 'medium' });
-  assert.equal(rawLevel(contents, mAt.path), 'medium');
 });
 integrationTest('MS-04: upgrade-0.18 notes keep their stored reasoning-level byte for byte; reading ignores it for non-override topics', async () => {
   const fs = require('node:fs'), path = require('node:path'), support = require('../support.cjs');
@@ -441,12 +386,12 @@ const valueOf = page => typeof page.displayValue === 'function' ? page.displayVa
 const statusOf = page => typeof page.status === 'function' ? page.status() : page.status;
 const pageNamed = (tab, name) => allPages(tab.getSettingDefinitions()).find(p => p.name === name);
 
-test('settings page: five top-level groups in order, twelve rows, three top-level pages and no nested page', () => {
+test('settings page: five top-level groups in order, eleven rows (no AIM folder row since AIM was removed), three top-level pages and no nested page', () => {
   const { tab } = groupedTab();
   const defs = tab.getSettingDefinitions();
   assert.ok(defs.every(d => d.type === 'group'), 'the top level holds only groups');
   assert.deepEqual(plain(defs.map(d => d.heading)), ['General', 'AI', 'Notes', 'Map', 'Advanced']);
-  assert.equal(defs.reduce((n, d) => n + d.items.length, 0), 12);
+  assert.equal(defs.reduce((n, d) => n + d.items.length, 0), 11);
   assert.deepEqual(plain(pagesOf(defs).map(p => p.name)), ['AI connection', 'Note style', 'Advanced and troubleshooting']);
   const note = pageNamed(tab, 'Note style');
   assert.deepEqual(plain(pagesOf(note.items).map(p => p.name)), [], 'the "By topic type" sub-page is gone (grilling Q11)');
@@ -460,7 +405,8 @@ test('settings page: every control and saved key is still reachable after the re
   assert.ok(rows.some(r => r.control && r.control.key === 'claudePath'));
   assert.equal(rows.filter(r => r.render && MODEL_ROW.test(r.name)).length, 1);
   const names = rows.map(r => r.name);
-  for (const name of ['Interface language', 'Hover preview size', 'Mind Maps folder', 'AIM folder', 'Record AI exchanges', 'Save map AI conversations', 'Add diagrams after research', 'Reconnect existing Workspace', 'File location', 'Topic', 'AIM conclusion note']) assert.ok(names.includes(name), `${name} is on the page`);
+  for (const name of ['Interface language', 'Hover preview size', 'Mind Maps folder', 'Record AI exchanges', 'Save map AI conversations', 'Add diagrams after research', 'Reconnect existing Workspace', 'File location', 'Topic']) assert.ok(names.includes(name), `${name} is on the page`);
+  for (const name of ['AIM folder', 'AIM conclusion note']) assert.equal(names.includes(name), false, `${name} is gone with AIM (the saved aimFolder value is kept)`);
 });
 
 test('settings page: the two sub-page intro rows render with an empty name and the sentence as the description, and stay out of search', () => {
@@ -498,11 +444,11 @@ test('AI connection entry: shows how many CLIs are connected and warns only when
   assert.equal(statusOf(page), null);
 });
 
-test('Note style page: a "Topic types" group of seven rows in kind order (the AIM row last), then "My styles" with one row, then "More" with only File location; no Structure, Voice or By topic type row', () => {
+test('Note style page: a "Topic types" group of six rows in kind order (no AIM row since AIM was removed), then "My styles" with one row, then "More" with only File location; no Structure, Voice or By topic type row', () => {
   const note = pageNamed(groupedTab().tab, 'Note style');
   const groups = note.items.filter(item => item.type === 'group');
   assert.deepEqual(plain(groups.map(group => group.heading)), ['Topic types', 'My styles', 'More']);
-  assert.deepEqual(plain(groups[0].items.map(row => row.name)), ['Topic', 'Atomic knowledge', 'Hypothesis', 'Evidence', 'Conclusion', 'Action', 'AIM conclusion note']);
+  assert.deepEqual(plain(groups[0].items.map(row => row.name)), ['Topic', 'Atomic knowledge', 'Hypothesis', 'Evidence', 'Conclusion', 'Action']);
   assert.deepEqual(plain(groups[1].items.map(row => row.name)), ['My styles']);
   assert.deepEqual(plain(groups[2].items.map(row => row.name)), ['File location']);
   const names = flattenDefinitions(note.items).map(row => row.name);

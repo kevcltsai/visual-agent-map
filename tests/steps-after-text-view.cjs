@@ -157,7 +157,7 @@ test('plus: an attached text block has a + like a card; its menu lists topic kin
   assert.equal(h.view.history.past.length, past + 1);
 });
 
-test('plus: not on a free block, not in selection mode, AIM or presentation', async () => {
+test('plus: not on a free block, not in selection mode or presentation', async () => {
   const free = await harness(({ root }) => [txt({ id: 'f1', x: 5, y: 6 }), txt({ parentId: root.id })]);
   assert.equal(find(free.textEl('f1'), i => i.hasClass('vam-text-add')), undefined, 'free block');
   assert.ok(find(free.textEl('t1'), i => i.hasClass('vam-text-add')));
@@ -166,10 +166,6 @@ test('plus: not on a free block, not in selection mode, AIM or presentation', as
   assert.equal(multi.view.selection.state.multiSelectMode, true);
   multi.view.render();
   assert.equal(find(multi.textEl('t1'), i => i.hasClass('vam-text-add')), undefined, 'selection mode');
-  const aim = await harness();
-  aim.view.map.aim = { branches: [] };
-  aim.view.render();
-  assert.equal(find(aim.textEl('t1'), i => i.hasClass('vam-text-add')), undefined, 'AIM');
   const present = await harness();
   present.view.presentation = { order: [], currentId: 'x' };
   present.view.render();

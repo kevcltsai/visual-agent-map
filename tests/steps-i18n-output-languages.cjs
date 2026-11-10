@@ -165,19 +165,6 @@ test('output languages: ja task prompt equals the en prompt except the language 
   assert.equal(/日本語|日文/.test(ja), false);
 });
 
-test('output languages: ja AIM shell prompts equal the en prompts except the language name and heading clauses', async () => {
-  const aimBase = { title: 'Goal G', summary: 'Summary S', rules: 'Rule R', detail: 'Reports D', ancestors: 'Known conditions C', workingFindings: 'Prior findings F', sourceContext: 'Source [S1]: fact', mode: 'task', promptProfile: 'aim', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' };
-  for (const phase of [undefined, 'initial-clarification', 'initial-question', 'research-plan', 'report-review', 'delivery-writing']) {
-    const task = phase ? `<!-- aim-phase: ${phase} -->\nPhase task text.` : 'Plain task text.';
-    const en = await promptsFor({ ...aimBase, task, outputLanguage: 'en' }, { language: 'en' });
-    const ja = await promptsFor({ ...aimBase, task, outputLanguage: 'ja' }, { language: 'en' });
-    assert.equal(ja.length, en.length, String(phase));
-    ja.forEach((call, i) => assertReduces(`aim ${phase}`, call.prompt, en[i].prompt));
-    assert.ok(ja[0].prompt.includes('Japanese'), `aim ${phase} names Japanese`);
-    assert.equal(ja[0].prompt.includes(CLAUSE_JA), false, `aim ${phase}: AIM prompts carry no fixed-heading clause (as for zh-CN)`);
-  }
-});
-
 test('output languages: ja outline, structure-review and goal-recommend prompts equal the en prompts except the language name', () => {
   const { buildOutlineGeneratePrompt } = support.load('core/outline-generation-service.ts', { obsidian: support.obsidian });
   const { buildStructureReviewPrompt } = support.load('core/structure-review-service.ts', { obsidian: support.obsidian });
@@ -215,19 +202,6 @@ test('output languages: same-as-input task prompts equal the en prompts except t
   // Under a zh-TW interface the instruction language stays English for this row (the clause is spelled for the instruction language).
   const zhUi = (await promptsFor({ ...base, outputLanguage: 'same-as-input' }, { language: 'zh-TW' }))[0].prompt;
   assert.ok(zhUi.includes(flavour.name) && !zhUi.includes('使用者的主題'));
-});
-
-test('output languages: same-as-input AIM shell prompts equal the en prompts except the clause (no heading clause, as for ja)', async () => {
-  const aimBase = { title: 'Goal G', summary: 'Summary S', rules: 'Rule R', detail: 'Reports D', ancestors: 'Known conditions C', workingFindings: 'Prior findings F', sourceContext: 'Source [S1]: fact', mode: 'task', promptProfile: 'aim', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' };
-  for (const phase of [undefined, 'initial-clarification', 'initial-question', 'research-plan', 'report-review', 'delivery-writing']) {
-    const task = phase ? `<!-- aim-phase: ${phase} -->\nPhase task text.` : 'Plain task text.';
-    const en = await promptsFor({ ...aimBase, task, outputLanguage: 'en' }, { language: 'en' });
-    const follow = await promptsFor({ ...aimBase, task, outputLanguage: 'same-as-input' }, { language: 'en' });
-    assert.equal(follow.length, en.length, String(phase));
-    follow.forEach((call, i) => assertReduces(`aim ${phase}`, call.prompt, en[i].prompt, undefined, followFlavour('topic', 'Goal G')));
-    assert.ok(follow[0].prompt.includes(anchoredEn('topic', 'Goal G')), `aim ${phase} carries the anchored clause`);
-    assert.ok(follow[0].prompt.includes('Goal G'), `aim ${phase}: the prompt contains the user text (the goal)`);
-  }
 });
 
 test('output languages: same-as-input outline and structure-review prompts equal the en prompts except the clause, and contain the user text', () => {
@@ -280,48 +254,6 @@ test('output languages: map.outputLanguage round-trips, and an unknown value is 
   for (const id of ['ja', 'same-as-input', 'zh-CN']) assert.equal(parseMap(serializeMap({ ...base, outputLanguage: id })).outputLanguage, id);
   assert.equal('outputLanguage' in parseMap(serializeMap(base)), false);
   for (const bad of ['xx', 5, null, {}]) assert.equal('outputLanguage' in parseMap(serializeMap({ ...base, outputLanguage: bad })), false, `${JSON.stringify(bad)} is ignored`);
-});
-
-test('output languages: new AIM maps record outputLanguage when it differs from the note language or was picked by hand; a legacy map gets it on first write', async () => {
-  const subject = await support.coverageSetup('東京ラーメンの旅');
-  const stored = await subject.repo.readMap(subject.created.mapPath);
-  assert.equal(stored.outputLanguage, 'ja');
-  assert.equal(stored.aim.contentLanguage, 'en');
-  assert.equal('outputLanguage' in stored.aim, false, 'the 6e2250e aim.outputLanguage field is gone');
-  // A Chinese topic in the same interface stores no outputLanguage.
-  const plain = await support.coverageSetup('東京五天自由行怎麼排');
-  assert.equal('outputLanguage' in (await plain.repo.readMap(plain.created.mapPath)), false);
-  // An English topic follows its text (D-2026-10-83) and fixed text stays English; Simplified Chinese keeps Traditional fixed text.
-  const english = await support.coverageSetup('Plan a 5-day Taipei trip');
-  const englishMap = await english.repo.readMap(english.created.mapPath);
-  assert.equal(englishMap.outputLanguage, 'same-as-input'); assert.equal(englishMap.aim.contentLanguage, 'en');
-  const simplified = await support.coverageSetup('东京五天自由行怎么排');
-  const simplifiedMap = await simplified.repo.readMap(simplified.created.mapPath);
-  assert.equal(simplifiedMap.outputLanguage, 'zh-CN'); assert.equal(simplifiedMap.aim.contentLanguage, 'zh-TW');
-  // A language picked by hand in the start dialog wins over detection and is recorded even when it equals the note language.
-  const { createAimMap } = support.load('experiences/aim/create-map.ts');
-  const repo = support.fixture('en').repo;
-  const manual = await createAimMap(repo, 'gpt-6-luna', { requestId: 'manual-1', topic: 'Plan a 5-day Taipei trip', context: '', outputLanguage: 'es', minimumAnswersBeforeConclusion: 3 });
-  assert.equal((await repo.readMap(manual.mapPath)).outputLanguage, 'es'); assert.equal((await repo.readMap(manual.mapPath)).aim.contentLanguage, 'en');
-  const sameAsNote = await createAimMap(repo, 'gpt-6-luna', { requestId: 'manual-2', topic: 'Plan a trip', context: '', outputLanguage: 'en', minimumAnswersBeforeConclusion: 3 });
-  assert.equal((await repo.readMap(sameAsNote.mapPath)).outputLanguage, 'en');
-  // Legacy: no contentLanguage at all; the first write stamps both fields and a later title edit cannot change them.
-  const legacy = await subject.repo.readMap(subject.created.mapPath);
-  delete legacy.aim.contentLanguage; delete legacy.outputLanguage;
-  await subject.repo.saveMap(subject.created.mapPath, legacy);
-  const written = await subject.repo.readMap(subject.created.mapPath);
-  assert.equal(written.aim.contentLanguage, 'en');
-  assert.equal(written.outputLanguage, 'ja');
-  // A map upgraded from the note-language-only form (0.24) is pinned on its next write.
-  delete written.outputLanguage;
-  await subject.repo.saveMap(subject.created.mapPath, written);
-  assert.equal((await subject.repo.readMap(subject.created.mapPath)).outputLanguage, 'ja');
-  // An unknown stored outputLanguage does not stop the map from opening, and is dropped.
-  const odd = await subject.repo.readMap(subject.created.mapPath);
-  odd.outputLanguage = 'xx';
-  await subject.repo.saveMap(subject.created.mapPath, odd);
-  await assert.doesNotReject(subject.repo.readMap(subject.created.mapPath));
-  assert.notEqual((await subject.repo.readMap(subject.created.mapPath)).outputLanguage, 'xx');
 });
 
 test('output languages: selection AI follows the selected text (letters, then the follow-the-text clause, then the interface)', () => {
@@ -437,12 +369,6 @@ test('output languages: the menu offers the follow-input row first, then registr
   const settings = fs.readFileSync(path.join(__dirname, '..', 'ui/settings-tab.ts'), 'utf8');
   assert.equal(settings.includes('OUTPUT_LANGUAGE'), false, 'the interface-language menu does not list output-only languages');
   assert.equal(settings.includes('FOLLOW_INPUT'), false);
-  // The AIM start dialog has the same menu and sends the language only when it was picked by hand.
-  const start = fs.readFileSync(path.join(__dirname, '..', 'ui/modals/aim-start-modal.ts'), 'utf8');
-  assert.match(start, /FOLLOW_INPUT_ID, text: supportedLanguageLabel\(FOLLOW_INPUT_ID\)/);
-  assert.match(start, /for \(const option of OUTPUT_LANGUAGE_CHOICES\)/);
-  assert.match(start, /\.\.\.\(languagePicked \? \{ outputLanguage: language\.value as ContentLanguage \} : \{\}\)/);
-  assert.match(start, /chooseAimContentLanguage\(getUiLanguage\(\), topic\.value, context\.value\)/);
 });
 
 test('output languages: a manual choice in the task menu is saved on the map when a run starts, from the dialog and the selection dialog', () => {

@@ -1,5 +1,5 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
-import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./core/content-language";
+import { resolveAimContentLanguage } from "./core/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
 import {
   changeTopicStyles,
@@ -73,7 +73,6 @@ import {
   type MapSource
 } from "./experiences/visual-map/map-sources";
 import { upgradeLegacyAimText } from "./core/legacy-names";
-import { aimEnabled } from "./experiences/aim/availability";
 import { managedNodeIds } from "./core/argument-map/model";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
 export { normalizeReasoningLevel } from "./ai/task-policy";
@@ -285,8 +284,6 @@ export interface OrganizePlan {
   moves: OrganizeMove[];
   /** Maps that could not be read: left exactly where they are. */
   skipped: { mapPath: string; error: string }[];
-  /** Titles of AIM maps with a running or saving research attempt; any entry refuses the whole batch. */
-  busy: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -348,15 +345,6 @@ const NOTE_CSS_CLASS = "visual-agent-map-node";
  * the matching snapshot hash, and so do its drafts. Changing only node paths leaves an AIM map unreadable.
  * Returns whether anything changed.
  */
-export function hasActiveAimAttempt(map: MapDocument): boolean {
-  return (
-    aimEnabled() &&
-    !!map.aim?.runs.some(run =>
-      run.attempts.some(attempt => attempt.status === "running" || attempt.status === "saving")
-    )
-  );
-}
-
 export function rebaseMapNotePaths(map: MapDocument, rebase: (path: string) => string): boolean {
   let changed = false;
   const move = (path: string): string => {
@@ -1396,7 +1384,6 @@ export class Repository {
 
   async ensureWorkspace(): Promise<void> {
     await this.folder(this.settings.mindMapsFolder);
-    if (aimEnabled()) await this.folder(this.settings.aimFolder);
   }
 
   unique(folder: string, name: string, avoid?: ReadonlySet<string>): string {
@@ -1895,58 +1882,6 @@ export class Repository {
     }
   }
 
-  /** Idempotently create a reserved note identity for a journaled AIM result draft. */
-  async createNoteAt(
-    title: string,
-    model: string,
-    map: MapDocument,
-    mapPath: string,
-    modelSource: ModelSource,
-    path: string,
-    id: string,
-    initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning" | "prompt"> & {
-      /** Language of the placeholder text (AIM content language); headings follow it too: English content, English headings (C8). */
-      contentLanguage?: NoteLanguage;
-    } = {}
-  ): Promise<MapNode> {
-    const textLanguage = initial.contentLanguage ?? this.noteLanguage;
-    const folder = this.topicFolder(mapPath, "Notes");
-    await this.ensureTopicFolders(this.topicRoot(mapPath));
-    if (parentPath(path) !== folder || !path.endsWith(".md") || !id.trim())
-      throw new Error("A reserved note must use a valid identity inside this map's Notes folder.");
-    const existing = this.app.vault.getAbstractFileByPath(path);
-    if (existing) {
-      if (existing instanceof TFile) {
-        const fm = frontmatter(await this.app.vault.read(existing));
-        if (marker(fm["agent-map-node"]) && text(fm["node-id"]) === id)
-          return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
-      }
-      throw new Error(`Reserved result note path already belongs to another file: ${path}`);
-    }
-    const metadata = {
-      "agent-map-node": true,
-      "node-id": id,
-      "topic-id": map.id,
-      "topic-state": "active",
-      "agent-map-id": map.id,
-      title,
-      summary: initial.summary ?? placeholder(textLanguage),
-      "preview-initialized": false,
-      model,
-      "model-source": modelSource,
-      ...(modelSource === "manual" ? { "reasoning-level": initial.reasoning ?? this.settings.cliReasoning } : {}),
-      status: "idea",
-      cssclasses: [NOTE_CSS_CLASS],
-      ...(initial.contentLanguage ? { "content-language": initial.contentLanguage } : {})
-    };
-    const origin = initial.thinkingOrigin ? `## Thinking Origin\n\n${originMarkdown(initial.thinkingOrigin)}` : "";
-    await this.app.vault.create(
-      path,
-      `---\n${stringifyYaml(metadata)}---\n${localizeHeadings(noteBody(title, metadata.summary, this.noteLanguage, initial.prompt ?? "", "", placeholder(textLanguage), initial.detail ?? "", "", "", origin), this.headingsFor(textLanguage))}`
-    );
-    return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
-  }
-
   /** `keepTitle` keeps the source title as is (a paste); without it the copy gets the translated "copy" suffix. */
   async duplicateNote(
     sourcePath: string,
@@ -2280,21 +2215,7 @@ export class Repository {
     );
   }
 
-  /**
-   * Legacy AIM maps have no stored content language. Persist the derived value the first time the map is written
-   * anyway (never on open), so later interface-language changes cannot change it.
-   */
-  private stampAimContentLanguage(map: MapDocument): void {
-    if (!map.aim || !aimEnabled()) return;
-    const resolved = resolveAimContentLanguage(map, this.settings.language);
-    if (map.aim.contentLanguage === undefined) map.aim.contentLanguage = noteLanguageOf(resolved);
-    // Both are written together on the first write; a map in an output-only language (ja, ko, the follow-the-input
-    // row...) gets it pinned here so a later title edit cannot change it. Registry languages are re-derived as before.
-    if (map.outputLanguage === undefined && isOutputOnlyLanguage(resolved)) map.outputLanguage = resolved;
-  }
-
   async saveMap(path: string, map: MapDocument): Promise<void> {
-    this.stampAimContentLanguage(map);
     let print = "";
     await this.app.vault.process(this.file(path), content => {
       const text = writeMapContent(content, map);
@@ -2344,7 +2265,6 @@ export class Repository {
       const map = parseMap(content);
       const before = coordinatePrint(map);
       change(map);
-      this.stampAimContentLanguage(map);
       updated = map;
       const text = writeMapContent(content, map);
       print = this.printAfterWrite(path, before, coordinatePrint(map));
@@ -3110,12 +3030,10 @@ export class Repository {
    * Changes the Mind Maps/AIM folder on the same move engine as Organize: every topic in the old container moves to the
    * new one (links, node paths and cited paths follow; any failure restores everything and the setting is unchanged),
    * then the old folder is removed only if it is empty. Returns old Map.md path -> new Map.md path.
-   * `busy` lets the caller veto when an open view has AIM work running.
    */
   async changeMapFolder(
     key: "mindMapsFolder" | "aimFolder",
     path: string,
-    busy: (mapPath: string) => boolean = () => false,
     onProgress?: MoveProgress
   ): Promise<Map<string, string>> {
     const next = normalizePath(path),
@@ -3136,12 +3054,11 @@ export class Repository {
         } catch {
           throw new Error(this.message("error.map_folder_unreadable"));
         }
-        if (hasActiveAimAttempt(map) || busy(file.path)) throw new Error(this.message("error.organize_aim_busy"));
-        // While AIM is hidden an AIM map stays where it is (the folder keeps it, so it is not removed below).
-        if (map.aim && !aimEnabled()) continue;
+        // An old AIM map stays where it is (the folder keeps it, so it is not removed below).
+        if (map.aim) continue;
         const toRoot = normalizePath(`${next}/${root.split("/").at(-1) ?? safeName(map.title)}`);
         if (this.app.vault.getAbstractFileByPath(toRoot)) throw new Error(this.message("error.map_folder_exists"));
-        moves.push({ mapPath: file.path, title: map.title, kind: map.aim ? "aim" : "mind", fromRoot: root, toRoot });
+        moves.push({ mapPath: file.path, title: map.title, kind: "mind", fromRoot: root, toRoot });
       }
       if (moves.length || !this.app.vault.getAbstractFileByPath(next)) {
         await this.folder(parentPath(next));
@@ -3219,11 +3136,10 @@ export class Repository {
 
   /**
    * Read-only preview of "Organize workspace folders": every readable topic folder directly inside the legacy Topics
-   * folder moves to Mind Maps (no `aim`) or AIM (`aim`). Unreadable maps are listed, never moved; a running or saving
-   * AIM attempt anywhere refuses the whole batch.
+   * folder moves to Mind Maps; an old AIM map (`aim`) stays where it is. Unreadable maps are listed, never moved.
    */
   async planOrganizeWorkspaceFolders(): Promise<OrganizePlan> {
-    const plan: OrganizePlan = { moves: [], skipped: [], busy: [] };
+    const plan: OrganizePlan = { moves: [], skipped: [] };
     const reserved = new Set<string>();
     for (const file of await this.mapFiles()) {
       const root = parentPath(file.path);
@@ -3235,10 +3151,9 @@ export class Repository {
         plan.skipped.push({ mapPath: file.path, error: error instanceof Error ? error.message : String(error) });
         continue;
       }
-      if (hasActiveAimAttempt(map)) plan.busy.push(map.title);
-      // While AIM is hidden an AIM map in the legacy Topics folder stays there; nothing creates or fills the AIM folder.
-      if (map.aim && !aimEnabled()) continue;
-      const container = map.aim ? this.settings.aimFolder : this.settings.mindMapsFolder;
+      // An old AIM map in the legacy Topics folder stays there; nothing creates or fills the AIM folder.
+      if (map.aim) continue;
+      const container = this.settings.mindMapsFolder;
       // A misconfigured target equal to the source container would rename every topic on every run.
       if (container === this.settings.topicsFolder) continue;
       const base = normalizePath(`${container}/${root.split("/").at(-1) ?? safeName(map.title)}`);
@@ -3246,7 +3161,7 @@ export class Repository {
         number = 2;
       while (this.app.vault.getAbstractFileByPath(toRoot) || reserved.has(toRoot)) toRoot = `${base} ${number++}`;
       reserved.add(toRoot);
-      plan.moves.push({ mapPath: file.path, title: map.title, kind: map.aim ? "aim" : "mind", fromRoot: root, toRoot });
+      plan.moves.push({ mapPath: file.path, title: map.title, kind: "mind", fromRoot: root, toRoot });
     }
     return plan;
   }
@@ -3256,7 +3171,6 @@ export class Repository {
    * topic already moved (folder, Map.md text, path references). Returns old Map.md path -> new Map.md path.
    */
   async organizeWorkspaceFolders(plan: OrganizePlan, onProgress?: MoveProgress): Promise<Map<string, string>> {
-    if (plan.busy.length) throw new Error(this.message("error.organize_aim_busy"));
     return this.runTopicMoves(plan.moves, [], onProgress);
   }
 
@@ -3270,10 +3184,6 @@ export class Repository {
     alsoManaged: string[] = [],
     onProgress?: MoveProgress
   ): Promise<Map<string, string>> {
-    // Re-check just before the first write: the plan may be stale.
-    for (const move of moves)
-      if (hasActiveAimAttempt(await this.readMap(move.mapPath)))
-        throw new Error(this.message("error.organize_aim_busy"));
     this.pendingContainers = alsoManaged;
     try {
       return await this.moveTopicsWithRollback(moves, onProgress);
@@ -3392,12 +3302,7 @@ export class Repository {
     const originalRoot = root.path;
     const originalMapPath = `${originalRoot}/Map.md`,
       originalContent = await this.app.vault.read(this.file(originalMapPath));
-    const originalMap = parseMap(originalContent);
-    if (hasActiveAimAttempt(originalMap)) {
-      throw new Error(
-        "An AIM research attempt is still running or saving. Wait for it to finish before renaming this topic."
-      );
-    }
+    parseMap(originalContent); // an unreadable map is refused before anything moves
     // A rename only changes this topic's folder: rebuild just it (or nothing, when a batch rebuilds once itself).
     const rebuild = async (): Promise<void> => {
       if (options.rebuild !== false) await this.rebuildDerivedData({ roots: [originalRoot, desired] });

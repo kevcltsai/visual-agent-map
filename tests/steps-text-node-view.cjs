@@ -141,10 +141,9 @@ test('Enter on a focused text node opens the editor', async () => {
   assert.ok(find(h.textEl('t1'), i => i.tag === 'textarea'));
 });
 
-test('counter-example: AIM and presentation cannot edit text', async () => {
-  for (const mode of ['aim', 'presentation']) {
+test('counter-example: presentation cannot edit text', async () => {
+  for (const mode of ['presentation']) {
     const h = await harness(({ root }) => [txt({ parentId: root.id })]);
-    if (mode === 'aim') h.view.map.aim = { branches: [] };
     if (mode === 'presentation') h.view.presentation = { order: [], currentId: 'x' };
     h.view.render();
     h.textEl('t1').fire('dblclick', {});
@@ -185,7 +184,7 @@ test('canvas-text-node: with a selected topic the command still hangs the block 
   assert.equal((await h.onDisk())[0].parentId, h.root.id);
 });
 
-test('canvas-text-node: the empty-canvas menu offers Add text node here; AIM and presentation do not', async () => {
+test('canvas-text-node: the empty-canvas menu offers Add text node here; presentation does not', async () => {
   const h = await harness();
   h.view.viewportEl = { clientWidth: 800, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, right: 800, top: 0, bottom: 600 }) };
   h.view.onCanvasContextMenu({ clientX: 110, clientY: 45, preventDefault() {}, target: { closest: () => null } });
@@ -195,11 +194,10 @@ test('canvas-text-node: the empty-canvas menu offers Add text node here; AIM and
   await h.settle();
   const items = await h.onDisk();
   assert.deepEqual([items[0].x, items[0].y, items[0].parentId], [110, 45, undefined]);
-  for (const mode of ['aim', 'presentation']) {
+  for (const mode of ['presentation']) {
     const g = await harness();
     g.view.viewportEl = h.view.viewportEl;
-    if (mode === 'aim') g.view.map.aim = { branches: [] };
-    else g.view.presentation = { order: [], currentId: 'x' };
+    g.view.presentation = { order: [], currentId: 'x' };
     g.view.onCanvasContextMenu({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: () => null } });
     assert.ok(!(g.menus[0]?.items ?? []).some(i => i.title === 'Add text node here'), mode);
   }
@@ -491,10 +489,9 @@ test('canvas-text-node: chatUserTexts carries links for the map chat context', a
   assert.equal('links' in out.find(t => t.id === 't1'), false);
 });
 
-test('canvas-text-node: AIM and presentation cannot start link mode or move a block', async () => {
-  for (const mode of ['aim', 'presentation']) {
+test('canvas-text-node: presentation cannot start link mode or move a block', async () => {
+  for (const mode of ['presentation']) {
     const h = await harness(() => [free()]);
-    if (mode === 'aim') h.view.map.aim = { branches: [] };
     if (mode === 'presentation') h.view.presentation = { order: [], currentId: 'x' };
     h.view.render();
     h.view.startLinking('f1');
@@ -533,14 +530,9 @@ test('text-node-width: the handle is a separator with range; not drawn when the 
   assert.equal(handleOf(h)('t1'), undefined, 'no handle while presenting');
 });
 
-test('text-node-width: no handle in an AIM map or in selection mode (the map cannot edit canvas items); it is there again afterwards', async () => {
+test('text-node-width: no handle in selection mode (the map cannot edit canvas items); it is there again afterwards', async () => {
   const h = await harness(({ root }) => [txt({ parentId: root.id }), free()]);
   assert.ok(handleOf(h)('t1') && handleOf(h)('f1'), 'editable map has handles');
-  h.view.map.aim = { branches: [] };
-  h.view.render();
-  assert.equal(handleOf(h)('t1'), undefined, 'AIM attached');
-  assert.equal(handleOf(h)('f1'), undefined, 'AIM free');
-  delete h.view.map.aim;
   h.view.selection.toggleMultiSelect();
   assert.equal(h.view.selection.state.multiSelectMode, true);
   h.view.render();

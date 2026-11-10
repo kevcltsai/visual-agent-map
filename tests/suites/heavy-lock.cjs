@@ -348,7 +348,7 @@ test('heavy lock: SIGTERM stops the holder\'s whole subtree before the lock is r
   } finally { await stop(holder); fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('heavy lock: the CLI wrapper passes SIGTERM to the whole command tree (the test:aim shape: wrapper, npm-like shell, node --test)', async () => {
+test('heavy lock: the CLI wrapper passes SIGTERM to the whole command tree (wrapper, npm-like shell, node --test)', async () => {
   const dir = tmp('vam-heavy-lock-');
   const wrapper = spawn(process.execPath, [path.join(root, 'scripts', 'heavy-lock.mjs'), 'wrapped', '--', 'sh', '-c', `${process.execPath} -e "console.log('inner ' + process.pid); setInterval(() => {}, 1000)" && true`], { env: cleanEnv(dir), stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
@@ -444,7 +444,7 @@ test('heavy lock: a racer renaming its mutex in while the holder removes its own
   } finally { fs.rmSync = realRm; require('node:module').syncBuiltinESMExports(); fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('heavy lock: test:aim:run refuses to run outside the lock, with no token or a forged one, and runs under the wrapper', async () => {
+test('heavy lock: --require-held refuses to run outside the lock, with no token or a forged one, and runs under the wrapper', async () => {
   const cli = path.join(root, 'scripts', 'heavy-lock.mjs');
   const dir = tmp('vam-heavy-lock-');
   const run = (env, args) => require('node:child_process').spawnSync(process.execPath, [cli, ...args], { env, encoding: 'utf8' });
@@ -459,9 +459,6 @@ test('heavy lock: test:aim:run refuses to run outside the lock, with no token or
     } finally { await stop(holder); }
     const wrapped = run(cleanEnv(dir), ['guard', '--', process.execPath, cli, '--require-held']);
     assert.equal(wrapped.status, 0, wrapped.stderr);
-    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).scripts;
-    assert.match(pkg['test:aim'], /heavy-lock\.mjs .* -- npm run test:aim:run/);
-    assert.match(pkg['test:aim:run'], /^node scripts\/heavy-lock\.mjs --require-held && /);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

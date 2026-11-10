@@ -306,11 +306,3 @@ export function mapChatLanguageSources(message: string): string[] {
  * (default names, labels) calls to learn what the map is written in. Same rule as {@link resolveAimContentLanguage}.
  */
 export const resolveMapOutputLanguage = resolveAimContentLanguage;
-
-/** The note language of {@link resolveAimContentLanguage}: what fixed text written into this map's notes uses. */
-export function resolveAimNoteLanguage(
-  map: Pick<MapDocument, "title" | "aim" | "outputLanguage"> | undefined | null,
-  uiLanguage: UiLanguage
-): NoteLanguage {
-  return noteLanguageOf(resolveAimContentLanguage(map, uiLanguage));
-}

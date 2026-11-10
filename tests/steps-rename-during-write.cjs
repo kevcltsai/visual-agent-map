@@ -117,6 +117,33 @@ test('a VAM rename keeps the undo steps and Undo moves the map back', async () =
   assert.equal(view.history.canUndo, true, 'the earlier step is still there');
 });
 
+test('an empty map renamed outside during a write loses its undo steps; a move rolled back keeps them', async () => {
+  const h = harness();
+  const a = await h.map('Alpha'), b = await h.map('Beta');
+  // The last card of B was removed: the read-back sees no change of structure after the move.
+  await h.repo.updateMap(b, doc => { doc.nodes = []; });
+  await h.open(a);
+  const vb = await h.open(b);
+  vb.history.push({ label: 'remove card', undo: async () => {}, redo: async () => {} });
+  const folder = b.replace(/\/Map\.md$/, ''), moved = `${folder} renamed`;
+  // A move that is rolled back within the write ends where it started: the steps still apply.
+  await h.plugin.mutate(async () => {
+    await h.app.fileManager.renameFile(h.files.get(folder), moved);
+    await h.app.fileManager.renameFile(h.files.get(moved), folder);
+  });
+  await settle(h.plugin);
+  assert.equal(vb.path, b);
+  assert.equal(vb.history.canUndo, true, 'a rolled-back move keeps the steps');
+  await h.plugin.mutate(async () => {
+    await h.repo.updateNote((await h.repo.readMap(a)).nodes[0].path, { summary: 'A write' });
+    await h.app.fileManager.renameFile(h.files.get(folder), moved);
+  });
+  await settle(h.plugin);
+  assert.equal(vb.path, `${moved}/Map.md`);
+  assert.ok(vb.map);
+  assert.equal(vb.history.canUndo, false, 'the steps of the old path are gone');
+});
+
 test('relocate and followPath: a path already followed still clears; an unrelated mapping changes nothing', () => {
   const view = Object.create(VisualAgentMapView.prototype);
   let cleared = 0;

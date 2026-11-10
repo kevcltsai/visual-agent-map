@@ -28,7 +28,7 @@ import { AiCalls, type AiCallExchange } from "./ai-calls";
 import { aiRuntimeForModel } from "./ai-runtime-service";
 import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
-import { openedUrlsFromEvents } from "./argument-map/source-proof";
+import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
 import { repairCounts, sourceRegistry } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
@@ -308,7 +308,11 @@ export class AiTaskService {
       stage = t("log.stage_parsing_reply");
       let result = step.parse(raw);
       if (countsWeb) result.retrievals = retrievals;
-      if (keepsEvents) result.evidence = { openedUrls: openedUrlsFromEvents(webEvents) };
+      if (keepsEvents)
+        result.evidence = {
+          openedUrls: openedUrlsFromEvents(webEvents),
+          searchQueries: searchQueriesFromEvents(webEvents)
+        };
       if (readerFacingDetail(input)) {
         result.detail = normalizeMathDelimiters(normalizeDetailHeadings(result.detail));
         result.detail = normalizeOutputScriptHeadings(result.detail, outputLanguage, input.detailTemplate, input);

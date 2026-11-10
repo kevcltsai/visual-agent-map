@@ -224,3 +224,16 @@ test('openedUrlsFromEvents: only completed openPage events with a url count', ()
   ]);
   assert.deepEqual(plain(urls), ['https://a.example.org/x']);
 });
+
+test('searchQueriesFromEvents: only completed search events count; queries and query are read, blanks and repeats are dropped', () => {
+  const ev = (method, action) => ({ method, params: { item: { id: 'i', type: 'webSearch', action } } });
+  const queries = sp.searchQueriesFromEvents([
+    ev('item/completed', { type: 'search', query: ' youth unemployment 2024 ' }),
+    ev('item/completed', { type: 'search', queries: ['cpi 2024', 'youth unemployment 2024', '', 7] }),
+    ev('item/started', { type: 'search', query: 'started only' }),
+    ev('item/completed', { type: 'openPage', url: 'https://a.example.org/x', query: 'not a search' }),
+    ev('item/completed', { type: 'search' }), ev('item/completed', { type: 'search', query: 42 }), ev('item/completed', null),
+    { method: 'item/completed', params: null }, null
+  ]);
+  assert.deepEqual(plain(queries), ['youth unemployment 2024', 'cpi 2024']);
+});

@@ -31,7 +31,15 @@ function argumentEvidenceSchema(responseSchema: typeof baseResponseSchema, needI
             stance: { type: "string", enum: ["supports", "contradicts", "uncertain"] },
             claim: { type: "string" },
             quote: { type: "string", maxLength: 200 },
-            url: { type: "string" }
+            url: { type: "string" },
+            // Optional: not in `required`; a malformed value is dropped by the parser, never refused.
+            figure: {
+              type: "object",
+              additionalProperties: false,
+              properties: { number: { type: "string" }, period: { type: "string" }, unit: { type: "string" } },
+              required: ["number", "period", "unit"]
+            },
+            note: { type: "string", maxLength: 200 }
           },
           required: ["need", "status", "stance", "claim", "quote", "url"]
         }

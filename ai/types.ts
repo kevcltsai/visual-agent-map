@@ -47,8 +47,22 @@ export type ArgumentEvidenceItem =
       claim: string;
       quote: string;
       url: string;
+      /** Optional figure the page reports, as text (the chart turns it into a number later). */
+      figure?: ArgumentEvidenceFigure;
+      /** Optional note from the reply (shown only in the note, never trusted as evidence). */
+      note?: string;
     }
-  | { need: string; status: "not_found" };
+  | {
+      need: string;
+      status: "not_found";
+      /** Optional: what was found and why it was not used. */
+      note?: string;
+    };
+export interface ArgumentEvidenceFigure {
+  number: string;
+  period: string;
+  unit: string;
+}
 export interface TaskContext {
   title: string;
   summary: string;
@@ -138,7 +152,10 @@ export interface AiResult {
    * Source-proof input for the argument map: the URLs the provider's tool log shows it opened successfully during this call
    * (from the web events' `action.url`). Additive and optional; no existing consumer reads it. Absent when not collected.
    */
-  evidence?: { openedUrls: string[] };
+  evidence?: {
+    openedUrls: string[];
+    /** Queries the provider's search events show (recorded by the program, not self-reported). */ searchQueries: string[];
+  };
   /** Argument-evidence contract only: the reply's per-need entries (ids already checked against the request). Absent otherwise. */
   argumentEvidence?: ArgumentEvidenceItem[];
   /** Sections still off their template count after the repair request; present only when the context had counts. */

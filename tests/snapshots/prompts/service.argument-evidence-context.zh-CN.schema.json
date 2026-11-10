@@ -114,6 +114,30 @@
           },
           "url": {
             "type": "string"
+          },
+          "figure": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "number": {
+                "type": "string"
+              },
+              "period": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "number",
+              "period",
+              "unit"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200
           }
         },
         "required": [

@@ -1,6 +1,6 @@
 import { neutralizeUnsafeMermaid } from "../../../ai/mermaid-safety";
 import { truncateSummary } from "../../../ai/result-utils";
-import type { AiResult, ArgumentEvidenceItem } from "../../../ai/types";
+import type { AiResult, ArgumentEvidenceFigure, ArgumentEvidenceItem } from "../../../ai/types";
 import { foldText, QUOTE_MAX, QUOTE_MIN } from "../../argument-map/source-proof";
 import { t, type ContentLanguage, translateNote } from "../../../i18n";
 
@@ -46,6 +46,38 @@ export function extractJsonObject(raw: string): string {
 }
 
 const EVIDENCE_KEYS = ["need", "status", "stance", "claim", "quote", "url"];
+/** Optional reply fields (V1 boost): a malformed one is dropped, the entry itself is kept. */
+const EVIDENCE_OPTIONAL_KEYS = ["figure", "note"];
+const NOTE_MAX = 200;
+const FIGURE_NUMBER_MAX = 40;
+const FIGURE_PERIOD_MAX = 60;
+const FIGURE_UNIT_MAX = 40;
+
+/** The figure of a found entry, or undefined when it is not exactly three non-blank strings within their limits. */
+function readFigure(value: unknown): ArgumentEvidenceFigure | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const keys = Object.keys(raw);
+  if (keys.length !== 3 || !["number", "period", "unit"].every(key => keys.includes(key))) return undefined;
+  const { number, period, unit } = raw;
+  if (typeof number !== "string" || typeof period !== "string" || typeof unit !== "string") return undefined;
+  const figure = { number: number.trim(), period: period.trim(), unit: unit.trim() };
+  if (!figure.number || !figure.period || !figure.unit) return undefined;
+  if (
+    figure.number.length > FIGURE_NUMBER_MAX ||
+    figure.period.length > FIGURE_PERIOD_MAX ||
+    figure.unit.length > FIGURE_UNIT_MAX
+  )
+    return undefined;
+  return figure;
+}
+
+/** The note of an entry (what was found, why it was not used), trimmed and cut to 200 characters; undefined when not text. */
+function readNote(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const note = Array.from(value.trim()).slice(0, NOTE_MAX).join("");
+  return note || undefined;
+}
 const EVIDENCE_STANCES = ["supports", "contradicts", "uncertain"];
 /** Same floor as `verifySource`: a quote with fewer folded characters proves nothing. */
 const QUOTE_FOLDED_MIN = 8;
@@ -53,7 +85,7 @@ const QUOTE_FOLDED_MIN = 8;
 /**
  * The argument-evidence entries of a reply. Anything `verifySource` could not use is refused here: a need id outside the
  * request or cited twice, extra or missing fields, a found entry without a claim, with a quote outside 12 to 200 characters
- * or a url that is not http(s); a not-found entry that still carries a quote, url or stance. No entry is repaired or dropped.
+ * or a url that is not http(s); a not-found entry that still carries a quote, url or stance. The optional `figure` and `note` are dropped when malformed. No entry is repaired or dropped.
  * A request need the reply does not mention is simply unanswered (the caller treats it as not found).
  */
 export function parseArgumentEvidence(value: unknown, needIds: readonly string[]): ArgumentEvidenceItem[] {
@@ -67,9 +99,13 @@ export function parseArgumentEvidence(value: unknown, needIds: readonly string[]
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return refuse("an entry is not an object");
     const item = entry as Record<string, unknown>;
     const keys = Object.keys(item);
-    if (keys.length !== EVIDENCE_KEYS.length || EVIDENCE_KEYS.some(key => !keys.includes(key)))
+    if (
+      EVIDENCE_KEYS.some(key => !keys.includes(key)) ||
+      keys.some(key => !EVIDENCE_KEYS.includes(key) && !EVIDENCE_OPTIONAL_KEYS.includes(key))
+    )
       return refuse("an entry has missing or extra fields");
     const { need, status, stance, claim, quote, url } = item;
+    const note = readNote(item.note);
     if (typeof need !== "string" || !allowed.has(need)) return refuse("an entry cites an unknown need");
     if (seen.has(need)) return refuse("a need is answered twice");
     seen.add(need);
@@ -78,7 +114,7 @@ export function parseArgumentEvidence(value: unknown, needIds: readonly string[]
     if (status === "not_found") {
       // A claimed miss may not smuggle in a source; its claim text (a reason) is dropped.
       if (quote.trim() || url.trim() || stance !== "uncertain") return refuse("a not_found entry carries a source");
-      return { need, status };
+      return { need, status, ...(note ? { note } : {}) };
     }
     if (status !== "found") return refuse("status must be found or not_found");
     if (!EVIDENCE_STANCES.includes(stance)) return refuse("stance is not an allowed value");
@@ -94,13 +130,16 @@ export function parseArgumentEvidence(value: unknown, needIds: readonly string[]
       return refuse("a url is not valid");
     }
     if (protocol !== "http:" && protocol !== "https:") return refuse("a url is not http or https");
+    const figure = readFigure(item.figure);
     return {
       need,
       status: "found",
       stance: stance as "supports" | "contradicts" | "uncertain",
       claim: claim.trim(),
       quote: quote.trim(),
-      url: url.trim()
+      url: url.trim(),
+      ...(figure ? { figure } : {}),
+      ...(note ? { note } : {})
     };
   });
 }

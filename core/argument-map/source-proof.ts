@@ -189,6 +189,28 @@ export function openedUrlsFromEvents(events: readonly unknown[]): string[] {
   return urls;
 }
 
+/** Search queries the provider ran, from its completed search events (`action.query` or `action.queries`); blank and repeated ones dropped. */
+export function searchQueriesFromEvents(events: readonly unknown[]): string[] {
+  const queries: string[] = [];
+  const add = (value: unknown): void => {
+    if (typeof value !== "string") return;
+    const query = value.trim();
+    if (query && !queries.includes(query)) queries.push(query);
+  };
+  for (const event of events) {
+    const e = event as {
+      method?: unknown;
+      params?: { item?: { type?: unknown; action?: { type?: unknown; query?: unknown; queries?: unknown } | null } };
+    } | null;
+    if (!e || typeof e !== "object" || e.method !== "item/completed") continue;
+    const item = e.params?.item;
+    if (item?.type !== "webSearch" || item.action?.type !== "search") continue;
+    add(item.action.query);
+    if (Array.isArray(item.action.queries)) for (const query of item.action.queries as unknown[]) add(query);
+  }
+  return queries;
+}
+
 async function fetchWithTimeout(
   fetch: FetchPage,
   url: string,

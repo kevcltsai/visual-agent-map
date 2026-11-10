@@ -111,6 +111,35 @@ test('response shape: strict per-need schema; contract misuse throws; other cont
   assert.deepEqual(plain(base.schema), plain(schemas.localizedResponseSchema('en')));
 });
 
+const FIG = { number: '9.2', period: '2024-03', unit: 'percent' };
+test('V1 boost: figure and note are optional, kept when well formed, dropped (entry kept) when malformed', () => {
+  const out = plain(parseEv([found('n1', { figure: FIG, note: ' read from the table ' }), miss('n2', { note: 'opened two pages; both were 2019 data' })]));
+  assert.deepEqual(out[0].figure, FIG);
+  assert.equal(out[0].note, 'read from the table');
+  assert.equal(out[1].note, 'opened two pages; both were 2019 data');
+  // Absent fields leave the entry exactly as before (no undefined keys).
+  assert.equal('figure' in plain(parseEv([found('n1')])[0]), false);
+  assert.equal('note' in plain(parseEv([found('n1')])[0]), false);
+  for (const figure of ['9.2', 9.2, null, [], {}, { number: 9.2, period: 'x', unit: 'y' }, { number: '', period: 'x', unit: 'y' }, { number: '9.2', period: '   ', unit: 'y' }, { number: '9.2', period: 'x' }, { number: '9'.repeat(41), period: 'x', unit: 'y' }, { ...FIG, extra: 1 }]) {
+    const entry = plain(parseEv([found('n1', { figure })])[0]);
+    assert.equal('figure' in entry, false, JSON.stringify(figure));
+    assert.equal(entry.status, 'found');
+    assert.equal(entry.claim, 'Rate rose');
+  }
+  for (const note of [5, null, ['x'], {}, '   ']) assert.equal('note' in plain(parseEv([found('n1', { note })])[0]), false, JSON.stringify(note));
+  assert.equal(parseEv([found('n1', { note: 'x'.repeat(300) })])[0].note.length, 200);
+  // A not_found entry keeps no figure, and still may not carry a source.
+  assert.equal('figure' in plain(parseEv([miss('n2', { figure: FIG })])[0]), false);
+  refuse([miss('n2', { quote: QUOTE, note: 'n' })]);
+});
+
+test('V1 boost: the response schema offers figure and note as optional fields', () => {
+  const item = plain(schemas.taskResponseShape(context(), 'en').schema).properties.argumentEvidence.items;
+  assert.deepEqual(item.properties.figure.required.sort(), ['number', 'period', 'unit']);
+  assert.equal(item.properties.note.type, 'string');
+  assert.deepEqual(item.required, ['need', 'status', 'stance', 'claim', 'quote', 'url']);
+});
+
 function runtimeEmitting(events, reply) {
   const rt = capturingRuntime([reply]);
   const inner = rt.runTask;
@@ -128,7 +157,7 @@ test('AiTaskService: the result carries the parsed entries and the opened urls; 
   const seen = [];
   const result = await makeService(rt).askModel(context(), 'gpt-6-luna', 'low', undefined, undefined, undefined, event => seen.push(event));
   assert.deepEqual(plain(result.argumentEvidence.map(item => item.need)), ['n1', 'n2']);
-  assert.deepEqual(plain(result.evidence), { openedUrls: ['https://stats.example.org/report'] });
+  assert.deepEqual(plain(result.evidence), { openedUrls: ['https://stats.example.org/report'], searchQueries: [] });
   assert.equal(result.retrievals, 2);
   assert.equal(seen.length, 3);
   assert.match(rt.calls[0].prompt, /"argumentEvidence"/);
@@ -192,5 +221,12 @@ test('AiTaskService: a page opened in a failed first attempt is not counted for 
   };
   const result = await makeService(rt).askModel(context(), 'gpt-6-luna', 'low');
   assert.equal(attempt, 2);
-  assert.deepEqual(plain(result.evidence), { openedUrls: ['https://second.example.org/b'] });
+  assert.deepEqual(plain(result.evidence), { openedUrls: ['https://second.example.org/b'], searchQueries: [] });
+});
+
+test('V1 boost: the result carries the queries of this call\'s search events (program-recorded), nothing from the reply', async () => {
+  const search = query => ({ method: 'item/completed', params: { item: { id: query, type: 'webSearch', action: { type: 'search', query } } } });
+  const rt = runtimeEmitting([search('youth unemployment 2024'), opened('https://stats.example.org/report'), search('cpi march 2024')], body([found('n1')], { searchQueries: ['made up by the AI'] }));
+  const result = await makeService(rt).askModel(context(), 'gpt-6-luna', 'low');
+  assert.deepEqual(plain(result.evidence), { openedUrls: ['https://stats.example.org/report'], searchQueries: ['youth unemployment 2024', 'cpi march 2024'] });
 });

@@ -70,7 +70,7 @@ export const inferenceCheckStep: StepDefinition<InferenceCheckRequest, Inference
     renderTemplate(template, {
       languageInstruction: languageInstruction(
         request.language,
-        strOf(asRec(asRec(request.input.basis).framing).original)
+        strOf(asRec(asRec(asRec(request.input).basis).framing).original)
       ),
       input: JSON.stringify(request.input)
     }),

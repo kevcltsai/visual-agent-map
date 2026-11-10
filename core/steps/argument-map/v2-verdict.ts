@@ -97,7 +97,7 @@ export const verdictV2Step: StepDefinition<VerdictV2Request, VerdictDraft> = {
   version: 1,
   render: request =>
     renderTemplate(template, {
-      languageInstruction: languageInstruction(request.language, strOf(asRec(request.input.claim).text)),
+      languageInstruction: languageInstruction(request.language, strOf(asRec(asRec(request.input).claim).text)),
       input: JSON.stringify(request.input)
     }),
   schema: VERDICT_V2_SCHEMA,

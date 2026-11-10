@@ -1,0 +1,141 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "hypotheses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "alternative",
+              "reverse",
+              "common_cause",
+              "measurement",
+              "facet"
+            ]
+          },
+          "predictions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "support",
+                    "refute",
+                    "identification"
+                  ]
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "alsoPredictedBy": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "hypothesisId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "strength": {
+                        "type": "string",
+                        "enum": [
+                          "same",
+                          "weaker"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "hypothesisId",
+                      "strength"
+                    ]
+                  },
+                  "minItems": 0
+                },
+                "auxiliary": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "text",
+                "required",
+                "alsoPredictedBy",
+                "auxiliary",
+                "reason"
+              ]
+            },
+            "minItems": 2,
+            "maxItems": 5
+          },
+          "identification": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "strategy": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "assumptions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "maxItems": 6
+                  }
+                },
+                "required": [
+                  "strategy",
+                  "assumptions"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "predictions",
+          "identification"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 6
+    }
+  },
+  "required": [
+    "hypotheses"
+  ]
+}

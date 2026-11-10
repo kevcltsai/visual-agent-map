@@ -1,0 +1,133 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "rejudge",
+        "add_alternative",
+        "undecidable"
+      ]
+    },
+    "vetoes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "contradiction",
+              "double_count",
+              "missed_alternative"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "kind",
+          "detail"
+        ]
+      },
+      "minItems": 0
+    },
+    "allocations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "needId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "hypothesisId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "needId",
+          "hypothesisId"
+        ]
+      },
+      "minItems": 0
+    },
+    "rejudge": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "answer": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "holds",
+        "fails",
+        "causal_established",
+        "causal_conditional",
+        "causal_compatible",
+        "causal_against",
+        "main_cause_largest",
+        "main_cause_secondary",
+        "main_cause_not",
+        "main_cause_undecidable",
+        "compare_greater",
+        "compare_equivalent",
+        "compare_opposite",
+        "compare_undetermined",
+        "insufficient",
+        null
+      ]
+    },
+    "contributors": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "largest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "basis": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "difference_with_uncertainty",
+        "point_estimates",
+        "none",
+        null
+      ]
+    }
+  },
+  "required": [
+    "decision",
+    "vetoes",
+    "allocations",
+    "rejudge",
+    "answer",
+    "contributors",
+    "largest",
+    "basis"
+  ]
+}

@@ -52,7 +52,7 @@ import {
   type ArgumentRoles,
   type Hypothesis,
   type RoleKey
-} from "../../core/argument-map/model";
+} from "../../core/argument-map/model-v1";
 import { arrangeArgumentMap } from "../../core/argument-map/layout";
 import { verifySource, type FetchPage } from "../../core/argument-map/source-proof";
 import {
@@ -89,8 +89,11 @@ const Y_STEP = 160;
 
 export type ArgumentRunRefusal = "busy" | "unusable" | "exists" | "missing" | "finished" | "not_paused" | "disposed";
 export class ArgumentRunError extends Error {
-  constructor(readonly code: ArgumentRunRefusal) {
-    super(`argument run refused: ${code}`);
+  constructor(
+    readonly code: ArgumentRunRefusal,
+    detail?: string
+  ) {
+    super(`argument run refused: ${code}${detail ? ` (${detail})` : ""}`);
     this.name = "ArgumentRunError";
   }
 }

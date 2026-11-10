@@ -1,5 +1,10 @@
 import type { TranslationKey } from "../../i18n";
-import { MAX_RESEARCH_CALLS, MIN_VERIFIED, verifiedCount, type ArgumentMapData } from "../../core/argument-map/model";
+import {
+  MAX_RESEARCH_CALLS,
+  MIN_VERIFIED,
+  verifiedCount,
+  type ArgumentMapData
+} from "../../core/argument-map/model-v1";
 
 type Translate = (key: TranslationKey, ...values: unknown[]) => string;
 export type ArgumentProgressTone = "run" | "paused" | "warn" | "done";

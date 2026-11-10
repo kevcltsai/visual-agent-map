@@ -76,6 +76,141 @@
       "language": "zh-CN",
       "schema": true
     },
+    "argument-map-v2-assessment.en": {
+      "builder": "core/steps/argument-map/v2-assessment.ts assessmentStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-v2-assessment.zh": {
+      "builder": "core/steps/argument-map/v2-assessment.ts assessmentStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-v2-assessment.zh-CN": {
+      "builder": "core/steps/argument-map/v2-assessment.ts assessmentStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-v2-comparison.en": {
+      "builder": "core/steps/argument-map/v2-comparison.ts comparisonStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-v2-comparison.zh": {
+      "builder": "core/steps/argument-map/v2-comparison.ts comparisonStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-v2-comparison.zh-CN": {
+      "builder": "core/steps/argument-map/v2-comparison.ts comparisonStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-v2-conclusion.en": {
+      "builder": "core/steps/argument-map/v2-conclusion.ts conclusionV2Step",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-v2-conclusion.zh": {
+      "builder": "core/steps/argument-map/v2-conclusion.ts conclusionV2Step",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-v2-conclusion.zh-CN": {
+      "builder": "core/steps/argument-map/v2-conclusion.ts conclusionV2Step",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-v2-framing.en": {
+      "builder": "core/steps/argument-map/v2-framing.ts framingStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-v2-framing.zh": {
+      "builder": "core/steps/argument-map/v2-framing.ts framingStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-v2-framing.zh-CN": {
+      "builder": "core/steps/argument-map/v2-framing.ts framingStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-v2-hypotheses-first.en": {
+      "builder": "core/steps/argument-map/v2-hypotheses.ts hypothesesV2Step",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-v2-hypotheses-first.zh": {
+      "builder": "core/steps/argument-map/v2-hypotheses.ts hypothesesV2Step",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-v2-hypotheses-first.zh-CN": {
+      "builder": "core/steps/argument-map/v2-hypotheses.ts hypothesesV2Step",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-v2-inference-check.en": {
+      "builder": "core/steps/argument-map/v2-inference-check.ts inferenceCheckStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-v2-inference-check.zh": {
+      "builder": "core/steps/argument-map/v2-inference-check.ts inferenceCheckStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-v2-inference-check.zh-CN": {
+      "builder": "core/steps/argument-map/v2-inference-check.ts inferenceCheckStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-v2-needs-round.en": {
+      "builder": "core/steps/argument-map/v2-needs.ts needsV2Step",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-v2-needs-round.zh": {
+      "builder": "core/steps/argument-map/v2-needs.ts needsV2Step",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-v2-needs-round.zh-CN": {
+      "builder": "core/steps/argument-map/v2-needs.ts needsV2Step",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-v2-premise.en": {
+      "builder": "core/steps/argument-map/v2-premise.ts premiseVerdictStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-v2-premise.zh": {
+      "builder": "core/steps/argument-map/v2-premise.ts premiseVerdictStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-v2-premise.zh-CN": {
+      "builder": "core/steps/argument-map/v2-premise.ts premiseVerdictStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-v2-verdict.en": {
+      "builder": "core/steps/argument-map/v2-verdict.ts verdictV2Step",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-v2-verdict.zh": {
+      "builder": "core/steps/argument-map/v2-verdict.ts verdictV2Step",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-v2-verdict.zh-CN": {
+      "builder": "core/steps/argument-map/v2-verdict.ts verdictV2Step",
+      "language": "zh-CN",
+      "schema": true
+    },
     "argument-map-verdict.en": {
       "builder": "core/steps/argument-map/verdict.ts verdictStep",
       "language": "en",

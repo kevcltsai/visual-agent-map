@@ -119,7 +119,9 @@ import { ModelDiscovery, type ModelDiscoveryState } from "./core/model-discovery
 import { ShallowExpansionCoordinator, type ExpansionBatchState } from "./experiences/visual-map/expansion-batch";
 import { ResearchProgressStore } from "./experiences/visual-map/research-progress";
 import { TopicRuns, type ChartJob } from "./experiences/visual-map/topic-run";
-import { ArgumentRuns, topicKindOfNote } from "./experiences/visual-map/argument-run";
+import { ArgumentRuns, topicKindOfNote, type ArgumentRunPorts } from "./experiences/visual-map/argument-run";
+import { ArgumentRunRouter } from "./experiences/visual-map/argument-run-router";
+import { ArgumentRunsV2 } from "./experiences/visual-map/argument-run-v2";
 import { inertHtmlText } from "./core/argument-map/source-proof";
 import { askArgumentStep, providerArgumentRunner } from "./core/steps/argument-map/runner";
 import type { ResearchObserver } from "./ai/research-observer";
@@ -366,7 +368,7 @@ export default class VisualAgentMapPlugin extends Plugin {
    * button opens (the map view, `openArgumentStart`); the map chat cannot start it. Also reachable from
    * `app.plugins.plugins[id].argumentRuns` over CDP. Ports are lazy getters, so `repo` may be built later.
    */
-  readonly argumentRuns = new ArgumentRuns({
+  private readonly argumentRunPorts: ArgumentRunPorts = {
     mutate: work => this.mutate(work),
     readMap: path => this.repo.readMap(path),
     updateMap: (path, change) => this.repo.updateMap(path, change),
@@ -409,7 +411,14 @@ export default class VisualAgentMapPlugin extends Plugin {
     log: line => this.logs.appendLog("info", line),
     t: (key, ...values) => t(key, ...values),
     confirmUsage: () => this.confirmAiUsage(this.currentModelChoice().model, async () => {})
-  });
+  };
+  /** v1 runner (legacy maps) and v2 runner (methodology 6) share the ports; `config("")` is the global configuration (no map exists yet). */
+  readonly argumentRunsV1 = new ArgumentRuns(this.argumentRunPorts);
+  readonly argumentRunsV2 = new ArgumentRunsV2(this.argumentRunPorts);
+  /** What the map view calls: routes by the map's argument kind (usable -> v2, legacy -> v1). */
+  readonly argumentRuns = new ArgumentRunRouter(this.argumentRunsV1, this.argumentRunsV2, path =>
+    this.repo.readMap(path)
+  );
   /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
   readonly pendingResearchOptions = new Map<string, TaskOptions>();
@@ -1542,7 +1551,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   onunload(): void {
     // Background diagram jobs stop before the repository does, so none can apply a result after the vault is released.
     this.topicRuns.dispose();
-    this.argumentRuns.dispose();
+    this.argumentRuns.dispose(); // both runners
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();
     void this.coffeeManager?.stop();

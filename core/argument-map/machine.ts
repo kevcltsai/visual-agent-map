@@ -29,7 +29,7 @@ import {
   type SourceProof,
   type StopReason,
   type Verdict
-} from "./model";
+} from "./model-v1";
 
 export class GateError extends Error {
   constructor(message: string) {

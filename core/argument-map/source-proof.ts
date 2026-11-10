@@ -1,11 +1,12 @@
 /**
  * Argument map source proof. A source counts as evidence only when the program itself opened the URL and found the quoted text
  * (`page_match`), or when the program was blocked and the provider's own tool log shows it opened that exact URL
- * (`provider_read`). Everything else is `not_found`: a 404, a DNS failure, an invented URL, a quote that is not on the page, a
+ * (`provider_read` on the V1 exit, `unverified_quote` on the v2 exit `verifySourceV2`). Everything else is `not_found`: a 404, a DNS failure, an invented URL, a quote that is not on the page, a
  * URL that appears only in the AI's text. What this cannot prove: that the page supports the claim, and that a `provider_read`
  * page really says what the provider reported. Spec: docs/history/tasks/2026-11-09-argument-map-layout (plan section 3).
  */
-import type { SourceProof } from "./model";
+import type { SourceProof as SourceProofV2 } from "./model";
+import type { SourceProof } from "./model-v1";
 
 export const QUOTE_MIN = 12;
 export const QUOTE_MAX = 200;
@@ -29,6 +30,10 @@ export type NotFoundReason =
   | "blocked_unverified";
 
 export type SourceCheck = { ok: true; proof: SourceProof } | { ok: false; result: "not_found"; reason: NotFoundReason };
+
+/** The v2 outcome: the same checks, but a tool-log-only quote is `unverified_quote` (kept on record, never satisfies a need). */
+export type SourceCheckV2 =
+  { ok: true; proof: SourceProofV2 } | { ok: false; result: "not_found"; reason: NotFoundReason };
 
 /** The slice of Obsidian's `requestUrl` this module uses. */
 export interface FetchRequest {
@@ -208,7 +213,25 @@ async function fetchWithTimeout(
   }
 }
 
-export async function verifySource(input: VerifySourceInput): Promise<SourceCheck> {
+/** V1 exit: a blocked page vouched for by the tool log is `provider_read` (V1 runner behaviour, unchanged). */
+export function verifySource(input: VerifySourceInput): Promise<SourceCheck> {
+  return verifyWith(input, "provider_read") as Promise<SourceCheck>;
+}
+
+/** v2 exit: same gates, but the tool-log-only outcome is `unverified_quote`. Only `page_match` can satisfy a need. */
+export function verifySourceV2(input: VerifySourceInput): Promise<SourceCheckV2> {
+  return verifyWith(input, "unverified_quote") as Promise<SourceCheckV2>;
+}
+
+/** Log line for the unverified quotes of a run: ids and domains only, never the quote, claim or full URL. */
+export function unverifiedQuoteLog(runId: string, items: readonly { id: string; domain: string }[]): string {
+  return `argument-run unverified_quote runId=${runId} count=${items.length} items=${items.map(i => `${i.id}@${i.domain || "-"}`).join(",") || "-"}`;
+}
+
+async function verifyWith(
+  input: VerifySourceInput,
+  blockedCheck: "provider_read" | "unverified_quote"
+): Promise<SourceCheck | SourceCheckV2> {
   const fail = (reason: NotFoundReason): SourceCheck => ({ ok: false, result: "not_found", reason });
   const url = allowedUrl(input.url);
   if (!url) return fail("rejected_url");
@@ -221,13 +244,13 @@ export async function verifySource(input: VerifySourceInput): Promise<SourceChec
 
   const requested = new URL(url.href);
   requested.hash = "";
-  const proof = (check: SourceProof["check"]): SourceCheck => ({
+  const proof = (check: SourceProof["check"] | SourceProofV2["check"]): SourceCheck => ({
     ok: true,
     proof: {
       url: requested.href,
       quote: input.quote.trim(),
       claim: input.claim.trim(),
-      check,
+      check: check as SourceProof["check"],
       checkedAt: (input.now ?? (() => new Date().toISOString()))()
     }
   });
@@ -237,7 +260,7 @@ export async function verifySource(input: VerifySourceInput): Promise<SourceChec
     return !!parsed && canonical(parsed) === key;
   });
   /** The program could not read the page itself: only the provider's own tool log can vouch for it. */
-  const blocked = (): SourceCheck => (openedByProvider ? proof("provider_read") : fail("blocked_unverified"));
+  const blocked = (): SourceCheck => (openedByProvider ? proof(blockedCheck) : fail("blocked_unverified"));
 
   let response: FetchResponse | typeof TIMED_OUT;
   try {

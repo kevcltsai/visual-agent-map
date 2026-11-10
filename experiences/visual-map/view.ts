@@ -3810,8 +3810,16 @@ export class VisualAgentMapView extends ItemView {
       await this.plugin.repo.saveMap(path, map);
       if (!isCurrent()) return;
     }
-    // An argument map is never written on open: a legacy (`"v": 1`) map is read-only, and a version 2 map is arranged by the flow
-    // that writes it (packet V5a/V7).
+    // A version 2 argument map left running by a closed Obsidian is recovered by the runner (no provider call); when it changed the
+    // saved map, the map is read again. A legacy (`"v": 1`) map is read-only: opening it never recovers or writes.
+    if (map.argumentMap !== undefined && readArgumentMap(map).kind === "usable") {
+      const runs = (this.plugin as { argumentRunsV2?: { recover(path: string): Promise<boolean> } }).argumentRunsV2;
+      // A recovery that fails must not keep the map shut: it opens as saved and its bar says the run was interrupted.
+      const changed = runs ? await runs.recover(path).catch(() => false) : false;
+      if (!isCurrent()) return;
+      if (changed) map = await this.plugin.repo.readMap(path);
+      if (!isCurrent()) return;
+    }
     // Another map, or the first one this window shows: the cards are drawn before the notes are read (a slow disk or a busy
     // machine can take a second per note). Opening the map already on screen keeps its cards until the read ends, as before.
     const progressive = map.nodes.length > 0 && (this.path !== path || this.paintCount === 0);
@@ -3871,7 +3879,7 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
       await this.recoverInterruptedNotes(isCurrent);
       if (!isCurrent()) return;
-      // No argument-run recovery here: a legacy (`"v": 1`) map is read-only and opening it never writes (version 2 recovery: packet V5a).
+      // Argument-run recovery runs above, before the map is shown (version 2 only; a legacy map is read-only).
       this.endNoteLoad(load);
       this.render();
       this.app.workspace.requestSaveLayout();

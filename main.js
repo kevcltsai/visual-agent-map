@@ -96243,7 +96243,7 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
         );
       });
       if (changed || vamFile) await this.rebuildDerivedData();
-      if (sourceError) throw sourceError;
+      if (sourceError) throw sourceError instanceof Error ? sourceError : new Error(String(sourceError));
       if (error) throw error;
     } catch (batchError) {
       failed = true;

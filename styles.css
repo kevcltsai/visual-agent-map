@@ -1757,7 +1757,22 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-modal .vam-relation-footer { margin-top: 20px; }
 .vam-map-chat .vam-map-chat-hero-actions { display: flex; flex-wrap: wrap; justify-content: center; align-self: center; gap: 8px; margin-top: 8px; }
 .vam-map-chat .vam-map-chat-hero-actions[hidden] { display: none; }
-.vam-map-chat button.vam-map-chat-empty-map[hidden], .vam-map-chat button.vam-map-chat-argument[hidden] { display: none; }
+.vam-map-chat button.vam-map-chat-empty-map[hidden] { display: none; }
+/* Opening screen tabs: Mind map / Hypothesis research (Beta); the research tab's description, suggested claims and usage warning. */
+.vam-map-chat .vam-map-chat-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--background-modifier-border); }
+.vam-map-chat .vam-map-chat-tabs[hidden] { display: none; }
+.vam-map-chat button.vam-map-chat-tab { display: inline-flex; align-items: center; gap: 6px; height: auto; padding: 6px 14px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-small); cursor: pointer; }
+.vam-map-chat button.vam-map-chat-tab:hover { color: var(--text-normal); background: transparent; }
+.vam-map-chat button.vam-map-chat-tab.is-selected { color: var(--text-normal); font-weight: var(--font-semibold); border-bottom-color: var(--interactive-accent); }
+.vam-map-chat button.vam-map-chat-tab:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+.vam-map-chat .vam-map-chat-beta { padding: 0 6px; border: 1px solid var(--background-modifier-border); border-radius: 999px; color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: var(--font-normal); line-height: 1.5; }
+.vam-map-chat .vam-map-chat-argument-desc { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: var(--line-height-normal); }
+.vam-map-chat .vam-map-chat-argument-desc[hidden], .vam-map-chat .vam-map-chat-argument-panel[hidden] { display: none; }
+.vam-map-chat .vam-map-chat-argument-panel { display: grid; gap: 10px; min-width: 0; }
+.vam-map-chat .vam-map-chat-claim-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.vam-map-chat button.vam-map-chat-claim-pick { height: auto; max-width: 100%; padding: 4px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-small); text-align: left; white-space: normal; cursor: pointer; }
+.vam-map-chat button.vam-map-chat-claim-pick:hover { background: var(--background-modifier-hover); }
+.vam-map-chat .vam-map-chat-argument-usage { margin: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: var(--line-height-normal); }
 /* The model a card runs on when it is not the current model (MS-08): muted small text. */
 .vam-node-model-tag { display: inline-flex; align-items: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; color: var(--text-muted); }
 

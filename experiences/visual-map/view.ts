@@ -471,7 +471,6 @@ import {
 import { ArgumentRunError, WORST_CASE_AI_CALLS } from "./argument-run";
 import { rerunWithAssumptions } from "./argument-rerun";
 import { describeArgumentProgress } from "./argument-progress";
-import { ArgumentStartModal } from "../../ui/modals/argument-start-modal";
 import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
@@ -21151,46 +21150,30 @@ export class VisualAgentMapView extends ItemView {
     this.focusNode(root);
     this.cardEls.get(root.id)?.focus?.({ preventScroll: true });
   }
-  private openArgumentStart(draft: string): void {
+  /**
+   * Sending from the opening screen's "Hypothesis research" tab: the run starts at once with the claim. Nothing starts when the
+   * opening screen is gone, the map got cards or a research key, or a run is already going on this map.
+   */
+  private startArgumentFromTab(claim: string): void {
     const map = this.map;
-    if (this.closed || !map || !this.chatHero()) return;
+    const text = claim.trim();
+    if (this.closed || !map || !this.chatHero() || !text) return;
     const path = this.path;
-    const mapId = map.id;
-    const stale = (): boolean =>
-      this.closed ||
-      this.path !== path ||
-      this.map?.id !== mapId ||
-      this.map.argumentMap !== undefined ||
-      this.map.nodes.length > 0 ||
-      this.plugin.argumentRuns.isRunning(path);
-    const models = this.chatModelChoices().map(choice => ({ id: choice.value, label: choice.label }));
-    new ArgumentStartModal(
-      this.app,
-      draft,
-      models,
-      this.plugin.settings.cliModel,
-      WORST_CASE_AI_CALLS,
-      async ({ claim, model }) => {
-        if (!claim.trim() || stale()) return;
-        // The window's model is the current model, the same as picking it in the opening screen's model menu.
-        if (model !== this.plugin.settings.cliModel) {
-          await this.plugin.setCurrentModel(model);
-          if (stale()) return;
-        }
-        this.chat?.clearDraft();
-        this.argumentFocusMapId = mapId;
-        // The run is not awaited: its first checkpoint replaces the opening screen with the argument map.
-        void this.plugin.argumentRuns.start(path, claim).catch((error: unknown) => {
-          this.argumentFocusMapId = null;
-          if (error instanceof ArgumentRunError) new Notice(t("ui.argument_start_refused"));
-        });
-      }
-    ).open();
+    if (map.argumentMap !== undefined || map.nodes.length > 0 || this.plugin.argumentRuns.isRunning(path)) return;
+    this.chat?.clearDraft();
+    this.argumentFocusMapId = map.id;
+    // The run is not awaited: its first checkpoint replaces the opening screen with the argument map. The model is the
+    // current model: picking it in the composer's menu already set it.
+    void this.plugin.argumentRuns.start(path, text).catch((error: unknown) => {
+      this.argumentFocusMapId = null;
+      if (error instanceof ArgumentRunError) new Notice(t("ui.argument_start_refused"));
+    });
   }
   private chatHost(): MapChatHost {
     return {
       createEmptyMap: () => this.startBlankMap(),
-      startArgumentResearch: draft => this.openArgumentStart(draft),
+      startArgumentResearch: claim => this.startArgumentFromTab(claim),
+      argumentCalls: () => WORST_CASE_AI_CALLS,
       topicTitle: id => {
         const node = this.map?.nodes.find(item => item.id === id);
         return node ? (this.notes.get(id)?.title ?? node.path) : null;

@@ -2944,28 +2944,86 @@ integrationTest('45 ui: the opening screen has a secondary "create an empty mind
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
   const button = chat.emptyMapEl; assert.equal(button.hidden, false); assert.equal(button.text, 'Create an empty mind map'); assert.equal(button.attrs.type, 'button'); assert.equal(button.hasClass('mod-cta'), false);
   assert.equal(button.tabIndex === undefined || button.tabIndex >= 0, true, 'in the tab order');
-  const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === button || i === chat.researchEl); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : i === button ? 'empty' : 'research'), ['title', 'input', 'empty', 'research']);
-  assert.equal(button.parent, chat.heroActionsEl, 'both buttons share one row'); assert.equal(chat.researchEl.parent, chat.heroActionsEl);
+  const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === button); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : 'empty'), ['title', 'input', 'empty']);
+  assert.equal(button.parent, chat.heroActionsEl, 'the button sits in the mind-map tab\'s panel'); assert.equal(chat.researchEl, undefined, 'the old research button is gone');
 });
 
-integrationTest('P9a ui: the opening screen has a "Hypothesis research…" button right of the empty-map button in the same row; it hands the typed text to the host', async () => {
-  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const button = chat.researchEl;
-  assert.equal(button.hidden, false); assert.equal(button.text, 'Hypothesis research…'); assert.equal(button.attrs.type, 'button'); assert.equal(button.hasClass('mod-cta'), false); assert.ok(hasClass(button, 'vam-map-chat-argument'));
-  assert.ok(hasClass(chat.heroActionsEl, 'vam-map-chat-hero-actions')); assert.deepEqual([...chat.heroActionsEl.children], [chat.emptyMapEl, button]);
-  const body = chat.bodyEl.children; assert.equal(body.at(-2), chat.heroActionsEl, 'the row sits where the empty-map button sat: after the composer, before the head row'); assert.equal(body.at(-1), chat.headEl);
-  const asked = []; chat.host.startArgumentResearch = draft => asked.push(draft); h.type('  Is it true?  '); button.click();
-  eq(asked, [chat.draft], 'the draft is passed once'); assert.match(asked[0], /Is it true\?/);
+// ---- opening screen (P8): the two tabs, the suggestions, and sending straight from the field ----------------------------------------
+const SUGGESTIONS = ['Is the high youth unemployment in the US caused by AI?', 'Is Taiwan\'s rising housing price mainly due to low interest rates?', 'Has remote work lowered employee productivity?', 'Has public safety in New Zealand gotten worse in recent years?', 'Does social media make teenagers more depressed?', 'Do electric cars have lower total carbon emissions than gasoline cars?', 'Does raising the minimum wage reduce employment?', 'Is Taiwan\'s low birth rate mainly caused by economic pressure?', 'Is coffee good for your health?', 'Do short videos make people less able to focus?'];
+function heroFixture(extra = {}) {
+  const started = [];
+  const f = panelFixture({ startArgumentResearch: claim => { started.push(claim); }, argumentCalls: () => 122, createEmptyMap: () => {}, ...extra });
+  f.panel.mount(f.overlay, 'hero');
+  return { ...f, started };
+}
+const suggestionButtons = chat => findAll(chat.bodyEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-claim-pick'));
+
+test('P8 tabs: tablist/tab/tabpanel roles, aria-selected, roving tabindex, arrow keys, Home and End switch and move the keyboard', () => {
+  const f = heroFixture(); const c = f.panel;
+  assert.equal(c.tabsEl.attrs.role, 'tablist'); assert.equal(c.mapTabEl.attrs.role, 'tab'); assert.equal(c.researchTabEl.attrs.role, 'tab');
+  assert.equal(c.mapTabEl.text, 'Mind map'); assert.match(visibleText(c.researchTabEl), /Hypothesis research.*Beta/);
+  const state = () => [c.mapTabEl.attrs['aria-selected'], c.researchTabEl.attrs['aria-selected'], c.mapTabEl.attrs.tabindex, c.researchTabEl.attrs.tabindex];
+  eq(state(), ['true', 'false', '0', '-1'], 'starts on the mind map tab');
+  assert.equal(c.mapTabEl.attrs['aria-controls'], c.heroActionsEl.attrs.id); assert.equal(c.heroActionsEl.attrs.role, 'tabpanel'); assert.equal(c.heroActionsEl.attrs['aria-labelledby'], c.mapTabEl.attrs.id);
+  assert.equal(c.researchTabEl.attrs['aria-controls'], c.researchPanelEl.attrs.id); assert.equal(c.researchPanelEl.attrs.role, 'tabpanel'); assert.equal(c.researchPanelEl.attrs['aria-labelledby'], c.researchTabEl.attrs.id);
+  assert.equal(c.researchPanelEl.hidden, true);
+  assert.equal(key(c.mapTabEl, { key: 'ArrowRight' }), true);
+  eq(state(), ['false', 'true', '-1', '0']); assert.equal(f.page.doc.activeElement, c.researchTabEl); assert.equal(c.researchPanelEl.hidden, false); assert.equal(c.heroActionsEl.hidden, true);
+  key(c.researchTabEl, { key: 'ArrowRight' }); eq(state(), ['true', 'false', '0', '-1'], 'wraps around'); assert.equal(f.page.doc.activeElement, c.mapTabEl);
+  key(c.mapTabEl, { key: 'ArrowLeft' }); eq(state(), ['false', 'true', '-1', '0'], 'wraps the other way');
+  key(c.researchTabEl, { key: 'Home' }); eq(state(), ['true', 'false', '0', '-1']);
+  key(c.mapTabEl, { key: 'End' }); eq(state(), ['false', 'true', '-1', '0']);
+  c.mapTabEl.click(); eq(state(), ['true', 'false', '0', '-1'], 'a click selects too');
 });
 
-integrationTest('P9a counterexample: a host without startArgumentResearch shows no research button; the empty-map button, its text and its place are as before; with neither the row is hidden', async () => {
-  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
-  delete chat.host.startArgumentResearch; h.repaint();
-  assert.equal(chat.researchEl.hidden, true); assert.equal(chat.emptyMapEl.hidden, false); assert.equal(chat.heroActionsEl.hidden, false); assert.equal(chat.emptyMapEl.text, 'Create an empty mind map');
-  assert.equal(chat.bodyEl.children.at(-2), chat.heroActionsEl); eq(findAll(chat.bodyEl, i => i === chat.emptyMapEl || i === chat.researchEl && !i.hidden).map(i => i === chat.emptyMapEl ? 'empty' : 'research'), ['empty']);
-  delete chat.host.createEmptyMap; h.repaint();
-  assert.equal(chat.emptyMapEl.hidden, true); assert.equal(chat.heroActionsEl.hidden, true, 'no button: no row'); assert.equal(chat.bodyEl.children.at(-1), chat.headEl);
-  const g = await harness(); await g.view.hydrate(); g.repaint(); g.open(); assert.equal(g.view.chat.researchEl.hidden, true, 'a map with cards'); assert.equal(g.view.chat.heroActionsEl.hidden, true);
-  h.type('Coffee'); await h.view.sendMapChat(); assert.equal(chat.researchEl.hidden, true, 'side window');
+test('P8 research tab: description, usage warning with 122, no start button, model inside the box bottom-left and the send key inside bottom-right', () => {
+  const f = heroFixture(); const c = f.panel; c.researchTabEl.click();
+  assert.equal(c.researchDescEl.hidden, false); assert.match(c.researchDescEl.text, /Enter a claim you want to check/);
+  const warn = find(c.researchPanelEl, i => hasClass(i, 'vam-map-chat-argument-usage'));
+  assert.match(warn.text, /122 AI calls/, 'usage shows 122'); assert.match(warn.text, /^⚠ /);
+  assert.equal(findAll(c.bodyEl, i => i.tag === 'button' && /Start research/.test(i.text ?? '')).length, 0, 'no start-research button');
+  const box = c.inputEl.parent; assert.equal(c.modelEl.parent, box); assert.equal(c.sendEl.parent, box);
+  assert.ok(box.children.indexOf(c.inputEl) < box.children.indexOf(c.modelEl) && box.children.indexOf(c.modelEl) < box.children.indexOf(c.sendEl), 'field, model, send key');
+  assert.equal(c.sendEl.tag, 'button'); assert.equal(c.sendEl.attrs['aria-label'], 'Start research'); c.mapTabEl.click(); assert.equal(c.sendEl.attrs['aria-label'], 'Send', 'the map tab keeps the ordinary label');
+});
+
+test('P8 suggestions: 3 distinct items from the 10-item pool, a new pick each time the tab opens, click fills the field and starts nothing, no line about randomness', () => {
+  const rolls = [0.99, 0.5, 0.1, 0.3, 0.7, 0.2, 0, 0, 0, 0, 0, 0, 0, 0]; let at = 0;
+  const f = heroFixture({ random: () => rolls[at++ % rolls.length] }); const c = f.panel;
+  c.researchTabEl.click();
+  const first = suggestionButtons(c).map(b => b.text);
+  assert.equal(first.length, 3); assert.equal(new Set(first).size, 3, 'distinct'); assert.ok(first.every(x => SUGGESTIONS.includes(x)), 'from the pool');
+  c.mapTabEl.click(); c.researchTabEl.click();
+  const second = suggestionButtons(c).map(b => b.text);
+  assert.equal(second.length, 3); assert.equal(new Set(second).size, 3); assert.notDeepEqual(second, first, 'picked again on the next opening');
+  suggestionButtons(c)[1].click();
+  assert.equal(c.draft, second[1], 'click fills the field'); assert.deepEqual(f.started, [], 'and does not start'); assert.equal(f.page.doc.activeElement, c.inputEl, 'the keyboard goes to the field');
+  const all = visibleText(c.researchPanelEl) + c.researchDescEl.text;
+  assert.doesNotMatch(all, /random|隨機/i);
+});
+
+test('P8 Enter: blank, whitespace or IME composition starts nothing; text starts once with the trimmed claim; Shift+Enter does not; the send key works too', () => {
+  const f = heroFixture(); const c = f.panel; c.researchTabEl.click(); const input = c.inputEl;
+  input.value = ''; key(input, { key: 'Enter' }); assert.deepEqual(f.started, [], 'blank');
+  input.value = '  \n\t '; key(input, { key: 'Enter' }); c.sendEl.click(); assert.deepEqual(f.started, [], 'whitespace, also by the send key');
+  input.value = 'Coffee is good'; key(input, { key: 'Enter', isComposing: true }); assert.deepEqual(f.started, [], 'IME key event');
+  input.fire('compositionstart'); key(input, { key: 'Enter' }); assert.deepEqual(f.started, [], 'composing'); input.fire('compositionend');
+  key(input, { key: 'Enter', shiftKey: true }); assert.deepEqual(f.started, [], 'Shift+Enter breaks the line');
+  assert.equal(f.calls.send, 0, 'the research tab never sends a chat turn');
+  input.value = '  Coffee is good \n'; assert.equal(key(input, { key: 'Enter' }), true); assert.deepEqual(f.started, ['Coffee is good']);
+  input.value = 'Again'; c.sendEl.click(); assert.deepEqual(f.started, ['Coffee is good', 'Again']);
+});
+
+test('P8: on the mind map tab Enter sends the chat turn as before and starts no research; the draft stays when the tab changes', () => {
+  const f = heroFixture(); const c = f.panel; const input = c.inputEl; input.value = 'Plan my trip';
+  key(input, { key: 'Enter' }); assert.equal(f.calls.send, 1); assert.deepEqual(f.started, []);
+  c.researchTabEl.click(); assert.equal(c.draft, 'Plan my trip', 'draft kept across tabs');
+});
+
+test('P8: a host without startArgumentResearch shows no tabs and no research panel; the opening screen is as before', () => {
+  const f = panelFixture({ createEmptyMap: () => {} }); f.panel.mount(f.overlay, 'hero');
+  assert.equal(f.panel.tabsEl.hidden, true); assert.equal(f.panel.researchPanelEl.hidden, true); assert.equal(f.panel.heroActionsEl.hidden, false); assert.equal(f.panel.heroTitleEl.hidden, false);
+  f.panel.inputEl.value = 'x'; key(f.panel.inputEl, { key: 'Enter' }); assert.equal(f.calls.send, 1);
 });
 
 integrationTest('P9a counterexample: the map chat cannot start a hypothesis research run, however the message is worded', async () => {

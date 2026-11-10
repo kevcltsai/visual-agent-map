@@ -314,8 +314,12 @@ export interface MapChatHost {
   steer?(): void;
   /** The opening screen's secondary button: a new empty map through the name box, no AI. Absent: no button. */
   createEmptyMap?(): void;
-  /** The opening screen's other button: hypothesis research, with the text typed so far. Absent: no button. */
-  startArgumentResearch?(draft: string): void;
+  /** The opening screen's "Hypothesis research" tab: sending a non-blank claim there starts the research directly. Absent: no tabs. */
+  startArgumentResearch?(claim: string): void;
+  /** The most AI calls one research can make, for the usage warning of the research tab. */
+  argumentCalls?(): number;
+  /** The random source of the suggested claims (tests); Math.random when absent. */
+  random?(): number;
   /** The clock the stage seconds are counted on (tests); the real time when absent. */
   now?(): number;
   /** Resolves a `[[link]]` target to the vault path of the note it names, or null. */
@@ -421,6 +425,33 @@ export function droppedLinkTarget(text: string): string | null {
 
 let panelSequence = 0;
 
+type HeroTab = "map" | "research";
+const HERO_TABS: readonly HeroTab[] = ["map", "research"];
+/** The pool of suggested claims of the research tab (each shown text is its i18n key's). */
+export const ARGUMENT_SUGGESTION_KEYS = [
+  "ui.argument_suggestion_1",
+  "ui.argument_suggestion_2",
+  "ui.argument_suggestion_3",
+  "ui.argument_suggestion_4",
+  "ui.argument_suggestion_5",
+  "ui.argument_suggestion_6",
+  "ui.argument_suggestion_7",
+  "ui.argument_suggestion_8",
+  "ui.argument_suggestion_9",
+  "ui.argument_suggestion_10"
+] as const;
+/** `count` distinct items of `pool`, drawn with `random` (a partial shuffle; a copy, the pool is not changed). */
+export function pickArgumentSuggestions<T>(pool: readonly T[], random: () => number, count = 3): T[] {
+  const rest = [...pool];
+  const picked: T[] = [];
+  while (picked.length < count && rest.length) {
+    const roll = random();
+    const at = Number.isFinite(roll) ? Math.min(rest.length - 1, Math.max(0, Math.floor(roll * rest.length))) : 0;
+    picked.push(rest.splice(at, 1)[0]);
+  }
+  return picked;
+}
+
 /**
  * The map's AI chat window: messages, draft, reference chips and the open or collapsed state. It lives on the view, builds
  * its elements once, and is put back into each repaint of the map (see {@link mount}); nothing here talks to the AI.
@@ -472,7 +503,17 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private logEl!: HTMLElement;
   private heroActionsEl!: HTMLDivElement;
   private emptyMapEl!: HTMLButtonElement;
-  private researchEl!: HTMLButtonElement;
+  private tabsEl!: HTMLDivElement;
+  private mapTabEl!: HTMLButtonElement;
+  private researchTabEl!: HTMLButtonElement;
+  private researchTabLabelEl!: HTMLSpanElement;
+  private betaEl!: HTMLSpanElement;
+  private researchDescEl!: HTMLParagraphElement;
+  private researchPanelEl!: HTMLDivElement;
+  private suggestionsEl!: HTMLDivElement;
+  private usageEl!: HTMLParagraphElement;
+  private heroTab: HeroTab = "map";
+  private suggestionKeys: (typeof ARGUMENT_SUGGESTION_KEYS)[number][] = [];
   private resizerEl!: HTMLElement;
   private liveEl!: HTMLElement;
   private stopResizing: (() => void) | null = null;
@@ -1728,11 +1769,37 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     }));
     setIcon(close, "x");
     close.addEventListener("click", () => this.setOpen(false, true));
+    // Opening screen only: the two ways in. Each tab names the panel it controls; the one composer below is shared by both.
+    this.tabsEl = this.bodyEl.createDiv({
+      cls: "vam-map-chat-tabs",
+      attr: { role: "tablist", "aria-label": t("ui.argument_tab_label") }
+    });
+    this.tabsEl.hidden = true;
+    this.mapTabEl = this.tabsEl.createEl("button", {
+      cls: "vam-map-chat-tab",
+      text: t("ui.argument_tab_map"),
+      attr: { type: "button", role: "tab", id: `${this.id}-tab-map`, "aria-controls": `${this.id}-panel-map` }
+    });
+    this.researchTabEl = this.tabsEl.createEl("button", {
+      cls: "vam-map-chat-tab",
+      attr: { type: "button", role: "tab", id: `${this.id}-tab-research`, "aria-controls": `${this.id}-panel-research` }
+    });
+    this.researchTabLabelEl = this.researchTabEl.createSpan({ text: t("ui.argument_tab_research") });
+    this.betaEl = this.researchTabEl.createSpan({ cls: "vam-map-chat-beta", text: t("ui.argument_tab_beta") });
+    this.mapTabEl.addEventListener("click", () => this.selectTab("map", false));
+    this.researchTabEl.addEventListener("click", () => this.selectTab("research", false));
+    this.mapTabEl.addEventListener("keydown", event => this.onTabKey(event));
+    this.researchTabEl.addEventListener("keydown", event => this.onTabKey(event));
     this.heroTitleEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-hero-title",
       text: t("ui.map_chat_hero_title"),
       attr: { role: "heading", "aria-level": "2" }
     });
+    this.researchDescEl = this.bodyEl.createEl("p", {
+      cls: "vam-map-chat-argument-desc",
+      text: t("ui.argument_tab_description")
+    });
+    this.researchDescEl.hidden = true;
     // A map that has content opens the window onto an empty log: one line says what it is for.
     // A dashed box with a faint chat icon; the words stay for screen readers only.
     this.guideEl = this.bodyEl.createDiv("vam-map-chat-guide");
@@ -1769,7 +1836,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       if (event.key === "Enter") openInternal(event, event.target);
     });
     // Opening screen only: a secondary way in that needs no model. Tab order: the chips, the message field, the controls.
-    this.heroActionsEl = this.bodyEl.createDiv({ cls: "vam-map-chat-hero-actions" });
+    this.heroActionsEl = this.bodyEl.createDiv({
+      cls: "vam-map-chat-hero-actions",
+      attr: { id: `${this.id}-panel-map`, "aria-labelledby": `${this.id}-tab-map` }
+    });
     this.heroActionsEl.hidden = true;
     this.emptyMapEl = this.heroActionsEl.createEl("button", {
       cls: "vam-map-chat-empty-map",
@@ -1778,13 +1848,17 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     });
     this.emptyMapEl.hidden = true;
     this.emptyMapEl.addEventListener("click", () => this.host.createEmptyMap?.());
-    this.researchEl = this.heroActionsEl.createEl("button", {
-      cls: "vam-map-chat-argument",
-      text: t("ui.argument_start_button"),
-      attr: { type: "button" }
+    // The research tab's panel (below the composer, in the place of the button row): suggested claims, then the usage warning.
+    this.researchPanelEl = this.bodyEl.createDiv({
+      cls: "vam-map-chat-argument-panel",
+      attr: { id: `${this.id}-panel-research`, "aria-labelledby": `${this.id}-tab-research` }
     });
-    this.researchEl.hidden = true;
-    this.researchEl.addEventListener("click", () => this.host.startArgumentResearch?.(this.draft));
+    this.researchPanelEl.hidden = true;
+    this.suggestionsEl = this.researchPanelEl.createDiv({
+      cls: "vam-map-chat-claim-picks",
+      attr: { role: "group", "aria-label": t("ui.argument_suggestions_label") }
+    });
+    this.usageEl = this.researchPanelEl.createEl("p", { cls: "vam-map-chat-argument-usage" });
     this.chipsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
@@ -1937,11 +2011,16 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.guideTextEl.setText(t("ui.map_chat_empty_log"));
     this.logLabelEl.setText(t("ui.map_chat_log_label"));
     this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
-    this.researchEl.setText(t("ui.argument_start_button"));
+    this.tabsEl.setAttr("aria-label", t("ui.argument_tab_label"));
+    this.mapTabEl.setText(t("ui.argument_tab_map"));
+    this.researchTabLabelEl.setText(t("ui.argument_tab_research"));
+    this.betaEl.setText(t("ui.argument_tab_beta"));
+    this.researchDescEl.setText(t("ui.argument_tab_description"));
+    this.suggestionsEl.setAttr("aria-label", t("ui.argument_suggestions_label"));
+    this.renderSuggestions();
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
     this.renderPlaceholder();
-    this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
     this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
     this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));
     this.applyOpen();
@@ -1954,6 +2033,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
   /** Send was pressed: a hidden Send button, or a row that is rebuilt, must not leave the keyboard on the page. */
   private sendPressed(): void {
+    if (this.researchMode()) {
+      this.startResearch();
+      return;
+    }
     this.handOffFocus(() => this.host.send());
   }
   /** Runs `start` (which begins a turn); if the keyboard was in the window and fell out of it, Stop (the one control of a waiting turn) takes it. */
@@ -1983,6 +2066,65 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     }
   }
 
+  /** The opening screen is on its "Hypothesis research" tab: Enter and the send key start a research instead of a chat turn. */
+  private researchMode(): boolean {
+    return this.hero && this.heroTab === "research" && !!this.host.startArgumentResearch;
+  }
+  /** Starts the research with the typed claim; a blank claim starts nothing. */
+  private startResearch(): void {
+    const claim = this.inputEl.value.trim();
+    if (!claim || this.working) return;
+    this.host.startArgumentResearch?.(claim);
+  }
+  private selectTab(tab: HeroTab, focus: boolean): void {
+    if (!this.built) return;
+    const opened = tab === "research" && this.heroTab !== "research";
+    this.heroTab = tab;
+    // A new pick of three claims each time the tab opens.
+    if (opened) {
+      const pool = ARGUMENT_SUGGESTION_KEYS;
+      this.suggestionKeys = pickArgumentSuggestions(pool, () => this.host.random?.() ?? Math.random());
+      this.renderSuggestions();
+    }
+    this.applyOpen();
+    if (focus) (tab === "map" ? this.mapTabEl : this.researchTabEl).focus();
+  }
+  private onTabKey(event: KeyboardEvent): void {
+    const at = HERO_TABS.indexOf(this.heroTab);
+    const last = HERO_TABS.length - 1;
+    const next =
+      event.key === "ArrowRight"
+        ? HERO_TABS[at === last ? 0 : at + 1]
+        : event.key === "ArrowLeft"
+          ? HERO_TABS[at === 0 ? last : at - 1]
+          : event.key === "Home"
+            ? HERO_TABS[0]
+            : event.key === "End"
+              ? HERO_TABS[last]
+              : null;
+    if (!next) return;
+    event.preventDefault();
+    this.selectTab(next, true);
+  }
+  private renderSuggestions(): void {
+    this.suggestionsEl.empty();
+    for (const key of this.suggestionKeys) {
+      const text = t(key);
+      const button = this.suggestionsEl.createEl("button", {
+        cls: "vam-map-chat-claim-pick",
+        text,
+        attr: { type: "button" }
+      });
+      // A click only fills the field; sending is the owner's own Enter or send key.
+      button.addEventListener("click", () => {
+        this.inputEl.value = text;
+        this.renderSteerHint();
+        this.inputEl.focus();
+        this.inputEl.setSelectionRange(text.length, text.length);
+      });
+    }
+  }
+
   private onKey(event: KeyboardEvent): void {
     if (event.key === "Escape" && !event.isComposing && !this.composing) {
       // On the opening screen there is no window to fold.
@@ -1995,6 +2137,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     // Enter sends, Shift+Enter breaks the line, and a key that confirms an IME candidate does neither.
     if (event.key !== "Enter" || event.shiftKey || event.isComposing || this.composing) return;
     event.preventDefault();
+    if (this.researchMode()) {
+      this.startResearch();
+      return;
+    }
     // While a turn works, Enter with text is a follow-up for it; without text it does nothing.
     if (this.working) {
       if (this.draft.trim()) this.host.steer?.();
@@ -2135,13 +2281,13 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    * map" button (so reading and Tab order match what is seen); the head row (icons only) is hidden there. In the window it is on top.
    * Elements are moved only when they are out of place, so a control that has the keyboard is not moved for nothing.
    */
-  private placeHeadAndEmptyMap(hero: boolean, showActions: boolean): void {
+  private placeHeadAndEmptyMap(hero: boolean, panel: HTMLElement | null): void {
     const children = (): Element[] => Array.from(this.bodyEl.children);
     if (!hero) {
       if (children()[0] !== this.headEl) this.bodyEl.insertBefore(this.headEl, this.bodyEl.firstChild);
       return;
     }
-    const tail = showActions ? [this.heroActionsEl, this.headEl] : [this.headEl];
+    const tail = panel ? [panel, this.headEl] : [this.headEl];
     const now = children().slice(-tail.length);
     if (tail.every((el, index) => now[index] === el)) return;
     for (const el of tail) {
@@ -2214,20 +2360,38 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.resizerEl.hidden = !docked;
     this.resizerEl.toggleClass("is-hidden", !docked);
     this.headEl.toggleClass("is-hero", hero);
-    this.heroTitleEl.hidden = !hero;
-    this.heroTitleEl.toggleClass("is-hidden", !hero);
+    const tabbed = hero && !!this.host.startArgumentResearch;
+    const onResearch = tabbed && this.heroTab === "research";
+    this.tabsEl.hidden = !tabbed;
+    this.tabsEl.toggleClass("is-hidden", !tabbed);
+    for (const [tab, el] of [
+      ["map", this.mapTabEl],
+      ["research", this.researchTabEl]
+    ] as const) {
+      const selected = this.heroTab === tab;
+      el.setAttr("aria-selected", String(selected));
+      el.setAttr("tabindex", selected ? "0" : "-1");
+      el.toggleClass("is-selected", selected);
+    }
+    if (tabbed) this.heroActionsEl.setAttr("role", "tabpanel");
+    else this.heroActionsEl.removeAttribute("role");
+    if (tabbed) this.researchPanelEl.setAttr("role", "tabpanel");
+    else this.researchPanelEl.removeAttribute("role");
+    this.heroTitleEl.hidden = !hero || onResearch;
+    this.heroTitleEl.toggleClass("is-hidden", !hero || onResearch);
+    this.researchDescEl.hidden = !onResearch;
+    this.researchPanelEl.hidden = !onResearch;
+    this.usageEl.setText(t("ui.argument_tab_usage_0", String(this.host.argumentCalls?.() ?? "")));
+    this.sendEl.setAttr("aria-label", t(onResearch ? "ui.argument_tab_send" : "ui.map_chat_send"));
     // The opening screen asks for a topic; the side window talks about the map in front of it.
     this.renderPlaceholder();
     this.applyWidth();
-    const showEmptyMap = hero && !!this.host.createEmptyMap;
-    const showResearch = hero && !!this.host.startArgumentResearch;
+    const showEmptyMap = hero && !!this.host.createEmptyMap && !onResearch;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
-    this.researchEl.hidden = !showResearch;
-    this.researchEl.toggleClass("is-hidden", !showResearch);
-    this.heroActionsEl.hidden = !(showEmptyMap || showResearch);
-    this.heroActionsEl.toggleClass("is-hidden", !(showEmptyMap || showResearch));
-    this.placeHeadAndEmptyMap(hero, showEmptyMap || showResearch);
+    this.heroActionsEl.hidden = !showEmptyMap;
+    this.heroActionsEl.toggleClass("is-hidden", !showEmptyMap);
+    this.placeHeadAndEmptyMap(hero, onResearch ? this.researchPanelEl : showEmptyMap ? this.heroActionsEl : null);
     this.renderGuide();
     this.refreshSave();
     // Someone opens the window because a reply came in while it was folded: they land on the newest message.
@@ -3070,9 +3234,11 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       ? "ui.map_chat_steer_placeholder"
       : this.chainWaitingState
         ? "ui.map_chat_chain_wait_placeholder"
-        : this.hero
-          ? "ui.map_chat_hero_placeholder"
-          : "ui.map_chat_input_placeholder";
+        : this.researchMode()
+          ? "ui.argument_tab_placeholder"
+          : this.hero
+            ? "ui.map_chat_hero_placeholder"
+            : "ui.map_chat_input_placeholder";
     this.inputEl.setAttr("placeholder", t(key));
   }
   /** "Enter 補充" beside the stop key while a turn works and the field has text. */

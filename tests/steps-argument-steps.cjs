@@ -533,6 +533,41 @@ test('facet plan: the question is required, non blank, a plain string and ground
   assert.equal(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.question = '  Did the rate rise?  '; })).question, 'Did the rate rise?');
   assert.ok(mod.FACET_PLAN_SCHEMA.required.includes('question'));
 });
+// ---- V1 boost semantic fix: the situation answers only the fact; causes go to hypotheses (decisions #36 A1/A2, #38) ----
+test('facet plan: a causal question is refused (zh-TW, zh-CN, en)', () => {
+  for (const q of ['Is youth unemployment high because of automation?', 'Is it caused by AI?', 'Is it due to AI?', 'Is it driven by AI?', 'What is the reason for the rise?', '失業率偏高是否由AI造成？', '失業率偏高的原因？', '失业率偏高是否由AI导致？', '因为AI吗？'])
+    bad(mod.facetPlanStep, fpReq, fpWith(v => { v.question = q; }), /only the factual claim/);
+});
+test('facet plan: a facet whose title is causal is dropped; fewer than 3 facets left throws', () => {
+  const four = fpWith(v => { v.facets.push({ title: 'Other reasons for the rise', needs: [fneed('Candidate list')] }); });
+  const out = ok(mod.facetPlanStep, fpReq, four);
+  assert.equal(out.facets.length, 3);
+  assert.ok(!out.facets.some(f => /reasons/.test(f.title)));
+  const caused = fpWith(v => { v.facets.push({ title: 'What caused the change', needs: [fneed('Change series')] }); });
+  assert.deepEqual(plain(ok(mod.facetPlanStep, fpReq, caused)).facets.map(f => f.title), ['Level of the rate', 'Direction of change', 'Who is counted']);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].title = '導致失業的職業'; }), /3 to 5/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].title = '失业的原因'; }), /3 to 5/);
+});
+test('facet plan: a fact need with a causal marker moves to causalQuestions and builds no datum', () => {
+  const out = plain(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].needs.push(fneed('Share of the rise that is due to automation')); })));
+  assert.deepEqual(out.facets[0].needs.map(n => n.need), ['Official youth unemployment rate series', 'Survey notes on the rate']);
+  assert.ok(out.causalQuestions.includes('Share of the rise that is due to automation'));
+  const zh = plain(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].needs.push(fneed('造成上升的因素')); })));
+  assert.ok(zh.causalQuestions.includes('造成上升的因素'));
+});
+test('facet plan: the marker lists cover zh-TW, zh-CN and en; the prompt tells the facets to be sub-aspects of the fact', () => {
+  const lists = mod.CAUSAL_MARKERS;
+  for (const word of ['造成', '導致', '引起', '原因', '因為', '是否由']) assert.ok(lists.traditional.includes(word), word);
+  for (const word of ['造成', '导致', '引起', '原因', '因为', '是否由']) assert.ok(lists.simplified.includes(word), word);
+  for (const word of ['cause', 'caused', 'because', 'due to', 'driven by', 'reason']) assert.ok(lists.en.includes(word), word);
+  assert.match(mod.facetPlanStep.render(fpReq), /sub-aspects of the FACT[\s\S]*never a cause/);
+});
+test('facet judge: the prompt carries the scope rule (judged against the claim within the card scope; prompt-only, not program-checkable)', () => {
+  const prompt = mod.facetJudgeStep.render(fjReq());
+  assert.match(prompt, /WITHIN the scope of the assumption card/);
+  assert.match(prompt, /different subgroup[\s\S]*"irrelevant"[\s\S]*scope difference/);
+  assert.match(prompt, /"refutes" only when a datum inside the scope contradicts/);
+});
 const preset = [{ label: 'Age band', value: 'ages 25 to 34, 2018 to 2019', reason: 'edited by the owner' }];
 test('facet plan: preset assumptions replace the AI assumption card; without them the AI card stays; the prompt shows them only when given', () => {
   const withPreset = { ...fpReq, presetAssumptions: preset };

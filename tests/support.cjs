@@ -33,7 +33,7 @@ function load(entry, overrides = {}, windowValues = {}, buildOptions = {}) {
   }
   return module.exports;
 }
-/** Same as load, with AIM hidden the way the shipped build has it (tests/suites/aim-hidden.cjs). */
+/** Same as load, with AIM hidden the way the shipped build has it (tests/suites/legacy-aim-map.cjs). */
 const loadHidden = (entry, overrides = {}, windowValues = {}) => load(entry, overrides, windowValues, { define: { __VAM_AIM__: 'false' } });
 const core = load('map-model.ts');
 const layout = load('map-layout.ts');

@@ -629,3 +629,25 @@ test('facet verdict: insights are 1 to 3 of consistent, tension or missing; the 
   assert.notEqual(mod.facetVerdictStep.render(req), mod.verdictStep.render(req));
   assert.throws(() => sr.prepareStep(mod.facetVerdictStep, fvReq({ hypothesisId: 'h1', round: 1, evidence: [] })), error => error.name === 'ArgumentStepError');
 });
+// ---- V1 boost live run 2: baseline rule and round 2 request shape ----
+test('facet judge prompt: baseline data of the card are in scope for the comparing facet', () => {
+  const prompt = mod.facetJudgeStep.render(fjReq());
+  assert.match(prompt, /Baseline rule/);
+  assert.match(prompt, /IN scope for the facet that compares against that baseline/);
+  assert.match(prompt, /do NOT serve as its baseline/);
+});
+test('facet judge round 2 request: fixed stances are marked copy exactly and every existing need is listed as already asked', () => {
+  const req = fjReq({ round: 2, facets: [
+    { id: 'fa', title: 'Level of the rate', data: [fdatum('a1', { fixedStance: 'supports' }), fdatum('a2')], notFoundNeeds: ['Rate in the labour force survey'] },
+    { id: 'fb', title: 'Direction of change', data: [fdatum('b1', { fixedStance: 'irrelevant' })] }
+  ] });
+  const prompt = mod.facetJudgeStep.render(req);
+  assert.match(prompt, /- a1: propStance supports \(fixed — copy exactly\)/);
+  assert.match(prompt, /- b1: propStance irrelevant \(fixed — copy exactly\)/);
+  assert.doesNotMatch(prompt, /- a2: propStance/);
+  const asked = prompt.slice(prompt.indexOf('Already asked'));
+  for (const need of ['need of a1', 'need of a2', 'need of b1', 'Rate in the labour force survey']) assert.ok(asked.includes(JSON.stringify(need).slice(1, -1)), need);
+});
+test('facet judge request without fixed data has no fixed stances block', () => {
+  assert.doesNotMatch(mod.facetJudgeStep.render(fjReq({ facets: [{ id: 'fa', title: 'T', data: [fdatum('a1')] }] })), /\nFixed stances \(/);
+});

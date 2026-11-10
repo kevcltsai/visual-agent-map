@@ -46073,7 +46073,9 @@ The premise is the facts about the current situation that the proposition takes 
 
 Scope rule (checked by you only; the program cannot check it). Judge every datum against the factual claim of the premise WITHIN the scope of the assumption card (population, period, region, baseline; when no card is supplied, the scope the proposition itself states). A datum about a different subgroup, period or region than that scope, or only about a trend or change when the claim is about a level (or the reverse), is "irrelevant", and its reason must name that scope difference; do not use it as "refutes". Use "refutes" only when a datum inside the scope contradicts the claim. A facet is "refutes" only when in-scope data contradict the claim; out-of-scope data alone make it "insufficient".
 
-Step 1, data. For every datum of every facet, give a propStance toward the premise: "supports" (it shows the premise holds), "refutes" (it shows the premise is false) or "irrelevant" (it says nothing useful about the premise, or is unclear). The research stance in a datum ("stance") is only a hint about the page, not about the premise. A datum that carries "fixedStance" has already been decided: copy that value unchanged. Give each stance a short reason.
+Baseline rule: data that supply the baseline or comparison values named by the assumption card (for example the overall rate when the card compares a group against the overall population) are IN scope for the facet that compares against that baseline. Judge them together with the in-scope subject data: they support the premise when the comparison holds, and they are not "irrelevant" merely because they describe a wider population. Only data about a different population, period or region than the card that do NOT serve as its baseline are "irrelevant". Example: the card says "group A compared with everyone, 2024"; a datum giving the 2024 figure for everyone is the baseline and is judged with the 2024 group A figure (supports if group A is higher), while a 2019 figure for group A is out of scope.
+
+Step 1, data. For every datum of every facet, give a propStance toward the premise: "supports" (it shows the premise holds), "refutes" (it shows the premise is false) or "irrelevant" (it says nothing useful about the premise, or is unclear). The research stance in a datum ("stance") is only a hint about the page, not about the premise. A datum that carries "fixedStance" has already been decided: copy that value unchanged, exactly as listed under "Fixed stances" below; never judge it again. Give each stance a short reason.
 
 Step 2, facets. For every facet give a verdict: "supports" when its data show its aspect holds, "refutes" when its data show the aspect is false, "insufficient" when its data are missing, unclear or too thin to decide. A facet with no data, or only irrelevant data, is "insufficient". Each facet has a reason, a summary (one or two plain sentences that tell a reader what this facet found; it is shown on the facet card) and citedData: the ids of the data of that facet your verdict rests on. A "supports" or "refutes" verdict must cite at least one datum of that facet whose propStance is the same; never cite an irrelevant datum or a datum of another facet.
 
@@ -46091,7 +46093,7 @@ Proposition (JSON string):
 {{proposition}}{{assumptions}}
 
 Facets with their data (JSON array; a facet's "notFoundNeeds" are needs already tried and not found: never repeat them as a retry need):
-{{facets}}
+{{facets}}{{fixedStances}}{{asked}}
 `;
 
 // core/steps/argument-map/facet-judge-retry1.md
@@ -46102,6 +46104,12 @@ var facet_judge_retry2_default = "There is no further search. retryNeeds must be
 
 // core/steps/argument-map/facet-judge-assumptions.md
 var facet_judge_assumptions_default = "Assumption card (JSON array of {label, value, reason}):\n{{assumptionsJson}}\n";
+
+// core/steps/argument-map/facet-judge-fixed.md
+var facet_judge_fixed_default = "Fixed stances (the propStance of these data is already decided; return exactly this value):\n{{lines}}\n";
+
+// core/steps/argument-map/facet-judge-asked.md
+var facet_judge_asked_default = "Already asked (JSON array of need texts, found and not found; do not repeat any of them as a retry need):\n{{needsJson}}\n";
 
 // core/steps/argument-map/facet-judge.ts
 var MAX_ASSUMPTION_INSIGHTS = 3;
@@ -46171,6 +46179,23 @@ var sourcesOf3 = (request) => {
 };
 var RETRY_ROUND_1 = facet_judge_retry1_default.trim();
 var RETRY_ROUND_2 = facet_judge_retry2_default.trim();
+var fixedStancesBlock = (request) => {
+  const lines = request.facets.flatMap(
+    (f) => f.data.filter((d) => d.fixedStance).map((d) => `- ${d.id}: propStance ${d.fixedStance} (fixed \u2014 copy exactly)`)
+  );
+  return lines.length ? `
+
+${renderTemplate(facet_judge_fixed_default.trim(), { lines: lines.join("\n") })}` : "";
+};
+var askedBlock = (request) => {
+  const needs = [...new Set(request.facets.flatMap((f) => {
+    var _a2;
+    return [...f.data.map((d) => d.need), ...(_a2 = f.notFoundNeeds) != null ? _a2 : []];
+  }))];
+  return needs.length ? `
+
+${renderTemplate(facet_judge_asked_default.trim(), { needsJson: JSON.stringify(needs) })}` : "";
+};
 var ids = (values) => [...values].sort().join("\n");
 function parseFacetJudge(raw, request) {
   var _a2;
@@ -46259,6 +46284,8 @@ var facetJudgeStep = {
       assumptions: ((_a2 = request.assumptions) == null ? void 0 : _a2.length) ? `
 
 ${renderTemplate(facet_judge_assumptions_default.trim(), { assumptionsJson: JSON.stringify(request.assumptions) })}` : "",
+      fixedStances: fixedStancesBlock(request),
+      asked: askedBlock(request),
       facets: JSON.stringify(
         request.facets.map((f) => {
           var _a3;

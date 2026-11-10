@@ -15,6 +15,8 @@ import template from "./facet-judge.md";
 import retryOnce from "./facet-judge-retry1.md";
 import retryNone from "./facet-judge-retry2.md";
 import assumptionsBlock from "./facet-judge-assumptions.md";
+import fixedBlock from "./facet-judge-fixed.md";
+import askedTemplate from "./facet-judge-asked.md";
 
 /** One found datum as the facet judge sees it. `fixedStance` is set when its stance toward the proposition is already decided and cannot change. */
 export interface FacetJudgeDatum {
@@ -119,6 +121,19 @@ const sourcesOf = (request: FacetJudgeRequest): string[] => [
 const RETRY_ROUND_1 = retryOnce.trim();
 const RETRY_ROUND_2 = retryNone.trim();
 
+/** Every fixed datum, spelled out so the judge copies its stance instead of judging it again. */
+const fixedStancesBlock = (request: FacetJudgeRequest): string => {
+  const lines = request.facets.flatMap(f =>
+    f.data.filter(d => d.fixedStance).map(d => `- ${d.id}: propStance ${d.fixedStance} (fixed — copy exactly)`)
+  );
+  return lines.length ? `\n\n${renderTemplate(fixedBlock.trim(), { lines: lines.join("\n") })}` : "";
+};
+/** Every need text already asked, found or not found, so that no retry need repeats one. */
+const askedBlock = (request: FacetJudgeRequest): string => {
+  const needs = [...new Set(request.facets.flatMap(f => [...f.data.map(d => d.need), ...(f.notFoundNeeds ?? [])]))];
+  return needs.length ? `\n\n${renderTemplate(askedTemplate.trim(), { needsJson: JSON.stringify(needs) })}` : "";
+};
+
 const ids = (values: string[]): string => [...values].sort().join("\n");
 
 export function parseFacetJudge(raw: string, request: FacetJudgeRequest): FacetJudgeResult {
@@ -205,6 +220,8 @@ export const facetJudgeStep: StepDefinition<FacetJudgeRequest, FacetJudgeResult>
       assumptions: request.assumptions?.length
         ? `\n\n${renderTemplate(assumptionsBlock.trim(), { assumptionsJson: JSON.stringify(request.assumptions) })}`
         : "",
+      fixedStances: fixedStancesBlock(request),
+      asked: askedBlock(request),
       facets: JSON.stringify(
         request.facets.map(f => ({
           id: f.id,

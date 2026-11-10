@@ -38,6 +38,10 @@ export function siblingRanks(state: ArgumentMapData): Map<string, number> {
     h.needs.forEach((need, at) => rank.set(need.id, key(itemRank(need), at)));
   });
   state.situation.data.forEach((datum, index) => rank.set(datum.id, key(itemRank(datum), index)));
+  // Facet-judged maps: the definitions card first, then the facets in the order the state lists them.
+  const { assumptions, facets } = state.situation;
+  if (assumptions) rank.set(assumptions.id, key(0, 0));
+  facets?.forEach((facet, index) => rank.set(facet.id, key(1, index)));
   return rank;
 }
 

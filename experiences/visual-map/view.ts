@@ -469,6 +469,7 @@ import {
   type ArgumentCardView
 } from "./argument-card";
 import { ArgumentRunError, WORST_CASE_AI_CALLS } from "./argument-run";
+import { rerunWithAssumptions } from "./argument-rerun";
 import { describeArgumentProgress } from "./argument-progress";
 import { ArgumentStartModal } from "../../ui/modals/argument-start-modal";
 import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
@@ -13807,7 +13808,7 @@ export class VisualAgentMapView extends ItemView {
     // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
     // The summary text (and, for a card with none, the faint "add a summary" line) opens its field on a plain click.
     const textEditable = !!note && this.cardTextEditable();
-    if (argumentView) renderArgumentCardBody(card, argumentView);
+    if (argumentView) renderArgumentCardBody(card, argumentView, () => void this.rerunFromDefinitions(node.id));
     else if (textEditable && this.inlineSummary?.id === node.id) this.paintCardSummaryEdit(card, node);
     else if (research?.preview?.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
@@ -14393,6 +14394,45 @@ export class VisualAgentMapView extends ItemView {
     const read = readArgumentMap(this.map);
     if (read.kind !== "usable" || !managedNodeIds(this.map).has(id)) return null;
     return describeArgumentCard(read.data, id, t);
+  }
+  /**
+   * The definitions card's "re-run" button: reads the table of the card's note (the owner may have edited it), and starts a NEW map with
+   * those items; an unreadable table only shows a notice. The map on screen is never written. There is no confirm window (decision 46).
+   */
+  private async rerunFromDefinitions(cardId: string): Promise<void> {
+    const map = this.map;
+    if (this.closed || !map || map.argumentMap === undefined) return;
+    const read = readArgumentMap(map);
+    if (read.kind !== "usable" || read.data.situation.assumptions?.id !== cardId) return;
+    const definitions = map.nodes.find(node => node.id === cardId);
+    const root = map.nodes.find(node => node.id === read.data.roles.proposition);
+    if (!definitions || !root) return;
+    const rootNote = this.notes.get(root.id);
+    const proposition =
+      rootNote?.summary && !isPlaceholder(rootNote.summary) ? rootNote.summary : (rootNote?.title ?? "");
+    try {
+      const result = await rerunWithAssumptions({
+        readDefinitions: async () => (await this.plugin.repo.readNote(definitions.path, map)).detail,
+        proposition: () => proposition,
+        createMap: async () => {
+          let created = "";
+          await this.plugin.mutate(async () => {
+            created = await this.plugin.repo.createMap(
+              [...proposition.trim()].slice(0, 40).join("") || t("ui.untitled_mind_map")
+            );
+          });
+          return created;
+        },
+        start: (mapPath, claim, presetAssumptions) =>
+          this.plugin.argumentRuns.start(mapPath, claim, { presetAssumptions }).catch((error: unknown) => {
+            if (error instanceof ArgumentRunError) new Notice(t("ui.argument_start_refused"));
+          })
+      });
+      if (result.kind === "unreadable") new Notice(t("ui.argument_rerun_unreadable"));
+      else await this.plugin.openMapInNewTab(result.mapPath);
+    } catch (error) {
+      errorNotice(error);
+    }
   }
   /** The heading of a managed card: its note's title, the note's summary (a concluded conclusion only), or the flow's own text. */
   private argumentTitleOf(view: ArgumentCardView, note: Note | undefined): string {

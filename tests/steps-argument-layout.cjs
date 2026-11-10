@@ -120,3 +120,25 @@ test('the ordinary arrange path is untouched: a map without argumentMap lays out
   layout.arrangeArgumentMap(build().nodes, build().state, heightOf);
   assert.equal(JSON.stringify(ordinary.arrangeMap(list, undefined, undefined, 'right')), before);
 });
+
+test('facet map: under the situation the definitions card comes first, then the facets in state order; data under a facet follow itemRank', () => {
+  const state = plain(machine.newArgumentMap(ROLES, 'run-1'));
+  state.situation.assumptions = { id: 'as', items: [{ label: 'a', value: 'b', reason: 'c' }] };
+  state.situation.facets = ['f1', 'f2', 'f3'].map(id => ({ id, title: id, verdict: 'pending', reason: '', citedData: [], summary: '' }));
+  state.situation.data = [
+    { id: 'dm', need: 'm', attempts: 1, state: 'not_found', facetId: 'f1' },
+    { id: 'do', need: 'o', attempts: 1, state: 'found', stance: 'opposes', proof, facetId: 'f1' },
+    { id: 'ds', need: 's', attempts: 1, state: 'found', stance: 'supports', proof, facetId: 'f1' },
+    { id: 'dx', need: 'x', attempts: 1, state: 'pending', facetId: 'f3' }
+  ];
+  const nodes = [node('P', null), node('S', 'P'), node('C', 'P'), node('V', 'C'), node('E', 'C'), node('f3', 'S'), node('f1', 'S'), node('f2', 'S'), node('as', 'S'), node('dm', 'f1'), node('do', 'f1'), node('ds', 'f1'), node('dx', 'f3')];
+  for (const order of [nodes, [...nodes].reverse()]) {
+    const ordered = layout.orderArgumentNodes(order, state);
+    const kids = parent => ordered.filter(n => n.parentId === parent).map(n => n.id);
+    assert.deepEqual(plain(kids('S')), ['as', 'f1', 'f2', 'f3']);
+    assert.deepEqual(plain(kids('f1')), ['ds', 'do', 'dm']);
+  }
+  const arranged = layout.arrangeArgumentMap(nodes, state);
+  const at = id => arranged.find(n => n.id === id);
+  assert.ok(at('as').y < at('f1').y && at('f1').y < at('f2').y && at('f2').y < at('f3').y);
+});

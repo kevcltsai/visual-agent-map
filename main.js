@@ -2863,7 +2863,34 @@ var en = {
   "ui.argument_why_source_quote_missing": "The quoted text could not be matched on the page",
   "ui.argument_why_source_blocked_unverified": "The page was blocked, so the quote could not be checked",
   "ui.argument_note_searched": "Searches made",
-  "ui.argument_why_round_limit": "Not verified within the round limit"
+  "ui.argument_why_round_limit": "Not verified within the round limit",
+  "ui.argument_facet_0": "Facet {0}",
+  "ui.argument_facet_summary_0": "Summary: {0}",
+  "ui.argument_facet_supports": "Supports",
+  "ui.argument_facet_refutes": "Refutes",
+  "ui.argument_facet_insufficient": "Not enough data",
+  "ui.argument_facet_pending": "Judging",
+  "ui.argument_data_prop_refutes": "Opposes the proposition",
+  "ui.argument_data_unjudged": "Found, not judged yet",
+  "ui.argument_gate_facets_0_1": "\u2713 Matches the proposition",
+  "ui.argument_gate_facets_line_0_1": "{0} of {1} facets support it, none refute it",
+  "ui.argument_gate_insufficient": "Not enough data",
+  "ui.argument_reason_0": "Reason: {0}",
+  "ui.argument_reason_refuted_0_1": 'Facet "{0}" was refuted: {1}',
+  "ui.argument_reason_insufficient_0_1": "Only {0} of {1} facets have usable data, even after one more search round.",
+  "ui.argument_conclusion_state_insufficient": "Conclusion \xB7 not enough data",
+  "ui.argument_conclusion_insufficient_title": "Not enough data on the current situation; stopped",
+  "ui.argument_conclusion_insufficient_hint_0_1": "Only {0} of {1} facets found usable data, even after searching again a different way.",
+  "ui.argument_missing_facets_0": "Missing: {0}",
+  "ui.argument_list_sep": ", ",
+  "ui.argument_refuted_facet_0": 'Refuted: facet "{0}"',
+  "ui.argument_refuted_data_0": "Data: {0}",
+  "ui.argument_assumption_kind": "Assumptions",
+  "ui.argument_definitions_hint": "Each reason is in the note. Research follows these definitions.",
+  "ui.argument_rerun": "Re-run with these assumptions\u2026",
+  "ui.argument_rerun_aria": "Re-run with these assumptions in a new map; this map stays as it is",
+  "ui.argument_rerun_unreadable": "Could not read the definitions table, so no new map was made. Check the table in the assumptions note.",
+  "ui.argument_searched_0": "Tried {0} searches; the note lists them"
 };
 
 // i18n/zh-CN.ts
@@ -5622,7 +5649,34 @@ var zhCN = {
   "ui.argument_why_source_quote_missing": "\u6458\u5F55\u5728\u9875\u9762\u4E0A\u6838\u5BF9\u4E0D\u5230",
   "ui.argument_why_source_blocked_unverified": "\u9875\u9762\u6321\u4F4F\u4E86\u8BFB\u53D6\uFF0C\u6458\u5F55\u65E0\u6CD5\u6838\u5BF9",
   "ui.argument_note_searched": "\u641C\u7D22\u8BB0\u5F55",
-  "ui.argument_why_round_limit": "\u5728\u8F6E\u6570\u4E0A\u9650\u5185\u672A\u80FD\u9A8C\u8BC1"
+  "ui.argument_why_round_limit": "\u5728\u8F6E\u6570\u4E0A\u9650\u5185\u672A\u80FD\u9A8C\u8BC1",
+  "ui.argument_facet_0": "\u9762\u5411 {0}",
+  "ui.argument_facet_summary_0": "\u5C0F\u7ED3\uFF1A{0}",
+  "ui.argument_facet_supports": "\u652F\u6301",
+  "ui.argument_facet_refutes": "\u53CD\u9A73",
+  "ui.argument_facet_insufficient": "\u8D44\u6599\u4E0D\u8DB3",
+  "ui.argument_facet_pending": "\u5224\u5B9A\u4E2D",
+  "ui.argument_data_prop_refutes": "\u53CD\u9A73\u547D\u9898",
+  "ui.argument_data_unjudged": "\u5DF2\u627E\u5230\u30FB\u5F85\u5224\u5B9A",
+  "ui.argument_gate_facets_0_1": "\u2713 \u7B26\u5408\u547D\u9898",
+  "ui.argument_gate_facets_line_0_1": "{0}\uFF0F{1} \u4E2A\u9762\u5411\u652F\u6301\uFF0C\u6CA1\u6709\u53CD\u9A73",
+  "ui.argument_gate_insufficient": "\u8D44\u6599\u4E0D\u8DB3",
+  "ui.argument_reason_0": "\u539F\u56E0\uFF1A{0}",
+  "ui.argument_reason_refuted_0_1": "\u9762\u5411\u201C{0}\u201D\u88AB\u53CD\u9A73\uFF0C{1}",
+  "ui.argument_reason_insufficient_0_1": "{1} \u4E2A\u9762\u5411\u53EA\u6709 {0} \u4E2A\u6709\u80FD\u7528\u7684\u6570\u636E\uFF0C\u8865\u67E5\u4E00\u8F6E\u540E\u4ECD\u4E0D\u591F\u3002",
+  "ui.argument_conclusion_state_insufficient": "\u7ED3\u8BBA\u30FB\u8D44\u6599\u4E0D\u8DB3",
+  "ui.argument_conclusion_insufficient_title": "\u73B0\u51B5\u8D44\u6599\u4E0D\u8DB3\uFF0C\u5DF2\u505C\u6B62",
+  "ui.argument_conclusion_insufficient_hint_0_1": "{1} \u4E2A\u9762\u5411\u53EA\u6709 {0} \u4E2A\u627E\u5230\u80FD\u7528\u7684\u6570\u636E\uFF0C\u6362\u67E5\u6CD5\u518D\u627E\u4E00\u8F6E\u540E\u4ECD\u4E0D\u591F\u3002",
+  "ui.argument_missing_facets_0": "\u8FD8\u7F3A\uFF1A{0}",
+  "ui.argument_list_sep": "\u3001",
+  "ui.argument_refuted_facet_0": "\u53CD\u9A73\uFF1A\u9762\u5411\u201C{0}\u201D",
+  "ui.argument_refuted_data_0": "\u6570\u636E\uFF1A{0}",
+  "ui.argument_assumption_kind": "\u5047\u8BBE",
+  "ui.argument_definitions_hint": "\u6BCF\u9879\u7406\u7531\u5199\u5728\u7B14\u8BB0\u91CC\u3002\u7814\u7A76\u65F6\u7167\u8FD9\u7EC4\u5B9A\u4E49\u627E\u8D44\u6599\u3002",
+  "ui.argument_rerun": "\u7528\u8FD9\u7EC4\u5047\u8BBE\u91CD\u8DD1\u2026",
+  "ui.argument_rerun_aria": "\u7528\u8FD9\u7EC4\u5047\u8BBE\u5728\u65B0\u56FE\u91CD\u8DD1\uFF0C\u539F\u56FE\u4E0D\u53D8",
+  "ui.argument_rerun_unreadable": "\u770B\u4E0D\u61C2\u5B9A\u4E49\u8868\uFF0C\u6CA1\u6709\u5F00\u65B0\u56FE\u3002\u8BF7\u68C0\u67E5\u5047\u8BBE\u5361\u7B14\u8BB0\u91CC\u7684\u8868\u683C\u3002",
+  "ui.argument_searched_0": "\u67E5\u8FC7 {0} \u79CD\u5199\u6CD5\uFF0C\u7B14\u8BB0\u91CC\u6709\u8BB0\u5F55"
 };
 
 // i18n/zh-TW.ts
@@ -8381,7 +8435,34 @@ var zhTW = {
   "ui.argument_why_source_quote_missing": "\u6458\u9304\u5728\u9801\u9762\u4E0A\u6838\u5C0D\u4E0D\u5230",
   "ui.argument_why_source_blocked_unverified": "\u9801\u9762\u64CB\u4F4F\u4E86\u8B80\u53D6\uFF0C\u6458\u9304\u7121\u6CD5\u6838\u5C0D",
   "ui.argument_note_searched": "\u641C\u5C0B\u7D00\u9304",
-  "ui.argument_why_round_limit": "\u5728\u8F2A\u6578\u4E0A\u9650\u5167\u672A\u80FD\u9A57\u8B49"
+  "ui.argument_why_round_limit": "\u5728\u8F2A\u6578\u4E0A\u9650\u5167\u672A\u80FD\u9A57\u8B49",
+  "ui.argument_facet_0": "\u9762\u5411 {0}",
+  "ui.argument_facet_summary_0": "\u5C0F\u7D50\uFF1A{0}",
+  "ui.argument_facet_supports": "\u652F\u6301",
+  "ui.argument_facet_refutes": "\u53CD\u99C1",
+  "ui.argument_facet_insufficient": "\u8CC7\u6599\u4E0D\u8DB3",
+  "ui.argument_facet_pending": "\u5224\u5B9A\u4E2D",
+  "ui.argument_data_prop_refutes": "\u53CD\u99C1\u547D\u984C",
+  "ui.argument_data_unjudged": "\u5DF2\u627E\u5230\u30FB\u5F85\u5224\u5B9A",
+  "ui.argument_gate_facets_0_1": "\u2713 \u7B26\u5408\u547D\u984C",
+  "ui.argument_gate_facets_line_0_1": "{0}\uFF0F{1} \u500B\u9762\u5411\u652F\u6301\uFF0C\u6C92\u6709\u53CD\u99C1",
+  "ui.argument_gate_insufficient": "\u8CC7\u6599\u4E0D\u8DB3",
+  "ui.argument_reason_0": "\u539F\u56E0\uFF1A{0}",
+  "ui.argument_reason_refuted_0_1": "\u9762\u5411\u300C{0}\u300D\u88AB\u53CD\u99C1\uFF0C{1}",
+  "ui.argument_reason_insufficient_0_1": "{1} \u500B\u9762\u5411\u53EA\u6709 {0} \u500B\u6709\u80FD\u7528\u7684\u6578\u64DA\uFF0C\u88DC\u67E5\u4E00\u8F2A\u5F8C\u4ECD\u4E0D\u5920\u3002",
+  "ui.argument_conclusion_state_insufficient": "\u7D50\u8AD6\u30FB\u8CC7\u6599\u4E0D\u8DB3",
+  "ui.argument_conclusion_insufficient_title": "\u73FE\u6CC1\u8CC7\u6599\u4E0D\u8DB3\uFF0C\u5DF2\u505C\u6B62",
+  "ui.argument_conclusion_insufficient_hint_0_1": "{1} \u500B\u9762\u5411\u53EA\u6709 {0} \u500B\u627E\u5230\u80FD\u7528\u7684\u6578\u64DA\uFF0C\u63DB\u67E5\u6CD5\u518D\u627E\u4E00\u8F2A\u5F8C\u4ECD\u4E0D\u5920\u3002",
+  "ui.argument_missing_facets_0": "\u9084\u7F3A\uFF1A{0}",
+  "ui.argument_list_sep": "\u3001",
+  "ui.argument_refuted_facet_0": "\u53CD\u99C1\uFF1A\u9762\u5411\u300C{0}\u300D",
+  "ui.argument_refuted_data_0": "\u6578\u64DA\uFF1A{0}",
+  "ui.argument_assumption_kind": "\u5047\u8A2D",
+  "ui.argument_definitions_hint": "\u6BCF\u9805\u7406\u7531\u5BEB\u5728\u7B46\u8A18\u88E1\u3002\u7814\u7A76\u6642\u7167\u9019\u7D44\u5B9A\u7FA9\u627E\u8CC7\u6599\u3002",
+  "ui.argument_rerun": "\u7528\u9019\u7D44\u5047\u8A2D\u91CD\u8DD1\u2026",
+  "ui.argument_rerun_aria": "\u7528\u9019\u7D44\u5047\u8A2D\u5728\u65B0\u5716\u91CD\u8DD1\uFF0C\u539F\u5716\u4E0D\u8B8A",
+  "ui.argument_rerun_unreadable": "\u770B\u4E0D\u61C2\u5B9A\u7FA9\u8868\uFF0C\u6C92\u6709\u958B\u65B0\u5716\u3002\u8ACB\u6AA2\u67E5\u5047\u8A2D\u5361\u7B46\u8A18\u88E1\u7684\u8868\u683C\u3002",
+  "ui.argument_searched_0": "\u67E5\u904E {0} \u7A2E\u5BEB\u6CD5\uFF0C\u7B46\u8A18\u88E1\u6709\u8A18\u9304"
 };
 
 // i18n/languages.ts
@@ -29977,7 +30058,7 @@ var UsageControl = class {
       const detail = box.createEl("em");
       return { strong, input: detail.createSpan(), output: detail.createSpan() };
     };
-    const cells = {
+    const cells2 = {
       map: cell2(t("ui.usage_this_map")),
       today: cell2(t("ui.usage_today")),
       month: cell2(t("ui.usage_this_month"))
@@ -29994,7 +30075,7 @@ var UsageControl = class {
       sections: [totalsSection],
       empty,
       error,
-      cells,
+      cells: cells2,
       filters,
       footEstimates
     };
@@ -38684,7 +38765,7 @@ var MapChatPanel = class {
   chainEndText(reason, remaining, details, last, round3 = this.chainRound, restored = false) {
     const bare = (value) => clip2(value, 200).replace(/[\s.。!！?？…]+$/u, "");
     const left = remaining.trim() ? t("ui.map_chat_chain_left_end_0", bare(remaining)) : "";
-    const why = (details != null ? details : []).length ? t(
+    const why2 = (details != null ? details : []).length ? t(
       "ui.map_chat_chain_reason_0",
       bare(
         (details != null ? details : []).slice(0, 3).map((item) => clip2(item, 120)).join(t("ui.map_chat_chain_detail_separator"))
@@ -38703,7 +38784,7 @@ var MapChatPanel = class {
           say("ui.map_chat_chain_end_max_rounds_more")
         );
       case "research_failed":
-        return this.joinSentences(say("ui.map_chat_chain_end_research_failed"), why);
+        return this.joinSentences(say("ui.map_chat_chain_end_research_failed"), why2);
       case "stopped":
         return say("ui.map_chat_chain_end_stopped");
       case "user_took_over":
@@ -38711,7 +38792,7 @@ var MapChatPanel = class {
       case "research_stopped":
         return this.joinSentences(say("ui.map_chat_chain_end_research_stopped"), left);
       case "research_not_started":
-        return this.joinSentences(say("ui.map_chat_chain_end_research_not_started"), why);
+        return this.joinSentences(say("ui.map_chat_chain_end_research_not_started"), why2);
       case "wait_timeout":
         return say("ui.map_chat_chain_end_wait_timeout_0", Math.round(MAP_CHAT_CHAIN_WAIT_MS / 6e4));
       case "other_background_work":
@@ -39581,19 +39662,19 @@ ${typed}` : draft;
     this.saveEl.hidden = this.hero;
     this.saveEl.toggleClass("is-hidden", this.hero);
     this.refreshNewButton();
-    let why = "";
-    if (!this.completedTurns().length) why = t("ui.map_chat_save_empty");
-    else if (!this.host.saveTranscript) why = t("ui.map_chat_save_unavailable");
+    let why2 = "";
+    if (!this.completedTurns().length) why2 = t("ui.map_chat_save_empty");
+    else if (!this.host.saveTranscript) why2 = t("ui.map_chat_save_unavailable");
     else {
       const can = (_b2 = (_a2 = this.host).canSave) == null ? void 0 : _b2.call(_a2);
-      if (can && !can.ok) why = can.reason;
+      if (can && !can.ok) why2 = can.reason;
     }
-    const disabled = !!why || this.saving;
+    const disabled = !!why2 || this.saving;
     this.saveDisabled = disabled;
     this.saveEl.setAttr("aria-disabled", String(disabled));
     this.saveEl.toggleClass("is-disabled", disabled);
-    this.saveEl.setAttr("aria-label", why || t("ui.map_chat_save"));
-    this.saveEl.setAttr("title", why || t("ui.map_chat_save"));
+    this.saveEl.setAttr("aria-label", why2 || t("ui.map_chat_save"));
+    this.saveEl.setAttr("title", why2 || t("ui.map_chat_save"));
   }
   /**
    * The interface language changed: the fixed words of the window (title, buttons, labels, row labels) are set again in the
@@ -40592,8 +40673,8 @@ ${shown}` : t("ui.map_chat_model_label"));
       cell2.addClass("is-missed");
       const text10 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
       text10.createDiv({ cls: "vam-map-chat-images-topic", text: clip2(block.nodeTitle, 80) });
-      const why = block.state === "searching" ? block.running ? t("ui.map_chat_images_searching_0", clip2(block.query, 80)) : t("ui.map_chat_images_queued") : block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip2((_b2 = block.reason) != null ? _b2 : "", 160)) : (_c = block.reason) != null ? _c : t("ui.map_chat_images_none");
-      text10.createDiv({ cls: "vam-map-chat-images-reason", text: why });
+      const why2 = block.state === "searching" ? block.running ? t("ui.map_chat_images_searching_0", clip2(block.query, 80)) : t("ui.map_chat_images_queued") : block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip2((_b2 = block.reason) != null ? _b2 : "", 160)) : (_c = block.reason) != null ? _c : t("ui.map_chat_images_none");
+      text10.createDiv({ cls: "vam-map-chat-images-reason", text: why2 });
     }
   }
   /** Older saved records: what was listed, read-only (no link, no thumbnail, nothing to press). */
@@ -43264,8 +43345,8 @@ function readNote(value) {
 var EVIDENCE_STANCES = ["supports", "contradicts", "uncertain"];
 var QUOTE_FOLDED_MIN2 = 8;
 function parseArgumentEvidence(value, needIds) {
-  const refuse = (why) => {
-    throw new Error(`The argument evidence reply is not usable: ${why}.`);
+  const refuse = (why2) => {
+    throw new Error(`The argument evidence reply is not usable: ${why2}.`);
   };
   if (!Array.isArray(value) || !value.length) return refuse("argumentEvidence is not a list");
   const allowed = new Set(needIds);
@@ -44709,191 +44790,6 @@ function applyResume(state) {
   return next;
 }
 
-// experiences/visual-map/argument-card.ts
-var STANCE_KEY = {
-  supports: "ui.argument_stance_supports",
-  contradicts: "ui.argument_stance_contradicts",
-  uncertain: "ui.argument_stance_uncertain"
-};
-var STANCE_TONE = { supports: "yes", contradicts: "no", uncertain: "maybe" };
-var VERDICT_KEY = {
-  supported: "ui.hypothesis_supported",
-  refuted: "ui.hypothesis_refuted",
-  undecided: "ui.hypothesis_undecided"
-};
-var CONCLUSION_KIND = {
-  in_progress: "ui.argument_conclusion_state_progress",
-  concluded: "ui.argument_conclusion_state_concluded",
-  stopped_limit: "ui.argument_conclusion_state_limit",
-  stopped_mismatch: "ui.argument_conclusion_state_mismatch"
-};
-function sourceHost(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch (e) {
-    return "";
-  }
-}
-function missingChip(item, t2) {
-  if (item.state === "searching") return { tone: "run", text: t2("ui.argument_missing_searching") };
-  const key4 = item.state === "not_found" ? "ui.argument_missing_not_found" : "ui.argument_missing_pending";
-  return { tone: "gap", text: t2(key4) };
-}
-function datumChip(datum, t2) {
-  if (datum.state !== "found") return missingChip(datum, t2);
-  return datum.stance === "opposes" ? { tone: "no", text: t2("ui.argument_data_opposes") } : { tone: "yes", text: t2("ui.argument_stance_supports") };
-}
-function conclusionCard(state, t2) {
-  const view = conclusionView(state);
-  const base = {
-    role: "conclusion",
-    kind: t2(CONCLUSION_KIND[view]),
-    titleFrom: "text",
-    state: view,
-    chips: [],
-    lines: [],
-    label: t2(CONCLUSION_KIND[view])
-  };
-  const verified = verifiedCount(state);
-  if (view === "concluded")
-    return { ...base, titleFrom: "summary", lines: [t2("ui.argument_conclusion_done_hint", verified)] };
-  if (view === "stopped_mismatch")
-    return { ...base, title: t2("ui.argument_stopped_mismatch"), lines: [t2("ui.argument_mismatch_hint")] };
-  if (view === "stopped_limit")
-    return { ...base, title: t2("ui.argument_conclusion_limit"), lines: [t2("ui.argument_conclusion_limit_hint")] };
-  return {
-    ...base,
-    title: t2("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
-    lines: [t2("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
-  };
-}
-function hypothesisCard(state, h, t2) {
-  const index = state.hypotheses.indexOf(h) + 1;
-  const shown = displayVerdict(h);
-  const chips = h.location === "eliminated" ? [{ tone: "gap", text: t2("ui.argument_eliminated_chip") }] : [
-    shown === "verifying" ? { tone: "open", text: t2("ui.argument_verifying") } : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t2(VERDICT_KEY[shown]) }
-  ];
-  if (isVerified(h)) chips.push({ tone: "yes", text: t2("ui.argument_verified_done") });
-  const kind = t2("ui.argument_hypothesis_0", index);
-  const progress = t2("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
-  const lines = [progress];
-  if (h.location === "eliminated" && h.eliminationReason)
-    lines.push(t2("ui.argument_eliminated_0", h.eliminationReason));
-  const status = chips.map((chip) => chip.text).join(" ");
-  return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: `${kind}, ${status}, ${progress}` };
-}
-function needCard(need, t2) {
-  var _a2;
-  const kind = t2("ui.argument_evidence");
-  if (need.state === "found") {
-    const stance = (_a2 = need.stance) != null ? _a2 : "uncertain";
-    const chip2 = { tone: STANCE_TONE[stance], text: t2(STANCE_KEY[stance]) };
-    const host = need.proof ? sourceHost(need.proof.url) : "";
-    return {
-      role: "need",
-      kind: host ? `${kind} \xB7 ${host}` : kind,
-      titleFrom: "note",
-      chips: [chip2],
-      lines: need.proof ? [need.proof.claim] : [],
-      label: `${kind}, ${chip2.text}${host ? `, ${host}` : ""}`
-    };
-  }
-  const chip = missingChip(need, t2);
-  return {
-    role: "need",
-    kind,
-    titleFrom: "note",
-    dashed: true,
-    chips: [chip],
-    lines: need.reason ? [need.reason] : [],
-    label: `${kind}, ${chip.text}`
-  };
-}
-function datumCard(datum, t2) {
-  const kind = t2("ui.argument_data_item");
-  const chip = datumChip(datum, t2);
-  if (datum.state === "found") {
-    const host = datum.proof ? sourceHost(datum.proof.url) : "";
-    return {
-      role: "datum",
-      kind: host ? `${kind} \xB7 ${host}` : kind,
-      titleFrom: "note",
-      chips: [chip],
-      lines: datum.proof ? [datum.proof.claim] : [],
-      label: `${kind}, ${chip.text}${host ? `, ${host}` : ""}`
-    };
-  }
-  return {
-    role: "datum",
-    kind,
-    titleFrom: "note",
-    dashed: true,
-    chips: [chip],
-    lines: datum.reason ? [datum.reason] : [],
-    label: `${kind}, ${chip.text}`
-  };
-}
-function describeArgumentCard(state, id, t2) {
-  const { roles } = state;
-  const plain = (role, kind, lines = [], chips = []) => ({
-    role,
-    kind,
-    titleFrom: "note",
-    chips,
-    lines,
-    label: [kind, ...chips.map((chip) => chip.text), ...lines].join(", ")
-  });
-  if (id === roles.proposition) return plain("proposition", t2("ui.argument_proposition"));
-  if (id === roles.conclusion) return conclusionCard(state, t2);
-  if (id === roles.situation) {
-    const data = state.situation.data;
-    const found = data.filter((datum2) => datum2.state === "found").length;
-    const count3 = t2("ui.argument_data_count_0_1", found, data.length);
-    const gate = state.situation.gate.state;
-    if (gate === "matched")
-      return plain("situation", t2("ui.argument_situation"), [t2("ui.argument_gate_matched_0_1", found, data.length)]);
-    const chip = gate === "unmatched" ? { tone: "no", text: t2("ui.argument_gate_unmatched") } : { tone: "open", text: t2("ui.argument_gate_pending") };
-    return plain("situation", t2("ui.argument_situation"), [count3], [chip]);
-  }
-  const datum = state.situation.data.find((item) => item.id === id);
-  if (datum) return datumCard(datum, t2);
-  if ((id === roles.verified || id === roles.eliminated) && state.run.phase === "stopped_mismatch")
-    return plain("group", t2("ui.argument_group_label"));
-  if (id === roles.verified) {
-    const verifying = state.hypotheses.filter((h) => h.location === "verifying").length;
-    return plain("group", t2("ui.argument_group_label"), [
-      t2("ui.argument_group_verified_count_0_1", verifiedCount(state), Math.max(verifying, MIN_VERIFIED))
-    ]);
-  }
-  if (id === roles.eliminated) {
-    const count3 = state.hypotheses.filter((h) => h.location === "eliminated").length;
-    return plain("group", t2("ui.argument_group_label"), [t2("ui.argument_group_eliminated_count_0", count3)]);
-  }
-  for (const h of state.hypotheses) {
-    if (h.id === id) return hypothesisCard(state, h, t2);
-    const need = h.needs.find((item) => item.id === id);
-    if (need) return needCard(need, t2);
-  }
-  return null;
-}
-function renderArgumentKind(header2, view) {
-  const kind = header2.createSpan({ cls: "vam-argument-kind", text: view.kind });
-  kind.dataset.role = view.role;
-  return kind;
-}
-function renderArgumentCardBody(card, view) {
-  card.dataset.argumentRole = view.role;
-  if (view.state) card.dataset.argumentState = view.state;
-  if (view.dashed) card.dataset.argumentMissing = "true";
-  const body = card.createDiv({ cls: "vam-argument-body" });
-  if (view.chips.length) {
-    const row = body.createDiv({ cls: "vam-argument-chips" });
-    for (const chip of view.chips) row.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
-  }
-  for (const line2 of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line2 });
-  return body;
-}
-
 // experiences/visual-map/argument-notes.ts
 function plainLine2(text10) {
   return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/!\[|\[(?=\[)/g, (m) => m.replace("[", "&#91;")).replace(/\](?=\])/g, "&#93;");
@@ -45040,11 +44936,11 @@ function datumDetail(t2, d) {
 }
 function notFoundDetail(t2, log, code) {
   var _a2;
-  const why = (log == null ? void 0 : log.why) || code;
-  const note = why.includes(": ") ? why.slice(why.indexOf(": ") + 2) : "";
+  const why2 = (log == null ? void 0 : log.why) || code;
+  const note = why2.includes(": ") ? why2.slice(why2.indexOf(": ") + 2) : "";
   const parts = [
     [`### ${t2("ui.argument_note_core")}`],
-    callout(t2("ui.argument_not_found_0", whyText(t2, why)))
+    callout(t2("ui.argument_not_found_0", whyText(t2, why2)))
   ];
   const opened = ((_a2 = log == null ? void 0 : log.opened) != null ? _a2 : []).map(safeUrl).filter(Boolean);
   if ((log == null ? void 0 : log.queries.length) || opened.length || note) {
@@ -45054,7 +44950,7 @@ function notFoundDetail(t2, log, code) {
     if (note) out.push(`- ${t2("ui.argument_note_agent_note")}: ${line(note)}`);
     parts.push(out);
   }
-  parts.push([""], debug(t2, why));
+  parts.push([""], debug(t2, why2));
   return join2(parts);
 }
 function facetDetail(t2, facet, data) {
@@ -45210,10 +45106,10 @@ function conclusionDetail(t2, state, titles, answer, stoppedSummary = "") {
         ...sourceItems(cited)
       ]);
     }
-    const lacking = facets.filter((f) => f.verdict === "insufficient");
-    if (lacking.length) {
+    const lacking2 = facets.filter((f) => f.verdict === "insufficient");
+    if (lacking2.length) {
       const out = ["", `### ${t2("ui.argument_note_insufficient")}`];
-      for (const f of lacking) {
+      for (const f of lacking2) {
         out.push(`- ${line(f.title)}`);
         for (const d of data.filter((x) => x.facetId === f.id && x.searchLog))
           d.searchLog.queries.forEach(
@@ -45224,6 +45120,374 @@ function conclusionDetail(t2, state, titles, answer, stoppedSummary = "") {
     }
   }
   return join2(parts);
+}
+
+// experiences/visual-map/argument-card.ts
+var STANCE_KEY = {
+  supports: "ui.argument_stance_supports",
+  contradicts: "ui.argument_stance_contradicts",
+  uncertain: "ui.argument_stance_uncertain"
+};
+var STANCE_TONE = { supports: "yes", contradicts: "no", uncertain: "maybe" };
+var VERDICT_KEY = {
+  supported: "ui.hypothesis_supported",
+  refuted: "ui.hypothesis_refuted",
+  undecided: "ui.hypothesis_undecided"
+};
+var CONCLUSION_KIND = {
+  in_progress: "ui.argument_conclusion_state_progress",
+  concluded: "ui.argument_conclusion_state_concluded",
+  stopped_limit: "ui.argument_conclusion_state_limit",
+  stopped_mismatch: "ui.argument_conclusion_state_mismatch"
+};
+var isFacetMap = (state) => state.situation.facets !== void 0;
+var why = (t2, stored) => whyText(t2, stored);
+var PROP_CHIP = {
+  supports: { tone: "yes", key: "ui.argument_note_prop_supports" },
+  refutes: { tone: "no", key: "ui.argument_data_prop_refutes" },
+  irrelevant: { tone: "gap", key: "ui.argument_note_prop_irrelevant" }
+};
+var FACET_CHIP = {
+  supports: { tone: "yes", key: "ui.argument_facet_supports" },
+  refutes: { tone: "no", key: "ui.argument_facet_refutes" },
+  insufficient: { tone: "maybe", key: "ui.argument_facet_insufficient" },
+  pending: { tone: "open", key: "ui.argument_facet_pending" }
+};
+function figureLine(figure) {
+  if (!figure) return "";
+  const number = figure.number.trim();
+  const unit2 = figure.unit.trim();
+  const value = !unit2 || number.endsWith(unit2) ? number : unit2 === "%" ? `${number}%` : `${number} ${unit2}`;
+  return figure.period.trim() ? `${value}\uFF08${figure.period.trim()}\uFF09` : value;
+}
+function shortQuote(text10) {
+  const chars = [...text10.replace(/\s+/g, " ").trim()];
+  return `\u300C${chars.length > 120 ? `${chars.slice(0, 120).join("")}\u2026` : chars.join("")}\u300D`;
+}
+var lacking = (state) => {
+  var _a2;
+  return ((_a2 = state.situation.facets) != null ? _a2 : []).filter((f) => f.verdict === "insufficient");
+};
+function sourceHost(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch (e) {
+    return "";
+  }
+}
+function missingChip(item, t2) {
+  if (item.state === "searching") return { tone: "run", text: t2("ui.argument_missing_searching") };
+  const key4 = item.state === "not_found" ? "ui.argument_missing_not_found" : "ui.argument_missing_pending";
+  return { tone: "gap", text: t2(key4) };
+}
+function datumChip(datum, t2) {
+  if (datum.state !== "found") return missingChip(datum, t2);
+  return datum.stance === "opposes" ? { tone: "no", text: t2("ui.argument_data_opposes") } : { tone: "yes", text: t2("ui.argument_stance_supports") };
+}
+function conclusionCard(state, t2) {
+  const view = conclusionView(state);
+  const base = {
+    role: "conclusion",
+    kind: t2(CONCLUSION_KIND[view]),
+    titleFrom: "text",
+    state: view,
+    chips: [],
+    lines: [],
+    label: t2(CONCLUSION_KIND[view])
+  };
+  const verified = verifiedCount(state);
+  if (view === "stopped_mismatch" && isFacetMap(state)) return facetStopCard(state, base, t2);
+  if (view === "concluded")
+    return { ...base, titleFrom: "summary", lines: [t2("ui.argument_conclusion_done_hint", verified)] };
+  if (view === "stopped_mismatch")
+    return { ...base, title: t2("ui.argument_stopped_mismatch"), lines: [t2("ui.argument_mismatch_hint")] };
+  if (view === "stopped_limit")
+    return { ...base, title: t2("ui.argument_conclusion_limit"), lines: [t2("ui.argument_conclusion_limit_hint")] };
+  return {
+    ...base,
+    title: t2("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
+    lines: [t2("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
+  };
+}
+function facetStopCard(state, base, t2) {
+  var _a2;
+  const facets = (_a2 = state.situation.facets) != null ? _a2 : [];
+  if (state.situation.gate.kind === "data_insufficient") {
+    const missing = lacking(state);
+    const kind = t2("ui.argument_conclusion_state_insufficient");
+    return {
+      ...base,
+      kind,
+      label: kind,
+      state: "stopped_insufficient",
+      title: t2("ui.argument_conclusion_insufficient_title"),
+      lines: [
+        t2("ui.argument_conclusion_insufficient_hint_0_1", facets.length - missing.length, facets.length),
+        t2("ui.argument_missing_facets_0", missing.map((f) => f.title).join(t2("ui.argument_list_sep")))
+      ]
+    };
+  }
+  const refuted = facets.find((f) => f.verdict === "refutes");
+  const cited = refuted == null ? void 0 : refuted.citedData.map((id) => state.situation.data.find((d) => d.id === id)).find((d) => d == null ? void 0 : d.proof);
+  const lines = refuted ? [t2("ui.argument_refuted_facet_0", refuted.title)] : [t2("ui.argument_mismatch_hint")];
+  if (cited == null ? void 0 : cited.proof) {
+    lines.push(t2("ui.argument_refuted_data_0", cited.proof.claim), shortQuote(cited.proof.quote));
+    const url = safeUrl(cited.proof.url);
+    if (url) lines.push(url);
+  }
+  return { ...base, title: t2("ui.argument_stopped_mismatch"), lines };
+}
+function hypothesisCard(state, h, t2) {
+  const index = state.hypotheses.indexOf(h) + 1;
+  const shown = displayVerdict(h);
+  const chips = h.location === "eliminated" ? [{ tone: "gap", text: t2("ui.argument_eliminated_chip") }] : [
+    shown === "verifying" ? { tone: "open", text: t2("ui.argument_verifying") } : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t2(VERDICT_KEY[shown]) }
+  ];
+  if (isVerified(h)) chips.push({ tone: "yes", text: t2("ui.argument_verified_done") });
+  const kind = t2("ui.argument_hypothesis_0", index);
+  const progress = t2("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
+  const lines = [progress];
+  if (h.location === "eliminated" && h.eliminationReason)
+    lines.push(
+      t2(
+        "ui.argument_eliminated_0",
+        isFacetMap(state) && h.eliminationReason.startsWith("round_limit") ? why(t2, "round_limit") : h.eliminationReason
+      )
+    );
+  const status = chips.map((chip) => chip.text).join(" ");
+  return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: `${kind}, ${status}, ${progress}` };
+}
+function needCard(need, t2, readable = false) {
+  var _a2;
+  const kind = t2("ui.argument_evidence");
+  if (need.state === "found") {
+    const stance = (_a2 = need.stance) != null ? _a2 : "uncertain";
+    const chip2 = { tone: STANCE_TONE[stance], text: t2(STANCE_KEY[stance]) };
+    const host = need.proof ? sourceHost(need.proof.url) : "";
+    return {
+      role: "need",
+      kind: host ? `${kind} \xB7 ${host}` : kind,
+      titleFrom: "note",
+      chips: [chip2],
+      lines: need.proof ? [need.proof.claim] : [],
+      label: `${kind}, ${chip2.text}${host ? `, ${host}` : ""}`
+    };
+  }
+  const chip = missingChip(need, t2);
+  return {
+    role: "need",
+    kind,
+    titleFrom: "note",
+    dashed: true,
+    chips: [chip],
+    lines: need.reason ? [readable ? why(t2, need.reason) : need.reason] : [],
+    label: `${kind}, ${chip.text}`
+  };
+}
+function facetDatumCard(datum, t2) {
+  var _a2, _b2, _c, _d;
+  const kind = t2("ui.argument_data_item");
+  if (datum.state !== "found") {
+    const chip2 = missingChip(datum, t2);
+    const lines2 = datum.reason ? [why(t2, datum.reason)] : [];
+    const tried = (_b2 = (_a2 = datum.searchLog) == null ? void 0 : _a2.queries.length) != null ? _b2 : 0;
+    if (tried) lines2.push(t2("ui.argument_searched_0", tried));
+    return {
+      role: "datum",
+      kind,
+      titleFrom: "note",
+      dashed: true,
+      chips: [chip2],
+      lines: lines2,
+      label: `${kind}, ${chip2.text}`
+    };
+  }
+  const host = datum.proof ? sourceHost(datum.proof.url) : "";
+  const chip = datum.propStance ? { tone: PROP_CHIP[datum.propStance].tone, text: t2(PROP_CHIP[datum.propStance].key) } : { tone: "open", text: t2("ui.argument_data_unjudged") };
+  const lines = datum.propStance === "irrelevant" ? [datum.stanceReason || why(t2, "stance_uncertain")] : [figureLine((_c = datum.proof) == null ? void 0 : _c.figure) || ((_d = datum.proof) == null ? void 0 : _d.claim) || ""].filter(Boolean);
+  return {
+    role: "datum",
+    kind: host ? `${kind} \xB7 ${host}` : kind,
+    titleFrom: "note",
+    chips: [chip],
+    lines,
+    label: `${kind}, ${chip.text}${host ? `, ${host}` : ""}`
+  };
+}
+function datumCard(datum, t2) {
+  const kind = t2("ui.argument_data_item");
+  const chip = datumChip(datum, t2);
+  if (datum.state === "found") {
+    const host = datum.proof ? sourceHost(datum.proof.url) : "";
+    return {
+      role: "datum",
+      kind: host ? `${kind} \xB7 ${host}` : kind,
+      titleFrom: "note",
+      chips: [chip],
+      lines: datum.proof ? [datum.proof.claim] : [],
+      label: `${kind}, ${chip.text}${host ? `, ${host}` : ""}`
+    };
+  }
+  return {
+    role: "datum",
+    kind,
+    titleFrom: "note",
+    dashed: true,
+    chips: [chip],
+    lines: datum.reason ? [datum.reason] : [],
+    label: `${kind}, ${chip.text}`
+  };
+}
+function facetSituationCard(state, t2) {
+  var _a2;
+  const facets = (_a2 = state.situation.facets) != null ? _a2 : [];
+  const kind = t2("ui.argument_situation");
+  const question = state.situation.question;
+  const gate = state.situation.gate;
+  const base = {
+    role: "situation",
+    kind,
+    titleFrom: question ? "text" : "note",
+    ...question ? { title: question } : {},
+    chips: [],
+    lines: [],
+    label: kind
+  };
+  const finish = (chip, lines) => ({
+    ...base,
+    chips: [chip],
+    lines,
+    label: [kind, chip.text, ...lines].join(", ")
+  });
+  if (gate.state === "matched")
+    return finish({ tone: "yes", text: t2("ui.argument_gate_facets_0_1") }, [
+      t2("ui.argument_gate_facets_line_0_1", facets.filter((f) => f.verdict === "supports").length, facets.length)
+    ]);
+  if (gate.state === "pending") {
+    const data = state.situation.data;
+    const count3 = t2("ui.argument_data_count_0_1", data.filter((d) => d.state === "found").length, data.length);
+    return finish({ tone: "open", text: t2("ui.argument_gate_pending") }, [count3]);
+  }
+  if (gate.kind === "data_insufficient")
+    return finish({ tone: "maybe", text: t2("ui.argument_gate_insufficient") }, [
+      t2(
+        "ui.argument_reason_0",
+        t2("ui.argument_reason_insufficient_0_1", facets.length - lacking(state).length, facets.length)
+      )
+    ]);
+  const refuted = facets.find((f) => f.verdict === "refutes");
+  return finish(
+    { tone: "no", text: t2("ui.argument_gate_unmatched") },
+    refuted ? [t2("ui.argument_reason_0", t2("ui.argument_reason_refuted_0_1", refuted.title, refuted.reason))] : []
+  );
+}
+function assumptionsCard(state, t2) {
+  var _a2, _b2;
+  const kind = t2("ui.argument_assumption_kind");
+  const items = (_b2 = (_a2 = state.situation.assumptions) == null ? void 0 : _a2.items) != null ? _b2 : [];
+  return {
+    role: "assumptions",
+    kind,
+    titleFrom: "note",
+    chips: [],
+    lines: [t2("ui.argument_definitions_hint")],
+    label: kind,
+    definitions: items.map(({ label, value }) => ({ label, value })),
+    action: { text: t2("ui.argument_rerun"), ariaLabel: t2("ui.argument_rerun_aria") }
+  };
+}
+function facetCard(state, facet, t2) {
+  var _a2;
+  const kind = t2("ui.argument_facet_0", ((_a2 = state.situation.facets) != null ? _a2 : []).indexOf(facet) + 1);
+  const chip = { tone: FACET_CHIP[facet.verdict].tone, text: t2(FACET_CHIP[facet.verdict].key) };
+  const lines = facet.summary ? [t2("ui.argument_facet_summary_0", facet.summary)] : [];
+  return { role: "facet", kind, titleFrom: "note", chips: [chip], lines, label: `${kind}, ${chip.text}` };
+}
+function describeArgumentCard(state, id, t2) {
+  var _a2, _b2;
+  const { roles } = state;
+  const plain = (role, kind, lines = [], chips = []) => ({
+    role,
+    kind,
+    titleFrom: "note",
+    chips,
+    lines,
+    label: [kind, ...chips.map((chip) => chip.text), ...lines].join(", ")
+  });
+  if (id === roles.proposition) return plain("proposition", t2("ui.argument_proposition"));
+  if (id === roles.conclusion) return conclusionCard(state, t2);
+  if (id === roles.situation && isFacetMap(state)) return facetSituationCard(state, t2);
+  if (id === roles.situation) {
+    const data = state.situation.data;
+    const found = data.filter((datum2) => datum2.state === "found").length;
+    const count3 = t2("ui.argument_data_count_0_1", found, data.length);
+    const gate = state.situation.gate.state;
+    if (gate === "matched")
+      return plain("situation", t2("ui.argument_situation"), [t2("ui.argument_gate_matched_0_1", found, data.length)]);
+    const chip = gate === "unmatched" ? { tone: "no", text: t2("ui.argument_gate_unmatched") } : { tone: "open", text: t2("ui.argument_gate_pending") };
+    return plain("situation", t2("ui.argument_situation"), [count3], [chip]);
+  }
+  if (((_a2 = state.situation.assumptions) == null ? void 0 : _a2.id) === id) return assumptionsCard(state, t2);
+  const facet = (_b2 = state.situation.facets) == null ? void 0 : _b2.find((f) => f.id === id);
+  if (facet) return facetCard(state, facet, t2);
+  const datum = state.situation.data.find((item) => item.id === id);
+  if (datum) return isFacetMap(state) ? facetDatumCard(datum, t2) : datumCard(datum, t2);
+  if ((id === roles.verified || id === roles.eliminated) && state.run.phase === "stopped_mismatch")
+    return plain("group", t2("ui.argument_group_label"));
+  if (id === roles.verified) {
+    const verifying = state.hypotheses.filter((h) => h.location === "verifying").length;
+    return plain("group", t2("ui.argument_group_label"), [
+      t2("ui.argument_group_verified_count_0_1", verifiedCount(state), Math.max(verifying, MIN_VERIFIED))
+    ]);
+  }
+  if (id === roles.eliminated) {
+    const count3 = state.hypotheses.filter((h) => h.location === "eliminated").length;
+    return plain("group", t2("ui.argument_group_label"), [t2("ui.argument_group_eliminated_count_0", count3)]);
+  }
+  for (const h of state.hypotheses) {
+    if (h.id === id) return hypothesisCard(state, h, t2);
+    const need = h.needs.find((item) => item.id === id);
+    if (need) return needCard(need, t2, isFacetMap(state));
+  }
+  return null;
+}
+function renderArgumentKind(header2, view) {
+  const kind = header2.createSpan({ cls: "vam-argument-kind", text: view.kind });
+  kind.dataset.role = view.role;
+  return kind;
+}
+function renderArgumentCardBody(card, view, onAction) {
+  var _a2;
+  card.dataset.argumentRole = view.role;
+  if (view.state) card.dataset.argumentState = view.state;
+  if (view.dashed) card.dataset.argumentMissing = "true";
+  const body = card.createDiv({ cls: "vam-argument-body" });
+  if (view.chips.length) {
+    const row = body.createDiv({ cls: "vam-argument-chips" });
+    for (const chip of view.chips) row.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
+  }
+  if ((_a2 = view.definitions) == null ? void 0 : _a2.length) {
+    const list2 = body.createEl("dl", { cls: "vam-argument-definitions" });
+    for (const item of view.definitions) {
+      list2.createEl("dt", { text: item.label });
+      list2.createEl("dd", { text: item.value });
+    }
+  }
+  for (const line2 of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line2 });
+  if (view.action) renderArgumentAction(body, view.action, onAction);
+  return body;
+}
+function renderArgumentAction(body, action, onAction) {
+  const button = body.createEl("button", { cls: "vam-argument-action", text: action.text });
+  button.setAttr("type", "button");
+  button.setAttr("aria-label", action.ariaLabel);
+  for (const type of ["pointerdown", "mousedown", "dblclick", "keydown"])
+    button.addEventListener(type, (event) => event.stopPropagation());
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onAction == null ? void 0 : onAction(button);
+  });
+  return button;
 }
 
 // core/argument-map/layout.ts
@@ -45249,6 +45513,9 @@ function siblingRanks(state) {
     h.needs.forEach((need, at) => rank.set(need.id, key4(itemRank(need), at)));
   });
   state.situation.data.forEach((datum, index) => rank.set(datum.id, key4(itemRank(datum), index)));
+  const { assumptions, facets } = state.situation;
+  if (assumptions) rank.set(assumptions.id, key4(0, 0));
+  facets == null ? void 0 : facets.forEach((facet, index) => rank.set(facet.id, key4(1, index)));
   return rank;
 }
 function orderArgumentNodes(nodes, state) {
@@ -46387,11 +46654,13 @@ var ArgumentRuns = class {
     return this.drives.has(mapPath);
   }
   /** Creates the fixed nodes and the state, then runs to the end (or a pause). Resolves when the run is over. */
-  async start(mapPath, proposition) {
+  async start(mapPath, proposition, options = {}) {
+    var _a2;
     this.guard(mapPath);
     const text10 = proposition.trim();
     if (!text10) throw new ArgumentRunError("missing");
     const drive = this.open(mapPath);
+    if ((_a2 = options.presetAssumptions) == null ? void 0 : _a2.length) drive.preset = options.presetAssumptions.map((item) => ({ ...item }));
     drive.done = this.go(drive, async () => {
       const runId = this.ports.newId();
       await this.ports.mutate(async () => {
@@ -46723,7 +46992,12 @@ var ArgumentRuns = class {
   }
   /** The facet plan: dry-run with placeholder ids, then one card per assumption card, facet and need (card id == state id), all under the situation card. */
   async planFacets(drive, state, proposition) {
-    const request = { ...this.base(drive), proposition };
+    var _a2;
+    const request = {
+      ...this.base(drive),
+      proposition,
+      ...((_a2 = drive.preset) == null ? void 0 : _a2.length) ? { presetAssumptions: drive.preset.map((item) => ({ ...item })) } : {}
+    };
     const result = await this.ask(drive, ARGUMENT_STEPS.plan_facets, request);
     await this.checkpoint(drive, async (s, map) => {
       const items = result.assumptions.items;
@@ -47231,6 +47505,40 @@ var ArgumentRuns = class {
     });
   }
 };
+
+// experiences/visual-map/argument-rerun.ts
+var ENTITY = { lt: "<", gt: ">", amp: "&" };
+var decode = (text10) => text10.replace(/&#(\d{1,5});/g, (_m, code) => String.fromCodePoint(Number(code))).replace(/&(lt|gt|amp);/g, (_m, name2) => ENTITY[name2]);
+var cells = (row) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
+var isSeparator = (row) => cells(row).every((cell2) => /^\s*:?-{3,}:?\s*$/.test(cell2));
+function parseDefinitionsTable(detail) {
+  const lines = detail.split(/\r?\n/);
+  const start = lines.findIndex((line2) => line2.trim().startsWith("|"));
+  if (start < 0) return null;
+  const block = [];
+  for (const line2 of lines.slice(start)) {
+    if (!line2.trim().startsWith("|")) break;
+    block.push(line2);
+  }
+  if (block.length < 3 || cells(block[0]).length !== 3 || !isSeparator(block[1])) return null;
+  const items = [];
+  for (const row of block.slice(2)) {
+    const parts = cells(row);
+    if (parts.length !== 3) return null;
+    const [label, value, reason] = parts.map((part) => decode(part).trim());
+    if (!label || !value || !reason || label === "-" || value === "-") return null;
+    items.push({ label, value, reason });
+  }
+  return items;
+}
+async function rerunWithAssumptions(ports) {
+  const items = parseDefinitionsTable(await ports.readDefinitions());
+  const proposition = ports.proposition().trim();
+  if (!(items == null ? void 0 : items.length) || !proposition) return { kind: "unreadable" };
+  const mapPath = await ports.createMap();
+  void ports.start(mapPath, proposition, items);
+  return { kind: "started", mapPath };
+}
 
 // experiences/visual-map/argument-progress.ts
 function describeArgumentProgress(state, owned, t2) {
@@ -48860,8 +49168,8 @@ function judgeTopicScope(actions, nodes, rootId) {
 var missedImageRows = (blocks) => blocks.flatMap((block) => {
   var _a2, _b2;
   if (block.state === "searching" || placedImage(block)) return [];
-  const why = block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", (_a2 = block.reason) != null ? _a2 : "") : (_b2 = block.reason) != null ? _b2 : t("ui.map_chat_images_none");
-  return [{ status: block.state === "failed" ? "failed" : "skipped", text: `${block.nodeTitle}: ${why}` }];
+  const why2 = block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", (_a2 = block.reason) != null ? _a2 : "") : (_b2 = block.reason) != null ? _b2 : t("ui.map_chat_images_none");
+  return [{ status: block.state === "failed" ? "failed" : "skipped", text: `${block.nodeTitle}: ${why2}` }];
 });
 var plainLines = (lines) => onceImageLines(lines).flatMap((line2) => {
   const settled2 = settledLine(line2);
@@ -50791,7 +51099,7 @@ var ExchangeReject = class extends Error {
 };
 var RAW_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f￾￿]/;
 var TITLE_FORBIDDEN3 = /[\u0000-\u001f\u007f-\u009f]/;
-var ENTITY = /&(?:#[0-9]{1,7}|#x[0-9A-Fa-f]{1,6}|amp|lt|gt|quot|apos);/g;
+var ENTITY2 = /&(?:#[0-9]{1,7}|#x[0-9A-Fa-f]{1,6}|amp|lt|gt|quot|apos);/g;
 var ENTITY_PARTS = /&(?:#([0-9]{1,7})|#x([0-9A-Fa-f]{1,6})|(amp|lt|gt|quot|apos));/g;
 var NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 var NAME = /[\p{L}_:][\p{L}\p{N}_:.-]*/uy;
@@ -50807,7 +51115,7 @@ function utf8Length(text10) {
 var isXmlChar = (code) => code === 9 || code === 10 || code === 13 || code >= 32 && code <= 55295 || code >= 57344 && code <= 65533 || code >= 65536 && code <= 1114111;
 function decodeEntities(raw, line2) {
   if (!raw.includes("&")) return raw;
-  if (raw.replace(ENTITY, "").includes("&")) throw new ExchangeReject("bad-entity", line2);
+  if (raw.replace(ENTITY2, "").includes("&")) throw new ExchangeReject("bad-entity", line2);
   return raw.replace(
     ENTITY_PARTS,
     (_m, dec, hex, named) => {
@@ -51218,8 +51526,8 @@ function exchangeRefusal(reason, line2) {
   }
 }
 async function importExchangeFile(host, file) {
-  const refuse = (why) => {
-    new import_obsidian26.Notice(t("ui.exchange_refused", file.name, why));
+  const refuse = (why2) => {
+    new import_obsidian26.Notice(t("ui.exchange_refused", file.name, why2));
     return false;
   };
   if (file.size > EXCHANGE_MAX_BYTES) return refuse(exchangeRefusal("too-large"));
@@ -61668,12 +61976,12 @@ ${request.requirements}` : preset.text,
       const anchors = annotated.anchors.length;
       const make = window.createFragment;
       menu.addItem((item) => {
-        const first = t("ui.annotated_image_convert_back"), why = anchors ? t("ui.annotated_image_convert_back_blocked", anchors) : "";
+        const first = t("ui.annotated_image_convert_back"), why2 = anchors ? t("ui.annotated_image_convert_back_blocked", anchors) : "";
         item.setTitle(
-          why && make ? make((frag) => {
+          why2 && make ? make((frag) => {
             frag.createSpan({ text: first });
-            frag.createSpan({ text: why, cls: "vam-menu-subtitle" });
-          }) : why ? `${first} (${why})` : first
+            frag.createSpan({ text: why2, cls: "vam-menu-subtitle" });
+          }) : why2 ? `${first} (${why2})` : first
         ).setIcon("image").setDisabled(anchors > 0).onClick(() => this.enqueue(() => this.convertImageBack(id)));
       });
       menu.addSeparator();
@@ -66114,7 +66422,7 @@ ${request.requirements}` : preset.text,
     if (note && !this.selection.state.multiSelectMode)
       card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node));
     const textEditable = !!note && this.cardTextEditable();
-    if (argumentView) renderArgumentCardBody(card, argumentView);
+    if (argumentView) renderArgumentCardBody(card, argumentView, () => void this.rerunFromDefinitions(node.id));
     else if (textEditable && ((_A = this.inlineSummary) == null ? void 0 : _A.id) === node.id) this.paintCardSummaryEdit(card, node);
     else if ((_B = research == null ? void 0 : research.preview) == null ? void 0 : _B.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
@@ -66651,6 +66959,44 @@ ${request.requirements}` : preset.text,
     const read = readArgumentMap(this.map);
     if (read.kind !== "usable" || !managedNodeIds(this.map).has(id)) return null;
     return describeArgumentCard(read.data, id, t);
+  }
+  /**
+   * The definitions card's "re-run" button: reads the table of the card's note (the owner may have edited it), and starts a NEW map with
+   * those items; an unreadable table only shows a notice. The map on screen is never written. There is no confirm window (decision 46).
+   */
+  async rerunFromDefinitions(cardId) {
+    var _a2, _b2;
+    const map = this.map;
+    if (this.closed || !map || map.argumentMap === void 0) return;
+    const read = readArgumentMap(map);
+    if (read.kind !== "usable" || ((_a2 = read.data.situation.assumptions) == null ? void 0 : _a2.id) !== cardId) return;
+    const definitions2 = map.nodes.find((node) => node.id === cardId);
+    const root = map.nodes.find((node) => node.id === read.data.roles.proposition);
+    if (!definitions2 || !root) return;
+    const rootNote = this.notes.get(root.id);
+    const proposition = (rootNote == null ? void 0 : rootNote.summary) && !isPlaceholder(rootNote.summary) ? rootNote.summary : (_b2 = rootNote == null ? void 0 : rootNote.title) != null ? _b2 : "";
+    try {
+      const result = await rerunWithAssumptions({
+        readDefinitions: async () => (await this.plugin.repo.readNote(definitions2.path, map)).detail,
+        proposition: () => proposition,
+        createMap: async () => {
+          let created = "";
+          await this.plugin.mutate(async () => {
+            created = await this.plugin.repo.createMap(
+              [...proposition.trim()].slice(0, 40).join("") || t("ui.untitled_mind_map")
+            );
+          });
+          return created;
+        },
+        start: (mapPath, claim2, presetAssumptions) => this.plugin.argumentRuns.start(mapPath, claim2, { presetAssumptions }).catch((error) => {
+          if (error instanceof ArgumentRunError) new import_obsidian35.Notice(t("ui.argument_start_refused"));
+        })
+      });
+      if (result.kind === "unreadable") new import_obsidian35.Notice(t("ui.argument_rerun_unreadable"));
+      else await this.plugin.openMapInNewTab(result.mapPath);
+    } catch (error) {
+      errorNotice(error);
+    }
   }
   /** The heading of a managed card: its note's title, the note's summary (a concluded conclusion only), or the flow's own text. */
   argumentTitleOf(view, note) {
@@ -83337,6 +83683,9 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node[data-argument-role="group"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--background-primary-alt); border-color: var(--background-modifier-border-hover); }
 .vam-node[data-argument-missing="true"][data-status]:not([data-aim-kind]) { border: 1.5px dashed var(--background-modifier-border-hover); }
 .vam-node[data-argument-role="need"], .vam-node[data-argument-role="datum"] { border-radius: 6px; }
+.vam-node[data-argument-role="assumptions"] .vam-argument-definitions { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 0; font-size: var(--font-ui-small); line-height: 1.45; }
+.vam-node[data-argument-role="assumptions"] .vam-argument-definitions dt { color: var(--text-muted); font-weight: 600; }
+.vam-node[data-argument-role="assumptions"] .vam-argument-definitions dd { margin: 0; overflow-wrap: anywhere; }
 @keyframes vam-pulse { 50% { opacity: 0.35; } }
 @keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }
 /* Viewer-only parts: the pieces Obsidian would otherwise provide. */

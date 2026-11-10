@@ -170,3 +170,28 @@ test('line(): leading block markers are entity-encoded, ordinary text is unchang
   assert.ok(!/^- (- |# )/m.test(md), md);
   assert.ok(md.includes('plain text'));
 });
+
+// ---- P7: the definitions-table parser (re-run) -----------------------------------------------------------------------------------------
+const R = S.load('experiences/visual-map/argument-rerun.ts');
+test('definitions parser: what definitionsDetail writes reads back, brackets, pipes and markers included', () => {
+  const items = [{ label: 'Age', value: '16–24 (youth)', reason: 'BLS' }, { label: 'Odd | label', value: '[x] # a%% $$b', reason: '1. one <b>' }, { label: 'plain', value: 'v', reason: '-' }];
+  const md = N.definitionsDetail(t, items, ['an insight']);
+  assert.deepEqual(plainJson(R.parseDefinitionsTable(md)), items);
+});
+const plainJson = v => JSON.parse(JSON.stringify(v));
+test('definitions parser rejects unreadable tables', () => {
+  const head = '| a | b | c |\n| --- | --- | --- |';
+  for (const bad of ['', 'no table here', head, `${head}\n| only | two |`, `${head}\n| a | b | c | d |`, `${head}\n|  | v | r |`, `${head}\n| l |  | r |`, `${head}\n| l | v |  |`, `${head}\n| - | v | r |`, '| a | b | c |\n| x | y | z |\n| l | v | r |', '| a | b |\n| --- | --- |\n| l | v |'])
+    assert.equal(R.parseDefinitionsTable(bad), null, JSON.stringify(bad));
+  assert.deepEqual(plainJson(R.parseDefinitionsTable(`${head}\r\n| l | v | r |\r\n\r\ntext after`)), [{ label: 'l', value: 'v', reason: 'r' }]);
+});
+test('re-run: an unreadable table creates no map and starts nothing; a readable one starts a new map with presetAssumptions', async () => {
+  const calls = [];
+  const ports = detail => ({ readDefinitions: async () => detail, proposition: () => ' Claim ', createMap: async () => { calls.push('create'); return 'New.md'; }, start: async (p, c, a) => { calls.push(['start', p, c, plainJson(a)]); } });
+  assert.deepEqual(plainJson(await R.rerunWithAssumptions(ports('garbage'))), { kind: 'unreadable' });
+  assert.deepEqual(calls, []);
+  const ok = await R.rerunWithAssumptions(ports('| a | b | c |\n| --- | --- | --- |\n| l | v | r |'));
+  assert.equal(ok.kind, 'started');
+  assert.deepEqual(plainJson(calls), ['create', ['start', 'New.md', 'Claim', [{ label: 'l', value: 'v', reason: 'r' }]]]);
+  assert.deepEqual(plainJson(await R.rerunWithAssumptions({ ...ports('| a | b | c |\n| --- | --- | --- |\n| l | v | r |'), proposition: () => '  ' })), { kind: 'unreadable' });
+});

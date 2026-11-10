@@ -952,3 +952,26 @@ test('P6: an old (non-facet) map keeps the V1 note text byte for byte', async ()
   const datum = await r.text(state.situation.data[0].id);
   assert.equal(datum.detail, ['## 來源', src].join('\n'));
 });
+
+// ---- P7: re-run with the owner's definitions -------------------------------------------------------------------------------------------
+test('P7: start with presetAssumptions sends them in the facet-plan request and the assumption card shows them; without it the request has none', async () => {
+  const preset = [{ label: 'Age', value: '30 to 40', reason: 'owner edited' }];
+  const seen = [];
+  const r = await rig({ facet: true, script: { step: facetSteps({ plan_facets: request => { seen.push(plain(request)); return facetSteps().plan_facets(); } }) } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising', { presetAssumptions: preset });
+  assert.deepEqual(seen[0].presetAssumptions, preset);
+  const plain0 = await rig({ facet: true, script: { step: facetSteps({ plan_facets: request => { seen.push(plain(request)); return facetSteps().plan_facets(); } }) } });
+  await plain0.runs.start(plain0.mapPath, 'Youth unemployment is rising');
+  assert.equal('presetAssumptions' in seen[1], false);
+});
+test('P7: re-running on a new map leaves the original Map.md byte-identical', async () => {
+  const r = await rig({ facet: true, script: { step: facetSteps() } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const before = r.contents.get(r.mapPath);
+  assert.ok(before && before.length > 0);
+  const second = await r.repo.createMap('Argument again');
+  assert.notEqual(second, r.mapPath);
+  await r.runs.start(second, 'Youth unemployment is rising', { presetAssumptions: [{ label: 'Age', value: '30 to 40', reason: 'owner edited' }] });
+  assert.equal(r.contents.get(r.mapPath), before);
+  assert.equal(model.readArgumentMap(await r.repo.readMap(second)).kind, 'usable');
+});

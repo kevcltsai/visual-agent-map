@@ -65,6 +65,7 @@ import {
   readArgumentMap,
   type ArgumentMapData,
   type ArgumentRoles,
+  type AssumptionItem,
   type Hypothesis,
   type RoleKey,
   type SearchLog,
@@ -189,6 +190,8 @@ interface Drive {
   done: Promise<void>;
   /** Consecutive provider failures per research item (memory only, per drive; reset by an answer). */
   failures: Map<string, number>;
+  /** A re-run's assumption items (from the owner's edited definitions); the facet plan overrides the AI's assumption card with them. */
+  preset?: AssumptionItem[];
 }
 interface Plan {
   next: ArgumentMapData;
@@ -277,11 +280,16 @@ export class ArgumentRuns {
   }
 
   /** Creates the fixed nodes and the state, then runs to the end (or a pause). Resolves when the run is over. */
-  async start(mapPath: string, proposition: string): Promise<void> {
+  async start(
+    mapPath: string,
+    proposition: string,
+    options: { presetAssumptions?: AssumptionItem[] } = {}
+  ): Promise<void> {
     this.guard(mapPath);
     const text = proposition.trim();
     if (!text) throw new ArgumentRunError("missing");
     const drive = this.open(mapPath);
+    if (options.presetAssumptions?.length) drive.preset = options.presetAssumptions.map(item => ({ ...item }));
     drive.done = this.go(drive, async () => {
       const runId = this.ports.newId();
       await this.ports.mutate(async () => {
@@ -637,7 +645,11 @@ export class ArgumentRuns {
 
   /** The facet plan: dry-run with placeholder ids, then one card per assumption card, facet and need (card id == state id), all under the situation card. */
   private async planFacets(drive: Drive, state: ArgumentMapData, proposition: string): Promise<void> {
-    const request: FacetPlanRequest = { ...this.base(drive), proposition };
+    const request: FacetPlanRequest = {
+      ...this.base(drive),
+      proposition,
+      ...(drive.preset?.length ? { presetAssumptions: drive.preset.map(item => ({ ...item })) } : {})
+    };
     const result: FacetPlanResult = await this.ask(drive, ARGUMENT_STEPS.plan_facets, request);
     await this.checkpoint(drive, async (s, map) => {
       const items = result.assumptions.items;

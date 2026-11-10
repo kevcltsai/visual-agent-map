@@ -3054,7 +3054,36 @@ export const en = {
   "ui.argument_why_source_quote_missing": "The quoted text could not be matched on the page",
   "ui.argument_why_source_blocked_unverified": "The page was blocked, so the quote could not be checked",
   "ui.argument_note_searched": "Searches made",
-  "ui.argument_why_round_limit": "Not verified within the round limit"
+  "ui.argument_why_round_limit": "Not verified within the round limit",
+  "ui.argument_facet_0": "Facet {0}",
+  "ui.argument_facet_summary_0": "Summary: {0}",
+  "ui.argument_facet_supports": "Supports",
+  "ui.argument_facet_refutes": "Refutes",
+  "ui.argument_facet_insufficient": "Not enough data",
+  "ui.argument_facet_pending": "Judging",
+  "ui.argument_data_prop_refutes": "Opposes the proposition",
+  "ui.argument_data_unjudged": "Found, not judged yet",
+  "ui.argument_gate_facets_0_1": "✓ Matches the proposition",
+  "ui.argument_gate_facets_line_0_1": "{0} of {1} facets support it, none refute it",
+  "ui.argument_gate_insufficient": "Not enough data",
+  "ui.argument_reason_0": "Reason: {0}",
+  "ui.argument_reason_refuted_0_1": 'Facet "{0}" was refuted: {1}',
+  "ui.argument_reason_insufficient_0_1": "Only {0} of {1} facets have usable data, even after one more search round.",
+  "ui.argument_conclusion_state_insufficient": "Conclusion · not enough data",
+  "ui.argument_conclusion_insufficient_title": "Not enough data on the current situation; stopped",
+  "ui.argument_conclusion_insufficient_hint_0_1":
+    "Only {0} of {1} facets found usable data, even after searching again a different way.",
+  "ui.argument_missing_facets_0": "Missing: {0}",
+  "ui.argument_list_sep": ", ",
+  "ui.argument_refuted_facet_0": 'Refuted: facet "{0}"',
+  "ui.argument_refuted_data_0": "Data: {0}",
+  "ui.argument_assumption_kind": "Assumptions",
+  "ui.argument_definitions_hint": "Each reason is in the note. Research follows these definitions.",
+  "ui.argument_rerun": "Re-run with these assumptions…",
+  "ui.argument_rerun_aria": "Re-run with these assumptions in a new map; this map stays as it is",
+  "ui.argument_rerun_unreadable":
+    "Could not read the definitions table, so no new map was made. Check the table in the assumptions note.",
+  "ui.argument_searched_0": "Tried {0} searches; the note lists them"
 } as const;
 
 export type TranslationKey = keyof typeof en;

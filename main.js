@@ -55,16 +55,16 @@ function decorations(view) {
   if (!view.state.field(import_obsidian.editorLivePreviewField, false)) return builder.finish();
   let fence = null;
   for (let number = 1; number <= view.state.doc.lines; number++) {
-    const line = view.state.doc.line(number);
-    const delimiter2 = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line.text);
+    const line2 = view.state.doc.line(number);
+    const delimiter2 = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line2.text);
     if (delimiter2) {
       if (!fence) fence = { character: delimiter2[1][0], length: delimiter2[1].length };
       else if (delimiter2[1][0] === fence.character && delimiter2[1].length >= fence.length && !delimiter2[2].trim())
         fence = null;
       continue;
     }
-    if (!fence && markerLine.test(line.text) && !/^ {4}|^\t/.test(line.text)) {
-      builder.add(line.from, line.from, import_view.Decoration.line({ class: "vam-internal-marker-line" }));
+    if (!fence && markerLine.test(line2.text) && !/^ {4}|^\t/.test(line2.text)) {
+      builder.add(line2.from, line2.from, import_view.Decoration.line({ class: "vam-internal-marker-line" }));
     }
   }
   return builder.finish();
@@ -93,7 +93,7 @@ function registerInternalMarkerPresentation(plugin) {
     for (const node of nodes) {
       if ((_a2 = node.parentElement) == null ? void 0 : _a2.closest("pre, code")) continue;
       const text10 = (_b2 = node.textContent) != null ? _b2 : "";
-      const filtered = text10.split("\n").filter((line) => !markerLine.test(line)).join("\n");
+      const filtered = text10.split("\n").filter((line2) => !markerLine.test(line2)).join("\n");
       if (filtered === text10) continue;
       const parent = node.parentElement;
       node.textContent = filtered;
@@ -2793,7 +2793,77 @@ var en = {
   "ui.argument_stance_contradicts": "\u2715 Opposes",
   "ui.argument_stance_uncertain": "? Uncertain",
   "ui.argument_verified_done": "\u2713 Verified",
-  "ui.argument_verifying": "Verifying"
+  "ui.argument_verifying": "Verifying",
+  "ui.argument_note_core": "Core conclusion",
+  "ui.argument_note_verdict_supports": "Verdict: supports the proposition",
+  "ui.argument_note_verdict_refutes": "Verdict: refutes the proposition",
+  "ui.argument_note_verdict_insufficient": "Verdict: not enough data",
+  "ui.argument_note_verdict_pending": "Verdict: not judged yet",
+  "ui.argument_note_hyp_supported_0_1": "Verdict: supported ({0}/{1} evidence needs found)",
+  "ui.argument_note_hyp_refuted_0_1": "Verdict: refuted ({0}/{1} evidence needs found)",
+  "ui.argument_note_hyp_undecided_0_1": "Verdict: undecided ({0}/{1} evidence needs found)",
+  "ui.argument_note_data": "Data",
+  "ui.argument_note_chart": "Chart",
+  "ui.argument_note_col_data": "Data",
+  "ui.argument_note_col_number": "Number",
+  "ui.argument_note_col_period": "Period",
+  "ui.argument_note_col_stance": "Vs. proposition",
+  "ui.argument_note_col_reason": "Reason",
+  "ui.argument_note_col_source": "Source",
+  "ui.argument_note_col_facet": "Facet",
+  "ui.argument_note_col_verdict": "Verdict",
+  "ui.argument_note_col_hypothesis": "Hypothesis",
+  "ui.argument_note_col_key_evidence": "Key evidence",
+  "ui.argument_note_col_evidence": "Evidence",
+  "ui.argument_note_col_item": "Item",
+  "ui.argument_note_col_definition": "Definition",
+  "ui.argument_note_prop_supports": "Supports the proposition",
+  "ui.argument_note_prop_refutes": "Opposes the proposition",
+  "ui.argument_note_prop_irrelevant": "Not relevant",
+  "ui.argument_note_need_supports": "Supports",
+  "ui.argument_note_need_contradicts": "Opposes",
+  "ui.argument_note_need_uncertain": "Uncertain",
+  "ui.argument_note_need_missing": "Missing \xB7 not found",
+  "ui.argument_note_need_pending": "Missing \xB7 not searched",
+  "ui.argument_note_insights": "Integrated insights",
+  "ui.argument_note_insight_consistent": "Agree",
+  "ui.argument_note_insight_tension": "Pull against each other",
+  "ui.argument_note_insight_missing": "Still missing",
+  "ui.argument_note_why_holds": "Why it holds",
+  "ui.argument_note_why_fails": "Why it does not hold",
+  "ui.argument_note_why_undecided": "Why it is undecided",
+  "ui.argument_note_basis": "Basis",
+  "ui.argument_note_definition_insights": "How these definitions affect the result",
+  "ui.argument_note_basis_hypotheses": "Hypotheses relied on",
+  "ui.argument_note_eliminated": "Eliminated hypotheses",
+  "ui.argument_note_situation_basis": "Situation relied on",
+  "ui.argument_note_facets": "Facets",
+  "ui.argument_note_refuting": "Facet that refutes the proposition",
+  "ui.argument_note_insufficient": "Facets without enough data",
+  "ui.argument_note_facet_count_0_1": "{0} of {1} facets support the proposition",
+  "ui.argument_note_search_n_0": "Search {0}",
+  "ui.argument_note_opened": "Pages opened",
+  "ui.argument_note_not_adopted": "Why it was not used",
+  "ui.argument_note_agent_note": "Researcher note",
+  "ui.argument_note_debug": "Debug code",
+  "ui.argument_note_none": "None",
+  "ui.argument_why_budget": "The research budget ran out before this item was searched",
+  "ui.argument_why_no_answer": "The research gave no answer for this item",
+  "ui.argument_why_not_found": "The research did not find a usable page",
+  "ui.argument_why_stance_uncertain": "The page was found but its direction is uncertain",
+  "ui.argument_why_provider_error": "The AI provider returned an error",
+  "ui.argument_why_card_deleted": "The card was deleted during the search",
+  "ui.argument_why_source_rejected_url": "The page address was not accepted",
+  "ui.argument_why_source_bad_quote": "The quoted text was empty or unusable",
+  "ui.argument_why_source_bad_claim": "The claim was empty or unusable",
+  "ui.argument_why_source_network_error": "The page could not be loaded",
+  "ui.argument_why_source_http_status": "The page answered with an error status",
+  "ui.argument_why_source_content_type": "The page is not a readable text page",
+  "ui.argument_why_source_no_parser": "The page could not be read",
+  "ui.argument_why_source_quote_missing": "The quoted text could not be matched on the page",
+  "ui.argument_why_source_blocked_unverified": "The page was blocked, so the quote could not be checked",
+  "ui.argument_note_searched": "Searches made",
+  "ui.argument_why_round_limit": "Not verified within the round limit"
 };
 
 // i18n/zh-CN.ts
@@ -5482,7 +5552,77 @@ var zhCN = {
   "ui.argument_stance_contradicts": "\u2715 \u53CD\u5BF9",
   "ui.argument_stance_uncertain": "\uFF1F\u4E0D\u786E\u5B9A",
   "ui.argument_verified_done": "\u2713 \u9A8C\u8BC1\u5B8C\u6210",
-  "ui.argument_verifying": "\u9A8C\u8BC1\u4E2D"
+  "ui.argument_verifying": "\u9A8C\u8BC1\u4E2D",
+  "ui.argument_note_core": "\u6838\u5FC3\u7ED3\u8BBA",
+  "ui.argument_note_verdict_supports": "\u5224\u5B9A\uFF1A\u652F\u6301\u547D\u9898",
+  "ui.argument_note_verdict_refutes": "\u5224\u5B9A\uFF1A\u4E0E\u547D\u9898\u4E0D\u7B26",
+  "ui.argument_note_verdict_insufficient": "\u5224\u5B9A\uFF1A\u8D44\u6599\u4E0D\u8DB3",
+  "ui.argument_note_verdict_pending": "\u5224\u5B9A\uFF1A\u5C1A\u672A\u5224\u5B9A",
+  "ui.argument_note_hyp_supported_0_1": "\u5224\u5B9A\uFF1A\u88AB\u652F\u6301\uFF08{0}\uFF0F{1} \u6761\u8BC1\u636E\u9700\u6C42\u627E\u5230\uFF09",
+  "ui.argument_note_hyp_refuted_0_1": "\u5224\u5B9A\uFF1A\u88AB\u63A8\u7FFB\uFF08{0}\uFF0F{1} \u6761\u8BC1\u636E\u9700\u6C42\u627E\u5230\uFF09",
+  "ui.argument_note_hyp_undecided_0_1": "\u5224\u5B9A\uFF1A\u65E0\u6CD5\u5224\u5B9A\uFF08{0}\uFF0F{1} \u6761\u8BC1\u636E\u9700\u6C42\u627E\u5230\uFF09",
+  "ui.argument_note_data": "\u6570\u636E",
+  "ui.argument_note_chart": "\u56FE\u8868",
+  "ui.argument_note_col_data": "\u6570\u636E",
+  "ui.argument_note_col_number": "\u6570\u5B57",
+  "ui.argument_note_col_period": "\u671F\u95F4",
+  "ui.argument_note_col_stance": "\u5BF9\u547D\u9898",
+  "ui.argument_note_col_reason": "\u7406\u7531",
+  "ui.argument_note_col_source": "\u6765\u6E90",
+  "ui.argument_note_col_facet": "\u9762\u5411",
+  "ui.argument_note_col_verdict": "\u5224\u5B9A",
+  "ui.argument_note_col_hypothesis": "\u5047\u8BBE",
+  "ui.argument_note_col_key_evidence": "\u5173\u952E\u8BC1\u636E",
+  "ui.argument_note_col_evidence": "\u8BC1\u636E",
+  "ui.argument_note_col_item": "\u9879\u76EE",
+  "ui.argument_note_col_definition": "\u5B9A\u4E49",
+  "ui.argument_note_prop_supports": "\u652F\u6301\u547D\u9898",
+  "ui.argument_note_prop_refutes": "\u4E0E\u547D\u9898\u4E0D\u7B26",
+  "ui.argument_note_prop_irrelevant": "\u65E0\u5173",
+  "ui.argument_note_need_supports": "\u652F\u6301",
+  "ui.argument_note_need_contradicts": "\u53CD\u5BF9",
+  "ui.argument_note_need_uncertain": "\u4E0D\u786E\u5B9A",
+  "ui.argument_note_need_missing": "\u8FD8\u7F3A\u30FB\u627E\u4E0D\u5230",
+  "ui.argument_note_need_pending": "\u8FD8\u7F3A\u30FB\u5C1A\u672A\u67E5",
+  "ui.argument_note_insights": "\u6574\u5408\u6D1E\u89C1",
+  "ui.argument_note_insight_consistent": "\u4E00\u81F4\u7684\u5730\u65B9",
+  "ui.argument_note_insight_tension": "\u4E92\u76F8\u7275\u5236\u7684\u5730\u65B9",
+  "ui.argument_note_insight_missing": "\u8FD8\u7F3A\u7684",
+  "ui.argument_note_why_holds": "\u6210\u7ACB\u7684\u539F\u56E0",
+  "ui.argument_note_why_fails": "\u4E0D\u6210\u7ACB\u7684\u539F\u56E0",
+  "ui.argument_note_why_undecided": "\u65E0\u6CD5\u5224\u5B9A\u7684\u539F\u56E0",
+  "ui.argument_note_basis": "\u4F9D\u636E",
+  "ui.argument_note_definition_insights": "\u8FD9\u7EC4\u5B9A\u4E49\u5BF9\u7ED3\u679C\u7684\u5F71\u54CD",
+  "ui.argument_note_basis_hypotheses": "\u4F9D\u636E\u7684\u5047\u8BBE",
+  "ui.argument_note_eliminated": "\u6DD8\u6C70\u7684\u5047\u8BBE",
+  "ui.argument_note_situation_basis": "\u73B0\u51B5\u4F9D\u636E",
+  "ui.argument_note_facets": "\u9762\u5411",
+  "ui.argument_note_refuting": "\u4E0E\u547D\u9898\u4E0D\u7B26\u7684\u9762\u5411",
+  "ui.argument_note_insufficient": "\u8D44\u6599\u4E0D\u8DB3\u7684\u9762\u5411",
+  "ui.argument_note_facet_count_0_1": "{1} \u4E2A\u9762\u5411\u4E2D\u6709 {0} \u4E2A\u652F\u6301\u547D\u9898",
+  "ui.argument_note_search_n_0": "\u641C\u7D22 {0}",
+  "ui.argument_note_opened": "\u6253\u5F00\u7684\u9875\u9762",
+  "ui.argument_note_not_adopted": "\u4E0D\u91C7\u7528\u7684\u539F\u56E0",
+  "ui.argument_note_agent_note": "\u7814\u7A76\u5907\u6CE8",
+  "ui.argument_note_debug": "\u8C03\u8BD5\u4EE3\u7801",
+  "ui.argument_note_none": "\u65E0",
+  "ui.argument_why_budget": "\u7814\u7A76\u989D\u5EA6\u7528\u5B8C\uFF0C\u8FD8\u6CA1\u67E5\u5230\u8FD9\u4E00\u9879",
+  "ui.argument_why_no_answer": "\u7814\u7A76\u6CA1\u6709\u56DE\u590D\u8FD9\u4E00\u9879",
+  "ui.argument_why_not_found": "\u7814\u7A76\u6CA1\u6709\u627E\u5230\u53EF\u7528\u7684\u9875\u9762",
+  "ui.argument_why_stance_uncertain": "\u627E\u5230\u9875\u9762\uFF0C\u4F46\u770B\u4E0D\u51FA\u65B9\u5411",
+  "ui.argument_why_provider_error": "AI \u670D\u52A1\u8FD4\u56DE\u9519\u8BEF",
+  "ui.argument_why_card_deleted": "\u641C\u7D22\u671F\u95F4\u5361\u7247\u88AB\u5220\u9664",
+  "ui.argument_why_source_rejected_url": "\u9875\u9762\u7F51\u5740\u4E0D\u88AB\u63A5\u53D7",
+  "ui.argument_why_source_bad_quote": "\u6458\u5F55\u662F\u7A7A\u7684\u6216\u4E0D\u80FD\u7528",
+  "ui.argument_why_source_bad_claim": "\u8BBA\u70B9\u662F\u7A7A\u7684\u6216\u4E0D\u80FD\u7528",
+  "ui.argument_why_source_network_error": "\u9875\u9762\u52A0\u8F7D\u5931\u8D25",
+  "ui.argument_why_source_http_status": "\u9875\u9762\u8FD4\u56DE\u9519\u8BEF\u72B6\u6001",
+  "ui.argument_why_source_content_type": "\u9875\u9762\u4E0D\u662F\u53EF\u8BFB\u7684\u6587\u5B57\u9875",
+  "ui.argument_why_source_no_parser": "\u9875\u9762\u65E0\u6CD5\u89E3\u6790",
+  "ui.argument_why_source_quote_missing": "\u6458\u5F55\u5728\u9875\u9762\u4E0A\u6838\u5BF9\u4E0D\u5230",
+  "ui.argument_why_source_blocked_unverified": "\u9875\u9762\u6321\u4F4F\u4E86\u8BFB\u53D6\uFF0C\u6458\u5F55\u65E0\u6CD5\u6838\u5BF9",
+  "ui.argument_note_searched": "\u641C\u7D22\u8BB0\u5F55",
+  "ui.argument_why_round_limit": "\u5728\u8F6E\u6570\u4E0A\u9650\u5185\u672A\u80FD\u9A8C\u8BC1"
 };
 
 // i18n/zh-TW.ts
@@ -8171,7 +8311,77 @@ var zhTW = {
   "ui.argument_stance_contradicts": "\u2715 \u53CD\u5C0D",
   "ui.argument_stance_uncertain": "\uFF1F\u4E0D\u78BA\u5B9A",
   "ui.argument_verified_done": "\u2713 \u9A57\u8B49\u5B8C\u6210",
-  "ui.argument_verifying": "\u9A57\u8B49\u4E2D"
+  "ui.argument_verifying": "\u9A57\u8B49\u4E2D",
+  "ui.argument_note_core": "\u6838\u5FC3\u7D50\u8AD6",
+  "ui.argument_note_verdict_supports": "\u5224\u5B9A\uFF1A\u652F\u6301\u547D\u984C",
+  "ui.argument_note_verdict_refutes": "\u5224\u5B9A\uFF1A\u8207\u547D\u984C\u4E0D\u7B26",
+  "ui.argument_note_verdict_insufficient": "\u5224\u5B9A\uFF1A\u8CC7\u6599\u4E0D\u8DB3",
+  "ui.argument_note_verdict_pending": "\u5224\u5B9A\uFF1A\u5C1A\u672A\u5224\u5B9A",
+  "ui.argument_note_hyp_supported_0_1": "\u5224\u5B9A\uFF1A\u88AB\u652F\u6301\uFF08{0}\uFF0F{1} \u689D\u8B49\u64DA\u9700\u6C42\u627E\u5230\uFF09",
+  "ui.argument_note_hyp_refuted_0_1": "\u5224\u5B9A\uFF1A\u88AB\u63A8\u7FFB\uFF08{0}\uFF0F{1} \u689D\u8B49\u64DA\u9700\u6C42\u627E\u5230\uFF09",
+  "ui.argument_note_hyp_undecided_0_1": "\u5224\u5B9A\uFF1A\u7121\u6CD5\u5224\u5B9A\uFF08{0}\uFF0F{1} \u689D\u8B49\u64DA\u9700\u6C42\u627E\u5230\uFF09",
+  "ui.argument_note_data": "\u6578\u64DA",
+  "ui.argument_note_chart": "\u5716\u8868",
+  "ui.argument_note_col_data": "\u6578\u64DA",
+  "ui.argument_note_col_number": "\u6578\u5B57",
+  "ui.argument_note_col_period": "\u671F\u9593",
+  "ui.argument_note_col_stance": "\u5C0D\u547D\u984C",
+  "ui.argument_note_col_reason": "\u7406\u7531",
+  "ui.argument_note_col_source": "\u4F86\u6E90",
+  "ui.argument_note_col_facet": "\u9762\u5411",
+  "ui.argument_note_col_verdict": "\u5224\u5B9A",
+  "ui.argument_note_col_hypothesis": "\u5047\u8A2D",
+  "ui.argument_note_col_key_evidence": "\u95DC\u9375\u8B49\u64DA",
+  "ui.argument_note_col_evidence": "\u8B49\u64DA",
+  "ui.argument_note_col_item": "\u9805\u76EE",
+  "ui.argument_note_col_definition": "\u5B9A\u7FA9",
+  "ui.argument_note_prop_supports": "\u652F\u6301\u547D\u984C",
+  "ui.argument_note_prop_refutes": "\u8207\u547D\u984C\u4E0D\u7B26",
+  "ui.argument_note_prop_irrelevant": "\u7121\u95DC",
+  "ui.argument_note_need_supports": "\u652F\u6301",
+  "ui.argument_note_need_contradicts": "\u53CD\u5C0D",
+  "ui.argument_note_need_uncertain": "\u4E0D\u78BA\u5B9A",
+  "ui.argument_note_need_missing": "\u9084\u7F3A\u30FB\u627E\u4E0D\u5230",
+  "ui.argument_note_need_pending": "\u9084\u7F3A\u30FB\u5C1A\u672A\u67E5",
+  "ui.argument_note_insights": "\u6574\u5408\u6D1E\u898B",
+  "ui.argument_note_insight_consistent": "\u4E00\u81F4\u7684\u5730\u65B9",
+  "ui.argument_note_insight_tension": "\u4E92\u76F8\u727D\u5236\u7684\u5730\u65B9",
+  "ui.argument_note_insight_missing": "\u9084\u7F3A\u7684",
+  "ui.argument_note_why_holds": "\u6210\u7ACB\u7684\u539F\u56E0",
+  "ui.argument_note_why_fails": "\u4E0D\u6210\u7ACB\u7684\u539F\u56E0",
+  "ui.argument_note_why_undecided": "\u7121\u6CD5\u5224\u5B9A\u7684\u539F\u56E0",
+  "ui.argument_note_basis": "\u4F9D\u64DA",
+  "ui.argument_note_definition_insights": "\u9019\u7D44\u5B9A\u7FA9\u5C0D\u7D50\u679C\u7684\u5F71\u97FF",
+  "ui.argument_note_basis_hypotheses": "\u4F9D\u64DA\u7684\u5047\u8A2D",
+  "ui.argument_note_eliminated": "\u6DD8\u6C70\u7684\u5047\u8A2D",
+  "ui.argument_note_situation_basis": "\u73FE\u6CC1\u4F9D\u64DA",
+  "ui.argument_note_facets": "\u9762\u5411",
+  "ui.argument_note_refuting": "\u8207\u547D\u984C\u4E0D\u7B26\u7684\u9762\u5411",
+  "ui.argument_note_insufficient": "\u8CC7\u6599\u4E0D\u8DB3\u7684\u9762\u5411",
+  "ui.argument_note_facet_count_0_1": "{1} \u500B\u9762\u5411\u4E2D\u6709 {0} \u500B\u652F\u6301\u547D\u984C",
+  "ui.argument_note_search_n_0": "\u641C\u5C0B {0}",
+  "ui.argument_note_opened": "\u958B\u555F\u7684\u9801\u9762",
+  "ui.argument_note_not_adopted": "\u4E0D\u63A1\u7528\u7684\u539F\u56E0",
+  "ui.argument_note_agent_note": "\u7814\u7A76\u5099\u8A3B",
+  "ui.argument_note_debug": "\u9664\u932F\u4EE3\u78BC",
+  "ui.argument_note_none": "\u7121",
+  "ui.argument_why_budget": "\u7814\u7A76\u984D\u5EA6\u7528\u5B8C\uFF0C\u9084\u6C92\u67E5\u5230\u9019\u4E00\u9805",
+  "ui.argument_why_no_answer": "\u7814\u7A76\u6C92\u6709\u56DE\u8986\u9019\u4E00\u9805",
+  "ui.argument_why_not_found": "\u7814\u7A76\u6C92\u6709\u627E\u5230\u53EF\u7528\u7684\u9801\u9762",
+  "ui.argument_why_stance_uncertain": "\u627E\u5230\u9801\u9762\uFF0C\u4F46\u770B\u4E0D\u51FA\u65B9\u5411",
+  "ui.argument_why_provider_error": "AI \u670D\u52D9\u56DE\u50B3\u932F\u8AA4",
+  "ui.argument_why_card_deleted": "\u641C\u5C0B\u671F\u9593\u5361\u7247\u88AB\u522A\u9664",
+  "ui.argument_why_source_rejected_url": "\u9801\u9762\u7DB2\u5740\u4E0D\u88AB\u63A5\u53D7",
+  "ui.argument_why_source_bad_quote": "\u6458\u9304\u662F\u7A7A\u7684\u6216\u4E0D\u80FD\u7528",
+  "ui.argument_why_source_bad_claim": "\u8AD6\u9EDE\u662F\u7A7A\u7684\u6216\u4E0D\u80FD\u7528",
+  "ui.argument_why_source_network_error": "\u9801\u9762\u8F09\u5165\u5931\u6557",
+  "ui.argument_why_source_http_status": "\u9801\u9762\u56DE\u61C9\u932F\u8AA4\u72C0\u614B",
+  "ui.argument_why_source_content_type": "\u9801\u9762\u4E0D\u662F\u53EF\u8B80\u7684\u6587\u5B57\u9801",
+  "ui.argument_why_source_no_parser": "\u9801\u9762\u7121\u6CD5\u89E3\u6790",
+  "ui.argument_why_source_quote_missing": "\u6458\u9304\u5728\u9801\u9762\u4E0A\u6838\u5C0D\u4E0D\u5230",
+  "ui.argument_why_source_blocked_unverified": "\u9801\u9762\u64CB\u4F4F\u4E86\u8B80\u53D6\uFF0C\u6458\u9304\u7121\u6CD5\u6838\u5C0D",
+  "ui.argument_note_searched": "\u641C\u5C0B\u7D00\u9304",
+  "ui.argument_why_round_limit": "\u5728\u8F2A\u6578\u4E0A\u9650\u5167\u672A\u80FD\u9A57\u8B49"
 };
 
 // i18n/languages.ts
@@ -8928,8 +9138,8 @@ function inForeignEmbed(section3, host) {
 function scanCallouts(section3) {
   const callouts = section3.matches(".callout, .cm-callout") ? [section3] : [];
   callouts.push(...Array.from(section3.querySelectorAll(".callout, .cm-callout")));
-  for (const callout of callouts) {
-    if (!inForeignEmbed(section3, callout)) callout.addClass(CALLOUT_SCOPE_CLASS);
+  for (const callout2 of callouts) {
+    if (!inForeignEmbed(section3, callout2)) callout2.addClass(CALLOUT_SCOPE_CLASS);
   }
 }
 function scanLinks(section3) {
@@ -9228,25 +9438,25 @@ function parseOne(markdown) {
     current = void 0;
     legacyInsightHeader = false;
   };
-  for (const line of lines) {
+  for (const line2 of lines) {
     if (fence) {
-      if (new RegExp(`^\\s*${fence.marker}{${fence.width},}\\s*$`).test(line)) fence = void 0;
+      if (new RegExp(`^\\s*${fence.marker}{${fence.width},}\\s*$`).test(line2)) fence = void 0;
       continue;
     }
-    const fenceStart = /^\s*(`{3,}|~{3,})/.exec(line);
+    const fenceStart = /^\s*(`{3,}|~{3,})/.exec(line2);
     if (fenceStart) {
       fence = { marker: fenceStart[1][0], width: fenceStart[1].length };
       continue;
     }
-    const heading = /^(?:\*\*##\s+(.+?)\*\*|##\s+(.+?)\s*)$/.exec(line.trim());
+    const heading = /^(?:\*\*##\s+(.+?)\*\*|##\s+(.+?)\s*)$/.exec(line2.trim());
     if (heading) {
       flush();
       category = CATEGORY_ALIASES[((_a2 = heading[1]) != null ? _a2 : heading[2]).trim().replace(/^\*\*|\*\*$/g, "").toLocaleLowerCase()];
       legacyGrouped = false;
       continue;
     }
-    const list2 = /^\s{0,3}[-*+]\s+(.+?)\s*$/.exec(line);
-    if (list2 && !/^\s{2,}/.test(line) && (legacyGrouped || !category)) {
+    const list2 = /^\s{0,3}[-*+]\s+(.+?)\s*$/.exec(line2);
+    if (list2 && !/^\s{2,}/.test(line2) && (legacyGrouped || !category)) {
       if (legacyGrouped) {
         flush();
         category = void 0;
@@ -9264,7 +9474,7 @@ function parseOne(markdown) {
     }
     if (!category) continue;
     if (list2) {
-      const isDetail = /^\s{2,}/.test(line);
+      const isDetail = /^\s{2,}/.test(line2);
       if (isDetail && current) {
         const value2 = splitInsightText(list2[1]);
         if (legacyInsightHeader && !current.summary) {
@@ -9319,9 +9529,9 @@ function parseOne(markdown) {
       continue;
     }
     if (current) {
-      const sourceLine = [...line.matchAll(SOURCE_MARKER)].map((match) => match[1].trim());
+      const sourceLine = [...line2.matchAll(SOURCE_MARKER)].map((match) => match[1].trim());
       if (sourceLine.length) current.sources = unique([...current.sources, ...sourceLine]);
-      const detail = line.replace(MARKER, "").replace(SOURCE_MARKER, "").trim();
+      const detail = line2.replace(MARKER, "").replace(SOURCE_MARKER, "").trim();
       if (detail && !detail.startsWith("<!--")) {
         const text10 = detail.replace(/^>\s?/, ""), labeled = /^(脈絡|來賓的理由|脈絡與分歧|Context|Reasoning|原疑問|疑問|Question|可能解方|Possible solution|條件與限制|限制|Conditions and limits)[：:]\s*(.*)$/i.exec(
           text10
@@ -9338,8 +9548,8 @@ function parseOne(markdown) {
           else current.detail = [current.detail, value].filter(Boolean).join("\n");
         }
       }
-    } else if (category && line.trim()) {
-      const value = splitInsightText(line.trim());
+    } else if (category && line2.trim()) {
+      const value = splitInsightText(line2.trim());
       const summary = value.summary.replace(/^>\s?/, "").trim();
       if (summary) {
         const sentence = ((_h = (_g = summary.match(/^.{1,180}?(?:[。！？.!?](?=\s|$)|$)/u)) == null ? void 0 : _g[0]) == null ? void 0 : _h.trim()) || summary.slice(0, 180);
@@ -10260,7 +10470,7 @@ var LABEL_ANCHOR_CONTEXT = pair2(label_anchor_context_zh_default, label_anchor_c
 var FIELDS_ANCHOR_CONTEXT = pair2(fields_anchor_context_zh_default, fields_anchor_context_en_default);
 function anchorContextFields(language2) {
   const words2 = new Map(
-    inLanguage(FIELDS_ANCHOR_CONTEXT, language2).split("\n").map((line) => line.trim()).filter(Boolean).map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)])
+    inLanguage(FIELDS_ANCHOR_CONTEXT, language2).split("\n").map((line2) => line2.trim()).filter(Boolean).map((line2) => [line2.slice(0, line2.indexOf("=")), line2.slice(line2.indexOf("=") + 1)])
   );
   const word = (key4) => {
     var _a2;
@@ -12067,9 +12277,9 @@ function normalizeObserverHeadings(markdown) {
     "$1"
   );
   const forms = outputScriptObserverHeadings();
-  return unwrapped.replace(/^(#{1,2}) (.+?)[ \t]*$/gm, (line, hashes, text10) => {
+  return unwrapped.replace(/^(#{1,2}) (.+?)[ \t]*$/gm, (line2, hashes, text10) => {
     const form = forms.get(text10);
-    return form && hashes.length === (form.category ? 2 : 1) ? `${hashes} ${form.heading}` : line;
+    return form && hashes.length === (form.category ? 2 : 1) ? `${hashes} ${form.heading}` : line2;
   });
 }
 function mergeObserverNotes(session, generated) {
@@ -13441,18 +13651,18 @@ function conversationBoundary(raw) {
     }
   }
   let fence = "", offset = start;
-  for (const line of raw.slice(start).split("\n")) {
-    const match = /^\s*(`{3,}|~{3,})/.exec(line);
+  for (const line2 of raw.slice(start).split("\n")) {
+    const match = /^\s*(`{3,}|~{3,})/.exec(line2);
     if (match) {
       if (!fence) fence = match[1];
-      else if (match[1][0] === fence[0] && match[1].length >= fence.length && !line.slice(match[0].length).trim())
+      else if (match[1][0] === fence[0] && match[1].length >= fence.length && !line2.slice(match[0].length).trim())
         fence = "";
     }
-    if (!fence && /^## (?:對話紀錄|Conversation)\s*$/.test(line)) {
+    if (!fence && /^## (?:對話紀錄|Conversation)\s*$/.test(line2)) {
       const navigation = /<!-- coffee-tables-navigation:([^\n]+) -->[\r\n]*$/.exec(raw.slice(0, offset));
-      return { index: offset, heading: line, ...navigation ? { navigation } : {} };
+      return { index: offset, heading: line2, ...navigation ? { navigation } : {} };
     }
-    offset += line.length + 1;
+    offset += line2.length + 1;
   }
   throw new Error("Coffee Tables Markdown is missing its conversation section");
 }
@@ -13640,7 +13850,7 @@ var CoffeeStorage = class {
         const inputPattern = /^> \*\*你（插話）\*\*：([^\n]*(?:\n> [^\n]*)*)/gm, inputs = [...body.matchAll(inputPattern)];
         inputs.forEach((input2, index) => {
           if (roundInterventions[index])
-            roundInterventions[index].text = input2[1].split("\n").map((line) => line.replace(/^> ?/, "")).join("\n").trim();
+            roundInterventions[index].text = input2[1].split("\n").map((line2) => line2.replace(/^> ?/, "")).join("\n").trim();
         });
         const withoutInputs = body.replace(/^<!-- coffee-tables-round:[a-zA-Z0-9-]+ -->\s*$/gm, "").replace(inputPattern, "").replace(/\n{3,}/g, "\n\n").trim(), { dialogue, notes } = splitObserverNotes(withoutInputs);
         rounds.push({
@@ -13687,7 +13897,7 @@ var CoffeeStorage = class {
     const settings = (_o = settingsMatch == null ? void 0 : settingsMatch[1]) != null ? _o : "";
     const model = (_q = (_p = /^- (?:模型|Model): (.+)$/m.exec(settings)) == null ? void 0 : _p[1]) != null ? _q : side.model;
     const reasoning = (_s = (_r = /^- (?:推理強度|Reasoning): (.+)$/m.exec(settings)) == null ? void 0 : _r[1]) != null ? _s : side.reasoning;
-    const custom = (_x = (_w = (_u = (_t = /^### (?:這桌的額外要求|Additional requests)\s*\n([\s\S]*?)(?=^### |$(?![\s\S]))/m.exec(settings)) == null ? void 0 : _t[1]) == null ? void 0 : _u.split("\n").map((line) => line.replace(/^> ?/, "")).join("\n").trim()) != null ? _w : (_v = side.guests) == null ? void 0 : _v.customPrompt) != null ? _x : "";
+    const custom = (_x = (_w = (_u = (_t = /^### (?:這桌的額外要求|Additional requests)\s*\n([\s\S]*?)(?=^### |$(?![\s\S]))/m.exec(settings)) == null ? void 0 : _t[1]) == null ? void 0 : _u.split("\n").map((line2) => line2.replace(/^> ?/, "")).join("\n").trim()) != null ? _w : (_v = side.guests) == null ? void 0 : _v.customPrompt) != null ? _x : "";
     const styleMatch = /^<!-- coffee-tables-style:([^\n]+) -->$/m.exec(settings);
     let styleSnapshot;
     if (styleMatch)
@@ -13786,7 +13996,7 @@ var CoffeeStorage = class {
         "",
         `### ${t2("\u804A\u5929\u5BA4\u98A8\u683C", "Conversation style")}`,
         "",
-        ...session.guests.stylePrompt.split("\n").map((line) => `> ${line}`),
+        ...session.guests.stylePrompt.split("\n").map((line2) => `> ${line2}`),
         `<!-- coffee-tables-style:${encodeURIComponent(JSON.stringify({ id: session.guests.styleId, name: session.guests.styleName, prompt: session.guests.stylePrompt }))} -->`
       );
     else if ((_j = session.guests) == null ? void 0 : _j.customPrompt.trim())
@@ -13794,7 +14004,7 @@ var CoffeeStorage = class {
         "",
         `### ${t2("\u9019\u684C\u7684\u984D\u5916\u8981\u6C42", "Additional requests")}`,
         "",
-        ...session.guests.customPrompt.split("\n").map((line) => `> ${line}`)
+        ...session.guests.customPrompt.split("\n").map((line2) => `> ${line2}`)
       );
     if ((_l = (_k = session.guests) == null ? void 0 : _k.referenceFiles) == null ? void 0 : _l.length) {
       const files = session.guests.referenceFiles;
@@ -14667,7 +14877,7 @@ function interleaveInterventions(markdown, interventions) {
     var _a2;
     for (const item of interventions)
       if (!inserted.has(item.id) && ((_a2 = item.afterTurn) != null ? _a2 : 0) <= count3) {
-        const quoted = item.text.trim().split("\n").map((line, index) => index === 0 ? `> **\u4F60\uFF08\u63D2\u8A71\uFF09**\uFF1A${line}` : `> ${line}`).join("\n");
+        const quoted = item.text.trim().split("\n").map((line2, index) => index === 0 ? `> **\u4F60\uFF08\u63D2\u8A71\uFF09**\uFF1A${line2}` : `> ${line2}`).join("\n");
         output.push("", quoted, "");
         inserted.add(item.id);
       }
@@ -14686,7 +14896,7 @@ function contentHash(value) {
   return (hash >>> 0).toString(16);
 }
 function demoteRootHeadings(markdown) {
-  return markdown.split("\n").map((line) => /^(#{1,2})\s/.test(line) ? `##${line}` : line).join("\n");
+  return markdown.split("\n").map((line2) => /^(#{1,2})\s/.test(line2) ? `##${line2}` : line2).join("\n");
 }
 function shortHash(value) {
   let hash = 2166136261;
@@ -15028,7 +15238,7 @@ var CoffeeDeleteModal = class extends import_obsidian8.Modal {
     if (this.lines.length) {
       content.createEl("p", { text: this.t("coffee.delete_many_tables_intro") });
       const list2 = content.createEl("ul");
-      for (const line of this.lines) list2.createEl("li", { text: line });
+      for (const line2 of this.lines) list2.createEl("li", { text: line2 });
     } else {
       content.createEl("p", {
         text: this.t("coffee.will_be_backed_up_and_moved_to_the_vault_trash", this.topic)
@@ -17823,9 +18033,9 @@ var STANDARD_HEADING_KEYS = [
 function noteLanguageFromBody(body) {
   if (!body) return void 0;
   const headings = new Set(
-    body.split(/\r?\n/).map((line) => {
+    body.split(/\r?\n/).map((line2) => {
       var _a2;
-      return (_a2 = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line)) == null ? void 0 : _a2[1];
+      return (_a2 = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line2)) == null ? void 0 : _a2[1];
     }).filter((heading) => heading !== void 0)
   );
   const found = NOTE_LANGUAGES.filter(
@@ -19084,7 +19294,7 @@ function numberIn(value, min, max) {
 }
 function textLines(title) {
   const raw = Array.isArray(title) ? title : String(title != null ? title : "").split(/\r?\n/);
-  return raw.slice(0, 20).map((line) => String(line).slice(0, TEXT_LIMIT2));
+  return raw.slice(0, 20).map((line2) => String(line2).slice(0, TEXT_LIMIT2));
 }
 function buildMapSvg(scene) {
   var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
@@ -19148,9 +19358,9 @@ function buildMapSvg(scene) {
     const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / lineStep) + 1);
     const shown = textLines(card.title).slice(0, fits);
     if (card.clipped === true && shown.length) shown[shown.length - 1] += "\u2026";
-    shown.forEach((line, i) => {
+    shown.forEach((line2, i) => {
       out.push(
-        `<text x="${left}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize != null ? titleSize : 13}"${titleWeight === void 0 ? "" : ` font-weight="${titleWeight}"`} fill="${fill2}">${escapeXml(line)}</text>`
+        `<text x="${left}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize != null ? titleSize : 13}"${titleWeight === void 0 ? "" : ` font-weight="${titleWeight}"`} fill="${fill2}">${escapeXml(line2)}</text>`
       );
     });
     const sum2 = card.summary;
@@ -19159,12 +19369,12 @@ function buildMapSvg(scene) {
     if (sum2 && sumX !== null && sumY !== null) {
       const sumSize = (_m = numberIn(sum2.size, 8, 40)) != null ? _m : 12;
       const sumStep = Math.max(14, Math.round(sumSize * 1.5));
-      const sumLines = textLines(sum2.lines).filter((line) => line.length > 0);
+      const sumLines = textLines(sum2.lines).filter((line2) => line2.length > 0);
       const room = Math.max(0, Math.floor((box[1] + box[3] - 8 - sumY) / sumStep));
-      sumLines.slice(0, room).forEach((line, i, drawn) => {
+      sumLines.slice(0, room).forEach((line2, i, drawn) => {
         const cut = i === drawn.length - 1 && drawn.length < sumLines.length ? "\u2026" : "";
         out.push(
-          `<text x="${sumX}" y="${sumY + sumSize + i * sumStep}" font-family="${FONT}" font-size="${sumSize}" fill="${color(sum2.textColor, fill2)}">${escapeXml(line + cut)}</text>`
+          `<text x="${sumX}" y="${sumY + sumSize + i * sumStep}" font-family="${FONT}" font-size="${sumSize}" fill="${color(sum2.textColor, fill2)}">${escapeXml(line2 + cut)}</text>`
         );
       });
     }
@@ -19184,9 +19394,9 @@ function buildMapSvg(scene) {
     const lineHeight = 17;
     const first = summary.side === "up" ? y - (lines.length - 1) * lineHeight - 4 : summary.side === "down" ? y + 13 : y - (lines.length - 1) * lineHeight / 2 + 4;
     const fill2 = color(summary.textColor, textColor);
-    lines.forEach((line, i) => {
+    lines.forEach((line2, i) => {
       out.push(
-        `<text x="${x}" y="${Math.round((first + i * lineHeight) * 100) / 100}" text-anchor="${anchor}" font-family="${FONT}" font-size="13" fill="${fill2}">${escapeXml(line)}</text>`
+        `<text x="${x}" y="${Math.round((first + i * lineHeight) * 100) / 100}" text-anchor="${anchor}" font-family="${FONT}" font-size="13" fill="${fill2}">${escapeXml(line2)}</text>`
       );
     });
     out.push("</g>");
@@ -19215,38 +19425,38 @@ function wrapText(text10, maxWidth) {
   const widthOf = (token) => Array.from(token).reduce((sum2, ch) => sum2 + (wide.test(ch) ? 13 : 7), 0);
   const lines = [];
   for (const paragraph of String(text10 != null ? text10 : "").split(/\r?\n/)) {
-    let line = "";
+    let line2 = "";
     let used = 0;
     const flush = () => {
-      lines.push(line);
-      line = "";
+      lines.push(line2);
+      line2 = "";
       used = 0;
     };
     for (const token of (_a2 = paragraph.match(tokens2)) != null ? _a2 : []) {
       const w = widthOf(token);
-      if (used + w <= maxWidth || !line && w <= maxWidth) {
-        line += token;
+      if (used + w <= maxWidth || !line2 && w <= maxWidth) {
+        line2 += token;
         used += w;
         continue;
       }
       if (w <= maxWidth) {
         if (/^\s+$/.test(token)) {
-          line += token;
+          line2 += token;
           continue;
         }
-        if (line) flush();
-        line = token;
+        if (line2) flush();
+        line2 = token;
         used = w;
         continue;
       }
       for (const ch of Array.from(token)) {
         const cw = wide.test(ch) ? 13 : 7;
-        if (used + cw > maxWidth && line) flush();
-        line += ch;
+        if (used + cw > maxWidth && line2) flush();
+        line2 += ch;
         used += cw;
       }
     }
-    lines.push(line);
+    lines.push(line2);
   }
   return lines;
 }
@@ -20369,9 +20579,9 @@ function structureOf(nodes, folded2) {
   };
   const joinsOf = (node) => {
     var _a3;
-    return folded2 && node.collapsed ? [] : ((_a3 = joins.get(node.id)) != null ? _a3 : []).filter((join3) => {
+    return folded2 && node.collapsed ? [] : ((_a3 = joins.get(node.id)) != null ? _a3 : []).filter((join4) => {
       var _a4;
-      return !(folded2 && ((_a4 = ids2.get(join3.parentId)) == null ? void 0 : _a4.collapsed));
+      return !(folded2 && ((_a4 = ids2.get(join4.parentId)) == null ? void 0 : _a4.collapsed));
     });
   };
   return { kidsOf, joinsOf };
@@ -22153,10 +22363,10 @@ var import_node_crypto5 = require("node:crypto");
 // ai/markdown-blocks.ts
 function fencedLines(lines) {
   let fence = null;
-  return lines.map((line) => {
-    const open = /^\s*(`{3,}|~{3,})/.exec(line);
+  return lines.map((line2) => {
+    const open = /^\s*(`{3,}|~{3,})/.exec(line2);
     if (fence) {
-      const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
+      const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line2);
       if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
       return true;
     }
@@ -22171,10 +22381,10 @@ function normalizeDetailHeadings(markdown) {
   const lines = markdown.split("\n");
   const code = fencedLines(lines);
   const parents = [];
-  return lines.map((line, index) => {
+  return lines.map((line2, index) => {
     var _a2, _b2;
-    const heading = code[index] ? null : /^(#{1,6})([ \t]+.*|[ \t]*)$/.exec(line);
-    if (!heading) return line;
+    const heading = code[index] ? null : /^(#{1,6})([ \t]+.*|[ \t]*)$/.exec(line2);
+    if (!heading) return line2;
     const original = heading[1].length;
     while (parents.length && parents[parents.length - 1].original >= original) parents.pop();
     const level = Math.min(6, ((_b2 = (_a2 = parents[parents.length - 1]) == null ? void 0 : _a2.level) != null ? _b2 : 2) + 1);
@@ -22183,24 +22393,24 @@ function normalizeDetailHeadings(markdown) {
   }).join("\n");
 }
 var MATH_LOOKAHEAD_LINES = 20;
-function maskInlineCode(line) {
+function maskInlineCode(line2) {
   let out = "";
   let i = 0;
-  while (i < line.length) {
-    if (line[i] !== "`") {
-      out += line[i++];
+  while (i < line2.length) {
+    if (line2[i] !== "`") {
+      out += line2[i++];
       continue;
     }
     let run = 0;
-    while (line[i + run] === "`") run++;
+    while (line2[i + run] === "`") run++;
     const ticks = "`".repeat(run);
-    const close = line.indexOf(ticks, i + run);
+    const close = line2.indexOf(ticks, i + run);
     let end = close;
-    while (end !== -1 && (line[end + run] === "`" || line[end - 1] === "`")) {
-      end = line.indexOf(ticks, end + 1);
+    while (end !== -1 && (line2[end + run] === "`" || line2[end - 1] === "`")) {
+      end = line2.indexOf(ticks, end + 1);
     }
     if (end === -1) {
-      out += line.slice(i, i + run);
+      out += line2.slice(i, i + run);
       i += run;
     } else {
       out += "\0".repeat(end + run - i);
@@ -22213,13 +22423,13 @@ function normalizeMathDelimiters(markdown) {
   if (!/\\[[\]()]/.test(markdown)) return markdown;
   const lines = markdown.split("\n");
   const code = fencedLines(lines);
-  const masked = lines.map((line, index) => code[index] ? line : maskInlineCode(line));
+  const masked = lines.map((line2, index) => code[index] ? line2 : maskInlineCode(line2));
   const tokens2 = [];
-  masked.forEach((line, index) => {
+  masked.forEach((line2, index) => {
     if (code[index]) return;
     const pattern = /(\\+)([[\]()])/g;
     let match;
-    while (match = pattern.exec(line)) {
+    while (match = pattern.exec(line2)) {
       if (match[1].length % 2 === 1)
         tokens2.push({ line: index, start: match.index + match[1].length - 1, kind: match[2] });
     }
@@ -22267,8 +22477,8 @@ function normalizeMathDelimiters(markdown) {
   }
   edits.sort((a, b) => a.line === b.line ? b.start - a.start : a.line - b.line);
   for (const edit of edits) {
-    const line = lines[edit.line];
-    lines[edit.line] = line.slice(0, edit.start) + edit.text + line.slice(edit.end);
+    const line2 = lines[edit.line];
+    lines[edit.line] = line2.slice(0, edit.start) + edit.text + line2.slice(edit.end);
   }
   return lines.join("\n");
 }
@@ -22883,9 +23093,9 @@ function countItems(body) {
   const lines = body.split("\n");
   const code = fencedLines(lines);
   const outside = lines.filter((_, index) => !code[index]);
-  const headings = outside.filter((line) => /^####\s+\S/.test(line)).length;
+  const headings = outside.filter((line2) => /^####\s+\S/.test(line2)).length;
   if (headings) return headings;
-  return outside.filter((line) => /^(?:[-*+]|\d+[.)])\s+\S/.test(line)).length;
+  return outside.filter((line2) => /^(?:[-*+]|\d+[.)])\s+\S/.test(line2)).length;
 }
 function sectionBodies(detail, template2) {
   const lookup = sectionLookup(template2);
@@ -22893,15 +23103,15 @@ function sectionBodies(detail, template2) {
   const code = fencedLines(lines);
   const bodies = /* @__PURE__ */ new Map();
   let current;
-  lines.forEach((line, index) => {
-    const heading = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+  lines.forEach((line2, index) => {
+    const heading = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line2);
     const match = heading ? lookup.get(heading[1].toLocaleLowerCase()) : void 0;
     if (match !== void 0) {
       current = match;
       if (!bodies.has(match)) bodies.set(match, []);
       return;
     }
-    if (current !== void 0) bodies.get(current).push(line);
+    if (current !== void 0) bodies.get(current).push(line2);
   });
   return new Map([...bodies].map(([index, body]) => [index, body.join("\n")]));
 }
@@ -22954,14 +23164,14 @@ function structureText(template2, language2, standardText) {
     if (section3.description.trim()) rules.push(description(section3));
     if (section3.count)
       rules.push(customDetailRule(section3.count.mode, language2, { heading, n: String(section3.count.n) }));
-    for (const callout of (_b2 = section3.callouts) != null ? _b2 : [])
+    for (const callout2 of (_b2 = section3.callouts) != null ? _b2 : [])
       rules.push(
         customDetailCallout(language2, {
           heading,
-          type: callout.type,
-          fold: callout.fold,
+          type: callout2.type,
+          fold: callout2.fold,
           // A multi-line callout body is joined into one sentence: line breaks become spaces.
-          body: callout.body.replace(/\s*\n\s*/g, " ").trim()
+          body: callout2.body.replace(/\s*\n\s*/g, " ").trim()
         })
       );
   }
@@ -23268,13 +23478,13 @@ var noteSet = (notes) => notes === void 0 ? [] : typeof notes === "string" ? [no
 function splitChatLines(lines, notes) {
   const texts = noteSet(notes);
   return {
-    results: lines.filter((line) => !texts.includes(line.text)),
-    notes: lines.filter((line) => texts.includes(line.text))
+    results: lines.filter((line2) => !texts.includes(line2.text)),
+    notes: lines.filter((line2) => texts.includes(line2.text))
   };
 }
 function countChatLines(lines, ignore) {
   const counts = { done: 0, skipped: 0, failed: 0 };
-  for (const line of splitChatLines(lines, ignore).results) counts[line.status]++;
+  for (const line2 of splitChatLines(lines, ignore).results) counts[line2.status]++;
   return counts;
 }
 var CHAT_PLAN_GROUP_ORDER = ["create", "change", "delete", "research", "view"];
@@ -23351,20 +23561,20 @@ function splitFrontmatter(text10) {
 function codeRanges(text10) {
   const ranges = [];
   let offset = 0, fence = null;
-  for (const line of text10.split(/(?<=\n)/)) {
-    const open = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+  for (const line2 of text10.split(/(?<=\n)/)) {
+    const open = /^ {0,3}(`{3,}|~{3,})/.exec(line2);
     if (open) {
       const marker3 = open[1];
       if (!fence) fence = { marker: marker3, start: offset };
-      else if (marker3[0] === fence.marker[0] && marker3.length >= fence.marker.length && !/\S/.test(line.slice(open[0].length))) {
-        ranges.push([fence.start, offset + line.length]);
+      else if (marker3[0] === fence.marker[0] && marker3.length >= fence.marker.length && !/\S/.test(line2.slice(open[0].length))) {
+        ranges.push([fence.start, offset + line2.length]);
         fence = null;
       }
     } else if (!fence) {
-      for (const span of line.matchAll(/(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g))
+      for (const span of line2.matchAll(/(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g))
         ranges.push([offset + span.index, offset + span.index + span[0].length]);
     }
-    offset += line.length;
+    offset += line2.length;
   }
   if (fence) ranges.push([fence.start, text10.length]);
   return ranges;
@@ -23528,8 +23738,8 @@ function frontmatterBlock(content) {
 function topLevelValues(block, keys) {
   const found = /* @__PURE__ */ new Map();
   if (block === null) return found;
-  for (const line of block.split(/\r?\n/)) {
-    const match = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
+  for (const line2 of block.split(/\r?\n/)) {
+    const match = line2.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
     if (!match || !keys.includes(match[1]) || found.has(match[1])) continue;
     found.set(match[1], match[2].replace(/^(["'])(.*)\1$/, "$2"));
   }
@@ -23540,8 +23750,8 @@ function hypothesisLines(block) {
   var _a2, _b2;
   if (block === null) return [];
   const found = [];
-  for (const line of block.split(/\r?\n/)) {
-    const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
+  for (const line2 of block.split(/\r?\n/)) {
+    const match = line2.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
     const key4 = match ? (_b2 = (_a2 = match[1]) != null ? _a2 : match[2]) != null ? _b2 : match[3] : void 0;
     if (match && key4 !== void 0 && HYPOTHESIS_KEYS.includes(key4))
       found.push(`${key4}=${match[4].replace(/^(["'])(.*)\1$/, "$2")}`);
@@ -23551,8 +23761,8 @@ function hypothesisLines(block) {
 function hasDuplicateIdentityKey(block) {
   if (block === null) return false;
   const seen = /* @__PURE__ */ new Set();
-  for (const line of block.split(/\r?\n/)) {
-    const match = line.match(/^([A-Za-z0-9_-]+)\s*:/);
+  for (const line2 of block.split(/\r?\n/)) {
+    const match = line2.match(/^([A-Za-z0-9_-]+)\s*:/);
     if (!match || !TOPIC_IDENTITY_KEYS.includes(match[1])) continue;
     if (seen.has(match[1])) return true;
     seen.add(match[1]);
@@ -23966,7 +24176,7 @@ function continuationFields(input2) {
       round: input2.round,
       maxRounds: input2.maxRounds,
       remaining: clip(input2.remaining, 500),
-      lastResults: lines.map((line) => ({ status: line.status, text: clip(line.text, CONTINUATION_TEXT_LIMIT) })),
+      lastResults: lines.map((line2) => ({ status: line2.status, text: clip(line2.text, CONTINUATION_TEXT_LIMIT) })),
       ...omitted > 0 ? { lastResultsOmitted: omitted } : {},
       research: input2.research.map((item) => ({
         ...item.id ? { id: item.id } : {},
@@ -24101,8 +24311,8 @@ function truncateSummary(value, limit = 80) {
     if (/\s/.test(window2[index])) gap = index;
   return `${(gap >= 0 ? window2.slice(0, gap) : window2).join("").trimEnd()}\u2026`;
 }
-function sourceFootnoteDefinition(line) {
-  const match = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/.exec(line);
+function sourceFootnoteDefinition(line2) {
+  const match = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/.exec(line2);
   if (!match) return null;
   const target = match[2].trim();
   const external = NOTE_LANGUAGES.some(
@@ -24148,10 +24358,10 @@ function normalizeOutputScriptHeadings(detail, output, template2, context = {}) 
   }
   const lines = detail.split("\n");
   const code = fencedLines(lines);
-  return lines.map((line, index) => {
-    const heading = code[index] ? null : /^###([ \t]+)(.+?)([ \t]*)$/.exec(line);
+  return lines.map((line2, index) => {
+    const heading = code[index] ? null : /^###([ \t]+)(.+?)([ \t]*)$/.exec(line2);
     const canonical2 = heading ? forms.get(heading[2]) : void 0;
-    return heading && canonical2 ? `###${heading[1]}${canonical2}${heading[3]}` : line;
+    return heading && canonical2 ? `###${heading[1]}${canonical2}${heading[3]}` : line2;
   }).join("\n");
 }
 function canonicalDetail(value, language2 = "zh-TW", template2 = standardTemplate(language2)) {
@@ -24166,19 +24376,19 @@ function canonicalDetail(value, language2 = "zh-TW", template2 = standardTemplat
   let current = null;
   const detailLines = detail.split("\n");
   const code = fencedLines(detailLines);
-  for (const [index, line] of detailLines.entries()) {
-    if (!code[index] && sourceFootnoteDefinition(line)) {
-      footnotes.push(line);
+  for (const [index, line2] of detailLines.entries()) {
+    if (!code[index] && sourceFootnoteDefinition(line2)) {
+      footnotes.push(line2);
       continue;
     }
-    const heading = /^###\s+(.+?)\s*$/.exec(line);
+    const heading = /^###\s+(.+?)\s*$/.exec(line2);
     const match = heading ? aliases.get(heading[1].toLocaleLowerCase()) : void 0;
     if (match !== void 0) {
       current = match;
       if (!sections.has(match)) sections.set(match, []);
       continue;
     }
-    (current === null ? leading : sections.get(current)).push(line);
+    (current === null ? leading : sections.get(current)).push(line2);
   }
   if (template2.id === TEXTBOOK_TEMPLATE_ID || template2.layout === "intro" || template2.omitEmpty)
     return textbookDetail(template2, leading, sections, footnotes, sourcesIndex);
@@ -24313,15 +24523,15 @@ function targetKey(target) {
   const link = /^\[\[([^\]|]+)/.exec(target);
   return link ? link[1].trim().replace(/\.md$/i, "") : target;
 }
-function outsideInlineCode(line, edit) {
-  return line.split(/(`+[^`]*`+)/).map((part, index) => index % 2 ? part : edit(part)).join("");
+function outsideInlineCode(line2, edit) {
+  return line2.split(/(`+[^`]*`+)/).map((part, index) => index % 2 ? part : edit(part)).join("");
 }
 function sourceDefinitions(detail) {
   const lines = detail.split("\n");
   const code = fencedLines(lines);
   const definitions2 = /* @__PURE__ */ new Map();
-  lines.forEach((line, index) => {
-    const definition = code[index] ? null : sourceFootnoteDefinition(line);
+  lines.forEach((line2, index) => {
+    const definition = code[index] ? null : sourceFootnoteDefinition(line2);
     if (definition) definitions2.set(definition.label, definition.target);
   });
   return definitions2;
@@ -24330,8 +24540,8 @@ function footnoteDefinitionLabels(content) {
   const lines = content.split("\n");
   const code = fencedLines(lines);
   const labels = /* @__PURE__ */ new Set();
-  lines.forEach((line, index) => {
-    const match = code[index] ? null : /^\[\^([^\]\s]+)\]:/.exec(line);
+  lines.forEach((line2, index) => {
+    const match = code[index] ? null : /^\[\^([^\]\s]+)\]:/.exec(line2);
     if (match) labels.add(match[1]);
   });
   return labels;
@@ -24340,8 +24550,8 @@ function usesFootnote(content, label) {
   const lines = content.split("\n");
   const code = fencedLines(lines);
   return lines.some(
-    (line, index) => !code[index] && outsideInlineCode(
-      line,
+    (line2, index) => !code[index] && outsideInlineCode(
+      line2,
       (text10) => [...text10.matchAll(FOOTNOTE_REFERENCE)].some((match) => match[1] === label) ? "\0" : ""
     ).includes("\0")
   );
@@ -24350,13 +24560,13 @@ function definesFootnote(content, label) {
   const lines = content.split("\n");
   const code = fencedLines(lines);
   const prefix = `[^${label}]:`;
-  return lines.some((line, index) => !code[index] && line.startsWith(prefix));
+  return lines.some((line2, index) => !code[index] && line2.startsWith(prefix));
 }
 function resolveDetailReferences(detail, groups, previousDetail = "", template2) {
   const documents = dedupeReferenceGroups(groups).flatMap((group) => group.documents);
   const cited = /* @__PURE__ */ new Map();
-  const source = (line) => {
-    const identified = line.replace(/\[S(\d+)\]/g, (original, number2) => {
+  const source = (line2) => {
+    const identified = line2.replace(/\[S(\d+)\]/g, (original, number2) => {
       const document2 = documents[Number(number2) - 1];
       if (!document2) return tNote("note.source_unconfirmed_0", original);
       const label = sourceFootnoteLabel(document2.path);
@@ -24372,17 +24582,17 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template2)
   const defined = /* @__PURE__ */ new Map();
   const reserved = /* @__PURE__ */ new Set();
   const dropped = /* @__PURE__ */ new Set();
-  lines.forEach((line, index) => {
+  lines.forEach((line2, index) => {
     if (!code[index]) {
-      const definition = sourceFootnoteDefinition(line);
+      const definition = sourceFootnoteDefinition(line2);
       if (definition) {
         defined.set(definition.label, definition.target);
         return;
       }
-      const other = /^\[\^([^\]\s]+)\]:/.exec(line);
+      const other = /^\[\^([^\]\s]+)\]:/.exec(line2);
       if (other) reserved.add(other[1]);
     }
-    body.push(code[index] ? line : outsideInlineCode(line, source));
+    body.push(code[index] ? line2 : outsideInlineCode(line2, source));
     bodyCode.push(code[index]);
   });
   const previous = sourceDefinitions(previousDetail);
@@ -24400,9 +24610,9 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template2)
     if (owners.length > 1 || documents.some((candidate) => usesFootnote(candidate.content, label))) dropped.add(label);
     return void 0;
   };
-  body.forEach((line, index) => {
+  body.forEach((line2, index) => {
     if (bodyCode[index]) return;
-    outsideInlineCode(line, (text11) => {
+    outsideInlineCode(line2, (text11) => {
       for (const [, label] of text11.matchAll(FOOTNOTE_REFERENCE))
         if (!label.startsWith("src-") && !targetOf(label) && !dropped.has(label)) reserved.add(label);
       return text11;
@@ -24423,8 +24633,8 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template2)
     return numbers.get(key4);
   };
   const renumbered = body.map(
-    (line, index) => bodyCode[index] ? line : outsideInlineCode(
-      line,
+    (line2, index) => bodyCode[index] ? line2 : outsideInlineCode(
+      line2,
       (text11) => text11.replace(FOOTNOTE_REFERENCE, (original, label) => {
         if (reserved.has(label)) return original;
         const target = targetOf(label);
@@ -24435,22 +24645,22 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template2)
     )
   );
   const compact = renumbered.filter(
-    (line, index) => bodyCode[index] || line.trim() || index === 0 || renumbered[index - 1].trim() || bodyCode[index - 1]
+    (line2, index) => bodyCode[index] || line2.trim() || index === 0 || renumbered[index - 1].trim() || bodyCode[index - 1]
   );
   const text10 = compact.join("\n").trimEnd();
   if (!ordered.length) return text10;
   const headings = sourcesHeadingKeys(template2 != null ? template2 : standardTemplate("en"));
   const textLines2 = text10.split("\n");
   const textCode = fencedLines(textLines2);
-  const start = textLines2.findIndex((line, index) => {
-    const match = textCode[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+  const start = textLines2.findIndex((line2, index) => {
+    const match = textCode[index] ? null : /^###\s+(.+?)\s*$/.exec(line2);
     return !!match && headings.has(match[1].toLocaleLowerCase());
   });
   if (start < 0) return `${text10}
 
 ${ordered.join("\n")}
 `;
-  let end = textLines2.findIndex((line, index) => index > start && !textCode[index] && /^###\s+/.test(line));
+  let end = textLines2.findIndex((line2, index) => index > start && !textCode[index] && /^###\s+/.test(line2));
   if (end < 0) end = textLines2.length;
   while (end > start + 1 && !textLines2[end - 1].trim()) end--;
   return [
@@ -25079,8 +25289,8 @@ function setFrontmatterKeys(content, values) {
   const kept = [];
   const written2 = /* @__PURE__ */ new Set();
   let skipping = false;
-  for (const line of match[1].split(/\r?\n/)) {
-    const key4 = (_a2 = /^([A-Za-z][\w-]*):/.exec(line)) == null ? void 0 : _a2[1];
+  for (const line2 of match[1].split(/\r?\n/)) {
+    const key4 = (_a2 = /^([A-Za-z][\w-]*):/.exec(line2)) == null ? void 0 : _a2[1];
     if (key4) {
       skipping = Object.keys(values).includes(key4);
       if (skipping && !written2.has(key4)) {
@@ -25088,8 +25298,8 @@ function setFrontmatterKeys(content, values) {
         const value = values[key4];
         if (value !== null) kept.push(...render(key4, value));
       }
-    } else if (skipping && !/^\s+|^-(\s|$)/.test(line) && line !== "") skipping = false;
-    if (!skipping) kept.push(line);
+    } else if (skipping && !/^\s+|^-(\s|$)/.test(line2) && line2 !== "") skipping = false;
+    if (!skipping) kept.push(line2);
   }
   for (const [key4, value] of Object.entries(values))
     if (!written2.has(key4) && value !== null) kept.push(...render(key4, value));
@@ -25113,9 +25323,9 @@ function markerlessHeadingSet(content) {
   const lines = content.split("\n");
   const code = fencedLines(lines);
   const headings = /* @__PURE__ */ new Set();
-  lines.forEach((line, index) => {
+  lines.forEach((line2, index) => {
     var _a2;
-    const text10 = code[index] ? void 0 : (_a2 = /^## (.+?)[ \t]*\r?$/.exec(line)) == null ? void 0 : _a2[1];
+    const text10 = code[index] ? void 0 : (_a2 = /^## (.+?)[ \t]*\r?$/.exec(line2)) == null ? void 0 : _a2[1];
     if (text10 !== void 0) headings.add(text10);
   });
   if (headings.has("Current Summary") || headings.has("Detail")) return void 0;
@@ -25135,10 +25345,10 @@ function noteHeadingSet(content) {
 }
 function fencedOutsideDetail(lines) {
   let inDetail = false;
-  const masked = lines.map((line) => {
-    if (line.trim() === DETAIL_START) inDetail = true;
-    const value = inDetail ? "" : line;
-    if (line.trim() === DETAIL_END) inDetail = false;
+  const masked = lines.map((line2) => {
+    if (line2.trim() === DETAIL_START) inDetail = true;
+    const value = inDetail ? "" : line2;
+    if (line2.trim() === DETAIL_END) inDetail = false;
     return value;
   });
   return fencedLines(masked);
@@ -25156,20 +25366,20 @@ function renameManagedHeadings(content, rename) {
   let inDetail = false;
   let origin = "none";
   for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    if (line.trim() === DETAIL_START) inDetail = true;
-    if (line.trim() === DETAIL_END) inDetail = false;
+    const line2 = lines[index];
+    if (line2.trim() === DETAIL_START) inDetail = true;
+    if (line2.trim() === DETAIL_END) inDetail = false;
     if (inDetail || code[index]) continue;
-    if (origin === "heading" && line.startsWith(">")) origin = "quote";
-    else if (origin === "heading" && line.trim()) origin = "none";
-    else if (origin === "quote" && !line.startsWith(">")) origin = "none";
+    if (origin === "heading" && line2.startsWith(">")) origin = "quote";
+    else if (origin === "heading" && line2.trim()) origin = "none";
+    else if (origin === "quote" && !line2.startsWith(">")) origin = "none";
     if (origin === "quote") continue;
-    const heading = /^## (.+?)([ \t]*\r?)$/.exec(line);
-    const callout = heading ? null : CALLOUT_TITLE.exec(line);
-    const current = (_a2 = heading == null ? void 0 : heading[1]) != null ? _a2 : callout == null ? void 0 : callout[2];
+    const heading = /^## (.+?)([ \t]*\r?)$/.exec(line2);
+    const callout2 = heading ? null : CALLOUT_TITLE.exec(line2);
+    const current = (_a2 = heading == null ? void 0 : heading[1]) != null ? _a2 : callout2 == null ? void 0 : callout2[2];
     const next = current === void 0 ? void 0 : rename(current, heading ? "heading" : "callout");
     if (next !== void 0 && next !== current)
-      lines[index] = heading ? `## ${next}${heading[2]}` : `${callout[1]}${next}${callout[3]}`;
+      lines[index] = heading ? `## ${next}${heading[2]}` : `${callout2[1]}${next}${callout2[3]}`;
     if (heading && (current === "Thinking Origin" || next === "Thinking Origin")) origin = "heading";
   }
   return lines.join("\n");
@@ -25199,22 +25409,22 @@ function decodeCalloutSections(content) {
   let inDetail = false;
   let origin = "none";
   for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    if (line.trim() === DETAIL_START) inDetail = true;
-    if (line.trim() === DETAIL_END) inDetail = false;
-    if (/^## Thinking Origin\s*$/.test(line)) origin = "heading";
-    else if (origin === "heading" && line.startsWith(">")) origin = "quote";
-    else if (origin === "heading" && line.trim()) origin = "none";
-    else if (origin === "quote" && !line.startsWith(">")) origin = "none";
-    const callout = inDetail || code[index] || origin !== "none" ? null : CALLOUT_SECTION.exec(line);
-    if (!callout) {
-      out.push(line);
+    const line2 = lines[index];
+    if (line2.trim() === DETAIL_START) inDetail = true;
+    if (line2.trim() === DETAIL_END) inDetail = false;
+    if (/^## Thinking Origin\s*$/.test(line2)) origin = "heading";
+    else if (origin === "heading" && line2.startsWith(">")) origin = "quote";
+    else if (origin === "heading" && line2.trim()) origin = "none";
+    else if (origin === "quote" && !line2.startsWith(">")) origin = "none";
+    const callout2 = inDetail || code[index] || origin !== "none" ? null : CALLOUT_SECTION.exec(line2);
+    if (!callout2) {
+      out.push(line2);
       continue;
     }
     let end = index + 1;
     while (end < lines.length && lines[end].startsWith(">") && !CALLOUT_SECTION.test(lines[end])) end++;
     out.push(
-      `## ${callout[1]}`,
+      `## ${callout2[1]}`,
       "",
       ...lines.slice(index + 1, end).map((item) => item.replace(/^> ?/, "").replace(/\r$/, "")),
       ""
@@ -25225,7 +25435,7 @@ function decodeCalloutSections(content) {
 }
 function calloutSection(title, value) {
   const lines = value.trim().split("\n");
-  return [`> [!info]- ${title}`, ...lines.map((line) => line ? `> ${line}` : ">")].join("\n");
+  return [`> [!info]- ${title}`, ...lines.map((line2) => line2 ? `> ${line2}` : ">")].join("\n");
 }
 var previewSection = (content) => [...new Set([section2(content, "Preview"), section2(content, "\u9810\u89BD")].filter(Boolean))].join("\n\n");
 function sectionBounds(content, heading) {
@@ -25287,12 +25497,12 @@ ${managed}
 ${content.slice(at).trimStart()}`;
 }
 function originMarkdown(value) {
-  return value.split(/\r?\n/).map((line) => `> ${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}`).join("\n");
+  return value.split(/\r?\n/).map((line2) => `> ${line2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}`).join("\n");
 }
 function readThinkingOrigin(content) {
   const value = section2(content, "Thinking Origin");
   if (!value) return void 0;
-  return value.split("\n").map((line) => line.replace(/^> ?/, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")).join("\n");
+  return value.split("\n").map((line2) => line2.replace(/^> ?/, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")).join("\n");
 }
 function replaceSummarySection(content, value) {
   if (sectionBounds(content, "Current Summary")) return replaceSection(content, "Current Summary", value);
@@ -25357,8 +25567,8 @@ function detailWithVisualReferences(detail, visualReferences, template2) {
       const keys = sourcesHeadingKeys(template2);
       const lines = current.split("\n");
       const code = fencedLines(lines);
-      const at = lines.findIndex((line, index) => {
-        const heading = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+      const at = lines.findIndex((line2, index) => {
+        const heading = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line2);
         return !!heading && keys.has(heading[1].toLocaleLowerCase());
       });
       current = at < 0 ? [current.trimEnd(), block].filter(Boolean).join("\n\n") : [lines.slice(0, at).join("\n").trimEnd(), block, lines.slice(at).join("\n").trimStart()].filter(Boolean).join("\n\n");
@@ -27685,8 +27895,8 @@ function withCover(content, link) {
 }
 function declaredCover(content) {
   const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
-  const line = block ? /^topic-cover:[ \t]*(.*?)[ \t]*$/m.exec(block[1]) : null;
-  return line ? line[1].replace(/^["']|["']$/g, "") : null;
+  const line2 = block ? /^topic-cover:[ \t]*(.*?)[ \t]*$/m.exec(block[1]) : null;
+  return line2 ? line2[1].replace(/^["']|["']$/g, "") : null;
 }
 function withCoverOff(content) {
   const declared = declaredCover(content);
@@ -28557,31 +28767,31 @@ var CLASS_ANNOTATION = /<<[A-Za-z][A-Za-z0-9_]*>>/g;
 var CLASS_DECLARATION = /^class\s+[A-Za-z_][A-Za-z0-9_-]*(?:~[A-Za-z0-9_, ]*~)?(?=\s*(?:\{|\["[^"\]]*"\])?\s*$)/;
 var FENCE = /^(`{3,}|~{3,})(.*)$/;
 var PREFIX = /^(?:[ \t]+|>|(?:[-*+]|\d+[.)])(?=[ \t])|\[[ xX]\](?=[ \t]))/;
-function core(line) {
-  let rest = line;
+function core(line2) {
+  let rest = line2;
   for (let match = PREFIX.exec(rest); match; match = PREFIX.exec(rest)) rest = rest.slice(match[0].length);
   return rest;
 }
-function fenceOf(line) {
-  const fence = FENCE.exec(core(line));
+function fenceOf(line2) {
+  const fence = FENCE.exec(core(line2));
   return fence && !(fence[1][0] === "`" && fence[2].includes("`")) ? fence : null;
 }
 function unsafeMermaid(body) {
-  const lines = body.map((line) => line.trim()).filter(Boolean);
+  const lines = body.map((line2) => line2.trim()).filter(Boolean);
   if (!lines.length) return false;
   if (lines[0] === "---") return true;
-  const header2 = lines.find((line) => !line.startsWith("%%"));
+  const header2 = lines.find((line2) => !line2.startsWith("%%"));
   if (!header2 || !allowedHeader(header2)) return true;
   const classDiagram = /^classDiagram(?:-v2)?(?![\w-])/.test(header2);
-  return lines.some((line) => {
-    const text10 = classDiagram ? line.replace(CLASS_ANNOTATION, " ").replace(CLASS_DECLARATION, "C") : line;
+  return lines.some((line2) => {
+    const text10 = classDiagram ? line2.replace(CLASS_ANNOTATION, " ").replace(CLASS_DECLARATION, "C") : line2;
     return UNSAFE_LINE.some((pattern) => pattern.test(text10));
   });
 }
 function neutralizeUnsafeMermaid(markdown) {
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
-  lines.forEach((line, index) => {
-    const fence = fenceOf(line);
+  lines.forEach((line2, index) => {
+    const fence = fenceOf(line2);
     if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
     const body = [];
     for (let next = index + 1; next < lines.length; next++) {
@@ -28590,7 +28800,7 @@ function neutralizeUnsafeMermaid(markdown) {
       if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
       body.push(content);
     }
-    if (unsafeMermaid(body)) lines[index] = line.replace(/mermaid/i, "text");
+    if (unsafeMermaid(body)) lines[index] = line2.replace(/mermaid/i, "text");
   });
   return lines.join("\n");
 }
@@ -28625,7 +28835,7 @@ function mermaidSyntaxCheck(load) {
 async function demoteUnparsableMermaid(markdown, check) {
   if (!check || !/mermaid/i.test(markdown)) return markdown;
   const parts = markdown.split(/(\r\n?|\n)/);
-  const at = (line) => line * 2;
+  const at = (line2) => line2 * 2;
   const count3 = Math.ceil(parts.length / 2);
   const demote = [];
   let outer = null;
@@ -28659,7 +28869,7 @@ async function demoteUnparsableMermaid(markdown, check) {
     }
     const opened = index;
     index = next;
-    if (!body.some((line) => line.trim())) continue;
+    if (!body.some((line2) => line2.trim())) continue;
     const verdict = await check(body.join("\n"));
     if (verdict === "unavailable") {
       console.warn("Visual Agent Map: the Mermaid parser is unavailable; diagrams were not syntax-checked.");
@@ -28707,9 +28917,9 @@ function mermaidBlocks(markdown) {
     index = next;
   }
   const blocks = [];
-  lines.forEach((line, index) => {
+  lines.forEach((line2, index) => {
     var _a2;
-    const fence = fenceOf(line);
+    const fence = fenceOf(line2);
     if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
     const body = [];
     for (let next = index + 1; next < lines.length; next++) {
@@ -28815,9 +29025,9 @@ function dragManagerPaths(app) {
   }
   return paths.length ? paths : null;
 }
-function pathFromLine(line) {
+function pathFromLine(line2) {
   var _a2;
-  const text10 = line.trim();
+  const text10 = line2.trim();
   if (!text10 || text10.startsWith("#")) return null;
   if (/^obsidian:\/\//i.test(text10)) {
     const file = (_a2 = text10.match(/[?&]file=([^&#]*)/i)) == null ? void 0 : _a2[1];
@@ -28831,9 +29041,9 @@ function pathFromLine(line) {
   const link = text10.match(/^\[\[([^\]|#]+)/);
   return link ? link[1] : text10;
 }
-function lineName(line) {
+function lineName(line2) {
   var _a2;
-  let last = (_a2 = line.split(/[\\/]/).filter(Boolean).at(-1)) != null ? _a2 : line;
+  let last = (_a2 = line2.split(/[\\/]/).filter(Boolean).at(-1)) != null ? _a2 : line2;
   try {
     last = decodeURIComponent(last);
   } catch (e) {
@@ -28868,11 +29078,11 @@ function readDrag(app, data) {
       }
     }
   const seen = /* @__PURE__ */ new Set();
-  for (const line of lines) {
-    const raw = managed ? line : pathFromLine(line);
+  for (const line2 of lines) {
+    const raw = managed ? line2 : pathFromLine(line2);
     if (raw === null) continue;
     const path = resolveInVault(app, raw);
-    if (path === null) read.outside.push(lineName(raw || line));
+    if (path === null) read.outside.push(lineName(raw || line2));
     else if (!seen.has(path)) {
       seen.add(path);
       read.inside.push({ path, name: baseName3(path) });
@@ -28939,7 +29149,7 @@ function drawMapSourcesPanel(parent, host, focus) {
     dropResult.empty();
     if (hover !== null) return;
     if (session.added) dropResult.createDiv({ cls: "vam-map-sources-drop-ok", text: session.added });
-    for (const line of session.rejected) dropResult.createDiv({ cls: "vam-map-sources-drop-line", text: line });
+    for (const line2 of session.rejected) dropResult.createDiv({ cls: "vam-map-sources-drop-line", text: line2 });
   };
   const repaint = () => {
     paint();
@@ -29760,7 +29970,7 @@ var UsageControl = class {
     const totalsSection = root.createDiv({ cls: "vam-usage-section" });
     totalsSection.createDiv({ cls: "vam-usage-heading", text: t("ui.usage_totals") });
     const grid = totalsSection.createDiv({ cls: "vam-usage-totals" });
-    const cell = (label) => {
+    const cell2 = (label) => {
       const box = grid.createDiv();
       box.createEl("small", { text: label });
       const strong = box.createEl("strong");
@@ -29768,9 +29978,9 @@ var UsageControl = class {
       return { strong, input: detail.createSpan(), output: detail.createSpan() };
     };
     const cells = {
-      map: cell(t("ui.usage_this_map")),
-      today: cell(t("ui.usage_today")),
-      month: cell(t("ui.usage_this_month"))
+      map: cell2(t("ui.usage_this_map")),
+      today: cell2(t("ui.usage_today")),
+      month: cell2(t("ui.usage_this_month"))
     };
     const empty = root.createEl("p", { cls: "vam-usage-empty", text: t("ui.usage_empty") });
     empty.hidden = true;
@@ -29823,10 +30033,10 @@ var UsageControl = class {
     }
     parts.error.hidden = true;
     for (const section3 of parts.sections) section3.hidden = false;
-    const total2 = (cell, tokens2) => {
-      cell.strong.setText(mark(sum(tokens2), tokens2.estimated));
-      cell.input.setText(t("ui.usage_in_0", formatTokens(tokens2.inputTokens)));
-      cell.output.setText(t("ui.usage_out_0", formatTokens(tokens2.outputTokens)));
+    const total2 = (cell2, tokens2) => {
+      cell2.strong.setText(mark(sum(tokens2), tokens2.estimated));
+      cell2.input.setText(t("ui.usage_in_0", formatTokens(tokens2.inputTokens)));
+      cell2.output.setText(t("ui.usage_out_0", formatTokens(tokens2.outputTokens)));
     };
     total2(parts.cells.map, map.value);
     total2(parts.cells.today, today.value);
@@ -30078,8 +30288,8 @@ var KeyboardShortcutsModal = class extends import_obsidian19.Modal {
   }
   onOpen() {
     this.titleEl.setText(t("ui.keyboard_shortcuts"));
-    const table = this.contentEl.createEl("table", { cls: "vam-shortcuts" });
-    const body = table.createEl("tbody");
+    const table2 = this.contentEl.createEl("table", { cls: "vam-shortcuts" });
+    const body = table2.createEl("tbody");
     for (const entry of MAP_KEYBOARD_SHORTCUTS) {
       const row = body.createEl("tr");
       const keys = row.createEl("td", { cls: "vam-shortcuts-keys" });
@@ -30134,36 +30344,36 @@ function ringImageSize(image) {
   return { x: image.x + (image.w - w) / 2, y: image.y + (image.h - h) / 2, w, h };
 }
 var expand = (r, m) => ({ x: r.x - m, y: r.y - m, w: r.w + 2 * m, h: r.h + 2 * m });
-function ringSlotsAt(clearance, cell) {
+function ringSlotsAt(clearance, cell2) {
   const { x: L, y: T } = clearance;
   const Rr = L + clearance.w;
   const B = T + clearance.h;
   const out = [];
-  const perRow = Math.floor(clearance.w / (cell.w + RING_GAP)) + 1;
-  const rowSpan = (perRow - 1) * (cell.w + RING_GAP);
+  const perRow = Math.floor(clearance.w / (cell2.w + RING_GAP)) + 1;
+  const rowSpan = (perRow - 1) * (cell2.w + RING_GAP);
   for (const { side, ay } of [
     { side: "top", ay: T },
     { side: "bottom", ay: B }
   ])
-    for (let i = 0; i < perRow; i++) out.push({ side, ax: (L + Rr) / 2 - rowSpan / 2 + i * (cell.w + RING_GAP), ay });
-  const perColumn = Math.max(0, Math.floor((clearance.h - 2 * RING_GAP + RING_GAP) / (cell.h + RING_GAP)));
-  const columnSpan = (perColumn - 1) * (cell.h + RING_GAP);
+    for (let i = 0; i < perRow; i++) out.push({ side, ax: (L + Rr) / 2 - rowSpan / 2 + i * (cell2.w + RING_GAP), ay });
+  const perColumn = Math.max(0, Math.floor((clearance.h - 2 * RING_GAP + RING_GAP) / (cell2.h + RING_GAP)));
+  const columnSpan = (perColumn - 1) * (cell2.h + RING_GAP);
   for (const { side, ax } of [
     { side: "left", ax: L },
     { side: "right", ax: Rr }
   ])
     for (let i = 0; i < perColumn; i++)
-      out.push({ side, ax, ay: (T + B) / 2 - columnSpan / 2 + i * (cell.h + RING_GAP) });
+      out.push({ side, ax, ay: (T + B) / 2 - columnSpan / 2 + i * (cell2.h + RING_GAP) });
   return out;
 }
-function ringSlots(image, count3, cell, margin = RING_MARGIN, fixedLines = []) {
+function ringSlots(image, count3, cell2, margin = RING_MARGIN, fixedLines = []) {
   for (let m = margin; ; m += RING_GROW) {
     const clearance = expand(image, m);
-    let slots = ringSlotsAt(clearance, cell);
+    let slots = ringSlotsAt(clearance, cell2);
     if (fixedLines.length)
       slots = slots.filter((slot) => {
-        const rect2 = ringCardRect(slot, cell.w, cell.h);
-        return !fixedLines.some((line) => segmentHitsRect(line, rect2));
+        const rect2 = ringCardRect(slot, cell2.w, cell2.h);
+        return !fixedLines.some((line2) => segmentHitsRect(line2, rect2));
       });
     if (slots.length >= count3) return { slots, clearance };
   }
@@ -30426,14 +30636,14 @@ function uncross(points, slots, fixedLines, picked) {
 }
 var CROSSING_GROW_STEPS = 20;
 function solveRing(image, members, fixedLines = []) {
-  const cell = {
+  const cell2 = {
     w: members.reduce((m, c) => Math.max(m, cardW(c)), 0) || CARD_WIDTH,
     h: members.reduce((m, c) => Math.max(m, cardH(c)), 0) || DEFAULT_CARD_HEIGHT
   };
   const points = members.map(
     (c) => [image.x + clamp012(c.anchorX) * image.w, image.y + clamp012(c.anchorY) * image.h]
   );
-  let { slots, clearance } = ringSlots(image, members.length, cell, RING_MARGIN, fixedLines);
+  let { slots, clearance } = ringSlots(image, members.length, cell2, RING_MARGIN, fixedLines);
   let best = null;
   for (let step = 0; ; step++) {
     const cost = points.map((p) => slots.map((s) => Math.hypot(p[0] - s.ax, p[1] - s.ay)));
@@ -30447,7 +30657,7 @@ function solveRing(image, members, fixedLines = []) {
     const score = found.fixed * FIXED_CROSSING_WEIGHT + found.ring;
     if (!best || score < best.score) best = { slots, clearance, picked: picked2, score };
     if (best.score === 0 || step >= CROSSING_GROW_STEPS) break;
-    ({ slots, clearance } = ringSlots(image, members.length, cell, image.x - clearance.x + RING_GROW, fixedLines));
+    ({ slots, clearance } = ringSlots(image, members.length, cell2, image.x - clearance.x + RING_GROW, fixedLines));
   }
   ({ slots, clearance } = best);
   const picked = best.picked;
@@ -31134,12 +31344,12 @@ function stripSequenceQuotes(body) {
   const lines = body.split("\n");
   const first = lines.find((l) => l.trim() !== "");
   if (first === void 0 || !/^\s*sequenceDiagram\b/.test(first)) return body;
-  return lines.map((line) => {
+  return lines.map((line2) => {
     for (const re of [SEQ_ALIAS, SEQ_NOTE, SEQ_MESSAGE]) {
-      const m = re.exec(line);
+      const m = re.exec(line2);
       if (m) return m[1] + m[2] + m[3];
     }
-    return line;
+    return line2;
   }).join("\n");
 }
 function normBody(body) {
@@ -31182,7 +31392,7 @@ async function applyCharts(detail, charts, options) {
     const segment = ["", "```mermaid", ...item.body.split("\n"), "```"];
     const next = lines[end + 1];
     if (next !== void 0 && next.trim() !== "") segment.push("");
-    out.splice(end + 1, 0, ...segment.map((line) => line + cr));
+    out.splice(end + 1, 0, ...segment.map((line2) => line2 + cr));
   }
   const final = out.join("\n");
   if (neutralizeUnsafeMermaid(detail) === detail && neutralizeUnsafeMermaid(final) !== final)
@@ -31202,13 +31412,13 @@ function outsideCode(text10) {
 function keysOf(text10) {
   return [...linksOf([text10]).keys()];
 }
-function plainLine(line) {
-  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
+function plainLine(line2) {
+  const stripped = line2.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
   return `- ${stripped}`;
 }
-function linkTokens(line, wanted) {
+function linkTokens(line2, wanted) {
   const out = [];
-  for (const match of line.matchAll(TOKEN)) {
+  for (const match of line2.matchAll(TOKEN)) {
     const token = match[0];
     if (!wanted(keysOf(token))) continue;
     if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
@@ -31222,17 +31432,17 @@ function carriedSourceLines(previousTexts, nextTexts) {
   if (!missing.size) return [];
   const covered = /* @__PURE__ */ new Set();
   const lines = [];
-  const add = (line) => {
-    if (line.trim() && !lines.includes(line)) lines.push(line);
+  const add = (line2) => {
+    if (line2.trim() && !lines.includes(line2)) lines.push(line2);
   };
   const open = (keys) => keys.some((key4) => missing.has(key4) && !covered.has(key4));
-  for (const line of previousTexts.flatMap(outsideCode)) {
-    const keys = keysOf(line);
+  for (const line2 of previousTexts.flatMap(outsideCode)) {
+    const keys = keysOf(line2);
     if (!open(keys)) continue;
-    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
+    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line2);
     if (definition) add(`- ${definition[1].trim()}`);
-    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
-    else add(plainLine(line));
+    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line2)) for (const token of linkTokens(line2, open)) add(`- ${token}`);
+    else add(plainLine(line2));
     for (const key4 of keys) covered.add(key4);
   }
   return lines;
@@ -31243,11 +31453,11 @@ function carryForwardSources(detail, previousTexts, nextTexts, language2, templa
   const heading = translateNote(language2, HEADING_KEY);
   const lines = detail.split("\n");
   const code = fencedLines(lines);
-  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
+  const existing = lines.findIndex((line2, index) => !code[index] && ANY_HEADING.test(line2));
   if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
   const keys = sourcesHeadingKeys(template2);
-  const start = lines.findIndex((line, index) => {
-    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+  const start = lines.findIndex((line2, index) => {
+    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line2);
     return !!match && keys.has(match[1].toLocaleLowerCase());
   });
   if (start < 0) return `${detail.trimEnd()}
@@ -31259,7 +31469,7 @@ ${carried.join("\n")}
   return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
 }
 function insertAfterBlock(lines, code, start, add, stop, separate = false) {
-  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
+  let end = lines.findIndex((line2, index) => index > start && !code[index] && stop.test(line2));
   if (end < 0) end = lines.length;
   while (end > start + 1 && !lines[end - 1].trim()) end--;
   return [
@@ -31276,24 +31486,24 @@ var UPDATE_LOG_HEADING = /^(#{1,6})[ \t]+.*(?:更新紀錄|更新记录|Update l
 var HEADING = /^(#{1,6})[ \t]+\S/;
 function withoutUpdateLog(text10, logHeadings) {
   const names3 = new Set(logHeadings.map((name2) => name2.trim().toLocaleLowerCase()).filter(Boolean));
-  const isLog = (line) => {
-    const match = UPDATE_LOG_HEADING.exec(line);
+  const isLog = (line2) => {
+    const match = UPDATE_LOG_HEADING.exec(line2);
     if (match) return match;
-    const heading = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/.exec(line);
+    const heading = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/.exec(line2);
     return heading && names3.has(heading[2].trim().toLocaleLowerCase()) ? heading : null;
   };
   const lines = text10.replace(/\r\n/g, "\n").split("\n"), kept = [];
   let skipping = 0;
-  for (const line of lines) {
-    const heading = HEADING.exec(line);
+  for (const line2 of lines) {
+    const heading = HEADING.exec(line2);
     if (skipping && heading && heading[1].length <= skipping) skipping = 0;
     if (!skipping) {
-      const log = isLog(line);
+      const log = isLog(line2);
       if (log) {
         skipping = log[1].length;
         continue;
       }
-      kept.push(line);
+      kept.push(line2);
     }
   }
   return kept.join("\n");
@@ -31387,25 +31597,25 @@ function withoutSourceNumbers(text10) {
 }
 function keptLineSet(oldDetail, newDetail) {
   const now = new Set(
-    newDetail.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"))
+    newDetail.split("\n").map((line2) => line2.trim()).filter((line2) => line2 && !line2.startsWith("#"))
   );
   return new Set(
-    oldDetail.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#") && now.has(line))
+    oldDetail.split("\n").map((line2) => line2.trim()).filter((line2) => line2 && !line2.startsWith("#") && now.has(line2))
   );
 }
 function withoutLines(text10, kept, keepCharts = false) {
   const lines = text10.split("\n");
   const chart = keepCharts ? mermaidLines(lines) : [];
-  return lines.filter((line, index) => chart[index] || !kept.has(line.trim())).join("\n");
+  return lines.filter((line2, index) => chart[index] || !kept.has(line2.trim())).join("\n");
 }
 function addedLines(base, now) {
   var _a2;
   const left = /* @__PURE__ */ new Map();
-  for (const line of base.split("\n")) left.set(line, ((_a2 = left.get(line)) != null ? _a2 : 0) + 1);
-  return now.split("\n").filter((line) => {
+  for (const line2 of base.split("\n")) left.set(line2, ((_a2 = left.get(line2)) != null ? _a2 : 0) + 1);
+  return now.split("\n").filter((line2) => {
     var _a3;
-    const n = (_a3 = left.get(line)) != null ? _a3 : 0;
-    if (n) left.set(line, n - 1);
+    const n = (_a3 = left.get(line2)) != null ? _a3 : 0;
+    if (n) left.set(line2, n - 1);
     return !n;
   });
 }
@@ -31417,16 +31627,16 @@ function mermaidLines(lines) {
   let start = -1;
   let fence = "";
   let mermaid = false;
-  lines.forEach((line, index) => {
+  lines.forEach((line2, index) => {
     if (fence) {
-      const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
+      const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line2);
       if (close && close[1][0] === fence[0] && close[1].length >= fence.length) {
         if (mermaid) for (let at = start; at <= index; at++) out[at] = true;
         fence = "";
       }
       return;
     }
-    const open = /^\s*(`{3,}|~{3,})\s*(\S*)/.exec(line);
+    const open = /^\s*(`{3,}|~{3,})\s*(\S*)/.exec(line2);
     if (open) {
       fence = open[1];
       start = index;
@@ -31452,14 +31662,14 @@ function footnoteDefinitions(text10) {
   const lines = text10.replace(/\r\n/g, "\n").split("\n");
   const code = fencedLines(lines);
   const out = /* @__PURE__ */ new Map();
-  lines.forEach((line, index) => {
-    const match = code[index] ? null : FOOTNOTE_DEFINITION.exec(line);
+  lines.forEach((line2, index) => {
+    const match = code[index] ? null : FOOTNOTE_DEFINITION.exec(line2);
     if (match && !out.has(match[1])) out.set(match[1], match[2].trim());
   });
   return out;
 }
-function remapFootnotes(line, oldDefinitions, detail) {
-  if (!/\[\^/.test(line)) return line;
+function remapFootnotes(line2, oldDefinitions, detail) {
+  if (!/\[\^/.test(line2)) return line2;
   const fresh = footnoteDefinitions(detail);
   const byKey = /* @__PURE__ */ new Map();
   const byText = /* @__PURE__ */ new Map();
@@ -31468,7 +31678,7 @@ function remapFootnotes(line, oldDefinitions, detail) {
     if (!byText.has(key2(body))) byText.set(key2(body), id);
   }
   const appended = [];
-  const text10 = line.replace(FOOTNOTE_REF, (_match, id) => {
+  const text10 = line2.replace(FOOTNOTE_REF, (_match, id) => {
     var _a2;
     const body = oldDefinitions.get(id);
     if (!body) return "";
@@ -31492,32 +31702,32 @@ function quoteMissingLines(oldDetail, detail, missing, template2, language2, log
   const covered = /* @__PURE__ */ new Set();
   let section3 = -1;
   let logLevel = 0;
-  oldLines.forEach((line, index) => {
+  oldLines.forEach((line2, index) => {
     var _a2, _b2;
     let text10;
     if (oldCode[index]) {
       if (logLevel) return;
-      text10 = line.trim() ? inlineCode(line.trim()) : "";
+      text10 = line2.trim() ? inlineCode(line2.trim()) : "";
     } else {
-      const heading = HEADING_ANY.exec(line);
+      const heading = HEADING_ANY.exec(line2);
       if (heading) {
         const level = heading[1].length;
         if (logLevel && level <= logLevel) logLevel = 0;
         const name2 = key2(heading[2]);
-        if (!logLevel && (logNames.has(name2) || UPDATE_LOG_HEADING.test(line))) logLevel = level;
+        if (!logLevel && (logNames.has(name2) || UPDATE_LOG_HEADING.test(line2))) logLevel = level;
         if (level === 3) section3 = (_a2 = lookup.get(name2)) != null ? _a2 : -1;
         if (logLevel) return;
         text10 = heading[2].trim();
       } else {
         if (logLevel) return;
-        text10 = line.replace(/^[ \t]*(?:>[ \t]*)+/, "").trim();
-        const callout = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text10);
-        if (callout && titles.has(key2(callout[1]))) return;
+        text10 = line2.replace(/^[ \t]*(?:>[ \t]*)+/, "").trim();
+        const callout2 = /^\[![\w-]+\][+-]?[ \t]*(.*)$/.exec(text10);
+        if (callout2 && titles.has(key2(callout2[1]))) return;
         const definition = FOOTNOTE_DEFINITION.exec(text10);
         if (definition) text10 = definition[2].trim();
       }
     }
-    if (!text10 || kept.has(line.trim())) return;
+    if (!text10 || kept.has(line2.trim())) return;
     const own2 = checkMergePreservation({
       sourceTexts: [text10],
       mergedTexts: []
@@ -31531,7 +31741,7 @@ function quoteMissingLines(oldDetail, detail, missing, template2, language2, log
   let out = detail;
   const title = translateNote(language2, "note.kept_from_earlier_version");
   for (const [index, lines] of groups) {
-    const block = [`> [!note] ${title}`, ...lines.map((line) => `> ${line}`)];
+    const block = [`> [!note] ${title}`, ...lines.map((line2) => `> ${line2}`)];
     out = insertIntoSection(out, index, block, template2, lookup);
   }
   return out;
@@ -31540,8 +31750,8 @@ function insertIntoSection(detail, index, block, template2, lookup) {
   const lines = detail.split("\n");
   const code = fencedLines(lines);
   const sections = [];
-  lines.forEach((line, at) => {
-    const match = code[at] ? null : /^###[ \t]+(.+?)[ \t]*$/.exec(line);
+  lines.forEach((line2, at) => {
+    const match = code[at] ? null : /^###[ \t]+(.+?)[ \t]*$/.exec(line2);
     if (match) sections.push({ at, index: lookup.get(key2(match[1])) });
   });
   const roleOf = (found) => {
@@ -31597,7 +31807,7 @@ function byLanguage(zhTW2, zhCN2, en2) {
   ]);
 }
 function normalizeStyleContent(text10) {
-  return text10.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[ \t]+$/, "")).join("\n").replace(/\n+$/, "") + "\n";
+  return text10.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n").map((line2) => line2.replace(/[ \t]+$/, "")).join("\n").replace(/\n+$/, "") + "\n";
 }
 var LEGACY_V1 = byLanguage(
   {
@@ -31635,8 +31845,8 @@ ${words2.comment(template2.name)}
 
 ${sections.join("\n")}`;
 }
-var issue = (line, code, message, ...values) => ({
-  line,
+var issue = (line2, code, message, ...values) => ({
+  line: line2,
   code,
   values,
   message
@@ -31648,26 +31858,26 @@ function stripNoteStyleComments(text10) {
   const out = [];
   let fence = null;
   let open;
-  lines.forEach((line, index) => {
+  lines.forEach((line2, index) => {
     if (open === void 0) {
       if (fence) {
-        const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
+        const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line2);
         if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
-        out.push(line);
+        out.push(line2);
         return;
       }
-      const fenceOpen = /^\s*(`{3,}|~{3,})/.exec(line);
+      const fenceOpen = /^\s*(`{3,}|~{3,})/.exec(line2);
       if (fenceOpen) {
         fence = fenceOpen[1];
-        out.push(line);
+        out.push(line2);
         return;
       }
     }
     let kept = "";
     let at = 0;
     let touched = false;
-    while (at < line.length) {
-      const mark2 = line.indexOf(COMMENT_MARK, at);
+    while (at < line2.length) {
+      const mark2 = line2.indexOf(COMMENT_MARK, at);
       if (open !== void 0) {
         touched = true;
         if (mark2 < 0) break;
@@ -31675,10 +31885,10 @@ function stripNoteStyleComments(text10) {
         at = mark2 + COMMENT_MARK.length;
       } else {
         if (mark2 < 0) {
-          kept += line.slice(at);
+          kept += line2.slice(at);
           break;
         }
-        kept += line.slice(at, mark2);
+        kept += line2.slice(at, mark2);
         open = index + 1;
         touched = true;
         at = mark2 + COMMENT_MARK.length;
@@ -31697,8 +31907,8 @@ function standardKeyOf(heading) {
     ([, name2]) => NAME_LANGUAGES.some((language2) => lowered2(translate(language2, name2)) === key4)
   );
 }
-function parseCount(line) {
-  const head = /^(?:數量|数量|count)\s*[:：]\s*(.*)$/i.exec(line.trim());
+function parseCount(line2) {
+  const head = /^(?:數量|数量|count)\s*[:：]\s*(.*)$/i.exec(line2.trim());
   if (!head) return void 0;
   const value = /^(至少|at\s+least)?\s*(\d{1,6})$/i.exec(head[1].trim());
   return value ? { mode: value[1] ? "min" : "exact", n: Number(value[2]) } : "invalid";
@@ -31736,7 +31946,7 @@ function parseNoteStyleFile(text10, options) {
   let tone2;
   let bodyStart = 0;
   if (lines[0].trimEnd() === "---") {
-    const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
+    const end = lines.findIndex((line2, index) => index > 0 && line2.trimEnd() === "---");
     if (end < 0) {
       issues.push(issue(1, "frontmatter_unclosed", "The frontmatter opened by --- on line 1 is never closed."));
       bodyStart = lines.length;
@@ -31769,10 +31979,10 @@ function parseNoteStyleFile(text10, options) {
   const bodyLines = stripped.text.split("\n");
   const code = fencedLines(bodyLines);
   const headings = [];
-  bodyLines.forEach((line, index) => {
+  bodyLines.forEach((line2, index) => {
     var _a2;
     if (code[index]) return;
-    const heading = /^##(?:[ \t]+(.*?))?[ \t]*$/.exec(line);
+    const heading = /^##(?:[ \t]+(.*?))?[ \t]*$/.exec(line2);
     if (heading) headings.push({ index, name: ((_a2 = heading[1]) != null ? _a2 : "").trim() });
   });
   if (!headings.length) issues.push(issue(Math.max(1, bodyStart + 1), "no_sections", "The file has no ## section."));
@@ -31781,13 +31991,13 @@ function parseNoteStyleFile(text10, options) {
     const end = position + 1 < headings.length ? headings[position + 1].index : bodyLines.length;
     let content = bodyLines.slice(heading.index + 1, end);
     const sectionCode = code.slice(heading.index + 1, end);
-    const line = bodyStart + heading.index + 1;
+    const line2 = bodyStart + heading.index + 1;
     let count3;
     const first = content.findIndex((entry) => entry.trim());
     if (first >= 0 && !sectionCode[first]) {
       const parsed = parseCount(content[first]);
       if (parsed === "invalid")
-        issues.push(issue(line + 1 + first, "count_invalid", `Line ${line + 1 + first}: the count is not a number.`));
+        issues.push(issue(line2 + 1 + first, "count_invalid", `Line ${line2 + 1 + first}: the count is not a number.`));
       else if (parsed) count3 = parsed;
       if (parsed) {
         content = content.filter((_, index) => index !== first);
@@ -31814,7 +32024,7 @@ function parseNoteStyleFile(text10, options) {
       ...count3 ? { count: count3 } : {},
       aliases,
       callouts,
-      line
+      line: line2
     };
   });
   if (!sections.some((section3) => section3.role === "sources")) {
@@ -32138,14 +32348,14 @@ function fileFor(files, language2) {
   return files[match != null ? match : CANONICAL_LANGUAGES[0]];
 }
 var template = (id, nameKey, files, omitEmpty = false) => {
-  const table = Object.fromEntries(CANONICAL_LANGUAGES.map((language2, index) => [language2, files[index]]));
+  const table2 = Object.fromEntries(CANONICAL_LANGUAGES.map((language2, index) => [language2, files[index]]));
   return {
     category: "template",
     id,
     nameKey,
     ...omitEmpty ? { omitEmpty: true } : {},
-    body: (language2) => strip2(fileFor(table, language2)),
-    sections: (language2) => strip2(fileFor(table, language2))
+    body: (language2) => strip2(fileFor(table2, language2)),
+    sections: (language2) => strip2(fileFor(table2, language2))
   };
 };
 function builtinTemplateText(id, language2) {
@@ -32229,9 +32439,9 @@ function splitTemplateZones(text10) {
   const code = fencedLines(lines);
   const names3 = new Set(CANONICAL_LANGUAGES.map(templateFormatHeading));
   const separatorLines = [];
-  lines.forEach((line, index) => {
+  lines.forEach((line2, index) => {
     if (code[index]) return;
-    const heading = /^#[ \t]+(.*?)[ \t]*$/.exec(line);
+    const heading = /^#[ \t]+(.*?)[ \t]*$/.exec(line2);
     if (heading && names3.has(heading[1])) separatorLines.push(index + 1);
   });
   if (!separatorLines.length) return { sections: lines.join("\n"), format: void 0, separatorLines };
@@ -32334,13 +32544,13 @@ function leadStructure(template2, lead, language2, anchor) {
     if (section3.description.trim()) rules.push(descriptionRule(section3, language2).rule);
     if (section3.count)
       rules.push(customDetailRule(section3.count.mode, language2, { heading, n: String(section3.count.n) }));
-    for (const callout of (_a2 = section3.callouts) != null ? _a2 : [])
+    for (const callout2 of (_a2 = section3.callouts) != null ? _a2 : [])
       rules.push(
         customDetailCallout(language2, {
           heading,
-          type: callout.type,
-          fold: callout.fold,
-          body: callout.body.replace(/\s*\n\s*/g, " ").trim()
+          type: callout2.type,
+          fold: callout2.fold,
+          body: callout2.body.replace(/\s*\n\s*/g, " ").trim()
         })
       );
   }
@@ -32642,9 +32852,9 @@ function headingLines(detail) {
   const lines = detail.split("\n");
   const code = fencedLines(lines);
   const found = [];
-  lines.forEach((line, index) => {
+  lines.forEach((line2, index) => {
     if (code[index]) return;
-    const match = HEADING2.exec(line);
+    const match = HEADING2.exec(line2);
     if (match) found.push({ index, name: match[1].trim() });
   });
   return found;
@@ -32684,7 +32894,7 @@ function templateFromDetail(detail, language2) {
         description: found.description,
         aliases: [...key3(found.name) !== heading ? [found.name] : [], ...found.aliases],
         ...found.count ? { count: { ...found.count } } : {},
-        ...found.callouts ? { callouts: found.callouts.map((callout) => ({ ...callout })) } : {}
+        ...found.callouts ? { callouts: found.callouts.map((callout2) => ({ ...callout2 })) } : {}
       };
     } else {
       role = isNewSourcesHeading(name2) ? "sources" : LOG_KEYS.has(heading) ? "log" : "none";
@@ -32727,10 +32937,10 @@ function demoteUnknownHeadings(detail, template2) {
   const lookup = sectionLookup(template2);
   const lines = detail.split("\n");
   const code = fencedLines(lines);
-  return lines.map((line, index) => {
-    if (code[index]) return line;
-    const match = HEADING2.exec(line);
-    return match && !lookup.has(key3(match[1])) ? `#${line}` : line;
+  return lines.map((line2, index) => {
+    if (code[index]) return line2;
+    const match = HEADING2.exec(line2);
+    return match && !lookup.has(key3(match[1])) ? `#${line2}` : line2;
   }).join("\n");
 }
 function decidedTemplateFromDetail(detail, language2) {
@@ -32942,7 +33152,7 @@ function parseRecipeFile(text10) {
   };
   let bodyStart = 0;
   if (lines[0].trimEnd() === "---") {
-    const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
+    const end = lines.findIndex((line2, index) => index > 0 && line2.trimEnd() === "---");
     if (end < 0) {
       result.issues.push({
         line: 1,
@@ -32992,7 +33202,7 @@ function parseRecipeFile(text10) {
   }
   result.voiceSet = result.lines.voice !== void 0;
   result.formatSet = result.lines.format !== void 0;
-  result.description = (_b2 = (_a2 = lines.slice(bodyStart).find((line) => line.trim())) == null ? void 0 : _a2.trim()) != null ? _b2 : "";
+  result.description = (_b2 = (_a2 = lines.slice(bodyStart).find((line2) => line2.trim())) == null ? void 0 : _a2.trim()) != null ? _b2 : "";
   return result;
 }
 var PART_KEY = {
@@ -33035,8 +33245,8 @@ function updateRecipeFileText(oldText, parts, language2) {
   const text10 = bom ? oldText.slice(1) : oldText;
   const eol = text10.includes("\r\n") ? "\r\n" : "\n";
   const lines = text10.split("\n");
-  const bare = (line) => line.replace(/\r$/, "");
-  const closing = bare(lines[0]).trimEnd() === "---" ? lines.findIndex((line, index) => index > 0 && bare(line).trimEnd() === "---") : -1;
+  const bare = (line2) => line2.replace(/\r$/, "");
+  const closing = bare(lines[0]).trimEnd() === "---" ? lines.findIndex((line2, index) => index > 0 && bare(line2).trimEnd() === "---") : -1;
   const wanted = (slot) => slotValue(slot, parts, language2);
   if (closing < 0) {
     const head = [
@@ -33078,10 +33288,10 @@ function updateRecipeFileText(oldText, parts, language2) {
 }
 function renamePartInRecipeText(oldText, category, oldName, newName) {
   const lines = oldText.split("\n");
-  const bare = (line) => line.replace(/\r$/, "");
+  const bare = (line2) => line2.replace(/\r$/, "");
   const first = lines[0].replace(/^\uFEFF/, "");
   if (bare(first).trimEnd() !== "---") return oldText;
-  const closing = lines.findIndex((line, index) => index > 0 && bare(line).trimEnd() === "---");
+  const closing = lines.findIndex((line2, index) => index > 0 && bare(line2).trimEnd() === "---");
   if (closing < 0) return oldText;
   for (let index = 1; index < closing; index++) {
     const raw = bare(lines[index]);
@@ -33089,10 +33299,10 @@ function renamePartInRecipeText(oldText, category, oldName, newName) {
     const pair5 = /^(([^:：]+?)\s*[:：]\s*)(.*)$/.exec(raw);
     if (!pair5 || !KEYS[category].includes(pair5[2].trim().toLocaleLowerCase())) continue;
     const value = pair5[3].trim();
-    const quote2 = value.length >= 2 && /^(["']).*\1$/.test(value) ? value[0] : "";
-    const bareValue = quote2 ? value.slice(1, -1).trim() : value;
+    const quote3 = value.length >= 2 && /^(["']).*\1$/.test(value) ? value[0] : "";
+    const bareValue = quote3 ? value.slice(1, -1).trim() : value;
     if (bareValue !== oldName || builtinPartIdOf(category, bareValue) !== void 0) continue;
-    lines[index] = `${pair5[1]}${quote2}${newName}${quote2}${lines[index].endsWith("\r") ? "\r" : ""}`;
+    lines[index] = `${pair5[1]}${quote3}${newName}${quote3}${lines[index].endsWith("\r") ? "\r" : ""}`;
   }
   return lines.join("\n");
 }
@@ -34075,8 +34285,8 @@ var NoteStyleStore = class {
   legacyRefs(category) {
     var _a2;
     const legacy = (_a2 = this.settings.noteStyleRecipe) == null ? void 0 : _a2.legacy;
-    const table = category === "structure" ? legacy == null ? void 0 : legacy.templates : category === "voice" ? legacy == null ? void 0 : legacy.tones : void 0;
-    return new Set(Object.values(table != null ? table : {}));
+    const table2 = category === "structure" ? legacy == null ? void 0 : legacy.templates : category === "voice" ? legacy == null ? void 0 : legacy.tones : void 0;
+    return new Set(Object.values(table2 != null ? table2 : {}));
   }
   // ---- changing the user's own files from the manage window (each is one user action; nothing is overwritten) ----
   /** The cache and the folder of the files of a style or part category. */
@@ -34559,7 +34769,7 @@ function emptyNoteStyleStore(settings) {
 
 // ai/callout-titles.ts
 function titleTable(language2) {
-  const table = /* @__PURE__ */ new Map();
+  const table2 = /* @__PURE__ */ new Map();
   const text10 = [
     translate(language2, "note.callout_titles_1"),
     translate(language2, "note.callout_titles_2"),
@@ -34569,9 +34779,9 @@ function titleTable(language2) {
   for (const group of text10.split("|")) {
     const [title, types] = group.split(":");
     if (!title || !types) continue;
-    for (const type of types.split(",")) table.set(type, title);
+    for (const type of types.split(",")) table2.set(type, title);
   }
-  return table;
+  return table2;
 }
 var BARE_HEADER = /^((?:[ \t]*>)+[ \t]*\[!([A-Za-z]+)\][+-]?)[ \t]*$/;
 function titleBareCallouts(text10, language2, keepLines) {
@@ -34579,15 +34789,15 @@ function titleBareCallouts(text10, language2, keepLines) {
   if (!titles.size) return text10;
   const lines = text10.split("\n");
   const code = fencedLines(lines);
-  return lines.map((line, index) => {
-    if (code[index] || keepLines.has(line)) return line;
-    const match = BARE_HEADER.exec(line.replace(/\r$/, ""));
+  return lines.map((line2, index) => {
+    if (code[index] || keepLines.has(line2)) return line2;
+    const match = BARE_HEADER.exec(line2.replace(/\r$/, ""));
     const title = match ? titles.get(match[2].toLowerCase()) : void 0;
-    return match && title ? `${match[1]} ${title}${line.endsWith("\r") ? "\r" : ""}` : line;
+    return match && title ? `${match[1]} ${title}${line2.endsWith("\r") ? "\r" : ""}` : line2;
   }).join("\n");
 }
 function bareCalloutLines(text10) {
-  return new Set(text10.split("\n").filter((line) => BARE_HEADER.test(line.replace(/\r$/, ""))));
+  return new Set(text10.split("\n").filter((line2) => BARE_HEADER.test(line2.replace(/\r$/, ""))));
 }
 
 // ai/note-writeback.ts
@@ -34632,20 +34842,20 @@ function scan2(text10, classify3) {
   const lines = text10.split("\n");
   const starts = [];
   let position = 0;
-  for (const line of lines) {
+  for (const line2 of lines) {
     starts.push(position);
-    position += line.length + 1;
+    position += line2.length + 1;
   }
   const code = fencedLines(lines);
   const headings = [];
-  lines.forEach((line, index) => {
+  lines.forEach((line2, index) => {
     if (code[index]) return;
-    const match = /^###\s+(.+?)\s*$/.exec(line);
+    const match = /^###\s+(.+?)\s*$/.exec(line2);
     if (match) headings.push({ line: index, text: match[1], key: classify3.classify(match[1]) });
   });
   return { text: text10, lines, starts, code, headings };
 }
-var lineEnd = (view, line) => view.starts[line] + view.lines[line].length;
+var lineEnd = (view, line2) => view.starts[line2] + view.lines[line2].length;
 function sectionRange(view, key4) {
   var _a2, _b2;
   const position = view.headings.findIndex((heading2) => heading2.key === key4);
@@ -34674,7 +34884,7 @@ function definitions(view) {
 }
 function lastContentLine(view, from, to) {
   const definition = /* @__PURE__ */ new Set();
-  for (const item of definitions(view)) for (let line = item.first; line <= item.last; line++) definition.add(line);
+  for (const item of definitions(view)) for (let line2 = item.first; line2 <= item.last; line2++) definition.add(line2);
   for (let index = to - 1; index >= from; index--) if (view.lines[index].trim() && !definition.has(index)) return index;
   return -1;
 }
@@ -34686,14 +34896,14 @@ function logMarker(oldLines) {
 }
 function definitionLines(view) {
   const found = /* @__PURE__ */ new Set();
-  for (const item of definitions(view)) for (let line = item.first; line <= item.last; line++) found.add(line);
+  for (const item of definitions(view)) for (let line2 = item.first; line2 <= item.last; line2++) found.add(line2);
   return found;
 }
 function logLines(view, key4) {
   const range = sectionRange(view, key4);
   if (!range) return [];
   const definition = definitionLines(view);
-  return view.lines.slice(range.from, range.to).filter((line, offset) => line.trim() && !isPlaceholder2(line) && !definition.has(range.from + offset));
+  return view.lines.slice(range.from, range.to).filter((line2, offset) => line2.trim() && !isPlaceholder2(line2) && !definition.has(range.from + offset));
 }
 function logHeadingName(template2, language2) {
   var _a2, _b2;
@@ -34709,7 +34919,7 @@ function withLogLines(detail, view, key4, heading, linesFor) {
 
 ${body}`;
   const definition = definitionLines(view);
-  const kept = view.lines.slice(range.from, range.to).filter((line, offset) => line.trim() && definition.has(range.from + offset));
+  const kept = view.lines.slice(range.from, range.to).filter((line2, offset) => line2.trim() && definition.has(range.from + offset));
   if (kept.length) body = `${body}
 
 ${kept.join("\n")}`;
@@ -34723,13 +34933,13 @@ ${body}${after}`;
 }
 function mergeLogLines(existing, oldLines, summary, now) {
   const marker3 = logMarker(oldLines);
-  const old = new Set(oldLines.map((line) => line.trim()));
-  const added = existing.filter((line) => !old.has(line.trim()));
+  const old = new Set(oldLines.map((line2) => line2.trim()));
+  const added = existing.filter((line2) => !old.has(line2.trim()));
   const kept = oldLines;
   if (added.length === 1) return [...kept, added[0]];
   if (added.length === 0) return [...kept, `${marker3}${summaryLine(now, summary)}`];
   const [first, ...rest] = added;
-  return [...kept, [first, ...rest.map((line) => line.trim().replace(DATE_PREFIX, "").trim())].join("\uFF1B")];
+  return [...kept, [first, ...rest.map((line2) => line2.trim().replace(DATE_PREFIX, "").trim())].join("\uFF1B")];
 }
 function replySections(reply, classify3, template2) {
   const view = scan2(reply, classify3);
@@ -34762,9 +34972,9 @@ ${part}`;
 function deepenHeadings(body) {
   const lines = body.split("\n");
   const code = fencedLines(lines);
-  return lines.map((line, index) => {
-    const match = code[index] ? null : /^(#{1,6})([ \t]+.*|[ \t]*)$/.exec(line);
-    return match && match[1].length < 5 ? `#####${match[2]}` : line;
+  return lines.map((line2, index) => {
+    const match = code[index] ? null : /^(#{1,6})([ \t]+.*|[ \t]*)$/.exec(line2);
+    return match && match[1].length < 5 ? `#####${match[2]}` : line2;
   }).join("\n");
 }
 function relabel(text10, map) {
@@ -34772,7 +34982,7 @@ function relabel(text10, map) {
   const lines = text10.split("\n");
   const code = fencedLines(lines);
   return lines.map(
-    (line, index) => code[index] ? line : line.replace(FOOTNOTE_REF2, (whole, label) => map.has(label) ? `[^${map.get(label)}]` : whole)
+    (line2, index) => code[index] ? line2 : line2.replace(FOOTNOTE_REF2, (whole, label) => map.has(label) ? `[^${map.get(label)}]` : whole)
   ).join("\n");
 }
 function composeTop(input2) {
@@ -34784,9 +34994,9 @@ function composeTop(input2) {
   const oldDefinitions = definitions(oldView);
   const oldTargets = new Map(oldDefinitions.map((item) => [item.label, item.target]));
   let counter = 0;
-  oldView.lines.forEach((line, index) => {
+  oldView.lines.forEach((line2, index) => {
     if (oldView.code[index]) return;
-    for (const match of line.matchAll(FOOTNOTE_REF2))
+    for (const match of line2.matchAll(FOOTNOTE_REF2))
       if (/^\d+$/.test(match[1])) counter = Math.max(counter, Number(match[1]));
   });
   const used = /* @__PURE__ */ new Set([...oldTargets.keys()]);
@@ -34799,7 +35009,7 @@ function composeTop(input2) {
     const defined = definitions(view);
     const drop = /* @__PURE__ */ new Set();
     for (const item of defined) {
-      for (let line = item.first; line <= item.last; line++) drop.add(line);
+      for (let line2 = item.first; line2 <= item.last; line2++) drop.add(line2);
       if (seen.has(item.label)) continue;
       seen.add(item.label);
       if (oldTargets.get(item.label) === item.target) continue;
@@ -34852,8 +35062,8 @@ ${body}${needsBlank(at2) ? "\n" : ""}`, order: 0 });
       return;
     }
     const last = lastContentLine(oldView, range.from, range.to);
-    const existing = new Set(oldView.lines.slice(range.from, range.to).map((line) => line.trim()));
-    const items = body.split("\n").filter((line) => !line.trim() || !existing.has(line.trim())).join("\n").trim();
+    const existing = new Set(oldView.lines.slice(range.from, range.to).map((line2) => line2.trim()));
+    const items = body.split("\n").filter((line2) => !line2.trim() || !existing.has(line2.trim())).join("\n").trim();
     if (!items) return;
     const at = lineEnd(oldView, last >= 0 ? last : range.heading.line);
     plan.push({
@@ -34974,8 +35184,8 @@ function composeWriteback(raw) {
     );
   } else {
     const oldLines = logLines(scan2(input2.oldDetail, classify3), key4);
-    const line = `${logMarker(oldLines)}${formatDate(input2.now)}\u3000${translate(input2.language, "note.writeback_fresh_replaced_0", (_a2 = input2.backupPath) != null ? _a2 : "")}`;
-    detail = withLogLines(input2.aiDetail, view, key4, heading, () => [...oldLines, line]);
+    const line2 = `${logMarker(oldLines)}${formatDate(input2.now)}\u3000${translate(input2.language, "note.writeback_fresh_replaced_0", (_a2 = input2.backupPath) != null ? _a2 : "")}`;
+    detail = withLogLines(input2.aiDetail, view, key4, heading, () => [...oldLines, line2]);
   }
   return { ok: true, detail, record: { inserts: [], kept: [detail] } };
 }
@@ -36519,7 +36729,7 @@ function firstMarkdownTable(markdown) {
     for (let j = i; j < lines.length && /^\s*\|.+\|\s*$/.test(lines[j]); j++) {
       if (j === i + 1) continue;
       rows2.push(
-        lines[j].trim().slice(1, -1).split("|").map((cell) => cell.trim()).filter(Boolean)
+        lines[j].trim().slice(1, -1).split("|").map((cell2) => cell2.trim()).filter(Boolean)
       );
       if (rows2.length >= 4) break;
     }
@@ -37138,29 +37348,29 @@ var WIKI = /\[\[([^[\]\n]+)\]\]/y;
 function bracketTable(scan3) {
   if (scan3.brackets) return scan3.brackets;
   const { src } = scan3;
-  const table = new Int32Array(src.length).fill(-1);
+  const table2 = new Int32Array(src.length).fill(-1);
   const stack = [];
   for (let at = 0; at < src.length; at++) {
     const ch = src[at];
     if (ch === "\\") at++;
     else if (ch === "[") stack.push(at);
-    else if (ch === "]" && stack.length) table[stack.pop()] = at;
+    else if (ch === "]" && stack.length) table2[stack.pop()] = at;
   }
-  return scan3.brackets = table;
+  return scan3.brackets = table2;
 }
 function parenTable(scan3) {
   if (scan3.parens) return scan3.parens;
   const { src } = scan3;
-  const table = new Int32Array(src.length).fill(-1);
+  const table2 = new Int32Array(src.length).fill(-1);
   let stack = [];
   for (let at = 0; at < src.length; at++) {
     const ch = src[at];
     if (ch === "\\") at++;
     else if (ch === "(") stack.push(at);
-    else if (ch === ")" && stack.length) table[stack.pop()] = at;
+    else if (ch === ")" && stack.length) table2[stack.pop()] = at;
     else if (ch === "\n") stack = [];
   }
-  return scan3.parens = table;
+  return scan3.parens = table2;
 }
 function bracketLink(scan3, open) {
   var _a2;
@@ -37360,10 +37570,10 @@ function parseInline(src, depth = 0, links = true, ends) {
 var FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 var FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 var HEADING_OPEN = /^ {0,3}(#{1,6})(?:[ \t]+|$)/;
-function headingAt(line) {
-  const open = HEADING_OPEN.exec(line);
+function headingAt(line2) {
+  const open = HEADING_OPEN.exec(line2);
   if (!open) return null;
-  let text10 = line.slice(open[0].length).trimEnd();
+  let text10 = line2.slice(open[0].length).trimEnd();
   let at = text10.length;
   while (at > 0 && text10[at - 1] === "#") at--;
   if (at > 0 && at < text10.length && (text10[at - 1] === " " || text10[at - 1] === "	")) text10 = text10.slice(0, at).trimEnd();
@@ -37372,11 +37582,11 @@ function headingAt(line) {
 var RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
 var QUOTE = /^ {0,3}>/;
 var LIST = /^( *)([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
-var isFenceOpen = (line) => {
-  const open = FENCE_OPEN.exec(line);
+var isFenceOpen = (line2) => {
+  const open = FENCE_OPEN.exec(line2);
   return open && !(open[1][0] === "`" && open[2].includes("`")) ? open : null;
 };
-var startsBlock = (line) => !!isFenceOpen(line) || !!headingAt(line) || RULE.test(line) || QUOTE.test(line) || LIST.test(line);
+var startsBlock = (line2) => !!isFenceOpen(line2) || !!headingAt(line2) || RULE.test(line2) || QUOTE.test(line2) || LIST.test(line2);
 function parseBlocks(lines, depth = 0, starts, budget) {
   var _a2;
   const blocks = [];
@@ -37390,13 +37600,13 @@ function parseBlocks(lines, depth = 0, starts, budget) {
   };
   for (let at = 0; at < lines.length; ) {
     if (budget == null ? void 0 : budget.over) break;
-    const line = lines[at];
-    if (!line.trim()) {
+    const line2 = lines[at];
+    if (!line2.trim()) {
       at++;
       continue;
     }
     starts == null ? void 0 : starts.push(at);
-    const open = isFenceOpen(line);
+    const open = isFenceOpen(line2);
     if (open) {
       const mark2 = open[1][0];
       const length = open[1].length;
@@ -37412,18 +37622,18 @@ function parseBlocks(lines, depth = 0, starts, budget) {
       emit({ t: "code", text: body.join("\n") });
       continue;
     }
-    const heading = headingAt(line);
+    const heading = headingAt(line2);
     if (heading) {
       emit({ t: "h", level: heading.level, c: parseInline(heading.text) });
       at++;
       continue;
     }
-    if (RULE.test(line)) {
+    if (RULE.test(line2)) {
       emit({ t: "hr" });
       at++;
       continue;
     }
-    if (QUOTE.test(line)) {
+    if (QUOTE.test(line2)) {
       const inner = [];
       for (; at < lines.length && QUOTE.test(lines[at]); at++) inner.push(lines[at].replace(/^ {0,3}> ?/, ""));
       emit({
@@ -37432,7 +37642,7 @@ function parseBlocks(lines, depth = 0, starts, budget) {
       });
       continue;
     }
-    if (LIST.test(line)) {
+    if (LIST.test(line2)) {
       const rows2 = [];
       while (at < lines.length) {
         const row = lines[at];
@@ -37471,7 +37681,7 @@ ${row.trim()}`;
       if (!emit(list2) && budget) budget.itemLines = itemLines;
       continue;
     }
-    const paragraph = [line];
+    const paragraph = [line2];
     for (at++; at < lines.length && lines[at].trim() && !startsBlock(lines[at]); at++) paragraph.push(lines[at]);
     const ends = [];
     if (!emit({ t: "p", c: parseInline(paragraph.join("\n"), 0, true, budget ? ends : void 0) }) && budget)
@@ -37515,8 +37725,8 @@ function layoutReply(text10, budget = MAX_REPLY_NODES) {
   let head = clean3;
   let tail = "";
   if (clean3.length > MAX_REPLY_CHARS) {
-    const line2 = clean3.lastIndexOf("\n", MAX_REPLY_CHARS);
-    let cut = line2 >= MAX_REPLY_CHARS / 2 ? line2 : MAX_REPLY_CHARS;
+    const line3 = clean3.lastIndexOf("\n", MAX_REPLY_CHARS);
+    let cut = line3 >= MAX_REPLY_CHARS / 2 ? line3 : MAX_REPLY_CHARS;
     if (isLowSurrogate(clean3.charCodeAt(cut)) && isHighSurrogate(clean3.charCodeAt(cut - 1))) cut--;
     head = clean3.slice(0, cut);
     tail = clean3.slice(cut);
@@ -37529,7 +37739,7 @@ function layoutReply(text10, budget = MAX_REPLY_NODES) {
   const over = blocks.pop();
   const first = starts[blocks.length];
   const room = limit.room - limit.used;
-  let line = first;
+  let line2 = first;
   let offset = 0;
   if (over.t === "p" && limit.ends) {
     let used = 1;
@@ -37545,10 +37755,10 @@ function layoutReply(text10, budget = MAX_REPLY_NODES) {
     while (kept < over.items.length && used + itemCost(over.items[kept]) <= room) used += itemCost(over.items[kept++]);
     if (kept > 0) {
       blocks.push({ t: "list", ordered: over.ordered, items: over.items.slice(0, kept) });
-      line = limit.itemLines[kept];
+      line2 = limit.itemLines[kept];
     }
   }
-  return { blocks, plain: lines.slice(line).join("\n").slice(offset) + tail };
+  return { blocks, plain: lines.slice(line2).join("\n").slice(offset) + tail };
 }
 var isHighSurrogate = (code) => code >= 55296 && code <= 56319;
 var isLowSurrogate = (code) => code >= 56320 && code <= 57343;
@@ -37674,7 +37884,7 @@ function escapeText(value) {
 }
 var escapeLine = (value) => escapeText(value.replace(/\s+/g, " ").trim());
 function escapeMultiline(value) {
-  return value.replace(/\r\n?/g, "\n").split("\n").map((line) => escapeText(line.replace(/^[ \t]+/, "").replace(/[ \t]+$/, ""))).join("\\\n");
+  return value.replace(/\r\n?/g, "\n").split("\n").map((line2) => escapeText(line2.replace(/^[ \t]+/, "").replace(/[ \t]+$/, ""))).join("\\\n");
 }
 function linkAliasOf(title) {
   return stripControl(title).replace(/[[\]|`\r\n\\]/g, " ").replace(/%{2,}/g, "%").replace(/\s+/g, " ").trim();
@@ -37736,7 +37946,7 @@ function inlineMarkdown(nodes) {
   return out;
 }
 var tidy = (text10) => text10.replace(/^[ \t]+/, "").replace(/\\\n[ \t]+/g, "\\\n");
-var indentOf = (text10, pad3, first) => text10.split("\n").map((line, at) => at === 0 ? `${first}${line}` : line ? `${pad3}${line}` : line).join("\n");
+var indentOf = (text10, pad3, first) => text10.split("\n").map((line2, at) => at === 0 ? `${first}${line2}` : line2 ? `${pad3}${line2}` : line2).join("\n");
 function listMarkdown(block) {
   return block.items.map((item, index) => {
     const marker3 = block.ordered ? `${index + 1}. ` : "- ";
@@ -37764,7 +37974,7 @@ ${text10}
 ${fence}`;
     }
     case "quote":
-      return blocksMarkdown(block.c).split("\n").map((line) => line ? `> ${line}` : ">").join("\n");
+      return blocksMarkdown(block.c).split("\n").map((line2) => line2 ? `> ${line2}` : ">").join("\n");
     case "list":
       return listMarkdown(block);
   }
@@ -37780,8 +37990,8 @@ function refMarkdown(ref) {
   if (ref.kind === "topic") return wikiLink(ref.path, ref.title);
   const link = ref.path ? wikiLink(ref.path, "") : "";
   if (ref.kind === "file") return link;
-  const quote2 = ref.text ? escapeLine([...ref.text.replace(/\s+/g, " ")].slice(0, 200).join("")) : "";
-  return [link, quote2].filter(Boolean).join(" ");
+  const quote3 = ref.text ? escapeLine([...ref.text.replace(/\s+/g, " ")].slice(0, 200).join("")) : "";
+  return [link, quote3].filter(Boolean).join(" ");
 }
 function imagesMarkdown(block, labels) {
   var _a2;
@@ -37827,10 +38037,10 @@ ${escapeLine(labels.saved)}: ${localStamp(input2.savedAt)}`
     parts.push(`### ${escapeLine(labels.ai)}`);
     const answer = replyMarkdown(turn.answer);
     if (answer.trim()) parts.push(answer);
-    const basis = ((_c = turn.basis) != null ? _c : []).filter((line) => line.trim());
+    const basis = ((_c = turn.basis) != null ? _c : []).filter((line2) => line2.trim());
     if (turn.lines.length || basis.length) {
       parts.push(`**${escapeLine(labels.results)}**`);
-      parts.push([...turn.lines, ...basis].map((line) => `- ${escapeLine(line)}`).join("\n"));
+      parts.push([...turn.lines, ...basis].map((line2) => `- ${escapeLine(line2)}`).join("\n"));
     }
     if (turn.plan)
       parts.push(
@@ -37852,30 +38062,30 @@ function hasUnsavedChat(completedTurns, savedTurns) {
 function placedImage(block) {
   return block.state === "ready" ? block.items.find((item) => item.inserted) : void 0;
 }
-function settledLine(line) {
-  const blocks = line.imageGroup;
-  if (!blocks) return line;
+function settledLine(line2) {
+  const blocks = line2.imageGroup;
+  if (!blocks) return line2;
   const total2 = blocks.length;
   const pending2 = blocks.filter((block) => block.state === "searching").length;
   const labels = [...new Set(blocks.flatMap((block) => block.modelLabel ? [block.modelLabel] : []))];
   const model = labels.length ? t("ui.map_chat_model_suffix_0", labels.join(t("ui.map_chat_model_separator"))) : "";
   if (pending2) {
-    return { ...line, status: "done", text: t("ui.map_chat_line_images_progress_0_1", total2 - pending2, total2) + model };
+    return { ...line2, status: "done", text: t("ui.map_chat_line_images_progress_0_1", total2 - pending2, total2) + model };
   }
   const placed = blocks.filter((block) => placedImage(block)).length;
   const missed = total2 - placed;
   return {
-    ...line,
+    ...line2,
     status: placed ? "done" : blocks.some((block) => block.state === "failed") ? "failed" : "skipped",
     text: (missed ? t("ui.map_chat_line_images_group_0_1", placed, missed) : t("ui.map_chat_line_images_group_0", placed)) + model
   };
 }
 function onceImageLines(lines) {
   const seen = /* @__PURE__ */ new Set();
-  return lines.filter((line) => {
-    if (!line.imageGroup) return true;
-    if (seen.has(line.imageGroup)) return false;
-    seen.add(line.imageGroup);
+  return lines.filter((line2) => {
+    if (!line2.imageGroup) return true;
+    if (seen.has(line2.imageGroup)) return false;
+    seen.add(line2.imageGroup);
     return true;
   });
 }
@@ -37883,10 +38093,10 @@ var STAGE_ORDER = { preparing: 0, consent: 1, waiting: 2, writing: 3, applying: 
 function settleExpandFailures(lines, failures) {
   let result = lines;
   for (const { was, next, failure } of failures) {
-    const at = was ? result.findIndex((line) => line.basis === was) : -1;
+    const at = was ? result.findIndex((line2) => line2.basis === was) : -1;
     if (at < 0) result = [...result, failure];
-    else if (next) result = [...result.map((line, index) => index === at ? { ...line, basis: next } : line), failure];
-    else result = result.map((line, index) => index === at ? failure : line);
+    else if (next) result = [...result.map((line2, index) => index === at ? { ...line2, basis: next } : line2), failure];
+    else result = result.map((line2, index) => index === at ? failure : line2);
   }
   return result;
 }
@@ -38973,7 +39183,7 @@ ${typed}` : draft;
       last.lateFailures = [...(_a2 = last.lateFailures) != null ? _a2 : [], { was, next, failure }];
       return next;
     }
-    const at = last.lines.findIndex((line) => line.basis === was);
+    const at = last.lines.findIndex((line2) => line2.basis === was);
     last.lines = settleExpandFailures(last.lines, [{ was, next, failure }]);
     this.renderLog();
     return at >= 0 ? next : was;
@@ -39087,10 +39297,10 @@ ${typed}` : draft;
       const answer = {
         role: "assistant",
         text: turn.reply,
-        lines: turn.lines.map((line) => ({
-          status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
-          text: line.text,
-          ...line.basis ? { basis: line.basis } : {}
+        lines: turn.lines.map((line2) => ({
+          status: line2.status === "skipped" || line2.status === "failed" ? line2.status : "done",
+          text: line2.text,
+          ...line2.basis ? { basis: line2.basis } : {}
         })),
         modelLabel: turn.modelLabel || void 0,
         stale: true
@@ -39099,10 +39309,10 @@ ${typed}` : draft;
         if (turn.planState && turn.planState !== "cancelled" && ((_c = turn.planLines) == null ? void 0 : _c.length))
           answer.lines = [
             ...answer.lines,
-            ...turn.planLines.map((line) => ({
-              status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
-              text: line.text,
-              ...line.basis ? { basis: line.basis } : {}
+            ...turn.planLines.map((line2) => ({
+              status: line2.status === "skipped" || line2.status === "failed" ? line2.status : "done",
+              text: line2.text,
+              ...line2.basis ? { basis: line2.basis } : {}
             }))
           ];
         answer.plan = {
@@ -39606,8 +39816,8 @@ ${typed}` : draft;
     this.setDropHighlight(false);
     const text10 = (_b2 = (_a2 = event.dataTransfer) == null ? void 0 : _a2.getData("text/plain")) != null ? _b2 : "";
     if (!text10.trim()) return;
-    const lines = text10.split(/\r?\n/).filter((line) => line.trim());
-    const links = lines.map((line) => droppedLinkTarget(line));
+    const lines = text10.split(/\r?\n/).filter((line2) => line2.trim());
+    const links = lines.map((line2) => droppedLinkTarget(line2));
     if (links.length && links.every(Boolean)) {
       const paths = links.map((link) => this.host.resolveLink(link));
       if (paths.every(Boolean)) {
@@ -39870,9 +40080,9 @@ ${shown}` : t("ui.map_chat_model_label"));
       this.chainWaitingState && this.messages.at(-1) === message ? `wait:${this.chainWaitingState.kinds.join(",")}:${this.chainWaitingLeft}:${this.waitWord(this.chainWaitingState)}` : "",
       message.chainNote ? `chain:${message.chainNote.reason}:${message.chainNote.text}` : "",
       ((_i = message.unread) != null ? _i : []).map((item) => `${item.oversize ? "o" : "d"}:${item.title}`).join("\n"),
-      JSON.stringify(message.lines.map((line) => {
+      JSON.stringify(message.lines.map((line2) => {
         var _a3;
-        return (_a3 = line.basis) != null ? _a3 : null;
+        return (_a3 = line2.basis) != null ? _a3 : null;
       })),
       t("ui.map_chat_basis_title_only"),
       t("ui.map_chat_chain_wait_tail"),
@@ -39893,7 +40103,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
-      message.lines.map(settledLine).map((line) => `${line.status}:${line.text}`).join("\n"),
+      message.lines.map(settledLine).map((line2) => `${line2.status}:${line2.text}`).join("\n"),
       message.plan ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.aiWork ? "ai:" : ""}${message.plan.openGroups ? "open:" : ""}${message.plan.items.length}:${message.plan.estimate}:${(_m = (_l = message.plan.groups) == null ? void 0 : _l.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _m : ""}` : "",
       message.choices ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
       ((_n = message.images) != null ? _n : []).map(
@@ -39979,11 +40189,11 @@ ${shown}` : t("ui.map_chat_model_label"));
     if ((_c = message.images) == null ? void 0 : _c.length) this.buildImages(row, message.images);
     if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row);
     if (message.seenImage) {
-      const line = row.createDiv("vam-map-chat-seen-row");
-      const eye = line.createSpan("vam-map-chat-seen-icon");
+      const line2 = row.createDiv("vam-map-chat-seen-row");
+      const eye = line2.createSpan("vam-map-chat-seen-icon");
       eye.setAttr("aria-hidden", "true");
       (0, import_obsidian23.setIcon)(eye, "eye");
-      line.createDiv({
+      line2.createDiv({
         cls: "vam-map-chat-seen",
         text: t("ui.map_chat_seen_image_0", clip2(message.seenImage.note, 80))
       });
@@ -40018,7 +40228,7 @@ ${shown}` : t("ui.map_chat_model_label"));
    */
   buildBasis(row, message) {
     var _a2;
-    const all = summarizeBasis(message.lines.flatMap((line) => line.basis ? [line.basis] : []));
+    const all = summarizeBasis(message.lines.flatMap((line2) => line2.basis ? [line2.basis] : []));
     const entries = message.linesOpen ? all : all.filter((entry) => entry.kind === "outline_only");
     const unread = (_a2 = message.unread) != null ? _a2 : [];
     if (!entries.length && !unread.length) return;
@@ -40033,21 +40243,21 @@ ${shown}` : t("ui.map_chat_model_label"));
         )
       });
   }
-  buildBasisEntry(line, entry) {
+  buildBasisEntry(line2, entry) {
     const quoted = (titles) => titles.map((title) => t("ui.map_chat_basis_quote_0", title)).join(t("ui.map_chat_basis_title_separator"));
     if (entry.kind === "outline_only") {
       if (entry.type === "cards") {
-        line.createEl("strong", { text: t("ui.map_chat_basis_title_only_0", entry.count) });
-        line.createSpan({ text: t("ui.map_chat_basis_title_only_hint") });
+        line2.createEl("strong", { text: t("ui.map_chat_basis_title_only_0", entry.count) });
+        line2.createSpan({ text: t("ui.map_chat_basis_title_only_hint") });
       } else {
-        line.createEl("strong", { text: t("ui.map_chat_basis_title_only") });
+        line2.createEl("strong", { text: t("ui.map_chat_basis_title_only") });
         if (entry.existingChildren > 0)
-          line.createSpan({ text: t("ui.map_chat_basis_children_0", entry.existingChildren) });
+          line2.createSpan({ text: t("ui.map_chat_basis_children_0", entry.existingChildren) });
       }
       return;
     }
     if (entry.type === "cards")
-      line.setText(
+      line2.setText(
         t(
           entry.kind === "research" ? "ui.map_chat_basis_research_0_1" : "ui.map_chat_basis_note_0_1",
           quoted(entry.titles),
@@ -40055,18 +40265,18 @@ ${shown}` : t("ui.map_chat_model_label"));
         )
       );
     else
-      line.setText(
+      line2.setText(
         entry.existingChildren > 0 ? t("ui.map_chat_basis_expand_0_1", quoted(entry.titles), entry.existingChildren) : t("ui.map_chat_basis_expand_0", quoted(entry.titles))
       );
   }
   /** The waiting row of a continuation: how far the research and expansions are, the time (hidden from readers), and what is left. */
   buildChainWait(row) {
     const box = row.createDiv({ cls: "vam-map-chat-chain-wait", attr: { role: "status" } });
-    const line = box.createDiv("vam-map-chat-chain-wait-line");
-    const label = line.createSpan({ cls: "vam-map-chat-chain-wait-label" });
-    const elapsed = line.createSpan({ cls: "vam-map-chat-chain-wait-elapsed" });
+    const line2 = box.createDiv("vam-map-chat-chain-wait-line");
+    const label = line2.createSpan({ cls: "vam-map-chat-chain-wait-label" });
+    const elapsed = line2.createSpan({ cls: "vam-map-chat-chain-wait-elapsed" });
     elapsed.setAttr("aria-hidden", "true");
-    line.createSpan({
+    line2.createSpan({
       cls: "vam-map-chat-chain-wait-tail",
       text: t("ui.map_chat_stage_elapsed_0", t("ui.map_chat_chain_wait_tail"))
     });
@@ -40135,9 +40345,9 @@ ${shown}` : t("ui.map_chat_model_label"));
     this.paintStage();
   }
   /** A result the reader still has to look at: anything not done, and a picture line where some card got no picture. */
-  needsLook(line) {
+  needsLook(line2) {
     var _a2;
-    return line.status !== "done" || !!((_a2 = line.imageGroup) == null ? void 0 : _a2.some((block) => !placedImage(block)));
+    return line2.status !== "done" || !!((_a2 = line2.imageGroup) == null ? void 0 : _a2.some((block) => !placedImage(block)));
   }
   /** The toggle of "View details": one per reply, for the plan card and the results alike. Focus follows the rebuilt button. */
   buildDetailToggle(parent, message, open) {
@@ -40159,14 +40369,14 @@ ${shown}` : t("ui.map_chat_model_label"));
    * line says what happened in words, so the colour is never the only sign. Returns whether Undo was put in the summary row.
    */
   buildOutcome(row, message, applied) {
-    const shownLines = message.lines.filter((line) => {
+    const shownLines = message.lines.filter((line2) => {
       var _a2;
-      return !((_a2 = line.imageGroup) == null ? void 0 : _a2.some((block) => block.state === "searching"));
+      return !((_a2 = line2.imageGroup) == null ? void 0 : _a2.some((block) => block.state === "searching"));
     });
     const { results, notes } = splitChatLines(shownLines.map(settledLine), chatNoteTexts());
-    const folded2 = results.filter((line) => !this.needsLook(line));
-    const loud = results.filter((line) => this.needsLook(line));
-    const hasBasis = message.lines.some((line) => line.basis);
+    const folded2 = results.filter((line2) => !this.needsLook(line2));
+    const loud = results.filter((line2) => this.needsLook(line2));
+    const hasBasis = message.lines.some((line2) => line2.basis);
     const hasDetail = folded2.length > 0 || !!applied || hasBasis;
     const open = hasDetail && message.linesOpen === true;
     const undo = message.replyUndo;
@@ -40184,10 +40394,10 @@ ${shown}` : t("ui.map_chat_model_label"));
       if (hasDetail) this.buildDetailToggle(summary, message, open);
       if (undo) this.buildReplyUndo(summary, undo.token);
     }
-    for (const line of loud) list2.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+    for (const line2 of loud) list2.createDiv({ cls: `vam-map-chat-line is-${line2.status}`, text: line2.text });
     if (open) {
       if (applied) this.buildPlan(list2, applied, message);
-      for (const line of folded2) list2.createDiv({ cls: `vam-map-chat-line is-${line.status}`, text: line.text });
+      for (const line2 of folded2) list2.createDiv({ cls: `vam-map-chat-line is-${line2.status}`, text: line2.text });
     }
     for (const note of notes) list2.createDiv({ cls: "vam-map-chat-line is-note", text: note.text });
     return !!undo;
@@ -40356,14 +40566,14 @@ ${shown}` : t("ui.map_chat_model_label"));
     }
     const list2 = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
     for (const block of blocks) {
-      const cell = list2.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
+      const cell2 = list2.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
       const item = placedImage(block);
       if (item) {
-        cell.createEl("img", {
+        cell2.createEl("img", {
           cls: "vam-map-chat-images-thumb",
           attr: { src: item.candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
         });
-        const text11 = cell.createDiv({ cls: "vam-map-chat-images-text" });
+        const text11 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
         text11.createDiv({ cls: "vam-map-chat-images-topic", text: clip2(block.nodeTitle, 80) });
         text11.createDiv({ cls: "vam-map-chat-images-title", text: clip2(item.candidate.title, 80) });
         if (item.candidate.source)
@@ -40379,8 +40589,8 @@ ${shown}` : t("ui.map_chat_model_label"));
           });
         continue;
       }
-      cell.addClass("is-missed");
-      const text10 = cell.createDiv({ cls: "vam-map-chat-images-text" });
+      cell2.addClass("is-missed");
+      const text10 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
       text10.createDiv({ cls: "vam-map-chat-images-topic", text: clip2(block.nodeTitle, 80) });
       const why = block.state === "searching" ? block.running ? t("ui.map_chat_images_searching_0", clip2(block.query, 80)) : t("ui.map_chat_images_queued") : block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip2((_b2 = block.reason) != null ? _b2 : "", 160)) : (_c = block.reason) != null ? _c : t("ui.map_chat_images_none");
       text10.createDiv({ cls: "vam-map-chat-images-reason", text: why });
@@ -40396,8 +40606,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     const list2 = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
     for (const block of blocks)
       for (const item of block.items) {
-        const cell = list2.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
-        const text10 = cell.createDiv({ cls: "vam-map-chat-images-text" });
+        const cell2 = list2.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
+        const text10 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
         if (item.inserted)
           text10.createDiv({
             cls: "vam-map-chat-images-state is-inserted",
@@ -40545,7 +40755,7 @@ var import_node_crypto7 = require("node:crypto");
 var estimateTokens = (value) => Math.ceil((value || "").length / 4);
 var dedupeRules = (value) => Array.from(
   new Map(
-    value.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => [line.replace(/\s+/g, " ").toLowerCase(), line])
+    value.split("\n").map((line2) => line2.trim()).filter(Boolean).map((line2) => [line2.replace(/\s+/g, " ").toLowerCase(), line2])
   ).values()
 ).join("\n");
 function buildPreparedTaskContext(input2, model, budget = 32e3, provider = "codex") {
@@ -41208,12 +41418,12 @@ var CodexAppServerRuntime = class {
     while (true) {
       const newline = this.buffer.indexOf("\n");
       if (newline < 0) return;
-      const line = this.buffer.slice(0, newline).trim();
+      const line2 = this.buffer.slice(0, newline).trim();
       this.buffer = this.buffer.slice(newline + 1);
-      if (!line) continue;
+      if (!line2) continue;
       let message;
       try {
-        message = JSON.parse(line);
+        message = JSON.parse(line2);
       } catch (error) {
         this.failProcess(
           child,
@@ -42100,12 +42310,12 @@ var ClaudeCodeCliRuntime = class {
         onStructuredDelta: controls.onStructuredDelta,
         onStructuredJson: controls.onStructuredJson
       }) : null;
-      const readStreamLine = (line) => {
+      const readStreamLine = (line2) => {
         var _a4, _b4, _c3, _d3, _e3, _f3, _g2, _h2;
-        if (!line.trim().startsWith("{")) return;
+        if (!line2.trim().startsWith("{")) return;
         let parsedLine;
         try {
-          parsedLine = JSON.parse(line);
+          parsedLine = JSON.parse(line2);
         } catch (error) {
           if (!observer) throw error;
           observer.stop();
@@ -42116,7 +42326,7 @@ var ClaudeCodeCliRuntime = class {
         const record = parsedLine;
         if (record.parent_tool_use_id) return;
         if (record.type === "result") {
-          finalResult = line;
+          finalResult = line2;
           if (inputOpen) {
             inputOpen = false;
             child.stdin.end();
@@ -42217,9 +42427,9 @@ var ClaudeCodeCliRuntime = class {
         try {
           let newline;
           while ((newline = streamBuffer.indexOf("\n")) >= 0) {
-            const line = streamBuffer.slice(0, newline);
+            const line2 = streamBuffer.slice(0, newline);
             streamBuffer = streamBuffer.slice(newline + 1);
-            readStreamLine(line);
+            readStreamLine(line2);
           }
         } catch (error) {
           stop();
@@ -42928,9 +43138,9 @@ async function verifySource(input2) {
   const fail3 = (reason) => ({ ok: false, result: "not_found", reason });
   const url = allowedUrl(input2.url);
   if (!url) return fail3("rejected_url");
-  const quote2 = input2.quote.normalize("NFKC").trim();
-  const length = Array.from(quote2).length;
-  const foldedQuote = foldText(quote2);
+  const quote3 = input2.quote.normalize("NFKC").trim();
+  const length = Array.from(quote3).length;
+  const foldedQuote = foldText(quote3);
   if (length < QUOTE_MIN || length > QUOTE_MAX || Array.from(foldedQuote).length < QUOTE_FOLDED_MIN)
     return fail3("bad_quote");
   if (!input2.claim.trim()) return fail3("bad_claim");
@@ -43066,21 +43276,21 @@ function parseArgumentEvidence(value, needIds) {
     const keys = Object.keys(item);
     if (EVIDENCE_KEYS.some((key4) => !keys.includes(key4)) || keys.some((key4) => !EVIDENCE_KEYS.includes(key4) && !EVIDENCE_OPTIONAL_KEYS.includes(key4)))
       return refuse("an entry has missing or extra fields");
-    const { need, status, stance, claim: claim2, quote: quote2, url } = item;
+    const { need, status, stance, claim: claim2, quote: quote3, url } = item;
     const note = readNote(item.note);
     if (typeof need !== "string" || !allowed.has(need)) return refuse("an entry cites an unknown need");
     if (seen.has(need)) return refuse("a need is answered twice");
     seen.add(need);
-    if (typeof claim2 !== "string" || typeof quote2 !== "string" || typeof url !== "string" || typeof stance !== "string")
+    if (typeof claim2 !== "string" || typeof quote3 !== "string" || typeof url !== "string" || typeof stance !== "string")
       return refuse("an entry field is not a string");
     if (status === "not_found") {
-      if (quote2.trim() || url.trim() || stance !== "uncertain") return refuse("a not_found entry carries a source");
+      if (quote3.trim() || url.trim() || stance !== "uncertain") return refuse("a not_found entry carries a source");
       return { need, status, ...note ? { note } : {} };
     }
     if (status !== "found") return refuse("status must be found or not_found");
     if (!EVIDENCE_STANCES.includes(stance)) return refuse("stance is not an allowed value");
     if (!claim2.trim()) return refuse("a found entry has no claim");
-    const trimmed2 = quote2.normalize("NFKC").trim();
+    const trimmed2 = quote3.normalize("NFKC").trim();
     const length = Array.from(trimmed2).length;
     if (length < QUOTE_MIN || length > QUOTE_MAX || Array.from(foldText(trimmed2)).length < QUOTE_FOLDED_MIN2)
       return refuse(`a quote must be ${QUOTE_MIN} to ${QUOTE_MAX} characters of real text`);
@@ -43097,7 +43307,7 @@ function parseArgumentEvidence(value, needIds) {
       status: "found",
       stance,
       claim: claim2.trim(),
-      quote: quote2.trim(),
+      quote: quote3.trim(),
       url: url.trim(),
       ...figure ? { figure } : {},
       ...note ? { note } : {}
@@ -44680,8 +44890,336 @@ function renderArgumentCardBody(card, view) {
     const row = body.createDiv({ cls: "vam-argument-chips" });
     for (const chip of view.chips) row.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
   }
-  for (const line of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line });
+  for (const line2 of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line2 });
   return body;
+}
+
+// experiences/visual-map/argument-notes.ts
+function plainLine2(text10) {
+  return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/!\[|\[(?=\[)/g, (m) => m.replace("[", "&#91;")).replace(/\](?=\])/g, "&#93;");
+}
+var line = (text10) => plainLine2(text10 != null ? text10 : "").replace(/\]\(/g, "]&#40;");
+var cell = (text10) => line(text10).replace(/\|/g, "&#124;") || "-";
+function safeUrl(url) {
+  try {
+    const parsed = new URL(url.trim());
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    return parsed.href.replace(
+      /[()[\]<>|`\s]/g,
+      (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`
+    );
+  } catch (e) {
+    return "";
+  }
+}
+var quote2 = (text10) => `"${line(text10)}"`;
+var table = (head, rows2) => [
+  `| ${head.map(cell).join(" | ")} |`,
+  `| ${head.map(() => "---").join(" | ")} |`,
+  ...rows2.map((r) => `| ${r.map(cell).join(" | ")} |`)
+];
+var callout = (text10) => ["> [!summary]", `> ${line(text10)}`];
+var debug = (t2, code) => [
+  `> [!note]- ${t2("ui.argument_note_debug")}`,
+  `> ${line(code)}`
+];
+var NUMBER = /^[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/;
+function figureNumber(figure) {
+  if (!figure) return null;
+  const text10 = figure.number.trim().replace(/\s*%$/, "").replace(/^[$€£¥]/, "");
+  if (!NUMBER.test(text10)) return null;
+  const value = Number(text10.replace(/,/g, ""));
+  return Number.isFinite(value) && Math.abs(value) <= 1e12 ? value : null;
+}
+var unitOf = (figure) => {
+  const unit2 = figure.unit.trim().toLowerCase();
+  return unit2 || (/%\s*$/.test(figure.number) ? "%" : "");
+};
+var chartLabel = (text10) => [
+  ...text10.replace(/["[\]{}();<>`:\\\r\n\u2028\u2029]/g, " ").replace(/\s+/g, " ").trim()
+].slice(0, 20).join("").trim();
+function buildChart(title, rows2) {
+  const points = [];
+  for (const row of rows2) {
+    const value = figureNumber(row.figure);
+    if (value !== null) points.push({ label: chartLabel(row.label) || "n", value, unit: unitOf(row.figure) });
+  }
+  if (points.length < 2 || points.length > 12 || new Set(points.map((p) => p.unit)).size !== 1) return "";
+  const values = points.map((p) => p.value);
+  const low = Math.min(0, ...values);
+  const high = Math.max(0, ...values);
+  const chart = [
+    "```mermaid",
+    "xychart-beta",
+    `  title "${chartLabel(title) || "chart"}"`,
+    `  x-axis [${points.map((p) => `"${p.label}"`).join(", ")}]`,
+    `  y-axis "${chartLabel(points[0].unit) || "value"}" ${low} --> ${high === low ? low + 1 : high}`,
+    `  bar [${values.join(", ")}]`,
+    "```"
+  ].join("\n");
+  return neutralizeUnsafeMermaid(chart);
+}
+var WHY_KEYS = {
+  budget: "ui.argument_why_budget",
+  no_answer: "ui.argument_why_no_answer",
+  not_found: "ui.argument_why_not_found",
+  stance_uncertain: "ui.argument_why_stance_uncertain",
+  provider_error: "ui.argument_why_provider_error",
+  card_deleted: "ui.argument_why_card_deleted",
+  source_rejected_url: "ui.argument_why_source_rejected_url",
+  source_bad_quote: "ui.argument_why_source_bad_quote",
+  source_bad_claim: "ui.argument_why_source_bad_claim",
+  source_network_error: "ui.argument_why_source_network_error",
+  source_http_status: "ui.argument_why_source_http_status",
+  source_content_type: "ui.argument_why_source_content_type",
+  source_no_parser: "ui.argument_why_source_no_parser",
+  source_quote_missing: "ui.argument_why_source_quote_missing",
+  source_blocked_unverified: "ui.argument_why_source_blocked_unverified",
+  round_limit: "ui.argument_why_round_limit"
+};
+function whyText(t2, stored) {
+  const code = stored.split(/[:\s]/, 1)[0];
+  return t2(Object.hasOwn(WHY_KEYS, code) ? WHY_KEYS[code] : WHY_KEYS.not_found);
+}
+var PROP_KEYS = {
+  supports: "ui.argument_note_prop_supports",
+  refutes: "ui.argument_note_prop_refutes",
+  irrelevant: "ui.argument_note_prop_irrelevant"
+};
+var propText = (t2, d) => d.propStance ? t2(PROP_KEYS[d.propStance]) : "-";
+var figureText = (f) => f ? `${f.number}${f.unit ? ` ${f.unit}` : ""}` : "-";
+var sourceItems = (items) => items.map(({ claim: claim2, proof }) => {
+  const url = safeUrl(proof.url);
+  return `- ${line(claim2)} ${quote2(proof.quote)}${url ? ` ${url}` : ""}`;
+});
+var sourceLines = (t2, items) => items.length ? ["", `### ${t2("ui.argument_sources")}`, ...sourceItems(items)] : [];
+var dataRows = (t2, data) => data.map((d) => {
+  var _a2, _b2, _c, _d, _e;
+  return [
+    d.need,
+    figureText((_a2 = d.proof) == null ? void 0 : _a2.figure),
+    ((_c = (_b2 = d.proof) == null ? void 0 : _b2.figure) == null ? void 0 : _c.period) || "-",
+    d.state === "found" ? propText(t2, d) : t2(d.state === "not_found" ? "ui.argument_note_need_missing" : "ui.argument_note_need_pending"),
+    (_e = (_d = d.stanceReason) != null ? _d : d.reason) != null ? _e : ""
+  ];
+});
+var dataHead = (t2) => [
+  t2("ui.argument_note_col_data"),
+  t2("ui.argument_note_col_number"),
+  t2("ui.argument_note_col_period"),
+  t2("ui.argument_note_col_stance"),
+  t2("ui.argument_note_col_reason")
+];
+var chartOf = (title, data) => buildChart(
+  title,
+  data.filter((d) => d.state === "found" && d.propStance !== "irrelevant").map((d) => {
+    var _a2;
+    return { label: d.need, figure: (_a2 = d.proof) == null ? void 0 : _a2.figure };
+  })
+);
+var chartSection = (t2, chart) => chart ? ["", `### ${t2("ui.argument_note_chart")}`, chart] : [];
+var VERDICT_KEYS = {
+  supports: "ui.argument_note_verdict_supports",
+  refutes: "ui.argument_note_verdict_refutes",
+  insufficient: "ui.argument_note_verdict_insufficient",
+  pending: "ui.argument_note_verdict_pending"
+};
+var join2 = (parts) => parts.flat().join("\n");
+function datumDetail(t2, d) {
+  return join2([
+    [`### ${t2("ui.argument_note_core")}`],
+    callout(`${propText(t2, d)}${d.stanceReason ? `: ${d.stanceReason}` : ""}`),
+    ["", `### ${t2("ui.argument_note_data")}`],
+    table(dataHead(t2), dataRows(t2, [d])),
+    sourceLines(t2, d.state === "found" && d.proof ? [{ claim: d.proof.claim, proof: d.proof }] : [])
+  ]);
+}
+function notFoundDetail(t2, log, code) {
+  var _a2;
+  const why = (log == null ? void 0 : log.why) || code;
+  const note = why.includes(": ") ? why.slice(why.indexOf(": ") + 2) : "";
+  const parts = [
+    [`### ${t2("ui.argument_note_core")}`],
+    callout(t2("ui.argument_not_found_0", whyText(t2, why)))
+  ];
+  const opened = ((_a2 = log == null ? void 0 : log.opened) != null ? _a2 : []).map(safeUrl).filter(Boolean);
+  if ((log == null ? void 0 : log.queries.length) || opened.length || note) {
+    const out = ["", `### ${t2("ui.argument_note_searched")}`];
+    log == null ? void 0 : log.queries.forEach((q, i) => out.push(`- ${t2("ui.argument_note_search_n_0", String(i + 1))}: ${quote2(q)}`));
+    if (opened.length) out.push(`- ${t2("ui.argument_note_opened")}: ${opened.join(" ")}`);
+    if (note) out.push(`- ${t2("ui.argument_note_agent_note")}: ${line(note)}`);
+    parts.push(out);
+  }
+  parts.push([""], debug(t2, why));
+  return join2(parts);
+}
+function facetDetail(t2, facet, data) {
+  return join2([
+    [`### ${t2("ui.argument_note_core")}`],
+    callout(`${t2(VERDICT_KEYS[facet.verdict])}${facet.reason ? `: ${facet.reason}` : ""}`),
+    ["", `### ${t2("ui.argument_note_data")}`],
+    table(dataHead(t2), dataRows(t2, data)),
+    chartSection(t2, chartOf(facet.title, data)),
+    sourceLines(
+      t2,
+      data.filter((d) => d.state === "found" && d.proof).map((d) => ({ claim: d.proof.claim, proof: d.proof }))
+    )
+  ]);
+}
+function situationDetail(t2, state) {
+  var _a2, _b2;
+  const facets = (_a2 = state.situation.facets) != null ? _a2 : [];
+  const supporting = facets.filter((f) => f.verdict === "supports").length;
+  return join2([
+    [`### ${t2("ui.argument_note_core")}`],
+    callout(t2("ui.argument_note_facet_count_0_1", String(supporting), String(facets.length))),
+    ["", `### ${t2("ui.argument_note_facets")}`],
+    table(
+      [t2("ui.argument_note_col_facet"), t2("ui.argument_note_col_verdict"), t2("ui.argument_note_col_reason")],
+      facets.map((f) => [f.title, t2(VERDICT_KEYS[f.verdict]), f.reason])
+    ),
+    chartSection(t2, chartOf((_b2 = state.situation.question) != null ? _b2 : "", state.situation.data))
+  ]);
+}
+function definitionsDetail(t2, items, insights) {
+  return join2([
+    [`### ${t2("ui.argument_definitions")}`],
+    table(
+      [t2("ui.argument_note_col_item"), t2("ui.argument_note_col_definition"), t2("ui.argument_note_col_reason")],
+      items.map((i) => [i.label, i.value, i.reason])
+    ),
+    (insights == null ? void 0 : insights.length) ? ["", `### ${t2("ui.argument_note_definition_insights")}`, ...insights.map((i) => `- ${line(i)}`)] : []
+  ]);
+}
+var INSIGHT_KEYS = {
+  consistent: "ui.argument_note_insight_consistent",
+  tension: "ui.argument_note_insight_tension",
+  missing: "ui.argument_note_insight_missing"
+};
+var NEED_KEYS = {
+  supports: "ui.argument_note_need_supports",
+  contradicts: "ui.argument_note_need_contradicts",
+  uncertain: "ui.argument_note_need_uncertain"
+};
+function hypothesisDetail(t2, h, reason) {
+  var _a2, _b2;
+  const verdict = (_a2 = h.userVerdict) != null ? _a2 : h.aiVerdict;
+  const found = foundNeeds(h);
+  const verdictKey = verdict === "supported" ? "ui.argument_note_hyp_supported_0_1" : verdict === "refuted" ? "ui.argument_note_hyp_refuted_0_1" : "ui.argument_note_hyp_undecided_0_1";
+  const whyKey = verdict === "supported" ? "ui.argument_note_why_holds" : verdict === "refuted" ? "ui.argument_note_why_fails" : "ui.argument_note_why_undecided";
+  const rows2 = h.needs.map((n) => {
+    var _a3, _b3;
+    return [
+      n.text,
+      figureText((_a3 = n.proof) == null ? void 0 : _a3.figure),
+      n.state === "found" ? t2(NEED_KEYS[(_b3 = n.stance) != null ? _b3 : "uncertain"]) : t2(n.state === "not_found" ? "ui.argument_note_need_missing" : "ui.argument_note_need_pending"),
+      n.proof && safeUrl(n.proof.url) || "-"
+    ];
+  });
+  return join2([
+    [`### ${t2("ui.argument_note_core")}`],
+    callout(t2(verdictKey, String(found.length), String(h.needs.length))),
+    ["", `### ${t2(whyKey)}`, line(reason)],
+    h.basis ? ["", `### ${t2("ui.argument_note_basis")}`, line(h.basis)] : [],
+    ((_b2 = h.insights) == null ? void 0 : _b2.length) ? [
+      "",
+      `### ${t2("ui.argument_note_insights")}`,
+      ...h.insights.map((i) => `- ${t2(INSIGHT_KEYS[i.kind])}: ${line(i.text)}`)
+    ] : [],
+    ["", `### ${t2("ui.argument_note_col_evidence")}`],
+    table(
+      [
+        t2("ui.argument_note_col_evidence"),
+        t2("ui.argument_note_col_number"),
+        t2("ui.argument_note_col_stance"),
+        t2("ui.argument_note_col_source")
+      ],
+      rows2
+    ),
+    sourceLines(
+      t2,
+      found.map((n) => ({ claim: n.proof.claim, proof: n.proof }))
+    )
+  ]);
+}
+function conclusionDetail(t2, state, titles, answer, stoppedSummary = "") {
+  var _a2;
+  const facets = (_a2 = state.situation.facets) != null ? _a2 : [];
+  const data = state.situation.data;
+  const title = (id) => {
+    var _a3;
+    return (_a3 = titles.get(id)) != null ? _a3 : id;
+  };
+  const parts = [];
+  if (answer) {
+    const based = state.hypotheses.filter((h) => state.conclusion.basedOn.includes(h.id));
+    parts.push([`### ${t2("ui.argument_note_core")}`], callout(answer.summary));
+    if (answer.points.length)
+      parts.push(["", `### ${t2("ui.argument_note_insights")}`, ...answer.points.map((p) => `- ${line(p)}`)]);
+    parts.push(
+      ["", `### ${t2("ui.argument_note_basis_hypotheses")}`],
+      table(
+        [
+          t2("ui.argument_note_col_hypothesis"),
+          t2("ui.argument_note_col_verdict"),
+          t2("ui.argument_note_col_key_evidence")
+        ],
+        based.map((h) => [
+          title(h.id),
+          t2("ui.argument_note_need_supports"),
+          foundNeeds(h).map((n) => n.proof.claim).slice(0, 2).join("; ")
+        ])
+      )
+    );
+    const eliminated = state.hypotheses.filter((h) => h.location === "eliminated");
+    if (eliminated.length)
+      parts.push([
+        "",
+        `### ${t2("ui.argument_note_eliminated")}`,
+        ...eliminated.map(
+          (h) => {
+            var _a3, _b2;
+            return `- ${line(title(h.id))}: ${line(((_a3 = h.eliminationReason) == null ? void 0 : _a3.startsWith("round_limit")) ? whyText(t2, "round_limit") : (_b2 = h.eliminationReason) != null ? _b2 : "")}`;
+          }
+        )
+      ]);
+  } else {
+    parts.push([`### ${t2("ui.argument_note_core")}`], callout(stoppedSummary));
+  }
+  parts.push(
+    ["", `### ${t2("ui.argument_note_situation_basis")}`],
+    table(
+      [t2("ui.argument_note_col_facet"), t2("ui.argument_note_col_verdict"), t2("ui.argument_note_col_reason")],
+      facets.map((f) => [f.title, t2(VERDICT_KEYS[f.verdict]), f.summary || f.reason])
+    )
+  );
+  if (!answer) {
+    for (const f of facets.filter((x) => x.verdict === "refutes")) {
+      const cited = f.citedData.flatMap((id) => {
+        const d = data.find((x) => x.id === id);
+        return (d == null ? void 0 : d.proof) ? [{ claim: d.proof.claim, proof: d.proof }] : [];
+      });
+      parts.push([
+        "",
+        `### ${t2("ui.argument_note_refuting")}`,
+        `- ${line(f.title)}: ${line(f.reason)}`,
+        ...sourceItems(cited)
+      ]);
+    }
+    const lacking = facets.filter((f) => f.verdict === "insufficient");
+    if (lacking.length) {
+      const out = ["", `### ${t2("ui.argument_note_insufficient")}`];
+      for (const f of lacking) {
+        out.push(`- ${line(f.title)}`);
+        for (const d of data.filter((x) => x.facetId === f.id && x.searchLog))
+          d.searchLog.queries.forEach(
+            (q, i) => out.push(`  - ${t2("ui.argument_note_search_n_0", String(i + 1))}: ${quote2(q)}`)
+          );
+      }
+      parts.push(out);
+    }
+  }
+  return join2(parts);
 }
 
 // core/argument-map/layout.ts
@@ -45773,9 +46311,6 @@ var ArgumentRunError = class extends Error {
 function topicKindOfNote(kind) {
   return kind === "hypothesis" ? "hypothesis" : kind === "need" || kind === "datum" ? "evidence" : kind === "conclusion" ? "conclusion" : "topic";
 }
-function plainLine2(text10) {
-  return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/!\[|\[(?=\[)/g, (m) => m.replace("[", "&#91;")).replace(/\](?=\])/g, "&#93;");
-}
 var shorten = (text10, max) => Array.from(text10.trim()).slice(0, max).join("");
 var capText = (text10, max) => {
   let out = "";
@@ -45824,6 +46359,8 @@ var ArgumentRuns = class {
     __publicField(this, "waiting", []);
     __publicField(this, "inFlight", 0);
     __publicField(this, "disposed", false);
+    /** Raw translation for the note builders: they escape every model/web string themselves. */
+    __publicField(this, "tr", (key4, ...values) => this.ports.t(key4, ...values));
   }
   // ---- note writes: every model/web-derived string passes here before it reaches a Markdown note ----------------------------------
   /** Translation with every string argument treated as plain single-line text. */
@@ -46207,7 +46744,7 @@ var ArgumentRuns = class {
       };
       const ids2 = /* @__PURE__ */ new Map();
       if (items.length) {
-        const detail = items.map((i) => `- ${plainLine2(i.label)}: ${plainLine2(i.value)} (${plainLine2(i.reason)})`).join("\n");
+        const detail = definitionsDetail(this.tr, items);
         ids2.set("as", (await make("group", this.ports.t("ui.argument_definitions"), void 0, detail)).id);
       }
       for (const [i, f] of result.facets.entries()) {
@@ -46307,16 +46844,29 @@ var ArgumentRuns = class {
       const judged = result.facets;
       const inner = plan.notes;
       plan.notes = async () => {
-        for (const f of judged) await this.noteSummary(map, f.id, drive, f.summary, f.reason);
+        var _a3;
+        const final = plan.next;
+        for (const f of judged) {
+          const facet = (_a3 = final.situation.facets) == null ? void 0 : _a3.find((x) => x.id === f.id);
+          if (!facet) continue;
+          const own2 = final.situation.data.filter((d) => d.facetId === f.id);
+          await this.noteById(map, f.id, drive, { summary: f.summary, detail: facetDetail(this.tr, facet, own2) });
+          for (const d of own2.filter((x) => x.state === "found" && x.proof))
+            await this.noteById(map, d.id, drive, { detail: datumDetail(this.tr, d) });
+        }
+        await this.noteById(map, final.roles.situation, drive, { detail: situationDetail(this.tr, final) });
+        const as = final.situation.assumptions;
+        if (as == null ? void 0 : as.items.length)
+          await this.noteById(map, as.id, drive, { detail: definitionsDetail(this.tr, as.items, as.insights) });
         if (inner) await inner();
       };
       return plan;
     });
   }
-  async noteSummary(map, id, drive, summary, detail) {
+  async noteById(map, id, drive, patch) {
     var _a2, _b2;
     const path = (_b2 = (_a2 = map.nodes.find((n) => n.id === id)) == null ? void 0 : _a2.path) != null ? _b2 : await this.notePath(drive, id);
-    if (path) await this.writeNote(path, { summary, detail: `${this.t("ui.argument_reason")}: ${plainLine2(detail)}` });
+    if (path) await this.writeNote(path, patch);
   }
   async propose(drive, state, proposition, count3) {
     var _a2;
@@ -46413,7 +46963,16 @@ var ArgumentRuns = class {
         }));
       return {
         next,
-        notes: () => this.noteDetail(map, hypothesisId, drive, `${this.t("ui.argument_reason")}: ${plainLine2(result.reason)}`)
+        notes: () => this.noteDetail(
+          map,
+          hypothesisId,
+          drive,
+          facet ? hypothesisDetail(
+            this.tr,
+            next.hypotheses.find((h) => h.id === hypothesisId),
+            result.reason
+          ) : `${this.t("ui.argument_reason")}: ${plainLine2(result.reason)}`
+        )
       };
     });
   }
@@ -46427,7 +46986,10 @@ var ArgumentRuns = class {
       var _a2;
       const next = applyConclusion(s, result);
       const pointLines = result.points.map((p) => `- ${plainLine2(p.text)}`);
-      const detail = [
+      const detail = hasFacets(next) ? conclusionDetail(this.tr, next, await this.hypothesisTitles(drive, next), {
+        summary: result.summary,
+        points: result.points.map((p) => p.text)
+      }) : [
         ...pointLines,
         "",
         ...this.dataSection(next, next.conclusion.basedOn),
@@ -46464,7 +47026,7 @@ var ArgumentRuns = class {
       summary = t2("ui.argument_stopped_limit_0", next.conclusion.missing.join("; "));
     else
       summary = gate.kind === "data_insufficient" ? t2("ui.argument_stopped_insufficient") : gate.kind === "data_missing" ? t2("ui.argument_stopped_missing") : t2("ui.argument_stopped_mismatch");
-    const detail = next.run.phase === "stopped_mismatch" ? [`${t2("ui.argument_reason")}: ${plainLine2((_a2 = gate.reason) != null ? _a2 : "")}`, "", ...this.dataSection(next, [])].join("\n") : "";
+    const detail = hasFacets(next) ? conclusionDetail(this.tr, next, await this.hypothesisTitles(drive, next), void 0, summary) : next.run.phase === "stopped_mismatch" ? [`${t2("ui.argument_reason")}: ${plainLine2((_a2 = gate.reason) != null ? _a2 : "")}`, "", ...this.dataSection(next, [])].join("\n") : "";
     const path = (_b2 = (await this.ports.readMap(drive.mapPath)).nodes.find((n) => n.id === next.roles.conclusion)) == null ? void 0 : _b2.path;
     this.ports.log(
       `argument-run stopped runId=${next.run.runId} phase=${next.run.phase} stopReason=${(_c = next.run.stopReason) != null ? _c : "-"} gateKind=${(_d = gate.kind) != null ? _d : "-"}`
@@ -46476,10 +47038,15 @@ var ArgumentRuns = class {
       }
     };
   }
-  async noteDetail(map, id, drive, line) {
+  async hypothesisTitles(drive, state) {
+    const titles = /* @__PURE__ */ new Map();
+    for (const h of state.hypotheses) titles.set(h.id, (await this.text(drive, h.id)).title);
+    return titles;
+  }
+  async noteDetail(map, id, drive, line2) {
     var _a2, _b2;
     const path = (_b2 = (_a2 = map.nodes.find((n) => n.id === id)) == null ? void 0 : _a2.path) != null ? _b2 : await this.notePath(drive, id);
-    if (path) await this.writeNote(path, { detail: line });
+    if (path) await this.writeNote(path, { detail: line2 });
   }
   // ---- research ----------------------------------------------------------------------------------------------------------------
   async slot() {
@@ -46652,7 +47219,9 @@ var ArgumentRuns = class {
             detail: [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n")
           });
         } else if (!result.found)
-          await this.writeNote(node.path, { detail: this.t("ui.argument_not_found_0", result.reason) });
+          await this.writeNote(node.path, {
+            detail: hasFacets(next) ? notFoundDetail(this.tr, searchLog, result.reason) : this.t("ui.argument_not_found_0", result.reason)
+          });
       };
       return { next, notes };
     });
@@ -47486,16 +48055,16 @@ function isRecordFilePath(path) {
 function recordFilesIn(files) {
   return files.filter((file) => isRecordFilePath(file.path));
 }
-function serializeLine(line) {
-  const { v: _ignored, ...rest } = line;
+function serializeLine(line2) {
+  const { v: _ignored, ...rest } = line2;
   return `${JSON.stringify({ v: RECORD_VERSION, ...rest })}
 `;
 }
-function withValidSteers(line) {
-  if (line.type !== "turn_end" || !("steers" in line)) return line;
-  const steers = line.steers;
-  if (Array.isArray(steers) && steers.every((item) => typeof item === "string")) return line;
-  const { steers: _dropped, ...rest } = line;
+function withValidSteers(line2) {
+  if (line2.type !== "turn_end" || !("steers" in line2)) return line2;
+  const steers = line2.steers;
+  if (Array.isArray(steers) && steers.every((item) => typeof item === "string")) return line2;
+  const { steers: _dropped, ...rest } = line2;
   return rest;
 }
 function parseRecord(text10) {
@@ -47524,8 +48093,8 @@ function parseRecord(text10) {
   }
   return { lines, skipped: skipped2, unrecoverable, cleanEnd: text10 === "" || text10.endsWith("\n") };
 }
-var lineTime = (line) => {
-  const value = line.type === "conversation" ? line.startedAt : line.at;
+var lineTime = (line2) => {
+  const value = line2.type === "conversation" ? line2.startedAt : line2.at;
   return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
 };
 function lastLineAt(lines) {
@@ -47580,38 +48149,38 @@ function restoreConversation(id, lines) {
   const undone = /* @__PURE__ */ new Map();
   const chainEnds = /* @__PURE__ */ new Map();
   let startedResearch = false;
-  for (const line of lines) {
-    if (line.type === "conversation") {
-      mapPath = typeof line.mapPath === "string" ? line.mapPath : mapPath;
-      mapId = typeof line.mapId === "string" ? line.mapId : mapId;
-    } else if (line.type === "moved") {
-      if (typeof line.to === "string") mapPath = line.to;
-    } else if (line.type === "turn_start") {
-      if (!starts.has(line.turn)) order.push(line.turn);
-      starts.set(line.turn, line);
-    } else if (line.type === "turn_end") {
-      ends.set(line.turn, line);
-    } else if (line.type === "plan") {
-      plans.set(line.turn, { state: line.state, lines: Array.isArray(line.lines) ? line.lines : [] });
-    } else if (line.type === "lines") {
-      if (Array.isArray(line.lines)) {
-        const plan = plans.get(line.turn);
-        if (plan) plan.lines = line.lines;
-        else current.set(line.turn, line.lines);
+  for (const line2 of lines) {
+    if (line2.type === "conversation") {
+      mapPath = typeof line2.mapPath === "string" ? line2.mapPath : mapPath;
+      mapId = typeof line2.mapId === "string" ? line2.mapId : mapId;
+    } else if (line2.type === "moved") {
+      if (typeof line2.to === "string") mapPath = line2.to;
+    } else if (line2.type === "turn_start") {
+      if (!starts.has(line2.turn)) order.push(line2.turn);
+      starts.set(line2.turn, line2);
+    } else if (line2.type === "turn_end") {
+      ends.set(line2.turn, line2);
+    } else if (line2.type === "plan") {
+      plans.set(line2.turn, { state: line2.state, lines: Array.isArray(line2.lines) ? line2.lines : [] });
+    } else if (line2.type === "lines") {
+      if (Array.isArray(line2.lines)) {
+        const plan = plans.get(line2.turn);
+        if (plan) plan.lines = line2.lines;
+        else current.set(line2.turn, line2.lines);
       }
-    } else if (line.type === "images") {
-      images.set(line.turn, { state: line.state, items: (_a2 = line.items) != null ? _a2 : [], inserted: (_b2 = line.inserted) != null ? _b2 : [] });
-    } else if (line.type === "event") {
-      if (line.kind === "undo") undone.set(line.turn, true);
-      else if (line.kind === "redo") undone.set(line.turn, false);
-      else if (line.kind === "research_started") startedResearch = true;
-      else if (line.kind === "chain_end") {
-        const reason = MAP_CHAT_CHAIN_END_REASONS.find((item) => item === line.reason);
+    } else if (line2.type === "images") {
+      images.set(line2.turn, { state: line2.state, items: (_a2 = line2.items) != null ? _a2 : [], inserted: (_b2 = line2.inserted) != null ? _b2 : [] });
+    } else if (line2.type === "event") {
+      if (line2.kind === "undo") undone.set(line2.turn, true);
+      else if (line2.kind === "redo") undone.set(line2.turn, false);
+      else if (line2.kind === "research_started") startedResearch = true;
+      else if (line2.kind === "chain_end") {
+        const reason = MAP_CHAT_CHAIN_END_REASONS.find((item) => item === line2.reason);
         if (reason && reason !== "map_changed")
-          chainEnds.set(line.turn, {
+          chainEnds.set(line2.turn, {
             reason,
-            round: Number.isInteger(line.round) && line.round >= 1 ? Math.min(line.round, 99) : 1,
-            remaining: typeof line.remaining === "string" ? line.remaining.slice(0, 1e3) : ""
+            round: Number.isInteger(line2.round) && line2.round >= 1 ? Math.min(line2.round, 99) : 1,
+            remaining: typeof line2.remaining === "string" ? line2.remaining.slice(0, 1e3) : ""
           });
       }
     }
@@ -47732,20 +48301,20 @@ var MapChatRecordWriter = class {
     for (const turn of turns) this.conv.ended.add(turn);
   }
   /** Takes one line. Dropped when closed, disposed or off, or when its turn already ended (the turn fence). */
-  write(line) {
+  write(line2) {
     var _a2;
     if (this.dead() || this.closed || !this.enabled) return;
     const conv = this.conv;
-    if (line.type === "turn_start" || line.type === "turn_end") {
-      if (conv.ended.has(line.turn)) return;
-      if (line.type === "turn_end") conv.ended.add(line.turn);
+    if (line2.type === "turn_start" || line2.type === "turn_end") {
+      if (conv.ended.has(line2.turn)) return;
+      if (line2.type === "turn_end") conv.ended.add(line2.turn);
     }
-    const text10 = serializeLine({ ...line, at: (_a2 = line.at) != null ? _a2 : this.stamp() });
+    const text10 = serializeLine({ ...line2, at: (_a2 = line2.at) != null ? _a2 : this.stamp() });
     const target = this.target;
     if (!conv.file && !(target == null ? void 0 : target.root)) conv.held = true;
     void this.enqueue(async () => {
       conv.pending.push(text10);
-      if (line.type === "event" && line.kind === "research_started") conv.researchLine = text10;
+      if (line2.type === "event" && line2.kind === "research_started") conv.researchLine = text10;
       await this.flush(conv, target);
     });
   }
@@ -48002,8 +48571,8 @@ function topicChatPath(root, nodeId, configDir) {
   if (!isSafeTopicNodeId(nodeId)) throw new RecordPathError(`Bad topic id: ${String(nodeId)}`);
   return `${topicChatDir(root, configDir)}/${nodeId}.jsonl`;
 }
-function serializeTopicChatLine(line) {
-  const { v: _ignored, ...rest } = line;
+function serializeTopicChatLine(line2) {
+  const { v: _ignored, ...rest } = line2;
   return `${JSON.stringify({ v: TOPIC_CHAT_RECORD_VERSION, ...rest })}
 `;
 }
@@ -48049,8 +48618,8 @@ function parseTopicChat(text10) {
       unrecoverable = true;
       continue;
     }
-    const line = version === TOPIC_CHAT_RECORD_VERSION ? validLine(value) : null;
-    if (line) lines.push(line);
+    const line2 = version === TOPIC_CHAT_RECORD_VERSION ? validLine(value) : null;
+    if (line2) lines.push(line2);
     else skipped2++;
   }
   return { lines, skipped: skipped2, unrecoverable, cleanEnd: text10 === "" || text10.endsWith("\n") };
@@ -48059,24 +48628,24 @@ function restoreTopicChat(lines) {
   var _a2;
   const turns = [];
   const byId = /* @__PURE__ */ new Map();
-  for (const line of lines) {
-    if (line.type === "turn") {
-      if (byId.has(line.id)) continue;
+  for (const line2 of lines) {
+    if (line2.type === "turn") {
+      if (byId.has(line2.id)) continue;
       const turn = {
-        id: line.id,
-        kind: line.kind,
-        mode: line.mode,
-        message: line.message,
+        id: line2.id,
+        kind: line2.kind,
+        mode: line2.mode,
+        message: line2.message,
         result: null,
         steers: []
       };
-      byId.set(line.id, turn);
+      byId.set(line2.id, turn);
       turns.push(turn);
-    } else if (line.type === "steer") {
-      (_a2 = byId.get(line.id)) == null ? void 0 : _a2.steers.push(line.text);
+    } else if (line2.type === "steer") {
+      (_a2 = byId.get(line2.id)) == null ? void 0 : _a2.steers.push(line2.text);
     } else {
-      const turn = byId.get(line.id);
-      if (turn && !turn.result) turn.result = { status: line.status, text: line.text };
+      const turn = byId.get(line2.id);
+      if (turn && !turn.result) turn.result = { status: line2.status, text: line2.text };
     }
   }
   return turns;
@@ -48115,7 +48684,7 @@ var TopicChatRecordWriter = class {
     }
   }
   /** Takes one line. Dropped when closed or disposed, for an unsafe id, or without a managed folder. */
-  write(root, nodeId, line) {
+  write(root, nodeId, line2) {
     if (this.dead() || this.closed || !root || !isSafeTopicNodeId(nodeId)) return;
     let path;
     try {
@@ -48123,7 +48692,7 @@ var TopicChatRecordWriter = class {
     } catch (e) {
       return;
     }
-    const text10 = serializeTopicChatLine(line);
+    const text10 = serializeTopicChatLine(line2);
     void this.enqueue(() => this.append(root, path, text10));
   }
   /** Resolves when everything queued so far has run. */
@@ -48290,11 +48859,11 @@ var missedImageRows = (blocks) => blocks.flatMap((block) => {
   const why = block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", (_a2 = block.reason) != null ? _a2 : "") : (_b2 = block.reason) != null ? _b2 : t("ui.map_chat_images_none");
   return [{ status: block.state === "failed" ? "failed" : "skipped", text: `${block.nodeTitle}: ${why}` }];
 });
-var plainLines = (lines) => onceImageLines(lines).flatMap((line) => {
-  const settled2 = settledLine(line);
+var plainLines = (lines) => onceImageLines(lines).flatMap((line2) => {
+  const settled2 = settledLine(line2);
   return [
     { status: settled2.status, text: settled2.text, ...settled2.basis ? { basis: settled2.basis } : {} },
-    ...line.imageGroup ? missedImageRows(line.imageGroup) : []
+    ...line2.imageGroup ? missedImageRows(line2.imageGroup) : []
   ];
 });
 var MapChatTurnRecord = class {
@@ -48318,10 +48887,10 @@ var MapChatTurnRecord = class {
     return this.writer.conversationId === this.conversationId;
   }
   /** Writes a line of this turn into its own conversation; a failure to build the line is logged, never thrown into the chat. */
-  write(line) {
+  write(line2) {
     if (!this.live()) return;
     try {
-      this.writer.write(line);
+      this.writer.write(line2);
     } catch (error) {
       this.log(error instanceof Error ? error.message : String(error));
     }
@@ -48637,7 +49206,7 @@ function outlineTitle(raw) {
   return plain.replace(new RegExp(`${mark2}(\\d+)${mark2}`, "g"), (_match, index) => kept[Number(index)]).trim();
 }
 function unwrapFencedOutline(lines) {
-  const firstContent = lines.findIndex((line) => line.trim() !== "");
+  const firstContent = lines.findIndex((line2) => line2.trim() !== "");
   let index = 0;
   while (index < lines.length) {
     const open = FENCE_OPEN2.exec(lines[index]);
@@ -48662,20 +49231,20 @@ function unwrapFencedOutline(lines) {
       continue;
     }
     const inner = lines.slice(index + 1, close);
-    if (!labelled[2] && inner.some((line) => line.trim() !== "" && !HEADING3.test(line))) return lines;
+    if (!labelled[2] && inner.some((line2) => line2.trim() !== "" && !HEADING3.test(line2))) return lines;
     const outside = [...lines.slice(0, index), ...lines.slice(close + 1)];
-    if (!inner.some((line) => HEADING3.test(line)) || outside.some((line) => HEADING3.test(line))) return lines;
-    return lines.map((line, position) => position === index || position === close ? "" : line);
+    if (!inner.some((line2) => HEADING3.test(line2)) || outside.some((line2) => HEADING3.test(line2))) return lines;
+    return lines.map((line2, position) => position === index || position === close ? "" : line2);
   }
   return lines;
 }
 function sanitizeOutlineDraft(markdown) {
-  return markdown.split("\n").map((line) => {
+  return markdown.split("\n").map((line2) => {
     var _a2;
-    const heading = HEADING3.exec(line);
-    if (!heading) return line;
+    const heading = HEADING3.exec(line2);
+    if (!heading) return line2;
     const title = outlineTitle(((_a2 = heading[2]) != null ? _a2 : "").replace(/(^|[ \t]+)#+[ \t]*$/, ""));
-    if (!titleProblem(title)) return line;
+    if (!titleProblem(title)) return line2;
     return `${heading[1]} ${sanitizeGeneratedTitle(title)}`;
   }).join("\n");
 }
@@ -48693,11 +49262,11 @@ function parseOutline(input2) {
   let start = 0;
   let vamNote = false;
   if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
-    const end = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
+    const end = lines.findIndex((line2, index) => index > 0 && line2.trim() === "---");
     if (end > 0) {
       start = end + 1;
       skippedLines += start;
-      vamNote = lines.slice(1, end).some((line) => /^(visual-agent-map|agent-map-node)[ \t]*:/.test(line));
+      vamNote = lines.slice(1, end).some((line2) => /^(visual-agent-map|agent-map-node)[ \t]*:/.test(line2));
     }
   }
   const stack = [];
@@ -48705,28 +49274,28 @@ function parseOutline(input2) {
   const seenFiles = /* @__PURE__ */ new Map();
   let rootLevel = 0;
   for (let index = start; index < lines.length; index++) {
-    const line = lines[index];
+    const line2 = lines[index];
     const lineNumber = index + 1;
-    if (line.includes("<!-- visual-agent-map:")) vamNote = true;
+    if (line2.includes("<!-- visual-agent-map:")) vamNote = true;
     if (fence) {
       skippedLines++;
-      const close = FENCE_CLOSE2.exec(line);
+      const close = FENCE_CLOSE2.exec(line2);
       if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
       continue;
     }
     if (block) {
       skippedLines++;
       const end = block === "html" ? "-->" : block === "obsidian" ? "%%" : "$$";
-      if (line.includes(end)) block = null;
+      if (line2.includes(end)) block = null;
       continue;
     }
-    const open = FENCE_OPEN2.exec(line);
+    const open = FENCE_OPEN2.exec(line2);
     if (open && !(open[1][0] === "`" && open[2].includes("`"))) {
       skippedLines++;
       fence = open[1];
       continue;
     }
-    const trimmed2 = line.trim();
+    const trimmed2 = line2.trim();
     if (trimmed2.startsWith("<!--")) {
       skippedLines++;
       if (!trimmed2.includes("-->", 4)) block = "html";
@@ -48746,7 +49315,7 @@ function parseOutline(input2) {
       blankLines++;
       continue;
     }
-    const heading = HEADING3.exec(line);
+    const heading = HEADING3.exec(line2);
     if (!heading) {
       ignoredLines++;
       continue;
@@ -49345,16 +49914,16 @@ var MARKDOWN_HEADING = /^ {0,3}#{1,6}[ \t]+\S/m;
 var LIST_MARKER = /^(?:[-*+]|\d{1,9}[.)])(?:[ \t]+|$)/;
 var CHECKBOX = /^\[[ xX]\](?:[ \t]+|$)/;
 var TITLE_FORBIDDEN2 = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
-var reject = (reason, line) => line === void 0 ? { ok: false, reason } : { ok: false, reason, line };
-function splitIndent(line) {
+var reject = (reason, line2) => line2 === void 0 ? { ok: false, reason } : { ok: false, reason, line: line2 };
+function splitIndent(line2) {
   let indent2 = 0;
   let index = 0;
-  for (; index < line.length; index++) {
-    if (line[index] === " ") indent2++;
-    else if (line[index] === "	") indent2 += TAB_COLUMNS;
+  for (; index < line2.length; index++) {
+    if (line2[index] === " ") indent2++;
+    else if (line2[index] === "	") indent2 += TAB_COLUMNS;
     else break;
   }
-  return { indent: indent2, rest: line.slice(index) };
+  return { indent: indent2, rest: line2.slice(index) };
 }
 function parseIndentedText(text10) {
   try {
@@ -49540,10 +50109,10 @@ var noteParts = (text10) => {
   const found = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text10);
   if (!found) return null;
   const blocks = [];
-  for (const line of found[1].split("\n")) {
-    const continued = blocks.length > 0 && /^(\s|-(\s|$)|$)/.test(line);
-    if (continued) blocks[blocks.length - 1].push(line);
-    else blocks.push([line]);
+  for (const line2 of found[1].split("\n")) {
+    const continued = blocks.length > 0 && /^(\s|-(\s|$)|$)/.test(line2);
+    if (continued) blocks[blocks.length - 1].push(line2);
+    else blocks.push([line2]);
   }
   return {
     blocks: blocks.filter((lines) => !/^updated\s*:/.test(lines[0])).map((lines) => lines.join("\n")),
@@ -49655,9 +50224,9 @@ var choiceCount = 0;
 function styleChoiceField(parent, options) {
   const id = `vam-style-choice-${++choiceCount}`;
   const root = parent.createDiv("vam-style-choice");
-  const line = root.createDiv("vam-style-choice-line");
-  const text10 = line.createSpan({ cls: "vam-style-choice-text" });
-  const toggle = line.createEl("button", { text: t("ui.note_style_change_once"), cls: "vam-field-link" });
+  const line2 = root.createDiv("vam-style-choice-line");
+  const text10 = line2.createSpan({ cls: "vam-style-choice-text" });
+  const toggle = line2.createEl("button", { text: t("ui.note_style_change_once"), cls: "vam-field-link" });
   toggle.type = "button";
   toggle.setAttr("aria-expanded", "false");
   toggle.setAttr("aria-controls", id);
@@ -50210,10 +50779,10 @@ var MAX_XML_DEPTH = 200;
 var MAX_ATTRIBUTES = 100;
 var FALLBACK_ROOT_TITLE = "Imported outline";
 var ExchangeReject = class extends Error {
-  constructor(reason, line) {
+  constructor(reason, line2) {
     super(reason);
     this.reason = reason;
-    this.line = line;
+    this.line = line2;
   }
 };
 var RAW_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f￾￿]/;
@@ -50232,15 +50801,15 @@ function utf8Length(text10) {
   return bytes;
 }
 var isXmlChar = (code) => code === 9 || code === 10 || code === 13 || code >= 32 && code <= 55295 || code >= 57344 && code <= 65533 || code >= 65536 && code <= 1114111;
-function decodeEntities(raw, line) {
+function decodeEntities(raw, line2) {
   if (!raw.includes("&")) return raw;
-  if (raw.replace(ENTITY, "").includes("&")) throw new ExchangeReject("bad-entity", line);
+  if (raw.replace(ENTITY, "").includes("&")) throw new ExchangeReject("bad-entity", line2);
   return raw.replace(
     ENTITY_PARTS,
     (_m, dec, hex, named) => {
       if (named !== void 0) return NAMED[named];
       const code = dec !== void 0 ? parseInt(dec, 10) : parseInt(hex, 16);
-      if (!isXmlChar(code)) throw new ExchangeReject("bad-entity", line);
+      if (!isXmlChar(code)) throw new ExchangeReject("bad-entity", line2);
       return String.fromCodePoint(code);
     }
   );
@@ -50250,10 +50819,10 @@ function tokenize(source) {
   const length = source.length;
   let pos = 0;
   let lineAt = 0;
-  let line = 1;
+  let line2 = 1;
   const lineOf = (position) => {
-    while (lineAt < position && lineAt < length) if (source.charCodeAt(lineAt++) === 10) line++;
-    return line;
+    while (lineAt < position && lineAt < length) if (source.charCodeAt(lineAt++) === 10) line2++;
+    return line2;
   };
   const fail3 = (reason, at = pos) => {
     throw new ExchangeReject(reason, lineOf(at));
@@ -50341,9 +50910,9 @@ function tokenize(source) {
       if (source[pos] !== "=") fail3("bad-xml");
       pos++;
       skipSpace3();
-      const quote2 = source[pos];
-      if (quote2 !== '"' && quote2 !== "'") fail3("bad-xml");
-      const close = source.indexOf(quote2, pos + 1);
+      const quote3 = source[pos];
+      if (quote3 !== '"' && quote3 !== "'") fail3("bad-xml");
+      const close = source.indexOf(quote3, pos + 1);
       if (close < 0) fail3("bad-xml");
       const raw = source.slice(pos + 1, close);
       if (raw.includes("<")) fail3("bad-xml");
@@ -50411,21 +50980,21 @@ function richText(element) {
   walk(element);
   return out.split("\n").map((part) => part.trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
-function cleanTitle(raw, line) {
+function cleanTitle(raw, line2) {
   const title = raw.replace(/\s+/g, " ").trim();
-  if (!title) throw new ExchangeReject("empty-title", line);
-  if (TITLE_FORBIDDEN3.test(title)) throw new ExchangeReject("bad-title", line);
-  if ([...title].length > OUTLINE_TITLE_LIMIT) throw new ExchangeReject("title-too-long", line);
+  if (!title) throw new ExchangeReject("empty-title", line2);
+  if (TITLE_FORBIDDEN3.test(title)) throw new ExchangeReject("bad-title", line2);
+  if ([...title].length > OUTLINE_TITLE_LIMIT) throw new ExchangeReject("title-too-long", line2);
   const problem2 = titleProblem(title);
-  if (problem2) throw new ExchangeReject(`title-${problem2}`, line);
+  if (problem2) throw new ExchangeReject(`title-${problem2}`, line2);
   return title;
 }
-function cleanBody(raw, line) {
+function cleanBody(raw, line2) {
   const body = raw.replace(/\r\n?/g, "\n");
   if (!body.trim()) return "";
-  if (body.length > EXCHANGE_MAX_BODY) throw new ExchangeReject("body-too-long", line);
+  if (body.length > EXCHANGE_MAX_BODY) throw new ExchangeReject("body-too-long", line2);
   if (body.includes("<!-- visual-agent-map:") || /^\uFEFF?---[ \t]*(?:\n|$)/.test(body))
-    throw new ExchangeReject("bad-body", line);
+    throw new ExchangeReject("bad-body", line2);
   return body;
 }
 var readOpml = (element) => {
@@ -50619,7 +51188,7 @@ function toFreeMind(map, notes) {
     },
     (node, depth) => node.children.length || noteOf(notes, node.id).body ? `${indent(depth + 1)}</node>` : ""
   );
-  const body = roots.length > 1 ? [`  <node ID="ID_0" TEXT="${escapeAttr(map.title)}">`, ...lines.map((line) => `  ${line}`), "  </node>"] : lines;
+  const body = roots.length > 1 ? [`  <node ID="ID_0" TEXT="${escapeAttr(map.title)}">`, ...lines.map((line2) => `  ${line2}`), "  </node>"] : lines;
   return ['<?xml version="1.0" encoding="UTF-8"?>', '<map version="1.0.1">', ...body, "</map>", ""].join("\n");
 }
 
@@ -50628,7 +51197,7 @@ var messageOf2 = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 };
-function exchangeRefusal(reason, line) {
+function exchangeRefusal(reason, line2) {
   switch (reason) {
     case "too-large":
       return t("ui.exchange_reason_too_large", Math.round(EXCHANGE_MAX_BYTES / (1024 * 1024)));
@@ -50641,7 +51210,7 @@ function exchangeRefusal(reason, line) {
     case "too-deep":
       return t("ui.exchange_reason_too_big");
     default:
-      return line === void 0 ? t("ui.exchange_reason_invalid") : t("ui.exchange_reason_invalid_line_0", line);
+      return line2 === void 0 ? t("ui.exchange_reason_invalid") : t("ui.exchange_reason_invalid_line_0", line2);
   }
 }
 async function importExchangeFile(host, file) {
@@ -51030,7 +51599,7 @@ function renderSynthesisContent(parent, topics) {
 function imageReferencesFromMarkdown(markdown) {
   const lines = markdown.split("\n");
   const blocks = lines.flatMap(
-    (line, index) => /^\s*!\[[^\]]*\]\(https?:\/\/[^\s)]+\)/i.test(line) ? [
+    (line2, index) => /^\s*!\[[^\]]*\]\(https?:\/\/[^\s)]+\)/i.test(line2) ? [
       lines.slice(Math.max(0, index - 2), Math.min(lines.length, index + 4)).join("\n").trim()
     ] : []
   );
@@ -53780,11 +54349,11 @@ function appendGoalSvg(parent, kind) {
     for (const [name2, value] of Object.entries(attrs)) el.setAttribute(name2, value);
     svg.appendChild(el);
   };
-  const line = { fill: "none", stroke: "currentColor", "stroke-width": "2" };
+  const line2 = { fill: "none", stroke: "currentColor", "stroke-width": "2" };
   if (kind === "target") {
-    add("circle", { ...line, cx: "12", cy: "12", r: "9" });
-    add("circle", { ...line, cx: "12", cy: "12", r: "5" });
-    add("circle", { ...line, cx: "12", cy: "12", r: "1.5", fill: "currentColor" });
+    add("circle", { ...line2, cx: "12", cy: "12", r: "9" });
+    add("circle", { ...line2, cx: "12", cy: "12", r: "5" });
+    add("circle", { ...line2, cx: "12", cy: "12", r: "1.5", fill: "currentColor" });
   } else if (kind === "spark")
     add("path", {
       fill: "currentColor",
@@ -53797,14 +54366,14 @@ function appendGoalSvg(parent, kind) {
     });
   else if (kind === "sort")
     add("path", {
-      ...line,
+      ...line2,
       "stroke-linecap": "round",
       d: ["M4 6h10M4 12h7M4 18h4", "M17 5v14m0 0l-3-3m3 3l3-3"].join("")
     });
   else {
-    add("rect", { ...line, "stroke-linejoin": "round", x: "3", y: "3", width: "8", height: "8", rx: "1.5" });
+    add("rect", { ...line2, "stroke-linejoin": "round", x: "3", y: "3", width: "8", height: "8", rx: "1.5" });
     add("rect", {
-      ...line,
+      ...line2,
       "stroke-linejoin": "round",
       "stroke-dasharray": "3 2",
       x: "13",
@@ -53813,7 +54382,7 @@ function appendGoalSvg(parent, kind) {
       height: "8",
       rx: "1.5"
     });
-    add("path", { ...line, "stroke-linejoin": "round", d: "M5 7l1.5 1.5L9.5 5" });
+    add("path", { ...line2, "stroke-linejoin": "round", d: "M5 7l1.5 1.5L9.5 5" });
   }
   parent.appendChild(svg);
 }
@@ -53851,7 +54420,7 @@ var RELATION_LABEL_NOTE_MAX = 60;
 var TEXT_NODE_HEIGHT = 28;
 var TEXT_NODE_WIDTH = TEXT_AUTO_WIDTH_MAX;
 function estimateTextWidth(text10) {
-  const line = Math.max(
+  const line2 = Math.max(
     0,
     ...text10.split(/\r?\n/).map(
       (part) => Array.from(part).reduce(
@@ -53860,7 +54429,7 @@ function estimateTextWidth(text10) {
       )
     )
   );
-  return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
+  return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line2 + 16)));
 }
 var anchorLineKey = (imageId, anchorId, topicId) => `anchor:${imageId}:${anchorId}:${topicId}`;
 var BOUNDARY_PAD = 16;
@@ -60480,16 +61049,16 @@ ${request.requirements}` : preset.text,
       (_a2 = this.anchorDragCancel) == null ? void 0 : _a2.call(this, true);
       const start = { x: event.clientX, y: event.clientY }, doc = (_b2 = this.contentEl) == null ? void 0 : _b2.ownerDocument;
       let active = false, done = false, to = { x: origin.x, y: origin.y };
-      const lines = () => [...this.anchorLinks].filter(([, line]) => line.imageId === image.id && line.anchorId === anchorId);
+      const lines = () => [...this.anchorLinks].filter(([, line2]) => line2.imageId === image.id && line2.anchorId === anchorId);
       const paint = (at) => {
         dot.style.left = `${Math.round(at.x * 1e6) / 1e4}%`;
         dot.style.top = `${Math.round(at.y * 1e6) / 1e4}%`;
-        for (const [key4, line] of lines()) {
-          const end = this.lineEndEl(line.topicId);
+        for (const [key4, line2] of lines()) {
+          const end = this.lineEndEl(line2.topicId);
           if (end)
             this.placeAnchorLine(
               key4,
-              { ...line, point: { x: image.x + at.x * image.w, y: image.y + at.y * image.h } },
+              { ...line2, point: { x: image.x + at.x * image.w, y: image.y + at.y * image.h } },
               boxOf(end)
             );
         }
@@ -61841,7 +62410,7 @@ ${request.requirements}` : preset.text,
     const text10 = ((_a2 = this.map.canvasItems) != null ? _a2 : []).find((item) => item.kind === "text" && item.id === id);
     if (!text10) return;
     const parent = (_b2 = this.map.nodes.find((node) => node.id === text10.parentId)) != null ? _b2 : null;
-    const title = text10.text.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+    const title = text10.text.split(/\r?\n/).map((line2) => line2.trim()).find(Boolean);
     if (!title) return;
     const followerIds = this.map.nodes.filter((node) => node.afterTextId === id).map((node) => node.id);
     if (followerIds.length && !this.mergeUnlocked(followerIds)) return;
@@ -63392,8 +63961,8 @@ ${request.requirements}` : preset.text,
       target ? { kind: "under", parentId: target.id } : { kind: "tree" }
     ).catch((error) => errorNotice(error));
   }
-  pasteTextRefusal(reason, line) {
-    const at = line != null ? line : 0;
+  pasteTextRefusal(reason, line2) {
+    const at = line2 != null ? line2 : 0;
     switch (reason) {
       case "too-long":
         return t("ui.clipboard_text_too_long", PASTE_TEXT_MAX_CHARS);
@@ -63406,7 +63975,7 @@ ${request.requirements}` : preset.text,
       case "vam-note":
         return t("ui.clipboard_text_vam_note");
       case "outline":
-        return line ? t("ui.clipboard_text_outline_line", line) : t("ui.clipboard_text_outline");
+        return line2 ? t("ui.clipboard_text_outline_line", line2) : t("ui.clipboard_text_outline");
       default:
         return t("ui.clipboard_text_bad_title", at);
     }
@@ -66667,8 +67236,8 @@ ${request.requirements}` : preset.text,
     } else if (isPlaceholder(note.summary)) {
       summary == null ? void 0 : summary.remove();
       if (!addLine && !typing && editable && title) {
-        const line = card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
-        title.after(line);
+        const line2 = card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
+        title.after(line2);
       }
     } else {
       addLine == null ? void 0 : addLine.remove();
@@ -66849,9 +67418,9 @@ ${request.requirements}` : preset.text,
     entry.session.turns.splice(0, 0, ...restored);
     this.notifyTopicChat(entry);
   }
-  writeTopicChatLine(entry, line) {
+  writeTopicChatLine(entry, line2) {
     var _a2;
-    (_a2 = this.topicChatWriter()) == null ? void 0 : _a2.write(this.topicChatRoot(entry), entry.nodeId, line);
+    (_a2 = this.topicChatWriter()) == null ? void 0 : _a2.write(this.topicChatRoot(entry), entry.nodeId, line2);
   }
   newTopicTurnId() {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -67519,10 +68088,10 @@ ${request.requirements}` : preset.text,
       ) : [];
       const refused = verdicts.filter((verdict) => verdict === "out").length;
       const problems = lines.filter(
-        (line, index) => line.status !== "done" && (index >= result.actions.length || verdicts[index] === "ok")
+        (line2, index) => line2.status !== "done" && (index >= result.actions.length || verdicts[index] === "ok")
       );
-      let sentence = result.reply.trim() || lines.map((line) => line.text).join("\n");
-      if (problems.length) sentence = [sentence, ...problems.map((line) => line.text)].filter(Boolean).join("\n\n");
+      let sentence = result.reply.trim() || lines.map((line2) => line2.text).join("\n");
+      if (problems.length) sentence = [sentence, ...problems.map((line2) => line2.text)].filter(Boolean).join("\n\n");
       if (refused) sentence = [sentence, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");
       if (!sentence) sentence = t("ui.topic_chat_result_unknown");
       if (controller.signal.aborted)
@@ -68644,12 +69213,12 @@ ${request.requirements}` : preset.text,
       svg.appendChild(defs);
     }
     for (const gap of kind === "derives_from" ? [false, true] : [false]) {
-      const line = createSvg("path");
-      line.setAttribute("d", "M 0 5 L 32 5");
-      if (arrow) line.setAttribute("marker-end", arrow);
-      line.addClass(gap ? "vam-relation-gap" : "vam-relation");
-      if (!gap) line.addClass(`vam-relation-${kind}`);
-      svg.appendChild(line);
+      const line2 = createSvg("path");
+      line2.setAttribute("d", "M 0 5 L 32 5");
+      if (arrow) line2.setAttribute("marker-end", arrow);
+      line2.addClass(gap ? "vam-relation-gap" : "vam-relation");
+      if (!gap) line2.addClass(`vam-relation-${kind}`);
+      svg.appendChild(line2);
     }
     parent.insertBefore(svg, null);
   }
@@ -70260,7 +70829,7 @@ ${request.requirements}` : preset.text,
                       state.failures.length,
                       skipped2
                     ),
-                    ...researchWebLines(web).map((line) => line.text)
+                    ...researchWebLines(web).map((line2) => line2.text)
                   ].join(" ")
                 );
                 onSettled == null ? void 0 : onSettled(web);
@@ -73317,7 +73886,7 @@ ${note.detail.trim()}` : "",
     if (this.chatChain !== run || run.state.phase === "ended") return;
     run.partial = null;
     for (const id of round3.work.created) run.createdIds.add(id);
-    run.lastResults = chatResultLines(round3.lines).map((line) => ({ text: line.text, status: line.status }));
+    run.lastResults = chatResultLines(round3.lines).map((line2) => ({ text: line2.text, status: line2.status }));
     run.anchor = { path: round3.anchor.path, id: round3.anchor.id };
     const step = finishRound(run.state, {
       remaining: round3.result.remaining,
@@ -73675,7 +74244,7 @@ ${note.detail.trim()}` : "",
               turn: ++this.chatRecordTurnSeq,
               message: item.question.text,
               reply: item.answer.text,
-              lines: item.answer.lines.map((line) => ({ status: settledLine(line).status, text: settledLine(line).text })),
+              lines: item.answer.lines.map((line2) => ({ status: settledLine(line2).status, text: settledLine(line2).text })),
               modelLabel: (_a2 = item.answer.modelLabel) != null ? _a2 : "",
               steers: ((_b2 = item.question.steers) != null ? _b2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text)
             };
@@ -73818,7 +74387,7 @@ ${note.detail.trim()}` : "",
       restored.startedResearch
     );
     const numbers = latest.parsed.lines.flatMap(
-      (line) => "turn" in line && typeof line.turn === "number" ? [line.turn] : []
+      (line2) => "turn" in line2 && typeof line2.turn === "number" ? [line2.turn] : []
     );
     writer.markEnded(numbers);
     this.chatRecordTurnSeq = Math.max(0, ...numbers);
@@ -74077,8 +74646,8 @@ ${note.detail.trim()}` : "",
   }
   chatLine(label, outcome) {
     if (outcome.status === "done" && outcome.images) {
-      const line = { status: "done", text: "", imageGroup: outcome.images };
-      return { ...line, text: settledLine(line).text };
+      const line2 = { status: "done", text: "", imageGroup: outcome.images };
+      return { ...line2, text: settledLine(line2).text };
     }
     if (outcome.status === "done")
       return {
@@ -74456,9 +75025,9 @@ ${note.detail.trim()}` : "",
     if (options.context) {
       const created = createdParentsOf(result.actions);
       for (const [index, action] of result.actions.entries()) {
-        const line = lines[index];
-        if (action.kind === "add_child" && (line == null ? void 0 : line.status) === "done")
-          line.basis = chatBasisFor(options.context.basis, action.parentId || null, options.context.parents, created);
+        const line2 = lines[index];
+        if (action.kind === "add_child" && (line2 == null ? void 0 : line2.status) === "done")
+          line2.basis = chatBasisFor(options.context.basis, action.parentId || null, options.context.parents, created);
       }
     }
     const all = [...lines];
@@ -75808,7 +76377,7 @@ ${addition}` : addition },
       outline: t("ui.map_chat_note_basis_outline")
     };
     const basis = [
-      ...new Set(answer.lines.flatMap((line) => line.basis ? [basisSummary(line.basis, basisLabels)] : []))
+      ...new Set(answer.lines.flatMap((line2) => line2.basis ? [basisSummary(line2.basis, basisLabels)] : []))
     ];
     return {
       question: question.text,
@@ -75817,7 +76386,7 @@ ${addition}` : addition },
       steers: ((_e = question.steers) != null ? _e : []).filter((steer) => steer.state === "live").map((steer) => steer.text),
       refs,
       answer: answer.text,
-      lines: answer.lines.map((line) => settledLine(line).text),
+      lines: answer.lines.map((line2) => settledLine(line2).text),
       ...answer.plan ? { plan: answer.plan.state } : {},
       images: ((_f = answer.images) != null ? _f : []).map((block) => ({
         nodeTitle: block.nodeTitle,
@@ -76734,9 +77303,9 @@ ${addition}` : addition },
       if (boxFor(fromId) && boxFor(toId)) linked2.push({ key: key4, fromId, toId });
     }
     const anchored = [];
-    for (const [key4, line] of this.anchorLinks)
-      if ((group.has(line.topicId) || line.imageId === movingImageId) && boxFor(line.topicId))
-        anchored.push({ key: key4, line });
+    for (const [key4, line2] of this.anchorLinks)
+      if ((group.has(line2.topicId) || line2.imageId === movingImageId) && boxFor(line2.topicId))
+        anchored.push({ key: key4, line: line2 });
     const spineIds = /* @__PURE__ */ new Set();
     for (const id of group.keys()) {
       const member = nodes.find((item) => item.id === id);
@@ -76771,14 +77340,14 @@ ${addition}` : addition },
           (_b3 = this.relationGapEls.get(link.key)) == null ? void 0 : _b3.setAttribute("d", d);
           this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
         }
-        for (const { key: key4, line } of anchored) {
-          const box = shifted(line.topicId, dx, dy);
+        for (const { key: key4, line: line2 } of anchored) {
+          const box = shifted(line2.topicId, dx, dy);
           if (!box) continue;
-          const from = line.imageId === movingImageId ? {
-            ...line,
-            point: { x: line.point.x + dx, y: line.point.y + dy },
-            ...line.image ? { image: { ...line.image, x: line.image.x + dx, y: line.image.y + dy } } : {}
-          } : line;
+          const from = line2.imageId === movingImageId ? {
+            ...line2,
+            point: { x: line2.point.x + dx, y: line2.point.y + dy },
+            ...line2.image ? { image: { ...line2.image, x: line2.image.x + dx, y: line2.image.y + dy } } : {}
+          } : line2;
           this.placeAnchorLine(key4, from, box);
         }
         for (const edge of tree) {
@@ -76854,7 +77423,7 @@ ${addition}` : addition },
       const other = this.cardEls.get(fromId === id ? toId : fromId);
       if (other) linked2.push({ key: key4, dragIsFrom: fromId === id, far: boxOf(other) });
     }
-    const anchored = [...this.anchorLinks].filter(([, line]) => line.topicId === id);
+    const anchored = [...this.anchorLinks].filter(([, line2]) => line2.topicId === id);
     const dragged = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === id);
     const spineId = this.spineEls.has(id) ? id : (dragged == null ? void 0 : dragged.parentId) && !dragged.afterTextId && this.spineEls.has(dragged.parentId) ? dragged.parentId : null;
     const spineBoxes = spineId ? this.spineBoxes(spineId) : null;
@@ -76871,7 +77440,7 @@ ${addition}` : addition },
           (_b3 = this.relationGapEls.get(link.key)) == null ? void 0 : _b3.setAttribute("d", d);
           this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
         }
-        for (const [key4, line] of anchored) this.placeAnchorLine(key4, line, { x, y, ...size });
+        for (const [key4, line2] of anchored) this.placeAnchorLine(key4, line2, { x, y, ...size });
         for (const edge of touching2) {
           const path = this.edgeEls.get(edge.key);
           if (!path) continue;
@@ -77019,7 +77588,7 @@ ${addition}` : addition },
         lines.push(path);
       }
     }
-    for (const line of lines) this.edgesEl.appendChild(line);
+    for (const line2 of lines) this.edgesEl.appendChild(line2);
     if (mapDirection === "fishbone") {
       for (const node of this.canvasNodes()) {
         if (node.parentId || !this.cardEls.has(node.id) || this.spineEls.has(node.id)) continue;
@@ -77145,33 +77714,33 @@ ${addition}` : addition },
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
   }
   /** Moves one anchor line (all its parts and its label) to meet a topic card that stands at `box`. */
-  placeAnchorLine(key4, line, box) {
+  placeAnchorLine(key4, line2, box) {
     var _a2, _b2, _c;
-    const d = this.anchorPathData(line, box);
+    const d = this.anchorPathData(line2, box);
     (_a2 = this.relationEls.get(key4)) == null ? void 0 : _a2.setAttribute("d", d);
     (_b2 = this.relationHitEls.get(key4)) == null ? void 0 : _b2.setAttribute("d", d);
     (_c = this.relationGapEls.get(key4)) == null ? void 0 : _c.setAttribute("d", d);
-    this.placeRelationLabel(key4, this.anchorLabelPoint(line, box));
+    this.placeRelationLabel(key4, this.anchorLabelPoint(line2, box));
   }
   /**
    * The side of its picture a ring card stands on, or null when the line is not a ring line or the card has been dragged
    * into the picture (the end rule does not hold there; the caller falls back to the curve). Reads only the line it is given:
    * a drag preview passes a moved copy.
    */
-  anchorLineSide(line, box) {
-    const image = line.image;
+  anchorLineSide(line2, box) {
+    const image = line2.image;
     if (!image) return null;
     const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
     if (cx > image.x && cx < image.x + image.w && cy > image.y && cy < image.y + image.h) return null;
     return ringSide(image, { x: box.x, y: box.y, w: box.width, h: box.height });
   }
-  anchorPathData(line, box) {
-    const side = this.anchorLineSide(line, box);
-    return side ? pointToBoxStraightPathData(line.point, box, side, line.fromAnchor) : pointToBoxPathData(line.point, box, line.fromAnchor);
+  anchorPathData(line2, box) {
+    const side = this.anchorLineSide(line2, box);
+    return side ? pointToBoxStraightPathData(line2.point, box, side, line2.fromAnchor) : pointToBoxPathData(line2.point, box, line2.fromAnchor);
   }
-  anchorLabelPoint(line, box) {
-    const side = this.anchorLineSide(line, box);
-    return side ? pointToBoxStraightLabelPoint(line.point, box, side, line.fromAnchor) : pointToBoxLabelPoint(line.point, box, line.fromAnchor);
+  anchorLabelPoint(line2, box) {
+    const side = this.anchorLineSide(line2, box);
+    return side ? pointToBoxStraightLabelPoint(line2.point, box, side, line2.fromAnchor) : pointToBoxLabelPoint(line2.point, box, line2.fromAnchor);
   }
   relationLinkPath(link, axis) {
     return link.anchor ? this.anchorPathData(link.anchor, boxOf(link.to)) : relationPathData(boxOf(link.from), boxOf(link.to), axis);
@@ -77825,7 +78394,7 @@ var PromptPreviewModal = class extends import_obsidian37.Modal {
     if (text10 === this.problemText) return;
     this.problemText = text10;
     region.empty();
-    for (const line of lines) region.createEl("p", { text: line, cls: "vam-prompt-preview-problem" });
+    for (const line2 of lines) region.createEl("p", { text: line2, cls: "vam-prompt-preview-problem" });
   }
   renderBody() {
     var _a2, _b2;
@@ -77928,10 +78497,10 @@ function splitStructure(text10) {
   const stripped = stripNoteStyleComments(lines.join("\n")).text.split("\n");
   const code = fencedLines(stripped);
   const at = [];
-  stripped.forEach((line, index) => {
+  stripped.forEach((line2, index) => {
     var _a2;
     if (code[index]) return;
-    const heading = /^##(?:[ \t]+(.*?))?[ \t]*$/.exec(line);
+    const heading = /^##(?:[ \t]+(.*?))?[ \t]*$/.exec(line2);
     if (heading) at.push({ index, name: ((_a2 = heading[1]) != null ? _a2 : "").trim() });
   });
   const first = at.length ? at[0].index : lines.length;
@@ -78128,8 +78697,8 @@ var NoteStyleEditorModal = class extends import_obsidian38.Modal {
     fieldset.createEl("legend", { text: t("ui.editor_update_legend") });
     for (const mode of UPDATE_MODES) {
       const id = `vam-editor-update-${mode}`;
-      const line = fieldset.createDiv({ cls: "vam-editor-mode" });
-      const radio = line.createEl("input", {
+      const line2 = fieldset.createDiv({ cls: "vam-editor-mode" });
+      const radio = line2.createEl("input", {
         type: "radio",
         attr: { name: "vam-editor-update", id, "aria-describedby": `${id}-desc` }
       });
@@ -78140,7 +78709,7 @@ var NoteStyleEditorModal = class extends import_obsidian38.Modal {
         this.changed();
       });
       this.updateRadios.set(mode, radio);
-      const text10 = line.createDiv({ cls: "vam-editor-mode-text" });
+      const text10 = line2.createDiv({ cls: "vam-editor-mode-text" });
       text10.createEl("label", { text: t(UPDATE_MODE_KEYS[mode]), attr: { for: id } });
       text10.createDiv({ text: t(UPDATE_DESC_KEYS[mode]), cls: "setting-item-description", attr: { id: `${id}-desc` } });
     }
@@ -78283,11 +78852,11 @@ var NoteStyleEditorModal = class extends import_obsidian38.Modal {
     const rows2 = this.draft.rows;
     const controls = [];
     rows2.forEach((row2, index) => {
-      const line = list2.createDiv({ cls: "vam-editor-section" });
-      const input2 = line.createEl("input", { type: "text", cls: "vam-editor-section-name" });
+      const line2 = list2.createDiv({ cls: "vam-editor-section" });
+      const input2 = line2.createEl("input", { type: "text", cls: "vam-editor-section-name" });
       input2.value = row2.name;
       const button = (text10, key4, cls, run) => {
-        const el = line.createEl("button", { text: text10, cls, attr: { type: "button" } });
+        const el = line2.createEl("button", { text: text10, cls, attr: { type: "button" } });
         el.addEventListener("click", run);
         return el;
       };
@@ -78439,12 +79008,12 @@ var NoteStyleEditorModal = class extends import_obsidian38.Modal {
       `*${plainMd(t("ui.editor_example_voice_0", this.voiceName()))}* \xB7 *${plainMd(t("ui.editor_example_format_0", formatName))}*`,
       ""
     ];
-    const callout = (title) => [
+    const callout2 = (title) => [
       `> [!note] ${plainMd(title)}`,
       `> ${plainMd(t("ui.editor_example_callout"))}`,
       ""
     ];
-    const table = [
+    const table2 = [
       `| ${plainMd(t("ui.editor_example_col_a"))} | ${plainMd(t("ui.editor_example_col_b"))} |`,
       "| --- | --- |",
       `| ${plainMd(t("ui.editor_example_cell_a"))} | ${plainMd(t("ui.editor_example_cell_b"))} |`,
@@ -78465,8 +79034,8 @@ var NoteStyleEditorModal = class extends import_obsidian38.Modal {
       }
       if (hint) lines.push(hint, "");
       lines.push(plainMd(t("ui.editor_example_body")), "");
-      if (formatId === "rich") lines.push(...index % 2 === 0 ? callout(section3.name) : table);
-      else if (index === 0) lines.push(...callout(section3.name));
+      if (formatId === "rich") lines.push(...index % 2 === 0 ? callout2(section3.name) : table2);
+      else if (index === 0) lines.push(...callout2(section3.name));
     }
     return lines.join("\n");
   }
@@ -79117,10 +79686,10 @@ var NoteStyleManageModal = class extends import_obsidian39.Modal {
     const radios = form.createDiv({ cls: "vam-manage-modes" });
     const radio = (value, label) => {
       const id = `vam-manage-mode-${tab}-${value}`;
-      const line = radios.createDiv({ cls: "vam-manage-mode" });
-      const input2 = line.createEl("input", { type: "radio", attr: { name: `vam-manage-mode-${tab}`, id } });
+      const line2 = radios.createDiv({ cls: "vam-manage-mode" });
+      const input2 = line2.createEl("input", { type: "radio", attr: { name: `vam-manage-mode-${tab}`, id } });
       input2.checked = value === mode;
-      line.createEl("label", { text: label, attr: { for: id } });
+      line2.createEl("label", { text: label, attr: { for: id } });
       return input2;
     };
     const fromRadio = radio("from", t("ui.manage_add_from"));
@@ -79337,7 +79906,7 @@ var ConfirmDialog = class extends import_obsidian39.Modal {
   onOpen() {
     const { opts } = this;
     this.titleEl.setText(opts.title);
-    for (const line of opts.lines) this.contentEl.createEl("p", { text: line });
+    for (const line2 of opts.lines) this.contentEl.createEl("p", { text: line2 });
     const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
     const confirm = row.createEl("button", { text: opts.confirm, cls: "mod-warning" });
     const cancel = row.createEl("button", { text: t("ui.cancel") });
@@ -79367,7 +79936,7 @@ var ViewDialog = class extends import_obsidian39.Modal {
     const { opts } = this;
     this.titleEl.setText(opts.title);
     this.contentEl.createEl("p", { text: t("ui.manage_view_readonly"), cls: "vam-manage-dialog-note" });
-    for (const line of (_a2 = opts.lines) != null ? _a2 : []) this.contentEl.createEl("p", { text: line });
+    for (const line2 of (_a2 = opts.lines) != null ? _a2 : []) this.contentEl.createEl("p", { text: line2 });
     if (opts.text !== void 0) this.contentEl.createEl("pre", { text: opts.text, cls: "vam-manage-view-text" });
     const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
     const close = row.createEl("button", { text: t("ui.close") });
@@ -79574,12 +80143,12 @@ function renderNoteKindSetting(setting, plugin, kind) {
     for (const el of tagEls) el.remove();
     tagEls = item ? kindStyleTags(item).map((tag) => setting.nameEl.createSpan({ text: tag.text, cls: `vam-style-tag ${tag.cls}` })) : [];
   };
-  const writeDesc = (line) => {
-    const key4 = line ? `${line.error ? "!" : ""}${line.text}` : "";
+  const writeDesc = (line2) => {
+    const key4 = line2 ? `${line2.error ? "!" : ""}${line2.text}` : "";
     if (key4 === shownDesc) return;
     shownDesc = key4;
     setting.descEl.empty();
-    if (line) setting.descEl.createDiv({ text: line.text, cls: line.error ? "vam-block-status-error" : void 0 });
+    if (line2) setting.descEl.createDiv({ text: line2.text, cls: line2.error ? "vam-block-status-error" : void 0 });
   };
   const render = () => {
     if (!picker) return;
@@ -79655,8 +80224,8 @@ function renderMyStylesSetting(setting, plugin) {
     const unused = store.listUnusedCopies(new Set(plugin.topicNoteStyleRefs().map((item) => item.ref))).length;
     setting.descEl.empty();
     if (unused) setting.descEl.createDiv({ text: t("ui.my_styles_unused_0", unused), cls: "vam-style-unused" });
-    const line = setting.descEl.createDiv({ text: `${t("ui.my_styles_path_desc")} ` });
-    const link = line.createEl("a", { text: store.folder(), cls: "vam-field-link", attr: { href: "#", role: "link" } });
+    const line2 = setting.descEl.createDiv({ text: `${t("ui.my_styles_path_desc")} ` });
+    const link = line2.createEl("a", { text: store.folder(), cls: "vam-field-link", attr: { href: "#", role: "link" } });
     link.addEventListener("click", (event) => {
       event.preventDefault();
       void plugin.openNoteStylesFolder();
@@ -80880,8 +81449,8 @@ function htmlBlockLines(lines) {
   const blocks = [];
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i];
-    const open = /^ {0,3}<(!--|\/?([A-Za-z][A-Za-z0-9-]*)(?=[\s/>]|$))/.exec(line);
+    const line2 = lines[i];
+    const open = /^ {0,3}<(!--|\/?([A-Za-z][A-Za-z0-9-]*)(?=[\s/>]|$))/.exec(line2);
     if (!open) {
       i++;
       continue;
@@ -80892,7 +81461,7 @@ function htmlBlockLines(lines) {
     } else {
       const name2 = ((_a2 = open[2]) != null ? _a2 : "").toLowerCase();
       const closes = (text10) => text10.toLowerCase().includes(`</${name2}`);
-      if (open[1].startsWith("/") || VOID_TAGS.has(name2) || closes(line)) {
+      if (open[1].startsWith("/") || VOID_TAGS.has(name2) || closes(line2)) {
         while (last + 1 < lines.length && lines[last + 1].trim() !== "") last++;
       } else {
         while (last < lines.length && !closes(lines[last])) last++;
@@ -80907,7 +81476,7 @@ function htmlBlockLines(lines) {
 var FENCE_OPEN3 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 function fenceRanges(lines, offsets, html) {
   const ranges = [];
-  const inHtml = (line) => html.some(([first, last]) => line >= first && line <= last);
+  const inHtml = (line2) => html.some(([first, last]) => line2 >= first && line2 <= last);
   for (let i = 0; i < lines.length; i++) {
     const open = FENCE_OPEN3.exec(lines[i]);
     if (!open || inHtml(i)) continue;
@@ -80924,11 +81493,11 @@ function fenceRanges(lines, offsets, html) {
   }
   return ranges;
 }
-function inlineRangesOfLine(line, base) {
+function inlineRangesOfLine(line2, base) {
   var _a2;
-  if (/[|<$\\]/.test(line) || FENCE_LINE.test(line) || /^ {4}|^\t/.test(line)) return [];
+  if (/[|<$\\]/.test(line2) || FENCE_LINE.test(line2) || /^ {4}|^\t/.test(line2)) return [];
   const runs = [];
-  for (const match of line.matchAll(/`+/g)) runs.push({ start: (_a2 = match.index) != null ? _a2 : 0, length: match[0].length });
+  for (const match of line2.matchAll(/`+/g)) runs.push({ start: (_a2 = match.index) != null ? _a2 : 0, length: match[0].length });
   const ranges = [];
   for (let i = 0; i < runs.length; i++) {
     for (let j = i + 1; j < runs.length; j++) {
@@ -80946,15 +81515,15 @@ function markdownCodeRanges(markdown) {
   const lines = markdown.split("\n");
   const offsets = [];
   let at = 0;
-  for (const line of lines) {
+  for (const line2 of lines) {
     offsets.push(at);
-    at += line.length + 1;
+    at += line2.length + 1;
   }
   const fences = fenceRanges(lines, offsets, htmlBlockLines(lines));
   const ranges = [...fences];
-  lines.forEach((line, index) => {
+  lines.forEach((line2, index) => {
     if (inside(fences, offsets[index])) return;
-    ranges.push(...inlineRangesOfLine(line, offsets[index]));
+    ranges.push(...inlineRangesOfLine(line2, offsets[index]));
   });
   return ranges.sort((a, b) => a.start - b.start);
 }
@@ -84432,8 +85001,8 @@ function lineSpans(source) {
   }
   return lines;
 }
-function tailSpan(line, from, offset) {
-  const rest = line.slice(from);
+function tailSpan(line2, from, offset) {
+  const rest = line2.slice(from);
   const lead = rest.length - rest.trimStart().length;
   const text10 = rest.trim();
   if (!text10) return null;
@@ -85306,10 +85875,10 @@ function applyTopicToPreset(presetText, topic, language2) {
   const quoted = JSON.stringify(topic.trim());
   PLACEHOLDER_PATTERN.lastIndex = 0;
   if (PLACEHOLDER_PATTERN.test(presetText)) return presetText.replace(PLACEHOLDER_PATTERN, () => quoted);
-  const line = renderTemplate(inLanguage({ zh: topic_line_zh_default, en: topic_line_en_default }, language2), { topic: quoted });
+  const line2 = renderTemplate(inLanguage({ zh: topic_line_zh_default, en: topic_line_en_default }, language2), { topic: quoted });
   return `${presetText.trimEnd()}
 
-${line}`;
+${line2}`;
 }
 function noteInputs(request) {
   var _a2, _b2;
@@ -85343,21 +85912,21 @@ function splitSummaries(text10) {
   const summaries = [];
   let afterHeading = false;
   let gap = false;
-  for (const line of text10.split("\n")) {
-    const quote2 = REPLY_SUMMARY.exec(line);
-    if (quote2 && afterHeading) {
-      summaries[summaries.length - 1] = quote2[1].trim();
+  for (const line2 of text10.split("\n")) {
+    const quote3 = REPLY_SUMMARY.exec(line2);
+    if (quote3 && afterHeading) {
+      summaries[summaries.length - 1] = quote3[1].trim();
       afterHeading = false;
       continue;
     }
-    if (quote2 && gap) {
+    if (quote3 && gap) {
       gap = false;
       continue;
     }
-    gap = (afterHeading || gap) && line.trim() === "";
-    afterHeading = REPLY_HEADING.test(line);
+    gap = (afterHeading || gap) && line2.trim() === "";
+    afterHeading = REPLY_HEADING.test(line2);
     if (afterHeading) summaries.push(void 0);
-    kept.push(line);
+    kept.push(line2);
   }
   return { text: kept.join("\n"), summaries };
 }
@@ -86020,18 +86589,18 @@ var ImageTranslateAction = class extends import_obsidian45.Component {
       if (unique3) {
         outcome = "ui.image_translate_added";
         const lineStart = text10.lastIndexOf("\n", at) + 1;
-        const line = text10.slice(lineStart, text10.indexOf("\n", at) < 0 ? text10.length : text10.indexOf("\n", at));
-        const quote2 = (_d = (_c = /^\s*(?:>\s*)+/.exec(line)) == null ? void 0 : _c[0]) != null ? _d : "";
+        const line2 = text10.slice(lineStart, text10.indexOf("\n", at) < 0 ? text10.length : text10.indexOf("\n", at));
+        const quote3 = (_d = (_c = /^\s*(?:>\s*)+/.exec(line2)) == null ? void 0 : _c[0]) != null ? _d : "";
         let end = text10.indexOf("\n", at + token.length);
-        if (/^\s*\|/.test(line))
+        if (/^\s*\|/.test(line2))
           while (end >= 0 && /^\s*\|/.test(
             text10.slice(end + 1, text10.indexOf("\n", end + 1) < 0 ? void 0 : text10.indexOf("\n", end + 1))
           ))
             end = text10.indexOf("\n", end + 1);
         if (end < 0) end = text10.length;
-        const gap = quote2 ? `
-${quote2.trimEnd()}
-${quote2}` : "\n\n";
+        const gap = quote3 ? `
+${quote3.trimEnd()}
+${quote3}` : "\n\n";
         return `${text10.slice(0, end)}${gap}${embed}${text10.slice(end)}`;
       }
       outcome = "ui.image_translate_appended";
@@ -86170,8 +86739,8 @@ function findUnique(source, selected) {
 }
 function positionAt(source, offset) {
   const before = source.slice(0, offset);
-  const line = before.split("\n").length - 1;
-  return { line, ch: before.length - (before.lastIndexOf("\n") + 1) };
+  const line2 = before.split("\n").length - 1;
+  return { line: line2, ch: before.length - (before.lastIndexOf("\n") + 1) };
 }
 function locateImageToken(view, image, markdown, matches) {
   if (!matches.length) return null;
@@ -86182,9 +86751,9 @@ function locateImageToken(view, image, markdown, matches) {
   if (matches.length === 1) return toToken(matches[0]);
   const block = image.closest("[data-vam-line-start]");
   if (block) {
-    const lineOffset = (line) => {
+    const lineOffset = (line2) => {
       let offset = 0;
-      for (let index = 0; index < line && offset >= 0; index++) offset = markdown.indexOf("\n", offset) + 1 || -1;
+      for (let index = 0; index < line2 && offset >= 0; index++) offset = markdown.indexOf("\n", offset) + 1 || -1;
       return offset < 0 ? markdown.length : offset;
     };
     const from = lineOffset(Number(block.dataset.vamLineStart));
@@ -87141,7 +87710,7 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
       clearUndo: (path) => {
         for (const view of this.views()) if (view.mapPath === path) view.clearUndoHistory();
       },
-      log: (line) => this.logs.appendLog("info", line),
+      log: (line2) => this.logs.appendLog("info", line2),
       t: (key4, ...values) => t(key4, ...values),
       confirmUsage: () => this.confirmAiUsage(this.currentModelChoice().model, async () => {
       })
@@ -88440,7 +89009,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (renamed.unchanged) return { ok: true, ref, unchanged: true, topics: 0, styles: 0, failed: [] };
     const failed = [];
     const next = renamed.ref;
-    const swap = (table) => table && Object.values(table).includes(ref) ? Object.fromEntries(Object.entries(table).map(([key4, value]) => [key4, value === ref ? next : value])) : void 0;
+    const swap = (table2) => table2 && Object.values(table2).includes(ref) ? Object.fromEntries(Object.entries(table2).map(([key4, value]) => [key4, value === ref ? next : value])) : void 0;
     let settingsChanged = false;
     const byKind = category === "recipe" ? swap(this.settings.noteStyleByKind) : void 0;
     if (byKind) {
@@ -88449,12 +89018,12 @@ ${t("ui.organize_link_wait_hint")}`;
     }
     if (category !== "recipe") {
       const legacy = (_a2 = this.settings.noteStyleRecipe) == null ? void 0 : _a2.legacy;
-      const table = category === "structure" ? "templates" : category === "voice" ? "tones" : void 0;
-      const swapped = table ? swap(legacy == null ? void 0 : legacy[table]) : void 0;
-      if (legacy && table && swapped) {
+      const table2 = category === "structure" ? "templates" : category === "voice" ? "tones" : void 0;
+      const swapped = table2 ? swap(legacy == null ? void 0 : legacy[table2]) : void 0;
+      if (legacy && table2 && swapped) {
         this.settings.noteStyleRecipe = {
           ...this.settings.noteStyleRecipe,
-          legacy: { ...legacy, [table]: swapped }
+          legacy: { ...legacy, [table2]: swapped }
         };
         settingsChanged = true;
       }

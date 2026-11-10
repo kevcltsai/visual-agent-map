@@ -12,6 +12,17 @@
  */
 import type { TranslationKey } from "../../i18n";
 import { neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
+import {
+  conclusionDetail,
+  datumDetail,
+  definitionsDetail,
+  facetDetail,
+  hypothesisDetail,
+  notFoundDetail,
+  plainLine,
+  situationDetail,
+  type Translate
+} from "./argument-notes";
 import type { AiResult, TaskContext } from "../../ai/types";
 import {
   GateError,
@@ -137,16 +148,7 @@ export interface RunConfig {
   language: ArgumentStepBase["language"];
 }
 
-/** Model/web text as inert plain single-line text: line breaks become a space, 3+ backtick/tilde runs cannot form a fence, and Markdown inline constructs that load or link things (`![` images/embeds, `[[` `]]` wikilinks, `<` `>` raw HTML) are entity-encoded. Ordinary text is unchanged. */
-export function plainLine(text: string): string {
-  return text
-    .replace(/[\r\n\u2028\u2029]+/g, " ")
-    .replace(/`{3,}|~{3,}/g, m => [...m].join(" "))
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/!\[|\[(?=\[)/g, m => m.replace("[", "&#91;"))
-    .replace(/\](?=\])/g, "&#93;");
-}
+export { plainLine };
 
 /** Everything the runner touches. `mutate` is the plugin's serialized write queue; the others are repository/model/network seams. */
 export interface ArgumentRunPorts {
@@ -255,6 +257,8 @@ export class ArgumentRuns {
   private t(key: TranslationKey, ...values: unknown[]): string {
     return this.ports.t(key, ...values.map(v => (typeof v === "string" ? plainLine(v) : v)));
   }
+  /** Raw translation for the note builders: they escape every model/web string themselves. */
+  private readonly tr: Translate = (key, ...values) => this.ports.t(key, ...values);
   private makeNote(input: NoteInput, map: MapDocument, mapPath: string): Promise<MapNode> {
     const safe: NoteInput = { ...input, title: plainLine(input.title) };
     if (input.summary !== undefined) safe.summary = plainLine(input.summary);
@@ -659,9 +663,7 @@ export class ArgumentRuns {
       };
       const ids = new Map<string, string>();
       if (items.length) {
-        const detail = items
-          .map(i => `- ${plainLine(i.label)}: ${plainLine(i.value)} (${plainLine(i.reason)})`)
-          .join("\n");
+        const detail = definitionsDetail(this.tr, items);
         ids.set("as", (await make("group", this.ports.t("ui.argument_definitions"), undefined, detail)).id);
       }
       for (const [i, f] of result.facets.entries()) {
@@ -768,21 +770,32 @@ export class ArgumentRuns {
       const judged = result.facets;
       const inner = plan.notes;
       plan.notes = async () => {
-        for (const f of judged) await this.noteSummary(map, f.id, drive, f.summary, f.reason);
+        const final = plan.next;
+        for (const f of judged) {
+          const facet = final.situation.facets?.find(x => x.id === f.id);
+          if (!facet) continue;
+          const own = final.situation.data.filter(d => d.facetId === f.id);
+          await this.noteById(map, f.id, drive, { summary: f.summary, detail: facetDetail(this.tr, facet, own) });
+          for (const d of own.filter(x => x.state === "found" && x.proof))
+            await this.noteById(map, d.id, drive, { detail: datumDetail(this.tr, d) });
+        }
+        await this.noteById(map, final.roles.situation, drive, { detail: situationDetail(this.tr, final) });
+        const as = final.situation.assumptions;
+        if (as?.items.length)
+          await this.noteById(map, as.id, drive, { detail: definitionsDetail(this.tr, as.items, as.insights) });
         if (inner) await inner();
       };
       return plan;
     });
   }
-  private async noteSummary(
+  private async noteById(
     map: MapDocument,
     id: string,
     drive: Drive,
-    summary: string,
-    detail: string
+    patch: { summary?: string; detail?: string }
   ): Promise<void> {
     const path = map.nodes.find(n => n.id === id)?.path ?? (await this.notePath(drive, id));
-    if (path) await this.writeNote(path, { summary, detail: `${this.t("ui.argument_reason")}: ${plainLine(detail)}` });
+    if (path) await this.writeNote(path, patch);
   }
 
   private async propose(drive: Drive, state: ArgumentMapData, proposition: string, count: number): Promise<void> {
@@ -894,7 +907,18 @@ export class ArgumentRuns {
       return {
         next,
         notes: () =>
-          this.noteDetail(map, hypothesisId, drive, `${this.t("ui.argument_reason")}: ${plainLine(result.reason)}`)
+          this.noteDetail(
+            map,
+            hypothesisId,
+            drive,
+            facet
+              ? hypothesisDetail(
+                  this.tr,
+                  next.hypotheses.find(h => h.id === hypothesisId)!,
+                  result.reason
+                )
+              : `${this.t("ui.argument_reason")}: ${plainLine(result.reason)}`
+          )
       };
     });
   }
@@ -908,13 +932,18 @@ export class ArgumentRuns {
     await this.checkpoint(drive, async (s, map) => {
       const next = applyConclusion(s, result);
       const pointLines = result.points.map(p => `- ${plainLine(p.text)}`);
-      const detail = [
-        ...pointLines,
-        "",
-        ...this.dataSection(next, next.conclusion.basedOn),
-        "",
-        ...this.sourceSection(next, next.conclusion.basedOn)
-      ].join("\n");
+      const detail = hasFacets(next)
+        ? conclusionDetail(this.tr, next, await this.hypothesisTitles(drive, next), {
+            summary: result.summary,
+            points: result.points.map(p => p.text)
+          })
+        : [
+            ...pointLines,
+            "",
+            ...this.dataSection(next, next.conclusion.basedOn),
+            "",
+            ...this.sourceSection(next, next.conclusion.basedOn)
+          ].join("\n");
       const path = map.nodes.find(n => n.id === next.roles.conclusion)?.path;
       this.ports.log(`argument-run concluded runId=${s.run.runId} phase=concluded`);
       return {
@@ -955,8 +984,9 @@ export class ArgumentRuns {
           : gate.kind === "data_missing"
             ? t("ui.argument_stopped_missing")
             : t("ui.argument_stopped_mismatch");
-    const detail =
-      next.run.phase === "stopped_mismatch"
+    const detail = hasFacets(next)
+      ? conclusionDetail(this.tr, next, await this.hypothesisTitles(drive, next), undefined, summary)
+      : next.run.phase === "stopped_mismatch"
         ? [`${t("ui.argument_reason")}: ${plainLine(gate.reason ?? "")}`, "", ...this.dataSection(next, [])].join("\n")
         : "";
     const path = (await this.ports.readMap(drive.mapPath)).nodes.find(n => n.id === next.roles.conclusion)?.path;
@@ -969,6 +999,11 @@ export class ArgumentRuns {
         if (path) await this.writeNote(path, { summary, detail });
       }
     };
+  }
+  private async hypothesisTitles(drive: Drive, state: ArgumentMapData): Promise<Map<string, string>> {
+    const titles = new Map<string, string>();
+    for (const h of state.hypotheses) titles.set(h.id, (await this.text(drive, h.id)).title);
+    return titles;
   }
   private async noteDetail(map: MapDocument, id: string, drive: Drive, line: string): Promise<void> {
     const path = map.nodes.find(n => n.id === id)?.path ?? (await this.notePath(drive, id));
@@ -1175,7 +1210,11 @@ export class ArgumentRuns {
             detail: [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n")
           });
         } else if (!result.found)
-          await this.writeNote(node.path, { detail: this.t("ui.argument_not_found_0", result.reason) });
+          await this.writeNote(node.path, {
+            detail: hasFacets(next)
+              ? notFoundDetail(this.tr, searchLog, result.reason)
+              : this.t("ui.argument_not_found_0", result.reason)
+          });
       };
       return { next, notes };
     });

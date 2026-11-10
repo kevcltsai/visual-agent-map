@@ -918,3 +918,37 @@ test('P5: the research cap and the worst-case call count follow the constants (7
   assert.equal(WORST_CASE_AI_CALLS, model.MAX_RESEARCH_CALLS + 1 + 2 + 4 + 36 + 1);
   assert.equal(WORST_CASE_AI_CALLS, 122);
 });
+
+// ---- P6: notes of a facet map; an old map's notes stay as V1 wrote them ---------------------------------------------------------------
+test('P6: a facet map writes facet, datum, situation, definitions, hypothesis and conclusion notes; research detail never reaches a note', async () => {
+  const fig = (id, n) => foundEntry(id, { figure: { number: n, period: '2026-07', unit: '%' } });
+  let n = 0;
+  const r = await rig({ facet: true, script: { step: facetSteps(), ask: ctx => ({ summary: 's', detail: 'SECRET-DETAIL-TEXT', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [fig(ctx.argumentEvidenceNeeds[0].id, String(++n))] }) } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.equal(state.run.phase, 'concluded');
+  const doc = await r.repo.readMap(r.mapPath);
+  const core = '### 核心結論';
+  const facetNote = await r.text(state.situation.facets[0].id);
+  assert.ok(facetNote.detail.startsWith(core) && facetNote.detail.includes('判定：支持命題') && facetNote.detail.includes('| 數據 |'));
+  const datumNote = await r.text(state.situation.data[0].id);
+  assert.ok(datumNote.detail.startsWith(core) && datumNote.detail.includes(URL_OK));
+  assert.ok((await r.text(state.roles.situation)).detail.includes('個面向中有'));
+  assert.ok((await r.text(state.situation.assumptions.id)).detail.includes('The age band narrows the data'));
+  assert.ok((await r.text(state.hypotheses[0].id)).detail.includes('成立的原因') && (await r.text(state.hypotheses[0].id)).detail.includes('the sources agree'));
+  const conclusion = await r.text(state.roles.conclusion);
+  assert.ok(conclusion.detail.includes('final answer') && conclusion.detail.includes('### 依據的假設') && conclusion.detail.includes('### 現況依據'));
+  for (const node of doc.nodes) assert.ok(!(await r.repo.readNote(node.path)).detail?.includes('SECRET-DETAIL-TEXT'), node.id);
+});
+
+test('P6: an old (non-facet) map keeps the V1 note text byte for byte', async () => {
+  const r = await rig({ script: { step: steps() } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  const conclusion = await r.text(state.roles.conclusion);
+  const claim = 'Rate rose';
+  const src = `- ${claim}「${QUOTE}」（${URL_OK}）`;
+  assert.equal(conclusion.detail, ['- point', '', '## 依據的現況數據', src, '', '## 來源', src, src, src, src, src, src].join('\n'));
+  const datum = await r.text(state.situation.data[0].id);
+  assert.equal(datum.detail, ['## 來源', src].join('\n'));
+});

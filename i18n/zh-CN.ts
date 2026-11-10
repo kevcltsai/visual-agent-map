@@ -2891,6 +2891,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.topic_chat_synthesis_researched_first_0_1":
     "先研究了 {0} 个还没研究的子议题，再整合 {1} 个子议题的发现，写回这个议题。",
   "ui.topic_chat_running": "执行中…",
+  "ui.topic_chat_stop": "停止",
   "ui.topic_chat_stopped": "已停止。",
   "ui.topic_chat_failed_0": "没有完成：{0}",
   "ui.topic_chat_no_children": "这个议题还没有子议题可以整合。",

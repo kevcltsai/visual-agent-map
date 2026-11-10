@@ -2892,6 +2892,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.topic_chat_synthesis_researched_first_0_1":
     "先研究了 {0} 個還沒研究的子議題，再整合 {1} 個子議題的發現，寫回這個議題。",
   "ui.topic_chat_running": "執行中…",
+  "ui.topic_chat_stop": "停止",
   "ui.topic_chat_stopped": "已停止。",
   "ui.topic_chat_failed_0": "沒有完成：{0}",
   "ui.topic_chat_no_children": "這個議題還沒有子議題可以整合。",

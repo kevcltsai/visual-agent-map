@@ -10,7 +10,7 @@ const { TopicChatWindow } = load('experiences/visual-map/topic-chat.ts', { obsid
 const { t } = load('i18n.ts');
 const hasClass = (item, name) => dom.hasCls(item, name);
 
-function fixture({ anchor, submit, steer } = {}) {
+function fixture({ anchor, submit, steer, stoppable } = {}) {
   const docListeners = {};
   const doc = { activeElement: null, listeners: docListeners,
     addEventListener(name, fn) { (docListeners[name] ??= []).push(fn); },
@@ -18,7 +18,7 @@ function fixture({ anchor, submit, steer } = {}) {
   const root = element('div'); root.root = doc; root.ownerDocument = doc;
   const session = { turns: [], mode: 'quick', running: false, draftKind: null, draftText: '' };
   const watchers = [];
-  const calls = { submit: [], steer: [], close: 0, modes: [], opener: 0 };
+  const calls = { submit: [], steer: [], stop: 0, close: 0, modes: [], opener: 0 };
   const host = {
     topicTitle: () => 'Premise',
     anchor: anchor ?? (() => null),
@@ -28,6 +28,8 @@ function fixture({ anchor, submit, steer } = {}) {
     setDraft: (kind, text) => { session.draftKind = kind; session.draftText = text; },
     submit: async (kind, text) => { calls.submit.push([kind, text]); return submit ? submit(kind, text) : true; },
     steer: text => { calls.steer.push(text); return steer ? steer(text) : true; },
+    canStop: () => (stoppable ? stoppable() : true),
+    stop: () => { calls.stop++; },
     close: () => { calls.close++; }
   };
   const opener = { focus: () => { calls.opener++; } };
@@ -1727,4 +1729,26 @@ integrationTest('topic chat steer: a retried attempt (a new handler through the 
   assert.deepEqual(a2, ['s1', 's2'], 'the new attempt gets each addition exactly once');
   assert.deepEqual(a1, ['s1', 's2'], 'the old one is not sent again');
   assert.equal(applied, 1); assert.equal(message, 'q\n\ns1\n\ns2', 'each addition once in the applied question');
+});
+
+test('topic chat window stop: the running row shows a labelled Stop button that calls the host; idle and the closing gap show none', () => {
+  let stoppable = true;
+  const f = fixture({ stoppable: () => stoppable });
+  const stopBtn = () => find(f.win.el, i => i.tag === 'button' && hasClass(i, 'vam-topic-chat-stop'));
+  assert.equal(stopBtn(), undefined, 'idle: no stop button');
+  f.session.running = true; f.refresh();
+  const btn = stopBtn();
+  assert.ok(btn, 'running: stop button shown');
+  assert.equal(btn.text, t('ui.topic_chat_stop'));
+  assert.equal(btn.attrs.type, 'button');
+  assert.equal(btn.attrs['aria-label'], t('ui.topic_chat_stop'));
+  assert.ok(hasClass(btn.parent, 'is-running'));
+  btn.click();
+  assert.equal(f.calls.stop, 1);
+  assert.deepEqual(f.calls.submit, []);
+  stoppable = false; f.refresh();
+  assert.equal(stopBtn(), undefined, 'closing gap (cannot stop): no stop button');
+  assert.ok(findAll(f.win.el, i => hasClass(i, 'is-running')).length === 1, 'the Running row stays');
+  stoppable = true; f.session.running = false; f.refresh();
+  assert.equal(stopBtn(), undefined, 'idle again: no stop button');
 });

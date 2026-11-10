@@ -2892,6 +2892,7 @@ var en = {
   "ui.topic_chat_synthesis_done_0": "Synthesized the findings of {0} subtopics and wrote them back to this topic.",
   "ui.topic_chat_synthesis_researched_first_0_1": "Researched {0} unresearched subtopics first, then synthesized the findings of {1} subtopics and wrote them back to this topic.",
   "ui.topic_chat_running": "Running\u2026",
+  "ui.topic_chat_stop": "Stop",
   "ui.topic_chat_stopped": "Stopped.",
   "ui.topic_chat_failed_0": "Did not finish: {0}",
   "ui.topic_chat_no_children": "This topic has no subtopics to synthesize yet.",
@@ -5762,6 +5763,7 @@ var zhCN = {
   "ui.topic_chat_synthesis_done_0": "\u5DF2\u6574\u5408 {0} \u4E2A\u5B50\u8BAE\u9898\u7684\u53D1\u73B0\uFF0C\u5199\u56DE\u8FD9\u4E2A\u8BAE\u9898\u3002",
   "ui.topic_chat_synthesis_researched_first_0_1": "\u5148\u7814\u7A76\u4E86 {0} \u4E2A\u8FD8\u6CA1\u7814\u7A76\u7684\u5B50\u8BAE\u9898\uFF0C\u518D\u6574\u5408 {1} \u4E2A\u5B50\u8BAE\u9898\u7684\u53D1\u73B0\uFF0C\u5199\u56DE\u8FD9\u4E2A\u8BAE\u9898\u3002",
   "ui.topic_chat_running": "\u6267\u884C\u4E2D\u2026",
+  "ui.topic_chat_stop": "\u505C\u6B62",
   "ui.topic_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
   "ui.topic_chat_failed_0": "\u6CA1\u6709\u5B8C\u6210\uFF1A{0}",
   "ui.topic_chat_no_children": "\u8FD9\u4E2A\u8BAE\u9898\u8FD8\u6CA1\u6709\u5B50\u8BAE\u9898\u53EF\u4EE5\u6574\u5408\u3002",
@@ -8632,6 +8634,7 @@ var zhTW = {
   "ui.topic_chat_synthesis_done_0": "\u5DF2\u6574\u5408 {0} \u500B\u5B50\u8B70\u984C\u7684\u767C\u73FE\uFF0C\u5BEB\u56DE\u9019\u500B\u8B70\u984C\u3002",
   "ui.topic_chat_synthesis_researched_first_0_1": "\u5148\u7814\u7A76\u4E86 {0} \u500B\u9084\u6C92\u7814\u7A76\u7684\u5B50\u8B70\u984C\uFF0C\u518D\u6574\u5408 {1} \u500B\u5B50\u8B70\u984C\u7684\u767C\u73FE\uFF0C\u5BEB\u56DE\u9019\u500B\u8B70\u984C\u3002",
   "ui.topic_chat_running": "\u57F7\u884C\u4E2D\u2026",
+  "ui.topic_chat_stop": "\u505C\u6B62",
   "ui.topic_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
   "ui.topic_chat_failed_0": "\u6C92\u6709\u5B8C\u6210\uFF1A{0}",
   "ui.topic_chat_no_children": "\u9019\u500B\u8B70\u984C\u9084\u6C92\u6709\u5B50\u8B70\u984C\u53EF\u4EE5\u6574\u5408\u3002",
@@ -53679,7 +53682,16 @@ var TopicChatWindow = class {
       }
     }
     if (session.running) {
-      this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running", text: t("ui.topic_chat_running") });
+      const running2 = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running" });
+      running2.createSpan({ text: t("ui.topic_chat_running") });
+      if (this.host.canStop()) {
+        const stop = running2.createEl("button", {
+          cls: "vam-topic-chat-stop",
+          text: t("ui.topic_chat_stop"),
+          attr: { type: "button", "aria-label": t("ui.topic_chat_stop") }
+        });
+        stop.addEventListener("click", () => this.host.stop());
+      }
     }
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }
@@ -74819,6 +74831,11 @@ ${request.requirements}` : preset.text,
         entry.steers.add(text13);
         return true;
       },
+      canStop: () => entry.session.running && !!entry.controller && !entry.controller.signal.aborted && !entry.steerEnd,
+      stop: () => {
+        var _a2;
+        if (entry.session.running && !entry.steerEnd) (_a2 = entry.controller) == null ? void 0 : _a2.abort();
+      },
       close: () => {
         var _a2;
         if (((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry) this.closeTopicChatWindow();
@@ -74919,6 +74936,7 @@ ${request.requirements}` : preset.text,
       entry.steers = steers;
       entry.steerFolded = folded2;
       entry.steerEnd = null;
+      entry.controller = controller;
       this.writeTopicChatLine(entry, {
         type: "turn",
         id: entry.runningTurnId,

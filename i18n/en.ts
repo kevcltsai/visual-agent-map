@@ -3105,6 +3105,7 @@ export const en = {
   "ui.topic_chat_synthesis_researched_first_0_1":
     "Researched {0} unresearched subtopics first, then synthesized the findings of {1} subtopics and wrote them back to this topic.",
   "ui.topic_chat_running": "Running…",
+  "ui.topic_chat_stop": "Stop",
   "ui.topic_chat_stopped": "Stopped.",
   "ui.topic_chat_failed_0": "Did not finish: {0}",
   "ui.topic_chat_no_children": "This topic has no subtopics to synthesize yet.",

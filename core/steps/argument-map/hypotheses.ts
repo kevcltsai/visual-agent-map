@@ -14,6 +14,7 @@ import {
 } from "./shared";
 import type { GateDatum } from "./gate";
 import template from "./hypotheses.md";
+import causalTemplate from "./hypotheses-causal.md";
 
 export interface HypothesesRequest extends ArgumentStepBase {
   proposition: string;
@@ -102,7 +103,7 @@ export const hypothesesStep: StepDefinition<HypothesesRequest, HypothesesResult>
       data: JSON.stringify(request.data.map(pick)),
       existing: JSON.stringify(request.existing),
       causal: request.causalQuestions?.length
-        ? `\n\nQuestions the hypotheses must help answer (JSON array). They are not candidate hypotheses: every hypothesis must still be derived from the supplied situation data and cite it, and a question must not become a hypothesis just because it is listed. Include at least one hypothesis that offers an explanation other than the cause named in the proposition.\n${JSON.stringify(request.causalQuestions)}`
+        ? renderTemplate(causalTemplate, { questions: JSON.stringify(request.causalQuestions) })
         : ""
     }),
   schema: HYPOTHESES_SCHEMA,

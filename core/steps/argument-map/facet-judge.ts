@@ -12,6 +12,8 @@ import {
   type ArgumentStepBase
 } from "./shared";
 import template from "./facet-judge.md";
+import retryOnce from "./facet-judge-retry1.md";
+import retryNone from "./facet-judge-retry2.md";
 
 /** One found datum as the facet judge sees it. `fixedStance` is set when its stance toward the proposition is already decided and cannot change. */
 export interface FacetJudgeDatum {
@@ -100,9 +102,8 @@ const sourcesOf = (request: FacetJudgeRequest): string[] => [
   request.proposition,
   ...request.facets.flatMap(f => [f.title, ...f.data.flatMap(d => [d.need, d.claim, d.quote, d.url, d.stance])])
 ];
-const RETRY_ROUND_1 =
-  'For each facet judged "insufficient", you may list up to 3 retryNeeds: concrete, searchable items that would settle that facet, each different from the needs already shown and from each other, at most 9 in all. Leave retryNeeds empty for any other verdict.';
-const RETRY_ROUND_2 = "There is no further search. retryNeeds must be an empty list for every facet.";
+const RETRY_ROUND_1 = retryOnce.trim();
+const RETRY_ROUND_2 = retryNone.trim();
 
 const ids = (values: string[]): string => [...values].sort().join("\n");
 

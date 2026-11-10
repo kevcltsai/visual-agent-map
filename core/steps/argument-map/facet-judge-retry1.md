@@ -1,0 +1,1 @@
+For each facet judged "insufficient", you may list up to 3 retryNeeds: concrete, searchable items that would settle that facet, each different from the needs already shown and from each other, at most 9 in all. Leave retryNeeds empty for any other verdict.

@@ -14,6 +14,7 @@ import {
 } from "./shared";
 import type { GateDatum } from "./gate";
 import template from "./facet-hypotheses.md";
+import firstBatchRule from "./facet-hypotheses-first.md";
 
 export interface FacetHypothesesDatum extends GateDatum {
   propStance: PropStance;
@@ -115,7 +116,7 @@ export const facetHypothesesStep: StepDefinition<FacetHypothesesRequest, FacetHy
       languageInstruction: languageInstruction(request.language, request.proposition),
       count: String(request.count),
       alternativeRule: isFirstBatch(request)
-        ? "At least one hypothesis whose alternative is true is required in this batch."
+        ? firstBatchRule.trim()
         : "",
       proposition: JSON.stringify(request.proposition),
       data: JSON.stringify(request.data.map(pick)),

@@ -149,8 +149,8 @@ test('zh-CN prompt snapshots: exactly 105 lines carry a research.* text that dif
   // note-style-recipe T4 P1, one line each = 95; + the four zh-CN snapshots service.reference-groups-{top,fresh}.{1,2}
   // of note-style-recipe T4 F1, one line each = 99; + the two zh-CN snapshots service.{research,decompose}-anchor-context
   // of annotated-image P5a, one line each = 101; + the two zh-CN snapshots service.task-ai-{decided,followed} of
-  // ai-proposed-note-style P2, one line each = 103; + the zh-CN snapshot service.synthesize-standard (topic chat P1b), one line = 104; + the zh-CN snapshot service.argument-evidence (argument map P4), one line = 105.
-  assert.equal(lines.length, 105);
+  // ai-proposed-note-style P2, one line each = 103; + the zh-CN snapshot service.synthesize-standard (topic chat P1b), one line = 104; + the zh-CN snapshot service.argument-evidence (argument map P4), one line = 105; + the zh-CN snapshot service.argument-evidence-context (V1 boost P3), one line = 106.
+  assert.equal(lines.length, 106);
 });
 
 test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 103 output-language sentences and 96 clauses, none in zh-TW', () => {
@@ -169,6 +169,6 @@ test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 103 out
   // service.task-ai-{decided,followed} of ai-proposed-note-style P2 add 2 sentences and 1 clause (the decided prompt has
   // no detail structure, so no clause). The same two snapshots then lose their sentence again (the AI decides or keeps the
   // sections, so no six-standard-headings sentence): 103 - 2 = 101; the followed one keeps its clause. The zh-CN snapshot
-  // service.synthesize-standard (topic chat P1b) adds 1 sentence and 1 clause: 102 and 95. The zh-CN snapshot service.argument-evidence (argument map P4) adds 1 and 1: 103 and 96.
-  assert.deepEqual(total, { rules: 103, clauses: 96 });
+  // service.synthesize-standard (topic chat P1b) adds 1 sentence and 1 clause: 102 and 95. The zh-CN snapshot service.argument-evidence (argument map P4) adds 1 and 1: 103 and 96. The zh-CN snapshot service.argument-evidence-context (V1 boost P3) adds 1 and 1: 104 and 97.
+  assert.deepEqual(total, { rules: 104, clauses: 97 });
 });

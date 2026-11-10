@@ -75,6 +75,17 @@ test('gate: the prompt shows only the allowed datum fields, even when the caller
   assert.match(prompt, /"id":"d1"/);
   assert.match(prompt, /Youth unemployment rose in 2024/);
 });
+test('gate: the prompt defines the premise, keeps causal claims out of it, and asks for premise data in citedData', () => {
+  for (const language of ['en', 'zh-TW']) {
+    const prompt = mod.situationGateStep.render({ ...gateReq, language });
+    assert.match(prompt, /premise is the facts about the current situation that the proposition takes for granted/i, language);
+    assert.match(prompt, /causal or explanatory claim is not part of the premise/i, language);
+    assert.match(prompt, /must not decide this judgement/i, language);
+    assert.match(prompt, /matches is true, include data that bear on the premise/i, language);
+    const rules = prompt.split('\n\n').slice(1, 3).join('\n');
+    assert.doesNotMatch(rules, /\d|https?:/, `${language}: no number or link in the rule text`);
+  }
+});
 
 // ---- hypotheses ----
 const hypReq = { ...base, proposition: PROP, data: [datum('d1'), datum('d2')], count: 3, existing: ['Old idea about hiring'] };

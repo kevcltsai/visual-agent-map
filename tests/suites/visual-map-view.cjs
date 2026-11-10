@@ -834,6 +834,54 @@ integrationTest('selection, arrow keys and select-mode toggles repaint only the 
   assert.equal(view.selection.state.selected, 'root'); assert.deepEqual(stops(), ['root']);
   assert.equal(fixture.renders(), 0, 'selection and arrow keys never call render()');
 });
+// The depth rule cards used before the paint index, kept verbatim as the reference: one `nodes.find` per step up.
+const oldNodeDepth = (nodes, node) => {
+  let depth = 1; const seen = new Set([node.id]);
+  for (let parent = node.parentId; parent; depth++) { if (seen.has(parent)) break; seen.add(parent); parent = nodes.find(item => item.id === parent)?.parentId ?? null; }
+  return depth;
+};
+// 1,000 topics: a deep chain, a wide fan, missing parents, duplicate ids and corrupt cycles, in a fixed shuffled order.
+const thousandNodes = () => {
+  let seed = 7; const rand = n => (seed = (seed * 1103515245 + 12345) % 2147483648) % n;
+  const nodes = [node('n0')];
+  for (let i = 1; i < 1000; i++) nodes.push(node(`n${i}`, i < 200 ? `n${i - 1}` : i % 97 === 0 ? `gone${i}` : `n${rand(i)}`));
+  nodes[500].parentId = 'n502'; nodes[501].parentId = 'n500'; nodes[502].parentId = 'n501'; // a three-topic cycle, with n0-rooted topics below it
+  nodes[700].parentId = 'n700'; // its own parent
+  nodes.push({ ...node('n300', 'n5') }); // a duplicate id: the first one wins, as find did
+  for (let i = nodes.length - 1; i > 0; i--) { const j = rand(i + 1); [nodes[i], nodes[j]] = [nodes[j], nodes[i]]; }
+  return nodes;
+};
+test('card index: every depth and lookup on a 1,000-topic map matches the old per-card find, in any query order', () => {
+  const { cardIndex } = load('experiences/visual-map/card-index.ts');
+  const nodes = thousandNodes(); const expected = nodes.map(item => oldNodeDepth(nodes, item));
+  for (const order of [nodes, [...nodes].reverse()]) {
+    const index = cardIndex(nodes);
+    const got = new Map(order.map(item => [item, index.depth(item)]));
+    assert.deepEqual(nodes.map(item => got.get(item)), expected);
+  }
+  const index = cardIndex(nodes);
+  for (const item of nodes) assert.equal(index.node(item.id), nodes.find(other => other.id === item.id));
+  assert.equal(index.node('missing'), undefined);
+  assert.ok(expected.includes(3) && Math.max(...expected) >= 200, 'the fixture has cycles and a deep chain');
+  // A display copy off the map is walked from its own parent and does not change what the map's topic with that id gets.
+  const copy = { ...node('n10', 'gone') }; assert.equal(index.depth(copy), 2); assert.equal(index.depth(nodes.find(item => item.id === 'n10')), 11);
+});
+integrationTest('a paint of 1,000 cards sets each aria-level as before without searching the map per card', () => {
+  const { cardIndex } = load('experiences/visual-map/card-index.ts');
+  const fixture = selectionView(load); const { view } = fixture;
+  const nodes = thousandNodes(); const expected = new Map(nodes.map(item => [item.id, String(oldNodeDepth(nodes, nodes.find(other => other.id === item.id)))]));
+  view.map = map(nodes); view.notes = new Map(nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed' }]));
+  view.cardEls.clear(); view.stageEl.children = []; view.selection.moveTabStop(view.defaultTabStop(nodes));
+  let finds = 0; const find = nodes.find; nodes.find = function (...args) { finds++; return find.apply(this, args); };
+  view.paintCardIndex = cardIndex(nodes);
+  for (const item of nodes) view.renderNode(item);
+  view.paintCardIndex = null;
+  assert.equal(finds, 0, 'no card searches the map');
+  const levels = new Map(view.stageEl.children.filter(card => card.attrs.role === 'treeitem').map(card => [card.dataset.nodeId, card.attrs['aria-level']]));
+  for (const [id, level] of expected) assert.equal(levels.get(id), level, id);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.equal(source.match(/this\.paintCardIndex = (?:this\.map \? )?cardIndex\(this\.map\.nodes\)/g)?.length, 2, 'the full paint and the loading batch both build the index once');
+});
 integrationTest('persona 11: Alt+arrow on a focused card reorders it among its siblings; plain arrows still walk, and Alt does nothing in select mode', () => {
   const fixture = selectionView(load); const { view } = fixture; fixture.build(); let cards = fixture.cards();
   const calls = []; view.enqueue = fn => fn(); view.shiftSiblingByKey = (node, offset) => { calls.push([node.id, offset]); };

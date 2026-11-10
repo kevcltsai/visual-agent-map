@@ -16,6 +16,11 @@ export const MAX_HYPOTHESES = 6;
 export const MAX_NEEDS = 6;
 export const MAX_ROUND_NEEDS = 3;
 export const MAX_RESEARCH_CALLS = 66;
+export const MAX_FRAMING_CALLS = 3;
+export const MAX_PREMISES = 3;
+export const MAX_TESTABLE = 2;
+export const MAX_PREMISE_DATA = 2;
+export const MAX_PREMISE_ATTEMPTS = 2;
 
 export const ROLE_KEYS = ["proposition", "premises", "conclusion"] as const;
 export type RoleKey = (typeof ROLE_KEYS)[number];
@@ -205,6 +210,8 @@ export interface Prediction {
   /** Claim ids of the auxiliary premises this prediction leans on. */
   auxiliary: string[];
   required: boolean;
+  /** Refute predictions only: why seeing it lowers the credibility of the hypothesis. */
+  reason?: string;
 }
 export interface Identification {
   strategy: string;
@@ -448,6 +455,7 @@ function problem(raw: Rec, nodeIds: ReadonlySet<string>): string | null {
       if (!oneOf(PREDICTION_KINDS, prediction.kind)) return "unknown prediction enum";
       if (!bool(prediction.required) || !strList(prediction.auxiliary) || !recList(prediction.alsoPredictedBy))
         return "prediction malformed";
+      if (!optStr(prediction.reason)) return "prediction malformed";
       for (const id of prediction.auxiliary) if (!claimIds.has(id)) return "prediction malformed";
       for (const entry of prediction.alsoPredictedBy) {
         if (!isStr(entry.hypothesisId)) return "prediction malformed";

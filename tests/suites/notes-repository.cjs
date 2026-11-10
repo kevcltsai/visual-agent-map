@@ -2508,3 +2508,35 @@ integrationTest('C8 review: without Detail markers an English note stays English
   assert.equal(noteHeadingLanguage('# T\n\n## 目前摘要\n\n## 詳細內容\n\nx'), 'zh-TW');
   assert.equal(noteHeadingLanguage('# T\n\n## Current Summary\n\n## 目前摘要\n\n## 詳細內容\n\nx'), 'en', 'an English managed heading keeps it English');
 });
+integrationTest('deleting many non-node notes scans the maps once; a hit, a broken Map.md and non-VAM notes behave as before', async () => {
+  const { repo, app } = fixture();
+  const path = await repo.createMap('Perf', []), map = await repo.readMap(path);
+  const node = await repo.createNote('Tracked', 'a', map, path, 'workspace'); map.nodes.push(node); await repo.saveMap(path, map);
+  const gone = Array.from({ length: 50 }, (_, index) => `Personal/gone-${index}.md`);
+  const reads = [];
+  for (const method of ['read', 'cachedRead']) { const original = app.vault[method].bind(app.vault); app.vault[method] = async file => { reads.push(file.path); return original(file); }; }
+  assert.equal(await repo.anyMapNodePath(gone), false);
+  assert.equal(reads.filter(item => item === path).length, 1, 'all maps are scanned once for 50 deleted paths');
+  reads.length = 0;
+  assert.equal(await repo.anyMapNodePath([...gone, node.path]), true);
+  assert.equal(reads.filter(item => item === path).length, 1);
+  assert.equal(await repo.anyMapNodePath([]), false);
+  const second = await repo.createMap('Broken', []);
+  await app.vault.modify(app.vault.getAbstractFileByPath(second), '---\nvisual-agent-map: true\n---\nnot a map');
+  assert.equal(await repo.anyMapNodePath(gone), false, 'a broken Map.md is skipped, not fatal');
+  assert.equal(await repo.anyMapNodePath([node.path]), true);
+});
+integrationTest('reference update reads each affected note once, and skips non-VAM and unmarked notes', async () => {
+  const { repo, app } = fixture();
+  const path = await repo.createMap('Perf', []), map = await repo.readMap(path);
+  const a = await repo.createNote('A', 'a', map, path, 'workspace'), b = await repo.createNote('B', 'b', map, path, 'workspace');
+  map.nodes.push(a, b); await repo.saveMap(path, map);
+  await repo.updateNote(a.path, { sourcePaths: ['Personal/old.md'] });
+  await app.vault.create('Personal/plain.md', '# Plain\n\nsource-notes: Personal/old.md');
+  const reads = [];
+  const original = app.vault.read.bind(app.vault); app.vault.read = async file => { reads.push(file.path); return original(file); };
+  await repo.replaceSourcePath('Personal/old.md', 'Personal/new.md');
+  assert.equal(reads.filter(item => item === a.path).length, 1, 'the affected note is read once');
+  assert.equal(reads.includes('Personal/plain.md'), false);
+  assert.deepEqual((await repo.readNote(a.path)).sourcePaths, ['Personal/new.md']);
+});

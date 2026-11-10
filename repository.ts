@@ -1596,7 +1596,13 @@ export class Repository {
 
   async readNote(path: string, map?: MapDocument, ctx?: NoteReadContext): Promise<Note> {
     const file = this.file(path),
-      raw = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file),
+      raw = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file);
+    return this.parseNote(path, raw, map, ctx);
+  }
+
+  /** Parses already-read note content; `readNote` reads the file once and calls this. */
+  private async parseNote(path: string, raw: string, map?: MapDocument, ctx?: NoteReadContext): Promise<Note> {
+    const file = this.file(path),
       content = decodeCalloutSections(upgradeLegacyAimText(raw)),
       fm = frontmatter(content);
     const status = text(fm.status, "idea");
@@ -2436,7 +2442,14 @@ export class Repository {
 
   /** Whether any map lists `path` as a node; only map files are read. */
   async isMapNodePath(path: string): Promise<boolean> {
-    for (const { map } of await this.readableMaps()) if (map.nodes.some(node => node.path === path)) return true;
+    return this.anyMapNodePath([path]);
+  }
+
+  /** Whether any map lists any of `paths` as a node; all maps are scanned once however many paths are given. */
+  async anyMapNodePath(paths: string[]): Promise<boolean> {
+    if (!paths.length) return false;
+    const wanted = new Set(paths);
+    for (const { map } of await this.readableMaps()) if (map.nodes.some(node => wanted.has(node.path))) return true;
     return false;
   }
 
@@ -2758,7 +2771,7 @@ export class Repository {
   private async readNoteIfManaged(file: TFile): Promise<Note | null> {
     const content = await this.app.vault.read(file),
       fm = frontmatter(content);
-    return marker(fm["agent-map-node"]) ? this.readNote(file.path) : null;
+    return marker(fm["agent-map-node"]) ? this.parseNote(file.path, content) : null;
   }
 
   /**

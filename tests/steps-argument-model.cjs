@@ -202,11 +202,14 @@ test('facet boost model: an old map keeps reading without facets, and a datum wi
 const SEARCH_LOG = { queries: ['youth unemployment 2024'], opened: ['https://stats.example.org/a'], why: 'the page had only 2019 data' };
 const proofOf = extra => ({ url: 'https://stats.example.org/a', quote: 'quote number one', claim: 'claim', check: 'page_match', checkedAt: '2026-11-11T00:00:00.000Z', ...extra });
 const longText = 'x'.repeat(201);
+const hypothesisWith = insights => d => { d.hypotheses.push({ id: 'h1', citedData: [], round: 1, location: 'verifying', needs: [], ...(insights === undefined ? {} : { insights }) }); };
 const goodOptionals = {
   'question on the situation': d => { d.situation.question = 'Did the youth rate rise?'; },
   'figure on a datum proof': d => { d.situation.data[0].state = 'found'; d.situation.data[0].proof = proofOf({ figure: { number: '9.2', period: '2024-03', unit: 'percent' } }); },
   'searchLog on a datum': d => { d.situation.data[0].searchLog = SEARCH_LOG; },
   'searchLog on a need': d => { d.hypotheses.push({ id: 'h1', citedData: [], round: 1, location: 'verifying', needs: [{ id: 'n1', text: 'n', addedRound: 1, state: 'not_found', searchLog: SEARCH_LOG }] }); },
+  'assumption insights (three, 300 characters)': d => { d.situation.assumptions = { id: 'as1', items: [{ label: 'a', value: 'v', reason: 'r' }], insights: ['x'.repeat(300), 'two', 'three'] }; },
+  'hypothesis insights (one to three, all kinds)': hypothesisWith([{ kind: 'consistent', text: 'a' }, { kind: 'tension', text: 'b' }, { kind: 'missing', text: 'c' }]),
   'searchLog with five queries of 200 characters': d => { d.situation.data[0].searchLog = { queries: Array(5).fill('x'.repeat(200)), opened: [], why: 'w' }; }
 };
 for (const [name, edit] of Object.entries(goodOptionals)) {
@@ -234,6 +237,17 @@ const badOptionals = {
   'searchLog query over 200 characters': d => { d.situation.data[0].searchLog = { ...SEARCH_LOG, queries: [longText] }; },
   'searchLog why over 200 characters': d => { d.situation.data[0].searchLog = { ...SEARCH_LOG, why: longText }; },
   'searchLog missing why': d => { d.situation.data[0].searchLog = { queries: [], opened: [] }; },
+  'assumption insights not an array': d => { d.situation.assumptions = { id: 'as1', items: [{ label: 'a', value: 'v', reason: 'r' }], insights: 'x' }; },
+  'assumption insights four items': d => { d.situation.assumptions = { id: 'as1', items: [{ label: 'a', value: 'v', reason: 'r' }], insights: ['1', '2', '3', '4'] }; },
+  'assumption insight blank': d => { d.situation.assumptions = { id: 'as1', items: [{ label: 'a', value: 'v', reason: 'r' }], insights: [''] }; },
+  'assumption insight over 300 characters': d => { d.situation.assumptions = { id: 'as1', items: [{ label: 'a', value: 'v', reason: 'r' }], insights: ['x'.repeat(301)] }; },
+  'assumption insight not a string': d => { d.situation.assumptions = { id: 'as1', items: [{ label: 'a', value: 'v', reason: 'r' }], insights: [3] }; },
+  'hypothesis insights not an array': hypothesisWith('x'),
+  'hypothesis insights four items': hypothesisWith([1, 2, 3, 4].map(i => ({ kind: 'missing', text: `t${i}` }))),
+  'hypothesis insight unknown kind': hypothesisWith([{ kind: 'maybe', text: 't' }]),
+  'hypothesis insight blank text': hypothesisWith([{ kind: 'missing', text: '' }]),
+  'hypothesis insight over 300 characters': hypothesisWith([{ kind: 'missing', text: 'x'.repeat(301) }]),
+  'hypothesis insight with an extra key': hypothesisWith([{ kind: 'missing', text: 't', id: 1 }]),
   'searchLog on a need malformed': d => { d.hypotheses.push({ id: 'h1', citedData: [], round: 1, location: 'verifying', needs: [{ id: 'n1', text: 'n', addedRound: 1, state: 'not_found', searchLog: { queries: 'x', opened: [], why: '' } }] }); }
 };
 for (const [name, edit] of Object.entries(badOptionals)) {

@@ -183,7 +183,7 @@ type ClaudeRecord = {
 
 /** Translates the main agent's WebSearch/WebFetch calls into provider-neutral web events and counts successful retrievals. */
 export class ClaudeWebActivity {
-  private readonly pending = new Map<string, { action: "search" | "openPage"; url?: string }>();
+  private readonly pending = new Map<string, { action: "search" | "openPage"; url?: string; query?: string }>();
   retrievals = 0;
   constructor(private readonly emit?: (event: WebSearchEvent) => void) {}
 
@@ -198,10 +198,14 @@ export class ClaudeWebActivity {
         (item.name === "WebSearch" || item.name === "WebFetch")
       ) {
         // A WebFetch's requested URL is kept so the completed event says which page was opened (source proof, argument map).
-        const requested = (item.input as { url?: unknown } | undefined)?.url;
+        // A WebSearch's query is kept the same way so the program records what was searched (argument map search log).
+        const input = item.input as { url?: unknown; query?: unknown } | undefined;
+        const requested = input?.url;
+        const searched = input?.query;
         this.pending.set(item.id, {
           action: item.name === "WebSearch" ? "search" : "openPage",
-          ...(item.name === "WebFetch" && typeof requested === "string" && requested ? { url: requested } : {})
+          ...(item.name === "WebFetch" && typeof requested === "string" && requested ? { url: requested } : {}),
+          ...(item.name === "WebSearch" && typeof searched === "string" && searched ? { query: searched } : {})
         });
         this.send({ method: "item/started", params: { item: { id: item.id, type: "webSearch", action: null } } });
       } else if (
@@ -220,7 +224,11 @@ export class ClaudeWebActivity {
             item: {
               id: item.tool_use_id,
               type: "webSearch",
-              action: { type: opened.action, ...(opened.url ? { url: opened.url } : {}) }
+              action: {
+                type: opened.action,
+                ...(opened.url ? { url: opened.url } : {}),
+                ...(opened.query ? { query: opened.query } : {})
+              }
             }
           }
         });

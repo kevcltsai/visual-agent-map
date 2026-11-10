@@ -1,5 +1,12 @@
 import type { EvidenceInput, VerdictInput } from "../../argument-map/machine";
-import { VERDICTS, type Verdict } from "../../argument-map/model";
+import {
+  INSIGHT_KINDS,
+  MAX_INSIGHTS,
+  VERDICTS,
+  type InsightKind,
+  type HypothesisInsight,
+  type Verdict
+} from "../../argument-map/model";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import {
   ArgumentStepError,
@@ -38,14 +45,9 @@ export const VERDICT_SCHEMA = {
   required: ["verdict", "citedNeeds", "reason"]
 };
 
-/** Insights of a facet map's verdict (V1 boost): how the evidence agrees, pulls against itself, or is still missing. */
-export const INSIGHT_KINDS = ["consistent", "tension", "missing"] as const;
-export type InsightKind = (typeof INSIGHT_KINDS)[number];
-export const MAX_INSIGHTS = 3;
-export interface VerdictInsight {
-  kind: InsightKind;
-  text: string;
-}
+/** Insights of a facet map's verdict (V1 boost); the kinds and the cap live in the data contract (model.ts). */
+export { INSIGHT_KINDS, MAX_INSIGHTS, type InsightKind };
+export type VerdictInsight = HypothesisInsight;
 export interface FacetVerdictResult extends VerdictResult {
   insights: VerdictInsight[];
 }

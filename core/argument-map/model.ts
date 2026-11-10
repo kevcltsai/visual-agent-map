@@ -75,6 +75,15 @@ export interface SearchLog {
   opened: string[];
   why: string;
 }
+/** Insights of a facet map's verdict (V1 boost): how the evidence agrees, pulls against itself, or is still missing. At most 3, each at most 300 characters. */
+export const INSIGHT_KINDS = ["consistent", "tension", "missing"] as const;
+export type InsightKind = (typeof INSIGHT_KINDS)[number];
+export const MAX_INSIGHTS = 3;
+export const INSIGHT_MAX_TEXT = 300;
+export interface HypothesisInsight {
+  kind: InsightKind;
+  text: string;
+}
 export const SEARCH_LOG_MAX_ITEMS = 5;
 export const SEARCH_LOG_MAX_TEXT = 200;
 export interface SourceProof {
@@ -139,6 +148,8 @@ export interface Hypothesis {
   round: number;
   location: Location;
   needs: Need[];
+  /** Facet-judged maps: what the verdict step said about how the evidence agrees, pulls against itself or is missing (kept so the note can be rewritten). */
+  insights?: HypothesisInsight[];
   /** Facet-judged maps: "from datum X we observe Y, so we guess Z", and whether it explains the proposition by a cause other than the one it names. */
   basis?: string;
   alternative?: boolean;
@@ -165,8 +176,8 @@ export interface ArgumentMapData {
   situation: {
     data: SituationDatum[];
     gate: SituationGate;
-    /** `id` is the node id of the assumption card. Facet-judged maps only. */
-    assumptions?: { id: string; items: AssumptionItem[] };
+    /** `id` is the node id of the assumption card. Facet-judged maps only. `insights` is the last facet judgement's reading of the card (0 to 3 sentences). */
+    assumptions?: { id: string; items: AssumptionItem[]; insights?: string[] };
     /** Present only on a facet-judged map; a map without it runs the V1 path unchanged. */
     facets?: Facet[];
     causalQuestions?: string[];
@@ -190,6 +201,19 @@ const optOneOf = <T extends string>(list: readonly T[], value: unknown): boolean
 const count = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0;
 const strList = (value: unknown): value is string[] => Array.isArray(value) && value.every(isStr);
 const optStr = (value: unknown): boolean => value === undefined || typeof value === "string";
+const insightText = (value: unknown): boolean => isStr(value) && value.length <= INSIGHT_MAX_TEXT;
+function badInsights(value: unknown): boolean {
+  if (value === undefined) return false;
+  return !Array.isArray(value) || value.length > MAX_INSIGHTS || !value.every(insightText);
+}
+function badHypothesisInsights(value: unknown): boolean {
+  if (value === undefined) return false;
+  if (!Array.isArray(value) || value.length > MAX_INSIGHTS) return true;
+  return value.some(
+    entry =>
+      !isRec(entry) || Object.keys(entry).length !== 2 || !oneOf(INSIGHT_KINDS, entry.kind) || !insightText(entry.text)
+  );
+}
 
 function badFigure(value: unknown): boolean {
   if (value === undefined) return false;
@@ -231,6 +255,7 @@ function readFacets(situation: Rec, ids: Set<string>): string | null {
     for (const item of assumptions.items as unknown[])
       if (!isRec(item) || !isStr(item.label) || !isStr(item.value) || !isStr(item.reason))
         return "assumptions malformed";
+    if (badInsights(assumptions.insights)) return "assumptions malformed";
     ids.add(assumptions.id);
   }
   if (facets === undefined) return null;
@@ -297,6 +322,7 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
       (hypothesis.alternative !== undefined && typeof hypothesis.alternative !== "boolean")
     )
       return "hypothesis malformed";
+    if (badHypothesisInsights(hypothesis.insights)) return "hypothesis malformed";
     for (const need of hypothesis.needs as unknown[]) {
       if (!isRec(need) || !isStr(need.id) || !isStr(need.text) || !count(need.addedRound) || ids.has(need.id))
         return "need malformed";

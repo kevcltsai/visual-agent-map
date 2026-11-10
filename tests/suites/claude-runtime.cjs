@@ -29,6 +29,12 @@ test('Claude isolated research reports web activity in the Codex event shape and
   assert.deepEqual(urlEvents.filter(event => event.method === 'item/completed').map(event => event.params.item.action), [{ type: 'search' }, { type: 'openPage', url: 'https://example.org/a' }, { type: 'openPage' }]);
   assert.deepEqual(urlEvents.filter(event => event.method === 'item/started').every(event => event.params.item.action === null), true, 'started events are unchanged');
   assert.deepEqual(JSON.parse(JSON.stringify(load('core/argument-map/source-proof.ts').openedUrlsFromEvents(urlEvents))), ['https://example.org/a'], 'a failed fetch is not an opened page');
+  // A WebSearch's query rides on the completed event as action.query, so the program records what was searched (P5); a missing or blank query keeps the old shape.
+  const searchWith = (id, input) => ({ type: 'assistant', parent_tool_use_id: null, message: { content: [{ type: 'tool_use', id, name: 'WebSearch', input }] } });
+  const queryEvents = [];
+  await runWith([searchWith('q1', { query: 'youth unemployment rate 2024' }), done('q1'), searchWith('q2', { query: 42 }), done('q2'), searchWith('q3', { query: '' }), done('q3'), searchWith('q4', { query: 'failed query' }), done('q4', { is_error: true }), use('q5', 'WebSearch'), done('q5')], { onWebSearchEvent: event => { queryEvents.push(JSON.parse(JSON.stringify(event))); } });
+  assert.deepEqual(queryEvents.filter(event => event.method === 'item/completed').map(event => event.params.item.action), [{ type: 'search', query: 'youth unemployment rate 2024' }, { type: 'search' }, { type: 'search' }, { type: 'search' }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(load('core/argument-map/source-proof.ts').searchQueriesFromEvents(queryEvents))), ['youth unemployment rate 2024'], 'only a successful search with a text query is recorded');
   await assert.rejects(runWith([]), /did not perform web search|沒有實際執行網路搜尋/);
   await assert.rejects(runWith([use('s1', 'WebSearch'), done('s1', { is_error: true })]), /did not perform web search|沒有實際執行網路搜尋/, 'a denied or failed tool call is not a retrieval');
   const subagent = { ...use('s2', 'WebSearch'), parent_tool_use_id: 'task-1' };

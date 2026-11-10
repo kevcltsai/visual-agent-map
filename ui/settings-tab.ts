@@ -1074,8 +1074,11 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       return;
     } else if (typeof value === "string" && (key === "codexPath" || key === "claudePath"))
       this.plugin.settings[key] = value.trim();
-    else if (key === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
-    else return;
+    else if (key === "cliReasoning") {
+      this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
+      // A card that follows the current reasoning level shows it from its note read.
+      this.plugin.rereadAllViews();
+    } else return;
     if (key === "codexPath") this.plugin.resetCodexRuntime();
     if (key === "claudePath") this.plugin.modelDiscovery.invalidate("claude");
     await this.plugin.saveSettings();

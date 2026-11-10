@@ -336,6 +336,19 @@ test('changing the current model makes the next write read every open map back',
   assert.equal(noteOf(vb, b.nodes[0]).model, 'next-model');
 });
 
+test('changing the current reasoning level in Settings makes the next write read every open map back', async () => {
+  const h = harness();
+  const a = await h.map('Alpha'), b = await h.map('Beta');
+  const va = await h.open(a.mapPath), vb = await h.open(b.mapPath);
+  h.plugin.saveData = async () => {};
+  assert.notEqual(noteOf(va, a.nodes[0]).reasoning, 'high');
+  const { VisualAgentMapSettingTab } = load('main.ts', { obsidian });
+  await VisualAgentMapSettingTab.prototype.setControlValue.call({ plugin: h.plugin }, 'cliReasoning', 'high');
+  await h.plugin.mutate(async () => {});
+  assert.equal(noteOf(va, a.nodes[0]).reasoning, 'high');
+  assert.equal(noteOf(vb, b.nodes[0]).reasoning, 'high');
+});
+
 test('a model change while a read-back runs is not consumed by it: one follow-up reads the new model', async () => {
   const h = harness();
   const a = await h.map('Alpha');

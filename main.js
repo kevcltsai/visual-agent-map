@@ -88495,8 +88495,10 @@ var VisualAgentMapSettingTab = class extends import_obsidian45.PluginSettingTab 
       return;
     } else if (typeof value === "string" && (key4 === "codexPath" || key4 === "claudePath"))
       this.plugin.settings[key4] = value.trim();
-    else if (key4 === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
-    else return;
+    else if (key4 === "cliReasoning") {
+      this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
+      this.plugin.rereadAllViews();
+    } else return;
     if (key4 === "codexPath") this.plugin.resetCodexRuntime();
     if (key4 === "claudePath") this.plugin.modelDiscovery.invalidate("claude");
     await this.plugin.saveSettings();
@@ -95567,6 +95569,15 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
     if (this.syncSeq !== start) this.runMutation(async () => {
     });
   }
+  /**
+   * A setting that a note read resolves (the current model and reasoning level) changed, with no file written: the next
+   * write reads every open map back, as every write did before reads were limited to changed files. It takes a new event
+   * number, so a read-back already running (its snapshot taken before the change) cannot consume the mark.
+   */
+  rereadAllViews() {
+    const seq = ++this.syncSeq;
+    for (const view of this.views()) view.unsynced.markFull(seq);
+  }
   /** A vault event while VAM writes: every open view collects the paths (a rename gives both) under one new number. */
   collectUnsynced(...paths) {
     if (!this.writing) return;
@@ -96400,8 +96411,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (typeof model !== "string" || !model.trim()) return;
     this.settings.cliModel = model.trim();
     await this.saveSettings();
-    const seq = ++this.syncSeq;
-    for (const view of this.views()) view.unsynced.markFull(seq);
+    this.rereadAllViews();
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */

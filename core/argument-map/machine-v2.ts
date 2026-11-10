@@ -608,7 +608,12 @@ function settlePremises(next: ArgumentMapData): ArgumentMapData {
 function closePremise(next: ArgumentMapData, claim: Claim, result: PremiseResult): ArgumentMapData {
   claim.result = result;
   claim.status = "done";
-  if (result !== "holds") for (const dependent of dependents(next, claim.id)) dependent.status = "not_evaluated";
+  if (result !== "holds")
+    for (const dependent of dependents(next, claim.id)) {
+      dependent.status = "not_evaluated";
+      // A dependent premise closed while a datum of it was being researched: that datum is not left "searching" (a late result is refused).
+      for (const d of dependent.data ?? []) if (d.state === "searching") d.state = "pending";
+    }
   return settlePremises(next);
 }
 

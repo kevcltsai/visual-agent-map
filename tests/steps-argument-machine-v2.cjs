@@ -626,3 +626,14 @@ test('reducers are pure: a successful call leaves its input untouched and the ou
   built.framing.restatement = 'changed';
   assert.equal(f.restatement, 'Restated', 'the map owns a copy of the framing');
 });
+test('counterexample 前提失敗 (R1 L2): a premise that fails closes a dependent premise whose datum was being searched; that datum does not stay searching', () => {
+  const drafts = claimDrafts().map(c => c.id === 'P2' ? { ...c, dependsOn: ['P1'] } : c);
+  let s = make({}, drafts);
+  s = m.beginPremiseResearch(s, 'P2', 'p2d1');
+  assert.equal(s.claims.find(c => c.id === 'P2').data[0].state, 'searching');
+  s = settlePremise(s, 'P1', 'fails');
+  const p2 = s.claims.find(c => c.id === 'P2');
+  assert.equal(p2.status, 'not_evaluated');
+  assert.ok(p2.data.every(d => d.state !== 'searching'), 'no datum is left searching on a closed premise');
+  valid(s);
+});

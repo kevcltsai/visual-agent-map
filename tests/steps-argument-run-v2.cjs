@@ -246,3 +246,79 @@ test('resume refusals write nothing: missing, legacy, unusable, not paused, fini
   assert.equal(await r.snapshot(), junk);
   assert.ok(paused.length > 0);
 });
+
+// ---- counterexamples added after weakening one gate at a time (each was red once the gate was removed) -------------------------------------
+const answerFor = ctx => ({ summary: '', detail: '', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [foundEntry(ctx.argumentEvidenceNeeds[0].id)] });
+const waitAsk = async r => { for (let i = 0; i < 50 && r.stat.ask.length === 0; i++) await tick(); };
+
+test('resume refuses a legacy map and writes nothing', async () => {
+  const r = await rig();
+  const doc = await r.repo.readMap(r.mapPath);
+  const ids = {};
+  for (const role of ['proposition', 'situation', 'conclusion', 'verified', 'eliminated']) {
+    const n = await r.repo.createNote(role, 'model-a', doc, r.mapPath, 'workspace');
+    doc.nodes.push(n);
+    ids[role] = n.id;
+  }
+  doc.argumentMap = legacyMachine.newArgumentMap(ids, 'run-1');
+  await r.repo.saveMap(r.mapPath, doc);
+  const before = await r.snapshot();
+  assert.deepEqual(plain(await r.runs.resume(r.mapPath)), { ok: false, refusal: 'legacy' });
+  assert.equal(await r.snapshot(), before);
+  assert.equal(r.stat.ask.length + r.stat.steps.length, 0);
+});
+
+test('stale fence: a need result that arrives after the phase moved on is dropped', async () => {
+  const gate = defer();
+  const r = await rig({ script: { ask: async (ctx, n) => { if (n >= 2) await gate.promise; return answerFor(ctx); } } }); // call 1 is the premise, call 2 the first need
+  const started = r.runs.start(r.mapPath, locked());
+  for (let i = 0; i < 100 && r.stat.ask.length < 2; i++) await tick();
+  assert.equal(r.stat.ask.length, 2);
+  assert.equal((await r.state()).run.phase, 'analysis');
+  await r.repo.updateMap(r.mapPath, doc => { doc.argumentMap.run.phase = 'comparison'; }); // same run id, same searching need, later phase
+  gate.resolve();
+  await started;
+  const needs = (await r.state()).hypotheses.flatMap(h => h.needs);
+  assert.ok(needs.length > 0 && needs.every(n => n.state !== 'found'), 'the late result of the earlier phase was not applied');
+  assert.match(r.log(), /stale dropped/);
+});
+
+test('stale fence: the drive loop stops reading a map whose run id changed and does not research its items', async () => {
+  const gate = defer();
+  const r = await rig({ script: { ask: async ctx => { await gate.promise; return answerFor(ctx); } } });
+  const started = r.runs.start(r.mapPath, locked());
+  await waitAsk(r);
+  await r.repo.updateMap(r.mapPath, doc => {
+    doc.argumentMap.run.runId = 'other';
+    doc.argumentMap.claims.find(c => c.role === 'premise').data[0].state = 'pending'; // the foreign run has work left
+  });
+  const foreign = await r.snapshot();
+  gate.resolve();
+  await started;
+  for (let i = 0; i < 20; i++) await tick();
+  assert.equal(r.stat.ask.length, 1, 'no provider call for the foreign run');
+  assert.equal(await r.snapshot(), foreign, 'the foreign run was not written to');
+});
+
+test('a result whose commit was queued before dispose is not written (the in-lock fence)', async () => {
+  const gate = defer();
+  const hold = { promise: null, release: null };
+  let queue = Promise.resolve();
+  const mutate = work => {
+    const next = queue.then(async () => { if (hold.promise) await hold.promise; return work(); });
+    queue = next.catch(() => undefined);
+    return next;
+  };
+  const r = await rig({ ports: { mutate }, script: { ask: async ctx => { await gate.promise; const d = defer(); hold.promise = d.promise; hold.release = d.resolve; return answerFor(ctx); } } });
+  const started = r.runs.start(r.mapPath, locked());
+  await waitAsk(r);
+  gate.resolve();
+  for (let i = 0; i < 50 && !hold.promise; i++) await tick();
+  for (let i = 0; i < 20; i++) await tick(); // the commit is now waiting in the queue
+  r.runs.dispose();
+  const frozen = await r.snapshot();
+  hold.release();
+  await started;
+  for (let i = 0; i < 20; i++) await tick();
+  assert.equal(await r.snapshot(), frozen);
+});

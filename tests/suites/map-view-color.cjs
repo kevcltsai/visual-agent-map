@@ -33,6 +33,8 @@ const RELATION_FIXTURE = `<defs><marker id="m" viewBox="0 0 10 10" markerWidth="
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><style>
 button { background: var(--interactive-normal); color: var(--text-normal); border: 0; font: inherit; }
 button:hover { background: var(--interactive-hover); }
+button.mod-cta { background: var(--interactive-accent); color: var(--text-on-accent); }
+button.mod-cta:hover { background: var(--interactive-accent-hover, var(--interactive-accent)); }
 ${styles}
 body { margin: 0; width: 1200px; height: 800px; background: var(--background-primary); color: var(--text-normal); }
 </style></head><body>
@@ -63,6 +65,7 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 <div id="chat-secondary"><div class="vam-map-chat"><div class="vam-map-chat-msg is-error"><span class="vam-map-chat-text">Chat error</span><div class="vam-map-chat-line is-failed">Failed line</div><div class="vam-map-chat-plan-warning">Plan warning</div><div class="vam-map-chat-plan-group is-danger"><span class="vam-map-chat-plan-group-title">Danger group</span></div><span class="vam-map-chat-count-failed">2 failed</span><div class="vam-map-chat-images-state is-inserted">Inserted</div><button class="vam-map-chat-lines-toggle">Show lines</button><button class="vam-map-chat-more">More</button></div></div></div>
 <div id="chat-user"><div class="vam-map-chat"><div class="vam-map-chat-msg is-user is-error"><span class="vam-map-chat-text">Chat error</span><div class="vam-map-chat-line is-failed">Failed line</div><div class="vam-map-chat-plan-warning">Plan warning</div><div class="vam-map-chat-plan-group is-danger"><span class="vam-map-chat-plan-group-title">Danger group</span></div><span class="vam-map-chat-count-failed">2 failed</span><div class="vam-map-chat-images-state is-inserted">Inserted</div><button class="vam-map-chat-lines-toggle">Show lines</button><button class="vam-map-chat-more">More</button></div></div></div>
 <div class="vam-node" style="position:static;width:200px"><button class="vam-add-child" style="opacity:1">+</button></div>
+<div class="vam-argument-bar"><span class="vam-argument-chip is-run">Searching</span><button class="mod-cta">Resume</button></div>
 </body></html>`;
 
 // [name, selector, kind, need, options]. kind: outline (search highlight frame against the canvas), color (text colour), stroke (SVG stroke), fill (SVG fill), border (card frame), dot (::before fill), ring (::before border).
@@ -95,6 +98,9 @@ const CASES = [
   ['switcher-icon', '.vam-map-switcher-icon svg', 'color', 3],
   ['ai-explore', '.vam-ai-explore', 'color', 4.5, { buttonEnvelope: true }],
   ['ai-explore-hover', '.vam-ai-explore', 'color', 4.5, { buttonEnvelope: true, hover: true }],
+  ['argument-run-chip', '.vam-argument-chip.is-run', 'color', 4.5],
+  ['argument-bar-resume', '.vam-argument-bar button.mod-cta', 'color', 4.5],
+  ['argument-bar-resume-hover', '.vam-argument-bar button.mod-cta', 'color', 4.5, { hover: true }],
   ['tools-done-selecting', '.vam-map-tools button.is-active', 'color', 4.5],
   ['tools-done-selecting-hover', '.vam-map-tools button.is-active', 'color', 4.5, { hover: true }],
   ['goal-bar-text', '.vam-goal-bar:not(.is-empty) .vam-goal-text', 'color', 4.5],

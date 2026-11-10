@@ -2116,7 +2116,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-argument-chip.is-no { background: color-mix(in srgb, var(--color-red) 16%, var(--background-primary)); color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }
 .vam-argument-chip.is-maybe { background: color-mix(in srgb, var(--color-yellow) 22%, var(--background-primary)); color: color-mix(in srgb, var(--color-yellow) 55%, var(--text-normal)); }
 .vam-argument-chip.is-gap, .vam-argument-chip.is-open { background: var(--background-modifier-hover); color: var(--text-muted); }
-.vam-argument-chip.is-run { background: var(--background-modifier-hover); color: var(--text-accent); }
+.vam-argument-chip.is-run { background: var(--background-modifier-hover); color: color-mix(in srgb, var(--text-accent) 60%, var(--text-normal)); }
 .vam-argument-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 42px; padding: 7px 12px; border-bottom: 1px solid var(--background-modifier-border); font-size: var(--font-ui-small); }
 .vam-argument-bar-status { display: inline-flex; flex-wrap: wrap; gap: 0 8px; }
 .vam-argument-bar-status b { font-weight: 600; }
@@ -2124,6 +2124,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-argument-bar-count { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .vam-argument-bar-spacer { flex: 1; }
 .vam-argument-bar button { min-height: 24px; }
+.vam-argument-bar button.mod-cta, .vam-argument-bar button.mod-cta:hover { background: color-mix(in srgb, var(--interactive-accent) 80%, black); color: var(--text-on-accent); }
 /* Group cards (verified, eliminated hypotheses) sit quietly under the conclusion. */
 .vam-node[data-argument-role="group"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--background-primary-alt); border-color: var(--background-modifier-border-hover); }
 /* The conclusion: waiting has a strong frame, concluded is the one dark card, the two stopped states are plain. */

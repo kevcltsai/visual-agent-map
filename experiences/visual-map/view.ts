@@ -4215,7 +4215,7 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   /** The status bars for background AI work on the open map: structure review and AI outline generation. */
-  /** Which button of the progress bar was pressed last ("stop" or "resume"): the focus waits for the other one to appear. */
+  /** Which button of the progress bar was pressed last, on which map: the focus waits for the other button to appear (see keepArgumentBarFocus). */
   private argumentBarPressed: { path: string; action: "stop" | "resume" } | null = null;
   /**
    * The hypothesis research progress bar, derived on every paint from the saved run state and whether this session drives the run
@@ -4246,7 +4246,6 @@ export class VisualAgentMapView extends ItemView {
     if (view.detail) status.createSpan({ text: view.detail });
     if (view.count) bar.createSpan({ cls: "vam-argument-bar-count", text: view.count });
     bar.createSpan({ cls: "vam-argument-bar-spacer" });
-    let button: HTMLButtonElement | null = null;
     if (view.action === "stop") {
       const stop = bar.createEl("button", { text: t("ui.argument_bar_stop"), attr: { type: "button" } });
       stop.addEventListener("click", () => {
@@ -4254,7 +4253,6 @@ export class VisualAgentMapView extends ItemView {
         this.argumentBarPressed = { path, action: "stop" };
         void this.plugin.argumentRuns.stop(path);
       });
-      button = stop;
     } else if (view.action === "resume") {
       const resume = bar.createEl("button", {
         text: t("ui.argument_bar_resume"),
@@ -4273,30 +4271,35 @@ export class VisualAgentMapView extends ItemView {
           );
         });
       });
-      button = resume;
     }
-    // After a press the pressed button is gone (stop and resume swap): the keyboard goes to the one that replaced it, or to the bar.
-    // Only when the keyboard was in the old bar (now gone: the page holds it) or nowhere; a press on another map is forgotten.
-    const pressed = this.argumentBarPressed;
-    if (pressed && pressed.path !== path) this.argumentBarPressed = null;
-    else if (pressed && view.action !== pressed.action) {
-      this.argumentBarPressed = null;
-      const doc = parent.ownerDocument;
-      const active = doc?.activeElement ?? null;
-      if (!active || active === doc?.body || active.isConnected === false) (button ?? bar).focus();
-    }
+    this.argumentBarShown = view.action;
+    // A press on another map is forgotten; the focus itself is moved by keepArgumentBarFocus, which sees where it was before the repaint.
+    if (this.argumentBarPressed && this.argumentBarPressed.path !== path) this.argumentBarPressed = null;
   }
+  /** The action the last painted bar offered, so the focus code can tell when a pressed button has been swapped for the other one. */
+  private argumentBarShown: "stop" | "resume" | null = null;
   /**
-   * Call before a repaint: when the keyboard is on a button of the argument run bar, the returned function (call it after the
-   * repaint) puts it on the new bar's button (else the bar), because paint() empties the content and drops the focus.
+   * Call before a repaint; call the returned function after it. The repaint empties the content, so the focus is read before it:
+   * - it was on the bar (or on the pressed button that fell to the page): it goes to the new bar's button, else to the bar;
+   * - it is parked on the page after a press and the bar now offers the other button: it goes to that button;
+   * - it was anywhere else: it is left alone, and the pending press is forgotten.
    */
   private keepArgumentBarFocus(): () => void {
+    const doc = this.contentEl?.ownerDocument;
+    const active = doc?.activeElement ?? null;
     const bar = this.contentEl?.querySelector?.<HTMLElement>(".vam-argument-bar");
-    const active = this.contentEl?.ownerDocument?.activeElement ?? null;
-    if (!bar || !active || !bar.contains?.(active)) return () => {};
+    const inBar = !!bar && !!active && !!bar.contains?.(active);
+    const onPage = !active || active === doc?.body || active.isConnected === false;
+    if (this.argumentBarPressed && (this.argumentBarPressed.path !== this.path || (!inBar && !onPage)))
+      this.argumentBarPressed = null;
+    const pressed = this.argumentBarPressed;
+    if (!inBar && !pressed) return () => {};
     return () => {
       const next = this.contentEl?.querySelector?.<HTMLElement>(".vam-argument-bar");
-      (next?.querySelector?.<HTMLElement>("button") ?? next)?.focus();
+      if (!next) return;
+      const swapped = !!pressed && this.argumentBarShown !== pressed.action;
+      if (swapped && this.argumentBarPressed === pressed) this.argumentBarPressed = null;
+      if (inBar || swapped) (next.querySelector?.<HTMLElement>("button") ?? next).focus();
     };
   }
   private renderBackgroundBars(parent: HTMLElement): void {

@@ -170,36 +170,6 @@ test('counterexample: ordinary maps, version 2 keys and unusable keys get no bar
   assert.equal(render(broken.view).children.length, 0, 'unusable');
 });
 
-test('focus follows the swap: after stop the next bar puts focus on resume; after resume, on stop; a bar without buttons takes it itself', () => {
-  const view = fakeView(make({ calls: 1 }), { owned: true }).view;
-  let parent = render(view);
-  buttons(parent)[0].click();
-  view.map.argumentMap = make({ status: 'paused', stopReason: 'user' });
-  view.plugin.argumentRuns.isRunning = () => false;
-  parent = render(view);
-  const resume = buttons(parent)[0];
-  assert.equal(resume.focused, true, 'focus on resume');
-  resume.click();
-  view.map.argumentMap = make({ calls: 2 });
-  view.plugin.argumentRuns.isRunning = () => true;
-  parent = render(view);
-  assert.equal(buttons(parent)[0].focused, true, 'focus on stop');
-  buttons(parent)[0].click();
-  view.map.argumentMap = make({ phase: 'concluded', status: 'finished' });
-  parent = render(view);
-  assert.equal(bars(parent)[0].focused, true, 'no button: the bar holds the focus');
-});
-
-test('focus is not moved by a render that did not change the button, nor when nothing was pressed', () => {
-  const view = fakeView(make({ calls: 1 }), { owned: true }).view;
-  let parent = render(view);
-  assert.equal(buttons(parent)[0].focused, undefined, 'nothing pressed: no focus taken');
-  buttons(parent)[0].click();
-  view.map.argumentMap = make({ calls: 2 });
-  parent = render(view);
-  assert.equal(buttons(parent)[0].focused, undefined, 'same action still showing: wait for the swap');
-});
-
 // ---- keyboard focus survives the repaint (paint() empties contentEl) -----------------------------------------------------
 const withDocument = view => { view.contentEl.root = { activeElement: null, body: { tag: 'body' } }; Object.defineProperty(view.contentEl, 'ownerDocument', { get: () => view.contentEl.root }); return view; };
 const repaint = view => {
@@ -210,6 +180,36 @@ const repaint = view => {
   restore();
   return { parent, doc };
 };
+
+test('focus follows the swap: after stop the next bar puts focus on resume; after resume, on stop; a bar without buttons takes it itself', () => {
+  const view = withDocument(fakeView(make({ calls: 1 }), { owned: true }).view);
+  let parent = render(view);
+  buttons(parent)[0].click();
+  view.map.argumentMap = make({ status: 'paused', stopReason: 'user' });
+  view.plugin.argumentRuns.isRunning = () => false;
+  parent = repaint(view).parent;
+  const resume = buttons(parent)[0];
+  assert.equal(resume.focused, true, 'focus on resume');
+  resume.click();
+  view.map.argumentMap = make({ calls: 2 });
+  view.plugin.argumentRuns.isRunning = () => true;
+  parent = repaint(view).parent;
+  assert.equal(buttons(parent)[0].focused, true, 'focus on stop');
+  buttons(parent)[0].click();
+  view.map.argumentMap = make({ phase: 'concluded', status: 'finished' });
+  parent = repaint(view).parent;
+  assert.equal(bars(parent)[0].focused, true, 'no button: the bar holds the focus');
+});
+
+test('focus is not moved by a repaint that did not change the button, nor when nothing was pressed', () => {
+  const view = withDocument(fakeView(make({ calls: 1 }), { owned: true }).view);
+  let parent = render(view);
+  assert.equal(buttons(parent)[0].focused, undefined, 'nothing pressed: no focus taken');
+  buttons(parent)[0].click();
+  view.map.argumentMap = make({ calls: 2 });
+  parent = repaint(view).parent;
+  assert.equal(buttons(parent)[0].focused, undefined, 'same action still showing: wait for the swap');
+});
 
 test('keyboard focus on Stop is restored to the new Stop after a checkpoint repaint', () => {
   const view = withDocument(fakeView(make({ calls: 1 }), { owned: true }).view);
@@ -241,17 +241,20 @@ test('counterexample: a repaint does not take focus when the keyboard was not in
   assert.equal(buttons(parent)[0].focused, undefined);
 });
 
-test('counterexample: press Stop, move focus elsewhere, the next render does not steal focus', () => {
+test('counterexample: press Stop, move focus elsewhere (it is inside the content a repaint empties), several repaints, focus is never pulled back', () => {
   const view = withDocument(fakeView(make({ calls: 1 }), { owned: true }).view);
   buttons(render(view))[0].click();
-  const other = dom.element('input');
-  other.focus = () => { view.contentEl.root.activeElement = other; };
-  other.focus();
+  const composer = dom.element('textarea');
+  composer.root = view.contentEl.root;
+  composer.focus();
   view.map.argumentMap = make({ status: 'paused', stopReason: 'user' });
   view.plugin.argumentRuns.isRunning = () => false;
-  const parent = render(view);
-  assert.equal(view.contentEl.root.activeElement, other);
-  assert.equal(buttons(parent)[0].focused, undefined);
+  for (let n = 0; n < 3; n++) {
+    const { parent, doc } = repaint(view);
+    assert.equal(buttons(parent)[0].focused, undefined, `repaint ${n}: the new button took nothing`);
+    assert.equal(doc.activeElement, doc.body, `repaint ${n}: the composer is rebuilt by the view, the bar leaves the focus alone`);
+    doc.activeElement = composer; // the view puts the focus back on the composer after the repaint
+  }
 });
 
 test('counterexample: a press on one map does not move focus in a bar of another map', () => {
@@ -260,5 +263,5 @@ test('counterexample: a press on one map does not move focus in a bar of another
   view.path = 'Other.vam';
   view.map.argumentMap = make({ status: 'paused', stopReason: 'user' });
   view.plugin.argumentRuns.isRunning = () => false;
-  assert.equal(buttons(render(view))[0].focused, undefined);
+  assert.equal(buttons(repaint(view).parent)[0].focused, undefined);
 });

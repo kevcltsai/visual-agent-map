@@ -60943,8 +60943,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     /** True only while refreshFromPlugin repaints (synchronously: every restorer it triggers runs inside that call). */
     __publicField(this, "externalRefresh", false);
     /** The status bars for background AI work on the open map: structure review and AI outline generation. */
-    /** Which button of the progress bar was pressed last ("stop" or "resume"): the focus waits for the other one to appear. */
+    /** Which button of the progress bar was pressed last, on which map: the focus waits for the other button to appear (see keepArgumentBarFocus). */
     __publicField(this, "argumentBarPressed", null);
+    /** The action the last painted bar offered, so the focus code can tell when a pressed button has been swapped for the other one. */
+    __publicField(this, "argumentBarShown", null);
     /** The run of key removals the showing Notice reports; a removal inside it replaces that Notice. */
     __publicField(this, "removalRun", null);
     /** True while a drag that started inside this view (for example a card's own cover image) is under way. */
@@ -63172,7 +63174,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
    * computes are shown, never text from the model.
    */
   renderArgumentRunBar(parent) {
-    var _a2;
     const map = this.map;
     if (!map || map.argumentMap === void 0) return;
     const read = readArgumentMap(map);
@@ -63196,7 +63197,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     if (view.detail) status.createSpan({ text: view.detail });
     if (view.count) bar.createSpan({ cls: "vam-argument-bar-count", text: view.count });
     bar.createSpan({ cls: "vam-argument-bar-spacer" });
-    let button = null;
     if (view.action === "stop") {
       const stop = bar.createEl("button", { text: t("ui.argument_bar_stop"), attr: { type: "button" } });
       stop.addEventListener("click", () => {
@@ -63204,7 +63204,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
         this.argumentBarPressed = { path, action: "stop" };
         void this.plugin.argumentRuns.stop(path);
       });
-      button = stop;
     } else if (view.action === "resume") {
       const resume = bar.createEl("button", {
         text: t("ui.argument_bar_resume"),
@@ -63223,31 +63222,35 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
           );
         });
       });
-      button = resume;
     }
-    const pressed = this.argumentBarPressed;
-    if (pressed && pressed.path !== path) this.argumentBarPressed = null;
-    else if (pressed && view.action !== pressed.action) {
-      this.argumentBarPressed = null;
-      const doc = parent.ownerDocument;
-      const active = (_a2 = doc == null ? void 0 : doc.activeElement) != null ? _a2 : null;
-      if (!active || active === (doc == null ? void 0 : doc.body) || active.isConnected === false) (button != null ? button : bar).focus();
-    }
+    this.argumentBarShown = view.action;
+    if (this.argumentBarPressed && this.argumentBarPressed.path !== path) this.argumentBarPressed = null;
   }
   /**
-   * Call before a repaint: when the keyboard is on a button of the argument run bar, the returned function (call it after the
-   * repaint) puts it on the new bar's button (else the bar), because paint() empties the content and drops the focus.
+   * Call before a repaint; call the returned function after it. The repaint empties the content, so the focus is read before it:
+   * - it was on the bar (or on the pressed button that fell to the page): it goes to the new bar's button, else to the bar;
+   * - it is parked on the page after a press and the bar now offers the other button: it goes to that button;
+   * - it was anywhere else: it is left alone, and the pending press is forgotten.
    */
   keepArgumentBarFocus() {
-    var _a2, _b2, _c, _d, _e, _f;
-    const bar = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-argument-bar");
-    const active = (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.ownerDocument) == null ? void 0 : _d.activeElement) != null ? _e : null;
-    if (!bar || !active || !((_f = bar.contains) == null ? void 0 : _f.call(bar, active))) return () => {
+    var _a2, _b2, _c, _d, _e;
+    const doc = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument;
+    const active = (_b2 = doc == null ? void 0 : doc.activeElement) != null ? _b2 : null;
+    const bar = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector) == null ? void 0 : _d.call(_c, ".vam-argument-bar");
+    const inBar = !!bar && !!active && !!((_e = bar.contains) == null ? void 0 : _e.call(bar, active));
+    const onPage = !active || active === (doc == null ? void 0 : doc.body) || active.isConnected === false;
+    if (this.argumentBarPressed && (this.argumentBarPressed.path !== this.path || !inBar && !onPage))
+      this.argumentBarPressed = null;
+    const pressed = this.argumentBarPressed;
+    if (!inBar && !pressed) return () => {
     };
     return () => {
-      var _a3, _b3, _c2, _d2, _e2;
+      var _a3, _b3, _c2, _d2;
       const next = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-argument-bar");
-      (_e2 = (_d2 = (_c2 = next == null ? void 0 : next.querySelector) == null ? void 0 : _c2.call(next, "button")) != null ? _d2 : next) == null ? void 0 : _e2.focus();
+      if (!next) return;
+      const swapped = !!pressed && this.argumentBarShown !== pressed.action;
+      if (swapped && this.argumentBarPressed === pressed) this.argumentBarPressed = null;
+      if (inBar || swapped) ((_d2 = (_c2 = next.querySelector) == null ? void 0 : _c2.call(next, "button")) != null ? _d2 : next).focus();
     };
   }
   renderBackgroundBars(parent) {

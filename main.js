@@ -8979,8 +8979,8 @@ function uiLanguageOfHeadings(set) {
   return (_b2 = (_a2 = registry.find((item) => item.noteHeadings === set)) == null ? void 0 : _a2.id) != null ? _b2 : FALLBACK_LANGUAGE;
 }
 var NOTE_LANGUAGES = [...new Set(registry.map((item) => item.note))];
-var SUPPORTED_LANGUAGES = LANGUAGES.map(({ id, label, name: name2 }) => ({ id, label, name: name2 }));
-var OUTPUT_LANGUAGE_CHOICES = outputRegistry.filter((item) => !item.followsInput).map(({ id, label, name: name2 }) => ({ id, label, name: name2 }));
+var SUPPORTED_LANGUAGES = LANGUAGES.map(({ id, label: label2, name: name2 }) => ({ id, label: label2, name: name2 }));
+var OUTPUT_LANGUAGE_CHOICES = outputRegistry.filter((item) => !item.followsInput).map(({ id, label: label2, name: name2 }) => ({ id, label: label2, name: name2 }));
 function isFollowInputLanguage(value) {
   return outputRegistry.some((item) => item.id === value && item.followsInput === true);
 }
@@ -9037,8 +9037,8 @@ function uiLanguageFromAppLocale(locale) {
     const found = (_a2 = registry.find((item) => item.id.toLowerCase() === id)) == null ? void 0 : _a2.id;
     return isUiLanguage(found) ? found : null;
   };
-  const exact = byId(tag);
-  if (exact) return exact;
+  const exact2 = byId(tag);
+  if (exact2) return exact2;
   if (/^zh(-|$)/.test(tag)) {
     const traditional = /(^|-)(hant|tw|hk|mo)(-|$)/.test(tag.slice(2));
     const id = traditional ? "zh-TW" : "zh-CN";
@@ -9320,10 +9320,10 @@ var MermaidZoomModal = class extends import_obsidian2.Modal {
     const height = (viewport == null ? void 0 : viewport.clientHeight) || (viewport == null ? void 0 : viewport.getBoundingClientRect().height) || 0;
     return { width: width || 900, height: height || 600 };
   }
-  toolButton(parent, icon, label, run, text13) {
+  toolButton(parent, icon, label2, run, text13) {
     const button = parent.createEl("button", {
       cls: "vam-mermaid-zoom-tool",
-      attr: { type: "button", "aria-label": label }
+      attr: { type: "button", "aria-label": label2 }
     });
     if (icon) (0, import_obsidian2.setIcon)(button, icon);
     if (text13) button.createSpan({ text: text13 });
@@ -9835,12 +9835,12 @@ function parseOne(markdown) {
           value2.summary
         );
         if (labeled) {
-          const label = labeled[1].toLocaleLowerCase(), body2 = labeled[2].trim();
-          if (["\u539F\u7591\u554F", "\u7591\u554F", "question"].includes(label))
+          const label2 = labeled[1].toLocaleLowerCase(), body2 = labeled[2].trim();
+          if (["\u539F\u7591\u554F", "\u7591\u554F", "question"].includes(label2))
             current.question = [current.question, body2].filter(Boolean).join("\n");
-          else if (["\u53EF\u80FD\u89E3\u65B9", "possible solution"].includes(label))
+          else if (["\u53EF\u80FD\u89E3\u65B9", "possible solution"].includes(label2))
             current.proposedSolution = [current.proposedSolution, body2].filter(Boolean).join("\n");
-          else if (["\u689D\u4EF6\u8207\u9650\u5236", "\u9650\u5236", "conditions and limits"].includes(label))
+          else if (["\u689D\u4EF6\u8207\u9650\u5236", "\u9650\u5236", "conditions and limits"].includes(label2))
             current.limitations = [current.limitations, body2].filter(Boolean).join("\n");
           else current.detail = [current.detail, body2].filter(Boolean).join("\n");
         } else current.detail = [current.detail, value2.summary].filter(Boolean).join("\n");
@@ -9886,12 +9886,12 @@ function parseOne(markdown) {
         );
         if (!labeled) current.detail = [current.detail, text13].filter(Boolean).join("\n");
         else {
-          const label = labeled[1].toLocaleLowerCase(), value = labeled[2].trim();
-          if (["\u539F\u7591\u554F", "\u7591\u554F", "question"].includes(label))
+          const label2 = labeled[1].toLocaleLowerCase(), value = labeled[2].trim();
+          if (["\u539F\u7591\u554F", "\u7591\u554F", "question"].includes(label2))
             current.question = [current.question, value].filter(Boolean).join("\n");
-          else if (["\u53EF\u80FD\u89E3\u65B9", "possible solution"].includes(label))
+          else if (["\u53EF\u80FD\u89E3\u65B9", "possible solution"].includes(label2))
             current.proposedSolution = [current.proposedSolution, value].filter(Boolean).join("\n");
-          else if (["\u689D\u4EF6\u8207\u9650\u5236", "\u9650\u5236", "conditions and limits"].includes(label))
+          else if (["\u689D\u4EF6\u8207\u9650\u5236", "\u9650\u5236", "conditions and limits"].includes(label2))
             current.limitations = [current.limitations, value].filter(Boolean).join("\n");
           else current.detail = [current.detail, value].filter(Boolean).join("\n");
         }
@@ -10050,12 +10050,12 @@ function serializeInsightNotes(insights, language2) {
       if (item.detail)
         lines.push(`  - ${translate(language2, "coffee.note_context")}\uFF1A${item.detail.split(/\r?\n/).join(" ")}`);
       if (category === "solutions") {
-        for (const [label, value] of [
+        for (const [label2, value] of [
           [translate(language2, "coffee.note_original_question"), item.question],
           [translate(language2, "coffee.note_possible_solution"), item.proposedSolution],
           [translate(language2, "coffee.conditions_and_limits"), item.limitations]
         ]) {
-          if (value) lines.push(`  - ${label}\uFF1A${value}`);
+          if (value) lines.push(`  - ${label2}\uFF1A${value}`);
         }
       }
     }
@@ -11298,8 +11298,8 @@ function customizationFields(parent, initial, language2, changed = () => void 0)
     text: t2("coffee.combine_similar_ideas_while_retaining_important")
   });
   const controls = converge.createDiv("ct-style-fields");
-  const select = (label, options) => {
-    const field = controls.createEl("label", { text: label });
+  const select = (label2, options) => {
+    const field = controls.createEl("label", { text: label2 });
     const el = field.createEl("select");
     for (const [value, text13] of options) el.createEl("option", { value, text: text13 });
     return el;
@@ -11321,7 +11321,7 @@ function customizationFields(parent, initial, language2, changed = () => void 0)
   const preserve = /* @__PURE__ */ new Map();
   const fieldset = converge.createEl("fieldset");
   fieldset.createEl("legend", { text: t2("coffee.keep_these_aspects") });
-  for (const [key4, label] of [
+  for (const [key4, label2] of [
     ["disagreements", "coffee.preserve_disagreements"],
     ["conditions", "coffee.preserve_conditions"],
     ["counterexamples", "coffee.preserve_counterexamples"],
@@ -11330,7 +11330,7 @@ function customizationFields(parent, initial, language2, changed = () => void 0)
   ]) {
     const row = fieldset.createEl("label");
     const input2 = row.createEl("input", { attr: { type: "checkbox" } });
-    row.createSpan({ text: t2(label) });
+    row.createSpan({ text: t2(label2) });
     preserve.set(key4, input2);
   }
   const warning = converge.createEl("p", {
@@ -11422,8 +11422,8 @@ var CoffeeCustomizationModal = class extends import_obsidian5.Modal {
       cls: "ct-muted",
       text: t2("coffee.choose_how_people_speak_and_interact_you_can_restore")
     });
-    const label = content.createEl("label", { text: t2("coffee.conversation_instructions") });
-    const style = label.createEl("textarea", { attr: { rows: "6", maxlength: "30000" } });
+    const label2 = content.createEl("label", { text: t2("coffee.conversation_instructions") });
+    const style = label2.createEl("textarea", { attr: { rows: "6", maxlength: "30000" } });
     const builtin = cleanChatStyle(builtinCoffeeStyle(engine.session.language));
     style.value = cleanChatStyle(
       (_c = (_a2 = engine.session.guests) == null ? void 0 : _a2.stylePrompt) != null ? _c : [builtin, (_b2 = engine.session.guests) == null ? void 0 : _b2.customPrompt].filter(Boolean).join("\n\n")
@@ -11435,8 +11435,8 @@ var CoffeeCustomizationModal = class extends import_obsidian5.Modal {
     const fields = customizationFields(content, (_d = engine.session.guests) == null ? void 0 : _d.customization, engine.session.language);
     const errors = content.createEl("p", { cls: "ct-error", attr: { "aria-live": "polite" } });
     const actions = content.createDiv("ct-customization-actions");
-    const run = (label2, action) => {
-      const button = actions.createEl("button", { text: label2 });
+    const run = (label3, action) => {
+      const button = actions.createEl("button", { text: label3 });
       button.onclick = () => {
         const value = fields.read(), issues = validateCustomization(value, engine.session.language);
         errors.setText(issues.join("\n"));
@@ -11518,12 +11518,12 @@ var CoffeeConvergenceModal = class extends import_obsidian5.Modal {
         return (_a3 = engine.session.pinnedInsightIds) == null ? void 0 : _a3.includes(id);
       });
       const block = content.createEl("section", { cls: "ct-convergence-proposal" });
-      const label = block.createEl("label");
-      const checkbox = label.createEl("input", { attr: { type: "checkbox" } });
+      const label2 = block.createEl("label");
+      const checkbox = label2.createEl("input", { attr: { type: "checkbox" } });
       checkbox.checked = !unchanged && !pinned;
       checkbox.disabled = pinned || unchanged;
       if (checkbox.checked) selected.add(index);
-      label.createSpan({
+      label2.createSpan({
         text: pinned ? t2("coffee.pinned_unchanged") : unchanged ? t2("coffee.unchanged") : item.sourceIds.length > 1 ? t2("coffee.merge_insights", item.sourceIds.length) : t2("coffee.revise_insight")
       });
       checkbox.onchange = () => {
@@ -11767,13 +11767,13 @@ function claudeModelChoice(model) {
 
 // core/model-discovery.ts
 var FOLLOW_DEFAULT_MODEL = "__follow_default__";
-function syncModelSelect(select, models, label, missingLabel) {
+function syncModelSelect(select, models, label2, missingLabel) {
   const selected = select.value;
   select.replaceChildren();
   const unique3 = [...new Set(models)];
-  for (const id of unique3) select.add(new Option(label(id), id));
+  for (const id of unique3) select.add(new Option(label2(id), id));
   if (selected && !unique3.includes(selected)) {
-    const unavailable = new Option(`${label(selected)} (${missingLabel})`, selected);
+    const unavailable = new Option(`${label2(selected)} (${missingLabel})`, selected);
     unavailable.disabled = true;
     select.add(unavailable);
   }
@@ -12117,16 +12117,16 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     else if (prefill.method === "ai")
       this.status.setText(this.t("coffee.review_and_edit_this_draft_then_create_the_research_map"));
   }
-  field(label, rows2) {
+  field(label2, rows2) {
     const id = `ct-handoff-${(0, import_node_crypto2.randomUUID)()}`;
-    this.contentEl.createEl("label", { text: label, attr: { for: id } });
-    return this.contentEl.createEl("textarea", { attr: { id, rows: String(rows2), "aria-label": label } });
+    this.contentEl.createEl("label", { text: label2, attr: { for: id } });
+    return this.contentEl.createEl("textarea", { attr: { id, rows: String(rows2), "aria-label": label2 } });
   }
-  select(parent, label, values, display = (value) => value) {
+  select(parent, label2, values, display = (value) => value) {
     const id = `ct-handoff-${(0, import_node_crypto2.randomUUID)()}`;
     const group = parent.createDiv();
-    group.createEl("label", { text: label, attr: { for: id } });
-    const select = group.createEl("select", { attr: { id, "aria-label": label } });
+    group.createEl("label", { text: label2, attr: { for: id } });
+    const select = group.createEl("select", { attr: { id, "aria-label": label2 } });
     for (const value of values) select.createEl("option", { text: display(value), value });
     return select;
   }
@@ -14673,9 +14673,9 @@ ${session.observerDraftMarkdown}`);
       } catch (e) {
       }
     }
-    const exact = parsed.filter((side) => side.filePath === path);
-    if (exact.length === 1) return exact[0];
-    if (exact.length > 1) throw new Error("Multiple Coffee Tables records point to this note; no session was opened");
+    const exact2 = parsed.filter((side) => side.filePath === path);
+    if (exact2.length === 1) return exact2[0];
+    if (exact2.length > 1) throw new Error("Multiple Coffee Tables records point to this note; no session was opened");
     const moved = title ? parsed.filter(
       (side) => side.topic === title && (!side.filePath || !this.vault.getAbstractFileByPath(side.filePath))
     ) : [];
@@ -14918,9 +14918,9 @@ ${session.observerDraftMarkdown}`);
       } catch (e) {
       }
     }
-    const exact = records.filter((record) => record.side.filePath === path);
+    const exact2 = records.filter((record) => record.side.filePath === path);
     const located = records.filter((record) => this.locations.get(record.side.id) === path);
-    const candidates = exact.length ? exact : located.length ? located : records.filter(
+    const candidates = exact2.length ? exact2 : located.length ? located : records.filter(
       (record) => record.side.topic === title && (!record.side.filePath || !this.vault.getAbstractFileByPath(record.side.filePath))
     );
     if (candidates.length !== 1)
@@ -16105,8 +16105,8 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     void this.home(edit);
     this.app.workspace.requestSaveLayout();
   }
-  button(parent, label, action, disabled = false) {
-    const button = parent.createEl("button", { text: label });
+  button(parent, label2, action, disabled = false) {
+    const button = parent.createEl("button", { text: label2 });
     button.disabled = disabled;
     button.addEventListener("click", () => {
       void Promise.resolve().then(action).catch((error) => new import_obsidian8.Notice(error instanceof Error ? error.message : String(error)));
@@ -16324,9 +16324,9 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
     };
     for (const category of CATEGORIES4) {
       const row = guestSection.createDiv("ct-count-row");
-      const label = row.createEl("label");
-      label.createSpan({ text: this.t(category.label) });
-      const input2 = label.createEl("input", {
+      const label2 = row.createEl("label");
+      label2.createSpan({ text: this.t(category.label) });
+      const input2 = label2.createEl("input", {
         attr: {
           type: "number",
           min: "0",
@@ -18574,12 +18574,12 @@ function cleanAnnotatedImage(raw, tally) {
   return item;
 }
 function cleanBoundary(raw) {
-  const { id, members, label } = raw;
+  const { id, members, label: label2 } = raw;
   if (typeof id !== "string" || !ID.test(id) || !Array.isArray(members) || members.length > MEMBER_LIMIT) return null;
   if (!members.every((m) => typeof m === "string" && ID.test(m))) return null;
   const item = { id, kind: "boundary", members: [...new Set(members)] };
-  if (typeof label === "string" && label.trim())
-    item.label = label.replace(CONTROL_ALL, " ").trim().slice(0, LABEL_LIMIT);
+  if (typeof label2 === "string" && label2.trim())
+    item.label = label2.replace(CONTROL_ALL, " ").trim().slice(0, LABEL_LIMIT);
   return item;
 }
 function cleanText(value) {
@@ -19137,12 +19137,12 @@ function actionStatus(actions) {
 }
 function armDiscard(button, status, discard, blocked = () => false, labels = { confirm: t("ui.discard_confirm"), hint: t("ui.discard_confirm_hint") }) {
   var _a2;
-  const label = (_a2 = button.textContent) != null ? _a2 : "";
+  const label2 = (_a2 = button.textContent) != null ? _a2 : "";
   let timer = 0;
   const disarm = () => {
     window.clearTimeout(timer);
     timer = 0;
-    button.setText(label);
+    button.setText(label2);
     button.removeClass("mod-warning");
   };
   button.addEventListener("click", () => {
@@ -19244,14 +19244,14 @@ var AnchorModal = class extends import_obsidian9.Modal {
         ["pick", t("ui.anchor_target_pick")],
         ["none", t("ui.anchor_target_none")]
       ];
-      for (const [value, label] of choices) {
+      for (const [value, label2] of choices) {
         const row = group.createEl("label", { cls: "vam-anchor-choice" });
         const radio = row.createEl("input", { type: "radio", attr: { name: "vam-anchor-target", value } });
         radio.checked = value === target;
         radio.addEventListener("change", () => {
           if (radio.checked) target = value;
         });
-        row.createSpan({ text: label });
+        row.createSpan({ text: label2 });
       }
     }
     const actions = modalActions(this);
@@ -19387,19 +19387,19 @@ function shape(side, e) {
     extent: e
   };
 }
-function summaryTextBox(side, label, w, h) {
-  if (side === "left") return { x: label.x - w, y: label.y - h / 2, w, h };
-  if (side === "down") return { x: label.x - w / 2, y: label.y, w, h };
-  if (side === "up") return { x: label.x - w / 2, y: label.y - h, w, h };
-  return { x: label.x, y: label.y - h / 2, w, h };
+function summaryTextBox(side, label2, w, h) {
+  if (side === "left") return { x: label2.x - w, y: label2.y - h / 2, w, h };
+  if (side === "down") return { x: label2.x - w / 2, y: label2.y, w, h };
+  if (side === "up") return { x: label2.x - w / 2, y: label2.y - h, w, h };
+  return { x: label2.x, y: label2.y - h / 2, w, h };
 }
 var BRACKET_TEXT_MAX_PUSH = 3 * 280;
-function avoidBracketObstacles(side, label, size, obstacles, maxPush = BRACKET_TEXT_MAX_PUSH) {
+function avoidBracketObstacles(side, label2, size, obstacles, maxPush = BRACKET_TEXT_MAX_PUSH) {
   const outward = side === "right" || side === "down" ? 1 : -1;
   const horizontal = side === "right" || side === "left";
   let pushed = 0;
   for (let pass = 0; pass <= obstacles.length; pass++) {
-    const at = horizontal ? { x: label.x + outward * pushed, y: label.y } : { x: label.x, y: label.y + outward * pushed };
+    const at = horizontal ? { x: label2.x + outward * pushed, y: label2.y } : { x: label2.x, y: label2.y + outward * pushed };
     const box = summaryTextBox(side, at, size.w, size.h);
     let step = 0;
     for (const o of obstacles) {
@@ -19412,7 +19412,7 @@ function avoidBracketObstacles(side, label, size, obstacles, maxPush = BRACKET_T
     pushed = Math.min(maxPush, pushed + step);
     if (pushed >= maxPush) break;
   }
-  return pushed === 0 ? label : horizontal ? { x: round(label.x + outward * pushed), y: label.y } : { x: label.x, y: round(label.y + outward * pushed) };
+  return pushed === 0 ? label2 : horizontal ? { x: round(label2.x + outward * pushed), y: label2.y } : { x: label2.x, y: round(label2.y + outward * pushed) };
 }
 
 // experiences/visual-map/attachment-store.ts
@@ -19747,11 +19747,11 @@ function buildMapSvg(scene) {
     const box = rect(b == null ? void 0 : b.x, b == null ? void 0 : b.y, b == null ? void 0 : b.w, b == null ? void 0 : b.h);
     if (!box || typeof b.label !== "string" || !b.label) continue;
     const stroke = color(b.stroke, strokeColor);
-    const label = b.label.slice(0, TEXT_LIMIT2);
+    const label2 = b.label.slice(0, TEXT_LIMIT2);
     const wide = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/;
-    const textWidth = Array.from(label).reduce((sum2, ch) => sum2 + (wide.test(ch) ? 13 : 7), 0);
+    const textWidth = Array.from(label2).reduce((sum2, ch) => sum2 + (wide.test(ch) ? 13 : 7), 0);
     const chipWidth = Math.max(20, Math.min(box[2] - 24, textWidth + 16));
-    const lines = wrapText(label, Math.max(7, chipWidth - 16));
+    const lines = wrapText(label2, Math.max(7, chipWidth - 16));
     out.push(
       `<g><rect x="${box[0] + 12}" y="${box[1] - 10}" width="${chipWidth}" height="20" rx="10" fill="${background}" stroke="${stroke}"/><text x="${box[0] + 20}" y="${box[1] + 4}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml((_p = lines[0]) != null ? _p : "")}</text></g>`
     );
@@ -22097,7 +22097,7 @@ var History = class {
    * nothing when the history was cleared since the mark, or when fewer than two entries were pushed. Each entry's
    * undo/redo is read when it runs, so later patches to an entry (a wrapper replaced after push) still apply.
    */
-  collapseSince(mark2, label) {
+  collapseSince(mark2, label2) {
     if (mark2.epoch !== this.epoch) return;
     const start = Math.max(0, mark2.length - (this.dropped - mark2.dropped));
     if (this.past.length - start < 2) return;
@@ -22126,7 +22126,7 @@ var History = class {
     const combined = {
       undo: () => run([...entries].reverse(), false),
       redo: () => run(entries, true),
-      ...label ? { label } : {}
+      ...label2 ? { label: label2 } : {}
     };
     this.past.push(combined);
     this.future = [];
@@ -22315,7 +22315,7 @@ function begin(deps) {
       "rollback-failed"
     );
   }
-  function entryFor(ops, records, rebuild2, label, noteRecords = [], attachments = []) {
+  function entryFor(ops, records, rebuild2, label2, noteRecords = [], attachments = []) {
     const toward = (op, direction) => op.kind === "create" === (direction === "undo");
     const sequence = (direction) => {
       const moved = ops.filter((op) => op.kind === "move"), created = ops.filter((op) => op.kind === "create"), renamed = ops.filter((op) => op.kind === "rename");
@@ -22387,7 +22387,7 @@ function begin(deps) {
       redo: () => apply("redo"),
       parkedPaths: () => ops.filter((op) => op.kind === "move" && op.target).map((op) => op.target),
       createdParkPaths: () => ops.filter((op) => op.kind === "create" && op.target).map((op) => op.target),
-      ...label === void 0 ? {} : { label }
+      ...label2 === void 0 ? {} : { label: label2 }
     };
   }
   async function place(owner) {
@@ -22879,9 +22879,9 @@ var AimClarificationModal = class extends import_obsidian11.Modal {
       text: text13("ui.aim_clarify_intro")
     });
     const fields = this.questions.map((question) => {
-      const label = this.contentEl.createEl("label", { cls: "vam-field" });
-      label.createSpan({ text: question });
-      const input2 = label.createEl("textarea", { attr: { rows: "2" } });
+      const label2 = this.contentEl.createEl("label", { cls: "vam-field" });
+      label2.createSpan({ text: question });
+      const input2 = label2.createEl("textarea", { attr: { rows: "2" } });
       input2.setAttr("aria-label", question);
       input2.placeholder = text13("ui.aim_clarify_placeholder");
       return { question, input: input2 };
@@ -25133,8 +25133,8 @@ function referenceCatalog(groups) {
 function resolveWikilinks(text13, documents) {
   return text13.replace(/\[\[([^\]]+)\]\]/g, (original, target) => {
     const name2 = target.split("|")[0].trim();
-    const exact = documents.filter((document2) => document2.path === name2);
-    const matches = exact.length ? exact : documents.filter((document2) => {
+    const exact2 = documents.filter((document2) => document2.path === name2);
+    const matches = exact2.length ? exact2 : documents.filter((document2) => {
       var _a2;
       const basename2 = (_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path;
       return basename2 === name2 || basename2.replace(/\.md$/i, "") === name2;
@@ -25191,20 +25191,20 @@ function footnoteDefinitionLabels(content) {
   });
   return labels;
 }
-function usesFootnote(content, label) {
+function usesFootnote(content, label2) {
   const lines = content.split("\n");
   const code = fencedLines(lines);
   return lines.some(
     (line, index) => !code[index] && outsideInlineCode(
       line,
-      (text13) => [...text13.matchAll(FOOTNOTE_REFERENCE)].some((match) => match[1] === label) ? "\0" : ""
+      (text13) => [...text13.matchAll(FOOTNOTE_REFERENCE)].some((match) => match[1] === label2) ? "\0" : ""
     ).includes("\0")
   );
 }
-function definesFootnote(content, label) {
+function definesFootnote(content, label2) {
   const lines = content.split("\n");
   const code = fencedLines(lines);
-  const prefix = `[^${label}]:`;
+  const prefix = `[^${label2}]:`;
   return lines.some((line, index) => !code[index] && line.startsWith(prefix));
 }
 function resolveDetailReferences(detail, groups, previousDetail = "", template2) {
@@ -25214,9 +25214,9 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template2)
     const identified = line.replace(/\[S(\d+)\]/g, (original, number2) => {
       const document2 = documents[Number(number2) - 1];
       if (!document2) return tNote("note.source_unconfirmed_0", original);
-      const label = sourceFootnoteLabel(document2.path);
-      cited.set(label, footnoteTarget(document2));
-      return `[^${label}]`;
+      const label2 = sourceFootnoteLabel(document2.path);
+      cited.set(label2, footnoteTarget(document2));
+      return `[^${label2}]`;
     });
     return documents.length ? resolveWikilinks(identified, documents) : identified;
   };
@@ -25243,23 +25243,23 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template2)
   const previous = sourceDefinitions(previousDetail);
   const writerLabels = footnoteDefinitionLabels(previousDetail);
   const byLabel = new Map(documents.map((document2) => [sourceFootnoteLabel(document2.path), document2]));
-  const targetOf = (label) => {
+  const targetOf = (label2) => {
     var _a2, _b2;
-    const target = (_b2 = (_a2 = cited.get(label)) != null ? _a2 : defined.get(label)) != null ? _b2 : previous.get(label);
+    const target = (_b2 = (_a2 = cited.get(label2)) != null ? _a2 : defined.get(label2)) != null ? _b2 : previous.get(label2);
     if (target) return target;
-    const document2 = byLabel.get(label);
+    const document2 = byLabel.get(label2);
     if (document2) return footnoteTarget(document2);
-    if (writerLabels.has(label)) return void 0;
-    const owners = documents.filter((candidate) => definesFootnote(candidate.content, label));
+    if (writerLabels.has(label2)) return void 0;
+    const owners = documents.filter((candidate) => definesFootnote(candidate.content, label2));
     if (owners.length === 1) return footnoteTarget(owners[0]);
-    if (owners.length > 1 || documents.some((candidate) => usesFootnote(candidate.content, label))) dropped.add(label);
+    if (owners.length > 1 || documents.some((candidate) => usesFootnote(candidate.content, label2))) dropped.add(label2);
     return void 0;
   };
   body.forEach((line, index) => {
     if (bodyCode[index]) return;
     outsideInlineCode(line, (text14) => {
-      for (const [, label] of text14.matchAll(FOOTNOTE_REFERENCE))
-        if (!label.startsWith("src-") && !targetOf(label) && !dropped.has(label)) reserved.add(label);
+      for (const [, label2] of text14.matchAll(FOOTNOTE_REFERENCE))
+        if (!label2.startsWith("src-") && !targetOf(label2) && !dropped.has(label2)) reserved.add(label2);
       return text14;
     });
   });
@@ -25280,12 +25280,12 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template2)
   const renumbered = body.map(
     (line, index) => bodyCode[index] ? line : outsideInlineCode(
       line,
-      (text14) => text14.replace(FOOTNOTE_REFERENCE, (original, label) => {
-        if (reserved.has(label)) return original;
-        const target = targetOf(label);
+      (text14) => text14.replace(FOOTNOTE_REFERENCE, (original, label2) => {
+        if (reserved.has(label2)) return original;
+        const target = targetOf(label2);
         if (target) return `[^${number(target)}]`;
-        if (label.startsWith("src-")) return ` ${tNote("note.source_unconfirmed_0", label)}`;
-        return dropped.has(label) ? "" : original;
+        if (label2.startsWith("src-")) return ` ${tNote("note.source_unconfirmed_0", label2)}`;
+        return dropped.has(label2) ? "" : original;
       })
     )
   );
@@ -25607,14 +25607,23 @@ function conclusionView(state) {
 // core/argument-map/model.ts
 var MAX_ROUND2 = 3;
 var MAX_HYPOTHESES2 = 6;
+var MAX_ROUND_NEEDS2 = 3;
 var MAX_RESEARCH_CALLS2 = 66;
 var MAX_FRAMING_CALLS = 3;
 var MAX_PREMISES = 3;
 var MAX_TESTABLE = 2;
+var MAX_PREMISE_DATA = 2;
 var MAX_COMPARISONS = 2;
 var MAX_REVERDICTS = 1;
 var MAX_INFERENCE_CHECKS = 2;
 var WORST_CASE_AI_CALLS = MAX_FRAMING_CALLS + MAX_RESEARCH_CALLS2 + MAX_PREMISES * 2 + MAX_TESTABLE * 2 + MAX_HYPOTHESES2 * MAX_ROUND2 * 3 + MAX_HYPOTHESES2 * MAX_REVERDICTS + MAX_TESTABLE * MAX_COMPARISONS + 1 + MAX_INFERENCE_CHECKS;
+var CLAIM_TYPES = ["fact", "causal", "main_cause", "comparison"];
+var CLAIM_ROLES = ["premise", "testable"];
+var PREMISE_RESULTS = ["holds", "fails", "insufficient"];
+var CANDIDATE_KINDS = ["interpretation", "related"];
+var PREDICTION_KINDS = ["support", "refute", "identification"];
+var OVERLAP_STRENGTHS = ["same", "weaker"];
+var EVIDENCE_STANCES = ["supports", "refutes", "irrelevant"];
 var isRec2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isStr2 = (value) => typeof value === "string" && value !== "";
 function managedNodeIds(map) {
@@ -26334,10 +26343,10 @@ function relationReferences(map, nodeId, language2, hasNote) {
       return ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => r.kind === kind && r[side] === nodeId).map((r) => notes.get(side === "from" ? r.to : r.from)).filter((path) => path !== void 0);
     };
     const groups = start === finish ? [[start, [...ends("from"), ...ends("to")]]] : [[start, ends("from")], [finish, ends("to")]];
-    for (const [label, paths] of groups)
+    for (const [label2, paths] of groups)
       if (paths.length)
         lines.push(
-          `${label}${ref.colon}${[...new Set(paths)].map((path) => `[[${noteLink(path)}]]`).join(ref.listSeparator)}`
+          `${label2}${ref.colon}${[...new Set(paths)].map((path) => `[[${noteLink(path)}]]`).join(ref.listSeparator)}`
         );
   }
   return lines;
@@ -26356,9 +26365,9 @@ function derivedLabelLanguage(content, fm) {
   var _a2;
   if (Array.isArray(fm["agent-map-references"]))
     for (const entry of fm["agent-map-references"]) {
-      const label = (_a2 = /^([^：:]+)[：:]/.exec(String(entry))) == null ? void 0 : _a2[1];
-      if (label && REFERENCE_LABELS.includes(label)) return "zh-TW";
-      if (label && ENGLISH_REFERENCE_LABELS.includes(label)) return "en";
+      const label2 = (_a2 = /^([^：:]+)[：:]/.exec(String(entry))) == null ? void 0 : _a2[1];
+      if (label2 && REFERENCE_LABELS.includes(label2)) return "zh-TW";
+      if (label2 && ENGLISH_REFERENCE_LABELS.includes(label2)) return "en";
     }
   if (/^(?:## |> \[!info\][+-]? )預覽[ \t]*$/m.test(content)) return "zh-TW";
   if (/^(?:## |> \[!info\][+-]? )Preview[ \t]*$/m.test(content)) return "en";
@@ -26370,10 +26379,10 @@ function derivedLabelLanguage(content, fm) {
 function withReferenceLinks(body, fm, language2) {
   const sources = Array.isArray(fm["source-notes"]) ? fm["source-notes"].map(String).filter(Boolean) : [];
   const relationships = Array.isArray(fm["agent-map-references"]) ? fm["agent-map-references"].map(String).filter((text13) => text13.includes("[[")) : [];
-  const label = translate(language2, "note.source_topic_label");
+  const label2 = translate(language2, "note.source_topic_label");
   const links = [
     ...relationships.map((value) => localizeReference(value, language2)),
-    ...sources.map((path) => `${label}[[${noteLink(path)}]]`)
+    ...sources.map((path) => `${label2}[[${noteLink(path)}]]`)
   ];
   const clean4 = withoutReference(body).trimEnd();
   return links.length ? `${clean4}
@@ -28837,11 +28846,11 @@ var CoverFrameModal = class extends import_obsidian14.Modal {
       this.summaryEl_ = this.makeEditable(summary, "ui.card_edit_summary_label");
     }
   }
-  makeEditable(el, label) {
+  makeEditable(el, label2) {
     el.setAttr("contenteditable", "plaintext-only");
     el.setAttr("role", "textbox");
     el.setAttr("tabindex", "0");
-    el.setAttr("aria-label", t(label));
+    el.setAttr("aria-label", t(label2));
     el.addClass("is-editable");
     el.addEventListener("input", () => this.checkText());
     el.addEventListener("keydown", (event) => {
@@ -28933,9 +28942,9 @@ var CoverFrameModal = class extends import_obsidian14.Modal {
   }
   /** The tool row above the card: the picture size slider (30-100% of the content width). */
   buildTools(row) {
-    const label = row.createEl("label", { cls: "vam-card-frame-tool" });
-    label.createSpan({ text: t("ui.card_edit_picture_size") });
-    const slider = label.createEl("input", {
+    const label2 = row.createEl("label", { cls: "vam-card-frame-tool" });
+    label2.createSpan({ text: t("ui.card_edit_picture_size") });
+    const slider = label2.createEl("input", {
       cls: "vam-card-frame-size",
       type: "range",
       attr: { min: String(COVER_SIZE_MIN * 100), max: "100", step: String(SIZE_STEP) }
@@ -30451,9 +30460,9 @@ var UsageControl = class {
       this.numberEl.setText("\u2013");
       button.setAttr("aria-label", t("ui.usage_button_unavailable"));
     } else {
-      const label = formatTokens(sum(today.value));
-      this.numberEl.setText(label);
-      button.setAttr("aria-label", t("ui.usage_button_today_0", label));
+      const label2 = formatTokens(sum(today.value));
+      this.numberEl.setText(label2);
+      button.setAttr("aria-label", t("ui.usage_button_today_0", label2));
     }
     if (this.isOpen && this.parts) this.fillPanel(this.parts);
   }
@@ -30522,9 +30531,9 @@ var UsageControl = class {
     const totalsSection = root.createDiv({ cls: "vam-usage-section" });
     totalsSection.createDiv({ cls: "vam-usage-heading", text: t("ui.usage_totals") });
     const grid = totalsSection.createDiv({ cls: "vam-usage-totals" });
-    const cell = (label) => {
+    const cell = (label2) => {
       const box = grid.createDiv();
-      box.createEl("small", { text: label });
+      box.createEl("small", { text: label2 });
       const strong = box.createEl("strong");
       const detail = box.createEl("em");
       return { strong, input: detail.createSpan(), output: detail.createSpan() };
@@ -33144,7 +33153,7 @@ function phaseGuidance(phase, language2, responseContract, structured = false) {
 }
 function buildAimPrompt(context, language2, provider = "codex") {
   const phase = aimPhase(context.task);
-  const field = (label, value) => (value == null ? void 0 : value.trim()) ? `${label}:
+  const field = (label2, value) => (value == null ? void 0 : value.trim()) ? `${label2}:
 ${value}` : "";
   const blocks = [
     inLanguageNaming(LANGUAGE, language2, { language: "region", languagePlain: "plain" }, void 0, {
@@ -35692,7 +35701,7 @@ function relabel(text13, map) {
   const lines = text13.split("\n");
   const code = fencedLines(lines);
   return lines.map(
-    (line, index) => code[index] ? line : line.replace(FOOTNOTE_REF2, (whole, label) => map.has(label) ? `[^${map.get(label)}]` : whole)
+    (line, index) => code[index] ? line : line.replace(FOOTNOTE_REF2, (whole, label2) => map.has(label2) ? `[^${map.get(label2)}]` : whole)
   ).join("\n");
 }
 function composeTop(input2) {
@@ -35723,17 +35732,17 @@ function composeTop(input2) {
       if (seen.has(item.label)) continue;
       seen.add(item.label);
       if (oldTargets.get(item.label) === item.target) continue;
-      let label = item.label;
-      if (/^\d+$/.test(label)) {
+      let label2 = item.label;
+      if (/^\d+$/.test(label2)) {
         counter++;
-        label = String(counter);
-      } else if (used.has(label)) {
+        label2 = String(counter);
+      } else if (used.has(label2)) {
         let suffix = 2;
-        while (used.has(`${label}-${suffix}`)) suffix++;
-        label = `${label}-${suffix}`;
+        while (used.has(`${label2}-${suffix}`)) suffix++;
+        label2 = `${label2}-${suffix}`;
       }
-      used.add(label);
-      if (label !== item.label) map.set(item.label, label);
+      used.add(label2);
+      if (label2 !== item.label) map.set(item.label, label2);
       newDefinitions.push({ label: item.label, text: item.text });
     }
     return lines.filter((_line, index) => !drop.has(index)).join("\n");
@@ -35805,9 +35814,9 @@ ${body}${needsBlank(at2) ? "\n" : ""}`, order: 0 });
 
 ${logLine}`);
   if (newDefinitions.length) {
-    const text13 = newDefinitions.map((item) => item.text.replace(/^\[\^([^\]\s]+)\]/, (_whole, label) => {
+    const text13 = newDefinitions.map((item) => item.text.replace(/^\[\^([^\]\s]+)\]/, (_whole, label2) => {
       var _a2;
-      return `[^${(_a2 = map.get(label)) != null ? _a2 : label}]`;
+      return `[^${(_a2 = map.get(label2)) != null ? _a2 : label2}]`;
     })).join("\n");
     const last = oldDefinitions[oldDefinitions.length - 1];
     if (last) plan.push({ at: lineEnd(oldView, last.last), text: `
@@ -36002,15 +36011,15 @@ function steerObserver(observer, steer) {
 }
 
 // ai/note-style-label.ts
-function runStyleLabelText(label, language2) {
-  const bracket = label.templateSource === "kind" && label.aiSectionsMode !== "decide" && label.aiSectionsMode !== "follow";
+function runStyleLabelText(label2, language2) {
+  const bracket = label2.templateSource === "kind" && label2.aiSectionsMode !== "decide" && label2.aiSectionsMode !== "follow";
   return bracket ? translate(
     language2,
     "ui.note_style_label_0_1_2",
-    label.templateName,
-    label.toneName,
+    label2.templateName,
+    label2.toneName,
     translate(language2, "ui.note_style_source_kind")
-  ) : translate(language2, "ui.note_style_label_0_1", label.templateName, label.toneName);
+  ) : translate(language2, "ui.note_style_label_0_1", label2.templateName, label2.toneName);
 }
 
 // experiences/visual-map/topic-run.ts
@@ -37127,8 +37136,8 @@ var NoteStyleFileError = class extends Error {
     this.open = open;
   }
 };
-function actionNotice(message, label, run, timeout = 12e3) {
-  return backgroundResultNotice(message, { label, open: run }, timeout);
+function actionNotice(message, label2, run, timeout = 12e3) {
+  return backgroundResultNotice(message, { label: label2, open: run }, timeout);
 }
 function errorNotice(error) {
   const message = error == null ? void 0 : error.message;
@@ -37492,15 +37501,15 @@ var RELEVANCE_LABEL = {
   support: "ui.relevance_support",
   side: "ui.relevance_side"
 };
-function renderRelevanceTag(parent, tier, label) {
+function renderRelevanceTag(parent, tier, label2) {
   const tag = parent.createSpan({ cls: "vam-relevance-tag" });
   tag.dataset.tier = tier;
   (0, import_obsidian22.setIcon)(tag.createSpan({ cls: "vam-relevance-icon" }), RELEVANCE_ICON[tier]);
-  tag.createSpan({ text: label });
+  tag.createSpan({ text: label2 });
   return tag;
 }
 var tagSeq = 0;
-function renderRelevanceTagButton(parent, tier, label, ariaLabel, open, disabled) {
+function renderRelevanceTagButton(parent, tier, label2, ariaLabel, open, disabled) {
   const tag = parent.createEl("button", { cls: "vam-relevance-tag vam-relevance-tag-button" });
   tag.type = "button";
   tag.dataset.tier = tier;
@@ -37511,7 +37520,7 @@ function renderRelevanceTagButton(parent, tier, label, ariaLabel, open, disabled
   tag.setAttr("aria-labelledby", nameId);
   tag.setAttr("aria-haspopup", "menu");
   (0, import_obsidian22.setIcon)(tag.createSpan({ cls: "vam-relevance-icon" }), RELEVANCE_ICON[tier]);
-  const visible = tag.createSpan({ text: label });
+  const visible = tag.createSpan({ text: label2 });
   visible.setAttr("aria-hidden", "true");
   tag.createSpan({ cls: "vam-relevance-tag-name", text: ariaLabel, attr: { id: nameId } });
   tag.addEventListener("click", (event) => {
@@ -37774,9 +37783,9 @@ var RelevanceSummaryModal = class extends import_obsidian23.Modal {
     super(app);
     this.host = host;
   }
-  renderRows(label, rows2) {
+  renderRows(label2, rows2) {
     const list2 = this.contentEl.createEl("ul", { cls: "vam-relevance-changes" });
-    list2.setAttr("aria-label", label);
+    list2.setAttr("aria-label", label2);
     for (const row of rows2) {
       const item = list2.createEl("li", { cls: "vam-relevance-change" });
       item.createDiv({ cls: "vam-relevance-change-title", text: row.title });
@@ -38243,9 +38252,9 @@ function parseInline(src, depth = 0, links = true, ends) {
       if (link) {
         if (links && HTTP_URL.test(link.dest)) {
           flush(at);
-          const label = parseInline(link.label, depth + 1, false);
+          const label2 = parseInline(link.label, depth + 1, false);
           push(
-            { t: "link", href: link.dest, c: visibleLength(label) ? label : [{ t: "text", text: link.dest }] },
+            { t: "link", href: link.dest, c: visibleLength(label2) ? label2 : [{ t: "text", text: link.dest }] },
             link.end
           );
         } else buf += src.slice(at, link.end);
@@ -38602,14 +38611,14 @@ function linkAliasOf(title) {
 function wikiTargetOf(value) {
   return stripControl(value).replace(/\.md$/i, "").replace(/[[\]|`!\\\r\n]/g, " ").replace(/%{2,}/g, "%").replace(/\s+/g, " ").trim();
 }
-function wikiLink(target, label) {
+function wikiLink(target, label2) {
   const path = wikiTargetOf(target);
-  const alias = linkAliasOf(label);
-  if (!path) return escapeLine(label || target);
+  const alias = linkAliasOf(label2);
+  if (!path) return escapeLine(label2 || target);
   return alias && alias !== path ? `[[${path}|${alias}]]` : `[[${path}]]`;
 }
-function pageLink(label, url) {
-  const text13 = escapeLine(label) || escapeLine(url);
+function pageLink(label2, url) {
+  const text13 = escapeLine(label2) || escapeLine(url);
   return /^https:\/\/[^\s<>]+$/i.test(url) ? `[${text13}](<${url}>)` : text13;
 }
 function codeSpan(text13) {
@@ -38647,8 +38656,8 @@ function inlineMarkdown(nodes) {
         out += wikiLink(node.target, node.label);
         break;
       case "link": {
-        const label = inlineMarkdown(node.c).replace(/\\\n/g, " ");
-        out += /^https?:\/\/[^\s<>]+$/i.test(node.href) ? `[${label || escapeText(node.href)}](<${node.href}>)` : label;
+        const label2 = inlineMarkdown(node.c).replace(/\\\n/g, " ");
+        out += /^https?:\/\/[^\s<>]+$/i.test(node.href) ? `[${label2 || escapeText(node.href)}](<${node.href}>)` : label2;
         break;
       }
     }
@@ -39352,8 +39361,8 @@ var MapChatPanel = class {
     const els = this.chainWaitingEls;
     const state = this.chainWaitingState;
     if (!els || !state) return;
-    const label = t("ui.map_chat_chain_wait_label_0_1_2", this.waitWord(state), state.settled, state.total);
-    if (els.label.textContent !== label) els.label.setText(label);
+    const label2 = t("ui.map_chat_chain_wait_label_0_1_2", this.waitWord(state), state.settled, state.total);
+    if (els.label.textContent !== label2) els.label.setText(label2);
     const seconds = Math.max(0, Math.round((this.clockNow() - this.chainWaitingSince) / 1e3));
     els.elapsed.setText(
       t("ui.map_chat_stage_elapsed_0", `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`)
@@ -40268,10 +40277,10 @@ ${typed}` : draft;
       return;
     }
     if (!this.newEl) {
-      const label = t("ui.map_chat_new_conversation");
+      const label2 = t("ui.map_chat_new_conversation");
       const button = this.newEl = this.headEl.createEl("button", {
         cls: "vam-map-chat-new clickable-icon",
-        attr: { type: "button", "aria-label": label, title: label }
+        attr: { type: "button", "aria-label": label2, title: label2 }
       });
       (0, import_obsidian24.setIcon)(button, "square-pen");
       button.addEventListener("click", () => this.startNewConversation());
@@ -40739,13 +40748,13 @@ ${shown}` : t("ui.map_chat_model_label"));
     }
     if (this.noteChip) {
       const note = this.noteChip;
-      const label = t("ui.map_chat_ref_note_0", clip2(baseName4(note)));
+      const label2 = t("ui.map_chat_ref_note_0", clip2(baseName4(note)));
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-note" });
-      chip.createSpan({ cls: "vam-map-chat-chip-label", text: label });
+      chip.createSpan({ cls: "vam-map-chat-chip-label", text: label2 });
       const remove = chip.createEl("button", {
         cls: "vam-map-chat-note-remove",
         text: "\xD7",
-        attr: { "aria-label": t("ui.map_chat_remove_ref_0", label), type: "button" }
+        attr: { "aria-label": t("ui.map_chat_remove_ref_0", label2), type: "button" }
       });
       remove.addEventListener("click", () => {
         this.dismissedNote = note;
@@ -40754,13 +40763,13 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
     }
     for (const entry of this.chips) {
-      const label = this.chipLabel(entry);
+      const label2 = this.chipLabel(entry);
       const chip = this.chipsEl.createDiv({ cls: `vam-map-chat-chip is-${entry.kind}` });
-      chip.createSpan({ cls: "vam-map-chat-chip-label", text: label });
+      chip.createSpan({ cls: "vam-map-chat-chip-label", text: label2 });
       const remove = chip.createEl("button", {
         cls: "vam-map-chat-chip-remove",
         text: "\xD7",
-        attr: { "aria-label": t("ui.map_chat_remove_ref_0", label), type: "button" }
+        attr: { "aria-label": t("ui.map_chat_remove_ref_0", label2), type: "button" }
       });
       remove.addEventListener("click", () => this.removeChip(entry));
     }
@@ -40983,7 +40992,7 @@ ${shown}` : t("ui.map_chat_model_label"));
   buildChainWait(row) {
     const box = row.createDiv({ cls: "vam-map-chat-chain-wait", attr: { role: "status" } });
     const line = box.createDiv("vam-map-chat-chain-wait-line");
-    const label = line.createSpan({ cls: "vam-map-chat-chain-wait-label" });
+    const label2 = line.createSpan({ cls: "vam-map-chat-chain-wait-label" });
     const elapsed = line.createSpan({ cls: "vam-map-chat-chain-wait-elapsed" });
     elapsed.setAttr("aria-hidden", "true");
     line.createSpan({
@@ -40995,7 +41004,7 @@ ${shown}` : t("ui.map_chat_model_label"));
         cls: "vam-map-chat-chain-wait-left",
         text: t("ui.map_chat_chain_left_0", this.chainWaitingLeft)
       });
-    this.chainWaitingEls = { label, elapsed };
+    this.chainWaitingEls = { label: label2, elapsed };
     this.paintWait();
   }
   /** "Undo this reply" under an "apply directly" reply. Nothing of it is saved with the conversation. */
@@ -41048,10 +41057,10 @@ ${shown}` : t("ui.map_chat_model_label"));
   /** The stage line of the running turn: the stage name, then the seconds (hidden from screen readers; they tick). */
   buildStage(row, message) {
     const box = row.createDiv({ cls: `vam-map-chat-progress${message.text ? " is-compact" : ""}` });
-    const label = box.createSpan({ cls: "vam-map-chat-progress-stage" });
+    const label2 = box.createSpan({ cls: "vam-map-chat-progress-stage" });
     const elapsed = box.createSpan({ cls: "vam-map-chat-progress-elapsed" });
     elapsed.setAttr("aria-hidden", "true");
-    this.stageEls = { box, label, elapsed, slow: null };
+    this.stageEls = { box, label: label2, elapsed, slow: null };
     this.paintStage();
   }
   /** A result the reader still has to look at: anything not done, and a picture line where some card got no picture. */
@@ -44244,7 +44253,7 @@ function extractJsonObject(raw) {
   throw new SyntaxError(t("error.codex_reply_no_json"));
 }
 var EVIDENCE_KEYS = ["need", "status", "stance", "claim", "quote", "url"];
-var EVIDENCE_STANCES = ["supports", "contradicts", "uncertain"];
+var EVIDENCE_STANCES2 = ["supports", "contradicts", "uncertain"];
 var QUOTE_FOLDED_MIN2 = 8;
 function parseArgumentEvidence(value, needIds) {
   const refuse = (why) => {
@@ -44270,7 +44279,7 @@ function parseArgumentEvidence(value, needIds) {
       return { need, status };
     }
     if (status !== "found") return refuse("status must be found or not_found");
-    if (!EVIDENCE_STANCES.includes(stance)) return refuse("stance is not an allowed value");
+    if (!EVIDENCE_STANCES2.includes(stance)) return refuse("stance is not an allowed value");
     if (!claim2.trim()) return refuse("a found entry has no claim");
     const trimmed2 = quote2.normalize("NFKC").trim();
     const length = Array.from(trimmed2).length;
@@ -44293,11 +44302,11 @@ function parseArgumentEvidence(value, needIds) {
     };
   });
 }
-function parseAiResult(raw, label, language2, strictGapAudit = false, webResearch = false, contract, argumentEvidenceNeedIds) {
+function parseAiResult(raw, label2, language2, strictGapAudit = false, webResearch = false, contract, argumentEvidenceNeedIds) {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
   const parsed = JSON.parse(extractJsonObject(cleaned));
   if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string")
-    throw new Error(t("error.ai_reply_missing_summary_0", label));
+    throw new Error(t("error.ai_reply_missing_summary_0", label2));
   if (strictGapAudit && (!["user_condition", "external_evidence"].includes(parsed.summary) || !parsed.detail.trim() || !Array.isArray(parsed.suggestions) || parsed.suggestions.length !== 0 || !Array.isArray(parsed.visualReferences) || parsed.visualReferences.length !== 0)) {
     throw new Error("AIM research-gap audit returned an invalid structured classification.");
   }
@@ -46257,6 +46266,132 @@ var verdictStep = {
   parse: parseVerdict
 };
 
+// core/steps/argument-map/v2-shared.ts
+var S = {
+  str: { type: "string", minLength: 1 },
+  free: { type: "string" },
+  bool: { type: "boolean" },
+  arr: (items, min = 0, max) => ({
+    type: "array",
+    items,
+    minItems: min,
+    ...max === void 0 ? {} : { maxItems: max }
+  }),
+  enum: (values) => ({ type: "string", enum: [...values] }),
+  obj: (properties) => ({
+    type: "object",
+    additionalProperties: false,
+    properties,
+    required: Object.keys(properties)
+  })
+};
+
+// core/steps/argument-map/v2-assessment.ts
+var ASSESSMENT_SCHEMA = S.obj({
+  assessments: S.arr(
+    S.obj({
+      id: S.str,
+      relevant: S.bool,
+      stance: S.enum(EVIDENCE_STANCES),
+      scopeFit: S.bool,
+      scopeNote: S.free,
+      sourceType: S.str,
+      underlyingSource: S.str,
+      alsoRelevantTo: S.arr(S.str),
+      sameCondition: { type: ["boolean", "null"] }
+    }),
+    1
+  )
+});
+
+// core/steps/argument-map/v2-framing.ts
+var MAX_LIST = 8;
+var MAX_CANDIDATES = 3;
+var FRAMING_SCHEMA = S.obj({
+  restatement: S.str,
+  presuppositions: S.arr(S.str, 0, MAX_LIST),
+  loadedTerms: S.arr(S.str, 0, MAX_LIST),
+  vagueTerms: S.arr(S.str, 0, MAX_LIST),
+  outOfScope: S.arr(S.str, 0, MAX_LIST),
+  candidates: S.arr(
+    S.obj({
+      id: S.str,
+      question: S.str,
+      answerShape: S.str,
+      diff: S.str,
+      kind: S.enum(CANDIDATE_KINDS),
+      unanswered: S.bool
+    }),
+    1,
+    MAX_CANDIDATES
+  ),
+  chosen: S.str,
+  claims: S.arr(
+    S.obj({
+      id: S.str,
+      text: S.str,
+      type: S.enum(CLAIM_TYPES),
+      role: S.enum(CLAIM_ROLES),
+      dependsOn: S.arr(S.str, 0, MAX_PREMISES),
+      definitions: S.arr(S.obj({ term: S.str, meaning: S.str }), 1, 6),
+      dataNeeds: S.arr(S.str, 0, MAX_PREMISE_DATA)
+    }),
+    1,
+    MAX_PREMISES + MAX_TESTABLE
+  ),
+  settings: S.arr(S.str, 0, MAX_LIST),
+  composition: S.free
+});
+
+// core/steps/argument-map/v2-hypotheses.ts
+var MAX_PREDICTIONS = 5;
+var HYPOTHESES_V2_SCHEMA = S.obj({
+  hypotheses: S.arr(
+    S.obj({
+      id: S.str,
+      role: S.enum(["primary", "alternative", "reverse", "common_cause", "measurement", "facet"]),
+      predictions: S.arr(
+        S.obj({
+          kind: S.enum(PREDICTION_KINDS),
+          text: S.str,
+          required: S.bool,
+          alsoPredictedBy: S.arr(S.obj({ hypothesisId: S.str, strength: S.enum(OVERLAP_STRENGTHS) })),
+          auxiliary: S.arr(S.str),
+          reason: S.free
+        }),
+        2,
+        MAX_PREDICTIONS
+      ),
+      identification: {
+        anyOf: [{ type: "null" }, S.obj({ strategy: S.str, assumptions: S.arr(S.str, 1, 6) })]
+      }
+    }),
+    1,
+    MAX_HYPOTHESES2
+  )
+});
+
+// core/steps/argument-map/v2-needs.ts
+var NEEDS_V2_SCHEMA = S.obj({
+  needs: S.arr(
+    S.obj({
+      predictionId: S.str,
+      text: S.str,
+      criteria: S.obj({ supports: S.str, refutes: S.str, irrelevant: S.str }),
+      replaces: { type: ["string", "null"] }
+    }),
+    1,
+    MAX_ROUND_NEEDS2
+  )
+});
+
+// core/steps/argument-map/v2-premise.ts
+var PREMISE_VERDICT_SCHEMA = S.obj({
+  result: S.enum(PREMISE_RESULTS),
+  reason: S.str,
+  citedData: S.arr(S.str)
+});
+
 // core/steps/argument-map/runner.ts
 var ARGUMENT_STEPS = {
   plan_situation: planSituationStep,
@@ -47413,7 +47548,7 @@ function parseMapChat(raw, context) {
         if (typeof field !== "string") throw new Dropped("bad_value");
         return field;
       };
-      const flag = (key4) => item[key4] === true;
+      const flag2 = (key4) => item[key4] === true;
       const topicKind = () => {
         const given = text13("topicKind", false);
         if (given && !TOPIC_KINDS.includes(given)) throw new Dropped("bad_value");
@@ -47515,7 +47650,7 @@ function parseMapChat(raw, context) {
           break;
         }
         case "delete_topic":
-          actions.push({ kind: "delete_topic", nodeId: node("nodeId"), branch: flag("branch") });
+          actions.push({ kind: "delete_topic", nodeId: node("nodeId"), branch: flag2("branch") });
           break;
         case "edit_md_file": {
           const path = text13("path");
@@ -47532,7 +47667,7 @@ function parseMapChat(raw, context) {
           break;
         }
         case "select_topics": {
-          const all = flag("all");
+          const all = flag2("all");
           if (all && created) throw new Dropped("bad_value");
           const nodeIds = all ? [...known] : list2("nodeIds");
           if (!nodeIds.length) throw new Dropped("missing_field");
@@ -47564,10 +47699,10 @@ function parseMapChat(raw, context) {
             goal,
             direction: text13("direction", false),
             mode,
-            images: research && mode !== "quick" && flag("images"),
+            images: research && mode !== "quick" && flag2("images"),
             // Only a boolean `true` counts: a missing field (an older reply) or a string "true" is false.
-            ...research && flag("needsWeb") ? { needsWeb: true } : {},
-            ...research && flag("otherProvider") ? { otherProvider: true } : {}
+            ...research && flag2("needsWeb") ? { needsWeb: true } : {},
+            ...research && flag2("otherProvider") ? { otherProvider: true } : {}
           });
           break;
         }
@@ -50086,10 +50221,10 @@ function aiModeField(parent, options = {}) {
   paint();
   return { element, value: () => current, set };
 }
-function linkedField(parent, label) {
+function linkedField(parent, label2) {
   const field = parent.createDiv("vam-field");
   const head = field.createDiv("vam-field-head");
-  head.createSpan({ text: label });
+  head.createSpan({ text: label2 });
   return { field, head };
 }
 function fieldLink(head, text13, run) {
@@ -50123,8 +50258,8 @@ function modelField(parent, models, defaultLabel, repair) {
         model.createEl("option", { value: id, text: id });
       model.value = id != null ? id : "";
     },
-    setDefaultLabel: (label) => {
-      defaultLabel = label;
+    setDefaultLabel: (label2) => {
+      defaultLabel = label2;
       fill2();
     },
     dispose
@@ -50351,8 +50486,8 @@ var OutlineImportModal = class extends import_obsidian26.Modal {
       const ticket = ++labelTicket;
       const placement = this.placementRequest();
       const answer = this.defaultModelLabel(placement.kind === "under" ? placement.parentId : null);
-      const apply = (label) => {
-        if (ticket === labelTicket) model.setDefaultLabel(label);
+      const apply = (label2) => {
+        if (ticket === labelTicket) model.setDefaultLabel(label2);
       };
       if (typeof answer === "string") apply(answer);
       else answer.then(apply, () => {
@@ -50408,11 +50543,11 @@ var OutlineImportModal = class extends import_obsidian26.Modal {
     ];
     const marks = [];
     for (const option of options) {
-      const label = group.createEl("label", {
+      const label2 = group.createEl("label", {
         cls: `vam-outline-option${option.reason ? " is-disabled" : ""}${option.kind === this.placement ? " is-checked" : ""}`
       });
-      marks.push({ label, kind: option.kind });
-      const input2 = label.createEl("input", { type: "radio", value: option.kind });
+      marks.push({ label: label2, kind: option.kind });
+      const input2 = label2.createEl("input", { type: "radio", value: option.kind });
       input2.name = "vam-outline-placement";
       input2.checked = option.kind === this.placement;
       input2.disabled = option.reason !== null;
@@ -50422,7 +50557,7 @@ var OutlineImportModal = class extends import_obsidian26.Modal {
         for (const mark2 of marks) mark2.label.toggleClass("is-checked", mark2.kind === this.placement);
         this.syncModelLabel();
       });
-      const text13 = label.createDiv("vam-outline-option-text");
+      const text13 = label2.createDiv("vam-outline-option-text");
       text13.createSpan({ text: option.text });
       if (option.reason) text13.createSpan({ text: option.reason, cls: "vam-outline-placement-reason" });
     }
@@ -51485,9 +51620,9 @@ function proposalOutline(items) {
   return nodes;
 }
 function renderSynthesisContent(parent, topics) {
-  const label = parent.createEl("label", { cls: "vam-field" });
-  label.createSpan({ text: t("ui.synthesis_content") });
-  const select = label.createEl("select");
+  const label2 = parent.createEl("label", { cls: "vam-field" });
+  label2.createSpan({ text: t("ui.synthesis_content") });
+  const select = label2.createEl("select");
   select.setAttr("aria-label", t("ui.synthesis_content"));
   select.createEl("option", { value: "full", text: t("ui.synthesis_content_full") });
   select.createEl("option", { value: "summary", text: t("ui.synthesis_content_summary") });
@@ -52157,14 +52292,14 @@ var DraftReviewView = class {
     toolbar.createEl("strong", { text: t("ui.ai_draft") });
     const toggle = toolbar.createEl("button", { text: t("ui.edit_draft"), cls: "vam-draft-toggle" });
     toggle.setAttr("aria-pressed", "false");
-    const section3 = (label, value, rows2) => {
+    const section3 = (label2, value, rows2) => {
       const wrap = content.createDiv("vam-draft-section");
-      wrap.createEl("h4", { text: label });
+      wrap.createEl("h4", { text: label2 });
       const preview = wrap.createDiv("vam-draft-preview markdown-rendered");
       const input2 = wrap.createEl("textarea", { cls: "vam-task-input", text: value });
       input2.rows = rows2;
       input2.hidden = true;
-      input2.setAttr("aria-label", label);
+      input2.setAttr("aria-label", label2);
       return { preview, input: input2 };
     };
     const summary = section3(t("ui.draft_summary"), this.summary, 4);
@@ -52314,12 +52449,12 @@ var MapConflictModal = class extends import_obsidian30.Modal {
       this.resolve(map);
     };
     const options = this.contentEl.createDiv("vam-conflict-options");
-    const option = (label, description, map) => {
+    const option = (label2, description, map) => {
       const row = options.createDiv("vam-conflict-option");
       const text13 = row.createDiv("vam-conflict-option-text");
-      text13.createEl("strong", { text: label });
+      text13.createEl("strong", { text: label2 });
       text13.createSpan({ text: description, cls: "vam-hint" });
-      row.createEl("button", { text: label }).addEventListener("click", () => finish(map()));
+      row.createEl("button", { text: label2 }).addEventListener("click", () => finish(map()));
     };
     option(t("ui.use_file_contents"), t("ui.conflict_use_file_desc"), () => clone(this.disk));
     option(t("ui.keep_editor_contents"), t("ui.conflict_keep_editor_desc"), () => clone(this.local));
@@ -52532,21 +52667,21 @@ var StructureReviewModal = class extends import_obsidian31.Modal {
         const note = row.element.createEl("p", { cls: "vam-structure-note", attr: { "aria-live": "polite" } });
         let busy = false;
         let message = "";
-        const label = () => button.setAttr(
+        const label2 = () => button.setAttr(
           "aria-label",
           t(
             entry.applied ? "ui.structure_review_applied_named" : "ui.structure_review_apply_named",
             row.title.value.trim() || item.title
           )
         );
-        row.title.addEventListener("input", label);
+        row.title.addEventListener("input", label2);
         const refresh = () => {
           const stale = entry.applied ? null : this.host.staleReason(entry.suggestion);
           row.element.toggleClass("is-applied", entry.applied);
           row.element.toggleClass("is-stale", !!stale);
           button.disabled = busy || entry.applied || !!stale;
           button.setText(t(entry.applied ? "ui.structure_review_applied" : "ui.structure_review_apply"));
-          label();
+          label2();
           row.title.readOnly = entry.applied || entry.suggestion.kind !== "strengthen";
           note.setText(stale != null ? stale : message);
         };
@@ -52865,9 +53000,9 @@ function positionIds(realIds) {
   const toReal = /* @__PURE__ */ new Map();
   realIds.forEach((realId, index) => {
     if (toShort.has(realId)) return;
-    const label = `c${index + 1}`;
-    toShort.set(realId, label);
-    toReal.set(label, realId);
+    const label2 = `c${index + 1}`;
+    toShort.set(realId, label2);
+    toReal.set(label2, realId);
   });
   return { short: (realId) => toShort.get(realId), real: (shortId) => toReal.get(shortId) };
 }
@@ -53028,13 +53163,13 @@ function parseGoalRecommend(raw, request) {
     const withAnchor = keys.includes("anchor");
     if (keys.length !== (withAnchor ? 3 : 2) || !["id", "tier"].every((key4) => keys.includes(key4)))
       throw invalid3(locale, `${where} keys`);
-    const { id: label, tier, anchor } = item;
-    if (typeof label !== "string" || !label) throw invalid3(locale, `${where} id`);
+    const { id: label2, tier, anchor } = item;
+    if (typeof label2 !== "string" || !label2) throw invalid3(locale, `${where} id`);
     if (typeof tier !== "string" || !GOAL_RECOMMEND_TIERS.includes(tier))
       throw invalid3(locale, `${where} tier`);
     if (withAnchor && anchor !== null && typeof anchor !== "string") throw invalid3(locale, `${where} anchor`);
-    const id = ids.real(label);
-    if (id === void 0) throw invalid3(locale, `${where} id ${label}`);
+    const id = ids.real(label2);
+    if (id === void 0) throw invalid3(locale, `${where} id ${label2}`);
     if (!gradable.has(id)) throw invalid3(locale, `${where} top-level ${id}`);
     if (seen.has(id)) throw invalid3(locale, `${where} duplicate ${id}`);
     seen.add(id);
@@ -53103,7 +53238,7 @@ function parseGoalRecommend(raw, request) {
 var trimmed = (text13) => text13.replace(/\n$/, "");
 var promptCards = (request) => {
   const ids = positionIds(request.nodes.map((node) => node.id));
-  const label = (id) => {
+  const label2 = (id) => {
     var _a2;
     return (_a2 = ids.short(id)) != null ? _a2 : id;
   };
@@ -53113,10 +53248,10 @@ var promptCards = (request) => {
   return request.nodes.map((node) => {
     var _a2, _b2;
     return {
-      id: label(node.id),
+      id: label2(node.id),
       title: node.title,
       summary: node.summary,
-      parentId: node.parentId === null ? null : label(node.parentId),
+      parentId: node.parentId === null ? null : label2(node.parentId),
       depth: node.depth,
       ...request.scope === "current" && node.parentId !== null ? { tier: (_b2 = (_a2 = pins.get(node.id)) != null ? _a2 : tiers.get(node.id)) != null ? _b2 : null } : {},
       ...pins.has(node.id) ? { pinned: pins.get(node.id) } : {},
@@ -54028,7 +54163,7 @@ var AimStartModal = class extends import_obsidian35.Modal {
       ["explore", t("ui.aim_outcome_explore")],
       ["custom", t("ui.aim_outcome_custom")]
     ];
-    for (const [value, label] of goalChoices) outcome.createEl("option", { value, text: label });
+    for (const [value, label2] of goalChoices) outcome.createEl("option", { value, text: label2 });
     outcome.value = "auto";
     outcomeLabel.createEl("p", { cls: "vam-hint", text: t("ui.aim_outcome_hint") });
     const customLabel = this.contentEl.createEl("label", { cls: "vam-field" });
@@ -54044,11 +54179,11 @@ var AimStartModal = class extends import_obsidian35.Modal {
       ["images", t("ui.aim_format_images")],
       ["longform", t("ui.aim_format_longform")]
     ];
-    const formatInputs = formatChoices.map(([value, label]) => {
+    const formatInputs = formatChoices.map(([value, label2]) => {
       const row = this.contentEl.createEl("label", { cls: "vam-field vam-next-toggle" });
       const checkbox = row.createEl("input", { attr: { type: "checkbox" } });
-      checkbox.setAttr("aria-label", label);
-      row.createSpan({ text: label });
+      checkbox.setAttr("aria-label", label2);
+      row.createSpan({ text: label2 });
       return { value, checkbox };
     });
     const modelLabel = this.contentEl.createEl("label", { cls: "vam-field" });
@@ -54117,13 +54252,13 @@ var AimStartModal = class extends import_obsidian35.Modal {
     reasoningLabel.createSpan({ text: t("ui.reasoning_level") });
     const reasoning = reasoningLabel.createEl("select");
     reasoning.setAttr("aria-label", t("ui.reasoning_level"));
-    for (const [value, label] of [
+    for (const [value, label2] of [
       ["auto", t("ui.auto")],
       ["low", t("ui.low")],
       ["medium", t("ui.medium")],
       ["high", t("ui.high")]
     ])
-      reasoning.createEl("option", { value, text: label });
+      reasoning.createEl("option", { value, text: label2 });
     reasoning.value = this.defaultReasoning;
     const interactionLabel = this.contentEl.createEl("label", { cls: "vam-field" });
     interactionLabel.createSpan({ text: t("ui.aim_interaction") });
@@ -54279,10 +54414,10 @@ var AimAnswerModal = class extends import_obsidian36.Modal {
     });
     const boxes = /* @__PURE__ */ new Map();
     for (const option of this.options) {
-      const label = choices.createEl("label", { cls: "vam-aim-answer-option" });
-      const input2 = label.createEl("input", { type: "checkbox", value: option.id });
+      const label2 = choices.createEl("label", { cls: "vam-aim-answer-option" });
+      const input2 = label2.createEl("input", { type: "checkbox", value: option.id });
       input2.setAttr("aria-label", option.label);
-      label.createSpan({ text: option.label });
+      label2.createSpan({ text: option.label });
       boxes.set(option.id, input2);
       input2.addEventListener("change", () => {
         this.requestId = (0, import_node_crypto11.randomUUID)();
@@ -54376,9 +54511,9 @@ var AimSteerModal = class extends import_obsidian38.Modal {
   onOpen() {
     this.titleEl.setText(t("ui.aim_steer"));
     this.contentEl.createEl("p", { text: t("ui.aim_steer_hint"), cls: "vam-modal-intro" });
-    const label = this.contentEl.createEl("label", { cls: "vam-field" });
-    label.createSpan({ text: t("ui.aim_steer_prompt") });
-    const direction = label.createEl("textarea", { attr: { rows: "3" } });
+    const label2 = this.contentEl.createEl("label", { cls: "vam-field" });
+    label2.createSpan({ text: t("ui.aim_steer_prompt") });
+    const direction = label2.createEl("textarea", { attr: { rows: "3" } });
     new import_obsidian38.Setting(this.contentEl).addButton(
       (button) => button.setButtonText(t("ui.aim_steer_submit")).setCta().onClick(() => {
         if (!direction.value.trim()) {
@@ -55130,9 +55265,9 @@ function extractPlannerQuestionCandidate(result) {
     return marked.raw.question.trim();
   const body = (_a2 = marked == null ? void 0 : marked.body) != null ? _a2 : result.detail;
   const lines = body.split(/\r?\n/).map((line) => line.trim());
-  const label = /^(?:\*\*|__)?(?:question|問題)\s*[:：]\s*(?:\*\*|__)?\s*/i;
-  const labeledQuestion = lines.find((line) => label.test(line) && /[?？]\s*$/.test(line.replace(label, "")));
-  if (labeledQuestion) return labeledQuestion.replace(label, "").trim();
+  const label2 = /^(?:\*\*|__)?(?:question|問題)\s*[:：]\s*(?:\*\*|__)?\s*/i;
+  const labeledQuestion = lines.find((line) => label2.test(line) && /[?？]\s*$/.test(line.replace(label2, "")));
+  if (labeledQuestion) return labeledQuestion.replace(label2, "").trim();
   const bodyQuestion = lines.map((line) => line.replace(/^(?:[-*•]|\d+[.)、])\s+/, "")).find((candidate) => candidate && candidate.length <= 500 && /[?？]\s*$/.test(candidate));
   if (bodyQuestion) return bodyQuestion;
   const candidates = [result.summary];
@@ -57885,7 +58020,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
       throw new Error(
         "The saved answer or research changed while Planner was creating a new question; refresh the result and try again."
       );
-    const options = labels.map((label) => ({ id: this.id(), label }));
+    const options = labels.map((label2) => ({ id: this.id(), label: label2 }));
     options.push({
       id: AIM_UNKNOWN_OPTION_ID,
       label: translateNote(language2, "note.aim_unknown_option")
@@ -60321,9 +60456,9 @@ var MergeTopicsModal = class extends import_obsidian39.Modal {
         text: this.parentName !== void 0 ? t("ui.merge_into_parent_ai_desc", this.parentName, this.count - 1) : t("ui.merge_ai_desc", this.count),
         cls: "vam-merge-desc"
       });
-      const label = this.contentEl.createEl("label", { cls: "vam-merge-skip-ai" });
-      skipAi = label.createEl("input", { type: "checkbox" });
-      label.createSpan({ text: t("ui.merge_no_ai") });
+      const label2 = this.contentEl.createEl("label", { cls: "vam-merge-skip-ai" });
+      skipAi = label2.createEl("input", { type: "checkbox" });
+      label2.createSpan({ text: t("ui.merge_no_ai") });
     }
     const actions = modalActions(this);
     const status = actionStatus(actions);
@@ -62194,11 +62329,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
    * composing only picks the text. A repaint suspends it (`suspendInlineName`) and the same field is built again from the draft.
    * `done` gets the typed text, or null for Esc.
    */
-  createInlineNameInput(parent, cls, label, done) {
+  createInlineNameInput(parent, cls, label2, done) {
     const state = this.inlineName;
     const input2 = parent.createEl("input", {
       cls,
-      attr: { type: "text", dir: "auto", ...label ? { "aria-label": label } : {} }
+      attr: { type: "text", dir: "auto", ...label2 ? { "aria-label": label2 } : {} }
     });
     input2.value = state.draft;
     let live2 = true;
@@ -62296,8 +62431,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
    * Names an edit field for assistive tech without `aria-label`: Obsidian turns every aria-label into a hover tooltip, and
    * on a field sitting right over the key hint it would cover the hint. A hidden label element carries the same text.
    */
-  nameEditField(card, field, id, label) {
-    const text13 = card.createSpan({ cls: "vam-sr-only", text: label });
+  nameEditField(card, field, id, label2) {
+    const text13 = card.createSpan({ cls: "vam-sr-only", text: label2 });
     text13.id = id;
     field.setAttr("aria-labelledby", id);
   }
@@ -63730,10 +63865,10 @@ ${request.requirements}` : preset.text,
       attr: { role: "button", tabindex: "0", "aria-labelledby": textName }
     });
     text13.setText(goal != null ? goal : t("ui.relevance_goal_placeholder"));
-    const label = goal ? t("ui.relevance_goal_0", goal) : t("ui.relevance_goal_placeholder");
+    const label2 = goal ? t("ui.relevance_goal_0", goal) : t("ui.relevance_goal_placeholder");
     bar.createSpan({
       cls: "vam-sr-only",
-      text: sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label,
+      text: sorted ? `${label2}${t("ui.relevance_sorted_suffix")}` : label2,
       attr: { id: textName }
     });
     text13.setAttr("aria-description", t(goal ? "ui.relevance_goal_edit_hint" : "ui.relevance_goal_set_hint"));
@@ -64418,7 +64553,7 @@ ${request.requirements}` : preset.text,
     var _a2;
     const button = this.mapSourcesButtonEl;
     if (!button) return;
-    const label = mapSourcesButtonLabel(this.mapSources.length);
+    const label2 = mapSourcesButtonLabel(this.mapSources.length);
     const unreadable = unreadableMapSources(this.app, this.mapSources);
     button.empty();
     const icon = button.createSpan({ cls: "vam-sources-button-icon" });
@@ -64430,7 +64565,7 @@ ${request.requirements}` : preset.text,
       badge.setAttr("aria-hidden", "true");
       if (unreadable) badge.addClass("is-bad");
     }
-    button.setAttr("aria-label", label);
+    button.setAttr("aria-label", label2);
     button.setAttr("aria-expanded", String(this.mapSourcesOpen));
     if (unreadable) button.setAttr("aria-description", t("ui.map_sources_unreadable_description_0", unreadable));
     else (_a2 = button.removeAttribute) == null ? void 0 : _a2.call(button, "aria-description");
@@ -65566,12 +65701,12 @@ ${request.requirements}` : preset.text,
     return card;
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
-  openKindMenu(event, pick5) {
+  openKindMenu(event, pick6) {
     const menu = this.newMenu();
     this.drawInDom(menu);
     for (const kind of TOPIC_KINDS)
       menu.addItem(
-        (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(kindIconId(kind)).onClick(() => pick5(kind))
+        (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(kindIconId(kind)).onClick(() => pick6(kind))
       );
     menu.showAtMouseEvent(event);
   }
@@ -66588,10 +66723,10 @@ ${request.requirements}` : preset.text,
       this.render();
     } else this.changed(file);
   }
-  iconButton(parent, icon, label, action) {
+  iconButton(parent, icon, label2, action) {
     const button = parent.createEl("button", { cls: "clickable-icon vam-icon-button" });
     if (this.renderingCard) button.tabIndex = -1;
-    button.setAttr("aria-label", label);
+    button.setAttr("aria-label", label2);
     button.dataset.icon = icon;
     (0, import_obsidian40.setIcon)(button, icon);
     button.addEventListener("click", (event) => {
@@ -66956,9 +67091,9 @@ ${request.requirements}` : preset.text,
     const text13 = this.researchStageText(progress);
     stageEl.setText(text13);
     stageEl.setAttr("title", text13);
-    const label = cardLabels.get(card);
-    const named = label == null ? void 0 : label.textContent;
-    if (label && named && oldText) {
+    const label2 = cardLabels.get(card);
+    const named = label2 == null ? void 0 : label2.textContent;
+    if (label2 && named && oldText) {
       const at = named.lastIndexOf(oldText);
       if (at >= 0) this.labelCard(card, named.slice(0, at) + text13 + named.slice(at + oldText.length));
     }
@@ -67957,11 +68092,11 @@ ${request.requirements}` : preset.text,
     this.canvasImageEls = /* @__PURE__ */ new Map();
     for (const item of items) {
       if (item.kind !== "image" && !isAnnotatedImage(item) || !layer) continue;
-      const image = item, annotated = isAnnotatedImage(image) ? image : null, name2 = (_d = image.path.split("/").pop()) != null ? _d : image.path, label = annotated ? this.annotatedLabel(annotated, name2) : t("ui.canvas_image_label", name2), el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
+      const image = item, annotated = isAnnotatedImage(image) ? image : null, name2 = (_d = image.path.split("/").pop()) != null ? _d : image.path, label2 = annotated ? this.annotatedLabel(annotated, name2) : t("ui.canvas_image_label", name2), el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
       el.dataset.itemId = image.id;
       this.canvasImageEls.set(image.id, el);
       el.setAttr("role", annotated ? "group" : "img");
-      el.setAttr("aria-label", label);
+      el.setAttr("aria-label", label2);
       el.tabIndex = 0;
       el.style.left = `${image.x}px`;
       el.style.top = `${image.y}px`;
@@ -69646,17 +69781,17 @@ ${request.requirements}` : preset.text,
         layer.setAttr("role", "group");
         layer.setAttr("aria-label", t("ui.canvas_boundaries_group"));
       }
-      const label = (_a2 = boundary.label) != null ? _a2 : "", el = layer.createDiv("vam-boundary");
+      const label2 = (_a2 = boundary.label) != null ? _a2 : "", el = layer.createDiv("vam-boundary");
       el.dataset.itemId = boundary.id;
       el.setAttr("role", "group");
-      el.setAttr("aria-label", label ? t("ui.canvas_boundary_label", label) : t("ui.canvas_boundary_default"));
+      el.setAttr("aria-label", label2 ? t("ui.canvas_boundary_label", label2) : t("ui.canvas_boundary_default"));
       el.tabIndex = 0;
       el.style.left = `${box.x}px`;
       el.style.top = `${box.y}px`;
       el.style.width = `${box.w}px`;
       el.style.height = `${box.h}px`;
-      const chip = el.createSpan({ cls: "vam-boundary-label", text: label });
-      if (!label) chip.addClass("is-empty");
+      const chip = el.createSpan({ cls: "vam-boundary-label", text: label2 });
+      if (!label2) chip.addClass("is-empty");
       el.addEventListener("focus", () => el.addClass("is-selected"));
       el.addEventListener("blur", () => el.removeClass("is-selected"));
       chip.addEventListener("pointerdown", (event) => {
@@ -69845,21 +69980,21 @@ ${request.requirements}` : preset.text,
       path.setAttribute("fill", "none");
       svg.appendChild(path);
       el.appendChild(svg);
-      const label = el.createDiv({ cls: "vam-summary-text", text: summary.text });
-      label.style.left = `${geometry.label.x}px`;
-      label.style.top = `${geometry.label.y}px`;
+      const label2 = el.createDiv({ cls: "vam-summary-text", text: summary.text });
+      label2.style.left = `${geometry.label.x}px`;
+      label2.style.top = `${geometry.label.y}px`;
       this.summaryEls.set(summary.id, el);
       el.addEventListener("focus", () => el.addClass("is-selected"));
       el.addEventListener("blur", () => el.removeClass("is-selected"));
-      label.addEventListener("pointerdown", (event) => {
+      label2.addEventListener("pointerdown", (event) => {
         if (event.button === 0 && !this.editingSummaryId) el.focus({ preventScroll: true });
       });
       if (!editable || isNew) continue;
-      label.addEventListener("dblclick", (event) => {
+      label2.addEventListener("dblclick", (event) => {
         event.stopPropagation();
         this.startSummaryEdit(summary.id);
       });
-      label.addEventListener("contextmenu", (event) => {
+      label2.addEventListener("contextmenu", (event) => {
         event.preventDefault();
         event.stopPropagation();
         const menu = this.newMenu();
@@ -70058,16 +70193,16 @@ ${request.requirements}` : preset.text,
       this.app,
       t("ui.canvas_boundary_name"),
       (_c = current.label) != null ? _c : "",
-      (label) => {
+      (label2) => {
         this.focusItemId = id;
-        this.enqueue(() => this.renameBoundary(id, label));
+        this.enqueue(() => this.renameBoundary(id, label2));
       },
       { allowEmpty: true }
     ).open();
   }
   /** Sets or clears (blank) a frame's label. */
-  async renameBoundary(id, label) {
-    const text13 = label.trim();
+  async renameBoundary(id, label2) {
+    const text13 = label2.trim();
     await this.changeCanvasItems(
       id,
       (items) => items.map((item) => {
@@ -70078,11 +70213,11 @@ ${request.requirements}` : preset.text,
     );
   }
   /** Frames the given topics (ids that are cards of this map, deduplicated) with an optional label; one undo step. Returns the new id. */
-  async addBoundary(ids, label) {
+  async addBoundary(ids, label2) {
     if (!this.map || this.aimLive()) return null;
     const known = new Set(this.map.nodes.map((node) => node.id)), members = [...new Set(ids)].filter((id2) => known.has(id2));
     if (!members.length) return null;
-    const id = `frame-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, text13 = label.trim();
+    const id = `frame-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, text13 = label2.trim();
     this.focusItemId = id;
     const frame = { id, kind: "boundary", members, ...text13 ? { label: text13 } : {} };
     await this.mapChange((map) => {
@@ -70100,7 +70235,7 @@ ${request.requirements}` : preset.text,
       this.app,
       t("ui.canvas_boundary_name"),
       "",
-      (label) => this.enqueue(async () => void await this.addBoundary(ids, label)),
+      (label2) => this.enqueue(async () => void await this.addBoundary(ids, label2)),
       { allowEmpty: true }
     ).open();
   }
@@ -70374,22 +70509,22 @@ ${request.requirements}` : preset.text,
     const mapPath = this.path, epoch = this.mapOpenEpoch, stale = () => this.closed || this.path !== mapPath || this.mapOpenEpoch !== epoch || !this.map;
     let first = true;
     for (const file of files) {
-      const label = file.name || "?";
+      const label2 = file.name || "?";
       let data;
       try {
         if (file.size > IMAGE_MAX_BYTES) {
-          new import_obsidian40.Notice(t("ui.canvas_image_too_large", label));
+          new import_obsidian40.Notice(t("ui.canvas_image_too_large", label2));
           continue;
         }
         data = await file.arrayBuffer();
       } catch (e) {
-        if (!stale()) new import_obsidian40.Notice(t("ui.canvas_image_unreadable", label));
+        if (!stale()) new import_obsidian40.Notice(t("ui.canvas_image_unreadable", label2));
         continue;
       }
       if (stale()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
-        new import_obsidian40.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        new import_obsidian40.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label2));
         continue;
       }
       const name2 = safeImageName(file.name, accepted.mime);
@@ -70621,22 +70756,22 @@ ${request.requirements}` : preset.text,
     const path = this.path, epoch = this.mapOpenEpoch, stale = () => this.closed || this.path !== path || this.mapOpenEpoch !== epoch || !this.map;
     let offset = 0;
     for (const file of files) {
-      const label = file.name || "?";
+      const label2 = file.name || "?";
       let data;
       try {
         if (file.size > IMAGE_MAX_BYTES) {
-          new import_obsidian40.Notice(t("ui.canvas_image_too_large", label));
+          new import_obsidian40.Notice(t("ui.canvas_image_too_large", label2));
           continue;
         }
         data = await file.arrayBuffer();
       } catch (e) {
-        if (!stale()) new import_obsidian40.Notice(t("ui.canvas_image_unreadable", label));
+        if (!stale()) new import_obsidian40.Notice(t("ui.canvas_image_unreadable", label2));
         continue;
       }
       if (stale()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
-        new import_obsidian40.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        new import_obsidian40.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label2));
         continue;
       }
       const name2 = safeImageName(file.name, accepted.mime);
@@ -71665,7 +71800,7 @@ ${request.requirements}` : preset.text,
       }
     });
   }
-  recordNoteWrite(path, before, after, fields, label) {
+  recordNoteWrite(path, before, after, fields, label2) {
     const oldValues = {}, newValues = {};
     for (const field of fields) {
       oldValues[field] = before[field];
@@ -71678,7 +71813,7 @@ ${request.requirements}` : preset.text,
           throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
       await this.plugin.repo.updateNote(path, replacement);
     };
-    this.history.push({ label, undo: () => restore(newValues, oldValues), redo: () => restore(oldValues, newValues) });
+    this.history.push({ label: label2, undo: () => restore(newValues, oldValues), redo: () => restore(oldValues, newValues) });
     this.updateHistoryButtons();
   }
   openDetails(node) {
@@ -71707,17 +71842,17 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d, _e;
     (_a2 = this.chat) == null ? void 0 : _a2.refreshReplyUndo();
     const undo = (_b2 = this.contentEl) == null ? void 0 : _b2.querySelector("[data-history=undo]"), redo = (_c = this.contentEl) == null ? void 0 : _c.querySelector("[data-history=redo]");
-    const label = (button, text13) => {
+    const label2 = (button, text13) => {
       if (button.dataset.icon) button.setAttr("aria-label", text13);
       else button.setText(text13);
     };
     if (undo) {
       undo.disabled = !this.history.canUndo;
-      label(undo, ((_d = this.history.undoEntry) == null ? void 0 : _d.label) ? t("ui.undo_0", this.history.undoEntry.label) : t("ui.undo"));
+      label2(undo, ((_d = this.history.undoEntry) == null ? void 0 : _d.label) ? t("ui.undo_0", this.history.undoEntry.label) : t("ui.undo"));
     }
     if (redo) {
       redo.disabled = !this.history.canRedo;
-      label(redo, ((_e = this.history.redoEntry) == null ? void 0 : _e.label) ? t("ui.redo_0", this.history.redoEntry.label) : t("ui.redo"));
+      label2(redo, ((_e = this.history.redoEntry) == null ? void 0 : _e.label) ? t("ui.redo_0", this.history.redoEntry.label) : t("ui.redo"));
     }
   }
   async synchronize() {
@@ -73020,9 +73155,9 @@ ${request.requirements}` : preset.text,
     const selecting = this.selection.state.multiSelectMode;
     tools.addClass("vam-tools-mini");
     tools.toggleClass("is-open", selecting);
-    const label = selecting ? t("ui.finish_topic_selection") : t("ui.select_topics");
+    const label2 = selecting ? t("ui.finish_topic_selection") : t("ui.select_topics");
     const integrate = tools.createEl("button", { cls: "vam-tools-select" });
-    integrate.setAttr("aria-label", label);
+    integrate.setAttr("aria-label", label2);
     integrate.setAttr("aria-pressed", String(selecting));
     if (selecting) integrate.addClass("is-active");
     const icon = integrate.createSpan("vam-tools-select-icon");
@@ -73208,14 +73343,14 @@ ${request.requirements}` : preset.text,
     if (batch) {
       const currentNode = batch.currentPath ? (_p = this.map) == null ? void 0 : _p.nodes.find((item) => item.path === batch.currentPath) : void 0;
       const currentTitle = currentNode ? (_q = this.notes.get(currentNode.id)) == null ? void 0 : _q.title : void 0;
-      const label = this.batchProgressLabel(
+      const label2 = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
         currentTitle ? t("ui.shallow_research_current", currentTitle) : void 0
       );
       header2.createSpan({
         cls: `vam-status vam-status-${batch.status === "running" ? "running" : batch.failures.length ? "error" : "completed"}`,
-        text: label
+        text: label2
       });
       if (batch.status === "running")
         this.button(header2, t("ui.stop_research"), () => this.plugin.expansionCoordinator.stop(node.path));
@@ -73480,8 +73615,8 @@ ${request.requirements}` : preset.text,
         ).addClass("vam-aim-retry");
       } else if (!activeInitialRun && !terminalResult) {
         this.renderAimFailure(card, initialBranch);
-        const label = initialBranch.researchPlan || initialBranch.results.length ? t("ui.aim_continue_research") : t("ui.aim_retry_subtopics");
-        this.button(card, label, () => void this.retryAimSubtopics(initialBranch.id), this.aimBusy).addClass(
+        const label2 = initialBranch.researchPlan || initialBranch.results.length ? t("ui.aim_continue_research") : t("ui.aim_retry_subtopics");
+        this.button(card, label2, () => void this.retryAimSubtopics(initialBranch.id), this.aimBusy).addClass(
           "vam-aim-retry"
         );
       }
@@ -74263,7 +74398,7 @@ ${request.requirements}` : preset.text,
       named = stripped === named ? named.replace(previous, "") : stripped;
     }
     if (note == null ? void 0 : note.modelOverride) {
-      const label = this.plugin.modelLabel(note.model), text13 = t("ui.card_model_override_0", label), tag = header2.createSpan({ cls: "vam-node-model-tag", text: label });
+      const label2 = this.plugin.modelLabel(note.model), text13 = t("ui.card_model_override_0", label2), tag = header2.createSpan({ cls: "vam-node-model-tag", text: label2 });
       tag.setAttr("aria-hidden", "true");
       tag.setAttr("title", text13);
       const row = cardMarkerRows.get(card);
@@ -74371,12 +74506,12 @@ ${request.requirements}` : preset.text,
       var _a3;
       return (_a3 = note == null ? void 0 : note.style) == null ? void 0 : _a3.includes(id);
     });
-    const flag = (name2, value) => {
+    const flag2 = (name2, value) => {
       if (value) card.dataset[name2] = value;
       else delete card.dataset[name2];
     };
-    flag("topicStyleBold", ids.includes("bold") ? "true" : void 0);
-    flag("topicStyleBorder", ids.includes("border-thick") ? "thick" : void 0);
+    flag2("topicStyleBold", ids.includes("bold") ? "true" : void 0);
+    flag2("topicStyleBorder", ids.includes("border-thick") ? "thick" : void 0);
     const size = ids.includes("text-small") ? "small" : ids.includes("text-large") ? "large" : void 0;
     if (size) card.dataset.topicStyleSize = size;
     else delete card.dataset.topicStyleSize;
@@ -74391,15 +74526,15 @@ ${request.requirements}` : preset.text,
   }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   labelCard(card, text13) {
-    let label = cardLabels.get(card);
-    if (!label) {
-      label = card.createSpan({ cls: "vam-card-label" });
-      label.id = `vam-card-label-${++cardLabelSequence}`;
-      cardLabels.set(card, label);
+    let label2 = cardLabels.get(card);
+    if (!label2) {
+      label2 = card.createSpan({ cls: "vam-card-label" });
+      label2.id = `vam-card-label-${++cardLabelSequence}`;
+      cardLabels.set(card, label2);
     }
-    label.textContent = text13;
+    label2.textContent = text13;
     const cut = cardCutLabels.get(card);
-    card.setAttr("aria-labelledby", cut ? `${label.id} ${cut.id}` : label.id);
+    card.setAttr("aria-labelledby", cut ? `${label2.id} ${cut.id}` : label2.id);
   }
   /** Marks or unmarks a card as cut: a dashed outline and a hidden "Cut" part of its accessible name. */
   paintCut(card, id, cut = this.cutIds().has(id)) {
@@ -74409,14 +74544,14 @@ ${request.requirements}` : preset.text,
       const part = card.createSpan({ cls: "vam-card-label", text: t("ui.clipboard_cut_mark") });
       part.id = `vam-card-cut-${++cardLabelSequence}`;
       cardCutLabels.set(card, part);
-      const label = cardLabels.get(card);
-      if (label) card.setAttr("aria-labelledby", `${label.id} ${part.id}`);
+      const label2 = cardLabels.get(card);
+      if (label2) card.setAttr("aria-labelledby", `${label2.id} ${part.id}`);
     } else if (!cut && existing) {
       card.removeClass("is-cut");
       existing.remove();
       cardCutLabels.delete(card);
-      const label = cardLabels.get(card);
-      if (label) card.setAttr("aria-labelledby", label.id);
+      const label2 = cardLabels.get(card);
+      if (label2) card.setAttr("aria-labelledby", label2.id);
     }
   }
   /** The topics of a pending cut that belongs to this map. */
@@ -74683,17 +74818,17 @@ ${request.requirements}` : preset.text,
           text: topicStatusLabel(note.status, this.plugin.settings.language)
         });
     } else if (!this.isMerging(node.id) && !this.plugin.topicRuns.isBusy(node.path) && !((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) && !this.isResearchQueued(node)) {
-      const label = note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
+      const label2 = note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
       if (showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id)))
-        this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
+        this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label2));
       else this.labelCard(card, note.title);
       if (note.status === "idea") status == null ? void 0 : status.remove();
       else if (status) {
         status.className = `vam-status vam-status-${note.status}`;
-        status.setText(label);
+        status.setText(label2);
       } else if (header2) {
-        const chip = header2.createSpan({ cls: `vam-status vam-status-${note.status}`, text: label });
+        const chip = header2.createSpan({ cls: `vam-status vam-status-${note.status}`, text: label2 });
         if (header2.firstChild && header2.firstChild !== chip) header2.insertBefore(chip, header2.firstChild);
       }
     }
@@ -75778,9 +75913,9 @@ ${request.requirements}` : preset.text,
     };
   }
   /** A folded group: a button with `aria-expanded` that shows or hides its body. Every control inside stays in the DOM. Returns the body. */
-  renderDisclosure(parent, label) {
+  renderDisclosure(parent, label2) {
     const group = parent.createDiv("vam-disclosure");
-    const toggle = group.createEl("button", { text: label, cls: "vam-disclosure-toggle" });
+    const toggle = group.createEl("button", { text: label2, cls: "vam-disclosure-toggle" });
     toggle.type = "button";
     const body = group.createDiv("vam-disclosure-body");
     body.id = `vam-disclosure-${++this.disclosureSeq}`;
@@ -76151,10 +76286,10 @@ ${request.requirements}` : preset.text,
     const row = list2.createEl("li", { cls: "vam-relation-row vam-anchor-relation-row" });
     this.bindRelationRow(row, ref.relation, described, key4);
     this.relationSwatch(row, ref.relation.kind);
-    const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
-    label.createSpan({ text: text13, cls: "vam-relation-sentence", attr: { dir: "auto" } });
+    const label2 = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+    label2.createSpan({ text: text13, cls: "vam-relation-sentence", attr: { dir: "auto" } });
     if (ref.relation.description)
-      label.createSpan({ text: ref.relation.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
+      label2.createSpan({ text: ref.relation.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
     if (!this.anchorRelationsEditable()) return;
     const tools = row.createSpan({ cls: "vam-relation-tools" });
     const reopen = () => {
@@ -76280,9 +76415,9 @@ ${request.requirements}` : preset.text,
         cls: "vam-relation-sentence",
         attr: { dir: "auto" }
       });
-      const field = (label, id) => {
+      const field = (label2, id) => {
         const row = root.createDiv("vam-relation-field");
-        row.createEl("label", { text: label, attr: { for: id } });
+        row.createEl("label", { text: label2, attr: { for: id } });
         return row;
       };
       const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
@@ -76472,9 +76607,9 @@ ${request.requirements}` : preset.text,
         cls: "vam-relation-sentence",
         attr: { dir: "auto" }
       });
-      const field = (label, id) => {
+      const field = (label2, id) => {
         const row = root.createDiv("vam-relation-field");
-        row.createEl("label", { text: label, attr: { for: id } });
+        row.createEl("label", { text: label2, attr: { for: id } });
         return row;
       };
       const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
@@ -76671,8 +76806,8 @@ ${request.requirements}` : preset.text,
         box.setAttr("aria-label", def.single ? t("ui.topic_marker_group_single", title) : title);
         if (def.single) box.addClass("is-segmented");
         for (const id of def.ids) {
-          const label = t(markerLabelKey(id));
-          const choice2 = this.button(box, def.single ? "" : label, () => {
+          const label2 = t(markerLabelKey(id));
+          const choice2 = this.button(box, def.single ? "" : label2, () => {
             this.enqueue(async () => {
               await this.changeTopicMarker(node, id);
               paint(id);
@@ -76681,8 +76816,8 @@ ${request.requirements}` : preset.text,
           choice2.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
           choice2.dataset.marker = id;
           if (def.single) {
-            choice2.setAttr("aria-label", label);
-            choice2.setAttr("title", label);
+            choice2.setAttr("aria-label", label2);
+            choice2.setAttr("title", label2);
           }
           const on = active.includes(id);
           choice2.setAttr("aria-pressed", String(on));
@@ -77516,14 +77651,14 @@ ${request.requirements}` : preset.text,
           const row = list2.createEl("li", { cls: "vam-relation-row" }), text13 = this.relationRowText(link, node.id), described = link.description ? `${text13}. ${link.description}` : text13;
           this.bindRelationRow(row, link, described);
           this.relationSwatch(row, link.kind);
-          const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
-          label.createSpan({
+          const label2 = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+          label2.createSpan({
             text: this.relationSentence(link, node.id),
             cls: "vam-relation-sentence",
             attr: { dir: "auto" }
           });
           if (link.description)
-            label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
+            label2.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
           const tools = row.createSpan({ cls: "vam-relation-tools" });
           const pair6 = relationPairKey(link.from, link.to);
           const edit = this.iconButton(
@@ -79756,9 +79891,9 @@ ${note.detail.trim()}` : "",
       const text13 = el.querySelector(".vam-summary-text");
       const side = ["right", "left", "down", "up"].find((each) => el.hasClass(`is-side-${each}`));
       if (!text13 || !side) continue;
-      const label = { x: parseFloat(text13.style.left), y: parseFloat(text13.style.top) };
-      if (!Number.isFinite(label.x) || !Number.isFinite(label.y)) continue;
-      boxes.push(summaryTextBox(side, label, text13.offsetWidth, text13.offsetHeight));
+      const label2 = { x: parseFloat(text13.style.left), y: parseFloat(text13.style.top) };
+      if (!Number.isFinite(label2.x) || !Number.isFinite(label2.y)) continue;
+      boxes.push(summaryTextBox(side, label2, text13.offsetWidth, text13.offsetHeight));
     }
     const minX = Math.min(...boxes.map((b) => b.x)), maxX = Math.max(...boxes.map((b) => b.x + b.w));
     const minY = Math.min(...boxes.map((b) => b.y)), maxY = Math.max(...boxes.map((b) => b.y + b.h));
@@ -82080,7 +82215,7 @@ ${note.detail.trim()}` : "",
       models.map((model) => this.plugin.modelLabel(model)).join(t("ui.map_chat_model_separator"))
     );
   }
-  chatLine(label, outcome) {
+  chatLine(label2, outcome) {
     if (outcome.status === "done" && outcome.images) {
       const line = { status: "done", text: "", imageGroup: outcome.images };
       return { ...line, text: settledLine(line).text };
@@ -82089,7 +82224,7 @@ ${note.detail.trim()}` : "",
       return {
         status: "done",
         ...outcome.basis ? { basis: outcome.basis } : {},
-        text: t("ui.map_chat_line_done_0", label) + (outcome.skippedCards ? t(
+        text: t("ui.map_chat_line_done_0", label2) + (outcome.skippedCards ? t(
           aimEnabled() ? "ui.map_chat_line_cards_skipped_0" : "ui.map_chat_line_cards_skipped_hidden_0",
           outcome.skippedCards
         ) : "")
@@ -82098,7 +82233,7 @@ ${note.detail.trim()}` : "",
       status: outcome.status,
       text: t(
         outcome.status === "skipped" ? "ui.map_chat_line_skipped_0_1" : "ui.map_chat_line_failed_0_1",
-        label,
+        label2,
         outcome.reason
       )
     };
@@ -82223,14 +82358,14 @@ ${note.detail.trim()}` : "",
           later.push(index);
           continue;
         }
-        const label = this.chatActionLabel(action, refTitles);
+        const label2 = this.chatActionLabel(action, refTitles);
         if (!same2()) {
           stopped = true;
-          lines[index] = this.chatLine(label, lost());
+          lines[index] = this.chatLine(label2, lost());
           continue;
         }
         if (noNewMap) {
-          lines[index] = this.chatLine(label, skipped(noNewMapReason));
+          lines[index] = this.chatLine(label2, skipped(noNewMapReason));
           continue;
         }
         if (action.kind === "rename_map") {
@@ -82239,7 +82374,7 @@ ${note.detail.trim()}` : "",
             wrote = true;
             touched.add(anchor.path);
           }
-          lines[index] = this.chatLine(label, outcome);
+          lines[index] = this.chatLine(label2, outcome);
           continue;
         }
         if (action.kind === "create_map") {
@@ -82254,7 +82389,7 @@ ${note.detail.trim()}` : "",
             noNewMap = true;
             if ("created" in outcome && outcome.created) noNewMapReason = "ui.map_chat_skip_map_not_opened";
           }
-          lines[index] = this.chatLine(label, outcome);
+          lines[index] = this.chatLine(label2, outcome);
           continue;
         }
         const box = { outcome: { status: "done" } };
@@ -82272,7 +82407,7 @@ ${note.detail.trim()}` : "",
           laidOutCount = run.created.length;
           layoutDone = true;
         }
-        lines[index] = this.chatLine(label, box.outcome);
+        lines[index] = this.chatLine(label2, box.outcome);
       }
       let arranged = false;
       if (!scope && run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same2() && // A reply that made a ring places the ring and the other new cards below, never the whole map again.
@@ -82388,7 +82523,7 @@ ${note.detail.trim()}` : "",
       this.applySelectionChange(this.selection.setSelected(branchRoot.id));
     for (const index of later) {
       const action = result.actions[index];
-      const label = this.chatActionLabel(action, refTitles);
+      const label2 = this.chatActionLabel(action, refTitles);
       let outcome;
       if (!same2()) outcome = lost();
       else if (noNewMap) outcome = skipped(noNewMapReason);
@@ -82459,7 +82594,7 @@ ${note.detail.trim()}` : "",
           outcome = { status: "failed", reason: errorMessage(error) };
         }
       }
-      lines[index] = this.chatLine(label, outcome);
+      lines[index] = this.chatLine(label2, outcome);
     }
     if (options.context) {
       const created = createdParentsOf(result.actions);
@@ -82591,8 +82726,8 @@ ${note.detail.trim()}` : "",
         options: match.maps.map((topic, index) => {
           var _a3;
           const part = parts[index];
-          const label = part.seq ? t("ui.map_chat_choose_label_0_1_2", part.title, (_a3 = part.folder) != null ? _a3 : "", part.seq) : part.folder ? t("ui.map_chat_choose_label_0_1", part.title, part.folder) : part.title;
-          return { label, pick: () => void this.chatPickMap(topic) };
+          const label2 = part.seq ? t("ui.map_chat_choose_label_0_1_2", part.title, (_a3 = part.folder) != null ? _a3 : "", part.seq) : part.folder ? t("ui.map_chat_choose_label_0_1", part.title, part.folder) : part.title;
+          return { label: label2, pick: () => void this.chatPickMap(topic) };
         }),
         picked: false
       });
@@ -85141,13 +85276,13 @@ ${addition}` : addition },
       this.relationHitEls.set(key4, hit);
     }
     for (const link of links) {
-      const label = createSvg("text");
-      label.addClass("vam-relation-label");
-      if (link.anchor) label.setAttribute("data-anchor-relation", "");
+      const label2 = createSvg("text");
+      label2.addClass("vam-relation-label");
+      if (link.anchor) label2.setAttribute("data-anchor-relation", "");
       if (link.anchor && link.relation.ring === true && link.kind === "related")
-        label.addClass("is-ring-quiet");
-      this.edgesEl.appendChild(label);
-      this.relationLabelEls.set(link.key, label);
+        label2.addClass("is-ring-quiet");
+      this.edgesEl.appendChild(label2);
+      this.relationLabelEls.set(link.key, label2);
       this.placeRelationLabel(
         link.key,
         link.anchor ? this.anchorLabelPoint(link.anchor, boxOf(link.to)) : relationLabelPoint(boxOf(link.from), boxOf(link.to), axis)
@@ -85253,14 +85388,14 @@ ${addition}` : addition },
    * ("—" for related) and, on a second line, the note cut to 60 characters with an ellipsis. Text only, never markup.
    */
   paintRelationLabel(key4, expanded) {
-    const label = this.relationLabelEls.get(key4), link = this.relationData.get(key4);
-    if (!label || !link) return;
+    const label2 = this.relationLabelEls.get(key4), link = this.relationData.get(key4);
+    if (!label2 || !link) return;
     const name2 = t(RELATION_NAME_KEY[link.kind]);
     if (!expanded) {
-      label.textContent = name2;
+      label2.textContent = name2;
       return;
     }
-    label.textContent = "";
+    label2.textContent = "";
     const anchored = this.anchorLinks.get(key4), titleOf = (id) => {
       var _a2, _b2;
       return anchored && id === anchored.anchorId ? anchored.anchorNote ? t("ui.anchor_relation_end_0", anchored.anchorNote) : t("ui.anchor_relation_end_empty") : (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
@@ -85272,22 +85407,22 @@ ${addition}` : addition },
       titleOf(link.to)
     );
     if (at) head.setAttribute("x", String(at.x));
-    label.appendChild(head);
+    label2.appendChild(head);
     if (link.description) {
       const note = createSvg("tspan"), chars = Array.from(link.description);
       note.textContent = chars.length > RELATION_LABEL_NOTE_MAX ? `${chars.slice(0, RELATION_LABEL_NOTE_MAX).join("")}\u2026` : link.description;
       if (at) note.setAttribute("x", String(at.x));
       note.setAttribute("dy", "1.3em");
-      label.appendChild(note);
+      label2.appendChild(note);
     }
   }
   placeRelationLabel(key4, point) {
     this.relationLabelAt.set(key4, point);
-    const label = this.relationLabelEls.get(key4);
-    if (!label) return;
-    label.setAttribute("x", String(point.x));
-    label.setAttribute("y", String(point.y));
-    for (const part of Array.from(label.children)) part.setAttribute("x", String(point.x));
+    const label2 = this.relationLabelEls.get(key4);
+    if (!label2) return;
+    label2.setAttribute("x", String(point.x));
+    label2.setAttribute("y", String(point.y));
+    for (const part of Array.from(label2.children)) part.setAttribute("x", String(point.x));
   }
   /**
    * Repaints the relation highlights from the current state, without touching the DOM structure: with topics selected
@@ -85827,13 +85962,13 @@ var PromptPreviewModal = class extends import_obsidian42.Modal {
     const { contentEl } = this;
     contentEl.addClass("vam-prompt-preview");
     contentEl.createEl("p", { text: t("ui.preview_prompt_hint"), cls: "setting-item-description" });
-    const label = contentEl.createEl("label", {
+    const label2 = contentEl.createEl("label", {
       text: t("ui.preview_prompt_step_label"),
       cls: "vam-prompt-preview-label"
     });
     const select = contentEl.createEl("select", { cls: "dropdown" });
     select.id = "vam-prompt-preview-step";
-    label.setAttr("for", select.id);
+    label2.setAttr("for", select.id);
     for (const item of PREVIEW_STEPS) select.createEl("option", { text: t(item.nameKey), value: item.id });
     select.value = this.step;
     select.addEventListener("change", () => {
@@ -85919,9 +86054,9 @@ var CARD_VOICES = [
 ];
 
 // ui/radio-group.ts
-function renderRadioGroup(parent, label, choices, current, pick5, idPrefix = "vam-radio") {
-  const labelEl = parent.createEl("p", { text: label, cls: "vam-style-card-label" });
-  const id = `${idPrefix}-${label}`;
+function renderRadioGroup(parent, label2, choices, current, pick6, idPrefix = "vam-radio") {
+  const labelEl = parent.createEl("p", { text: label2, cls: "vam-style-card-label" });
+  const id = `${idPrefix}-${label2}`;
   labelEl.setAttr("id", id);
   const group = parent.createDiv({ cls: "vam-style-chips", attr: { role: "radiogroup", "aria-labelledby": id } });
   const stop = choices.findIndex((choice2) => choice2.value === current);
@@ -85937,13 +86072,13 @@ function renderRadioGroup(parent, label, choices, current, pick5, idPrefix = "va
         tabindex: checked || stop < 0 && index === 0 ? "0" : "-1"
       }
     });
-    chip.addEventListener("click", () => pick5(choice2.value));
+    chip.addEventListener("click", () => pick6(choice2.value));
     chip.addEventListener("keydown", (event) => {
       const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
       if (!step) return;
       event.preventDefault();
       const next = (index + step + choices.length) % choices.length;
-      pick5(choices[next].value);
+      pick6(choices[next].value);
     });
     return chip;
   });
@@ -86333,17 +86468,17 @@ var NoteStyleEditorModal = class extends import_obsidian43.Modal {
       const remove = button("\u2212", "remove", "vam-editor-section-remove", () => this.removeRow(index));
       up.disabled = index === 0;
       down.disabled = index === rows2.length - 1;
-      const label = () => {
+      const label2 = () => {
         const name2 = row2.name.trim() || String(index + 1);
         input2.setAttr("aria-label", t("ui.editor_section_name_aria_0", String(index + 1)));
         up.setAttr("aria-label", t("ui.editor_section_up_aria_0", name2));
         down.setAttr("aria-label", t("ui.editor_section_down_aria_0", name2));
         remove.setAttr("aria-label", t("ui.editor_section_remove_aria_0", name2));
       };
-      label();
+      label2();
       input2.addEventListener("input", () => {
         row2.name = input2.value;
-        label();
+        label2();
         this.changed();
       });
       controls.push({ name: input2, up, down, remove });
@@ -87152,12 +87287,12 @@ var NoteStyleManageModal = class extends import_obsidian44.Modal {
     let name2 = "";
     let touched = false;
     const radios = form.createDiv({ cls: "vam-manage-modes" });
-    const radio = (value, label) => {
+    const radio = (value, label2) => {
       const id = `vam-manage-mode-${tab}-${value}`;
       const line = radios.createDiv({ cls: "vam-manage-mode" });
       const input2 = line.createEl("input", { type: "radio", attr: { name: `vam-manage-mode-${tab}`, id } });
       input2.checked = value === mode;
-      line.createEl("label", { text: label, attr: { for: id } });
+      line.createEl("label", { text: label2, attr: { for: id } });
       return input2;
     };
     const fromRadio = radio("from", t("ui.manage_add_from"));
@@ -87449,7 +87584,7 @@ function renderNoteStyleCard(setting, plugin) {
     const format = globalPartRef(defaults2, "format");
     const voiceChoices = CARD_VOICES.map((item) => ({ value: `builtin:${item.id}`, label: t(item.name) }));
     const formatChoices = CARD_FORMATS.map((item) => ({ value: `builtin:${item.id}`, label: t(item.name) }));
-    const pick5 = (category) => (value) => {
+    const pick6 = (category) => (value) => {
       void plugin.setGlobalPart(category, value).then(() => {
         redrawKindRows(plugin);
         draw({ category, value });
@@ -87460,7 +87595,7 @@ function renderNoteStyleCard(setting, plugin) {
       if ((focus == null ? void 0 : focus.category) !== category) return;
       (_a2 = buttons[choices.findIndex((choice2) => choice2.value === focus.value)]) == null ? void 0 : _a2.focus();
     };
-    const voiceButtons = renderRadioGroup(body, t("ui.note_style_voice_label"), voiceChoices, voice, pick5("voice"));
+    const voiceButtons = renderRadioGroup(body, t("ui.note_style_voice_label"), voiceChoices, voice, pick6("voice"));
     refocus("voice", voiceChoices, voiceButtons);
     const sampleBox = body.createDiv({ cls: "vam-style-sample", attr: { "aria-live": "polite" } });
     const chosen = CARD_VOICES.find((item) => `builtin:${item.id}` === voice);
@@ -87475,7 +87610,7 @@ function renderNoteStyleCard(setting, plugin) {
       t("ui.note_style_format_label"),
       formatChoices,
       format,
-      pick5("format")
+      pick6("format")
     );
     refocus("format", formatChoices, formatButtons);
     const chosenFormat = CARD_FORMATS.find((item) => `builtin:${item.id}` === format);
@@ -87908,10 +88043,10 @@ var VisualAgentMapSettingTab = class extends import_obsidian45.PluginSettingTab 
     selector == null ? void 0 : selector.focus();
   }
   /** Folder name (relative to the workspace folder) for new Mind Maps / AIM maps; stored as a full path. */
-  renderMapFolderSetting(setting, key4, label, fallback) {
+  renderMapFolderSetting(setting, key4, label2, fallback) {
     const workspace = this.plugin.settings.workspaceFolder, current = this.plugin.settings[key4];
     const shown = current.startsWith(`${workspace}/`) ? current.slice(workspace.length + 1) : current;
-    setting.setName(t(label)).setDesc(t("ui.settings_map_folder_desc_0", workspace)).addText((input2) => {
+    setting.setName(t(label2)).setDesc(t("ui.settings_map_folder_desc_0", workspace)).addText((input2) => {
       input2.setPlaceholder(fallback).setValue(shown);
       bindMapFolderInput(this.plugin, key4, input2);
     });
@@ -88256,11 +88391,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian45.PluginSettingTab 
   }
   /** A button row of the "Advanced" page: name, one-line help and one button. */
   /** `run` gets the button, so what it opens or reports lands in the settings window. */
-  actionRow(name2, desc, label, run) {
+  actionRow(name2, desc, label2, run) {
     return {
       name: name2,
       render: (setting) => {
-        setting.setName(name2).setDesc(desc).addButton((button) => button.setButtonText(label).onClick(() => run(button.buttonEl)));
+        setting.setName(name2).setDesc(desc).addButton((button) => button.setButtonText(label2).onClick(() => run(button.buttonEl)));
       }
     };
   }
@@ -88303,14 +88438,14 @@ var VisualAgentMapSettingTab = class extends import_obsidian45.PluginSettingTab 
         var _a4, _b4;
         return ((_b4 = (_a4 = other.querySelector(".setting-item-name")) == null ? void 0 : _a4.textContent) == null ? void 0 : _b4.trim()) === name2;
       });
-      const label = (element) => {
+      const label2 = (element) => {
         var _a4, _b4;
         return (_b4 = element.getAttribute("aria-label")) != null ? _b4 : ((_a4 = element.textContent) == null ? void 0 : _a4.trim()) || element.tagName.toLowerCase();
       };
       const own2 = controls().filter(
-        (other) => other.closest(".setting-item") === item && label(other) === label(control)
+        (other) => other.closest(".setting-item") === item && label2(other) === label2(control)
       );
-      return JSON.stringify([name2, sameName.indexOf(item), label(control), own2.indexOf(control)]);
+      return JSON.stringify([name2, sameName.indexOf(item), label2(control), own2.indexOf(control)]);
     };
     const active = (_b2 = (_a2 = root == null ? void 0 : root.doc) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
     const wanted = active && (root == null ? void 0 : root.contains(active)) ? identity(active) : null;
@@ -89063,7 +89198,7 @@ function cleanSegment(text13, ctx, out) {
   const pattern = /!\[\[([^\]\n]+)\]\]|\[\[([^\]\n]+)\]\]|!\[([^\]\n]*)\]\(([^)\n]+)\)|\[([^\]\n]*)\]\(([^)\n]+)\)/g;
   return text13.replace(
     pattern,
-    (all, embed, link, alt, src, label, href) => {
+    (all, embed, link, alt, src, label2, href) => {
       var _a2;
       if (embed !== void 0) {
         const { target, alias } = splitWikilink(embed);
@@ -89090,7 +89225,7 @@ function cleanSegment(text13, ctx, out) {
       }
       const raw = (href != null ? href : "").trim();
       if (isWeb(raw) || /^(mailto:|#)/i.test(raw)) return all;
-      return label != null ? label : "";
+      return label2 != null ? label2 : "";
     }
   );
 }
@@ -90066,11 +90201,11 @@ function shareFileName(title) {
   return `${base || "map"}.html`;
 }
 var escapeHtml = (text13) => text13.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-function omitAssetImages(html, names3, label) {
+function omitAssetImages(html, names3, label2) {
   if (names3 && !names3.size) return html;
   return html.replace(
     /<img\b[^>]*?\ssrc="vam-asset:([^"]*)"[^>]*>/g,
-    (all, name2) => !names3 || names3.has(name2) ? `<span class="vam-image-omitted">${escapeHtml(label)}</span>` : all
+    (all, name2) => !names3 || names3.has(name2) ? `<span class="vam-image-omitted">${escapeHtml(label2)}</span>` : all
   );
 }
 function resolveRelative(folder, ref) {
@@ -92104,18 +92239,18 @@ var ShareModal = class extends import_obsidian48.Modal {
     this.restoreFocus(container, focusIndex);
   }
   renderLanguageResult(container, item, host, note) {
-    const label = this.languageLabel(item.language);
+    const label2 = this.languageLabel(item.language);
     const row = container.createDiv({ cls: "vam-share-translate-row" });
-    row.createDiv({ text: `${label}: ${this.statusText(item)}`, cls: "vam-share-note" });
+    row.createDiv({ text: `${label2}: ${this.statusText(item)}`, cls: "vam-share-note" });
     row.createDiv({ text: t("share.translate_result_model_0", host.modelLabel(item.model)), cls: "vam-share-note" });
     if (item.diagramsKept > 0)
       row.createDiv({ text: t("share.translate_diagrams_kept_0", item.diagramsKept), cls: "vam-share-note" });
     if (item.status === "complete" || item.status === "incomplete") {
       if (UNVERIFIED_LANGUAGES.includes(item.language))
-        row.createDiv({ text: t("share.translate_unverified_0", label), cls: "vam-share-note" });
+        row.createDiv({ text: t("share.translate_unverified_0", label2), cls: "vam-share-note" });
     }
     if (item.status === "incomplete")
-      new import_obsidian48.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
+      new import_obsidian48.Setting(row).setName(`${label2}: ${t("share.translate_include_incomplete")}`).addToggle(
         (toggle) => toggle.setValue(this.includeIncomplete.has(item.language)).onChange((value) => {
           if (value) this.includeIncomplete.add(item.language);
           else this.includeIncomplete.delete(item.language);
@@ -92661,11 +92796,11 @@ function groupsFor(prepared, language2, mapId, model, cache) {
     return group;
   };
   const plainField = (source, translated) => !!translated.trim() && !translated.includes(PLACEHOLDER_OPEN) && source.trim().length > 0;
-  const label = (_source, translated) => !!translated.trim() && !/[\r\n]/.test(translated);
+  const label2 = (_source, translated) => !!translated.trim() && !/[\r\n]/.test(translated);
   const groups = [
     make("body", shareTranslateStep, prepared.bodyTexts, placeholdersMatch, TRANSLATE_BATCH_CHARS),
     make("field", shareTranslateStep, prepared.fieldTexts, plainField, TRANSLATE_FIELD_BATCH_CHARS),
-    make("label", shareTranslateLabelsStep, prepared.labelTexts, label, TRANSLATE_LABEL_BATCH_CHARS)
+    make("label", shareTranslateLabelsStep, prepared.labelTexts, label2, TRANSLATE_LABEL_BATCH_CHARS)
   ];
   return { groups, hits };
 }
@@ -94571,14 +94706,14 @@ var SelectionAiPanel = class extends import_obsidian51.Component {
     this.presets = this.contentEl.createDiv({ cls: "vam-context-ai-presets" });
     this.presets.setAttribute("role", "group");
     this.presets.setAttribute("aria-label", t("ui.context_ai_quick_actions"));
-    const preset = (id, icon, label, prompt) => {
+    const preset = (id, icon, label2, prompt) => {
       const button = this.presets.createEl("button", { cls: "vam-context-ai-preset" });
       button.dataset.preset = id;
       (0, import_obsidian51.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
-      button.createSpan({ text: label });
+      button.createSpan({ text: label2 });
       button.addEventListener(
         "click",
-        () => void this.generate(prompt(), label, id === "search_images" ? "image_search" : void 0, button)
+        () => void this.generate(prompt(), label2, id === "search_images" ? "image_search" : void 0, button)
       );
     };
     const language2 = getUiLanguage();
@@ -94717,7 +94852,7 @@ var SelectionAiPanel = class extends import_obsidian51.Component {
     this.runButton.toggleClass("mod-cta", !visible);
     if (visible) this.reposition();
   }
-  async generate(prompt, label, requestedAction, trigger) {
+  async generate(prompt, label2, requestedAction, trigger) {
     var _a2;
     if (this.controller) return;
     await this.resolveManaged();
@@ -94738,7 +94873,7 @@ var SelectionAiPanel = class extends import_obsidian51.Component {
     this.setBusy(trigger);
     const model = this.modelOf();
     const withModel = (text13) => t("ui.progress_stage_with_model_0_1", text13, this.modelLabel(model));
-    const running2 = () => withModel(t("ui.context_ai_running_0", label));
+    const running2 = () => withModel(t("ui.context_ai_running_0", label2));
     status.setText(running2());
     try {
       const at = this.snapshot.matchAt;

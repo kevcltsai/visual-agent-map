@@ -12,6 +12,8 @@ import { renderTemplate, type StepDefinition } from "../../step-runner";
 import { ArgumentStepError, grounded, languageInstruction, list, overBudget, type ArgumentStepBase } from "./shared";
 import { S, exact, flag, fromRequest, maybeText, pick, short, strings } from "./v2-shared";
 import template from "./v2-hypotheses.md";
+import firstRules from "./v2-hypotheses-first.md";
+import alternativeRules from "./v2-hypotheses-alternatives.md";
 
 export type HypothesesMode = "first" | "alternatives";
 
@@ -244,10 +246,7 @@ export const hypothesesV2Step: StepDefinition<HypothesesV2Request, HypothesesV2R
       languageInstruction: languageInstruction(request.language, request.restatement),
       mode: request.mode,
       type: request.claim.type,
-      modeRules:
-        request.mode === "first"
-          ? "Write the whole first set of hypotheses for this claim at once; the roles below set how many and which."
-          : "Hypotheses already exist and the comparison found a missed alternative described under the gap. Write only new alternatives that address the gap (any role except primary), never a hypothesis that already exists.",
+      modeRules: (request.mode === "first" ? firstRules : alternativeRules).trim(),
       ids: request.ids.join(", "),
       max: String(request.ids.length),
       restatement: JSON.stringify(request.restatement),

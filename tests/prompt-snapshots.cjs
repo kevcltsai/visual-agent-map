@@ -449,6 +449,23 @@ test('collect snapshots: chart step (chart.add@1)', () => {
     ];
     for (const [name, key, input] of steps) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'situation-gate' ? 'gate' : name === 'plan-situation' ? 'plan' : name}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
   }
+  // Argument map v2 (V4a): the five methodology-6 steps. Fixed inputs; the v1 snapshots above are untouched.
+  const v2Definition = { term: 'youth', meaning: 'ages 15 to 24' };
+  const v2Crit = { supports: 'counts fall', refutes: 'counts rise', irrelevant: 'no hiring data' };
+  const v2Datum = (id, stance) => ({ id, need: `Need of ${id}`, claim: `Claim of ${id}`, quote: `Quote of ${id} reports 9.2 percent`, url: `https://stats.example.org/${id}`, usable: true, assessment: { relevant: true, stance, scopeFit: true, scopeNote: '', sourceType: 'official statistics', underlyingSource: 'BLS' } });
+  const v2Item = (id, over = {}) => ({ id, need: `Need of ${id}`, criteria: null, replaces: null, claim: `Claim of ${id}`, quote: `Quote of ${id} reports 9.2 percent`, url: `https://stats.example.org/${id}`, ...over });
+  for (const [language, tag] of LANGUAGES) {
+    const v2Base = { ...argumentBase, language };
+    const hypothesesPremises = [{ id: 'P1', text: 'Youth unemployment rose since 2023', result: 'holds' }, { id: 'P2', text: 'AI tools are in use', result: 'pending' }];
+    const v2Steps = [
+      ['framing', 'framingStep', { ...v2Base, original: 'Is AI the main reason for youth unemployment since 2023?', note: 'I mean the share of young people without work', attempt: 2 }],
+      ['premise', 'premiseVerdictStep', { ...v2Base, premise: { text: 'Youth unemployment rose since 2023', definitions: [v2Definition] }, data: [v2Datum('d1', 'supports'), v2Datum('d2', 'refutes')] }],
+      ['hypotheses-first', 'hypothesesV2Step', { ...v2Base, restatement: 'Is AI the largest cause of the rise in youth unemployment since 2023?', claim: { id: 'T1', text: 'AI is the main reason youth unemployment rose', type: 'main_cause', definitions: [v2Definition] }, premises: hypothesesPremises, mode: 'first', ids: ['H1', 'H2', 'H3', 'H4'], existing: [], gap: '' }],
+      ['needs-round', 'needsV2Step', { ...v2Base, claim: { text: 'AI is the main reason youth unemployment rose', definitions: [v2Definition] }, hypothesis: { id: 'H1', role: 'primary', round: 2, predictions: [{ id: 'H1-p1', kind: 'support', text: 'Junior hiring falls first in AI-exposed jobs', required: true }, { id: 'H1-p2', kind: 'refute', text: 'Junior hiring rises in AI-exposed jobs', required: false }], identification: { strategy: 'Compare exposed and unexposed jobs', assumptions: ['Both groups follow the same trend before 2023'] } }, mode: 'round', max: 2, ids: ['H1-n4', 'H1-n5'], existing: [{ id: 'H1-n1', predictionId: 'H1-p1', text: 'Monthly junior hiring counts', state: 'not_found' }, { id: 'H1-n2', predictionId: 'H1-p2', text: 'Posting trends for juniors', state: 'found' }], replaceable: [{ id: 'H1-n1', predictionId: 'H1-p1', text: 'Monthly junior hiring counts', reason: 'No public series' }] }],
+      ['assessment', 'assessmentStep', { ...v2Base, scope: { claim: 'AI is the main reason youth unemployment rose', definitions: [v2Definition] }, items: [v2Item('H1-n2', { criteria: v2Crit }), v2Item('H1-r1', { criteria: v2Crit, replaces: 'Monthly junior hiring counts' })], siblings: [{ id: 'H2', predictions: ['Hiring falls because of the policy change'] }] }]
+    ];
+    for (const [name, key, input] of v2Steps) record(`argument-map-v2-${name}.${tag}`, `core/steps/argument-map/v2-${name.replace(/-.*/, '')}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
+  }
   for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);
 });
 

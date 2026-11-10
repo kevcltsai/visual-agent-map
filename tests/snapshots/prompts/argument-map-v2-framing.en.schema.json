@@ -1,0 +1,204 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "restatement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "presuppositions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "loadedTerms": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "vagueTerms": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "outOfScope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1
+          },
+          "answerShape": {
+            "type": "string",
+            "minLength": 1
+          },
+          "diff": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "interpretation",
+              "related"
+            ]
+          },
+          "unanswered": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "answerShape",
+          "diff",
+          "kind",
+          "unanswered"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 3
+    },
+    "chosen": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "causal",
+              "main_cause",
+              "comparison"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "premise",
+              "testable"
+            ]
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "maxItems": 3
+          },
+          "definitions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "term": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "meaning": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "term",
+                "meaning"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 6
+          },
+          "dataNeeds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "maxItems": 2
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "type",
+          "role",
+          "dependsOn",
+          "definitions",
+          "dataNeeds"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 5
+    },
+    "settings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "composition": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "restatement",
+    "presuppositions",
+    "loadedTerms",
+    "vagueTerms",
+    "outOfScope",
+    "candidates",
+    "chosen",
+    "claims",
+    "settings",
+    "composition"
+  ]
+}

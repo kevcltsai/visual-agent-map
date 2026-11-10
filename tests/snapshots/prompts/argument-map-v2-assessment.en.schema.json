@@ -1,0 +1,73 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "relevant": {
+            "type": "boolean"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "refutes",
+              "irrelevant"
+            ]
+          },
+          "scopeFit": {
+            "type": "boolean"
+          },
+          "scopeNote": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "underlyingSource": {
+            "type": "string",
+            "minLength": 1
+          },
+          "alsoRelevantTo": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0
+          },
+          "sameCondition": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "relevant",
+          "stance",
+          "scopeFit",
+          "scopeNote",
+          "sourceType",
+          "underlyingSource",
+          "alsoRelevantTo",
+          "sameCondition"
+        ]
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "assessments"
+  ]
+}

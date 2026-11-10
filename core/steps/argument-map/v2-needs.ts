@@ -18,6 +18,8 @@ import {
 } from "./shared";
 import { S, exact, fromRequest, short } from "./v2-shared";
 import template from "./v2-needs.md";
+import firstRules from "./v2-needs-first.md";
+import roundRules from "./v2-needs-round.md";
 
 export type NeedsMode = "first" | "round";
 
@@ -181,10 +183,7 @@ export const needsV2Step: StepDefinition<NeedsV2Request, NeedsV2Result> = {
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.claim.text),
       mode: request.mode,
-      modeRules:
-        request.mode === "first"
-          ? "This is the first listing, written before any search. Every prediction marked required needs at least one need. replaces must be null."
-          : "An earlier round left gaps. Add only what the existing needs did not cover. To stand in for a need listed under the needs nobody could find, set replaces to its id and test the same prediction with the same condition (a replacement counts only if a later check confirms it tests the same condition); otherwise replaces is null and the need is exploratory. Each of those can be replaced once.",
+      modeRules: (request.mode === "first" ? firstRules : roundRules).trim(),
       max: String(request.max),
       claim: JSON.stringify({
         text: request.claim.text,

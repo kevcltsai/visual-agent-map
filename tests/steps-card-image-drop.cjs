@@ -23,7 +23,7 @@ const png = (w = 400, h = 200) => {
 };
 const file = (data, { type = 'image/png', name = 'pic.png' } = {}) => ({ name, type, size: data.byteLength, arrayBuffer: async () => data });
 
-async function harness({ aim = false } = {}) {
+async function harness({ aim = false, attachmentSetting = MEDIA } = {}) {
   const { repo, app, contents, files } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -45,6 +45,8 @@ async function harness({ aim = false } = {}) {
     files.delete(f.path); contents.delete(f.path);
     if (entry?.parent) entry.parent.children = entry.parent.children.filter(c => c !== entry);
   };
+  // Obsidian's attachmentFolderPath; the fake getAvailablePathForAttachment below stands for this fixed folder.
+  app.vault.getConfig = key => (key === 'attachmentFolderPath' ? attachmentSetting : undefined);
   app.fileManager.getAvailablePathForAttachment = async name => {
     if (!files.has(MEDIA)) await app.vault.createFolder(MEDIA);
     const dot = name.lastIndexOf('.'), base = name.slice(0, dot), ext = name.slice(dot);
@@ -366,4 +368,21 @@ test('chat pick: a failed or non-image download still inserts the Detail picture
     assert.doesNotMatch(h.note(), /topic-cover/);
     assert.deepEqual(h.mediaFiles(), []);
   }
+});
+
+test('default attachment setting (vault root): a picture dropped on a card goes to the map folder\'s Attachments, not Notes/ or the root', async () => {
+  const h = await harness();
+  h.app.vault.getConfig = () => undefined; // never set: the vault root
+  let asked = 0;
+  h.app.fileManager.getAvailablePathForAttachment = async () => { asked++; return 'pic.png'; };
+  assert.equal(h.node.path.startsWith(`${TOPICS}/map-i/Notes/`), true, 'the card note lives in Notes/');
+  h.view.onCardDrop(dragEvent([file(png())]), card(), h.node);
+  await h.settle();
+  assert.equal(asked, 0);
+  const stored = `${TOPICS}/map-i/Attachments/pic.png`;
+  assert.notEqual(h.app.vault.getAbstractFileByPath(stored), undefined);
+  assert.equal(h.app.vault.getAbstractFileByPath('pic.png'), undefined);
+  assert.ok(h.note().includes(`![[${stored}]]`), 'the embed points at the map Attachments file');
+  assert.deepEqual(h.mediaFiles(), []);
+  assert.equal(h.entries.length, 1, 'one undo step');
 });

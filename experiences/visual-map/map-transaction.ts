@@ -2,7 +2,16 @@ import { t } from "../../i18n";
 import { clone, type MapDocument } from "../../map-model";
 import { pruneAfterText } from "./canvas-items";
 import type { Note, Repository, TopicState } from "../../repository";
-import { claim, findSame, fingerprintOf, isLinked, release, unchangedFile, type Fingerprint } from "./attachment-store";
+import {
+  attachmentPath,
+  claim,
+  findSame,
+  fingerprintOf,
+  isLinked,
+  release,
+  unchangedFile,
+  type Fingerprint
+} from "./attachment-store";
 
 /**
  * One undoable step that moves note files and edits Map.md files together.
@@ -489,14 +498,14 @@ export function begin(deps: TransactionDeps): Transaction {
   }
 
   /**
-   * Stores every registered attachment where Obsidian's settings put it, reusing a file with the same content in that
+   * Stores every registered attachment where `attachmentPath` puts it, reusing a file with the same content in that
    * folder (also one this step already wrote). Each record is pushed as soon as its file exists, so a later failure
    * trashes it.
    */
   async function place(owner: object): Promise<void> {
     for (const source of sources) {
       const print = fingerprintOf(source.data);
-      const path = await repo.app.fileManager.getAvailablePathForAttachment(source.name, source.sourcePath);
+      const path = await attachmentPath(repo.app, source.name, source.sourcePath);
       const same = await findSame(repo.app, path, print, owner);
       if (same) {
         placed.push({ key: source.key, path: same, created: false, print });

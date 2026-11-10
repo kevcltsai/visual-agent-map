@@ -18754,7 +18754,7 @@ function pruneAfterText(map, log) {
     const nodes = Array.isArray(map.nodes) ? map.nodes : [];
     if (!nodes.some((node) => node && typeof node === "object" && "afterTextId" in node)) return 0;
     const items = Array.isArray(map.canvasItems) ? map.canvasItems : [];
-    const parentOf = new Map(
+    const parentOf2 = new Map(
       treeTextNodes(
         items,
         nodes.flatMap((node) => node && typeof node.id === "string" ? [node.id] : [])
@@ -18763,7 +18763,7 @@ function pruneAfterText(map, log) {
     for (const node of nodes) {
       if (!node || typeof node !== "object" || !("afterTextId" in node)) continue;
       const value = node.afterTextId;
-      if (typeof value === "string" && parentOf.has(value) && parentOf.get(value) === node.parentId) continue;
+      if (typeof value === "string" && parentOf2.has(value) && parentOf2.get(value) === node.parentId) continue;
       delete node.afterTextId;
       dropped++;
     }
@@ -19331,6 +19331,75 @@ function avoidBracketObstacles(side, label, size, obstacles, maxPush = BRACKET_T
   return pushed === 0 ? label : horizontal ? { x: round(label.x + outward * pushed), y: label.y } : { x: label.x, y: round(label.y + outward * pushed) };
 }
 
+// experiences/visual-map/attachment-store.ts
+var import_node_crypto3 = require("node:crypto");
+var import_obsidian10 = require("obsidian");
+var MAP_FILE = "Map.md";
+var parentOf = (path) => path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+var nameOf = (path) => path.slice(path.lastIndexOf("/") + 1);
+function mapFolderOf(app, notePath) {
+  const folder = parentOf(notePath);
+  const root = nameOf(notePath) === MAP_FILE ? folder : nameOf(folder) === "Notes" ? parentOf(folder) : null;
+  if (root === null || root === "") return null;
+  return app.vault.getAbstractFileByPath(`${root}/${MAP_FILE}`) instanceof import_obsidian10.TFile ? root : null;
+}
+var defaultAttachmentSetting = (app) => {
+  var _a2, _b2;
+  const value = (_b2 = (_a2 = app.vault).getConfig) == null ? void 0 : _b2.call(_a2, "attachmentFolderPath");
+  return value === void 0 || value === null || value === "" || value === "/";
+};
+async function attachmentPath(app, name2, sourcePath) {
+  const map = defaultAttachmentSetting(app) ? mapFolderOf(app, sourcePath) : null;
+  if (map === null) return app.fileManager.getAvailablePathForAttachment(name2, sourcePath);
+  const folder = `${map}/Attachments`;
+  if (!(app.vault.getAbstractFileByPath(folder) instanceof import_obsidian10.TFolder)) await app.vault.createFolder(folder);
+  const dot = name2.lastIndexOf(".");
+  const [base, extension] = dot <= 0 ? [name2, ""] : [name2.slice(0, dot), name2.slice(dot)];
+  let path = `${folder}/${name2}`;
+  for (let n = 1; app.vault.getAbstractFileByPath(path); n++) path = `${folder}/${base} ${n}${extension}`;
+  return path;
+}
+var fingerprintOf = (data) => ({
+  size: data.byteLength,
+  sha256: (0, import_node_crypto3.createHash)("sha256").update(new Uint8Array(data)).digest("hex")
+});
+var pending = [];
+function claim(path, owner) {
+  pending.push({ path, owner });
+}
+function release(owner) {
+  pending = pending.filter((item) => item.owner !== owner);
+}
+var heldByOther = (path, owner) => pending.some((item) => item.path === path && item.owner !== owner);
+var extensionOf = (path) => {
+  const name2 = path.slice(path.lastIndexOf("/") + 1);
+  const dot = name2.lastIndexOf(".");
+  return dot < 0 ? "" : name2.slice(dot + 1);
+};
+var sameContent = async (app, file, print) => file.stat.size === print.size && fingerprintOf(await app.vault.readBinary(file)).sha256 === print.sha256;
+async function findSame(app, path, print, owner) {
+  const slash = path.lastIndexOf("/");
+  const folder = app.vault.getAbstractFileByPath(slash < 0 ? "/" : path.slice(0, slash));
+  if (!(folder instanceof import_obsidian10.TFolder)) return null;
+  const extension = extensionOf(path);
+  for (const child of folder.children) {
+    if (!(child instanceof import_obsidian10.TFile) || child.extension !== extension || heldByOther(child.path, owner)) continue;
+    if (await sameContent(app, child, print)) return child.path;
+  }
+  return null;
+}
+async function unchangedFile(app, path, print) {
+  const file = app.vault.getAbstractFileByPath(path);
+  return file instanceof import_obsidian10.TFile && await sameContent(app, file, print) ? file : null;
+}
+function isLinked(app, path) {
+  var _a2;
+  return Object.values((_a2 = app.metadataCache.resolvedLinks) != null ? _a2 : {}).some((targets) => {
+    var _a3;
+    return ((_a3 = targets[path]) != null ? _a3 : 0) > 0;
+  });
+}
+
 // experiences/visual-map/image-input.ts
 var IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 var EXTENSION = {
@@ -19762,13 +19831,13 @@ var keyOf = (el) => {
   var _a2;
   return `${el.tagName.toLowerCase()}|${el.getAttribute("aria-label") || el.classList.item(0) || ((_a2 = el.textContent) != null ? _a2 : "").trim()}`;
 };
-function describeFocus(el, root, parentOf) {
+function describeFocus(el, root, parentOf2) {
   var _a2;
   if (!el || el === root || !root.contains(el)) return null;
   const target = el;
   const text13 = target.closest(".vam-text-node");
   if ((text13 == null ? void 0 : text13.dataset.itemId) && root.contains(text13))
-    return { itemId: text13.dataset.itemId, parentId: (_a2 = parentOf(text13.dataset.itemId)) != null ? _a2 : null };
+    return { itemId: text13.dataset.itemId, parentId: (_a2 = parentOf2(text13.dataset.itemId)) != null ? _a2 : null };
   const card = target.closest(".vam-node");
   const scope = card && root.contains(card) && card.dataset.nodeId ? card : root;
   const nodeId = scope === card ? card.dataset.nodeId : void 0;
@@ -20143,9 +20212,9 @@ function synthesisDefaultName(language2, names3) {
 }
 
 // experiences/aim/research-plan.ts
-var import_node_crypto3 = require("node:crypto");
+var import_node_crypto4 = require("node:crypto");
 function researchContentHash(report) {
-  return (0, import_node_crypto3.createHash)("sha256").update(JSON.stringify({ summary: report.summary, detail: report.detail })).digest("hex");
+  return (0, import_node_crypto4.createHash)("sha256").update(JSON.stringify({ summary: report.summary, detail: report.detail })).digest("hex");
 }
 function hoistNestedValidity(item) {
   var _a2;
@@ -21976,50 +22045,6 @@ var History = class {
   }
 };
 
-// experiences/visual-map/attachment-store.ts
-var import_node_crypto4 = require("node:crypto");
-var import_obsidian10 = require("obsidian");
-var fingerprintOf = (data) => ({
-  size: data.byteLength,
-  sha256: (0, import_node_crypto4.createHash)("sha256").update(new Uint8Array(data)).digest("hex")
-});
-var pending = [];
-function claim(path, owner) {
-  pending.push({ path, owner });
-}
-function release(owner) {
-  pending = pending.filter((item) => item.owner !== owner);
-}
-var heldByOther = (path, owner) => pending.some((item) => item.path === path && item.owner !== owner);
-var extensionOf = (path) => {
-  const name2 = path.slice(path.lastIndexOf("/") + 1);
-  const dot = name2.lastIndexOf(".");
-  return dot < 0 ? "" : name2.slice(dot + 1);
-};
-var sameContent = async (app, file, print) => file.stat.size === print.size && fingerprintOf(await app.vault.readBinary(file)).sha256 === print.sha256;
-async function findSame(app, path, print, owner) {
-  const slash = path.lastIndexOf("/");
-  const folder = app.vault.getAbstractFileByPath(slash < 0 ? "/" : path.slice(0, slash));
-  if (!(folder instanceof import_obsidian10.TFolder)) return null;
-  const extension = extensionOf(path);
-  for (const child of folder.children) {
-    if (!(child instanceof import_obsidian10.TFile) || child.extension !== extension || heldByOther(child.path, owner)) continue;
-    if (await sameContent(app, child, print)) return child.path;
-  }
-  return null;
-}
-async function unchangedFile(app, path, print) {
-  const file = app.vault.getAbstractFileByPath(path);
-  return file instanceof import_obsidian10.TFile && await sameContent(app, file, print) ? file : null;
-}
-function isLinked(app, path) {
-  var _a2;
-  return Object.values((_a2 = app.metadataCache.resolvedLinks) != null ? _a2 : {}).some((targets) => {
-    var _a3;
-    return ((_a3 = targets[path]) != null ? _a3 : 0) > 0;
-  });
-}
-
 // experiences/visual-map/map-transaction.ts
 var isTransactionError = (error, kind) => {
   const found = error == null ? void 0 : error.kind;
@@ -22280,7 +22305,7 @@ function begin(deps) {
   async function place(owner) {
     for (const source of sources) {
       const print = fingerprintOf(source.data);
-      const path = await repo.app.fileManager.getAvailablePathForAttachment(source.name, source.sourcePath);
+      const path = await attachmentPath(repo.app, source.name, source.sourcePath);
       const same2 = await findSame(repo.app, path, print, owner);
       if (same2) {
         placed.push({ key: source.key, path: same2, created: false, print });
@@ -35764,14 +35789,14 @@ function isAiLocked(notes, id) {
 function aiLockBlock(op, targets, map, notes, options = {}) {
   var _a2, _b2;
   const nodes = (_a2 = map == null ? void 0 : map.nodes) != null ? _a2 : [];
-  const parentOf = (id) => {
+  const parentOf2 = (id) => {
     var _a3, _b3;
     return (_b3 = (_a3 = nodes.find((node) => node.id === id)) == null ? void 0 : _a3.parentId) != null ? _b3 : null;
   };
   for (const id of targets) {
     if (isAiLocked(notes, id)) return "locked";
     if (op === "write" || op === "addChild") continue;
-    if (isAiLocked(notes, parentOf(id))) return "lockedParent";
+    if (isAiLocked(notes, parentOf2(id))) return "lockedParent";
     if (op === "move") {
       if (options.to !== void 0 && isAiLocked(notes, options.to)) return "lockedParent";
       continue;
@@ -36918,7 +36943,7 @@ function openInWindowOf(modal, anchor) {
 
 // experiences/visual-map/note-style-picker.ts
 function builtinRecipeItems() {
-  const nameOf = (list2, id) => {
+  const nameOf2 = (list2, id) => {
     const found = list2.find((item) => item.id === id);
     return found ? t(found.nameKey) : id;
   };
@@ -36933,10 +36958,10 @@ function builtinRecipeItems() {
       ...aim ? { aimOnly: true } : {},
       ...recipe.aiDecidesSections ? { topicOnly: true } : {},
       structure: {
-        name: aim ? t(recipe.nameKey) : recipe.aiDecidesSections ? t("ui.note_style_ai_sections_decide") : nameOf(templates, recipe.structure)
+        name: aim ? t(recipe.nameKey) : recipe.aiDecidesSections ? t("ui.note_style_ai_sections_decide") : nameOf2(templates, recipe.structure)
       },
-      voice: { name: nameOf(tones, recipe.voice) },
-      format: { name: nameOf(BUILTIN_FORMATS, recipe.format) },
+      voice: { name: nameOf2(tones, recipe.voice) },
+      format: { name: nameOf2(BUILTIN_FORMATS, recipe.format) },
       update: recipe.update,
       issues: []
     };
@@ -48036,7 +48061,7 @@ function clipboardOutline(payload) {
 function buildClipboardPayload(input2) {
   var _a2;
   try {
-    const parentOf = new Map(input2.nodes.map((n) => [n.id, n.parentId]));
+    const parentOf2 = new Map(input2.nodes.map((n) => [n.id, n.parentId]));
     const position = /* @__PURE__ */ new Map();
     input2.order.forEach((id, index) => {
       if (!position.has(id)) position.set(id, index);
@@ -48048,15 +48073,15 @@ function buildClipboardPayload(input2) {
       var _a3;
       return (_a3 = position.get(id)) != null ? _a3 : Number.MAX_SAFE_INTEGER;
     };
-    const selected = new Set(input2.selectedIds.filter((id) => parentOf.has(id)));
+    const selected = new Set(input2.selectedIds.filter((id) => parentOf2.has(id)));
     const hasSelectedAncestor = (id) => {
       var _a3, _b2;
       const visited = /* @__PURE__ */ new Set([id]);
-      let current = (_a3 = parentOf.get(id)) != null ? _a3 : null;
+      let current = (_a3 = parentOf2.get(id)) != null ? _a3 : null;
       while (current !== null && !visited.has(current)) {
         if (selected.has(current)) return true;
         visited.add(current);
-        current = (_b2 = parentOf.get(current)) != null ? _b2 : null;
+        current = (_b2 = parentOf2.get(current)) != null ? _b2 : null;
       }
       return false;
     };
@@ -48204,15 +48229,15 @@ function canPasteCut(nodes, rootIds, targetId) {
   var _a2;
   if (!rootIds.length) return { ok: false, reason: "nothing-selected" };
   if (targetId === null) return { ok: true };
-  const parentOf = new Map(nodes.map((n) => [n.id, n.parentId]));
-  if (!parentOf.has(targetId)) return { ok: false, reason: "unknown-target" };
+  const parentOf2 = new Map(nodes.map((n) => [n.id, n.parentId]));
+  if (!parentOf2.has(targetId)) return { ok: false, reason: "unknown-target" };
   const roots = new Set(rootIds);
   const visited = /* @__PURE__ */ new Set();
   let current = targetId;
   while (current !== null && !visited.has(current)) {
     if (roots.has(current)) return { ok: false, reason: "into-own-branch" };
     visited.add(current);
-    current = (_a2 = parentOf.get(current)) != null ? _a2 : null;
+    current = (_a2 = parentOf2.get(current)) != null ? _a2 : null;
   }
   return { ok: true };
 }
@@ -50411,7 +50436,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     var _a3;
     return (_a3 = item.key) != null ? _a3 : item.title;
   };
-  const parentOf = (item) => {
+  const parentOf2 = (item) => {
     var _a3;
     return (_a3 = item.key !== void 0 ? item.parentKey : item.parentTitle) != null ? _a3 : "";
   };
@@ -50422,25 +50447,25 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
   const all = toolbar.createEl("button", { cls: "vam-proposal-all" });
   if (review) toolbar.hidden = true;
   const list2 = parent.createDiv("vam-proposal-list");
-  const roots = suggestions.filter((item) => !parentOf(item));
+  const roots = suggestions.filter((item) => !parentOf2(item));
   const keyed = suggestions.some((item) => item.key !== void 0);
   const depthFirst = (item) => [
     item,
-    ...suggestions.filter((other) => parentOf(other) === keyOf2(item)).flatMap(depthFirst)
+    ...suggestions.filter((other) => parentOf2(other) === keyOf2(item)).flatMap(depthFirst)
   ];
   const ordered = [
     ...new Set(
       keyed ? [...roots.flatMap(depthFirst), ...suggestions] : [
-        ...roots.flatMap((root) => [root, ...suggestions.filter((item) => parentOf(item) === keyOf2(root))]),
-        ...suggestions.filter((item) => parentOf(item) && !roots.some((root) => keyOf2(root) === parentOf(item)))
+        ...roots.flatMap((root) => [root, ...suggestions.filter((item) => parentOf2(item) === keyOf2(root))]),
+        ...suggestions.filter((item) => parentOf2(item) && !roots.some((root) => keyOf2(root) === parentOf2(item)))
       ]
     )
   ];
   const depthOf2 = (item) => {
     var _a3;
     let depth = 0;
-    for (let up = parentOf(item); up && depth < 6; depth++)
-      up = parentOf((_a3 = suggestions.find((other) => keyOf2(other) === up)) != null ? _a3 : { title: "", task: "", contribution: "" });
+    for (let up = parentOf2(item); up && depth < 6; depth++)
+      up = parentOf2((_a3 = suggestions.find((other) => keyOf2(other) === up)) != null ? _a3 : { title: "", task: "", contribution: "" });
     return depth;
   };
   const count3 = () => rows2.filter((row) => row.check.checked).length;
@@ -50451,7 +50476,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     changed(picked);
   };
   for (const item of ordered) {
-    const row = list2.createDiv(parentOf(item) ? "vam-proposal is-child" : "vam-proposal");
+    const row = list2.createDiv(parentOf2(item) ? "vam-proposal is-child" : "vam-proposal");
     if (keyed) row.addClass(`vam-proposal-depth-${Math.min(depthOf2(item), 5)}`);
     const head = row.createDiv("vam-proposal-head");
     const check = head.createEl("input", { type: "checkbox" });
@@ -50488,18 +50513,18 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     (_a2 = options.apply) == null ? void 0 : _a2.call(options, item, { element: row, head, title });
     check.addEventListener("change", () => {
       const uncheckChildren = (key4) => rows2.forEach((other) => {
-        if (parentOf(other.item) === key4 && other.check.checked) {
+        if (parentOf2(other.item) === key4 && other.check.checked) {
           other.check.checked = false;
           uncheckChildren(keyOf2(other.item));
         }
       });
-      if (check.checked && parentOf(item)) {
-        let parentKey = parentOf(item);
+      if (check.checked && parentOf2(item)) {
+        let parentKey = parentOf2(item);
         while (parentKey) {
           const parent2 = rows2.find((other) => keyOf2(other.item) === parentKey);
           if (!parent2) break;
           parent2.check.checked = true;
-          parentKey = parentOf(parent2.item);
+          parentKey = parentOf2(parent2.item);
         }
       }
       if (!check.checked) uncheckChildren(keyOf2(item));
@@ -50518,9 +50543,9 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       const selected = rows2.filter((row) => row.check.checked && row.title.value.trim());
       if (!selected.length) return t("ui.select_at_least_one_subtopic");
       const renamed = new Map(selected.map((row) => [keyOf2(row.item), row.title.value.trim()]));
-      const names3 = selected.filter((row) => !parentOf(row.item)).map((row) => row.title.value.trim());
+      const names3 = selected.filter((row) => !parentOf2(row.item)).map((row) => row.title.value.trim());
       if (new Set(names3).size !== names3.length) return t("ui.first_level_topic_names_must_be_unique");
-      if (selected.some((row) => parentOf(row.item) && !renamed.has(parentOf(row.item))))
+      if (selected.some((row) => parentOf2(row.item) && !renamed.has(parentOf2(row.item))))
         return t("ui.select_the_parent_topic_before_its_child");
       return selected.map((row) => {
         var _a3, _b2, _c, _d, _e;
@@ -50528,7 +50553,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
           title: row.title.value.trim(),
           task: (_b2 = (_a3 = row.task) == null ? void 0 : _a3.value.trim()) != null ? _b2 : row.item.task,
           contribution: (_d = (_c = row.contribution) == null ? void 0 : _c.value.trim()) != null ? _d : row.item.contribution,
-          parentTitle: parentOf(row.item) ? renamed.get(parentOf(row.item)) : "",
+          parentTitle: parentOf2(row.item) ? renamed.get(parentOf2(row.item)) : "",
           ...row.item.key !== void 0 ? { key: row.item.key, parentKey: (_e = row.item.parentKey) != null ? _e : "" } : {}
         };
       });
@@ -65499,10 +65524,10 @@ ${request.requirements}` : preset.text,
     const viewport = clone(this.map.viewport);
     const opened = this.map;
     try {
-      const entry = await tx.editMap(this.path, (map, _resolve, attachmentPath) => {
+      const entry = await tx.editMap(this.path, (map, _resolve, attachmentPath2) => {
         map.viewport = clone(viewport);
         before = clone(map);
-        change2(map, attachmentPath);
+        change2(map, attachmentPath2);
         this.pruneSummariesIn(map);
         after = clone(map);
       }).commit({ deferRebuild: true });
@@ -70521,7 +70546,7 @@ ${request.requirements}` : preset.text,
         return;
       }
       const data = await blob.arrayBuffer();
-      const destination = await this.app.fileManager.getAvailablePathForAttachment(name2, mapPath);
+      const destination = await attachmentPath(this.app, name2, mapPath);
       if (!isCurrent()) return;
       await this.app.vault.createBinary(destination, data);
       new import_obsidian39.Notice(t("ui.export_saved", destination));
@@ -96337,12 +96362,12 @@ ${t("ui.organize_link_wait_hint")}`;
     if (!mime) throw new Error(t("ui.context_ai_image_unavailable"));
     return `data:${mime};base64,${buffer.toString("base64")}`;
   }
-  /** Writes a generated image where the vault keeps attachments for `notePath`; returns the new file's path. */
+  /** Writes a generated image where `attachmentPath` puts attachments for `notePath`; returns the new file's path. */
   async saveGeneratedImage(dataUrl, notePath, name2) {
     const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(dataUrl);
     if (!match) throw new Error(t("ui.context_ai_image_not_generated"));
     const extension = match[1] === "jpeg" ? "jpg" : match[1];
-    const path = await this.app.fileManager.getAvailablePathForAttachment(`${name2}.${extension}`, notePath);
+    const path = await attachmentPath(this.app, `${name2}.${extension}`, notePath);
     const bytes = Buffer.from(match[2], "base64");
     await this.app.vault.createBinary(path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     return path;

@@ -21,7 +21,7 @@ const png = (w = 400, h = 200, extra = 0) => {
 };
 const file = (data, { type = 'image/png', name = 'pic.png' } = {}) => ({ name, type, size: data.byteLength, arrayBuffer: async () => data });
 
-async function harness({ aim = false, integration = false } = {}) {
+async function harness({ aim = false, integration = false, attachmentSetting = MEDIA } = {}) {
   const { repo, app, contents, files } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -43,6 +43,8 @@ async function harness({ aim = false, integration = false } = {}) {
     files.delete(f.path); contents.delete(f.path);
     if (entry?.parent) entry.parent.children = entry.parent.children.filter(c => c !== entry);
   };
+  // Obsidian's attachmentFolderPath; the fake getAvailablePathForAttachment below stands for this fixed folder.
+  app.vault.getConfig = key => (key === 'attachmentFolderPath' ? attachmentSetting : undefined);
   app.fileManager.getAvailablePathForAttachment = async name => {
     if (!files.has(MEDIA)) await app.vault.createFolder(MEDIA);
     const dot = name.lastIndexOf('.'), base = name.slice(0, dot), ext = name.slice(dot);
@@ -299,4 +301,21 @@ test('imageSize reads PNG, GIF, JPEG and WebP headers and gives null for anythin
   assert.deepEqual(plain(imageSize(webp)), { width: 100, height: 50 });
   assert.equal(imageSize(new Uint8Array([1, 2, 3])), null);
   assert.equal(imageSize(new Uint8Array(0)), null);
+});
+
+test('default attachment setting (vault root): a dropped picture is stored in the map folder\'s Attachments, not the vault root', async () => {
+  const attachments = `${TOPICS}/map-i/Attachments`;
+  for (const setting of [undefined, '', '/']) {
+    const h = await harness();
+    h.app.vault.getConfig = key => (key === 'attachmentFolderPath' ? setting : undefined);
+    let asked = 0;
+    h.app.fileManager.getAvailablePathForAttachment = async () => { asked++; return 'pic.png'; };
+    h.view.onCanvasDrop(dropEvent([file(png())]));
+    await h.settle();
+    assert.equal(asked, 0, 'Obsidian is not asked for the vault root');
+    assert.deepEqual((await h.onDisk()).map(item => item.path), [`${attachments}/pic.png`], String(setting));
+    assert.equal(h.app.vault.getAbstractFileByPath(`${attachments}/pic.png`) !== undefined, true);
+    assert.equal(h.app.vault.getAbstractFileByPath('pic.png'), undefined);
+    assert.deepEqual(h.mediaFiles(), []);
+  }
 });

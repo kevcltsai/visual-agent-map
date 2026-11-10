@@ -79,6 +79,7 @@ import {
   type BracketRect,
   type BracketResult
 } from "./summary-bracket-geometry";
+import { attachmentPath } from "./attachment-store";
 import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAGE_MAX_BYTES } from "./image-input";
 import {
   EXPORT_MAX_EDGE,
@@ -13659,7 +13660,7 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       const data = await blob.arrayBuffer();
-      const destination = await this.app.fileManager.getAvailablePathForAttachment(name, mapPath);
+      const destination = await attachmentPath(this.app, name, mapPath);
       // Last check before anything is written.
       if (!isCurrent()) return;
       await this.app.vault.createBinary(destination, data);

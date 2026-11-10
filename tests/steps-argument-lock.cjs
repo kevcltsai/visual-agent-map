@@ -422,7 +422,6 @@ test('definitions re-run: a double click creates and starts ONE new map; the gua
   const first = h.view.rerunFromDefinitions(def.id);
   const second = h.view.rerunFromDefinitions(def.id);
   await Promise.all([first, second]);
-  console.log(h.notices, h.view.plugin === undefined, Object.keys(h.view.plugin||{}).slice(0,50).join(","), JSON.stringify(model.readArgumentMap(h.view.map).kind));
   assert.equal(starts.length, 1, 'one run started');
   assert.equal(opened.length, 1, 'one map opened');
   assert.equal(h.notices.length, 0, h.notices.join('|'));

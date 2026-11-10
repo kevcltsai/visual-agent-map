@@ -1554,6 +1554,8 @@ export class VisualAgentMapView extends ItemView {
   private syncHold = 0;
   private syncPending = false;
   private unsyncedPaths: UnsyncedPaths | null = null;
+  /** The path the open map had before a rename during a write moved it (followPath); null once a VAM move claimed it. */
+  private followedFrom: string | null = null;
   /** Files changed while VAM was writing that this view has not read back yet (the plugin fills it; see synchronize). */
   get unsynced(): UnsyncedPaths {
     return (this.unsyncedPaths ??= new UnsyncedPaths());
@@ -7717,9 +7719,21 @@ export class VisualAgentMapView extends ItemView {
    */
   relocate(moved: Map<string, string>): void {
     const next = moved.get(this.path);
-    if (!next) return;
-    this.path = next;
+    // The rename event may already have moved the view (followPath, while VAM was writing): the steps still clear.
+    if (!next && ![...moved.values()].includes(this.path)) return;
+    if (next) this.path = next;
+    this.followedFrom = null;
     this.history.clear();
+  }
+  /**
+   * A rename event while VAM is writing: only the open map's path follows, so the read-back at the end of the write finds
+   * it. The undo history is left to whoever moved it: a VAM rename keeps it, relocate clears it, and a move nobody
+   * claimed by the end of the write (one made outside VAM) clears it in synchronize.
+   */
+  followPath(oldPath: string, newPath: string): void {
+    if (this.path !== oldPath) return;
+    this.followedFrom ??= oldPath;
+    this.path = newPath;
   }
   async renamed(file: TFile, oldPath: string): Promise<void> {
     if (this.path === oldPath) this.path = file.path;
@@ -13317,6 +13331,12 @@ export class VisualAgentMapView extends ItemView {
    * started. Without it, always.
    */
   async synchronize(scope?: { seq: number }): Promise<void> {
+    if (this.followedFrom) {
+      // Moved during the write by a rename no VAM step claimed (an outside one): the undo steps name the old paths. A
+      // move rolled back to where it started changed nothing.
+      if (this.followedFrom !== this.path) this.history.clear();
+      this.followedFrom = null;
+    }
     // A batch of chat writes reads the map back once, when it is done.
     if (this.syncHold > 0) {
       this.syncPending = true;
@@ -13947,11 +13967,13 @@ export class VisualAgentMapView extends ItemView {
     const before = clone(this.map),
       beforeRoot = this.plugin.repo.topicRoot(this.path);
     this.path = await this.plugin.repo.renameTopic(this.path, title);
+    this.followedFrom = null;
     this.map = await this.plugin.repo.readMap(this.path);
     const after = clone(this.map),
       afterRoot = this.plugin.repo.topicRoot(this.path);
     const restore = async (map: MapDocument, root: string): Promise<void> => {
       this.path = await this.plugin.repo.renameTopic(this.path, map.title, root);
+      this.followedFrom = null;
       this.map = clone(map);
       await this.plugin.repo.saveMap(this.path, this.map);
       await this.plugin.rebuildDerivedData();

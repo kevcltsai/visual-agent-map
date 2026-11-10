@@ -61020,6 +61020,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     __publicField(this, "syncHold", 0);
     __publicField(this, "syncPending", false);
     __publicField(this, "unsyncedPaths", null);
+    /** The path the open map had before a rename during a write moved it (followPath); null once a VAM move claimed it. */
+    __publicField(this, "followedFrom", null);
     __publicField(this, "heldViews", []);
     /** The hint on an empty canvas, which follows the chat while it builds a map. */
     __publicField(this, "emptyMapEl", null);
@@ -66788,9 +66790,21 @@ ${request.requirements}` : preset.text,
    */
   relocate(moved) {
     const next = moved.get(this.path);
-    if (!next) return;
-    this.path = next;
+    if (!next && ![...moved.values()].includes(this.path)) return;
+    if (next) this.path = next;
+    this.followedFrom = null;
     this.history.clear();
+  }
+  /**
+   * A rename event while VAM is writing: only the open map's path follows, so the read-back at the end of the write finds
+   * it. The undo history is left to whoever moved it: a VAM rename keeps it, relocate clears it, and a move nobody
+   * claimed by the end of the write (one made outside VAM) clears it in synchronize.
+   */
+  followPath(oldPath, newPath) {
+    var _a2;
+    if (this.path !== oldPath) return;
+    (_a2 = this.followedFrom) != null ? _a2 : this.followedFrom = oldPath;
+    this.path = newPath;
   }
   async renamed(file, oldPath) {
     if (this.path === oldPath) this.path = file.path;
@@ -71942,6 +71956,10 @@ ${request.requirements}` : preset.text,
    */
   async synchronize(scope) {
     var _a2, _b2;
+    if (this.followedFrom) {
+      if (this.followedFrom !== this.path) this.history.clear();
+      this.followedFrom = null;
+    }
     if (this.syncHold > 0) {
       this.syncPending = true;
       return;
@@ -72517,10 +72535,12 @@ ${request.requirements}` : preset.text,
     }
     const before = clone(this.map), beforeRoot = this.plugin.repo.topicRoot(this.path);
     this.path = await this.plugin.repo.renameTopic(this.path, title);
+    this.followedFrom = null;
     this.map = await this.plugin.repo.readMap(this.path);
     const after = clone(this.map), afterRoot = this.plugin.repo.topicRoot(this.path);
     const restore = async (map, root) => {
       this.path = await this.plugin.repo.renameTopic(this.path, map.title, root);
+      this.followedFrom = null;
       this.map = clone(map);
       await this.plugin.repo.saveMap(this.path, this.map);
       await this.plugin.rebuildDerivedData();
@@ -96158,6 +96178,7 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
         if (file.path === oldPath) return;
         const external = !this.writing;
         if (external) for (const view of this.views()) view.relocate(/* @__PURE__ */ new Map([[oldPath, file.path]]));
+        else for (const view of this.views()) view.followPath(oldPath, file.path);
         this.runMutation(async () => {
           var _a2;
           await this.repo.replaceSourcePath(oldPath, file.path);

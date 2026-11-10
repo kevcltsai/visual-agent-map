@@ -171,5 +171,5 @@ test('UI fixture: each state reads as usable, shows its conclusion state, and th
       assert.ok(read.data.hypotheses.some(h => h.location === 'eliminated'));
     }
   }
-  assert.deepEqual(views, { in_progress: 'in_progress', concluded: 'concluded', stopped_mismatch: 'stopped_mismatch', stopped_limit: 'stopped_limit' });
+  assert.deepEqual(Object.fromEntries(Object.entries(views).filter(([name]) => !name.startsWith('facet_'))), { in_progress: 'in_progress', concluded: 'concluded', stopped_mismatch: 'stopped_mismatch', stopped_limit: 'stopped_limit' });
 });

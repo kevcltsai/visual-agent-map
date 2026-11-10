@@ -227,6 +227,7 @@ import { classifyProviderError, otherProviderModel, providerOfFailure } from "..
 import { UsageControl } from "./usage-panel";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
+import { createNoteReadContext } from "../../core/note-read-context";
 import { PLACEHOLDER_MAP_NAMES, isPlaceholderMapTitle, uniqueDefaultName } from "../../core/default-names";
 import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
@@ -3658,13 +3659,19 @@ export class VisualAgentMapView extends ItemView {
   }
   private async hydrate(
     isCurrent: () => boolean = () => true,
-    onRead?: (index: number, note: Note | undefined) => void
-  ): Promise<void> {
+    onRead?: (index: number, note: Note | undefined) => void,
+    meta?: { goal: string | undefined; context: string | undefined; sources: MapSource[] }
+  ): Promise<{ failedPaths: string[] }> {
     this.aimFailedReports.clear();
     let goal: string | undefined;
     let context: string | undefined;
     let sources: MapSource[] = [];
-    if (this.path && !this.map?.aim) {
+    // One context per hydrate: each ancestor note is read once however many notes inherit from it.
+    const ctx = createNoteReadContext(this.map ?? undefined);
+    if (meta) {
+      // The caller already read Map.md once (synchronize); the goal and sources are not read again.
+      if (this.path && !this.map?.aim) ({ goal, context, sources } = meta);
+    } else if (this.path && !this.map?.aim) {
       try {
         ({ goal, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch {
@@ -3685,7 +3692,7 @@ export class VisualAgentMapView extends ItemView {
       while (next < nodes.length && isCurrent()) {
         const index = next++;
         try {
-          read[index] = await this.plugin.repo.readNote(nodes[index].path, this.map ?? undefined);
+          read[index] = await this.plugin.repo.readNote(nodes[index].path, this.map ?? undefined, ctx);
         } catch {
           /* A missing note remains visible and removable on the map. */
         }
@@ -3693,7 +3700,7 @@ export class VisualAgentMapView extends ItemView {
       }
     };
     await Promise.all(Array.from({ length: Math.min(8, nodes.length) }, worker));
-    if (!isCurrent()) return;
+    if (!isCurrent()) return { failedPaths: [] };
     const loaded = new Map<string, Note>();
     nodes.forEach((node, index) => {
       const note = read[index];
@@ -3704,6 +3711,7 @@ export class VisualAgentMapView extends ItemView {
     this.relevanceContext = context;
     this.mapSources = sources;
     await this.hydrateFailedReportTargets(isCurrent);
+    return { failedPaths: Array.from(ctx.failedPaths) };
   }
   private async hydrateFailedReportTargets(isCurrent: () => boolean): Promise<void> {
     const map = this.map,
@@ -13308,7 +13316,8 @@ export class VisualAgentMapView extends ItemView {
       this.render();
       return;
     }
-    const disk = await this.plugin.repo.readMap(this.path);
+    // Map.md is read once here; its goal and sources go to hydrate instead of being read again.
+    const { map: disk, ...meta } = await this.plugin.repo.readMapMeta(this.path);
     const structureChanged =
       JSON.stringify({ ...disk, viewport: null }) !== JSON.stringify({ ...this.map, viewport: null });
     if (structureChanged) {
@@ -13318,7 +13327,7 @@ export class VisualAgentMapView extends ItemView {
       this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
-    await this.hydrate();
+    await this.hydrate(undefined, undefined, meta);
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
       // The chat field is a text field too, but it is where the user waits for the map to change: only an IME
       // composition in it counts as editing (same rule as changed()).

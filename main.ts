@@ -1202,11 +1202,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     try {
       // A note whose frontmatter cannot be written must not keep the maps from following the other moves: the rebase
       // and the rebuild still run, and the first error is thrown at the end.
-      let sourceError: unknown;
+      let sourceError: Error | undefined;
       try {
         await this.repo.replaceSourcePaths(pairs);
       } catch (replaceError) {
-        sourceError = replaceError;
+        sourceError = replaceError instanceof Error ? replaceError : new Error(String(replaceError));
       }
       const { changed, error } = await this.rebaseMaps(pairs);
       // Derived references depend only on maps and VAM notes; renaming an unrelated note leaves them unchanged.
@@ -1217,7 +1217,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         );
       });
       if (changed || vamFile) await this.rebuildDerivedData();
-      if (sourceError) throw sourceError instanceof Error ? sourceError : new Error(String(sourceError));
+      if (sourceError) throw sourceError;
       if (error) throw error;
     } catch (batchError) {
       failed = true;

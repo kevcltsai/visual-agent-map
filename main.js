@@ -96232,7 +96232,7 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
       try {
         await this.repo.replaceSourcePaths(pairs);
       } catch (replaceError) {
-        sourceError = replaceError;
+        sourceError = replaceError instanceof Error ? replaceError : new Error(String(replaceError));
       }
       const { changed, error } = await this.rebaseMaps(pairs);
       const vamFile = renames.some(({ file }) => {
@@ -96243,7 +96243,7 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
         );
       });
       if (changed || vamFile) await this.rebuildDerivedData();
-      if (sourceError) throw sourceError instanceof Error ? sourceError : new Error(String(sourceError));
+      if (sourceError) throw sourceError;
       if (error) throw error;
     } catch (batchError) {
       failed = true;

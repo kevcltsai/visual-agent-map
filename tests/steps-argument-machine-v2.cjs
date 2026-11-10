@@ -460,6 +460,16 @@ test('evidence assessment: only found needs, all of the settled round at once, o
   refuses(done, () => assessAll(done, 'H1', ['H1-n1']));
   valid(done);
 });
+test('counterexample V3: an unverified_quote need never completes the test and borrows nothing from another need page_match', () => {
+  let s = m.applyNeeds(hypothesised(), 'H1', needs('H1', 2));
+  s = researched(researched(s, 'H1', 'H1-n1', found(1, 'unverified_quote')), 'H1', 'H1-n2', found(2, 'page_match'));
+  s = assessAll(s, 'H1', ['H1-n1', 'H1-n2']);
+  assert.equal(m.testStatus(hOf(s, 'H1')), 'in_progress', 'one unmet need keeps the test open');
+  let only = researched(m.applyNeeds(hypothesised(), 'H1', needs('H1', 1)), 'H1', 'H1-n1', found(1, 'unverified_quote'));
+  only = assessAll(only, 'H1', ['H1-n1']);
+  assert.notEqual(m.testStatus(hOf(only, 'H1')), 'complete');
+  assert.equal(hOf(only, 'H1').needs[0].proof.check, 'unverified_quote', 'kept on record');
+});
 test('testStatus: in_progress, complete, limit_incomplete are derived and never stored', () => {
   let s = m.applyNeeds(hypothesised(), 'H1', needs('H1'));
   assert.equal(m.testStatus(hOf(s, 'H1')), 'in_progress');

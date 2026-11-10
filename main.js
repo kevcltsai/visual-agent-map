@@ -44136,7 +44136,10 @@ async function fetchWithTimeout(fetch, url, timeoutMs) {
     if (timer !== void 0) window.clearTimeout(timer);
   }
 }
-async function verifySource(input2) {
+function verifySource(input2) {
+  return verifyWith(input2, "provider_read");
+}
+async function verifyWith(input2, blockedCheck) {
   var _a2, _b2, _c;
   const fail3 = (reason) => ({ ok: false, result: "not_found", reason });
   const url = allowedUrl(input2.url);
@@ -44167,7 +44170,7 @@ async function verifySource(input2) {
     const parsed = allowedUrl(opened);
     return !!parsed && canonical(parsed) === key4;
   });
-  const blocked = () => openedByProvider ? proof("provider_read") : fail3("blocked_unverified");
+  const blocked = () => openedByProvider ? proof(blockedCheck) : fail3("blocked_unverified");
   let response;
   try {
     response = await fetchWithTimeout(input2.fetch, requested.href, (_a2 = input2.timeoutMs) != null ? _a2 : FETCH_TIMEOUT_MS);

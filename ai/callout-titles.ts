@@ -3,13 +3,19 @@ import { fencedLines } from "./markdown-blocks";
 
 /**
  * The prompts ask the AI for `> [!type]` callouts but not for a title, so Obsidian shows the English type name. When the
- * note language has titles (the `note.callout_titles` text: `title:type,type|title:type`; English says `none`), bare
+ * note language has titles (the `note.callout_titles_1..4` texts, joined with `|`: `title:type,type|title:type`; English says `none`), bare
  * callout headers get one. NoteLanguage has no zh-CN value (zh-CN notes resolve to zh-TW), so zh-CN titles are
  * in the dictionary but are not reachable from write-back today.
  */
 function titleTable(language: NoteLanguage): Map<string, string> {
   const table = new Map<string, string>();
-  for (const group of translate(language, "note.callout_titles").split("|")) {
+  const text = [
+    translate(language, "note.callout_titles_1"),
+    translate(language, "note.callout_titles_2"),
+    translate(language, "note.callout_titles_3"),
+    translate(language, "note.callout_titles_4")
+  ].join("|");
+  for (const group of text.split("|")) {
     const [title, types] = group.split(":");
     if (!title || !types) continue;
     for (const type of types.split(",")) table.set(type, title);

@@ -2467,7 +2467,10 @@ var en = {
   "note.earlier_research_sources": "Sources from earlier research",
   "note.no_new_information": "No new information in this task.",
   "note.writeback_fresh_replaced_0": "Replaced with new research; the earlier version is backed up at {0}",
-  "note.callout_titles": "none",
+  "note.callout_titles_1": "none",
+  "note.callout_titles_2": "none",
+  "note.callout_titles_3": "none",
+  "note.callout_titles_4": "none",
   "note.visual_reference": "Visual reference",
   "ui.aim_preparing_clarification": "Preparing initial clarification\u2026",
   "ui.aim_answered_not_started": "Answered \xB7 research not started",
@@ -5339,7 +5342,10 @@ var zhCN = {
   "note.earlier_research_sources": "\u5148\u524D\u7814\u7A76\u7684\u6765\u6E90",
   "note.no_new_information": "\u672C\u6B21\u65E0\u6DFB\u52A0\u5185\u5BB9\u3002",
   "note.writeback_fresh_replaced_0": "\u5DF2\u7528\u65B0\u7814\u7A76\u53D6\u4EE3\uFF0C\u65E7\u7248\u5907\u4EFD\u5728 {0}",
-  "note.callout_titles": "\u6458\u8981:summary,abstract,tldr|\u7B14\u8BB0:note|\u4FE1\u606F:info|\u5F85\u529E:todo|\u63D0\u793A:tip,hint|\u91CD\u8981:important|\u6210\u529F:success,check,done|\u95EE\u9898:question,help,faq|\u6CE8\u610F:warning,caution,attention|\u5931\u8D25:failure,fail,missing|\u5371\u9669:danger,error|\u9519\u8BEF:bug|\u793A\u4F8B:example|\u5F15\u7528:quote,cite",
+  "note.callout_titles_1": "\u6458\u8981:summary,abstract,tldr|\u7B14\u8BB0:note|\u4FE1\u606F:info|\u5F85\u529E:todo|\u63D0\u793A:tip,hint",
+  "note.callout_titles_2": "\u91CD\u8981:important|\u6210\u529F:success,check,done|\u95EE\u9898:question,help,faq|\u793A\u4F8B:example",
+  "note.callout_titles_3": "\u6CE8\u610F:warning,caution,attention|\u5931\u8D25:failure,fail,missing|\u5371\u9669:danger,error",
+  "note.callout_titles_4": "\u9519\u8BEF:bug|\u5F15\u7528:quote,cite",
   "note.visual_reference": "\u89C6\u89C9\u53C2\u8003",
   "ui.aim_preparing_clarification": "\u6B63\u5728\u51C6\u5907\u5F00\u59CB\u524D\u7684\u6761\u4EF6\u5398\u6E05\u2026",
   "ui.aim_answered_not_started": "\u5DF2\u56DE\u7B54\u30FB\u7814\u7A76\u5C1A\u672A\u5F00\u59CB",
@@ -8211,7 +8217,10 @@ var zhTW = {
   "note.earlier_research_sources": "\u5148\u524D\u7814\u7A76\u7684\u4F86\u6E90",
   "note.no_new_information": "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u3002",
   "note.writeback_fresh_replaced_0": "\u5DF2\u7528\u65B0\u7814\u7A76\u53D6\u4EE3\uFF0C\u820A\u7248\u5099\u4EFD\u5728 {0}",
-  "note.callout_titles": "\u6458\u8981:summary,abstract,tldr|\u7B46\u8A18:note|\u8CC7\u8A0A:info|\u5F85\u8FA6:todo|\u63D0\u793A:tip,hint|\u91CD\u8981:important|\u6210\u529F:success,check,done|\u554F\u984C:question,help,faq|\u6CE8\u610F:warning,caution,attention|\u5931\u6557:failure,fail,missing|\u5371\u96AA:danger,error|\u932F\u8AA4:bug|\u7BC4\u4F8B:example|\u5F15\u8FF0:quote,cite",
+  "note.callout_titles_1": "\u6458\u8981:summary,abstract,tldr|\u7B46\u8A18:note|\u8CC7\u8A0A:info|\u5F85\u8FA6:todo|\u63D0\u793A:tip,hint",
+  "note.callout_titles_2": "\u91CD\u8981:important|\u6210\u529F:success,check,done|\u554F\u984C:question,help,faq|\u7BC4\u4F8B:example",
+  "note.callout_titles_3": "\u6CE8\u610F:warning,caution,attention|\u5931\u6557:failure,fail,missing|\u5371\u96AA:danger,error",
+  "note.callout_titles_4": "\u932F\u8AA4:bug|\u5F15\u8FF0:quote,cite",
   "note.visual_reference": "\u8996\u89BA\u53C3\u8003",
   "ui.aim_preparing_clarification": "\u6B63\u5728\u6E96\u5099\u958B\u59CB\u524D\u7684\u689D\u4EF6\u91D0\u6E05\u2026",
   "ui.aim_answered_not_started": "\u5DF2\u56DE\u7B54\u30FB\u7814\u7A76\u5C1A\u672A\u958B\u59CB",
@@ -35447,7 +35456,13 @@ function emptyNoteStyleStore(settings) {
 // ai/callout-titles.ts
 function titleTable(language2) {
   const table = /* @__PURE__ */ new Map();
-  for (const group of translate(language2, "note.callout_titles").split("|")) {
+  const text13 = [
+    translate(language2, "note.callout_titles_1"),
+    translate(language2, "note.callout_titles_2"),
+    translate(language2, "note.callout_titles_3"),
+    translate(language2, "note.callout_titles_4")
+  ].join("|");
+  for (const group of text13.split("|")) {
     const [title, types] = group.split(":");
     if (!title || !types) continue;
     for (const type of types.split(",")) table.set(type, title);

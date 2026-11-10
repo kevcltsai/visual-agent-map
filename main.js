@@ -51273,23 +51273,33 @@ var ArgumentRunsV2 = class {
    * finished or already paused map (or one this runner is driving) is not written. Returns whether a pause was written.
    */
   async recover(mapPath) {
-    if (this.disposed || this.drives.has(mapPath)) return false;
     let wrote = false;
     await this.ports.mutate(async () => {
-      if (this.disposed) return;
-      const read = readArgumentMap2(await this.ports.readMap(mapPath));
-      if (read.kind !== "usable" || read.data.run.status !== "running" || TERMINAL3.includes(read.data.run.phase))
-        return;
-      const before = read.data;
-      await this.ports.updateMap(mapPath, (doc) => {
-        const now = readArgumentMap2(doc);
-        if (now.kind !== "usable" || !same2(now.data, before)) return;
-        doc.argumentMap = applyPause2(now.data, "interrupted");
-        wrote = true;
-      });
-      if (wrote) this.ports.clearUndo(mapPath);
+      wrote = await this.recoverInMutation(mapPath);
     });
-    if (wrote) this.ports.log("argument-run paused stopReason=interrupted");
+    return wrote;
+  }
+  /**
+   * The body of `recover` for a caller that already owns the mutate queue (open-map runs inside `plugin.mutate`; enqueuing there again
+   * would wait for itself forever). It never calls `ports.mutate`.
+   */
+  async recoverInMutation(mapPath) {
+    if (this.disposed || this.drives.has(mapPath)) return false;
+    const read = readArgumentMap2(await this.ports.readMap(mapPath));
+    if (read.kind !== "usable" || read.data.run.status !== "running" || TERMINAL3.includes(read.data.run.phase))
+      return false;
+    const before = read.data;
+    let wrote = false;
+    await this.ports.updateMap(mapPath, (doc) => {
+      const now = readArgumentMap2(doc);
+      if (now.kind !== "usable" || !same2(now.data, before)) return;
+      doc.argumentMap = applyPause2(now.data, "interrupted");
+      wrote = true;
+    });
+    if (wrote) {
+      this.ports.clearUndo(mapPath);
+      this.ports.log("argument-run paused stopReason=interrupted");
+    }
     return wrote;
   }
   /** Plugin unload: abort everything; nothing is written afterwards. */
@@ -68282,7 +68292,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       if (!isCurrent()) return;
     }
     if (map.argumentMap !== void 0 && readArgumentMap2(map).kind === "usable") {
-      const changed = await this.plugin.argumentRuns.recover(path).catch(() => false);
+      const changed = await this.plugin.argumentRuns.recoverInMutation(path).catch(() => false);
       if (!isCurrent()) return;
       if (changed) map = await this.plugin.repo.readMap(path);
       if (!isCurrent()) return;
@@ -98599,6 +98609,10 @@ var ArgumentRunRouter = class {
   /** Open-map recovery of a v2 run a reload left running (v1 has none). */
   recover(path) {
     return this.v2.recover(path);
+  }
+  /** `recover` for a caller already inside `plugin.mutate` (open-map): never enqueues again. */
+  recoverInMutation(path) {
+    return this.v2.recoverInMutation(path);
   }
   dispose() {
     this.v1.dispose();

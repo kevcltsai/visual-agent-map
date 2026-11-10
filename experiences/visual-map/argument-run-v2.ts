@@ -151,6 +151,7 @@ export interface ArgumentRunV2Api {
   stop(path: string): Promise<void>;
   isRunning(path: string): boolean;
   recover(path: string): Promise<boolean>;
+  recoverInMutation(path: string): Promise<boolean>;
   dispose(): void;
 }
 
@@ -459,23 +460,34 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
    * finished or already paused map (or one this runner is driving) is not written. Returns whether a pause was written.
    */
   async recover(mapPath: string): Promise<boolean> {
-    if (this.disposed || this.drives.has(mapPath)) return false;
     let wrote = false;
     await this.ports.mutate(async () => {
-      if (this.disposed) return;
-      const read = readArgumentMap(await this.ports.readMap(mapPath));
-      if (read.kind !== "usable" || read.data.run.status !== "running" || TERMINAL.includes(read.data.run.phase))
-        return;
-      const before = read.data;
-      await this.ports.updateMap(mapPath, doc => {
-        const now = readArgumentMap(doc);
-        if (now.kind !== "usable" || !same(now.data, before)) return;
-        doc.argumentMap = applyPause(now.data, "interrupted");
-        wrote = true;
-      });
-      if (wrote) this.ports.clearUndo(mapPath);
+      wrote = await this.recoverInMutation(mapPath);
     });
-    if (wrote) this.ports.log("argument-run paused stopReason=interrupted");
+    return wrote;
+  }
+
+  /**
+   * The body of `recover` for a caller that already owns the mutate queue (open-map runs inside `plugin.mutate`; enqueuing there again
+   * would wait for itself forever). It never calls `ports.mutate`.
+   */
+  async recoverInMutation(mapPath: string): Promise<boolean> {
+    if (this.disposed || this.drives.has(mapPath)) return false;
+    const read = readArgumentMap(await this.ports.readMap(mapPath));
+    if (read.kind !== "usable" || read.data.run.status !== "running" || TERMINAL.includes(read.data.run.phase))
+      return false;
+    const before = read.data;
+    let wrote = false;
+    await this.ports.updateMap(mapPath, doc => {
+      const now = readArgumentMap(doc);
+      if (now.kind !== "usable" || !same(now.data, before)) return;
+      doc.argumentMap = applyPause(now.data, "interrupted");
+      wrote = true;
+    });
+    if (wrote) {
+      this.ports.clearUndo(mapPath);
+      this.ports.log("argument-run paused stopReason=interrupted");
+    }
     return wrote;
   }
 

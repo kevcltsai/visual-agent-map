@@ -65,7 +65,7 @@ test('start refusals write nothing: legacy, unusable, existing map, unlocked fra
 test('locked framing: the runner has no operation that edits the framing or the breakdown; a second start cannot replace it', async () => {
   const names = Object.getOwnPropertyNames(run.ArgumentRunsV2.prototype).filter(n => !n.startsWith('_') && n !== 'constructor');
   const privateByDesign = new Set(['t', 'makeNote', 'writeNote', 'drafts', 'guard', 'open', 'dead', 'go', 'usageAllowed', 'settle', 'fail', 'pause', 'loop', 'state', 'guarded', 'checkpoint', 'attach', 'base', 'ask', 'claimOf', 'pathOf', 'cardNote', 'textStep', 'afterPremise', 'proposeIds', 'propose', 'needs', 'slot', 'free', 'research', 'releaseFailed', 'commitEvidence', 'verdictPlan', 'verdict', 'compare', 'conclusionNotes', 'conclude', 'inferenceCheck']);
-  assert.deepEqual(names.filter(n => !privateByDesign.has(n)).sort(), ['dispose', 'frame', 'isRunning', 'recover', 'resume', 'start', 'stop']);
+  assert.deepEqual(names.filter(n => !privateByDesign.has(n)).sort(), ['dispose', 'frame', 'isRunning', 'recover', 'recoverInMutation', 'resume', 'start', 'stop']);
   const r = await rig();
   await r.runs.start(r.mapPath, locked());
   const s = await r.state();

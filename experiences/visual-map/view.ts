@@ -3815,7 +3815,8 @@ export class VisualAgentMapView extends ItemView {
     // saved map, the map is read again. A legacy (`"v": 1`) map is read-only: opening it never recovers or writes.
     if (map.argumentMap !== undefined && readArgumentMap(map).kind === "usable") {
       // A recovery that fails must not keep the map shut: it opens as saved and its bar says the run was interrupted.
-      const changed = await this.plugin.argumentRuns.recover(path).catch(() => false);
+      const changed = await this.plugin.argumentRuns.recoverInMutation(path).catch(() => false);
+      // (openMapInMutation owns the mutate queue: the nested recover() would wait for itself.)
       if (!isCurrent()) return;
       if (changed) map = await this.plugin.repo.readMap(path);
       if (!isCurrent()) return;

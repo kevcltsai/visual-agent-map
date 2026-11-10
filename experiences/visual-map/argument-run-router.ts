@@ -64,6 +64,11 @@ export class ArgumentRunRouter {
     return this.v2.recover(path);
   }
 
+  /** `recover` for a caller already inside `plugin.mutate` (open-map): never enqueues again. */
+  recoverInMutation(path: string): Promise<boolean> {
+    return this.v2.recoverInMutation(path);
+  }
+
   dispose(): void {
     this.v1.dispose();
     this.v2.dispose();

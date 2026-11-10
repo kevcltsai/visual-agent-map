@@ -119,3 +119,30 @@ test('recover loses to a change made between its read and its write: nothing is 
   assert.equal(await racing.recover(r.mapPath), false);
   assert.equal((await r.state()).run.status, 'running', 'the newer state stays');
 });
+
+// P1 (V8 UI): openMap runs inside plugin.mutate, so its recovery must not enqueue on the same serial queue (it waited for itself for good).
+const within = (ms, promise, label) => Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error(`${label}: timed out after ${ms} ms`)), ms).unref())]);
+
+test('P1: recoverInMutation inside the real serial mutate queue completes (no nested mutate) and pauses the run', async () => {
+  const { r, fresh } = await interrupted();
+  let changed;
+  await within(2000, r.ports.mutate(async () => { changed = await fresh.recoverInMutation(r.mapPath); }), 'recover inside mutate');
+  assert.equal(changed, true);
+  assert.equal((await r.state()).run.stopReason, 'interrupted');
+  await within(2000, r.ports.mutate(async () => undefined), 'queue still free');
+});
+
+test('P1: recoverInMutation leaves legacy-free states alone (finished/absent run) and a throw is the caller to swallow', async () => {
+  const r = await rig();
+  let changed;
+  await within(2000, r.ports.mutate(async () => { changed = await new run.ArgumentRunsV2(r.ports).recoverInMutation(r.mapPath); }), 'recover inside mutate');
+  assert.equal(changed, false);
+});
+
+test('P1: view openMapInMutation never calls the queued recover()', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  const start = src.indexOf('private async openMapInMutation');
+  const body = src.slice(start, src.indexOf('\n  }\n', start));
+  assert.ok(!/argumentRuns\.recover\(/.test(body), 'recover() enqueues on the queue openMapInMutation already owns');
+  assert.ok(/argumentRuns\.recoverInMutation\(/.test(body));
+});

@@ -161,7 +161,18 @@ export function newArgumentMap(roles: ArgumentRoles, runId: string): ArgumentMap
 }
 
 // ---- next actions --------------------------------------------------------------------------------------------------------------
+/** Situation phase: the research budget is spent while data are still pending (nothing in flight), so nothing can run again. */
+function situationLimit(state: ArgumentMapData): boolean {
+  const { data } = state.situation;
+  return (
+    state.run.researchCalls >= MAX_RESEARCH_CALLS &&
+    data.some(d => d.state === "pending") &&
+    !data.some(d => d.state === "searching")
+  );
+}
+
 function limitStop(state: ArgumentMapData, actions: ArgumentAction[]): boolean {
+  if (state.run.phase === "situation") return state.situation.gate.state === "pending" && situationLimit(state);
   if (state.run.phase !== "analysis" || verifiedHypotheses(state).length >= MIN_VERIFIED) return false;
   if (state.hypotheses.length >= MAX_HYPOTHESES && verifyingCount(state) < MIN_VERIFIED) return true;
   return actions.length === 0 && !hasSearching(state);
@@ -204,7 +215,9 @@ function situationActions(state: ArgumentMapData): ArgumentAction[] {
       actions.push({ type: "research_situation", dataId: datum.id });
       budget -= 1;
     }
-  if (actions.length || data.some(d => d.state === "pending" || d.state === "searching")) return actions;
+  if (actions.length) return actions;
+  if (situationLimit(state)) return [{ type: "stop_limit" }];
+  if (data.some(d => d.state === "pending" || d.state === "searching")) return actions;
   return [{ type: data.some(d => d.state === "not_found") ? "gate_missing" : "judge_gate" }];
 }
 
@@ -262,6 +275,20 @@ export function applySituationEvidence(
   if (blank(result.reason)) throw new GateError("a miss needs a reason");
   datum.reason = result.reason;
   datum.state = datum.attempts >= MAX_SITUATION_ATTEMPTS ? "not_found" : "pending";
+  return next;
+}
+
+/**
+ * A provider failure (the model never answered) is not a try: the datum goes back to pending and its attempt is refunded.
+ * `researchCalls` keeps the call (it was made); reason, proof and stance are untouched; never found, never not_found.
+ */
+export function releaseSituationResearch(state: ArgumentMapData, dataId: string): ArgumentMapData {
+  inSituation(state);
+  const next = clone(state);
+  const datum = next.situation.data.find(d => d.id === dataId);
+  if (!datum || datum.state !== "searching") throw new GateError("situation datum is not being researched");
+  datum.state = "pending";
+  datum.attempts -= 1;
   return next;
 }
 
@@ -426,6 +453,16 @@ export function applyEvidence(
   return next;
 }
 
+/** A provider failure is not a try (the model never answered): the need goes back to pending. `researchCalls` keeps the call. */
+export function releaseNeedResearch(state: ArgumentMapData, hypothesisId: string, needId: string): ArgumentMapData {
+  inAnalysis(state);
+  const next = clone(state);
+  const need = hypothesisOf(next, hypothesisId).needs.find(n => n.id === needId);
+  if (!need || need.state !== "searching") throw new GateError("need is not being researched");
+  need.state = "pending";
+  return next;
+}
+
 // ---- verdicts -------------------------------------------------------------------------------------------------------------------
 const evidenceOf = (needs: Need[]): EvidenceInput[] =>
   needs.map(n => ({
@@ -517,7 +554,10 @@ export function applyLimitStop(state: ArgumentMapData): ArgumentMapData {
   if (state.run.status !== "running" || !limitStop(state, analysisActionsSafe(state)))
     throw new GateError("the run is not at a limit");
   const next = clone(state);
-  const missing = [`verified ${verifiedHypotheses(state).length}/${MIN_VERIFIED}`];
+  const missing =
+    state.run.phase === "situation"
+      ? state.situation.data.map(d => `${d.id}: ${d.state}`)
+      : [`verified ${verifiedHypotheses(state).length}/${MIN_VERIFIED}`];
   for (const h of next.hypotheses)
     missing.push(
       `${h.id}: ${h.location === "eliminated" ? "eliminated" : isVerified(h) ? "verified" : "not verified"}`

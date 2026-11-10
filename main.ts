@@ -1156,6 +1156,9 @@ export default class VisualAgentMapPlugin extends Plugin {
         // open map must follow its Map.md now: if a note's handler ran first, the view would find its old path gone
         // and close the map as deleted.
         if (external) for (const view of this.views()) view.relocate(new Map([[oldPath, file.path]]));
+        // During a write (VAM's own move, or one outside it), only the path follows: the read-back at the end of the
+        // write must not find the old Map.md gone and close the map. Whoever moved it decides about the undo steps.
+        else for (const view of this.views()) view.followPath(oldPath, file.path);
         this.runMutation(async () => {
           await this.repo.replaceSourcePath(oldPath, file.path);
           let mapChanged = false;

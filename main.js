@@ -66788,9 +66788,16 @@ ${request.requirements}` : preset.text,
    */
   relocate(moved) {
     const next = moved.get(this.path);
-    if (!next) return;
-    this.path = next;
+    if (!next && ![...moved.values()].includes(this.path)) return;
+    if (next) this.path = next;
     this.history.clear();
+  }
+  /**
+   * A rename event while VAM is writing: only the open map's path follows, so the read-back at the end of the write finds
+   * it. The undo history is left to whoever moved it (a VAM rename keeps it; relocate clears it).
+   */
+  followPath(oldPath, newPath) {
+    if (this.path === oldPath) this.path = newPath;
   }
   async renamed(file, oldPath) {
     if (this.path === oldPath) this.path = file.path;
@@ -96147,6 +96154,7 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
         if (file.path === oldPath) return;
         const external = !this.writing;
         if (external) for (const view of this.views()) view.relocate(/* @__PURE__ */ new Map([[oldPath, file.path]]));
+        else for (const view of this.views()) view.followPath(oldPath, file.path);
         this.runMutation(async () => {
           var _a2;
           await this.repo.replaceSourcePath(oldPath, file.path);

@@ -7717,9 +7717,17 @@ export class VisualAgentMapView extends ItemView {
    */
   relocate(moved: Map<string, string>): void {
     const next = moved.get(this.path);
-    if (!next) return;
-    this.path = next;
+    // The rename event may already have moved the view (followPath, while VAM was writing): the steps still clear.
+    if (!next && ![...moved.values()].includes(this.path)) return;
+    if (next) this.path = next;
     this.history.clear();
+  }
+  /**
+   * A rename event while VAM is writing: only the open map's path follows, so the read-back at the end of the write finds
+   * it. The undo history is left to whoever moved it (a VAM rename keeps it; relocate clears it).
+   */
+  followPath(oldPath: string, newPath: string): void {
+    if (this.path === oldPath) this.path = newPath;
   }
   async renamed(file: TFile, oldPath: string): Promise<void> {
     if (this.path === oldPath) this.path = file.path;

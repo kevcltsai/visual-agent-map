@@ -45818,570 +45818,6 @@ ${value}`).join("\n\n");
   }
 };
 
-// experiences/visual-map/argument-card.ts
-var STANCE_KEY = {
-  supports: "ui.argument_stance_supports",
-  contradicts: "ui.argument_stance_contradicts",
-  uncertain: "ui.argument_stance_uncertain"
-};
-var STANCE_TONE = { supports: "yes", contradicts: "no", uncertain: "maybe" };
-var VERDICT_KEY = {
-  supported: "ui.hypothesis_supported",
-  refuted: "ui.hypothesis_refuted",
-  undecided: "ui.hypothesis_undecided"
-};
-var CONCLUSION_KIND = {
-  in_progress: "ui.argument_conclusion_state_progress",
-  concluded: "ui.argument_conclusion_state_concluded",
-  stopped_limit: "ui.argument_conclusion_state_limit",
-  stopped_mismatch: "ui.argument_conclusion_state_mismatch"
-};
-function sourceHost(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch (e) {
-    return "";
-  }
-}
-function missingChip(item, t2) {
-  if (item.state === "searching") return { tone: "run", text: t2("ui.argument_missing_searching") };
-  const key4 = item.state === "not_found" ? "ui.argument_missing_not_found" : "ui.argument_missing_pending";
-  return { tone: "gap", text: t2(key4) };
-}
-function datumChip(datum, t2) {
-  if (datum.state !== "found") return missingChip(datum, t2);
-  return datum.stance === "opposes" ? { tone: "no", text: t2("ui.argument_data_opposes") } : { tone: "yes", text: t2("ui.argument_stance_supports") };
-}
-function conclusionCard(state, t2) {
-  const view = conclusionView(state);
-  const base = {
-    role: "conclusion",
-    kind: t2(CONCLUSION_KIND[view]),
-    titleFrom: "text",
-    state: view,
-    chips: [],
-    lines: [],
-    label: t2(CONCLUSION_KIND[view])
-  };
-  const verified = verifiedCount(state);
-  if (view === "concluded")
-    return { ...base, titleFrom: "summary", lines: [t2("ui.argument_conclusion_done_hint", verified)] };
-  if (view === "stopped_mismatch")
-    return { ...base, title: t2("ui.argument_stopped_mismatch"), lines: [t2("ui.argument_mismatch_hint")] };
-  if (view === "stopped_limit")
-    return { ...base, title: t2("ui.argument_conclusion_limit"), lines: [t2("ui.argument_conclusion_limit_hint")] };
-  return {
-    ...base,
-    title: t2("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
-    lines: [t2("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
-  };
-}
-function hypothesisCard(state, h, t2) {
-  const index = state.hypotheses.indexOf(h) + 1;
-  const shown = displayVerdict(h);
-  const chips = h.location === "eliminated" ? [{ tone: "gap", text: t2("ui.argument_eliminated_chip") }] : [
-    shown === "verifying" ? { tone: "open", text: t2("ui.argument_verifying") } : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t2(VERDICT_KEY[shown]) }
-  ];
-  if (isVerified(h)) chips.push({ tone: "yes", text: t2("ui.argument_verified_done") });
-  const kind = t2("ui.argument_hypothesis_0", index);
-  const progress = t2("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
-  const lines = [progress];
-  if (h.location === "eliminated" && h.eliminationReason)
-    lines.push(t2("ui.argument_eliminated_0", h.eliminationReason));
-  const status = chips.map((chip) => chip.text).join(" ");
-  return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: `${kind}, ${status}, ${progress}` };
-}
-function needCard(need, t2) {
-  var _a2;
-  const kind = t2("ui.argument_evidence");
-  if (need.state === "found") {
-    const stance = (_a2 = need.stance) != null ? _a2 : "uncertain";
-    const chip2 = { tone: STANCE_TONE[stance], text: t2(STANCE_KEY[stance]) };
-    const host = need.proof ? sourceHost(need.proof.url) : "";
-    return {
-      role: "need",
-      kind: host ? `${kind} \xB7 ${host}` : kind,
-      titleFrom: "note",
-      chips: [chip2],
-      lines: need.proof ? [need.proof.claim] : [],
-      label: `${kind}, ${chip2.text}${host ? `, ${host}` : ""}`
-    };
-  }
-  const chip = missingChip(need, t2);
-  return {
-    role: "need",
-    kind,
-    titleFrom: "note",
-    dashed: true,
-    chips: [chip],
-    lines: need.reason ? [need.reason] : [],
-    label: `${kind}, ${chip.text}`
-  };
-}
-function datumCard(datum, t2) {
-  const kind = t2("ui.argument_data_item");
-  const chip = datumChip(datum, t2);
-  if (datum.state === "found") {
-    const host = datum.proof ? sourceHost(datum.proof.url) : "";
-    return {
-      role: "datum",
-      kind: host ? `${kind} \xB7 ${host}` : kind,
-      titleFrom: "note",
-      chips: [chip],
-      lines: datum.proof ? [datum.proof.claim] : [],
-      label: `${kind}, ${chip.text}${host ? `, ${host}` : ""}`
-    };
-  }
-  return {
-    role: "datum",
-    kind,
-    titleFrom: "note",
-    dashed: true,
-    chips: [chip],
-    lines: datum.reason ? [datum.reason] : [],
-    label: `${kind}, ${chip.text}`
-  };
-}
-function describeArgumentCard(state, id, t2) {
-  const { roles } = state;
-  const plain = (role, kind, lines = [], chips = []) => ({
-    role,
-    kind,
-    titleFrom: "note",
-    chips,
-    lines,
-    label: [kind, ...chips.map((chip) => chip.text), ...lines].join(", ")
-  });
-  if (id === roles.proposition) return plain("proposition", t2("ui.argument_proposition"));
-  if (id === roles.conclusion) return conclusionCard(state, t2);
-  if (id === roles.situation) {
-    const data = state.situation.data;
-    const found = data.filter((datum2) => datum2.state === "found").length;
-    const count4 = t2("ui.argument_data_count_0_1", found, data.length);
-    const gate = state.situation.gate.state;
-    if (gate === "matched")
-      return plain("situation", t2("ui.argument_situation"), [t2("ui.argument_gate_matched_0_1", found, data.length)]);
-    const chip = gate === "unmatched" ? { tone: "no", text: t2("ui.argument_gate_unmatched") } : { tone: "open", text: t2("ui.argument_gate_pending") };
-    return plain("situation", t2("ui.argument_situation"), [count4], [chip]);
-  }
-  const datum = state.situation.data.find((item) => item.id === id);
-  if (datum) return datumCard(datum, t2);
-  if ((id === roles.verified || id === roles.eliminated) && state.run.phase === "stopped_mismatch")
-    return plain("group", t2("ui.argument_group_label"));
-  if (id === roles.verified) {
-    const verifying = state.hypotheses.filter((h) => h.location === "verifying").length;
-    return plain("group", t2("ui.argument_group_label"), [
-      t2("ui.argument_group_verified_count_0_1", verifiedCount(state), Math.max(verifying, MIN_VERIFIED))
-    ]);
-  }
-  if (id === roles.eliminated) {
-    const count4 = state.hypotheses.filter((h) => h.location === "eliminated").length;
-    return plain("group", t2("ui.argument_group_label"), [t2("ui.argument_group_eliminated_count_0", count4)]);
-  }
-  for (const h of state.hypotheses) {
-    if (h.id === id) return hypothesisCard(state, h, t2);
-    const need = h.needs.find((item) => item.id === id);
-    if (need) return needCard(need, t2);
-  }
-  return null;
-}
-
-// experiences/visual-map/argument-card-v2.ts
-var ANSWER_KEY = {
-  holds: "ui.argument_v2_answer_holds",
-  fails: "ui.argument_v2_answer_fails",
-  causal_established: "ui.argument_v2_answer_causal_established",
-  causal_conditional: "ui.argument_v2_answer_causal_conditional",
-  causal_compatible: "ui.argument_v2_answer_causal_compatible",
-  causal_against: "ui.argument_v2_answer_causal_against",
-  main_cause_largest: "ui.argument_v2_answer_main_cause_largest",
-  main_cause_secondary: "ui.argument_v2_answer_main_cause_secondary",
-  main_cause_not: "ui.argument_v2_answer_main_cause_not",
-  main_cause_undecidable: "ui.argument_v2_answer_main_cause_undecidable",
-  compare_greater: "ui.argument_v2_answer_compare_greater",
-  compare_equivalent: "ui.argument_v2_answer_compare_equivalent",
-  compare_opposite: "ui.argument_v2_answer_compare_opposite",
-  compare_undetermined: "ui.argument_v2_answer_compare_undetermined",
-  insufficient: "ui.argument_v2_answer_insufficient"
-};
-var CLAIM_KIND = {
-  fact: "ui.argument_v2_claim_fact",
-  causal: "ui.argument_v2_claim_causal",
-  main_cause: "ui.argument_v2_claim_main_cause",
-  comparison: "ui.argument_v2_claim_comparison"
-};
-var ROLE_KEY = {
-  primary: "ui.argument_v2_role_primary",
-  alternative: "ui.argument_v2_role_alternative",
-  reverse: "ui.argument_v2_role_reverse",
-  common_cause: "ui.argument_v2_role_common_cause",
-  measurement: "ui.argument_v2_role_measurement",
-  facet: "ui.argument_v2_role_facet",
-  side: "ui.argument_v2_role_side"
-};
-var VERDICT_KEY2 = {
-  supported: "ui.hypothesis_supported",
-  refuted: "ui.hypothesis_refuted",
-  undecided: "ui.hypothesis_undecided",
-  insufficient: "ui.argument_v2_verdict_insufficient"
-};
-var VERDICT_TONE = { supported: "yes", refuted: "no", undecided: "maybe", insufficient: "open" };
-var CONFIDENCE_KEY = {
-  high: "ui.argument_v2_confidence_high",
-  medium: "ui.argument_v2_confidence_medium",
-  low: "ui.argument_v2_confidence_low"
-};
-var VETO_KEY = {
-  contradiction: "ui.argument_v2_veto_contradiction",
-  double_count: "ui.argument_v2_veto_double_count",
-  missed_alternative: "ui.argument_v2_veto_missed_alternative",
-  unhandled_counter: "ui.argument_v2_veto_unhandled_counter"
-};
-var CAUSAL_KEY = {
-  not_applicable: "ui.argument_v2_causal_not_applicable",
-  established: "ui.argument_v2_causal_established",
-  conditional: "ui.argument_v2_causal_conditional_0",
-  compatible: "ui.argument_v2_causal_compatible"
-};
-var CAUSE_ROLES = ["primary", "alternative", "reverse", "common_cause"];
-var labelOf = (kind, chips, lines) => [kind, ...chips.map((chip) => chip.text), ...lines].join(", ");
-function missingChip2(item, t2) {
-  if (item.state === "searching") return { tone: "run", text: t2("ui.argument_missing_searching") };
-  return {
-    tone: "gap",
-    text: t2(item.state === "not_found" ? "ui.argument_missing_not_found" : "ui.argument_missing_pending")
-  };
-}
-var checkedText = (check, t2) => t2(check === "page_match" ? "ui.argument_v2_checked" : "ui.argument_v2_unchecked");
-function datumCard2(datum, t2) {
-  var _a2;
-  const kind = t2("ui.argument_data_item");
-  if (datum.state !== "found") {
-    const chip = missingChip2(datum, t2);
-    const lines = datum.reason ? [datum.reason] : [];
-    return {
-      role: "datum",
-      kind,
-      titleFrom: "note",
-      dashed: true,
-      chips: [chip],
-      lines,
-      label: labelOf(kind, [chip], [])
-    };
-  }
-  const host = datum.proof ? sourceHost(datum.proof.url) : "";
-  const shown = [host, checkedText((_a2 = datum.proof) == null ? void 0 : _a2.check, t2)].filter(Boolean).join(" \xB7 ");
-  const chips = [
-    datum.stance === "opposes" ? { tone: "no", text: t2("ui.argument_data_opposes") } : { tone: "yes", text: t2("ui.argument_stance_supports") }
-  ];
-  if (datum.assessment && !datum.assessment.scopeFit)
-    chips.push({ tone: "gap", text: t2("ui.argument_v2_scope_mismatch") });
-  const kindLine = `${kind} \xB7 ${shown}`;
-  return {
-    role: "datum",
-    kind: kindLine,
-    titleFrom: "note",
-    chips,
-    lines: datum.proof ? [datum.proof.claim] : [],
-    label: labelOf(kindLine, chips, [])
-  };
-}
-function needCard2(state, h, need, t2) {
-  var _a2, _b2, _c;
-  const kind = t2("ui.argument_evidence");
-  if (need.state !== "found") {
-    const chip = missingChip2(need, t2);
-    return {
-      role: "need",
-      kind,
-      titleFrom: "note",
-      dashed: true,
-      chips: [chip],
-      lines: need.reason ? [need.reason] : [],
-      label: labelOf(kind, [chip], [])
-    };
-  }
-  const host = need.proof ? sourceHost(need.proof.url) : "";
-  const kindLine = `${kind} \xB7 ${[host, checkedText((_a2 = need.proof) == null ? void 0 : _a2.check, t2)].filter(Boolean).join(" \xB7 ")}`;
-  const chips = [];
-  const assessment = need.assessment;
-  if (!assessment) chips.push({ tone: "open", text: t2("ui.argument_v2_awaiting_assessment") });
-  else if (assessment.stance === "supports") {
-    chips.push({ tone: "yes", text: t2("ui.argument_stance_supports") });
-    const prediction = h.predictions.find((p) => p.id === need.predictionId);
-    if (prediction && prediction.alsoPredictedBy.every((entry) => entry.strength === "weaker"))
-      chips.push({ tone: "yes", text: t2("ui.argument_v2_distinguishing") });
-  } else if (assessment.stance === "refutes") {
-    chips.push({ tone: "no", text: t2("ui.argument_stance_contradicts") });
-    const cls = (_c = (_b2 = h.verdict) == null ? void 0 : _b2.refutations.find((entry) => entry.needId === need.id)) == null ? void 0 : _c.class;
-    if (cls)
-      chips.push({
-        tone: "no",
-        text: t2(
-          cls === "decisive" ? "ui.argument_v2_decisive" : cls === "conditional" ? "ui.argument_v2_conditional" : "ui.argument_v2_nondecisive"
-        )
-      });
-  } else chips.push({ tone: "gap", text: t2("ui.argument_v2_irrelevant") });
-  if (assessment && !assessment.scopeFit) chips.push({ tone: "gap", text: t2("ui.argument_v2_scope_mismatch") });
-  if (need.registered === "post")
-    chips.push({
-      tone: "open",
-      text: t2(need.replaces === void 0 ? "ui.argument_v2_exploratory" : "ui.argument_v2_post")
-    });
-  return {
-    role: "need",
-    kind: kindLine,
-    titleFrom: "note",
-    chips,
-    lines: need.proof ? [need.proof.claim] : [],
-    label: labelOf(kindLine, chips, [])
-  };
-}
-function requiredCounts(h) {
-  const qualifies2 = (need) => {
-    var _a2;
-    return need.state === "found" && ((_a2 = need.proof) == null ? void 0 : _a2.check) === "page_match" && !!need.assessment && need.assessment.relevant && need.assessment.scopeFit;
-  };
-  const met2 = (need) => qualifies2(need) || h.needs.some((r) => r.replaces === need.id && r.sameCondition === true && r.registered === "pre" && qualifies2(r));
-  const required = h.predictions.filter((p) => p.required);
-  const ok = required.filter((p) => {
-    const own2 = h.needs.filter((n) => n.predictionId === p.id && n.registered === "pre" && n.replaces === void 0);
-    return own2.length > 0 && own2.every(met2);
-  });
-  return { met: ok.length, total: required.length };
-}
-function hypothesisCard2(h, t2) {
-  var _a2, _b2;
-  const kind = t2("ui.argument_v2_hypothesis_0", t2(ROLE_KEY[h.role]));
-  const chips = [];
-  const lines = [];
-  const verdict = h.verdict;
-  if (verdict) {
-    chips.push({ tone: VERDICT_TONE[verdict.value], text: t2(VERDICT_KEY2[verdict.value]) });
-    chips.push({ tone: "open", text: t2("ui.argument_v2_confidence_0", t2(CONFIDENCE_KEY[verdict.confidence])) });
-    if (verdict.refutations.some((entry) => entry.class === "conditional"))
-      chips.push({ tone: "maybe", text: t2("ui.argument_v2_conditional") });
-  } else {
-    chips.push({ tone: "open", text: t2("ui.argument_v2_testing") });
-  }
-  if (h.userVerdict) chips.push({ tone: "open", text: t2("ui.argument_v2_user_mark_0", t2(VERDICT_KEY2[h.userVerdict])) });
-  if (h.addedAfterComparison) chips.push({ tone: "gap", text: t2("ui.argument_v2_late") });
-  if (((_b2 = (_a2 = h.reverdicts) != null ? _a2 : verdict == null ? void 0 : verdict.reverdicts) != null ? _b2 : 0) > 0)
-    chips.push({ tone: "maybe", text: t2("ui.argument_v2_reverdict") });
-  if (verdict && CAUSE_ROLES.includes(h.role)) {
-    const assumptions = verdict.assumptionStatus.map((entry) => entry.assumption).join(t2("ui.list_separator"));
-    lines.push(
-      t2(
-        "ui.argument_v2_causal_line_0",
-        verdict.causal === "conditional" ? t2(CAUSAL_KEY.conditional, assumptions) : t2(CAUSAL_KEY[verdict.causal])
-      )
-    );
-  }
-  const counts = requiredCounts(h);
-  lines.push(t2("ui.argument_v2_required_0_1_2", counts.met, counts.total, Math.min(h.round, MAX_ROUND2)));
-  return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: labelOf(kind, chips, lines) };
-}
-function comparisonCard(state, claim2, t2) {
-  const c = claim2.comparison;
-  const own2 = state.hypotheses.filter((h) => h.claimId === claim2.id);
-  const ready = own2.length > 0 && own2.every((h) => h.verdict !== void 0);
-  const chips = [];
-  const lines = [];
-  let kind;
-  let title;
-  if (c.state === "done") {
-    kind = t2("ui.argument_v2_cmp_done");
-    title = c.answer ? t2(ANSWER_KEY[c.answer]) : t2("ui.argument_v2_cmp_done_title");
-  } else if (c.state === "vetoed" || c.state === "undecidable") {
-    const undecidable = c.state === "undecidable";
-    kind = t2(undecidable ? "ui.argument_v2_cmp_undecidable" : "ui.argument_v2_cmp_vetoed");
-    title = t2(undecidable ? "ui.argument_v2_cmp_undecidable_title" : "ui.argument_v2_cmp_vetoed_title");
-    chips.push({ tone: "no", text: t2(undecidable ? "ui.argument_v2_claim_blocked" : "ui.argument_v2_cmp_blocked") });
-    for (const veto of c.vetoes) if (!veto.resolved) lines.push(t2(VETO_KEY[veto.kind]));
-  } else {
-    kind = t2(ready ? "ui.argument_v2_cmp_running" : "ui.argument_v2_cmp_waiting");
-    title = t2(ready ? "ui.argument_v2_cmp_running_title" : "ui.argument_v2_cmp_waiting_title");
-  }
-  if (own2.some((h) => {
-    var _a2, _b2, _c;
-    return ((_c = (_b2 = h.reverdicts) != null ? _b2 : (_a2 = h.verdict) == null ? void 0 : _a2.reverdicts) != null ? _c : 0) > 0;
-  }))
-    chips.push({ tone: "maybe", text: t2("ui.argument_v2_reverdict") });
-  return {
-    role: "comparison",
-    kind,
-    titleFrom: "text",
-    title,
-    state: c.state,
-    chips,
-    lines,
-    label: labelOf(kind, chips, [title, ...lines])
-  };
-}
-function claimAnswer(state, claim2, t2) {
-  var _a2, _b2, _c;
-  const done = state.run.phase === "concluded" && state.conclusion.state === "concluded";
-  const answer = done ? (_a2 = state.conclusion.answers.find((entry) => entry.claimId === claim2.id)) == null ? void 0 : _a2.answer : void 0;
-  if (answer) return t2("ui.argument_v2_claim_answer_0", t2(ANSWER_KEY[answer]));
-  const blocked = state.run.phase === "concluded" && state.conclusion.state === "undecidable" && (((_b2 = claim2.comparison) == null ? void 0 : _b2.state) === "vetoed" || ((_c = claim2.comparison) == null ? void 0 : _c.state) === "undecidable");
-  return t2("ui.argument_v2_claim_answer_0", t2(blocked ? "ui.argument_v2_claim_blocked" : "ui.argument_v2_claim_open"));
-}
-function claimCard(state, claim2, t2) {
-  var _a2, _b2;
-  if (claim2.role === "premise") {
-    const kind2 = t2("ui.argument_v2_premise_kind");
-    const data = (_a2 = claim2.data) != null ? _a2 : [];
-    const found = data.filter((datum) => datum.state === "found").length;
-    const chip = claim2.result === "holds" ? { tone: "yes", text: t2("ui.argument_v2_premise_holds") } : claim2.result === "fails" ? { tone: "no", text: t2("ui.argument_v2_premise_fails") } : claim2.result === "insufficient" ? { tone: "maybe", text: t2("ui.argument_v2_premise_insufficient") } : { tone: "open", text: t2("ui.argument_v2_premise_checking") };
-    const lines2 = [t2("ui.argument_data_count_0_1", found, data.length)];
-    return {
-      role: "claim",
-      kind: kind2,
-      titleFrom: "note",
-      ...claim2.result === "insufficient" ? { dashed: true } : {},
-      state: (_b2 = claim2.result) != null ? _b2 : "checking",
-      chips: [chip],
-      lines: lines2,
-      label: labelOf(kind2, [chip], lines2)
-    };
-  }
-  const kind = t2(CLAIM_KIND[claim2.type]);
-  if (claim2.status === "not_evaluated") {
-    const chip = { tone: "open", text: t2("ui.argument_v2_not_evaluated") };
-    const lines2 = [t2("ui.argument_v2_not_evaluated_hint")];
-    return {
-      role: "claim",
-      kind,
-      titleFrom: "note",
-      dashed: true,
-      state: "not_evaluated",
-      chips: [chip],
-      lines: lines2,
-      label: labelOf(kind, [chip], lines2)
-    };
-  }
-  const lines = [claimAnswer(state, claim2, t2)];
-  const count4 = state.hypotheses.filter((h) => h.claimId === claim2.id).length;
-  if (count4) lines.push(t2("ui.argument_v2_claim_hypotheses_0", count4));
-  return {
-    role: "claim",
-    kind,
-    titleFrom: "note",
-    state: claim2.status,
-    chips: [],
-    lines,
-    label: labelOf(kind, [], lines)
-  };
-}
-function conclusionViewV2(state) {
-  if (state.run.phase === "stopped_premise") return "stopped_premise";
-  if (state.run.phase === "concluded" && state.conclusion.state === "concluded") return "concluded";
-  if (state.run.phase === "concluded" && state.conclusion.state === "undecidable") return "undecidable";
-  return "pending";
-}
-var CONCLUSION_KIND2 = {
-  pending: "ui.argument_v2_concl_pending",
-  concluded: "ui.argument_v2_concl_concluded",
-  undecidable: "ui.argument_v2_concl_undecidable",
-  stopped_premise: "ui.argument_v2_concl_stopped_premise"
-};
-function conclusionCard2(state, t2) {
-  const view = conclusionViewV2(state);
-  const kind = t2(CONCLUSION_KIND2[view]);
-  const card = (titleFrom, title, hint) => ({
-    role: "conclusion",
-    kind,
-    state: view,
-    chips: [],
-    titleFrom,
-    ...title === void 0 ? {} : { title },
-    lines: [hint],
-    label: labelOf(kind, [], [...title === void 0 ? [] : [title], hint])
-  });
-  if (view === "concluded") return card("summary", void 0, t2("ui.argument_v2_concl_concluded_hint"));
-  if (view === "undecidable")
-    return card("text", t2("ui.argument_v2_concl_undecidable_title"), t2("ui.argument_v2_concl_undecidable_hint"));
-  if (view === "stopped_premise")
-    return card("text", t2("ui.argument_v2_concl_stopped_title"), t2("ui.argument_v2_concl_stopped_hint"));
-  const testable = state.hypotheses;
-  const judged = testable.filter((h) => h.verdict !== void 0).length;
-  return card(
-    "text",
-    t2("ui.argument_v2_concl_pending_title"),
-    t2("ui.argument_v2_concl_pending_hint_0_1", judged, testable.length)
-  );
-}
-function describeArgumentCardV2(state, id, t2) {
-  var _a2, _b2, _c;
-  const { roles } = state;
-  const plain = (role, kind, lines = [], over = {}) => ({
-    role,
-    kind,
-    titleFrom: "note",
-    chips: [],
-    lines,
-    label: labelOf(kind, [], [...over.title === void 0 ? [] : [over.title], ...lines]),
-    ...over
-  });
-  if (id === roles.proposition) {
-    const asked = (_a2 = state.framing.candidates.find((candidate) => candidate.id === state.framing.chosen)) == null ? void 0 : _a2.question;
-    return plain(
-      "proposition",
-      t2("ui.argument_v2_proposition_kind"),
-      asked ? [t2("ui.argument_v2_asked_0", asked)] : []
-    );
-  }
-  if (id === roles.conclusion) return conclusionCard2(state, t2);
-  if (id === roles.premises) {
-    const premises = state.claims.filter((claim2) => claim2.role === "premise");
-    const holds = premises.filter((claim2) => claim2.result === "holds").length;
-    return plain(
-      "group",
-      t2("ui.argument_group_label"),
-      [t2("ui.argument_v2_premises_count_0_1", holds, premises.length)],
-      {
-        titleFrom: "text",
-        title: t2("ui.argument_v2_premises_title")
-      }
-    );
-  }
-  for (const claim2 of state.claims) {
-    if (claim2.id === id) return claimCard(state, claim2, t2);
-    if (((_b2 = claim2.comparison) == null ? void 0 : _b2.nodeId) === id) return comparisonCard(state, claim2, t2);
-    const datum = (_c = claim2.data) == null ? void 0 : _c.find((item) => item.id === id);
-    if (datum) return datumCard2(datum, t2);
-  }
-  for (const h of state.hypotheses) {
-    if (h.id === id) return hypothesisCard2(h, t2);
-    const need = h.needs.find((item) => item.id === id);
-    if (need) return needCard2(state, h, need, t2);
-  }
-  return null;
-}
-function describeLegacyArgumentCard(state, id, t2) {
-  const view = describeArgumentCard(state, id, t2);
-  if (!view || view.role !== "conclusion") return view;
-  const marker5 = t2("ui.argument_legacy_marker");
-  return { ...view, lines: [...view.lines, marker5], label: `${view.label}, ${marker5}` };
-}
-function renderArgumentKindV2(header2, view) {
-  const kind = header2.createSpan({ cls: "vam-argument-kind", text: view.kind });
-  kind.dataset.role = view.role;
-  return kind;
-}
-function renderArgumentCardBodyV2(card, view) {
-  card.dataset.argumentRole = view.role;
-  if (view.state) card.dataset.argumentState = view.state;
-  if (view.dashed) card.dataset.argumentMissing = "true";
-  const body = card.createDiv({ cls: "vam-argument-body" });
-  if (view.chips.length) {
-    const row = body.createDiv({ cls: "vam-argument-chips" });
-    for (const chip of view.chips) row.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
-  }
-  for (const line of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line });
-  return body;
-}
-
 // core/argument-map/machine.ts
 var GateError = class extends Error {
   constructor(message) {
@@ -46807,6 +46243,2031 @@ function applyResume(state) {
   next.run.status = "running";
   delete next.run.stopReason;
   return next;
+}
+
+// core/argument-map/machine-v2.ts
+var TERMINAL2 = ["concluded", "stopped_premise"];
+var clone3 = (value) => JSON.parse(JSON.stringify(value));
+var blank2 = (value) => typeof value !== "string" || value.trim() === "";
+var isTerminal2 = (state) => TERMINAL2.includes(state.run.phase);
+var oneOf3 = (list2, value) => typeof value === "string" && list2.includes(value);
+function live2(state) {
+  if (isTerminal2(state)) throw new GateError(`run is finished (${state.run.phase})`);
+}
+function running2(state) {
+  live2(state);
+  if (state.run.status !== "running") throw new GateError("run is not running");
+}
+function inPremises(state) {
+  live2(state);
+  if (state.run.phase !== "premises") throw new GateError("the premise phase is over");
+}
+function inAnalysis2(state) {
+  live2(state);
+  if (state.run.phase !== "analysis") throw new GateError("the premises are not settled");
+}
+function allIds2(state) {
+  var _a2;
+  const ids = new Set(Object.values(state.roles));
+  for (const claim2 of state.claims) {
+    ids.add(claim2.id);
+    for (const datum of (_a2 = claim2.data) != null ? _a2 : []) ids.add(datum.id);
+    if (claim2.comparison) ids.add(claim2.comparison.nodeId);
+  }
+  for (const h of state.hypotheses) {
+    ids.add(h.id);
+    for (const p of h.predictions) ids.add(p.id);
+    for (const need of h.needs) ids.add(need.id);
+  }
+  return ids;
+}
+function newId3(ids, id) {
+  if (blank2(id)) throw new GateError("empty id");
+  const text13 = id;
+  if (ids.has(text13)) throw new GateError(`duplicate id ${text13}`);
+  ids.add(text13);
+  return text13;
+}
+function checkedProof2(value) {
+  const p = value;
+  if (!p || typeof p !== "object" || blank2(p.url) || blank2(p.quote) || blank2(p.claim) || blank2(p.checkedAt))
+    throw new GateError("evidence needs a source");
+  if (!oneOf3(PROOF_CHECKS2, p.check)) throw new GateError("unknown source check");
+  let protocol = "";
+  try {
+    protocol = new URL(p.url).protocol;
+  } catch (e) {
+    throw new GateError("source url is not a url");
+  }
+  if (protocol !== "http:" && protocol !== "https:") throw new GateError("source url must be http(s)");
+  return {
+    url: p.url,
+    quote: p.quote,
+    claim: p.claim,
+    check: p.check,
+    checkedAt: p.checkedAt
+  };
+}
+function checkedAssessment(value, siblings) {
+  const a = value;
+  if (!a || typeof a !== "object") throw new GateError("assessment missing");
+  if (typeof a.relevant !== "boolean" || typeof a.scopeFit !== "boolean") throw new GateError("assessment malformed");
+  if (!oneOf3(EVIDENCE_STANCES, a.stance)) throw new GateError("unknown assessment stance");
+  if (a.relevant !== (a.stance !== "irrelevant")) throw new GateError("assessment relevance and stance disagree");
+  if (!a.scopeFit && blank2(a.scopeNote)) throw new GateError("a scope miss needs a note");
+  if (blank2(a.sourceType) || blank2(a.underlyingSource))
+    throw new GateError("assessment needs a source type and an underlying source");
+  const also = Array.isArray(a.alsoRelevantTo) ? a.alsoRelevantTo : [];
+  if (also.some((id) => !siblings.has(id))) throw new GateError("alsoRelevantTo names a hypothesis outside this claim");
+  const out = {
+    relevant: a.relevant,
+    stance: a.stance,
+    scopeFit: a.scopeFit,
+    sourceType: a.sourceType,
+    underlyingSource: a.underlyingSource,
+    alsoRelevantTo: [...new Set(also)]
+  };
+  if (typeof a.scopeNote === "string" && a.scopeNote.trim() !== "") out.scopeNote = a.scopeNote;
+  return out;
+}
+function claimOf(state, id) {
+  const found = state.claims.find((c) => c.id === id);
+  if (!found) throw new GateError(`unknown claim ${id}`);
+  return found;
+}
+function openPremise(state, id) {
+  const claim2 = claimOf(state, id);
+  if (claim2.role !== "premise") throw new GateError(`${id} is not a premise`);
+  if (claim2.status === "done" || claim2.status === "not_evaluated") throw new GateError(`premise ${id} is closed`);
+  return claim2;
+}
+function liveTestable(state, id) {
+  const claim2 = claimOf(state, id);
+  if (claim2.role !== "testable") throw new GateError(`${id} is not a testable claim`);
+  if (claim2.status === "not_evaluated") throw new GateError(`claim ${id} was not evaluated`);
+  return claim2;
+}
+function hypothesisOf2(state, id) {
+  const found = state.hypotheses.find((h) => h.id === id);
+  if (!found) throw new GateError(`unknown hypothesis ${id}`);
+  liveTestable(state, found.claimId);
+  if (found.verdict !== void 0) throw new GateError(`hypothesis ${id} already has a verdict`);
+  return found;
+}
+var premisesOf = (state) => state.claims.filter((c) => c.role === "premise");
+var budgetLeft = (state) => MAX_RESEARCH_CALLS2 - state.run.researchCalls;
+var verifiedProof = (item) => {
+  var _a2;
+  return ((_a2 = item.proof) == null ? void 0 : _a2.check) === "page_match";
+};
+function newArgumentMap2(framing, input2) {
+  var _a2;
+  if (!framing || typeof framing !== "object") throw new GateError("framing missing");
+  if (blank2(framing.lockedAt)) throw new GateError("the framing is not locked");
+  if (blank2(framing.original) || blank2(framing.restatement))
+    throw new GateError("framing needs the original and a restatement");
+  if (!Number.isInteger(framing.attempts) || framing.attempts < 1 || framing.attempts > MAX_FRAMING_CALLS)
+    throw new GateError("framing attempts out of range");
+  if (!Array.isArray(framing.candidates) || framing.candidates.length === 0)
+    throw new GateError("framing has no candidate question");
+  const candidateIds = /* @__PURE__ */ new Set();
+  for (const candidate of framing.candidates) {
+    if (blank2(candidate == null ? void 0 : candidate.id) || candidateIds.has(candidate.id))
+      throw new GateError("candidate id missing or duplicated");
+    candidateIds.add(candidate.id);
+    if (blank2(candidate.question) || blank2(candidate.answerShape)) throw new GateError("candidate malformed");
+    if (!oneOf3(CANDIDATE_KINDS, candidate.kind)) throw new GateError("unknown candidate kind");
+  }
+  if (!candidateIds.has(framing.chosen)) throw new GateError("the chosen question is not a candidate");
+  if (blank2(input2 == null ? void 0 : input2.runId)) throw new GateError("a run needs an id");
+  const roleIds = Object.values((_a2 = input2.roles) != null ? _a2 : {});
+  if (roleIds.length !== 3 || roleIds.some(blank2)) throw new GateError("roles missing");
+  const drafts = Array.isArray(input2.claims) ? input2.claims : [];
+  const premises = drafts.filter((c) => c.role === "premise");
+  const testable = drafts.filter((c) => c.role === "testable");
+  if (premises.length + testable.length !== drafts.length) throw new GateError("unknown claim role");
+  if (premises.length < 1)
+    throw new GateError(
+      "a map needs at least 1 premise (a fact claim the testable claims rely on): a hypothesis's refute prediction needs one"
+    );
+  if (premises.length > MAX_PREMISES) throw new GateError("too many premises");
+  if (testable.length < 1 || testable.length > MAX_TESTABLE) throw new GateError("a map needs 1 or 2 testable claims");
+  const ids = /* @__PURE__ */ new Set();
+  for (const id of roleIds) newId3(ids, id);
+  const claims = [];
+  for (const draft of drafts) {
+    newId3(ids, draft.id);
+    if (blank2(draft.text)) throw new GateError("empty claim");
+    if (!oneOf3(CLAIM_TYPES, draft.type) || !oneOf3(CLAIM_ROLES, draft.role))
+      throw new GateError("unknown claim type or role");
+    if (!Array.isArray(draft.dependsOn) || !Array.isArray(draft.definitions)) throw new GateError("claim malformed");
+    for (const d of draft.definitions)
+      if (blank2(d == null ? void 0 : d.term) || blank2(d == null ? void 0 : d.meaning)) throw new GateError("definition malformed");
+    const claim2 = {
+      id: draft.id,
+      text: draft.text,
+      type: draft.type,
+      role: draft.role,
+      dependsOn: [...draft.dependsOn],
+      definitions: draft.definitions.map((d) => ({ term: d.term, meaning: d.meaning })),
+      status: "pending"
+    };
+    if (draft.role === "premise") {
+      if (draft.type !== "fact") throw new GateError("only a fact can be a premise");
+      if (draft.comparisonNodeId !== void 0) throw new GateError("a premise has no comparison card");
+      const data = Array.isArray(draft.data) ? draft.data : [];
+      if (data.length < 1 || data.length > MAX_PREMISE_DATA) throw new GateError("a premise needs 1 or 2 data");
+      claim2.data = data.map((d) => {
+        if (blank2(d == null ? void 0 : d.need)) throw new GateError("empty premise need");
+        return { id: newId3(ids, d.id), need: d.need, attempts: 0, state: "pending" };
+      });
+    } else {
+      if (draft.data !== void 0) throw new GateError("only a premise carries data");
+      claim2.comparison = {
+        nodeId: newId3(ids, draft.comparisonNodeId),
+        attempts: 0,
+        state: "pending",
+        vetoes: [],
+        allocations: [],
+        missedAlternativeAdded: false
+      };
+    }
+    claims.push(claim2);
+  }
+  const byId = new Map(claims.map((c) => [c.id, c]));
+  for (const claim2 of claims)
+    for (const dep of claim2.dependsOn) {
+      const target = byId.get(dep);
+      if (!target || target === claim2) throw new GateError("a claim depends on an unknown claim or on itself");
+      if (target.role !== "premise") throw new GateError("a claim can only depend on a premise");
+    }
+  const visiting = /* @__PURE__ */ new Set();
+  const visited = /* @__PURE__ */ new Set();
+  const walk = (id) => {
+    var _a3, _b2;
+    if (visited.has(id)) return;
+    if (visiting.has(id)) throw new GateError("premise dependencies loop");
+    visiting.add(id);
+    for (const dep of (_b2 = (_a3 = byId.get(id)) == null ? void 0 : _a3.dependsOn) != null ? _b2 : []) walk(dep);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const claim2 of claims) walk(claim2.id);
+  const state = {
+    v: 2,
+    roles: { ...input2.roles },
+    framing: clone3(framing),
+    claims,
+    hypotheses: [],
+    run: { runId: input2.runId, phase: premises.length ? "premises" : "analysis", status: "running", researchCalls: 0 },
+    conclusion: { state: "pending", answers: [], deleted: [] }
+  };
+  return state;
+}
+var qualifies = (need) => need.state === "found" && verifiedProof(need) && !!need.assessment && need.assessment.relevant && need.assessment.scopeFit;
+var met = (h, need) => qualifies(need) || h.needs.some((r) => r.replaces === need.id && r.sameCondition === true && r.registered === "pre" && qualifies(r));
+function requiredMet(h) {
+  const required = h.predictions.filter((p) => p.required);
+  if (!required.length) return false;
+  return required.every((p) => {
+    const own2 = h.needs.filter((n) => n.predictionId === p.id && n.registered === "pre" && n.replaces === void 0);
+    return own2.length > 0 && own2.every((n) => met(h, n));
+  });
+}
+var awaitingAssessment = (h) => h.needs.some((n) => n.state === "found" && !n.assessment);
+var canAddRound = (h) => h.round < MAX_ROUND2 && h.needs.length < MAX_NEEDS2;
+function testStatus(h, researchCalls = 0) {
+  if (requiredMet(h)) return "complete";
+  if (h.needs.some((n) => n.state === "searching") || awaitingAssessment(h)) return "in_progress";
+  const exhausted = researchCalls >= MAX_RESEARCH_CALLS2;
+  if (!exhausted && h.needs.some((n) => n.state === "pending")) return "in_progress";
+  if (exhausted) return "limit_incomplete";
+  return canAddRound(h) ? "in_progress" : "limit_incomplete";
+}
+var hasVerifiedRefutation = (h) => h.needs.some((n) => {
+  var _a2;
+  return qualifies(n) && ((_a2 = n.assessment) == null ? void 0 : _a2.stance) === "refutes";
+});
+function premiseActions(state, claim2) {
+  var _a2;
+  const data = (_a2 = claim2.data) != null ? _a2 : [];
+  if (data.some((d) => d.state === "searching")) return [];
+  const actions = [];
+  let budget = budgetLeft(state);
+  for (const datum of data)
+    if (datum.state === "pending" && datum.attempts < MAX_PREMISE_ATTEMPTS && budget > 0) {
+      actions.push({ type: "research_premise", claimId: claim2.id, dataId: datum.id });
+      budget -= 1;
+    }
+  if (actions.length) return actions;
+  if (data.some((d) => d.state !== "found")) return [{ type: "premise_missing", claimId: claim2.id }];
+  return [{ type: data.every((d) => d.assessment) ? "judge_premise" : "assess_premise", claimId: claim2.id }];
+}
+function hypothesisActions(state, h) {
+  if (h.verdict !== void 0) return [];
+  if (h.needs.some((n) => n.state === "searching") && !h.needs.some((n) => n.state === "pending")) return [];
+  const calls = state.run.researchCalls;
+  if (h.needs.length === 0)
+    return [{ type: calls >= MAX_RESEARCH_CALLS2 ? "program_verdict" : "add_needs", hypothesisId: h.id }];
+  const actions = [];
+  let budget = budgetLeft(state);
+  for (const need of h.needs)
+    if (need.state === "pending" && budget > 0) {
+      actions.push({ type: "research_need", hypothesisId: h.id, needId: need.id });
+      budget -= 1;
+    }
+  if (actions.length || h.needs.some((n) => n.state === "searching")) return actions;
+  if (awaitingAssessment(h)) return [{ type: "assess_evidence", hypothesisId: h.id }];
+  const status = testStatus(h, calls);
+  if (status === "complete") return [{ type: "verdict", hypothesisId: h.id }];
+  if (status === "limit_incomplete")
+    return [{ type: hasVerifiedRefutation(h) ? "verdict" : "program_verdict", hypothesisId: h.id }];
+  return [{ type: "next_round", hypothesisId: h.id }];
+}
+var minHypotheses = (type) => type === "fact" ? 2 : 3;
+var canPropose = (state, claim2) => state.run.researchCalls < MAX_RESEARCH_CALLS2 && MAX_HYPOTHESES2 - state.hypotheses.length >= minHypotheses(claim2.type);
+var closedClaim = (claim2) => {
+  var _a2, _b2;
+  return ((_a2 = claim2.comparison) == null ? void 0 : _a2.state) === "done" || ((_b2 = claim2.comparison) == null ? void 0 : _b2.state) === "undecidable";
+};
+var claimHypotheses = (state, claimId) => state.hypotheses.filter((h) => h.claimId === claimId);
+var liveTestables = (state) => state.claims.filter((c) => c.role === "testable" && c.status !== "not_evaluated");
+var alternativePending = (claim2) => {
+  var _a2;
+  return ((_a2 = claim2.comparison) == null ? void 0 : _a2.state) === "vetoed" && !claim2.comparison.missedAlternativeAdded && claim2.comparison.vetoes.some((v) => !v.resolved && v.kind === "missed_alternative");
+};
+var verdictsComplete = (state, claim2) => {
+  const own2 = claimHypotheses(state, claim2.id);
+  return own2.length > 0 && own2.every((h) => h.verdict !== void 0);
+};
+function readyToCompare(state, claim2) {
+  const c = claim2.comparison;
+  if (!c || claim2.status === "not_evaluated") return false;
+  if (c.state !== "pending" && c.state !== "vetoed") return false;
+  if (c.attempts >= MAX_COMPARISONS || alternativePending(claim2)) return false;
+  return verdictsComplete(state, claim2);
+}
+function settle(next) {
+  if (!["analysis", "comparison", "conclusion"].includes(next.run.phase)) return next;
+  const live3 = liveTestables(next);
+  if (live3.every(closedClaim)) next.run.phase = "conclusion";
+  else if (live3.every((c) => closedClaim(c) || verdictsComplete(next, c) && !alternativePending(c)))
+    next.run.phase = "comparison";
+  else next.run.phase = "analysis";
+  return next;
+}
+function nextActions2(state) {
+  var _a2;
+  if (isTerminal2(state) || state.run.status !== "running") return [];
+  if (state.run.phase === "premises") {
+    const out2 = [];
+    for (const claim2 of premisesOf(state))
+      if (claim2.status === "pending" || claim2.status === "in_progress") out2.push(...premiseActions(state, claim2));
+    return out2;
+  }
+  if (state.run.phase === "conclusion") return [{ type: "conclude" }];
+  if (state.run.phase === "inference_check")
+    return ((_a2 = state.run.inferenceChecks) != null ? _a2 : 0) < MAX_INFERENCE_CHECKS ? [{ type: "inference_check" }] : [];
+  if (state.run.phase !== "analysis" && state.run.phase !== "comparison") return [];
+  const out = [];
+  for (const claim2 of state.claims) {
+    if (claim2.role !== "testable" || claim2.status === "not_evaluated" || closedClaim(claim2)) continue;
+    const own2 = claimHypotheses(state, claim2.id);
+    if (own2.length === 0) {
+      out.push({ type: canPropose(state, claim2) ? "propose_hypotheses" : "no_hypotheses", claimId: claim2.id });
+      continue;
+    }
+    if (alternativePending(claim2)) out.push({ type: "propose_alternatives", claimId: claim2.id });
+    for (const h of own2) out.push(...hypothesisActions(state, h));
+    if (readyToCompare(state, claim2)) out.push({ type: "compare", claimId: claim2.id });
+  }
+  return out;
+}
+function datumOf(claim2, id) {
+  var _a2;
+  const datum = (_a2 = claim2.data) == null ? void 0 : _a2.find((d) => d.id === id);
+  if (!datum) throw new GateError(`unknown premise datum ${id}`);
+  return datum;
+}
+function beginPremiseResearch(state, claimId, dataId) {
+  inPremises(state);
+  running2(state);
+  const next = clone3(state);
+  const claim2 = openPremise(next, claimId);
+  const datum = datumOf(claim2, dataId);
+  if (datum.state !== "pending") throw new GateError("premise datum is not waiting for research");
+  if (datum.attempts >= MAX_PREMISE_ATTEMPTS) throw new GateError("premise datum is out of attempts");
+  if (next.run.researchCalls >= MAX_RESEARCH_CALLS2) throw new GateError("research call limit reached");
+  datum.attempts += 1;
+  datum.state = "searching";
+  claim2.status = "in_progress";
+  next.run.researchCalls += 1;
+  return next;
+}
+function applyPremiseEvidence(state, claimId, dataId, result) {
+  inPremises(state);
+  const next = clone3(state);
+  const datum = datumOf(openPremise(next, claimId), dataId);
+  if (datum.state !== "searching") throw new GateError("premise datum is not being researched");
+  if (result.found === true) {
+    datum.proof = checkedProof2(result.proof);
+    if (result.stance === "supports" || result.stance === "opposes") datum.stance = result.stance;
+    datum.state = "found";
+    return next;
+  }
+  if (blank2(result.reason)) throw new GateError("a miss needs a reason");
+  datum.reason = result.reason;
+  datum.state = datum.attempts >= MAX_PREMISE_ATTEMPTS ? "not_found" : "pending";
+  return next;
+}
+function releasePremiseResearch(state, claimId, dataId) {
+  inPremises(state);
+  const next = clone3(state);
+  const datum = datumOf(openPremise(next, claimId), dataId);
+  if (datum.state !== "searching") throw new GateError("premise datum is not being researched");
+  datum.state = "pending";
+  datum.attempts -= 1;
+  return next;
+}
+function dependents(state, claimId) {
+  const hit = /* @__PURE__ */ new Set([claimId]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const c of state.claims)
+      if (!hit.has(c.id) && c.dependsOn.some((d) => hit.has(d))) {
+        hit.add(c.id);
+        grew = true;
+      }
+  }
+  hit.delete(claimId);
+  return state.claims.filter((c) => hit.has(c.id));
+}
+function settlePremises(next) {
+  if (!premisesOf(next).every((c) => c.status === "done" || c.status === "not_evaluated")) return next;
+  const testable = next.claims.filter((c) => c.role === "testable");
+  if (!testable.every((c) => c.status === "not_evaluated")) {
+    next.run.phase = "analysis";
+    return next;
+  }
+  const blockers = premisesOf(next).filter((c) => c.result === "fails" || c.result === "insufficient");
+  const onlyMissing = blockers.length > 0 && blockers.every((c) => {
+    var _a2;
+    return ((_a2 = c.data) != null ? _a2 : []).some((d) => d.state === "not_found");
+  });
+  next.run.phase = "stopped_premise";
+  next.run.status = "finished";
+  next.run.stopReason = onlyMissing ? "data_missing" : "premise";
+  next.conclusion = { state: "stopped_premise", answers: [], deleted: [] };
+  return next;
+}
+function closePremise(next, claim2, result) {
+  var _a2;
+  claim2.result = result;
+  claim2.status = "done";
+  if (result !== "holds")
+    for (const dependent of dependents(next, claim2.id)) {
+      dependent.status = "not_evaluated";
+      for (const d of (_a2 = dependent.data) != null ? _a2 : []) if (d.state === "searching") d.state = "pending";
+    }
+  return settlePremises(next);
+}
+function applyPremiseMissing(state, claimId) {
+  var _a2, _b2;
+  inPremises(state);
+  const next = clone3(state);
+  const claim2 = openPremise(next, claimId);
+  const data = (_a2 = claim2.data) != null ? _a2 : [];
+  if (data.some((d) => d.state === "searching")) throw new GateError("premise data are still being researched");
+  const researchable = (d) => d.state === "pending" && d.attempts < MAX_PREMISE_ATTEMPTS && next.run.researchCalls < MAX_RESEARCH_CALLS2;
+  if (data.some(researchable)) throw new GateError("premise data can still be researched");
+  if (data.every((d) => d.state === "found")) throw new GateError("no premise datum is missing");
+  for (const d of data)
+    if (d.state === "pending") {
+      d.state = "not_found";
+      d.reason = (_b2 = d.reason) != null ? _b2 : "research limit reached";
+    }
+  return closePremise(next, claim2, "insufficient");
+}
+function applyPremiseAssessments(state, claimId, items) {
+  var _a2;
+  inPremises(state);
+  const next = clone3(state);
+  const claim2 = openPremise(next, claimId);
+  const data = (_a2 = claim2.data) != null ? _a2 : [];
+  if (data.some((d) => d.state !== "found" || !d.proof)) throw new GateError("every premise datum must be found first");
+  const todo = data.filter((d) => !d.assessment);
+  const given = Array.isArray(items) ? items : [];
+  if (!todo.length || given.length !== todo.length || new Set(given.map((i) => i == null ? void 0 : i.datumId)).size !== todo.length)
+    throw new GateError("assess every unassessed premise datum, once");
+  for (const item of given) {
+    const datum = todo.find((d) => d.id === item.datumId);
+    if (!datum) throw new GateError("assessment names a datum outside this premise");
+    datum.assessment = checkedAssessment(item.assessment, /* @__PURE__ */ new Set());
+  }
+  return next;
+}
+function applyPremiseResult(state, claimId, verdict) {
+  var _a2, _b2;
+  inPremises(state);
+  const next = clone3(state);
+  const claim2 = openPremise(next, claimId);
+  const data = (_a2 = claim2.data) != null ? _a2 : [];
+  if (data.some((d) => d.state !== "found" || !d.assessment))
+    throw new GateError("every premise datum must be found and assessed first");
+  if (!oneOf3(PREMISE_RESULTS, verdict.result)) throw new GateError("unknown premise result");
+  if (blank2(verdict.reason)) throw new GateError("a premise result needs a reason");
+  const cited = Array.isArray(verdict.citedData) ? verdict.citedData : [];
+  const known = new Map(data.map((d) => [d.id, d]));
+  if (cited.some((id) => !known.has(id))) throw new GateError("the result cites data outside the premise");
+  if (verdict.result !== "insufficient") {
+    if (!cited.length) throw new GateError("holds and fails must cite data");
+    for (const id of cited) {
+      const datum = known.get(id);
+      if (!verifiedProof(datum) || !((_b2 = datum.assessment) == null ? void 0 : _b2.relevant) || !datum.assessment.scopeFit)
+        throw new GateError("a premise result may only rest on checked, relevant, in-scope data");
+    }
+  }
+  return closePremise(next, claim2, verdict.result);
+}
+var CAUSAL_ROLES = ["primary", "alternative", "reverse", "common_cause"];
+var ROLES_OF = {
+  fact: ["facet"],
+  causal: CAUSAL_ROLES,
+  main_cause: CAUSAL_ROLES,
+  comparison: ["primary", "alternative", "measurement"]
+};
+function checkFloor(type, roles) {
+  const n = (role) => roles.filter((r) => r === role).length;
+  if (roles.some((r) => !ROLES_OF[type].includes(r)))
+    throw new GateError("a hypothesis role does not fit the claim type");
+  if (type === "fact" && n("facet") < 2) throw new GateError("a fact needs at least 2 facets");
+  if (type === "comparison" && !(n("primary") === 1 && n("alternative") >= 1 && n("measurement") >= 1))
+    throw new GateError("a comparison needs A, B and a measurement explanation");
+  if ((type === "causal" || type === "main_cause") && !(n("primary") === 1 && roles.length >= 3))
+    throw new GateError("a cause needs H-Y and 2 alternatives");
+}
+function applyHypotheses2(state, claimId, items) {
+  inAnalysis2(state);
+  const type = liveTestable(state, claimId).type;
+  if (state.hypotheses.some((h) => h.claimId === claimId)) throw new GateError("the claim already has hypotheses");
+  if (!Array.isArray(items) || !items.length) throw new GateError("no hypotheses");
+  if (state.hypotheses.length + items.length > MAX_HYPOTHESES2) throw new GateError("hypothesis limit reached");
+  checkFloor(
+    type,
+    items.map((i) => i == null ? void 0 : i.role)
+  );
+  const next = buildHypotheses(state, claimId, items, false);
+  claimOf(next, claimId).status = "in_progress";
+  return settle(next);
+}
+function buildHypotheses(state, claimId, items, late) {
+  const next = clone3(state);
+  const claim2 = claimOf(next, claimId);
+  const ids = allIds2(next);
+  const batch = new Set(items.map((i) => i == null ? void 0 : i.id));
+  if (batch.size !== items.length) throw new GateError("duplicate hypothesis id");
+  const known = new Set(batch);
+  if (late) {
+    for (const h of next.hypotheses) if (h.claimId === claimId) known.add(h.id);
+  }
+  const premiseIds = new Set(premisesOf(next).map((c) => c.id));
+  const causal = claim2.type === "causal" || claim2.type === "main_cause";
+  for (const item of items) {
+    const id = newId3(ids, item.id);
+    if (!oneOf3(["primary", "alternative", "reverse", "common_cause", "measurement", "facet", "side"], item.role))
+      throw new GateError("unknown hypothesis role");
+    const predictions = Array.isArray(item.predictions) ? item.predictions : [];
+    if (!predictions.some((p) => (p == null ? void 0 : p.kind) === "support") || !predictions.some((p) => (p == null ? void 0 : p.kind) === "refute"))
+      throw new GateError("a hypothesis needs a support and a refute prediction");
+    if (!predictions.some((p) => (p == null ? void 0 : p.required) === true)) throw new GateError("a hypothesis needs a required test");
+    const h = { id, claimId, role: item.role, round: 1, predictions: [], needs: [] };
+    if (late) h.addedAfterComparison = true;
+    for (const p of predictions) {
+      if (!p || !oneOf3(PREDICTION_KINDS, p.kind)) throw new GateError("unknown prediction kind");
+      if (blank2(p.text) || typeof p.required !== "boolean") throw new GateError("prediction malformed");
+      const prediction = {
+        id: newId3(ids, p.id),
+        kind: p.kind,
+        text: p.text,
+        alsoPredictedBy: [],
+        auxiliary: [],
+        required: p.required
+      };
+      if (p.kind === "support") {
+        if (!Array.isArray(p.alsoPredictedBy))
+          throw new GateError("a support prediction must say who else predicts it");
+        for (const entry of p.alsoPredictedBy) {
+          if (!oneOf3(OVERLAP_STRENGTHS, entry == null ? void 0 : entry.strength)) throw new GateError("unknown overlap strength");
+          if (!known.has(entry.hypothesisId) || entry.hypothesisId === id)
+            throw new GateError("alsoPredictedBy names an unknown hypothesis");
+          prediction.alsoPredictedBy.push({ hypothesisId: entry.hypothesisId, strength: entry.strength });
+        }
+      }
+      if (p.kind === "refute") {
+        if (!Array.isArray(p.auxiliary) || !p.auxiliary.length || p.auxiliary.some((a) => !premiseIds.has(a)))
+          throw new GateError("a refute prediction needs auxiliary premises");
+        if (blank2(p.reason)) throw new GateError("a refute prediction needs a reason");
+        prediction.auxiliary = [...new Set(p.auxiliary)];
+        Object.assign(prediction, { reason: p.reason });
+      }
+      h.predictions.push(prediction);
+    }
+    if (causal && CAUSAL_ROLES.includes(item.role)) {
+      const ident = item.identification;
+      if (!ident || blank2(ident.strategy) || !Array.isArray(ident.assumptions) || !ident.assumptions.length || ident.assumptions.some(blank2))
+        throw new GateError("a cause needs an identification strategy and its assumptions");
+      h.identification = { strategy: ident.strategy, assumptions: [...ident.assumptions] };
+    } else if (item.identification) h.identification = clone3(item.identification);
+    next.hypotheses.push(h);
+  }
+  return next;
+}
+var researchBegan = (h) => h.round > 1 || h.needs.some((n) => n.state === "searching" || n.state === "found" || n.state === "not_found");
+function needFrom(item, h, ids, registered) {
+  if (blank2(item == null ? void 0 : item.text)) throw new GateError("empty need");
+  const prediction = h.predictions.find((p) => p.id === item.predictionId);
+  if (!prediction) throw new GateError("a need must name a prediction of its hypothesis");
+  const c = item.criteria;
+  if (!c || blank2(c.supports) || blank2(c.refutes) || blank2(c.irrelevant))
+    throw new GateError("a need must say what counts as support, refutation and irrelevance");
+  return {
+    id: newId3(ids, item.id),
+    predictionId: prediction.id,
+    text: item.text,
+    criteria: { supports: c.supports, refutes: c.refutes, irrelevant: c.irrelevant },
+    registered,
+    addedRound: h.round,
+    state: "pending"
+  };
+}
+function applyNeeds(state, hypothesisId, items) {
+  inAnalysis2(state);
+  const next = clone3(state);
+  const h = hypothesisOf2(next, hypothesisId);
+  if (h.needs.length) throw new GateError("the needs are already listed");
+  if (!Array.isArray(items) || !items.length) throw new GateError("no needs");
+  if (items.length > MAX_ROUND_NEEDS2) throw new GateError("too many needs in this round");
+  const ids = allIds2(next);
+  for (const item of items) h.needs.push(needFrom(item, h, ids, researchBegan(h) ? "post" : "pre"));
+  for (const p of h.predictions)
+    if (p.required && !h.needs.some((n) => n.predictionId === p.id))
+      throw new GateError("every required prediction needs a need");
+  return next;
+}
+function startNextRound2(state, hypothesisId, items) {
+  inAnalysis2(state);
+  const next = clone3(state);
+  const h = hypothesisOf2(next, hypothesisId);
+  if (!h.needs.length || h.needs.some((n) => n.state === "pending" || n.state === "searching"))
+    throw new GateError("the round is not finished");
+  if (h.needs.some((n) => !n.assessment && n.state === "found")) throw new GateError("the round is not assessed");
+  if (testStatus(h) === "complete") throw new GateError("the tests are already complete");
+  if (h.round >= MAX_ROUND2) throw new GateError("round limit reached");
+  if (!Array.isArray(items) || !items.length) throw new GateError("no needs");
+  if (items.length > MAX_ROUND_NEEDS2 || h.needs.length + items.length > MAX_NEEDS2)
+    throw new GateError("too many needs");
+  h.round += 1;
+  const ids = allIds2(next);
+  const replaced = new Set(h.needs.map((n) => n.replaces).filter((id) => id !== void 0));
+  for (const item of items) {
+    const need = needFrom(item, h, ids, "post");
+    if (item.replaces !== void 0) {
+      const target = h.needs.find((n) => n.id === item.replaces);
+      if (!target || target.state !== "not_found" || target.addedRound >= h.round || replaced.has(target.id))
+        throw new GateError("a replacement must stand in for a dead need of an earlier round, once");
+      if (target.predictionId !== need.predictionId) throw new GateError("a replacement must test the same prediction");
+      replaced.add(target.id);
+      need.replaces = target.id;
+    }
+    h.needs.push(need);
+  }
+  return next;
+}
+function beginResearch2(state, hypothesisId, needId) {
+  inAnalysis2(state);
+  running2(state);
+  const next = clone3(state);
+  const need = hypothesisOf2(next, hypothesisId).needs.find((n) => n.id === needId);
+  if (!need || need.state !== "pending") throw new GateError("need is not waiting for research");
+  if (next.run.researchCalls >= MAX_RESEARCH_CALLS2) throw new GateError("research call limit reached");
+  need.state = "searching";
+  next.run.researchCalls += 1;
+  return next;
+}
+function applyEvidence2(state, hypothesisId, needId, result) {
+  inAnalysis2(state);
+  const next = clone3(state);
+  const need = hypothesisOf2(next, hypothesisId).needs.find((n) => n.id === needId);
+  if (!need || need.state !== "searching") throw new GateError("need is not being researched");
+  if (result.found === true) {
+    need.proof = checkedProof2(result.proof);
+    need.state = "found";
+    return next;
+  }
+  if (blank2(result.reason)) throw new GateError("a miss needs a reason");
+  need.reason = result.reason;
+  need.state = "not_found";
+  return next;
+}
+function releaseNeedResearch2(state, hypothesisId, needId) {
+  inAnalysis2(state);
+  const next = clone3(state);
+  const need = hypothesisOf2(next, hypothesisId).needs.find((n) => n.id === needId);
+  if (!need || need.state !== "searching") throw new GateError("need is not being researched");
+  need.state = "pending";
+  return next;
+}
+function applyEvidenceAssessment(state, hypothesisId, items) {
+  inAnalysis2(state);
+  const next = clone3(state);
+  const h = hypothesisOf2(next, hypothesisId);
+  if (h.needs.some((n) => n.state === "pending" || n.state === "searching"))
+    throw new GateError("the round is still being researched");
+  const todo = h.needs.filter((n) => n.state === "found" && !n.assessment);
+  const given = Array.isArray(items) ? items : [];
+  if (!todo.length || given.length !== todo.length || new Set(given.map((i) => i == null ? void 0 : i.needId)).size !== todo.length)
+    throw new GateError("assess every found, unassessed need of the round, once");
+  const siblings = new Set(next.hypotheses.filter((o) => o.claimId === h.claimId && o.id !== h.id).map((o) => o.id));
+  for (const item of given) {
+    const need = todo.find((n) => n.id === item.needId);
+    if (!need) throw new GateError("assessment names a need that is not waiting for one");
+    need.assessment = checkedAssessment(item.assessment, siblings);
+    if (need.replaces !== void 0) {
+      if (typeof item.sameCondition !== "boolean")
+        throw new GateError("a replacement assessment must say whether it is the same condition");
+      need.sameCondition = item.sameCondition;
+      if (item.sameCondition) need.registered = "pre";
+    } else if (item.sameCondition !== void 0) throw new GateError("sameCondition belongs to a replacement need");
+  }
+  return next;
+}
+function applyProgramVerdict(state, hypothesisId) {
+  var _a2;
+  inAnalysis2(state);
+  const next = clone3(state);
+  const h = hypothesisOf2(next, hypothesisId);
+  if (testStatus(h, next.run.researchCalls) !== "limit_incomplete") throw new GateError("the test is not at its limit");
+  if (hasVerifiedRefutation(h)) throw new GateError("refuting evidence exists: the verdict needs the AI");
+  const open = h.predictions.filter((p) => p.required && !requiredPrediction(h, p.id)).map((p) => p.id);
+  h.verdict = {
+    value: "insufficient",
+    by: "program",
+    reason: `limit_incomplete: required tests without checked evidence: ${open.join(", ") || "none"}`,
+    citedNeeds: [],
+    counterNotes: [],
+    refutations: [],
+    causal: "not_applicable",
+    assumptionStatus: [],
+    confidence: "low",
+    reverdicts: (_a2 = h.reverdicts) != null ? _a2 : 0
+  };
+  return settle(next);
+}
+function requiredPrediction(h, predictionId) {
+  const own2 = h.needs.filter(
+    (n) => n.predictionId === predictionId && n.registered === "pre" && n.replaces === void 0
+  );
+  return own2.length > 0 && own2.every((n) => met(h, n));
+}
+function numbersIn(text13) {
+  var _a2;
+  const found = (_a2 = text13.normalize("NFKC").match(/(?<![\w.])\d+(?:,\d{3})*(?:\.\d+)?/gu)) != null ? _a2 : [];
+  return new Set(found.map((n) => n.replace(/,/g, "")));
+}
+function urlsIn(text13) {
+  var _a2;
+  const found = (_a2 = text13.match(/https?:\/\/[^\s"'<>\])}，。；）]+/giu)) != null ? _a2 : [];
+  return new Set(found.map((u) => u.replace(/[.,;:!?]+$/u, "").toLowerCase()));
+}
+var sourceText = (input2) => JSON.stringify(input2);
+function guardText(text13, source, what) {
+  if (typeof text13 !== "string" || text13.trim() === "") throw new GateError(`${what} is empty`);
+  const okNumbers = numbersIn(source);
+  for (const n of numbersIn(text13))
+    if (!okNumbers.has(n)) throw new GateError(`${what} has a number that is not in the input: ${n}`);
+  const okUrls = urlsIn(source);
+  for (const u of urlsIn(text13)) if (!okUrls.has(u)) throw new GateError(`${what} has a URL that is not in the input`);
+  return text13;
+}
+var unique2 = (list2) => [...new Set(list2)];
+var CAUSE_ROLES = ["primary", "alternative", "reverse", "common_cause"];
+var distinguishing = (p) => p.kind === "support" && p.alsoPredictedBy.every((e) => e.strength === "weaker");
+function scopeOf(state, h) {
+  var _a2, _b2;
+  const out = /* @__PURE__ */ new Map();
+  for (const need of h.needs) out.set(need.id, { need, owner: h, own: true });
+  const allocations = (_b2 = (_a2 = claimOf(state, h.claimId).comparison) == null ? void 0 : _a2.allocations) != null ? _b2 : [];
+  for (const a of allocations) {
+    if (a.hypothesisId !== h.id) continue;
+    for (const o of state.hypotheses) {
+      if (o.id === h.id) continue;
+      const need = o.needs.find((n) => n.id === a.needId);
+      if (need) out.set(need.id, { need, owner: o, own: false });
+    }
+  }
+  return out;
+}
+var refutesH = (need) => {
+  var _a2;
+  return qualifies(need) && ((_a2 = need.assessment) == null ? void 0 : _a2.stance) === "refutes";
+};
+var counterEvidenceOf = (scope) => [...scope.values()].filter((s) => refutesH(s.need)).map((s) => s.need.id);
+function evidenceView(s) {
+  const { need } = s;
+  const view = {
+    needId: need.id,
+    fromHypothesis: s.owner.id,
+    own: s.own,
+    predictionId: need.predictionId,
+    text: need.text,
+    criteria: need.criteria,
+    registered: need.registered,
+    state: need.state
+  };
+  if (need.reason) view.reason = need.reason;
+  if (need.replaces) view.replaces = need.replaces;
+  if (need.proof)
+    view.source = { url: need.proof.url, quote: need.proof.quote, claim: need.proof.claim, check: need.proof.check };
+  if (need.assessment) view.assessment = need.assessment;
+  return view;
+}
+var premiseView = (c) => {
+  var _a2;
+  return { id: c.id, text: c.text, result: (_a2 = c.result) != null ? _a2 : null };
+};
+var claimView = (c) => ({
+  id: c.id,
+  text: c.text,
+  type: c.type,
+  definitions: c.definitions
+});
+function prepareVerdict2(state, hypothesisId) {
+  var _a2;
+  const h = hypothesisOf2(state, hypothesisId);
+  const claim2 = claimOf(state, h.claimId);
+  const scope = scopeOf(state, h);
+  const auxiliary = unique2(h.predictions.flatMap((p) => p.auxiliary));
+  return {
+    hypothesis: { id: h.id, role: h.role, round: h.round, testStatus: testStatus(h, state.run.researchCalls) },
+    claim: claimView(claim2),
+    identification: (_a2 = h.identification) != null ? _a2 : null,
+    predictions: h.predictions.map((p) => ({
+      id: p.id,
+      kind: p.kind,
+      text: p.text,
+      required: p.required,
+      distinguishing: distinguishing(p),
+      auxiliary: p.auxiliary,
+      ...p.reason ? { reason: p.reason } : {}
+    })),
+    premises: auxiliary.map((id) => premiseView(claimOf(state, id))),
+    evidence: [...scope.values()].map(evidenceView),
+    counterEvidence: counterEvidenceOf(scope)
+  };
+}
+var rankOf = (c) => CONFIDENCES.indexOf(c);
+var lowerOf = (a, b) => rankOf(a) >= rankOf(b) ? a : b;
+function applyVerdict2(state, hypothesisId, draft) {
+  var _a2, _b2, _c;
+  inAnalysis2(state);
+  const next = clone3(state);
+  const h = hypothesisOf2(next, hypothesisId);
+  const d = draft;
+  if (!d || typeof d !== "object") throw new GateError("verdict missing");
+  if (!oneOf3(VERDICT_VALUES, d.value)) throw new GateError("unknown verdict value");
+  if (d.value === "insufficient") throw new GateError("only the program can give insufficient");
+  const asked = d.value;
+  const source = sourceText(prepareVerdict2(state, hypothesisId));
+  const reason = guardText(d.reason, source, "the verdict reason");
+  const status = testStatus(h, next.run.researchCalls);
+  const scope = scopeOf(next, h);
+  const cited = Array.isArray(d.citedNeeds) ? d.citedNeeds : [];
+  if (new Set(cited).size !== cited.length) throw new GateError("a cited need is listed twice");
+  for (const id of cited) {
+    const s = scope.get(id);
+    if (!s) throw new GateError(`the verdict cites evidence outside its scope: ${id}`);
+    if (!qualifies(s.need))
+      throw new GateError(`the verdict cites evidence that is not checked, relevant and in scope: ${id}`);
+  }
+  const counter = counterEvidenceOf(scope);
+  const refutations = Array.isArray(d.refutations) ? d.refutations : [];
+  const notes = Array.isArray(d.counterNotes) ? d.counterNotes : [];
+  if (refutations.length !== counter.length || new Set(refutations.map((r) => r == null ? void 0 : r.needId)).size !== counter.length)
+    throw new GateError("the verdict must classify every counter-evidence, once");
+  if (notes.length !== refutations.length) throw new GateError("counterNotes must cover every counter-evidence");
+  const storedRefutations = [];
+  refutations.forEach((r, i) => {
+    const s = scope.get(r == null ? void 0 : r.needId);
+    if (!s || !counter.includes(r.needId))
+      throw new GateError(`a refutation names evidence that is not counter-evidence: ${r == null ? void 0 : r.needId}`);
+    if (!oneOf3(REFUTATION_CLASSES, r.class)) throw new GateError("unknown refutation class");
+    guardText(notes[i], source, "a counter note");
+    const aux = Array.isArray(r.auxiliary) ? unique2(r.auxiliary) : [];
+    if (r.class !== "nondecisive") {
+      const prediction = s.own ? h.predictions.find((p) => p.id === s.need.predictionId) : void 0;
+      if (!prediction || prediction.kind !== "refute")
+        throw new GateError("only evidence for the hypothesis' own refute prediction can be decisive or conditional");
+      if (!aux.length || prediction.auxiliary.some((a) => !aux.includes(a)))
+        throw new GateError("a refutation must name the auxiliary premises of its prediction");
+      for (const a of aux) {
+        const premise = next.claims.find((c) => c.id === a);
+        if (!premise || premise.role !== "premise") throw new GateError("an auxiliary is not a premise");
+      }
+      if (r.class === "decisive") {
+        if (s.need.registered !== "pre") throw new GateError("an exploratory result cannot be a decisive refutation");
+        if (aux.some((a) => {
+          var _a3;
+          return ((_a3 = next.claims.find((c) => c.id === a)) == null ? void 0 : _a3.result) !== "holds";
+        }))
+          throw new GateError(
+            "a decisive refutation needs auxiliary premises that hold; otherwise it is only conditional"
+          );
+      }
+    } else if (aux.length) throw new GateError("a nondecisive counter-evidence names no auxiliary premises");
+    storedRefutations.push({ needId: r.needId, class: r.class, auxiliary: aux });
+  });
+  const decisive = storedRefutations.some((r) => r.class === "decisive");
+  const blocking = storedRefutations.some((r) => r.class === "decisive" || r.class === "conditional");
+  let value = asked;
+  let by = "ai";
+  let storedReason = reason;
+  if (asked === "refuted") {
+    if (!decisive)
+      throw new GateError("refuted needs a decisive refutation (pre-registered, auxiliary premises that hold)");
+    if (!storedRefutations.some((r) => r.class === "decisive" && cited.includes(r.needId)))
+      throw new GateError("the decisive refutation must be cited");
+  } else {
+    if (decisive) throw new GateError("a decisive refutation exists: the verdict can only be refuted");
+    if (asked === "supported") {
+      if (status !== "complete") throw new GateError("supported needs a complete test");
+      if (blocking) throw new GateError("a conditional refutation blocks supported");
+      const support = h.predictions.filter(distinguishing).flatMap(
+        (p) => h.needs.filter((n) => {
+          var _a3;
+          return n.predictionId === p.id && qualifies(n) && ((_a3 = n.assessment) == null ? void 0 : _a3.stance) === "supports";
+        })
+      );
+      if (!support.length) throw new GateError("supported needs a distinguishing support that was met");
+      if (!support.some((n) => cited.includes(n.id))) throw new GateError("cite the distinguishing support");
+      for (const p of h.predictions.filter((q) => q.kind === "refute"))
+        if (!h.needs.some((n) => n.predictionId === p.id && qualifies(n)))
+          throw new GateError(`a refute prediction has no data: ${p.id}`);
+    } else if (status === "complete") {
+    } else if (status === "limit_incomplete") {
+      value = "insufficient";
+      by = "program";
+      storedReason = `limit_incomplete: ${reason}`;
+    } else throw new GateError("undecided needs a complete test");
+  }
+  const identified = h.identification !== void 0;
+  const assumptions = [];
+  let causal = d.causal;
+  if (!oneOf3(CAUSAL_STATES, causal)) throw new GateError("unknown causal state");
+  if (value === "supported" && identified) {
+    const given = Array.isArray(d.assumptionStatus) ? d.assumptionStatus : [];
+    const wanted = (_b2 = (_a2 = h.identification) == null ? void 0 : _a2.assumptions) != null ? _b2 : [];
+    if (given.length !== wanted.length || wanted.some((w) => given.filter((g) => (g == null ? void 0 : g.assumption) === w).length !== 1))
+      throw new GateError("assumptionStatus must cover every identification assumption, once");
+    for (const g of given) {
+      if (!oneOf3(ASSUMPTION_STATES, g.status)) throw new GateError("unknown assumption status");
+      const entry = { assumption: g.assumption, status: g.status };
+      if (g.status === "defended") entry.defense = guardText(g.defense, source, "an assumption defense");
+      assumptions.push(entry);
+    }
+    if (causal === "not_applicable") throw new GateError("a supported cause needs a causal state");
+    const open = assumptions.filter((a) => a.status !== "checked");
+    if (causal === "established" && open.length)
+      throw new GateError("established needs every identification assumption checked");
+    if (causal === "conditional") {
+      if (!open.length) throw new GateError("conditional needs an assumption that was not checked");
+      if (open.some((a) => a.status !== "defended"))
+        throw new GateError("conditional needs a defense for every unchecked assumption");
+    }
+  } else if (causal !== "not_applicable")
+    throw new GateError("only a supported cause can have a causal state; otherwise it is not_applicable");
+  let confidence = "low";
+  if (oneOf3(CONFIDENCES, d.confidence)) confidence = d.confidence;
+  else throw new GateError("unknown confidence");
+  if (by === "program") confidence = "low";
+  const sources = unique2(
+    cited.map((id) => {
+      var _a3, _b3, _c2;
+      return ((_c2 = (_b3 = (_a3 = scope.get(id)) == null ? void 0 : _a3.need.assessment) == null ? void 0 : _b3.underlyingSource) != null ? _c2 : "").trim().toLowerCase();
+    }).filter(Boolean)
+  );
+  let ceiling = "high";
+  if (sources.length < 2) ceiling = "medium";
+  if (value === "supported") {
+    if (identified && causal !== "established") ceiling = lowerOf(ceiling, "medium");
+    const preSupport = cited.some((id) => {
+      var _a3, _b3;
+      const n = (_a3 = scope.get(id)) == null ? void 0 : _a3.need;
+      return !!n && n.registered === "pre" && ((_b3 = n.assessment) == null ? void 0 : _b3.stance) === "supports";
+    });
+    if (!preSupport) ceiling = "low";
+  }
+  confidence = lowerOf(confidence, ceiling);
+  h.verdict = {
+    value,
+    by,
+    reason: storedReason,
+    citedNeeds: cited,
+    counterNotes: notes.map((n) => n),
+    refutations: storedRefutations,
+    causal,
+    assumptionStatus: assumptions,
+    confidence,
+    reverdicts: (_c = h.reverdicts) != null ? _c : 0
+  };
+  return settle(next);
+}
+function applyNoHypotheses(state, claimId) {
+  inAnalysis2(state);
+  const next = clone3(state);
+  const claim2 = liveTestable(next, claimId);
+  if (closedClaim(claim2)) throw new GateError("the claim is already closed");
+  if (claimHypotheses(next, claimId).length) throw new GateError("the claim has hypotheses");
+  if (canPropose(next, claim2)) throw new GateError("hypotheses can still be proposed");
+  const c = claim2.comparison;
+  c.state = "undecidable";
+  c.answer = "insufficient";
+  claim2.status = "done";
+  return settle(next);
+}
+function applyAlternativeHypotheses(state, claimId, items) {
+  inAnalysis2(state);
+  const claim2 = liveTestable(state, claimId);
+  if (!alternativePending(claim2)) throw new GateError("the comparison does not owe an alternative");
+  if (!Array.isArray(items) || !items.length) throw new GateError("no hypotheses");
+  if (state.hypotheses.length + items.length > MAX_HYPOTHESES2) throw new GateError("hypothesis limit reached");
+  const allowed = ROLES_OF[claim2.type].filter((r) => r !== "primary");
+  if (items.some((i) => !allowed.includes(i == null ? void 0 : i.role))) throw new GateError("a late alternative cannot take this role");
+  const next = buildHypotheses(state, claimId, items, true);
+  const c = claimOf(next, claimId).comparison;
+  c.missedAlternativeAdded = true;
+  for (const v of c.vetoes) if (v.kind === "missed_alternative") v.resolved = true;
+  return settle(next);
+}
+var ANSWERS_OF = {
+  fact: ["holds", "fails", "insufficient"],
+  causal: ["causal_established", "causal_conditional", "causal_compatible", "causal_against", "insufficient"],
+  main_cause: [
+    "main_cause_largest",
+    "main_cause_secondary",
+    "main_cause_not",
+    "main_cause_undecidable",
+    "insufficient"
+  ],
+  comparison: ["compare_greater", "compare_equivalent", "compare_opposite", "compare_undetermined", "insufficient"]
+};
+var undecidableAnswer = (type) => type === "main_cause" ? "main_cause_undecidable" : type === "comparison" ? "compare_undetermined" : "insufficient";
+function checkAnswer(state, claim2, key4, extra) {
+  var _a2, _b2, _c, _d;
+  if (!oneOf3(ANSWER_KEYS, key4)) throw new GateError("unknown answer");
+  if (!ANSWERS_OF[claim2.type].includes(key4))
+    throw new GateError(`the answer ${key4} does not fit a ${claim2.type} claim`);
+  const hypotheses = claimHypotheses(state, claim2.id);
+  const value = (h) => {
+    var _a3;
+    return (_a3 = h == null ? void 0 : h.verdict) == null ? void 0 : _a3.value;
+  };
+  const primary = hypotheses.find((h) => h.role === "primary");
+  if (claim2.type !== "main_cause" && (extra.contributors || extra.largest !== void 0 || extra.basis !== void 0))
+    throw new GateError("only a main-cause comparison has contributors");
+  switch (key4) {
+    case "holds":
+      if (!hypotheses.length || hypotheses.some((h) => value(h) !== "supported"))
+        throw new GateError("holds needs every facet supported (a refuted facet cannot be answered as holding)");
+      break;
+    case "fails":
+      if (!hypotheses.some((h) => value(h) === "refuted")) throw new GateError("fails needs a refuted facet");
+      break;
+    case "causal_established":
+    case "causal_conditional":
+    case "causal_compatible": {
+      const want = key4 === "causal_established" ? "established" : key4 === "causal_conditional" ? "conditional" : "compatible";
+      if (value(primary) !== "supported" || ((_a2 = primary == null ? void 0 : primary.verdict) == null ? void 0 : _a2.causal) !== want)
+        throw new GateError(`the answer ${key4} does not match the cause's verdict and causal state`);
+      break;
+    }
+    case "causal_against":
+      if (value(primary) !== "refuted") throw new GateError("causal_against needs a refuted cause");
+      break;
+    case "compare_greater":
+    case "compare_opposite":
+      if (value(primary) !== "supported") throw new GateError("a direction needs the supported measurement of A");
+      if (hypotheses.some((h) => h.role === "measurement" && value(h) !== "refuted"))
+        throw new GateError("a direction needs the measurement explanation refuted");
+      break;
+    default:
+      break;
+  }
+  if (claim2.type !== "main_cause") return;
+  const candidates = hypotheses.filter((h) => CAUSE_ROLES.includes(h.role));
+  const contributors = (_b2 = extra.contributors) != null ? _b2 : [];
+  if (new Set(contributors).size !== contributors.length) throw new GateError("a contributor is listed twice");
+  for (const id of contributors) {
+    const h = candidates.find((c) => c.id === id);
+    if (!h) throw new GateError("a contributor is not a candidate cause of this claim");
+    if (((_c = h.verdict) == null ? void 0 : _c.causal) !== "established" && ((_d = h.verdict) == null ? void 0 : _d.causal) !== "conditional")
+      throw new GateError("a cause that is only compatible cannot enter the contribution comparison");
+  }
+  if (extra.largest !== void 0 && !contributors.includes(extra.largest))
+    throw new GateError("the largest contributor must be a contributor");
+  if (extra.basis !== void 0 && !oneOf3(COMPARISON_BASES, extra.basis))
+    throw new GateError("unknown comparison basis");
+  const complete = candidates.every((h) => contributors.includes(h.id) || value(h) === "refuted");
+  const ranked = extra.basis === "difference_with_uncertainty" && contributors.length >= 2;
+  if (key4 === "main_cause_not" && value(primary) !== "refuted")
+    throw new GateError("main_cause_not needs a refuted cause");
+  if (key4 === "main_cause_largest" || key4 === "main_cause_secondary") {
+    if (!primary || !contributors.includes(primary.id))
+      throw new GateError("the main cause is not among the contributors");
+    if (!ranked)
+      throw new GateError("only a direct difference with its uncertainty can rank causes; point estimates cannot");
+    if (!complete)
+      throw new GateError("a ranking needs every candidate compared (or refuted): otherwise the answer is undecidable");
+    if (extra.largest === void 0) throw new GateError("a ranking names the largest contributor");
+    if (key4 === "main_cause_largest" && extra.largest !== primary.id)
+      throw new GateError("the main cause is not the largest");
+    if (key4 === "main_cause_secondary" && extra.largest === primary.id)
+      throw new GateError("the main cause is the largest");
+  }
+  if (key4 === "main_cause_undecidable" && extra.largest !== void 0 && !ranked)
+    throw new GateError("a subset result needs a direct difference over at least 2 contributors");
+  if (key4 !== "main_cause_largest" && key4 !== "main_cause_secondary" && key4 !== "main_cause_undecidable" && contributors.length)
+    throw new GateError("contributors only belong to a ranking or a subset result");
+}
+function prepareComparison(state, claimId) {
+  const claim2 = liveTestable(state, claimId);
+  const c = claim2.comparison;
+  const hypotheses = claimHypotheses(state, claimId);
+  const shared2 = /* @__PURE__ */ new Map();
+  const evidence = (h) => h.needs.filter((n) => n.state === "found" && n.assessment).map((n) => {
+    var _a2, _b2, _c;
+    const key4 = ((_b2 = (_a2 = n.assessment) == null ? void 0 : _a2.underlyingSource) != null ? _b2 : "").trim().toLowerCase();
+    shared2.set(key4, [...(_c = shared2.get(key4)) != null ? _c : [], n.id]);
+    return evidenceView({ need: n, owner: h, own: true });
+  });
+  const hypothesesView = hypotheses.map((h) => {
+    var _a2;
+    return {
+      id: h.id,
+      role: h.role,
+      addedAfterComparison: h.addedAfterComparison === true,
+      reverdicts: (_a2 = h.reverdicts) != null ? _a2 : 0,
+      verdict: h.verdict ? {
+        value: h.verdict.value,
+        by: h.verdict.by,
+        confidence: h.verdict.confidence,
+        causal: h.verdict.causal,
+        reason: h.verdict.reason,
+        citedNeeds: h.verdict.citedNeeds,
+        counterNotes: h.verdict.counterNotes,
+        refutations: h.verdict.refutations,
+        assumptionStatus: h.verdict.assumptionStatus
+      } : null,
+      evidence: evidence(h)
+    };
+  });
+  return {
+    claim: claimView(claim2),
+    premises: premisesOf(state).map(premiseView),
+    hypotheses: hypothesesView,
+    sharedSources: [...shared2.entries()].filter(([, ids]) => ids.length > 1).map(([underlyingSource, needIds]) => ({ underlyingSource, needIds })),
+    comparison: {
+      attempts: c.attempts,
+      allocations: c.allocations,
+      room: {
+        lastAttempt: c.attempts + 1 >= MAX_COMPARISONS,
+        canAddAlternative: !c.missedAlternativeAdded && state.hypotheses.length < MAX_HYPOTHESES2,
+        canSendBack: hypotheses.filter((h) => {
+          var _a2, _b2;
+          return ((_a2 = h.verdict) == null ? void 0 : _a2.by) === "ai" && ((_b2 = h.reverdicts) != null ? _b2 : 0) < MAX_REVERDICTS;
+        }).map((h) => h.id)
+      }
+    }
+  };
+}
+var VETO_DECISIONS = ["complete", "rejudge", "add_alternative", "undecidable"];
+function applyComparison(state, claimId, draft) {
+  var _a2, _b2, _c;
+  live2(state);
+  if (state.run.phase !== "analysis" && state.run.phase !== "comparison")
+    throw new GateError("the run is not at the comparison");
+  const next = clone3(state);
+  const claim2 = liveTestable(next, claimId);
+  if (!readyToCompare(next, claim2)) throw new GateError("the claim is not ready for a comparison");
+  const c = claim2.comparison;
+  const d = draft;
+  if (!d || typeof d !== "object") throw new GateError("comparison missing");
+  if (!VETO_DECISIONS.includes(d.decision))
+    throw new GateError("unknown comparison decision");
+  const decision = d.decision;
+  const source = sourceText(prepareComparison(state, claimId));
+  const hypotheses = claimHypotheses(next, claimId);
+  const byId = new Map(hypotheses.map((h) => [h.id, h]));
+  const aiVetoes = (Array.isArray(d.vetoes) ? d.vetoes : []).map((v) => {
+    if (!oneOf3(VETO_KINDS, v == null ? void 0 : v.kind)) throw new GateError("unknown veto kind");
+    return { kind: v.kind, detail: guardText(v.detail, source, "a veto detail"), resolved: false };
+  });
+  const allocations = [...c.allocations];
+  for (const a of Array.isArray(d.allocations) ? d.allocations : []) {
+    const target = byId.get(a == null ? void 0 : a.hypothesisId);
+    const owner = hypotheses.find((h) => h.needs.some((n) => n.id === (a == null ? void 0 : a.needId)));
+    const need = owner == null ? void 0 : owner.needs.find((n) => n.id === a.needId);
+    if (!target || !owner || !need)
+      throw new GateError("an allocation names evidence or a hypothesis outside this claim");
+    if (owner.id === target.id) throw new GateError("evidence cannot be allocated to its own hypothesis");
+    if (!refutesH(need) || !((_a2 = need.assessment) == null ? void 0 : _a2.alsoRelevantTo.includes(target.id)))
+      throw new GateError(
+        "only checked refuting evidence that the assessment marked as relevant to that hypothesis can be allocated"
+      );
+    if (!allocations.some((x) => x.needId === need.id && x.hypothesisId === target.id))
+      allocations.push({ needId: need.id, hypothesisId: target.id });
+  }
+  const unhandled = unique2(
+    allocations.filter((a) => {
+      var _a3;
+      const h = byId.get(a.hypothesisId);
+      return ((_a3 = h == null ? void 0 : h.verdict) == null ? void 0 : _a3.value) === "supported" && !h.verdict.refutations.some((r) => r.needId === a.needId);
+    }).map((a) => a.hypothesisId)
+  );
+  const programVetoes = unhandled.map((id) => ({
+    kind: "unhandled_counter",
+    detail: `counter-evidence allocated to ${id} is not answered by its verdict`,
+    resolved: false
+  }));
+  const vetoes = [...aiVetoes, ...programVetoes];
+  const last = c.attempts + 1 >= MAX_COMPARISONS;
+  c.attempts += 1;
+  c.allocations = allocations;
+  for (const old of c.vetoes) old.resolved = true;
+  if (!vetoes.length) {
+    if (decision !== "complete") throw new GateError("without a veto the comparison completes");
+    const extra = {};
+    if (d.contributors !== void 0) extra.contributors = Array.isArray(d.contributors) ? [...d.contributors] : [];
+    if (d.largest !== void 0) extra.largest = d.largest;
+    if (d.basis !== void 0) extra.basis = d.basis;
+    checkAnswer(next, claim2, d.answer, extra);
+    c.state = "done";
+    c.answer = d.answer;
+    delete c.contributors;
+    delete c.largest;
+    delete c.basis;
+    if (claim2.type === "main_cause") {
+      c.contributors = (_b2 = extra.contributors) != null ? _b2 : [];
+      if (extra.largest !== void 0) c.largest = extra.largest;
+      if (extra.basis !== void 0) c.basis = extra.basis;
+    }
+    claim2.status = "done";
+    return settle(next);
+  }
+  let remedy = decision === "complete" ? "rejudge" : decision;
+  const eligible = (h) => {
+    var _a3, _b3;
+    return ((_a3 = h.verdict) == null ? void 0 : _a3.by) === "ai" && ((_b3 = h.reverdicts) != null ? _b3 : 0) < MAX_REVERDICTS;
+  };
+  let rejudge = [];
+  if (!last && remedy !== "undecidable") {
+    const chosen = decision === "rejudge" && Array.isArray(d.rejudge) ? unique2(d.rejudge) : [];
+    for (const id of chosen) {
+      const h = byId.get(id);
+      if (!h) throw new GateError("rejudge names a hypothesis outside this claim");
+      if (!eligible(h)) throw new GateError("a hypothesis can be sent back once, and only if the AI judged it");
+    }
+    if (unhandled.some((id) => !eligible(byId.get(id)))) remedy = "undecidable";
+    rejudge = unique2([...chosen, ...unhandled]);
+    if (remedy === "rejudge" && !rejudge.length)
+      throw new GateError("a veto needs a remedy: name the hypotheses to send back");
+    if (remedy === "add_alternative") {
+      if (!aiVetoes.some((v) => v.kind === "missed_alternative"))
+        throw new GateError("add_alternative needs a missed_alternative veto");
+      if (c.missedAlternativeAdded || next.hypotheses.length >= MAX_HYPOTHESES2)
+        throw new GateError("no late alternative can be added; the answer is undecidable");
+    }
+  } else remedy = "undecidable";
+  if (remedy === "undecidable") {
+    c.state = "undecidable";
+    c.answer = undecidableAnswer(claim2.type);
+    delete c.contributors;
+    delete c.largest;
+    delete c.basis;
+    c.vetoes.push(...vetoes);
+    claim2.status = "done";
+    return settle(next);
+  }
+  c.state = "vetoed";
+  c.vetoes.push(...vetoes);
+  for (const id of rejudge) {
+    const h = byId.get(id);
+    delete h.verdict;
+    h.reverdicts = ((_c = h.reverdicts) != null ? _c : 0) + 1;
+  }
+  for (const v of c.vetoes) v.resolved = !(remedy === "add_alternative" && v.kind === "missed_alternative");
+  return settle(next);
+}
+function conditionalAssumptions(state, claim2) {
+  var _a2;
+  const c = claim2.comparison;
+  if (!(c == null ? void 0 : c.answer)) return [];
+  const hypotheses = claimHypotheses(state, claim2.id);
+  const conditional = (h) => {
+    var _a3;
+    return ((_a3 = h == null ? void 0 : h.verdict) == null ? void 0 : _a3.causal) === "conditional" ? h.verdict.assumptionStatus.filter((a) => a.status !== "checked").map((a) => a.assumption) : [];
+  };
+  if (c.answer === "causal_conditional") return conditional(hypotheses.find((h) => h.role === "primary"));
+  if (claim2.type === "main_cause" && ["main_cause_largest", "main_cause_secondary", "main_cause_undecidable"].includes(c.answer))
+    return unique2(((_a2 = c.contributors) != null ? _a2 : []).flatMap((id) => conditional(hypotheses.find((h) => h.id === id))));
+  return [];
+}
+function prepareConclusion2(state) {
+  var _a2;
+  const f = state.framing;
+  const chosen = f.candidates.find((c) => c.id === f.chosen);
+  return {
+    framing: {
+      original: f.original,
+      restatement: f.restatement,
+      chosen: chosen ? { question: chosen.question, diff: chosen.diff, kind: chosen.kind, unanswered: chosen.unanswered } : null,
+      settings: f.settings,
+      composition: (_a2 = f.composition) != null ? _a2 : null,
+      outOfScope: f.outOfScope
+    },
+    premises: premisesOf(state).map(premiseView),
+    claims: state.claims.filter((c) => c.role === "testable").map((c) => {
+      var _a3, _b2, _c;
+      return {
+        ...claimView(c),
+        evaluated: c.status !== "not_evaluated",
+        comparison: c.comparison ? {
+          state: c.comparison.state,
+          answer: (_a3 = c.comparison.answer) != null ? _a3 : null,
+          contributors: (_b2 = c.comparison.contributors) != null ? _b2 : [],
+          largest: (_c = c.comparison.largest) != null ? _c : null,
+          blockers: c.comparison.vetoes.filter((v) => !v.resolved).map((v) => ({ kind: v.kind, detail: v.detail })),
+          requiredAssumptions: conditionalAssumptions(state, c)
+        } : null,
+        hypotheses: claimHypotheses(state, c.id).map((h) => ({
+          id: h.id,
+          role: h.role,
+          addedAfterComparison: h.addedAfterComparison === true,
+          verdict: h.verdict ? {
+            value: h.verdict.value,
+            confidence: h.verdict.confidence,
+            causal: h.verdict.causal,
+            assumptionStatus: h.verdict.assumptionStatus
+          } : null
+        }))
+      };
+    })
+  };
+}
+function checkSentence(state, claim2, sentence, assumptions) {
+  var _a2;
+  const need = conditionalAssumptions(state, claim2);
+  if (assumptions.length !== need.length || need.some((a) => !assumptions.includes(a)))
+    throw new GateError("the answer must list exactly the identification assumptions it rests on");
+  for (const a of need)
+    if (!sentence.includes(a))
+      throw new GateError("an identification assumption must be written into the sentence itself");
+  const c = claim2.comparison;
+  if ((c == null ? void 0 : c.answer) === "main_cause_undecidable" && c.largest !== void 0) {
+    for (const id of (_a2 = c.contributors) != null ? _a2 : [])
+      if (!sentence.includes(id)) throw new GateError("a subset result must name every compared candidate");
+  }
+}
+function applyConclusion2(state, draft) {
+  live2(state);
+  if (state.run.phase !== "conclusion") throw new GateError("the conclusion is not due");
+  const next = clone3(state);
+  const d = draft;
+  if (!d || typeof d !== "object") throw new GateError("conclusion missing");
+  const source = sourceText(prepareConclusion2(state));
+  const live_ = liveTestables(next);
+  for (const claim2 of live_) if (!closedClaim(claim2)) throw new GateError("a comparison is not finished");
+  const given = Array.isArray(d.answers) ? d.answers : [];
+  if (given.length !== live_.length || new Set(given.map((a) => a == null ? void 0 : a.claimId)).size !== live_.length)
+    throw new GateError("answer every evaluated testable claim, once");
+  const answers = [];
+  for (const claim2 of live_) {
+    const item = given.find((a) => (a == null ? void 0 : a.claimId) === claim2.id);
+    if (!item) throw new GateError("an answer names a claim that is not evaluated");
+    const c = claim2.comparison;
+    if (!oneOf3(ANSWER_KEYS, item.answer)) throw new GateError("unknown answer");
+    if (item.answer !== c.answer) throw new GateError("the answer must be the comparison's");
+    checkAnswer(next, claim2, item.answer, { contributors: c.contributors, largest: c.largest, basis: c.basis });
+    const sentence = guardText(item.sentence, source, "a conclusion sentence");
+    const assumptions = Array.isArray(item.assumptions) ? item.assumptions : [];
+    checkSentence(next, claim2, sentence, assumptions);
+    answers.push({ claimId: claim2.id, answer: item.answer, sentence, assumptions: [...assumptions] });
+  }
+  const conclusion = { state: "pending", answers, deleted: [] };
+  if (d.overall !== void 0) {
+    if (blank2(next.framing.composition))
+      throw new GateError("the breakdown has no composition rule: report the claims, not a whole-sentence answer");
+    conclusion.overall = guardText(d.overall, source, "the overall sentence");
+  }
+  next.conclusion = conclusion;
+  next.run.phase = "inference_check";
+  next.run.inferenceChecks = 0;
+  return next;
+}
+function sentencesOf(state) {
+  const out = state.conclusion.answers.filter((a) => a.sentence !== "").map((a) => ({ id: a.claimId, sentence: a.sentence }));
+  if (state.conclusion.overall) out.push({ id: "overall", sentence: state.conclusion.overall });
+  return out;
+}
+function prepareInferenceCheck(state) {
+  var _a2;
+  return {
+    check: ((_a2 = state.run.inferenceChecks) != null ? _a2 : 0) + 1,
+    sentences: sentencesOf(state),
+    basis: prepareConclusion2(state)
+  };
+}
+function applyInferenceCheck(state, items) {
+  var _a2;
+  live2(state);
+  if (state.run.phase !== "inference_check") throw new GateError("the inference check is not due");
+  const done = (_a2 = state.run.inferenceChecks) != null ? _a2 : 0;
+  if (done >= MAX_INFERENCE_CHECKS) throw new GateError("inference checks are used up");
+  const next = clone3(state);
+  const sentences = sentencesOf(next);
+  const given = Array.isArray(items) ? items : [];
+  if (given.length !== sentences.length || new Set(given.map((i) => i == null ? void 0 : i.id)).size !== sentences.length)
+    throw new GateError("check every sentence, once");
+  const source = sourceText(prepareInferenceCheck(state));
+  const finalCheck = done + 1 >= MAX_INFERENCE_CHECKS;
+  let rewrote = false;
+  for (const entry of sentences) {
+    const item = given.find((i) => (i == null ? void 0 : i.id) === entry.id);
+    if (!item || !["ok", "rewrite", "delete"].includes(item.status))
+      throw new GateError("a check answers ok, rewrite or delete");
+    const answer = next.conclusion.answers.find((a) => a.claimId === entry.id);
+    let text13 = entry.sentence;
+    let remove = item.status === "delete";
+    if (item.status === "rewrite") {
+      const rewrite = guardText(item.rewrite, source, "a rewritten sentence");
+      const claim2 = answer ? next.claims.find((c) => c.id === answer.claimId) : void 0;
+      if (claim2 && answer) checkSentence(next, claim2, rewrite, answer.assumptions);
+      if (finalCheck) remove = true;
+      else text13 = rewrite;
+    }
+    if (remove) {
+      next.conclusion.deleted.push(entry.sentence);
+      if (answer) answer.sentence = "";
+      else delete next.conclusion.overall;
+    } else if (item.status === "rewrite") {
+      rewrote = true;
+      if (answer) answer.sentence = text13;
+      else next.conclusion.overall = text13;
+    }
+  }
+  next.run.inferenceChecks = done + 1;
+  if (rewrote && !finalCheck) return next;
+  const undecidable = liveTestables(next).some((c) => {
+    var _a3;
+    return ((_a3 = c.comparison) == null ? void 0 : _a3.state) === "undecidable";
+  });
+  next.conclusion.state = undecidable ? "undecidable" : "concluded";
+  next.run.phase = "concluded";
+  next.run.status = "finished";
+  delete next.run.stopReason;
+  return next;
+}
+function applyUserVerdict(state, hypothesisId, value) {
+  if (value !== void 0 && !oneOf3(VERDICT_VALUES, value)) throw new GateError("unknown verdict");
+  const next = clone3(state);
+  const h = next.hypotheses.find((o) => o.id === hypothesisId);
+  if (!h) throw new GateError(`unknown hypothesis ${hypothesisId}`);
+  if (value === void 0) delete h.userVerdict;
+  else h.userVerdict = value;
+  return next;
+}
+function applyPause2(state, reason) {
+  var _a2;
+  live2(state);
+  if (!["user", "interrupted", "error"].includes(reason)) throw new GateError("unknown pause reason");
+  const next = clone3(state);
+  for (const claim2 of next.claims) for (const d of (_a2 = claim2.data) != null ? _a2 : []) if (d.state === "searching") d.state = "pending";
+  for (const h of next.hypotheses) for (const need of h.needs) if (need.state === "searching") need.state = "pending";
+  next.run.status = "paused";
+  next.run.stopReason = reason;
+  return next;
+}
+function applyResume2(state) {
+  live2(state);
+  if (state.run.status !== "paused") throw new GateError("the run is not paused");
+  const next = clone3(state);
+  next.run.status = "running";
+  delete next.run.stopReason;
+  return next;
+}
+
+// experiences/visual-map/argument-card.ts
+var STANCE_KEY = {
+  supports: "ui.argument_stance_supports",
+  contradicts: "ui.argument_stance_contradicts",
+  uncertain: "ui.argument_stance_uncertain"
+};
+var STANCE_TONE = { supports: "yes", contradicts: "no", uncertain: "maybe" };
+var VERDICT_KEY = {
+  supported: "ui.hypothesis_supported",
+  refuted: "ui.hypothesis_refuted",
+  undecided: "ui.hypothesis_undecided"
+};
+var CONCLUSION_KIND = {
+  in_progress: "ui.argument_conclusion_state_progress",
+  concluded: "ui.argument_conclusion_state_concluded",
+  stopped_limit: "ui.argument_conclusion_state_limit",
+  stopped_mismatch: "ui.argument_conclusion_state_mismatch"
+};
+function sourceHost(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch (e) {
+    return "";
+  }
+}
+function missingChip(item, t2) {
+  if (item.state === "searching") return { tone: "run", text: t2("ui.argument_missing_searching") };
+  const key4 = item.state === "not_found" ? "ui.argument_missing_not_found" : "ui.argument_missing_pending";
+  return { tone: "gap", text: t2(key4) };
+}
+function datumChip(datum, t2) {
+  if (datum.state !== "found") return missingChip(datum, t2);
+  return datum.stance === "opposes" ? { tone: "no", text: t2("ui.argument_data_opposes") } : { tone: "yes", text: t2("ui.argument_stance_supports") };
+}
+function conclusionCard(state, t2) {
+  const view = conclusionView(state);
+  const base = {
+    role: "conclusion",
+    kind: t2(CONCLUSION_KIND[view]),
+    titleFrom: "text",
+    state: view,
+    chips: [],
+    lines: [],
+    label: t2(CONCLUSION_KIND[view])
+  };
+  const verified = verifiedCount(state);
+  if (view === "concluded")
+    return { ...base, titleFrom: "summary", lines: [t2("ui.argument_conclusion_done_hint", verified)] };
+  if (view === "stopped_mismatch")
+    return { ...base, title: t2("ui.argument_stopped_mismatch"), lines: [t2("ui.argument_mismatch_hint")] };
+  if (view === "stopped_limit")
+    return { ...base, title: t2("ui.argument_conclusion_limit"), lines: [t2("ui.argument_conclusion_limit_hint")] };
+  return {
+    ...base,
+    title: t2("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
+    lines: [t2("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
+  };
+}
+function hypothesisCard(state, h, t2) {
+  const index = state.hypotheses.indexOf(h) + 1;
+  const shown = displayVerdict(h);
+  const chips = h.location === "eliminated" ? [{ tone: "gap", text: t2("ui.argument_eliminated_chip") }] : [
+    shown === "verifying" ? { tone: "open", text: t2("ui.argument_verifying") } : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t2(VERDICT_KEY[shown]) }
+  ];
+  if (isVerified(h)) chips.push({ tone: "yes", text: t2("ui.argument_verified_done") });
+  const kind = t2("ui.argument_hypothesis_0", index);
+  const progress = t2("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
+  const lines = [progress];
+  if (h.location === "eliminated" && h.eliminationReason)
+    lines.push(t2("ui.argument_eliminated_0", h.eliminationReason));
+  const status = chips.map((chip) => chip.text).join(" ");
+  return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: `${kind}, ${status}, ${progress}` };
+}
+function needCard(need, t2) {
+  var _a2;
+  const kind = t2("ui.argument_evidence");
+  if (need.state === "found") {
+    const stance = (_a2 = need.stance) != null ? _a2 : "uncertain";
+    const chip2 = { tone: STANCE_TONE[stance], text: t2(STANCE_KEY[stance]) };
+    const host = need.proof ? sourceHost(need.proof.url) : "";
+    return {
+      role: "need",
+      kind: host ? `${kind} \xB7 ${host}` : kind,
+      titleFrom: "note",
+      chips: [chip2],
+      lines: need.proof ? [need.proof.claim] : [],
+      label: `${kind}, ${chip2.text}${host ? `, ${host}` : ""}`
+    };
+  }
+  const chip = missingChip(need, t2);
+  return {
+    role: "need",
+    kind,
+    titleFrom: "note",
+    dashed: true,
+    chips: [chip],
+    lines: need.reason ? [need.reason] : [],
+    label: `${kind}, ${chip.text}`
+  };
+}
+function datumCard(datum, t2) {
+  const kind = t2("ui.argument_data_item");
+  const chip = datumChip(datum, t2);
+  if (datum.state === "found") {
+    const host = datum.proof ? sourceHost(datum.proof.url) : "";
+    return {
+      role: "datum",
+      kind: host ? `${kind} \xB7 ${host}` : kind,
+      titleFrom: "note",
+      chips: [chip],
+      lines: datum.proof ? [datum.proof.claim] : [],
+      label: `${kind}, ${chip.text}${host ? `, ${host}` : ""}`
+    };
+  }
+  return {
+    role: "datum",
+    kind,
+    titleFrom: "note",
+    dashed: true,
+    chips: [chip],
+    lines: datum.reason ? [datum.reason] : [],
+    label: `${kind}, ${chip.text}`
+  };
+}
+function describeArgumentCard(state, id, t2) {
+  const { roles } = state;
+  const plain = (role, kind, lines = [], chips = []) => ({
+    role,
+    kind,
+    titleFrom: "note",
+    chips,
+    lines,
+    label: [kind, ...chips.map((chip) => chip.text), ...lines].join(", ")
+  });
+  if (id === roles.proposition) return plain("proposition", t2("ui.argument_proposition"));
+  if (id === roles.conclusion) return conclusionCard(state, t2);
+  if (id === roles.situation) {
+    const data = state.situation.data;
+    const found = data.filter((datum2) => datum2.state === "found").length;
+    const count4 = t2("ui.argument_data_count_0_1", found, data.length);
+    const gate = state.situation.gate.state;
+    if (gate === "matched")
+      return plain("situation", t2("ui.argument_situation"), [t2("ui.argument_gate_matched_0_1", found, data.length)]);
+    const chip = gate === "unmatched" ? { tone: "no", text: t2("ui.argument_gate_unmatched") } : { tone: "open", text: t2("ui.argument_gate_pending") };
+    return plain("situation", t2("ui.argument_situation"), [count4], [chip]);
+  }
+  const datum = state.situation.data.find((item) => item.id === id);
+  if (datum) return datumCard(datum, t2);
+  if ((id === roles.verified || id === roles.eliminated) && state.run.phase === "stopped_mismatch")
+    return plain("group", t2("ui.argument_group_label"));
+  if (id === roles.verified) {
+    const verifying = state.hypotheses.filter((h) => h.location === "verifying").length;
+    return plain("group", t2("ui.argument_group_label"), [
+      t2("ui.argument_group_verified_count_0_1", verifiedCount(state), Math.max(verifying, MIN_VERIFIED))
+    ]);
+  }
+  if (id === roles.eliminated) {
+    const count4 = state.hypotheses.filter((h) => h.location === "eliminated").length;
+    return plain("group", t2("ui.argument_group_label"), [t2("ui.argument_group_eliminated_count_0", count4)]);
+  }
+  for (const h of state.hypotheses) {
+    if (h.id === id) return hypothesisCard(state, h, t2);
+    const need = h.needs.find((item) => item.id === id);
+    if (need) return needCard(need, t2);
+  }
+  return null;
+}
+
+// experiences/visual-map/argument-card-v2.ts
+var ANSWER_KEY = {
+  holds: "ui.argument_v2_answer_holds",
+  fails: "ui.argument_v2_answer_fails",
+  causal_established: "ui.argument_v2_answer_causal_established",
+  causal_conditional: "ui.argument_v2_answer_causal_conditional",
+  causal_compatible: "ui.argument_v2_answer_causal_compatible",
+  causal_against: "ui.argument_v2_answer_causal_against",
+  main_cause_largest: "ui.argument_v2_answer_main_cause_largest",
+  main_cause_secondary: "ui.argument_v2_answer_main_cause_secondary",
+  main_cause_not: "ui.argument_v2_answer_main_cause_not",
+  main_cause_undecidable: "ui.argument_v2_answer_main_cause_undecidable",
+  compare_greater: "ui.argument_v2_answer_compare_greater",
+  compare_equivalent: "ui.argument_v2_answer_compare_equivalent",
+  compare_opposite: "ui.argument_v2_answer_compare_opposite",
+  compare_undetermined: "ui.argument_v2_answer_compare_undetermined",
+  insufficient: "ui.argument_v2_answer_insufficient"
+};
+var CLAIM_KIND = {
+  fact: "ui.argument_v2_claim_fact",
+  causal: "ui.argument_v2_claim_causal",
+  main_cause: "ui.argument_v2_claim_main_cause",
+  comparison: "ui.argument_v2_claim_comparison"
+};
+var ROLE_KEY = {
+  primary: "ui.argument_v2_role_primary",
+  alternative: "ui.argument_v2_role_alternative",
+  reverse: "ui.argument_v2_role_reverse",
+  common_cause: "ui.argument_v2_role_common_cause",
+  measurement: "ui.argument_v2_role_measurement",
+  facet: "ui.argument_v2_role_facet",
+  side: "ui.argument_v2_role_side"
+};
+var VERDICT_KEY2 = {
+  supported: "ui.hypothesis_supported",
+  refuted: "ui.hypothesis_refuted",
+  undecided: "ui.hypothesis_undecided",
+  insufficient: "ui.argument_v2_verdict_insufficient"
+};
+var VERDICT_TONE = { supported: "yes", refuted: "no", undecided: "maybe", insufficient: "open" };
+var CONFIDENCE_KEY = {
+  high: "ui.argument_v2_confidence_high",
+  medium: "ui.argument_v2_confidence_medium",
+  low: "ui.argument_v2_confidence_low"
+};
+var VETO_KEY = {
+  contradiction: "ui.argument_v2_veto_contradiction",
+  double_count: "ui.argument_v2_veto_double_count",
+  missed_alternative: "ui.argument_v2_veto_missed_alternative",
+  unhandled_counter: "ui.argument_v2_veto_unhandled_counter"
+};
+var CAUSAL_KEY = {
+  not_applicable: "ui.argument_v2_causal_not_applicable",
+  established: "ui.argument_v2_causal_established",
+  conditional: "ui.argument_v2_causal_conditional_0",
+  compatible: "ui.argument_v2_causal_compatible"
+};
+var CAUSE_ROLES2 = ["primary", "alternative", "reverse", "common_cause"];
+var labelOf = (kind, chips, lines) => [kind, ...chips.map((chip) => chip.text), ...lines].join(", ");
+function missingChip2(item, t2) {
+  if (item.state === "searching") return { tone: "run", text: t2("ui.argument_missing_searching") };
+  return {
+    tone: "gap",
+    text: t2(item.state === "not_found" ? "ui.argument_missing_not_found" : "ui.argument_missing_pending")
+  };
+}
+var checkedText = (check, t2) => t2(check === "page_match" ? "ui.argument_v2_checked" : "ui.argument_v2_unchecked");
+function datumCard2(datum, t2) {
+  var _a2;
+  const kind = t2("ui.argument_data_item");
+  if (datum.state !== "found") {
+    const chip = missingChip2(datum, t2);
+    const lines = datum.reason ? [datum.reason] : [];
+    return {
+      role: "datum",
+      kind,
+      titleFrom: "note",
+      dashed: true,
+      chips: [chip],
+      lines,
+      label: labelOf(kind, [chip], [])
+    };
+  }
+  const host = datum.proof ? sourceHost(datum.proof.url) : "";
+  const shown = [host, checkedText((_a2 = datum.proof) == null ? void 0 : _a2.check, t2)].filter(Boolean).join(" \xB7 ");
+  const chips = [
+    datum.stance === "opposes" ? { tone: "no", text: t2("ui.argument_data_opposes") } : { tone: "yes", text: t2("ui.argument_stance_supports") }
+  ];
+  if (datum.assessment && !datum.assessment.scopeFit)
+    chips.push({ tone: "gap", text: t2("ui.argument_v2_scope_mismatch") });
+  const kindLine = `${kind} \xB7 ${shown}`;
+  return {
+    role: "datum",
+    kind: kindLine,
+    titleFrom: "note",
+    chips,
+    lines: datum.proof ? [datum.proof.claim] : [],
+    label: labelOf(kindLine, chips, [])
+  };
+}
+function needCard2(state, h, need, t2) {
+  var _a2, _b2, _c;
+  const kind = t2("ui.argument_evidence");
+  if (need.state !== "found") {
+    const chip = missingChip2(need, t2);
+    return {
+      role: "need",
+      kind,
+      titleFrom: "note",
+      dashed: true,
+      chips: [chip],
+      lines: need.reason ? [need.reason] : [],
+      label: labelOf(kind, [chip], [])
+    };
+  }
+  const host = need.proof ? sourceHost(need.proof.url) : "";
+  const kindLine = `${kind} \xB7 ${[host, checkedText((_a2 = need.proof) == null ? void 0 : _a2.check, t2)].filter(Boolean).join(" \xB7 ")}`;
+  const chips = [];
+  const assessment = need.assessment;
+  if (!assessment) chips.push({ tone: "open", text: t2("ui.argument_v2_awaiting_assessment") });
+  else if (assessment.stance === "supports") {
+    chips.push({ tone: "yes", text: t2("ui.argument_stance_supports") });
+    const prediction = h.predictions.find((p) => p.id === need.predictionId);
+    if (prediction && prediction.alsoPredictedBy.every((entry) => entry.strength === "weaker"))
+      chips.push({ tone: "yes", text: t2("ui.argument_v2_distinguishing") });
+  } else if (assessment.stance === "refutes") {
+    chips.push({ tone: "no", text: t2("ui.argument_stance_contradicts") });
+    const cls = (_c = (_b2 = h.verdict) == null ? void 0 : _b2.refutations.find((entry) => entry.needId === need.id)) == null ? void 0 : _c.class;
+    if (cls)
+      chips.push({
+        tone: "no",
+        text: t2(
+          cls === "decisive" ? "ui.argument_v2_decisive" : cls === "conditional" ? "ui.argument_v2_conditional" : "ui.argument_v2_nondecisive"
+        )
+      });
+  } else chips.push({ tone: "gap", text: t2("ui.argument_v2_irrelevant") });
+  if (assessment && !assessment.scopeFit) chips.push({ tone: "gap", text: t2("ui.argument_v2_scope_mismatch") });
+  if (need.registered === "post")
+    chips.push({
+      tone: "open",
+      text: t2(need.replaces === void 0 ? "ui.argument_v2_exploratory" : "ui.argument_v2_post")
+    });
+  return {
+    role: "need",
+    kind: kindLine,
+    titleFrom: "note",
+    chips,
+    lines: need.proof ? [need.proof.claim] : [],
+    label: labelOf(kindLine, chips, [])
+  };
+}
+function requiredCounts(h) {
+  const qualifies2 = (need) => {
+    var _a2;
+    return need.state === "found" && ((_a2 = need.proof) == null ? void 0 : _a2.check) === "page_match" && !!need.assessment && need.assessment.relevant && need.assessment.scopeFit;
+  };
+  const met2 = (need) => qualifies2(need) || h.needs.some((r) => r.replaces === need.id && r.sameCondition === true && r.registered === "pre" && qualifies2(r));
+  const required = h.predictions.filter((p) => p.required);
+  const ok = required.filter((p) => {
+    const own2 = h.needs.filter((n) => n.predictionId === p.id && n.registered === "pre" && n.replaces === void 0);
+    return own2.length > 0 && own2.every(met2);
+  });
+  return { met: ok.length, total: required.length };
+}
+function hypothesisCard2(h, t2) {
+  var _a2, _b2;
+  const kind = t2("ui.argument_v2_hypothesis_0", t2(ROLE_KEY[h.role]));
+  const chips = [];
+  const lines = [];
+  const verdict = h.verdict;
+  if (verdict) {
+    chips.push({ tone: VERDICT_TONE[verdict.value], text: t2(VERDICT_KEY2[verdict.value]) });
+    chips.push({ tone: "open", text: t2("ui.argument_v2_confidence_0", t2(CONFIDENCE_KEY[verdict.confidence])) });
+    if (verdict.refutations.some((entry) => entry.class === "conditional"))
+      chips.push({ tone: "maybe", text: t2("ui.argument_v2_conditional") });
+  } else {
+    chips.push({ tone: "open", text: t2("ui.argument_v2_testing") });
+  }
+  if (h.userVerdict) chips.push({ tone: "open", text: t2("ui.argument_v2_user_mark_0", t2(VERDICT_KEY2[h.userVerdict])) });
+  if (h.addedAfterComparison) chips.push({ tone: "gap", text: t2("ui.argument_v2_late") });
+  if (((_b2 = (_a2 = h.reverdicts) != null ? _a2 : verdict == null ? void 0 : verdict.reverdicts) != null ? _b2 : 0) > 0)
+    chips.push({ tone: "maybe", text: t2("ui.argument_v2_reverdict") });
+  if (verdict && CAUSE_ROLES2.includes(h.role)) {
+    const assumptions = verdict.assumptionStatus.map((entry) => entry.assumption).join(t2("ui.list_separator"));
+    lines.push(
+      t2(
+        "ui.argument_v2_causal_line_0",
+        verdict.causal === "conditional" ? t2(CAUSAL_KEY.conditional, assumptions) : t2(CAUSAL_KEY[verdict.causal])
+      )
+    );
+  }
+  const counts = requiredCounts(h);
+  lines.push(t2("ui.argument_v2_required_0_1_2", counts.met, counts.total, Math.min(h.round, MAX_ROUND2)));
+  return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: labelOf(kind, chips, lines) };
+}
+function comparisonCard(state, claim2, t2) {
+  const c = claim2.comparison;
+  const own2 = state.hypotheses.filter((h) => h.claimId === claim2.id);
+  const ready = own2.length > 0 && own2.every((h) => h.verdict !== void 0);
+  const chips = [];
+  const lines = [];
+  let kind;
+  let title;
+  if (c.state === "done") {
+    kind = t2("ui.argument_v2_cmp_done");
+    title = c.answer ? t2(ANSWER_KEY[c.answer]) : t2("ui.argument_v2_cmp_done_title");
+  } else if (c.state === "vetoed" || c.state === "undecidable") {
+    const undecidable = c.state === "undecidable";
+    kind = t2(undecidable ? "ui.argument_v2_cmp_undecidable" : "ui.argument_v2_cmp_vetoed");
+    title = t2(undecidable ? "ui.argument_v2_cmp_undecidable_title" : "ui.argument_v2_cmp_vetoed_title");
+    chips.push({ tone: "no", text: t2(undecidable ? "ui.argument_v2_claim_blocked" : "ui.argument_v2_cmp_blocked") });
+    for (const veto of c.vetoes) if (!veto.resolved) lines.push(t2(VETO_KEY[veto.kind]));
+  } else {
+    kind = t2(ready ? "ui.argument_v2_cmp_running" : "ui.argument_v2_cmp_waiting");
+    title = t2(ready ? "ui.argument_v2_cmp_running_title" : "ui.argument_v2_cmp_waiting_title");
+  }
+  if (own2.some((h) => {
+    var _a2, _b2, _c;
+    return ((_c = (_b2 = h.reverdicts) != null ? _b2 : (_a2 = h.verdict) == null ? void 0 : _a2.reverdicts) != null ? _c : 0) > 0;
+  }))
+    chips.push({ tone: "maybe", text: t2("ui.argument_v2_reverdict") });
+  return {
+    role: "comparison",
+    kind,
+    titleFrom: "text",
+    title,
+    state: c.state,
+    chips,
+    lines,
+    label: labelOf(kind, chips, [title, ...lines])
+  };
+}
+function claimAnswer(state, claim2, t2) {
+  var _a2, _b2, _c;
+  const done = state.run.phase === "concluded" && state.conclusion.state === "concluded";
+  const answer = done ? (_a2 = state.conclusion.answers.find((entry) => entry.claimId === claim2.id)) == null ? void 0 : _a2.answer : void 0;
+  if (answer) return t2("ui.argument_v2_claim_answer_0", t2(ANSWER_KEY[answer]));
+  const blocked = state.run.phase === "concluded" && state.conclusion.state === "undecidable" && (((_b2 = claim2.comparison) == null ? void 0 : _b2.state) === "vetoed" || ((_c = claim2.comparison) == null ? void 0 : _c.state) === "undecidable");
+  return t2("ui.argument_v2_claim_answer_0", t2(blocked ? "ui.argument_v2_claim_blocked" : "ui.argument_v2_claim_open"));
+}
+function claimCard(state, claim2, t2) {
+  var _a2, _b2;
+  if (claim2.role === "premise") {
+    const kind2 = t2("ui.argument_v2_premise_kind");
+    const data = (_a2 = claim2.data) != null ? _a2 : [];
+    const found = data.filter((datum) => datum.state === "found").length;
+    const chip = claim2.result === "holds" ? { tone: "yes", text: t2("ui.argument_v2_premise_holds") } : claim2.result === "fails" ? { tone: "no", text: t2("ui.argument_v2_premise_fails") } : claim2.result === "insufficient" ? { tone: "maybe", text: t2("ui.argument_v2_premise_insufficient") } : { tone: "open", text: t2("ui.argument_v2_premise_checking") };
+    const lines2 = [t2("ui.argument_data_count_0_1", found, data.length)];
+    return {
+      role: "claim",
+      kind: kind2,
+      titleFrom: "note",
+      ...claim2.result === "insufficient" ? { dashed: true } : {},
+      state: (_b2 = claim2.result) != null ? _b2 : "checking",
+      chips: [chip],
+      lines: lines2,
+      label: labelOf(kind2, [chip], lines2)
+    };
+  }
+  const kind = t2(CLAIM_KIND[claim2.type]);
+  if (claim2.status === "not_evaluated") {
+    const chip = { tone: "open", text: t2("ui.argument_v2_not_evaluated") };
+    const lines2 = [t2("ui.argument_v2_not_evaluated_hint")];
+    return {
+      role: "claim",
+      kind,
+      titleFrom: "note",
+      dashed: true,
+      state: "not_evaluated",
+      chips: [chip],
+      lines: lines2,
+      label: labelOf(kind, [chip], lines2)
+    };
+  }
+  const lines = [claimAnswer(state, claim2, t2)];
+  const count4 = state.hypotheses.filter((h) => h.claimId === claim2.id).length;
+  if (count4) lines.push(t2("ui.argument_v2_claim_hypotheses_0", count4));
+  return {
+    role: "claim",
+    kind,
+    titleFrom: "note",
+    state: claim2.status,
+    chips: [],
+    lines,
+    label: labelOf(kind, [], lines)
+  };
+}
+function conclusionViewV2(state) {
+  if (state.run.phase === "stopped_premise") return "stopped_premise";
+  if (state.run.phase === "concluded" && state.conclusion.state === "concluded") return "concluded";
+  if (state.run.phase === "concluded" && state.conclusion.state === "undecidable") return "undecidable";
+  return "pending";
+}
+var CONCLUSION_KIND2 = {
+  pending: "ui.argument_v2_concl_pending",
+  concluded: "ui.argument_v2_concl_concluded",
+  undecidable: "ui.argument_v2_concl_undecidable",
+  stopped_premise: "ui.argument_v2_concl_stopped_premise"
+};
+function conclusionCard2(state, t2) {
+  const view = conclusionViewV2(state);
+  const kind = t2(CONCLUSION_KIND2[view]);
+  const card = (titleFrom, title, hint) => ({
+    role: "conclusion",
+    kind,
+    state: view,
+    chips: [],
+    titleFrom,
+    ...title === void 0 ? {} : { title },
+    lines: [hint],
+    label: labelOf(kind, [], [...title === void 0 ? [] : [title], hint])
+  });
+  if (view === "concluded") return card("summary", void 0, t2("ui.argument_v2_concl_concluded_hint"));
+  if (view === "undecidable")
+    return card("text", t2("ui.argument_v2_concl_undecidable_title"), t2("ui.argument_v2_concl_undecidable_hint"));
+  if (view === "stopped_premise")
+    return card("text", t2("ui.argument_v2_concl_stopped_title"), t2("ui.argument_v2_concl_stopped_hint"));
+  const testable = state.hypotheses;
+  const judged = testable.filter((h) => h.verdict !== void 0).length;
+  return card(
+    "text",
+    t2("ui.argument_v2_concl_pending_title"),
+    t2("ui.argument_v2_concl_pending_hint_0_1", judged, testable.length)
+  );
+}
+function describeArgumentCardV2(state, id, t2) {
+  var _a2, _b2, _c;
+  const { roles } = state;
+  const plain = (role, kind, lines = [], over = {}) => ({
+    role,
+    kind,
+    titleFrom: "note",
+    chips: [],
+    lines,
+    label: labelOf(kind, [], [...over.title === void 0 ? [] : [over.title], ...lines]),
+    ...over
+  });
+  if (id === roles.proposition) {
+    const asked = (_a2 = state.framing.candidates.find((candidate) => candidate.id === state.framing.chosen)) == null ? void 0 : _a2.question;
+    return plain(
+      "proposition",
+      t2("ui.argument_v2_proposition_kind"),
+      asked ? [t2("ui.argument_v2_asked_0", asked)] : []
+    );
+  }
+  if (id === roles.conclusion) return conclusionCard2(state, t2);
+  if (id === roles.premises) {
+    const premises = state.claims.filter((claim2) => claim2.role === "premise");
+    const holds = premises.filter((claim2) => claim2.result === "holds").length;
+    return plain(
+      "group",
+      t2("ui.argument_group_label"),
+      [t2("ui.argument_v2_premises_count_0_1", holds, premises.length)],
+      {
+        titleFrom: "text",
+        title: t2("ui.argument_v2_premises_title")
+      }
+    );
+  }
+  for (const claim2 of state.claims) {
+    if (claim2.id === id) return claimCard(state, claim2, t2);
+    if (((_b2 = claim2.comparison) == null ? void 0 : _b2.nodeId) === id) return comparisonCard(state, claim2, t2);
+    const datum = (_c = claim2.data) == null ? void 0 : _c.find((item) => item.id === id);
+    if (datum) return datumCard2(datum, t2);
+  }
+  for (const h of state.hypotheses) {
+    if (h.id === id) return hypothesisCard2(h, t2);
+    const need = h.needs.find((item) => item.id === id);
+    if (need) return needCard2(state, h, need, t2);
+  }
+  return null;
+}
+function describeLegacyArgumentCard(state, id, t2) {
+  const view = describeArgumentCard(state, id, t2);
+  if (!view || view.role !== "conclusion") return view;
+  const marker5 = t2("ui.argument_legacy_marker");
+  return { ...view, lines: [...view.lines, marker5], label: `${view.label}, ${marker5}` };
+}
+function renderArgumentKindV2(header2, view) {
+  const kind = header2.createSpan({ cls: "vam-argument-kind", text: view.kind });
+  kind.dataset.role = view.role;
+  return kind;
+}
+function renderArgumentCardBodyV2(card, view) {
+  card.dataset.argumentRole = view.role;
+  if (view.state) card.dataset.argumentState = view.state;
+  if (view.dashed) card.dataset.argumentMissing = "true";
+  const body = card.createDiv({ cls: "vam-argument-body" });
+  if (view.chips.length) {
+    const row = body.createDiv({ cls: "vam-argument-chips" });
+    for (const chip of view.chips) row.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
+  }
+  for (const line of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line });
+  return body;
 }
 
 // core/argument-map/layout.ts
@@ -47524,7 +48985,7 @@ var ASSESSMENT_SCHEMA = S.obj({
     1
   )
 });
-var scopeOf = (claim2) => ({
+var scopeOf2 = (claim2) => ({
   claim: claim2.text,
   definitions: claim2.definitions.map((d) => ({ term: d.term, meaning: d.meaning }))
 });
@@ -47536,7 +48997,7 @@ function premiseAssessmentParts(claim2) {
   const todo = data.filter((d) => !d.assessment);
   if (!todo.length) throw new ArgumentStepError("no premise datum is waiting for an assessment");
   return {
-    scope: scopeOf(claim2),
+    scope: scopeOf2(claim2),
     items: todo.map((d) => ({
       id: d.id,
       need: d.need,
@@ -47559,7 +49020,7 @@ function needAssessmentParts(state, hypothesisId) {
   const todo = h.needs.filter((n) => n.state === "found" && !n.assessment && n.proof);
   if (!todo.length) throw new ArgumentStepError("no need is waiting for an assessment");
   return {
-    scope: scopeOf(claim2),
+    scope: scopeOf2(claim2),
     items: todo.map((n) => {
       var _a2, _b2;
       return {
@@ -47869,1449 +49330,6 @@ var conclusionV2Step = {
   parse: parseConclusionV2
 };
 
-// core/argument-map/machine-v2.ts
-var TERMINAL2 = ["concluded", "stopped_premise"];
-var clone3 = (value) => JSON.parse(JSON.stringify(value));
-var blank2 = (value) => typeof value !== "string" || value.trim() === "";
-var isTerminal2 = (state) => TERMINAL2.includes(state.run.phase);
-var oneOf3 = (list2, value) => typeof value === "string" && list2.includes(value);
-function live2(state) {
-  if (isTerminal2(state)) throw new GateError(`run is finished (${state.run.phase})`);
-}
-function running2(state) {
-  live2(state);
-  if (state.run.status !== "running") throw new GateError("run is not running");
-}
-function inPremises(state) {
-  live2(state);
-  if (state.run.phase !== "premises") throw new GateError("the premise phase is over");
-}
-function inAnalysis2(state) {
-  live2(state);
-  if (state.run.phase !== "analysis") throw new GateError("the premises are not settled");
-}
-function allIds2(state) {
-  var _a2;
-  const ids = new Set(Object.values(state.roles));
-  for (const claim2 of state.claims) {
-    ids.add(claim2.id);
-    for (const datum of (_a2 = claim2.data) != null ? _a2 : []) ids.add(datum.id);
-    if (claim2.comparison) ids.add(claim2.comparison.nodeId);
-  }
-  for (const h of state.hypotheses) {
-    ids.add(h.id);
-    for (const p of h.predictions) ids.add(p.id);
-    for (const need of h.needs) ids.add(need.id);
-  }
-  return ids;
-}
-function newId3(ids, id) {
-  if (blank2(id)) throw new GateError("empty id");
-  const text13 = id;
-  if (ids.has(text13)) throw new GateError(`duplicate id ${text13}`);
-  ids.add(text13);
-  return text13;
-}
-function checkedProof2(value) {
-  const p = value;
-  if (!p || typeof p !== "object" || blank2(p.url) || blank2(p.quote) || blank2(p.claim) || blank2(p.checkedAt))
-    throw new GateError("evidence needs a source");
-  if (!oneOf3(PROOF_CHECKS2, p.check)) throw new GateError("unknown source check");
-  let protocol = "";
-  try {
-    protocol = new URL(p.url).protocol;
-  } catch (e) {
-    throw new GateError("source url is not a url");
-  }
-  if (protocol !== "http:" && protocol !== "https:") throw new GateError("source url must be http(s)");
-  return {
-    url: p.url,
-    quote: p.quote,
-    claim: p.claim,
-    check: p.check,
-    checkedAt: p.checkedAt
-  };
-}
-function checkedAssessment(value, siblings) {
-  const a = value;
-  if (!a || typeof a !== "object") throw new GateError("assessment missing");
-  if (typeof a.relevant !== "boolean" || typeof a.scopeFit !== "boolean") throw new GateError("assessment malformed");
-  if (!oneOf3(EVIDENCE_STANCES, a.stance)) throw new GateError("unknown assessment stance");
-  if (a.relevant !== (a.stance !== "irrelevant")) throw new GateError("assessment relevance and stance disagree");
-  if (!a.scopeFit && blank2(a.scopeNote)) throw new GateError("a scope miss needs a note");
-  if (blank2(a.sourceType) || blank2(a.underlyingSource))
-    throw new GateError("assessment needs a source type and an underlying source");
-  const also = Array.isArray(a.alsoRelevantTo) ? a.alsoRelevantTo : [];
-  if (also.some((id) => !siblings.has(id))) throw new GateError("alsoRelevantTo names a hypothesis outside this claim");
-  const out = {
-    relevant: a.relevant,
-    stance: a.stance,
-    scopeFit: a.scopeFit,
-    sourceType: a.sourceType,
-    underlyingSource: a.underlyingSource,
-    alsoRelevantTo: [...new Set(also)]
-  };
-  if (typeof a.scopeNote === "string" && a.scopeNote.trim() !== "") out.scopeNote = a.scopeNote;
-  return out;
-}
-function claimOf(state, id) {
-  const found = state.claims.find((c) => c.id === id);
-  if (!found) throw new GateError(`unknown claim ${id}`);
-  return found;
-}
-function openPremise(state, id) {
-  const claim2 = claimOf(state, id);
-  if (claim2.role !== "premise") throw new GateError(`${id} is not a premise`);
-  if (claim2.status === "done" || claim2.status === "not_evaluated") throw new GateError(`premise ${id} is closed`);
-  return claim2;
-}
-function liveTestable(state, id) {
-  const claim2 = claimOf(state, id);
-  if (claim2.role !== "testable") throw new GateError(`${id} is not a testable claim`);
-  if (claim2.status === "not_evaluated") throw new GateError(`claim ${id} was not evaluated`);
-  return claim2;
-}
-function hypothesisOf2(state, id) {
-  const found = state.hypotheses.find((h) => h.id === id);
-  if (!found) throw new GateError(`unknown hypothesis ${id}`);
-  liveTestable(state, found.claimId);
-  if (found.verdict !== void 0) throw new GateError(`hypothesis ${id} already has a verdict`);
-  return found;
-}
-var premisesOf = (state) => state.claims.filter((c) => c.role === "premise");
-var budgetLeft = (state) => MAX_RESEARCH_CALLS2 - state.run.researchCalls;
-var verifiedProof = (item) => {
-  var _a2;
-  return ((_a2 = item.proof) == null ? void 0 : _a2.check) === "page_match";
-};
-function newArgumentMap2(framing, input2) {
-  var _a2;
-  if (!framing || typeof framing !== "object") throw new GateError("framing missing");
-  if (blank2(framing.lockedAt)) throw new GateError("the framing is not locked");
-  if (blank2(framing.original) || blank2(framing.restatement))
-    throw new GateError("framing needs the original and a restatement");
-  if (!Number.isInteger(framing.attempts) || framing.attempts < 1 || framing.attempts > MAX_FRAMING_CALLS)
-    throw new GateError("framing attempts out of range");
-  if (!Array.isArray(framing.candidates) || framing.candidates.length === 0)
-    throw new GateError("framing has no candidate question");
-  const candidateIds = /* @__PURE__ */ new Set();
-  for (const candidate of framing.candidates) {
-    if (blank2(candidate == null ? void 0 : candidate.id) || candidateIds.has(candidate.id))
-      throw new GateError("candidate id missing or duplicated");
-    candidateIds.add(candidate.id);
-    if (blank2(candidate.question) || blank2(candidate.answerShape)) throw new GateError("candidate malformed");
-    if (!oneOf3(CANDIDATE_KINDS, candidate.kind)) throw new GateError("unknown candidate kind");
-  }
-  if (!candidateIds.has(framing.chosen)) throw new GateError("the chosen question is not a candidate");
-  if (blank2(input2 == null ? void 0 : input2.runId)) throw new GateError("a run needs an id");
-  const roleIds = Object.values((_a2 = input2.roles) != null ? _a2 : {});
-  if (roleIds.length !== 3 || roleIds.some(blank2)) throw new GateError("roles missing");
-  const drafts = Array.isArray(input2.claims) ? input2.claims : [];
-  const premises = drafts.filter((c) => c.role === "premise");
-  const testable = drafts.filter((c) => c.role === "testable");
-  if (premises.length + testable.length !== drafts.length) throw new GateError("unknown claim role");
-  if (premises.length > MAX_PREMISES) throw new GateError("too many premises");
-  if (testable.length < 1 || testable.length > MAX_TESTABLE) throw new GateError("a map needs 1 or 2 testable claims");
-  const ids = /* @__PURE__ */ new Set();
-  for (const id of roleIds) newId3(ids, id);
-  const claims = [];
-  for (const draft of drafts) {
-    newId3(ids, draft.id);
-    if (blank2(draft.text)) throw new GateError("empty claim");
-    if (!oneOf3(CLAIM_TYPES, draft.type) || !oneOf3(CLAIM_ROLES, draft.role))
-      throw new GateError("unknown claim type or role");
-    if (!Array.isArray(draft.dependsOn) || !Array.isArray(draft.definitions)) throw new GateError("claim malformed");
-    for (const d of draft.definitions)
-      if (blank2(d == null ? void 0 : d.term) || blank2(d == null ? void 0 : d.meaning)) throw new GateError("definition malformed");
-    const claim2 = {
-      id: draft.id,
-      text: draft.text,
-      type: draft.type,
-      role: draft.role,
-      dependsOn: [...draft.dependsOn],
-      definitions: draft.definitions.map((d) => ({ term: d.term, meaning: d.meaning })),
-      status: "pending"
-    };
-    if (draft.role === "premise") {
-      if (draft.type !== "fact") throw new GateError("only a fact can be a premise");
-      if (draft.comparisonNodeId !== void 0) throw new GateError("a premise has no comparison card");
-      const data = Array.isArray(draft.data) ? draft.data : [];
-      if (data.length < 1 || data.length > MAX_PREMISE_DATA) throw new GateError("a premise needs 1 or 2 data");
-      claim2.data = data.map((d) => {
-        if (blank2(d == null ? void 0 : d.need)) throw new GateError("empty premise need");
-        return { id: newId3(ids, d.id), need: d.need, attempts: 0, state: "pending" };
-      });
-    } else {
-      if (draft.data !== void 0) throw new GateError("only a premise carries data");
-      claim2.comparison = {
-        nodeId: newId3(ids, draft.comparisonNodeId),
-        attempts: 0,
-        state: "pending",
-        vetoes: [],
-        allocations: [],
-        missedAlternativeAdded: false
-      };
-    }
-    claims.push(claim2);
-  }
-  const byId = new Map(claims.map((c) => [c.id, c]));
-  for (const claim2 of claims)
-    for (const dep of claim2.dependsOn) {
-      const target = byId.get(dep);
-      if (!target || target === claim2) throw new GateError("a claim depends on an unknown claim or on itself");
-      if (target.role !== "premise") throw new GateError("a claim can only depend on a premise");
-    }
-  const visiting = /* @__PURE__ */ new Set();
-  const visited = /* @__PURE__ */ new Set();
-  const walk = (id) => {
-    var _a3, _b2;
-    if (visited.has(id)) return;
-    if (visiting.has(id)) throw new GateError("premise dependencies loop");
-    visiting.add(id);
-    for (const dep of (_b2 = (_a3 = byId.get(id)) == null ? void 0 : _a3.dependsOn) != null ? _b2 : []) walk(dep);
-    visiting.delete(id);
-    visited.add(id);
-  };
-  for (const claim2 of claims) walk(claim2.id);
-  const state = {
-    v: 2,
-    roles: { ...input2.roles },
-    framing: clone3(framing),
-    claims,
-    hypotheses: [],
-    run: { runId: input2.runId, phase: premises.length ? "premises" : "analysis", status: "running", researchCalls: 0 },
-    conclusion: { state: "pending", answers: [], deleted: [] }
-  };
-  return state;
-}
-var qualifies = (need) => need.state === "found" && verifiedProof(need) && !!need.assessment && need.assessment.relevant && need.assessment.scopeFit;
-var met = (h, need) => qualifies(need) || h.needs.some((r) => r.replaces === need.id && r.sameCondition === true && r.registered === "pre" && qualifies(r));
-function requiredMet(h) {
-  const required = h.predictions.filter((p) => p.required);
-  if (!required.length) return false;
-  return required.every((p) => {
-    const own2 = h.needs.filter((n) => n.predictionId === p.id && n.registered === "pre" && n.replaces === void 0);
-    return own2.length > 0 && own2.every((n) => met(h, n));
-  });
-}
-var awaitingAssessment = (h) => h.needs.some((n) => n.state === "found" && !n.assessment);
-var canAddRound = (h) => h.round < MAX_ROUND2 && h.needs.length < MAX_NEEDS2;
-function testStatus(h, researchCalls = 0) {
-  if (requiredMet(h)) return "complete";
-  if (h.needs.some((n) => n.state === "searching") || awaitingAssessment(h)) return "in_progress";
-  const exhausted = researchCalls >= MAX_RESEARCH_CALLS2;
-  if (!exhausted && h.needs.some((n) => n.state === "pending")) return "in_progress";
-  if (exhausted) return "limit_incomplete";
-  return canAddRound(h) ? "in_progress" : "limit_incomplete";
-}
-var hasVerifiedRefutation = (h) => h.needs.some((n) => {
-  var _a2;
-  return qualifies(n) && ((_a2 = n.assessment) == null ? void 0 : _a2.stance) === "refutes";
-});
-function premiseActions(state, claim2) {
-  var _a2;
-  const data = (_a2 = claim2.data) != null ? _a2 : [];
-  if (data.some((d) => d.state === "searching")) return [];
-  const actions = [];
-  let budget = budgetLeft(state);
-  for (const datum of data)
-    if (datum.state === "pending" && datum.attempts < MAX_PREMISE_ATTEMPTS && budget > 0) {
-      actions.push({ type: "research_premise", claimId: claim2.id, dataId: datum.id });
-      budget -= 1;
-    }
-  if (actions.length) return actions;
-  if (data.some((d) => d.state !== "found")) return [{ type: "premise_missing", claimId: claim2.id }];
-  return [{ type: data.every((d) => d.assessment) ? "judge_premise" : "assess_premise", claimId: claim2.id }];
-}
-function hypothesisActions(state, h) {
-  if (h.verdict !== void 0) return [];
-  if (h.needs.some((n) => n.state === "searching") && !h.needs.some((n) => n.state === "pending")) return [];
-  const calls = state.run.researchCalls;
-  if (h.needs.length === 0)
-    return [{ type: calls >= MAX_RESEARCH_CALLS2 ? "program_verdict" : "add_needs", hypothesisId: h.id }];
-  const actions = [];
-  let budget = budgetLeft(state);
-  for (const need of h.needs)
-    if (need.state === "pending" && budget > 0) {
-      actions.push({ type: "research_need", hypothesisId: h.id, needId: need.id });
-      budget -= 1;
-    }
-  if (actions.length || h.needs.some((n) => n.state === "searching")) return actions;
-  if (awaitingAssessment(h)) return [{ type: "assess_evidence", hypothesisId: h.id }];
-  const status = testStatus(h, calls);
-  if (status === "complete") return [{ type: "verdict", hypothesisId: h.id }];
-  if (status === "limit_incomplete")
-    return [{ type: hasVerifiedRefutation(h) ? "verdict" : "program_verdict", hypothesisId: h.id }];
-  return [{ type: "next_round", hypothesisId: h.id }];
-}
-var minHypotheses = (type) => type === "fact" ? 2 : 3;
-var canPropose = (state, claim2) => state.run.researchCalls < MAX_RESEARCH_CALLS2 && MAX_HYPOTHESES2 - state.hypotheses.length >= minHypotheses(claim2.type);
-var closedClaim = (claim2) => {
-  var _a2, _b2;
-  return ((_a2 = claim2.comparison) == null ? void 0 : _a2.state) === "done" || ((_b2 = claim2.comparison) == null ? void 0 : _b2.state) === "undecidable";
-};
-var claimHypotheses = (state, claimId) => state.hypotheses.filter((h) => h.claimId === claimId);
-var liveTestables = (state) => state.claims.filter((c) => c.role === "testable" && c.status !== "not_evaluated");
-var alternativePending = (claim2) => {
-  var _a2;
-  return ((_a2 = claim2.comparison) == null ? void 0 : _a2.state) === "vetoed" && !claim2.comparison.missedAlternativeAdded && claim2.comparison.vetoes.some((v) => !v.resolved && v.kind === "missed_alternative");
-};
-var verdictsComplete = (state, claim2) => {
-  const own2 = claimHypotheses(state, claim2.id);
-  return own2.length > 0 && own2.every((h) => h.verdict !== void 0);
-};
-function readyToCompare(state, claim2) {
-  const c = claim2.comparison;
-  if (!c || claim2.status === "not_evaluated") return false;
-  if (c.state !== "pending" && c.state !== "vetoed") return false;
-  if (c.attempts >= MAX_COMPARISONS || alternativePending(claim2)) return false;
-  return verdictsComplete(state, claim2);
-}
-function settle(next) {
-  if (!["analysis", "comparison", "conclusion"].includes(next.run.phase)) return next;
-  const live3 = liveTestables(next);
-  if (live3.every(closedClaim)) next.run.phase = "conclusion";
-  else if (live3.every((c) => closedClaim(c) || verdictsComplete(next, c) && !alternativePending(c)))
-    next.run.phase = "comparison";
-  else next.run.phase = "analysis";
-  return next;
-}
-function nextActions2(state) {
-  var _a2;
-  if (isTerminal2(state) || state.run.status !== "running") return [];
-  if (state.run.phase === "premises") {
-    const out2 = [];
-    for (const claim2 of premisesOf(state))
-      if (claim2.status === "pending" || claim2.status === "in_progress") out2.push(...premiseActions(state, claim2));
-    return out2;
-  }
-  if (state.run.phase === "conclusion") return [{ type: "conclude" }];
-  if (state.run.phase === "inference_check")
-    return ((_a2 = state.run.inferenceChecks) != null ? _a2 : 0) < MAX_INFERENCE_CHECKS ? [{ type: "inference_check" }] : [];
-  if (state.run.phase !== "analysis" && state.run.phase !== "comparison") return [];
-  const out = [];
-  for (const claim2 of state.claims) {
-    if (claim2.role !== "testable" || claim2.status === "not_evaluated" || closedClaim(claim2)) continue;
-    const own2 = claimHypotheses(state, claim2.id);
-    if (own2.length === 0) {
-      out.push({ type: canPropose(state, claim2) ? "propose_hypotheses" : "no_hypotheses", claimId: claim2.id });
-      continue;
-    }
-    if (alternativePending(claim2)) out.push({ type: "propose_alternatives", claimId: claim2.id });
-    for (const h of own2) out.push(...hypothesisActions(state, h));
-    if (readyToCompare(state, claim2)) out.push({ type: "compare", claimId: claim2.id });
-  }
-  return out;
-}
-function datumOf(claim2, id) {
-  var _a2;
-  const datum = (_a2 = claim2.data) == null ? void 0 : _a2.find((d) => d.id === id);
-  if (!datum) throw new GateError(`unknown premise datum ${id}`);
-  return datum;
-}
-function beginPremiseResearch(state, claimId, dataId) {
-  inPremises(state);
-  running2(state);
-  const next = clone3(state);
-  const claim2 = openPremise(next, claimId);
-  const datum = datumOf(claim2, dataId);
-  if (datum.state !== "pending") throw new GateError("premise datum is not waiting for research");
-  if (datum.attempts >= MAX_PREMISE_ATTEMPTS) throw new GateError("premise datum is out of attempts");
-  if (next.run.researchCalls >= MAX_RESEARCH_CALLS2) throw new GateError("research call limit reached");
-  datum.attempts += 1;
-  datum.state = "searching";
-  claim2.status = "in_progress";
-  next.run.researchCalls += 1;
-  return next;
-}
-function applyPremiseEvidence(state, claimId, dataId, result) {
-  inPremises(state);
-  const next = clone3(state);
-  const datum = datumOf(openPremise(next, claimId), dataId);
-  if (datum.state !== "searching") throw new GateError("premise datum is not being researched");
-  if (result.found === true) {
-    datum.proof = checkedProof2(result.proof);
-    if (result.stance === "supports" || result.stance === "opposes") datum.stance = result.stance;
-    datum.state = "found";
-    return next;
-  }
-  if (blank2(result.reason)) throw new GateError("a miss needs a reason");
-  datum.reason = result.reason;
-  datum.state = datum.attempts >= MAX_PREMISE_ATTEMPTS ? "not_found" : "pending";
-  return next;
-}
-function releasePremiseResearch(state, claimId, dataId) {
-  inPremises(state);
-  const next = clone3(state);
-  const datum = datumOf(openPremise(next, claimId), dataId);
-  if (datum.state !== "searching") throw new GateError("premise datum is not being researched");
-  datum.state = "pending";
-  datum.attempts -= 1;
-  return next;
-}
-function dependents(state, claimId) {
-  const hit = /* @__PURE__ */ new Set([claimId]);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const c of state.claims)
-      if (!hit.has(c.id) && c.dependsOn.some((d) => hit.has(d))) {
-        hit.add(c.id);
-        grew = true;
-      }
-  }
-  hit.delete(claimId);
-  return state.claims.filter((c) => hit.has(c.id));
-}
-function settlePremises(next) {
-  if (!premisesOf(next).every((c) => c.status === "done" || c.status === "not_evaluated")) return next;
-  const testable = next.claims.filter((c) => c.role === "testable");
-  if (!testable.every((c) => c.status === "not_evaluated")) {
-    next.run.phase = "analysis";
-    return next;
-  }
-  const blockers = premisesOf(next).filter((c) => c.result === "fails" || c.result === "insufficient");
-  const onlyMissing = blockers.length > 0 && blockers.every((c) => {
-    var _a2;
-    return ((_a2 = c.data) != null ? _a2 : []).some((d) => d.state === "not_found");
-  });
-  next.run.phase = "stopped_premise";
-  next.run.status = "finished";
-  next.run.stopReason = onlyMissing ? "data_missing" : "premise";
-  next.conclusion = { state: "stopped_premise", answers: [], deleted: [] };
-  return next;
-}
-function closePremise(next, claim2, result) {
-  claim2.result = result;
-  claim2.status = "done";
-  if (result !== "holds") for (const dependent of dependents(next, claim2.id)) dependent.status = "not_evaluated";
-  return settlePremises(next);
-}
-function applyPremiseMissing(state, claimId) {
-  var _a2, _b2;
-  inPremises(state);
-  const next = clone3(state);
-  const claim2 = openPremise(next, claimId);
-  const data = (_a2 = claim2.data) != null ? _a2 : [];
-  if (data.some((d) => d.state === "searching")) throw new GateError("premise data are still being researched");
-  const researchable = (d) => d.state === "pending" && d.attempts < MAX_PREMISE_ATTEMPTS && next.run.researchCalls < MAX_RESEARCH_CALLS2;
-  if (data.some(researchable)) throw new GateError("premise data can still be researched");
-  if (data.every((d) => d.state === "found")) throw new GateError("no premise datum is missing");
-  for (const d of data)
-    if (d.state === "pending") {
-      d.state = "not_found";
-      d.reason = (_b2 = d.reason) != null ? _b2 : "research limit reached";
-    }
-  return closePremise(next, claim2, "insufficient");
-}
-function applyPremiseAssessments(state, claimId, items) {
-  var _a2;
-  inPremises(state);
-  const next = clone3(state);
-  const claim2 = openPremise(next, claimId);
-  const data = (_a2 = claim2.data) != null ? _a2 : [];
-  if (data.some((d) => d.state !== "found" || !d.proof)) throw new GateError("every premise datum must be found first");
-  const todo = data.filter((d) => !d.assessment);
-  const given = Array.isArray(items) ? items : [];
-  if (!todo.length || given.length !== todo.length || new Set(given.map((i) => i == null ? void 0 : i.datumId)).size !== todo.length)
-    throw new GateError("assess every unassessed premise datum, once");
-  for (const item of given) {
-    const datum = todo.find((d) => d.id === item.datumId);
-    if (!datum) throw new GateError("assessment names a datum outside this premise");
-    datum.assessment = checkedAssessment(item.assessment, /* @__PURE__ */ new Set());
-  }
-  return next;
-}
-function applyPremiseResult(state, claimId, verdict) {
-  var _a2, _b2;
-  inPremises(state);
-  const next = clone3(state);
-  const claim2 = openPremise(next, claimId);
-  const data = (_a2 = claim2.data) != null ? _a2 : [];
-  if (data.some((d) => d.state !== "found" || !d.assessment))
-    throw new GateError("every premise datum must be found and assessed first");
-  if (!oneOf3(PREMISE_RESULTS, verdict.result)) throw new GateError("unknown premise result");
-  if (blank2(verdict.reason)) throw new GateError("a premise result needs a reason");
-  const cited = Array.isArray(verdict.citedData) ? verdict.citedData : [];
-  const known = new Map(data.map((d) => [d.id, d]));
-  if (cited.some((id) => !known.has(id))) throw new GateError("the result cites data outside the premise");
-  if (verdict.result !== "insufficient") {
-    if (!cited.length) throw new GateError("holds and fails must cite data");
-    for (const id of cited) {
-      const datum = known.get(id);
-      if (!verifiedProof(datum) || !((_b2 = datum.assessment) == null ? void 0 : _b2.relevant) || !datum.assessment.scopeFit)
-        throw new GateError("a premise result may only rest on checked, relevant, in-scope data");
-    }
-  }
-  return closePremise(next, claim2, verdict.result);
-}
-var CAUSAL_ROLES = ["primary", "alternative", "reverse", "common_cause"];
-var ROLES_OF = {
-  fact: ["facet"],
-  causal: CAUSAL_ROLES,
-  main_cause: CAUSAL_ROLES,
-  comparison: ["primary", "alternative", "measurement"]
-};
-function checkFloor(type, roles) {
-  const n = (role) => roles.filter((r) => r === role).length;
-  if (roles.some((r) => !ROLES_OF[type].includes(r)))
-    throw new GateError("a hypothesis role does not fit the claim type");
-  if (type === "fact" && n("facet") < 2) throw new GateError("a fact needs at least 2 facets");
-  if (type === "comparison" && !(n("primary") === 1 && n("alternative") >= 1 && n("measurement") >= 1))
-    throw new GateError("a comparison needs A, B and a measurement explanation");
-  if ((type === "causal" || type === "main_cause") && !(n("primary") === 1 && roles.length >= 3))
-    throw new GateError("a cause needs H-Y and 2 alternatives");
-}
-function applyHypotheses2(state, claimId, items) {
-  inAnalysis2(state);
-  const type = liveTestable(state, claimId).type;
-  if (state.hypotheses.some((h) => h.claimId === claimId)) throw new GateError("the claim already has hypotheses");
-  if (!Array.isArray(items) || !items.length) throw new GateError("no hypotheses");
-  if (state.hypotheses.length + items.length > MAX_HYPOTHESES2) throw new GateError("hypothesis limit reached");
-  checkFloor(
-    type,
-    items.map((i) => i == null ? void 0 : i.role)
-  );
-  const next = buildHypotheses(state, claimId, items, false);
-  claimOf(next, claimId).status = "in_progress";
-  return settle(next);
-}
-function buildHypotheses(state, claimId, items, late) {
-  const next = clone3(state);
-  const claim2 = claimOf(next, claimId);
-  const ids = allIds2(next);
-  const batch = new Set(items.map((i) => i == null ? void 0 : i.id));
-  if (batch.size !== items.length) throw new GateError("duplicate hypothesis id");
-  const known = new Set(batch);
-  if (late) {
-    for (const h of next.hypotheses) if (h.claimId === claimId) known.add(h.id);
-  }
-  const premiseIds = new Set(premisesOf(next).map((c) => c.id));
-  const causal = claim2.type === "causal" || claim2.type === "main_cause";
-  for (const item of items) {
-    const id = newId3(ids, item.id);
-    if (!oneOf3(["primary", "alternative", "reverse", "common_cause", "measurement", "facet", "side"], item.role))
-      throw new GateError("unknown hypothesis role");
-    const predictions = Array.isArray(item.predictions) ? item.predictions : [];
-    if (!predictions.some((p) => (p == null ? void 0 : p.kind) === "support") || !predictions.some((p) => (p == null ? void 0 : p.kind) === "refute"))
-      throw new GateError("a hypothesis needs a support and a refute prediction");
-    if (!predictions.some((p) => (p == null ? void 0 : p.required) === true)) throw new GateError("a hypothesis needs a required test");
-    const h = { id, claimId, role: item.role, round: 1, predictions: [], needs: [] };
-    if (late) h.addedAfterComparison = true;
-    for (const p of predictions) {
-      if (!p || !oneOf3(PREDICTION_KINDS, p.kind)) throw new GateError("unknown prediction kind");
-      if (blank2(p.text) || typeof p.required !== "boolean") throw new GateError("prediction malformed");
-      const prediction = {
-        id: newId3(ids, p.id),
-        kind: p.kind,
-        text: p.text,
-        alsoPredictedBy: [],
-        auxiliary: [],
-        required: p.required
-      };
-      if (p.kind === "support") {
-        if (!Array.isArray(p.alsoPredictedBy))
-          throw new GateError("a support prediction must say who else predicts it");
-        for (const entry of p.alsoPredictedBy) {
-          if (!oneOf3(OVERLAP_STRENGTHS, entry == null ? void 0 : entry.strength)) throw new GateError("unknown overlap strength");
-          if (!known.has(entry.hypothesisId) || entry.hypothesisId === id)
-            throw new GateError("alsoPredictedBy names an unknown hypothesis");
-          prediction.alsoPredictedBy.push({ hypothesisId: entry.hypothesisId, strength: entry.strength });
-        }
-      }
-      if (p.kind === "refute") {
-        if (!Array.isArray(p.auxiliary) || !p.auxiliary.length || p.auxiliary.some((a) => !premiseIds.has(a)))
-          throw new GateError("a refute prediction needs auxiliary premises");
-        if (blank2(p.reason)) throw new GateError("a refute prediction needs a reason");
-        prediction.auxiliary = [...new Set(p.auxiliary)];
-        Object.assign(prediction, { reason: p.reason });
-      }
-      h.predictions.push(prediction);
-    }
-    if (causal && CAUSAL_ROLES.includes(item.role)) {
-      const ident = item.identification;
-      if (!ident || blank2(ident.strategy) || !Array.isArray(ident.assumptions) || !ident.assumptions.length || ident.assumptions.some(blank2))
-        throw new GateError("a cause needs an identification strategy and its assumptions");
-      h.identification = { strategy: ident.strategy, assumptions: [...ident.assumptions] };
-    } else if (item.identification) h.identification = clone3(item.identification);
-    next.hypotheses.push(h);
-  }
-  return next;
-}
-var researchBegan = (h) => h.round > 1 || h.needs.some((n) => n.state === "searching" || n.state === "found" || n.state === "not_found");
-function needFrom(item, h, ids, registered) {
-  if (blank2(item == null ? void 0 : item.text)) throw new GateError("empty need");
-  const prediction = h.predictions.find((p) => p.id === item.predictionId);
-  if (!prediction) throw new GateError("a need must name a prediction of its hypothesis");
-  const c = item.criteria;
-  if (!c || blank2(c.supports) || blank2(c.refutes) || blank2(c.irrelevant))
-    throw new GateError("a need must say what counts as support, refutation and irrelevance");
-  return {
-    id: newId3(ids, item.id),
-    predictionId: prediction.id,
-    text: item.text,
-    criteria: { supports: c.supports, refutes: c.refutes, irrelevant: c.irrelevant },
-    registered,
-    addedRound: h.round,
-    state: "pending"
-  };
-}
-function applyNeeds(state, hypothesisId, items) {
-  inAnalysis2(state);
-  const next = clone3(state);
-  const h = hypothesisOf2(next, hypothesisId);
-  if (h.needs.length) throw new GateError("the needs are already listed");
-  if (!Array.isArray(items) || !items.length) throw new GateError("no needs");
-  if (items.length > MAX_ROUND_NEEDS2) throw new GateError("too many needs in this round");
-  const ids = allIds2(next);
-  for (const item of items) h.needs.push(needFrom(item, h, ids, researchBegan(h) ? "post" : "pre"));
-  for (const p of h.predictions)
-    if (p.required && !h.needs.some((n) => n.predictionId === p.id))
-      throw new GateError("every required prediction needs a need");
-  return next;
-}
-function startNextRound2(state, hypothesisId, items) {
-  inAnalysis2(state);
-  const next = clone3(state);
-  const h = hypothesisOf2(next, hypothesisId);
-  if (!h.needs.length || h.needs.some((n) => n.state === "pending" || n.state === "searching"))
-    throw new GateError("the round is not finished");
-  if (h.needs.some((n) => !n.assessment && n.state === "found")) throw new GateError("the round is not assessed");
-  if (testStatus(h) === "complete") throw new GateError("the tests are already complete");
-  if (h.round >= MAX_ROUND2) throw new GateError("round limit reached");
-  if (!Array.isArray(items) || !items.length) throw new GateError("no needs");
-  if (items.length > MAX_ROUND_NEEDS2 || h.needs.length + items.length > MAX_NEEDS2)
-    throw new GateError("too many needs");
-  h.round += 1;
-  const ids = allIds2(next);
-  const replaced = new Set(h.needs.map((n) => n.replaces).filter((id) => id !== void 0));
-  for (const item of items) {
-    const need = needFrom(item, h, ids, "post");
-    if (item.replaces !== void 0) {
-      const target = h.needs.find((n) => n.id === item.replaces);
-      if (!target || target.state !== "not_found" || target.addedRound >= h.round || replaced.has(target.id))
-        throw new GateError("a replacement must stand in for a dead need of an earlier round, once");
-      if (target.predictionId !== need.predictionId) throw new GateError("a replacement must test the same prediction");
-      replaced.add(target.id);
-      need.replaces = target.id;
-    }
-    h.needs.push(need);
-  }
-  return next;
-}
-function beginResearch2(state, hypothesisId, needId) {
-  inAnalysis2(state);
-  running2(state);
-  const next = clone3(state);
-  const need = hypothesisOf2(next, hypothesisId).needs.find((n) => n.id === needId);
-  if (!need || need.state !== "pending") throw new GateError("need is not waiting for research");
-  if (next.run.researchCalls >= MAX_RESEARCH_CALLS2) throw new GateError("research call limit reached");
-  need.state = "searching";
-  next.run.researchCalls += 1;
-  return next;
-}
-function applyEvidence2(state, hypothesisId, needId, result) {
-  inAnalysis2(state);
-  const next = clone3(state);
-  const need = hypothesisOf2(next, hypothesisId).needs.find((n) => n.id === needId);
-  if (!need || need.state !== "searching") throw new GateError("need is not being researched");
-  if (result.found === true) {
-    need.proof = checkedProof2(result.proof);
-    need.state = "found";
-    return next;
-  }
-  if (blank2(result.reason)) throw new GateError("a miss needs a reason");
-  need.reason = result.reason;
-  need.state = "not_found";
-  return next;
-}
-function releaseNeedResearch2(state, hypothesisId, needId) {
-  inAnalysis2(state);
-  const next = clone3(state);
-  const need = hypothesisOf2(next, hypothesisId).needs.find((n) => n.id === needId);
-  if (!need || need.state !== "searching") throw new GateError("need is not being researched");
-  need.state = "pending";
-  return next;
-}
-function applyEvidenceAssessment(state, hypothesisId, items) {
-  inAnalysis2(state);
-  const next = clone3(state);
-  const h = hypothesisOf2(next, hypothesisId);
-  if (h.needs.some((n) => n.state === "pending" || n.state === "searching"))
-    throw new GateError("the round is still being researched");
-  const todo = h.needs.filter((n) => n.state === "found" && !n.assessment);
-  const given = Array.isArray(items) ? items : [];
-  if (!todo.length || given.length !== todo.length || new Set(given.map((i) => i == null ? void 0 : i.needId)).size !== todo.length)
-    throw new GateError("assess every found, unassessed need of the round, once");
-  const siblings = new Set(next.hypotheses.filter((o) => o.claimId === h.claimId && o.id !== h.id).map((o) => o.id));
-  for (const item of given) {
-    const need = todo.find((n) => n.id === item.needId);
-    if (!need) throw new GateError("assessment names a need that is not waiting for one");
-    need.assessment = checkedAssessment(item.assessment, siblings);
-    if (need.replaces !== void 0) {
-      if (typeof item.sameCondition !== "boolean")
-        throw new GateError("a replacement assessment must say whether it is the same condition");
-      need.sameCondition = item.sameCondition;
-      if (item.sameCondition) need.registered = "pre";
-    } else if (item.sameCondition !== void 0) throw new GateError("sameCondition belongs to a replacement need");
-  }
-  return next;
-}
-function applyProgramVerdict(state, hypothesisId) {
-  var _a2;
-  inAnalysis2(state);
-  const next = clone3(state);
-  const h = hypothesisOf2(next, hypothesisId);
-  if (testStatus(h, next.run.researchCalls) !== "limit_incomplete") throw new GateError("the test is not at its limit");
-  if (hasVerifiedRefutation(h)) throw new GateError("refuting evidence exists: the verdict needs the AI");
-  const open = h.predictions.filter((p) => p.required && !requiredPrediction(h, p.id)).map((p) => p.id);
-  h.verdict = {
-    value: "insufficient",
-    by: "program",
-    reason: `limit_incomplete: required tests without checked evidence: ${open.join(", ") || "none"}`,
-    citedNeeds: [],
-    counterNotes: [],
-    refutations: [],
-    causal: "not_applicable",
-    assumptionStatus: [],
-    confidence: "low",
-    reverdicts: (_a2 = h.reverdicts) != null ? _a2 : 0
-  };
-  return settle(next);
-}
-function requiredPrediction(h, predictionId) {
-  const own2 = h.needs.filter(
-    (n) => n.predictionId === predictionId && n.registered === "pre" && n.replaces === void 0
-  );
-  return own2.length > 0 && own2.every((n) => met(h, n));
-}
-function numbersIn(text13) {
-  var _a2;
-  const found = (_a2 = text13.normalize("NFKC").match(/(?<![\w.])\d+(?:,\d{3})*(?:\.\d+)?/gu)) != null ? _a2 : [];
-  return new Set(found.map((n) => n.replace(/,/g, "")));
-}
-function urlsIn(text13) {
-  var _a2;
-  const found = (_a2 = text13.match(/https?:\/\/[^\s"'<>\])}，。；）]+/giu)) != null ? _a2 : [];
-  return new Set(found.map((u) => u.replace(/[.,;:!?]+$/u, "").toLowerCase()));
-}
-var sourceText = (input2) => JSON.stringify(input2);
-function guardText(text13, source, what) {
-  if (typeof text13 !== "string" || text13.trim() === "") throw new GateError(`${what} is empty`);
-  const okNumbers = numbersIn(source);
-  for (const n of numbersIn(text13))
-    if (!okNumbers.has(n)) throw new GateError(`${what} has a number that is not in the input: ${n}`);
-  const okUrls = urlsIn(source);
-  for (const u of urlsIn(text13)) if (!okUrls.has(u)) throw new GateError(`${what} has a URL that is not in the input`);
-  return text13;
-}
-var unique2 = (list2) => [...new Set(list2)];
-var CAUSE_ROLES2 = ["primary", "alternative", "reverse", "common_cause"];
-var distinguishing = (p) => p.kind === "support" && p.alsoPredictedBy.every((e) => e.strength === "weaker");
-function scopeOf2(state, h) {
-  var _a2, _b2;
-  const out = /* @__PURE__ */ new Map();
-  for (const need of h.needs) out.set(need.id, { need, owner: h, own: true });
-  const allocations = (_b2 = (_a2 = claimOf(state, h.claimId).comparison) == null ? void 0 : _a2.allocations) != null ? _b2 : [];
-  for (const a of allocations) {
-    if (a.hypothesisId !== h.id) continue;
-    for (const o of state.hypotheses) {
-      if (o.id === h.id) continue;
-      const need = o.needs.find((n) => n.id === a.needId);
-      if (need) out.set(need.id, { need, owner: o, own: false });
-    }
-  }
-  return out;
-}
-var refutesH = (need) => {
-  var _a2;
-  return qualifies(need) && ((_a2 = need.assessment) == null ? void 0 : _a2.stance) === "refutes";
-};
-var counterEvidenceOf = (scope) => [...scope.values()].filter((s) => refutesH(s.need)).map((s) => s.need.id);
-function evidenceView(s) {
-  const { need } = s;
-  const view = {
-    needId: need.id,
-    fromHypothesis: s.owner.id,
-    own: s.own,
-    predictionId: need.predictionId,
-    text: need.text,
-    criteria: need.criteria,
-    registered: need.registered,
-    state: need.state
-  };
-  if (need.reason) view.reason = need.reason;
-  if (need.replaces) view.replaces = need.replaces;
-  if (need.proof)
-    view.source = { url: need.proof.url, quote: need.proof.quote, claim: need.proof.claim, check: need.proof.check };
-  if (need.assessment) view.assessment = need.assessment;
-  return view;
-}
-var premiseView = (c) => {
-  var _a2;
-  return { id: c.id, text: c.text, result: (_a2 = c.result) != null ? _a2 : null };
-};
-var claimView = (c) => ({
-  id: c.id,
-  text: c.text,
-  type: c.type,
-  definitions: c.definitions
-});
-function prepareVerdict2(state, hypothesisId) {
-  var _a2;
-  const h = hypothesisOf2(state, hypothesisId);
-  const claim2 = claimOf(state, h.claimId);
-  const scope = scopeOf2(state, h);
-  const auxiliary = unique2(h.predictions.flatMap((p) => p.auxiliary));
-  return {
-    hypothesis: { id: h.id, role: h.role, round: h.round, testStatus: testStatus(h, state.run.researchCalls) },
-    claim: claimView(claim2),
-    identification: (_a2 = h.identification) != null ? _a2 : null,
-    predictions: h.predictions.map((p) => ({
-      id: p.id,
-      kind: p.kind,
-      text: p.text,
-      required: p.required,
-      distinguishing: distinguishing(p),
-      auxiliary: p.auxiliary,
-      ...p.reason ? { reason: p.reason } : {}
-    })),
-    premises: auxiliary.map((id) => premiseView(claimOf(state, id))),
-    evidence: [...scope.values()].map(evidenceView),
-    counterEvidence: counterEvidenceOf(scope)
-  };
-}
-var rankOf = (c) => CONFIDENCES.indexOf(c);
-var lowerOf = (a, b) => rankOf(a) >= rankOf(b) ? a : b;
-function applyVerdict2(state, hypothesisId, draft) {
-  var _a2, _b2, _c;
-  inAnalysis2(state);
-  const next = clone3(state);
-  const h = hypothesisOf2(next, hypothesisId);
-  const d = draft;
-  if (!d || typeof d !== "object") throw new GateError("verdict missing");
-  if (!oneOf3(VERDICT_VALUES, d.value)) throw new GateError("unknown verdict value");
-  if (d.value === "insufficient") throw new GateError("only the program can give insufficient");
-  const asked = d.value;
-  const source = sourceText(prepareVerdict2(state, hypothesisId));
-  const reason = guardText(d.reason, source, "the verdict reason");
-  const status = testStatus(h, next.run.researchCalls);
-  const scope = scopeOf2(next, h);
-  const cited = Array.isArray(d.citedNeeds) ? d.citedNeeds : [];
-  if (new Set(cited).size !== cited.length) throw new GateError("a cited need is listed twice");
-  for (const id of cited) {
-    const s = scope.get(id);
-    if (!s) throw new GateError(`the verdict cites evidence outside its scope: ${id}`);
-    if (!qualifies(s.need))
-      throw new GateError(`the verdict cites evidence that is not checked, relevant and in scope: ${id}`);
-  }
-  const counter = counterEvidenceOf(scope);
-  const refutations = Array.isArray(d.refutations) ? d.refutations : [];
-  const notes = Array.isArray(d.counterNotes) ? d.counterNotes : [];
-  if (refutations.length !== counter.length || new Set(refutations.map((r) => r == null ? void 0 : r.needId)).size !== counter.length)
-    throw new GateError("the verdict must classify every counter-evidence, once");
-  if (notes.length !== refutations.length) throw new GateError("counterNotes must cover every counter-evidence");
-  const storedRefutations = [];
-  refutations.forEach((r, i) => {
-    const s = scope.get(r == null ? void 0 : r.needId);
-    if (!s || !counter.includes(r.needId))
-      throw new GateError(`a refutation names evidence that is not counter-evidence: ${r == null ? void 0 : r.needId}`);
-    if (!oneOf3(REFUTATION_CLASSES, r.class)) throw new GateError("unknown refutation class");
-    guardText(notes[i], source, "a counter note");
-    const aux = Array.isArray(r.auxiliary) ? unique2(r.auxiliary) : [];
-    if (r.class !== "nondecisive") {
-      const prediction = s.own ? h.predictions.find((p) => p.id === s.need.predictionId) : void 0;
-      if (!prediction || prediction.kind !== "refute")
-        throw new GateError("only evidence for the hypothesis' own refute prediction can be decisive or conditional");
-      if (!aux.length || prediction.auxiliary.some((a) => !aux.includes(a)))
-        throw new GateError("a refutation must name the auxiliary premises of its prediction");
-      for (const a of aux) {
-        const premise = next.claims.find((c) => c.id === a);
-        if (!premise || premise.role !== "premise") throw new GateError("an auxiliary is not a premise");
-      }
-      if (r.class === "decisive") {
-        if (s.need.registered !== "pre") throw new GateError("an exploratory result cannot be a decisive refutation");
-        if (aux.some((a) => {
-          var _a3;
-          return ((_a3 = next.claims.find((c) => c.id === a)) == null ? void 0 : _a3.result) !== "holds";
-        }))
-          throw new GateError(
-            "a decisive refutation needs auxiliary premises that hold; otherwise it is only conditional"
-          );
-      }
-    } else if (aux.length) throw new GateError("a nondecisive counter-evidence names no auxiliary premises");
-    storedRefutations.push({ needId: r.needId, class: r.class, auxiliary: aux });
-  });
-  const decisive = storedRefutations.some((r) => r.class === "decisive");
-  const blocking = storedRefutations.some((r) => r.class === "decisive" || r.class === "conditional");
-  let value = asked;
-  let by = "ai";
-  let storedReason = reason;
-  if (asked === "refuted") {
-    if (!decisive)
-      throw new GateError("refuted needs a decisive refutation (pre-registered, auxiliary premises that hold)");
-    if (!storedRefutations.some((r) => r.class === "decisive" && cited.includes(r.needId)))
-      throw new GateError("the decisive refutation must be cited");
-  } else {
-    if (decisive) throw new GateError("a decisive refutation exists: the verdict can only be refuted");
-    if (asked === "supported") {
-      if (status !== "complete") throw new GateError("supported needs a complete test");
-      if (blocking) throw new GateError("a conditional refutation blocks supported");
-      const support = h.predictions.filter(distinguishing).flatMap(
-        (p) => h.needs.filter((n) => {
-          var _a3;
-          return n.predictionId === p.id && qualifies(n) && ((_a3 = n.assessment) == null ? void 0 : _a3.stance) === "supports";
-        })
-      );
-      if (!support.length) throw new GateError("supported needs a distinguishing support that was met");
-      if (!support.some((n) => cited.includes(n.id))) throw new GateError("cite the distinguishing support");
-      for (const p of h.predictions.filter((q) => q.kind === "refute"))
-        if (!h.needs.some((n) => n.predictionId === p.id && qualifies(n)))
-          throw new GateError(`a refute prediction has no data: ${p.id}`);
-    } else if (status === "complete") {
-    } else if (status === "limit_incomplete") {
-      value = "insufficient";
-      by = "program";
-      storedReason = `limit_incomplete: ${reason}`;
-    } else throw new GateError("undecided needs a complete test");
-  }
-  const identified = h.identification !== void 0;
-  const assumptions = [];
-  let causal = d.causal;
-  if (!oneOf3(CAUSAL_STATES, causal)) throw new GateError("unknown causal state");
-  if (value === "supported" && identified) {
-    const given = Array.isArray(d.assumptionStatus) ? d.assumptionStatus : [];
-    const wanted = (_b2 = (_a2 = h.identification) == null ? void 0 : _a2.assumptions) != null ? _b2 : [];
-    if (given.length !== wanted.length || wanted.some((w) => given.filter((g) => (g == null ? void 0 : g.assumption) === w).length !== 1))
-      throw new GateError("assumptionStatus must cover every identification assumption, once");
-    for (const g of given) {
-      if (!oneOf3(ASSUMPTION_STATES, g.status)) throw new GateError("unknown assumption status");
-      const entry = { assumption: g.assumption, status: g.status };
-      if (g.status === "defended") entry.defense = guardText(g.defense, source, "an assumption defense");
-      assumptions.push(entry);
-    }
-    if (causal === "not_applicable") throw new GateError("a supported cause needs a causal state");
-    const open = assumptions.filter((a) => a.status !== "checked");
-    if (causal === "established" && open.length)
-      throw new GateError("established needs every identification assumption checked");
-    if (causal === "conditional") {
-      if (!open.length) throw new GateError("conditional needs an assumption that was not checked");
-      if (open.some((a) => a.status !== "defended"))
-        throw new GateError("conditional needs a defense for every unchecked assumption");
-    }
-  } else if (causal !== "not_applicable")
-    throw new GateError("only a supported cause can have a causal state; otherwise it is not_applicable");
-  let confidence = "low";
-  if (oneOf3(CONFIDENCES, d.confidence)) confidence = d.confidence;
-  else throw new GateError("unknown confidence");
-  if (by === "program") confidence = "low";
-  const sources = unique2(
-    cited.map((id) => {
-      var _a3, _b3, _c2;
-      return ((_c2 = (_b3 = (_a3 = scope.get(id)) == null ? void 0 : _a3.need.assessment) == null ? void 0 : _b3.underlyingSource) != null ? _c2 : "").trim().toLowerCase();
-    }).filter(Boolean)
-  );
-  let ceiling = "high";
-  if (sources.length < 2) ceiling = "medium";
-  if (value === "supported") {
-    if (identified && causal !== "established") ceiling = lowerOf(ceiling, "medium");
-    const preSupport = cited.some((id) => {
-      var _a3, _b3;
-      const n = (_a3 = scope.get(id)) == null ? void 0 : _a3.need;
-      return !!n && n.registered === "pre" && ((_b3 = n.assessment) == null ? void 0 : _b3.stance) === "supports";
-    });
-    if (!preSupport) ceiling = "low";
-  }
-  confidence = lowerOf(confidence, ceiling);
-  h.verdict = {
-    value,
-    by,
-    reason: storedReason,
-    citedNeeds: cited,
-    counterNotes: notes.map((n) => n),
-    refutations: storedRefutations,
-    causal,
-    assumptionStatus: assumptions,
-    confidence,
-    reverdicts: (_c = h.reverdicts) != null ? _c : 0
-  };
-  return settle(next);
-}
-function applyNoHypotheses(state, claimId) {
-  inAnalysis2(state);
-  const next = clone3(state);
-  const claim2 = liveTestable(next, claimId);
-  if (closedClaim(claim2)) throw new GateError("the claim is already closed");
-  if (claimHypotheses(next, claimId).length) throw new GateError("the claim has hypotheses");
-  if (canPropose(next, claim2)) throw new GateError("hypotheses can still be proposed");
-  const c = claim2.comparison;
-  c.state = "undecidable";
-  c.answer = "insufficient";
-  claim2.status = "done";
-  return settle(next);
-}
-function applyAlternativeHypotheses(state, claimId, items) {
-  inAnalysis2(state);
-  const claim2 = liveTestable(state, claimId);
-  if (!alternativePending(claim2)) throw new GateError("the comparison does not owe an alternative");
-  if (!Array.isArray(items) || !items.length) throw new GateError("no hypotheses");
-  if (state.hypotheses.length + items.length > MAX_HYPOTHESES2) throw new GateError("hypothesis limit reached");
-  const allowed = ROLES_OF[claim2.type].filter((r) => r !== "primary");
-  if (items.some((i) => !allowed.includes(i == null ? void 0 : i.role))) throw new GateError("a late alternative cannot take this role");
-  const next = buildHypotheses(state, claimId, items, true);
-  const c = claimOf(next, claimId).comparison;
-  c.missedAlternativeAdded = true;
-  for (const v of c.vetoes) if (v.kind === "missed_alternative") v.resolved = true;
-  return settle(next);
-}
-var ANSWERS_OF = {
-  fact: ["holds", "fails", "insufficient"],
-  causal: ["causal_established", "causal_conditional", "causal_compatible", "causal_against", "insufficient"],
-  main_cause: [
-    "main_cause_largest",
-    "main_cause_secondary",
-    "main_cause_not",
-    "main_cause_undecidable",
-    "insufficient"
-  ],
-  comparison: ["compare_greater", "compare_equivalent", "compare_opposite", "compare_undetermined", "insufficient"]
-};
-var undecidableAnswer = (type) => type === "main_cause" ? "main_cause_undecidable" : type === "comparison" ? "compare_undetermined" : "insufficient";
-function checkAnswer(state, claim2, key4, extra) {
-  var _a2, _b2, _c, _d;
-  if (!oneOf3(ANSWER_KEYS, key4)) throw new GateError("unknown answer");
-  if (!ANSWERS_OF[claim2.type].includes(key4))
-    throw new GateError(`the answer ${key4} does not fit a ${claim2.type} claim`);
-  const hypotheses = claimHypotheses(state, claim2.id);
-  const value = (h) => {
-    var _a3;
-    return (_a3 = h == null ? void 0 : h.verdict) == null ? void 0 : _a3.value;
-  };
-  const primary = hypotheses.find((h) => h.role === "primary");
-  if (claim2.type !== "main_cause" && (extra.contributors || extra.largest !== void 0 || extra.basis !== void 0))
-    throw new GateError("only a main-cause comparison has contributors");
-  switch (key4) {
-    case "holds":
-      if (!hypotheses.length || hypotheses.some((h) => value(h) !== "supported"))
-        throw new GateError("holds needs every facet supported (a refuted facet cannot be answered as holding)");
-      break;
-    case "fails":
-      if (!hypotheses.some((h) => value(h) === "refuted")) throw new GateError("fails needs a refuted facet");
-      break;
-    case "causal_established":
-    case "causal_conditional":
-    case "causal_compatible": {
-      const want = key4 === "causal_established" ? "established" : key4 === "causal_conditional" ? "conditional" : "compatible";
-      if (value(primary) !== "supported" || ((_a2 = primary == null ? void 0 : primary.verdict) == null ? void 0 : _a2.causal) !== want)
-        throw new GateError(`the answer ${key4} does not match the cause's verdict and causal state`);
-      break;
-    }
-    case "causal_against":
-      if (value(primary) !== "refuted") throw new GateError("causal_against needs a refuted cause");
-      break;
-    case "compare_greater":
-    case "compare_opposite":
-      if (value(primary) !== "supported") throw new GateError("a direction needs the supported measurement of A");
-      if (hypotheses.some((h) => h.role === "measurement" && value(h) !== "refuted"))
-        throw new GateError("a direction needs the measurement explanation refuted");
-      break;
-    default:
-      break;
-  }
-  if (claim2.type !== "main_cause") return;
-  const candidates = hypotheses.filter((h) => CAUSE_ROLES2.includes(h.role));
-  const contributors = (_b2 = extra.contributors) != null ? _b2 : [];
-  if (new Set(contributors).size !== contributors.length) throw new GateError("a contributor is listed twice");
-  for (const id of contributors) {
-    const h = candidates.find((c) => c.id === id);
-    if (!h) throw new GateError("a contributor is not a candidate cause of this claim");
-    if (((_c = h.verdict) == null ? void 0 : _c.causal) !== "established" && ((_d = h.verdict) == null ? void 0 : _d.causal) !== "conditional")
-      throw new GateError("a cause that is only compatible cannot enter the contribution comparison");
-  }
-  if (extra.largest !== void 0 && !contributors.includes(extra.largest))
-    throw new GateError("the largest contributor must be a contributor");
-  if (extra.basis !== void 0 && !oneOf3(COMPARISON_BASES, extra.basis))
-    throw new GateError("unknown comparison basis");
-  const complete = candidates.every((h) => contributors.includes(h.id) || value(h) === "refuted");
-  const ranked = extra.basis === "difference_with_uncertainty" && contributors.length >= 2;
-  if (key4 === "main_cause_not" && value(primary) !== "refuted")
-    throw new GateError("main_cause_not needs a refuted cause");
-  if (key4 === "main_cause_largest" || key4 === "main_cause_secondary") {
-    if (!primary || !contributors.includes(primary.id))
-      throw new GateError("the main cause is not among the contributors");
-    if (!ranked)
-      throw new GateError("only a direct difference with its uncertainty can rank causes; point estimates cannot");
-    if (!complete)
-      throw new GateError("a ranking needs every candidate compared (or refuted): otherwise the answer is undecidable");
-    if (extra.largest === void 0) throw new GateError("a ranking names the largest contributor");
-    if (key4 === "main_cause_largest" && extra.largest !== primary.id)
-      throw new GateError("the main cause is not the largest");
-    if (key4 === "main_cause_secondary" && extra.largest === primary.id)
-      throw new GateError("the main cause is the largest");
-  }
-  if (key4 === "main_cause_undecidable" && extra.largest !== void 0 && !ranked)
-    throw new GateError("a subset result needs a direct difference over at least 2 contributors");
-  if (key4 !== "main_cause_largest" && key4 !== "main_cause_secondary" && key4 !== "main_cause_undecidable" && contributors.length)
-    throw new GateError("contributors only belong to a ranking or a subset result");
-}
-function prepareComparison(state, claimId) {
-  const claim2 = liveTestable(state, claimId);
-  const c = claim2.comparison;
-  const hypotheses = claimHypotheses(state, claimId);
-  const shared2 = /* @__PURE__ */ new Map();
-  const evidence = (h) => h.needs.filter((n) => n.state === "found" && n.assessment).map((n) => {
-    var _a2, _b2, _c;
-    const key4 = ((_b2 = (_a2 = n.assessment) == null ? void 0 : _a2.underlyingSource) != null ? _b2 : "").trim().toLowerCase();
-    shared2.set(key4, [...(_c = shared2.get(key4)) != null ? _c : [], n.id]);
-    return evidenceView({ need: n, owner: h, own: true });
-  });
-  const hypothesesView = hypotheses.map((h) => {
-    var _a2;
-    return {
-      id: h.id,
-      role: h.role,
-      addedAfterComparison: h.addedAfterComparison === true,
-      reverdicts: (_a2 = h.reverdicts) != null ? _a2 : 0,
-      verdict: h.verdict ? {
-        value: h.verdict.value,
-        by: h.verdict.by,
-        confidence: h.verdict.confidence,
-        causal: h.verdict.causal,
-        reason: h.verdict.reason,
-        citedNeeds: h.verdict.citedNeeds,
-        counterNotes: h.verdict.counterNotes,
-        refutations: h.verdict.refutations,
-        assumptionStatus: h.verdict.assumptionStatus
-      } : null,
-      evidence: evidence(h)
-    };
-  });
-  return {
-    claim: claimView(claim2),
-    premises: premisesOf(state).map(premiseView),
-    hypotheses: hypothesesView,
-    sharedSources: [...shared2.entries()].filter(([, ids]) => ids.length > 1).map(([underlyingSource, needIds]) => ({ underlyingSource, needIds })),
-    comparison: {
-      attempts: c.attempts,
-      allocations: c.allocations,
-      room: {
-        lastAttempt: c.attempts + 1 >= MAX_COMPARISONS,
-        canAddAlternative: !c.missedAlternativeAdded && state.hypotheses.length < MAX_HYPOTHESES2,
-        canSendBack: hypotheses.filter((h) => {
-          var _a2, _b2;
-          return ((_a2 = h.verdict) == null ? void 0 : _a2.by) === "ai" && ((_b2 = h.reverdicts) != null ? _b2 : 0) < MAX_REVERDICTS;
-        }).map((h) => h.id)
-      }
-    }
-  };
-}
-var VETO_DECISIONS = ["complete", "rejudge", "add_alternative", "undecidable"];
-function applyComparison(state, claimId, draft) {
-  var _a2, _b2, _c;
-  live2(state);
-  if (state.run.phase !== "analysis" && state.run.phase !== "comparison")
-    throw new GateError("the run is not at the comparison");
-  const next = clone3(state);
-  const claim2 = liveTestable(next, claimId);
-  if (!readyToCompare(next, claim2)) throw new GateError("the claim is not ready for a comparison");
-  const c = claim2.comparison;
-  const d = draft;
-  if (!d || typeof d !== "object") throw new GateError("comparison missing");
-  if (!VETO_DECISIONS.includes(d.decision))
-    throw new GateError("unknown comparison decision");
-  const decision = d.decision;
-  const source = sourceText(prepareComparison(state, claimId));
-  const hypotheses = claimHypotheses(next, claimId);
-  const byId = new Map(hypotheses.map((h) => [h.id, h]));
-  const aiVetoes = (Array.isArray(d.vetoes) ? d.vetoes : []).map((v) => {
-    if (!oneOf3(VETO_KINDS, v == null ? void 0 : v.kind)) throw new GateError("unknown veto kind");
-    return { kind: v.kind, detail: guardText(v.detail, source, "a veto detail"), resolved: false };
-  });
-  const allocations = [...c.allocations];
-  for (const a of Array.isArray(d.allocations) ? d.allocations : []) {
-    const target = byId.get(a == null ? void 0 : a.hypothesisId);
-    const owner = hypotheses.find((h) => h.needs.some((n) => n.id === (a == null ? void 0 : a.needId)));
-    const need = owner == null ? void 0 : owner.needs.find((n) => n.id === a.needId);
-    if (!target || !owner || !need)
-      throw new GateError("an allocation names evidence or a hypothesis outside this claim");
-    if (owner.id === target.id) throw new GateError("evidence cannot be allocated to its own hypothesis");
-    if (!refutesH(need) || !((_a2 = need.assessment) == null ? void 0 : _a2.alsoRelevantTo.includes(target.id)))
-      throw new GateError(
-        "only checked refuting evidence that the assessment marked as relevant to that hypothesis can be allocated"
-      );
-    if (!allocations.some((x) => x.needId === need.id && x.hypothesisId === target.id))
-      allocations.push({ needId: need.id, hypothesisId: target.id });
-  }
-  const unhandled = unique2(
-    allocations.filter((a) => {
-      var _a3;
-      const h = byId.get(a.hypothesisId);
-      return ((_a3 = h == null ? void 0 : h.verdict) == null ? void 0 : _a3.value) === "supported" && !h.verdict.refutations.some((r) => r.needId === a.needId);
-    }).map((a) => a.hypothesisId)
-  );
-  const programVetoes = unhandled.map((id) => ({
-    kind: "unhandled_counter",
-    detail: `counter-evidence allocated to ${id} is not answered by its verdict`,
-    resolved: false
-  }));
-  const vetoes = [...aiVetoes, ...programVetoes];
-  const last = c.attempts + 1 >= MAX_COMPARISONS;
-  c.attempts += 1;
-  c.allocations = allocations;
-  for (const old of c.vetoes) old.resolved = true;
-  if (!vetoes.length) {
-    if (decision !== "complete") throw new GateError("without a veto the comparison completes");
-    const extra = {};
-    if (d.contributors !== void 0) extra.contributors = Array.isArray(d.contributors) ? [...d.contributors] : [];
-    if (d.largest !== void 0) extra.largest = d.largest;
-    if (d.basis !== void 0) extra.basis = d.basis;
-    checkAnswer(next, claim2, d.answer, extra);
-    c.state = "done";
-    c.answer = d.answer;
-    delete c.contributors;
-    delete c.largest;
-    delete c.basis;
-    if (claim2.type === "main_cause") {
-      c.contributors = (_b2 = extra.contributors) != null ? _b2 : [];
-      if (extra.largest !== void 0) c.largest = extra.largest;
-      if (extra.basis !== void 0) c.basis = extra.basis;
-    }
-    claim2.status = "done";
-    return settle(next);
-  }
-  let remedy = decision === "complete" ? "rejudge" : decision;
-  const eligible = (h) => {
-    var _a3, _b3;
-    return ((_a3 = h.verdict) == null ? void 0 : _a3.by) === "ai" && ((_b3 = h.reverdicts) != null ? _b3 : 0) < MAX_REVERDICTS;
-  };
-  let rejudge = [];
-  if (!last && remedy !== "undecidable") {
-    const chosen = decision === "rejudge" && Array.isArray(d.rejudge) ? unique2(d.rejudge) : [];
-    for (const id of chosen) {
-      const h = byId.get(id);
-      if (!h) throw new GateError("rejudge names a hypothesis outside this claim");
-      if (!eligible(h)) throw new GateError("a hypothesis can be sent back once, and only if the AI judged it");
-    }
-    if (unhandled.some((id) => !eligible(byId.get(id)))) remedy = "undecidable";
-    rejudge = unique2([...chosen, ...unhandled]);
-    if (remedy === "rejudge" && !rejudge.length)
-      throw new GateError("a veto needs a remedy: name the hypotheses to send back");
-    if (remedy === "add_alternative") {
-      if (!aiVetoes.some((v) => v.kind === "missed_alternative"))
-        throw new GateError("add_alternative needs a missed_alternative veto");
-      if (c.missedAlternativeAdded || next.hypotheses.length >= MAX_HYPOTHESES2)
-        throw new GateError("no late alternative can be added; the answer is undecidable");
-    }
-  } else remedy = "undecidable";
-  if (remedy === "undecidable") {
-    c.state = "undecidable";
-    c.answer = undecidableAnswer(claim2.type);
-    delete c.contributors;
-    delete c.largest;
-    delete c.basis;
-    c.vetoes.push(...vetoes);
-    claim2.status = "done";
-    return settle(next);
-  }
-  c.state = "vetoed";
-  c.vetoes.push(...vetoes);
-  for (const id of rejudge) {
-    const h = byId.get(id);
-    delete h.verdict;
-    h.reverdicts = ((_c = h.reverdicts) != null ? _c : 0) + 1;
-  }
-  for (const v of c.vetoes) v.resolved = !(remedy === "add_alternative" && v.kind === "missed_alternative");
-  return settle(next);
-}
-function conditionalAssumptions(state, claim2) {
-  var _a2;
-  const c = claim2.comparison;
-  if (!(c == null ? void 0 : c.answer)) return [];
-  const hypotheses = claimHypotheses(state, claim2.id);
-  const conditional = (h) => {
-    var _a3;
-    return ((_a3 = h == null ? void 0 : h.verdict) == null ? void 0 : _a3.causal) === "conditional" ? h.verdict.assumptionStatus.filter((a) => a.status !== "checked").map((a) => a.assumption) : [];
-  };
-  if (c.answer === "causal_conditional") return conditional(hypotheses.find((h) => h.role === "primary"));
-  if (claim2.type === "main_cause" && ["main_cause_largest", "main_cause_secondary", "main_cause_undecidable"].includes(c.answer))
-    return unique2(((_a2 = c.contributors) != null ? _a2 : []).flatMap((id) => conditional(hypotheses.find((h) => h.id === id))));
-  return [];
-}
-function prepareConclusion2(state) {
-  var _a2;
-  const f = state.framing;
-  const chosen = f.candidates.find((c) => c.id === f.chosen);
-  return {
-    framing: {
-      original: f.original,
-      restatement: f.restatement,
-      chosen: chosen ? { question: chosen.question, diff: chosen.diff, kind: chosen.kind, unanswered: chosen.unanswered } : null,
-      settings: f.settings,
-      composition: (_a2 = f.composition) != null ? _a2 : null,
-      outOfScope: f.outOfScope
-    },
-    premises: premisesOf(state).map(premiseView),
-    claims: state.claims.filter((c) => c.role === "testable").map((c) => {
-      var _a3, _b2, _c;
-      return {
-        ...claimView(c),
-        evaluated: c.status !== "not_evaluated",
-        comparison: c.comparison ? {
-          state: c.comparison.state,
-          answer: (_a3 = c.comparison.answer) != null ? _a3 : null,
-          contributors: (_b2 = c.comparison.contributors) != null ? _b2 : [],
-          largest: (_c = c.comparison.largest) != null ? _c : null,
-          blockers: c.comparison.vetoes.filter((v) => !v.resolved).map((v) => ({ kind: v.kind, detail: v.detail })),
-          requiredAssumptions: conditionalAssumptions(state, c)
-        } : null,
-        hypotheses: claimHypotheses(state, c.id).map((h) => ({
-          id: h.id,
-          role: h.role,
-          addedAfterComparison: h.addedAfterComparison === true,
-          verdict: h.verdict ? {
-            value: h.verdict.value,
-            confidence: h.verdict.confidence,
-            causal: h.verdict.causal,
-            assumptionStatus: h.verdict.assumptionStatus
-          } : null
-        }))
-      };
-    })
-  };
-}
-function checkSentence(state, claim2, sentence, assumptions) {
-  var _a2;
-  const need = conditionalAssumptions(state, claim2);
-  if (assumptions.length !== need.length || need.some((a) => !assumptions.includes(a)))
-    throw new GateError("the answer must list exactly the identification assumptions it rests on");
-  for (const a of need)
-    if (!sentence.includes(a))
-      throw new GateError("an identification assumption must be written into the sentence itself");
-  const c = claim2.comparison;
-  if ((c == null ? void 0 : c.answer) === "main_cause_undecidable" && c.largest !== void 0) {
-    for (const id of (_a2 = c.contributors) != null ? _a2 : [])
-      if (!sentence.includes(id)) throw new GateError("a subset result must name every compared candidate");
-  }
-}
-function applyConclusion2(state, draft) {
-  live2(state);
-  if (state.run.phase !== "conclusion") throw new GateError("the conclusion is not due");
-  const next = clone3(state);
-  const d = draft;
-  if (!d || typeof d !== "object") throw new GateError("conclusion missing");
-  const source = sourceText(prepareConclusion2(state));
-  const live_ = liveTestables(next);
-  for (const claim2 of live_) if (!closedClaim(claim2)) throw new GateError("a comparison is not finished");
-  const given = Array.isArray(d.answers) ? d.answers : [];
-  if (given.length !== live_.length || new Set(given.map((a) => a == null ? void 0 : a.claimId)).size !== live_.length)
-    throw new GateError("answer every evaluated testable claim, once");
-  const answers = [];
-  for (const claim2 of live_) {
-    const item = given.find((a) => (a == null ? void 0 : a.claimId) === claim2.id);
-    if (!item) throw new GateError("an answer names a claim that is not evaluated");
-    const c = claim2.comparison;
-    if (!oneOf3(ANSWER_KEYS, item.answer)) throw new GateError("unknown answer");
-    if (item.answer !== c.answer) throw new GateError("the answer must be the comparison's");
-    checkAnswer(next, claim2, item.answer, { contributors: c.contributors, largest: c.largest, basis: c.basis });
-    const sentence = guardText(item.sentence, source, "a conclusion sentence");
-    const assumptions = Array.isArray(item.assumptions) ? item.assumptions : [];
-    checkSentence(next, claim2, sentence, assumptions);
-    answers.push({ claimId: claim2.id, answer: item.answer, sentence, assumptions: [...assumptions] });
-  }
-  const conclusion = { state: "pending", answers, deleted: [] };
-  if (d.overall !== void 0) {
-    if (blank2(next.framing.composition))
-      throw new GateError("the breakdown has no composition rule: report the claims, not a whole-sentence answer");
-    conclusion.overall = guardText(d.overall, source, "the overall sentence");
-  }
-  next.conclusion = conclusion;
-  next.run.phase = "inference_check";
-  next.run.inferenceChecks = 0;
-  return next;
-}
-function sentencesOf(state) {
-  const out = state.conclusion.answers.filter((a) => a.sentence !== "").map((a) => ({ id: a.claimId, sentence: a.sentence }));
-  if (state.conclusion.overall) out.push({ id: "overall", sentence: state.conclusion.overall });
-  return out;
-}
-function prepareInferenceCheck(state) {
-  var _a2;
-  return {
-    check: ((_a2 = state.run.inferenceChecks) != null ? _a2 : 0) + 1,
-    sentences: sentencesOf(state),
-    basis: prepareConclusion2(state)
-  };
-}
-function applyInferenceCheck(state, items) {
-  var _a2;
-  live2(state);
-  if (state.run.phase !== "inference_check") throw new GateError("the inference check is not due");
-  const done = (_a2 = state.run.inferenceChecks) != null ? _a2 : 0;
-  if (done >= MAX_INFERENCE_CHECKS) throw new GateError("inference checks are used up");
-  const next = clone3(state);
-  const sentences = sentencesOf(next);
-  const given = Array.isArray(items) ? items : [];
-  if (given.length !== sentences.length || new Set(given.map((i) => i == null ? void 0 : i.id)).size !== sentences.length)
-    throw new GateError("check every sentence, once");
-  const source = sourceText(prepareInferenceCheck(state));
-  const finalCheck = done + 1 >= MAX_INFERENCE_CHECKS;
-  let rewrote = false;
-  for (const entry of sentences) {
-    const item = given.find((i) => (i == null ? void 0 : i.id) === entry.id);
-    if (!item || !["ok", "rewrite", "delete"].includes(item.status))
-      throw new GateError("a check answers ok, rewrite or delete");
-    const answer = next.conclusion.answers.find((a) => a.claimId === entry.id);
-    let text13 = entry.sentence;
-    let remove = item.status === "delete";
-    if (item.status === "rewrite") {
-      const rewrite = guardText(item.rewrite, source, "a rewritten sentence");
-      const claim2 = answer ? next.claims.find((c) => c.id === answer.claimId) : void 0;
-      if (claim2 && answer) checkSentence(next, claim2, rewrite, answer.assumptions);
-      if (finalCheck) remove = true;
-      else text13 = rewrite;
-    }
-    if (remove) {
-      next.conclusion.deleted.push(entry.sentence);
-      if (answer) answer.sentence = "";
-      else delete next.conclusion.overall;
-    } else if (item.status === "rewrite") {
-      rewrote = true;
-      if (answer) answer.sentence = text13;
-      else next.conclusion.overall = text13;
-    }
-  }
-  next.run.inferenceChecks = done + 1;
-  if (rewrote && !finalCheck) return next;
-  const undecidable = liveTestables(next).some((c) => {
-    var _a3;
-    return ((_a3 = c.comparison) == null ? void 0 : _a3.state) === "undecidable";
-  });
-  next.conclusion.state = undecidable ? "undecidable" : "concluded";
-  next.run.phase = "concluded";
-  next.run.status = "finished";
-  delete next.run.stopReason;
-  return next;
-}
-function applyPause2(state, reason) {
-  var _a2;
-  live2(state);
-  if (!["user", "interrupted", "error"].includes(reason)) throw new GateError("unknown pause reason");
-  const next = clone3(state);
-  for (const claim2 of next.claims) for (const d of (_a2 = claim2.data) != null ? _a2 : []) if (d.state === "searching") d.state = "pending";
-  for (const h of next.hypotheses) for (const need of h.needs) if (need.state === "searching") need.state = "pending";
-  next.run.status = "paused";
-  next.run.stopReason = reason;
-  return next;
-}
-function applyResume2(state) {
-  live2(state);
-  if (state.run.status !== "paused") throw new GateError("the run is not paused");
-  const next = clone3(state);
-  next.run.status = "running";
-  delete next.run.stopReason;
-  return next;
-}
-
 // core/steps/argument-map/v2-framing.md
 var v2_framing_default = `Restate and break down the user's original claim so it can later be tested with evidence. This step only organizes what is being asked. Do not answer the question, do not research, browse or answer from memory.
 
@@ -49327,7 +49345,8 @@ var v2_framing_default = `Restate and break down the user's original claim so it
    - composition: write how the claims' answers combine into an answer to the original. Leave it empty when they cannot be combined; then only each claim is answered and the original gets no overall answer.
    - definitions: at least one {term, meaning} for each claim, covering subject, region, period and measure. For a main_cause claim define "mainly" as a comparable causal contribution with a common baseline, not explained variance. For a comparison claim define the common scale and how large a difference counts.
    - dataNeeds: for a premise, 1 or 2 short descriptions of the data to look up; for a testable claim, an empty array.
-   There are at most 3 premises and 1 or 2 testable claims.
+   List at least one premise: a "fact" claim describing a checkable background fact the claim being tested relies on, such as data existing or a definition holding. When there is no premise to write, split out a fact premise such as "the phenomenon the claim refers to actually exists".
+   There are 1 to 3 premises and 1 or 2 testable claims.
 5. settings: assumptions or choices the user may want to confirm (for example a period), as short phrases; empty when none. These are the user's settings, not facts.
 
 Return only JSON with exactly the fields restatement, presuppositions, loadedTerms, vagueTerms, outOfScope, candidates, chosen, claims, settings and composition (a string, empty when the answers cannot be combined). Do not add other fields, paths or links. Every number anywhere in the reply (including years, percentages and statistics, also inside definitions and settings) must be a number that appears in the original claim or in the user's note; never add an outside year, percentage or statistic, and describe it in words instead of digits when needed. If definitions or settings need a time range, use only the words the original already has (for example "since then" or the period as the original states it). Do not write any link or URL. All context is supplied; do not inspect files, use tools or search the web.
@@ -50296,8 +50315,8 @@ var WORST_CASE_AI_CALLS2 = MAX_RESEARCH_CALLS + 1 + 1 + (MAX_HYPOTHESES - MIN_VE
 var X_STEP = 320;
 var Y_STEP = 160;
 var ArgumentRunError = class extends Error {
-  constructor(code) {
-    super(`argument run refused: ${code}`);
+  constructor(code, detail) {
+    super(`argument run refused: ${code}${detail ? ` (${detail})` : ""}`);
     this.code = code;
     this.name = "ArgumentRunError";
   }
@@ -81299,6 +81318,8 @@ ${request.requirements}` : preset.text,
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeHypothesisLeaning(path, leaning)).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
+      const argument = map.argumentMap === void 0 ? null : readArgumentMap2(map);
+      if ((argument == null ? void 0 : argument.kind) === "usable") map.argumentMap = applyUserVerdict(argument.data, node.id, leaning);
     }).commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
@@ -98588,14 +98609,14 @@ var ArgumentRunRouter = class {
   isRunning(path) {
     return this.v1.isRunning(path) || this.v2.isRunning(path);
   }
-  /** The v1 start window's call; a v2 map is started through `ArgumentRunsV2.start` with a locked framing instead. */
-  start(path, claim2) {
-    return this.v1.start(path, claim2);
+  /** Refused: a new map is started through `ArgumentRunsV2.start` with a locked framing; the v1 start would write a v1 map. */
+  start(_path, _claim) {
+    return Promise.reject(new ArgumentRunError("unusable", "use argumentRunsV2.start with a locked framing"));
   }
   async resume(path) {
     if (this.v1.isRunning(path) || this.v2.isRunning(path)) throw new ArgumentRunError("busy");
     const kind = readArgumentMap2(await this.readMap(path)).kind;
-    if (kind !== "usable") return this.v1.resume(path);
+    if (kind !== "usable") throw new ArgumentRunError("unusable");
     try {
       const outcome = await this.v2.resume(path);
       if (!outcome.ok) throw toV1Refusal(outcome.refusal);

@@ -71,7 +71,7 @@ export type EvidenceResult = { found: true; stance: string; proof: SourceProof }
 /** The AI's judgement of a facet-judged situation: a stance for each found datum of the pending facets and a verdict for each pending facet. */
 export interface FacetJudgement {
   data: { id: string; propStance: unknown; reason: string }[];
-  facets: { id: string; verdict: unknown; reason: string; citedData: string[] }[];
+  facets: { id: string; verdict: unknown; reason: string; citedData: string[]; summary: string }[];
 }
 export interface SituationPlan {
   assumptions?: { id: string; items: AssumptionItem[] };
@@ -508,6 +508,8 @@ export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudge
   for (const entry of verdicts) {
     const facet = nextFacets.find(f => f.id === entry.id);
     if (!facet || !pendingIds.has(facet.id)) throw new GateError("the judgement names a facet that is not waiting");
+    if (blank(entry.summary)) throw new GateError("a facet needs a summary");
+    facet.summary = entry.summary;
     const own = foundOf(next, facet.id);
     // No found data, or only data that bear no stance (#47): nothing to rest a verdict on, whatever the AI said.
     if (!own.some(d => d.propStance !== "irrelevant")) {

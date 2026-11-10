@@ -245,16 +245,16 @@ test('conclusion: a number or URL outside the input throws; below 3 verified hyp
 
 // ---- schemas and registry ----
 test('every step has a strict schema and the registry maps the machine actions', () => {
-  for (const step of [mod.planSituationStep, mod.facetPlanStep, mod.situationGateStep, mod.hypothesesStep, mod.needsStep, mod.verdictStep, mod.conclusionStep]) {
+  for (const step of [mod.planSituationStep, mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.needsStep, mod.verdictStep, mod.conclusionStep]) {
     assert.equal(step.schema.additionalProperties, false);
     assert.deepEqual([...step.schema.required].sort(), Object.keys(step.schema.properties).sort());
   }
-  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_gate', 'plan_facets', 'plan_situation', 'propose_hypotheses', 'revise', 'verdict']);
+  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_facets', 'judge_gate', 'plan_facets', 'plan_situation', 'propose_hypotheses', 'revise', 'verdict']);
   assert.equal(mod.ARGUMENT_STEPS.plan_facets, mod.facetPlanStep);
   assert.equal(mod.ARGUMENT_STEPS.plan_situation, mod.planSituationStep);
   assert.equal(mod.ARGUMENT_STEPS.revise, mod.needsStep);
   const ids = new Set(Object.values(mod.ARGUMENT_STEPS).map(step => step.id));
-  assert.equal(ids.size, 7);
+  assert.equal(ids.size, 8);
 });
 
 // ---- text-only through the real runtimes ----
@@ -280,12 +280,90 @@ function codexChild(requests, text) {
   } };
   return child;
 }
+// ---- V1 boost P3: facet judge step ----
+const fdatum = (id, over = {}) => ({ id, need: `need of ${id}`, claim: `claim of ${id}`, quote: `quote of ${id} says 9.2 percent`, url: `https://stats.example.org/${id}`, stance: 'supports', ...over });
+const fjReq = (over = {}) => ({ ...base, proposition: PROP, round: 1, facets: [
+  { id: 'fa', title: 'Level of the rate', data: [fdatum('a1'), fdatum('a2', { stance: 'opposes' })] },
+  { id: 'fb', title: 'Direction of change', data: [fdatum('b1', { stance: 'uncertain', fixedStance: 'irrelevant' })] },
+  { id: 'fc', title: 'Who is counted', data: [] }
+], ...over });
+const fjOk = () => ({
+  data: [{ id: 'a1', propStance: 'supports', reason: 'a1 says 9.2 percent' }, { id: 'a2', propStance: 'refutes', reason: 'a2 points the other way' }, { id: 'b1', propStance: 'irrelevant', reason: 'b1 is unclear' }],
+  facets: [
+    { id: 'fa', verdict: 'supports', reason: 'a1 fits', summary: 'The rate level fits.', citedData: ['a1'], retryNeeds: [] },
+    { id: 'fb', verdict: 'insufficient', reason: 'only unclear data', summary: 'Direction is not shown.', citedData: [], retryNeeds: ['Year on year change in the youth rate'] },
+    { id: 'fc', verdict: 'insufficient', reason: 'no data', summary: 'Nothing found.', citedData: [], retryNeeds: [] }
+  ]
+});
+const fjWith = fn => { const v = fjOk(); fn(v); return v; };
+const fjFacet = (v, id) => v.facets.find(f => f.id === id);
+test('facet judge: a well formed reply parses and feeds applyFacetVerdicts shape', () => {
+  const out = plain(ok(mod.facetJudgeStep, fjReq(), fjOk()));
+  assert.deepEqual(out, fjOk());
+});
+test('facet judge: data ids must be exactly the found ones; facet ids exactly those sent; more than 5 facets refused', () => {
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.data.pop(); }), /every found datum|data/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.data.push({ id: 'zz', propStance: 'supports', reason: 'x' }); }), /data/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.data[1].id = 'a1'; }), /data/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.facets.pop(); }), /facets/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.facets[2].id = 'fz'; }), /facets/);
+  bad(mod.facetJudgeStep, fjReq({ facets: Array.from({ length: 6 }, (_, i) => ({ id: `x${i}`, title: `T${i}`, data: [] })) }), fjOk(), /5 facets/);
+});
+test('facet judge: a stance already fixed in the request must come back unchanged; unknown stance refused', () => {
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.data[2].propStance = 'supports'; }), /fixed/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.data[0].propStance = 'maybe'; }), /stance/);
+});
+test('facet judge: citations belong to the facet, are found, not irrelevant, and a supports/refutes verdict cites a same stance datum', () => {
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').citedData = ['b1']; }), /cite/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').citedData = ['zz']; }), /cite/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').citedData = ['b1']; }), /cite/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').citedData = []; }), /same stance|cite/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').verdict = 'refutes'; }), /same stance/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').verdict = 'pending'; }), /verdict/);
+  assert.ok(ok(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').verdict = 'refutes'; fjFacet(v, 'fa').citedData = ['a2']; })));
+});
+test('facet judge: an empty summary or reason is refused', () => {
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').summary = ''; }), /summary/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').summary = '  '; }), /summary/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').reason = ''; }), /reason/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { delete fjFacet(v, 'fa').summary; }));
+});
+test('facet judge: retryNeeds only on insufficient, only in round 1, at most 3 per facet and 9 in all, grounded', () => {
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').retryNeeds = ['Another series']; }), /retry/);
+  bad(mod.facetJudgeStep, fjReq({ round: 2 }), fjOk(), /retry/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').retryNeeds = ['one', 'two', 'three', 'four'].map(x => `Need ${x}`); }), /retry/);
+  const wide = fjReq({ facets: ['p', 'q', 'r', 's'].map(id => ({ id, title: `Title ${id}`, data: [] })) });
+  const wideOk = n => ({ data: [], facets: ['p', 'q', 'r', 's'].map(id => ({ id, verdict: 'insufficient', reason: 'none', summary: 'none', citedData: [], retryNeeds: ['alpha', 'bravo', 'charlie'].slice(0, n).map(w => `${w} ${id}`) })) });
+  assert.ok(ok(mod.facetJudgeStep, wide, wideOk(2)), '8 in all is fine');
+  bad(mod.facetJudgeStep, wide, wideOk(3), /retry/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').retryNeeds = ['Rate for 2019']; }), /number 2019/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').retryNeeds = ['see https://x.example.com']; }), /link/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').retryNeeds = ['Need a', 'need a.']; }), /repeat/);
+  assert.ok(ok(mod.facetJudgeStep, fjReq({ round: 2 }), fjWith(v => { fjFacet(v, 'fb').retryNeeds = []; })));
+});
+test('facet judge: free text may not carry a number or link the request lacks; extra fields refused', () => {
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').summary = 'It reached 11.4 percent'; }), /number 11.4/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.data[0].reason = 'see https://evil.example.com'; }), /link/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.extra = 1; }));
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').extra = 1; }));
+  bad(mod.facetJudgeStep, fjReq(), 'not json');
+});
+test('facet judge: the prompt shows only the proposition and the facets; a secret field never appears; round 1 and 2 differ only by the request', () => {
+  const prompt = mod.facetJudgeStep.render({ ...fjReq(), secret: 'LEAKED-X' });
+  assert.doesNotMatch(prompt, /LEAKED/);
+  assert.match(prompt, /Level of the rate/);
+  assert.match(prompt, /"fixedStance":"irrelevant"/);
+  assert.notEqual(prompt, mod.facetJudgeStep.render(fjReq({ round: 2 })));
+  assert.throws(() => sr.prepareStep(mod.facetJudgeStep, fjReq({ facets: [] })), error => error.name === 'ArgumentStepError');
+});
+
 const stepCases = () => {
   const f = conclusionFixture();
   const v = verdictFixture();
   return [
     ['plan', mod.planSituationStep, planReq, { data: [{ need: 'Official rate series' }] }],
     ['gate', mod.situationGateStep, gateReq, gateOk],
+    ['facet-judge', mod.facetJudgeStep, fjReq(), fjOk()],
     ['hypotheses', mod.hypothesesStep, hypReq, hypOk],
     ['needs', mod.needsStep, needReq, { needs: [{ text: 'Job posting trends for juniors' }] }],
     ['verdict', mod.verdictStep, vReq(v.input), { verdict: 'supported', citedNeeds: ['h1-n1'], reason: 'The claim of h1 is backed' }],

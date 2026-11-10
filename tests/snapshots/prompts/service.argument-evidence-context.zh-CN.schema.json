@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "适合思维导图的一句简体中文结论，80 字内"
+    },
+    "detail": {
+      "type": "string",
+      "description": "完整的简体中文 Markdown 分析"
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "contribution": {
+            "type": "string"
+          },
+          "parentTitle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "task",
+          "contribution",
+          "parentTitle"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "visualReferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "formula": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "imageUrl",
+          "sourceUrl",
+          "description",
+          "palette",
+          "formula"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "argumentEvidence": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "need": {
+            "type": "string",
+            "enum": [
+              "n1",
+              "n2"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "found",
+              "not_found"
+            ]
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "contradicts",
+              "uncertain"
+            ]
+          },
+          "claim": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "need",
+          "status",
+          "stance",
+          "claim",
+          "quote",
+          "url"
+        ]
+      }
+    }
+  },
+  "required": [
+    "summary",
+    "detail",
+    "suggestions",
+    "visualReferences",
+    "argumentEvidence"
+  ],
+  "additionalProperties": false
+}

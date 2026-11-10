@@ -136,6 +136,17 @@ test('AiTaskService: the result carries the parsed entries and the opened urls; 
   assert.deepEqual(plain(rt.calls[0].schema.properties.argumentEvidence.items.properties.need.enum), ['n1', 'n2']);
 });
 
+test('AiTaskService: a need with a context shows it to the research; a need without one renders exactly as before', async () => {
+  const withContext = context({ argumentEvidenceNeeds: [{ id: 'n1', text: 'a', context: 'Period: ages 16 to 24, 2023 to 2024' }, { id: 'n2', text: 'b' }] });
+  const rt = runtimeEmitting([opened('https://stats.example.org/report')], body([found('n1'), miss('n2')]));
+  await makeService(rt).askModel(withContext, 'gpt-6-luna', 'low');
+  assert.match(rt.calls[0].prompt, /\[\{"id":"n1","text":"a","context":"Period: ages 16 to 24, 2023 to 2024"\},\{"id":"n2","text":"b"\}\]/);
+  const plainRt = runtimeEmitting([opened('https://stats.example.org/report')], body([found('n1'), miss('n2')]));
+  await makeService(plainRt).askModel(context({ argumentEvidenceNeeds: [{ id: 'n1', text: 'a', context: undefined }, { id: 'n2', text: 'b' }] }), 'gpt-6-luna', 'low');
+  assert.match(plainRt.calls[0].prompt, /\[\{"id":"n1","text":"a"\},\{"id":"n2","text":"b"\}\]/);
+  assert.equal(plain(plainRt.calls[0].schema).properties.argumentEvidence.items.properties.need.enum.length, 2);
+});
+
 test('AiTaskService: out-of-scope or malformed evidence rejects the whole reply; no entry is kept', async () => {
   for (const items of [[found('n9')], [found('n1', { url: 'ftp://x.org/a' })], [found('n1', { quote: 'short' })]]) {
     const rt = runtimeEmitting([opened('https://stats.example.org/report')], body(items));

@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
-const { ArgumentRuns, ArgumentRunError, WORST_CASE_AI_CALLS } = S.load('experiences/visual-map/argument-run.ts');
+const { ArgumentRuns, ArgumentRunError, WORST_CASE_AI_CALLS, assumptionScope } = S.load('experiences/visual-map/argument-run.ts');
 const { ARGUMENT_STEPS, ArgumentStepError } = S.load('core/steps/argument-map/runner.ts');
 const model = S.load('core/argument-map/model.ts');
 const { translate } = S.load('i18n.ts');
@@ -107,6 +107,16 @@ test('happy path: runs to a conclusion; begin is written before each dispatch; o
   const again = layoutModule.arrangeArgumentMap(doc.nodes, doc.argumentMap);
   assert.deepEqual(again.map(n => [n.id, n.x, n.y]), doc.nodes.map(n => [n.id, n.x, n.y]));
   assert.equal(layoutModule.arrangeUnarrangedArgumentMap(doc.nodes, doc.argumentMap), null);
+});
+
+test('B3: situation research carries the assumptions as its scope; an old map (no assumptions) sends a need without a context key', async () => {
+  assert.equal(assumptionScope({ situation: { data: [] } }), undefined);
+  assert.equal(assumptionScope({ situation: { data: [], assumptions: { id: 'as', items: [] } } }), undefined);
+  assert.equal(assumptionScope({ situation: { data: [], assumptions: { id: 'as', items: [{ label: 'Age band', value: '16 to 24, 2023 to 2024', reason: 'r' }, { label: 'Unemployed', value: 'ILO definition', reason: 'r' }] } } }), 'Age band: 16 to 24, 2023 to 2024; Unemployed: ILO definition');
+  const r = await rig({ script: { step: steps() } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  assert.ok(r.stat.ask.length > 0);
+  for (const ctx of r.stat.ask) assert.equal('context' in ctx.argumentEvidenceNeeds[0], false);
 });
 
 test('layers: the eliminated group hangs under the conclusion; each situation datum is a leaf card (node id == datum id) under the situation card', async () => {

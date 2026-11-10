@@ -16,6 +16,36 @@
       "language": "zh-CN",
       "schema": true
     },
+    "argument-map-facet-judge-round2.en": {
+      "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-facet-judge-round2.zh": {
+      "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-facet-judge-round2.zh-CN": {
+      "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-facet-judge.en": {
+      "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-facet-judge.zh": {
+      "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-facet-judge.zh-CN": {
+      "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "argument-map-facet-plan.en": {
       "builder": "core/steps/argument-map/facet-plan.ts facetPlanStep",
       "language": "en",
@@ -575,6 +605,21 @@
       "builder": "core/reframing-service.ts buildReframePrompt",
       "language": "zh-CN",
       "schema": false
+    },
+    "service.argument-evidence-context.en": {
+      "builder": "AiTaskService instructions: argument-evidence contract, one need carries a scope context (period and definitions)",
+      "language": "en",
+      "schema": true
+    },
+    "service.argument-evidence-context.zh": {
+      "builder": "AiTaskService instructions: argument-evidence contract, one need carries a scope context (period and definitions)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.argument-evidence-context.zh-CN": {
+      "builder": "AiTaskService instructions: argument-evidence contract, one need carries a scope context (period and definitions)",
+      "language": "zh-CN",
+      "schema": true
     },
     "service.argument-evidence.en": {
       "builder": "AiTaskService instructions: mode task, web research, argument-evidence response contract (two needs)",

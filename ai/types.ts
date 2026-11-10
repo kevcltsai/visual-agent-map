@@ -32,6 +32,8 @@ export type AiResponseContract = "argument-evidence";
 export interface ArgumentEvidenceNeed {
   id: string;
   text: string;
+  /** Optional scope the research must keep (for example the period and definitions the facet plan assumed); shown only when present. */
+  context?: string;
 }
 /**
  * One reply entry of the argument-evidence contract, parsed and shape-checked only: a found entry has a claim, a quote of 12 to

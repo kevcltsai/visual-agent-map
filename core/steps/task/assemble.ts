@@ -449,7 +449,7 @@ export function assembleTaskPrompt(
   const jsonContract =
     context.responseContract === "argument-evidence"
       ? inLanguage(ARGUMENT_EVIDENCE_CONTRACT, language).replace("<<needs>>", () =>
-          JSON.stringify((context.argumentEvidenceNeeds ?? []).map(({ id, text }) => ({ id, text })))
+          JSON.stringify((context.argumentEvidenceNeeds ?? []).map(({ id, text, context: scope }) => (scope ? { id, text, context: scope } : { id, text })))
         )
       : inLanguage(JSON_CONTRACT, language);
   add(fixed(withProviderOutput(jsonContract, provider, language), "json-contract"));

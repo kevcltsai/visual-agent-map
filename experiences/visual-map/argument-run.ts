@@ -191,6 +191,15 @@ const domainOf = (url: string | undefined): string => {
   }
 };
 /** A signal that aborts when either input does (no `AbortSignal.any`, which older runtimes lack). */
+/** The period and definitions the facet plan assumed, as one line for situation research; undefined when the map has none (old maps). */
+export function assumptionScope(state: Pick<ArgumentMapData, "situation">): string | undefined {
+  const items = state.situation.assumptions?.items ?? [];
+  return items.length ? items.map(i => `${i.label}: ${i.value}`).join("; ") : undefined;
+}
+const scopeOf = (isNeed: boolean, state: Pick<ArgumentMapData, "situation">): { context?: string } => {
+  const context = isNeed ? undefined : assumptionScope(state);
+  return context ? { context } : {};
+};
 function linked(a: AbortSignal, b: AbortSignal): AbortSignal {
   const controller = new AbortController();
   const abort = (): void => controller.abort();
@@ -812,7 +821,7 @@ export class ArgumentRuns {
               mode: "task",
               researchMode: "research",
               responseContract: "argument-evidence",
-              argumentEvidenceNeeds: [{ id: itemId, text: needText }],
+              argumentEvidenceNeeds: [{ id: itemId, text: needText, ...scopeOf(isNeed, state) }],
               usageMapPath: drive.mapPath,
               outputLanguage: this.ports.config(drive.mapPath).language
             },

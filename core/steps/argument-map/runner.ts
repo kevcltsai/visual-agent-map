@@ -2,6 +2,7 @@ import type { AiCalls } from "../../ai-calls";
 import { providerStepRunner, type ProviderStepRunner } from "../../provider-step-runner";
 import { prepareStep, type StepDefinition } from "../../step-runner";
 import { conclusionStep } from "./conclusion";
+import { facetJudgeStep } from "./facet-judge";
 import { facetPlanStep } from "./facet-plan";
 import { situationGateStep } from "./gate";
 import { hypothesesStep } from "./hypotheses";
@@ -11,6 +12,7 @@ import { ArgumentStepError, type ArgumentStepBase } from "./shared";
 import { verdictStep } from "./verdict";
 
 export * from "./conclusion";
+export * from "./facet-judge";
 export * from "./facet-plan";
 export * from "./gate";
 export * from "./hypotheses";
@@ -27,6 +29,7 @@ export const ARGUMENT_STEPS = {
   plan_situation: planSituationStep,
   plan_facets: facetPlanStep,
   judge_gate: situationGateStep,
+  judge_facets: facetJudgeStep,
   propose_hypotheses: hypothesesStep,
   add_needs: needsStep,
   revise: needsStep,

@@ -614,7 +614,7 @@ function judgement(s, stances = {}, verdicts = {}) {
     facets: pending.map(f => {
       const verdict = verdicts[f.id] ?? 'supports';
       const citedData = found.filter(d => d.facetId === f.id && stance(d) === verdict).map(d => d.id);
-      return { id: f.id, verdict, reason: `because ${f.id}`, citedData };
+      return { id: f.id, verdict, reason: `because ${f.id}`, citedData, summary: `summary of ${f.id}` };
     })
   };
 }
@@ -872,4 +872,23 @@ test('facet boost: old maps keep every old action and cap (no facets key, gate_m
   assert.equal(s.situation.facets, undefined);
   s.run.researchCalls = 66;
   assert.deepEqual(types(s), ['stop_limit']);
+});
+
+// ---- V1 boost P3: the facet summary (decision B5) ----
+test('facet summary: the judgement stores each facet summary; a blank or missing summary is refused, also for a facet with no data', () => {
+  const s0 = researchAll(planned([1, 1, 1, 1]));
+  const done = judged(s0);
+  for (const f of done.situation.facets) assert.equal(f.summary, `summary of ${f.id}`);
+  for (const blank of ['', '  ', undefined]) {
+    const j = judgement(s0);
+    j.facets[0].summary = blank;
+    assert.throws(() => m.applyFacetVerdicts(s0, j), e => e.name === 'GateError' && /summary/.test(e.message));
+  }
+  const nodata = researchAll(planned([1, 1, 1, 1]), ['f1d1']);
+  const empty = nodata.situation.facets.find(f => dataOf(nodata, f.id).every(d => d.state !== 'found'));
+  assert.ok(empty, 'one facet has no found data');
+  const j = judgement(nodata);
+  j.facets.find(v => v.id === empty.id).summary = '';
+  assert.throws(() => m.applyFacetVerdicts(nodata, j), e => e.name === 'GateError' && /summary/.test(e.message));
+  assert.equal(judged(nodata).situation.facets.find(f => f.id === empty.id).summary, `summary of ${empty.id}`);
 });

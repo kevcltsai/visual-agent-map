@@ -64,6 +64,7 @@ test('collect snapshots: AiTaskService general task prompt', async () => {
     await recordContext(`service.default-adaptive.${tag}`, 'AiTaskService instructions: no mode, adaptive detail, no sources', language, { ...ctx, mode: undefined, detailFormat: 'adaptive', sourceContext: undefined, workingFindings: undefined, detail: '', rules: '', ancestors: '' });
     // Argument map (hypothesis research P4): the evidence research reply contract on the existing task.run path; the standard JSON contract line is replaced, nothing else.
     await recordContext(`service.argument-evidence.${tag}`, 'AiTaskService instructions: mode task, web research, argument-evidence response contract (two needs)', language, { ...ctx, detail: '', rules: '', ancestors: '', workingFindings: undefined, sourceContext: undefined, responseContract: 'argument-evidence', argumentEvidenceNeeds: [{ id: 'n1', text: language === 'en' ? 'Monthly junior hiring counts' : '每月初階職缺數' }, { id: 'n2', text: 'Unemployment rate 2024' }] });
+    await recordContext(`service.argument-evidence-context.${tag}`, 'AiTaskService instructions: argument-evidence contract, one need carries a scope context (period and definitions)', language, { ...ctx, detail: '', rules: '', ancestors: '', workingFindings: undefined, sourceContext: undefined, responseContract: 'argument-evidence', argumentEvidenceNeeds: [{ id: 'n1', text: language === 'en' ? 'Monthly junior hiring counts' : '每月初階職缺數', context: language === 'en' ? 'Age band: ages 16 to 24; Period: 2023 to 2024' : '年齡層：16 至 24 歲；期間：2023 至 2024 年' }, { id: 'n2', text: 'Unemployment rate 2024' }] });
     await recordContext(`service.reference-groups.${tag}`, 'AiTaskService reference extraction then task', language, { ...ctx, sourceContext: undefined, referenceGroups: [{ id: 'g1', name: 'Group', location: '/refs', documents: [{ path: '/refs/a.md', content: 'Reference body A' }] }] });
     // Note style recipe T4 F1: the reference extraction pass that runs before a top or fresh task follows the update mode (no absorb-or-replace text, no old-Detail label in fresh).
     for (const updateMode of ['top', 'fresh']) {
@@ -329,6 +330,11 @@ test('collect snapshots: chart step (chart.add@1)', () => {
   const argumentBase = { model: 'm', reasoning: 'low' };
   const argumentProposition = 'Youth unemployment rose';
   const argumentData = [argumentDatum('d1', 'supports'), argumentDatum('d2', 'opposes')];
+  const judgeFacets = [
+    { id: 'f1', title: 'Level of the rate', data: [{ ...argumentDatum('d1', 'supports') }, { ...argumentDatum('d2', 'opposes') }] },
+    { id: 'f2', title: 'Direction of change', data: [{ ...argumentDatum('d3', 'uncertain'), fixedStance: 'irrelevant' }] },
+    { id: 'f3', title: 'Who is counted', data: [] }
+  ];
   for (const [language, tag] of LANGUAGES) {
     const request = { ...argumentBase, language, proposition: argumentProposition };
     const steps = [
@@ -341,9 +347,11 @@ test('collect snapshots: chart step (chart.add@1)', () => {
     ];
     // V1 boost: the facet plan step and the hypotheses step with causal questions (new snapshots only)
     for (const [name, key, input] of [
+      ['facet-judge', 'facetJudgeStep', { ...request, round: 1, facets: judgeFacets }],
+      ['facet-judge-round2', 'facetJudgeStep', { ...request, round: 2, facets: judgeFacets.slice(1, 2) }],
       ['facet-plan', 'facetPlanStep', request],
       ['hypotheses-causal', 'hypothesesStep', { ...request, data: argumentData, count: 3, existing: ['Earlier hypothesis title'], causalQuestions: ['Did automation drive the rise?'] }]
-    ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'facet-plan' ? 'facet-plan' : 'hypotheses'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
+    ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name.startsWith('facet-judge') ? 'facet-judge' : name === 'facet-plan' ? 'facet-plan' : 'hypotheses'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
     for (const [name, key, input] of steps) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'situation-gate' ? 'gate' : name === 'plan-situation' ? 'plan' : name}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
   }
   for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);

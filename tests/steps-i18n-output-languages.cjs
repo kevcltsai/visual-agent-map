@@ -12,7 +12,7 @@ const support = require('./support.cjs');
 
 const i18n = load('i18n.ts');
 const { LANGUAGES, OUTPUT_LANGUAGES } = load('i18n/languages.ts');
-const content = load('experiences/aim/content-language.ts');
+const content = load('core/content-language.ts');
 const result = load('ai/result-utils.ts');
 const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage, selectionOutputLanguage, defaultOutputLanguage, outputLanguageForMap, cardOutputLanguage, noteLanguageFromBody, mapChatLanguageSources } = content;
 // The clause without an anchor (nothing to quote), then the anchored one that names and quotes the user's own text (D-2026-10-94).

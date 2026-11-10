@@ -48,6 +48,7 @@ import {
 } from "../_shared/fragments";
 import {
   ADAPTIVE_DETAIL_STRUCTURE,
+  ARGUMENT_EVIDENCE_CONTEXT_RULE,
   ARGUMENT_EVIDENCE_CONTRACT,
   AI_DECIDED_SECTIONS,
   AI_FOLLOWED_SECTIONS,
@@ -450,7 +451,7 @@ export function assembleTaskPrompt(
     context.responseContract === "argument-evidence"
       ? inLanguage(ARGUMENT_EVIDENCE_CONTRACT, language).replace("<<needs>>", () =>
           JSON.stringify((context.argumentEvidenceNeeds ?? []).map(({ id, text, context: scope }) => (scope ? { id, text, context: scope } : { id, text })))
-        )
+        ) + ((context.argumentEvidenceNeeds ?? []).some(need => need.context) ? "\n\n" + inLanguage(ARGUMENT_EVIDENCE_CONTEXT_RULE, language) : "")
       : inLanguage(JSON_CONTRACT, language);
   add(fixed(withProviderOutput(jsonContract, provider, language), "json-contract"));
   {

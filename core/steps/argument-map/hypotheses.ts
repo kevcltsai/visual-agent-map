@@ -14,7 +14,6 @@ import {
 } from "./shared";
 import type { GateDatum } from "./gate";
 import template from "./hypotheses.md";
-import causalTemplate from "./hypotheses-causal.md";
 
 export interface HypothesesRequest extends ArgumentStepBase {
   proposition: string;
@@ -24,8 +23,6 @@ export interface HypothesesRequest extends ArgumentStepBase {
   count: number;
   /** Titles of hypotheses already on the map, eliminated ones included. */
   existing: string[];
-  /** Cause questions moved out of the situation plan; rendered, and their words reusable, only when non-empty. */
-  causalQuestions?: string[];
 }
 export interface ProposedHypothesis {
   title: string;
@@ -68,7 +65,6 @@ const pick = (d: GateDatum): GateDatum => ({
 const sourcesOf = (request: HypothesesRequest): string[] => [
   request.proposition,
   ...request.existing,
-  ...(request.causalQuestions ?? []),
   ...request.data.flatMap(d => [d.need, d.claim, d.quote, d.url, d.stance])
 ];
 
@@ -101,10 +97,7 @@ export const hypothesesStep: StepDefinition<HypothesesRequest, HypothesesResult>
       count: String(request.count),
       proposition: JSON.stringify(request.proposition),
       data: JSON.stringify(request.data.map(pick)),
-      existing: JSON.stringify(request.existing),
-      causal: request.causalQuestions?.length
-        ? "\n\n" + renderTemplate(causalTemplate, { questions: JSON.stringify(request.causalQuestions) })
-        : ""
+      existing: JSON.stringify(request.existing)
     }),
   schema: HYPOTHESES_SCHEMA,
   policy: (prompt, request) => {

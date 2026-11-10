@@ -49,8 +49,8 @@ export type PropStance = (typeof PROP_STANCES)[number];
 export const FACET_VERDICTS = ["supports", "refutes", "insufficient", "pending"] as const;
 export type FacetVerdict = (typeof FACET_VERDICTS)[number];
 /**
- * The single switch point for decision #47: the proposition stance of a datum whose source was verified but whose research answer was
- * "uncertain". TODO decision #47: the owner picks (a) irrelevant (this value) or (b) a fourth label; (b) changes only this constant and the type.
+ * The proposition stance of a datum whose source was verified but whose research answer was "uncertain". Decision #49 chose 甲 (irrelevant).
+ * Switching to 乙 (a fourth label) would change this constant and the type, and also machine.ts and facet-judge.ts, where `!== "irrelevant"` decides which data are usable.
  */
 export const UNCERTAIN_RESEARCH_STANCE: PropStance = "irrelevant";
 export function propStanceForUncertainResearch(): PropStance {

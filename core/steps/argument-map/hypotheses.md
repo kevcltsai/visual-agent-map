@@ -15,4 +15,4 @@ Situation data (JSON array):
 {{data}}
 
 Existing hypotheses (JSON array of titles):
-{{existing}}{{causal}}
+{{existing}}

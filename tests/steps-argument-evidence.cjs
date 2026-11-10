@@ -147,6 +147,14 @@ test('AiTaskService: a need with a context shows it to the research; a need with
   assert.equal(plain(plainRt.calls[0].schema).properties.argumentEvidence.items.properties.need.enum.length, 2);
 });
 
+test('AiTaskService: the context instruction appears only when a need carries a context', async () => {
+  const rt = runtimeEmitting([opened('https://stats.example.org/report')], body([found('n1'), miss('n2')]));
+  await makeService(rt).askModel(context({ argumentEvidenceNeeds: [{ id: 'n1', text: 'a', context: 'Period: 2023' }, { id: 'n2', text: 'b' }] }), 'gpt-6-luna', 'low');
+  assert.match(rt.calls[0].prompt, /period and definitions of that need/);
+  const plainRt = runtimeEmitting([opened('https://stats.example.org/report')], body([found('n1'), miss('n2')]));
+  await makeService(plainRt).askModel(context({ argumentEvidenceNeeds: [{ id: 'n1', text: 'a' }, { id: 'n2', text: 'b' }] }), 'gpt-6-luna', 'low');
+  assert.doesNotMatch(plainRt.calls[0].prompt, /period and definitions of that need/);
+});
 test('AiTaskService: out-of-scope or malformed evidence rejects the whole reply; no entry is kept', async () => {
   for (const items of [[found('n9')], [found('n1', { url: 'ftp://x.org/a' })], [found('n1', { quote: 'short' })]]) {
     const rt = runtimeEmitting([opened('https://stats.example.org/report')], body(items));

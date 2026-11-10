@@ -476,6 +476,8 @@ const stopFacets = (
  * changed) and a verdict for each pending facet. A facet with no found data is `insufficient` whatever the AI said; "supports" and
  * "refutes" must cite at least one found, non-irrelevant datum of the facet with that same stance. The program then decides the outcome.
  */
+/** Program data (not UI text): the reason stored when the machine forces a facet insufficient and the AI did not itself say so. */
+const NO_USABLE_DATA_REASON = "no usable data for this facet";
 export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudgement): ArgumentMapData {
   inSituation(state);
   const facets = facetsOf(state);
@@ -514,7 +516,7 @@ export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudge
     // No found data, or only data that bear no stance (#47): nothing to rest a verdict on, whatever the AI said.
     if (!own.some(d => d.propStance !== "irrelevant")) {
       facet.verdict = "insufficient";
-      facet.reason = blank(entry.reason) ? "no data found" : entry.reason;
+      facet.reason = entry.verdict === "insufficient" && !blank(entry.reason) ? entry.reason : NO_USABLE_DATA_REASON;
       facet.citedData = [];
       continue;
     }

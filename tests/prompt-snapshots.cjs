@@ -333,7 +333,7 @@ test('collect snapshots: chart step (chart.add@1)', () => {
   const judgeFacets = [
     { id: 'f1', title: 'Level of the rate', data: [{ ...argumentDatum('d1', 'supports') }, { ...argumentDatum('d2', 'opposes') }] },
     { id: 'f2', title: 'Direction of change', data: [{ ...argumentDatum('d3', 'uncertain'), fixedStance: 'irrelevant' }] },
-    { id: 'f3', title: 'Who is counted', data: [] }
+    { id: 'f3', title: 'Who is counted', data: [], notFoundNeeds: ['Share of part-time workers in the count'] }
   ];
   for (const [language, tag] of LANGUAGES) {
     const request = { ...argumentBase, language, proposition: argumentProposition };
@@ -345,14 +345,13 @@ test('collect snapshots: chart step (chart.add@1)', () => {
       ['verdict', 'verdictStep', { ...argumentBase, language, hypothesis: 'Firms hired fewer juniors', input: { hypothesisId: 'h1', round: 1, evidence: [argumentEvidence('n1', 'supports'), argumentEvidence('n2', 'uncertain')] } }],
       ['conclusion', 'conclusionStep', { ...request, input: { hypotheses: [{ id: 'h1', round: 1, evidence: [argumentEvidence('n1', 'supports')] }, { id: 'h2', round: 1, evidence: [argumentEvidence('n2', 'supports')] }, { id: 'h3', round: 2, evidence: [argumentEvidence('n3', 'supports')] }] }, statements: { h1: 'Hiring slowed', h2: 'Entry jobs automated', h3: 'Wages stalled' } }]
     ];
-    // V1 boost: the facet plan step and the hypotheses step with causal questions (new snapshots only)
+    // V1 boost: the facet judge, facet hypotheses and facet plan steps (new snapshots only)
     for (const [name, key, input] of [
       ['facet-judge', 'facetJudgeStep', { ...request, round: 1, facets: judgeFacets }],
       ['facet-judge-round2', 'facetJudgeStep', { ...request, round: 2, facets: judgeFacets.slice(1, 2) }],
       ['facet-hypotheses', 'facetHypothesesStep', { ...request, data: argumentData.map(d => ({ ...d, propStance: 'supports' })), count: 3, existing: [], causalQuestions: ['Did automation drive the rise?'] }],
-      ['facet-plan', 'facetPlanStep', request],
-      ['hypotheses-causal', 'hypothesesStep', { ...request, data: argumentData, count: 3, existing: ['Earlier hypothesis title'], causalQuestions: ['Did automation drive the rise?'] }]
-    ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name.startsWith('facet-judge') ? 'facet-judge' : name === 'facet-hypotheses' ? 'facet-hypotheses' : name === 'facet-plan' ? 'facet-plan' : 'hypotheses'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
+      ['facet-plan', 'facetPlanStep', request]
+    ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name.startsWith('facet-judge') ? 'facet-judge' : name === 'facet-hypotheses' ? 'facet-hypotheses' : 'facet-plan'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
     for (const [name, key, input] of steps) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'situation-gate' ? 'gate' : name === 'plan-situation' ? 'plan' : name}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
   }
   for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);

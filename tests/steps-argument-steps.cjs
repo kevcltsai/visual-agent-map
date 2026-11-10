@@ -316,7 +316,7 @@ test('facet judge: a stance already fixed in the request must come back unchange
 test('facet judge: citations belong to the facet, are found, not irrelevant, and a supports/refutes verdict cites a same stance datum', () => {
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').citedData = ['b1']; }), /cite/);
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').citedData = ['zz']; }), /cite/);
-  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').citedData = ['b1']; }), /cite/);
+  assert.ok(ok(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').citedData = ['b1']; })), 'a facet with only irrelevant data is left to the machine (M1)');
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').citedData = []; }), /same stance|cite/);
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').verdict = 'refutes'; }), /same stance/);
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').verdict = 'pending'; }), /verdict/);
@@ -327,6 +327,30 @@ test('facet judge: an empty summary or reason is refused', () => {
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').summary = '  '; }), /summary/);
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').reason = ''; }), /reason/);
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { delete fjFacet(v, 'fa').summary; }));
+});
+test('facet judge: a facet with no found data, or only irrelevant data, is not refused for its verdict or citations; the machine forces it', () => {
+  const out = plain(ok(mod.facetJudgeStep, fjReq(), fjWith(v => {
+    Object.assign(fjFacet(v, 'fc'), { verdict: 'supports', citedData: ['a1'] });
+    Object.assign(fjFacet(v, 'fb'), { verdict: 'refutes', citedData: ['b1'], retryNeeds: [] });
+  })));
+  assert.equal(out.facets.find(f => f.id === 'fc').verdict, 'supports', 'parse leaves forcing to the machine');
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { Object.assign(fjFacet(v, 'fc'), { verdict: 'supports', reason: ' ' }); }), /reason/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { Object.assign(fjFacet(v, 'fc'), { verdict: 'supports', summary: '' }); }), /summary/);
+  // a facet with usable data keeps the full check
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').citedData = ['b1']; }), /cite/);
+  // the machine will force it insufficient, so retry needs stay allowed in round 1
+  assert.ok(ok(mod.facetJudgeStep, fjReq(), fjWith(v => { Object.assign(fjFacet(v, 'fb'), { verdict: 'supports', citedData: [] }); })));
+});
+test('facet judge: a retry need equal to a need already tried (not found) for a pending facet is refused, and the prompt lists it', () => {
+  const req = fjReq({ facets: [{ id: 'fa', title: 'Level of the rate', data: [fdatum('a1')], notFoundNeeds: ['Rate in the labour force survey'] }, { id: 'fb', title: 'Direction of change', data: [fdatum('b1', { fixedStance: 'irrelevant' })] }, { id: 'fc', title: 'Who is counted', data: [] }] });
+  const good = fjWith(v => { v.data = v.data.filter(d => d.id !== 'a2'); fjFacet(v, 'fa').retryNeeds = []; fjFacet(v, 'fb').retryNeeds = ['Year on year change in the youth rate']; });
+  assert.ok(ok(mod.facetJudgeStep, req, good));
+  const repeat = fjWith(v => { v.data = v.data.filter(d => d.id !== 'a2'); fjFacet(v, 'fa').verdict = 'insufficient'; fjFacet(v, 'fa').citedData = []; fjFacet(v, 'fa').retryNeeds = ['rate in the labour force survey.']; });
+  bad(mod.facetJudgeStep, req, repeat, /repeat/);
+  const prompt = mod.facetJudgeStep.render(req);
+  assert.match(prompt, /Rate in the labour force survey/);
+  assert.match(prompt, /already tried/i);
+  assert.ok(!mod.facetJudgeStep.render(fjReq()).includes('"notFoundNeeds":['), 'no not-found needs, nothing extra in the prompt');
 });
 test('facet judge: retryNeeds only on insufficient, only in round 1, at most 3 per facet and 9 in all, grounded', () => {
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').retryNeeds = ['Another series']; }), /retry/);
@@ -525,21 +549,3 @@ test('facet plan: the prompt shows only the proposition; the secret field of a r
   assert.equal(sr.prepareStep(mod.facetPlanStep, fpReq).prompt.length > 100, true);
 });
 
-const causalReq = { ...hypReq, causalQuestions: ['Did automation drive the rise?'] };
-test('hypotheses: causal questions render only when given, and the prompt without them is byte-identical to before', () => {
-  const without = mod.hypothesesStep.render(hypReq);
-  assert.equal(mod.hypothesesStep.render({ ...hypReq, causalQuestions: [] }), without);
-  assert.equal(mod.hypothesesStep.render({ ...hypReq, causalQuestions: undefined }), without);
-  assert.ok(!without.includes('ausal'));
-  const withCausal = mod.hypothesesStep.render(causalReq);
-  assert.ok(withCausal.startsWith(without), 'the causal part is appended after the existing list');
-  assert.match(withCausal, /Did automation drive the rise\?/);
-  assert.ok(withCausal.length > without.length);
-});
-test('hypotheses: the words of a causal question may be reused, but numbers and links of it still must come from the request', () => {
-  assert.ok(ok(mod.hypothesesStep, causalReq, { hypotheses: [hyp('Automation drove the rise'), hyp('B'), hyp('C')] }));
-  bad(mod.hypothesesStep, hypReq, { hypotheses: [hyp('Automation drove the rise 7'), hyp('B'), hyp('C')] }, /number 7/);
-  const numbered = { ...hypReq, causalQuestions: ['Did the 2008 crisis do it?'] };
-  assert.ok(ok(mod.hypothesesStep, numbered, { hypotheses: [{ ...hyp('A'), statement: 'The 2008 crisis mattered' }, hyp('B'), hyp('C')] }));
-  bad(mod.hypothesesStep, hypReq, { hypotheses: [{ ...hyp('A'), statement: 'The 2008 crisis mattered' }, hyp('B'), hyp('C')] }, /number 2008/);
-});

@@ -29,6 +29,8 @@ export interface FacetJudgeFacet {
   id: string;
   title: string;
   data: FacetJudgeDatum[];
+  /** Texts of the needs of this facet that were searched and not found; a retry need may not repeat them. */
+  notFoundNeeds?: string[];
 }
 /** `facets` holds only the facets waiting for a judgement (all of them in round 1, the insufficient ones that got new data in round 2). */
 export interface FacetJudgeRequest extends ArgumentStepBase {
@@ -100,7 +102,7 @@ const pick = (d: FacetJudgeDatum): FacetJudgeDatum => ({
 });
 const sourcesOf = (request: FacetJudgeRequest): string[] => [
   request.proposition,
-  ...request.facets.flatMap(f => [f.title, ...f.data.flatMap(d => [d.need, d.claim, d.quote, d.url, d.stance])])
+  ...request.facets.flatMap(f => [f.title, ...(f.notFoundNeeds ?? []), ...f.data.flatMap(d => [d.need, d.claim, d.quote, d.url, d.stance])])
 ];
 const RETRY_ROUND_1 = retryOnce.trim();
 const RETRY_ROUND_2 = retryNone.trim();
@@ -127,7 +129,7 @@ export function parseFacetJudge(raw: string, request: FacetJudgeRequest): FacetJ
   if (ids(data.map(d => d.id)) !== ids(found.map(d => d.id)))
     throw new ArgumentStepError("the data must name every found datum exactly once");
   const stanceOf = new Map(data.map(d => [d.id, d.propStance]));
-  const asked = new Set(request.facets.flatMap(f => f.data.map(d => normalized(d.need))));
+  const asked = new Set(request.facets.flatMap(f => [...f.data.map(d => d.need), ...(f.notFoundNeeds ?? [])].map(normalized)));
   let retryTotal = 0;
   const facets = list(item.facets, "facets").map(entry => {
     const one = parseObject(JSON.stringify(entry), ["id", "verdict", "reason", "summary", "citedData", "retryNeeds"]);
@@ -140,12 +142,14 @@ export function parseFacetJudge(raw: string, request: FacetJudgeRequest): FacetJ
     const summary = text(one.summary, "summary");
     grounded([reason, summary], sources);
     const own = new Map(facet.data.map(d => [d.id, stanceOf.get(d.id)]));
+    // No found data, or only irrelevant data: the machine forces "insufficient", so the verdict and citations are not checked here.
+    const usable = [...own.values()].some(stance => stance !== "irrelevant");
     const citedData = [...new Set(list(one.citedData, "citedData"))].map(cited => {
-      if (typeof cited !== "string" || !own.has(cited) || own.get(cited) === "irrelevant")
+      if (usable && (typeof cited !== "string" || !own.has(cited) || own.get(cited) === "irrelevant"))
         throw new ArgumentStepError("a facet may cite found, relevant data of its own only");
-      return cited;
+      return cited as string;
     });
-    if (verdict !== "insufficient" && !citedData.some(c => own.get(c) === verdict))
+    if (usable && verdict !== "insufficient" && !citedData.some(c => own.get(c) === verdict))
       throw new ArgumentStepError(`a ${verdict} verdict must cite a datum with the same stance`);
     const retryNeeds: string[] = [];
     for (const raw of list(one.retryNeeds, "retryNeeds")) {
@@ -156,7 +160,7 @@ export function parseFacetJudge(raw: string, request: FacetJudgeRequest): FacetJ
       grounded([need], sources);
       retryNeeds.push(need);
     }
-    if (retryNeeds.length && (request.round !== 1 || verdict !== "insufficient"))
+    if (retryNeeds.length && (request.round !== 1 || (usable && verdict !== "insufficient")))
       throw new ArgumentStepError("retry needs are only allowed for an insufficient facet in round 1");
     if (retryNeeds.length > MAX_FACET_NEEDS) throw new ArgumentStepError("too many retry needs for one facet");
     retryTotal += retryNeeds.length;
@@ -177,7 +181,7 @@ export const facetJudgeStep: StepDefinition<FacetJudgeRequest, FacetJudgeResult>
       languageInstruction: languageInstruction(request.language, request.proposition),
       retryRule: request.round === 1 ? RETRY_ROUND_1 : RETRY_ROUND_2,
       proposition: JSON.stringify(request.proposition),
-      facets: JSON.stringify(request.facets.map(f => ({ id: f.id, title: f.title, data: f.data.map(pick) })))
+      facets: JSON.stringify(request.facets.map(f => ({ id: f.id, title: f.title, data: f.data.map(pick), ...(f.notFoundNeeds?.length ? { notFoundNeeds: f.notFoundNeeds } : {}) })))
     }),
   schema: FACET_JUDGE_SCHEMA,
   policy: (prompt, request) => {

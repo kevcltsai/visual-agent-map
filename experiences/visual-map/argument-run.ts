@@ -190,7 +190,6 @@ const domainOf = (url: string | undefined): string => {
     return "-";
   }
 };
-/** A signal that aborts when either input does (no `AbortSignal.any`, which older runtimes lack). */
 /** The period and definitions the facet plan assumed, as one line for situation research; undefined when the map has none (old maps). */
 export function assumptionScope(state: Pick<ArgumentMapData, "situation">): string | undefined {
   const items = state.situation.assumptions?.items ?? [];
@@ -200,6 +199,7 @@ const scopeOf = (isNeed: boolean, state: Pick<ArgumentMapData, "situation">): { 
   const context = isNeed ? undefined : assumptionScope(state);
   return context ? { context } : {};
 };
+/** A signal that aborts when either input does (no `AbortSignal.any`, which older runtimes lack). */
 function linked(a: AbortSignal, b: AbortSignal): AbortSignal {
   const controller = new AbortController();
   const abort = (): void => controller.abort();

@@ -741,6 +741,17 @@ test('facet boost: a facet with no found data judged supports is stored insuffic
   assert.equal(s.situation.facets.find(f => f.id === 'f4').verdict, 'insufficient');
   assert.deepEqual(plain(s.situation.facets.find(f => f.id === 'f4').citedData), []);
 });
+test('facet boost: a forced insufficient keeps the AI reason only if the AI said insufficient, else a fixed program reason', () => {
+  const reasonOf = verdict => {
+    const s = researchAll(planned([1, 1, 1, 1]), ['f4d1']);
+    const j = judgement(s);
+    Object.assign(j.facets.find(f => f.id === 'f4'), { verdict, reason: 'AI reason about f4' });
+    return m.applyFacetVerdicts(s, j).situation.facets.find(f => f.id === 'f4').reason;
+  };
+  assert.equal(reasonOf('supports'), 'no usable data for this facet');
+  assert.equal(reasonOf('refutes'), 'no usable data for this facet');
+  assert.equal(reasonOf('insufficient'), 'AI reason about f4');
+});
 test('facet boost: citations: other facet, irrelevant data, other stance, unfound data, no citation are all GateErrors', () => {
   const s = researchAll(planned([2, 1, 1, 1]), ['f1d2']);
   const mutate = fn => { const j = judgement(s, { f2d1: 'irrelevant' }, { f2: 'insufficient' }); fn(j); return j; };

@@ -62,6 +62,8 @@ import JsonZH from "./json.zh.md";
 import JsonEN from "./json.en.md";
 import ArgumentEvidenceZH from "./argument-evidence.zh.md";
 import ArgumentEvidenceEN from "./argument-evidence.en.md";
+import ArgumentEvidenceContextZH from "./argument-evidence-context.zh.md";
+import ArgumentEvidenceContextEN from "./argument-evidence-context.en.md";
 import LabelDetailZH from "./label-detail.zh.md";
 import LabelDetailEN from "./label-detail.en.md";
 import LabelFindingsZH from "./label-findings.zh.md";
@@ -129,6 +131,8 @@ export const LABEL_DETAIL_TOP: FragmentPair = pair(LabelDetailTopZH, LabelDetail
 export const JSON_CONTRACT: FragmentPair = pair(JsonZH, JsonEN);
 /** The argument-map evidence research reply contract; a template with a `<<needs>>` placeholder (see assemble.ts). */
 export const ARGUMENT_EVIDENCE_CONTRACT: FragmentPair = pair(ArgumentEvidenceZH, ArgumentEvidenceEN);
+/** One sentence appended after the needs, only when a need carries a context (period and definitions). */
+export const ARGUMENT_EVIDENCE_CONTEXT_RULE: FragmentPair = pair(ArgumentEvidenceContextZH, ArgumentEvidenceContextEN);
 export const LABEL_DETAIL: FragmentPair = pair(LabelDetailZH, LabelDetailEN);
 export const LABEL_FINDINGS: FragmentPair = pair(LabelFindingsZH, LabelFindingsEN);
 /** A template, not text: {@link outputLanguage} fills its `{{language}}` and `{{headingRule}}` placeholders. */

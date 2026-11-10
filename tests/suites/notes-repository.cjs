@@ -2509,7 +2509,7 @@ integrationTest('C8 review: without Detail markers an English note stays English
   assert.equal(noteHeadingLanguage('# T\n\n## Current Summary\n\n## 目前摘要\n\n## 詳細內容\n\nx'), 'en', 'an English managed heading keeps it English');
 });
 integrationTest('deleting many non-node notes scans the maps once; a hit, a broken Map.md and non-VAM notes behave as before', async () => {
-  const { repo, app } = fixture();
+  const { repo, app, contents } = fixture();
   const path = await repo.createMap('Perf', []), map = await repo.readMap(path);
   const node = await repo.createNote('Tracked', 'a', map, path, 'workspace'); map.nodes.push(node); await repo.saveMap(path, map);
   const gone = Array.from({ length: 50 }, (_, index) => `Personal/gone-${index}.md`);
@@ -2522,8 +2522,10 @@ integrationTest('deleting many non-node notes scans the maps once; a hit, a brok
   assert.equal(reads.filter(item => item === path).length, 1);
   assert.equal(await repo.anyMapNodePath([]), false);
   const second = await repo.createMap('Broken', []);
-  await app.vault.modify(app.vault.getAbstractFileByPath(second), '---\nvisual-agent-map: true\n---\nnot a map');
+  contents.set(second, contents.get(second).replace(/```[\s\S]*$/, '```\n{ not json\n```\n'));
+  const failures = []; repo.onUnreadableMaps = list => failures.push(...list);
   assert.equal(await repo.anyMapNodePath(gone), false, 'a broken Map.md is skipped, not fatal');
+  assert.equal(failures.length, 1, 'the broken map is reported once per scan');
   assert.equal(await repo.anyMapNodePath([node.path]), true);
 });
 integrationTest('reference update reads each affected note once, and skips non-VAM and unmarked notes', async () => {

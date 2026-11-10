@@ -1,6 +1,6 @@
 import { evidenceCard, EVIDENCE_LOOKUP_FIELD_RULE, EVIDENCE_LOOKUP_RULE } from "./evidence-context";
 import { deduplicateAimRequest } from "./request-context";
-import { resolveAimContentLanguage } from "./content-language";
+import { resolveAimContentLanguage } from "../../core/content-language";
 import { buildFinalDelivery, type DeliveryEvidence } from "./final-delivery";
 import { createHash, randomUUID } from "node:crypto";
 import type { AiResult, TaskContext } from "../../ai/types";

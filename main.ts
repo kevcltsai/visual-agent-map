@@ -11,7 +11,7 @@ import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-p
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
 import type { TaskOptions } from "./experiences/visual-map/modals";
 import { attachmentPath } from "./experiences/visual-map/attachment-store";
-import { selectionOutputLanguage } from "./experiences/aim/content-language";
+import { selectionOutputLanguage } from "./core/content-language";
 import {
   t,
   setUiLanguage,
@@ -140,7 +140,7 @@ import {
 import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
 import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
-import { AIM_CREATE_MAP_COMMAND_ID } from "./experiences/aim/legacy-names";
+import { AIM_CREATE_MAP_COMMAND_ID } from "./core/legacy-names";
 import { noticeInWindowOf } from "./ui/modals/notice-in-window";
 import { openInWindowOf } from "./ui/modals/open-in-window";
 import { aimEnabled } from "./experiences/aim/availability";

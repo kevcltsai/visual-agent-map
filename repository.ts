@@ -1,5 +1,5 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
-import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./experiences/aim/content-language";
+import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./core/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
 import {
   changeTopicStyles,
@@ -71,7 +71,7 @@ import {
   serializeMapSources,
   type MapSource
 } from "./experiences/visual-map/map-sources";
-import { upgradeLegacyAimText } from "./experiences/aim/legacy-names";
+import { upgradeLegacyAimText } from "./core/legacy-names";
 import { aimEnabled } from "./experiences/aim/availability";
 import { managedNodeIds } from "./core/argument-map/model";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";

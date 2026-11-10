@@ -16,7 +16,7 @@ import type {
 import type { Repository } from "../../repository";
 import { managedHeadingValue, managedSectionValue } from "../../note-values";
 import { NOTE_LANGUAGES, noteLanguageOf, translate, translateNote } from "../../i18n";
-import { resolveAimContentLanguage, resolveAimNoteLanguage } from "./content-language";
+import { resolveAimContentLanguage, resolveAimNoteLanguage } from "../../core/content-language";
 
 export interface NewAnswerBranch {
   requestId?: string;

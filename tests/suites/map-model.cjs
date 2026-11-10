@@ -180,7 +180,7 @@ test('undo and redo preserve ordering; new edit invalidates redo', () => {
   const h = new core.History(); h.push('move'); h.push('delete'); assert.equal(h.undo(), 'delete'); assert.equal(h.undo(), 'move'); assert.equal(h.redo(), 'move'); h.push('edit'); assert.equal(h.canRedo, false); assert.equal(h.undo(), 'edit');
 });
 test('maps saved under the pre-AIM name are upgraded to AIM keys, markers and sentinels on read', () => {
-  const { LEGACY_KEY_PREFIX, LEGACY_MARKER_PREFIX, LEGACY_VALUES } = require('../support.cjs').load('experiences/aim/legacy-names.ts');
+  const { LEGACY_KEY_PREFIX, LEGACY_MARKER_PREFIX, LEGACY_VALUES } = require('../support.cjs').load('core/legacy-names.ts');
   const legacyKey = key => key.startsWith('aim') ? LEGACY_KEY_PREFIX + key.slice(3) : key;
   const toLegacy = value => Array.isArray(value) ? value.map(toLegacy)
     : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, item]) => [legacyKey(key), toLegacy(item)]))

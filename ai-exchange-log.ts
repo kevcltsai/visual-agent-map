@@ -1,6 +1,6 @@
 import { readStoreText, writeStoreAtomically, type StoreAdapter } from "./store-adapter";
 import { t } from "./i18n";
-import { upgradeLegacyAimText } from "./experiences/aim/legacy-names";
+import { upgradeLegacyAimText } from "./core/legacy-names";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

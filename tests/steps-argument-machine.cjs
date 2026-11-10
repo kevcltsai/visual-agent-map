@@ -386,3 +386,115 @@ test('no reducer works on a stopped_mismatch or concluded run', () => {
   refuses(s, () => m.applySituationData(s, [{ id: 'd2', need: 'x' }]));
   refuses(s, () => m.addNeeds(s, 'x', []));
 });
+
+// ---- dead need replaced (ticket 01) -------------------------------------------------------------------------------------------
+const miss = { found: false, reason: 'none' };
+/** h1 round 1 with needs [a found, b not_found], settled. */
+function deadB() {
+  let s = withHypotheses();
+  s = m.addNeeds(s, 'h1', [{ id: 'a', text: 'x' }, { id: 'b', text: 'y' }]);
+  s = researched(s, 'h1', 'a', found());
+  return researched(s, 'h1', 'b', miss);
+}
+test('dead need #1: revise replaces the not_found need; once the replacement is found the verdict is offered in round 2 and the hypothesis verifies', () => {
+  let s = deadB();
+  assert.deepEqual(actions(s).filter(a => a.hypothesisId === 'h1').map(a => a.type), ['revise']);
+  s = m.startNextRound(s, 'h1', [{ id: 'rc', text: 'z' }]);
+  assert.equal(s.hypotheses[0].needs.find(n => n.id === 'rc').replaces, 'b');
+  assert.equal(s.hypotheses[0].needs.find(n => n.id === 'b').state, 'not_found', 'the dead need record is kept');
+  s = researched(s, 'h1', 'rc', found('supports', 3));
+  assert.deepEqual(actions(s).filter(a => a.hypothesisId === 'h1').map(a => a.type), ['verdict']);
+  s = m.applyVerdict(s, 'h1', { verdict: 'supported', citedNeeds: ['a', 'rc'], reason: 'ok' });
+  assert.equal(model.isVerified(s.hypotheses[0]), true);
+  assert.equal(s.hypotheses[0].round, 2);
+});
+test('dead need #2: with no replacement the not_found need still blocks, even when the user marks supported', () => {
+  const s = plain(deadB());
+  s.hypotheses[0].aiVerdict = 'supported';
+  s.hypotheses[0].userVerdict = 'supported';
+  assert.equal(model.isVerified(s.hypotheses[0]), false);
+  assert.equal(model.displayVerdict(s.hypotheses[0]), 'verifying');
+  assert.deepEqual([...model.retiredNeedIds(s.hypotheses[0])], []);
+});
+test('dead need #3: a pending or not_found replacement does not verify; a round-3 replacement that is also dead goes to eliminate_limit', () => {
+  let s = m.startNextRound(deadB(), 'h1', [{ id: 'rc', text: 'z' }]);
+  assert.equal(model.isVerified({ ...plain(s.hypotheses[0]), aiVerdict: 'supported', userVerdict: 'supported' }), false, 'pending replacement');
+  s = researched(s, 'h1', 'rc', miss);
+  assert.equal(model.allNeedsFound(s.hypotheses[0]), false, 'dead replacement');
+  s = m.startNextRound(s, 'h1', [{ id: 'rd', text: 'w' }]);
+  assert.equal(s.hypotheses[0].needs.find(n => n.id === 'rd').replaces, 'rc', 'chain: only the still-open dead need is taken');
+  s = researched(s, 'h1', 'rd', miss);
+  assert.deepEqual(actions(s).filter(a => a.hypothesisId === 'h1').map(a => a.type), ['eliminate_limit']);
+  s = m.eliminateAtLimit(s, 'h1');
+  assert.equal(s.hypotheses[0].location, 'eliminated');
+});
+test('dead need #4: addNeeds in the same round never sets replaces and the dead need still blocks', () => {
+  let s = withHypotheses();
+  s = m.addNeeds(s, 'h1', [{ id: 'a', text: 'x' }]);
+  s = researched(s, 'h1', 'a', miss);
+  s = m.addNeeds(s, 'h1', [{ id: 'b', text: 'y' }]);
+  assert.equal(s.hypotheses[0].needs[1].replaces, undefined);
+  s = researched(s, 'h1', 'b', found());
+  assert.equal(model.allNeedsFound(s.hypotheses[0]), false);
+  assert.deepEqual(types(s).filter(t => t === 'verdict'), []);
+});
+test('dead need: extra items beyond the dead needs carry no replaces; fewer items leave dead needs open', () => {
+  let s = withHypotheses();
+  s = m.addNeeds(s, 'h1', [{ id: 'a', text: 'x' }, { id: 'b', text: 'y' }, { id: 'c2', text: 'w' }]);
+  s = researched(s, 'h1', 'a', miss); s = researched(s, 'h1', 'b', miss); s = researched(s, 'h1', 'c2', found());
+  const two = m.startNextRound(s, 'h1', [{ id: 'r1', text: 'p' }]);
+  assert.deepEqual(plain(two.hypotheses[0].needs.slice(3).map(n => n.replaces)), ['a']);
+  const more = m.startNextRound(s, 'h1', [{ id: 'r1', text: 'p' }, { id: 'r2', text: 'q' }, { id: 'r3', text: 'r' }]);
+  assert.deepEqual(plain(more.hypotheses[0].needs.slice(3).map(n => n.replaces ?? null)), ['a', 'b', null]);
+  let done = more;
+  for (const id of ['r1', 'r2', 'r3']) done = researched(done, 'h1', id, found());
+  assert.equal(model.allNeedsFound(done.hypotheses[0]), true);
+  const one = researched(two, 'h1', 'r1', found());
+  assert.equal(model.allNeedsFound(one.hypotheses[0]), false, 'b is still open and blocks');
+});
+test('dead need #5: forged replaces at selector level does not retire anything', () => {
+  const base = plain(deadB()).hypotheses[0];
+  base.needs.push({ id: 'rc', text: 'z', addedRound: 2, state: 'found', replaces: 'b' });
+  base.aiVerdict = 'supported';
+  assert.equal(model.isVerified(base), true, 'the legitimate shape verifies');
+  const forge = edit => { const h = plain(base); edit(h); return h; };
+  const cases = {
+    'points to a found need': h => { h.needs[2].replaces = 'a'; },
+    'points to a pending need': h => { h.needs[1].state = 'pending'; h.needs[2].state = 'found'; },
+    'same round': h => { h.needs[2].addedRound = 1; },
+    'earlier round': h => { h.needs[1].addedRound = 2; h.needs[2].addedRound = 1; },
+    'unknown id': h => { h.needs[2].replaces = 'zzz'; }
+  };
+  for (const [name, edit] of Object.entries(cases)) assert.equal(model.isVerified(forge(edit)), false, name);
+  const other = plain(base); other.needs[2].replaces = 'x-in-another-hypothesis';
+  assert.equal(model.isVerified(other), false, 'a need in another hypothesis cannot be retired from here');
+  const searching = forge(h => { h.needs[1].state = 'searching'; });
+  assert.deepEqual([...model.retiredNeedIds(searching)], []);
+});
+test('dead need #7: caps hold with replacements (6 needs, round 4, 7th need, no re-research, 66 calls)', () => {
+  let s = withHypotheses();
+  s = m.addNeeds(s, 'h1', [1, 2, 3].map(i => ({ id: `n${i}`, text: 'x' })));
+  for (const id of ['n1', 'n2', 'n3']) s = researched(s, 'h1', id, miss);
+  s = m.startNextRound(s, 'h1', [4, 5, 6].map(i => ({ id: `n${i}`, text: 'x' })));
+  assert.deepEqual(plain(s.hypotheses[0].needs.slice(3).map(n => n.replaces)), ['n1', 'n2', 'n3']);
+  assert.equal(s.hypotheses[0].needs.length, 6);
+  refuses(s, () => m.beginResearch(s, 'h1', 'n1'));
+  for (const id of ['n4', 'n5', 'n6']) s = researched(s, 'h1', id, miss);
+  refuses(s, () => m.startNextRound(s, 'h1', [{ id: 'n7', text: 'x' }]));
+  const four = withHypotheses();
+  let t = m.addNeeds(four, 'h1', [{ id: 'a', text: 'x' }]);
+  t = researched(t, 'h1', 'a', miss); t = m.startNextRound(t, 'h1', [{ id: 'b', text: 'x' }]);
+  t = researched(t, 'h1', 'b', miss); t = m.startNextRound(t, 'h1', [{ id: 'c2', text: 'x' }]);
+  t = researched(t, 'h1', 'c2', miss);
+  refuses(t, () => m.startNextRound(t, 'h1', [{ id: 'd', text: 'x' }]));
+  let u = m.startNextRound(deadB(), 'h1', [{ id: 'rc', text: 'z' }]);
+  const capped = plain(u); capped.run.researchCalls = 66;
+  refuses(capped, () => m.beginResearch(capped, 'h1', 'rc'));
+  assert.ok(!actions(capped).some(a => a.type === 'research_need'));
+});
+test('dead need #8: verdict input excludes the dead need and citing it is refused', () => {
+  let s = m.startNextRound(deadB(), 'h1', [{ id: 'rc', text: 'z' }]);
+  s = researched(s, 'h1', 'rc', found('supports', 3));
+  assert.deepEqual(plain(m.prepareVerdict(s, 'h1').evidence.map(e => e.id)), ['a', 'rc']);
+  refuses(s, () => m.applyVerdict(s, 'h1', { verdict: 'supported', citedNeeds: ['b'], reason: 'r' }));
+});

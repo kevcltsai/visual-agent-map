@@ -74,6 +74,8 @@ export interface Need {
   stance?: NeedStance;
   proof?: SourceProof;
   reason?: string;
+  /** On a need added in a later round: the id of a `not_found` need of the same hypothesis it stands in for. The dead need itself is never rewritten. */
+  replaces?: string;
 }
 export interface Hypothesis {
   id: string;
@@ -176,6 +178,19 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
       ids.add(need.id);
       if (!oneOf(ITEM_STATES, need.state) || !optOneOf(NEED_STANCES, need.stance)) return "unknown need enum";
       if (badProof(need.proof) || !optStr(need.reason)) return "need malformed";
+      if (need.replaces !== undefined && !isStr(need.replaces)) return "need malformed";
+    }
+    const replaced = new Set<string>();
+    for (const need of hypothesis.needs as Rec[]) {
+      if (need.replaces === undefined) continue;
+      const target = (hypothesis.needs as Rec[]).find(other => other.id === need.replaces);
+      if (
+        !target ||
+        (target.addedRound as number) >= (need.addedRound as number) ||
+        replaced.has(need.replaces as string)
+      )
+        return "need malformed";
+      replaced.add(need.replaces as string);
     }
   }
   const conclusion = raw.conclusion;
@@ -222,8 +237,20 @@ export function effectiveVerdict(h: Hypothesis): Verdict {
 export function foundNeeds(h: Hypothesis): Need[] {
   return h.needs.filter(need => need.state === "found");
 }
+/** Ids of dead needs that a later need of the same hypothesis stands in for. Re-checked here (not trusted from the field alone): only a `not_found` need can be retired, and only by a need of a later round. */
+export function retiredNeedIds(h: Hypothesis): Set<string> {
+  const retired = new Set<string>();
+  for (const need of h.needs) {
+    if (need.replaces === undefined) continue;
+    const dead = h.needs.find(other => other.id === need.replaces);
+    if (dead && dead.state === "not_found" && need.addedRound > dead.addedRound) retired.add(dead.id);
+  }
+  return retired;
+}
 export function allNeedsFound(h: Hypothesis): boolean {
-  return h.needs.length > 0 && h.needs.every(need => need.state === "found");
+  const retired = retiredNeedIds(h);
+  const live = h.needs.filter(need => !retired.has(need.id));
+  return live.length > 0 && live.every(need => need.state === "found");
 }
 /** "Verified" is never stored: needs listed and all found, still in the verifying group, and the effective verdict is supported. */
 export function isVerified(h: Hypothesis): boolean {

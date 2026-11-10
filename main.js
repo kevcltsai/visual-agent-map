@@ -25428,6 +25428,15 @@ function problem(raw, nodeIds) {
       ids.add(need.id);
       if (!oneOf(ITEM_STATES, need.state) || !optOneOf(NEED_STANCES, need.stance)) return "unknown need enum";
       if (badProof(need.proof) || !optStr(need.reason)) return "need malformed";
+      if (need.replaces !== void 0 && !isStr(need.replaces)) return "need malformed";
+    }
+    const replaced = /* @__PURE__ */ new Set();
+    for (const need of hypothesis.needs) {
+      if (need.replaces === void 0) continue;
+      const target = hypothesis.needs.find((other) => other.id === need.replaces);
+      if (!target || target.addedRound >= need.addedRound || replaced.has(need.replaces))
+        return "need malformed";
+      replaced.add(need.replaces);
     }
   }
   const conclusion = raw.conclusion;
@@ -25468,8 +25477,19 @@ function effectiveVerdict(h) {
 function foundNeeds(h) {
   return h.needs.filter((need) => need.state === "found");
 }
+function retiredNeedIds(h) {
+  const retired = /* @__PURE__ */ new Set();
+  for (const need of h.needs) {
+    if (need.replaces === void 0) continue;
+    const dead = h.needs.find((other) => other.id === need.replaces);
+    if (dead && dead.state === "not_found" && need.addedRound > dead.addedRound) retired.add(dead.id);
+  }
+  return retired;
+}
 function allNeedsFound(h) {
-  return h.needs.length > 0 && h.needs.every((need) => need.state === "found");
+  const retired = retiredNeedIds(h);
+  const live2 = h.needs.filter((need) => !retired.has(need.id));
+  return live2.length > 0 && live2.every((need) => need.state === "found");
 }
 function isVerified(h) {
   return allNeedsFound(h) && h.location === "verifying" && effectiveVerdict(h) === "supported";
@@ -45099,22 +45119,27 @@ function applyHypotheses(state, items) {
   }
   return next;
 }
-function pushNeeds(next, h, items) {
+function pushNeeds(next, h, items, replaceDead) {
   if (!items.length) throw new GateError("no needs");
   const inRound = h.needs.filter((n) => n.addedRound === h.round).length;
   if (inRound + items.length > MAX_ROUND_NEEDS) throw new GateError("too many needs in this round");
   if (h.needs.length + items.length > MAX_NEEDS) throw new GateError("too many needs for this hypothesis");
   const ids = allIds(next);
-  for (const item of items) {
+  const open = replaceDead ? h.needs.filter(
+    (n) => n.state === "not_found" && n.addedRound < h.round && !h.needs.some((other) => other.replaces === n.id)
+  ) : [];
+  for (const [index, item] of items.entries()) {
     if (blank(item.text)) throw new GateError("empty need");
-    h.needs.push({ id: newId2(ids, item.id), text: item.text, addedRound: h.round, state: "pending" });
+    const need = { id: newId2(ids, item.id), text: item.text, addedRound: h.round, state: "pending" };
+    if (index < open.length) need.replaces = open[index].id;
+    h.needs.push(need);
   }
   delete h.aiVerdict;
 }
 function addNeeds(state, hypothesisId, items) {
   inAnalysis(state);
   const next = clone2(state);
-  pushNeeds(next, hypothesisOf(next, hypothesisId), items);
+  pushNeeds(next, hypothesisOf(next, hypothesisId), items, false);
   return next;
 }
 function startNextRound(state, hypothesisId, items) {
@@ -45125,7 +45150,7 @@ function startNextRound(state, hypothesisId, items) {
   if (isVerified(h)) throw new GateError("the hypothesis is already verified");
   if (h.round >= MAX_ROUND) throw new GateError("round limit reached");
   h.round += 1;
-  pushNeeds(next, h, items);
+  pushNeeds(next, h, items, true);
   return next;
 }
 function beginResearch(state, hypothesisId, needId) {

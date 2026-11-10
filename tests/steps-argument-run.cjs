@@ -13,6 +13,7 @@ const URL_OK = 'https://stats.example.org/report';
 const PAGE = `<html><body><p>${QUOTE}, the highest in a decade.</p></body></html>`;
 const STEP_NAME = { 'argument-map.plan-situation': 'plan_situation', 'argument-map.situation-gate': 'judge_gate', 'argument-map.hypotheses': 'propose_hypotheses', 'argument-map.verdict': 'verdict', 'argument-map.conclusion': 'conclude' };
 const stepName = (step, request) => (step.id === ARGUMENT_STEPS.add_needs.id ? (request.existing.length ? 'revise' : 'add_needs') : STEP_NAME[step.id]);
+const plain = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const defer = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const foundEntry = (id, over = {}) => ({ need: id, status: 'found', stance: 'supports', claim: 'Rate rose', quote: QUOTE, url: URL_OK, ...over });
@@ -270,6 +271,21 @@ test('one corrective retry: a refused step succeeds the second time; failing twi
   assert.equal(broken.stat.ask.length, 0);
 });
 
+test('dead need #9: a not_found need is replaced in round 2 and the hypothesis verifies without a 3rd round', async () => {
+  const r = await rig({ script: { step: steps({ add_needs: (_request, n) => ({ needs: n === 1 ? [{ text: 'dead source' }, { text: 'live two' }] : [{ text: 'need one' }, { text: 'need two' }] }), revise: () => ({ needs: [{ text: 'replacement source' }] }) }),
+    ask: ctx => { const { id, text } = ctx.argumentEvidenceNeeds[0]; return { summary: 's', detail: 'd', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [text === 'dead source' ? { need: id, status: 'not_found' } : foundEntry(id)] }; } } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(r.stat.steps.filter(n => n === 'revise').length, 1);
+  assert.equal(state.run.phase, 'concluded');
+  assert.equal(model.verifiedCount(state), 3);
+  const h1 = state.hypotheses[0];
+  assert.equal(h1.round, 2);
+  assert.deepEqual(plain(h1.needs.map(n => [n.text, n.state])), [['dead source', 'not_found'], ['live two', 'found'], ['replacement source', 'found']]);
+  assert.equal(h1.needs[2].replaces, h1.needs[0].id);
+  assert.equal(state.run.researchCalls, 2 + 3 + 2 + 2);
+});
+
 test('limits: refuted hypotheses stop at round 3, never 4; <3 verified never concludes; a user flip does not verify unfound needs', async () => {
   let asked = 0;
   const r = await rig({ script: { step: steps({ verdict: request => ({ verdict: 'refuted', citedNeeds: [request.input.evidence[0].id], reason: 'no' }) }),
@@ -283,7 +299,10 @@ test('limits: refuted hypotheses stop at round 3, never 4; <3 verified never con
   assert.ok(state.run.researchCalls <= 66);
   assert.ok((await r.text(state.roles.conclusion)).summary.startsWith('限制內未能驗證 3 個假設'));
   for (const h of state.hypotheses) {
-    const flipped = { ...h, location: 'verifying', userVerdict: 'supported', needs: h.needs.map((n, i) => (i === 0 ? { ...n, state: 'not_found' } : n)) };
+    // flip a need that is not retired (a replaced dead need no longer blocks, so flipping needs[0] would test nothing)
+    const retired = model.retiredNeedIds(h);
+    const target = h.needs.filter(n => !retired.has(n.id)).at(-1)?.id; // undefined only for a hypothesis with no needs, which is never verified anyway
+    const flipped = { ...h, location: 'verifying', userVerdict: 'supported', needs: h.needs.map(n => (n.id === target ? { ...n, state: 'not_found' } : n)) };
     assert.equal(model.isVerified(flipped), false);
   }
 });

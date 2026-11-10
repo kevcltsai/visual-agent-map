@@ -98,3 +98,31 @@ test('an existing map with other optional keys and no argumentMap is unaffected 
   const text = core.serializeMap(doc);
   assert.equal(roundTrip(text), text);
 });
+
+// ---- dead need replaced: reader (ticket 01) --------------------------------------------------------------------------------------
+const withNeeds = needs => doc => { doc.hypotheses.push({ id: 'h1', citedData: [], round: 2, location: 'verifying', needs }); };
+const need = (id, round, state, extra = {}) => ({ id, text: id, addedRound: round, state, ...extra });
+const readWith = needs => { const doc = baseMap({ argumentMap: usable() }); withNeeds(needs)(doc.argumentMap); return model.readArgumentMap(doc); };
+test('dead need reader: a valid replaces is usable and round-trips; forgeries make the key unusable', () => {
+  const ok = [need('a', 1, 'not_found'), need('b', 2, 'found', { replaces: 'a' })];
+  assert.equal(readWith(ok).kind, 'usable');
+  const text = core.serializeMap(baseMap({ argumentMap: Object.assign(usable(), { hypotheses: [{ id: 'h1', citedData: [], round: 2, location: 'verifying', needs: ok }] }) }));
+  assert.equal(roundTrip(text), text);
+  const forged = {
+    'unknown id': [need('a', 1, 'not_found'), need('b', 2, 'found', { replaces: 'zzz' })],
+    'same round': [need('a', 1, 'not_found'), need('b', 1, 'found', { replaces: 'a' })],
+    'earlier round': [need('a', 2, 'not_found'), need('b', 1, 'found', { replaces: 'a' })],
+    'self': [need('a', 1, 'not_found', { replaces: 'a' })],
+    'empty string': [need('a', 1, 'not_found'), need('b', 2, 'found', { replaces: '' })],
+    'not a string': [need('a', 1, 'not_found'), need('b', 2, 'found', { replaces: 7 })],
+    'two replace one': [need('a', 1, 'not_found'), need('b', 2, 'found', { replaces: 'a' }), need('c2', 2, 'found', { replaces: 'a' })]
+  };
+  for (const [name, needs] of Object.entries(forged)) {
+    const read = readWith(needs);
+    assert.equal(read.kind, 'unusable', name);
+    assert.equal(read.reason, 'need malformed', name);
+  }
+  const doc = baseMap({ argumentMap: usable() });
+  doc.argumentMap.hypotheses.push({ id: 'h1', citedData: [], round: 2, location: 'verifying', needs: [need('a', 1, 'not_found')] }, { id: 'h2', citedData: [], round: 2, location: 'verifying', needs: [need('b', 2, 'found', { replaces: 'a' })] });
+  assert.equal(model.readArgumentMap(doc).kind, 'unusable', 'a need in another hypothesis');
+});

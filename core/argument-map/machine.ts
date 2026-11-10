@@ -338,20 +338,33 @@ export function applyHypotheses(state: ArgumentMapData, items: { id: string; cit
   return next;
 }
 
-function pushNeeds(next: ArgumentMapData, h: Hypothesis, items: { id: string; text: string }[]): void {
+function pushNeeds(
+  next: ArgumentMapData,
+  h: Hypothesis,
+  items: { id: string; text: string }[],
+  replaceDead: boolean
+): void {
   if (!items.length) throw new GateError("no needs");
   const inRound = h.needs.filter(n => n.addedRound === h.round).length;
   if (inRound + items.length > MAX_ROUND_NEEDS) throw new GateError("too many needs in this round");
   if (h.needs.length + items.length > MAX_NEEDS) throw new GateError("too many needs for this hypothesis");
   const ids = allIds(next);
-  for (const item of items) {
+  // Only the next-round path may stand in for dead needs: not_found, from an earlier round, not already replaced; list order.
+  const open = replaceDead
+    ? h.needs.filter(
+        n => n.state === "not_found" && n.addedRound < h.round && !h.needs.some(other => other.replaces === n.id)
+      )
+    : [];
+  for (const [index, item] of items.entries()) {
     if (blank(item.text)) throw new GateError("empty need");
-    h.needs.push({ id: newId(ids, item.id), text: item.text, addedRound: h.round, state: "pending" });
+    const need: Need = { id: newId(ids, item.id), text: item.text, addedRound: h.round, state: "pending" };
+    if (index < open.length) need.replaces = open[index].id;
+    h.needs.push(need);
   }
   delete h.aiVerdict;
 }
 
-/** The only way to list needs. Add-only: there is no reducer that removes or rewrites one. */
+/** The only way to list needs (with startNextRound). Add-only: there is no reducer that removes or rewrites one. A later round may *replace* a dead need (see startNextRound), still without removing it. */
 export function addNeeds(
   state: ArgumentMapData,
   hypothesisId: string,
@@ -359,7 +372,7 @@ export function addNeeds(
 ): ArgumentMapData {
   inAnalysis(state);
   const next = clone(state);
-  pushNeeds(next, hypothesisOf(next, hypothesisId), items);
+  pushNeeds(next, hypothesisOf(next, hypothesisId), items, false);
   return next;
 }
 
@@ -375,7 +388,7 @@ export function startNextRound(
   if (isVerified(h)) throw new GateError("the hypothesis is already verified");
   if (h.round >= MAX_ROUND) throw new GateError("round limit reached");
   h.round += 1;
-  pushNeeds(next, h, items);
+  pushNeeds(next, h, items, true);
   return next;
 }
 

@@ -1276,7 +1276,7 @@ export function applyVerdict(state: ArgumentMapData, hypothesisId: string, draft
     citedNeeds: cited,
     counterNotes: notes.map(n => n),
     refutations: storedRefutations,
-    causal: causal as Verdict["causal"],
+    causal: causal,
     assumptionStatus: assumptions,
     confidence,
     reverdicts: h.reverdicts ?? 0

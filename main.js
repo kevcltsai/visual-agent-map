@@ -25605,6 +25605,16 @@ function conclusionView(state) {
 }
 
 // core/argument-map/model.ts
+var MAX_ROUND2 = 3;
+var MAX_HYPOTHESES2 = 6;
+var MAX_RESEARCH_CALLS2 = 66;
+var MAX_FRAMING_CALLS = 3;
+var MAX_PREMISES = 3;
+var MAX_TESTABLE = 2;
+var MAX_COMPARISONS = 2;
+var MAX_REVERDICTS = 1;
+var MAX_INFERENCE_CHECKS = 2;
+var WORST_CASE_AI_CALLS = MAX_FRAMING_CALLS + MAX_RESEARCH_CALLS2 + MAX_PREMISES * 2 + MAX_TESTABLE * 2 + MAX_HYPOTHESES2 * MAX_ROUND2 * 3 + MAX_HYPOTHESES2 * MAX_REVERDICTS + MAX_TESTABLE * MAX_COMPARISONS + 1 + MAX_INFERENCE_CHECKS;
 var isRec2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isStr2 = (value) => typeof value === "string" && value !== "";
 function managedNodeIds(map) {
@@ -46269,7 +46279,7 @@ async function askArgumentStep(step, request, runner, signal) {
 
 // experiences/visual-map/argument-run.ts
 var MAX_RESEARCH_CONCURRENCY = 3;
-var WORST_CASE_AI_CALLS = MAX_RESEARCH_CALLS + 1 + 1 + (MAX_HYPOTHESES - MIN_VERIFIED + 1) + MAX_HYPOTHESES * MAX_ROUND * 2 + 1;
+var WORST_CASE_AI_CALLS2 = MAX_RESEARCH_CALLS + 1 + 1 + (MAX_HYPOTHESES - MIN_VERIFIED + 1) + MAX_HYPOTHESES * MAX_ROUND * 2 + 1;
 var X_STEP = 320;
 var Y_STEP = 160;
 var ArgumentRunError = class extends Error {
@@ -80300,7 +80310,7 @@ ${note.detail.trim()}` : "",
       draft,
       models,
       this.plugin.settings.cliModel,
-      WORST_CASE_AI_CALLS,
+      WORST_CASE_AI_CALLS2,
       async ({ claim: claim2, model }) => {
         var _a2;
         if (!claim2.trim() || stale()) return;

@@ -78,7 +78,7 @@ function allJudged() {
   return judged(s, 'F2', {}, factSupported('F2'));
 }
 const done = (answer, over = {}) => ({ decision: 'complete', vetoes: [], allocations: [], answer, ...over });
-function toConclusion(over = {}) {
+function toConclusion() {
   let s = m.applyComparison(allJudged(), 'T1', done('causal_established'));
   s = m.applyComparison(s, 'T2', done('holds'));
   return s;

@@ -8,15 +8,14 @@ const machine = require('./support.cjs').load('core/argument-map/machine-v2.ts')
 
 const pendingStop = async r => { const s = await r.state(); return `${s.run.status}/${s.run.stopReason}`; };
 
-test('start: one card per claim, datum, comparison, hypothesis and need with real ids; runs to the stage-3 hook; logs carry no text', async () => {
+test('start: one card per claim, datum, comparison, hypothesis and need with real ids; runs through stage 3 to the end; logs carry no text', async () => {
   const r = await rig();
   const out = await r.runs.start(r.mapPath, locked());
   assert.deepEqual(plain(out), { ok: true });
   const s = await r.state();
-  assert.equal(s.run.phase, 'analysis');
-  assert.equal(await pendingStop(r), 'paused/error', 'verdict is stage 3: the run pauses explicitly');
-  assert.ok(r.log().includes('pending action=verdict'));
-  assert.ok(!r.stat.steps.includes('verdict'));
+  assert.equal(s.run.phase, 'concluded');
+  assert.equal(await pendingStop(r), 'finished/undefined', 'stage 3 runs to the end');
+  assert.deepEqual(plain(r.stat.steps.filter(n => ['verdict', 'comparison', 'conclusion', 'inference-check'].includes(n))), ['verdict', 'verdict', 'comparison', 'conclusion', 'inference-check']);
   const premise = s.claims.find(c => c.role === 'premise');
   const testable = s.claims.find(c => c.role === 'testable');
   assert.ok(!/^c\d/.test(premise.id) && premise.id.startsWith('id-'), 'labels were replaced by real ids');
@@ -65,7 +64,7 @@ test('start refusals write nothing: legacy, unusable, existing map, unlocked fra
 
 test('locked framing: the runner has no operation that edits the framing or the breakdown; a second start cannot replace it', async () => {
   const names = Object.getOwnPropertyNames(run.ArgumentRunsV2.prototype).filter(n => !n.startsWith('_') && n !== 'constructor');
-  const privateByDesign = new Set(['t', 'makeNote', 'writeNote', 'drafts', 'guard', 'open', 'dead', 'go', 'usageAllowed', 'settle', 'fail', 'pause', 'loop', 'state', 'guarded', 'checkpoint', 'attach', 'base', 'ask', 'claimOf', 'pathOf', 'cardNote', 'textStep', 'afterPremise', 'proposeIds', 'propose', 'needs', 'slot', 'free', 'research', 'releaseFailed', 'commitEvidence']);
+  const privateByDesign = new Set(['t', 'makeNote', 'writeNote', 'drafts', 'guard', 'open', 'dead', 'go', 'usageAllowed', 'settle', 'fail', 'pause', 'loop', 'state', 'guarded', 'checkpoint', 'attach', 'base', 'ask', 'claimOf', 'pathOf', 'cardNote', 'textStep', 'afterPremise', 'proposeIds', 'propose', 'needs', 'slot', 'free', 'research', 'releaseFailed', 'commitEvidence', 'verdictPlan', 'verdict', 'compare', 'conclusionNotes', 'conclude', 'inferenceCheck']);
   assert.deepEqual(names.filter(n => !privateByDesign.has(n)).sort(), ['dispose', 'frame', 'isRunning', 'recover', 'resume', 'start', 'stop']);
   const r = await rig();
   await r.runs.start(r.mapPath, locked());
@@ -143,6 +142,8 @@ test('research limit: when the call budget runs out the program decides (AI = 0)
   for (const h of s.hypotheses) { assert.equal(h.verdict.by, 'program'); assert.equal(h.verdict.value, 'insufficient'); }
   assert.ok(!r.stat.steps.includes('verdict'));
   assert.ok(r.log().includes('by=program'));
+  assert.ok(r.stat.steps.includes('comparison') && r.stat.steps.includes('conclusion'), 'the claim still gets its comparison and conclusion with AI = 0 for the verdicts');
+  assert.equal((await r.state()).run.status, 'finished');
   assert.equal(r.stat.ask.length, 2, 'the premise call and the one need call that fit the budget; nothing after');
 });
 
@@ -201,7 +202,7 @@ test('provider failure (timeout) is not a try and never a miss: released once, a
   assert.deepEqual(plain(await r.runs.resume(r.mapPath)), { ok: true });
   s = await r.state();
   assert.equal(datum().state, 'found');
-  assert.equal(await pendingStop(r), 'paused/error', 'and then the stage-3 hook');
+  assert.equal(await pendingStop(r), 'finished/undefined', 'and then the run goes on through stage 3 to the end');
 });
 
 test('stale fence: a result for a run whose id changed meanwhile, and one after dispose, write nothing', async () => {
@@ -230,7 +231,7 @@ test('stale fence: a result for a run whose id changed meanwhile, and one after 
 });
 
 test('resume refusals write nothing: missing, legacy, unusable, not paused, finished; busy while running', async () => {
-  const r = await rig();
+  const r = await rig({ script: { step: { conclusion: () => { throw new Error('provider down'); } } } });
   assert.deepEqual(plain(await r.runs.resume(r.mapPath)), { ok: false, refusal: 'missing' });
   await r.runs.start(r.mapPath, locked());
   const paused = await r.snapshot();

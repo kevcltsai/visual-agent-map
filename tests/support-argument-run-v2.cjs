@@ -29,6 +29,11 @@ const steps = (over = {}) => ({
   premise: request => { const usable = request.data.every(d => d.usable); return { result: usable ? 'holds' : 'insufficient', reason: 'data fit', citedData: usable ? request.data.map(d => d.id) : [] }; },
   hypotheses: request => ({ hypotheses: request.ids.slice(0, 2).map((id, i) => ({ id, role: 'facet', predictions: [{ id: `${id}-p1`, kind: 'support', text: `facet ${i + 1} holds`, required: true, alsoPredictedBy: [], auxiliary: [] }, { id: `${id}-p2`, kind: 'refute', text: `facet ${i + 1} fails`, required: false, alsoPredictedBy: [], auxiliary: [request.premises[0].id], reason: 'it would show the facet is absent' }] })) }),
   needs: request => ({ needs: request.hypothesis.predictions.filter(p => p.required).slice(0, request.max).map((p, i) => ({ id: request.ids[i], predictionId: p.id, text: `need for ${p.id}`, criteria: { supports: 's', refutes: 'r', irrelevant: 'i' } })) }),
+  // stage 3 (V5b): the default verdict is `undecided` (a complete test nothing decides), the comparison completes with `insufficient`.
+  verdict: request => ({ value: 'undecided', reason: 'no decisive result', citedNeeds: [], counterNotes: request.input.counterEvidence.map(() => 'note'), refutations: request.input.counterEvidence.map(needId => ({ needId, class: 'nondecisive', auxiliary: [] })), causal: 'not_applicable', assumptionStatus: [], confidence: 'low' }),
+  comparison: () => ({ decision: 'complete', vetoes: [], allocations: [], rejudge: [], answer: 'insufficient' }),
+  conclusion: request => ({ answers: request.input.claims.filter(c => c.evaluated).map(c => ({ claimId: c.id, answer: c.comparison.answer, sentence: `${c.text} cannot be settled`, assumptions: c.comparison.requiredAssumptions })) }),
+  'inference-check': request => request.input.sentences.map(x => ({ id: x.id, status: 'ok' })),
   ...over
 });
 

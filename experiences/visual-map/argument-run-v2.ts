@@ -665,7 +665,8 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
     step: StepDefinition<Request, Output>,
     request: Request
   ): Promise<Output> {
-    return this.ports.runStep(step, request, drive.controller.signal);
+    // a provider that ignores abort must not hang Stop: the call is abandoned the moment the drive aborts
+    return untilAborted(drive.controller.signal, this.ports.runStep(step, request, drive.controller.signal));
   }
   private claimOf(state: ArgumentMapData, id: string): ArgumentMapData["claims"][number] {
     const claim = state.claims.find(c => c.id === id);

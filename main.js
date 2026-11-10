@@ -96408,7 +96408,8 @@ ${t("ui.organize_link_wait_hint")}`;
     if (typeof model !== "string" || !model.trim()) return;
     this.settings.cliModel = model.trim();
     await this.saveSettings();
-    for (const view of this.views()) view.unsynced.markFull(this.syncSeq);
+    const seq = ++this.syncSeq;
+    for (const view of this.views()) view.unsynced.markFull(seq);
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */

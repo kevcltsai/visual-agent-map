@@ -1431,7 +1431,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     await this.saveSettings();
     // A card that follows the current model shows it from its note read: the next write reads every open map back, as
     // every write did before reads were limited to changed files.
-    for (const view of this.views()) view.unsynced.markFull(this.syncSeq);
+    // A new number: a read-back already running took its snapshot before the change and must not consume this mark.
+    const seq = ++this.syncSeq;
+    for (const view of this.views()) view.unsynced.markFull(seq);
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */

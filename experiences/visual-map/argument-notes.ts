@@ -28,8 +28,22 @@ export function plainLine(text: string): string {
     .replace(/!\[|\[(?=\[)/g, m => m.replace("[", "&#91;"))
     .replace(/\](?=\])/g, "&#93;");
 }
-/** Plain text that also cannot form a Markdown link (`](`). */
-const line = (text: string | undefined): string => plainLine(text ?? "").replace(/\]\(/g, "]&#40;");
+/** Entity for one ASCII character. */
+const entity = (c: string): string => `&#${c.charCodeAt(0)};`;
+/**
+ * Plain text that cannot form any link (every `[` and `]` is an entity, so no inline, reference or `[x]: url` definition), a comment or math
+ * block (`%%`, `$$`), or a block of its own: leading whitespace is dropped and a leading heading, list, rule, setext, fence or table marker
+ * is entity-encoded. Ordinary text reads the same.
+ */
+const line = (text: string | undefined): string =>
+  plainLine(text ?? "")
+    .replace(/[[\]]/g, entity)
+    .replace(/%%/g, () => "%&#37;")
+    .replace(/\$\$/g, () => "$&#36;")
+    .replace(/^\s+/, "")
+    .replace(/^(?:[#+\-*=`~|:\\]|(\d+)([.)]))/, (m, digits?: string, mark?: string) =>
+      digits ? `${digits}${entity(mark!)}` : entity(m)
+    );
 /** A table cell: one line, `|` cannot split the row. */
 const cell = (text: string | undefined): string => line(text).replace(/\|/g, "&#124;") || "-";
 /** An http(s) URL as text (no link syntax characters), or "" for anything else. */

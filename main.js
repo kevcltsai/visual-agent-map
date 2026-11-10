@@ -44898,7 +44898,11 @@ function renderArgumentCardBody(card, view) {
 function plainLine2(text10) {
   return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/!\[|\[(?=\[)/g, (m) => m.replace("[", "&#91;")).replace(/\](?=\])/g, "&#93;");
 }
-var line = (text10) => plainLine2(text10 != null ? text10 : "").replace(/\]\(/g, "]&#40;");
+var entity = (c) => `&#${c.charCodeAt(0)};`;
+var line = (text10) => plainLine2(text10 != null ? text10 : "").replace(/[[\]]/g, entity).replace(/%%/g, () => "%&#37;").replace(/\$\$/g, () => "$&#36;").replace(/^\s+/, "").replace(
+  /^(?:[#+\-*=`~|:\\]|(\d+)([.)]))/,
+  (m, digits, mark2) => digits ? `${digits}${entity(mark2)}` : entity(m)
+);
 var cell = (text10) => line(text10).replace(/\|/g, "&#124;") || "-";
 function safeUrl(url) {
   try {

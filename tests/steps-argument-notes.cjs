@@ -137,3 +137,36 @@ test('conclusion card (stopped): the refuting facet with datum quote and link, o
   const lacking = N.conclusionDetail(t, state([datum({ id: 'd9', state: 'not_found', proof: undefined, propStance: undefined, searchLog: { queries: ['10-year average'], opened: [], why: 'not_found' } })], [facet({ verdict: 'insufficient', citedData: [] })]), new Map(), undefined, 's');
   assert.ok(lacking.includes(t('ui.argument_note_insufficient')) && lacking.includes('10-year average'));
 });
+
+// ---- block / reference syntax from model or web text (security review) ---------------------------------------------------------------
+const BLOCK_EVIL = ['[x]: https://evil.example/a', 'see [a][b] now', '# Heading', '%%comment%% hidden', '$$x^2$$ math', '```js\nalert(1)', '> quoted', '1. listed', '   indented', '- bullet', '+ plus', '=== setext', '~~~ fence', '2) paren'];
+const allBuilders = evil => {
+  const h = hyp({ basis: evil, insights: [{ kind: 'tension', text: evil }], needs: [need({ text: evil })] });
+  const st = state([datum({ need: evil, stanceReason: evil })], [facet({ title: evil, reason: evil, summary: evil })], { hypotheses: [h], conclusion: { state: 'concluded', basedOn: ['h1'], missing: [] } });
+  return [
+    N.datumDetail(t, st.situation.data[0]),
+    N.notFoundDetail(t, { queries: [evil], opened: [], why: `source_quote_missing: ${evil}` }, 'x'),
+    N.facetDetail(t, st.situation.facets[0], st.situation.data),
+    N.situationDetail(t, st),
+    N.definitionsDetail(t, [{ label: evil, value: evil, reason: evil }], [evil]),
+    N.hypothesisDetail(t, h, evil),
+    N.conclusionDetail(t, st, new Map([['h1', evil]]), { summary: evil, points: [evil] }),
+    N.conclusionDetail(t, state([datum()], [facet({ verdict: 'refutes', reason: evil })]), new Map(), undefined, evil)
+  ];
+};
+test('block and reference syntax in model text is inert in every builder', () => {
+  for (const evil of BLOCK_EVIL) for (const md of allBuilders(evil)) {
+    const first = evil.split('\n')[0];
+    assert.ok(!/\[[^\]]*\]\s*:|\]\s*\[|\[|\]/.test(md.replace(/\[!(?:summary|note)\]-?/g, '').replace(/```mermaid[\s\S]*?```/g, '')), `bracket survives: ${JSON.stringify(evil)}`);
+    assert.ok(!/%%|\$\$/.test(md), `%% or $$ survives: ${JSON.stringify(evil)}`);
+    const marker = /^\s*([#>+\-*=~`]|\d+[.)])/.test(first);
+    if (marker) assert.ok(!md.split('\n').some(l => ['', '- ', '> ', '| ', '  - ', '- 1: '].some(pre => l.startsWith(pre + first.trim()))), `raw marker survives at a line start: ${JSON.stringify(first)}`);
+    assert.ok(!md.split('\n').some(l => /indented/.test(l) && /^ {3,}\S/.test(l.replace(/^ {2}- /, ''))), 'indent');
+  }
+});
+test('line(): leading block markers are entity-encoded, ordinary text is unchanged', () => {
+  const md = N.definitionsDetail(t, [{ label: 'plain text', value: '# H', reason: '1. one' }], ['# H', '- b', 'normal']);
+  assert.ok(md.includes('&#35; H'), md);
+  assert.ok(!/^- (- |# )/m.test(md), md);
+  assert.ok(md.includes('plain text'));
+});

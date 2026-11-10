@@ -30,31 +30,35 @@ export function plainLine(text: string): string {
 }
 /** Entity for one ASCII character. */
 const entity = (c: string): string => `&#${c.charCodeAt(0)};`;
+/** Every ASCII punctuation character that Markdown or Obsidian can read as syntax (including `&`, so a literal entity stays literal). */
+const MARKDOWN_PUNCT = /[\\`*_~=^#$%[\](){}<>|!:&]/g;
 /**
- * Plain text that cannot form any link (every `[` and `]` is an entity, so no inline, reference or `[x]: url` definition), a comment or math
- * block (`%%`, `$$`), or a block of its own: leading whitespace is dropped and a leading heading, list, rule, setext, fence or table marker
- * is entity-encoded. Ordinary text reads the same.
+ * Plain single-line text that cannot form anything: every Markdown/Obsidian punctuation character is an entity (so no link, image, wikilink,
+ * footnote, tag, inline or block math, comment, highlight, callout or HTML), line breaks become a space, leading whitespace is dropped and a
+ * leading list, heading, rule or ordered-list marker is encoded too. Letters, digits, spaces and other text read the same.
  */
 const line = (text: string | undefined): string =>
-  plainLine(text ?? "")
-    .replace(/[[\]]/g, entity)
-    .replace(/%%/g, () => "%&#37;")
-    .replace(/\$\$/g, () => "$&#36;")
+  (text ?? "")
+    .replace(/[\r\n\u2028\u2029]+/g, " ")
     .replace(/^\s+/, "")
-    .replace(/^(?:[#+\-*=`~|:\\]|(\d+)([.)]))/, (m, digits?: string, mark?: string) =>
+    .replace(MARKDOWN_PUNCT, entity)
+    .replace(/^(?:[+-]|(\d+)([.)]))/, (m, digits?: string, mark?: string) =>
       digits ? `${digits}${entity(mark!)}` : entity(m)
     );
 /** A table cell: one line, `|` cannot split the row. */
 const cell = (text: string | undefined): string => line(text).replace(/\|/g, "&#124;") || "-";
-/** An http(s) URL as text (no link syntax characters), or "" for anything else. */
+const URL_ALLOWED = /^[A-Za-z0-9\-._~:/?#@&+,;=]$/;
+const percent = (byte: number): string => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+/** An http(s) URL as inert text: only RFC 3986 characters stay, a `%` that is not a valid escape is `%25`, everything else (`$`, brackets, `=` or `~` runs, quotes, non-ASCII) is percent-encoded. "" for anything not http(s). */
 export function safeUrl(url: string): string {
   try {
     const parsed = new URL(url.trim());
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
-    return parsed.href.replace(
-      /[()[\]<>|`\s]/g,
-      c => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`
-    );
+    // A valid escape stays; a lone `%` becomes %25; a run of `=` or `~` (highlight, strikethrough) and any other character outside the whitelist is encoded.
+    return parsed.href.replace(/%[0-9A-Fa-f]{2}|[=~]{2,}|[\s\S]/gu, m => {
+      if (/^%[0-9A-Fa-f]{2}$/.test(m) || URL_ALLOWED.test(m)) return m;
+      return [...new TextEncoder().encode(m)].map(percent).join("");
+    });
   } catch {
     return "";
   }
@@ -66,9 +70,14 @@ const table = (head: string[], rows: string[][]): string[] => [
   ...rows.map(r => `| ${r.map(cell).join(" | ")} |`)
 ];
 const callout = (text: string): string[] => ["> [!summary]", `> ${line(text)}`];
+/** The stored reason in a collapsed callout: a plain snake_case code stays as is (it cannot form emphasis between letters), any free text after it is encoded. */
+const debugCode = (stored: string): string => {
+  const [, code = "", rest = ""] = /^([a-z]+(?:_[a-z]+)*)(.*)$/s.exec(stored.trim()) ?? [];
+  return `${code}${/^\s/.test(rest) ? " " : ""}${line(rest)}`;
+};
 const debug = (t: Translate, code: string): string[] => [
   `> [!note]- ${t("ui.argument_note_debug")}`,
-  `> ${line(code)}`
+  `> ${debugCode(code)}`
 ];
 
 // ---- chart ---------------------------------------------------------------------------------------------------------------------
@@ -163,6 +172,11 @@ const sourceItems = (items: { claim: string; proof: SourceProof }[]): string[] =
   });
 const sourceLines = (t: Translate, items: { claim: string; proof: SourceProof }[]): string[] =>
   items.length ? ["", `### ${t("ui.argument_sources")}`, ...sourceItems(items)] : [];
+/** The sources section of a datum or need note (facet maps): claim, quote and link, all inert. */
+export const sourceNote = (t: Translate, proof: SourceProof): string =>
+  sourceLines(t, [{ claim: proof.claim, proof }])
+    .join("\n")
+    .replace(/^\n/, "");
 const dataRows = (t: Translate, data: SituationDatum[]): string[][] =>
   data.map(d => [
     d.need,

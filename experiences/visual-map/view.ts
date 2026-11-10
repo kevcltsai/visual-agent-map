@@ -14398,9 +14398,10 @@ export class VisualAgentMapView extends ItemView {
    * The definitions card's "re-run" button: reads the table of the card's note (the owner may have edited it), and starts a NEW map with
    * those items; an unreadable table only shows a notice. The map on screen is never written. There is no confirm window (decision 46).
    */
+  private rerunning = false;
   private async rerunFromDefinitions(cardId: string): Promise<void> {
     const map = this.map;
-    if (this.closed || !map || map.argumentMap === undefined) return;
+    if (this.rerunning || this.closed || !map || map.argumentMap === undefined) return;
     const read = readArgumentMap(map);
     if (read.kind !== "usable" || read.data.situation.assumptions?.id !== cardId) return;
     const definitions = map.nodes.find(node => node.id === cardId);
@@ -14409,6 +14410,7 @@ export class VisualAgentMapView extends ItemView {
     const rootNote = this.notes.get(root.id);
     const proposition =
       rootNote?.summary && !isPlaceholder(rootNote.summary) ? rootNote.summary : (rootNote?.title ?? "");
+    this.rerunning = true;
     try {
       const result = await rerunWithAssumptions({
         readDefinitions: async () => (await this.plugin.repo.readNote(definitions.path, map)).detail,
@@ -14431,6 +14433,8 @@ export class VisualAgentMapView extends ItemView {
       else await this.plugin.openMapInNewTab(result.mapPath);
     } catch (error) {
       errorNotice(error);
+    } finally {
+      this.rerunning = false;
     }
   }
   /** The heading of a managed card: its note's title, the note's summary (a concluded conclusion only), or the flow's own text. */

@@ -21,6 +21,7 @@ import {
   notFoundDetail,
   plainLine,
   situationDetail,
+  sourceNote,
   type Translate
 } from "./argument-notes";
 import type { AiResult, TaskContext } from "../../ai/types";
@@ -588,7 +589,7 @@ export class ArgumentRuns {
             next,
             notes: async () => {
               for (const d of spent)
-                await this.noteDetail(map, d.id, drive, this.t("ui.argument_not_found_0", "budget"));
+                await this.noteDetail(map, d.id, drive, notFoundDetail(this.tr, undefined, "budget"));
             }
           };
         });
@@ -1216,12 +1217,14 @@ export class ArgumentRuns {
       }
       const proof = result.found ? result.proof : undefined;
       const lines = proof ? [this.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
+      const sourcesDetail = (p: NonNullable<typeof proof>): string =>
+        hasFacets(next) ? sourceNote(this.tr, p) : [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n");
       const notes = async (): Promise<void> => {
         if (!node) return; // the user deleted the card: skip it, keep the state consistent
         if (proof) {
           await this.writeNote(node.path, {
             summary: proof.claim,
-            detail: [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n")
+            detail: sourcesDetail(proof)
           });
         } else if (!result.found)
           await this.writeNote(node.path, {

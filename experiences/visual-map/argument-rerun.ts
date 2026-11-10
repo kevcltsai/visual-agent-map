@@ -1,15 +1,15 @@
 /**
  * Re-run from the definitions card (V1 boost). The owner edits the definitions table in the card's note; this reads it back (the inverse of
- * `definitionsDetail`) and starts a NEW map in the same folder with those items as the assumption card. The original map is never written.
+ * `definitionsDetail`) and starts a NEW map (created in the mind-maps folder like any new map) with those items as the assumption card. The original map is never written.
  */
 import type { AssumptionItem } from "../../core/argument-map/model";
 
 const ENTITY: Record<string, string> = { lt: "<", gt: ">", amp: "&" };
-/** The builder's entity encoding (`&#NN;` for `[ ] ( | # ...`, `&lt;` `&gt;`) read back as characters. */
+/** The builder's entity encoding (`&#NN;` for every Markdown punctuation character), decoded in one pass so a literal `&amp;` survives read back as characters. */
 const decode = (text: string): string =>
-  text
-    .replace(/&#(\d{1,5});/g, (_m, code: string) => String.fromCodePoint(Number(code)))
-    .replace(/&(lt|gt|amp);/g, (_m, name: string) => ENTITY[name]);
+  text.replace(/&(?:#(\d{1,5})|(lt|gt|amp));/g, (_m, code?: string, name?: string) =>
+    code ? String.fromCodePoint(Number(code)) : ENTITY[name!]
+  );
 
 const cells = (row: string): string[] => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
 const isSeparator = (row: string): boolean => cells(row).every(cell => /^\s*:?-{3,}:?\s*$/.test(cell));
@@ -44,7 +44,7 @@ export interface RerunPorts {
   readDefinitions(): Promise<string>;
   /** The proposition text of the map being re-run. */
   proposition(): string;
-  /** Creates the new map in the same folder and returns its path. Only called after the table was read. */
+  /** Creates the new map in the mind-maps folder (not necessarily next to the original) and returns its path. Only called after the table was read. */
   createMap(): Promise<string>;
   /** Starts the run on the new map with the assumption card preset. */
   start(mapPath: string, proposition: string, presetAssumptions: AssumptionItem[]): Promise<void>;

@@ -195,3 +195,31 @@ test('re-run: an unreadable table creates no map and starts nothing; a readable 
   assert.deepEqual(plainJson(calls), ['create', ['start', 'New.md', 'Claim', [{ label: 'l', value: 'v', reason: 'r' }]]]);
   assert.deepEqual(plainJson(await R.rerunWithAssumptions({ ...ports('| a | b | c |\n| --- | --- | --- |\n| l | v | r |'), proposition: () => '  ' })), { kind: 'unreadable' });
 });
+
+// ---- review round 1 (B1): whitelist sanitizing ---------------------------------------------------------------------------------------
+const inertText = md => !/%%|\$|(^|[^&\w])#\w|\]\(|\[\[|!\[|<[a-z]|==|~~|`|\*|\bhttps?:[^\s]*[()[\]]/i.test(md.replace(/&#\d+;/g, ''));
+test('safeUrl: whitelist only; a lone % is %25, $ is %24, nothing else can start math, a comment, a highlight or a link', () => {
+  assert.equal(N.safeUrl('https://a.example/p?q=%%&r=$$x'), 'https://a.example/p?q=%25%25&r=%24%24x');
+  assert.equal(N.safeUrl('https://a.example/a%41%%41'), 'https://a.example/a%41%25%41');
+  assert.equal(N.safeUrl('https://a.example/x?a=1&b=2#frag'), 'https://a.example/x?a=1&b=2#frag');
+  for (const bad of ['https://a.example/%%a%%', 'https://a.example/$x$ and $$y$$', 'https://a.example/a==b==c~~d~~', "https://a.example/p(1)[2]{3}!'*`|\\^\"", 'https://a.example/é中 x']) {
+    const out = N.safeUrl(bad);
+    assert.ok(/^https?:\/\/[A-Za-z0-9\-._~:/?#@&+,;=%]*$/.test(out), out);
+    assert.ok(!/%%|\$|==|~~/.test(out) && !/%(?![0-9A-Fa-f]{2})/.test(out), out);
+  }
+  for (const out of [N.datumDetail(t, datum({ proof: proof({ url: 'https://a.example/$$%%' }) })), N.notFoundDetail(t, { queries: [], opened: ['https://a.example/$$%%'], why: 'x' }, 'x')]) assert.ok(!/\$\$|%%/.test(out), out);
+});
+test('line: inline math, tags, formatting and block markers cannot form from model text; ordinary text reads the same', () => {
+  const evil = ['$x$ and $y$', '#tag and #other', '*bold* _it_ ~~del~~ ==hi== ^sup', '{{x}} {y} ^block', '[[a]] ![b](c) [d](obsidian://open?vault=v)', '%%comment%%', '> quote', '- item', '1. one', '|a|b|', '\\$x\\$', 'a: b'];
+  for (const bad of evil) {
+    const md = N.datumDetail(t, datum({ need: bad, stanceReason: bad, proof: proof({ claim: bad, quote: bad }) })) + N.hypothesisDetail(t, hyp({ basis: bad, needs: [] }), bad);
+    assert.ok(inertText(md.replace(/^\s*[|>#-].*$/gm, l => (/^(### |> \[!summary\]|\| |> \[!note\]-)/.test(l) ? '' : l))), JSON.stringify(bad));
+    assert.ok(!md.includes(bad) || !/[$#*_~=^{}\[\]|]/.test(bad), JSON.stringify(bad));
+  }
+  const md = N.hypothesisDetail(t, hyp({ basis: 'plain words only' }), 'GDP grew 3 percent in 2020');
+  assert.ok(md.includes('plain words only') && md.includes('GDP grew 3 percent in 2020'));
+});
+test('definitions table: the stronger encoding still round-trips through the re-run parser', () => {
+  const items = [{ label: '$x$ #tag', value: '*a* _b_ ~~c~~ ==d== ^e {f} [g](h) <i> |j| !k :l &#37; &amp; %%m%% $$n$$', reason: '1. one \\ back `tick` > quote' }, { label: 'Age', value: '16–24 (youth)', reason: 'BLS: x' }, { label: '+ plus', value: '- minus', reason: '2) two' }];
+  assert.deepEqual(plainJson(R.parseDefinitionsTable(N.definitionsDetail(t, items, ['i']))), items);
+});

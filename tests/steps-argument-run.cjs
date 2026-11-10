@@ -1001,3 +1001,42 @@ test('P7: re-running on a new map leaves the original Map.md byte-identical', as
   assert.equal(r.contents.get(r.mapPath), before);
   assert.equal(model.readArgumentMap(await r.repo.readMap(second)).kind, 'usable');
 });
+
+// ---- review round 1 fixes: facet-map source notes go through the notes module; the budget note is readable ----
+const spyNotes = () => { const h = { writes: [] }; return { h, ports: { updateNote: (path, patch) => { h.writes.push(patch); return h.repo.updateNote(path, patch); } } }; };
+test('facet map: need and datum source notes (written before the judgement) keep a model claim with a link, math and a tag inert', async () => {
+  const { h, ports } = spyNotes();
+  const evil = 'Rate rose [x](obsidian://open?vault=v) $x$ and #tag $$y$$ %%c%%';
+  const r = await rig({ facet: true, ports, script: { step: facetSteps(), ask: ctx => aiReply([foundEntry(ctx.argumentEvidenceNeeds[0].id, { claim: evil })]) } });
+  h.repo = r.repo;
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const sourced = h.writes.filter(w => w.detail?.includes('Rate rose'));
+  assert.ok(sourced.length > 0, 'a source note was written');
+  for (const w of sourced) {
+    assert.ok(!/\]\(/.test(w.detail) && !/\$x\$|\$\$/.test(w.detail) && !/(^|\s)#tag/.test(w.detail) && !/%%/.test(w.detail), w.detail);
+    assert.ok(w.detail.startsWith('### '), 'built by the notes module');
+  }
+});
+test('facet map: a datum closed by the research budget gets a readable reason, not the raw code', async () => {
+  const { h, ports } = spyNotes();
+  const r = await rig({ facet: true, ports, script: { step: facetSteps({ judge_facets: judgeBy([]) }) } });
+  h.repo = r.repo;
+  let seeded = false;
+  const inner = r.ports.updateMap;
+  r.ports.updateMap = async (path, change) => {
+    const written = await inner(path, change);
+    const read = model.readArgumentMap(await r.repo.readMap(path));
+    if (!seeded && read.kind === 'usable' && read.data.situation.data.length) {
+      seeded = true;
+      await r.repo.updateMap(path, d => { const s = model.readArgumentMap(d).data; s.run.researchCalls = model.MAX_RESEARCH_CALLS; d.argumentMap = s; });
+    }
+    return written;
+  };
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const budget = h.writes.filter(w => w.detail?.includes('budget') && w.detail.includes('[!note]-'));
+  assert.ok(seeded && budget.length > 0, 'a budget note was written');
+  for (const w of budget) {
+    assert.ok(w.detail.includes(translate('zh-TW', 'ui.argument_why_budget')), w.detail);
+    assert.ok(!w.detail.includes('未找到：budget'), w.detail);
+  }
+});

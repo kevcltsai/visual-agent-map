@@ -411,3 +411,21 @@ test('V1 boost: managedNodeIds also lists facet card ids and the assumption card
   });
   assert.deepEqual([...model.managedNodeIds({ argumentMap: state })].sort(), ['as9', 'c', 'd1', 'd2', 'd3', 'e', 'f1', 'f2', 'f3', 'p', 's', 'v']);
 });
+
+test('definitions re-run: a double click creates and starts ONE new map; the guard resets so a later click works', async () => {
+  const starts = [], opened = [];
+  const h = await harness([...'PSCVEHNF'].concat('D', 'A'), { argumentRuns: { start: async (path, claim, opts) => { starts.push([path, claim, opts]); } }, openMapInNewTab: async path => { opened.push(path); } });
+  const def = h.nodes[9];
+  await h.repo.updateNote(def.path, { detail: '| a | b | c |\n| --- | --- | --- |\n| l | v | r |' });
+  h.view.map.argumentMap.situation.assumptions = { id: def.id, items: [{ label: 'l', value: 'v', reason: 'r' }] };
+  await h.repo.saveMap(MAP, h.view.map);
+  const first = h.view.rerunFromDefinitions(def.id);
+  const second = h.view.rerunFromDefinitions(def.id);
+  await Promise.all([first, second]);
+  console.log(h.notices, h.view.plugin === undefined, Object.keys(h.view.plugin||{}).slice(0,50).join(","), JSON.stringify(model.readArgumentMap(h.view.map).kind));
+  assert.equal(starts.length, 1, 'one run started');
+  assert.equal(opened.length, 1, 'one map opened');
+  assert.equal(h.notices.length, 0, h.notices.join('|'));
+  await h.view.rerunFromDefinitions(def.id);
+  assert.equal(starts.length, 2, 'the guard is reset after the first finished');
+});

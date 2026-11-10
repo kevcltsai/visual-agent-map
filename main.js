@@ -44995,19 +44995,22 @@ function plainLine2(text10) {
   return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/!\[|\[(?=\[)/g, (m) => m.replace("[", "&#91;")).replace(/\](?=\])/g, "&#93;");
 }
 var entity = (c) => `&#${c.charCodeAt(0)};`;
-var line = (text10) => plainLine2(text10 != null ? text10 : "").replace(/[[\]]/g, entity).replace(/%%/g, () => "%&#37;").replace(/\$\$/g, () => "$&#36;").replace(/^\s+/, "").replace(
-  /^(?:[#+\-*=`~|:\\]|(\d+)([.)]))/,
+var MARKDOWN_PUNCT = /[\\`*_~=^#$%[\](){}<>|!:&]/g;
+var line = (text10) => (text10 != null ? text10 : "").replace(/[\r\n\u2028\u2029]+/g, " ").replace(/^\s+/, "").replace(MARKDOWN_PUNCT, entity).replace(
+  /^(?:[+-]|(\d+)([.)]))/,
   (m, digits, mark2) => digits ? `${digits}${entity(mark2)}` : entity(m)
 );
 var cell = (text10) => line(text10).replace(/\|/g, "&#124;") || "-";
+var URL_ALLOWED = /^[A-Za-z0-9\-._~:/?#@&+,;=]$/;
+var percent = (byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
 function safeUrl(url) {
   try {
     const parsed = new URL(url.trim());
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
-    return parsed.href.replace(
-      /[()[\]<>|`\s]/g,
-      (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`
-    );
+    return parsed.href.replace(/%[0-9A-Fa-f]{2}|[=~]{2,}|[\s\S]/gu, (m) => {
+      if (/^%[0-9A-Fa-f]{2}$/.test(m) || URL_ALLOWED.test(m)) return m;
+      return [...new TextEncoder().encode(m)].map(percent).join("");
+    });
   } catch (e) {
     return "";
   }
@@ -45019,9 +45022,14 @@ var table = (head, rows2) => [
   ...rows2.map((r) => `| ${r.map(cell).join(" | ")} |`)
 ];
 var callout = (text10) => ["> [!summary]", `> ${line(text10)}`];
+var debugCode = (stored) => {
+  var _a2;
+  const [, code = "", rest = ""] = (_a2 = /^([a-z]+(?:_[a-z]+)*)(.*)$/s.exec(stored.trim())) != null ? _a2 : [];
+  return `${code}${/^\s/.test(rest) ? " " : ""}${line(rest)}`;
+};
 var debug = (t2, code) => [
   `> [!note]- ${t2("ui.argument_note_debug")}`,
-  `> ${line(code)}`
+  `> ${debugCode(code)}`
 ];
 var NUMBER = /^[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/;
 function figureNumber(figure) {
@@ -45093,6 +45101,7 @@ var sourceItems = (items) => items.map(({ claim: claim2, proof }) => {
   return `- ${line(claim2)} ${quote2(proof.quote)}${url ? ` ${url}` : ""}`;
 });
 var sourceLines = (t2, items) => items.length ? ["", `### ${t2("ui.argument_sources")}`, ...sourceItems(items)] : [];
+var sourceNote = (t2, proof) => sourceLines(t2, [{ claim: proof.claim, proof }]).join("\n").replace(/^\n/, "");
 var dataRows = (t2, data) => data.map((d) => {
   var _a2, _b2, _c, _d, _e;
   return [
@@ -47135,7 +47144,7 @@ var ArgumentRuns = class {
             next,
             notes: async () => {
               for (const d of spent)
-                await this.noteDetail(map, d.id, drive, this.t("ui.argument_not_found_0", "budget"));
+                await this.noteDetail(map, d.id, drive, notFoundDetail(this.tr, void 0, "budget"));
             }
           };
         });
@@ -47689,12 +47698,13 @@ var ArgumentRuns = class {
       }
       const proof = result.found ? result.proof : void 0;
       const lines = proof ? [this.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
+      const sourcesDetail = (p) => hasFacets(next) ? sourceNote(this.tr, p) : [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n");
       const notes = async () => {
         if (!node) return;
         if (proof) {
           await this.writeNote(node.path, {
             summary: proof.claim,
-            detail: [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n")
+            detail: sourcesDetail(proof)
           });
         } else if (!result.found)
           await this.writeNote(node.path, {
@@ -47708,7 +47718,10 @@ var ArgumentRuns = class {
 
 // experiences/visual-map/argument-rerun.ts
 var ENTITY = { lt: "<", gt: ">", amp: "&" };
-var decode = (text10) => text10.replace(/&#(\d{1,5});/g, (_m, code) => String.fromCodePoint(Number(code))).replace(/&(lt|gt|amp);/g, (_m, name2) => ENTITY[name2]);
+var decode = (text10) => text10.replace(
+  /&(?:#(\d{1,5})|(lt|gt|amp));/g,
+  (_m, code, name2) => code ? String.fromCodePoint(Number(code)) : ENTITY[name2]
+);
 var cells = (row) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
 var isSeparator = (row) => cells(row).every((cell2) => /^\s*:?-{3,}:?\s*$/.test(cell2));
 function parseDefinitionsTable(detail) {
@@ -55413,6 +55426,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "renderWhenShown", false);
     /** The last camera move (fit, focus) asked of a hidden tab: its pane measures 0, so it waits for drawWhenShown. */
     __publicField(this, "cameraWhenShown", null);
+    /**
+     * The definitions card's "re-run" button: reads the table of the card's note (the owner may have edited it), and starts a NEW map with
+     * those items; an unreadable table only shows a notice. The map on screen is never written. There is no confirm window (decision 46).
+     */
+    __publicField(this, "rerunning", false);
     /** Heights (canvas units) the cards had at the last check, and the map they belong to. */
     __publicField(this, "heightsSeen", /* @__PURE__ */ new Map());
     __publicField(this, "heightsSeenMap", null);
@@ -67112,14 +67130,10 @@ ${request.requirements}` : preset.text,
     if (read.kind !== "usable" || !managedNodeIds(this.map).has(id)) return null;
     return describeArgumentCard(read.data, id, t);
   }
-  /**
-   * The definitions card's "re-run" button: reads the table of the card's note (the owner may have edited it), and starts a NEW map with
-   * those items; an unreadable table only shows a notice. The map on screen is never written. There is no confirm window (decision 46).
-   */
   async rerunFromDefinitions(cardId) {
     var _a2, _b2;
     const map = this.map;
-    if (this.closed || !map || map.argumentMap === void 0) return;
+    if (this.rerunning || this.closed || !map || map.argumentMap === void 0) return;
     const read = readArgumentMap(map);
     if (read.kind !== "usable" || ((_a2 = read.data.situation.assumptions) == null ? void 0 : _a2.id) !== cardId) return;
     const definitions2 = map.nodes.find((node) => node.id === cardId);
@@ -67127,6 +67141,7 @@ ${request.requirements}` : preset.text,
     if (!definitions2 || !root) return;
     const rootNote = this.notes.get(root.id);
     const proposition = (rootNote == null ? void 0 : rootNote.summary) && !isPlaceholder(rootNote.summary) ? rootNote.summary : (_b2 = rootNote == null ? void 0 : rootNote.title) != null ? _b2 : "";
+    this.rerunning = true;
     try {
       const result = await rerunWithAssumptions({
         readDefinitions: async () => (await this.plugin.repo.readNote(definitions2.path, map)).detail,
@@ -67148,6 +67163,8 @@ ${request.requirements}` : preset.text,
       else await this.plugin.openMapInNewTab(result.mapPath);
     } catch (error) {
       errorNotice(error);
+    } finally {
+      this.rerunning = false;
     }
   }
   /** The heading of a managed card: its note's title, the note's summary (a concluded conclusion only), or the flow's own text. */
@@ -68724,11 +68741,11 @@ ${request.requirements}` : preset.text,
           const sources = panel.createDiv("vam-reference-sources");
           sources.createEl("strong", { text: t("ui.source_topics") });
           for (const path of sourcePaths) {
-            const sourceNode = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === path), sourceNote = sourceNode ? this.notes.get(sourceNode.id) : null;
+            const sourceNode = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === path), sourceNote2 = sourceNode ? this.notes.get(sourceNode.id) : null;
             const file = this.app.vault.getAbstractFileByPath(path);
             this.button(
               sources,
-              (_c = sourceNote == null ? void 0 : sourceNote.title) != null ? _c : file instanceof import_obsidian34.TFile ? file.basename : t("ui.0_moved", (_b2 = path.split("/").at(-1)) == null ? void 0 : _b2.replace(/\.md$/, "")),
+              (_c = sourceNote2 == null ? void 0 : sourceNote2.title) != null ? _c : file instanceof import_obsidian34.TFile ? file.basename : t("ui.0_moved", (_b2 = path.split("/").at(-1)) == null ? void 0 : _b2.replace(/\.md$/, "")),
               () => {
                 close == null ? void 0 : close();
                 if (sourceNode) {

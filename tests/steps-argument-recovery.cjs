@@ -153,7 +153,7 @@ async function harnessV2() {
 test('version 2 map: opening asks the runner to recover once with the map path; no provider call', async () => {
   const h = await harnessV2();
   const recovered = [];
-  h.view.plugin.argumentRunsV2 = { recover: async path => { recovered.push(path); return false; } };
+  h.view.plugin.argumentRuns = { recover: async path => { recovered.push(path); return false; } };
   await h.open();
   assert.deepEqual(recovered, [h.mapPath]);
   assert.equal(h.calls.provider, 0);
@@ -162,7 +162,7 @@ test('version 2 map: opening asks the runner to recover once with the map path; 
 
 test('version 2 map: when recovery changed the map, the view shows the saved result', async () => {
   const h = await harnessV2();
-  h.view.plugin.argumentRunsV2 = {
+  h.view.plugin.argumentRuns = {
     recover: async path => {
       await h.repo.updateMap(path, doc => { doc.argumentMap.run.stopReason = 'interrupted'; });
       return true;
@@ -176,7 +176,7 @@ test('counterexample: a legacy map and an ordinary map never reach the version 2
   for (const withKey of [true, false]) {
     const h = await harness({ withKey });
     let calls = 0;
-    h.view.plugin.argumentRunsV2 = { recover: async () => { calls++; return true; } };
+    h.view.plugin.argumentRuns = { recover: async () => { calls++; return true; } };
     const before = await h.text();
     await h.open();
     assert.equal(calls, 0, withKey ? 'legacy' : 'no key');
@@ -184,12 +184,17 @@ test('counterexample: a legacy map and an ordinary map never reach the version 2
   }
 });
 
-test('counterexample: a recovery that fails, or a plugin without the runner, still opens the version 2 map as saved', async () => {
+test('counterexample: a recovery that fails still opens the version 2 map as saved', async () => {
   const failing = await harnessV2();
-  failing.view.plugin.argumentRunsV2 = { recover: () => Promise.reject(new Error('boom')) };
+  failing.view.plugin.argumentRuns = { recover: () => Promise.reject(new Error('boom')) };
   await failing.open();
   assert.equal(failing.view.map.argumentMap.v, 2);
-  const missing = await harnessV2();
-  await missing.open();
-  assert.equal(missing.view.map.argumentMap.v, 2);
+});
+
+test('wiring: the real plugin router has recover (open-map recovery) and the v2 runner has frame/start/isRunning (no TODO body)', async () => {
+  const plugin = new Plugin({}, { id: 'vam', version: '0.0.0' });
+  for (const method of ['start', 'stop', 'resume', 'isRunning', 'recover', 'dispose']) assert.equal(typeof plugin.argumentRuns[method], 'function', `router.${method}`);
+  for (const method of ['frame', 'start', 'isRunning']) assert.equal(typeof plugin.argumentRunsV2[method], 'function', `argumentRunsV2.${method}`);
+  assert.equal(plugin.argumentRunsV2.isRunning('Nothing.vam'), false);
+  plugin.argumentRuns.dispose();
 });

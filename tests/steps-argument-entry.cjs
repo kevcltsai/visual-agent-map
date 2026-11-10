@@ -303,14 +303,9 @@ async function drive(modal, mutate) {
   go.click(); await settle();
 }
 
-test('the window opens only on the opening screen and only when the V2 runner is wired', () => {
+test('the window opens only on the opening screen (the V2 runner is a real typed plugin member)', () => {
   assert.equal(open(fakeView({ chatHero: () => false }).view), undefined, 'not on the opening screen: no window');
   assert.equal(open(fakeView({ closed: true }).view), undefined, 'closed view: no window');
-  const unwired = fakeView();
-  delete unwired.view.plugin.argumentRunsV2;
-  notices.length = 0;
-  assert.equal(open(unwired.view), undefined, 'argumentRunsV2 missing: no window');
-  assert.deepEqual(notices, ['Could not start hypothesis research on this mind map.']);
 });
 
 test('view: Next frames with the trimmed claim; confirm starts the run with a locked framing that carries the user edits', async () => {

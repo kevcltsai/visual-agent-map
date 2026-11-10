@@ -1,34 +1,18 @@
-// Byte-exact prompt (and provider response schema) snapshots, English and Traditional Chinese.
-// Compare mode is the default: any difference fails. UPDATE_PROMPT_SNAPSHOTS=1 rewrites tests/snapshots/prompts.
-// tests/snapshots/prompts/index.json is the coverage table (snapshot -> builder/flow -> language -> i18n keys).
+// Byte-exact prompt (and provider response schema) snapshots in every registered language, AIM prompts excepted (those are
+// tests/aim-prompt-snapshots.cjs). Compare mode is the default: any difference fails. UPDATE_PROMPT_SNAPSHOTS=1 rewrites
+// tests/snapshots/prompts. tests/snapshots/prompts/index.json is the coverage table (snapshot -> builder/flow -> language).
+// The harness is tests/support-prompt-snapshots.cjs.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const path = require('node:path');
-const { load: loadModule, loadSource, normalizeText, promptsFor, root } = require('./support-replay.cjs');
+const { load: loadModule, loadSource } = require('./support-replay.cjs');
 const support = require('./support.cjs');
 const { runPanel } = require('./support-selection-ai.cjs');
-const { captureAimPhaseVariants } = require('./support-aim-flow-capture.cjs');
 
-const directory = path.join(__dirname, 'snapshots', 'prompts');
-const update = process.env.UPDATE_PROMPT_SNAPSHOTS === '1';
-// [language id, snapshot tag] for every registered language. The tag is the instruction language for the first language
-// that uses it (so the files stay `.en.` / `.zh.`) and the language id for later ones (`.zh-CN.`).
-const REGISTRY = loadRegistry();
-const LANGUAGES = REGISTRY.map((entry, index) => [entry.id, REGISTRY.findIndex(other => other.instruction === entry.instruction) === index ? entry.instruction : entry.id]);
-function loadRegistry() { return loadModule('i18n/languages.ts').LANGUAGES; }
-const snapshots = new Map(); // name -> { prompt, schema, builder, language }
-
-function record(name, builder, language, prompt, schema) {
-  assert.ok(!snapshots.has(name), `duplicate snapshot ${name}`);
-  snapshots.set(name, { builder, language, prompt: normalizeText(prompt), schema });
-}
-async function recordContext(name, builder, language, context, model) {
-  const sent = await promptsFor(context, { language, reuseModule: true, ...(model ? { model } : {}) });
-  assert.ok(sent.length >= 1, `${name}: no prompt reached the provider`);
-  sent.forEach((call, index) => record(sent.length === 1 ? name : `${name}.${index + 1}`, builder, language, call.prompt, call.schema));
-}
+const { LANGUAGES, snapshotCollector } = require('./support-prompt-snapshots.cjs');
+const { record, recordContext, compareTest } = snapshotCollector({ directory: path.join(__dirname, 'snapshots', 'prompts'), generator: 'tests/prompt-snapshots.cjs', minimum: 100 });
 
 const base = { title: 'Topic T', summary: 'Current summary S', rules: 'Rule R', detail: 'Existing detail D', task: 'Do task X', ancestors: 'Ancestor A', workingFindings: 'Older finding F', sourceContext: 'Source [S1]: fact', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'auto' };
 
@@ -177,96 +161,6 @@ test('collect snapshots: topics whose language is read from the text (D-2026-10-
   await recordContext('service.task-topic-french.follow-input', 'AiTaskService instructions: general task, French topic on the follow-input row with the anchored clause (D-2026-10-94)', frenchLanguage, { ...base, title: french, outputLanguage: frenchLanguage });
 });
 
-test('collect snapshots: AIM prompt builder per phase', async () => {
-  const phases = ['research-gap-audit', 'initial-clarification', 'initial-question', 'research-plan', 'research-plan-repair', 'subtopic-research', 'targeted-followup-research', 'report-review', 'decision-quality-review', 'format-repair', 'delivery-outline', 'delivery-research', 'delivery-writing', 'delivery-acceptance'];
-  const aimBase = { title: 'Goal G', summary: 'Summary S', rules: 'Rule R', detail: 'Reports D', ancestors: 'Known conditions C', workingFindings: 'Prior findings F', sourceContext: 'Source [S1]: fact', mode: 'task', promptProfile: 'aim', researchMode: 'local', researchDepth: 'normal', visualMode: 'off' };
-  for (const [language, tag] of LANGUAGES) for (const phase of [undefined, ...phases]) {
-    const task = phase ? `<!-- aim-phase: ${phase} -->\nPhase task text.` : 'Plain task text.';
-    const research = ['subtopic-research', 'targeted-followup-research', 'delivery-research'].includes(phase);
-    const context = { ...aimBase, task, outputLanguage: language, researchMode: research ? 'research' : 'local', ...(phase === 'research-gap-audit' ? { responseContract: 'aim-gap-audit' } : {}), ...(phase === 'delivery-acceptance' ? { responseContract: 'aim-delivery-acceptance' } : {}), ...(research ? { aimIsolatedResearch: true } : {}) };
-    await recordContext(`aim-builder.${phase ?? 'no-phase'}.${tag}`, `buildAimPrompt via AiTaskService (phase ${phase ?? 'none'}, legacy marker contract)`, language, context);
-  }
-  for (const [language, tag] of LANGUAGES)
-    await recordContext(`aim-builder.tone.${tag}`, 'buildAimPrompt via AiTaskService with a resolved tone text (B1)', language, { ...aimBase, task: 'Plain task text.', outputLanguage: language, toneText: language === 'en' ? 'Tone: example voice. Write warmly.' : '寫作語氣：範例語氣。請溫暖地寫作。' });
-  const contracts = { intake: { kind: 'intake' }, 'question-required': { kind: 'question', requireQuestion: true }, 'question-optional': { kind: 'question', requireQuestion: false }, plan: { kind: 'plan' }, reuse: { kind: 'reuse' }, 'review-all': { kind: 'review', decisions: ['research_more', 'ask_user', 'conclude'] }, 'review-floor': { kind: 'review', decisions: ['research_more', 'ask_user'] }, outline: { kind: 'outline' }, 'delivery-research': { kind: 'delivery-research' } };
-  for (const [name, contract] of Object.entries(contracts)) {
-    const context = { ...aimBase, task: '<!-- aim-phase: report-review -->\nStructured contract task.', outputLanguage: 'en', aimContract: contract, aimEvidenceLookup: name === 'review-all', ...(name === 'delivery-research' ? { researchMode: 'research', aimIsolatedResearch: true } : {}) };
-    await recordContext(`aim-contract.${name}.en`, `AiTaskService schema + structured-contract prompt (${contract.kind})`, 'en', context);
-  }
-});
-
-test('collect snapshots: AIM flow phase tasks (manual-flow, final-delivery)', async () => {
-  const subject = await support.coverageSetup('Snapshot goal');
-  const first = new Map();
-  const inner = subject.model.ask;
-  const { AimManualFlow } = loadModule('experiences/aim/manual-flow.ts');
-  const { AimRunStore } = loadModule('experiences/aim/research-run-store.ts');
-  const ask = async context => {
-    const phase = context.task.match(/aim-phase:\s*([a-z-]+)/)?.[1] ?? 'none';
-    const key = phase === 'report-review' && /Hard floor: \d+ answered/.test(context.task) ? `${phase}-${first.has(phase) ? 'later' : 'first'}` : phase;
-    if (!first.has(key)) first.set(key, { ...context, onProgress: undefined, signal: undefined });
-    return inner(context);
-  };
-  subject.flow = new AimManualFlow(subject.repo, new AimRunStore(subject.repo), ask);
-  await support.coverageThreeAnswers(subject);
-  assert.ok(first.size >= 6, `expected several AIM phases, saw ${[...first.keys()].join(',')}`);
-  for (const [phase, context] of [...first.entries()].sort(([a], [b]) => a.localeCompare(b)))
-    for (const [language, tag] of LANGUAGES)
-      await recordContext(`aim-flow.${phase}.${tag}`, `AimManualFlow/final-delivery phase ${phase} through AiTaskService`, language, { ...context, outputLanguage: language });
-});
-
-test('collect snapshots: AIM flow final delivery with a note style (claim to judgment, plain voice, lean format)', async () => {
-  const { AimManualFlow } = loadModule('experiences/aim/manual-flow.ts');
-  const { AimRunStore } = loadModule('experiences/aim/research-run-store.ts');
-  const { lookupBuiltinFormat } = loadModule('core/blocks/builtin.ts');
-  const names = ['Claim', 'Prediction', 'How to check', 'Support', 'Counter', 'Current judgment', 'Evidence and sources', 'Update log'];
-  const drive = async (language, withStyle) => {
-    const subject = await support.coverageSetup('Snapshot goal');
-    const first = new Map();
-    const inner = subject.model.ask;
-    const ask = async context => {
-      const phase = context.task.match(/aim-phase:\s*([a-z-]+)/)?.[1] ?? 'none';
-      const key = phase === 'report-review' && /Hard floor: \d+ answered/.test(context.task) ? `${phase}-${first.has(phase) ? 'later' : 'first'}` : phase;
-      if (!first.has(key)) first.set(key, { ...context, onProgress: undefined, signal: undefined });
-      return inner(context);
-    };
-    subject.flow = new AimManualFlow(subject.repo, new AimRunStore(subject.repo), ask);
-    if (withStyle)
-      subject.flow.noteStyle = () => ({
-        recipe: { ref: 'file:AIM plain lean', name: 'AIM plain lean', source: 'kind' },
-        template: { id: 'aim-plain-lean', name: 'AIM plain lean', sections: names.map(name => ({ id: name, name, description: `${name}: what this section says.`, role: 'none', aliases: [] })) },
-        toneText: 'Write in plain words: short sentences, everyday terms, the conclusion first.',
-        formatText: lookupBuiltinFormat('lean', language),
-        contextFields: { styleSelection: { template: { id: 'aim-plain-lean' }, tone: {}, format: { id: 'lean' } } }
-      });
-    await support.coverageThreeAnswers(subject);
-    return first;
-  };
-  for (const [language, tag] of LANGUAGES) {
-    const plain = await drive(language, false);
-    const styled = await drive(language, true);
-    for (const [phase, context] of styled) {
-      if (phase === 'delivery-outline' || phase === 'delivery-writing') continue;
-      // askAimModel drops the tone of structured calls, so the contract phases are compared without it.
-      const { toneText, ...rest } = context;
-      const { toneText: _plainTone, ...plainRest } = plain.get(phase) ?? {};
-      const ids = value => JSON.parse(JSON.stringify(value).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '<id>')); // each run has its own ids
-      assert.deepEqual(ids(rest), ids(plainRest), `${language}: phase ${phase} is unchanged by the style`);
-    }
-    for (const phase of ['delivery-outline', 'delivery-writing'])
-      await recordContext(`aim-flow.style-${phase}.${tag}`, `AimManualFlow/final-delivery phase ${phase} with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService`, language, { ...styled.get(phase), outputLanguage: language });
-  }
-});
-
-test('collect snapshots: AIM flow phase task variants (safety net before the templates move)', async () => {
-  // Phase-task text assembled in manual-flow.ts and planner-review.ts, captured at the flow's model-call seam for every variant
-  // the older test above does not reach. support-aim-flow-capture.cjs fails if any expected variant could not be driven.
-  const variants = await captureAimPhaseVariants();
-  for (const [variant, context] of [...variants.entries()].sort(([a], [b]) => a.localeCompare(b)))
-    for (const [language, tag] of LANGUAGES)
-      await recordContext(`aim-flow.${variant}.${tag}`, `AimManualFlow/planner-review phase task variant ${variant} through AiTaskService`, language, { ...context, outputLanguage: language });
-});
-
 test('collect snapshots: Visual Map expansion and synthesis tasks', async () => {
   const { VisualAgentMapView } = support.load('main.ts', { obsidian: support.obsidian });
   for (const [language, tag] of LANGUAGES) {
@@ -405,7 +299,7 @@ test('collect snapshots: Coffee Tables, Reframe, Markdown context', async () => 
   record('markdown-context.run-prompt', 'markdown-context/selection-ai.ts runPrompt via the panel (transform action, not localized)', 'none', sentByPanel[1]);
 });
 
-test('collect snapshots: Claude structured-output instruction (task, AIM phase, chart)', async () => {
+test('collect snapshots: Claude structured-output instruction (task, chart)', async () => {
   // Claude prompts add the StructuredOutput-first sentence; the Codex snapshots above stay byte-identical.
   const claude = 'claude:sonnet';
   for (const [language, tag] of LANGUAGES) {
@@ -414,8 +308,6 @@ test('collect snapshots: Claude structured-output instruction (task, AIM phase, 
     await recordContext(`claude.task-quick.${tag}`, 'AiTaskService instructions for Claude: Quick AI mode research (StructuredOutput-first sentence, no tools)', language, { ...ctx, researchMode: 'local', researchDepth: 'normal', visualMode: 'off', mapAiMode: 'quick' }, claude);
     await recordContext(`claude.task-decompose.${tag}`, 'AiTaskService instructions for Claude: mode decompose', language, { ...ctx, mode: 'decompose', researchDepth: 'deep' }, claude);
     await recordContext(`claude.task-synthesize.${tag}`, 'AiTaskService instructions for Claude: mode synthesize, local', language, { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off' }, claude);
-    const aim = { title: 'Goal G', summary: 'Summary S', rules: 'Rule R', detail: 'Reports D', ancestors: 'Known conditions C', workingFindings: 'Prior findings F', sourceContext: 'Source [S1]: fact', mode: 'task', promptProfile: 'aim', researchMode: 'research', researchDepth: 'normal', visualMode: 'off', task: '<!-- aim-phase: subtopic-research -->\nPhase task text.', outputLanguage: language };
-    await recordContext(`claude.aim-subtopic-research.${tag}`, 'buildAimPrompt for Claude (phase subtopic-research)', language, aim, claude);
   }
   const { chartStep } = loadModule('core/steps/chart/step.ts');
   for (const [language, tag] of LANGUAGES) {
@@ -498,26 +390,4 @@ test('collect snapshots: preset instruction strings composed directly from i18n'
   }
 });
 
-test('prompt snapshots match the checked-in files byte for byte', () => {
-  assert.ok(snapshots.size > 100, `unexpectedly few snapshots: ${snapshots.size}`);
-  const index = {
-    note: 'Generated by tests/prompt-snapshots.cjs. Do not edit by hand; rerun with UPDATE_PROMPT_SNAPSHOTS=1.',
-    snapshots: Object.fromEntries([...snapshots.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, value]) => [name, { builder: value.builder, language: value.language, schema: value.schema !== undefined }]))
-  };
-  const expected = new Map();
-  for (const [name, value] of snapshots) {
-    expected.set(`${name}.txt`, value.prompt);
-    if (value.schema !== undefined) expected.set(`${name}.schema.json`, `${JSON.stringify(value.schema, null, 2)}\n`);
-  }
-  expected.set('index.json', `${JSON.stringify(index, null, 2)}\n`);
-  if (update) {
-    fs.rmSync(directory, { recursive: true, force: true });
-    fs.mkdirSync(directory, { recursive: true });
-    for (const [file, content] of expected) fs.writeFileSync(path.join(directory, file), content);
-    return;
-  }
-  assert.ok(fs.existsSync(directory), 'snapshots missing; run once with UPDATE_PROMPT_SNAPSHOTS=1');
-  const onDisk = new Set(fs.readdirSync(directory));
-  assert.deepEqual([...onDisk].sort(), [...expected.keys()].sort(), 'snapshot file set differs (stale or missing snapshots)');
-  for (const [file, content] of expected) assert.equal(fs.readFileSync(path.join(directory, file), 'utf8'), content, `snapshot ${file} changed`);
-});
+compareTest('prompt snapshots match the checked-in files byte for byte');

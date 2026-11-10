@@ -67,7 +67,7 @@ if (depsDir) process.on('exit', () => {
 
 /** Same call shape as esbuild.buildSync; callers pass `entryPoints` and, when needed, `external`. */
 function buildSync(options) {
-  // AIM is hidden in production (experiences/aim/availability.ts); the suites build with it on unless a caller passes define: { __VAM_AIM__: 'false' } (tests/suites/aim-hidden.cjs).
+  // AIM is hidden in production (experiences/aim/availability.ts); the suites build with it on unless a caller passes define: { __VAM_AIM__: 'false' } (tests/suites/legacy-aim-map.cjs).
   const resolved = { bundle: true, write: false, platform: 'node', format: 'cjs', loader: { '.md': 'text' }, ...(depsDir ? { metafile: true } : {}), ...options, define: { __VAM_AIM__: 'true', ...options.define } };
   const key = `${process.cwd()}\0${JSON.stringify(resolved)}`;
   if (!cacheEnabled) { const built = esbuild.buildSync(resolved); if (depsDir) { bundleSources.delete(key); record(key, built, resolved); } return built; }

@@ -21,6 +21,25 @@ export const MAX_PREMISES = 3;
 export const MAX_TESTABLE = 2;
 export const MAX_PREMISE_DATA = 2;
 export const MAX_PREMISE_ATTEMPTS = 2;
+export const MAX_COMPARISONS = 2;
+export const MAX_REVERDICTS = 1;
+export const MAX_INFERENCE_CHECKS = 2;
+/**
+ * The most AI calls one map can make (spec 7, plan "成本"); the start window shows this constant. A correction retry of a step is not counted.
+ * framing + research (premise research included) + premise assessment and result + proposing hypotheses (first batch + one late alternative
+ * batch per testable claim) + per hypothesis per round (needs, assessment, verdict) + sending a hypothesis back once + comparisons +
+ * the conclusion + inference checks. 3 + 66 + 6 + 4 + 54 + 6 + 4 + 1 + 2 = 146.
+ */
+export const WORST_CASE_AI_CALLS =
+  MAX_FRAMING_CALLS +
+  MAX_RESEARCH_CALLS +
+  MAX_PREMISES * 2 +
+  MAX_TESTABLE * 2 +
+  MAX_HYPOTHESES * MAX_ROUND * 3 +
+  MAX_HYPOTHESES * MAX_REVERDICTS +
+  MAX_TESTABLE * MAX_COMPARISONS +
+  1 +
+  MAX_INFERENCE_CHECKS;
 
 export const ROLE_KEYS = ["proposition", "premises", "conclusion"] as const;
 export type RoleKey = (typeof ROLE_KEYS)[number];
@@ -76,6 +95,9 @@ export const COMPARISON_STATES = ["pending", "done", "vetoed", "undecidable"] as
 export type ComparisonState = (typeof COMPARISON_STATES)[number];
 export const VETO_KINDS = ["contradiction", "double_count", "missed_alternative", "unhandled_counter"] as const;
 export type VetoKind = (typeof VETO_KINDS)[number];
+/** What a main-cause comparison rests on (methodology 8): only a direct difference with its uncertainty can rank causes. */
+export const COMPARISON_BASES = ["difference_with_uncertainty", "point_estimates", "none"] as const;
+export type ComparisonBasis = (typeof COMPARISON_BASES)[number];
 /** Every answer a conclusion may give (methodology section 9); the machine checks the answer against the claim's type. */
 export const ANSWER_KEYS = [
   "holds",
@@ -183,6 +205,10 @@ export interface Comparison {
   allocations: Allocation[];
   answer?: AnswerKey;
   missedAlternativeAdded: boolean;
+  /** Main-cause claims only: the hypotheses the contribution comparison covered, the one found largest (if any) and what that rests on. */
+  contributors?: string[];
+  largest?: string;
+  basis?: ComparisonBasis;
 }
 export interface Claim {
   id: string;
@@ -271,6 +297,10 @@ export interface Hypothesis {
   verdict?: Verdict;
   /** A mark only: the user's reading, never an input to the comparison or the conclusion. */
   userVerdict?: VerdictValue;
+  /** How many times the comparison sent this hypothesis back for a new verdict (at most MAX_REVERDICTS). */
+  reverdicts?: number;
+  /** Added by the second (late alternative) batch after a comparison: shown as such, its needs are still pre-registered (decision 29). */
+  addedAfterComparison?: boolean;
 }
 export interface ArgumentRun {
   runId: string;
@@ -278,6 +308,8 @@ export interface ArgumentRun {
   status: RunStatus;
   stopReason?: StopReason;
   researchCalls: number;
+  /** Inference checks done so far (at most MAX_INFERENCE_CHECKS). */
+  inferenceChecks?: number;
 }
 export interface ConclusionAnswer {
   claimId: string;
@@ -372,6 +404,7 @@ function problem(raw: Rec, nodeIds: ReadonlySet<string>): string | null {
   const run = raw.run;
   if (!isRec(run)) return "run missing";
   if (!isStr(run.runId) || !count(run.researchCalls)) return "run malformed";
+  if (run.inferenceChecks !== undefined && !count(run.inferenceChecks)) return "run malformed";
   if (!oneOf(RUN_PHASES, run.phase) || !oneOf(RUN_STATUSES, run.status) || !optOneOf(STOP_REASONS, run.stopReason))
     return "unknown run enum";
   // claims
@@ -415,6 +448,9 @@ function problem(raw: Rec, nodeIds: ReadonlySet<string>): string | null {
         )
           return "comparison malformed";
         if (!oneOf(COMPARISON_STATES, comparison.state)) return "unknown comparison enum";
+        if (!optOneOf(COMPARISON_BASES, comparison.basis)) return "unknown comparison enum";
+        if (comparison.contributors !== undefined && !strList(comparison.contributors)) return "comparison malformed";
+        if (!optStr(comparison.largest)) return "comparison malformed";
         if (!recList(comparison.vetoes) || !recList(comparison.allocations)) return "comparison malformed";
         for (const veto of comparison.vetoes) {
           if (!oneOf(VETO_KINDS, veto.kind)) return "unknown veto kind";
@@ -440,6 +476,11 @@ function problem(raw: Rec, nodeIds: ReadonlySet<string>): string | null {
       return "hypothesis malformed";
     if (!oneOf(HYPOTHESIS_ROLES, hypothesis.role) || !optOneOf(VERDICT_VALUES, hypothesis.userVerdict))
       return "unknown hypothesis enum";
+    if (
+      (hypothesis.reverdicts !== undefined && !count(hypothesis.reverdicts)) ||
+      !optBool(hypothesis.addedAfterComparison)
+    )
+      return "hypothesis malformed";
     const identification = hypothesis.identification;
     if (
       identification !== undefined &&
@@ -495,6 +536,8 @@ function problem(raw: Rec, nodeIds: ReadonlySet<string>): string | null {
   for (const claim of claims as Rec[]) {
     const comparison = claim.comparison;
     if (!isRec(comparison)) continue;
+    for (const id of [...((comparison.contributors as string[] | undefined) ?? []), comparison.largest])
+      if (id !== undefined && !hypothesisIds.has(id as string)) return "comparison malformed";
     for (const allocation of comparison.allocations as Rec[])
       if (
         !isStr(allocation.needId) ||

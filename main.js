@@ -51251,6 +51251,23 @@ var MultiResearchModal = class extends import_obsidian28.Modal {
   }
 };
 
+// experiences/visual-map/chat-research-sources.ts
+function chatResearchReferenceGroups(input2) {
+  const documents = [];
+  const whole = /* @__PURE__ */ new Set();
+  for (const file of [...input2.files, ...input2.activeFile ? [input2.activeFile] : []]) {
+    if (whole.has(file.path)) continue;
+    whole.add(file.path);
+    documents.push({ path: file.path, content: file.content, key: file.path });
+  }
+  input2.snippets.forEach((snippet, index) => {
+    if (!snippet.text.trim()) return;
+    const key4 = whole.has(snippet.path) ? snippet.path : `chat-snippet:${index}`;
+    documents.push({ path: snippet.path || "Selected text", content: snippet.text, key: key4 });
+  });
+  return documents.length ? [{ id: "chat-references", name: "Chat references", location: "", documents }] : [];
+}
+
 // experiences/visual-map/structure-review-modal.ts
 var import_obsidian31 = require("obsidian");
 
@@ -60755,6 +60772,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     __publicField(this, "goalSuggestPanelEl", null);
     /** This map's saved data sources (`map-sources`), loaded with the map; the toolbar button and its panel draw from it. */
     __publicField(this, "mapSources", []);
+    /** The attachments of the latest chat turn, as reference documents for a research the chat starts. */
+    __publicField(this, "chatTurnReferences", []);
     __publicField(this, "mapSourcesPanelId", `vam-map-sources-panel-${++relevancePanelSeq}`);
     __publicField(this, "mapSourcesOpen", false);
     __publicField(this, "mapSourcesPickerOpen", false);
@@ -78150,7 +78169,7 @@ ${request.requirements}` : preset.text,
         await confirmEach(index + 1, run);
       });
       await confirmEach(0, async () => {
-        var _a2;
+        var _a2, _b2;
         if (this.plugin.expansionCoordinator.isRunning(key4)) {
           new import_obsidian40.Notice(t("ui.multi_research_already_running"));
           return;
@@ -78169,7 +78188,7 @@ ${request.requirements}` : preset.text,
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         const shared2 = {
-          referenceGroups: [],
+          referenceGroups: (_a2 = request.referenceGroups) != null ? _a2 : [],
           requirements: request.requirements,
           // The picked model is for this batch only (D4): it never becomes a topic's own model.
           ...request.model ? { runOnce: { model: request.model } } : {},
@@ -78186,7 +78205,7 @@ ${request.requirements}` : preset.text,
             ...shared2
           } : { ...aiModeOptions(noteAiMode(note.researchMode), "research"), ...shared2 };
         };
-        if (retryBatchKey && ((_a2 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _a2.status) !== "running")
+        if (retryBatchKey && ((_b2 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _b2.status) !== "running")
           this.plugin.expansionBatches.delete(retryBatchKey);
         let reported = false;
         let skipped2 = 0;
@@ -78240,7 +78259,7 @@ ${request.requirements}` : preset.text,
               return void 0;
             },
             () => {
-              var _a3, _b2;
+              var _a3, _b3;
               const state = this.plugin.expansionBatches.get(key4);
               if (state && state.status !== "running" && !reported) {
                 reported = true;
@@ -78262,7 +78281,7 @@ ${request.requirements}` : preset.text,
                   if (stopped && !topics.has(node.id))
                     topics.set(node.id, {
                       id: node.id,
-                      title: (_b2 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b2 : node.path,
+                      title: (_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : node.path,
                       status: "stopped"
                     });
                 tell({
@@ -80790,6 +80809,11 @@ ${note.detail.trim()}` : "",
     }
     const activePath = chat.currentNote();
     const activeSource = activePath ? await this.readChatFile(activePath) : null;
+    this.chatTurnReferences = chatResearchReferenceGroups({
+      files,
+      activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
+      snippets
+    });
     const mapTitles = await Promise.resolve().then(() => this.plugin.repo.topics()).then((topics) => topics.map((topic) => topic.title)).catch(() => []);
     const picture = this.chatSelectedImage(origin.imageId);
     let imageDataUrl;
@@ -83228,7 +83252,7 @@ ${note.detail.trim()}` : "",
   }
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
   async runChatSelection(action, message = "", batch = newChatImageBatch(), held, work, continuation = false) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
     const launch = (work2) => {
@@ -83276,6 +83300,8 @@ ${note.detail.trim()}` : "",
         const researchIds = [...this.selection.state.multiSelected];
         const conversation = this.chatConversation;
         const key4 = this.multiResearchKey();
+        const mapSourceGroups = await this.taskSourceSettings().mapSources((_b2 = work == null ? void 0 : work.controller.signal) != null ? _b2 : new AbortController().signal).catch(() => []);
+        const referenceGroups = [...mapSourceGroups, ...this.chatTurnReferences];
         this.chatStartedResearch = true;
         this.markResearchRecorded(this.chatLastRecord);
         const outcome = new Promise((resolve) => {
@@ -83294,7 +83320,8 @@ ${note.detail.trim()}` : "",
             this.startMultiResearch(
               {
                 ...chatResearchRequest(action, (_a3 = this.map) == null ? void 0 : _a3.aiMode, (mode) => aiModeOptions(mode, "research")),
-                ...retryModel ? { model: retryModel } : {}
+                ...retryModel ? { model: retryModel } : {},
+                ...referenceGroups.length ? { referenceGroups } : {}
               },
               void 0,
               (web) => {
@@ -83334,7 +83361,7 @@ ${note.detail.trim()}` : "",
           })
         );
         const expandChat = this.chat;
-        const expandTurns = (_b2 = expandChat == null ? void 0 : expandChat.transcript().length) != null ? _b2 : 0;
+        const expandTurns = (_c = expandChat == null ? void 0 : expandChat.transcript().length) != null ? _c : 0;
         const expandRecord = this.chatLastRecord;
         const cards = infos.map(({ parent, note }) => ({
           id: parent.id,

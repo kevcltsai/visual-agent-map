@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test, integrationTest, root, load, core, plain, DEFAULT_SETTINGS, fixture, withExpansionCoordinator, until, deferred, obsidian } = require('../support.cjs');
+const { test, integrationTest, root, load, core, plain, DEFAULT_SETTINGS, fixture, withExpansionCoordinator, until, deferred, obsidian, researchSeam } = require('../support.cjs');
 const dom = require('../support-dom.cjs');
 const { repoFiles } = require('../support-repo-scan.cjs');
 const { element, find, findAll, byLabel, tick } = dom;
@@ -8353,4 +8353,58 @@ test('chat layout: a cancelled plan card is unchanged (title, sentence, lists, s
   const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q'); f.panel.finish('plan', []); const plan = planOf(true); f.panel.showPlan(plan); f.panel.settlePlan(plan, 'cancelled');
   const card = find(f.panel.logEl, i => hasClass(i, 'vam-map-chat-plan')); assert.equal(find(card, i => hasClass(i, 'vam-map-chat-plan-title')).text, 'Cancelled plan');
   assert.equal(findAll(card, i => i.tag === 'details').length, 3); assert.match(visibleText(card), /Nothing was changed/); assert.equal(toggleOf(card), undefined);
+});
+
+// ---- Chat research carries the turn's references (the notes and snippets the user attached) to every topic ---------------------
+
+/** The real startMultiResearch with the module seam stubbed: every topic's run request is kept, each run left open until `finishAll`. */
+function researchRuns(h) {
+  const runs = [], done = [];
+  researchSeam(h.view).run = async (child, _done, _failed, options, accepted) => {
+    runs.push({ id: child.id, options }); h.plugin.running.add(child.path); accepted();
+    return { finished: new Promise(resolve => { done.push(() => { h.plugin.running.delete(child.path); resolve(); }); options.signal.addEventListener('abort', () => resolve(), { once: true }); }) };
+  };
+  return { runs, finishAll: () => done.forEach(fn => fn()) };
+}
+const sentDocs = run => run.options.referenceGroups.flatMap(group => group.documents);
+const researchTurn = async h => {
+  const sent = researchRuns(h);
+  h.control.reply = async () => ({ reply: 'Researching.', actions: [researchAct({ nodeIds: [h.ids.a, h.ids.b] })], rejected: [] });
+  h.type('research a and b'); await h.view.sendMapChat();
+  await until(() => sent.runs.length === 2);
+  return sent;
+};
+integrationTest('chat research: every topic run carries the attached file, snippet and current note', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.setActive('Notes/Other.md', h.contents.get('Notes/Other.md'));
+  chat.addFile('Notes/Research.md'); chat.addSnippet('a quoted line', 'Notes/Elsewhere.md', false);
+  const sent = await researchTurn(h);
+  assert.equal(sent.runs.length, 2);
+  for (const run of sent.runs) {
+    const docs = sentDocs(run);
+    assert.ok(docs.some(d => d.path === 'Notes/Research.md' && d.content.includes('Sleep needs darkness')), 'the attached file, whole');
+    assert.ok(docs.some(d => d.content.includes('Other note about naps')), 'the current note');
+    assert.ok(docs.some(d => d.content.includes('a quoted line')), 'the snippet text');
+  }
+  sent.finishAll();
+});
+integrationTest('chat research: no chips and no map sources send an empty reference list; a removed current-note chip is not sent', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const none = await researchTurn(h);
+  for (const run of none.runs) eq(run.options.referenceGroups, []); none.finishAll();
+  const g = await harness(); await g.view.hydrate(); const chat2 = g.open();
+  g.setActive('Notes/Other.md', g.contents.get('Notes/Other.md')); chat2.refreshNote(); noteRemove(chat2).click();
+  const removed = await researchTurn(g);
+  for (const run of removed.runs) eq(run.options.referenceGroups, [], 'the note the user took off is not in the request'); removed.finishAll();
+});
+integrationTest('chat research: an unreadable file is skipped, a snippet and its file chip are sent once, and the topics still run', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  chat.addFile('Notes/Gone.md'); chat.addFile('Notes/Research.md'); chat.addSnippet('darkness', 'Notes/Research.md', false);
+  const sent = await researchTurn(h);
+  for (const run of sent.runs) {
+    const docs = sentDocs(run);
+    eq(docs.filter(d => d.content.includes('Sleep needs darkness')).length, 1, 'file and snippet of the same note are one document');
+    assert.ok(!docs.some(d => d.path === 'Notes/Gone.md'));
+  }
+  sent.finishAll();
 });

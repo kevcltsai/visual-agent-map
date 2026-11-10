@@ -11130,11 +11130,17 @@ ${session.draftMarkdown}` : "",
 ${session.observerDraftMarkdown}` : ""
   ].filter(Boolean).join("\n\n");
 }
+var historyLengths = /* @__PURE__ */ new WeakMap();
+function rememberHistory(input2, text13) {
+  historyLengths.set(input2, text13.length);
+  return text13;
+}
 var observerOnlyStep = {
   id: "coffee.observer-only",
   version: 1,
-  render: ({ session }) => {
+  render: (input2) => {
     var _a2, _b2, _c, _d;
+    const { session } = input2;
     const key4 = coffeeInstruction(session.language);
     const style = ((_a2 = session.guests) == null ? void 0 : _a2.customization) ? cleanChatStyle(conversationStyle(session.language, session.guests)) : conversationStyle(session.language, session.guests);
     return renderTemplate(key4 === "zh" ? prompt_zh_default : prompt_en_default, {
@@ -11143,13 +11149,16 @@ var observerOnlyStep = {
 ${style}
 ` : "",
       references: formatReferenceContext((_c = (_b2 = session.guests) == null ? void 0 : _b2.referenceFiles) != null ? _c : []),
-      history: history(session),
+      // Built where it always was among the template values, so a failure surfaces in the same order.
+      history: rememberHistory(input2, history(session)),
       observerFormat: observerFormat(session.language, true, (_d = session.guests) == null ? void 0 : _d.customization)
     });
   },
-  policy: (prompt, { session }) => {
+  policy: (prompt, input2) => {
+    var _a2;
+    const { session } = input2;
     const language2 = session.language;
-    if (history(session).length > MAX_COFFEE_CONTEXT_CHARS)
+    if (((_a2 = historyLengths.get(input2)) != null ? _a2 : history(session).length) > MAX_COFFEE_CONTEXT_CHARS)
       throw new Error(coffeeText(language2, "coffee.table_too_long_to_summarize"));
     if (prompt.length > MAX_COFFEE_CONTEXT_CHARS)
       throw new Error(coffeeText(language2, "coffee.table_too_long_to_summarize_prompt"));
@@ -67289,8 +67298,7 @@ ${request.requirements}` : preset.text,
         reasoning,
         sourceContent: "",
         controller: new AbortController(),
-        state: "running",
-        progress: ""
+        state: "running"
       };
       this.mergeTasks.set(snapshot.path, task);
       this.mergeOpen = false;
@@ -67322,11 +67330,6 @@ ${request.requirements}` : preset.text,
         referenceGroups: [sourceGroup],
         // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
         referenceDelivery: "direct",
-        onProgress: (message) => {
-          if (!this.isLiveMergeTask(task)) return;
-          task.progress = message;
-          this.render();
-        },
         outputLanguage: language2,
         mode: "merge",
         usageMapPath: task.mapPath,
@@ -67388,7 +67391,6 @@ ${request.requirements}` : preset.text,
       progress.end();
       task.state = "applying";
       task.draft = result;
-      task.progress = "";
       this.render();
       const previous = this.history.undoEntry;
       await this.confirmMergeDraft(task, result.summary, result.detail);

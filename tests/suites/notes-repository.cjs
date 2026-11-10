@@ -1557,6 +1557,26 @@ integrationTest('AI merge: a second Merge press while the merge runs only report
   release(); await h.untilSettled(task);
   assert.equal(h.view.mergeTasks.size, 0);
 });
+integrationTest('AI merge: reference progress messages repaint nothing; the run still ends written, or with its failure shown', async () => {
+  for (const outcome of ['done', 'failed']) {
+    const h = await aiMergeHarness(); let renders = 0, during = -1;
+    h.view.render = () => { renders++; };
+    const answer = h.answer;
+    h.answer = async (signal, context) => {
+      const before = renders;
+      for (const message of ['Reading references 1/2', 'Reading references 2/2', '']) context.onProgress?.(message);
+      during = renders - before;
+      if (outcome === 'failed') throw new Error('model down');
+      return answer(signal, context);
+    };
+    const { task } = await h.begin(); const rendersAtStart = renders; await h.untilSettled(task);
+    assert.equal(during, 0, `${outcome}: progress messages trigger no whole-view render`);
+    assert.ok(renders > rendersAtStart, `${outcome}: the end of the run still repaints`);
+    assert.equal(h.view.mergeTasks.size, 0, `${outcome}: the task is cleared`);
+    if (outcome === 'done') { assert.ok(await h.mergedNode('AI merged')); assert.deepEqual(h.notices.filter(m => /Merged into/.test(m)), ['Merged into “AI merged”. You can undo.']); }
+    else { assert.deepEqual(h.failures, ['AI merge failed']); assert.ok(h.notices.some(m => /AI merge failed: model down/.test(m))); assert.equal(await h.mergedNode('AI merged'), undefined); }
+  }
+});
 integrationTest('AI merge: a failure while moving a source rolls everything back, shows the error and leaves no task to retry', async () => {
   const h = await aiMergeHarness(); const original = await h.shape(); const nodes = JSON.stringify((await h.repo.readMap(h.path)).nodes);
   const move = h.repo.moveUnique.bind(h.repo); let calls = 0;

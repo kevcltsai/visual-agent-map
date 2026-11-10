@@ -788,7 +788,6 @@ interface MergeTask {
   controller: AbortController;
   /** running: the model works (Stop works); applying: the result is being written; a task that ends is removed. */
   state: "running" | "applying";
-  progress: string;
   draft?: AiResult;
   /** The request in flight (tests await it). */
   run?: Promise<void>;
@@ -8526,8 +8525,7 @@ export class VisualAgentMapView extends ItemView {
         reasoning,
         sourceContent: "",
         controller: new AbortController(),
-        state: "running",
-        progress: ""
+        state: "running"
       };
       this.mergeTasks.set(snapshot.path, task);
       this.mergeOpen = false;
@@ -8559,11 +8557,6 @@ export class VisualAgentMapView extends ItemView {
         referenceGroups: [sourceGroup],
         // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
         referenceDelivery: "direct",
-        onProgress: message => {
-          if (!this.isLiveMergeTask(task)) return;
-          task.progress = message;
-          this.render();
-        },
         outputLanguage: language,
         mode: "merge",
         usageMapPath: task.mapPath,
@@ -8628,7 +8621,6 @@ export class VisualAgentMapView extends ItemView {
       progress.end();
       task.state = "applying";
       task.draft = result;
-      task.progress = "";
       this.render();
       const previous = this.history.undoEntry;
       await this.confirmMergeDraft(task, result.summary, result.detail);

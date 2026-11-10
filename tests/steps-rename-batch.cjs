@@ -201,6 +201,28 @@ test('a rename whose first map save fails still leaves Map.md and the view at th
   assert.equal(view.notes.size, 3);
 });
 
+test('a card whose source-path write fails during a folder rename: Map.md and the view still follow every move, and the error is surfaced', async () => {
+  const h = harness();
+  const mapPath = await h.map('Alpha', 3);
+  const view = await h.open(mapPath);
+  const [first, second] = view.map.nodes.map(node => node.path);
+  await h.repo.updateNote(first, { sourcePaths: [second] });
+  const folder = folderOf(mapPath), moved = `${folder} renamed`;
+  h.failWrites(file => file.path.endsWith('/Card 1.md'));
+  const errors = [];
+  const mutate = h.plugin.mutate.bind(h.plugin);
+  h.plugin.mutate = (work, options) => mutate(work, options).catch(error => { errors.push(error); });
+  await h.app.fileManager.renameFile(h.files.get(folder), moved);
+  await settle(h.plugin);
+  assert.ok(allUnder(await h.repo.readMap(`${moved}/Map.md`), moved), 'Map.md on disk follows every move');
+  assert.equal(view.path, `${moved}/Map.md`);
+  assert.ok(allUnder(view.map, moved), 'the open view follows every move');
+  assert.equal(h.counts.rebuilds, 1, 'derived data is still rebuilt');
+  assert.ok(h.counts.syncs >= 1, 'a failed batch still ends with a read-back of the views');
+  assert.equal(view.notes.size, 3, 'and every card is read from the new folder');
+  assert.ok(errors.some(error => /injected write failure/.test(String(error && error.message))), 'the write error is still surfaced');
+});
+
 test('an open Map.md renamed outside while the batch runs stays open at its new path', async () => {
   const h = harness();
   const a = await h.map('Alpha', 2), b = await h.map('Beta', 2);

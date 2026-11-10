@@ -1198,8 +1198,16 @@ export default class VisualAgentMapPlugin extends Plugin {
    */
   private async applyRenames(renames: readonly PendingRename[]): Promise<void> {
     const pairs = renames.map(rename => rename.pair);
+    let failed = false;
     try {
-      await this.repo.replaceSourcePaths(pairs);
+      // A note whose frontmatter cannot be written must not keep the maps from following the other moves: the rebase
+      // and the rebuild still run, and the first error is thrown at the end.
+      let sourceError: unknown;
+      try {
+        await this.repo.replaceSourcePaths(pairs);
+      } catch (replaceError) {
+        sourceError = replaceError;
+      }
       const { changed, error } = await this.rebaseMaps(pairs);
       // Derived references depend only on maps and VAM notes; renaming an unrelated note leaves them unchanged.
       const vamFile = renames.some(({ file }) => {
@@ -1209,8 +1217,14 @@ export default class VisualAgentMapPlugin extends Plugin {
         );
       });
       if (changed || vamFile) await this.rebuildDerivedData();
+      if (sourceError) throw sourceError;
       if (error) throw error;
+    } catch (batchError) {
+      failed = true;
+      throw batchError;
     } finally {
+      // A failed batch ends without the scoped read-back: queue an empty write so the views read back what is on disk.
+      if (failed) this.runMutation(async () => {});
       // The open maps follow every move even when a step above failed, so the next save of a view writes the new paths.
       // Only a move made outside VAM clears the undo steps: VAM's own renames keep them.
       const outside = renames.some(rename => rename.external);

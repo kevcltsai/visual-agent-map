@@ -411,6 +411,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
     // The real switch on a stand-in whose `views` lists the one view under test (the plugin's own `views` is the other windows) and whose vault holds no record file (the keep/delete question is tested with the modal).
     setMapChatRecords: on => realPlugin.prototype.setMapChatRecords.call({ settings, app: { vault: { getFiles: () => [] } }, mapChatRecordWriters: plugin.mapChatRecordWriters, saveSettings: plugin.saveSettings, views: () => [ctx.view] }, on),
     setCurrentModel: model => realPlugin.prototype.setCurrentModel.call(plugin, model),
+    rereadAllViews() {},
     subscribeCurrentModel: listener => realPlugin.prototype.subscribeCurrentModel.call(plugin, listener),
     availableModels: () => control.claudeReady ? ['gpt-6-luna', 'claude:sonnet', 'claude:haiku'] : ['gpt-6-luna'], modelLabel: id => `label(${id})`,
     subscribeModelDiscovery: listener => { control.listeners.push(listener); return () => { control.listeners.splice(control.listeners.indexOf(listener), 1); }; },

@@ -229,6 +229,7 @@ import { UsageControl } from "./usage-panel";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
 import { createNoteReadContext } from "../../core/note-read-context";
+import { needsReadBack, UnsyncedPaths } from "../../core/sync-scope";
 import { PLACEHOLDER_MAP_NAMES, isPlaceholderMapTitle, uniqueDefaultName } from "../../core/default-names";
 import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
@@ -1552,6 +1553,11 @@ export class VisualAgentMapView extends ItemView {
   private renderPending = false;
   private syncHold = 0;
   private syncPending = false;
+  private unsyncedPaths: UnsyncedPaths | null = null;
+  /** Files changed while VAM was writing that this view has not read back yet (the plugin fills it; see synchronize). */
+  get unsynced(): UnsyncedPaths {
+    return (this.unsyncedPaths ??= new UnsyncedPaths());
+  }
   private heldViews: VisualAgentMapView[] = [];
   /** The hint on an empty canvas, which follows the chat while it builds a map. */
   private emptyMapEl: HTMLElement | null = null;
@@ -3299,6 +3305,7 @@ export class VisualAgentMapView extends ItemView {
   async onClose(): Promise<void> {
     this.closeTopicLinkMenu();
     this.closed = true;
+    this.unsyncedPaths = null;
     this.closeTopicChatWindow();
     this.topicChatSessions.clear();
     if (this.plugin.repo.isDisposed()) this.topicChatRecords?.dispose();
@@ -13304,13 +13311,32 @@ export class VisualAgentMapView extends ItemView {
       label(redo, this.history.redoEntry?.label ? t("ui.redo_0", this.history.redoEntry.label) : t("ui.redo"));
     }
   }
-  async synchronize(): Promise<void> {
+  /**
+   * Reads the map back after a write. With `scope` (the end of a plugin write) only when a file this view collected since
+   * its last read-back is its Map.md or one of its notes; `scope.seq` is the plugin's event number when the read-back
+   * started. Without it, always.
+   */
+  async synchronize(scope?: { seq: number }): Promise<void> {
     // A batch of chat writes reads the map back once, when it is done.
     if (this.syncHold > 0) {
       this.syncPending = true;
       return;
     }
     if (!this.path || !this.map || this.closed) return;
+    const snapshot = this.unsynced.snapshot(),
+      seq = scope?.seq ?? 0;
+    if (
+      scope &&
+      !needsReadBack(
+        snapshot,
+        this.path,
+        this.map.nodes.map(node => node.path)
+      )
+    ) {
+      // Nothing of this map changed: what was collected is done with (a later change to Map.md reads every note anyway).
+      this.unsynced.settle(snapshot, [], seq);
+      return;
+    }
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof TFile)) {
       this.map = null;
       this.path = "";
@@ -13329,7 +13355,10 @@ export class VisualAgentMapView extends ItemView {
       this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
-    await this.hydrate(undefined, undefined, meta);
+    const read = await this.hydrate(undefined, undefined, meta);
+    // A note or ancestor whose read threw stays collected and is read again at the end of the next write. (Tests that
+    // replace hydrate return nothing: nothing failed.)
+    this.unsynced.settle(snapshot, (read as typeof read | undefined)?.failedPaths ?? [], seq);
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
       // The chat field is a text field too, but it is where the user waits for the map to change: only an IME
       // composition in it counts as editing (same rule as changed()).

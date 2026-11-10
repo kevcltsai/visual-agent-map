@@ -32812,7 +32812,11 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
     "<<needs>>",
     () => {
       var _a3;
-      return JSON.stringify(((_a3 = context.argumentEvidenceNeeds) != null ? _a3 : []).map(({ id, text: text10, context: scope }) => scope ? { id, text: text10, context: scope } : { id, text: text10 }));
+      return JSON.stringify(
+        ((_a3 = context.argumentEvidenceNeeds) != null ? _a3 : []).map(
+          ({ id, text: text10, context: scope }) => scope ? { id, text: text10, context: scope } : { id, text: text10 }
+        )
+      );
     }
   ) + (((_b2 = context.argumentEvidenceNeeds) != null ? _b2 : []).some((need) => need.context) ? "\n\n" + inLanguage(ARGUMENT_EVIDENCE_CONTEXT_RULE, language2) : "") : inLanguage(JSON_CONTRACT, language2);
   add(fixed(withProviderOutput(jsonContract, provider, language2), "json-contract"));

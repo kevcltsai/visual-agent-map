@@ -776,7 +776,8 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
       notes: async () => {
         if (stopped)
           await this.cardNote(map, next.roles.conclusion, {
-            summary:
+            summary: this.t("ui.argument_v2_concl_stopped_title"),
+            detail:
               next.run.stopReason === "data_missing"
                 ? this.t("ui.argument_stopped_missing")
                 : this.t("ui.argument_reason") + ": " + claim.text
@@ -887,8 +888,8 @@ export class ArgumentRunsV2 implements ArgumentRunV2Api {
       const summary = !done
         ? this.ports.t("ui.argument_in_progress")
         : next.conclusion.state === "concluded"
-          ? this.ports.t("ui.argument_conclusion_state_concluded")
-          : this.ports.t("ui.argument_conclusion_limit");
+          ? this.ports.t("ui.argument_v2_concl_concluded")
+          : this.ports.t("ui.argument_v2_concl_undecidable_title");
       const lines: string[] = [];
       for (const a of next.conclusion.answers) {
         const claim = next.claims.find(c => c.id === a.claimId);

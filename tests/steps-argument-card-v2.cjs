@@ -278,3 +278,31 @@ test('styles: every state a V2 card puts in data-argument-state that looks diffe
   }
   assert.doesNotMatch(css.slice(css.indexOf('Version 2 cards')), /!important/);
 });
+
+// ---- integration seams (V5-V7): hypothesis sent back, answer names in three languages --------------------------------------------
+test('hypothesis card: a hypothesis sent back for a new verdict says so; one never sent back does not', () => {
+  const state = fresh();
+  assert.ok(!chipTexts(view(state, 'h1')).includes(t('ui.argument_v2_reverdict')));
+  state.hypotheses[0].reverdicts = 1;
+  assert.ok(chipTexts(view(state, 'h1')).includes(t('ui.argument_v2_reverdict')));
+});
+
+test('every answer key has a display name in en, zh-TW and zh-CN, and the comparison card uses it', () => {
+  const { ANSWER_KEYS } = S.load('core/argument-map/model.ts');
+  assert.equal(ANSWER_KEYS.length, 15);
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
+    const names = new Set();
+    for (const key of ANSWER_KEYS) {
+      const text = translate(lang, `ui.argument_v2_answer_${key}`);
+      assert.ok(text && text !== `ui.argument_v2_answer_${key}`, `${lang} ${key}`);
+      names.add(text);
+    }
+    assert.equal(names.size, 15, `${lang}: names distinct`);
+  }
+  for (const key of ANSWER_KEYS) {
+    const state = fresh();
+    const claim = state.claims[1];
+    claim.comparison.state = 'done'; claim.comparison.answer = key;
+    assert.equal(view(state, 'cmp').title, t(`ui.argument_v2_answer_${key}`));
+  }
+});

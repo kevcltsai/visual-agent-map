@@ -125,6 +125,7 @@ test('every premise fails: the run stops on the premise, finished, the conclusio
   assert.equal(s.claims.find(c => c.role === 'testable').status, 'not_evaluated');
   assert.equal(r.stat.steps.includes('hypotheses'), false);
   assert.ok(r.log().includes('stopped runId'));
+  assert.equal((await r.text(s.roles.conclusion)).summary, r.ports.t('ui.argument_v2_concl_stopped_title'), 'premise failure has its own conclusion summary');
   assert.deepEqual(plain(await r.runs.resume(r.mapPath)), { ok: false, refusal: 'finished' });
 });
 

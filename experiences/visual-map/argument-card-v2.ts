@@ -245,6 +245,7 @@ function hypothesisCard(h: Hypothesis, t: Translate): ArgumentCardViewV2 {
   }
   if (h.userVerdict) chips.push({ tone: "open", text: t("ui.argument_v2_user_mark_0", t(VERDICT_KEY[h.userVerdict])) });
   if (h.addedAfterComparison) chips.push({ tone: "gap", text: t("ui.argument_v2_late") });
+  if ((h.reverdicts ?? verdict?.reverdicts ?? 0) > 0) chips.push({ tone: "maybe", text: t("ui.argument_v2_reverdict") });
   if (verdict && CAUSE_ROLES.includes(h.role)) {
     const assumptions = verdict.assumptionStatus.map(entry => entry.assumption).join(t("ui.list_separator"));
     lines.push(

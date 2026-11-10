@@ -20,7 +20,7 @@ test('happy path: verdict, comparison, conclusion and inference check each run o
   const testable = s.claims.find(c => c.role === 'testable');
   assert.equal(testable.comparison.state, 'done');
   const card = await r.text(s.roles.conclusion);
-  assert.equal(card.summary, r.ports.t('ui.argument_conclusion_state_concluded'));
+  assert.equal(card.summary, r.ports.t('ui.argument_v2_concl_concluded'));
   assert.ok(card.detail.includes(`${testable.text}: ${testable.text} cannot be settled`), 'sentence under the claim text');
   const log = r.log();
   for (const part of ['verdict runId=', 'compare runId=', 'conclusion runId=', 'inference runId=', 'vetoes=-']) assert.ok(log.includes(part), part);
@@ -54,7 +54,7 @@ test('comparison vetoes twice: the second veto ends undecidable (no third compar
   assert.equal(testable.comparison.state, 'undecidable');
   assert.equal(testable.comparison.answer, 'insufficient');
   assert.equal(await finished(r), 'finished/concluded/undecidable');
-  assert.equal((await r.text(s.roles.conclusion)).summary, r.ports.t('ui.argument_conclusion_limit'));
+  assert.equal((await r.text(s.roles.conclusion)).summary, r.ports.t('ui.argument_v2_concl_undecidable_title'));
 });
 
 test('a missed alternative is asked once: new hypothesis cards under the claim with their own ids; a second request for one is undecidable', async () => {

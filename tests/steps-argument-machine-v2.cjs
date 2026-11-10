@@ -98,9 +98,17 @@ test('claim gates: only a fact can be a premise, a cause cannot, limits, depende
   ];
   bad.forEach((claims, i) => assert.throws(() => make({}, claims), error => error instanceof m.GateError, `bad claims #${i} must be refused`));
 });
-test('a map with no premise starts in analysis', () => {
-  const s = valid(make({}, claimDrafts().filter(c => c.id === 'T2').map(c => ({ ...c, dependsOn: [] }))));
+test('counterexample 零前提: a map with no premise is refused (a refute prediction needs a premise, so it could never conclude)', () => {
+  const noPremise = claimDrafts().filter(c => c.id === 'T2').map(c => ({ ...c, dependsOn: [] }));
+  assert.throws(() => make({}, noPremise), error => error instanceof m.GateError && /at least 1 premise/.test(error.message));
+});
+test('a map with one premise settles into analysis, takes hypotheses whose refute prediction leans on it, and can conclude', () => {
+  const one = [claimDrafts()[1], { ...claimDrafts()[3], dependsOn: ['P2'] }];
+  const s = valid(settlePremise(make({}, one), 'P2'));
   assert.equal(s.run.phase, 'analysis');
+  const set = [1, 2].map(i => hyp(`H${i}`, 'facet', { predictions: [pred(`H${i}-s`, 'support', { required: true }), pred(`H${i}-r`, 'refute', { auxiliary: ['P2'] })] }));
+  const next = m.applyHypotheses(s, 'T2', set);
+  assert.equal(next.hypotheses.length, 2, 'the hypotheses are accepted with the one premise as the auxiliary');
 });
 test('locked: there is no reducer that edits the framing, the breakdown or a definition, and a whole run leaves them as locked', () => {
   eq(Object.keys(m).filter(k => /framing|restate|decompos|definition|rewrite|relax|remove|delete|edit|loosen/i.test(k)), []);

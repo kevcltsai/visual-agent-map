@@ -292,6 +292,8 @@ export function newArgumentMap(framing: Framing, input: NewMapInput): ArgumentMa
   const premises = drafts.filter(c => c.role === "premise");
   const testable = drafts.filter(c => c.role === "testable");
   if (premises.length + testable.length !== drafts.length) throw new GateError("unknown claim role");
+  if (premises.length < 1)
+    throw new GateError("a map needs at least 1 premise (a fact claim the testable claims rely on): a hypothesis's refute prediction needs one");
   if (premises.length > MAX_PREMISES) throw new GateError("too many premises");
   if (testable.length < 1 || testable.length > MAX_TESTABLE) throw new GateError("a map needs 1 or 2 testable claims");
   const ids = new Set<string>();

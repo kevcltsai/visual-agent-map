@@ -114,12 +114,16 @@ test('an unusable argumentMap key (v:3) is kept as it is and not paused', async 
 });
 
 test('wiring: the plugin owns an ArgumentRuns test entry, and dispose refuses further starts', async () => {
-  const entry = new Plugin({}, { id: 'vam', version: '0.0.0' }).argumentRuns;
+  const plugin = new Plugin({}, { id: 'vam', version: '0.0.0' });
+  const entry = plugin.argumentRuns;
   assert.ok(entry, 'plugin.argumentRuns exists');
   for (const method of ['start', 'stop', 'resume', 'isRunning', 'dispose']) assert.equal(typeof entry[method], 'function');
   assert.equal(entry.isRunning('Nothing.md'), false);
+  await assert.rejects(entry.start('Nothing.md', 'claim'), error => error.code === 'unusable', 'the v1 start is refused (B3)');
   entry.dispose();
-  await assert.rejects(entry.start('Nothing.md', 'claim'), error => error.code === 'disposed');
+  const outcome = await plugin.argumentRunsV2.start('Nothing.md', {}).catch(error => ({ ok: false, refusal: error.code }));
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.refusal, 'disposed');
 });
 
 test('counterexample: opening a legacy map never starts, resumes or writes (start, resume, stop, provider all 0)', async () => {

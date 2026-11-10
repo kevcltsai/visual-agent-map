@@ -126,6 +126,11 @@ test('framing: the prompt states the premise-only dependsOn rule and the no-outs
   }
 });
 
+test('framing counterexample: a breakdown with no premise is refused by the dry run, and the prompt asks for at least one premise in every language', () => {
+  const v = framingOk(); v.claims = [{ ...v.claims[1], dependsOn: [] }];
+  bad(fr, framingReq(), v, /premise/i);
+  for (const language of ['zh-TW', 'zh-CN', 'en']) assert.match(fr.render(framingReq({ language })), /List at least one premise/);
+});
 test('framing: missing, extra and non-object replies throw, nested objects too', () => {
   exactKeys(fr, framingReq(), framingOk());
   for (const key of ['id', 'text', 'type', 'role', 'dependsOn', 'definitions', 'dataNeeds']) { const v = framingOk(); delete v.claims[0][key]; bad(fr, framingReq(), v, /unexpected fields/); }

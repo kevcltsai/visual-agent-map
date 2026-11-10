@@ -264,3 +264,17 @@ test('legacy (V1) map in the view: managed nodes still count as argument cards (
   const legacyShape = VisualAgentMapView.prototype.argumentCardView.call({ map: legacy }, 'c');
   assert.match(legacyShape.label, /Old method \(V1\)/);
 });
+
+test('styles: every state a V2 card puts in data-argument-state that looks different has a rule, and nothing uses !important', () => {
+  const css = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '../styles.css'), 'utf8');
+  const state = fresh();
+  Object.assign(state.run, { phase: 'concluded' });
+  const seen = new Set();
+  for (const s of ['done', 'vetoed', 'undecidable']) { state.claims[1].comparison.state = s; seen.add(`comparison|${view(state, 'cmp').state}`); }
+  for (const [phase, c] of [['concluded', 'concluded'], ['concluded', 'undecidable'], ['stopped_premise', 'pending'], ['analysis', 'pending']]) { state.run.phase = phase; state.conclusion.state = c; seen.add(`conclusion|${view(state, 'c').state}`); }
+  for (const key of seen) {
+    const [role, value] = key.split('|');
+    assert.match(css, new RegExp(`data-argument-role="${role}"\\]\\[data-argument-state="${value}"\\]`), key);
+  }
+  assert.doesNotMatch(css.slice(css.indexOf('Version 2 cards')), /!important/);
+});

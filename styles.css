@@ -2132,11 +2132,28 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 /* Group cards (verified, eliminated hypotheses) sit quietly under the conclusion. */
 .vam-node[data-argument-role="group"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--background-primary-alt); border-color: var(--background-modifier-border-hover); }
 /* The conclusion: waiting has a strong frame, concluded is the one dark card, the two stopped states are plain. */
-.vam-node[data-argument-role="conclusion"][data-argument-state="in_progress"][data-status]:not([data-aim-kind]) { border: 2px solid var(--interactive-accent); }
+.vam-node[data-argument-role="conclusion"][data-argument-state="in_progress"][data-status]:not([data-aim-kind]), .vam-node[data-argument-role="conclusion"][data-argument-state="pending"][data-status]:not([data-aim-kind]) { border: 2px solid var(--interactive-accent); }
 .vam-node[data-argument-role="conclusion"][data-argument-state="concluded"][data-status]:not([data-aim-kind]) { --vam-card-bg: var(--interactive-accent); border-color: var(--interactive-accent); }
 .vam-node[data-argument-role="conclusion"][data-argument-state="concluded"] :is(.vam-card-title, .vam-argument-kind, .vam-argument-line) { color: var(--text-on-accent); }
 /* A missing need or datum is a dashed placeholder; an eliminated hypothesis is dashed too. */
 .vam-node[data-argument-missing="true"][data-status]:not([data-aim-kind]) { border: 1.5px dashed var(--background-modifier-border-hover); }
 .vam-node[data-argument-role="need"], .vam-node[data-argument-role="datum"] { border-radius: 6px; }
+/* Version 2 cards (methodology 6). The comparison card has a 2px frame in every state: accent while it works, solid accent when done (the inverted one is the concluded conclusion), red when vetoed, dashed red when it cannot decide. */
+.vam-node[data-argument-role="comparison"][data-status]:not([data-aim-kind]) { border: 2px solid var(--background-modifier-border-hover); }
+.vam-node[data-argument-role="comparison"][data-argument-state="done"][data-status]:not([data-aim-kind]) { border-color: var(--interactive-accent); }
+.vam-node[data-argument-role="comparison"][data-argument-state="vetoed"][data-status]:not([data-aim-kind]) { border-color: var(--color-red); }
+.vam-node[data-argument-role="comparison"][data-argument-state="undecidable"][data-status]:not([data-aim-kind]) { border: 2px dashed var(--color-red); }
+/* The premises group and the premises under it are quiet; a premise that did not hold or a claim that was not evaluated is dashed (data-argument-missing). */
+.vam-node[data-argument-role="claim"][data-argument-state="fails"][data-status]:not([data-aim-kind]) { border-color: var(--color-red); }
+.vam-node[data-argument-role="claim"][data-argument-state="not_evaluated"] :is(.vam-card-title, .vam-argument-line) { color: var(--text-muted); }
+/* The conclusion that cannot answer, and the one stopped by a premise, stay plain but are marked at the edge. */
+.vam-node[data-argument-role="conclusion"][data-argument-state="undecidable"][data-status]:not([data-aim-kind]), .vam-node[data-argument-role="conclusion"][data-argument-state="stopped_premise"][data-status]:not([data-aim-kind]) { border-color: var(--color-red); }
+/* Chips wrap rather than overflow; model text breaks anywhere so a long word cannot widen the card. */
+.vam-node[data-argument-role] :is(.vam-card-title, .vam-argument-kind) { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .vam-node[data-argument-role] .vam-argument-line { font-size: var(--font-ui-smaller); }
+  .vam-argument-chip { line-height: 18px; }
+  .vam-argument-bar { padding: 6px 8px; gap: 4px 8px; }
+}
 /* The arrowhead of a tree edge: on the parent's right edge, pointing at the parent. */
 .vam-argument-tip { fill: var(--text-muted); stroke: none; }

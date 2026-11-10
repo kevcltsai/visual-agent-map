@@ -89,8 +89,8 @@ const Y_STEP = 160;
 
 export type ArgumentRunRefusal = "busy" | "unusable" | "exists" | "missing" | "finished" | "not_paused" | "disposed";
 export class ArgumentRunError extends Error {
-  constructor(readonly code: ArgumentRunRefusal) {
-    super(`argument run refused: ${code}`);
+  constructor(readonly code: ArgumentRunRefusal, detail?: string) {
+    super(`argument run refused: ${code}${detail ? ` (${detail})` : ""}`);
     this.name = "ArgumentRunError";
   }
 }

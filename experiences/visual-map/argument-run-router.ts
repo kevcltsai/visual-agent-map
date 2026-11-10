@@ -1,6 +1,6 @@
 /**
- * The one `plugin.argumentRuns` the map view talks to: it sends a call to the v1 runner (legacy maps, and `start(path, claim)`, which is the
- * v1 start window's call) or to the v2 runner (usable v2 maps), by what `readArgumentMap` says about the map. The v2 runner reports a
+ * The one `plugin.argumentRuns` the map view talks to: it sends a call to the v2 runner (usable v2 maps); legacy maps and the v1 `start` are refused (`unusable`),
+ * `stop` reaches both runners (it never writes), by what `readArgumentMap` says about the map. The v2 runner reports a
  * refusal as a result and throws `ArgumentRunV2Error`; here both become the v1 `ArgumentRunError` the view already handles
  * (`legacy` and anything v1 has no word for become `unusable`).
  */
@@ -38,15 +38,15 @@ export class ArgumentRunRouter {
     return this.v1.isRunning(path) || this.v2.isRunning(path);
   }
 
-  /** The v1 start window's call; a v2 map is started through `ArgumentRunsV2.start` with a locked framing instead. */
-  start(path: string, claim: string): Promise<void> {
-    return this.v1.start(path, claim);
+  /** Refused: a new map is started through `ArgumentRunsV2.start` with a locked framing; the v1 start would write a v1 map. */
+  start(_path: string, _claim: string): Promise<void> {
+    return Promise.reject(new ArgumentRunError("unusable", "use argumentRunsV2.start with a locked framing"));
   }
 
   async resume(path: string): Promise<void> {
     if (this.v1.isRunning(path) || this.v2.isRunning(path)) throw new ArgumentRunError("busy");
     const kind = readArgumentMap(await this.readMap(path)).kind;
-    if (kind !== "usable") return this.v1.resume(path); // legacy and the rest: v1 gives the refusal it always did
+    if (kind !== "usable") throw new ArgumentRunError("unusable"); // legacy maps are read-only: nothing writes to them
     try {
       const outcome = await this.v2.resume(path);
       if (!outcome.ok) throw toV1Refusal(outcome.refusal);

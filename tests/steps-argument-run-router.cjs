@@ -30,17 +30,17 @@ test('router: a usable v2 map goes to the v2 runner, a legacy map to v1, start i
   assert.equal((await r.state()).run.status, 'finished', 'v2 resumed through the router');
   assert.deepEqual(v1.calls, [], 'v1 untouched');
   assert.equal(await code(() => router.resume(r.mapPath)), 'finished', 'a v2 refusal is a v1 ArgumentRunError');
-  await router.start('p', 'a claim');
+  assert.equal(await code(() => router.start('p', 'a claim')), 'unusable', 'the v1 start is refused');
   await router.stop('p');
-  assert.deepEqual(plain(v1.calls), [['start', 'p', 'a claim'], ['stop', 'p']]);
+  assert.deepEqual(plain(v1.calls), [['stop', 'p']], 'v1 start never reached; stop reaches v1');
   assert.equal(await router.recover(r.mapPath), false);
   assert.equal(router.isRunning(r.mapPath), false);
   const legacy = await rig();
   await legacyMap(legacy);
   const v1b = fakeV1();
   const routerB = new routerModule.ArgumentRunRouter(v1b, legacy.runs, path => legacy.ports.readMap(path));
-  await routerB.resume(legacy.mapPath);
-  assert.deepEqual(plain(v1b.calls), [['resume', legacy.mapPath]]);
+  assert.equal(await code(() => routerB.resume(legacy.mapPath)), 'unusable', 'a legacy map is refused at the router');
+  assert.deepEqual(plain(v1b.calls), [], 'v1 not asked to resume a legacy map');
   assert.equal(legacy.stat.steps.length + legacy.stat.ask.length, 0, 'the v2 runner was not asked for a legacy map');
   routerB.dispose();
   assert.ok(v1b.calls.some(c => c[0] === 'dispose'));
@@ -58,4 +58,21 @@ test('router: v2 refusals become v1 error codes; legacy and the codes v1 does no
   r.runs.dispose();
   assert.equal(await code(() => router.resume(r.mapPath)), 'disposed');
   assert.ok(v2Module.ArgumentRunV2Error);
+});
+
+test('router (real v1 runner): a paused legacy map is refused, its key is byte-identical, no step runs; start is refused; stop stops both', async () => {
+  const r = await rig();
+  await legacyMap(r);
+  const doc0 = await r.repo.readMap(r.mapPath); doc0.argumentMap.run.stopReason = 'user'; await r.repo.saveMap(r.mapPath, doc0);
+  const before = JSON.stringify((await r.repo.readMap(r.mapPath)).argumentMap);
+  const v1 = new v1Module.ArgumentRuns(r.ports);
+  const router = new routerModule.ArgumentRunRouter(v1, r.runs, path => r.ports.readMap(path));
+  assert.equal(await code(() => router.resume(r.mapPath)), 'unusable');
+  assert.equal(await code(() => router.start(r.mapPath, 'claim')), 'unusable');
+  await new Promise(res => setTimeout(res, 100));
+  assert.equal(JSON.stringify((await r.repo.readMap(r.mapPath)).argumentMap), before, 'key unchanged');
+  assert.equal(r.stat.steps.length + r.stat.ask.length, 0, 'no step ran');
+  await router.stop(r.mapPath);
+  assert.equal(JSON.stringify((await r.repo.readMap(r.mapPath)).argumentMap), before, 'stop writes nothing');
+  v1.dispose();
 });

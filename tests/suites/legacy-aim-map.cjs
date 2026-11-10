@@ -124,7 +124,6 @@ integrationTest('legacy-aim-map: opening and saving an old AIM map writes no AIM
   assert.equal(contents.get(mapPath), text, 'reading writes nothing');
   await repo.saveMap(mapPath, await repo.readMap(mapPath));
   assert.equal(aimBlockOf(contents.get(mapPath)).contentLanguage, undefined, 'the language is not stamped');
-  assert.equal(hiddenRepository.hasActiveAimAttempt({ aim: { runs: [{ attempts: [{ status: 'running' }] }] } }), false);
 });
 
 integrationTest('legacy-aim-map: D8 a copied or duplicated topic carries no AIM field', async () => {
@@ -182,6 +181,19 @@ integrationTest('legacy-aim-map: an old AIM map with a run left running can be r
   assert.ok(aimBlockOf(contents.get(mapPath)).runs.some(run => run.attempts.some(attempt => attempt.status === 'running')), 'the fixture has a running attempt');
   const renamed = await repo.renameTopic(mapPath, 'Renamed run');
   assert.ok((await repo.readMap(renamed)).aim.runs.length > 0);
+});
+
+integrationTest('legacy-aim-map: Organize workspace folders sees no busy AIM work in a map with a run left running, and leaves the map where it is', async () => {
+  const { repo, contents, mapPath } = await legacyVault('running-attempt', { folder: 'Agent Workspace/Topics' });
+  assert.ok(mapPath.startsWith('Agent Workspace/Topics/'), 'the map sits in the legacy Topics folder');
+  assert.ok(aimBlockOf(contents.get(mapPath)).runs.some(run => run.attempts.some(attempt => attempt.status === 'running')), 'the fixture has a running attempt');
+  const before = contents.get(mapPath);
+  const plan = await repo.planOrganizeWorkspaceFolders();
+  assert.deepEqual(plain(plan.busy), [], 'no run counts as active');
+  assert.deepEqual(plain(plan.skipped), [], 'the map is read without error');
+  assert.deepEqual(plain(plan.moves), [], 'an AIM map in the legacy Topics folder stays there while AIM is hidden');
+  assert.deepEqual([...(await repo.organizeWorkspaceFolders(plan)).entries()], [], 'organizing does not refuse and moves nothing');
+  assert.equal(contents.get(mapPath), before, 'the map file is untouched');
 });
 
 integrationTest('legacy-aim-map: the aimFolder setting is a managed map container: maps in it are listed, renamed, organized in place', async () => {
@@ -299,7 +311,6 @@ test('legacy-aim-map: E1 an old AIM map is edited like any map (no edit lock)', 
   const view = viewOf(doc);
   for (const name of ['relationsEnabled', 'canEditSummary']) assert.equal(view[name](), true, `${name} is open`);
   assert.equal(view.clipboardReadOnly(), false, 'the map can be pasted into');
-  assert.equal(view.hasActiveAimWork('Agent Workspace/AIM/Old/Map.md'), false);
   assert.notEqual(view.shareSnapshot(), 'aim', 'the map can be shared');
 });
 

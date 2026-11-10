@@ -563,3 +563,25 @@ test('releaseNeedResearch refuses a non-searching need, an eliminated hypothesis
   const situation = m.beginSituationResearch(m.applySituationData(m.newArgumentMap(roles, 'r'), [{ id: 'd1', need: 'x' }]), 'd1');
   refuses(situation, () => m.releaseNeedResearch(situation, 'h1', 'n1'));
 });
+
+test('situation research budget exhausted with data still pending ends at the limit (stop_limit); not_found still goes to data_missing', () => {
+  let s = m.applySituationData(m.newArgumentMap(roles, 'r'), [{ id: 'd1', need: 'x' }, { id: 'd2', need: 'y' }]);
+  s = m.beginSituationResearch(s, 'd2');
+  s = m.applySituationEvidence(s, 'd2', found());
+  while (s.run.researchCalls < 66) {
+    s = m.beginSituationResearch(s, 'd1');
+    s = m.releaseSituationResearch(s, 'd1');
+  }
+  assert.equal(s.situation.data[0].state, 'pending');
+  assert.deepEqual(types(s), ['stop_limit']);
+  const stopped = m.applyLimitStop(s);
+  assert.equal(stopped.run.phase, 'stopped_limit');
+  assert.equal(stopped.run.status, 'finished');
+  assert.equal(stopped.run.stopReason, 'limit');
+  assert.ok(stopped.conclusion.missing.length > 0);
+  assert.deepEqual(actions(stopped), []);
+  // below the budget a pending datum still gets research, and not_found still ends as data_missing
+  const fresh = m.applySituationData(m.newArgumentMap(roles, 'r2'), [{ id: 'd1', need: 'x' }]);
+  assert.deepEqual(types(fresh), ['research_situation']);
+  refuses(fresh, () => m.applyLimitStop(fresh));
+});

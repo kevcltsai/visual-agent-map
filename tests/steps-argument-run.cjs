@@ -610,7 +610,7 @@ test('after release a resume that answers not_found ends as data_missing and the
 
 test('stale: a rejection arriving after the user Stop writes nothing and the pause reason stays user', async () => {
   const gate = defer();
-  const r = await rig({ script: { step: steps(), ask: async ctx => { if (ctx.task === 'unemployment rate') await gate.promise; return okAnswer(ctx); } } });
+  const r = await rig({ script: { step: steps(), ask: async ctx => { if (ctx.task === 'unemployment rate') { await gate.promise; throw new Error('timeout'); } return okAnswer(ctx); } } });
   const started = r.runs.start(r.mapPath, 'p');
   while (r.stat.ask.length < 2) await tick();
   await r.runs.stop(r.mapPath);
@@ -652,6 +652,54 @@ test('dispose: a provider failure after dispose writes nothing', async () => {
   await started;
   for (let i = 0; i < 20; i++) await tick();
   assert.equal(r.contents.get(r.mapPath), snapshot);
+});
+
+test('persistent timeout with repeated resumes ends at the research limit (stopped_limit), never idle in running; a further resume is refused as finished', async () => {
+  const r = await rig({ script: { step: steps(), ask: ctx => { if (ctx.task === 'unemployment rate') throw new Error('timeout'); return okAnswer(ctx); } } });
+  await r.runs.start(r.mapPath, 'p');
+  for (let i = 0; i < 60; i++) {
+    if ((await r.state()).run.status !== 'paused') break;
+    await r.runs.resume(r.mapPath);
+  }
+  const state = await r.state();
+  assert.equal(state.run.phase, 'stopped_limit');
+  assert.equal(state.run.status, 'finished');
+  assert.equal(state.run.stopReason, 'limit');
+  assert.ok(state.run.researchCalls <= 66);
+  assert.equal(state.run.researchCalls, r.stat.ask.length);
+  assert.equal(r.stat.steps.includes('judge_gate'), false);
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+  await assert.rejects(() => r.runs.resume(r.mapPath), e => e instanceof ArgumentRunError && e.code === 'finished');
+});
+
+test('failure counter resets after an answer: reject, not_found, reject, found concludes with no pause', async () => {
+  const counts = {};
+  const r = await rig({ script: { step: steps(), ask: async ctx => {
+    if (ctx.task !== 'unemployment rate') return okAnswer(ctx);
+    counts.n = (counts.n ?? 0) + 1;
+    if (counts.n === 1 || counts.n === 3) throw new Error('timeout');
+    return counts.n === 2 ? notFound(ctx) : okAnswer(ctx);
+  } } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(state.run.phase, 'concluded');
+  assert.equal(state.run.stopReason, undefined);
+  assert.equal(state.run.researchCalls, r.stat.ask.length);
+  assert.equal(r.stat.logs.some(l => l.includes('paused stopReason')), false);
+});
+
+test('failures are counted per item, not summed: every situation datum rejects once then answers found, no pause', async () => {
+  const seen = new Set();
+  const r = await rig({ script: { step: steps(), ask: ctx => {
+    if (ctx.task.startsWith('need')) return okAnswer(ctx);
+    if (!seen.has(ctx.task)) { seen.add(ctx.task); throw new Error('timeout'); }
+    return okAnswer(ctx);
+  } } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(state.run.phase, 'concluded');
+  assert.equal(state.run.stopReason, undefined);
+  assert.equal(state.run.researchCalls, r.stat.ask.length);
 });
 
 test('worst-case AI call count shown before a run is 109', () => {

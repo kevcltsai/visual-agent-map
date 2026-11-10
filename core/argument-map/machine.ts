@@ -161,7 +161,18 @@ export function newArgumentMap(roles: ArgumentRoles, runId: string): ArgumentMap
 }
 
 // ---- next actions --------------------------------------------------------------------------------------------------------------
+/** Situation phase: the research budget is spent while data are still pending (nothing in flight), so nothing can run again. */
+function situationLimit(state: ArgumentMapData): boolean {
+  const { data } = state.situation;
+  return (
+    state.run.researchCalls >= MAX_RESEARCH_CALLS &&
+    data.some(d => d.state === "pending") &&
+    !data.some(d => d.state === "searching")
+  );
+}
+
 function limitStop(state: ArgumentMapData, actions: ArgumentAction[]): boolean {
+  if (state.run.phase === "situation") return state.situation.gate.state === "pending" && situationLimit(state);
   if (state.run.phase !== "analysis" || verifiedHypotheses(state).length >= MIN_VERIFIED) return false;
   if (state.hypotheses.length >= MAX_HYPOTHESES && verifyingCount(state) < MIN_VERIFIED) return true;
   return actions.length === 0 && !hasSearching(state);
@@ -204,7 +215,9 @@ function situationActions(state: ArgumentMapData): ArgumentAction[] {
       actions.push({ type: "research_situation", dataId: datum.id });
       budget -= 1;
     }
-  if (actions.length || data.some(d => d.state === "pending" || d.state === "searching")) return actions;
+  if (actions.length) return actions;
+  if (situationLimit(state)) return [{ type: "stop_limit" }];
+  if (data.some(d => d.state === "pending" || d.state === "searching")) return actions;
   return [{ type: data.some(d => d.state === "not_found") ? "gate_missing" : "judge_gate" }];
 }
 
@@ -541,7 +554,10 @@ export function applyLimitStop(state: ArgumentMapData): ArgumentMapData {
   if (state.run.status !== "running" || !limitStop(state, analysisActionsSafe(state)))
     throw new GateError("the run is not at a limit");
   const next = clone(state);
-  const missing = [`verified ${verifiedHypotheses(state).length}/${MIN_VERIFIED}`];
+  const missing =
+    state.run.phase === "situation"
+      ? state.situation.data.map(d => `${d.id}: ${d.state}`)
+      : [`verified ${verifiedHypotheses(state).length}/${MIN_VERIFIED}`];
   for (const h of next.hypotheses)
     missing.push(
       `${h.id}: ${h.location === "eliminated" ? "eliminated" : isVerified(h) ? "verified" : "not verified"}`

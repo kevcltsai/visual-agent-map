@@ -47296,9 +47296,11 @@ function checkAnswer(state, claim2, key4, extra) {
       break;
     case "compare_greater":
     case "compare_opposite":
-      if (value(primary) !== "supported") throw new GateError("a direction needs the supported measurement of A");
+    case "compare_equivalent":
+      if (value(primary) !== "supported")
+        throw new GateError(`${key4} needs the supported measurement of A (without it the answer is undetermined)`);
       if (hypotheses.some((h) => h.role === "measurement" && value(h) !== "refuted"))
-        throw new GateError("a direction needs the measurement explanation refuted");
+        throw new GateError(`${key4} needs the measurement explanation refuted`);
       break;
     default:
       break;

@@ -1390,9 +1390,12 @@ function checkAnswer(state: ArgumentMapData, claim: Claim, key: unknown, extra: 
       break;
     case "compare_greater":
     case "compare_opposite":
-      if (value(primary) !== "supported") throw new GateError("a direction needs the supported measurement of A");
+    case "compare_equivalent":
+      // equivalence is also a claim that needs evidence (methodology 9): "no proof of a difference" is compare_undetermined, not "equal"
+      if (value(primary) !== "supported")
+        throw new GateError(`${key} needs the supported measurement of A (without it the answer is undetermined)`);
       if (hypotheses.some(h => h.role === "measurement" && value(h) !== "refuted"))
-        throw new GateError("a direction needs the measurement explanation refuted");
+        throw new GateError(`${key} needs the measurement explanation refuted`);
       break;
     default:
       break;

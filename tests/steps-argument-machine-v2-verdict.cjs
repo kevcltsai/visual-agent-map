@@ -766,3 +766,29 @@ test('reducers are pure: a successful V2b call leaves its input untouched and re
     if (out && out.v === 2) assert.notEqual(out, state);
   }
 });
+
+// ---- compare_equivalent needs a supported primary (review R2 M1; methodology 9: equivalence needs evidence) ----------------------
+function comparisonJudged(primaryDraft, measurementOpen = false) {
+  const cmp = claimDrafts().map(c => (c.id === 'T1' ? { ...c, type: 'comparison' } : c));
+  let s = m.applyHypotheses(m.applyHypotheses(analysis(cmp), 'T1', [facet('A'), facet('B'), facet('M')].map((h, i) => ({ ...h, role: ['primary', 'alternative', 'measurement'][i] }))), 'T2', [facet('F1'), facet('F2')]);
+  s = judged(s, 'A', primaryDraft === 'refuted' ? { stance: 'refutes' } : {}, primaryDraft === 'supported' ? factSupported('A') : primaryDraft === 'refuted' ? refutedDraft('A') : undecidedDraft());
+  s = judged(s, 'B', { stance: 'refutes' }, refutedDraft('B'));
+  s = judged(s, 'M', measurementOpen ? {} : { stance: 'refutes' }, measurementOpen ? undecidedDraft() : refutedDraft('M'));
+  s = judged(s, 'F1', {}, factSupported('F1'));
+  return judged(s, 'F2', {}, factSupported('F2'));
+}
+test('compare_equivalent: refused unless the primary is supported; a refuted, undecided or insufficient primary cannot be answered as equal', () => {
+  for (const kind of ['refuted', 'undecided']) {
+    const s = comparisonJudged(kind);
+    refuses(s, () => m.applyComparison(s, 'T1', done('compare_equivalent')));
+    refuses(s, () => m.applyComparison(s, 'T1', done('compare_greater')));
+  }
+  const ok = comparisonJudged('supported');
+  assert.equal(cOf(m.applyComparison(ok, 'T1', done('compare_equivalent')), 'T1').comparison.answer, 'compare_equivalent');
+  assert.equal(cOf(m.applyComparison(ok, 'T1', done('compare_greater')), 'T1').comparison.answer, 'compare_greater', 'the existing direction answer is unchanged');
+});
+test('compare_equivalent: the measurement explanation must be refuted too (as strict as a direction); undetermined stays free', () => {
+  const s = comparisonJudged('supported', true);
+  refuses(s, () => m.applyComparison(s, 'T1', done('compare_equivalent')));
+  assert.equal(cOf(m.applyComparison(s, 'T1', done('compare_undetermined')), 'T1').comparison.answer, 'compare_undetermined');
+});

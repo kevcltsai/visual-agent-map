@@ -25624,6 +25624,30 @@ var CANDIDATE_KINDS = ["interpretation", "related"];
 var PREDICTION_KINDS = ["support", "refute", "identification"];
 var OVERLAP_STRENGTHS = ["same", "weaker"];
 var EVIDENCE_STANCES = ["supports", "refutes", "irrelevant"];
+var VERDICT_VALUES = ["supported", "refuted", "undecided", "insufficient"];
+var REFUTATION_CLASSES = ["decisive", "conditional", "nondecisive"];
+var CAUSAL_STATES = ["not_applicable", "established", "conditional", "compatible"];
+var ASSUMPTION_STATES = ["checked", "unchecked", "defended"];
+var CONFIDENCES = ["high", "medium", "low"];
+var VETO_KINDS = ["contradiction", "double_count", "missed_alternative", "unhandled_counter"];
+var COMPARISON_BASES = ["difference_with_uncertainty", "point_estimates", "none"];
+var ANSWER_KEYS = [
+  "holds",
+  "fails",
+  "causal_established",
+  "causal_conditional",
+  "causal_compatible",
+  "causal_against",
+  "main_cause_largest",
+  "main_cause_secondary",
+  "main_cause_not",
+  "main_cause_undecidable",
+  "compare_greater",
+  "compare_equivalent",
+  "compare_opposite",
+  "compare_undetermined",
+  "insufficient"
+];
 var isRec2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isStr2 = (value) => typeof value === "string" && value !== "";
 function managedNodeIds(map) {
@@ -46304,6 +46328,31 @@ var ASSESSMENT_SCHEMA = S.obj({
   )
 });
 
+// core/steps/argument-map/v2-comparison.ts
+var DECISIONS = ["complete", "rejudge", "add_alternative", "undecidable"];
+var AI_VETOES = VETO_KINDS.filter((k) => k !== "unhandled_counter");
+var orNull = {
+  str: { type: ["string", "null"] },
+  strings: { type: ["array", "null"], items: { type: "string", minLength: 1 } },
+  enum: (values) => ({ type: ["string", "null"], enum: [...values, null] })
+};
+var COMPARISON_SCHEMA = S.obj({
+  decision: S.enum(DECISIONS),
+  vetoes: S.arr(S.obj({ kind: S.enum(AI_VETOES), detail: S.str })),
+  allocations: S.arr(S.obj({ needId: S.str, hypothesisId: S.str })),
+  rejudge: S.arr(S.str),
+  answer: orNull.enum(ANSWER_KEYS),
+  contributors: orNull.strings,
+  largest: orNull.str,
+  basis: orNull.enum(COMPARISON_BASES)
+});
+
+// core/steps/argument-map/v2-conclusion.ts
+var CONCLUSION_V2_SCHEMA = S.obj({
+  answers: S.arr(S.obj({ claimId: S.str, answer: S.enum(ANSWER_KEYS), sentence: S.str, assumptions: S.arr(S.str) }), 1),
+  overall: S.free
+});
+
 // core/steps/argument-map/v2-framing.ts
 var MAX_LIST = 8;
 var MAX_CANDIDATES = 3;
@@ -46371,6 +46420,12 @@ var HYPOTHESES_V2_SCHEMA = S.obj({
   )
 });
 
+// core/steps/argument-map/v2-inference-check.ts
+var STATUSES = ["ok", "rewrite", "delete"];
+var INFERENCE_CHECK_SCHEMA = S.obj({
+  items: S.arr(S.obj({ id: S.str, status: S.enum(STATUSES), rewrite: S.free }), 1)
+});
+
 // core/steps/argument-map/v2-needs.ts
 var NEEDS_V2_SCHEMA = S.obj({
   needs: S.arr(
@@ -46390,6 +46445,19 @@ var PREMISE_VERDICT_SCHEMA = S.obj({
   result: S.enum(PREMISE_RESULTS),
   reason: S.str,
   citedData: S.arr(S.str)
+});
+
+// core/steps/argument-map/v2-verdict.ts
+var AI_VALUES = VERDICT_VALUES.filter((v) => v !== "insufficient");
+var VERDICT_V2_SCHEMA = S.obj({
+  value: S.enum(AI_VALUES),
+  reason: S.str,
+  citedNeeds: S.arr(S.str),
+  counterNotes: S.arr(S.str),
+  refutations: S.arr(S.obj({ needId: S.str, class: S.enum(REFUTATION_CLASSES), auxiliary: S.arr(S.str) })),
+  causal: S.enum(CAUSAL_STATES),
+  assumptionStatus: S.arr(S.obj({ assumption: S.str, status: S.enum(ASSUMPTION_STATES), defense: S.free })),
+  confidence: S.enum(CONFIDENCES)
 });
 
 // core/steps/argument-map/runner.ts
@@ -48452,7 +48520,7 @@ var TOPIC_CHAT_RECORD_VERSION = 1;
 var TOPIC_CHAT_SUBPATH = "Chats/topics";
 var KINDS2 = ["research", "expand", "synthesize", "ask"];
 var MODES = ["quick", "standard"];
-var STATUSES = ["done", "failed", "stopped"];
+var STATUSES2 = ["done", "failed", "stopped"];
 var NODE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 var isSafeTopicNodeId = (id) => typeof id === "string" && NODE_ID_PATTERN.test(id);
 function topicChatDir(root, configDir) {
@@ -48477,7 +48545,7 @@ function validLine(value) {
     return value;
   }
   if (value.type === "result") {
-    if (!isText2(value.status) || !STATUSES.includes(value.status) || !isText2(value.text)) return null;
+    if (!isText2(value.status) || !STATUSES2.includes(value.status) || !isText2(value.text)) return null;
     return value;
   }
   if (value.type === "steer") {

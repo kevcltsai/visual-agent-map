@@ -245,7 +245,7 @@ test('conclusion: a number or URL outside the input throws; below 3 verified hyp
 
 // ---- schemas and registry ----
 test('every step has a strict schema and the registry maps the machine actions', () => {
-  for (const step of [mod.planSituationStep, mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.conclusionStep]) {
+  for (const step of [mod.planSituationStep, mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep]) {
     assert.equal(step.schema.additionalProperties, false);
     assert.deepEqual([...step.schema.required].sort(), Object.keys(step.schema.properties).sort());
   }
@@ -293,7 +293,8 @@ const fjOk = () => ({
     { id: 'fa', verdict: 'supports', reason: 'a1 fits', summary: 'The rate level fits.', citedData: ['a1'], retryNeeds: [] },
     { id: 'fb', verdict: 'insufficient', reason: 'only unclear data', summary: 'Direction is not shown.', citedData: [], retryNeeds: ['Year on year change in the youth rate'] },
     { id: 'fc', verdict: 'insufficient', reason: 'no data', summary: 'Nothing found.', citedData: [], retryNeeds: [] }
-  ]
+  ],
+  assumptionInsights: []
 });
 const fjWith = fn => { const v = fjOk(); fn(v); return v; };
 const fjFacet = (v, id) => v.facets.find(f => f.id === id);
@@ -357,7 +358,7 @@ test('facet judge: retryNeeds only on insufficient, only in round 1, at most 3 p
   bad(mod.facetJudgeStep, fjReq({ round: 2 }), fjOk(), /retry/);
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').retryNeeds = ['one', 'two', 'three', 'four'].map(x => `Need ${x}`); }), /retry/);
   const wide = fjReq({ facets: ['p', 'q', 'r', 's'].map(id => ({ id, title: `Title ${id}`, data: [] })) });
-  const wideOk = n => ({ data: [], facets: ['p', 'q', 'r', 's'].map(id => ({ id, verdict: 'insufficient', reason: 'none', summary: 'none', citedData: [], retryNeeds: ['alpha', 'bravo', 'charlie'].slice(0, n).map(w => `${w} ${id}`) })) });
+  const wideOk = n => ({ data: [], facets: ['p', 'q', 'r', 's'].map(id => ({ id, verdict: 'insufficient', reason: 'none', summary: 'none', citedData: [], retryNeeds: ['alpha', 'bravo', 'charlie'].slice(0, n).map(w => `${w} ${id}`) })), assumptionInsights: [] });
   assert.ok(ok(mod.facetJudgeStep, wide, wideOk(2)), '8 in all is fine');
   bad(mod.facetJudgeStep, wide, wideOk(3), /retry/);
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').retryNeeds = ['Rate for 2019']; }), /number 2019/);
@@ -486,13 +487,15 @@ const fpOk = () => ({
     { title: 'Direction of change', needs: [fneed('Year on year change in the youth rate')] },
     { title: 'Who is counted', needs: [fneed('Definition of unemployed used by the agency'), fneed('Why the labour force survey changed', 'cause')] }
   ],
-  causalQuestions: ['Did automation drive the rise?']
+  causalQuestions: ['Did automation drive the rise?'],
+  question: 'Did youth unemployment rise in 2024?'
 });
 const fpWith = fn => { const v = fpOk(); fn(v); return v; };
 
 test('facet plan: a well formed reply parses; ids are not in the output; cause needs move to causalQuestions and build no data', () => {
   const out = plain(ok(mod.facetPlanStep, fpReq, fpOk()));
-  assert.deepEqual(Object.keys(out).sort(), ['assumptions', 'causalQuestions', 'facets']);
+  assert.deepEqual(Object.keys(out).sort(), ['assumptions', 'causalQuestions', 'facets', 'question']);
+  assert.equal(out.question, 'Did youth unemployment rise in 2024?');
   assert.equal(out.facets.length, 3);
   assert.deepEqual(out.facets[2].needs, [{ need: 'Definition of unemployed used by the agency' }]);
   assert.deepEqual(out.causalQuestions, ['Why the labour force survey changed', 'Did automation drive the rise?'], 'cause needs first, then the explicit questions');
@@ -549,3 +552,76 @@ test('facet plan: the prompt shows only the proposition; the secret field of a r
   assert.equal(sr.prepareStep(mod.facetPlanStep, fpReq).prompt.length > 100, true);
 });
 
+
+
+// ---- V1 boost P4b: question, preset assumptions, assumption insights, verdict insights ----
+test('facet plan: the question is required, non blank, a plain string and grounded in the proposition', () => {
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { delete v.question; }), /unexpected fields/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.question = '   '; }), /non-empty/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.question = 5; }), /non-empty/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.question = 'Did the rate rise in 2019?'; }), /number 2019/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.question = 'See https://x.example.com'; }), /link/);
+  assert.equal(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.question = '  Did the rate rise?  '; })).question, 'Did the rate rise?');
+  assert.ok(mod.FACET_PLAN_SCHEMA.required.includes('question'));
+});
+const preset = [{ label: 'Age band', value: 'ages 25 to 34, 2018 to 2019', reason: 'edited by the owner' }];
+test('facet plan: preset assumptions replace the AI assumption card; without them the AI card stays; the prompt shows them only when given', () => {
+  const withPreset = { ...fpReq, presetAssumptions: preset };
+  assert.deepEqual(plain(ok(mod.facetPlanStep, withPreset, fpOk()).assumptions), { items: preset });
+  assert.deepEqual(plain(ok(mod.facetPlanStep, withPreset, fpWith(v => { v.assumptions = { items: [] }; })).assumptions), { items: preset });
+  assert.equal(ok(mod.facetPlanStep, fpReq, fpOk()).assumptions.items[0].label, 'Age band');
+  assert.notEqual(ok(mod.facetPlanStep, fpReq, fpOk()).assumptions.items[0].value, preset[0].value);
+  assert.match(mod.facetPlanStep.render(withPreset), /ages 25 to 34, 2018 to 2019/);
+  assert.doesNotMatch(mod.facetPlanStep.render(fpReq), /ages 25 to 34/);
+  assert.doesNotMatch(mod.facetPlanStep.render({ ...fpReq, presetAssumptions: [] }), /fixed by the owner/);
+  assert.equal(mod.facetPlanStep.render({ ...fpReq, presetAssumptions: [] }), mod.facetPlanStep.render(fpReq));
+  // The preset is a program value: a malformed one is refused before any call.
+  for (const presetAssumptions of [[{ label: '', value: 'v', reason: 'r' }], [{ label: 'l', value: 'v' }], 'x', [{ label: 'l', value: 'v', reason: 'r', extra: 1 }]])
+    assert.throws(() => sr.prepareStep(mod.facetPlanStep, { ...fpReq, presetAssumptions }), error => error.name === 'ArgumentStepError');
+});
+
+const withAssumptions = { assumptions: [{ label: 'Age band', value: 'ages 16 to 24 in 2023 to 2024', reason: 'young people' }] };
+test('facet judge: assumptionInsights are 0 to 3 texts, empty when the request has no assumption card, grounded', () => {
+  // no assumption card: must be empty
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.assumptionInsights = ['The age band matters']; }), /assumption/);
+  assert.deepEqual(plain(ok(mod.facetJudgeStep, fjReq(), fjOk()).assumptionInsights), []);
+  // with a card: 0 to 3
+  const req = fjReq(withAssumptions);
+  assert.deepEqual(plain(ok(mod.facetJudgeStep, req, fjWith(v => { v.assumptionInsights = ['The age band narrows the data', 'The period fits']; })).assumptionInsights), ['The age band narrows the data', 'The period fits']);
+  assert.deepEqual(plain(ok(mod.facetJudgeStep, req, fjOk()).assumptionInsights), []);
+  bad(mod.facetJudgeStep, req, fjWith(v => { v.assumptionInsights = ['a', 'b', 'c', 'd']; }), /assumption/);
+  bad(mod.facetJudgeStep, req, fjWith(v => { v.assumptionInsights = ['  ']; }), /non-empty/);
+  bad(mod.facetJudgeStep, req, fjWith(v => { v.assumptionInsights = [5]; }), /non-empty/);
+  bad(mod.facetJudgeStep, req, fjWith(v => { v.assumptionInsights = ['Rate was 77 percent']; }), /number 77/);
+  bad(mod.facetJudgeStep, req, fjWith(v => { delete v.assumptionInsights; }), /unexpected fields/);
+  assert.ok(mod.FACET_JUDGE_SCHEMA.required.includes('assumptionInsights'));
+  assert.match(mod.facetJudgeStep.render(req), /ages 16 to 24 in 2023 to 2024/);
+  assert.doesNotMatch(mod.facetJudgeStep.render(fjReq()), /Age band/);
+});
+
+const fvReq = (input, over = {}) => ({ ...vReq(input), ...over });
+const fvGood = { verdict: 'supported', citedNeeds: ['n1'], reason: 'Matches the 9.2 percent', insights: [{ kind: 'consistent', text: 'The data agree on 9.2 percent' }] };
+const fvInput = { hypothesisId: 'h1', round: 1, evidence: [{ id: 'n1', claim: 'Rate was 9.2 percent', quote: 'rate 9.2 percent', url: 'https://stats.example.org/a', stance: 'supports' }] };
+test('facet verdict: insights are 1 to 3 of consistent, tension or missing; the old verdict step keeps its V1 schema, parser and prompt', () => {
+  const req = fvReq(fvInput);
+  assert.equal(ok(mod.facetVerdictStep, req, fvGood).insights.length, 1);
+  const three = ['consistent', 'tension', 'missing'].map(kind => ({ kind, text: `${kind} point about 9.2 percent` }));
+  assert.equal(ok(mod.facetVerdictStep, req, { ...fvGood, insights: three }).insights.length, 3);
+  bad(mod.facetVerdictStep, req, { ...fvGood, insights: [] }, /insights/);
+  bad(mod.facetVerdictStep, req, { ...fvGood, insights: [...three, three[0]] }, /insights/);
+  bad(mod.facetVerdictStep, req, { ...fvGood, insights: undefined }, /unexpected fields/);
+  bad(mod.facetVerdictStep, req, { ...fvGood, insights: 'x' }, /insights/);
+  bad(mod.facetVerdictStep, req, { ...fvGood, insights: [{ kind: 'other', text: 'x' }] }, /kind/);
+  bad(mod.facetVerdictStep, req, { ...fvGood, insights: [{ kind: 'missing', text: ' ' }] }, /non-empty/);
+  bad(mod.facetVerdictStep, req, { ...fvGood, insights: [{ kind: 'missing', text: 'It was 12 percent' }] }, /number 12/);
+  bad(mod.facetVerdictStep, req, { ...fvGood, insights: [{ kind: 'missing', text: 'x', extra: 1 }] }, /unexpected fields/);
+  bad(mod.facetVerdictStep, req, { ...fvGood, citedNeeds: ['n9'] }, /outside/);
+  assert.ok(mod.FACET_VERDICT_SCHEMA.required.includes('insights'));
+  // the V1 step is untouched: no insights in its schema, and an insights reply is refused by it
+  assert.equal('insights' in mod.verdictStep.schema.properties, false);
+  const { insights, ...old } = fvGood;
+  assert.ok(ok(mod.verdictStep, req, old));
+  bad(mod.verdictStep, req, fvGood, /unexpected fields/);
+  assert.notEqual(mod.facetVerdictStep.render(req), mod.verdictStep.render(req));
+  assert.throws(() => sr.prepareStep(mod.facetVerdictStep, fvReq({ hypothesisId: 'h1', round: 1, evidence: [] })), error => error.name === 'ArgumentStepError');
+});

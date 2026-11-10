@@ -13,15 +13,20 @@ import {
   type ArgumentStepBase
 } from "./shared";
 import template from "./facet-plan.md";
+import presetText from "./facet-plan-preset.md";
 
 export interface FacetPlanRequest extends ArgumentStepBase {
   proposition: string;
+  /** Rerun from an edited assumption card: these replace whatever the AI proposes (and are shown to it so the facets fit them). */
+  presetAssumptions?: { label: string; value: string; reason: string }[];
 }
 /** Fact needs only: the program assigns every id, and a "cause" need has already moved into `causalQuestions`. */
 export interface FacetPlanResult {
   assumptions: { items: { label: string; value: string; reason: string }[] };
   facets: { title: string; needs: { need: string }[] }[];
   causalQuestions: string[];
+  /** The proposition restated as the question the situation card is titled with. */
+  question: string;
 }
 
 export const NEED_KINDS = ["fact", "cause"] as const;
@@ -71,14 +76,17 @@ export const FACET_PLAN_SCHEMA = {
       },
       minItems: MIN_FACETS
     },
-    causalQuestions: { type: "array", items: { type: "string", minLength: 1 } }
+    causalQuestions: { type: "array", items: { type: "string", minLength: 1 } },
+    question: { type: "string", minLength: 1 }
   },
-  required: ["assumptions", "facets", "causalQuestions"]
+  required: ["assumptions", "facets", "causalQuestions", "question"]
 };
 
 export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPlanResult {
-  const item = parseObject(raw, ["assumptions", "facets", "causalQuestions"]);
+  const item = parseObject(raw, ["assumptions", "facets", "causalQuestions", "question"]);
   const sources = [request.proposition];
+  const question = text(item.question, "question");
+  grounded([question], sources);
   const assumptionList = parseObject(JSON.stringify(item.assumptions), ["items"]);
   const items = list(assumptionList.items, "assumptions.items").map(entry => {
     const one = parseObject(JSON.stringify(entry), ["label", "value", "reason"]);
@@ -130,7 +138,31 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
   });
   if (total > MAX_SITUATION_NEEDS) throw new ArgumentStepError(`expected at most ${MAX_SITUATION_NEEDS} fact needs`);
   for (const question of list(item.causalQuestions, "causalQuestions")) addCausal(text(question, "causal question"));
-  return { assumptions: { items }, facets, causalQuestions: causal };
+  return {
+    assumptions: { items: request.presetAssumptions?.length ? request.presetAssumptions.map(a => ({ ...a })) : items },
+    facets,
+    causalQuestions: causal,
+    question
+  };
+}
+
+const PRESET_KEYS = ["label", "value", "reason"];
+/** A preset is a program value read from the owner's note: three non-blank strings per item, nothing else. */
+function checkPreset(preset: FacetPlanRequest["presetAssumptions"]): void {
+  if (preset === undefined) return;
+  if (
+    !Array.isArray(preset) ||
+    preset.some(
+      a =>
+        !a ||
+        typeof a !== "object" ||
+        Object.keys(a).length !== PRESET_KEYS.length ||
+        PRESET_KEYS.some(
+          key => typeof (a as Record<string, unknown>)[key] !== "string" || !(a as Record<string, string>)[key].trim()
+        )
+    )
+  )
+    throw new ArgumentStepError("the preset assumptions are not usable");
 }
 
 /** Plan the facets, their fact needs, the assumption card items and the causal questions of one proposition. Text-only; ids are made by the program. */
@@ -140,9 +172,15 @@ export const facetPlanStep: StepDefinition<FacetPlanRequest, FacetPlanResult> = 
   render: request =>
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.proposition),
-      proposition: JSON.stringify(request.proposition)
+      proposition: JSON.stringify(request.proposition),
+      preset: request.presetAssumptions?.length
+        ? `\n\n${presetText.trim()}\n${JSON.stringify(request.presetAssumptions)}`
+        : ""
     }),
   schema: FACET_PLAN_SCHEMA,
-  policy: prompt => overBudget(prompt, FACET_PLAN_SCHEMA),
+  policy: (prompt, request) => {
+    checkPreset(request.presetAssumptions);
+    overBudget(prompt, FACET_PLAN_SCHEMA);
+  },
   parse: parseFacetPlan
 };

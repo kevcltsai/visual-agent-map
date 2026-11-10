@@ -63,12 +63,27 @@ export type Location = (typeof LOCATIONS)[number];
 export const CONCLUSION_STATES = ["pending", "concluded", "stopped"] as const;
 export type ConclusionState = (typeof CONCLUSION_STATES)[number];
 
+/** What the page reports as a number, as text: the chart turns it into a number later. */
+export interface SourceFigure {
+  number: string;
+  period: string;
+  unit: string;
+}
+/** What was searched for one item: queries the program recorded, pages it opened, and why the result was not used. At most 5 queries and 5 pages, each at most 200 characters. */
+export interface SearchLog {
+  queries: string[];
+  opened: string[];
+  why: string;
+}
+export const SEARCH_LOG_MAX_ITEMS = 5;
+export const SEARCH_LOG_MAX_TEXT = 200;
 export interface SourceProof {
   url: string;
   quote: string;
   claim: string;
   check: ProofCheck;
   checkedAt: string;
+  figure?: SourceFigure;
 }
 export interface SituationDatum {
   id: string;
@@ -82,6 +97,7 @@ export interface SituationDatum {
   facetId?: string;
   propStance?: PropStance;
   stanceReason?: string;
+  searchLog?: SearchLog;
 }
 export interface SituationGate {
   state: GateState;
@@ -115,6 +131,7 @@ export interface Need {
   reason?: string;
   /** On a need added in a later round: the id of a `not_found` need of the same hypothesis it stands in for. The dead need itself is never rewritten. */
   replaces?: string;
+  searchLog?: SearchLog;
 }
 export interface Hypothesis {
   id: string;
@@ -153,6 +170,8 @@ export interface ArgumentMapData {
     /** Present only on a facet-judged map; a map without it runs the V1 path unchanged. */
     facets?: Facet[];
     causalQuestions?: string[];
+    /** Facet-judged maps: the question the situation card is titled with. */
+    question?: string;
   };
   hypotheses: Hypothesis[];
   conclusion: ArgumentConclusion;
@@ -172,6 +191,12 @@ const count = (value: unknown): value is number => typeof value === "number" && 
 const strList = (value: unknown): value is string[] => Array.isArray(value) && value.every(isStr);
 const optStr = (value: unknown): boolean => value === undefined || typeof value === "string";
 
+function badFigure(value: unknown): boolean {
+  if (value === undefined) return false;
+  if (!isRec(value) || Object.keys(value).length !== 3) return true;
+  return !isStr(value.number) || !isStr(value.period) || !isStr(value.unit);
+}
+
 function badProof(value: unknown): boolean {
   if (value === undefined) return false;
   return (
@@ -180,14 +205,26 @@ function badProof(value: unknown): boolean {
     !isStr(value.quote) ||
     !isStr(value.claim) ||
     !oneOf(PROOF_CHECKS, value.check) ||
-    !isStr(value.checkedAt)
+    !isStr(value.checkedAt) ||
+    badFigure(value.figure)
   );
+}
+
+function badSearchLog(value: unknown): boolean {
+  if (value === undefined) return false;
+  if (!isRec(value) || typeof value.why !== "string" || value.why.length > SEARCH_LOG_MAX_TEXT) return true;
+  const bad = (list: unknown): boolean =>
+    !Array.isArray(list) ||
+    list.length > SEARCH_LOG_MAX_ITEMS ||
+    list.some(entry => typeof entry !== "string" || entry.length > SEARCH_LOG_MAX_TEXT);
+  return bad(value.queries) || bad(value.opened);
 }
 
 /** Facets, assumptions and causal questions (all optional, all or nothing for the facets); their ids join `ids`. */
 function readFacets(situation: Rec, ids: Set<string>): string | null {
   const { facets, assumptions, causalQuestions } = situation;
   if (causalQuestions !== undefined && !strList(causalQuestions)) return "situation malformed";
+  if (situation.question !== undefined && !isStr(situation.question)) return "situation malformed";
   if (assumptions !== undefined) {
     if (!isRec(assumptions) || !isStr(assumptions.id) || !Array.isArray(assumptions.items))
       return "assumptions malformed";
@@ -234,7 +271,8 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
       return "situation data malformed";
     ids.add(datum.id);
     if (!oneOf(ITEM_STATES, datum.state) || !optOneOf(DATA_STANCES, datum.stance)) return "unknown situation enum";
-    if (badProof(datum.proof) || !optStr(datum.reason)) return "situation data malformed";
+    if (badProof(datum.proof) || !optStr(datum.reason) || badSearchLog(datum.searchLog))
+      return "situation data malformed";
     if (!optOneOf(PROP_STANCES, datum.propStance)) return "unknown situation enum";
     if (!optStr(datum.stanceReason) || (datum.facetId !== undefined && !isStr(datum.facetId)))
       return "situation data malformed";
@@ -254,14 +292,17 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
       return "unknown hypothesis enum";
     if (!optOneOf(VERDICTS, hypothesis.userVerdict) || !optStr(hypothesis.eliminationReason))
       return "hypothesis malformed";
-    if (!optStr(hypothesis.basis) || (hypothesis.alternative !== undefined && typeof hypothesis.alternative !== "boolean"))
+    if (
+      !optStr(hypothesis.basis) ||
+      (hypothesis.alternative !== undefined && typeof hypothesis.alternative !== "boolean")
+    )
       return "hypothesis malformed";
     for (const need of hypothesis.needs as unknown[]) {
       if (!isRec(need) || !isStr(need.id) || !isStr(need.text) || !count(need.addedRound) || ids.has(need.id))
         return "need malformed";
       ids.add(need.id);
       if (!oneOf(ITEM_STATES, need.state) || !optOneOf(NEED_STANCES, need.stance)) return "unknown need enum";
-      if (badProof(need.proof) || !optStr(need.reason)) return "need malformed";
+      if (badProof(need.proof) || !optStr(need.reason) || badSearchLog(need.searchLog)) return "need malformed";
       if (need.replaces !== undefined && !isStr(need.replaces)) return "need malformed";
     }
     const replaced = new Set<string>();

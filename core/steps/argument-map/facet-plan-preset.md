@@ -1,0 +1,1 @@
+Assumptions fixed by the owner (JSON array of {label, value, reason}). Plan the facets and needs for exactly these assumptions; do not change or replace them, and return an empty assumptions list.

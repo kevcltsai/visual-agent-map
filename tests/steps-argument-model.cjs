@@ -197,3 +197,51 @@ test('facet boost model: an old map keeps reading without facets, and a datum wi
   doc.argumentMap.situation.data.push({ id: 'd1', need: 'x', attempts: 0, state: 'pending' });
   assert.equal(model.readArgumentMap(doc).kind, 'usable');
 });
+
+// ---- V1 boost P4b: question, figure, searchLog ----
+const SEARCH_LOG = { queries: ['youth unemployment 2024'], opened: ['https://stats.example.org/a'], why: 'the page had only 2019 data' };
+const proofOf = extra => ({ url: 'https://stats.example.org/a', quote: 'quote number one', claim: 'claim', check: 'page_match', checkedAt: '2026-11-11T00:00:00.000Z', ...extra });
+const longText = 'x'.repeat(201);
+const goodOptionals = {
+  'question on the situation': d => { d.situation.question = 'Did the youth rate rise?'; },
+  'figure on a datum proof': d => { d.situation.data[0].state = 'found'; d.situation.data[0].proof = proofOf({ figure: { number: '9.2', period: '2024-03', unit: 'percent' } }); },
+  'searchLog on a datum': d => { d.situation.data[0].searchLog = SEARCH_LOG; },
+  'searchLog on a need': d => { d.hypotheses.push({ id: 'h1', citedData: [], round: 1, location: 'verifying', needs: [{ id: 'n1', text: 'n', addedRound: 1, state: 'not_found', searchLog: SEARCH_LOG }] }); },
+  'searchLog with five queries of 200 characters': d => { d.situation.data[0].searchLog = { queries: Array(5).fill('x'.repeat(200)), opened: [], why: 'w' }; }
+};
+for (const [name, edit] of Object.entries(goodOptionals)) {
+  test(`boost optional fields read as usable and round-trip: ${name}`, () => {
+    const doc = facetMapDoc();
+    edit(doc.argumentMap);
+    const text = core.serializeMap(doc);
+    assert.equal(roundTrip(text), text);
+    assert.equal(model.readArgumentMap(core.parseMap(text)).kind, 'usable');
+  });
+}
+const badOptionals = {
+  'blank question': d => { d.situation.question = ''; },
+  'question not a string': d => { d.situation.question = 5; },
+  'figure not an object': d => { d.situation.data[0].proof = proofOf({ figure: '9.2' }); },
+  'figure number as a JS number': d => { d.situation.data[0].proof = proofOf({ figure: { number: 9.2, period: 'p', unit: 'u' } }); },
+  'figure missing unit': d => { d.situation.data[0].proof = proofOf({ figure: { number: '9.2', period: 'p' } }); },
+  'figure blank period': d => { d.situation.data[0].proof = proofOf({ figure: { number: '9.2', period: '', unit: 'u' } }); },
+  'figure with an extra key': d => { d.situation.data[0].proof = proofOf({ figure: { number: '9.2', period: 'p', unit: 'u', x: 1 } }); },
+  'figure on a need proof': d => { d.hypotheses.push({ id: 'h1', citedData: [], round: 1, location: 'verifying', needs: [{ id: 'n1', text: 'n', addedRound: 1, state: 'found', proof: proofOf({ figure: [] }) }] }); },
+  'searchLog not an object': d => { d.situation.data[0].searchLog = 'q'; },
+  'searchLog queries not strings': d => { d.situation.data[0].searchLog = { ...SEARCH_LOG, queries: [1] }; },
+  'searchLog six queries': d => { d.situation.data[0].searchLog = { ...SEARCH_LOG, queries: Array(6).fill('q') }; },
+  'searchLog six opened': d => { d.situation.data[0].searchLog = { ...SEARCH_LOG, opened: Array(6).fill('https://a.example.org/') }; },
+  'searchLog query over 200 characters': d => { d.situation.data[0].searchLog = { ...SEARCH_LOG, queries: [longText] }; },
+  'searchLog why over 200 characters': d => { d.situation.data[0].searchLog = { ...SEARCH_LOG, why: longText }; },
+  'searchLog missing why': d => { d.situation.data[0].searchLog = { queries: [], opened: [] }; },
+  'searchLog on a need malformed': d => { d.hypotheses.push({ id: 'h1', citedData: [], round: 1, location: 'verifying', needs: [{ id: 'n1', text: 'n', addedRound: 1, state: 'not_found', searchLog: { queries: 'x', opened: [], why: '' } }] }); }
+};
+for (const [name, edit] of Object.entries(badOptionals)) {
+  test(`boost optional fields: unusable and preserved: ${name}`, () => {
+    const doc = facetMapDoc();
+    edit(doc.argumentMap);
+    const text = core.serializeMap(doc);
+    assert.equal(roundTrip(text), text);
+    assert.equal(model.readArgumentMap(core.parseMap(text)).kind, 'unusable');
+  });
+}

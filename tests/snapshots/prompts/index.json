@@ -31,6 +31,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "argument-map-facet-judge-assumptions.en": {
+      "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-facet-judge-assumptions.zh": {
+      "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-facet-judge-assumptions.zh-CN": {
+      "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "argument-map-facet-judge-round2.en": {
       "builder": "core/steps/argument-map/facet-judge.ts facetJudgeStep",
       "language": "en",
@@ -61,6 +76,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "argument-map-facet-plan-preset.en": {
+      "builder": "core/steps/argument-map/facet-plan.ts facetPlanStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-facet-plan-preset.zh": {
+      "builder": "core/steps/argument-map/facet-plan.ts facetPlanStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-facet-plan-preset.zh-CN": {
+      "builder": "core/steps/argument-map/facet-plan.ts facetPlanStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "argument-map-facet-plan.en": {
       "builder": "core/steps/argument-map/facet-plan.ts facetPlanStep",
       "language": "en",
@@ -73,6 +103,21 @@
     },
     "argument-map-facet-plan.zh-CN": {
       "builder": "core/steps/argument-map/facet-plan.ts facetPlanStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "argument-map-facet-verdict.en": {
+      "builder": "core/steps/argument-map/verdict.ts facetVerdictStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-facet-verdict.zh": {
+      "builder": "core/steps/argument-map/verdict.ts facetVerdictStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-facet-verdict.zh-CN": {
+      "builder": "core/steps/argument-map/verdict.ts facetVerdictStep",
       "language": "zh-CN",
       "schema": true
     },

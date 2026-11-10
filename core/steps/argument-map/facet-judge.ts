@@ -37,7 +37,10 @@ export interface FacetJudgeRequest extends ArgumentStepBase {
   proposition: string;
   round: 1 | 2;
   facets: FacetJudgeFacet[];
+  /** The assumption card of the map, when it has one: the judge writes up to 3 insights about how it bears on the data. */
+  assumptions?: { label: string; value: string; reason: string }[];
 }
+export const MAX_ASSUMPTION_INSIGHTS = 3;
 export interface FacetJudgeResult {
   data: { id: string; propStance: PropStance; reason: string }[];
   facets: {
@@ -48,6 +51,8 @@ export interface FacetJudgeResult {
     citedData: string[];
     retryNeeds: string[];
   }[];
+  /** 0 to 3 plain sentences about the assumption card; always empty when the request has none. */
+  assumptionInsights: string[];
 }
 
 const VERDICTS = ["supports", "refutes", "insufficient"] as const;
@@ -86,9 +91,10 @@ export const FACET_JUDGE_SCHEMA = {
         },
         required: ["id", "verdict", "reason", "summary", "citedData", "retryNeeds"]
       }
-    }
+    },
+    assumptionInsights: { ...strings, maxItems: MAX_ASSUMPTION_INSIGHTS }
   },
-  required: ["data", "facets"]
+  required: ["data", "facets", "assumptionInsights"]
 };
 
 const pick = (d: FacetJudgeDatum): FacetJudgeDatum => ({
@@ -102,7 +108,12 @@ const pick = (d: FacetJudgeDatum): FacetJudgeDatum => ({
 });
 const sourcesOf = (request: FacetJudgeRequest): string[] => [
   request.proposition,
-  ...request.facets.flatMap(f => [f.title, ...(f.notFoundNeeds ?? []), ...f.data.flatMap(d => [d.need, d.claim, d.quote, d.url, d.stance])])
+  ...(request.assumptions ?? []).flatMap(a => [a.label, a.value, a.reason]),
+  ...request.facets.flatMap(f => [
+    f.title,
+    ...(f.notFoundNeeds ?? []),
+    ...f.data.flatMap(d => [d.need, d.claim, d.quote, d.url, d.stance])
+  ])
 ];
 const RETRY_ROUND_1 = retryOnce.trim();
 const RETRY_ROUND_2 = retryNone.trim();
@@ -111,7 +122,7 @@ const ids = (values: string[]): string => [...values].sort().join("\n");
 
 export function parseFacetJudge(raw: string, request: FacetJudgeRequest): FacetJudgeResult {
   if (request.facets.length > MAX_FACETS) throw new ArgumentStepError(`at most ${MAX_FACETS} facets can be judged`);
-  const item = parseObject(raw, ["data", "facets"]);
+  const item = parseObject(raw, ["data", "facets", "assumptionInsights"]);
   const sources = sourcesOf(request);
   const found = request.facets.flatMap(f => f.data.map(d => ({ ...d, facetId: f.id })));
   const data = list(item.data, "data").map(entry => {
@@ -129,7 +140,9 @@ export function parseFacetJudge(raw: string, request: FacetJudgeRequest): FacetJ
   if (ids(data.map(d => d.id)) !== ids(found.map(d => d.id)))
     throw new ArgumentStepError("the data must name every found datum exactly once");
   const stanceOf = new Map(data.map(d => [d.id, d.propStance]));
-  const asked = new Set(request.facets.flatMap(f => [...f.data.map(d => d.need), ...(f.notFoundNeeds ?? [])].map(normalized)));
+  const asked = new Set(
+    request.facets.flatMap(f => [...f.data.map(d => d.need), ...(f.notFoundNeeds ?? [])].map(normalized))
+  );
   let retryTotal = 0;
   const facets = list(item.facets, "facets").map(entry => {
     const one = parseObject(JSON.stringify(entry), ["id", "verdict", "reason", "summary", "citedData", "retryNeeds"]);
@@ -169,7 +182,14 @@ export function parseFacetJudge(raw: string, request: FacetJudgeRequest): FacetJ
   if (ids(facets.map(f => f.id)) !== ids(request.facets.map(f => f.id)))
     throw new ArgumentStepError("the facets must be exactly those supplied, each once");
   if (retryTotal > MAX_RETRY_NEEDS) throw new ArgumentStepError("too many retry needs");
-  return { data, facets };
+  const assumptionInsights = list(item.assumptionInsights, "assumptionInsights").map(entry =>
+    text(entry, "assumption insight")
+  );
+  if (assumptionInsights.length > MAX_ASSUMPTION_INSIGHTS) throw new ArgumentStepError("at most 3 assumption insights");
+  if (assumptionInsights.length && !request.assumptions?.length)
+    throw new ArgumentStepError("assumption insights need an assumption card");
+  grounded(assumptionInsights, sources);
+  return { data, facets, assumptionInsights };
 }
 
 /** Judge the facets: a stance for each found datum, a verdict and summary for each facet, and the retry needs of the insufficient ones (round 1 only). Text-only. */
@@ -181,7 +201,17 @@ export const facetJudgeStep: StepDefinition<FacetJudgeRequest, FacetJudgeResult>
       languageInstruction: languageInstruction(request.language, request.proposition),
       retryRule: request.round === 1 ? RETRY_ROUND_1 : RETRY_ROUND_2,
       proposition: JSON.stringify(request.proposition),
-      facets: JSON.stringify(request.facets.map(f => ({ id: f.id, title: f.title, data: f.data.map(pick), ...(f.notFoundNeeds?.length ? { notFoundNeeds: f.notFoundNeeds } : {}) })))
+      assumptions: request.assumptions?.length
+        ? `\n\nAssumption card (JSON array of {label, value, reason}):\n${JSON.stringify(request.assumptions)}`
+        : "",
+      facets: JSON.stringify(
+        request.facets.map(f => ({
+          id: f.id,
+          title: f.title,
+          data: f.data.map(pick),
+          ...(f.notFoundNeeds?.length ? { notFoundNeeds: f.notFoundNeeds } : {})
+        }))
+      )
     }),
   schema: FACET_JUDGE_SCHEMA,
   policy: (prompt, request) => {

@@ -8,7 +8,9 @@ Step 2, facets. For every facet give a verdict: "supports" when its data show it
 
 Step 3, retry. There is no further search. retryNeeds must be an empty list for every facet.
 
-Return only JSON: {"data":[{"id":"","propStance":"supports","reason":""}],"facets":[{"id":"","verdict":"insufficient","reason":"","summary":"","citedData":[""],"retryNeeds":[""]}]}. Include exactly the data and the facets supplied, each once, ids copied exactly. Use only numbers and links that appear in the supplied text. No reason, summary or retry need may contain a number, year or URL that is not in the supplied text. Do not add other fields, paths, new links or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
+Step 4, assumptions. When an assumption card is supplied, give assumptionInsights: up to 3 plain sentences on how the data you judged fit or strain those assumptions (the age group, the period, the definitions), for a reader of the assumption card. When no assumption card is supplied, assumptionInsights must be an empty list.
+
+Return only JSON: {"data":[{"id":"","propStance":"supports","reason":""}],"facets":[{"id":"","verdict":"insufficient","reason":"","summary":"","citedData":[""],"retryNeeds":[""]}],"assumptionInsights":[""]}. Include exactly the data and the facets supplied, each once, ids copied exactly. Use only numbers and links that appear in the supplied text. No reason, summary or retry need may contain a number, year or URL that is not in the supplied text. Do not add other fields, paths, new links or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
 
 Write in Simplified Chinese (Mainland China).
 

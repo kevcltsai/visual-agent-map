@@ -6,9 +6,11 @@ Then choose 3 to 5 facets: the different aspects of the situation that must hold
 
 Last, list in causalQuestions the questions about causes or explanations that the proposition itself raises, in your own words, or an empty list when it raises none.
 
+Also return question: the proposition rewritten as one short question that a reader can answer yes or no (for example "Did X rise?"). It is shown as the title of the situation card.
+
 Use only numbers and links that appear in the proposition. A facet title, a need, a causal question, an assumption label or reason must not contain any number, year or URL that is not in the proposition. An assumption value may contain years and periods but must not contain any URL.
 
-Return only JSON: {"assumptions":{"items":[{"label":"","value":"","reason":""}]},"facets":[{"title":"","needs":[{"need":"","kind":"fact"}]}],"causalQuestions":[""]}. Do not add other fields, ids, paths, new links or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
+Return only JSON: {"assumptions":{"items":[{"label":"","value":"","reason":""}]},"facets":[{"title":"","needs":[{"need":"","kind":"fact"}]}],"causalQuestions":[""],"question":""}. Do not add other fields, ids, paths, new links or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
 
 Write in English.
 

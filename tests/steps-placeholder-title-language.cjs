@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./support.cjs');
 
-const content = load('experiences/aim/content-language.ts');
+const content = load('core/content-language.ts');
 const names = load('core/default-names.ts');
 
 test('N1 placeholder topic names: three languages, optional number, nothing else', () => {

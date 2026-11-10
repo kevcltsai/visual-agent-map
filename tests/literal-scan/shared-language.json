@@ -1,0 +1,4 @@
+{
+  "dirs": ["core/content-language.ts", "core/legacy-names.ts"],
+  "allow": []
+}

@@ -193,12 +193,13 @@ test('test-affected: VAM_AFFECTED_TESTS keeps the listed node --test files, drop
   assert.deepEqual(applyAffected(parts, { VAM_AFFECTED_TESTS: 'tests/suites/x.cjs' }).map(part => part.name), ['run']);
 });
 
-// A fake gh answers `gh run list` with the given tab-separated rows (id, head sha, run name).
+// A fake gh answers `gh run list` with the given tab-separated rows (id, head sha, run name, optional conclusion; default success).
+// Like the real listing, it returns nothing when `--status` is passed: the status filter lags behind finished workflow_dispatch runs.
 function fakeGh(rows, exit = 0) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-gh-'));
   const bin = path.join(dir, 'gh');
-  fs.writeFileSync(path.join(dir, 'rows.tsv'), rows.map(row => row.join('\t')).join('\n'));
-  fs.writeFileSync(bin, `#!/bin/sh\ncat "${path.join(dir, 'rows.tsv')}"\nexit ${exit}\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(dir, 'rows.tsv'), rows.map(row => (row.length < 4 ? [...row, 'success'] : row).join('\t')).join('\n'));
+  fs.writeFileSync(bin, `#!/bin/sh\nfor a in "$@"; do [ "$a" = --status ] && exit 0; done\ncat "${path.join(dir, 'rows.tsv')}"\nexit ${exit}\n`, { mode: 0o755 });
   return { dir, bin };
 }
 const SHA = 'f'.repeat(40);
@@ -216,6 +217,12 @@ test('find-green-ci-run: a green affected run is never returned; a full run is, 
   assert.equal(green([['100', 'e'.repeat(40), 'CI full: other commit']]).status, 1);
   assert.equal(green([['100', SHA, 'CI full: x']], SHA, 1).status, 1);
   assert.equal(green([]).status, 1);
+  // Regression: the `--status success` filter hid finished runs for over an hour, so the script must not pass it and must read conclusion itself.
+  const unfiltered = green([['100', SHA, 'CI full: dispatch', 'success']]);
+  assert.deepEqual([unfiltered.status, unfiltered.stdout.trim()], [0, '100']);
+  assert.equal(green([['100', SHA, 'CI full: x', 'failure']]).status, 1);
+  assert.equal(green([['100', SHA, 'CI affected: x', 'success']]).status, 1);
+  assert.equal(green([['100', 'e'.repeat(40), 'CI full: x', 'success']]).status, 1);
 });
 test('pre-push: a push to main with only an affected green run still runs the full verify; a full green run skips it; a feature branch runs verify:push', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-hook-'));

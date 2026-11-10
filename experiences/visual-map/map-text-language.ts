@@ -1,6 +1,6 @@
 import type { MapDocument } from "../../map-model";
 import { isUiLanguage, translate, uiLocale, type ContentLanguage, type UiLanguage } from "../../i18n";
-import { detectAimContentLanguage, resolveMapOutputLanguage } from "../aim/content-language";
+import { detectAimContentLanguage, resolveMapOutputLanguage } from "../../core/content-language";
 
 /**
  * "Map text language": the registry language (an interface language with a dictionary) that fixed text VAM makes up for

@@ -96226,8 +96226,14 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
    */
   async applyRenames(renames) {
     const pairs = renames.map((rename) => rename.pair);
+    let failed = false;
     try {
-      await this.repo.replaceSourcePaths(pairs);
+      let sourceError;
+      try {
+        await this.repo.replaceSourcePaths(pairs);
+      } catch (replaceError) {
+        sourceError = replaceError;
+      }
       const { changed, error } = await this.rebaseMaps(pairs);
       const vamFile = renames.some(({ file }) => {
         var _a2;
@@ -96237,8 +96243,14 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
         );
       });
       if (changed || vamFile) await this.rebuildDerivedData();
+      if (sourceError) throw sourceError;
       if (error) throw error;
+    } catch (batchError) {
+      failed = true;
+      throw batchError;
     } finally {
+      if (failed) this.runMutation(async () => {
+      });
       const outside = renames.some((rename) => rename.external);
       const seq = ++this.syncSeq;
       for (const view of this.views()) {

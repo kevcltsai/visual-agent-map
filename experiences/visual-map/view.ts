@@ -170,6 +170,7 @@ import {
   type CoverLook,
   type CoverPosition
 } from "./card-cover";
+import { cardIndex, type CardIndex } from "./card-index";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
@@ -2039,6 +2040,13 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The map's child index while a paint draws its cards; null otherwise. */
   private paintChildIndex: Map<string, MapNode[]> | null = null;
+  /** The map's nodes by id and their depths while a paint draws its cards; null otherwise. */
+  private paintCardIndex: CardIndex | null = null;
+  /** The map node with this id: from the paint's index while a paint draws its cards, else a search of the map. */
+  private mapNodeById(id: string | undefined): MapNode | undefined {
+    if (id === undefined) return undefined;
+    return this.paintCardIndex ? this.paintCardIndex.node(id) : this.map?.nodes.find(item => item.id === id);
+  }
   /** Card measurements waiting for the paint to finish building every card; null outside a paint. */
   private pendingCardFits: Array<() => void> | null = null;
   private cardChecks = new Map<string, HTMLInputElement>();
@@ -2162,6 +2170,7 @@ export class VisualAgentMapView extends ItemView {
     const fits: Array<() => void> = [];
     this.renderingCard = true;
     this.paintChildIndex = childIndex(this.map.nodes);
+    this.paintCardIndex = cardIndex(this.map.nodes);
     this.pendingCardFits = fits;
     try {
       for (const id of ids) {
@@ -2179,6 +2188,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       this.renderingCard = false;
       this.paintChildIndex = null;
+      this.paintCardIndex = null;
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();
@@ -14550,6 +14560,7 @@ export class VisualAgentMapView extends ItemView {
     this.renderingCard = true;
     // Every card shows its branch size: one child index per paint keeps that linear in the map size.
     this.paintChildIndex = this.map ? childIndex(this.map.nodes) : null;
+    this.paintCardIndex = this.map ? cardIndex(this.map.nodes) : null;
     const fits: Array<() => void> = [];
     this.pendingCardFits = fits;
     try {
@@ -14557,6 +14568,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       this.renderingCard = false;
       this.paintChildIndex = null;
+      this.paintCardIndex = null;
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();
@@ -14712,7 +14724,8 @@ export class VisualAgentMapView extends ItemView {
   private renderNode(shownNode: MapNode): void {
     if (!this.stageEl) return;
     // Every handler below acts on the real node, so nothing written to the map can carry display coordinates.
-    const node = this.map?.nodes.find(item => item.id === shownNode.id) ?? shownNode;
+    const index = this.paintCardIndex ?? cardIndex(this.map?.nodes ?? []);
+    const node = index.node(shownNode.id) ?? shownNode;
     // A card whose note is not read yet is drawn from the map alone: the title the cache knows and grey bars for the summary.
     const loading = this.cardLoading(node);
     const note = loading ? undefined : this.notes.get(node.id),
@@ -14727,7 +14740,7 @@ export class VisualAgentMapView extends ItemView {
     this.paintCut(card, node.id);
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
-    card.setAttr("aria-level", String(this.nodeDepth(node)));
+    card.setAttr("aria-level", String(index.depth(node)));
     card.setAttr(
       "aria-selected",
       String(node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id))
@@ -14963,7 +14976,7 @@ export class VisualAgentMapView extends ItemView {
     // One Stop for every AI run on this card: a dialog's run still starting, guided expand, and research. A batch and
     // a synthesis show their own Stop; a child researched by a running batch is stopped through its batch.
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? this.map?.nodes.find(item => item.id === node.parentId) : undefined;
+    const parentNode = node.parentId ? this.mapNodeById(node.parentId) : undefined;
     const batchChild = !!parentNode && !!this.plugin.expansionCoordinator?.isRunning(parentNode.path);
     const stoppable =
       this.startingTasks.has(node.path) ||
@@ -15483,7 +15496,7 @@ export class VisualAgentMapView extends ItemView {
    * height handle its real height, which only exists once it is laid out.
    */
   private refreshCardHeightState(card: HTMLElement): void {
-    const node = this.map?.nodes.find(item => item.id === card.dataset?.nodeId);
+    const node = this.mapNodeById(card.dataset?.nodeId);
     if (!node) return;
     // A card that loses its height is rebuilt by the repaint, so only a set height has a state to refresh here.
     if (node.height && card.style.height !== "") this.measureClipped(card);
@@ -15698,17 +15711,6 @@ export class VisualAgentMapView extends ItemView {
       null
     );
   }
-  /** Nesting level of a topic, 1 for a root; guards against a corrupt parent cycle. */
-  private nodeDepth(node: MapNode): number {
-    let depth = 1;
-    const seen = new Set([node.id]);
-    for (let parent = node.parentId; parent; depth++) {
-      if (seen.has(parent)) break;
-      seen.add(parent);
-      parent = this.map?.nodes.find(item => item.id === parent)?.parentId ?? null;
-    }
-    return depth;
-  }
   /**
    * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window
    * or past the canvas edge (a row wider than a card on the left edge); a row wider than the visible canvas wraps. Measured,
@@ -15884,7 +15886,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The type to show: only a topic on an ordinary map has one other than "topic" (AIM shows none). */
   private topicKindOf(id: string): TopicKind {
-    const node = this.map?.nodes.find(item => item.id === id);
+    const node = this.mapNodeById(id);
     if (!this.relationsEnabled() || !node || isAimNode(node)) return "topic";
     return this.notes.get(id)?.topicKind ?? "topic";
   }
@@ -26932,7 +26934,7 @@ export class VisualAgentMapView extends ItemView {
         "aria-valuemax": String(CARD_WIDTH_MAX)
       }
     });
-    const widthOf = (): number => this.map?.nodes.find(item => item.id === node.id)?.width ?? CARD_WIDTH;
+    const widthOf = (): number => this.mapNodeById(node.id)?.width ?? CARD_WIDTH;
     const sync = (width: number): void => handle.setAttr("aria-valuenow", String(width));
     handle.tabIndex = -1;
     sync(widthOf());
@@ -27053,7 +27055,7 @@ export class VisualAgentMapView extends ItemView {
         "aria-valuemax": String(CARD_HEIGHT_MAX)
       }
     });
-    const setHeight = (): number | undefined => this.map?.nodes.find(item => item.id === node.id)?.height;
+    const setHeight = (): number | undefined => this.mapNodeById(node.id)?.height;
     const heightOf = (): number => setHeight() ?? clampCardHeight(card.offsetHeight) ?? CARD_HEIGHT_MIN;
     const sync = (height: number): void => handle.setAttr("aria-valuenow", String(height));
     handle.tabIndex = -1;

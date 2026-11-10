@@ -1,5 +1,5 @@
 import type { EvidenceInput, VerdictInput } from "../../argument-map/machine";
-import { VERDICTS, type Verdict } from "../../argument-map/model";
+import { VERDICTS, type Verdict } from "../../argument-map/model-v1";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import {
   ArgumentStepError,

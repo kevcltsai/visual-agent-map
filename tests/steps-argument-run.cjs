@@ -5,7 +5,8 @@ const assert = require('node:assert/strict');
 const S = require('./support.cjs');
 const { ArgumentRuns, ArgumentRunError, WORST_CASE_AI_CALLS } = S.load('experiences/visual-map/argument-run.ts');
 const { ARGUMENT_STEPS, ArgumentStepError } = S.load('core/steps/argument-map/runner.ts');
-const model = S.load('core/argument-map/model.ts');
+const model = S.load('core/argument-map/model-v1.ts');
+const { managedNodeIds } = S.load('core/argument-map/model.ts');
 const { translate } = S.load('i18n.ts');
 
 const QUOTE = 'Youth unemployment rose to 9.2 percent in March';
@@ -127,7 +128,7 @@ test('layers: the eliminated group hangs under the conclusion; each situation da
     assert.equal(note.summary, 'Rate rose');
     assert.ok(note.detail.includes(URL_OK));
   }
-  assert.ok(model.managedNodeIds(doc).has(state.situation.data[0].id));
+  assert.ok(managedNodeIds(doc).has(state.situation.data[0].id));
 });
 
 test('situation data: a deleted datum card is a miss with no note and no duplicate node', async () => {

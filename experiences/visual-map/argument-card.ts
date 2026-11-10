@@ -17,7 +17,7 @@ import {
   type Hypothesis,
   type Need,
   type SituationDatum
-} from "../../core/argument-map/model";
+} from "../../core/argument-map/model-v1";
 
 type Translate = (key: TranslationKey, ...values: unknown[]) => string;
 export type ArgumentRole = "proposition" | "situation" | "datum" | "conclusion" | "group" | "hypothesis" | "need";

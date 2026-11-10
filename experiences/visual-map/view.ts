@@ -460,8 +460,8 @@ import {
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
-import { GateError, applyPause } from "../../core/argument-map/machine";
-import { effectiveVerdict, managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
+import { effectiveVerdict, readArgumentMap } from "../../core/argument-map/model-v1";
+import { managedNodeIds } from "../../core/argument-map/model";
 import {
   describeArgumentCard,
   renderArgumentCardBody,
@@ -471,7 +471,7 @@ import {
 import { ArgumentRunError, WORST_CASE_AI_CALLS } from "./argument-run";
 import { describeArgumentProgress } from "./argument-progress";
 import { ArgumentStartModal } from "../../ui/modals/argument-start-modal";
-import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
+import { arrangeArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
   MAP_CHAT_ANCHOR_PREFIX,
@@ -3804,15 +3804,8 @@ export class VisualAgentMapView extends ItemView {
       await this.plugin.repo.saveMap(path, map);
       if (!isCurrent()) return;
     }
-    // A usable argument map whose cards are still stacked (the flow placed them) is arranged once, here, with no provider call.
-    const argumentOnOpen = map.argumentMap === undefined ? null : readArgumentMap(map);
-    const arranged =
-      argumentOnOpen?.kind === "usable" ? arrangeUnarrangedArgumentMap(map.nodes, argumentOnOpen.data) : null;
-    if (arranged) {
-      map.nodes = arranged;
-      await this.plugin.repo.saveMap(path, map);
-      if (!isCurrent()) return;
-    }
+    // An argument map is never written on open: a legacy (`"v": 1`) map is read-only, and a version 2 map is arranged by the flow
+    // that writes it (packet V5a/V7).
     // Another map, or the first one this window shows: the cards are drawn before the notes are read (a slow disk or a busy
     // machine can take a second per note). Opening the map already on screen keeps its cards until the read ends, as before.
     const progressive = map.nodes.length > 0 && (this.path !== path || this.paintCount === 0);
@@ -3872,8 +3865,7 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
       await this.recoverInterruptedNotes(isCurrent);
       if (!isCurrent()) return;
-      await this.recoverArgumentRun(isCurrent);
-      if (!isCurrent()) return;
+      // No argument-run recovery here: a legacy (`"v": 1`) map is read-only and opening it never writes (version 2 recovery: packet V5a).
       this.endNoteLoad(load);
       this.render();
       this.app.workspace.requestSaveLayout();
@@ -3908,31 +3900,6 @@ export class VisualAgentMapView extends ItemView {
       } catch (error) {
         console.warn("Visual Agent Map interrupted run", error);
       }
-    }
-  }
-  /**
-   * A hypothesis-research run left `running` by a reload has no owner: it is paused in this same mutation (items back to pending, no
-   * provider call), like an interrupted note. A map without the `argumentMap` key never reaches the write.
-   */
-  private async recoverArgumentRun(isCurrent: () => boolean): Promise<void> {
-    const map = this.map;
-    if (!map || map.argumentMap === undefined) return;
-    const read = readArgumentMap(map);
-    if (read.kind !== "usable" || read.data.run.status !== "running" || this.plugin.argumentRuns.isRunning(this.path))
-      return;
-    try {
-      const updated = await this.plugin.repo.updateMap(this.path, doc => {
-        const current = readArgumentMap(doc);
-        if (current.kind !== "usable" || current.data.run.status !== "running") return;
-        try {
-          doc.argumentMap = applyPause(current.data, "interrupted");
-        } catch (error) {
-          if (!(error instanceof GateError)) throw error; // a finished run is left as it is
-        }
-      });
-      if (isCurrent() && this.map === map) map.argumentMap = updated.argumentMap;
-    } catch (error) {
-      console.warn("Visual Agent Map argument run recovery", error);
     }
   }
   openAimStart(): void {
@@ -17963,10 +17930,7 @@ export class VisualAgentMapView extends ItemView {
       .rewriteNote(node.path, path => this.plugin.repo.writeHypothesisLeaning(path, leaning))
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
-        // On an argument map the same step records the user's verdict; `aiVerdict` stays the runner's.
-        const read = readArgumentMap(map);
-        const entry = read.kind === "usable" ? read.data.hypotheses.find(item => item.id === node.id) : undefined;
-        if (entry) entry.userVerdict = leaning;
+        // A legacy (`"v": 1`) argument map is read-only, so its key is not written here (version 2 records a mark only: packet V7).
       })
       .commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);

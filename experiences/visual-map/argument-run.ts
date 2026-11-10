@@ -52,7 +52,7 @@ import {
   type ArgumentRoles,
   type Hypothesis,
   type RoleKey
-} from "../../core/argument-map/model";
+} from "../../core/argument-map/model-v1";
 import { arrangeArgumentMap } from "../../core/argument-map/layout";
 import { verifySource, type FetchPage } from "../../core/argument-map/source-proof";
 import {

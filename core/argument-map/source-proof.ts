@@ -5,7 +5,7 @@
  * URL that appears only in the AI's text. What this cannot prove: that the page supports the claim, and that a `provider_read`
  * page really says what the provider reported. Spec: docs/history/tasks/2026-11-09-argument-map-layout (plan section 3).
  */
-import type { SourceProof } from "./model";
+import type { SourceProof } from "./model-v1";
 
 export const QUOTE_MIN = 12;
 export const QUOTE_MAX = 200;

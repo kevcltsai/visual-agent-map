@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
 const m = S.load('core/argument-map/machine.ts');
-const model = S.load('core/argument-map/model.ts');
+const model = S.load('core/argument-map/model-v1.ts');
 
 const roles = { proposition: 'p', situation: 's', conclusion: 'c', verified: 'v', eliminated: 'e' };
 const proof = (n = 1) => ({ url: `https://example.org/${n}`, quote: `quote number ${n} from the page`, claim: `claim ${n}`, check: 'page_match', checkedAt: '2026-11-09T00:00:00.000Z' });

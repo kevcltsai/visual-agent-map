@@ -157,7 +157,7 @@ test('production createNote port: datum and need become evidence, hypothesis and
 
 test('UI fixture: each state reads as usable, shows its conclusion state, and the default covers dashed items, stances and an eliminated hypothesis', () => {
   const fixture = require('./fixtures/argument-map-ui.cjs');
-  const model = support.load('core/argument-map/model.ts');
+  const model = support.load('core/argument-map/model-v1.ts');
   const views = {};
   for (const [name, one] of Object.entries(fixture.states)) {
     const ids = Object.fromEntries(one.notes.map(n => [n.key, `id-${n.key}`]));

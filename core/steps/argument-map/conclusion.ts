@@ -1,5 +1,5 @@
 import type { ConclusionInput, EvidenceInput } from "../../argument-map/machine";
-import { MIN_VERIFIED } from "../../argument-map/model";
+import { MIN_VERIFIED } from "../../argument-map/model-v1";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import {
   ArgumentStepError,

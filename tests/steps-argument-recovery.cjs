@@ -1,5 +1,5 @@
-// Argument map recovery and wiring (P5b): a reload that leaves a run `running` without an owner pauses it when the map opens, with no
-// provider call; maps without the key are untouched; a run this instance owns is left alone. Real main.ts plugin wiring is checked for
+// Argument map recovery and wiring (P5b, rewritten for V2 packet V1): a legacy (`"v": 1`) map is read-only, so a reload that leaves its run
+// `running` does NOT pause it when the map opens (opening never writes); maps without the key are untouched. Real main.ts plugin wiring is checked for
 // the test entry and for dispose. Unit level: the view is a harness over the real repository, not a live Obsidian.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -54,17 +54,15 @@ async function harness({ withKey = true, running = true, phase, stacked = false 
   return { repo, view, mapPath, text, owners, calls, open: () => view.openMapInMutation(mapPath) };
 }
 
-test('reload with a running run and no owner: paused as interrupted, items pending, no provider call', async () => {
+test('legacy v1 map: a run left running by a reload is NOT paused on open; the map is not written, no provider call', async () => {
   const h = await harness();
-  const before = (await h.repo.readMap(h.mapPath)).argumentMap;
-  assert.equal(before.situation.data[0].state, 'searching');
+  const before = await h.text();
+  const stored = (await h.repo.readMap(h.mapPath)).argumentMap;
+  assert.equal(stored.v, 1);
+  assert.equal(stored.run.status, 'running');
   await h.open();
-  const after = (await h.repo.readMap(h.mapPath)).argumentMap;
-  assert.equal(after.run.status, 'paused');
-  assert.equal(after.run.stopReason, 'interrupted');
-  assert.equal(after.situation.data[0].state, 'pending');
-  assert.equal(after.run.researchCalls, before.run.researchCalls);
-  assert.equal(h.view.map.argumentMap.run.status, 'paused');
+  assert.equal(await h.text(), before, 'opening wrote nothing');
+  assert.equal(h.view.map.argumentMap.run.status, 'running');
   assert.equal(h.calls.provider, 0);
 });
 
@@ -76,18 +74,12 @@ test('a map without the argumentMap key is not rewritten', async () => {
   assert.equal(h.view.map.argumentMap, undefined);
 });
 
-test('open: a stacked argument map is arranged once (no overlap, no provider call); opening again writes nothing', async () => {
+test('open: a stacked legacy map is not arranged and not written (read-only); no provider call', async () => {
   const h = await harness({ stacked: true, running: false });
-  const before = (await h.repo.readMap(h.mapPath)).nodes;
-  assert.equal(new Set(before.map(n => `${n.x},${n.y}`)).size, 1);
+  const before = await h.text();
   await h.open();
-  const after = (await h.repo.readMap(h.mapPath)).nodes;
-  assert.ok(new Set(after.map(n => `${n.x},${n.y}`)).size > 1);
-  assert.deepEqual(after.map(n => n.id), before.map(n => n.id));
+  assert.equal(await h.text(), before);
   assert.equal(h.calls.provider, 0);
-  const once = await h.text();
-  await h.open();
-  assert.equal(await h.text(), once);
 });
 
 test('open: an ordinary map with stacked cards is not arranged', async () => {
@@ -113,9 +105,9 @@ test('a run this instance owns, a paused run and a finished run are left as they
   assert.equal(await finished.text(), finishedBefore);
 });
 
-test('an unusable argumentMap key is kept as it is and not paused', async () => {
+test('an unusable argumentMap key (v:3) is kept as it is and not paused', async () => {
   const h = await harness();
-  await h.repo.updateMap(h.mapPath, doc => { doc.argumentMap = { ...doc.argumentMap, v: 2 }; });
+  await h.repo.updateMap(h.mapPath, doc => { doc.argumentMap = { ...doc.argumentMap, v: 3 }; });
   const before = await h.text();
   await h.open();
   assert.equal(await h.text(), before);
@@ -130,20 +122,13 @@ test('wiring: the plugin owns an ArgumentRuns test entry, and dispose refuses fu
   await assert.rejects(entry.start('Nothing.md', 'claim'), error => error.code === 'disposed');
 });
 
-test('counterexample: no auto-rerun after a reload; the paused run waits for the person to press resume (start, resume, provider all 0)', async () => {
-  const progress = load('experiences/visual-map/argument-progress.ts');
+test('counterexample: opening a legacy map never starts, resumes or writes (start, resume, stop, provider all 0)', async () => {
   const h = await harness();
   const runs = [];
   h.view.plugin.argumentRuns = { isRunning: p => h.owners.has(p), start: (...a) => { runs.push(['start', ...a]); return Promise.resolve(); }, resume: (...a) => { runs.push(['resume', ...a]); return Promise.resolve(); }, stop: (...a) => { runs.push(['stop', ...a]); } };
+  const before = await h.text();
   await h.open();
-  const state = h.view.map.argumentMap;
-  assert.equal(state.run.status, 'paused');
-  assert.equal(state.run.stopReason, 'interrupted');
-  const bar = progress.describeArgumentProgress(state, false, (key, ...values) => key);
-  assert.equal(bar.tone, 'warn');
-  assert.equal(bar.title, 'ui.argument_bar_interrupted');
-  assert.equal(bar.detail, 'ui.argument_bar_no_auto_rerun');
-  assert.equal(bar.action, 'resume', 'only a press resumes it');
+  assert.equal(await h.text(), before);
   assert.deepEqual(runs, [], 'nothing was started or resumed by opening');
   assert.equal(h.calls.provider, 0);
 });

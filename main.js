@@ -25464,7 +25464,7 @@ function mapSourceStatus(app, source) {
   return { exists: item instanceof import_obsidian12.TFile };
 }
 
-// core/argument-map/model.ts
+// core/argument-map/model-v1.ts
 var ARGUMENT_MAP_VERSION = 1;
 var MAX_ROUND = 3;
 var MAX_HYPOTHESES = 6;
@@ -25563,26 +25563,6 @@ function readArgumentMap(map) {
   if (found) return { kind: "unusable", reason: found, raw: map.argumentMap };
   return { kind: "usable", data: map.argumentMap };
 }
-function managedNodeIds(map) {
-  const ids = /* @__PURE__ */ new Set();
-  const raw = map == null ? void 0 : map.argumentMap;
-  if (!isRec(raw)) return ids;
-  if (isRec(raw.roles)) {
-    for (const id of Object.values(raw.roles)) if (isStr(id)) ids.add(id);
-  }
-  if (isRec(raw.situation) && Array.isArray(raw.situation.data)) {
-    for (const datum of raw.situation.data) if (isRec(datum) && isStr(datum.id)) ids.add(datum.id);
-  }
-  if (Array.isArray(raw.hypotheses))
-    for (const h of raw.hypotheses) {
-      if (!isRec(h)) continue;
-      if (isStr(h.id)) ids.add(h.id);
-      if (Array.isArray(h.needs)) {
-        for (const need of h.needs) if (isRec(need) && isStr(need.id)) ids.add(need.id);
-      }
-    }
-  return ids;
-}
 function effectiveVerdict(h) {
   var _a2, _b2;
   return (_b2 = (_a2 = h.userVerdict) != null ? _a2 : h.aiVerdict) != null ? _b2 : "undecided";
@@ -25622,6 +25602,40 @@ function conclusionView(state) {
   if (phase === "stopped_limit") return "stopped_limit";
   if (phase === "concluded" && verifiedCount(state) >= MIN_VERIFIED) return "concluded";
   return "in_progress";
+}
+
+// core/argument-map/model.ts
+var isRec2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isStr2 = (value) => typeof value === "string" && value !== "";
+function managedNodeIds(map) {
+  const ids = /* @__PURE__ */ new Set();
+  const raw = map == null ? void 0 : map.argumentMap;
+  if (!isRec2(raw)) return ids;
+  const add = (value) => {
+    if (isStr2(value)) ids.add(value);
+  };
+  if (isRec2(raw.roles)) for (const id of Object.values(raw.roles)) add(id);
+  if (isRec2(raw.situation) && Array.isArray(raw.situation.data)) {
+    for (const datum of raw.situation.data) if (isRec2(datum)) add(datum.id);
+  }
+  if (Array.isArray(raw.claims))
+    for (const claim2 of raw.claims) {
+      if (!isRec2(claim2)) continue;
+      add(claim2.id);
+      if (Array.isArray(claim2.data)) {
+        for (const datum of claim2.data) if (isRec2(datum)) add(datum.id);
+      }
+      if (isRec2(claim2.comparison)) add(claim2.comparison.nodeId);
+    }
+  if (Array.isArray(raw.hypotheses))
+    for (const h of raw.hypotheses) {
+      if (!isRec2(h)) continue;
+      add(h.id);
+      if (Array.isArray(h.needs)) {
+        for (const need of h.needs) if (isRec2(need)) add(need.id);
+      }
+    }
+  return ids;
 }
 
 // repository.ts
@@ -45043,6 +45057,191 @@ ${value}`).join("\n\n");
   }
 };
 
+// experiences/visual-map/argument-card.ts
+var STANCE_KEY = {
+  supports: "ui.argument_stance_supports",
+  contradicts: "ui.argument_stance_contradicts",
+  uncertain: "ui.argument_stance_uncertain"
+};
+var STANCE_TONE = { supports: "yes", contradicts: "no", uncertain: "maybe" };
+var VERDICT_KEY = {
+  supported: "ui.hypothesis_supported",
+  refuted: "ui.hypothesis_refuted",
+  undecided: "ui.hypothesis_undecided"
+};
+var CONCLUSION_KIND = {
+  in_progress: "ui.argument_conclusion_state_progress",
+  concluded: "ui.argument_conclusion_state_concluded",
+  stopped_limit: "ui.argument_conclusion_state_limit",
+  stopped_mismatch: "ui.argument_conclusion_state_mismatch"
+};
+function sourceHost(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch (e) {
+    return "";
+  }
+}
+function missingChip(item, t2) {
+  if (item.state === "searching") return { tone: "run", text: t2("ui.argument_missing_searching") };
+  const key4 = item.state === "not_found" ? "ui.argument_missing_not_found" : "ui.argument_missing_pending";
+  return { tone: "gap", text: t2(key4) };
+}
+function datumChip(datum, t2) {
+  if (datum.state !== "found") return missingChip(datum, t2);
+  return datum.stance === "opposes" ? { tone: "no", text: t2("ui.argument_data_opposes") } : { tone: "yes", text: t2("ui.argument_stance_supports") };
+}
+function conclusionCard(state, t2) {
+  const view = conclusionView(state);
+  const base = {
+    role: "conclusion",
+    kind: t2(CONCLUSION_KIND[view]),
+    titleFrom: "text",
+    state: view,
+    chips: [],
+    lines: [],
+    label: t2(CONCLUSION_KIND[view])
+  };
+  const verified = verifiedCount(state);
+  if (view === "concluded")
+    return { ...base, titleFrom: "summary", lines: [t2("ui.argument_conclusion_done_hint", verified)] };
+  if (view === "stopped_mismatch")
+    return { ...base, title: t2("ui.argument_stopped_mismatch"), lines: [t2("ui.argument_mismatch_hint")] };
+  if (view === "stopped_limit")
+    return { ...base, title: t2("ui.argument_conclusion_limit"), lines: [t2("ui.argument_conclusion_limit_hint")] };
+  return {
+    ...base,
+    title: t2("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
+    lines: [t2("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
+  };
+}
+function hypothesisCard(state, h, t2) {
+  const index = state.hypotheses.indexOf(h) + 1;
+  const shown = displayVerdict(h);
+  const chips = h.location === "eliminated" ? [{ tone: "gap", text: t2("ui.argument_eliminated_chip") }] : [
+    shown === "verifying" ? { tone: "open", text: t2("ui.argument_verifying") } : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t2(VERDICT_KEY[shown]) }
+  ];
+  if (isVerified(h)) chips.push({ tone: "yes", text: t2("ui.argument_verified_done") });
+  const kind = t2("ui.argument_hypothesis_0", index);
+  const progress = t2("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
+  const lines = [progress];
+  if (h.location === "eliminated" && h.eliminationReason)
+    lines.push(t2("ui.argument_eliminated_0", h.eliminationReason));
+  const status = chips.map((chip) => chip.text).join(" ");
+  return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: `${kind}, ${status}, ${progress}` };
+}
+function needCard(need, t2) {
+  var _a2;
+  const kind = t2("ui.argument_evidence");
+  if (need.state === "found") {
+    const stance = (_a2 = need.stance) != null ? _a2 : "uncertain";
+    const chip2 = { tone: STANCE_TONE[stance], text: t2(STANCE_KEY[stance]) };
+    const host = need.proof ? sourceHost(need.proof.url) : "";
+    return {
+      role: "need",
+      kind: host ? `${kind} \xB7 ${host}` : kind,
+      titleFrom: "note",
+      chips: [chip2],
+      lines: need.proof ? [need.proof.claim] : [],
+      label: `${kind}, ${chip2.text}${host ? `, ${host}` : ""}`
+    };
+  }
+  const chip = missingChip(need, t2);
+  return {
+    role: "need",
+    kind,
+    titleFrom: "note",
+    dashed: true,
+    chips: [chip],
+    lines: need.reason ? [need.reason] : [],
+    label: `${kind}, ${chip.text}`
+  };
+}
+function datumCard(datum, t2) {
+  const kind = t2("ui.argument_data_item");
+  const chip = datumChip(datum, t2);
+  if (datum.state === "found") {
+    const host = datum.proof ? sourceHost(datum.proof.url) : "";
+    return {
+      role: "datum",
+      kind: host ? `${kind} \xB7 ${host}` : kind,
+      titleFrom: "note",
+      chips: [chip],
+      lines: datum.proof ? [datum.proof.claim] : [],
+      label: `${kind}, ${chip.text}${host ? `, ${host}` : ""}`
+    };
+  }
+  return {
+    role: "datum",
+    kind,
+    titleFrom: "note",
+    dashed: true,
+    chips: [chip],
+    lines: datum.reason ? [datum.reason] : [],
+    label: `${kind}, ${chip.text}`
+  };
+}
+function describeArgumentCard(state, id, t2) {
+  const { roles } = state;
+  const plain = (role, kind, lines = [], chips = []) => ({
+    role,
+    kind,
+    titleFrom: "note",
+    chips,
+    lines,
+    label: [kind, ...chips.map((chip) => chip.text), ...lines].join(", ")
+  });
+  if (id === roles.proposition) return plain("proposition", t2("ui.argument_proposition"));
+  if (id === roles.conclusion) return conclusionCard(state, t2);
+  if (id === roles.situation) {
+    const data = state.situation.data;
+    const found = data.filter((datum2) => datum2.state === "found").length;
+    const count3 = t2("ui.argument_data_count_0_1", found, data.length);
+    const gate = state.situation.gate.state;
+    if (gate === "matched")
+      return plain("situation", t2("ui.argument_situation"), [t2("ui.argument_gate_matched_0_1", found, data.length)]);
+    const chip = gate === "unmatched" ? { tone: "no", text: t2("ui.argument_gate_unmatched") } : { tone: "open", text: t2("ui.argument_gate_pending") };
+    return plain("situation", t2("ui.argument_situation"), [count3], [chip]);
+  }
+  const datum = state.situation.data.find((item) => item.id === id);
+  if (datum) return datumCard(datum, t2);
+  if ((id === roles.verified || id === roles.eliminated) && state.run.phase === "stopped_mismatch")
+    return plain("group", t2("ui.argument_group_label"));
+  if (id === roles.verified) {
+    const verifying = state.hypotheses.filter((h) => h.location === "verifying").length;
+    return plain("group", t2("ui.argument_group_label"), [
+      t2("ui.argument_group_verified_count_0_1", verifiedCount(state), Math.max(verifying, MIN_VERIFIED))
+    ]);
+  }
+  if (id === roles.eliminated) {
+    const count3 = state.hypotheses.filter((h) => h.location === "eliminated").length;
+    return plain("group", t2("ui.argument_group_label"), [t2("ui.argument_group_eliminated_count_0", count3)]);
+  }
+  for (const h of state.hypotheses) {
+    if (h.id === id) return hypothesisCard(state, h, t2);
+    const need = h.needs.find((item) => item.id === id);
+    if (need) return needCard(need, t2);
+  }
+  return null;
+}
+function renderArgumentKind(header2, view) {
+  const kind = header2.createSpan({ cls: "vam-argument-kind", text: view.kind });
+  kind.dataset.role = view.role;
+  return kind;
+}
+function renderArgumentCardBody(card, view) {
+  card.dataset.argumentRole = view.role;
+  if (view.state) card.dataset.argumentState = view.state;
+  if (view.dashed) card.dataset.argumentMissing = "true";
+  const body = card.createDiv({ cls: "vam-argument-body" });
+  if (view.chips.length) {
+    const row = body.createDiv({ cls: "vam-argument-chips" });
+    for (const chip of view.chips) row.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
+  }
+  for (const line of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line });
+  return body;
+}
+
 // core/argument-map/machine.ts
 var GateError = class extends Error {
   constructor(message) {
@@ -45470,191 +45669,6 @@ function applyResume(state) {
   return next;
 }
 
-// experiences/visual-map/argument-card.ts
-var STANCE_KEY = {
-  supports: "ui.argument_stance_supports",
-  contradicts: "ui.argument_stance_contradicts",
-  uncertain: "ui.argument_stance_uncertain"
-};
-var STANCE_TONE = { supports: "yes", contradicts: "no", uncertain: "maybe" };
-var VERDICT_KEY = {
-  supported: "ui.hypothesis_supported",
-  refuted: "ui.hypothesis_refuted",
-  undecided: "ui.hypothesis_undecided"
-};
-var CONCLUSION_KIND = {
-  in_progress: "ui.argument_conclusion_state_progress",
-  concluded: "ui.argument_conclusion_state_concluded",
-  stopped_limit: "ui.argument_conclusion_state_limit",
-  stopped_mismatch: "ui.argument_conclusion_state_mismatch"
-};
-function sourceHost(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch (e) {
-    return "";
-  }
-}
-function missingChip(item, t2) {
-  if (item.state === "searching") return { tone: "run", text: t2("ui.argument_missing_searching") };
-  const key4 = item.state === "not_found" ? "ui.argument_missing_not_found" : "ui.argument_missing_pending";
-  return { tone: "gap", text: t2(key4) };
-}
-function datumChip(datum, t2) {
-  if (datum.state !== "found") return missingChip(datum, t2);
-  return datum.stance === "opposes" ? { tone: "no", text: t2("ui.argument_data_opposes") } : { tone: "yes", text: t2("ui.argument_stance_supports") };
-}
-function conclusionCard(state, t2) {
-  const view = conclusionView(state);
-  const base = {
-    role: "conclusion",
-    kind: t2(CONCLUSION_KIND[view]),
-    titleFrom: "text",
-    state: view,
-    chips: [],
-    lines: [],
-    label: t2(CONCLUSION_KIND[view])
-  };
-  const verified = verifiedCount(state);
-  if (view === "concluded")
-    return { ...base, titleFrom: "summary", lines: [t2("ui.argument_conclusion_done_hint", verified)] };
-  if (view === "stopped_mismatch")
-    return { ...base, title: t2("ui.argument_stopped_mismatch"), lines: [t2("ui.argument_mismatch_hint")] };
-  if (view === "stopped_limit")
-    return { ...base, title: t2("ui.argument_conclusion_limit"), lines: [t2("ui.argument_conclusion_limit_hint")] };
-  return {
-    ...base,
-    title: t2("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
-    lines: [t2("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
-  };
-}
-function hypothesisCard(state, h, t2) {
-  const index = state.hypotheses.indexOf(h) + 1;
-  const shown = displayVerdict(h);
-  const chips = h.location === "eliminated" ? [{ tone: "gap", text: t2("ui.argument_eliminated_chip") }] : [
-    shown === "verifying" ? { tone: "open", text: t2("ui.argument_verifying") } : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t2(VERDICT_KEY[shown]) }
-  ];
-  if (isVerified(h)) chips.push({ tone: "yes", text: t2("ui.argument_verified_done") });
-  const kind = t2("ui.argument_hypothesis_0", index);
-  const progress = t2("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
-  const lines = [progress];
-  if (h.location === "eliminated" && h.eliminationReason)
-    lines.push(t2("ui.argument_eliminated_0", h.eliminationReason));
-  const status = chips.map((chip) => chip.text).join(" ");
-  return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: `${kind}, ${status}, ${progress}` };
-}
-function needCard(need, t2) {
-  var _a2;
-  const kind = t2("ui.argument_evidence");
-  if (need.state === "found") {
-    const stance = (_a2 = need.stance) != null ? _a2 : "uncertain";
-    const chip2 = { tone: STANCE_TONE[stance], text: t2(STANCE_KEY[stance]) };
-    const host = need.proof ? sourceHost(need.proof.url) : "";
-    return {
-      role: "need",
-      kind: host ? `${kind} \xB7 ${host}` : kind,
-      titleFrom: "note",
-      chips: [chip2],
-      lines: need.proof ? [need.proof.claim] : [],
-      label: `${kind}, ${chip2.text}${host ? `, ${host}` : ""}`
-    };
-  }
-  const chip = missingChip(need, t2);
-  return {
-    role: "need",
-    kind,
-    titleFrom: "note",
-    dashed: true,
-    chips: [chip],
-    lines: need.reason ? [need.reason] : [],
-    label: `${kind}, ${chip.text}`
-  };
-}
-function datumCard(datum, t2) {
-  const kind = t2("ui.argument_data_item");
-  const chip = datumChip(datum, t2);
-  if (datum.state === "found") {
-    const host = datum.proof ? sourceHost(datum.proof.url) : "";
-    return {
-      role: "datum",
-      kind: host ? `${kind} \xB7 ${host}` : kind,
-      titleFrom: "note",
-      chips: [chip],
-      lines: datum.proof ? [datum.proof.claim] : [],
-      label: `${kind}, ${chip.text}${host ? `, ${host}` : ""}`
-    };
-  }
-  return {
-    role: "datum",
-    kind,
-    titleFrom: "note",
-    dashed: true,
-    chips: [chip],
-    lines: datum.reason ? [datum.reason] : [],
-    label: `${kind}, ${chip.text}`
-  };
-}
-function describeArgumentCard(state, id, t2) {
-  const { roles } = state;
-  const plain = (role, kind, lines = [], chips = []) => ({
-    role,
-    kind,
-    titleFrom: "note",
-    chips,
-    lines,
-    label: [kind, ...chips.map((chip) => chip.text), ...lines].join(", ")
-  });
-  if (id === roles.proposition) return plain("proposition", t2("ui.argument_proposition"));
-  if (id === roles.conclusion) return conclusionCard(state, t2);
-  if (id === roles.situation) {
-    const data = state.situation.data;
-    const found = data.filter((datum2) => datum2.state === "found").length;
-    const count3 = t2("ui.argument_data_count_0_1", found, data.length);
-    const gate = state.situation.gate.state;
-    if (gate === "matched")
-      return plain("situation", t2("ui.argument_situation"), [t2("ui.argument_gate_matched_0_1", found, data.length)]);
-    const chip = gate === "unmatched" ? { tone: "no", text: t2("ui.argument_gate_unmatched") } : { tone: "open", text: t2("ui.argument_gate_pending") };
-    return plain("situation", t2("ui.argument_situation"), [count3], [chip]);
-  }
-  const datum = state.situation.data.find((item) => item.id === id);
-  if (datum) return datumCard(datum, t2);
-  if ((id === roles.verified || id === roles.eliminated) && state.run.phase === "stopped_mismatch")
-    return plain("group", t2("ui.argument_group_label"));
-  if (id === roles.verified) {
-    const verifying = state.hypotheses.filter((h) => h.location === "verifying").length;
-    return plain("group", t2("ui.argument_group_label"), [
-      t2("ui.argument_group_verified_count_0_1", verifiedCount(state), Math.max(verifying, MIN_VERIFIED))
-    ]);
-  }
-  if (id === roles.eliminated) {
-    const count3 = state.hypotheses.filter((h) => h.location === "eliminated").length;
-    return plain("group", t2("ui.argument_group_label"), [t2("ui.argument_group_eliminated_count_0", count3)]);
-  }
-  for (const h of state.hypotheses) {
-    if (h.id === id) return hypothesisCard(state, h, t2);
-    const need = h.needs.find((item) => item.id === id);
-    if (need) return needCard(need, t2);
-  }
-  return null;
-}
-function renderArgumentKind(header2, view) {
-  const kind = header2.createSpan({ cls: "vam-argument-kind", text: view.kind });
-  kind.dataset.role = view.role;
-  return kind;
-}
-function renderArgumentCardBody(card, view) {
-  card.dataset.argumentRole = view.role;
-  if (view.state) card.dataset.argumentState = view.state;
-  if (view.dashed) card.dataset.argumentMissing = "true";
-  const body = card.createDiv({ cls: "vam-argument-body" });
-  if (view.chips.length) {
-    const row = body.createDiv({ cls: "vam-argument-chips" });
-    for (const chip of view.chips) row.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
-  }
-  for (const line of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line });
-  return body;
-}
-
 // core/argument-map/layout.ts
 var GROUP_STANCE = { supports: 0, contradicts: 1, opposes: 1, uncertain: 2 };
 function itemRank(item) {
@@ -45708,12 +45722,6 @@ function arrangeArgumentMap(nodes, state, heightOf, options = {}) {
     const at = placed.get(node.id);
     return at ? { ...node, x: at.x, y: at.y } : node;
   });
-}
-var UNARRANGED_PROBE_HEIGHT = 40;
-function arrangeUnarrangedArgumentMap(nodes, state) {
-  const all = new Set(nodes.map((node) => node.id));
-  if (!cardsOverlapAny(nodes, all, () => UNARRANGED_PROBE_HEIGHT)) return null;
-  return arrangeArgumentMap(nodes, state);
 }
 
 // core/provider-step-runner.ts
@@ -62953,13 +62961,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       await this.plugin.repo.saveMap(path, map);
       if (!isCurrent()) return;
     }
-    const argumentOnOpen = map.argumentMap === void 0 ? null : readArgumentMap(map);
-    const arranged = (argumentOnOpen == null ? void 0 : argumentOnOpen.kind) === "usable" ? arrangeUnarrangedArgumentMap(map.nodes, argumentOnOpen.data) : null;
-    if (arranged) {
-      map.nodes = arranged;
-      await this.plugin.repo.saveMap(path, map);
-      if (!isCurrent()) return;
-    }
     const progressive = map.nodes.length > 0 && (this.path !== path || this.paintCount === 0);
     if (this.path !== path) this.plugin.closeStaleDetails();
     if (this.path !== path) this.dropMapBackground();
@@ -63013,8 +63014,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       if (!isCurrent()) return;
       await this.recoverInterruptedNotes(isCurrent);
       if (!isCurrent()) return;
-      await this.recoverArgumentRun(isCurrent);
-      if (!isCurrent()) return;
       this.endNoteLoad(load);
       this.render();
       this.app.workspace.requestSaveLayout();
@@ -63049,31 +63048,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       } catch (error) {
         console.warn("Visual Agent Map interrupted run", error);
       }
-    }
-  }
-  /**
-   * A hypothesis-research run left `running` by a reload has no owner: it is paused in this same mutation (items back to pending, no
-   * provider call), like an interrupted note. A map without the `argumentMap` key never reaches the write.
-   */
-  async recoverArgumentRun(isCurrent) {
-    const map = this.map;
-    if (!map || map.argumentMap === void 0) return;
-    const read = readArgumentMap(map);
-    if (read.kind !== "usable" || read.data.run.status !== "running" || this.plugin.argumentRuns.isRunning(this.path))
-      return;
-    try {
-      const updated = await this.plugin.repo.updateMap(this.path, (doc) => {
-        const current = readArgumentMap(doc);
-        if (current.kind !== "usable" || current.data.run.status !== "running") return;
-        try {
-          doc.argumentMap = applyPause(current.data, "interrupted");
-        } catch (error) {
-          if (!(error instanceof GateError)) throw error;
-        }
-      });
-      if (isCurrent() && this.map === map) map.argumentMap = updated.argumentMap;
-    } catch (error) {
-      console.warn("Visual Agent Map argument run recovery", error);
     }
   }
   openAimStart() {
@@ -75981,9 +75955,6 @@ ${request.requirements}` : preset.text,
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeHypothesisLeaning(path, leaning)).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
-      const read = readArgumentMap(map);
-      const entry2 = read.kind === "usable" ? read.data.hypotheses.find((item) => item.id === node.id) : void 0;
-      if (entry2) entry2.userVerdict = leaning;
     }).commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();

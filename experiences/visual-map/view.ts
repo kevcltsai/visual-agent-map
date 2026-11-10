@@ -4216,7 +4216,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The status bars for background AI work on the open map: structure review and AI outline generation. */
   /** Which button of the progress bar was pressed last ("stop" or "resume"): the focus waits for the other one to appear. */
-  private argumentBarPressed: "stop" | "resume" | null = null;
+  private argumentBarPressed: { path: string; action: "stop" | "resume" } | null = null;
   /**
    * The hypothesis research progress bar, derived on every paint from the saved run state and whether this session drives the run
    * (nothing else is stored). A map without a usable argument key gets no element at all. Only fixed words and counts the program
@@ -4251,7 +4251,7 @@ export class VisualAgentMapView extends ItemView {
       const stop = bar.createEl("button", { text: t("ui.argument_bar_stop"), attr: { type: "button" } });
       stop.addEventListener("click", () => {
         stop.disabled = true;
-        this.argumentBarPressed = "stop";
+        this.argumentBarPressed = { path, action: "stop" };
         void this.plugin.argumentRuns.stop(path);
       });
       button = stop;
@@ -4263,7 +4263,7 @@ export class VisualAgentMapView extends ItemView {
       });
       resume.addEventListener("click", () => {
         resume.disabled = true;
-        this.argumentBarPressed = "resume";
+        this.argumentBarPressed = { path, action: "resume" };
         this.plugin.argumentRuns.resume(path).catch((error: unknown) => {
           this.argumentBarPressed = null;
           resume.disabled = false;
@@ -4276,10 +4276,28 @@ export class VisualAgentMapView extends ItemView {
       button = resume;
     }
     // After a press the pressed button is gone (stop and resume swap): the keyboard goes to the one that replaced it, or to the bar.
-    if (this.argumentBarPressed && view.action !== this.argumentBarPressed) {
+    // Only when the keyboard was in the old bar (now gone: the page holds it) or nowhere; a press on another map is forgotten.
+    const pressed = this.argumentBarPressed;
+    if (pressed && pressed.path !== path) this.argumentBarPressed = null;
+    else if (pressed && view.action !== pressed.action) {
       this.argumentBarPressed = null;
-      (button ?? bar).focus();
+      const doc = parent.ownerDocument;
+      const active = doc?.activeElement ?? null;
+      if (!active || active === doc?.body || active.isConnected === false) (button ?? bar).focus();
     }
+  }
+  /**
+   * Call before a repaint: when the keyboard is on a button of the argument run bar, the returned function (call it after the
+   * repaint) puts it on the new bar's button (else the bar), because paint() empties the content and drops the focus.
+   */
+  private keepArgumentBarFocus(): () => void {
+    const bar = this.contentEl?.querySelector?.<HTMLElement>(".vam-argument-bar");
+    const active = this.contentEl?.ownerDocument?.activeElement ?? null;
+    if (!bar || !active || !bar.contains?.(active)) return () => {};
+    return () => {
+      const next = this.contentEl?.querySelector?.<HTMLElement>(".vam-argument-bar");
+      (next?.querySelector?.<HTMLElement>("button") ?? next)?.focus();
+    };
   }
   private renderBackgroundBars(parent: HTMLElement): void {
     const review = this.structureReviewTask;
@@ -14135,6 +14153,7 @@ export class VisualAgentMapView extends ItemView {
     }
     const keepMapFocus = this.holdMapFocus();
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
+    const restoreArgumentFocus = this.keepArgumentBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const topicChatHeld = this.detachTopicChat();
     const restoreSearch = this.holdMapSearch();
@@ -14569,6 +14588,7 @@ export class VisualAgentMapView extends ItemView {
     this.transform();
     this.drawEdges();
     restoreRelevanceFocus();
+    restoreArgumentFocus();
     restoreChatFocus();
     this.remountTopicChat(topicChatHeld);
     keepMapFocus();
@@ -22602,7 +22622,9 @@ export class VisualAgentMapView extends ItemView {
     const root = map.nodes.find(node => node.id === read.data.roles.proposition);
     if (!root) return;
     this.argumentFocusMapId = null;
+    // focusNode only centres the camera: the keyboard is still in the opening screen's composer until the card takes it.
     this.focusNode(root);
+    this.cardEls.get(root.id)?.focus?.({ preventScroll: true });
   }
   private openArgumentStart(draft: string): void {
     const map = this.map;

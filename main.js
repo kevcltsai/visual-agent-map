@@ -5783,7 +5783,7 @@ var zhCN = {
   "ui.argument_start_confirm": "\u5F00\u59CB\u7814\u7A76",
   "ui.argument_start_refused": "\u65E0\u6CD5\u5728\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u4E0A\u5F00\u59CB\u5047\u8BBE\u7814\u7A76\u3002",
   "ui.argument_bar_label": "\u5047\u8BBE\u7814\u7A76\u8FDB\u5EA6",
-  "ui.argument_bar_situation": "\u786E\u8BA4\u73B0\u72B6",
+  "ui.argument_bar_situation": "\u786E\u8BA4\u73B0\u51B5",
   "ui.argument_bar_round_0": "\u9A8C\u8BC1\u5047\u8BBE\u30FB\u7B2C {0} \u8F6E",
   "ui.argument_bar_searching_data_0": "\u6B63\u5728\u627E {0} \u6761\u6570\u636E",
   "ui.argument_bar_searching_evidence_0": "\u6B63\u5728\u627E {0} \u6761\u8BC1\u636E",
@@ -46156,7 +46156,7 @@ async function askArgumentStep(step, request, runner, signal) {
 
 // experiences/visual-map/argument-run.ts
 var MAX_RESEARCH_CONCURRENCY = 3;
-var WORST_CASE_AI_CALLS = MAX_RESEARCH_CALLS + 1 + 1 + (MAX_HYPOTHESES - 3 + 1) + MAX_HYPOTHESES * MAX_ROUND * 2 + 1;
+var WORST_CASE_AI_CALLS = MAX_RESEARCH_CALLS + 1 + 1 + (MAX_HYPOTHESES - MIN_VERIFIED + 1) + MAX_HYPOTHESES * MAX_ROUND * 2 + 1;
 var X_STEP = 320;
 var Y_STEP = 160;
 var ArgumentRunError = class extends Error {
@@ -63172,6 +63172,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
    * computes are shown, never text from the model.
    */
   renderArgumentRunBar(parent) {
+    var _a2;
     const map = this.map;
     if (!map || map.argumentMap === void 0) return;
     const read = readArgumentMap(map);
@@ -63200,7 +63201,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       const stop = bar.createEl("button", { text: t("ui.argument_bar_stop"), attr: { type: "button" } });
       stop.addEventListener("click", () => {
         stop.disabled = true;
-        this.argumentBarPressed = "stop";
+        this.argumentBarPressed = { path, action: "stop" };
         void this.plugin.argumentRuns.stop(path);
       });
       button = stop;
@@ -63212,7 +63213,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       });
       resume.addEventListener("click", () => {
         resume.disabled = true;
-        this.argumentBarPressed = "resume";
+        this.argumentBarPressed = { path, action: "resume" };
         this.plugin.argumentRuns.resume(path).catch((error) => {
           this.argumentBarPressed = null;
           resume.disabled = false;
@@ -63224,10 +63225,30 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       });
       button = resume;
     }
-    if (this.argumentBarPressed && view.action !== this.argumentBarPressed) {
+    const pressed = this.argumentBarPressed;
+    if (pressed && pressed.path !== path) this.argumentBarPressed = null;
+    else if (pressed && view.action !== pressed.action) {
       this.argumentBarPressed = null;
-      (button != null ? button : bar).focus();
+      const doc = parent.ownerDocument;
+      const active = (_a2 = doc == null ? void 0 : doc.activeElement) != null ? _a2 : null;
+      if (!active || active === (doc == null ? void 0 : doc.body) || active.isConnected === false) (button != null ? button : bar).focus();
     }
+  }
+  /**
+   * Call before a repaint: when the keyboard is on a button of the argument run bar, the returned function (call it after the
+   * repaint) puts it on the new bar's button (else the bar), because paint() empties the content and drops the focus.
+   */
+  keepArgumentBarFocus() {
+    var _a2, _b2, _c, _d, _e, _f;
+    const bar = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-argument-bar");
+    const active = (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.ownerDocument) == null ? void 0 : _d.activeElement) != null ? _e : null;
+    if (!bar || !active || !((_f = bar.contains) == null ? void 0 : _f.call(bar, active))) return () => {
+    };
+    return () => {
+      var _a3, _b3, _c2, _d2, _e2;
+      const next = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-argument-bar");
+      (_e2 = (_d2 = (_c2 = next == null ? void 0 : next.querySelector) == null ? void 0 : _c2.call(next, "button")) != null ? _d2 : next) == null ? void 0 : _e2.focus();
+    };
   }
   renderBackgroundBars(parent) {
     var _a2, _b2, _c, _d;
@@ -72356,6 +72377,7 @@ ${request.requirements}` : preset.text,
     }
     const keepMapFocus = this.holdMapFocus();
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
+    const restoreArgumentFocus = this.keepArgumentBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const topicChatHeld = this.detachTopicChat();
     const restoreSearch = this.holdMapSearch();
@@ -72758,6 +72780,7 @@ ${request.requirements}` : preset.text,
     this.transform();
     this.drawEdges();
     restoreRelevanceFocus();
+    restoreArgumentFocus();
     restoreChatFocus();
     this.remountTopicChat(topicChatHeld);
     keepMapFocus();
@@ -80101,6 +80124,7 @@ ${note.detail.trim()}` : "",
   }
   /** After a run was started from the opening screen: the keyboard goes to the proposition card once, when the argument map first shows. */
   focusArgumentRootOnce() {
+    var _a2, _b2;
     const map = this.map;
     if (this.argumentFocusMapId === null || !map || map.id !== this.argumentFocusMapId || map.argumentMap === void 0)
       return;
@@ -80110,6 +80134,7 @@ ${note.detail.trim()}` : "",
     if (!root) return;
     this.argumentFocusMapId = null;
     this.focusNode(root);
+    (_b2 = (_a2 = this.cardEls.get(root.id)) == null ? void 0 : _a2.focus) == null ? void 0 : _b2.call(_a2, { preventScroll: true });
   }
   openArgumentStart(draft) {
     const map = this.map;

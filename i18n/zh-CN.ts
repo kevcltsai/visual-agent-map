@@ -2914,7 +2914,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.argument_start_confirm": "开始研究",
   "ui.argument_start_refused": "无法在这张思维导图上开始假设研究。",
   "ui.argument_bar_label": "假设研究进度",
-  "ui.argument_bar_situation": "确认现状",
+  "ui.argument_bar_situation": "确认现况",
   "ui.argument_bar_round_0": "验证假设・第 {0} 轮",
   "ui.argument_bar_searching_data_0": "正在找 {0} 条数据",
   "ui.argument_bar_searching_evidence_0": "正在找 {0} 条证据",

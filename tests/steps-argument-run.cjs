@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
-const { ArgumentRuns, ArgumentRunError } = S.load('experiences/visual-map/argument-run.ts');
+const { ArgumentRuns, ArgumentRunError, WORST_CASE_AI_CALLS } = S.load('experiences/visual-map/argument-run.ts');
 const { ARGUMENT_STEPS, ArgumentStepError } = S.load('core/steps/argument-map/runner.ts');
 const model = S.load('core/argument-map/model.ts');
 const { translate } = S.load('i18n.ts');
@@ -492,4 +492,8 @@ test('sanitize inline Markdown on write: claim/quote/reason/point and note title
       assert.ok(inert(note.detail ?? ''), `${bad} detail ${note.detail}`);
     }
   }
+});
+
+test('worst-case AI call count shown before a run is 109', () => {
+  assert.equal(WORST_CASE_AI_CALLS, 109);
 });

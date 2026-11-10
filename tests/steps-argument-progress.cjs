@@ -92,7 +92,7 @@ function fakeView(state, { owned = false, argumentMap = state } = {}) {
   };
   return { view, calls };
 }
-const render = view => { const parent = dom.element('div'); parent.root = view.contentEl.root; view.contentEl = parent; VisualAgentMapView.prototype.renderArgumentRunBar.call(view, parent); return parent; };
+const render = view => { const parent = dom.element('div'); parent.root = view.contentEl.root; Object.defineProperty(parent, 'ownerDocument', { get: () => parent.root }); view.contentEl = parent; VisualAgentMapView.prototype.renderArgumentRunBar.call(view, parent); return parent; };
 const bars = parent => dom.findAll(parent, i => i.cls.split(/\s+/).includes('vam-argument-bar'));
 const buttons = parent => dom.findAll(parent, i => i.tag === 'button');
 
@@ -198,4 +198,67 @@ test('focus is not moved by a render that did not change the button, nor when no
   view.map.argumentMap = make({ calls: 2 });
   parent = render(view);
   assert.equal(buttons(parent)[0].focused, undefined, 'same action still showing: wait for the swap');
+});
+
+// ---- keyboard focus survives the repaint (paint() empties contentEl) -----------------------------------------------------
+const withDocument = view => { view.contentEl.root = { activeElement: null, body: { tag: 'body' } }; Object.defineProperty(view.contentEl, 'ownerDocument', { get: () => view.contentEl.root }); return view; };
+const repaint = view => {
+  const restore = VisualAgentMapView.prototype.keepArgumentBarFocus.call(view);
+  const doc = view.contentEl.root;
+  doc.activeElement = doc.body; // the old bar is gone: focus fell to the page
+  const parent = render(view);
+  restore();
+  return { parent, doc };
+};
+
+test('keyboard focus on Stop is restored to the new Stop after a checkpoint repaint', () => {
+  const view = withDocument(fakeView(make({ calls: 1 }), { owned: true }).view);
+  buttons(render(view))[0].focus();
+  view.map.argumentMap = make({ calls: 2 });
+  const { parent, doc } = repaint(view);
+  assert.equal(doc.activeElement, buttons(parent)[0]);
+  assert.equal(buttons(parent)[0].text, 'Stop');
+});
+
+test('keyboard focus on Resume is restored to the new Resume after a repaint', () => {
+  const view = withDocument(fakeView(make({ status: 'paused', stopReason: 'user' })).view);
+  buttons(render(view))[0].focus();
+  const { parent, doc } = repaint(view);
+  assert.equal(doc.activeElement, buttons(parent)[0]);
+  assert.equal(buttons(parent)[0].text, 'Resume');
+});
+
+test('counterexample: a repaint does not take focus when the keyboard was not in the bar', () => {
+  const view = withDocument(fakeView(make({ calls: 1 }), { owned: true }).view);
+  render(view);
+  const other = dom.element('input');
+  other.focus = () => { view.contentEl.root.activeElement = other; };
+  other.focus();
+  const restore = VisualAgentMapView.prototype.keepArgumentBarFocus.call(view);
+  const parent = render(view);
+  restore();
+  assert.equal(view.contentEl.root.activeElement, other);
+  assert.equal(buttons(parent)[0].focused, undefined);
+});
+
+test('counterexample: press Stop, move focus elsewhere, the next render does not steal focus', () => {
+  const view = withDocument(fakeView(make({ calls: 1 }), { owned: true }).view);
+  buttons(render(view))[0].click();
+  const other = dom.element('input');
+  other.focus = () => { view.contentEl.root.activeElement = other; };
+  other.focus();
+  view.map.argumentMap = make({ status: 'paused', stopReason: 'user' });
+  view.plugin.argumentRuns.isRunning = () => false;
+  const parent = render(view);
+  assert.equal(view.contentEl.root.activeElement, other);
+  assert.equal(buttons(parent)[0].focused, undefined);
+});
+
+test('counterexample: a press on one map does not move focus in a bar of another map', () => {
+  const view = withDocument(fakeView(make({ calls: 1 }), { owned: true }).view);
+  buttons(render(view))[0].click();
+  view.path = 'Other.vam';
+  view.map.argumentMap = make({ status: 'paused', stopReason: 'user' });
+  view.plugin.argumentRuns.isRunning = () => false;
+  assert.equal(buttons(render(view))[0].focused, undefined);
 });

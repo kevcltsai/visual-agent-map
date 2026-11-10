@@ -170,3 +170,29 @@ test('a refused start shows a notice; the run is not awaited', async () => {
   assert.deepEqual(notices, ['Could not start hypothesis research on this mind map.']);
   assert.equal(calls.cleared, 1);
 });
+
+// focusNode only pans the camera; the real keyboard focus (still in the opening screen's composer) must be moved onto the card itself.
+test('the proposition card takes the keyboard focus once, not just the camera, when the argument map first shows', () => {
+  const machine = load('core/argument-map/machine.ts');
+  const roles = { proposition: 'p', situation: 's', conclusion: 'c', verified: 'v', eliminated: 'e' };
+  const doc = { activeElement: null };
+  const composer = dom.element('textarea'); composer.root = doc; composer.focus();
+  const card = dom.element('div'); card.root = doc;
+  const cardFocus = card.focus.bind(card);
+  card.focus = options => { card.focusOptions = options; cardFocus(); };
+  const panned = [];
+  const view = {
+    argumentFocusMapId: 'm1',
+    map: { id: 'm1', nodes: [{ id: 'p' }, { id: 's' }, { id: 'c' }, { id: 'v' }, { id: 'e' }], argumentMap: machine.newArgumentMap(roles, 'run') },
+    cardEls: new Map([['p', card]]),
+    focusNode: node => panned.push(node.id)
+  };
+  VisualAgentMapView.prototype.focusArgumentRootOnce.call(view);
+  assert.deepEqual(panned, ['p']);
+  assert.equal(doc.activeElement, card, 'the card, not the composer, holds the focus');
+  assert.equal(card.focusOptions.preventScroll, true);
+  assert.equal(view.argumentFocusMapId, null);
+  composer.focus();
+  VisualAgentMapView.prototype.focusArgumentRootOnce.call(view);
+  assert.equal(doc.activeElement, composer, 'only once: a later sync does not steal focus again');
+});

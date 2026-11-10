@@ -2001,13 +2001,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.externalReconcilePaths.clear();
       void this.mutate(async () => {
         // Only a deleted map node can leave a dangling path; other deletions need no vault scan.
-        let tracked = false;
-        for (const path of deleted)
-          if (await this.repo.isMapNodePath(path)) {
-            tracked = true;
-            break;
-          }
-        if (!tracked) return;
+        if (!(await this.repo.anyMapNodePath(deleted))) return;
         const repaired = await this.repo.reconcileMissingNodePaths();
         if (repaired) await this.rebuildDerivedData();
       }).catch(error => console.error("Visual Agent Map external rename reconciliation", error));

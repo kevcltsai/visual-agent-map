@@ -4,7 +4,7 @@ import type { Repository } from "../../repository";
 import { normalizeReasoningLevel } from "../../ai/task-policy";
 import { randomUUID } from "node:crypto";
 import { noteLanguageOf, translate, type ContentLanguage } from "../../i18n";
-import { chooseAimContentLanguage } from "./content-language";
+import { chooseAimContentLanguage } from "../../core/content-language";
 import { buildAimRootContext, type AimOutcomeExpectation } from "./outcome-expectations";
 
 export interface AimStartInput {

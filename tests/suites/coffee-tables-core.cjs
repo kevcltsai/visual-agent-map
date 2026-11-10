@@ -75,6 +75,24 @@ test('Coffee Tables every prompt mode carries cumulative update operations and t
   const refresh = coffeePrompts.observerOnlyPrompt(session);
   assert.match(refresh, /更早保存的跨域連結/);
 });
+test('Coffee observer refresh assembles the table context once per request; the history limit is still checked before the prompt limit', () => {
+  const { MAX_COFFEE_CONTEXT_CHARS: max } = load('experiences/coffee-tables/prompt-parts.ts');
+  const session = coffeeTypes.createSession('題目', 'm', 'low', 'zh-TW');
+  session.status = 'completed'; session.transcriptMarkdown = '### 甲\n短句';
+  let reads = 0; const questions = session.questions;
+  Object.defineProperty(session, 'questions', { get() { reads++; return questions; } });
+  assert.match(coffeePrompts.observerOnlyPrompt(session), /短句/);
+  assert.equal(reads, 1, 'one request assembles the context once');
+  // A history over the limit fails with the history message, before the prompt is measured.
+  session.transcriptMarkdown = 'x'.repeat(max + 1);
+  assert.throws(() => coffeePrompts.observerOnlyPrompt(session), { message: '這桌的內容太長，無法安全地全部交給模型。舊內容已完整保留。' });
+  // A history within the limit whose full prompt is over it fails with the prompt message: the limit is the history's own length.
+  session.transcriptMarkdown = 'x'.repeat(max - 10);
+  assert.ok(coffeePrompts.assembleCoffeeContext(session).length <= max);
+  assert.throws(() => coffeePrompts.observerOnlyPrompt(session), { message: '這桌的內容太長，無法安全地全部交給模型；舊內容已完整保留。' });
+  session.observerDraftMarkdown = 'y'.repeat(20);
+  assert.throws(() => coffeePrompts.observerOnlyPrompt(session), { message: '這桌的內容太長，無法安全地全部交給模型。舊內容已完整保留。' }, 'the drafts count toward the history');
+});
 test('Coffee customization preserves saved text, validates reserved markers, and keeps editable style focused', () => {
   const defaults = coffeeCustomization.defaultCustomization('zh-TW');
   const saved = { ...defaults, observerPrompt: '不要刪除來源；這是一般整理偏好。' };

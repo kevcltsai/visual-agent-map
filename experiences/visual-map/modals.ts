@@ -1,6 +1,6 @@
 // Modals and task helpers used by the Visual Map view; moved from view.ts unchanged.
 import type VisualAgentMapPlugin from "../../main";
-import { defaultOutputLanguage } from "../aim/content-language";
+import { defaultOutputLanguage } from "../../core/content-language";
 import {
   FOLLOW_INPUT_ID,
   OUTPUT_LANGUAGE_CHOICES,

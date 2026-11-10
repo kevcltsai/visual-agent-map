@@ -75,6 +75,24 @@ test('unload clears the pending external reconciliation so no repo work runs aft
   assert.equal(mutated, 0, 'the 500 ms reconcile timer never fired after unload');
 });
 
+test('one external delete batch scans the maps once, however many notes were deleted', async () => {
+  const plugin = newPlugin();
+  const checked = [];
+  let reconciled = 0;
+  plugin.repo = {
+    async anyMapNodePath(paths) { checked.push([...paths]); return false; },
+    async reconcileMissingNodePaths() { reconciled++; return 0; },
+    dispose() {}
+  };
+  plugin.mutate = work => work();
+  for (let i = 0; i < 50; i++) plugin.scheduleExternalReconciliation(`Personal/gone-${i}.md`);
+  await delay(700);
+  assert.equal(checked.length, 1, 'one map scan for the whole batch');
+  assert.equal(checked[0].length, 50);
+  assert.equal(reconciled, 0, 'no node deleted, nothing reconciled');
+  plugin.onunload();
+});
+
 test('Reconnect existing workspace (offerWorkspaceReconnect) rebuilds Coffee Tables for the chosen folder', async () => {
   const modals = [];
   const obsidian = { ...S.obsidian, Modal: class { constructor(app) { this.app = app; } open() { modals.push(this); } close() {} } };

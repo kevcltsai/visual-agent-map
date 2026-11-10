@@ -1,14 +1,15 @@
 name: CI
 
 # The run name tells find-green-ci-run.sh which runs are full. A full run is a push to main or a manual run with full=true;
-# every other push (feature branches, pull requests) runs only the tests a change can reach (scripts/test-affected.mjs).
-run-name: "CI ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}: ${{ github.event.head_commit.message || github.event.pull_request.title || github.ref_name }}"
+# every other push (feature branches) runs only the tests a change can reach (scripts/test-affected.mjs).
+# There is no pull_request trigger: a PR shows its branch's push run for the same commit, so one commit runs once.
+# The PR merge ref is not tested on its own; the full run on main after the merge covers it.
+run-name: "CI ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}: ${{ github.event.head_commit.message || github.ref_name }}"
 
 on:
   push:
     branches:
       - "**"
-  pull_request:
   workflow_dispatch:
     inputs:
       full:

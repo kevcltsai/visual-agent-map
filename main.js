@@ -11583,11 +11583,17 @@ ${session.draftMarkdown}` : "",
 ${session.observerDraftMarkdown}` : ""
   ].filter(Boolean).join("\n\n");
 }
+var historyLengths = /* @__PURE__ */ new WeakMap();
+function rememberHistory(input2, text13) {
+  historyLengths.set(input2, text13.length);
+  return text13;
+}
 var observerOnlyStep = {
   id: "coffee.observer-only",
   version: 1,
-  render: ({ session }) => {
+  render: (input2) => {
     var _a2, _b2, _c, _d;
+    const { session } = input2;
     const key4 = coffeeInstruction(session.language);
     const style = ((_a2 = session.guests) == null ? void 0 : _a2.customization) ? cleanChatStyle(conversationStyle(session.language, session.guests)) : conversationStyle(session.language, session.guests);
     return renderTemplate(key4 === "zh" ? prompt_zh_default : prompt_en_default, {
@@ -11596,13 +11602,16 @@ var observerOnlyStep = {
 ${style}
 ` : "",
       references: formatReferenceContext((_c = (_b2 = session.guests) == null ? void 0 : _b2.referenceFiles) != null ? _c : []),
-      history: history(session),
+      // Built where it always was among the template values, so a failure surfaces in the same order.
+      history: rememberHistory(input2, history(session)),
       observerFormat: observerFormat(session.language, true, (_d = session.guests) == null ? void 0 : _d.customization)
     });
   },
-  policy: (prompt, { session }) => {
+  policy: (prompt, input2) => {
+    var _a2;
+    const { session } = input2;
     const language2 = session.language;
-    if (history(session).length > MAX_COFFEE_CONTEXT_CHARS)
+    if (((_a2 = historyLengths.get(input2)) != null ? _a2 : history(session).length) > MAX_COFFEE_CONTEXT_CHARS)
       throw new Error(coffeeText(language2, "coffee.table_too_long_to_summarize"));
     if (prompt.length > MAX_COFFEE_CONTEXT_CHARS)
       throw new Error(coffeeText(language2, "coffee.table_too_long_to_summarize_prompt"));
@@ -18751,7 +18760,7 @@ var hanScriptVotes = (text13) => {
   return { simplified, traditional };
 };
 
-// experiences/aim/content-language.ts
+// core/content-language.ts
 var OUTPUT_ROWS = OUTPUT_LANGUAGES;
 var isOutputOnlyLanguage = (value) => OUTPUT_LANGUAGES.some((item) => item.id === value);
 var UNDECIDED_HAN = "han";
@@ -20816,7 +20825,7 @@ function validateAimResearchPlan(subtopics) {
   return plan;
 }
 
-// experiences/aim/legacy-names.ts
+// core/legacy-names.ts
 var LEGACY_KEY_PREFIX = "mindSearch";
 var LEGACY_MARKER_PREFIX = "mindsearch-";
 var AIM_CREATE_MAP_COMMAND_ID = "create-mindsearch-map";
@@ -24655,6 +24664,29 @@ function chatPlanGroupOf(kind) {
   }
 }
 
+// core/note-read-context.ts
+function createNoteReadContext(map) {
+  var _a2;
+  return {
+    nodesById: new Map(((_a2 = map == null ? void 0 : map.nodes) != null ? _a2 : []).map((node) => [node.id, node])),
+    ancestorFm: /* @__PURE__ */ new Map(),
+    reads: /* @__PURE__ */ new Map(),
+    failedPaths: /* @__PURE__ */ new Set(),
+    map
+  };
+}
+function readOnce(ctx, path, read) {
+  let pending2 = ctx.reads.get(path);
+  if (!pending2) {
+    pending2 = read().catch((error) => {
+      ctx.failedPaths.add(path);
+      throw error;
+    });
+    ctx.reads.set(path, pending2);
+  }
+  return pending2;
+}
+
 // core/link-rewrite.ts
 function linkPathOf(target) {
   const hash = target.indexOf("#");
@@ -27315,7 +27347,7 @@ var Repository = class {
    * manual keeps it, workspace follows the current setting, inherited uses the nearest manual ancestor's stored model
    * and otherwise the current setting. `overridden` is true when the model comes from a manual topic or ancestor.
    */
-  async effectiveModel(path, stored, source, map, storedReasoning) {
+  async effectiveModel(path, stored, source, map, storedReasoning, ctx) {
     if (source === "manual")
       return {
         model: stored || this.settings.cliModel,
@@ -27338,20 +27370,41 @@ var Repository = class {
       }
     }
     const seen = /* @__PURE__ */ new Set();
+    const byId = ctx && owner && ctx.map === owner ? ctx.nodesById : void 0;
     let node = owner == null ? void 0 : owner.nodes.find((item) => item.path === path);
     while (node && node.parentId && !seen.has(node.id)) {
       seen.add(node.id);
-      const parent = owner.nodes.find((item) => item.id === node.parentId);
+      const parentId = node.parentId;
+      const parent = byId ? byId.get(parentId) : owner.nodes.find((item) => item.id === parentId);
       if (!parent) break;
-      try {
-        const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text5(fm.model))
-          return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
-      } catch (e) {
-      }
+      const fm = await this.ancestorFrontmatter(parent.path, ctx);
+      if (fm && fm["model-source"] === "manual" && text5(fm.model))
+        return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
       node = parent;
     }
     return { model: this.settings.cliModel, overridden: false };
+  }
+  /**
+   * An ancestor note's frontmatter, or null when it is missing or unreadable (the walk skips it). With a context the
+   * file is read once per hydrate; an existing file whose read throws is recorded in `ctx.failedPaths`.
+   */
+  async ancestorFrontmatter(path, ctx) {
+    const load = async () => {
+      try {
+        const file = this.file(path);
+        const content = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file);
+        return frontmatter(content);
+      } catch (e) {
+        return null;
+      }
+    };
+    if (!ctx) return load();
+    let pending2 = ctx.ancestorFm.get(path);
+    if (!pending2) {
+      pending2 = load();
+      ctx.ancestorFm.set(path, pending2);
+    }
+    return pending2;
   }
   /**
    * Resolve the model for a topic: run-once choice, then the topic's override (inherited upward), then the current
@@ -27405,14 +27458,26 @@ var Repository = class {
     }
     return false;
   }
-  async readNote(path, map) {
+  async readNote(path, map, ctx) {
+    const file = this.file(path), raw = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file);
+    return this.parseNote(path, raw, map, ctx);
+  }
+  /** Parses already-read note content; `readNote` reads the file once and calls this. */
+  async parseNote(path, raw, map, ctx) {
     var _a2, _b2;
-    const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))), fm = frontmatter(content);
+    const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(raw)), fm = frontmatter(content);
     const status = text5(fm.status, "idea");
     const normalized2 = status === "review" || status === "accepted" ? "completed" : status;
     const source = text5(fm["model-source"], "workspace");
     const modelSource = ["workspace", "inherited", "manual"].includes(source) ? source : "workspace";
-    const effective = await this.effectiveModel(path, text5(fm.model), modelSource, map, text5(fm["reasoning-level"]));
+    const effective = await this.effectiveModel(
+      path,
+      text5(fm.model),
+      modelSource,
+      map,
+      text5(fm["reasoning-level"]),
+      ctx
+    );
     const { model, reasoning } = this.chooseModel(effective);
     const state = text5(
       fm["topic-state"],
@@ -27725,6 +27790,17 @@ ${body}`);
   }
   async readMap(path) {
     return parseMap(await this.app.vault.read(this.file(path)));
+  }
+  /** Map.md read once: the map plus its goal, context and sources (what hydrate and synchronize need). */
+  async readMapMeta(path) {
+    const content = await this.app.vault.read(this.file(path));
+    const fm = frontmatter(content);
+    return {
+      map: parseMap(content),
+      goal: readRelevanceGoal(fm),
+      context: readRelevanceContext(fm),
+      sources: readMapSources(fm)
+    };
   }
   /** The map file's `relevance-goal` frontmatter, if any. The map file keeps its frontmatter across saves. */
   async readRelevanceGoal(path) {
@@ -28112,7 +28188,13 @@ ${body}`);
   }
   /** Whether any map lists `path` as a node; only map files are read. */
   async isMapNodePath(path) {
-    for (const { map } of await this.readableMaps()) if (map.nodes.some((node) => node.path === path)) return true;
+    return this.anyMapNodePath([path]);
+  }
+  /** Whether any map lists any of `paths` as a node; all maps are scanned once however many paths are given. */
+  async anyMapNodePath(paths) {
+    if (!paths.length) return false;
+    const wanted = new Set(paths);
+    for (const { map } of await this.readableMaps()) if (map.nodes.some((node) => wanted.has(node.path))) return true;
     return false;
   }
   async reconcileMissingNodePaths() {
@@ -28399,7 +28481,7 @@ ${body}`);
   }
   async readNoteIfManaged(file) {
     const content = await this.app.vault.read(file), fm = frontmatter(content);
-    return marker2(fm["agent-map-node"]) ? this.readNote(file.path) : null;
+    return marker2(fm["agent-map-node"]) ? this.parseNote(file.path, content) : null;
   }
   /**
    * Renames generated subtopic notes to their titles. A note that cannot be renamed (a read-only folder, say) is counted
@@ -29270,6 +29352,53 @@ ${embed}
 
 ${embed}${tail.includes("\n") ? tail : `${tail}
 `}`;
+}
+
+// experiences/visual-map/card-index.ts
+function cardIndex(nodes) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const node of nodes) if (!byId.has(node.id)) byId.set(node.id, node);
+  const depths = /* @__PURE__ */ new Map();
+  const depth = (start) => {
+    const indexed = byId.get(start.id) === start;
+    if (indexed) {
+      const known = depths.get(start.id);
+      if (known !== void 0) return known;
+    }
+    const chain = [start];
+    const at = /* @__PURE__ */ new Map([[start.id, 0]]);
+    let base = 0;
+    for (; ; ) {
+      const parentId = chain[chain.length - 1].parentId;
+      if (!parentId) break;
+      const known = depths.get(parentId);
+      if (known !== void 0) {
+        base = known;
+        break;
+      }
+      const repeat = at.get(parentId);
+      if (repeat !== void 0) {
+        const cycle = chain.length - repeat;
+        for (let i = repeat; i < chain.length; i++) if (i > 0 || indexed) depths.set(chain[i].id, cycle);
+        chain.length = repeat;
+        base = cycle;
+        break;
+      }
+      const parent = byId.get(parentId);
+      if (!parent) {
+        base = 1;
+        break;
+      }
+      at.set(parentId, chain.length);
+      chain.push(parent);
+    }
+    for (let i = chain.length - 1; i >= 0; i--) {
+      base += 1;
+      if (i > 0 || indexed) depths.set(chain[i].id, base);
+    }
+    return base;
+  };
+  return { node: (id) => byId.get(id), depth };
 }
 
 // experiences/visual-map/cover-frame-editor.ts
@@ -31391,6 +31520,65 @@ var NameModal = class extends import_obsidian17.Modal {
     input2.select();
   }
 };
+
+// core/sync-scope.ts
+var UNSYNCED_LIMIT = 500;
+var UnsyncedPaths = class {
+  constructor() {
+    __publicField(this, "paths", /* @__PURE__ */ new Map());
+    __publicField(this, "full", null);
+  }
+  /** A vault event for `path` with event number `seq` (numbers only grow). */
+  add(path, seq) {
+    if (this.full !== null) {
+      this.full = Math.max(this.full, seq);
+      return;
+    }
+    this.paths.set(path, seq);
+    if (this.paths.size > UNSYNCED_LIMIT) this.markFull(seq);
+  }
+  /** The next read-back reads the whole map; `seq` is the event number the mark belongs to. */
+  markFull(seq) {
+    var _a2;
+    this.full = Math.max((_a2 = this.full) != null ? _a2 : seq, seq);
+    this.paths.clear();
+  }
+  isEmpty() {
+    return this.full === null && this.paths.size === 0;
+  }
+  snapshot() {
+    return { paths: new Map(this.paths), full: this.full };
+  }
+  /**
+   * A read-back of `snapshot` ended without throwing. Only what it covered is forgotten: a path (or the full mark) that
+   * got a newer event meanwhile stays. A path whose read threw stays too, or comes back with `seq` (the event number when
+   * the snapshot was taken) when the snapshot did not list it (an ancestor read for a child); this never moves a newer
+   * number back.
+   */
+  settle(snapshot, failedPaths, seq) {
+    const failed = new Set(failedPaths);
+    if (snapshot.full !== null && this.full === snapshot.full) this.full = null;
+    for (const [path, at] of snapshot.paths)
+      if (!failed.has(path) && this.paths.get(path) === at) this.paths.delete(path);
+    for (const path of failed) {
+      if (this.full !== null) break;
+      if (!this.paths.has(path)) this.paths.set(path, seq);
+    }
+    if (this.paths.size > UNSYNCED_LIMIT) this.markFull(seq);
+  }
+  /** The view closed: nothing is read back for it any more. */
+  clear() {
+    this.paths.clear();
+    this.full = null;
+  }
+};
+function needsReadBack(snapshot, mapPath, nodePaths) {
+  if (snapshot.full !== null) return true;
+  if (!snapshot.paths.size) return false;
+  if (snapshot.paths.has(mapPath)) return true;
+  for (const path of nodePaths) if (snapshot.paths.has(path)) return true;
+  return false;
+}
 
 // ui/modals/choice-modal.ts
 var import_obsidian18 = require("obsidian");
@@ -38666,7 +38854,7 @@ var oneLine2 = (value) => {
 };
 function summarizeBasis(bases) {
   const entries = [];
-  const cardIndex = /* @__PURE__ */ new Map();
+  const cardIndex2 = /* @__PURE__ */ new Map();
   for (const basis of bases) {
     const titles = basis.kind === "outline_only" ? [] : basis.sources.map((source) => oneLine2(source.title)).filter((title, at2, all) => title && all.indexOf(title) === at2);
     const kind = basis.kind === "outline_only" || !titles.length ? "outline_only" : basis.kind;
@@ -38677,12 +38865,12 @@ function summarizeBasis(bases) {
       continue;
     }
     const key4 = kind === "outline_only" ? kind : `${kind}${titles.join("")}`;
-    const at = cardIndex.get(key4);
+    const at = cardIndex2.get(key4);
     if (at !== void 0) {
       entries[at].count++;
       continue;
     }
-    cardIndex.set(key4, entries.length);
+    cardIndex2.set(key4, entries.length);
     entries.push(
       kind === "outline_only" ? { type: "cards", kind, titles: [], count: 1 } : { type: "cards", kind, titles, count: 1 }
     );
@@ -66189,6 +66377,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     __publicField(this, "renderPending", false);
     __publicField(this, "syncHold", 0);
     __publicField(this, "syncPending", false);
+    __publicField(this, "unsyncedPaths", null);
     __publicField(this, "heldViews", []);
     /** The hint on an empty canvas, which follows the chat while it builds a map. */
     __publicField(this, "emptyMapEl", null);
@@ -66406,6 +66595,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     __publicField(this, "fitOnly");
     /** The map's child index while a paint draws its cards; null otherwise. */
     __publicField(this, "paintChildIndex", null);
+    /** The map's nodes by id and their depths while a paint draws its cards; null otherwise. */
+    __publicField(this, "paintCardIndex", null);
     /** Card measurements waiting for the paint to finish building every card; null outside a paint. */
     __publicField(this, "pendingCardFits", null);
     __publicField(this, "cardChecks", /* @__PURE__ */ new Map());
@@ -66547,6 +66738,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
   /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
   droppedCyclesOfLastMerge() {
     return this.lastDroppedCycles;
+  }
+  /** Files changed while VAM was writing that this view has not read back yet (the plugin fills it; see synchronize). */
+  get unsynced() {
+    var _a2;
+    return (_a2 = this.unsyncedPaths) != null ? _a2 : this.unsyncedPaths = new UnsyncedPaths();
   }
   /**
    * The one measurer of a text block: its width and height as the browser lays it out. Without `as` a drawn block is read
@@ -66734,6 +66930,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       heightOf: (id) => id === textId ? to.height : this.cardHeightOf(id)
     });
   }
+  /** The map node with this id: from the paint's index while a paint draws its cards, else a search of the map. */
+  mapNodeById(id) {
+    var _a2;
+    if (id === void 0) return void 0;
+    return this.paintCardIndex ? this.paintCardIndex.node(id) : (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+  }
   onMapWindowFocus() {
     var _a2, _b2, _c;
     if (!this.focusRestorePending) return;
@@ -66814,6 +67016,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     const fits = [];
     this.renderingCard = true;
     this.paintChildIndex = childIndex(this.map.nodes);
+    this.paintCardIndex = cardIndex(this.map.nodes);
     this.pendingCardFits = fits;
     try {
       for (const id of ids) {
@@ -66830,6 +67033,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     } finally {
       this.renderingCard = false;
       this.paintChildIndex = null;
+      this.paintCardIndex = null;
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();
@@ -67823,6 +68027,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     this.closeTopicLinkMenu();
     this.closed = true;
+    this.unsyncedPaths = null;
     this.closeTopicChatWindow();
     this.topicChatSessions.clear();
     if (this.plugin.repo.isDisposed()) (_a2 = this.topicChatRecords) == null ? void 0 : _a2.dispose();
@@ -68170,13 +68375,16 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
   async persist() {
     if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
-  async hydrate(isCurrent = () => true, onRead) {
-    var _a2, _b2, _c;
+  async hydrate(isCurrent = () => true, onRead, meta) {
+    var _a2, _b2, _c, _d, _e;
     this.aimFailedReports.clear();
     let goal;
     let context;
     let sources = [];
-    if (this.path && !((_a2 = this.map) == null ? void 0 : _a2.aim)) {
+    const ctx = createNoteReadContext((_a2 = this.map) != null ? _a2 : void 0);
+    if (meta) {
+      if (this.path && !((_b2 = this.map) == null ? void 0 : _b2.aim)) ({ goal, context, sources } = meta);
+    } else if (this.path && !((_c = this.map) == null ? void 0 : _c.aim)) {
       try {
         ({ goal, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch (e) {
@@ -68186,7 +68394,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       } catch (e) {
       }
     }
-    const nodes = (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : [];
+    const nodes = (_e = (_d = this.map) == null ? void 0 : _d.nodes) != null ? _e : [];
     const read = new Array(nodes.length);
     let next = 0;
     const worker = async () => {
@@ -68194,14 +68402,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       while (next < nodes.length && isCurrent()) {
         const index = next++;
         try {
-          read[index] = await this.plugin.repo.readNote(nodes[index].path, (_a3 = this.map) != null ? _a3 : void 0);
+          read[index] = await this.plugin.repo.readNote(nodes[index].path, (_a3 = this.map) != null ? _a3 : void 0, ctx);
         } catch (e) {
         }
         onRead == null ? void 0 : onRead(index, read[index]);
       }
     };
     await Promise.all(Array.from({ length: Math.min(8, nodes.length) }, worker));
-    if (!isCurrent()) return;
+    if (!isCurrent()) return { failedPaths: [] };
     const loaded = /* @__PURE__ */ new Map();
     nodes.forEach((node, index) => {
       const note = read[index];
@@ -68212,6 +68420,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     this.relevanceContext = context;
     this.mapSources = sources;
     await this.hydrateFailedReportTargets(isCurrent);
+    return { failedPaths: Array.from(ctx.failedPaths) };
   }
   async hydrateFailedReportTargets(isCurrent) {
     var _a2;
@@ -72680,8 +72889,7 @@ ${request.requirements}` : preset.text,
         reasoning,
         sourceContent: "",
         controller: new AbortController(),
-        state: "running",
-        progress: ""
+        state: "running"
       };
       this.mergeTasks.set(snapshot.path, task);
       this.mergeOpen = false;
@@ -72713,11 +72921,6 @@ ${request.requirements}` : preset.text,
         referenceGroups: [sourceGroup],
         // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
         referenceDelivery: "direct",
-        onProgress: (message) => {
-          if (!this.isLiveMergeTask(task)) return;
-          task.progress = message;
-          this.render();
-        },
         outputLanguage: language2,
         mode: "merge",
         usageMapPath: task.mapPath,
@@ -72779,7 +72982,6 @@ ${request.requirements}` : preset.text,
       progress.end();
       task.state = "applying";
       task.draft = result;
-      task.progress = "";
       this.render();
       const previous = this.history.undoEntry;
       await this.confirmMergeDraft(task, result.summary, result.detail);
@@ -77064,12 +77266,27 @@ ${request.requirements}` : preset.text,
       label2(redo, ((_e = this.history.redoEntry) == null ? void 0 : _e.label) ? t("ui.redo_0", this.history.redoEntry.label) : t("ui.redo"));
     }
   }
-  async synchronize() {
+  /**
+   * Reads the map back after a write. With `scope` (the end of a plugin write) only when a file this view collected since
+   * its last read-back is its Map.md or one of its notes; `scope.seq` is the plugin's event number when the read-back
+   * started. Without it, always.
+   */
+  async synchronize(scope) {
+    var _a2, _b2;
     if (this.syncHold > 0) {
       this.syncPending = true;
       return;
     }
     if (!this.path || !this.map || this.closed) return;
+    const snapshot = this.unsynced.snapshot(), seq = (_a2 = scope == null ? void 0 : scope.seq) != null ? _a2 : 0;
+    if (scope && !needsReadBack(
+      snapshot,
+      this.path,
+      this.map.nodes.map((node) => node.path)
+    )) {
+      this.unsynced.settle(snapshot, [], seq);
+      return;
+    }
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian40.TFile)) {
       this.map = null;
       this.path = "";
@@ -77077,7 +77294,7 @@ ${request.requirements}` : preset.text,
       this.render();
       return;
     }
-    const disk = await this.plugin.repo.readMap(this.path);
+    const { map: disk, ...meta } = await this.plugin.repo.readMapMeta(this.path);
     const structureChanged = JSON.stringify({ ...disk, viewport: null }) !== JSON.stringify({ ...this.map, viewport: null });
     if (structureChanged) {
       disk.viewport = this.map.viewport;
@@ -77086,7 +77303,8 @@ ${request.requirements}` : preset.text,
       this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
-    await this.hydrate();
+    const read = await this.hydrate(void 0, void 0, meta);
+    this.unsynced.settle(snapshot, (_b2 = read == null ? void 0 : read.failedPaths) != null ? _b2 : [], seq);
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
       const editing = this.typingInField();
       if ((!editing || structureChanged) && !this.dragging) this.render();
@@ -78240,6 +78458,7 @@ ${request.requirements}` : preset.text,
     }));
     this.renderingCard = true;
     this.paintChildIndex = this.map ? childIndex(this.map.nodes) : null;
+    this.paintCardIndex = this.map ? cardIndex(this.map.nodes) : null;
     const fits = [];
     this.pendingCardFits = fits;
     try {
@@ -78247,6 +78466,7 @@ ${request.requirements}` : preset.text,
     } finally {
       this.renderingCard = false;
       this.paintChildIndex = null;
+      this.paintCardIndex = null;
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();
@@ -78386,9 +78606,10 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T;
     if (!this.stageEl) return;
-    const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
+    const index = (_c = this.paintCardIndex) != null ? _c : cardIndex((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []);
+    const node = (_d = index.node(shownNode.id)) != null ? _d : shownNode;
     const loading = this.cardLoading(node);
     const note = loading ? void 0 : this.notes.get(node.id), card = this.stageEl.createDiv({
       cls: `vam-node${node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id) ? " is-selected" : ""}`
@@ -78401,7 +78622,7 @@ ${request.requirements}` : preset.text,
     this.paintCut(card, node.id);
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
-    card.setAttr("aria-level", String(this.nodeDepth(node)));
+    card.setAttr("aria-level", String(index.depth(node)));
     card.setAttr(
       "aria-selected",
       String(node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id))
@@ -78426,11 +78647,11 @@ ${request.requirements}` : preset.text,
     card.dataset.nodeId = node.id;
     const queued = this.isResearchQueued(node);
     const merging = this.isMerging(node.id);
-    card.dataset.status = merging || this.plugin.topicRuns.isBusy(node.path) || ((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) || this.startingTasks.has(node.path) ? "running" : queued ? "queued" : loading ? "idea" : (_d = note == null ? void 0 : note.status) != null ? _d : "error";
+    card.dataset.status = merging || this.plugin.topicRuns.isBusy(node.path) || ((_e = this.plugin.quickExpandPending) == null ? void 0 : _e.has(node.path)) || this.startingTasks.has(node.path) ? "running" : queued ? "queued" : loading ? "idea" : (_f = note == null ? void 0 : note.status) != null ? _f : "error";
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
-    const typingSummary = ((_e = this.inlineSummary) == null ? void 0 : _e.id) === node.id;
+    const typingSummary = ((_g = this.inlineSummary) == null ? void 0 : _g.id) === node.id;
     if (shownNode.height && !typingSummary) card.style.height = `${shownNode.height}px`;
     card.tabIndex = node.id === this.selection.state.tabStopId ? 0 : -1;
     card.addEventListener("dragover", (event) => this.onCardDragOver(event, card, node));
@@ -78438,11 +78659,11 @@ ${request.requirements}` : preset.text,
     card.addEventListener("drop", (event) => this.onCardDrop(event, card, node));
     const header2 = card.createDiv("vam-node-header");
     const argumentView = loading ? null : this.argumentCardView(node.id);
-    this.labelCard(card, loading ? this.preReadTitle(node) : (_f = note == null ? void 0 : note.title) != null ? _f : t("ui.note_missing"));
+    this.labelCard(card, loading ? this.preReadTitle(node) : (_h = note == null ? void 0 : note.title) != null ? _h : t("ui.note_missing"));
     if (this.selection.state.multiSelectMode) {
       const select = header2.createEl("input", { type: "checkbox" });
       select.checked = this.selection.state.multiSelected.has(node.id);
-      select.setAttr("aria-label", (_g = note == null ? void 0 : note.title) != null ? _g : node.path);
+      select.setAttr("aria-label", (_i = note == null ? void 0 : note.title) != null ? _i : node.path);
       select.tabIndex = -1;
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", (event) => {
@@ -78451,10 +78672,10 @@ ${request.requirements}` : preset.text,
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
-    const research = (_h = this.plugin.researchProgress) == null ? void 0 : _h.get(node.path);
+    const research = (_j = this.plugin.researchProgress) == null ? void 0 : _j.get(node.path);
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
-    const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_i = this.plugin.quickExpandPending) == null ? void 0 : _i.has(node.path)) || this.startingTasks.has(node.path);
+    const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_k = this.plugin.quickExpandPending) == null ? void 0 : _k.has(node.path)) || this.startingTasks.has(node.path);
     const doc = this.map, aimData = doc == null ? void 0 : doc.aim;
     const aimProgress = aimEnabled() && !!aimData && (node.aimKind === "question" || node.aimKind === "topic" && aimData.branches.some((branch) => branch.questionNodeId === node.id && !branch.parentBranchId));
     if (doc && aimData && aimProgress) {
@@ -78487,7 +78708,7 @@ ${request.requirements}` : preset.text,
           header2.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
       } else if (!note || note.status !== (isAimNode(node) ? "completed" : "idea") || active || queued) {
         const chip = header2.createSpan({
-          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_j = note == null ? void 0 : note.status) != null ? _j : "error"}`,
+          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_l = note == null ? void 0 : note.status) != null ? _l : "error"}`,
           text: statusText
         });
         if (active) chip.setAttr("role", "status");
@@ -78498,7 +78719,7 @@ ${request.requirements}` : preset.text,
         else this.labelCard(card, note.title);
       }
     }
-    const relevance = !node.aimKind && !((_k = this.map) == null ? void 0 : _k.aim) ? note == null ? void 0 : note.relevance : void 0;
+    const relevance = !node.aimKind && !((_m = this.map) == null ? void 0 : _m.aim) ? note == null ? void 0 : note.relevance : void 0;
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
@@ -78508,14 +78729,14 @@ ${request.requirements}` : preset.text,
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
         (button) => this.openRelevanceMenu(node, relevance.tier, button),
-        ((_l = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _l.status) === "running"
+        ((_n = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _n.status) === "running"
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
         (0, import_obsidian40.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
-      const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
+      const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     if (argumentView) {
@@ -78528,7 +78749,7 @@ ${request.requirements}` : preset.text,
       const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength && leaning) renderHypothesisTag(header2, leaning, strength, kindText);
       else header2.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
-      const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
+      const named = (_p = cardLabels.get(card)) == null ? void 0 : _p.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header2, node.id);
@@ -78538,7 +78759,7 @@ ${request.requirements}` : preset.text,
     this.paintCardStyle(card, note, isAimNode(node));
     if (header2) this.paintAiLock(card, header2, node);
     const errorDetails = [];
-    if ((_o = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _o.length) {
+    if ((_q = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _q.length) {
       const issue2 = header2.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
@@ -78550,8 +78771,8 @@ ${request.requirements}` : preset.text,
       if (failure.technical) technicalDetails.push(failure.technical);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_p = this.map) == null ? void 0 : _p.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_q = this.notes.get(currentNode.id)) == null ? void 0 : _q.title : void 0;
+      const currentNode = batch.currentPath ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_s = this.notes.get(currentNode.id)) == null ? void 0 : _s.title : void 0;
       const label2 = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -78578,16 +78799,16 @@ ${request.requirements}` : preset.text,
       this.renderRetryFailedButton(header2, node.path, batch);
     }
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.id === node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_s = this.plugin.expansionCoordinator) == null ? void 0 : _s.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
+    const parentNode = node.parentId ? this.mapNodeById(node.parentId) : void 0;
+    const batchChild = !!parentNode && !!((_t = this.plugin.expansionCoordinator) == null ? void 0 : _t.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header2,
         t(
           stopLabelKey(
             this.plugin.topicRuns.runKind(node.path),
-            !!((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)),
+            !!((_v = this.plugin.quickExpandPending) == null ? void 0 : _v.has(node.path)),
             this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
           )
         ),
@@ -78604,7 +78825,7 @@ ${request.requirements}` : preset.text,
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header2, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_w = (_v = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _v.length) != null ? _w : 0;
+    const pendingCount = (_x = (_w = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _w.length) != null ? _x : 0;
     if (pendingCount && !this.selection.state.multiSelectMode && !this.aimLive())
       this.button(
         header2,
@@ -78647,7 +78868,7 @@ ${request.requirements}` : preset.text,
       }
     }
     if (!this.selection.state.multiSelectMode) {
-      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header2,
           t("ui.aim_new_question"),
@@ -78659,7 +78880,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && assumptions.length) {
+      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && assumptions.length) {
         const correct = this.button(
           header2,
           t("ui.aim_correct_assumption"),
@@ -78671,7 +78892,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && node.aimKind === "conclusion") {
+      if (aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header2,
           t("ui.aim_steer"),
@@ -78721,7 +78942,7 @@ ${request.requirements}` : preset.text,
           () => this.whenEditing(() => this.selectSubtopics(node))
         );
     }
-    if (!this.selection.state.multiSelectMode && aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "question")
+    if (!this.selection.state.multiSelectMode && aimEnabled() && ((_B = this.map) == null ? void 0 : _B.aim) && node.aimKind === "question")
       iconTool(
         t("ui.remove_from_map"),
         "trash",
@@ -78736,11 +78957,11 @@ ${request.requirements}` : preset.text,
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const shownTitle = loading ? this.preReadTitle(node) : argumentView ? this.argumentTitleOf(argumentView, note) : (_B = note == null ? void 0 : note.title) != null ? _B : node.path;
+    const shownTitle = loading ? this.preReadTitle(node) : argumentView ? this.argumentTitleOf(argumentView, note) : (_C = note == null ? void 0 : note.title) != null ? _C : node.path;
     const title = card.createEl("h3", { text: shownTitle, cls: "vam-card-title" });
     title.setAttr("title", shownTitle);
     title.setAttr("dir", "auto");
-    if (note && ((_C = this.inlineName) == null ? void 0 : _C.target) === "card" && this.inlineName.id === node.id) {
+    if (note && ((_D = this.inlineName) == null ? void 0 : _D.target) === "card" && this.inlineName.id === node.id) {
       title.addClass("vam-sr-only");
       this.paintCardNameEdit(card, node, note);
     }
@@ -78748,8 +78969,8 @@ ${request.requirements}` : preset.text,
       card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node));
     const textEditable = !!note && this.cardTextEditable();
     if (argumentView) renderArgumentCardBodyV2(card, argumentView);
-    else if (textEditable && ((_D = this.inlineSummary) == null ? void 0 : _D.id) === node.id) this.paintCardSummaryEdit(card, node);
-    else if ((_E = research == null ? void 0 : research.preview) == null ? void 0 : _E.summary)
+    else if (textEditable && ((_E = this.inlineSummary) == null ? void 0 : _E.id) === node.id) this.paintCardSummaryEdit(card, node);
+    else if ((_F = research == null ? void 0 : research.preview) == null ? void 0 : _F.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (loading) {
       const bars = card.createDiv({ cls: "vam-card-loading-bars" });
@@ -78759,14 +78980,14 @@ ${request.requirements}` : preset.text,
     } else if (!note || !isPlaceholder(note.summary)) {
       const summaryText2 = card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_F = note == null ? void 0 : note.summary) != null ? _F : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_G = note == null ? void 0 : note.summary) != null ? _G : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_G = note == null ? void 0 : note.summary) != null ? _G : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_H = note == null ? void 0 : note.summary) != null ? _H : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
       if (textEditable) summaryText2.addClass("is-inline-editable");
     }
-    if (!argumentView && textEditable && !((_H = research == null ? void 0 : research.preview) == null ? void 0 : _H.summary) && ((_I = this.inlineSummary) == null ? void 0 : _I.id) !== node.id && isPlaceholder(note.summary))
+    if (!argumentView && textEditable && !((_I = research == null ? void 0 : research.preview) == null ? void 0 : _I.summary) && ((_J = this.inlineSummary) == null ? void 0 : _J.id) !== node.id && isPlaceholder(note.summary))
       card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
-    else if (((_J = this.inlineSummary) == null ? void 0 : _J.id) === node.id && !textEditable) this.inlineSummary = null;
+    else if (((_K = this.inlineSummary) == null ? void 0 : _K.id) === node.id && !textEditable) this.inlineSummary = null;
     this.paintCardImageRelations(card, node.id);
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
@@ -78781,7 +79002,7 @@ ${request.requirements}` : preset.text,
         });
       }
     }
-    if (node.aimKind === "conclusion" && aimEnabled() && ((_K = this.map) == null ? void 0 : _K.aim)) {
+    if (node.aimKind === "conclusion" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -78794,7 +79015,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && aimEnabled() && ((_M = this.map) == null ? void 0 : _M.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -78830,11 +79051,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && aimEnabled() && ((_M = this.map) == null ? void 0 : _M.aim)) {
+    if (node.aimKind === "question" && aimEnabled() && ((_N = this.map) == null ? void 0 : _N.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_O = (_N = node.aimQuestion) == null ? void 0 : _N.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _O : branch.answerSnapshot.selections;
+        const labels = (_P = (_O = node.aimQuestion) == null ? void 0 : _O.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _P : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -78877,11 +79098,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && aimEnabled() && ((_P = this.map) == null ? void 0 : _P.aim)) {
+    if (node.aimKind === "answer" && aimEnabled() && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_R = (_Q = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _Q.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _R : branch.answerSnapshot.selections;
+        const labels = (_S = (_R = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _R.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _S : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -78894,7 +79115,7 @@ ${request.requirements}` : preset.text,
       node,
       (point, wasSelected) => this.switchTopicChat(node, point.target) || this.openCardTextEditor(point, card, node, wasSelected)
     );
-    if (!this.selection.state.multiSelectMode && !((_S = this.map) == null ? void 0 : _S.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !((_T = this.map) == null ? void 0 : _T.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -79015,10 +79236,7 @@ ${request.requirements}` : preset.text,
    */
   refreshCardHeightState(card) {
     var _a2, _b2;
-    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => {
-      var _a3;
-      return item.id === ((_a3 = card.dataset) == null ? void 0 : _a3.nodeId);
-    });
+    const node = this.mapNodeById((_a2 = card.dataset) == null ? void 0 : _a2.nodeId);
     if (!node) return;
     if (node.height && card.style.height !== "") this.measureClipped(card);
     else if (card.offsetHeight && !node.height)
@@ -79213,18 +79431,6 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d, _e;
     return (_e = (_d = (_b2 = this.selection.state.selected && shown.some((node) => node.id === this.selection.state.selected) ? this.selection.state.selected : null) != null ? _b2 : (_a2 = shown.find((node) => !node.parentId)) == null ? void 0 : _a2.id) != null ? _d : (_c = shown[0]) == null ? void 0 : _c.id) != null ? _e : null;
   }
-  /** Nesting level of a topic, 1 for a root; guards against a corrupt parent cycle. */
-  nodeDepth(node) {
-    var _a2, _b2, _c;
-    let depth = 1;
-    const seen = /* @__PURE__ */ new Set([node.id]);
-    for (let parent = node.parentId; parent; depth++) {
-      if (seen.has(parent)) break;
-      seen.add(parent);
-      parent = (_c = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === parent)) == null ? void 0 : _b2.parentId) != null ? _c : null;
-    }
-    return depth;
-  }
   /**
    * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window
    * or past the canvas edge (a row wider than a card on the left edge); a row wider than the visible canvas wraps. Measured,
@@ -79392,10 +79598,10 @@ ${request.requirements}` : preset.text,
   }
   /** The type to show: only a topic on an ordinary map has one other than "topic" (AIM shows none). */
   topicKindOf(id) {
-    var _a2, _b2, _c;
-    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    var _a2, _b2;
+    const node = this.mapNodeById(id);
     if (!this.relationsEnabled() || !node || isAimNode(node)) return "topic";
-    return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.topicKind) != null ? _c : "topic";
+    return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.topicKind) != null ? _b2 : "topic";
   }
   /** True for a card the argument flow owns on a map whose `argumentMap` key is usable (those cards are plain rectangles). */
   isArgumentCard(id) {
@@ -89463,8 +89669,8 @@ ${addition}` : addition },
       }
     });
     const widthOf = () => {
-      var _a2, _b2, _c;
-      return (_c = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === node.id)) == null ? void 0 : _b2.width) != null ? _c : CARD_WIDTH;
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.mapNodeById(node.id)) == null ? void 0 : _a2.width) != null ? _b2 : CARD_WIDTH;
     };
     const sync = (width) => handle.setAttr("aria-valuenow", String(width));
     handle.tabIndex = -1;
@@ -89585,8 +89791,8 @@ ${addition}` : addition },
       }
     });
     const setHeight = () => {
-      var _a3, _b2;
-      return (_b2 = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === node.id)) == null ? void 0 : _b2.height;
+      var _a3;
+      return (_a3 = this.mapNodeById(node.id)) == null ? void 0 : _a3.height;
     };
     const heightOf = () => {
       var _a3, _b2;
@@ -93639,8 +93845,10 @@ var VisualAgentMapSettingTab = class extends import_obsidian45.PluginSettingTab 
       return;
     } else if (typeof value === "string" && (key4 === "codexPath" || key4 === "claudePath"))
       this.plugin.settings[key4] = value.trim();
-    else if (key4 === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
-    else return;
+    else if (key4 === "cliReasoning") {
+      this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
+      this.plugin.rereadAllViews();
+    } else return;
     if (key4 === "codexPath") this.plugin.resetCodexRuntime();
     if (key4 === "claudePath") this.plugin.modelDiscovery.invalidate("claude");
     await this.plugin.saveSettings();
@@ -100720,6 +100928,8 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
     __publicField(this, "localizedCommands", []);
     __publicField(this, "queue", Promise.resolve());
     __publicField(this, "writing", 0);
+    /** Numbers the vault events collected while VAM writes (see collectUnsynced); only ever grows. */
+    __publicField(this, "syncSeq", 0);
     __publicField(this, "externalReconcileTimer", null);
     __publicField(this, "externalReconcilePaths", /* @__PURE__ */ new Set());
     __publicField(this, "workspaceRecoveryCandidates", []);
@@ -100750,15 +100960,17 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
     return plainFailure(context, error);
   }
   /**
-   * Runs a write after every earlier one. Views re-read the map and its notes afterwards unless the caller states the
-   * write only touches the viewport (`sync: false`), which changes nothing another view could need to reload.
+   * Runs a write after every earlier one. Afterwards each view re-reads its map and notes when a file it shows changed
+   * while VAM was writing (collectUnsynced), unless the caller states the write only touches the viewport
+   * (`sync: false`), which changes nothing another view could need to reload; what was collected then waits for the next
+   * write. `sync: "full"` makes every view re-read its whole map.
    */
   async mutate(work, options = {}) {
     const result = this.queue.then(async () => {
       this.writing++;
       try {
         await work();
-        if (options.sync !== false) for (const view of this.views()) await view.synchronize();
+        if (options.sync !== false) await this.readBackViews(options.sync === "full");
       } finally {
         this.writing--;
       }
@@ -100770,6 +100982,34 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
       errorNotice(error);
     });
     return result;
+  }
+  /**
+   * The end of a write: each view not held by a chat batch reads back what it collected. A file that changed while the
+   * views were read is collected too; one more (empty) write is queued for it, never awaited here. A read that failed
+   * stays collected for the next write and does not queue one, so a broken file cannot loop.
+   */
+  async readBackViews(full) {
+    const views = this.views();
+    if (full) for (const view of views) view.unsynced.markFull(this.syncSeq);
+    const start = this.syncSeq;
+    for (const view of views) await view.synchronize({ seq: start });
+    if (this.syncSeq !== start) this.runMutation(async () => {
+    });
+  }
+  /**
+   * A setting that a note read resolves (the current model and reasoning level) changed, with no file written: the next
+   * write reads every open map back, as every write did before reads were limited to changed files. It takes a new event
+   * number, so a read-back already running (its snapshot taken before the change) cannot consume the mark.
+   */
+  rereadAllViews() {
+    const seq = ++this.syncSeq;
+    for (const view of this.views()) view.unsynced.markFull(seq);
+  }
+  /** A vault event while VAM writes: every open view collects the paths (a rename gives both) under one new number. */
+  collectUnsynced(...paths) {
+    if (!this.writing) return;
+    const seq = ++this.syncSeq;
+    for (const view of this.views()) for (const path of paths) view.unsynced.add(path, seq);
   }
   /** Fire-and-forget mutation for event and command handlers; mutate() has already logged any failure. */
   runMutation(work) {
@@ -101318,11 +101558,18 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
   registerVaultEvents() {
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
+        if (file instanceof import_obsidian53.TFile) this.collectUnsynced(file.path);
         if (!this.writing && file instanceof import_obsidian53.TFile) for (const view of this.views()) view.changed(file);
       })
     );
     this.registerEvent(
+      this.app.vault.on("create", (file) => {
+        if (file instanceof import_obsidian53.TFile) this.collectUnsynced(file.path);
+      })
+    );
+    this.registerEvent(
       this.app.vault.on("delete", (file) => {
+        if (file instanceof import_obsidian53.TFile) this.collectUnsynced(file.path);
         if (file instanceof import_obsidian53.TFile) this.scheduleExternalReconciliation(file.path);
         if (!this.writing && file instanceof import_obsidian53.TFile) {
           for (const view of this.views()) view.deleted(file);
@@ -101333,6 +101580,7 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
+        if (file instanceof import_obsidian53.TFile) this.collectUnsynced(oldPath, file.path);
         if (!(file instanceof import_obsidian53.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
         if (file.path === oldPath) return;
         const external = !this.writing;
@@ -101590,6 +101838,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (typeof model !== "string" || !model.trim()) return;
     this.settings.cliModel = model.trim();
     await this.saveSettings();
+    this.rereadAllViews();
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */
@@ -102143,13 +102392,7 @@ ${t("ui.organize_link_wait_hint")}`;
       const deleted = [...this.externalReconcilePaths];
       this.externalReconcilePaths.clear();
       void this.mutate(async () => {
-        let tracked = false;
-        for (const path of deleted)
-          if (await this.repo.isMapNodePath(path)) {
-            tracked = true;
-            break;
-          }
-        if (!tracked) return;
+        if (!await this.repo.anyMapNodePath(deleted)) return;
         const repaired = await this.repo.reconcileMissingNodePaths();
         if (repaired) await this.rebuildDerivedData();
       }).catch((error) => console.error("Visual Agent Map external rename reconciliation", error));

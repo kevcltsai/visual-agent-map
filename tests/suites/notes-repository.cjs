@@ -1505,7 +1505,7 @@ integrationTest('AI merge: Stop before or after the request, an AI failure and c
     const { task } = await h.begin();
     assert.equal(task.state, 'running');
     if (scenario === 'stop') h.view.stopMergeTask(task);
-    if (scenario === 'close') { h.view.closed = true; for (const t of h.view.mergeTasks.values()) t.controller.abort(); }
+    if (scenario === 'close') { while (!h.asks.length) await new Promise(r => setImmediate(r)); h.view.closed = true; for (const t of h.view.mergeTasks.values()) t.controller.abort(); }
     await h.untilSettled(task);
     assert.deepEqual(h.files(), files, scenario); assert.deepEqual(await h.shape(), original, scenario); assert.equal(h.view.history.canUndo, false, scenario);
     assert.equal(h.view.mergeTasks.size, 0, `${scenario}: the merging state is cleared`);
@@ -1538,8 +1538,9 @@ integrationTest('AI merge: when the sources or the map change during the run (so
     otherMapPath: async h => { h.view.path = 'Agent Workspace/Topics/other/Map.md'; }
   };
   for (const [name, change] of Object.entries(cases)) {
-    const h = await aiMergeHarness(); h.answer = async () => { await change(h); return { summary: 's', detail: 'd', visualReferences: [], formatIssues: [], suggestions: [] }; };
-    const { task } = await h.begin(); const files = h.files(); const nodes = JSON.stringify(h.view.map.nodes);
+    const h = await aiMergeHarness(); let files, nodes;
+    h.answer = async () => { await change(h); files = h.files(); nodes = JSON.stringify(h.view.map.nodes); return { summary: 's', detail: 'd', visualReferences: [], formatIssues: [], suggestions: [] }; };
+    const { task } = await h.begin();
     await h.untilSettled(task);
     assert.deepEqual(h.files(), files, `${name}: no file created or moved`); assert.equal(JSON.stringify(h.view.map.nodes), nodes, name);
     assert.equal(h.view.mergeTasks.size, 0, name); assert.equal(h.view.history.canUndo, false, name);
@@ -1556,6 +1557,26 @@ integrationTest('AI merge: a second Merge press while the merge runs only report
   assert.deepEqual(plain(h.view.mergeCheck()), { ok: false, reason: 'ui.merge_busy' }, 'the sources stay locked while it runs');
   release(); await h.untilSettled(task);
   assert.equal(h.view.mergeTasks.size, 0);
+});
+integrationTest('AI merge: reference progress messages repaint nothing; the run still ends written, or with its failure shown', async () => {
+  for (const outcome of ['done', 'failed']) {
+    const h = await aiMergeHarness(); let renders = 0, during = -1;
+    h.view.render = () => { renders++; };
+    const answer = h.answer;
+    h.answer = async (signal, context) => {
+      const before = renders;
+      for (const message of ['Reading references 1/2', 'Reading references 2/2', '']) context.onProgress?.(message);
+      during = renders - before;
+      if (outcome === 'failed') throw new Error('model down');
+      return answer(signal, context);
+    };
+    const { task } = await h.begin(); const rendersAtStart = renders; await h.untilSettled(task);
+    assert.equal(during, 0, `${outcome}: progress messages trigger no whole-view render`);
+    assert.ok(renders > rendersAtStart, `${outcome}: the end of the run still repaints`);
+    assert.equal(h.view.mergeTasks.size, 0, `${outcome}: the task is cleared`);
+    if (outcome === 'done') { assert.ok(await h.mergedNode('AI merged')); assert.deepEqual(h.notices.filter(m => /Merged into/.test(m)), ['Merged into “AI merged”. You can undo.']); }
+    else { assert.deepEqual(h.failures, ['AI merge failed']); assert.ok(h.notices.some(m => /AI merge failed: model down/.test(m))); assert.equal(await h.mergedNode('AI merged'), undefined); }
+  }
 });
 integrationTest('AI merge: a failure while moving a source rolls everything back, shows the error and leaves no task to retry', async () => {
   const h = await aiMergeHarness(); const original = await h.shape(); const nodes = JSON.stringify((await h.repo.readMap(h.path)).nodes);
@@ -2507,4 +2528,38 @@ integrationTest('C8 review: without Detail markers an English note stays English
   assert.equal(noteHeadingLanguage('# T\n\n## 目前摘要\n\n```\n## 詳細內容\n```\n'), 'en', 'a heading inside fenced code does not count');
   assert.equal(noteHeadingLanguage('# T\n\n## 目前摘要\n\n## 詳細內容\n\nx'), 'zh-TW');
   assert.equal(noteHeadingLanguage('# T\n\n## Current Summary\n\n## 目前摘要\n\n## 詳細內容\n\nx'), 'en', 'an English managed heading keeps it English');
+});
+integrationTest('deleting many non-node notes scans the maps once; a hit, a broken Map.md and non-VAM notes behave as before', async () => {
+  const { repo, app, contents } = fixture();
+  const path = await repo.createMap('Perf', []), map = await repo.readMap(path);
+  const node = await repo.createNote('Tracked', 'a', map, path, 'workspace'); map.nodes.push(node); await repo.saveMap(path, map);
+  const gone = Array.from({ length: 50 }, (_, index) => `Personal/gone-${index}.md`);
+  const reads = [];
+  for (const method of ['read', 'cachedRead']) { const original = app.vault[method].bind(app.vault); app.vault[method] = async file => { reads.push(file.path); return original(file); }; }
+  assert.equal(await repo.anyMapNodePath(gone), false);
+  assert.equal(reads.filter(item => item === path).length, 1, 'all maps are scanned once for 50 deleted paths');
+  reads.length = 0;
+  assert.equal(await repo.anyMapNodePath([...gone, node.path]), true);
+  assert.equal(reads.filter(item => item === path).length, 1);
+  assert.equal(await repo.anyMapNodePath([]), false);
+  const second = await repo.createMap('Broken', []);
+  contents.set(second, contents.get(second).replace(/```[\s\S]*$/, '```\n{ not json\n```\n'));
+  const failures = []; repo.onUnreadableMaps = list => failures.push(...list);
+  assert.equal(await repo.anyMapNodePath(gone), false, 'a broken Map.md is skipped, not fatal');
+  assert.equal(failures.length, 1, 'the broken map is reported once per scan');
+  assert.equal(await repo.anyMapNodePath([node.path]), true);
+});
+integrationTest('reference update reads each affected note once, and skips non-VAM and unmarked notes', async () => {
+  const { repo, app } = fixture();
+  const path = await repo.createMap('Perf', []), map = await repo.readMap(path);
+  const a = await repo.createNote('A', 'a', map, path, 'workspace'), b = await repo.createNote('B', 'b', map, path, 'workspace');
+  map.nodes.push(a, b); await repo.saveMap(path, map);
+  await repo.updateNote(a.path, { sourcePaths: ['Personal/old.md'] });
+  await app.vault.create('Personal/plain.md', '# Plain\n\nsource-notes: Personal/old.md');
+  const reads = [];
+  const original = app.vault.read.bind(app.vault); app.vault.read = async file => { reads.push(file.path); return original(file); };
+  await repo.replaceSourcePath('Personal/old.md', 'Personal/new.md');
+  assert.equal(reads.filter(item => item === a.path).length, 1, 'the affected note is read once');
+  assert.equal(reads.includes('Personal/plain.md'), false);
+  assert.deepEqual((await repo.readNote(a.path)).sourcePaths, ['Personal/new.md']);
 });

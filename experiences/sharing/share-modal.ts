@@ -3,7 +3,7 @@ import type { ReasoningLevel } from "../../ai/types";
 import { FOLLOW_DEFAULT_MODEL } from "../../core/model-discovery";
 import { isFollowInputLanguage, supportedLanguageLabel, t } from "../../i18n";
 import { actionStatus, modalActions } from "../../ui/modals/action-bar";
-import { detectAimContentLanguage } from "../aim/content-language";
+import { detectAimContentLanguage } from "../../core/content-language";
 import { mapContentLanguage } from "../visual-map/map-text-language";
 import {
   BuildController,

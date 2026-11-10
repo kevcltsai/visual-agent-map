@@ -11,7 +11,7 @@ import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-p
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
 import type { TaskOptions } from "./experiences/visual-map/modals";
 import { attachmentPath } from "./experiences/visual-map/attachment-store";
-import { selectionOutputLanguage } from "./experiences/aim/content-language";
+import { selectionOutputLanguage } from "./core/content-language";
 import {
   t,
   setUiLanguage,
@@ -142,7 +142,7 @@ import {
 import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
 import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
-import { AIM_CREATE_MAP_COMMAND_ID } from "./experiences/aim/legacy-names";
+import { AIM_CREATE_MAP_COMMAND_ID } from "./core/legacy-names";
 import { noticeInWindowOf } from "./ui/modals/notice-in-window";
 import { openInWindowOf } from "./ui/modals/open-in-window";
 import { aimEnabled } from "./experiences/aim/availability";
@@ -505,6 +505,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   private localizedCommands: { command: Command; key: TranslationKey }[] = [];
   private queue: Promise<void> = Promise.resolve();
   private writing = 0;
+  /** Numbers the vault events collected while VAM writes (see collectUnsynced); only ever grows. */
+  private syncSeq = 0;
   private externalReconcileTimer: number | null = null;
   private readonly externalReconcilePaths = new Set<string>();
   private workspaceRecoveryCandidates: string[] = [];
@@ -520,15 +522,17 @@ export default class VisualAgentMapPlugin extends Plugin {
     return plainFailure(context, error);
   }
   /**
-   * Runs a write after every earlier one. Views re-read the map and its notes afterwards unless the caller states the
-   * write only touches the viewport (`sync: false`), which changes nothing another view could need to reload.
+   * Runs a write after every earlier one. Afterwards each view re-reads its map and notes when a file it shows changed
+   * while VAM was writing (collectUnsynced), unless the caller states the write only touches the viewport
+   * (`sync: false`), which changes nothing another view could need to reload; what was collected then waits for the next
+   * write. `sync: "full"` makes every view re-read its whole map.
    */
-  async mutate(work: () => Promise<void>, options: { sync?: boolean } = {}): Promise<void> {
+  async mutate(work: () => Promise<void>, options: { sync?: boolean | "full" } = {}): Promise<void> {
     const result = this.queue.then(async () => {
       this.writing++;
       try {
         await work();
-        if (options.sync !== false) for (const view of this.views()) await view.synchronize();
+        if (options.sync !== false) await this.readBackViews(options.sync === "full");
       } finally {
         this.writing--;
       }
@@ -540,6 +544,33 @@ export default class VisualAgentMapPlugin extends Plugin {
       errorNotice(error);
     });
     return result;
+  }
+  /**
+   * The end of a write: each view not held by a chat batch reads back what it collected. A file that changed while the
+   * views were read is collected too; one more (empty) write is queued for it, never awaited here. A read that failed
+   * stays collected for the next write and does not queue one, so a broken file cannot loop.
+   */
+  private async readBackViews(full: boolean): Promise<void> {
+    const views = this.views();
+    if (full) for (const view of views) view.unsynced.markFull(this.syncSeq);
+    const start = this.syncSeq;
+    for (const view of views) await view.synchronize({ seq: start });
+    if (this.syncSeq !== start) this.runMutation(async () => {});
+  }
+  /**
+   * A setting that a note read resolves (the current model and reasoning level) changed, with no file written: the next
+   * write reads every open map back, as every write did before reads were limited to changed files. It takes a new event
+   * number, so a read-back already running (its snapshot taken before the change) cannot consume the mark.
+   */
+  rereadAllViews(): void {
+    const seq = ++this.syncSeq;
+    for (const view of this.views()) view.unsynced.markFull(seq);
+  }
+  /** A vault event while VAM writes: every open view collects the paths (a rename gives both) under one new number. */
+  private collectUnsynced(...paths: string[]): void {
+    if (!this.writing) return;
+    const seq = ++this.syncSeq;
+    for (const view of this.views()) for (const path of paths) view.unsynced.add(path, seq);
   }
   /** Fire-and-forget mutation for event and command handlers; mutate() has already logged any failure. */
   runMutation(work: () => Promise<void>): void {
@@ -1108,11 +1139,18 @@ export default class VisualAgentMapPlugin extends Plugin {
   registerVaultEvents(): void {
     this.registerEvent(
       this.app.vault.on("modify", file => {
+        if (file instanceof TFile) this.collectUnsynced(file.path);
         if (!this.writing && file instanceof TFile) for (const view of this.views()) view.changed(file);
       })
     );
     this.registerEvent(
+      this.app.vault.on("create", file => {
+        if (file instanceof TFile) this.collectUnsynced(file.path);
+      })
+    );
+    this.registerEvent(
       this.app.vault.on("delete", file => {
+        if (file instanceof TFile) this.collectUnsynced(file.path);
         if (file instanceof TFile) this.scheduleExternalReconciliation(file.path);
         if (!this.writing && file instanceof TFile) {
           for (const view of this.views()) view.deleted(file);
@@ -1127,6 +1165,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     // Renames are queued even while VAM is writing (handling is idempotent), so a user rename during a write is not lost.
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
+        if (file instanceof TFile) this.collectUnsynced(oldPath, file.path);
         if (!(file instanceof TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
         // A rename event whose path did not change (replayed after a rolled-back move) has nothing to update.
         if (file.path === oldPath) return;
@@ -1405,6 +1444,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (typeof model !== "string" || !model.trim()) return;
     this.settings.cliModel = model.trim();
     await this.saveSettings();
+    this.rereadAllViews();
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */
@@ -2010,13 +2050,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.externalReconcilePaths.clear();
       void this.mutate(async () => {
         // Only a deleted map node can leave a dangling path; other deletions need no vault scan.
-        let tracked = false;
-        for (const path of deleted)
-          if (await this.repo.isMapNodePath(path)) {
-            tracked = true;
-            break;
-          }
-        if (!tracked) return;
+        if (!(await this.repo.anyMapNodePath(deleted))) return;
         const repaired = await this.repo.reconcileMissingNodePaths();
         if (repaired) await this.rebuildDerivedData();
       }).catch(error => console.error("Visual Agent Map external rename reconciliation", error));

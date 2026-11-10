@@ -8,6 +8,7 @@
  *
  * Pure functions (no obsidian import) plus `backupNote`, which talks to a small port.
  */
+import { bareCalloutLines, titleBareCallouts } from "./callout-titles";
 import { NOTE_LANGUAGES, translate, type NoteLanguage } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
 import { sectionLookup, type DetailTemplate } from "./detail-templates";
@@ -511,7 +512,11 @@ export function chartPreserves(record: WritebackRecord, charted: string): boolea
 // ---------------------------------------------------------------------------------------------------------------------
 // Entry point
 
-export function composeWriteback(input: WritebackInput): WritebackResult {
+export function composeWriteback(raw: WritebackInput): WritebackResult {
+  const input = {
+    ...raw,
+    aiDetail: titleBareCallouts(raw.aiDetail, raw.language, bareCalloutLines(raw.oldDetail))
+  };
   if (input.mode === "top") return composeTop(input);
   const classify = classifier(input.template, input.language);
   const key = classify.logKey;

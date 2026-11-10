@@ -2456,6 +2456,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "note.earlier_research_sources": "先前研究的来源",
   "note.no_new_information": "本次无添加内容。",
   "note.writeback_fresh_replaced_0": "已用新研究取代，旧版备份在 {0}",
+  "note.callout_titles": "摘要:summary,abstract,tldr|笔记:note|信息:info|待办:todo|提示:tip,hint|重要:important|成功:success,check,done|问题:question,help,faq|注意:warning,caution,attention|失败:failure,fail,missing|危险:danger,error|错误:bug|示例:example|引用:quote,cite",
   "note.visual_reference": "视觉参考",
   "ui.aim_preparing_clarification": "正在准备开始前的条件厘清…",
   "ui.aim_answered_not_started": "已回答・研究尚未开始",

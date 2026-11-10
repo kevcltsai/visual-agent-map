@@ -2639,6 +2639,7 @@ export const en = {
   "note.earlier_research_sources": "Sources from earlier research",
   "note.no_new_information": "No new information in this task.",
   "note.writeback_fresh_replaced_0": "Replaced with new research; the earlier version is backed up at {0}",
+  "note.callout_titles": "none",
   "note.visual_reference": "Visual reference",
   "ui.aim_preparing_clarification": "Preparing initial clarification…",
   "ui.aim_answered_not_started": "Answered · research not started",

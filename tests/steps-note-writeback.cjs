@@ -1095,3 +1095,36 @@ test('K1 top: a user structure with the old names behaves as before (names win, 
   assert.equal(cutInserts(result), oldNote('standard'));
   assert.ok(underHeading(result.detail, '關鍵知識').includes(`#### ${TODAY}\n\nNEW-K`));
 });
+
+// Callout titles: a zh-TW write-back gives bare `> [!type]` headers a Chinese title; everything else stays byte for byte.
+const calloutBody = (callouts) => `### 核心結論\n\n${callouts}\n\n### 更新紀錄\n\n2026-01-01　舊`;
+const calloutRun = (mode, callouts, extra = {}) => W.composeWriteback({
+  mode, oldDetail: '### 核心結論\n\n舊\n\n### 更新紀錄\n\n2026-01-01　舊', aiDetail: mode === 'top' ? `### 核心結論\n\n${callouts}` : calloutBody(callouts),
+  summary: '摘要', template: standard, language: 'zh-TW', now: NOW, backupPath: 'B/x.md', ...extra
+}).detail;
+
+test('callout titles: zh-TW bare headers get a title in merge, fresh and top (summary, fold, upper case, nested)', () => {
+  const ai = '> [!summary]\n> a\n\n> [!note]-\n> b\n\n> [!TIP]+\n> c\n\n> > [!warning]\n> > d\n\n> [!unknownkind]\n> e';
+  for (const mode of ['merge', 'fresh', 'top']) {
+    const out = calloutRun(mode, ai);
+    assert.ok(out.includes('> [!summary] 摘要\n'), `${mode} summary`);
+    assert.ok(out.includes('> [!note]- 筆記\n'), `${mode} fold`);
+    assert.ok(out.includes('> [!TIP]+ 提示\n'), `${mode} upper case`);
+    assert.ok(out.includes('> > [!warning] 注意\n'), `${mode} nested`);
+    assert.ok(out.includes('> [!unknownkind]\n'), `${mode} unknown type untouched`);
+  }
+});
+
+test('callout titles: en output, code blocks, titled callouts and old Detail header lines stay unchanged', () => {
+  const ai = '> [!summary]\n> a';
+  const en = W.composeWriteback({ mode: 'fresh', oldDetail: '### Update log\n\n2026-01-01　old', aiDetail: `### Core conclusions\n\n${ai}`, summary: 's', template: W.standardTemplate('en'), language: 'en', now: NOW, backupPath: 'B/x.md' });
+  assert.ok(en.detail.includes('> [!summary]\n> a') && !en.detail.includes('> [!summary] '), 'en unchanged');
+  const code = calloutRun('merge', '```md\n> [!tip]\n```\n\n~~~\n> [!tip]\n~~~');
+  assert.equal(count(code, '> [!tip]\n'), 2, 'fenced lines unchanged');
+  assert.ok(!code.includes('> [!tip] '), 'no title inside fences');
+  const titled = calloutRun('merge', '> [!warning] 小心\n> x');
+  assert.ok(titled.includes('> [!warning] 小心\n') && !titled.includes('注意'), 'existing title kept');
+  const mine = W.composeWriteback({ mode: 'merge', oldDetail: '### 核心結論\n\n> [!note]\n> mine\n\n### 更新紀錄\n\n2026-01-01　舊', aiDetail: calloutBody('> [!note]\n> mine\n\n> [!note]\n> new'), summary: '摘要', template: standard, language: 'zh-TW', now: NOW });
+  assert.ok(mine.detail.includes('> [!note]\n> mine'), 'old header line kept');
+  assert.ok(mine.detail.includes('> [!note]\n> new'), 'same bare header text as the old one is also left alone (identical line)');
+});

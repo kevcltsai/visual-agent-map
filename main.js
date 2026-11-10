@@ -24202,6 +24202,29 @@ function chatPlanGroupOf(kind) {
   }
 }
 
+// core/note-read-context.ts
+function createNoteReadContext(map) {
+  var _a2;
+  return {
+    nodesById: new Map(((_a2 = map == null ? void 0 : map.nodes) != null ? _a2 : []).map((node) => [node.id, node])),
+    ancestorFm: /* @__PURE__ */ new Map(),
+    reads: /* @__PURE__ */ new Map(),
+    failedPaths: /* @__PURE__ */ new Set(),
+    map
+  };
+}
+function readOnce(ctx, path, read) {
+  let pending2 = ctx.reads.get(path);
+  if (!pending2) {
+    pending2 = read().catch((error) => {
+      ctx.failedPaths.add(path);
+      throw error;
+    });
+    ctx.reads.set(path, pending2);
+  }
+  return pending2;
+}
+
 // core/link-rewrite.ts
 function linkPathOf(target) {
   const hash = target.indexOf("#");
@@ -26549,7 +26572,7 @@ var Repository = class {
    * manual keeps it, workspace follows the current setting, inherited uses the nearest manual ancestor's stored model
    * and otherwise the current setting. `overridden` is true when the model comes from a manual topic or ancestor.
    */
-  async effectiveModel(path, stored, source, map, storedReasoning) {
+  async effectiveModel(path, stored, source, map, storedReasoning, ctx) {
     if (source === "manual")
       return {
         model: stored || this.settings.cliModel,
@@ -26572,20 +26595,41 @@ var Repository = class {
       }
     }
     const seen = /* @__PURE__ */ new Set();
+    const byId = ctx && owner && ctx.map === owner ? ctx.nodesById : void 0;
     let node = owner == null ? void 0 : owner.nodes.find((item) => item.path === path);
     while (node && node.parentId && !seen.has(node.id)) {
       seen.add(node.id);
-      const parent = owner.nodes.find((item) => item.id === node.parentId);
+      const parentId = node.parentId;
+      const parent = byId ? byId.get(parentId) : owner.nodes.find((item) => item.id === parentId);
       if (!parent) break;
-      try {
-        const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text5(fm.model))
-          return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
-      } catch (e) {
-      }
+      const fm = await this.ancestorFrontmatter(parent.path, ctx);
+      if (fm && fm["model-source"] === "manual" && text5(fm.model))
+        return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
       node = parent;
     }
     return { model: this.settings.cliModel, overridden: false };
+  }
+  /**
+   * An ancestor note's frontmatter, or null when it is missing or unreadable (the walk skips it). With a context the
+   * file is read once per hydrate; an existing file whose read throws is recorded in `ctx.failedPaths`.
+   */
+  async ancestorFrontmatter(path, ctx) {
+    const load = async () => {
+      try {
+        const file = this.file(path);
+        const content = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file);
+        return frontmatter(content);
+      } catch (e) {
+        return null;
+      }
+    };
+    if (!ctx) return load();
+    let pending2 = ctx.ancestorFm.get(path);
+    if (!pending2) {
+      pending2 = load();
+      ctx.ancestorFm.set(path, pending2);
+    }
+    return pending2;
   }
   /**
    * Resolve the model for a topic: run-once choice, then the topic's override (inherited upward), then the current
@@ -26639,14 +26683,21 @@ var Repository = class {
     }
     return false;
   }
-  async readNote(path, map) {
+  async readNote(path, map, ctx) {
     var _a2, _b2;
-    const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))), fm = frontmatter(content);
+    const file = this.file(path), raw = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file), content = decodeCalloutSections(upgradeLegacyAimText(raw)), fm = frontmatter(content);
     const status = text5(fm.status, "idea");
     const normalized2 = status === "review" || status === "accepted" ? "completed" : status;
     const source = text5(fm["model-source"], "workspace");
     const modelSource = ["workspace", "inherited", "manual"].includes(source) ? source : "workspace";
-    const effective = await this.effectiveModel(path, text5(fm.model), modelSource, map, text5(fm["reasoning-level"]));
+    const effective = await this.effectiveModel(
+      path,
+      text5(fm.model),
+      modelSource,
+      map,
+      text5(fm["reasoning-level"]),
+      ctx
+    );
     const { model, reasoning } = this.chooseModel(effective);
     const state = text5(
       fm["topic-state"],
@@ -26959,6 +27010,17 @@ ${body}`);
   }
   async readMap(path) {
     return parseMap(await this.app.vault.read(this.file(path)));
+  }
+  /** Map.md read once: the map plus its goal, context and sources (what hydrate and synchronize need). */
+  async readMapMeta(path) {
+    const content = await this.app.vault.read(this.file(path));
+    const fm = frontmatter(content);
+    return {
+      map: parseMap(content),
+      goal: readRelevanceGoal(fm),
+      context: readRelevanceContext(fm),
+      sources: readMapSources(fm)
+    };
   }
   /** The map file's `relevance-goal` frontmatter, if any. The map file keeps its frontmatter across saves. */
   async readRelevanceGoal(path) {
@@ -45178,7 +45240,12 @@ function newArgumentMap(roles, runId) {
     conclusion: { state: "pending", basedOn: [], missing: [] }
   };
 }
+function situationLimit(state) {
+  const { data } = state.situation;
+  return state.run.researchCalls >= MAX_RESEARCH_CALLS && data.some((d) => d.state === "pending") && !data.some((d) => d.state === "searching");
+}
 function limitStop(state, actions) {
+  if (state.run.phase === "situation") return state.situation.gate.state === "pending" && situationLimit(state);
   if (state.run.phase !== "analysis" || verifiedHypotheses(state).length >= MIN_VERIFIED) return false;
   if (state.hypotheses.length >= MAX_HYPOTHESES && verifyingCount(state) < MIN_VERIFIED) return true;
   return actions.length === 0 && !hasSearching(state);
@@ -45219,7 +45286,9 @@ function situationActions(state) {
       actions.push({ type: "research_situation", dataId: datum.id });
       budget -= 1;
     }
-  if (actions.length || data.some((d) => d.state === "pending" || d.state === "searching")) return actions;
+  if (actions.length) return actions;
+  if (situationLimit(state)) return [{ type: "stop_limit" }];
+  if (data.some((d) => d.state === "pending" || d.state === "searching")) return actions;
   return [{ type: data.some((d) => d.state === "not_found") ? "gate_missing" : "judge_gate" }];
 }
 function nextActions(state) {
@@ -45267,6 +45336,15 @@ function applySituationEvidence(state, dataId, result) {
   if (blank(result.reason)) throw new GateError("a miss needs a reason");
   datum.reason = result.reason;
   datum.state = datum.attempts >= MAX_SITUATION_ATTEMPTS ? "not_found" : "pending";
+  return next;
+}
+function releaseSituationResearch(state, dataId) {
+  inSituation(state);
+  const next = clone2(state);
+  const datum = next.situation.data.find((d) => d.id === dataId);
+  if (!datum || datum.state !== "searching") throw new GateError("situation datum is not being researched");
+  datum.state = "pending";
+  datum.attempts -= 1;
   return next;
 }
 function applyGateMissing(state) {
@@ -45397,6 +45475,14 @@ function applyEvidence(state, hypothesisId, needId, result) {
   need.state = "not_found";
   return next;
 }
+function releaseNeedResearch(state, hypothesisId, needId) {
+  inAnalysis(state);
+  const next = clone2(state);
+  const need = hypothesisOf(next, hypothesisId).needs.find((n) => n.id === needId);
+  if (!need || need.state !== "searching") throw new GateError("need is not being researched");
+  need.state = "pending";
+  return next;
+}
 var evidenceOf = (needs) => needs.map((n) => {
   var _a2, _b2, _c, _d, _e, _f, _g;
   return {
@@ -45462,7 +45548,7 @@ function applyLimitStop(state) {
   if (state.run.status !== "running" || !limitStop(state, analysisActionsSafe(state)))
     throw new GateError("the run is not at a limit");
   const next = clone2(state);
-  const missing = [`verified ${verifiedHypotheses(state).length}/${MIN_VERIFIED}`];
+  const missing = state.run.phase === "situation" ? state.situation.data.map((d) => `${d.id}: ${d.state}`) : [`verified ${verifiedHypotheses(state).length}/${MIN_VERIFIED}`];
   for (const h of next.hypotheses)
     missing.push(
       `${h.id}: ${h.location === "eliminated" ? "eliminated" : isVerified(h) ? "verified" : "not verified"}`
@@ -46440,7 +46526,8 @@ var ArgumentRuns = class {
       controller: new AbortController(),
       stopRequested: false,
       disposed: false,
-      done: Promise.resolve()
+      done: Promise.resolve(),
+      failures: /* @__PURE__ */ new Map()
     };
     this.drives.set(mapPath, drive);
     return drive;
@@ -46518,6 +46605,10 @@ var ArgumentRuns = class {
       const research = actions.filter((a) => a.type === "research_situation" || a.type === "research_need");
       if (research.length) {
         await Promise.all(research.slice(0, MAX_RESEARCH_CONCURRENCY).map((a) => this.research(drive, state, a)));
+        if (!this.dead(drive) && [...drive.failures.values()].some((n) => n >= 2)) {
+          await this.pause(drive, "error", false);
+          return;
+        }
       } else await this.guarded(drive, () => this.textStep(drive, state, actions[0]));
       if (drive.stopRequested) return;
     }
@@ -46830,7 +46921,10 @@ var ArgumentRuns = class {
     if (next) next();
     else this.inFlight--;
   }
-  /** begin (writes researchCalls) -> dispatch -> verify -> commit. Never throws: a failed item becomes a miss. */
+  /**
+   * begin (writes researchCalls) -> dispatch -> verify -> commit. Never throws. A reply that cannot be used becomes a miss; a provider
+   * failure (askModel rejected) is released back to pending instead, never a miss.
+   */
   async research(drive, state, action) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     const isNeed = action.type === "research_need";
@@ -46858,8 +46952,9 @@ var ArgumentRuns = class {
       let openedUrls = [];
       let domain = "-";
       let code = "";
+      let reply;
       try {
-        const reply = await untilAborted(
+        reply = await untilAborted(
           signal,
           this.ports.askModel(
             {
@@ -46881,6 +46976,16 @@ var ArgumentRuns = class {
             signal
           )
         );
+      } catch (error) {
+        if (this.dead(drive)) return;
+        if (busy == null ? void 0 : busy.signal.aborted) {
+          void this.stop(drive.mapPath);
+          return;
+        }
+        await this.releaseFailed(drive, state, isNeed, hypothesisId, itemId, error);
+        return;
+      }
+      try {
         openedUrls = (_g = (_f = reply.evidence) == null ? void 0 : _f.openedUrls) != null ? _g : [];
         const entry = (_h = reply.argumentEvidence) == null ? void 0 : _h.find((e) => e.need === itemId);
         if (!entry) result = { found: false, reason: "no_answer" };
@@ -46918,6 +47023,7 @@ var ArgumentRuns = class {
       );
       try {
         await this.commitEvidence(drive, isNeed, hypothesisId, itemId, result);
+        drive.failures.delete(itemId);
       } catch (error) {
         if (!(error instanceof GateError)) throw error;
         this.ports.log(`argument-run stale dropped runId=${state.run.runId}`);
@@ -46926,6 +47032,22 @@ var ArgumentRuns = class {
       busy == null ? void 0 : busy.release();
       this.free();
     }
+  }
+  /** A provider failure is not a try: the item goes back to pending (no note, no card text) and the failure is counted for this drive. */
+  async releaseFailed(drive, state, isNeed, hypothesisId, itemId, error) {
+    var _a2;
+    this.ports.log(
+      `argument-run proof runId=${state.run.runId} phase=${state.run.phase} result=provider_failure proof=${error instanceof Error ? error.name : "error"} domain=-`
+    );
+    try {
+      await this.checkpoint(drive, async (s) => ({
+        next: isNeed ? releaseNeedResearch(s, hypothesisId, itemId) : releaseSituationResearch(s, itemId)
+      }));
+    } catch (failure) {
+      if (!(failure instanceof GateError)) throw failure;
+      this.ports.log(`argument-run stale dropped runId=${state.run.runId}`);
+    }
+    drive.failures.set(itemId, ((_a2 = drive.failures.get(itemId)) != null ? _a2 : 0) + 1);
   }
   /** The stale fence: the run id (checkpoint) and the item still `searching` (the reducers throw otherwise); a deleted node gets no note. */
   async commitEvidence(drive, isNeed, hypothesisId, itemId, result) {
@@ -62808,13 +62930,16 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
   async persist() {
     if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
-  async hydrate(isCurrent = () => true, onRead) {
-    var _a2, _b2, _c;
+  async hydrate(isCurrent = () => true, onRead, meta) {
+    var _a2, _b2, _c, _d, _e;
     this.aimFailedReports.clear();
     let goal;
     let context;
     let sources = [];
-    if (this.path && !((_a2 = this.map) == null ? void 0 : _a2.aim)) {
+    const ctx = createNoteReadContext((_a2 = this.map) != null ? _a2 : void 0);
+    if (meta) {
+      if (this.path && !((_b2 = this.map) == null ? void 0 : _b2.aim)) ({ goal, context, sources } = meta);
+    } else if (this.path && !((_c = this.map) == null ? void 0 : _c.aim)) {
       try {
         ({ goal, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch (e) {
@@ -62824,7 +62949,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       } catch (e) {
       }
     }
-    const nodes = (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : [];
+    const nodes = (_e = (_d = this.map) == null ? void 0 : _d.nodes) != null ? _e : [];
     const read = new Array(nodes.length);
     let next = 0;
     const worker = async () => {
@@ -62832,14 +62957,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       while (next < nodes.length && isCurrent()) {
         const index = next++;
         try {
-          read[index] = await this.plugin.repo.readNote(nodes[index].path, (_a3 = this.map) != null ? _a3 : void 0);
+          read[index] = await this.plugin.repo.readNote(nodes[index].path, (_a3 = this.map) != null ? _a3 : void 0, ctx);
         } catch (e) {
         }
         onRead == null ? void 0 : onRead(index, read[index]);
       }
     };
     await Promise.all(Array.from({ length: Math.min(8, nodes.length) }, worker));
-    if (!isCurrent()) return;
+    if (!isCurrent()) return { failedPaths: [] };
     const loaded = /* @__PURE__ */ new Map();
     nodes.forEach((node, index) => {
       const note = read[index];
@@ -62850,6 +62975,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     this.relevanceContext = context;
     this.mapSources = sources;
     await this.hydrateFailedReportTargets(isCurrent);
+    return { failedPaths: Array.from(ctx.failedPaths) };
   }
   async hydrateFailedReportTargets(isCurrent) {
     var _a2;
@@ -71743,7 +71869,7 @@ ${request.requirements}` : preset.text,
       this.render();
       return;
     }
-    const disk = await this.plugin.repo.readMap(this.path);
+    const { map: disk, ...meta } = await this.plugin.repo.readMapMeta(this.path);
     const structureChanged = JSON.stringify({ ...disk, viewport: null }) !== JSON.stringify({ ...this.map, viewport: null });
     if (structureChanged) {
       disk.viewport = this.map.viewport;
@@ -71752,7 +71878,7 @@ ${request.requirements}` : preset.text,
       this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
-    await this.hydrate();
+    await this.hydrate(void 0, void 0, meta);
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
       const editing = this.typingInField();
       if ((!editing || structureChanged) && !this.dragging) this.render();

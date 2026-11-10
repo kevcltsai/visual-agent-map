@@ -1023,7 +1023,7 @@ const viewportFixture = () => {
   const a = node('a'), b = node('b', 'a');
   const doc = map([a, b]);
   const note = { title: 'T', summary: '', status: 'completed' };
-  const repo = { isDisposed: () => false, coordinatesChangedOutside: async () => false, updateMap: async (_path, change) => { counts.updateMap++; change(doc); }, readMap: async () => { counts.readMap++; return JSON.parse(JSON.stringify(doc)); }, readNote: async () => { counts.readNote++; return { ...note }; } };
+  const repo = { isDisposed: () => false, coordinatesChangedOutside: async () => false, updateMap: async (_path, change) => { counts.updateMap++; change(doc); }, readMap: async () => { counts.readMap++; return JSON.parse(JSON.stringify(doc)); }, readMapMeta: async () => { counts.readMap++; return { map: JSON.parse(JSON.stringify(doc)), goal: undefined, context: undefined, sources: [] }; }, readNote: async () => { counts.readNote++; return { ...note }; } };
   const plugin = Object.create(Plugin.prototype);
   Object.assign(plugin, { queue: Promise.resolve(), writing: 0, logs: { appendLog() {} }, repo, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), pendingSuggestions: new Map(), syncOutline() {}, releaseOutline() {}, detailsShown: () => false, setOutlineActive() {} });
   const app = { vault: { getAbstractFileByPath: () => new obsidian.TFile('m/Map.md') } };

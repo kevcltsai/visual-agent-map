@@ -498,3 +498,68 @@ test('dead need #8: verdict input excludes the dead need and citing it is refuse
   assert.deepEqual(plain(m.prepareVerdict(s, 'h1').evidence.map(e => e.id)), ['a', 'rc']);
   refuses(s, () => m.applyVerdict(s, 'h1', { verdict: 'supported', citedNeeds: ['b'], reason: 'r' }));
 });
+
+// ---- provider failure is not a try (ticket 04) -------------------------------------------------------------------------------
+test('releaseSituationResearch: a searching datum returns to pending, the attempt is refunded, nothing else moves', () => {
+  let s = m.applySituationData(m.newArgumentMap(roles, 'r'), [{ id: 'd1', need: 'x' }]);
+  s = m.beginSituationResearch(s, 'd1');
+  s = m.applySituationEvidence(s, 'd1', { found: false, reason: 'not_found' });
+  s = m.beginSituationResearch(s, 'd1');
+  const before = JSON.stringify(s);
+  const next = m.releaseSituationResearch(s, 'd1');
+  assert.equal(JSON.stringify(s), before, 'input untouched');
+  const datum = next.situation.data[0];
+  assert.equal(datum.state, 'pending');
+  assert.equal(datum.attempts, 1);
+  assert.equal(datum.reason, 'not_found');
+  assert.equal(datum.proof, undefined);
+  assert.equal(datum.stance, undefined);
+  assert.equal(next.run.researchCalls, 2, 'the call was made, researchCalls keeps it');
+  assert.equal(next.run.status, 'running');
+  assert.deepEqual(types(next), ['research_situation']);
+});
+
+test('releaseSituationResearch refuses a pending, found or not_found datum, an unknown id, a terminal run and the analysis phase', () => {
+  let s = m.applySituationData(m.newArgumentMap(roles, 'r'), [{ id: 'd1', need: 'x' }, { id: 'd2', need: 'y' }]);
+  refuses(s, () => m.releaseSituationResearch(s, 'd1'));
+  refuses(s, () => m.releaseSituationResearch(s, 'nope'));
+  s = m.beginSituationResearch(s, 'd1');
+  s = m.applySituationEvidence(s, 'd1', found());
+  refuses(s, () => m.releaseSituationResearch(s, 'd1'));
+  s = m.beginSituationResearch(s, 'd2');
+  s = m.applySituationEvidence(s, 'd2', { found: false, reason: 'a' });
+  s = m.beginSituationResearch(s, 'd2');
+  s = m.applySituationEvidence(s, 'd2', { found: false, reason: 'b' });
+  assert.equal(s.situation.data[1].state, 'not_found');
+  refuses(s, () => m.releaseSituationResearch(s, 'd2'));
+  const stopped = m.applyGateMissing(s);
+  refuses(stopped, () => m.releaseSituationResearch(stopped, 'd2'));
+  const analysis = withHypotheses();
+  refuses(analysis, () => m.releaseSituationResearch(analysis, 'd1'));
+});
+
+test('releaseNeedResearch: a searching need returns to pending, nothing else moves', () => {
+  let s = m.addNeeds(withHypotheses(), 'h1', [{ id: 'n1', text: 'a' }, { id: 'n2', text: 'b' }]);
+  s = m.beginResearch(s, 'h1', 'n1');
+  const before = JSON.stringify(s);
+  const next = m.releaseNeedResearch(s, 'h1', 'n1');
+  assert.equal(JSON.stringify(s), before, 'input untouched');
+  const need = next.hypotheses.find(h => h.id === 'h1').needs.find(n => n.id === 'n1');
+  assert.equal(need.state, 'pending');
+  assert.equal(need.proof, undefined);
+  assert.equal(need.reason, undefined);
+  assert.equal(next.run.researchCalls, s.run.researchCalls);
+  assert.equal(next.hypotheses.find(h => h.id === 'h1').round, 1);
+});
+
+test('releaseNeedResearch refuses a non-searching need, an eliminated hypothesis and the situation phase', () => {
+  let s = m.addNeeds(withHypotheses(), 'h1', [{ id: 'n1', text: 'a' }]);
+  refuses(s, () => m.releaseNeedResearch(s, 'h1', 'n1'));
+  refuses(s, () => m.releaseNeedResearch(s, 'h1', 'nope'));
+  s = researched(s, 'h1', 'n1', found());
+  refuses(s, () => m.releaseNeedResearch(s, 'h1', 'n1'));
+  const gone = drop(withHypotheses(), 'h1');
+  refuses(gone, () => m.releaseNeedResearch(gone, 'h1', 'h1-r1-n1'));
+  const situation = m.beginSituationResearch(m.applySituationData(m.newArgumentMap(roles, 'r'), [{ id: 'd1', need: 'x' }]), 'd1');
+  refuses(situation, () => m.releaseNeedResearch(situation, 'h1', 'n1'));
+});

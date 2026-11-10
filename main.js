@@ -45173,6 +45173,15 @@ function applySituationEvidence(state, dataId, result) {
   datum.state = datum.attempts >= MAX_SITUATION_ATTEMPTS ? "not_found" : "pending";
   return next;
 }
+function releaseSituationResearch(state, dataId) {
+  inSituation(state);
+  const next = clone2(state);
+  const datum = next.situation.data.find((d) => d.id === dataId);
+  if (!datum || datum.state !== "searching") throw new GateError("situation datum is not being researched");
+  datum.state = "pending";
+  datum.attempts -= 1;
+  return next;
+}
 function applyGateMissing(state) {
   inSituation(state);
   const { data } = state.situation;
@@ -45299,6 +45308,14 @@ function applyEvidence(state, hypothesisId, needId, result) {
   if (blank(result.reason)) throw new GateError("a miss needs a reason");
   need.reason = result.reason;
   need.state = "not_found";
+  return next;
+}
+function releaseNeedResearch(state, hypothesisId, needId) {
+  inAnalysis(state);
+  const next = clone2(state);
+  const need = hypothesisOf(next, hypothesisId).needs.find((n) => n.id === needId);
+  if (!need || need.state !== "searching") throw new GateError("need is not being researched");
+  need.state = "pending";
   return next;
 }
 var evidenceOf = (needs) => needs.map((n) => {
@@ -46344,7 +46361,8 @@ var ArgumentRuns = class {
       controller: new AbortController(),
       stopRequested: false,
       disposed: false,
-      done: Promise.resolve()
+      done: Promise.resolve(),
+      failures: /* @__PURE__ */ new Map()
     };
     this.drives.set(mapPath, drive);
     return drive;
@@ -46422,6 +46440,10 @@ var ArgumentRuns = class {
       const research = actions.filter((a) => a.type === "research_situation" || a.type === "research_need");
       if (research.length) {
         await Promise.all(research.slice(0, MAX_RESEARCH_CONCURRENCY).map((a) => this.research(drive, state, a)));
+        if (!this.dead(drive) && [...drive.failures.values()].some((n) => n >= 2)) {
+          await this.pause(drive, "error", false);
+          return;
+        }
       } else await this.guarded(drive, () => this.textStep(drive, state, actions[0]));
       if (drive.stopRequested) return;
     }
@@ -46734,7 +46756,10 @@ var ArgumentRuns = class {
     if (next) next();
     else this.inFlight--;
   }
-  /** begin (writes researchCalls) -> dispatch -> verify -> commit. Never throws: a failed item becomes a miss. */
+  /**
+   * begin (writes researchCalls) -> dispatch -> verify -> commit. Never throws. A reply that cannot be used becomes a miss; a provider
+   * failure (askModel rejected) is released back to pending instead, never a miss.
+   */
   async research(drive, state, action) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     const isNeed = action.type === "research_need";
@@ -46762,8 +46787,9 @@ var ArgumentRuns = class {
       let openedUrls = [];
       let domain = "-";
       let code = "";
+      let reply;
       try {
-        const reply = await untilAborted(
+        reply = await untilAborted(
           signal,
           this.ports.askModel(
             {
@@ -46785,6 +46811,16 @@ var ArgumentRuns = class {
             signal
           )
         );
+      } catch (error) {
+        if (this.dead(drive)) return;
+        if (busy == null ? void 0 : busy.signal.aborted) {
+          void this.stop(drive.mapPath);
+          return;
+        }
+        await this.releaseFailed(drive, state, isNeed, hypothesisId, itemId, error);
+        return;
+      }
+      try {
         openedUrls = (_g = (_f = reply.evidence) == null ? void 0 : _f.openedUrls) != null ? _g : [];
         const entry = (_h = reply.argumentEvidence) == null ? void 0 : _h.find((e) => e.need === itemId);
         if (!entry) result = { found: false, reason: "no_answer" };
@@ -46822,6 +46858,7 @@ var ArgumentRuns = class {
       );
       try {
         await this.commitEvidence(drive, isNeed, hypothesisId, itemId, result);
+        drive.failures.delete(itemId);
       } catch (error) {
         if (!(error instanceof GateError)) throw error;
         this.ports.log(`argument-run stale dropped runId=${state.run.runId}`);
@@ -46830,6 +46867,22 @@ var ArgumentRuns = class {
       busy == null ? void 0 : busy.release();
       this.free();
     }
+  }
+  /** A provider failure is not a try: the item goes back to pending (no note, no card text) and the failure is counted for this drive. */
+  async releaseFailed(drive, state, isNeed, hypothesisId, itemId, error) {
+    var _a2;
+    this.ports.log(
+      `argument-run proof runId=${state.run.runId} phase=${state.run.phase} result=provider_failure proof=${error instanceof Error ? error.name : "error"} domain=-`
+    );
+    try {
+      await this.checkpoint(drive, async (s) => ({
+        next: isNeed ? releaseNeedResearch(s, hypothesisId, itemId) : releaseSituationResearch(s, itemId)
+      }));
+    } catch (failure) {
+      if (!(failure instanceof GateError)) throw failure;
+      this.ports.log(`argument-run stale dropped runId=${state.run.runId}`);
+    }
+    drive.failures.set(itemId, ((_a2 = drive.failures.get(itemId)) != null ? _a2 : 0) + 1);
   }
   /** The stale fence: the run id (checkpoint) and the item still `searching` (the reducers throw otherwise); a deleted node gets no note. */
   async commitEvidence(drive, isNeed, hypothesisId, itemId, result) {

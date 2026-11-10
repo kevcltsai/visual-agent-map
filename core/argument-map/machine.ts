@@ -265,6 +265,20 @@ export function applySituationEvidence(
   return next;
 }
 
+/**
+ * A provider failure (the model never answered) is not a try: the datum goes back to pending and its attempt is refunded.
+ * `researchCalls` keeps the call (it was made); reason, proof and stance are untouched; never found, never not_found.
+ */
+export function releaseSituationResearch(state: ArgumentMapData, dataId: string): ArgumentMapData {
+  inSituation(state);
+  const next = clone(state);
+  const datum = next.situation.data.find(d => d.id === dataId);
+  if (!datum || datum.state !== "searching") throw new GateError("situation datum is not being researched");
+  datum.state = "pending";
+  datum.attempts -= 1;
+  return next;
+}
+
 /** Unfound data end the run without asking the AI. */
 export function applyGateMissing(state: ArgumentMapData): ArgumentMapData {
   inSituation(state);
@@ -423,6 +437,16 @@ export function applyEvidence(
   if (blank(result.reason)) throw new GateError("a miss needs a reason");
   need.reason = result.reason;
   need.state = "not_found";
+  return next;
+}
+
+/** A provider failure is not a try (the model never answered): the need goes back to pending. `researchCalls` keeps the call. */
+export function releaseNeedResearch(state: ArgumentMapData, hypothesisId: string, needId: string): ArgumentMapData {
+  inAnalysis(state);
+  const next = clone(state);
+  const need = hypothesisOf(next, hypothesisId).needs.find(n => n.id === needId);
+  if (!need || need.state !== "searching") throw new GateError("need is not being researched");
+  need.state = "pending";
   return next;
 }
 

@@ -2,6 +2,7 @@
 // repository fixture; the stage-3 actions (verdict onward) pause the run with an explicit pending error, tested here as the hook.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const legacyMachine = require('./support.cjs').load('core/argument-map/machine.ts');
 const { rig, locked, run, model, QUOTE, URL_OK, plain, tick, defer, foundEntry } = require('./support-argument-run-v2.cjs');
 const machine = require('./support.cjs').load('core/argument-map/machine-v2.ts');
 
@@ -19,7 +20,7 @@ test('start: one card per claim, datum, comparison, hypothesis and need with rea
   const premise = s.claims.find(c => c.role === 'premise');
   const testable = s.claims.find(c => c.role === 'testable');
   assert.ok(!/^c\d/.test(premise.id) && premise.id.startsWith('id-'), 'labels were replaced by real ids');
-  assert.deepEqual(testable.dependsOn, [premise.id], 'dependsOn is remapped');
+  assert.deepEqual(plain(testable.dependsOn), [premise.id], 'dependsOn is remapped');
   assert.equal(premise.result, 'holds');
   assert.equal(premise.data[0].proof.check, 'page_match');
   const doc = await r.repo.readMap(r.mapPath);
@@ -38,7 +39,7 @@ test('start: one card per claim, datum, comparison, hypothesis and need with rea
 
 test('start refusals write nothing: legacy, unusable, existing map, unlocked framing, illegal breakdown', async () => {
   const cases = {
-    legacy: async r => { const doc = await r.repo.readMap(r.mapPath); const n = await r.repo.createNote('p', 'model-a', doc, r.mapPath, 'workspace'); doc.nodes.push(n); doc.argumentMap = { v: 1, roles: { proposition: n.id, situation: n.id, conclusion: n.id, verified: n.id, eliminated: n.id }, situation: { data: [], gate: { state: 'pending' } }, hypotheses: [], run: { runId: 'old', phase: 'situation', status: 'running', researchCalls: 0 }, conclusion: { state: 'pending' } }; await r.repo.saveMap(r.mapPath, doc); },
+    legacy: async r => { const doc = await r.repo.readMap(r.mapPath); const ids = {}; for (const role of ['proposition', 'situation', 'conclusion', 'verified', 'eliminated']) { const n = await r.repo.createNote(role, 'model-a', doc, r.mapPath, 'workspace'); doc.nodes.push(n); ids[role] = n.id; } doc.argumentMap = legacyMachine.newArgumentMap(ids, 'run-1'); await r.repo.saveMap(r.mapPath, doc); },
     unusable: async r => { const doc = await r.repo.readMap(r.mapPath); doc.argumentMap = { v: 2, junk: true }; await r.repo.saveMap(r.mapPath, doc); }
   };
   for (const [refusal, prepare] of Object.entries(cases)) {
@@ -129,7 +130,9 @@ test('every premise fails: the run stops on the premise, finished, the conclusio
 });
 
 test('research limit: when the call budget runs out the program decides (AI = 0), no verdict step is asked', async () => {
-  const r = await rig({ script: { step: { needs: async request => {
+  // The only need comes back not_found, so no required test is met: with the budget spent a complete test would still be the AI's, an incomplete one is the program's.
+  const ask = (ctx, n) => ({ summary: '', detail: '', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [n === 1 ? foundEntry(ctx.argumentEvidenceNeeds[0].id) : { need: ctx.argumentEvidenceNeeds[0].id, status: 'not_found' }] }); // call 1 is the premise
+  const r = await rig({ script: { ask, step: { needs: async request => {
     await r.repo.updateMap(r.mapPath, doc => { doc.argumentMap.run.researchCalls = model.MAX_RESEARCH_CALLS - 1; });
     return { needs: request.hypothesis.predictions.filter(p => p.required).slice(0, request.max).map((p, i) => ({ id: request.ids[i], predictionId: p.id, text: `need for ${p.id}`, criteria: { supports: 's', refutes: 'r', irrelevant: 'i' } })) };
   } } } });

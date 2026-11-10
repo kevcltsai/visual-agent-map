@@ -533,7 +533,7 @@ function tabWithDoc(extra = {}) {
   const saved = [];
   const plugin = {
     settings: { cliModel: 'm', language: 'en', codexPath: 'codex', claudePath: 'claude' },
-    subscribeModelDiscovery: () => () => {}, subscribeCurrentModel: () => () => {},
+    subscribeModelDiscovery: () => () => {}, subscribeCurrentModel: () => () => {}, rereadAllViews() {},
     codexDiagnostic() { return { installed: this.settings.codexPath === '/ok/codex', executable: this.settings.codexPath }; },
     claudeDiagnostic() { return { installed: false, executable: 'claude' }; },
     resetCodexRuntime() {}, modelDiscovery: { invalidate() {} }, refreshModelDiscovery: async () => {},

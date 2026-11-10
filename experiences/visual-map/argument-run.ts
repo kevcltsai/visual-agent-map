@@ -413,7 +413,12 @@ export class ArgumentRuns {
     return run();
   }
   private async usageAllowed(drive: Drive): Promise<boolean> {
-    if (!this.ports.confirmUsage || (await this.ports.confirmUsage(drive.mapPath))) return true;
+    // The usage notice can sit open for good: Stop must not wait for an answer nobody gives.
+    const answered = await untilAborted(
+      drive.controller.signal,
+      this.ports.confirmUsage?.(drive.mapPath) ?? Promise.resolve(true)
+    ).catch(() => false);
+    if (answered) return true;
     drive.stopRequested = true;
     return false;
   }
@@ -567,7 +572,7 @@ export class ArgumentRuns {
     step: StepDefinition<Request, Output>,
     request: Request
   ): Promise<Output> {
-    return this.ports.runStep(step, request, drive.controller.signal);
+    return untilAborted(drive.controller.signal, this.ports.runStep(step, request, drive.controller.signal));
   }
 
   private async textStep(drive: Drive, state: ArgumentMapData, action: ArgumentAction): Promise<void> {

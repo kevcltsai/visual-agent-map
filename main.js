@@ -46990,7 +46990,12 @@ var ArgumentRuns = class {
     return run();
   }
   async usageAllowed(drive) {
-    if (!this.ports.confirmUsage || await this.ports.confirmUsage(drive.mapPath)) return true;
+    var _a2, _b2, _c;
+    const answered = await untilAborted(
+      drive.controller.signal,
+      (_c = (_b2 = (_a2 = this.ports).confirmUsage) == null ? void 0 : _b2.call(_a2, drive.mapPath)) != null ? _c : Promise.resolve(true)
+    ).catch(() => false);
+    if (answered) return true;
     drive.stopRequested = true;
     return false;
   }
@@ -47128,7 +47133,7 @@ var ArgumentRuns = class {
     return (await this.text(drive, state.roles.proposition)).summary;
   }
   ask(drive, step, request) {
-    return this.ports.runStep(step, request, drive.controller.signal);
+    return untilAborted(drive.controller.signal, this.ports.runStep(step, request, drive.controller.signal));
   }
   async textStep(drive, state, action) {
     const proposition = await this.proposition(drive, state);

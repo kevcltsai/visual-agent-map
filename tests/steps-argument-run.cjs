@@ -1040,3 +1040,34 @@ test('facet map: a datum closed by the research budget gets a readable reason, n
     assert.ok(!w.detail.includes('未找到：budget'), w.detail);
   }
 });
+
+const within = (promise, label) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} did not settle`)), 1500))]);
+
+test('stop settles while the usage notice is still open (confirmUsage never answers): no step ran, the run is paused by the user', async () => {
+  const r = await rig({ facet: true, script: { step: facetSteps() }, ports: { confirmUsage: () => new Promise(() => undefined) } });
+  const started = r.runs.start(r.mapPath, 'p');
+  while (!r.runs.isRunning(r.mapPath) || (await r.repo.readMap(r.mapPath)).nodes.length < 5) await tick();
+  await within(r.runs.stop(r.mapPath), 'stop');
+  await within(started, 'start');
+  const state = await r.state();
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'user');
+  assert.equal(r.stat.steps.length, 0);
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+});
+
+test('stop settles when the plan_facets provider call ignores abort; its late result is not written', async () => {
+  const gate = defer();
+  const r = await rig({ facet: true, script: { step: facetSteps({ plan_facets: async () => { await gate.promise; return facetSteps().plan_facets(); } }) } });
+  const started = r.runs.start(r.mapPath, 'p');
+  while (!r.stat.steps.includes('plan_facets')) await tick();
+  await within(r.runs.stop(r.mapPath), 'stop');
+  await within(started, 'start');
+  gate.resolve();
+  await tick(); await tick();
+  const state = await r.state();
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'user');
+  assert.equal(state.situation.data.length, 0);
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+});

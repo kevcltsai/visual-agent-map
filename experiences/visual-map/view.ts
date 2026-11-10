@@ -230,6 +230,7 @@ import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/mod
 import { NameModal } from "../../ui/modals/name-modal";
 import { createNoteReadContext } from "../../core/note-read-context";
 import { needsReadBack, UnsyncedPaths } from "../../core/sync-scope";
+import { chainRebase, type RenamePair } from "../../core/rename-batch";
 import { PLACEHOLDER_MAP_NAMES, isPlaceholderMapTitle, uniqueDefaultName } from "../../core/default-names";
 import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
@@ -7735,14 +7736,16 @@ export class VisualAgentMapView extends ItemView {
     this.followedFrom ??= oldPath;
     this.path = newPath;
   }
-  async renamed(file: TFile, oldPath: string): Promise<void> {
-    if (this.path === oldPath) this.path = file.path;
-    if (this.map) {
-      rebaseMapNotePaths(this.map, moveNotePath(oldPath, file.path));
-      this.history.clear();
-      await this.hydrate();
-      this.render();
-    }
+  /**
+   * A batch of rename events (perf ticket 10), in event order: the open map's note paths follow every move in memory;
+   * the plugin then reads back what changed through synchronize. `outside` says the batch holds a move made outside
+   * VAM, which clears the undo steps as each outside rename did before (they may name a path or a source list that
+   * moved); VAM's own renames keep them. The map's own path already followed when the event arrived.
+   */
+  renamed(pairs: readonly RenamePair[], outside: boolean): void {
+    if (!this.map) return;
+    rebaseMapNotePaths(this.map, chainRebase(pairs));
+    if (outside) this.history.clear();
   }
   deleted(file: TFile): void {
     if (file.path === this.path) {

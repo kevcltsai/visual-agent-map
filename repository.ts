@@ -46,6 +46,7 @@ import { readOnce, type NoteReadContext } from "./core/note-read-context";
 import { findWikilinks, linkPathOf, rewriteLinkTargets, splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
 import { contentHash } from "./core/map-chat-context";
+import { mentionsOldPath, rebasePathList, type RenamePair } from "./core/rename-batch";
 import {
   managedHeadingValue,
   managedSectionValue,
@@ -2745,26 +2746,26 @@ export class Repository {
   }
 
   async replaceSourcePath(oldPath: string, newPath: string): Promise<void> {
-    if (oldPath === newPath) return;
+    await this.replaceSourcePaths([[oldPath, newPath]]);
+  }
+
+  /**
+   * Points the `source-notes` and `reference-materials` of every VAM note through the moves `pairs`, applied in event
+   * order (see core/rename-batch), in one pass over the notes: a folder rename's moves are rewritten together.
+   */
+  async replaceSourcePaths(pairs: readonly RenamePair[]): Promise<void> {
+    if (!pairs.some(([from, to]) => from !== to)) return;
     for (const file of await this.markedFiles("agent-map-node")) {
-      // Skip notes whose indexed frontmatter does not mention the old path.
+      // Skip notes whose indexed frontmatter names none of the old paths.
       const cached = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      if (
-        cached &&
-        ![cached["source-notes"], cached["reference-materials"]].some(
-          list => Array.isArray(list) && list.includes(oldPath)
-        )
-      )
+      if (cached && ![cached["source-notes"], cached["reference-materials"]].some(list => mentionsOldPath(list, pairs)))
         continue;
       const note = await this.readNoteIfManaged(file);
-      if (note?.referencePaths?.includes(oldPath))
-        await this.updateNote(file.path, {
-          referencePaths: note.referencePaths.map(path => (path === oldPath ? newPath : path))
-        });
-      if (!note?.sourcePaths.includes(oldPath)) continue;
-      await this.updateNote(file.path, {
-        sourcePaths: note.sourcePaths.map(path => (path === oldPath ? newPath : path))
-      });
+      if (!note) continue;
+      const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
+      if (referencePaths) await this.updateNote(file.path, { referencePaths });
+      const sourcePaths = rebasePathList(note.sourcePaths, pairs);
+      if (sourcePaths) await this.updateNote(file.path, { sourcePaths });
     }
   }
 

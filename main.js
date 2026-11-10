@@ -24881,6 +24881,27 @@ function continuationFields(input2) {
   };
 }
 
+// core/rename-batch.ts
+function rebasePath(pairs, path) {
+  for (const [from, to] of pairs) if (path === from) path = to;
+  return path;
+}
+function chainRebase(pairs) {
+  return (path) => rebasePath(pairs, path);
+}
+function rebasePathList(list2, pairs) {
+  if (!mentionsOldPath(list2, pairs)) return null;
+  const next = list2.map((path) => rebasePath(pairs, path));
+  return next.some((path, index) => path !== list2[index]) ? next : null;
+}
+function mentionsOldPath(list2, pairs) {
+  if (!Array.isArray(list2)) return false;
+  return pairs.some(([from, to]) => from !== to && list2.includes(from));
+}
+function touchedPaths(pairs) {
+  return [...new Set(pairs.flat())];
+}
+
 // note-values.ts
 var managedSectionValue = (value) => value.trim();
 var managedHeadingValue = (value) => value.replace(/\n/g, " ").trim();
@@ -27694,23 +27715,25 @@ ${body}`);
     return { foreign: foreign.size, edits };
   }
   async replaceSourcePath(oldPath, newPath) {
-    var _a2, _b2;
-    if (oldPath === newPath) return;
+    await this.replaceSourcePaths([[oldPath, newPath]]);
+  }
+  /**
+   * Points the `source-notes` and `reference-materials` of every VAM note through the moves `pairs`, applied in event
+   * order (see core/rename-batch), in one pass over the notes: a folder rename's moves are rewritten together.
+   */
+  async replaceSourcePaths(pairs) {
+    var _a2;
+    if (!pairs.some(([from, to]) => from !== to)) return;
     for (const file of await this.markedFiles("agent-map-node")) {
       const cached = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter;
-      if (cached && ![cached["source-notes"], cached["reference-materials"]].some(
-        (list2) => Array.isArray(list2) && list2.includes(oldPath)
-      ))
+      if (cached && ![cached["source-notes"], cached["reference-materials"]].some((list2) => mentionsOldPath(list2, pairs)))
         continue;
       const note = await this.readNoteIfManaged(file);
-      if ((_b2 = note == null ? void 0 : note.referencePaths) == null ? void 0 : _b2.includes(oldPath))
-        await this.updateNote(file.path, {
-          referencePaths: note.referencePaths.map((path) => path === oldPath ? newPath : path)
-        });
-      if (!(note == null ? void 0 : note.sourcePaths.includes(oldPath))) continue;
-      await this.updateNote(file.path, {
-        sourcePaths: note.sourcePaths.map((path) => path === oldPath ? newPath : path)
-      });
+      if (!note) continue;
+      const referencePaths = note.referencePaths && rebasePathList(note.referencePaths, pairs);
+      if (referencePaths) await this.updateNote(file.path, { referencePaths });
+      const sourcePaths = rebasePathList(note.sourcePaths, pairs);
+      if (sourcePaths) await this.updateNote(file.path, { sourcePaths });
     }
   }
   async readNoteIfManaged(file) {
@@ -28252,8 +28275,8 @@ ${body}`;
       }
       const map = await this.readMap(next);
       map.title = title;
-      const rebasePath = (path) => path.startsWith(`${originalRoot}/`) ? `${desired}/${path.slice(originalRoot.length + 1)}` : path;
-      rebaseMapNotePaths(map, rebasePath);
+      const rebasePath2 = (path) => path.startsWith(`${originalRoot}/`) ? `${desired}/${path.slice(originalRoot.length + 1)}` : path;
+      rebaseMapNotePaths(map, rebasePath2);
       await this.saveMap(next, map);
       await rebuild2();
       return next;
@@ -66806,14 +66829,16 @@ ${request.requirements}` : preset.text,
     (_a2 = this.followedFrom) != null ? _a2 : this.followedFrom = oldPath;
     this.path = newPath;
   }
-  async renamed(file, oldPath) {
-    if (this.path === oldPath) this.path = file.path;
-    if (this.map) {
-      rebaseMapNotePaths(this.map, moveNotePath(oldPath, file.path));
-      this.history.clear();
-      await this.hydrate();
-      this.render();
-    }
+  /**
+   * A batch of rename events (perf ticket 10), in event order: the open map's note paths follow every move in memory;
+   * the plugin then reads back what changed through synchronize. `outside` says the batch holds a move made outside
+   * VAM, which clears the undo steps as each outside rename did before (they may name a path or a source list that
+   * moved); VAM's own renames keep them. The map's own path already followed when the event arrived.
+   */
+  renamed(pairs, outside) {
+    if (!this.map) return;
+    rebaseMapNotePaths(this.map, chainRebase(pairs));
+    if (outside) this.history.clear();
   }
   deleted(file) {
     var _a2;
@@ -95521,6 +95546,8 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
     __publicField(this, "localizedCommands", []);
     __publicField(this, "queue", Promise.resolve());
     __publicField(this, "writing", 0);
+    /** Rename events waiting for the batch queued by the first of them; null once that batch has started (ticket 10). */
+    __publicField(this, "pendingRenames", null);
     /** Numbers the vault events collected while VAM writes (see collectUnsynced); only ever grows. */
     __publicField(this, "syncSeq", 0);
     __publicField(this, "externalReconcileTimer", null);
@@ -96179,25 +96206,75 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
         const external = !this.writing;
         if (external) for (const view of this.views()) view.relocate(/* @__PURE__ */ new Map([[oldPath, file.path]]));
         else for (const view of this.views()) view.followPath(oldPath, file.path);
-        this.runMutation(async () => {
-          var _a2;
-          await this.repo.replaceSourcePath(oldPath, file.path);
-          let mapChanged = false;
-          for (const { file: mapFile, map } of await this.repo.readableMaps()) {
-            if (rebaseMapNotePaths(map, moveNotePath(oldPath, file.path))) {
-              await this.repo.saveMap(mapFile.path, map);
-              mapChanged = true;
-            }
-          }
-          const frontmatter2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter;
-          const vamFile = [frontmatter2 == null ? void 0 : frontmatter2["agent-map-node"], frontmatter2 == null ? void 0 : frontmatter2["visual-agent-map"]].some(
-            (value) => value === true || value === "true"
-          );
-          if (mapChanged || vamFile) await this.rebuildDerivedData();
-          if (external) for (const view of this.views()) await view.renamed(file, oldPath);
+        const rename = { pair: [oldPath, file.path], file, external };
+        if (this.pendingRenames) {
+          this.pendingRenames.push(rename);
+          return;
+        }
+        const batch = this.pendingRenames = [rename];
+        this.runMutation(() => {
+          if (this.pendingRenames === batch) this.pendingRenames = null;
+          return this.applyRenames(batch);
         });
       })
     );
+  }
+  /**
+   * One batch of rename events, in event order: source paths are rewritten in one pass over the notes, every readable
+   * map is rebased once, derived data is rebuilt at most once, and the open maps follow in memory; what they read back
+   * is left to the scoped read-back at the end of this write (which waits while a chat batch holds a view).
+   */
+  async applyRenames(renames) {
+    const pairs = renames.map((rename) => rename.pair);
+    try {
+      await this.repo.replaceSourcePaths(pairs);
+      const { changed, error } = await this.rebaseMaps(pairs);
+      const vamFile = renames.some(({ file }) => {
+        var _a2;
+        const frontmatter2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter;
+        return [frontmatter2 == null ? void 0 : frontmatter2["agent-map-node"], frontmatter2 == null ? void 0 : frontmatter2["visual-agent-map"]].some(
+          (value) => value === true || value === "true"
+        );
+      });
+      if (changed || vamFile) await this.rebuildDerivedData();
+      if (error) throw error;
+    } finally {
+      const outside = renames.some((rename) => rename.external);
+      const seq = ++this.syncSeq;
+      for (const view of this.views()) {
+        view.renamed(pairs, outside);
+        for (const path of touchedPaths(pairs)) view.unsynced.add(path, seq);
+      }
+    }
+  }
+  /**
+   * Rebases every readable map through the moves. A map whose save failed is read and rebased once more after the others
+   * (its file was not written, so the moves still apply to it); a second failure is returned, after the other maps.
+   */
+  async rebaseMaps(pairs) {
+    let changed = false;
+    const failed = [];
+    for (const { file, map } of await this.repo.readableMaps()) {
+      if (!rebaseMapNotePaths(map, chainRebase(pairs))) continue;
+      try {
+        await this.repo.saveMap(file.path, map);
+        changed = true;
+      } catch (e) {
+        failed.push(file.path);
+      }
+    }
+    let error;
+    for (const path of failed) {
+      try {
+        const map = await this.repo.readMap(path);
+        if (!rebaseMapNotePaths(map, chainRebase(pairs))) continue;
+        await this.repo.saveMap(path, map);
+        changed = true;
+      } catch (retryError) {
+        error != null ? error : error = retryError instanceof Error ? retryError : new Error(String(retryError));
+      }
+    }
+    return { changed, error };
   }
   /** One Notice and log line per scan; the same map and error is not repeated within a few seconds (one rename = two scans). */
   reportUnreadableMaps(failures) {

@@ -71,10 +71,10 @@ import {
 } from "./ui/settings-tab";
 import { join } from "node:path";
 import { type MapDocument } from "./map-model";
+import { chainRebase, touchedPaths, type RenamePair } from "./core/rename-batch";
 import {
   DEFAULT_SETTINGS,
   isManagedMapPath,
-  moveNotePath,
   normalizeReasoningLevel,
   normalizeMapChatWidth,
   normalizeMapChatOpen,
@@ -305,6 +305,12 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
   };
 }
 
+/** A rename event waiting in a batch: the move, the file, and whether it came while VAM was not writing. */
+interface PendingRename {
+  pair: RenamePair;
+  file: TFile;
+  external: boolean;
+}
 export default class VisualAgentMapPlugin extends Plugin {
   /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */
   mermaidZoom: MermaidZoomHandle | null = null;
@@ -496,6 +502,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   private localizedCommands: { command: Command; key: TranslationKey }[] = [];
   private queue: Promise<void> = Promise.resolve();
   private writing = 0;
+  /** Rename events waiting for the batch queued by the first of them; null once that batch has started (ticket 10). */
+  private pendingRenames: PendingRename[] | null = null;
   /** Numbers the vault events collected while VAM writes (see collectUnsynced); only ever grows. */
   private syncSeq = 0;
   private externalReconcileTimer: number | null = null;
@@ -1154,6 +1162,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     );
     // Renames are queued even while VAM is writing (handling is idempotent), so a user rename during a write is not lost.
+    // A folder rename reports every file inside it: the first event queues a batch at once (where a single handler was
+    // queued before), and every event that arrives before that batch starts joins it (perf ticket 10).
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
         if (file instanceof TFile) this.collectUnsynced(oldPath, file.path);
@@ -1161,33 +1171,84 @@ export default class VisualAgentMapPlugin extends Plugin {
         // A rename event whose path did not change (replayed after a rolled-back move) has nothing to update.
         if (file.path === oldPath) return;
         const external = !this.writing;
-        // A folder rename reports every file inside it, and each queued handler ends by synchronizing every view. An
-        // open map must follow its Map.md now: if a note's handler ran first, the view would find its old path gone
-        // and close the map as deleted.
+        // An open map follows its Map.md now, not when the batch runs: the batch ends by synchronizing every view, and
+        // a view that read back first would find its old path gone and close the map as deleted.
         if (external) for (const view of this.views()) view.relocate(new Map([[oldPath, file.path]]));
         // During a write (VAM's own move, or one outside it), only the path follows: the read-back at the end of the
         // write must not find the old Map.md gone and close the map. Whoever moved it decides about the undo steps.
         else for (const view of this.views()) view.followPath(oldPath, file.path);
-        this.runMutation(async () => {
-          await this.repo.replaceSourcePath(oldPath, file.path);
-          let mapChanged = false;
-          for (const { file: mapFile, map } of await this.repo.readableMaps()) {
-            if (rebaseMapNotePaths(map, moveNotePath(oldPath, file.path))) {
-              await this.repo.saveMap(mapFile.path, map);
-              mapChanged = true;
-            }
-          }
-          // Derived references depend only on maps and VAM notes; renaming an unrelated note leaves them unchanged.
-          const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
-          const vamFile = [frontmatter?.["agent-map-node"], frontmatter?.["visual-agent-map"]].some(
-            value => value === true || value === "true"
-          );
-          if (mapChanged || vamFile) await this.rebuildDerivedData();
-          // VAM's own renames already update open views (and must keep their undo history).
-          if (external) for (const view of this.views()) await view.renamed(file, oldPath);
+        const rename: PendingRename = { pair: [oldPath, file.path], file, external };
+        if (this.pendingRenames) {
+          this.pendingRenames.push(rename);
+          return;
+        }
+        const batch = (this.pendingRenames = [rename]);
+        this.runMutation(() => {
+          // From here on a rename event opens the next batch.
+          if (this.pendingRenames === batch) this.pendingRenames = null;
+          return this.applyRenames(batch);
         });
       })
     );
+  }
+  /**
+   * One batch of rename events, in event order: source paths are rewritten in one pass over the notes, every readable
+   * map is rebased once, derived data is rebuilt at most once, and the open maps follow in memory; what they read back
+   * is left to the scoped read-back at the end of this write (which waits while a chat batch holds a view).
+   */
+  private async applyRenames(renames: readonly PendingRename[]): Promise<void> {
+    const pairs = renames.map(rename => rename.pair);
+    try {
+      await this.repo.replaceSourcePaths(pairs);
+      const { changed, error } = await this.rebaseMaps(pairs);
+      // Derived references depend only on maps and VAM notes; renaming an unrelated note leaves them unchanged.
+      const vamFile = renames.some(({ file }) => {
+        const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+        return [frontmatter?.["agent-map-node"], frontmatter?.["visual-agent-map"]].some(
+          value => value === true || value === "true"
+        );
+      });
+      if (changed || vamFile) await this.rebuildDerivedData();
+      if (error) throw error;
+    } finally {
+      // The open maps follow every move even when a step above failed, so the next save of a view writes the new paths.
+      // Only a move made outside VAM clears the undo steps: VAM's own renames keep them.
+      const outside = renames.some(rename => rename.external);
+      const seq = ++this.syncSeq;
+      for (const view of this.views()) {
+        view.renamed(pairs, outside);
+        for (const path of touchedPaths(pairs)) view.unsynced.add(path, seq);
+      }
+    }
+  }
+  /**
+   * Rebases every readable map through the moves. A map whose save failed is read and rebased once more after the others
+   * (its file was not written, so the moves still apply to it); a second failure is returned, after the other maps.
+   */
+  private async rebaseMaps(pairs: readonly RenamePair[]): Promise<{ changed: boolean; error?: Error }> {
+    let changed = false;
+    const failed: string[] = [];
+    for (const { file, map } of await this.repo.readableMaps()) {
+      if (!rebaseMapNotePaths(map, chainRebase(pairs))) continue;
+      try {
+        await this.repo.saveMap(file.path, map);
+        changed = true;
+      } catch {
+        failed.push(file.path);
+      }
+    }
+    let error: Error | undefined;
+    for (const path of failed) {
+      try {
+        const map = await this.repo.readMap(path);
+        if (!rebaseMapNotePaths(map, chainRebase(pairs))) continue;
+        await this.repo.saveMap(path, map);
+        changed = true;
+      } catch (retryError) {
+        error ??= retryError instanceof Error ? retryError : new Error(String(retryError));
+      }
+    }
+    return { changed, error };
   }
   private readonly unreadableReported = new Map<string, number>();
   /** One Notice and log line per scan; the same map and error is not repeated within a few seconds (one rename = two scans). */

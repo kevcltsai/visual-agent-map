@@ -14,6 +14,13 @@ export const MAX_RESEARCH_CALLS = 66;
 export const MAX_SITUATION_DATA = 6;
 export const MAX_SITUATION_ATTEMPTS = 2;
 export const MIN_VERIFIED = 3;
+/** Facet-judged maps (V1 boost): 3-5 facets, 1-3 needs each, 15 first-round needs, 9 retry needs, 24 situation research calls. */
+export const MIN_FACETS = 3;
+export const MAX_FACETS = 5;
+export const MAX_FACET_NEEDS = 3;
+export const MAX_SITUATION_NEEDS = 15;
+export const MAX_RETRY_NEEDS = 9;
+export const MAX_SITUATION_RESEARCH = 24;
 
 export const ROLE_KEYS = ["proposition", "situation", "conclusion", "verified", "eliminated"] as const;
 export type RoleKey = (typeof ROLE_KEYS)[number];
@@ -35,8 +42,20 @@ export const PROOF_CHECKS = ["page_match", "provider_read"] as const;
 export type ProofCheck = (typeof PROOF_CHECKS)[number];
 export const GATE_STATES = ["pending", "matched", "unmatched"] as const;
 export type GateState = (typeof GATE_STATES)[number];
-export const GATE_KINDS = ["not_matching", "data_missing"] as const;
+export const GATE_KINDS = ["not_matching", "data_missing", "data_insufficient"] as const;
 export type GateKind = (typeof GATE_KINDS)[number];
+export const PROP_STANCES = ["supports", "refutes", "irrelevant"] as const;
+export type PropStance = (typeof PROP_STANCES)[number];
+export const FACET_VERDICTS = ["supports", "refutes", "insufficient", "pending"] as const;
+export type FacetVerdict = (typeof FACET_VERDICTS)[number];
+/**
+ * The single switch point for decision #47: the proposition stance of a datum whose source was verified but whose research answer was
+ * "uncertain". TODO decision #47: the owner picks (a) irrelevant (this value) or (b) a fourth label; (b) changes only this constant and the type.
+ */
+export const UNCERTAIN_RESEARCH_STANCE: PropStance = "irrelevant";
+export function propStanceForUncertainResearch(): PropStance {
+  return UNCERTAIN_RESEARCH_STANCE;
+}
 export const VERDICTS = ["supported", "refuted", "undecided"] as const;
 export type Verdict = (typeof VERDICTS)[number];
 export const LOCATIONS = ["verifying", "eliminated"] as const;
@@ -59,12 +78,32 @@ export interface SituationDatum {
   stance?: DataStance;
   proof?: SourceProof;
   reason?: string;
+  /** Facet-judged maps only: the facet this datum belongs to, its stance toward the proposition and why. */
+  facetId?: string;
+  propStance?: PropStance;
+  stanceReason?: string;
 }
 export interface SituationGate {
   state: GateState;
   kind?: GateKind;
   reason?: string;
   citedData: string[];
+  /** Facet-judged maps: the round (1 or 2) the gate is in or finished in. */
+  round?: 1 | 2;
+}
+export interface AssumptionItem {
+  label: string;
+  value: string;
+  reason: string;
+}
+export interface Facet {
+  /** Node id of the facet card. */
+  id: string;
+  title: string;
+  verdict: FacetVerdict;
+  reason: string;
+  citedData: string[];
+  summary: string;
 }
 export interface Need {
   id: string;
@@ -103,7 +142,15 @@ export interface ArgumentMapData {
   v: 1;
   roles: ArgumentRoles;
   run: ArgumentRun;
-  situation: { data: SituationDatum[]; gate: SituationGate };
+  situation: {
+    data: SituationDatum[];
+    gate: SituationGate;
+    /** `id` is the node id of the assumption card. Facet-judged maps only. */
+    assumptions?: { id: string; items: AssumptionItem[] };
+    /** Present only on a facet-judged map; a map without it runs the V1 path unchanged. */
+    facets?: Facet[];
+    causalQuestions?: string[];
+  };
   hypotheses: Hypothesis[];
   conclusion: ArgumentConclusion;
 }
@@ -134,6 +181,30 @@ function badProof(value: unknown): boolean {
   );
 }
 
+/** Facets, assumptions and causal questions (all optional, all or nothing for the facets); their ids join `ids`. */
+function readFacets(situation: Rec, ids: Set<string>): string | null {
+  const { facets, assumptions, causalQuestions } = situation;
+  if (causalQuestions !== undefined && !strList(causalQuestions)) return "situation malformed";
+  if (assumptions !== undefined) {
+    if (!isRec(assumptions) || !isStr(assumptions.id) || !Array.isArray(assumptions.items))
+      return "assumptions malformed";
+    for (const item of assumptions.items as unknown[])
+      if (!isRec(item) || !isStr(item.label) || !isStr(item.value) || !isStr(item.reason))
+        return "assumptions malformed";
+    ids.add(assumptions.id);
+  }
+  if (facets === undefined) return null;
+  if (!Array.isArray(facets) || facets.length < MIN_FACETS || facets.length > MAX_FACETS) return "facets malformed";
+  for (const facet of facets as unknown[]) {
+    if (!isRec(facet) || !isStr(facet.id) || ids.has(facet.id) || !isStr(facet.title)) return "facets malformed";
+    ids.add(facet.id);
+    if (!oneOf(FACET_VERDICTS, facet.verdict)) return "unknown facet enum";
+    if (typeof facet.reason !== "string" || typeof facet.summary !== "string" || !strList(facet.citedData))
+      return "facets malformed";
+  }
+  return null;
+}
+
 /** Why the key cannot be used, or null when it is a well-formed version 1 value. Never mutates `raw`. */
 function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
   if (!isRec(raw)) return "not an object";
@@ -152,15 +223,23 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
   const situation = raw.situation;
   if (!isRec(situation) || !Array.isArray(situation.data) || !isRec(situation.gate)) return "situation malformed";
   const ids = new Set<string>();
+  const facetProblem = readFacets(situation, ids);
+  if (facetProblem) return facetProblem;
+  const facetIds = Array.isArray(situation.facets) ? new Set((situation.facets as Rec[]).map(f => f.id)) : null;
   for (const datum of situation.data as unknown[]) {
     if (!isRec(datum) || !isStr(datum.id) || !isStr(datum.need) || !count(datum.attempts) || ids.has(datum.id))
       return "situation data malformed";
     ids.add(datum.id);
     if (!oneOf(ITEM_STATES, datum.state) || !optOneOf(DATA_STANCES, datum.stance)) return "unknown situation enum";
     if (badProof(datum.proof) || !optStr(datum.reason)) return "situation data malformed";
+    if (!optOneOf(PROP_STANCES, datum.propStance)) return "unknown situation enum";
+    if (!optStr(datum.stanceReason) || (datum.facetId !== undefined && !isStr(datum.facetId)))
+      return "situation data malformed";
+    if (facetIds && (!isStr(datum.facetId) || !facetIds.has(datum.facetId))) return "situation data malformed";
   }
   const gate = situation.gate;
   if (!oneOf(GATE_STATES, gate.state) || !optOneOf(GATE_KINDS, gate.kind)) return "unknown gate enum";
+  if (gate.round !== undefined && gate.round !== 1 && gate.round !== 2) return "gate malformed";
   if (!strList(gate.citedData) || !optStr(gate.reason)) return "gate malformed";
   if (!Array.isArray(raw.hypotheses)) return "hypotheses malformed";
   for (const hypothesis of raw.hypotheses as unknown[]) {
@@ -209,7 +288,7 @@ export function readArgumentMap(map: { nodes: readonly { id: string }[]; argumen
 }
 
 /**
- * The node ids the flow owns (the five role nodes, every situation datum card, every hypothesis and every need card), read tolerantly from the raw
+ * The node ids the flow owns (the five role nodes, every situation datum card, every facet card, the assumption card, every hypothesis and every need card), read tolerantly from the raw
  * key so an unusable key still protects what it names. Empty when the map has no `argumentMap` key. The AI lock
  * treats these as locked; the runner never asks the lock.
  */
@@ -220,6 +299,11 @@ export function managedNodeIds(map: { argumentMap?: unknown } | null | undefined
   if (isRec(raw.roles)) for (const id of Object.values(raw.roles)) if (isStr(id)) ids.add(id);
   if (isRec(raw.situation) && Array.isArray(raw.situation.data))
     for (const datum of raw.situation.data) if (isRec(datum) && isStr(datum.id)) ids.add(datum.id);
+  if (isRec(raw.situation)) {
+    if (Array.isArray(raw.situation.facets))
+      for (const facet of raw.situation.facets) if (isRec(facet) && isStr(facet.id)) ids.add(facet.id);
+    if (isRec(raw.situation.assumptions) && isStr(raw.situation.assumptions.id)) ids.add(raw.situation.assumptions.id);
+  }
   if (Array.isArray(raw.hypotheses))
     for (const h of raw.hypotheses) {
       if (!isRec(h)) continue;

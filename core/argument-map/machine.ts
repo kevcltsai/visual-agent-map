@@ -5,18 +5,26 @@
  * (texts, stances, verdicts, citations); every gate below is decided here. Spec: docs/history/tasks/2026-11-09-argument-map-layout.
  */
 import {
+  MAX_FACETS,
+  MAX_FACET_NEEDS,
   MAX_HYPOTHESES,
   MAX_NEEDS,
   MAX_RESEARCH_CALLS,
   MAX_ROUND,
+  MAX_RETRY_NEEDS,
   MAX_ROUND_NEEDS,
   MAX_SITUATION_ATTEMPTS,
   MAX_SITUATION_DATA,
+  MAX_SITUATION_NEEDS,
+  MAX_SITUATION_RESEARCH,
+  MIN_FACETS,
   MIN_VERIFIED,
   DATA_STANCES,
   NEED_STANCES,
   PROOF_CHECKS,
+  PROP_STANCES,
   VERDICTS,
+  propStanceForUncertainResearch,
   allNeedsFound,
   effectiveVerdict,
   foundNeeds,
@@ -24,6 +32,8 @@ import {
   verifiedHypotheses,
   type ArgumentMapData,
   type ArgumentRoles,
+  type AssumptionItem,
+  type Facet,
   type Hypothesis,
   type Need,
   type SourceProof,
@@ -43,6 +53,9 @@ export type ArgumentAction =
   | { type: "research_situation"; dataId: string }
   | { type: "gate_missing" }
   | { type: "judge_gate" }
+  | { type: "judge_facets" }
+  | { type: "situation_budget" }
+  | { type: "add_retry_needs" }
   | { type: "propose_hypotheses"; count: number }
   | { type: "add_needs"; hypothesisId: string }
   | { type: "research_need"; hypothesisId: string; needId: string }
@@ -54,6 +67,18 @@ export type ArgumentAction =
 
 /** What a research answer must be: a source the caller verified, or a miss with a reason. `proof` is re-checked for shape here. */
 export type EvidenceResult = { found: true; stance: string; proof: SourceProof } | { found: false; reason: string };
+
+/** The AI's judgement of a facet-judged situation: a stance for each found datum of the pending facets and a verdict for each pending facet. */
+export interface FacetJudgement {
+  data: { id: string; propStance: unknown; reason: string }[];
+  facets: { id: string; verdict: unknown; reason: string; citedData: string[] }[];
+}
+export interface SituationPlan {
+  assumptions?: { id: string; items: AssumptionItem[] };
+  facets: { id: string; title: string; needs: { id: string; need: string }[] }[];
+  causalQuestions: string[];
+}
+export type FacetOutcome = "mismatch" | "matched" | "retry" | "insufficient";
 
 export interface EvidenceInput {
   id: string;
@@ -102,6 +127,8 @@ function hypothesisOf(state: ArgumentMapData, id: string): Hypothesis {
 function allIds(state: ArgumentMapData): Set<string> {
   const ids = new Set<string>(Object.values(state.roles));
   for (const datum of state.situation.data) ids.add(datum.id);
+  for (const facet of state.situation.facets ?? []) ids.add(facet.id);
+  if (state.situation.assumptions) ids.add(state.situation.assumptions.id);
   for (const h of state.hypotheses) {
     ids.add(h.id);
     for (const need of h.needs) ids.add(need.id);
@@ -148,6 +175,22 @@ const canRevise = (h: Hypothesis): boolean => h.round < MAX_ROUND && h.needs.len
 const verifyingCount = (state: ArgumentMapData): number =>
   state.hypotheses.filter(h => h.location === "verifying").length;
 
+/** A map with `situation.facets` is judged by facets (V1 boost); one without runs the V1 path unchanged. */
+export const hasFacets = (state: ArgumentMapData): boolean => state.situation.facets !== undefined;
+const facetsOf = (state: ArgumentMapData): Facet[] => {
+  if (!state.situation.facets) throw new GateError("this map has no facets");
+  return state.situation.facets;
+};
+/** Facet maps research each need once (a miss is final); V1 maps keep 2 attempts. */
+const maxAttempts = (state: ArgumentMapData): number => (hasFacets(state) ? 1 : MAX_SITUATION_ATTEMPTS);
+/** Situation research calls still allowed on a facet map: the situation cap and the whole-map cap, whichever is smaller. */
+function situationBudget(state: ArgumentMapData): number {
+  const used = state.situation.data.filter(d => d.attempts > 0).length;
+  return Math.max(0, Math.min(MAX_SITUATION_RESEARCH - used, MAX_RESEARCH_CALLS - state.run.researchCalls));
+}
+const foundOf = (state: ArgumentMapData, facetId: string) =>
+  state.situation.data.filter(d => d.facetId === facetId && d.state === "found");
+
 // ---- creation ------------------------------------------------------------------------------------------------------------------
 export function newArgumentMap(roles: ArgumentRoles, runId: string): ArgumentMapData {
   return {
@@ -172,7 +215,8 @@ function situationLimit(state: ArgumentMapData): boolean {
 }
 
 function limitStop(state: ArgumentMapData, actions: ArgumentAction[]): boolean {
-  if (state.run.phase === "situation") return state.situation.gate.state === "pending" && situationLimit(state);
+  if (state.run.phase === "situation")
+    return !hasFacets(state) && state.situation.gate.state === "pending" && situationLimit(state);
   if (state.run.phase !== "analysis" || verifiedHypotheses(state).length >= MIN_VERIFIED) return false;
   if (state.hypotheses.length >= MAX_HYPOTHESES && verifyingCount(state) < MIN_VERIFIED) return true;
   return actions.length === 0 && !hasSearching(state);
@@ -205,9 +249,28 @@ function analysisActions(state: ArgumentMapData): ArgumentAction[] {
   return actions;
 }
 
+/** Facet map: research each pending need once within the budget, then the budget-out step, the facet judgement or the one retry batch. Never stop_limit. */
+function facetSituationActions(state: ArgumentMapData): ArgumentAction[] {
+  const { data } = state.situation;
+  const actions: ArgumentAction[] = [];
+  let budget = situationBudget(state);
+  for (const datum of data)
+    if (datum.state === "pending" && budget > 0) {
+      actions.push({ type: "research_situation", dataId: datum.id });
+      budget -= 1;
+    }
+  if (actions.length || data.some(d => d.state === "searching")) return actions;
+  if (data.some(d => d.state === "pending")) return [{ type: "situation_budget" }];
+  const facets = facetsOf(state);
+  if (facets.some(f => f.verdict === "pending")) return [{ type: "judge_facets" }];
+  if (state.situation.gate.round === 1 && facetOutcome(state, facets) === "retry") return [{ type: "add_retry_needs" }];
+  return actions;
+}
+
 function situationActions(state: ArgumentMapData): ArgumentAction[] {
   const { data } = state.situation;
   if (data.length === 0) return [{ type: "plan_situation" }];
+  if (hasFacets(state)) return facetSituationActions(state);
   const actions: ArgumentAction[] = [];
   let budget = MAX_RESEARCH_CALLS - state.run.researchCalls;
   for (const datum of data)
@@ -232,6 +295,7 @@ export function nextActions(state: ArgumentMapData): ArgumentAction[] {
 // ---- situation ----------------------------------------------------------------------------------------------------------------
 export function applySituationData(state: ArgumentMapData, items: { id: string; need: string }[]): ArgumentMapData {
   inSituation(state);
+  if (hasFacets(state)) throw new GateError("a facet map is planned with applySituationPlan");
   if (!items.length) throw new GateError("no situation data");
   if (state.situation.data.length + items.length > MAX_SITUATION_DATA) throw new GateError("too many situation data");
   const next = clone(state);
@@ -243,14 +307,63 @@ export function applySituationData(state: ArgumentMapData, items: { id: string; 
   return next;
 }
 
+/**
+ * Plan of a facet-judged situation: 3-5 facets with 1-3 needs each (15 at most), optional assumption card, causal questions.
+ * The facet map starts here with `gate.round = 1`; every facet is `pending` until judged.
+ */
+export function applySituationPlan(state: ArgumentMapData, plan: SituationPlan): ArgumentMapData {
+  inSituation(state);
+  if (state.situation.data.length || hasFacets(state)) throw new GateError("the situation is already planned");
+  const entries = Array.isArray(plan.facets) ? plan.facets : [];
+  if (entries.length < MIN_FACETS || entries.length > MAX_FACETS)
+    throw new GateError(`a situation needs ${MIN_FACETS} to ${MAX_FACETS} facets`);
+  const total = entries.reduce((sum, f) => sum + (Array.isArray(f.needs) ? f.needs.length : 0), 0);
+  if (total > MAX_SITUATION_NEEDS) throw new GateError("too many situation needs");
+  const next = clone(state);
+  const ids = allIds(next);
+  const items = plan.assumptions?.items ?? [];
+  for (const item of items)
+    if (blank(item.label) || blank(item.value) || blank(item.reason))
+      throw new GateError("an assumption is incomplete");
+  if (items.length) {
+    next.situation.assumptions = { id: newId(ids, plan.assumptions!.id), items: items.map(i => ({ ...i })) };
+  }
+  next.situation.facets = [];
+  next.situation.data = [];
+  for (const entry of entries) {
+    if (blank(entry.title)) throw new GateError("empty facet title");
+    const needs = Array.isArray(entry.needs) ? entry.needs : [];
+    if (needs.length < 1 || needs.length > MAX_FACET_NEEDS)
+      throw new GateError(`a facet needs 1 to ${MAX_FACET_NEEDS} situation needs`);
+    const id = newId(ids, entry.id);
+    next.situation.facets.push({ id, title: entry.title, verdict: "pending", reason: "", citedData: [], summary: "" });
+    for (const need of needs) {
+      if (blank(need.need)) throw new GateError("empty situation need");
+      next.situation.data.push({
+        id: newId(ids, need.id),
+        need: need.need,
+        attempts: 0,
+        state: "pending",
+        facetId: id
+      });
+    }
+  }
+  next.situation.causalQuestions = (Array.isArray(plan.causalQuestions) ? plan.causalQuestions : []).filter(
+    q => !blank(q)
+  );
+  next.situation.gate.round = 1;
+  return next;
+}
+
 export function beginSituationResearch(state: ArgumentMapData, dataId: string): ArgumentMapData {
   inSituation(state);
   running(state);
   const next = clone(state);
   const datum = next.situation.data.find(d => d.id === dataId);
   if (!datum || datum.state !== "pending") throw new GateError("situation datum is not waiting for research");
-  if (datum.attempts >= MAX_SITUATION_ATTEMPTS) throw new GateError("situation datum is out of attempts");
+  if (datum.attempts >= maxAttempts(state)) throw new GateError("situation datum is out of attempts");
   if (next.run.researchCalls >= MAX_RESEARCH_CALLS) throw new GateError("research call limit reached");
+  if (hasFacets(state) && situationBudget(state) <= 0) throw new GateError("situation research limit reached");
   datum.attempts += 1;
   datum.state = "searching";
   next.run.researchCalls += 1;
@@ -267,14 +380,16 @@ export function applySituationEvidence(
   const datum = next.situation.data.find(d => d.id === dataId);
   if (!datum || datum.state !== "searching") throw new GateError("situation datum is not being researched");
   if (result.found === true) {
-    datum.stance = stanceOf(DATA_STANCES, result.stance);
+    // A facet map keeps an "uncertain" answer whose source was verified: the stance toward the proposition comes from one constant (#47).
+    if (hasFacets(state) && result.stance === "uncertain") datum.propStance = propStanceForUncertainResearch();
+    else datum.stance = stanceOf(DATA_STANCES, result.stance);
     datum.proof = checkedProof(result.proof);
     datum.state = "found";
     return next;
   }
   if (blank(result.reason)) throw new GateError("a miss needs a reason");
   datum.reason = result.reason;
-  datum.state = datum.attempts >= MAX_SITUATION_ATTEMPTS ? "not_found" : "pending";
+  datum.state = datum.attempts >= maxAttempts(state) ? "not_found" : "pending";
   return next;
 }
 
@@ -292,9 +407,10 @@ export function releaseSituationResearch(state: ArgumentMapData, dataId: string)
   return next;
 }
 
-/** Unfound data end the run without asking the AI. */
+/** Unfound data end the run without asking the AI. Refused on a facet map: one missing datum never stops it. */
 export function applyGateMissing(state: ArgumentMapData): ArgumentMapData {
   inSituation(state);
+  if (hasFacets(state)) throw new GateError("a facet map is judged by facets, not stopped by a missing datum");
   const { data } = state.situation;
   if (!data.length || data.some(d => d.state === "pending" || d.state === "searching"))
     throw new GateError("situation data are not settled");
@@ -315,6 +431,174 @@ function stopMismatch(next: ArgumentMapData, reason: StopReason): ArgumentMapDat
   next.run.status = "finished";
   next.run.stopReason = reason;
   next.conclusion = { state: "stopped", basedOn: [], missing: [] };
+  return next;
+}
+
+/** Budget spent while needs are still pending (facet map): they are never researched and are recorded as `not_found(budget)`. */
+export function applySituationBudgetOut(state: ArgumentMapData): ArgumentMapData {
+  inSituation(state);
+  facetsOf(state);
+  const { data } = state.situation;
+  if (data.some(d => d.state === "searching")) throw new GateError("research is still running");
+  if (!data.some(d => d.state === "pending")) throw new GateError("no situation need is waiting");
+  if (situationBudget(state) > 0) throw new GateError("research budget remains");
+  const next = clone(state);
+  for (const datum of next.situation.data)
+    if (datum.state === "pending") {
+      datum.state = "not_found";
+      datum.reason = "budget";
+    }
+  return next;
+}
+
+/** What the facets say: any refutation stops; at least half supporting matches; otherwise one retry round (when it can still run) or data_insufficient. */
+export function situationOutcome(facets: readonly Facet[], round: 1 | 2, canRetry = true): FacetOutcome {
+  if (facets.some(f => f.verdict === "refutes")) return "mismatch";
+  if (facets.filter(f => f.verdict === "supports").length * 2 >= facets.length) return "matched";
+  return round === 1 && canRetry ? "retry" : "insufficient";
+}
+const facetOutcome = (state: ArgumentMapData, facets: Facet[]): FacetOutcome =>
+  situationOutcome(facets, state.situation.gate.round === 2 ? 2 : 1, situationBudget(state) > 0);
+
+const stopFacets = (
+  next: ArgumentMapData,
+  kind: "not_matching" | "data_insufficient",
+  reason: string,
+  cited: string[]
+) => {
+  const round = next.situation.gate.round ?? 1;
+  next.situation.gate = { state: "unmatched", kind, reason, citedData: cited, round };
+  return stopMismatch(next, kind === "not_matching" ? "mismatch" : "data_missing");
+};
+
+/**
+ * The facet judgement: stances for every found datum of the pending facets (a stance already fixed, e.g. an uncertain answer, cannot be
+ * changed) and a verdict for each pending facet. A facet with no found data is `insufficient` whatever the AI said; "supports" and
+ * "refutes" must cite at least one found, non-irrelevant datum of the facet with that same stance. The program then decides the outcome.
+ */
+export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudgement): ArgumentMapData {
+  inSituation(state);
+  const facets = facetsOf(state);
+  if (state.situation.data.some(d => d.state === "pending" || d.state === "searching"))
+    throw new GateError("situation data are not settled");
+  const pending = facets.filter(f => f.verdict === "pending");
+  if (!pending.length) throw new GateError("no facet is waiting for a judgement");
+  const next = clone(state);
+  const nextFacets = facetsOf(next);
+  const pendingIds = new Set(pending.map(f => f.id));
+  const foundData = next.situation.data.filter(d => d.state === "found" && pendingIds.has(d.facetId ?? ""));
+  const stances = Array.isArray(judgement.data) ? judgement.data : [];
+  if (stances.length !== foundData.length || new Set(stances.map(e => e.id)).size !== foundData.length)
+    throw new GateError("the judgement must give a stance for every found datum of the facets judged");
+  for (const entry of stances) {
+    const datum = foundData.find(d => d.id === entry.id);
+    if (!datum) throw new GateError("the judgement names a datum that is not being judged");
+    const stance = stanceOf(PROP_STANCES, entry.propStance);
+    if (datum.propStance !== undefined && datum.propStance !== stance)
+      throw new GateError("a stance that is already fixed cannot be changed");
+    if (blank(entry.reason)) throw new GateError("a stance needs a reason");
+    if (datum.propStance === undefined) {
+      datum.propStance = stance;
+      datum.stanceReason = entry.reason;
+    }
+  }
+  const verdicts = Array.isArray(judgement.facets) ? judgement.facets : [];
+  if (verdicts.length !== pending.length || new Set(verdicts.map(v => v.id)).size !== pending.length)
+    throw new GateError("the judgement must give a verdict for every facet waiting");
+  for (const entry of verdicts) {
+    const facet = nextFacets.find(f => f.id === entry.id);
+    if (!facet || !pendingIds.has(facet.id)) throw new GateError("the judgement names a facet that is not waiting");
+    const own = foundOf(next, facet.id);
+    // No found data, or only data that bear no stance (#47): nothing to rest a verdict on, whatever the AI said.
+    if (!own.some(d => d.propStance !== "irrelevant")) {
+      facet.verdict = "insufficient";
+      facet.reason = blank(entry.reason) ? "no data found" : entry.reason;
+      facet.citedData = [];
+      continue;
+    }
+    const verdict = stanceOf(["supports", "refutes", "insufficient"] as const, entry.verdict);
+    if (blank(entry.reason)) throw new GateError("a facet verdict needs a reason");
+    const cited = Array.isArray(entry.citedData) ? entry.citedData : [];
+    const usable = new Set(own.filter(d => d.propStance !== "irrelevant").map(d => d.id));
+    if (cited.some(id => typeof id !== "string" || !usable.has(id)))
+      throw new GateError("a facet may cite found, relevant data of its own only");
+    if (verdict !== "insufficient" && !cited.some(id => own.find(d => d.id === id)?.propStance === verdict))
+      throw new GateError(`a ${verdict} verdict must cite a datum with the same stance`);
+    facet.verdict = verdict;
+    facet.reason = entry.reason;
+    facet.citedData = [...new Set(cited)];
+  }
+  const outcome = facetOutcome(next, nextFacets);
+  const refuting = nextFacets.filter(f => f.verdict === "refutes");
+  const reasons = (list: Facet[]): string => list.map(f => `${f.title}: ${f.reason}`).join("; ");
+  if (outcome === "mismatch")
+    return stopFacets(next, "not_matching", reasons(refuting), [...new Set(refuting.flatMap(f => f.citedData))]);
+  if (outcome === "matched") {
+    const supporting = nextFacets.filter(f => f.verdict === "supports");
+    next.situation.gate = {
+      state: "matched",
+      reason: reasons(supporting),
+      citedData: [...new Set(supporting.flatMap(f => f.citedData))],
+      round: next.situation.gate.round
+    };
+    next.run.phase = "analysis";
+    return next;
+  }
+  if (outcome === "insufficient")
+    return stopFacets(next, "data_insufficient", reasons(nextFacets.filter(f => f.verdict === "insufficient")), []);
+  return next;
+}
+
+/**
+ * The one retry batch (round 1 to 2): new needs for facets judged `insufficient`, 1-3 per facet and 9 at most; those facets go back to
+ * `pending` and only they are judged again. An empty batch ends the run as data_insufficient.
+ */
+export function addRetryNeeds(
+  state: ArgumentMapData,
+  items: { facetId: string; id: string; need: string }[]
+): ArgumentMapData {
+  inSituation(state);
+  const facets = facetsOf(state);
+  if (
+    state.situation.gate.round !== 1 ||
+    facets.some(f => f.verdict === "pending") ||
+    facetOutcome(state, facets) !== "retry"
+  )
+    throw new GateError("a retry batch is not allowed now");
+  if (items.length > MAX_RETRY_NEEDS) throw new GateError("too many retry needs");
+  if (state.situation.data.length + items.length > MAX_SITUATION_RESEARCH)
+    throw new GateError("too many situation needs");
+  const next = clone(state);
+  if (!items.length)
+    return stopFacets(
+      next,
+      "data_insufficient",
+      facetsOf(next)
+        .filter(f => f.verdict === "insufficient")
+        .map(f => `${f.title}: ${f.reason}`)
+        .join("; "),
+      []
+    );
+  const ids = allIds(next);
+  const perFacet = new Map<string, number>();
+  for (const item of items) {
+    const facet = facetsOf(next).find(f => f.id === item.facetId);
+    if (!facet || facet.verdict !== "insufficient")
+      throw new GateError("only an insufficient facet can be searched again");
+    if (blank(item.need)) throw new GateError("empty retry need");
+    const count = (perFacet.get(facet.id) ?? 0) + 1;
+    if (count > MAX_FACET_NEEDS) throw new GateError("too many retry needs for one facet");
+    perFacet.set(facet.id, count);
+    next.situation.data.push({
+      id: newId(ids, item.id),
+      need: item.need,
+      attempts: 0,
+      state: "pending",
+      facetId: facet.id
+    });
+  }
+  for (const facet of facetsOf(next)) if (perFacet.has(facet.id)) facet.verdict = "pending";
+  next.situation.gate.round = 2;
   return next;
 }
 
@@ -579,7 +863,12 @@ export function applyPause(
   live(state);
   if (!["user", "interrupted", "error"].includes(reason)) throw new GateError("unknown pause reason");
   const next = clone(state);
-  for (const datum of next.situation.data) if (datum.state === "searching") datum.state = "pending";
+  for (const datum of next.situation.data)
+    if (datum.state === "searching") {
+      datum.state = "pending";
+      // A facet map researches each need once, so the interrupted try is refunded (V1 maps keep their count).
+      if (hasFacets(next) && datum.attempts > 0) datum.attempts -= 1;
+    }
   for (const h of next.hypotheses) for (const need of h.needs) if (need.state === "searching") need.state = "pending";
   next.run.status = "paused";
   next.run.stopReason = reason;

@@ -24619,6 +24619,9 @@ var MAX_RESEARCH_CALLS = 66;
 var MAX_SITUATION_DATA = 6;
 var MAX_SITUATION_ATTEMPTS = 2;
 var MIN_VERIFIED = 3;
+var MIN_FACETS = 3;
+var MAX_FACETS = 5;
+var MAX_SITUATION_RESEARCH = 24;
 var ROLE_KEYS = ["proposition", "situation", "conclusion", "verified", "eliminated"];
 var RUN_PHASES = ["situation", "analysis", "concluded", "stopped_mismatch", "stopped_limit"];
 var RUN_STATUSES = ["running", "paused", "finished"];
@@ -24628,7 +24631,13 @@ var DATA_STANCES = ["supports", "opposes"];
 var NEED_STANCES = ["supports", "contradicts", "uncertain"];
 var PROOF_CHECKS = ["page_match", "provider_read"];
 var GATE_STATES = ["pending", "matched", "unmatched"];
-var GATE_KINDS = ["not_matching", "data_missing"];
+var GATE_KINDS = ["not_matching", "data_missing", "data_insufficient"];
+var PROP_STANCES = ["supports", "refutes", "irrelevant"];
+var FACET_VERDICTS = ["supports", "refutes", "insufficient", "pending"];
+var UNCERTAIN_RESEARCH_STANCE = "irrelevant";
+function propStanceForUncertainResearch() {
+  return UNCERTAIN_RESEARCH_STANCE;
+}
 var VERDICTS = ["supported", "refuted", "undecided"];
 var LOCATIONS = ["verifying", "eliminated"];
 var CONCLUSION_STATES = ["pending", "concluded", "stopped"];
@@ -24642,6 +24651,28 @@ var optStr = (value) => value === void 0 || typeof value === "string";
 function badProof(value) {
   if (value === void 0) return false;
   return !isRec(value) || !isStr(value.url) || !isStr(value.quote) || !isStr(value.claim) || !oneOf(PROOF_CHECKS, value.check) || !isStr(value.checkedAt);
+}
+function readFacets(situation, ids) {
+  const { facets, assumptions, causalQuestions } = situation;
+  if (causalQuestions !== void 0 && !strList(causalQuestions)) return "situation malformed";
+  if (assumptions !== void 0) {
+    if (!isRec(assumptions) || !isStr(assumptions.id) || !Array.isArray(assumptions.items))
+      return "assumptions malformed";
+    for (const item of assumptions.items)
+      if (!isRec(item) || !isStr(item.label) || !isStr(item.value) || !isStr(item.reason))
+        return "assumptions malformed";
+    ids.add(assumptions.id);
+  }
+  if (facets === void 0) return null;
+  if (!Array.isArray(facets) || facets.length < MIN_FACETS || facets.length > MAX_FACETS) return "facets malformed";
+  for (const facet of facets) {
+    if (!isRec(facet) || !isStr(facet.id) || ids.has(facet.id) || !isStr(facet.title)) return "facets malformed";
+    ids.add(facet.id);
+    if (!oneOf(FACET_VERDICTS, facet.verdict)) return "unknown facet enum";
+    if (typeof facet.reason !== "string" || typeof facet.summary !== "string" || !strList(facet.citedData))
+      return "facets malformed";
+  }
+  return null;
 }
 function problem(raw, nodeIds) {
   if (!isRec(raw)) return "not an object";
@@ -24660,15 +24691,23 @@ function problem(raw, nodeIds) {
   const situation = raw.situation;
   if (!isRec(situation) || !Array.isArray(situation.data) || !isRec(situation.gate)) return "situation malformed";
   const ids = /* @__PURE__ */ new Set();
+  const facetProblem = readFacets(situation, ids);
+  if (facetProblem) return facetProblem;
+  const facetIds = Array.isArray(situation.facets) ? new Set(situation.facets.map((f) => f.id)) : null;
   for (const datum of situation.data) {
     if (!isRec(datum) || !isStr(datum.id) || !isStr(datum.need) || !count(datum.attempts) || ids.has(datum.id))
       return "situation data malformed";
     ids.add(datum.id);
     if (!oneOf(ITEM_STATES, datum.state) || !optOneOf(DATA_STANCES, datum.stance)) return "unknown situation enum";
     if (badProof(datum.proof) || !optStr(datum.reason)) return "situation data malformed";
+    if (!optOneOf(PROP_STANCES, datum.propStance)) return "unknown situation enum";
+    if (!optStr(datum.stanceReason) || datum.facetId !== void 0 && !isStr(datum.facetId))
+      return "situation data malformed";
+    if (facetIds && (!isStr(datum.facetId) || !facetIds.has(datum.facetId))) return "situation data malformed";
   }
   const gate = situation.gate;
   if (!oneOf(GATE_STATES, gate.state) || !optOneOf(GATE_KINDS, gate.kind)) return "unknown gate enum";
+  if (gate.round !== void 0 && gate.round !== 1 && gate.round !== 2) return "gate malformed";
   if (!strList(gate.citedData) || !optStr(gate.reason)) return "gate malformed";
   if (!Array.isArray(raw.hypotheses)) return "hypotheses malformed";
   for (const hypothesis of raw.hypotheses) {
@@ -24717,6 +24756,12 @@ function managedNodeIds(map) {
   }
   if (isRec(raw.situation) && Array.isArray(raw.situation.data)) {
     for (const datum of raw.situation.data) if (isRec(datum) && isStr(datum.id)) ids.add(datum.id);
+  }
+  if (isRec(raw.situation)) {
+    if (Array.isArray(raw.situation.facets)) {
+      for (const facet of raw.situation.facets) if (isRec(facet) && isStr(facet.id)) ids.add(facet.id);
+    }
+    if (isRec(raw.situation.assumptions) && isStr(raw.situation.assumptions.id)) ids.add(raw.situation.assumptions.id);
   }
   if (Array.isArray(raw.hypotheses))
     for (const h of raw.hypotheses) {
@@ -43714,8 +43759,11 @@ function hypothesisOf(state, id) {
   return found;
 }
 function allIds(state) {
+  var _a2;
   const ids = new Set(Object.values(state.roles));
   for (const datum of state.situation.data) ids.add(datum.id);
+  for (const facet of (_a2 = state.situation.facets) != null ? _a2 : []) ids.add(facet.id);
+  if (state.situation.assumptions) ids.add(state.situation.assumptions.id);
   for (const h of state.hypotheses) {
     ids.add(h.id);
     for (const need of h.needs) ids.add(need.id);
@@ -43757,6 +43805,16 @@ var settled = (h) => h.needs.every((n) => n.state === "found" || n.state === "no
 var hasSearching = (state) => state.situation.data.some((d) => d.state === "searching") || state.hypotheses.some((h) => h.needs.some((n) => n.state === "searching"));
 var canRevise = (h) => h.round < MAX_ROUND && h.needs.length < MAX_NEEDS;
 var verifyingCount = (state) => state.hypotheses.filter((h) => h.location === "verifying").length;
+var hasFacets = (state) => state.situation.facets !== void 0;
+var facetsOf = (state) => {
+  if (!state.situation.facets) throw new GateError("this map has no facets");
+  return state.situation.facets;
+};
+var maxAttempts = (state) => hasFacets(state) ? 1 : MAX_SITUATION_ATTEMPTS;
+function situationBudget(state) {
+  const used = state.situation.data.filter((d) => d.attempts > 0).length;
+  return Math.max(0, Math.min(MAX_SITUATION_RESEARCH - used, MAX_RESEARCH_CALLS - state.run.researchCalls));
+}
 function newArgumentMap(roles, runId) {
   return {
     v: 1,
@@ -43772,7 +43830,8 @@ function situationLimit(state) {
   return state.run.researchCalls >= MAX_RESEARCH_CALLS && data.some((d) => d.state === "pending") && !data.some((d) => d.state === "searching");
 }
 function limitStop(state, actions) {
-  if (state.run.phase === "situation") return state.situation.gate.state === "pending" && situationLimit(state);
+  if (state.run.phase === "situation")
+    return !hasFacets(state) && state.situation.gate.state === "pending" && situationLimit(state);
   if (state.run.phase !== "analysis" || verifiedHypotheses(state).length >= MIN_VERIFIED) return false;
   if (state.hypotheses.length >= MAX_HYPOTHESES && verifyingCount(state) < MIN_VERIFIED) return true;
   return actions.length === 0 && !hasSearching(state);
@@ -43803,9 +43862,26 @@ function analysisActions(state) {
   }
   return actions;
 }
+function facetSituationActions(state) {
+  const { data } = state.situation;
+  const actions = [];
+  let budget = situationBudget(state);
+  for (const datum of data)
+    if (datum.state === "pending" && budget > 0) {
+      actions.push({ type: "research_situation", dataId: datum.id });
+      budget -= 1;
+    }
+  if (actions.length || data.some((d) => d.state === "searching")) return actions;
+  if (data.some((d) => d.state === "pending")) return [{ type: "situation_budget" }];
+  const facets = facetsOf(state);
+  if (facets.some((f) => f.verdict === "pending")) return [{ type: "judge_facets" }];
+  if (state.situation.gate.round === 1 && facetOutcome(state, facets) === "retry") return [{ type: "add_retry_needs" }];
+  return actions;
+}
 function situationActions(state) {
   const { data } = state.situation;
   if (data.length === 0) return [{ type: "plan_situation" }];
+  if (hasFacets(state)) return facetSituationActions(state);
   const actions = [];
   let budget = MAX_RESEARCH_CALLS - state.run.researchCalls;
   for (const datum of data)
@@ -43826,6 +43902,7 @@ function nextActions(state) {
 }
 function applySituationData(state, items) {
   inSituation(state);
+  if (hasFacets(state)) throw new GateError("a facet map is planned with applySituationPlan");
   if (!items.length) throw new GateError("no situation data");
   if (state.situation.data.length + items.length > MAX_SITUATION_DATA) throw new GateError("too many situation data");
   const next = clone2(state);
@@ -43842,8 +43919,9 @@ function beginSituationResearch(state, dataId) {
   const next = clone2(state);
   const datum = next.situation.data.find((d) => d.id === dataId);
   if (!datum || datum.state !== "pending") throw new GateError("situation datum is not waiting for research");
-  if (datum.attempts >= MAX_SITUATION_ATTEMPTS) throw new GateError("situation datum is out of attempts");
+  if (datum.attempts >= maxAttempts(state)) throw new GateError("situation datum is out of attempts");
   if (next.run.researchCalls >= MAX_RESEARCH_CALLS) throw new GateError("research call limit reached");
+  if (hasFacets(state) && situationBudget(state) <= 0) throw new GateError("situation research limit reached");
   datum.attempts += 1;
   datum.state = "searching";
   next.run.researchCalls += 1;
@@ -43855,14 +43933,15 @@ function applySituationEvidence(state, dataId, result) {
   const datum = next.situation.data.find((d) => d.id === dataId);
   if (!datum || datum.state !== "searching") throw new GateError("situation datum is not being researched");
   if (result.found === true) {
-    datum.stance = stanceOf(DATA_STANCES, result.stance);
+    if (hasFacets(state) && result.stance === "uncertain") datum.propStance = propStanceForUncertainResearch();
+    else datum.stance = stanceOf(DATA_STANCES, result.stance);
     datum.proof = checkedProof(result.proof);
     datum.state = "found";
     return next;
   }
   if (blank(result.reason)) throw new GateError("a miss needs a reason");
   datum.reason = result.reason;
-  datum.state = datum.attempts >= MAX_SITUATION_ATTEMPTS ? "not_found" : "pending";
+  datum.state = datum.attempts >= maxAttempts(state) ? "not_found" : "pending";
   return next;
 }
 function releaseSituationResearch(state, dataId) {
@@ -43876,6 +43955,7 @@ function releaseSituationResearch(state, dataId) {
 }
 function applyGateMissing(state) {
   inSituation(state);
+  if (hasFacets(state)) throw new GateError("a facet map is judged by facets, not stopped by a missing datum");
   const { data } = state.situation;
   if (!data.length || data.some((d) => d.state === "pending" || d.state === "searching"))
     throw new GateError("situation data are not settled");
@@ -43900,6 +43980,12 @@ function stopMismatch(next, reason) {
   next.conclusion = { state: "stopped", basedOn: [], missing: [] };
   return next;
 }
+function situationOutcome(facets, round3, canRetry = true) {
+  if (facets.some((f) => f.verdict === "refutes")) return "mismatch";
+  if (facets.filter((f) => f.verdict === "supports").length * 2 >= facets.length) return "matched";
+  return round3 === 1 && canRetry ? "retry" : "insufficient";
+}
+var facetOutcome = (state, facets) => situationOutcome(facets, state.situation.gate.round === 2 ? 2 : 1, situationBudget(state) > 0);
 function applySituationGate(state, verdict) {
   inSituation(state);
   const { data } = state.situation;
@@ -44091,7 +44177,11 @@ function applyPause(state, reason) {
   live(state);
   if (!["user", "interrupted", "error"].includes(reason)) throw new GateError("unknown pause reason");
   const next = clone2(state);
-  for (const datum of next.situation.data) if (datum.state === "searching") datum.state = "pending";
+  for (const datum of next.situation.data)
+    if (datum.state === "searching") {
+      datum.state = "pending";
+      if (hasFacets(next) && datum.attempts > 0) datum.attempts -= 1;
+    }
   for (const h of next.hypotheses) for (const need of h.needs) if (need.state === "searching") need.state = "pending";
   next.run.status = "paused";
   next.run.stopReason = reason;

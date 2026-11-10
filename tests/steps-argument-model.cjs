@@ -128,3 +128,60 @@ test('dead need reader: a valid replaces is usable and round-trips; forgeries ma
   doc.argumentMap.hypotheses.push({ id: 'h1', citedData: [], round: 2, location: 'verifying', needs: [need('a', 1, 'not_found')] }, { id: 'h2', citedData: [], round: 2, location: 'verifying', needs: [need('b', 2, 'found', { replaces: 'a' })] });
   assert.equal(model.readArgumentMap(doc).kind, 'unusable', 'a need in another hypothesis');
 });
+
+// ---- V1 boost P1: facets, assumptions, data_insufficient ----------------------------------------------------------------------------
+const facetPlan = () => ({
+  assumptions: { id: 'as1', items: [{ label: 'Age', value: '16-24 in 2024', reason: 'young people' }] },
+  facets: [1, 2, 3, 4].map(i => ({ id: `f${i}`, title: `Facet ${i}`, needs: [{ id: `d${i}`, need: `need ${i}` }] })),
+  causalQuestions: ['why?']
+});
+const facetMapDoc = () => {
+  const state = machine.applySituationPlan(machine.newArgumentMap(ROLES, 'run-1'), facetPlan());
+  return baseMap({ argumentMap: plain(state) });
+};
+test('facet boost model: facets, assumptions, facetId, propStance, round and data_insufficient read as usable and round-trip', () => {
+  const doc = facetMapDoc();
+  doc.argumentMap.situation.data[0].propStance = 'irrelevant';
+  doc.argumentMap.situation.data[0].stanceReason = 'no stance';
+  doc.argumentMap.situation.gate = { state: 'unmatched', kind: 'data_insufficient', reason: 'r', citedData: [], round: 2 };
+  doc.argumentMap.situation.facets[1].verdict = 'insufficient';
+  doc.argumentMap.situation.facets[2].verdict = 'refutes';
+  const text = core.serializeMap(doc);
+  assert.equal(roundTrip(text), text);
+  const read = model.readArgumentMap(core.parseMap(text));
+  assert.equal(read.kind, 'usable');
+  assert.equal(read.data.situation.facets.length, 4);
+  assert.equal(model.readArgumentMap(facetMapDoc()).kind, 'usable');
+  assert.equal(model.UNCERTAIN_RESEARCH_STANCE, 'irrelevant');
+});
+const badFacets = {
+  'datum with a facetId that is not a facet': d => { d.situation.data[0].facetId = 'ghost'; },
+  'datum without a facetId on a facet map': d => { delete d.situation.data[0].facetId; },
+  'six facets': d => { for (const i of [5, 6]) d.situation.facets.push({ id: `f${i}`, title: `F${i}`, verdict: 'pending', reason: '', citedData: [], summary: '' }); },
+  'two facets': d => { d.situation.facets.length = 2; d.situation.data = d.situation.data.slice(0, 2); },
+  'duplicate facet id': d => { d.situation.facets[1].id = 'f1'; },
+  'facet id equals a datum id': d => { d.situation.facets[1].id = 'd1'; },
+  'facet id equals the assumption id': d => { d.situation.facets[1].id = 'as1'; },
+  'unknown facet verdict': d => { d.situation.facets[0].verdict = 'maybe'; },
+  'unknown propStance': d => { d.situation.data[0].propStance = 'opposes'; },
+  'unknown gate kind': d => { d.situation.gate.kind = 'data_unknown'; },
+  'gate round 3': d => { d.situation.gate.round = 3; },
+  'assumptions without items': d => { d.situation.assumptions = { id: 'as1' }; },
+  'assumption item blank': d => { d.situation.assumptions.items[0].value = ''; },
+  'causalQuestions not strings': d => { d.situation.causalQuestions = [1]; },
+  'facet citedData not strings': d => { d.situation.facets[0].citedData = [1]; }
+};
+for (const [name, edit] of Object.entries(badFacets)) {
+  test(`facet boost model: unusable and preserved: ${name}`, () => {
+    const doc = facetMapDoc();
+    edit(doc.argumentMap);
+    const text = core.serializeMap(doc);
+    assert.equal(roundTrip(text), text);
+    assert.equal(model.readArgumentMap(core.parseMap(text)).kind, 'unusable');
+  });
+}
+test('facet boost model: an old map keeps reading without facets, and a datum without facetId is fine there', () => {
+  const doc = baseMap({ argumentMap: usable() });
+  doc.argumentMap.situation.data.push({ id: 'd1', need: 'x', attempts: 0, state: 'pending' });
+  assert.equal(model.readArgumentMap(doc).kind, 'usable');
+});

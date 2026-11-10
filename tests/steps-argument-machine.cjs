@@ -585,3 +585,291 @@ test('situation research budget exhausted with data still pending ends at the li
   assert.deepEqual(types(fresh), ['research_situation']);
   refuses(fresh, () => m.applyLimitStop(fresh));
 });
+
+
+// ---- V1 boost P1: facets (面向判定), data_insufficient, one research per need ------------------------------------------------------
+const f4 = (counts = [1, 1, 1, 1]) => ({
+  assumptions: { id: 'as1', items: [{ label: 'Age band', value: '16-24 in 2024', reason: 'the proposition says young people' }] },
+  facets: counts.map((c, i) => ({ id: `f${i + 1}`, title: `Facet ${i + 1}`, needs: Array.from({ length: c }, (_, j) => ({ id: `f${i + 1}d${j + 1}`, need: `need f${i + 1}-${j + 1}` })) })),
+  causalQuestions: ['why did it happen?']
+});
+const planned = (counts, run = 'run-f') => m.applySituationPlan(m.newArgumentMap(roles, run), f4(counts));
+const dataOf = (s, facetId) => s.situation.data.filter(d => d.facetId === facetId);
+/** Research every pending datum once: `miss` ids are not found, the rest are found (research stance supports). */
+function researchAll(s, miss = []) {
+  for (const d of plain(s.situation.data).filter(x => x.state === 'pending')) {
+    s = m.beginSituationResearch(s, d.id);
+    s = m.applySituationEvidence(s, d.id, miss.includes(d.id) ? { found: false, reason: 'nothing' } : found('supports', Number(d.id.replace(/\D/g, '')) || 1));
+  }
+  return s;
+}
+/** A judgement for every pending facet: stances by datum id (default supports), verdicts by facet id (default supports); cites the facet's found data of the matching stance. */
+function judgement(s, stances = {}, verdicts = {}) {
+  const pending = s.situation.facets.filter(f => f.verdict === 'pending');
+  const ids = new Set(pending.map(f => f.id));
+  const found = s.situation.data.filter(d => ids.has(d.facetId) && d.state === 'found');
+  const stance = d => d.propStance ?? stances[d.id] ?? 'supports';
+  return {
+    data: found.map(d => ({ id: d.id, propStance: stance(d), reason: `why ${d.id}` })),
+    facets: pending.map(f => {
+      const verdict = verdicts[f.id] ?? 'supports';
+      const citedData = found.filter(d => d.facetId === f.id && stance(d) === verdict).map(d => d.id);
+      return { id: f.id, verdict, reason: `because ${f.id}`, citedData };
+    })
+  };
+}
+const judged = (s, stances, verdicts) => m.applyFacetVerdicts(s, judgement(s, stances, verdicts));
+
+test('facet boost: the unemployment fixture (5 found + 1 not_found) still stops an old map with gate_missing', () => {
+  let s = m.newArgumentMap(roles, 'r');
+  s = m.applySituationData(s, Array.from({ length: 6 }, (_, i) => ({ id: `d${i + 1}`, need: `need ${i + 1}` })));
+  for (let i = 1; i <= 6; i++) for (let k = 0; k < (i === 6 ? 2 : 1); k++) {
+    s = m.beginSituationResearch(s, `d${i}`);
+    s = m.applySituationEvidence(s, `d${i}`, i === 6 ? { found: false, reason: 'x' } : found('supports', i));
+  }
+  assert.deepEqual(types(s), ['gate_missing']);
+  assert.equal(m.applyGateMissing(s).run.phase, 'stopped_mismatch');
+});
+test('facet boost: the same data on a facet map do not stop: judge_facets', () => {
+  let s = planned([2, 2, 1, 1]);
+  s = researchAll(s, ['f4d1']);
+  assert.equal(s.situation.data.find(d => d.id === 'f4d1').state, 'not_found');
+  assert.deepEqual(types(s), ['judge_facets']);
+  refuses(s, () => m.applyGateMissing(s), 'a facet map never stops early on a missing datum');
+});
+test('facet boost: a facet map researches each need once; a miss is not_found at once and never asked again', () => {
+  let s = planned([1, 1, 1]);
+  s = m.beginSituationResearch(s, 'f1d1');
+  s = m.applySituationEvidence(s, 'f1d1', { found: false, reason: 'nothing' });
+  const d = s.situation.data.find(x => x.id === 'f1d1');
+  assert.equal(d.state, 'not_found');
+  assert.equal(d.attempts, 1);
+  assert.ok(!actions(s).some(a => a.dataId === 'f1d1'));
+  refuses(s, () => m.beginSituationResearch(s, 'f1d1'));
+  assert.equal(s.situation.gate.round, 1);
+});
+test('facet boost: the plan makes the facet cards, the assumption card id and causal questions; ids join allIds', () => {
+  const s = planned([2, 1, 1, 1]);
+  assert.equal(s.situation.facets.length, 4);
+  assert.deepEqual(plain(s.situation.facets[0]), { id: 'f1', title: 'Facet 1', verdict: 'pending', reason: '', citedData: [], summary: '' });
+  assert.equal(s.situation.assumptions.id, 'as1');
+  assert.deepEqual(plain(s.situation.causalQuestions), ['why did it happen?']);
+  assert.equal(s.situation.data.length, 5);
+  assert.ok(s.situation.data.every(d => d.facetId && d.state === 'pending'));
+  refuses(s, () => m.applySituationPlan(s, f4()));
+  const clash = f4(); clash.facets[0].id = 'p';
+  gateError(() => m.applySituationPlan(m.newArgumentMap(roles, 'r'), clash));
+  const clash2 = f4(); clash2.assumptions.id = 'f1';
+  gateError(() => m.applySituationPlan(m.newArgumentMap(roles, 'r'), clash2));
+  const none = f4(); none.assumptions = { id: 'as1', items: [] };
+  assert.equal(m.applySituationPlan(m.newArgumentMap(roles, 'r'), none).situation.assumptions, undefined);
+});
+test('facet boost: plan limits: 6 facets, 2 facets, 0 or 4 needs in a facet, 16 needs are refused', () => {
+  const blankState = () => m.newArgumentMap(roles, 'r');
+  gateError(() => m.applySituationPlan(blankState(), f4([1, 1, 1, 1, 1, 1])));
+  gateError(() => m.applySituationPlan(blankState(), f4([1, 1])));
+  gateError(() => m.applySituationPlan(blankState(), f4([0, 1, 1])));
+  gateError(() => m.applySituationPlan(blankState(), f4([4, 1, 1])));
+  gateError(() => m.applySituationPlan(blankState(), f4([3, 3, 3, 3, 4])));
+  assert.equal(m.applySituationPlan(blankState(), f4([3, 3, 3, 3, 3])).situation.data.length, 15);
+  const blankTitle = f4(); blankTitle.facets[0].title = '  ';
+  gateError(() => m.applySituationPlan(blankState(), blankTitle));
+  const old = m.applySituationData(blankState(), [{ id: 'd1', need: 'x' }]);
+  gateError(() => m.applySituationPlan(old, f4()));
+  gateError(() => m.applySituationData(planned(), [{ id: 'zz', need: 'x' }]));
+});
+test('facet boost: any refuting facet: unmatched / not_matching, hypotheses refused', () => {
+  let s = researchAll(planned([1, 1, 1, 1]));
+  s = judged(s, { f2d1: 'refutes' }, { f2: 'refutes' });
+  assert.equal(s.situation.gate.state, 'unmatched');
+  assert.equal(s.situation.gate.kind, 'not_matching');
+  assert.deepEqual(plain(s.situation.gate.citedData), ['f2d1']);
+  assert.equal(s.situation.gate.round, 1);
+  assert.equal(s.run.phase, 'stopped_mismatch');
+  assert.equal(s.run.stopReason, 'mismatch');
+  assert.deepEqual(actions(s), []);
+  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'] }]));
+});
+test('facet boost: 2 of 4 supports and no refutes goes to analysis, and hypotheses are accepted', () => {
+  let s = researchAll(planned([1, 1, 1, 1]));
+  s = judged(s, {}, { f3: 'insufficient', f4: 'insufficient' });
+  assert.equal(s.situation.gate.state, 'matched');
+  assert.equal(s.run.phase, 'analysis');
+  assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'supports', 'insufficient', 'insufficient']);
+  assert.ok(s.situation.gate.citedData.length >= 1);
+  assert.equal(m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'] }]).hypotheses.length, 1);
+});
+test('facet boost: 1 of 4 supports: retry round, then still short: data_insufficient (stopReason data_missing)', () => {
+  let s = researchAll(planned([1, 1, 1, 1]), ['f2d1', 'f3d1']);
+  s = judged(s, {}, { f1: 'supports', f2: 'supports', f3: 'supports', f4: 'insufficient' });
+  assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'insufficient', 'insufficient', 'insufficient'], 'facets without found data are forced insufficient');
+  assert.equal(s.run.phase, 'situation');
+  assert.deepEqual(types(s), ['add_retry_needs']);
+  s = m.addRetryNeeds(s, [{ facetId: 'f2', id: 'r2', need: 'other way 2' }, { facetId: 'f3', id: 'r3', need: 'other way 3' }]);
+  assert.equal(s.situation.gate.round, 2);
+  assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'pending', 'pending', 'insufficient']);
+  assert.deepEqual(types(s), ['research_situation', 'research_situation']);
+  s = researchAll(s, ['r2', 'r3']);
+  assert.deepEqual(types(s), ['judge_facets']);
+  s = judged(s, {}, {});
+  assert.equal(s.situation.gate.state, 'unmatched');
+  assert.equal(s.situation.gate.kind, 'data_insufficient');
+  assert.equal(s.situation.gate.round, 2);
+  assert.equal(s.run.phase, 'stopped_mismatch');
+  assert.equal(s.run.stopReason, 'data_missing');
+  assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'insufficient', 'insufficient', 'insufficient']);
+  assert.deepEqual(actions(s), []);
+});
+test('facet boost: round 2 only re-judges the facets that were insufficient; a supported one keeps its verdict', () => {
+  let s = researchAll(planned([1, 1, 1, 1]), ['f3d1', 'f4d1']);
+  s = judged(s, {}, { f1: 'supports', f2: 'insufficient', f3: 'supports', f4: 'supports' });
+  s = m.addRetryNeeds(s, [{ facetId: 'f3', id: 'r3', need: 'other' }]);
+  assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'insufficient', 'pending', 'insufficient']);
+  s = researchAll(s);
+  const j = judgement(s);
+  assert.deepEqual(plain(j.facets.map(f => f.id)), ['f3']);
+  const withExtra = { ...j, facets: [...j.facets, { id: 'f1', verdict: 'refutes', reason: 'x', citedData: ['f1d1'] }] };
+  refuses(s, () => m.applyFacetVerdicts(s, withExtra));
+  s = m.applyFacetVerdicts(s, j);
+  assert.equal(s.situation.gate.state, 'matched', '2 supports of 4 once f3 is supported');
+});
+test('facet boost: a facet with no found data judged supports is stored insufficient', () => {
+  let s = researchAll(planned([1, 1, 1, 1]), ['f4d1']);
+  const j = judgement(s);
+  j.facets.find(f => f.id === 'f4').verdict = 'supports';
+  s = m.applyFacetVerdicts(s, j);
+  assert.equal(s.situation.facets.find(f => f.id === 'f4').verdict, 'insufficient');
+  assert.deepEqual(plain(s.situation.facets.find(f => f.id === 'f4').citedData), []);
+});
+test('facet boost: citations: other facet, irrelevant data, other stance, unfound data, no citation are all GateErrors', () => {
+  const s = researchAll(planned([2, 1, 1, 1]), ['f1d2']);
+  const mutate = fn => { const j = judgement(s, { f2d1: 'irrelevant' }, { f2: 'insufficient' }); fn(j); return j; };
+  const f1 = j => j.facets.find(f => f.id === 'f1');
+  assert.equal(m.applyFacetVerdicts(s, mutate(() => {})).situation.facets.length, 4, 'the unmutated judgement is accepted');
+  refuses(s, () => m.applyFacetVerdicts(s, mutate(j => { f1(j).citedData = ['f2d1']; })));
+  refuses(s, () => m.applyFacetVerdicts(s, mutate(j => { f1(j).citedData = ['f1d2']; })));
+  refuses(s, () => m.applyFacetVerdicts(s, mutate(j => { f1(j).citedData = []; })));
+  refuses(s, () => m.applyFacetVerdicts(s, mutate(j => { j.facets.find(f => f.id === 'f3').citedData = ['ghost']; })));
+  const s2 = researchAll(planned([2, 1, 1, 1]));
+  const irrelevant = judgement(s2, { f1d1: 'irrelevant' });
+  assert.equal(m.applyFacetVerdicts(s2, irrelevant).situation.facets[0].verdict, 'supports', 'citing the other, relevant datum is fine');
+  irrelevant.facets.find(f => f.id === 'f1').citedData = ['f1d1', 'f1d2'];
+  refuses(s2, () => m.applyFacetVerdicts(s2, irrelevant));
+  const wrongStance = judgement(s, { f1d1: 'refutes' });
+  refuses(s, () => m.applyFacetVerdicts(s, wrongStance));
+  const refuteNoCite = judgement(s, {}, { f1: 'refutes' });
+  refuses(s, () => m.applyFacetVerdicts(s, refuteNoCite));
+  const missingData = judgement(s); missingData.data.pop();
+  refuses(s, () => m.applyFacetVerdicts(s, missingData));
+  const unknownStance = judgement(s); unknownStance.data[0].propStance = 'maybe';
+  refuses(s, () => m.applyFacetVerdicts(s, unknownStance));
+  const noReason = judgement(s); noReason.data[0].reason = ' ';
+  refuses(s, () => m.applyFacetVerdicts(s, noReason));
+  const pendingVerdict = judgement(s); pendingVerdict.facets[0].verdict = 'pending';
+  refuses(s, () => m.applyFacetVerdicts(s, pendingVerdict));
+});
+test('facet boost: uncertain research maps to the single stance constant and the judgement cannot override it', () => {
+  assert.equal(model.UNCERTAIN_RESEARCH_STANCE, 'irrelevant');
+  assert.equal(model.propStanceForUncertainResearch(), 'irrelevant');
+  let s = planned([1, 1, 1, 1]);
+  s = m.beginSituationResearch(s, 'f1d1');
+  s = m.applySituationEvidence(s, 'f1d1', { found: true, stance: 'uncertain', proof: proof(1) });
+  const d = s.situation.data.find(x => x.id === 'f1d1');
+  assert.equal(d.state, 'found');
+  assert.equal(d.propStance, 'irrelevant');
+  s = researchAll(s);
+  const j = judgement(s);
+  j.data.find(x => x.id === 'f1d1').propStance = 'supports';
+  refuses(s, () => m.applyFacetVerdicts(s, j));
+  const keep = judgement(s);
+  assert.equal(keep.data.find(x => x.id === 'f1d1').propStance, 'irrelevant');
+  s = m.applyFacetVerdicts(s, keep);
+  assert.equal(s.situation.data.find(x => x.id === 'f1d1').propStance, 'irrelevant');
+  assert.equal(s.situation.facets[0].verdict, 'insufficient', 'only irrelevant data: no basis');
+  // old maps are untouched: an uncertain stance is still refused there
+  let o = m.applySituationData(m.newArgumentMap(roles, 'r'), [{ id: 'd1', need: 'x' }]);
+  o = m.beginSituationResearch(o, 'd1');
+  refuses(o, () => m.applySituationEvidence(o, 'd1', { found: true, stance: 'uncertain', proof: proof(1) }));
+});
+test('facet boost: retry needs: only insufficient facets, once, 3 per facet, 9 in all; before the judgement or after round 2 refused', () => {
+  const fresh = () => judged(researchAll(planned([1, 1, 1, 1, 1]), ['f1d1', 'f2d1', 'f3d1', 'f4d1']), {}, { f5: 'supports' });
+  const base = fresh();
+  assert.equal(base.situation.gate.round, 1);
+  assert.deepEqual(types(base), ['add_retry_needs']);
+  const need = (facetId, id) => ({ facetId, id, need: `n ${id}` });
+  // not yet judged
+  const early = researchAll(planned([1, 1, 1, 1]));
+  refuses(early, () => m.addRetryNeeds(early, [need('f1', 'x1')]));
+  // a supported facet, an unknown facet, a blank need, a duplicate id
+  refuses(base, () => m.addRetryNeeds(base, [need('f5', 'x1')]));
+  refuses(base, () => m.addRetryNeeds(base, [need('zz', 'x1')]));
+  refuses(base, () => m.addRetryNeeds(base, [{ facetId: 'f1', id: 'x1', need: ' ' }]));
+  refuses(base, () => m.addRetryNeeds(base, [need('f1', 'x1'), need('f2', 'x1')]));
+  refuses(base, () => m.addRetryNeeds(base, [need('f1', 'f2')]));
+  // 4 for one facet; 10 in all
+  refuses(base, () => m.addRetryNeeds(base, [1, 2, 3, 4].map(i => need('f1', `a${i}`))));
+  const ten = ['f1', 'f2', 'f3', 'f4'].flatMap((f, i) => [1, 2, 3].map(k => need(f, `b${i}${k}`))).slice(0, 10);
+  assert.equal(ten.length, 10);
+  refuses(base, () => m.addRetryNeeds(base, ten));
+  // nine is fine
+  const nine = ten.slice(0, 9);
+  const after = m.addRetryNeeds(base, nine);
+  assert.equal(after.situation.data.length, 14);
+  // a second batch is refused (round is 2 now)
+  refuses(after, () => m.addRetryNeeds(after, [need('f1', 'again')]));
+  // an empty batch ends the run as data_insufficient (round 1)
+  const none = m.addRetryNeeds(base, []);
+  assert.equal(none.situation.gate.kind, 'data_insufficient');
+  assert.equal(none.run.stopReason, 'data_missing');
+  assert.equal(none.situation.gate.round, 1);
+  // a refuting facet never reaches a retry
+  const refuted = judged(researchAll(planned([1, 1, 1, 1])), { f1d1: 'refutes' }, { f1: 'refutes' });
+  refuses(refuted, () => m.addRetryNeeds(refuted, [need('f2', 'x')]));
+});
+test('facet boost: budget spent: only situation_budget, no stop_limit; the unresearched needs become not_found(budget) and the run ends data_insufficient', () => {
+  let s = planned([1, 1, 1, 1]);
+  s.run.researchCalls = 78;
+  assert.deepEqual(types(s), ['situation_budget']);
+  refuses(planned([1, 1, 1, 1]), () => m.applySituationBudgetOut(planned([1, 1, 1, 1])));
+  refuses(s, () => m.applyLimitStop(s));
+  s = m.applySituationBudgetOut(s);
+  assert.ok(s.situation.data.every(d => d.state === 'not_found' && d.reason === 'budget'));
+  assert.deepEqual(types(s), ['judge_facets']);
+  s = judged(s, {}, {});
+  assert.equal(s.situation.gate.kind, 'data_insufficient');
+  assert.equal(s.run.stopReason, 'data_missing');
+  assert.equal(s.run.phase, 'stopped_mismatch');
+  assert.ok(!s.situation.data.some(d => d.state === 'pending'));
+});
+test('facet boost: the research cap is min(24 - used, whole-map remaining); a facet map never emits stop_limit', () => {
+  const s = planned([3, 3, 3, 3, 3]);
+  assert.equal(actions(s).length, 15);
+  s.run.researchCalls = 60;
+  assert.equal(actions(s).length, 6, 'whole-map remaining is smaller');
+  const t = planned([3, 3, 3, 3, 3]);
+  t.situation.data.forEach((d, i) => { if (i < 10) { d.state = 'not_found'; d.attempts = 1; } });
+  t.run.researchCalls = 10;
+  const used = t.situation.data.filter(d => d.attempts > 0).length;
+  assert.equal(used, 10);
+  assert.equal(actions(t).length, 5);
+  assert.ok(!types(s).includes('stop_limit') && !types(t).includes('stop_limit'));
+});
+test('facet boost: pausing a facet map puts searching data back to pending and refunds the attempt, so it researches again after resume', () => {
+  let s = planned([1, 1, 1]);
+  s = m.beginSituationResearch(s, 'f1d1');
+  s = m.applyPause(s, 'user');
+  const d = s.situation.data.find(x => x.id === 'f1d1');
+  assert.equal(d.state, 'pending');
+  assert.equal(d.attempts, 0);
+  s = m.applyResume(s);
+  assert.ok(actions(s).some(a => a.dataId === 'f1d1'));
+  s = m.beginSituationResearch(s, 'f1d1');
+  assert.equal(s.situation.data.find(x => x.id === 'f1d1').state, 'searching');
+});
+test('facet boost: old maps keep every old action and cap (no facets key, gate_missing / judge_gate / stop_limit unchanged)', () => {
+  let s = m.newArgumentMap(roles, 'r');
+  s = m.applySituationData(s, [{ id: 'd1', need: 'x' }]);
+  assert.equal(s.situation.facets, undefined);
+  s.run.researchCalls = 66;
+  assert.deepEqual(types(s), ['stop_limit']);
+});

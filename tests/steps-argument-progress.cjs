@@ -31,7 +31,7 @@ const describe = (state, owned) => plain(progress.describeArgumentProgress(state
 
 test('running and owned, analysis: round, searching evidence, used count, stop', () => {
   const state = make({ calls: 12, hypotheses: [hyp('h1', [need('a', 'searching'), need('b', 'found')], { round: 2 }), hyp('h2', [need('c', 'searching')], { round: 1 }), hyp('h3', [need('d', 'searching')], { location: 'eliminated', round: 3 })] });
-  assert.deepEqual(describe(state, true), { tone: 'run', title: 'Testing hypotheses · round 2', detail: 'Looking for 2 pieces of evidence', count: '12/66 research calls used', action: 'stop' });
+  assert.deepEqual(describe(state, true), { tone: 'run', title: 'Testing hypotheses · round 2', detail: 'Looking for 2 pieces of evidence', count: '12/78 research calls used', action: 'stop' });
 });
 
 test('running and owned: round defaults to 1; no detail when nothing is searching', () => {
@@ -43,13 +43,13 @@ test('running and owned: round defaults to 1; no detail when nothing is searchin
 
 test('running and owned, situation phase: checking the situation with the data being searched', () => {
   const data = [{ id: 'd1', need: 'x', attempts: 1, state: 'searching' }, { id: 'd2', need: 'y', attempts: 0, state: 'pending' }];
-  assert.deepEqual(describe(make({ phase: 'situation', data, calls: 1 }), true), { tone: 'run', title: 'Checking the situation', detail: 'Looking for 1 data points', count: '1/66 research calls used', action: 'stop' });
+  assert.deepEqual(describe(make({ phase: 'situation', data, calls: 1 }), true), { tone: 'run', title: 'Checking the situation', detail: 'Looking for 1 data points', count: '1/78 research calls used', action: 'stop' });
   assert.equal(describe(make({ phase: 'situation' }), true).detail, undefined);
 });
 
 test('paused by the user: paused, verified count, used count, resume', () => {
   const state = make({ status: 'paused', stopReason: 'user', calls: 20, hypotheses: [hyp('h1', [{ ...need('a', 'found'), stance: 'supports' }], { aiVerdict: 'supported' })] });
-  assert.deepEqual(describe(state, false), { tone: 'paused', title: 'Paused', detail: '1/3 hypotheses verified', count: '20/66 research calls used', action: 'resume' });
+  assert.deepEqual(describe(state, false), { tone: 'paused', title: 'Paused', detail: '1/3 hypotheses verified', count: '20/78 research calls used', action: 'resume' });
   assert.equal(describe(make({ status: 'paused' }), false).action, 'resume', 'no stop reason is treated like the user stopping');
 });
 
@@ -113,7 +113,7 @@ test('the bar: region named, status live region holds only the phase text, count
   assert.match(statusText, /Looking for 1 pieces of evidence/);
   assert.doesNotMatch(statusText, /research calls/, 'the count is not read out on every change');
   const [count] = dom.findAll(bar, i => i.cls.split(/\s+/).includes('vam-argument-bar-count'));
-  assert.equal(count.text, '7/66 research calls used');
+  assert.equal(count.text, '7/78 research calls used');
   assert.equal(dom.findAll(status, i => i === count).length, 0);
   assert.deepEqual(buttons(bar).map(b => b.text), ['Stop']);
 });

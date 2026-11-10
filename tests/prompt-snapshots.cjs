@@ -338,7 +338,6 @@ test('collect snapshots: chart step (chart.add@1)', () => {
   for (const [language, tag] of LANGUAGES) {
     const request = { ...argumentBase, language, proposition: argumentProposition };
     const steps = [
-      ['plan-situation', 'planSituationStep', { ...request, max: 4 }],
       ['situation-gate', 'situationGateStep', { ...request, data: argumentData }],
       ['hypotheses', 'hypothesesStep', { ...request, data: argumentData, count: 3, existing: ['Earlier hypothesis title'] }],
       ['needs', 'needsStep', { ...request, hypothesis: { title: 'Hiring slowed', statement: 'Firms hired fewer juniors', round: 1 }, data: [argumentData[0]], existing: [{ text: 'Monthly junior hiring counts', state: 'found' }], max: 2 }],
@@ -355,7 +354,7 @@ test('collect snapshots: chart step (chart.add@1)', () => {
       ['facet-judge-assumptions', 'facetJudgeStep', { ...request, round: 1, facets: judgeFacets, assumptions: [{ label: 'Age band', value: 'ages 16 to 24 in 2023 to 2024', reason: 'young people' }] }],
       ['facet-verdict', 'facetVerdictStep', { ...argumentBase, language, hypothesis: 'Firms hired fewer juniors', input: { hypothesisId: 'h1', round: 1, evidence: [argumentEvidence('n1', 'supports'), argumentEvidence('n2', 'uncertain')] } }]
     ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name.startsWith('facet-judge') ? 'facet-judge' : name === 'facet-verdict' ? 'verdict' : name === 'facet-hypotheses' ? 'facet-hypotheses' : 'facet-plan'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
-    for (const [name, key, input] of steps) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'situation-gate' ? 'gate' : name === 'plan-situation' ? 'plan' : name}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
+    for (const [name, key, input] of steps) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'situation-gate' ? 'gate' : name}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
   }
   for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);
 });

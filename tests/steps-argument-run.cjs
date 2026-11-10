@@ -6,25 +6,27 @@ const S = require('./support.cjs');
 const { ArgumentRuns, ArgumentRunError, WORST_CASE_AI_CALLS, assumptionScope } = S.load('experiences/visual-map/argument-run.ts');
 const { ARGUMENT_STEPS, ArgumentStepError } = S.load('core/steps/argument-map/runner.ts');
 const model = S.load('core/argument-map/model.ts');
+const machine = S.load('core/argument-map/machine.ts');
 const { translate } = S.load('i18n.ts');
 
 const QUOTE = 'Youth unemployment rose to 9.2 percent in March';
 const URL_OK = 'https://stats.example.org/report';
 const PAGE = `<html><body><p>${QUOTE}, the highest in a decade.</p></body></html>`;
-const STEP_NAME = { 'argument-map.plan-situation': 'plan_situation', 'argument-map.situation-gate': 'judge_gate', 'argument-map.hypotheses': 'propose_hypotheses', 'argument-map.verdict': 'verdict', 'argument-map.conclusion': 'conclude' };
+const STEP_NAME = { 'argument-map.facet-plan': 'plan_facets', 'argument-map.facet-judge': 'judge_facets', 'argument-map.facet-hypotheses': 'propose_facet_hypotheses', 'argument-map.facet-verdict': 'verdict_facets', 'argument-map.situation-gate': 'judge_gate', 'argument-map.hypotheses': 'propose_hypotheses', 'argument-map.verdict': 'verdict', 'argument-map.conclusion': 'conclude' };
 const stepName = (step, request) => (step.id === ARGUMENT_STEPS.add_needs.id ? (request.existing.length ? 'revise' : 'add_needs') : STEP_NAME[step.id]);
 const plain = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const defer = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const foundEntry = (id, over = {}) => ({ need: id, status: 'found', stance: 'supports', claim: 'Rate rose', quote: QUOTE, url: URL_OK, ...over });
 
-/** Everything the run needs; `over` replaces fakes. `script.step[name](request, n)` returns a parsed output or throws; `script.ask(ctx, n)` an AiResult. */
+/** Everything the run needs; `over` replaces fakes. Legacy mode (default): the old plan step no longer exists, so after the start write the rig seeds old-style data (`script.step.plan_situation()` needs, one card each, no facets) and the run continues as an old map; `over.facet` skips the seeding and the new facet plan runs. `script.step[name](request, n)` returns a parsed output or throws; `script.ask(ctx, n)` an AiResult. */
 async function rig(over = {}) {
   const data = S.fixture('zh-TW', { linkIndex: true });
   const { repo } = data;
   const mapPath = await repo.createMap('Argument');
   const stat = { ask: [], steps: [], undo: [], logs: [], fetches: 0, active: 0, maxActive: 0 };
   let queue = Promise.resolve();
+  let seeded = false;
   const script = { step: {}, ask: (ctx) => ({ summary: 's', detail: 'd', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [foundEntry(ctx.argumentEvidenceNeeds[0].id)] }), ...over.script };
   const ports = {
     mutate: work => { const next = queue.then(work); queue = next.catch(() => undefined); return next; },
@@ -60,6 +62,23 @@ async function rig(over = {}) {
     t: (key, ...values) => translate('zh-TW', key, ...values),
     ...over.ports
   };
+  if (!over.facet) {
+    const inner = ports.updateMap;
+    ports.updateMap = async (path, change) => {
+      const written = await inner(path, change);
+      if (seeded) return written;
+      const doc = await repo.readMap(path);
+      const read = model.readArgumentMap(doc);
+      if (read.kind !== 'usable' || read.data.situation.data.length || read.data.situation.facets) return written;
+      seeded = true;
+      const planned = script.step.plan_situation({ proposition: '' }, 1);
+      const items = [];
+      const nodes = [];
+      for (const d of planned.data) { const node = await ports.createNote({ kind: 'datum', title: d.need, summary: d.need }, doc, path); items.push({ id: node.id, need: d.need }); nodes.push(node); }
+      await repo.updateMap(path, d => { for (const node of nodes) { node.parentId = read.data.roles.situation; node.x = 0; node.y = 0; d.nodes.push(node); } d.argumentMap = machine.applySituationData(model.readArgumentMap(d).data, items); });
+      return written;
+    };
+  }
   const runs = new ArgumentRuns(ports);
   const state = async () => model.readArgumentMap(await repo.readMap(mapPath)).data;
   return { ...data, runs, ports, stat, script, mapPath, state, text: async id => repo.readNote((await repo.readMap(mapPath)).nodes.find(n => n.id === id).path) };
@@ -73,6 +92,22 @@ const steps = (over = {}) => ({
   add_needs: () => ({ needs: [{ text: 'need one' }, { text: 'need two' }] }),
   revise: () => ({ needs: [{ text: 'next one' }] }),
   verdict: request => ({ verdict: 'supported', citedNeeds: [request.input.evidence[0].id], reason: 'enough' }),
+  conclude: request => ({ summary: 'final answer', points: [{ text: 'point', hypothesisIds: request.input.hypotheses.map(h => h.id) }], basedOn: request.input.hypotheses.map(h => h.id) }),
+  ...over
+});
+
+/** Default scripted steps of a facet-judged map (`rig({ facet: true })`): three facets of one need each, all supporting. */
+const facetSteps = (over = {}) => ({
+  plan_facets: () => ({ assumptions: { items: [{ label: 'Age band', value: '16 to 24', reason: 'the claim is about youth' }] }, facets: [{ title: 'Rate', needs: [{ need: 'unemployment rate' }] }, { title: 'Postings', needs: [{ need: 'job postings' }] }, { title: 'Hiring', needs: [{ need: 'junior hiring' }] }], causalQuestions: ['Why would it rise?'], question: 'Is youth unemployment rising?' }),
+  judge_facets: request => ({
+    data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: d.fixedStance ?? 'supports', reason: 'it fits' }))),
+    facets: request.facets.map(f => ({ id: f.id, verdict: f.data.length ? 'supports' : 'insufficient', reason: 'enough', summary: `summary of ${f.title}`, citedData: f.data.length ? [f.data[0].id] : [], retryNeeds: [] })),
+    assumptionInsights: ['The age band narrows the data']
+  }),
+  propose_facet_hypotheses: request => ({ hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${request.existing.length + i + 1}`, statement: `statement ${request.existing.length + i + 1}`, basis: 'because of the data', alternative: false, citedData: [request.data[0].id] })) }),
+  add_needs: () => ({ needs: [{ text: 'need one' }, { text: 'need two' }] }),
+  revise: () => ({ needs: [{ text: 'next one' }] }),
+  verdict_facets: request => ({ verdict: 'supported', citedNeeds: [request.input.evidence[0].id], reason: 'enough', insights: [{ kind: 'consistent', text: 'the sources agree' }] }),
   conclude: request => ({ summary: 'final answer', points: [{ text: 'point', hypothesisIds: request.input.hypotheses.map(h => h.id) }], basedOn: request.input.hypotheses.map(h => h.id) }),
   ...over
 });
@@ -265,17 +300,16 @@ test('caps: a 7th hypothesis is refused (no notes left behind) and the run pause
   assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 5 + 2, 'five fixed cards and the two data cards; no hypothesis note');
 });
 
-test('one corrective retry: a refused step succeeds the second time; failing twice pauses with error', async () => {
-  const flaky = { ...steps() };
-  flaky.plan_situation = (_request, n) => { if (n === 1) throw new ArgumentStepError('bad reply'); return { data: [{ need: 'a' }] }; };
-  const r = await rig({ script: { step: flaky } });
+test('one corrective retry: a refused step succeeds the second time; failing twice pauses with error (the facet plan; the old plan step is removed)', async () => {
+  const flaky = facetSteps({ plan_facets: (_request, n) => { if (n === 1) throw new ArgumentStepError('bad reply'); return facetSteps().plan_facets(); } });
+  const r = await rig({ facet: true, script: { step: flaky } });
   await r.runs.start(r.mapPath, 'p');
-  assert.equal(r.stat.steps.filter(n => n === 'plan_situation').length, 2);
+  assert.equal(r.stat.steps.filter(n => n === 'plan_facets').length, 2);
   assert.equal((await r.state()).run.phase, 'concluded');
-  const broken = await rig({ script: { step: steps({ plan_situation: () => { throw new ArgumentStepError('bad reply'); } }) } });
+  const broken = await rig({ facet: true, script: { step: facetSteps({ plan_facets: () => { throw new ArgumentStepError('bad reply'); } }) } });
   await broken.runs.start(broken.mapPath, 'p');
   const state = await broken.state();
-  assert.equal(broken.stat.steps.filter(n => n === 'plan_situation').length, 2);
+  assert.equal(broken.stat.steps.filter(n => n === 'plan_facets').length, 2);
   assert.equal(state.run.status, 'paused');
   assert.equal(state.run.stopReason, 'error');
   assert.equal(broken.stat.ask.length, 0);
@@ -306,7 +340,7 @@ test('limits: refuted hypotheses stop at round 3, never 4; <3 verified never con
   assert.equal(r.stat.steps.includes('conclude'), false);
   assert.ok(Math.max(...state.hypotheses.map(h => h.round)) <= 3);
   assert.ok(state.hypotheses.length <= 6);
-  assert.ok(state.run.researchCalls <= 66);
+  assert.ok(state.run.researchCalls <= 78);
   assert.ok((await r.text(state.roles.conclusion)).summary.startsWith('限制內未能驗證 3 個假設'));
   for (const h of state.hypotheses) {
     // flip a need that is not retired (a replaced dead need no longer blocks, so flipping needs[0] would test nothing)
@@ -675,7 +709,7 @@ test('persistent timeout with repeated resumes ends at the research limit (stopp
   assert.equal(state.run.phase, 'stopped_limit');
   assert.equal(state.run.status, 'finished');
   assert.equal(state.run.stopReason, 'limit');
-  assert.ok(state.run.researchCalls <= 66);
+  assert.ok(state.run.researchCalls <= 78);
   assert.equal(state.run.researchCalls, r.stat.ask.length);
   assert.equal(r.stat.steps.includes('judge_gate'), false);
   assert.equal(r.runs.isRunning(r.mapPath), false);
@@ -712,6 +746,175 @@ test('failures are counted per item, not summed: every situation datum rejects o
   assert.equal(state.run.researchCalls, r.stat.ask.length);
 });
 
-test('worst-case AI call count shown before a run is 109', () => {
-  assert.equal(WORST_CASE_AI_CALLS, 109);
+test('worst-case AI call count shown before a run is 122', () => {
+  assert.equal(WORST_CASE_AI_CALLS, 122);
+});
+
+// ---- P5: the facet-judged map wired into the runner ----
+const aiReply = (entries, evidence = {}) => ({ summary: 's', detail: 'd', suggestions: [], visualReferences: [], evidence: { openedUrls: [], ...evidence }, argumentEvidence: entries });
+const needOf = ctx => ctx.argumentEvidenceNeeds[0];
+const notFoundEntry = (id, note) => ({ need: id, status: 'not_found', ...(note ? { note } : {}) });
+/** A judge that supports every facet holding a relevant datum and marks the others insufficient (with `retry(facet, n)` as their retry needs). */
+const judgeBy = (log, retry = () => []) => (request, n) => {
+  log.push(plain(request));
+  const stance = d => d.fixedStance ?? 'supports';
+  return {
+    data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: stance(d), reason: 'it fits' }))),
+    facets: request.facets.map(f => {
+      const good = f.data.filter(d => stance(d) === 'supports');
+      return { id: f.id, verdict: good.length ? 'supports' : 'insufficient', reason: 'SECRET-REASON-TEXT', summary: `summary of ${f.title}`, citedData: good.length ? [good[0].id] : [], retryNeeds: good.length ? [] : retry(f, n) };
+    }),
+    assumptionInsights: ['The age band narrows the data']
+  };
+};
+const askByNeed = byText => ctx => { const need = needOf(ctx); return (byText[need.text] ?? (() => aiReply([foundEntry(need.id)])))(need, ctx); };
+const rowsOf = async r => (await r.state()).situation.data;
+
+test('P5: a new map plans by facets and never calls the old plan step; every card id is its state id', async () => {
+  const r = await rig({ facet: true, script: { step: facetSteps() } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  assert.ok(r.stat.steps.includes('plan_facets'));
+  assert.ok(!r.stat.steps.includes('plan_situation'));
+  assert.equal(state.situation.question, 'Is youth unemployment rising?');
+  const byId = new Map((await r.repo.readMap(r.mapPath)).nodes.map(n => [n.id, n]));
+  assert.equal(state.situation.facets.length, 3);
+  assert.equal(byId.get(state.situation.assumptions.id).parentId, state.roles.situation);
+  for (const f of state.situation.facets) {
+    assert.equal(byId.get(f.id)?.parentId, state.roles.situation, `facet ${f.id}`);
+    assert.equal(f.summary, `summary of ${f.title}`);
+  }
+  for (const d of state.situation.data) assert.equal(byId.get(d.id)?.parentId, d.facetId, `datum ${d.id}`);
+  assert.equal(state.run.phase, 'concluded');
+});
+
+test('P5: a pause between the facet judgement and its checkpoint leaves no verdicts and no retry needs; resume asks the judge again', async () => {
+  const log = [];
+  const holder = {};
+  let first = true;
+  const judge = judgeBy(log, () => ['one more search']);
+  const r = await rig({ facet: true, script: { step: facetSteps({ judge_facets: async (request, n) => {
+    const out = judge(request, n);
+    if (first) { first = false; void holder.runs.stop(holder.mapPath); await tick(); }
+    return out;
+  } }), ask: askByNeed({ 'job postings': need => aiReply([notFoundEntry(need.id)]), 'junior hiring': need => aiReply([notFoundEntry(need.id)]) }) } });
+  holder.runs = r.runs; holder.mapPath = r.mapPath;
+  await r.runs.start(r.mapPath, 'p');
+  let state = await r.state();
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.situation.data.length, 3, 'no half retry batch');
+  assert.ok(state.situation.facets.every(f => f.verdict === 'pending'));
+  assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 5 + 1 + 3 + 3);
+  await r.runs.resume(r.mapPath);
+  state = await r.state();
+  assert.equal(log.length >= 2, true, 'the judge was asked again');
+  assert.ok(state.situation.facets.every(f => f.verdict !== 'pending'));
+  assert.ok(state.situation.data.length > 3, 'the retry batch is written with the verdicts');
+});
+
+test('P5: a round-1 retry with no retry needs ends data_insufficient (not not_matching); the stop log has the kind and no text', async () => {
+  const log = [];
+  const r = await rig({ facet: true, script: { step: facetSteps({ judge_facets: judgeBy(log) }), ask: askByNeed({ 'job postings': need => aiReply([notFoundEntry(need.id)]), 'junior hiring': need => aiReply([notFoundEntry(need.id)]) }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(state.run.phase, 'stopped_mismatch');
+  assert.equal(state.situation.gate.kind, 'data_insufficient');
+  assert.equal(state.run.stopReason, 'data_missing');
+  assert.equal((await r.text(state.roles.conclusion)).summary, translate('zh-TW', 'ui.argument_stopped_insufficient'));
+  const lines = r.stat.logs.filter(l => l.startsWith('argument-run stopped'));
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /gateKind=data_insufficient$/);
+  assert.ok(!r.stat.logs.join('\n').includes('SECRET-REASON-TEXT'));
+});
+
+test('P5: round 2 judges only the facets still insufficient, carries a fixed stance, and the retry needs become cards under their facet', async () => {
+  const log = [];
+  const r = await rig({ facet: true, script: {
+    step: facetSteps({ judge_facets: judgeBy(log, (f, n) => (n === 1 ? [`${f.title} again`] : [])) }),
+    ask: askByNeed({ 'unemployment rate': (need) => aiReply([foundEntry(need.id, { stance: 'uncertain' })]), 'job postings': need => aiReply([notFoundEntry(need.id)]) })
+  } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(log.length, 2);
+  assert.deepEqual(log[0].facets.map(f => f.title), ['Rate', 'Postings', 'Hiring']);
+  assert.deepEqual(log[1].facets.map(f => f.title), ['Rate', 'Postings'], 'the supported facet is not asked again');
+  assert.equal(log[1].round, 2);
+  const rate = log[1].facets.find(f => f.title === 'Rate');
+  assert.ok(rate.data.some(d => d.fixedStance === 'irrelevant'), 'the uncertain answer keeps its fixed stance');
+  assert.deepEqual(log[1].facets.find(f => f.title === 'Postings').notFoundNeeds, ['job postings']);
+  const byId = new Map((await r.repo.readMap(r.mapPath)).nodes.map(n => [n.id, n]));
+  const retried = state.situation.data.filter(d => d.need.endsWith('again'));
+  assert.equal(retried.length, 2);
+  for (const d of retried) assert.equal(byId.get(d.id)?.parentId, d.facetId);
+  assert.equal(state.run.phase, 'concluded');
+});
+
+test('P5: on a facet map an uncertain answer with a verified source is found/irrelevant; with a bad source it is not_found(source_*); an old map keeps stance_uncertain', async () => {
+  const bad = await rig({ facet: true, script: { step: facetSteps(), ask: askByNeed({ 'unemployment rate': need => aiReply([foundEntry(need.id, { stance: 'uncertain', url: 'https://bad.example.org/x' })]), 'job postings': need => aiReply([foundEntry(need.id, { stance: 'uncertain' })]) }) },
+    ports: { fetch: async request => ({ status: 200, headers: { 'content-type': 'text/html' }, text: request.url.includes('bad.example') ? '<html><body>nothing relevant</body></html>' : PAGE, url: request.url }) } });
+  await bad.runs.start(bad.mapPath, 'p');
+  const data = await rowsOf(bad);
+  const rate = data.find(d => d.need === 'unemployment rate');
+  assert.equal(rate.state, 'not_found');
+  assert.match(rate.reason, /^source_/);
+  assert.equal(rate.stance, undefined);
+  const postings = data.find(d => d.need === 'job postings');
+  assert.equal(postings.state, 'found');
+  assert.equal(postings.propStance, 'irrelevant');
+  assert.equal(postings.stance, undefined);
+  assert.ok(postings.proof.url);
+
+  const old = await rig({ script: { step: steps(), ask: askByNeed({ 'unemployment rate': need => aiReply([foundEntry(need.id, { stance: 'uncertain' })]) }) } });
+  await old.runs.start(old.mapPath, 'p');
+  const first = (await rowsOf(old)).find(d => d.need === 'unemployment rate');
+  assert.equal(first.state, 'not_found');
+  assert.equal(first.reason, 'stance_uncertain');
+});
+
+test('P5: a facet map asks the facet-hypotheses and facet-verdict steps and keeps basis and insights; a blank basis is refused', async () => {
+  const r = await rig({ facet: true, script: { step: facetSteps({ verdict_facets: request => ({ verdict: 'supported', citedNeeds: [request.input.evidence[0].id], reason: 'enough', insights: [{ kind: 'tension', text: 'x'.repeat(400) }] }) }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.ok(r.stat.steps.includes('propose_facet_hypotheses') && r.stat.steps.includes('verdict_facets'));
+  assert.ok(!r.stat.steps.includes('propose_hypotheses') && !r.stat.steps.includes('verdict'));
+  assert.deepEqual(plain(state.situation.assumptions.insights), ['The age band narrows the data']);
+  for (const h of state.hypotheses) {
+    assert.equal(h.basis, 'because of the data');
+    assert.deepEqual(plain(h.insights), [{ kind: 'tension', text: 'x'.repeat(300) }]);
+  }
+  const blank = await rig({ facet: true, script: { step: facetSteps({ propose_facet_hypotheses: request => ({ hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${i}`, statement: `s${i}`, basis: ' ', alternative: false, citedData: [request.data[0].id] })) }) }) } });
+  await blank.runs.start(blank.mapPath, 'p');
+  const refused = await blank.state();
+  assert.equal(refused.hypotheses.length, 0);
+  assert.equal(refused.run.status, 'paused');
+  assert.equal(refused.run.stopReason, 'error');
+});
+
+test('P5: a figure is kept on the proof and the search log of a miss (queries, pages, reason and note, capped) is stored on data and needs', async () => {
+  const figure = { number: '9.2', period: 'March 2024', unit: 'percent' };
+  const long = 'q'.repeat(250);
+  const missing = need => aiReply([notFoundEntry(need.id, 'the page had no table')], { searchQueries: ['a', 'b', 'c', 'd', 'e', long, 'g'], openedUrls: ['https://one.example.org/', 'https://two.example.org/'] });
+  const r = await rig({ facet: true, script: { step: facetSteps(), ask: askByNeed({ 'unemployment rate': need => aiReply([foundEntry(need.id, { figure })]), 'job postings': missing }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const data = await rowsOf(r);
+  assert.deepEqual(plain(data.find(d => d.need === 'unemployment rate').proof.figure), figure);
+  const log = data.find(d => d.need === 'job postings').searchLog;
+  assert.equal(log.queries.length, 5);
+  assert.ok(log.queries.every(q => q.length <= 200));
+  assert.deepEqual(plain(log.opened), ['https://one.example.org/', 'https://two.example.org/']);
+  assert.ok(log.why.includes('not_found') && log.why.includes('the page had no table') && log.why.length <= 200);
+  assert.equal(data.find(d => d.need === 'unemployment rate').searchLog, undefined);
+
+  const old = await rig({ script: { step: steps({ add_needs: (_request, n) => ({ needs: n === 1 ? [{ text: 'dead source' }, { text: 'live two' }] : [{ text: 'need one' }, { text: 'need two' }] }) }),
+    ask: askByNeed({ 'dead source': need => aiReply([notFoundEntry(need.id, 'nothing')], { searchQueries: ['dead query'], openedUrls: [] }) }) } });
+  await old.runs.start(old.mapPath, 'p');
+  const dead = (await old.state()).hypotheses.flatMap(h => h.needs).find(n => n.text === 'dead source');
+  assert.equal(dead.state, 'not_found');
+  assert.deepEqual(plain(dead.searchLog), { queries: ['dead query'], opened: [], why: 'not_found: nothing' });
+});
+
+test('P5: the research cap and the worst-case call count follow the constants (78 research calls, 122 AI calls)', () => {
+  assert.equal(model.MAX_RESEARCH_CALLS, 78);
+  assert.equal(WORST_CASE_AI_CALLS, model.MAX_RESEARCH_CALLS + 1 + 2 + 4 + 36 + 1);
+  assert.equal(WORST_CASE_AI_CALLS, 122);
 });

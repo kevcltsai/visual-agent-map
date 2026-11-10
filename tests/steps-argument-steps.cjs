@@ -128,36 +128,6 @@ test('needs: a number or URL the request does not have throws; round and max com
   assert.equal(mod.needsAllowed({ ...h, needs: [1, 2, 3, 4, 5, 6].map(i => ({ ...h.needs[0], id: `n${i}`, addedRound: 1 })) }), 0);
 });
 
-// ---- plan_situation ----
-const planReq = { ...base, proposition: PROP, max: 3 };
-test('plan_situation: 1..max needs, none repeating another; the program (not the reply) makes the ids', () => {
-  const out = plain(ok(mod.planSituationStep, planReq, { data: [{ need: 'Official youth unemployment rate series' }, { need: 'Labour force survey notes' }] }));
-  assert.deepEqual(out, { data: [{ need: 'Official youth unemployment rate series' }, { need: 'Labour force survey notes' }] });
-  bad(mod.planSituationStep, planReq, { data: [] }, /expected 1 to 3/);
-  bad(mod.planSituationStep, planReq, { data: [{ need: 'a' }, { need: 'b' }, { need: 'c' }, { need: 'd' }] }, /expected 1 to 3/);
-  bad(mod.planSituationStep, planReq, { data: [{ need: 'x' }, { need: 'X.' }] }, /repeats/);
-  bad(mod.planSituationStep, planReq, { data: [{ need: '' }] });
-  bad(mod.planSituationStep, planReq, { data: [{ need: 'x', id: 'd1' }] });
-  bad(mod.planSituationStep, planReq, { data: [{ need: 'x' }], extra: 1 });
-  bad(mod.planSituationStep, planReq, 'not json');
-});
-test('plan_situation: a number or URL the proposition does not have throws; ones it has pass; the result fits the machine', () => {
-  bad(mod.planSituationStep, planReq, { data: [{ need: 'Rate in 2019' }] }, /number 2019/);
-  bad(mod.planSituationStep, planReq, { data: [{ need: 'see https://x.example.com' }] }, /link/);
-  assert.ok(ok(mod.planSituationStep, planReq, { data: [{ need: 'Rate for 2024' }] }));
-  const out = ok(mod.planSituationStep, planReq, { data: [{ need: 'Rate series' }, { need: 'Survey notes' }] });
-  const s = m.applySituationData(m.newArgumentMap(roles, 'r'), plain(out).data.map((d, i) => ({ id: `d${i + 1}`, need: d.need })));
-  assert.equal(s.situation.data.length, 2);
-});
-test('plan_situation: policy needs a sane max within the machine cap; the prompt shows only the proposition and the cap', () => {
-  const prep = max => sr.prepareStep(mod.planSituationStep, { ...planReq, max });
-  assert.ok(prep(1) && prep(6));
-  for (const max of [0, 7, 1.5, NaN]) assert.throws(() => prep(max), error => error.name === 'ArgumentStepError');
-  const prompt = mod.planSituationStep.render({ ...planReq, secret: 'LEAKED-X' });
-  assert.doesNotMatch(prompt, /LEAKED/);
-  assert.match(prompt, /Youth unemployment rose in 2024/);
-});
-
 // ---- verdict ----
 function verdictFixture() {
   let s = withHyps(['h1', 'h2', 'h3']);
@@ -245,16 +215,16 @@ test('conclusion: a number or URL outside the input throws; below 3 verified hyp
 
 // ---- schemas and registry ----
 test('every step has a strict schema and the registry maps the machine actions', () => {
-  for (const step of [mod.planSituationStep, mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep]) {
+  for (const step of [mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep]) {
     assert.equal(step.schema.additionalProperties, false);
     assert.deepEqual([...step.schema.required].sort(), Object.keys(step.schema.properties).sort());
   }
-  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_facets', 'judge_gate', 'plan_facets', 'plan_situation', 'propose_facet_hypotheses', 'propose_hypotheses', 'revise', 'verdict']);
+  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_facets', 'judge_gate', 'plan_facets', 'propose_facet_hypotheses', 'propose_hypotheses', 'revise', 'verdict']);
   assert.equal(mod.ARGUMENT_STEPS.plan_facets, mod.facetPlanStep);
-  assert.equal(mod.ARGUMENT_STEPS.plan_situation, mod.planSituationStep);
+  assert.equal(mod.ARGUMENT_STEPS.plan_situation, undefined); // the old plan step was removed; plan_facets serves the action
   assert.equal(mod.ARGUMENT_STEPS.revise, mod.needsStep);
   const ids = new Set(Object.values(mod.ARGUMENT_STEPS).map(step => step.id));
-  assert.equal(ids.size, 9);
+  assert.equal(ids.size, 8);
 });
 
 // ---- text-only through the real runtimes ----
@@ -425,7 +395,6 @@ const stepCases = () => {
   const f = conclusionFixture();
   const v = verdictFixture();
   return [
-    ['plan', mod.planSituationStep, planReq, { data: [{ need: 'Official rate series' }] }],
     ['gate', mod.situationGateStep, gateReq, gateOk],
     ['facet-judge', mod.facetJudgeStep, fjReq(), fjOk()],
     ['facet-hypotheses', mod.facetHypothesesStep, fhReq(), fhOk()],

@@ -2752,6 +2752,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.argument_group_eliminated": "已淘汰的假設",
   "ui.argument_stopped_mismatch": "現況不符合命題，已停止",
   "ui.argument_stopped_missing": "找不到所需的現況資料，已停止",
+  "ui.argument_stopped_insufficient": "資料不足，無法判斷命題，已停止",
+  "ui.argument_definitions": "定義與範圍",
   "ui.argument_stopped_limit_0": "限制內未能驗證 3 個假設，已停止。{0}",
   "ui.argument_in_progress": "研究進行中，尚無結論",
   "ui.argument_situation_data": "依據的現況數據",

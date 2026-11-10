@@ -156,7 +156,7 @@ test('need caps: 3 per hypothesis per round, 6 per hypothesis', () => {
   for (const id of ['n4', 'n5', 'n6']) s = researched(s, 'h1', id, { found: false, reason: 'none' });
   refuses(s, () => m.startNextRound(s, 'h1', [{ id: 'n7', text: 'x' }]));
 });
-test('research caps: researchCalls is counted at dispatch and capped at 66', () => {
+test('research caps: researchCalls is counted at dispatch and capped at 78', () => {
   let s = withHypotheses();
   s = m.addNeeds(s, 'h1', [{ id: 'n1', text: 'x' }, { id: 'n2', text: 'x' }]);
   const before = s.run.researchCalls;
@@ -164,7 +164,7 @@ test('research caps: researchCalls is counted at dispatch and capped at 66', () 
   assert.equal(s.run.researchCalls, before + 1, 'counted before the answer arrives');
   assert.equal(s.hypotheses[0].needs[0].state, 'searching');
   refuses(s, () => m.beginResearch(s, 'h1', 'n1'));
-  const capped = plain(s); capped.run.researchCalls = 66;
+  const capped = plain(s); capped.run.researchCalls = 78;
   refuses(capped, () => m.beginResearch(capped, 'h1', 'n2'));
   assert.ok(!actions(capped).some(a => a.type === 'research_need'), 'no research action at the cap');
 });
@@ -471,7 +471,7 @@ test('dead need #5: forged replaces at selector level does not retire anything',
   const searching = forge(h => { h.needs[1].state = 'searching'; });
   assert.deepEqual([...model.retiredNeedIds(searching)], []);
 });
-test('dead need #7: caps hold with replacements (6 needs, round 4, 7th need, no re-research, 66 calls)', () => {
+test('dead need #7: caps hold with replacements (6 needs, round 4, 7th need, no re-research, 78 calls)', () => {
   let s = withHypotheses();
   s = m.addNeeds(s, 'h1', [1, 2, 3].map(i => ({ id: `n${i}`, text: 'x' })));
   for (const id of ['n1', 'n2', 'n3']) s = researched(s, 'h1', id, miss);
@@ -488,7 +488,7 @@ test('dead need #7: caps hold with replacements (6 needs, round 4, 7th need, no 
   t = researched(t, 'h1', 'c2', miss);
   refuses(t, () => m.startNextRound(t, 'h1', [{ id: 'd', text: 'x' }]));
   let u = m.startNextRound(deadB(), 'h1', [{ id: 'rc', text: 'z' }]);
-  const capped = plain(u); capped.run.researchCalls = 66;
+  const capped = plain(u); capped.run.researchCalls = 78;
   refuses(capped, () => m.beginResearch(capped, 'h1', 'rc'));
   assert.ok(!actions(capped).some(a => a.type === 'research_need'));
 });
@@ -568,7 +568,7 @@ test('situation research budget exhausted with data still pending ends at the li
   let s = m.applySituationData(m.newArgumentMap(roles, 'r'), [{ id: 'd1', need: 'x' }, { id: 'd2', need: 'y' }]);
   s = m.beginSituationResearch(s, 'd2');
   s = m.applySituationEvidence(s, 'd2', found());
-  while (s.run.researchCalls < 66) {
+  while (s.run.researchCalls < 78) {
     s = m.beginSituationResearch(s, 'd1');
     s = m.releaseSituationResearch(s, 'd1');
   }
@@ -855,7 +855,7 @@ test('facet boost: budget spent: only situation_budget, no stop_limit; the unres
 test('facet boost: the research cap is min(24 - used, whole-map remaining); a facet map never emits stop_limit', () => {
   const s = planned([3, 3, 3, 3, 3]);
   assert.equal(actions(s).length, 15);
-  s.run.researchCalls = 60;
+  s.run.researchCalls = 72;
   assert.equal(actions(s).length, 6, 'whole-map remaining is smaller');
   const t = planned([3, 3, 3, 3, 3]);
   t.situation.data.forEach((d, i) => { if (i < 10) { d.state = 'not_found'; d.attempts = 1; } });
@@ -881,7 +881,7 @@ test('facet boost: old maps keep every old action and cap (no facets key, gate_m
   let s = m.newArgumentMap(roles, 'r');
   s = m.applySituationData(s, [{ id: 'd1', need: 'x' }]);
   assert.equal(s.situation.facets, undefined);
-  s.run.researchCalls = 66;
+  s.run.researchCalls = 78;
   assert.deepEqual(types(s), ['stop_limit']);
 });
 
@@ -921,4 +921,14 @@ test('facet hypotheses: an old map (no facets) accepts the old item shape and st
   const h = withHypotheses(["h1"]).hypotheses[0];
   assert.equal('basis' in h, false);
   assert.equal('alternative' in h, false);
+});
+test('P5: a found proof keeps a well-formed figure (exactly three non-blank strings) and drops a malformed one without failing the evidence', () => {
+  const good = { number: '9.2', period: 'March 2024', unit: 'percent' };
+  for (const [figure, kept] of [[good, true], [{ ...good, unit: ' ' }, false], [{ number: '9.2', period: 'March' }, false], [{ ...good, extra: 'x' }, false], ['9.2', false], [[good.number, good.period, good.unit], false]]) {
+    let s = m.addNeeds(withHypotheses(['h1', 'h2', 'h3']), 'h1', [{ id: 'n1', text: 'x' }]);
+    s = researched(s, 'h1', 'n1', { found: true, stance: 'supports', proof: { ...proof(), figure } });
+    const got = s.hypotheses[0].needs[0];
+    assert.equal(got.state, 'found');
+    assert.deepEqual(got.proof.figure && plain(got.proof.figure), kept ? good : undefined);
+  }
 });

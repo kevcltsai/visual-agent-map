@@ -155,13 +155,22 @@ function checkedProof(value: unknown): SourceProof {
     throw new GateError("source url is not a url");
   }
   if (protocol !== "http:" && protocol !== "https:") throw new GateError("source url must be http(s)");
+  const figure = readFigure(p.figure);
   return {
     url: p.url as string,
     quote: p.quote as string,
     claim: p.claim as string,
     check: p.check as SourceProof["check"],
-    checkedAt: p.checkedAt as string
+    checkedAt: p.checkedAt as string,
+    ...(figure ? { figure } : {})
   };
+}
+/** The optional figure of a proof, kept only when it is exactly three non-blank strings; a cosmetic field never fails the evidence. */
+function readFigure(value: unknown): SourceProof["figure"] {
+  const f = value as Record<string, unknown> | undefined;
+  if (!f || typeof f !== "object" || Array.isArray(f) || Object.keys(f).length !== 3) return undefined;
+  if (blank(f.number) || blank(f.period) || blank(f.unit)) return undefined;
+  return { number: f.number as string, period: f.period as string, unit: f.unit as string };
 }
 function stanceOf<T extends string>(list: readonly T[], value: unknown): T {
   if (!(list as readonly string[]).includes(value as string)) throw new GateError("unknown stance");

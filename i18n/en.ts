@@ -2942,6 +2942,8 @@ export const en = {
   "ui.argument_group_eliminated": "Eliminated hypotheses",
   "ui.argument_stopped_mismatch": "The current situation does not match the proposition. Stopped.",
   "ui.argument_stopped_missing": "The situation data could not be found. Stopped.",
+  "ui.argument_stopped_insufficient": "Not enough data to judge the proposition. Stopped.",
+  "ui.argument_definitions": "Definitions and scope",
   "ui.argument_stopped_limit_0": "Fewer than 3 hypotheses were verified within the limits. Stopped. {0}",
   "ui.argument_in_progress": "Research is in progress. No conclusion yet.",
   "ui.argument_situation_data": "Situation data relied on",

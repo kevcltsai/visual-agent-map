@@ -115,9 +115,7 @@ export const facetHypothesesStep: StepDefinition<FacetHypothesesRequest, FacetHy
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.proposition),
       count: String(request.count),
-      alternativeRule: isFirstBatch(request)
-        ? firstBatchRule.trim()
-        : "",
+      alternativeRule: isFirstBatch(request) ? firstBatchRule.trim() : "",
       proposition: JSON.stringify(request.proposition),
       data: JSON.stringify(request.data.map(pick)),
       causal: JSON.stringify(request.causalQuestions),

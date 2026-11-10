@@ -14,6 +14,7 @@ import {
 import template from "./facet-judge.md";
 import retryOnce from "./facet-judge-retry1.md";
 import retryNone from "./facet-judge-retry2.md";
+import assumptionsBlock from "./facet-judge-assumptions.md";
 
 /** One found datum as the facet judge sees it. `fixedStance` is set when its stance toward the proposition is already decided and cannot change. */
 export interface FacetJudgeDatum {
@@ -202,7 +203,7 @@ export const facetJudgeStep: StepDefinition<FacetJudgeRequest, FacetJudgeResult>
       retryRule: request.round === 1 ? RETRY_ROUND_1 : RETRY_ROUND_2,
       proposition: JSON.stringify(request.proposition),
       assumptions: request.assumptions?.length
-        ? `\n\nAssumption card (JSON array of {label, value, reason}):\n${JSON.stringify(request.assumptions)}`
+        ? `\n\n${renderTemplate(assumptionsBlock.trim(), { assumptionsJson: JSON.stringify(request.assumptions) })}`
         : "",
       facets: JSON.stringify(
         request.facets.map(f => ({

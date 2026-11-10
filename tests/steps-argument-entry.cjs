@@ -23,7 +23,7 @@ const Plugin = MODULES.default;
 const find = dom.findAll;
 const choices = [{ id: 'a', label: 'Model A' }, { id: 'b', label: 'Model B' }];
 
-function openModal(claim, onStart, calls = 109) {
+function openModal(claim, onStart, calls = 122) {
   const modal = new ArgumentStartModal({}, claim, choices, 'a', calls, onStart);
   modal.onOpen();
   const area = find(modal.contentEl, i => i.tag === 'textarea')[0];
@@ -41,7 +41,7 @@ test('start window: title, proposition (from the draft), model, usage and networ
   assert.equal(m.select.value, 'a');
   assert.deepEqual(find(m.select, i => i.tag === 'option').map(o => o.text), ['Model A', 'Model B']);
   const hint = find(m.modal.contentEl, i => i.tag === 'p' && i.cls.includes('vam-hint'))[0];
-  assert.equal(hint.text, 'Up to about 109 AI calls. Research connects to web pages the AI finds.');
+  assert.equal(hint.text, 'Up to about 122 AI calls. Research connects to web pages the AI finds.');
   assert.equal(m.start.disabled, false);
   assert.ok(m.start.hasClass('mod-cta'));
   assert.equal(m.area.focused, true, 'focus in the proposition field');

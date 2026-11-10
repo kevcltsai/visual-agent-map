@@ -2750,6 +2750,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.argument_group_eliminated": "已淘汰的假设",
   "ui.argument_stopped_mismatch": "现况不符合命题，已停止",
   "ui.argument_stopped_missing": "找不到所需的现况数据，已停止",
+  "ui.argument_stopped_insufficient": "数据不足，无法判断命题，已停止",
+  "ui.argument_definitions": "定义与范围",
   "ui.argument_stopped_limit_0": "限制内未能验证 3 个假设，已停止。{0}",
   "ui.argument_in_progress": "研究进行中，尚无结论",
   "ui.argument_situation_data": "依据的现况数据",

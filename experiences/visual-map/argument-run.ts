@@ -16,20 +16,24 @@ import type { AiResult, TaskContext } from "../../ai/types";
 import {
   GateError,
   addNeeds,
+  addRetryNeeds,
   applyConclusion,
   applyEvidence,
+  applyFacetVerdicts,
   applyGateMissing,
   applyHypotheses,
   applyLimitStop,
   applyPause,
   applyResume,
-  applySituationData,
+  applySituationBudgetOut,
   applySituationEvidence,
   applySituationGate,
+  applySituationPlan,
   applyVerdict,
   beginResearch,
   beginSituationResearch,
   eliminateAtLimit,
+  hasFacets,
   newArgumentMap,
   nextActions,
   prepareConclusion,
@@ -42,35 +46,44 @@ import {
 } from "../../core/argument-map/machine";
 import {
   MAX_HYPOTHESES,
+  INSIGHT_MAX_TEXT,
   MAX_RESEARCH_CALLS,
   MAX_ROUND,
-  MAX_SITUATION_DATA,
   MIN_VERIFIED,
   foundNeeds,
   readArgumentMap,
   type ArgumentMapData,
   type ArgumentRoles,
   type Hypothesis,
-  type RoleKey
+  type RoleKey,
+  type SearchLog,
+  SEARCH_LOG_MAX_ITEMS,
+  SEARCH_LOG_MAX_TEXT
 } from "../../core/argument-map/model";
 import { arrangeArgumentMap } from "../../core/argument-map/layout";
 import { verifySource, type FetchPage } from "../../core/argument-map/source-proof";
 import {
   ARGUMENT_STEPS,
   ArgumentStepError,
+  facetVerdictStep,
   gateData,
   needsAllowed,
   type ArgumentStepBase,
   type ConclusionRequest,
   type ConclusionResult,
+  type FacetHypothesesRequest,
+  type FacetHypothesesResult,
+  type FacetJudgeRequest,
+  type FacetJudgeResult,
+  type FacetPlanRequest,
+  type FacetPlanResult,
+  type FacetVerdictResult,
   type GateRequest,
   type GateVerdict,
   type HypothesesRequest,
   type HypothesesResult,
   type NeedsRequest,
   type NeedsResult,
-  type PlanSituationRequest,
-  type PlanSituationResult,
   type VerdictRequest,
   type VerdictResult
 } from "../../core/steps/argument-map/runner";
@@ -79,11 +92,13 @@ import type { MapDocument, MapNode } from "../../map-model";
 
 export const MAX_RESEARCH_CONCURRENCY = 3;
 /**
- * The most AI calls one run can make, shown before it starts (corrections and retries not counted): the research calls, plan_situation,
- * judge_gate, propose (up to MAX_HYPOTHESES - MIN_VERIFIED + 1), a needs step and a verdict step per hypothesis per round, and conclude.
+ * The most AI calls one run can make, shown before it starts (corrections and retries not counted): the research calls, plan_facets,
+ * the facet judgement (at most two: round 1 and the retry round), propose (up to MAX_HYPOTHESES - MIN_VERIFIED + 1), a needs step and
+ * a verdict step per hypothesis per round, and conclude.
  */
+const FACET_JUDGEMENTS = 2;
 export const WORST_CASE_AI_CALLS =
-  MAX_RESEARCH_CALLS + 1 + 1 + (MAX_HYPOTHESES - MIN_VERIFIED + 1) + MAX_HYPOTHESES * MAX_ROUND * 2 + 1;
+  MAX_RESEARCH_CALLS + 1 + FACET_JUDGEMENTS + (MAX_HYPOTHESES - MIN_VERIFIED + 1) + MAX_HYPOTHESES * MAX_ROUND * 2 + 1;
 const X_STEP = 320;
 const Y_STEP = 160;
 
@@ -183,6 +198,15 @@ interface Plan {
 }
 
 const shorten = (text: string, max: number): string => Array.from(text.trim()).slice(0, max).join("");
+/** At most `max` UTF-16 units of the text, never splitting a character. */
+const capText = (text: string, max: number): string => {
+  let out = "";
+  for (const ch of text.trim()) {
+    if (out.length + ch.length > max) break;
+    out += ch;
+  }
+  return out;
+};
 const domainOf = (url: string | undefined): string => {
   try {
     return new URL(url ?? "").hostname;
@@ -537,29 +561,30 @@ export class ArgumentRuns {
     const proposition = await this.proposition(drive, state);
     const base = this.base(drive);
     switch (action.type) {
-      case "plan_situation": {
-        const request: PlanSituationRequest = { ...base, proposition, max: MAX_SITUATION_DATA };
-        const result: PlanSituationResult = await this.ask(drive, ARGUMENT_STEPS.plan_situation, request);
+      case "plan_situation":
+        // A map with no data yet is always planned by facets (a new map; old maps are already past this step).
+        return this.planFacets(drive, state, proposition);
+      case "judge_facets":
+        return this.judgeFacets(drive, state, proposition);
+      case "situation_budget": {
         await this.checkpoint(drive, async (s, map) => {
-          // Dry run with placeholder ids first: a refused batch must not leave notes behind.
-          applySituationData(
-            s,
-            result.data.map((d, i) => ({ id: `dry-${i}`, need: d.need }))
+          const next = applySituationBudgetOut(s);
+          const spent = next.situation.data.filter(
+            d => d.reason === "budget" && s.situation.data.some(o => o.id === d.id && o.state === "pending")
           );
-          // Each datum is a leaf card under the situation card; the card's id is the datum's id (like a need).
-          const nodes: Plan["nodes"] = [];
-          const items: { id: string; need: string }[] = [];
-          for (const d of result.data) {
-            const node = await this.makeNote(
-              { kind: "datum", title: shorten(d.need, 80), summary: d.need },
-              map,
-              drive.mapPath
-            );
-            nodes.push({ node, parentId: s.roles.situation });
-            items.push({ id: node.id, need: d.need });
-          }
-          return { next: applySituationData(s, items), nodes };
+          return {
+            next,
+            notes: async () => {
+              for (const d of spent)
+                await this.noteDetail(map, d.id, drive, this.t("ui.argument_not_found_0", "budget"));
+            }
+          };
         });
+        return;
+      }
+      case "add_retry_needs": {
+        // Only an old checkpoint (judged before the retry batch was written with it) lands here: nothing to search, so the run stops.
+        await this.checkpoint(drive, async s => this.stopPlan(drive, addRetryNeeds(s, [])));
         return;
       }
       case "gate_missing": {
@@ -606,33 +631,205 @@ export class ArgumentRuns {
     }
   }
 
+  /** The facet plan: dry-run with placeholder ids, then one card per assumption card, facet and need (card id == state id), all under the situation card. */
+  private async planFacets(drive: Drive, state: ArgumentMapData, proposition: string): Promise<void> {
+    const request: FacetPlanRequest = { ...this.base(drive), proposition };
+    const result: FacetPlanResult = await this.ask(drive, ARGUMENT_STEPS.plan_facets, request);
+    await this.checkpoint(drive, async (s, map) => {
+      const items = result.assumptions.items;
+      const plan = (id: (name: string) => string): Parameters<typeof applySituationPlan>[1] => ({
+        ...(items.length ? { assumptions: { id: id("as"), items } } : {}),
+        facets: result.facets.map((f, i) => ({
+          id: id(`f${i}`),
+          title: f.title,
+          needs: f.needs.map((n, j) => ({ id: id(`f${i}-${j}`), need: n.need }))
+        })),
+        causalQuestions: result.causalQuestions
+      });
+      // Dry run first: a refused plan must not leave notes behind.
+      applySituationPlan(
+        s,
+        plan(name => `dry-${name}`)
+      );
+      const nodes: Plan["nodes"] = [];
+      const make = async (kind: NoteKind, title: string, summary: string | undefined, detail?: string) => {
+        const node = await this.makeNote({ kind, title: shorten(title, 80), summary, detail }, map, drive.mapPath);
+        nodes.push({ node, parentId: s.roles.situation });
+        return node;
+      };
+      const ids = new Map<string, string>();
+      if (items.length) {
+        const detail = items
+          .map(i => `- ${plainLine(i.label)}: ${plainLine(i.value)} (${plainLine(i.reason)})`)
+          .join("\n");
+        ids.set("as", (await make("group", this.ports.t("ui.argument_definitions"), undefined, detail)).id);
+      }
+      for (const [i, f] of result.facets.entries()) {
+        ids.set(`f${i}`, (await make("group", f.title, f.title)).id);
+      }
+      for (const [i, f] of result.facets.entries())
+        for (const [j, n] of f.needs.entries()) {
+          const node = await this.makeNote(
+            { kind: "datum", title: shorten(n.need, 80), summary: n.need },
+            map,
+            drive.mapPath
+          );
+          nodes.push({ node, parentId: ids.get(`f${i}`)! });
+          ids.set(`f${i}-${j}`, node.id);
+        }
+      const next = applySituationPlan(
+        s,
+        plan(name => ids.get(name)!)
+      );
+      next.situation.question = result.question;
+      return { next, nodes };
+    });
+  }
+
+  /**
+   * The facet judgement and, in the same checkpoint, the one retry batch: a refused batch (the machine's caps) writes nothing, and a
+   * run paused between the call and the write has neither the verdicts nor half of the retry needs; it asks again on resume.
+   */
+  private async judgeFacets(drive: Drive, state: ArgumentMapData, proposition: string): Promise<void> {
+    const { situation } = state;
+    const round = situation.gate.round === 2 ? 2 : 1;
+    const request: FacetJudgeRequest = {
+      ...this.base(drive),
+      proposition,
+      round,
+      facets: (situation.facets ?? [])
+        .filter(f => f.verdict === "pending")
+        .map(f => {
+          const own = situation.data.filter(d => d.facetId === f.id);
+          const notFound = own.filter(d => d.state === "not_found").map(d => d.need);
+          return {
+            id: f.id,
+            title: f.title,
+            data: own
+              .filter(d => d.state === "found" && d.proof)
+              .map(d => ({
+                id: d.id,
+                need: d.need,
+                claim: d.proof!.claim,
+                quote: d.proof!.quote,
+                url: d.proof!.url,
+                stance: d.stance ?? "uncertain",
+                ...(d.propStance ? { fixedStance: d.propStance } : {})
+              })),
+            ...(notFound.length ? { notFoundNeeds: notFound } : {})
+          };
+        }),
+      ...(situation.assumptions?.items.length
+        ? { assumptions: situation.assumptions.items.map(i => ({ label: i.label, value: i.value, reason: i.reason })) }
+        : {})
+    };
+    const result: FacetJudgeResult = await this.ask(drive, ARGUMENT_STEPS.judge_facets, request);
+    await this.checkpoint(drive, async (s, map) => {
+      let next = applyFacetVerdicts(s, {
+        data: result.data,
+        facets: result.facets.map(f => ({
+          id: f.id,
+          verdict: f.verdict,
+          reason: f.reason,
+          citedData: f.citedData,
+          summary: f.summary
+        }))
+      });
+      // The last judgement wins: the insights about the assumption card are replaced (and dropped when the judge had none).
+      if (next.situation.assumptions) {
+        const insights = result.assumptionInsights.map(t => capText(t, INSIGHT_MAX_TEXT)).filter(Boolean);
+        if (insights.length) next.situation.assumptions.insights = insights;
+        else delete next.situation.assumptions.insights;
+      }
+      const nodes: Plan["nodes"] = [];
+      if (next.run.phase === "situation") {
+        // Facets still insufficient after round 1: their retry needs (none at all means data_insufficient).
+        const wanted = result.facets
+          .filter(f => next.situation.facets!.some(x => x.id === f.id && x.verdict === "insufficient"))
+          .flatMap(f => f.retryNeeds.map(need => ({ facetId: f.id, need })));
+        addRetryNeeds(
+          next,
+          wanted.map((w, i) => ({ ...w, id: `dry-${i}` }))
+        );
+        const items: { facetId: string; id: string; need: string }[] = [];
+        for (const w of wanted) {
+          const node = await this.makeNote(
+            { kind: "datum", title: shorten(w.need, 80), summary: w.need },
+            map,
+            drive.mapPath
+          );
+          nodes.push({ node, parentId: w.facetId });
+          items.push({ ...w, id: node.id });
+        }
+        next = addRetryNeeds(next, items);
+      }
+      const stopped = next.run.phase === "stopped_mismatch";
+      const plan: Plan = stopped ? await this.stopPlan(drive, next) : { next, nodes };
+      const judged = result.facets;
+      const inner = plan.notes;
+      plan.notes = async () => {
+        for (const f of judged) await this.noteSummary(map, f.id, drive, f.summary, f.reason);
+        if (inner) await inner();
+      };
+      return plan;
+    });
+  }
+  private async noteSummary(
+    map: MapDocument,
+    id: string,
+    drive: Drive,
+    summary: string,
+    detail: string
+  ): Promise<void> {
+    const path = map.nodes.find(n => n.id === id)?.path ?? (await this.notePath(drive, id));
+    if (path) await this.writeNote(path, { summary, detail: `${this.t("ui.argument_reason")}: ${plainLine(detail)}` });
+  }
+
   private async propose(drive: Drive, state: ArgumentMapData, proposition: string, count: number): Promise<void> {
     const existing: string[] = [];
     for (const h of state.hypotheses) existing.push((await this.text(drive, h.id)).title);
-    const request: HypothesesRequest = {
-      ...this.base(drive),
-      proposition,
-      data: gateData(state.situation.data.filter(d => d.state === "found")),
-      count,
-      existing
-    };
-    const result: HypothesesResult = await this.ask(drive, ARGUMENT_STEPS.propose_hypotheses, request);
+    const found = state.situation.data.filter(d => d.state === "found");
+    let result: HypothesesResult | FacetHypothesesResult;
+    if (hasFacets(state)) {
+      // A facet map: the data with a stance toward the proposition, the causal questions, and a basis and alternative flag back.
+      const stanced = found.filter(d => d.propStance !== undefined && d.propStance !== "irrelevant");
+      const request: FacetHypothesesRequest = {
+        ...this.base(drive),
+        proposition,
+        data: gateData(stanced).map((d, i) => ({ ...d, propStance: stanced[i].propStance! })),
+        count,
+        existing,
+        causalQuestions: state.situation.causalQuestions ?? []
+      };
+      result = await this.ask(drive, ARGUMENT_STEPS.propose_facet_hypotheses, request);
+    } else {
+      const request: HypothesesRequest = {
+        ...this.base(drive),
+        proposition,
+        data: gateData(found),
+        count,
+        existing
+      };
+      result = await this.ask(drive, ARGUMENT_STEPS.propose_hypotheses, request);
+    }
+    const proposed: { title: string; statement: string; citedData: string[]; basis?: string; alternative?: boolean }[] =
+      result.hypotheses;
     await this.checkpoint(drive, async (s, map) => {
       // Dry run with placeholder ids first: a refused batch (the gate) must not leave notes behind.
       applyHypotheses(
         s,
-        result.hypotheses.map((h, i) => ({ id: `dry-${i}`, citedData: h.citedData }))
+        proposed.map((h, i) => ({ id: `dry-${i}`, citedData: h.citedData, basis: h.basis, alternative: h.alternative }))
       );
       const nodes: Plan["nodes"] = [];
-      const items: { id: string; citedData: string[] }[] = [];
-      for (const h of result.hypotheses) {
+      const items: { id: string; citedData: string[]; basis?: string; alternative?: boolean }[] = [];
+      for (const h of proposed) {
         const node = await this.makeNote(
           { kind: "hypothesis", title: h.title, summary: h.statement },
           map,
           drive.mapPath
         );
         nodes.push({ node, parentId: s.roles.verified });
-        items.push({ id: node.id, citedData: h.citedData });
+        items.push({ id: node.id, citedData: h.citedData, basis: h.basis, alternative: h.alternative });
       }
       return { next: applyHypotheses(s, items), nodes };
     });
@@ -682,12 +879,24 @@ export class ArgumentRuns {
       hypothesis: (await this.text(drive, hypothesisId)).summary,
       input: prepareVerdict(state, hypothesisId)
     };
-    const result: VerdictResult = await this.ask(drive, ARGUMENT_STEPS.verdict, request);
-    await this.checkpoint(drive, async (s, map) => ({
-      next: applyVerdict(s, hypothesisId, result),
-      notes: () =>
-        this.noteDetail(map, hypothesisId, drive, `${this.t("ui.argument_reason")}: ${plainLine(result.reason)}`)
-    }));
+    // A facet map's verdict also returns insights, kept on the hypothesis so its note can be rewritten; an old map keeps the V1 step.
+    const facet: FacetVerdictResult | undefined = hasFacets(state)
+      ? await this.ask(drive, facetVerdictStep, request)
+      : undefined;
+    const result: VerdictResult = facet ?? (await this.ask(drive, ARGUMENT_STEPS.verdict, request));
+    await this.checkpoint(drive, async (s, map) => {
+      const next = applyVerdict(s, hypothesisId, result);
+      if (facet)
+        next.hypotheses.find(h => h.id === hypothesisId)!.insights = facet.insights.map(i => ({
+          kind: i.kind,
+          text: capText(i.text, INSIGHT_MAX_TEXT)
+        }));
+      return {
+        next,
+        notes: () =>
+          this.noteDetail(map, hypothesisId, drive, `${this.t("ui.argument_reason")}: ${plainLine(result.reason)}`)
+      };
+    });
   }
 
   private async conclude(drive: Drive, state: ArgumentMapData, proposition: string): Promise<void> {
@@ -739,14 +948,20 @@ export class ArgumentRuns {
     let summary: string;
     if (next.run.phase === "stopped_limit")
       summary = t("ui.argument_stopped_limit_0", next.conclusion.missing.join("; "));
-    else summary = gate.kind === "data_missing" ? t("ui.argument_stopped_missing") : t("ui.argument_stopped_mismatch");
+    else
+      summary =
+        gate.kind === "data_insufficient"
+          ? t("ui.argument_stopped_insufficient")
+          : gate.kind === "data_missing"
+            ? t("ui.argument_stopped_missing")
+            : t("ui.argument_stopped_mismatch");
     const detail =
       next.run.phase === "stopped_mismatch"
         ? [`${t("ui.argument_reason")}: ${plainLine(gate.reason ?? "")}`, "", ...this.dataSection(next, [])].join("\n")
         : "";
     const path = (await this.ports.readMap(drive.mapPath)).nodes.find(n => n.id === next.roles.conclusion)?.path;
     this.ports.log(
-      `argument-run stopped runId=${next.run.runId} phase=${next.run.phase} stopReason=${next.run.stopReason ?? "-"}`
+      `argument-run stopped runId=${next.run.runId} phase=${next.run.phase} stopReason=${next.run.stopReason ?? "-"} gateKind=${gate.kind ?? "-"}`
     );
     return {
       next,
@@ -807,6 +1022,7 @@ export class ArgumentRuns {
       let domain = "-";
       let code = "";
       let reply: AiResult;
+      let note = "";
       try {
         reply = await untilAborted(
           signal,
@@ -842,12 +1058,16 @@ export class ArgumentRuns {
       try {
         openedUrls = reply.evidence?.openedUrls ?? [];
         const entry = reply.argumentEvidence?.find(e => e.need === itemId);
+        note = entry?.note ?? "";
+        const facetMap = !isNeed && hasFacets(state);
         if (!entry) result = { found: false, reason: "no_answer" };
         else if (entry.status !== "found") result = { found: false, reason: "not_found" };
         else {
           domain = domainOf(entry.url);
           const stance = !isNeed && entry.stance === "contradicts" ? "opposes" : entry.stance;
-          if (!isNeed && entry.stance === "uncertain") result = { found: false, reason: "stance_uncertain" };
+          // An old map cannot hold an uncertain datum; a facet map keeps it when the source verifies (the machine sets its stance).
+          if (!isNeed && !facetMap && entry.stance === "uncertain")
+            result = { found: false, reason: "stance_uncertain" };
           else {
             const check = await verifySource({
               url: entry.url,
@@ -860,7 +1080,7 @@ export class ArgumentRuns {
             });
             code = check.ok ? check.proof.check : check.reason;
             result = check.ok
-              ? { found: true, stance, proof: check.proof }
+              ? { found: true, stance, proof: entry.figure ? { ...check.proof, figure: entry.figure } : check.proof }
               : { found: false, reason: `source_${check.reason}` };
           }
         }
@@ -878,7 +1098,16 @@ export class ArgumentRuns {
         `argument-run proof runId=${state.run.runId} phase=${state.run.phase} result=${result.found ? "found" : result.reason} proof=${code || "-"} domain=${domain}`
       );
       try {
-        await this.commitEvidence(drive, isNeed, hypothesisId, itemId, result);
+        const searchLog: SearchLog | undefined = result.found
+          ? undefined
+          : {
+              queries: (reply.evidence?.searchQueries ?? [])
+                .slice(0, SEARCH_LOG_MAX_ITEMS)
+                .map(q => capText(q, SEARCH_LOG_MAX_TEXT)),
+              opened: openedUrls.slice(0, SEARCH_LOG_MAX_ITEMS).map(u => capText(u, SEARCH_LOG_MAX_TEXT)),
+              why: capText([result.reason, note].filter(Boolean).join(": "), SEARCH_LOG_MAX_TEXT)
+            };
+        await this.commitEvidence(drive, isNeed, hypothesisId, itemId, result, searchLog);
         drive.failures.delete(itemId);
       } catch (error) {
         // The item is no longer `searching` (someone paused or changed the run meanwhile): the late result is dropped.
@@ -920,7 +1149,8 @@ export class ArgumentRuns {
     isNeed: boolean,
     hypothesisId: string,
     itemId: string,
-    result: EvidenceResult
+    result: EvidenceResult,
+    searchLog?: SearchLog
   ): Promise<void> {
     await this.checkpoint(drive, async (s, map) => {
       const node = map.nodes.find(n => n.id === itemId);
@@ -929,6 +1159,12 @@ export class ArgumentRuns {
       const next = isNeed
         ? applyEvidence(s, hypothesisId, itemId, settled)
         : applySituationEvidence(s, itemId, settled);
+      if (searchLog) {
+        const item = isNeed
+          ? next.hypotheses.find(h => h.id === hypothesisId)?.needs.find(n => n.id === itemId)
+          : next.situation.data.find(d => d.id === itemId);
+        if (item) item.searchLog = searchLog;
+      }
       const proof = result.found ? result.proof : undefined;
       const lines = proof ? [this.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
       const notes = async (): Promise<void> => {

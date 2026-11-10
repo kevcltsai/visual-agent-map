@@ -89,10 +89,10 @@ test('card view: managed cards get a view, free cards and ordinary maps do not; 
 
 test('renderNode and refreshCard: managed cards skip the summary, the add-summary hint and the type tag (source)', () => {
   const view = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(view, /if \(argumentView\) renderArgumentCardBody\(card, argumentView\);\n\s+else if \(textEditable/);
+  assert.match(view, /if \(argumentView\) renderArgumentCardBodyV2\(card, argumentView\);\n\s+else if \(textEditable/);
   assert.match(view, /!argumentView &&\n\s+textEditable &&/);
   assert.match(view, /if \(argumentView\) \{\n\s+summary\?\.remove\(\);\n\s+addLine\?\.remove\(\);/);
-  assert.match(view, /if \(argumentView\) \{\n[^\n]*\n[^\n]*\n\s+renderArgumentKind\(header, argumentView\);/);
+  assert.match(view, /if \(argumentView\) \{\n[^\n]*\n[^\n]*\n\s+renderArgumentKindV2\(header, argumentView\);/);
   // Baseline 11 on 4728cbcd; main's partial-repaint commit ffd32778 added one call site, this feature adds none.
   assert.equal(view.split('\n').filter(line => line.includes('drawEdges')).length, 12, 'no new drawEdges call sites');
   assert.equal(view.split('\n').filter(line => line.includes('aiLockReason(')).length, 23);

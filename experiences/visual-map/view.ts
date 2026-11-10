@@ -460,18 +460,20 @@ import {
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
-import { effectiveVerdict, readArgumentMap } from "../../core/argument-map/model-v1";
-import { managedNodeIds } from "../../core/argument-map/model";
+import { effectiveVerdict } from "../../core/argument-map/model-v1";
+import { managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
 import {
-  describeArgumentCard,
-  renderArgumentCardBody,
-  renderArgumentKind,
-  type ArgumentCardView
-} from "./argument-card";
+  describeArgumentCardV2,
+  describeLegacyArgumentCard,
+  renderArgumentCardBodyV2,
+  renderArgumentKindV2,
+  type ArgumentCardShape
+} from "./argument-card-v2";
 import { ArgumentRunError, WORST_CASE_AI_CALLS } from "./argument-run";
-import { describeArgumentProgress } from "./argument-progress";
+import { describeArgumentProgressV2, describeLegacyProgress } from "./argument-progress-v2";
 import { ArgumentStartModal } from "../../ui/modals/argument-start-modal";
 import { arrangeArgumentMap } from "../../core/argument-map/layout";
+import { arrangeArgumentMapV2 } from "../../core/argument-map/layout-v2";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
   MAP_CHAT_ANCHOR_PREFIX,
@@ -1891,10 +1893,12 @@ export class VisualAgentMapView extends ItemView {
   private arrangeAll(map: MapDocument, options: { reset?: boolean } = {}): void {
     // An argument map is arranged by its roles and stances (always to the right); any other map takes the ordinary path below.
     const argument = readArgumentMap(map);
-    if (argument.kind === "usable") {
-      map.nodes = arrangeArgumentMap(map.nodes, argument.data, this.cardHeightOf, {
-        hidden: supersededAimNodeIds(map)
-      });
+    if (argument.kind === "usable" || argument.kind === "legacy") {
+      const options = { hidden: supersededAimNodeIds(map) };
+      map.nodes =
+        argument.kind === "usable"
+          ? arrangeArgumentMapV2(map.nodes, argument.data, this.cardHeightOf, options)
+          : arrangeArgumentMap(map.nodes, argument.data, this.cardHeightOf, options);
       return;
     }
     // Pictures with a ring of topics keep their cards out of the arrangement and solve the ring after it.
@@ -2100,7 +2104,9 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Whether `map` is a usable argument map: its arrangement is fixed by the flow, so the layout controls are off (like AIM's). */
   private argumentLive(map: MapDocument | null | undefined = this.map): boolean {
-    return !!map && map.argumentMap !== undefined && readArgumentMap(map).kind === "usable";
+    if (!map || map.argumentMap === undefined) return false;
+    const kind = readArgumentMap(map).kind;
+    return kind === "usable" || kind === "legacy";
   }
   private mapOpenEpoch = 0;
   /**
@@ -4199,9 +4205,13 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     if (!map || map.argumentMap === undefined) return;
     const read = readArgumentMap(map);
-    if (read.kind !== "usable") return;
+    if (read.kind !== "usable" && read.kind !== "legacy") return;
     const path = this.path;
-    const view = describeArgumentProgress(read.data, this.plugin.argumentRuns.isRunning(path), t);
+    // A legacy (`"v": 1`) map is read-only: its bar says so and offers no stop or resume.
+    const view =
+      read.kind === "legacy"
+        ? describeLegacyProgress(read.data, t)
+        : describeArgumentProgressV2(read.data, this.plugin.argumentRuns.isRunning(path), t);
     const bar = parent.createDiv({
       cls: "vam-argument-bar",
       attr: {
@@ -14863,7 +14873,7 @@ export class VisualAgentMapView extends ItemView {
     if (argumentView) {
       // The flow's cards carry their own role and kind line, not a type tag, so no type shape or colour rule matches them.
       card.dataset.argumentRole = argumentView.role;
-      renderArgumentKind(header, argumentView);
+      renderArgumentKindV2(header, argumentView);
       this.labelCard(card, t("ui.topic_card_label_0_1", this.argumentTitleOf(argumentView, note), argumentView.label));
     } else if (kind !== "topic") {
       card.dataset.topicKind = kind;
@@ -15131,7 +15141,7 @@ export class VisualAgentMapView extends ItemView {
     // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
     // The summary text (and, for a card with none, the faint "add a summary" line) opens its field on a plain click.
     const textEditable = !!note && this.cardTextEditable();
-    if (argumentView) renderArgumentCardBody(card, argumentView);
+    if (argumentView) renderArgumentCardBodyV2(card, argumentView);
     else if (textEditable && this.inlineSummary?.id === node.id) this.paintCardSummaryEdit(card, node);
     else if (research?.preview?.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
@@ -15857,18 +15867,20 @@ export class VisualAgentMapView extends ItemView {
   }
   /** True for a card the argument flow owns on a map whose `argumentMap` key is usable (those cards are plain rectangles). */
   private isArgumentCard(id: string): boolean {
-    if (!this.map || this.map.argumentMap === undefined || readArgumentMap(this.map).kind !== "usable") return false;
+    if (!this.map || this.map.argumentMap === undefined) return false;
+    const kind = readArgumentMap(this.map).kind;
+    if (kind !== "usable" && kind !== "legacy") return false;
     return managedNodeIds(this.map).has(id);
   }
   /** What the flow says on a managed card of a usable argument map, or null (an ordinary card, or a map without the key). */
-  private argumentCardView(id: string): ArgumentCardView | null {
+  private argumentCardView(id: string): ArgumentCardShape | null {
     if (!this.map || this.map.argumentMap === undefined) return null;
     const read = readArgumentMap(this.map);
-    if (read.kind !== "usable" || !managedNodeIds(this.map).has(id)) return null;
-    return describeArgumentCard(read.data, id, t);
+    if ((read.kind !== "usable" && read.kind !== "legacy") || !managedNodeIds(this.map).has(id)) return null;
+    return read.kind === "usable" ? describeArgumentCardV2(read.data, id, t) : describeLegacyArgumentCard(read.data, id, t);
   }
   /** The heading of a managed card: its note's title, the note's summary (a concluded conclusion only), or the flow's own text. */
-  private argumentTitleOf(view: ArgumentCardView, note: Note | undefined): string {
+  private argumentTitleOf(view: ArgumentCardShape, note: Note | undefined): string {
     if (view.titleFrom === "text") return view.title ?? "";
     if (view.titleFrom === "summary")
       return note?.summary && !isPlaceholder(note.summary) ? note.summary : (note?.title ?? "");
@@ -15887,7 +15899,13 @@ export class VisualAgentMapView extends ItemView {
   /** The verdict of a hypothesis of an argument map (the user's, else the AI's, else undecided); undefined on any other map. */
   private argumentVerdictOf(id: string): HypothesisLeaning | undefined {
     const read = this.map ? readArgumentMap(this.map) : null;
-    const entry = read?.kind === "usable" ? read.data.hypotheses.find(item => item.id === id) : undefined;
+    if (read?.kind === "usable") {
+      // Version 2: the user's mark when there is one, else the verdict (a mark only; "insufficient" reads as undecided here).
+      const entry = read.data.hypotheses.find(item => item.id === id);
+      const value = entry ? (entry.userVerdict ?? entry.verdict?.value ?? "undecided") : undefined;
+      return value === "insufficient" ? "undecided" : value;
+    }
+    const entry = read?.kind === "legacy" ? read.data.hypotheses.find(item => item.id === id) : undefined;
     return entry ? effectiveVerdict(entry) : undefined;
   }
   /** The leaning to show on a card: only a hypothesis on an ordinary map has one. */
@@ -22596,7 +22614,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.argumentFocusMapId === null || !map || map.id !== this.argumentFocusMapId || map.argumentMap === undefined)
       return;
     const read = readArgumentMap(map);
-    if (read.kind !== "usable") return;
+    if (read.kind !== "usable" && read.kind !== "legacy") return;
     const root = map.nodes.find(node => node.id === read.data.roles.proposition);
     if (!root) return;
     this.argumentFocusMapId = null;
@@ -27839,8 +27857,10 @@ export class VisualAgentMapView extends ItemView {
     const argumentRead = this.map.argumentMap === undefined ? null : readArgumentMap(this.map);
     const tipSkip =
       argumentRead?.kind === "usable"
-        ? new Set([argumentRead.data.roles.proposition, argumentRead.data.roles.eliminated])
-        : null;
+        ? new Set([argumentRead.data.roles.proposition])
+        : argumentRead?.kind === "legacy"
+          ? new Set([argumentRead.data.roles.proposition, argumentRead.data.roles.eliminated])
+          : null;
     const tipped = new Set<string>();
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);

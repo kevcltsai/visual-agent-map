@@ -11,7 +11,7 @@ import {
   t,
   type ContentLanguage
 } from "../../i18n";
-import { chooseAimContentLanguage } from "../../experiences/aim/content-language";
+import { chooseAimContentLanguage } from "../../core/content-language";
 import type {
   AimOutcomeExpectation,
   AimOutcomeFormat,

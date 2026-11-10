@@ -1,5 +1,5 @@
 import { validateAimResearchPlan } from "./experiences/aim/research-plan";
-import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
+import { upgradeLegacyAimData } from "./core/legacy-names";
 import { aimEnabled } from "./experiences/aim/availability";
 import type { AiResult } from "./ai/types";
 import { debugLog, type LogLevel } from "./log-manager";

@@ -18307,7 +18307,7 @@ var hanScriptVotes = (text13) => {
   return { simplified, traditional };
 };
 
-// experiences/aim/content-language.ts
+// core/content-language.ts
 var OUTPUT_ROWS = OUTPUT_LANGUAGES;
 var isOutputOnlyLanguage = (value) => OUTPUT_LANGUAGES.some((item) => item.id === value);
 var UNDECIDED_HAN = "han";
@@ -20372,7 +20372,7 @@ function validateAimResearchPlan(subtopics) {
   return plan;
 }
 
-// experiences/aim/legacy-names.ts
+// core/legacy-names.ts
 var LEGACY_KEY_PREFIX = "mindSearch";
 var LEGACY_MARKER_PREFIX = "mindsearch-";
 var AIM_CREATE_MAP_COMMAND_ID = "create-mindsearch-map";

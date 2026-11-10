@@ -6,7 +6,7 @@ import {
   outputLanguageForMap,
   rememberedOutputLanguage,
   resolveAimContentLanguage
-} from "../aim/content-language";
+} from "../../core/content-language";
 import {
   addFreeTextNode,
   addImage,

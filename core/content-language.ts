@@ -1,4 +1,4 @@
-import type { MapDocument } from "../../map-model";
+import type { MapDocument } from "../map-model";
 import {
   contentLocale,
   FOLLOW_INPUT_ID,
@@ -15,10 +15,10 @@ import {
   type OutputOnlyId,
   type TranslationKey,
   type UiLanguage
-} from "../../i18n";
-import { isPlaceholderMapTitle, isPlaceholderTopicTitle, PLACEHOLDER_MAP_NAMES } from "../../core/default-names";
-import { hanScriptVotes } from "../../i18n/han-fold";
-import { LATIN_TEXT_DETECTION } from "../../i18n/languages";
+} from "../i18n";
+import { isPlaceholderMapTitle, isPlaceholderTopicTitle, PLACEHOLDER_MAP_NAMES } from "./default-names";
+import { hanScriptVotes } from "../i18n/han-fold";
+import { LATIN_TEXT_DETECTION } from "../i18n/languages";
 
 /**
  * What {@link detectAimContentLanguage} can name: an output-only language (including the follow-the-input row), a Han

@@ -725,7 +725,7 @@ integrationTest('AIM recovers a Map commit interrupted after its Note was writte
 });
 
 test('AIM content language detector follows the character rules; Japanese and Korean are detected, no signal falls back to the interface language', () => {
-  const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage } = load('experiences/aim/content-language.ts');
+  const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage } = load('core/content-language.ts');
   const cases = [
     ['東京五天自由行怎麼排', 'zh-TW'], ['Plan a 5-day Taipei trip', 'same-as-input'], ['Python 的 async 怎麼用', 'zh-TW'],
     ['What does 侘寂 mean', 'same-as-input'], ['东京五天自由行怎么排', 'zh-CN'], ['東京ラーメンの旅', 'ja'], ['東京の旅行', 'zh-TW'], ['한국 여행', 'ko'], ['🍜', undefined], ['2026', undefined], ['', undefined]

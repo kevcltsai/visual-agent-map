@@ -336,6 +336,27 @@ test('changing the current model makes the next write read every open map back',
   assert.equal(noteOf(vb, b.nodes[0]).model, 'next-model');
 });
 
+test('a model change while a read-back runs is not consumed by it: one follow-up reads the new model', async () => {
+  const h = harness();
+  const a = await h.map('Alpha');
+  const va = await h.open(a.mapPath);
+  h.plugin.saveData = async () => {};
+  await h.plugin.setCurrentModel('first-model');
+  let changed = false;
+  h.setHook(file => {
+    if (changed || file.path !== a.nodes[1].path) return null;
+    changed = true;
+    const text = h.contents.get(file.path);
+    // The model changes once the first note of this read-back is already parsed with the old one.
+    return new Promise(resolve => setTimeout(() => { void h.plugin.setCurrentModel('second-model'); resolve(text); }, 0));
+  });
+  await h.plugin.mutate(async () => {});
+  await settleQueue(h.plugin);
+  assert.ok(changed);
+  assert.equal(noteOf(va, a.nodes[0]).model, 'second-model');
+  assert.ok(va.unsynced.isEmpty());
+});
+
 test('a closed view drops what it collected', async () => {
   const h = harness();
   const a = await h.map('Alpha');

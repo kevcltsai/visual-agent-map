@@ -7,7 +7,7 @@ integrationTest('workspace repair creates only the configured base folders and i
   assert.equal(repo.workspaceExists(), false);
   await repo.ensureWorkspace(); await repo.ensureWorkspace();
   assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Mind Maps') instanceof TFolder);
-  assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/AIM') instanceof TFolder);
+  assert.ok(!app.vault.getAbstractFileByPath('Agent Workspace/AIM'), 'the AIM folder is no longer created');
   assert.ok(!app.vault.getAbstractFileByPath('Agent Workspace/Topics'), 'the legacy Topics folder is no longer created');
   assert.ok(!app.vault.getAbstractFileByPath('Agent Workspace/Inbox'), 'Inbox is no longer created');
 });

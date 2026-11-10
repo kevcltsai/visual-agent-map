@@ -1,1 +1,0 @@
-The original response chose research_more but named no research target and marked the goal as already answered, so it identified no evidence gap to search. Make the decision again from the same saved report and answer snapshot below; research_more is not available. Do not search, repeat research, add evidence, or invent facts.

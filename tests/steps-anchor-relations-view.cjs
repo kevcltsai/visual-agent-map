@@ -592,10 +592,6 @@ test('editor: an unreachable pair (already related) cannot be duplicated; the li
   hit.fire('click');
   assert.equal(h.modals.length, before + 1, 'the click opens the anchor relation editor dialog');
   assert.equal(h.view.selection.state.selectedRelation, key);
-  const ro = await real(root => [ann({ anchors: [pt('p1', 'x')], relations: [{ kind: 'related', from: 'p1', to: root }] })]);
-  ro.view.aimLive = () => true;
-  ro.view.openAnchorRelationEditor({ imageId: 'img1', anchorId: 'p1', topicId: ro.root });
-  assert.equal(ro.modals.length, 0, 'AIM opens no editor');
 });
 
 test('add from topic: "Point on an image…" lists existing anchors ("image · anchor"), disables the linked one, and adds a relation with the row kind (anchor -> topic)', async () => {
@@ -680,13 +676,11 @@ test('pick mode: clicking an annotated image starts placing; Enter writes the an
   assert.equal(undone.relations, undefined);
 });
 
-test('counter-example (read-only P4b): AIM and selection mode show the rows but no add entry, edit or remove buttons', async () => {
-  for (const mode of ['selection', 'aim']) {
+test('counter-example (read-only P4b): selection mode shows the rows but no add entry, edit or remove buttons', async () => {
+  for (const mode of ['selection']) {
     const h = await real(root => [ann({ anchors: [pt('p1', 'x')], relations: [{ kind: 'related', from: 'p1', to: root }] })]);
     if (mode === 'selection') h.view.selection.toggleMultiSelect();
-    else h.view.aimLive = () => true;
     const host = h.panel();
-    if (mode === 'aim') { assert.deepEqual(rowTexts(host), [], mode + ': AIM shows no relation section at all'); continue; }
     assert.deepEqual(rowTexts(host), ['Related ← Annotated image · x'], mode);
     assert.equal(findAll(host, i => i.hasClass('vam-relation-add-anchor')).length, 0, mode);
     assert.equal(findAll(host, i => i.tag === 'button' && /Edit relation|Remove relation/.test(i.attrs['aria-label'] ?? '')).length, 0, mode);

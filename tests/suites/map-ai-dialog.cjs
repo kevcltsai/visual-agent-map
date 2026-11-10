@@ -706,13 +706,11 @@ integrationTest('B2 synthesize (chat): a declined usage notice starts nothing an
   const lines = await chatApply(h, [synth([h.parent.id])], 'x');
   assert.deepEqual(plain(lines.map(l => l.status)), ['skipped']); assert.match(lines[0].text, /did not start/); assert.equal(h.calls.length, 0);
 });
-integrationTest('B2 synthesize (chat): a start that fails before the provider accepts is a failed line; a map that is read-only or switched is skipped', async () => {
+integrationTest('B2 synthesize (chat): a start that fails before the provider accepts is a failed line', async () => {
   const h = await synthesisHarness();
   h.plugin.askModel = async () => { throw new Error('provider down'); };
   const failed = await chatApply(h, [synth([h.parent.id])], 'x');
   assert.deepEqual(plain(failed.map(l => l.status)), ['failed']); assert.match(failed[0].text, /provider down/); assert.equal(h.modals.length, 0);
-  const ro = await synthesisHarness(); ro.view.map.aim = { kind: 'aim' };
-  const skippedRo = await chatApply(ro, [synth([ro.parent.id])], 'x'); assert.deepEqual(plain(skippedRo.map(l => l.status)), ['skipped']); assert.equal(ro.calls.length, 0);
 });
 integrationTest('B2 synthesize (chat): the options equal what the integration dialog hands over when its fields are left alone (selection)', async () => {
   const selDialog = await synthesisHarness(); const selDialogSeen = spyOptions(selDialog);

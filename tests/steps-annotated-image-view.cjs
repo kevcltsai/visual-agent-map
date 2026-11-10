@@ -308,11 +308,10 @@ test('moving and resizing an annotated image keeps its anchors; one undo step ea
   assert.equal(sized.anchors.length, 1);
 });
 
-test('counter-example (read-only): selection mode and AIM draw the look but give no menu, handle, drag or conversion', async () => {
-  for (const mode of ['selection', 'aim']) {
+test('counter-example (read-only): selection mode draws the look but give no menu, handle, drag or conversion', async () => {
+  for (const mode of ['selection']) {
     const h = await harness([annotated({ note: 'n' }), image({ id: 'img2', x: 400 })]);
     if (mode === 'selection') h.view.selection.toggleMultiSelect();
-    else h.view.aimLive = () => true;
     h.view.render();
     const els = findAll(h.view.stageEl, i => i.hasClass('vam-canvas-image'));
     assert.ok(els[0].hasClass('is-annotated'), mode);
@@ -637,11 +636,10 @@ test('delete: Delete or Backspace on an anchor removes it and its relations only
   }
 });
 
-test('counter-example (read-only): selection mode and AIM draw anchors and tooltips but cannot place, edit or delete', async () => {
-  for (const mode of ['selection', 'aim']) {
+test('counter-example (read-only): selection mode draws anchors and tooltips but cannot place, edit or delete', async () => {
+  for (const mode of ['selection']) {
     const h = await harness([annotated({ note: 'n', anchors: [at('a1', 0.5, 0.5, 'x')] })]);
     if (mode === 'selection') h.view.selection.toggleMultiSelect();
-    else h.view.aimLive = () => true;
     h.view.render();
     const [a] = anchorsOf(h.imageEl());
     assert.ok(a, mode);
@@ -1052,11 +1050,10 @@ test('counter-example (destructive): Delete anchor removes only that anchor and 
   assert.deepEqual(await h.onDisk(), before);
 });
 
-test('counter-example (read-only): right-click on an anchor in selection mode or AIM opens no menu and changes nothing', async () => {
-  for (const mode of ['selection', 'aim']) {
+test('counter-example (read-only): right-click on an anchor in selection mode opens no menu and changes nothing', async () => {
+  for (const mode of ['selection']) {
     const h = await harness(withRelations);
     if (mode === 'selection') h.view.selection.toggleMultiSelect();
-    else h.view.aimLive = () => true;
     h.view.render();
     const before = h.fileText();
     assert.equal(anchorMenu(h), null, mode);
@@ -1234,13 +1231,12 @@ test('counter-example (out of range): dragging past the picture clamps the ancho
   assert.deepEqual(await h.anchorOnDisk(), { kind: 'image-2d', x: 1, y: 0 });
 });
 
-test('counter-example (read-only): selection mode and AIM anchors have no drag, no grab class and write nothing', async () => {
-  for (const mode of ['selection', 'aim']) {
+test('counter-example (read-only): selection-mode anchors have no drag, no grab class and write nothing', async () => {
+  for (const mode of ['selection']) {
     const h = await harness([annotated({ anchors: [at('a1', 0.5, 0.5)] })]);
     h.doc = element('div');
     h.view.contentEl.ownerDocument = h.doc;
     if (mode === 'selection') h.view.selection.toggleMultiSelect();
-    else h.view.aimLive = () => true;
     h.view.render();
     h.imageEl().getBoundingClientRect = () => ({ left: 1000, top: 500, width: 200, height: 100 });
     const [dot] = anchorsOf(h.imageEl());

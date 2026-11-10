@@ -7,7 +7,6 @@ import {
   type NoteLanguage,
   type ContentLanguage
 } from "../i18n";
-import type { AiResult } from "./types";
 import { fencedLines } from "./markdown-blocks";
 import { NEW_STANDARD_HEADING_KEYS } from "./section-aliases";
 import {
@@ -58,15 +57,6 @@ export function truncateSummary(value: string, limit = 80): string {
   for (let index = window.length - 1; index >= 0 && prefix[index] >= floor && gap < 0; index--)
     if (/\s/.test(window[index])) gap = index;
   return `${(gap >= 0 ? window.slice(0, gap) : window).join("").trimEnd()}…`;
-}
-
-const LEGACY_SEARCH_FAILURE = /\bresearch status\s*:\s*(?:not searched|search failed|unavailable)\b/i;
-
-/** A searched report is unusable when its structured status says no search succeeded; legacy wording is consulted only without one. */
-export function reportedSearchFailure(result: Pick<AiResult, "summary" | "detail" | "searchStatus">): boolean {
-  // A completed report may still mention one unavailable source or subtask in its narrative.
-  if (result.searchStatus !== undefined) return result.searchStatus !== "completed";
-  return LEGACY_SEARCH_FAILURE.test(`${result.summary}\n${result.detail}`);
 }
 
 /**
@@ -129,10 +119,10 @@ export function normalizeOutputScriptHeadings(
   detail: string,
   output: ContentLanguage,
   template?: Pick<DetailTemplate, "id">,
-  context: { detailFormat?: string; promptProfile?: string } = {}
+  context: { detailFormat?: string } = {}
 ): string {
-  // Adaptive and AIM details have no fixed template: their headings are the model's own choice and stay as written.
-  if (context.detailFormat === "adaptive" || context.promptProfile === "aim") return detail;
+  // Adaptive details have no fixed template: their headings are the model's own choice and stay as written.
+  if (context.detailFormat === "adaptive") return detail;
   if (!verbatimHeadingLanguage(output) || (template && !isBuiltinTemplateId(template.id))) return detail;
   const note = noteLanguageOf(output);
   const forms = new Map<string, string>();

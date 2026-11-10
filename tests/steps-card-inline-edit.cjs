@@ -180,10 +180,9 @@ test('negative: a press elsewhere on the card, with Cmd/Ctrl held, or on a butto
   assert.equal(nothingOpen(h, 'leaf'), true);
 });
 
-test('negative: presentation, selection mode and a live AIM map never open a field from a click, F2 or the command', async () => {
-  for (const mode of ['presentation', 'select', 'aim']) {
+test('negative: presentation and selection mode never open a field from a click, F2 or the command', async () => {
+  for (const mode of ['presentation', 'select']) {
     const h = await harness(); await withSummary(h, 'leaf', 'some summary');
-    if (mode === 'aim') h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
     if (mode === 'select') setSelection(h.view, true);
     if (mode === 'presentation') { h.view.selection.setSelected(h.ids.root); h.view.startPresentation(); }
     h.build(); place(h, 'leaf');

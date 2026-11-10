@@ -490,7 +490,7 @@ function page() {
 }
 
 /** A trimmed copy of the map-chat harness: the real view and repository, a fake render() that repaints the overlay like render() does. */
-async function harness({ aim = false } = {}) {
+async function harness() {
   const { repo, app, files } = repoFixture('en');
   app.vault.configDir = '.obsidian';
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'claude:sonnet' };
@@ -532,7 +532,6 @@ async function harness({ aim = false } = {}) {
   const p = page();
   Object.assign(view, { path: MAP, contentEl: p.root, focusNode() {}, fit() {}, closed: false });
   view.map = await repo.readMap(MAP);
-  if (aim) view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
   const reload = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   view.hydrate = reload;
   let overlay = null;
@@ -571,7 +570,7 @@ const stubResearch = h => {
   return calls;
 };
 
-integrationTest('topic chat counterexample 7: openTopicChat does not open while notes load, in presentation, on AIM or on a locked topic', async () => {
+integrationTest('topic chat counterexample 7: openTopicChat does not open while notes load, in presentation or on a locked topic', async () => {
   const h = await harness();
   h.view.noteLoad = {}; h.view.openTopicChat(h.node('a')); assert.equal(h.win(), undefined, 'notes loading');
   h.view.noteLoad = null; h.view.presentation = {}; h.view.openTopicChat(h.node('a')); assert.equal(h.win(), undefined, 'presentation');
@@ -580,18 +579,11 @@ integrationTest('topic chat counterexample 7: openTopicChat does not open while 
   assert.equal(h.win(), undefined, 'AI lock'); assert.equal(h.notices.at(-1), t('ui.ai_locked_notice'));
   h.view.notes.get(h.ids.a).aiLocked = false; h.view.openTopicChat(h.node('a'));
   assert.ok(h.win(), 'a plain topic opens'); assert.ok(find(h.overlay(), i => hasClass(i, 'vam-topic-chat')), 'in the canvas overlay');
-  const aim = await harness({ aim: true });
-  aim.view.openTopicChat(aim.node('a')); assert.equal(aim.win(), undefined, 'AIM');
 });
 
-integrationTest('topic chat counterexample 7: AIM offers no AI explore on the card menu or the command; the plain map offers both', async () => {
+integrationTest('topic chat counterexample 7: the card menu and the command offer AI explore and open the topic chat', async () => {
   const item = () => { const it = { setTitle(title) { it.title = title; return it; }, setIcon() { return it; }, setSection() { return it; }, setDisabled() { return it; }, onClick(fn) { it.fn = fn; return it; } }; return it; };
   const menuOf = (h) => { const items = []; return { items, menu: { addItem(cb) { const it = item(); cb(it); items.push(it); return this; }, addSeparator() { return this; } } }; };
-  const aim = await harness({ aim: true });
-  const a = menuOf(aim); aim.view.addCardMenuActions(a.menu, aim.node('a'));
-  assert.equal(a.items.some(i => i.title === t('ui.ai_explore')), false, 'no menu entry on AIM');
-  aim.view.selection.setSelected(aim.ids.a);
-  assert.equal(aim.view.mapCommand('ai-explore', true), false, 'no command on AIM');
   const h = await harness();
   const m = menuOf(h); h.view.addCardMenuActions(m.menu, h.node('a'));
   const entry = m.items.find(i => i.title === t('ui.ai_explore'));
@@ -1591,7 +1583,6 @@ const outcomes = [
   ['declined usage question', { hook: h => { h.control.decline = true; }, notice: true }],
   ['AI lock', { hook: h => { h.view.aiLockReason = () => ({}); }, notice: true }],
   ['busy card', { hook: h => { h.plugin.quickExpandPending.add(h.node('a').path); }, notice: true }],
-  ['AIM', { hook: h => { h.view.aimLive = () => true; }, notice: true }],
   ['presentation', { hook: h => { h.view.presentation = {}; }, notice: true }],
   ['deleted card', { hook: h => { h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.a); }, notice: true }],
   ['view closed', { hook: h => { h.view.closed = true; }, notice: false }],

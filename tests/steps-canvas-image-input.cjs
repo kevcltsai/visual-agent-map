@@ -21,7 +21,7 @@ const png = (w = 400, h = 200, extra = 0) => {
 };
 const file = (data, { type = 'image/png', name = 'pic.png' } = {}) => ({ name, type, size: data.byteLength, arrayBuffer: async () => data });
 
-async function harness({ aim = false, integration = false, attachmentSetting = MEDIA } = {}) {
+async function harness({ integration = false, attachmentSetting = MEDIA } = {}) {
   const { repo, app, contents, files } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -66,7 +66,6 @@ async function harness({ aim = false, integration = false, attachmentSetting = M
   view.viewportEl = element('div');
   view.viewportEl.getBoundingClientRect = () => ({ left: 10, top: 5, right: 810, bottom: 605, width: 800, height: 600 });
   view.viewportEl.clientWidth = 800; view.viewportEl.clientHeight = 600;
-  if (aim) view.map.aim = { version: 1 };
   if (integration) view.selection.toggleMultiSelect();
   view.focusNode = () => {}; view.openDetails = () => {};
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
@@ -189,8 +188,8 @@ test('dragover accepts only files on a map that can be edited', async () => {
   assert.equal(text.defaultPrevented, false, 'plain text is not ours');
 });
 
-test('D11: AIM and topic selection mode register no entry; a normal map registers all of them', async () => {
-  for (const [name, options] of [['aim', { aim: true }], ['integration', { integration: true }]]) {
+test('D11: topic selection mode registers no entry; a normal map registers all of them', async () => {
+  for (const [name, options] of [['integration', { integration: true }]]) {
     const h = await harness(options);
     h.view.setupCanvasImageInput();
     assert.deepEqual(Object.keys(h.view.viewportEl.listeners), [], name);

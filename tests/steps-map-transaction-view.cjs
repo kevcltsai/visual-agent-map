@@ -416,24 +416,3 @@ test('X11: undo of a copy whose Map.md write and restore both fail reports rollb
   assert.equal(h.contents.get(MAP), after, 'Map.md is the state after the copy');
   assert.equal(h.view.history.canUndo, true, 'pointer restored');
 });
-
-test('X12: AIM removeSelected of a removable question branch: undo brings the branch back', async () => {
-  const h = await branchHarness();
-  const doc = await h.repo.readMap(MAP);
-  doc.nodes.find(n => n.id === h.ids.child).aimKind = 'question';
-  doc.aim = {
-    version: 1,
-    branches: [{ id: 'b1', questionNodeId: h.ids.child, parentBranchId: null, answerSnapshot: { selections: [], freeText: '' }, inputSnapshot: { topic: 't', conditions: {}, upstreamResults: [] }, createdAt: '2026-01-01T00:00:00.000Z', results: [] }],
-    runs: [],
-    pendingCommits: []
-  };
-  await h.repo.saveMap(MAP, doc);
-  h.view.map = await h.repo.readMap(MAP);
-  await h.view.hydrate();
-  const original = JSON.stringify(h.view.map.aim);
-  await removeBranch(h, h.ids.child);
-  assert.equal(h.view.map.aim.branches.length, 0);
-  await h.view.travel(false);
-  assert.equal(JSON.stringify(h.view.map.aim), original);
-  assert.equal(h.view.map.nodes.length, 4);
-});

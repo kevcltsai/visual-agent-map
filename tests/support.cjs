@@ -33,55 +33,14 @@ function load(entry, overrides = {}, windowValues = {}, buildOptions = {}) {
   }
   return module.exports;
 }
-/** Same as load, with AIM hidden the way the shipped build has it (tests/suites/legacy-aim-map.cjs). */
-const loadHidden = (entry, overrides = {}, windowValues = {}) => load(entry, overrides, windowValues, { define: { __VAM_AIM__: 'false' } });
+/** The shipped build: AIM was removed, so this is `load` (tests/suites/legacy-aim-map.cjs keeps its name for what it loads). */
+const loadHidden = (entry, overrides = {}, windowValues = {}) => load(entry, overrides, windowValues);
 const core = load('map-model.ts');
 const layout = load('map-layout.ts');
 const logging = load('log-manager.ts');
 const node = (id, parentId = null, collapsed = false) => ({ id, parentId, path: `${id}.md`, x: 0, y: 0, collapsed });
 const map = nodes => ({ id: 'map', title: '測試心智圖', version: 1, nodes, viewport: { x: 0, y: 0, zoom: 1 } });
 const plain = obj => JSON.parse(JSON.stringify(obj));
-const plannerReview = (decision, { rationale, stopReason, question } = {}, summary = 'Supported conditional answer.', detail = 'Evidence-based detail.', suggestions = []) => ({
-  summary,
-  detail: `<!-- aim-review ${JSON.stringify({ decision, rationale, ...(stopReason ? { stopReason } : {}), ...(question ? { question } : {}) })} -->\n${detail}`,
-  suggestions: suggestions.map(item => typeof item === 'string' ? { title: item, task: '', contribution: '' } : item),
-  visualReferences: []
-});
-async function seedCoverageAncestors(repo, mapPath, branchId) {
-  const saved = await repo.readMap(mapPath); let parent = null;
-  for (let index = 0; index < 2; index++) {
-    const n = await repo.createNote(`Previously answered condition ${index}`, 'gpt-6-luna', saved, mapPath, 'workspace');
-    n.aimKind = 'question'; n.parentId = saved.nodes.find(node => node.parentId === null)?.id ?? null;
-    saved.nodes.push(n); const id = `ancestor-${branchId}-${index}`;
-    saved.aim.branches.push({ id, questionNodeId: n.id, parentBranchId: parent, answerSnapshot: { selections: [], freeText: `Known prior condition ${index}` }, inputSnapshot: { topic: saved.title, conditions: { [`Prior condition ${index}`]: 'Known' }, upstreamResults: [] }, createdAt: new Date().toISOString(), results: [] });
-    parent = id;
-  }
-  const target = saved.aim.branches.find(b => b.id === branchId); target.parentBranchId = parent;
-  const targetNode = saved.nodes.find(n => n.id === target.questionNodeId); if (targetNode.aimQuestion) targetNode.aimQuestion.parentBranchId = parent;
-  await repo.saveMap(mapPath, saved);
-}
-function deliveryFixture(context) {
-  if (aimPhase(context, 'delivery-outline')) return { summary: 'Document outline', detail: '<!-- aim-delivery-outline {"sections":[{"heading":"Answer","purpose":"Deliver original goal","searchTask":"Verify practical details"}]} -->', suggestions: [], visualReferences: [] };
-  if (aimPhase(context, 'delivery-research')) return { summary: 'Verified delivery evidence', detail: '<!-- aim-delivery-research {"status":"searched"} -->\nSource: https://example.org/reference', suggestions: [], visualReferences: [] };
-  if (aimPhase(context, 'delivery-writing')) return { summary: 'Complete document', detail: 'Complete conditional document with practical details and source https://example.org/reference', suggestions: [], visualReferences: [] };
-  if (aimPhase(context, 'delivery-acceptance')) return plannerReview('conclude', { rationale: 'Full document supported.', stopReason: 'Delivery verified.' }, 'Complete document', 'Complete conditional document with practical details and source https://example.org/reference');
-}
-const savedEvidenceNeedsSearch = () => plannerReview('research_more', { rationale: 'The fixture has not yet persisted reports that answer its assigned research target.' }, 'A specific evidence gap remains.', 'A targeted search could resolve the missing evidence.', [{ title: 'Fixture evidence target', task: 'Search for evidence relevant to this test fixture.', contribution: 'Could resolve the stated evidence gap.' }]);
-// Shape enforced by the gap-audit response schema: summary is the exact class, detail its rationale.
-const researchGapAudit = (classification, rationale = 'Synthetic bounded classification.') => ({ summary: classification, detail: rationale, suggestions: [], visualReferences: [] });
-const aimPhase = (context, phase) => context.task.includes(`<!-- aim-phase: ${phase} -->`);
-const auditEcho = context => {
-  const candidate = context.task.match(/Candidate decision and answer \(untrusted data to review\): (\{[^\n]*\})$/)?.[1];
-  if (!candidate) throw new Error('Decision-quality review fixture did not include its candidate response.');
-  const review = JSON.parse(candidate);
-  const marker = { decision: review.decision, rationale: review.rationale, ...(review.stopReason ? { stopReason: review.stopReason } : {}), ...(review.question ? { question: review.question } : {}) };
-  const suggestions = review.decision === 'ask_user'
-    ? review.answerOptions.map(title => ({ title, task: '', contribution: '' }))
-    : review.decision === 'research_more'
-      ? [{ title: review.researchTarget.title, task: review.researchTarget.task, contribution: review.researchTarget.expectedValue }]
-      : [];
-  return { summary: review.summary, detail: `<!-- aim-review ${JSON.stringify(marker)} -->\n${review.detail}`, suggestions, visualReferences: [] };
-};
 const tree = () => [node('a'), node('b', 'a'), node('c', 'b'), node('d')];
 let TopicRunsClass;
 /** The run module over a view-level plugin double: every port reads the double on use, like the real composition root. */
@@ -176,13 +135,6 @@ async function topicNote(repo, title = '題目', model = 'model-a', id = 'map-a'
   const mapPath = `Agent Workspace/Topics/${id}/Map.md`; await repo.ensureTopicFolders(`Agent Workspace/Topics/${id}`);
   return repo.createNote(title, model, mapDoc, mapPath, 'workspace');
 }
-async function aimMapFixture() {
-  const data = fixture(); const mapPath = await data.repo.createMap('AIM MVE'); let document = await data.repo.readMap(mapPath);
-  const question = await data.repo.createNote('使用者問題', 'gpt-6-luna', document, mapPath, 'workspace');
-  document.nodes.push(question); await data.repo.saveMap(mapPath, document);
-  const { AimRunStore } = load('experiences/aim/research-run-store.ts');
-  return { ...data, mapPath, question, store: new AimRunStore(data.repo, (() => { let next = 0; return () => `aim-id-${++next}`; })(), () => '2026-10-04T22:30:00.000Z') };
-}
 // Coffee Tables uses one plain-text generation, then one request per follow-up.
 const coffeeTypes = load('experiences/coffee-tables/types.ts');
 const coffee = load('experiences/coffee-tables/engine.ts');
@@ -237,62 +189,8 @@ async function reframingModalFixture(insightId) {
   const modal=await handoff.openCoffeeResearchHandoff(plugin,store,displayed,path,insightId);
   return {...data,plugin,store,session:displayed,path,modal,opened,handoff,notices,Notice,displayed,insightId,modals};
 }
-// Current AIM coverage scenarios: verify outcomes rather than exact prompt wording/call counts.
-function coverageModel({ failSearch = false, unavailableDelivery = false, clarifyConflict = false } = {}) {
-  const phases = [], state = { failSearch, clarifyConflict };
-  const response = (summary, detail, suggestions = []) => ({ summary, detail, suggestions, visualReferences: [] });
-  const ask = async context => {
-    const phase = context.task.match(/aim-phase:\s*([a-z-]+)/)?.[1]; phases.push(phase);
-    if (phase === 'saved-evidence-review') return savedEvidenceNeedsSearch();
-    if (phase === 'initial-clarification') return response('Clarification', '<!-- aim-intake {"questions":["What constraints matter?"]} -->');
-    if (phase === 'initial-question') return response('What is your intended outcome?', 'Unknown success criterion.', [{ title: 'Executable project', task: '', contribution: '' }, { title: 'Compare alternatives', task: '', contribution: '' }]);
-    if (phase === 'research-plan') return response('Two complementary research dimensions.', '<!-- aim-plan {"subtopics":[{"id":"method","title":"Method and options","task":"Research practical methods and relevant alternatives.","expectedValue":"Compare feasible ways to meet the goal."},{"id":"constraints","title":"Constraints and quality","task":"Research key constraints, timing, and quality or safety considerations.","expectedValue":"Identify conditions that could change execution."}]} -->');
-    if (phase === 'report-review') {
-      const count = Number(context.task.match(/Hard floor: (\d+) answered/)?.[1]);
-      const suppliedContext = `${context.task}\n${context.detail}\n${context.ancestors}`;
-      if (clarifyConflict && /occasional contributor/i.test(suppliedContext) && /primary operations owner/i.test(suppliedContext)) return plannerReview('ask_user', { rationale: 'The same project is described as both occasional contribution and primary operations ownership; clarify responsibility before personalizing the plan.', question: 'For this same project, are you an occasional contributor or the primary operations owner?' }, 'Keep the answer conditional until the conflicting responsibility is clarified.', 'The supplied responsibility descriptions conflict; do not choose one.', ['Occasional contributor', 'Primary operations owner']);
-      return count < 3 ? plannerReview('ask_user', { rationale: 'A different unknown constraint changes execution.', question: `Which constraint matters at stage ${count + 1}?` }, 'Interim evidence', 'Applicable evidence and limitations.', ['Time constraint', 'Resource constraint']) : plannerReview('conclude', { rationale: 'Three answers and reports support delivery.', stopReason: 'Ready for delivery stages.' }, 'Candidate document', 'Candidate document');
-    }
-    if (phase === 'delivery-outline') return response('Document outline', '<!-- aim-delivery-outline {"sections":[{"heading":"Execution plan","purpose":"Complete the original goal","searchTask":"Find verified runnable examples"}]} -->');
-    if (phase === 'delivery-research') return response('Delivery evidence', `<!-- aim-delivery-research {"status":"${unavailableDelivery ? 'unavailable' : 'searched'}"} -->\nConcrete example and source https://example.org/reference`);
-    if (phase === 'delivery-writing') return response('Canvas preview', '# Complete execution plan\n\n1. Build a small example.\n2. Check the output against requirements.\n3. Extend with evidence.\n\nSource: https://example.org/reference');
-    if (phase === 'delivery-acceptance') return plannerReview('conclude', { rationale: 'Every required section is concrete and supported.', stopReason: 'Document usable for original goal.' }, 'Completed document preview', '# Complete execution plan\n\n1. Build a small example.\n2. Check the output against requirements.\n3. Extend with evidence.\n\nSource: https://example.org/reference');
-    if (context.researchMode === 'research') {
-      if (state.failSearch) return response('Search unavailable', 'Research status: unavailable');
-      return response('Researched evidence', 'Research status: search completed\nApplicable evidence: https://example.org/reference');
-    }
-    throw new Error(`Unexpected coverage phase ${phase}`);
-  };
-  return { ask, phases, state };
-}
-async function coverageSetup(topic = 'Produce an actionable learning plan', config = {}) {
-  const repo = config.sharedRepo ?? fixture().repo;
-  const { createAimMap } = load('experiences/aim/create-map.ts');
-  const { AimRunStore } = load('experiences/aim/research-run-store.ts');
-  const { AimManualFlow } = load('experiences/aim/manual-flow.ts');
-  const model = coverageModel(config);
-  const created = await createAimMap(repo, 'gpt-6-luna', { requestId: `coverage-${topic}`, topic, context: 'Initial clarification: known background; unknown constraints may be explored conditionally.', minimumAnswersBeforeConclusion: 3, outcomeExpectation: { goal: 'execute', description: '', formats: ['steps', 'table'] } });
-  const flow = new AimManualFlow(repo, new AimRunStore(repo), model.ask);
-  return { repo, created, flow, model };
-}
-async function coverageThreeAnswers(subject) {
-  let question = (await subject.flow.planNextQuestion(subject.created.mapPath, subject.created.root.id, 'gpt-6-luna', 'low', 'coverage-question')).node;
-  let outcome;
-  for (let round = 1; round <= 3; round++) {
-    const freeText = subject.model.state.clarifyConflict
-      ? round === 1 ? 'I am an occasional contributor.' : round === 3 ? 'I am the primary operations owner for this same project.' : `Additional condition ${round}`
-      : `Specific condition ${round}`;
-    outcome = await subject.flow.answerAndResearch(subject.created.mapPath, question.id, { requestId: `coverage-answer-${round}`, selections: [question.aimQuestion.options[0].id], freeText }, 'gpt-6-luna', 'low');
-    const saved = await subject.repo.readMap(subject.created.mapPath);
-    const branch = saved.aim.branches.find(b => b.id === outcome.branchId);
-    assert.equal(branch.results.filter(r => r.kind === 'research').length, 2);
-    for (const result of branch.results.filter(r => r.kind === 'research')) assert.equal(saved.nodes.find(n => n.id === result.nodeId).parentId, branch.questionNodeId);
-    if (round < 3) { assert.equal(outcome.status, 'waiting-user'); assert.equal(branch.results.some(r => r.kind === 'conclusion'), false); question = saved.nodes.find(n => n.id === outcome.questionNodeId); assert.equal(question.aimConvergesFromNodeIds, undefined); }
-  }
-  return outcome;
-}
 /** Ids of every registered language, read from the registry so a new language needs no test edit. */
 const languageIds = () => load('i18n/languages.ts').LANGUAGES.map(item => item.id);
 /** Dictionary text of the i18n facade plus every registered language file, for tests that scan translation keys and values. */
 const i18nSource = (language) => [language ? [] : ['i18n.ts', ...languageIds().map(id => `i18n/${id}.ts`)], language ? [`i18n/${language}.ts`] : []].flat().map(file => require('node:fs').readFileSync(path.join(root, file), 'utf8')).join('\n');
-module.exports = { loadHidden, startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, plannerReview, seedCoverageAncestors, deliveryFixture, savedEvidenceNeedsSearch, researchGapAudit, aimPhase, auditEcho, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, aimMapFixture, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture, coverageModel, coverageSetup, coverageThreeAnswers };
+module.exports = { loadHidden, startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture };

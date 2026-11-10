@@ -4,8 +4,11 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { promptsFor, makeService } = require('./support-replay.cjs');
 const support = require('./support.cjs');
-const { load, obsidian } = support;
 
+// The open-items marker an old AIM conclusion note carries (written by the removed AIM engine); the repository still keeps it
+// after the Detail block and reads it back, so these helpers rebuild the saved format here.
+const openItemsMarker = titles => `<!-- aim-open-items ${JSON.stringify(titles).replace(/>/g, '\\u003e')} -->`;
+const readOpenItems = detail => { const marker = detail.match(/<!--\s*aim-open-items\s+(\[[^\n]*\])\s*-->/); return marker ? JSON.parse(marker[1]) : []; };
 const reply = detail => JSON.stringify({ summary: 'S', detail, suggestions: [], visualReferences: [] });
 const ask = async (context, detail) => {
   const runtime = { runTask: async () => reply(detail) };
@@ -16,10 +19,8 @@ test('P1-b: reader-facing detail headings start at ### and never skip a level', 
   const written = '## Route overview\n\ntext\n\n#### Meals\n\n- a\n\n```md\n## not a heading\n```\n\n## Checklist\n\n###### Deep';
   const expected = '### Route overview\n\ntext\n\n#### Meals\n\n- a\n\n```md\n## not a heading\n```\n\n### Checklist\n\n#### Deep';
   assert.equal((await ask({ mode: undefined, detailFormat: 'adaptive' }, written)).detail, expected);
-  assert.equal((await ask({ mode: 'task', promptProfile: 'aim', task: '<!-- aim-phase: delivery-writing -->\nWrite.', detailFormat: 'adaptive' }, written)).detail, expected);
   assert.equal((await ask({ mode: undefined, detailFormat: 'adaptive' }, '# Title\n\n## Part\n\n### Sub')).detail, '### Title\n\n#### Part\n\n##### Sub');
-  // Machine-read structures of control phases keep their headings.
-  assert.equal((await ask({ mode: 'task', promptProfile: 'aim', task: '<!-- aim-phase: delivery-outline -->\nOutline.' }, written)).detail, written);
+  // Machine-read structures keep their headings.
   assert.equal((await ask({ mode: 'decompose' }, written)).detail, written);
 });
 
@@ -30,14 +31,7 @@ test('P0/P1-b: reader-facing prompts forbid internal IDs and review comments and
   }
 });
 
-test('P0: an AIM delivery task asks for ### section headings', () => {
-  const { renderWritingTask } = load('experiences/aim/steps/delivery-writing/step.ts');
-  const task = renderWritingTask({ outline: 'A; B', knownConditions: 'C', evidence: 'E' });
-  assert.match(task, /each section heading as a ### heading/);
-});
-
-test('P0: the open items marker is kept outside the Detail block and still read back', async () => {
-  const { openItemsMarker, readOpenItems } = load('experiences/aim/manual-flow.ts', { obsidian });
+test('P0: an old AIM note\'s open items marker is kept outside the Detail block and still read back', async () => {
   const { repo, contents } = support.fixture('en');
   const note = await support.topicNote(repo);
   await repo.updateNote(note.path, { detail: `### Answer\n\nBody.\n\n${openItemsMarker(['Budget'])}` });
@@ -70,18 +64,6 @@ test('P1-a: summary, then Preview, then Detail, then Prompt; an empty Prompt is 
   assert.ok(at('^> \\[!info\\]- Prompt$') > at('^## Detail'), 'a Prompt with text comes after Detail');
   assert.ok(at('^> \\[!info\\]- Preview$') < at('^## Detail') && at('^## Detail') < at('^> \\[!info\\]- Prompt$'), 'Preview, Detail, Prompt');
   assert.equal((await repo.readNote(note.path)).prompt, 'Research the route.');
-});
-
-test('P0: the rejected-document warning lists what to fix in reader wording, without internal IDs', () => {
-  const { rejectedDeliveryWarning } = load('experiences/aim/rejected-warning.ts');
-  const zh = rejectedDeliveryWarning(['高雄鹽埕／鼓山一帶單人住宿候選', '依 9a7207f4-…-v3、64442f66-…-v5 補租車規定', '高雄鹽埕／鼓山一帶單人住宿候選'], 'zh-TW');
-  assert.match(zh, /^> \[!warning\] 這份文件未通過最終審查\n/);
-  assert.match(zh, /^> - 高雄鹽埕／鼓山一帶單人住宿候選$/m);
-  assert.match(zh, /^> - 依 補租車規定$|^> - 補租車規定$/m);
-  assert.equal((zh.match(/高雄鹽埕/g) ?? []).length, 1, 'each item once');
-  assert.ok(!/[0-9a-f]{8}-/.test(zh), 'no internal IDs');
-  assert.match(rejectedDeliveryWarning(['Commute'], 'en'), /^> \[!warning\] This document did not pass the final review\n(?:>.*\n)*> - Commute$/);
-  assert.equal(rejectedDeliveryWarning([], 'en'), '');
 });
 
 // P1-a (owner decisions 2026-10-15 and 2026-10-19): Preview and Prompt are collapsed callouts; Preview follows the
@@ -202,7 +184,6 @@ test('P1-a (2026-10-19): an answer-first note with Preview after Detail moves Pr
 });
 
 test('P0 (2026-10-19): the open items marker survives with Preview before Detail and a Prompt after it', async () => {
-  const { openItemsMarker, readOpenItems } = load('experiences/aim/manual-flow.ts', { obsidian });
   const { repo, contents } = support.fixture('en');
   const note = await support.topicNote(repo);
   await repo.updateNote(note.path, { summary: 'S.', prompt: 'Task.', detail: `### Answer\n\nBody.\n\n${openItemsMarker(['Budget'])}` });

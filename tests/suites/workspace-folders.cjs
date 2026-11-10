@@ -1,10 +1,17 @@
 const assert = require('node:assert/strict');
 const { integrationTest, load, core, map, plain, obsidian, fixture, DEFAULT_SETTINGS, TFile } = require('../support.cjs');
 const repository = load('repository.ts', { obsidian });
-const { createAimMap } = load('experiences/aim/create-map.ts');
-const newAim = async (repo, topic) => (await createAimMap(repo, 'gpt-6-luna', { requestId: `req-${topic}`, topic, context: '' })).mapPath;
+/** An old AIM map, made by hand (AIM was removed): a plain map with an `aim` block, moved into the aimFolder container. */
+const newAim = async (repo, topic) => {
+  const created = await repo.createMap(topic);
+  const doc = await repo.readMap(created);
+  doc.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
+  await repo.saveMap(created, doc);
+  await repo.folder(repo.settings.aimFolder);
+  return repo.renameTopic(created, topic, `${repo.settings.aimFolder}/${topic}`);
+};
 
-integrationTest('new mind maps are created in Mind Maps and new AIM maps in AIM; Topics is untouched', async () => {
+integrationTest('new mind maps are created in Mind Maps and an old AIM map is listed from AIM; Topics is untouched', async () => {
   const { repo, app } = fixture('en');
   const mind = await repo.createMap('Plain topic');
   const aimPath = await newAim(repo, 'Research topic');
@@ -99,11 +106,10 @@ integrationTest('a pre-0.4 map outside every container opens and reads, but rena
 });
 
 // ---- Organize workspace folders -------------------------------------------------------------------------------
-const { AimRunStore } = load('experiences/aim/research-run-store.ts');
 const LEGACY = 'Agent Workspace/Topics';
 const bodyOf = (title, links) => `\n# ${title}\n\n## Detail\n\n${links}\n`;
 
-/** A 0.18-style vault: legacy Topics holds two mind maps and one AIM map; an unfiled VAM note cites a moved note. */
+/** A 0.18-style vault: legacy Topics holds three mind maps; an unfiled VAM note cites a moved note. */
 async function legacyVault(writtenIn = 'en', uiLanguage = writtenIn) {
   const data = fixture(writtenIn);
   const { repo, app } = data;
@@ -122,7 +128,9 @@ async function legacyVault(writtenIn = 'en', uiLanguage = writtenIn) {
   };
   const alpha = await toLegacy(await repo.createMap('Alpha'), 'Alpha'); await addNotes(alpha);
   const beta = await toLegacy(await repo.createMap('Beta'), 'Beta'); await addNotes(beta);
-  const gammaCreated = (await createAimMap(repo, 'gpt-6-luna', { requestId: 'req-gamma', topic: 'Gamma', context: '' })).mapPath;
+  // Gamma was an AIM map when AIM existed; it is a plain map now (AIM was removed; an old AIM map stays where it is, see
+  // tests/suites/legacy-aim-map.cjs E5 and the dedicated tests below).
+  const gammaCreated = await repo.createMap('Gamma');
   const gamma = await toLegacy(gammaCreated, 'Gamma');
   const aimDoc = await repo.readMap(gamma);
   const question = await repo.createNote('Question', 'gpt-6-luna', aimDoc, gamma, 'workspace');
@@ -169,18 +177,18 @@ integrationTest('Organize previews first and writes nothing until it runs', asyn
   const before = snapshot(vault);
   const plan = await vault.repo.planOrganizeWorkspaceFolders();
   assert.deepEqual(plain(plan.moves.map(move => [move.title, move.kind, move.toRoot])), [
-    ['Alpha', 'mind', 'Agent Workspace/Mind Maps/Alpha'], ['Beta', 'mind', 'Agent Workspace/Mind Maps/Beta'], ['Gamma', 'aim', 'Agent Workspace/AIM/Gamma']
+    ['Alpha', 'mind', 'Agent Workspace/Mind Maps/Alpha'], ['Beta', 'mind', 'Agent Workspace/Mind Maps/Beta'], ['Gamma', 'mind', 'Agent Workspace/Mind Maps/Gamma']
   ]);
-  assert.deepEqual(plain(plan.skipped), []); assert.deepEqual(plain(plan.busy), []);
+  assert.deepEqual(plain(plan.skipped), []); assert.equal('busy' in plan, false, 'no AIM attempt can be active: the plan has no busy list');
   assertUnchanged(vault, before, 'planning');
 });
 
-integrationTest('Organize moves mind maps to Mind Maps and AIM to AIM; every map opens, links and cited paths resolve; a second run is a no-op', async () => {
+integrationTest('Organize moves mind maps to Mind Maps; every map opens, links and cited paths resolve; a second run is a no-op', async () => {
   const vault = await legacyVault();
   const { repo, app } = vault;
   const mapping = await repo.organizeWorkspaceFolders(await repo.planOrganizeWorkspaceFolders());
   assert.deepEqual(plain([...mapping.entries()].sort()), [
-    [vault.paths.alpha, 'Agent Workspace/Mind Maps/Alpha/Map.md'], [vault.paths.beta, 'Agent Workspace/Mind Maps/Beta/Map.md'], [vault.paths.gamma, 'Agent Workspace/AIM/Gamma/Map.md']
+    [vault.paths.alpha, 'Agent Workspace/Mind Maps/Alpha/Map.md'], [vault.paths.beta, 'Agent Workspace/Mind Maps/Beta/Map.md'], [vault.paths.gamma, 'Agent Workspace/Mind Maps/Gamma/Map.md']
   ].sort());
   for (const next of mapping.values()) {
     const doc = await repo.readMap(next);
@@ -203,23 +211,6 @@ integrationTest('Organize keeps a clash-free name: an existing target folder get
   assert.equal(mapping.get(vault.paths.alpha), 'Agent Workspace/Mind Maps/Alpha 2/Map.md');
   assert.ok(vault.app.vault.getAbstractFileByPath('Agent Workspace/Mind Maps/Alpha/Map.md'), 'the pre-existing map is untouched');
   await assertResolves(vault);
-});
-
-integrationTest('Organize refuses the whole batch while an AIM attempt is running or saving, with zero moves', async () => {
-  const vault = await legacyVault();
-  const store = new AimRunStore(vault.repo);
-  const doc = await vault.repo.readMap(vault.paths.gamma);
-  const branch = await store.createAnswerBranch(vault.paths.gamma, { questionNodeId: doc.nodes.find(node => node.path.endsWith('Question.md')).id, parentBranchId: null, answerSnapshot: { selections: [], freeText: 'x' }, inputSnapshot: { topic: 'Gamma', conditions: {}, upstreamResults: [] } });
-  await store.startAttempt(vault.paths.gamma, branch.id, 'running-run');
-  const before = snapshot(vault);
-  const plan = await vault.repo.planOrganizeWorkspaceFolders();
-  assert.deepEqual(plain(plan.busy), ['Gamma']);
-  await assert.rejects(vault.repo.organizeWorkspaceFolders(plan), /still running or saving/);
-  assertUnchanged(vault, before, 'busy refusal');
-  // A plan made while idle is re-checked right before the first write.
-  const stale = { ...plan, busy: [] };
-  await assert.rejects(vault.repo.organizeWorkspaceFolders(stale), /still running or saving/);
-  assertUnchanged(vault, before, 'stale plan refusal');
 });
 
 integrationTest('Organize skips an unreadable map, leaves it and its notes byte-identical, and still moves the rest', async () => {
@@ -247,7 +238,7 @@ integrationTest('Organize restores every moved topic, path and content, when a l
   const plan = await repo.planOrganizeWorkspaceFolders();
   const before = snapshot(vault);
   const rename = app.fileManager.renameFile;
-  app.fileManager.renameFile = async (item, target) => { if (target.startsWith('Agent Workspace/AIM/')) throw new Error('injected move failure'); return rename(item, target); };
+  app.fileManager.renameFile = async (item, target) => { if (target.startsWith('Agent Workspace/Mind Maps/Gamma')) throw new Error('injected move failure'); return rename(item, target); };
   await assert.rejects(repo.organizeWorkspaceFolders(plan), /injected move failure/);
   app.fileManager.renameFile = rename;
   assertUnchanged(vault, before, 'after a failed third move');
@@ -272,7 +263,7 @@ integrationTest('Organize reports both errors when the rollback also fails', asy
   const plan = await repo.planOrganizeWorkspaceFolders();
   const rename = app.fileManager.renameFile;
   app.fileManager.renameFile = async (item, target) => {
-    if (target.startsWith('Agent Workspace/AIM/')) throw new Error('injected move failure');
+    if (target.startsWith('Agent Workspace/Mind Maps/Gamma')) throw new Error('injected move failure');
     if (target.startsWith(`${LEGACY}/`)) throw new Error('injected rollback failure');
     return rename(item, target);
   };
@@ -311,18 +302,18 @@ integrationTest('the Organize command is registered in both languages and writes
   const plugin = new Plugin();
   const relocated = [];
   Object.assign(plugin, { app: { ...vault.app, workspace: { requestSaveLayout() {}, getLeavesOfType: () => [] } }, repo: vault.repo, settings: vault.repo.settings });
-  plugin.views = () => [{ hasActiveAimWork: () => false, relocate: mapping => relocated.push(mapping), synchronize: async () => {} }];
+  plugin.views = () => [{ relocate: mapping => relocated.push(mapping), synchronize: async () => {} }];
   installTrash(vault);
   const before = snapshot(vault);
   await plugin.offerOrganizeWorkspaceFolders();
   assert.equal(opened.length, 1, 'a preview dialog opens');
   assert.match(opened[0].description, /Afterwards these folders are empty and are moved to the trash: Agent Workspace\/Topics\./);
-  assert.match(opened[0].description, /2 mind map\(s\) into Agent Workspace\/Mind Maps and 1 AIM map\(s\) into Agent Workspace\/AIM/);
+  assert.match(opened[0].description, /Move 3 mind map\(s\) into Agent Workspace\/Mind Maps\./);
   assertUnchanged(vault, before, 'preview only');
   opened[0].choices[0].action();
   await plugin.queue;
   assert.equal(relocated.length, 1); assert.equal(relocated[0].size, 3, 'open views follow the moved maps');
-  assert.ok(vault.app.vault.getAbstractFileByPath('Agent Workspace/AIM/Gamma/Map.md'));
+  assert.ok(vault.app.vault.getAbstractFileByPath('Agent Workspace/Mind Maps/Gamma/Map.md'));
   assert.deepEqual(notices, ['Organized 3 map(s). Moved the empty legacy folders to the trash: Agent Workspace/Topics.']);
   assert.match(opened[0].description, /Automatically update internal links/, 'the preview explains the wait and the per-map prompts');
   assert.deepEqual(progress.map(message => message.replace(/: .*/, '')), ['Moving 1/3', 'Moving 2/3', 'Moving 3/3', 'hidden'], 'one persistent progress notice, closed at the end');
@@ -331,20 +322,6 @@ integrationTest('the Organize command is registered in both languages and writes
   await plugin.offerOrganizeWorkspaceFolders();
   assert.deepEqual(notices, ['No maps in the legacy Topics folder need organizing.']);
   assert.equal(opened.length, 1, 'no dialog when there is nothing to do');
-});
-
-integrationTest('the Organize command refuses while an open view has AIM work running', async () => {
-  const vault = await legacyVault();
-  const notices = [], opened = [];
-  const fake = { ...obsidian, Notice: class { constructor(message) { notices.push(message); } }, Modal: class { open() { opened.push(this); } } };
-  const { default: Plugin } = load('main.ts', { obsidian: fake });
-  const plugin = new Plugin();
-  Object.assign(plugin, { app: vault.app, repo: vault.repo, settings: vault.repo.settings });
-  plugin.views = () => [{ hasActiveAimWork: path => path === vault.paths.gamma, synchronize: async () => {} }];
-  const before = snapshot(vault);
-  await plugin.offerOrganizeWorkspaceFolders();
-  assert.equal(opened.length, 0); assert.match(notices[0], /still running or saving/);
-  assertUnchanged(vault, before, 'busy open view');
 });
 
 // ---- Review fixes -----------------------------------------------------------------------------------------------
@@ -386,7 +363,7 @@ integrationTest('Organize skips maps when the target container is the legacy Top
   const vault = await legacyVault();
   vault.repo.settings.mindMapsFolder = vault.repo.settings.topicsFolder;
   const plan = await vault.repo.planOrganizeWorkspaceFolders();
-  assert.deepEqual(plain(plan.moves.map(move => move.title)), ['Gamma']);
+  assert.deepEqual(plain(plan.moves.map(move => move.title)), [], 'every map would land in Topics again, so none moves (AIM maps never move)');
 });
 
 integrationTest('replaying rename events after a rolled-back Organize rewrites no note', async () => {
@@ -402,7 +379,7 @@ integrationTest('replaying rename events after a rolled-back Organize rewrites n
   const plan = await repo.planOrganizeWorkspaceFolders();
   const before = snapshot(vault);
   const rename = app.fileManager.renameFile;
-  app.fileManager.renameFile = async (item, target) => { if (target.startsWith('Agent Workspace/AIM/')) throw new Error('injected move failure'); return rename(item, target); };
+  app.fileManager.renameFile = async (item, target) => { if (target.startsWith('Agent Workspace/Mind Maps/Gamma')) throw new Error('injected move failure'); return rename(item, target); };
   await assert.rejects(repo.organizeWorkspaceFolders(plan), /injected move failure/);
   app.fileManager.renameFile = rename;
   // Obsidian reports each moved file's rename after the fact; by now every file is back at its original path.
@@ -427,23 +404,25 @@ integrationTest('rediscovery uses the configured folder names, and an unowned no
   assert.ok(!/topic-state/.test(await app.vault.read(app.vault.getAbstractFileByPath(path))), 'no topic-state was written');
 });
 
-integrationTest('a folder-setting change moves every map with notes, cross-map citations and an AIM map; everything resolves', async () => {
+integrationTest('a folder-setting change moves every mind map with notes and cross-map citations; an old AIM map stays in its folder; everything resolves', async () => {
   const vault = await legacyVault();
   const { repo, app } = vault;
   app.vault.modify = async (file, content) => app.vault.process(file, () => content);
   const trashed = [];
   app.fileManager.trashFile = async folder => { trashed.push([folder.path, folder.children.length]); for (const key of [...vault.files.keys()]) if (key === folder.path) vault.files.delete(key); };
   await repo.organizeWorkspaceFolders(await repo.planOrganizeWorkspaceFolders());
+  const oldAim = await newAim(repo, 'Old research');
   const mind = await repo.changeMapFolder('mindMapsFolder', 'Agent Workspace/Ideas');
-  assert.deepEqual(Array.from(mind.values()).sort(), ['Agent Workspace/Ideas/Alpha/Map.md', 'Agent Workspace/Ideas/Beta/Map.md']);
+  assert.deepEqual(Array.from(mind.values()).sort(), ['Agent Workspace/Ideas/Alpha/Map.md', 'Agent Workspace/Ideas/Beta/Map.md', 'Agent Workspace/Ideas/Gamma/Map.md']);
   const aimMoved = await repo.changeMapFolder('aimFolder', 'Agent Workspace/Research');
-  assert.deepEqual(Array.from(aimMoved.values()), ['Agent Workspace/Research/Gamma/Map.md']);
+  assert.deepEqual(Array.from(aimMoved.values()), [], 'an old AIM map is not moved (AIM was removed)');
+  assert.ok(app.vault.getAbstractFileByPath(oldAim), 'the old AIM map stays where it was');
   assert.equal(repo.settings.mindMapsFolder, 'Agent Workspace/Ideas'); assert.equal(repo.settings.aimFolder, 'Agent Workspace/Research');
-  assert.deepEqual(trashed, [['Agent Workspace/Mind Maps', 0], ['Agent Workspace/AIM', 0]], 'only empty old folders are removed');
+  assert.deepEqual(trashed, [['Agent Workspace/Mind Maps', 0]], 'only empty old folders are removed: the AIM folder still holds its map');
   assert.deepEqual(plain((await repo.readNote(vault.cites)).sourcePaths), ['Agent Workspace/Ideas/Beta/Notes/First.md'], 'a note in another place follows');
   const second = await repo.readNote('Agent Workspace/Ideas/Alpha/Notes/Second.md');
   assert.deepEqual(plain(second.sourcePaths), ['Agent Workspace/Ideas/Alpha/Notes/First.md']);
-  for (const file of await repo.mapFiles()) assert.equal(repository.isManagedMapPath(repo.settings, file.path), true);
+  for (const file of (await repo.mapFiles()).filter(file => file.path !== oldAim)) assert.equal(repository.isManagedMapPath(repo.settings, file.path), true, file.path);
   await assertResolves(vault);
 });
 
@@ -454,25 +433,6 @@ integrationTest('a folder-setting change never deletes a non-empty old folder', 
   app.vault.modify = async (file, content) => app.vault.process(file, () => content);
   await repo.changeMapFolder('mindMapsFolder', 'Agent Workspace/Ideas');
   assert.deepEqual(trashed, []); assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Mind Maps/stray.md'));
-});
-
-integrationTest('a folder-setting change is refused with zero moves while an AIM attempt runs or a view has AIM work', async () => {
-  const { repo, app, files, contents } = fixture('en');
-  const mapPath = await newAim(repo, 'Busy');
-  const store = new AimRunStore(repo);
-  const doc = await repo.readMap(mapPath);
-  const question = await repo.createNote('Q', 'gpt-6-luna', doc, mapPath, 'workspace');
-  doc.nodes.push(question); await repo.saveMap(mapPath, doc);
-  const branch = await store.createAnswerBranch(mapPath, { questionNodeId: question.id, parentBranchId: null, answerSnapshot: { selections: [], freeText: 'x' }, inputSnapshot: { topic: 'Busy', conditions: {}, upstreamResults: [] } });
-  await repo.createMap('Idle');
-  const idleBefore = snapshot({ files, contents });
-  await assert.rejects(repo.changeMapFolder('mindMapsFolder', 'Agent Workspace/Ideas', () => true), /still running or saving/);
-  assertUnchanged({ files, contents }, idleBefore, 'view busy');
-  await store.startAttempt(mapPath, branch.id, 'run');
-  const before = snapshot({ files, contents });
-  await assert.rejects(repo.changeMapFolder('aimFolder', 'Agent Workspace/Research'), /still running or saving/);
-  assertUnchanged({ files, contents }, before, 'persisted running attempt');
-  assert.equal(repo.settings.aimFolder, 'Agent Workspace/AIM');
 });
 
 integrationTest('a folder-setting change restores all bytes and keeps the old setting when a later move fails', async () => {
@@ -500,13 +460,10 @@ integrationTest('the plugin keeps open views on their maps after a folder-settin
   const plugin = new Plugin();
   const relocated = []; let saved = 0;
   Object.assign(plugin, { app: { ...app, workspace: { requestSaveLayout() {}, getLeavesOfType: () => [] } }, repo, settings: repo.settings, saveSettings: async () => { saved++; } });
-  plugin.views = () => [{ hasActiveAimWork: () => false, relocate: mapping => relocated.push(mapping) }];
+  plugin.views = () => [{ relocate: mapping => relocated.push(mapping) }];
   await plugin.changeMapFolder('mindMapsFolder', 'Agent Workspace/Ideas');
   assert.equal(relocated.length, 1); assert.equal(relocated[0].get('Agent Workspace/Mind Maps/Alpha/Map.md'), 'Agent Workspace/Ideas/Alpha/Map.md');
   assert.equal(saved, 1); assert.equal(repo.settings.mindMapsFolder, 'Agent Workspace/Ideas');
-  plugin.views = () => [{ hasActiveAimWork: () => true, relocate: () => {} }];
-  await assert.rejects(plugin.changeMapFolder('mindMapsFolder', 'Agent Workspace/Again'), /still running or saving/);
-  assert.equal(saved, 1);
 });
 
 integrationTest('Organize and folder changes rebuild only the moved topics: notes of other topics are not rewritten', async () => {
@@ -626,7 +583,7 @@ integrationTest('zh-TW notes under an en UI keep every label through a folder-se
   const originals = noteOriginals(vault);
   const moved = await repo.changeMapFolder('mindMapsFolder', 'Agent Workspace/Ideas');
   const pairs = [...moved.entries()].map(([from, to]) => [from.replace(/\/Map\.md$/, '/'), to.replace(/\/Map\.md$/, '/')]);
-  assert.equal(moved.size, 2);
+  assert.equal(moved.size, 3);
   assertScaffoldingKept(vault, originals, pairs, 'zh-TW', 'folder change');
   await assertResolves(vault);
 });
@@ -743,7 +700,7 @@ const noticePlugin = (vault, notices) => {
   const { default: Plugin } = load('main.ts', { obsidian: fake });
   const plugin = new Plugin();
   Object.assign(plugin, { app: { ...vault.app, workspace: { requestSaveLayout() {}, getLeavesOfType: () => [] } }, repo: vault.repo, settings: vault.repo.settings });
-  plugin.views = () => [{ hasActiveAimWork: () => false, relocate() {}, synchronize: async () => {} }];
+  plugin.views = () => [{ relocate() {}, synchronize: async () => {} }];
   return plugin;
 };
 

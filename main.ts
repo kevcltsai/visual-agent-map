@@ -19,8 +19,7 @@ import {
   initialUiLanguage,
   languagePromptName,
   uiLocale,
-  type TranslationKey,
-  type ContentLanguage
+  type TranslationKey
 } from "./i18n";
 import {
   addIcon,
@@ -127,7 +126,6 @@ import type { ResearchObserver } from "./ai/research-observer";
 import { AiTaskService } from "./core/ai-task-service";
 import { mermaidSyntaxCheck } from "./ai/mermaid-safety";
 import { localizedResponseSchema } from "./core/steps/task/schemas";
-import { announceTestOverrides } from "./experiences/aim/flow-limits";
 import { ReframingService, providerReframeRunner } from "./core/reframing-service";
 import { OutlineGenerationService, providerOutlineRunner } from "./core/outline-generation-service";
 import { StructureReviewService, providerStructureReviewRunner } from "./core/structure-review-service";
@@ -140,10 +138,8 @@ import {
 import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
 import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
-import { AIM_CREATE_MAP_COMMAND_ID } from "./core/legacy-names";
 import { noticeInWindowOf } from "./ui/modals/notice-in-window";
 import { openInWindowOf } from "./ui/modals/open-in-window";
-import { aimEnabled } from "./experiences/aim/availability";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
 export { extractJsonObject } from "./core/ai-task-service";
@@ -660,7 +656,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     }
     const snapshot = view?.shareSnapshot();
     if (!snapshot || snapshot === "none") return void new Notice(t("share.unavailable_no_map"));
-    if (snapshot === "aim") return void new Notice(t("share.unavailable_aim"));
     if (snapshot === "empty") return void new Notice(t("share.unavailable_empty"));
     new ShareModal(this.app, {
       source: snapshot,
@@ -710,7 +705,6 @@ export default class VisualAgentMapPlugin extends Plugin {
       .catch(error => new Notice(error instanceof Error ? error.message : String(error)));
   }
   async onload(): Promise<void> {
-    announceTestOverrides(message => new Notice(message, 0));
     const saved = (await this.loadData()) as Partial<Settings> | null;
     this.settings = settingsFromSaved(saved, obsidianAppLanguage());
     // The removed chat-model key is migrated into cliModel above; write the data back at once so it runs only once.
@@ -871,13 +865,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addLocalizedCommand("open-map", "ui.command_open_map", () => {
       void this.activateView().catch(error => new Notice(String(error)));
     });
-    // AIM is hidden in this release (experiences/aim/availability.ts): no command, so the palette never offers it.
-    if (aimEnabled())
-      this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.command_new_aim", () => {
-        void this.activateView()
-          .then(() => this.views()[0]?.openAimStart())
-          .catch(error => new Notice(String(error)));
-      });
     this.addLocalizedCommand("import-outline", "ui.command_import_outline", () => {
       void this.activateView()
         .then(() => this.views()[0]?.openOutlineImport())
@@ -1222,12 +1209,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     const progress = this.moveProgress();
     let mapping: Map<string, string>;
     try {
-      mapping = await this.repo.changeMapFolder(
-        key,
-        path,
-        mapPath => this.views().some(view => view.hasActiveAimWork(mapPath)),
-        progress.report
-      );
+      mapping = await this.repo.changeMapFolder(key, path, progress.report);
     } finally {
       progress.done();
     }
@@ -1253,22 +1235,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       new Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
       return;
     }
-    const busyOpen = this.views().some(view => plan.moves.some(move => view.hasActiveAimWork(move.mapPath)));
-    if (plan.busy.length || busyOpen) {
-      new Notice(t("error.organize_aim_busy"));
-      return;
-    }
     const mind = plan.moves.filter(move => move.kind === "mind").length;
-    let description = aimEnabled()
-      ? t(
-          "ui.organize_preview_0_1_2_3_4",
-          mind,
-          plan.moves.length - mind,
-          plan.skipped.length,
-          this.settings.mindMapsFolder,
-          this.settings.aimFolder
-        )
-      : t("ui.organize_preview_hidden_0_1_2", mind, plan.skipped.length, this.settings.mindMapsFolder);
+    let description = t("ui.organize_preview_hidden_0_1_2", mind, plan.skipped.length, this.settings.mindMapsFolder);
     if (plan.skipped.length)
       description += `\n${t("ui.organize_skipped_list_0", plan.skipped.map(item => item.mapPath).join(", "))}`;
     const toClean = await this.repo.emptyLegacyFolders(plan);
@@ -1332,9 +1300,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** `anchor` is the button that asked; its window gets the notice (the settings page may be a popout window). */
   async repairWorkspace(anchor?: HTMLElement): Promise<void> {
     // A file where a folder belongs cannot be repaired here: say so instead of reporting the workspace ready.
-    const blocked =
-      this.repo.blockingFile(this.settings.mindMapsFolder) ??
-      (aimEnabled() ? this.repo.blockingFile(this.settings.aimFolder) : null);
+    const blocked = this.repo.blockingFile(this.settings.mindMapsFolder);
     if (blocked) {
       noticeInWindowOf(t("ui.repair_workspace_blocked_0", blocked), anchor);
       return;
@@ -2457,17 +2423,6 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** Runs the chart step in the background for a note that was just written; see {@link TopicRuns.addChartsAfterWrite}. */
   addChartsAfterWrite(job: ChartJob): void {
     this.topicRuns.addChartsAfterWrite(job);
-  }
-  /** The chart step for a finished AIM conclusion; the setting is checked inside, so off returns the detail untouched. */
-  async addAimDiagrams(request: {
-    title: string;
-    detail: string;
-    language: ContentLanguage;
-    model: string;
-    signal?: AbortSignal;
-    onStart?: () => void;
-  }): Promise<string> {
-    return this.aiTasks.addDiagramsToDetail(request);
   }
   private pluginDirectory(): string {
     const adapter = this.app.vault.adapter;

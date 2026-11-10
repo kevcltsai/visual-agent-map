@@ -1,5 +1,5 @@
-// Byte-exact prompt (and provider response schema) snapshots in every registered language, AIM prompts excepted (those are
-// tests/aim-prompt-snapshots.cjs). Compare mode is the default: any difference fails. UPDATE_PROMPT_SNAPSHOTS=1 rewrites
+// Byte-exact prompt (and provider response schema) snapshots in every registered language (AIM prompts left with AIM in
+// ticket 07, and so did their snapshots). Compare mode is the default: any difference fails. UPDATE_PROMPT_SNAPSHOTS=1 rewrites
 // tests/snapshots/prompts. tests/snapshots/prompts/index.json is the coverage table (snapshot -> builder/flow -> language).
 // The harness is tests/support-prompt-snapshots.cjs.
 const { test } = require('node:test');

@@ -13,14 +13,13 @@ const setSelection = (view, mode, ids = [...view.selection.state.multiSelected])
 
 // root(0,0) -> a(400,0) -> c(800,0); root -> b(400,200); root -> d(400,400). Every card is 280 x 100, zoom 1.
 // The fake card rect equals its position, so a pointer's client position is also its map position.
-function harness({ notes = [], aim = false } = {}) {
+function harness({ notes = [] } = {}) {
   const frames = [];
   const windowValues = { setTimeout: run => { run(); return 1; }, clearTimeout() {}, requestAnimationFrame: run => { frames.push(run); return frames.length; }, cancelAnimationFrame() {} };
   const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Notice: dom.makeNotice(notes) } }, windowValues);
   const spec = [['root', null, 0, 0], ['a', 'root', 400, 0], ['b', 'root', 400, 200], ['c', 'a', 800, 0], ['d', 'root', 400, 400]];
   const nodes = spec.map(([id, parentId, x, y]) => Object.assign(support.node(id, parentId), { x, y }));
   const doc = support.map(nodes);
-  if (aim) doc.aim = {};
   const view = new VisualAgentMapView({ app: {} }, { settings: { ...support.DEFAULT_SETTINGS }, pendingSuggestions: new Map(), expansionBatches: new Map(), detailsShown: () => false, setOutlineActive() {} });
   view.map = doc; view.path = 'm/Map.md';
   const make = id => {
@@ -115,23 +114,6 @@ test('relevance sort keeps every card where it is', () => {
   h.drag('d', 450, 250); assert.deepEqual(h.lit(), []);
   h.drop('d', 450, 250);
   assert.equal(h.changes.length, 0);
-});
-
-test('a map that cannot select topics (AIM, read-only) never changes parent by drag', () => {
-  const h = harness({ aim: true });
-  h.drag('d', 450, 250); assert.deepEqual(h.lit(), []);
-  h.drop('d', 450, 250);
-  assert.equal(h.saved().d.parentId, 'root'); assert.equal(h.changes.length, 1, 'only the position is written');
-});
-
-test('protected AIM references refuse the move with the existing error and write nothing', () => {
-  const h = harness();
-  h.view.assertAimReferencesRemain = () => { throw new Error('AIM question and result nodes referenced by saved branches cannot be moved.'); };
-  h.drag('d', 450, 250); h.drop('d', 450, 250);
-  return Promise.resolve().then(() => {
-    assert.equal(h.changes.length, 0);
-    assert.deepEqual(h.errors, ['AIM question and result nodes referenced by saved branches cannot be moved.']);
-  });
 });
 
 test('the highlight is removed on pointercancel and lostpointercapture, and nothing is written', () => {

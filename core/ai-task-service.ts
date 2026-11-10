@@ -101,9 +101,9 @@ export interface AiTaskServiceOptions {
   diagramsEnabled?: () => boolean;
 }
 
-/** The usage action of a request: every task (quick or standard) is research, merge is a kind of synthesis; reference rounds, count repairs and AIM are "other"; chart calls name their own. */
+/** The usage action of a request: every task (quick or standard) is research, merge is a kind of synthesis; reference rounds and count repairs are "other"; chart calls name their own. */
 function usageActionOf(context: TaskContext, role?: TaskStepRole): UsageAction {
-  if (role !== undefined || context.countRepair || context.promptProfile === "aim") return "other";
+  if (role !== undefined || context.countRepair) return "other";
   if (context.mode === "decompose") return "expand";
   if (context.mode === "synthesize" || context.mode === "merge") return "synthesize";
   return "research";
@@ -195,18 +195,14 @@ export class AiTaskService {
       language: outputLanguage,
       provider,
       providerLabel: provider === "claude" ? "Claude Code" : "Codex App Server",
-      strictGapAudit: shape.isAimGapAudit,
-      webResearch: shape.isIsolatedWebResearch,
-      contract: shape.contract,
       argumentEvidenceNeedIds: shape.argumentEvidenceNeedIds
     });
 
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
-    // A standard research (Research mode of a plain task, not AIM and not a helper request): its web retrievals are counted for
+    // A standard research (Research mode of a plain task, not a helper request): its web retrievals are counted for
     // the result, and it must make at least one, whatever its answer length (the short overview of a Standard subtopic research
     // included). A Quick run is not in Research mode, so it neither searches nor is checked.
     const countsWeb =
-      !context.aimIsolatedResearch &&
       (context.mode ?? "task") === "task" &&
       context.researchMode === "research" &&
       role === undefined &&
@@ -247,11 +243,7 @@ export class AiTaskService {
               )
             }
           : {}),
-        ...(context.aimIsolatedResearch
-          ? { webSearchOnly: context.researchMode !== "local", textOnly: context.researchMode === "local" }
-          : requiresWeb
-            ? { webSearchOnly: true }
-            : {}),
+        ...(requiresWeb ? { webSearchOnly: true } : {}),
         onAccepted: accepted,
         // Search depth guides investigation; it does not impose a per-task query cap.
         // Codex uses 0 as no steering budget; Claude receives webSearch separately.
@@ -331,13 +323,7 @@ export class AiTaskService {
       if (this.options.exchangeLoggingEnabled()) exchanges?.parsed(exchangeId);
       // "AI suggested", first research: the sections the AI wrote become the note's template (one call; no repair follows).
       const aiDecides = input.aiSections === "decide";
-      if (
-        aiDecides &&
-        (input.mode ?? "task") === "task" &&
-        input.promptProfile !== "aim" &&
-        !input.countRepair &&
-        !input.detail?.trim()
-      ) {
+      if (aiDecides && (input.mode ?? "task") === "task" && !input.countRepair && !input.detail?.trim()) {
         const decided = decidedTemplateFromDetail(result.detail, noteLanguageOf(outputLanguage));
         if (decided.ok) result.decidedTemplate = decided.template;
         else result.aiSectionsFallback = true;
@@ -594,7 +580,6 @@ export class AiTaskService {
       this.diagramsOn() &&
       !input.countRepair &&
       !input.intermediateDetail &&
-      input.promptProfile !== "aim" &&
       (input.mode === "task" || input.mode === "synthesize") &&
       // The template decides: no mermaid block in its sections or format rules, no chart step.
       chartsWanted(input.styleSelection ?? selectionFromContext(input, language), input, language)
@@ -657,45 +642,6 @@ export class AiTaskService {
 
   private diagramsOn(): boolean {
     return this.options.diagramsEnabled?.() !== false;
-  }
-
-  /**
-   * The chart step for a finished AIM conclusion (its final detail only, never interim or gap-audit text). Returns the
-   * detail unchanged when diagrams are off or the step fails; only a stop throws.
-   */
-  async addDiagramsToDetail(request: {
-    title: string;
-    detail: string;
-    language: ContentLanguage;
-    model: string;
-    signal?: AbortSignal;
-    /** Called once, right before the step starts; never when diagrams are off. */
-    onStart?: () => void;
-  }): Promise<string> {
-    if (!this.diagramsOn()) return request.detail;
-    if (request.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-    request.onStart?.();
-    const input: TaskContext = {
-      title: request.title,
-      summary: "",
-      rules: "",
-      detail: request.detail,
-      task: "",
-      ancestors: "",
-      mode: "task",
-      detailFormat: "adaptive",
-      outputLanguage: request.language
-    };
-    return this.addCharts(
-      input,
-      request.detail,
-      undefined,
-      request.language,
-      this.runtimeIdFor(request.model),
-      request.model,
-      request.signal,
-      this.options.exchangeLoggingEnabled() ? this.options.exchanges() : null
-    );
   }
 
   /**

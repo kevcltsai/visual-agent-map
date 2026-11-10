@@ -33,7 +33,7 @@ export type OutlinePlacement = { kind: "new" } | { kind: "tree" } | { kind: "und
 
 /** What the open view offers as an import target, read when the window opens. */
 export interface OutlineImportTarget {
-  map: "none" | "aim" | "editable";
+  map: "none" | "editable";
   selected?: { id: string; title: string };
 }
 
@@ -258,12 +258,7 @@ export class OutlineImportModal extends Modal {
     const group = section.createDiv("vam-outline-placement");
     group.setAttr("role", "radiogroup");
     group.setAttr("aria-label", t("ui.outline_import_placement"));
-    const mapReason =
-      this.target.map === "aim"
-        ? t("ui.outline_import_placement_aim")
-        : this.target.map === "none"
-          ? t("ui.outline_import_placement_no_map")
-          : null;
+    const mapReason = this.target.map === "none" ? t("ui.outline_import_placement_no_map") : null;
     const selected = this.target.selected;
     const options: { kind: OutlinePlacement["kind"]; text: string; reason: string | null }[] = [
       { kind: "tree", text: t("ui.outline_import_placement_tree"), reason: mapReason },

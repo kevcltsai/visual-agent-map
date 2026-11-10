@@ -1,1 +1,0 @@
-Return 0–5 distinct evidence tasks in aim.subtopics, using reuse/update/research and dependsOn. Empty requires usable prior evidence; no minimum new searches. Do not answer the goal or research in this Planner turn.

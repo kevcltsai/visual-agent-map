@@ -1,5 +1,5 @@
 // Entry point for the unit and integration suites. `--layer=unit|integration` (read in support.cjs)
-// selects which tests register; without it every suite test registers, which test:aim relies on.
+// selects which tests register; without it every suite test registers.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -32,13 +32,6 @@ const suites = [
   'coffee-tables-core.cjs',
   'coffee-tables-session.cjs',
   'reframing.cjs',
-  'aim-planner.cjs',
-  'aim-start-and-lifecycle.cjs',
-  'aim-branches-and-recovery.cjs',
-  'aim-coverage-and-delivery.cjs',
-  'aim-language-audit.cjs',
-  'aim-flow-limits.cjs',
-  'aim-note-paths.cjs',
   'legacy-aim-map.cjs',
   'workspace-folders.cjs',
   'upgrade-0.18.cjs',
@@ -67,7 +60,7 @@ assert.deepEqual(fs.readdirSync(directory).filter(file => file.endsWith('.cjs'))
 // Suites share no files or process state (every temp path comes from mkdtemp, and each suite passes alone in a fresh process), so any partition keeps the same tests.
 // The assignment is greedy by approximate integration seconds (default 2) and deterministic; the shards partition `suites`, so no suite is dropped or repeated.
 const shard = process.argv.find(value => value.startsWith('--shard='))?.split('=')[1];
-const weights = { 'map-chat.cjs': 60, 'relevance-grade.cjs': 18, 'expansion-and-synthesis.cjs': 16, 'map-ai-dialog.cjs': 11, 'notes-repository.cjs': 11, 'visual-map-view.cjs': 9, 'outline-import.cjs': 6, 'aim-coverage-and-delivery.cjs': 5, 'reframing.cjs': 5, 'map-structure.cjs': 5 };
+const weights = { 'map-chat.cjs': 60, 'relevance-grade.cjs': 18, 'expansion-and-synthesis.cjs': 16, 'map-ai-dialog.cjs': 11, 'notes-repository.cjs': 11, 'visual-map-view.cjs': 9, 'outline-import.cjs': 6, 'reframing.cjs': 5, 'map-structure.cjs': 5 };
 function shardOf(index, count) {
   const loads = Array.from({ length: count }, () => ({ weight: 0, suites: [] }));
   for (const suite of suites.slice().sort((a, b) => (weights[b] ?? 2) - (weights[a] ?? 2) || a.localeCompare(b))) {
@@ -86,11 +79,5 @@ if (shard) {
 if (process.env.VAM_AFFECTED_TESTS) {
   const affected = new Set(process.env.VAM_AFFECTED_TESTS.split(','));
   selected = selected.filter(suite => affected.has(`tests/suites/${suite}`));
-}
-// `VAM_SUITES=aim` registers only the AIM suites (tests/suites/aim-*.cjs, every test in them); `VAM_SUITES=other` registers the rest. test:aim runs both, the second with a name pattern.
-const group = process.env.VAM_SUITES;
-if (group) {
-  assert.ok(group === 'aim' || group === 'other', `bad VAM_SUITES=${group}`);
-  selected = selected.filter(suite => suite.startsWith('aim-') === (group === 'aim'));
 }
 for (const suite of selected) require(path.join(directory, suite));

@@ -1,7 +1,6 @@
-import { foldAimContract, type AimContract } from "../../../ai/aim-contracts";
 import { neutralizeUnsafeMermaid } from "../../../ai/mermaid-safety";
 import { truncateSummary } from "../../../ai/result-utils";
-import { SEARCH_STATUSES, type AiResult, type ArgumentEvidenceItem, type SearchStatus } from "../../../ai/types";
+import type { AiResult, ArgumentEvidenceItem } from "../../../ai/types";
 import { foldText, QUOTE_MAX, QUOTE_MIN } from "../../argument-map/source-proof";
 import { t, type ContentLanguage, translateNote } from "../../../i18n";
 
@@ -110,9 +109,6 @@ export function parseAiResult(
   raw: string,
   label: string,
   language: ContentLanguage,
-  strictGapAudit = false,
-  webResearch = false,
-  contract?: AimContract,
   argumentEvidenceNeedIds?: readonly string[]
 ): AiResult {
   const cleaned = raw
@@ -124,31 +120,16 @@ export function parseAiResult(
     detail?: unknown;
     suggestions?: unknown;
     visualReferences?: unknown;
-    searchStatus?: unknown;
-    aim?: unknown;
     argumentEvidence?: unknown;
   } = JSON.parse(extractJsonObject(cleaned)) as {
     summary?: unknown;
     detail?: unknown;
     suggestions?: unknown;
     visualReferences?: unknown;
-    searchStatus?: unknown;
-    aim?: unknown;
     argumentEvidence?: unknown;
   };
   if (typeof parsed.summary !== "string" || typeof parsed.detail !== "string")
     throw new Error(t("error.ai_reply_missing_summary_0", label));
-  if (
-    strictGapAudit &&
-    (!(["user_condition", "external_evidence"] as string[]).includes(parsed.summary) ||
-      !parsed.detail.trim() ||
-      !Array.isArray(parsed.suggestions) ||
-      parsed.suggestions.length !== 0 ||
-      !Array.isArray(parsed.visualReferences) ||
-      parsed.visualReferences.length !== 0)
-  ) {
-    throw new Error("AIM research-gap audit returned an invalid structured classification.");
-  }
   const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
   const suggestions = Array.isArray(parsed.suggestions)
     ? parsed.suggestions
@@ -187,20 +168,15 @@ export function parseAiResult(
         .filter(item => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl))
         .slice(0, 6)
     : [];
-  const searchStatus =
-    webResearch && (SEARCH_STATUSES as readonly unknown[]).includes(parsed.searchStatus)
-      ? (parsed.searchStatus as SearchStatus)
-      : undefined;
   const result: AiResult = {
     summary: truncateSummary(parsed.summary),
     // Checked before anything is written: an unsafe mermaid block is kept as plain code, never rendered.
     detail: neutralizeUnsafeMermaid(parsed.detail.trim()),
     suggestions,
     visualReferences,
-    ...(searchStatus ? { searchStatus } : {}),
     ...(argumentEvidenceNeedIds
       ? { argumentEvidence: parseArgumentEvidence(parsed.argumentEvidence, argumentEvidenceNeedIds) }
       : {})
   };
-  return contract ? foldAimContract(contract, parsed.aim, result) : result;
+  return result;
 }

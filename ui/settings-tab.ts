@@ -19,7 +19,6 @@ import { CARD_VOICES } from "../ai/note-style-card-voices";
 import { renderRadioGroup } from "./radio-group";
 import { BUILTIN_BLOCKS } from "../core/blocks/builtin";
 import { openInWindowOf } from "./modals/open-in-window";
-import { aimEnabled } from "../experiences/aim/availability";
 import { parseBlockRef } from "../core/blocks/block-files";
 import { NoteStyleManageModal, recipeIssueText, styleKindName } from "./modals/note-style-manage-modal";
 
@@ -713,8 +712,8 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
         {
           type: "group",
           heading: t("ui.settings_group_kinds"),
-          items: STYLE_KINDS.filter(kind => kind !== "aim" || aimEnabled()).map(kind => ({
-            name: kind === "aim" ? t("ui.note_style_kind_aim") : t(`ui.topic_kind_${kind}`),
+          items: STYLE_KINDS.filter(kind => kind !== "aim").map(kind => ({
+            name: t(`ui.topic_kind_${kind}`),
             render: (setting: Setting) => renderNoteKindSetting(setting, this.plugin, kind)
           }))
         },
@@ -959,17 +958,8 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
             name: t("ui.mind_maps_folder"),
             render: setting =>
               this.renderMapFolderSetting(setting, "mindMapsFolder", "ui.mind_maps_folder", "Mind Maps")
-          },
-          // AIM is hidden in this release (experiences/aim/availability.ts); the aimFolder value is kept untouched.
-          ...(aimEnabled()
-            ? [
-                {
-                  name: t("ui.aim_maps_folder"),
-                  render: (setting: Setting) =>
-                    this.renderMapFolderSetting(setting, "aimFolder", "ui.aim_maps_folder", "AIM")
-                }
-              ]
-            : [])
+          }
+          // No row for aimFolder: AIM was removed, and the saved value is kept untouched (an old AIM map's container).
         ]
       },
       {
@@ -1003,9 +993,7 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
   /** Entry status of the "Note style" page: a row whose saved style is gone. */
   private noteStyleStatus(): "warning" | null {
     try {
-      return STYLE_KINDS.some(kind => (kind !== "aim" || aimEnabled()) && missingStyleRef(this.plugin, kind))
-        ? "warning"
-        : null;
+      return STYLE_KINDS.some(kind => kind !== "aim" && missingStyleRef(this.plugin, kind)) ? "warning" : null;
     } catch {
       return null;
     }

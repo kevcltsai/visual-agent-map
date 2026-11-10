@@ -23,7 +23,7 @@ const png = (w = 400, h = 200) => {
 };
 const file = (data, { type = 'image/png', name = 'pic.png' } = {}) => ({ name, type, size: data.byteLength, arrayBuffer: async () => data });
 
-async function harness({ aim = false, attachmentSetting = MEDIA } = {}) {
+async function harness({ attachmentSetting = MEDIA } = {}) {
   const { repo, app, contents, files } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -67,7 +67,6 @@ async function harness({ aim = false, attachmentSetting = MEDIA } = {}) {
   view.viewportEl = element('div');
   view.viewportEl.getBoundingClientRect = () => ({ left: 10, top: 5, right: 810, bottom: 605, width: 800, height: 600 });
   view.viewportEl.clientWidth = 800; view.viewportEl.clientHeight = 600;
-  if (aim) view.map.aim = { version: 1 };
   view.selection.exitMultiSelect('emptyMap');
   view.focusNode = () => {}; view.openDetails = () => {};
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
@@ -206,15 +205,12 @@ test('pasting a picture with a selected topic puts it on that card, not on the c
   assert.equal(await h.onDisk(), undefined, 'no canvas item');
 });
 
-test('paste leaves everything else alone: text only, a selection that cannot take covers, or a read-only map', async () => {
+test('paste leaves everything else alone: text only', async () => {
   const h = await harness();
   h.view.selection.setSelected(h.node.id);
   const textOnly = clipboardEvent([], { 'text/plain': 'hello' });
   assert.equal(h.view.pasteCanvasImages(textOnly), false);
   assert.equal(textOnly.defaultPrevented, false);
-  const aim = await harness({ aim: true });
-  aim.view.selection.setSelected(aim.node.id);
-  assert.equal(aim.view.pasteCanvasImages(clipboardEvent([file(png())])), false);
 });
 
 test('dragover highlights the card with is-drop-target until it leaves or drops; the canvas hint is replaced meanwhile', async () => {
@@ -239,17 +235,12 @@ test('dragover highlights the card with is-drop-target until it leaves or drops;
   assert.ok(!vp.hasClass('is-image-drop'));
 });
 
-test('a drag that carries no files, or a card that cannot take covers, shows no highlight and is not consumed', async () => {
+test('a drag that carries no files shows no highlight and is not consumed', async () => {
   const h = await harness();
   const c = card();
   const text = dragEvent([], { dataTransfer: { files: [], types: ['text/plain'] } });
   h.view.onCardDragOver(text, c, h.node);
   assert.equal(text.defaultPrevented, false);
-  assert.ok(!c.hasClass('is-drop-target'));
-  const aim = await harness({ aim: true });
-  const over = dragEvent([]);
-  aim.view.onCardDragOver(over, c, aim.node);
-  assert.equal(over.defaultPrevented, false);
   assert.ok(!c.hasClass('is-drop-target'));
 });
 

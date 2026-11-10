@@ -362,7 +362,7 @@ test('Bug bash E #35 (follow-up): through the real paint() and a leaf that behav
   // what Obsidian does for leaf.setViewState: hand the state to the view with a result object, then redraw the title when the view asked for a layout refresh
   const leaf = { setViewState: async viewState => { const result = { history: true }; await view.setState(viewState.state, result); if (result.layout) workspace.updateTitle(); } };
   const maps = { 'A.md': { title: 'Map A', nodes: [] }, 'B.md': { title: 'Map B', nodes: [] } };
-  Object.assign(view, { leaf, path: 'A.md', map: maps['A.md'], headerTitle: 'Map A', closed: false, aimProgressEls: new Map(), paintCount: 0, plugin: { syncOutline() {} }, notes: new Map() });
+  Object.assign(view, { leaf, path: 'A.md', map: maps['A.md'], headerTitle: 'Map A', closed: false, paintCount: 0, plugin: { syncOutline() {} }, notes: new Map() });
   // the switcher / openMap path: the other map is read, then painted
   view.openMap = async file => { view.path = file; view.map = maps[file]; try { view.paint(); } catch (error) { if (error !== stop) throw error; } };
   const settle = () => new Promise(resolve => setTimeout(resolve, 60));
@@ -833,7 +833,7 @@ test('card tools: AI explore, Details, fold, this card, select subtopics and rem
 });
 test('selection bar: nothing before the first card is picked; then a narrow bottom bar whose main button follows the count', () => {
   const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A' }], ['b', { title: 'B' }]]), map: { nodes: [] } });
-  view.mergeCheck = () => ({ ok: true }); view.multiResearchKey = () => 'k'; view.aimLive = () => false;
+  view.mergeCheck = () => ({ ok: true }); view.multiResearchKey = () => 'k';
   const host = () => { const el = fakeEl(); el.toggleClass = (name, on) => (on ? el.classes.add(name) : el.classes.delete(name)); return el; };
   setSelection(view, true, []);
   const none = host(); const empty = view.renderSelectionBar(none);

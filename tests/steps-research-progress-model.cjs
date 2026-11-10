@@ -1,5 +1,5 @@
 // MS-08 P8a: every shared progress stage text carries the model that really runs the task (D4: "{0} ({1})" in English,
-// "{0}・{1}" in Chinese); the chart step shows the model of the task it belongs to; AIM resolves the branch root's model once.
+// "{0}・{1}" in Chinese); the chart step shows the model of the task it belongs to.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -86,34 +86,4 @@ test('startTaskProgress takes the task model and every call site passes the mode
   assert.equal(store.get('task:merge:M.md').model, 'm2');
   started.end();
   assert.equal(store.get('task:merge:M.md'), undefined);
-});
-
-test('AIM resolves the branch root model once per run and the stage text uses the cache', async () => {
-  const calls = [];
-  const v = Object.assign(view(), {
-    closed: false,
-    path: 'Map.md',
-    map: {
-      aim: { branches: [
-        { id: 'b1', questionNodeId: 'q1', parentBranchId: null },
-        { id: 'b2', questionNodeId: 'q2', parentBranchId: 'b1' }
-      ] },
-      nodes: [{ id: 'q1', path: 'Root.md' }, { id: 'q2', path: 'Child.md' }]
-    },
-    aimBranchModels: new Map(),
-    aimBranchModelPending: new Set(),
-    aimProgressEls: new Map(),
-    aimBusy: true,
-    render() {}
-  });
-  v.plugin.repo = { resolveTopicModel: async p => { calls.push(p); return { model: 'root-model' }; } };
-  v.aimProgress = { branchId: 'b2', stage: 'research-plan', startedAt: Date.now(), targets: new Map() };
-  v.ensureAimBranchModel('b2');
-  v.ensureAimBranchModel('b2');
-  await new Promise(resolve => setImmediate(resolve));
-  v.ensureAimBranchModel('b2');
-  assert.deepEqual(calls, ['Root.md']);
-  const text = v.aimStageText();
-  assert.ok(text.includes('L:root-model'), text);
-  assert.ok(text.includes('0:0'), text);
 });

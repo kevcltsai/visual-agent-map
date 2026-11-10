@@ -1,5 +1,5 @@
 // Lane A: Visual Map and the general task service run through the Step Runner.
-//  - AiTaskService sends every model call as a step (task.run, aim.<phase>, task.reference-extract/reduce) and keeps
+//  - AiTaskService sends every model call as a step (task.run, task.reference-extract/reduce) and keeps
 //    its exchange-log sequence: begin -> sent(request json) -> received -> parsed, or failed with the stage message.
 //  - The 42 lane prompt keys left i18n.ts; their texts are Markdown fragments with a zh and an en file.
 const { test } = require('node:test');
@@ -9,7 +9,6 @@ const path = require('node:path');
 const { load, root, makeService } = require('./support-replay.cjs');
 
 const { translate } = load('i18n.ts');
-const { buildAimPrompt } = load('ai/aim-prompt.ts');
 const { taskPrompt } = load('core/steps/task/render.ts');
 
 const GOOD = JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] });
@@ -27,15 +26,6 @@ function runtime(reply) {
   const calls = [];
   return { calls, runTask: async (prompt, model, effort, schema, controls) => { calls.push({ prompt, model, effort, schema, controls }); controls.onRequest?.({ via: 'fake', n: calls.length }); return typeof reply === 'function' ? reply(prompt, calls.length) : reply; } };
 }
-
-test('an AIM request is the step aim.<phase>@1 and its prompt is exactly buildAimPrompt', async () => {
-  const log = spyLog(), fake = runtime(GOOD);
-  const aim = context({ promptProfile: 'aim', task: '<!-- aim-phase: research-plan -->\nPlan the evidence.', outputLanguage: 'zh-TW' });
-  await makeService(fake, { logging: true, exchanges: log }).askModel(aim, 'gpt-6-luna', 'low');
-  assert.equal(log.events[0][1].step, 'aim.research-plan@1');
-  assert.equal(fake.calls[0].prompt, buildAimPrompt(aim, 'zh-TW'));
-  assert.equal(taskPrompt(aim, 'zh-TW'), buildAimPrompt(aim, 'zh-TW'), 'the step render delegates to buildAimPrompt');
-});
 
 test('Visual Map task text comes from fragments and renders the same as the strings it replaced', () => {
   const { expansionTask, researchTopicTask, synthesisGoalTask, mergeGoalTask, noSummaryYet } = load('experiences/visual-map/steps/fragments.ts');
@@ -67,7 +57,7 @@ test('architecture: ai-task-service sends model calls only through AiCalls, and 
   assert.doesNotMatch(service, /\.runTask\(/, 'AiTaskService must not call a runtime directly');
   assert.equal((service.match(/calls\.run\(\s*step,/g) ?? []).length, 2);
   assert.doesNotMatch(service, /runtimeStepProvider\(|new StepRunner\(|finish: "caller"/);
-  for (const file of ['core/ai-task-service.ts', 'core/steps/task/render.ts', 'ai/aim-prompt.ts', 'ai/visual-guidance.ts', 'experiences/visual-map/view.ts', 'experiences/visual-map/thinking-origin.ts'])
+  for (const file of ['core/ai-task-service.ts', 'core/steps/task/render.ts', 'ai/visual-guidance.ts', 'experiences/visual-map/view.ts', 'experiences/visual-map/thinking-origin.ts'])
     assert.doesNotMatch(fs.readFileSync(path.join(root, file), 'utf8'), /["`]prompt\.[a-z_]+["`]/, `${file} must not read a prompt.* i18n key`);
 });
 
@@ -119,8 +109,6 @@ test('B2 W1 / D-2026-10-248: every standard research (normal, deep and the short
   const local = await controlsOf(context({ researchMode: 'local', researchDepth: 'normal' }));
   assert.equal(local.webSearchOnly, undefined); assert.equal(local.requireWeb, undefined); assert.equal(local.webSearch, false, 'local mode carries no web parameter');
   assert.equal((await controlsOf(researchContext({ mode: 'synthesize' }))).webSearchOnly, undefined, 'a synthesis is not a standard research');
-  const aim = await controlsOf(researchContext({ aimIsolatedResearch: true }));
-  assert.equal(aim.webSearchOnly, true); assert.equal(aim.textOnly, false); assert.equal(aim.requireWeb, undefined);
 });
 
 test('B2 W1: a research with no retrieval is sent once more; the second attempt\'s answer is kept and carries its search count', async () => {
@@ -154,13 +142,12 @@ test('B2 W1: a research whose provider counted no retrieval reports 0 searches (
   assert.equal(counted.retrievals, 1, 'only completed retrievals count'); assert.equal(seen.length, 2, 'the caller\'s own listener still hears every event');
 });
 
-test('B2 W2 / D-2026-10-248: the research prompt says to search when Detail has no source (every depth in research mode, all languages); local and AIM keep the old text', () => {
+test('B2 W2 / D-2026-10-248: the research prompt says to search when Detail has no source (every depth in research mode, all languages); local keeps the old text', () => {
   for (const language of ['en', 'zh-TW', 'zh-CN']) {
     const required = translate(language, 'research.web_required');
     for (const depth of ['normal', 'deep']) assert.ok(taskPrompt(researchContext({ researchDepth: depth }), language).includes(required), `${language} ${depth}`);
     assert.ok(taskPrompt(researchContext({ researchDepth: 'fast' }), language).includes(required), `${language} fast (a standard subtopic research)`);
     assert.ok(!taskPrompt(context({ researchMode: 'local', researchDepth: 'normal' }), language).includes(required), `${language} local`);
-    assert.ok(!taskPrompt(researchContext({ aimIsolatedResearch: true }), language).includes(required), `${language} AIM`);
   }
   assert.match(translate('en', 'research.web_required'), /search before you stop/); assert.match(translate('zh-TW', 'research.web_required'), /尚未查證/);
 });

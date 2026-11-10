@@ -69,15 +69,16 @@ integrationTest('the upgrade check can fail: a note that 0.19 would have to repa
 });
 
 for (const language of ['en', 'zh-TW'])
-integrationTest(`Organize on the upgraded vault under a ${language} UI moves Topics maps only; Inbox, pre-0.4 map, its notes and other files stay byte-identical, and moved notes keep their labels`, async () => {
+integrationTest(`Organize on the upgraded vault under a ${language} UI moves the Topics mind maps only (an old AIM map stays in Topics); Inbox, pre-0.4 map, its notes and other files stay byte-identical, and moved notes keep their labels`, async () => {
   const vault = await upgradedVault(undefined, language);
   const { repo, app, originals } = vault;
   await repo.ensureWorkspace();
   await repo.rebuildDerivedData();
   const mapping = await repo.organizeWorkspaceFolders(await repo.planOrganizeWorkspaceFolders());
   assert.deepEqual([...mapping.values()].sort(), [
-    'Agent Workspace/AIM/Steak doneness/Map.md', 'Agent Workspace/Mind Maps/Alpha trip/Map.md', 'Agent Workspace/Mind Maps/Beta budget/Map.md'
+    'Agent Workspace/Mind Maps/Alpha trip/Map.md', 'Agent Workspace/Mind Maps/Beta budget/Map.md'
   ]);
+  assert.ok(app.vault.getAbstractFileByPath('Agent Workspace/Topics/Steak doneness/Map.md'), 'the old AIM map stays where it was');
   // Moved notes: the original text with only the moved path prefixes replaced (labels in each note's own language), `updated` aside.
   const pairs = [...mapping.entries()].map(([from, to]) => [from.replace(/\/Map\.md$/, '/'), to.replace(/\/Map\.md$/, '/')]);
   const strip = text => text.replace(/^updated:.*\n/m, '');

@@ -1,1 +1,0 @@
-Review the complete deliverable against the original goal and task contract. Return the decision in the aim fields and a brief acceptance note or list of issues; do not reproduce or rewrite the draft. If research_more is required, identify one concrete evidence target. Do not ask the user.

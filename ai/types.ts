@@ -1,6 +1,5 @@
 import type { CountIssue, DetailTemplate } from "./detail-templates";
 import type { StyleSelection } from "../core/steps/task/assemble";
-import type { AimContract } from "./aim-contracts";
 import type { ContentLanguage } from "../i18n";
 import type { ReferenceGroup } from "./reference-materials";
 import type { UpdateMode } from "./note-style-recipe";
@@ -28,8 +27,7 @@ export interface Suggestion {
   thinkingOriginBaseline?: string;
 }
 export type AiTaskKind = "task" | "decompose" | "synthesize" | "merge";
-export type PromptProfile = "aim";
-export type AiResponseContract = "aim-gap-audit" | "aim-delivery-acceptance" | "argument-evidence";
+export type AiResponseContract = "argument-evidence";
 /** One evidence need the argument map asks a research call to look up; `id` is the key the reply must cite. */
 export interface ArgumentEvidenceNeed {
   id: string;
@@ -98,29 +96,17 @@ export interface TaskContext {
   styleSelection?: StyleSelection;
   /** Resolved writing-tone text (trusted). Absent for the default academic tone, so prompts stay unchanged. */
   toneText?: string;
-  /** AIM final document only: the format rules of the user's note style, in place of the standard Obsidian format (trusted; never serialized). */
-  aimNoteFormat?: string;
   /** Trusted flag: after the note is written, run the chart step once. Never serialized into a prompt. */
   addCharts?: boolean;
   /** internal: this request is the single count repair. */
   countRepair?: boolean;
-  /** Select a phase-aware prompt builder for AIM requests. */
-  promptProfile?: PromptProfile;
-  /** Selects a narrow trusted response schema for the AIM gap audit only. */
+  /** Selects a narrow trusted response schema (the argument-evidence contract). */
   responseContract?: AiResponseContract;
   /**
-   * Required with `responseContract: "argument-evidence"` (plus `researchMode: "research"`, no AIM profile): the needs this one
+   * Required with `responseContract: "argument-evidence"` (plus `researchMode: "research"`): the needs this one
    * research call must answer, shown in the prompt as JSON; the reply may only cite these ids. Trusted, never serialized elsewhere.
    */
   argumentEvidenceNeeds?: readonly ArgumentEvidenceNeed[];
-  /** Provider-enforced AIM control payload for this phase; folded back into the canonical marker form. */
-  aimContract?: AimContract;
-  /** Lets the AIM payload request full evidence reports by ID (trusted workflow flag; never serialized). */
-  aimEvidenceLookup?: boolean;
-  /** Trusted workflow lookup allowlist for AIM evidence retrieval; never serialize into prompts. */
-  aimEvidenceIds?: readonly string[];
-  /** Isolate independent research to supplied context and web tools. */
-  aimIsolatedResearch?: boolean;
   /** Bounded timeout override for this task only. */
   timeoutMs?: number;
   researchMode?: ResearchMode;
@@ -136,17 +122,13 @@ export interface WebSearchEvent {
   method: "item/started" | "item/completed";
   params: unknown;
 }
-export type SearchStatus = "completed" | "failed" | "not_attempted";
-export const SEARCH_STATUSES: readonly SearchStatus[] = ["completed", "failed", "not_attempted"];
-/** searchStatus is present only for isolated web-research tasks, whose schema requires it. */
 export interface AiResult {
   summary: string;
   detail: string;
   suggestions: Suggestion[];
   visualReferences: VisualReference[];
-  searchStatus?: SearchStatus;
   /**
-   * Web searches and page fetches the provider made for this answer. Set only on a standard research (Research mode, not AIM);
+   * Web searches and page fetches the provider made for this answer. Set only on a standard research (Research mode);
    * 0 means it answered without the web. Absent on every other result.
    */
   retrievals?: number;

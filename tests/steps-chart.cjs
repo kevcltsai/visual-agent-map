@@ -270,8 +270,8 @@ test('askModel makes exactly one call even when the request is chart-eligible; t
   assert.match(detail, /```mermaid\ntimeline/);
 });
 
-test('chartEligible is false without the flag, and for decompose, merge, AIM, intermediate and count-repair requests', async () => {
-  const cases = [{ addCharts: undefined }, { mode: 'decompose' }, { mode: 'merge' }, { promptProfile: 'aim' }, { intermediateDetail: true }, { countRepair: true }];
+test('chartEligible is false without the flag, and for decompose, merge, intermediate and count-repair requests', async () => {
+  const cases = [{ addCharts: undefined }, { mode: 'decompose' }, { mode: 'merge' }, { intermediateDetail: true }, { countRepair: true }];
   for (const extra of cases) {
     const { calls, service, base } = fixture([TASK_REPLY(NOTE), chartReply()]);
     assert.equal(service.chartEligible({ ...base, ...extra }), false, JSON.stringify(extra));

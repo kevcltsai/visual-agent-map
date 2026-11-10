@@ -150,9 +150,9 @@ test('C4: every command keeps its id, takes its name from a ui.command_* key wit
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   const { translate } = load('i18n.ts');
   const ids = [], keys = new Map();
-  for (const match of source.matchAll(/addLocalizedCommand\(\s*("[^"]+"|AIM_CREATE_MAP_COMMAND_ID),\s*"([^"]+)"/g)) { ids.push(match[1].replace(/"/g, '')); keys.set(ids.at(-1), match[2]); }
+  for (const match of source.matchAll(/addLocalizedCommand\(\s*("[^"]+"),\s*"([^"]+)"/g)) { ids.push(match[1].replace(/"/g, '')); keys.set(ids.at(-1), match[2]); }
   for (const match of source.matchAll(/id: "([^"]+)",\s*name: t\("([^"]+)"\)/g)) { ids.push(match[1]); keys.set(match[1], match[2]); }
-  assert.deepEqual(ids.slice().sort(), ['AIM_CREATE_MAP_COMMAND_ID', 'add-summary-bracket', 'add-text-node', 'fix-math-formulas', 'import-outline', 'import-outline-exchange', 'markdown-selection-ai', 'normalize-note-filenames', 'open-coffee-tables', 'open-debug-log', 'open-map', 'open-note-styles-folder', 'open-prompt-monitor', 'open-topic-outline', 'organize-workspace-folders', 'preview-full-prompt', 'rebuild-references', 'reconnect-workspace', 'repair-note-presentation', 'repair-workspace', 'share-map', 'toggle-map-chat'].sort(), 'the 22 command ids are unchanged, so hotkeys keep working');
+  assert.deepEqual(ids.slice().sort(), ['add-summary-bracket', 'add-text-node', 'fix-math-formulas', 'import-outline', 'import-outline-exchange', 'markdown-selection-ai', 'normalize-note-filenames', 'open-coffee-tables', 'open-debug-log', 'open-map', 'open-note-styles-folder', 'open-prompt-monitor', 'open-topic-outline', 'organize-workspace-folders', 'preview-full-prompt', 'rebuild-references', 'reconnect-workspace', 'repair-note-presentation', 'repair-workspace', 'share-map', 'toggle-map-chat'].sort(), 'the 21 command ids are unchanged (the AIM create command left with AIM, ticket 07), so hotkeys keep working');
   const category = { en: ['Maintenance: ', 'Diagnostics: '], 'zh-TW': ['維護：', '診斷：'], 'zh-CN': ['维护：', '诊断：'] };
   const maintenance = ['rebuild-references', 'normalize-note-filenames', 'repair-note-presentation', 'fix-math-formulas', 'organize-workspace-folders', 'repair-workspace', 'reconnect-workspace'];
   const diagnostics = ['open-prompt-monitor', 'open-debug-log'];
@@ -188,7 +188,7 @@ test('topic status labels follow the selected UI language after startup', () => 
   assert.equal(topicStatusLabel('error', 'en'), 'Task error');
 });
 // Files whose messages, logs and generated note text must come from i18n.ts, never inline Chinese.
-const runtimeMessageFiles = ['ai/runtime/codex-app-server.ts', 'ai/runtime/claude-code-cli.ts', 'core/ai-task-service.ts', 'core/reframing-service.ts', 'ai-exchange-log.ts', 'pending-suggestions.ts', 'main.ts', 'experiences/aim/research-run-store.ts', 'ai/reference-materials.ts', 'ui/modals/aim-clarification-modal.ts', 'ui/preview-utils.ts'];
+const runtimeMessageFiles = ['ai/runtime/codex-app-server.ts', 'ai/runtime/claude-code-cli.ts', 'core/ai-task-service.ts', 'core/reframing-service.ts', 'ai-exchange-log.ts', 'pending-suggestions.ts', 'main.ts', 'ai/reference-materials.ts', 'ui/preview-utils.ts'];
 test('runtime, service and log messages carry no inline Chinese text', () => {
   const offenders = runtimeMessageFiles.flatMap(file => fs.readFileSync(path.join(root, file), 'utf8').split('\n').map((line, index) => [file, index + 1, line]).filter(([, , line]) => /\p{Script=Han}/u.test(line)).map(([file, line]) => `${file}:${line}`));
   assert.deepEqual(offenders, []);
@@ -278,7 +278,7 @@ test('registry prompt names reproduce every language spelling in the prompt file
   assert.equal(name('zh-CN', 'en', 'usage'), 'Simplified Chinese (Mainland China usage)');
   assert.equal(name('en', 'en', 'plain'), 'English');
   // The language fragments (core and Coffee Tables) take the name from the registry ({{language}}) instead of spelling it out.
-  const parameterised = ['core/steps/aim/language.zh.md', 'core/steps/reframe/language.zh.md'];
+  const parameterised = ['core/steps/reframe/language.zh.md'];
   for (const step of ['table', 'question', 'observer-only', 'navigation-summary']) for (const lang of ['zh', 'en']) parameterised.push(`experiences/coffee-tables/steps/${step}/prompt.${lang}.md`);
   for (const lang of ['zh', 'en']) parameterised.push(`experiences/coffee-tables/steps/_shared/builtin-style.${lang}.md`);
   for (const file of parameterised) assert.ok(fs.readFileSync(path.join(root, file), 'utf8').includes('{{language}}'), file);

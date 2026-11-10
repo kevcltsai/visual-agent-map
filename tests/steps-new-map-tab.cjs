@@ -5,8 +5,7 @@ const { load, DEFAULT_SETTINGS, obsidian, fixture, plain } = require('./support.
 const dom = require('./support-dom.cjs');
 
 class FuzzySuggestModal { constructor() {} setPlaceholder() {} setInstructions() {} open() {} close() {} }
-let capturedModal = null;
-class CapturingModal { constructor(app, ...args) { this.app = app; this.args = args; } open() { capturedModal = this; } close() {} }
+class CapturingModal { constructor(app, ...args) { this.app = app; this.args = args; } open() {} close() {} }
 
 // A leaf and workspace that follow Obsidian 1.15.0's order (checked in the extracted app.js: Leaf.setViewState, Workspace.getLeaf / createLeafInTabGroup / setActiveLeaf, TabGroup.selectTabIndex, the Leaf constructor's ResizeObserver):
 //   getLeaf("tab") reuses the most recently active tab when it is still empty (and then does not activate it); otherwise it makes an empty leaf and,
@@ -296,8 +295,6 @@ test('N5 hasRunningWork: false when idle, true for each kind of work', () => {
     startingTasks: v => { v.startingTasks.set('k', new AbortController()); },
     startingExpand: v => { v.startingExpand.add('k'); },
     mergeTasks: v => { v.mergeTasks.set('k', { controller: new AbortController() }); },
-    aimBusy: v => { v.aimBusy = true; },
-    aimController: v => { v.aimController = new AbortController(); },
     goalSuggestTask: v => { v.goalSuggestTask = { controller: new AbortController(), state: 'running' }; },
     structureReviewTask: v => { v.structureReviewTask = { controller: new AbortController() }; },
     outlineDraftTask: v => { v.outlineDraftTask = { controller: new AbortController() }; },
@@ -368,7 +365,7 @@ each('L1 an error from opening the new tab is shown, not swallowed', async ({ fo
   assert.ok(notices.some(text => String(text).includes('tab boom')), JSON.stringify(notices));
 });
 
-// B2: AIM start and outline import with a real repository, the real serial mutate and a target view that is not the source view.
+// B2: outline import with a real repository, the real serial mutate and a target view that is not the source view.
 const outlineApi = load('experiences/visual-map/outline-import.ts', { obsidian });
 async function realWorld({ blank = false, focusNewTab = true } = {}) {
   const { repo } = fixture('en');
@@ -385,26 +382,6 @@ async function realWorld({ blank = false, focusNewTab = true } = {}) {
   source.view.startShallowResearch = async () => { source.view.events.push('research'); };
   return { w, repo, source };
 }
-
-each('B2 AIM start with a map open: the new map opens in a new tab and focus lands there, not on the source view', async ({ focusNewTab }) => {
-  const { w, source } = await realWorld({ focusNewTab });
-  source.view.openAimStart();
-  await capturedModal.submit({ requestId: 'r1', topic: 'New goal', context: '', model: 'gpt-6-luna', reasoning: 'low' });
-  await settle();
-  assert.deepEqual(w.getLeafCalls, ['tab']); assert.deepEqual(source.calls.openInPlace, [], 'the source view did not open the new map');
-  const target = w.newViews[0];
-  assert.notEqual(target, source.view); assert.equal(target.path, w.viewStates[0].state.file);
-  assert.deepEqual(source.view.events, []);
-  assert.ok(target.events.includes('render') && target.events.some(e => e.startsWith('focus:')), JSON.stringify(target.events));
-});
-
-test('B2 AIM start from the blank screen stays in the same tab', async () => {
-  const { w, source } = await realWorld({ blank: true });
-  source.view.openAimStart();
-  await capturedModal.submit({ requestId: 'r2', topic: 'New goal', context: '', model: 'gpt-6-luna', reasoning: 'low' });
-  await settle();
-  assert.deepEqual(w.getLeafCalls, []); assert.equal(source.calls.openInPlace.length, 1);
-});
 
 each('B2 outline import with a map open: the new map opens in a new tab; fit and the shallow research land on it', async ({ focusNewTab }) => {
   const { w, source } = await realWorld({ focusNewTab });

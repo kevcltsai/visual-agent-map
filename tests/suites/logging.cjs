@@ -150,12 +150,6 @@ test('Prompt monitor reads phases and repair reasons from prompts logged before 
   assert.equal(metrics.repairReason, 'missing plan marker');
   assert.equal(metrics.prompt, prompt);
 });
-test('AIM create command keeps its original command ID so existing hotkeys and URIs still work', () => {
-  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  const { AIM_CREATE_MAP_COMMAND_ID, LEGACY_MARKER_PREFIX } = load('core/legacy-names.ts');
-  assert.match(source, /addLocalizedCommand\(AIM_CREATE_MAP_COMMAND_ID, "ui\.command_new_aim"/);
-  assert.equal(AIM_CREATE_MAP_COMMAND_ID, `create-${LEGACY_MARKER_PREFIX}map`);
-});
 integrationTest('AI exchange log: milestones are optional, validated as an object on load, ignore unknown keys, and are printed', async () => {
   const { AiExchangeLog, formatAiExchange } = load('ai-exchange-log.ts');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-milestones-'));

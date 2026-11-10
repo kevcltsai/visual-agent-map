@@ -85,12 +85,11 @@ test('sharing D-2026-10-110: the P1 payload never carries a Markdown detail, eve
   }
 });
 
-test('sharing: AIM maps are refused with an explicit error', () => {
+test('sharing: an old AIM map is shared like any map, and the payload carries no AIM data', () => {
   const aimNode = { ...fixtureMap(), aim: { branches: [] } };
-  assert.throws(() => format.buildSharePayload(aimNode, {}, options()), error => error.name === 'ShareError' && error.code === 'aim-map');
   const kindMap = fixtureMap();
   kindMap.nodes[0].aimKind = 'topic';
-  assert.throws(() => format.buildSharePayload(kindMap, {}, options()), /AIM maps cannot be shared/);
+  for (const doc of [aimNode, kindMap]) assert.doesNotMatch(JSON.stringify(format.buildSharePayload(doc, {}, options())), /"aim/);
 });
 
 test('sharing: serialized JSON never contains "</" or "<!--" and round-trips', () => {

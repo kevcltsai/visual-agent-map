@@ -108,7 +108,7 @@ test('only the unsafe mermaid block changes; safe blocks and other code stay as 
   assert.equal(parse('~~~md\n```mermaid\nflowchart LR\nA --> B\n```\n~~~'), '~~~md\n```mermaid\nflowchart LR\nA --> B\n```\n~~~');
 });
 
-test('reader-facing prompts carry the Obsidian syntax rules; decompose and AIM control phases do not', async () => {
+test('reader-facing prompts carry the Obsidian syntax rules; decompose does not', async () => {
   const marker = { en: 'The detail is rendered in Obsidian.', 'zh-TW': 'detail 會在 Obsidian 中渲染' };
   const base = { title: 'T', summary: 'S', rules: '', detail: 'D', task: 'X', ancestors: '', researchMode: 'local', researchDepth: 'fast', visualMode: 'off' };
   const sent = async context => (await promptsFor(context, { language: context.outputLanguage })).at(-1).prompt;
@@ -120,9 +120,6 @@ test('reader-facing prompts carry the Obsidian syntax rules; decompose and AIM c
     assert.equal(await has({ mode: 'task', detailTemplate: { id: 'custom', name: 'C', sections: [{ name: 'A', description: '', role: 'body' }] } }), true, `${language} custom template`);
     assert.equal(await has({ mode: 'decompose' }), false, `${language} decompose`);
     assert.equal(await has({ mode: 'task', intermediateDetail: true }), false, `${language} reference extraction`);
-    const aim = async phase => has({ mode: 'task', promptProfile: 'aim', task: `<!-- aim-phase: ${phase} -->\nTask.`, ...(phase.endsWith('research') ? { researchMode: 'research', aimIsolatedResearch: true } : {}) });
-    for (const phase of ['subtopic-research', 'targeted-followup-research', 'delivery-writing']) assert.equal(await aim(phase), true, `${language} AIM ${phase}`);
-    for (const phase of ['research-plan', 'report-review', 'delivery-outline', 'delivery-research', 'format-repair']) assert.equal(await aim(phase), false, `${language} AIM ${phase}`);
   }
 });
 
@@ -251,12 +248,6 @@ test('math normalizer keeps escaped link text; a prose regex bracket is a known 
   assert.equal(n('regex `\\[a-z\\]` 在程式碼內'), 'regex `\\[a-z\\]` 在程式碼內');
   // Documented ambiguity: outside code, `\[a-z\]` is read as display math.
   assert.equal(n('regex \\[a-z\\]'), 'regex $$a-z$$');
-});
-
-test('AIM interim detail normalizes math delimiters as well as headings', () => {
-  const { AimManualFlow } = load('experiences/aim/manual-flow.ts');
-  const out = AimManualFlow.prototype.interimDetail.call(null, ['# 標題\n\n速率 \\(k\\)', '', '\\[\nFo=\\frac{\\alpha t}{L^2}\n\\]']);
-  assert.equal(out, '### 標題\n\n速率 $k$\n\n$$\nFo=\\frac{\\alpha t}{L^2}\n$$');
 });
 
 // Every offline mermaid type Obsidian draws is kept as a mermaid block; anything else, and any unsafe line, is not.

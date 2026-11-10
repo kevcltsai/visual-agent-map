@@ -995,12 +995,6 @@ integrationTest('map chat: synthesize of several cards starts the selection inte
 });
 
 integrationTest('map chat: run actions are skipped, not guessed, when the map cannot take them', async () => {
-  const h = await harness({ aim: true }); await h.view.hydrate();
-  const lines = await apply(h, [
-    { kind: 'select_topics', nodeIds: [h.ids.a], all: false },
-    { kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '' }
-  ]);
-  eq(lines.map(l => l.status), ['skipped', 'skipped']);
   const plain = await harness(); await plain.view.hydrate();
   plain.view.relevanceGradeable = () => false; plain.view.openSelectionSynthesis = () => { throw new Error('must not open'); };
   const result = await apply(plain, [
@@ -1361,9 +1355,9 @@ async function scheduleFixture() {
   const { h, chat, view } = await syncFixture();
   let painted = 0; view.renderPreservingFocus = () => { painted++; };
   const run = name => { h.timers.length = 0; view[name](); const fire = h.timers.pop(); assert.ok(fire, 'a repaint was scheduled'); painted = 0; const left = h.timers.length; fire(); return { painted, rescheduled: h.timers.length > left || h.timers.length > 0 }; };
-  return { h, chat, view, run, reset: () => { view.aimProgressRenderTimer = null; view.researchRenderTimer = null; } };
+  return { h, chat, view, run, reset: () => { view.researchRenderTimer = null; } };
 }
-for (const name of ['scheduleResearchRender', 'scheduleAimProgressRender'])
+for (const name of ['scheduleResearchRender'])
   integrationTest(`map chat C3: ${name} paints while the chat field has focus, waits for IME composition and for other text fields`, async () => {
     const { h, chat, view, run, reset } = await scheduleFixture();
     chat.inputEl.matches = selector => /textarea/.test(selector); // the real field is a textarea: the old "any text field" rule would defer
@@ -2940,12 +2934,6 @@ integrationTest('B2-fix F2: sending the first message from the opening screen do
   }
 });
 
-integrationTest('B1 ui: an AIM map with no cards does NOT get the opening screen', async () => {
-  const h = await harness({ aim: true, empty: true }); await h.view.hydrate(); h.repaint();
-  assert.equal(h.view.map.nodes.length, 0); assert.ok(h.view.map.aim); assert.equal(h.view.chat.isHero, false); assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')), undefined);
-  assert.equal(h.workspace().children[0], h.view.chat.el);
-});
-
 integrationTest('B1 ui: a map with cards does not get the opening screen either', async () => {
   const h = await harness(); await h.view.hydrate(); h.repaint(); assert.equal(h.view.chat.isHero, false);
 });
@@ -3060,9 +3048,6 @@ integrationTest('goal banner P3: the empty canvas button opens the add menu and 
   assert.match(css, /^\.vam-empty\.is-add-first \{[^}]*top: 12px;[^}]*left: 12px;[^}]*transform: none;/m, 'they sit in the top-left corner, so a picture in the middle stays uncovered');
   assert.ok(css.indexOf('.vam-empty.is-add-first {') < css.indexOf('.has-chat-hero .vam-empty { display: none; }'), 'the chat hero still hides them: its rule has equal specificity, so it must come later');
   add.click(); assert.deepEqual(menu, [null]);
-  const aim = await harness({ aim: true }); await aim.view.hydrate();
-  const aimBox = element('div'); aim.view.aimLive = () => true; aim.view.fillEmptyMap(aimBox);
-  assert.equal(findAll(aimBox, i => i.tag === 'button').length, 0, 'a live AIM map keeps its own hint');
 });
 
 integrationTest('B1 ui: many chips scroll inside their own box, so the message field stays in the window', async () => {
@@ -3284,11 +3269,11 @@ integrationTest('B1 ui: stopping a turn and applying a plan each say one thing; 
 
 // ---- what must not change --------------------------------------------------------------------------------------------
 
-test('B1 ui: single sources stay single: one typingInField (5 mentions: the definition and its 4 callers), the same 7 renderChatMarkdown mentions in code (the topic chat window is a second user of the one renderer: import and call), one definition each of the focus capture and the detach', () => {
+test('B1 ui: single sources stay single: one typingInField (4 mentions: the definition and its 3 callers; the AIM progress caller left with AIM), the same 7 renderChatMarkdown mentions in code (the topic chat window is a second user of the one renderer: import and call), one definition each of the focus capture and the detach', () => {
   const files = repoFiles(root, { skipDirectories: ['node_modules', 'tests', 'samples', 'scripts'] }).filter(file => file.endsWith('.ts'));
   const sources = files.map(file => fs.readFileSync(path.join(root, file), 'utf8'));
   const total = pattern => sources.reduce((sum, text) => sum + (text.match(new RegExp(pattern, 'g')) ?? []).length, 0);
-  assert.equal(total('typingInField'), 5, 'typingInField'); assert.equal(total('active\\?\\.matches\\("input, textarea, select"\\)'), 1, 'the typing check is written once'); assert.equal(total('renderChatMarkdown'), 7, 'renderChatMarkdown');
+  assert.equal(total('typingInField'), 4, 'typingInField'); assert.equal(total('active\\?\\.matches\\("input, textarea, select"\\)'), 1, 'the typing check is written once'); assert.equal(total('renderChatMarkdown'), 7, 'renderChatMarkdown');
   assert.equal(total('captureFocus\\(\\): \\(\\) => void \\{'), 1, 'one capture'); assert.equal(total('private detachMapChat\\(\\)'), 1, 'one detach');
 });
 
@@ -4371,10 +4356,9 @@ const spoilCases = [
   ['card gone', h => { h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.a); }, /no longer on the map/],
   ['merging', h => { h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' }); }, /being merged/],
   ['AI running (activeTasks)', h => { h.plugin.activeTasks.set(h.node('a').path, new AbortController()); }, /AI is working on the card/],
-  ['AI running (running)', h => { h.plugin.running.add(h.node('a').path); }, /AI is working on the card/],
-  ['AIM map', h => { h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; }, /cannot be edited/]
+  ['AI running (running)', h => { h.plugin.running.add(h.node('a').path); }, /AI is working on the card/]
 ];
-integrationTest('R1-5 place: a found picture is refused at the write, in words and with nothing written, when the map, the card, a merge, an AI task or the map type changed meanwhile; nothing running is aborted', async () => {
+integrationTest('R1-5 place: a found picture is refused at the write, in words and with nothing written, when the map, the card, a merge or an AI task changed meanwhile; nothing running is aborted', async () => {
   for (const [label, spoil, reason] of spoilCases) {
     const { h } = await imageHarness(); const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(2); };
     const file = noteFile(h, 'a'); const before = h.contents.get(file); const guard = new AbortController(); h.plugin.activeTasks.set('probe', guard);
@@ -4387,7 +4371,7 @@ integrationTest('R1-5 place: a found picture is refused at the write, in words a
   }
 });
 integrationTest('R1-5 place: the checks run again inside the write, where a merge or an AI task that started in between is seen', async () => {
-  for (const [label, spoil, reason] of [spoilCases[3], spoilCases[4], spoilCases[6]]) {
+  for (const [label, spoil, reason] of [spoilCases[3], spoilCases[4]]) {
     const { h } = await imageHarness(); h.control.search = async () => imageItems(1);
     const file = noteFile(h, 'a'); const before = h.contents.get(file); const guard = new AbortController(); h.plugin.activeTasks.set('probe', guard); const mutate = h.plugin.mutate.bind(h.plugin);
     h.plugin.mutate = work => { spoil(h); return mutate(work); };
@@ -5374,10 +5358,6 @@ integrationTest('chat 02: a send on an ordinary map tells the model each card ty
   assert.equal('kind' in outline(h.ids.root), false, 'an ordinary topic sends no kind');
   eq(context.relations, [{ kind: 'supports', from: h.ids.b, to: h.ids.a, description: 'A short reason' }]);
 });
-integrationTest('chat 02: a send on an AIM map carries no type, strength or relation', async () => {
-  const h = await harness(); const context = await chat02Type(h, true);
-  assert.equal(context.outline.some(n => 'kind' in n || 'strength' in n), false); assert.equal('relations' in context, false);
-});
 
 // ---- chat 03: the AI chat changes topic types ---------------------------------------------------------------------------
 const body = text => text.replace(/^---\n[\s\S]*?\n---\n/, '');
@@ -5407,19 +5387,6 @@ integrationTest('chat 03: add_child with a type creates the card with that type 
   await apply(h, [{ kind: 'add_child', parentId: h.ids.a, title: 'A claim', summary: 's', topicKind: 'hypothesis', strength: 'medium' }]);
   const made = h.view.map.nodes.find(n => h.view.notes.get(n.id)?.title === 'A claim');
   const note = await h.repo.readNote(made.path); assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'medium');
-});
-integrationTest('chat 03: on an AIM map set_topic_kind writes nothing and is skipped', async () => {
-  const h = await harness({ aim: true }); const before = h.contents.get(h.node('a').path);
-  const lines = await apply(h, [{ kind: 'set_topic_kind', nodeIds: [h.ids.a], topicKind: 'evidence' }]);
-  eq(lines.map(l => l.status), ['skipped']); assert.equal(h.contents.get(h.node('a').path), before);
-});
-integrationTest('chat 03: an AIM send tells the parser, so a reply that changes a type is counted as skipped and writes nothing', async () => {
-  const h = await harness({ aim: true }); const before = h.contents.get(h.node('a').path);
-  h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'set_topic_kind', nodeIds: [h.ids.a], topicKind: 'evidence' }] }), request.context);
-  h.open(); h.type('make it evidence'); await h.view.sendMapChat();
-  await until(() => !h.view.chat.isBusy);
-  assert.equal(h.contents.get(h.node('a').path), before);
-  assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
 });
 integrationTest('chat 03: ask_topic_kind changes nothing and offers three choices; "type only" then applies the type', async () => {
   const h = await harness(); h.open(); const before = h.contents.get(h.node('a').path);
@@ -5668,19 +5635,6 @@ integrationTest('chat 06: a relation the map no longer allows (duplicate pair, c
   assert.equal(h.contents.get(MAP), before, 'Map.md is not written');
   assert.equal(h.view.history.canUndo, false, 'nothing to undo');
 });
-integrationTest('chat 06: on an AIM map a relation action writes nothing and is skipped', async () => {
-  const h = await harness({ aim: true }); await h.view.hydrate(); const before = h.contents.get(MAP);
-  const lines = await apply(h, [addRel(h.ids.a, h.ids.b, 'supports'), { kind: 'remove_relation', fromId: h.ids.a, toId: h.ids.b }]);
-  eq(lines.map(l => l.status), ['skipped', 'skipped']); assert.equal(h.contents.get(MAP), before);
-});
-integrationTest('chat 06: an AIM send tells the parser, so a reply that adds a relation is counted as skipped and writes nothing', async () => {
-  const h = await harness({ aim: true }); const before = h.contents.get(MAP);
-  h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'add_relation', fromId: h.ids.a, toId: h.ids.b, relationKind: 'supports' }] }), request.context);
-  h.open(); h.type('link these two'); await h.view.sendMapChat();
-  await until(() => !h.view.chat.isBusy);
-  assert.equal(h.contents.get(MAP), before);
-  assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
-});
 integrationTest('chat 06: a real send checks a duplicate relation against the map it sent, and counts it as skipped', async () => {
   const h = await harness(); await h.view.hydrate();
   await linkOnDisk(h, [{ kind: 'supports', from: h.ids.c, to: h.ids.b }]); h.view.map = await h.repo.readMap(MAP);
@@ -5873,11 +5827,6 @@ integrationTest('chat 08: a card that already looks like that is not written, an
   assert.equal(h.contents.get(h.node('a').path), before);
   assert.equal(h.view.history.canUndo, false, 'nothing to undo');
 });
-integrationTest('chat 08: on an AIM map set_appearance writes nothing and is skipped', async () => {
-  const h = await harness({ aim: true }); const before = h.contents.get(h.node('a').path);
-  eq((await apply(h, [lookAct([h.ids.a], { color: 'red' })])).map(l => l.status), ['skipped']);
-  assert.equal(h.contents.get(h.node('a').path), before);
-});
 integrationTest('chat 08: a real send carries each card\'s appearance (default left out); an unknown value is counted as skipped and writes nothing', async () => {
   const h = await harness(); const path = h.node('a').path;
   await h.repo.writeTopicColor(path, 'green'); await h.repo.writeTopicMarkers(path, 'flag-blue'); await h.repo.writeTopicStyle(path, { set: ['bold'] }); await h.view.hydrate();
@@ -5890,16 +5839,6 @@ integrationTest('chat 08: a real send carries each card\'s appearance (default l
   assert.equal(card(h.ids.a).color, 'green'); eq(card(h.ids.a).markers, ['flag-blue']); eq(card(h.ids.a).formats, ['bold']);
   assert.equal(['color', 'markers', 'formats'].some(key => key in card(h.ids.b)), false);
   assert.equal(h.contents.get(h.node('b').path), before);
-  assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
-});
-integrationTest('chat 08: an AIM send carries no appearance and counts set_appearance as skipped', async () => {
-  const h = await harness({ aim: true }); await h.repo.writeTopicColor(h.node('a').path, 'green'); await h.view.hydrate();
-  const before = h.contents.get(h.node('a').path);
-  h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'set_appearance', nodeIds: [h.ids.a], color: 'red' }] }), request.context);
-  h.open(); h.type('make it red'); await h.view.sendMapChat();
-  await until(() => !h.view.chat.isBusy);
-  assert.equal(JSON.parse(h.control.requests[0].context.json).outline.some(n => 'color' in n), false);
-  assert.equal(h.contents.get(h.node('a').path), before);
   assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
 });
 integrationTest('chat 08: Undo takes back every appearance change of one reply in one step, with its other writes; Redo puts them back', async () => {
@@ -5952,15 +5891,11 @@ const hypNote = async (h, key, values = {}) => {
   await h.view.hydrate();
 };
 const setKind = (nodeIds, extra) => ({ kind: 'set_topic_kind', nodeIds, topicKind: 'hypothesis', ...extra });
-integrationTest('hypothesis-leaning: S15 a send on an ordinary map tells the model a hypothesis leaning and strength; an AIM map sends neither', async () => {
+integrationTest('hypothesis-leaning: S15 a send on an ordinary map tells the model a hypothesis leaning and strength', async () => {
   const h = await harness(); await hypNote(h, 'a', { leaning: 'refuted', strength: 'medium' });
   h.open(); h.type('q'); await h.view.sendMapChat();
   const node = JSON.parse(h.control.requests[0].context.json).outline.find(n => n.id === h.ids.a);
   assert.equal(node.leaning, 'refuted'); assert.equal(node.strength, 'medium');
-  const aim = await harness(); await hypNote(aim, 'a', { leaning: 'supported' }); aim.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; await aim.view.hydrate();
-  aim.open(); aim.type('q'); await aim.view.sendMapChat();
-  const sent = JSON.parse(aim.control.requests[0].context.json).outline;
-  assert.equal(sent.some(n => 'leaning' in n || 'strength' in n), false);
 });
 integrationTest('hypothesis-leaning: S18 set_topic_kind to hypothesis starts undecided and none without writing the keys; leaning and strength are written when given', async () => {
   const h = await harness();
@@ -6029,10 +5964,7 @@ integrationTest('hypothesis-leaning: S19 add_child writes topicKind, leaning and
   const two = await read('Claim2'); assert.equal(two.hypothesisLeaning, 'refuted'); assert.equal(two.hypothesisStrength, 'weak');
   const three = await read('Claim3'); assert.equal(three.hypothesisLeaning, 'undecided'); assert.equal(three.hypothesisStrength, 'none');
 });
-integrationTest('hypothesis-leaning: S20 set_topic_kind with a leaning skips an AIM card and a card being merged, and writes nothing', async () => {
-  const aim = await harness({ aim: true }); const aimBefore = aim.contents.get(aim.node('a').path);
-  const aimLines = await apply(aim, [setKind([aim.ids.a], { leaning: 'supported' })]);
-  eq(aimLines.map(l => l.status), ['skipped']); assert.equal(aim.contents.get(aim.node('a').path), aimBefore);
+integrationTest('hypothesis-leaning: S20 set_topic_kind with a leaning skips a card being merged, and writes nothing', async () => {
   const h = await harness(); await hypNote(h, 'a');
   h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
   const before = h.contents.get(h.node('a').path);
@@ -8113,9 +8045,8 @@ integrationTest('D1 find_images: in multi-select mode (the way to pick several c
   const block = { mapPath: h3.view.path, mapId: h3.view.map.id, nodeId: h3.ids.a };
   assert.equal(h3.view.chatCoverTarget(block)?.id, h3.ids.a, 'the card is the cover target');
   h3.view.isMerging = () => true; assert.equal(h3.view.chatCoverTarget(block), null, 'a merging card gets no cover');
-  h3.view.isMerging = () => false; h3.view.aimLive = () => true; assert.equal(h3.view.chatCoverTarget(block), null, 'AIM locks the card');
-  h3.view.aimLive = () => false; h3.view.map.nodes.find(n => n.id === h3.ids.a).aimKind = 'question';
-  assert.equal(h3.view.chatCoverTarget(block), null, 'an AIM card gets no cover');
+  h3.view.isMerging = () => false; h3.view.map.nodes.find(n => n.id === h3.ids.a).aimKind = 'question';
+  assert.equal(h3.view.chatCoverTarget(block)?.id, h3.ids.a, 'an old AIM card takes a cover like any card');
 });
 const coverStub = h => { h.view.chatHasNoCover = () => true; h.view.chatFetchImage = async () => pngBytes(); };
 const undoLabels = h => h.view.history.past.map(e => e.label);

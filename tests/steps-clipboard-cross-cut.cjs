@@ -514,12 +514,11 @@ test('P7 pure checks: what stops a cut at the source, and what counts as the sam
   const base = [node('top', null), node('p', 'top'), node('q', 'p')];
   const found = { branch: [base[1], base[2]] };
   assert.equal(cutSourceProblem(map(base), record, found), null);
-  assert.equal(cutSourceProblem(map(base, { aim: {} }), record, found), 'aim');
+  assert.equal(cutSourceProblem(map(base, { aim: {} }), record, found), null, 'an old AIM map is cut like any map');
   assert.equal(cutSourceProblem(map([...base, node('late', 'q')]), record, found), 'changed', 'a new child would be cut off from its parent');
   assert.equal(cutSourceProblem(map(base), record, null), 'changed');
   assert.equal(cutSourceProblem(map([node('top', null)]), record, null), 'gone');
   assert.equal(cutSourceProblem({ id: 'other', nodes: base }, record, found), 'gone');
-  assert.equal(cutSourceProblem(map(base), record, { branch: [node('p', 'top', { aimKind: 'question' }), base[2]] }), 'aim');
   const note = (lines, body = 'text\n') => `---\n${lines.join('\n')}\n---\n${body}`;
   assert.equal(sameApartFromStamps(note(['a: 1', 'b: 2']), note(['b: 2', 'updated: now', 'a: 1'])), true);
   assert.equal(sameApartFromStamps(note(['a: 1']), note(['a: 2'])), false);

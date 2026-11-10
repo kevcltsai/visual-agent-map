@@ -90,13 +90,13 @@ test('main task routing: Codex local and web, Claude without the prefix; the sch
 
 test('main task controls: signal reaches the runtime and aborts with the caller, timeout, search flags, accepted and web callbacks', async () => {
   const h = rig({ handler: call => answer(call) });
-  const controller = new AbortController(), accepted = () => {}, web = () => {};
-  await h.service.askModel(context({ researchMode: 'research', timeoutMs: 240_000, aimIsolatedResearch: true }), 'gpt-6-luna', 'low', controller.signal, undefined, accepted, web);
+  const controller = new AbortController(), accepted = () => {}, webEvents = [], web = event => webEvents.push(event);
+  await h.service.askModel(context({ researchMode: 'research', timeoutMs: 240_000 }), 'gpt-6-luna', 'low', controller.signal, undefined, accepted, web);
   const controls = h.state.calls[0].controls;
-  assert.equal(controls.onAccepted, accepted); assert.equal(controls.onWebSearchEvent, web);
+  assert.equal(controls.onAccepted, accepted);
+  controls.onWebSearchEvent?.({ method: 'item/started', params: {} }); assert.deepEqual(webEvents, [{ method: 'item/started', params: {} }], 'web events reach the caller (a standard research counts them on the way)');
   assert.equal(controls.timeoutMs, 240_000); assert.equal(controls.timeoutMessage, translate('en', 'ui.aim_task_timeout', 4));
-  assert.equal(controls.webSearch, true); assert.equal(controls.searchBudget, 0); assert.equal(controls.webSearchOnly, true); assert.equal(controls.textOnly, false);
-  assert.ok(h.state.calls[0].schema.required.includes('searchStatus'), 'isolated web research selects the web research schema');
+  assert.equal(controls.webSearch, true); assert.equal(controls.searchBudget, 0); assert.equal(controls.webSearchOnly, true); assert.equal(controls.textOnly, undefined);
   assert.ok(controls.signal instanceof AbortSignal);
   assert.equal(controls.signal.aborted, false);
   // D-2026-10-318: the runtime signal belongs to AiCalls and follows the caller's only while the call runs.
@@ -438,20 +438,6 @@ test('chart log switched on during the call is not recorded; switched off after 
   assert.deepEqual(off.names(), ['begin', 'ox', 'sent']);
 });
 
-// ---- 8. AIM conclusion diagrams ----
-test('addDiagramsToDetail: diagrams off means no call, no event and no onStart; on gives the chart success sequence', async () => {
-  const off = chartRig(call => answer(call, chartReply()), { extra: { diagramsEnabled: () => false } });
-  let started = 0;
-  const same = await off.service.addDiagramsToDetail({ title: 'Goal', detail: NOTE, language: 'en', model: 'gpt-6-luna', onStart: () => { started++; } });
-  assert.equal(same, NOTE); assert.equal(started, 0); assert.deepEqual(off.order, []); assert.equal(off.state.calls.length, 0);
-  const on = chartRig(call => answer(call, chartReply()), { extra: { diagramsEnabled: () => true } });
-  const detail = await on.service.addDiagramsToDetail({ title: 'Goal', detail: NOTE, language: 'en', model: 'gpt-6-luna', onStart: () => { started++; } });
-  assert.match(detail, /```mermaid\ntimeline/); assert.equal(started, 1);
-  assert.deepEqual(on.names(), ['begin', 'sent', 'received', 'milestones', 'parsed', 'completed'], 'no onExchange on this path');
-  assert.deepEqual({ ...on.order[0][2], id: '<id>', startedAt: '<time>' }, { id: '<id>', startedAt: '<time>', topic: 'Goal', mode: 'task', model: 'gpt-6-luna', effort: 'low', step: 'chart.add@1' });
-  assert.equal(on.state.calls[0].controls.timeoutMs, 180_000);
-});
-
 // Stop semantics after AiTaskService moved onto AiCalls:
 //  main task / reference: a reply that arrives after the caller's stop is refused before `received`;
 //  chart: the same, with only failed("Aborted") written;
@@ -571,15 +557,12 @@ test('the task prompt asks for StructuredOutput only on Claude, and the runtime 
   assert.equal(claude.state.directoryReads, 1); assert.equal(codex.state.directoryReads, 1);
 });
 
-test('the chart prompt asks for StructuredOutput only on Claude, for chartDetail and addDiagramsToDetail', async () => {
+test('the chart prompt asks for StructuredOutput only on Claude, for chartDetail', async () => {
   for (const model of ['claude:sonnet', 'gpt-6-luna']) {
     const expected = model.startsWith('claude:');
     const viaChart = runtimeRig({ reply: () => CHART_REPLY });
     await viaChart.service.chartDetail({ input: chartContext(), detail: NOTE, model });
     assert.equal(viaChart.state.calls.length, 1, model); assert.equal(usesStructuredOutput(viaChart.state.calls[0]), expected, `chartDetail ${model}`);
-    const viaDiagrams = runtimeRig({ reply: () => CHART_REPLY });
-    await viaDiagrams.service.addDiagramsToDetail({ title: 'Goal', detail: NOTE, language: 'en', model });
-    assert.equal(viaDiagrams.state.calls.length, 1, model); assert.equal(usesStructuredOutput(viaDiagrams.state.calls[0]), expected, `addDiagramsToDetail ${model}`);
   }
 });
 
@@ -665,11 +648,11 @@ test('AI suggested decide: no section, more than 12, a repeated name or a # in a
   }
 });
 
-test('AI suggested decide: only the first research with an empty Detail, in task mode, outside AIM and the repair, decides', async () => {
+test('AI suggested decide: only the first research with an empty Detail, in task mode, outside the repair, decides', async () => {
   const detail = sectionDetail(['Swing plane', 'Drills', 'Sources']);
   const skipped = {
     follow: { aiSections: 'follow' }, general: { aiSections: 'general' }, none: { aiSections: undefined },
-    notEmpty: { detail: '### Existing\n\nx' }, aim: { promptProfile: 'aim' }, repair: { countRepair: true }
+    notEmpty: { detail: '### Existing\n\nx' }, repair: { countRepair: true }
   };
   for (const [name, extra] of Object.entries(skipped)) {
     const { result } = await decided(detail, extra);

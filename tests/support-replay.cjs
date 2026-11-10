@@ -98,25 +98,4 @@ function replayRuntime(entries) {
 
 function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 
-const phaseOf = context => /<!--\s*(?:aim|mindsearch)-phase:\s*([a-z-]+)\s*-->/.exec(context.task ?? '')?.[1];
-/**
- * Replay ask double for the AimManualFlow ask seam (`ask(context) -> Promise<AiResult>`).
- * `steps` are the historical parsed results in order: { phase, result }. A call whose phase equals the next unconsumed
- * historical step receives that result (a deep copy). Any other phase is answered only by `fills[phase]` (neutral,
- * non-historical stand-ins that let the flow reach the phase under test); with neither it throws ReplayMiss.
- * There is no fallback to a live provider.
- */
-function replayAsk(steps, fills = {}) {
-  let next = 0;
-  const observed = [];
-  const ask = async context => {
-    const phase = phaseOf(context);
-    observed.push({ phase, context });
-    if (next < steps.length && steps[next].phase === phase) return JSON.parse(JSON.stringify(steps[next++].result));
-    if (fills[phase] !== undefined) return JSON.parse(JSON.stringify(typeof fills[phase] === 'function' ? fills[phase](context) : fills[phase]));
-    throw new ReplayMiss(`Replay ask has no historical result or fill for phase ${phase} (next historical step: ${steps[next]?.phase ?? 'none'}).`);
-  };
-  return { ask, observed, phases: () => observed.map(item => item.phase), consumed: () => next, unused: () => steps.slice(next) };
-}
-
-module.exports = { replayAsk, root, load, loadSource, normalizeText, sha256, capturingRuntime, makeService, promptsFor, replayRuntime, ReplayMiss, readJson, EMPTY_RESULT };
+module.exports = { root, load, loadSource, normalizeText, sha256, capturingRuntime, makeService, promptsFor, replayRuntime, ReplayMiss, readJson, EMPTY_RESULT };

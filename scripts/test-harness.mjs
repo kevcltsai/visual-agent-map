@@ -254,43 +254,11 @@ function assertObsidianClosed() {
   if (result.error || result.status !== 1) throw new Error("Close Obsidian before resetting the canonical vault, then rerun. No running vault will be replaced.");
 }
 
-// Smoke profile: builds the AIM smoke bundle outside the repository and installs it ONLY into a disposable test vault
-// that is not the canonical vault. Never touches the repository's main.js or any personal vault.
+// The name "smoke" stays reserved for a session vault: the old AIM smoke profile used this vault path.
 export const smokeVault = process.platform === "darwin" ? "/private/tmp/vam-e2e-smoke" : join(tmpdir(), "vam-e2e-smoke");
-export const smokeArtifact = process.platform === "darwin" ? "/private/tmp/vam-smoke-artifact" : join(tmpdir(), "vam-smoke-artifact");
-export const SMOKE_MARKER = "VAM_SMOKE_PROFILE_ACTIVE";
-function smokeSetup(args) {
-  const search = args.find(arg => arg.startsWith("--smoke-web-search="))?.split("=")[1] ?? "on";
-  if (!["on", "off"].includes(search)) throw new Error("--smoke-web-search must be on or off.");
-  if (resolve(smokeVault) === resolve(canonicalVault)) throw new Error("The smoke vault must not be the canonical vault.");
-  run("node", ["tests/smoke/build-smoke.mjs", `--out=${smokeArtifact}`, `--web-search=${search}`]);
-  if (!readFileSync(join(smokeArtifact, "main.js"), "utf8").includes(SMOKE_MARKER)) throw new Error("The smoke artifact lacks the smoke marker.");
-  if (readFileSync(join(root, "main.js"), "utf8").includes(SMOKE_MARKER)) throw new Error("The production main.js contains the smoke marker; refusing to continue.");
-  const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" }).trim();
-  const source = { profile: "smoke", webSearch: search, branch: git("branch", "--show-current"), commit: git("rev-parse", "HEAD"), status: git("status", "--short"), fingerprint: sourceFingerprint() };
-  const runtime = installedObsidianRuntime();
-  source.obsidianRuntime = { version: runtime.version, hash: runtime.hash };
-  const lock = `${smokeVault}.lock`;
-  mkdirSync(lock); // Exclusive writer; an existing lock requires investigation.
-  try {
-    const record = prepareTestVault({ vault: smokeVault, artifact: smokeArtifact, profile: "normal", source });
-    const appProfile = prepareObsidianProfile(smokeVault, runtime);
-    process.stdout.write(`${JSON.stringify({ profile: "smoke", vault: smokeVault, artifact: smokeArtifact, appProfile, notice: "Obsidian shows a persistent 'Test overrides active' Notice on load. Results are profile=smoke evidence, not a full E2E PASS.", ...record }, null, 2)}\n`);
-    verifyTestVault(smokeVault, smokeArtifact);
-    return appProfile;
-  } finally { rmSync(lock, { recursive: true }); }
-}
 
 export function main(args = process.argv.slice(2)) {
   if (args.some(arg => arg.startsWith("--session="))) return sessionMain(args);
-  if (args.includes("--smoke")) {
-    for (const arg of args) if (arg !== "--smoke" && arg !== "--smoke-launch" && !/^--smoke-web-search=(on|off)$/.test(arg)) throw new Error(`--smoke cannot be combined with: ${arg}`);
-    // The smoke vault has its own private Obsidian profile, so a personal Obsidian may stay open; only a smoke instance blocks a reset.
-    if (spawnSync("pgrep", ["-f", "--", `--user-data-dir=${smokeVault}`], { encoding: "utf8" }).status === 0) throw new Error("Close the Obsidian instance that has the smoke vault open, then rerun.");
-    const appProfile = smokeSetup(args);
-    if (args.includes("--smoke-launch")) { launchObsidian(appProfile); process.stdout.write("Smoke vault opened. Run the planned smoke case, then record the result as profile=smoke.\n"); }
-    return;
-  }
   for (const arg of args) if (!["--ui", "--prepare", "--update-current"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`Unknown argument: ${arg}`);
   const ui = args.includes("--ui"), prepare = ui || args.includes("--prepare");
   const update = args.includes("--update-current");

@@ -311,7 +311,7 @@ test('A3 clean-up: a member moved to another parent or removed shrinks or remove
   assert.equal((await h.repo.readMap(MAP)).canvasItems, undefined);
 });
 
-test('T6 P3 entries (counterexample 15, D4/D10): Note style… only for one regular topic; a multi-selection, an AIM conclusion card, an AIM map and presentation get none; Menu key / Shift+F10 (client 0,0) opens the menu beside the card', async () => {
+test('T6 P3 entries (counterexample 15, D4/D10): Note style… only for one regular topic; a multi-selection and presentation get none; Menu key / Shift+F10 (client 0,0) opens the menu beside the card', async () => {
   const h = await harness();
   const card = h.view.cardEls.get(h.ids.b);
   card.getBoundingClientRect = () => ({ left: 500, bottom: 190, top: 150, right: 700 });
@@ -326,16 +326,11 @@ test('T6 P3 entries (counterexample 15, D4/D10): Note style… only for one regu
   h.view.onCanvasContextMenu(event());
   assert.deepEqual(titles(), ['Add summary bracket'], 'two or more selected topics: no per-topic style');
   h.view.selection.replaceMulti([]);
-  h.view.map.nodes.find(n => n.id === h.ids.b).aimKind = 'conclusion';
-  h.view.onCanvasContextMenu(event());
-  assert.deepEqual(titles(), ['Add summary bracket'], 'an AIM conclusion card has its own style row in the settings');
-  delete h.view.map.nodes.find(n => n.id === h.ids.b).aimKind;
   h.view.onCanvasContextMenu(event(0, 0));
   assert.deepEqual(plain(h.menus.at(-1).at), { x: 500, y: 190 }, 'keyboard: the menu sits at the bottom-left of the card');
   assert.equal(h.menus.at(-1).mouse, undefined);
-  for (const mode of ['aim', 'presentation']) {
+  for (const mode of ['presentation']) {
     const g = await harness();
-    if (mode === 'aim') g.view.map.aim = { branches: [] };
     if (mode === 'presentation') g.view.presentation = { order: [], currentId: 'x' };
     const gcard = g.view.cardEls.get(g.ids.b);
     const before = g.menus.length;
@@ -354,7 +349,7 @@ test('A5 wiring: the integration context gets the brackets of that parent only; 
   assert.equal(plainMap.view.chatSummaries(), undefined);
 });
 
-test('entries: right-click on a card offers the bracket for the multi-selection (or that card); AIM and presentation get none', async () => {
+test('entries: right-click on a card offers the bracket for the multi-selection (or that card); presentation gets none', async () => {
   const h = await harness();
   const card = h.view.cardEls.get(h.ids.b);
   const event = () => ({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
@@ -365,9 +360,8 @@ test('entries: right-click on a card offers the bracket for the multi-selection 
   h.menus.at(-1).items.find(i => i.title === 'Add summary bracket').click();
   assert.ok(h.area(), 'one card is enough; the editor opens');
   assert.deepEqual(plain(h.view.pendingSummary.members), [h.ids.b]);
-  for (const mode of ['aim', 'presentation']) {
+  for (const mode of ['presentation']) {
     const g = await harness({ build: ids => [{ id: 's1', kind: 'summary', parentId: ids.root, members: [ids.b], text: 'x' }] });
-    if (mode === 'aim') g.view.map.aim = { branches: [] };
     if (mode === 'presentation') g.view.presentation = { order: [], currentId: 'x' };
     g.view.render();
     g.view.selection.replaceMulti([g.ids.c]);

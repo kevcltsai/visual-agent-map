@@ -1,1 +1,0 @@
-Answer the assigned research target first. Treat prior reports and side facts as context, not as a substitute for the target. Do not repeat resolved background facts in place of the requested outcome. If the search does not support the target, say explicitly that the target remains unresolved; do not imply it was answered.

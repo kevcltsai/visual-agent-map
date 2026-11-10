@@ -2440,11 +2440,6 @@ integrationTest('C8 language switch: a note keeps the heading language it was wr
   assert.match(contents.get(cn.path), /## 当前摘要\n\n切換後/, 'zh-CN headings stay Simplified');
   assert.match(contents.get(en.path), /## Current Summary\n\nStill English/, 'English headings stay English');
   assert.equal((await repo.readNote(cn.path)).rules, '规则内容');
-  const mapPath = await repo.createMap('AIM English'); const map = await repo.readMap(mapPath);
-  const reserved = `${repo.topicFolder(mapPath, 'Notes')}/English AIM note.md`;
-  const aim = await repo.createNoteAt('English AIM note', 'model-a', map, mapPath, 'workspace', reserved, 'aim-en', { contentLanguage: 'en' });
-  assert.match(contents.get(aim.path), /## Current Summary\n\nNo conclusion yet/, 'an English-content note keeps English headings under a Chinese interface');
-  assert.doesNotMatch(contents.get(aim.path), /目前摘要|詳細內容/);
 });
 test('C8 heading language: only the managed Detail heading decides; the marker line is hidden in Live Preview and when shown as text', () => {
   const { noteHeadingLanguage, localizeHeadings } = load('repository.ts', { obsidian });

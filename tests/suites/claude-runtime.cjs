@@ -49,7 +49,7 @@ test('Claude stream mode skips plain-text warning lines between JSON records', a
   const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
   assert.equal(await new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn }).runTask('hi', 'sonnet', 'low', undefined, { onText: () => {} }), 'hello');
 });
-test('AiTaskService gives Claude the same web telemetry and search requirement as Codex for isolated research', async () => {
+test('AiTaskService gives Claude the same web telemetry and search requirement as Codex for a standard research', async () => {
   const { AiTaskService } = load('core/ai-task-service.ts');
   let received;
   const service = new AiTaskService({
@@ -58,7 +58,7 @@ test('AiTaskService gives Claude the same web telemetry and search requirement a
     claudeRuntime: () => ({ runTask: async (_prompt, _model, _effort, _schema, controls) => { received = controls; controls.onWebSearchEvent({ method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'search' } } } }); return JSON.stringify({ summary: 's', detail: 'd', suggestions: [], visualReferences: [], searchStatus: 'completed' }); } })
   });
   const events = [];
-  await service.askModel({ title: 'T', summary: '', rules: '', detail: '', task: 'Research', ancestors: '', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'off', promptProfile: 'aim', aimIsolatedResearch: true }, 'claude:sonnet', 'low', undefined, undefined, undefined, event => events.push(event));
+  await service.askModel({ title: 'T', summary: '', rules: '', detail: '', task: 'Research', ancestors: '', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'off' }, 'claude:sonnet', 'low', undefined, undefined, undefined, event => events.push(event));
   assert.equal(received.webSearchOnly, true);
   assert.equal(events.length, 1);
 });

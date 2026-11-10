@@ -1144,7 +1144,7 @@ integrationTest('AI merge check: Stop, closing the view or a source edit during 
     };
     const { task } = await h.begin(); await reached;
     if (scenario === 'stop') h.view.stopMergeTask(task);
-    if (scenario === 'close') { while (!h.asks.length) await new Promise(r => setImmediate(r)); h.view.closed = true; for (const t of h.view.mergeTasks.values()) t.controller.abort(); }
+    if (scenario === 'close') { h.view.closed = true; for (const t of h.view.mergeTasks.values()) t.controller.abort(); }
     await h.untilSettled(task);
     assert.equal(h.view.mergeTasks.size, 0, scenario); assert.equal(h.view.history.canUndo, false, scenario); assert.deepEqual((await h.shape()).nodes, original.nodes, scenario);
     if (scenario === 'stale') { assert.deepEqual(h.notices.filter(m => /nothing was merged/.test(m)), ['A source topic changed or left the map, so nothing was merged']); assert.notDeepEqual(h.files(), files); }
@@ -1538,8 +1538,9 @@ integrationTest('AI merge: when the sources or the map change during the run (so
     otherMapPath: async h => { h.view.path = 'Agent Workspace/Topics/other/Map.md'; }
   };
   for (const [name, change] of Object.entries(cases)) {
-    const h = await aiMergeHarness(); h.answer = async () => { await change(h); return { summary: 's', detail: 'd', visualReferences: [], formatIssues: [], suggestions: [] }; };
-    const { task } = await h.begin(); await new Promise(r => setImmediate(r)); const files = h.files(); const nodes = JSON.stringify(h.view.map.nodes);
+    const h = await aiMergeHarness(); let files, nodes;
+    h.answer = async () => { await change(h); files = h.files(); nodes = JSON.stringify(h.view.map.nodes); return { summary: 's', detail: 'd', visualReferences: [], formatIssues: [], suggestions: [] }; };
+    const { task } = await h.begin();
     await h.untilSettled(task);
     assert.deepEqual(h.files(), files, `${name}: no file created or moved`); assert.equal(JSON.stringify(h.view.map.nodes), nodes, name);
     assert.equal(h.view.mergeTasks.size, 0, name); assert.equal(h.view.history.canUndo, false, name);

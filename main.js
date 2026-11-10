@@ -30755,6 +30755,65 @@ var NameModal = class extends import_obsidian17.Modal {
   }
 };
 
+// core/sync-scope.ts
+var UNSYNCED_LIMIT = 500;
+var UnsyncedPaths = class {
+  constructor() {
+    __publicField(this, "paths", /* @__PURE__ */ new Map());
+    __publicField(this, "full", null);
+  }
+  /** A vault event for `path` with event number `seq` (numbers only grow). */
+  add(path, seq) {
+    if (this.full !== null) {
+      this.full = Math.max(this.full, seq);
+      return;
+    }
+    this.paths.set(path, seq);
+    if (this.paths.size > UNSYNCED_LIMIT) this.markFull(seq);
+  }
+  /** The next read-back reads the whole map; `seq` is the event number the mark belongs to. */
+  markFull(seq) {
+    var _a2;
+    this.full = Math.max((_a2 = this.full) != null ? _a2 : seq, seq);
+    this.paths.clear();
+  }
+  isEmpty() {
+    return this.full === null && this.paths.size === 0;
+  }
+  snapshot() {
+    return { paths: new Map(this.paths), full: this.full };
+  }
+  /**
+   * A read-back of `snapshot` ended without throwing. Only what it covered is forgotten: a path (or the full mark) that
+   * got a newer event meanwhile stays. A path whose read threw stays too, or comes back with `seq` (the event number when
+   * the snapshot was taken) when the snapshot did not list it (an ancestor read for a child); this never moves a newer
+   * number back.
+   */
+  settle(snapshot, failedPaths, seq) {
+    const failed = new Set(failedPaths);
+    if (snapshot.full !== null && this.full === snapshot.full) this.full = null;
+    for (const [path, at] of snapshot.paths)
+      if (!failed.has(path) && this.paths.get(path) === at) this.paths.delete(path);
+    for (const path of failed) {
+      if (this.full !== null) break;
+      if (!this.paths.has(path)) this.paths.set(path, seq);
+    }
+    if (this.paths.size > UNSYNCED_LIMIT) this.markFull(seq);
+  }
+  /** The view closed: nothing is read back for it any more. */
+  clear() {
+    this.paths.clear();
+    this.full = null;
+  }
+};
+function needsReadBack(snapshot, mapPath, nodePaths) {
+  if (snapshot.full !== null) return true;
+  if (!snapshot.paths.size) return false;
+  if (snapshot.paths.has(mapPath)) return true;
+  for (const path of nodePaths) if (snapshot.paths.has(path)) return true;
+  return false;
+}
+
 // ui/modals/choice-modal.ts
 var import_obsidian18 = require("obsidian");
 var ChoiceModal = class extends import_obsidian18.Modal {
@@ -60960,6 +61019,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     __publicField(this, "renderPending", false);
     __publicField(this, "syncHold", 0);
     __publicField(this, "syncPending", false);
+    __publicField(this, "unsyncedPaths", null);
     __publicField(this, "heldViews", []);
     /** The hint on an empty canvas, which follows the chat while it builds a map. */
     __publicField(this, "emptyMapEl", null);
@@ -61320,6 +61380,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
   /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
   droppedCyclesOfLastMerge() {
     return this.lastDroppedCycles;
+  }
+  /** Files changed while VAM was writing that this view has not read back yet (the plugin fills it; see synchronize). */
+  get unsynced() {
+    var _a2;
+    return (_a2 = this.unsyncedPaths) != null ? _a2 : this.unsyncedPaths = new UnsyncedPaths();
   }
   /**
    * The one measurer of a text block: its width and height as the browser lays it out. Without `as` a drawn block is read
@@ -62603,6 +62668,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     this.closeTopicLinkMenu();
     this.closed = true;
+    this.unsyncedPaths = null;
     this.closeTopicChatWindow();
     this.topicChatSessions.clear();
     if (this.plugin.repo.isDisposed()) (_a2 = this.topicChatRecords) == null ? void 0 : _a2.dispose();
@@ -71869,12 +71935,27 @@ ${request.requirements}` : preset.text,
       label(redo, ((_e = this.history.redoEntry) == null ? void 0 : _e.label) ? t("ui.redo_0", this.history.redoEntry.label) : t("ui.redo"));
     }
   }
-  async synchronize() {
+  /**
+   * Reads the map back after a write. With `scope` (the end of a plugin write) only when a file this view collected since
+   * its last read-back is its Map.md or one of its notes; `scope.seq` is the plugin's event number when the read-back
+   * started. Without it, always.
+   */
+  async synchronize(scope) {
+    var _a2, _b2;
     if (this.syncHold > 0) {
       this.syncPending = true;
       return;
     }
     if (!this.path || !this.map || this.closed) return;
+    const snapshot = this.unsynced.snapshot(), seq = (_a2 = scope == null ? void 0 : scope.seq) != null ? _a2 : 0;
+    if (scope && !needsReadBack(
+      snapshot,
+      this.path,
+      this.map.nodes.map((node) => node.path)
+    )) {
+      this.unsynced.settle(snapshot, [], seq);
+      return;
+    }
     if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian40.TFile)) {
       this.map = null;
       this.path = "";
@@ -71891,7 +71972,8 @@ ${request.requirements}` : preset.text,
       this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
-    await this.hydrate(void 0, void 0, meta);
+    const read = await this.hydrate(void 0, void 0, meta);
+    this.unsynced.settle(snapshot, (_b2 = read == null ? void 0 : read.failedPaths) != null ? _b2 : [], seq);
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
       const editing = this.typingInField();
       if ((!editing || structureChanged) && !this.dragging) this.render();
@@ -95417,6 +95499,8 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
     __publicField(this, "localizedCommands", []);
     __publicField(this, "queue", Promise.resolve());
     __publicField(this, "writing", 0);
+    /** Numbers the vault events collected while VAM writes (see collectUnsynced); only ever grows. */
+    __publicField(this, "syncSeq", 0);
     __publicField(this, "externalReconcileTimer", null);
     __publicField(this, "externalReconcilePaths", /* @__PURE__ */ new Set());
     __publicField(this, "workspaceRecoveryCandidates", []);
@@ -95447,15 +95531,17 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
     return plainFailure(context, error);
   }
   /**
-   * Runs a write after every earlier one. Views re-read the map and its notes afterwards unless the caller states the
-   * write only touches the viewport (`sync: false`), which changes nothing another view could need to reload.
+   * Runs a write after every earlier one. Afterwards each view re-reads its map and notes when a file it shows changed
+   * while VAM was writing (collectUnsynced), unless the caller states the write only touches the viewport
+   * (`sync: false`), which changes nothing another view could need to reload; what was collected then waits for the next
+   * write. `sync: "full"` makes every view re-read its whole map.
    */
   async mutate(work, options = {}) {
     const result = this.queue.then(async () => {
       this.writing++;
       try {
         await work();
-        if (options.sync !== false) for (const view of this.views()) await view.synchronize();
+        if (options.sync !== false) await this.readBackViews(options.sync === "full");
       } finally {
         this.writing--;
       }
@@ -95467,6 +95553,25 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
       errorNotice(error);
     });
     return result;
+  }
+  /**
+   * The end of a write: each view not held by a chat batch reads back what it collected. A file that changed while the
+   * views were read is collected too; one more (empty) write is queued for it, never awaited here. A read that failed
+   * stays collected for the next write and does not queue one, so a broken file cannot loop.
+   */
+  async readBackViews(full) {
+    const views = this.views();
+    if (full) for (const view of views) view.unsynced.markFull(this.syncSeq);
+    const start = this.syncSeq;
+    for (const view of views) await view.synchronize({ seq: start });
+    if (this.syncSeq !== start) this.runMutation(async () => {
+    });
+  }
+  /** A vault event while VAM writes: every open view collects the paths (a rename gives both) under one new number. */
+  collectUnsynced(...paths) {
+    if (!this.writing) return;
+    const seq = ++this.syncSeq;
+    for (const view of this.views()) for (const path of paths) view.unsynced.add(path, seq);
   }
   /** Fire-and-forget mutation for event and command handlers; mutate() has already logged any failure. */
   runMutation(work) {
@@ -96015,11 +96120,18 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
   registerVaultEvents() {
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
+        if (file instanceof import_obsidian53.TFile) this.collectUnsynced(file.path);
         if (!this.writing && file instanceof import_obsidian53.TFile) for (const view of this.views()) view.changed(file);
       })
     );
     this.registerEvent(
+      this.app.vault.on("create", (file) => {
+        if (file instanceof import_obsidian53.TFile) this.collectUnsynced(file.path);
+      })
+    );
+    this.registerEvent(
       this.app.vault.on("delete", (file) => {
+        if (file instanceof import_obsidian53.TFile) this.collectUnsynced(file.path);
         if (file instanceof import_obsidian53.TFile) this.scheduleExternalReconciliation(file.path);
         if (!this.writing && file instanceof import_obsidian53.TFile) {
           for (const view of this.views()) view.deleted(file);
@@ -96030,6 +96142,7 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
+        if (file instanceof import_obsidian53.TFile) this.collectUnsynced(oldPath, file.path);
         if (!(file instanceof import_obsidian53.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
         if (file.path === oldPath) return;
         const external = !this.writing;
@@ -96287,6 +96400,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (typeof model !== "string" || !model.trim()) return;
     this.settings.cliModel = model.trim();
     await this.saveSettings();
+    for (const view of this.views()) view.unsynced.markFull(this.syncSeq);
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */

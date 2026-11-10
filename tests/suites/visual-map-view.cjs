@@ -1025,7 +1025,7 @@ const viewportFixture = () => {
   const note = { title: 'T', summary: '', status: 'completed' };
   const repo = { isDisposed: () => false, coordinatesChangedOutside: async () => false, updateMap: async (_path, change) => { counts.updateMap++; change(doc); }, readMap: async () => { counts.readMap++; return JSON.parse(JSON.stringify(doc)); }, readMapMeta: async () => { counts.readMap++; return { map: JSON.parse(JSON.stringify(doc)), goal: undefined, context: undefined, sources: [] }; }, readNote: async () => { counts.readNote++; return { ...note }; } };
   const plugin = Object.create(Plugin.prototype);
-  Object.assign(plugin, { queue: Promise.resolve(), writing: 0, logs: { appendLog() {} }, repo, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), pendingSuggestions: new Map(), syncOutline() {}, releaseOutline() {}, detailsShown: () => false, setOutlineActive() {} });
+  Object.assign(plugin, { queue: Promise.resolve(), writing: 0, syncSeq: 0, logs: { appendLog() {} }, repo, settings: { ...DEFAULT_SETTINGS }, expansionBatches: new Map(), pendingSuggestions: new Map(), syncOutline() {}, releaseOutline() {}, detailsShown: () => false, setOutlineActive() {} });
   const app = { vault: { getAbstractFileByPath: () => new obsidian.TFile('m/Map.md') } };
   const view = new VisualAgentMapView({ app }, plugin);
   view.app = app; view.path = 'm/Map.md'; view.map = doc; view.render = () => {};
@@ -1078,14 +1078,16 @@ integrationTest('a viewport-only write skips the note re-read, while a content w
   await plugin.queue;
   assert.equal(counts.updateMap, 1, 'the viewport is written');
   assert.equal(counts.readNote, 0, 'no note is read'); assert.equal(counts.readMap, 0, 'the map is not re-read either');
-  await plugin.mutate(async () => {});
+  // A content write: Obsidian reports the note it wrote while VAM is writing.
+  await plugin.mutate(async () => { plugin.collectUnsynced(view.map.nodes[1].path); });
   assert.equal(counts.readNote, 2, 'a content write re-reads every note'); assert.equal(counts.readMap, 1);
 });
 integrationTest('write queue keeps order: a content write interleaved with viewport writes still synchronizes and none is lost', async () => {
-  const { plugin, counts } = viewportFixture();
+  const { plugin, view, counts } = viewportFixture();
   const order = [];
   const first = plugin.mutate(async () => { order.push('viewport 1'); }, { sync: false });
-  const content = plugin.mutate(async () => { order.push('content'); });
+  // A content write: Obsidian reports the note it wrote while VAM is writing.
+  const content = plugin.mutate(async () => { order.push('content'); plugin.collectUnsynced(view.map.nodes[1].path); });
   const second = plugin.mutate(async () => { order.push('viewport 2'); }, { sync: false });
   await Promise.all([first, content, second]);
   assert.deepEqual(order, ['viewport 1', 'content', 'viewport 2']);

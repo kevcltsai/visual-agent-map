@@ -1,5 +1,5 @@
-// Argument map recovery and wiring (P5b, rewritten for V2 packet V1): a legacy (`"v": 1`) map is read-only, so a reload that leaves its run
-// `running` does NOT pause it when the map opens (opening never writes); maps without the key are untouched. Real main.ts plugin wiring is checked for
+// Argument map recovery and wiring (P5b): a reload that leaves a run `running` without an owner pauses it when the map opens, with no
+// provider call; maps without the key are untouched; a run this instance owns is left alone. Real main.ts plugin wiring is checked for
 // the test entry and for dispose. Unit level: the view is a harness over the real repository, not a live Obsidian.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -54,15 +54,17 @@ async function harness({ withKey = true, running = true, phase, stacked = false 
   return { repo, view, mapPath, text, owners, calls, open: () => view.openMapInMutation(mapPath) };
 }
 
-test('legacy v1 map: a run left running by a reload is NOT paused on open; the map is not written, no provider call', async () => {
+test('reload with a running run and no owner: paused as interrupted, items pending, no provider call', async () => {
   const h = await harness();
-  const before = await h.text();
-  const stored = (await h.repo.readMap(h.mapPath)).argumentMap;
-  assert.equal(stored.v, 1);
-  assert.equal(stored.run.status, 'running');
+  const before = (await h.repo.readMap(h.mapPath)).argumentMap;
+  assert.equal(before.situation.data[0].state, 'searching');
   await h.open();
-  assert.equal(await h.text(), before, 'opening wrote nothing');
-  assert.equal(h.view.map.argumentMap.run.status, 'running');
+  const after = (await h.repo.readMap(h.mapPath)).argumentMap;
+  assert.equal(after.run.status, 'paused');
+  assert.equal(after.run.stopReason, 'interrupted');
+  assert.equal(after.situation.data[0].state, 'pending');
+  assert.equal(after.run.researchCalls, before.run.researchCalls);
+  assert.equal(h.view.map.argumentMap.run.status, 'paused');
   assert.equal(h.calls.provider, 0);
 });
 
@@ -74,12 +76,18 @@ test('a map without the argumentMap key is not rewritten', async () => {
   assert.equal(h.view.map.argumentMap, undefined);
 });
 
-test('open: a stacked legacy map is not arranged and not written (read-only); no provider call', async () => {
+test('open: a stacked argument map is arranged once (no overlap, no provider call); opening again writes nothing', async () => {
   const h = await harness({ stacked: true, running: false });
-  const before = await h.text();
+  const before = (await h.repo.readMap(h.mapPath)).nodes;
+  assert.equal(new Set(before.map(n => `${n.x},${n.y}`)).size, 1);
   await h.open();
-  assert.equal(await h.text(), before);
+  const after = (await h.repo.readMap(h.mapPath)).nodes;
+  assert.ok(new Set(after.map(n => `${n.x},${n.y}`)).size > 1);
+  assert.deepEqual(after.map(n => n.id), before.map(n => n.id));
   assert.equal(h.calls.provider, 0);
+  const once = await h.text();
+  await h.open();
+  assert.equal(await h.text(), once);
 });
 
 test('open: an ordinary map with stacked cards is not arranged', async () => {
@@ -105,100 +113,37 @@ test('a run this instance owns, a paused run and a finished run are left as they
   assert.equal(await finished.text(), finishedBefore);
 });
 
-test('an unusable argumentMap key (v:3) is kept as it is and not paused', async () => {
+test('an unusable argumentMap key is kept as it is and not paused', async () => {
   const h = await harness();
-  await h.repo.updateMap(h.mapPath, doc => { doc.argumentMap = { ...doc.argumentMap, v: 3 }; });
+  await h.repo.updateMap(h.mapPath, doc => { doc.argumentMap = { ...doc.argumentMap, v: 2 }; });
   const before = await h.text();
   await h.open();
   assert.equal(await h.text(), before);
 });
 
 test('wiring: the plugin owns an ArgumentRuns test entry, and dispose refuses further starts', async () => {
-  const plugin = new Plugin({}, { id: 'vam', version: '0.0.0' });
-  const entry = plugin.argumentRuns;
+  const entry = new Plugin({}, { id: 'vam', version: '0.0.0' }).argumentRuns;
   assert.ok(entry, 'plugin.argumentRuns exists');
   for (const method of ['start', 'stop', 'resume', 'isRunning', 'dispose']) assert.equal(typeof entry[method], 'function');
   assert.equal(entry.isRunning('Nothing.md'), false);
-  await assert.rejects(entry.start('Nothing.md', 'claim'), error => error.code === 'unusable', 'the v1 start is refused (B3)');
   entry.dispose();
-  const outcome = await plugin.argumentRunsV2.start('Nothing.md', {}).catch(error => ({ ok: false, refusal: error.code }));
-  assert.equal(outcome.ok, false);
-  assert.equal(outcome.refusal, 'disposed');
+  await assert.rejects(entry.start('Nothing.md', 'claim'), error => error.code === 'disposed');
 });
 
-test('counterexample: opening a legacy map never starts, resumes or writes (start, resume, stop, provider all 0)', async () => {
+test('counterexample: no auto-rerun after a reload; the paused run waits for the person to press resume (start, resume, provider all 0)', async () => {
+  const progress = load('experiences/visual-map/argument-progress.ts');
   const h = await harness();
   const runs = [];
   h.view.plugin.argumentRuns = { isRunning: p => h.owners.has(p), start: (...a) => { runs.push(['start', ...a]); return Promise.resolve(); }, resume: (...a) => { runs.push(['resume', ...a]); return Promise.resolve(); }, stop: (...a) => { runs.push(['stop', ...a]); } };
-  const before = await h.text();
   await h.open();
-  assert.equal(await h.text(), before);
+  const state = h.view.map.argumentMap;
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'interrupted');
+  const bar = progress.describeArgumentProgress(state, false, (key, ...values) => key);
+  assert.equal(bar.tone, 'warn');
+  assert.equal(bar.title, 'ui.argument_bar_interrupted');
+  assert.equal(bar.detail, 'ui.argument_bar_no_auto_rerun');
+  assert.equal(bar.action, 'resume', 'only a press resumes it');
   assert.deepEqual(runs, [], 'nothing was started or resumed by opening');
   assert.equal(h.calls.provider, 0);
-});
-
-// ---- version 2: open-map recovery goes through the runner (packet V7) --------------------------------------------------------------
-const { v2State } = require('./fixtures/argument-map-v2-state.cjs');
-async function harnessV2() {
-  const h = await harness({ withKey: false });
-  const doc = await h.repo.readMap(h.mapPath);
-  const ids = ['p', 'pr', 'c', 'q1', 'd1', 'q2', 'cmp', 'h1', 'n1'];
-  const created = {};
-  for (const name of ids) {
-    const node = await h.repo.createNote(name, 'gpt-6-luna', doc, h.mapPath, 'workspace');
-    doc.nodes.push(node);
-    created[name.toUpperCase()] = node.id;
-  }
-  doc.argumentMap = v2State(created);
-  await h.repo.saveMap(h.mapPath, doc);
-  return { ...h, created };
-}
-
-test('version 2 map: opening asks the runner to recover once with the map path; no provider call', async () => {
-  const h = await harnessV2();
-  const recovered = [];
-  h.view.plugin.argumentRuns = { recoverInMutation: async path => { recovered.push(path); return false; } };
-  await h.open();
-  assert.deepEqual(recovered, [h.mapPath]);
-  assert.equal(h.calls.provider, 0);
-  assert.equal(h.view.map.argumentMap.v, 2);
-});
-
-test('version 2 map: when recovery changed the map, the view shows the saved result', async () => {
-  const h = await harnessV2();
-  h.view.plugin.argumentRuns = {
-    recoverInMutation: async path => {
-      await h.repo.updateMap(path, doc => { doc.argumentMap.run.stopReason = 'interrupted'; });
-      return true;
-    }
-  };
-  await h.open();
-  assert.equal(h.view.map.argumentMap.run.stopReason, 'interrupted');
-});
-
-test('counterexample: a legacy map and an ordinary map never reach the version 2 runner', async () => {
-  for (const withKey of [true, false]) {
-    const h = await harness({ withKey });
-    let calls = 0;
-    h.view.plugin.argumentRuns = { recoverInMutation: async () => { calls++; return true; } };
-    const before = await h.text();
-    await h.open();
-    assert.equal(calls, 0, withKey ? 'legacy' : 'no key');
-    assert.equal(await h.text(), before);
-  }
-});
-
-test('counterexample: a recovery that fails still opens the version 2 map as saved', async () => {
-  const failing = await harnessV2();
-  failing.view.plugin.argumentRuns = { recoverInMutation: () => Promise.reject(new Error('boom')) };
-  await failing.open();
-  assert.equal(failing.view.map.argumentMap.v, 2);
-});
-
-test('wiring: the real plugin router has recover (open-map recovery) and the v2 runner has frame/start/isRunning (no TODO body)', async () => {
-  const plugin = new Plugin({}, { id: 'vam', version: '0.0.0' });
-  for (const method of ['start', 'stop', 'resume', 'isRunning', 'recover', 'recoverInMutation', 'dispose']) assert.equal(typeof plugin.argumentRuns[method], 'function', `router.${method}`);
-  for (const method of ['frame', 'start', 'isRunning']) assert.equal(typeof plugin.argumentRunsV2[method], 'function', `argumentRunsV2.${method}`);
-  assert.equal(plugin.argumentRunsV2.isRunning('Nothing.vam'), false);
-  plugin.argumentRuns.dispose();
 });

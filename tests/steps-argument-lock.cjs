@@ -9,8 +9,6 @@ const { core, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, att
 const root = path.resolve(__dirname, '..');
 const machine = S.load('core/argument-map/machine.ts');
 const model = S.load('core/argument-map/model.ts');
-const modelV1 = S.load('core/argument-map/model-v1.ts');
-const { v2State } = require('./fixtures/argument-map-v2-state.cjs');
 const MAP = 'Agent Workspace/Topics/map-a/Map.md';
 const LOCKED_NOTICE = /議題已鎖定，AI 不會修改|Topic is locked; AI will not change it/;
 async function harness(titles = ['P', 'S', 'C', 'V', 'E', 'H', 'N', 'F'], plugin = {}, argument = true) {
@@ -135,33 +133,6 @@ test('aiLockReason: every managed node is locked for every op; the free node and
   for (const op of ['write', 'addChild', 'remove', 'move']) assert.equal(h.view.aiLockReason(op, [h.nodes[F].id], undefined, { to: null }), null, op);
   const plain = await harness(undefined, {}, false);
   for (const node of plain.nodes) assert.equal(plain.view.aiLockReason('write', [node.id]), null);
-});
-
-test('v2 map: every managed node (roles, claims, premise data, comparison, hypothesis, need) is locked for every op and readNote marks it aiLocked; the free node is not', async () => {
-  const h = await harness([...'PRCQDTMHNF'], {}, false);
-  const [P_, PR, C_, Q1, D1, Q2, CMP, H1, N1, FREE] = h.nodes;
-  h.view.map.argumentMap = v2State({ P: P_.id, PR: PR.id, C: C_.id, Q1: Q1.id, D1: D1.id, Q2: Q2.id, CMP: CMP.id, H1: H1.id, N1: N1.id });
-  assert.equal(model.readArgumentMap(h.view.map).kind, 'usable', 'the fixture is a usable v2 value');
-  await h.repo.saveMap(MAP, h.view.map);
-  for (const node of [P_, PR, C_, Q1, D1, Q2, CMP, H1, N1]) {
-    for (const op of ['write', 'addChild', 'remove', 'move']) assert.equal(h.view.aiLockReason(op, [node.id], undefined, { to: null }), 'locked', `${node.id} ${op}`);
-    assert.equal((await h.repo.readNote(node.path, h.view.map)).aiLocked, true, 'readNote marks it');
-  }
-  assert.equal(h.view.aiLockReason('write', [FREE.id]), null);
-  assert.notEqual((await h.repo.readNote(FREE.path, h.view.map)).aiLocked, true);
-});
-
-test('legacy and unusable keys: the nodes they name stay locked (a v:3 key and a v1 key alike)', async () => {
-  const h = await harness([...'PRCQDTMHNF'], {}, false);
-  const [P_, PR, C_, Q1, D1, Q2, CMP, H1, N1] = h.nodes;
-  const ids = { P: P_.id, PR: PR.id, C: C_.id, Q1: Q1.id, D1: D1.id, Q2: Q2.id, CMP: CMP.id, H1: H1.id, N1: N1.id };
-  h.view.map.argumentMap = { ...v2State(ids), v: 3 };
-  assert.equal(model.readArgumentMap(h.view.map).kind, 'unusable');
-  for (const id of Object.values(ids)) assert.equal(h.view.aiLockReason('write', [id]), 'locked', `v:3 ${id}`);
-  h.view.map.argumentMap = machine.newArgumentMap({ proposition: P_.id, situation: PR.id, conclusion: C_.id, verified: Q1.id, eliminated: D1.id }, 'run-1');
-  assert.equal(model.readArgumentMap(h.view.map).kind, 'legacy');
-  for (const node of [P_, PR, C_, Q1, D1]) assert.equal(h.view.aiLockReason('write', [node.id]), 'locked', `legacy ${node.id}`);
-  assert.equal(h.view.aiLockReason('write', [Q2.id]), null, 'a node the legacy key does not name is free');
 });
 
 test('readNote marks managed notes aiLocked only when given the map; the free note and a plain map are unmarked', async () => {
@@ -393,26 +364,24 @@ async function verdictHarness() {
   return h;
 }
 
-test('legacy verdict: the Inspector setter writes the note leaning but never the legacy argumentMap key (read-only); aiVerdict and userVerdict untouched', async () => {
+test('verdict: the Inspector setter writes hypothesis-leaning and userVerdict in one transaction; aiVerdict is untouched', async () => {
   const h = await verdictHarness();
   const hy = h.nodes[H];
   h.view.map.argumentMap.hypotheses[0].aiVerdict = 'refuted';
   await h.repo.saveMap(MAP, h.view.map);
-  const keyBefore = JSON.stringify(core.parseMap(h.contents.get(MAP)).argumentMap);
   await h.view.changeHypothesisLeaning(hy, 'supported');
   const saved = core.parseMap(h.contents.get(MAP));
   const entry = saved.argumentMap.hypotheses[0];
-  assert.equal(entry.userVerdict, undefined, 'the legacy key gets no userVerdict');
-  assert.equal(JSON.stringify(saved.argumentMap), keyBefore, 'the legacy key is byte-identical');
+  assert.equal(entry.userVerdict, 'supported');
   assert.equal(entry.aiVerdict, 'refuted');
-  assert.equal((await h.repo.readNote(hy.path)).hypothesisLeaning, 'supported', 'the note leaning (a note, not the key) is still saved');
-  assert.equal(h.view.argumentVerdictOf(hy.id), 'refuted', 'the legacy display shows the stored verdict');
-  assert.equal(modelV1.isVerified(entry), false);
-  assert.equal(modelV1.displayVerdict(entry), 'verifying');
+  assert.equal((await h.repo.readNote(hy.path)).hypothesisLeaning, 'supported');
+  assert.equal(h.view.argumentVerdictOf(hy.id), 'supported');
+  assert.equal(model.isVerified(entry), false, 'needs still pending: not verified although the user chose supported');
+  assert.equal(model.displayVerdict(entry), 'verifying');
   assert.equal((await h.repo.readNote(hy.path)).hypothesisStrength, 'weak', 'the existing setter lifts none to weak, exactly as on any map');
 });
 
-test('legacy verdict: no verdict reads as undecided, the AI value shows; the user value is not written; a plain map gets no userVerdict', async () => {
+test('verdict: with every need found the user value wins over the AI value; no verdict reads as undecided; a plain map gets no userVerdict', async () => {
   const h = await verdictHarness();
   const hy = h.nodes[H];
   const entry = h.view.map.argumentMap.hypotheses[0];
@@ -423,51 +392,11 @@ test('legacy verdict: no verdict reads as undecided, the AI value shows; the use
   await h.repo.saveMap(MAP, h.view.map);
   await h.view.changeHypothesisLeaning(hy, 'refuted');
   const saved = core.parseMap(h.contents.get(MAP)).argumentMap.hypotheses[0];
-  assert.equal(saved.userVerdict, undefined, 'legacy: never written');
-  assert.equal(modelV1.isVerified(saved), true, 'the AI value stands; the user value never overrides it on a legacy map');
+  assert.equal(saved.userVerdict, 'refuted');
+  assert.equal(model.isVerified(saved), false);
   const plain = await harness(undefined, {}, false);
   Object.assign(plain.view, { history: { push() {} }, refreshAfterSavedChange: async () => {}, relationsEnabled: () => true, isHypothesis: () => true });
   await plain.view.changeHypothesisLeaning(plain.nodes[H], 'supported');
   assert.equal(core.parseMap(plain.contents.get(MAP)).argumentMap, undefined);
   assert.equal(plain.view.argumentVerdictOf(plain.nodes[H].id), undefined);
-});
-
-test('v2 verdict: the Inspector setter writes the note leaning and the key userVerdict in one save; the card shows the mark chip; the mark never reaches a step input; no-key maps get none', async () => {
-  const h = await harness([...'PRCQDTMHNF'], {}, false);
-  Object.assign(h.view, { history: { push() {} }, refreshAfterSavedChange: async () => {}, relationsEnabled: () => true, isHypothesis: () => true });
-  const [P_, PR, C_, Q1, D1, Q2, CMP, H1, N1] = h.nodes;
-  await h.repo.writeTopicKind(H1.path, 'hypothesis');
-  const state = v2State({ P: P_.id, PR: PR.id, C: C_.id, Q1: Q1.id, D1: D1.id, Q2: Q2.id, CMP: CMP.id, H1: H1.id, N1: N1.id });
-  delete state.hypotheses[0].userVerdict;
-  h.view.map.argumentMap = state;
-  await h.repo.saveMap(MAP, h.view.map);
-  await h.view.changeHypothesisLeaning(H1, 'refuted');
-  const saved = core.parseMap(h.contents.get(MAP)).argumentMap;
-  assert.equal(saved.hypotheses[0].userVerdict, 'refuted', 'the key records the user mark');
-  assert.equal(saved.hypotheses[0].verdict.value, 'supported', 'the AI verdict is untouched');
-  assert.equal((await h.repo.readNote(H1.path)).hypothesisLeaning, 'refuted', 'the note is saved as before');
-  const cardModule = S.load('experiences/visual-map/argument-card-v2.ts');
-  const { translate } = S.load('i18n.ts');
-  const shown = cardModule.describeArgumentCardV2(model.readArgumentMap(core.parseMap(h.contents.get(MAP))).data, H1.id, (k, ...v) => translate('en', k, ...v));
-  assert.ok(shown.chips.some(chip => /refuted/i.test(chip.text) && chip.text !== 'Refuted'), 'the mark chip appears after a redraw');
-  // The mark is a mark only (machine layer: steps-argument-machine-v2-verdict 使用者標記不影響輸入); here the write changes nothing but that field.
-  const rest = JSON.parse(JSON.stringify(saved)); delete rest.hypotheses[0].userVerdict;
-  assert.deepEqual(rest, JSON.parse(JSON.stringify({ ...state, hypotheses: [{ ...state.hypotheses[0] }] })), 'only userVerdict changed in the key');
-  await h.view.changeHypothesisLeaning(H1, 'undecided');
-  assert.equal(core.parseMap(h.contents.get(MAP)).argumentMap.hypotheses[0].userVerdict, 'undecided');
-});
-
-test('v2 verdict: a hypothesis note that is not in the key (user-added or old note) saves only the note; no key write, no error, the save still succeeds', async () => {
-  const h = await harness([...'PRCQDTMHNF'], {}, false);
-  Object.assign(h.view, { history: { push() {} }, refreshAfterSavedChange: async () => {}, relationsEnabled: () => true, isHypothesis: () => true });
-  const [P_, PR, C_, Q1, D1, Q2, CMP, H1, N1] = h.nodes;
-  await h.repo.writeTopicKind(H1.path, 'hypothesis');
-  const state = v2State({ P: P_.id, PR: PR.id, C: C_.id, Q1: Q1.id, D1: D1.id, Q2: Q2.id, CMP: CMP.id, H1: H1.id, N1: N1.id });
-  h.view.map.argumentMap = state;
-  await h.repo.saveMap(MAP, h.view.map);
-  const keyBefore = JSON.stringify(core.parseMap(h.contents.get(MAP)).argumentMap);
-  const stranger = { ...H1, id: 'user-added-node-not-in-key' };
-  await h.view.changeHypothesisLeaning(stranger, 'refuted');
-  assert.equal(JSON.stringify(core.parseMap(h.contents.get(MAP)).argumentMap), keyBefore, 'the key is byte-identical');
-  assert.equal((await h.repo.readNote(H1.path)).hypothesisLeaning, 'refuted', 'the note leaning is still written');
 });

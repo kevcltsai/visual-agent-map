@@ -459,22 +459,18 @@ import {
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
-import { effectiveVerdict } from "../../core/argument-map/model-v1";
-import { applyUserVerdict } from "../../core/argument-map/machine-v2";
-import { managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
+import { GateError, applyPause } from "../../core/argument-map/machine";
+import { effectiveVerdict, managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
 import {
-  describeArgumentCardV2,
-  describeLegacyArgumentCard,
-  renderArgumentCardBodyV2,
-  renderArgumentKindV2,
-  type ArgumentCardShape
-} from "./argument-card-v2";
-import { ArgumentRunError } from "./argument-run";
-import { lockFraming, MAX_FRAMING_CALLS, WORST_CASE_AI_CALLS } from "./argument-run-v2";
-import { describeArgumentProgressV2, describeLegacyProgress } from "./argument-progress-v2";
+  describeArgumentCard,
+  renderArgumentCardBody,
+  renderArgumentKind,
+  type ArgumentCardView
+} from "./argument-card";
+import { ArgumentRunError, WORST_CASE_AI_CALLS } from "./argument-run";
+import { describeArgumentProgress } from "./argument-progress";
 import { ArgumentStartModal } from "../../ui/modals/argument-start-modal";
-import { arrangeArgumentMap } from "../../core/argument-map/layout";
-import { arrangeArgumentMapV2 } from "../../core/argument-map/layout-v2";
+import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
   MAP_CHAT_ANCHOR_PREFIX,
@@ -1808,12 +1804,10 @@ export class VisualAgentMapView extends ItemView {
   private arrangeAll(map: MapDocument, options: { reset?: boolean } = {}): void {
     // An argument map is arranged by its roles and stances (always to the right); any other map takes the ordinary path below.
     const argument = readArgumentMap(map);
-    if (argument.kind === "usable" || argument.kind === "legacy") {
-      const options = { hidden: supersededAimNodeIds(map) };
-      map.nodes =
-        argument.kind === "usable"
-          ? arrangeArgumentMapV2(map.nodes, argument.data, this.cardHeightOf, options)
-          : arrangeArgumentMap(map.nodes, argument.data, this.cardHeightOf, options);
+    if (argument.kind === "usable") {
+      map.nodes = arrangeArgumentMap(map.nodes, argument.data, this.cardHeightOf, {
+        hidden: supersededAimNodeIds(map)
+      });
       return;
     }
     // Pictures with a ring of topics keep their cards out of the arrangement and solve the ring after it.
@@ -2019,9 +2013,7 @@ export class VisualAgentMapView extends ItemView {
   private aimViewEpoch = 0;
   /** Whether `map` is a usable argument map: its arrangement is fixed by the flow, so the layout controls are off (like AIM's). */
   private argumentLive(map: MapDocument | null | undefined = this.map): boolean {
-    if (!map || map.argumentMap === undefined) return false;
-    const kind = readArgumentMap(map).kind;
-    return kind === "usable" || kind === "legacy";
+    return !!map && map.argumentMap !== undefined && readArgumentMap(map).kind === "usable";
   }
   private mapOpenEpoch = 0;
   /**
@@ -3596,14 +3588,13 @@ export class VisualAgentMapView extends ItemView {
     }
     let map = await this.plugin.repo.readMap(path);
     if (!isCurrent()) return;
-    // A version 2 argument map left running by a closed Obsidian is recovered by the runner (no provider call); when it changed the
-    // saved map, the map is read again. A legacy (`"v": 1`) map is read-only: opening it never recovers or writes.
-    if (map.argumentMap !== undefined && readArgumentMap(map).kind === "usable") {
-      // A recovery that fails must not keep the map shut: it opens as saved and its bar says the run was interrupted.
-      const changed = await this.plugin.argumentRuns.recoverInMutation(path).catch(() => false);
-      // (openMapInMutation owns the mutate queue: the nested recover() would wait for itself.)
-      if (!isCurrent()) return;
-      if (changed) map = await this.plugin.repo.readMap(path);
+    // A usable argument map whose cards are still stacked (the flow placed them) is arranged once, here, with no provider call.
+    const argumentOnOpen = map.argumentMap === undefined ? null : readArgumentMap(map);
+    const arranged =
+      argumentOnOpen?.kind === "usable" ? arrangeUnarrangedArgumentMap(map.nodes, argumentOnOpen.data) : null;
+    if (arranged) {
+      map.nodes = arranged;
+      await this.plugin.repo.saveMap(path, map);
       if (!isCurrent()) return;
     }
     // Another map, or the first one this window shows: the cards are drawn before the notes are read (a slow disk or a busy
@@ -3664,7 +3655,8 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
       await this.recoverInterruptedNotes(isCurrent);
       if (!isCurrent()) return;
-      // Argument-run recovery runs above, before the map is shown (version 2 only; a legacy map is read-only).
+      await this.recoverArgumentRun(isCurrent);
+      if (!isCurrent()) return;
       this.endNoteLoad(load);
       this.render();
       this.app.workspace.requestSaveLayout();
@@ -3699,6 +3691,31 @@ export class VisualAgentMapView extends ItemView {
       } catch (error) {
         console.warn("Visual Agent Map interrupted run", error);
       }
+    }
+  }
+  /**
+   * A hypothesis-research run left `running` by a reload has no owner: it is paused in this same mutation (items back to pending, no
+   * provider call), like an interrupted note. A map without the `argumentMap` key never reaches the write.
+   */
+  private async recoverArgumentRun(isCurrent: () => boolean): Promise<void> {
+    const map = this.map;
+    if (!map || map.argumentMap === undefined) return;
+    const read = readArgumentMap(map);
+    if (read.kind !== "usable" || read.data.run.status !== "running" || this.plugin.argumentRuns.isRunning(this.path))
+      return;
+    try {
+      const updated = await this.plugin.repo.updateMap(this.path, doc => {
+        const current = readArgumentMap(doc);
+        if (current.kind !== "usable" || current.data.run.status !== "running") return;
+        try {
+          doc.argumentMap = applyPause(current.data, "interrupted");
+        } catch (error) {
+          if (!(error instanceof GateError)) throw error; // a finished run is left as it is
+        }
+      });
+      if (isCurrent() && this.map === map) map.argumentMap = updated.argumentMap;
+    } catch (error) {
+      console.warn("Visual Agent Map argument run recovery", error);
     }
   }
   private modelChoices(): ModelChoices {
@@ -3922,13 +3939,9 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     if (!map || map.argumentMap === undefined) return;
     const read = readArgumentMap(map);
-    if (read.kind !== "usable" && read.kind !== "legacy") return;
+    if (read.kind !== "usable") return;
     const path = this.path;
-    // A legacy (`"v": 1`) map is read-only: its bar says so and offers no stop or resume.
-    const view =
-      read.kind === "legacy"
-        ? describeLegacyProgress(read.data, t)
-        : describeArgumentProgressV2(read.data, this.plugin.argumentRuns.isRunning(path), t);
+    const view = describeArgumentProgress(read.data, this.plugin.argumentRuns.isRunning(path), t);
     const bar = parent.createDiv({
       cls: "vam-argument-bar",
       attr: {
@@ -13572,7 +13585,7 @@ export class VisualAgentMapView extends ItemView {
     if (argumentView) {
       // The flow's cards carry their own role and kind line, not a type tag, so no type shape or colour rule matches them.
       card.dataset.argumentRole = argumentView.role;
-      renderArgumentKindV2(header, argumentView);
+      renderArgumentKind(header, argumentView);
       this.labelCard(card, t("ui.topic_card_label_0_1", this.argumentTitleOf(argumentView, note), argumentView.label));
     } else if (kind !== "topic") {
       card.dataset.topicKind = kind;
@@ -13791,7 +13804,7 @@ export class VisualAgentMapView extends ItemView {
     // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
     // The summary text (and, for a card with none, the faint "add a summary" line) opens its field on a plain click.
     const textEditable = !!note && this.cardTextEditable();
-    if (argumentView) renderArgumentCardBodyV2(card, argumentView);
+    if (argumentView) renderArgumentCardBody(card, argumentView);
     else if (textEditable && this.inlineSummary?.id === node.id) this.paintCardSummaryEdit(card, node);
     else if (research?.preview?.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
@@ -14368,22 +14381,18 @@ export class VisualAgentMapView extends ItemView {
   }
   /** True for a card the argument flow owns on a map whose `argumentMap` key is usable (those cards are plain rectangles). */
   private isArgumentCard(id: string): boolean {
-    if (!this.map || this.map.argumentMap === undefined) return false;
-    const kind = readArgumentMap(this.map).kind;
-    if (kind !== "usable" && kind !== "legacy") return false;
+    if (!this.map || this.map.argumentMap === undefined || readArgumentMap(this.map).kind !== "usable") return false;
     return managedNodeIds(this.map).has(id);
   }
   /** What the flow says on a managed card of a usable argument map, or null (an ordinary card, or a map without the key). */
-  private argumentCardView(id: string): ArgumentCardShape | null {
+  private argumentCardView(id: string): ArgumentCardView | null {
     if (!this.map || this.map.argumentMap === undefined) return null;
     const read = readArgumentMap(this.map);
-    if ((read.kind !== "usable" && read.kind !== "legacy") || !managedNodeIds(this.map).has(id)) return null;
-    return read.kind === "usable"
-      ? describeArgumentCardV2(read.data, id, t)
-      : describeLegacyArgumentCard(read.data, id, t);
+    if (read.kind !== "usable" || !managedNodeIds(this.map).has(id)) return null;
+    return describeArgumentCard(read.data, id, t);
   }
   /** The heading of a managed card: its note's title, the note's summary (a concluded conclusion only), or the flow's own text. */
-  private argumentTitleOf(view: ArgumentCardShape, note: Note | undefined): string {
+  private argumentTitleOf(view: ArgumentCardView, note: Note | undefined): string {
     if (view.titleFrom === "text") return view.title ?? "";
     if (view.titleFrom === "summary")
       return note?.summary && !isPlaceholder(note.summary) ? note.summary : (note?.title ?? "");
@@ -14402,13 +14411,7 @@ export class VisualAgentMapView extends ItemView {
   /** The verdict of a hypothesis of an argument map (the user's, else the AI's, else undecided); undefined on any other map. */
   private argumentVerdictOf(id: string): HypothesisLeaning | undefined {
     const read = this.map ? readArgumentMap(this.map) : null;
-    if (read?.kind === "usable") {
-      // Version 2: the user's mark when there is one, else the verdict (a mark only; "insufficient" reads as undecided here).
-      const entry = read.data.hypotheses.find(item => item.id === id);
-      const value = entry ? (entry.userVerdict ?? entry.verdict?.value ?? "undecided") : undefined;
-      return value === "insufficient" ? "undecided" : value;
-    }
-    const entry = read?.kind === "legacy" ? read.data.hypotheses.find(item => item.id === id) : undefined;
+    const entry = read?.kind === "usable" ? read.data.hypotheses.find(item => item.id === id) : undefined;
     return entry ? effectiveVerdict(entry) : undefined;
   }
   /** The leaning to show on a card: only a hypothesis on an ordinary map has one. */
@@ -16438,12 +16441,10 @@ export class VisualAgentMapView extends ItemView {
       .rewriteNote(node.path, path => this.plugin.repo.writeHypothesisLeaning(path, leaning))
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
-        // A legacy (`"v": 1`) argument map is read-only, so its key is not written here; a usable (version 2) one records the user's mark
-        // (a mark only: no step reads it) in the same save. A map with no key is left as it is.
-        const argument = map.argumentMap === undefined ? null : readArgumentMap(map);
-        // A hypothesis note the key does not list (added by the user, or an older note) keeps only its note leaning: no key write, no error.
-        if (argument?.kind === "usable" && argument.data.hypotheses.some(h => h.id === node.id))
-          map.argumentMap = applyUserVerdict(argument.data, node.id, leaning);
+        // On an argument map the same step records the user's verdict; `aiVerdict` stays the runner's.
+        const read = readArgumentMap(map);
+        const entry = read.kind === "usable" ? read.data.hypotheses.find(item => item.id === node.id) : undefined;
+        if (entry) entry.userVerdict = leaning;
       })
       .commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);
@@ -21099,7 +21100,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.argumentFocusMapId === null || !map || map.id !== this.argumentFocusMapId || map.argumentMap === undefined)
       return;
     const read = readArgumentMap(map);
-    if (read.kind !== "usable" && read.kind !== "legacy") return;
+    if (read.kind !== "usable") return;
     const root = map.nodes.find(node => node.id === read.data.roles.proposition);
     if (!root) return;
     this.argumentFocusMapId = null;
@@ -21110,7 +21111,6 @@ export class VisualAgentMapView extends ItemView {
   private openArgumentStart(draft: string): void {
     const map = this.map;
     if (this.closed || !map || !this.chatHero()) return;
-    const runs = this.plugin.argumentRunsV2;
     const path = this.path;
     const mapId = map.id;
     const stale = (): boolean =>
@@ -21119,43 +21119,30 @@ export class VisualAgentMapView extends ItemView {
       this.map?.id !== mapId ||
       this.map.argumentMap !== undefined ||
       this.map.nodes.length > 0 ||
-      runs.isRunning(path);
+      this.plugin.argumentRuns.isRunning(path);
     const models = this.chatModelChoices().map(choice => ({ id: choice.value, label: choice.label }));
-    new ArgumentStartModal(this.app, {
+    new ArgumentStartModal(
+      this.app,
       draft,
       models,
-      defaultModel: this.plugin.settings.cliModel,
-      calls: WORST_CASE_AI_CALLS,
-      maxFraming: MAX_FRAMING_CALLS,
-      framer: runs,
-      beforeFrame: async model => {
-        if (stale()) return false;
+      this.plugin.settings.cliModel,
+      WORST_CASE_AI_CALLS,
+      async ({ claim, model }) => {
+        if (!claim.trim() || stale()) return;
         // The window's model is the current model, the same as picking it in the opening screen's model menu.
         if (model !== this.plugin.settings.cliModel) {
           await this.plugin.setCurrentModel(model);
-          if (stale()) return false;
+          if (stale()) return;
         }
-        return true;
-      },
-      onConfirm: ({ claim, result, chosen, attempts }) => {
-        if (!claim.trim() || stale()) return;
         this.chat?.clearDraft();
         this.argumentFocusMapId = mapId;
-        const locked = lockFraming(claim, result, attempts, new Date().toISOString(), chosen);
-        // The run is not awaited: its first checkpoint (one mutate) replaces the opening screen with the argument map.
-        void runs
-          .start(path, locked)
-          .then(outcome => {
-            if (outcome.ok) return;
-            this.argumentFocusMapId = null;
-            new Notice(t("ui.argument_start_refused"));
-          })
-          .catch(() => {
-            this.argumentFocusMapId = null;
-            new Notice(t("ui.argument_start_refused"));
-          });
+        // The run is not awaited: its first checkpoint replaces the opening screen with the argument map.
+        void this.plugin.argumentRuns.start(path, claim).catch((error: unknown) => {
+          this.argumentFocusMapId = null;
+          if (error instanceof ArgumentRunError) new Notice(t("ui.argument_start_refused"));
+        });
       }
-    }).open();
+    ).open();
   }
   private chatHost(): MapChatHost {
     return {
@@ -26342,10 +26329,8 @@ export class VisualAgentMapView extends ItemView {
     const argumentRead = this.map.argumentMap === undefined ? null : readArgumentMap(this.map);
     const tipSkip =
       argumentRead?.kind === "usable"
-        ? new Set([argumentRead.data.roles.proposition])
-        : argumentRead?.kind === "legacy"
-          ? new Set([argumentRead.data.roles.proposition, argumentRead.data.roles.eliminated])
-          : null;
+        ? new Set([argumentRead.data.roles.proposition, argumentRead.data.roles.eliminated])
+        : null;
     const tipped = new Set<string>();
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);

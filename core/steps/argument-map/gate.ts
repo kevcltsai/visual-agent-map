@@ -1,4 +1,4 @@
-import type { SituationDatum } from "../../argument-map/model-v1";
+import type { SituationDatum } from "../../argument-map/model";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import {
   ArgumentStepError,

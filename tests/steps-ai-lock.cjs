@@ -55,27 +55,6 @@ test('helper: removing a subtree with a locked topic, or a topic related to a lo
 });
 
 // ---- reader and writer ------------------------------------------------------------------------------------------------
-// argumentMap managed nodes (V2 packet V1): the lock must hold for a legacy v1 key, a v2 key and an unusable key alike, because it reads the raw key.
-test('argumentMap managed nodes stay AI-locked for a legacy v1 key, a v2 key and an unusable key; a map without the key locks nothing', () => {
-  const { v2State } = require('./fixtures/argument-map-v2-state.cjs');
-  const model = S.load('core/argument-map/model.ts');
-  const v1 = { v: 1, roles: { proposition: 'p', situation: 's', conclusion: 'c', verified: 'v', eliminated: 'e' }, situation: { data: [{ id: 'd1' }] }, hypotheses: [{ id: 'h', needs: [{ id: 'n' }] }] };
-  const v3 = { ...v2State(), v: 3 };
-  const free = { id: 'free', parentId: null };
-  const cases = [
-    ['legacy v1', v1, ['p', 's', 'c', 'v', 'e', 'd1', 'h', 'n']],
-    ['v2', v2State(), ['p', 'pr', 'c', 'q1', 'd1', 'q2', 'cmp', 'h1', 'n1']],
-    ['unusable v:3', v3, ['p', 'pr', 'c', 'q1', 'd1', 'q2', 'cmp', 'h1', 'n1']]
-  ];
-  for (const [name, argumentMap, ids] of cases) {
-    const managed = model.managedNodeIds({ argumentMap });
-    const map = { nodes: [...ids.map(id => ({ id, parentId: null })), free] };
-    for (const id of ids) for (const op of ['write', 'addChild', 'remove', 'move']) assert.equal(lock.aiLockBlock(op, [id], map, id2 => managed.has(id2), { to: null }), 'locked', `${name} ${id} ${op}`);
-    assert.equal(lock.aiLockBlock('write', ['free'], map, id2 => managed.has(id2)), null, `${name}: a free node is not locked`);
-  }
-  assert.equal(model.managedNodeIds({ argumentMap: undefined }).size, 0);
-});
-
 test('reader: only `ai-locked: true` locks; anything else reads as unlocked', () => {
   assert.equal(values.readAiLocked({ 'ai-locked': true }), true);
   for (const value of [undefined, false, 'true', 1, null]) assert.equal(values.readAiLocked({ 'ai-locked': value }), false, String(value));

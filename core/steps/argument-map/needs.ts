@@ -12,7 +12,7 @@ import {
 } from "./shared";
 import type { GateDatum } from "./gate";
 import template from "./needs.md";
-import { MAX_NEEDS, MAX_ROUND_NEEDS, type Hypothesis } from "../../argument-map/model-v1";
+import { MAX_NEEDS, MAX_ROUND_NEEDS, type Hypothesis } from "../../argument-map/model";
 
 export interface NeedsRequest extends ArgumentStepBase {
   proposition: string;

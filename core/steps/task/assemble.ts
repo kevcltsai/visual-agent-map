@@ -450,8 +450,15 @@ export function assembleTaskPrompt(
   const jsonContract =
     context.responseContract === "argument-evidence"
       ? inLanguage(ARGUMENT_EVIDENCE_CONTRACT, language).replace("<<needs>>", () =>
-          JSON.stringify((context.argumentEvidenceNeeds ?? []).map(({ id, text, context: scope }) => (scope ? { id, text, context: scope } : { id, text })))
-        ) + ((context.argumentEvidenceNeeds ?? []).some(need => need.context) ? "\n\n" + inLanguage(ARGUMENT_EVIDENCE_CONTEXT_RULE, language) : "")
+          JSON.stringify(
+            (context.argumentEvidenceNeeds ?? []).map(({ id, text, context: scope }) =>
+              scope ? { id, text, context: scope } : { id, text }
+            )
+          )
+        ) +
+        ((context.argumentEvidenceNeeds ?? []).some(need => need.context)
+          ? "\n\n" + inLanguage(ARGUMENT_EVIDENCE_CONTEXT_RULE, language)
+          : "")
       : inLanguage(JSON_CONTRACT, language);
   add(fixed(withProviderOutput(jsonContract, provider, language), "json-contract"));
   {

@@ -2728,8 +2728,10 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.argument_tab_research": "假設研究",
   "ui.argument_tab_beta": "Beta",
   "ui.argument_tab_label": "開場方式",
-  "ui.argument_tab_description": "輸入一個你想驗證的說法，AI 會先上網查現況是否成立，再列出可能的原因逐一找證據。證據不夠就不下結論。這是 Beta 功能，結果請對照每張卡的來源。",
-  "ui.argument_tab_usage_0": "⚠ 一次研究最多約 {0} 次 AI 呼叫，會用掉不少使用額度，請挑真正想查的命題。研究時會連線到 AI 找到的網頁。",
+  "ui.argument_tab_description":
+    "輸入一個你想驗證的說法，AI 會先上網查現況是否成立，再列出可能的原因逐一找證據。證據不夠就不下結論。這是 Beta 功能，結果請對照每張卡的來源。",
+  "ui.argument_tab_usage_0":
+    "⚠ 一次研究最多約 {0} 次 AI 呼叫，會用掉不少使用額度，請挑真正想查的命題。研究時會連線到 AI 找到的網頁。",
   "ui.argument_tab_placeholder": "輸入一個你想驗證的說法",
   "ui.argument_tab_send": "開始研究",
   "ui.argument_suggestions_label": "建議命題",

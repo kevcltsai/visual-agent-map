@@ -2918,8 +2918,10 @@ export const en = {
   "ui.argument_tab_research": "Hypothesis research",
   "ui.argument_tab_beta": "Beta",
   "ui.argument_tab_label": "Way to start",
-  "ui.argument_tab_description": "Enter a claim you want to check. The AI first searches the web to see whether the situation holds, then lists possible causes and looks for evidence on each. If the evidence is not enough, it draws no conclusion. This is a Beta feature; check the results against the source on each card.",
-  "ui.argument_tab_usage_0": "⚠ One study makes up to about {0} AI calls and uses a good part of your quota, so pick a claim you really want to check. The study connects to web pages the AI finds.",
+  "ui.argument_tab_description":
+    "Enter a claim you want to check. The AI first searches the web to see whether the situation holds, then lists possible causes and looks for evidence on each. If the evidence is not enough, it draws no conclusion. This is a Beta feature; check the results against the source on each card.",
+  "ui.argument_tab_usage_0":
+    "⚠ One study makes up to about {0} AI calls and uses a good part of your quota, so pick a claim you really want to check. The study connects to web pages the AI finds.",
   "ui.argument_tab_placeholder": "Enter a claim you want to check",
   "ui.argument_tab_send": "Start research",
   "ui.argument_suggestions_label": "Suggested claims",

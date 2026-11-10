@@ -2726,8 +2726,10 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.argument_tab_research": "假设研究",
   "ui.argument_tab_beta": "Beta",
   "ui.argument_tab_label": "开场方式",
-  "ui.argument_tab_description": "输入一个你想验证的说法，AI 会先上网查现状是否成立，再列出可能的原因逐一找证据。证据不够就不下结论。这是 Beta 功能，结果请对照每张卡的来源。",
-  "ui.argument_tab_usage_0": "⚠ 一次研究最多约 {0} 次 AI 调用，会用掉不少使用额度，请挑真正想查的命题。研究时会连接到 AI 找到的网页。",
+  "ui.argument_tab_description":
+    "输入一个你想验证的说法，AI 会先上网查现状是否成立，再列出可能的原因逐一找证据。证据不够就不下结论。这是 Beta 功能，结果请对照每张卡的来源。",
+  "ui.argument_tab_usage_0":
+    "⚠ 一次研究最多约 {0} 次 AI 调用，会用掉不少使用额度，请挑真正想查的命题。研究时会连接到 AI 找到的网页。",
   "ui.argument_tab_placeholder": "输入一个你想验证的说法",
   "ui.argument_tab_send": "开始研究",
   "ui.argument_suggestions_label": "建议命题",

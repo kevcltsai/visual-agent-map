@@ -26684,8 +26684,13 @@ var Repository = class {
     return false;
   }
   async readNote(path, map, ctx) {
+    const file = this.file(path), raw = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file);
+    return this.parseNote(path, raw, map, ctx);
+  }
+  /** Parses already-read note content; `readNote` reads the file once and calls this. */
+  async parseNote(path, raw, map, ctx) {
     var _a2, _b2;
-    const file = this.file(path), raw = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file), content = decodeCalloutSections(upgradeLegacyAimText(raw)), fm = frontmatter(content);
+    const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(raw)), fm = frontmatter(content);
     const status = text5(fm.status, "idea");
     const normalized2 = status === "review" || status === "accepted" ? "completed" : status;
     const source = text5(fm["model-source"], "workspace");
@@ -27408,7 +27413,13 @@ ${body}`);
   }
   /** Whether any map lists `path` as a node; only map files are read. */
   async isMapNodePath(path) {
-    for (const { map } of await this.readableMaps()) if (map.nodes.some((node) => node.path === path)) return true;
+    return this.anyMapNodePath([path]);
+  }
+  /** Whether any map lists any of `paths` as a node; all maps are scanned once however many paths are given. */
+  async anyMapNodePath(paths) {
+    if (!paths.length) return false;
+    const wanted = new Set(paths);
+    for (const { map } of await this.readableMaps()) if (map.nodes.some((node) => wanted.has(node.path))) return true;
     return false;
   }
   async reconcileMissingNodePaths() {
@@ -27695,7 +27706,7 @@ ${body}`);
   }
   async readNoteIfManaged(file) {
     const content = await this.app.vault.read(file), fm = frontmatter(content);
-    return marker2(fm["agent-map-node"]) ? this.readNote(file.path) : null;
+    return marker2(fm["agent-map-node"]) ? this.parseNote(file.path, content) : null;
   }
   /**
    * Renames generated subtopic notes to their titles. A note that cannot be renamed (a read-only folder, say) is counted
@@ -96782,13 +96793,7 @@ ${t("ui.organize_link_wait_hint")}`;
       const deleted = [...this.externalReconcilePaths];
       this.externalReconcilePaths.clear();
       void this.mutate(async () => {
-        let tracked = false;
-        for (const path of deleted)
-          if (await this.repo.isMapNodePath(path)) {
-            tracked = true;
-            break;
-          }
-        if (!tracked) return;
+        if (!await this.repo.anyMapNodePath(deleted)) return;
         const repaired = await this.repo.reconcileMissingNodePaths();
         if (repaired) await this.rebuildDerivedData();
       }).catch((error) => console.error("Visual Agent Map external rename reconciliation", error));

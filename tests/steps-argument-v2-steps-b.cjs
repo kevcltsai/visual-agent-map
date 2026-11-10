@@ -332,3 +332,228 @@ test('comparison: the policy refuses a user mark, an empty hypothesis list and a
   assert.throws(() => run({ ...request, input: { ...request.input, hypotheses: [] } }), isStepError(/hypotheses/));
   assert.throws(() => run({ ...request, input: { ...request.input, claim: { ...request.input.claim, text: 'x'.repeat(200_000) } } }), isStepError(/token budget/));
 });
+
+// ---- conclusion ----
+const toCond = () => {
+  let s = m.applyHypotheses(m.applyHypotheses(analysis(), 'T1', causalSet()), 'T2', [facet('F1'), facet('F2')]);
+  s = judged(s, 'H1', {}, defended());
+  s = judged(s, 'H2', { stance: 'refutes' }, refutedDraft('H2'));
+  s = judged(s, 'H3', { stance: 'refutes' }, refutedDraft('H3'));
+  s = judged(s, 'F1', {}, factSupported('F1'));
+  s = judged(s, 'F2', {}, factSupported('F2'));
+  s = m.applyComparison(s, 'T1', done('causal_conditional'));
+  return m.applyComparison(s, 'T2', done('holds'));
+};
+const nReq = (s = toConclusion(), over = {}) => ({ ...base, input: plain(m.prepareConclusion(s)), ...over });
+const nOk = (over = {}) => ({ answers: [{ claimId: 'T1', answer: 'causal_established', sentence: 'AI caused the rise.', assumptions: [] }, { claimId: 'T2', answer: 'holds', sentence: 'Adoption is widespread.', assumptions: [] }], overall: '', ...over });
+const nWith = (i, patch) => { const v = nOk(); v.answers[i] = { ...v.answers[i], ...patch }; return v; };
+
+test('conclusion: the request has the comparison results and verdict summaries only; a valid reply parses and applies', () => {
+  const s = toConclusion();
+  let marked = s; for (const h of s.hypotheses) marked = m.applyUserVerdict(marked, h.id, 'undecided');
+  const request = nReq(marked);
+  const prompt = cn.render(request);
+  assert.doesNotMatch(prompt, /userVerdict|quote \d+ from the page|https:\/\//, 'no mark and no evidence text');
+  assert.equal(JSON.stringify(request.input), JSON.stringify(m.prepareConclusion(s)));
+  const draft = cn.parse(JSON.stringify(nOk()), request);
+  eq(draft.answers.map(a => a.claimId), ['T1', 'T2']); assert.equal(draft.overall, undefined);
+  const next = valid(m.applyConclusion(s, draft));
+  assert.equal(next.run.phase, 'inference_check');
+  cn.policy(prompt, request);
+});
+test('conclusion: the answer must equal the comparison, every evaluated claim is answered once, and the machine agrees', () => {
+  const request = nReq();
+  bad(cn, request, nWith(0, { answer: 'causal_compatible' }), /comparison's/);
+  bad(cn, request, nWith(0, { answer: 'holds' }), /comparison's/);
+  bad(cn, request, nOk({ answers: nOk().answers.slice(0, 1) }), /every evaluated claim/);
+  bad(cn, request, nOk({ answers: [nOk().answers[0], nOk().answers[0]] }), /twice/);
+  bad(cn, request, nOk({ answers: [nOk().answers[0], { ...nOk().answers[1], claimId: 'T9' }] }), /outside the request/);
+  bad(cn, request, nOk({ answers: [nOk().answers[0], { ...nOk().answers[1], claimId: 'P1' }] }), /outside the request/);
+  bad(cn, request, nOk({ answers: [] }), /every evaluated claim/);
+  eq(cn.parse(JSON.stringify(nOk()), request).answers.length, 2);
+});
+test('conclusion: missing, extra and non-enum fields throw', () => {
+  const request = nReq();
+  exactKeys(cn, request, nOk());
+  for (const key of ['claimId', 'answer', 'sentence', 'assumptions']) { const v = nOk(); delete v.answers[0][key]; bad(cn, request, v, /unexpected fields/); }
+  bad(cn, request, nWith(0, { extra: 1 }), /unexpected fields/);
+  bad(cn, request, nWith(0, { answer: 'certainly' }), /not allowed/); bad(cn, request, nWith(1, { answer: 7 }), /not allowed/);
+  bad(cn, request, '{', /not JSON/); bad(cn, request, '"x"', /must be an object/);
+});
+test('conclusion: a conditional answer lists exactly its assumptions and writes them into the sentence', () => {
+  const s = toCond(); const request = nReq(s);
+  const need = request.input.claims[0].comparison.requiredAssumptions;
+  eq(need, ['parallel trends']);
+  const reply = nOk({ answers: [{ claimId: 'T1', answer: 'causal_conditional', sentence: 'AI caused the rise, if parallel trends holds.', assumptions: ['parallel trends'] }, nOk().answers[1]] });
+  valid(m.applyConclusion(s, cn.parse(JSON.stringify(reply), request)));
+  const patch = patchAnswer => nOk({ answers: [{ ...reply.answers[0], ...patchAnswer }, reply.answers[1]] });
+  bad(cn, request, patch({ assumptions: [] }), /exactly the assumptions/);
+  bad(cn, request, patch({ assumptions: ['parallel trends', 'parallel trends'] }), /exactly the assumptions/);
+  bad(cn, request, patch({ assumptions: ['other trends'] }), /outside the request/);
+  bad(cn, request, patch({ sentence: 'AI caused the rise.' }), /written into the sentence/);
+  bad(cn, request, nOk({ answers: [{ claimId: 'T1', answer: 'causal_conditional', sentence: 'AI caused the rise.', assumptions: [] }, nOk().answers[1]] }), /exactly the assumptions/);
+  const listedButUnwritten = nOk({ answers: [{ claimId: 'T1', answer: 'causal_conditional', sentence: 'AI caused the rise.', assumptions: ['parallel trends'] }, nOk().answers[1]] });
+  bad(cn, request, listedButUnwritten, /written into the sentence/);
+  bad(cn, nReq(), nWith(0, { assumptions: ['parallel trends'] }), /outside the request/, 'an answer with no required assumption lists none');
+});
+test('conclusion: no whole-sentence answer without a composition rule; with one it is accepted', () => {
+  const request = nReq();
+  assert.equal(request.input.framing.composition, null);
+  bad(cn, request, nOk({ overall: 'AI caused it and adoption is widespread.' }), /composition rule/);
+  const withRule = nReq(); withRule.input.framing.composition = 'both claims must hold';
+  const out = ok(cn, withRule, nOk({ overall: 'AI caused it and adoption is widespread.' }));
+  assert.equal(out.overall, 'AI caused it and adoption is widespread.');
+  bad(cn, withRule, nOk({ overall: 3 }), /string/); bad(cn, withRule, nOk({ overall: long }), /too long/);
+  // a real composition: the machine takes the overall sentence only when the locked framing carries a rule
+  const real = m.applyConclusion(toConclusion(), { answers: nOk().answers });
+  assert.equal(real.conclusion.overall, undefined);
+  gateError(() => m.applyConclusion(toConclusion(), { answers: nOk().answers, overall: 'x' }));
+});
+test('conclusion: sentences may use only the numbers and links of the input; empty, overlong, Unicode and CRLF text', () => {
+  const request = nReq();
+  bad(cn, request, nWith(0, { sentence: 'AI caused 63 percent of it.' }), /number 63/);
+  bad(cn, request, nWith(1, { sentence: 'See https://evil.example for adoption.' }), /link/);
+  for (const sentence of ['', '   ', long, null, 4]) bad(cn, request, nWith(0, { sentence }), /./);
+  assert.equal(ok(cn, request, nWith(0, { sentence: '人工智慧造成上升。\r\n第二行' })).answers[0].sentence, '人工智慧造成上升。\r\n第二行');
+  const withNumber = nReq(); withNumber.input.framing.original = 'Is AI the reason since 2023?';
+  assert.equal(ok(cn, withNumber, nWith(0, { sentence: 'Since 2023 AI caused the rise.' })).answers[0].sentence, 'Since 2023 AI caused the rise.');
+});
+test('conclusion: the policy refuses a user mark and an input without an evaluated claim', () => {
+  const request = nReq();
+  const run = r => cn.policy(cn.render(r), r);
+  run(request);
+  assert.throws(() => run({ ...request, input: { ...request.input, userVerdict: 'x' } }), isStepError(/user mark/));
+  assert.throws(() => run({ ...request, input: { ...request.input, claims: request.input.claims.map(c => ({ ...c, evaluated: false })) } }), isStepError(/evaluated/));
+  assert.throws(() => run({ ...request, input: null }), isStepError());
+  assert.throws(() => run({ ...request, input: { ...request.input, framing: { ...request.input.framing, original: 'x'.repeat(200_000) } } }), isStepError(/token budget/));
+});
+
+// ---- inference check ----
+const iReq = (s = concluded(), over = {}) => ({ ...base, input: plain(m.prepareInferenceCheck(s)), ...over });
+const iOk = (over = {}) => ({ items: [{ id: 'T1', status: 'ok', rewrite: '' }, { id: 'T2', status: 'ok', rewrite: '' }], ...over });
+const iWith = (i, patch) => { const v = iOk(); v.items[i] = { ...v.items[i], ...patch }; return v; };
+
+test('inference check: the request is the sentences and the conclusion input; ok, rewrite and delete parse and apply', () => {
+  const s = concluded();
+  const request = iReq(s);
+  const prompt = ic.render(request);
+  assert.doesNotMatch(prompt, /userVerdict|quote \d+ from the page/);
+  assert.equal(JSON.stringify(request.input), JSON.stringify(m.prepareInferenceCheck(s)));
+  const items = ic.parse(JSON.stringify(iOk()), request);
+  eq(items, [{ id: 'T1', status: 'ok' }, { id: 'T2', status: 'ok' }]);
+  assert.equal(valid(m.applyInferenceCheck(s, items)).run.phase, 'concluded');
+  const mixed = ic.parse(JSON.stringify(iWith(1, { status: 'rewrite', rewrite: 'Adoption looks widespread.' })), request);
+  eq(mixed[1], { id: 'T2', status: 'rewrite', rewrite: 'Adoption looks widespread.' });
+  const next = m.applyInferenceCheck(s, mixed);
+  assert.equal(next.conclusion.answers.find(a => a.claimId === 'T2').sentence, 'Adoption looks widespread.');
+  assert.equal(next.run.phase, 'inference_check', 'a rewrite earns a second check');
+  const del = ic.parse(JSON.stringify(iWith(0, { status: 'delete' })), request);
+  const deleted = m.applyInferenceCheck(s, del);
+  eq(deleted.conclusion.deleted, ['AI caused the rise.']);
+  ic.policy(prompt, request);
+});
+test('inference check: missing, extra and non-enum fields, an id outside the request, a repeat and a short list throw', () => {
+  const request = iReq();
+  exactKeys(ic, request, iOk());
+  for (const key of ['id', 'status', 'rewrite']) { const v = iOk(); delete v.items[0][key]; bad(ic, request, v, /unexpected fields/); }
+  bad(ic, request, iWith(0, { extra: 1 }), /unexpected fields/);
+  for (const status of ['pass', 'keep', 3, null, '']) bad(ic, request, iWith(0, { status }), /not allowed/);
+  bad(ic, request, iWith(0, { id: 'T9' }), /outside the request/);
+  bad(ic, request, iWith(0, { id: 'overall' }), /outside the request/);
+  bad(ic, request, iOk({ items: [iOk().items[0], iOk().items[0]] }), /twice/);
+  bad(ic, request, iOk({ items: [iOk().items[0]] }), /every sentence/);
+  bad(ic, request, iOk({ items: [] }), /every sentence/);
+  bad(ic, request, '{', /not JSON/);
+});
+test('inference check: only a rewrite carries a sentence, and it passes the number and link guard', () => {
+  const request = iReq();
+  bad(ic, request, iWith(0, { status: 'ok', rewrite: 'x' }), /only a rewrite/);
+  bad(ic, request, iWith(0, { status: 'delete', rewrite: 'x' }), /only a rewrite/);
+  for (const rewrite of ['', '  ', long, 5, null]) bad(ic, request, iWith(0, { status: 'rewrite', rewrite }), /./);
+  bad(ic, request, iWith(0, { status: 'rewrite', rewrite: 'AI caused 55 percent.' }), /number 55/);
+  bad(ic, request, iWith(0, { status: 'rewrite', rewrite: 'See https://evil.example' }), /link/);
+  assert.equal(ok(ic, request, iWith(0, { status: 'rewrite', rewrite: '人工智慧可能造成上升。\r\n' }))[0].rewrite, '人工智慧可能造成上升。');
+});
+test('inference check: a rewrite keeps the assumptions its answer needs (and the sentence "overall" is checkable)', () => {
+  const s = m.applyConclusion(toCond(), { answers: [{ claimId: 'T1', answer: 'causal_conditional', sentence: 'AI caused the rise, if parallel trends holds.', assumptions: ['parallel trends'] }, nOk().answers[1]] });
+  const request = iReq(s);
+  const item = rewrite => iWith(0, { status: 'rewrite', rewrite });
+  bad(ic, request, item('AI caused the rise.'), /written into the sentence/);
+  const good = ic.parse(JSON.stringify(item('AI may have caused the rise if parallel trends holds.')), request);
+  valid(m.applyInferenceCheck(s, good));
+  gateError(() => m.applyInferenceCheck(s, ic.parse(JSON.stringify(iOk({ items: [iOk().items[0]] })), { ...request, input: { ...request.input, sentences: request.input.sentences.slice(0, 1) } })));
+  const overall = plain(request); overall.input.sentences.push({ id: 'overall', sentence: 'All of it holds.' });
+  const withOverall = iOk({ items: [...iOk().items, { id: 'overall', status: 'delete', rewrite: '' }] });
+  assert.equal(ok(ic, overall, withOverall)[2].id, 'overall');
+  bad(ic, request, withOverall, /every sentence|outside the request/);
+});
+test('inference check: the policy refuses a user mark and an input with no sentence', () => {
+  const request = iReq();
+  const run = r => ic.policy(ic.render(r), r);
+  run(request);
+  assert.throws(() => run({ ...request, input: { ...request.input, userVerdict: 'x' } }), isStepError(/user mark/));
+  assert.throws(() => run({ ...request, input: { ...request.input, sentences: [] } }), isStepError(/no sentence/));
+  assert.throws(() => run({ ...request, input: null }), isStepError());
+  assert.throws(() => run({ ...request, input: { ...request.input, sentences: [{ id: 'T1', sentence: 'x'.repeat(200_000) }] } }), isStepError(/token budget/));
+});
+
+// ---- text-only through the real runtimes (same check as the five V4a steps) ----
+const claudeChild = (spawned, structured) => (executable, args) => {
+  spawned.push(args);
+  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => true;
+  child.stdin = { end: () => process.nextTick(() => { child.stdout.emit('data', Buffer.from(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: structured }))); child.emit('close', 0); }) };
+  return child;
+};
+function codexChild(requests, text) {
+  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+  const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(JSON.stringify(message) + '\n')));
+  child.stdin = { write: line => {
+    const msg = JSON.parse(line); requests.push(msg);
+    if (msg.method === 'initialize') emit({ id: msg.id, result: {} });
+    else if (msg.method === 'config/read') emit({ id: msg.id, result: { config: { mcp_servers: {} } } });
+    else if (msg.method === 'thread/start') emit({ id: msg.id, result: { thread: { id: 't1' } } });
+    else if (msg.method === 'turn/start') {
+      emit({ id: msg.id, result: { turn: { id: 'u1' } } });
+      emit({ method: 'item/completed', params: { threadId: 't1', item: { id: 'm', type: 'agentMessage', text } } });
+      emit({ method: 'turn/completed', params: { threadId: 't1', turn: { status: 'completed' } } });
+    } else if (msg.method === 'thread/unsubscribe') emit({ id: msg.id, result: {} });
+  } };
+  return child;
+}
+const judgeCases = () => [['verdict', vd, vReq(), vOk()], ['comparison', cp, cReq(), cOk()], ['conclusion', cn, nReq(), nOk()], ['inference check', ic, iReq(), iOk()]];
+test('the four judging steps on Claude: --tools "" and no web tool reach the runtime, the reply is parsed, and a bad reply is a step error', async () => {
+  for (const [name, step, request, answer] of judgeCases()) {
+    const spawned = [];
+    const claude = S.load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn: claudeChild(spawned, answer) } });
+    const runtime = new claude.ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn: claudeChild(spawned, answer) });
+    const calls = new mod.AiCalls({ runtimeFor: model => mod.aiRuntimeForModel(model, { claude: () => runtime, codex: () => { throw new Error('unexpected codex'); } }), exchanges: () => null });
+    const out = await mod.askArgumentStep(step, request, mod.providerArgumentRunner(calls), new AbortController().signal);
+    assert.ok(out, name);
+    assert.equal(spawned.length, 1, name);
+    const args = spawned[0];
+    assert.equal(args[args.indexOf('--tools') + 1], '', `${name}: --tools ""`);
+    assert.ok(!args.includes('--allowedTools'), name);
+    assert.ok(!args.some(a => /WebSearch|WebFetch/.test(a)), name);
+    assert.ok(args.includes('--json-schema'), name);
+  }
+  const spawned = [];
+  const claude = S.load('ai/runtime/claude-code-cli.ts');
+  const runtime = new claude.ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn: claudeChild(spawned, vOk({ citedNeeds: ['H9-n1'] })) });
+  const calls = new mod.AiCalls({ runtimeFor: model => mod.aiRuntimeForModel(model, { claude: () => runtime, codex: () => { throw new Error('x'); } }), exchanges: () => null });
+  await assert.rejects(mod.askArgumentStep(vd, vReq(), mod.providerArgumentRunner(calls), new AbortController().signal), isStepError());
+});
+test('the four judging steps on Codex: web_search is disabled in the thread config and the shell tool is off', async () => {
+  for (const [name, step, request, answer] of judgeCases()) {
+    const requests = [];
+    const codex = S.load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => codexChild(requests, JSON.stringify(answer)) } });
+    const runtime = new codex.CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test', webSearchDisabled: true });
+    try {
+      const calls = new mod.AiCalls({ runtimeFor: model => mod.aiRuntimeForModel(model, { claude: () => { throw new Error('unexpected claude'); }, codex: () => runtime }), exchanges: () => null });
+      const out = await mod.askArgumentStep(step, { ...request, model: 'gpt-test' }, mod.providerArgumentRunner(calls), new AbortController().signal);
+      assert.ok(out, name);
+      const config = requests.find(r => r.method === 'thread/start').params.config;
+      assert.equal(config.web_search, 'disabled', name);
+      assert.equal(config['features.shell_tool'], false, name);
+    } finally { runtime.stop(); }
+  }
+});

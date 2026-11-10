@@ -201,11 +201,17 @@ const foundOf = (state: ArgumentMapData, facetId: string) =>
   state.situation.data.filter(d => d.facetId === facetId && d.state === "found");
 
 // ---- creation ------------------------------------------------------------------------------------------------------------------
-export function newArgumentMap(roles: ArgumentRoles, runId: string): ArgumentMapData {
+export function newArgumentMap(roles: ArgumentRoles, runId: string, preset?: AssumptionItem[]): ArgumentMapData {
   return {
     v: 1,
     roles: { ...roles },
-    run: { runId, phase: "situation", status: "running", researchCalls: 0 },
+    run: {
+      runId,
+      phase: "situation",
+      status: "running",
+      researchCalls: 0,
+      ...(preset?.length ? { presetAssumptions: preset.map(item => ({ ...item })) } : {})
+    },
     situation: { data: [], gate: { state: "pending", citedData: [] } },
     hypotheses: [],
     conclusion: { state: "pending", basedOn: [], missing: [] }

@@ -163,6 +163,8 @@ export interface ArgumentRun {
   status: RunStatus;
   stopReason?: StopReason;
   researchCalls: number;
+  /** A re-run: the definitions the owner kept. Saved here so a run paused before the facet plan still uses them on resume. */
+  presetAssumptions?: AssumptionItem[];
 }
 export interface ArgumentConclusion {
   state: ConclusionState;
@@ -283,6 +285,15 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
   const run = raw.run;
   if (!isRec(run)) return "run missing";
   if (!isStr(run.runId) || !count(run.researchCalls)) return "run malformed";
+  if (run.presetAssumptions !== undefined) {
+    const preset = run.presetAssumptions;
+    if (
+      !Array.isArray(preset) ||
+      !preset.length ||
+      preset.some(item => !isRec(item) || !isStr(item.label) || !isStr(item.value) || !isStr(item.reason))
+    )
+      return "run malformed";
+  }
   if (!oneOf(RUN_PHASES, run.phase) || !oneOf(RUN_STATUSES, run.status) || !optOneOf(STOP_REASONS, run.stopReason))
     return "unknown run enum";
   const situation = raw.situation;

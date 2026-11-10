@@ -964,6 +964,32 @@ test('P7: start with presetAssumptions sends them in the facet-plan request and 
   await plain0.runs.start(plain0.mapPath, 'Youth unemployment is rising');
   assert.equal('presetAssumptions' in seen[1], false);
 });
+test('P8: the preset assumptions are saved in the map, so a re-run paused before the facet plan still uses them on resume; a bad saved preset makes the map unusable', async () => {
+  const preset = [{ label: 'Age', value: '30 to 40', reason: 'owner edited' }];
+  const seen = [];
+  const holder = {};
+  let first = true;
+  const r = await rig({ facet: true, script: { step: facetSteps({ plan_facets: async request => {
+    seen.push(plain(request));
+    if (first) { first = false; void holder.runs.stop(holder.mapPath); await tick(); }
+    return facetSteps().plan_facets();
+  } }) } });
+  holder.runs = r.runs; holder.mapPath = r.mapPath;
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising', { presetAssumptions: preset });
+  const paused = await r.state();
+  assert.equal(paused.run.status, 'paused');
+  assert.equal(paused.situation.facets, undefined, 'paused before the facet plan was written');
+  assert.deepEqual(plain(paused.run.presetAssumptions), preset, 'saved in the map');
+  await r.runs.resume(r.mapPath);
+  assert.equal(seen.length, 2);
+  assert.deepEqual(seen[1].presetAssumptions, preset, 'the resumed plan request still carries them');
+  const map = await r.repo.readMap(r.mapPath);
+  for (const bad of [[{ label: 'a', value: 'b' }], 'x', [{ label: '', value: 'v', reason: 'r' }], []]) {
+    const copy = JSON.parse(JSON.stringify(map));
+    copy.argumentMap.run.presetAssumptions = bad;
+    assert.equal(model.readArgumentMap(copy).kind, 'unusable', JSON.stringify(bad));
+  }
+});
 test('P7: re-running on a new map leaves the original Map.md byte-identical', async () => {
   const r = await rig({ facet: true, script: { step: facetSteps() } });
   await r.runs.start(r.mapPath, 'Youth unemployment is rising');

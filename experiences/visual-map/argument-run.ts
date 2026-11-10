@@ -323,7 +323,7 @@ export class ArgumentRuns {
         await p.updateMap(mapPath, doc => {
           if (doc.argumentMap !== undefined) throw new ArgumentRunError("exists");
           for (const [node, parentId] of parents) this.attach(doc, node, parentId);
-          doc.argumentMap = newArgumentMap(roles, runId);
+          doc.argumentMap = newArgumentMap(roles, runId, drive.preset);
         });
         p.clearUndo(mapPath);
       });
@@ -648,7 +648,9 @@ export class ArgumentRuns {
     const request: FacetPlanRequest = {
       ...this.base(drive),
       proposition,
-      ...(drive.preset?.length ? { presetAssumptions: drive.preset.map(item => ({ ...item })) } : {})
+      ...(state.run.presetAssumptions?.length
+        ? { presetAssumptions: state.run.presetAssumptions.map(item => ({ ...item })) }
+        : {})
     };
     const result: FacetPlanResult = await this.ask(drive, ARGUMENT_STEPS.plan_facets, request);
     await this.checkpoint(drive, async (s, map) => {

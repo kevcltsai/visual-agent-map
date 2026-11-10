@@ -1,1 +1,0 @@
-Hypotheses already exist and the comparison found a missed alternative described under the gap. Write only new alternatives that address the gap (any role except primary), never a hypothesis that already exists.

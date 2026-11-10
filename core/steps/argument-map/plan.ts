@@ -11,7 +11,7 @@ import {
   type ArgumentStepBase
 } from "./shared";
 import template from "./plan.md";
-import { MAX_SITUATION_DATA } from "../../argument-map/model-v1";
+import { MAX_SITUATION_DATA } from "../../argument-map/model";
 
 export interface PlanSituationRequest extends ArgumentStepBase {
   proposition: string;

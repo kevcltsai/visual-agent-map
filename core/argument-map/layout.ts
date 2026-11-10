@@ -6,7 +6,7 @@
  */
 import type { MapNode } from "../../map-graph";
 import { arrangeMap, cardsOverlapAny, type HeightOf } from "../../map-layout";
-import { isVerified, type ArgumentMapData, type Hypothesis, type Need, type SituationDatum } from "./model-v1";
+import { isVerified, type ArgumentMapData, type Hypothesis, type Need, type SituationDatum } from "./model";
 
 const GROUP_STANCE = { supports: 0, contradicts: 1, opposes: 1, uncertain: 2 } as const;
 /** Found items first (supports, then contradicts, then uncertain), then the dashed missing ones (searching, pending, not found). */

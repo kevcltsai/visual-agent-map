@@ -24202,6 +24202,29 @@ function chatPlanGroupOf(kind) {
   }
 }
 
+// core/note-read-context.ts
+function createNoteReadContext(map) {
+  var _a2;
+  return {
+    nodesById: new Map(((_a2 = map == null ? void 0 : map.nodes) != null ? _a2 : []).map((node) => [node.id, node])),
+    ancestorFm: /* @__PURE__ */ new Map(),
+    reads: /* @__PURE__ */ new Map(),
+    failedPaths: /* @__PURE__ */ new Set(),
+    map
+  };
+}
+function readOnce(ctx, path, read) {
+  let pending2 = ctx.reads.get(path);
+  if (!pending2) {
+    pending2 = read().catch((error) => {
+      ctx.failedPaths.add(path);
+      throw error;
+    });
+    ctx.reads.set(path, pending2);
+  }
+  return pending2;
+}
+
 // core/link-rewrite.ts
 function linkPathOf(target) {
   const hash = target.indexOf("#");
@@ -26549,7 +26572,7 @@ var Repository = class {
    * manual keeps it, workspace follows the current setting, inherited uses the nearest manual ancestor's stored model
    * and otherwise the current setting. `overridden` is true when the model comes from a manual topic or ancestor.
    */
-  async effectiveModel(path, stored, source, map, storedReasoning) {
+  async effectiveModel(path, stored, source, map, storedReasoning, ctx) {
     if (source === "manual")
       return {
         model: stored || this.settings.cliModel,
@@ -26572,20 +26595,41 @@ var Repository = class {
       }
     }
     const seen = /* @__PURE__ */ new Set();
+    const byId = ctx && owner && ctx.map === owner ? ctx.nodesById : void 0;
     let node = owner == null ? void 0 : owner.nodes.find((item) => item.path === path);
     while (node && node.parentId && !seen.has(node.id)) {
       seen.add(node.id);
-      const parent = owner.nodes.find((item) => item.id === node.parentId);
+      const parentId = node.parentId;
+      const parent = byId ? byId.get(parentId) : owner.nodes.find((item) => item.id === parentId);
       if (!parent) break;
-      try {
-        const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text5(fm.model))
-          return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
-      } catch (e) {
-      }
+      const fm = await this.ancestorFrontmatter(parent.path, ctx);
+      if (fm && fm["model-source"] === "manual" && text5(fm.model))
+        return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
       node = parent;
     }
     return { model: this.settings.cliModel, overridden: false };
+  }
+  /**
+   * An ancestor note's frontmatter, or null when it is missing or unreadable (the walk skips it). With a context the
+   * file is read once per hydrate; an existing file whose read throws is recorded in `ctx.failedPaths`.
+   */
+  async ancestorFrontmatter(path, ctx) {
+    const load = async () => {
+      try {
+        const file = this.file(path);
+        const content = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file);
+        return frontmatter(content);
+      } catch (e) {
+        return null;
+      }
+    };
+    if (!ctx) return load();
+    let pending2 = ctx.ancestorFm.get(path);
+    if (!pending2) {
+      pending2 = load();
+      ctx.ancestorFm.set(path, pending2);
+    }
+    return pending2;
   }
   /**
    * Resolve the model for a topic: run-once choice, then the topic's override (inherited upward), then the current
@@ -26639,14 +26683,21 @@ var Repository = class {
     }
     return false;
   }
-  async readNote(path, map) {
+  async readNote(path, map, ctx) {
     var _a2, _b2;
-    const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))), fm = frontmatter(content);
+    const file = this.file(path), raw = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file), content = decodeCalloutSections(upgradeLegacyAimText(raw)), fm = frontmatter(content);
     const status = text5(fm.status, "idea");
     const normalized2 = status === "review" || status === "accepted" ? "completed" : status;
     const source = text5(fm["model-source"], "workspace");
     const modelSource = ["workspace", "inherited", "manual"].includes(source) ? source : "workspace";
-    const effective = await this.effectiveModel(path, text5(fm.model), modelSource, map, text5(fm["reasoning-level"]));
+    const effective = await this.effectiveModel(
+      path,
+      text5(fm.model),
+      modelSource,
+      map,
+      text5(fm["reasoning-level"]),
+      ctx
+    );
     const { model, reasoning } = this.chooseModel(effective);
     const state = text5(
       fm["topic-state"],
@@ -26959,6 +27010,17 @@ ${body}`);
   }
   async readMap(path) {
     return parseMap(await this.app.vault.read(this.file(path)));
+  }
+  /** Map.md read once: the map plus its goal, context and sources (what hydrate and synchronize need). */
+  async readMapMeta(path) {
+    const content = await this.app.vault.read(this.file(path));
+    const fm = frontmatter(content);
+    return {
+      map: parseMap(content),
+      goal: readRelevanceGoal(fm),
+      context: readRelevanceContext(fm),
+      sources: readMapSources(fm)
+    };
   }
   /** The map file's `relevance-goal` frontmatter, if any. The map file keeps its frontmatter across saves. */
   async readRelevanceGoal(path) {
@@ -62751,13 +62813,16 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
   async persist() {
     if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
-  async hydrate(isCurrent = () => true, onRead) {
-    var _a2, _b2, _c;
+  async hydrate(isCurrent = () => true, onRead, meta) {
+    var _a2, _b2, _c, _d, _e;
     this.aimFailedReports.clear();
     let goal;
     let context;
     let sources = [];
-    if (this.path && !((_a2 = this.map) == null ? void 0 : _a2.aim)) {
+    const ctx = createNoteReadContext((_a2 = this.map) != null ? _a2 : void 0);
+    if (meta) {
+      if (this.path && !((_b2 = this.map) == null ? void 0 : _b2.aim)) ({ goal, context, sources } = meta);
+    } else if (this.path && !((_c = this.map) == null ? void 0 : _c.aim)) {
       try {
         ({ goal, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch (e) {
@@ -62767,7 +62832,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       } catch (e) {
       }
     }
-    const nodes = (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : [];
+    const nodes = (_e = (_d = this.map) == null ? void 0 : _d.nodes) != null ? _e : [];
     const read = new Array(nodes.length);
     let next = 0;
     const worker = async () => {
@@ -62775,14 +62840,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       while (next < nodes.length && isCurrent()) {
         const index = next++;
         try {
-          read[index] = await this.plugin.repo.readNote(nodes[index].path, (_a3 = this.map) != null ? _a3 : void 0);
+          read[index] = await this.plugin.repo.readNote(nodes[index].path, (_a3 = this.map) != null ? _a3 : void 0, ctx);
         } catch (e) {
         }
         onRead == null ? void 0 : onRead(index, read[index]);
       }
     };
     await Promise.all(Array.from({ length: Math.min(8, nodes.length) }, worker));
-    if (!isCurrent()) return;
+    if (!isCurrent()) return { failedPaths: [] };
     const loaded = /* @__PURE__ */ new Map();
     nodes.forEach((node, index) => {
       const note = read[index];
@@ -62793,6 +62858,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     this.relevanceContext = context;
     this.mapSources = sources;
     await this.hydrateFailedReportTargets(isCurrent);
+    return { failedPaths: Array.from(ctx.failedPaths) };
   }
   async hydrateFailedReportTargets(isCurrent) {
     var _a2;
@@ -71686,7 +71752,7 @@ ${request.requirements}` : preset.text,
       this.render();
       return;
     }
-    const disk = await this.plugin.repo.readMap(this.path);
+    const { map: disk, ...meta } = await this.plugin.repo.readMapMeta(this.path);
     const structureChanged = JSON.stringify({ ...disk, viewport: null }) !== JSON.stringify({ ...this.map, viewport: null });
     if (structureChanged) {
       disk.viewport = this.map.viewport;
@@ -71695,7 +71761,7 @@ ${request.requirements}` : preset.text,
       this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
-    await this.hydrate();
+    await this.hydrate(void 0, void 0, meta);
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
       const editing = this.typingInField();
       if ((!editing || structureChanged) && !this.dragging) this.render();

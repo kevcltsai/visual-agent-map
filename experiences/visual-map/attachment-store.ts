@@ -35,7 +35,12 @@ export async function attachmentPath(app: App, name: string, sourcePath: string)
   const map = defaultAttachmentSetting(app) ? mapFolderOf(app, sourcePath) : null;
   if (map === null) return app.fileManager.getAvailablePathForAttachment(name, sourcePath);
   const folder = `${map}/Attachments`;
-  if (!(app.vault.getAbstractFileByPath(folder) instanceof TFolder)) await app.vault.createFolder(folder);
+  const isFolder = (): boolean => app.vault.getAbstractFileByPath(folder) instanceof TFolder;
+  // Another write (an export, a second view) may create the folder between the check and createFolder: that is fine.
+  if (!isFolder())
+    await app.vault.createFolder(folder).catch((error: unknown) => {
+      if (!isFolder()) throw error;
+    });
   const dot = name.lastIndexOf(".");
   const [base, extension] = dot <= 0 ? [name, ""] : [name.slice(0, dot), name.slice(dot)];
   let path = `${folder}/${name}`;

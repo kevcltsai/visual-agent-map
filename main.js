@@ -19352,7 +19352,11 @@ async function attachmentPath(app, name2, sourcePath) {
   const map = defaultAttachmentSetting(app) ? mapFolderOf(app, sourcePath) : null;
   if (map === null) return app.fileManager.getAvailablePathForAttachment(name2, sourcePath);
   const folder = `${map}/Attachments`;
-  if (!(app.vault.getAbstractFileByPath(folder) instanceof import_obsidian10.TFolder)) await app.vault.createFolder(folder);
+  const isFolder = () => app.vault.getAbstractFileByPath(folder) instanceof import_obsidian10.TFolder;
+  if (!isFolder())
+    await app.vault.createFolder(folder).catch((error) => {
+      if (!isFolder()) throw error;
+    });
   const dot = name2.lastIndexOf(".");
   const [base, extension] = dot <= 0 ? [name2, ""] : [name2.slice(0, dot), name2.slice(dot)];
   let path = `${folder}/${name2}`;

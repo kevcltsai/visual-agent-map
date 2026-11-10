@@ -421,6 +421,19 @@ test('A22: default setting: a note outside any map still gets getAvailablePathFo
   assert.equal(h.files.has(ATTACHMENTS), false);
 });
 
+test('A23: default setting: two first writes racing to create <map>/Attachments both succeed; another createFolder failure still throws', async () => {
+  const { attachmentPath } = load('experiences/visual-map/attachment-store.ts', { obsidian });
+  const h = await harness({ attachmentFolder: 'default' });
+  const createFolder = h.app.vault.createFolder;
+  // Each call yields first, so both see no folder before either creates it.
+  h.app.vault.createFolder = async p => { await Promise.resolve(); return createFolder(p); };
+  const paths = await Promise.all([attachmentPath(h.app, 'a.png', MAP), attachmentPath(h.app, 'b.png', h.parent)]);
+  assert.deepEqual(paths, [`${ATTACHMENTS}/a.png`, `${ATTACHMENTS}/b.png`]);
+  const other = await harness({ attachmentFolder: 'default' });
+  other.app.vault.createFolder = async () => { throw new Error('disk full'); };
+  await assert.rejects(attachmentPath(other.app, 'a.png', MAP), /disk full/);
+});
+
 test('A12: no test called vault.delete, vault.trash or adapter.remove', () => {
   assert.deepEqual(forbidden, { 'vault.delete': 0, 'vault.trash': 0, 'adapter.remove': 0 });
 });

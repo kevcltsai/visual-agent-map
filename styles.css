@@ -1755,8 +1755,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-modal .vam-relation-reason { margin: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-topic-modal .vam-relation-remaining { align-self: flex-end; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-topic-modal .vam-relation-footer { margin-top: 20px; }
-.vam-map-chat button.vam-map-chat-empty-map { align-self: center; margin-top: 8px; }
-.vam-map-chat button.vam-map-chat-empty-map[hidden] { display: none; }
+.vam-map-chat .vam-map-chat-hero-actions { display: flex; flex-wrap: wrap; justify-content: center; align-self: center; gap: 8px; margin-top: 8px; }
+.vam-map-chat .vam-map-chat-hero-actions[hidden] { display: none; }
+.vam-map-chat button.vam-map-chat-empty-map[hidden], .vam-map-chat button.vam-map-chat-argument[hidden] { display: none; }
 /* The model a card runs on when it is not the current model (MS-08): muted small text. */
 .vam-node-model-tag { display: inline-flex; align-items: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; color: var(--text-muted); }
 

@@ -2898,7 +2898,7 @@ integrationTest('opening screen: removing the only item does not take the keyboa
 integrationTest('UX B6: on the opening screen the model menu is in the composer after the message field (never in the head row); the head row is hidden there and shows again in the window', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; assert.equal(chat.isHero, true);
   const body = () => chat.bodyEl.children;
-  if (chat.emptyMapEl.hidden === false) assert.equal(body().at(-2), chat.emptyMapEl, 'the empty-map button is second to last in the body');
+  if (chat.emptyMapEl.hidden === false) { assert.equal(body().at(-2), chat.heroActionsEl, 'the button row is second to last in the body'); assert.equal(chat.heroActionsEl.children[0], chat.emptyMapEl, 'the empty-map button leads the row'); }
   assert.ok(chat.headEl.hasClass('is-hero'), 'the head row is hidden on the opening screen'); assert.equal(find(chat.headEl, i => i === chat.modelEl), undefined, 'the model menu is not in the head row');
   const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.modelEl).map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : 'model');
   eq(order, ['title', 'input', 'model'], 'reading and Tab order: the question, the field, then the model');
@@ -2955,7 +2955,35 @@ integrationTest('45 ui: the opening screen has a secondary "create an empty mind
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
   const button = chat.emptyMapEl; assert.equal(button.hidden, false); assert.equal(button.text, 'Create an empty mind map'); assert.equal(button.attrs.type, 'button'); assert.equal(button.hasClass('mod-cta'), false);
   assert.equal(button.tabIndex === undefined || button.tabIndex >= 0, true, 'in the tab order');
-  const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === button); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : 'empty'), ['title', 'input', 'empty']);
+  const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === button || i === chat.researchEl); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : i === button ? 'empty' : 'research'), ['title', 'input', 'empty', 'research']);
+  assert.equal(button.parent, chat.heroActionsEl, 'both buttons share one row'); assert.equal(chat.researchEl.parent, chat.heroActionsEl);
+});
+
+integrationTest('P9a ui: the opening screen has a "Hypothesis research…" button right of the empty-map button in the same row; it hands the typed text to the host', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const button = chat.researchEl;
+  assert.equal(button.hidden, false); assert.equal(button.text, 'Hypothesis research…'); assert.equal(button.attrs.type, 'button'); assert.equal(button.hasClass('mod-cta'), false); assert.ok(hasClass(button, 'vam-map-chat-argument'));
+  assert.ok(hasClass(chat.heroActionsEl, 'vam-map-chat-hero-actions')); assert.deepEqual([...chat.heroActionsEl.children], [chat.emptyMapEl, button]);
+  const body = chat.bodyEl.children; assert.equal(body.at(-2), chat.heroActionsEl, 'the row sits where the empty-map button sat: after the composer, before the head row'); assert.equal(body.at(-1), chat.headEl);
+  const asked = []; chat.host.startArgumentResearch = draft => asked.push(draft); h.type('  Is it true?  '); button.click();
+  eq(asked, [chat.draft], 'the draft is passed once'); assert.match(asked[0], /Is it true\?/);
+});
+
+integrationTest('P9a counterexample: a host without startArgumentResearch shows no research button; the empty-map button, its text and its place are as before; with neither the row is hidden', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  delete chat.host.startArgumentResearch; h.repaint();
+  assert.equal(chat.researchEl.hidden, true); assert.equal(chat.emptyMapEl.hidden, false); assert.equal(chat.heroActionsEl.hidden, false); assert.equal(chat.emptyMapEl.text, 'Create an empty mind map');
+  assert.equal(chat.bodyEl.children.at(-2), chat.heroActionsEl); eq(findAll(chat.bodyEl, i => i === chat.emptyMapEl || i === chat.researchEl && !i.hidden).map(i => i === chat.emptyMapEl ? 'empty' : 'research'), ['empty']);
+  delete chat.host.createEmptyMap; h.repaint();
+  assert.equal(chat.emptyMapEl.hidden, true); assert.equal(chat.heroActionsEl.hidden, true, 'no button: no row'); assert.equal(chat.bodyEl.children.at(-1), chat.headEl);
+  const g = await harness(); await g.view.hydrate(); g.repaint(); g.open(); assert.equal(g.view.chat.researchEl.hidden, true, 'a map with cards'); assert.equal(g.view.chat.heroActionsEl.hidden, true);
+  h.type('Coffee'); await h.view.sendMapChat(); assert.equal(chat.researchEl.hidden, true, 'side window');
+});
+
+integrationTest('P9a counterexample: the map chat cannot start a hypothesis research run, however the message is worded', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint();
+  const runs = []; h.plugin.argumentRuns = { isRunning: () => false, start: (...a) => { runs.push(['start', ...a]); return Promise.resolve(); }, resume: (...a) => { runs.push(['resume', ...a]); return Promise.resolve(); }, stop: (...a) => { runs.push(['stop', ...a]); } };
+  for (const text of ['幫我做假設研究', 'run hypothesis research on: is coffee healthy?']) { h.type(text); await h.view.sendMapChat(); }
+  eq(runs, [], 'no run was started, resumed or stopped by a chat message'); assert.ok(h.control.requests.length >= 1, 'the messages went to the chat as ordinary requests');
 });
 
 integrationTest('45 ui: the button turns the opening screen into this map\'s empty canvas: no name box, no new file, no AI request', async () => {

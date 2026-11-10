@@ -467,6 +467,8 @@ import {
   renderArgumentKind,
   type ArgumentCardView
 } from "./argument-card";
+import { ArgumentRunError, WORST_CASE_AI_CALLS } from "./argument-run";
+import { ArgumentStartModal } from "../../ui/modals/argument-start-modal";
 import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
@@ -13234,6 +13236,7 @@ export class VisualAgentMapView extends ItemView {
         this.drawEdges();
       }
     }
+    this.focusArgumentRootOnce();
   }
   /** The header's export and share button (AIM and integration mode included, decision D11; sharing is not offered for AIM). */
   private addExportButton(parent: HTMLElement): HTMLButtonElement {
@@ -22516,9 +22519,63 @@ export class VisualAgentMapView extends ItemView {
     // The pressed button is gone; the keyboard goes to the empty canvas's "Add first topic" (the one way to add a topic by hand).
     this.contentEl.querySelector<HTMLElement>(".vam-empty .vam-empty-add")?.focus();
   }
+  /**
+   * The opening screen's "Hypothesis research…": the start window. Nothing runs until its start button, and by then the map may have
+   * changed (a card added, another map in this tab, the view closed, a run already going), so the press is checked again.
+   */
+  private argumentFocusMapId: string | null = null;
+  /** After a run was started from the opening screen: the keyboard goes to the proposition card once, when the argument map first shows. */
+  private focusArgumentRootOnce(): void {
+    const map = this.map;
+    if (this.argumentFocusMapId === null || !map || map.id !== this.argumentFocusMapId || map.argumentMap === undefined)
+      return;
+    const read = readArgumentMap(map);
+    if (read.kind !== "usable") return;
+    const root = map.nodes.find(node => node.id === read.data.roles.proposition);
+    if (!root) return;
+    this.argumentFocusMapId = null;
+    this.focusNode(root);
+  }
+  private openArgumentStart(draft: string): void {
+    const map = this.map;
+    if (this.closed || !map || !this.chatHero()) return;
+    const path = this.path;
+    const mapId = map.id;
+    const stale = (): boolean =>
+      this.closed ||
+      this.path !== path ||
+      this.map?.id !== mapId ||
+      this.map.argumentMap !== undefined ||
+      this.map.nodes.length > 0 ||
+      this.plugin.argumentRuns.isRunning(path);
+    const models = this.chatModelChoices().map(choice => ({ id: choice.value, label: choice.label }));
+    new ArgumentStartModal(
+      this.app,
+      draft,
+      models,
+      this.plugin.settings.cliModel,
+      WORST_CASE_AI_CALLS,
+      async ({ claim, model }) => {
+        if (!claim.trim() || stale()) return;
+        // The window's model is the current model, the same as picking it in the opening screen's model menu.
+        if (model !== this.plugin.settings.cliModel) {
+          await this.plugin.setCurrentModel(model);
+          if (stale()) return;
+        }
+        this.chat?.clearDraft();
+        this.argumentFocusMapId = mapId;
+        // The run is not awaited: its first checkpoint replaces the opening screen with the argument map.
+        void this.plugin.argumentRuns.start(path, claim).catch((error: unknown) => {
+          this.argumentFocusMapId = null;
+          if (error instanceof ArgumentRunError) new Notice(t("ui.argument_start_refused"));
+        });
+      }
+    ).open();
+  }
   private chatHost(): MapChatHost {
     return {
       createEmptyMap: () => this.startBlankMap(),
+      startArgumentResearch: draft => this.openArgumentStart(draft),
       topicTitle: id => {
         const node = this.map?.nodes.find(item => item.id === id);
         return node ? (this.notes.get(id)?.title ?? node.path) : null;

@@ -314,6 +314,8 @@ export interface MapChatHost {
   steer?(): void;
   /** The opening screen's secondary button: a new empty map through the name box, no AI. Absent: no button. */
   createEmptyMap?(): void;
+  /** The opening screen's other button: hypothesis research, with the text typed so far. Absent: no button. */
+  startArgumentResearch?(draft: string): void;
   /** The clock the stage seconds are counted on (tests); the real time when absent. */
   now?(): number;
   /** Resolves a `[[link]]` target to the vault path of the note it names, or null. */
@@ -468,7 +470,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private guideEl!: HTMLElement;
   private hintEl!: HTMLElement;
   private logEl!: HTMLElement;
+  private heroActionsEl!: HTMLDivElement;
   private emptyMapEl!: HTMLButtonElement;
+  private researchEl!: HTMLButtonElement;
   private resizerEl!: HTMLElement;
   private liveEl!: HTMLElement;
   private stopResizing: (() => void) | null = null;
@@ -1765,13 +1769,22 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       if (event.key === "Enter") openInternal(event, event.target);
     });
     // Opening screen only: a secondary way in that needs no model. Tab order: the chips, the message field, the controls.
-    this.emptyMapEl = this.bodyEl.createEl("button", {
+    this.heroActionsEl = this.bodyEl.createDiv({ cls: "vam-map-chat-hero-actions" });
+    this.heroActionsEl.hidden = true;
+    this.emptyMapEl = this.heroActionsEl.createEl("button", {
       cls: "vam-map-chat-empty-map",
       text: t("ui.create_an_empty_mind_map"),
       attr: { type: "button" }
     });
     this.emptyMapEl.hidden = true;
     this.emptyMapEl.addEventListener("click", () => this.host.createEmptyMap?.());
+    this.researchEl = this.heroActionsEl.createEl("button", {
+      cls: "vam-map-chat-argument",
+      text: t("ui.argument_start_button"),
+      attr: { type: "button" }
+    });
+    this.researchEl.hidden = true;
+    this.researchEl.addEventListener("click", () => this.host.startArgumentResearch?.(this.draft));
     this.chipsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
@@ -1924,6 +1937,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.guideTextEl.setText(t("ui.map_chat_empty_log"));
     this.logLabelEl.setText(t("ui.map_chat_log_label"));
     this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
+    this.researchEl.setText(t("ui.argument_start_button"));
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
     this.renderPlaceholder();
@@ -2121,13 +2135,13 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    * map" button (so reading and Tab order match what is seen); the head row (icons only) is hidden there. In the window it is on top.
    * Elements are moved only when they are out of place, so a control that has the keyboard is not moved for nothing.
    */
-  private placeHeadAndEmptyMap(hero: boolean, showEmptyMap: boolean): void {
+  private placeHeadAndEmptyMap(hero: boolean, showActions: boolean): void {
     const children = (): Element[] => Array.from(this.bodyEl.children);
     if (!hero) {
       if (children()[0] !== this.headEl) this.bodyEl.insertBefore(this.headEl, this.bodyEl.firstChild);
       return;
     }
-    const tail = showEmptyMap ? [this.emptyMapEl, this.headEl] : [this.headEl];
+    const tail = showActions ? [this.heroActionsEl, this.headEl] : [this.headEl];
     const now = children().slice(-tail.length);
     if (tail.every((el, index) => now[index] === el)) return;
     for (const el of tail) {
@@ -2206,9 +2220,14 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.renderPlaceholder();
     this.applyWidth();
     const showEmptyMap = hero && !!this.host.createEmptyMap;
+    const showResearch = hero && !!this.host.startArgumentResearch;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
-    this.placeHeadAndEmptyMap(hero, showEmptyMap);
+    this.researchEl.hidden = !showResearch;
+    this.researchEl.toggleClass("is-hidden", !showResearch);
+    this.heroActionsEl.hidden = !(showEmptyMap || showResearch);
+    this.heroActionsEl.toggleClass("is-hidden", !(showEmptyMap || showResearch));
+    this.placeHeadAndEmptyMap(hero, showEmptyMap || showResearch);
     this.renderGuide();
     this.refreshSave();
     // Someone opens the window because a reply came in while it was folded: they land on the newest message.

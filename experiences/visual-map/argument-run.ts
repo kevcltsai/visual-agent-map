@@ -36,6 +36,9 @@ import {
   type EvidenceResult
 } from "../../core/argument-map/machine";
 import {
+  MAX_HYPOTHESES,
+  MAX_RESEARCH_CALLS,
+  MAX_ROUND,
   MAX_SITUATION_DATA,
   foundNeeds,
   readArgumentMap,
@@ -69,6 +72,12 @@ import type { StepDefinition } from "../../core/step-runner";
 import type { MapDocument, MapNode } from "../../map-model";
 
 export const MAX_RESEARCH_CONCURRENCY = 3;
+/**
+ * The most AI calls one run can make, shown before it starts (corrections and retries not counted): the research calls, plan_situation,
+ * judge_gate, propose (up to MAX_HYPOTHESES - 3 + 1), a needs step and a verdict step per hypothesis per round, and conclude.
+ */
+export const WORST_CASE_AI_CALLS =
+  MAX_RESEARCH_CALLS + 1 + 1 + (MAX_HYPOTHESES - 3 + 1) + MAX_HYPOTHESES * MAX_ROUND * 2 + 1;
 const X_STEP = 320;
 const Y_STEP = 160;
 

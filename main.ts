@@ -365,8 +365,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly expansionBatches = new Map<string, ExpansionBatchState>();
   readonly expansionCoordinator = new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches);
   /**
-   * Hypothesis research runner, keyed by map path. Test entry only (reachable from `app.plugins.plugins[id].argumentRuns`
-   * over CDP): there is no command, menu, ribbon or button for it. Ports are lazy getters, so `repo` may be built later.
+   * Hypothesis research runner, keyed by map path. Started from the start window that the opening screen's "Hypothesis research…"
+   * button opens (the map view, `openArgumentStart`); the map chat cannot start it. Also reachable from
+   * `app.plugins.plugins[id].argumentRuns` over CDP. Ports are lazy getters, so `repo` may be built later.
    */
   readonly argumentRuns = new ArgumentRuns({
     mutate: work => this.mutate(work),

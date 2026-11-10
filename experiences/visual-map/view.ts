@@ -1130,6 +1130,8 @@ interface TopicChatEntry {
   steerFolded?: string[];
   /** How the current task ended (set by `settleTopicChat`); `plan`: the reply needs a plan, so nothing is sent on. */
   steerEnd?: { status: TopicRecordStatus; plan: boolean } | null;
+  /** The AbortController of the current run (the window's stop button aborts it). */
+  controller?: AbortController;
 }
 /** How one expansion the chat started came out. */
 type ChatExpandOutcome =
@@ -16758,6 +16760,10 @@ export class VisualAgentMapView extends ItemView {
         entry.steers.add(text);
         return true;
       },
+      canStop: () => entry.session.running && !!entry.controller && !entry.controller.signal.aborted && !entry.steerEnd,
+      stop: () => {
+        if (entry.session.running && !entry.steerEnd) entry.controller?.abort();
+      },
       close: () => {
         if (this.topicChatOpen?.entry === entry) this.closeTopicChatWindow();
       }
@@ -16870,6 +16876,7 @@ export class VisualAgentMapView extends ItemView {
       entry.steers = steers;
       entry.steerFolded = folded;
       entry.steerEnd = null;
+      entry.controller = controller;
       this.writeTopicChatLine(entry, {
         type: "turn",
         id: entry.runningTurnId,

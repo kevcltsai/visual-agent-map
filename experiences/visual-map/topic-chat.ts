@@ -50,6 +50,10 @@ export interface TopicChatHost {
   submit(kind: TopicChatKind, text: string): Promise<boolean>;
   /** An addition typed while a task runs; true when it was taken (the input then clears), false when it was not (the input stays). */
   steer(text: string): boolean;
+  /** True while the current run can be stopped (running, not yet aborted, not in the gap after the reply). */
+  canStop(): boolean;
+  /** Aborts the current run; the view's stop handling puts unsent additions back in the box. */
+  stop(): void;
   close(): void;
 }
 
@@ -459,7 +463,16 @@ export class TopicChatWindow {
       }
     }
     if (session.running) {
-      this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running", text: t("ui.topic_chat_running") });
+      const running = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running" });
+      running.createSpan({ text: t("ui.topic_chat_running") });
+      if (this.host.canStop()) {
+        const stop = running.createEl("button", {
+          cls: "vam-topic-chat-stop",
+          text: t("ui.topic_chat_stop"),
+          attr: { type: "button", "aria-label": t("ui.topic_chat_stop") }
+        });
+        stop.addEventListener("click", () => this.host.stop());
+      }
     }
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }

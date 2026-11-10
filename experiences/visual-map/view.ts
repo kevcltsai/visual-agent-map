@@ -470,7 +470,7 @@ import {
   type ArgumentCardShape
 } from "./argument-card-v2";
 import { ArgumentRunError } from "./argument-run";
-import { lockFraming, MAX_FRAMING_CALLS, WORST_CASE_AI_CALLS, type ArgumentRunV2Api } from "./argument-run-v2";
+import { lockFraming, MAX_FRAMING_CALLS, WORST_CASE_AI_CALLS } from "./argument-run-v2";
 import { describeArgumentProgressV2, describeLegacyProgress } from "./argument-progress-v2";
 import { ArgumentStartModal } from "../../ui/modals/argument-start-modal";
 import { arrangeArgumentMap } from "../../core/argument-map/layout";
@@ -3814,9 +3814,8 @@ export class VisualAgentMapView extends ItemView {
     // A version 2 argument map left running by a closed Obsidian is recovered by the runner (no provider call); when it changed the
     // saved map, the map is read again. A legacy (`"v": 1`) map is read-only: opening it never recovers or writes.
     if (map.argumentMap !== undefined && readArgumentMap(map).kind === "usable") {
-      const runs = (this.plugin as { argumentRunsV2?: { recover(path: string): Promise<boolean> } }).argumentRunsV2;
       // A recovery that fails must not keep the map shut: it opens as saved and its bar says the run was interrupted.
-      const changed = runs ? await runs.recover(path).catch(() => false) : false;
+      const changed = await this.plugin.argumentRuns.recover(path).catch(() => false);
       if (!isCurrent()) return;
       if (changed) map = await this.plugin.repo.readMap(path);
       if (!isCurrent()) return;
@@ -22636,13 +22635,7 @@ export class VisualAgentMapView extends ItemView {
   private openArgumentStart(draft: string): void {
     const map = this.map;
     if (this.closed || !map || !this.chatHero()) return;
-    // main.ts wires `argumentRunsV2` in a later packet; until then the window cannot run, so it does not open.
-    const runs = (this.plugin as { argumentRunsV2?: Pick<ArgumentRunV2Api, "frame" | "start" | "isRunning"> })
-      .argumentRunsV2;
-    if (!runs) {
-      new Notice(t("ui.argument_start_refused"));
-      return;
-    }
+    const runs = this.plugin.argumentRunsV2;
     const path = this.path;
     const mapId = map.id;
     const stale = (): boolean =>

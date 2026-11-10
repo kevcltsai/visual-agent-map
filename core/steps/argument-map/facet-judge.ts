@@ -16,6 +16,7 @@ import retryOnce from "./facet-judge-retry1.md";
 import retryNone from "./facet-judge-retry2.md";
 import assumptionsBlock from "./facet-judge-assumptions.md";
 import fixedBlock from "./facet-judge-fixed.md";
+import priorBlock from "./facet-judge-prior.md";
 import askedTemplate from "./facet-judge-asked.md";
 
 /** One found datum as the facet judge sees it. `fixedStance` is set when its stance toward the proposition is already decided and cannot change. */
@@ -26,11 +27,18 @@ export interface FacetJudgeDatum {
   quote: string;
   url: string;
   stance: string;
+  /** Decided for good (supports, refutes, or an uncertain research answer): the judge copies it. */
   fixedStance?: PropStance;
+  /** An earlier `irrelevant` judgement that may be judged again in round 2. */
+  priorStance?: PropStance;
 }
 export interface FacetJudgeFacet {
   id: string;
   title: string;
+  /** What data supports this facet and what refutes it; required (the policy refuses a facet without one). */
+  criterion: string;
+  /** The comparison baseline of the facet, when it has one. */
+  baseline?: string;
   data: FacetJudgeDatum[];
   /** Texts of the needs of this facet that were searched and not found; a retry need may not repeat them. */
   notFoundNeeds?: string[];
@@ -107,13 +115,16 @@ const pick = (d: FacetJudgeDatum): FacetJudgeDatum => ({
   quote: d.quote,
   url: d.url,
   stance: d.stance,
-  ...(d.fixedStance ? { fixedStance: d.fixedStance } : {})
+  ...(d.fixedStance ? { fixedStance: d.fixedStance } : {}),
+  ...(d.priorStance ? { priorStance: d.priorStance } : {})
 });
 const sourcesOf = (request: FacetJudgeRequest): string[] => [
   request.proposition,
   ...(request.assumptions ?? []).flatMap(a => [a.label, a.value, a.reason]),
   ...request.facets.flatMap(f => [
     f.title,
+    f.criterion ?? "",
+    f.baseline ?? "",
     ...(f.notFoundNeeds ?? []),
     ...f.data.flatMap(d => [d.need, d.claim, d.quote, d.url, d.stance])
   ])
@@ -127,6 +138,15 @@ const fixedStancesBlock = (request: FacetJudgeRequest): string => {
     f.data.filter(d => d.fixedStance).map(d => `- ${d.id}: propStance ${d.fixedStance} (fixed — copy exactly)`)
   );
   return lines.length ? `\n\n${renderTemplate(fixedBlock.trim(), { lines: lines.join("\n") })}` : "";
+};
+/** Every earlier irrelevant stance that round 2 may judge again. */
+const priorStancesBlock = (request: FacetJudgeRequest): string => {
+  const lines = request.facets.flatMap(f =>
+    f.data
+      .filter(d => d.priorStance && !d.fixedStance)
+      .map(d => `- ${d.id}: propStance ${d.priorStance} (prior, re-judge allowed)`)
+  );
+  return lines.length ? `\n\n${renderTemplate(priorBlock.trim(), { lines: lines.join("\n") })}` : "";
 };
 /** Every need text already asked, found or not found, so that no retry need repeats one. */
 const askedBlock = (request: FacetJudgeRequest): string => {
@@ -220,12 +240,14 @@ export const facetJudgeStep: StepDefinition<FacetJudgeRequest, FacetJudgeResult>
       assumptions: request.assumptions?.length
         ? `\n\n${renderTemplate(assumptionsBlock.trim(), { assumptionsJson: JSON.stringify(request.assumptions) })}`
         : "",
-      fixedStances: fixedStancesBlock(request),
+      fixedStances: fixedStancesBlock(request) + priorStancesBlock(request),
       asked: askedBlock(request),
       facets: JSON.stringify(
         request.facets.map(f => ({
           id: f.id,
           title: f.title,
+          criterion: f.criterion,
+          ...(f.baseline ? { baseline: f.baseline } : {}),
           data: f.data.map(pick),
           ...(f.notFoundNeeds?.length ? { notFoundNeeds: f.notFoundNeeds } : {})
         }))
@@ -235,6 +257,8 @@ export const facetJudgeStep: StepDefinition<FacetJudgeRequest, FacetJudgeResult>
   policy: (prompt, request) => {
     if (!request.facets.length || request.facets.length > MAX_FACETS)
       throw new ArgumentStepError(`the judge needs 1 to ${MAX_FACETS} facets`);
+    if (request.facets.some(f => typeof f.criterion !== "string" || !f.criterion.trim()))
+      throw new ArgumentStepError("every facet to judge needs a criterion");
     overBudget(prompt, FACET_JUDGE_SCHEMA);
   },
   parse: parseFacetJudge

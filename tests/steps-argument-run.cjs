@@ -1071,3 +1071,31 @@ test('stop settles when the plan_facets provider call ignores abort; its late re
   assert.equal(state.situation.data.length, 0);
   assert.equal(r.runs.isRunning(r.mapPath), false);
 });
+
+test('sem3 run: criterion, baseline and definition needs reach the state, the definitions card and the judge request; an irrelevant datum goes back marked re-judge allowed', async () => {
+  const log = [];
+  const plan = () => { const base = facetSteps().plan_facets(); base.facets[0] = { ...base.facets[0], criterion: 'Supports when higher than overall', baseline: '16 to 24' }; base.facets[1] = { ...base.facets[1], criterion: 'Supports when postings fall' }; base.facets[2] = { ...base.facets[2], criterion: 'Supports when hiring falls' }; return { ...base, definitionNeeds: ['how youth is defined'] }; };
+  const judge = (request, n) => {
+    log.push(plain(request));
+    const stance = d => (d.fixedStance ?? (n === 1 && ['unemployment rate', 'job postings'].includes(d.need) ? 'irrelevant' : 'supports'));
+    return {
+      data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: stance(d), reason: 'it fits' }))),
+      facets: request.facets.map(f => { const good = f.data.filter(d => stance(d) === 'supports'); return { id: f.id, verdict: good.length ? 'supports' : 'insufficient', reason: 'ok', summary: `summary of ${f.title}`, citedData: good.length ? [good[0].id] : [], retryNeeds: good.length || n > 1 ? [] : [`${f.title} again`] }; }),
+      assumptionInsights: []
+    };
+  };
+  const r = await rig({ facet: true, script: { step: facetSteps({ plan_facets: plan, judge_facets: judge }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(state.situation.facets[0].criterion, 'Supports when higher than overall');
+  assert.equal(state.situation.facets[0].baseline, '16 to 24');
+  assert.deepEqual(plain(state.situation.assumptions.definitionNeeds), ['how youth is defined']);
+  assert.equal(state.situation.data.length, 3 + 2, 'no datum for the definition need (3 planned + 2 retry)');
+  assert.ok((await r.text(state.situation.assumptions.id)).detail.includes('how youth is defined'));
+  assert.equal(log[0].facets[0].criterion, 'Supports when higher than overall');
+  assert.equal(log[0].facets[0].baseline, '16 to 24');
+  assert.equal(log[1].round, 2);
+  const again = log[1].facets.find(f => f.title === 'Rate').data.find(d => d.need === 'unemployment rate');
+  assert.equal(again.priorStance, 'irrelevant');
+  assert.equal(again.fixedStance, undefined);
+});

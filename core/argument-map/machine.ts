@@ -25,6 +25,7 @@ import {
   PROP_STANCES,
   VERDICTS,
   propStanceForUncertainResearch,
+  isStanceLocked,
   allNeedsFound,
   effectiveVerdict,
   foundNeeds,
@@ -75,7 +76,9 @@ export interface FacetJudgement {
 }
 export interface SituationPlan {
   assumptions?: { id: string; items: AssumptionItem[] };
-  facets: { id: string; title: string; needs: { id: string; need: string }[] }[];
+  /** Definition needs of the plan: no datum card; their text is kept on the definitions card. */
+  definitionNeeds?: string[];
+  facets: { id: string; title: string; criterion?: string; baseline?: string; needs: { id: string; need: string }[] }[];
   causalQuestions: string[];
 }
 export type FacetOutcome = "mismatch" | "matched" | "retry" | "insufficient";
@@ -340,8 +343,13 @@ export function applySituationPlan(state: ArgumentMapData, plan: SituationPlan):
   for (const item of items)
     if (blank(item.label) || blank(item.value) || blank(item.reason))
       throw new GateError("an assumption is incomplete");
-  if (items.length) {
-    next.situation.assumptions = { id: newId(ids, plan.assumptions!.id), items: items.map(i => ({ ...i })) };
+  const definitionNeeds = (Array.isArray(plan.definitionNeeds) ? plan.definitionNeeds : []).filter(n => !blank(n));
+  if (items.length || definitionNeeds.length) {
+    next.situation.assumptions = {
+      id: newId(ids, plan.assumptions!.id),
+      items: items.map(i => ({ ...i })),
+      ...(definitionNeeds.length ? { definitionNeeds } : {})
+    };
   }
   next.situation.facets = [];
   next.situation.data = [];
@@ -351,7 +359,16 @@ export function applySituationPlan(state: ArgumentMapData, plan: SituationPlan):
     if (needs.length < 1 || needs.length > MAX_FACET_NEEDS)
       throw new GateError(`a facet needs 1 to ${MAX_FACET_NEEDS} situation needs`);
     const id = newId(ids, entry.id);
-    next.situation.facets.push({ id, title: entry.title, verdict: "pending", reason: "", citedData: [], summary: "" });
+    next.situation.facets.push({
+      id,
+      title: entry.title,
+      verdict: "pending",
+      reason: "",
+      citedData: [],
+      summary: "",
+      ...(entry.criterion && !blank(entry.criterion) ? { criterion: entry.criterion } : {}),
+      ...(entry.baseline && !blank(entry.baseline) ? { baseline: entry.baseline } : {})
+    });
     for (const need of needs) {
       if (blank(need.need)) throw new GateError("empty situation need");
       next.situation.data.push({
@@ -491,8 +508,8 @@ const stopFacets = (
  * changed) and a verdict for each pending facet. A facet with no found data is `insufficient` whatever the AI said; "supports" and
  * "refutes" must cite at least one found, non-irrelevant datum of the facet with that same stance. The program then decides the outcome.
  */
-/** Program data (not UI text): the reason stored when the machine forces a facet insufficient and the AI did not itself say so. */
-const NO_USABLE_DATA_REASON = "no usable data for this facet";
+/** Program code (rendered by the notes through i18n, never shown raw): the reason stored when the machine forces a facet insufficient and the AI did not itself say so. */
+export const NO_USABLE_DATA_REASON = "no_usable_data";
 export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudgement): ArgumentMapData {
   inSituation(state);
   const facets = facetsOf(state);
@@ -511,10 +528,11 @@ export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudge
     const datum = foundData.find(d => d.id === entry.id);
     if (!datum) throw new GateError("the judgement names a datum that is not being judged");
     const stance = stanceOf(PROP_STANCES, entry.propStance);
-    if (datum.propStance !== undefined && datum.propStance !== stance)
+    // Locked: supports, refutes and the uncertain mapping. An irrelevant stance the judge gave in round 1 may be judged again (#sem3).
+    if (isStanceLocked(datum) && datum.propStance !== stance)
       throw new GateError("a stance that is already fixed cannot be changed");
     if (blank(entry.reason)) throw new GateError("a stance needs a reason");
-    if (datum.propStance === undefined) {
+    if (!isStanceLocked(datum)) {
       datum.propStance = stance;
       datum.stanceReason = entry.reason;
     }

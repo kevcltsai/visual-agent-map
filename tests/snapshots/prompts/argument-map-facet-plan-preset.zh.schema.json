@@ -47,6 +47,13 @@
             "type": "string",
             "minLength": 1
           },
+          "criterion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline": {
+            "type": "string"
+          },
           "needs": {
             "type": "array",
             "items": {
@@ -61,7 +68,8 @@
                   "type": "string",
                   "enum": [
                     "fact",
-                    "cause"
+                    "cause",
+                    "definition"
                   ]
                 }
               },
@@ -74,6 +82,8 @@
         },
         "required": [
           "title",
+          "criterion",
+          "baseline",
           "needs"
         ]
       },

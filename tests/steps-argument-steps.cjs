@@ -253,9 +253,9 @@ function codexChild(requests, text) {
 // ---- V1 boost P3: facet judge step ----
 const fdatum = (id, over = {}) => ({ id, need: `need of ${id}`, claim: `claim of ${id}`, quote: `quote of ${id} says 9.2 percent`, url: `https://stats.example.org/${id}`, stance: 'supports', ...over });
 const fjReq = (over = {}) => ({ ...base, proposition: PROP, round: 1, facets: [
-  { id: 'fa', title: 'Level of the rate', data: [fdatum('a1'), fdatum('a2', { stance: 'opposes' })] },
-  { id: 'fb', title: 'Direction of change', data: [fdatum('b1', { stance: 'uncertain', fixedStance: 'irrelevant' })] },
-  { id: 'fc', title: 'Who is counted', data: [] }
+  { id: 'fa', title: 'Level of the rate', criterion: 'Supports when the level of the rate holds', data: [fdatum('a1'), fdatum('a2', { stance: 'opposes' })] },
+  { id: 'fb', title: 'Direction of change', criterion: 'Supports when the direction of change holds', data: [fdatum('b1', { stance: 'uncertain', fixedStance: 'irrelevant' })] },
+  { id: 'fc', title: 'Who is counted', criterion: 'Supports when the who is counted holds', data: [] }
 ], ...over });
 const fjOk = () => ({
   data: [{ id: 'a1', propStance: 'supports', reason: 'a1 says 9.2 percent' }, { id: 'a2', propStance: 'refutes', reason: 'a2 points the other way' }, { id: 'b1', propStance: 'irrelevant', reason: 'b1 is unclear' }],
@@ -313,7 +313,7 @@ test('facet judge: a facet with no found data, or only irrelevant data, is not r
   assert.ok(ok(mod.facetJudgeStep, fjReq(), fjWith(v => { Object.assign(fjFacet(v, 'fb'), { verdict: 'supports', citedData: [] }); })));
 });
 test('facet judge: a retry need equal to a need already tried (not found) for a pending facet is refused, and the prompt lists it', () => {
-  const req = fjReq({ facets: [{ id: 'fa', title: 'Level of the rate', data: [fdatum('a1')], notFoundNeeds: ['Rate in the labour force survey'] }, { id: 'fb', title: 'Direction of change', data: [fdatum('b1', { fixedStance: 'irrelevant' })] }, { id: 'fc', title: 'Who is counted', data: [] }] });
+  const req = fjReq({ facets: [{ id: 'fa', title: 'Level of the rate', criterion: 'Supports when the level of the rate holds', data: [fdatum('a1')], notFoundNeeds: ['Rate in the labour force survey'] }, { id: 'fb', title: 'Direction of change', criterion: 'Supports when the direction of change holds', data: [fdatum('b1', { fixedStance: 'irrelevant' })] }, { id: 'fc', title: 'Who is counted', criterion: 'Supports when the who is counted holds', data: [] }] });
   const good = fjWith(v => { v.data = v.data.filter(d => d.id !== 'a2'); fjFacet(v, 'fa').retryNeeds = []; fjFacet(v, 'fb').retryNeeds = ['Year on year change in the youth rate']; });
   assert.ok(ok(mod.facetJudgeStep, req, good));
   const repeat = fjWith(v => { v.data = v.data.filter(d => d.id !== 'a2'); fjFacet(v, 'fa').verdict = 'insufficient'; fjFacet(v, 'fa').citedData = []; fjFacet(v, 'fa').retryNeeds = ['rate in the labour force survey.']; });
@@ -450,11 +450,14 @@ test('a reply that cites outside the input fails inside the runner (nothing is a
 const fpReq = { ...base, proposition: PROP };
 const fneed = (need, kind = 'fact') => ({ need, kind });
 const fpOk = () => ({
-  assumptions: { items: [{ label: 'Age band', value: 'ages 16 to 24 for the years 2023 to 2024', reason: 'the proposition names young people' }] },
+  assumptions: { items: [
+    { label: 'Age band', value: 'ages 16 to 24 for the years 2023 to 2024', reason: 'the proposition names young people' },
+    { label: 'Baselines', value: 'the overall rate in the same period; the rate of the same age band before the pandemic', reason: 'a level claim needs something to compare with' }
+  ] },
   facets: [
-    { title: 'Level of the rate', needs: [fneed('Official youth unemployment rate series'), fneed('Survey notes on the rate')] },
-    { title: 'Direction of change', needs: [fneed('Year on year change in the youth rate')] },
-    { title: 'Who is counted', needs: [fneed('Definition of unemployed used by the agency'), fneed('Why the labour force survey changed', 'cause')] }
+    { title: 'Level of the rate', criterion: 'Supports: the youth rate is above the overall rate in the same period. Refutes: it is at or below it.', baseline: 'The overall rate in the same period', needs: [fneed('Official youth unemployment rate series'), fneed('Survey notes on the rate')] },
+    { title: 'Direction of change', criterion: 'Supports: the youth rate is higher than the same age band before the pandemic. Refutes: it is lower.', baseline: 'the rate of the same age band before the pandemic', needs: [fneed('Year on year change in the youth rate')] },
+    { title: 'Who is counted', criterion: 'Supports: the agency counts the young people the proposition means.', baseline: '', needs: [fneed('Definition of unemployed used by the agency'), fneed('Why the labour force survey changed', 'cause')] }
   ],
   causalQuestions: ['Did automation drive the rise?'],
   question: 'Did youth unemployment rise in 2024?'
@@ -463,19 +466,54 @@ const fpWith = fn => { const v = fpOk(); fn(v); return v; };
 
 test('facet plan: a well formed reply parses; ids are not in the output; cause needs move to causalQuestions and build no data', () => {
   const out = plain(ok(mod.facetPlanStep, fpReq, fpOk()));
-  assert.deepEqual(Object.keys(out).sort(), ['assumptions', 'causalQuestions', 'facets', 'question']);
+  assert.deepEqual(Object.keys(out).sort(), ['assumptions', 'causalQuestions', 'definitionNeeds', 'facets', 'question']);
   assert.equal(out.question, 'Did youth unemployment rise in 2024?');
   assert.equal(out.facets.length, 3);
   assert.deepEqual(out.facets[2].needs, [{ need: 'Definition of unemployed used by the agency' }]);
   assert.deepEqual(out.causalQuestions, ['Why the labour force survey changed', 'Did automation drive the rise?'], 'cause needs first, then the explicit questions');
   assert.equal(out.facets.reduce((n, f) => n + f.needs.length, 0), 4, 'the cause need is not a datum');
-  assert.equal(out.assumptions.items.length, 1);
-  assert.deepEqual(plain(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions = { items: [] }; }))).assumptions, { items: [] });
+  assert.equal(out.assumptions.items.length, 2);
+  assert.deepEqual(plain(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions = { items: [] }; v.facets.forEach(f => { f.baseline = ''; }); }))).assumptions, { items: [] });
 });
 test('facet plan: the output feeds applySituationPlan (the ids come from the program)', () => {
   const out = ok(mod.facetPlanStep, fpReq, fpOk());
-  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions };
+  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions };
   assert.equal(m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan).situation.data.length, 4);
+});
+// ---- sem3: baseline-type facets (criterion, baseline, definition needs) ----
+test('sem3 facet plan: every facet needs a non-empty criterion', () => {
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { delete v.facets[0].criterion; }), /criterion/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].criterion = '  '; }), /criterion/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[2].criterion = ''; }), /criterion/);
+  assert.equal(ok(mod.facetPlanStep, fpReq, fpOk()).facets[0].criterion.startsWith('Supports:'), true);
+});
+test('sem3 facet plan: a baseline must equal (normalized) an assumption value or one listed phrase of it', () => {
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].baseline = 'the rate of the over 25s'; }), /baseline/);
+  assert.ok(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].baseline = 'THE overall rate, in the same period!'; })), 'case and punctuation are normalized away');
+  assert.ok(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].baseline = 'ages 16 to 24 for the years 2023 to 2024'; })), 'a whole item value');
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions.items = []; }), /baseline/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { delete v.facets[0].baseline; }), /baseline/);
+  assert.equal(ok(mod.facetPlanStep, fpReq, fpOk()).facets[2].baseline, undefined, 'an empty baseline is not carried');
+});
+test('sem3 facet plan: a definition need builds no datum, is kept for the definitions card, and the facet still needs a fact need', () => {
+  const out = ok(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[2].needs.push(fneed('How the agency defines the youth group', 'definition')); }));
+  assert.deepEqual(plain(out.definitionNeeds), ['How the agency defines the youth group']);
+  assert.equal(out.facets.reduce((n, f) => n + f.needs.length, 0), 4, 'no datum for the definition need');
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs = [fneed('How is it measured', 'definition')]; }), /1 to 3/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs.push(fneed('official youth unemployment rate series', 'definition')); }), /repeats/);
+  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, definitionNeeds: out.definitionNeeds, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions };
+  const state = m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan);
+  assert.equal(state.situation.data.length, 4);
+  assert.deepEqual(plain(state.situation.assumptions.definitionNeeds), ['How the agency defines the youth group']);
+  assert.equal(state.situation.facets[0].criterion, out.facets[0].criterion);
+  assert.equal(state.situation.facets[0].baseline, 'The overall rate in the same period');
+});
+test('sem3 facet plan: the prompt asks for one facet per baseline and no longer lists trend/subgroups/measurement as default facets', () => {
+  const prompt = mod.facetPlanStep.render(fpReq);
+  assert.doesNotMatch(prompt, /the trend, the comparison groups, how it is measured/);
+  assert.match(prompt, /criterion/);
+  assert.match(prompt, /one facet per comparison baseline/);
+  assert.match(prompt, /"definition"/);
 });
 test('facet plan: after the cause needs leave, a facet without a fact need or fewer than 3 facets throws', () => {
   bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs = [fneed('Why did it change', 'cause')]; }), /at least one|1 to 3/);
@@ -483,10 +521,10 @@ test('facet plan: after the cause needs leave, a facet without a fact need or fe
   bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets = []; }), /3 to 5/);
 });
 test('facet plan: 6 facets, 16 fact needs, and 0 or 4 fact needs in one facet are refused', () => {
-  bad(mod.facetPlanStep, fpReq, fpWith(v => { for (const t of ['Fourth', 'Fifth', 'Sixth']) v.facets.push({ title: t, needs: [fneed(`need of ${t}`)] }); }), /3 to 5/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { for (const t of ['Fourth', 'Fifth', 'Sixth']) v.facets.push({ title: t, criterion: 'Supports when it holds.', baseline: '', needs: [fneed(`need of ${t}`)] }); }), /3 to 5/);
   const W = ['alpha', 'bravo', 'charlie', 'delta', 'echo'];
   const many = i => Array.from({ length: 3 }, (_, k) => fneed(`distinct need ${W[i]} ${W[k]}`));
-  const five = extra => ({ ...fpOk(), facets: Array.from({ length: 5 }, (_, i) => ({ title: `Title ${W[i]}`, needs: i === 4 ? many(i).slice(0, extra) : many(i) })) });
+  const five = extra => ({ ...fpOk(), facets: Array.from({ length: 5 }, (_, i) => ({ title: `Title ${W[i]}`, criterion: 'Supports when it holds.', baseline: '', needs: i === 4 ? many(i).slice(0, extra) : many(i) })) });
   assert.ok(ok(mod.facetPlanStep, fpReq, five(3)), '15 needs are fine');
   const sixteen = five(3); sixteen.facets[4].needs.push(fneed('one more need'));
   bad(mod.facetPlanStep, fpReq, sixteen, /1 to 3|at most 15/);
@@ -539,11 +577,11 @@ test('facet plan: a causal question is refused (zh-TW, zh-CN, en)', () => {
     bad(mod.facetPlanStep, fpReq, fpWith(v => { v.question = q; }), /only the factual claim/);
 });
 test('facet plan: a facet whose title is causal is dropped; fewer than 3 facets left throws', () => {
-  const four = fpWith(v => { v.facets.push({ title: 'Other reasons for the rise', needs: [fneed('Candidate list')] }); });
+  const four = fpWith(v => { v.facets.push({ title: 'Other reasons for the rise', criterion: 'c', baseline: '', needs: [fneed('Candidate list')] }); });
   const out = ok(mod.facetPlanStep, fpReq, four);
   assert.equal(out.facets.length, 3);
   assert.ok(!out.facets.some(f => /reasons/.test(f.title)));
-  const caused = fpWith(v => { v.facets.push({ title: 'What caused the change', needs: [fneed('Change series')] }); });
+  const caused = fpWith(v => { v.facets.push({ title: 'What caused the change', criterion: 'c', baseline: '', needs: [fneed('Change series')] }); });
   assert.deepEqual(plain(ok(mod.facetPlanStep, fpReq, caused)).facets.map(f => f.title), ['Level of the rate', 'Direction of change', 'Who is counted']);
   bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].title = '導致失業的職業'; }), /3 to 5/);
   bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].title = '失业的原因'; }), /3 to 5/);
@@ -560,7 +598,7 @@ test('facet plan: the marker lists cover zh-TW, zh-CN and en; the prompt tells t
   for (const word of ['造成', '導致', '引起', '原因', '因為', '是否由']) assert.ok(lists.traditional.includes(word), word);
   for (const word of ['造成', '导致', '引起', '原因', '因为', '是否由']) assert.ok(lists.simplified.includes(word), word);
   for (const word of ['cause', 'caused', 'because', 'due to', 'driven by', 'reason']) assert.ok(lists.en.includes(word), word);
-  assert.match(mod.facetPlanStep.render(fpReq), /sub-aspects of the FACT[\s\S]*never a cause/);
+  assert.match(mod.facetPlanStep.render(fpReq), /sub-claim of the FACT[\s\S]*never a cause/);
 });
 test('facet judge: the prompt carries the scope rule (judged against the claim within the card scope; prompt-only, not program-checkable)', () => {
   const prompt = mod.facetJudgeStep.render(fjReq());
@@ -571,8 +609,11 @@ test('facet judge: the prompt carries the scope rule (judged against the claim w
 const preset = [{ label: 'Age band', value: 'ages 25 to 34, 2018 to 2019', reason: 'edited by the owner' }];
 test('facet plan: preset assumptions replace the AI assumption card; without them the AI card stays; the prompt shows them only when given', () => {
   const withPreset = { ...fpReq, presetAssumptions: preset };
-  assert.deepEqual(plain(ok(mod.facetPlanStep, withPreset, fpOk()).assumptions), { items: preset });
-  assert.deepEqual(plain(ok(mod.facetPlanStep, withPreset, fpWith(v => { v.assumptions = { items: [] }; })).assumptions), { items: preset });
+  const noBase = fn => fpWith(v => { v.facets.forEach(f => { f.baseline = ''; }); fn(v); });
+  assert.deepEqual(plain(ok(mod.facetPlanStep, withPreset, noBase(() => {})).assumptions), { items: preset });
+  assert.deepEqual(plain(ok(mod.facetPlanStep, withPreset, noBase(v => { v.assumptions = { items: [] }; })).assumptions), { items: preset });
+  // the baseline is checked against the preset the owner kept, not against the AI card
+  bad(mod.facetPlanStep, withPreset, fpOk(), /baseline/);
   assert.equal(ok(mod.facetPlanStep, fpReq, fpOk()).assumptions.items[0].label, 'Age band');
   assert.notEqual(ok(mod.facetPlanStep, fpReq, fpOk()).assumptions.items[0].value, preset[0].value);
   assert.match(mod.facetPlanStep.render(withPreset), /ages 25 to 34, 2018 to 2019/);
@@ -638,8 +679,8 @@ test('facet judge prompt: baseline data of the card are in scope for the compari
 });
 test('facet judge round 2 request: fixed stances are marked copy exactly and every existing need is listed as already asked', () => {
   const req = fjReq({ round: 2, facets: [
-    { id: 'fa', title: 'Level of the rate', data: [fdatum('a1', { fixedStance: 'supports' }), fdatum('a2')], notFoundNeeds: ['Rate in the labour force survey'] },
-    { id: 'fb', title: 'Direction of change', data: [fdatum('b1', { fixedStance: 'irrelevant' })] }
+    { id: 'fa', title: 'Level of the rate', criterion: 'Supports when the level of the rate holds', data: [fdatum('a1', { fixedStance: 'supports' }), fdatum('a2')], notFoundNeeds: ['Rate in the labour force survey'] },
+    { id: 'fb', title: 'Direction of change', criterion: 'Supports when the direction of change holds', data: [fdatum('b1', { fixedStance: 'irrelevant' })] }
   ] });
   const prompt = mod.facetJudgeStep.render(req);
   assert.match(prompt, /- a1: propStance supports \(fixed — copy exactly\)/);
@@ -647,6 +688,21 @@ test('facet judge round 2 request: fixed stances are marked copy exactly and eve
   assert.doesNotMatch(prompt, /- a2: propStance/);
   const asked = prompt.slice(prompt.indexOf('Already asked'));
   for (const need of ['need of a1', 'need of a2', 'need of b1', 'Rate in the labour force survey']) assert.ok(asked.includes(JSON.stringify(need).slice(1, -1)), need);
+});
+test('sem3 facet judge: the prompt renders each facet criterion and baseline and says to decide by the criterion', () => {
+  const req = fjReq({ facets: [{ id: 'fa', title: 'Level of the rate', criterion: 'Supports when above the overall rate', baseline: 'the overall rate', data: [fdatum('a1')] }] });
+  const prompt = mod.facetJudgeStep.render(req);
+  assert.ok(prompt.includes('Supports when above the overall rate') && prompt.includes('the overall rate'));
+  assert.match(prompt, /"criterion":"Supports when above the overall rate"/);
+  assert.match(prompt, /by that criterion/);
+});
+test('sem3 facet judge: a facet without a criterion is refused before any call; the prompt lists re-judge allowed prior stances', () => {
+  for (const criterion of [undefined, '', '  '])
+    assert.throws(() => sr.prepareStep(mod.facetJudgeStep, fjReq({ facets: [{ id: 'fa', title: 'T', criterion, data: [fdatum('a1')] }] })), error => error.name === 'ArgumentStepError' && /criterion/.test(error.message));
+  const prompt = mod.facetJudgeStep.render(fjReq({ round: 2, facets: [{ id: 'fa', title: 'T', criterion: 'c', data: [fdatum('a1', { priorStance: 'irrelevant' })] }] }));
+  assert.match(prompt, /- a1: propStance irrelevant \(prior, re-judge allowed\)/);
+  assert.doesNotMatch(prompt, /copy exactly\)/);
+  assert.ok(ok(mod.facetJudgeStep, fjReq({ round: 2, facets: [{ id: 'fa', title: 'T', criterion: 'c', data: [fdatum('a1', { priorStance: 'irrelevant' })] }] }), { data: [{ id: 'a1', propStance: 'supports', reason: 'a1 says 9.2 percent' }], facets: [{ id: 'fa', verdict: 'supports', reason: 'ok', summary: 'ok', citedData: ['a1'], retryNeeds: [] }], assumptionInsights: [] }));
 });
 test('facet judge request without fixed data has no fixed stances block', () => {
   assert.doesNotMatch(mod.facetJudgeStep.render(fjReq({ facets: [{ id: 'fa', title: 'T', data: [fdatum('a1')] }] })), /\nFixed stances \(/);

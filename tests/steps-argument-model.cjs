@@ -135,6 +135,12 @@ const facetPlan = () => ({
   facets: [1, 2, 3, 4].map(i => ({ id: `f${i}`, title: `Facet ${i}`, needs: [{ id: `d${i}`, need: `need ${i}` }] })),
   causalQuestions: ['why?']
 });
+const withNeed = fn => { const d = facetMapDoc(); fn(d.argumentMap.situation); return model.readArgumentMap(core.parseMap(core.serializeMap(d))); };
+test('sem3 model: criterion, baseline and definitionNeeds are optional (old maps) and, when present, must be strings', () => {
+  assert.equal(withNeed(sit => { sit.facets[0].criterion = 'supports when higher'; sit.facets[0].baseline = 'overall'; sit.assumptions.definitionNeeds = ['how it is measured']; }).kind, 'usable');
+  for (const mutate of [sit => { sit.facets[0].criterion = 5; }, sit => { sit.facets[0].baseline = ['x']; }, sit => { sit.assumptions.definitionNeeds = 'x'; }, sit => { sit.assumptions.definitionNeeds = [1]; }])
+    assert.equal(withNeed(mutate).kind, 'unusable');
+});
 const facetMapDoc = () => {
   const state = machine.applySituationPlan(machine.newArgumentMap(ROLES, 'run-1'), facetPlan());
   return baseMap({ argumentMap: plain(state) });

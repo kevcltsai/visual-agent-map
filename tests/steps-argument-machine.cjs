@@ -741,15 +741,15 @@ test('facet boost: a facet with no found data judged supports is stored insuffic
   assert.equal(s.situation.facets.find(f => f.id === 'f4').verdict, 'insufficient');
   assert.deepEqual(plain(s.situation.facets.find(f => f.id === 'f4').citedData), []);
 });
-test('facet boost: a forced insufficient keeps the AI reason only if the AI said insufficient, else a fixed program reason', () => {
+test('facet boost: a forced insufficient keeps the AI reason only if the AI said insufficient, else a fixed program reason code (never English prose)', () => {
   const reasonOf = verdict => {
     const s = researchAll(planned([1, 1, 1, 1]), ['f4d1']);
     const j = judgement(s);
     Object.assign(j.facets.find(f => f.id === 'f4'), { verdict, reason: 'AI reason about f4' });
     return m.applyFacetVerdicts(s, j).situation.facets.find(f => f.id === 'f4').reason;
   };
-  assert.equal(reasonOf('supports'), 'no usable data for this facet');
-  assert.equal(reasonOf('refutes'), 'no usable data for this facet');
+  assert.equal(reasonOf('supports'), 'no_usable_data');
+  assert.equal(reasonOf('refutes'), 'no_usable_data');
   assert.equal(reasonOf('insufficient'), 'AI reason about f4');
 });
 test('facet boost: citations: other facet, irrelevant data, other stance, unfound data, no citation are all GateErrors', () => {
@@ -931,4 +931,53 @@ test('P5: a found proof keeps a well-formed figure (exactly three non-blank stri
     assert.equal(got.state, 'found');
     assert.deepEqual(got.proof.figure && plain(got.proof.figure), kept ? good : undefined);
   }
+});
+
+// ---- sem3: only supports/refutes and the uncertain mapping are locked; an irrelevant judgement may be redone in round 2 ----
+test('sem3 machine: an irrelevant stance from the AI is re-judgeable in round 2; supports/refutes and the uncertain mapping stay locked', () => {
+  let s = researchAll(planned([2, 1, 1, 1]), ['f3d1', 'f4d1']);
+  // round 1: f1d2 and f2d1 are judged irrelevant (f2 has nothing else, so it is insufficient)
+  s = judged(s, { f1d2: 'irrelevant', f2d1: 'irrelevant' }, { f1: 'supports', f2: 'insufficient', f3: 'insufficient', f4: 'insufficient' });
+  const get = id => s.situation.data.find(d => d.id === id);
+  assert.equal(get('f1d2').propStance, 'irrelevant');
+  assert.equal(get('f1d2').stanceReason, 'why f1d2');
+  s = m.addRetryNeeds(s, [{ facetId: 'f2', id: 'r2', need: 'other' }]);
+  s = researchAll(s);
+  const j = judgement(s, { f2d1: 'supports', r2: 'supports' }, { f2: 'supports' });
+  assert.equal(j.data.find(d => d.id === 'f2d1').propStance, 'irrelevant', 'sanity: the helper copies the old stance unless told');
+  j.data.find(d => d.id === 'f2d1').propStance = 'supports';
+  s = m.applyFacetVerdicts(s, j);
+  assert.equal(get('f2d1').propStance, 'supports', 'the irrelevant datum was re-judged');
+  assert.equal(get('f2d1').stanceReason, 'why f2d1');
+  assert.equal(s.situation.gate.state, 'matched');
+});
+test('sem3 machine: supports/refutes stay fixed in round 2 (changing them is refused)', () => {
+  for (const locked of ['supports', 'refutes']) {
+    let s = researchAll(planned([1, 1, 1, 1]), ['f4d1']);
+    s = judged(s, { f1d1: locked === 'refutes' ? 'refutes' : 'supports', f2d1: 'supports', f3d1: 'supports' }, { f1: 'insufficient', f2: 'insufficient', f3: 'supports', f4: 'insufficient' });
+    assert.equal(s.situation.gate.state, 'pending');
+    s = m.addRetryNeeds(s, [{ facetId: 'f1', id: 'r1', need: 'other' }]);
+    s = researchAll(s);
+    const j = judgement(s, { r1: 'supports' }, { f1: 'supports' });
+    j.data.find(d => d.id === 'f1d1').propStance = locked === 'supports' ? 'refutes' : 'supports';
+    refuses(s, () => m.applyFacetVerdicts(s, j));
+  }
+});
+test('sem3 machine: situationOutcome matches three baseline facets that each support (run 2/3 real data shape)', () => {
+  const plan = { assumptions: { id: 'as', items: [{ label: 'Baselines', value: 'overall; pre-pandemic; 25+', reason: 'compare' }] }, definitionNeeds: ['how youth unemployment is measured'],
+    facets: [['vs overall', 'The overall rate in the same period'], ['vs pre-pandemic', 'pre-pandemic'], ['vs 25+', '25+']].map(([title, baseline], i) => ({ id: `b${i}`, title, criterion: `Supports when 16-24 is higher than ${baseline}`, baseline, needs: [{ id: `b${i}s`, need: `16-24 rate ${title}` }, { id: `b${i}b`, need: `baseline ${title}` }] })), causalQuestions: [] };
+  let s = m.applySituationPlan(m.newArgumentMap(roles, 'run-b'), plan);
+  assert.equal(s.situation.data.length, 6, 'the definition need makes no datum');
+  assert.deepEqual(plain(s.situation.assumptions.definitionNeeds), ['how youth unemployment is measured']);
+  const figures = { b0s: ['9.3', '2025'], b0b: ['4.1', '2025'], b1s: ['9.3', '2025'], b1b: ['7.8', '2019'], b2s: ['9.3', '2025'], b2b: ['4.5', '2025'] };
+  for (const d of plain(s.situation.data)) {
+    s = m.beginSituationResearch(s, d.id);
+    const [number, period] = figures[d.id];
+    s = m.applySituationEvidence(s, d.id, { found: true, stance: 'supports', proof: { ...proof(1), figure: { number, period, unit: '%' } } });
+  }
+  s = m.applyFacetVerdicts(s, judgement(s));
+  assert.equal(m.situationOutcome(s.situation.facets, 1), 'matched');
+  assert.equal(s.situation.gate.state, 'matched');
+  assert.equal(s.situation.facets[1].baseline, 'pre-pandemic');
+  assert.ok(s.situation.facets[0].criterion.includes('higher than'));
 });

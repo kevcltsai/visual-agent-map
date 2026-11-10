@@ -56,6 +56,12 @@ export const UNCERTAIN_RESEARCH_STANCE: PropStance = "irrelevant";
 export function propStanceForUncertainResearch(): PropStance {
   return UNCERTAIN_RESEARCH_STANCE;
 }
+/**
+ * A found datum's stance is locked once decided: `supports` and `refutes` never change, and neither does the stance mapped from an
+ * uncertain research answer (no `stanceReason`). An `irrelevant` stance the facet judge gave (it has a reason) may be judged again in round 2.
+ */
+export const isStanceLocked = (datum: { propStance?: PropStance; stanceReason?: string }): boolean =>
+  datum.propStance !== undefined && (datum.propStance !== "irrelevant" || datum.stanceReason === undefined);
 export const VERDICTS = ["supported", "refuted", "undecided"] as const;
 export type Verdict = (typeof VERDICTS)[number];
 export const LOCATIONS = ["verifying", "eliminated"] as const;
@@ -129,6 +135,10 @@ export interface Facet {
   reason: string;
   citedData: string[];
   summary: string;
+  /** What data supports this facet's sub-claim and what refutes it. Absent on maps made before facets carried one. */
+  criterion?: string;
+  /** The comparison baseline this facet checks against (one of the definitions card's values). */
+  baseline?: string;
 }
 export interface Need {
   id: string;
@@ -179,7 +189,7 @@ export interface ArgumentMapData {
     data: SituationDatum[];
     gate: SituationGate;
     /** `id` is the node id of the assumption card. Facet-judged maps only. `insights` is the last facet judgement's reading of the card (0 to 3 sentences). */
-    assumptions?: { id: string; items: AssumptionItem[]; insights?: string[] };
+    assumptions?: { id: string; items: AssumptionItem[]; insights?: string[]; definitionNeeds?: string[] };
     /** Present only on a facet-judged map; a map without it runs the V1 path unchanged. */
     facets?: Facet[];
     causalQuestions?: string[];
@@ -258,6 +268,8 @@ function readFacets(situation: Rec, ids: Set<string>): string | null {
       if (!isRec(item) || !isStr(item.label) || !isStr(item.value) || !isStr(item.reason))
         return "assumptions malformed";
     if (badInsights(assumptions.insights)) return "assumptions malformed";
+    if (assumptions.definitionNeeds !== undefined && !strList(assumptions.definitionNeeds))
+      return "assumptions malformed";
     ids.add(assumptions.id);
   }
   if (facets === undefined) return null;
@@ -268,6 +280,7 @@ function readFacets(situation: Rec, ids: Set<string>): string | null {
     if (!oneOf(FACET_VERDICTS, facet.verdict)) return "unknown facet enum";
     if (typeof facet.reason !== "string" || typeof facet.summary !== "string" || !strList(facet.citedData))
       return "facets malformed";
+    if (!optStr(facet.criterion) || !optStr(facet.baseline)) return "facets malformed";
   }
   return null;
 }

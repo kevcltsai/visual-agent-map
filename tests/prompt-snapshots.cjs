@@ -331,9 +331,9 @@ test('collect snapshots: chart step (chart.add@1)', () => {
   const argumentProposition = 'Youth unemployment rose';
   const argumentData = [argumentDatum('d1', 'supports'), argumentDatum('d2', 'opposes')];
   const judgeFacets = [
-    { id: 'f1', title: 'Level of the rate', data: [{ ...argumentDatum('d1', 'supports') }, { ...argumentDatum('d2', 'opposes') }] },
-    { id: 'f2', title: 'Direction of change', data: [{ ...argumentDatum('d3', 'uncertain'), fixedStance: 'irrelevant' }] },
-    { id: 'f3', title: 'Who is counted', data: [], notFoundNeeds: ['Share of part-time workers in the count'] }
+    { id: 'f1', title: 'Level of the rate', criterion: 'Supports when the rate is above the overall rate; refutes when it is not', baseline: 'the overall rate', data: [{ ...argumentDatum('d1', 'supports') }, { ...argumentDatum('d2', 'opposes') }] },
+    { id: 'f2', title: 'Direction of change', criterion: 'Supports when the rate rose; refutes when it fell', data: [{ ...argumentDatum('d3', 'uncertain'), fixedStance: 'irrelevant' }, { ...argumentDatum('d4', 'supports'), priorStance: 'irrelevant' }] },
+    { id: 'f3', title: 'Who is counted', criterion: 'Supports when the agency counts the group', data: [], notFoundNeeds: ['Share of part-time workers in the count'] }
   ];
   for (const [language, tag] of LANGUAGES) {
     const request = { ...argumentBase, language, proposition: argumentProposition };

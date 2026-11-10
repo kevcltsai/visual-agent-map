@@ -223,3 +223,24 @@ test('definitions table: the stronger encoding still round-trips through the re-
   const items = [{ label: '$x$ #tag', value: '*a* _b_ ~~c~~ ==d== ^e {f} [g](h) <i> |j| !k :l &#37; &amp; %%m%% $$n$$', reason: '1. one \\ back `tick` > quote' }, { label: 'Age', value: '16–24 (youth)', reason: 'BLS: x' }, { label: '+ plus', value: '- minus', reason: '2) two' }];
   assert.deepEqual(plainJson(R.parseDefinitionsTable(N.definitionsDetail(t, items, ['i']))), items);
 });
+
+// ---- sem3: no raw reason code or English program string reaches a note ----
+const RAW = ['source_quote_missing', 'no_usable_data', 'not_found', 'source_rejected_url', 'budget'];
+test('sem3 notes: stored reason codes render as readable text everywhere (datum rows, facet table, situation table, conclusion tables)', () => {
+  const lost = datum({ id: 'd2', state: 'not_found', proof: undefined, propStance: undefined, stanceReason: undefined, reason: 'source_quote_missing: page has only a single-year number' });
+  const none = facet({ id: 'f2', verdict: 'insufficient', reason: 'no_usable_data', summary: '', citedData: [] });
+  const st = state([datum(), lost], [facet(), none]);
+  const outs = [N.datumDetail(t, lost), N.facetDetail(t, none, st.situation.data), N.situationDetail(t, st), N.conclusionDetail(t, st, new Map(), undefined, 'stopped')];
+  for (const md of outs) for (const code of RAW) assert.ok(!md.includes(code), `${code} leaked in: ${md.slice(0, 200)}`);
+  assert.ok(N.facetDetail(t, none, st.situation.data).includes(t('ui.argument_why_no_usable_data')));
+  assert.ok(N.facetDetail(t, none, st.situation.data).includes(t('ui.argument_why_source_quote_missing')));
+  assert.ok(!N.situationDetail(t, st).includes('no usable data for this facet'), 'no English program string');
+  const stored = N.facetDetail(t, facet({ reason: 'no usable data for this facet' }), []);
+  assert.ok(!stored.includes('no usable data for this facet'), 'a map stored by the earlier build is rendered readable too');
+});
+test('sem3 notes: the definitions card lists definition needs and AI free-text reasons are untouched', () => {
+  const md = N.definitionsDetail(t, [{ label: 'Age', value: '16-24', reason: 'why' }], undefined, ['how it is measured']);
+  assert.ok(md.includes('how it is measured') && md.includes(t('ui.argument_note_definition_needs')));
+  assert.ok(N.facetDetail(t, facet({ reason: 'clear gap' }), []).includes('clear gap'));
+  assert.ok(N.definitionsDetail(t, [], undefined, ['only need']).includes('only need'));
+});

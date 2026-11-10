@@ -64,6 +64,7 @@ import {
   MIN_VERIFIED,
   foundNeeds,
   readArgumentMap,
+  isStanceLocked,
   type ArgumentMapData,
   type ArgumentRoles,
   type AssumptionItem,
@@ -661,11 +662,14 @@ export class ArgumentRuns {
     const result: FacetPlanResult = await this.ask(drive, ARGUMENT_STEPS.plan_facets, request);
     await this.checkpoint(drive, async (s, map) => {
       const items = result.assumptions.items;
+      const definitionNeeds = result.definitionNeeds ?? [];
       const plan = (id: (name: string) => string): Parameters<typeof applySituationPlan>[1] => ({
-        ...(items.length ? { assumptions: { id: id("as"), items } } : {}),
+        ...(items.length || definitionNeeds.length ? { assumptions: { id: id("as"), items }, definitionNeeds } : {}),
         facets: result.facets.map((f, i) => ({
           id: id(`f${i}`),
           title: f.title,
+          criterion: f.criterion,
+          baseline: f.baseline,
           needs: f.needs.map((n, j) => ({ id: id(`f${i}-${j}`), need: n.need }))
         })),
         causalQuestions: result.causalQuestions
@@ -682,8 +686,8 @@ export class ArgumentRuns {
         return node;
       };
       const ids = new Map<string, string>();
-      if (items.length) {
-        const detail = definitionsDetail(this.tr, items);
+      if (items.length || definitionNeeds.length) {
+        const detail = definitionsDetail(this.tr, items, undefined, definitionNeeds);
         ids.set("as", (await make("group", this.ports.t("ui.argument_definitions"), undefined, detail)).id);
       }
       for (const [i, f] of result.facets.entries()) {
@@ -727,6 +731,8 @@ export class ArgumentRuns {
           return {
             id: f.id,
             title: f.title,
+            criterion: f.criterion ?? f.title,
+            ...(f.baseline ? { baseline: f.baseline } : {}),
             data: own
               .filter(d => d.state === "found" && d.proof)
               .map(d => ({
@@ -736,7 +742,11 @@ export class ArgumentRuns {
                 quote: d.proof!.quote,
                 url: d.proof!.url,
                 stance: d.stance ?? "uncertain",
-                ...(d.propStance ? { fixedStance: d.propStance } : {})
+                ...(d.propStance
+                  ? isStanceLocked(d)
+                    ? { fixedStance: d.propStance }
+                    : { priorStance: d.propStance }
+                  : {})
               })),
             ...(notFound.length ? { notFoundNeeds: notFound } : {})
           };
@@ -801,8 +811,10 @@ export class ArgumentRuns {
         }
         await this.noteById(map, final.roles.situation, drive, { detail: situationDetail(this.tr, final) });
         const as = final.situation.assumptions;
-        if (as?.items.length)
-          await this.noteById(map, as.id, drive, { detail: definitionsDetail(this.tr, as.items, as.insights) });
+        if (as?.items.length || as?.definitionNeeds?.length)
+          await this.noteById(map, as.id, drive, {
+            detail: definitionsDetail(this.tr, as.items, as.insights, as.definitionNeeds)
+          });
         if (inner) await inner();
       };
       return plan;

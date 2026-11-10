@@ -149,12 +149,22 @@ const WHY_KEYS = {
   source_no_parser: "ui.argument_why_source_no_parser",
   source_quote_missing: "ui.argument_why_source_quote_missing",
   source_blocked_unverified: "ui.argument_why_source_blocked_unverified",
-  round_limit: "ui.argument_why_round_limit"
+  round_limit: "ui.argument_why_round_limit",
+  no_usable_data: "ui.argument_why_no_usable_data"
 } as const satisfies Record<string, TranslationKey>;
 /** A stored reason code (`code` or `code: free text`) as a readable sentence; an unknown code falls back to "not found". */
 export function whyText(t: Translate, stored: string): string {
   const code = stored.split(/[:\s]/, 1)[0];
   return t(Object.hasOwn(WHY_KEYS, code) ? WHY_KEYS[code as keyof typeof WHY_KEYS] : WHY_KEYS.not_found);
+}
+
+/** The program text a map stored before `no_usable_data` became a code. */
+const LEGACY_NO_USABLE_DATA = "no usable data for this facet";
+/** A facet or datum reason for display: a stored program code (or its earlier English string) becomes a readable sentence; the AI's own words pass through. */
+export function reasonText(t: Translate, stored: string): string {
+  if (stored === LEGACY_NO_USABLE_DATA) return whyText(t, "no_usable_data");
+  const code = stored.split(/[:\s]/, 1)[0];
+  return Object.hasOwn(WHY_KEYS, code) ? whyText(t, stored) : stored;
 }
 
 // ---- shared pieces -------------------------------------------------------------------------------------------------------------
@@ -185,7 +195,7 @@ const dataRows = (t: Translate, data: SituationDatum[]): string[][] =>
     d.state === "found"
       ? propText(t, d)
       : t(d.state === "not_found" ? "ui.argument_note_need_missing" : "ui.argument_note_need_pending"),
-    d.stanceReason ?? d.reason ?? ""
+    d.stanceReason ?? (d.reason ? reasonText(t, d.reason) : "")
   ]);
 const dataHead = (t: Translate): string[] => [
   t("ui.argument_note_col_data"),
@@ -250,7 +260,7 @@ export function notFoundDetail(
 export function facetDetail(t: Translate, facet: Facet, data: SituationDatum[]): string {
   return join([
     [`### ${t("ui.argument_note_core")}`],
-    callout(`${t(VERDICT_KEYS[facet.verdict])}${facet.reason ? `: ${facet.reason}` : ""}`),
+    callout(`${t(VERDICT_KEYS[facet.verdict])}${facet.reason ? `: ${reasonText(t, facet.reason)}` : ""}`),
     ["", `### ${t("ui.argument_note_data")}`],
     table(dataHead(t), dataRows(t, data)),
     chartSection(t, chartOf(facet.title, data)),
@@ -270,7 +280,7 @@ export function situationDetail(t: Translate, state: ArgumentMapData): string {
     ["", `### ${t("ui.argument_note_facets")}`],
     table(
       [t("ui.argument_note_col_facet"), t("ui.argument_note_col_verdict"), t("ui.argument_note_col_reason")],
-      facets.map(f => [f.title, t(VERDICT_KEYS[f.verdict]), f.reason])
+      facets.map(f => [f.title, t(VERDICT_KEYS[f.verdict]), reasonText(t, f.reason)])
     ),
     chartSection(t, chartOf(state.situation.question ?? "", state.situation.data))
   ]);
@@ -279,7 +289,8 @@ export function situationDetail(t: Translate, state: ArgumentMapData): string {
 export function definitionsDetail(
   t: Translate,
   items: { label: string; value: string; reason: string }[],
-  insights?: string[]
+  insights?: string[],
+  definitionNeeds?: string[]
 ): string {
   return join([
     [`### ${t("ui.argument_definitions")}`],
@@ -287,6 +298,9 @@ export function definitionsDetail(
       [t("ui.argument_note_col_item"), t("ui.argument_note_col_definition"), t("ui.argument_note_col_reason")],
       items.map(i => [i.label, i.value, i.reason])
     ),
+    definitionNeeds?.length
+      ? ["", `### ${t("ui.argument_note_definition_needs")}`, ...definitionNeeds.map(n => `- ${line(n)}`)]
+      : [],
     insights?.length
       ? ["", `### ${t("ui.argument_note_definition_insights")}`, ...insights.map(i => `- ${line(i)}`)]
       : []
@@ -413,7 +427,7 @@ export function conclusionDetail(
     ["", `### ${t("ui.argument_note_situation_basis")}`],
     table(
       [t("ui.argument_note_col_facet"), t("ui.argument_note_col_verdict"), t("ui.argument_note_col_reason")],
-      facets.map(f => [f.title, t(VERDICT_KEYS[f.verdict]), f.summary || f.reason])
+      facets.map(f => [f.title, t(VERDICT_KEYS[f.verdict]), f.summary || reasonText(t, f.reason)])
     )
   );
   if (!answer) {
@@ -425,7 +439,7 @@ export function conclusionDetail(
       parts.push([
         "",
         `### ${t("ui.argument_note_refuting")}`,
-        `- ${line(f.title)}: ${line(f.reason)}`,
+        `- ${line(f.title)}: ${line(reasonText(t, f.reason))}`,
         ...sourceItems(cited)
       ]);
     }

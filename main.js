@@ -24211,6 +24211,29 @@ function chatPlanGroupOf(kind) {
   }
 }
 
+// core/note-read-context.ts
+function createNoteReadContext(map) {
+  var _a2;
+  return {
+    nodesById: new Map(((_a2 = map == null ? void 0 : map.nodes) != null ? _a2 : []).map((node) => [node.id, node])),
+    ancestorFm: /* @__PURE__ */ new Map(),
+    reads: /* @__PURE__ */ new Map(),
+    failedPaths: /* @__PURE__ */ new Set(),
+    map
+  };
+}
+function readOnce(ctx, path, read) {
+  let pending2 = ctx.reads.get(path);
+  if (!pending2) {
+    pending2 = read().catch((error) => {
+      ctx.failedPaths.add(path);
+      throw error;
+    });
+    ctx.reads.set(path, pending2);
+  }
+  return pending2;
+}
+
 // core/link-rewrite.ts
 function linkPathOf(target) {
   const hash = target.indexOf("#");
@@ -26558,7 +26581,7 @@ var Repository = class {
    * manual keeps it, workspace follows the current setting, inherited uses the nearest manual ancestor's stored model
    * and otherwise the current setting. `overridden` is true when the model comes from a manual topic or ancestor.
    */
-  async effectiveModel(path, stored, source, map, storedReasoning) {
+  async effectiveModel(path, stored, source, map, storedReasoning, ctx) {
     if (source === "manual")
       return {
         model: stored || this.settings.cliModel,
@@ -26581,20 +26604,41 @@ var Repository = class {
       }
     }
     const seen = /* @__PURE__ */ new Set();
+    const byId = ctx && owner && ctx.map === owner ? ctx.nodesById : void 0;
     let node = owner == null ? void 0 : owner.nodes.find((item) => item.path === path);
     while (node && node.parentId && !seen.has(node.id)) {
       seen.add(node.id);
-      const parent = owner.nodes.find((item) => item.id === node.parentId);
+      const parentId = node.parentId;
+      const parent = byId ? byId.get(parentId) : owner.nodes.find((item) => item.id === parentId);
       if (!parent) break;
-      try {
-        const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text5(fm.model))
-          return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
-      } catch (e) {
-      }
+      const fm = await this.ancestorFrontmatter(parent.path, ctx);
+      if (fm && fm["model-source"] === "manual" && text5(fm.model))
+        return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
       node = parent;
     }
     return { model: this.settings.cliModel, overridden: false };
+  }
+  /**
+   * An ancestor note's frontmatter, or null when it is missing or unreadable (the walk skips it). With a context the
+   * file is read once per hydrate; an existing file whose read throws is recorded in `ctx.failedPaths`.
+   */
+  async ancestorFrontmatter(path, ctx) {
+    const load = async () => {
+      try {
+        const file = this.file(path);
+        const content = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file);
+        return frontmatter(content);
+      } catch (e) {
+        return null;
+      }
+    };
+    if (!ctx) return load();
+    let pending2 = ctx.ancestorFm.get(path);
+    if (!pending2) {
+      pending2 = load();
+      ctx.ancestorFm.set(path, pending2);
+    }
+    return pending2;
   }
   /**
    * Resolve the model for a topic: run-once choice, then the topic's override (inherited upward), then the current
@@ -26648,14 +26692,21 @@ var Repository = class {
     }
     return false;
   }
-  async readNote(path, map) {
+  async readNote(path, map, ctx) {
     var _a2, _b2;
-    const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))), fm = frontmatter(content);
+    const file = this.file(path), raw = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file), content = decodeCalloutSections(upgradeLegacyAimText(raw)), fm = frontmatter(content);
     const status = text5(fm.status, "idea");
     const normalized2 = status === "review" || status === "accepted" ? "completed" : status;
     const source = text5(fm["model-source"], "workspace");
     const modelSource = ["workspace", "inherited", "manual"].includes(source) ? source : "workspace";
-    const effective = await this.effectiveModel(path, text5(fm.model), modelSource, map, text5(fm["reasoning-level"]));
+    const effective = await this.effectiveModel(
+      path,
+      text5(fm.model),
+      modelSource,
+      map,
+      text5(fm["reasoning-level"]),
+      ctx
+    );
     const { model, reasoning } = this.chooseModel(effective);
     const state = text5(
       fm["topic-state"],
@@ -26968,6 +27019,17 @@ ${body}`);
   }
   async readMap(path) {
     return parseMap(await this.app.vault.read(this.file(path)));
+  }
+  /** Map.md read once: the map plus its goal, context and sources (what hydrate and synchronize need). */
+  async readMapMeta(path) {
+    const content = await this.app.vault.read(this.file(path));
+    const fm = frontmatter(content);
+    return {
+      map: parseMap(content),
+      goal: readRelevanceGoal(fm),
+      context: readRelevanceContext(fm),
+      sources: readMapSources(fm)
+    };
   }
   /** The map file's `relevance-goal` frontmatter, if any. The map file keeps its frontmatter across saves. */
   async readRelevanceGoal(path) {
@@ -28513,6 +28575,53 @@ ${embed}
 
 ${embed}${tail.includes("\n") ? tail : `${tail}
 `}`;
+}
+
+// experiences/visual-map/card-index.ts
+function cardIndex(nodes) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const node of nodes) if (!byId.has(node.id)) byId.set(node.id, node);
+  const depths = /* @__PURE__ */ new Map();
+  const depth = (start) => {
+    const indexed = byId.get(start.id) === start;
+    if (indexed) {
+      const known = depths.get(start.id);
+      if (known !== void 0) return known;
+    }
+    const chain = [start];
+    const at = /* @__PURE__ */ new Map([[start.id, 0]]);
+    let base = 0;
+    for (; ; ) {
+      const parentId = chain[chain.length - 1].parentId;
+      if (!parentId) break;
+      const known = depths.get(parentId);
+      if (known !== void 0) {
+        base = known;
+        break;
+      }
+      const repeat = at.get(parentId);
+      if (repeat !== void 0) {
+        const cycle = chain.length - repeat;
+        for (let i = repeat; i < chain.length; i++) if (i > 0 || indexed) depths.set(chain[i].id, cycle);
+        chain.length = repeat;
+        base = cycle;
+        break;
+      }
+      const parent = byId.get(parentId);
+      if (!parent) {
+        base = 1;
+        break;
+      }
+      at.set(parentId, chain.length);
+      chain.push(parent);
+    }
+    for (let i = chain.length - 1; i >= 0; i--) {
+      base += 1;
+      if (i > 0 || indexed) depths.set(chain[i].id, base);
+    }
+    return base;
+  };
+  return { node: (id) => byId.get(id), depth };
 }
 
 // experiences/visual-map/cover-frame-editor.ts
@@ -37909,7 +38018,7 @@ var oneLine2 = (value) => {
 };
 function summarizeBasis(bases) {
   const entries = [];
-  const cardIndex = /* @__PURE__ */ new Map();
+  const cardIndex2 = /* @__PURE__ */ new Map();
   for (const basis of bases) {
     const titles = basis.kind === "outline_only" ? [] : basis.sources.map((source) => oneLine2(source.title)).filter((title, at2, all) => title && all.indexOf(title) === at2);
     const kind = basis.kind === "outline_only" || !titles.length ? "outline_only" : basis.kind;
@@ -37920,12 +38029,12 @@ function summarizeBasis(bases) {
       continue;
     }
     const key4 = kind === "outline_only" ? kind : `${kind}${titles.join("")}`;
-    const at = cardIndex.get(key4);
+    const at = cardIndex2.get(key4);
     if (at !== void 0) {
       entries[at].count++;
       continue;
     }
-    cardIndex.set(key4, entries.length);
+    cardIndex2.set(key4, entries.length);
     entries.push(
       kind === "outline_only" ? { type: "cards", kind, titles: [], count: 1 } : { type: "cards", kind, titles, count: 1 }
     );
@@ -45140,7 +45249,12 @@ function newArgumentMap(roles, runId) {
     conclusion: { state: "pending", basedOn: [], missing: [] }
   };
 }
+function situationLimit(state) {
+  const { data } = state.situation;
+  return state.run.researchCalls >= MAX_RESEARCH_CALLS && data.some((d) => d.state === "pending") && !data.some((d) => d.state === "searching");
+}
 function limitStop(state, actions) {
+  if (state.run.phase === "situation") return state.situation.gate.state === "pending" && situationLimit(state);
   if (state.run.phase !== "analysis" || verifiedHypotheses(state).length >= MIN_VERIFIED) return false;
   if (state.hypotheses.length >= MAX_HYPOTHESES && verifyingCount(state) < MIN_VERIFIED) return true;
   return actions.length === 0 && !hasSearching(state);
@@ -45181,7 +45295,9 @@ function situationActions(state) {
       actions.push({ type: "research_situation", dataId: datum.id });
       budget -= 1;
     }
-  if (actions.length || data.some((d) => d.state === "pending" || d.state === "searching")) return actions;
+  if (actions.length) return actions;
+  if (situationLimit(state)) return [{ type: "stop_limit" }];
+  if (data.some((d) => d.state === "pending" || d.state === "searching")) return actions;
   return [{ type: data.some((d) => d.state === "not_found") ? "gate_missing" : "judge_gate" }];
 }
 function nextActions(state) {
@@ -45229,6 +45345,15 @@ function applySituationEvidence(state, dataId, result) {
   if (blank(result.reason)) throw new GateError("a miss needs a reason");
   datum.reason = result.reason;
   datum.state = datum.attempts >= MAX_SITUATION_ATTEMPTS ? "not_found" : "pending";
+  return next;
+}
+function releaseSituationResearch(state, dataId) {
+  inSituation(state);
+  const next = clone2(state);
+  const datum = next.situation.data.find((d) => d.id === dataId);
+  if (!datum || datum.state !== "searching") throw new GateError("situation datum is not being researched");
+  datum.state = "pending";
+  datum.attempts -= 1;
   return next;
 }
 function applyGateMissing(state) {
@@ -45359,6 +45484,14 @@ function applyEvidence(state, hypothesisId, needId, result) {
   need.state = "not_found";
   return next;
 }
+function releaseNeedResearch(state, hypothesisId, needId) {
+  inAnalysis(state);
+  const next = clone2(state);
+  const need = hypothesisOf(next, hypothesisId).needs.find((n) => n.id === needId);
+  if (!need || need.state !== "searching") throw new GateError("need is not being researched");
+  need.state = "pending";
+  return next;
+}
 var evidenceOf = (needs) => needs.map((n) => {
   var _a2, _b2, _c, _d, _e, _f, _g;
   return {
@@ -45424,7 +45557,7 @@ function applyLimitStop(state) {
   if (state.run.status !== "running" || !limitStop(state, analysisActionsSafe(state)))
     throw new GateError("the run is not at a limit");
   const next = clone2(state);
-  const missing = [`verified ${verifiedHypotheses(state).length}/${MIN_VERIFIED}`];
+  const missing = state.run.phase === "situation" ? state.situation.data.map((d) => `${d.id}: ${d.state}`) : [`verified ${verifiedHypotheses(state).length}/${MIN_VERIFIED}`];
   for (const h of next.hypotheses)
     missing.push(
       `${h.id}: ${h.location === "eliminated" ? "eliminated" : isVerified(h) ? "verified" : "not verified"}`
@@ -46402,7 +46535,8 @@ var ArgumentRuns = class {
       controller: new AbortController(),
       stopRequested: false,
       disposed: false,
-      done: Promise.resolve()
+      done: Promise.resolve(),
+      failures: /* @__PURE__ */ new Map()
     };
     this.drives.set(mapPath, drive);
     return drive;
@@ -46480,6 +46614,10 @@ var ArgumentRuns = class {
       const research = actions.filter((a) => a.type === "research_situation" || a.type === "research_need");
       if (research.length) {
         await Promise.all(research.slice(0, MAX_RESEARCH_CONCURRENCY).map((a) => this.research(drive, state, a)));
+        if (!this.dead(drive) && [...drive.failures.values()].some((n) => n >= 2)) {
+          await this.pause(drive, "error", false);
+          return;
+        }
       } else await this.guarded(drive, () => this.textStep(drive, state, actions[0]));
       if (drive.stopRequested) return;
     }
@@ -46792,7 +46930,10 @@ var ArgumentRuns = class {
     if (next) next();
     else this.inFlight--;
   }
-  /** begin (writes researchCalls) -> dispatch -> verify -> commit. Never throws: a failed item becomes a miss. */
+  /**
+   * begin (writes researchCalls) -> dispatch -> verify -> commit. Never throws. A reply that cannot be used becomes a miss; a provider
+   * failure (askModel rejected) is released back to pending instead, never a miss.
+   */
   async research(drive, state, action) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     const isNeed = action.type === "research_need";
@@ -46820,8 +46961,9 @@ var ArgumentRuns = class {
       let openedUrls = [];
       let domain = "-";
       let code = "";
+      let reply;
       try {
-        const reply = await untilAborted(
+        reply = await untilAborted(
           signal,
           this.ports.askModel(
             {
@@ -46843,6 +46985,16 @@ var ArgumentRuns = class {
             signal
           )
         );
+      } catch (error) {
+        if (this.dead(drive)) return;
+        if (busy == null ? void 0 : busy.signal.aborted) {
+          void this.stop(drive.mapPath);
+          return;
+        }
+        await this.releaseFailed(drive, state, isNeed, hypothesisId, itemId, error);
+        return;
+      }
+      try {
         openedUrls = (_g = (_f = reply.evidence) == null ? void 0 : _f.openedUrls) != null ? _g : [];
         const entry = (_h = reply.argumentEvidence) == null ? void 0 : _h.find((e) => e.need === itemId);
         if (!entry) result = { found: false, reason: "no_answer" };
@@ -46880,6 +47032,7 @@ var ArgumentRuns = class {
       );
       try {
         await this.commitEvidence(drive, isNeed, hypothesisId, itemId, result);
+        drive.failures.delete(itemId);
       } catch (error) {
         if (!(error instanceof GateError)) throw error;
         this.ports.log(`argument-run stale dropped runId=${state.run.runId}`);
@@ -46888,6 +47041,22 @@ var ArgumentRuns = class {
       busy == null ? void 0 : busy.release();
       this.free();
     }
+  }
+  /** A provider failure is not a try: the item goes back to pending (no note, no card text) and the failure is counted for this drive. */
+  async releaseFailed(drive, state, isNeed, hypothesisId, itemId, error) {
+    var _a2;
+    this.ports.log(
+      `argument-run proof runId=${state.run.runId} phase=${state.run.phase} result=provider_failure proof=${error instanceof Error ? error.name : "error"} domain=-`
+    );
+    try {
+      await this.checkpoint(drive, async (s) => ({
+        next: isNeed ? releaseNeedResearch(s, hypothesisId, itemId) : releaseSituationResearch(s, itemId)
+      }));
+    } catch (failure) {
+      if (!(failure instanceof GateError)) throw failure;
+      this.ports.log(`argument-run stale dropped runId=${state.run.runId}`);
+    }
+    drive.failures.set(itemId, ((_a2 = drive.failures.get(itemId)) != null ? _a2 : 0) + 1);
   }
   /** The stale fence: the run id (checkpoint) and the item still `searching` (the reducers throw otherwise); a deleted node gets no note. */
   async commitEvidence(drive, isNeed, hypothesisId, itemId, result) {
@@ -60997,6 +61166,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     __publicField(this, "fitOnly");
     /** The map's child index while a paint draws its cards; null otherwise. */
     __publicField(this, "paintChildIndex", null);
+    /** The map's nodes by id and their depths while a paint draws its cards; null otherwise. */
+    __publicField(this, "paintCardIndex", null);
     /** Card measurements waiting for the paint to finish building every card; null outside a paint. */
     __publicField(this, "pendingCardFits", null);
     __publicField(this, "cardChecks", /* @__PURE__ */ new Map());
@@ -61326,6 +61497,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       heightOf: (id) => id === textId ? to.height : this.cardHeightOf(id)
     });
   }
+  /** The map node with this id: from the paint's index while a paint draws its cards, else a search of the map. */
+  mapNodeById(id) {
+    var _a2;
+    if (id === void 0) return void 0;
+    return this.paintCardIndex ? this.paintCardIndex.node(id) : (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+  }
   onMapWindowFocus() {
     var _a2, _b2, _c;
     if (!this.focusRestorePending) return;
@@ -61404,6 +61581,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     const fits = [];
     this.renderingCard = true;
     this.paintChildIndex = childIndex(this.map.nodes);
+    this.paintCardIndex = cardIndex(this.map.nodes);
     this.pendingCardFits = fits;
     try {
       for (const id of ids) {
@@ -61420,6 +61598,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     } finally {
       this.renderingCard = false;
       this.paintChildIndex = null;
+      this.paintCardIndex = null;
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();
@@ -62760,13 +62939,16 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
   async persist() {
     if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
-  async hydrate(isCurrent = () => true, onRead) {
-    var _a2, _b2, _c;
+  async hydrate(isCurrent = () => true, onRead, meta) {
+    var _a2, _b2, _c, _d, _e;
     this.aimFailedReports.clear();
     let goal;
     let context;
     let sources = [];
-    if (this.path && !((_a2 = this.map) == null ? void 0 : _a2.aim)) {
+    const ctx = createNoteReadContext((_a2 = this.map) != null ? _a2 : void 0);
+    if (meta) {
+      if (this.path && !((_b2 = this.map) == null ? void 0 : _b2.aim)) ({ goal, context, sources } = meta);
+    } else if (this.path && !((_c = this.map) == null ? void 0 : _c.aim)) {
       try {
         ({ goal, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch (e) {
@@ -62776,7 +62958,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       } catch (e) {
       }
     }
-    const nodes = (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : [];
+    const nodes = (_e = (_d = this.map) == null ? void 0 : _d.nodes) != null ? _e : [];
     const read = new Array(nodes.length);
     let next = 0;
     const worker = async () => {
@@ -62784,14 +62966,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
       while (next < nodes.length && isCurrent()) {
         const index = next++;
         try {
-          read[index] = await this.plugin.repo.readNote(nodes[index].path, (_a3 = this.map) != null ? _a3 : void 0);
+          read[index] = await this.plugin.repo.readNote(nodes[index].path, (_a3 = this.map) != null ? _a3 : void 0, ctx);
         } catch (e) {
         }
         onRead == null ? void 0 : onRead(index, read[index]);
       }
     };
     await Promise.all(Array.from({ length: Math.min(8, nodes.length) }, worker));
-    if (!isCurrent()) return;
+    if (!isCurrent()) return { failedPaths: [] };
     const loaded = /* @__PURE__ */ new Map();
     nodes.forEach((node, index) => {
       const note = read[index];
@@ -62802,6 +62984,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian40.Ite
     this.relevanceContext = context;
     this.mapSources = sources;
     await this.hydrateFailedReportTargets(isCurrent);
+    return { failedPaths: Array.from(ctx.failedPaths) };
   }
   async hydrateFailedReportTargets(isCurrent) {
     var _a2;
@@ -71688,7 +71871,7 @@ ${request.requirements}` : preset.text,
       this.render();
       return;
     }
-    const disk = await this.plugin.repo.readMap(this.path);
+    const { map: disk, ...meta } = await this.plugin.repo.readMapMeta(this.path);
     const structureChanged = JSON.stringify({ ...disk, viewport: null }) !== JSON.stringify({ ...this.map, viewport: null });
     if (structureChanged) {
       disk.viewport = this.map.viewport;
@@ -71697,7 +71880,7 @@ ${request.requirements}` : preset.text,
       this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
-    await this.hydrate();
+    await this.hydrate(void 0, void 0, meta);
     if (structureChanged || before !== JSON.stringify(Array.from(this.notes))) {
       const editing = this.typingInField();
       if ((!editing || structureChanged) && !this.dragging) this.render();
@@ -72851,6 +73034,7 @@ ${request.requirements}` : preset.text,
     }));
     this.renderingCard = true;
     this.paintChildIndex = this.map ? childIndex(this.map.nodes) : null;
+    this.paintCardIndex = this.map ? cardIndex(this.map.nodes) : null;
     const fits = [];
     this.pendingCardFits = fits;
     try {
@@ -72858,6 +73042,7 @@ ${request.requirements}` : preset.text,
     } finally {
       this.renderingCard = false;
       this.paintChildIndex = null;
+      this.paintCardIndex = null;
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();
@@ -72997,9 +73182,10 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T;
     if (!this.stageEl) return;
-    const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
+    const index = (_c = this.paintCardIndex) != null ? _c : cardIndex((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []);
+    const node = (_d = index.node(shownNode.id)) != null ? _d : shownNode;
     const loading = this.cardLoading(node);
     const note = loading ? void 0 : this.notes.get(node.id), card = this.stageEl.createDiv({
       cls: `vam-node${node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id) ? " is-selected" : ""}`
@@ -73012,7 +73198,7 @@ ${request.requirements}` : preset.text,
     this.paintCut(card, node.id);
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
-    card.setAttr("aria-level", String(this.nodeDepth(node)));
+    card.setAttr("aria-level", String(index.depth(node)));
     card.setAttr(
       "aria-selected",
       String(node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id))
@@ -73037,11 +73223,11 @@ ${request.requirements}` : preset.text,
     card.dataset.nodeId = node.id;
     const queued = this.isResearchQueued(node);
     const merging = this.isMerging(node.id);
-    card.dataset.status = merging || this.plugin.topicRuns.isBusy(node.path) || ((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) || this.startingTasks.has(node.path) ? "running" : queued ? "queued" : loading ? "idea" : (_d = note == null ? void 0 : note.status) != null ? _d : "error";
+    card.dataset.status = merging || this.plugin.topicRuns.isBusy(node.path) || ((_e = this.plugin.quickExpandPending) == null ? void 0 : _e.has(node.path)) || this.startingTasks.has(node.path) ? "running" : queued ? "queued" : loading ? "idea" : (_f = note == null ? void 0 : note.status) != null ? _f : "error";
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
-    const typingSummary = ((_e = this.inlineSummary) == null ? void 0 : _e.id) === node.id;
+    const typingSummary = ((_g = this.inlineSummary) == null ? void 0 : _g.id) === node.id;
     if (shownNode.height && !typingSummary) card.style.height = `${shownNode.height}px`;
     card.tabIndex = node.id === this.selection.state.tabStopId ? 0 : -1;
     card.addEventListener("dragover", (event) => this.onCardDragOver(event, card, node));
@@ -73049,11 +73235,11 @@ ${request.requirements}` : preset.text,
     card.addEventListener("drop", (event) => this.onCardDrop(event, card, node));
     const header2 = card.createDiv("vam-node-header");
     const argumentView = loading ? null : this.argumentCardView(node.id);
-    this.labelCard(card, loading ? this.preReadTitle(node) : (_f = note == null ? void 0 : note.title) != null ? _f : t("ui.note_missing"));
+    this.labelCard(card, loading ? this.preReadTitle(node) : (_h = note == null ? void 0 : note.title) != null ? _h : t("ui.note_missing"));
     if (this.selection.state.multiSelectMode) {
       const select = header2.createEl("input", { type: "checkbox" });
       select.checked = this.selection.state.multiSelected.has(node.id);
-      select.setAttr("aria-label", (_g = note == null ? void 0 : note.title) != null ? _g : node.path);
+      select.setAttr("aria-label", (_i = note == null ? void 0 : note.title) != null ? _i : node.path);
       select.tabIndex = -1;
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", (event) => {
@@ -73062,10 +73248,10 @@ ${request.requirements}` : preset.text,
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
-    const research = (_h = this.plugin.researchProgress) == null ? void 0 : _h.get(node.path);
+    const research = (_j = this.plugin.researchProgress) == null ? void 0 : _j.get(node.path);
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
-    const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_i = this.plugin.quickExpandPending) == null ? void 0 : _i.has(node.path)) || this.startingTasks.has(node.path);
+    const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_k = this.plugin.quickExpandPending) == null ? void 0 : _k.has(node.path)) || this.startingTasks.has(node.path);
     const doc = this.map, aimData = doc == null ? void 0 : doc.aim;
     const aimProgress = aimEnabled() && !!aimData && (node.aimKind === "question" || node.aimKind === "topic" && aimData.branches.some((branch) => branch.questionNodeId === node.id && !branch.parentBranchId));
     if (doc && aimData && aimProgress) {
@@ -73098,7 +73284,7 @@ ${request.requirements}` : preset.text,
           header2.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
       } else if (!note || note.status !== (isAimNode(node) ? "completed" : "idea") || active || queued) {
         const chip = header2.createSpan({
-          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_j = note == null ? void 0 : note.status) != null ? _j : "error"}`,
+          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_l = note == null ? void 0 : note.status) != null ? _l : "error"}`,
           text: statusText
         });
         if (active) chip.setAttr("role", "status");
@@ -73109,7 +73295,7 @@ ${request.requirements}` : preset.text,
         else this.labelCard(card, note.title);
       }
     }
-    const relevance = !node.aimKind && !((_k = this.map) == null ? void 0 : _k.aim) ? note == null ? void 0 : note.relevance : void 0;
+    const relevance = !node.aimKind && !((_m = this.map) == null ? void 0 : _m.aim) ? note == null ? void 0 : note.relevance : void 0;
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
@@ -73119,14 +73305,14 @@ ${request.requirements}` : preset.text,
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
         (button) => this.openRelevanceMenu(node, relevance.tier, button),
-        ((_l = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _l.status) === "running"
+        ((_n = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _n.status) === "running"
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
         (0, import_obsidian40.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
-      const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
+      const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     if (argumentView) {
@@ -73139,7 +73325,7 @@ ${request.requirements}` : preset.text,
       const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength && leaning) renderHypothesisTag(header2, leaning, strength, kindText);
       else header2.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
-      const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
+      const named = (_p = cardLabels.get(card)) == null ? void 0 : _p.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header2, node.id);
@@ -73149,7 +73335,7 @@ ${request.requirements}` : preset.text,
     this.paintCardStyle(card, note, isAimNode(node));
     if (header2) this.paintAiLock(card, header2, node);
     const errorDetails = [];
-    if ((_o = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _o.length) {
+    if ((_q = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _q.length) {
       const issue2 = header2.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
@@ -73161,8 +73347,8 @@ ${request.requirements}` : preset.text,
       if (failure.technical) technicalDetails.push(failure.technical);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_p = this.map) == null ? void 0 : _p.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_q = this.notes.get(currentNode.id)) == null ? void 0 : _q.title : void 0;
+      const currentNode = batch.currentPath ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_s = this.notes.get(currentNode.id)) == null ? void 0 : _s.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -73189,16 +73375,16 @@ ${request.requirements}` : preset.text,
       this.renderRetryFailedButton(header2, node.path, batch);
     }
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.id === node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_s = this.plugin.expansionCoordinator) == null ? void 0 : _s.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
+    const parentNode = node.parentId ? this.mapNodeById(node.parentId) : void 0;
+    const batchChild = !!parentNode && !!((_t = this.plugin.expansionCoordinator) == null ? void 0 : _t.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header2,
         t(
           stopLabelKey(
             this.plugin.topicRuns.runKind(node.path),
-            !!((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)),
+            !!((_v = this.plugin.quickExpandPending) == null ? void 0 : _v.has(node.path)),
             this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
           )
         ),
@@ -73215,7 +73401,7 @@ ${request.requirements}` : preset.text,
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header2, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_w = (_v = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _v.length) != null ? _w : 0;
+    const pendingCount = (_x = (_w = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _w.length) != null ? _x : 0;
     if (pendingCount && !this.selection.state.multiSelectMode && !this.aimLive())
       this.button(
         header2,
@@ -73258,7 +73444,7 @@ ${request.requirements}` : preset.text,
       }
     }
     if (!this.selection.state.multiSelectMode) {
-      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header2,
           t("ui.aim_new_question"),
@@ -73270,7 +73456,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && assumptions.length) {
+      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && assumptions.length) {
         const correct = this.button(
           header2,
           t("ui.aim_correct_assumption"),
@@ -73282,7 +73468,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && node.aimKind === "conclusion") {
+      if (aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header2,
           t("ui.aim_steer"),
@@ -73332,7 +73518,7 @@ ${request.requirements}` : preset.text,
           () => this.whenEditing(() => this.selectSubtopics(node))
         );
     }
-    if (!this.selection.state.multiSelectMode && aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "question")
+    if (!this.selection.state.multiSelectMode && aimEnabled() && ((_B = this.map) == null ? void 0 : _B.aim) && node.aimKind === "question")
       iconTool(
         t("ui.remove_from_map"),
         "trash",
@@ -73347,11 +73533,11 @@ ${request.requirements}` : preset.text,
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const shownTitle = loading ? this.preReadTitle(node) : argumentView ? this.argumentTitleOf(argumentView, note) : (_B = note == null ? void 0 : note.title) != null ? _B : node.path;
+    const shownTitle = loading ? this.preReadTitle(node) : argumentView ? this.argumentTitleOf(argumentView, note) : (_C = note == null ? void 0 : note.title) != null ? _C : node.path;
     const title = card.createEl("h3", { text: shownTitle, cls: "vam-card-title" });
     title.setAttr("title", shownTitle);
     title.setAttr("dir", "auto");
-    if (note && ((_C = this.inlineName) == null ? void 0 : _C.target) === "card" && this.inlineName.id === node.id) {
+    if (note && ((_D = this.inlineName) == null ? void 0 : _D.target) === "card" && this.inlineName.id === node.id) {
       title.addClass("vam-sr-only");
       this.paintCardNameEdit(card, node, note);
     }
@@ -73359,8 +73545,8 @@ ${request.requirements}` : preset.text,
       card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node));
     const textEditable = !!note && this.cardTextEditable();
     if (argumentView) renderArgumentCardBody(card, argumentView);
-    else if (textEditable && ((_D = this.inlineSummary) == null ? void 0 : _D.id) === node.id) this.paintCardSummaryEdit(card, node);
-    else if ((_E = research == null ? void 0 : research.preview) == null ? void 0 : _E.summary)
+    else if (textEditable && ((_E = this.inlineSummary) == null ? void 0 : _E.id) === node.id) this.paintCardSummaryEdit(card, node);
+    else if ((_F = research == null ? void 0 : research.preview) == null ? void 0 : _F.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (loading) {
       const bars = card.createDiv({ cls: "vam-card-loading-bars" });
@@ -73370,14 +73556,14 @@ ${request.requirements}` : preset.text,
     } else if (!note || !isPlaceholder(note.summary)) {
       const summaryText2 = card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_F = note == null ? void 0 : note.summary) != null ? _F : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_G = note == null ? void 0 : note.summary) != null ? _G : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_G = note == null ? void 0 : note.summary) != null ? _G : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_H = note == null ? void 0 : note.summary) != null ? _H : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
       if (textEditable) summaryText2.addClass("is-inline-editable");
     }
-    if (!argumentView && textEditable && !((_H = research == null ? void 0 : research.preview) == null ? void 0 : _H.summary) && ((_I = this.inlineSummary) == null ? void 0 : _I.id) !== node.id && isPlaceholder(note.summary))
+    if (!argumentView && textEditable && !((_I = research == null ? void 0 : research.preview) == null ? void 0 : _I.summary) && ((_J = this.inlineSummary) == null ? void 0 : _J.id) !== node.id && isPlaceholder(note.summary))
       card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
-    else if (((_J = this.inlineSummary) == null ? void 0 : _J.id) === node.id && !textEditable) this.inlineSummary = null;
+    else if (((_K = this.inlineSummary) == null ? void 0 : _K.id) === node.id && !textEditable) this.inlineSummary = null;
     this.paintCardImageRelations(card, node.id);
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
@@ -73392,7 +73578,7 @@ ${request.requirements}` : preset.text,
         });
       }
     }
-    if (node.aimKind === "conclusion" && aimEnabled() && ((_K = this.map) == null ? void 0 : _K.aim)) {
+    if (node.aimKind === "conclusion" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -73405,7 +73591,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && aimEnabled() && ((_M = this.map) == null ? void 0 : _M.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -73441,11 +73627,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && aimEnabled() && ((_M = this.map) == null ? void 0 : _M.aim)) {
+    if (node.aimKind === "question" && aimEnabled() && ((_N = this.map) == null ? void 0 : _N.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_O = (_N = node.aimQuestion) == null ? void 0 : _N.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _O : branch.answerSnapshot.selections;
+        const labels = (_P = (_O = node.aimQuestion) == null ? void 0 : _O.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _P : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -73488,11 +73674,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && aimEnabled() && ((_P = this.map) == null ? void 0 : _P.aim)) {
+    if (node.aimKind === "answer" && aimEnabled() && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_R = (_Q = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _Q.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _R : branch.answerSnapshot.selections;
+        const labels = (_S = (_R = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _R.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _S : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -73505,7 +73691,7 @@ ${request.requirements}` : preset.text,
       node,
       (point, wasSelected) => this.switchTopicChat(node, point.target) || this.openCardTextEditor(point, card, node, wasSelected)
     );
-    if (!this.selection.state.multiSelectMode && !((_S = this.map) == null ? void 0 : _S.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !((_T = this.map) == null ? void 0 : _T.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -73626,10 +73812,7 @@ ${request.requirements}` : preset.text,
    */
   refreshCardHeightState(card) {
     var _a2, _b2;
-    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => {
-      var _a3;
-      return item.id === ((_a3 = card.dataset) == null ? void 0 : _a3.nodeId);
-    });
+    const node = this.mapNodeById((_a2 = card.dataset) == null ? void 0 : _a2.nodeId);
     if (!node) return;
     if (node.height && card.style.height !== "") this.measureClipped(card);
     else if (card.offsetHeight && !node.height)
@@ -73824,18 +74007,6 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d, _e;
     return (_e = (_d = (_b2 = this.selection.state.selected && shown.some((node) => node.id === this.selection.state.selected) ? this.selection.state.selected : null) != null ? _b2 : (_a2 = shown.find((node) => !node.parentId)) == null ? void 0 : _a2.id) != null ? _d : (_c = shown[0]) == null ? void 0 : _c.id) != null ? _e : null;
   }
-  /** Nesting level of a topic, 1 for a root; guards against a corrupt parent cycle. */
-  nodeDepth(node) {
-    var _a2, _b2, _c;
-    let depth = 1;
-    const seen = /* @__PURE__ */ new Set([node.id]);
-    for (let parent = node.parentId; parent; depth++) {
-      if (seen.has(parent)) break;
-      seen.add(parent);
-      parent = (_c = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === parent)) == null ? void 0 : _b2.parentId) != null ? _c : null;
-    }
-    return depth;
-  }
   /**
    * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window
    * or past the canvas edge (a row wider than a card on the left edge); a row wider than the visible canvas wraps. Measured,
@@ -74003,10 +74174,10 @@ ${request.requirements}` : preset.text,
   }
   /** The type to show: only a topic on an ordinary map has one other than "topic" (AIM shows none). */
   topicKindOf(id) {
-    var _a2, _b2, _c;
-    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    var _a2, _b2;
+    const node = this.mapNodeById(id);
     if (!this.relationsEnabled() || !node || isAimNode(node)) return "topic";
-    return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.topicKind) != null ? _c : "topic";
+    return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.topicKind) != null ? _b2 : "topic";
   }
   /** True for a card the argument flow owns on a map whose `argumentMap` key is usable (those cards are plain rectangles). */
   isArgumentCard(id) {
@@ -84055,8 +84226,8 @@ ${addition}` : addition },
       }
     });
     const widthOf = () => {
-      var _a2, _b2, _c;
-      return (_c = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === node.id)) == null ? void 0 : _b2.width) != null ? _c : CARD_WIDTH;
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.mapNodeById(node.id)) == null ? void 0 : _a2.width) != null ? _b2 : CARD_WIDTH;
     };
     const sync = (width) => handle.setAttr("aria-valuenow", String(width));
     handle.tabIndex = -1;
@@ -84177,8 +84348,8 @@ ${addition}` : addition },
       }
     });
     const setHeight = () => {
-      var _a3, _b2;
-      return (_b2 = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === node.id)) == null ? void 0 : _b2.height;
+      var _a3;
+      return (_a3 = this.mapNodeById(node.id)) == null ? void 0 : _a3.height;
     };
     const heightOf = () => {
       var _a3, _b2;

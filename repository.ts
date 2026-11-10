@@ -42,6 +42,7 @@ import type { StyleKind } from "./ai/note-style-recipe";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { fencedLines } from "./ai/markdown-blocks";
 import { clampMapChatWidth, MAP_CHAT_WIDTH_DEFAULT } from "./core/map-chat-layout";
+import { readOnce, type NoteReadContext } from "./core/note-read-context";
 import { findWikilinks, linkPathOf, rewriteLinkTargets, splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
 import { contentHash } from "./core/map-chat-context";
@@ -588,6 +589,12 @@ export interface RelevanceGoalState {
 export interface RelevanceSetup {
   goal: string | undefined;
   context: string | undefined;
+}
+
+/** Everything one read of Map.md gives: the document and its frontmatter values. */
+export interface MapMeta extends RelevanceSetup {
+  map: MapDocument;
+  sources: MapSource[];
 }
 
 function noteTitle(content: string, fm: Record<string, unknown>, fallback: string): string {
@@ -1452,7 +1459,8 @@ export class Repository {
     stored: string | undefined,
     source: ModelSource,
     map?: MapDocument,
-    storedReasoning?: string
+    storedReasoning?: string,
+    ctx?: NoteReadContext
   ): Promise<{ model: string; overridden: boolean; reasoning?: string }> {
     if (source === "manual")
       return {
@@ -1477,21 +1485,45 @@ export class Repository {
       }
     }
     const seen = new Set<string>();
+    const byId = ctx && owner && ctx.map === owner ? ctx.nodesById : undefined;
     let node = owner?.nodes.find(item => item.path === path);
     while (node && node.parentId && !seen.has(node.id)) {
       seen.add(node.id);
-      const parent = owner!.nodes.find(item => item.id === node!.parentId);
+      const parentId = node.parentId;
+      const parent = byId ? byId.get(parentId) : owner!.nodes.find(item => item.id === parentId);
       if (!parent) break;
-      try {
-        const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text(fm.model))
-          return { model: text(fm.model), overridden: true, reasoning: text(fm["reasoning-level"]) || undefined };
-      } catch {
-        /* A missing ancestor note is skipped. */
-      }
+      const fm = await this.ancestorFrontmatter(parent.path, ctx);
+      if (fm && fm["model-source"] === "manual" && text(fm.model))
+        return { model: text(fm.model), overridden: true, reasoning: text(fm["reasoning-level"]) || undefined };
       node = parent;
     }
     return { model: this.settings.cliModel, overridden: false };
+  }
+
+  /**
+   * An ancestor note's frontmatter, or null when it is missing or unreadable (the walk skips it). With a context the
+   * file is read once per hydrate; an existing file whose read throws is recorded in `ctx.failedPaths`.
+   */
+  private async ancestorFrontmatter(path: string, ctx?: NoteReadContext): Promise<Record<string, unknown> | null> {
+    const load = async (): Promise<Record<string, unknown> | null> => {
+      try {
+        const file = this.file(path);
+        const content = ctx
+          ? await readOnce(ctx, path, () => this.app.vault.read(file))
+          : await this.app.vault.read(file);
+        return frontmatter(content);
+      } catch {
+        /* A missing ancestor note is skipped (a read that threw is already in ctx.failedPaths). */
+        return null;
+      }
+    };
+    if (!ctx) return load();
+    let pending = ctx.ancestorFm.get(path);
+    if (!pending) {
+      pending = load();
+      ctx.ancestorFm.set(path, pending);
+    }
+    return pending;
   }
 
   /**
@@ -1562,9 +1594,10 @@ export class Repository {
     return false;
   }
 
-  async readNote(path: string, map?: MapDocument): Promise<Note> {
+  async readNote(path: string, map?: MapDocument, ctx?: NoteReadContext): Promise<Note> {
     const file = this.file(path),
-      content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))),
+      raw = ctx ? await readOnce(ctx, path, () => this.app.vault.read(file)) : await this.app.vault.read(file),
+      content = decodeCalloutSections(upgradeLegacyAimText(raw)),
       fm = frontmatter(content);
     const status = text(fm.status, "idea");
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
@@ -1572,7 +1605,14 @@ export class Repository {
     const modelSource: ModelSource = ["workspace", "inherited", "manual"].includes(source)
       ? (source as ModelSource)
       : "workspace";
-    const effective = await this.effectiveModel(path, text(fm.model), modelSource, map, text(fm["reasoning-level"]));
+    const effective = await this.effectiveModel(
+      path,
+      text(fm.model),
+      modelSource,
+      map,
+      text(fm["reasoning-level"]),
+      ctx
+    );
     const { model, reasoning } = this.chooseModel(effective);
     const state = text(
       fm["topic-state"],
@@ -1958,6 +1998,18 @@ export class Repository {
 
   async readMap(path: string): Promise<MapDocument> {
     return parseMap(await this.app.vault.read(this.file(path)));
+  }
+
+  /** Map.md read once: the map plus its goal, context and sources (what hydrate and synchronize need). */
+  async readMapMeta(path: string): Promise<MapMeta> {
+    const content = await this.app.vault.read(this.file(path));
+    const fm = frontmatter(content);
+    return {
+      map: parseMap(content),
+      goal: readRelevanceGoal(fm),
+      context: readRelevanceContext(fm),
+      sources: readMapSources(fm)
+    };
   }
 
   /** The map file's `relevance-goal` frontmatter, if any. The map file keeps its frontmatter across saves. */

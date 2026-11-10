@@ -6,6 +6,9 @@
  * Rules kept here: `researchCalls` is written (begin) before a research dispatch; a result is committed only while the run id, the
  * item's `searching` state and the unchanged argument map still match (stale fence); a user-deleted node is skipped; Stop and
  * dispose abort everything and nothing is written after dispose; a failed step gets one corrective retry, then the run pauses.
+ * A provider failure on a research item (the model never answered, e.g. the 3-minute limit) is not a try and never a miss: the item
+ * goes back to pending, it is retried once, and a second consecutive failure pauses the run with 'error' (resumable). Only an
+ * answer that arrived can become a miss (no_answer, not_found, a refused source).
  */
 import type { TranslationKey } from "../../i18n";
 import { neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
@@ -31,6 +34,8 @@ import {
   nextActions,
   prepareConclusion,
   prepareVerdict,
+  releaseNeedResearch,
+  releaseSituationResearch,
   startNextRound,
   type ArgumentAction,
   type EvidenceResult
@@ -165,6 +170,8 @@ interface Drive {
   stopRequested: boolean;
   disposed: boolean;
   done: Promise<void>;
+  /** Consecutive provider failures per research item (memory only, per drive; reset by an answer). */
+  failures: Map<string, number>;
 }
 interface Plan {
   next: ArgumentMapData;
@@ -325,7 +332,8 @@ export class ArgumentRuns {
       controller: new AbortController(),
       stopRequested: false,
       disposed: false,
-      done: Promise.resolve()
+      done: Promise.resolve(),
+      failures: new Map()
     };
     this.drives.set(mapPath, drive);
     return drive;
@@ -408,6 +416,11 @@ export class ArgumentRuns {
       const research = actions.filter(a => a.type === "research_situation" || a.type === "research_need");
       if (research.length) {
         await Promise.all(research.slice(0, MAX_RESEARCH_CONCURRENCY).map(a => this.research(drive, state, a)));
+        // Two consecutive provider failures on one item: the one automatic retry is spent, so the run pauses (resumable).
+        if (!this.dead(drive) && [...drive.failures.values()].some(n => n >= 2)) {
+          await this.pause(drive, "error", false);
+          return;
+        }
       } else await this.guarded(drive, () => this.textStep(drive, state, actions[0]));
       if (drive.stopRequested) return;
     }
@@ -752,7 +765,10 @@ export class ArgumentRuns {
     else this.inFlight--;
   }
 
-  /** begin (writes researchCalls) -> dispatch -> verify -> commit. Never throws: a failed item becomes a miss. */
+  /**
+   * begin (writes researchCalls) -> dispatch -> verify -> commit. Never throws. A reply that cannot be used becomes a miss; a provider
+   * failure (askModel rejected) is released back to pending instead, never a miss.
+   */
   private async research(drive: Drive, state: ArgumentMapData, action: ArgumentAction): Promise<void> {
     const isNeed = action.type === "research_need";
     if (action.type !== "research_need" && action.type !== "research_situation") return;
@@ -781,8 +797,9 @@ export class ArgumentRuns {
       let openedUrls: string[] = [];
       let domain = "-";
       let code = "";
+      let reply: AiResult;
       try {
-        const reply = await untilAborted(
+        reply = await untilAborted(
           signal,
           this.ports.askModel(
             {
@@ -804,6 +821,16 @@ export class ArgumentRuns {
             signal
           )
         );
+      } catch (error) {
+        if (this.dead(drive)) return;
+        if (busy?.signal.aborted) {
+          void this.stop(drive.mapPath);
+          return;
+        }
+        await this.releaseFailed(drive, state, isNeed, hypothesisId, itemId, error);
+        return;
+      }
+      try {
         openedUrls = reply.evidence?.openedUrls ?? [];
         const entry = reply.argumentEvidence?.find(e => e.need === itemId);
         if (!entry) result = { found: false, reason: "no_answer" };
@@ -843,6 +870,7 @@ export class ArgumentRuns {
       );
       try {
         await this.commitEvidence(drive, isNeed, hypothesisId, itemId, result);
+        drive.failures.delete(itemId);
       } catch (error) {
         // The item is no longer `searching` (someone paused or changed the run meanwhile): the late result is dropped.
         if (!(error instanceof GateError)) throw error;
@@ -852,6 +880,29 @@ export class ArgumentRuns {
       busy?.release();
       this.free();
     }
+  }
+
+  /** A provider failure is not a try: the item goes back to pending (no note, no card text) and the failure is counted for this drive. */
+  private async releaseFailed(
+    drive: Drive,
+    state: ArgumentMapData,
+    isNeed: boolean,
+    hypothesisId: string,
+    itemId: string,
+    error: unknown
+  ): Promise<void> {
+    this.ports.log(
+      `argument-run proof runId=${state.run.runId} phase=${state.run.phase} result=provider_failure proof=${error instanceof Error ? error.name : "error"} domain=-`
+    );
+    try {
+      await this.checkpoint(drive, async s => ({
+        next: isNeed ? releaseNeedResearch(s, hypothesisId, itemId) : releaseSituationResearch(s, itemId)
+      }));
+    } catch (failure) {
+      if (!(failure instanceof GateError)) throw failure;
+      this.ports.log(`argument-run stale dropped runId=${state.run.runId}`);
+    }
+    drive.failures.set(itemId, (drive.failures.get(itemId) ?? 0) + 1);
   }
 
   /** The stale fence: the run id (checkpoint) and the item still `searching` (the reducers throw otherwise); a deleted node gets no note. */

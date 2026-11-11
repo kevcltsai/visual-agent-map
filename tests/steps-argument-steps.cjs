@@ -599,6 +599,15 @@ test('facet plan: the marker lists cover zh-TW, zh-CN and en; the prompt tells t
   for (const word of ['造成', '导致', '引起', '原因', '因为', '是否由']) assert.ok(lists.simplified.includes(word), word);
   for (const word of ['cause', 'caused', 'because', 'due to', 'driven by', 'reason']) assert.ok(lists.en.includes(word), word);
   assert.match(mod.facetPlanStep.render(fpReq), /sub-claim of the FACT[\s\S]*never a cause/);
+  for (const word of ['why', '為什麼', '为什么', '由於', '由于', '成因', '歸因', '归因']) assert.ok(mod.CAUSAL_MARKERS.traditional.includes(word) || mod.CAUSAL_MARKERS.simplified.includes(word) || mod.CAUSAL_MARKERS.en.includes(word), word);
+  for (const q of ['Why is youth unemployment high?', '為什麼失業率偏高？', '为什么失业率偏高？', '失業率偏高由於AI？', '失业率偏高由于AI？', '失業率偏高的成因？', '失業率偏高的歸因？', '失业率偏高的归因？'])
+    bad(mod.facetPlanStep, fpReq, fpWith(v => { v.question = q; }), /only the factual claim/);
+  assert.ok(!/factors?\b|因素/.test(mod.CAUSAL_MARKERS.traditional.join()), 'the too-broad 因素 stays out');
+});
+test('facet plan: the number rule matches the grounding (proposition or assumption values), not "only the proposition"', () => {
+  const prompt = mod.facetPlanStep.render(fpReq);
+  assert.match(prompt, /only numbers that appear in the proposition or the assumption values/);
+  assert.doesNotMatch(prompt, /numbers and links that appear in the proposition\./);
 });
 test('facet judge: the prompt carries the scope rule (judged against the claim within the card scope; prompt-only, not program-checkable)', () => {
   const prompt = mod.facetJudgeStep.render(fjReq());

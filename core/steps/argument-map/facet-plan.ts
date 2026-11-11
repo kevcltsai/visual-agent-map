@@ -37,9 +37,9 @@ export interface FacetPlanResult {
  * refusing. Lists cover zh-TW, zh-CN and en; "由...造成/引起" is caught by 造成/引起.
  */
 export const CAUSAL_MARKERS = {
-  traditional: ["造成", "導致", "引起", "原因", "因為", "是否由"],
-  simplified: ["造成", "导致", "引起", "原因", "因为", "是否由"],
-  en: ["cause", "caused", "causes", "causing", "because", "due to", "driven by", "reason", "reasons"]
+  traditional: ["造成", "導致", "引起", "原因", "因為", "是否由", "為什麼", "由於", "成因", "歸因"],
+  simplified: ["造成", "导致", "引起", "原因", "因为", "是否由", "为什么", "由于", "成因", "归因"],
+  en: ["cause", "caused", "causes", "causing", "because", "due to", "driven by", "reason", "reasons", "why"]
 } as const;
 const CAUSAL_RE = new RegExp(
   [

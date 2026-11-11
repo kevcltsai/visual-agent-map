@@ -1897,6 +1897,42 @@ integrationTest('topic chat chain: Stop after the provider accepted a step abort
   assert.equal((await topicLines(h, 'root')).at(-1).status, 'stopped');
 });
 
+integrationTest('topic chat chain: the root stalls after the provider accepted and Stop aborts it; the root note is unchanged and the sentence counts the steps below', async () => {
+  const h = await harness(); await deepen(h);
+  h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
+  let call = 0;
+  h.plugin.askModel = (_context, _model, _reasoning, signal, _onExchange, onAccepted) => {
+    call++; onAccepted?.();
+    if (call < 3) return Promise.resolve({ summary: `S${call}`, detail: `D${call}`, visualReferences: [], suggestions: [] });
+    return new Promise((_resolve, reject) => {
+      signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+      setTimeout(() => h.entry('root').controller.abort(), 20);
+    });
+  };
+  h.view.runAgent = async () => ({ finished: Promise.resolve() });
+  const before = (await h.repo.readNote(h.node('root').path)).detail;
+  const text = await startDeep(h, 'bottom-up');
+  assert.equal(call, 3, 'c and a finished, the root was asked');
+  assert.equal((await h.repo.readNote(h.node('root').path)).detail, before, 'the aborted root wrote nothing');
+  assert.equal(text, t('ui.topic_chat_subtree_stopped_0_1', 2, 3));
+  assert.equal((await topicLines(h, 'root')).at(-1).status, 'stopped');
+});
+
+integrationTest('topic chat: a one-level integration stopped after the provider accepted writes nothing and ends stopped', async () => {
+  const h = await harness(); h.flatten(); await researched(h);
+  h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
+  h.plugin.askModel = (_context, _model, _reasoning, signal, _onExchange, onAccepted) => new Promise((_resolve, reject) => {
+    onAccepted?.();
+    signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    setTimeout(() => h.entry('root').controller.abort(), 20);
+  });
+  const before = await h.repo.readNote(h.node('root').path);
+  assert.equal(await h.host('root').submit('synthesize', 'x'), true);
+  await waitFor(() => !h.entry('root').session.running);
+  assert.deepEqual(plain(await h.repo.readNote(h.node('root').path)), plain(before), 'nothing written');
+  assert.equal((await topicLines(h, 'root')).at(-1).status, 'stopped');
+});
+
 integrationTest('topic chat chain: a topic deleted mid-chain is skipped, the others run', async () => {
   const h = await harness(); await deepen(h);
   const { steps } = stubChain(h, key => { if (key === 'c') h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.a); return true; });

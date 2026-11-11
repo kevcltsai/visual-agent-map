@@ -2715,7 +2715,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.topic_chat_choice_quick": "快速",
   "ui.topic_chat_choice_quick_hint_0_1": "{0} 個子議題完整內容＋其餘議題的標題與摘要，約 {1} 次 AI",
   "ui.topic_chat_choice_bottom_up": "由下往上整合",
-  "ui.topic_chat_choice_bottom_up_hint_0": "從最底層逐層整合，不上網，約 {0} 次 AI。",
+  "ui.topic_chat_choice_bottom_up_hint_0": "從最底層逐層整合，不上網，約 {0} 次 AI",
   "ui.topic_chat_choice_research_first": "先研究再整合",
   "ui.topic_chat_choice_research_first_hint_0_1": "先研究 {0} 個最底層議題，再逐層整合，約 {1} 次 AI",
   "ui.topic_chat_choice_start": "開始",

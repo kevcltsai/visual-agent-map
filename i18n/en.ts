@@ -2907,7 +2907,7 @@ export const en = {
     "Full content of {0} subtopics plus the titles and summaries of the other topics; about {1} AI calls",
   "ui.topic_chat_choice_bottom_up": "Integrate bottom-up",
   "ui.topic_chat_choice_bottom_up_hint_0":
-    "Integrate every level from the deepest up, no web search; about {0} AI calls.",
+    "Integrate every level from the deepest up, no web search; about {0} AI calls",
   "ui.topic_chat_choice_research_first": "Research first, then integrate",
   "ui.topic_chat_choice_research_first_hint_0_1":
     "Research the {0} deepest topics first, then integrate level by level; about {1} AI calls",

@@ -1060,7 +1060,7 @@ integrationTest('map chat single-topic synthesis goes through the real integrate
   assert.equal(f.contexts[0].updateMode, 'merge');
   assert.equal('subtreeOutline' in f.contexts[0], false);
 });
-integrationTest('the retry of a dialog integration keeps the outline and the fresh default; the first attempt failed after the options were stored', async () => {
+integrationTest('the retry of a failed subtree-chain step keeps the fresh default and the outline', async () => {
   const f = await subtreeFixture(undefined, async call => { if (call === 1) throw new Error('boom'); return f.draftResult; });
   const failures = [];
   await f.view.startSynthesis(f.parent, { ...f.options(), subtreeIntegration: true }, 'Integrate', m => failures.push(m), () => {});

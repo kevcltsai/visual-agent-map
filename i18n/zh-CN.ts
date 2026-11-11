@@ -2714,7 +2714,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.topic_chat_choice_quick": "快速",
   "ui.topic_chat_choice_quick_hint_0_1": "{0} 个子议题完整内容＋其余议题的标题与摘要，约 {1} 次 AI",
   "ui.topic_chat_choice_bottom_up": "由下往上整合",
-  "ui.topic_chat_choice_bottom_up_hint_0": "从最底层逐层整合，不联网，约 {0} 次 AI。",
+  "ui.topic_chat_choice_bottom_up_hint_0": "从最底层逐层整合，不联网，约 {0} 次 AI",
   "ui.topic_chat_choice_research_first": "先研究再整合",
   "ui.topic_chat_choice_research_first_hint_0_1": "先研究 {0} 个最底层议题，再逐层整合，约 {1} 次 AI",
   "ui.topic_chat_choice_start": "开始",

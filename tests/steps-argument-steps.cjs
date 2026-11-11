@@ -217,7 +217,8 @@ test('conclusion: a number or URL outside the input throws; no verified hypothes
 test('every step has a strict schema and the registry maps the machine actions', () => {
   for (const step of [mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep]) {
     assert.equal(step.schema.additionalProperties, false);
-    assert.deepEqual([...step.schema.required].sort(), Object.keys(step.schema.properties).sort());
+    const optional = step === mod.facetVerdictStep ? ['sameQuestion'] : []; // #62: asked only when a core was replaced
+    assert.deepEqual([...step.schema.required].sort(), Object.keys(step.schema.properties).filter(k => !optional.includes(k)).sort());
   }
   assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_facets', 'judge_gate', 'plan_facets', 'propose_facet_hypotheses', 'propose_hypotheses', 'revise', 'verdict']);
   assert.equal(mod.ARGUMENT_STEPS.plan_facets, mod.facetPlanStep);
@@ -357,31 +358,55 @@ test('facet judge: the prompt shows only the proposition and the facets; a secre
   assert.throws(() => sr.prepareStep(mod.facetJudgeStep, fjReq({ facets: [] })), error => error.name === 'ArgumentStepError');
 });
 
+// ---- #62: core needs ----
+test('needs (#62): core first needs exactly one core need; replace allows at most one; no mode keeps V1 and refuses a core', () => {
+  const first = { ...needReq, core: 'first' };
+  const r = ok(mod.needsStep, first, { needs: [{ text: 'Job posting trends for juniors', core: true }, { text: 'Hiring counts by firm size' }] });
+  assert.deepEqual(plain(r.needs), [{ text: 'Job posting trends for juniors', core: true }, { text: 'Hiring counts by firm size' }]);
+  bad(mod.needsStep, first, { needs: [{ text: 'Job posting trends for juniors' }] }, /exactly one/);
+  bad(mod.needsStep, first, { needs: [{ text: 'a', core: true }, { text: 'b', core: true }] }, /exactly one/);
+  bad(mod.needsStep, first, { needs: [{ text: 'a', core: 'yes' }] }, /core must be a boolean/);
+  const replace = { ...needReq, core: 'replace' };
+  assert.equal(ok(mod.needsStep, replace, { needs: [{ text: 'Job posting trends for juniors' }] }).needs.length, 1);
+  assert.equal(ok(mod.needsStep, replace, { needs: [{ text: 'Job posting trends for juniors', core: true }] }).needs[0].core, true);
+  bad(mod.needsStep, replace, { needs: [{ text: 'a', core: true }, { text: 'b', core: true }] }, /at most one/);
+  bad(mod.needsStep, needReq, { needs: [{ text: 'a', core: true }] }, /no core need/);
+  assert.equal(ok(mod.needsStep, needReq, { needs: [{ text: 'a', core: false }] }).needs[0].core, undefined);
+  assert.throws(() => mod.needsStep.policy('x', { ...needReq, core: 'later' }), error => error.name === 'ArgumentStepError');
+  assert.match(mod.needsStep.render(first), /Exactly one of the needs is the core need/);
+  assert.match(mod.needsStep.render(replace), /earlier core need was not found/);
+  assert.doesNotMatch(mod.needsStep.render(needReq), /core need/);
+});
+test('needs (#62): existing needs show claim, period and reason to the model and to the grounding check', () => {
+  const req = { ...needReq, core: 'replace', existing: [{ text: 'Monthly junior hiring counts', state: 'not_found', claim: 'Juniors hired per month', period: '2019 to 2020', reason: 'no page reports it' }] };
+  const prompt = mod.needsStep.render(req);
+  assert.match(prompt, /"claim":"Juniors hired per month","period":"2019 to 2020","reason":"no page reports it"/);
+  assert.ok(ok(mod.needsStep, req, { needs: [{ text: 'Hiring per month in 2019', core: true }] }));
+  assert.doesNotMatch(mod.needsStep.render(needReq), /"period"|"reason"/);
+});
+
 // ---- V1 boost P4 (decision #50): hypotheses of a facet map ----
 const fhReq = (over = {}) => ({ ...base, proposition: PROP, count: 3, existing: [], causalQuestions: ['Did automation drive the rise?'],
   data: [datum('d1', { propStance: 'supports' }), datum('d2', { propStance: 'supports' }), datum('d3', { propStance: 'irrelevant' }), datum('d4', { propStance: 'refutes' })], ...over });
-const fh = (title, over = {}) => ({ title, statement: `${title} statement`, basis: `From d1 we observe the rate, so we guess ${title}`, alternative: false, citedData: ['d1'], ...over });
-const fhOk = () => ({ hypotheses: [fh('Hiring slowed'), fh('Entry jobs automated'), fh('Wages stalled', { alternative: true, citedData: ['d1', 'd2'] })] });
+const fh = (title, over = {}) => ({ title, statement: `${title} statement`, alternative: false, ...over });
+const fhOk = () => ({ hypotheses: [fh('Hiring slowed'), fh('Entry jobs automated'), fh('Wages stalled', { alternative: true })] });
 const fhWith = fn => { const v = fhOk(); fn(v); return v; };
-test('facet hypotheses: a well formed reply parses with basis and alternative; the old step keeps its V1 schema and parser', () => {
+test('facet hypotheses: a well formed reply parses with title, statement and alternative only; the old step keeps its V1 schema and parser', () => {
   assert.deepEqual(plain(ok(mod.facetHypothesesStep, fhReq(), fhOk())), fhOk());
   assert.deepEqual(Object.keys(mod.hypothesesStep.schema.properties.hypotheses.items.properties), ['title', 'statement', 'citedData']);
   assert.deepEqual(plain(ok(mod.hypothesesStep, hypReq, hypOk)), hypOk);
   bad(mod.hypothesesStep, hypReq, { hypotheses: hypOk.hypotheses.map(h => ({ ...h, basis: 'x' })) });
-  assert.deepEqual(Object.keys(mod.facetHypothesesStep.schema.properties.hypotheses.items.properties), ['title', 'statement', 'basis', 'alternative', 'citedData']);
+  assert.deepEqual(Object.keys(mod.facetHypothesesStep.schema.properties.hypotheses.items.properties), ['title', 'statement', 'alternative']);
   assert.equal(mod.ARGUMENT_STEPS.propose_facet_hypotheses, mod.facetHypothesesStep);
 });
-test('facet hypotheses: an empty or missing basis, or a non-boolean alternative, is refused', () => {
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = ''; }), /basis/);
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = '  '; }), /basis/);
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { delete v.hypotheses[0].basis; }));
+test('facet hypotheses (#62): basis and citedData are no longer accepted; a non-boolean alternative or an invented number is refused', () => {
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = 'because'; }), /unexpected fields/);
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d1']; }), /unexpected fields/);
   bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].alternative = 'yes'; }), /alternative/);
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = 'we guess 11.4 percent'; }), /number 11.4/);
-});
-test('facet hypotheses: citing irrelevant or refuting data is refused', () => {
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d3']; }), /support/);
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d4']; }), /support/);
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d1', 'd4']; }), /support/);
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].statement = 'we guess 11.4 percent'; }), /number 11.4/);
+  assert.doesNotMatch(mod.facetHypothesesStep.render(fhReq()), /basis|citedData/);
+  assert.match(mod.facetHypothesesStep.render(fhReq({ unconfirmed: true })), /situation is unconfirmed/);
+  assert.doesNotMatch(mod.facetHypothesesStep.render(fhReq()), /situation is unconfirmed/);
 });
 test('facet hypotheses: the first batch needs one alternative; a later (replacement) batch does not', () => {
   bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[2].alternative = false; }), /alternative/);
@@ -891,4 +916,27 @@ test('P4 facet judge: a datum flagged uncertainSource reaches the prompt as such
   assert.match(prompt, /"id":"d1"[^}]*"uncertainSource":true/);
   assert.doesNotMatch(prompt, /"id":"d2"[^}]*uncertainSource/);
   assert.match(prompt, /Source rule/);
+});
+
+const fvCore = { ...fvInput, evidence: [{ ...fvInput.evidence[0], core: true }] };
+test('facet verdict (#62): the core flag reaches the prompt; sameQuestion is required only when a core was replaced', () => {
+  const req = fvReq(fvCore);
+  const prompt = mod.facetVerdictStep.render(req);
+  assert.match(prompt, /"core":true/);
+  assert.match(prompt, /evidence marked core/);
+  assert.doesNotMatch(prompt, /sameQuestion|Earlier core need/);
+  assert.doesNotMatch(mod.facetVerdictStep.render(fvReq(fvInput)), /"core"/);
+  assert.doesNotMatch(mod.verdictStep.render(vReq(fvCore)), /"core"/);
+  assert.equal(ok(mod.facetVerdictStep, req, fvGood).sameQuestion, undefined);
+  assert.equal(ok(mod.facetVerdictStep, req, { ...fvGood, sameQuestion: true }).sameQuestion, undefined, 'an unasked sameQuestion is dropped');
+  const replaced = fvReq({ ...fvCore, replacedCore: { id: 'n0', text: 'Rate in the old survey' } });
+  const rp = mod.facetVerdictStep.render(replaced);
+  assert.match(rp, /"sameQuestion":true\|false/);
+  assert.match(rp, /Earlier core need that was not found[^]*Rate in the old survey/);
+  assert.equal(ok(mod.facetVerdictStep, replaced, { ...fvGood, sameQuestion: false }).sameQuestion, false);
+  assert.equal(ok(mod.facetVerdictStep, replaced, { ...fvGood, sameQuestion: true }).sameQuestion, true);
+  bad(mod.facetVerdictStep, replaced, fvGood, /sameQuestion/);
+  bad(mod.facetVerdictStep, replaced, { ...fvGood, sameQuestion: 'yes' }, /sameQuestion/);
+  assert.ok(mod.FACET_VERDICT_SCHEMA.properties.sameQuestion);
+  assert.ok(!mod.FACET_VERDICT_SCHEMA.required.includes('sameQuestion'));
 });

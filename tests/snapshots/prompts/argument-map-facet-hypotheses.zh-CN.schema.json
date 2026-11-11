@@ -16,27 +16,14 @@
             "type": "string",
             "minLength": 1
           },
-          "basis": {
-            "type": "string",
-            "minLength": 1
-          },
           "alternative": {
             "type": "boolean"
-          },
-          "citedData": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            }
           }
         },
         "required": [
           "title",
           "statement",
-          "basis",
-          "alternative",
-          "citedData"
+          "alternative"
         ]
       }
     }

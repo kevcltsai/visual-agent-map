@@ -51,6 +51,8 @@ export { INSIGHT_KINDS, MAX_INSIGHTS, type InsightKind };
 export type VerdictInsight = HypothesisInsight;
 export interface FacetVerdictResult extends VerdictResult {
   insights: VerdictInsight[];
+  /** Only when the request carries a replaced core (decision #62): whether the new core asks the same question as the one nobody found. */
+  sameQuestion?: boolean;
 }
 
 export const FACET_VERDICT_SCHEMA = {
@@ -58,6 +60,7 @@ export const FACET_VERDICT_SCHEMA = {
   additionalProperties: false,
   properties: {
     ...VERDICT_SCHEMA.properties,
+    sameQuestion: { type: "boolean" },
     insights: {
       type: "array",
       minItems: 1,
@@ -80,9 +83,11 @@ const pick = (e: EvidenceInput): EvidenceInput => ({
   url: e.url,
   stance: e.stance
 });
+const facetPick = (e: EvidenceInput): EvidenceInput => ({ ...pick(e), ...(e.core === true ? { core: true } : {}) });
 export const verdictTexts = (request: VerdictRequest): string[] => [
   request.hypothesis,
-  ...request.input.evidence.flatMap(e => [e.claim, e.quote, e.url, e.stance])
+  ...request.input.evidence.flatMap(e => [e.claim, e.quote, e.url, e.stance]),
+  request.input.replacedCore?.text ?? ""
 ];
 
 export function parseVerdict(raw: string, request: VerdictRequest): VerdictResult {
@@ -97,8 +102,17 @@ export function parseVerdict(raw: string, request: VerdictRequest): VerdictResul
 }
 
 export function parseFacetVerdict(raw: string, request: VerdictRequest): FacetVerdictResult {
-  const item = parseObject(raw, ["verdict", "citedNeeds", "reason", "insights"]);
-  const { insights: rawInsights, ...rest } = item;
+  const asked = request.input.replacedCore !== undefined;
+  let keys = ["verdict", "citedNeeds", "reason", "insights"];
+  try {
+    const probe: unknown = JSON.parse(raw);
+    if (probe && typeof probe === "object" && "sameQuestion" in probe) keys = [...keys, "sameQuestion"];
+  } catch {
+    // parseObject below reports the unreadable reply
+  }
+  const item = parseObject(raw, keys);
+  const { insights: rawInsights, sameQuestion, ...rest } = item;
+  if (asked && typeof sameQuestion !== "boolean") throw new ArgumentStepError("sameQuestion must be a boolean");
   const base = parseVerdict(JSON.stringify(rest), request);
   const entries = list(rawInsights, "insights");
   if (entries.length < 1 || entries.length > MAX_INSIGHTS)
@@ -116,8 +130,11 @@ export function parseFacetVerdict(raw: string, request: VerdictRequest): FacetVe
     insights.map(i => i.text),
     verdictTexts(request)
   );
-  return { ...base, insights };
+  return { ...base, insights, ...(asked ? { sameQuestion: sameQuestion as boolean } : {}) };
 }
+
+const REPLACED_RULE =
+  "The core need of this hypothesis replaced an earlier core need that nobody could find. Also return sameQuestion: true when the new core evidence answers the same question as the earlier core need (given below), false when it asks something different.";
 
 /** Judge one hypothesis from its own found evidence. Text-only. */
 export const verdictStep: StepDefinition<VerdictRequest, VerdictResult> = {
@@ -145,7 +162,12 @@ export const facetVerdictStep: StepDefinition<VerdictRequest, FacetVerdictResult
     renderTemplate(facetTemplate, {
       languageInstruction: languageInstruction(request.language, request.hypothesis),
       hypothesis: JSON.stringify(request.hypothesis),
-      evidence: JSON.stringify(request.input.evidence.map(pick))
+      evidence: JSON.stringify(request.input.evidence.map(facetPick)),
+      sameQuestionField: request.input.replacedCore ? '"sameQuestion":true|false,' : "",
+      replacedRule: request.input.replacedCore ? ` ${REPLACED_RULE}` : "",
+      replaced: request.input.replacedCore
+        ? `\n\nEarlier core need that was not found (JSON string):\n${JSON.stringify(request.input.replacedCore.text)}`
+        : ""
     }),
   schema: FACET_VERDICT_SCHEMA,
   policy: (prompt, request) => {

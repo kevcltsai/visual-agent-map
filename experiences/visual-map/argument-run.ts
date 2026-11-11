@@ -121,7 +121,7 @@ import {
 import type { StepDefinition } from "../../core/step-runner";
 import type { MapDocument, MapNode } from "../../map-model";
 
-export const MAX_RESEARCH_CONCURRENCY = 3;
+export const MAX_RESEARCH_CONCURRENCY = 6;
 /**
  * The most AI calls one run can make, shown before it starts (corrections and retries not counted): the research calls, plan_facets,
  * the facet judgement (at most two: round 1 and the retry round), propose (up to MAX_HYPOTHESES - MIN_VERIFIED + 1), a needs step and

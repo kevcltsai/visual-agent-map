@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
-const { ArgumentRuns, ArgumentRunError, WORST_CASE_AI_CALLS, assumptionScope, untilAborted } = S.load('experiences/visual-map/argument-run.ts');
+const { ArgumentRuns, ArgumentRunError, MAX_RESEARCH_CONCURRENCY: MAX, WORST_CASE_AI_CALLS, assumptionScope, untilAborted } = S.load('experiences/visual-map/argument-run.ts');
 const { ARGUMENT_STEPS, ArgumentStepError } = S.load('core/steps/argument-map/runner.ts');
 const model = S.load('core/argument-map/model.ts');
 const machine = S.load('core/argument-map/machine.ts');
@@ -285,13 +285,14 @@ test('dispose: aborts and never writes afterwards', async () => {
   await assert.rejects(() => r.runs.start(r.mapPath, 'p'), e => e instanceof ArgumentRunError && e.code === 'disposed');
 });
 
-test('concurrency: at most 3 research dispatches at once', async () => {
-  const r = await rig({ script: { step: steps({ plan_situation: () => ({ data: Array.from({ length: 6 }, (_, i) => ({ need: `n${i}` })) }) }), ask: async ctx => {
+test('concurrency: at most 6 research dispatches at once', async () => {
+  const r = await rig({ facet: true, script: { step: manyNeeds(15), ask: async ctx => {
     await tick(); await tick();
     return { summary: 's', detail: 'd', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [foundEntry(ctx.argumentEvidenceNeeds[0].id)] };
   } } });
   await r.runs.start(r.mapPath, 'p');
-  assert.ok(r.stat.maxActive <= 3 && r.stat.maxActive >= 2, `max ${r.stat.maxActive}`);
+  assert.equal(MAX, 6);
+  assert.ok(r.stat.maxActive <= MAX && r.stat.maxActive >= 2, `max ${r.stat.maxActive}`);
 });
 
 test('caps: a 7th hypothesis is refused (no notes left behind) and the run pauses after one corrective retry', async () => {
@@ -1624,26 +1625,28 @@ test('R1 M2: a fact question whose facets are all insufficient stops with the ou
   await noCodeShown(r, 'fact insufficient');
 });
 
-// ---- research pool: a finished call frees its slot at once (no batch barrier); still at most 3 at once ----
+// ---- research pool: a finished call frees its slot at once (no batch barrier); still at most MAX (6) at once ----
+// 5 facets x 3 needs at most: enough pending items to fill more than one set of slots.
+const manyNeeds = n => facetSteps({ plan_facets: () => ({ ...facetSteps().plan_facets(), facets: Array.from({ length: Math.ceil(n / 3) }, (_, f) => ({ title: `F${f}`, needs: Array.from({ length: Math.min(3, n - f * 3) }, (_, k) => ({ need: `n${f * 3 + k}` })) })) }) });
 const sixData = () => steps({ plan_situation: () => ({ data: Array.from({ length: 6 }, (_, i) => ({ need: `n${i}` })) }) });
 const asked = (r, task) => r.stat.ask.some(ctx => ctx.task === task);
 const until = async (done, limit = 400) => { for (let i = 0; i < limit && !done(); i++) await tick(); return done(); };
 
-test('pool: a slow research call does not hold the free slots; the 4th call starts before the slow one ends', async () => {
+test('pool: a slow research call does not hold the free slots; the call after the first full set starts before the slow one ends', async () => {
   const slow = defer();
   let slowEnded = false;
-  const r = await rig({ script: { step: sixData(), ask: async ctx => {
+  const r = await rig({ facet: true, script: { step: manyNeeds(MAX + 3), ask: async ctx => {
     if (ctx.task === 'n0') { await slow.promise; slowEnded = true; } else await tick();
     return okAnswer(ctx);
   } } });
   const started = r.runs.start(r.mapPath, 'p');
-  const fourth = await until(() => asked(r, 'n3'));
+  const fourth = await until(() => asked(r, `n${MAX}`));
   slow.resolve();
   await started;
-  assert.ok(fourth, 'the 4th research call starts while the slow one is still out');
+  assert.ok(fourth, 'the next research call starts while the slow one is still out');
   const state = await r.state();
   assert.equal(state.run.phase, 'concluded');
-  assert.ok(r.stat.maxActive <= 3, `max ${r.stat.maxActive}`);
+  assert.ok(r.stat.maxActive <= MAX, `max ${r.stat.maxActive}`);
   assert.equal(state.run.researchCalls, r.stat.ask.length, 'researchCalls counts every call, no more');
   assert.ok(state.situation.data.every(d => d.state === 'found' && d.attempts === 1), 'each datum researched once');
 });
@@ -1655,7 +1658,7 @@ test('pool: Stop while a slow call is out dispatches nothing new, pauses (user) 
     return okAnswer(ctx);
   } } });
   const started = r.runs.start(r.mapPath, 'p');
-  assert.ok(await until(() => asked(r, 'n3')));
+  assert.ok(await until(() => asked(r, 'n5')));
   await r.runs.stop(r.mapPath);
   await started;
   const count = r.stat.ask.length;
@@ -1697,7 +1700,7 @@ test('pool: an item failing twice stops new dispatches; the call still out is co
   assert.equal(datum(state, 'n1').state, 'pending');
   assert.ok(state.situation.data.every(d => d.state !== 'searching'));
   assert.equal(state.run.researchCalls, r.stat.ask.length);
-  assert.ok(r.stat.maxActive <= 3);
+  assert.ok(r.stat.maxActive <= MAX);
 });
 
 test('pool: an item whose card note is busy (begin refused) does not hold the others back; the run pauses only once nothing else can move', async () => {
@@ -1709,7 +1712,7 @@ test('pool: an item whose card note is busy (begin refused) does not hold the ot
   } } });
   await r.runs.start(r.mapPath, 'p');
   const state = await r.state();
-  assert.equal(state.situation.data.filter(d => d.state === 'found').length, 5, 'the five free items are researched');
+  assert.equal(state.situation.data.filter(d => d.state === 'found').length, 5, 'every free item is researched');
   assert.equal(state.situation.data.filter(d => d.state === 'pending').length, 1);
   assert.equal(state.run.status, 'paused');
   assert.equal(state.run.stopReason, 'error');

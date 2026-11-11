@@ -47942,7 +47942,7 @@ async function askArgumentStep(step, request, runner, signal) {
 }
 
 // experiences/visual-map/argument-run.ts
-var MAX_RESEARCH_CONCURRENCY = 3;
+var MAX_RESEARCH_CONCURRENCY = 6;
 var FACET_JUDGEMENTS = 2;
 var WORST_CASE_AI_CALLS = MAX_RESEARCH_CALLS + 1 + FACET_JUDGEMENTS + (MAX_HYPOTHESES - MIN_VERIFIED + 1) + MAX_HYPOTHESES * MAX_ROUND * 2 + 1;
 var X_STEP = 320;

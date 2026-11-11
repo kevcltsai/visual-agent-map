@@ -280,6 +280,9 @@ export function untilAborted<T>(signal: AbortSignal, work: Promise<T>): Promise<
     );
   });
 }
+/** The item a research action works on (a need or a situation datum). */
+const researchItem = (action: ArgumentAction): string =>
+  action.type === "research_need" ? action.needId : action.type === "research_situation" ? action.dataId : "";
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 /** `gateData` refuses an empty list; an unconfirmed situation (decision #58) may have no usable datum at all, so only there an empty list passes. */
@@ -505,9 +508,16 @@ export class ArgumentRuns {
     let thrown: { error: unknown } | undefined;
     let idle = 0;
     let last = "";
-    // A begin that wrote nothing (note busy, stale) leaves the item pending: wait for a call out before trying again.
-    let refused = false;
+    // Items whose begin wrote nothing (note busy, stale): skipped until a call out lands, so they never hold the others back.
+    const refused = new Set<string>();
     const failedTwice = (): boolean => [...drive.failures.values()].some(n => n >= 2);
+    // A run whose state stops changing ends (pause 'error'); counted only when nothing is out and no new item is tried.
+    const stuck = (state: ArgumentMapData): boolean => {
+      const key = JSON.stringify(state);
+      idle = key === last ? idle + 1 : 0;
+      last = key;
+      return idle >= 3;
+    };
     try {
       for (;;) {
         if (this.dead(drive) || thrown) break;
@@ -521,21 +531,12 @@ export class ArgumentRuns {
           return;
         }
         const state = await this.state(drive);
-        if (!state) break;
+        if (!state || thrown) break;
         const actions = nextActions(state);
         if (!actions.length && !pool.size) break;
-        if (!pool.size) {
-          const key = JSON.stringify(state);
-          idle = key === last ? idle + 1 : 0;
-          last = key;
-          if (idle >= 3) {
-            await this.pause(drive, "error", false);
-            return;
-          }
-          refused = false;
-        }
-        const next = actions.find(a => a.type === "research_situation" || a.type === "research_need");
-        if (next && pool.size < MAX_RESEARCH_CONCURRENCY && !refused) {
+        const research = actions.filter(a => a.type === "research_situation" || a.type === "research_need");
+        const next = research.find(a => !refused.has(researchItem(a)));
+        if (next && pool.size < MAX_RESEARCH_CONCURRENCY) {
           let begun = (): void => undefined;
           const started = new Promise<boolean>(resolve => (begun = () => resolve(true)));
           let task: Promise<void>;
@@ -546,12 +547,20 @@ export class ArgumentRuns {
             .finally(() => pool.delete(task));
           pool.add(task);
           // The call is out once its begin is written; a research that ended without one wrote nothing.
-          refused = !(await Promise.race([started, task.then(() => false)]));
+          if (!(await Promise.race([started, task.then(() => false)]))) refused.add(researchItem(next));
           continue;
         }
         if (pool.size) {
           await Promise.race(pool);
-          refused = false;
+          refused.clear();
+          continue;
+        }
+        if (stuck(state)) {
+          await this.pause(drive, "error", false);
+          return;
+        }
+        if (research.length) {
+          refused.clear(); // every pending item was refused and nothing is out: try them again (the idle count ends a run that cannot move)
           continue;
         }
         await this.guarded(drive, () => this.textStep(drive, state, actions[0]));

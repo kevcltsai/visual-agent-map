@@ -48008,6 +48008,7 @@ function untilAborted(signal, work) {
     );
   });
 }
+var researchItem = (action) => action.type === "research_need" ? action.needId : action.type === "research_situation" ? action.dataId : "";
 var same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 var dataOrNone = (state, data) => data.length === 0 && isSituationUnconfirmed(state) ? [] : gateData(data);
 var premiseData = (state) => {
@@ -48209,8 +48210,14 @@ var ArgumentRuns = class {
     let thrown;
     let idle = 0;
     let last = "";
-    let refused = false;
+    const refused = /* @__PURE__ */ new Set();
     const failedTwice = () => [...drive.failures.values()].some((n) => n >= 2);
+    const stuck = (state) => {
+      const key4 = JSON.stringify(state);
+      idle = key4 === last ? idle + 1 : 0;
+      last = key4;
+      return idle >= 3;
+    };
     try {
       for (; ; ) {
         if (this.dead(drive) || thrown) break;
@@ -48223,21 +48230,12 @@ var ArgumentRuns = class {
           return;
         }
         const state = await this.state(drive);
-        if (!state) break;
+        if (!state || thrown) break;
         const actions = nextActions(state);
         if (!actions.length && !pool.size) break;
-        if (!pool.size) {
-          const key4 = JSON.stringify(state);
-          idle = key4 === last ? idle + 1 : 0;
-          last = key4;
-          if (idle >= 3) {
-            await this.pause(drive, "error", false);
-            return;
-          }
-          refused = false;
-        }
-        const next = actions.find((a) => a.type === "research_situation" || a.type === "research_need");
-        if (next && pool.size < MAX_RESEARCH_CONCURRENCY && !refused) {
+        const research = actions.filter((a) => a.type === "research_situation" || a.type === "research_need");
+        const next = research.find((a) => !refused.has(researchItem(a)));
+        if (next && pool.size < MAX_RESEARCH_CONCURRENCY) {
           let begun = () => void 0;
           const started = new Promise((resolve) => begun = () => resolve(true));
           let task;
@@ -48245,12 +48243,20 @@ var ArgumentRuns = class {
             thrown != null ? thrown : thrown = { error };
           }).finally(() => pool.delete(task));
           pool.add(task);
-          refused = !await Promise.race([started, task.then(() => false)]);
+          if (!await Promise.race([started, task.then(() => false)])) refused.add(researchItem(next));
           continue;
         }
         if (pool.size) {
           await Promise.race(pool);
-          refused = false;
+          refused.clear();
+          continue;
+        }
+        if (stuck(state)) {
+          await this.pause(drive, "error", false);
+          return;
+        }
+        if (research.length) {
+          refused.clear();
           continue;
         }
         await this.guarded(drive, () => this.textStep(drive, state, actions[0]));

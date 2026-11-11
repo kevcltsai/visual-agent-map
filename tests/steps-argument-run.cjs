@@ -1699,3 +1699,19 @@ test('pool: an item failing twice stops new dispatches; the call still out is co
   assert.equal(state.run.researchCalls, r.stat.ask.length);
   assert.ok(r.stat.maxActive <= 3);
 });
+
+test('pool: an item whose card note is busy (begin refused) does not hold the others back; the run pauses only once nothing else can move', async () => {
+  let blocked;
+  const r = await rig({ script: { step: sixData() }, ports: { begin: path => {
+    blocked ??= path; // the first card asked for stays busy for the whole run
+    if (path === blocked) return null;
+    const controller = new AbortController(); return { signal: controller.signal, release: () => undefined };
+  } } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(state.situation.data.filter(d => d.state === 'found').length, 5, 'the five free items are researched');
+  assert.equal(state.situation.data.filter(d => d.state === 'pending').length, 1);
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'error');
+  assert.equal(state.run.researchCalls, r.stat.ask.length);
+});

@@ -1245,8 +1245,14 @@ export class ArgumentRuns {
       }
       const proof = result.found ? result.proof : undefined;
       const lines = proof ? [this.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
+      const datumInNext = isNeed ? undefined : next.situation.data.find(d => d.id === itemId);
+      // A facet map writes the whole datum note now (stance shows as "judging" until the facet judge decides); needs keep the sources only.
       const sourcesDetail = (p: NonNullable<typeof proof>): string =>
-        hasFacets(next) ? sourceNote(this.tr, p) : [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n");
+        hasFacets(next)
+          ? datumInNext
+            ? datumDetail(this.tr, datumInNext)
+            : sourceNote(this.tr, p)
+          : [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n");
       const notes = async (): Promise<void> => {
         if (!node) return; // the user deleted the card: skip it, keep the state consistent
         if (proof) {

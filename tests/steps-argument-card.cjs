@@ -199,6 +199,8 @@ test('facet map: a datum with no propStance never shows 支持命題 (it is not 
   assert.ok(!textOf(view).includes('支持命題'), textOf(view));
   assert.ok(!view.chips.some(c => c.tone === 'yes'), textOf(view));
   assert.equal(view.chips.length, 1);
+  same(view.chips, [{ tone: 'open', text: '判定中' }]);
+  assert.ok(!textOf(view).includes('無關'), textOf(view));
   const supports = card.describeArgumentCard(facetState(), 'd1', t);
   same(supports.chips, [{ tone: 'yes', text: '支持命題' }]);
 });

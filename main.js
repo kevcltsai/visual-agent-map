@@ -2886,7 +2886,8 @@ var en = {
   "ui.argument_facet_insufficient": "Not enough data",
   "ui.argument_facet_pending": "Judging",
   "ui.argument_data_prop_refutes": "Opposes the proposition",
-  "ui.argument_data_unjudged": "Found, not judged yet",
+  "ui.argument_data_unjudged": "Judging",
+  "ui.argument_note_prop_pending_line": "Versus the proposition: judging",
   "ui.argument_gate_facets_0_1": "\u2713 Matches the proposition",
   "ui.argument_gate_facets_line_0_1": "{0} of {1} facets support it, none refute it",
   "ui.argument_gate_insufficient": "Not enough data",
@@ -5687,7 +5688,8 @@ var zhCN = {
   "ui.argument_facet_insufficient": "\u8D44\u6599\u4E0D\u8DB3",
   "ui.argument_facet_pending": "\u5224\u5B9A\u4E2D",
   "ui.argument_data_prop_refutes": "\u53CD\u9A73\u547D\u9898",
-  "ui.argument_data_unjudged": "\u5DF2\u627E\u5230\u30FB\u5F85\u5224\u5B9A",
+  "ui.argument_data_unjudged": "\u5224\u5B9A\u4E2D",
+  "ui.argument_note_prop_pending_line": "\u5BF9\u547D\u9898\uFF1A\u5224\u5B9A\u4E2D",
   "ui.argument_gate_facets_0_1": "\u2713 \u7B26\u5408\u547D\u9898",
   "ui.argument_gate_facets_line_0_1": "{0}\uFF0F{1} \u4E2A\u9762\u5411\u652F\u6301\uFF0C\u6CA1\u6709\u53CD\u9A73",
   "ui.argument_gate_insufficient": "\u8D44\u6599\u4E0D\u8DB3",
@@ -8488,7 +8490,8 @@ var zhTW = {
   "ui.argument_facet_insufficient": "\u8CC7\u6599\u4E0D\u8DB3",
   "ui.argument_facet_pending": "\u5224\u5B9A\u4E2D",
   "ui.argument_data_prop_refutes": "\u53CD\u99C1\u547D\u984C",
-  "ui.argument_data_unjudged": "\u5DF2\u627E\u5230\u30FB\u5F85\u5224\u5B9A",
+  "ui.argument_data_unjudged": "\u5224\u5B9A\u4E2D",
+  "ui.argument_note_prop_pending_line": "\u5C0D\u547D\u984C\uFF1A\u5224\u5B9A\u4E2D",
   "ui.argument_gate_facets_0_1": "\u2713 \u7B26\u5408\u547D\u984C",
   "ui.argument_gate_facets_line_0_1": "{0}\uFF0F{1} \u500B\u9762\u5411\u652F\u6301\uFF0C\u6C92\u6709\u53CD\u99C1",
   "ui.argument_gate_insufficient": "\u8CC7\u6599\u4E0D\u8DB3",
@@ -19532,8 +19535,8 @@ function buildMapSvg(scene) {
     if (!box || typeof b.label !== "string" || !b.label) continue;
     const stroke = color(b.stroke, strokeColor);
     const label = b.label.slice(0, TEXT_LIMIT2);
-    const wide = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/;
-    const textWidth = Array.from(label).reduce((sum2, ch) => sum2 + (wide.test(ch) ? 13 : 7), 0);
+    const wide2 = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/;
+    const textWidth = Array.from(label).reduce((sum2, ch) => sum2 + (wide2.test(ch) ? 13 : 7), 0);
     const chipWidth = Math.max(20, Math.min(box[2] - 24, textWidth + 16));
     const lines = wrapText(label, Math.max(7, chipWidth - 16));
     out.push(
@@ -19546,9 +19549,9 @@ function buildMapSvg(scene) {
 function wrapText(text10, maxWidth) {
   var _a2;
   const WIDE = "\u1100-\u11FF\u2E80-\uA4CF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF";
-  const wide = new RegExp(`[${WIDE}]`);
+  const wide2 = new RegExp(`[${WIDE}]`);
   const tokens2 = new RegExp(`[${WIDE}]|\\s+|[^\\s${WIDE}]+`, "gu");
-  const widthOf = (token) => Array.from(token).reduce((sum2, ch) => sum2 + (wide.test(ch) ? 13 : 7), 0);
+  const widthOf = (token) => Array.from(token).reduce((sum2, ch) => sum2 + (wide2.test(ch) ? 13 : 7), 0);
   const lines = [];
   for (const paragraph of String(text10 != null ? text10 : "").split(/\r?\n/)) {
     let line2 = "";
@@ -19576,7 +19579,7 @@ function wrapText(text10, maxWidth) {
         continue;
       }
       for (const ch of Array.from(token)) {
-        const cw = wide.test(ch) ? 13 : 7;
+        const cw = wide2.test(ch) ? 13 : 7;
         if (used + cw > maxWidth && line2) flush();
         line2 += ch;
         used += cw;
@@ -20773,8 +20776,8 @@ function horizontalPositions(input2) {
   };
   for (const [id, point] of result) {
     const depth = depths.get(id);
-    const narrow = sign < 0 ? Math.max(0, CARD_WIDTH - textBlockWidth(byId.get(id))) : 0;
-    point.x = left + sign * (depth * COLUMN + shiftAt(depth)) + narrow;
+    const narrow2 = sign < 0 ? Math.max(0, CARD_WIDTH - textBlockWidth(byId.get(id))) : 0;
+    point.x = left + sign * (depth * COLUMN + shiftAt(depth)) + narrow2;
   }
   return { placed: result, sizes };
 }
@@ -24985,11 +24988,7 @@ var GATE_STATES = ["pending", "matched", "unmatched"];
 var GATE_KINDS = ["not_matching", "data_missing", "data_insufficient"];
 var PROP_STANCES = ["supports", "refutes", "irrelevant"];
 var FACET_VERDICTS = ["supports", "refutes", "insufficient", "pending"];
-var UNCERTAIN_RESEARCH_STANCE = "irrelevant";
-function propStanceForUncertainResearch() {
-  return UNCERTAIN_RESEARCH_STANCE;
-}
-var isStanceLocked = (datum) => datum.propStance !== void 0 && (datum.propStance !== "irrelevant" || datum.stanceReason === void 0);
+var isStanceLocked = (datum) => datum.propStance !== void 0 && datum.propStance !== "irrelevant";
 var VERDICTS = ["supported", "refuted", "undecided"];
 var LOCATIONS = ["verifying", "eliminated"];
 var CONCLUSION_STATES = ["pending", "concluded", "stopped"];
@@ -38628,15 +38627,15 @@ var MapChatPanel = class {
     this.applyOpen();
   }
   /** The pane became too narrow to dock the window (or wide enough again). The window folds to its edge, or docks back. */
-  setNarrow(narrow, widths) {
+  setNarrow(narrow2, widths) {
     if (widths && (widths.docked !== this.dockedPx || widths.overlay !== this.overlayPx)) {
       this.dockedPx = widths.docked;
       this.overlayPx = widths.overlay;
       this.applyWidth();
     }
-    if (narrow === this.narrow) return;
+    if (narrow2 === this.narrow) return;
     const hadFocus = this.hasFocus();
-    this.narrow = narrow;
+    this.narrow = narrow2;
     this.overlayOpen = false;
     this.applyOpen();
     this.host.layoutChanged(this.shown);
@@ -44599,8 +44598,7 @@ function applySituationEvidence(state, dataId, result) {
   const datum = next.situation.data.find((d) => d.id === dataId);
   if (!datum || datum.state !== "searching") throw new GateError("situation datum is not being researched");
   if (result.found === true) {
-    if (hasFacets(state) && result.stance === "uncertain") datum.propStance = propStanceForUncertainResearch();
-    else datum.stance = stanceOf(DATA_STANCES, result.stance);
+    if (!(hasFacets(state) && result.stance === "uncertain")) datum.stance = stanceOf(DATA_STANCES, result.stance);
     datum.proof = checkedProof(result.proof);
     datum.state = "found";
     return next;
@@ -45013,16 +45011,22 @@ function applyResume(state) {
 }
 
 // experiences/visual-map/argument-notes.ts
+var wide = (c) => String.fromCharCode(c.charCodeAt(0) + 65248);
+var wideRun = (run) => [...run].map(wide).join("");
 function plainLine2(text10) {
-  return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/!\[|\[(?=\[)/g, (m) => m.replace("[", "&#91;")).replace(/\](?=\])/g, "&#93;");
+  return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "\uFF1C").replace(/>/g, "\uFF1E").replace(/!\[|\[(?=\[)/g, (m) => m.replace("[", "\uFF3B")).replace(/\](?=\])/g, "\uFF3D");
 }
-var entity = (c) => `&#${c.charCodeAt(0)};`;
-var MARKDOWN_PUNCT = /[\\`*_~=^#$%[\](){}<>|!:&]/g;
-var line = (text10) => (text10 != null ? text10 : "").replace(/[\r\n\u2028\u2029]+/g, " ").replace(/^\s+/, "").replace(MARKDOWN_PUNCT, entity).replace(
-  /^(?:[+-]|(\d+)([.)]))/,
-  (m, digits, mark2) => digits ? `${digits}${entity(mark2)}` : entity(m)
-);
-var cell = (text10) => line(text10).replace(/\|/g, "&#124;") || "-";
+var ALWAYS_WIDE = /[\\`*_^#$[\]<|]/g;
+var WIDE_RUNS = /%{2,}|={2,}|~{2,}/g;
+var ENTITY_AMP = /&(?=#|\w+;)/g;
+var SYNTAX_COLON = /:(?=[:/])|(?<=:):/g;
+var WWW = /\bwww\./gi;
+var LEADING = /^(?:([+\-＞>])|(\d+)([.)]))/;
+var line = (text10) => (text10 != null ? text10 : "").replace(/[\r\n\u2028\u2029]+/g, " ").replace(/^\s+/, "").replace(
+  LEADING,
+  (_m, mark2, digits, ordered) => digits ? `${digits}${ordered === "." ? "\uFF0E" : "\uFF09"}` : mark2 === ">" ? "\uFF1E" : wide(mark2)
+).replace(ENTITY_AMP, wide).replace(ALWAYS_WIDE, wide).replace(WIDE_RUNS, wideRun).replace(SYNTAX_COLON, wide).replace(WWW, (m) => `${m.slice(0, 3)}\uFF0E`);
+var cell = (text10) => line(text10) || "-";
 var URL_ALLOWED = /^[A-Za-z0-9\-._~:/?#@&+,;=]$/;
 var percent = (byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
 function safeUrl(url) {
@@ -45119,7 +45123,7 @@ var PROP_KEYS = {
   refutes: "ui.argument_note_prop_refutes",
   irrelevant: "ui.argument_note_prop_irrelevant"
 };
-var propText = (t2, d) => d.propStance ? t2(PROP_KEYS[d.propStance]) : "-";
+var propText = (t2, d) => d.propStance ? t2(PROP_KEYS[d.propStance]) : d.state === "found" ? t2("ui.argument_data_unjudged") : "-";
 var figureText = (f) => f ? `${f.number}${f.unit ? ` ${f.unit}` : ""}` : "-";
 var sourceItems = (items) => items.map(({ claim: claim2, proof }) => {
   const url = safeUrl(proof.url);
@@ -45162,7 +45166,9 @@ var join2 = (parts) => parts.flat().join("\n");
 function datumDetail(t2, d) {
   return join2([
     [`### ${t2("ui.argument_note_core")}`],
-    callout(`${propText(t2, d)}${d.stanceReason ? `: ${d.stanceReason}` : ""}`),
+    callout(
+      d.state === "found" && !d.propStance ? t2("ui.argument_note_prop_pending_line") : `${propText(t2, d)}${d.stanceReason ? `: ${d.stanceReason}` : ""}`
+    ),
     ["", `### ${t2("ui.argument_note_data")}`],
     table(dataHead(t2), dataRows(t2, [d])),
     sourceLines(t2, d.state === "found" && d.proof ? [{ claim: d.proof.claim, proof: d.proof }] : [])
@@ -47866,7 +47872,8 @@ var ArgumentRuns = class {
       }
       const proof = result.found ? result.proof : void 0;
       const lines = proof ? [this.t("ui.argument_source_0_1_2", proof.claim, proof.quote, proof.url)] : [];
-      const sourcesDetail = (p) => hasFacets(next) ? sourceNote(this.tr, p) : [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n");
+      const datumInNext = isNeed ? void 0 : next.situation.data.find((d) => d.id === itemId);
+      const sourcesDetail = (p) => hasFacets(next) ? datumInNext ? datumDetail(this.tr, datumInNext) : sourceNote(this.tr, p) : [`## ${this.t("ui.argument_sources")}`, ...lines].join("\n");
       const notes = async () => {
         if (!node) return;
         if (proof) {
@@ -47886,10 +47893,15 @@ var ArgumentRuns = class {
 
 // experiences/visual-map/argument-rerun.ts
 var ENTITY = { lt: "<", gt: ">", amp: "&" };
+var narrow = (c) => String.fromCharCode(c.charCodeAt(0) - 65248);
+var narrowRun = (run) => [...run].map(narrow).join("");
 var decode = (text10) => text10.replace(
   /&(?:#(\d{1,5})|(lt|gt|amp));/g,
   (_m, code, name2) => code ? String.fromCodePoint(Number(code)) : ENTITY[name2]
-);
+).replace(
+  /^(?:([＋－＞])|(\d+)([．）]))/,
+  (_m, mark2, digits, ordered) => digits ? `${digits}${ordered === "\uFF0E" ? "." : ")"}` : narrow(mark2)
+).replace(/[＼｀＊＿＾＃＄［］＜｜]/g, narrow).replace(/％{2,}|＝{2,}|～{2,}/g, narrowRun).replace(/＆(?=#|\w+;)/g, narrow).replace(/：+(?=\/)|：{2,}/g, narrowRun).replace(/\bwww．/gi, (m) => `${m.slice(0, 3)}.`);
 var cells = (row) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
 var isSeparator = (row) => cells(row).every((cell2) => /^\s*:?-{3,}:?\s*$/.test(cell2));
 function parseDefinitionsTable(detail) {
@@ -47906,7 +47918,7 @@ function parseDefinitionsTable(detail) {
   for (const row of block.slice(2)) {
     const parts = cells(row);
     if (parts.length !== 3) return null;
-    const [label, value, reason] = parts.map((part) => decode(part).trim());
+    const [label, value, reason] = parts.map((part) => decode(part.trim()));
     if (!label || !value || !reason || label === "-" || value === "-") return null;
     items.push({ label, value, reason });
   }

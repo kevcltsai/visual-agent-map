@@ -755,9 +755,9 @@ const aiReply = (entries, evidence = {}) => ({ summary: 's', detail: 'd', sugges
 const needOf = ctx => ctx.argumentEvidenceNeeds[0];
 const notFoundEntry = (id, note) => ({ need: id, status: 'not_found', ...(note ? { note } : {}) });
 /** A judge that supports every facet holding a relevant datum and marks the others insufficient (with `retry(facet, n)` as their retry needs). */
-const judgeBy = (log, retry = () => []) => (request, n) => {
+const judgeBy = (log, retry = () => [], pick = () => 'supports') => (request, n) => {
   log.push(plain(request));
-  const stance = d => d.fixedStance ?? 'supports';
+  const stance = d => d.fixedStance ?? pick(d);
   return {
     data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: stance(d), reason: 'it fits' }))),
     facets: request.facets.map(f => {
@@ -830,7 +830,7 @@ test('P5: a round-1 retry with no retry needs ends data_insufficient (not not_ma
 test('P5: round 2 judges only the facets still insufficient, carries a fixed stance, and the retry needs become cards under their facet', async () => {
   const log = [];
   const r = await rig({ facet: true, script: {
-    step: facetSteps({ judge_facets: judgeBy(log, (f, n) => (n === 1 ? [`${f.title} again`] : [])) }),
+    step: facetSteps({ judge_facets: judgeBy(log, (f, n) => (n === 1 ? [`${f.title} again`] : []), d => d.priorStance ?? (d.need === 'unemployment rate' ? 'irrelevant' : 'supports')) }),
     ask: askByNeed({ 'unemployment rate': (need) => aiReply([foundEntry(need.id, { stance: 'uncertain' })]), 'job postings': need => aiReply([notFoundEntry(need.id)]) })
   } });
   await r.runs.start(r.mapPath, 'p');
@@ -840,7 +840,8 @@ test('P5: round 2 judges only the facets still insufficient, carries a fixed sta
   assert.deepEqual(log[1].facets.map(f => f.title), ['Rate', 'Postings'], 'the supported facet is not asked again');
   assert.equal(log[1].round, 2);
   const rate = log[1].facets.find(f => f.title === 'Rate');
-  assert.ok(rate.data.some(d => d.fixedStance === 'irrelevant'), 'the uncertain answer keeps its fixed stance');
+  // Bug A: the uncertain answer was unjudged in round 1; the judge said irrelevant (with a reason), which is carried as a re-judgeable prior, not fixed.
+  assert.ok(rate.data.some(d => d.priorStance === 'irrelevant' && d.fixedStance === undefined), 'the judge irrelevant stance is a prior, not fixed');
   assert.deepEqual(log[1].facets.find(f => f.title === 'Postings').notFoundNeeds, ['job postings']);
   const byId = new Map((await r.repo.readMap(r.mapPath)).nodes.map(n => [n.id, n]));
   const retried = state.situation.data.filter(d => d.need.endsWith('again'));
@@ -849,8 +850,16 @@ test('P5: round 2 judges only the facets still insufficient, carries a fixed sta
   assert.equal(state.run.phase, 'concluded');
 });
 
-test('P5: on a facet map an uncertain answer with a verified source is found/irrelevant; with a bad source it is not_found(source_*); an old map keeps stance_uncertain', async () => {
-  const bad = await rig({ facet: true, script: { step: facetSteps(), ask: askByNeed({ 'unemployment rate': need => aiReply([foundEntry(need.id, { stance: 'uncertain', url: 'https://bad.example.org/x' })]), 'job postings': need => aiReply([foundEntry(need.id, { stance: 'uncertain' })]) }) },
+test('P5: on a facet map an uncertain answer with a verified source is found and unjudged (judge decides, nothing locked); with a bad source it is not_found(source_*); an old map keeps stance_uncertain', async () => {
+  // Bug A: this used to be stored found/irrelevant with no reason and locked, so the facet judge never saw it as open.
+  const seen = [];
+  const judgeLog = request => {
+    for (const f of request.facets) for (const d of f.data) seen.push({ need: d.need, fixedStance: d.fixedStance, priorStance: d.priorStance });
+    return { data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: d.need === 'job postings' ? 'irrelevant' : (d.fixedStance ?? 'supports'), reason: 'judge reason' }))),
+      facets: request.facets.map(f => ({ id: f.id, verdict: f.data.length ? 'supports' : 'insufficient', reason: 'enough', summary: `summary of ${f.title}`, citedData: f.data.length ? [f.data[0].id] : [], retryNeeds: [] })),
+      assumptionInsights: [] };
+  };
+  const bad = await rig({ facet: true, script: { step: facetSteps({ judge_facets: judgeLog }), ask: askByNeed({ 'unemployment rate': need => aiReply([foundEntry(need.id, { stance: 'uncertain', url: 'https://bad.example.org/x' })]), 'job postings': need => aiReply([foundEntry(need.id, { stance: 'uncertain' })]) }) },
     ports: { fetch: async request => ({ status: 200, headers: { 'content-type': 'text/html' }, text: request.url.includes('bad.example') ? '<html><body>nothing relevant</body></html>' : PAGE, url: request.url }) } });
   await bad.runs.start(bad.mapPath, 'p');
   const data = await rowsOf(bad);
@@ -860,9 +869,14 @@ test('P5: on a facet map an uncertain answer with a verified source is found/irr
   assert.equal(rate.stance, undefined);
   const postings = data.find(d => d.need === 'job postings');
   assert.equal(postings.state, 'found');
-  assert.equal(postings.propStance, 'irrelevant');
   assert.equal(postings.stance, undefined);
   assert.ok(postings.proof.url);
+  const asked = seen.find(x => x.need === 'job postings');
+  assert.ok(asked, 'the judge was shown the uncertain datum');
+  assert.equal(asked.fixedStance, undefined);
+  assert.equal(asked.priorStance, undefined);
+  assert.equal(postings.propStance, 'irrelevant', 'the judge decided it');
+  assert.equal(postings.stanceReason, 'judge reason');
 
   const old = await rig({ script: { step: steps(), ask: askByNeed({ 'unemployment rate': need => aiReply([foundEntry(need.id, { stance: 'uncertain' })]) }) } });
   await old.runs.start(old.mapPath, 'p');
@@ -1112,4 +1126,27 @@ test('untilAborted: the abort listener is removed once the work settles first (n
   assert.equal(live.size, 1);
   signal.aborted = true; [...live][0](); live.clear();
   await assert.rejects(pending, /aborted/);
+});
+
+test('Bug C: on a facet map a found datum has its full note (summary, figure, quote, link, 判定中) before the facet judgement, and the stance and reason after it', async () => {
+  const before = [];
+  let rr;
+  const judge = async request => {
+    for (const f of request.facets) for (const d of f.data) before.push(await rr.text(d.id));
+    return facetSteps().judge_facets(request);
+  };
+  rr = await rig({ facet: true, script: { step: facetSteps({ judge_facets: judge }) } });
+  await rr.runs.start(rr.mapPath, 'p');
+  assert.ok(before.length > 0);
+  for (const note of before) {
+    assert.ok(note.detail.includes('判定中'), note.detail);
+    assert.ok(note.detail.includes(URL_OK), note.detail);
+    assert.ok(note.summary && !note.summary.includes('判定中'));
+    assert.ok(!note.detail.includes('&#'), note.detail);
+  }
+  const state = await rr.state();
+  const found = state.situation.data.find(d => d.state === 'found');
+  const after = await rr.text(found.id);
+  assert.ok(!after.detail.includes('判定中'), after.detail);
+  assert.ok(after.detail.includes('it fits'), after.detail);
 });

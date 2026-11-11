@@ -18,35 +18,51 @@ import {
 
 export type Translate = (key: TranslationKey, ...values: string[]) => string;
 
-/** Model/web text as inert plain single-line text: line breaks become a space, 3+ backtick/tilde runs cannot form a fence, and Markdown inline constructs that load or link things (`![` images/embeds, `[[` `]]` wikilinks, `<` `>` raw HTML) are entity-encoded. Ordinary text is unchanged. */
+/** The full-width twin of one ASCII punctuation character (U+FF01..U+FF5E): looks the same, is never Markdown syntax. */
+const wide = (c: string): string => String.fromCharCode(c.charCodeAt(0) + 0xfee0);
+const wideRun = (run: string): string => [...run].map(wide).join("");
+
+/** Model/web text as inert plain single-line text: line breaks become a space, 3+ backtick/tilde runs cannot form a fence, and Markdown inline constructs that load or link things (`![` images/embeds, `[[` `]]` wikilinks, `<` `>` raw HTML) become their full-width twins. Ordinary text is unchanged. */
 export function plainLine(text: string): string {
   return text
     .replace(/[\r\n\u2028\u2029]+/g, " ")
     .replace(/`{3,}|~{3,}/g, m => [...m].join(" "))
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/!\[|\[(?=\[)/g, m => m.replace("[", "&#91;"))
-    .replace(/\](?=\])/g, "&#93;");
+    .replace(/</g, "＜")
+    .replace(/>/g, "＞")
+    .replace(/!\[|\[(?=\[)/g, m => m.replace("[", "［"))
+    .replace(/\](?=\])/g, "］");
 }
-/** Entity for one ASCII character. */
-const entity = (c: string): string => `&#${c.charCodeAt(0)};`;
-/** Every ASCII punctuation character that Markdown or Obsidian can read as syntax (including `&`, so a literal entity stays literal). */
-const MARKDOWN_PUNCT = /[\\`*_~=^#$%[\](){}<>|!:&]/g;
+/** Always full-width: each of these can start or end syntax anywhere in a line (escape, code, emphasis, tag, math, sup, link/embed/footnote brackets, HTML, table cell). */
+const ALWAYS_WIDE = /[\\`*_^#$[\]<|]/g;
+/** Full-width only as a run of two or more: `%%` comment, `==` highlight, `~~` strikethrough. One `%`, `=` or `~` can form nothing and stays readable. */
+const WIDE_RUNS = /%{2,}|={2,}|~{2,}/g;
+/** An `&` that would start a literal entity (`&#37;`, `&amp;`) is full-width so the text never turns into another character. A plain `&` stays. */
+const ENTITY_AMP = /&(?=#|\w+;)/g;
+/** A `:` that makes a bare URL (`://`) or an inline field (`::`). A `:` in ordinary prose (`a: b`, `10:30`) stays. */
+const SYNTAX_COLON = /:(?=[:/])|(?<=:):/g;
+/** `www.` starts a bare link in some renderers. */
+const WWW = /\bwww\./gi;
+/** A leading list, quote or ordered-list marker (the text is trimmed first, so these would start a block). `#` is in ALWAYS_WIDE. */
+const LEADING = /^(?:([+\-＞>])|(\d+)([.)]))/;
 /**
- * Plain single-line text that cannot form anything: every Markdown/Obsidian punctuation character is an entity (so no link, image, wikilink,
- * footnote, tag, inline or block math, comment, highlight, callout or HTML), line breaks become a space, leading whitespace is dropped and a
- * leading list, heading, rule or ordered-list marker is encoded too. Letters, digits, spaces and other text read the same.
+ * Plain single-line text that cannot form anything, written with full-width twins instead of HTML entities so it reads the same in Live
+ * Preview, source and reading view: no link, image, wikilink, footnote, tag, inline or block math, comment, highlight, callout, heading, list
+ * or HTML. Line breaks become a space and leading whitespace is dropped. Letters, digits, spaces and ordinary punctuation read the same.
  */
 const line = (text: string | undefined): string =>
   (text ?? "")
     .replace(/[\r\n\u2028\u2029]+/g, " ")
     .replace(/^\s+/, "")
-    .replace(MARKDOWN_PUNCT, entity)
-    .replace(/^(?:[+-]|(\d+)([.)]))/, (m, digits?: string, mark?: string) =>
-      digits ? `${digits}${entity(mark!)}` : entity(m)
-    );
-/** A table cell: one line, `|` cannot split the row. */
-const cell = (text: string | undefined): string => line(text).replace(/\|/g, "&#124;") || "-";
+    .replace(LEADING, (_m, mark?: string, digits?: string, ordered?: string) =>
+      digits ? `${digits}${ordered === "." ? "．" : "）"}` : mark === ">" ? "＞" : wide(mark!)
+    )
+    .replace(ENTITY_AMP, wide)
+    .replace(ALWAYS_WIDE, wide)
+    .replace(WIDE_RUNS, wideRun)
+    .replace(SYNTAX_COLON, wide)
+    .replace(WWW, m => `${m.slice(0, 3)}．`);
+/** A table cell: one line, `|` cannot split the row (it is full-width already). */
+const cell = (text: string | undefined): string => line(text) || "-";
 const URL_ALLOWED = /^[A-Za-z0-9\-._~:/?#@&+,;=]$/;
 const percent = (byte: number): string => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
 /** An http(s) URL as inert text: only RFC 3986 characters stay, a `%` that is not a valid escape is `%25`, everything else (`$`, brackets, `=` or `~` runs, quotes, non-ASCII) is percent-encoded. "" for anything not http(s). */
@@ -172,7 +188,9 @@ const PROP_KEYS = {
   refutes: "ui.argument_note_prop_refutes",
   irrelevant: "ui.argument_note_prop_irrelevant"
 } as const;
-const propText = (t: Translate, d: SituationDatum): string => (d.propStance ? t(PROP_KEYS[d.propStance]) : "-");
+/** A found datum with no stance is being judged; a datum that was not found has no stance at all. */
+const propText = (t: Translate, d: SituationDatum): string =>
+  d.propStance ? t(PROP_KEYS[d.propStance]) : d.state === "found" ? t("ui.argument_data_unjudged") : "-";
 const figureText = (f?: SourceFigure): string => (f ? `${f.number}${f.unit ? ` ${f.unit}` : ""}` : "-");
 const sourceItems = (items: { claim: string; proof: SourceProof }[]): string[] =>
   items.map(({ claim, proof }) => {
@@ -221,11 +239,15 @@ const VERDICT_KEYS = {
 const join = (parts: string[][]): string => parts.flat().join("\n");
 
 // ---- card notes ----------------------------------------------------------------------------------------------------------------
-/** A datum after its facet was judged: the figure, its stance toward the proposition and why, the source. */
+/** A datum: the figure, its stance toward the proposition and why ("judging" until its facet was judged), the source. */
 export function datumDetail(t: Translate, d: SituationDatum): string {
   return join([
     [`### ${t("ui.argument_note_core")}`],
-    callout(`${propText(t, d)}${d.stanceReason ? `: ${d.stanceReason}` : ""}`),
+    callout(
+      d.state === "found" && !d.propStance
+        ? t("ui.argument_note_prop_pending_line")
+        : `${propText(t, d)}${d.stanceReason ? `: ${d.stanceReason}` : ""}`
+    ),
     ["", `### ${t("ui.argument_note_data")}`],
     table(dataHead(t), dataRows(t, [d])),
     sourceLines(t, d.state === "found" && d.proof ? [{ claim: d.proof.claim, proof: d.proof }] : [])

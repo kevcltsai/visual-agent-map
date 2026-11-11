@@ -6,13 +6,16 @@
  */
 import type { TranslationKey } from "../../i18n";
 import {
+  composeFacets,
   conclusionView,
   displayVerdict,
   foundNeeds,
+  isFactMap,
   isSituationUnconfirmed,
   isLimitCut,
   isPartialConclusion,
   isVerified,
+  liveCore,
   MAX_ROUND,
   MIN_VERIFIED,
   verifiedCount,
@@ -38,6 +41,8 @@ export interface ArgumentCardView {
   role: ArgumentRole;
   /** The quiet type line above the title ("Hypothesis 2", "Conclusion · in progress"). */
   kind: string;
+  /** A small mark inside the type line: the question type on the situation card, "core" on a core evidence card. */
+  badge?: { text: string; tone: "qtype" | "core" };
   /** Where the heading comes from: the note's title, the note's summary (a concluded conclusion only), or `title` here. */
   titleFrom: "note" | "summary" | "text";
   title?: string;
@@ -159,9 +164,16 @@ function conclusionCard(state: ArgumentMapData, t: Translate): ArgumentCardView 
   };
   const verified = verifiedCount(state);
   if (view === "stopped_mismatch" && isFacetMap(state)) return facetStopCard(state, base, t);
+  if (view === "concluded" && isFactMap(state)) return factConclusionCard(state, base, t);
   if (view === "concluded")
     return {
       ...base,
+      ...(state.situation.questionType === "causal"
+        ? (() => {
+            const kind = t("ui.argument_conclusion_state_compare_0", verified);
+            return { kind, label: kind };
+          })()
+        : {}),
       titleFrom: "summary",
       lines: [
         ...(isSituationUnconfirmed(state) ? [t("ui.argument_premise_unconfirmed")] : []),
@@ -180,11 +192,14 @@ function conclusionCard(state: ArgumentMapData, t: Translate): ArgumentCardView 
         t("ui.argument_conclusion_limit_hint")
       ]
     };
-  const pending: ArgumentCardView = {
-    ...base,
-    title: t("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
-    lines: [t("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
-  };
+  // A fact question has no hypotheses to count: its conclusion is written from the facets.
+  const pending: ArgumentCardView = isFactMap(state)
+    ? { ...base, title: t("ui.argument_conclusion_fact_pending"), lines: [] }
+    : {
+        ...base,
+        title: t("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
+        lines: [t("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
+      };
   const paused = pausedParts(state, "analysis", t);
   if (!paused) return pending;
   const lines = [...pending.lines, ...paused.lines];
@@ -195,6 +210,20 @@ function conclusionCard(state: ArgumentMapData, t: Translate): ArgumentCardView 
     resume: paused.resume,
     label: [pending.label, paused.chip.text, ...lines].join(", ")
   };
+}
+
+const FACT_KIND = {
+  holds: "ui.argument_conclusion_state_fact_holds",
+  fails: "ui.argument_conclusion_state_fact_fails",
+  partial: "ui.argument_conclusion_state_fact_partial",
+  insufficient: "ui.argument_conclusion_state_insufficient"
+} as const satisfies Record<ReturnType<typeof composeFacets>["outcome"], TranslationKey>;
+/** A concluded fact question: the state (holds, does not hold, holds in part) comes from the facets, never from the note; the answer is the note's summary. How many facets lacked data is said next to it. */
+function factConclusionCard(state: ArgumentMapData, base: ArgumentCardView, t: Translate): ArgumentCardView {
+  const { outcome, insufficientCount } = composeFacets(state.situation.facets ?? []);
+  const kind = t(FACT_KIND[outcome]);
+  const lines = insufficientCount ? [t("ui.argument_note_outcome_insufficient_count_0", insufficientCount)] : [];
+  return { ...base, kind, label: [kind, ...lines].join(", "), titleFrom: "summary", lines };
 }
 
 /** A stopped facet map: not enough data (dashed yellow, what is missing) or a refuted facet (the facet, the datum, its quote and plain-text URL). */
@@ -226,15 +255,27 @@ function facetStopCard(state: ArgumentMapData, base: ArgumentCardView, t: Transl
   return { ...base, title: t("ui.argument_stopped_mismatch"), lines };
 }
 
+/** What the core evidence says so far (a hypothesis with a core shows this instead of the found/total count). */
+const coreStateKey = (core: Need): TranslationKey =>
+  core.state !== "found"
+    ? "ui.argument_core_state_missing"
+    : core.stance === "supports"
+      ? "ui.argument_core_state_supports"
+      : core.stance === "contradicts"
+        ? "ui.argument_core_state_contradicts"
+        : "ui.argument_core_state_uncertain";
+
 function hypothesisCard(state: ArgumentMapData, h: Hypothesis, t: Translate): ArgumentCardView {
   const index = state.hypotheses.indexOf(h) + 1;
   const shown = displayVerdict(h);
   // Still "verifying" after the run ended means the research limit cut it off: say so instead of showing a spinner-like state.
   const cutOff =
     isLimitCut(h) || (state.run.status === "finished" && h.location === "verifying" && shown === "verifying");
+  // A map with an unconfirmed group (made after question types) calls a cut-off hypothesis "unconfirmed"; an older map keeps its words.
+  const cutChip = state.roles.unconfirmed ? "ui.argument_unconfirmed_chip" : "ui.argument_unverified_limit";
   const chips: ArgumentChip[] =
     h.location === "eliminated" || cutOff
-      ? [{ tone: "gap", text: t(cutOff ? "ui.argument_unverified_limit" : "ui.argument_eliminated_chip") }]
+      ? [{ tone: state.roles.unconfirmed && cutOff ? "maybe" : "gap", text: t(cutOff ? cutChip : "ui.argument_eliminated_chip") }]
       : [
           shown === "verifying"
             ? { tone: "open", text: t("ui.argument_verifying") }
@@ -245,7 +286,10 @@ function hypothesisCard(state: ArgumentMapData, h: Hypothesis, t: Translate): Ar
     h.alternative === true && isFacetMap(state) ? "ui.argument_hypothesis_alt_0" : "ui.argument_hypothesis_0",
     index
   );
-  const progress = t("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
+  const core = liveCore(h);
+  const progress = core
+    ? t("ui.argument_core_progress_0_1", t(coreStateKey(core)), Math.min(h.round, MAX_ROUND))
+    : t("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
   const lines = [progress];
   // A limit-cut hypothesis was not refuted: its chip says so and there is no elimination reason line.
   if (h.location === "eliminated" && h.eliminationReason && !isLimitCut(h))
@@ -254,8 +298,12 @@ function hypothesisCard(state: ArgumentMapData, h: Hypothesis, t: Translate): Ar
   return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: `${kind}, ${status}, ${progress}` };
 }
 
-function needCard(need: Need, t: Translate, readable = false): ArgumentCardView {
+function needCard(need: Need, t: Translate, readable = false, hasCore = false): ArgumentCardView {
   const kind = t("ui.argument_evidence");
+  const badge: Pick<ArgumentCardView, "badge"> = need.core
+    ? { badge: { text: t("ui.argument_core_badge"), tone: "core" } }
+    : {};
+  const badgeLabel = need.core ? `, ${t("ui.argument_core_badge")}` : "";
   if (need.state === "found") {
     const stance = need.stance ?? "uncertain";
     const chip: ArgumentChip = { tone: STANCE_TONE[stance], text: t(STANCE_KEY[stance]) };
@@ -263,21 +311,30 @@ function needCard(need: Need, t: Translate, readable = false): ArgumentCardView 
     return {
       role: "need",
       kind: host ? `${kind} · ${host}` : kind,
+      ...badge,
       titleFrom: "note",
       chips: [chip],
       lines: need.proof ? [need.proof.claim] : [],
-      label: `${kind}, ${chip.text}${host ? `, ${host}` : ""}`
+      label: `${kind}${badgeLabel}, ${chip.text}${host ? `, ${host}` : ""}`
     };
   }
   const chip = missingChip(need, t);
+  // A need that was not found and is not the core never blocks a hypothesis that has one (decision #62): say so.
+  const supplementary = hasCore && !need.core && need.state === "not_found";
+  const lines = [
+    ...(supplementary ? [t("ui.argument_supplementary_hint")] : []),
+    ...(need.reason ? [readable ? why(t, need.reason) : need.reason] : [])
+  ];
+  const shownKind = supplementary ? t("ui.argument_evidence_supplementary") : kind;
   return {
     role: "need",
-    kind,
+    kind: shownKind,
+    ...badge,
     titleFrom: "note",
     dashed: true,
     chips: [chip],
-    lines: need.reason ? [readable ? why(t, need.reason) : need.reason] : [],
-    label: `${kind}, ${chip.text}`
+    lines,
+    label: `${shownKind}${badgeLabel}, ${chip.text}`
   };
 }
 
@@ -347,9 +404,12 @@ function facetSituationCard(state: ArgumentMapData, t: Translate): ArgumentCardV
   const kind = t("ui.argument_situation");
   const question = state.situation.question;
   const gate = state.situation.gate;
+  const type = state.situation.questionType;
+  const typeText = type ? t(type === "fact" ? "ui.argument_question_type_fact" : "ui.argument_question_type_causal") : "";
   const base: ArgumentCardView = {
     role: "situation",
     kind,
+    ...(type ? { badge: { text: typeText, tone: "qtype" as const } } : {}),
     titleFrom: question ? "text" : "note",
     ...(question ? { title: question } : {}),
     chips: [],
@@ -360,8 +420,27 @@ function facetSituationCard(state: ArgumentMapData, t: Translate): ArgumentCardV
     ...base,
     chips: [chip],
     lines,
-    label: [kind, chip.text, ...lines].join(", ")
+    label: [kind, typeText, chip.text, ...lines].filter(Boolean).join(", ")
   });
+  if (gate.state === "matched" && type) {
+    // After question types: the counts say what the facets found (a fact map has no "premise" chip; a causal map's premise holds).
+    const parts = [
+      ["ui.argument_facets_count_supports_0", facets.filter(f => f.verdict === "supports").length],
+      ["ui.argument_facets_count_refutes_0", facets.filter(f => f.verdict === "refutes").length],
+      ["ui.argument_facets_count_insufficient_0", lacking(state).length]
+    ] as const;
+    const line = t(
+      "ui.argument_facets_summary_0_1",
+      facets.length,
+      parts
+        .filter(([, count]) => count > 0)
+        .map(([key, count]) => t(key, count))
+        .join(t("ui.argument_list_sep"))
+    );
+    if (type === "fact")
+      return { ...base, lines: [line], label: [kind, typeText, line].join(", ") };
+    return finish({ tone: "yes", text: t("ui.argument_gate_premise_holds") }, [line]);
+  }
   if (gate.state === "matched")
     return finish({ tone: "yes", text: t("ui.argument_gate_facets_0_1") }, [
       t("ui.argument_gate_facets_line_0_1", facets.filter(f => f.verdict === "supports").length, facets.length)
@@ -461,7 +540,7 @@ export function describeArgumentCard(state: ArgumentMapData, id: string, t: Tran
   const datum = state.situation.data.find(item => item.id === id);
   if (datum) return isFacetMap(state) ? facetDatumCard(datum, t) : datumCard(datum, t);
   // A stopped mismatch ran no hypothesis research: the groups carry no "0 / 3" count, only their label.
-  if ((id === roles.verified || id === roles.eliminated) && state.run.phase === "stopped_mismatch")
+  if ((id === roles.verified || id === roles.eliminated || id === roles.unconfirmed) && state.run.phase === "stopped_mismatch")
     return plain("group", t("ui.argument_group_label"));
   if (id === roles.verified) {
     const verifying = state.hypotheses.filter(h => h.location === "verifying").length;
@@ -469,18 +548,23 @@ export function describeArgumentCard(state: ArgumentMapData, id: string, t: Tran
       t("ui.argument_group_verified_count_0_1", verifiedCount(state), Math.max(verifying, MIN_VERIFIED))
     ]);
   }
+  if (id !== undefined && id === roles.unconfirmed)
+    return plain("group", t("ui.argument_group_label"), [
+      t("ui.argument_group_unconfirmed_count_0", state.hypotheses.filter(isLimitCut).length)
+    ]);
   if (id === roles.eliminated) {
     const cut = state.hypotheses.filter(isLimitCut).length;
     const count = state.hypotheses.filter(h => h.location === "eliminated").length - cut;
+    // With an unconfirmed group the cut-off hypotheses are counted there, so this group holds only the refuted ones.
     return plain("group", t("ui.argument_group_label"), [
       t("ui.argument_group_eliminated_count_0", count),
-      ...(cut ? [t("ui.argument_group_unverified_count_0", cut)] : [])
+      ...(cut && !roles.unconfirmed ? [t("ui.argument_group_unverified_count_0", cut)] : [])
     ]);
   }
   for (const h of state.hypotheses) {
     if (h.id === id) return hypothesisCard(state, h, t);
     const need = h.needs.find(item => item.id === id);
-    if (need) return needCard(need, t, isFacetMap(state));
+    if (need) return needCard(need, t, isFacetMap(state), liveCore(h) !== undefined);
   }
   return null;
 }
@@ -489,6 +573,7 @@ export function describeArgumentCard(state: ArgumentMapData, id: string, t: Tran
 export function renderArgumentKind(header: HTMLElement, view: ArgumentCardView): HTMLElement {
   const kind = header.createSpan({ cls: "vam-argument-kind", text: view.kind });
   kind.dataset.role = view.role;
+  if (view.badge) kind.createSpan({ cls: `vam-argument-badge is-${view.badge.tone}`, text: view.badge.text });
   return kind;
 }
 

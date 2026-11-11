@@ -388,7 +388,9 @@ test('no reducer works on a stopped_mismatch or concluded run', () => {
 });
 
 // ---- dead need replaced (ticket 01) -------------------------------------------------------------------------------------------
-const miss = { found: false, reason: 'none' };
+// Only a source-side miss (url or quote failed) may be stood in for; the other reasons keep blocking (P1-1).
+const miss = { found: false, reason: 'source_quote_missing' };
+const hardMiss = { found: false, reason: 'not_found' };
 /** h1 round 1 with needs [a found, b not_found], settled. */
 function deadB() {
   let s = withHypotheses();
@@ -407,6 +409,22 @@ test('dead need #1: revise replaces the not_found need; once the replacement is 
   s = m.applyVerdict(s, 'h1', { verdict: 'supported', citedNeeds: ['a', 'rc'], reason: 'ok' });
   assert.equal(model.isVerified(s.hypotheses[0]), true);
   assert.equal(s.hypotheses[0].round, 2);
+});
+test('P1-1: a need whose miss was "nothing found" / no answer / uncertain / provider error is never replaced, so the hypothesis cannot verify around it', () => {
+  for (const reason of ['not_found', 'no_answer', 'stance_uncertain', 'provider_error', 'card_deleted', 'none']) {
+    let s = withHypotheses();
+    s = m.addNeeds(s, 'h1', [{ id: 'a', text: 'x' }, { id: 'b', text: 'y' }]);
+    s = researched(s, 'h1', 'a', found());
+    s = researched(s, 'h1', 'b', { found: false, reason });
+    s = m.startNextRound(s, 'h1', [{ id: 'rc', text: 'something easier' }]);
+    assert.equal(s.hypotheses[0].needs.find(n => n.id === 'rc').replaces, undefined, reason);
+    s = researched(s, 'h1', 'rc', found('supports', 3));
+    const h = plain(s.hypotheses[0]); h.aiVerdict = 'supported';
+    assert.equal(model.allNeedsFound(h), false, reason);
+    assert.equal(model.isVerified(h), false, reason);
+    h.needs.find(n => n.id === 'rc').replaces = 'b'; // a forged or older save
+    assert.equal(model.isVerified(h), false, `${reason}: a forged replaces does not retire it`);
+  }
 });
 test('dead need #2: with no replacement the not_found need still blocks, even when the user marks supported', () => {
   const s = plain(deadB());

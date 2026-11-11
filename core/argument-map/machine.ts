@@ -28,6 +28,7 @@ import {
   allNeedsFound,
   effectiveVerdict,
   foundNeeds,
+  isSourceSideMiss,
   isVerified,
   verifiedHypotheses,
   type ArgumentMapData,
@@ -162,6 +163,7 @@ function checkedProof(value: unknown): SourceProof {
     url: p.url as string,
     quote: p.quote as string,
     claim: p.claim as string,
+    ...(p.claimUnverified === true ? { claimUnverified: true } : {}),
     check: p.check as SourceProof["check"],
     checkedAt: p.checkedAt as string,
     ...(figure ? { figure } : {})
@@ -707,10 +709,14 @@ function pushNeeds(
   if (inRound + items.length > MAX_ROUND_NEEDS) throw new GateError("too many needs in this round");
   if (h.needs.length + items.length > MAX_NEEDS) throw new GateError("too many needs for this hypothesis");
   const ids = allIds(next);
-  // Only the next-round path may stand in for dead needs: not_found, from an earlier round, not already replaced; list order.
+  // Only the next-round path may stand in for dead needs: a source-side not_found (the model never said the evidence is absent), from an earlier round, not already replaced; list order.
   const open = replaceDead
     ? h.needs.filter(
-        n => n.state === "not_found" && n.addedRound < h.round && !h.needs.some(other => other.replaces === n.id)
+        n =>
+          n.state === "not_found" &&
+          isSourceSideMiss(n) &&
+          n.addedRound < h.round &&
+          !h.needs.some(other => other.replaces === n.id)
       )
     : [];
   for (const [index, item] of items.entries()) {

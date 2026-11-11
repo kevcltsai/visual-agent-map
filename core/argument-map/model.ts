@@ -89,6 +89,8 @@ export interface SourceProof {
   url: string;
   quote: string;
   claim: string;
+  /** Set when the AI's claim carried a number the quote does not: `claim` was then replaced by the quote. */
+  claimUnverified?: boolean;
   check: ProofCheck;
   checkedAt: string;
   figure?: SourceFigure;
@@ -411,13 +413,16 @@ export function effectiveVerdict(h: Hypothesis): Verdict {
 export function foundNeeds(h: Hypothesis): Need[] {
   return h.needs.filter(need => need.state === "found");
 }
-/** Ids of dead needs that a later need of the same hypothesis stands in for. Re-checked here (not trusted from the field alone): only a `not_found` need can be retired, and only by a need of a later round. */
+/** A miss caused by the source (the URL or the quote failed to check): the question stays open, so another source may answer it. Any other miss says the evidence is not there, and no later need may stand in for it. */
+export const isSourceSideMiss = (need: { reason?: string }): boolean => (need.reason ?? "").startsWith("source_");
+/** Ids of dead needs that a later need of the same hypothesis stands in for. Re-checked here (not trusted from the field alone): only a `not_found` need whose miss was source-side can be retired, and only by a need of a later round. A "nothing found", unanswered, uncertain or failed need keeps blocking verification. */
 export function retiredNeedIds(h: Hypothesis): Set<string> {
   const retired = new Set<string>();
   for (const need of h.needs) {
     if (need.replaces === undefined) continue;
     const dead = h.needs.find(other => other.id === need.replaces);
-    if (dead && dead.state === "not_found" && need.addedRound > dead.addedRound) retired.add(dead.id);
+    if (dead && dead.state === "not_found" && isSourceSideMiss(dead) && need.addedRound > dead.addedRound)
+      retired.add(dead.id);
   }
   return retired;
 }

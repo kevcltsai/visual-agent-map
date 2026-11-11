@@ -1151,6 +1151,7 @@ export class ArgumentRuns {
               url: entry.url,
               quote: entry.quote,
               claim: entry.claim,
+              ...(entry.figure ? { figure: entry.figure } : {}),
               openedUrls,
               fetch: this.ports.fetch,
               parseHtml: this.ports.parseHtml,
@@ -1158,7 +1159,7 @@ export class ArgumentRuns {
             });
             code = check.ok ? check.proof.check : check.reason;
             result = check.ok
-              ? { found: true, stance, proof: entry.figure ? { ...check.proof, figure: entry.figure } : check.proof }
+              ? { found: true, stance, proof: check.proof }
               : { found: false, reason: `source_${check.reason}` };
           }
         }

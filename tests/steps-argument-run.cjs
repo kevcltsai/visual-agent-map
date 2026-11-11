@@ -315,11 +315,12 @@ test('one corrective retry: a refused step succeeds the second time; failing twi
   assert.equal(broken.stat.ask.length, 0);
 });
 
-test('dead need #9: a not_found need is replaced in round 2 and the hypothesis verifies without a 3rd round', async () => {
+test('dead need #9: a source-side not_found need is replaced in round 2 and the hypothesis verifies without a 3rd round', async () => {
   const r = await rig({ script: { step: steps({ add_needs: (_request, n) => ({ needs: n === 1 ? [{ text: 'dead source' }, { text: 'live two' }] : [{ text: 'need one' }, { text: 'need two' }] }), revise: () => ({ needs: [{ text: 'replacement source' }] }) }),
-    ask: ctx => { const { id, text } = ctx.argumentEvidenceNeeds[0]; return { summary: 's', detail: 'd', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [text === 'dead source' ? { need: id, status: 'not_found' } : foundEntry(id)] }; } } });
+    ask: ctx => { const { id, text } = ctx.argumentEvidenceNeeds[0]; return { summary: 's', detail: 'd', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [text === 'dead source' ? foundEntry(id, { quote: 'a quote that is nowhere on this page' }) : foundEntry(id)] }; } } });
   await r.runs.start(r.mapPath, 'p');
   const state = await r.state();
+  assert.match(state.hypotheses[0].needs[0].reason, /^source_/, 'only a source-side miss (the quote failed to check) may be replaced');
   assert.equal(r.stat.steps.filter(n => n === 'revise').length, 1);
   assert.equal(state.run.phase, 'concluded');
   assert.equal(model.verifiedCount(state), 3);

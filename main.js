@@ -25173,12 +25173,17 @@ function effectiveVerdict(h) {
 function foundNeeds(h) {
   return h.needs.filter((need) => need.state === "found");
 }
+var isSourceSideMiss = (need) => {
+  var _a2;
+  return ((_a2 = need.reason) != null ? _a2 : "").startsWith("source_");
+};
 function retiredNeedIds(h) {
   const retired = /* @__PURE__ */ new Set();
   for (const need of h.needs) {
     if (need.replaces === void 0) continue;
     const dead = h.needs.find((other) => other.id === need.replaces);
-    if (dead && dead.state === "not_found" && need.addedRound > dead.addedRound) retired.add(dead.id);
+    if (dead && dead.state === "not_found" && isSourceSideMiss(dead) && need.addedRound > dead.addedRound)
+      retired.add(dead.id);
   }
   return retired;
 }
@@ -43360,6 +43365,10 @@ function canonical(url) {
 function foldText(text10) {
   return text10.normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}\p{Cc}\p{Cf}]/gu, "");
 }
+function numbersIn(text10) {
+  var _a2;
+  return ((_a2 = text10.normalize("NFKC").match(/\d[\d,]*(?:\.\d+)?/g)) != null ? _a2 : []).map((n) => n.replace(/,/g, "").replace(/\.0+$/, ""));
+}
 function header(headers, name2) {
   for (const key4 of Object.keys(headers != null ? headers : {})) if (key4.toLowerCase() === name2) return String(headers[key4]);
   return "";
@@ -43428,16 +43437,23 @@ async function verifySource(input2) {
   if (!input2.claim.trim()) return fail3("bad_claim");
   const requested = new URL(url.href);
   requested.hash = "";
-  const proof = (check) => {
+  const proof = (check, pageText2) => {
     var _a3;
+    const seen = /* @__PURE__ */ new Set([...numbersIn(input2.quote), ...pageText2 ? numbersIn(pageText2) : []]);
+    const claim2 = input2.claim.trim();
+    const claimOk = numbersIn(claim2).every((n) => seen.has(n));
+    const figureNumbers = input2.figure ? numbersIn(input2.figure.number) : [];
+    const figureOk = figureNumbers.length > 0 && figureNumbers.every((n) => seen.has(n));
     return {
       ok: true,
       proof: {
         url: requested.href,
         quote: input2.quote.trim(),
-        claim: input2.claim.trim(),
+        claim: claimOk ? claim2 : input2.quote.trim(),
+        ...claimOk ? {} : { claimUnverified: true },
         check,
-        checkedAt: ((_a3 = input2.now) != null ? _a3 : () => (/* @__PURE__ */ new Date()).toISOString())()
+        checkedAt: ((_a3 = input2.now) != null ? _a3 : () => (/* @__PURE__ */ new Date()).toISOString())(),
+        ...figureOk ? { figure: input2.figure } : {}
       }
     };
   };
@@ -43477,7 +43493,7 @@ async function verifySource(input2) {
     if (!input2.parseHtml) return fail3("no_parser");
     pageText = input2.parseHtml(response.text);
   }
-  if (foldText(pageText).includes(foldedQuote)) return proof("page_match");
+  if (foldText(pageText).includes(foldedQuote)) return proof("page_match", pageText);
   if (isHtml && pageText.trim().length < SHELL_TEXT_MAX) return blocked();
   return fail3("quote_missing");
 }
@@ -44399,6 +44415,7 @@ function checkedProof(value) {
     url: p.url,
     quote: p.quote,
     claim: p.claim,
+    ...p.claimUnverified === true ? { claimUnverified: true } : {},
     check: p.check,
     checkedAt: p.checkedAt,
     ...figure ? { figure } : {}
@@ -44848,7 +44865,7 @@ function pushNeeds(next, h, items, replaceDead) {
   if (h.needs.length + items.length > MAX_NEEDS) throw new GateError("too many needs for this hypothesis");
   const ids2 = allIds(next);
   const open = replaceDead ? h.needs.filter(
-    (n) => n.state === "not_found" && n.addedRound < h.round && !h.needs.some((other) => other.replaces === n.id)
+    (n) => n.state === "not_found" && isSourceSideMiss(n) && n.addedRound < h.round && !h.needs.some((other) => other.replaces === n.id)
   ) : [];
   for (const [index, item] of items.entries()) {
     if (blank(item.text)) throw new GateError("empty need");
@@ -47804,13 +47821,14 @@ var ArgumentRuns = class {
               url: entry.url,
               quote: entry.quote,
               claim: entry.claim,
+              ...entry.figure ? { figure: entry.figure } : {},
               openedUrls,
               fetch: this.ports.fetch,
               parseHtml: this.ports.parseHtml,
               now: this.ports.now
             });
             code = check.ok ? check.proof.check : check.reason;
-            result = check.ok ? { found: true, stance, proof: entry.figure ? { ...check.proof, figure: entry.figure } : check.proof } : { found: false, reason: `source_${check.reason}` };
+            result = check.ok ? { found: true, stance, proof: check.proof } : { found: false, reason: `source_${check.reason}` };
           }
         }
       } catch (error) {

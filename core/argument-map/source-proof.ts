@@ -5,7 +5,7 @@
  * URL that appears only in the AI's text. What this cannot prove: that the page supports the claim, and that a `provider_read`
  * page really says what the provider reported. Spec: docs/history/tasks/2026-11-09-argument-map-layout (plan section 3).
  */
-import type { SourceProof } from "./model";
+import type { SourceFigure, SourceProof } from "./model";
 
 export const QUOTE_MIN = 12;
 export const QUOTE_MAX = 200;
@@ -50,6 +50,8 @@ export interface VerifySourceInput {
   url: string;
   quote: string;
   claim: string;
+  /** The figure the AI reported; kept on the proof only when its number is in the quote or the fetched page. */
+  figure?: SourceFigure;
   /** URLs the provider's tool log shows it opened successfully during this same call. */
   openedUrls: readonly string[];
   fetch: FetchPage;
@@ -158,6 +160,11 @@ export function foldText(text: string): string {
     .replace(/[\s\p{P}\p{S}\p{Cc}\p{Cf}]/gu, "");
 }
 
+/** The numbers a text carries (NFKC, thousands commas dropped): "1,200" and "1200" are one number. */
+export function numbersIn(text: string): string[] {
+  return (text.normalize("NFKC").match(/\d[\d,]*(?:\.\d+)?/g) ?? []).map(n => n.replace(/,/g, "").replace(/\.0+$/, ""));
+}
+
 function header(headers: Record<string, string>, name: string): string {
   for (const key of Object.keys(headers ?? {})) if (key.toLowerCase() === name) return String(headers[key]);
   return "";
@@ -243,16 +250,27 @@ export async function verifySource(input: VerifySourceInput): Promise<SourceChec
 
   const requested = new URL(url.href);
   requested.hash = "";
-  const proof = (check: SourceProof["check"]): SourceCheck => ({
-    ok: true,
-    proof: {
-      url: requested.href,
-      quote: input.quote.trim(),
-      claim: input.claim.trim(),
-      check,
-      checkedAt: (input.now ?? (() => new Date().toISOString()))()
-    }
-  });
+  // The quote vouches only for the numbers it carries (or the page the program read). A claim or figure with a number
+  // outside them is not proved: the claim becomes the quote itself and the figure is dropped.
+  const proof = (check: SourceProof["check"], pageText?: string): SourceCheck => {
+    const seen = new Set([...numbersIn(input.quote), ...(pageText ? numbersIn(pageText) : [])]);
+    const claim = input.claim.trim();
+    const claimOk = numbersIn(claim).every(n => seen.has(n));
+    const figureNumbers = input.figure ? numbersIn(input.figure.number) : [];
+    const figureOk = figureNumbers.length > 0 && figureNumbers.every(n => seen.has(n));
+    return {
+      ok: true,
+      proof: {
+        url: requested.href,
+        quote: input.quote.trim(),
+        claim: claimOk ? claim : input.quote.trim(),
+        ...(claimOk ? {} : { claimUnverified: true }),
+        check,
+        checkedAt: (input.now ?? (() => new Date().toISOString()))(),
+        ...(figureOk ? { figure: input.figure } : {})
+      }
+    };
+  };
   const key = canonical(requested);
   const openedByProvider = input.openedUrls.some(opened => {
     const parsed = allowedUrl(opened);
@@ -300,7 +318,7 @@ export async function verifySource(input: VerifySourceInput): Promise<SourceChec
     if (!input.parseHtml) return fail("no_parser");
     pageText = input.parseHtml(response.text);
   }
-  if (foldText(pageText).includes(foldedQuote)) return proof("page_match");
+  if (foldText(pageText).includes(foldedQuote)) return proof("page_match", pageText);
   // A page that is readable and lacks the quote is not rescued by the tool log; only an empty shell is.
   if (isHtml && pageText.trim().length < SHELL_TEXT_MAX) return blocked();
   return fail("quote_missing");

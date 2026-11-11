@@ -215,17 +215,17 @@ test('conclusion: a number or URL outside the input throws; no verified hypothes
 
 // ---- schemas and registry ----
 test('every step has a strict schema and the registry maps the machine actions', () => {
-  for (const step of [mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep]) {
+  for (const step of [mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep, mod.conclusionFactStep]) {
     assert.equal(step.schema.additionalProperties, false);
     const optional = step === mod.facetVerdictStep ? ['sameQuestion'] : []; // #62: asked only when a core was replaced
     assert.deepEqual([...step.schema.required].sort(), Object.keys(step.schema.properties).filter(k => !optional.includes(k)).sort());
   }
-  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_facets', 'judge_gate', 'plan_facets', 'propose_facet_hypotheses', 'propose_hypotheses', 'revise', 'verdict']);
+  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'conclude_facts', 'judge_facets', 'judge_gate', 'plan_facets', 'propose_facet_hypotheses', 'propose_hypotheses', 'revise', 'verdict']);
   assert.equal(mod.ARGUMENT_STEPS.plan_facets, mod.facetPlanStep);
   assert.equal(mod.ARGUMENT_STEPS.plan_situation, undefined); // the old plan step was removed; plan_facets serves the action
   assert.equal(mod.ARGUMENT_STEPS.revise, mod.needsStep);
   const ids = new Set(Object.values(mod.ARGUMENT_STEPS).map(step => step.id));
-  assert.equal(ids.size, 8);
+  assert.equal(ids.size, 9);
 });
 
 // ---- text-only through the real runtimes ----
@@ -939,4 +939,48 @@ test('facet verdict (#62): the core flag reaches the prompt; sameQuestion is req
   bad(mod.facetVerdictStep, replaced, { ...fvGood, sameQuestion: 'yes' }, /sameQuestion/);
   assert.ok(mod.FACET_VERDICT_SCHEMA.properties.sameQuestion);
   assert.ok(!mod.FACET_VERDICT_SCHEMA.required.includes('sameQuestion'));
+});
+
+// ---- #63: conclusion of all hypotheses; fact conclusion from facets ----
+const allInput = () => ({ hypotheses: [
+  { id: 'h1', round: 1, status: 'verified', evidence: [{ id: 'n1', claim: 'Rate was 9.2 percent', quote: 'rate 9.2 percent', url: 'https://stats.example.org/a', stance: 'supports', core: true }] },
+  { id: 'h2', round: 2, status: 'unconfirmed', evidence: [{ id: 'n2', claim: 'Hiring fell', quote: 'hiring fell', url: 'https://stats.example.org/b', stance: 'uncertain' }] },
+  { id: 'h3', round: 1, status: 'eliminated', evidence: [{ id: 'n3', claim: 'Wages rose', quote: 'wages rose', url: 'https://stats.example.org/c', stance: 'contradicts' }] }
+] });
+const allReq = (over = {}) => ({ ...base, proposition: PROP, input: allInput(), statements: { h1: 'Hiring slowed', h2: 'Entry jobs automated', h3: 'Wages stalled' }, ...over });
+test('conclusion (#63): the prompt lists every hypothesis with its status; a point may cite an unverified one, but basedOn keeps the verified only', () => {
+  const prompt = mod.conclusionStep.render(allReq());
+  for (const word of ['"status":"verified"', '"status":"unconfirmed"', '"status":"eliminated"', 'Wages rose', '"core":true', 'main explanation']) assert.ok(prompt.includes(word), word);
+  const r = ok(mod.conclusionStep, allReq(), { summary: 'Slow hiring is the main explanation', points: [{ text: 'Hiring slowed', hypothesisIds: ['h1'] }, { text: 'Automation is not confirmed', hypothesisIds: ['h2', 'h3'] }, { text: 'Both together', hypothesisIds: ['h1', 'h2'] }] });
+  assert.deepEqual(plain(r.basedOn), ['h1']);
+});
+test('conclusion (#63): every point resting only on unverified hypotheses is refused; so is a request with no verified hypothesis', () => {
+  bad(mod.conclusionStep, allReq(), { summary: 's', points: [{ text: 'x', hypothesisIds: ['h2'] }, { text: 'y', hypothesisIds: ['h3'] }] }, /verified/);
+  bad(mod.conclusionStep, allReq(), { summary: 's', points: [{ text: 'x', hypothesisIds: ['h9'] }] }, /outside/);
+  const none = allReq({ input: { hypotheses: allInput().hypotheses.slice(1) } });
+  assert.throws(() => sr.prepareStep(mod.conclusionStep, none), error => error.name === 'ArgumentStepError');
+  assert.throws(() => mod.conclusionStep.render(allReq({ statements: { h1: 'x', h2: 'y' } })), error => error.name === 'ArgumentStepError');
+});
+const factFacets = () => [
+  { id: 'fa-0000001', title: 'Level of the rate', verdict: 'supports', summary: 'The rate is above the overall rate.', reason: 'Data agree', data: [{ claim: 'Rate was 9.2 percent', quote: 'rate 9.2 percent', url: 'https://stats.example.org/a', stance: 'supports' }] },
+  { id: 'fb-0000002', title: 'Direction of change', verdict: 'insufficient', summary: 'Not shown.', reason: 'No data', data: [] }
+];
+const factReq = (over = {}) => ({ ...base, proposition: PROP, outcome: 'holds', facets: factFacets(), ...over });
+test('conclusion-fact (#60): points rest on facet ids only; the program outcome is in the prompt; ids, numbers and links outside the request are refused', () => {
+  const prompt = mod.conclusionFactStep.render(factReq());
+  assert.match(prompt, /already decided the overall result from the facets: holds/);
+  assert.match(prompt, /"verdict":"insufficient"/);
+  assert.doesNotMatch(prompt, /citedData|hypothes/i);
+  assert.match(mod.conclusionFactStep.render(factReq({ outcome: 'insufficient' })), /cannot be decided/);
+  const good = { summary: 'The rate is 9.2 percent', points: [{ text: 'The level fits', facetIds: ['fa-0000001'] }, { text: 'The direction is not shown', facetIds: ['fb-0000002', 'fa-0000001'] }] };
+  assert.deepEqual(plain(ok(mod.conclusionFactStep, factReq(), good).basedOn), ['fa-0000001', 'fb-0000002']);
+  bad(mod.conclusionFactStep, factReq(), { ...good, points: [{ text: 'x', facetIds: ['h1'] }] }, /outside/);
+  bad(mod.conclusionFactStep, factReq(), { ...good, points: [{ text: 'x', facetIds: [] }] }, /at least one/);
+  bad(mod.conclusionFactStep, factReq(), { ...good, points: [{ text: 'x', hypothesisIds: ['fa-0000001'] }] }, /unexpected fields/);
+  bad(mod.conclusionFactStep, factReq(), { ...good, summary: 'Jobless rate was 14 percent' }, /number 14/);
+  bad(mod.conclusionFactStep, factReq(), { ...good, summary: 'see fa-0000001' }, /id/);
+  assert.throws(() => sr.prepareStep(mod.conclusionFactStep, factReq({ facets: [] })), error => error.name === 'ArgumentStepError');
+  assert.throws(() => sr.prepareStep(mod.conclusionFactStep, factReq({ outcome: 'maybe' })), error => error.name === 'ArgumentStepError');
+  assert.match(mod.conclusionFactStep.render(factReq({ unconfirmed: true })), /situation behind the proposition is unconfirmed/);
+  assert.equal(mod.ARGUMENT_STEPS.conclude_facts, mod.conclusionFactStep);
 });

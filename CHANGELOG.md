@@ -9,9 +9,34 @@
 - A new group, "Hypotheses with evidence, unconfirmed", holds hypotheses that have evidence but were not confirmed. "Eliminated" now holds only hypotheses the evidence refuted.
 - Evidence from a page that is not an official, academic or major news source now needs a second independent source; without one it counts as uncertain and cannot carry a facet on its own.
 - Hypothesis-research maps made before this change still open and show as before. An unfinished one cannot be resumed; use "Re-run with these assumptions" on its definitions card to start a new map.
-- Hypothesis research now checks the situation by facets, starting from a definitions card, with readable reasons and a separate "insufficient data" stop. Each card keeps full research notes, and the opening screen has tabs, including a Beta hypothesis research tab.
-- AIM is removed; your old AIM maps still open and work as ordinary maps.
-- Argument map: when the AI does not answer in time for a situation item or an evidence item, the run now retries once and then pauses so you can resume it, instead of counting it as not found.
+
+## [0.34.0] - 2026-11-11
+
+### Check a claim with hypothesis research (Beta)
+
+Open the new Hypothesis research tab on the opening screen and type a claim, for example "remote work lowers productivity". The AI first checks whether the situation holds, then lists possible causes and looks for evidence on each.
+
+- It starts from a definitions card and checks the situation one facet at a time, with a plain reason on each card.
+- When the evidence is not enough, it stops with "insufficient data" instead of drawing a conclusion.
+- Each card keeps its full research notes. If the AI does not answer in time, it tries once more and then pauses so you can resume.
+
+### Stop a topic chat from its window
+
+The topic chat window now has a Stop button on its Running row, so you can stop a reply without reaching the card.
+
+### Changed
+
+- AIM is removed. Your old AIM maps still open and work as ordinary maps.
+- With Obsidian's default attachment setting, a mind map's images and exports now go to an Attachments folder inside the map's folder instead of the vault root.
+
+### Fixes
+
+- Renaming or moving a map while VAM is writing no longer clears it or breaks undo, open maps pick up a new default model or reasoning level, and file names that Windows reserves, such as CON, are now made safe.
+
+### Known issues
+
+- Hypothesis research can sometimes count a cause as checked when the evidence only partly answers it. Check the source on each card before you rely on a conclusion.
+- If you rewrite a hypothesis by hand, run hypothesis research again. Evidence found for the earlier wording can still count toward the conclusion.
 
 ## [0.33.0] - 2026-11-09
 

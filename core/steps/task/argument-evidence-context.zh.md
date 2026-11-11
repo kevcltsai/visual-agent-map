@@ -1,1 +1,1 @@
-帶有 "context" 的需求必須依它回答：context 是該需求要遵守的期間與定義。若沒有任何網頁符合，該需求就回 not_found。
+帶有 "context" 的需求必須依它回答：context 是該需求要遵守的期間與定義，也可能寫著一個假設主張。優先採用符合 context 期間的網頁；沒有的話，採用發佈期間最接近的頁面（例如最新已公布的年度），並把該年份寫在 "note"；只有最接近的年度不是回 not_found 的理由，完全找不到回答該需求的真實網頁才回 not_found。context 若寫著假設主張，"stance" 表示該頁對這個假設主張的影響（supports、contradicts 或 uncertain），不是對任務所問問題的影響。

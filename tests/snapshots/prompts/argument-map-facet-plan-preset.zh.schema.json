@@ -99,12 +99,20 @@
     "question": {
       "type": "string",
       "minLength": 1
+    },
+    "questionType": {
+      "type": "string",
+      "enum": [
+        "fact",
+        "causal"
+      ]
     }
   },
   "required": [
     "assumptions",
     "facets",
     "causalQuestions",
-    "question"
+    "question",
+    "questionType"
   ]
 }

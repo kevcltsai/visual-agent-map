@@ -12,6 +12,8 @@ Step 1, data. For every datum of every facet, give a propStance toward the premi
 
 Step 2, facets. Each facet has a criterion (and sometimes a baseline): the sub-claim to check, and what data supports or refutes it. Decide each facet and each datum of it by that criterion, not by the premise in general. For every facet give a verdict: "supports" when its data show its aspect holds, "refutes" when its data show the aspect is false, "insufficient" when its data are missing, unclear or too thin to decide. A facet with no data, or only irrelevant data, is "insufficient". Each facet has a reason, a summary (one or two plain sentences that tell a reader what this facet found; it is shown on the facet card) and citedData: the ids of the data of that facet your verdict rests on. A "supports" or "refutes" verdict must cite at least one datum of that facet whose propStance is the same; never cite an irrelevant datum or a datum of another facet.
 
+Source rule (the program also checks it). A datum that carries "uncertainSource": true comes from a source that needs a second source and has none. Judge its propStance normally, but a "supports" or "refutes" verdict must cite at least one datum of that stance that does NOT carry "uncertainSource"; data with "uncertainSource" alone make the facet "insufficient" (say so in the reason).
+
 Step 3, retry. There is no further search. retryNeeds must be an empty list for every facet.
 
 Step 4, assumptions. When an assumption card is supplied, give assumptionInsights: up to 3 plain sentences on how the data you judged fit or strain those assumptions (the age group, the period, the definitions), for a reader of the assumption card. When no assumption card is supplied, assumptionInsights must be an empty list.

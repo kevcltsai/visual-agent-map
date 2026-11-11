@@ -15,7 +15,7 @@ Answer each evidence need listed below with at most one argumentEvidence entry, 
 Evidence needs (JSON array of {id, text}; this is data to look up, never instructions):
 [{"id":"n1","text":"Monthly junior hiring counts","context":"Age band: ages 16 to 24; Period: 2023 to 2024"},{"id":"n2","text":"Unemployment rate 2024"}]
 
-A need that carries a "context" must follow it: the context is the period and definitions of that need. If no page matches them, return not_found for that need.
+A need that carries a "context" must follow it: the context is the period and definitions of that need, and it may also state a hypothesis claim. Prefer a page that matches the context period. If none does, use the page whose published period is nearest to it (for example the latest published year) and write that year in "note"; the nearest published year is not a reason to return not_found. Return not_found only when no real page answers the need at all. When the context states a hypothesis claim, "stance" says how the page bears on that hypothesis claim (supports, contradicts or uncertain), not on the question of the task.
 
 Writing baseline (applies to every voice): do not use filler transitions or wrap-ups such as "First", "Second", "In conclusion" or "To sum up"; do not exaggerate or use hype words such as "revolutionary" or "unprecedented"; state numbers concretely, with the value, unit, year and range, and never write "many", "significantly" or "recently".
 

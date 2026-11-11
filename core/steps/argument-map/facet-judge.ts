@@ -27,7 +27,7 @@ export interface FacetJudgeDatum {
   quote: string;
   url: string;
   stance: string;
-  /** Decided for good (supports, refutes, or an uncertain research answer): the judge copies it. */
+  /** Decided for good (supports or refutes): the judge copies it. */
   fixedStance?: PropStance;
   /** An earlier `irrelevant` judgement that may be judged again in round 2. */
   priorStance?: PropStance;

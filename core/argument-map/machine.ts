@@ -24,7 +24,6 @@ import {
   PROOF_CHECKS,
   PROP_STANCES,
   VERDICTS,
-  propStanceForUncertainResearch,
   isStanceLocked,
   allNeedsFound,
   effectiveVerdict,
@@ -412,9 +411,9 @@ export function applySituationEvidence(
   const datum = next.situation.data.find(d => d.id === dataId);
   if (!datum || datum.state !== "searching") throw new GateError("situation datum is not being researched");
   if (result.found === true) {
-    // A facet map keeps an "uncertain" answer whose source was verified: the stance toward the proposition comes from one constant (#47).
-    if (hasFacets(state) && result.stance === "uncertain") datum.propStance = propStanceForUncertainResearch();
-    else datum.stance = stanceOf(DATA_STANCES, result.stance);
+    // A facet map keeps an "uncertain" answer whose source was verified, found and unjudged: research stance is relative to the need, so it
+    // never decides propStance; the facet judge assigns it (it may say irrelevant, with a reason).
+    if (!(hasFacets(state) && result.stance === "uncertain")) datum.stance = stanceOf(DATA_STANCES, result.stance);
     datum.proof = checkedProof(result.proof);
     datum.state = "found";
     return next;
@@ -528,7 +527,7 @@ export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudge
     const datum = foundData.find(d => d.id === entry.id);
     if (!datum) throw new GateError("the judgement names a datum that is not being judged");
     const stance = stanceOf(PROP_STANCES, entry.propStance);
-    // Locked: supports, refutes and the uncertain mapping. An irrelevant stance the judge gave in round 1 may be judged again (#sem3).
+    // Locked: supports and refutes. An irrelevant stance, or none yet, may be judged (again) (#sem3).
     if (isStanceLocked(datum) && datum.propStance !== stance)
       throw new GateError("a stance that is already fixed cannot be changed");
     if (blank(entry.reason)) throw new GateError("a stance needs a reason");

@@ -49,19 +49,12 @@ export type PropStance = (typeof PROP_STANCES)[number];
 export const FACET_VERDICTS = ["supports", "refutes", "insufficient", "pending"] as const;
 export type FacetVerdict = (typeof FACET_VERDICTS)[number];
 /**
- * The proposition stance of a datum whose source was verified but whose research answer was "uncertain". Decision #49 chose 甲 (irrelevant).
- * Switching to 乙 (a fourth label) would change this constant and the type, and also machine.ts and facet-judge.ts, where `!== "irrelevant"` decides which data are usable.
- */
-export const UNCERTAIN_RESEARCH_STANCE: PropStance = "irrelevant";
-export function propStanceForUncertainResearch(): PropStance {
-  return UNCERTAIN_RESEARCH_STANCE;
-}
-/**
- * A found datum's stance is locked once decided: `supports` and `refutes` never change, and neither does the stance mapped from an
- * uncertain research answer (no `stanceReason`). An `irrelevant` stance the facet judge gave (it has a reason) may be judged again in round 2.
+ * A found datum's stance is locked once the facet judge decided `supports` or `refutes`: it never changes. An `irrelevant` stance may be
+ * judged again in round 2, and a found datum with no stance is simply not judged yet. Research stance (relative to the need) never decides
+ * the stance toward the proposition, so nothing is locked before the judge has judged it.
  */
 export const isStanceLocked = (datum: { propStance?: PropStance; stanceReason?: string }): boolean =>
-  datum.propStance !== undefined && (datum.propStance !== "irrelevant" || datum.stanceReason === undefined);
+  datum.propStance !== undefined && datum.propStance !== "irrelevant";
 export const VERDICTS = ["supported", "refuted", "undecided"] as const;
 export type Verdict = (typeof VERDICTS)[number];
 export const LOCATIONS = ["verifying", "eliminated"] as const;

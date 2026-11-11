@@ -779,24 +779,41 @@ test('facet boost: citations: other facet, irrelevant data, other stance, unfoun
   const pendingVerdict = judgement(s); pendingVerdict.facets[0].verdict = 'pending';
   refuses(s, () => m.applyFacetVerdicts(s, pendingVerdict));
 });
-test('facet boost: uncertain research maps to the single stance constant and the judgement cannot override it', () => {
-  assert.equal(model.UNCERTAIN_RESEARCH_STANCE, 'irrelevant');
-  assert.equal(model.propStanceForUncertainResearch(), 'irrelevant');
-  let s = planned([1, 1, 1, 1]);
-  s = m.beginSituationResearch(s, 'f1d1');
-  s = m.applySituationEvidence(s, 'f1d1', { found: true, stance: 'uncertain', proof: proof(1) });
+test('facet boost: uncertain research is stored found with NO propStance (unjudged, never locked); the judge assigns it like any other datum', () => {
+  // Bug A: research stance is relative to the need, so it must not decide propStance (it used to be locked as irrelevant with no reason).
+  assert.equal(model.UNCERTAIN_RESEARCH_STANCE, undefined);
+  assert.equal(model.propStanceForUncertainResearch, undefined);
+  const uncertain = () => {
+    const s = m.applySituationEvidence(m.beginSituationResearch(planned([1, 1, 1, 1]), 'f1d1'), 'f1d1', { found: true, stance: 'uncertain', proof: proof(1) });
+    return s;
+  };
+  let s = uncertain();
   const d = s.situation.data.find(x => x.id === 'f1d1');
   assert.equal(d.state, 'found');
-  assert.equal(d.propStance, 'irrelevant');
+  assert.equal(d.propStance, undefined);
+  assert.equal(d.stance, undefined);
+  assert.equal(model.isStanceLocked(d), false);
   s = researchAll(s);
   const j = judgement(s);
   j.data.find(x => x.id === 'f1d1').propStance = 'supports';
-  refuses(s, () => m.applyFacetVerdicts(s, j));
-  const keep = judgement(s);
-  assert.equal(keep.data.find(x => x.id === 'f1d1').propStance, 'irrelevant');
-  s = m.applyFacetVerdicts(s, keep);
-  assert.equal(s.situation.data.find(x => x.id === 'f1d1').propStance, 'irrelevant');
-  assert.equal(s.situation.facets[0].verdict, 'insufficient', 'only irrelevant data: no basis');
+  j.data.find(x => x.id === 'f1d1').reason = 'the figure shows it';
+  const supported = m.applyFacetVerdicts(s, j);
+  assert.equal(supported.situation.data.find(x => x.id === 'f1d1').propStance, 'supports');
+  assert.equal(supported.situation.data.find(x => x.id === 'f1d1').stanceReason, 'the figure shows it');
+  // the judge may still say irrelevant, with a reason (the #47 meaning lives only at the judge level)
+  const irrelevant = m.applyFacetVerdicts(s, judgement(s, { f1d1: 'irrelevant' }));
+  const kept = irrelevant.situation.data.find(x => x.id === 'f1d1');
+  assert.equal(kept.propStance, 'irrelevant');
+  assert.ok(kept.stanceReason && kept.stanceReason.trim());
+  assert.equal(irrelevant.situation.facets[0].verdict, 'insufficient', 'only irrelevant data: no basis');
+  // an irrelevant stance with no reason (stored by the earlier build) is not locked either: the judge may re-assess it
+  assert.equal(model.isStanceLocked({ propStance: 'irrelevant' }), false);
+  assert.equal(model.isStanceLocked({ propStance: 'supports', stanceReason: 'x' }), true);
+  assert.equal(model.isStanceLocked({ propStance: 'refutes' }), true);
+  // a stance with a blank reason is refused, so an irrelevant datum never has an empty reason
+  const blank = judgement(s, { f1d1: 'irrelevant' });
+  blank.data.find(x => x.id === 'f1d1').reason = ' ';
+  refuses(s, () => m.applyFacetVerdicts(s, blank));
   // old maps are untouched: an uncertain stance is still refused there
   let o = m.applySituationData(m.newArgumentMap(roles, 'r'), [{ id: 'd1', need: 'x' }]);
   o = m.beginSituationResearch(o, 'd1');

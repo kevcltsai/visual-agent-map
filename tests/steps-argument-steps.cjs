@@ -293,6 +293,11 @@ test('facet judge: citations belong to the facet, are found, not irrelevant, and
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').verdict = 'pending'; }), /verdict/);
   assert.ok(ok(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').verdict = 'refutes'; fjFacet(v, 'fa').citedData = ['a2']; })));
 });
+test('facet judge: a datum stance without a reason (or a blank one) is refused, so an irrelevant datum never has an empty reason', () => {
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.data[2].reason = ''; }), /reason/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.data[2].reason = '   '; }), /reason/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { delete v.data[2].reason; }));
+});
 test('facet judge: an empty summary or reason is refused', () => {
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').summary = ''; }), /summary/);
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').summary = '  '; }), /summary/);

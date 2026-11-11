@@ -27,6 +27,8 @@ export interface TopicChatChoice {
   researched: number;
   /** Unresearched deepest topics the research-first choice researches. */
   leaves: number;
+  /** Direct subtopics (the quick choice sends their full content). */
+  children: number;
   /** AI calls per choice, in the order the options are listed. */
   calls: Record<IntegrationDepth, number>;
   selected: IntegrationDepth;
@@ -615,7 +617,7 @@ function depthLabel(depth: IntegrationDepth): string {
 
 function depthHint(depth: IntegrationDepth, choice: TopicChatChoice): string {
   const calls = choice.calls[depth];
-  if (depth === "quick") return t("ui.topic_chat_choice_quick_hint_0", calls);
+  if (depth === "quick") return t("ui.topic_chat_choice_quick_hint_0_1", choice.children, calls);
   if (depth === "bottom-up") return t("ui.topic_chat_choice_bottom_up_hint_0", calls);
   return t("ui.topic_chat_choice_research_first_hint_0_1", choice.leaves, calls);
 }

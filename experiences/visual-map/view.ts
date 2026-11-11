@@ -1073,6 +1073,8 @@ interface TopicChatEntry {
 /** How the steps below the root of a subtree integration ended: `halt` set means the root is not integrated. */
 interface SubtreeChainOutcome {
   halt: "stopped" | "failed" | null;
+  /** Why the chain stopped when an AI lock stopped it. */
+  reason?: string;
   /** Steps that succeeded (research or integration) and the steps planned, the root's included. */
   done: number;
   total: number;
@@ -15536,6 +15538,7 @@ export class VisualAgentMapView extends ItemView {
           topics: stats.topics,
           researched: stats.researched,
           leaves: stats.unresearchedLeaves,
+          children: nodes.filter(item => item.parentId === node.id).length,
           calls: {
             quick: integrationCalls(stats, "quick"),
             "bottom-up": integrationCalls(stats, "bottom-up"),
@@ -15790,7 +15793,7 @@ export class VisualAgentMapView extends ItemView {
           else
             this.settleTopicChat(
               entry,
-              t("ui.topic_chat_subtree_stopped_0_1", chain.done, chain.total),
+              [t("ui.topic_chat_subtree_stopped_0_1", chain.done, chain.total), chain.reason].filter(Boolean).join(" "),
               live,
               false,
               "stopped"
@@ -15850,6 +15853,8 @@ export class VisualAgentMapView extends ItemView {
         {
           ...chatSynthesisOptions({ outputLanguage: language }),
           researchMode: researchModeOf(mode),
+          // Only a chosen depth over a deeper subtree (the chain) sends the outline; a plain integration keeps its old form.
+          ...(depth !== undefined ? { subtreeIntegration: true } : {}),
           signal: controller.signal,
           onProgress: () => {},
           steer: steers
@@ -15862,6 +15867,7 @@ export class VisualAgentMapView extends ItemView {
         endHooks,
         {
           isOpen: () => false,
+          accepted: cancel => controller.signal.addEventListener("abort", cancel, { once: true }),
           onWritten: () => {
             written = true;
           }
@@ -15964,6 +15970,7 @@ export class VisualAgentMapView extends ItemView {
       if (!target) continue;
       if (this.aiLockReason("write", [target.id])) {
         outcome.halt = "stopped";
+        outcome.reason = t("ui.ai_locked_notice");
         return outcome;
       }
       if (this.topicChatBusy(target)) continue;
@@ -15982,6 +15989,7 @@ export class VisualAgentMapView extends ItemView {
             {
               ...chatSynthesisOptions({ outputLanguage: language }),
               researchMode: "local",
+              subtreeIntegration: true,
               signal: controller.signal,
               onProgress: () => {}
             },
@@ -15990,6 +15998,7 @@ export class VisualAgentMapView extends ItemView {
             () => {},
             {
               isOpen: () => false,
+              accepted: cancel => controller.signal.addEventListener("abort", cancel, { once: true }),
               onWritten: () => {
                 written = true;
               }
@@ -19612,7 +19621,7 @@ export class VisualAgentMapView extends ItemView {
         );
         const detailTemplate = run.template;
         synthesisRun = run;
-        updateMode = integrationUpdateMode(run);
+        updateMode = options?.subtreeIntegration ? integrationUpdateMode(run) : run.updateMode;
         return {
           detailTemplate,
           updateMode,
@@ -19636,7 +19645,9 @@ export class VisualAgentMapView extends ItemView {
           tone: run.toneText ? { toneText: run.toneText } : {},
           style: run.contextFields
         };
-        const outlineText = subtreeOutlineText(buildSubtreeOutline(this.subtreePlanNodes(), node.id));
+        const outlineText = options?.subtreeIntegration
+          ? subtreeOutlineText(buildSubtreeOutline(this.subtreePlanNodes(), node.id))
+          : "";
         return withThinkingOrigin(
           {
             title: note.title,

@@ -2717,11 +2717,11 @@ var en = {
   "ui.topic_chat_failed_children": "No subtopic could be researched.",
   "ui.topic_chat_choice_message_0_1_2": "Below this topic there are {0} levels and {1} topics; only {2} were researched. How deep should the integration go?",
   "ui.topic_chat_choice_quick": "Quick",
-  "ui.topic_chat_choice_quick_hint_0": "Each subtopic that has its own subtopics is integrated from them first (no web search), then this topic; about {0} AI calls.",
+  "ui.topic_chat_choice_quick_hint_0_1": "Full content of {0} subtopics plus the titles and summaries of the other topics; about {1} AI calls",
   "ui.topic_chat_choice_bottom_up": "Integrate bottom-up",
   "ui.topic_chat_choice_bottom_up_hint_0": "Integrate every level from the deepest up, no web search; about {0} AI calls.",
   "ui.topic_chat_choice_research_first": "Research first, then integrate",
-  "ui.topic_chat_choice_research_first_hint_0_1": "Research the {0} unresearched deepest topics first, then integrate level by level; about {1} AI calls.",
+  "ui.topic_chat_choice_research_first_hint_0_1": "Research the {0} deepest topics first, then integrate level by level; about {1} AI calls",
   "ui.topic_chat_choice_start": "Start",
   "ui.topic_chat_choice_cancel": "Cancel",
   "ui.topic_chat_choice_cancelled": "Cancelled. Nothing was run.",
@@ -5532,11 +5532,11 @@ var zhCN = {
   "ui.topic_chat_failed_children": "\u6CA1\u6709\u5B50\u8BAE\u9898\u7814\u7A76\u6210\u529F\u3002",
   "ui.topic_chat_choice_message_0_1_2": "\u4E0B\u9762\u6709 {0} \u5C42\u3001{1} \u4E2A\u8BAE\u9898\uFF0C\u53EA\u6709 {2} \u4E2A\u7814\u7A76\u8FC7\u3002\u8981\u6574\u5408\u5230\u591A\u6DF1\uFF1F",
   "ui.topic_chat_choice_quick": "\u5FEB\u901F",
-  "ui.topic_chat_choice_quick_hint_0": "\u6709\u5B50\u8BAE\u9898\u7684\u5B50\u8BAE\u9898\u5148\u7528\u81EA\u5DF1\u7684\u5B50\u8BAE\u9898\u6574\u5408\uFF08\u4E0D\u8054\u7F51\uFF09\uFF0C\u518D\u6574\u5408\u8FD9\u4E2A\u8BAE\u9898\uFF0C\u7EA6 {0} \u6B21 AI\u3002",
+  "ui.topic_chat_choice_quick_hint_0_1": "{0} \u4E2A\u5B50\u8BAE\u9898\u5B8C\u6574\u5185\u5BB9\uFF0B\u5176\u4F59\u8BAE\u9898\u7684\u6807\u9898\u4E0E\u6458\u8981\uFF0C\u7EA6 {1} \u6B21 AI",
   "ui.topic_chat_choice_bottom_up": "\u7531\u4E0B\u5F80\u4E0A\u6574\u5408",
   "ui.topic_chat_choice_bottom_up_hint_0": "\u4ECE\u6700\u5E95\u5C42\u9010\u5C42\u6574\u5408\uFF0C\u4E0D\u8054\u7F51\uFF0C\u7EA6 {0} \u6B21 AI\u3002",
   "ui.topic_chat_choice_research_first": "\u5148\u7814\u7A76\u518D\u6574\u5408",
-  "ui.topic_chat_choice_research_first_hint_0_1": "\u5148\u8054\u7F51\u7814\u7A76 {0} \u4E2A\u6700\u5E95\u5C42\u6CA1\u7814\u7A76\u8FC7\u7684\u8BAE\u9898\uFF0C\u518D\u9010\u5C42\u6574\u5408\uFF0C\u7EA6 {1} \u6B21 AI\u3002",
+  "ui.topic_chat_choice_research_first_hint_0_1": "\u5148\u7814\u7A76 {0} \u4E2A\u6700\u5E95\u5C42\u8BAE\u9898\uFF0C\u518D\u9010\u5C42\u6574\u5408\uFF0C\u7EA6 {1} \u6B21 AI",
   "ui.topic_chat_choice_start": "\u5F00\u59CB",
   "ui.topic_chat_choice_cancel": "\u53D6\u6D88",
   "ui.topic_chat_choice_cancelled": "\u5DF2\u53D6\u6D88\uFF0C\u6CA1\u6709\u6267\u884C\u3002",
@@ -8347,11 +8347,11 @@ var zhTW = {
   "ui.topic_chat_failed_children": "\u6C92\u6709\u5B50\u8B70\u984C\u7814\u7A76\u6210\u529F\u3002",
   "ui.topic_chat_choice_message_0_1_2": "\u5E95\u4E0B\u6709 {0} \u5C64\u3001{1} \u500B\u8B70\u984C\uFF0C\u53EA\u6709 {2} \u500B\u7814\u7A76\u904E\u3002\u8981\u6574\u5408\u5230\u591A\u6DF1\uFF1F",
   "ui.topic_chat_choice_quick": "\u5FEB\u901F",
-  "ui.topic_chat_choice_quick_hint_0": "\u6709\u5B50\u8B70\u984C\u7684\u5B50\u8B70\u984C\u5148\u7528\u81EA\u5DF1\u7684\u5B50\u8B70\u984C\u6574\u5408\uFF08\u4E0D\u4E0A\u7DB2\uFF09\uFF0C\u518D\u6574\u5408\u9019\u500B\u8B70\u984C\uFF0C\u7D04 {0} \u6B21 AI\u3002",
+  "ui.topic_chat_choice_quick_hint_0_1": "{0} \u500B\u5B50\u8B70\u984C\u5B8C\u6574\u5167\u5BB9\uFF0B\u5176\u9918\u8B70\u984C\u7684\u6A19\u984C\u8207\u6458\u8981\uFF0C\u7D04 {1} \u6B21 AI",
   "ui.topic_chat_choice_bottom_up": "\u7531\u4E0B\u5F80\u4E0A\u6574\u5408",
   "ui.topic_chat_choice_bottom_up_hint_0": "\u5F9E\u6700\u5E95\u5C64\u9010\u5C64\u6574\u5408\uFF0C\u4E0D\u4E0A\u7DB2\uFF0C\u7D04 {0} \u6B21 AI\u3002",
   "ui.topic_chat_choice_research_first": "\u5148\u7814\u7A76\u518D\u6574\u5408",
-  "ui.topic_chat_choice_research_first_hint_0_1": "\u5148\u4E0A\u7DB2\u7814\u7A76 {0} \u500B\u6700\u5E95\u5C64\u6C92\u7814\u7A76\u904E\u7684\u8B70\u984C\uFF0C\u518D\u9010\u5C64\u6574\u5408\uFF0C\u7D04 {1} \u6B21 AI\u3002",
+  "ui.topic_chat_choice_research_first_hint_0_1": "\u5148\u7814\u7A76 {0} \u500B\u6700\u5E95\u5C64\u8B70\u984C\uFF0C\u518D\u9010\u5C64\u6574\u5408\uFF0C\u7D04 {1} \u6B21 AI",
   "ui.topic_chat_choice_start": "\u958B\u59CB",
   "ui.topic_chat_choice_cancel": "\u53D6\u6D88",
   "ui.topic_chat_choice_cancelled": "\u5DF2\u53D6\u6D88\uFF0C\u6C92\u6709\u57F7\u884C\u3002",
@@ -54913,7 +54913,7 @@ function depthLabel(depth) {
 }
 function depthHint(depth, choice) {
   const calls = choice.calls[depth];
-  if (depth === "quick") return t("ui.topic_chat_choice_quick_hint_0", calls);
+  if (depth === "quick") return t("ui.topic_chat_choice_quick_hint_0_1", choice.children, calls);
   if (depth === "bottom-up") return t("ui.topic_chat_choice_bottom_up_hint_0", calls);
   return t("ui.topic_chat_choice_research_first_hint_0_1", choice.leaves, calls);
 }
@@ -68649,6 +68649,7 @@ ${request.requirements}` : preset.text,
           topics: stats.topics,
           researched: stats.researched,
           leaves: stats.unresearchedLeaves,
+          children: nodes.filter((item) => item.parentId === node.id).length,
           calls: {
             quick: integrationCalls(stats, "quick"),
             "bottom-up": integrationCalls(stats, "bottom-up"),
@@ -68876,7 +68877,7 @@ ${request.requirements}` : preset.text,
           else
             this.settleTopicChat(
               entry,
-              t("ui.topic_chat_subtree_stopped_0_1", chain.done, chain.total),
+              [t("ui.topic_chat_subtree_stopped_0_1", chain.done, chain.total), chain.reason].filter(Boolean).join(" "),
               live2,
               false,
               "stopped"
@@ -68935,6 +68936,8 @@ ${request.requirements}` : preset.text,
         {
           ...chatSynthesisOptions({ outputLanguage: language2 }),
           researchMode: researchModeOf(mode),
+          // Only a chosen depth over a deeper subtree (the chain) sends the outline; a plain integration keeps its old form.
+          ...depth !== void 0 ? { subtreeIntegration: true } : {},
           signal: controller.signal,
           onProgress: () => {
           },
@@ -68948,6 +68951,7 @@ ${request.requirements}` : preset.text,
         endHooks,
         {
           isOpen: () => false,
+          accepted: (cancel) => controller.signal.addEventListener("abort", cancel, { once: true }),
           onWritten: () => {
             written2 = true;
           }
@@ -69039,6 +69043,7 @@ ${request.requirements}` : preset.text,
       if (!target) continue;
       if (this.aiLockReason("write", [target.id])) {
         outcome.halt = "stopped";
+        outcome.reason = t("ui.ai_locked_notice");
         return outcome;
       }
       if (this.topicChatBusy(target)) continue;
@@ -69057,6 +69062,7 @@ ${request.requirements}` : preset.text,
             {
               ...chatSynthesisOptions({ outputLanguage: language2 }),
               researchMode: "local",
+              subtreeIntegration: true,
               signal: controller.signal,
               onProgress: () => {
               }
@@ -69068,6 +69074,7 @@ ${request.requirements}` : preset.text,
             },
             {
               isOpen: () => false,
+              accepted: (cancel) => controller.signal.addEventListener("abort", cancel, { once: true }),
               onWritten: () => {
                 written2 = true;
               }
@@ -72430,7 +72437,7 @@ ${request.requirements}` : preset.text,
         );
         const detailTemplate = run.template;
         synthesisRun = run;
-        updateMode = integrationUpdateMode(run);
+        updateMode = (options == null ? void 0 : options.subtreeIntegration) ? integrationUpdateMode(run) : run.updateMode;
         return {
           detailTemplate,
           updateMode,
@@ -72453,7 +72460,7 @@ ${request.requirements}` : preset.text,
           tone: run.toneText ? { toneText: run.toneText } : {},
           style: run.contextFields
         };
-        const outlineText = subtreeOutlineText(buildSubtreeOutline(this.subtreePlanNodes(), node.id));
+        const outlineText = (options == null ? void 0 : options.subtreeIntegration) ? subtreeOutlineText(buildSubtreeOutline(this.subtreePlanNodes(), node.id)) : "";
         return withThinkingOrigin(
           {
             title: note.title,

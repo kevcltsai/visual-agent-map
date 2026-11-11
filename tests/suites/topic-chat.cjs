@@ -1780,7 +1780,7 @@ integrationTest('topic chat depth card: a deeper subtree shows the card with the
   const asks = h.control.usageAsks; const host = h.host('root');
   assert.equal(await host.submit('synthesize', 'all'), true);
   const choice = h.entry('root').session.choice;
-  assert.deepEqual(plain({ ...choice, turn: undefined }), plain({ levels: 3, topics: 4, researched: 0, leaves: 2, calls: { quick: 2, 'bottom-up': 3, 'research-first': 5 }, selected: 'quick', text: 'all', turn: undefined }));
+  assert.deepEqual(plain({ ...choice, turn: undefined }), plain({ levels: 3, topics: 4, researched: 0, leaves: 2, children: 2, calls: { quick: 2, 'bottom-up': 3, 'research-first': 5 }, selected: 'quick', text: 'all', turn: undefined }));
   assert.equal(h.entry('root').session.running, false); assert.equal(h.control.usageAsks, asks, 'no usage question yet');
   const win = h.win(); const card = find(win.el, i => i.attrs?.role === 'radiogroup');
   assert.ok(card, 'the radio group is drawn');
@@ -1868,7 +1868,33 @@ integrationTest('topic chat chain: an AI lock that appears mid-chain stops befor
   const { steps } = stubChain(h, key => { if (key === 'c') return h.repo.writeAiLocked(h.node('a').path, true).then(() => true); return true; });
   const text = await startDeep(h, 'bottom-up');
   assert.deepEqual(steps.map(s => s.key), ['c'], 'a locked topic and everything after it do not run');
-  assert.equal(text, t('ui.topic_chat_subtree_stopped_0_1', 1, 3));
+  assert.equal(text, `${t('ui.topic_chat_subtree_stopped_0_1', 1, 3)} ${t('ui.ai_locked_notice')}`, 'the stop names the lock');
+});
+
+integrationTest('topic chat chain: the chain steps and the root take the subtree option; a plain one-level integration does not', async () => {
+  const h = await harness(); await deepen(h); const { steps } = stubChain(h);
+  await startDeep(h, 'bottom-up');
+  assert.deepEqual(steps.map(s => [s.key, s.options.subtreeIntegration]), [['c', true], ['a', true], ['root', true]]);
+  const g = await harness(); g.flatten(); await researched(g); const plain1 = stubChain(g);
+  assert.equal(await g.host('root').submit('synthesize', 'x'), true); await waitFor(() => plain1.steps.length === 1);
+  assert.equal(plain1.steps[0].options.subtreeIntegration, undefined);
+});
+
+integrationTest('topic chat chain: Stop after the provider accepted a step aborts that step, writes nothing and says how far it got', async () => {
+  const h = await harness(); await deepen(h);
+  let seen = 0; const written = [];
+  h.plugin.askModel = (context, _model, _reasoning, signal, _onExchange, onAccepted) => new Promise((_resolve, reject) => {
+    seen++; context.onWorkingFindingsSent?.(context.workingFindings ?? ''); onAccepted?.();
+    signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    setTimeout(() => h.entry('root').controller.abort(), 20);
+  });
+  h.view.runAgent = async () => ({ finished: Promise.resolve() });
+  const before = (await h.repo.readNote(h.node('c').path)).detail;
+  const text = await startDeep(h, 'bottom-up');
+  assert.equal(seen, 1, 'only the first step called the model');
+  assert.equal((await h.repo.readNote(h.node('c').path)).detail, before, 'the aborted step wrote nothing');
+  assert.equal(text, t('ui.topic_chat_subtree_stopped_0_1', 0, 3));
+  assert.equal((await topicLines(h, 'root')).at(-1).status, 'stopped');
 });
 
 integrationTest('topic chat chain: a topic deleted mid-chain is skipped, the others run', async () => {

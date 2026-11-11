@@ -1006,8 +1006,8 @@ async function backgroundSynthesisFixture(askModel) {
   return { repo, parent, plugin, view, contexts, options, directionsResult, draftResult };
 }
 // Integrating the whole subtree (P1): the update mode default and the outline the root's prompt carries.
-async function subtreeFixture(parentStyle) {
-  const f = await backgroundSynthesisFixture(async () => f.draftResult);
+async function subtreeFixture(parentStyle, ask) {
+  const f = await backgroundSynthesisFixture(ask ? call => ask(call, f) : async () => f.draftResult);
   const map = f.view.map; const child = map.nodes.find(item => item.parentId === f.parent.id);
   const grand = await f.repo.createNote('Grand topic', 'model-a', map, f.view.path, 'workspace'); grand.parentId = child.id; map.nodes.push(grand); await f.repo.saveMap(f.view.path, map);
   await f.repo.updateNote(child.path, { status: 'completed', summary: 'Child summary', detail: 'Child finding.' });
@@ -1029,7 +1029,7 @@ test('integrationUpdateMode: only an unset merge becomes fresh; a chosen style, 
 });
 integrationTest('integration with no note style set is a whole rewrite: the old Detail is not sent, and the prompt carries the subtree outline', async () => {
   const f = await subtreeFixture();
-  await f.view.integrateChildren(f.parent, f.options(), 'Integrate', () => {}, m => assert.fail(m));
+  await f.view.integrateChildren(f.parent, { ...f.options(), subtreeIntegration: true }, 'Integrate', () => {}, m => assert.fail(m));
   const context = f.contexts[0];
   assert.equal(context.updateMode, 'fresh');
   assert.match(context.subtreeOutline, /- Child\n {2}- Grand topic — Grand summary \[unresearched\]/);
@@ -1037,10 +1037,38 @@ integrationTest('integration with no note style set is a whole rewrite: the old 
 });
 integrationTest('an explicit note style that merges keeps the merge update (and the old Detail) in the integration', async () => {
   const f = await subtreeFixture('builtin:general');
-  await f.view.integrateChildren(f.parent, f.options(), 'Integrate', () => {}, m => assert.fail(m));
+  await f.view.integrateChildren(f.parent, { ...f.options(), subtreeIntegration: true }, 'Integrate', () => {}, m => assert.fail(m));
   assert.equal(f.contexts[0].updateMode, 'merge');
   assert.equal(f.contexts[0].detail, 'Existing knowledge');
   assert.ok(f.contexts[0].subtreeOutline, 'the outline does not depend on the update mode');
+});
+// Decision #9: only the topic chat chain and the integrate dialog (with its retry) take the outline and the fresh default; every other path is as before.
+integrationTest('an integration without the subtree option (map chat, ask action) keeps the style update mode and sends no outline', async () => {
+  const f = await subtreeFixture();
+  await f.view.startSynthesis(f.parent, f.options(), 'Integrate', m => assert.fail(m), () => {});
+  const context = f.contexts[0];
+  assert.equal(context.updateMode, 'merge', 'the unset style merges as before');
+  assert.equal(context.detail, 'Existing knowledge', 'the old Detail travels as before');
+  assert.equal('subtreeOutline' in context, false);
+});
+integrationTest('map chat single-topic synthesis goes through the real integrateChildren with merge and no outline', async () => {
+  const f = await subtreeFixture();
+  f.view.launchChatTask = async (_model, run) => { let accepted = false; await run(m => assert.fail(m), () => { accepted = true; }); return { status: 'started', accepted }; };
+  f.view.outputLanguageMemory = () => ({});
+  await f.view.chatSynthesize([f.parent.id], 'Integrate');
+  assert.equal(f.contexts.length, 1, 'the model ran once');
+  assert.equal(f.contexts[0].updateMode, 'merge');
+  assert.equal('subtreeOutline' in f.contexts[0], false);
+});
+integrationTest('the retry of a dialog integration keeps the outline and the fresh default; the first attempt failed after the options were stored', async () => {
+  const f = await subtreeFixture(undefined, async call => { if (call === 1) throw new Error('boom'); return f.draftResult; });
+  const failures = [];
+  await f.view.startSynthesis(f.parent, { ...f.options(), subtreeIntegration: true }, 'Integrate', m => failures.push(m), () => {});
+  assert.equal(failures.length, 1); assert.equal(f.view.synthesisTasks.get(f.parent.path).state, 'failed');
+  f.plugin.confirmAiUsage = async (_model, run) => run(); f.view.notesLoading = () => false;
+  f.view.retrySynthesis(f.parent);
+  await until(() => f.contexts.length === 2 && !f.view.synthesisTasks.has(f.parent.path));
+  assert.equal(f.contexts[1].updateMode, 'fresh'); assert.ok(f.contexts[1].subtreeOutline);
 });
 integrationTest('a one-level subtree sends no outline; the direct subtopics travel as before', async () => {
   const f = await backgroundSynthesisFixture(async () => f.draftResult);
@@ -1053,7 +1081,7 @@ integrationTest('fresh integration whose file cannot be read for the backup call
   const hooks = f.view.writebackHooks.bind(f.view);
   f.view.writebackHooks = () => ({ ...hooks(), readRaw: async () => { throw new Error('no file'); } });
   const failures = [];
-  await f.view.integrateChildren(f.parent, f.options(), 'Integrate', () => assert.fail('wrote'), m => failures.push(m));
+  await f.view.integrateChildren(f.parent, { ...f.options(), subtreeIntegration: true }, 'Integrate', () => assert.fail('wrote'), m => failures.push(m));
   assert.equal(f.contexts.length, 0, 'no model call');
   assert.deepEqual(failures, [load('i18n.ts').t('ui.writeback_backup_failed')]);
   assert.equal((await f.repo.readNote(f.parent.path)).detail, 'Existing knowledge');

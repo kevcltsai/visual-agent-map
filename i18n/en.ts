@@ -2903,14 +2903,14 @@ export const en = {
   "ui.topic_chat_choice_message_0_1_2":
     "Below this topic there are {0} levels and {1} topics; only {2} were researched. How deep should the integration go?",
   "ui.topic_chat_choice_quick": "Quick",
-  "ui.topic_chat_choice_quick_hint_0":
-    "Each subtopic that has its own subtopics is integrated from them first (no web search), then this topic; about {0} AI calls.",
+  "ui.topic_chat_choice_quick_hint_0_1":
+    "Full content of {0} subtopics plus the titles and summaries of the other topics; about {1} AI calls",
   "ui.topic_chat_choice_bottom_up": "Integrate bottom-up",
   "ui.topic_chat_choice_bottom_up_hint_0":
     "Integrate every level from the deepest up, no web search; about {0} AI calls.",
   "ui.topic_chat_choice_research_first": "Research first, then integrate",
   "ui.topic_chat_choice_research_first_hint_0_1":
-    "Research the {0} unresearched deepest topics first, then integrate level by level; about {1} AI calls.",
+    "Research the {0} deepest topics first, then integrate level by level; about {1} AI calls",
   "ui.topic_chat_choice_start": "Start",
   "ui.topic_chat_choice_cancel": "Cancel",
   "ui.topic_chat_choice_cancelled": "Cancelled. Nothing was run.",

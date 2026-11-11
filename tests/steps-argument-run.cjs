@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
-const { ArgumentRuns, ArgumentRunError, WORST_CASE_AI_CALLS, assumptionScope } = S.load('experiences/visual-map/argument-run.ts');
+const { ArgumentRuns, ArgumentRunError, WORST_CASE_AI_CALLS, assumptionScope, untilAborted } = S.load('experiences/visual-map/argument-run.ts');
 const { ARGUMENT_STEPS, ArgumentStepError } = S.load('core/steps/argument-map/runner.ts');
 const model = S.load('core/argument-map/model.ts');
 const machine = S.load('core/argument-map/machine.ts');
@@ -1098,4 +1098,18 @@ test('sem3 run: criterion, baseline and definition needs reach the state, the de
   const again = log[1].facets.find(f => f.title === 'Rate').data.find(d => d.need === 'unemployment rate');
   assert.equal(again.priorStance, 'irrelevant');
   assert.equal(again.fixedStance, undefined);
+});
+
+test('untilAborted: the abort listener is removed once the work settles first (no listener build-up over many asks)', async () => {
+  const live = new Set();
+  const signal = { aborted: false, addEventListener: (_t, fn) => live.add(fn), removeEventListener: (_t, fn) => live.delete(fn) };
+  for (let i = 0; i < 25; i++) {
+    assert.equal(await untilAborted(signal, Promise.resolve(i)), i);
+    await assert.rejects(untilAborted(signal, Promise.reject(new Error('x'))), /x/);
+  }
+  assert.equal(live.size, 0, 'listeners left on the signal');
+  const pending = untilAborted(signal, new Promise(() => undefined));
+  assert.equal(live.size, 1);
+  signal.aborted = true; [...live][0](); live.clear();
+  await assert.rejects(pending, /aborted/);
 });

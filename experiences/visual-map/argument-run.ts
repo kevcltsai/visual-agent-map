@@ -240,11 +240,22 @@ function linked(a: AbortSignal, b: AbortSignal): AbortSignal {
   return controller.signal;
 }
 /** The call's result, or a rejection the moment `signal` aborts: a provider that ignores abort must not hang Stop. */
-function untilAborted<T>(signal: AbortSignal, work: Promise<T>): Promise<T> {
+export function untilAborted<T>(signal: AbortSignal, work: Promise<T>): Promise<T> {
   if (signal.aborted) return Promise.reject(new Error("aborted"));
   return new Promise<T>((resolve, reject) => {
-    signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
-    work.then(resolve, reject);
+    const onAbort = (): void => reject(new Error("aborted"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    const settle = (): void => signal.removeEventListener("abort", onAbort);
+    work.then(
+      value => {
+        settle();
+        resolve(value);
+      },
+      error => {
+        settle();
+        reject(error);
+      }
+    );
   });
 }
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);

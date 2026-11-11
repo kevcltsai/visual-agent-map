@@ -1623,3 +1623,79 @@ test('R1 M2: a fact question whose facets are all insufficient stops with the ou
   for (const title of ['Rate', 'Postings', 'Hiring']) assert.ok(note.detail.includes(title), `${title} in the note`);
   await noCodeShown(r, 'fact insufficient');
 });
+
+// ---- research pool: a finished call frees its slot at once (no batch barrier); still at most 3 at once ----
+const sixData = () => steps({ plan_situation: () => ({ data: Array.from({ length: 6 }, (_, i) => ({ need: `n${i}` })) }) });
+const asked = (r, task) => r.stat.ask.some(ctx => ctx.task === task);
+const until = async (done, limit = 400) => { for (let i = 0; i < limit && !done(); i++) await tick(); return done(); };
+
+test('pool: a slow research call does not hold the free slots; the 4th call starts before the slow one ends', async () => {
+  const slow = defer();
+  let slowEnded = false;
+  const r = await rig({ script: { step: sixData(), ask: async ctx => {
+    if (ctx.task === 'n0') { await slow.promise; slowEnded = true; } else await tick();
+    return okAnswer(ctx);
+  } } });
+  const started = r.runs.start(r.mapPath, 'p');
+  const fourth = await until(() => asked(r, 'n3'));
+  slow.resolve();
+  await started;
+  assert.ok(fourth, 'the 4th research call starts while the slow one is still out');
+  const state = await r.state();
+  assert.equal(state.run.phase, 'concluded');
+  assert.ok(r.stat.maxActive <= 3, `max ${r.stat.maxActive}`);
+  assert.equal(state.run.researchCalls, r.stat.ask.length, 'researchCalls counts every call, no more');
+  assert.ok(state.situation.data.every(d => d.state === 'found' && d.attempts === 1), 'each datum researched once');
+});
+
+test('pool: Stop while a slow call is out dispatches nothing new, pauses (user) and drops the late result', async () => {
+  const slow = defer();
+  const r = await rig({ script: { step: sixData(), ask: async ctx => {
+    if (ctx.task === 'n0') await slow.promise; else await tick();
+    return okAnswer(ctx);
+  } } });
+  const started = r.runs.start(r.mapPath, 'p');
+  assert.ok(await until(() => asked(r, 'n3')));
+  await r.runs.stop(r.mapPath);
+  await started;
+  const count = r.stat.ask.length;
+  const before = JSON.stringify(await r.state());
+  slow.resolve();
+  for (let i = 0; i < 20; i++) await tick();
+  assert.equal(r.stat.ask.length, count, 'no dispatch after Stop');
+  assert.equal(JSON.stringify(await r.state()), before, 'the late result is not written');
+  const state = await r.state();
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'user');
+  assert.ok(state.situation.data.every(d => d.state !== 'searching'));
+  assert.equal(datum(state, 'n0').state, 'pending');
+  assert.equal(state.run.researchCalls, count);
+});
+
+test('pool: an item failing twice stops new dispatches; the call still out is committed, then the run pauses with error', async () => {
+  const slow = defer();
+  let failures = 0;
+  let afterSecond = 0;
+  const r = await rig({ script: { step: sixData(), ask: async ctx => {
+    if (failures >= 2) afterSecond++;
+    if (ctx.task === 'n0') { await slow.promise; return okAnswer(ctx); }
+    await tick();
+    if (ctx.task === 'n1') { failures++; throw new Error('timeout'); }
+    return okAnswer(ctx);
+  } } });
+  const started = r.runs.start(r.mapPath, 'p');
+  assert.ok(await until(() => failures >= 2));
+  for (let i = 0; i < 20; i++) await tick();
+  assert.equal(r.runs.isRunning(r.mapPath), true, 'the run waits for the call still out');
+  slow.resolve();
+  await started;
+  const state = await r.state();
+  assert.equal(afterSecond, 0, 'no research call starts after the second failure of one item');
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'error');
+  assert.equal(datum(state, 'n0').state, 'found', 'the slow call still out is committed');
+  assert.equal(datum(state, 'n1').state, 'pending');
+  assert.ok(state.situation.data.every(d => d.state !== 'searching'));
+  assert.equal(state.run.researchCalls, r.stat.ask.length);
+  assert.ok(r.stat.maxActive <= 3);
+});

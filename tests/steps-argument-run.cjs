@@ -824,7 +824,7 @@ test('P5 #58: a round-1 retry with no retry needs ends unconfirmed and the run g
   const seen = { hyp: [], conclude: [] };
   const r = await rig({ facet: true, script: { step: facetSteps({
     judge_facets: judgeBy(log, () => [], () => 'irrelevant'),
-    propose_facet_hypotheses: request => { seen.hyp.push(request.unconfirmed); return { hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${request.existing.length + i + 1}`, statement: `statement ${request.existing.length + i + 1}`, basis: 'because of the data', alternative: i === 0, citedData: [] })) }; },
+    propose_facet_hypotheses: request => { seen.hyp.push(request.unconfirmed); return { hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${request.existing.length + i + 1}`, statement: `statement ${request.existing.length + i + 1}`, alternative: i === 0 })) }; },
     conclude: request => { seen.conclude.push(request.unconfirmed); return facetSteps().conclude(request); }
   }), ask: askByNeed({ 'job postings': need => aiReply([notFoundEntry(need.id)]), 'junior hiring': need => aiReply([notFoundEntry(need.id)]) }) } });
   await r.runs.start(r.mapPath, 'p');

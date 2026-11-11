@@ -794,6 +794,21 @@ test('P5: a new map plans by facets and never calls the old plan step; every car
   assert.equal(state.run.phase, 'concluded');
 });
 
+test('#61/#62: a hypothesis that cites no data still gets the premise data of the supporting facets in its needs request', async () => {
+  const seen = [];
+  const r = await rig({ facet: true, script: { step: facetSteps({
+    propose_facet_hypotheses: request => ({ hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${i + 1}`, statement: `statement ${i + 1}`, alternative: false })) }),
+    add_needs: request => { seen.push(request.data.map(d => d.id)); return facetSteps().add_needs(); }
+  }) } });
+  await r.runs.start(r.mapPath, 'Youth unemployment is rising');
+  const state = await r.state();
+  const premise = state.situation.data.filter(d => d.state === 'found').map(d => d.id).sort();
+  assert.ok(premise.length > 0);
+  assert.ok(seen.length > 0);
+  for (const ids of seen) assert.equal(JSON.stringify([...ids].sort()), JSON.stringify(premise));
+  assert.equal(state.run.phase, 'concluded');
+});
+
 test('P5: a pause between the facet judgement and its checkpoint leaves no verdicts and no retry needs; resume asks the judge again', async () => {
   const log = [];
   const holder = {};

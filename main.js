@@ -47796,6 +47796,16 @@ function untilAborted(signal, work) {
 }
 var same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 var dataOrNone = (state, data) => data.length === 0 && isSituationUnconfirmed(state) ? [] : gateData(data);
+var premiseData = (state) => {
+  var _a2;
+  const supporting = new Set(((_a2 = state.situation.facets) != null ? _a2 : []).filter((f) => f.verdict === "supports").map((f) => f.id));
+  return state.situation.data.filter(
+    (d) => {
+      var _a3;
+      return d.state === "found" && d.propStance !== void 0 && d.propStance !== "irrelevant" && (isSituationUnconfirmed(state) || supporting.has((_a3 = d.facetId) != null ? _a3 : ""));
+    }
+  );
+};
 var ArgumentRuns = class {
   constructor(ports) {
     this.ports = ports;
@@ -48365,26 +48375,20 @@ var ArgumentRuns = class {
     if (path) await this.writeNote(path, patch);
   }
   async propose(drive, state, proposition, count3) {
-    var _a2, _b2;
+    var _a2;
     const existing = [];
     for (const h of state.hypotheses) existing.push((await this.text(drive, h.id)).title);
     const found = state.situation.data.filter((d) => d.state === "found");
     let result;
     if (hasFacets(state)) {
-      const supporting = new Set(((_a2 = state.situation.facets) != null ? _a2 : []).filter((f) => f.verdict === "supports").map((f) => f.id));
-      const stanced = found.filter(
-        (d) => {
-          var _a3;
-          return d.propStance !== void 0 && d.propStance !== "irrelevant" && (isSituationUnconfirmed(state) || supporting.has((_a3 = d.facetId) != null ? _a3 : ""));
-        }
-      );
+      const stanced = premiseData(state);
       const request = {
         ...this.base(drive),
         proposition,
         data: dataOrNone(state, stanced).map((d, i) => ({ ...d, propStance: stanced[i].propStance })),
         count: count3,
         existing,
-        causalQuestions: (_b2 = state.situation.causalQuestions) != null ? _b2 : [],
+        causalQuestions: (_a2 = state.situation.causalQuestions) != null ? _a2 : [],
         ...isSituationUnconfirmed(state) ? { unconfirmed: true } : {}
       };
       result = await this.ask(drive, ARGUMENT_STEPS.propose_facet_hypotheses, request);
@@ -48435,7 +48439,7 @@ var ArgumentRuns = class {
       hypothesis: { title: text10.title, statement: await this.statementOf(drive, h), round: round3 },
       data: dataOrNone(
         state,
-        state.situation.data.filter((d) => h.citedData.includes(d.id))
+        hasFacets(state) ? premiseData(state) : state.situation.data.filter((d) => h.citedData.includes(d.id))
       ),
       existing: h.needs.map((n) => {
         var _a3, _b2, _c, _d, _e, _f, _g;

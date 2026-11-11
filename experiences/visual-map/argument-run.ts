@@ -286,6 +286,19 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
 const dataOrNone = (state: ArgumentMapData, data: readonly SituationDatum[]): GateDatum[] =>
   data.length === 0 && isSituationUnconfirmed(state) ? [] : gateData(data);
 
+/** Decision #61: the premise data a facet map hands to the hypothesis steps, the found data with a stance from the facets that support the
+ * premise (an unconfirmed premise has none, so it sends what was found). Hypotheses cite no data (#62), so their needs get this too. */
+const premiseData = (state: ArgumentMapData): SituationDatum[] => {
+  const supporting = new Set((state.situation.facets ?? []).filter(f => f.verdict === "supports").map(f => f.id));
+  return state.situation.data.filter(
+    d =>
+      d.state === "found" &&
+      d.propStance !== undefined &&
+      d.propStance !== "irrelevant" &&
+      (isSituationUnconfirmed(state) || supporting.has(d.facetId ?? ""))
+  );
+};
+
 export class ArgumentRuns {
   private readonly drives = new Map<string, Drive>();
   private waiting: (() => void)[] = [];
@@ -916,13 +929,7 @@ export class ArgumentRuns {
     if (hasFacets(state)) {
       // A facet map: the data with a stance toward the proposition and the causal questions. Decision #61: only the data of the facets that
       // support the premise are sent (an unconfirmed premise has none, so it sends what was found); the hypotheses come back with no basis.
-      const supporting = new Set((state.situation.facets ?? []).filter(f => f.verdict === "supports").map(f => f.id));
-      const stanced = found.filter(
-        d =>
-          d.propStance !== undefined &&
-          d.propStance !== "irrelevant" &&
-          (isSituationUnconfirmed(state) || supporting.has(d.facetId ?? ""))
-      );
+      const stanced = premiseData(state);
       const request: FacetHypothesesRequest = {
         ...this.base(drive),
         proposition,
@@ -992,7 +999,7 @@ export class ArgumentRuns {
       hypothesis: { title: text.title, statement: await this.statementOf(drive, h), round },
       data: dataOrNone(
         state,
-        state.situation.data.filter(d => h.citedData.includes(d.id))
+        hasFacets(state) ? premiseData(state) : state.situation.data.filter(d => h.citedData.includes(d.id))
       ),
       existing: h.needs.map(n => ({
         text: n.text,

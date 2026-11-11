@@ -194,6 +194,55 @@ test('re-run: an unreadable table creates no map and starts nothing; a readable 
   assert.deepEqual(plainJson(await R.rerunWithAssumptions({ ...ports('| a | b | c |\n| --- | --- | --- |\n| l | v | r |'), proposition: () => '  ' })), { kind: 'unreadable' });
 });
 
+// ---- #60: the question type line of the definitions note and the fact conclusion note --------------------------------------------------
+const TABLE = '| a | b | c |\n| --- | --- | --- |\n| l | v | r |';
+test('parseQuestionType: a known type on the line, no line (AI decides), an unknown value (unreadable); the line is read before the table only; CRLF and every language read', () => {
+  assert.equal(R.parseQuestionType(`### x\n題型: 事實題\n\n${TABLE}`), 'fact');
+  assert.equal(R.parseQuestionType(`題型：因果題\r\n\r\n${TABLE}`), 'causal');
+  assert.equal(R.parseQuestionType(`题型: 因果题\n${TABLE}`), 'causal');
+  assert.equal(R.parseQuestionType(`Question type: fact question\n${TABLE}`), 'fact');
+  assert.equal(R.parseQuestionType(`Question type: CAUSAL\n${TABLE}`), 'causal');
+  assert.equal(R.parseQuestionType(TABLE), undefined);
+  assert.equal(R.parseQuestionType(''), undefined);
+  assert.equal(R.parseQuestionType(`題型: 其他\n${TABLE}`), null);
+  assert.equal(R.parseQuestionType(`題型:\n${TABLE}`), null);
+  assert.equal(R.parseQuestionType(`${TABLE}\n題型: 事實題`), undefined, 'a line after the table is not the owner\'s type line');
+  for (const type of ['fact', 'causal']) for (const lang of ['zh-TW', 'zh-CN', 'en'])
+    assert.equal(R.parseQuestionType(N.definitionsDetail(key => translate(lang, key), [{ label: 'l', value: 'v', reason: 'r' }], undefined, undefined, type)), type, `${lang} ${type} reads back what definitionsDetail wrote`);
+  assert.equal(R.parseQuestionType(N.definitionsDetail(t, [{ label: 'l', value: 'v', reason: 'r' }])), undefined, 'an older note has no line');
+});
+test('re-run: the question type on the definitions note reaches start as presetQuestionType; no line passes undefined; an unknown value creates no map and starts nothing', async () => {
+  const calls = [];
+  const ports = detail => ({ readDefinitions: async () => detail, proposition: () => 'Claim', createMap: async () => { calls.push('create'); return 'New.md'; }, start: async (...args) => { calls.push(['start', args[3]]); } });
+  assert.equal((await R.rerunWithAssumptions(ports(`題型: 事實題\n${TABLE}`))).kind, 'started');
+  assert.equal((await R.rerunWithAssumptions(ports(TABLE))).kind, 'started');
+  assert.equal(calls[1][1], 'fact');
+  assert.equal(calls[3][1], undefined, 'no line: the AI decides');
+  calls.length = 0;
+  assert.deepEqual(plainJson(await R.rerunWithAssumptions(ports(`題型: 其他\n${TABLE}`))), { kind: 'unreadable' });
+  assert.deepEqual(calls, [], 'nothing is created for an unknown value');
+});
+test('fact conclusion note: the program-composed outcome, the insufficient count, the summary and points, and no hypothesis table', () => {
+  const fact = (verdicts, summary = 'the model summary') => {
+    const facets = verdicts.map((verdict, i) => facet({ id: `f${i}`, title: `F${i}`, verdict }));
+    const st = state([datum()], facets, {});
+    st.situation.questionType = 'fact';
+    st.roles = { proposition: 'p', situation: 's', conclusion: 'c' };
+    st.conclusion = { state: 'concluded', basedOn: ['f0'], missing: [] };
+    return N.conclusionDetail(t, st, new Map(), { summary, points: ['point A', 'point B'] });
+  };
+  assert.ok(fact(['supports', 'supports']).includes(t('ui.argument_note_outcome_holds')));
+  assert.ok(fact(['refutes', 'refutes']).includes(t('ui.argument_note_outcome_fails')));
+  assert.ok(fact(['supports', 'refutes']).includes(t('ui.argument_note_outcome_partial')));
+  const insufficient = fact(['insufficient', 'insufficient']);
+  assert.ok(insufficient.includes(t('ui.argument_note_outcome_insufficient')) && insufficient.includes(t('ui.argument_note_outcome_insufficient_count_0', '2')));
+  const withCount = fact(['supports', 'insufficient']);
+  assert.ok(withCount.includes(t('ui.argument_note_outcome_holds')) && withCount.includes(t('ui.argument_note_outcome_insufficient_count_0', '1')));
+  const detail = fact(['supports']);
+  assert.ok(detail.includes('the model summary') && detail.includes('- point A') && detail.includes('- point B'));
+  assert.ok(!detail.includes(t('ui.argument_note_basis_hypotheses')), 'a fact conclusion has no hypothesis table');
+});
+
 // ---- review round 1 (B1): whitelist sanitizing ---------------------------------------------------------------------------------------
 const inertText = md => !/%%|\$|(^|[^&\w])#\w|\]\(|\[\[|!\[|<[a-z]|==|~~|`|\*|\bhttps?:[^\s]*[()[\]]/i.test(md);
 test('safeUrl: whitelist only; a lone % is %25, $ is %24, nothing else can start math, a comment, a highlight or a link', () => {

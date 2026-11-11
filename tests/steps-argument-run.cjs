@@ -12,12 +12,13 @@ const { translate } = S.load('i18n.ts');
 const QUOTE = 'Youth unemployment rose to 9.2 percent in March';
 const URL_OK = 'https://stats.example.org/report';
 const PAGE = `<html><body><p>${QUOTE}, the highest in a decade.</p></body></html>`;
-const STEP_NAME = { 'argument-map.facet-plan': 'plan_facets', 'argument-map.facet-judge': 'judge_facets', 'argument-map.facet-hypotheses': 'propose_facet_hypotheses', 'argument-map.facet-verdict': 'verdict_facets', 'argument-map.situation-gate': 'judge_gate', 'argument-map.hypotheses': 'propose_hypotheses', 'argument-map.verdict': 'verdict', 'argument-map.conclusion': 'conclude' };
+const STEP_NAME = { 'argument-map.facet-plan': 'plan_facets', 'argument-map.facet-judge': 'judge_facets', 'argument-map.facet-hypotheses': 'propose_facet_hypotheses', 'argument-map.facet-verdict': 'verdict_facets', 'argument-map.situation-gate': 'judge_gate', 'argument-map.hypotheses': 'propose_hypotheses', 'argument-map.verdict': 'verdict', 'argument-map.conclusion': 'conclude', 'argument-map.conclusion-fact': 'conclude_facts' };
 const stepName = (step, request) => (step.id === ARGUMENT_STEPS.add_needs.id ? (request.existing.length ? 'revise' : 'add_needs') : STEP_NAME[step.id]);
 const plain = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const defer = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
-const foundEntry = (id, over = {}) => ({ need: id, status: 'found', stance: 'supports', claim: 'Rate rose', quote: QUOTE, url: URL_OK, ...over });
+// #64: the research reply carries a tier; a missing one counts as 'other' (needs a second source), so the default fake says 'primary'.
+const foundEntry = (id, over = {}) => ({ need: id, status: 'found', stance: 'supports', claim: 'Rate rose', quote: QUOTE, url: URL_OK, tier: 'primary', ...over });
 
 /** Everything the run needs; `over` replaces fakes. Legacy mode (default): the old plan step no longer exists, so after the start write the rig seeds old-style data (`script.step.plan_situation()` needs, one card each, no facets) and the run continues as an old map; `over.facet` skips the seeding and the new facet plan runs. `script.step[name](request, n)` returns a parsed output or throws; `script.ask(ctx, n)` an AiResult. */
 async function rig(over = {}) {
@@ -58,7 +59,7 @@ async function rig(over = {}) {
     config: () => ({ model: 'model-a', reasoning: 'low', language: 'zh-TW' }),
     begin: () => { const controller = new AbortController(); return { signal: controller.signal, release: () => undefined }; },
     clearUndo: path => stat.undo.push(path),
-    log: line => stat.logs.push(line),
+    log: line => { stat.logs.push(line); },
     t: (key, ...values) => translate('zh-TW', key, ...values),
     ...over.ports
   };
@@ -76,7 +77,7 @@ async function rig(over = {}) {
       const nodes = [];
       // A V1 map (no longer made by a new start) keeps its two groups: the rig makes them with the old data.
       const groups = [];
-      for (const key of ['verified', 'eliminated']) { const node = await ports.createNote({ kind: 'group', title: key }, doc, path); node.parentId = read.data.roles.conclusion; node.x = 0; node.y = 0; groups.push([key, node]); }
+      for (const key of ['verified', 'eliminated']) { const node = await ports.createNote({ kind: 'group', title: translate('zh-TW', key === 'verified' ? 'ui.argument_group_verified' : 'ui.argument_group_eliminated') }, doc, path); node.parentId = read.data.roles.conclusion; node.x = 0; node.y = 0; groups.push([key, node]); }
       for (const d of planned.data) { const node = await ports.createNote({ kind: 'datum', title: d.need, summary: d.need }, doc, path); items.push({ id: node.id, need: d.need }); nodes.push(node); }
       await repo.updateMap(path, d => { for (const [, node] of groups) d.nodes.push(node); for (const node of nodes) { node.parentId = read.data.roles.situation; node.x = 0; node.y = 0; d.nodes.push(node); } const applied = machine.applySituationData(model.readArgumentMap(d).data, items); for (const [key, node] of groups) applied.roles[key] = node.id; d.argumentMap = applied; });
       return written;
@@ -107,11 +108,12 @@ const facetSteps = (over = {}) => ({
     facets: request.facets.map(f => ({ id: f.id, verdict: f.data.length ? 'supports' : 'insufficient', reason: 'enough', summary: `summary of ${f.title}`, citedData: f.data.length ? [f.data[0].id] : [], retryNeeds: [] })),
     assumptionInsights: ['The age band narrows the data']
   }),
-  propose_facet_hypotheses: request => ({ hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${request.existing.length + i + 1}`, statement: `statement ${request.existing.length + i + 1}`, basis: 'because of the data', alternative: false, citedData: [request.data[0].id] })) }),
-  add_needs: () => ({ needs: [{ text: 'need one' }, { text: 'need two' }] }),
+  propose_facet_hypotheses: request => ({ hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${request.existing.length + i + 1}`, statement: `statement ${request.existing.length + i + 1}`, alternative: false, citedData: request.data.length ? [request.data[0].id] : [] })) }), // #62: citing data is optional; an unconfirmed premise may send none
+  add_needs: () => ({ needs: [{ text: 'need one', core: true }, { text: 'need two' }] }), // #62: round 1 carries exactly one core need
   revise: () => ({ needs: [{ text: 'next one' }] }),
   verdict_facets: request => ({ verdict: 'supported', citedNeeds: [request.input.evidence[0].id], reason: 'enough', insights: [{ kind: 'consistent', text: 'the sources agree' }] }),
-  conclude: request => ({ summary: 'final answer', points: [{ text: 'point', hypothesisIds: request.input.hypotheses.map(h => h.id) }], basedOn: request.input.hypotheses.map(h => h.id) }),
+  // #63: the input lists every hypothesis with its status; only the verified ones may carry a point or the basis.
+  conclude: request => { const ids = request.input.hypotheses.filter(h => h.status === 'verified').map(h => h.id); return { summary: 'final answer', points: [{ text: 'point', hypothesisIds: ids }], basedOn: ids }; },
   ...over
 });
 
@@ -808,7 +810,7 @@ test('P5: a pause between the facet judgement and its checkpoint leaves no verdi
   assert.equal(state.run.status, 'paused');
   assert.equal(state.situation.data.length, 3, 'no half retry batch');
   assert.ok(state.situation.facets.every(f => f.verdict === 'pending'));
-  assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 5 + 1 + 3 + 3);
+  assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 3 + 3 + 1 + 3 + 3, 'three fixed cards, the three groups of the plan checkpoint (#62 adds unconfirmed), assumptions, 3 facets, 3 data');
   await r.runs.resume(r.mapPath);
   state = await r.state();
   assert.equal(log.length >= 2, true, 'the judge was asked again');
@@ -816,13 +818,14 @@ test('P5: a pause between the facet judgement and its checkpoint leaves no verdi
   assert.ok(state.situation.data.length > 3, 'the retry batch is written with the verdicts');
 });
 
+// #60: facets compose as holds / fails / partial / insufficient (no half-support threshold), so "unconfirmed" needs every facet insufficient: here no datum is relevant.
 test('P5 #58: a round-1 retry with no retry needs ends unconfirmed and the run goes on to hypotheses, verdicts and a conclusion that starts with the premise line', async () => {
   const log = [];
   const seen = { hyp: [], conclude: [] };
   const r = await rig({ facet: true, script: { step: facetSteps({
-    judge_facets: judgeBy(log),
+    judge_facets: judgeBy(log, () => [], () => 'irrelevant'),
     propose_facet_hypotheses: request => { seen.hyp.push(request.unconfirmed); return { hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${request.existing.length + i + 1}`, statement: `statement ${request.existing.length + i + 1}`, basis: 'because of the data', alternative: i === 0, citedData: [] })) }; },
-    conclude: request => { seen.conclude.push(request.unconfirmed); return { summary: 'final answer', points: [{ text: 'point', hypothesisIds: request.input.hypotheses.map(h => h.id) }], basedOn: request.input.hypotheses.map(h => h.id) }; }
+    conclude: request => { seen.conclude.push(request.unconfirmed); return facetSteps().conclude(request); }
   }), ask: askByNeed({ 'job postings': need => aiReply([notFoundEntry(need.id)]), 'junior hiring': need => aiReply([notFoundEntry(need.id)]) }) } });
   await r.runs.start(r.mapPath, 'p');
   const state = await r.state();
@@ -841,8 +844,9 @@ test('P5 #58: a round-1 retry with no retry needs ends unconfirmed and the run g
   assert.ok(!r.stat.logs.some(l => l.startsWith('argument-run stopped')));
   assert.ok(!r.stat.logs.join('\n').includes('SECRET-REASON-TEXT'));
 });
-test('P5 #58: a refuting facet still stops as mismatch with no hypothesis step', async () => {
-  const r = await rig({ facet: true, script: { step: facetSteps({ judge_facets: request => ({ data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: f.title === 'Postings' ? 'refutes' : 'supports', reason: 'it fits' }))), facets: request.facets.map(f => ({ id: f.id, verdict: f.title === 'Postings' ? 'refutes' : 'supports', reason: 'r', summary: `s ${f.title}`, citedData: [f.data[0].id], retryNeeds: [] })), assumptionInsights: [] }) }) } });
+// #60/#61: a refuting facet with no supporting one stops as mismatch; refuting plus supporting is partial (see the partial test below).
+test('P5 #58: facets that refute with none supporting stop as mismatch with no hypothesis step', async () => {
+  const r = await rig({ facet: true, script: { step: facetSteps({ judge_facets: request => ({ data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: 'refutes', reason: 'it fits' }))), facets: request.facets.map(f => ({ id: f.id, verdict: 'refutes', reason: 'r', summary: `s ${f.title}`, citedData: [f.data[0].id], retryNeeds: [] })), assumptionInsights: [] }) }) } });
   await r.runs.start(r.mapPath, 'p');
   const state = await r.state();
   assert.equal(state.run.phase, 'stopped_mismatch');
@@ -908,7 +912,7 @@ test('P5: on a facet map an uncertain answer with a verified source is found and
   assert.equal(first.reason, 'stance_uncertain');
 });
 
-test('P5: a facet map asks the facet-hypotheses and facet-verdict steps and keeps basis and insights; a blank basis is refused', async () => {
+test('P5 #62: a facet map asks the facet-hypotheses and facet-verdict steps and keeps insights but no basis; a hypothesis citing data that was not found is refused', async () => {
   const r = await rig({ facet: true, script: { step: facetSteps({ verdict_facets: request => ({ verdict: 'supported', citedNeeds: [request.input.evidence[0].id], reason: 'enough', insights: [{ kind: 'tension', text: 'x'.repeat(400) }] }) }) } });
   await r.runs.start(r.mapPath, 'p');
   const state = await r.state();
@@ -916,10 +920,10 @@ test('P5: a facet map asks the facet-hypotheses and facet-verdict steps and keep
   assert.ok(!r.stat.steps.includes('propose_hypotheses') && !r.stat.steps.includes('verdict'));
   assert.deepEqual(plain(state.situation.assumptions.insights), ['The age band narrows the data']);
   for (const h of state.hypotheses) {
-    assert.equal(h.basis, 'because of the data');
+    assert.equal(h.basis, undefined, '#62: a hypothesis has no basis');
     assert.deepEqual(plain(h.insights), [{ kind: 'tension', text: 'x'.repeat(300) }]);
   }
-  const blank = await rig({ facet: true, script: { step: facetSteps({ propose_facet_hypotheses: request => ({ hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${i}`, statement: `s${i}`, basis: ' ', alternative: false, citedData: [request.data[0].id] })) }) }) } });
+  const blank = await rig({ facet: true, script: { step: facetSteps({ propose_facet_hypotheses: request => ({ hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${i}`, statement: `s${i}`, alternative: false, citedData: ['no-such-datum'] })) }) }) } });
   await blank.runs.start(blank.mapPath, 'p');
   const refused = await blank.state();
   assert.equal(refused.hypotheses.length, 0);
@@ -1231,7 +1235,7 @@ test('P1-5: the hypothesis, need, conclusion and gate-reason notes written from 
 test('P2-8: the second attempt carries the sanitized parser reason in its prompt; the first attempt and later steps do not', async () => {
   const prompts = [];
   // The refusal comes from the run's own parser (the step it was handed), so it is the run's ArgumentStepError, not a test-realm copy.
-  const bad = JSON.stringify({ assumptions: { items: [] }, facets: ['Rate in 1999', 'Postings', 'Hiring'].map((title, i) => ({ title, criterion: 'a higher rate supports it', baseline: '', needs: [{ need: `need ${'abc'[i]}`, kind: 'fact' }] })), causalQuestions: [], question: 'Is it rising?' });
+  const bad = JSON.stringify({ assumptions: { items: [] }, facets: ['Rate in 1999', 'Postings', 'Hiring'].map((title, i) => ({ title, criterion: 'a higher rate supports it', baseline: '', needs: [{ need: `need ${'abc'[i]}`, kind: 'fact' }] })), causalQuestions: [], question: 'Is it rising?', questionType: 'causal' }); // #60: the plan reply always carries questionType
   const r = await rig({ facet: true, script: { step: facetSteps() }, ports: {} });
   const inner = r.ports.runStep;
   let planCalls = 0;
@@ -1298,7 +1302,8 @@ test('#59 facet run: 2 verified at the limit gives a partial conclusion; replace
   assert.equal(model.verifiedCount(state), 2);
   assert.equal(state.hypotheses.length, 6);
   assert.equal(seen.length, 1);
-  assert.equal(seen[0].input.hypotheses.length, 2);
+  assert.equal(seen[0].input.hypotheses.length, 6, '#63: every hypothesis is listed');
+  assert.equal(seen[0].input.hypotheses.filter(h => h.status === 'verified').length, 2);
   assert.equal(seen[0].partial, true);
   const line = tw('ui.argument_partial_conclusion_0_1', 2, 3);
   assert.equal(line, '只驗證了 2 個假設（目標 3 個），以下結論只根據這些假設');
@@ -1317,7 +1322,7 @@ test('#59 facet run: a full conclusion carries no partial flag, no partial line'
 });
 test('#59 facet run: an unconfirmed premise with no hypothesis verified stops at the limit in plain words: nothing verified, the cut ones named with the limit, the premise line on note and card', async () => {
   const log = [];
-  const r = await rig({ facet: true, script: { step: facetSteps({ judge_facets: judgeBy(log) }),
+  const r = await rig({ facet: true, script: { step: facetSteps({ judge_facets: judgeBy(log, () => [], () => 'irrelevant') }), // #60: unconfirmed = every facet insufficient
     ask: askByNeed({ 'job postings': need => aiReply([notFoundEntry(need.id)]), 'junior hiring': need => aiReply([notFoundEntry(need.id)]), 'need one': need => aiReply([notFoundEntry(need.id)]), 'need two': need => aiReply([notFoundEntry(need.id)]), 'next one': need => aiReply([notFoundEntry(need.id)]) }) } });
   await r.runs.start(r.mapPath, 'p');
   const state = await r.state();
@@ -1350,7 +1355,7 @@ test('#59 facet run: a hypothesis the evidence refuted is eliminated (not "unver
   await noCodeShown(r, 'all refuted');
 });
 test('#59 stopped paths show no uuid, id-N or English state word: mismatch and data missing', async () => {
-  const mismatch = await rig({ facet: true, script: { step: facetSteps({ judge_facets: request => ({ data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: f.title === 'Postings' ? 'refutes' : 'supports', reason: 'it fits' }))), facets: request.facets.map(f => ({ id: f.id, verdict: f.title === 'Postings' ? 'refutes' : 'supports', reason: 'r', summary: `s ${f.title}`, citedData: [f.data[0].id], retryNeeds: [] })), assumptionInsights: [] }) }) } });
+  const mismatch = await rig({ facet: true, script: { step: facetSteps({ judge_facets: request => ({ data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: 'refutes', reason: 'it fits' }))), facets: request.facets.map(f => ({ id: f.id, verdict: 'refutes', reason: 'r', summary: `s ${f.title}`, citedData: [f.data[0].id], retryNeeds: [] })), assumptionInsights: [] }) }) } });
   await mismatch.runs.start(mismatch.mapPath, 'p');
   assert.equal((await mismatch.state()).run.phase, 'stopped_mismatch');
   await noCodeShown(mismatch, 'stopped_mismatch');
@@ -1358,4 +1363,210 @@ test('#59 stopped paths show no uuid, id-N or English state word: mismatch and d
   await missing.runs.start(missing.mapPath, 'p');
   assert.equal((await missing.state()).situation.gate.kind, 'data_missing');
   await noCodeShown(missing, 'insufficient');
+});
+
+
+// ---- P7a/P7b (decisions #60-#66): research wiring and the question-type flow ----------------------------------------------------------
+const SECOND_URL = 'https://other.example.com/report';
+const coreNeedOf = async r => (await r.state()).hypotheses[0].needs.find(n => n.core);
+const factSteps = (over = {}) => facetSteps({
+  plan_facets: () => ({ ...facetSteps().plan_facets(), questionType: 'fact' }),
+  conclude_facts: request => ({ summary: `fact summary ${request.outcome}`, points: [{ text: 'fact point', facetIds: [request.facets[0].id] }], basedOn: [request.facets[0].id] }),
+  ...over
+});
+const judgeFacets = verdicts => request => ({
+  data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: d.fixedStance ?? (verdicts[f.title] === 'supports' ? 'supports' : verdicts[f.title] === 'refutes' ? 'refutes' : 'irrelevant'), reason: 'it fits' }))),
+  facets: request.facets.map(f => ({ id: f.id, verdict: verdicts[f.title], reason: 'r', summary: `s ${f.title}`, citedData: verdicts[f.title] === 'insufficient' ? [] : [f.data[0].id], retryNeeds: [] })),
+  assumptionInsights: []
+});
+
+test('P7a #64 (counterexample 7): a second source on the same hostname, with agrees=false, or failing the source check leaves the need uncertain with no second; a missing tier counts as other; a good second source is stored', async () => {
+  const cases = [
+    ['same hostname', { tier: 'other', second: { url: 'https://www.stats.example.org/other', quote: QUOTE, claim: 'Rate rose', agrees: true } }, false],
+    ['agrees=false', { tier: 'other', second: { url: SECOND_URL, quote: QUOTE, claim: 'Rate rose', agrees: false } }, false],
+    ['check fails', { tier: 'other', second: { url: SECOND_URL, quote: 'a sentence that is nowhere on the page', claim: 'Rate rose', agrees: true } }, false],
+    ['no second source', { tier: 'other' }, false],
+    ['missing tier', { tier: undefined }, false],
+    ['good second source', { tier: 'other', second: { url: SECOND_URL, quote: QUOTE, claim: 'Rate rose', agrees: true } }, true]
+  ];
+  for (const [name, over, ok] of cases) {
+    const r = await rig({ facet: true, script: { step: facetSteps(), ask: askByNeed({ 'need one': need => aiReply([foundEntry(need.id, over)]) }) } });
+    await r.runs.start(r.mapPath, 'p');
+    const core = await coreNeedOf(r);
+    assert.equal(core.state, 'found', name);
+    assert.equal(core.proof.tier, 'other', name);
+    if (ok) {
+      assert.equal(core.stance, 'supports', name);
+      assert.equal(core.proof.second.url, SECOND_URL, name);
+    } else {
+      assert.equal(core.stance, 'uncertain', name);
+      assert.equal(core.proof.second, undefined, `${name}: no second source is stored`);
+      assert.ok(!(await r.state()).hypotheses.some(model.isVerified), `${name}: an uncertain core verifies nothing`);
+    }
+  }
+  const primary = await rig({ facet: true, script: { step: facetSteps() } });
+  await primary.runs.start(primary.mapPath, 'p');
+  assert.equal((await coreNeedOf(primary)).proof.tier, 'primary');
+  assert.equal((await coreNeedOf(primary)).proof.second, undefined);
+});
+
+test('P7a #64 (counterexample 10): Stop while the second source is being fetched writes nothing and a late result is dropped; resume researches the need again', async () => {
+  const gate = defer();
+  let hold = true;
+  const holder = {};
+  const r = await rig({ facet: true,
+    ports: { fetch: async request => {
+      if (request.url === SECOND_URL && hold) { void holder.runs.stop(holder.mapPath); await gate.promise; }
+      return { status: 200, headers: { 'content-type': 'text/html' }, text: PAGE, url: request.url };
+    } },
+    script: { step: facetSteps(), ask: askByNeed({ 'need one': need => aiReply([foundEntry(need.id, { tier: 'other', second: { url: SECOND_URL, quote: QUOTE, claim: 'Rate rose', agrees: true } })]) }) } });
+  holder.runs = r.runs; holder.mapPath = r.mapPath;
+  await r.runs.start(r.mapPath, 'p');
+  let state = await r.state();
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'user');
+  const stuck = state.hypotheses.flatMap(h => h.needs).filter(n => n.core && n.state !== 'found');
+  assert.ok(stuck.length > 0 && stuck.every(n => n.state === 'pending' && !n.proof), 'the interrupted need is pending with no proof');
+  const before = r.contents.get(r.mapPath);
+  hold = false; gate.resolve();
+  for (let i = 0; i < 20; i++) await tick();
+  assert.equal(r.contents.get(r.mapPath), before, 'a late second-source result is not written');
+  await r.runs.resume(r.mapPath);
+  state = await r.state();
+  assert.equal(state.run.status !== 'paused', true);
+  assert.equal((await coreNeedOf(r)).proof.second.url, SECOND_URL, 'resume redoes the need and stores the second source');
+});
+
+test('P7a #62 #65: the needs step names its core mode and shows earlier needs; a research call for a hypothesis need carries the hypothesis claim, a situation datum does not', async () => {
+  const seen = { needs: [], revise: [], contexts: [] };
+  const r = await rig({ facet: true, script: {
+    step: facetSteps({
+      add_needs: request => { seen.needs.push(plain(request)); return { needs: [{ text: 'need one', core: true }, { text: 'need two' }] }; },
+      revise: request => { seen.revise.push(plain(request)); return { needs: [{ text: 'next core', core: true }] }; }
+    }),
+    ask: ctx => { const need = needOf(ctx); seen.contexts.push([need.text, need.context]); return need.text === 'need one' ? aiReply([notFoundEntry(need.id, 'no table found')]) : aiReply([foundEntry(need.id)]); }
+  } });
+  await r.runs.start(r.mapPath, 'p');
+  assert.ok(seen.needs.length > 0 && seen.needs.every(q => q.core === 'first' && q.existing.length === 0));
+  assert.ok(seen.revise.length > 0 && seen.revise.every(q => q.core === 'replace'), 'a core nobody found may be replaced');
+  const earlier = seen.revise[0].existing;
+  assert.ok(earlier.some(n => n.text === 'need one' && n.state === 'not_found' && /no table found/.test(n.reason)), 'the dead need carries why nothing was found');
+  assert.ok(earlier.some(n => n.text === 'need two' && n.claim === 'Rate rose'), 'a found need carries its claim');
+  const hyp = seen.contexts.filter(([text]) => /^(need|next)/.test(text));
+  assert.ok(hyp.length > 0 && hyp.every(([, context]) => /hypothesis claim: statement \d/.test(context) && context.includes('Age band: 16 to 24')));
+  const datum = seen.contexts.filter(([text]) => !/^(need|next)/.test(text));
+  assert.ok(datum.length > 0 && datum.every(([, context]) => context === 'Age band: 16 to 24' || context === undefined));
+  assert.ok(datum.every(([, context]) => !String(context).includes('hypothesis claim')));
+  // revise runs only while the live core is not_found: a found core gets no core mode in later rounds
+  const found = await rig({ facet: true, script: { step: facetSteps({ revise: request => { seen.revise.push(plain(request)); return { needs: [{ text: 'plain extra' }] }; } }), ask: askByNeed({ 'need two': need => aiReply([notFoundEntry(need.id)]) }) } });
+  seen.revise.length = 0;
+  await found.runs.start(found.mapPath, 'p');
+  assert.ok(seen.revise.every(q => q.core === undefined), 'core found: no core mode on later rounds');
+});
+
+test('P7b #60 #62: a causal plan checkpoint creates the three groups under the conclusion; a fact plan creates none and the questionType is stored', async () => {
+  const causal = await rig({ facet: true, script: { step: facetSteps() } });
+  await causal.runs.start(causal.mapPath, 'p');
+  const cs = await causal.state();
+  assert.equal(cs.situation.questionType, 'causal');
+  const byId = new Map((await causal.repo.readMap(causal.mapPath)).nodes.map(n => [n.id, n]));
+  for (const key of ['verified', 'eliminated', 'unconfirmed']) assert.equal(byId.get(cs.roles[key])?.parentId, cs.roles.conclusion, key);
+  const fact = await rig({ facet: true, script: { step: factSteps() } });
+  await fact.runs.start(fact.mapPath, 'p');
+  const fs = await fact.state();
+  assert.equal(fs.situation.questionType, 'fact');
+  assert.deepEqual([fs.roles.verified, fs.roles.eliminated, fs.roles.unconfirmed], [undefined, undefined, undefined]);
+  assert.equal((await fact.repo.readMap(fact.mapPath)).nodes.length, 3 + 1 + 3 + 3, 'proposition, situation, conclusion, assumptions, 3 facets, 3 data: no group cards');
+  // the start itself only made the three fixed cards (nothing exists before the plan runs)
+  const early = await rig({ facet: true, script: { step: facetSteps({ plan_facets: () => { throw new ArgumentStepError('bad reply'); } }) } });
+  await early.runs.start(early.mapPath, 'p');
+  assert.equal((await early.repo.readMap(early.mapPath)).nodes.length, 3);
+});
+
+test('P7b #60 (counterexample 1): a fact question has no propose_facet_hypotheses or needs step, concludes through conclude_facts with the four outcomes, and basedOn holds facet ids', async () => {
+  const outcomes = [
+    ['holds', { Rate: 'supports', Postings: 'supports', Hiring: 'supports' }, 'ui.argument_note_outcome_holds', 0],
+    ['fails', { Rate: 'refutes', Postings: 'refutes', Hiring: 'refutes' }, 'ui.argument_note_outcome_fails', 0],
+    ['partial', { Rate: 'supports', Postings: 'refutes', Hiring: 'supports' }, 'ui.argument_note_outcome_partial', 0],
+    ['insufficient', { Rate: 'insufficient', Postings: 'insufficient', Hiring: 'insufficient' }, 'ui.argument_note_outcome_insufficient', 3]
+  ];
+  for (const [outcome, verdicts, key, insufficient] of outcomes) {
+    const asked = [];
+    const r = await rig({ facet: true, script: { step: factSteps({ judge_facets: judgeFacets(verdicts), conclude_facts: request => { asked.push(plain(request)); return factSteps().conclude_facts(request); } }) } });
+    await r.runs.start(r.mapPath, 'p');
+    const state = await r.state();
+    assert.equal(state.run.phase, 'concluded', outcome);
+    assert.equal(state.run.status, 'finished', outcome);
+    for (const name of ['propose_facet_hypotheses', 'propose_hypotheses', 'add_needs', 'verdict_facets', 'conclude']) assert.ok(!r.stat.steps.includes(name), `${outcome}: ${name}`);
+    assert.equal(r.stat.steps.filter(n => n === 'conclude_facts').length, 1, outcome);
+    assert.equal(asked[0].outcome, outcome);
+    assert.equal(state.hypotheses.length, 0, outcome);
+    const facetIds = state.situation.facets.map(f => f.id);
+    assert.deepEqual(plain(state.conclusion.basedOn), [facetIds[0]], `${outcome}: basedOn is a facet id`);
+    const note = await r.text(state.roles.conclusion);
+    assert.equal(note.summary, `fact summary ${outcome}`);
+    assert.ok(note.detail.includes(translate('zh-TW', key)), `${outcome}: the program-composed outcome line`);
+    assert.equal(note.detail.includes(translate('zh-TW', 'ui.argument_note_outcome_insufficient_count_0', '3')), insufficient === 3, `${outcome}: the insufficient count line`);
+    assert.ok(note.detail.includes('fact point'), outcome);
+    const unsupported = await rig({ facet: true, script: { step: factSteps({ judge_facets: judgeFacets(verdicts), conclude_facts: () => ({ summary: 'x', points: [{ text: 'p', facetIds: ['no-such-facet'] }], basedOn: ['no-such-facet'] }) }) } });
+    await unsupported.runs.start(unsupported.mapPath, 'p');
+    assert.equal((await unsupported.state()).run.status, 'paused', `${outcome}: a conclusion citing a non-facet is refused`);
+  }
+});
+
+test('P7b #62 (counterexample 5): a refuted hypothesis is eliminated in the same checkpoint as its verdict and sits in the eliminated group, never in verifying-and-refuted', async () => {
+  const seenStates = [];
+  const r = await rig({ facet: true, script: { step: facetSteps({ verdict_facets: verdictByNumber(n => (n === 1 ? 'refuted' : 'supported')) }) } });
+  const inner = r.ports.updateMap;
+  r.ports.updateMap = async (path, change) => {
+    const written = await inner(path, change);
+    const read = model.readArgumentMap(await r.repo.readMap(path));
+    if (read.kind === 'usable') seenStates.push(read.data.hypotheses.map(h => [h.aiVerdict, h.location]));
+    return written;
+  };
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  const first = state.hypotheses[0];
+  assert.equal(first.aiVerdict, 'refuted');
+  assert.equal(first.location, 'eliminated');
+  assert.ok(first.eliminationReason);
+  assert.ok(!seenStates.flat().some(([verdict, location]) => verdict === 'refuted' && location === 'verifying'), 'no checkpoint ever showed refuted while verifying');
+  const byId = new Map((await r.repo.readMap(r.mapPath)).nodes.map(n => [n.id, n]));
+  assert.equal(byId.get(first.id).parentId, state.roles.eliminated);
+  assert.ok(state.hypotheses.slice(1).every(h => byId.get(h.id).parentId !== state.roles.eliminated || h.location === 'eliminated'));
+});
+
+test('P7b #62: a hypothesis cut by the research limit moves to the unconfirmed group, not the eliminated one', async () => {
+  const r = await rig({ facet: true, script: { step: facetSteps({ verdict_facets: verdictByNumber(n => (n === 1 || n === 2 ? 'supported' : 'undecided')) }), ask: askByNeed({ 'need two': need => aiReply([notFoundEntry(need.id)]) }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  const byId = new Map((await r.repo.readMap(r.mapPath)).nodes.map(n => [n.id, n]));
+  const cut = state.hypotheses.filter(model.isLimitCut);
+  assert.ok(cut.length > 0, 'the limit cut a hypothesis');
+  for (const h of cut) assert.equal(byId.get(h.id).parentId, state.roles.unconfirmed, h.id);
+  assert.equal(state.hypotheses.filter(h => byId.get(h.id).parentId === state.roles.eliminated).some(model.isLimitCut), false);
+});
+
+test('P7b #66 (counterexample 9): a legacy paused facet map (no question type) refuses resume with legacy, no provider call, Map.md unchanged; a legacy finished map still counts the same verified hypotheses', async () => {
+  const flaky = facetSteps({ verdict_facets: () => { throw new ArgumentStepError('bad reply'); } });
+  const r = await rig({ facet: true, script: { step: flaky } });
+  await r.runs.start(r.mapPath, 'p');
+  assert.equal((await r.state()).run.status, 'paused');
+  await r.repo.updateMap(r.mapPath, d => { delete d.argumentMap.situation.questionType; });
+  const before = r.contents.get(r.mapPath);
+  const asked = r.stat.ask.length;
+  const stepsBefore = r.stat.steps.length;
+  await assert.rejects(() => r.runs.resume(r.mapPath), e => e instanceof ArgumentRunError && e.code === 'legacy');
+  assert.equal(r.contents.get(r.mapPath), before, 'Map.md is unchanged');
+  assert.equal(r.stat.ask.length, asked);
+  assert.equal(r.stat.steps.length, stepsBefore);
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+  const done = await rig({ facet: true, script: { step: facetSteps() } });
+  await done.runs.start(done.mapPath, 'p');
+  const before3 = model.verifiedCount(await done.state());
+  assert.equal(before3, 3);
+  await done.repo.updateMap(done.mapPath, d => { delete d.argumentMap.situation.questionType; for (const h of d.argumentMap.hypotheses) for (const n of h.needs) delete n.core; });
+  const legacy = await done.state();
+  assert.equal(model.verifiedCount(legacy), before3, 'the old rule (all needs found, evidence clearly supporting) gives the same count');
+  assert.deepEqual(plain(legacy.hypotheses.map(h => model.isVerified(h))), [true, true, true]);
 });

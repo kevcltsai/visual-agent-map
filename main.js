@@ -2715,6 +2715,20 @@ var en = {
   "ui.topic_chat_too_big": "This request touches too much; please use the AI chat in the left sidebar.",
   "ui.topic_chat_result_unknown": "See the topic itself for this result.",
   "ui.topic_chat_failed_children": "No subtopic could be researched.",
+  "ui.topic_chat_choice_message_0_1_2": "Below this topic there are {0} levels and {1} topics; only {2} were researched. How deep should the integration go?",
+  "ui.topic_chat_choice_quick": "Quick",
+  "ui.topic_chat_choice_quick_hint_0": "Each subtopic that has its own subtopics is integrated from them first (no web search), then this topic; about {0} AI calls.",
+  "ui.topic_chat_choice_bottom_up": "Integrate bottom-up",
+  "ui.topic_chat_choice_bottom_up_hint_0": "Integrate every level from the deepest up, no web search; about {0} AI calls.",
+  "ui.topic_chat_choice_research_first": "Research first, then integrate",
+  "ui.topic_chat_choice_research_first_hint_0_1": "Research the {0} unresearched deepest topics first, then integrate level by level; about {1} AI calls.",
+  "ui.topic_chat_choice_start": "Start",
+  "ui.topic_chat_choice_cancel": "Cancel",
+  "ui.topic_chat_choice_cancelled": "Cancelled. Nothing was run.",
+  "ui.topic_chat_progress_0_1": "Step {0} of {1}\u2026",
+  "ui.topic_chat_subtree_done_0_1_2": "Read {0} topics below ({1} not researched) and rewrote {2} notes, this one included.",
+  "ui.topic_chat_subtree_stopped_0_1": "Stopped. Finished {0} of {1}.",
+  "ui.topic_chat_failed_subtree": "No subtopic could be integrated.",
   "ui.topic_chat_record_failed": "The topic chat record was not saved.",
   "ui.exchange_reason_invalid_line_0": "it is not a valid OPML or FreeMind outline (line {0})",
   "ui.invalid_merged_json": "The merged contents are not valid JSON: check the quotes, commas and braces, then save again.",
@@ -5516,6 +5530,20 @@ var zhCN = {
   "ui.topic_chat_too_big": "\u8FD9\u4E2A\u8981\u6C42\u52A8\u5230\u7684\u5730\u65B9\u592A\u591A\uFF0C\u8BF7\u6539\u7528\u5DE6\u4FA7\u680F\u7684 AI \u5BF9\u8BDD\u3002",
   "ui.topic_chat_result_unknown": "\u8FD9\u6B21\u7684\u7ED3\u679C\u8BF7\u770B\u8BAE\u9898\u672C\u8EAB\u3002",
   "ui.topic_chat_failed_children": "\u6CA1\u6709\u5B50\u8BAE\u9898\u7814\u7A76\u6210\u529F\u3002",
+  "ui.topic_chat_choice_message_0_1_2": "\u4E0B\u9762\u6709 {0} \u5C42\u3001{1} \u4E2A\u8BAE\u9898\uFF0C\u53EA\u6709 {2} \u4E2A\u7814\u7A76\u8FC7\u3002\u8981\u6574\u5408\u5230\u591A\u6DF1\uFF1F",
+  "ui.topic_chat_choice_quick": "\u5FEB\u901F",
+  "ui.topic_chat_choice_quick_hint_0": "\u6709\u5B50\u8BAE\u9898\u7684\u5B50\u8BAE\u9898\u5148\u7528\u81EA\u5DF1\u7684\u5B50\u8BAE\u9898\u6574\u5408\uFF08\u4E0D\u8054\u7F51\uFF09\uFF0C\u518D\u6574\u5408\u8FD9\u4E2A\u8BAE\u9898\uFF0C\u7EA6 {0} \u6B21 AI\u3002",
+  "ui.topic_chat_choice_bottom_up": "\u7531\u4E0B\u5F80\u4E0A\u6574\u5408",
+  "ui.topic_chat_choice_bottom_up_hint_0": "\u4ECE\u6700\u5E95\u5C42\u9010\u5C42\u6574\u5408\uFF0C\u4E0D\u8054\u7F51\uFF0C\u7EA6 {0} \u6B21 AI\u3002",
+  "ui.topic_chat_choice_research_first": "\u5148\u7814\u7A76\u518D\u6574\u5408",
+  "ui.topic_chat_choice_research_first_hint_0_1": "\u5148\u8054\u7F51\u7814\u7A76 {0} \u4E2A\u6700\u5E95\u5C42\u6CA1\u7814\u7A76\u8FC7\u7684\u8BAE\u9898\uFF0C\u518D\u9010\u5C42\u6574\u5408\uFF0C\u7EA6 {1} \u6B21 AI\u3002",
+  "ui.topic_chat_choice_start": "\u5F00\u59CB",
+  "ui.topic_chat_choice_cancel": "\u53D6\u6D88",
+  "ui.topic_chat_choice_cancelled": "\u5DF2\u53D6\u6D88\uFF0C\u6CA1\u6709\u6267\u884C\u3002",
+  "ui.topic_chat_progress_0_1": "\u7B2C {0} \u6B65\uFF0C\u5171 {1} \u6B65\u2026",
+  "ui.topic_chat_subtree_done_0_1_2": "\u8BFB\u4E86\u4E0B\u9762 {0} \u4E2A\u8BAE\u9898\uFF08{1} \u4E2A\u6CA1\u7814\u7A76\u8FC7\uFF09\uFF0C\u6539\u5199\u4E86 {2} \u7BC7\u7B14\u8BB0\uFF08\u542B\u8FD9\u7BC7\uFF09\u3002",
+  "ui.topic_chat_subtree_stopped_0_1": "\u5DF2\u505C\u6B62\uFF0C\u5B8C\u6210 {0}\uFF0F{1}\u3002",
+  "ui.topic_chat_failed_subtree": "\u6CA1\u6709\u5B50\u8BAE\u9898\u6574\u5408\u6210\u529F\u3002",
   "ui.topic_chat_record_failed": "\u8BAE\u9898\u5BF9\u8BDD\u8BB0\u5F55\u6CA1\u6709\u5B58\u6210\u529F\u3002",
   "ui.exchange_reason_invalid_line_0": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7EB2\uFF0C\u7B2C {0} \u884C\u9644\u8FD1\u683C\u5F0F\u6709\u8BEF",
   "ui.invalid_merged_json": "\u5408\u5E76\u5185\u5BB9\u4E0D\u662F\u6709\u6548\u7684 JSON\uFF1A\u8BF7\u68C0\u67E5\u5F15\u53F7\u3001\u9017\u53F7\u4E0E\u5927\u62EC\u53F7\u662F\u5426\u6210\u5BF9\uFF0C\u4FEE\u6B63\u540E\u518D\u4FDD\u5B58\u3002",
@@ -8317,6 +8345,20 @@ var zhTW = {
   "ui.topic_chat_too_big": "\u9019\u500B\u8981\u6C42\u52D5\u5230\u7684\u5730\u65B9\u592A\u591A\uFF0C\u8ACB\u6539\u7528\u5DE6\u5074\u6B04\u7684 AI \u5C0D\u8A71\u3002",
   "ui.topic_chat_result_unknown": "\u9019\u6B21\u7684\u7D50\u679C\u8ACB\u770B\u8B70\u984C\u672C\u8EAB\u3002",
   "ui.topic_chat_failed_children": "\u6C92\u6709\u5B50\u8B70\u984C\u7814\u7A76\u6210\u529F\u3002",
+  "ui.topic_chat_choice_message_0_1_2": "\u5E95\u4E0B\u6709 {0} \u5C64\u3001{1} \u500B\u8B70\u984C\uFF0C\u53EA\u6709 {2} \u500B\u7814\u7A76\u904E\u3002\u8981\u6574\u5408\u5230\u591A\u6DF1\uFF1F",
+  "ui.topic_chat_choice_quick": "\u5FEB\u901F",
+  "ui.topic_chat_choice_quick_hint_0": "\u6709\u5B50\u8B70\u984C\u7684\u5B50\u8B70\u984C\u5148\u7528\u81EA\u5DF1\u7684\u5B50\u8B70\u984C\u6574\u5408\uFF08\u4E0D\u4E0A\u7DB2\uFF09\uFF0C\u518D\u6574\u5408\u9019\u500B\u8B70\u984C\uFF0C\u7D04 {0} \u6B21 AI\u3002",
+  "ui.topic_chat_choice_bottom_up": "\u7531\u4E0B\u5F80\u4E0A\u6574\u5408",
+  "ui.topic_chat_choice_bottom_up_hint_0": "\u5F9E\u6700\u5E95\u5C64\u9010\u5C64\u6574\u5408\uFF0C\u4E0D\u4E0A\u7DB2\uFF0C\u7D04 {0} \u6B21 AI\u3002",
+  "ui.topic_chat_choice_research_first": "\u5148\u7814\u7A76\u518D\u6574\u5408",
+  "ui.topic_chat_choice_research_first_hint_0_1": "\u5148\u4E0A\u7DB2\u7814\u7A76 {0} \u500B\u6700\u5E95\u5C64\u6C92\u7814\u7A76\u904E\u7684\u8B70\u984C\uFF0C\u518D\u9010\u5C64\u6574\u5408\uFF0C\u7D04 {1} \u6B21 AI\u3002",
+  "ui.topic_chat_choice_start": "\u958B\u59CB",
+  "ui.topic_chat_choice_cancel": "\u53D6\u6D88",
+  "ui.topic_chat_choice_cancelled": "\u5DF2\u53D6\u6D88\uFF0C\u6C92\u6709\u57F7\u884C\u3002",
+  "ui.topic_chat_progress_0_1": "\u7B2C {0} \u6B65\uFF0C\u5171 {1} \u6B65\u2026",
+  "ui.topic_chat_subtree_done_0_1_2": "\u8B80\u4E86\u5E95\u4E0B {0} \u500B\u8B70\u984C\uFF08{1} \u500B\u6C92\u7814\u7A76\u904E\uFF09\uFF0C\u6539\u5BEB\u4E86 {2} \u7BC7\u7B46\u8A18\uFF08\u542B\u9019\u7BC7\uFF09\u3002",
+  "ui.topic_chat_subtree_stopped_0_1": "\u5DF2\u505C\u6B62\uFF0C\u5B8C\u6210 {0}\uFF0F{1}\u3002",
+  "ui.topic_chat_failed_subtree": "\u6C92\u6709\u5B50\u8B70\u984C\u6574\u5408\u6210\u529F\u3002",
   "ui.topic_chat_record_failed": "\u8B70\u984C\u5C0D\u8A71\u7D00\u9304\u6C92\u6709\u5B58\u6210\u529F\u3002",
   "ui.exchange_reason_invalid_line_0": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7DB1\uFF0C\u7B2C {0} \u884C\u9644\u8FD1\u683C\u5F0F\u6709\u8AA4",
   "ui.invalid_merged_json": "\u5408\u4F75\u5167\u5BB9\u4E0D\u662F\u6709\u6548\u7684 JSON\uFF1A\u8ACB\u6AA2\u67E5\u5F15\u865F\u3001\u9017\u865F\u8207\u5927\u62EC\u865F\u662F\u5426\u6210\u5C0D\uFF0C\u4FEE\u6B63\u5F8C\u518D\u5132\u5B58\u3002",
@@ -36517,6 +36559,7 @@ var TopicRuns = class {
 };
 
 // experiences/visual-map/subtree-plan.ts
+var INTEGRATION_DEPTHS = ["quick", "bottom-up", "research-first"];
 var OUTLINE_SUMMARY_CHARS = 60;
 var OUTLINE_MAX_CHARS = 6e3;
 var UNRESEARCHED_MARK = "[unresearched]";
@@ -36545,6 +36588,57 @@ function walk(nodes, rootId) {
   };
   visit(rootId, 1);
   return { items, index };
+}
+function subtreeStats(nodes, rootId) {
+  const { items, index } = walk(nodes, rootId);
+  const hasChildren = (id) => {
+    var _a2, _b2;
+    return ((_b2 = (_a2 = index.get(id)) == null ? void 0 : _a2.length) != null ? _b2 : 0) > 0;
+  };
+  const reached = new Set(items.map((item) => item.node.id));
+  const childrenOf = (id) => {
+    var _a2;
+    return ((_a2 = index.get(id)) != null ? _a2 : []).filter((child) => reached.has(child.id));
+  };
+  return {
+    levels: items.reduce((deepest, item) => Math.max(deepest, item.depth), 0),
+    topics: items.length,
+    researched: items.filter((item) => item.node.researched).length,
+    parents: (childrenOf(rootId).length ? 1 : 0) + items.filter((item) => childrenOf(item.node.id).length).length,
+    unresearchedLeaves: items.filter((item) => !hasChildren(item.node.id) && !item.node.researched).length,
+    directParents: items.filter((item) => item.depth === 1 && childrenOf(item.node.id).length).length
+  };
+}
+function integrationCalls(stats, depth) {
+  if (depth === "quick") return stats.directParents + 1;
+  if (depth === "bottom-up") return stats.parents;
+  return stats.unresearchedLeaves + stats.parents;
+}
+function bottomUpOrder(nodes, rootId) {
+  var _a2;
+  const { items, index } = walk(nodes, rootId);
+  const reached = new Set(items.map((item) => item.node.id));
+  const parents = items.filter((item) => {
+    var _a3;
+    return ((_a3 = index.get(item.node.id)) != null ? _a3 : []).some((child) => reached.has(child.id));
+  });
+  const ordered = [...parents].sort((left, right) => right.depth - left.depth).map((item) => item.node.id);
+  if (((_a2 = index.get(rootId)) != null ? _a2 : []).length) ordered.push(rootId);
+  return ordered;
+}
+function quickOrder(nodes, rootId) {
+  const { items, index } = walk(nodes, rootId);
+  return items.filter((item) => {
+    var _a2, _b2;
+    return item.depth === 1 && ((_b2 = (_a2 = index.get(item.node.id)) == null ? void 0 : _a2.length) != null ? _b2 : 0) > 0;
+  }).map((item) => item.node.id);
+}
+function unresearchedLeaves(nodes, rootId) {
+  const { items, index } = walk(nodes, rootId);
+  return [...items].filter((item) => {
+    var _a2, _b2;
+    return !((_b2 = (_a2 = index.get(item.node.id)) == null ? void 0 : _a2.length) != null ? _b2 : 0) && !item.node.researched;
+  }).sort((left, right) => right.depth - left.depth).map((item) => item.node.id);
 }
 function unresearchedList(nodes, rootId) {
   const { items } = walk(nodes, rootId);
@@ -54388,6 +54482,8 @@ var TopicChatWindow = class {
     __publicField(this, "parentEl", null);
     __publicField(this, "submitting", false);
     __publicField(this, "destroyed", false);
+    __publicField(this, "choiceShown", false);
+    __publicField(this, "doc");
     this.el = parent.createDiv({ cls: "vam-topic-chat" });
     this.el.setAttr("role", "dialog");
     const labelId = `vam-topic-chat-label-${++labelSeq2}`;
@@ -54469,6 +54565,7 @@ var TopicChatWindow = class {
       if (!next || !this.modePickerEl.contains(next)) this.closeModeMenu(false);
     });
     const doc = parent.ownerDocument;
+    this.doc = doc != null ? doc : null;
     if (doc == null ? void 0 : doc.addEventListener) {
       const outside = (event) => {
         if (!this.modeMenuEl.hidden && !this.modePickerEl.contains(event.target)) this.closeModeMenu(false);
@@ -54492,6 +54589,7 @@ var TopicChatWindow = class {
       (_a2 = event.preventDefault) == null ? void 0 : _a2.call(event);
       (_b2 = event.stopPropagation) == null ? void 0 : _b2.call(event);
       if (!this.modeMenuEl.hidden) this.closeModeMenu(true);
+      else if (this.host.session().choice) this.cancelChoice();
       else this.requestClose();
     });
     this.cleanups.push(host.subscribe(() => this.refresh()));
@@ -54577,6 +54675,14 @@ var TopicChatWindow = class {
     this.modeMenuEl.hidden = true;
     this.modeToggleEl.setAttr("aria-expanded", "false");
     if (focusToggle) this.modeToggleEl.focus();
+  }
+  cancelChoice() {
+    this.host.cancelChoice();
+    if (!this.destroyed) this.inputEl.focus();
+  }
+  async confirmChoice() {
+    const started = await this.host.confirmChoice();
+    if (started && !this.destroyed) this.inputEl.focus();
   }
   pickMode(mode) {
     if (this.host.session().running) return;
@@ -54681,7 +54787,9 @@ var TopicChatWindow = class {
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }
   paintLog(session) {
-    var _a2;
+    var _a2, _b2, _c;
+    const active = (_a2 = this.doc) == null ? void 0 : _a2.activeElement;
+    const heldPart = active && this.logEl.contains(active) ? (_b2 = active.getAttr("data-part")) != null ? _b2 : null : null;
     this.logEl.empty();
     for (const turn of session.turns) {
       const row = this.logEl.createDiv({
@@ -54692,7 +54800,7 @@ var TopicChatWindow = class {
       const body = row.createSpan({ cls: "vam-topic-chat-text" });
       if (turn.markdown) renderChatMarkdown(body, turn.text, t("ui.map_chat_overflow_note"));
       else body.setText(turn.text);
-      for (const steer of (_a2 = turn.steers) != null ? _a2 : []) {
+      for (const steer of (_c = turn.steers) != null ? _c : []) {
         const bubble = this.logEl.createDiv({
           cls: steer.state === "queued" ? "vam-topic-chat-steer is-queued" : "vam-topic-chat-steer"
         });
@@ -54703,9 +54811,11 @@ var TopicChatWindow = class {
         bubble.createSpan({ cls: "vam-topic-chat-steer-text", text: steer.text });
       }
     }
+    if (session.choice) this.paintChoice(session.choice, heldPart, !this.choiceShown);
+    this.choiceShown = !!session.choice;
     if (session.running) {
       const running2 = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running" });
-      running2.createSpan({ text: t("ui.topic_chat_running") });
+      running2.createSpan({ text: session.progress || t("ui.topic_chat_running") });
       if (this.host.canStop()) {
         const stop = running2.createEl("button", {
           cls: "vam-topic-chat-stop",
@@ -54717,7 +54827,96 @@ var TopicChatWindow = class {
     }
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }
+  /** The depth card: an AI message with three radio options and Start / Cancel. Arrows switch, Enter starts, Escape cancels. */
+  paintChoice(choice, heldPart, focusNow) {
+    const row = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-choice" });
+    row.createSpan({ cls: "vam-topic-chat-who", text: t("ui.map_chat_role_ai") });
+    const messageId = `vam-topic-chat-choice-${++labelSeq2}`;
+    row.createSpan({
+      cls: "vam-topic-chat-text",
+      text: t("ui.topic_chat_choice_message_0_1_2", choice.levels, choice.topics, choice.researched),
+      attr: { id: messageId }
+    });
+    const group = row.createDiv({
+      cls: "vam-topic-chat-choice",
+      attr: { role: "radiogroup", "aria-labelledby": messageId }
+    });
+    let selectedEl = null;
+    for (const depth of INTEGRATION_DEPTHS) {
+      const selected = choice.selected === depth;
+      const optionId = `${messageId}-${depth}`;
+      const option = group.createDiv({
+        cls: selected ? "vam-topic-chat-choice-opt is-selected" : "vam-topic-chat-choice-opt",
+        attr: {
+          role: "radio",
+          tabindex: selected ? "0" : "-1",
+          "aria-checked": String(selected),
+          "aria-labelledby": `${optionId}-label`,
+          "aria-describedby": `${optionId}-hint`,
+          "data-part": "radio"
+        }
+      });
+      option.createSpan({ cls: "vam-topic-chat-choice-dot", attr: { "aria-hidden": "true" } });
+      const body = option.createSpan({ cls: "vam-topic-chat-choice-body" });
+      body.createSpan({
+        cls: "vam-topic-chat-choice-label",
+        text: depthLabel(depth),
+        attr: { id: `${optionId}-label` }
+      });
+      body.createSpan({
+        cls: "vam-topic-chat-choice-hint",
+        text: depthHint(depth, choice),
+        attr: { id: `${optionId}-hint` }
+      });
+      if (selected) selectedEl = option;
+      option.addEventListener("click", () => this.host.chooseDepth(depth));
+      option.addEventListener("keydown", (event) => {
+        var _a2, _b2;
+        const step = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 0;
+        if (step) {
+          event.preventDefault();
+          (_a2 = event.stopPropagation) == null ? void 0 : _a2.call(event);
+          this.host.chooseDepth(INTEGRATION_DEPTHS[(INTEGRATION_DEPTHS.indexOf(choice.selected) + step + INTEGRATION_DEPTHS.length) % INTEGRATION_DEPTHS.length]);
+        } else if (event.key === "Enter" && !event.isComposing) {
+          event.preventDefault();
+          (_b2 = event.stopPropagation) == null ? void 0 : _b2.call(event);
+          void this.confirmChoice();
+        } else if (event.key === " ") {
+          event.preventDefault();
+          this.host.chooseDepth(depth);
+        }
+      });
+    }
+    const actions = row.createDiv("vam-topic-chat-choice-actions");
+    const start = actions.createEl("button", {
+      cls: "vam-topic-chat-choice-start mod-cta",
+      text: t("ui.topic_chat_choice_start"),
+      attr: { type: "button", "data-part": "start" }
+    });
+    start.addEventListener("click", () => void this.confirmChoice());
+    const cancel = actions.createEl("button", {
+      cls: "vam-topic-chat-choice-cancel",
+      text: t("ui.topic_chat_choice_cancel"),
+      attr: { type: "button", "data-part": "cancel" }
+    });
+    cancel.addEventListener("click", () => this.cancelChoice());
+    const focusPart = focusNow ? "radio" : heldPart;
+    if (focusPart === "radio") selectedEl == null ? void 0 : selectedEl.focus();
+    else if (focusPart === "start") start.focus();
+    else if (focusPart === "cancel") cancel.focus();
+  }
 };
+function depthLabel(depth) {
+  return t(
+    depth === "quick" ? "ui.topic_chat_choice_quick" : depth === "bottom-up" ? "ui.topic_chat_choice_bottom_up" : "ui.topic_chat_choice_research_first"
+  );
+}
+function depthHint(depth, choice) {
+  const calls = choice.calls[depth];
+  if (depth === "quick") return t("ui.topic_chat_choice_quick_hint_0", calls);
+  if (depth === "bottom-up") return t("ui.topic_chat_choice_bottom_up_hint_0", calls);
+  return t("ui.topic_chat_choice_research_first_hint_0_1", choice.leaves, calls);
+}
 
 // experiences/visual-map/topic-chat-steer.ts
 var TopicChatSteers = class {
@@ -68356,6 +68555,29 @@ ${request.requirements}` : preset.text,
       close: () => {
         var _a2;
         if (((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry) this.closeTopicChatWindow();
+      },
+      chooseDepth: (depth) => {
+        const choice = entry.session.choice;
+        if (!choice || !INTEGRATION_DEPTHS.includes(depth)) return;
+        choice.selected = depth;
+        this.notifyTopicChat(entry);
+      },
+      confirmChoice: () => {
+        const target = node();
+        const choice = entry.session.choice;
+        if (!target || !choice || entry.submitting) return Promise.resolve(false);
+        entry.submitting = true;
+        return this.submitTopicChatNow(entry, target, "synthesize", choice.text, void 0, choice.selected).finally(
+          () => {
+            entry.submitting = false;
+          }
+        );
+      },
+      cancelChoice: () => {
+        if (!entry.session.choice) return;
+        entry.session.choice = null;
+        entry.session.turns.push({ role: "ai", text: t("ui.topic_chat_choice_cancelled") });
+        this.notifyTopicChat(entry);
       }
     };
   }
@@ -68382,7 +68604,7 @@ ${request.requirements}` : preset.text,
    * (it stayed so over the gap), so that guard is skipped; every other guard is as for a typed send. The text is taken from
    * `followUp` only once the usage question is confirmed, so an addition typed while it was open rides along.
    */
-  async submitTopicChatNow(entry, node, kind, text10, followUp) {
+  async submitTopicChatNow(entry, node, kind, text10, followUp, depth) {
     const map = this.map;
     if (this.closed || !map || map.id !== entry.mapId || this.presentation) return false;
     if (!followUp && entry.session.running || this.topicChatBusy(node)) {
@@ -68417,6 +68639,29 @@ ${request.requirements}` : preset.text,
       this.notifyTopicChat(entry);
       return true;
     }
+    if (kind === "synthesize" && depth === void 0 && !followUp) {
+      const nodes = this.subtreePlanNodes();
+      const stats = subtreeStats(nodes, node.id);
+      if (stats.levels > 1) {
+        entry.session.turns.push(userTurn);
+        entry.session.choice = {
+          levels: stats.levels,
+          topics: stats.topics,
+          researched: stats.researched,
+          leaves: stats.unresearchedLeaves,
+          calls: {
+            quick: integrationCalls(stats, "quick"),
+            "bottom-up": integrationCalls(stats, "bottom-up"),
+            "research-first": integrationCalls(stats, "research-first")
+          },
+          selected: "quick",
+          text: text10,
+          turn: userTurn
+        };
+        this.notifyTopicChat(entry);
+        return true;
+      }
+    }
     const mode = entry.session.mode;
     const controller = new AbortController();
     let started = false;
@@ -68436,6 +68681,12 @@ ${request.requirements}` : preset.text,
         userTurn.text = text10;
       }
       started = true;
+      const pending2 = entry.session.choice;
+      if (pending2) {
+        const at = entry.session.turns.indexOf(pending2.turn);
+        if (depth !== void 0 && at >= 0) entry.session.turns.splice(at, 1);
+        entry.session.choice = null;
+      }
       entry.session.turns.push(userTurn);
       entry.session.running = true;
       entry.runningTurnId = this.newTopicTurnId();
@@ -68463,7 +68714,7 @@ ${request.requirements}` : preset.text,
         message: text10
       });
       this.notifyTopicChat(entry);
-      void this.runTopicChatTask(entry, node, note, kind, mode, text10, controller, steers, userTurn);
+      void this.runTopicChatTask(entry, node, note, kind, mode, text10, controller, steers, userTurn, depth);
     });
     return went !== false && started;
   }
@@ -68529,7 +68780,7 @@ ${request.requirements}` : preset.text,
     }
   }
   /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
-  async runTopicChatTask(entry, node, note, kind, mode, text10, controller, steers, userTurn) {
+  async runTopicChatTask(entry, node, note, kind, mode, text10, controller, steers, userTurn, depth) {
     var _a2;
     const turnId = entry.runningTurnId;
     const live2 = () => {
@@ -68537,13 +68788,13 @@ ${request.requirements}` : preset.text,
       return !this.closed && ((_a3 = this.map) == null ? void 0 : _a3.id) === entry.mapId;
     };
     try {
-      await this.runTopicChatBody(entry, node, note, kind, mode, text10, controller, steers, userTurn);
+      await this.runTopicChatBody(entry, node, note, kind, mode, text10, controller, steers, userTurn, depth);
     } finally {
       if (entry.steers === steers && (steers.entries.length || ((_a2 = entry.steerFolded) == null ? void 0 : _a2.length)) && entry.session.running)
         await this.endTopicChatSteers(entry, steers, turnId, live2);
     }
   }
-  async runTopicChatBody(entry, node, note, kind, mode, text10, controller, steers, userTurn) {
+  async runTopicChatBody(entry, node, note, kind, mode, text10, controller, steers, userTurn, depth) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     const mapId = entry.mapId;
     const live2 = () => {
@@ -68609,7 +68860,31 @@ ${request.requirements}` : preset.text,
         return;
       }
       const children = (_d = (_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === node.id).length) != null ? _d : 0;
-      const toResearch = ((_f = (_e = this.map) == null ? void 0 : _e.nodes) != null ? _f : []).filter((item) => {
+      let chain = null;
+      if (depth !== void 0 && subtreeStats(this.subtreePlanNodes(), node.id).levels > 1) {
+        chain = await this.runSubtreeChain(entry, node, mode, language2, controller, steers, depth, live2);
+        if (chain.halt) {
+          endHooks();
+          if (chain.halt === "failed")
+            this.settleTopicChat(
+              entry,
+              t("ui.topic_chat_failed_0", t("ui.topic_chat_failed_subtree")),
+              live2,
+              true,
+              "failed"
+            );
+          else
+            this.settleTopicChat(
+              entry,
+              t("ui.topic_chat_subtree_stopped_0_1", chain.done, chain.total),
+              live2,
+              false,
+              "stopped"
+            );
+          return;
+        }
+      }
+      const toResearch = (chain ? [] : (_f = (_e = this.map) == null ? void 0 : _e.nodes) != null ? _f : []).filter((item) => {
         var _a3;
         if (item.parentId !== node.id) return false;
         const status = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.status;
@@ -68643,7 +68918,7 @@ ${request.requirements}` : preset.text,
         await this.hydrate();
       }
       let direction = text10;
-      if (toResearch.length) {
+      if (toResearch.length || chain) {
         const early = steers.takeQueued();
         steers.live(true);
         if (early.length) {
@@ -68679,7 +68954,16 @@ ${request.requirements}` : preset.text,
         }
       );
       endHooks();
-      if (written2)
+      if (written2 && chain) {
+        const finished = unresearchedList(this.subtreePlanNodes(), node.id);
+        this.settleTopicChat(
+          entry,
+          t("ui.topic_chat_subtree_done_0_1_2", chain.read, finished.total, chain.rewritten + 1),
+          live2,
+          false,
+          "done"
+        );
+      } else if (written2)
         this.settleTopicChat(
           entry,
           researchedFirst ? t("ui.topic_chat_synthesis_researched_first_0_1", researchedFirst, children) : t("ui.topic_chat_synthesis_done_0", children),
@@ -68688,7 +68972,13 @@ ${request.requirements}` : preset.text,
           "done"
         );
       else if (controller.signal.aborted || failure === t("ui.ai_task_cancelled"))
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live2, false, "stopped");
+        this.settleTopicChat(
+          entry,
+          chain ? t("ui.topic_chat_subtree_stopped_0_1", chain.done, chain.total) : t("ui.topic_chat_stopped"),
+          live2,
+          false,
+          "stopped"
+        );
       else
         this.settleTopicChat(
           entry,
@@ -68708,6 +68998,98 @@ ${request.requirements}` : preset.text,
         stopped ? "stopped" : "failed"
       );
     }
+  }
+  /**
+   * The steps below the root for the chosen depth, one after the other: quick (direct subtopics that have subtopics integrate
+   * those locally; childless unresearched ones are researched as before), bottom-up (every parent from the deepest, no web),
+   * research-first (unresearched leaves researched in the chat's mode, then bottom-up). Before each step: stopped, view gone,
+   * AI lock (stops here, nothing further runs), node gone or busy (skipped, never waited for). One failure does not stop the chain.
+   * The root is not part of it: the caller integrates it afterwards (unless the chain halted).
+   */
+  async runSubtreeChain(entry, root, mode, language2, controller, steers, depth, live2) {
+    var _a2, _b2;
+    const plan = this.subtreePlanNodes();
+    const steps = [];
+    if (depth === "quick") {
+      for (const item of plan)
+        if (item.parentId === root.id && !item.researched && !plan.some((other) => other.parentId === item.id))
+          steps.push({ kind: "research", id: item.id });
+      for (const id of quickOrder(plan, root.id)) steps.push({ kind: "integrate", id });
+    } else {
+      if (depth === "research-first")
+        for (const id of unresearchedLeaves(plan, root.id)) steps.push({ kind: "research", id });
+      for (const id of bottomUpOrder(plan, root.id)) if (id !== root.id) steps.push({ kind: "integrate", id });
+    }
+    const total2 = steps.length + 1;
+    const outcome = {
+      halt: null,
+      done: 0,
+      total: total2,
+      rewritten: 0,
+      read: subtreeStats(plan, root.id).topics
+    };
+    steers.live(false);
+    let attempted = 0;
+    for (const [index, step] of steps.entries()) {
+      if (controller.signal.aborted || !live2()) {
+        outcome.halt = "stopped";
+        return outcome;
+      }
+      const target = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === step.id);
+      if (!target) continue;
+      if (this.aiLockReason("write", [target.id])) {
+        outcome.halt = "stopped";
+        return outcome;
+      }
+      if (this.topicChatBusy(target)) continue;
+      attempted++;
+      entry.session.progress = t("ui.topic_chat_progress_0_1", index + 1, total2);
+      this.notifyTopicChat(entry);
+      try {
+        if (step.kind === "research") {
+          const note = await this.plugin.repo.readNote(target.path, (_b2 = this.map) != null ? _b2 : void 0);
+          const done = await this.runTopicChatResearch(target, note, mode, language2, "", controller.signal);
+          if (done.result) outcome.done++;
+        } else {
+          let written2 = false;
+          await this.startSynthesis(
+            target,
+            {
+              ...chatSynthesisOptions({ outputLanguage: language2 }),
+              researchMode: "local",
+              signal: controller.signal,
+              onProgress: () => {
+              }
+            },
+            "",
+            () => {
+            },
+            () => {
+            },
+            {
+              isOpen: () => false,
+              onWritten: () => {
+                written2 = true;
+              }
+            }
+          );
+          if (written2) {
+            outcome.done++;
+            outcome.rewritten++;
+          }
+        }
+      } catch (e) {
+      }
+      await this.hydrate();
+    }
+    if (controller.signal.aborted || !live2()) outcome.halt = "stopped";
+    else if (attempted > 0 && outcome.done === 0) outcome.halt = "failed";
+    entry.session.progress = void 0;
+    if (!outcome.halt) {
+      entry.session.progress = t("ui.topic_chat_progress_0_1", total2, total2);
+      this.notifyTopicChat(entry);
+    }
+    return outcome;
   }
   /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
   async runTopicChatResearch(node, note, mode, language2, text10, signal, accepted, launched, steer) {
@@ -68975,6 +69357,7 @@ ${request.requirements}` : preset.text,
   settleTopicChat(entry, sentence, live2, notice, status, markdown = false, plan = false) {
     if (!this.holdsTopicSteers(entry)) entry.session.running = false;
     entry.steerEnd = { status, plan };
+    entry.session.progress = void 0;
     const turnId = entry.runningTurnId;
     entry.runningTurnId = null;
     if (!live2()) return;

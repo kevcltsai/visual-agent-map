@@ -538,7 +538,7 @@ async function harness() {
   // What render() does around the topic chat window: take it out first, put it into the new overlay last.
   const repaint = () => {
     const held = view.detachTopicChat();
-    p.root.empty(); overlay = p.root.createDiv('vam-canvas-overlay');
+    p.root.empty(); overlay = p.root.createDiv('vam-canvas-overlay'); overlay.ownerDocument = p.doc;
     view.remountTopicChat(held);
   };
   view.render = () => { repaint(); };
@@ -548,6 +548,8 @@ async function harness() {
     node: key => view.map.nodes.find(n => n.id === ids[key]),
     saved: async () => (await repo.readMap(MAP)).nodes,
     entry: key => view.topicChatSessions.get(ids[key]),
+    // Everything below the root's direct subtopics goes (in memory): these tests are about a subtree one level deep, which has no depth card.
+    flatten: () => { view.map.nodes = view.map.nodes.filter(n => !n.parentId || n.parentId === ids.root); },
     host: key => view.topicChatHost(h.entry(key) ?? (view.openTopicChat(h.node(key)), h.entry(key))),
     win: () => view.topicChatOpen?.win,
     texts: () => findAll(h.win().el, () => true).map(i => i.text).join('|')
@@ -624,7 +626,7 @@ integrationTest('topic chat opens one window at a time: opening B closes A, A ke
 });
 
 integrationTest('topic chat counterexample 1: Standard integration is not Local (web search on), Quick is Local; the sidebar integration stays Local', async () => {
-  const h = await harness(); const seen = []; await researched(h);
+  const h = await harness(); h.flatten(); const seen = []; await researched(h);
   h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push({ id: node.id, options, direction, observer }); accepted(); };
   const host = h.host('root');
   host.setMode('standard');
@@ -649,7 +651,7 @@ integrationTest('topic chat counterexample 1: Standard integration is not Local 
 });
 
 integrationTest('topic chat integration: a written result reaches the window even though the observer says closed; a topic without subtopics answers at once without a usage question', async () => {
-  const h = await harness(); await researched(h);
+  const h = await harness(); h.flatten(); await researched(h);
   h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { accepted(); observer.onWritten(); };
   const host = h.host('root');
   await host.submit('synthesize', 'x'); await waitFor(() => !h.entry('root').session.running);
@@ -878,7 +880,7 @@ integrationTest('topic chat record writer: a cut file gets a line break first, a
 });
 
 integrationTest('topic chat synthesize researches only idea or error subtopics first (same mode), then integrates; the sentence says so', async () => {
-  const h = await harness(); const calls = stubResearch(h); const seen = [];
+  const h = await harness(); h.flatten(); const calls = stubResearch(h); const seen = [];
   h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push(node.id); accepted(); observer.onWritten(); };
   const statuses = { a: 'completed', b: 'error' }; const load0 = h.view.hydrate;
   h.view.hydrate = async () => { await load0(); for (const [k, v] of Object.entries(statuses)) h.view.notes.get(h.ids[k]).status = v; };
@@ -899,7 +901,7 @@ integrationTest('topic chat synthesize researches only idea or error subtopics f
 });
 
 integrationTest('topic chat synthesize: when every subtopic research fails the integration does not start and one sentence says so', async () => {
-  const h = await harness(); const calls = stubResearch(h); let synthesized = 0;
+  const h = await harness(); h.flatten(); const calls = stubResearch(h); let synthesized = 0;
   h.view.startSynthesis = async () => { synthesized++; };
   const host = h.host('root');
   await host.submit('synthesize', 'all');
@@ -1068,7 +1070,7 @@ integrationTest('topic chat ask: a declined usage question sends nothing; stop s
 });
 
 integrationTest('topic chat synthesize: aborting while the unresearched subtopics are researched does not start the integration', async () => {
-  const h = await harness(); const calls = stubResearch(h); let synthesized = 0;
+  const h = await harness(); h.flatten(); const calls = stubResearch(h); let synthesized = 0;
   h.view.startSynthesis = async () => { synthesized++; };
   await h.host('root').submit('synthesize', 'all');
   await waitFor(() => calls.length === 1);
@@ -1193,7 +1195,7 @@ integrationTest('topic chat B2: the map remembers aiMode only after the usage qu
 });
 
 integrationTest('topic chat B3: the parent topic edited while the integration was made keeps the edit, leaves no history or Undo, and one failure sentence is told', async () => {
-  const h = await harness(); await researched(h);
+  const h = await harness(); h.flatten(); await researched(h);
   const rootNote = h.node('root');
   await h.repo.updateNote(rootNote.path, { status: 'completed', summary: 'Existing conclusion', detail: 'Existing knowledge' });
   await h.view.hydrate();
@@ -1636,7 +1638,7 @@ integrationTest('topic chat steer: startSynthesis hands the steer to the run of 
 });
 
 integrationTest('topic chat steer: an addition typed while the subtopics are researched first rides in the integration text once, shows as taken in, and is written', async () => {
-  const h = await harness(); const calls = stubResearch(h); const seen = [];
+  const h = await harness(); h.flatten(); const calls = stubResearch(h); const seen = [];
   h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push({ direction, steer: options.steer }); accepted(); observer.onWritten(); };
   const statuses = { a: 'completed', b: 'error' }; const load0 = h.view.hydrate;
   h.view.hydrate = async () => { await load0(); for (const [k, v] of Object.entries(statuses)) h.view.notes.get(h.ids[k]).status = v; };
@@ -1663,7 +1665,7 @@ integrationTest('topic chat steer: research and expand hand the steer on; a synt
   await h.host('a').submit('expand', 'x'); await finished(h);
   assert.equal(got.research, got.research && entry0().steers && got.research); assert.ok(got.research && typeof got.research.bind === 'function' && typeof got.research.live === 'function');
   assert.ok(got.expand && typeof got.expand.bind === 'function');
-  await researched(h); let option;
+  h.flatten(); await researched(h); let option;
   h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { option = options; accepted(); observer.onWritten(); };
   await h.host('root').submit('synthesize', 'go'); await waitFor(() => !h.entry('root').session.running);
   assert.equal(option.steer, h.entry('root').steers);
@@ -1742,4 +1744,176 @@ test('topic chat window stop: the running row shows a labelled Stop button that 
   assert.ok(findAll(f.win.el, i => hasClass(i, 'is-running')).length === 1, 'the Running row stays');
   stoppable = true; f.session.running = false; f.refresh();
   assert.equal(stopBtn(), undefined, 'idle again: no stop button');
+});
+
+// ---- Subtree integration: the depth card and the chain below the root (root -> a, b; a -> c; c -> deep). ----
+const deepen = async h => {
+  const created = await h.repo.createNote('Deep', 'gpt-6-luna', h.view.map, MAP, 'inherited');
+  Object.assign(created, { parentId: h.ids.c, x: 700, y: 80 });
+  h.view.map.nodes.push(created); h.ids.deep = created.id; await h.view.hydrate();
+};
+const nameOf = (h, id) => Object.entries(h.ids).find(([, v]) => v === id)?.[0];
+/** Records each integration step; `on(key, call)` may return false to make that step write nothing. */
+const stubChain = (h, on = () => true) => {
+  const steps = []; const research = [];
+  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => {
+    const key = nameOf(h, node.id); steps.push({ key, options, direction });
+    accepted(); if ((await on(key, steps.at(-1))) !== false) observer.onWritten();
+  };
+  h.view.runAgent = async (node, done, failed, request, accepted) => { research.push({ key: nameOf(h, node.id), mode: request.researchMode }); accepted?.(); done({ summary: 'S', detail: 'D' }); return { finished: Promise.resolve() }; };
+  h.view.detailTemplateFor = async () => undefined;
+  return { steps, research };
+};
+const startDeep = async (h, depth, { mode = 'quick', text = 'all' } = {}) => {
+  const host = h.host('root'); host.setMode(mode);
+  assert.equal(await host.submit('synthesize', text), true);
+  host.chooseDepth(depth);
+  const asks = h.control.usageAsks;
+  assert.equal(await host.confirmChoice(), true);
+  assert.equal(h.control.usageAsks, asks + 1, 'one usage question for the whole chain');
+  await waitFor(() => !h.entry('root').session.running);
+  return h.entry('root').session.turns.at(-1).text;
+};
+
+integrationTest('topic chat depth card: a deeper subtree shows the card with the numbers from the map; Cancel runs no AI and writes no record', async () => {
+  const h = await harness(); await deepen(h); const { steps, research } = stubChain(h);
+  const asks = h.control.usageAsks; const host = h.host('root');
+  assert.equal(await host.submit('synthesize', 'all'), true);
+  const choice = h.entry('root').session.choice;
+  assert.deepEqual(plain({ ...choice, turn: undefined }), plain({ levels: 3, topics: 4, researched: 0, leaves: 2, calls: { quick: 2, 'bottom-up': 3, 'research-first': 5 }, selected: 'quick', text: 'all', turn: undefined }));
+  assert.equal(h.entry('root').session.running, false); assert.equal(h.control.usageAsks, asks, 'no usage question yet');
+  const win = h.win(); const card = find(win.el, i => i.attrs?.role === 'radiogroup');
+  assert.ok(card, 'the radio group is drawn');
+  assert.deepEqual(findAll(card, i => i.attrs?.role === 'radio').map(i => i.attrs['aria-checked']), ['true', 'false', 'false']);
+  assert.ok(find(win.el, i => i.tag === 'button' && i.text === t('ui.topic_chat_choice_start')));
+  const cancel = find(win.el, i => i.tag === 'button' && i.text === t('ui.topic_chat_choice_cancel'));
+  cancel.click(); await tick();
+  assert.equal(h.entry('root').session.choice, null);
+  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_choice_cancelled'));
+  assert.deepEqual([steps.length, research.length, h.control.usageAsks], [0, 0, asks]);
+  assert.deepEqual(await topicLines(h, 'root'), null, 'no record file line');
+  assert.equal(find(win.el, i => i.attrs?.role === 'radiogroup'), undefined, 'the card is gone');
+  assert.ok(h.page.doc.activeElement === find(win.el, i => i.tag === 'textarea'), 'the focus is back in the input');
+});
+
+integrationTest('topic chat depth card: a one-level subtree shows no card and starts as before', async () => {
+  const h = await harness(); h.flatten(); await researched(h); const { steps } = stubChain(h);
+  assert.equal(await h.host('root').submit('synthesize', 'x'), true);
+  assert.equal(h.entry('root').session.choice ?? null, null); await waitFor(() => steps.length === 1);
+});
+
+integrationTest('topic chat depth card keyboard: arrows switch (wrapping), Enter starts, Escape cancels and the input gets the focus, the card has a name and states', async () => {
+  const h = await harness(); await deepen(h); const { steps } = stubChain(h);
+  const host = h.host('root'); await host.submit('synthesize', 'all');
+  const win = h.win(); const radios = () => findAll(win.el, i => i.attrs?.role === 'radio');
+  const group = find(win.el, i => i.attrs?.role === 'radiogroup');
+  assert.ok(find(win.el, i => i.attrs?.id === group.attrs['aria-labelledby']).text.includes('3'), 'the group is named by the question');
+  for (const r of radios()) { assert.ok(find(win.el, i => i.attrs?.id === r.attrs['aria-labelledby'])?.text, 'each option has a name'); assert.ok(find(win.el, i => i.attrs?.id === r.attrs['aria-describedby'])?.text.includes('AI'), 'and a description'); }
+  assert.ok(h.page.doc.activeElement === radios()[0], 'the selected option holds the focus when the card appears');
+  radios()[0].keydown({ key: 'ArrowDown' });
+  assert.equal(h.entry('root').session.choice.selected, 'bottom-up');
+  assert.ok(h.page.doc.activeElement === radios()[1], 'the focus follows the selection after the repaint');
+  assert.deepEqual(radios().map(r => [r.attrs['aria-checked'], r.attrs.tabindex]), [['false', '-1'], ['true', '0'], ['false', '-1']]);
+  radios()[1].keydown({ key: 'ArrowUp' }); radios()[0].keydown({ key: 'ArrowUp' });
+  assert.equal(h.entry('root').session.choice.selected, 'research-first', 'wraps around');
+  win.el.fire('keydown', { key: 'Escape' });
+  assert.equal(h.entry('root').session.choice, null, 'Escape cancels the card first'); assert.ok(h.view.topicChatOpen?.win === win, 'the window stays');
+  assert.ok(h.page.doc.activeElement === find(win.el, i => i.tag === 'textarea'), 'Escape: the focus is in the input');
+  await host.submit('synthesize', 'again');
+  radios()[0].keydown({ key: 'Enter' }); await waitFor(() => steps.length > 0 && !h.entry('root').session.running);
+  assert.equal(steps.at(-1).key, 'root');
+});
+
+integrationTest('topic chat quick: the direct subtopic with subtopics integrates its own subtopics locally first, then the root; no research', async () => {
+  const h = await harness(); await deepen(h); await researched(h); const { steps, research } = stubChain(h);
+  const text = await startDeep(h, 'quick', { mode: 'standard' });
+  assert.deepEqual(steps.map(s => s.key), ['a', 'root']); assert.equal(research.length, 0, 'no web research');
+  assert.equal(steps[0].options.researchMode, 'local', 'the middle step never goes to the web'); assert.equal(steps[1].options.researchMode, 'research', 'the root runs in the chat mode as before');
+  assert.equal(steps[1].direction, 'all');
+  assert.equal(text, t('ui.topic_chat_subtree_done_0_1_2', 4, 0, 2));
+});
+
+integrationTest('topic chat quick: a childless unresearched direct subtopic is researched as before, then the integrations', async () => {
+  const h = await harness(); await deepen(h); const { steps, research } = stubChain(h);
+  await startDeep(h, 'quick');
+  assert.deepEqual(research.map(r => r.key), ['b']); assert.deepEqual(steps.map(s => s.key), ['a', 'root']);
+});
+
+integrationTest('topic chat bottom-up: deepest parent first, the root last, no research; the sentence counts what was read, not researched and rewritten', async () => {
+  const h = await harness(); await deepen(h); const { steps, research } = stubChain(h);
+  const text = await startDeep(h, 'bottom-up');
+  assert.deepEqual(steps.map(s => s.key), ['c', 'a', 'root']); assert.equal(research.length, 0);
+  assert.ok(steps.slice(0, 2).every(s => s.options.researchMode === 'local' && s.direction === ''));
+  assert.equal(text, t('ui.topic_chat_subtree_done_0_1_2', 4, 4, 3));
+});
+
+integrationTest('topic chat research-first: the unresearched leaves are researched in the chat mode (deepest first), then bottom-up', async () => {
+  const h = await harness(); await deepen(h); const { steps, research } = stubChain(h);
+  await startDeep(h, 'research-first', { mode: 'standard' });
+  assert.deepEqual(research.map(r => r.key), ['deep', 'b']); assert.ok(research.every(r => r.mode === 'research'));
+  assert.deepEqual(steps.map(s => s.key), ['c', 'a', 'root']);
+});
+
+integrationTest('topic chat chain: a stop in the middle writes nothing for the steps not run and says how far it got', async () => {
+  const h = await harness(); await deepen(h);
+  const { steps } = stubChain(h, key => { if (key === 'a') h.entry('root').controller.abort(); return key !== 'a'; });
+  const text = await startDeep(h, 'bottom-up');
+  assert.deepEqual(steps.map(s => s.key), ['c', 'a'], 'the root never started');
+  assert.equal(text, t('ui.topic_chat_subtree_stopped_0_1', 1, 3));
+  assert.equal((await topicLines(h, 'root')).at(-1).status, 'stopped');
+});
+
+integrationTest('topic chat chain: an AI lock that appears mid-chain stops before the next step', async () => {
+  const h = await harness(); await deepen(h);
+  const { steps } = stubChain(h, key => { if (key === 'c') return h.repo.writeAiLocked(h.node('a').path, true).then(() => true); return true; });
+  const text = await startDeep(h, 'bottom-up');
+  assert.deepEqual(steps.map(s => s.key), ['c'], 'a locked topic and everything after it do not run');
+  assert.equal(text, t('ui.topic_chat_subtree_stopped_0_1', 1, 3));
+});
+
+integrationTest('topic chat chain: a topic deleted mid-chain is skipped, the others run', async () => {
+  const h = await harness(); await deepen(h);
+  const { steps } = stubChain(h, key => { if (key === 'c') h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.a); return true; });
+  await startDeep(h, 'bottom-up');
+  assert.deepEqual(steps.map(s => s.key), ['c', 'root']);
+});
+
+integrationTest('topic chat chain: a topic that is busy elsewhere is skipped, not waited for', async () => {
+  const h = await harness(); await deepen(h); const { steps } = stubChain(h);
+  h.plugin.quickExpandPending.add(h.node('c').path);
+  await startDeep(h, 'bottom-up');
+  assert.deepEqual(steps.map(s => s.key), ['a', 'root']);
+});
+
+integrationTest('topic chat chain: one step that fails does not stop the chain; the sentence counts only what was rewritten', async () => {
+  const h = await harness(); await deepen(h); const { steps } = stubChain(h, key => key !== 'c');
+  const text = await startDeep(h, 'bottom-up');
+  assert.deepEqual(steps.map(s => s.key), ['c', 'a', 'root']);
+  assert.equal(text, t('ui.topic_chat_subtree_done_0_1_2', 4, 4, 2));
+});
+
+integrationTest('topic chat chain: when every step fails the root is not integrated and one sentence says so', async () => {
+  const h = await harness(); await deepen(h); const { steps } = stubChain(h, () => false);
+  const text = await startDeep(h, 'bottom-up');
+  assert.deepEqual(steps.map(s => s.key), ['c', 'a']);
+  assert.equal(text, t('ui.topic_chat_failed_0', t('ui.topic_chat_failed_subtree')));
+  assert.equal((await topicLines(h, 'root')).at(-1).status, 'failed');
+});
+
+integrationTest('topic chat chain: a view that closed mid-chain stops it and a late result is not written into the session or the record', async () => {
+  const h = await harness(); await deepen(h);
+  const { steps } = stubChain(h, key => { if (key === 'c') h.view.closed = true; return true; });
+  const host = h.host('root'); await host.submit('synthesize', 'all'); host.chooseDepth('bottom-up');
+  const turnsBefore = h.entry('root').session.turns.length;
+  await host.confirmChoice(); await waitFor(() => !h.entry('root').session.running);
+  assert.deepEqual(steps.map(s => s.key), ['c']);
+  assert.equal(h.entry('root').session.turns.length, turnsBefore, 'no sentence in the closed chat');
+  assert.equal((await topicLines(h, 'root'))?.some(l => l.type === 'result') ?? false, false);
+});
+
+integrationTest('topic chat chain: additions typed during the chain wait and go into the root integration once', async () => {
+  const h = await harness(); await deepen(h);
+  const { steps } = stubChain(h, key => { if (key === 'c') h.host('root').steer('also this'); return true; });
+  await startDeep(h, 'bottom-up');
+  assert.equal(steps.at(-1).direction, 'all\n\nalso this'); assert.ok(steps.slice(0, 2).every(s => s.direction === ''));
 });

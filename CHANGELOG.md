@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Topic chat Synthesize now asks how deep to integrate when the subtopics have subtopics of their own, integrates the whole subtree (rewriting each note, with a backup) instead of re-researching the direct subtopics, and tells how many topics it read and how many were not researched.
+
 ## [0.34.0] - 2026-11-11
 
 ### Check a claim with hypothesis research (Beta)

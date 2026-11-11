@@ -2900,6 +2900,25 @@ export const en = {
   "ui.topic_chat_too_big": "This request touches too much; please use the AI chat in the left sidebar.",
   "ui.topic_chat_result_unknown": "See the topic itself for this result.",
   "ui.topic_chat_failed_children": "No subtopic could be researched.",
+  "ui.topic_chat_choice_message_0_1_2":
+    "Below this topic there are {0} levels and {1} topics; only {2} were researched. How deep should the integration go?",
+  "ui.topic_chat_choice_quick": "Quick",
+  "ui.topic_chat_choice_quick_hint_0":
+    "Each subtopic that has its own subtopics is integrated from them first (no web search), then this topic; about {0} AI calls.",
+  "ui.topic_chat_choice_bottom_up": "Integrate bottom-up",
+  "ui.topic_chat_choice_bottom_up_hint_0":
+    "Integrate every level from the deepest up, no web search; about {0} AI calls.",
+  "ui.topic_chat_choice_research_first": "Research first, then integrate",
+  "ui.topic_chat_choice_research_first_hint_0_1":
+    "Research the {0} unresearched deepest topics first, then integrate level by level; about {1} AI calls.",
+  "ui.topic_chat_choice_start": "Start",
+  "ui.topic_chat_choice_cancel": "Cancel",
+  "ui.topic_chat_choice_cancelled": "Cancelled. Nothing was run.",
+  "ui.topic_chat_progress_0_1": "Step {0} of {1}…",
+  "ui.topic_chat_subtree_done_0_1_2":
+    "Read {0} topics below ({1} not researched) and rewrote {2} notes, this one included.",
+  "ui.topic_chat_subtree_stopped_0_1": "Stopped. Finished {0} of {1}.",
+  "ui.topic_chat_failed_subtree": "No subtopic could be integrated.",
   "ui.topic_chat_record_failed": "The topic chat record was not saved.",
   "ui.exchange_reason_invalid_line_0": "it is not a valid OPML or FreeMind outline (line {0})",
   "ui.invalid_merged_json":

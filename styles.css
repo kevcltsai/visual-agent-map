@@ -2087,6 +2087,18 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-chat-stop { flex: 0 0 auto; margin-left: auto; padding: 0 10px; height: auto; min-height: 20px; font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-error); background: transparent; border: 1px solid var(--text-error); border-radius: 999px; box-shadow: none; cursor: pointer; }
 .vam-topic-chat-stop:hover { background: var(--background-modifier-hover); }
 .vam-topic-chat-stop:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-topic-chat-msg.is-choice { white-space: normal; gap: 6px; }
+.vam-topic-chat-choice { display: flex; flex-direction: column; gap: 4px; }
+.vam-topic-chat-choice-opt { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); cursor: pointer; }
+.vam-topic-chat-choice-opt:hover { background: var(--background-modifier-hover); }
+.vam-topic-chat-choice-opt.is-selected { border-color: var(--interactive-accent); }
+.vam-topic-chat-choice-opt:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-topic-chat-choice-dot { flex: 0 0 auto; width: 12px; height: 12px; margin-top: 3px; border: 2px solid var(--text-muted); border-radius: 50%; box-sizing: border-box; }
+.vam-topic-chat-choice-opt.is-selected .vam-topic-chat-choice-dot { border-color: var(--interactive-accent); background: radial-gradient(var(--interactive-accent) 40%, transparent 45%); }
+.vam-topic-chat-choice-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vam-topic-chat-choice-hint { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-topic-chat-choice-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.vam-topic-chat-choice-start:focus-visible, .vam-topic-chat-choice-cancel:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-topic-chat-who { font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-topic-chat-steer { align-self: flex-end; display: flex; flex-direction: column; gap: 2px; max-width: 85%; padding: 5px 8px; border-left: 2px solid var(--interactive-accent); border-radius: var(--radius-s); background: var(--background-modifier-hover); overflow-wrap: anywhere; white-space: pre-wrap; }
 .vam-topic-chat-steer-tag { font-size: var(--font-ui-smaller); color: var(--text-accent); }

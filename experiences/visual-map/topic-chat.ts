@@ -1,6 +1,7 @@
 import { setIcon } from "obsidian";
 import { t } from "../../i18n";
 import { renderChatMarkdown } from "../../core/map-chat-render";
+import { INTEGRATION_DEPTHS as DEPTHS, type IntegrationDepth } from "./subtree-plan";
 
 /** The three buttons; a message typed without one is an "ask". */
 export type TopicChatButtonKind = "research" | "expand" | "synthesize";
@@ -19,6 +20,18 @@ export interface TopicChatTurn {
   steers?: ReadonlyArray<{ text: string; state: "live" | "queued" }>;
 }
 
+/** The depth-choice card an integration over a deeper subtree shows before it starts: numbers from the map, the option picked so far. */
+export interface TopicChatChoice {
+  levels: number;
+  topics: number;
+  researched: number;
+  /** Unresearched deepest topics the research-first choice researches. */
+  leaves: number;
+  /** AI calls per choice, in the order the options are listed. */
+  calls: Record<IntegrationDepth, number>;
+  selected: IntegrationDepth;
+}
+
 export interface TopicChatSession {
   turns: readonly TopicChatTurn[];
   mode: TopicChatMode;
@@ -26,6 +39,10 @@ export interface TopicChatSession {
   /** The button pressed but not yet sent; its suggestion shows as grey text until adopted. */
   draftKind: TopicChatButtonKind | null;
   draftText: string;
+  /** The depth-choice card while it waits for an answer (it writes no record and starts no AI). */
+  choice?: TopicChatChoice | null;
+  /** One line of progress for the running row (a subtree integration's "step x of y"); replaces the plain running text. */
+  progress?: string;
 }
 
 export interface TopicChatRect {
@@ -55,6 +72,12 @@ export interface TopicChatHost {
   /** Aborts the current run; the view's stop handling puts unsent additions back in the box. */
   stop(): void;
   close(): void;
+  /** The depth card: picks an option. */
+  chooseDepth(depth: IntegrationDepth): void;
+  /** The depth card: starts with the picked option; resolves true when the run started. */
+  confirmChoice(): Promise<boolean>;
+  /** The depth card: drops it; nothing runs and nothing is written. */
+  cancelChoice(): void;
 }
 
 const MODES: readonly TopicChatMode[] = ["quick", "standard"];
@@ -100,6 +123,8 @@ export class TopicChatWindow {
   private parentEl: HTMLElement | null = null;
   private submitting = false;
   private destroyed = false;
+  private choiceShown = false;
+  private readonly doc: Document | null;
 
   constructor(
     private readonly host: TopicChatHost,
@@ -194,6 +219,7 @@ export class TopicChatWindow {
       if (!next || !this.modePickerEl.contains(next)) this.closeModeMenu(false);
     });
     const doc = parent.ownerDocument;
+    this.doc = doc ?? null;
     if (doc?.addEventListener) {
       const outside = (event: MouseEvent): void => {
         if (!this.modeMenuEl.hidden && !this.modePickerEl.contains(event.target as Node)) this.closeModeMenu(false);
@@ -216,8 +242,9 @@ export class TopicChatWindow {
       if (event.key !== "Escape") return;
       event.preventDefault?.();
       event.stopPropagation?.();
-      // An open mode menu takes the first Escape; only a second one closes the window.
+      // An open mode menu takes the first Escape, then an open depth card; only the next one closes the window.
       if (!this.modeMenuEl.hidden) this.closeModeMenu(true);
+      else if (this.host.session().choice) this.cancelChoice();
       else this.requestClose();
     });
     this.cleanups.push(host.subscribe(() => this.refresh()));
@@ -317,6 +344,16 @@ export class TopicChatWindow {
     this.modeMenuEl.hidden = true;
     this.modeToggleEl.setAttr("aria-expanded", "false");
     if (focusToggle) this.modeToggleEl.focus();
+  }
+
+  private cancelChoice(): void {
+    this.host.cancelChoice();
+    if (!this.destroyed) this.inputEl.focus();
+  }
+
+  private async confirmChoice(): Promise<void> {
+    const started = await this.host.confirmChoice();
+    if (started && !this.destroyed) this.inputEl.focus();
   }
 
   private pickMode(mode: TopicChatMode): void {
@@ -436,6 +473,9 @@ export class TopicChatWindow {
   }
 
   private paintLog(session: TopicChatSession): void {
+    // The log is emptied and drawn again on every change: remember which part of the card held the focus and give it back.
+    const active = this.doc?.activeElement as HTMLElement | null | undefined;
+    const heldPart = active && this.logEl.contains(active) ? (active.getAttr("data-part") ?? null) : null;
     this.logEl.empty();
     for (const turn of session.turns) {
       const row = this.logEl.createDiv({
@@ -462,9 +502,11 @@ export class TopicChatWindow {
         bubble.createSpan({ cls: "vam-topic-chat-steer-text", text: steer.text });
       }
     }
+    if (session.choice) this.paintChoice(session.choice, heldPart, !this.choiceShown);
+    this.choiceShown = !!session.choice;
     if (session.running) {
       const running = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running" });
-      running.createSpan({ text: t("ui.topic_chat_running") });
+      running.createSpan({ text: session.progress || t("ui.topic_chat_running") });
       if (this.host.canStop()) {
         const stop = running.createEl("button", {
           cls: "vam-topic-chat-stop",
@@ -476,4 +518,104 @@ export class TopicChatWindow {
     }
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }
+
+  /** The depth card: an AI message with three radio options and Start / Cancel. Arrows switch, Enter starts, Escape cancels. */
+  private paintChoice(choice: TopicChatChoice, heldPart: string | null, focusNow: boolean): void {
+    const row = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-choice" });
+    row.createSpan({ cls: "vam-topic-chat-who", text: t("ui.map_chat_role_ai") });
+    const messageId = `vam-topic-chat-choice-${++labelSeq}`;
+    row.createSpan({
+      cls: "vam-topic-chat-text",
+      text: t("ui.topic_chat_choice_message_0_1_2", choice.levels, choice.topics, choice.researched),
+      attr: { id: messageId }
+    });
+    const group = row.createDiv({
+      cls: "vam-topic-chat-choice",
+      attr: { role: "radiogroup", "aria-labelledby": messageId }
+    });
+    let selectedEl: HTMLElement | null = null;
+    for (const depth of DEPTHS) {
+      const selected = choice.selected === depth;
+      const optionId = `${messageId}-${depth}`;
+      const option = group.createDiv({
+        cls: selected ? "vam-topic-chat-choice-opt is-selected" : "vam-topic-chat-choice-opt",
+        attr: {
+          role: "radio",
+          tabindex: selected ? "0" : "-1",
+          "aria-checked": String(selected),
+          "aria-labelledby": `${optionId}-label`,
+          "aria-describedby": `${optionId}-hint`,
+          "data-part": "radio"
+        }
+      });
+      option.createSpan({ cls: "vam-topic-chat-choice-dot", attr: { "aria-hidden": "true" } });
+      const body = option.createSpan({ cls: "vam-topic-chat-choice-body" });
+      body.createSpan({
+        cls: "vam-topic-chat-choice-label",
+        text: depthLabel(depth),
+        attr: { id: `${optionId}-label` }
+      });
+      body.createSpan({
+        cls: "vam-topic-chat-choice-hint",
+        text: depthHint(depth, choice),
+        attr: { id: `${optionId}-hint` }
+      });
+      if (selected) selectedEl = option;
+      option.addEventListener("click", () => this.host.chooseDepth(depth));
+      option.addEventListener("keydown", event => {
+        const step =
+          event.key === "ArrowDown" || event.key === "ArrowRight"
+            ? 1
+            : event.key === "ArrowUp" || event.key === "ArrowLeft"
+              ? -1
+              : 0;
+        if (step) {
+          event.preventDefault();
+          event.stopPropagation?.();
+          this.host.chooseDepth(DEPTHS[(DEPTHS.indexOf(choice.selected) + step + DEPTHS.length) % DEPTHS.length]);
+        } else if (event.key === "Enter" && !event.isComposing) {
+          event.preventDefault();
+          event.stopPropagation?.();
+          void this.confirmChoice();
+        } else if (event.key === " ") {
+          event.preventDefault();
+          this.host.chooseDepth(depth);
+        }
+      });
+    }
+    const actions = row.createDiv("vam-topic-chat-choice-actions");
+    const start = actions.createEl("button", {
+      cls: "vam-topic-chat-choice-start mod-cta",
+      text: t("ui.topic_chat_choice_start"),
+      attr: { type: "button", "data-part": "start" }
+    });
+    start.addEventListener("click", () => void this.confirmChoice());
+    const cancel = actions.createEl("button", {
+      cls: "vam-topic-chat-choice-cancel",
+      text: t("ui.topic_chat_choice_cancel"),
+      attr: { type: "button", "data-part": "cancel" }
+    });
+    cancel.addEventListener("click", () => this.cancelChoice());
+    const focusPart = focusNow ? "radio" : heldPart;
+    if (focusPart === "radio") selectedEl?.focus();
+    else if (focusPart === "start") start.focus();
+    else if (focusPart === "cancel") cancel.focus();
+  }
+}
+
+function depthLabel(depth: IntegrationDepth): string {
+  return t(
+    depth === "quick"
+      ? "ui.topic_chat_choice_quick"
+      : depth === "bottom-up"
+        ? "ui.topic_chat_choice_bottom_up"
+        : "ui.topic_chat_choice_research_first"
+  );
+}
+
+function depthHint(depth: IntegrationDepth, choice: TopicChatChoice): string {
+  const calls = choice.calls[depth];
+  if (depth === "quick") return t("ui.topic_chat_choice_quick_hint_0", calls);
+  if (depth === "bottom-up") return t("ui.topic_chat_choice_bottom_up_hint_0", calls);
+  return t("ui.topic_chat_choice_research_first_hint_0_1", choice.leaves, calls);
 }

@@ -37,7 +37,7 @@ export type ApplyChartsResult = { ok: true; detail: string } | { ok: false; code
 export function numberTokens(text: string): string[] {
   const s = text.normalize("NFKC"),
     out: string[] = [];
-  const re = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g;
+  const re = /\d{1,3}(?:,\d{3})+(?!\d)(?:\.\d+)?|\d+(?:\.\d+)?/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(s))) {
     const p = m.index > 0 ? s[m.index - 1] : "",

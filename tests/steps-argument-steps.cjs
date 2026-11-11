@@ -480,6 +480,23 @@ test('facet plan: a well formed reply parses; ids are not in the output; cause n
   assert.equal(out.assumptions.items.length, 2);
   assert.deepEqual(plain(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions = { items: [] }; v.facets.forEach(f => { f.baseline = ''; }); }))).assumptions, { items: [] });
 });
+// Real claude:haiku replies (ids 5aaf3f5e, 6633f1f1, 752a4543) the parser wrongly refused for 「紐西蘭治安相比20年前, 是不是有變差了」.
+const liveNzFixture = name => require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', `facet-plan-nz-${name}.json`), 'utf8');
+const liveNzReq = { ...base, language: 'zh-TW', proposition: '紐西蘭治安相比20年前, 是不是有變差了', today: '2026-11-11' };
+test('facet plan: real replies that restate a stated year range, use a year inside it, or write the date before a fullwidth comma are accepted', () => {
+  for (const name of ['baseline-restates-range', 'year-inside-range', 'date-with-fullwidth-comma']) assert.doesNotThrow(() => mod.facetPlanStep.parse(liveNzFixture(name), liveNzReq), name);
+});
+test('facet plan: a number outside the request and outside every stated range is still refused; a wide span or another range grounds nothing', () => {
+  const real = JSON.parse(liveNzFixture('year-inside-range'));
+  const invented = JSON.parse(JSON.stringify(real)); invented.facets[0].criterion += ' 11202 cases';
+  bad(mod.facetPlanStep, liveNzReq, invented, /11202/);
+  const outside = JSON.parse(JSON.stringify(real)); outside.facets[0].criterion += ' 2009';
+  bad(mod.facetPlanStep, liveNzReq, outside, /2009/);
+  const wide = JSON.parse(JSON.stringify(real)); wide.assumptions.items[3].value = '1980至2007年前後的範圍'; wide.assumptions.items[3].reason = '以2025年回推20年約為2005年';
+  bad(mod.facetPlanStep, liveNzReq, wide, /2005/);
+  const unrelated = JSON.parse(liveNzFixture('baseline-restates-range')); unrelated.facets[0].baseline = '約1990至1994年的每十萬人警方紀錄犯罪率';
+  bad(mod.facetPlanStep, liveNzReq, unrelated, /baseline/);
+});
 test('facet plan: the output feeds applySituationPlan (the ids come from the program)', () => {
   const out = ok(mod.facetPlanStep, fpReq, fpOk());
   const plan = { assumptions: { id: 'as', items: out.assumptions.items }, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions };

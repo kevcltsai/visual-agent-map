@@ -31430,7 +31430,7 @@ var CHART_SHAPES = [
 ];
 function numberTokens(text10) {
   const s = text10.normalize("NFKC"), out = [];
-  const re = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g;
+  const re = /\d{1,3}(?:,\d{3})+(?!\d)(?:\.\d+)?|\d+(?:\.\d+)?/g;
   let m;
   while (m = re.exec(s)) {
     const p = m.index > 0 ? s[m.index - 1] : "", pp = m.index > 1 ? s[m.index - 2] : "";
@@ -46272,8 +46272,17 @@ var substantial = (value) => [...value.replace(/\s/g, "")].reduce(
   (sum2, ch) => sum2 + (/[\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff]/.test(ch) ? 2 : 1),
   0
 ) >= 4;
+var YEAR_RANGE = /(\d{4})\s*(?:至|到|~|-|–|—|to)\s*(\d{4})/g;
+var MAX_RANGE_SPAN = 15;
+var yearRanges = (value) => [...value.normalize("NFKC").matchAll(YEAR_RANGE)].map((m) => [Number(m[1]), Number(m[2])]).filter(([from, to]) => to >= from && to - from <= MAX_RANGE_SPAN);
+var rangeYears = (values) => values.flatMap(
+  (value) => yearRanges(value).flatMap(([from, to]) => Array.from({ length: to - from + 1 }, (_, i) => String(from + i)))
+);
 var baselineMatches = (baseline, items) => {
   const key4 = normalized(baseline);
+  const ranges = yearRanges(baseline);
+  if (ranges.some(([from, to]) => items.some((item) => yearRanges(item.value).some(([f, t2]) => f === from && t2 === to))))
+    return true;
   return items.some((item) => {
     const value = normalized(item.value);
     const [short, long] = key4.length <= value.length ? [key4, value] : [value, key4];
@@ -46297,9 +46306,17 @@ function parseFacetPlan(raw, request) {
     return { label, value, reason };
   });
   for (const one of items)
-    grounded([one.label, one.reason], [request.proposition, ...today, ...items.map((a) => a.value)]);
+    grounded(
+      [one.label, one.reason],
+      [request.proposition, ...today, ...items.map((a) => a.value), ...rangeYears(items.map((a) => a.value))]
+    );
   const effectiveItems = ((_a2 = request.presetAssumptions) == null ? void 0 : _a2.length) ? request.presetAssumptions : items;
-  const withValues = [request.proposition, ...today, ...effectiveItems.map((a) => a.value)];
+  const withValues = [
+    request.proposition,
+    ...today,
+    ...effectiveItems.map((a) => a.value),
+    ...rangeYears(effectiveItems.map((a) => a.value))
+  ];
   grounded([question], withValues);
   const entries = list(item.facets, "facets");
   if (entries.length < MIN_FACETS || entries.length > MAX_FACETS)

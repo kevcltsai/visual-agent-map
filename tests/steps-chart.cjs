@@ -80,6 +80,7 @@ test('number rules: sourced numbers pass; midpoints, invented bounds and non-bod
   assert.equal(await code(NOTE, [draft(P1, 'timeline\n  title T\n  1200 : Items')]), 'ok');
   assert.equal(await code(NOTE, [draft(P1, 'timeline\n  title T\n  １,２００ : Items')]), 'ok');
   assert.deepEqual([...insert.numberTokens('A1 v2 C4 H2O quadrant-1 stateDiagram-v2 7 1,200.5')], ['7', '1200.5']);
+  assert.deepEqual([...insert.numberTokens('2026-11-11，2026年 and 1,200')], ['2026', '11', '11', '2026', '1200']);
   // URL, footnote and existing-mermaid numbers are not sources
   assert.equal(await code(NOTE, [draft(P1, 'timeline\n  title T\n  777 : Link')]), 'number_not_in_note');
   assert.equal(await code(NOTE, [draft(P1, 'timeline\n  title T\n  99 : Footnote')]), 'number_not_in_note');

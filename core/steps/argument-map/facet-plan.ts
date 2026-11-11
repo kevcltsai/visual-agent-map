@@ -114,9 +114,27 @@ const substantial = (value: string): boolean =>
     0
   ) >= 4;
 
+/** The year ranges an assumption value states ("2004至2008年", "2004-2008"), each as [from, to]; a span over 15 years is not a period around a point and is ignored. */
+const YEAR_RANGE = /(\d{4})\s*(?:至|到|~|-|–|—|to)\s*(\d{4})/g;
+const MAX_RANGE_SPAN = 15;
+const yearRanges = (value: string): [number, number][] =>
+  [...value.normalize("NFKC").matchAll(YEAR_RANGE)]
+    .map(m => [Number(m[1]), Number(m[2])] as [number, number])
+    .filter(([from, to]) => to >= from && to - from <= MAX_RANGE_SPAN);
+
+/** Every year inside a stated range counts as given: "about 2004 to 2008" lets the reply say 2005. */
+const rangeYears = (values: string[]): string[] =>
+  values.flatMap(value =>
+    yearRanges(value).flatMap(([from, to]) => Array.from({ length: to - from + 1 }, (_, i) => String(from + i)))
+  );
+
 /** A baseline is tied to an assumption when it contains, or is contained in, one assumption value (after normalizing), and the shorter side is not a trivial fragment. */
 const baselineMatches = (baseline: string, items: { value: string }[]): boolean => {
   const key = normalized(baseline);
+  // A baseline that states the same year range as a value restates that value, even with different words around it.
+  const ranges = yearRanges(baseline);
+  if (ranges.some(([from, to]) => items.some(item => yearRanges(item.value).some(([f, t]) => f === from && t === to))))
+    return true;
   return items.some(item => {
     const value = normalized(item.value);
     const [short, long] = key.length <= value.length ? [key, value] : [value, key];
@@ -142,10 +160,18 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
   // Label and reason may use the years and quantities of the assumption values (the AI's scope choices); links stay proposition-only
   // because every value's links were checked against the proposition above.
   for (const one of items)
-    grounded([one.label, one.reason], [request.proposition, ...today, ...items.map(a => a.value)]);
+    grounded(
+      [one.label, one.reason],
+      [request.proposition, ...today, ...items.map(a => a.value), ...rangeYears(items.map(a => a.value))]
+    );
   const effectiveItems = request.presetAssumptions?.length ? request.presetAssumptions : items;
   // Assumption values are the AI's own scope choices (links-only checked), so their years and quantities may be reused below.
-  const withValues = [request.proposition, ...today, ...effectiveItems.map(a => a.value)];
+  const withValues = [
+    request.proposition,
+    ...today,
+    ...effectiveItems.map(a => a.value),
+    ...rangeYears(effectiveItems.map(a => a.value))
+  ];
   grounded([question], withValues);
   const entries = list(item.facets, "facets");
   if (entries.length < MIN_FACETS || entries.length > MAX_FACETS)

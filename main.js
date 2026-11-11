@@ -2906,7 +2906,13 @@ var en = {
   "ui.argument_rerun": "Re-run with these assumptions\u2026",
   "ui.argument_rerun_aria": "Re-run with these assumptions in a new map; this map stays as it is",
   "ui.argument_rerun_unreadable": "Could not read the definitions table, so no new map was made. Check the table in the assumptions note.",
-  "ui.argument_searched_0": "Tried {0} searches; the note lists them"
+  "ui.argument_searched_0": "Tried {0} searches; the note lists them",
+  "ui.argument_paused_reason_user": "You stopped it",
+  "ui.argument_paused_reason_error": "The AI reply was not in the right format; a retry also failed",
+  "ui.argument_paused_reason_interrupted": "Interrupted last time",
+  "ui.argument_paused_reason_limit": "Research calls used up",
+  "ui.argument_paused_resume_aria": "Resume research from where it stopped",
+  "ui.argument_hypothesis_alt_0": "Hypothesis {0} \xB7 competing explanation"
 };
 
 // i18n/zh-CN.ts
@@ -5708,7 +5714,13 @@ var zhCN = {
   "ui.argument_rerun": "\u7528\u8FD9\u7EC4\u5047\u8BBE\u91CD\u8DD1\u2026",
   "ui.argument_rerun_aria": "\u7528\u8FD9\u7EC4\u5047\u8BBE\u5728\u65B0\u56FE\u91CD\u8DD1\uFF0C\u539F\u56FE\u4E0D\u53D8",
   "ui.argument_rerun_unreadable": "\u770B\u4E0D\u61C2\u5B9A\u4E49\u8868\uFF0C\u6CA1\u6709\u5F00\u65B0\u56FE\u3002\u8BF7\u68C0\u67E5\u5047\u8BBE\u5361\u7B14\u8BB0\u91CC\u7684\u8868\u683C\u3002",
-  "ui.argument_searched_0": "\u67E5\u8FC7 {0} \u79CD\u5199\u6CD5\uFF0C\u7B14\u8BB0\u91CC\u6709\u8BB0\u5F55"
+  "ui.argument_searched_0": "\u67E5\u8FC7 {0} \u79CD\u5199\u6CD5\uFF0C\u7B14\u8BB0\u91CC\u6709\u8BB0\u5F55",
+  "ui.argument_paused_reason_user": "\u4F60\u5DF2\u505C\u6B62",
+  "ui.argument_paused_reason_error": "AI \u56DE\u590D\u683C\u5F0F\u4E0D\u5BF9\uFF0C\u91CD\u8BD5\u4E00\u6B21\u4ECD\u5931\u8D25",
+  "ui.argument_paused_reason_interrupted": "\u4E0A\u6B21\u4E2D\u65AD",
+  "ui.argument_paused_reason_limit": "\u7814\u7A76\u6B21\u6570\u5DF2\u7528\u5B8C",
+  "ui.argument_paused_resume_aria": "\u63A5\u7EED\u7814\u7A76\uFF0C\u4ECE\u505C\u4E0B\u7684\u5730\u65B9\u7EE7\u7EED",
+  "ui.argument_hypothesis_alt_0": "\u5047\u8BBE {0}\u30FB\u7ADE\u4E89\u89E3\u91CA"
 };
 
 // i18n/zh-TW.ts
@@ -8510,7 +8522,13 @@ var zhTW = {
   "ui.argument_rerun": "\u7528\u9019\u7D44\u5047\u8A2D\u91CD\u8DD1\u2026",
   "ui.argument_rerun_aria": "\u7528\u9019\u7D44\u5047\u8A2D\u5728\u65B0\u5716\u91CD\u8DD1\uFF0C\u539F\u5716\u4E0D\u8B8A",
   "ui.argument_rerun_unreadable": "\u770B\u4E0D\u61C2\u5B9A\u7FA9\u8868\uFF0C\u6C92\u6709\u958B\u65B0\u5716\u3002\u8ACB\u6AA2\u67E5\u5047\u8A2D\u5361\u7B46\u8A18\u88E1\u7684\u8868\u683C\u3002",
-  "ui.argument_searched_0": "\u67E5\u904E {0} \u7A2E\u5BEB\u6CD5\uFF0C\u7B46\u8A18\u88E1\u6709\u8A18\u9304"
+  "ui.argument_searched_0": "\u67E5\u904E {0} \u7A2E\u5BEB\u6CD5\uFF0C\u7B46\u8A18\u88E1\u6709\u8A18\u9304",
+  "ui.argument_paused_reason_user": "\u4F60\u5DF2\u505C\u6B62",
+  "ui.argument_paused_reason_error": "AI \u56DE\u8986\u683C\u5F0F\u4E0D\u5C0D\uFF0C\u91CD\u8A66\u4E00\u6B21\u4ECD\u5931\u6557",
+  "ui.argument_paused_reason_interrupted": "\u4E0A\u6B21\u4E2D\u65B7",
+  "ui.argument_paused_reason_limit": "\u7814\u7A76\u6B21\u6578\u5DF2\u7528\u5B8C",
+  "ui.argument_paused_resume_aria": "\u63A5\u7E8C\u7814\u7A76\uFF0C\u5F9E\u505C\u4E0B\u7684\u5730\u65B9\u7E7C\u7E8C",
+  "ui.argument_hypothesis_alt_0": "\u5047\u8A2D {0}\u30FB\u7AF6\u722D\u89E3\u91CB"
 };
 
 // i18n/languages.ts
@@ -45402,6 +45420,22 @@ var CONCLUSION_KIND = {
   stopped_limit: "ui.argument_conclusion_state_limit",
   stopped_mismatch: "ui.argument_conclusion_state_mismatch"
 };
+var PAUSE_REASON_KEY = {
+  user: "ui.argument_paused_reason_user",
+  error: "ui.argument_paused_reason_error",
+  interrupted: "ui.argument_paused_reason_interrupted",
+  limit: "ui.argument_paused_reason_limit"
+};
+function pausedParts(state, phase, t2) {
+  const run = state.run;
+  if (run.status !== "paused" || run.phase !== phase) return null;
+  const reason = run.stopReason === void 0 ? void 0 : PAUSE_REASON_KEY[run.stopReason];
+  return {
+    chip: { tone: "maybe", text: t2("ui.argument_bar_paused") },
+    lines: reason ? [t2("ui.argument_reason_0", t2(reason))] : [],
+    resume: { text: t2("ui.argument_bar_resume"), ariaLabel: t2("ui.argument_paused_resume_aria") }
+  };
+}
 var isFacetMap = (state) => state.situation.facets !== void 0;
 var why = (t2, stored) => whyText(t2, stored);
 var PROP_CHIP = {
@@ -45465,10 +45499,20 @@ function conclusionCard(state, t2) {
     return { ...base, title: t2("ui.argument_stopped_mismatch"), lines: [t2("ui.argument_mismatch_hint")] };
   if (view === "stopped_limit")
     return { ...base, title: t2("ui.argument_conclusion_limit"), lines: [t2("ui.argument_conclusion_limit_hint")] };
-  return {
+  const pending2 = {
     ...base,
     title: t2("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
     lines: [t2("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
+  };
+  const paused = pausedParts(state, "analysis", t2);
+  if (!paused) return pending2;
+  const lines = [...pending2.lines, ...paused.lines];
+  return {
+    ...pending2,
+    chips: [paused.chip],
+    lines,
+    resume: paused.resume,
+    label: [pending2.label, paused.chip.text, ...lines].join(", ")
   };
 }
 function facetStopCard(state, base, t2) {
@@ -45506,7 +45550,10 @@ function hypothesisCard(state, h, t2) {
     shown === "verifying" ? { tone: "open", text: t2("ui.argument_verifying") } : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t2(VERDICT_KEY[shown]) }
   ];
   if (isVerified(h)) chips.push({ tone: "yes", text: t2("ui.argument_verified_done") });
-  const kind = t2("ui.argument_hypothesis_0", index);
+  const kind = t2(
+    h.alternative === true && isFacetMap(state) ? "ui.argument_hypothesis_alt_0" : "ui.argument_hypothesis_0",
+    index
+  );
   const progress = t2("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
   const lines = [progress];
   if (h.location === "eliminated" && h.eliminationReason)
@@ -45628,6 +45675,8 @@ function facetSituationCard(state, t2) {
   if (gate.state === "pending") {
     const data = state.situation.data;
     const count3 = t2("ui.argument_data_count_0_1", data.filter((d) => d.state === "found").length, data.length);
+    const paused = pausedParts(state, "situation", t2);
+    if (paused) return { ...finish(paused.chip, [count3, ...paused.lines]), resume: paused.resume };
     return finish({ tone: "open", text: t2("ui.argument_gate_pending") }, [count3]);
   }
   if (gate.kind === "data_insufficient")
@@ -45686,6 +45735,12 @@ function describeArgumentCard(state, id, t2) {
     const gate = state.situation.gate.state;
     if (gate === "matched")
       return plain("situation", t2("ui.argument_situation"), [t2("ui.argument_gate_matched_0_1", found, data.length)]);
+    const paused = gate === "pending" ? pausedParts(state, "situation", t2) : null;
+    if (paused)
+      return {
+        ...plain("situation", t2("ui.argument_situation"), [count3, ...paused.lines], [paused.chip]),
+        resume: paused.resume
+      };
     const chip = gate === "unmatched" ? { tone: "no", text: t2("ui.argument_gate_unmatched") } : { tone: "open", text: t2("ui.argument_gate_pending") };
     return plain("situation", t2("ui.argument_situation"), [count3], [chip]);
   }
@@ -45718,7 +45773,7 @@ function renderArgumentKind(header2, view) {
   kind.dataset.role = view.role;
   return kind;
 }
-function renderArgumentCardBody(card, view, onAction) {
+function renderArgumentCardBody(card, view, onAction, onResume) {
   var _a2;
   card.dataset.argumentRole = view.role;
   if (view.state) card.dataset.argumentState = view.state;
@@ -45737,6 +45792,7 @@ function renderArgumentCardBody(card, view, onAction) {
   }
   for (const line2 of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line2 });
   if (view.action) renderArgumentAction(body, view.action, onAction);
+  if (view.resume) renderArgumentAction(body, view.resume, onResume);
   return body;
 }
 function renderArgumentAction(body, action, onAction) {
@@ -55288,6 +55344,15 @@ var NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-map-
 );
 var CLICKABLE_SELECTOR = ["button", "input", "textarea", "a", "[role='button']"].join(",");
 var NOTE_LOAD_FRAME_DELAY_MS = 150;
+function requestArgumentResume(plugin, path, button, onFailed) {
+  button.disabled = true;
+  plugin.argumentRuns.resume(path).catch((error) => {
+    onFailed();
+    button.disabled = false;
+    if (!(error instanceof ArgumentRunError) || error.code === "busy") return;
+    new import_obsidian34.Notice(t(error.code === "finished" ? "ui.argument_resume_refused_finished" : "ui.argument_resume_refused"));
+  });
+}
 var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -57765,16 +57830,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
         attr: { type: "button" }
       });
       resume.addEventListener("click", () => {
-        resume.disabled = true;
         this.argumentBarPressed = { path, action: "resume" };
-        this.plugin.argumentRuns.resume(path).catch((error) => {
-          this.argumentBarPressed = null;
-          resume.disabled = false;
-          if (!(error instanceof ArgumentRunError) || error.code === "busy") return;
-          new import_obsidian34.Notice(
-            t(error.code === "finished" ? "ui.argument_resume_refused_finished" : "ui.argument_resume_refused")
-          );
-        });
+        requestArgumentResume(this.plugin, path, resume, () => this.argumentBarPressed = null);
       });
     }
     this.argumentBarShown = view.action;
@@ -66839,7 +66896,16 @@ ${request.requirements}` : preset.text,
     if (note && !this.selection.state.multiSelectMode)
       card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node));
     const textEditable = !!note && this.cardTextEditable();
-    if (argumentView) renderArgumentCardBody(card, argumentView, () => void this.rerunFromDefinitions(node.id));
+    if (argumentView)
+      renderArgumentCardBody(
+        card,
+        argumentView,
+        () => void this.rerunFromDefinitions(node.id),
+        (button) => {
+          this.argumentBarPressed = { path: this.path, action: "resume" };
+          requestArgumentResume(this.plugin, this.path, button, () => this.argumentBarPressed = null);
+        }
+      );
     else if (textEditable && ((_A = this.inlineSummary) == null ? void 0 : _A.id) === node.id) this.paintCardSummaryEdit(card, node);
     else if ((_B = research == null ? void 0 : research.preview) == null ? void 0 : _B.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);

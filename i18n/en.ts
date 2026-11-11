@@ -3101,7 +3101,13 @@ export const en = {
   "ui.argument_rerun_aria": "Re-run with these assumptions in a new map; this map stays as it is",
   "ui.argument_rerun_unreadable":
     "Could not read the definitions table, so no new map was made. Check the table in the assumptions note.",
-  "ui.argument_searched_0": "Tried {0} searches; the note lists them"
+  "ui.argument_searched_0": "Tried {0} searches; the note lists them",
+  "ui.argument_paused_reason_user": "You stopped it",
+  "ui.argument_paused_reason_error": "The AI reply was not in the right format; a retry also failed",
+  "ui.argument_paused_reason_interrupted": "Interrupted last time",
+  "ui.argument_paused_reason_limit": "Research calls used up",
+  "ui.argument_paused_resume_aria": "Resume research from where it stopped",
+  "ui.argument_hypothesis_alt_0": "Hypothesis {0} · competing explanation"
 } as const;
 
 export type TranslationKey = keyof typeof en;

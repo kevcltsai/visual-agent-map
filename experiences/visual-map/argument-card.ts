@@ -50,6 +50,8 @@ export interface ArgumentCardView {
   definitions?: { label: string; value: string }[];
   /** The definitions card: the re-run button. */
   action?: { text: string; ariaLabel: string };
+  /** A paused run's card: the same resume as the progress bar's button. */
+  resume?: { text: string; ariaLabel: string };
 }
 
 const STANCE_KEY = {
@@ -69,6 +71,28 @@ const CONCLUSION_KIND: Record<ReturnType<typeof conclusionView>, TranslationKey>
   stopped_limit: "ui.argument_conclusion_state_limit",
   stopped_mismatch: "ui.argument_conclusion_state_mismatch"
 };
+const PAUSE_REASON_KEY = {
+  user: "ui.argument_paused_reason_user",
+  error: "ui.argument_paused_reason_error",
+  interrupted: "ui.argument_paused_reason_interrupted",
+  limit: "ui.argument_paused_reason_limit"
+} as const satisfies Record<string, TranslationKey>;
+/** The card of the phase a paused run stopped in: the chip, the reason line (when the reason is known) and the resume button. */
+function pausedParts(
+  state: ArgumentMapData,
+  phase: "situation" | "analysis",
+  t: Translate
+): { chip: ArgumentChip; lines: string[]; resume: { text: string; ariaLabel: string } } | null {
+  const run = state.run;
+  if (run.status !== "paused" || run.phase !== phase) return null;
+  const reason =
+    run.stopReason === undefined ? undefined : PAUSE_REASON_KEY[run.stopReason as keyof typeof PAUSE_REASON_KEY];
+  return {
+    chip: { tone: "maybe", text: t("ui.argument_bar_paused") },
+    lines: reason ? [t("ui.argument_reason_0", t(reason))] : [],
+    resume: { text: t("ui.argument_bar_resume"), ariaLabel: t("ui.argument_paused_resume_aria") }
+  };
+}
 const isFacetMap = (state: ArgumentMapData): boolean => state.situation.facets !== undefined;
 /** A stored reason code as a readable sentence (facet maps only; an old map keeps the V1 text). */
 const why = (t: Translate, stored: string): string => whyText(t, stored);
@@ -138,10 +162,20 @@ function conclusionCard(state: ArgumentMapData, t: Translate): ArgumentCardView 
     return { ...base, title: t("ui.argument_stopped_mismatch"), lines: [t("ui.argument_mismatch_hint")] };
   if (view === "stopped_limit")
     return { ...base, title: t("ui.argument_conclusion_limit"), lines: [t("ui.argument_conclusion_limit_hint")] };
-  return {
+  const pending: ArgumentCardView = {
     ...base,
     title: t("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
     lines: [t("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
+  };
+  const paused = pausedParts(state, "analysis", t);
+  if (!paused) return pending;
+  const lines = [...pending.lines, ...paused.lines];
+  return {
+    ...pending,
+    chips: [paused.chip],
+    lines,
+    resume: paused.resume,
+    label: [pending.label, paused.chip.text, ...lines].join(", ")
   };
 }
 
@@ -186,7 +220,10 @@ function hypothesisCard(state: ArgumentMapData, h: Hypothesis, t: Translate): Ar
             : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t(VERDICT_KEY[shown]) }
         ];
   if (isVerified(h)) chips.push({ tone: "yes", text: t("ui.argument_verified_done") });
-  const kind = t("ui.argument_hypothesis_0", index);
+  const kind = t(
+    h.alternative === true && isFacetMap(state) ? "ui.argument_hypothesis_alt_0" : "ui.argument_hypothesis_0",
+    index
+  );
   const progress = t("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
   const lines = [progress];
   if (h.location === "eliminated" && h.eliminationReason)
@@ -315,6 +352,8 @@ function facetSituationCard(state: ArgumentMapData, t: Translate): ArgumentCardV
   if (gate.state === "pending") {
     const data = state.situation.data;
     const count = t("ui.argument_data_count_0_1", data.filter(d => d.state === "found").length, data.length);
+    const paused = pausedParts(state, "situation", t);
+    if (paused) return { ...finish(paused.chip, [count, ...paused.lines]), resume: paused.resume };
     return finish({ tone: "open", text: t("ui.argument_gate_pending") }, [count]);
   }
   if (gate.kind === "data_insufficient")
@@ -380,6 +419,12 @@ export function describeArgumentCard(state: ArgumentMapData, id: string, t: Tran
     const gate = state.situation.gate.state;
     if (gate === "matched")
       return plain("situation", t("ui.argument_situation"), [t("ui.argument_gate_matched_0_1", found, data.length)]);
+    const paused = gate === "pending" ? pausedParts(state, "situation", t) : null;
+    if (paused)
+      return {
+        ...plain("situation", t("ui.argument_situation"), [count, ...paused.lines], [paused.chip]),
+        resume: paused.resume
+      };
     const chip: ArgumentChip =
       gate === "unmatched"
         ? { tone: "no", text: t("ui.argument_gate_unmatched") }
@@ -423,7 +468,8 @@ export function renderArgumentKind(header: HTMLElement, view: ArgumentCardView):
 export function renderArgumentCardBody(
   card: HTMLElement,
   view: ArgumentCardView,
-  onAction?: (button: HTMLElement) => void
+  onAction?: (button: HTMLElement) => void,
+  onResume?: (button: HTMLElement) => void
 ): HTMLElement {
   card.dataset.argumentRole = view.role;
   if (view.state) card.dataset.argumentState = view.state;
@@ -442,6 +488,7 @@ export function renderArgumentCardBody(
   }
   for (const line of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line });
   if (view.action) renderArgumentAction(body, view.action, onAction);
+  if (view.resume) renderArgumentAction(body, view.resume, onResume);
   return body;
 }
 

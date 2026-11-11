@@ -2907,5 +2907,11 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.argument_rerun": "用這組假設重跑…",
   "ui.argument_rerun_aria": "用這組假設在新圖重跑，原圖不變",
   "ui.argument_rerun_unreadable": "看不懂定義表，沒有開新圖。請檢查假設卡筆記裡的表格。",
-  "ui.argument_searched_0": "查過 {0} 種寫法，筆記裡有記錄"
+  "ui.argument_searched_0": "查過 {0} 種寫法，筆記裡有記錄",
+  "ui.argument_paused_reason_user": "你已停止",
+  "ui.argument_paused_reason_error": "AI 回覆格式不對，重試一次仍失敗",
+  "ui.argument_paused_reason_interrupted": "上次中斷",
+  "ui.argument_paused_reason_limit": "研究次數已用完",
+  "ui.argument_paused_resume_aria": "接續研究，從停下的地方繼續",
+  "ui.argument_hypothesis_alt_0": "假設 {0}・競爭解釋"
 };

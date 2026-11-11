@@ -1780,7 +1780,7 @@ integrationTest('topic chat depth card: a deeper subtree shows the card with the
   const asks = h.control.usageAsks; const host = h.host('root');
   assert.equal(await host.submit('synthesize', 'all'), true);
   const choice = h.entry('root').session.choice;
-  assert.deepEqual(plain({ ...choice, turn: undefined }), plain({ levels: 3, topics: 4, researched: 0, leaves: 2, children: 2, calls: { quick: 3, 'bottom-up': 4, 'research-first': 6 }, selected: 'quick', text: 'all', turn: undefined }));
+  assert.deepEqual(plain({ ...choice, turn: undefined }), plain({ levels: 3, topics: 4, researched: 0, leaves: 2, children: 2, calls: { quick: 4, 'bottom-up': 4, 'research-first': 6 }, selected: 'quick', text: 'all', turn: undefined }));
   assert.equal(h.entry('root').session.running, false); assert.equal(h.control.usageAsks, asks, 'no usage question yet');
   const win = h.win(); const card = find(win.el, i => i.attrs?.role === 'radiogroup');
   assert.ok(card, 'the radio group is drawn');

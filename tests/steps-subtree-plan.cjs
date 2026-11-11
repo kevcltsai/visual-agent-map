@@ -33,7 +33,7 @@ function bigMap() {
 
 test('stats of the real-sample shape: 4 levels, 180 topics, 5 researched, 80 parents, 101 unresearched leaves', () => {
   const stats = M.subtreeStats(bigMap(), 'root');
-  assert.deepEqual(plain(stats), { levels: 4, topics: 180, researched: 5, parents: 80, unresearchedLeaves: 101, directParents: 4 });
+  assert.deepEqual(plain(stats), { levels: 4, topics: 180, researched: 5, parents: 80, unresearchedLeaves: 101, directParents: 4, directUnresearchedLeaves: 0 });
   assert.deepEqual(plain(['quick', 'bottom-up', 'research-first'].map(depth => M.integrationCalls(stats, depth))), [6, 81, 182]);
 });
 
@@ -59,6 +59,15 @@ test('bottom-up order: the deepest parent first, the root last; A1 before A; cal
   assert.equal(M.integrationCalls(M.subtreeStats(nodes, 'root'), 'bottom-up'), 5);
   assert.deepEqual(plain(M.quickOrder(nodes, 'root')), ['A', 'B']);
   assert.equal(M.integrationCalls(M.subtreeStats(nodes, 'root'), 'quick'), 4);
+});
+
+test('quick also counts each childless unresearched direct subtopic (it is researched first, no chart): 3 + 1 = 4, and a researched or deeper one adds none', () => {
+  // root -> A (has B1), C (idea, no children), D (error, no children), E (researched leaf); B1 is deeper and unresearched.
+  const nodes = [node('root', null), node('A', 'root'), node('B1', 'A', false), node('C', 'root', false), node('D', 'root', false), node('E', 'root')];
+  const stats = M.subtreeStats(nodes, 'root');
+  assert.equal(stats.directUnresearchedLeaves, 2);
+  assert.equal(M.integrationCalls(stats, 'quick'), 1 + 2 + 2);
+  assert.equal(M.integrationCalls(M.subtreeStats(small(), 'root'), 'quick'), 4);
 });
 
 test('research-first: the unresearched leaves are named deepest first and counted before the integrations', () => {

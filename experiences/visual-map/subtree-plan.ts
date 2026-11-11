@@ -30,6 +30,8 @@ export interface SubtreeStats {
   unresearchedLeaves: number;
   /** Direct subtopics that have subtopics of their own. */
   directParents: number;
+  /** Direct subtopics with no subtopics that were never researched (the quick choice researches each). */
+  directUnresearchedLeaves: number;
 }
 
 /** Longest summary an outline line carries, in characters. */
@@ -83,13 +85,16 @@ export function subtreeStats(nodes: readonly PlanNode[], rootId: string): Subtre
     researched: items.filter(item => item.node.researched).length,
     parents: (childrenOf(rootId).length ? 1 : 0) + items.filter(item => childrenOf(item.node.id).length).length,
     unresearchedLeaves: items.filter(item => !hasChildren(item.node.id) && !item.node.researched).length,
-    directParents: items.filter(item => item.depth === 1 && childrenOf(item.node.id).length).length
+    directParents: items.filter(item => item.depth === 1 && childrenOf(item.node.id).length).length,
+    directUnresearchedLeaves: items.filter(
+      item => item.depth === 1 && !hasChildren(item.node.id) && !item.node.researched
+    ).length
   };
 }
 
-/** AI calls a depth choice costs: quick = direct subtopics with subtopics + 1; bottom-up = nodes with subtopics; research-first = unresearched leaves + nodes with subtopics; each + 1 for the root's chart step (intermediate steps queue none). */
+/** AI calls a depth choice costs: quick = direct subtopics with subtopics + unresearched direct subtopics without subtopics (researched, no chart) + 1; bottom-up = nodes with subtopics; research-first = unresearched leaves + nodes with subtopics; each + 1 for the root's chart step (intermediate steps queue none). */
 export function integrationCalls(stats: SubtreeStats, depth: IntegrationDepth): number {
-  if (depth === "quick") return stats.directParents + 2;
+  if (depth === "quick") return stats.directParents + stats.directUnresearchedLeaves + 2;
   if (depth === "bottom-up") return stats.parents + 1;
   return stats.unresearchedLeaves + stats.parents + 1;
 }

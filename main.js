@@ -36606,11 +36606,14 @@ function subtreeStats(nodes, rootId) {
     researched: items.filter((item) => item.node.researched).length,
     parents: (childrenOf(rootId).length ? 1 : 0) + items.filter((item) => childrenOf(item.node.id).length).length,
     unresearchedLeaves: items.filter((item) => !hasChildren(item.node.id) && !item.node.researched).length,
-    directParents: items.filter((item) => item.depth === 1 && childrenOf(item.node.id).length).length
+    directParents: items.filter((item) => item.depth === 1 && childrenOf(item.node.id).length).length,
+    directUnresearchedLeaves: items.filter(
+      (item) => item.depth === 1 && !hasChildren(item.node.id) && !item.node.researched
+    ).length
   };
 }
 function integrationCalls(stats, depth) {
-  if (depth === "quick") return stats.directParents + 2;
+  if (depth === "quick") return stats.directParents + stats.directUnresearchedLeaves + 2;
   if (depth === "bottom-up") return stats.parents + 1;
   return stats.unresearchedLeaves + stats.parents + 1;
 }

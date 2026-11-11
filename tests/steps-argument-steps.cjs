@@ -716,3 +716,29 @@ test('sem3 facet judge: a facet without a criterion is refused before any call; 
 test('facet judge request without fixed data has no fixed stances block', () => {
   assert.doesNotMatch(mod.facetJudgeStep.render(fjReq({ facets: [{ id: 'fa', title: 'T', data: [fdatum('a1')] }] })), /\nFixed stances \(/);
 });
+
+// ---- real haiku replies (owner's first run, 2026-11-11) that an over-strict parser refused ----
+const REAL_PROP = '台灣少子化主要是因為經濟壓力嗎';
+const realReq = { ...base, language: 'zh-TW', proposition: REAL_PROP };
+const REAL_YEARS = "{\"assumptions\":{\"items\":[{\"label\":\"指標\",\"value\":\"總生育率（TFR）與年出生人數\",\"reason\":\"少子化通常以生育率與出生數衡量，原命題未指明用哪一個指標。\"},{\"label\":\"期間\",\"value\":\"2015至2025年\",\"reason\":\"原命題沒有時間範圍，以近十年作為預設，較能反映目前狀況。\"},{\"label\":\"比較基準（更替水準）\",\"value\":\"更替水準（每位婦女約2.1人）\",\"reason\":\"判斷是否屬於少子化，需要一個生育率門檻。\"},{\"label\":\"比較基準（前期）\",\"value\":\"2015年的水準\",\"reason\":\"判斷是否在下降，需要一個起點。\"},{\"label\":\"比較對象（同區域）\",\"value\":\"南韓與日本的同期生育率\",\"reason\":\"判斷台灣的情況是否比鄰近經濟體更低。\"}]},\"facets\":[{\"title\":\"台灣總生育率低於更替水準\",\"criterion\":\"若2015至2025年間台灣總生育率長期低於2.1，支持此面向；若達到或高於2.1，則反駁。\",\"baseline\":\"更替水準（每位婦女約2.1人）\",\"needs\":[{\"need\":\"台灣近年總生育率數值及其與更替水準的差距\",\"kind\":\"fact\"},{\"need\":\"總生育率與更替水準的定義及計算方式\",\"kind\":\"definition\"}]},{\"title\":\"台灣出生率較2015年下降\",\"criterion\":\"若2015至2025年間台灣年出生人數與總生育率明顯下降，支持此面向；若持平或上升，則反駁。\",\"baseline\":\"2015年的水準\",\"needs\":[{\"need\":\"2015至2025年台灣年出生人數與總生育率的變化數據\",\"kind\":\"fact\"}]},{\"title\":\"台灣生育率低於南韓與日本同期水準\",\"criterion\":\"若同期台灣總生育率低於南韓與日本，支持此面向；若不低於或較高，則反駁。\",\"baseline\":\"南韓與日本的同期生育率\",\"needs\":[{\"need\":\"同期南韓與日本總生育率的官方統計數據\",\"kind\":\"fact\"}]}],\"causalQuestions\":[\"經濟壓力是否為台灣少子化的主要原因？\"],\"question\":\"台灣是否正在經歷少子化？\"}";
+const REAL_PARTS = "{\"assumptions\":{\"items\":[{\"label\":\"地理範圍\",\"value\":\"臺灣全境（全國層級）\",\"reason\":\"命題只寫「台灣」，未說明是全國或某個縣市，預設採全國資料。\"},{\"label\":\"時間範圍\",\"value\":\"最近已公布的完整年度；比較對象為較早的同期（約十年前）\",\"reason\":\"命題沒有指定時間，預設看最新可得的統計，並與較早的同期比較才能判斷「少子化」是否存在。\"},{\"label\":\"少子化指標\",\"value\":\"總生育率與年度出生數\",\"reason\":\"「少子化」在命題中沒有數值定義，預設以官方常用的總生育率與出生數來檢查。\"},{\"label\":\"國際比較基準\",\"value\":\"其他已開發經濟體的平均總生育率\",\"reason\":\"命題沒有比較對象；若要判斷臺灣的水準是否偏低，需要與其他已開發經濟體比較。\"},{\"label\":\"替代水準基準\",\"value\":\"總生育率需達到的人口替代水準（每名婦女約2.1名子女）\",\"reason\":\"人口學上常以維持人口穩定所需的生育率作為判斷少子化的門檻，預設用來衡量臺灣是否低於該水準。\"}]},\"facets\":[{\"title\":\"出生數或總生育率低於較早的同期\",\"criterion\":\"若臺灣最近已公布年度的總生育率或出生數低於較早的同期，支持此面向；若兩者持平或更高，則反駁。\",\"baseline\":\"較早的同期（約十年前）\",\"needs\":[{\"need\":\"臺灣最近已公布年度的總生育率與較早同期的總生育率\",\"kind\":\"fact\"},{\"need\":\"臺灣最近已公布年度的出生數與較早同期的出生數\",\"kind\":\"fact\"},{\"need\":\"少子化的定義，以及官方採用的總生育率與出生數計算方式\",\"kind\":\"definition\"}]},{\"title\":\"總生育率低於人口替代水準\",\"criterion\":\"若臺灣最近已公布年度的總生育率低於人口替代水準，支持此面向；若達到或高於該水準，則反駁。\",\"baseline\":\"人口替代水準\",\"needs\":[{\"need\":\"臺灣最近已公布年度總生育率與人口替代水準的差距\",\"kind\":\"fact\"}]},{\"title\":\"總生育率在已開發經濟體中偏低\",\"criterion\":\"若臺灣最近已公布年度的總生育率低於其他已開發經濟體的平均值，支持此面向；若高於或相近，則反駁。\",\"baseline\":\"其他已開發經濟體的平均總生育率\",\"needs\":[{\"need\":\"臺灣與其他已開發經濟體最近年度平均總生育率的比較資料\",\"kind\":\"fact\"}]}],\"causalQuestions\":[\"經濟壓力是否是臺灣少子化的主要原因？\"],\"question\":\"臺灣正在出現少子化現象嗎？\"}";
+const realWith = (raw, fn) => { const v = JSON.parse(raw); fn(v); return v; };
+
+test('facet plan: years in the reply\'s own assumption values may be reused in question, titles, criteria, baselines and needs', () => {
+  const out = plain(ok(mod.facetPlanStep, realReq, JSON.parse(REAL_YEARS)));
+  assert.equal(out.facets[1].baseline, '2015年的水準');
+  bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.facets[1].title = '台灣出生率較2012年下降'; }), /number 2012/);
+  bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.facets[0].needs[0].need = '2012年的總生育率'; }), /number 2012/);
+  bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.question = '台灣2030年是否少子化？'; }), /number 2030/);
+  bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.causalQuestions = ['2015年經濟壓力是主因嗎？']; }), /number 2015/);
+});
+
+test('facet plan: a baseline may be a part of an assumption value, or contain one; trivial or unrelated baselines still fail', () => {
+  const out = plain(ok(mod.facetPlanStep, realReq, JSON.parse(REAL_PARTS)));
+  assert.deepEqual(out.facets.map(f => f.baseline), ['較早的同期（約十年前）', '人口替代水準', '其他已開發經濟體的平均總生育率']);
+  assert.ok(ok(mod.facetPlanStep, realReq, realWith(REAL_PARTS, v => { v.facets[2].baseline = '臺灣全境（全國層級）的數據'; })), 'a baseline that contains a value');
+  bad(mod.facetPlanStep, realReq, realWith(REAL_PARTS, v => { v.facets[1].baseline = '歷史平均出生人數'; }), /baseline/);
+  bad(mod.facetPlanStep, realReq, realWith(REAL_PARTS, v => { v.facets[1].baseline = '水'; }), /baseline/);
+  bad(mod.facetPlanStep, realReq, realWith(REAL_PARTS, v => { v.facets[1].baseline = '年'; }), /baseline/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].baseline = 'all'; v.assumptions.items.forEach(i => { i.value = 'overall'; }); }), /baseline/);
+});

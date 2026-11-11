@@ -46354,13 +46354,13 @@ First, when the proposition leaves out who, when, where or compared with what (f
 
 Then choose 3 to 5 facets. A facet is one checkable sub-claim of the FACT that the proposition claims: when the proposition says a group's level is high, make one facet per comparison baseline named in your assumptions (for example "16\u201324 is higher than the overall rate in the same period", "higher than the same age band before the pandemic", "higher than people aged 25 and over"), so each facet can be decided by data about that group and that baseline. Make a trend facet only when the proposition itself claims a change. Do not make a facet of how something is measured or defined: put that as a need of kind "definition" instead. A facet is never a cause or an explanation: do not make facets about what might explain, produce or drive the fact, and do not use words such as cause, because, reason, \u9020\u6210, \u5C0E\u81F4 or \u539F\u56E0 in a facet title or fact need.
 
-Each facet has a short title, a criterion, a baseline and 1 to 3 needs. The criterion says in one or two sentences what data would support the facet and what data would refute it. The baseline is the comparison the facet checks against, copied exactly from one assumption value (or one phrase of a value that lists several baselines); when the facet compares against nothing, or the assumption list has no baseline, return "" for it. A need is one concrete, searchable item written so a later step can look for it on a web page. Give each need a kind: "fact" for a statistic, a dated event or an official statement about the situation itself (look for both the figure of the group and the figure of the baseline); "definition" for how a term or measure is defined (it is not searched for the situation; it is listed on the definitions card); "cause" for a question about why something happens or what causes it (not searched for the situation; kept for the hypotheses that come later). Each facet needs at least one "fact" need. Use at most 15 fact needs in all. A need must not repeat another one or ask for the same thing in other words, and a title must not repeat another title.
+Each facet has a short title, a criterion, a baseline and 1 to 3 needs. The criterion says in one or two sentences what data would support the facet and what data would refute it. The baseline is the comparison the facet checks against, one assumption value, or a phrase copied from one (it may also be a value together with extra words); when the facet compares against nothing, or the assumption list has no baseline, return "" for it. A need is one concrete, searchable item written so a later step can look for it on a web page. Give each need a kind: "fact" for a statistic, a dated event or an official statement about the situation itself (look for both the figure of the group and the figure of the baseline); "definition" for how a term or measure is defined (it is not searched for the situation; it is listed on the definitions card); "cause" for a question about why something happens or what causes it (not searched for the situation; kept for the hypotheses that come later). Each facet needs at least one "fact" need. Use at most 15 fact needs in all. A need must not repeat another one or ask for the same thing in other words, and a title must not repeat another title.
 
 Last, list in causalQuestions the questions about causes or explanations that the proposition itself raises, in your own words, or an empty list when it raises none.
 
 Also return question: the proposition rewritten as one short question that a reader can answer yes or no (for example "Did X rise?"). It restates only the factual claim: when the proposition also asks or says why, drop the causal part ("Is unemployment high because of AI?" becomes "Is unemployment high?"). It must not contain a cause word such as cause, because, due to, \u9020\u6210, \u5C0E\u81F4 or \u662F\u5426\u7531. It is shown as the title of the situation card.
 
-Use only links that appear in the proposition, and only numbers that appear in the proposition or the assumption values. A facet title, criterion, baseline, a need, a causal question, an assumption label or reason must not contain any number or year that is in neither the proposition nor the assumption values, and no URL that is not in the proposition. An assumption value may contain years and periods but must not contain any URL.
+Use only links that appear in the proposition, and only numbers that appear in the proposition or the assumption values. A facet title, criterion, baseline, a need, the question, a causal question, an assumption label or reason must not contain any number or year that is in neither the proposition nor the assumption values, and no URL that is not in the proposition. An assumption value may contain years and periods but must not contain any URL.
 
 Return only JSON: {"assumptions":{"items":[{"label":"","value":"","reason":""}]},"facets":[{"title":"","criterion":"","baseline":"","needs":[{"need":"","kind":"fact"}]}],"causalQuestions":[""],"question":""}. Do not add other fields, ids, paths, new links or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
 
@@ -46442,16 +46442,24 @@ var FACET_PLAN_SCHEMA = {
   },
   required: ["assumptions", "facets", "causalQuestions", "question"]
 };
-var baselinePhrases = (items) => new Set(
-  items.flatMap((i) => [i.value, ...i.value.split(/[;；、\n]/)]).map(normalized).filter(Boolean)
-);
+var substantial = (value) => [...value.replace(/\s/g, "")].reduce(
+  (sum2, ch) => sum2 + (/[\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff]/.test(ch) ? 2 : 1),
+  0
+) >= 4;
+var baselineMatches = (baseline, items) => {
+  const key4 = normalized(baseline);
+  return items.some((item) => {
+    const value = normalized(item.value);
+    const [short, long] = key4.length <= value.length ? [key4, value] : [value, key4];
+    return substantial(short) && long.includes(short);
+  });
+};
 function parseFacetPlan(raw, request) {
   var _a2, _b2;
   const item = parseObject(raw, ["assumptions", "facets", "causalQuestions", "question"]);
   const sources = [request.proposition];
   const question = text8(item.question, "question");
   if (isCausal(question)) throw new ArgumentStepError("the question must restate only the factual claim, not a cause");
-  grounded([question], sources);
   const assumptionList = parseObject(JSON.stringify(item.assumptions), ["items"]);
   const items = list(assumptionList.items, "assumptions.items").map((entry) => {
     const one = parseObject(JSON.stringify(entry), ["label", "value", "reason"]);
@@ -46463,7 +46471,8 @@ function parseFacetPlan(raw, request) {
     return { label, value, reason };
   });
   const effectiveItems = ((_a2 = request.presetAssumptions) == null ? void 0 : _a2.length) ? request.presetAssumptions : items;
-  const phrases = baselinePhrases(effectiveItems);
+  const withValues = [request.proposition, ...effectiveItems.map((a) => a.value)];
+  grounded([question], withValues);
   const entries = list(item.facets, "facets");
   if (entries.length < MIN_FACETS || entries.length > MAX_FACETS)
     throw new ArgumentStepError(`expected ${MIN_FACETS} to ${MAX_FACETS} facets`);
@@ -46491,18 +46500,15 @@ function parseFacetPlan(raw, request) {
     const title = text8(one.title, "title");
     const criterion = text8(one.criterion, "criterion");
     const baseline = one.baseline.trim();
-    if (baseline && !phrases.has(normalized(baseline)))
+    if (baseline && !baselineMatches(baseline, effectiveItems))
       throw new ArgumentStepError(
-        "a facet baseline must be one of the assumption values or a baseline phrase listed in one"
+        "a facet baseline must be one of the assumption values or a part of one (or contain one)"
       );
-    grounded(
-      [criterion, baseline],
-      [request.proposition, ...effectiveItems.flatMap((a) => [a.label, a.value, a.reason])]
-    );
+    grounded([criterion, baseline], [...withValues, ...effectiveItems.flatMap((a) => [a.label, a.reason])]);
     const titleKey = normalized(title);
     if (titles.has(titleKey)) throw new ArgumentStepError("a facet title repeats another one");
     titles.add(titleKey);
-    grounded([title], sources);
+    grounded([title], withValues);
     if (isCausal(title)) continue;
     const needs = [];
     for (const raw2 of list(one.needs, "needs")) {
@@ -46512,7 +46518,7 @@ function parseFacetPlan(raw, request) {
       const key4 = normalized(needText);
       if (needKeys.has(key4)) throw new ArgumentStepError("a situation need repeats another one");
       needKeys.add(key4);
-      grounded([needText], sources);
+      grounded([needText], withValues);
       if (need.kind === "cause" || isCausal(needText)) addCausal(needText);
       else if (need.kind === "definition") definitionNeeds.push(needText);
       else needs.push({ need: needText });

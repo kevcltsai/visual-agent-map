@@ -105,21 +105,28 @@ export const FACET_PLAN_SCHEMA = {
   required: ["assumptions", "facets", "causalQuestions", "question"]
 };
 
-/** The phrases a baseline may name: each whole assumption value, and each phrase of a value that lists several (split at ; ； 、 or a line break). */
-const baselinePhrases = (items: { value: string }[]): Set<string> =>
-  new Set(
-    items
-      .flatMap(i => [i.value, ...i.value.split(/[;；、\n]/)])
-      .map(normalized)
-      .filter(Boolean)
-  );
+/** A text long enough to be a baseline match: at least 4 latin characters or 2 CJK characters (a CJK character counts double). */
+const substantial = (value: string): boolean =>
+  [...value.replace(/\s/g, "")].reduce(
+    (sum, ch) => sum + (/[\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff]/.test(ch) ? 2 : 1),
+    0
+  ) >= 4;
+
+/** A baseline is tied to an assumption when it contains, or is contained in, one assumption value (after normalizing), and the shorter side is not a trivial fragment. */
+const baselineMatches = (baseline: string, items: { value: string }[]): boolean => {
+  const key = normalized(baseline);
+  return items.some(item => {
+    const value = normalized(item.value);
+    const [short, long] = key.length <= value.length ? [key, value] : [value, key];
+    return substantial(short) && long.includes(short);
+  });
+};
 
 export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPlanResult {
   const item = parseObject(raw, ["assumptions", "facets", "causalQuestions", "question"]);
   const sources = [request.proposition];
   const question = text(item.question, "question");
   if (isCausal(question)) throw new ArgumentStepError("the question must restate only the factual claim, not a cause");
-  grounded([question], sources);
   const assumptionList = parseObject(JSON.stringify(item.assumptions), ["items"]);
   const items = list(assumptionList.items, "assumptions.items").map(entry => {
     const one = parseObject(JSON.stringify(entry), ["label", "value", "reason"]);
@@ -131,7 +138,9 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
     return { label, value, reason };
   });
   const effectiveItems = request.presetAssumptions?.length ? request.presetAssumptions : items;
-  const phrases = baselinePhrases(effectiveItems);
+  // Assumption values are the AI's own scope choices (links-only checked), so their years and quantities may be reused below.
+  const withValues = [request.proposition, ...effectiveItems.map(a => a.value)];
+  grounded([question], withValues);
   const entries = list(item.facets, "facets");
   if (entries.length < MIN_FACETS || entries.length > MAX_FACETS)
     throw new ArgumentStepError(`expected ${MIN_FACETS} to ${MAX_FACETS} facets`);
@@ -159,18 +168,15 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
     const title = text(one.title, "title");
     const criterion = text(one.criterion, "criterion");
     const baseline = (one.baseline as string).trim();
-    if (baseline && !phrases.has(normalized(baseline)))
+    if (baseline && !baselineMatches(baseline, effectiveItems))
       throw new ArgumentStepError(
-        "a facet baseline must be one of the assumption values or a baseline phrase listed in one"
+        "a facet baseline must be one of the assumption values or a part of one (or contain one)"
       );
-    grounded(
-      [criterion, baseline],
-      [request.proposition, ...effectiveItems.flatMap(a => [a.label, a.value, a.reason])]
-    );
+    grounded([criterion, baseline], [...withValues, ...effectiveItems.flatMap(a => [a.label, a.reason])]);
     const titleKey = normalized(title);
     if (titles.has(titleKey)) throw new ArgumentStepError("a facet title repeats another one");
     titles.add(titleKey);
-    grounded([title], sources);
+    grounded([title], withValues);
     if (isCausal(title)) continue; // a cause topic is not a facet of the fact
     const needs: { need: string }[] = [];
     for (const raw of list(one.needs, "needs")) {
@@ -180,7 +186,7 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
       const key = normalized(needText);
       if (needKeys.has(key)) throw new ArgumentStepError("a situation need repeats another one");
       needKeys.add(key);
-      grounded([needText], sources);
+      grounded([needText], withValues);
       if (need.kind === "cause" || isCausal(needText)) addCausal(needText);
       else if (need.kind === "definition") definitionNeeds.push(needText);
       else needs.push({ need: needText });

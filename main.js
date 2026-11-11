@@ -25109,7 +25109,7 @@ function problem(raw, nodeIds) {
       return "unknown hypothesis enum";
     if (!optOneOf(VERDICTS, hypothesis.userVerdict) || !optStr(hypothesis.eliminationReason))
       return "hypothesis malformed";
-    if (!optStr(hypothesis.basis) || hypothesis.alternative !== void 0 && typeof hypothesis.alternative !== "boolean")
+    if (!optStr(hypothesis.basis) || !optStr(hypothesis.statement) || hypothesis.alternative !== void 0 && typeof hypothesis.alternative !== "boolean")
       return "hypothesis malformed";
     if (badHypothesisInsights(hypothesis.insights)) return "hypothesis malformed";
     for (const need of hypothesis.needs) {
@@ -44853,6 +44853,7 @@ function applyHypotheses(state, items) {
       round: 1,
       location: "verifying",
       needs: [],
+      ...typeof item.statement === "string" && item.statement.trim() ? { statement: item.statement } : {},
       ...facetMap ? { basis: item.basis, alternative: item.alternative === true } : {}
     });
   }
@@ -47302,6 +47303,14 @@ var ArgumentRuns = class {
     const path = await this.notePath(drive, id);
     return path ? this.ports.readNote(path) : { title: "", summary: "" };
   }
+  /** What the hypothesis says for every reasoning step: the statement stored at creation. The note is only a view the user may edit; an edit never reaches the model. Maps made before the statement was stored fall back to the note. */
+  async statementOf(drive, h) {
+    const note = await this.text(drive, h.id);
+    if (h.statement === void 0) return note.summary;
+    if (note.summary.trim() !== plainLine2(h.statement).trim())
+      this.ports.log(`argument-run hypothesis note edited id=${h.id}; the stored statement is used`);
+    return h.statement;
+  }
   async proposition(drive, state) {
     return (await this.text(drive, state.roles.proposition)).summary;
   }
@@ -47588,7 +47597,13 @@ var ArgumentRuns = class {
           drive.mapPath
         );
         nodes.push({ node, parentId: s.roles.verified });
-        items.push({ id: node.id, citedData: h.citedData, basis: h.basis, alternative: h.alternative });
+        items.push({
+          id: node.id,
+          citedData: h.citedData,
+          basis: h.basis,
+          alternative: h.alternative,
+          statement: h.statement
+        });
       }
       return { next: applyHypotheses(s, items), nodes };
     });
@@ -47600,7 +47615,7 @@ var ArgumentRuns = class {
     const request = {
       ...this.base(drive),
       proposition,
-      hypothesis: { title: text10.title, statement: text10.summary, round: round3 },
+      hypothesis: { title: text10.title, statement: await this.statementOf(drive, h), round: round3 },
       data: gateData(state.situation.data.filter((d) => h.citedData.includes(d.id))),
       existing: h.needs.map((n) => ({ text: n.text, state: n.state })),
       max: needsAllowed({ ...h, round: round3 })
@@ -47627,7 +47642,10 @@ var ArgumentRuns = class {
   async verdict(drive, state, hypothesisId) {
     const request = {
       ...this.base(drive),
-      hypothesis: (await this.text(drive, hypothesisId)).summary,
+      hypothesis: await this.statementOf(
+        drive,
+        state.hypotheses.find((h) => h.id === hypothesisId)
+      ),
       input: prepareVerdict(state, hypothesisId)
     };
     const facet = hasFacets(state) ? await this.ask(drive, facetVerdictStep, request) : void 0;
@@ -47657,7 +47675,11 @@ var ArgumentRuns = class {
   async conclude(drive, state, proposition) {
     const input2 = prepareConclusion(state);
     const statements = {};
-    for (const h of input2.hypotheses) statements[h.id] = (await this.text(drive, h.id)).summary;
+    for (const h of input2.hypotheses)
+      statements[h.id] = await this.statementOf(
+        drive,
+        state.hypotheses.find((x) => x.id === h.id)
+      );
     const request = { ...this.base(drive), proposition, input: input2, statements };
     const result = await this.ask(drive, ARGUMENT_STEPS.conclude, request);
     await this.checkpoint(drive, async (s, map) => {

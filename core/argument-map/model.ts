@@ -158,6 +158,8 @@ export interface Hypothesis {
   /** Facet-judged maps: "from datum X we observe Y, so we guess Z", and whether it explains the proposition by a cause other than the one it names. */
   basis?: string;
   alternative?: boolean;
+  /** The statement as the AI proposed it, stored at creation. Verdict, needs and conclusion read this, never the editable note text. Absent on maps made before it was stored. */
+  statement?: string;
   aiVerdict?: Verdict;
   userVerdict?: Verdict;
   eliminationReason?: string;
@@ -338,6 +340,7 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
       return "hypothesis malformed";
     if (
       !optStr(hypothesis.basis) ||
+      !optStr(hypothesis.statement) ||
       (hypothesis.alternative !== undefined && typeof hypothesis.alternative !== "boolean")
     )
       return "hypothesis malformed";

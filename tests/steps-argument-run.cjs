@@ -1151,3 +1151,27 @@ test('Bug C: on a facet map a found datum has its full note (summary, figure, qu
   assert.ok(!after.detail.includes('判定中'), after.detail);
   assert.ok(after.detail.includes('it fits'), after.detail);
 });
+
+// ---- P1-3: the verdict and the conclusion read the statement stored at creation, never an edited note ----
+test('P1-3: a hypothesis note edited by the user does not change what the verdict, the needs step and the conclusion are given', async () => {
+  let r;
+  const seen = { verdict: [], needs: [], conclude: null };
+  let edited = false;
+  const editAll = async () => {
+    if (edited) return; edited = true;
+    const state = await r.state();
+    const doc = await r.repo.readMap(r.mapPath);
+    for (const h of state.hypotheses) await r.repo.updateNote(doc.nodes.find(n => n.id === h.id).path, { summary: `Edited: now 99% certain (${h.id})` });
+  };
+  r = await rig({ script: { step: steps({
+    add_needs: async request => { seen.needs.push(request.hypothesis.statement); await editAll(); return { needs: [{ text: 'need one' }, { text: 'need two' }] }; },
+    verdict: request => { seen.verdict.push(request.hypothesis); return { verdict: 'supported', citedNeeds: [request.input.evidence[0].id], reason: 'enough' }; },
+    conclude: request => { seen.conclude = request.statements; return { summary: 'final answer', points: [{ text: 'point', hypothesisIds: request.input.hypotheses.map(h => h.id) }], basedOn: request.input.hypotheses.map(h => h.id) }; }
+  }) } });
+  await r.runs.start(r.mapPath, 'p');
+  assert.equal((await r.state()).run.phase, 'concluded');
+  assert.ok(seen.verdict.length >= 3 && seen.verdict.every(t => /^statement \d$/.test(t)), JSON.stringify(seen.verdict));
+  assert.ok(Object.values(seen.conclude).every(t => /^statement \d$/.test(t)), JSON.stringify(seen.conclude));
+  assert.ok(seen.needs.slice(1).every(t => /^statement \d$/.test(t)), 'the needs step of a later hypothesis too');
+  assert.ok(r.stat.logs.some(l => l.includes('hypothesis note edited')), 'the edit is logged (ids only)');
+});

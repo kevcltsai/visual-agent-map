@@ -576,6 +576,14 @@ export class ArgumentRuns {
     const path = await this.notePath(drive, id);
     return path ? this.ports.readNote(path) : { title: "", summary: "" };
   }
+  /** What the hypothesis says for every reasoning step: the statement stored at creation. The note is only a view the user may edit; an edit never reaches the model. Maps made before the statement was stored fall back to the note. */
+  private async statementOf(drive: Drive, h: Hypothesis): Promise<string> {
+    const note = await this.text(drive, h.id);
+    if (h.statement === undefined) return note.summary;
+    if (note.summary.trim() !== plainLine(h.statement).trim())
+      this.ports.log(`argument-run hypothesis note edited id=${h.id}; the stored statement is used`);
+    return h.statement;
+  }
   private async proposition(drive: Drive, state: ArgumentMapData): Promise<string> {
     return (await this.text(drive, state.roles.proposition)).summary;
   }
@@ -877,7 +885,13 @@ export class ArgumentRuns {
         proposed.map((h, i) => ({ id: `dry-${i}`, citedData: h.citedData, basis: h.basis, alternative: h.alternative }))
       );
       const nodes: Plan["nodes"] = [];
-      const items: { id: string; citedData: string[]; basis?: string; alternative?: boolean }[] = [];
+      const items: {
+        id: string;
+        citedData: string[];
+        basis?: string;
+        alternative?: boolean;
+        statement?: string;
+      }[] = [];
       for (const h of proposed) {
         const node = await this.makeNote(
           { kind: "hypothesis", title: h.title, summary: h.statement },
@@ -885,7 +899,13 @@ export class ArgumentRuns {
           drive.mapPath
         );
         nodes.push({ node, parentId: s.roles.verified });
-        items.push({ id: node.id, citedData: h.citedData, basis: h.basis, alternative: h.alternative });
+        items.push({
+          id: node.id,
+          citedData: h.citedData,
+          basis: h.basis,
+          alternative: h.alternative,
+          statement: h.statement
+        });
       }
       return { next: applyHypotheses(s, items), nodes };
     });
@@ -904,7 +924,7 @@ export class ArgumentRuns {
     const request: NeedsRequest = {
       ...this.base(drive),
       proposition,
-      hypothesis: { title: text.title, statement: text.summary, round },
+      hypothesis: { title: text.title, statement: await this.statementOf(drive, h), round },
       data: gateData(state.situation.data.filter(d => h.citedData.includes(d.id))),
       existing: h.needs.map(n => ({ text: n.text, state: n.state })),
       max: needsAllowed({ ...h, round })
@@ -932,7 +952,10 @@ export class ArgumentRuns {
   private async verdict(drive: Drive, state: ArgumentMapData, hypothesisId: string): Promise<void> {
     const request: VerdictRequest = {
       ...this.base(drive),
-      hypothesis: (await this.text(drive, hypothesisId)).summary,
+      hypothesis: await this.statementOf(
+        drive,
+        state.hypotheses.find(h => h.id === hypothesisId)!
+      ),
       input: prepareVerdict(state, hypothesisId)
     };
     // A facet map's verdict also returns insights, kept on the hypothesis so its note can be rewritten; an old map keeps the V1 step.
@@ -969,7 +992,11 @@ export class ArgumentRuns {
   private async conclude(drive: Drive, state: ArgumentMapData, proposition: string): Promise<void> {
     const input = prepareConclusion(state);
     const statements: Record<string, string> = {};
-    for (const h of input.hypotheses) statements[h.id] = (await this.text(drive, h.id)).summary;
+    for (const h of input.hypotheses)
+      statements[h.id] = await this.statementOf(
+        drive,
+        state.hypotheses.find(x => x.id === h.id)!
+      );
     const request: ConclusionRequest = { ...this.base(drive), proposition, input, statements };
     const result: ConclusionResult = await this.ask(drive, ARGUMENT_STEPS.conclude, request);
     await this.checkpoint(drive, async (s, map) => {

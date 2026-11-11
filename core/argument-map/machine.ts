@@ -667,7 +667,7 @@ export function applySituationGate(
 // ---- hypotheses and needs ----------------------------------------------------------------------------------------------------
 export function applyHypotheses(
   state: ArgumentMapData,
-  items: { id: string; citedData: string[]; basis?: string; alternative?: boolean }[]
+  items: { id: string; citedData: string[]; basis?: string; alternative?: boolean; statement?: string }[]
 ): ArgumentMapData {
   inAnalysis(state);
   if (!items.length) throw new GateError("no hypotheses");
@@ -692,6 +692,7 @@ export function applyHypotheses(
       round: 1,
       location: "verifying",
       needs: [],
+      ...(typeof item.statement === "string" && item.statement.trim() ? { statement: item.statement } : {}),
       ...(facetMap ? { basis: item.basis, alternative: item.alternative === true } : {})
     });
   }

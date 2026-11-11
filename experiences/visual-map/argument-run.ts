@@ -46,6 +46,7 @@ import {
   beginResearch,
   beginSituationResearch,
   eliminateAtLimit,
+  applyFactConclusion,
   hasFacets,
   isSituationUnconfirmed,
   newArgumentMap,
@@ -66,6 +67,8 @@ import {
   MIN_VERIFIED,
   foundNeeds,
   isLimitCut,
+  composeFacets,
+  isLegacyFacetMap,
   isUncertainSource,
   isVerified,
   liveCore,
@@ -73,6 +76,7 @@ import {
   isStanceLocked,
   type ArgumentMapData,
   type ArgumentRoles,
+  type QuestionType,
   type AssumptionItem,
   type Hypothesis,
   type SituationDatum,
@@ -94,6 +98,8 @@ import {
   needsAllowed,
   type ArgumentStepBase,
   type ConclusionRequest,
+  type ConclusionFactRequest,
+  type ConclusionFactResult,
   type ConclusionResult,
   type FacetHypothesesRequest,
   type FacetHypothesesResult,
@@ -127,7 +133,7 @@ export const WORST_CASE_AI_CALLS =
 const X_STEP = 320;
 const Y_STEP = 160;
 
-export type ArgumentRunRefusal = "busy" | "unusable" | "exists" | "missing" | "finished" | "not_paused" | "disposed";
+export type ArgumentRunRefusal = "busy" | "unusable" | "exists" | "missing" | "finished" | "not_paused" | "legacy" | "disposed";
 export class ArgumentRunError extends Error {
   constructor(readonly code: ArgumentRunRefusal) {
     super(`argument run refused: ${code}`);
@@ -207,6 +213,8 @@ interface Drive {
   retryReason?: string;
   /** A re-run's assumption items (from the owner's edited definitions); the facet plan overrides the AI's assumption card with them. */
   preset?: AssumptionItem[];
+  /** A re-run's question type (the definitions card's 題型 line); it wins over the AI's. */
+  presetQuestionType?: QuestionType;
 }
 interface Plan {
   next: ArgumentMapData;
@@ -313,13 +321,14 @@ export class ArgumentRuns {
   async start(
     mapPath: string,
     proposition: string,
-    options: { presetAssumptions?: AssumptionItem[] } = {}
+    options: { presetAssumptions?: AssumptionItem[]; presetQuestionType?: QuestionType } = {}
   ): Promise<void> {
     this.guard(mapPath);
     const text = proposition.trim();
     if (!text) throw new ArgumentRunError("missing");
     const drive = this.open(mapPath);
     if (options.presetAssumptions?.length) drive.preset = options.presetAssumptions.map(item => ({ ...item }));
+    drive.presetQuestionType = options.presetQuestionType;
     drive.done = this.go(drive, async () => {
       const runId = this.ports.newId();
       await this.ports.mutate(async () => {
@@ -333,31 +342,24 @@ export class ArgumentRuns {
         const proposed = await make("proposition", shorten(text, 80), text);
         const situation = await make("situation", p.t("ui.argument_situation"));
         const conclusion = await make("conclusion", p.t("ui.argument_conclusion"), p.t("ui.argument_in_progress"));
-        const verified = await make("group", p.t("ui.argument_group_verified"));
-        const eliminated = await make("group", p.t("ui.argument_group_eliminated"));
-        const roles: ArgumentRoles = {
-          proposition: proposed.id,
-          situation: situation.id,
-          conclusion: conclusion.id,
-          verified: verified.id,
-          eliminated: eliminated.id
-        };
+        // Decision #66: a new map starts with these three; a causal plan makes the three groups at its checkpoint.
+        const roles: ArgumentRoles = { proposition: proposed.id, situation: situation.id, conclusion: conclusion.id };
         const parents: [MapNode, string | null][] = [
           [proposed, null],
           [situation, proposed.id],
-          [conclusion, proposed.id],
-          [verified, conclusion.id],
-          [eliminated, conclusion.id]
+          [conclusion, proposed.id]
         ];
         if (this.dead(drive)) return;
         await p.updateMap(mapPath, doc => {
           if (doc.argumentMap !== undefined) throw new ArgumentRunError("exists");
           for (const [node, parentId] of parents) this.attach(doc, node, parentId);
-          doc.argumentMap = newArgumentMap(roles, runId, drive.preset);
+          doc.argumentMap = newArgumentMap(roles, runId, drive.preset, drive.presetQuestionType);
         });
         p.clearUndo(mapPath);
       });
-      this.ports.log(`argument-run start runId=${runId} phase=situation`);
+      this.ports.log(
+        `argument-run start runId=${runId} phase=situation${drive.presetQuestionType ? ` questionType=${drive.presetQuestionType}` : ""}`
+      );
     });
     return this.finish(drive);
   }
@@ -370,6 +372,8 @@ export class ArgumentRuns {
     if (read.kind !== "usable") throw new ArgumentRunError("unusable");
     if (["concluded", "stopped_mismatch", "stopped_limit"].includes(read.data.run.phase))
       throw new ArgumentRunError("finished");
+    // Decision #66: a facet map made before question types is never run again; refused before anything is written.
+    if (isLegacyFacetMap(read.data)) throw new ArgumentRunError("legacy");
     if (read.data.run.status !== "paused") throw new ArgumentRunError("not_paused");
     const drive = this.open(mapPath);
     drive.done = this.go(drive, async () => {
@@ -673,7 +677,7 @@ export class ArgumentRuns {
           const h = next.hypotheses.find(x => x.id === action.hypothesisId)!;
           return {
             next,
-            reparent: [{ id: h.id, parentId: next.roles.eliminated }],
+            reparent: [{ id: h.id, parentId: next.roles.unconfirmed ?? next.roles.eliminated ?? next.roles.conclusion }],
             notes: () =>
               this.noteDetail(
                 map,
@@ -690,6 +694,8 @@ export class ArgumentRuns {
       }
       case "conclude":
         return this.conclude(drive, state, proposition);
+      case "conclude_facts":
+        return this.concludeFacts(drive, state, proposition);
       case "stop_limit": {
         await this.checkpoint(drive, async s => this.stopPlan(drive, applyLimitStop(s)));
         return;
@@ -707,7 +713,8 @@ export class ArgumentRuns {
       today: this.ports.now().slice(0, 10),
       ...(state.run.presetAssumptions?.length
         ? { presetAssumptions: state.run.presetAssumptions.map(item => ({ ...item })) }
-        : {})
+        : {}),
+      ...(state.run.presetQuestionType ? { presetQuestionType: state.run.presetQuestionType } : {})
     };
     const result: FacetPlanResult = await this.ask(drive, ARGUMENT_STEPS.plan_facets, request);
     await this.checkpoint(drive, async (s, map) => {
@@ -722,7 +729,11 @@ export class ArgumentRuns {
           baseline: f.baseline,
           needs: f.needs.map((n, j) => ({ id: id(`f${i}-${j}`), need: n.need }))
         })),
-        causalQuestions: result.causalQuestions
+        causalQuestions: result.causalQuestions,
+        questionType: result.questionType,
+        ...(result.questionType === "causal"
+          ? { groups: { verified: id("g-ok"), eliminated: id("g-out"), unconfirmed: id("g-open") } }
+          : {})
       });
       // Dry run first: a refused plan must not leave notes behind.
       applySituationPlan(
@@ -737,11 +748,23 @@ export class ArgumentRuns {
       };
       const ids = new Map<string, string>();
       if (items.length || definitionNeeds.length) {
-        const detail = definitionsDetail(this.tr, items, undefined, definitionNeeds);
+        const detail = definitionsDetail(this.tr, items, undefined, definitionNeeds, result.questionType);
         ids.set("as", (await make("group", this.ports.t("ui.argument_definitions"), undefined, detail)).id);
       }
       for (const [i, f] of result.facets.entries()) {
         ids.set(`f${i}`, (await make("group", f.title, f.title)).id);
+      }
+      if (result.questionType === "causal") {
+        // Same mutation as the question type (decision #66): the three groups sit under the conclusion card.
+        for (const [key, title] of [
+          ["g-ok", "ui.argument_group_verified"],
+          ["g-out", "ui.argument_group_eliminated"],
+          ["g-open", "ui.argument_group_unconfirmed"]
+        ] as const) {
+          const node = await this.makeNote({ kind: "group", title: this.ports.t(title) }, map, drive.mapPath);
+          nodes.push({ node, parentId: s.roles.conclusion });
+          ids.set(key, node.id);
+        }
       }
       for (const [i, f] of result.facets.entries())
         for (const [j, n] of f.needs.entries()) {
@@ -758,6 +781,7 @@ export class ArgumentRuns {
         plan(name => ids.get(name)!)
       );
       next.situation.question = result.question;
+      this.ports.log(`argument-run planned runId=${s.run.runId} questionType=${result.questionType}`);
       return { next, nodes };
     });
   }
@@ -864,7 +888,7 @@ export class ArgumentRuns {
         const as = final.situation.assumptions;
         if (as?.items.length || as?.definitionNeeds?.length)
           await this.noteById(map, as.id, drive, {
-            detail: definitionsDetail(this.tr, as.items, as.insights, as.definitionNeeds)
+            detail: definitionsDetail(this.tr, as.items, as.insights, as.definitionNeeds, final.situation.questionType)
           });
         if (inner) await inner();
       };
@@ -887,8 +911,15 @@ export class ArgumentRuns {
     const found = state.situation.data.filter(d => d.state === "found");
     let result: HypothesesResult | FacetHypothesesResult;
     if (hasFacets(state)) {
-      // A facet map: the data with a stance toward the proposition, the causal questions, and a basis and alternative flag back.
-      const stanced = found.filter(d => d.propStance !== undefined && d.propStance !== "irrelevant");
+      // A facet map: the data with a stance toward the proposition and the causal questions. Decision #61: only the data of the facets that
+      // support the premise are sent (an unconfirmed premise has none, so it sends what was found); the hypotheses come back with no basis.
+      const supporting = new Set((state.situation.facets ?? []).filter(f => f.verdict === "supports").map(f => f.id));
+      const stanced = found.filter(
+        d =>
+          d.propStance !== undefined &&
+          d.propStance !== "irrelevant" &&
+          (isSituationUnconfirmed(state) || supporting.has(d.facetId ?? ""))
+      );
       const request: FacetHypothesesRequest = {
         ...this.base(drive),
         proposition,
@@ -909,19 +940,17 @@ export class ArgumentRuns {
       };
       result = await this.ask(drive, ARGUMENT_STEPS.propose_hypotheses, request);
     }
-    const proposed: { title: string; statement: string; citedData: string[]; basis?: string; alternative?: boolean }[] =
-      result.hypotheses;
+    const proposed: { title: string; statement: string; citedData?: string[]; alternative?: boolean }[] = result.hypotheses;
     await this.checkpoint(drive, async (s, map) => {
       // Dry run with placeholder ids first: a refused batch (the gate) must not leave notes behind.
       applyHypotheses(
         s,
-        proposed.map((h, i) => ({ id: `dry-${i}`, citedData: h.citedData, basis: h.basis, alternative: h.alternative }))
+        proposed.map((h, i) => ({ id: `dry-${i}`, citedData: h.citedData, alternative: h.alternative }))
       );
       const nodes: Plan["nodes"] = [];
       const items: {
         id: string;
-        citedData: string[];
-        basis?: string;
+        citedData?: string[];
         alternative?: boolean;
         statement?: string;
       }[] = [];
@@ -931,11 +960,10 @@ export class ArgumentRuns {
           map,
           drive.mapPath
         );
-        nodes.push({ node, parentId: s.roles.verified });
+        nodes.push({ node, parentId: s.roles.verified ?? s.roles.conclusion });
         items.push({
           id: node.id,
           citedData: h.citedData,
-          basis: h.basis,
           alternative: h.alternative,
           statement: h.statement
         });
@@ -1026,8 +1054,13 @@ export class ArgumentRuns {
           kind: i.kind,
           text: capText(i.text, INSIGHT_MAX_TEXT)
         }));
+      const refuted = next.hypotheses.find(h => h.id === hypothesisId)!.location === "eliminated";
       return {
         next,
+        // Decision #62: a refuted hypothesis was eliminated in this same write, so its card moves to the eliminated group with it.
+        ...(refuted
+          ? { reparent: [{ id: hypothesisId, parentId: next.roles.eliminated ?? next.roles.conclusion }] }
+          : {}),
         notes: () =>
           this.noteDetail(
             map,
@@ -1055,7 +1088,8 @@ export class ArgumentRuns {
       );
     const unconfirmed = isSituationUnconfirmed(state);
     // Fewer verified hypotheses than the target (decision #59): the conclusion is written on those and the program says so.
-    const partial = input.hypotheses.length < MIN_VERIFIED;
+    const verifiedCount = input.hypotheses.filter(h => h.status === "verified").length;
+    const partial = verifiedCount < MIN_VERIFIED;
     const request: ConclusionRequest = {
       ...this.base(drive),
       proposition,
@@ -1079,7 +1113,7 @@ export class ArgumentRuns {
             },
             "",
             unconfirmed ? this.t("ui.argument_premise_unconfirmed") : undefined,
-            partial ? this.t("ui.argument_partial_conclusion_0_1", input.hypotheses.length, MIN_VERIFIED) : undefined
+            partial ? this.t("ui.argument_partial_conclusion_0_1", verifiedCount, MIN_VERIFIED) : undefined
           )
         : [
             ...pointLines,
@@ -1090,6 +1124,48 @@ export class ArgumentRuns {
           ].join("\n");
       const path = map.nodes.find(n => n.id === next.roles.conclusion)?.path;
       this.ports.log(`argument-run concluded runId=${s.run.runId} phase=concluded`);
+      return {
+        next,
+        notes: async () => {
+          if (path) await this.writeNote(path, { summary: result.summary, detail });
+        }
+      };
+    });
+  }
+
+  /** A fact question (decision #60): the program composes the outcome from the facets; the model writes the summary and points over facets only. */
+  private async concludeFacts(drive: Drive, state: ArgumentMapData, proposition: string): Promise<void> {
+    const facets = state.situation.facets ?? [];
+    const { outcome } = composeFacets(facets);
+    const request: ConclusionFactRequest = {
+      ...this.base(drive),
+      proposition,
+      outcome,
+      facets: facets.map(f => ({
+        id: f.id,
+        title: f.title,
+        verdict: f.verdict,
+        summary: f.summary,
+        reason: f.reason,
+        data: state.situation.data
+          .filter(d => d.facetId === f.id && d.state === "found" && d.proof && d.propStance !== "irrelevant")
+          .map(d => ({ claim: d.proof!.claim, quote: d.proof!.quote, url: d.proof!.url, stance: d.propStance ?? "uncertain" }))
+      })),
+      ...(isSituationUnconfirmed(state) ? { unconfirmed: true } : {})
+    };
+    const result: ConclusionFactResult = await this.ask(drive, ARGUMENT_STEPS.conclude_facts, request);
+    await this.checkpoint(drive, async (s, map) => {
+      const next = applyFactConclusion(s, result);
+      const detail = conclusionDetail(
+        this.tr,
+        next,
+        new Map(),
+        { summary: result.summary, points: result.points.map(p => p.text) },
+        "",
+        isSituationUnconfirmed(next) ? this.t("ui.argument_premise_unconfirmed") : undefined
+      );
+      const path = map.nodes.find(n => n.id === next.roles.conclusion)?.path;
+      this.ports.log(`argument-run concluded runId=${s.run.runId} phase=concluded questionType=fact outcome=${outcome}`);
       return {
         next,
         notes: async () => {

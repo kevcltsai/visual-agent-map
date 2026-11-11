@@ -74,8 +74,11 @@ async function rig(over = {}) {
       const planned = script.step.plan_situation({ proposition: '' }, 1);
       const items = [];
       const nodes = [];
+      // A V1 map (no longer made by a new start) keeps its two groups: the rig makes them with the old data.
+      const groups = [];
+      for (const key of ['verified', 'eliminated']) { const node = await ports.createNote({ kind: 'group', title: key }, doc, path); node.parentId = read.data.roles.conclusion; node.x = 0; node.y = 0; groups.push([key, node]); }
       for (const d of planned.data) { const node = await ports.createNote({ kind: 'datum', title: d.need, summary: d.need }, doc, path); items.push({ id: node.id, need: d.need }); nodes.push(node); }
-      await repo.updateMap(path, d => { for (const node of nodes) { node.parentId = read.data.roles.situation; node.x = 0; node.y = 0; d.nodes.push(node); } d.argumentMap = machine.applySituationData(model.readArgumentMap(d).data, items); });
+      await repo.updateMap(path, d => { for (const [, node] of groups) d.nodes.push(node); for (const node of nodes) { node.parentId = read.data.roles.situation; node.x = 0; node.y = 0; d.nodes.push(node); } const applied = machine.applySituationData(model.readArgumentMap(d).data, items); for (const [key, node] of groups) applied.roles[key] = node.id; d.argumentMap = applied; });
       return written;
     };
   }
@@ -98,7 +101,7 @@ const steps = (over = {}) => ({
 
 /** Default scripted steps of a facet-judged map (`rig({ facet: true })`): three facets of one need each, all supporting. */
 const facetSteps = (over = {}) => ({
-  plan_facets: () => ({ assumptions: { items: [{ label: 'Age band', value: '16 to 24', reason: 'the claim is about youth' }] }, facets: [{ title: 'Rate', needs: [{ need: 'unemployment rate' }] }, { title: 'Postings', needs: [{ need: 'job postings' }] }, { title: 'Hiring', needs: [{ need: 'junior hiring' }] }], causalQuestions: ['Why would it rise?'], question: 'Is youth unemployment rising?' }),
+  plan_facets: () => ({ assumptions: { items: [{ label: 'Age band', value: '16 to 24', reason: 'the claim is about youth' }] }, facets: [{ title: 'Rate', needs: [{ need: 'unemployment rate' }] }, { title: 'Postings', needs: [{ need: 'job postings' }] }, { title: 'Hiring', needs: [{ need: 'junior hiring' }] }], causalQuestions: ['Why would it rise?'], question: 'Is youth unemployment rising?', questionType: 'causal' }),
   judge_facets: request => ({
     data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: d.fixedStance ?? 'supports', reason: 'it fits' }))),
     facets: request.facets.map(f => ({ id: f.id, verdict: f.data.length ? 'supports' : 'insufficient', reason: 'enough', summary: `summary of ${f.title}`, citedData: f.data.length ? [f.data[0].id] : [], retryNeeds: [] })),
@@ -1080,7 +1083,7 @@ const within = (promise, label) => Promise.race([promise, new Promise((_, reject
 test('stop settles while the usage notice is still open (confirmUsage never answers): no step ran, the run is paused by the user', async () => {
   const r = await rig({ facet: true, script: { step: facetSteps() }, ports: { confirmUsage: () => new Promise(() => undefined) } });
   const started = r.runs.start(r.mapPath, 'p');
-  while (!r.runs.isRunning(r.mapPath) || (await r.repo.readMap(r.mapPath)).nodes.length < 5) await tick();
+  while (!r.runs.isRunning(r.mapPath) || (await r.repo.readMap(r.mapPath)).nodes.length < 3) await tick();
   await within(r.runs.stop(r.mapPath), 'stop');
   await within(started, 'start');
   const state = await r.state();

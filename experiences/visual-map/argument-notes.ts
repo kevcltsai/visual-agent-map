@@ -6,13 +6,16 @@
 import { neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
 import type { TranslationKey } from "../../i18n";
 import {
+  composeFacets,
   foundNeeds,
+  isFactMap,
   isLimitCut,
   isPartialConclusion,
   isVerified,
   type ArgumentMapData,
   type Facet,
   type Hypothesis,
+  type QuestionType,
   type InsightKind,
   type SituationDatum,
   type SourceFigure,
@@ -255,6 +258,16 @@ const VERDICT_KEYS = {
   insufficient: "ui.argument_note_verdict_insufficient",
   pending: "ui.argument_note_verdict_pending"
 } as const;
+const QUESTION_TYPE_KEYS = {
+  fact: "ui.argument_question_type_fact",
+  causal: "ui.argument_question_type_causal"
+} as const;
+const OUTCOME_KEYS = {
+  holds: "ui.argument_note_outcome_holds",
+  fails: "ui.argument_note_outcome_fails",
+  partial: "ui.argument_note_outcome_partial",
+  insufficient: "ui.argument_note_outcome_insufficient"
+} as const;
 const join = (parts: string[][]): string => parts.flat().join("\n");
 
 // ---- card notes ----------------------------------------------------------------------------------------------------------------
@@ -329,10 +342,13 @@ export function definitionsDetail(
   t: Translate,
   items: { label: string; value: string; reason: string }[],
   insights?: string[],
-  definitionNeeds?: string[]
+  definitionNeeds?: string[],
+  questionType?: QuestionType
 ): string {
   return join([
     [`### ${t("ui.argument_definitions")}`],
+    // Decision #60: the owner may change this line and re-run; `parseQuestionType` in argument-rerun reads it back.
+    questionType ? [`${t("ui.argument_question_type")}: ${t(QUESTION_TYPE_KEYS[questionType])}`, ""] : [],
     table(
       [t("ui.argument_note_col_item"), t("ui.argument_note_col_definition"), t("ui.argument_note_col_reason")],
       items.map(i => [i.label, i.value, i.reason])
@@ -434,7 +450,16 @@ export function conclusionDetail(
   const parts: string[][] = [];
   const notices = [premiseNote, partialNote].filter((x): x is string => !!x);
   if (notices.length) parts.push([...notices.map(n => line(n)), ""]);
-  if (answer) {
+  if (answer && isFactMap(state)) {
+    // A fact question (decision #60): the program-composed outcome first, then the model's summary and points; there are no hypotheses.
+    const { outcome, insufficientCount } = composeFacets(facets);
+    parts.push([`### ${t("ui.argument_note_core")}`, `- ${t(OUTCOME_KEYS[outcome])}`]);
+    if (insufficientCount)
+      parts.push([`- ${t("ui.argument_note_outcome_insufficient_count_0", String(insufficientCount))}`]);
+    parts.push(callout(answer.summary));
+    if (answer.points.length)
+      parts.push(["", `### ${t("ui.argument_note_insights")}`, ...answer.points.map(p => `- ${line(p)}`)]);
+  } else if (answer) {
     const based = state.hypotheses.filter(h => state.conclusion.basedOn.includes(h.id));
     parts.push([`### ${t("ui.argument_note_core")}`], callout(answer.summary));
     if (answer.points.length)

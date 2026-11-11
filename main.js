@@ -2715,6 +2715,20 @@ var en = {
   "ui.topic_chat_too_big": "This request touches too much; please use the AI chat in the left sidebar.",
   "ui.topic_chat_result_unknown": "See the topic itself for this result.",
   "ui.topic_chat_failed_children": "No subtopic could be researched.",
+  "ui.topic_chat_choice_message_0_1_2": "Below this topic there are {0} levels and {1} topics; only {2} were researched. How deep should the integration go?",
+  "ui.topic_chat_choice_quick": "Quick",
+  "ui.topic_chat_choice_quick_hint_0_1": "Full content of {0} subtopics plus the titles and summaries of the other topics; about {1} AI calls",
+  "ui.topic_chat_choice_bottom_up": "Integrate bottom-up",
+  "ui.topic_chat_choice_bottom_up_hint_0": "Integrate every level from the deepest up, no web search; about {0} AI calls",
+  "ui.topic_chat_choice_research_first": "Research first, then integrate",
+  "ui.topic_chat_choice_research_first_hint_0_1": "Research the {0} deepest topics first, then integrate level by level; about {1} AI calls",
+  "ui.topic_chat_choice_start": "Start",
+  "ui.topic_chat_choice_cancel": "Cancel",
+  "ui.topic_chat_choice_cancelled": "Cancelled. Nothing was run.",
+  "ui.topic_chat_progress_0_1": "Step {0} of {1}\u2026",
+  "ui.topic_chat_subtree_done_0_1_2": "Read {0} topics below ({1} not researched) and rewrote {2} notes, this one included.",
+  "ui.topic_chat_subtree_stopped_0_1": "Stopped. Finished {0} of {1}.",
+  "ui.topic_chat_failed_subtree": "No subtopic could be integrated.",
   "ui.topic_chat_record_failed": "The topic chat record was not saved.",
   "ui.exchange_reason_invalid_line_0": "it is not a valid OPML or FreeMind outline (line {0})",
   "ui.invalid_merged_json": "The merged contents are not valid JSON: check the quotes, commas and braces, then save again.",
@@ -5570,6 +5584,20 @@ var zhCN = {
   "ui.topic_chat_too_big": "\u8FD9\u4E2A\u8981\u6C42\u52A8\u5230\u7684\u5730\u65B9\u592A\u591A\uFF0C\u8BF7\u6539\u7528\u5DE6\u4FA7\u680F\u7684 AI \u5BF9\u8BDD\u3002",
   "ui.topic_chat_result_unknown": "\u8FD9\u6B21\u7684\u7ED3\u679C\u8BF7\u770B\u8BAE\u9898\u672C\u8EAB\u3002",
   "ui.topic_chat_failed_children": "\u6CA1\u6709\u5B50\u8BAE\u9898\u7814\u7A76\u6210\u529F\u3002",
+  "ui.topic_chat_choice_message_0_1_2": "\u4E0B\u9762\u6709 {0} \u5C42\u3001{1} \u4E2A\u8BAE\u9898\uFF0C\u53EA\u6709 {2} \u4E2A\u7814\u7A76\u8FC7\u3002\u8981\u6574\u5408\u5230\u591A\u6DF1\uFF1F",
+  "ui.topic_chat_choice_quick": "\u5FEB\u901F",
+  "ui.topic_chat_choice_quick_hint_0_1": "{0} \u4E2A\u5B50\u8BAE\u9898\u5B8C\u6574\u5185\u5BB9\uFF0B\u5176\u4F59\u8BAE\u9898\u7684\u6807\u9898\u4E0E\u6458\u8981\uFF0C\u7EA6 {1} \u6B21 AI",
+  "ui.topic_chat_choice_bottom_up": "\u7531\u4E0B\u5F80\u4E0A\u6574\u5408",
+  "ui.topic_chat_choice_bottom_up_hint_0": "\u4ECE\u6700\u5E95\u5C42\u9010\u5C42\u6574\u5408\uFF0C\u4E0D\u8054\u7F51\uFF0C\u7EA6 {0} \u6B21 AI",
+  "ui.topic_chat_choice_research_first": "\u5148\u7814\u7A76\u518D\u6574\u5408",
+  "ui.topic_chat_choice_research_first_hint_0_1": "\u5148\u7814\u7A76 {0} \u4E2A\u6700\u5E95\u5C42\u8BAE\u9898\uFF0C\u518D\u9010\u5C42\u6574\u5408\uFF0C\u7EA6 {1} \u6B21 AI",
+  "ui.topic_chat_choice_start": "\u5F00\u59CB",
+  "ui.topic_chat_choice_cancel": "\u53D6\u6D88",
+  "ui.topic_chat_choice_cancelled": "\u5DF2\u53D6\u6D88\uFF0C\u6CA1\u6709\u6267\u884C\u3002",
+  "ui.topic_chat_progress_0_1": "\u7B2C {0} \u6B65\uFF0C\u5171 {1} \u6B65\u2026",
+  "ui.topic_chat_subtree_done_0_1_2": "\u8BFB\u4E86\u4E0B\u9762 {0} \u4E2A\u8BAE\u9898\uFF08{1} \u4E2A\u6CA1\u7814\u7A76\u8FC7\uFF09\uFF0C\u6539\u5199\u4E86 {2} \u7BC7\u7B14\u8BB0\uFF08\u542B\u8FD9\u7BC7\uFF09\u3002",
+  "ui.topic_chat_subtree_stopped_0_1": "\u5DF2\u505C\u6B62\uFF0C\u5B8C\u6210 {0}\uFF0F{1}\u3002",
+  "ui.topic_chat_failed_subtree": "\u6CA1\u6709\u5B50\u8BAE\u9898\u6574\u5408\u6210\u529F\u3002",
   "ui.topic_chat_record_failed": "\u8BAE\u9898\u5BF9\u8BDD\u8BB0\u5F55\u6CA1\u6709\u5B58\u6210\u529F\u3002",
   "ui.exchange_reason_invalid_line_0": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7EB2\uFF0C\u7B2C {0} \u884C\u9644\u8FD1\u683C\u5F0F\u6709\u8BEF",
   "ui.invalid_merged_json": "\u5408\u5E76\u5185\u5BB9\u4E0D\u662F\u6709\u6548\u7684 JSON\uFF1A\u8BF7\u68C0\u67E5\u5F15\u53F7\u3001\u9017\u53F7\u4E0E\u5927\u62EC\u53F7\u662F\u5426\u6210\u5BF9\uFF0C\u4FEE\u6B63\u540E\u518D\u4FDD\u5B58\u3002",
@@ -8425,6 +8453,20 @@ var zhTW = {
   "ui.topic_chat_too_big": "\u9019\u500B\u8981\u6C42\u52D5\u5230\u7684\u5730\u65B9\u592A\u591A\uFF0C\u8ACB\u6539\u7528\u5DE6\u5074\u6B04\u7684 AI \u5C0D\u8A71\u3002",
   "ui.topic_chat_result_unknown": "\u9019\u6B21\u7684\u7D50\u679C\u8ACB\u770B\u8B70\u984C\u672C\u8EAB\u3002",
   "ui.topic_chat_failed_children": "\u6C92\u6709\u5B50\u8B70\u984C\u7814\u7A76\u6210\u529F\u3002",
+  "ui.topic_chat_choice_message_0_1_2": "\u5E95\u4E0B\u6709 {0} \u5C64\u3001{1} \u500B\u8B70\u984C\uFF0C\u53EA\u6709 {2} \u500B\u7814\u7A76\u904E\u3002\u8981\u6574\u5408\u5230\u591A\u6DF1\uFF1F",
+  "ui.topic_chat_choice_quick": "\u5FEB\u901F",
+  "ui.topic_chat_choice_quick_hint_0_1": "{0} \u500B\u5B50\u8B70\u984C\u5B8C\u6574\u5167\u5BB9\uFF0B\u5176\u9918\u8B70\u984C\u7684\u6A19\u984C\u8207\u6458\u8981\uFF0C\u7D04 {1} \u6B21 AI",
+  "ui.topic_chat_choice_bottom_up": "\u7531\u4E0B\u5F80\u4E0A\u6574\u5408",
+  "ui.topic_chat_choice_bottom_up_hint_0": "\u5F9E\u6700\u5E95\u5C64\u9010\u5C64\u6574\u5408\uFF0C\u4E0D\u4E0A\u7DB2\uFF0C\u7D04 {0} \u6B21 AI",
+  "ui.topic_chat_choice_research_first": "\u5148\u7814\u7A76\u518D\u6574\u5408",
+  "ui.topic_chat_choice_research_first_hint_0_1": "\u5148\u7814\u7A76 {0} \u500B\u6700\u5E95\u5C64\u8B70\u984C\uFF0C\u518D\u9010\u5C64\u6574\u5408\uFF0C\u7D04 {1} \u6B21 AI",
+  "ui.topic_chat_choice_start": "\u958B\u59CB",
+  "ui.topic_chat_choice_cancel": "\u53D6\u6D88",
+  "ui.topic_chat_choice_cancelled": "\u5DF2\u53D6\u6D88\uFF0C\u6C92\u6709\u57F7\u884C\u3002",
+  "ui.topic_chat_progress_0_1": "\u7B2C {0} \u6B65\uFF0C\u5171 {1} \u6B65\u2026",
+  "ui.topic_chat_subtree_done_0_1_2": "\u8B80\u4E86\u5E95\u4E0B {0} \u500B\u8B70\u984C\uFF08{1} \u500B\u6C92\u7814\u7A76\u904E\uFF09\uFF0C\u6539\u5BEB\u4E86 {2} \u7BC7\u7B46\u8A18\uFF08\u542B\u9019\u7BC7\uFF09\u3002",
+  "ui.topic_chat_subtree_stopped_0_1": "\u5DF2\u505C\u6B62\uFF0C\u5B8C\u6210 {0}\uFF0F{1}\u3002",
+  "ui.topic_chat_failed_subtree": "\u6C92\u6709\u5B50\u8B70\u984C\u6574\u5408\u6210\u529F\u3002",
   "ui.topic_chat_record_failed": "\u8B70\u984C\u5C0D\u8A71\u7D00\u9304\u6C92\u6709\u5B58\u6210\u529F\u3002",
   "ui.exchange_reason_invalid_line_0": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7DB1\uFF0C\u7B2C {0} \u884C\u9644\u8FD1\u683C\u5F0F\u6709\u8AA4",
   "ui.invalid_merged_json": "\u5408\u4F75\u5167\u5BB9\u4E0D\u662F\u6709\u6548\u7684 JSON\uFF1A\u8ACB\u6AA2\u67E5\u5F15\u865F\u3001\u9017\u865F\u8207\u5927\u62EC\u865F\u662F\u5426\u6210\u5C0D\uFF0C\u4FEE\u6B63\u5F8C\u518D\u5132\u5B58\u3002",
@@ -19840,22 +19882,22 @@ function mapOutline(nodes, titleOf, summaryOf = () => "", mapTitle = "") {
       children.set(node.parentId, list2);
     } else roots.push(node);
   }
-  const oneLine3 = (value) => (value != null ? value : "").replace(/\s+/g, " ").trim();
+  const oneLine4 = (value) => (value != null ? value : "").replace(/\s+/g, " ").trim();
   const lines = [];
   const seen = /* @__PURE__ */ new Set();
   const wrap = roots.length > 1;
-  if (wrap) lines.push(`# ${oneLine3(mapTitle) || "Map"}`);
-  const walk = (node, depth) => {
+  if (wrap) lines.push(`# ${oneLine4(mapTitle) || "Map"}`);
+  const walk2 = (node, depth) => {
     var _a3;
     if (seen.has(node.id)) return;
     seen.add(node.id);
-    const title = oneLine3(titleOf(node.id)) || node.id;
+    const title = oneLine4(titleOf(node.id)) || node.id;
     lines.push(`${"#".repeat(Math.min(6, depth + 1 + (wrap ? 1 : 0)))} ${title}`);
-    const summary = oneLine3(summaryOf(node.id));
+    const summary = oneLine4(summaryOf(node.id));
     if (summary) lines.push("", `> ${summary}`, "");
-    for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk(child, depth + 1);
+    for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk2(child, depth + 1);
   };
-  for (const root of roots) walk(root, 0);
+  for (const root of roots) walk2(root, 0);
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "");
 }
 
@@ -20074,7 +20116,7 @@ function readingOrder(topics, opts = {}) {
   const sortedRoots = [...roots].sort(byPosition);
   const sortedKids = /* @__PURE__ */ new Map();
   for (const [id, list2] of children) sortedKids.set(id, [...list2].sort(byPosition));
-  const walk = (withHidden) => {
+  const walk2 = (withHidden) => {
     const seen = /* @__PURE__ */ new Set();
     const out = [];
     const stack = [...sortedRoots].reverse();
@@ -20089,8 +20131,8 @@ function readingOrder(topics, opts = {}) {
     }
     return out;
   };
-  const order = walk(includeHidden);
-  const reachable = includeHidden ? new Set(order) : new Set(walk(true));
+  const order = walk2(includeHidden);
+  const reachable = includeHidden ? new Set(order) : new Set(walk2(true));
   const cut = nodes.filter((node, index) => position.get(node.id) === index && !reachable.has(node.id));
   for (const node of cut.sort(byPosition)) order.push(node.id);
   return order;
@@ -20408,13 +20450,13 @@ function composePositions(input2) {
   const arrange = (roots, direction) => {
     var _a2, _b2;
     const heads = [];
-    const walk = (node, root) => {
+    const walk2 = (node, root) => {
       for (const child of [...input2.kidsOf(node), ...input2.joinsOf(node)]) {
         if (branchDirectionOf(child)) heads.push({ node: child, root });
-        else walk(child, root);
+        else walk2(child, root);
       }
     };
-    for (const root of roots) walk(root, root);
+    for (const root of roots) walk2(root, root);
     const tree = { roots, kidsOf: input2.kidsOf, joinsOf: input2.joinsOf, heightFor: input2.heightFor };
     if (!heads.length) return engine(direction, tree);
     const vertical = direction === "down" || direction === "up";
@@ -24165,15 +24207,15 @@ function treeOrder(outline) {
     else roots.push(node);
   const ordered = [];
   const seen = /* @__PURE__ */ new Set();
-  const walk = (node) => {
+  const walk2 = (node) => {
     var _a3;
     if (seen.has(node.id)) return;
     seen.add(node.id);
     ordered.push(node);
-    for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk(child);
+    for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk2(child);
   };
-  for (const root of roots) walk(root);
-  for (const node of outline) walk(node);
+  for (const root of roots) walk2(root);
+  for (const node of outline) walk2(node);
   return ordered;
 }
 var appearanceFields = (node, aim) => {
@@ -32853,7 +32895,17 @@ function taskPrompt(context, language2, provider = "codex") {
   return generalTaskPrompt(context, language2, provider);
 }
 
+// core/steps/task/synthesize-outline-label.zh.md
+var synthesize_outline_label_zh_default = "\u5B50\u8B70\u984C\u5927\u7DB1\uFF08\u552F\u8B80\uFF1B\u5217\u51FA\u76F4\u5C6C\u5B50\u8B70\u984C\u4EE5\u4E0B\u66F4\u6DF1\u5C64\u8B70\u984C\u7684\u6A19\u984C\u8207\u6458\u8981\uFF0C\u4F9B\u4F60\u628A\u6574\u500B\u5B50\u6A39\u7D0D\u5165\u6574\u5408\u3002\u6A19\u6709 [unresearched] \u7684\u8B70\u984C\u5C1A\u672A\u7814\u7A76\uFF0C\u6C92\u6709\u5167\u5BB9\u53EF\u5F15\u7528\uFF1A\u4E0D\u5F97\u7DE8\u9020\u5B83\u5011\u7684\u5167\u5BB9\uFF0C\u4E5F\u4E0D\u5F97\u7576\u4F5C\u5DF2\u67E5\u8B49\u7684\u767C\u73FE\uFF1B\u8ACB\u628A\u5927\u7DB1\u672B\u6BB5\u5217\u51FA\u7684\u672A\u7814\u7A76\u8B70\u984C\u5BEB\u9032\u300C\u5F85\u78BA\u8A8D\u554F\u984C\u300D\uFF08\u6216\u7B49\u540C\u7684\u672A\u89E3\u554F\u984C\u6BB5\uFF09\uFF0C\u9010\u4E00\u5217\u51FA\u6A19\u984C\uFF09\n";
+
+// core/steps/task/synthesize-outline-label.en.md
+var synthesize_outline_label_en_default = "Subtopic outline (read-only; the titles and summaries of the topics below the direct subtopics, so the whole subtree is integrated. A topic marked [unresearched] was never researched and has no content to cite: do not invent its content or treat it as a verified finding; write the unresearched topics listed at the end of the outline into the open questions section (or the equivalent unresolved-questions section), naming each by title)\n";
+
 // core/steps/task/assemble.ts
+var LABEL_SYNTHESIZE_OUTLINE = {
+  zh: renderTemplate(synthesize_outline_label_zh_default, {}),
+  en: renderTemplate(synthesize_outline_label_en_default, {})
+};
 var CUSTOM_LEGACY_TONE = "custom-legacy";
 var DEFAULT_TONE = "academic";
 var TONE_MARKER = "\0tone\0";
@@ -33117,6 +33169,9 @@ ${context.summaryDirections}`, "summary-directions"));
 ${context.anchorContext}`, "anchor-context"));
   add(input(`${inLanguage(LABEL_ANCESTORS, language2)}:
 ${context.ancestors || none}`, "ancestors"));
+  if (step === "synthesize" && context.subtreeOutline)
+    add(input(`${inLanguage(LABEL_SYNTHESIZE_OUTLINE, language2)}:
+${context.subtreeOutline}`, "subtree-outline"));
   add(input(`${inLanguage(LABEL_TASK, language2)}:
 ${context.task}`, "task"));
   const segments = [];
@@ -36729,6 +36784,160 @@ var TopicRuns = class {
   }
 };
 
+// experiences/visual-map/subtree-plan.ts
+var INTEGRATION_DEPTHS = ["quick", "bottom-up", "research-first"];
+var OUTLINE_SUMMARY_CHARS = 60;
+var OUTLINE_MAX_CHARS = 6e3;
+var UNRESEARCHED_MARK = "[unresearched]";
+var childrenIndex = (nodes) => {
+  const index = /* @__PURE__ */ new Map();
+  for (const node of nodes) {
+    if (node.parentId === null) continue;
+    const list2 = index.get(node.parentId);
+    if (list2) list2.push(node);
+    else index.set(node.parentId, [node]);
+  }
+  return index;
+};
+function walk(nodes, rootId) {
+  const index = childrenIndex(nodes);
+  const items = [];
+  const seen = /* @__PURE__ */ new Set([rootId]);
+  const visit = (id, depth) => {
+    var _a2;
+    for (const child of (_a2 = index.get(id)) != null ? _a2 : []) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      items.push({ node: child, depth });
+      visit(child.id, depth + 1);
+    }
+  };
+  visit(rootId, 1);
+  return { items, index };
+}
+function subtreeStats(nodes, rootId) {
+  const { items, index } = walk(nodes, rootId);
+  const hasChildren = (id) => {
+    var _a2, _b2;
+    return ((_b2 = (_a2 = index.get(id)) == null ? void 0 : _a2.length) != null ? _b2 : 0) > 0;
+  };
+  const reached = new Set(items.map((item) => item.node.id));
+  const childrenOf = (id) => {
+    var _a2;
+    return ((_a2 = index.get(id)) != null ? _a2 : []).filter((child) => reached.has(child.id));
+  };
+  return {
+    levels: items.reduce((deepest, item) => Math.max(deepest, item.depth), 0),
+    topics: items.length,
+    researched: items.filter((item) => item.node.researched).length,
+    parents: (childrenOf(rootId).length ? 1 : 0) + items.filter((item) => childrenOf(item.node.id).length).length,
+    unresearchedLeaves: items.filter((item) => !hasChildren(item.node.id) && !item.node.researched).length,
+    directParents: items.filter((item) => item.depth === 1 && childrenOf(item.node.id).length).length,
+    directUnresearchedLeaves: items.filter(
+      (item) => item.depth === 1 && !hasChildren(item.node.id) && !item.node.researched
+    ).length
+  };
+}
+function integrationCalls(stats, depth) {
+  if (depth === "quick") return stats.directParents + stats.directUnresearchedLeaves + 2;
+  if (depth === "bottom-up") return stats.parents + 1;
+  return stats.unresearchedLeaves + stats.parents + 1;
+}
+function bottomUpOrder(nodes, rootId) {
+  var _a2;
+  const { items, index } = walk(nodes, rootId);
+  const reached = new Set(items.map((item) => item.node.id));
+  const parents = items.filter((item) => {
+    var _a3;
+    return ((_a3 = index.get(item.node.id)) != null ? _a3 : []).some((child) => reached.has(child.id));
+  });
+  const ordered = [...parents].sort((left, right) => right.depth - left.depth).map((item) => item.node.id);
+  if (((_a2 = index.get(rootId)) != null ? _a2 : []).length) ordered.push(rootId);
+  return ordered;
+}
+function quickOrder(nodes, rootId) {
+  const { items, index } = walk(nodes, rootId);
+  return items.filter((item) => {
+    var _a2, _b2;
+    return item.depth === 1 && ((_b2 = (_a2 = index.get(item.node.id)) == null ? void 0 : _a2.length) != null ? _b2 : 0) > 0;
+  }).map((item) => item.node.id);
+}
+function unresearchedLeaves(nodes, rootId) {
+  const { items, index } = walk(nodes, rootId);
+  return [...items].filter((item) => {
+    var _a2, _b2;
+    return !((_b2 = (_a2 = index.get(item.node.id)) == null ? void 0 : _a2.length) != null ? _b2 : 0) && !item.node.researched;
+  }).sort((left, right) => right.depth - left.depth).map((item) => item.node.id);
+}
+function unresearchedList(nodes, rootId) {
+  const { items } = walk(nodes, rootId);
+  const open = items.filter((item) => !item.node.researched);
+  return {
+    total: open.length,
+    titles: open.filter((item) => item.depth <= 2).map((item) => item.node.title),
+    deeper: open.filter((item) => item.depth > 2).length
+  };
+}
+var oneLine2 = (value) => value.replace(/\s+/g, " ").trim();
+var clip2 = (value, max) => {
+  const line2 = oneLine2(value);
+  return line2.length > max ? `${Array.from(line2).slice(0, max).join("")}\u2026` : line2;
+};
+function buildSubtreeOutline(nodes, rootId, maxChars = OUTLINE_MAX_CHARS) {
+  const { items } = walk(nodes, rootId);
+  const deepest = items.reduce((max, item) => Math.max(max, item.depth), 0);
+  const unresearched = unresearchedList(nodes, rootId);
+  if (deepest < 2) return { text: "", topics: items.length, unresearched };
+  const below = /* @__PURE__ */ new Map();
+  const index = childrenIndex(nodes);
+  const count3 = (id, seen) => {
+    var _a2;
+    let sum2 = 0;
+    for (const child of (_a2 = index.get(id)) != null ? _a2 : []) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      sum2 += 1 + count3(child.id, seen);
+    }
+    return sum2;
+  };
+  for (const item of items) below.set(item.node.id, count3(item.node.id, /* @__PURE__ */ new Set([rootId, item.node.id])));
+  const render = (summaryDepths2, foldFrom2) => items.filter((item) => item.depth < foldFrom2).map((item) => {
+    const { node, depth } = item;
+    const folded2 = depth + 1 === foldFrom2 && below.get(node.id) > 0 ? ` (+${below.get(node.id)} subtopics)` : "";
+    const summary = depth >= 2 && summaryDepths2.has(depth) && node.summary ? ` \u2014 ${clip2(node.summary, OUTLINE_SUMMARY_CHARS)}` : "";
+    const mark2 = !node.researched ? ` ${UNRESEARCHED_MARK}` : "";
+    return `${"  ".repeat(depth - 1)}- ${oneLine2(node.title)}${summary}${mark2}${folded2}`;
+  }).join("\n");
+  const summaryDepths = /* @__PURE__ */ new Set();
+  for (let depth = 2; depth <= deepest; depth++) summaryDepths.add(depth);
+  let foldFrom = deepest + 1;
+  let text10 = render(summaryDepths, foldFrom);
+  const steps = [];
+  if (deepest >= 2) steps.push(() => summaryDepths.delete(deepest));
+  if (deepest >= 3) steps.push(() => summaryDepths.delete(deepest - 1));
+  if (deepest >= 3) steps.push(() => foldFrom = deepest);
+  for (let depth = deepest - 2; depth >= 2; depth--) steps.push(() => summaryDepths.delete(depth));
+  for (let depth = deepest - 1; depth >= 3; depth--) steps.push(() => foldFrom = depth);
+  for (const step of steps) {
+    if (text10.length <= maxChars) break;
+    step();
+    text10 = render(summaryDepths, foldFrom);
+  }
+  return { text: text10, topics: items.length, unresearched };
+}
+var UNRESEARCHED_TITLES_MAX = 60;
+function subtreeOutlineText(outline) {
+  if (!outline.text) return "";
+  const { total: total2, titles, deeper } = outline.unresearched;
+  if (!total2) return outline.text;
+  const named = titles.slice(0, UNRESEARCHED_TITLES_MAX);
+  const rest = deeper + (titles.length - named.length);
+  return [
+    outline.text,
+    `Unresearched topics: ${total2} of ${outline.topics}.${named.length ? ` ${named.map(oneLine2).join("; ")}.` : ""}${rest ? ` The other ${rest} unresearched topics are deeper down and are not listed.` : ""}`
+  ].join("\n\n");
+}
+
 // experiences/visual-map/note-style-picker.ts
 var import_obsidian20 = require("obsidian");
 
@@ -37572,7 +37781,7 @@ function basisSummary(basis, labels, titleLimit = 5) {
   return (basis.kind === "research" ? labels.research : labels.note).replace(/\{0\}/g, () => shown);
 }
 var SUMMARY_TITLE_LIMIT = 60;
-var oneLine2 = (value) => {
+var oneLine3 = (value) => {
   const flat = value.replace(/\s+/g, " ").trim();
   const chars = [...flat];
   return chars.length > SUMMARY_TITLE_LIMIT ? `${chars.slice(0, SUMMARY_TITLE_LIMIT - 1).join("")}\u2026` : flat;
@@ -37581,7 +37790,7 @@ function summarizeBasis(bases) {
   const entries = [];
   const cardIndex2 = /* @__PURE__ */ new Map();
   for (const basis of bases) {
-    const titles = basis.kind === "outline_only" ? [] : basis.sources.map((source) => oneLine2(source.title)).filter((title, at2, all) => title && all.indexOf(title) === at2);
+    const titles = basis.kind === "outline_only" ? [] : basis.sources.map((source) => oneLine3(source.title)).filter((title, at2, all) => title && all.indexOf(title) === at2);
     const kind = basis.kind === "outline_only" || !titles.length ? "outline_only" : basis.kind;
     if (basis.existingChildren !== void 0) {
       entries.push(
@@ -38476,7 +38685,7 @@ function expandFailureLine(title, reason) {
     text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_topic_0", title), reason)
   };
 }
-var clip2 = (value, limit = LABEL_LIMIT2) => {
+var clip3 = (value, limit = LABEL_LIMIT2) => {
   const text10 = value.replace(/\s+/g, " ").trim();
   const characters = [...text10];
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text10;
@@ -39080,12 +39289,12 @@ var MapChatPanel = class {
     );
   }
   chainEndText(reason, remaining, details, last, round3 = this.chainRound, restored = false) {
-    const bare = (value) => clip2(value, 200).replace(/[\s.。!！?？…]+$/u, "");
+    const bare = (value) => clip3(value, 200).replace(/[\s.。!！?？…]+$/u, "");
     const left = remaining.trim() ? t("ui.map_chat_chain_left_end_0", bare(remaining)) : "";
     const why2 = (details != null ? details : []).length ? t(
       "ui.map_chat_chain_reason_0",
       bare(
-        (details != null ? details : []).slice(0, 3).map((item) => clip2(item, 120)).join(t("ui.map_chat_chain_detail_separator"))
+        (details != null ? details : []).slice(0, 3).map((item) => clip3(item, 120)).join(t("ui.map_chat_chain_detail_separator"))
       )
     ) : "";
     const say = (key4, ...values) => t(key4, ...values);
@@ -39482,7 +39691,7 @@ ${typed}` : draft;
     this.clearStage();
     this.renderLog();
     this.renderBusy();
-    this.announce(announce !== void 0 ? clip2(announce, 160) : t("ui.map_chat_live_failed_0", clip2(text10, 160)));
+    this.announce(announce !== void 0 ? clip3(announce, 160) : t("ui.map_chat_live_failed_0", clip3(text10, 160)));
     this.markUnread();
   }
   /** The user stopped the turn: whatever text arrived stays, marked as stopped. */
@@ -39513,9 +39722,9 @@ ${typed}` : draft;
     this.scrollToEnd();
     this.scrollToEndWhenSettled();
     this.announce(
-      `${t("ui.map_chat_live_done_0", clip2(last.text, 160))} ${t(
+      `${t("ui.map_chat_live_done_0", clip3(last.text, 160))} ${t(
         "ui.map_chat_live_plan_0",
-        clip2((_a2 = plan.summary) != null ? _a2 : t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator"))), 160)
+        clip3((_a2 = plan.summary) != null ? _a2 : t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator"))), 160)
       )}`
     );
     (_c = (_b2 = this.host).stateChanged) == null ? void 0 : _c.call(_b2);
@@ -40265,7 +40474,7 @@ ${typed}` : draft;
     parent.createSpan({ cls: "vam-map-chat-count-failed", text: t("ui.map_chat_count_failed_0", counts.failed) });
   }
   spokenTurn(reply, lines) {
-    const said = t("ui.map_chat_live_done_0", clip2(reply, 160));
+    const said = t("ui.map_chat_live_done_0", clip3(reply, 160));
     const counts = this.countsText(countChatLines(lines, chatNoteTexts()));
     return counts ? `${said} ${t("ui.map_chat_live_results_0", counts)}` : said;
   }
@@ -40444,10 +40653,10 @@ ${shown}` : t("ui.map_chat_model_label"));
   chipLabel(chip) {
     if (chip.kind === "topic") {
       const title = this.host.topicTitle(chip.id);
-      return t("ui.map_chat_ref_topic_0", title === null ? t("ui.map_chat_ref_gone") : clip2(title));
+      return t("ui.map_chat_ref_topic_0", title === null ? t("ui.map_chat_ref_gone") : clip3(title));
     }
-    if (chip.kind === "file") return t("ui.map_chat_ref_file_0", clip2(baseName4(chip.path)));
-    return chip.path ? t("ui.map_chat_ref_snippet_0", clip2(baseName4(chip.path))) : t("ui.map_chat_ref_text");
+    if (chip.kind === "file") return t("ui.map_chat_ref_file_0", clip3(baseName4(chip.path)));
+    return chip.path ? t("ui.map_chat_ref_snippet_0", clip3(baseName4(chip.path))) : t("ui.map_chat_ref_text");
   }
   /** The picture selection changed: the chip and the switch follow. */
   refreshImage() {
@@ -40525,7 +40734,7 @@ ${shown}` : t("ui.map_chat_model_label"));
         cls: "vam-map-chat-chip-label",
         text: t(
           picture.kind === "annotated" ? "ui.map_chat_ref_image_annotated_0" : "ui.map_chat_ref_image_plain_0",
-          clip2(picture.kind === "annotated" ? name2 : picture.name)
+          clip3(picture.kind === "annotated" ? name2 : picture.name)
         )
       });
     }
@@ -40534,11 +40743,11 @@ ${shown}` : t("ui.map_chat_model_label"));
       const title = this.host.topicTitle(id);
       if (title === null) continue;
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-auto" });
-      chip.createSpan({ cls: "vam-map-chat-chip-label", text: t("ui.map_chat_ref_selected_0", clip2(title)) });
+      chip.createSpan({ cls: "vam-map-chat-chip-label", text: t("ui.map_chat_ref_selected_0", clip3(title)) });
     }
     if (this.noteChip) {
       const note = this.noteChip;
-      const label = t("ui.map_chat_ref_note_0", clip2(baseName4(note)));
+      const label = t("ui.map_chat_ref_note_0", clip3(baseName4(note)));
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-note" });
       chip.createSpan({ cls: "vam-map-chat-chip-label", text: label });
       const remove = chip.createEl("button", {
@@ -40704,7 +40913,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       (0, import_obsidian23.setIcon)(eye, "eye");
       line2.createDiv({
         cls: "vam-map-chat-seen",
-        text: t("ui.map_chat_seen_image_0", clip2(message.seenImage.note, 80))
+        text: t("ui.map_chat_seen_image_0", clip3(message.seenImage.note, 80))
       });
     }
     if (message.chainNote)
@@ -40748,7 +40957,7 @@ ${shown}` : t("ui.map_chat_model_label"));
         cls: "vam-map-chat-basis-line is-unread",
         text: t(
           item.oversize ? "ui.map_chat_research_oversize_0" : "ui.map_chat_research_deferred_0",
-          clip2(item.title, 60)
+          clip3(item.title, 60)
         )
       });
   }
@@ -41053,7 +41262,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     const head = box.createDiv({ cls: "vam-map-chat-images-status" });
     if (pending2.length) {
       const current = (_a2 = pending2.find((block) => block.running)) != null ? _a2 : pending2[0];
-      head.setText(t("ui.map_chat_images_searching_0", clip2(current.nodeTitle || current.query, 80)));
+      head.setText(t("ui.map_chat_images_searching_0", clip3(current.nodeTitle || current.query, 80)));
       box.createDiv({
         cls: "vam-map-chat-images-progress",
         text: t("ui.map_chat_images_progress_0_1", blocks.length - pending2.length, blocks.length)
@@ -41083,8 +41292,8 @@ ${shown}` : t("ui.map_chat_model_label"));
           attr: { src: item.candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
         });
         const text11 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
-        text11.createDiv({ cls: "vam-map-chat-images-topic", text: clip2(block.nodeTitle, 80) });
-        text11.createDiv({ cls: "vam-map-chat-images-title", text: clip2(item.candidate.title, 80) });
+        text11.createDiv({ cls: "vam-map-chat-images-topic", text: clip3(block.nodeTitle, 80) });
+        text11.createDiv({ cls: "vam-map-chat-images-title", text: clip3(item.candidate.title, 80) });
         if (item.candidate.source)
           text11.createEl("a", {
             cls: "vam-map-chat-images-source",
@@ -41093,15 +41302,15 @@ ${shown}` : t("ui.map_chat_model_label"));
               href: item.candidate.source,
               target: "_blank",
               rel: "noopener noreferrer",
-              "aria-label": t("ui.map_chat_images_source_0", clip2(item.candidate.title))
+              "aria-label": t("ui.map_chat_images_source_0", clip3(item.candidate.title))
             }
           });
         continue;
       }
       cell2.addClass("is-missed");
       const text10 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
-      text10.createDiv({ cls: "vam-map-chat-images-topic", text: clip2(block.nodeTitle, 80) });
-      const why2 = block.state === "searching" ? block.running ? t("ui.map_chat_images_searching_0", clip2(block.query, 80)) : t("ui.map_chat_images_queued") : block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip2((_b2 = block.reason) != null ? _b2 : "", 160)) : (_c = block.reason) != null ? _c : t("ui.map_chat_images_none");
+      text10.createDiv({ cls: "vam-map-chat-images-topic", text: clip3(block.nodeTitle, 80) });
+      const why2 = block.state === "searching" ? block.running ? t("ui.map_chat_images_searching_0", clip3(block.query, 80)) : t("ui.map_chat_images_queued") : block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip3((_b2 = block.reason) != null ? _b2 : "", 160)) : (_c = block.reason) != null ? _c : t("ui.map_chat_images_none");
       text10.createDiv({ cls: "vam-map-chat-images-reason", text: why2 });
     }
   }
@@ -41120,9 +41329,9 @@ ${shown}` : t("ui.map_chat_model_label"));
         if (item.inserted)
           text10.createDiv({
             cls: "vam-map-chat-images-state is-inserted",
-            text: t("ui.map_chat_images_inserted_0", clip2(item.inserted))
+            text: t("ui.map_chat_images_inserted_0", clip3(item.inserted))
           });
-        else text10.createDiv({ cls: "vam-map-chat-images-title", text: clip2(item.candidate.title, 80) });
+        else text10.createDiv({ cls: "vam-map-chat-images-title", text: clip3(item.candidate.title, 80) });
       }
   }
   buildChoices(row, choices) {
@@ -44053,7 +44262,12 @@ var AiTaskService = class {
       };
     }
     const totalStarted = Date.now();
-    const prepared = buildPreparedTaskContext(context, model, 32e3, provider);
+    const prepared = buildPreparedTaskContext(
+      context,
+      model,
+      32e3 - estimateTokens(context.subtreeOutline),
+      provider
+    );
     if (prepared.context.sourceContext !== context.sourceContext) {
       throw new Error(t("ui.source_context_exceeds_budget"));
     }
@@ -51612,12 +51826,12 @@ function resolveCrossSource(payload, record, sourceMap) {
     for (let i = 0; i < count3; i++) {
       const node = byId.get(record.nodeIds[i]);
       if (!node || node.path !== record.notePaths[i]) return null;
-      const clip4 = payload.nodes[i];
-      if (clip4.parent === null) {
+      const clip5 = payload.nodes[i];
+      if (clip5.parent === null) {
         if (node.parentId && ids2.has(node.parentId)) return null;
         roots.push(node);
       } else {
-        const parentIndex = payload.nodes.findIndex((item) => item.id === clip4.parent);
+        const parentIndex = payload.nodes.findIndex((item) => item.id === clip5.parent);
         if (parentIndex < 0 || node.parentId !== record.nodeIds[parentIndex]) return null;
       }
       branch.push(node);
@@ -52678,7 +52892,7 @@ function richText(element) {
   const newline = () => {
     if (out && !out.endsWith("\n")) out += "\n";
   };
-  const walk = (current) => {
+  const walk2 = (current) => {
     const name2 = current.name.toLowerCase();
     if (SKIPPED_TAGS.has(name2)) return;
     if (name2 === "br") {
@@ -52689,7 +52903,7 @@ function richText(element) {
     if (block) newline();
     for (const child of current.children) {
       if (typeof child !== "string") {
-        walk(child);
+        walk2(child);
         continue;
       }
       let piece = child.replace(/\s+/g, " ");
@@ -52698,7 +52912,7 @@ function richText(element) {
     }
     if (block) newline();
   };
-  walk(element);
+  walk2(element);
   return out.split("\n").map((part) => part.trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 function cleanTitle(raw, line2) {
@@ -54465,7 +54679,7 @@ var STRUCTURE_REVIEW_SCHEMA = {
   },
   required: ["suggestions"]
 };
-var clip3 = (value, limit) => {
+var clip4 = (value, limit) => {
   const text10 = value.replace(/\s+/g, " ").trim();
   const characters = [...text10];
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text10;
@@ -54487,8 +54701,8 @@ function buildStructureReviewNodes(nodes, describe, scopeRootId) {
     const info = describe(id);
     result.push({
       id,
-      title: clip3((_a3 = info == null ? void 0 : info.title) != null ? _a3 : "", TITLE_LIMIT2),
-      summary: clip3((_b3 = info == null ? void 0 : info.summary) != null ? _b3 : "", SUMMARY_LIMIT3),
+      title: clip4((_a3 = info == null ? void 0 : info.title) != null ? _a3 : "", TITLE_LIMIT2),
+      summary: clip4((_b3 = info == null ? void 0 : info.summary) != null ? _b3 : "", SUMMARY_LIMIT3),
       status: (_c = info == null ? void 0 : info.status) != null ? _c : "",
       parentId,
       depth
@@ -54589,7 +54803,7 @@ function isSuggestionStale(suggestion2, currentTree) {
   const target = byId.get(suggestion2.targetId);
   if (!target) return true;
   if (target.parentId !== suggestion2.basis.targetParentId) return true;
-  if (clip3(target.title, TITLE_LIMIT2) !== suggestion2.basis.targetTitle) return true;
+  if (clip4(target.title, TITLE_LIMIT2) !== suggestion2.basis.targetTitle) return true;
   if (suggestion2.kind === "move" || suggestion2.kind === "merge") {
     const destinationId = suggestion2.kind === "move" ? suggestion2.newParentId : suggestion2.mergeIntoId;
     if (!destinationId || !byId.has(destinationId)) return true;
@@ -55353,6 +55567,8 @@ var TopicChatWindow = class {
     __publicField(this, "parentEl", null);
     __publicField(this, "submitting", false);
     __publicField(this, "destroyed", false);
+    __publicField(this, "choiceShown", false);
+    __publicField(this, "doc");
     this.el = parent.createDiv({ cls: "vam-topic-chat" });
     this.el.setAttr("role", "dialog");
     const labelId = `vam-topic-chat-label-${++labelSeq2}`;
@@ -55434,6 +55650,7 @@ var TopicChatWindow = class {
       if (!next || !this.modePickerEl.contains(next)) this.closeModeMenu(false);
     });
     const doc = parent.ownerDocument;
+    this.doc = doc != null ? doc : null;
     if (doc == null ? void 0 : doc.addEventListener) {
       const outside = (event) => {
         if (!this.modeMenuEl.hidden && !this.modePickerEl.contains(event.target)) this.closeModeMenu(false);
@@ -55457,6 +55674,7 @@ var TopicChatWindow = class {
       (_a2 = event.preventDefault) == null ? void 0 : _a2.call(event);
       (_b2 = event.stopPropagation) == null ? void 0 : _b2.call(event);
       if (!this.modeMenuEl.hidden) this.closeModeMenu(true);
+      else if (this.host.session().choice) this.cancelChoice();
       else this.requestClose();
     });
     this.cleanups.push(host.subscribe(() => this.refresh()));
@@ -55542,6 +55760,14 @@ var TopicChatWindow = class {
     this.modeMenuEl.hidden = true;
     this.modeToggleEl.setAttr("aria-expanded", "false");
     if (focusToggle) this.modeToggleEl.focus();
+  }
+  cancelChoice() {
+    this.host.cancelChoice();
+    if (!this.destroyed) this.inputEl.focus();
+  }
+  async confirmChoice() {
+    const started = await this.host.confirmChoice();
+    if (started && !this.destroyed) this.inputEl.focus();
   }
   pickMode(mode) {
     if (this.host.session().running) return;
@@ -55646,7 +55872,9 @@ var TopicChatWindow = class {
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }
   paintLog(session) {
-    var _a2;
+    var _a2, _b2, _c;
+    const active = (_a2 = this.doc) == null ? void 0 : _a2.activeElement;
+    const heldPart = active && this.logEl.contains(active) ? (_b2 = active.getAttr("data-part")) != null ? _b2 : null : null;
     this.logEl.empty();
     for (const turn of session.turns) {
       const row = this.logEl.createDiv({
@@ -55657,7 +55885,7 @@ var TopicChatWindow = class {
       const body = row.createSpan({ cls: "vam-topic-chat-text" });
       if (turn.markdown) renderChatMarkdown(body, turn.text, t("ui.map_chat_overflow_note"));
       else body.setText(turn.text);
-      for (const steer of (_a2 = turn.steers) != null ? _a2 : []) {
+      for (const steer of (_c = turn.steers) != null ? _c : []) {
         const bubble = this.logEl.createDiv({
           cls: steer.state === "queued" ? "vam-topic-chat-steer is-queued" : "vam-topic-chat-steer"
         });
@@ -55668,9 +55896,11 @@ var TopicChatWindow = class {
         bubble.createSpan({ cls: "vam-topic-chat-steer-text", text: steer.text });
       }
     }
+    if (session.choice) this.paintChoice(session.choice, heldPart, !this.choiceShown);
+    this.choiceShown = !!session.choice;
     if (session.running) {
       const running2 = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-running" });
-      running2.createSpan({ text: t("ui.topic_chat_running") });
+      running2.createSpan({ text: session.progress || t("ui.topic_chat_running") });
       if (this.host.canStop()) {
         const stop = running2.createEl("button", {
           cls: "vam-topic-chat-stop",
@@ -55682,7 +55912,96 @@ var TopicChatWindow = class {
     }
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }
+  /** The depth card: an AI message with three radio options and Start / Cancel. Arrows switch, Enter starts, Escape cancels. */
+  paintChoice(choice, heldPart, focusNow) {
+    const row = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-choice" });
+    row.createSpan({ cls: "vam-topic-chat-who", text: t("ui.map_chat_role_ai") });
+    const messageId = `vam-topic-chat-choice-${++labelSeq2}`;
+    row.createSpan({
+      cls: "vam-topic-chat-text",
+      text: t("ui.topic_chat_choice_message_0_1_2", choice.levels, choice.topics, choice.researched),
+      attr: { id: messageId }
+    });
+    const group = row.createDiv({
+      cls: "vam-topic-chat-choice",
+      attr: { role: "radiogroup", "aria-labelledby": messageId }
+    });
+    let selectedEl = null;
+    for (const depth of INTEGRATION_DEPTHS) {
+      const selected = choice.selected === depth;
+      const optionId = `${messageId}-${depth}`;
+      const option = group.createDiv({
+        cls: selected ? "vam-topic-chat-choice-opt is-selected" : "vam-topic-chat-choice-opt",
+        attr: {
+          role: "radio",
+          tabindex: selected ? "0" : "-1",
+          "aria-checked": String(selected),
+          "aria-labelledby": `${optionId}-label`,
+          "aria-describedby": `${optionId}-hint`,
+          "data-part": "radio"
+        }
+      });
+      option.createSpan({ cls: "vam-topic-chat-choice-dot", attr: { "aria-hidden": "true" } });
+      const body = option.createSpan({ cls: "vam-topic-chat-choice-body" });
+      body.createSpan({
+        cls: "vam-topic-chat-choice-label",
+        text: depthLabel(depth),
+        attr: { id: `${optionId}-label` }
+      });
+      body.createSpan({
+        cls: "vam-topic-chat-choice-hint",
+        text: depthHint(depth, choice),
+        attr: { id: `${optionId}-hint` }
+      });
+      if (selected) selectedEl = option;
+      option.addEventListener("click", () => this.host.chooseDepth(depth));
+      option.addEventListener("keydown", (event) => {
+        var _a2, _b2;
+        const step = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 0;
+        if (step) {
+          event.preventDefault();
+          (_a2 = event.stopPropagation) == null ? void 0 : _a2.call(event);
+          this.host.chooseDepth(INTEGRATION_DEPTHS[(INTEGRATION_DEPTHS.indexOf(choice.selected) + step + INTEGRATION_DEPTHS.length) % INTEGRATION_DEPTHS.length]);
+        } else if (event.key === "Enter" && !event.isComposing) {
+          event.preventDefault();
+          (_b2 = event.stopPropagation) == null ? void 0 : _b2.call(event);
+          void this.confirmChoice();
+        } else if (event.key === " ") {
+          event.preventDefault();
+          this.host.chooseDepth(depth);
+        }
+      });
+    }
+    const actions = row.createDiv("vam-topic-chat-choice-actions");
+    const start = actions.createEl("button", {
+      cls: "vam-topic-chat-choice-start mod-cta",
+      text: t("ui.topic_chat_choice_start"),
+      attr: { type: "button", "data-part": "start" }
+    });
+    start.addEventListener("click", () => void this.confirmChoice());
+    const cancel = actions.createEl("button", {
+      cls: "vam-topic-chat-choice-cancel",
+      text: t("ui.topic_chat_choice_cancel"),
+      attr: { type: "button", "data-part": "cancel" }
+    });
+    cancel.addEventListener("click", () => this.cancelChoice());
+    const focusPart = focusNow ? "radio" : heldPart;
+    if (focusPart === "radio") selectedEl == null ? void 0 : selectedEl.focus();
+    else if (focusPart === "start") start.focus();
+    else if (focusPart === "cancel") cancel.focus();
+  }
 };
+function depthLabel(depth) {
+  return t(
+    depth === "quick" ? "ui.topic_chat_choice_quick" : depth === "bottom-up" ? "ui.topic_chat_choice_bottom_up" : "ui.topic_chat_choice_research_first"
+  );
+}
+function depthHint(depth, choice) {
+  const calls = choice.calls[depth];
+  if (depth === "quick") return t("ui.topic_chat_choice_quick_hint_0_1", choice.children, calls);
+  if (depth === "bottom-up") return t("ui.topic_chat_choice_bottom_up_hint_0", calls);
+  return t("ui.topic_chat_choice_research_first_hint_0_1", choice.leaves, calls);
+}
 
 // experiences/visual-map/topic-chat-steer.ts
 var TopicChatSteers = class {
@@ -56209,6 +56528,10 @@ function chatSynthesisOptions(input2) {
     visualMode: "off",
     ...input2.synthesisTitle !== void 0 ? { synthesisTitle: input2.synthesisTitle } : {}
   };
+}
+function integrationUpdateMode(run) {
+  const unset = run.recipe.implicit === true || run.recipe.source === "kind" && run.recipe.ref.startsWith("builtin:");
+  return run.updateMode === "merge" && unset ? "fresh" : run.updateMode;
 }
 var newChatWork = () => ({
   controller: new AbortController(),
@@ -65730,11 +66053,11 @@ ${request.requirements}` : preset.text,
     const nodeIds = (_b2 = source == null ? void 0 : source.nodeIds) != null ? _b2 : [];
     const ids2 = new Set(nodeIds);
     const byId = new Map(map.nodes.map((node) => [node.id, node]));
-    const intact = source !== null && nodeIds.length === payload.nodes.length && payload.nodes.every((clip4, index) => {
+    const intact = source !== null && nodeIds.length === payload.nodes.length && payload.nodes.every((clip5, index) => {
       const node = byId.get(nodeIds[index]);
       if (!node) return false;
-      if (clip4.parent === null) return !node.parentId || !ids2.has(node.parentId);
-      return node.parentId === nodeIds[payload.nodes.findIndex((item) => item.id === clip4.parent)];
+      if (clip5.parent === null) return !node.parentId || !ids2.has(node.parentId);
+      return node.parentId === nodeIds[payload.nodes.findIndex((item) => item.id === clip5.parent)];
     });
     if ((record == null ? void 0 : record.mode) === "cut" && source && !intact) {
       sessionFor(this.plugin).cancelCut();
@@ -65765,7 +66088,7 @@ ${request.requirements}` : preset.text,
     if (cross && record) {
       tops = await this.copyFromOtherMap(cross, target, payload, record.nodeIds);
     } else if (source && intact) {
-      const roots = payload.nodes.map((clip4, index) => clip4.parent === null ? byId.get(nodeIds[index]) : void 0).filter((node) => !!node);
+      const roots = payload.nodes.map((clip5, index) => clip5.parent === null ? byId.get(nodeIds[index]) : void 0).filter((node) => !!node);
       if ((record == null ? void 0 : record.mode) === "cut") {
         const check = canPasteCut(
           map.nodes,
@@ -69331,6 +69654,29 @@ ${request.requirements}` : preset.text,
       close: () => {
         var _a2;
         if (((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry) === entry) this.closeTopicChatWindow();
+      },
+      chooseDepth: (depth) => {
+        const choice = entry.session.choice;
+        if (!choice || !INTEGRATION_DEPTHS.includes(depth)) return;
+        choice.selected = depth;
+        this.notifyTopicChat(entry);
+      },
+      confirmChoice: () => {
+        const target = node();
+        const choice = entry.session.choice;
+        if (!target || !choice || entry.submitting) return Promise.resolve(false);
+        entry.submitting = true;
+        return this.submitTopicChatNow(entry, target, "synthesize", choice.text, void 0, choice.selected).finally(
+          () => {
+            entry.submitting = false;
+          }
+        );
+      },
+      cancelChoice: () => {
+        if (!entry.session.choice) return;
+        entry.session.choice = null;
+        entry.session.turns.push({ role: "ai", text: t("ui.topic_chat_choice_cancelled") });
+        this.notifyTopicChat(entry);
       }
     };
   }
@@ -69357,7 +69703,7 @@ ${request.requirements}` : preset.text,
    * (it stayed so over the gap), so that guard is skipped; every other guard is as for a typed send. The text is taken from
    * `followUp` only once the usage question is confirmed, so an addition typed while it was open rides along.
    */
-  async submitTopicChatNow(entry, node, kind, text10, followUp) {
+  async submitTopicChatNow(entry, node, kind, text10, followUp, depth) {
     const map = this.map;
     if (this.closed || !map || map.id !== entry.mapId || this.presentation) return false;
     if (!followUp && entry.session.running || this.topicChatBusy(node)) {
@@ -69392,6 +69738,30 @@ ${request.requirements}` : preset.text,
       this.notifyTopicChat(entry);
       return true;
     }
+    if (kind === "synthesize" && depth === void 0 && !followUp) {
+      const nodes = this.subtreePlanNodes();
+      const stats = subtreeStats(nodes, node.id);
+      if (stats.levels > 1) {
+        entry.session.turns.push(userTurn);
+        entry.session.choice = {
+          levels: stats.levels,
+          topics: stats.topics,
+          researched: stats.researched,
+          leaves: stats.unresearchedLeaves,
+          children: nodes.filter((item) => item.parentId === node.id).length,
+          calls: {
+            quick: integrationCalls(stats, "quick"),
+            "bottom-up": integrationCalls(stats, "bottom-up"),
+            "research-first": integrationCalls(stats, "research-first")
+          },
+          selected: "quick",
+          text: text10,
+          turn: userTurn
+        };
+        this.notifyTopicChat(entry);
+        return true;
+      }
+    }
     const mode = entry.session.mode;
     const controller = new AbortController();
     let started = false;
@@ -69411,6 +69781,12 @@ ${request.requirements}` : preset.text,
         userTurn.text = text10;
       }
       started = true;
+      const pending2 = entry.session.choice;
+      if (pending2) {
+        const at = entry.session.turns.indexOf(pending2.turn);
+        if (depth !== void 0 && at >= 0) entry.session.turns.splice(at, 1);
+        entry.session.choice = null;
+      }
       entry.session.turns.push(userTurn);
       entry.session.running = true;
       entry.runningTurnId = this.newTopicTurnId();
@@ -69438,7 +69814,7 @@ ${request.requirements}` : preset.text,
         message: text10
       });
       this.notifyTopicChat(entry);
-      void this.runTopicChatTask(entry, node, note, kind, mode, text10, controller, steers, userTurn);
+      void this.runTopicChatTask(entry, node, note, kind, mode, text10, controller, steers, userTurn, depth);
     });
     return went !== false && started;
   }
@@ -69504,7 +69880,7 @@ ${request.requirements}` : preset.text,
     }
   }
   /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
-  async runTopicChatTask(entry, node, note, kind, mode, text10, controller, steers, userTurn) {
+  async runTopicChatTask(entry, node, note, kind, mode, text10, controller, steers, userTurn, depth) {
     var _a2;
     const turnId = entry.runningTurnId;
     const live2 = () => {
@@ -69512,13 +69888,13 @@ ${request.requirements}` : preset.text,
       return !this.closed && ((_a3 = this.map) == null ? void 0 : _a3.id) === entry.mapId;
     };
     try {
-      await this.runTopicChatBody(entry, node, note, kind, mode, text10, controller, steers, userTurn);
+      await this.runTopicChatBody(entry, node, note, kind, mode, text10, controller, steers, userTurn, depth);
     } finally {
       if (entry.steers === steers && (steers.entries.length || ((_a2 = entry.steerFolded) == null ? void 0 : _a2.length)) && entry.session.running)
         await this.endTopicChatSteers(entry, steers, turnId, live2);
     }
   }
-  async runTopicChatBody(entry, node, note, kind, mode, text10, controller, steers, userTurn) {
+  async runTopicChatBody(entry, node, note, kind, mode, text10, controller, steers, userTurn, depth) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     const mapId = entry.mapId;
     const live2 = () => {
@@ -69584,7 +69960,31 @@ ${request.requirements}` : preset.text,
         return;
       }
       const children = (_d = (_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === node.id).length) != null ? _d : 0;
-      const toResearch = ((_f = (_e = this.map) == null ? void 0 : _e.nodes) != null ? _f : []).filter((item) => {
+      let chain = null;
+      if (depth !== void 0 && subtreeStats(this.subtreePlanNodes(), node.id).levels > 1) {
+        chain = await this.runSubtreeChain(entry, node, mode, language2, controller, steers, depth, live2);
+        if (chain.halt) {
+          endHooks();
+          if (chain.halt === "failed")
+            this.settleTopicChat(
+              entry,
+              t("ui.topic_chat_failed_0", t("ui.topic_chat_failed_subtree")),
+              live2,
+              true,
+              "failed"
+            );
+          else
+            this.settleTopicChat(
+              entry,
+              [t("ui.topic_chat_subtree_stopped_0_1", chain.done, chain.total), chain.reason].filter(Boolean).join(" "),
+              live2,
+              false,
+              "stopped"
+            );
+          return;
+        }
+      }
+      const toResearch = (chain ? [] : (_f = (_e = this.map) == null ? void 0 : _e.nodes) != null ? _f : []).filter((item) => {
         var _a3;
         if (item.parentId !== node.id) return false;
         const status = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.status;
@@ -69618,7 +70018,7 @@ ${request.requirements}` : preset.text,
         await this.hydrate();
       }
       let direction = text10;
-      if (toResearch.length) {
+      if (toResearch.length || chain) {
         const early = steers.takeQueued();
         steers.live(true);
         if (early.length) {
@@ -69635,6 +70035,8 @@ ${request.requirements}` : preset.text,
         {
           ...chatSynthesisOptions({ outputLanguage: language2 }),
           researchMode: researchModeOf(mode),
+          // Only a chosen depth over a deeper subtree (the chain) sends the outline; a plain integration keeps its old form.
+          ...depth !== void 0 ? { subtreeIntegration: true } : {},
           signal: controller.signal,
           onProgress: () => {
           },
@@ -69648,13 +70050,23 @@ ${request.requirements}` : preset.text,
         endHooks,
         {
           isOpen: () => false,
+          accepted: (cancel) => controller.signal.addEventListener("abort", cancel, { once: true }),
           onWritten: () => {
             written2 = true;
           }
         }
       );
       endHooks();
-      if (written2)
+      if (written2 && chain) {
+        const finished = unresearchedList(this.subtreePlanNodes(), node.id);
+        this.settleTopicChat(
+          entry,
+          t("ui.topic_chat_subtree_done_0_1_2", chain.read, finished.total, chain.rewritten + 1),
+          live2,
+          false,
+          "done"
+        );
+      } else if (written2)
         this.settleTopicChat(
           entry,
           researchedFirst ? t("ui.topic_chat_synthesis_researched_first_0_1", researchedFirst, children) : t("ui.topic_chat_synthesis_done_0", children),
@@ -69663,7 +70075,13 @@ ${request.requirements}` : preset.text,
           "done"
         );
       else if (controller.signal.aborted || failure === t("ui.ai_task_cancelled"))
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live2, false, "stopped");
+        this.settleTopicChat(
+          entry,
+          chain ? t("ui.topic_chat_subtree_stopped_0_1", chain.done, chain.total) : t("ui.topic_chat_stopped"),
+          live2,
+          false,
+          "stopped"
+        );
       else
         this.settleTopicChat(
           entry,
@@ -69684,8 +70102,115 @@ ${request.requirements}` : preset.text,
       );
     }
   }
+  /**
+   * The steps below the root for the chosen depth, one after the other: quick (direct subtopics that have subtopics integrate
+   * those locally; childless unresearched ones are researched as before), bottom-up (every parent from the deepest, no web),
+   * research-first (unresearched leaves researched in the chat's mode, then bottom-up). Before each step: stopped, view gone,
+   * AI lock (stops here, nothing further runs), node gone or busy (skipped, never waited for). One failure does not stop the chain.
+   * The root is not part of it: the caller integrates it afterwards (unless the chain halted).
+   */
+  async runSubtreeChain(entry, root, mode, language2, controller, steers, depth, live2) {
+    var _a2, _b2;
+    const plan = this.subtreePlanNodes();
+    const steps = [];
+    if (depth === "quick") {
+      for (const item of plan)
+        if (item.parentId === root.id && !item.researched && !plan.some((other) => other.parentId === item.id))
+          steps.push({ kind: "research", id: item.id });
+      for (const id of quickOrder(plan, root.id)) steps.push({ kind: "integrate", id });
+    } else {
+      if (depth === "research-first")
+        for (const id of unresearchedLeaves(plan, root.id)) steps.push({ kind: "research", id });
+      for (const id of bottomUpOrder(plan, root.id)) if (id !== root.id) steps.push({ kind: "integrate", id });
+    }
+    const total2 = steps.length + 1;
+    const outcome = {
+      halt: null,
+      done: 0,
+      total: total2,
+      rewritten: 0,
+      read: subtreeStats(plan, root.id).topics
+    };
+    steers.live(false);
+    let attempted = 0;
+    for (const [index, step] of steps.entries()) {
+      if (controller.signal.aborted || !live2()) {
+        outcome.halt = "stopped";
+        return outcome;
+      }
+      const target = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === step.id);
+      if (!target) continue;
+      if (this.aiLockReason("write", [target.id])) {
+        outcome.halt = "stopped";
+        outcome.reason = t("ui.ai_locked_notice");
+        return outcome;
+      }
+      if (this.topicChatBusy(target)) continue;
+      attempted++;
+      entry.session.progress = t("ui.topic_chat_progress_0_1", index + 1, total2);
+      this.notifyTopicChat(entry);
+      try {
+        if (step.kind === "research") {
+          const note = await this.plugin.repo.readNote(target.path, (_b2 = this.map) != null ? _b2 : void 0);
+          const done = await this.runTopicChatResearch(
+            target,
+            note,
+            mode,
+            language2,
+            "",
+            controller.signal,
+            void 0,
+            void 0,
+            void 0,
+            false
+          );
+          if (done.result) outcome.done++;
+        } else {
+          let written2 = false;
+          await this.startSynthesis(
+            target,
+            {
+              ...chatSynthesisOptions({ outputLanguage: language2 }),
+              researchMode: "local",
+              subtreeIntegration: true,
+              skipCharts: true,
+              signal: controller.signal,
+              onProgress: () => {
+              }
+            },
+            "",
+            () => {
+            },
+            () => {
+            },
+            {
+              isOpen: () => false,
+              accepted: (cancel) => controller.signal.addEventListener("abort", cancel, { once: true }),
+              onWritten: () => {
+                written2 = true;
+              }
+            }
+          );
+          if (written2) {
+            outcome.done++;
+            outcome.rewritten++;
+          }
+        }
+      } catch (e) {
+      }
+      await this.hydrate();
+    }
+    if (controller.signal.aborted || !live2()) outcome.halt = "stopped";
+    else if (attempted > 0 && outcome.done === 0) outcome.halt = "failed";
+    entry.session.progress = void 0;
+    if (!outcome.halt) {
+      entry.session.progress = t("ui.topic_chat_progress_0_1", total2, total2);
+      this.notifyTopicChat(entry);
+    }
+    return outcome;
+  }
   /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
-  async runTopicChatResearch(node, note, mode, language2, text10, signal, accepted, launched, steer) {
+  async runTopicChatResearch(node, note, mode, language2, text10, signal, accepted, launched, steer, charts = mode !== "quick") {
     let result;
     let failure;
     const referenceGroups = await this.taskSourceSettings().mapSources(signal).catch(() => []);
@@ -69706,7 +70231,7 @@ ${request.requirements}` : preset.text,
         outputLanguage: language2,
         rules: "",
         ...aiModeOptions(mode, "research"),
-        addCharts: mode !== "quick"
+        addCharts: charts
       },
       accepted,
       void 0,
@@ -69950,6 +70475,7 @@ ${request.requirements}` : preset.text,
   settleTopicChat(entry, sentence, live2, notice, status, markdown = false, plan = false) {
     if (!this.holdsTopicSteers(entry)) entry.session.running = false;
     entry.steerEnd = { status, plan };
+    entry.session.progress = void 0;
     const turnId = entry.runningTurnId;
     entry.runningTurnId = null;
     if (!live2()) return;
@@ -72952,6 +73478,21 @@ ${request.requirements}` : preset.text,
       }
     });
   }
+  /** The map's nodes as the subtree plan reads them (title and summary from the note; a note not loaded counts as not researched). */
+  subtreePlanNodes() {
+    var _a2, _b2;
+    return ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []).map((item) => {
+      var _a3, _b3, _c;
+      const note = this.notes.get(item.id);
+      return {
+        id: item.id,
+        parentId: (_a3 = item.parentId) != null ? _a3 : null,
+        title: (_b3 = note == null ? void 0 : note.title) != null ? _b3 : item.path,
+        summary: (_c = note == null ? void 0 : note.summary) != null ? _c : "",
+        researched: !!note && note.status !== "idea" && note.status !== "error"
+      };
+    });
+  }
   async integrateChildren(node, options, direction = "", drafted, failed, accepted) {
     var _a2;
     if (!this.map || this.plugin.topicRuns.isBusy(node.path)) {
@@ -72972,6 +73513,7 @@ ${request.requirements}` : preset.text,
     const selectedSources = (_a2 = options == null ? void 0 : options.referenceGroups) != null ? _a2 : [];
     let findingsSent = false;
     let synthesisRun;
+    let updateMode;
     let task = "";
     let childSources;
     await this.plugin.topicRuns.start(node.path, "integrateChildren", {
@@ -73006,9 +73548,10 @@ ${request.requirements}` : preset.text,
         );
         const detailTemplate = run.template;
         synthesisRun = run;
+        updateMode = (options == null ? void 0 : options.subtreeIntegration) ? integrationUpdateMode(run) : run.updateMode;
         return {
           detailTemplate,
-          updateMode: run.updateMode,
+          updateMode,
           viewChanged: () => {
             var _a4, _b2;
             return ((_a4 = options == null ? void 0 : options.signal) == null ? void 0 : _a4.aborted) === true || this.closed || this.path !== mapPath || ((_b2 = this.map) == null ? void 0 : _b2.id) !== mapId || childIds2() !== startIds;
@@ -73028,6 +73571,7 @@ ${request.requirements}` : preset.text,
           tone: run.toneText ? { toneText: run.toneText } : {},
           style: run.contextFields
         };
+        const outlineText = (options == null ? void 0 : options.subtreeIntegration) ? subtreeOutlineText(buildSubtreeOutline(this.subtreePlanNodes(), node.id)) : "";
         return withThinkingOrigin(
           {
             title: note.title,
@@ -73055,7 +73599,8 @@ ${request.requirements}` : preset.text,
             visualMode: (_e = options == null ? void 0 : options.visualMode) != null ? _e : note.visualMode,
             detailTemplate: run.template,
             ...synthesisStyle.style,
-            updateMode: run.updateMode,
+            updateMode: updateMode != null ? updateMode : run.updateMode,
+            ...outlineText ? { subtreeOutline: outlineText } : {},
             addCharts: true
           },
           note
@@ -73090,7 +73635,7 @@ ${request.requirements}` : preset.text,
         await this.hydrate();
         this.render();
       },
-      queueCharts: (job) => this.queueCharts(job),
+      ...(options == null ? void 0 : options.skipCharts) ? {} : { queueCharts: (job) => this.queueCharts(job) },
       failed,
       notify: (message) => new import_obsidian34.Notice(message),
       onSettled: async () => {
@@ -83972,7 +84517,7 @@ function extractSegments(root) {
     const trail = raw.slice(raw.trimEnd().length);
     units.push({ index: units.length, kind: "run", text: text10, nodes: run, lead, trail, parts });
   };
-  const walk = (parent) => {
+  const walk2 = (parent) => {
     let run = [];
     for (const child of Array.from(parent.childNodes)) {
       if (child.nodeType === TEXT_NODE) {
@@ -83990,13 +84535,13 @@ function extractSegments(root) {
       else {
         flush(run);
         run = [];
-        if (kind === "block") walk(element);
+        if (kind === "block") walk2(element);
       }
     }
     flush(run);
   };
   collectAlt(root);
-  walk(root);
+  walk2(root);
   return { units };
 }
 var tokensOf = (text10) => [...text10.matchAll(TOKEN2)].map((match) => match[0]);
@@ -88175,13 +88720,13 @@ var ImageTranslateAction = class extends import_obsidian44.Component {
         halo.style.top = `${rect2.top}px`;
         halo.style.width = `${rect2.width}px`;
         halo.style.height = `${rect2.height}px`;
-        const clip4 = pane ? [
+        const clip5 = pane ? [
           Math.max(-6, pane.top - rect2.top),
           Math.max(-6, rect2.right - pane.right),
           Math.max(-6, rect2.bottom - pane.bottom),
           Math.max(-6, pane.left - rect2.left)
         ] : [-6, -6, -6, -6];
-        halo.style.clipPath = `inset(${clip4.map((value) => `${value}px`).join(" ")})`;
+        halo.style.clipPath = `inset(${clip5.map((value) => `${value}px`).join(" ")})`;
       }
       this.haloFrame = window.requestAnimationFrame(follow);
     };

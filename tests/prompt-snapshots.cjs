@@ -186,7 +186,7 @@ test('collect snapshots: Visual Map expansion and synthesis tasks', async () => 
     await view.proposeIntegrationDirections(parent, synthesisOptions, () => {}, message => { throw new Error(message); });
     contexts.kind = 'synthesis-draft-default-goal';
     // The draft step (no chosen direction) is written directly; the prompt it sends is what is snapshotted.
-    await view.integrateChildren(parent, synthesisOptions, '', () => {}, message => { throw new Error(message); });
+    await view.integrateChildren(parent, { ...synthesisOptions, subtreeIntegration: true }, '', () => {}, message => { throw new Error(message); });
     // AI merge of two sibling topics (prompt.merge_goal): the sources go in as one reference group, without Thinking Origin.
     const second = await repo.createNote('Second child', 'model-a', mapDoc, mapPath, 'workspace'); second.parentId = parent.id; mapDoc.nodes.push(second);
     await repo.updateNote(second.path, { summary: 'Second summary', detail: 'Second detail', thinkingOrigin: 'Origin never sent' });

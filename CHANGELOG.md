@@ -9,6 +9,7 @@
 - A new group, "Hypotheses with evidence, unconfirmed", holds hypotheses that have evidence but were not confirmed. "Eliminated" now holds only hypotheses the evidence refuted.
 - Evidence from a page that is not an official, academic or major news source now needs a second independent source; without one it counts as uncertain and cannot carry a facet on its own.
 - Hypothesis-research maps made before this change still open and show as before. An unfinished one cannot be resumed; use "Re-run with these assumptions" on its definitions card to start a new map.
+- Topic chat Synthesize now asks how deep to integrate when the subtopics have subtopics of their own, integrates the whole subtree (rewriting each note, with a backup) instead of re-researching the direct subtopics, and tells how many topics it read and how many were not researched.
 
 ## [0.34.0] - 2026-11-11
 

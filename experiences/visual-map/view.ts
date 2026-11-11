@@ -345,6 +345,19 @@ import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNote } from "../../ai/note-writeback";
 import { stopLabelKey, type WritebackHooks } from "./topic-run";
 import {
+  INTEGRATION_DEPTHS,
+  bottomUpOrder,
+  buildSubtreeOutline,
+  integrationCalls,
+  quickOrder,
+  subtreeOutlineText,
+  subtreeStats,
+  unresearchedLeaves,
+  unresearchedList,
+  type IntegrationDepth,
+  type PlanNode
+} from "./subtree-plan";
+import {
   errorNotice,
   actionNotice,
   openTopicStyleChooser,
@@ -594,6 +607,7 @@ import {
   TopicChatWindow,
   type TopicChatHost,
   type TopicChatButtonKind,
+  type TopicChatChoice,
   type TopicChatKind,
   type TopicChatMode,
   type TopicChatTurn
@@ -1002,6 +1016,14 @@ export function chatSynthesisOptions(input: { outputLanguage: ContentLanguage; s
     ...(input.synthesisTitle !== undefined ? { synthesisTitle: input.synthesisTitle } : {})
   };
 }
+/**
+ * The update mode of an integration: a note style that does not set one (the kind's built-in default, or an old topic's implicit
+ * style) integrates as a whole rewrite, so the old Detail is not carried forward; a style the user chose runs as it says.
+ */
+export function integrationUpdateMode(run: Pick<RunStyle, "updateMode" | "recipe">): UpdateMode {
+  const unset = run.recipe.implicit === true || (run.recipe.source === "kind" && run.recipe.ref.startsWith("builtin:"));
+  return run.updateMode === "merge" && unset ? "fresh" : run.updateMode;
+}
 /** Web activity of the topics a research batch finished: searches made, topics that reported it, and those that made none. */
 interface ResearchWebTally {
   searches: number;
@@ -1030,6 +1052,9 @@ interface TopicChatEntry {
     running: boolean;
     draftKind: TopicChatButtonKind | null;
     draftText: string;
+    /** The depth card of an integration over a deeper subtree, waiting for an answer; `turn` is the user line that asked. */
+    choice?: (TopicChatChoice & { text: string; turn: TopicChatTurn }) | null;
+    progress?: string;
   };
   watchers: Set<() => void>;
   /** The id of the turn whose result is not written yet (null when idle). */
@@ -1044,6 +1069,19 @@ interface TopicChatEntry {
   steerEnd?: { status: TopicRecordStatus; plan: boolean } | null;
   /** The AbortController of the current run (the window's stop button aborts it). */
   controller?: AbortController;
+}
+/** How the steps below the root of a subtree integration ended: `halt` set means the root is not integrated. */
+interface SubtreeChainOutcome {
+  halt: "stopped" | "failed" | null;
+  /** Why the chain stopped when an AI lock stopped it. */
+  reason?: string;
+  /** Steps that succeeded (research or integration) and the steps planned, the root's included. */
+  done: number;
+  total: number;
+  /** Notes below the root that were rewritten. */
+  rewritten: number;
+  /** Topics below the root the root's integration reads. */
+  read: number;
 }
 /** How one expansion the chat started came out. */
 type ChatExpandOutcome =
@@ -15415,6 +15453,30 @@ export class VisualAgentMapView extends ItemView {
       },
       close: () => {
         if (this.topicChatOpen?.entry === entry) this.closeTopicChatWindow();
+      },
+      chooseDepth: depth => {
+        const choice = entry.session.choice;
+        if (!choice || !INTEGRATION_DEPTHS.includes(depth)) return;
+        choice.selected = depth;
+        this.notifyTopicChat(entry);
+      },
+      confirmChoice: () => {
+        const target = node();
+        const choice = entry.session.choice;
+        if (!target || !choice || entry.submitting) return Promise.resolve(false);
+        entry.submitting = true;
+        return this.submitTopicChatNow(entry, target, "synthesize", choice.text, undefined, choice.selected).finally(
+          () => {
+            entry.submitting = false;
+          }
+        );
+      },
+      cancelChoice: () => {
+        if (!entry.session.choice) return;
+        // Nothing ran and nothing was written (no record line): the card goes and one sentence says so.
+        entry.session.choice = null;
+        entry.session.turns.push({ role: "ai", text: t("ui.topic_chat_choice_cancelled") });
+        this.notifyTopicChat(entry);
       }
     };
   }
@@ -15455,7 +15517,8 @@ export class VisualAgentMapView extends ItemView {
     node: MapNode,
     kind: TopicChatKind,
     text: string,
-    followUp?: TopicChatSteers
+    followUp?: TopicChatSteers,
+    depth?: IntegrationDepth
   ): Promise<boolean> {
     const map = this.map;
     if (this.closed || !map || map.id !== entry.mapId || this.presentation) return false;
@@ -15491,6 +15554,31 @@ export class VisualAgentMapView extends ItemView {
       this.notifyTopicChat(entry);
       return true;
     }
+    if (kind === "synthesize" && depth === undefined && !followUp) {
+      // Deeper than one level: ask how deep first. The card writes no record and calls no AI; Cancel ends it there.
+      const nodes = this.subtreePlanNodes();
+      const stats = subtreeStats(nodes, node.id);
+      if (stats.levels > 1) {
+        entry.session.turns.push(userTurn);
+        entry.session.choice = {
+          levels: stats.levels,
+          topics: stats.topics,
+          researched: stats.researched,
+          leaves: stats.unresearchedLeaves,
+          children: nodes.filter(item => item.parentId === node.id).length,
+          calls: {
+            quick: integrationCalls(stats, "quick"),
+            "bottom-up": integrationCalls(stats, "bottom-up"),
+            "research-first": integrationCalls(stats, "research-first")
+          },
+          selected: "quick",
+          text,
+          turn: userTurn
+        };
+        this.notifyTopicChat(entry);
+        return true;
+      }
+    }
     const mode = entry.session.mode;
     const controller = new AbortController();
     let started = false;
@@ -15510,6 +15598,13 @@ export class VisualAgentMapView extends ItemView {
         userTurn.text = text;
       }
       started = true;
+      // A card that was answered (or left for a new question) goes; its asking line is replaced by this run's own.
+      const pending = entry.session.choice;
+      if (pending) {
+        const at = entry.session.turns.indexOf(pending.turn);
+        if (depth !== undefined && at >= 0) entry.session.turns.splice(at, 1);
+        entry.session.choice = null;
+      }
       entry.session.turns.push(userTurn);
       entry.session.running = true;
       entry.runningTurnId = this.newTopicTurnId();
@@ -15535,7 +15630,7 @@ export class VisualAgentMapView extends ItemView {
         message: text
       });
       this.notifyTopicChat(entry);
-      void this.runTopicChatTask(entry, node, note, kind, mode, text, controller, steers, userTurn);
+      void this.runTopicChatTask(entry, node, note, kind, mode, text, controller, steers, userTurn, depth);
     });
     return went !== false && started;
   }
@@ -15615,12 +15710,13 @@ export class VisualAgentMapView extends ItemView {
     text: string,
     controller: AbortController,
     steers: TopicChatSteers,
-    userTurn: TopicChatTurn
+    userTurn: TopicChatTurn,
+    depth?: IntegrationDepth
   ): Promise<void> {
     const turnId = entry.runningTurnId;
     const live = (): boolean => !this.closed && this.map?.id === entry.mapId;
     try {
-      await this.runTopicChatBody(entry, node, note, kind, mode, text, controller, steers, userTurn);
+      await this.runTopicChatBody(entry, node, note, kind, mode, text, controller, steers, userTurn, depth);
     } finally {
       // No additions: `settleTopicChat` already freed the entry, exactly as before.
       if (entry.steers === steers && (steers.entries.length || entry.steerFolded?.length) && entry.session.running)
@@ -15636,7 +15732,8 @@ export class VisualAgentMapView extends ItemView {
     text: string,
     controller: AbortController,
     steers: TopicChatSteers,
-    userTurn: TopicChatTurn
+    userTurn: TopicChatTurn,
+    depth?: IntegrationDepth
   ): Promise<void> {
     const mapId = entry.mapId;
     // The map id, not its path: a rename or Organize meanwhile moves the file but the result still belongs here.
@@ -15706,7 +15803,32 @@ export class VisualAgentMapView extends ItemView {
       }
       // synthesize: subtopics that were never researched are researched first (same mode), then everything is integrated.
       const children = this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0;
-      const toResearch = (this.map?.nodes ?? []).filter(item => {
+      // A chosen depth over a deeper subtree: the subtopics below are handled first, one step after the other, then the root.
+      let chain: SubtreeChainOutcome | null = null;
+      if (depth !== undefined && subtreeStats(this.subtreePlanNodes(), node.id).levels > 1) {
+        chain = await this.runSubtreeChain(entry, node, mode, language, controller, steers, depth, live);
+        if (chain.halt) {
+          endHooks();
+          if (chain.halt === "failed")
+            this.settleTopicChat(
+              entry,
+              t("ui.topic_chat_failed_0", t("ui.topic_chat_failed_subtree")),
+              live,
+              true,
+              "failed"
+            );
+          else
+            this.settleTopicChat(
+              entry,
+              [t("ui.topic_chat_subtree_stopped_0_1", chain.done, chain.total), chain.reason].filter(Boolean).join(" "),
+              live,
+              false,
+              "stopped"
+            );
+          return;
+        }
+      }
+      const toResearch = (chain ? [] : (this.map?.nodes ?? [])).filter(item => {
         if (item.parentId !== node.id) return false;
         const status = this.notes.get(item.id)?.status;
         return (status === "idea" || status === "error") && !this.topicChatBusy(item);
@@ -15741,7 +15863,7 @@ export class VisualAgentMapView extends ItemView {
         await this.hydrate();
       }
       let direction = text;
-      if (toResearch.length) {
+      if (toResearch.length || chain) {
         const early = steers.takeQueued();
         steers.live(true);
         if (early.length) {
@@ -15758,6 +15880,8 @@ export class VisualAgentMapView extends ItemView {
         {
           ...chatSynthesisOptions({ outputLanguage: language }),
           researchMode: researchModeOf(mode),
+          // Only a chosen depth over a deeper subtree (the chain) sends the outline; a plain integration keeps its old form.
+          ...(depth !== undefined ? { subtreeIntegration: true } : {}),
           signal: controller.signal,
           onProgress: () => {},
           steer: steers
@@ -15770,13 +15894,23 @@ export class VisualAgentMapView extends ItemView {
         endHooks,
         {
           isOpen: () => false,
+          accepted: cancel => controller.signal.addEventListener("abort", cancel, { once: true }),
           onWritten: () => {
             written = true;
           }
         }
       );
       endHooks();
-      if (written)
+      if (written && chain) {
+        const finished = unresearchedList(this.subtreePlanNodes(), node.id);
+        this.settleTopicChat(
+          entry,
+          t("ui.topic_chat_subtree_done_0_1_2", chain.read, finished.total, chain.rewritten + 1),
+          live,
+          false,
+          "done"
+        );
+      } else if (written)
         this.settleTopicChat(
           entry,
           researchedFirst
@@ -15787,7 +15921,13 @@ export class VisualAgentMapView extends ItemView {
           "done"
         );
       else if (controller.signal.aborted || failure === t("ui.ai_task_cancelled"))
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
+        this.settleTopicChat(
+          entry,
+          chain ? t("ui.topic_chat_subtree_stopped_0_1", chain.done, chain.total) : t("ui.topic_chat_stopped"),
+          live,
+          false,
+          "stopped"
+        );
       else
         this.settleTopicChat(
           entry,
@@ -15808,6 +15948,120 @@ export class VisualAgentMapView extends ItemView {
       );
     }
   }
+  /**
+   * The steps below the root for the chosen depth, one after the other: quick (direct subtopics that have subtopics integrate
+   * those locally; childless unresearched ones are researched as before), bottom-up (every parent from the deepest, no web),
+   * research-first (unresearched leaves researched in the chat's mode, then bottom-up). Before each step: stopped, view gone,
+   * AI lock (stops here, nothing further runs), node gone or busy (skipped, never waited for). One failure does not stop the chain.
+   * The root is not part of it: the caller integrates it afterwards (unless the chain halted).
+   */
+  private async runSubtreeChain(
+    entry: TopicChatEntry,
+    root: MapNode,
+    mode: TopicChatMode,
+    language: ContentLanguage,
+    controller: AbortController,
+    steers: TopicChatSteers,
+    depth: IntegrationDepth,
+    live: () => boolean
+  ): Promise<SubtreeChainOutcome> {
+    const plan = this.subtreePlanNodes();
+    const steps: Array<{ kind: "research" | "integrate"; id: string }> = [];
+    if (depth === "quick") {
+      for (const item of plan)
+        if (item.parentId === root.id && !item.researched && !plan.some(other => other.parentId === item.id))
+          steps.push({ kind: "research", id: item.id });
+      for (const id of quickOrder(plan, root.id)) steps.push({ kind: "integrate", id });
+    } else {
+      if (depth === "research-first")
+        for (const id of unresearchedLeaves(plan, root.id)) steps.push({ kind: "research", id });
+      for (const id of bottomUpOrder(plan, root.id)) if (id !== root.id) steps.push({ kind: "integrate", id });
+    }
+    const total = steps.length + 1;
+    const outcome: SubtreeChainOutcome = {
+      halt: null,
+      done: 0,
+      total,
+      rewritten: 0,
+      read: subtreeStats(plan, root.id).topics
+    };
+    // Additions typed meanwhile are not for these steps: they wait and go into the root's integration, once.
+    steers.live(false);
+    let attempted = 0;
+    for (const [index, step] of steps.entries()) {
+      if (controller.signal.aborted || !live()) {
+        outcome.halt = "stopped";
+        return outcome;
+      }
+      const target = this.map?.nodes.find(item => item.id === step.id);
+      if (!target) continue;
+      if (this.aiLockReason("write", [target.id])) {
+        outcome.halt = "stopped";
+        outcome.reason = t("ui.ai_locked_notice");
+        return outcome;
+      }
+      if (this.topicChatBusy(target)) continue;
+      attempted++;
+      entry.session.progress = t("ui.topic_chat_progress_0_1", index + 1, total);
+      this.notifyTopicChat(entry);
+      try {
+        if (step.kind === "research") {
+          const note = await this.plugin.repo.readNote(target.path, this.map ?? undefined);
+          const done = await this.runTopicChatResearch(
+            target,
+            note,
+            mode,
+            language,
+            "",
+            controller.signal,
+            undefined,
+            undefined,
+            undefined,
+            false
+          );
+          if (done.result) outcome.done++;
+        } else {
+          let written = false;
+          await this.startSynthesis(
+            target,
+            {
+              ...chatSynthesisOptions({ outputLanguage: language }),
+              researchMode: "local",
+              subtreeIntegration: true,
+              skipCharts: true,
+              signal: controller.signal,
+              onProgress: () => {}
+            },
+            "",
+            () => {},
+            () => {},
+            {
+              isOpen: () => false,
+              accepted: cancel => controller.signal.addEventListener("abort", cancel, { once: true }),
+              onWritten: () => {
+                written = true;
+              }
+            }
+          );
+          if (written) {
+            outcome.done++;
+            outcome.rewritten++;
+          }
+        }
+      } catch {
+        // One step that throws counts as failed; the next one still runs.
+      }
+      await this.hydrate();
+    }
+    if (controller.signal.aborted || !live()) outcome.halt = "stopped";
+    else if (attempted > 0 && outcome.done === 0) outcome.halt = "failed";
+    entry.session.progress = undefined;
+    if (!outcome.halt) {
+      entry.session.progress = t("ui.topic_chat_progress_0_1", total, total);
+      this.notifyTopicChat(entry);
+    }
+    return outcome;
+  }
   /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
   private async runTopicChatResearch(
     node: MapNode,
@@ -15818,7 +16072,8 @@ export class VisualAgentMapView extends ItemView {
     signal: AbortSignal,
     accepted?: () => void,
     launched?: () => void,
-    steer?: ResearchSteer
+    steer?: ResearchSteer,
+    charts = mode !== "quick"
   ): Promise<{ result?: AiResult; failure?: string }> {
     let result: AiResult | undefined;
     let failure: string | undefined;
@@ -15842,7 +16097,7 @@ export class VisualAgentMapView extends ItemView {
         outputLanguage: language,
         rules: "",
         ...aiModeOptions(mode, "research"),
-        addCharts: mode !== "quick"
+        addCharts: charts
       },
       accepted,
       undefined,
@@ -16119,6 +16374,7 @@ export class VisualAgentMapView extends ItemView {
     // With additions the entry stays running over the gap until they are settled (`endTopicChatSteers` frees it).
     if (!this.holdsTopicSteers(entry)) entry.session.running = false;
     entry.steerEnd = { status, plan };
+    entry.session.progress = undefined;
     const turnId = entry.runningTurnId;
     entry.runningTurnId = null;
     // Late-result fence: a view that closed or moved to another map writes nothing (its next open says the result is unknown).
@@ -19327,6 +19583,19 @@ export class VisualAgentMapView extends ItemView {
       }
     });
   }
+  /** The map's nodes as the subtree plan reads them (title and summary from the note; a note not loaded counts as not researched). */
+  private subtreePlanNodes(): PlanNode[] {
+    return (this.map?.nodes ?? []).map(item => {
+      const note = this.notes.get(item.id);
+      return {
+        id: item.id,
+        parentId: item.parentId ?? null,
+        title: note?.title ?? item.path,
+        summary: note?.summary ?? "",
+        researched: !!note && note.status !== "idea" && note.status !== "error"
+      };
+    });
+  }
   private async integrateChildren(
     node: MapNode,
     options?: TaskOptions,
@@ -19360,6 +19629,7 @@ export class VisualAgentMapView extends ItemView {
     const selectedSources = options?.referenceGroups ?? [];
     let findingsSent = false;
     let synthesisRun: Awaited<ReturnType<VisualAgentMapView["detailTemplateFor"]>> | undefined;
+    let updateMode: UpdateMode | undefined;
     let task = "";
     let childSources: ReferenceGroup | undefined;
     await this.plugin.topicRuns.start(node.path, "integrateChildren", {
@@ -19391,9 +19661,10 @@ export class VisualAgentMapView extends ItemView {
         );
         const detailTemplate = run.template;
         synthesisRun = run;
+        updateMode = options?.subtreeIntegration ? integrationUpdateMode(run) : run.updateMode;
         return {
           detailTemplate,
-          updateMode: run.updateMode,
+          updateMode,
           viewChanged: () =>
             options?.signal?.aborted === true ||
             this.closed ||
@@ -19414,6 +19685,9 @@ export class VisualAgentMapView extends ItemView {
           tone: run.toneText ? { toneText: run.toneText } : {},
           style: run.contextFields
         };
+        const outlineText = options?.subtreeIntegration
+          ? subtreeOutlineText(buildSubtreeOutline(this.subtreePlanNodes(), node.id))
+          : "";
         return withThinkingOrigin(
           {
             title: note.title,
@@ -19441,7 +19715,8 @@ export class VisualAgentMapView extends ItemView {
             visualMode: options?.visualMode ?? note.visualMode,
             detailTemplate: run.template,
             ...synthesisStyle.style,
-            updateMode: run.updateMode,
+            updateMode: updateMode ?? run.updateMode,
+            ...(outlineText ? { subtreeOutline: outlineText } : {}),
             addCharts: true
           },
           note
@@ -19478,7 +19753,7 @@ export class VisualAgentMapView extends ItemView {
         await this.hydrate();
         this.render();
       },
-      queueCharts: job => this.queueCharts(job),
+      ...(options?.skipCharts ? {} : { queueCharts: job => this.queueCharts(job) }),
       failed,
       notify: message => new Notice(message),
       onSettled: async () => {

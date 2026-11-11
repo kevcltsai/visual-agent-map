@@ -90,6 +90,11 @@ export interface TaskContext {
    * read-only data, never a source to cite. Research and expand only; empty or absent adds nothing.
    */
   anchorContext?: string;
+  /**
+   * Synthesize only: the outline of the topics below the direct subtopics (titles, short summaries, unresearched marks) and the
+   * unresearched list, built by the topic chat's integration. Read-only, not a reference group; empty or absent adds nothing. Counted in the 32k budget.
+   */
+  subtreeOutline?: string;
   workingFindings?: string;
   sourceContext?: string;
   referenceGroups?: ReferenceGroup[];

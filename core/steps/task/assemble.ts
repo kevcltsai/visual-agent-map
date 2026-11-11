@@ -76,6 +76,15 @@ import {
   textbookDetailStructure
 } from "./fragments";
 import { isQuickTask, quickGuidance, readerFacingDetail } from "./render";
+import { renderTemplate } from "../../step-runner";
+import SynthesizeOutlineLabelZH from "./synthesize-outline-label.zh.md";
+import SynthesizeOutlineLabelEN from "./synthesize-outline-label.en.md";
+
+/** Label (and rule) of the subtopic outline block; a synthesize prompt with an outline only. */
+const LABEL_SYNTHESIZE_OUTLINE = {
+  zh: renderTemplate(SynthesizeOutlineLabelZH, {}),
+  en: renderTemplate(SynthesizeOutlineLabelEN, {})
+};
 
 /** Which task step a prompt is for; `default` is a request without a mode. */
 export type PromptStep = "research" | "quick" | "decompose" | "synthesize" | "merge" | "default";
@@ -521,6 +530,8 @@ export function assembleTaskPrompt(
   if (context.anchorContext)
     add(input(`${inLanguage(LABEL_ANCHOR_CONTEXT, language)}:\n${context.anchorContext}`, "anchor-context"));
   add(input(`${inLanguage(LABEL_ANCESTORS, language)}:\n${context.ancestors || none}`, "ancestors"));
+  if (step === "synthesize" && context.subtreeOutline)
+    add(input(`${inLanguage(LABEL_SYNTHESIZE_OUTLINE, language)}:\n${context.subtreeOutline}`, "subtree-outline"));
   add(input(`${inLanguage(LABEL_TASK, language)}:\n${context.task}`, "task"));
 
   const segments: PromptSegment[] = [];

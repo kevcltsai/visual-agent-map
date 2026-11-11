@@ -9,6 +9,11 @@
       "reason": "statement written into a handed-over note as stored data, not a prompt template; the model later sees it only as quoted note content"
     },
     {
+      "file": "experiences/visual-map/subtree-plan.ts",
+      "text": "unresearched topics are deeper down and are not listed.",
+      "reason": "data line of the outline block (counts and titles of the subtree, like a table row); the rule that says what to do with it lives in the synthesize step template"
+    },
+    {
       "file": "experiences/visual-map/view.ts",
       "text": "25,0.5 75,0.5",
       "reason": "SVG polygon points, not natural language"

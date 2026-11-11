@@ -181,7 +181,12 @@ export class AiTaskService {
     }
 
     const totalStarted = Date.now();
-    const prepared = buildPreparedTaskContext(context, model, 32_000, provider);
+    const prepared = buildPreparedTaskContext(
+      context,
+      model,
+      32_000 - estimateTokens(context.subtreeOutline),
+      provider
+    );
     if (prepared.context.sourceContext !== context.sourceContext) {
       throw new Error(t("ui.source_context_exceeds_budget"));
     }

@@ -517,7 +517,7 @@ const oneLine = text => !/[\r\n]/.test(text);
 test('sanitize inline Markdown: plainLine neutralizes images, wikilinks, embeds, html and keeps ordinary text', () => {
   const { plainLine } = S.load('experiences/visual-map/argument-run.ts');
   for (const bad of INLINE) assert.ok(inert(plainLine(`x ${bad} y`)) && oneLine(plainLine(bad)), JSON.stringify(plainLine(bad)));
-  for (const text of ['GDP grew 3.2% in 2020 (see Table 1)', 'see [x] and a & b', 'https://stats.example.org/report?a=1&b=2', 'list [1] [2]', 'ok]']) assert.equal(plainLine(text), text);
+  for (const text of ['GDP grew 3.2% in 2020 (see Table 1)', 'see x and a & b', 'https://stats.example.org/report?a=1&b=2', 'list 1 2', 'ok']) assert.equal(plainLine(text), text);
   assert.ok(plainLine('![[Secret Note]]').includes('Secret Note'));
 });
 
@@ -1182,7 +1182,7 @@ const activeLeft = text => /\]\(|obsidian:\/\/|%%|\$|^#|^[-+>]|^\d+[.)]|==|\[\^|
 test('P1-5: plainLine neutralizes links, comments, math, highlight, footnotes, a leading heading/list/quote marker and non-web URL schemes', () => {
   const { plainLine } = S.load('experiences/visual-map/argument-run.ts');
   for (const bad of ACTIVE) assert.ok(!activeLeft(plainLine(bad)), `${bad} -> ${plainLine(bad)}`);
-  for (const text of ['GDP grew 3.2% in 2020 (see Table 1)', 'see [x] and a & b', 'https://stats.example.org/report?a=1&b=2', 'a-b and 5 - 3', 'rate: 9.2%']) assert.equal(plainLine(text), text);
+  for (const text of ['GDP grew 3.2% in 2020 (see Table 1)', 'see x and a & b', 'https://stats.example.org/report?a=1&b=2', 'a-b and 5 - 3', 'rate: 9.2%']) assert.equal(plainLine(text), text);
 });
 test('P1-5: the hypothesis, need, conclusion and gate-reason notes written from model text carry none of it as active Markdown', async () => {
   const payload = i => ACTIVE[i % ACTIVE.length];

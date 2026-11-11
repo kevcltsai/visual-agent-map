@@ -22,17 +22,16 @@ export type Translate = (key: TranslationKey, ...values: string[]) => string;
 const wide = (c: string): string => String.fromCharCode(c.charCodeAt(0) + 0xfee0);
 const wideRun = (run: string): string => [...run].map(wide).join("");
 
-/** A non-web URL scheme (`obsidian://`, `file://`, `javascript:`-style) would open something: its colon is full-width. `http(s)://` stays readable. */
-const ACTIVE_SCHEME = /(?<![A-Za-z0-9+.-])(?!https?:)([A-Za-z][A-Za-z0-9+.-]*):(?=\/\/)/g;
-/** Model/web text as inert plain single-line text: line breaks become a space, 3+ backtick/tilde runs cannot form a fence, and Markdown inline constructs that load, link or hide things become their full-width twins: `![` images/embeds, `[[` `]]` wikilinks, `](` link targets, `[^` footnotes, `<` `>` raw HTML, `$` math, `%%` comments, `==` and `~~` runs, a non-web URL scheme, and a leading `#`, list, quote or ordered-list marker. Ordinary text is unchanged. */
+/** A non-web URL scheme (`obsidian:open`, `file://`, `mailto:`, `javascript:`) would open something: its colon is full-width, with or without `//`; a colon followed by a space stays. `http(s)://` stays readable. */
+const ACTIVE_SCHEME = /(?<![A-Za-z0-9+.-])(?!https?:)([A-Za-z][A-Za-z0-9+.-]*):(?=\S)/g;
+/** Model/web text as inert plain single-line text: line breaks become a space, 3+ backtick/tilde runs cannot form a fence, and Markdown inline constructs that load, link or hide things become their full-width twins: every `[` and `]` (links, reference links, images/embeds, wikilinks, footnotes), `<` `>` raw HTML, `$` math, `%%` comments, `==` and `~~` runs, a non-web URL scheme, and a leading `#`, list, quote or ordered-list marker. Ordinary text is unchanged. */
 export function plainLine(text: string): string {
   return text
     .replace(/[\r\n\u2028\u2029]+/g, " ")
     .replace(/`{3,}|~{3,}/g, m => [...m].join(" "))
     .replace(/</g, "＜")
     .replace(/>/g, "＞")
-    .replace(/!\[|\[(?=[\[^])/g, m => m.replace("[", "［"))
-    .replace(/\](?=[\](])/g, "］")
+    .replace(/[[\]]/g, wide)
     .replace(/\$/g, "＄")
     .replace(/%{2,}|={2,}|~{2,}/g, wideRun)
     .replace(ACTIVE_SCHEME, (_m, scheme: string) => `${scheme}：`)
@@ -70,6 +69,7 @@ const line = (text: string | undefined): string =>
     .replace(ALWAYS_WIDE, wide)
     .replace(WIDE_RUNS, wideRun)
     .replace(SYNTAX_COLON, wide)
+    .replace(ACTIVE_SCHEME, (_m, scheme: string) => `${scheme}：`)
     .replace(WWW, m => `${m.slice(0, 3)}．`);
 /** A table cell: one line, `|` cannot split the row (it is full-width already). */
 const cell = (text: string | undefined): string => line(text) || "-";

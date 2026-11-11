@@ -333,3 +333,15 @@ test('Bug C: a judged irrelevant datum shows its reason in the note, never an em
   assert.ok(!/\| - \|$/.test(row), row);
   assert.ok(row.endsWith('比較基準不是疫情前 |'), row);
 });
+
+// ---- P1-5 (review): reference-style links and scheme-without-// are inert in summaries (plainLine) and details (line) ----
+const REF = ['[x][y]', '[x]: obsidian:open?vault=a', 'obsidian:open?file=b', 'javascript:alert(1)', 'mailto:a@b.example', 'MAILTO:a@b.example'];
+const refLeft = text => /[\[\]]|\b(?!https?:)[a-z][a-z0-9+.-]*:(?=\S)/i.test(text);
+test('P1-5: every bracket and every non-web scheme colon is widened in plainLine and in the detail builders', () => {
+  for (const bad of REF) {
+    assert.ok(!refLeft(N.plainLine(`x ${bad} y`)), `plainLine ${bad} -> ${N.plainLine(bad)}`);
+    const md = N.datumDetail(t, datum({ need: bad, stanceReason: bad, proof: proof({ claim: bad, quote: bad + ' quote text long enough' }) }));
+    assert.ok(!/\[x\]|obsidian:open|javascript:|mailto:/i.test(md), `detail ${bad}`);
+  }
+  assert.equal(N.plainLine('rate: 9.2% at 10:30 see https://a.example/x'), 'rate: 9.2% at 10:30 see https://a.example/x');
+});

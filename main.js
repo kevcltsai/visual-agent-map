@@ -45031,9 +45031,9 @@ function applyResume(state) {
 // experiences/visual-map/argument-notes.ts
 var wide = (c) => String.fromCharCode(c.charCodeAt(0) + 65248);
 var wideRun = (run) => [...run].map(wide).join("");
-var ACTIVE_SCHEME = /(?<![A-Za-z0-9+.-])(?!https?:)([A-Za-z][A-Za-z0-9+.-]*):(?=\/\/)/g;
+var ACTIVE_SCHEME = /(?<![A-Za-z0-9+.-])(?!https?:)([A-Za-z][A-Za-z0-9+.-]*):(?=\S)/g;
 function plainLine2(text10) {
-  return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "\uFF1C").replace(/>/g, "\uFF1E").replace(/!\[|\[(?=[\[^])/g, (m) => m.replace("[", "\uFF3B")).replace(/\](?=[\](])/g, "\uFF3D").replace(/\$/g, "\uFF04").replace(/%{2,}|={2,}|~{2,}/g, wideRun).replace(ACTIVE_SCHEME, (_m, scheme) => `${scheme}\uFF1A`).replace(
+  return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "\uFF1C").replace(/>/g, "\uFF1E").replace(/[[\]]/g, wide).replace(/\$/g, "\uFF04").replace(/%{2,}|={2,}|~{2,}/g, wideRun).replace(ACTIVE_SCHEME, (_m, scheme) => `${scheme}\uFF1A`).replace(
     /^(\s*)(?:(#)|([+\-*])(?=\s)|(\d+)([.)])(?=\s))/,
     (_m, space, hash, bullet, digits, ordered) => hash ? `${space}\uFF03` : bullet ? `${space}${wide(bullet)}` : `${space}${digits}${ordered === "." ? "\uFF0E" : "\uFF09"}`
   );
@@ -45047,7 +45047,7 @@ var LEADING = /^(?:([+\-＞>])|(\d+)([.)]))/;
 var line = (text10) => (text10 != null ? text10 : "").replace(/[\r\n\u2028\u2029]+/g, " ").replace(/^\s+/, "").replace(
   LEADING,
   (_m, mark2, digits, ordered) => digits ? `${digits}${ordered === "." ? "\uFF0E" : "\uFF09"}` : mark2 === ">" ? "\uFF1E" : wide(mark2)
-).replace(ENTITY_AMP, wide).replace(ALWAYS_WIDE, wide).replace(WIDE_RUNS, wideRun).replace(SYNTAX_COLON, wide).replace(WWW, (m) => `${m.slice(0, 3)}\uFF0E`);
+).replace(ENTITY_AMP, wide).replace(ALWAYS_WIDE, wide).replace(WIDE_RUNS, wideRun).replace(SYNTAX_COLON, wide).replace(ACTIVE_SCHEME, (_m, scheme) => `${scheme}\uFF1A`).replace(WWW, (m) => `${m.slice(0, 3)}\uFF0E`);
 var cell = (text10) => line(text10) || "-";
 var URL_ALLOWED = /^[A-Za-z0-9\-._~:/?#@&+,;=]$/;
 var percent = (byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;

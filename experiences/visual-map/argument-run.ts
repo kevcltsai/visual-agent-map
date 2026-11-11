@@ -16,6 +16,7 @@ import {
   conclusionDetail,
   datumDetail,
   definitionsDetail,
+  eliminatedWhy,
   facetDetail,
   hypothesisDetail,
   notFoundDetail,
@@ -64,6 +65,8 @@ import {
   MAX_ROUND,
   MIN_VERIFIED,
   foundNeeds,
+  isLimitCut,
+  isVerified,
   readArgumentMap,
   isStanceLocked,
   type ArgumentMapData,
@@ -668,7 +671,15 @@ export class ArgumentRuns {
             next,
             reparent: [{ id: h.id, parentId: next.roles.eliminated }],
             notes: () =>
-              this.noteDetail(map, h.id, drive, this.t("ui.argument_eliminated_0", h.eliminationReason ?? ""))
+              this.noteDetail(
+                map,
+                h.id,
+                drive,
+                // Cut by the research limit, not refuted: the note says so in plain words, never the stored code.
+                isLimitCut(h)
+                  ? this.t("ui.argument_unverified_limit")
+                  : this.t("ui.argument_eliminated_0", eliminatedWhy(this.tr, h))
+              )
           };
         });
         return;
@@ -982,9 +993,14 @@ export class ArgumentRuns {
     const facet: FacetVerdictResult | undefined = hasFacets(state)
       ? await this.ask(drive, facetVerdictStep, request)
       : undefined;
-    const result: VerdictResult = facet ?? (await this.ask(drive, ARGUMENT_STEPS.verdict, request));
+    let result: VerdictResult = facet ?? (await this.ask(drive, ARGUMENT_STEPS.verdict, request));
     await this.checkpoint(drive, async (s, map) => {
       const next = applyVerdict(s, hypothesisId, result);
+      // The program kept a "supported" verdict as undecided because the stances do not clearly back it: the model's reason would argue
+      // the opposite of the card, so the note says what the program decided.
+      const held =
+        result.verdict === "supported" && next.hypotheses.find(h => h.id === hypothesisId)!.aiVerdict !== "supported";
+      if (held) result = { ...result, reason: this.t("ui.argument_verdict_held") };
       if (facet)
         next.hypotheses.find(h => h.id === hypothesisId)!.insights = facet.insights.map(i => ({
           kind: i.kind,
@@ -1018,12 +1034,15 @@ export class ArgumentRuns {
         state.hypotheses.find(x => x.id === h.id)!
       );
     const unconfirmed = isSituationUnconfirmed(state);
+    // Fewer verified hypotheses than the target (decision #59): the conclusion is written on those and the program says so.
+    const partial = input.hypotheses.length < MIN_VERIFIED;
     const request: ConclusionRequest = {
       ...this.base(drive),
       proposition,
       input,
       statements,
-      ...(unconfirmed ? { unconfirmed } : {})
+      ...(unconfirmed ? { unconfirmed } : {}),
+      ...(partial ? { partial } : {})
     };
     const result: ConclusionResult = await this.ask(drive, ARGUMENT_STEPS.conclude, request);
     await this.checkpoint(drive, async (s, map) => {
@@ -1039,7 +1058,8 @@ export class ArgumentRuns {
               points: result.points.map(p => p.text)
             },
             "",
-            unconfirmed ? this.t("ui.argument_premise_unconfirmed") : undefined
+            unconfirmed ? this.t("ui.argument_premise_unconfirmed") : undefined,
+            partial ? this.t("ui.argument_partial_conclusion_0_1", input.hypotheses.length, MIN_VERIFIED) : undefined
           )
         : [
             ...pointLines,
@@ -1079,8 +1099,17 @@ export class ArgumentRuns {
     const t = (key: TranslationKey, ...values: unknown[]): string => this.t(key, ...values);
     const { gate } = next.situation;
     let summary: string;
+    const titles = await this.hypothesisTitles(drive, next);
     if (next.run.phase === "stopped_limit")
-      summary = t("ui.argument_stopped_limit_0", next.conclusion.missing.join("; "));
+      summary = next.hypotheses.length
+        ? t("ui.argument_stopped_limit_0", this.limitLists(next, titles))
+        : t(
+            "ui.argument_stopped_limit_data_0",
+            next.situation.data
+              .filter(d => d.state !== "found")
+              .map(d => plainLine(d.need))
+              .join(t("ui.argument_list_sep"))
+          );
     else
       summary =
         gate.kind === "data_insufficient"
@@ -1089,7 +1118,16 @@ export class ArgumentRuns {
             ? t("ui.argument_stopped_missing")
             : t("ui.argument_stopped_mismatch");
     const detail = hasFacets(next)
-      ? conclusionDetail(this.tr, next, await this.hypothesisTitles(drive, next), undefined, summary)
+      ? conclusionDetail(
+          this.tr,
+          next,
+          titles,
+          undefined,
+          summary,
+          next.run.phase === "stopped_limit" && isSituationUnconfirmed(next)
+            ? this.t("ui.argument_premise_unconfirmed")
+            : undefined
+        )
       : next.run.phase === "stopped_mismatch"
         ? [`${t("ui.argument_reason")}: ${plainLine(gate.reason ?? "")}`, "", ...this.dataSection(next, [])].join("\n")
         : "";
@@ -1104,10 +1142,33 @@ export class ArgumentRuns {
       }
     };
   }
+  /** A hypothesis title; one with no readable title is named by its place in the list, never by its id. */
   private async hypothesisTitles(drive: Drive, state: ArgumentMapData): Promise<Map<string, string>> {
     const titles = new Map<string, string>();
-    for (const h of state.hypotheses) titles.set(h.id, (await this.text(drive, h.id)).title);
+    for (const [i, h] of state.hypotheses.entries())
+      titles.set(h.id, (await this.text(drive, h.id)).title.trim() || this.t("ui.argument_hypothesis_0", i + 1));
     return titles;
+  }
+  /** The stopped summary in plain words: what was verified, what ran out of research (never refuted) and what the evidence refuted. */
+  private limitLists(state: ArgumentMapData, titles: ReadonlyMap<string, string>): string {
+    const sep = this.t("ui.argument_list_sep");
+    const name = (h: Hypothesis): string => titles.get(h.id) ?? "";
+    const refutedHyps = state.hypotheses.filter(h => h.location === "eliminated" && !isLimitCut(h));
+    const verified = state.hypotheses.filter(isVerified).map(name);
+    const unverified = state.hypotheses.filter(h => !isVerified(h) && !refutedHyps.includes(h)).map(name);
+    const refuted = refutedHyps.map(name);
+    return [
+      this.t("ui.argument_stopped_verified_0", verified.length ? verified.join(sep) : this.t("ui.argument_none")),
+      ...(unverified.length
+        ? [
+            this.t(
+              "ui.argument_stopped_unverified_0",
+              unverified.map(n => `${n}${this.t("ui.argument_limit_suffix")}`).join(sep)
+            )
+          ]
+        : []),
+      ...(refuted.length ? [this.t("ui.argument_stopped_refuted_0", refuted.join(sep))] : [])
+    ].join(this.t("ui.argument_clause_sep"));
   }
   private async noteDetail(map: MapDocument, id: string, drive: Drive, line: string): Promise<void> {
     const path = map.nodes.find(n => n.id === id)?.path ?? (await this.notePath(drive, id));

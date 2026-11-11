@@ -202,13 +202,13 @@ test('conclusion: citing an eliminated or still-verifying hypothesis, or none, t
   bad(mod.conclusionStep, req, { ...good, points: [{ text: 'x' }] });
   bad(mod.conclusionStep, req, { ...good, summary: ' ' });
 });
-test('conclusion: a number or URL outside the input throws; below 3 verified hypotheses the policy refuses', () => {
+test('conclusion: a number or URL outside the input throws; no verified hypothesis the policy refuses (1 or 2 is allowed, decision #59)', () => {
   const f = conclusionFixture();
   const req = cReq(f);
   bad(mod.conclusionStep, req, { summary: 'Unemployment hit 14 percent', points: [{ text: 'x', hypothesisIds: ['h1'] }] }, /number 14/);
   bad(mod.conclusionStep, req, { summary: 's', points: [{ text: 'see https://memory.example.com', hypothesisIds: ['h1'] }] }, /link/);
-  const two = { ...req, input: { hypotheses: f.input.hypotheses.slice(0, 2) } };
-  assert.throws(() => sr.prepareStep(mod.conclusionStep, two), error => error.name === 'ArgumentStepError');
+  const none = { ...req, input: { hypotheses: [] } };
+  assert.throws(() => sr.prepareStep(mod.conclusionStep, none), error => error.name === 'ArgumentStepError');
   const s2 = withHyps(['h1', 'h2', 'h3']);
   assert.throws(() => m.prepareConclusion(settle(settle(s2, 'h1'), 'h2')), error => error instanceof m.GateError);
 });

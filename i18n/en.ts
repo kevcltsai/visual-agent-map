@@ -3087,6 +3087,22 @@ export const en = {
   "ui.argument_gate_unconfirmed": "Situation unconfirmed",
   "ui.argument_premise_unconfirmed":
     "The situation data were not enough, so the premise of the conclusion below is unconfirmed",
+  "ui.argument_partial_conclusion_0_1":
+    "Only {0} hypotheses were verified (target {1}); the conclusion below rests on those only",
+  "ui.argument_unverified_limit": "Not verified (research ran out)",
+  "ui.argument_limit_suffix": " (research ran out)",
+  "ui.argument_group_unverified_count_0": "{0} not verified (research ran out)",
+  "ui.argument_note_unverified": "Unverified hypotheses",
+  "ui.argument_stopped_verified_0": "Verified: {0}",
+  "ui.argument_stopped_unverified_0": "Not verified: {0}",
+  "ui.argument_stopped_refuted_0": "Eliminated: {0}",
+  "ui.argument_eliminated_refuted": "The evidence refuted this hypothesis",
+  "ui.argument_none": "none",
+  "ui.argument_clause_sep": "; ",
+  "ui.argument_stopped_limit_data_0":
+    "The situation data could not all be found within the limits. Stopped. Not found: {0}",
+  "ui.argument_verdict_held":
+    "The supporting evidence does not clearly outnumber the contradicting and uncertain evidence, so the verdict is undecided.",
   "ui.argument_reason_0": "Reason: {0}",
   "ui.argument_reason_refuted_0_1": 'Facet "{0}" was refuted: {1}',
   "ui.argument_reason_insufficient_0_1": "Only {0} of {1} facets have usable data, even after one more search round.",

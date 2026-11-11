@@ -346,6 +346,7 @@ test('propose_hypotheses fills the verifying group up to 3 within the 6 cap', ()
   let s = matched();
   assert.deepEqual(actions(s), [{ type: 'propose_hypotheses', count: 3 }]);
   s = withHypotheses(['h1', 'h2', 'h3']);
+  s = settle(settle(s, 'h2'), 'h3');
   s = drop(s, 'h1');
   assert.deepEqual(actions(s).filter(a => a.type === 'propose_hypotheses'), [{ type: 'propose_hypotheses', count: 1 }]);
 });

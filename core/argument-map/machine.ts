@@ -28,6 +28,7 @@ import {
   isSituationUnconfirmed,
   allNeedsFound,
   effectiveVerdict,
+  evidenceClearlySupports,
   foundNeeds,
   isSourceSideMiss,
   isVerified,
@@ -247,7 +248,9 @@ function analysisActions(state: ArgumentMapData): ArgumentAction[] {
   if (verifiedHypotheses(state).length >= MIN_VERIFIED) return [{ type: "conclude" }];
   const actions: ArgumentAction[] = [];
   let budget = MAX_RESEARCH_CALLS - state.run.researchCalls;
-  const want = Math.min(MIN_VERIFIED - verifyingCount(state), MAX_HYPOTHESES - state.hypotheses.length);
+  // Finish the hypotheses already on the table before proposing more (decision #59): replacements wait until none is still open.
+  const open = state.hypotheses.some(h => h.location === "verifying" && !isVerified(h));
+  const want = open ? 0 : Math.min(MIN_VERIFIED - verifyingCount(state), MAX_HYPOTHESES - state.hypotheses.length);
   if (want > 0) actions.push({ type: "propose_hypotheses", count: want });
   for (const h of state.hypotheses) {
     if (h.location !== "verifying") continue;
@@ -310,7 +313,12 @@ export function nextActions(state: ArgumentMapData): ArgumentAction[] {
   if (isTerminal(state) || state.run.status !== "running") return [];
   if (state.run.phase === "situation") return situationActions(state);
   const actions = analysisActions(state);
-  return limitStop(state, actions) ? [{ type: "stop_limit" }] : actions;
+  if (!limitStop(state, actions)) return actions;
+  // At the limit with 1 or 2 verified hypotheses the conclusion is still written, on those only (decision #59).
+  // Hypotheses still being worked on finish first (their own steps are in `actions`).
+  if (verifiedHypotheses(state).length >= 1)
+    return actions.length || hasSearching(state) ? actions : [{ type: "conclude" }];
+  return [{ type: "stop_limit" }];
 }
 
 // ---- situation ----------------------------------------------------------------------------------------------------------------
@@ -843,7 +851,9 @@ export function applyVerdict(
   const cited = Array.isArray(verdict.citedNeeds) ? verdict.citedNeeds : [];
   if (!cited.length || cited.some(id => !inside.has(id)))
     throw new GateError("a verdict must cite evidence of this hypothesis");
-  h.aiVerdict = verdict.verdict as Verdict;
+  // A supported verdict the evidence does not clearly back is kept as undecided: the program checks the stances, not only the prompt.
+  h.aiVerdict =
+    verdict.verdict === "supported" && !evidenceClearlySupports(h) ? "undecided" : (verdict.verdict as Verdict);
   return next;
 }
 
@@ -874,11 +884,13 @@ export function eliminateAtLimit(state: ArgumentMapData, hypothesisId: string): 
 }
 
 // ---- conclusion -----------------------------------------------------------------------------------------------------------------
-/** The whole input of the conclusion step: verified hypotheses and their evidence. Refused below 3. */
+/** The whole input of the conclusion step: verified hypotheses and their evidence. Refused below 3 unless the run is at its limit with at least 1 (decision #59). */
 export function prepareConclusion(state: ArgumentMapData): ConclusionInput {
   inAnalysis(state);
   const verified = verifiedHypotheses(state);
-  if (verified.length < MIN_VERIFIED) throw new GateError("fewer than 3 verified hypotheses");
+  if (!verified.length) throw new GateError("no verified hypothesis");
+  if (verified.length < MIN_VERIFIED && !limitStop(state, analysisActionsSafe(state)))
+    throw new GateError("fewer than 3 verified hypotheses and the run is not at its limit");
   return { hypotheses: verified.map(h => ({ id: h.id, round: h.round, evidence: evidenceOf(foundNeeds(h)) })) };
 }
 
@@ -892,7 +904,12 @@ export function applyConclusion(state: ArgumentMapData, conclusion: { basedOn: s
   next.run.phase = "concluded";
   next.run.status = "finished";
   delete next.run.stopReason;
-  next.conclusion = { state: "concluded", basedOn: [...new Set(basedOn)], missing: [] };
+  next.conclusion = {
+    state: "concluded",
+    basedOn: [...new Set(basedOn)],
+    missing: [],
+    ...(verified.size < MIN_VERIFIED ? { partial: true } : {})
+  };
   return next;
 }
 
@@ -901,14 +918,11 @@ export function applyLimitStop(state: ArgumentMapData): ArgumentMapData {
   if (state.run.status !== "running" || !limitStop(state, analysisActionsSafe(state)))
     throw new GateError("the run is not at a limit");
   const next = clone(state);
+  // Ids of what is still open; the card and note turn them into titles, so no code or state word is ever stored for display.
   const missing =
     state.run.phase === "situation"
-      ? state.situation.data.map(d => `${d.id}: ${d.state}`)
-      : [`verified ${verifiedHypotheses(state).length}/${MIN_VERIFIED}`];
-  for (const h of next.hypotheses)
-    missing.push(
-      `${h.id}: ${h.location === "eliminated" ? "eliminated" : isVerified(h) ? "verified" : "not verified"}`
-    );
+      ? state.situation.data.filter(d => d.state !== "found").map(d => d.id)
+      : state.hypotheses.filter(h => !isVerified(h)).map(h => h.id);
   next.run.phase = "stopped_limit";
   next.run.status = "finished";
   next.run.stopReason = "limit";

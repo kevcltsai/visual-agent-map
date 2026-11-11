@@ -178,6 +178,8 @@ export interface ArgumentConclusion {
   state: ConclusionState;
   basedOn: string[];
   missing: string[];
+  /** Decision #59: written from fewer verified hypotheses than the target, at the research limit. Absent on every older map. */
+  partial?: boolean;
 }
 export interface ArgumentMapData {
   v: 1;
@@ -371,6 +373,7 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
   const conclusion = raw.conclusion;
   if (!isRec(conclusion) || !oneOf(CONCLUSION_STATES, conclusion.state)) return "conclusion malformed";
   if (!strList(conclusion.basedOn) || !strList(conclusion.missing)) return "conclusion malformed";
+  if (conclusion.partial !== undefined && conclusion.partial !== true) return "conclusion malformed";
   return null;
 }
 
@@ -439,6 +442,25 @@ export function allNeedsFound(h: Hypothesis): boolean {
 export function isVerified(h: Hypothesis): boolean {
   return allNeedsFound(h) && h.location === "verifying" && effectiveVerdict(h) === "supported";
 }
+/**
+ * Evidence gate (decision #59, B3): a hypothesis is supported only if its found evidence leans clearly toward it. Supports must outnumber
+ * twice the contradicts and be at least as many as the uncertain ones; an uncertain answer never counts as support. Stances are program
+ * data, so this is checked here and not only asked of the model.
+ */
+export function evidenceClearlySupports(h: Hypothesis): boolean {
+  const retired = retiredNeedIds(h);
+  const stances = foundNeeds(h)
+    .filter(n => !retired.has(n.id))
+    .map(n => n.stance ?? "uncertain");
+  const count = (stance: NeedStance): number => stances.filter(s => s === stance).length;
+  const supports = count("supports");
+  return supports > 2 * count("contradicts") && supports >= count("uncertain") && supports > 0;
+}
+/** A hypothesis the round or research limit cut off: not refuted by evidence (its final verdict is not "refuted"), only unfinished. Old maps store it as an elimination with a `round_limit` reason. */
+export const isLimitCut = (h: Hypothesis): boolean =>
+  h.location === "eliminated" &&
+  (h.eliminationReason ?? "").startsWith("round_limit") &&
+  !(allNeedsFound(h) && effectiveVerdict(h) === "refuted");
 export function verifiedHypotheses(state: ArgumentMapData): Hypothesis[] {
   return state.hypotheses.filter(isVerified);
 }
@@ -449,6 +471,9 @@ export function verifiedCount(state: ArgumentMapData): number {
 export function displayVerdict(h: Hypothesis): Verdict | "verifying" {
   return allNeedsFound(h) ? effectiveVerdict(h) : "verifying";
 }
+/** A conclusion written from fewer verified hypotheses than the target (decision #59). */
+export const isPartialConclusion = (state: ArgumentMapData): boolean =>
+  state.run.phase === "concluded" && state.conclusion.partial === true && verifiedCount(state) < MIN_VERIFIED;
 /** The situation gate ended data_insufficient and the run went on (decision #58). */
 export const isSituationUnconfirmed = (state: ArgumentMapData): boolean => state.situation.gate.state === "unconfirmed";
 export type ConclusionView = "in_progress" | "concluded" | "stopped_limit" | "stopped_mismatch";
@@ -457,6 +482,10 @@ export function conclusionView(state: ArgumentMapData): ConclusionView {
   const { phase } = state.run;
   if (phase === "stopped_mismatch") return "stopped_mismatch";
   if (phase === "stopped_limit") return "stopped_limit";
-  if (phase === "concluded" && verifiedCount(state) >= MIN_VERIFIED) return "concluded";
+  if (
+    phase === "concluded" &&
+    (verifiedCount(state) >= MIN_VERIFIED || (state.conclusion.partial === true && verifiedCount(state) >= 1))
+  )
+    return "concluded";
   return "in_progress";
 }

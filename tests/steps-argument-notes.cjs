@@ -123,10 +123,10 @@ test('hypothesis card: verdict, why it holds, insights by kind, evidence table w
   assert.ok(N.hypothesisDetail(t, hyp({ aiVerdict: 'refuted' }), 'r').includes(t('ui.argument_note_why_fails')));
 });
 test('conclusion card (concluded): summary, insights, basis table, eliminated, situation basis', () => {
-  const st = state([datum()], [facet()], { hypotheses: [hyp({ needs: [need()] }), hyp({ id: 'h2', location: 'eliminated', eliminationReason: 'round_limit: not verified after round 3' })], conclusion: { state: 'concluded', basedOn: ['h1'], missing: [] } });
-  const md = N.conclusionDetail(t, st, new Map([['h1', 'Hyp 1'], ['h2', 'Hyp 2']]), { summary: 'final answer', points: ['p1', 'p2'] });
-  for (const key of ['core', 'insights', 'basis_hypotheses', 'eliminated', 'situation_basis']) assert.ok(md.includes(`### ${t(`ui.argument_note_${key}`)}`), key);
-  assert.ok(md.includes('final answer') && md.includes('Hyp 1') && md.includes('Hyp 2') && md.includes(t('ui.argument_why_round_limit')));
+  const st = state([datum()], [facet()], { hypotheses: [hyp({ needs: [need()] }), hyp({ id: 'h2', location: 'eliminated', eliminationReason: 'round_limit: not verified after round 3' }), hyp({ id: 'h3', location: 'eliminated', eliminationReason: 'the data fall' })], conclusion: { state: 'concluded', basedOn: ['h1'], missing: [] } });
+  const md = N.conclusionDetail(t, st, new Map([['h1', 'Hyp 1'], ['h2', 'Hyp 2'], ['h3', 'Hyp 3']]), { summary: 'final answer', points: ['p1', 'p2'] });
+  for (const key of ['core', 'insights', 'basis_hypotheses', 'eliminated', 'unverified', 'situation_basis']) assert.ok(md.includes(`### ${t(`ui.argument_note_${key}`)}`), key);
+  assert.ok(md.includes('final answer') && md.includes('Hyp 1') && md.includes('Hyp 2') && md.includes(t('ui.argument_unverified_limit')) && md.includes('the data fall'));
   assert.ok(!md.includes('round_limit'));
 });
 test('conclusion card (stopped): the refuting facet with datum quote and link, or the insufficient facets with their searches', () => {

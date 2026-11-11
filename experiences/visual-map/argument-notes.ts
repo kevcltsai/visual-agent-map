@@ -7,6 +7,9 @@ import { neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
 import type { TranslationKey } from "../../i18n";
 import {
   foundNeeds,
+  isLimitCut,
+  isPartialConclusion,
+  isVerified,
   type ArgumentMapData,
   type Facet,
   type Hypothesis,
@@ -181,6 +184,12 @@ const noteOf = (stored: string): string =>
 export function whyText(t: Translate, stored: string): string {
   const code = codeOf(stored);
   return t(Object.hasOwn(WHY_KEYS, code) ? WHY_KEYS[code as keyof typeof WHY_KEYS] : WHY_KEYS.not_found);
+}
+
+/** Why a hypothesis was eliminated, in plain words: a limit code on a hypothesis the evidence refuted says so; any other reason is shown as its readable text. */
+export function eliminatedWhy(t: Translate, h: Hypothesis): string {
+  const stored = h.eliminationReason ?? "";
+  return stored.startsWith("round_limit") ? t("ui.argument_eliminated_refuted") : reasonText(t, stored);
 }
 
 /** The program text a map stored before `no_usable_data` became a code. */
@@ -413,15 +422,20 @@ export function conclusionDetail(
   answer?: { summary: string; points: string[] },
   stoppedSummary = "",
   /** Decision #58: the program-written first line of a conclusion whose situation is unconfirmed. */
-  premiseNote?: string
+  premiseNote?: string,
+  /** Decision #59: the program-written line of a conclusion written from fewer verified hypotheses than the target. */
+  partialNote?: string
 ): string {
   const facets = state.situation.facets ?? [];
   const data = state.situation.data;
-  const title = (id: string): string => titles.get(id) ?? id;
+  // A hypothesis with no readable title is named by its place in the list, never by its id.
+  const title = (id: string): string =>
+    titles.get(id)?.trim() || t("ui.argument_hypothesis_0", String(state.hypotheses.findIndex(h => h.id === id) + 1));
   const parts: string[][] = [];
+  const notices = [premiseNote, partialNote].filter((x): x is string => !!x);
+  if (notices.length) parts.push([...notices.map(n => line(n)), ""]);
   if (answer) {
     const based = state.hypotheses.filter(h => state.conclusion.basedOn.includes(h.id));
-    if (premiseNote) parts.push([line(premiseNote), ""]);
     parts.push([`### ${t("ui.argument_note_core")}`], callout(answer.summary));
     if (answer.points.length)
       parts.push(["", `### ${t("ui.argument_note_insights")}`, ...answer.points.map(p => `- ${line(p)}`)]);
@@ -443,15 +457,22 @@ export function conclusionDetail(
         ])
       )
     );
-    const eliminated = state.hypotheses.filter(h => h.location === "eliminated");
+    // A hypothesis cut by the research limit was never refuted: it is listed as unverified, not as eliminated.
+    const eliminated = state.hypotheses.filter(h => h.location === "eliminated" && !isLimitCut(h));
     if (eliminated.length)
       parts.push([
         "",
         `### ${t("ui.argument_note_eliminated")}`,
-        ...eliminated.map(
-          h =>
-            `- ${line(title(h.id))}: ${line(h.eliminationReason?.startsWith("round_limit") ? whyText(t, "round_limit") : (h.eliminationReason ?? ""))}`
-        )
+        ...eliminated.map(h => `- ${line(title(h.id))}: ${line(eliminatedWhy(t, h))}`)
+      ]);
+    const unverified = state.hypotheses.filter(
+      h => isLimitCut(h) || (isPartialConclusion(state) && h.location === "verifying" && !isVerified(h))
+    );
+    if (unverified.length)
+      parts.push([
+        "",
+        `### ${t("ui.argument_note_unverified")}`,
+        ...unverified.map(h => `- ${line(title(h.id))}: ${t("ui.argument_unverified_limit")}`)
       ]);
   } else {
     parts.push([`### ${t("ui.argument_note_core")}`], callout(stoppedSummary));

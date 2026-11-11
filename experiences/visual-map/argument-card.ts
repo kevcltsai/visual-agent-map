@@ -10,6 +10,8 @@ import {
   displayVerdict,
   foundNeeds,
   isSituationUnconfirmed,
+  isLimitCut,
+  isPartialConclusion,
   isVerified,
   MAX_ROUND,
   MIN_VERIFIED,
@@ -21,7 +23,7 @@ import {
   type SituationDatum,
   type SourceFigure
 } from "../../core/argument-map/model";
-import { safeUrl, whyText } from "./argument-notes";
+import { eliminatedWhy, safeUrl, whyText } from "./argument-notes";
 
 type Translate = (key: TranslationKey, ...values: unknown[]) => string;
 export type ArgumentRole =
@@ -163,13 +165,21 @@ function conclusionCard(state: ArgumentMapData, t: Translate): ArgumentCardView 
       titleFrom: "summary",
       lines: [
         ...(isSituationUnconfirmed(state) ? [t("ui.argument_premise_unconfirmed")] : []),
+        ...(isPartialConclusion(state) ? [t("ui.argument_partial_conclusion_0_1", verified, MIN_VERIFIED)] : []),
         t("ui.argument_conclusion_done_hint", verified)
       ]
     };
   if (view === "stopped_mismatch")
     return { ...base, title: t("ui.argument_stopped_mismatch"), lines: [t("ui.argument_mismatch_hint")] };
   if (view === "stopped_limit")
-    return { ...base, title: t("ui.argument_conclusion_limit"), lines: [t("ui.argument_conclusion_limit_hint")] };
+    return {
+      ...base,
+      title: t("ui.argument_conclusion_limit"),
+      lines: [
+        ...(isSituationUnconfirmed(state) ? [t("ui.argument_premise_unconfirmed")] : []),
+        t("ui.argument_conclusion_limit_hint")
+      ]
+    };
   const pending: ArgumentCardView = {
     ...base,
     title: t("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
@@ -219,9 +229,12 @@ function facetStopCard(state: ArgumentMapData, base: ArgumentCardView, t: Transl
 function hypothesisCard(state: ArgumentMapData, h: Hypothesis, t: Translate): ArgumentCardView {
   const index = state.hypotheses.indexOf(h) + 1;
   const shown = displayVerdict(h);
+  // Still "verifying" after the run ended means the research limit cut it off: say so instead of showing a spinner-like state.
+  const cutOff =
+    isLimitCut(h) || (state.run.status === "finished" && h.location === "verifying" && shown === "verifying");
   const chips: ArgumentChip[] =
-    h.location === "eliminated"
-      ? [{ tone: "gap", text: t("ui.argument_eliminated_chip") }]
+    h.location === "eliminated" || cutOff
+      ? [{ tone: "gap", text: t(cutOff ? "ui.argument_unverified_limit" : "ui.argument_eliminated_chip") }]
       : [
           shown === "verifying"
             ? { tone: "open", text: t("ui.argument_verifying") }
@@ -234,13 +247,9 @@ function hypothesisCard(state: ArgumentMapData, h: Hypothesis, t: Translate): Ar
   );
   const progress = t("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
   const lines = [progress];
-  if (h.location === "eliminated" && h.eliminationReason)
-    lines.push(
-      t(
-        "ui.argument_eliminated_0",
-        isFacetMap(state) && h.eliminationReason.startsWith("round_limit") ? why(t, "round_limit") : h.eliminationReason
-      )
-    );
+  // A limit-cut hypothesis was not refuted: its chip says so and there is no elimination reason line.
+  if (h.location === "eliminated" && h.eliminationReason && !isLimitCut(h))
+    lines.push(t("ui.argument_eliminated_0", eliminatedWhy(t, h)));
   const status = chips.map(chip => chip.text).join(" ");
   return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: `${kind}, ${status}, ${progress}` };
 }
@@ -461,8 +470,12 @@ export function describeArgumentCard(state: ArgumentMapData, id: string, t: Tran
     ]);
   }
   if (id === roles.eliminated) {
-    const count = state.hypotheses.filter(h => h.location === "eliminated").length;
-    return plain("group", t("ui.argument_group_label"), [t("ui.argument_group_eliminated_count_0", count)]);
+    const cut = state.hypotheses.filter(isLimitCut).length;
+    const count = state.hypotheses.filter(h => h.location === "eliminated").length - cut;
+    return plain("group", t("ui.argument_group_label"), [
+      t("ui.argument_group_eliminated_count_0", count),
+      ...(cut ? [t("ui.argument_group_unverified_count_0", cut)] : [])
+    ]);
   }
   for (const h of state.hypotheses) {
     if (h.id === id) return hypothesisCard(state, h, t);

@@ -344,6 +344,7 @@ import { CANONICAL_LANGUAGES } from "../../ai/note-style-file";
 import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNote } from "../../ai/note-writeback";
 import { stopLabelKey, type WritebackHooks } from "./topic-run";
+import { buildSubtreeOutline, subtreeOutlineText, type PlanNode } from "./subtree-plan";
 import {
   errorNotice,
   actionNotice,
@@ -1001,6 +1002,14 @@ export function chatSynthesisOptions(input: { outputLanguage: ContentLanguage; s
     visualMode: "off",
     ...(input.synthesisTitle !== undefined ? { synthesisTitle: input.synthesisTitle } : {})
   };
+}
+/**
+ * The update mode of an integration: a note style that does not set one (the kind's built-in default, or an old topic's implicit
+ * style) integrates as a whole rewrite, so the old Detail is not carried forward; a style the user chose runs as it says.
+ */
+export function integrationUpdateMode(run: Pick<RunStyle, "updateMode" | "recipe">): UpdateMode {
+  const unset = run.recipe.implicit === true || (run.recipe.source === "kind" && run.recipe.ref.startsWith("builtin:"));
+  return run.updateMode === "merge" && unset ? "fresh" : run.updateMode;
 }
 /** Web activity of the topics a research batch finished: searches made, topics that reported it, and those that made none. */
 interface ResearchWebTally {
@@ -19300,6 +19309,19 @@ export class VisualAgentMapView extends ItemView {
       }
     });
   }
+  /** The map's nodes as the subtree plan reads them (title and summary from the note; a note not loaded counts as not researched). */
+  private subtreePlanNodes(): PlanNode[] {
+    return (this.map?.nodes ?? []).map(item => {
+      const note = this.notes.get(item.id);
+      return {
+        id: item.id,
+        parentId: item.parentId ?? null,
+        title: note?.title ?? item.path,
+        summary: note?.summary ?? "",
+        researched: !!note && note.status !== "idea" && note.status !== "error"
+      };
+    });
+  }
   private async integrateChildren(
     node: MapNode,
     options?: TaskOptions,
@@ -19333,6 +19355,7 @@ export class VisualAgentMapView extends ItemView {
     const selectedSources = options?.referenceGroups ?? [];
     let findingsSent = false;
     let synthesisRun: Awaited<ReturnType<VisualAgentMapView["detailTemplateFor"]>> | undefined;
+    let updateMode: UpdateMode | undefined;
     let task = "";
     let childSources: ReferenceGroup | undefined;
     await this.plugin.topicRuns.start(node.path, "integrateChildren", {
@@ -19364,9 +19387,10 @@ export class VisualAgentMapView extends ItemView {
         );
         const detailTemplate = run.template;
         synthesisRun = run;
+        updateMode = integrationUpdateMode(run);
         return {
           detailTemplate,
-          updateMode: run.updateMode,
+          updateMode,
           viewChanged: () =>
             options?.signal?.aborted === true ||
             this.closed ||
@@ -19387,6 +19411,7 @@ export class VisualAgentMapView extends ItemView {
           tone: run.toneText ? { toneText: run.toneText } : {},
           style: run.contextFields
         };
+        const outlineText = subtreeOutlineText(buildSubtreeOutline(this.subtreePlanNodes(), node.id));
         return withThinkingOrigin(
           {
             title: note.title,
@@ -19414,7 +19439,8 @@ export class VisualAgentMapView extends ItemView {
             visualMode: options?.visualMode ?? note.visualMode,
             detailTemplate: run.template,
             ...synthesisStyle.style,
-            updateMode: run.updateMode,
+            updateMode: updateMode ?? run.updateMode,
+            ...(outlineText ? { subtreeOutline: outlineText } : {}),
             addCharts: true
           },
           note

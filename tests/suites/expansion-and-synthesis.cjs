@@ -1005,6 +1005,59 @@ async function backgroundSynthesisFixture(askModel) {
   const draftResult = { summary: 'Draft summary', detail: 'Draft detail', visualReferences: [], suggestions: [] };
   return { repo, parent, plugin, view, contexts, options, directionsResult, draftResult };
 }
+// Integrating the whole subtree (P1): the update mode default and the outline the root's prompt carries.
+async function subtreeFixture(parentStyle) {
+  const f = await backgroundSynthesisFixture(async () => f.draftResult);
+  const map = f.view.map; const child = map.nodes.find(item => item.parentId === f.parent.id);
+  const grand = await f.repo.createNote('Grand topic', 'model-a', map, f.view.path, 'workspace'); grand.parentId = child.id; map.nodes.push(grand); await f.repo.saveMap(f.view.path, map);
+  await f.repo.updateNote(child.path, { status: 'completed', summary: 'Child summary', detail: 'Child finding.' });
+  await f.repo.updateNote(grand.path, { summary: 'Grand summary' });
+  if (parentStyle) await f.repo.updateNote(f.parent.path, { noteStyle: parentStyle });
+  f.view.notes = new Map(await Promise.all(map.nodes.map(async item => [item.id, await f.repo.readNote(item.path)])));
+  return { ...f, grand, child };
+}
+test('integrationUpdateMode: only an unset merge becomes fresh; a chosen style, top and an explicit fresh run as they say', () => {
+  const { integrationUpdateMode } = load('experiences/visual-map/view.ts', { obsidian });
+  const run = (updateMode, recipe) => ({ updateMode, recipe });
+  assert.equal(integrationUpdateMode(run('merge', { source: 'kind', ref: 'builtin:general' })), 'fresh');
+  assert.equal(integrationUpdateMode(run('merge', { source: 'topic', ref: 'legacy', implicit: true })), 'fresh');
+  assert.equal(integrationUpdateMode(run('merge', { source: 'topic', ref: 'builtin:general' })), 'merge');
+  assert.equal(integrationUpdateMode(run('merge', { source: 'run', ref: 'file:mine' })), 'merge');
+  assert.equal(integrationUpdateMode(run('merge', { source: 'kind', ref: 'file:mine' })), 'merge');
+  assert.equal(integrationUpdateMode(run('top', { source: 'kind', ref: 'builtin:general' })), 'top');
+  assert.equal(integrationUpdateMode(run('fresh', { source: 'topic', ref: 'file:mine' })), 'fresh');
+});
+integrationTest('integration with no note style set is a whole rewrite: the old Detail is not sent, and the prompt carries the subtree outline', async () => {
+  const f = await subtreeFixture();
+  await f.view.integrateChildren(f.parent, f.options(), 'Integrate', () => {}, m => assert.fail(m));
+  const context = f.contexts[0];
+  assert.equal(context.updateMode, 'fresh');
+  assert.match(context.subtreeOutline, /- Child\n {2}- Grand topic — Grand summary \[unresearched\]/);
+  assert.match(context.subtreeOutline, /Unresearched topics: 1 of 2\. Grand topic\./);
+});
+integrationTest('an explicit note style that merges keeps the merge update (and the old Detail) in the integration', async () => {
+  const f = await subtreeFixture('builtin:general');
+  await f.view.integrateChildren(f.parent, f.options(), 'Integrate', () => {}, m => assert.fail(m));
+  assert.equal(f.contexts[0].updateMode, 'merge');
+  assert.equal(f.contexts[0].detail, 'Existing knowledge');
+  assert.ok(f.contexts[0].subtreeOutline, 'the outline does not depend on the update mode');
+});
+integrationTest('a one-level subtree sends no outline; the direct subtopics travel as before', async () => {
+  const f = await backgroundSynthesisFixture(async () => f.draftResult);
+  await f.view.integrateChildren(f.parent, f.options(), 'Integrate', () => {}, m => assert.fail(m));
+  assert.equal('subtreeOutline' in f.contexts[0], false);
+  assert.equal(f.contexts[0].mode, 'synthesize');
+});
+integrationTest('fresh integration whose file cannot be read for the backup calls no AI and writes nothing (the guard holds on the new default)', async () => {
+  const f = await subtreeFixture();
+  const hooks = f.view.writebackHooks.bind(f.view);
+  f.view.writebackHooks = () => ({ ...hooks(), readRaw: async () => { throw new Error('no file'); } });
+  const failures = [];
+  await f.view.integrateChildren(f.parent, f.options(), 'Integrate', () => assert.fail('wrote'), m => failures.push(m));
+  assert.equal(f.contexts.length, 0, 'no model call');
+  assert.deepEqual(failures, [load('i18n.ts').t('ui.writeback_backup_failed')]);
+  assert.equal((await f.repo.readNote(f.parent.path)).detail, 'Existing knowledge');
+});
 integrationTest('closing the modal after dispatch does not abort background synthesis; directions then draft then save', async () => {
   const gate = deferred(); let seenSignal;
   const f = await backgroundSynthesisFixture(async (call, signal, onAccepted) => { seenSignal = signal; onAccepted(); await gate.promise; return call === 1 ? f.directionsResult : f.draftResult; });
@@ -2613,7 +2666,8 @@ const earlierDetail = `Earlier finding [one](${earlierSources[0]}) and [two](${e
 async function keepSourcesFixture(childText = 'Child finding.') {
   const f = await backgroundSynthesisFixture(async call => call === 1 ? f.directionsResult : f.draftResult);
   f.draftResult = { summary: 'Draft summary', detail: 'Draft detail citing only [the child](https://child.example/z).', visualReferences: [], suggestions: [] };
-  await f.repo.updateNote(f.parent.path, { detail: earlierDetail, summary: 'Old summary https://summary.example/s', newFindings: 'Working [finding](https://finding.example/w)' });
+  // An explicit note style: the merge update (carry-forward) is the style's own choice; the unset default integrates as a whole rewrite.
+  await f.repo.updateNote(f.parent.path, { noteStyle: 'builtin:general', detail: earlierDetail, summary: 'Old summary https://summary.example/s', newFindings: 'Working [finding](https://finding.example/w)' });
   const child = f.view.map.nodes.find(item => item.parentId === f.parent.id);
   await f.repo.updateNote(child.path, { status: 'completed', summary: 'Child summary', detail: childText });
   return f;
@@ -2695,6 +2749,7 @@ integrationTest('synthesis carry-forward: the saved detail minus the carried blo
   assert.match(carried, /#### Sources from earlier research/);
   const g = await backgroundSynthesisFixture(async call => call === 1 ? g.directionsResult : g.draftResult);
   g.draftResult = f.draftResult;
+  await g.repo.updateNote(g.parent.path, { noteStyle: 'builtin:general' });
   await synthesize(g);
   const baseline = (await g.repo.readNote(g.parent.path)).detail;
   assert.doesNotMatch(baseline, /Sources from earlier research/);

@@ -19678,22 +19678,22 @@ function mapOutline(nodes, titleOf, summaryOf = () => "", mapTitle = "") {
       children.set(node.parentId, list2);
     } else roots.push(node);
   }
-  const oneLine3 = (value) => (value != null ? value : "").replace(/\s+/g, " ").trim();
+  const oneLine4 = (value) => (value != null ? value : "").replace(/\s+/g, " ").trim();
   const lines = [];
   const seen = /* @__PURE__ */ new Set();
   const wrap = roots.length > 1;
-  if (wrap) lines.push(`# ${oneLine3(mapTitle) || "Map"}`);
-  const walk = (node, depth) => {
+  if (wrap) lines.push(`# ${oneLine4(mapTitle) || "Map"}`);
+  const walk2 = (node, depth) => {
     var _a3;
     if (seen.has(node.id)) return;
     seen.add(node.id);
-    const title = oneLine3(titleOf(node.id)) || node.id;
+    const title = oneLine4(titleOf(node.id)) || node.id;
     lines.push(`${"#".repeat(Math.min(6, depth + 1 + (wrap ? 1 : 0)))} ${title}`);
-    const summary = oneLine3(summaryOf(node.id));
+    const summary = oneLine4(summaryOf(node.id));
     if (summary) lines.push("", `> ${summary}`, "");
-    for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk(child, depth + 1);
+    for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk2(child, depth + 1);
   };
-  for (const root of roots) walk(root, 0);
+  for (const root of roots) walk2(root, 0);
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "");
 }
 
@@ -19912,7 +19912,7 @@ function readingOrder(topics, opts = {}) {
   const sortedRoots = [...roots].sort(byPosition);
   const sortedKids = /* @__PURE__ */ new Map();
   for (const [id, list2] of children) sortedKids.set(id, [...list2].sort(byPosition));
-  const walk = (withHidden) => {
+  const walk2 = (withHidden) => {
     const seen = /* @__PURE__ */ new Set();
     const out = [];
     const stack = [...sortedRoots].reverse();
@@ -19927,8 +19927,8 @@ function readingOrder(topics, opts = {}) {
     }
     return out;
   };
-  const order = walk(includeHidden);
-  const reachable = includeHidden ? new Set(order) : new Set(walk(true));
+  const order = walk2(includeHidden);
+  const reachable = includeHidden ? new Set(order) : new Set(walk2(true));
   const cut = nodes.filter((node, index) => position.get(node.id) === index && !reachable.has(node.id));
   for (const node of cut.sort(byPosition)) order.push(node.id);
   return order;
@@ -20246,13 +20246,13 @@ function composePositions(input2) {
   const arrange = (roots, direction) => {
     var _a2, _b2;
     const heads = [];
-    const walk = (node, root) => {
+    const walk2 = (node, root) => {
       for (const child of [...input2.kidsOf(node), ...input2.joinsOf(node)]) {
         if (branchDirectionOf(child)) heads.push({ node: child, root });
-        else walk(child, root);
+        else walk2(child, root);
       }
     };
-    for (const root of roots) walk(root, root);
+    for (const root of roots) walk2(root, root);
     const tree = { roots, kidsOf: input2.kidsOf, joinsOf: input2.joinsOf, heightFor: input2.heightFor };
     if (!heads.length) return engine(direction, tree);
     const vertical = direction === "down" || direction === "up";
@@ -24003,15 +24003,15 @@ function treeOrder(outline) {
     else roots.push(node);
   const ordered = [];
   const seen = /* @__PURE__ */ new Set();
-  const walk = (node) => {
+  const walk2 = (node) => {
     var _a3;
     if (seen.has(node.id)) return;
     seen.add(node.id);
     ordered.push(node);
-    for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk(child);
+    for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk2(child);
   };
-  for (const root of roots) walk(root);
-  for (const node of outline) walk(node);
+  for (const root of roots) walk2(root);
+  for (const node of outline) walk2(node);
   return ordered;
 }
 var appearanceFields = (node, aim) => {
@@ -32627,7 +32627,17 @@ function taskPrompt(context, language2, provider = "codex") {
   return generalTaskPrompt(context, language2, provider);
 }
 
+// core/steps/task/synthesize-outline-label.zh.md
+var synthesize_outline_label_zh_default = "\u5B50\u8B70\u984C\u5927\u7DB1\uFF08\u552F\u8B80\uFF1B\u5217\u51FA\u76F4\u5C6C\u5B50\u8B70\u984C\u4EE5\u4E0B\u66F4\u6DF1\u5C64\u8B70\u984C\u7684\u6A19\u984C\u8207\u6458\u8981\uFF0C\u4F9B\u4F60\u628A\u6574\u500B\u5B50\u6A39\u7D0D\u5165\u6574\u5408\u3002\u6A19\u6709 [unresearched] \u7684\u8B70\u984C\u5C1A\u672A\u7814\u7A76\uFF0C\u6C92\u6709\u5167\u5BB9\u53EF\u5F15\u7528\uFF1A\u4E0D\u5F97\u7DE8\u9020\u5B83\u5011\u7684\u5167\u5BB9\uFF0C\u4E5F\u4E0D\u5F97\u7576\u4F5C\u5DF2\u67E5\u8B49\u7684\u767C\u73FE\uFF1B\u8ACB\u628A\u5927\u7DB1\u672B\u6BB5\u5217\u51FA\u7684\u672A\u7814\u7A76\u8B70\u984C\u5BEB\u9032\u300C\u5F85\u78BA\u8A8D\u554F\u984C\u300D\uFF08\u6216\u7B49\u540C\u7684\u672A\u89E3\u554F\u984C\u6BB5\uFF09\uFF0C\u9010\u4E00\u5217\u51FA\u6A19\u984C\uFF09\n";
+
+// core/steps/task/synthesize-outline-label.en.md
+var synthesize_outline_label_en_default = "Subtopic outline (read-only; the titles and summaries of the topics below the direct subtopics, so the whole subtree is integrated. A topic marked [unresearched] was never researched and has no content to cite: do not invent its content or treat it as a verified finding; write the unresearched topics listed at the end of the outline into the open questions section (or the equivalent unresolved-questions section), naming each by title)\n";
+
 // core/steps/task/assemble.ts
+var LABEL_SYNTHESIZE_OUTLINE = {
+  zh: renderTemplate(synthesize_outline_label_zh_default, {}),
+  en: renderTemplate(synthesize_outline_label_en_default, {})
+};
 var CUSTOM_LEGACY_TONE = "custom-legacy";
 var DEFAULT_TONE = "academic";
 var TONE_MARKER = "\0tone\0";
@@ -32891,6 +32901,9 @@ ${context.summaryDirections}`, "summary-directions"));
 ${context.anchorContext}`, "anchor-context"));
   add(input(`${inLanguage(LABEL_ANCESTORS, language2)}:
 ${context.ancestors || none}`, "ancestors"));
+  if (step === "synthesize" && context.subtreeOutline)
+    add(input(`${inLanguage(LABEL_SYNTHESIZE_OUTLINE, language2)}:
+${context.subtreeOutline}`, "subtree-outline"));
   add(input(`${inLanguage(LABEL_TASK, language2)}:
 ${context.task}`, "task"));
   const segments = [];
@@ -36503,6 +36516,105 @@ var TopicRuns = class {
   }
 };
 
+// experiences/visual-map/subtree-plan.ts
+var OUTLINE_SUMMARY_CHARS = 60;
+var OUTLINE_MAX_CHARS = 6e3;
+var UNRESEARCHED_MARK = "[unresearched]";
+var childrenIndex = (nodes) => {
+  const index = /* @__PURE__ */ new Map();
+  for (const node of nodes) {
+    if (node.parentId === null) continue;
+    const list2 = index.get(node.parentId);
+    if (list2) list2.push(node);
+    else index.set(node.parentId, [node]);
+  }
+  return index;
+};
+function walk(nodes, rootId) {
+  const index = childrenIndex(nodes);
+  const items = [];
+  const seen = /* @__PURE__ */ new Set([rootId]);
+  const visit = (id, depth) => {
+    var _a2;
+    for (const child of (_a2 = index.get(id)) != null ? _a2 : []) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      items.push({ node: child, depth });
+      visit(child.id, depth + 1);
+    }
+  };
+  visit(rootId, 1);
+  return { items, index };
+}
+function unresearchedList(nodes, rootId) {
+  const { items } = walk(nodes, rootId);
+  const open = items.filter((item) => !item.node.researched);
+  return {
+    total: open.length,
+    titles: open.filter((item) => item.depth <= 2).map((item) => item.node.title),
+    deeper: open.filter((item) => item.depth > 2).length
+  };
+}
+var oneLine2 = (value) => value.replace(/\s+/g, " ").trim();
+var clip2 = (value, max) => {
+  const line2 = oneLine2(value);
+  return line2.length > max ? `${Array.from(line2).slice(0, max).join("")}\u2026` : line2;
+};
+function buildSubtreeOutline(nodes, rootId, maxChars = OUTLINE_MAX_CHARS) {
+  const { items } = walk(nodes, rootId);
+  const deepest = items.reduce((max, item) => Math.max(max, item.depth), 0);
+  const unresearched = unresearchedList(nodes, rootId);
+  if (deepest < 2) return { text: "", topics: items.length, unresearched };
+  const below = /* @__PURE__ */ new Map();
+  const index = childrenIndex(nodes);
+  const count3 = (id, seen) => {
+    var _a2;
+    let sum2 = 0;
+    for (const child of (_a2 = index.get(id)) != null ? _a2 : []) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      sum2 += 1 + count3(child.id, seen);
+    }
+    return sum2;
+  };
+  for (const item of items) below.set(item.node.id, count3(item.node.id, /* @__PURE__ */ new Set([rootId, item.node.id])));
+  const render = (summaryDepths2, foldFrom2) => items.filter((item) => item.depth < foldFrom2).map((item) => {
+    const { node, depth } = item;
+    const folded2 = depth + 1 === foldFrom2 && below.get(node.id) > 0 ? ` (+${below.get(node.id)} subtopics)` : "";
+    const summary = depth >= 2 && summaryDepths2.has(depth) && node.summary ? ` \u2014 ${clip2(node.summary, OUTLINE_SUMMARY_CHARS)}` : "";
+    const mark2 = !node.researched ? ` ${UNRESEARCHED_MARK}` : "";
+    return `${"  ".repeat(depth - 1)}- ${oneLine2(node.title)}${summary}${mark2}${folded2}`;
+  }).join("\n");
+  const summaryDepths = /* @__PURE__ */ new Set();
+  for (let depth = 2; depth <= deepest; depth++) summaryDepths.add(depth);
+  let foldFrom = deepest + 1;
+  let text10 = render(summaryDepths, foldFrom);
+  const steps = [];
+  if (deepest >= 2) steps.push(() => summaryDepths.delete(deepest));
+  if (deepest >= 3) steps.push(() => summaryDepths.delete(deepest - 1));
+  if (deepest >= 3) steps.push(() => foldFrom = deepest);
+  for (let depth = deepest - 2; depth >= 2; depth--) steps.push(() => summaryDepths.delete(depth));
+  for (let depth = deepest - 1; depth >= 3; depth--) steps.push(() => foldFrom = depth);
+  for (const step of steps) {
+    if (text10.length <= maxChars) break;
+    step();
+    text10 = render(summaryDepths, foldFrom);
+  }
+  return { text: text10, topics: items.length, unresearched };
+}
+var UNRESEARCHED_TITLES_MAX = 60;
+function subtreeOutlineText(outline) {
+  if (!outline.text) return "";
+  const { total: total2, titles, deeper } = outline.unresearched;
+  if (!total2) return outline.text;
+  const named = titles.slice(0, UNRESEARCHED_TITLES_MAX);
+  const rest = deeper + (titles.length - named.length);
+  return [
+    outline.text,
+    `Unresearched topics: ${total2} of ${outline.topics}.${named.length ? ` ${named.map(oneLine2).join("; ")}.` : ""}${rest ? ` The other ${rest} unresearched topics are deeper down and are not listed.` : ""}`
+  ].join("\n\n");
+}
+
 // experiences/visual-map/note-style-picker.ts
 var import_obsidian20 = require("obsidian");
 
@@ -37346,7 +37458,7 @@ function basisSummary(basis, labels, titleLimit = 5) {
   return (basis.kind === "research" ? labels.research : labels.note).replace(/\{0\}/g, () => shown);
 }
 var SUMMARY_TITLE_LIMIT = 60;
-var oneLine2 = (value) => {
+var oneLine3 = (value) => {
   const flat = value.replace(/\s+/g, " ").trim();
   const chars = [...flat];
   return chars.length > SUMMARY_TITLE_LIMIT ? `${chars.slice(0, SUMMARY_TITLE_LIMIT - 1).join("")}\u2026` : flat;
@@ -37355,7 +37467,7 @@ function summarizeBasis(bases) {
   const entries = [];
   const cardIndex2 = /* @__PURE__ */ new Map();
   for (const basis of bases) {
-    const titles = basis.kind === "outline_only" ? [] : basis.sources.map((source) => oneLine2(source.title)).filter((title, at2, all) => title && all.indexOf(title) === at2);
+    const titles = basis.kind === "outline_only" ? [] : basis.sources.map((source) => oneLine3(source.title)).filter((title, at2, all) => title && all.indexOf(title) === at2);
     const kind = basis.kind === "outline_only" || !titles.length ? "outline_only" : basis.kind;
     if (basis.existingChildren !== void 0) {
       entries.push(
@@ -38250,7 +38362,7 @@ function expandFailureLine(title, reason) {
     text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_topic_0", title), reason)
   };
 }
-var clip2 = (value, limit = LABEL_LIMIT2) => {
+var clip3 = (value, limit = LABEL_LIMIT2) => {
   const text10 = value.replace(/\s+/g, " ").trim();
   const characters = [...text10];
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text10;
@@ -38854,12 +38966,12 @@ var MapChatPanel = class {
     );
   }
   chainEndText(reason, remaining, details, last, round3 = this.chainRound, restored = false) {
-    const bare = (value) => clip2(value, 200).replace(/[\s.。!！?？…]+$/u, "");
+    const bare = (value) => clip3(value, 200).replace(/[\s.。!！?？…]+$/u, "");
     const left = remaining.trim() ? t("ui.map_chat_chain_left_end_0", bare(remaining)) : "";
     const why2 = (details != null ? details : []).length ? t(
       "ui.map_chat_chain_reason_0",
       bare(
-        (details != null ? details : []).slice(0, 3).map((item) => clip2(item, 120)).join(t("ui.map_chat_chain_detail_separator"))
+        (details != null ? details : []).slice(0, 3).map((item) => clip3(item, 120)).join(t("ui.map_chat_chain_detail_separator"))
       )
     ) : "";
     const say = (key4, ...values) => t(key4, ...values);
@@ -39256,7 +39368,7 @@ ${typed}` : draft;
     this.clearStage();
     this.renderLog();
     this.renderBusy();
-    this.announce(announce !== void 0 ? clip2(announce, 160) : t("ui.map_chat_live_failed_0", clip2(text10, 160)));
+    this.announce(announce !== void 0 ? clip3(announce, 160) : t("ui.map_chat_live_failed_0", clip3(text10, 160)));
     this.markUnread();
   }
   /** The user stopped the turn: whatever text arrived stays, marked as stopped. */
@@ -39287,9 +39399,9 @@ ${typed}` : draft;
     this.scrollToEnd();
     this.scrollToEndWhenSettled();
     this.announce(
-      `${t("ui.map_chat_live_done_0", clip2(last.text, 160))} ${t(
+      `${t("ui.map_chat_live_done_0", clip3(last.text, 160))} ${t(
         "ui.map_chat_live_plan_0",
-        clip2((_a2 = plan.summary) != null ? _a2 : t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator"))), 160)
+        clip3((_a2 = plan.summary) != null ? _a2 : t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator"))), 160)
       )}`
     );
     (_c = (_b2 = this.host).stateChanged) == null ? void 0 : _c.call(_b2);
@@ -40039,7 +40151,7 @@ ${typed}` : draft;
     parent.createSpan({ cls: "vam-map-chat-count-failed", text: t("ui.map_chat_count_failed_0", counts.failed) });
   }
   spokenTurn(reply, lines) {
-    const said = t("ui.map_chat_live_done_0", clip2(reply, 160));
+    const said = t("ui.map_chat_live_done_0", clip3(reply, 160));
     const counts = this.countsText(countChatLines(lines, chatNoteTexts()));
     return counts ? `${said} ${t("ui.map_chat_live_results_0", counts)}` : said;
   }
@@ -40218,10 +40330,10 @@ ${shown}` : t("ui.map_chat_model_label"));
   chipLabel(chip) {
     if (chip.kind === "topic") {
       const title = this.host.topicTitle(chip.id);
-      return t("ui.map_chat_ref_topic_0", title === null ? t("ui.map_chat_ref_gone") : clip2(title));
+      return t("ui.map_chat_ref_topic_0", title === null ? t("ui.map_chat_ref_gone") : clip3(title));
     }
-    if (chip.kind === "file") return t("ui.map_chat_ref_file_0", clip2(baseName4(chip.path)));
-    return chip.path ? t("ui.map_chat_ref_snippet_0", clip2(baseName4(chip.path))) : t("ui.map_chat_ref_text");
+    if (chip.kind === "file") return t("ui.map_chat_ref_file_0", clip3(baseName4(chip.path)));
+    return chip.path ? t("ui.map_chat_ref_snippet_0", clip3(baseName4(chip.path))) : t("ui.map_chat_ref_text");
   }
   /** The picture selection changed: the chip and the switch follow. */
   refreshImage() {
@@ -40299,7 +40411,7 @@ ${shown}` : t("ui.map_chat_model_label"));
         cls: "vam-map-chat-chip-label",
         text: t(
           picture.kind === "annotated" ? "ui.map_chat_ref_image_annotated_0" : "ui.map_chat_ref_image_plain_0",
-          clip2(picture.kind === "annotated" ? name2 : picture.name)
+          clip3(picture.kind === "annotated" ? name2 : picture.name)
         )
       });
     }
@@ -40308,11 +40420,11 @@ ${shown}` : t("ui.map_chat_model_label"));
       const title = this.host.topicTitle(id);
       if (title === null) continue;
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-auto" });
-      chip.createSpan({ cls: "vam-map-chat-chip-label", text: t("ui.map_chat_ref_selected_0", clip2(title)) });
+      chip.createSpan({ cls: "vam-map-chat-chip-label", text: t("ui.map_chat_ref_selected_0", clip3(title)) });
     }
     if (this.noteChip) {
       const note = this.noteChip;
-      const label = t("ui.map_chat_ref_note_0", clip2(baseName4(note)));
+      const label = t("ui.map_chat_ref_note_0", clip3(baseName4(note)));
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-note" });
       chip.createSpan({ cls: "vam-map-chat-chip-label", text: label });
       const remove = chip.createEl("button", {
@@ -40478,7 +40590,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       (0, import_obsidian23.setIcon)(eye, "eye");
       line2.createDiv({
         cls: "vam-map-chat-seen",
-        text: t("ui.map_chat_seen_image_0", clip2(message.seenImage.note, 80))
+        text: t("ui.map_chat_seen_image_0", clip3(message.seenImage.note, 80))
       });
     }
     if (message.chainNote)
@@ -40522,7 +40634,7 @@ ${shown}` : t("ui.map_chat_model_label"));
         cls: "vam-map-chat-basis-line is-unread",
         text: t(
           item.oversize ? "ui.map_chat_research_oversize_0" : "ui.map_chat_research_deferred_0",
-          clip2(item.title, 60)
+          clip3(item.title, 60)
         )
       });
   }
@@ -40827,7 +40939,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     const head = box.createDiv({ cls: "vam-map-chat-images-status" });
     if (pending2.length) {
       const current = (_a2 = pending2.find((block) => block.running)) != null ? _a2 : pending2[0];
-      head.setText(t("ui.map_chat_images_searching_0", clip2(current.nodeTitle || current.query, 80)));
+      head.setText(t("ui.map_chat_images_searching_0", clip3(current.nodeTitle || current.query, 80)));
       box.createDiv({
         cls: "vam-map-chat-images-progress",
         text: t("ui.map_chat_images_progress_0_1", blocks.length - pending2.length, blocks.length)
@@ -40857,8 +40969,8 @@ ${shown}` : t("ui.map_chat_model_label"));
           attr: { src: item.candidate.url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }
         });
         const text11 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
-        text11.createDiv({ cls: "vam-map-chat-images-topic", text: clip2(block.nodeTitle, 80) });
-        text11.createDiv({ cls: "vam-map-chat-images-title", text: clip2(item.candidate.title, 80) });
+        text11.createDiv({ cls: "vam-map-chat-images-topic", text: clip3(block.nodeTitle, 80) });
+        text11.createDiv({ cls: "vam-map-chat-images-title", text: clip3(item.candidate.title, 80) });
         if (item.candidate.source)
           text11.createEl("a", {
             cls: "vam-map-chat-images-source",
@@ -40867,15 +40979,15 @@ ${shown}` : t("ui.map_chat_model_label"));
               href: item.candidate.source,
               target: "_blank",
               rel: "noopener noreferrer",
-              "aria-label": t("ui.map_chat_images_source_0", clip2(item.candidate.title))
+              "aria-label": t("ui.map_chat_images_source_0", clip3(item.candidate.title))
             }
           });
         continue;
       }
       cell2.addClass("is-missed");
       const text10 = cell2.createDiv({ cls: "vam-map-chat-images-text" });
-      text10.createDiv({ cls: "vam-map-chat-images-topic", text: clip2(block.nodeTitle, 80) });
-      const why2 = block.state === "searching" ? block.running ? t("ui.map_chat_images_searching_0", clip2(block.query, 80)) : t("ui.map_chat_images_queued") : block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip2((_b2 = block.reason) != null ? _b2 : "", 160)) : (_c = block.reason) != null ? _c : t("ui.map_chat_images_none");
+      text10.createDiv({ cls: "vam-map-chat-images-topic", text: clip3(block.nodeTitle, 80) });
+      const why2 = block.state === "searching" ? block.running ? t("ui.map_chat_images_searching_0", clip3(block.query, 80)) : t("ui.map_chat_images_queued") : block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip3((_b2 = block.reason) != null ? _b2 : "", 160)) : (_c = block.reason) != null ? _c : t("ui.map_chat_images_none");
       text10.createDiv({ cls: "vam-map-chat-images-reason", text: why2 });
     }
   }
@@ -40894,9 +41006,9 @@ ${shown}` : t("ui.map_chat_model_label"));
         if (item.inserted)
           text10.createDiv({
             cls: "vam-map-chat-images-state is-inserted",
-            text: t("ui.map_chat_images_inserted_0", clip2(item.inserted))
+            text: t("ui.map_chat_images_inserted_0", clip3(item.inserted))
           });
-        else text10.createDiv({ cls: "vam-map-chat-images-title", text: clip2(item.candidate.title, 80) });
+        else text10.createDiv({ cls: "vam-map-chat-images-title", text: clip3(item.candidate.title, 80) });
       }
   }
   buildChoices(row, choices) {
@@ -43777,7 +43889,12 @@ var AiTaskService = class {
       };
     }
     const totalStarted = Date.now();
-    const prepared = buildPreparedTaskContext(context, model, 32e3, provider);
+    const prepared = buildPreparedTaskContext(
+      context,
+      model,
+      32e3 - estimateTokens(context.subtreeOutline),
+      provider
+    );
     if (prepared.context.sourceContext !== context.sourceContext) {
       throw new Error(t("ui.source_context_exceeds_budget"));
     }
@@ -50530,12 +50647,12 @@ function resolveCrossSource(payload, record, sourceMap) {
     for (let i = 0; i < count3; i++) {
       const node = byId.get(record.nodeIds[i]);
       if (!node || node.path !== record.notePaths[i]) return null;
-      const clip4 = payload.nodes[i];
-      if (clip4.parent === null) {
+      const clip5 = payload.nodes[i];
+      if (clip5.parent === null) {
         if (node.parentId && ids2.has(node.parentId)) return null;
         roots.push(node);
       } else {
-        const parentIndex = payload.nodes.findIndex((item) => item.id === clip4.parent);
+        const parentIndex = payload.nodes.findIndex((item) => item.id === clip5.parent);
         if (parentIndex < 0 || node.parentId !== record.nodeIds[parentIndex]) return null;
       }
       branch.push(node);
@@ -51596,7 +51713,7 @@ function richText(element) {
   const newline = () => {
     if (out && !out.endsWith("\n")) out += "\n";
   };
-  const walk = (current) => {
+  const walk2 = (current) => {
     const name2 = current.name.toLowerCase();
     if (SKIPPED_TAGS.has(name2)) return;
     if (name2 === "br") {
@@ -51607,7 +51724,7 @@ function richText(element) {
     if (block) newline();
     for (const child of current.children) {
       if (typeof child !== "string") {
-        walk(child);
+        walk2(child);
         continue;
       }
       let piece = child.replace(/\s+/g, " ");
@@ -51616,7 +51733,7 @@ function richText(element) {
     }
     if (block) newline();
   };
-  walk(element);
+  walk2(element);
   return out.split("\n").map((part) => part.trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 function cleanTitle(raw, line2) {
@@ -53383,7 +53500,7 @@ var STRUCTURE_REVIEW_SCHEMA = {
   },
   required: ["suggestions"]
 };
-var clip3 = (value, limit) => {
+var clip4 = (value, limit) => {
   const text10 = value.replace(/\s+/g, " ").trim();
   const characters = [...text10];
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text10;
@@ -53405,8 +53522,8 @@ function buildStructureReviewNodes(nodes, describe, scopeRootId) {
     const info = describe(id);
     result.push({
       id,
-      title: clip3((_a3 = info == null ? void 0 : info.title) != null ? _a3 : "", TITLE_LIMIT2),
-      summary: clip3((_b3 = info == null ? void 0 : info.summary) != null ? _b3 : "", SUMMARY_LIMIT3),
+      title: clip4((_a3 = info == null ? void 0 : info.title) != null ? _a3 : "", TITLE_LIMIT2),
+      summary: clip4((_b3 = info == null ? void 0 : info.summary) != null ? _b3 : "", SUMMARY_LIMIT3),
       status: (_c = info == null ? void 0 : info.status) != null ? _c : "",
       parentId,
       depth
@@ -53507,7 +53624,7 @@ function isSuggestionStale(suggestion2, currentTree) {
   const target = byId.get(suggestion2.targetId);
   if (!target) return true;
   if (target.parentId !== suggestion2.basis.targetParentId) return true;
-  if (clip3(target.title, TITLE_LIMIT2) !== suggestion2.basis.targetTitle) return true;
+  if (clip4(target.title, TITLE_LIMIT2) !== suggestion2.basis.targetTitle) return true;
   if (suggestion2.kind === "move" || suggestion2.kind === "merge") {
     const destinationId = suggestion2.kind === "move" ? suggestion2.newParentId : suggestion2.mergeIntoId;
     if (!destinationId || !byId.has(destinationId)) return true;
@@ -55127,6 +55244,10 @@ function chatSynthesisOptions(input2) {
     visualMode: "off",
     ...input2.synthesisTitle !== void 0 ? { synthesisTitle: input2.synthesisTitle } : {}
   };
+}
+function integrationUpdateMode(run) {
+  const unset = run.recipe.implicit === true || run.recipe.source === "kind" && run.recipe.ref.startsWith("builtin:");
+  return run.updateMode === "merge" && unset ? "fresh" : run.updateMode;
 }
 var newChatWork = () => ({
   controller: new AbortController(),
@@ -64643,11 +64764,11 @@ ${request.requirements}` : preset.text,
     const nodeIds = (_b2 = source == null ? void 0 : source.nodeIds) != null ? _b2 : [];
     const ids2 = new Set(nodeIds);
     const byId = new Map(map.nodes.map((node) => [node.id, node]));
-    const intact = source !== null && nodeIds.length === payload.nodes.length && payload.nodes.every((clip4, index) => {
+    const intact = source !== null && nodeIds.length === payload.nodes.length && payload.nodes.every((clip5, index) => {
       const node = byId.get(nodeIds[index]);
       if (!node) return false;
-      if (clip4.parent === null) return !node.parentId || !ids2.has(node.parentId);
-      return node.parentId === nodeIds[payload.nodes.findIndex((item) => item.id === clip4.parent)];
+      if (clip5.parent === null) return !node.parentId || !ids2.has(node.parentId);
+      return node.parentId === nodeIds[payload.nodes.findIndex((item) => item.id === clip5.parent)];
     });
     if ((record == null ? void 0 : record.mode) === "cut" && source && !intact) {
       sessionFor(this.plugin).cancelCut();
@@ -64678,7 +64799,7 @@ ${request.requirements}` : preset.text,
     if (cross && record) {
       tops = await this.copyFromOtherMap(cross, target, payload, record.nodeIds);
     } else if (source && intact) {
-      const roots = payload.nodes.map((clip4, index) => clip4.parent === null ? byId.get(nodeIds[index]) : void 0).filter((node) => !!node);
+      const roots = payload.nodes.map((clip5, index) => clip5.parent === null ? byId.get(nodeIds[index]) : void 0).filter((node) => !!node);
       if ((record == null ? void 0 : record.mode) === "cut") {
         const check = canPasteCut(
           map.nodes,
@@ -71856,6 +71977,21 @@ ${request.requirements}` : preset.text,
       }
     });
   }
+  /** The map's nodes as the subtree plan reads them (title and summary from the note; a note not loaded counts as not researched). */
+  subtreePlanNodes() {
+    var _a2, _b2;
+    return ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []).map((item) => {
+      var _a3, _b3, _c;
+      const note = this.notes.get(item.id);
+      return {
+        id: item.id,
+        parentId: (_a3 = item.parentId) != null ? _a3 : null,
+        title: (_b3 = note == null ? void 0 : note.title) != null ? _b3 : item.path,
+        summary: (_c = note == null ? void 0 : note.summary) != null ? _c : "",
+        researched: !!note && note.status !== "idea" && note.status !== "error"
+      };
+    });
+  }
   async integrateChildren(node, options, direction = "", drafted, failed, accepted) {
     var _a2;
     if (!this.map || this.plugin.topicRuns.isBusy(node.path)) {
@@ -71876,6 +72012,7 @@ ${request.requirements}` : preset.text,
     const selectedSources = (_a2 = options == null ? void 0 : options.referenceGroups) != null ? _a2 : [];
     let findingsSent = false;
     let synthesisRun;
+    let updateMode;
     let task = "";
     let childSources;
     await this.plugin.topicRuns.start(node.path, "integrateChildren", {
@@ -71910,9 +72047,10 @@ ${request.requirements}` : preset.text,
         );
         const detailTemplate = run.template;
         synthesisRun = run;
+        updateMode = integrationUpdateMode(run);
         return {
           detailTemplate,
-          updateMode: run.updateMode,
+          updateMode,
           viewChanged: () => {
             var _a4, _b2;
             return ((_a4 = options == null ? void 0 : options.signal) == null ? void 0 : _a4.aborted) === true || this.closed || this.path !== mapPath || ((_b2 = this.map) == null ? void 0 : _b2.id) !== mapId || childIds2() !== startIds;
@@ -71932,6 +72070,7 @@ ${request.requirements}` : preset.text,
           tone: run.toneText ? { toneText: run.toneText } : {},
           style: run.contextFields
         };
+        const outlineText = subtreeOutlineText(buildSubtreeOutline(this.subtreePlanNodes(), node.id));
         return withThinkingOrigin(
           {
             title: note.title,
@@ -71959,7 +72098,8 @@ ${request.requirements}` : preset.text,
             visualMode: (_e = options == null ? void 0 : options.visualMode) != null ? _e : note.visualMode,
             detailTemplate: run.template,
             ...synthesisStyle.style,
-            updateMode: run.updateMode,
+            updateMode: updateMode != null ? updateMode : run.updateMode,
+            ...outlineText ? { subtreeOutline: outlineText } : {},
             addCharts: true
           },
           note
@@ -82872,7 +83012,7 @@ function extractSegments(root) {
     const trail = raw.slice(raw.trimEnd().length);
     units.push({ index: units.length, kind: "run", text: text10, nodes: run, lead, trail, parts });
   };
-  const walk = (parent) => {
+  const walk2 = (parent) => {
     let run = [];
     for (const child of Array.from(parent.childNodes)) {
       if (child.nodeType === TEXT_NODE) {
@@ -82890,13 +83030,13 @@ function extractSegments(root) {
       else {
         flush(run);
         run = [];
-        if (kind === "block") walk(element);
+        if (kind === "block") walk2(element);
       }
     }
     flush(run);
   };
   collectAlt(root);
-  walk(root);
+  walk2(root);
   return { units };
 }
 var tokensOf = (text10) => [...text10.matchAll(TOKEN2)].map((match) => match[0]);
@@ -87075,13 +87215,13 @@ var ImageTranslateAction = class extends import_obsidian44.Component {
         halo.style.top = `${rect2.top}px`;
         halo.style.width = `${rect2.width}px`;
         halo.style.height = `${rect2.height}px`;
-        const clip4 = pane ? [
+        const clip5 = pane ? [
           Math.max(-6, pane.top - rect2.top),
           Math.max(-6, rect2.right - pane.right),
           Math.max(-6, rect2.bottom - pane.bottom),
           Math.max(-6, pane.left - rect2.left)
         ] : [-6, -6, -6, -6];
-        halo.style.clipPath = `inset(${clip4.map((value) => `${value}px`).join(" ")})`;
+        halo.style.clipPath = `inset(${clip5.map((value) => `${value}px`).join(" ")})`;
       }
       this.haloFrame = window.requestAnimationFrame(follow);
     };

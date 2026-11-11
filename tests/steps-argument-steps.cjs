@@ -609,9 +609,9 @@ test('facet plan: the marker lists cover zh-TW, zh-CN and en; the prompt tells t
     bad(mod.facetPlanStep, fpReq, fpWith(v => { v.question = q; }), /only the factual claim/);
   assert.ok(!/factors?\b|因素/.test(mod.CAUSAL_MARKERS.traditional.join()), 'the too-broad 因素 stays out');
 });
-test('facet plan: the number rule matches the grounding (proposition or assumption values), not "only the proposition"', () => {
+test('facet plan: the number rule matches the grounding (proposition, assumption values or today\'s date), not "only the proposition"', () => {
   const prompt = mod.facetPlanStep.render(fpReq);
-  assert.match(prompt, /only numbers that appear in the proposition or the assumption values/);
+  assert.match(prompt, /only numbers that appear in the proposition, the assumption values or today's date/);
   assert.doesNotMatch(prompt, /numbers and links that appear in the proposition\./);
 });
 test('facet judge: the prompt carries the scope rule (judged against the claim within the card scope; prompt-only, not program-checkable)', () => {
@@ -769,4 +769,21 @@ test('P2-7: an assumption label, reason and a causal question may reuse a year t
   bad(mod.facetPlanStep, req, fpWith(v => { v.assumptions.items[0].reason = 'covers 1999 only'; v.question = 'Did youth unemployment rise?'; }), /1999/);
   bad(mod.facetPlanStep, req, fpWith(v => { v.causalQuestions = ['Did automation drive the rise in 1999?']; v.question = 'Did youth unemployment rise?'; }), /1999/);
   bad(mod.facetPlanStep, req, fpWith(v => { v.assumptions.items[0].reason = 'see https://x.example.com'; v.question = 'Did youth unemployment rise?'; }), /link/);
+});
+
+// The owner's real 2026-11-11 replies for 「紐西蘭治安相比20年前, 是不是有變差了」: the build of that day refused them for 2006 and 2026,
+// years the model wrote into its own assumption values (period, baseline). Both must parse now.
+const NZ_PROP = '紐西蘭治安相比20年前, 是不是有變差了';
+const nzReq = { ...base, language: 'zh-TW', proposition: NZ_PROP, today: '2026-11-11' };
+const NZ_2006 = "{\"assumptions\":{\"items\":[{\"label\":\"比較基準時點\",\"value\":\"約2006年（20年前）\",\"reason\":\"提問以「20年前」為比較起點，以今年往前推算。\"},{\"label\":\"現況時點\",\"value\":\"最新可得的官方資料\",\"reason\":\"提問說「現在」但未指定年份，因此採用最新公布的資料。\"},{\"label\":\"治安衡量指標\",\"value\":\"警方登記的犯罪率，並以國家受害調查為輔\",\"reason\":\"治安沒有單一數字，需先決定用哪類統計來判斷。\"},{\"label\":\"地區範圍\",\"value\":\"紐西蘭全國\",\"reason\":\"提問未限定地區，採全國整體。\"},{\"label\":\"對象範圍\",\"value\":\"全體居民\",\"reason\":\"提問未指定年齡或族群，採整體人口。\"}]},\"facets\":[{\"title\":\"警方登記的整體犯罪率與基準時點相比\",\"criterion\":\"若最新官方資料的整體登記犯罪率高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。需同時取得最新與基準時點的數字。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭警方公布的最新整體登記犯罪率統計\",\"kind\":\"fact\"},{\"need\":\"紐西蘭約2006年的整體登記犯罪率統計\",\"kind\":\"fact\"},{\"need\":\"登記犯罪與受害調查在統計口徑與定義上的差異\",\"kind\":\"definition\"}]},{\"title\":\"國家受害調查的被害比例與基準時點相比\",\"criterion\":\"若最新受害調查的被害比例高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。受害調查可補足未報案的犯罪。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭國家受害調查中最新的被害比例\",\"kind\":\"fact\"},{\"need\":\"紐西蘭國家受害調查中約2006年的被害比例\",\"kind\":\"fact\"}]},{\"title\":\"暴力犯罪數字與基準時點相比\",\"criterion\":\"若最新暴力犯罪的登記數字或比率高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭警方統計中最新的暴力犯罪數字\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方統計中約2006年的暴力犯罪數字\",\"kind\":\"fact\"}]}],\"causalQuestions\":[],\"question\":\"紐西蘭治安相比20年前有變差嗎？\"}";
+const NZ_2026 = "{\"assumptions\":{\"items\":[{\"label\":\"時間範圍\",\"value\":\"現在（2026年）與20年前（2006年）\",\"reason\":\"今天是2026-11-11，「20年前」可換算為2006年，命題未寫明確切年份。\"},{\"label\":\"地區範圍\",\"value\":\"紐西蘭全國\",\"reason\":\"命題說「紐西蘭」，未限定城市或地區。\"},{\"label\":\"對象範圍\",\"value\":\"全體人口\",\"reason\":\"命題未指定特定年齡、族群或對象。\"},{\"label\":\"比較基準\",\"value\":\"2006年的全國治安指標\",\"reason\":\"命題以20年前作為比較基準，因此以2006年的同類指標為對照。\"},{\"label\":\"治安指標\",\"value\":\"警方登記的暴力與財產犯罪率，並參考住戶犯罪被害調查\",\"reason\":\"「治安」沒有單一量測方式，需同時看登記數據與民眾被害經驗才能判斷。\"}]},\"facets\":[{\"title\":\"警方登記犯罪率高於20年前\",\"criterion\":\"若2026年與2006年的全國每人口登記犯罪率比較顯示上升，支持此面向；若下降或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭警方或統計局公布的2026年全國每人口登記犯罪率\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方或統計局公布的2006年全國每人口登記犯罪率\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方「登記犯罪」與計算每人口犯罪率的定義與方法\",\"kind\":\"definition\"}]},{\"title\":\"暴力犯罪率高於20年前\",\"criterion\":\"若2026年與2006年的全國暴力犯罪率比較顯示上升，支持此面向；若下降或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭2026年全國暴力犯罪的每人口登記數據\",\"kind\":\"fact\"},{\"need\":\"紐西蘭2006年全國暴力犯罪的每人口登記數據\",\"kind\":\"fact\"}]},{\"title\":\"民眾犯罪被害經驗高於20年前\",\"criterion\":\"若住戶犯罪被害調查顯示近期的被害比例高於2006年前後，支持此面向；若較低或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭犯罪與被害調查（NZCVS）近期年度的民眾被害比例\",\"kind\":\"fact\"},{\"need\":\"紐西蘭犯罪與被害調查2006年前後的民眾被害比例\",\"kind\":\"fact\"}]},{\"title\":\"近年治安指標的變化方向\",\"criterion\":\"若近年警方登記犯罪與被害調查的年度數據整體走升，且長期高於2006年水準，支持此面向；若整體走降或回到原水準，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭警方登記犯罪的近年年度變化數據與官方趨勢說明\",\"kind\":\"fact\"}]}],\"causalQuestions\":[],\"question\":\"紐西蘭治安相比20年前是否變差？\"}";
+test('owner regression 2026-11-11: the New Zealand 20-years replies with 2006 and 2026 from the assumption values parse', () => {
+  for (const raw of [NZ_2006, NZ_2026]) {
+    const out = plain(ok(mod.facetPlanStep, nzReq, JSON.parse(raw)));
+    assert.ok(out.facets.length >= 3 && out.facets.length <= 5);
+    assert.ok(out.assumptions.items.length > 0);
+  }
+  // Without today's date the reason "今天是2026-11-11" has no source: the date is what makes it grounded, not a looser rule.
+  bad(mod.facetPlanStep, { ...nzReq, today: undefined }, JSON.parse(NZ_2026), /number 11/);
+  bad(mod.facetPlanStep, nzReq, realWith(NZ_2026, v => { v.assumptions.items[0].reason = '今天是2026-11-12'; }), /number 12/);
 });

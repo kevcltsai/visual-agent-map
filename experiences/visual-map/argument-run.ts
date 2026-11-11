@@ -78,6 +78,7 @@ import { arrangeArgumentMap } from "../../core/argument-map/layout";
 import { verifySource, type FetchPage } from "../../core/argument-map/source-proof";
 import {
   ARGUMENT_STEPS,
+  withRetryReason,
   ArgumentStepError,
   facetVerdictStep,
   gateData,
@@ -192,6 +193,8 @@ interface Drive {
   done: Promise<void>;
   /** Consecutive provider failures per research item (memory only, per drive; reset by an answer). */
   failures: Map<string, number>;
+  /** Set only while a corrective retry of a text step runs: why the previous attempt was refused. */
+  retryReason?: string;
   /** A re-run's assumption items (from the owner's edited definitions); the facet plan overrides the AI's assumption card with them. */
   preset?: AssumptionItem[];
 }
@@ -502,11 +505,15 @@ export class ArgumentRuns {
       } catch (error) {
         if (this.dead(drive)) return;
         const known = error instanceof ArgumentStepError || error instanceof GateError;
+        // Only a refusal the model can correct is passed on, as a short plain line; a provider error says nothing it could fix.
+        drive.retryReason = known ? error.message.replace(/\s+/g, " ").trim().slice(0, 200) : undefined;
         this.ports.log(`argument-run step failed attempt=${attempt} kind=${known ? error.name : "other"}`);
         if (attempt === 2) {
           await this.pause(drive, "error", false);
           return;
         }
+      } finally {
+        if (attempt === 2) drive.retryReason = undefined;
       }
     }
   }
@@ -592,7 +599,8 @@ export class ArgumentRuns {
     step: StepDefinition<Request, Output>,
     request: Request
   ): Promise<Output> {
-    return untilAborted(drive.controller.signal, this.ports.runStep(step, request, drive.controller.signal));
+    const sent = drive.retryReason ? withRetryReason(step, drive.retryReason) : step;
+    return untilAborted(drive.controller.signal, this.ports.runStep(sent, request, drive.controller.signal));
   }
 
   private async textStep(drive: Drive, state: ArgumentMapData, action: ArgumentAction): Promise<void> {
@@ -674,6 +682,7 @@ export class ArgumentRuns {
     const request: FacetPlanRequest = {
       ...this.base(drive),
       proposition,
+      today: this.ports.now().slice(0, 10),
       ...(state.run.presetAssumptions?.length
         ? { presetAssumptions: state.run.presetAssumptions.map(item => ({ ...item })) }
         : {})

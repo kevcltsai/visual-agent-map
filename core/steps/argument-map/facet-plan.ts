@@ -19,6 +19,8 @@ export interface FacetPlanRequest extends ArgumentStepBase {
   proposition: string;
   /** Rerun from an edited assumption card: these replace whatever the AI proposes (and are shown to it so the facets fit them). */
   presetAssumptions?: { label: string; value: string; reason: string }[];
+  /** Today's date (YYYY-MM-DD) from the program clock: a relative period ("20 years ago") needs it, and its numbers count as given. */
+  today?: string;
 }
 /** Fact needs only: the program assigns every id, and a "cause" need has already moved into `causalQuestions`. */
 export interface FacetPlanResult {
@@ -125,6 +127,7 @@ const baselineMatches = (baseline: string, items: { value: string }[]): boolean 
 export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPlanResult {
   const item = parseObject(raw, ["assumptions", "facets", "causalQuestions", "question"]);
   const sources = [request.proposition];
+  const today = request.today ? [request.today] : [];
   const question = text(item.question, "question");
   if (isCausal(question)) throw new ArgumentStepError("the question must restate only the factual claim, not a cause");
   const assumptionList = parseObject(JSON.stringify(item.assumptions), ["items"]);
@@ -138,10 +141,11 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
   });
   // Label and reason may use the years and quantities of the assumption values (the AI's scope choices); links stay proposition-only
   // because every value's links were checked against the proposition above.
-  for (const one of items) grounded([one.label, one.reason], [request.proposition, ...items.map(a => a.value)]);
+  for (const one of items)
+    grounded([one.label, one.reason], [request.proposition, ...today, ...items.map(a => a.value)]);
   const effectiveItems = request.presetAssumptions?.length ? request.presetAssumptions : items;
   // Assumption values are the AI's own scope choices (links-only checked), so their years and quantities may be reused below.
-  const withValues = [request.proposition, ...effectiveItems.map(a => a.value)];
+  const withValues = [request.proposition, ...today, ...effectiveItems.map(a => a.value)];
   grounded([question], withValues);
   const entries = list(item.facets, "facets");
   if (entries.length < MIN_FACETS || entries.length > MAX_FACETS)
@@ -238,6 +242,7 @@ export const facetPlanStep: StepDefinition<FacetPlanRequest, FacetPlanResult> = 
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.proposition),
       proposition: JSON.stringify(request.proposition),
+      today: request.today ? `\n\nToday's date: ${request.today}.` : "",
       preset: request.presetAssumptions?.length
         ? `\n\n${presetText.trim()}\n${JSON.stringify(request.presetAssumptions)}`
         : ""

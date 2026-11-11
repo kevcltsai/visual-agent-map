@@ -1204,3 +1204,28 @@ test('P1-5: the hypothesis, need, conclusion and gate-reason notes written from 
   const detail = (await r.text(state.roles.conclusion)).detail.split('\n').filter(l => l.startsWith('- ' + '') && !l.startsWith('| ')).slice(0, 1).join('');
   assert.ok(!/\]\(|obsidian:\/\//.test(detail), detail);
 });
+
+// ---- P2-8: the corrective retry tells the model why its previous reply was refused ----
+test('P2-8: the second attempt carries the sanitized parser reason in its prompt; the first attempt and later steps do not', async () => {
+  const prompts = [];
+  // The refusal comes from the run's own parser (the step it was handed), so it is the run's ArgumentStepError, not a test-realm copy.
+  const bad = JSON.stringify({ assumptions: { items: [] }, facets: ['Rate in 1999', 'Postings', 'Hiring'].map((title, i) => ({ title, criterion: 'a higher rate supports it', baseline: '', needs: [{ need: `need ${'abc'[i]}`, kind: 'fact' }] })), causalQuestions: [], question: 'Is it rising?' });
+  const r = await rig({ facet: true, script: { step: facetSteps() }, ports: {} });
+  const inner = r.ports.runStep;
+  let planCalls = 0;
+  r.ports.runStep = async (step, request, signal) => {
+    const text = step.render(request);
+    prompts.push([step.id, text]);
+    if (step.id === 'argument-map.facet-plan' && ++planCalls === 1) return step.parse(bad, request);
+    return inner(step, request, signal);
+  };
+  await r.runs.start(r.mapPath, 'p');
+  const plan = prompts.filter(([id]) => id === 'argument-map.facet-plan').map(([, text]) => text);
+  assert.equal(plan.length, 2);
+  assert.ok(!plan[0].includes('previous reply was refused'));
+  assert.ok(plan[0].includes("Today's date: 2026-11-09."), 'the facet plan gets the program date');
+  const line = plan[1].split('Your previous reply was refused because: ')[1]?.split('\n')[0] ?? '';
+  assert.match(line, /1999/);
+  assert.ok(line.length > 0 && line.length <= 200, 'one short line');
+  assert.ok(prompts.filter(([id]) => id !== 'argument-map.facet-plan').every(([, text]) => !text.includes('previous reply was refused')), 'the reason does not leak into later steps');
+});

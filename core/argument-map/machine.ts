@@ -25,6 +25,7 @@ import {
   PROP_STANCES,
   VERDICTS,
   isStanceLocked,
+  isSituationUnconfirmed,
   allNeedsFound,
   effectiveVerdict,
   foundNeeds,
@@ -102,6 +103,7 @@ export interface ConclusionInput {
 const TERMINAL = ["concluded", "stopped_mismatch", "stopped_limit"];
 const clone = (state: ArgumentMapData): ArgumentMapData => JSON.parse(JSON.stringify(state)) as ArgumentMapData;
 const blank = (value: unknown): boolean => typeof value !== "string" || value.trim() === "";
+export { isSituationUnconfirmed };
 const isTerminal = (state: ArgumentMapData): boolean => TERMINAL.includes(state.run.phase);
 
 function live(state: ArgumentMapData): void {
@@ -118,7 +120,7 @@ function inSituation(state: ArgumentMapData): void {
 }
 function inAnalysis(state: ArgumentMapData): void {
   live(state);
-  if (state.run.phase !== "analysis" || state.situation.gate.state !== "matched")
+  if (state.run.phase !== "analysis" || (state.situation.gate.state !== "matched" && !isSituationUnconfirmed(state)))
     throw new GateError("the situation gate has not matched");
 }
 function hypothesisOf(state: ArgumentMapData, id: string): Hypothesis {
@@ -500,8 +502,14 @@ const stopFacets = (
   cited: string[]
 ) => {
   const round = next.situation.gate.round ?? 1;
+  if (kind === "data_insufficient") {
+    // Decision #58: insufficient data does not stop the run; the situation is marked unconfirmed and the analysis begins.
+    next.situation.gate = { state: "unconfirmed", kind, reason, citedData: cited, round };
+    next.run.phase = "analysis";
+    return next;
+  }
   next.situation.gate = { state: "unmatched", kind, reason, citedData: cited, round };
-  return stopMismatch(next, kind === "not_matching" ? "mismatch" : "data_missing");
+  return stopMismatch(next, "mismatch");
 };
 
 /**
@@ -677,7 +685,8 @@ export function applyHypotheses(
   const foundData = new Set(next.situation.data.filter(d => d.state === "found").map(d => d.id));
   for (const item of items) {
     const cited = Array.isArray(item.citedData) ? item.citedData : [];
-    if (!cited.length || cited.some(id => !foundData.has(id)))
+    // An unconfirmed situation has no supporting data to cite (decision #58): an empty citation is allowed there only.
+    if ((!cited.length && !isSituationUnconfirmed(next)) || cited.some(id => !foundData.has(id)))
       throw new GateError("a hypothesis must cite found situation data");
     // A facet map (decision #50): every hypothesis states its basis and rests on data that support the proposition only.
     const facetMap = next.situation.facets !== undefined;

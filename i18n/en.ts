@@ -3084,6 +3084,9 @@ export const en = {
   "ui.argument_gate_facets_0_1": "✓ Matches the proposition",
   "ui.argument_gate_facets_line_0_1": "{0} of {1} facets support it, none refute it",
   "ui.argument_gate_insufficient": "Not enough data",
+  "ui.argument_gate_unconfirmed": "Situation unconfirmed",
+  "ui.argument_premise_unconfirmed":
+    "The situation data were not enough, so the premise of the conclusion below is unconfirmed",
   "ui.argument_reason_0": "Reason: {0}",
   "ui.argument_reason_refuted_0_1": 'Facet "{0}" was refuted: {1}',
   "ui.argument_reason_insufficient_0_1": "Only {0} of {1} facets have usable data, even after one more search round.",

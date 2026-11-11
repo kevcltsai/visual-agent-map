@@ -1,0 +1,1 @@
+citedData are ids of situation data that support the proposition (propStance "supports"), at least one, copied exactly from the supplied list; never cite a datum whose propStance is "irrelevant" or "refutes".

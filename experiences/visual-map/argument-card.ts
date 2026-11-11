@@ -9,6 +9,7 @@ import {
   conclusionView,
   displayVerdict,
   foundNeeds,
+  isSituationUnconfirmed,
   isVerified,
   MAX_ROUND,
   MIN_VERIFIED,
@@ -157,7 +158,14 @@ function conclusionCard(state: ArgumentMapData, t: Translate): ArgumentCardView 
   const verified = verifiedCount(state);
   if (view === "stopped_mismatch" && isFacetMap(state)) return facetStopCard(state, base, t);
   if (view === "concluded")
-    return { ...base, titleFrom: "summary", lines: [t("ui.argument_conclusion_done_hint", verified)] };
+    return {
+      ...base,
+      titleFrom: "summary",
+      lines: [
+        ...(isSituationUnconfirmed(state) ? [t("ui.argument_premise_unconfirmed")] : []),
+        t("ui.argument_conclusion_done_hint", verified)
+      ]
+    };
   if (view === "stopped_mismatch")
     return { ...base, title: t("ui.argument_stopped_mismatch"), lines: [t("ui.argument_mismatch_hint")] };
   if (view === "stopped_limit")
@@ -348,6 +356,13 @@ function facetSituationCard(state: ArgumentMapData, t: Translate): ArgumentCardV
   if (gate.state === "matched")
     return finish({ tone: "yes", text: t("ui.argument_gate_facets_0_1") }, [
       t("ui.argument_gate_facets_line_0_1", facets.filter(f => f.verdict === "supports").length, facets.length)
+    ]);
+  if (gate.state === "unconfirmed")
+    return finish({ tone: "maybe", text: t("ui.argument_gate_unconfirmed") }, [
+      t(
+        "ui.argument_reason_0",
+        t("ui.argument_reason_insufficient_0_1", facets.length - lacking(state).length, facets.length)
+      )
     ]);
   if (gate.state === "pending") {
     const data = state.situation.data;

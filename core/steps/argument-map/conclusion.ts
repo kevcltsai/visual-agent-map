@@ -14,6 +14,7 @@ import {
   type ArgumentStepBase
 } from "./shared";
 import template from "./conclusion.md";
+import premiseRule from "./conclusion-unconfirmed.md";
 
 export interface ConclusionRequest extends ArgumentStepBase {
   proposition: string;
@@ -21,6 +22,8 @@ export interface ConclusionRequest extends ArgumentStepBase {
   input: ConclusionInput;
   /** Statement of each verified hypothesis, by id (exactly the ids in `input`). */
   statements: Record<string, string>;
+  /** The situation gate ended data_insufficient (decision #58): the premise is unconfirmed; the program writes the first line, the model must not state the situation as fact. */
+  unconfirmed?: boolean;
 }
 export interface ConclusionPoint {
   text: string;
@@ -97,6 +100,7 @@ export const conclusionStep: StepDefinition<ConclusionRequest, ConclusionResult>
   render: request =>
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.proposition),
+      premiseRule: request.unconfirmed ? ` ${premiseRule.trim()}` : "",
       proposition: JSON.stringify(request.proposition),
       hypotheses: JSON.stringify(
         request.input.hypotheses.map(h => ({

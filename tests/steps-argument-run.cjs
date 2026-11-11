@@ -813,19 +813,38 @@ test('P5: a pause between the facet judgement and its checkpoint leaves no verdi
   assert.ok(state.situation.data.length > 3, 'the retry batch is written with the verdicts');
 });
 
-test('P5: a round-1 retry with no retry needs ends data_insufficient (not not_matching); the stop log has the kind and no text', async () => {
+test('P5 #58: a round-1 retry with no retry needs ends unconfirmed and the run goes on to hypotheses, verdicts and a conclusion that starts with the premise line', async () => {
   const log = [];
-  const r = await rig({ facet: true, script: { step: facetSteps({ judge_facets: judgeBy(log) }), ask: askByNeed({ 'job postings': need => aiReply([notFoundEntry(need.id)]), 'junior hiring': need => aiReply([notFoundEntry(need.id)]) }) } });
+  const seen = { hyp: [], conclude: [] };
+  const r = await rig({ facet: true, script: { step: facetSteps({
+    judge_facets: judgeBy(log),
+    propose_facet_hypotheses: request => { seen.hyp.push(request.unconfirmed); return { hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: `H${request.existing.length + i + 1}`, statement: `statement ${request.existing.length + i + 1}`, basis: 'because of the data', alternative: i === 0, citedData: [] })) }; },
+    conclude: request => { seen.conclude.push(request.unconfirmed); return { summary: 'final answer', points: [{ text: 'point', hypothesisIds: request.input.hypotheses.map(h => h.id) }], basedOn: request.input.hypotheses.map(h => h.id) }; }
+  }), ask: askByNeed({ 'job postings': need => aiReply([notFoundEntry(need.id)]), 'junior hiring': need => aiReply([notFoundEntry(need.id)]) }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(state.situation.gate.state, 'unconfirmed');
+  assert.equal(state.situation.gate.kind, 'data_insufficient');
+  assert.equal(state.run.phase, 'concluded');
+  assert.equal(state.run.stopReason, undefined);
+  assert.equal(model.verifiedCount(state), 3);
+  assert.deepEqual(seen.hyp, [true]);
+  assert.deepEqual(seen.conclude, [true]);
+  const premise = translate('zh-TW', 'ui.argument_premise_unconfirmed');
+  assert.equal(premise, '現況資料不足，以下結論前提未確認');
+  const conclusion = await r.text(state.roles.conclusion);
+  assert.ok(conclusion.detail.startsWith(premise), conclusion.detail.slice(0, 80));
+  assert.ok(conclusion.summary === 'final answer', 'the model summary is untouched');
+  assert.ok(!r.stat.logs.some(l => l.startsWith('argument-run stopped')));
+  assert.ok(!r.stat.logs.join('\n').includes('SECRET-REASON-TEXT'));
+});
+test('P5 #58: a refuting facet still stops as mismatch with no hypothesis step', async () => {
+  const r = await rig({ facet: true, script: { step: facetSteps({ judge_facets: request => ({ data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: f.title === 'Postings' ? 'refutes' : 'supports', reason: 'it fits' }))), facets: request.facets.map(f => ({ id: f.id, verdict: f.title === 'Postings' ? 'refutes' : 'supports', reason: 'r', summary: `s ${f.title}`, citedData: [f.data[0].id], retryNeeds: [] })), assumptionInsights: [] }) }) } });
   await r.runs.start(r.mapPath, 'p');
   const state = await r.state();
   assert.equal(state.run.phase, 'stopped_mismatch');
-  assert.equal(state.situation.gate.kind, 'data_insufficient');
-  assert.equal(state.run.stopReason, 'data_missing');
-  assert.equal((await r.text(state.roles.conclusion)).summary, translate('zh-TW', 'ui.argument_stopped_insufficient'));
-  const lines = r.stat.logs.filter(l => l.startsWith('argument-run stopped'));
-  assert.equal(lines.length, 1);
-  assert.match(lines[0], /gateKind=data_insufficient$/);
-  assert.ok(!r.stat.logs.join('\n').includes('SECRET-REASON-TEXT'));
+  assert.equal(state.run.stopReason, 'mismatch');
+  assert.ok(!r.stat.steps.includes('propose_facet_hypotheses'));
 });
 
 test('P5: round 2 judges only the facets still insufficient, carries a fixed stance, and the retry needs become cards under their facet', async () => {

@@ -46,6 +46,7 @@ import {
   beginSituationResearch,
   eliminateAtLimit,
   hasFacets,
+  isSituationUnconfirmed,
   newArgumentMap,
   nextActions,
   prepareConclusion,
@@ -69,6 +70,7 @@ import {
   type ArgumentRoles,
   type AssumptionItem,
   type Hypothesis,
+  type SituationDatum,
   type RoleKey,
   type SearchLog,
   SEARCH_LOG_MAX_ITEMS,
@@ -93,6 +95,7 @@ import {
   type FacetPlanRequest,
   type FacetPlanResult,
   type FacetVerdictResult,
+  type GateDatum,
   type GateRequest,
   type GateVerdict,
   type HypothesesRequest,
@@ -262,6 +265,10 @@ export function untilAborted<T>(signal: AbortSignal, work: Promise<T>): Promise<
   });
 }
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+/** `gateData` refuses an empty list; an unconfirmed situation (decision #58) may have no usable datum at all, so only there an empty list passes. */
+const dataOrNone = (state: ArgumentMapData, data: readonly SituationDatum[]): GateDatum[] =>
+  data.length === 0 && isSituationUnconfirmed(state) ? [] : gateData(data);
 
 export class ArgumentRuns {
   private readonly drives = new Map<string, Drive>();
@@ -869,10 +876,11 @@ export class ArgumentRuns {
       const request: FacetHypothesesRequest = {
         ...this.base(drive),
         proposition,
-        data: gateData(stanced).map((d, i) => ({ ...d, propStance: stanced[i].propStance! })),
+        data: dataOrNone(state, stanced).map((d, i) => ({ ...d, propStance: stanced[i].propStance! })),
         count,
         existing,
-        causalQuestions: state.situation.causalQuestions ?? []
+        causalQuestions: state.situation.causalQuestions ?? [],
+        ...(isSituationUnconfirmed(state) ? { unconfirmed: true } : {})
       };
       result = await this.ask(drive, ARGUMENT_STEPS.propose_facet_hypotheses, request);
     } else {
@@ -934,7 +942,10 @@ export class ArgumentRuns {
       ...this.base(drive),
       proposition,
       hypothesis: { title: text.title, statement: await this.statementOf(drive, h), round },
-      data: gateData(state.situation.data.filter(d => h.citedData.includes(d.id))),
+      data: dataOrNone(
+        state,
+        state.situation.data.filter(d => h.citedData.includes(d.id))
+      ),
       existing: h.needs.map(n => ({ text: n.text, state: n.state })),
       max: needsAllowed({ ...h, round })
     };
@@ -1006,16 +1017,30 @@ export class ArgumentRuns {
         drive,
         state.hypotheses.find(x => x.id === h.id)!
       );
-    const request: ConclusionRequest = { ...this.base(drive), proposition, input, statements };
+    const unconfirmed = isSituationUnconfirmed(state);
+    const request: ConclusionRequest = {
+      ...this.base(drive),
+      proposition,
+      input,
+      statements,
+      ...(unconfirmed ? { unconfirmed } : {})
+    };
     const result: ConclusionResult = await this.ask(drive, ARGUMENT_STEPS.conclude, request);
     await this.checkpoint(drive, async (s, map) => {
       const next = applyConclusion(s, result);
       const pointLines = result.points.map(p => `- ${plainLine(p.text)}`);
       const detail = hasFacets(next)
-        ? conclusionDetail(this.tr, next, await this.hypothesisTitles(drive, next), {
-            summary: result.summary,
-            points: result.points.map(p => p.text)
-          })
+        ? conclusionDetail(
+            this.tr,
+            next,
+            await this.hypothesisTitles(drive, next),
+            {
+              summary: result.summary,
+              points: result.points.map(p => p.text)
+            },
+            "",
+            unconfirmed ? this.t("ui.argument_premise_unconfirmed") : undefined
+          )
         : [
             ...pointLines,
             "",

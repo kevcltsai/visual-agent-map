@@ -411,7 +411,9 @@ export function conclusionDetail(
   state: ArgumentMapData,
   titles: ReadonlyMap<string, string>,
   answer?: { summary: string; points: string[] },
-  stoppedSummary = ""
+  stoppedSummary = "",
+  /** Decision #58: the program-written first line of a conclusion whose situation is unconfirmed. */
+  premiseNote?: string
 ): string {
   const facets = state.situation.facets ?? [];
   const data = state.situation.data;
@@ -419,6 +421,7 @@ export function conclusionDetail(
   const parts: string[][] = [];
   if (answer) {
     const based = state.hypotheses.filter(h => state.conclusion.basedOn.includes(h.id));
+    if (premiseNote) parts.push([line(premiseNote), ""]);
     parts.push([`### ${t("ui.argument_note_core")}`], callout(answer.summary));
     if (answer.points.length)
       parts.push(["", `### ${t("ui.argument_note_insights")}`, ...answer.points.map(p => `- ${line(p)}`)]);

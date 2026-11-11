@@ -2892,6 +2892,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.argument_gate_facets_0_1": "✓ 符合命題",
   "ui.argument_gate_facets_line_0_1": "{0}／{1} 個面向支持，沒有反駁",
   "ui.argument_gate_insufficient": "資料不足",
+  "ui.argument_gate_unconfirmed": "現況未確認",
+  "ui.argument_premise_unconfirmed": "現況資料不足，以下結論前提未確認",
   "ui.argument_reason_0": "原因：{0}",
   "ui.argument_reason_refuted_0_1": "面向「{0}」被反駁，{1}",
   "ui.argument_reason_insufficient_0_1": "{1} 個面向只有 {0} 個有能用的數據，補查一輪後仍不夠。",

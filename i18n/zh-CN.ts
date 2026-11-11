@@ -2890,6 +2890,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.argument_gate_facets_0_1": "✓ 符合命题",
   "ui.argument_gate_facets_line_0_1": "{0}／{1} 个面向支持，没有反驳",
   "ui.argument_gate_insufficient": "资料不足",
+  "ui.argument_gate_unconfirmed": "现况未确认",
+  "ui.argument_premise_unconfirmed": "现况资料不足，以下结论前提未确认",
   "ui.argument_reason_0": "原因：{0}",
   "ui.argument_reason_refuted_0_1": "面向“{0}”被反驳，{1}",
   "ui.argument_reason_insufficient_0_1": "{1} 个面向只有 {0} 个有能用的数据，补查一轮后仍不够。",

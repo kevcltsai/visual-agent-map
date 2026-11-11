@@ -717,7 +717,7 @@ test('facet boost: 2 of 4 supports and no refutes goes to analysis, and hypothes
   assert.ok(s.situation.gate.citedData.length >= 1);
   assert.equal(m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'], basis: 'from f1d1 we observe the rate, so we guess a cause' }]).hypotheses.length, 1);
 });
-test('facet boost: 1 of 4 supports: retry round, then still short: data_insufficient (stopReason data_missing)', () => {
+test('facet boost: 1 of 4 supports: retry round, then still short: data_insufficient (unconfirmed, the run goes on)', () => {
   let s = researchAll(planned([1, 1, 1, 1]), ['f2d1', 'f3d1']);
   s = judged(s, {}, { f1: 'supports', f2: 'supports', f3: 'supports', f4: 'insufficient' });
   assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'insufficient', 'insufficient', 'insufficient'], 'facets without found data are forced insufficient');
@@ -730,13 +730,13 @@ test('facet boost: 1 of 4 supports: retry round, then still short: data_insuffic
   s = researchAll(s, ['r2', 'r3']);
   assert.deepEqual(types(s), ['judge_facets']);
   s = judged(s, {}, {});
-  assert.equal(s.situation.gate.state, 'unmatched');
+  assert.equal(s.situation.gate.state, 'unconfirmed');
   assert.equal(s.situation.gate.kind, 'data_insufficient');
   assert.equal(s.situation.gate.round, 2);
-  assert.equal(s.run.phase, 'stopped_mismatch');
-  assert.equal(s.run.stopReason, 'data_missing');
+  assert.equal(s.run.phase, 'analysis', 'decision #58: insufficient data no longer stops the run');
+  assert.equal(s.run.stopReason, undefined);
   assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'insufficient', 'insufficient', 'insufficient']);
-  assert.deepEqual(actions(s), []);
+  assert.deepEqual(types(s), ['propose_hypotheses']);
 });
 test('facet boost: round 2 only re-judges the facets that were insufficient; a supported one keeps its verdict', () => {
   let s = researchAll(planned([1, 1, 1, 1]), ['f3d1', 'f4d1']);
@@ -866,13 +866,15 @@ test('facet boost: retry needs: only insufficient facets, once, 3 per facet, 9 i
   // an empty batch ends the run as data_insufficient (round 1)
   const none = m.addRetryNeeds(base, []);
   assert.equal(none.situation.gate.kind, 'data_insufficient');
-  assert.equal(none.run.stopReason, 'data_missing');
+  assert.equal(none.situation.gate.state, 'unconfirmed');
+  assert.equal(none.run.phase, 'analysis');
+  assert.equal(none.run.stopReason, undefined);
   assert.equal(none.situation.gate.round, 1);
   // a refuting facet never reaches a retry
   const refuted = judged(researchAll(planned([1, 1, 1, 1])), { f1d1: 'refutes' }, { f1: 'refutes' });
   refuses(refuted, () => m.addRetryNeeds(refuted, [need('f2', 'x')]));
 });
-test('facet boost: budget spent: only situation_budget, no stop_limit; the unresearched needs become not_found(budget) and the run ends data_insufficient', () => {
+test('facet boost: budget spent: only situation_budget, no stop_limit; the unresearched needs become not_found(budget) and the run goes on unconfirmed', () => {
   let s = planned([1, 1, 1, 1]);
   s.run.researchCalls = 78;
   assert.deepEqual(types(s), ['situation_budget']);
@@ -883,8 +885,8 @@ test('facet boost: budget spent: only situation_budget, no stop_limit; the unres
   assert.deepEqual(types(s), ['judge_facets']);
   s = judged(s, {}, {});
   assert.equal(s.situation.gate.kind, 'data_insufficient');
-  assert.equal(s.run.stopReason, 'data_missing');
-  assert.equal(s.run.phase, 'stopped_mismatch');
+  assert.equal(s.run.stopReason, undefined);
+  assert.equal(s.run.phase, 'analysis');
   assert.ok(!s.situation.data.some(d => d.state === 'pending'));
 });
 test('facet boost: the research cap is min(24 - used, whole-map remaining); a facet map never emits stop_limit', () => {

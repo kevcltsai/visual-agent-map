@@ -40,7 +40,8 @@ export const NEED_STANCES = ["supports", "contradicts", "uncertain"] as const;
 export type NeedStance = (typeof NEED_STANCES)[number];
 export const PROOF_CHECKS = ["page_match", "provider_read"] as const;
 export type ProofCheck = (typeof PROOF_CHECKS)[number];
-export const GATE_STATES = ["pending", "matched", "unmatched"] as const;
+/** `unconfirmed` (decision #58): the facets stayed insufficient after the retry round; the run goes on with the situation marked unconfirmed. */
+export const GATE_STATES = ["pending", "matched", "unmatched", "unconfirmed"] as const;
 export type GateState = (typeof GATE_STATES)[number];
 export const GATE_KINDS = ["not_matching", "data_missing", "data_insufficient"] as const;
 export type GateKind = (typeof GATE_KINDS)[number];
@@ -448,6 +449,8 @@ export function verifiedCount(state: ArgumentMapData): number {
 export function displayVerdict(h: Hypothesis): Verdict | "verifying" {
   return allNeedsFound(h) ? effectiveVerdict(h) : "verifying";
 }
+/** The situation gate ended data_insufficient and the run went on (decision #58). */
+export const isSituationUnconfirmed = (state: ArgumentMapData): boolean => state.situation.gate.state === "unconfirmed";
 export type ConclusionView = "in_progress" | "concluded" | "stopped_limit" | "stopped_mismatch";
 /** The four conclusion card states, derived from the run and the verified count. A concluded map falls back to in_progress when support is lost. */
 export function conclusionView(state: ArgumentMapData): ConclusionView {

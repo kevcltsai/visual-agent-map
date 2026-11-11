@@ -48199,32 +48199,67 @@ var ArgumentRuns = class {
     this.ports.log(`argument-run paused stopReason=${reason}`);
   }
   // ---- the loop ----------------------------------------------------------------------------------------------------------------
+  /**
+   * Research runs as a pool: up to MAX_RESEARCH_CONCURRENCY calls are out, and a finished one frees its slot for the next pending item
+   * at once. Each dispatch waits for its begin write (researchCalls, `searching`) before the next state read, so the budget and the
+   * pending list are never read stale. Text steps run one at a time and only with no research call out.
+   */
   async loop(drive) {
+    const pool = /* @__PURE__ */ new Set();
+    let thrown;
     let idle = 0;
     let last = "";
-    for (; ; ) {
-      if (this.dead(drive)) return;
-      const state = await this.state(drive);
-      if (!state) return;
-      const actions = nextActions(state);
-      if (!actions.length) return;
-      const key4 = JSON.stringify(state);
-      idle = key4 === last ? idle + 1 : 0;
-      last = key4;
-      if (idle >= 3) {
-        await this.pause(drive, "error", false);
-        return;
-      }
-      const research = actions.filter((a) => a.type === "research_situation" || a.type === "research_need");
-      if (research.length) {
-        await Promise.all(research.slice(0, MAX_RESEARCH_CONCURRENCY).map((a) => this.research(drive, state, a)));
-        if (!this.dead(drive) && [...drive.failures.values()].some((n) => n >= 2)) {
+    let refused = false;
+    const failedTwice = () => [...drive.failures.values()].some((n) => n >= 2);
+    try {
+      for (; ; ) {
+        if (this.dead(drive) || thrown) break;
+        if (failedTwice()) {
+          if (pool.size) {
+            await Promise.race(pool);
+            continue;
+          }
           await this.pause(drive, "error", false);
           return;
         }
-      } else await this.guarded(drive, () => this.textStep(drive, state, actions[0]));
-      if (drive.stopRequested) return;
+        const state = await this.state(drive);
+        if (!state) break;
+        const actions = nextActions(state);
+        if (!actions.length && !pool.size) break;
+        if (!pool.size) {
+          const key4 = JSON.stringify(state);
+          idle = key4 === last ? idle + 1 : 0;
+          last = key4;
+          if (idle >= 3) {
+            await this.pause(drive, "error", false);
+            return;
+          }
+          refused = false;
+        }
+        const next = actions.find((a) => a.type === "research_situation" || a.type === "research_need");
+        if (next && pool.size < MAX_RESEARCH_CONCURRENCY && !refused) {
+          let begun = () => void 0;
+          const started = new Promise((resolve) => begun = () => resolve(true));
+          let task;
+          task = this.research(drive, state, next, begun).catch((error) => {
+            thrown != null ? thrown : thrown = { error };
+          }).finally(() => pool.delete(task));
+          pool.add(task);
+          refused = !await Promise.race([started, task.then(() => false)]);
+          continue;
+        }
+        if (pool.size) {
+          await Promise.race(pool);
+          refused = false;
+          continue;
+        }
+        await this.guarded(drive, () => this.textStep(drive, state, actions[0]));
+        if (drive.stopRequested) return;
+      }
+    } finally {
+      await Promise.all(pool);
     }
+    if (thrown) throw thrown.error;
   }
   async state(drive) {
     const read = readArgumentMap(await this.ports.readMap(drive.mapPath));
@@ -48924,10 +48959,10 @@ var ArgumentRuns = class {
     else this.inFlight--;
   }
   /**
-   * begin (writes researchCalls) -> dispatch -> verify -> commit. Never throws. A reply that cannot be used becomes a miss; a provider
+   * begin (writes researchCalls; then `begun`) -> dispatch -> verify -> commit. Never throws. A reply that cannot be used becomes a miss; a provider
    * failure (askModel rejected) is released back to pending instead, never a miss.
    */
-  async research(drive, state, action) {
+  async research(drive, state, action, begun) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const isNeed = action.type === "research_need";
     if (action.type !== "research_need" && action.type !== "research_situation") return;
@@ -48949,6 +48984,7 @@ var ArgumentRuns = class {
         next: isNeed ? beginResearch(s, hypothesisId, itemId) : beginSituationResearch(s, itemId)
       }));
       if (!began || this.dead(drive)) return;
+      begun();
       const signal = busy ? linked(drive.controller.signal, busy.signal) : drive.controller.signal;
       const proposition = await this.proposition(drive, state);
       const context = hypothesis ? [assumptionScope(state), `hypothesis claim: ${plainLine2(await this.statementOf(drive, hypothesis))}`].filter(Boolean).join("; ") : scopeOf(false, state).context;

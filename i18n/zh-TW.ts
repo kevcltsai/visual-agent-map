@@ -2298,6 +2298,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "error.outline_generate_empty_topic": "請先輸入研究主題，再生成大綱。",
   "error.outline_generate_over_budget": "主題與預設太長，無法送出；請縮短。",
   "error.outline_generate_note_too_long": "這張卡的筆記太長，無法展開",
+  "error.outline_generate_empty_note": "這張卡的筆記還是空的，沒有可展開的內容，請先在筆記寫一些內容",
   "error.outline_generate_stopped": "大綱生成已停止。",
   "error.outline_generate_invalid": "無法使用 AI 的大綱：{0}",
   "error.outline_generate_no_headings": "AI 沒有回傳任何 Markdown 標題。",

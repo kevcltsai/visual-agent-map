@@ -49,7 +49,7 @@ const KINDS = {
   outline: {
     request: (extra = {}) => ({ topic: 'Sleep and memory', presetText: 'Make a tree for {research topic}.', language: 'en', model: 'gpt-6-luna', reasoning: 'low', ...extra }),
     good: '# Root\n> r\n## A\n> a', bad: 'Sorry, I cannot do that.',
-    name: 'outline-generate', topic: 'Outline · Sleep and memory', step: 'outline-generate@4', stopped: 'Outline generation stopped',
+    name: 'outline-generate', topic: 'Outline · Sleep and memory', step: 'outline-generate@5', stopped: 'Outline generation stopped',
     schema: () => undefined, stream: false
   },
   'map-chat': {

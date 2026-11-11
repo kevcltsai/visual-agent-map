@@ -87,7 +87,9 @@ export class OutlineGenerationService {
           !signal.aborted &&
           attempt < 2 &&
           error instanceof OutlineGenerateError &&
-          (error.code === "missing_summary" || error.code === "non_heading")
+          (error.code === "missing_summary" ||
+            error.code === "non_heading" ||
+            error.code === "invalid")
         )
           continue;
         throw error;

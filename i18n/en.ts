@@ -2459,6 +2459,7 @@ export const en = {
   "error.outline_generate_empty_topic": "Enter a research topic before generating an outline.",
   "error.outline_generate_over_budget": "The topic and preset are too long to send; shorten them.",
   "error.outline_generate_note_too_long": "This card's note is too long to expand.",
+  "error.outline_generate_empty_note": "Nothing to expand from yet: this topic's note is empty. Write something in the note first.",
   "error.outline_generate_stopped": "Outline generation stopped.",
   "error.outline_generate_invalid": "The AI outline could not be used: {0}",
   "error.outline_generate_no_headings": "The AI returned no Markdown headings.",

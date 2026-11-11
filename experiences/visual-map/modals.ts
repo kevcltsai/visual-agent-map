@@ -118,6 +118,8 @@ export interface QuickOutline {
       requirements: string;
       language: ContentLanguage;
       limits: OutlineLimits;
+      /** The topic chat's Expand: the note is the main source and `requirements` (the owner's words) leads; no preset text. */
+      fromNote?: boolean;
       /** The dialog's one-run model; absent: the topic's own. */
       runOnce?: RunOnceModel;
     },

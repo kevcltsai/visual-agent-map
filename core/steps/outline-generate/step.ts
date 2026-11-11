@@ -15,6 +15,8 @@ import languageEn from "./language.en.md";
 import languageZh from "./language.zh.md";
 import limitsEn from "./limits.en.md";
 import limitsZh from "./limits.zh.md";
+import expandDirection from "./expand-direction.md";
+import expandTemplate from "./expand.md";
 import template from "./prompt.md";
 import sourceBlock from "./source-block.md";
 import sourceChildren from "./source-children.md";
@@ -41,6 +43,12 @@ export interface OutlineGenerateRequest {
   noteDetail?: string;
   /** Untrusted: titles of the topic's current subtopics, quoted as data; the outline must not repeat them. */
   existingChildren?: string[];
+  /**
+   * Expansion from the note (the topic chat's Expand): the note is the main source and the preset is not used. The owner's own
+   * words (`direction`, may be blank) come first in the prompt. A blank note is refused (`empty_note`), never made up.
+   */
+  fromNote?: boolean;
+  direction?: string;
 }
 export interface OutlineGenerateResult {
   /** Heading-only Markdown (fence removed, summary lines taken out), ready for the outline textarea and `parseOutline`. */
@@ -53,6 +61,8 @@ export type OutlineGenerateErrorCode =
   | "over_budget"
   /** The request carries a note or existing subtopics and exceeds the budget: refused whole, never truncated. */
   | "note_too_long"
+  /** Expansion from the note, and the note is blank: nothing to expand from. */
+  | "empty_note"
   | "stopped"
   | "invalid"
   | "no_headings"
@@ -147,6 +157,33 @@ function splitSummaries(text: string): { text: string; summaries: (string | unde
   return { text: kept.join("\n"), summaries };
 }
 
+const HEADING_LEVEL = /^ {0,3}(#{1,6})(?:[ \t]|$)/;
+/**
+ * A reply that forgot its root (it starts with the summary line or with `##` headings) or that has several top-level headings
+ * gets the topic itself as the root: a leading `> ` line becomes the root's summary, and several top-level headings are
+ * moved one level down. A reply with one top-level heading is left exactly as it is. Without a `rootTitle` nothing changes.
+ */
+function ensureRoot(text: string, rootTitle?: string): string {
+  const title = rootTitle?.replace(/\s+/g, " ").trim();
+  if (!title) return text;
+  const lines = text.split("\n");
+  const levels = lines.map(line => HEADING_LEVEL.exec(line)?.[1].length ?? 0);
+  const headings = levels.filter(Boolean);
+  if (!headings.length) return text;
+  const top = Math.min(...headings);
+  if (top === 1 && headings.filter(level => level === 1).length === 1) return text;
+  const first = levels.findIndex(Boolean);
+  let summary = title;
+  let rest = lines;
+  const lead = lines.slice(0, first).filter(line => line.trim());
+  if (lead.length === 1 && REPLY_SUMMARY.test(lead[0])) {
+    summary = REPLY_SUMMARY.exec(lead[0])?.[1].trim() || title;
+    rest = lines.slice(first);
+  }
+  const body = top === 1 ? rest.map(line => (HEADING_LEVEL.test(line) ? line.replace(/^( {0,3})#/, "$1##") : line)) : rest;
+  return [`# ${title}`, `> ${summary}`, ...body].join("\n");
+}
+
 /**
  * Accept only heading Markdown where each heading line is followed by one `> summary` line: wrapping fence removed,
  * summary lines taken out, headings cleaned with `sanitizeOutlineDraft`, then `parseOutline` (not relaxed). Anything the
@@ -154,9 +191,9 @@ function splitSummaries(text: string): { text: string; summaries: (string | unde
  * fenced block or front matter, no heading at all, more than the 100-heading limit, or a heading (the root too) without
  * a non-empty summary rejects the whole reply.
  */
-export function parseOutlineReply(raw: string, language: ContentLanguage): OutlineGenerateResult {
+export function parseOutlineReply(raw: string, language: ContentLanguage, rootTitle?: string): OutlineGenerateResult {
   const locale = uiLocale(language);
-  const split = splitSummaries(stripWrappingFence(raw));
+  const split = splitSummaries(ensureRoot(stripWrappingFence(raw), rootTitle));
   // A heading title that would break a note (unpaired [[ ]], an escaped fence) is cleaned here, as the outline box does,
   // so one such heading does not fail the whole AI reply; the user's own pasted outline still goes through the strict parser.
   const text = sanitizeOutlineDraft(split.text);
@@ -197,10 +234,28 @@ export function parseOutlineReply(raw: string, language: ContentLanguage): Outli
  */
 export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, OutlineGenerateResult> = {
   id: "outline-generate",
-  version: 4,
+  version: 5,
   render: request => {
     const content = request.contentLanguage ?? request.language;
     const hasSource = !!noteSection(request);
+    if (request.fromNote) {
+      const direction = request.direction?.trim();
+      return renderTemplate(expandTemplate, {
+        direction: direction ? renderTemplate(expandDirection, { json: JSON.stringify(direction) }) : "",
+        topic: JSON.stringify(request.topic.trim()),
+        noteSection: noteSection(request),
+        limits: request.limits
+          ? renderTemplate(inLanguage({ zh: limitsZh, en: limitsEn }, content), {
+              levels: String(request.limits.levels),
+              maxTopics: String(request.limits.maxTopics)
+            })
+          : "",
+        languageInstruction: inLanguageNaming({ zh: languageZh, en: languageEn }, content, { language: "region" }, "en", {
+          kind: "topic",
+          text: request.topic
+        })
+      });
+    }
     return renderTemplate(template, {
       noteSection: noteSection(request),
       summaryBasis: hasSource ? summaryBasisNote : summaryBasis,
@@ -220,6 +275,8 @@ export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, Outline
     const locale = uiLocale(request.language);
     if (!request.topic.trim())
       throw new OutlineGenerateError("empty_topic", translate(locale, "error.outline_generate_empty_topic"));
+    if (request.fromNote && !request.noteDetail?.trim())
+      throw new OutlineGenerateError("empty_note", translate(locale, "error.outline_generate_empty_note"));
     if (estimateTokens(prompt) > OUTLINE_GENERATE_TOKEN_BUDGET) {
       // A request with a note or subtopics is refused whole (never truncated, never retried with the title only), with its own wording.
       const { note, children } = noteInputs(request);
@@ -228,5 +285,5 @@ export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, Outline
       throw new OutlineGenerateError("over_budget", translate(locale, "error.outline_generate_over_budget"));
     }
   },
-  parse: (raw, request) => parseOutlineReply(raw, request.language)
+  parse: (raw, request) => parseOutlineReply(raw, request.language, request.topic)
 };

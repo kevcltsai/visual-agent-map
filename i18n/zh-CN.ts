@@ -2297,6 +2297,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "error.outline_generate_empty_topic": "请先输入研究主题，再生成大纲。",
   "error.outline_generate_over_budget": "主题与预设太长，无法送出；请缩短。",
   "error.outline_generate_note_too_long": "这张卡的笔记太长，无法展开",
+  "error.outline_generate_empty_note": "这张卡的笔记还是空的，没有可展开的内容，请先在笔记里写一些内容",
   "error.outline_generate_stopped": "大纲生成已停止。",
   "error.outline_generate_invalid": "无法使用 AI 的大纲：{0}",
   "error.outline_generate_no_headings": "AI 没有返回任何 Markdown 标题。",

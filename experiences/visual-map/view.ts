@@ -4101,7 +4101,12 @@ export class VisualAgentMapView extends ItemView {
           {
             ...this.usageMapField(),
             topic: note.title,
-            presetText: request.requirements ? `${preset.text}\n\n${request.requirements}` : preset.text,
+            presetText: request.fromNote
+              ? ""
+              : request.requirements
+                ? `${preset.text}\n\n${request.requirements}`
+                : preset.text,
+            ...(request.fromNote ? { fromNote: true, direction: request.requirements } : {}),
             language: request.language,
             model: used.model,
             reasoning: normalizeReasoningLevel(used.reasoning ?? settings.cliReasoning),
@@ -25245,12 +25250,19 @@ export class VisualAgentMapView extends ItemView {
         new Notice(t("ui.ai_locked_notice"));
         return { status: "failed", reason: t("ui.ai_locked_notice") };
       }
+      // The note is what the subtopics come from; with none there is nothing to expand, and the AI is not asked to make it up.
+      if (!note.detail.trim()) {
+        const reason = t("error.outline_generate_empty_note");
+        new Notice(reason);
+        return { status: "failed", reason };
+      }
       const outline = this.quickOutline(parent);
       const limits = { levels: CHAT_EXPAND_LEVELS, maxTopics: CHAT_EXPAND_MAX_TOPICS };
       const generated = await outline.generate(
         {
           presetId: DEFAULT_OUTLINE_PRESET_ID,
           requirements: direction,
+          fromNote: true,
           language: defaultOutputLanguage(
             this.plugin.settings.language,
             note.title,

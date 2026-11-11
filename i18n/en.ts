@@ -3054,7 +3054,6 @@ export const en = {
   "ui.argument_note_opened": "Pages opened",
   "ui.argument_note_not_adopted": "Why it was not used",
   "ui.argument_note_agent_note": "Researcher note",
-  "ui.argument_note_debug": "Debug code",
   "ui.argument_note_none": "None",
   "ui.argument_why_budget": "The research budget ran out before this item was searched",
   "ui.argument_why_no_answer": "The research gave no answer for this item",

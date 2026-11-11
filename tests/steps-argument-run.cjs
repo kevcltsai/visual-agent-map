@@ -1033,11 +1033,11 @@ test('facet map: a datum closed by the research budget gets a readable reason, n
     return written;
   };
   await r.runs.start(r.mapPath, 'Youth unemployment is rising');
-  const budget = h.writes.filter(w => w.detail?.includes('budget') && w.detail.includes('[!note]-'));
+  const budget = h.writes.filter(w => w.detail?.includes(translate('zh-TW', 'ui.argument_why_budget')));
   assert.ok(seeded && budget.length > 0, 'a budget note was written');
   for (const w of budget) {
     assert.ok(w.detail.includes(translate('zh-TW', 'ui.argument_why_budget')), w.detail);
-    assert.ok(!w.detail.includes('未找到：budget'), w.detail);
+    assert.ok(!w.detail.includes('未找到：budget') && !w.detail.includes('budget') && !w.detail.includes('[!note]-'), w.detail);
   }
 });
 

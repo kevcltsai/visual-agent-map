@@ -305,3 +305,17 @@ test('definitions card render: a native button with aria-label; pointerdown/keyd
   assert.ok(flat.some(n => n.tag === 'dd' && n.text === '<img src=x onerror=1>'));
   assert.equal(flat.some(n => 'innerHTML' in n), false);
 });
+
+test('live4: a facet-map card for a not-found datum or need shows readable text for a plain or composite reason', () => {
+  const NOTE = 'BLS 2026年10月新聞稿沒有16至24歲合併數字';
+  const st = facetState();
+  st.situation.data.push(
+    fdatum('d9', 'f3', 'not_found', { reason: 'not_found', searchLog: { queries: ['q'], opened: [], why: `not_found: ${NOTE}` } }),
+    fdatum('d10', 'f3', 'not_found', { reason: `source_quote_missing: ${NOTE}` })
+  );
+  st.hypotheses = [hyp('h1', [need('n1', 'not_found', { reason: `not_found: ${NOTE}` })])];
+  for (const id of ['d9', 'd10', 'n1']) {
+    const text = textOf(card.describeArgumentCard(st, id, t));
+    for (const code of WHY_CODES) assert.ok(!text.includes(code), `${code} in ${id}: ${text}`);
+  }
+});

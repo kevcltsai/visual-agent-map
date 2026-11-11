@@ -70,15 +70,6 @@ const table = (head: string[], rows: string[][]): string[] => [
   ...rows.map(r => `| ${r.map(cell).join(" | ")} |`)
 ];
 const callout = (text: string): string[] => ["> [!summary]", `> ${line(text)}`];
-/** The stored reason in a collapsed callout: a plain snake_case code stays as is (it cannot form emphasis between letters), any free text after it is encoded. */
-const debugCode = (stored: string): string => {
-  const [, code = "", rest = ""] = /^([a-z]+(?:_[a-z]+)*)(.*)$/s.exec(stored.trim()) ?? [];
-  return `${code}${/^\s/.test(rest) ? " " : ""}${line(rest)}`;
-};
-const debug = (t: Translate, code: string): string[] => [
-  `> [!note]- ${t("ui.argument_note_debug")}`,
-  `> ${debugCode(code)}`
-];
 
 // ---- chart ---------------------------------------------------------------------------------------------------------------------
 const NUMBER = /^[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/;
@@ -152,9 +143,17 @@ const WHY_KEYS = {
   round_limit: "ui.argument_why_round_limit",
   no_usable_data: "ui.argument_why_no_usable_data"
 } as const satisfies Record<string, TranslationKey>;
+/** The leading snake_case code of a stored reason (`code`, `code: note`, `code：note`, `code.`); "" when it does not start with one. */
+const codeOf = (stored: string): string => /^[a-z]+(?:_[a-z]+)*/.exec(stored.trim())?.[0] ?? "";
+/** The free text after the code of a stored `code: note` reason. */
+const noteOf = (stored: string): string =>
+  stored
+    .trim()
+    .slice(codeOf(stored).length)
+    .replace(/^[\s:：.;,]+/, "");
 /** A stored reason code (`code` or `code: free text`) as a readable sentence; an unknown code falls back to "not found". */
 export function whyText(t: Translate, stored: string): string {
-  const code = stored.split(/[:\s]/, 1)[0];
+  const code = codeOf(stored);
   return t(Object.hasOwn(WHY_KEYS, code) ? WHY_KEYS[code as keyof typeof WHY_KEYS] : WHY_KEYS.not_found);
 }
 
@@ -163,7 +162,7 @@ const LEGACY_NO_USABLE_DATA = "no usable data for this facet";
 /** A facet or datum reason for display: a stored program code (or its earlier English string) becomes a readable sentence; the AI's own words pass through. */
 export function reasonText(t: Translate, stored: string): string {
   if (stored === LEGACY_NO_USABLE_DATA) return whyText(t, "no_usable_data");
-  const code = stored.split(/[:\s]/, 1)[0];
+  const code = codeOf(stored);
   return Object.hasOwn(WHY_KEYS, code) ? whyText(t, stored) : stored;
 }
 
@@ -240,7 +239,7 @@ export function notFoundDetail(
   code: string
 ): string {
   const why = log?.why || code;
-  const note = why.includes(": ") ? why.slice(why.indexOf(": ") + 2) : "";
+  const note = noteOf(why);
   const parts: string[][] = [
     [`### ${t("ui.argument_note_core")}`],
     callout(t("ui.argument_not_found_0", whyText(t, why)))
@@ -253,7 +252,6 @@ export function notFoundDetail(
     if (note) out.push(`- ${t("ui.argument_note_agent_note")}: ${line(note)}`);
     parts.push(out);
   }
-  parts.push([""], debug(t, why));
   return join(parts);
 }
 

@@ -2860,7 +2860,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.argument_note_opened": "打开的页面",
   "ui.argument_note_not_adopted": "不采用的原因",
   "ui.argument_note_agent_note": "研究备注",
-  "ui.argument_note_debug": "调试代码",
   "ui.argument_note_none": "无",
   "ui.argument_why_budget": "研究额度用完，还没查到这一项",
   "ui.argument_why_no_answer": "研究没有回复这一项",

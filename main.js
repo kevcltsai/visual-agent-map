@@ -2861,7 +2861,6 @@ var en = {
   "ui.argument_note_opened": "Pages opened",
   "ui.argument_note_not_adopted": "Why it was not used",
   "ui.argument_note_agent_note": "Researcher note",
-  "ui.argument_note_debug": "Debug code",
   "ui.argument_note_none": "None",
   "ui.argument_why_budget": "The research budget ran out before this item was searched",
   "ui.argument_why_no_answer": "The research gave no answer for this item",
@@ -5664,7 +5663,6 @@ var zhCN = {
   "ui.argument_note_opened": "\u6253\u5F00\u7684\u9875\u9762",
   "ui.argument_note_not_adopted": "\u4E0D\u91C7\u7528\u7684\u539F\u56E0",
   "ui.argument_note_agent_note": "\u7814\u7A76\u5907\u6CE8",
-  "ui.argument_note_debug": "\u8C03\u8BD5\u4EE3\u7801",
   "ui.argument_note_none": "\u65E0",
   "ui.argument_why_budget": "\u7814\u7A76\u989D\u5EA6\u7528\u5B8C\uFF0C\u8FD8\u6CA1\u67E5\u5230\u8FD9\u4E00\u9879",
   "ui.argument_why_no_answer": "\u7814\u7A76\u6CA1\u6709\u56DE\u590D\u8FD9\u4E00\u9879",
@@ -8467,7 +8465,6 @@ var zhTW = {
   "ui.argument_note_opened": "\u958B\u555F\u7684\u9801\u9762",
   "ui.argument_note_not_adopted": "\u4E0D\u63A1\u7528\u7684\u539F\u56E0",
   "ui.argument_note_agent_note": "\u7814\u7A76\u5099\u8A3B",
-  "ui.argument_note_debug": "\u9664\u932F\u4EE3\u78BC",
   "ui.argument_note_none": "\u7121",
   "ui.argument_why_budget": "\u7814\u7A76\u984D\u5EA6\u7528\u5B8C\uFF0C\u9084\u6C92\u67E5\u5230\u9019\u4E00\u9805",
   "ui.argument_why_no_answer": "\u7814\u7A76\u6C92\u6709\u56DE\u8986\u9019\u4E00\u9805",
@@ -44228,7 +44225,7 @@ var AiTaskService = class {
       provider
     });
     const aborted2 = (error) => !!(signal == null ? void 0 : signal.aborted) || error instanceof Error && error.name === "AbortError";
-    const codeOf = (error) => error instanceof ChartRejected ? error.code : "runtime_error";
+    const codeOf2 = (error) => error instanceof ChartRejected ? error.code : "runtime_error";
     const notAdded = (code) => translate(this.options.language(), "log.chart_not_added_0", code);
     const warn = (code) => console.warn("Visual Agent Map chart step", code);
     const refuse = (code, exchange) => {
@@ -44251,7 +44248,7 @@ var AiTaskService = class {
           usage: { action: "other", mapPath: input2.usageMapPath },
           requestLog: "request",
           stopped: () => new DOMException("Aborted", "AbortError"),
-          failMessage: (error) => aborted2(error) ? error instanceof Error ? error.message : String(error) : notAdded(codeOf(error)),
+          failMessage: (error) => aborted2(error) ? error instanceof Error ? error.message : String(error) : notAdded(codeOf2(error)),
           onBegin: onExchange,
           task: {
             timeoutMs: 18e4,
@@ -44277,7 +44274,7 @@ var AiTaskService = class {
       );
     } catch (error) {
       if (aborted2(error)) throw error;
-      warn(codeOf(error));
+      warn(codeOf2(error));
       return detail;
     }
   }
@@ -45050,15 +45047,6 @@ var table = (head, rows2) => [
   ...rows2.map((r) => `| ${r.map(cell).join(" | ")} |`)
 ];
 var callout = (text10) => ["> [!summary]", `> ${line(text10)}`];
-var debugCode = (stored) => {
-  var _a2;
-  const [, code = "", rest = ""] = (_a2 = /^([a-z]+(?:_[a-z]+)*)(.*)$/s.exec(stored.trim())) != null ? _a2 : [];
-  return `${code}${/^\s/.test(rest) ? " " : ""}${line(rest)}`;
-};
-var debug = (t2, code) => [
-  `> [!note]- ${t2("ui.argument_note_debug")}`,
-  `> ${debugCode(code)}`
-];
 var NUMBER = /^[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/;
 function figureNumber(figure) {
   if (!figure) return null;
@@ -45114,14 +45102,19 @@ var WHY_KEYS = {
   round_limit: "ui.argument_why_round_limit",
   no_usable_data: "ui.argument_why_no_usable_data"
 };
+var codeOf = (stored) => {
+  var _a2, _b2;
+  return (_b2 = (_a2 = /^[a-z]+(?:_[a-z]+)*/.exec(stored.trim())) == null ? void 0 : _a2[0]) != null ? _b2 : "";
+};
+var noteOf = (stored) => stored.trim().slice(codeOf(stored).length).replace(/^[\s:：.;,]+/, "");
 function whyText(t2, stored) {
-  const code = stored.split(/[:\s]/, 1)[0];
+  const code = codeOf(stored);
   return t2(Object.hasOwn(WHY_KEYS, code) ? WHY_KEYS[code] : WHY_KEYS.not_found);
 }
 var LEGACY_NO_USABLE_DATA = "no usable data for this facet";
 function reasonText(t2, stored) {
   if (stored === LEGACY_NO_USABLE_DATA) return whyText(t2, "no_usable_data");
-  const code = stored.split(/[:\s]/, 1)[0];
+  const code = codeOf(stored);
   return Object.hasOwn(WHY_KEYS, code) ? whyText(t2, stored) : stored;
 }
 var PROP_KEYS = {
@@ -45181,7 +45174,7 @@ function datumDetail(t2, d) {
 function notFoundDetail(t2, log, code) {
   var _a2;
   const why2 = (log == null ? void 0 : log.why) || code;
-  const note = why2.includes(": ") ? why2.slice(why2.indexOf(": ") + 2) : "";
+  const note = noteOf(why2);
   const parts = [
     [`### ${t2("ui.argument_note_core")}`],
     callout(t2("ui.argument_not_found_0", whyText(t2, why2)))
@@ -45194,7 +45187,6 @@ function notFoundDetail(t2, log, code) {
     if (note) out.push(`- ${t2("ui.argument_note_agent_note")}: ${line(note)}`);
     parts.push(out);
   }
-  parts.push([""], debug(t2, why2));
   return join2(parts);
 }
 function facetDetail(t2, facet, data) {
@@ -51782,7 +51774,7 @@ function emitTree(roots, open, close) {
   return lines;
 }
 var indent = (depth) => "  ".repeat(depth);
-var noteOf = (notes, id) => {
+var noteOf2 = (notes, id) => {
   var _a2;
   const note = notes.get(id);
   return { title: (note == null ? void 0 : note.title) || id, body: (_a2 = note == null ? void 0 : note.body) != null ? _a2 : "" };
@@ -51792,7 +51784,7 @@ function toOpml(map, notes) {
   const outlines = emitTree(
     roots,
     (node, depth) => {
-      const note = noteOf(notes, node.id);
+      const note = noteOf2(notes, node.id);
       const attrs = `text="${escapeAttr(note.title)}"${note.body ? ` _note="${escapeAttr(note.body)}"` : ""}`;
       return `${indent(depth + 2)}<outline ${attrs}${node.children.length ? ">" : "/>"}`;
     },
@@ -51817,7 +51809,7 @@ function toFreeMind(map, notes) {
   const lines = emitTree(
     roots,
     (node, depth) => {
-      const note = noteOf(notes, node.id);
+      const note = noteOf2(notes, node.id);
       const head = `${indent(depth + 1)}<node ID="ID_${++counter}" TEXT="${escapeAttr(note.title)}"`;
       const rich = note.body ? [
         `${indent(depth + 2)}<richcontent TYPE="NOTE"><html><head></head><body>${note.body.split(/\r\n?|\n/).map((part) => part ? `<p>${escapeText2(part)}</p>` : "<p><br/></p>").join("")}</body></html></richcontent>`
@@ -51825,7 +51817,7 @@ function toFreeMind(map, notes) {
       if (!node.children.length && !rich.length) return `${head}/>`;
       return [`${head}>`, ...rich].join("\n");
     },
-    (node, depth) => node.children.length || noteOf(notes, node.id).body ? `${indent(depth + 1)}</node>` : ""
+    (node, depth) => node.children.length || noteOf2(notes, node.id).body ? `${indent(depth + 1)}</node>` : ""
   );
   const body = roots.length > 1 ? [`  <node ID="ID_0" TEXT="${escapeAttr(map.title)}">`, ...lines.map((line2) => `  ${line2}`), "  </node>"] : lines;
   return ['<?xml version="1.0" encoding="UTF-8"?>', '<map version="1.0.1">', ...body, "</map>", ""].join("\n");

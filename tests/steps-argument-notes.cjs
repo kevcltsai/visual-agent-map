@@ -87,13 +87,11 @@ test('URLs: only http(s) is written, and never as link syntax', () => {
   const nf = N.notFoundDetail(t, { queries: [], opened: ['javascript:alert(1)', 'https://ok.example/p'], why: 'x' }, 'x');
   assert.ok(nf.includes('https://ok.example/p') && !nf.includes('javascript:'));
 });
-test('not found: a readable reason, the program-recorded searches, the raw code only in a collapsed callout', () => {
+test('not found: a readable reason and the program-recorded searches; no raw code anywhere', () => {
   const md = N.notFoundDetail(t, { queries: ['q one', 'q two'], opened: ['https://a.example/x'], why: 'source_quote_missing: page has only a single-year number' }, 'x');
   assert.ok(md.includes(t('ui.argument_why_source_quote_missing')));
   assert.ok(md.includes('q one') && md.includes('q two') && md.includes('single-year number'));
-  const before = md.slice(0, md.indexOf('[!note]-'));
-  assert.ok(!before.includes('source_quote_missing'), 'raw code only after the collapsed callout opens');
-  assert.ok(md.includes('> [!note]-') && md.split('[!note]-')[1].includes('source_quote_missing'));
+  assert.ok(!md.includes('source_quote_missing') && !md.includes('[!note]-'), md);
   assert.ok(N.notFoundDetail(t, undefined, 'budget').includes(t('ui.argument_why_budget')));
   assert.equal(N.whyText(t, 'something_new'), t('ui.argument_why_not_found'));
 });
@@ -243,4 +241,32 @@ test('sem3 notes: the definitions card lists definition needs and AI free-text r
   assert.ok(md.includes('how it is measured') && md.includes(t('ui.argument_note_definition_needs')));
   assert.ok(N.facetDetail(t, facet({ reason: 'clear gap' }), []).includes('clear gap'));
   assert.ok(N.definitionsDetail(t, [], undefined, ['only need']).includes('only need'));
+});
+
+// ---- live run 4 (claude:haiku): composite "code: note" strings must never show the code ----
+const WHY_CODES = ['budget', 'no_answer', 'not_found', 'stance_uncertain', 'provider_error', 'card_deleted', 'source_rejected_url', 'source_bad_quote', 'source_bad_claim', 'source_network_error', 'source_http_status', 'source_content_type', 'source_no_parser', 'source_quote_missing', 'source_blocked_unverified', 'round_limit', 'no_usable_data'];
+const NOTE = 'BLS 2026年10月新聞稿列出16–19歲13.9%，但沒有16至24歲合併數字；未採用7月9.1%。';
+const noCode = md => { for (const code of WHY_CODES) assert.ok(!md.includes(code) && !md.includes(code.replace(/_/g, '&#95;')), `${code} leaked in: ${md}`); };
+test('live4: a not-found datum or need with a composite searchLog.why renders no raw code, and keeps the agent note encoded', () => {
+  for (const code of ['not_found', 'source_quote_missing']) {
+    const why = `${code}: ${NOTE}`;
+    const log = { queries: ['bls.gov unemployment rate by age'], opened: ['https://www.bls.gov/x.htm'], why };
+    const md = N.notFoundDetail(t, log, code);
+    noCode(md);
+    assert.ok(!md.includes('&#58;') || !md.includes(code), md);
+    assert.ok(md.includes(t(`ui.argument_why_${code}`)) && md.includes('16–19歲13&#46;9&#37;') || md.includes('13'), md);
+    assert.ok(md.includes(t('ui.argument_note_agent_note')), md);
+    const d = datum({ id: 'd9', state: 'not_found', proof: undefined, propStance: undefined, stanceReason: undefined, reason: code, searchLog: log });
+    const st = state([datum(), d], [facet(), facet({ id: 'f2', verdict: 'insufficient', reason: why })]);
+    for (const out of [N.datumDetail(t, d), N.facetDetail(t, st.situation.facets[1], st.situation.data), N.situationDetail(t, st), N.conclusionDetail(t, st, new Map(), undefined, 's')]) noCode(out);
+  }
+});
+test('live4: reasonText splits a composite: the code becomes readable text, a code with trailing punctuation too', () => {
+  for (const code of WHY_CODES) {
+    for (const stored of [code, `${code}: ${NOTE}`, `${code}：${NOTE}`, `${code}.`, `${code};x`, `${code}(x)`]) {
+      const out = N.reasonText(t, stored);
+      assert.ok(!out.includes(code), `${stored} -> ${out}`);
+    }
+  }
+  assert.equal(N.reasonText(t, 'clear gap'), 'clear gap');
 });

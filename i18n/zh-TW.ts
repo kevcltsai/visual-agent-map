@@ -2862,7 +2862,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.argument_note_opened": "開啟的頁面",
   "ui.argument_note_not_adopted": "不採用的原因",
   "ui.argument_note_agent_note": "研究備註",
-  "ui.argument_note_debug": "除錯代碼",
   "ui.argument_note_none": "無",
   "ui.argument_why_budget": "研究額度用完，還沒查到這一項",
   "ui.argument_why_no_answer": "研究沒有回覆這一項",

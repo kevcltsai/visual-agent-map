@@ -5,11 +5,27 @@
 import type { AssumptionItem } from "../../core/argument-map/model";
 
 const ENTITY: Record<string, string> = { lt: "<", gt: ">", amp: "&" };
-/** The builder's entity encoding (`&#NN;` for every Markdown punctuation character), decoded in one pass so a literal `&amp;` survives read back as characters. */
+/** The reverse of a full-width twin (U+FF01..U+FF5E) back to its ASCII character. */
+const narrow = (c: string): string => String.fromCharCode(c.charCodeAt(0) - 0xfee0);
+const narrowRun = (run: string): string => [...run].map(narrow).join("");
+/**
+ * The inverse of the builder's `line`: full-width twins go back to ASCII only where the builder made them (always-wide characters, runs of
+ * `％％` `＝＝` `～～`, a leading marker, `＆` before an entity, `：` in `：//` or `：：`, `www．`), so native full-width text such as `30％` or `：` stays.
+ * Entities from notes written by an earlier build (`&#37;`) are decoded first, in one pass, so a literal `&amp;` survives as characters.
+ */
 const decode = (text: string): string =>
-  text.replace(/&(?:#(\d{1,5})|(lt|gt|amp));/g, (_m, code?: string, name?: string) =>
-    code ? String.fromCodePoint(Number(code)) : ENTITY[name!]
-  );
+  text
+    .replace(/&(?:#(\d{1,5})|(lt|gt|amp));/g, (_m, code?: string, name?: string) =>
+      code ? String.fromCodePoint(Number(code)) : ENTITY[name!]
+    )
+    .replace(/^(?:([＋－＞])|(\d+)([．）]))/, (_m, mark?: string, digits?: string, ordered?: string) =>
+      digits ? `${digits}${ordered === "．" ? "." : ")"}` : narrow(mark!)
+    )
+    .replace(/[＼｀＊＿＾＃＄［］＜｜]/g, narrow)
+    .replace(/％{2,}|＝{2,}|～{2,}/g, narrowRun)
+    .replace(/＆(?=#|\w+;)/g, narrow)
+    .replace(/：+(?=\/)|：{2,}/g, narrowRun)
+    .replace(/\bwww．/gi, m => `${m.slice(0, 3)}.`);
 
 const cells = (row: string): string[] => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
 const isSeparator = (row: string): boolean => cells(row).every(cell => /^\s*:?-{3,}:?\s*$/.test(cell));
@@ -32,7 +48,7 @@ export function parseDefinitionsTable(detail: string): AssumptionItem[] | null {
   for (const row of block.slice(2)) {
     const parts = cells(row);
     if (parts.length !== 3) return null;
-    const [label, value, reason] = parts.map(part => decode(part).trim());
+    const [label, value, reason] = parts.map(part => decode(part.trim()));
     if (!label || !value || !reason || label === "-" || value === "-") return null;
     items.push({ label, value, reason });
   }

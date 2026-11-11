@@ -1,0 +1,110 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "assumptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "label",
+              "value",
+              "reason"
+            ]
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
+    "facets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "criterion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline": {
+            "type": "string"
+          },
+          "needs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "need": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "fact",
+                    "cause",
+                    "definition"
+                  ]
+                }
+              },
+              "required": [
+                "need",
+                "kind"
+              ]
+            }
+          }
+        },
+        "required": [
+          "title",
+          "criterion",
+          "baseline",
+          "needs"
+        ]
+      },
+      "minItems": 3
+    },
+    "causalQuestions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "question": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "assumptions",
+    "facets",
+    "causalQuestions",
+    "question"
+  ]
+}

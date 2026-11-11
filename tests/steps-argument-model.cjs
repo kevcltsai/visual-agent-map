@@ -158,7 +158,6 @@ test('facet boost model: facets, assumptions, facetId, propStance, round and dat
   assert.equal(read.kind, 'usable');
   assert.equal(read.data.situation.facets.length, 4);
   assert.equal(model.readArgumentMap(facetMapDoc()).kind, 'usable');
-  assert.equal(model.UNCERTAIN_RESEARCH_STANCE, 'irrelevant');
 });
 test('facet hypotheses model: basis and alternative are optional, read as usable and round-trip; a wrong type is unusable', () => {
   const doc = facetMapDoc();

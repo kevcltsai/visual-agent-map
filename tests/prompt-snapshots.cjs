@@ -355,6 +355,8 @@ test('collect snapshots: chart step (chart.add@1)', () => {
       ['facet-verdict', 'facetVerdictStep', { ...argumentBase, language, hypothesis: 'Firms hired fewer juniors', input: { hypothesisId: 'h1', round: 1, evidence: [argumentEvidence('n1', 'supports'), argumentEvidence('n2', 'uncertain')] } }]
     ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name.startsWith('facet-judge') ? 'facet-judge' : name === 'facet-verdict' ? 'verdict' : name === 'facet-hypotheses' ? 'facet-hypotheses' : 'facet-plan'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
     for (const [name, key, input] of steps) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'situation-gate' ? 'gate' : name}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
+    // P2-8: the corrective-retry variant of the facet plan (the reason line is the only difference)
+    record(`argument-map-facet-plan-retry.${tag}`, 'core/steps/argument-map/runner.ts withRetryReason(facetPlanStep)', language, argumentSteps.withRetryReason(argumentSteps.facetPlanStep, 'The reply uses the number 9, which the request does not have').render(request), argumentSteps.facetPlanStep.schema);
   }
   for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);
 });

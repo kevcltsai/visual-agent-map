@@ -237,3 +237,25 @@ test('searchQueriesFromEvents: only completed search events count; queries and q
   ]);
   assert.deepEqual(plain(queries), ['youth unemployment 2024', 'cpi 2024']);
 });
+
+// ---- P1-2: the claim and the figure cannot vouch for numbers the quote does not carry ----
+test('P1-2: a claim number missing from the quote and the page is replaced by the quote; a supported claim is kept', async () => {
+  const { run } = make(reply(200, PAGE));
+  const bad = await run({ claim: 'Youth unemployment rose to 9.2 percent, up from 7.5 in 2023' });
+  assert.equal(bad.ok, true);
+  assert.equal(bad.proof.claim, QUOTE, 'the unsupported claim is replaced by the quote-based text');
+  assert.equal(bad.proof.claimUnverified, true);
+  const good = await run({ claim: 'Rate rose to 9.2 percent' });
+  assert.equal(good.proof.claim, 'Rate rose to 9.2 percent');
+  assert.equal(good.proof.claimUnverified, undefined);
+});
+test('P1-2: a figure whose number is not in the quote or the page is dropped; one that is stays; provider_read has only the quote', async () => {
+  const { run } = make(reply(200, PAGE));
+  assert.equal((await run({ figure: { number: '12.8', period: 'March', unit: '%' } })).proof.figure, undefined);
+  assert.deepEqual(plain((await run({ figure: { number: '9.2', period: 'March', unit: '%' } })).proof.figure), { number: '9.2', period: 'March', unit: '%' });
+  const blocked = make(reply(403, 'no'));
+  const r = await blocked.run({ openedUrls: ['https://stats.example.org/report'], claim: 'rose 11 percent', figure: { number: '11', period: 'x', unit: '%' } });
+  assert.equal(r.proof.check, 'provider_read');
+  assert.equal(r.proof.figure, undefined);
+  assert.equal(r.proof.claim, QUOTE);
+});

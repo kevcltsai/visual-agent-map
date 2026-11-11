@@ -9,6 +9,9 @@ import {
   conclusionView,
   displayVerdict,
   foundNeeds,
+  isSituationUnconfirmed,
+  isLimitCut,
+  isPartialConclusion,
   isVerified,
   MAX_ROUND,
   MIN_VERIFIED,
@@ -20,7 +23,7 @@ import {
   type SituationDatum,
   type SourceFigure
 } from "../../core/argument-map/model";
-import { safeUrl, whyText } from "./argument-notes";
+import { eliminatedWhy, safeUrl, whyText } from "./argument-notes";
 
 type Translate = (key: TranslationKey, ...values: unknown[]) => string;
 export type ArgumentRole =
@@ -50,6 +53,8 @@ export interface ArgumentCardView {
   definitions?: { label: string; value: string }[];
   /** The definitions card: the re-run button. */
   action?: { text: string; ariaLabel: string };
+  /** A paused run's card: the same resume as the progress bar's button. */
+  resume?: { text: string; ariaLabel: string };
 }
 
 const STANCE_KEY = {
@@ -69,6 +74,28 @@ const CONCLUSION_KIND: Record<ReturnType<typeof conclusionView>, TranslationKey>
   stopped_limit: "ui.argument_conclusion_state_limit",
   stopped_mismatch: "ui.argument_conclusion_state_mismatch"
 };
+const PAUSE_REASON_KEY = {
+  user: "ui.argument_paused_reason_user",
+  error: "ui.argument_paused_reason_error",
+  interrupted: "ui.argument_paused_reason_interrupted",
+  limit: "ui.argument_paused_reason_limit"
+} as const satisfies Record<string, TranslationKey>;
+/** The card of the phase a paused run stopped in: the chip, the reason line (when the reason is known) and the resume button. */
+function pausedParts(
+  state: ArgumentMapData,
+  phase: "situation" | "analysis",
+  t: Translate
+): { chip: ArgumentChip; lines: string[]; resume: { text: string; ariaLabel: string } } | null {
+  const run = state.run;
+  if (run.status !== "paused" || run.phase !== phase) return null;
+  const reason =
+    run.stopReason === undefined ? undefined : PAUSE_REASON_KEY[run.stopReason as keyof typeof PAUSE_REASON_KEY];
+  return {
+    chip: { tone: "maybe", text: t("ui.argument_bar_paused") },
+    lines: reason ? [t("ui.argument_reason_0", t(reason))] : [],
+    resume: { text: t("ui.argument_bar_resume"), ariaLabel: t("ui.argument_paused_resume_aria") }
+  };
+}
 const isFacetMap = (state: ArgumentMapData): boolean => state.situation.facets !== undefined;
 /** A stored reason code as a readable sentence (facet maps only; an old map keeps the V1 text). */
 const why = (t: Translate, stored: string): string => whyText(t, stored);
@@ -133,15 +160,40 @@ function conclusionCard(state: ArgumentMapData, t: Translate): ArgumentCardView 
   const verified = verifiedCount(state);
   if (view === "stopped_mismatch" && isFacetMap(state)) return facetStopCard(state, base, t);
   if (view === "concluded")
-    return { ...base, titleFrom: "summary", lines: [t("ui.argument_conclusion_done_hint", verified)] };
+    return {
+      ...base,
+      titleFrom: "summary",
+      lines: [
+        ...(isSituationUnconfirmed(state) ? [t("ui.argument_premise_unconfirmed")] : []),
+        ...(isPartialConclusion(state) ? [t("ui.argument_partial_conclusion_0_1", verified, MIN_VERIFIED)] : []),
+        t("ui.argument_conclusion_done_hint", verified)
+      ]
+    };
   if (view === "stopped_mismatch")
     return { ...base, title: t("ui.argument_stopped_mismatch"), lines: [t("ui.argument_mismatch_hint")] };
   if (view === "stopped_limit")
-    return { ...base, title: t("ui.argument_conclusion_limit"), lines: [t("ui.argument_conclusion_limit_hint")] };
-  return {
+    return {
+      ...base,
+      title: t("ui.argument_conclusion_limit"),
+      lines: [
+        ...(isSituationUnconfirmed(state) ? [t("ui.argument_premise_unconfirmed")] : []),
+        t("ui.argument_conclusion_limit_hint")
+      ]
+    };
+  const pending: ArgumentCardView = {
     ...base,
     title: t("ui.argument_conclusion_pending_0_1", verified, MIN_VERIFIED),
     lines: [t("ui.argument_conclusion_pending_hint_0", Math.max(0, MIN_VERIFIED - verified))]
+  };
+  const paused = pausedParts(state, "analysis", t);
+  if (!paused) return pending;
+  const lines = [...pending.lines, ...paused.lines];
+  return {
+    ...pending,
+    chips: [paused.chip],
+    lines,
+    resume: paused.resume,
+    label: [pending.label, paused.chip.text, ...lines].join(", ")
   };
 }
 
@@ -177,25 +229,27 @@ function facetStopCard(state: ArgumentMapData, base: ArgumentCardView, t: Transl
 function hypothesisCard(state: ArgumentMapData, h: Hypothesis, t: Translate): ArgumentCardView {
   const index = state.hypotheses.indexOf(h) + 1;
   const shown = displayVerdict(h);
+  // Still "verifying" after the run ended means the research limit cut it off: say so instead of showing a spinner-like state.
+  const cutOff =
+    isLimitCut(h) || (state.run.status === "finished" && h.location === "verifying" && shown === "verifying");
   const chips: ArgumentChip[] =
-    h.location === "eliminated"
-      ? [{ tone: "gap", text: t("ui.argument_eliminated_chip") }]
+    h.location === "eliminated" || cutOff
+      ? [{ tone: "gap", text: t(cutOff ? "ui.argument_unverified_limit" : "ui.argument_eliminated_chip") }]
       : [
           shown === "verifying"
             ? { tone: "open", text: t("ui.argument_verifying") }
             : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t(VERDICT_KEY[shown]) }
         ];
   if (isVerified(h)) chips.push({ tone: "yes", text: t("ui.argument_verified_done") });
-  const kind = t("ui.argument_hypothesis_0", index);
+  const kind = t(
+    h.alternative === true && isFacetMap(state) ? "ui.argument_hypothesis_alt_0" : "ui.argument_hypothesis_0",
+    index
+  );
   const progress = t("ui.argument_progress_0_1_2", foundNeeds(h).length, h.needs.length, Math.min(h.round, MAX_ROUND));
   const lines = [progress];
-  if (h.location === "eliminated" && h.eliminationReason)
-    lines.push(
-      t(
-        "ui.argument_eliminated_0",
-        isFacetMap(state) && h.eliminationReason.startsWith("round_limit") ? why(t, "round_limit") : h.eliminationReason
-      )
-    );
+  // A limit-cut hypothesis was not refuted: its chip says so and there is no elimination reason line.
+  if (h.location === "eliminated" && h.eliminationReason && !isLimitCut(h))
+    lines.push(t("ui.argument_eliminated_0", eliminatedWhy(t, h)));
   const status = chips.map(chip => chip.text).join(" ");
   return { role: "hypothesis", kind, titleFrom: "note", chips, lines, label: `${kind}, ${status}, ${progress}` };
 }
@@ -312,9 +366,18 @@ function facetSituationCard(state: ArgumentMapData, t: Translate): ArgumentCardV
     return finish({ tone: "yes", text: t("ui.argument_gate_facets_0_1") }, [
       t("ui.argument_gate_facets_line_0_1", facets.filter(f => f.verdict === "supports").length, facets.length)
     ]);
+  if (gate.state === "unconfirmed")
+    return finish({ tone: "maybe", text: t("ui.argument_gate_unconfirmed") }, [
+      t(
+        "ui.argument_reason_0",
+        t("ui.argument_reason_insufficient_0_1", facets.length - lacking(state).length, facets.length)
+      )
+    ]);
   if (gate.state === "pending") {
     const data = state.situation.data;
     const count = t("ui.argument_data_count_0_1", data.filter(d => d.state === "found").length, data.length);
+    const paused = pausedParts(state, "situation", t);
+    if (paused) return { ...finish(paused.chip, [count, ...paused.lines]), resume: paused.resume };
     return finish({ tone: "open", text: t("ui.argument_gate_pending") }, [count]);
   }
   if (gate.kind === "data_insufficient")
@@ -380,6 +443,12 @@ export function describeArgumentCard(state: ArgumentMapData, id: string, t: Tran
     const gate = state.situation.gate.state;
     if (gate === "matched")
       return plain("situation", t("ui.argument_situation"), [t("ui.argument_gate_matched_0_1", found, data.length)]);
+    const paused = gate === "pending" ? pausedParts(state, "situation", t) : null;
+    if (paused)
+      return {
+        ...plain("situation", t("ui.argument_situation"), [count, ...paused.lines], [paused.chip]),
+        resume: paused.resume
+      };
     const chip: ArgumentChip =
       gate === "unmatched"
         ? { tone: "no", text: t("ui.argument_gate_unmatched") }
@@ -401,8 +470,12 @@ export function describeArgumentCard(state: ArgumentMapData, id: string, t: Tran
     ]);
   }
   if (id === roles.eliminated) {
-    const count = state.hypotheses.filter(h => h.location === "eliminated").length;
-    return plain("group", t("ui.argument_group_label"), [t("ui.argument_group_eliminated_count_0", count)]);
+    const cut = state.hypotheses.filter(isLimitCut).length;
+    const count = state.hypotheses.filter(h => h.location === "eliminated").length - cut;
+    return plain("group", t("ui.argument_group_label"), [
+      t("ui.argument_group_eliminated_count_0", count),
+      ...(cut ? [t("ui.argument_group_unverified_count_0", cut)] : [])
+    ]);
   }
   for (const h of state.hypotheses) {
     if (h.id === id) return hypothesisCard(state, h, t);
@@ -423,7 +496,8 @@ export function renderArgumentKind(header: HTMLElement, view: ArgumentCardView):
 export function renderArgumentCardBody(
   card: HTMLElement,
   view: ArgumentCardView,
-  onAction?: (button: HTMLElement) => void
+  onAction?: (button: HTMLElement) => void,
+  onResume?: (button: HTMLElement) => void
 ): HTMLElement {
   card.dataset.argumentRole = view.role;
   if (view.state) card.dataset.argumentState = view.state;
@@ -442,6 +516,7 @@ export function renderArgumentCardBody(
   }
   for (const line of view.lines) body.createEl("p", { cls: "vam-argument-line", text: line });
   if (view.action) renderArgumentAction(body, view.action, onAction);
+  if (view.resume) renderArgumentAction(body, view.resume, onResume);
   return body;
 }
 

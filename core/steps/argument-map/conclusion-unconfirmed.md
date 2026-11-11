@@ -1,0 +1,1 @@
+The situation behind the proposition is unconfirmed: the situation data were not enough, and the program adds a notice about this itself. Do not state the situation as fact and do not repeat the notice; say only what the verified hypotheses and their evidence show.

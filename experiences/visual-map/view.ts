@@ -1387,6 +1387,22 @@ interface NoteLoadState {
   raf: number | null;
   isCurrent: () => boolean;
 }
+/** The one resume action, shared by the progress bar's button and the paused card's button. */
+function requestArgumentResume(
+  plugin: VisualAgentMapPlugin,
+  path: string,
+  button: HTMLElement,
+  onFailed: () => void
+): void {
+  (button as HTMLButtonElement).disabled = true;
+  plugin.argumentRuns.resume(path).catch((error: unknown) => {
+    onFailed();
+    (button as HTMLButtonElement).disabled = false;
+    if (!(error instanceof ArgumentRunError) || error.code === "busy") return;
+    new Notice(t(error.code === "finished" ? "ui.argument_resume_refused_finished" : "ui.argument_resume_refused"));
+  });
+}
+
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
@@ -4012,16 +4028,8 @@ export class VisualAgentMapView extends ItemView {
         attr: { type: "button" }
       });
       resume.addEventListener("click", () => {
-        resume.disabled = true;
         this.argumentBarPressed = { path, action: "resume" };
-        this.plugin.argumentRuns.resume(path).catch((error: unknown) => {
-          this.argumentBarPressed = null;
-          resume.disabled = false;
-          if (!(error instanceof ArgumentRunError) || error.code === "busy") return;
-          new Notice(
-            t(error.code === "finished" ? "ui.argument_resume_refused_finished" : "ui.argument_resume_refused")
-          );
-        });
+        requestArgumentResume(this.plugin, path, resume, () => (this.argumentBarPressed = null));
       });
     }
     this.argumentBarShown = view.action;
@@ -13845,7 +13853,16 @@ export class VisualAgentMapView extends ItemView {
     // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
     // The summary text (and, for a card with none, the faint "add a summary" line) opens its field on a plain click.
     const textEditable = !!note && this.cardTextEditable();
-    if (argumentView) renderArgumentCardBody(card, argumentView, () => void this.rerunFromDefinitions(node.id));
+    if (argumentView)
+      renderArgumentCardBody(
+        card,
+        argumentView,
+        () => void this.rerunFromDefinitions(node.id),
+        button => {
+          this.argumentBarPressed = { path: this.path, action: "resume" };
+          requestArgumentResume(this.plugin, this.path, button, () => (this.argumentBarPressed = null));
+        }
+      );
     else if (textEditable && this.inlineSummary?.id === node.id) this.paintCardSummaryEdit(card, node);
     else if (research?.preview?.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);

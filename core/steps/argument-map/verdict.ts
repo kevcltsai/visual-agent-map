@@ -14,6 +14,7 @@ import {
   grounded,
   languageInstruction,
   list,
+  noIds,
   overBudget,
   parseObject,
   text,
@@ -89,6 +90,8 @@ export function parseVerdict(raw: string, request: VerdictRequest): VerdictResul
   if (!(VERDICTS as readonly string[]).includes(item.verdict as string)) throw new ArgumentStepError("unknown verdict");
   const reason = text(item.reason, "reason");
   const citedNeeds = citation(item.citedNeeds, new Set(request.input.evidence.map(e => e.id)), "citedNeeds");
+  const ids = request.input.evidence.map(e => e.id);
+  noIds([reason], ids);
   grounded([reason], verdictTexts(request));
   return { verdict: item.verdict as Verdict, citedNeeds, reason };
 }
@@ -105,6 +108,10 @@ export function parseFacetVerdict(raw: string, request: VerdictRequest): FacetVe
     if (!(INSIGHT_KINDS as readonly unknown[]).includes(one.kind)) throw new ArgumentStepError("unknown insight kind");
     return { kind: one.kind as InsightKind, text: text(one.text, "insight") };
   });
+  noIds(
+    insights.map(i => i.text),
+    request.input.evidence.map(e => e.id)
+  );
   grounded(
     insights.map(i => i.text),
     verdictTexts(request)

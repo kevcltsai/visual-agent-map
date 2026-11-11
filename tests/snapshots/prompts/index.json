@@ -91,6 +91,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "argument-map-facet-plan-retry.en": {
+      "builder": "core/steps/argument-map/runner.ts withRetryReason(facetPlanStep)",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-facet-plan-retry.zh": {
+      "builder": "core/steps/argument-map/runner.ts withRetryReason(facetPlanStep)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-facet-plan-retry.zh-CN": {
+      "builder": "core/steps/argument-map/runner.ts withRetryReason(facetPlanStep)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "argument-map-facet-plan.en": {
       "builder": "core/steps/argument-map/facet-plan.ts facetPlanStep",
       "language": "en",

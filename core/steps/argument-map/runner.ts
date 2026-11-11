@@ -1,6 +1,6 @@
 import type { AiCalls } from "../../ai-calls";
 import { providerStepRunner, type ProviderStepRunner } from "../../provider-step-runner";
-import { prepareStep, type StepDefinition } from "../../step-runner";
+import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
 import { conclusionStep } from "./conclusion";
 import { facetHypothesesStep } from "./facet-hypotheses";
 import { facetJudgeStep } from "./facet-judge";
@@ -10,6 +10,7 @@ import { hypothesesStep } from "./hypotheses";
 import { needsStep } from "./needs";
 import { ArgumentStepError, type ArgumentStepBase } from "./shared";
 import { verdictStep } from "./verdict";
+import retryReasonTemplate from "./retry-reason.md";
 
 export * from "./conclusion";
 export * from "./facet-hypotheses";
@@ -36,6 +37,18 @@ export const ARGUMENT_STEPS = {
   verdict: verdictStep,
   conclude: conclusionStep
 } as const;
+
+/** The same step for the corrective retry: its prompt also says why the previous reply was refused (one short plain line). Only the render differs; the parser, schema and policy are the step's own. */
+export function withRetryReason<Request extends ArgumentStepBase, Output>(
+  step: StepDefinition<Request, Output>,
+  reason: string
+): StepDefinition<Request, Output> {
+  const line = reason.replace(/\s+/g, " ").trim().slice(0, 200);
+  return {
+    ...step,
+    render: request => `${step.render(request)}\n\n${renderTemplate(retryReasonTemplate.trim(), { reason: line })}`
+  };
+}
 
 export type ArgumentStepRunner<Request extends ArgumentStepBase, Output> = ProviderStepRunner<Request, Output>;
 

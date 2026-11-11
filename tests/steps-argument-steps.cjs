@@ -202,13 +202,13 @@ test('conclusion: citing an eliminated or still-verifying hypothesis, or none, t
   bad(mod.conclusionStep, req, { ...good, points: [{ text: 'x' }] });
   bad(mod.conclusionStep, req, { ...good, summary: ' ' });
 });
-test('conclusion: a number or URL outside the input throws; below 3 verified hypotheses the policy refuses', () => {
+test('conclusion: a number or URL outside the input throws; no verified hypothesis the policy refuses (1 or 2 is allowed, decision #59)', () => {
   const f = conclusionFixture();
   const req = cReq(f);
   bad(mod.conclusionStep, req, { summary: 'Unemployment hit 14 percent', points: [{ text: 'x', hypothesisIds: ['h1'] }] }, /number 14/);
   bad(mod.conclusionStep, req, { summary: 's', points: [{ text: 'see https://memory.example.com', hypothesisIds: ['h1'] }] }, /link/);
-  const two = { ...req, input: { hypotheses: f.input.hypotheses.slice(0, 2) } };
-  assert.throws(() => sr.prepareStep(mod.conclusionStep, two), error => error.name === 'ArgumentStepError');
+  const none = { ...req, input: { hypotheses: [] } };
+  assert.throws(() => sr.prepareStep(mod.conclusionStep, none), error => error.name === 'ArgumentStepError');
   const s2 = withHyps(['h1', 'h2', 'h3']);
   assert.throws(() => m.prepareConclusion(settle(settle(s2, 'h1'), 'h2')), error => error instanceof m.GateError);
 });
@@ -292,6 +292,11 @@ test('facet judge: citations belong to the facet, are found, not irrelevant, and
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').verdict = 'refutes'; }), /same stance/);
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').verdict = 'pending'; }), /verdict/);
   assert.ok(ok(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').verdict = 'refutes'; fjFacet(v, 'fa').citedData = ['a2']; })));
+});
+test('facet judge: a datum stance without a reason (or a blank one) is refused, so an irrelevant datum never has an empty reason', () => {
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.data[2].reason = ''; }), /reason/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { v.data[2].reason = '   '; }), /reason/);
+  bad(mod.facetJudgeStep, fjReq(), fjWith(v => { delete v.data[2].reason; }));
 });
 test('facet judge: an empty summary or reason is refused', () => {
   bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fa').summary = ''; }), /summary/);
@@ -475,6 +480,23 @@ test('facet plan: a well formed reply parses; ids are not in the output; cause n
   assert.equal(out.assumptions.items.length, 2);
   assert.deepEqual(plain(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions = { items: [] }; v.facets.forEach(f => { f.baseline = ''; }); }))).assumptions, { items: [] });
 });
+// Real claude:haiku replies (ids 5aaf3f5e, 6633f1f1, 752a4543) the parser wrongly refused for 「紐西蘭治安相比20年前, 是不是有變差了」.
+const liveNzFixture = name => require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', `facet-plan-nz-${name}.json`), 'utf8');
+const liveNzReq = { ...base, language: 'zh-TW', proposition: '紐西蘭治安相比20年前, 是不是有變差了', today: '2026-11-11' };
+test('facet plan: real replies that restate a stated year range, use a year inside it, or write the date before a fullwidth comma are accepted', () => {
+  for (const name of ['baseline-restates-range', 'year-inside-range', 'date-with-fullwidth-comma']) assert.doesNotThrow(() => mod.facetPlanStep.parse(liveNzFixture(name), liveNzReq), name);
+});
+test('facet plan: a number outside the request and outside every stated range is still refused; a wide span or another range grounds nothing', () => {
+  const real = JSON.parse(liveNzFixture('year-inside-range'));
+  const invented = JSON.parse(JSON.stringify(real)); invented.facets[0].criterion += ' 11202 cases';
+  bad(mod.facetPlanStep, liveNzReq, invented, /11202/);
+  const outside = JSON.parse(JSON.stringify(real)); outside.facets[0].criterion += ' 2009';
+  bad(mod.facetPlanStep, liveNzReq, outside, /2009/);
+  const wide = JSON.parse(JSON.stringify(real)); wide.assumptions.items[3].value = '1980至2007年前後的範圍'; wide.assumptions.items[3].reason = '以2025年回推20年約為2005年';
+  bad(mod.facetPlanStep, liveNzReq, wide, /2005/);
+  const unrelated = JSON.parse(liveNzFixture('baseline-restates-range')); unrelated.facets[0].baseline = '約1990至1994年的每十萬人警方紀錄犯罪率';
+  bad(mod.facetPlanStep, liveNzReq, unrelated, /baseline/);
+});
 test('facet plan: the output feeds applySituationPlan (the ids come from the program)', () => {
   const out = ok(mod.facetPlanStep, fpReq, fpOk());
   const plan = { assumptions: { id: 'as', items: out.assumptions.items }, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions };
@@ -604,9 +626,9 @@ test('facet plan: the marker lists cover zh-TW, zh-CN and en; the prompt tells t
     bad(mod.facetPlanStep, fpReq, fpWith(v => { v.question = q; }), /only the factual claim/);
   assert.ok(!/factors?\b|因素/.test(mod.CAUSAL_MARKERS.traditional.join()), 'the too-broad 因素 stays out');
 });
-test('facet plan: the number rule matches the grounding (proposition or assumption values), not "only the proposition"', () => {
+test('facet plan: the number rule matches the grounding (proposition, assumption values or today\'s date), not "only the proposition"', () => {
   const prompt = mod.facetPlanStep.render(fpReq);
-  assert.match(prompt, /only numbers that appear in the proposition or the assumption values/);
+  assert.match(prompt, /only numbers that appear in the proposition, the assumption values or today's date/);
   assert.doesNotMatch(prompt, /numbers and links that appear in the proposition\./);
 });
 test('facet judge: the prompt carries the scope rule (judged against the claim within the card scope; prompt-only, not program-checkable)', () => {
@@ -614,6 +636,20 @@ test('facet judge: the prompt carries the scope rule (judged against the claim w
   assert.match(prompt, /WITHIN the scope of the assumption card/);
   assert.match(prompt, /different subgroup[\s\S]*"irrelevant"[\s\S]*scope difference/);
   assert.match(prompt, /"refutes" only when a datum inside the scope contradicts/);
+});
+test('facet plan: a relative or current period is "the latest published year" and a baseline is a range around the point (prompt-only, not program-checkable)', () => {
+  const prompt = mod.facetPlanStep.render(fpReq);
+  assert.match(prompt, /relative or current period[\s\S]*latest published year[\s\S]*not today's calendar year/);
+  assert.match(prompt, /about 20 years ago[\s\S]*span of a few years around it/);
+  assert.match(prompt, /written as such in the assumption value/);
+});
+test('facet judge: a datum in the assumption period range or the nearest period within a few years is in scope, and the reason names the gap (prompt-only, not program-checkable)', () => {
+  for (const step of [mod.facetJudgeStep]) {
+    const prompt = step.render(fjReq());
+    assert.match(prompt, /Period rule[\s\S]*inside the range of the assumption[\s\S]*nearest available period[\s\S]*within a few years[\s\S]*IN scope/);
+    assert.match(prompt, /reason must say the period gap in plain words/);
+    assert.match(prompt, /different place, population or measure, or a period clearly outside the range/);
+  }
 });
 const preset = [{ label: 'Age band', value: 'ages 25 to 34, 2018 to 2019', reason: 'edited by the owner' }];
 test('facet plan: preset assumptions replace the AI assumption card; without them the AI card stays; the prompt shows them only when given', () => {
@@ -715,4 +751,117 @@ test('sem3 facet judge: a facet without a criterion is refused before any call; 
 });
 test('facet judge request without fixed data has no fixed stances block', () => {
   assert.doesNotMatch(mod.facetJudgeStep.render(fjReq({ facets: [{ id: 'fa', title: 'T', data: [fdatum('a1')] }] })), /\nFixed stances \(/);
+});
+
+// ---- real haiku replies (owner's first run, 2026-11-11) that an over-strict parser refused ----
+const REAL_PROP = '台灣少子化主要是因為經濟壓力嗎';
+const realReq = { ...base, language: 'zh-TW', proposition: REAL_PROP };
+const REAL_YEARS = "{\"assumptions\":{\"items\":[{\"label\":\"指標\",\"value\":\"總生育率（TFR）與年出生人數\",\"reason\":\"少子化通常以生育率與出生數衡量，原命題未指明用哪一個指標。\"},{\"label\":\"期間\",\"value\":\"2015至2025年\",\"reason\":\"原命題沒有時間範圍，以近十年作為預設，較能反映目前狀況。\"},{\"label\":\"比較基準（更替水準）\",\"value\":\"更替水準（每位婦女約2.1人）\",\"reason\":\"判斷是否屬於少子化，需要一個生育率門檻。\"},{\"label\":\"比較基準（前期）\",\"value\":\"2015年的水準\",\"reason\":\"判斷是否在下降，需要一個起點。\"},{\"label\":\"比較對象（同區域）\",\"value\":\"南韓與日本的同期生育率\",\"reason\":\"判斷台灣的情況是否比鄰近經濟體更低。\"}]},\"facets\":[{\"title\":\"台灣總生育率低於更替水準\",\"criterion\":\"若2015至2025年間台灣總生育率長期低於2.1，支持此面向；若達到或高於2.1，則反駁。\",\"baseline\":\"更替水準（每位婦女約2.1人）\",\"needs\":[{\"need\":\"台灣近年總生育率數值及其與更替水準的差距\",\"kind\":\"fact\"},{\"need\":\"總生育率與更替水準的定義及計算方式\",\"kind\":\"definition\"}]},{\"title\":\"台灣出生率較2015年下降\",\"criterion\":\"若2015至2025年間台灣年出生人數與總生育率明顯下降，支持此面向；若持平或上升，則反駁。\",\"baseline\":\"2015年的水準\",\"needs\":[{\"need\":\"2015至2025年台灣年出生人數與總生育率的變化數據\",\"kind\":\"fact\"}]},{\"title\":\"台灣生育率低於南韓與日本同期水準\",\"criterion\":\"若同期台灣總生育率低於南韓與日本，支持此面向；若不低於或較高，則反駁。\",\"baseline\":\"南韓與日本的同期生育率\",\"needs\":[{\"need\":\"同期南韓與日本總生育率的官方統計數據\",\"kind\":\"fact\"}]}],\"causalQuestions\":[\"經濟壓力是否為台灣少子化的主要原因？\"],\"question\":\"台灣是否正在經歷少子化？\"}";
+const REAL_PARTS = "{\"assumptions\":{\"items\":[{\"label\":\"地理範圍\",\"value\":\"臺灣全境（全國層級）\",\"reason\":\"命題只寫「台灣」，未說明是全國或某個縣市，預設採全國資料。\"},{\"label\":\"時間範圍\",\"value\":\"最近已公布的完整年度；比較對象為較早的同期（約十年前）\",\"reason\":\"命題沒有指定時間，預設看最新可得的統計，並與較早的同期比較才能判斷「少子化」是否存在。\"},{\"label\":\"少子化指標\",\"value\":\"總生育率與年度出生數\",\"reason\":\"「少子化」在命題中沒有數值定義，預設以官方常用的總生育率與出生數來檢查。\"},{\"label\":\"國際比較基準\",\"value\":\"其他已開發經濟體的平均總生育率\",\"reason\":\"命題沒有比較對象；若要判斷臺灣的水準是否偏低，需要與其他已開發經濟體比較。\"},{\"label\":\"替代水準基準\",\"value\":\"總生育率需達到的人口替代水準（每名婦女約2.1名子女）\",\"reason\":\"人口學上常以維持人口穩定所需的生育率作為判斷少子化的門檻，預設用來衡量臺灣是否低於該水準。\"}]},\"facets\":[{\"title\":\"出生數或總生育率低於較早的同期\",\"criterion\":\"若臺灣最近已公布年度的總生育率或出生數低於較早的同期，支持此面向；若兩者持平或更高，則反駁。\",\"baseline\":\"較早的同期（約十年前）\",\"needs\":[{\"need\":\"臺灣最近已公布年度的總生育率與較早同期的總生育率\",\"kind\":\"fact\"},{\"need\":\"臺灣最近已公布年度的出生數與較早同期的出生數\",\"kind\":\"fact\"},{\"need\":\"少子化的定義，以及官方採用的總生育率與出生數計算方式\",\"kind\":\"definition\"}]},{\"title\":\"總生育率低於人口替代水準\",\"criterion\":\"若臺灣最近已公布年度的總生育率低於人口替代水準，支持此面向；若達到或高於該水準，則反駁。\",\"baseline\":\"人口替代水準\",\"needs\":[{\"need\":\"臺灣最近已公布年度總生育率與人口替代水準的差距\",\"kind\":\"fact\"}]},{\"title\":\"總生育率在已開發經濟體中偏低\",\"criterion\":\"若臺灣最近已公布年度的總生育率低於其他已開發經濟體的平均值，支持此面向；若高於或相近，則反駁。\",\"baseline\":\"其他已開發經濟體的平均總生育率\",\"needs\":[{\"need\":\"臺灣與其他已開發經濟體最近年度平均總生育率的比較資料\",\"kind\":\"fact\"}]}],\"causalQuestions\":[\"經濟壓力是否是臺灣少子化的主要原因？\"],\"question\":\"臺灣正在出現少子化現象嗎？\"}";
+const realWith = (raw, fn) => { const v = JSON.parse(raw); fn(v); return v; };
+
+test('facet plan: years in the reply\'s own assumption values may be reused in question, titles, criteria, baselines and needs', () => {
+  const out = plain(ok(mod.facetPlanStep, realReq, JSON.parse(REAL_YEARS)));
+  assert.equal(out.facets[1].baseline, '2015年的水準');
+  bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.facets[1].title = '台灣出生率較2012年下降'; }), /number 2012/);
+  bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.facets[0].needs[0].need = '2012年的總生育率'; }), /number 2012/);
+  bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.question = '台灣2030年是否少子化？'; }), /number 2030/);
+  // P2-7 (intentional change): causal questions may now reuse a year of the assumption values; a year nowhere in the request is still refused.
+  assert.ok(ok(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.causalQuestions = ['2015年經濟壓力是主因嗎？']; })));
+  bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.causalQuestions = ['2012年經濟壓力是主因嗎？']; }), /number 2012/);
+});
+
+test('facet plan: a baseline may be a part of an assumption value, or contain one; trivial or unrelated baselines still fail', () => {
+  const out = plain(ok(mod.facetPlanStep, realReq, JSON.parse(REAL_PARTS)));
+  assert.deepEqual(out.facets.map(f => f.baseline), ['較早的同期（約十年前）', '人口替代水準', '其他已開發經濟體的平均總生育率']);
+  assert.ok(ok(mod.facetPlanStep, realReq, realWith(REAL_PARTS, v => { v.facets[2].baseline = '臺灣全境（全國層級）的數據'; })), 'a baseline that contains a value');
+  bad(mod.facetPlanStep, realReq, realWith(REAL_PARTS, v => { v.facets[1].baseline = '歷史平均出生人數'; }), /baseline/);
+  bad(mod.facetPlanStep, realReq, realWith(REAL_PARTS, v => { v.facets[1].baseline = '水'; }), /baseline/);
+  bad(mod.facetPlanStep, realReq, realWith(REAL_PARTS, v => { v.facets[1].baseline = '年'; }), /baseline/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].baseline = 'all'; v.assumptions.items.forEach(i => { i.value = 'overall'; }); }), /baseline/);
+});
+
+test('P1-4: a retry need that asks for a cause is refused like a facet-plan need (zh-TW, zh-CN and en markers)', () => {
+  for (const need of ['What caused the rise in the youth rate', 'Why the youth rate went up', '青年失業率上升的原因', '青年失业率上升的成因', 'Youth rate rise due to automation']) {
+    bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').retryNeeds = [need]; }), /cause|retry/);
+  }
+});
+
+test('P2-7: an assumption label, reason and a causal question may reuse a year the assumption values carry; a number or link nowhere in the request is still refused', () => {
+  const prop = ok(mod.facetPlanStep, { ...base, proposition: 'Youth unemployment is rising' }, fpWith(v => {
+    v.assumptions.items[0].value = 'ages 16 to 24 for the years 2023 to 2024';
+    v.assumptions.items[0].label = 'Age band 16 to 24';
+    v.assumptions.items[0].reason = 'covers 2023 to 2024 only';
+    v.causalQuestions = ['Did automation drive the rise in 2023?'];
+    v.question = 'Did youth unemployment rise?';
+  }));
+  assert.ok(prop);
+  const req = { ...base, proposition: 'Youth unemployment is rising' };
+  bad(mod.facetPlanStep, req, fpWith(v => { v.assumptions.items[0].reason = 'covers 1999 only'; v.question = 'Did youth unemployment rise?'; }), /1999/);
+  bad(mod.facetPlanStep, req, fpWith(v => { v.causalQuestions = ['Did automation drive the rise in 1999?']; v.question = 'Did youth unemployment rise?'; }), /1999/);
+  bad(mod.facetPlanStep, req, fpWith(v => { v.assumptions.items[0].reason = 'see https://x.example.com'; v.question = 'Did youth unemployment rise?'; }), /link/);
+});
+
+// The owner's real 2026-11-11 replies for 「紐西蘭治安相比20年前, 是不是有變差了」: the build of that day refused them for 2006 and 2026,
+// years the model wrote into its own assumption values (period, baseline). Both must parse now.
+const NZ_PROP = '紐西蘭治安相比20年前, 是不是有變差了';
+const nzReq = { ...base, language: 'zh-TW', proposition: NZ_PROP, today: '2026-11-11' };
+const NZ_2006 = "{\"assumptions\":{\"items\":[{\"label\":\"比較基準時點\",\"value\":\"約2006年（20年前）\",\"reason\":\"提問以「20年前」為比較起點，以今年往前推算。\"},{\"label\":\"現況時點\",\"value\":\"最新可得的官方資料\",\"reason\":\"提問說「現在」但未指定年份，因此採用最新公布的資料。\"},{\"label\":\"治安衡量指標\",\"value\":\"警方登記的犯罪率，並以國家受害調查為輔\",\"reason\":\"治安沒有單一數字，需先決定用哪類統計來判斷。\"},{\"label\":\"地區範圍\",\"value\":\"紐西蘭全國\",\"reason\":\"提問未限定地區，採全國整體。\"},{\"label\":\"對象範圍\",\"value\":\"全體居民\",\"reason\":\"提問未指定年齡或族群，採整體人口。\"}]},\"facets\":[{\"title\":\"警方登記的整體犯罪率與基準時點相比\",\"criterion\":\"若最新官方資料的整體登記犯罪率高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。需同時取得最新與基準時點的數字。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭警方公布的最新整體登記犯罪率統計\",\"kind\":\"fact\"},{\"need\":\"紐西蘭約2006年的整體登記犯罪率統計\",\"kind\":\"fact\"},{\"need\":\"登記犯罪與受害調查在統計口徑與定義上的差異\",\"kind\":\"definition\"}]},{\"title\":\"國家受害調查的被害比例與基準時點相比\",\"criterion\":\"若最新受害調查的被害比例高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。受害調查可補足未報案的犯罪。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭國家受害調查中最新的被害比例\",\"kind\":\"fact\"},{\"need\":\"紐西蘭國家受害調查中約2006年的被害比例\",\"kind\":\"fact\"}]},{\"title\":\"暴力犯罪數字與基準時點相比\",\"criterion\":\"若最新暴力犯罪的登記數字或比率高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭警方統計中最新的暴力犯罪數字\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方統計中約2006年的暴力犯罪數字\",\"kind\":\"fact\"}]}],\"causalQuestions\":[],\"question\":\"紐西蘭治安相比20年前有變差嗎？\"}";
+const NZ_2026 = "{\"assumptions\":{\"items\":[{\"label\":\"時間範圍\",\"value\":\"現在（2026年）與20年前（2006年）\",\"reason\":\"今天是2026-11-11，「20年前」可換算為2006年，命題未寫明確切年份。\"},{\"label\":\"地區範圍\",\"value\":\"紐西蘭全國\",\"reason\":\"命題說「紐西蘭」，未限定城市或地區。\"},{\"label\":\"對象範圍\",\"value\":\"全體人口\",\"reason\":\"命題未指定特定年齡、族群或對象。\"},{\"label\":\"比較基準\",\"value\":\"2006年的全國治安指標\",\"reason\":\"命題以20年前作為比較基準，因此以2006年的同類指標為對照。\"},{\"label\":\"治安指標\",\"value\":\"警方登記的暴力與財產犯罪率，並參考住戶犯罪被害調查\",\"reason\":\"「治安」沒有單一量測方式，需同時看登記數據與民眾被害經驗才能判斷。\"}]},\"facets\":[{\"title\":\"警方登記犯罪率高於20年前\",\"criterion\":\"若2026年與2006年的全國每人口登記犯罪率比較顯示上升，支持此面向；若下降或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭警方或統計局公布的2026年全國每人口登記犯罪率\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方或統計局公布的2006年全國每人口登記犯罪率\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方「登記犯罪」與計算每人口犯罪率的定義與方法\",\"kind\":\"definition\"}]},{\"title\":\"暴力犯罪率高於20年前\",\"criterion\":\"若2026年與2006年的全國暴力犯罪率比較顯示上升，支持此面向；若下降或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭2026年全國暴力犯罪的每人口登記數據\",\"kind\":\"fact\"},{\"need\":\"紐西蘭2006年全國暴力犯罪的每人口登記數據\",\"kind\":\"fact\"}]},{\"title\":\"民眾犯罪被害經驗高於20年前\",\"criterion\":\"若住戶犯罪被害調查顯示近期的被害比例高於2006年前後，支持此面向；若較低或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭犯罪與被害調查（NZCVS）近期年度的民眾被害比例\",\"kind\":\"fact\"},{\"need\":\"紐西蘭犯罪與被害調查2006年前後的民眾被害比例\",\"kind\":\"fact\"}]},{\"title\":\"近年治安指標的變化方向\",\"criterion\":\"若近年警方登記犯罪與被害調查的年度數據整體走升，且長期高於2006年水準，支持此面向；若整體走降或回到原水準，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭警方登記犯罪的近年年度變化數據與官方趨勢說明\",\"kind\":\"fact\"}]}],\"causalQuestions\":[],\"question\":\"紐西蘭治安相比20年前是否變差？\"}";
+test('owner regression 2026-11-11: the New Zealand 20-years replies with 2006 and 2026 from the assumption values parse', () => {
+  for (const raw of [NZ_2006, NZ_2026]) {
+    const out = plain(ok(mod.facetPlanStep, nzReq, JSON.parse(raw)));
+    assert.ok(out.facets.length >= 3 && out.facets.length <= 5);
+    assert.ok(out.assumptions.items.length > 0);
+  }
+  // Without today's date the reason "今天是2026-11-11" has no source: the date is what makes it grounded, not a looser rule.
+  bad(mod.facetPlanStep, { ...nzReq, today: undefined }, JSON.parse(NZ_2026), /number 11/);
+  bad(mod.facetPlanStep, nzReq, realWith(NZ_2026, v => { v.assumptions.items[0].reason = '今天是2026-11-12'; }), /number 12/);
+});
+
+// ---- #59: replies that name an id; partial conclusion ----
+const realReplies = require('./fixtures/argument-real-replies-with-ids.json');
+const P59_PROP = '紐西蘭治安相比20年前, 是不是有變差了';
+test('#59 real failed reply (needs, exchange 92d08dc8): the made-up number 111 is still refused', () => {
+  const req = { ...needReq, proposition: P59_PROP, hypothesis: { title: '警力配置與執法強度改變', statement: '治安感受的變化可能來自警力部署的調整', round: 3 }, data: [], existing: [], max: 1 };
+  bad(mod.needsStep, req, realReplies.needs.response, /number 111/);
+});
+test('#59 real failed reply (facet verdict, exchange 6333bbea): an id in the reason or insight text is refused as an id, not as a number', () => {
+  const ids = ['4924cc48-8487-4f23-88d9-154103363460', 'f1f62724-6a32-4d93-b9a0-c1d7bc3fbff3', 'c8cc89c1-0000-4000-8000-000000000001'];
+  const evidence = ids.map(id => ({ id, claim: '證據', quote: 'quote text here', url: 'https://example.org/a', stance: 'contradicts' }));
+  const req = fvReq({ hypothesisId: 'h1', round: 1, evidence }, { hypothesis: '監視器普及使治安改善' });
+  bad(mod.facetVerdictStep, req, realReplies.facetVerdict.response, /names an id/);
+  // the same reply with the ids removed from the text passes the id check (it then fails only on the numbers, which this fixture does not have)
+  const clean = JSON.parse(realReplies.facetVerdict.response);
+  clean.reason = '假說主張治安改善，但證據顯示不安全感上升。';
+  clean.insights = clean.insights.map(i => ({ ...i, text: i.text.replace(/c8cc89c1/g, '某項證據') }));
+  assert.equal(mod.facetVerdictStep.parse(reply(clean), req).citedNeeds.length, 2);
+});
+test('#59 verdict reason naming an evidence id (or its first 8 characters) is refused; short ids are not checked', () => {
+  const longId = 'abcdef12-3456-4789-8abc-def012345678';
+  const input = { hypothesisId: 'h1', round: 1, evidence: [{ id: longId, claim: 'Rate was 9.2 percent', quote: 'rate 9.2 percent', url: 'https://stats.example.org/a', stance: 'supports' }, { id: 'n2', claim: 'c', quote: 'q q q', url: 'https://stats.example.org/b', stance: 'supports' }] };
+  const req = fvReq(input);
+  const good = { verdict: 'supported', citedNeeds: [longId], reason: 'Matches the 9.2 percent', insights: [{ kind: 'consistent', text: 'The data agree on 9.2 percent' }] };
+  assert.ok(ok(mod.facetVerdictStep, req, good));
+  bad(mod.facetVerdictStep, req, { ...good, reason: `${longId} matches` }, /names an id/);
+  bad(mod.facetVerdictStep, req, { ...good, reason: 'ABCDEF12 matches' }, /names an id/);
+  const { insights, ...v1 } = good;
+  bad(mod.verdictStep, req, { ...v1, reason: 'abcdef12 matches' }, /names an id/);
+  assert.ok(ok(mod.facetVerdictStep, req, { ...good, reason: 'n2 matches the 9.2 percent' }), 'a short id is ordinary text');
+});
+test('#59 conclusion: an id in the summary or a point is refused; one verified hypothesis is a valid request and partial adds the partial rule to the prompt', () => {
+  const hid = '4924cc48-8487-4f23-88d9-154103363460';
+  const eid = 'f1f62724-6a32-4d93-b9a0-c1d7bc3fbff3';
+  const input = { hypotheses: [{ id: hid, round: 1, evidence: [{ id: eid, claim: 'Rate was 9.2 percent', quote: 'rate 9.2 percent', url: 'https://stats.example.org/a', stance: 'supports' }] }] };
+  const req = { ...base, proposition: PROP, input, statements: { [hid]: 'Hiring slowed' } };
+  const good = { summary: 'Hiring slowed', points: [{ text: 'Rate was 9.2 percent', hypothesisIds: [hid] }] };
+  assert.ok(ok(mod.conclusionStep, req, good));
+  bad(mod.conclusionStep, req, { ...good, summary: `see ${hid}` }, /names an id/);
+  bad(mod.conclusionStep, req, { ...good, points: [{ text: 'in 4924cc48 it rose', hypothesisIds: [hid] }] }, /names an id/);
+  bad(mod.conclusionStep, req, { ...good, points: [{ text: `evidence ${eid}`, hypothesisIds: [hid] }] }, /names an id/);
+  assert.ok(sr.prepareStep(mod.conclusionStep, req));
+  const full = mod.conclusionStep.render(req);
+  const partial = mod.conclusionStep.render({ ...req, partial: true });
+  assert.notEqual(partial, full);
+  assert.ok(partial.length > full.length);
 });

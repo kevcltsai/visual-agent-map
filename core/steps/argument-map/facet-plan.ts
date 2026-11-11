@@ -19,6 +19,8 @@ export interface FacetPlanRequest extends ArgumentStepBase {
   proposition: string;
   /** Rerun from an edited assumption card: these replace whatever the AI proposes (and are shown to it so the facets fit them). */
   presetAssumptions?: { label: string; value: string; reason: string }[];
+  /** Today's date (YYYY-MM-DD) from the program clock: a relative period ("20 years ago") needs it, and its numbers count as given. */
+  today?: string;
 }
 /** Fact needs only: the program assigns every id, and a "cause" need has already moved into `causalQuestions`. */
 export interface FacetPlanResult {
@@ -48,7 +50,7 @@ const CAUSAL_RE = new RegExp(
   ].join("|"),
   "i"
 );
-const isCausal = (value: string): boolean => CAUSAL_RE.test(value);
+export const isCausal = (value: string): boolean => CAUSAL_RE.test(value);
 
 export const NEED_KINDS = ["fact", "cause", "definition"] as const;
 
@@ -105,33 +107,72 @@ export const FACET_PLAN_SCHEMA = {
   required: ["assumptions", "facets", "causalQuestions", "question"]
 };
 
-/** The phrases a baseline may name: each whole assumption value, and each phrase of a value that lists several (split at ; ； 、 or a line break). */
-const baselinePhrases = (items: { value: string }[]): Set<string> =>
-  new Set(
-    items
-      .flatMap(i => [i.value, ...i.value.split(/[;；、\n]/)])
-      .map(normalized)
-      .filter(Boolean)
+/** A text long enough to be a baseline match: at least 4 latin characters or 2 CJK characters (a CJK character counts double). */
+const substantial = (value: string): boolean =>
+  [...value.replace(/\s/g, "")].reduce(
+    (sum, ch) => sum + (/[\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff]/.test(ch) ? 2 : 1),
+    0
+  ) >= 4;
+
+/** The year ranges an assumption value states ("2004至2008年", "2004-2008"), each as [from, to]; a span over 15 years is not a period around a point and is ignored. */
+const YEAR_RANGE = /(\d{4})\s*(?:至|到|~|-|–|—|to)\s*(\d{4})/g;
+const MAX_RANGE_SPAN = 15;
+const yearRanges = (value: string): [number, number][] =>
+  [...value.normalize("NFKC").matchAll(YEAR_RANGE)]
+    .map(m => [Number(m[1]), Number(m[2])] as [number, number])
+    .filter(([from, to]) => to >= from && to - from <= MAX_RANGE_SPAN);
+
+/** Every year inside a stated range counts as given: "about 2004 to 2008" lets the reply say 2005. */
+const rangeYears = (values: string[]): string[] =>
+  values.flatMap(value =>
+    yearRanges(value).flatMap(([from, to]) => Array.from({ length: to - from + 1 }, (_, i) => String(from + i)))
   );
+
+/** A baseline is tied to an assumption when it contains, or is contained in, one assumption value (after normalizing), and the shorter side is not a trivial fragment. */
+const baselineMatches = (baseline: string, items: { value: string }[]): boolean => {
+  const key = normalized(baseline);
+  // A baseline that states the same year range as a value restates that value, even with different words around it.
+  const ranges = yearRanges(baseline);
+  if (ranges.some(([from, to]) => items.some(item => yearRanges(item.value).some(([f, t]) => f === from && t === to))))
+    return true;
+  return items.some(item => {
+    const value = normalized(item.value);
+    const [short, long] = key.length <= value.length ? [key, value] : [value, key];
+    return substantial(short) && long.includes(short);
+  });
+};
 
 export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPlanResult {
   const item = parseObject(raw, ["assumptions", "facets", "causalQuestions", "question"]);
   const sources = [request.proposition];
+  const today = request.today ? [request.today] : [];
   const question = text(item.question, "question");
   if (isCausal(question)) throw new ArgumentStepError("the question must restate only the factual claim, not a cause");
-  grounded([question], sources);
   const assumptionList = parseObject(JSON.stringify(item.assumptions), ["items"]);
   const items = list(assumptionList.items, "assumptions.items").map(entry => {
     const one = parseObject(JSON.stringify(entry), ["label", "value", "reason"]);
     const label = text(one.label, "label");
     const value = text(one.value, "value");
     const reason = text(one.reason, "reason");
-    grounded([label, reason], sources);
     groundedLinks([value], sources);
     return { label, value, reason };
   });
+  // Label and reason may use the years and quantities of the assumption values (the AI's scope choices); links stay proposition-only
+  // because every value's links were checked against the proposition above.
+  for (const one of items)
+    grounded(
+      [one.label, one.reason],
+      [request.proposition, ...today, ...items.map(a => a.value), ...rangeYears(items.map(a => a.value))]
+    );
   const effectiveItems = request.presetAssumptions?.length ? request.presetAssumptions : items;
-  const phrases = baselinePhrases(effectiveItems);
+  // Assumption values are the AI's own scope choices (links-only checked), so their years and quantities may be reused below.
+  const withValues = [
+    request.proposition,
+    ...today,
+    ...effectiveItems.map(a => a.value),
+    ...rangeYears(effectiveItems.map(a => a.value))
+  ];
+  grounded([question], withValues);
   const entries = list(item.facets, "facets");
   if (entries.length < MIN_FACETS || entries.length > MAX_FACETS)
     throw new ArgumentStepError(`expected ${MIN_FACETS} to ${MAX_FACETS} facets`);
@@ -143,7 +184,7 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
     const key = normalized(question);
     if (causalKeys.has(key)) return;
     causalKeys.add(key);
-    grounded([question], sources);
+    grounded([question], withValues);
     causal.push(question);
   };
   const definitionNeeds: string[] = [];
@@ -159,18 +200,15 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
     const title = text(one.title, "title");
     const criterion = text(one.criterion, "criterion");
     const baseline = (one.baseline as string).trim();
-    if (baseline && !phrases.has(normalized(baseline)))
+    if (baseline && !baselineMatches(baseline, effectiveItems))
       throw new ArgumentStepError(
-        "a facet baseline must be one of the assumption values or a baseline phrase listed in one"
+        "a facet baseline must be one of the assumption values or a part of one (or contain one)"
       );
-    grounded(
-      [criterion, baseline],
-      [request.proposition, ...effectiveItems.flatMap(a => [a.label, a.value, a.reason])]
-    );
+    grounded([criterion, baseline], [...withValues, ...effectiveItems.flatMap(a => [a.label, a.reason])]);
     const titleKey = normalized(title);
     if (titles.has(titleKey)) throw new ArgumentStepError("a facet title repeats another one");
     titles.add(titleKey);
-    grounded([title], sources);
+    grounded([title], withValues);
     if (isCausal(title)) continue; // a cause topic is not a facet of the fact
     const needs: { need: string }[] = [];
     for (const raw of list(one.needs, "needs")) {
@@ -180,7 +218,7 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
       const key = normalized(needText);
       if (needKeys.has(key)) throw new ArgumentStepError("a situation need repeats another one");
       needKeys.add(key);
-      grounded([needText], sources);
+      grounded([needText], withValues);
       if (need.kind === "cause" || isCausal(needText)) addCausal(needText);
       else if (need.kind === "definition") definitionNeeds.push(needText);
       else needs.push({ need: needText });
@@ -230,6 +268,7 @@ export const facetPlanStep: StepDefinition<FacetPlanRequest, FacetPlanResult> = 
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.proposition),
       proposition: JSON.stringify(request.proposition),
+      today: request.today ? `\n\nToday's date: ${request.today}.` : "",
       preset: request.presetAssumptions?.length
         ? `\n\n${presetText.trim()}\n${JSON.stringify(request.presetAssumptions)}`
         : ""

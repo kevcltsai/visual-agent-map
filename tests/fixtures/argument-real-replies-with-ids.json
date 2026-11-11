@@ -1,0 +1,14 @@
+{
+ "needs": {
+  "exchange": "92d08dc8-c125-436b-839f-eed5d322ad90",
+  "step": "argument-map.needs@1",
+  "error": "The reply uses the number 111, which the request does not have",
+  "response": "{\"needs\":[{\"text\":\"紐西蘭警方對緊急與優先案件的到場回應時間（例如接獲111報案後到達現場的平均時間），相較於20年前是否有公開數據顯示變化？警方年報或獨立審查報告是否記錄這些數字？\"}]}"
+ },
+ "facetVerdict": {
+  "exchange": "6333bbea-4393-415d-bcd1-d6986bd796d0",
+  "step": "argument-map.facet-verdict@1",
+  "error": "The reply uses the number 4924, which the request does not have",
+  "response": "{\"verdict\":\"refuted\",\"citedNeeds\":[\"4924cc48-8487-4f23-88d9-154103363460\",\"f1f62724-6a32-4d93-b9a0-c1d7bc3fbff3\"],\"reason\":\"假說主張整體治安感受會改善，但 4924cc48 顯示感到因犯罪而不安全的比例上升，直接與此主張相反。f1f62724 也顯示搶劫、闖入住宅與性侵害上升，只有竊盜下降，不支持整體改善。\",\"insights\":[{\"kind\":\"consistent\",\"text\":\"兩項證據都指向治安感受或暴力與侵入型犯罪惡化，與假說所說的整體改善方向不一致。\"},{\"kind\":\"tension\",\"text\":\"c8cc89c1 提到 CCTV 可能與某地犯罪下降有關，但該說法屬軼事且沒有對照評估，無法支持監視器普及帶來改善的因果判斷。\"},{\"kind\":\"missing\",\"text\":\"目前證據沒有把監視器、行車記錄器、手機定位或私人保全的普及程度與犯罪或不安感的變化分開比較，因此無法驗證這些防護手段本身的效果。\"}]}"
+ }
+}

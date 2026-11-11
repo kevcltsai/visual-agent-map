@@ -123,10 +123,10 @@ test('hypothesis card: verdict, why it holds, insights by kind, evidence table w
   assert.ok(N.hypothesisDetail(t, hyp({ aiVerdict: 'refuted' }), 'r').includes(t('ui.argument_note_why_fails')));
 });
 test('conclusion card (concluded): summary, insights, basis table, eliminated, situation basis', () => {
-  const st = state([datum()], [facet()], { hypotheses: [hyp({ needs: [need()] }), hyp({ id: 'h2', location: 'eliminated', eliminationReason: 'round_limit: not verified after round 3' })], conclusion: { state: 'concluded', basedOn: ['h1'], missing: [] } });
-  const md = N.conclusionDetail(t, st, new Map([['h1', 'Hyp 1'], ['h2', 'Hyp 2']]), { summary: 'final answer', points: ['p1', 'p2'] });
-  for (const key of ['core', 'insights', 'basis_hypotheses', 'eliminated', 'situation_basis']) assert.ok(md.includes(`### ${t(`ui.argument_note_${key}`)}`), key);
-  assert.ok(md.includes('final answer') && md.includes('Hyp 1') && md.includes('Hyp 2') && md.includes(t('ui.argument_why_round_limit')));
+  const st = state([datum()], [facet()], { hypotheses: [hyp({ needs: [need()] }), hyp({ id: 'h2', location: 'eliminated', eliminationReason: 'round_limit: not verified after round 3' }), hyp({ id: 'h3', location: 'eliminated', eliminationReason: 'the data fall' })], conclusion: { state: 'concluded', basedOn: ['h1'], missing: [] } });
+  const md = N.conclusionDetail(t, st, new Map([['h1', 'Hyp 1'], ['h2', 'Hyp 2'], ['h3', 'Hyp 3']]), { summary: 'final answer', points: ['p1', 'p2'] });
+  for (const key of ['core', 'insights', 'basis_hypotheses', 'eliminated', 'unverified', 'situation_basis']) assert.ok(md.includes(`### ${t(`ui.argument_note_${key}`)}`), key);
+  assert.ok(md.includes('final answer') && md.includes('Hyp 1') && md.includes('Hyp 2') && md.includes(t('ui.argument_unverified_limit')) && md.includes('the data fall'));
   assert.ok(!md.includes('round_limit'));
 });
 test('conclusion card (stopped): the refuting facet with datum quote and link, or the insufficient facets with their searches', () => {
@@ -162,9 +162,9 @@ test('block and reference syntax in model text is inert in every builder', () =>
     assert.ok(!md.split('\n').some(l => /indented/.test(l) && /^ {3,}\S/.test(l.replace(/^ {2}- /, ''))), 'indent');
   }
 });
-test('line(): leading block markers are entity-encoded, ordinary text is unchanged', () => {
+test('line(): leading block markers are full-width, ordinary text is unchanged', () => {
   const md = N.definitionsDetail(t, [{ label: 'plain text', value: '# H', reason: '1. one' }], ['# H', '- b', 'normal']);
-  assert.ok(md.includes('&#35; H'), md);
+  assert.ok(md.includes('＃ H'), md);
   assert.ok(!/^- (- |# )/m.test(md), md);
   assert.ok(md.includes('plain text'));
 });
@@ -195,7 +195,7 @@ test('re-run: an unreadable table creates no map and starts nothing; a readable 
 });
 
 // ---- review round 1 (B1): whitelist sanitizing ---------------------------------------------------------------------------------------
-const inertText = md => !/%%|\$|(^|[^&\w])#\w|\]\(|\[\[|!\[|<[a-z]|==|~~|`|\*|\bhttps?:[^\s]*[()[\]]/i.test(md.replace(/&#\d+;/g, ''));
+const inertText = md => !/%%|\$|(^|[^&\w])#\w|\]\(|\[\[|!\[|<[a-z]|==|~~|`|\*|\bhttps?:[^\s]*[()[\]]/i.test(md);
 test('safeUrl: whitelist only; a lone % is %25, $ is %24, nothing else can start math, a comment, a highlight or a link', () => {
   assert.equal(N.safeUrl('https://a.example/p?q=%%&r=$$x'), 'https://a.example/p?q=%25%25&r=%24%24x');
   assert.equal(N.safeUrl('https://a.example/a%41%%41'), 'https://a.example/a%41%25%41');
@@ -246,16 +246,16 @@ test('sem3 notes: the definitions card lists definition needs and AI free-text r
 // ---- live run 4 (claude:haiku): composite "code: note" strings must never show the code ----
 const WHY_CODES = ['budget', 'no_answer', 'not_found', 'stance_uncertain', 'provider_error', 'card_deleted', 'source_rejected_url', 'source_bad_quote', 'source_bad_claim', 'source_network_error', 'source_http_status', 'source_content_type', 'source_no_parser', 'source_quote_missing', 'source_blocked_unverified', 'round_limit', 'no_usable_data'];
 const NOTE = 'BLS 2026年10月新聞稿列出16–19歲13.9%，但沒有16至24歲合併數字；未採用7月9.1%。';
-const noCode = md => { for (const code of WHY_CODES) assert.ok(!md.includes(code) && !md.includes(code.replace(/_/g, '&#95;')), `${code} leaked in: ${md}`); };
+const noCode = md => { for (const code of WHY_CODES) assert.ok(!md.includes(code) && !md.includes(code.replace(/_/g, '＿')), `${code} leaked in: ${md}`); };
 test('live4: a not-found datum or need with a composite searchLog.why renders no raw code, and keeps the agent note encoded', () => {
   for (const code of ['not_found', 'source_quote_missing']) {
     const why = `${code}: ${NOTE}`;
     const log = { queries: ['bls.gov unemployment rate by age'], opened: ['https://www.bls.gov/x.htm'], why };
     const md = N.notFoundDetail(t, log, code);
     noCode(md);
-    assert.ok(!md.includes('&#58;') || !md.includes(code), md);
+    assert.ok(!md.includes('&#'), md);
     assert.ok(md.includes(t(`ui.argument_why_${code}`)), `readable reason missing: ${md}`);
-    assert.ok(md.includes('13.9&#37;'), `encoded agent note missing: ${md}`);
+    assert.ok(md.includes('13.9%'), `readable agent note missing: ${md}`);
     assert.ok(md.includes(t('ui.argument_note_agent_note')), md);
     const d = datum({ id: 'd9', state: 'not_found', proof: undefined, propStance: undefined, stanceReason: undefined, reason: code, searchLog: log });
     const st = state([datum(), d], [facet(), facet({ id: 'f2', verdict: 'insufficient', reason: why })]);
@@ -270,4 +270,78 @@ test('live4: reasonText splits a composite: the code becomes readable text, a co
     }
   }
   assert.equal(N.reasonText(t, 'clear gap'), 'clear gap');
+});
+
+// ---- Bugs B and C: no HTML entities in any note, full-width neutralization, pending datum note ------------------------------------------
+const NZ_CLAIM = '司法部官方新聞稿報告 NZCVS 整體犯罪被害比例從 2018 年 30% 降到 2025 年 28%，但比較基準是 2018 年而非疫情前 2019 年。';
+const NZ_QUOTE = 'the proportion of victims of crime has dropped from 30% in 2018 to 28% in 2025.';
+const nzDatum = (over = {}) => datum({ need: '紐西蘭官方犯罪趨勢報告中，近期與疫情前比較的敘述', proof: proof({ claim: NZ_CLAIM, quote: NZ_QUOTE, url: 'https://www.justice.govt.nz/about/news-and-media/media-releases/new-survey-shows-drop-in-crime/', figure: { number: '28', period: '2025 年', unit: '% 成人' } }), ...over });
+const ATTACKS = ['$x$ and $y$', '#tag and #other', '*bold* _it_ ~~del~~ ==hi== ^sup', '{{x}} {y} ^block', '[[a]] ![b](c) [d](obsidian://open?vault=v)', '%%comment%%', '> quote', '- item', '+ plus', '1. one', '2) two', '|a|b|', '\\$x\\$', 'a: b', 'see http://evil.example/x and www.evil.example', 'key:: value', '<!-- c --> <b>x</b>', '> [!danger] callout', '# heading', '---', '===', '```js', '~~~', '&#37; &amp; &lt;', 'x\n### Injected', '30% of 2018: a-b, c.', ...EVIL];
+test('Bug B: no HTML entity in any builder output, for the real NZ data and every attack string', () => {
+  const entity = /&#\d+;|&(?:lt|gt|amp|quot);/;
+  const st = state([nzDatum()], [facet({ title: '近期與疫情前', reason: NZ_CLAIM, summary: NZ_CLAIM })]);
+  const outs = [N.datumDetail(t, st.situation.data[0]), N.facetDetail(t, st.situation.facets[0], st.situation.data), N.situationDetail(t, st), N.definitionsDetail(t, [{ label: '期間', value: '2018 年 30% 與 2025 年 28%', reason: 'NZCVS: 28% in 2025 - a "drop"' }], [NZ_CLAIM]), N.notFoundDetail(t, { queries: [NZ_QUOTE], opened: [], why: `not_found: ${NZ_CLAIM}` }, 'not_found')];
+  for (const md of outs) { assert.ok(!md.includes('&#'), md); assert.ok(!entity.test(md), md); }
+  assert.ok(outs[0].includes('30%') && outs[0].includes('28%'), 'percent signs read as plain %');
+  for (const bad of ATTACKS) {
+    const h = hyp({ basis: bad, insights: [{ kind: 'tension', text: bad }], needs: [need({ text: bad })] });
+    const s2 = state([nzDatum({ need: bad, stanceReason: bad, proof: proof({ claim: bad, quote: bad, figure: { number: '1', period: bad, unit: bad } }) })], [facet({ title: bad, reason: bad, summary: bad })], { hypotheses: [h], conclusion: { state: 'concluded', basedOn: ['h1'], missing: [] } });
+    const all = [N.datumDetail(t, s2.situation.data[0]), N.facetDetail(t, s2.situation.facets[0], s2.situation.data), N.situationDetail(t, s2), N.definitionsDetail(t, [{ label: bad, value: bad, reason: bad }], [bad], [bad]), N.hypothesisDetail(t, h, bad), N.conclusionDetail(t, s2, new Map([['h1', bad]]), { summary: bad, points: [bad] }), N.notFoundDetail(t, { queries: [bad], opened: [], why: `not_found: ${bad}` }, 'x')];
+    for (const md of all) {
+      assert.ok(!/&#\d+;|&lt;|&gt;|&amp;/.test(md), `${JSON.stringify(bad)} -> ${md}`);
+      // inert: no line of model text starts a heading/quote/list/rule except the builder's own, and no inline construct survives
+      assert.ok(!/%%|\$|==|~~|`|\*|\[\[|!\[|\]\(|<[a-z!/]|(^|[\s])#\w|\bhttps?:\/\/[^\s]*evil|\bwww\.evil|\w::|\^/.test(md.replace(/https:\/\/(?:stats\.example\.org|www\.justice\.govt\.nz)[^\s]*/g, '')), `${JSON.stringify(bad)} -> ${md}`);
+      for (const l of md.split('\n')) {
+        const own = /^(### |> \[!summary\]$|\| |- |  - |```mermaid$|```$|xychart|  |> )/.test(l) || l === '';
+        if (!own) assert.ok(!/^\s*([#>+\-*=~|`<\[]|\d+[.)])/.test(l), `${JSON.stringify(bad)} -> a bare line starts a block: ${JSON.stringify(l)}`);
+        if (l.startsWith('> ')) assert.ok(!/^> (\[!|>|#|-|\+|\d+[.)])/.test(l.replace('> [!summary]', '')), `callout/quote ${JSON.stringify(l)}`);
+        if (l.startsWith('- ')) assert.ok(!/^- (-|\+|>|#|\d+[.)]|\[)/.test(l), `list ${JSON.stringify(l)}`);
+      }
+    }
+  }
+});
+test('Bug B: full-width replacements are visually equal and the readable punctuation stays', () => {
+  const md = N.definitionsDetail(t, [{ label: '$5 #tag', value: 'GDP 30% (2018): a, b. 100%% [x] <y> |z| *s* _u_ ~~d~~ x ~ y =a= ==h== ^e', reason: '1. one' }, { label: '- minus', value: '> quote', reason: '+ plus' }, { label: 'u', value: 'http://a.example/x www.a.example key:: v &#37; &amp;', reason: '2) two' }]);
+  const rows = rowsOf(md);
+  assert.ok(rows[2].includes('＄5 ＃tag'), rows[2]);
+  assert.ok(rows[2].includes('GDP 30% (2018): a, b. 100％％ ［x］ ＜y> ｜z｜ ＊s＊ ＿u＿ ～～d～～ x ~ y =a= ＝＝h＝＝ ＾e'), rows[2]);
+  assert.ok(rows[2].includes('1． one'), rows[2]);
+  assert.ok(rows[3].includes('－ minus') && rows[3].includes('＞ quote') && rows[3].includes('＋ plus'), rows[3]);
+  assert.ok(rows[4].includes('http：//a.example/x www．a.example key：： v ＆＃37; ＆amp;') && rows[4].includes('2） two'), rows[4]);
+});
+test('Bug B: the definitions table round-trips through the re-run parser, including native full-width text and old entity notes', () => {
+  const items = [{ label: '$5 #tag', value: 'GDP 30% (2018): a, b. 100%% [x] <y> |z| *s* _u_ ~~d~~ x ~ y =a= ==h== ^e', reason: '1. one' }, { label: '- minus', value: '> quote', reason: '+ plus' }, { label: 'u', value: 'http://a.example/x www.a.example key:: v &#37; &amp; &lt;', reason: '2) two' }, { label: '全形：冒號（括號）％', value: '30％ 與 ！ ＂', reason: '１．不動' }, { label: 'x', value: 'back\\slash `tick` {b} !k', reason: 'ok' }];
+  assert.deepEqual(plainJson(R.parseDefinitionsTable(N.definitionsDetail(t, items, ['i']))), items);
+  const legacy = '| a | b | c |\n| --- | --- | --- |\n| l | 28 &#37; &#58; &#45; | r |';
+  assert.deepEqual(plainJson(R.parseDefinitionsTable(legacy)), [{ label: 'l', value: '28 % : -', reason: 'r' }]);
+});
+test('Bug C: a found datum with no propStance gets a full note: claim, figure, period, unit, quote, link and 對命題：判定中', () => {
+  const md = N.datumDetail(t, nzDatum({ propStance: undefined, stanceReason: undefined }));
+  assert.ok(md.includes('對命題: 判定中') || md.includes('對命題：判定中'), md);
+  assert.ok(md.includes('28 % 成人') && md.includes('2025 年'), md);
+  assert.ok(md.includes(NZ_CLAIM) && md.includes(NZ_QUOTE), md);
+  assert.ok(md.includes('https://www.justice.govt.nz/about/news-and-media/media-releases/new-survey-shows-drop-in-crime/'), md);
+  assert.ok(!md.includes('無關') && !md.includes('支持命題'), md);
+  assert.ok(!md.includes('&#'), md);
+  const row = rowsOf(md).pop();
+  assert.ok(row.includes('判定中'), row);
+});
+test('Bug C: a judged irrelevant datum shows its reason in the note, never an empty cell', () => {
+  const md = N.datumDetail(t, nzDatum({ propStance: 'irrelevant', stanceReason: '比較基準不是疫情前' }));
+  assert.ok(md.includes('無關') && md.includes('比較基準不是疫情前'), md);
+  const row = rowsOf(md).pop();
+  assert.ok(!/\| - \|$/.test(row), row);
+  assert.ok(row.endsWith('比較基準不是疫情前 |'), row);
+});
+
+// ---- P1-5 (review): reference-style links and scheme-without-// are inert in summaries (plainLine) and details (line) ----
+const REF = ['[x][y]', '[x]: obsidian:open?vault=a', 'obsidian:open?file=b', 'javascript:alert(1)', 'mailto:a@b.example', 'MAILTO:a@b.example'];
+const refLeft = text => /[\[\]]|\b(?!https?:)[a-z][a-z0-9+.-]*:(?=\S)/i.test(text);
+test('P1-5: every bracket and every non-web scheme colon is widened in plainLine and in the detail builders', () => {
+  for (const bad of REF) {
+    assert.ok(!refLeft(N.plainLine(`x ${bad} y`)), `plainLine ${bad} -> ${N.plainLine(bad)}`);
+    const md = N.datumDetail(t, datum({ need: bad, stanceReason: bad, proof: proof({ claim: bad, quote: bad + ' quote text long enough' }) }));
+    assert.ok(!/\[x\]|obsidian:open|javascript:|mailto:/i.test(md), `detail ${bad}`);
+  }
+  assert.equal(N.plainLine('rate: 9.2% at 10:30 see https://a.example/x'), 'rate: 9.2% at 10:30 see https://a.example/x');
 });

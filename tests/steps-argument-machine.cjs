@@ -346,6 +346,7 @@ test('propose_hypotheses fills the verifying group up to 3 within the 6 cap', ()
   let s = matched();
   assert.deepEqual(actions(s), [{ type: 'propose_hypotheses', count: 3 }]);
   s = withHypotheses(['h1', 'h2', 'h3']);
+  s = settle(settle(s, 'h2'), 'h3');
   s = drop(s, 'h1');
   assert.deepEqual(actions(s).filter(a => a.type === 'propose_hypotheses'), [{ type: 'propose_hypotheses', count: 1 }]);
 });
@@ -388,7 +389,9 @@ test('no reducer works on a stopped_mismatch or concluded run', () => {
 });
 
 // ---- dead need replaced (ticket 01) -------------------------------------------------------------------------------------------
-const miss = { found: false, reason: 'none' };
+// Only a source-side miss (url or quote failed) may be stood in for; the other reasons keep blocking (P1-1).
+const miss = { found: false, reason: 'source_quote_missing' };
+const hardMiss = { found: false, reason: 'not_found' };
 /** h1 round 1 with needs [a found, b not_found], settled. */
 function deadB() {
   let s = withHypotheses();
@@ -407,6 +410,22 @@ test('dead need #1: revise replaces the not_found need; once the replacement is 
   s = m.applyVerdict(s, 'h1', { verdict: 'supported', citedNeeds: ['a', 'rc'], reason: 'ok' });
   assert.equal(model.isVerified(s.hypotheses[0]), true);
   assert.equal(s.hypotheses[0].round, 2);
+});
+test('P1-1: a need whose miss was "nothing found" / no answer / uncertain / provider error is never replaced, so the hypothesis cannot verify around it', () => {
+  for (const reason of ['not_found', 'no_answer', 'stance_uncertain', 'provider_error', 'card_deleted', 'none']) {
+    let s = withHypotheses();
+    s = m.addNeeds(s, 'h1', [{ id: 'a', text: 'x' }, { id: 'b', text: 'y' }]);
+    s = researched(s, 'h1', 'a', found());
+    s = researched(s, 'h1', 'b', { found: false, reason });
+    s = m.startNextRound(s, 'h1', [{ id: 'rc', text: 'something easier' }]);
+    assert.equal(s.hypotheses[0].needs.find(n => n.id === 'rc').replaces, undefined, reason);
+    s = researched(s, 'h1', 'rc', found('supports', 3));
+    const h = plain(s.hypotheses[0]); h.aiVerdict = 'supported';
+    assert.equal(model.allNeedsFound(h), false, reason);
+    assert.equal(model.isVerified(h), false, reason);
+    h.needs.find(n => n.id === 'rc').replaces = 'b'; // a forged or older save
+    assert.equal(model.isVerified(h), false, `${reason}: a forged replaces does not retire it`);
+  }
 });
 test('dead need #2: with no replacement the not_found need still blocks, even when the user marks supported', () => {
   const s = plain(deadB());
@@ -699,7 +718,7 @@ test('facet boost: 2 of 4 supports and no refutes goes to analysis, and hypothes
   assert.ok(s.situation.gate.citedData.length >= 1);
   assert.equal(m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'], basis: 'from f1d1 we observe the rate, so we guess a cause' }]).hypotheses.length, 1);
 });
-test('facet boost: 1 of 4 supports: retry round, then still short: data_insufficient (stopReason data_missing)', () => {
+test('facet boost: 1 of 4 supports: retry round, then still short: data_insufficient (unconfirmed, the run goes on)', () => {
   let s = researchAll(planned([1, 1, 1, 1]), ['f2d1', 'f3d1']);
   s = judged(s, {}, { f1: 'supports', f2: 'supports', f3: 'supports', f4: 'insufficient' });
   assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'insufficient', 'insufficient', 'insufficient'], 'facets without found data are forced insufficient');
@@ -712,13 +731,13 @@ test('facet boost: 1 of 4 supports: retry round, then still short: data_insuffic
   s = researchAll(s, ['r2', 'r3']);
   assert.deepEqual(types(s), ['judge_facets']);
   s = judged(s, {}, {});
-  assert.equal(s.situation.gate.state, 'unmatched');
+  assert.equal(s.situation.gate.state, 'unconfirmed');
   assert.equal(s.situation.gate.kind, 'data_insufficient');
   assert.equal(s.situation.gate.round, 2);
-  assert.equal(s.run.phase, 'stopped_mismatch');
-  assert.equal(s.run.stopReason, 'data_missing');
+  assert.equal(s.run.phase, 'analysis', 'decision #58: insufficient data no longer stops the run');
+  assert.equal(s.run.stopReason, undefined);
   assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'insufficient', 'insufficient', 'insufficient']);
-  assert.deepEqual(actions(s), []);
+  assert.deepEqual(types(s), ['propose_hypotheses']);
 });
 test('facet boost: round 2 only re-judges the facets that were insufficient; a supported one keeps its verdict', () => {
   let s = researchAll(planned([1, 1, 1, 1]), ['f3d1', 'f4d1']);
@@ -779,24 +798,41 @@ test('facet boost: citations: other facet, irrelevant data, other stance, unfoun
   const pendingVerdict = judgement(s); pendingVerdict.facets[0].verdict = 'pending';
   refuses(s, () => m.applyFacetVerdicts(s, pendingVerdict));
 });
-test('facet boost: uncertain research maps to the single stance constant and the judgement cannot override it', () => {
-  assert.equal(model.UNCERTAIN_RESEARCH_STANCE, 'irrelevant');
-  assert.equal(model.propStanceForUncertainResearch(), 'irrelevant');
-  let s = planned([1, 1, 1, 1]);
-  s = m.beginSituationResearch(s, 'f1d1');
-  s = m.applySituationEvidence(s, 'f1d1', { found: true, stance: 'uncertain', proof: proof(1) });
+test('facet boost: uncertain research is stored found with NO propStance (unjudged, never locked); the judge assigns it like any other datum', () => {
+  // Bug A: research stance is relative to the need, so it must not decide propStance (it used to be locked as irrelevant with no reason).
+  assert.equal(model.UNCERTAIN_RESEARCH_STANCE, undefined);
+  assert.equal(model.propStanceForUncertainResearch, undefined);
+  const uncertain = () => {
+    const s = m.applySituationEvidence(m.beginSituationResearch(planned([1, 1, 1, 1]), 'f1d1'), 'f1d1', { found: true, stance: 'uncertain', proof: proof(1) });
+    return s;
+  };
+  let s = uncertain();
   const d = s.situation.data.find(x => x.id === 'f1d1');
   assert.equal(d.state, 'found');
-  assert.equal(d.propStance, 'irrelevant');
+  assert.equal(d.propStance, undefined);
+  assert.equal(d.stance, undefined);
+  assert.equal(model.isStanceLocked(d), false);
   s = researchAll(s);
   const j = judgement(s);
   j.data.find(x => x.id === 'f1d1').propStance = 'supports';
-  refuses(s, () => m.applyFacetVerdicts(s, j));
-  const keep = judgement(s);
-  assert.equal(keep.data.find(x => x.id === 'f1d1').propStance, 'irrelevant');
-  s = m.applyFacetVerdicts(s, keep);
-  assert.equal(s.situation.data.find(x => x.id === 'f1d1').propStance, 'irrelevant');
-  assert.equal(s.situation.facets[0].verdict, 'insufficient', 'only irrelevant data: no basis');
+  j.data.find(x => x.id === 'f1d1').reason = 'the figure shows it';
+  const supported = m.applyFacetVerdicts(s, j);
+  assert.equal(supported.situation.data.find(x => x.id === 'f1d1').propStance, 'supports');
+  assert.equal(supported.situation.data.find(x => x.id === 'f1d1').stanceReason, 'the figure shows it');
+  // the judge may still say irrelevant, with a reason (the #47 meaning lives only at the judge level)
+  const irrelevant = m.applyFacetVerdicts(s, judgement(s, { f1d1: 'irrelevant' }));
+  const kept = irrelevant.situation.data.find(x => x.id === 'f1d1');
+  assert.equal(kept.propStance, 'irrelevant');
+  assert.ok(kept.stanceReason && kept.stanceReason.trim());
+  assert.equal(irrelevant.situation.facets[0].verdict, 'insufficient', 'only irrelevant data: no basis');
+  // an irrelevant stance with no reason (stored by the earlier build) is not locked either: the judge may re-assess it
+  assert.equal(model.isStanceLocked({ propStance: 'irrelevant' }), false);
+  assert.equal(model.isStanceLocked({ propStance: 'supports', stanceReason: 'x' }), true);
+  assert.equal(model.isStanceLocked({ propStance: 'refutes' }), true);
+  // a stance with a blank reason is refused, so an irrelevant datum never has an empty reason
+  const blank = judgement(s, { f1d1: 'irrelevant' });
+  blank.data.find(x => x.id === 'f1d1').reason = ' ';
+  refuses(s, () => m.applyFacetVerdicts(s, blank));
   // old maps are untouched: an uncertain stance is still refused there
   let o = m.applySituationData(m.newArgumentMap(roles, 'r'), [{ id: 'd1', need: 'x' }]);
   o = m.beginSituationResearch(o, 'd1');
@@ -831,13 +867,15 @@ test('facet boost: retry needs: only insufficient facets, once, 3 per facet, 9 i
   // an empty batch ends the run as data_insufficient (round 1)
   const none = m.addRetryNeeds(base, []);
   assert.equal(none.situation.gate.kind, 'data_insufficient');
-  assert.equal(none.run.stopReason, 'data_missing');
+  assert.equal(none.situation.gate.state, 'unconfirmed');
+  assert.equal(none.run.phase, 'analysis');
+  assert.equal(none.run.stopReason, undefined);
   assert.equal(none.situation.gate.round, 1);
   // a refuting facet never reaches a retry
   const refuted = judged(researchAll(planned([1, 1, 1, 1])), { f1d1: 'refutes' }, { f1: 'refutes' });
   refuses(refuted, () => m.addRetryNeeds(refuted, [need('f2', 'x')]));
 });
-test('facet boost: budget spent: only situation_budget, no stop_limit; the unresearched needs become not_found(budget) and the run ends data_insufficient', () => {
+test('facet boost: budget spent: only situation_budget, no stop_limit; the unresearched needs become not_found(budget) and the run goes on unconfirmed', () => {
   let s = planned([1, 1, 1, 1]);
   s.run.researchCalls = 78;
   assert.deepEqual(types(s), ['situation_budget']);
@@ -848,8 +886,8 @@ test('facet boost: budget spent: only situation_budget, no stop_limit; the unres
   assert.deepEqual(types(s), ['judge_facets']);
   s = judged(s, {}, {});
   assert.equal(s.situation.gate.kind, 'data_insufficient');
-  assert.equal(s.run.stopReason, 'data_missing');
-  assert.equal(s.run.phase, 'stopped_mismatch');
+  assert.equal(s.run.stopReason, undefined);
+  assert.equal(s.run.phase, 'analysis');
   assert.ok(!s.situation.data.some(d => d.state === 'pending'));
 });
 test('facet boost: the research cap is min(24 - used, whole-map remaining); a facet map never emits stop_limit', () => {

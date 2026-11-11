@@ -24,11 +24,13 @@ import {
   PROOF_CHECKS,
   PROP_STANCES,
   VERDICTS,
-  propStanceForUncertainResearch,
   isStanceLocked,
+  isSituationUnconfirmed,
   allNeedsFound,
   effectiveVerdict,
+  evidenceClearlySupports,
   foundNeeds,
+  isSourceSideMiss,
   isVerified,
   verifiedHypotheses,
   type ArgumentMapData,
@@ -102,6 +104,7 @@ export interface ConclusionInput {
 const TERMINAL = ["concluded", "stopped_mismatch", "stopped_limit"];
 const clone = (state: ArgumentMapData): ArgumentMapData => JSON.parse(JSON.stringify(state)) as ArgumentMapData;
 const blank = (value: unknown): boolean => typeof value !== "string" || value.trim() === "";
+export { isSituationUnconfirmed };
 const isTerminal = (state: ArgumentMapData): boolean => TERMINAL.includes(state.run.phase);
 
 function live(state: ArgumentMapData): void {
@@ -118,7 +121,7 @@ function inSituation(state: ArgumentMapData): void {
 }
 function inAnalysis(state: ArgumentMapData): void {
   live(state);
-  if (state.run.phase !== "analysis" || state.situation.gate.state !== "matched")
+  if (state.run.phase !== "analysis" || (state.situation.gate.state !== "matched" && !isSituationUnconfirmed(state)))
     throw new GateError("the situation gate has not matched");
 }
 function hypothesisOf(state: ArgumentMapData, id: string): Hypothesis {
@@ -163,6 +166,7 @@ function checkedProof(value: unknown): SourceProof {
     url: p.url as string,
     quote: p.quote as string,
     claim: p.claim as string,
+    ...(p.claimUnverified === true ? { claimUnverified: true } : {}),
     check: p.check as SourceProof["check"],
     checkedAt: p.checkedAt as string,
     ...(figure ? { figure } : {})
@@ -244,7 +248,9 @@ function analysisActions(state: ArgumentMapData): ArgumentAction[] {
   if (verifiedHypotheses(state).length >= MIN_VERIFIED) return [{ type: "conclude" }];
   const actions: ArgumentAction[] = [];
   let budget = MAX_RESEARCH_CALLS - state.run.researchCalls;
-  const want = Math.min(MIN_VERIFIED - verifyingCount(state), MAX_HYPOTHESES - state.hypotheses.length);
+  // Finish the hypotheses already on the table before proposing more (decision #59): replacements wait until none is still open.
+  const open = state.hypotheses.some(h => h.location === "verifying" && !isVerified(h));
+  const want = open ? 0 : Math.min(MIN_VERIFIED - verifyingCount(state), MAX_HYPOTHESES - state.hypotheses.length);
   if (want > 0) actions.push({ type: "propose_hypotheses", count: want });
   for (const h of state.hypotheses) {
     if (h.location !== "verifying") continue;
@@ -307,7 +313,12 @@ export function nextActions(state: ArgumentMapData): ArgumentAction[] {
   if (isTerminal(state) || state.run.status !== "running") return [];
   if (state.run.phase === "situation") return situationActions(state);
   const actions = analysisActions(state);
-  return limitStop(state, actions) ? [{ type: "stop_limit" }] : actions;
+  if (!limitStop(state, actions)) return actions;
+  // At the limit with 1 or 2 verified hypotheses the conclusion is still written, on those only (decision #59).
+  // Hypotheses still being worked on finish first (their own steps are in `actions`).
+  if (verifiedHypotheses(state).length >= 1)
+    return actions.length || hasSearching(state) ? actions : [{ type: "conclude" }];
+  return [{ type: "stop_limit" }];
 }
 
 // ---- situation ----------------------------------------------------------------------------------------------------------------
@@ -412,9 +423,9 @@ export function applySituationEvidence(
   const datum = next.situation.data.find(d => d.id === dataId);
   if (!datum || datum.state !== "searching") throw new GateError("situation datum is not being researched");
   if (result.found === true) {
-    // A facet map keeps an "uncertain" answer whose source was verified: the stance toward the proposition comes from one constant (#47).
-    if (hasFacets(state) && result.stance === "uncertain") datum.propStance = propStanceForUncertainResearch();
-    else datum.stance = stanceOf(DATA_STANCES, result.stance);
+    // A facet map keeps an "uncertain" answer whose source was verified, found and unjudged: research stance is relative to the need, so it
+    // never decides propStance; the facet judge assigns it (it may say irrelevant, with a reason).
+    if (!(hasFacets(state) && result.stance === "uncertain")) datum.stance = stanceOf(DATA_STANCES, result.stance);
     datum.proof = checkedProof(result.proof);
     datum.state = "found";
     return next;
@@ -499,8 +510,14 @@ const stopFacets = (
   cited: string[]
 ) => {
   const round = next.situation.gate.round ?? 1;
+  if (kind === "data_insufficient") {
+    // Decision #58: insufficient data does not stop the run; the situation is marked unconfirmed and the analysis begins.
+    next.situation.gate = { state: "unconfirmed", kind, reason, citedData: cited, round };
+    next.run.phase = "analysis";
+    return next;
+  }
   next.situation.gate = { state: "unmatched", kind, reason, citedData: cited, round };
-  return stopMismatch(next, kind === "not_matching" ? "mismatch" : "data_missing");
+  return stopMismatch(next, "mismatch");
 };
 
 /**
@@ -528,7 +545,7 @@ export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudge
     const datum = foundData.find(d => d.id === entry.id);
     if (!datum) throw new GateError("the judgement names a datum that is not being judged");
     const stance = stanceOf(PROP_STANCES, entry.propStance);
-    // Locked: supports, refutes and the uncertain mapping. An irrelevant stance the judge gave in round 1 may be judged again (#sem3).
+    // Locked: supports and refutes. An irrelevant stance, or none yet, may be judged (again) (#sem3).
     if (isStanceLocked(datum) && datum.propStance !== stance)
       throw new GateError("a stance that is already fixed cannot be changed");
     if (blank(entry.reason)) throw new GateError("a stance needs a reason");
@@ -666,7 +683,7 @@ export function applySituationGate(
 // ---- hypotheses and needs ----------------------------------------------------------------------------------------------------
 export function applyHypotheses(
   state: ArgumentMapData,
-  items: { id: string; citedData: string[]; basis?: string; alternative?: boolean }[]
+  items: { id: string; citedData: string[]; basis?: string; alternative?: boolean; statement?: string }[]
 ): ArgumentMapData {
   inAnalysis(state);
   if (!items.length) throw new GateError("no hypotheses");
@@ -676,7 +693,8 @@ export function applyHypotheses(
   const foundData = new Set(next.situation.data.filter(d => d.state === "found").map(d => d.id));
   for (const item of items) {
     const cited = Array.isArray(item.citedData) ? item.citedData : [];
-    if (!cited.length || cited.some(id => !foundData.has(id)))
+    // An unconfirmed situation has no supporting data to cite (decision #58): an empty citation is allowed there only.
+    if ((!cited.length && !isSituationUnconfirmed(next)) || cited.some(id => !foundData.has(id)))
       throw new GateError("a hypothesis must cite found situation data");
     // A facet map (decision #50): every hypothesis states its basis and rests on data that support the proposition only.
     const facetMap = next.situation.facets !== undefined;
@@ -691,6 +709,7 @@ export function applyHypotheses(
       round: 1,
       location: "verifying",
       needs: [],
+      ...(typeof item.statement === "string" && item.statement.trim() ? { statement: item.statement } : {}),
       ...(facetMap ? { basis: item.basis, alternative: item.alternative === true } : {})
     });
   }
@@ -708,10 +727,14 @@ function pushNeeds(
   if (inRound + items.length > MAX_ROUND_NEEDS) throw new GateError("too many needs in this round");
   if (h.needs.length + items.length > MAX_NEEDS) throw new GateError("too many needs for this hypothesis");
   const ids = allIds(next);
-  // Only the next-round path may stand in for dead needs: not_found, from an earlier round, not already replaced; list order.
+  // Only the next-round path may stand in for dead needs: a source-side not_found (the model never said the evidence is absent), from an earlier round, not already replaced; list order.
   const open = replaceDead
     ? h.needs.filter(
-        n => n.state === "not_found" && n.addedRound < h.round && !h.needs.some(other => other.replaces === n.id)
+        n =>
+          n.state === "not_found" &&
+          isSourceSideMiss(n) &&
+          n.addedRound < h.round &&
+          !h.needs.some(other => other.replaces === n.id)
       )
     : [];
   for (const [index, item] of items.entries()) {
@@ -828,7 +851,9 @@ export function applyVerdict(
   const cited = Array.isArray(verdict.citedNeeds) ? verdict.citedNeeds : [];
   if (!cited.length || cited.some(id => !inside.has(id)))
     throw new GateError("a verdict must cite evidence of this hypothesis");
-  h.aiVerdict = verdict.verdict as Verdict;
+  // A supported verdict the evidence does not clearly back is kept as undecided: the program checks the stances, not only the prompt.
+  h.aiVerdict =
+    verdict.verdict === "supported" && !evidenceClearlySupports(h) ? "undecided" : (verdict.verdict as Verdict);
   return next;
 }
 
@@ -859,11 +884,13 @@ export function eliminateAtLimit(state: ArgumentMapData, hypothesisId: string): 
 }
 
 // ---- conclusion -----------------------------------------------------------------------------------------------------------------
-/** The whole input of the conclusion step: verified hypotheses and their evidence. Refused below 3. */
+/** The whole input of the conclusion step: verified hypotheses and their evidence. Refused below 3 unless the run is at its limit with at least 1 (decision #59). */
 export function prepareConclusion(state: ArgumentMapData): ConclusionInput {
   inAnalysis(state);
   const verified = verifiedHypotheses(state);
-  if (verified.length < MIN_VERIFIED) throw new GateError("fewer than 3 verified hypotheses");
+  if (!verified.length) throw new GateError("no verified hypothesis");
+  if (verified.length < MIN_VERIFIED && !limitStop(state, analysisActionsSafe(state)))
+    throw new GateError("fewer than 3 verified hypotheses and the run is not at its limit");
   return { hypotheses: verified.map(h => ({ id: h.id, round: h.round, evidence: evidenceOf(foundNeeds(h)) })) };
 }
 
@@ -877,7 +904,12 @@ export function applyConclusion(state: ArgumentMapData, conclusion: { basedOn: s
   next.run.phase = "concluded";
   next.run.status = "finished";
   delete next.run.stopReason;
-  next.conclusion = { state: "concluded", basedOn: [...new Set(basedOn)], missing: [] };
+  next.conclusion = {
+    state: "concluded",
+    basedOn: [...new Set(basedOn)],
+    missing: [],
+    ...(verified.size < MIN_VERIFIED ? { partial: true } : {})
+  };
   return next;
 }
 
@@ -886,14 +918,11 @@ export function applyLimitStop(state: ArgumentMapData): ArgumentMapData {
   if (state.run.status !== "running" || !limitStop(state, analysisActionsSafe(state)))
     throw new GateError("the run is not at a limit");
   const next = clone(state);
+  // Ids of what is still open; the card and note turn them into titles, so no code or state word is ever stored for display.
   const missing =
     state.run.phase === "situation"
-      ? state.situation.data.map(d => `${d.id}: ${d.state}`)
-      : [`verified ${verifiedHypotheses(state).length}/${MIN_VERIFIED}`];
-  for (const h of next.hypotheses)
-    missing.push(
-      `${h.id}: ${h.location === "eliminated" ? "eliminated" : isVerified(h) ? "verified" : "not verified"}`
-    );
+      ? state.situation.data.filter(d => d.state !== "found").map(d => d.id)
+      : state.hypotheses.filter(h => !isVerified(h)).map(h => h.id);
   next.run.phase = "stopped_limit";
   next.run.status = "finished";
   next.run.stopReason = "limit";

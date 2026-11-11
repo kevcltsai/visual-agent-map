@@ -15,6 +15,8 @@ import {
 import type { GateDatum } from "./gate";
 import template from "./facet-hypotheses.md";
 import firstBatchRule from "./facet-hypotheses-first.md";
+import citedRule from "./facet-hypotheses-cited.md";
+import unconfirmedRule from "./facet-hypotheses-unconfirmed.md";
 
 export interface FacetHypothesesDatum extends GateDatum {
   propStance: PropStance;
@@ -26,6 +28,8 @@ export interface FacetHypothesesRequest extends ArgumentStepBase {
   count: number;
   existing: string[];
   causalQuestions: string[];
+  /** The situation gate ended data_insufficient (decision #58): no datum has to be cited, and the prompt says the situation is unconfirmed. */
+  unconfirmed?: boolean;
 }
 export interface FacetHypothesis {
   title: string;
@@ -52,7 +56,7 @@ export const FACET_HYPOTHESES_SCHEMA = {
           statement: { type: "string", minLength: 1 },
           basis: { type: "string", minLength: 1 },
           alternative: { type: "boolean" },
-          citedData: { type: "array", items: { type: "string", minLength: 1 }, minItems: 1 }
+          citedData: { type: "array", items: { type: "string", minLength: 1 } }
         },
         required: ["title", "statement", "basis", "alternative", "citedData"]
       }
@@ -76,6 +80,9 @@ const sourcesOf = (request: FacetHypothesesRequest): string[] => [
   ...request.causalQuestions,
   ...request.data.flatMap(d => [d.need, d.claim, d.quote, d.url, d.stance])
 ];
+/** An unconfirmed situation may leave citedData empty; any id it does cite must still be one of the supplied supporting data. */
+const citationOrNone = (value: unknown, allowed: ReadonlySet<string>): string[] =>
+  list(value, "citedData").length ? citation(value, allowed, "citedData") : [];
 const isFirstBatch = (request: FacetHypothesesRequest): boolean => request.existing.length === 0;
 
 export function parseFacetHypotheses(raw: string, request: FacetHypothesesRequest): FacetHypothesesResult {
@@ -97,7 +104,9 @@ export function parseFacetHypotheses(raw: string, request: FacetHypothesesReques
     if (seen.has(key)) throw new ArgumentStepError("a hypothesis repeats another one");
     seen.add(key);
     grounded([title, statement, basis], sourcesOf(request));
-    const citedData = citation(one.citedData, allowed, "citedData");
+    const citedData = request.unconfirmed
+      ? citationOrNone(one.citedData, allowed)
+      : citation(one.citedData, allowed, "citedData");
     if (citedData.some(id => stances.get(id) !== "supports"))
       throw new ArgumentStepError("a hypothesis may cite only data that support the proposition");
     return { title, statement, basis, alternative: one.alternative, citedData };
@@ -116,6 +125,7 @@ export const facetHypothesesStep: StepDefinition<FacetHypothesesRequest, FacetHy
       languageInstruction: languageInstruction(request.language, request.proposition),
       count: String(request.count),
       alternativeRule: isFirstBatch(request) ? firstBatchRule.trim() : "",
+      citationRule: request.unconfirmed ? unconfirmedRule.trim() : citedRule.trim(),
       proposition: JSON.stringify(request.proposition),
       data: JSON.stringify(request.data.map(pick)),
       causal: JSON.stringify(request.causalQuestions),
@@ -123,7 +133,7 @@ export const facetHypothesesStep: StepDefinition<FacetHypothesesRequest, FacetHy
     }),
   schema: FACET_HYPOTHESES_SCHEMA,
   policy: (prompt, request) => {
-    if (!request.data.some(d => d.propStance === "supports"))
+    if (!request.unconfirmed && !request.data.some(d => d.propStance === "supports"))
       throw new ArgumentStepError("hypotheses need situation data that support the proposition");
     if (!Number.isInteger(request.count) || request.count < 1) throw new ArgumentStepError("nothing to propose");
     overBudget(prompt, FACET_HYPOTHESES_SCHEMA);

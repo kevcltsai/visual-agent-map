@@ -1,0 +1,1 @@
+Only some of the hypotheses that were planned could be verified, and the program adds a notice about this itself. Say only what the supplied verified hypotheses show; do not claim the proposition is fully answered and do not repeat the notice.

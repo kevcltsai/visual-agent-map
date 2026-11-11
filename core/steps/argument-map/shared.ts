@@ -101,6 +101,21 @@ export function grounded(replyTexts: string[], sources: string[]): void {
     if (!knownLinks.has(key)) fail(`The reply uses the link ${shown}, which the request does not have`);
 }
 
+/**
+ * A reply's free text is shown to the owner, so it must describe evidence and hypotheses by content, never by an id (or an id's first
+ * 8 characters, which a model likes to copy). Only ids of 8+ characters are checked: a shorter id could match ordinary words.
+ */
+export function noIds(replyTexts: string[], ids: string[]): void {
+  const body = replyTexts.join("\n").toLocaleLowerCase();
+  for (const id of ids) {
+    if (id.length < 8) continue;
+    if (body.includes(id.toLocaleLowerCase()) || body.includes(id.slice(0, 8).toLocaleLowerCase()))
+      throw new ArgumentStepError(
+        "The reply names an id. Describe the evidence or hypothesis by what it says, never by its id"
+      );
+  }
+}
+
 export const normalized = (value: string): string =>
   value
     .normalize("NFKC")

@@ -1,5 +1,4 @@
 import type { ConclusionInput, EvidenceInput } from "../../argument-map/machine";
-import { MIN_VERIFIED } from "../../argument-map/model";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import {
   ArgumentStepError,
@@ -8,12 +7,15 @@ import {
   idSchema,
   languageInstruction,
   list,
+  noIds,
   overBudget,
   parseObject,
   text,
   type ArgumentStepBase
 } from "./shared";
 import template from "./conclusion.md";
+import premiseRule from "./conclusion-unconfirmed.md";
+import partialRule from "./conclusion-partial.md";
 
 export interface ConclusionRequest extends ArgumentStepBase {
   proposition: string;
@@ -21,6 +23,10 @@ export interface ConclusionRequest extends ArgumentStepBase {
   input: ConclusionInput;
   /** Statement of each verified hypothesis, by id (exactly the ids in `input`). */
   statements: Record<string, string>;
+  /** The situation gate ended data_insufficient (decision #58): the premise is unconfirmed; the program writes the first line, the model must not state the situation as fact. */
+  unconfirmed?: boolean;
+  /** Fewer hypotheses were verified than the target (decision #59): the model must say what these show and not claim a full answer. */
+  partial?: boolean;
 }
 export interface ConclusionPoint {
   text: string;
@@ -86,6 +92,10 @@ export function parseConclusion(raw: string, request: ConclusionRequest): Conclu
     for (const id of hypothesisIds) if (!basedOn.includes(id)) basedOn.push(id);
     return { text: body, hypothesisIds };
   });
+  noIds(
+    [summary, ...points.map(p => p.text)],
+    request.input.hypotheses.flatMap(h => [h.id, ...h.evidence.map(e => e.id)])
+  );
   grounded([summary, ...points.map(p => p.text)], sourcesOf(request));
   return { summary, points, basedOn };
 }
@@ -97,6 +107,8 @@ export const conclusionStep: StepDefinition<ConclusionRequest, ConclusionResult>
   render: request =>
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.proposition),
+      premiseRule:
+        (request.unconfirmed ? ` ${premiseRule.trim()}` : "") + (request.partial ? ` ${partialRule.trim()}` : ""),
       proposition: JSON.stringify(request.proposition),
       hypotheses: JSON.stringify(
         request.input.hypotheses.map(h => ({
@@ -108,7 +120,8 @@ export const conclusionStep: StepDefinition<ConclusionRequest, ConclusionResult>
     }),
   schema: CONCLUSION_SCHEMA,
   policy: (prompt, request) => {
-    if (request.input.hypotheses.length < MIN_VERIFIED) throw new ArgumentStepError("fewer than 3 verified hypotheses");
+    if (!request.input.hypotheses.length)
+      throw new ArgumentStepError("a conclusion needs at least one verified hypothesis");
     overBudget(prompt, CONCLUSION_SCHEMA);
   },
   parse: parseConclusion

@@ -40,7 +40,8 @@ export const NEED_STANCES = ["supports", "contradicts", "uncertain"] as const;
 export type NeedStance = (typeof NEED_STANCES)[number];
 export const PROOF_CHECKS = ["page_match", "provider_read"] as const;
 export type ProofCheck = (typeof PROOF_CHECKS)[number];
-export const GATE_STATES = ["pending", "matched", "unmatched"] as const;
+/** `unconfirmed` (decision #58): the facets stayed insufficient after the retry round; the run goes on with the situation marked unconfirmed. */
+export const GATE_STATES = ["pending", "matched", "unmatched", "unconfirmed"] as const;
 export type GateState = (typeof GATE_STATES)[number];
 export const GATE_KINDS = ["not_matching", "data_missing", "data_insufficient"] as const;
 export type GateKind = (typeof GATE_KINDS)[number];
@@ -49,19 +50,12 @@ export type PropStance = (typeof PROP_STANCES)[number];
 export const FACET_VERDICTS = ["supports", "refutes", "insufficient", "pending"] as const;
 export type FacetVerdict = (typeof FACET_VERDICTS)[number];
 /**
- * The proposition stance of a datum whose source was verified but whose research answer was "uncertain". Decision #49 chose 甲 (irrelevant).
- * Switching to 乙 (a fourth label) would change this constant and the type, and also machine.ts and facet-judge.ts, where `!== "irrelevant"` decides which data are usable.
- */
-export const UNCERTAIN_RESEARCH_STANCE: PropStance = "irrelevant";
-export function propStanceForUncertainResearch(): PropStance {
-  return UNCERTAIN_RESEARCH_STANCE;
-}
-/**
- * A found datum's stance is locked once decided: `supports` and `refutes` never change, and neither does the stance mapped from an
- * uncertain research answer (no `stanceReason`). An `irrelevant` stance the facet judge gave (it has a reason) may be judged again in round 2.
+ * A found datum's stance is locked once the facet judge decided `supports` or `refutes`: it never changes. An `irrelevant` stance may be
+ * judged again in round 2, and a found datum with no stance is simply not judged yet. Research stance (relative to the need) never decides
+ * the stance toward the proposition, so nothing is locked before the judge has judged it.
  */
 export const isStanceLocked = (datum: { propStance?: PropStance; stanceReason?: string }): boolean =>
-  datum.propStance !== undefined && (datum.propStance !== "irrelevant" || datum.stanceReason === undefined);
+  datum.propStance !== undefined && datum.propStance !== "irrelevant";
 export const VERDICTS = ["supported", "refuted", "undecided"] as const;
 export type Verdict = (typeof VERDICTS)[number];
 export const LOCATIONS = ["verifying", "eliminated"] as const;
@@ -96,6 +90,8 @@ export interface SourceProof {
   url: string;
   quote: string;
   claim: string;
+  /** Set when the AI's claim carried a number the quote does not: `claim` was then replaced by the quote. */
+  claimUnverified?: boolean;
   check: ProofCheck;
   checkedAt: string;
   figure?: SourceFigure;
@@ -163,6 +159,8 @@ export interface Hypothesis {
   /** Facet-judged maps: "from datum X we observe Y, so we guess Z", and whether it explains the proposition by a cause other than the one it names. */
   basis?: string;
   alternative?: boolean;
+  /** The statement as the AI proposed it, stored at creation. Verdict, needs and conclusion read this, never the editable note text. Absent on maps made before it was stored. */
+  statement?: string;
   aiVerdict?: Verdict;
   userVerdict?: Verdict;
   eliminationReason?: string;
@@ -180,6 +178,8 @@ export interface ArgumentConclusion {
   state: ConclusionState;
   basedOn: string[];
   missing: string[];
+  /** Decision #59: written from fewer verified hypotheses than the target, at the research limit. Absent on every older map. */
+  partial?: boolean;
 }
 export interface ArgumentMapData {
   v: 1;
@@ -343,6 +343,7 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
       return "hypothesis malformed";
     if (
       !optStr(hypothesis.basis) ||
+      !optStr(hypothesis.statement) ||
       (hypothesis.alternative !== undefined && typeof hypothesis.alternative !== "boolean")
     )
       return "hypothesis malformed";
@@ -372,6 +373,7 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
   const conclusion = raw.conclusion;
   if (!isRec(conclusion) || !oneOf(CONCLUSION_STATES, conclusion.state)) return "conclusion malformed";
   if (!strList(conclusion.basedOn) || !strList(conclusion.missing)) return "conclusion malformed";
+  if (conclusion.partial !== undefined && conclusion.partial !== true) return "conclusion malformed";
   return null;
 }
 
@@ -418,13 +420,16 @@ export function effectiveVerdict(h: Hypothesis): Verdict {
 export function foundNeeds(h: Hypothesis): Need[] {
   return h.needs.filter(need => need.state === "found");
 }
-/** Ids of dead needs that a later need of the same hypothesis stands in for. Re-checked here (not trusted from the field alone): only a `not_found` need can be retired, and only by a need of a later round. */
+/** A miss caused by the source (the URL or the quote failed to check): the question stays open, so another source may answer it. Any other miss says the evidence is not there, and no later need may stand in for it. */
+export const isSourceSideMiss = (need: { reason?: string }): boolean => (need.reason ?? "").startsWith("source_");
+/** Ids of dead needs that a later need of the same hypothesis stands in for. Re-checked here (not trusted from the field alone): only a `not_found` need whose miss was source-side can be retired, and only by a need of a later round. A "nothing found", unanswered, uncertain or failed need keeps blocking verification. */
 export function retiredNeedIds(h: Hypothesis): Set<string> {
   const retired = new Set<string>();
   for (const need of h.needs) {
     if (need.replaces === undefined) continue;
     const dead = h.needs.find(other => other.id === need.replaces);
-    if (dead && dead.state === "not_found" && need.addedRound > dead.addedRound) retired.add(dead.id);
+    if (dead && dead.state === "not_found" && isSourceSideMiss(dead) && need.addedRound > dead.addedRound)
+      retired.add(dead.id);
   }
   return retired;
 }
@@ -437,6 +442,25 @@ export function allNeedsFound(h: Hypothesis): boolean {
 export function isVerified(h: Hypothesis): boolean {
   return allNeedsFound(h) && h.location === "verifying" && effectiveVerdict(h) === "supported";
 }
+/**
+ * Evidence gate (decision #59, B3): a hypothesis is supported only if its found evidence leans clearly toward it. Supports must outnumber
+ * twice the contradicts and be at least as many as the uncertain ones; an uncertain answer never counts as support. Stances are program
+ * data, so this is checked here and not only asked of the model.
+ */
+export function evidenceClearlySupports(h: Hypothesis): boolean {
+  const retired = retiredNeedIds(h);
+  const stances = foundNeeds(h)
+    .filter(n => !retired.has(n.id))
+    .map(n => n.stance ?? "uncertain");
+  const count = (stance: NeedStance): number => stances.filter(s => s === stance).length;
+  const supports = count("supports");
+  return supports > 2 * count("contradicts") && supports >= count("uncertain") && supports > 0;
+}
+/** A hypothesis the round or research limit cut off: not refuted by evidence (its final verdict is not "refuted"), only unfinished. Old maps store it as an elimination with a `round_limit` reason. */
+export const isLimitCut = (h: Hypothesis): boolean =>
+  h.location === "eliminated" &&
+  (h.eliminationReason ?? "").startsWith("round_limit") &&
+  !(allNeedsFound(h) && effectiveVerdict(h) === "refuted");
 export function verifiedHypotheses(state: ArgumentMapData): Hypothesis[] {
   return state.hypotheses.filter(isVerified);
 }
@@ -447,12 +471,21 @@ export function verifiedCount(state: ArgumentMapData): number {
 export function displayVerdict(h: Hypothesis): Verdict | "verifying" {
   return allNeedsFound(h) ? effectiveVerdict(h) : "verifying";
 }
+/** A conclusion written from fewer verified hypotheses than the target (decision #59). */
+export const isPartialConclusion = (state: ArgumentMapData): boolean =>
+  state.run.phase === "concluded" && state.conclusion.partial === true && verifiedCount(state) < MIN_VERIFIED;
+/** The situation gate ended data_insufficient and the run went on (decision #58). */
+export const isSituationUnconfirmed = (state: ArgumentMapData): boolean => state.situation.gate.state === "unconfirmed";
 export type ConclusionView = "in_progress" | "concluded" | "stopped_limit" | "stopped_mismatch";
 /** The four conclusion card states, derived from the run and the verified count. A concluded map falls back to in_progress when support is lost. */
 export function conclusionView(state: ArgumentMapData): ConclusionView {
   const { phase } = state.run;
   if (phase === "stopped_mismatch") return "stopped_mismatch";
   if (phase === "stopped_limit") return "stopped_limit";
-  if (phase === "concluded" && verifiedCount(state) >= MIN_VERIFIED) return "concluded";
+  if (
+    phase === "concluded" &&
+    (verifiedCount(state) >= MIN_VERIFIED || (state.conclusion.partial === true && verifiedCount(state) >= 1))
+  )
+    return "concluded";
   return "in_progress";
 }

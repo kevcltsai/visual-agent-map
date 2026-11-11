@@ -818,3 +818,50 @@ test('owner regression 2026-11-11: the New Zealand 20-years replies with 2006 an
   bad(mod.facetPlanStep, { ...nzReq, today: undefined }, JSON.parse(NZ_2026), /number 11/);
   bad(mod.facetPlanStep, nzReq, realWith(NZ_2026, v => { v.assumptions.items[0].reason = '今天是2026-11-12'; }), /number 12/);
 });
+
+// ---- #59: replies that name an id; partial conclusion ----
+const realReplies = require('./fixtures/argument-real-replies-with-ids.json');
+const P59_PROP = '紐西蘭治安相比20年前, 是不是有變差了';
+test('#59 real failed reply (needs, exchange 92d08dc8): the made-up number 111 is still refused', () => {
+  const req = { ...needReq, proposition: P59_PROP, hypothesis: { title: '警力配置與執法強度改變', statement: '治安感受的變化可能來自警力部署的調整', round: 3 }, data: [], existing: [], max: 1 };
+  bad(mod.needsStep, req, realReplies.needs.response, /number 111/);
+});
+test('#59 real failed reply (facet verdict, exchange 6333bbea): an id in the reason or insight text is refused as an id, not as a number', () => {
+  const ids = ['4924cc48-8487-4f23-88d9-154103363460', 'f1f62724-6a32-4d93-b9a0-c1d7bc3fbff3', 'c8cc89c1-0000-4000-8000-000000000001'];
+  const evidence = ids.map(id => ({ id, claim: '證據', quote: 'quote text here', url: 'https://example.org/a', stance: 'contradicts' }));
+  const req = fvReq({ hypothesisId: 'h1', round: 1, evidence }, { hypothesis: '監視器普及使治安改善' });
+  bad(mod.facetVerdictStep, req, realReplies.facetVerdict.response, /names an id/);
+  // the same reply with the ids removed from the text passes the id check (it then fails only on the numbers, which this fixture does not have)
+  const clean = JSON.parse(realReplies.facetVerdict.response);
+  clean.reason = '假說主張治安改善，但證據顯示不安全感上升。';
+  clean.insights = clean.insights.map(i => ({ ...i, text: i.text.replace(/c8cc89c1/g, '某項證據') }));
+  assert.equal(mod.facetVerdictStep.parse(reply(clean), req).citedNeeds.length, 2);
+});
+test('#59 verdict reason naming an evidence id (or its first 8 characters) is refused; short ids are not checked', () => {
+  const longId = 'abcdef12-3456-4789-8abc-def012345678';
+  const input = { hypothesisId: 'h1', round: 1, evidence: [{ id: longId, claim: 'Rate was 9.2 percent', quote: 'rate 9.2 percent', url: 'https://stats.example.org/a', stance: 'supports' }, { id: 'n2', claim: 'c', quote: 'q q q', url: 'https://stats.example.org/b', stance: 'supports' }] };
+  const req = fvReq(input);
+  const good = { verdict: 'supported', citedNeeds: [longId], reason: 'Matches the 9.2 percent', insights: [{ kind: 'consistent', text: 'The data agree on 9.2 percent' }] };
+  assert.ok(ok(mod.facetVerdictStep, req, good));
+  bad(mod.facetVerdictStep, req, { ...good, reason: `${longId} matches` }, /names an id/);
+  bad(mod.facetVerdictStep, req, { ...good, reason: 'ABCDEF12 matches' }, /names an id/);
+  const { insights, ...v1 } = good;
+  bad(mod.verdictStep, req, { ...v1, reason: 'abcdef12 matches' }, /names an id/);
+  assert.ok(ok(mod.facetVerdictStep, req, { ...good, reason: 'n2 matches the 9.2 percent' }), 'a short id is ordinary text');
+});
+test('#59 conclusion: an id in the summary or a point is refused; one verified hypothesis is a valid request and partial adds the partial rule to the prompt', () => {
+  const hid = '4924cc48-8487-4f23-88d9-154103363460';
+  const eid = 'f1f62724-6a32-4d93-b9a0-c1d7bc3fbff3';
+  const input = { hypotheses: [{ id: hid, round: 1, evidence: [{ id: eid, claim: 'Rate was 9.2 percent', quote: 'rate 9.2 percent', url: 'https://stats.example.org/a', stance: 'supports' }] }] };
+  const req = { ...base, proposition: PROP, input, statements: { [hid]: 'Hiring slowed' } };
+  const good = { summary: 'Hiring slowed', points: [{ text: 'Rate was 9.2 percent', hypothesisIds: [hid] }] };
+  assert.ok(ok(mod.conclusionStep, req, good));
+  bad(mod.conclusionStep, req, { ...good, summary: `see ${hid}` }, /names an id/);
+  bad(mod.conclusionStep, req, { ...good, points: [{ text: 'in 4924cc48 it rose', hypothesisIds: [hid] }] }, /names an id/);
+  bad(mod.conclusionStep, req, { ...good, points: [{ text: `evidence ${eid}`, hypothesisIds: [hid] }] }, /names an id/);
+  assert.ok(sr.prepareStep(mod.conclusionStep, req));
+  const full = mod.conclusionStep.render(req);
+  const partial = mod.conclusionStep.render({ ...req, partial: true });
+  assert.notEqual(partial, full);
+  assert.ok(partial.length > full.length);
+});

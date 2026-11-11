@@ -1248,3 +1248,111 @@ test('P2-8: the second attempt carries the sanitized parser reason in its prompt
   assert.ok(line.length > 0 && line.length <= 200, 'one short line');
   assert.ok(prompts.filter(([id]) => id !== 'argument-map.facet-plan').every(([, text]) => !text.includes('previous reply was refused')), 'the reason does not leak into later steps');
 });
+
+// ---- #59: partial conclusion, plain stop summary, limit-cut label ----------------------------------------------------------------------
+const cardLib = S.load('experiences/visual-map/argument-card.ts');
+const tw = (key, ...values) => translate('zh-TW', key, ...values);
+const NO_CODE_WORDS = /\b(verified|eliminated|round_limit|supported|refuted|undecided|stopped_limit|not verified)\b|\bid-\d+\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/i;
+/** Every text the owner reads for the conclusion and the hypotheses: note title/summary/detail and the card view. No id, uuid or state word may show. */
+async function shown(r) {
+  const state = await r.state();
+  const doc = await r.repo.readMap(r.mapPath);
+  const out = [];
+  for (const id of [state.roles.conclusion, state.roles.eliminated, ...state.hypotheses.map(h => h.id)]) {
+    const note = await r.text(id);
+    out.push([id, `${note.title}\n${note.summary ?? ''}\n${note.detail ?? ''}`]);
+    const view = cardLib.describeArgumentCard(state, id, tw);
+    out.push([`${id} card`, [view.title, view.kind, view.label, ...(view.chips ?? []).map(c => c.text), ...(view.lines ?? [])].join('\n')]);
+  }
+  assert.ok(doc.nodes.length);
+  return out;
+}
+async function noCodeShown(r, what) {
+  for (const [name, text] of await shown(r)) assert.ok(!NO_CODE_WORDS.test(text), `${what}: ${name} shows ${NO_CODE_WORDS.exec(text)?.[0]}\n${text.slice(0, 400)}`);
+}
+/** Hypotheses 1..n of the facet rig: `fate(n)` is 'supported' or 'refuted'. */
+const verdictByNumber = (fate, log) => request => {
+  const n = Number(/statement (\d+)/.exec(request.hypothesis)?.[1]);
+  log?.push(n);
+  return { verdict: fate(n), citedNeeds: [request.input.evidence[0].id], reason: 'enough', insights: [{ kind: 'consistent', text: 'the sources agree' }] };
+};
+const proposals = log => request => { log.push(request.count); return facetSteps().propose_facet_hypotheses(request); };
+
+test('#59 facet run: 2 verified at the limit gives a partial conclusion; replacements are proposed one at a time as 3, then 1, 1, 1', async () => {
+  const counts = [];
+  const seen = [];
+  const r = await rig({ facet: true, script: { step: facetSteps({
+    propose_facet_hypotheses: proposals(counts),
+    verdict_facets: verdictByNumber(n => (n === 2 || n === 3 ? 'supported' : 'refuted')),
+    conclude: request => { seen.push(plain(request)); return facetSteps().conclude(request); }
+  }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.deepEqual(counts, [3, 1, 1, 1]);
+  assert.equal(state.run.phase, 'concluded');
+  assert.equal(state.run.status, 'finished');
+  assert.equal(state.conclusion.partial, true);
+  assert.equal(model.verifiedCount(state), 2);
+  assert.equal(state.hypotheses.length, 6);
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].input.hypotheses.length, 2);
+  assert.equal(seen[0].partial, true);
+  const line = tw('ui.argument_partial_conclusion_0_1', 2, 3);
+  assert.equal(line, '只驗證了 2 個假設（目標 3 個），以下結論只根據這些假設');
+  assert.ok((await r.text(state.roles.conclusion)).detail.startsWith(line));
+  assert.ok(cardLib.describeArgumentCard(state, state.roles.conclusion, tw).lines.includes(line));
+  await noCodeShown(r, 'partial');
+});
+test('#59 facet run: a full conclusion carries no partial flag, no partial line', async () => {
+  const seen = [];
+  const r = await rig({ facet: true, script: { step: facetSteps({ conclude: request => { seen.push(request.partial); return facetSteps().conclude(request); } }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.deepEqual(seen, [undefined]);
+  assert.equal(state.conclusion.partial, undefined);
+  assert.ok(!(await r.text(state.roles.conclusion)).detail.includes('只驗證了'));
+});
+test('#59 facet run: an unconfirmed premise with no hypothesis verified stops at the limit in plain words: nothing verified, the cut ones named with the limit, the premise line on note and card', async () => {
+  const log = [];
+  const r = await rig({ facet: true, script: { step: facetSteps({ judge_facets: judgeBy(log) }),
+    ask: askByNeed({ 'job postings': need => aiReply([notFoundEntry(need.id)]), 'junior hiring': need => aiReply([notFoundEntry(need.id)]), 'need one': need => aiReply([notFoundEntry(need.id)]), 'need two': need => aiReply([notFoundEntry(need.id)]), 'next one': need => aiReply([notFoundEntry(need.id)]) }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(state.situation.gate.state, 'unconfirmed');
+  assert.equal(state.run.phase, 'stopped_limit');
+  assert.equal(model.verifiedCount(state), 0);
+  const note = await r.text(state.roles.conclusion);
+  const premise = tw('ui.argument_premise_unconfirmed');
+  assert.ok(note.summary.includes('已驗證：無；未驗證：H1（研究次數用完）'), note.summary);
+  assert.ok(note.detail.startsWith(premise), note.detail.slice(0, 100));
+  assert.ok(cardLib.describeArgumentCard(state, state.roles.conclusion, tw).lines.includes(premise));
+  const cut = state.hypotheses.find(h => model.isLimitCut(h));
+  assert.ok(cut, 'a hypothesis was cut by the limit');
+  assert.ok((await r.text(cut.id)).detail.includes('未驗證（研究次數用完）'));
+  assert.ok(!(await r.text(cut.id)).detail.includes('round_limit'));
+  assert.ok(cardLib.describeArgumentCard(state, cut.id, tw).chips.some(c => c.text === '未驗證（研究次數用完）'));
+  const group = cardLib.describeArgumentCard(state, state.roles.eliminated, tw);
+  assert.ok(group.lines.some(l => l.includes('未驗證（研究次數用完）')), JSON.stringify(group));
+  await noCodeShown(r, 'stopped_limit');
+});
+test('#59 facet run: a hypothesis the evidence refuted is eliminated (not "unverified"), the ones the research budget cut are listed apart', async () => {
+  const r = await rig({ facet: true, script: { step: facetSteps({ verdict_facets: verdictByNumber(() => 'refuted') }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(state.run.phase, 'stopped_limit');
+  const note = await r.text(state.roles.conclusion);
+  assert.ok(note.summary.includes('已驗證：無；') && note.summary.includes('已淘汰：H1、H2、H3、H4'), note.summary);
+  assert.ok(!note.summary.includes('未驗證：H1'), 'refuted ones are not listed as unverified');
+  assert.ok(!state.hypotheses.slice(0, 4).some(h => model.isLimitCut(h)), 'refuted by their verdict, so not limit-cut');
+  await noCodeShown(r, 'all refuted');
+});
+test('#59 stopped paths show no uuid, id-N or English state word: mismatch and data missing', async () => {
+  const mismatch = await rig({ facet: true, script: { step: facetSteps({ judge_facets: request => ({ data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: f.title === 'Postings' ? 'refutes' : 'supports', reason: 'it fits' }))), facets: request.facets.map(f => ({ id: f.id, verdict: f.title === 'Postings' ? 'refutes' : 'supports', reason: 'r', summary: `s ${f.title}`, citedData: [f.data[0].id], retryNeeds: [] })), assumptionInsights: [] }) }) } });
+  await mismatch.runs.start(mismatch.mapPath, 'p');
+  assert.equal((await mismatch.state()).run.phase, 'stopped_mismatch');
+  await noCodeShown(mismatch, 'stopped_mismatch');
+  const missing = await rig({ script: { step: steps(), ask: ctx => ({ summary: 's', detail: 'd', suggestions: [], visualReferences: [], argumentEvidence: [{ need: ctx.argumentEvidenceNeeds[0].id, status: 'not_found' }] }) } });
+  await missing.runs.start(missing.mapPath, 'p');
+  assert.equal((await missing.state()).situation.gate.kind, 'data_missing');
+  await noCodeShown(missing, 'insufficient');
+});

@@ -110,7 +110,9 @@ export function noIds(replyTexts: string[], ids: string[]): void {
   for (const id of ids) {
     if (id.length < 8) continue;
     if (body.includes(id.toLocaleLowerCase()) || body.includes(id.slice(0, 8).toLocaleLowerCase()))
-      fail("The reply names an id. Describe the evidence or hypothesis by what it says, never by its id");
+      throw new ArgumentStepError(
+        "The reply names an id. Describe the evidence or hypothesis by what it says, never by its id"
+      );
   }
 }
 

@@ -34,7 +34,7 @@ function bigMap() {
 test('stats of the real-sample shape: 4 levels, 180 topics, 5 researched, 80 parents, 101 unresearched leaves', () => {
   const stats = M.subtreeStats(bigMap(), 'root');
   assert.deepEqual(plain(stats), { levels: 4, topics: 180, researched: 5, parents: 80, unresearchedLeaves: 101, directParents: 4 });
-  assert.deepEqual(plain(['quick', 'bottom-up', 'research-first'].map(depth => M.integrationCalls(stats, depth))), [5, 80, 181]);
+  assert.deepEqual(plain(['quick', 'bottom-up', 'research-first'].map(depth => M.integrationCalls(stats, depth))), [6, 81, 182]);
 });
 
 test('a root with only direct subtopics is one level; an empty root has none and costs the root call only when it has subtopics', () => {
@@ -52,20 +52,20 @@ const small = (researched = () => true) => [
   node('root', null), node('A', 'root'), node('B', 'root'), node('A1', 'A'), node('A2', 'A'), node('B1', 'B'), node('B2', 'B'), node('A1a', 'A1'), node('A1b', 'A1')
 ].map(item => ({ ...item, researched: researched(item.id) }));
 
-test('bottom-up order: the deepest parent first, the root last; A1 before A; calls = parents', () => {
+test('bottom-up order: the deepest parent first, the root last; A1 before A; calls = parents + the root chart step', () => {
   const nodes = small();
   const order = M.bottomUpOrder(nodes, 'root');
   assert.deepEqual(plain(order), ['A1', 'A', 'B', 'root']);
-  assert.equal(M.integrationCalls(M.subtreeStats(nodes, 'root'), 'bottom-up'), 4);
+  assert.equal(M.integrationCalls(M.subtreeStats(nodes, 'root'), 'bottom-up'), 5);
   assert.deepEqual(plain(M.quickOrder(nodes, 'root')), ['A', 'B']);
-  assert.equal(M.integrationCalls(M.subtreeStats(nodes, 'root'), 'quick'), 3);
+  assert.equal(M.integrationCalls(M.subtreeStats(nodes, 'root'), 'quick'), 4);
 });
 
 test('research-first: the unresearched leaves are named deepest first and counted before the integrations', () => {
   const nodes = small(id => !['A1a', 'A1b', 'B1', 'B2', 'A2'].includes(id));
   assert.deepEqual(plain(M.unresearchedLeaves(nodes, 'root')).slice(0, 2).sort(), ['A1a', 'A1b']);
   assert.equal(M.unresearchedLeaves(nodes, 'root').length, 5);
-  assert.equal(M.integrationCalls(M.subtreeStats(nodes, 'root'), 'research-first'), 5 + 4);
+  assert.equal(M.integrationCalls(M.subtreeStats(nodes, 'root'), 'research-first'), 5 + 4 + 1);
 });
 
 test('a cycle in a damaged map does not hang the plan', () => {

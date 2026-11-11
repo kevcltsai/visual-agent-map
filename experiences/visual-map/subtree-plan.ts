@@ -87,11 +87,11 @@ export function subtreeStats(nodes: readonly PlanNode[], rootId: string): Subtre
   };
 }
 
-/** AI calls a depth choice costs: quick = direct subtopics with subtopics + 1; bottom-up = nodes with subtopics; research-first = unresearched leaves + nodes with subtopics. */
+/** AI calls a depth choice costs: quick = direct subtopics with subtopics + 1; bottom-up = nodes with subtopics; research-first = unresearched leaves + nodes with subtopics; each + 1 for the root's chart step (intermediate steps queue none). */
 export function integrationCalls(stats: SubtreeStats, depth: IntegrationDepth): number {
-  if (depth === "quick") return stats.directParents + 1;
-  if (depth === "bottom-up") return stats.parents;
-  return stats.unresearchedLeaves + stats.parents;
+  if (depth === "quick") return stats.directParents + 2;
+  if (depth === "bottom-up") return stats.parents + 1;
+  return stats.unresearchedLeaves + stats.parents + 1;
 }
 
 /** Ids of the nodes that integrate their own subtopics, in run order, the root last. Deeper nodes first; siblings in map order. */

@@ -61,6 +61,8 @@ export interface TaskOptions {
    * Set by the topic chat chain: the integration sends the subtree outline and an unset note style as a whole rewrite. Absent: the older behaviour (the style's own update mode, no outline).
    */
   subtreeIntegration?: boolean;
+  /** Set for the chain's intermediate integrations: the note is material for the level above, so no chart step is queued after the write. */
+  skipCharts?: boolean;
   /** Takes user additions while the run's main call is going (the topic chat window). Absent: the run takes none. */
   steer?: ResearchSteer;
 }

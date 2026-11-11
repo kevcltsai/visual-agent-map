@@ -36610,9 +36610,9 @@ function subtreeStats(nodes, rootId) {
   };
 }
 function integrationCalls(stats, depth) {
-  if (depth === "quick") return stats.directParents + 1;
-  if (depth === "bottom-up") return stats.parents;
-  return stats.unresearchedLeaves + stats.parents;
+  if (depth === "quick") return stats.directParents + 2;
+  if (depth === "bottom-up") return stats.parents + 1;
+  return stats.unresearchedLeaves + stats.parents + 1;
 }
 function bottomUpOrder(nodes, rootId) {
   var _a2;
@@ -69053,7 +69053,18 @@ ${request.requirements}` : preset.text,
       try {
         if (step.kind === "research") {
           const note = await this.plugin.repo.readNote(target.path, (_b2 = this.map) != null ? _b2 : void 0);
-          const done = await this.runTopicChatResearch(target, note, mode, language2, "", controller.signal);
+          const done = await this.runTopicChatResearch(
+            target,
+            note,
+            mode,
+            language2,
+            "",
+            controller.signal,
+            void 0,
+            void 0,
+            void 0,
+            false
+          );
           if (done.result) outcome.done++;
         } else {
           let written2 = false;
@@ -69063,6 +69074,7 @@ ${request.requirements}` : preset.text,
               ...chatSynthesisOptions({ outputLanguage: language2 }),
               researchMode: "local",
               subtreeIntegration: true,
+              skipCharts: true,
               signal: controller.signal,
               onProgress: () => {
               }
@@ -69099,7 +69111,7 @@ ${request.requirements}` : preset.text,
     return outcome;
   }
   /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
-  async runTopicChatResearch(node, note, mode, language2, text10, signal, accepted, launched, steer) {
+  async runTopicChatResearch(node, note, mode, language2, text10, signal, accepted, launched, steer, charts = mode !== "quick") {
     let result;
     let failure;
     const referenceGroups = await this.taskSourceSettings().mapSources(signal).catch(() => []);
@@ -69120,7 +69132,7 @@ ${request.requirements}` : preset.text,
         outputLanguage: language2,
         rules: "",
         ...aiModeOptions(mode, "research"),
-        addCharts: mode !== "quick"
+        addCharts: charts
       },
       accepted,
       void 0,
@@ -72524,7 +72536,7 @@ ${request.requirements}` : preset.text,
         await this.hydrate();
         this.render();
       },
-      queueCharts: (job) => this.queueCharts(job),
+      ...(options == null ? void 0 : options.skipCharts) ? {} : { queueCharts: (job) => this.queueCharts(job) },
       failed,
       notify: (message) => new import_obsidian34.Notice(message),
       onSettled: async () => {

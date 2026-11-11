@@ -15980,7 +15980,18 @@ export class VisualAgentMapView extends ItemView {
       try {
         if (step.kind === "research") {
           const note = await this.plugin.repo.readNote(target.path, this.map ?? undefined);
-          const done = await this.runTopicChatResearch(target, note, mode, language, "", controller.signal);
+          const done = await this.runTopicChatResearch(
+            target,
+            note,
+            mode,
+            language,
+            "",
+            controller.signal,
+            undefined,
+            undefined,
+            undefined,
+            false
+          );
           if (done.result) outcome.done++;
         } else {
           let written = false;
@@ -15990,6 +16001,7 @@ export class VisualAgentMapView extends ItemView {
               ...chatSynthesisOptions({ outputLanguage: language }),
               researchMode: "local",
               subtreeIntegration: true,
+              skipCharts: true,
               signal: controller.signal,
               onProgress: () => {}
             },
@@ -16033,7 +16045,8 @@ export class VisualAgentMapView extends ItemView {
     signal: AbortSignal,
     accepted?: () => void,
     launched?: () => void,
-    steer?: ResearchSteer
+    steer?: ResearchSteer,
+    charts = mode !== "quick"
   ): Promise<{ result?: AiResult; failure?: string }> {
     let result: AiResult | undefined;
     let failure: string | undefined;
@@ -16057,7 +16070,7 @@ export class VisualAgentMapView extends ItemView {
         outputLanguage: language,
         rules: "",
         ...aiModeOptions(mode, "research"),
-        addCharts: mode !== "quick"
+        addCharts: charts
       },
       accepted,
       undefined,
@@ -19713,7 +19726,7 @@ export class VisualAgentMapView extends ItemView {
         await this.hydrate();
         this.render();
       },
-      queueCharts: job => this.queueCharts(job),
+      ...(options?.skipCharts ? {} : { queueCharts: job => this.queueCharts(job) }),
       failed,
       notify: message => new Notice(message),
       onSettled: async () => {

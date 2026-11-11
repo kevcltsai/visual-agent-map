@@ -1760,7 +1760,7 @@ const stubChain = (h, on = () => true) => {
     const key = nameOf(h, node.id); steps.push({ key, options, direction });
     accepted(); if ((await on(key, steps.at(-1))) !== false) observer.onWritten();
   };
-  h.view.runAgent = async (node, done, failed, request, accepted) => { research.push({ key: nameOf(h, node.id), mode: request.researchMode }); accepted?.(); done({ summary: 'S', detail: 'D' }); return { finished: Promise.resolve() }; };
+  h.view.runAgent = async (node, done, failed, request, accepted) => { research.push({ key: nameOf(h, node.id), mode: request.researchMode, addCharts: request.addCharts }); accepted?.(); done({ summary: 'S', detail: 'D' }); return { finished: Promise.resolve() }; };
   h.view.detailTemplateFor = async () => undefined;
   return { steps, research };
 };
@@ -1780,7 +1780,7 @@ integrationTest('topic chat depth card: a deeper subtree shows the card with the
   const asks = h.control.usageAsks; const host = h.host('root');
   assert.equal(await host.submit('synthesize', 'all'), true);
   const choice = h.entry('root').session.choice;
-  assert.deepEqual(plain({ ...choice, turn: undefined }), plain({ levels: 3, topics: 4, researched: 0, leaves: 2, children: 2, calls: { quick: 2, 'bottom-up': 3, 'research-first': 5 }, selected: 'quick', text: 'all', turn: undefined }));
+  assert.deepEqual(plain({ ...choice, turn: undefined }), plain({ levels: 3, topics: 4, researched: 0, leaves: 2, children: 2, calls: { quick: 3, 'bottom-up': 4, 'research-first': 6 }, selected: 'quick', text: 'all', turn: undefined }));
   assert.equal(h.entry('root').session.running, false); assert.equal(h.control.usageAsks, asks, 'no usage question yet');
   const win = h.win(); const card = find(win.el, i => i.attrs?.role === 'radiogroup');
   assert.ok(card, 'the radio group is drawn');
@@ -1878,6 +1878,31 @@ integrationTest('topic chat chain: the chain steps and the root take the subtree
   const g = await harness(); g.flatten(); await researched(g); const plain1 = stubChain(g);
   assert.equal(await g.host('root').submit('synthesize', 'x'), true); await waitFor(() => plain1.steps.length === 1);
   assert.equal(plain1.steps[0].options.subtreeIntegration, undefined);
+});
+
+const chartPaths = h => {
+  const paths = [];
+  h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = job => { paths.push(job.path); };
+  h.plugin.askModel = async (_context, _model, _reasoning, _signal, _onExchange, onAccepted) => {
+    onAccepted?.(); return { summary: 'S', detail: 'D', visualReferences: [], suggestions: [] };
+  };
+  return paths;
+};
+
+integrationTest('topic chat chain: intermediate integrations queue no chart step, the root queues exactly one; a plain one-level integration still queues its chart', async () => {
+  const h = await harness(); await deepen(h); const paths = chartPaths(h);
+  h.view.runAgent = async () => ({ finished: Promise.resolve() });
+  await startDeep(h, 'bottom-up');
+  assert.deepEqual(paths, [h.node('root').path], 'c and a queued none; the root queued one');
+  const g = await harness(); g.flatten(); await researched(g); const plainPaths = chartPaths(g);
+  assert.equal(await g.host('root').submit('synthesize', 'x'), true); await waitFor(() => !g.entry('root').session.running);
+  assert.deepEqual(plainPaths, [g.node('root').path]);
+});
+
+integrationTest('topic chat chain: the research-first leaf researches ask for no charts even in standard mode', async () => {
+  const h = await harness(); await deepen(h); const { research } = stubChain(h);
+  await startDeep(h, 'research-first', { mode: 'standard' });
+  assert.deepEqual(research.map(r => [r.key, r.addCharts]), [['deep', false], ['b', false]]);
 });
 
 integrationTest('topic chat chain: Stop after the provider accepted a step aborts that step, writes nothing and says how far it got', async () => {

@@ -570,22 +570,6 @@ const stubResearch = h => {
   return calls;
 };
 
-integrationTest('parity (integration): the topic chat researches never-researched subtopics first in the same way as the map chat, then integrates with the same Quick options', async () => {
-  const h = await harness(); const ran = [], seen = [];
-  h.view.detailTemplateFor = async () => undefined;
-  h.view.runAgent = async (node, done, failed, request, accepted) => { ran.push({ id: node.id, mode: request.researchMode }); done({}); accepted?.(); return { finished: Promise.resolve() }; };
-  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push({ id: node.id, options }); accepted(); observer.onWritten(); };
-  await h.view.hydrate();
-  for (const n of h.view.notes.values()) n.status = 'idea';
-  const children = h.view.map.nodes.filter(n => n.parentId === h.ids.root).map(n => n.id);
-  const host = h.host('root'); host.setMode('quick');
-  assert.equal(await host.submit('synthesize', 'Integrate'), true);
-  await waitFor(() => seen.length === 1 && !h.entry('root').session.running);
-  assert.deepEqual(plain(ran.map(r => r.id).sort()), plain(children.slice().sort()));
-  assert.equal(ran[0].mode, 'local');
-  const o = seen[0].options; assert.deepEqual(plain([o.researchMode, o.researchDepth, o.visualMode, o.synthesisContent]), ['local', 'normal', 'off', 'full']);
-});
-
 integrationTest('parity (expand, research): the topic chat sends the generator the same request as the map chat (note-led, 2 levels, 15 topics) and researches with the topic\'s own prompt first', async () => {
   const h = await harness(); const requests = [], tasks = [];
   await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.', prompt: 'My own research prompt' }); await h.view.hydrate();
@@ -653,44 +637,6 @@ integrationTest('topic chat opens one window at a time: opening B closes A, A ke
   assert.equal(h.win(), undefined); assert.equal(h.view.topicChatSessions.size, 0, 'view close releases the sessions');
 });
 
-integrationTest('topic chat counterexample 1: Standard integration is not Local (web search on), Quick is Local; the sidebar integration stays Local', async () => {
-  const h = await harness(); const seen = []; await researched(h);
-  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push({ id: node.id, options, direction, observer }); accepted(); };
-  const host = h.host('root');
-  host.setMode('standard');
-  assert.equal(await host.submit('synthesize', 'Integrate sleep'), true);
-  host.setMode('quick');
-  await waitFor(() => !h.entry('root').session.running);
-  assert.equal(await host.submit('synthesize', 'Again'), true);
-  await waitFor(() => seen.length === 2 && !h.entry('root').session.running);
-  assert.equal(seen[0].options.researchMode, 'research'); assert.equal(seen[1].options.researchMode, 'local');
-  assert.equal(seen[0].direction, 'Integrate sleep');
-  assert.equal(seen[0].options.visualMode, 'off'); assert.equal(seen[0].options.researchDepth, 'normal'); assert.deepEqual(plain(seen[0].options.referenceGroups), []);
-  assert.equal(h.view.map.aiMode, undefined, 'an integration does not remember the mode on the map (only research and expand do)');
-  assert.equal(chatSynthesisOptions({ outputLanguage: 'en' }).researchMode, 'local', 'the sidebar integration is still Quick');
-  // The task service turns the Standard value into a web search, Quick into none.
-  const { default: Plugin } = load('main.ts', { obsidian });
-  for (const [mode, web] of [['research', true], ['local', false]]) {
-    const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: '.obsidian/plugins/visual-agent-map' };
-    let call; plugin.claudeCli = () => ({ runTask: async (...args) => { call = args; return JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] }); } });
-    await plugin.askModel({ title: 'T', summary: '', rules: '', detail: '', task: 'x', ancestors: '', mode: 'synthesize', researchMode: mode, researchDepth: 'normal', visualMode: 'off' }, 'claude:sonnet', 'low');
-    assert.equal(call[4].webSearch, web, mode);
-  }
-});
-
-integrationTest('topic chat integration: a written result reaches the window even though the observer says closed; a topic without subtopics answers at once without a usage question', async () => {
-  const h = await harness(); await researched(h);
-  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { accepted(); observer.onWritten(); };
-  const host = h.host('root');
-  await host.submit('synthesize', 'x'); await waitFor(() => !h.entry('root').session.running);
-  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_synthesis_done_0', 2));
-  const asks = h.control.usageAsks;
-  const leaf = h.host('b');
-  assert.equal(await leaf.submit('synthesize', 'x'), true);
-  assert.equal(h.control.usageAsks, asks, 'no usage question');
-  assert.equal(h.entry('b').session.turns.at(-1).text, t('ui.topic_chat_no_children'));
-});
-
 integrationTest('topic chat counterexample 4: expand makes the subtopics at once - no dialog, no proposal step, one undo step, one sentence with the titles', async () => {
   const h = await harness();
   await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.' });
@@ -727,30 +673,57 @@ integrationTest('topic chat counterexample 5: closing the window does not stop t
   h.view.openTopicChat(h.node('a')); assert.ok(h.texts().includes(sentence), 'visible after reopening');
 });
 
-integrationTest('topic chat research: Quick is local without charts, Standard searches the web; a result with the window closed goes through the usual completed Notice; stop says stopped', async () => {
+integrationTest('topic chat research (map-chat path): Quick is local, Standard searches the web; done, failed and stopped each say one sentence; a result with the window closed gets the Notice', async () => {
   const h = await harness(); const calls = stubResearch(h);
   const host = h.host('a');
   host.setMode('standard'); await host.submit('research', 'dig deeper');
   await waitFor(() => calls.length === 1);
-  assert.equal(calls[0].request.researchMode, 'research'); assert.equal(calls[0].request.addCharts, true); assert.match(calls[0].request.task, /dig deeper$/);
+  assert.equal(calls[0].request.researchMode, 'research'); assert.equal(calls[0].request.mapAiMode, 'standard'); assert.match(calls[0].request.task, /dig deeper$/);
   host.close();
   calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
-  assert.ok(h.notices.some(n => n.includes('Body')), 'completed Notice: ' + h.notices.join('|'));
+  assert.ok(h.notices.some(n => /Research finished/.test(n)), 'the batch Notice: ' + h.notices.join('|'));
   assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_research_done'));
+  assert.ok(h.notices.includes(t('ui.topic_chat_research_done')), 'the window was closed: the sentence goes out as a Notice');
   h.view.openTopicChat(h.node('a')); host.setMode('quick'); await host.submit('research', 'again');
   await waitFor(() => calls.length === 2);
-  assert.equal(calls[1].request.researchMode, 'local'); assert.equal(calls[1].request.addCharts, false);
-  calls[1].failed(t('ui.research_stopped_existing_content_was_preserved')); calls[1].gate.resolve(); await finished(h);
+  assert.equal(calls[1].request.researchMode, 'local'); assert.equal(calls[1].request.mapAiMode, 'quick');
+  calls[1].failed('model unavailable'); calls[1].gate.resolve(); await finished(h);
+  assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_failed_0', t('ui.topic_chat_result_unknown')));
+  assert.equal((await topicLines(h, 'a')).at(-1).status, 'failed');
+  // Stop (the window's Stop button): one stopped sentence.
+  host.setMode('quick'); await host.submit('research', 'third');
+  await waitFor(() => calls.length === 3);
+  host.stop();
+  calls[2].gate.resolve(); await finished(h);
   assert.equal(h.entry('a').session.turns.at(-1).text, t('ui.topic_chat_stopped'));
-  // A Quick result that lacks knowledge, with the window closed, also offers the Standard run; a Standard one does not.
-  h.view.openTopicChat(h.node('a')); host.setMode('standard'); await host.submit('research', 'std gap');
-  await waitFor(() => calls.length === 3); host.close();
-  calls[2].done({ summary: 'S', detail: 'Note: model knowledge is insufficient here.' }); calls[2].gate.resolve(); await finished(h);
-  assert.ok(!h.Notice.all.flatMap(n => n.actions ?? []).some(b => b.text === t('ui.rerun_standard')), 'Standard gap does not offer the Standard run');
-  h.view.openTopicChat(h.node('a')); host.setMode('quick'); await host.submit('research', 'third');
-  await waitFor(() => calls.length === 4); host.close();
-  calls[3].done({ summary: 'S', detail: 'Note: model knowledge is insufficient here.' }); calls[3].gate.resolve(); await finished(h);
-  assert.ok(h.Notice.all.flatMap(n => n.actions ?? []).some(b => b.text === t('ui.rerun_standard')), 'Quick gap offers the Standard run');
+});
+
+integrationTest('topic chat integration (map-chat path): always Quick/local whatever the mode, subtopics are not researched first, one sentence once the provider accepted; a topic without subtopics says so; a refused start says why', async () => {
+  const h = await harness(); const calls = stubResearch(h); const seen = [];
+  h.view.startSynthesis = async (node, options, direction, failed, accepted) => { seen.push({ id: node.id, options, direction }); accepted(); };
+  for (const n of h.view.notes.values()) n.status = 'idea';
+  const host = h.host('root');
+  for (const mode of ['standard', 'quick']) { host.setMode(mode); assert.equal(await host.submit('synthesize', 'Integrate sleep'), true); await waitFor(() => !h.entry('root').session.running); }
+  assert.equal(calls.length, 0, 'idea subtopics are not researched first');
+  assert.deepEqual(plain(seen.map(x => [x.id, x.direction, x.options.researchMode, x.options.researchDepth, x.options.visualMode])), [[h.ids.root, 'Integrate sleep', 'local', 'normal', 'off'], [h.ids.root, 'Integrate sleep', 'local', 'normal', 'off']]);
+  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_synthesis_started'));
+  assert.equal((await topicLines(h, 'root')).at(-1).status, 'done');
+  // A topic without subtopics: the window's own sentence, before anything starts.
+  assert.equal(await h.host('b').submit('synthesize', 'x'), true); await waitFor(() => !h.entry('b').session.running);
+  assert.equal(h.entry('b').session.turns.at(-1).text, t('ui.topic_chat_no_children'));
+  // The provider refusing the start: its message is the failed sentence.
+  h.view.startSynthesis = async (node, options, direction, failed) => { failed('provider said no'); };
+  await host.submit('synthesize', 'again'); await waitFor(() => !h.entry('root').session.running);
+  assert.match(h.entry('root').session.turns.at(-1).text, /provider said no/);
+});
+
+integrationTest('topic chat steer (map-chat path): an addition typed during research waits (queued) and is not handed to the research', async () => {
+  const h = await harness(); const calls = stubResearch(h); const host = h.host('a'); const entry = h.entry('a');
+  await host.submit('research', 'dig'); await waitFor(() => calls.length === 1);
+  assert.equal(host.steer('later'), true);
+  assert.equal(entry.steers.entries[0].state, 'queued', 'the map-chat research takes no addition');
+  assert.equal(calls[0].request.steer, undefined);
+  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await waitFor(() => !entry.session.running || entry.steerEnd);
 });
 
 integrationTest('topic chat busy topic: submit is refused with a Notice and nothing starts', async () => {
@@ -910,39 +883,6 @@ integrationTest('topic chat record writer: a cut file gets a line break first, a
   assert.equal(await topicText(h4, null, 'abc'), null);
 });
 
-integrationTest('topic chat synthesize researches only idea or error subtopics first (same mode), then integrates; the sentence says so', async () => {
-  const h = await harness(); const calls = stubResearch(h); const seen = [];
-  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push(node.id); accepted(); observer.onWritten(); };
-  const statuses = { a: 'completed', b: 'error' }; const load0 = h.view.hydrate;
-  h.view.hydrate = async () => { await load0(); for (const [k, v] of Object.entries(statuses)) h.view.notes.get(h.ids[k]).status = v; };
-  await h.view.hydrate();
-  const host = h.host('root'); host.setMode('standard');
-  await host.submit('synthesize', 'all'); await waitFor(() => calls.length === 1);
-  assert.equal(calls[0].node.id, h.ids.b, 'only the unresearched subtopic'); assert.equal(calls[0].request.researchMode, 'research');
-  assert.equal(seen.length, 0, 'integration waits for the research');
-  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve();
-  await waitFor(() => !h.entry('root').session.running);
-  assert.deepEqual(seen, [h.ids.root]);
-  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_synthesis_researched_first_0_1', 1, 2));
-  assert.equal(h.view.selection.selectedId ?? null, null, 'selection untouched');
-  // Nothing to research: straight to the integration with the plain sentence.
-  statuses.b = 'completed'; await h.view.hydrate(); calls.length = 0;
-  await host.submit('synthesize', 'again'); await waitFor(() => !h.entry('root').session.running && seen.length === 2);
-  assert.equal(calls.length, 0); assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_synthesis_done_0', 2));
-});
-
-integrationTest('topic chat synthesize: when every subtopic research fails the integration does not start and one sentence says so', async () => {
-  const h = await harness(); const calls = stubResearch(h); let synthesized = 0;
-  h.view.startSynthesis = async () => { synthesized++; };
-  const host = h.host('root');
-  await host.submit('synthesize', 'all');
-  for (let i = 0; i < 2; i++) { await waitFor(() => calls.length === i + 1); calls[i].failed('boom'); calls[i].gate.resolve(); }
-  await waitFor(() => !h.entry('root').session.running);
-  assert.equal(synthesized, 0);
-  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_failed_0', t('ui.topic_chat_failed_children')));
-  assert.equal((await topicLines(h, 'root')).at(-1).status, 'failed');
-});
-
 // ---- P3: a free question (map-chat step, subtree context, subtree-only writes) ----------------------------------------
 const ACT = {
   runMap: (action, nodeIds, extra = {}) => ({ kind: 'run_map_action', action, nodeIds, title: '', goal: '', direction: '', mode: '', images: false, ...extra })
@@ -1100,18 +1040,6 @@ integrationTest('topic chat ask: a declined usage question sends nothing; stop s
   assert.equal((await h.repo.readNote(h.node('a').path)).title, 'Body');
 });
 
-integrationTest('topic chat synthesize: aborting while the unresearched subtopics are researched does not start the integration', async () => {
-  const h = await harness(); const calls = stubResearch(h); let synthesized = 0;
-  h.view.startSynthesis = async () => { synthesized++; };
-  await h.host('root').submit('synthesize', 'all');
-  await waitFor(() => calls.length === 1);
-  h.view.startingTasks.get(h.node('root').path).abort();
-  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve();
-  await finished(h).catch(() => {}); await waitFor(() => !h.entry('root').session.running);
-  assert.equal(synthesized, 0, 'no integration after the stop');
-  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_stopped'));
-});
-
 integrationTest('topic chat integration: the integration is written into the parent topic and the Undo button of its Notice puts the old content back', async () => {
   const h = await harness(); await researched(h);
   const rootNote = h.node('root');
@@ -1225,27 +1153,6 @@ integrationTest('topic chat B2: the map remembers aiMode only after the usage qu
   assert.equal(h.view.map.aiMode, 'quick', 'a confirmed expand remembers it');
 });
 
-integrationTest('topic chat B3: the parent topic edited while the integration was made keeps the edit, leaves no history or Undo, and one failure sentence is told', async () => {
-  const h = await harness(); await researched(h);
-  const rootNote = h.node('root');
-  await h.repo.updateNote(rootNote.path, { status: 'completed', summary: 'Existing conclusion', detail: 'Existing knowledge' });
-  await h.view.hydrate();
-  h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
-  h.plugin.askModel = async (_context, _model, _reasoning, _signal, _onExchange, onAccepted) => {
-    onAccepted?.();
-    await h.repo.updateNote(rootNote.path, { summary: 'Edited meanwhile' });
-    return { summary: 'Draft summary', detail: 'Draft detail', visualReferences: [], suggestions: [] };
-  };
-  const host = h.host('root'); const historyBefore = h.view.history.canUndo;
-  await host.submit('synthesize', 'Integrate'); await waitFor(() => !h.entry('root').session.running);
-  const after = await h.repo.readNote(rootNote.path);
-  assert.deepEqual([after.summary, after.detail], ['Edited meanwhile', 'Existing knowledge'], 'the edit stays, nothing of the integration is written');
-  assert.equal(h.view.history.canUndo, historyBefore, 'no history entry'); assert.equal(h.view.history.canRedo, false);
-  assert.equal(h.Notice.all.flatMap(n => n.actions ?? []).some(b => b.text === t('ui.undo')), false, 'no Undo button');
-  assert.equal(h.entry('root').session.turns.at(-1).text, t('ui.topic_chat_failed_0', t('log.child_integration_failed')));
-  assert.equal((await topicLines(h, 'root')).at(-1).status, 'failed');
-});
-
 integrationTest('topic chat M1: starting a presentation closes the small window (a running task keeps going) and nothing can be sent during it', async () => {
   const h = await harness(); const calls = stubResearch(h);
   const host = h.host('a'); await host.submit('research', 'x'); await waitFor(() => calls.length === 1);
@@ -1280,8 +1187,8 @@ integrationTest('topic chat M3: a failed or skipped action is shown with the AI 
   await h.host('a').submit('ask', 'research it'); await waitFor(() => calls.length === 1);
   calls[0].failed('model unavailable'); calls[0].gate.resolve(); await finished(h);
   const text = h.entry('a').session.turns.at(-1).text;
-  assert.ok(text.includes('All done!'), 'the AI sentence stays'); assert.ok(text.includes('model unavailable'), 'the failure is shown with it');
-  assert.match(text, /^All done!\n\n.*Failed:.*model unavailable/s);
+  assert.ok(text.includes('All done!'), 'the AI sentence stays'); assert.ok(text.includes(t('ui.topic_chat_result_unknown')), 'the failure is shown with it (the map-chat research path hands on no provider message, only "unknown")');
+  assert.match(text, /^All done!\n\n.*Failed:/s);
   assert.equal((await topicLines(h, 'a')).at(-1).status, 'failed');
   // Everything went well: only the AI sentence, status done.
   mockChat(h, answer([{ kind: 'add_child', parentId: h.ids.b, title: 'Calm', summary: 'S' }], 'Added.'));
@@ -1327,7 +1234,7 @@ integrationTest('topic chat switch: a click on another card moves the window; th
   assert.equal(edits.length, 0, 'the switching click does not open the card text editor');
   // Task completes while the window shows B: Notice, B's window untouched.
   calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve(); await finished(h);
-  assert.ok(h.notices.some(n => n.includes('Body')), 'Notice for A: ' + h.notices.join('|'));
+  assert.ok(h.notices.some(n => /Research finished/.test(n)), 'Notice for A: ' + h.notices.join('|'));
   assert.ok(!h.texts().includes(t('ui.topic_chat_research_done')), 'B shows nothing of A');
   click('a');
   assert.equal(h.view.topicChatOpen.entry.nodeId, h.ids.a);
@@ -1666,41 +1573,6 @@ integrationTest('topic chat steer: startSynthesis hands the steer to the run of 
   h.view.synthesisTasks.delete(path);
   await h.view.startSynthesis(node, { steer, onProgress() {} }, 'go', () => {}, () => {});
   assert.equal(seen[1][1], steer); assert.equal(h.view.synthesisTasks.get(path).options.steer, undefined, 'the stored options carry no steer (a retry must not)');
-});
-
-integrationTest('topic chat steer: an addition typed while the subtopics are researched first rides in the integration text once, shows as taken in, and is written', async () => {
-  const h = await harness(); const calls = stubResearch(h); const seen = [];
-  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push({ direction, steer: options.steer }); accepted(); observer.onWritten(); };
-  const statuses = { a: 'completed', b: 'error' }; const load0 = h.view.hydrate;
-  h.view.hydrate = async () => { await load0(); for (const [k, v] of Object.entries(statuses)) h.view.notes.get(h.ids[k]).status = v; };
-  await h.view.hydrate();
-  const host = h.host('root'); const entry = h.entry('root');
-  await host.submit('synthesize', 'all'); await waitFor(() => calls.length === 1);
-  assert.equal(calls[0].request && true, true); assert.equal(host.steer('early'), true);
-  assert.equal(entry.steers.entries[0].state, 'queued', 'the subtopic research takes none');
-  calls[0].done({ summary: 'S', detail: 'D' }); calls[0].gate.resolve();
-  await waitFor(() => !entry.session.running);
-  assert.equal(seen.length, 1); assert.equal(seen[0].direction, 'all\n\nearly', 'folded in once');
-  assert.deepEqual(plain(seen[0].steer.entries), [], 'and not again as a waiting one');
-  assert.deepEqual(plain(entry.session.turns[0].steers), [{ text: 'early', state: 'live' }]); assert.equal(h.requests?.length ?? 0, 0, 'no follow-up');
-  const lines = await topicLines(h, 'root'); assert.deepEqual(lines.filter(x => x.type === 'steer').map(x => x.text), ['early']);
-  assert.equal(entry.session.turns.length, 2);
-});
-
-integrationTest('topic chat steer: research and expand hand the steer on; a synthesis without researching first passes the same one', async () => {
-  const h = await harness(); const entry0 = () => h.entry('a'); const got = {};
-  await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.' });
-  h.view.runAgent = async (node, done, failed, request, accepted, runOnce, steer) => { got.research = steer; accepted?.(); done({ summary: 'S', detail: 'D' }); return { finished: Promise.resolve() }; };
-  h.view.detailTemplateFor = async () => undefined;
-  h.plugin.outlineGeneration = { generate: async (_r, _s, steer) => { got.expand = steer; return outlineOf('# Body\n## Light'); } };
-  await h.host('a').submit('research', 'x'); await finished(h);
-  await h.host('a').submit('expand', 'x'); await finished(h);
-  assert.equal(got.research, got.research && entry0().steers && got.research); assert.ok(got.research && typeof got.research.bind === 'function' && typeof got.research.live === 'function');
-  assert.ok(got.expand && typeof got.expand.bind === 'function');
-  await researched(h); let option;
-  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { option = options; accepted(); observer.onWritten(); };
-  await h.host('root').submit('synthesize', 'go'); await waitFor(() => !h.entry('root').session.running);
-  assert.equal(option.steer, h.entry('root').steers);
 });
 
 integrationTest('topic chat steer (real window): Enter while running adds the text, the box clears, a live bubble shows under the turn; the buttons stay disabled; switching cards keeps it and the draft', async () => {

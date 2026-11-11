@@ -2698,6 +2698,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.topic_chat_mode_quick_hint": "快速：只用模型自己的知识，不使用网络找资料。",
   "ui.topic_chat_mode_standard_hint": "标准：上网搜索，补足最新或冷门资讯。",
   "ui.topic_chat_research_done": "研究完成，结果已写回这个议题。",
+  "ui.topic_chat_synthesis_started": "整合已开始，写入后会通知结果",
   "ui.topic_chat_expand_done_0_1": "已建立 {0} 个子议题：{1}。",
   "ui.topic_chat_synthesis_done_0": "已整合 {0} 个子议题的发现，写回这个议题。",
   "ui.topic_chat_synthesis_researched_first_0_1":

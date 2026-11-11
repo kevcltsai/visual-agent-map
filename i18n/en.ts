@@ -2889,6 +2889,7 @@ export const en = {
   "ui.topic_chat_mode_quick_hint": "Quick: uses only the model's own knowledge, no web search.",
   "ui.topic_chat_mode_standard_hint": "Standard: searches the web to fill in recent or niche information.",
   "ui.topic_chat_research_done": "Research finished; the result was written back to this topic.",
+  "ui.topic_chat_synthesis_started": "Integration started; its result will be shown when it is written.",
   "ui.topic_chat_expand_done_0_1": "Created {0} subtopics: {1}.",
   "ui.topic_chat_synthesis_done_0": "Synthesized the findings of {0} subtopics and wrote them back to this topic.",
   "ui.topic_chat_synthesis_researched_first_0_1":

@@ -582,14 +582,7 @@ import {
 import { ancestorTrail, createCardSearchField, type CardSearchSource } from "../../ui/card-search-field";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
-import {
-  aiModeOptions,
-  DEFAULT_MAP_AI_MODE,
-  hasKnowledgeGapMarker,
-  noteAiMode,
-  researchModeOf,
-  type MapAiMode
-} from "./ai-mode";
+import { aiModeOptions, DEFAULT_MAP_AI_MODE, hasKnowledgeGapMarker, noteAiMode, type MapAiMode } from "./ai-mode";
 import {
   TopicChatWindow,
   type TopicChatHost,
@@ -15649,133 +15642,25 @@ export class VisualAgentMapView extends ItemView {
         await this.runTopicChatAsk(entry, node, note, mode, text, controller, language, live, hooks, steers);
         return;
       }
-      if (kind === "expand") {
-        const outcome = await this.chatExpand(node, text, controller.signal, steers);
-        // A failure was already told by chatExpand's own Notice; a success with the window closed is told here.
-        if (outcome.status === "succeeded")
-          this.settleTopicChat(
-            entry,
-            t("ui.topic_chat_expand_done_0_1", outcome.titles.length, outcome.titles.join(t("ui.list_separator"))),
-            live,
-            true,
-            "done"
-          );
-        else if (outcome.status === "stopped")
-          this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
-        else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", outcome.reason), live, false, "failed");
-        return;
-      }
-      began = true;
-      hooks.begin(controller, kind === "research" ? "research" : undefined);
-      if (kind === "research") {
-        const { result, failure } = await this.runTopicChatResearch(
-          node,
-          note,
-          mode,
-          language,
-          text,
-          controller.signal,
-          endHooks,
-          endHooks,
-          steers
-        );
-        endHooks();
-        const stopped =
-          controller.signal.aborted ||
-          failure === t("ui.research_stopped_existing_content_was_preserved") ||
-          failure === t("ui.ai_task_cancelled");
-        if (result) {
-          // The window is closed: the usual Notice tells it (a Quick answer that lacked knowledge also offers Standard).
-          if (!this.topicChatOpenFor(entry)) hooks.completed?.("research", mode === "quick" ? result : undefined);
-          this.settleTopicChat(entry, t("ui.topic_chat_research_done"), live, false, "done");
-        } else if (stopped) this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
-        else if (failure) this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure), live, true, "failed");
-        else this.settleTopicChat(entry, t("ui.topic_chat_result_unknown"), live, true, "failed");
-        return;
-      }
-      // synthesize: subtopics that were never researched are researched first (same mode), then everything is integrated.
-      const children = this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0;
-      const toResearch = this.unresearchedChildren(node);
-      let researchedFirst = 0;
-      if (toResearch.length) {
-        // The subtopic researches take no additions (they are not this request): what is typed meanwhile waits, and goes
-        // into the integration's text below, once.
-        steers.live(false);
-        researchedFirst = await this.researchChildrenFirst(toResearch, mode, language, controller.signal, live);
-        if (controller.signal.aborted) {
-          endHooks();
-          this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
-          return;
-        }
-        if (!researchedFirst) {
-          endHooks();
-          this.settleTopicChat(
-            entry,
-            t("ui.topic_chat_failed_0", t("ui.topic_chat_failed_children")),
-            live,
-            true,
-            "failed"
-          );
-          return;
-        }
-        await this.hydrate();
-      }
-      let direction = text;
-      if (toResearch.length) {
-        const early = steers.takeQueued();
-        steers.live(true);
-        if (early.length) {
-          entry.steerFolded?.push(...early);
-          this.syncTopicSteerTurn(userTurn, entry.steerFolded ?? [], steers);
-          this.notifyTopicChat(entry);
-          direction = [text, ...early].join("\n\n");
-        }
-      }
-      let written = false;
-      let failure: string | undefined;
-      await this.startSynthesis(
-        node,
-        {
-          ...chatSynthesisOptions({ outputLanguage: language }),
-          researchMode: researchModeOf(mode),
-          signal: controller.signal,
-          onProgress: () => {},
-          steer: steers
-        },
-        direction,
-        message => {
-          failure = message;
-          endHooks();
-        },
-        endHooks,
-        {
-          isOpen: () => false,
-          onWritten: () => {
-            written = true;
-          }
-        }
-      );
-      endHooks();
-      if (written)
-        this.settleTopicChat(
-          entry,
-          researchedFirst
-            ? t("ui.topic_chat_synthesis_researched_first_0_1", researchedFirst, children)
-            : t("ui.topic_chat_synthesis_done_0", children),
-          live,
-          false,
-          "done"
-        );
-      else if (controller.signal.aborted || failure === t("ui.ai_task_cancelled"))
+      // The same code the map chat runs for the same action (`runChatSelection`): one model rule, one set of options, one lock check.
+      // Additions typed meanwhile wait (the map chat's run takes none) and go out as a new question afterwards.
+      steers.live(false);
+      const run = await this.runTopicChatAsMapAction(node, kind, mode, text, controller.signal);
+      if (run.status === "done") {
+        const sentence =
+          kind === "expand"
+            ? t(
+                "ui.topic_chat_expand_done_0_1",
+                run.titles?.length ?? 0,
+                (run.titles ?? []).join(t("ui.list_separator"))
+              )
+            : kind === "research"
+              ? t("ui.topic_chat_research_done")
+              : t("ui.topic_chat_synthesis_started");
+        this.settleTopicChat(entry, sentence, live, kind !== "synthesize", "done");
+      } else if (run.status === "stopped")
         this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
-      else
-        this.settleTopicChat(
-          entry,
-          t("ui.topic_chat_failed_0", failure ?? t("ui.ai_task_cancelled")),
-          live,
-          true,
-          "failed"
-        );
+      else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", run.reason ?? ""), live, true, "failed");
     } catch (error) {
       endHooks();
       const stopped = controller.signal.aborted;
@@ -15787,78 +15672,6 @@ export class VisualAgentMapView extends ItemView {
         stopped ? "stopped" : "failed"
       );
     }
-  }
-  /** The direct subtopics of a card that were never researched (idea or error) and are free to run: an integration researches them first. */
-  private unresearchedChildren(node: MapNode): MapNode[] {
-    return (this.map?.nodes ?? []).filter(item => {
-      if (item.parentId !== node.id) return false;
-      const status = this.notes.get(item.id)?.status;
-      return (status === "idea" || status === "error") && !this.topicChatBusy(item);
-    });
-  }
-  /**
-   * Researches those subtopics one after another, each as the topic chat's Research does, in `mode`; returns how many came out.
-   * Every integration entry (the topic chat's button and free question, the map chat) runs this before it integrates.
-   */
-  private async researchChildrenFirst(
-    children: MapNode[],
-    mode: TopicChatMode,
-    language: ContentLanguage,
-    signal: AbortSignal,
-    live: () => boolean = () => !this.closed
-  ): Promise<number> {
-    let researched = 0;
-    for (const child of children) {
-      if (signal.aborted || !live()) break;
-      const childNote = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
-      const done = await this.runTopicChatResearch(child, childNote, mode, language, "", signal);
-      if (done.result) researched++;
-    }
-    return researched;
-  }
-  /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
-  private async runTopicChatResearch(
-    node: MapNode,
-    note: Note,
-    mode: TopicChatMode,
-    language: ContentLanguage,
-    text: string,
-    signal: AbortSignal,
-    accepted?: () => void,
-    launched?: () => void,
-    steer?: ResearchSteer
-  ): Promise<{ result?: AiResult; failure?: string }> {
-    let result: AiResult | undefined;
-    let failure: string | undefined;
-    const referenceGroups = await this.taskSourceSettings()
-      .mapSources(signal)
-      .catch(() => []);
-    const runStyle = await this.detailTemplateFor(node, undefined, undefined, language);
-    const handle = await this.runAgent(
-      node,
-      done => {
-        result = done;
-      },
-      message => {
-        failure = message;
-      },
-      {
-        runStyle,
-        task: topicResearchTask(note, language, text),
-        referenceGroups,
-        signal,
-        outputLanguage: language,
-        rules: "",
-        ...aiModeOptions(mode, "research"),
-        addCharts: mode !== "quick"
-      },
-      accepted,
-      undefined,
-      steer
-    );
-    launched?.();
-    if (handle) await handle.finished;
-    return { result, failure };
   }
   /** The request of a free question: the context holds this topic and what is under it, nothing else of the map. */
   private async buildTopicChatRequest(
@@ -16053,6 +15866,59 @@ export class VisualAgentMapView extends ItemView {
       );
     }
   }
+  /**
+   * Runs the topic chat's research, expansion or integration as the map chat runs the same action: the one `runChatSelection`,
+   * with the action the map chat's reply would carry (the mode is the one the user picked in the window). Nothing here chooses a
+   * model, a reference, a task text, a level count or a lock rule of its own. Resolves when the work has ended; an integration
+   * resolves once the provider accepted it (the task tells its own end, as in the map chat).
+   */
+  private async runTopicChatAsMapAction(
+    node: MapNode,
+    kind: "research" | "expand" | "synthesize",
+    mode: TopicChatMode,
+    text: string,
+    signal: AbortSignal
+  ): Promise<{ status: "done" | "stopped" | "failed"; reason?: string; titles?: string[] }> {
+    const work = newChatWork();
+    const stop = (): void => work.controller.abort();
+    signal.addEventListener("abort", stop, { once: true });
+    if (signal.aborted) stop();
+    try {
+      const action = {
+        kind: "run_map_action",
+        action: kind === "research" ? "research_standard" : kind,
+        nodeIds: [node.id],
+        title: "",
+        goal: "",
+        direction: text,
+        mode,
+        images: false
+      } as Extract<MapChatAction, { kind: "run_map_action" }>;
+      const started = await this.runChatSelection(action, text, undefined, undefined, work);
+      if (signal.aborted) return { status: "stopped" };
+      if (started.status !== "done") return { status: "failed", reason: started.reason };
+      if (kind === "expand") {
+        const outcome = await work.expand[0]?.done;
+        if (!outcome || outcome.status === "stopped") return { status: "stopped" };
+        return outcome.status === "succeeded"
+          ? { status: "done", titles: outcome.titles }
+          : { status: "failed", reason: outcome.reason };
+      }
+      if (kind === "research") {
+        const outcome = await work.research[0];
+        if (signal.aborted) return { status: "stopped" };
+        if (!outcome || outcome.kind === "not_started")
+          return { status: "failed", reason: t("ui.map_chat_skip_not_started") };
+        if (outcome.succeeded) return { status: "done" };
+        return outcome.stopped
+          ? { status: "stopped" }
+          : { status: "failed", reason: t("ui.topic_chat_result_unknown") };
+      }
+      return { status: "done" };
+    } finally {
+      signal.removeEventListener("abort", stop);
+    }
+  }
   /** Carries out a research, expansion or integration a free question asked for, on the topics it names (all inside the subtree). */
   private async runTopicChatAction(
     action: Extract<MapChatAction, { kind: "run_map_action" }>,
@@ -16076,48 +15942,15 @@ export class VisualAgentMapView extends ItemView {
         reason = t("ui.ai_locked_notice");
         continue;
       }
-      if (action.action === "research_standard") {
-        const run = await this.runTopicChatResearch(target, note, mode, language, action.direction, signal);
-        if (run.result) done++;
-        else if (run.failure) reason = run.failure;
-      } else if (action.action === "expand") {
-        const outcome = await this.chatExpand(target, action.direction, signal);
-        if (outcome.status === "succeeded") done++;
-        else if (outcome.status === "failed") reason = outcome.reason;
-      } else if (action.action === "synthesize") {
-        let written = false;
-        const bare = this.unresearchedChildren(target);
-        if (bare.length) {
-          const researched = await this.researchChildrenFirst(bare, mode, language, signal);
-          if (signal.aborted) break;
-          if (!researched) {
-            reason = t("ui.topic_chat_failed_children");
-            continue;
-          }
-          await this.hydrate();
-        }
-        await this.startSynthesis(
-          target,
-          {
-            ...chatSynthesisOptions({ outputLanguage: language }),
-            researchMode: researchModeOf(mode),
-            signal,
-            onProgress: () => {}
-          },
-          action.direction,
-          message => {
-            reason = message;
-          },
-          () => {},
-          {
-            isOpen: () => false,
-            onWritten: () => {
-              written = true;
-            }
-          }
-        );
-        if (written) done++;
-      }
+      const run = await this.runTopicChatAsMapAction(
+        target,
+        action.action === "research_standard" ? "research" : action.action === "expand" ? "expand" : "synthesize",
+        mode,
+        action.direction,
+        signal
+      );
+      if (run.status === "done") done++;
+      else if (run.status === "failed" && run.reason) reason = run.reason;
     }
     return done ? { status: "done" } : { status: "failed", reason };
   }
@@ -25388,23 +25221,9 @@ export class VisualAgentMapView extends ItemView {
           map.title
         )
       });
-      return this.launchChatTask(note.model, async (failed, accepted) => {
-        // As the topic chat does: subtopics never researched are researched first (Quick: the chat integration never searches the web).
-        const bare = this.unresearchedChildren(node);
-        if (bare.length) {
-          const stop = signal ?? new AbortController().signal;
-          const researched = await this.researchChildrenFirst(
-            bare,
-            "quick",
-            options.outputLanguage ?? settings.language,
-            stop
-          );
-          if (stop.aborted) return failed(t("ui.topic_chat_stopped"));
-          if (!researched) return failed(t("ui.topic_chat_failed_children"));
-          await this.hydrate();
-        }
-        return this.startSynthesis(node, options, message, failed, accepted);
-      });
+      return this.launchChatTask(note.model, (failed, accepted) =>
+        this.startSynthesis(node, options, message, failed, accepted)
+      );
     }
     const waiting = this.integrationTask?.mapPath === this.path ? this.integrationTask : null;
     if (this.selectionStarting || (waiting && waiting.state !== "failed" && waiting.state !== "cancelled"))

@@ -2699,6 +2699,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.topic_chat_mode_quick_hint": "快速：只用模型自己的知識，不使用網路找資料。",
   "ui.topic_chat_mode_standard_hint": "標準：上網搜尋，補足最新或冷門資訊。",
   "ui.topic_chat_research_done": "研究完成，結果已寫回這個議題。",
+  "ui.topic_chat_synthesis_started": "整合已開始，寫入後會通知結果",
   "ui.topic_chat_expand_done_0_1": "已建立 {0} 個子議題：{1}。",
   "ui.topic_chat_synthesis_done_0": "已整合 {0} 個子議題的發現，寫回這個議題。",
   "ui.topic_chat_synthesis_researched_first_0_1":

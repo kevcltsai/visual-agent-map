@@ -2704,6 +2704,7 @@ var en = {
   "ui.topic_chat_mode_quick_hint": "Quick: uses only the model's own knowledge, no web search.",
   "ui.topic_chat_mode_standard_hint": "Standard: searches the web to fill in recent or niche information.",
   "ui.topic_chat_research_done": "Research finished; the result was written back to this topic.",
+  "ui.topic_chat_synthesis_started": "Integration started; its result will be shown when it is written.",
   "ui.topic_chat_expand_done_0_1": "Created {0} subtopics: {1}.",
   "ui.topic_chat_synthesis_done_0": "Synthesized the findings of {0} subtopics and wrote them back to this topic.",
   "ui.topic_chat_synthesis_researched_first_0_1": "Researched {0} unresearched subtopics first, then synthesized the findings of {1} subtopics and wrote them back to this topic.",
@@ -5506,6 +5507,7 @@ var zhCN = {
   "ui.topic_chat_mode_quick_hint": "\u5FEB\u901F\uFF1A\u53EA\u7528\u6A21\u578B\u81EA\u5DF1\u7684\u77E5\u8BC6\uFF0C\u4E0D\u4F7F\u7528\u7F51\u7EDC\u627E\u8D44\u6599\u3002",
   "ui.topic_chat_mode_standard_hint": "\u6807\u51C6\uFF1A\u4E0A\u7F51\u641C\u7D22\uFF0C\u8865\u8DB3\u6700\u65B0\u6216\u51B7\u95E8\u8D44\u8BAF\u3002",
   "ui.topic_chat_research_done": "\u7814\u7A76\u5B8C\u6210\uFF0C\u7ED3\u679C\u5DF2\u5199\u56DE\u8FD9\u4E2A\u8BAE\u9898\u3002",
+  "ui.topic_chat_synthesis_started": "\u6574\u5408\u5DF2\u5F00\u59CB\uFF0C\u5199\u5165\u540E\u4F1A\u901A\u77E5\u7ED3\u679C",
   "ui.topic_chat_expand_done_0_1": "\u5DF2\u5EFA\u7ACB {0} \u4E2A\u5B50\u8BAE\u9898\uFF1A{1}\u3002",
   "ui.topic_chat_synthesis_done_0": "\u5DF2\u6574\u5408 {0} \u4E2A\u5B50\u8BAE\u9898\u7684\u53D1\u73B0\uFF0C\u5199\u56DE\u8FD9\u4E2A\u8BAE\u9898\u3002",
   "ui.topic_chat_synthesis_researched_first_0_1": "\u5148\u7814\u7A76\u4E86 {0} \u4E2A\u8FD8\u6CA1\u7814\u7A76\u7684\u5B50\u8BAE\u9898\uFF0C\u518D\u6574\u5408 {1} \u4E2A\u5B50\u8BAE\u9898\u7684\u53D1\u73B0\uFF0C\u5199\u56DE\u8FD9\u4E2A\u8BAE\u9898\u3002",
@@ -8308,6 +8310,7 @@ var zhTW = {
   "ui.topic_chat_mode_quick_hint": "\u5FEB\u901F\uFF1A\u53EA\u7528\u6A21\u578B\u81EA\u5DF1\u7684\u77E5\u8B58\uFF0C\u4E0D\u4F7F\u7528\u7DB2\u8DEF\u627E\u8CC7\u6599\u3002",
   "ui.topic_chat_mode_standard_hint": "\u6A19\u6E96\uFF1A\u4E0A\u7DB2\u641C\u5C0B\uFF0C\u88DC\u8DB3\u6700\u65B0\u6216\u51B7\u9580\u8CC7\u8A0A\u3002",
   "ui.topic_chat_research_done": "\u7814\u7A76\u5B8C\u6210\uFF0C\u7D50\u679C\u5DF2\u5BEB\u56DE\u9019\u500B\u8B70\u984C\u3002",
+  "ui.topic_chat_synthesis_started": "\u6574\u5408\u5DF2\u958B\u59CB\uFF0C\u5BEB\u5165\u5F8C\u6703\u901A\u77E5\u7D50\u679C",
   "ui.topic_chat_expand_done_0_1": "\u5DF2\u5EFA\u7ACB {0} \u500B\u5B50\u8B70\u984C\uFF1A{1}\u3002",
   "ui.topic_chat_synthesis_done_0": "\u5DF2\u6574\u5408 {0} \u500B\u5B50\u8B70\u984C\u7684\u767C\u73FE\uFF0C\u5BEB\u56DE\u9019\u500B\u8B70\u984C\u3002",
   "ui.topic_chat_synthesis_researched_first_0_1": "\u5148\u7814\u7A76\u4E86 {0} \u500B\u9084\u6C92\u7814\u7A76\u7684\u5B50\u8B70\u984C\uFF0C\u518D\u6574\u5408 {1} \u500B\u5B50\u8B70\u984C\u7684\u767C\u73FE\uFF0C\u5BEB\u56DE\u9019\u500B\u8B70\u984C\u3002",
@@ -68430,7 +68433,7 @@ ${request.requirements}` : preset.text,
     }
   }
   async runTopicChatBody(entry, node, note, kind, mode, text10, controller, steers, userTurn) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e;
     const mapId = entry.mapId;
     const live2 = () => {
       var _a3;
@@ -68455,124 +68458,18 @@ ${request.requirements}` : preset.text,
         await this.runTopicChatAsk(entry, node, note, mode, text10, controller, language2, live2, hooks, steers);
         return;
       }
-      if (kind === "expand") {
-        const outcome = await this.chatExpand(node, text10, controller.signal, steers);
-        if (outcome.status === "succeeded")
-          this.settleTopicChat(
-            entry,
-            t("ui.topic_chat_expand_done_0_1", outcome.titles.length, outcome.titles.join(t("ui.list_separator"))),
-            live2,
-            true,
-            "done"
-          );
-        else if (outcome.status === "stopped")
-          this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live2, false, "stopped");
-        else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", outcome.reason), live2, false, "failed");
-        return;
-      }
-      began = true;
-      hooks.begin(controller, kind === "research" ? "research" : void 0);
-      if (kind === "research") {
-        const { result, failure: failure2 } = await this.runTopicChatResearch(
-          node,
-          note,
-          mode,
-          language2,
-          text10,
-          controller.signal,
-          endHooks,
-          endHooks,
-          steers
-        );
-        endHooks();
-        const stopped = controller.signal.aborted || failure2 === t("ui.research_stopped_existing_content_was_preserved") || failure2 === t("ui.ai_task_cancelled");
-        if (result) {
-          if (!this.topicChatOpenFor(entry)) (_b2 = hooks.completed) == null ? void 0 : _b2.call(hooks, "research", mode === "quick" ? result : void 0);
-          this.settleTopicChat(entry, t("ui.topic_chat_research_done"), live2, false, "done");
-        } else if (stopped) this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live2, false, "stopped");
-        else if (failure2) this.settleTopicChat(entry, t("ui.topic_chat_failed_0", failure2), live2, true, "failed");
-        else this.settleTopicChat(entry, t("ui.topic_chat_result_unknown"), live2, true, "failed");
-        return;
-      }
-      const children = (_d = (_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === node.id).length) != null ? _d : 0;
-      const toResearch = this.unresearchedChildren(node);
-      let researchedFirst = 0;
-      if (toResearch.length) {
-        steers.live(false);
-        researchedFirst = await this.researchChildrenFirst(toResearch, mode, language2, controller.signal, live2);
-        if (controller.signal.aborted) {
-          endHooks();
-          this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live2, false, "stopped");
-          return;
-        }
-        if (!researchedFirst) {
-          endHooks();
-          this.settleTopicChat(
-            entry,
-            t("ui.topic_chat_failed_0", t("ui.topic_chat_failed_children")),
-            live2,
-            true,
-            "failed"
-          );
-          return;
-        }
-        await this.hydrate();
-      }
-      let direction = text10;
-      if (toResearch.length) {
-        const early = steers.takeQueued();
-        steers.live(true);
-        if (early.length) {
-          (_e = entry.steerFolded) == null ? void 0 : _e.push(...early);
-          this.syncTopicSteerTurn(userTurn, (_f = entry.steerFolded) != null ? _f : [], steers);
-          this.notifyTopicChat(entry);
-          direction = [text10, ...early].join("\n\n");
-        }
-      }
-      let written2 = false;
-      let failure;
-      await this.startSynthesis(
-        node,
-        {
-          ...chatSynthesisOptions({ outputLanguage: language2 }),
-          researchMode: researchModeOf(mode),
-          signal: controller.signal,
-          onProgress: () => {
-          },
-          steer: steers
-        },
-        direction,
-        (message) => {
-          failure = message;
-          endHooks();
-        },
-        endHooks,
-        {
-          isOpen: () => false,
-          onWritten: () => {
-            written2 = true;
-          }
-        }
-      );
-      endHooks();
-      if (written2)
-        this.settleTopicChat(
-          entry,
-          researchedFirst ? t("ui.topic_chat_synthesis_researched_first_0_1", researchedFirst, children) : t("ui.topic_chat_synthesis_done_0", children),
-          live2,
-          false,
-          "done"
-        );
-      else if (controller.signal.aborted || failure === t("ui.ai_task_cancelled"))
+      steers.live(false);
+      const run = await this.runTopicChatAsMapAction(node, kind, mode, text10, controller.signal);
+      if (run.status === "done") {
+        const sentence = kind === "expand" ? t(
+          "ui.topic_chat_expand_done_0_1",
+          (_c = (_b2 = run.titles) == null ? void 0 : _b2.length) != null ? _c : 0,
+          ((_d = run.titles) != null ? _d : []).join(t("ui.list_separator"))
+        ) : kind === "research" ? t("ui.topic_chat_research_done") : t("ui.topic_chat_synthesis_started");
+        this.settleTopicChat(entry, sentence, live2, kind !== "synthesize", "done");
+      } else if (run.status === "stopped")
         this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live2, false, "stopped");
-      else
-        this.settleTopicChat(
-          entry,
-          t("ui.topic_chat_failed_0", failure != null ? failure : t("ui.ai_task_cancelled")),
-          live2,
-          true,
-          "failed"
-        );
+      else this.settleTopicChat(entry, t("ui.topic_chat_failed_0", (_e = run.reason) != null ? _e : ""), live2, true, "failed");
     } catch (error) {
       endHooks();
       const stopped = controller.signal.aborted;
@@ -68584,63 +68481,6 @@ ${request.requirements}` : preset.text,
         stopped ? "stopped" : "failed"
       );
     }
-  }
-  /** The direct subtopics of a card that were never researched (idea or error) and are free to run: an integration researches them first. */
-  unresearchedChildren(node) {
-    var _a2, _b2;
-    return ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []).filter((item) => {
-      var _a3;
-      if (item.parentId !== node.id) return false;
-      const status = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.status;
-      return (status === "idea" || status === "error") && !this.topicChatBusy(item);
-    });
-  }
-  /**
-   * Researches those subtopics one after another, each as the topic chat's Research does, in `mode`; returns how many came out.
-   * Every integration entry (the topic chat's button and free question, the map chat) runs this before it integrates.
-   */
-  async researchChildrenFirst(children, mode, language2, signal, live2 = () => !this.closed) {
-    var _a2;
-    let researched = 0;
-    for (const child of children) {
-      if (signal.aborted || !live2()) break;
-      const childNote = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
-      const done = await this.runTopicChatResearch(child, childNote, mode, language2, "", signal);
-      if (done.result) researched++;
-    }
-    return researched;
-  }
-  /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
-  async runTopicChatResearch(node, note, mode, language2, text10, signal, accepted, launched, steer) {
-    let result;
-    let failure;
-    const referenceGroups = await this.taskSourceSettings().mapSources(signal).catch(() => []);
-    const runStyle = await this.detailTemplateFor(node, void 0, void 0, language2);
-    const handle = await this.runAgent(
-      node,
-      (done) => {
-        result = done;
-      },
-      (message) => {
-        failure = message;
-      },
-      {
-        runStyle,
-        task: topicResearchTask(note, language2, text10),
-        referenceGroups,
-        signal,
-        outputLanguage: language2,
-        rules: "",
-        ...aiModeOptions(mode, "research"),
-        addCharts: mode !== "quick"
-      },
-      accepted,
-      void 0,
-      steer
-    );
-    launched == null ? void 0 : launched();
-    if (handle) await handle.finished;
-    return { result, failure };
   }
   /** The request of a free question: the context holds this topic and what is under it, nothing else of the map. */
   async buildTopicChatRequest(entry, node, note, message) {
@@ -68813,6 +68653,50 @@ ${request.requirements}` : preset.text,
       );
     }
   }
+  /**
+   * Runs the topic chat's research, expansion or integration as the map chat runs the same action: the one `runChatSelection`,
+   * with the action the map chat's reply would carry (the mode is the one the user picked in the window). Nothing here chooses a
+   * model, a reference, a task text, a level count or a lock rule of its own. Resolves when the work has ended; an integration
+   * resolves once the provider accepted it (the task tells its own end, as in the map chat).
+   */
+  async runTopicChatAsMapAction(node, kind, mode, text10, signal) {
+    var _a2;
+    const work = newChatWork();
+    const stop = () => work.controller.abort();
+    signal.addEventListener("abort", stop, { once: true });
+    if (signal.aborted) stop();
+    try {
+      const action = {
+        kind: "run_map_action",
+        action: kind === "research" ? "research_standard" : kind,
+        nodeIds: [node.id],
+        title: "",
+        goal: "",
+        direction: text10,
+        mode,
+        images: false
+      };
+      const started = await this.runChatSelection(action, text10, void 0, void 0, work);
+      if (signal.aborted) return { status: "stopped" };
+      if (started.status !== "done") return { status: "failed", reason: started.reason };
+      if (kind === "expand") {
+        const outcome = await ((_a2 = work.expand[0]) == null ? void 0 : _a2.done);
+        if (!outcome || outcome.status === "stopped") return { status: "stopped" };
+        return outcome.status === "succeeded" ? { status: "done", titles: outcome.titles } : { status: "failed", reason: outcome.reason };
+      }
+      if (kind === "research") {
+        const outcome = await work.research[0];
+        if (signal.aborted) return { status: "stopped" };
+        if (!outcome || outcome.kind === "not_started")
+          return { status: "failed", reason: t("ui.map_chat_skip_not_started") };
+        if (outcome.succeeded) return { status: "done" };
+        return outcome.stopped ? { status: "stopped" } : { status: "failed", reason: t("ui.topic_chat_result_unknown") };
+      }
+      return { status: "done" };
+    } finally {
+      signal.removeEventListener("abort", stop);
+    }
+  }
   /** Carries out a research, expansion or integration a free question asked for, on the topics it names (all inside the subtree). */
   async runTopicChatAction(action, targets, mode, language2, signal) {
     var _a2, _b2;
@@ -68831,50 +68715,15 @@ ${request.requirements}` : preset.text,
         reason = t("ui.ai_locked_notice");
         continue;
       }
-      if (action.action === "research_standard") {
-        const run = await this.runTopicChatResearch(target, note, mode, language2, action.direction, signal);
-        if (run.result) done++;
-        else if (run.failure) reason = run.failure;
-      } else if (action.action === "expand") {
-        const outcome = await this.chatExpand(target, action.direction, signal);
-        if (outcome.status === "succeeded") done++;
-        else if (outcome.status === "failed") reason = outcome.reason;
-      } else if (action.action === "synthesize") {
-        let written2 = false;
-        const bare = this.unresearchedChildren(target);
-        if (bare.length) {
-          const researched = await this.researchChildrenFirst(bare, mode, language2, signal);
-          if (signal.aborted) break;
-          if (!researched) {
-            reason = t("ui.topic_chat_failed_children");
-            continue;
-          }
-          await this.hydrate();
-        }
-        await this.startSynthesis(
-          target,
-          {
-            ...chatSynthesisOptions({ outputLanguage: language2 }),
-            researchMode: researchModeOf(mode),
-            signal,
-            onProgress: () => {
-            }
-          },
-          action.direction,
-          (message) => {
-            reason = message;
-          },
-          () => {
-          },
-          {
-            isOpen: () => false,
-            onWritten: () => {
-              written2 = true;
-            }
-          }
-        );
-        if (written2) done++;
-      }
+      const run = await this.runTopicChatAsMapAction(
+        target,
+        action.action === "research_standard" ? "research" : action.action === "expand" ? "expand" : "synthesize",
+        mode,
+        action.direction,
+        signal
+      );
+      if (run.status === "done") done++;
+      else if (run.status === "failed" && run.reason) reason = run.reason;
     }
     return done ? { status: "done" } : { status: "failed", reason };
   }
@@ -77281,23 +77130,10 @@ ${addition}` : addition },
           map.title
         )
       });
-      return this.launchChatTask(note.model, async (failed, accepted) => {
-        var _a3;
-        const bare = this.unresearchedChildren(node);
-        if (bare.length) {
-          const stop = signal != null ? signal : new AbortController().signal;
-          const researched = await this.researchChildrenFirst(
-            bare,
-            "quick",
-            (_a3 = options2.outputLanguage) != null ? _a3 : settings.language,
-            stop
-          );
-          if (stop.aborted) return failed(t("ui.topic_chat_stopped"));
-          if (!researched) return failed(t("ui.topic_chat_failed_children"));
-          await this.hydrate();
-        }
-        return this.startSynthesis(node, options2, message, failed, accepted);
-      });
+      return this.launchChatTask(
+        note.model,
+        (failed, accepted) => this.startSynthesis(node, options2, message, failed, accepted)
+      );
     }
     const waiting = ((_a2 = this.integrationTask) == null ? void 0 : _a2.mapPath) === this.path ? this.integrationTask : null;
     if (this.selectionStarting || waiting && waiting.state !== "failed" && waiting.state !== "cancelled")

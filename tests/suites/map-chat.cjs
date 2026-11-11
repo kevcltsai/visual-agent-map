@@ -4039,20 +4039,43 @@ integrationTest('B2 synthesize: the plan card keeps the user\'s message as the i
   const o = calls[0].options; eq([o.researchMode, o.visualMode, o.synthesisContent, 'depth' in o && o.depth !== undefined], ['local', 'off', 'full', false], 'an integration from the chat is always Quick (D-2026-10-229)');
 });
 
-integrationTest('parity (integration): a chat integration researches the never-researched subtopics first with the topic chat\'s own research, then integrates with the same options', async () => {
+integrationTest('parity (topic chat = map chat): the same topic, the same action and mode through both entries hands research, expand and integration exactly the same request', async () => {
   const h = await harness(); await h.view.hydrate(); h.open();
-  const ran = [], calls = [];
-  h.view.detailTemplateFor = async () => undefined;
-  h.view.runAgent = async (node, done, failed, request, accepted) => { ran.push({ id: node.id, task: request.task, mode: request.researchMode }); done({}); accepted?.(); return { finished: Promise.resolve() }; };
-  h.view.startSynthesis = async (node, options, direction, failed, accepted) => { calls.push({ id: node.id, options, direction }); accepted(); };
+  await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.', prompt: 'My own research prompt' }); await h.view.hydrate();
+  const node = h.node('a');
+  const viaChat = (action, mode, text) => withTimeout(h.view.applyMapChatActions({ actions: [{ kind: 'run_map_action', action, nodeIds: [h.ids.a], title: '', goal: '', direction: text, mode, images: false }], rejected: [], message: text }, { mdHashes: {}, topicHashes: topicBaseline(h) }));
+  const viaTopic = (kind, mode, text) => withTimeout(h.view.runTopicChatAsMapAction(node, kind, mode, text, new AbortController().signal));
+  const idle = () => withTimeout(until(() => h.plugin.running.size === 0 && h.plugin.activeTasks.size === 0 && !h.plugin.expansionCoordinator.isRunning(h.view.multiResearchKey())));
+  // Research: what the research of the card is handed (task, references, modes, charts, model / run-once argument).
+  const research = []; h.view.detailTemplateFor = async () => undefined;
+  h.view.runAgent = async (n, done, failed, request, accepted, runOnce) => { research.push(plain({ id: n.id, task: request.task, referenceGroups: request.referenceGroups, researchMode: request.researchMode, researchDepth: request.researchDepth, mapAiMode: request.mapAiMode, outputLanguage: request.outputLanguage, addCharts: request.addCharts, runOnce: runOnce ?? null })); done({}); accepted?.(); return { finished: Promise.resolve() }; };
+  for (const mode of ['quick', 'standard']) {
+    research.length = 0;
+    await viaChat('research_standard', mode, 'dig into sleep debt'); await withTimeout(until(() => research.length === 1)); await idle();
+    const chatSide = research.splice(0);
+    const topicRun = await viaTopic('research', mode, 'dig into sleep debt'); assert.equal(topicRun.status, 'done', JSON.stringify(topicRun)); await idle();
+    assert.equal(chatSide.length, 1, mode); assert.equal(research.length, 1, mode); assert.deepEqual(research, chatSide, 'research ' + mode);
+    assert.equal(research[0].researchMode, mode === 'quick' ? 'local' : 'research');
+  }
+  // Expand: the request the outline generator gets (an outline with nothing below its root writes nothing, so both start from the same card).
+  const requests = [];
+  h.plugin.outlineGeneration = { generate: async request => { requests.push(plain(request)); return { markdown: '# Body', nodes: outlineApi.parseOutline('# Body').nodes }; } };
+  await viaChat('expand', 'standard', 'split by cause'); await withTimeout(until(() => requests.length === 1)); await idle();
+  assert.equal((await viaTopic('expand', 'standard', 'split by cause')).status, 'failed'); await idle();
+  assert.equal(requests.length, 2); assert.deepEqual(requests[1], requests[0], 'expand');
+  assert.deepEqual(plain([requests[0].limits, requests[0].fromNote, requests[0].direction, requests[0].topic, requests[0].noteDetail]), [{ levels: 2, maxTopics: 15 }, true, 'split by cause', 'Body', 'Notes about Body.'].map(plain));
+  for (const key of ['existingChildren', 'model', 'reasoning', 'language']) assert.ok(key in requests[0] || requests[0][key] === undefined, key);
+  // Integration: options, direction and card handed to startSynthesis; subtopics are not researched first and the mode does not matter.
+  const seen = []; research.length = 0;
   h.view.notes.get(h.ids.c).status = 'idea';
-  const lines = await apply(h, [{ kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a], title: '', goal: '', direction: 'Integrate', mode: '', images: false }]);
-  assert.deepEqual(ran.map(r => r.id), [h.ids.c], 'the idea subtopic is researched first, as the topic chat does');
-  assert.equal(ran[0].mode, 'local', 'Quick: a chat integration never searches the web');
-  assert.equal(calls.length, 1); assert.equal(calls[0].id, h.ids.a);
-  const o = calls[0].options; eq([o.researchMode, o.researchDepth, o.visualMode, o.synthesisContent], ['local', 'normal', 'off', 'full']);
-  assert.equal(lines[0].status !== 'failed', true);
+  h.view.startSynthesis = async (n, options, direction, failed, accepted) => { seen.push(plain({ id: n.id, options, direction })); accepted(); };
+  await viaChat('synthesize', 'standard', 'Integrate sleep'); await withTimeout(until(() => seen.length === 1)); await idle();
+  assert.equal((await viaTopic('synthesize', 'standard', 'Integrate sleep')).status, 'done'); await idle();
+  assert.equal(seen.length, 2); assert.deepEqual(seen[1], seen[0], 'integration'); assert.equal(seen[0].id, h.ids.a); assert.equal(seen[0].direction, 'Integrate sleep');
+  assert.deepEqual([seen[0].options.researchMode, seen[0].options.researchDepth, seen[0].options.visualMode, seen[0].options.synthesisContent], ['local', 'normal', 'off', 'full'], 'always Quick');
+  assert.equal(research.length, 0, 'no research of the subtopics first');
 });
+
 integrationTest('parity (research task): both entries build the task with the topic\'s own prompt first', async () => {
   const { topicResearchTask } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, MarkdownView: class {} } });
   const own = topicResearchTask({ title: 'T', prompt: 'My own prompt' }, 'en', 'extra');

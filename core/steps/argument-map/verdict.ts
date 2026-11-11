@@ -22,6 +22,9 @@ import {
 } from "./shared";
 import template from "./verdict.md";
 import facetTemplate from "./facet-verdict.md";
+import noReplacedRule from "./verdict-no-replaced.md";
+import replacedRule from "./verdict-replaced.md";
+import replacedLabel from "./verdict-replaced-label.md";
 
 export interface VerdictRequest extends ArgumentStepBase {
   /** The hypothesis statement being judged. */
@@ -133,9 +136,8 @@ export function parseFacetVerdict(raw: string, request: VerdictRequest): FacetVe
   return { ...base, insights, ...(asked ? { sameQuestion: sameQuestion as boolean } : {}) };
 }
 
-const NO_REPLACED_RULE = "There is no replaced core need, so return sameQuestion: false.";
-const REPLACED_RULE =
-  "The core need of this hypothesis replaced an earlier core need that nobody could find. Also return sameQuestion: true when the new core evidence answers the same question as the earlier core need (given below), false when it asks something different.";
+const NO_REPLACED_RULE = noReplacedRule.trim();
+const REPLACED_RULE = replacedRule.trim();
 
 /** Judge one hypothesis from its own found evidence. Text-only. */
 export const verdictStep: StepDefinition<VerdictRequest, VerdictResult> = {
@@ -167,7 +169,7 @@ export const facetVerdictStep: StepDefinition<VerdictRequest, FacetVerdictResult
       sameQuestionField: '"sameQuestion":true|false,',
       replacedRule: ` ${request.input.replacedCore ? REPLACED_RULE : NO_REPLACED_RULE}`,
       replaced: request.input.replacedCore
-        ? `\n\nEarlier core need that was not found (JSON string):\n${JSON.stringify(request.input.replacedCore.text)}`
+        ? `\n\n${replacedLabel.trim()}\n${JSON.stringify(request.input.replacedCore.text)}`
         : ""
     }),
   schema: FACET_VERDICT_SCHEMA,

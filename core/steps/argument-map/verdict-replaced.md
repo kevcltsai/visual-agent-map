@@ -1,0 +1,1 @@
+The core need of this hypothesis replaced an earlier core need that nobody could find. Also return sameQuestion: true when the new core evidence answers the same question as the earlier core need (given below), false when it asks something different.

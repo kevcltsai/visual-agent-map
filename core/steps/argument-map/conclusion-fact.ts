@@ -15,6 +15,10 @@ import {
 } from "./shared";
 import template from "./conclusion-fact.md";
 import premiseRule from "./conclusion-unconfirmed.md";
+import outcomeHolds from "./conclusion-fact-holds.md";
+import outcomeFails from "./conclusion-fact-fails.md";
+import outcomePartial from "./conclusion-fact-partial.md";
+import outcomeInsufficient from "./conclusion-fact-insufficient.md";
 
 export interface ConclusionFactDatum {
   claim: string;
@@ -65,10 +69,10 @@ export const CONCLUSION_FACT_SCHEMA = {
 };
 
 const OUTCOME_TEXT: Record<FacetComposite, string> = {
-  holds: "holds (at least one facet supports the proposition and none refutes it).",
-  fails: "does not hold (at least one facet refutes the proposition and none supports it).",
-  partial: "holds in part (some facets support the proposition and others refute it).",
-  insufficient: "cannot be decided (no facet had enough data)."
+  holds: outcomeHolds.trim(),
+  fails: outcomeFails.trim(),
+  partial: outcomePartial.trim(),
+  insufficient: outcomeInsufficient.trim()
 };
 
 const checked = (request: ConclusionFactRequest): ConclusionFactFacet[] => {

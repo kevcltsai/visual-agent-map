@@ -12,6 +12,9 @@ import {
 } from "./shared";
 import type { GateDatum } from "./gate";
 import template from "./needs.md";
+import noCoreRule from "./needs-no-core.md";
+import coreFirst from "./needs-core-first.md";
+import coreReplace from "./needs-core-replace.md";
 import { MAX_NEEDS, MAX_ROUND_NEEDS, type Hypothesis } from "../../argument-map/model";
 
 export interface NeedsRequest extends ArgumentStepBase {
@@ -30,12 +33,10 @@ export interface NeedsResult {
   needs: { text: string; core?: true }[];
 }
 
-const NO_CORE_RULE = 'No need is the core here: set "core": false on every need.';
+const NO_CORE_RULE = noCoreRule.trim();
 const CORE_RULES = {
-  first:
-    'Exactly one of the needs is the core need: the single piece of evidence that decides whether the hypothesis holds. Mark it with "core": true and set "core": false on every other need.',
-  replace:
-    'The earlier core need was not found. You may list at most one new core need, marked with "core": true, only if it asks for something that can decide the hypothesis and can be found; set "core": false on every other need.'
+  first: coreFirst.trim(),
+  replace: coreReplace.trim()
 } as const;
 
 /** How many needs may still be added to a hypothesis this round; the same limits as the machine's `addNeeds`. */

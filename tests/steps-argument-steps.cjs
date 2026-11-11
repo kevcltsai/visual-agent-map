@@ -735,7 +735,9 @@ test('facet plan: years in the reply\'s own assumption values may be reused in q
   bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.facets[1].title = '台灣出生率較2012年下降'; }), /number 2012/);
   bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.facets[0].needs[0].need = '2012年的總生育率'; }), /number 2012/);
   bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.question = '台灣2030年是否少子化？'; }), /number 2030/);
-  bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.causalQuestions = ['2015年經濟壓力是主因嗎？']; }), /number 2015/);
+  // P2-7 (intentional change): causal questions may now reuse a year of the assumption values; a year nowhere in the request is still refused.
+  assert.ok(ok(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.causalQuestions = ['2015年經濟壓力是主因嗎？']; })));
+  bad(mod.facetPlanStep, realReq, realWith(REAL_YEARS, v => { v.causalQuestions = ['2012年經濟壓力是主因嗎？']; }), /number 2012/);
 });
 
 test('facet plan: a baseline may be a part of an assumption value, or contain one; trivial or unrelated baselines still fail', () => {
@@ -752,4 +754,19 @@ test('P1-4: a retry need that asks for a cause is refused like a facet-plan need
   for (const need of ['What caused the rise in the youth rate', 'Why the youth rate went up', '青年失業率上升的原因', '青年失业率上升的成因', 'Youth rate rise due to automation']) {
     bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').retryNeeds = [need]; }), /cause|retry/);
   }
+});
+
+test('P2-7: an assumption label, reason and a causal question may reuse a year the assumption values carry; a number or link nowhere in the request is still refused', () => {
+  const prop = ok(mod.facetPlanStep, { ...base, proposition: 'Youth unemployment is rising' }, fpWith(v => {
+    v.assumptions.items[0].value = 'ages 16 to 24 for the years 2023 to 2024';
+    v.assumptions.items[0].label = 'Age band 16 to 24';
+    v.assumptions.items[0].reason = 'covers 2023 to 2024 only';
+    v.causalQuestions = ['Did automation drive the rise in 2023?'];
+    v.question = 'Did youth unemployment rise?';
+  }));
+  assert.ok(prop);
+  const req = { ...base, proposition: 'Youth unemployment is rising' };
+  bad(mod.facetPlanStep, req, fpWith(v => { v.assumptions.items[0].reason = 'covers 1999 only'; v.question = 'Did youth unemployment rise?'; }), /1999/);
+  bad(mod.facetPlanStep, req, fpWith(v => { v.causalQuestions = ['Did automation drive the rise in 1999?']; v.question = 'Did youth unemployment rise?'; }), /1999/);
+  bad(mod.facetPlanStep, req, fpWith(v => { v.assumptions.items[0].reason = 'see https://x.example.com'; v.question = 'Did youth unemployment rise?'; }), /link/);
 });

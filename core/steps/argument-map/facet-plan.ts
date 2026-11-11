@@ -133,10 +133,12 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
     const label = text(one.label, "label");
     const value = text(one.value, "value");
     const reason = text(one.reason, "reason");
-    grounded([label, reason], sources);
     groundedLinks([value], sources);
     return { label, value, reason };
   });
+  // Label and reason may use the years and quantities of the assumption values (the AI's scope choices); links stay proposition-only
+  // because every value's links were checked against the proposition above.
+  for (const one of items) grounded([one.label, one.reason], [request.proposition, ...items.map(a => a.value)]);
   const effectiveItems = request.presetAssumptions?.length ? request.presetAssumptions : items;
   // Assumption values are the AI's own scope choices (links-only checked), so their years and quantities may be reused below.
   const withValues = [request.proposition, ...effectiveItems.map(a => a.value)];
@@ -152,7 +154,7 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
     const key = normalized(question);
     if (causalKeys.has(key)) return;
     causalKeys.add(key);
-    grounded([question], sources);
+    grounded([question], withValues);
     causal.push(question);
   };
   const definitionNeeds: string[] = [];

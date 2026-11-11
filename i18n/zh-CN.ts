@@ -2905,5 +2905,11 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.argument_rerun": "用这组假设重跑…",
   "ui.argument_rerun_aria": "用这组假设在新图重跑，原图不变",
   "ui.argument_rerun_unreadable": "看不懂定义表，没有开新图。请检查假设卡笔记里的表格。",
-  "ui.argument_searched_0": "查过 {0} 种写法，笔记里有记录"
+  "ui.argument_searched_0": "查过 {0} 种写法，笔记里有记录",
+  "ui.argument_paused_reason_user": "你已停止",
+  "ui.argument_paused_reason_error": "AI 回复格式不对，重试一次仍失败",
+  "ui.argument_paused_reason_interrupted": "上次中断",
+  "ui.argument_paused_reason_limit": "研究次数已用完",
+  "ui.argument_paused_resume_aria": "接续研究，从停下的地方继续",
+  "ui.argument_hypothesis_alt_0": "假设 {0}・竞争解释"
 };

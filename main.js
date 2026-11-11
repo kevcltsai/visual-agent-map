@@ -76658,7 +76658,11 @@ ${note.detail.trim()}` : "",
         return { status: "done", ...allBasis ? { basis: allBasis } : {} };
       }
       case "synthesize":
-        return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message, work == null ? void 0 : work.controller.signal);
+        return this.chatSynthesize(
+          targets.length ? targets : this.chatSelectionIds(),
+          message,
+          work == null ? void 0 : work.controller.signal
+        );
       case "rate_by_goal": {
         const goal = action.goal.trim();
         if (!goal || !this.relevanceGradeable()) return skipped("ui.map_chat_skip_unavailable");
@@ -77282,7 +77286,12 @@ ${addition}` : addition },
         const bare = this.unresearchedChildren(node);
         if (bare.length) {
           const stop = signal != null ? signal : new AbortController().signal;
-          const researched = await this.researchChildrenFirst(bare, "quick", (_a3 = options2.outputLanguage) != null ? _a3 : settings.language, stop);
+          const researched = await this.researchChildrenFirst(
+            bare,
+            "quick",
+            (_a3 = options2.outputLanguage) != null ? _a3 : settings.language,
+            stop
+          );
           if (stop.aborted) return failed(t("ui.topic_chat_stopped"));
           if (!researched) return failed(t("ui.topic_chat_failed_children"));
           await this.hydrate();
@@ -86729,10 +86738,16 @@ var outlineGenerateStep = {
           levels: String(request.limits.levels),
           maxTopics: String(request.limits.maxTopics)
         }) : "",
-        languageInstruction: inLanguageNaming({ zh: language_zh_default6, en: language_en_default6 }, content, { language: "region" }, "en", {
-          kind: "topic",
-          text: request.topic
-        })
+        languageInstruction: inLanguageNaming(
+          { zh: language_zh_default6, en: language_en_default6 },
+          content,
+          { language: "region" },
+          "en",
+          {
+            kind: "topic",
+            text: request.topic
+          }
+        )
       });
     }
     return renderTemplate(prompt_default6, {

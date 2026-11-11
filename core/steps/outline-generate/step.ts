@@ -180,7 +180,8 @@ function ensureRoot(text: string, rootTitle?: string): string {
     summary = REPLY_SUMMARY.exec(lead[0])?.[1].trim() || title;
     rest = lines.slice(first);
   }
-  const body = top === 1 ? rest.map(line => (HEADING_LEVEL.test(line) ? line.replace(/^( {0,3})#/, "$1##") : line)) : rest;
+  const body =
+    top === 1 ? rest.map(line => (HEADING_LEVEL.test(line) ? line.replace(/^( {0,3})#/, "$1##") : line)) : rest;
   return [`# ${title}`, `> ${summary}`, ...body].join("\n");
 }
 
@@ -250,10 +251,16 @@ export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, Outline
               maxTopics: String(request.limits.maxTopics)
             })
           : "",
-        languageInstruction: inLanguageNaming({ zh: languageZh, en: languageEn }, content, { language: "region" }, "en", {
-          kind: "topic",
-          text: request.topic
-        })
+        languageInstruction: inLanguageNaming(
+          { zh: languageZh, en: languageEn },
+          content,
+          { language: "region" },
+          "en",
+          {
+            kind: "topic",
+            text: request.topic
+          }
+        )
       });
     }
     return renderTemplate(template, {

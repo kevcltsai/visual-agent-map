@@ -24684,7 +24684,11 @@ export class VisualAgentMapView extends ItemView {
         return { status: "done", ...(allBasis ? { basis: allBasis } : {}) };
       }
       case "synthesize":
-        return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message, work?.controller.signal);
+        return this.chatSynthesize(
+          targets.length ? targets : this.chatSelectionIds(),
+          message,
+          work?.controller.signal
+        );
       case "rate_by_goal": {
         const goal = action.goal.trim();
         if (!goal || !this.relevanceGradeable()) return skipped("ui.map_chat_skip_unavailable");
@@ -25389,7 +25393,12 @@ export class VisualAgentMapView extends ItemView {
         const bare = this.unresearchedChildren(node);
         if (bare.length) {
           const stop = signal ?? new AbortController().signal;
-          const researched = await this.researchChildrenFirst(bare, "quick", options.outputLanguage ?? settings.language, stop);
+          const researched = await this.researchChildrenFirst(
+            bare,
+            "quick",
+            options.outputLanguage ?? settings.language,
+            stop
+          );
           if (stop.aborted) return failed(t("ui.topic_chat_stopped"));
           if (!researched) return failed(t("ui.topic_chat_failed_children"));
           await this.hydrate();

@@ -499,7 +499,7 @@ test('facet plan: a number outside the request and outside every stated range is
 });
 test('facet plan: the output feeds applySituationPlan (the ids come from the program)', () => {
   const out = ok(mod.facetPlanStep, fpReq, fpOk());
-  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions };
+  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions, questionType: 'fact' };
   assert.equal(m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan).situation.data.length, 4);
 });
 // ---- sem3: baseline-type facets (criterion, baseline, definition needs) ----
@@ -523,7 +523,7 @@ test('sem3 facet plan: a definition need builds no datum, is kept for the defini
   assert.equal(out.facets.reduce((n, f) => n + f.needs.length, 0), 4, 'no datum for the definition need');
   bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs = [fneed('How is it measured', 'definition')]; }), /1 to 3/);
   bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs.push(fneed('official youth unemployment rate series', 'definition')); }), /repeats/);
-  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, definitionNeeds: out.definitionNeeds, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions };
+  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, definitionNeeds: out.definitionNeeds, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions, questionType: 'fact' };
   const state = m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan);
   assert.equal(state.situation.data.length, 4);
   assert.deepEqual(plain(state.situation.assumptions.definitionNeeds), ['How the agency defines the youth group']);

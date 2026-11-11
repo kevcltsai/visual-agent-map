@@ -407,7 +407,7 @@ test('V1 boost: managedNodeIds also lists facet card ids and the assumption card
   assert.deepEqual([...model.managedNodeIds({ argumentMap: { situation: { data: [], assumptions: 'junk', facets: 'junk' } } })], []);
   const state = machine.applySituationPlan(machine.newArgumentMap({ proposition: 'p', situation: 's', conclusion: 'c', verified: 'v', eliminated: 'e' }, 'r'), {
     assumptions: { id: 'as9', items: [{ label: 'a', value: 'b', reason: 'c' }] },
-    facets: [1, 2, 3].map(i => ({ id: `f${i}`, title: `F${i}`, needs: [{ id: `d${i}`, need: `n${i}` }] })), causalQuestions: []
+    facets: [1, 2, 3].map(i => ({ id: `f${i}`, title: `F${i}`, needs: [{ id: `d${i}`, need: `n${i}` }] })), causalQuestions: [], questionType: 'fact'
   });
   assert.deepEqual([...model.managedNodeIds({ argumentMap: state })].sort(), ['as9', 'c', 'd1', 'd2', 'd3', 'e', 'f1', 'f2', 'f3', 'p', 's', 'v']);
 });

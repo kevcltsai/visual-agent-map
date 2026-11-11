@@ -22,9 +22,19 @@ export const MAX_SITUATION_NEEDS = 15;
 export const MAX_RETRY_NEEDS = 9;
 export const MAX_SITUATION_RESEARCH = 24;
 
-export const ROLE_KEYS = ["proposition", "situation", "conclusion", "verified", "eliminated"] as const;
+/** The three role nodes every map has; the group nodes are optional (a fact map has none, a causal map has all three, a map made before question types has the first two). */
+export const REQUIRED_ROLE_KEYS = ["proposition", "situation", "conclusion"] as const;
+export const GROUP_ROLE_KEYS = ["verified", "eliminated", "unconfirmed"] as const;
+export const ROLE_KEYS = [...REQUIRED_ROLE_KEYS, ...GROUP_ROLE_KEYS] as const;
 export type RoleKey = (typeof ROLE_KEYS)[number];
-export type ArgumentRoles = Record<RoleKey, string>;
+export type ArgumentRoles = Record<(typeof REQUIRED_ROLE_KEYS)[number], string> &
+  Partial<Record<(typeof GROUP_ROLE_KEYS)[number], string>>;
+/** Decision #60: a fact question is concluded from its facets by the program; a causal question goes on to hypotheses. */
+export const QUESTION_TYPES = ["fact", "causal"] as const;
+export type QuestionType = (typeof QUESTION_TYPES)[number];
+/** Source tier (decision #64): `primary` = official/government/international body, large news organisation or academic work; `other` needs a second independent source. */
+export const SOURCE_TIERS = ["primary", "other"] as const;
+export type SourceTier = (typeof SOURCE_TIERS)[number];
 
 export const RUN_PHASES = ["situation", "analysis", "concluded", "stopped_mismatch", "stopped_limit"] as const;
 export type RunPhase = (typeof RUN_PHASES)[number];
@@ -95,7 +105,20 @@ export interface SourceProof {
   check: ProofCheck;
   checkedAt: string;
   figure?: SourceFigure;
+  /** Decision #64. Absent on every older proof. */
+  tier?: SourceTier;
+  /** A second, independent source that agrees and passed the same source check. Stored only then. */
+  second?: SecondSource;
 }
+export interface SecondSource {
+  url: string;
+  quote: string;
+  check: ProofCheck;
+  checkedAt: string;
+}
+/** An `other`-tier source with no verified second source: its data cannot alone carry a facet's supports or refutes (decision #64). Older proofs (no tier) are not uncertain. */
+export const isUncertainSource = (proof: { tier?: SourceTier; second?: unknown } | undefined): boolean =>
+  proof?.tier === "other" && !proof.second;
 export interface SituationDatum {
   id: string;
   need: string;
@@ -146,6 +169,8 @@ export interface Need {
   reason?: string;
   /** On a need added in a later round: the id of a `not_found` need of the same hypothesis it stands in for. The dead need itself is never rewritten. */
   replaces?: string;
+  /** Decision #62: the one need whose finding decides the hypothesis (exactly one per hypothesis in the first round; a later round may replace a dead one). */
+  core?: true;
   searchLog?: SearchLog;
 }
 export interface Hypothesis {
@@ -173,6 +198,8 @@ export interface ArgumentRun {
   researchCalls: number;
   /** A re-run: the definitions the owner kept. Saved here so a run paused before the facet plan still uses them on resume. */
   presetAssumptions?: AssumptionItem[];
+  /** A re-run: the question type the owner kept on the definitions card; it wins over the AI's. */
+  presetQuestionType?: QuestionType;
 }
 export interface ArgumentConclusion {
   state: ConclusionState;
@@ -195,6 +222,8 @@ export interface ArgumentMapData {
     causalQuestions?: string[];
     /** Facet-judged maps: the question the situation card is titled with. */
     question?: string;
+    /** Decision #60. Absent on a map made before question types: with facets it is a legacy facet map (see isLegacyFacetMap). */
+    questionType?: QuestionType;
   };
   hypotheses: Hypothesis[];
   conclusion: ArgumentConclusion;
@@ -233,6 +262,17 @@ function badFigure(value: unknown): boolean {
   return !isStr(value.number) || !isStr(value.period) || !isStr(value.unit);
 }
 
+function badSecond(value: unknown): boolean {
+  if (value === undefined) return false;
+  return (
+    !isRec(value) ||
+    !isStr(value.url) ||
+    !isStr(value.quote) ||
+    !oneOf(PROOF_CHECKS, value.check) ||
+    !isStr(value.checkedAt)
+  );
+}
+
 function badProof(value: unknown): boolean {
   if (value === undefined) return false;
   return (
@@ -242,7 +282,9 @@ function badProof(value: unknown): boolean {
     !isStr(value.claim) ||
     !oneOf(PROOF_CHECKS, value.check) ||
     !isStr(value.checkedAt) ||
-    badFigure(value.figure)
+    badFigure(value.figure) ||
+    !optOneOf(SOURCE_TIERS, value.tier) ||
+    badSecond(value.second)
   );
 }
 
@@ -290,9 +332,15 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
   if (!isRec(raw)) return "not an object";
   if (raw.v !== ARGUMENT_MAP_VERSION) return "unsupported version";
   if (!isRec(raw.roles)) return "roles missing";
-  for (const key of ROLE_KEYS) {
+  for (const key of REQUIRED_ROLE_KEYS) {
     const id = raw.roles[key];
     if (!isStr(id)) return `role ${key} missing`;
+    if (!nodeIds.has(id)) return `role ${key} points to a missing node`;
+  }
+  for (const key of GROUP_ROLE_KEYS) {
+    const id = raw.roles[key];
+    if (id === undefined) continue;
+    if (!isStr(id)) return `role ${key} malformed`;
     if (!nodeIds.has(id)) return `role ${key} points to a missing node`;
   }
   const run = raw.run;
@@ -307,10 +355,12 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
     )
       return "run malformed";
   }
+  if (!optOneOf(QUESTION_TYPES, run.presetQuestionType)) return "unknown run enum";
   if (!oneOf(RUN_PHASES, run.phase) || !oneOf(RUN_STATUSES, run.status) || !optOneOf(STOP_REASONS, run.stopReason))
     return "unknown run enum";
   const situation = raw.situation;
   if (!isRec(situation) || !Array.isArray(situation.data) || !isRec(situation.gate)) return "situation malformed";
+  if (!optOneOf(QUESTION_TYPES, situation.questionType)) return "unknown situation enum";
   const ids = new Set<string>();
   const facetProblem = readFacets(situation, ids);
   if (facetProblem) return facetProblem;
@@ -355,6 +405,7 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
       if (!oneOf(ITEM_STATES, need.state) || !optOneOf(NEED_STANCES, need.stance)) return "unknown need enum";
       if (badProof(need.proof) || !optStr(need.reason) || badSearchLog(need.searchLog)) return "need malformed";
       if (need.replaces !== undefined && !isStr(need.replaces)) return "need malformed";
+      if (need.core !== undefined && need.core !== true) return "need malformed";
     }
     const replaced = new Set<string>();
     for (const need of hypothesis.needs as Rec[]) {
@@ -476,12 +527,30 @@ export const isPartialConclusion = (state: ArgumentMapData): boolean =>
   state.run.phase === "concluded" && state.conclusion.partial === true && verifiedCount(state) < MIN_VERIFIED;
 /** The situation gate ended data_insufficient and the run went on (decision #58). */
 export const isSituationUnconfirmed = (state: ArgumentMapData): boolean => state.situation.gate.state === "unconfirmed";
+/** A facet map made before question types (0.34.0): facets, no questionType. A finished one reads as before; an unfinished one is never resumed (decision #66). */
+export const isLegacyFacetMap = (state: ArgumentMapData): boolean =>
+  state.situation.facets !== undefined && state.situation.questionType === undefined;
+export const isFactMap = (state: ArgumentMapData): boolean => state.situation.questionType === "fact";
+export const FACET_COMPOSITES = ["holds", "fails", "partial", "insufficient"] as const;
+export type FacetComposite = (typeof FACET_COMPOSITES)[number];
+/** What the facets say together (decision #60). Supports and no refutation holds; refutation and no support fails; both is partial; neither (all insufficient or still pending) is insufficient. `insufficientCount` is shown next to the result. */
+export function composeFacets(facets: readonly { verdict: FacetVerdict }[]): {
+  outcome: FacetComposite;
+  insufficientCount: number;
+} {
+  const supports = facets.some(f => f.verdict === "supports");
+  const refutes = facets.some(f => f.verdict === "refutes");
+  const insufficientCount = facets.filter(f => f.verdict === "insufficient").length;
+  const outcome = supports && refutes ? "partial" : supports ? "holds" : refutes ? "fails" : "insufficient";
+  return { outcome, insufficientCount };
+}
 export type ConclusionView = "in_progress" | "concluded" | "stopped_limit" | "stopped_mismatch";
 /** The four conclusion card states, derived from the run and the verified count. A concluded map falls back to in_progress when support is lost. */
 export function conclusionView(state: ArgumentMapData): ConclusionView {
   const { phase } = state.run;
   if (phase === "stopped_mismatch") return "stopped_mismatch";
   if (phase === "stopped_limit") return "stopped_limit";
+  if (isFactMap(state)) return phase === "concluded" ? "concluded" : "in_progress";
   if (
     phase === "concluded" &&
     (verifiedCount(state) >= MIN_VERIFIED || (state.conclusion.partial === true && verifiedCount(state) >= 1))

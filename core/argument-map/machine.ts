@@ -19,13 +19,19 @@ import {
   MAX_SITUATION_RESEARCH,
   MIN_FACETS,
   MIN_VERIFIED,
+  QUESTION_TYPES,
   DATA_STANCES,
   NEED_STANCES,
   PROOF_CHECKS,
+  SOURCE_TIERS,
   PROP_STANCES,
   VERDICTS,
   isStanceLocked,
   isSituationUnconfirmed,
+  isUncertainSource,
+  isLegacyFacetMap,
+  isFactMap,
+  composeFacets,
   allNeedsFound,
   effectiveVerdict,
   evidenceClearlySupports,
@@ -39,6 +45,7 @@ import {
   type Facet,
   type Hypothesis,
   type Need,
+  type QuestionType,
   type SourceProof,
   type StopReason,
   type Verdict
@@ -66,6 +73,7 @@ export type ArgumentAction =
   | { type: "revise"; hypothesisId: string }
   | { type: "eliminate_limit"; hypothesisId: string }
   | { type: "conclude" }
+  | { type: "conclude_facts" }
   | { type: "stop_limit" };
 
 /** What a research answer must be: a source the caller verified, or a miss with a reason. `proof` is re-checked for shape here. */
@@ -82,8 +90,12 @@ export interface SituationPlan {
   definitionNeeds?: string[];
   facets: { id: string; title: string; criterion?: string; baseline?: string; needs: { id: string; need: string }[] }[];
   causalQuestions: string[];
+  /** Decision #60: the question type the plan checkpoint wrote. */
+  questionType: QuestionType;
+  /** Ids of the three group nodes the plan checkpoint made: required for a causal question, refused for a fact question. */
+  groups?: { verified: string; eliminated: string; unconfirmed: string };
 }
-export type FacetOutcome = "mismatch" | "matched" | "retry" | "insufficient";
+export { composeFacets };
 
 export interface EvidenceInput {
   id: string;
@@ -162,6 +174,9 @@ function checkedProof(value: unknown): SourceProof {
   }
   if (protocol !== "http:" && protocol !== "https:") throw new GateError("source url must be http(s)");
   const figure = readFigure(p.figure);
+  if (p.tier !== undefined && !(SOURCE_TIERS as readonly string[]).includes(p.tier))
+    throw new GateError("unknown source tier");
+  const second = readSecond(p.second);
   return {
     url: p.url as string,
     quote: p.quote as string,
@@ -169,7 +184,30 @@ function checkedProof(value: unknown): SourceProof {
     ...(p.claimUnverified === true ? { claimUnverified: true } : {}),
     check: p.check as SourceProof["check"],
     checkedAt: p.checkedAt as string,
-    ...(figure ? { figure } : {})
+    ...(figure ? { figure } : {}),
+    ...(p.tier !== undefined ? { tier: p.tier } : {}),
+    ...(second ? { second } : {})
+  };
+}
+/** The optional second source of a proof (decision #64): present only when the caller verified it; a malformed one is refused, not dropped. */
+function readSecond(value: unknown): SourceProof["second"] {
+  if (value === undefined) return undefined;
+  const v = value;
+  if (!v || typeof v !== "object" || blank(v.url) || blank(v.quote) || blank(v.checkedAt))
+    throw new GateError("a second source needs a url, a quote and a time");
+  if (!(PROOF_CHECKS as readonly string[]).includes(v.check as string)) throw new GateError("unknown source check");
+  let protocol = "";
+  try {
+    protocol = new URL(v.url as string).protocol;
+  } catch {
+    throw new GateError("second source url is not a url");
+  }
+  if (protocol !== "http:" && protocol !== "https:") throw new GateError("second source url must be http(s)");
+  return {
+    url: v.url as string,
+    quote: v.quote as string,
+    check: v.check as SourceProof["check"],
+    checkedAt: v.checkedAt as string
   };
 }
 /** The optional figure of a proof, kept only when it is exactly three non-blank strings; a cosmetic field never fails the evidence. */
@@ -208,7 +246,12 @@ const foundOf = (state: ArgumentMapData, facetId: string) =>
   state.situation.data.filter(d => d.facetId === facetId && d.state === "found");
 
 // ---- creation ------------------------------------------------------------------------------------------------------------------
-export function newArgumentMap(roles: ArgumentRoles, runId: string, preset?: AssumptionItem[]): ArgumentMapData {
+export function newArgumentMap(
+  roles: ArgumentRoles,
+  runId: string,
+  preset?: AssumptionItem[],
+  presetQuestionType?: QuestionType
+): ArgumentMapData {
   return {
     v: 1,
     roles: { ...roles },
@@ -217,7 +260,8 @@ export function newArgumentMap(roles: ArgumentRoles, runId: string, preset?: Ass
       phase: "situation",
       status: "running",
       researchCalls: 0,
-      ...(preset?.length ? { presetAssumptions: preset.map(item => ({ ...item })) } : {})
+      ...(preset?.length ? { presetAssumptions: preset.map(item => ({ ...item })) } : {}),
+      ...(presetQuestionType ? { presetQuestionType } : {})
     },
     situation: { data: [], gate: { state: "pending", citedData: [] } },
     hypotheses: [],
@@ -237,6 +281,7 @@ function situationLimit(state: ArgumentMapData): boolean {
 }
 
 function limitStop(state: ArgumentMapData, actions: ArgumentAction[]): boolean {
+  if (isFactMap(state)) return false;
   if (state.run.phase === "situation")
     return !hasFacets(state) && state.situation.gate.state === "pending" && situationLimit(state);
   if (state.run.phase !== "analysis" || verifiedHypotheses(state).length >= MIN_VERIFIED) return false;
@@ -287,7 +332,7 @@ function facetSituationActions(state: ArgumentMapData): ArgumentAction[] {
   if (data.some(d => d.state === "pending")) return [{ type: "situation_budget" }];
   const facets = facetsOf(state);
   if (facets.some(f => f.verdict === "pending")) return [{ type: "judge_facets" }];
-  if (state.situation.gate.round === 1 && facetOutcome(state, facets) === "retry") return [{ type: "add_retry_needs" }];
+  if (wantsRetry(state, facets)) return [{ type: "add_retry_needs" }];
   return actions;
 }
 
@@ -311,7 +356,10 @@ function situationActions(state: ArgumentMapData): ArgumentAction[] {
 /** Everything the runner may do next. Paused, finished and unmatched runs have none. */
 export function nextActions(state: ArgumentMapData): ArgumentAction[] {
   if (isTerminal(state) || state.run.status !== "running") return [];
+  // A facet map made before question types is never run again (decision #66).
+  if (isLegacyFacetMap(state)) return [];
   if (state.run.phase === "situation") return situationActions(state);
+  if (isFactMap(state)) return [{ type: "conclude_facts" }];
   const actions = analysisActions(state);
   if (!limitStop(state, actions)) return actions;
   // At the limit with 1 or 2 verified hypotheses the conclusion is still written, on those only (decision #59).
@@ -346,10 +394,21 @@ export function applySituationPlan(state: ArgumentMapData, plan: SituationPlan):
   const entries = Array.isArray(plan.facets) ? plan.facets : [];
   if (entries.length < MIN_FACETS || entries.length > MAX_FACETS)
     throw new GateError(`a situation needs ${MIN_FACETS} to ${MAX_FACETS} facets`);
+  if (!(QUESTION_TYPES as readonly string[]).includes(plan.questionType))
+    throw new GateError("a plan needs a question type");
+  if (plan.questionType === "causal" ? !plan.groups : plan.groups)
+    throw new GateError("only a causal plan makes the three groups");
   const total = entries.reduce((sum, f) => sum + (Array.isArray(f.needs) ? f.needs.length : 0), 0);
   if (total > MAX_SITUATION_NEEDS) throw new GateError("too many situation needs");
   const next = clone(state);
   const ids = allIds(next);
+  next.situation.questionType = plan.questionType;
+  if (plan.groups) {
+    // Written in the same mutation as the question type (decision #66): a causal map has its three groups from the plan on.
+    next.roles.verified = newId(ids, plan.groups.verified);
+    next.roles.eliminated = newId(ids, plan.groups.eliminated);
+    next.roles.unconfirmed = newId(ids, plan.groups.unconfirmed);
+  }
   const items = plan.assumptions?.items ?? [];
   for (const item of items)
     if (blank(item.label) || blank(item.value) || blank(item.reason))
@@ -494,14 +553,9 @@ export function applySituationBudgetOut(state: ArgumentMapData): ArgumentMapData
   return next;
 }
 
-/** What the facets say: any refutation stops; at least half supporting matches; otherwise one retry round (when it can still run) or data_insufficient. */
-export function situationOutcome(facets: readonly Facet[], round: 1 | 2, canRetry = true): FacetOutcome {
-  if (facets.some(f => f.verdict === "refutes")) return "mismatch";
-  if (facets.filter(f => f.verdict === "supports").length * 2 >= facets.length) return "matched";
-  return round === 1 && canRetry ? "retry" : "insufficient";
-}
-const facetOutcome = (state: ArgumentMapData, facets: Facet[]): FacetOutcome =>
-  situationOutcome(facets, state.situation.gate.round === 2 ? 2 : 1, situationBudget(state) > 0);
+/** Round 1 with an insufficient facet and budget left: one more batch of needs (decision #60). */
+const wantsRetry = (state: ArgumentMapData, facets: Facet[]): boolean =>
+  state.situation.gate.round === 1 && composeFacets(facets).insufficientCount > 0 && situationBudget(state) > 0;
 
 const stopFacets = (
   next: ArgumentMapData,
@@ -578,28 +632,40 @@ export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudge
       throw new GateError("a facet may cite found, relevant data of its own only");
     if (verdict !== "insufficient" && !cited.some(id => own.find(d => d.id === id)?.propStance === verdict))
       throw new GateError(`a ${verdict} verdict must cite a datum with the same stance`);
+    // Decision #64: data from a source that needs a second one and has none cannot alone carry a supports or refutes.
+    if (
+      verdict !== "insufficient" &&
+      !cited.some(id => {
+        const datum = own.find(d => d.id === id);
+        return datum?.propStance === verdict && !isUncertainSource(datum.proof);
+      })
+    )
+      throw new GateError(`a ${verdict} verdict cannot rest on uncertain sources only`);
     facet.verdict = verdict;
     facet.reason = entry.reason;
     facet.citedData = [...new Set(cited)];
   }
-  const outcome = facetOutcome(next, nextFacets);
-  const refuting = nextFacets.filter(f => f.verdict === "refutes");
+  return wantsRetry(next, nextFacets) ? next : finishFacets(next);
+}
+
+/** The facets are settled: the composed outcome decides. A fact map goes on to its conclusion whatever the outcome; a causal map stops when the premise fails (decision #61). */
+function finishFacets(next: ArgumentMapData): ArgumentMapData {
+  const facets = facetsOf(next);
+  const { outcome } = composeFacets(facets);
   const reasons = (list: Facet[]): string => list.map(f => `${f.title}: ${f.reason}`).join("; ");
-  if (outcome === "mismatch")
-    return stopFacets(next, "not_matching", reasons(refuting), [...new Set(refuting.flatMap(f => f.citedData))]);
-  if (outcome === "matched") {
-    const supporting = nextFacets.filter(f => f.verdict === "supports");
-    next.situation.gate = {
-      state: "matched",
-      reason: reasons(supporting),
-      citedData: [...new Set(supporting.flatMap(f => f.citedData))],
-      round: next.situation.gate.round
-    };
-    next.run.phase = "analysis";
-    return next;
-  }
-  if (outcome === "insufficient")
-    return stopFacets(next, "data_insufficient", reasons(nextFacets.filter(f => f.verdict === "insufficient")), []);
+  const cites = (list: Facet[]): string[] => [...new Set(list.flatMap(f => f.citedData))];
+  const of = (verdict: Facet["verdict"]): Facet[] => facets.filter(f => f.verdict === verdict);
+  if (outcome === "insufficient") return stopFacets(next, "data_insufficient", reasons(of("insufficient")), []);
+  if (outcome === "fails" && !isFactMap(next))
+    return stopFacets(next, "not_matching", reasons(of("refutes")), cites(of("refutes")));
+  const leading = of(outcome === "fails" ? "refutes" : "supports");
+  next.situation.gate = {
+    state: "matched",
+    reason: reasons(leading),
+    citedData: cites(leading),
+    round: next.situation.gate.round
+  };
+  next.run.phase = "analysis";
   return next;
 }
 
@@ -613,26 +679,13 @@ export function addRetryNeeds(
 ): ArgumentMapData {
   inSituation(state);
   const facets = facetsOf(state);
-  if (
-    state.situation.gate.round !== 1 ||
-    facets.some(f => f.verdict === "pending") ||
-    facetOutcome(state, facets) !== "retry"
-  )
+  if (state.situation.gate.round !== 1 || facets.some(f => f.verdict === "pending") || !wantsRetry(state, facets))
     throw new GateError("a retry batch is not allowed now");
   if (items.length > MAX_RETRY_NEEDS) throw new GateError("too many retry needs");
   if (state.situation.data.length + items.length > MAX_SITUATION_RESEARCH)
     throw new GateError("too many situation needs");
   const next = clone(state);
-  if (!items.length)
-    return stopFacets(
-      next,
-      "data_insufficient",
-      facetsOf(next)
-        .filter(f => f.verdict === "insufficient")
-        .map(f => `${f.title}: ${f.reason}`)
-        .join("; "),
-      []
-    );
+  if (!items.length) return finishFacets(next);
   const ids = allIds(next);
   const perFacet = new Map<string, number>();
   for (const item of items) {
@@ -686,6 +739,7 @@ export function applyHypotheses(
   items: { id: string; citedData: string[]; basis?: string; alternative?: boolean; statement?: string }[]
 ): ArgumentMapData {
   inAnalysis(state);
+  if (isFactMap(state)) throw new GateError("a fact question has no hypotheses");
   if (!items.length) throw new GateError("no hypotheses");
   if (state.hypotheses.length + items.length > MAX_HYPOTHESES) throw new GateError("hypothesis limit reached");
   const next = clone(state);
@@ -887,6 +941,7 @@ export function eliminateAtLimit(state: ArgumentMapData, hypothesisId: string): 
 /** The whole input of the conclusion step: verified hypotheses and their evidence. Refused below 3 unless the run is at its limit with at least 1 (decision #59). */
 export function prepareConclusion(state: ArgumentMapData): ConclusionInput {
   inAnalysis(state);
+  if (isFactMap(state)) throw new GateError("a fact question is concluded from its facets");
   const verified = verifiedHypotheses(state);
   if (!verified.length) throw new GateError("no verified hypothesis");
   if (verified.length < MIN_VERIFIED && !limitStop(state, analysisActionsSafe(state)))
@@ -910,6 +965,22 @@ export function applyConclusion(state: ArgumentMapData, conclusion: { basedOn: s
     missing: [],
     ...(verified.size < MIN_VERIFIED ? { partial: true } : {})
   };
+  return next;
+}
+
+/** The conclusion of a fact question (decision #60): its state comes from the facets; the AI only wrote the points, and every point rests on facets, so `basedOn` holds facet ids. */
+export function applyFactConclusion(state: ArgumentMapData, conclusion: { basedOn: string[] }): ArgumentMapData {
+  inAnalysis(state);
+  if (!isFactMap(state)) throw new GateError("only a fact question is concluded from its facets");
+  const facetIds = new Set(facetsOf(state).map(f => f.id));
+  const basedOn = Array.isArray(conclusion.basedOn) ? conclusion.basedOn : [];
+  if (!basedOn.length || basedOn.some(id => !facetIds.has(id)))
+    throw new GateError("a fact conclusion may rest on facets only");
+  const next = clone(state);
+  next.run.phase = "concluded";
+  next.run.status = "finished";
+  delete next.run.stopReason;
+  next.conclusion = { state: "concluded", basedOn: [...new Set(basedOn)], missing: [] };
   return next;
 }
 
@@ -956,6 +1027,7 @@ export function applyPause(
 export function applyResume(state: ArgumentMapData): ArgumentMapData {
   live(state);
   if (state.run.status !== "paused") throw new GateError("the run is not paused");
+  if (isLegacyFacetMap(state)) throw new GateError("legacy");
   const next = clone(state);
   next.run.status = "running";
   delete next.run.stopReason;

@@ -18,7 +18,8 @@ const found = (stance, n) => ({ found: true, stance, proof: proof(n) });
 const plan = () => ({
   assumptions: { id: 'as1', items: [{ label: 'Age band', value: '16-24', reason: 'the proposition says young people' }] },
   facets: [1, 2, 3, 4].map(i => ({ id: `f${i}`, title: `Facet ${i}`, needs: [{ id: `f${i}d1`, need: `need ${i}` }] })),
-  causalQuestions: ['why did it happen?']
+  causalQuestions: ['why did it happen?'],
+  questionType: 'causal', groups: { verified: 'gv', eliminated: 'ge', unconfirmed: 'gu' }
 });
 function researchAll(s, miss = []) {
   for (const d of plain(s.situation.data).filter(x => x.state === 'pending')) {
@@ -41,10 +42,10 @@ function judgement(s, stances = {}, verdicts = {}) {
   };
 }
 const judged = (s, stances, verdicts) => m.applyFacetVerdicts(s, judgement(s, stances, verdicts));
-/** Round 1 retry then round 2 still short: the unconfirmed state. */
+/** Round 1 retry then round 2 still short, every facet insufficient (decision #60: composed outcome insufficient): the unconfirmed state. */
 function unconfirmed() {
   let s = researchAll(m.applySituationPlan(m.newArgumentMap(roles, 'run-u'), plan()), ['f2d1', 'f3d1', 'f4d1']);
-  s = judged(s, {}, { f1: 'supports', f2: 'insufficient', f3: 'insufficient', f4: 'insufficient' });
+  s = judged(s, {}, { f1: 'insufficient', f2: 'insufficient', f3: 'insufficient', f4: 'insufficient' });
   s = m.addRetryNeeds(s, [{ facetId: 'f2', id: 'r2', need: 'other way 2' }]);
   s = researchAll(s, ['r2']);
   return judged(s, {}, {});
@@ -65,7 +66,7 @@ test('#58 machine: data_insufficient after the retry round goes on to analysis w
 });
 test('#58 machine: an empty retry batch and a spent budget also end unconfirmed', () => {
   let s = researchAll(m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan()), ['f2d1', 'f3d1', 'f4d1']);
-  s = judged(s, {}, { f2: 'insufficient', f3: 'insufficient', f4: 'insufficient' });
+  s = judged(s, {}, { f1: 'insufficient', f2: 'insufficient', f3: 'insufficient', f4: 'insufficient' });
   const none = m.addRetryNeeds(s, []);
   assert.equal(none.situation.gate.state, 'unconfirmed');
   assert.equal(none.run.phase, 'analysis');
@@ -75,8 +76,8 @@ test('#58 machine: an empty retry batch and a spent budget also end unconfirmed'
   assert.equal(b.situation.gate.state, 'unconfirmed');
   assert.equal(b.run.phase, 'analysis');
 });
-test('#58 machine: a refuting facet still stops as mismatch; matched still goes on as matched', () => {
-  const refuted = judged(researchAll(m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan())), { f1d1: 'refutes' }, { f1: 'refutes' });
+test('#58 machine: refuting facets and no supporting one still stop as mismatch; matched still goes on as matched', () => {
+  const refuted = judged(researchAll(m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan())), { f1d1: 'refutes', f2d1: 'refutes', f3d1: 'refutes', f4d1: 'refutes' }, { f1: 'refutes', f2: 'refutes', f3: 'refutes', f4: 'refutes' });
   assert.equal(refuted.run.phase, 'stopped_mismatch');
   assert.equal(refuted.run.stopReason, 'mismatch');
   assert.equal(refuted.situation.gate.state, 'unmatched');
@@ -86,7 +87,7 @@ test('#58 machine: a refuting facet still stops as mismatch; matched still goes 
 });
 test('#58 machine: refutes in round 2 beats insufficient: still stops', () => {
   let s = researchAll(m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan()), ['f2d1', 'f3d1', 'f4d1']);
-  s = judged(s, {}, { f2: 'insufficient', f3: 'insufficient', f4: 'insufficient' });
+  s = judged(s, {}, { f1: 'insufficient', f2: 'insufficient', f3: 'insufficient', f4: 'insufficient' });
   s = m.addRetryNeeds(s, [{ facetId: 'f2', id: 'r2', need: 'other' }]);
   s = researchAll(s);
   s = judged(s, { r2: 'refutes' }, { f2: 'refutes' });

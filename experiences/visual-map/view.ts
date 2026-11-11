@@ -2011,7 +2011,7 @@ export class VisualAgentMapView extends ItemView {
   private closed = false;
   /** The map a state change is opening: a new tab's default map must not race it (see onOpen). */
   private requestedFile: string | null = null;
-  private aimViewEpoch = 0;
+  private viewEpoch = 0;
   /** Whether `map` is a usable argument map: its arrangement is fixed by the flow, so the layout controls are off (like AIM's). */
   private argumentLive(map: MapDocument | null | undefined = this.map): boolean {
     return !!map && map.argumentMap !== undefined && readArgumentMap(map).kind === "usable";
@@ -2287,7 +2287,7 @@ export class VisualAgentMapView extends ItemView {
     this.usageControl?.stop();
     this.usageControl = this.plugin.usage ? new UsageControl(this.plugin.usage, () => this.path) : null;
     this.usageControl?.start();
-    const epoch = ++this.aimViewEpoch;
+    const epoch = ++this.viewEpoch;
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
@@ -2319,12 +2319,12 @@ export class VisualAgentMapView extends ItemView {
     this.registerDomEvent(this.contentEl, "keydown", event => this.onMapKeydown(event));
     this.registerDomEvent(this.contentEl, "focusin", event => this.trackMapFocus(event.target));
     await this.plugin.ready;
-    if (this.closed || this.aimViewEpoch !== epoch) return;
+    if (this.closed || this.viewEpoch !== epoch) return;
     if (!this.path && !this.mapOpenPending()) {
       if (!this.plugin.repo.workspaceExists()) this.render();
       else {
         const files = await this.plugin.repo.mapFiles();
-        if (this.closed || this.aimViewEpoch !== epoch) return;
+        if (this.closed || this.viewEpoch !== epoch) return;
         if (files.length) {
           let defaultPath = files[0].path;
           for (const file of files) {
@@ -2334,7 +2334,7 @@ export class VisualAgentMapView extends ItemView {
             } catch {
               continue;
             }
-            if (this.closed || this.aimViewEpoch !== epoch) return;
+            if (this.closed || this.viewEpoch !== epoch) return;
             if (this.mapOpenPending()) return;
             if (!candidate.aim) {
               defaultPath = file.path;
@@ -3202,7 +3202,7 @@ export class VisualAgentMapView extends ItemView {
     for (const task of this.mergeTasks.values()) task.controller.abort();
     this.mergeTasks.clear();
     this.dropMapBackground();
-    this.aimViewEpoch++;
+    this.viewEpoch++;
     this.mapOpenEpoch++;
     this.endNoteLoad();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
@@ -3567,9 +3567,9 @@ export class VisualAgentMapView extends ItemView {
     await this.plugin.mutate(() => this.openMapInMutation(path));
   }
   private async openMapInMutation(path: string): Promise<void> {
-    const viewEpoch = this.aimViewEpoch,
+    const viewEpoch = this.viewEpoch,
       openEpoch = ++this.mapOpenEpoch;
-    const isCurrent = () => !this.closed && this.aimViewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
+    const isCurrent = () => !this.closed && this.viewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
     if (path !== this.path) {
       this.closeMapSearch(false);

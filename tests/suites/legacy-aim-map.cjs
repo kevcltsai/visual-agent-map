@@ -161,6 +161,20 @@ integrationTest('legacy-aim-map: R3 decision 5 deleting a node whose note moves 
   assert.deepEqual(after, moved, 'only the moved note’s notePath values differ');
 });
 
+integrationTest('legacy-aim-map: a note with the old mindsearch- marker reads back with the aim- marker', async () => {
+  const { repo, contents } = fixture('en', { Repository: hiddenRepository.Repository });
+  const mapPath = await repo.createMap('Legacy marker');
+  const doc = await repo.readMap(mapPath);
+  const note = await repo.createNote('Card', 'model-a', doc, mapPath, 'workspace');
+  await repo.updateNote(note.path, { detail: '### Answer\n\nBody.\n\n<!-- aim-open-items ["Budget"] -->' });
+  const old = contents.get(note.path).replace('<!-- aim-open-items', '<!-- mindsearch-open-items');
+  assert.match(old, /mindsearch-open-items/, 'the file holds the old marker');
+  contents.set(note.path, old);
+  const detail = (await repo.readNote(note.path)).detail;
+  assert.match(detail, /<!--\s*aim-open-items \["Budget"\]\s*-->/, 'read back as the aim- marker');
+  assert.doesNotMatch(detail, /mindsearch/);
+});
+
 // ---- Rename and folders: aimFolder is still a managed map container -----------------------------------------------
 integrationTest('legacy-aim-map: renaming an old AIM map moves its folder and keeps the aim block apart from the moved paths', async () => {
   const { repo, contents, mapPath } = await legacyVault();
@@ -209,6 +223,22 @@ integrationTest('legacy-aim-map: the aimFolder setting is a managed map containe
   assert.deepEqual(plain(resolveMapFolders({ aimFolder: 'Kept/AIM' })).aimFolder, 'Kept/AIM', 'a saved aimFolder wins');
   repo.settings.aimFolder = 'Elsewhere/AIM';
   await assert.rejects(repo.renameTopic(mapPath, 'Renamed'), /./, 'outside every managed container the map is view-only');
+});
+
+integrationTest('legacy-aim-map: a custom saved aimFolder keeps an old AIM map in it open and renameable (the settings row is hidden, the value is kept)', async () => {
+  const { repo, mapPath } = await legacyVault();
+  const title = (await repo.readMap(mapPath)).title;
+  const custom = 'Elsewhere/Old AIM';
+  const mindMapsFolder = repo.settings.mindMapsFolder;
+  repo.settings.mindMapsFolder = custom;
+  const inCustom = await repo.renameTopic(mapPath, title, `${custom}/${title}`);
+  Object.assign(repo.settings, { mindMapsFolder, aimFolder: custom });
+  assert.equal(inCustom, `${custom}/${title}/Map.md`, 'the map sits in the custom container');
+  assert.ok((await repo.readMap(inCustom)).aim, 'the map opens');
+  const renamed = await repo.renameTopic(inCustom, 'Renamed in custom');
+  assert.equal(renamed, `${custom}/Renamed in custom/Map.md`);
+  assert.ok((await repo.readMap(renamed)).aim, 'the renamed map still opens');
+  assert.equal(repo.settings.aimFolder, custom, 'the saved value is untouched');
 });
 
 integrationTest('legacy-aim-map: N2 ensureWorkspace creates Mind Maps only, never the AIM folder', async () => {

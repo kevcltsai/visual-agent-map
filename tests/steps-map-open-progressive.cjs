@@ -265,7 +265,7 @@ test('f: closing the view while reading: no card, no render, no new read, no tim
   const done = h.open();
   await tick();
   assert.equal(h.reads.length, 8, 'eight reads in flight');
-  h.view.closed = true; h.view.aimViewEpoch++; h.view.mapOpenEpoch++; h.view.endNoteLoad();
+  h.view.closed = true; h.view.viewEpoch++; h.view.mapOpenEpoch++; h.view.endNoteLoad();
   assert.equal(frameTimers().length, 0, 'the delayed frame was cancelled');
   fireFrame();
   h.release(...h.nodes.keys());

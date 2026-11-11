@@ -238,7 +238,6 @@ export const en = {
   "ui.outline_ai_not_started": "Outline generation did not start.",
   "ui.aim_removed_notice":
     "This map was built with AIM. This feature has been removed; the map can still be used as an ordinary map.",
-  "ui.aim_research_saved": "This answer branch and its research report were saved.",
   "ui.aim_stage_with_elapsed_0_1": "{0} · {1}",
   "ui.ai_task_exceeded_0_minutes":
     "The AI task exceeded {0} minutes and was interrupted. Incomplete results are not applied.",

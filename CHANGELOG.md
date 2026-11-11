@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Hypothesis research now checks the situation by facets, starting from a definitions card, with readable reasons and a separate "insufficient data" stop. Each card keeps full research notes, and the opening screen has tabs, including a Beta hypothesis research tab.
+- AIM is removed; your old AIM maps still open and work as ordinary maps.
 - Argument map: when the AI does not answer in time for a situation item or an evidence item, the run now retries once and then pauses so you can resume it, instead of counting it as not found.
 
 ## [0.33.0] - 2026-11-09

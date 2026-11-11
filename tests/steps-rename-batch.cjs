@@ -284,3 +284,21 @@ test('a damaged Map.md is still skipped and reported during a batch; the other m
   assert.ok(allUnder(await h.repo.readMap(`${moved}/Map.md`), moved));
   assert.ok(allUnder(view.map, moved));
 });
+
+test('a folder rename where both the card source-path write and the map retry fail throws one error and logs the other', async () => {
+  const h = harness();
+  const mapPath = await h.map('Alpha', 2);
+  const view = await h.open(mapPath);
+  const [first, second] = view.map.nodes.map(node => node.path);
+  await h.repo.updateNote(first, { sourcePaths: [second] });
+  const folder = folderOf(mapPath), moved = `${folder} renamed`;
+  h.failWrites(file => file.path.endsWith('/Card 1.md') || file.path.endsWith('/Map.md'));
+  const errors = [];
+  const mutate = h.plugin.mutate.bind(h.plugin);
+  h.plugin.mutate = (work, options) => mutate(work, options).catch(error => { errors.push(error); });
+  await h.app.fileManager.renameFile(h.files.get(folder), moved);
+  await settle(h.plugin);
+  assert.equal(errors.length > 0, true, 'the first error is thrown');
+  const errorLines = h.logged.filter(([level, line]) => level === 'error' && /injected write failure .*\/Map\.md/.test(line));
+  assert.equal(errorLines.length > 0, true, 'the second error is in the log, not dropped');
+});

@@ -93,15 +93,12 @@ test('#58 machine: refutes in round 2 beats insufficient: still stops', () => {
   s = judged(s, { r2: 'refutes' }, { f2: 'refutes' });
   assert.equal(s.run.phase, 'stopped_mismatch');
 });
-test('#58 machine: hypotheses may have empty citedData only while unconfirmed; basis and the other guards stay', () => {
+test('#58 machine: while unconfirmed an empty citation is fine; a citation must still name found data', () => {
   const s = unconfirmed();
-  const one = m.applyHypotheses(s, [{ id: 'h1', citedData: [], basis: 'no data, so we guess x', alternative: true }]);
+  const one = m.applyHypotheses(s, [{ id: 'h1', citedData: [], alternative: true }]);
   assert.equal(one.hypotheses.length, 1);
   assert.deepEqual(plain(one.hypotheses[0].citedData), []);
-  assert.throws(() => m.applyHypotheses(s, [{ id: 'h1', citedData: [], basis: ' ' }]), e => e instanceof m.GateError);
-  assert.throws(() => m.applyHypotheses(s, [{ id: 'h1', citedData: ['ghost'], basis: 'b' }]), e => e instanceof m.GateError);
-  const matchedState = judged(researchAll(m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan())), {}, {});
-  assert.throws(() => m.applyHypotheses(matchedState, [{ id: 'h1', citedData: [], basis: 'b' }]), e => e instanceof m.GateError, 'matched still needs a citation');
+  assert.throws(() => m.applyHypotheses(s, [{ id: 'h1', citedData: ['ghost'] }]), e => e instanceof m.GateError);
 });
 test('#58 resume while unconfirmed: a paused unconfirmed run keeps its gate and offers the same next action', () => {
   const s = unconfirmed();

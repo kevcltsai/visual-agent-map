@@ -35,6 +35,10 @@ import {
   allNeedsFound,
   effectiveVerdict,
   evidenceClearlySupports,
+  liveCore,
+  coreEvidenceHolds,
+  hypothesisStatus,
+  type HypothesisStatus,
   foundNeeds,
   isSourceSideMiss,
   isVerified,
@@ -103,14 +107,19 @@ export interface EvidenceInput {
   quote: string;
   url: string;
   stance: string;
+  /** The core need of the hypothesis (decision #62). */
+  core?: true;
 }
 export interface VerdictInput {
   hypothesisId: string;
   round: number;
   evidence: EvidenceInput[];
+  /** When the live core replaced a core nobody found: that earlier core's text, so the verdict step can say whether the new one answers the same question. */
+  replacedCore?: { id: string; text: string };
 }
 export interface ConclusionInput {
-  hypotheses: { id: string; round: number; evidence: EvidenceInput[] }[];
+  /** A map judged by facets lists every hypothesis with its status (decision #63); any other map lists the verified ones only. */
+  hypotheses: { id: string; round: number; status: HypothesisStatus; evidence: EvidenceInput[] }[];
 }
 
 const TERMINAL = ["concluded", "stopped_mismatch", "stopped_limit"];
@@ -192,7 +201,7 @@ function checkedProof(value: unknown): SourceProof {
 /** The optional second source of a proof (decision #64): present only when the caller verified it; a malformed one is refused, not dropped. */
 function readSecond(value: unknown): SourceProof["second"] {
   if (value === undefined) return undefined;
-  const v = value;
+  const v = value as Record<string, unknown> | null;
   if (!v || typeof v !== "object" || blank(v.url) || blank(v.quote) || blank(v.checkedAt))
     throw new GateError("a second source needs a url, a quote and a time");
   if (!(PROOF_CHECKS as readonly string[]).includes(v.check as string)) throw new GateError("unknown source check");
@@ -309,10 +318,12 @@ function analysisActions(state: ArgumentMapData): ArgumentAction[] {
         budget -= 1;
       }
     if (!settled(h)) continue;
-    if (allNeedsFound(h)) {
+    const core = liveCore(h);
+    // With a core (decision #62) the verdict is due once the needs are settled and the core is found; a core nobody found is replaced next round or ends the hypothesis.
+    const verdictDue = core ? core.state === "found" : allNeedsFound(h);
+    if (verdictDue) {
       if (h.aiVerdict === undefined) actions.push({ type: "verdict", hypothesisId: h.id });
-      else if (effectiveVerdict(h) !== "supported")
-        actions.push({ type: canRevise(h) ? "revise" : "eliminate_limit", hypothesisId: h.id });
+      else if (!isVerified(h)) actions.push({ type: canRevise(h) ? "revise" : "eliminate_limit", hypothesisId: h.id });
     } else actions.push({ type: canRevise(h) ? "revise" : "eliminate_limit", hypothesisId: h.id });
   }
   return actions;
@@ -736,7 +747,7 @@ export function applySituationGate(
 // ---- hypotheses and needs ----------------------------------------------------------------------------------------------------
 export function applyHypotheses(
   state: ArgumentMapData,
-  items: { id: string; citedData: string[]; basis?: string; alternative?: boolean; statement?: string }[]
+  items: { id: string; citedData?: string[]; alternative?: boolean; statement?: string }[]
 ): ArgumentMapData {
   inAnalysis(state);
   if (isFactMap(state)) throw new GateError("a fact question has no hypotheses");
@@ -745,18 +756,15 @@ export function applyHypotheses(
   const next = clone(state);
   const ids = allIds(next);
   const foundData = new Set(next.situation.data.filter(d => d.state === "found").map(d => d.id));
+  const facetMap = next.situation.facets !== undefined;
   for (const item of items) {
     const cited = Array.isArray(item.citedData) ? item.citedData : [];
-    // An unconfirmed situation has no supporting data to cite (decision #58): an empty citation is allowed there only.
-    if ((!cited.length && !isSituationUnconfirmed(next)) || cited.some(id => !foundData.has(id)))
-      throw new GateError("a hypothesis must cite found situation data");
-    // A facet map (decision #50): every hypothesis states its basis and rests on data that support the proposition only.
-    const facetMap = next.situation.facets !== undefined;
     if (facetMap) {
-      if (blank(item.basis)) throw new GateError("a hypothesis needs a basis");
-      if (cited.some(id => next.situation.data.find(d => d.id === id)?.propStance !== "supports"))
-        throw new GateError("a hypothesis may cite only data that support the proposition");
-    }
+      // Decision #62: no basis, and no citation of supporting data is required; one that is given must still name found data.
+      if (cited.some(id => !foundData.has(id))) throw new GateError("a hypothesis may cite found situation data only");
+    } else if ((!cited.length && !isSituationUnconfirmed(next)) || cited.some(id => !foundData.has(id)))
+      // An unconfirmed situation has no supporting data to cite (decision #58): an empty citation is allowed there only.
+      throw new GateError("a hypothesis must cite found situation data");
     next.hypotheses.push({
       id: newId(ids, item.id),
       citedData: [...cited],
@@ -764,59 +772,66 @@ export function applyHypotheses(
       location: "verifying",
       needs: [],
       ...(typeof item.statement === "string" && item.statement.trim() ? { statement: item.statement } : {}),
-      ...(facetMap ? { basis: item.basis, alternative: item.alternative === true } : {})
+      ...(facetMap ? { alternative: item.alternative === true } : {})
     });
   }
   return next;
 }
 
-function pushNeeds(
-  next: ArgumentMapData,
-  h: Hypothesis,
-  items: { id: string; text: string }[],
-  replaceDead: boolean
-): void {
+type NeedItem = { id: string; text: string; core?: boolean };
+function pushNeeds(next: ArgumentMapData, h: Hypothesis, items: NeedItem[], replaceDead: boolean): void {
   if (!items.length) throw new GateError("no needs");
   const inRound = h.needs.filter(n => n.addedRound === h.round).length;
   if (inRound + items.length > MAX_ROUND_NEEDS) throw new GateError("too many needs in this round");
   if (h.needs.length + items.length > MAX_NEEDS) throw new GateError("too many needs for this hypothesis");
   const ids = allIds(next);
-  // Only the next-round path may stand in for dead needs: a source-side not_found (the model never said the evidence is absent), from an earlier round, not already replaced; list order.
+  // Decision #62: on a facet-judged map the first round lists exactly one core need; a later round lists one only to replace a core nobody found. A found or still pending core is never replaced, and no map but a facet map has one.
+  const coreItems = items.filter(item => item.core !== undefined && item.core !== false);
+  if (items.some(item => item.core !== undefined && typeof item.core !== "boolean"))
+    throw new GateError("core must be a boolean");
+  const dead = liveCore(h);
+  if (!hasFacets(next)) {
+    if (coreItems.length) throw new GateError("only a facet map has a core need");
+  } else if (!replaceDead) {
+    if (coreItems.length !== 1) throw new GateError("the first round lists exactly one core need");
+  } else if (coreItems.length > 1) throw new GateError("a round lists at most one core need");
+  else if (coreItems.length && dead?.state !== "not_found")
+    throw new GateError("a core need may only replace a core that was not found");
+  // Only the next-round path may stand in for dead needs: a source-side not_found (the model never said the evidence is absent), from an earlier round, not already replaced; list order. The core is replaced by the core item, never by a plain one.
   const open = replaceDead
     ? h.needs.filter(
         n =>
           n.state === "not_found" &&
           isSourceSideMiss(n) &&
+          n.core !== true &&
           n.addedRound < h.round &&
           !h.needs.some(other => other.replaces === n.id)
       )
     : [];
-  for (const [index, item] of items.entries()) {
+  let plain = 0;
+  for (const item of items) {
     if (blank(item.text)) throw new GateError("empty need");
     const need: Need = { id: newId(ids, item.id), text: item.text, addedRound: h.round, state: "pending" };
-    if (index < open.length) need.replaces = open[index].id;
+    if (coreItems.includes(item)) {
+      need.core = true;
+      if (replaceDead && dead) need.replaces = dead.id;
+    } else if (plain < open.length) need.replaces = open[plain++].id;
     h.needs.push(need);
   }
   delete h.aiVerdict;
 }
 
 /** The only way to list needs (with startNextRound). Add-only: there is no reducer that removes or rewrites one. A later round may *replace* a dead need (see startNextRound), still without removing it. */
-export function addNeeds(
-  state: ArgumentMapData,
-  hypothesisId: string,
-  items: { id: string; text: string }[]
-): ArgumentMapData {
+export function addNeeds(state: ArgumentMapData, hypothesisId: string, items: NeedItem[]): ArgumentMapData {
   inAnalysis(state);
   const next = clone(state);
-  pushNeeds(next, hypothesisOf(next, hypothesisId), items, false);
+  const h = hypothesisOf(next, hypothesisId);
+  if (hasFacets(next) && h.needs.length) throw new GateError("the needs of the first round are already listed");
+  pushNeeds(next, h, items, false);
   return next;
 }
 
-export function startNextRound(
-  state: ArgumentMapData,
-  hypothesisId: string,
-  items: { id: string; text: string }[]
-): ArgumentMapData {
+export function startNextRound(state: ArgumentMapData, hypothesisId: string, items: NeedItem[]): ArgumentMapData {
   inAnalysis(state);
   const next = clone(state);
   const h = hypothesisOf(next, hypothesisId);
@@ -879,23 +894,33 @@ const evidenceOf = (needs: Need[]): EvidenceInput[] =>
     claim: n.proof?.claim ?? "",
     quote: n.proof?.quote ?? "",
     url: n.proof?.url ?? "",
-    stance: n.stance ?? ""
+    stance: n.stance ?? "",
+    ...(n.core === true ? { core: true as const } : {})
   }));
 
 /** The whole input of a verdict step: that hypothesis' found needs and nothing else. Refused until every need is found. */
 export function prepareVerdict(state: ArgumentMapData, hypothesisId: string): VerdictInput {
   inAnalysis(state);
   const h = hypothesisOf(state, hypothesisId);
-  if (!allNeedsFound(h)) throw new GateError("not every evidence need is found");
-  return { hypothesisId: h.id, round: h.round, evidence: evidenceOf(foundNeeds(h)) };
+  const core = liveCore(h);
+  // With a core (decision #62) the verdict waits for settled needs and a found core; a supplementary need nobody found does not block it.
+  if (core ? core.state !== "found" || !settled(h) : !allNeedsFound(h))
+    throw new GateError("not every evidence need is found");
+  const earlier = core?.replaces === undefined ? undefined : h.needs.find(n => n.id === core.replaces);
+  return {
+    hypothesisId: h.id,
+    round: h.round,
+    evidence: evidenceOf(foundNeeds(h)),
+    ...(earlier ? { replacedCore: { id: earlier.id, text: earlier.text } } : {})
+  };
 }
 
 export function applyVerdict(
   state: ArgumentMapData,
   hypothesisId: string,
-  verdict: { verdict: unknown; citedNeeds: string[]; reason: string }
+  verdict: { verdict: unknown; citedNeeds: string[]; reason: string; sameQuestion?: unknown }
 ): ArgumentMapData {
-  prepareVerdict(state, hypothesisId);
+  const input = prepareVerdict(state, hypothesisId);
   const next = clone(state);
   const h = hypothesisOf(next, hypothesisId);
   if (h.aiVerdict !== undefined) throw new GateError("the hypothesis already has a verdict");
@@ -906,8 +931,18 @@ export function applyVerdict(
   if (!cited.length || cited.some(id => !inside.has(id)))
     throw new GateError("a verdict must cite evidence of this hypothesis");
   // A supported verdict the evidence does not clearly back is kept as undecided: the program checks the stances, not only the prompt.
-  h.aiVerdict =
-    verdict.verdict === "supported" && !evidenceClearlySupports(h) ? "undecided" : (verdict.verdict as Verdict);
+  const backed = liveCore(h) ? coreEvidenceHolds(h) : evidenceClearlySupports(h);
+  h.aiVerdict = verdict.verdict === "supported" && !backed ? "undecided" : (verdict.verdict as Verdict);
+  if (input.replacedCore) {
+    // The core replaced one nobody found: if it does not answer the same question, the earlier verdict basis is gone and the hypothesis stays undecided.
+    if (typeof verdict.sameQuestion !== "boolean") throw new GateError("a replaced core needs a sameQuestion answer");
+    if (!verdict.sameQuestion) h.aiVerdict = "undecided";
+  }
+  // Decision #62: a refuted hypothesis with a core is eliminated at this same checkpoint, so no verifying-and-refuted state exists.
+  if (liveCore(h) && h.aiVerdict === "refuted") {
+    h.location = "eliminated";
+    h.eliminationReason = verdict.reason;
+  }
   return next;
 }
 
@@ -944,9 +979,17 @@ export function prepareConclusion(state: ArgumentMapData): ConclusionInput {
   if (isFactMap(state)) throw new GateError("a fact question is concluded from its facets");
   const verified = verifiedHypotheses(state);
   if (!verified.length) throw new GateError("no verified hypothesis");
+  const listed = hasFacets(state) ? state.hypotheses : verified;
   if (verified.length < MIN_VERIFIED && !limitStop(state, analysisActionsSafe(state)))
     throw new GateError("fewer than 3 verified hypotheses and the run is not at its limit");
-  return { hypotheses: verified.map(h => ({ id: h.id, round: h.round, evidence: evidenceOf(foundNeeds(h)) })) };
+  return {
+    hypotheses: listed.map(h => ({
+      id: h.id,
+      round: h.round,
+      status: hypothesisStatus(h),
+      evidence: evidenceOf(foundNeeds(h))
+    }))
+  };
 }
 
 export function applyConclusion(state: ArgumentMapData, conclusion: { basedOn: string[] }): ArgumentMapData {

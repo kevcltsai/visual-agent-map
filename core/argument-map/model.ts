@@ -473,25 +473,46 @@ export function foundNeeds(h: Hypothesis): Need[] {
 }
 /** A miss caused by the source (the URL or the quote failed to check): the question stays open, so another source may answer it. Any other miss says the evidence is not there, and no later need may stand in for it. */
 export const isSourceSideMiss = (need: { reason?: string }): boolean => (need.reason ?? "").startsWith("source_");
-/** Ids of dead needs that a later need of the same hypothesis stands in for. Re-checked here (not trusted from the field alone): only a `not_found` need whose miss was source-side can be retired, and only by a need of a later round. A "nothing found", unanswered, uncertain or failed need keeps blocking verification. */
+/** Ids of dead needs that a later need of the same hypothesis stands in for. Re-checked here (not trusted from the field alone): only a `not_found` need can be retired, only by a need of a later round, and only when the miss was source-side or the dead need was the core (decision #62: a core nobody found, for any reason, may be replaced). A "nothing found", unanswered, uncertain or failed supplementary need keeps blocking old-rule verification. */
 export function retiredNeedIds(h: Hypothesis): Set<string> {
   const retired = new Set<string>();
   for (const need of h.needs) {
     if (need.replaces === undefined) continue;
     const dead = h.needs.find(other => other.id === need.replaces);
-    if (dead && dead.state === "not_found" && isSourceSideMiss(dead) && need.addedRound > dead.addedRound)
+    if (
+      dead &&
+      dead.state === "not_found" &&
+      (isSourceSideMiss(dead) || dead.core === true) &&
+      need.addedRound > dead.addedRound
+    )
       retired.add(dead.id);
   }
   return retired;
+}
+/** The core need that still counts (decision #62): the last core need not replaced by a later one. Absent on a hypothesis without a core (a map made before cores, or a V1 map). */
+export function liveCore(h: Hypothesis): Need | undefined {
+  const retired = retiredNeedIds(h);
+  return [...h.needs].reverse().find(need => need.core === true && !retired.has(need.id));
 }
 export function allNeedsFound(h: Hypothesis): boolean {
   const retired = retiredNeedIds(h);
   const live = h.needs.filter(need => !retired.has(need.id));
   return live.length > 0 && live.every(need => need.state === "found");
 }
-/** "Verified" is never stored: needs listed and all found, still in the verifying group, and the effective verdict is supported. */
+/** Core rule (decision #62): the core is found and its stance supports the hypothesis, and the live found needs that support outnumber those that contradict. An uncertain stance counts for neither side. Stances are program data, checked here. */
+export function coreEvidenceHolds(h: Hypothesis): boolean {
+  const core = liveCore(h);
+  if (!core || core.state !== "found" || core.stance !== "supports") return false;
+  const retired = retiredNeedIds(h);
+  const stances = foundNeeds(h)
+    .filter(n => !retired.has(n.id))
+    .map(n => n.stance);
+  return stances.filter(s => s === "supports").length > stances.filter(s => s === "contradicts").length;
+}
+/** "Verified" is never stored. With a live core: the core rule above, still in the verifying group, effective verdict supported (supplementary needs that were not found do not block). Without a core: needs listed and all found, verifying, effective verdict supported (the rule of maps made before cores). */
 export function isVerified(h: Hypothesis): boolean {
-  return allNeedsFound(h) && h.location === "verifying" && effectiveVerdict(h) === "supported";
+  if (h.location !== "verifying" || effectiveVerdict(h) !== "supported") return false;
+  return liveCore(h) ? coreEvidenceHolds(h) : allNeedsFound(h);
 }
 /**
  * Evidence gate (decision #59, B3): a hypothesis is supported only if its found evidence leans clearly toward it. Supports must outnumber
@@ -518,10 +539,20 @@ export function verifiedHypotheses(state: ArgumentMapData): Hypothesis[] {
 export function verifiedCount(state: ArgumentMapData): number {
   return verifiedHypotheses(state).length;
 }
-/** What a hypothesis card shows: any unfound need means "verifying", whatever the stored verdicts say. */
+/** What a hypothesis card shows: any unfound need means "verifying" (with a core: until the needs are settled and the core is found), whatever the stored verdicts say. */
 export function displayVerdict(h: Hypothesis): Verdict | "verifying" {
+  const core = liveCore(h);
+  if (core)
+    return core.state === "found" && h.needs.every(n => n.state === "found" || n.state === "not_found")
+      ? effectiveVerdict(h)
+      : "verifying";
   return allNeedsFound(h) ? effectiveVerdict(h) : "verifying";
 }
+export const HYPOTHESIS_STATUSES = ["verified", "unconfirmed", "eliminated"] as const;
+export type HypothesisStatus = (typeof HYPOTHESIS_STATUSES)[number];
+/** Where a hypothesis stands for the conclusion (decision #63): verified; refuted and eliminated; or evidence-in-hand but not confirmed (cut by a limit, or still short when the run ended). */
+export const hypothesisStatus = (h: Hypothesis): HypothesisStatus =>
+  isVerified(h) ? "verified" : h.location === "eliminated" && !isLimitCut(h) ? "eliminated" : "unconfirmed";
 /** A conclusion written from fewer verified hypotheses than the target (decision #59). */
 export const isPartialConclusion = (state: ArgumentMapData): boolean =>
   state.run.phase === "concluded" && state.conclusion.partial === true && verifiedCount(state) < MIN_VERIFIED;

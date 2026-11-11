@@ -66,7 +66,9 @@ import {
   MIN_VERIFIED,
   foundNeeds,
   isLimitCut,
+  isUncertainSource,
   isVerified,
+  liveCore,
   readArgumentMap,
   isStanceLocked,
   type ArgumentMapData,
@@ -76,6 +78,8 @@ import {
   type SituationDatum,
   type RoleKey,
   type SearchLog,
+  type SecondSource,
+  type SourceTier,
   SEARCH_LOG_MAX_ITEMS,
   SEARCH_LOG_MAX_TEXT
 } from "../../core/argument-map/model";
@@ -788,6 +792,7 @@ export class ArgumentRuns {
                 quote: d.proof!.quote,
                 url: d.proof!.url,
                 stance: d.stance ?? "uncertain",
+                ...(isUncertainSource(d.proof) ? { uncertainSource: true as const } : {}),
                 ...(d.propStance
                   ? isStanceLocked(d)
                     ? { fixedStance: d.propStance }
@@ -957,16 +962,31 @@ export class ArgumentRuns {
         state,
         state.situation.data.filter(d => h.citedData.includes(d.id))
       ),
-      existing: h.needs.map(n => ({ text: n.text, state: n.state })),
+      existing: h.needs.map(n => ({
+        text: n.text,
+        state: n.state,
+        // A facet map shows the earlier needs' claim, period and why nothing was found, so a new need does not repeat the old search.
+        ...(hasFacets(state)
+          ? {
+              ...(n.proof?.claim ? { claim: n.proof.claim } : {}),
+              ...(n.proof?.figure?.period ? { period: n.proof.figure.period } : {}),
+              ...(n.state === "not_found" && (n.searchLog?.why ?? n.reason) ? { reason: n.searchLog?.why ?? n.reason } : {})
+            }
+          : {})
+      })),
+      // Decision #62: the first round names one core need; a later round may name one only when the core was not found.
+      ...(hasFacets(state) && (!revise || liveCore(h)?.state === "not_found")
+        ? { core: revise ? ("replace" as const) : ("first" as const) }
+        : {}),
       max: needsAllowed({ ...h, round })
     };
     const result: NeedsResult = await this.ask(drive, ARGUMENT_STEPS[revise ? "revise" : "add_needs"], request);
     await this.checkpoint(drive, async (s, map) => {
-      const dry = result.needs.map((n, i) => ({ id: `dry-${i}`, text: n.text }));
+      const dry = result.needs.map((n, i) => ({ id: `dry-${i}`, text: n.text, ...(n.core ? { core: true } : {}) }));
       if (revise) startNextRound(s, hypothesisId, dry);
       else addNeeds(s, hypothesisId, dry);
       const nodes: Plan["nodes"] = [];
-      const items: { id: string; text: string }[] = [];
+      const items: { id: string; text: string; core?: boolean }[] = [];
       for (const n of result.needs) {
         const node = await this.makeNote(
           { kind: "need", title: shorten(n.text, 80), summary: n.text },
@@ -974,7 +994,7 @@ export class ArgumentRuns {
           drive.mapPath
         );
         nodes.push({ node, parentId: hypothesisId });
-        items.push({ id: node.id, text: n.text });
+        items.push({ id: node.id, text: n.text, ...(n.core ? { core: true } : {}) });
       }
       return { next: revise ? startNextRound(s, hypothesisId, items) : addNeeds(s, hypothesisId, items), nodes };
     });
@@ -1200,6 +1220,8 @@ export class ArgumentRuns {
     const hypothesisId = action.type === "research_need" ? action.hypothesisId : "";
     const map = await this.ports.readMap(drive.mapPath);
     const node = map.nodes.find(n => n.id === itemId);
+    // Decision #65 (facet maps only; an older map keeps its V1 research request): the hypothesis a need tests.
+    const hypothesis = isNeed && hasFacets(state) ? state.hypotheses.find(h => h.id === hypothesisId) : undefined;
     const needText = isNeed
       ? (state.hypotheses.find(h => h.id === hypothesisId)?.needs.find(n => n.id === itemId)?.text ?? "")
       : (state.situation.data.find(d => d.id === itemId)?.need ?? "");
@@ -1217,9 +1239,20 @@ export class ArgumentRuns {
       if (!began || this.dead(drive)) return;
       const signal = busy ? linked(drive.controller.signal, busy.signal) : drive.controller.signal;
       const proposition = await this.proposition(drive, state);
+      // A hypothesis need carries the claim it tests (the stance is relative to it) and the assumed period.
+      const context = hypothesis
+        ? [
+            assumptionScope(state),
+            `hypothesis claim: ${plainLine(await this.statementOf(drive, hypothesis))}`
+          ]
+            .filter(Boolean)
+            .join("; ")
+        : scopeOf(false, state).context;
       let result: EvidenceResult;
       let openedUrls: string[] = [];
       let domain = "-";
+      let tierLog = "-";
+      let secondLog = "-";
       let code = "";
       let reply: AiResult;
       let note = "";
@@ -1237,7 +1270,7 @@ export class ArgumentRuns {
               mode: "task",
               researchMode: "research",
               responseContract: "argument-evidence",
-              argumentEvidenceNeeds: [{ id: itemId, text: needText, ...scopeOf(isNeed, state) }],
+              argumentEvidenceNeeds: [{ id: itemId, text: needText, ...(context ? { context } : {}) }],
               usageMapPath: drive.mapPath,
               outputLanguage: this.ports.config(drive.mapPath).language
             },
@@ -1280,9 +1313,18 @@ export class ArgumentRuns {
               now: this.ports.now
             });
             code = check.ok ? check.proof.check : check.reason;
-            result = check.ok
-              ? { found: true, stance, proof: check.proof }
-              : { found: false, reason: `source_${check.reason}` };
+            if (!check.ok) result = { found: false, reason: `source_${check.reason}` };
+            else if (!hasFacets(state)) result = { found: true, stance, proof: check.proof };
+            else {
+              // Decision #64: a missing tier counts as `other`; an `other` source needs a second, independent one that agrees and passes the same check.
+              const tier: SourceTier = entry.tier ?? "other";
+              const second = tier === "other" ? await this.secondSource(signal, entry, openedUrls) : undefined;
+              tierLog = tier;
+              if (tier === "other") secondLog = second?.log ?? "missing";
+              const proof = { ...check.proof, tier, ...(second?.proof ? { second: second.proof } : {}) };
+              // A hypothesis need whose source stays uncertain is itself uncertain: it can neither back nor refute the hypothesis.
+              result = { found: true, stance: isNeed && isUncertainSource(proof) ? "uncertain" : stance, proof };
+            }
           }
         }
       } catch (error) {
@@ -1296,7 +1338,7 @@ export class ArgumentRuns {
       }
       if (this.dead(drive)) return;
       this.ports.log(
-        `argument-run proof runId=${state.run.runId} phase=${state.run.phase} result=${result.found ? "found" : result.reason} proof=${code || "-"} domain=${domain}`
+        `argument-run proof runId=${state.run.runId} phase=${state.run.phase} result=${result.found ? "found" : result.reason} proof=${code || "-"} domain=${domain} tier=${tierLog} second=${secondLog}`
       );
       try {
         const searchLog: SearchLog | undefined = result.found
@@ -1319,6 +1361,38 @@ export class ArgumentRuns {
       busy?.release();
       this.free();
     }
+  }
+
+  /**
+   * The second source of an `other`-tier answer (decision #64): it must agree, sit on another hostname than the first and pass the same
+   * `verifySource` check. Anything else is no second source. Rejects when Stop aborts `signal`, so nothing is written for a stopped run.
+   */
+  private async secondSource(
+    signal: AbortSignal,
+    entry: { url: string; second?: { url: string; quote: string; claim: string; agrees: boolean } },
+    openedUrls: readonly string[]
+  ): Promise<{ proof?: SecondSource; log: string }> {
+    const second = entry.second;
+    if (!second) return { log: "missing" };
+    const host = (url: string): string => domainOf(url).replace(/^www\./, "").toLowerCase();
+    if (!second.agrees || host(second.url) === host(entry.url)) return { log: "mismatch" };
+    const check = await untilAborted(
+      signal,
+      verifySource({
+        url: second.url,
+        quote: second.quote,
+        claim: second.claim,
+        openedUrls,
+        fetch: this.ports.fetch,
+        parseHtml: this.ports.parseHtml,
+        now: this.ports.now
+      })
+    );
+    if (!check.ok) return { log: "failed" };
+    return {
+      proof: { url: check.proof.url, quote: check.proof.quote, check: check.proof.check, checkedAt: check.proof.checkedAt },
+      log: "found"
+    };
   }
 
   /** A provider failure is not a try: the item goes back to pending (no note, no card text) and the failure is counted for this drive. */

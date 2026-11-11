@@ -28,6 +28,7 @@ The topic chat window now has a Stop button on its Running row, so you can stop 
 ### Known issues
 
 - Hypothesis research can sometimes count a cause as checked when the evidence only partly answers it. Check the source on each card before you rely on a conclusion.
+- If you rewrite a hypothesis by hand, run hypothesis research again. Evidence found for the earlier wording can still count toward the conclusion.
 
 ## [0.33.0] - 2026-11-09
 

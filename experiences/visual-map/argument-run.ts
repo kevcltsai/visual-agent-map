@@ -251,9 +251,9 @@ export function untilAborted<T>(signal: AbortSignal, work: Promise<T>): Promise<
         settle();
         resolve(value);
       },
-      error => {
+      (error: unknown) => {
         settle();
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     );
   });

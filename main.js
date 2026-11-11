@@ -46360,7 +46360,7 @@ Last, list in causalQuestions the questions about causes or explanations that th
 
 Also return question: the proposition rewritten as one short question that a reader can answer yes or no (for example "Did X rise?"). It restates only the factual claim: when the proposition also asks or says why, drop the causal part ("Is unemployment high because of AI?" becomes "Is unemployment high?"). It must not contain a cause word such as cause, because, due to, \u9020\u6210, \u5C0E\u81F4 or \u662F\u5426\u7531. It is shown as the title of the situation card.
 
-Use only numbers and links that appear in the proposition. A facet title, criterion, baseline, a need, a causal question, an assumption label or reason must not contain any number, year or URL that is not in the proposition. An assumption value may contain years and periods but must not contain any URL.
+Use only links that appear in the proposition, and only numbers that appear in the proposition or the assumption values. A facet title, criterion, baseline, a need, a causal question, an assumption label or reason must not contain any number or year that is in neither the proposition nor the assumption values, and no URL that is not in the proposition. An assumption value may contain years and periods but must not contain any URL.
 
 Return only JSON: {"assumptions":{"items":[{"label":"","value":"","reason":""}]},"facets":[{"title":"","criterion":"","baseline":"","needs":[{"need":"","kind":"fact"}]}],"causalQuestions":[""],"question":""}. Do not add other fields, ids, paths, new links or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
 
@@ -46377,9 +46377,9 @@ var facet_plan_preset_default = "Assumptions fixed by the owner (JSON array of {
 
 // core/steps/argument-map/facet-plan.ts
 var CAUSAL_MARKERS = {
-  traditional: ["\u9020\u6210", "\u5C0E\u81F4", "\u5F15\u8D77", "\u539F\u56E0", "\u56E0\u70BA", "\u662F\u5426\u7531"],
-  simplified: ["\u9020\u6210", "\u5BFC\u81F4", "\u5F15\u8D77", "\u539F\u56E0", "\u56E0\u4E3A", "\u662F\u5426\u7531"],
-  en: ["cause", "caused", "causes", "causing", "because", "due to", "driven by", "reason", "reasons"]
+  traditional: ["\u9020\u6210", "\u5C0E\u81F4", "\u5F15\u8D77", "\u539F\u56E0", "\u56E0\u70BA", "\u662F\u5426\u7531", "\u70BA\u4EC0\u9EBC", "\u7531\u65BC", "\u6210\u56E0", "\u6B78\u56E0"],
+  simplified: ["\u9020\u6210", "\u5BFC\u81F4", "\u5F15\u8D77", "\u539F\u56E0", "\u56E0\u4E3A", "\u662F\u5426\u7531", "\u4E3A\u4EC0\u4E48", "\u7531\u4E8E", "\u6210\u56E0", "\u5F52\u56E0"],
+  en: ["cause", "caused", "causes", "causing", "because", "due to", "driven by", "reason", "reasons", "why"]
 };
 var CAUSAL_RE = new RegExp(
   [
@@ -46964,8 +46964,19 @@ function linked(a, b) {
 function untilAborted(signal, work) {
   if (signal.aborted) return Promise.reject(new Error("aborted"));
   return new Promise((resolve, reject2) => {
-    signal.addEventListener("abort", () => reject2(new Error("aborted")), { once: true });
-    work.then(resolve, reject2);
+    const onAbort = () => reject2(new Error("aborted"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    const settle = () => signal.removeEventListener("abort", onAbort);
+    work.then(
+      (value) => {
+        settle();
+        resolve(value);
+      },
+      (error) => {
+        settle();
+        reject2(error instanceof Error ? error : new Error(String(error)));
+      }
+    );
   });
 }
 var same = (a, b) => JSON.stringify(a) === JSON.stringify(b);

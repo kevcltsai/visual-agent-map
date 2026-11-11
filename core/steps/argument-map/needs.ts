@@ -30,11 +30,12 @@ export interface NeedsResult {
   needs: { text: string; core?: true }[];
 }
 
+const NO_CORE_RULE = 'No need is the core here: set "core": false on every need.';
 const CORE_RULES = {
   first:
-    'Exactly one of the needs is the core need: the single piece of evidence that decides whether the hypothesis holds. Mark it with "core": true and give no other need a core field.',
+    'Exactly one of the needs is the core need: the single piece of evidence that decides whether the hypothesis holds. Mark it with "core": true and set "core": false on every other need.',
   replace:
-    'The earlier core need was not found. You may list at most one new core need, marked with "core": true, only if it asks for something that can decide the hypothesis and can be found; do not mark any other need.'
+    'The earlier core need was not found. You may list at most one new core need, marked with "core": true, only if it asks for something that can decide the hypothesis and can be found; set "core": false on every other need.'
 } as const;
 
 /** How many needs may still be added to a hypothesis this round; the same limits as the machine's `addNeeds`. */
@@ -53,7 +54,7 @@ export const NEEDS_SCHEMA = {
         type: "object",
         additionalProperties: false,
         properties: { text: { type: "string", minLength: 1 }, core: { type: "boolean" } },
-        required: ["text"]
+        required: ["text", "core"]
       },
       minItems: 1
     }
@@ -117,7 +118,7 @@ export const needsStep: StepDefinition<NeedsRequest, NeedsResult> = {
           stance: d.stance
         }))
       ),
-      coreRule: request.core ? ` ${CORE_RULES[request.core]}` : "",
+      coreRule: ` ${request.core ? CORE_RULES[request.core] : NO_CORE_RULE}`,
       existing: JSON.stringify(
         request.existing.map(n => ({ text: n.text, state: n.state, claim: n.claim, period: n.period, reason: n.reason }))
       )

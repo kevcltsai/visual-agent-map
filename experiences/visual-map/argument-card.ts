@@ -11,6 +11,7 @@ import {
   displayVerdict,
   foundNeeds,
   isFactMap,
+  isLegacyFacetMap,
   isSituationUnconfirmed,
   isLimitCut,
   isPartialConclusion,
@@ -90,14 +91,18 @@ function pausedParts(
   state: ArgumentMapData,
   phase: "situation" | "analysis",
   t: Translate
-): { chip: ArgumentChip; lines: string[]; resume: { text: string; ariaLabel: string } } | null {
+): { chip: ArgumentChip; lines: string[]; resume?: { text: string; ariaLabel: string } } | null {
   const run = state.run;
   if (run.status !== "paused" || run.phase !== phase) return null;
   const reason =
     run.stopReason === undefined ? undefined : PAUSE_REASON_KEY[run.stopReason as keyof typeof PAUSE_REASON_KEY];
+  const lines = reason ? [t("ui.argument_reason_0", t(reason))] : [];
+  // Decision #66 (R1 M1): an unfinished map made before question types is never resumed; the card says how to start a new one instead.
+  if (isLegacyFacetMap(state))
+    return { chip: { tone: "maybe", text: t("ui.argument_bar_paused") }, lines: [...lines, t("ui.argument_resume_refused_legacy")] };
   return {
     chip: { tone: "maybe", text: t("ui.argument_bar_paused") },
-    lines: reason ? [t("ui.argument_reason_0", t(reason))] : [],
+    lines,
     resume: { text: t("ui.argument_bar_resume"), ariaLabel: t("ui.argument_paused_resume_aria") }
   };
 }
@@ -207,7 +212,7 @@ function conclusionCard(state: ArgumentMapData, t: Translate): ArgumentCardView 
     ...pending,
     chips: [paused.chip],
     lines,
-    resume: paused.resume,
+    ...(paused.resume ? { resume: paused.resume } : {}),
     label: [pending.label, paused.chip.text, ...lines].join(", ")
   };
 }
@@ -456,7 +461,7 @@ function facetSituationCard(state: ArgumentMapData, t: Translate): ArgumentCardV
     const data = state.situation.data;
     const count = t("ui.argument_data_count_0_1", data.filter(d => d.state === "found").length, data.length);
     const paused = pausedParts(state, "situation", t);
-    if (paused) return { ...finish(paused.chip, [count, ...paused.lines]), resume: paused.resume };
+    if (paused) return { ...finish(paused.chip, [count, ...paused.lines]), ...(paused.resume ? { resume: paused.resume } : {}) };
     return finish({ tone: "open", text: t("ui.argument_gate_pending") }, [count]);
   }
   if (gate.kind === "data_insufficient")
@@ -526,7 +531,7 @@ export function describeArgumentCard(state: ArgumentMapData, id: string, t: Tran
     if (paused)
       return {
         ...plain("situation", t("ui.argument_situation"), [count, ...paused.lines], [paused.chip]),
-        resume: paused.resume
+        ...(paused.resume ? { resume: paused.resume } : {})
       };
     const chip: ArgumentChip =
       gate === "unmatched"

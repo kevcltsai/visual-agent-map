@@ -17,7 +17,8 @@
           }
         },
         "required": [
-          "text"
+          "text",
+          "core"
         ]
       },
       "minItems": 1

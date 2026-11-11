@@ -272,14 +272,16 @@ test('definitions table: the stronger encoding still round-trips through the re-
 });
 
 // ---- sem3: no raw reason code or English program string reaches a note ----
-const RAW = ['source_quote_missing', 'no_usable_data', 'not_found', 'source_rejected_url', 'budget'];
+const RAW = ['source_quote_missing', 'no_usable_data', 'uncertain_sources_only', 'not_found', 'source_rejected_url', 'budget'];
 test('sem3 notes: stored reason codes render as readable text everywhere (datum rows, facet table, situation table, conclusion tables)', () => {
   const lost = datum({ id: 'd2', state: 'not_found', proof: undefined, propStance: undefined, stanceReason: undefined, reason: 'source_quote_missing: page has only a single-year number' });
   const none = facet({ id: 'f2', verdict: 'insufficient', reason: 'no_usable_data', summary: '', citedData: [] });
-  const st = state([datum(), lost], [facet(), none]);
+  const unsure = facet({ id: 'f3', verdict: 'insufficient', reason: 'uncertain_sources_only', summary: '', citedData: [] });
+  const st = state([datum(), lost], [facet(), none, unsure]);
   const outs = [N.datumDetail(t, lost), N.facetDetail(t, none, st.situation.data), N.situationDetail(t, st), N.conclusionDetail(t, st, new Map(), undefined, 'stopped')];
   for (const md of outs) for (const code of RAW) assert.ok(!md.includes(code), `${code} leaked in: ${md.slice(0, 200)}`);
   assert.ok(N.facetDetail(t, none, st.situation.data).includes(t('ui.argument_why_no_usable_data')));
+  assert.ok(N.facetDetail(t, unsure, st.situation.data).includes(t('ui.argument_why_uncertain_sources_only')));
   assert.ok(N.facetDetail(t, none, st.situation.data).includes(t('ui.argument_why_source_quote_missing')));
   assert.ok(!N.situationDetail(t, st).includes('no usable data for this facet'), 'no English program string');
   const stored = N.facetDetail(t, facet({ reason: 'no usable data for this facet' }), []);

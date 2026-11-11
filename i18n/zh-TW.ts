@@ -2891,6 +2891,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.argument_note_searched": "搜尋紀錄",
   "ui.argument_why_round_limit": "在輪數上限內未能驗證",
   "ui.argument_why_no_usable_data": "這個面向沒有可用的資料",
+  "ui.argument_why_uncertain_sources_only": "這個面向的來源都不夠確定，無法據以判斷",
   "ui.argument_facet_0": "面向 {0}",
   "ui.argument_facet_summary_0": "小結：{0}",
   "ui.argument_facet_supports": "支持",

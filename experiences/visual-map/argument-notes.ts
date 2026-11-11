@@ -173,7 +173,8 @@ const WHY_KEYS = {
   source_quote_missing: "ui.argument_why_source_quote_missing",
   source_blocked_unverified: "ui.argument_why_source_blocked_unverified",
   round_limit: "ui.argument_why_round_limit",
-  no_usable_data: "ui.argument_why_no_usable_data"
+  no_usable_data: "ui.argument_why_no_usable_data",
+  uncertain_sources_only: "ui.argument_why_uncertain_sources_only"
 } as const satisfies Record<string, TranslationKey>;
 /** The leading snake_case code of a stored reason (`code`, `code: note`, `code：note`, `code.`); "" when it does not start with one. */
 const codeOf = (stored: string): string => /^[a-z]+(?:_[a-z]+)*/.exec(stored.trim())?.[0] ?? "";

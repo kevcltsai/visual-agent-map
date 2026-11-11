@@ -2,6 +2,8 @@
 // Unit level: machine, hypotheses parse, conclusion prompt, card, notes, data contract. The full run is in steps-argument-run.cjs.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const S = require('./support.cjs');
 const { loadWithAiCalls } = require('./support-ai-calls.cjs');
 const m = S.load('core/argument-map/machine.ts');
@@ -113,28 +115,27 @@ test('#58 resume while unconfirmed: a paused unconfirmed run keeps its gate and 
 const base = { language: 'en', model: 'claude:haiku', reasoning: 'low' };
 const fdatum = (id, over = {}) => ({ id, need: `need of ${id}`, claim: `claim of ${id}`, quote: `quote of ${id} says the rate`, url: `https://stats.example.org/${id}`, stance: 'supports', propStance: 'supports', ...over });
 const hreq = over => ({ ...base, proposition: 'Crime got worse', data: [], count: 1, existing: [], causalQuestions: [], ...over });
-const hyp = (over = {}) => ({ title: 'Reporting changed', statement: 'People report more now', basis: 'no data, so we guess a reporting change', alternative: true, citedData: [], ...over });
+const hyp = (over = {}) => ({ title: 'Reporting changed', statement: 'People report more now', alternative: true, ...over });
 const reply = value => JSON.stringify({ hypotheses: [value] });
-test('#58 hypotheses step: empty citedData parses only when the request says unconfirmed; the prompt says so', () => {
+test('#58 hypotheses step (#62 shape): a reply with no data parses; the policy and prompt differ only when the request says unconfirmed', () => {
   const step = mod.facetHypothesesStep;
-  assert.throws(() => step.parse(reply(hyp()), hreq({ data: [fdatum('d1')] })), e => e.name === 'ArgumentStepError' && /at least one id/.test(e.message));
   const parsed = step.parse(reply(hyp()), hreq({ unconfirmed: true }));
-  assert.deepEqual(plain(parsed.hypotheses[0].citedData), []);
-  assert.throws(() => step.parse(reply(hyp({ basis: '' })), hreq({ unconfirmed: true })), e => e.name === 'ArgumentStepError');
+  assert.deepEqual(plain(parsed.hypotheses[0]), { title: 'Reporting changed', statement: 'People report more now', alternative: true });
   assert.throws(() => step.parse(reply(hyp({ alternative: false })), hreq({ unconfirmed: true })), e => /alternative/.test(e.message), 'first batch still needs an alternative');
-  assert.throws(() => step.parse(reply(hyp({ citedData: ['zzz'] })), hreq({ unconfirmed: true })), e => /outside/.test(e.message));
   assert.throws(() => step.parse(reply(hyp({ statement: 'It rose 77 percent' })), hreq({ unconfirmed: true })), e => e.name === 'ArgumentStepError', 'number guard stays');
   step.policy(step.render(hreq({ unconfirmed: true })), hreq({ unconfirmed: true }));
   assert.throws(() => step.policy('x', hreq()), e => e.name === 'ArgumentStepError', 'confirmed with no supporting data is still refused');
   assert.match(step.render(hreq({ unconfirmed: true })), /unconfirmed/i);
   assert.ok(!/unconfirmed/i.test(step.render(hreq({ data: [fdatum('d1')] }))));
 });
-test('#58 conclusion step: the prompt says the premise is unconfirmed only when it is', () => {
+test('#58 conclusion step: the premise rule text is in the prompt only when the premise is unconfirmed', () => {
   const input = { hypotheses: [1, 2, 3].map(i => ({ id: `h${i}`, round: 1, evidence: [{ id: `n${i}`, claim: `c${i}`, quote: `q${i}`, url: `https://e.org/${i}`, stance: 'supports' }] })) };
   const statements = { h1: 'a', h2: 'b', h3: 'c' };
   const req = { ...base, proposition: 'Crime got worse', input, statements };
-  assert.match(mod.conclusionStep.render({ ...req, unconfirmed: true }), /unconfirmed/i);
-  assert.ok(!/unconfirmed/i.test(mod.conclusionStep.render(req)));
+  const rule = fs.readFileSync(path.join(__dirname, '..', 'core', 'steps', 'argument-map', 'conclusion-unconfirmed.md'), 'utf8').trim();
+  assert.ok(rule.length > 40);
+  assert.ok(mod.conclusionStep.render({ ...req, unconfirmed: true }).includes(rule));
+  assert.ok(!mod.conclusionStep.render(req).includes(rule));
 });
 
 const t = (key, ...values) => translate('zh-TW', key, ...values);

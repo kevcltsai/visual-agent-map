@@ -323,7 +323,7 @@ test('live4: a facet-map card for a not-found datum or need shows readable text 
 });
 
 // ---- 0.34.0 facet maps (no questionType): the cards read exactly as before question types (decision #66) ------------------------------------
-test('0.34.0 facet maps (completed and paused): every card matches the output stored in tests/fixtures/argument-card-v034.json', () => {
+test('0.34.0 facet maps (completed maps match the stored golden; paused ones show the re-run hint): every card matches the output stored in tests/fixtures/argument-card-v034.json', () => {
   const fs = require('node:fs'), path = require('node:path');
   const hyps = () => [verifiedHyp('h1'), hyp('h2', [need('n4', 'found', { stance: 'contradicts' })], { location: 'eliminated', eliminationReason: 'refuted: evidence', aiVerdict: 'refuted' }), hyp('h3', [need('n5', 'found'), need('n6', 'not_found', { reason: 'not_found: gone' })], { location: 'eliminated', eliminationReason: 'round_limit: no more', aiVerdict: 'undecided' }), hyp('h4', [need('n7', 'searching')], { aiVerdict: 'supported', alternative: true })];
   const build = (phase, gate, status, stopReason) => {
@@ -349,7 +349,12 @@ test('0.34.0 facet maps (completed and paused): every card matches the output st
   assert.equal(JSON.stringify(out, null, 1) + '\n', fs.readFileSync(file, 'utf8'));
   for (const view of Object.values(out).flatMap(map => Object.values(map))) assert.equal(view.badge, undefined, 'no badge on a map made before question types');
   assert.equal(out.completed.s.chips[0].text, '✓ 符合命題');
-  assert.equal(out.paused_analysis.c.resume.text, '接續');
+  // R1 M1 (decision #66, spec §9): the golden binds completed maps only. An unfinished one is never resumed, so its card shows the re-run hint instead of 接續.
+  for (const name of ['paused_situation', 'paused_analysis']) {
+    for (const view of Object.values(out[name])) assert.equal(view.resume, undefined, `${name}: no resume button`);
+  }
+  assert.ok(out.paused_analysis.c.lines.includes(t('ui.argument_resume_refused_legacy')));
+  assert.ok(out.paused_situation.s.lines.includes(t('ui.argument_resume_refused_legacy')));
 });
 
 // ---- new design (question types, core evidence, three groups, fact and comparison conclusions) ---------------------------------------------

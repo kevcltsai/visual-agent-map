@@ -575,6 +575,11 @@ const stopFacets = (
   cited: string[]
 ) => {
   const round = next.situation.gate.round ?? 1;
+  if (kind === "data_insufficient" && isFactMap(next)) {
+    // R1 M2 (spec §9): a fact question with every facet insufficient has nothing to conclude; the program stops with the data_insufficient card, no AI call.
+    next.situation.gate = { state: "unmatched", kind, reason, citedData: cited, round };
+    return stopMismatch(next, "mismatch");
+  }
   if (kind === "data_insufficient") {
     // Decision #58: insufficient data does not stop the run; the situation is marked unconfirmed and the analysis begins.
     next.situation.gate = { state: "unconfirmed", kind, reason, citedData: cited, round };
@@ -592,6 +597,8 @@ const stopFacets = (
  */
 /** Program code (rendered by the notes through i18n, never shown raw): the reason stored when the machine forces a facet insufficient and the AI did not itself say so. */
 export const NO_USABLE_DATA_REASON = "no_usable_data";
+/** Program code: the AI judged supports or refutes but every datum it cited comes from an uncertain source (decision #64); forced insufficient instead of a retry that would loop. */
+export const UNCERTAIN_SOURCES_REASON = "uncertain_sources_only";
 export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudgement): ArgumentMapData {
   inSituation(state);
   const facets = facetsOf(state);
@@ -643,15 +650,19 @@ export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudge
       throw new GateError("a facet may cite found, relevant data of its own only");
     if (verdict !== "insufficient" && !cited.some(id => own.find(d => d.id === id)?.propStance === verdict))
       throw new GateError(`a ${verdict} verdict must cite a datum with the same stance`);
-    // Decision #64: data from a source that needs a second one and has none cannot alone carry a supports or refutes.
+    // Decision #64: data from a source that needs a second one and has none cannot alone carry a supports or refutes; the program forces insufficient.
     if (
       verdict !== "insufficient" &&
       !cited.some(id => {
         const datum = own.find(d => d.id === id);
         return datum?.propStance === verdict && !isUncertainSource(datum.proof);
       })
-    )
-      throw new GateError(`a ${verdict} verdict cannot rest on uncertain sources only`);
+    ) {
+      facet.verdict = "insufficient";
+      facet.reason = UNCERTAIN_SOURCES_REASON;
+      facet.citedData = [];
+      continue;
+    }
     facet.verdict = verdict;
     facet.reason = entry.reason;
     facet.citedData = [...new Set(cited)];

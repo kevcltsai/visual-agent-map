@@ -51,7 +51,7 @@ export { INSIGHT_KINDS, MAX_INSIGHTS, type InsightKind };
 export type VerdictInsight = HypothesisInsight;
 export interface FacetVerdictResult extends VerdictResult {
   insights: VerdictInsight[];
-  /** Only when the request carries a replaced core (decision #62): whether the new core asks the same question as the one nobody found. */
+  /** Always asked (strict schema); only kept when the request carries a replaced core (decision #62): whether the new core asks the same question as the one nobody found. */
   sameQuestion?: boolean;
 }
 
@@ -73,7 +73,7 @@ export const FACET_VERDICT_SCHEMA = {
       }
     }
   },
-  required: [...VERDICT_SCHEMA.required, "insights"]
+  required: [...VERDICT_SCHEMA.required, "sameQuestion", "insights"]
 };
 
 const pick = (e: EvidenceInput): EvidenceInput => ({
@@ -133,6 +133,7 @@ export function parseFacetVerdict(raw: string, request: VerdictRequest): FacetVe
   return { ...base, insights, ...(asked ? { sameQuestion: sameQuestion as boolean } : {}) };
 }
 
+const NO_REPLACED_RULE = "There is no replaced core need, so return sameQuestion: false.";
 const REPLACED_RULE =
   "The core need of this hypothesis replaced an earlier core need that nobody could find. Also return sameQuestion: true when the new core evidence answers the same question as the earlier core need (given below), false when it asks something different.";
 
@@ -163,8 +164,8 @@ export const facetVerdictStep: StepDefinition<VerdictRequest, FacetVerdictResult
       languageInstruction: languageInstruction(request.language, request.hypothesis),
       hypothesis: JSON.stringify(request.hypothesis),
       evidence: JSON.stringify(request.input.evidence.map(facetPick)),
-      sameQuestionField: request.input.replacedCore ? '"sameQuestion":true|false,' : "",
-      replacedRule: request.input.replacedCore ? ` ${REPLACED_RULE}` : "",
+      sameQuestionField: '"sameQuestion":true|false,',
+      replacedRule: ` ${request.input.replacedCore ? REPLACED_RULE : NO_REPLACED_RULE}`,
       replaced: request.input.replacedCore
         ? `\n\nEarlier core need that was not found (JSON string):\n${JSON.stringify(request.input.replacedCore.text)}`
         : ""

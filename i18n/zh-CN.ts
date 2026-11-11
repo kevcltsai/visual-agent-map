@@ -2889,6 +2889,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.argument_note_searched": "搜索记录",
   "ui.argument_why_round_limit": "在轮数上限内未能验证",
   "ui.argument_why_no_usable_data": "这个面向没有可用的数据",
+  "ui.argument_why_uncertain_sources_only": "这个面向的来源都不够确定，无法据以判断",
   "ui.argument_facet_0": "面向 {0}",
   "ui.argument_facet_summary_0": "小结：{0}",
   "ui.argument_facet_supports": "支持",

@@ -217,8 +217,16 @@ test('conclusion: a number or URL outside the input throws; no verified hypothes
 test('every step has a strict schema and the registry maps the machine actions', () => {
   for (const step of [mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep, mod.conclusionFactStep]) {
     assert.equal(step.schema.additionalProperties, false);
-    const optional = step === mod.facetVerdictStep ? ['sameQuestion'] : []; // #62: asked only when a core was replaced
-    assert.deepEqual([...step.schema.required].sort(), Object.keys(step.schema.properties).filter(k => !optional.includes(k)).sort());
+    const strict = (node, where) => {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'object') {
+        assert.equal(node.additionalProperties, false, `${step.id} ${where}`);
+        assert.deepEqual([...node.required].sort(), Object.keys(node.properties).sort(), `${step.id} ${where}`);
+        for (const [k, v] of Object.entries(node.properties)) strict(v, `${where}.${k}`);
+      }
+      if (node.type === 'array') strict(node.items, `${where}[]`);
+    };
+    strict(step.schema, '$');
   }
   assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'conclude_facts', 'judge_facets', 'judge_gate', 'plan_facets', 'propose_facet_hypotheses', 'propose_hypotheses', 'revise', 'verdict']);
   assert.equal(mod.ARGUMENT_STEPS.plan_facets, mod.facetPlanStep);
@@ -919,12 +927,14 @@ test('P4 facet judge: a datum flagged uncertainSource reaches the prompt as such
 });
 
 const fvCore = { ...fvInput, evidence: [{ ...fvInput.evidence[0], core: true }] };
-test('facet verdict (#62): the core flag reaches the prompt; sameQuestion is required only when a core was replaced', () => {
+test('facet verdict (#62): the core flag reaches the prompt; sameQuestion is always in the strict schema (R1 B2) but only used when a core was replaced', () => {
   const req = fvReq(fvCore);
   const prompt = mod.facetVerdictStep.render(req);
   assert.match(prompt, /"core":true/);
   assert.match(prompt, /evidence marked core/);
-  assert.doesNotMatch(prompt, /sameQuestion|Earlier core need/);
+  assert.match(prompt, /"sameQuestion":true\|false/);
+  assert.match(prompt, /no replaced core need, so return sameQuestion: false/);
+  assert.doesNotMatch(prompt, /Earlier core need/);
   assert.doesNotMatch(mod.facetVerdictStep.render(fvReq(fvInput)), /"core"/);
   assert.doesNotMatch(mod.verdictStep.render(vReq(fvCore)), /"core"/);
   assert.equal(ok(mod.facetVerdictStep, req, fvGood).sameQuestion, undefined);
@@ -938,7 +948,8 @@ test('facet verdict (#62): the core flag reaches the prompt; sameQuestion is req
   bad(mod.facetVerdictStep, replaced, fvGood, /sameQuestion/);
   bad(mod.facetVerdictStep, replaced, { ...fvGood, sameQuestion: 'yes' }, /sameQuestion/);
   assert.ok(mod.FACET_VERDICT_SCHEMA.properties.sameQuestion);
-  assert.ok(!mod.FACET_VERDICT_SCHEMA.required.includes('sameQuestion'));
+  assert.ok(mod.FACET_VERDICT_SCHEMA.required.includes('sameQuestion'));
+  assert.doesNotMatch(rp, /no replaced core need/);
 });
 
 // ---- #63: conclusion of all hypotheses; fact conclusion from facets ----

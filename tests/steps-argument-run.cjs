@@ -844,7 +844,7 @@ test('P5 #58: a round-1 retry with no retry needs ends unconfirmed and the run g
   assert.ok(!r.stat.logs.some(l => l.startsWith('argument-run stopped')));
   assert.ok(!r.stat.logs.join('\n').includes('SECRET-REASON-TEXT'));
 });
-// #60/#61: a refuting facet with no supporting one stops as mismatch; refuting plus supporting is partial (see the partial test below).
+// #60/#61: a refuting facet with no supporting one stops as mismatch; refuting plus supporting is partial (see the B3 test and the fact-question outcomes test below).
 test('P5 #58: facets that refute with none supporting stop as mismatch with no hypothesis step', async () => {
   const r = await rig({ facet: true, script: { step: facetSteps({ judge_facets: request => ({ data: request.facets.flatMap(f => f.data.map(d => ({ id: d.id, propStance: 'refutes', reason: 'it fits' }))), facets: request.facets.map(f => ({ id: f.id, verdict: 'refutes', reason: 'r', summary: `s ${f.title}`, citedData: [f.data[0].id], retryNeeds: [] })), assumptionInsights: [] }) }) } });
   await r.runs.start(r.mapPath, 'p');
@@ -1265,7 +1265,7 @@ async function shown(r) {
   const state = await r.state();
   const doc = await r.repo.readMap(r.mapPath);
   const out = [];
-  for (const id of [state.roles.conclusion, state.roles.eliminated, ...state.hypotheses.map(h => h.id)]) {
+  for (const id of [state.roles.conclusion, state.roles.eliminated, ...state.hypotheses.map(h => h.id)].filter(Boolean)) {
     const note = await r.text(id);
     out.push([id, `${note.title}\n${note.summary ?? ''}\n${note.detail ?? ''}`]);
     const view = cardLib.describeArgumentCard(state, id, tw);
@@ -1485,12 +1485,11 @@ test('P7b #60 #62: a causal plan checkpoint creates the three groups under the c
   assert.equal((await early.repo.readMap(early.mapPath)).nodes.length, 3);
 });
 
-test('P7b #60 (counterexample 1): a fact question has no propose_facet_hypotheses or needs step, concludes through conclude_facts with the four outcomes, and basedOn holds facet ids', async () => {
+test('P7b #60 (counterexample 1): a fact question has no propose_facet_hypotheses or needs step, concludes through conclude_facts with the three outcomes it can reach, and basedOn holds facet ids', async () => {
   const outcomes = [
     ['holds', { Rate: 'supports', Postings: 'supports', Hiring: 'supports' }, 'ui.argument_note_outcome_holds', 0],
     ['fails', { Rate: 'refutes', Postings: 'refutes', Hiring: 'refutes' }, 'ui.argument_note_outcome_fails', 0],
-    ['partial', { Rate: 'supports', Postings: 'refutes', Hiring: 'supports' }, 'ui.argument_note_outcome_partial', 0],
-    ['insufficient', { Rate: 'insufficient', Postings: 'insufficient', Hiring: 'insufficient' }, 'ui.argument_note_outcome_insufficient', 3]
+    ['partial', { Rate: 'supports', Postings: 'refutes', Hiring: 'supports' }, 'ui.argument_note_outcome_partial', 0]
   ];
   for (const [outcome, verdicts, key, insufficient] of outcomes) {
     const asked = [];
@@ -1571,4 +1570,41 @@ test('P7b #66 (counterexample 9): a legacy paused facet map (no question type) r
   const legacy = await done.state();
   assert.equal(model.verifiedCount(legacy), before3, 'the old rule (all needs found, evidence clearly supporting) gives the same count');
   assert.deepEqual(plain(legacy.hypotheses.map(h => model.isVerified(h))), [true, true, true]);
+});
+
+test('R1 B3 (counterexample 2): with one facet supporting and one refuting, propose_facet_hypotheses is sent only the supporting facet data', async () => {
+  const requests = [];
+  const r = await rig({ facet: true, script: { step: facetSteps({
+    judge_facets: judgeFacets({ Rate: 'supports', Postings: 'refutes', Hiring: 'insufficient' }),
+    propose_facet_hypotheses: request => { requests.push(plain(request)); return facetSteps().propose_facet_hypotheses(request); }
+  }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  const rate = state.situation.facets.find(f => f.title === 'Rate').id;
+  assert.ok(requests.length >= 1);
+  const owner = new Map(state.situation.data.map(d => [d.id, d.facetId]));
+  for (const request of requests) {
+    assert.ok(request.data.length > 0);
+    assert.ok(request.data.every(d => owner.get(d.id) === rate), 'every datum sent belongs to the supporting facet');
+  }
+});
+
+test('R1 M2: a fact question whose facets are all insufficient stops with the outlined data-insufficient card, no conclusion call, every facet and what it lacks listed', async () => {
+  const asked = [];
+  const r = await rig({ facet: true, script: { step: factSteps({ judge_facets: judgeFacets({ Rate: 'insufficient', Postings: 'insufficient', Hiring: 'insufficient' }), conclude_facts: request => { asked.push(request); return factSteps().conclude_facts(request); } }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const state = await r.state();
+  assert.equal(state.run.phase, 'stopped_mismatch');
+  assert.equal(state.run.status, 'finished');
+  assert.equal(state.situation.gate.kind, 'data_insufficient');
+  assert.deepEqual(asked, []);
+  assert.ok(!r.stat.steps.includes('conclude_facts') && !r.stat.steps.includes('conclude'));
+  const view = cardLib.describeArgumentCard(state, state.roles.conclusion, (key, ...v) => translate('zh-TW', key, ...v));
+  assert.equal(view.state, 'stopped_insufficient');
+  const missingLine = view.lines.find(l => l.includes('Rate')) ?? '';
+  for (const title of ['Rate', 'Postings', 'Hiring']) assert.ok(missingLine.includes(title), `${title} is listed in: ${JSON.stringify(view.lines)}`);
+  const note = await r.text(state.roles.conclusion);
+  assert.equal(note.summary, translate('zh-TW', 'ui.argument_stopped_insufficient'));
+  for (const title of ['Rate', 'Postings', 'Hiring']) assert.ok(note.detail.includes(title), `${title} in the note`);
+  await noCodeShown(r, 'fact insufficient');
 });

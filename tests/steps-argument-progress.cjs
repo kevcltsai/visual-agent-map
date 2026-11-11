@@ -278,6 +278,18 @@ test('legacy refusal: resuming a pre-question-type facet map shows the "use the 
   assert.match(notices[0], /Re-run with these assumptions/);
 });
 
+test('R1 M1: an unfinished facet map made before question types offers no resume and says to re-run from the definitions card; a typed one still resumes', () => {
+  for (const stopReason of ['user', 'interrupted', 'error']) {
+    const legacy = make({ status: 'paused', stopReason });
+    legacy.situation.facets = [{ id: 'f1', title: 'F', verdict: 'supports', reason: '', citedData: [], summary: '' }];
+    const view = describe(legacy, false);
+    assert.equal(view.action, null, stopReason);
+    assert.equal(view.detail, t('ui.argument_resume_refused_legacy'), stopReason);
+    legacy.situation.questionType = 'causal';
+    assert.equal(describe(legacy, false).action, 'resume', `${stopReason}: a typed map resumes`);
+  }
+});
+
 test('fact question: the running bar says the conclusion is being written (no hypothesis round); a paused one shows no verified count', () => {
   const fact = make({ calls: 4 });
   fact.situation.facets = [{ id: 'f1', title: 'F', verdict: 'supports', reason: '', citedData: [], summary: '' }];

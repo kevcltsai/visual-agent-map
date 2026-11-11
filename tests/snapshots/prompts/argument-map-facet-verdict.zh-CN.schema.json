@@ -57,6 +57,7 @@
     "verdict",
     "citedNeeds",
     "reason",
+    "sameQuestion",
     "insights"
   ]
 }

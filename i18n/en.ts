@@ -3083,6 +3083,7 @@ export const en = {
   "ui.argument_note_searched": "Searches made",
   "ui.argument_why_round_limit": "Not verified within the round limit",
   "ui.argument_why_no_usable_data": "No usable data for this facet",
+  "ui.argument_why_uncertain_sources_only": "No source for this facet is certain enough to decide it",
   "ui.argument_facet_0": "Facet {0}",
   "ui.argument_facet_summary_0": "Summary: {0}",
   "ui.argument_facet_supports": "Supports",

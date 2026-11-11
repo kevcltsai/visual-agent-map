@@ -2,7 +2,7 @@ List the evidence needs for one hypothesis: the specific pieces of web evidence 
 
 List 1 to {{max}} needs.{{coreRule}} A need must not repeat one already listed under existing needs, and must not ask for the same thing in other words. When there are earlier needs, add only what they did not cover. Use only numbers and links that appear in the supplied text. A need text must not contain any number, year or URL that is not in the supplied input.
 
-Return only JSON: {"needs":[{"text":""}]}; a need marked as the core also has "core": true. Do not add other fields, paths, new links or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
+Return only JSON: {"needs":[{"text":"","core":true|false}]}. Do not add other fields, paths, new links or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
 
 {{languageInstruction}}
 

@@ -1,6 +1,7 @@
 import type { TranslationKey } from "../../i18n";
 import {
   isFactMap,
+  isLegacyFacetMap,
   MAX_RESEARCH_CALLS,
   MIN_VERIFIED,
   verifiedCount,
@@ -71,6 +72,15 @@ export function describeArgumentProgress(state: ArgumentMapData, owned: boolean,
       action: "stop"
     };
   }
+  // Decision #66 (R1 M1): an unfinished map made before question types is never resumed; the bar says how to start a new one.
+  if (isLegacyFacetMap(state))
+    return {
+      tone: "paused",
+      title: t("ui.argument_bar_paused"),
+      detail: t("ui.argument_resume_refused_legacy"),
+      count: used,
+      action: null
+    };
   if (run.stopReason === "interrupted")
     return {
       tone: "warn",

@@ -1080,7 +1080,7 @@ test('fact question (counter-example 1): facets settled go to analysis with only
   assert.equal(s.hypotheses.length, 0);
   assert.equal(model.conclusionView(s), 'in_progress');
 });
-test('fact question: a failing, partial or insufficient outcome still goes to conclude_facts (never a mismatch stop)', () => {
+test('fact question: a failing or partial outcome still goes to conclude_facts; every facet insufficient stops (R1 M2, no conclusion step)', () => {
   const failing = judged(researchAll(factMap()), stanceAll('refutes'), allV('refutes'));
   assert.equal(failing.run.phase, 'analysis');
   assert.equal(failing.situation.gate.state, 'matched');
@@ -1088,8 +1088,11 @@ test('fact question: a failing, partial or insufficient outcome still goes to co
   const partial = judged(researchAll(factMap()), { f2d1: 'refutes' }, { f2: 'refutes' });
   assert.deepEqual(actions(partial), [{ type: 'conclude_facts' }]);
   const none = m.addRetryNeeds(judged(researchAll(factMap(), ['f1d1', 'f2d1', 'f3d1', 'f4d1']), {}, {}), []);
-  assert.equal(none.situation.gate.state, 'unconfirmed');
-  assert.deepEqual(actions(none), [{ type: 'conclude_facts' }]);
+  assert.equal(none.situation.gate.state, 'unmatched');
+  assert.equal(none.situation.gate.kind, 'data_insufficient');
+  assert.equal(none.run.phase, 'stopped_mismatch');
+  assert.equal(none.run.status, 'finished');
+  assert.deepEqual(actions(none), []);
 });
 test('fact question: applyFactConclusion rests on facet ids only; hypothesis ids, unknown ids and an empty list are refused', () => {
   const s = judged(researchAll(factMap()), {}, {});
@@ -1142,9 +1145,15 @@ test('uncertain source (counter-example 7 part): a facet verdict cannot rest onl
   };
   const onlyF1d1 = s => { const j = judgement(s); j.facets.find(f => f.id === 'f1').citedData = ['f1d1']; return j; };
   const unsure = tiered('other', false);
-  refuses(unsure, () => m.applyFacetVerdicts(unsure, onlyF1d1(unsure)));
+  // R1 M3: not a GateError (a retry would loop on the same answer): the program forces insufficient and stores a reason code.
+  const forced = m.applyFacetVerdicts(unsure, onlyF1d1(unsure)).situation.facets[0];
+  assert.equal(forced.verdict, 'insufficient');
+  assert.equal(forced.reason, m.UNCERTAIN_SOURCES_REASON);
+  assert.deepEqual(plain(forced.citedData), []);
   const both = judgement(unsure); both.facets.find(f => f.id === 'f1').citedData = ['f1d1', 'f1d2'];
-  refuses(unsure, () => m.applyFacetVerdicts(unsure, both));
+  assert.equal(m.applyFacetVerdicts(unsure, both).situation.facets[0].verdict, 'insufficient');
+  const refutes = judgement(unsure, { f1d1: 'refutes', f1d2: 'refutes' }, { f1: 'refutes' }); refutes.facets.find(f => f.id === 'f1').citedData = ['f1d1'];
+  assert.equal(m.applyFacetVerdicts(unsure, refutes).situation.facets[0].verdict, 'insufficient', 'refutes on uncertain sources only is forced too');
   const insufficient = judgement(unsure, {}, { f1: 'insufficient' });
   assert.equal(m.applyFacetVerdicts(unsure, insufficient).situation.facets[0].verdict, 'insufficient', 'insufficient needs no citation');
   const confirmed = tiered('other', true);

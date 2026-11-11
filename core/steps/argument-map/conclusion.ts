@@ -67,7 +67,8 @@ const pick = (e: EvidenceInput): EvidenceInput => ({
   ...(e.core === true ? { core: true as const } : {})
 });
 /** A hypothesis without a status comes from a map that lists verified hypotheses only. */
-const isVerifiedIn = (h: ConclusionInput["hypotheses"][number]): boolean => h.status === undefined || h.status === "verified";
+const isVerifiedIn = (h: ConclusionInput["hypotheses"][number]): boolean =>
+  h.status === undefined || h.status === "verified";
 const statementOf = (request: ConclusionRequest, id: string): string => {
   const value = Object.prototype.hasOwnProperty.call(request.statements, id) ? request.statements[id] : undefined;
   if (typeof value !== "string" || !value.trim()) throw new ArgumentStepError(`no statement for hypothesis ${id}`);

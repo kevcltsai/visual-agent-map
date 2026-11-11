@@ -2966,7 +2966,8 @@ export const en = {
   "ui.argument_note_outcome_partial": "Result: holds in part",
   "ui.argument_note_outcome_insufficient": "Result: not enough data",
   "ui.argument_note_outcome_insufficient_count_0": "{0} facets had too little data",
-  "ui.argument_resume_refused_legacy": "This map was made before question types and cannot be resumed. Use \"Re-run with these assumptions\" on the definitions card to start a new map.",
+  "ui.argument_resume_refused_legacy":
+    'This map was made before question types and cannot be resumed. Use "Re-run with these assumptions" on the definitions card to start a new map.',
   "ui.argument_stopped_mismatch": "The current situation does not match the proposition. Stopped.",
   "ui.argument_stopped_missing": "The situation data could not be found. Stopped.",
   "ui.argument_stopped_insufficient": "Not enough data to judge the proposition. Stopped.",

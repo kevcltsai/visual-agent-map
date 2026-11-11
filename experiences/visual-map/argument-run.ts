@@ -133,7 +133,8 @@ export const WORST_CASE_AI_CALLS =
 const X_STEP = 320;
 const Y_STEP = 160;
 
-export type ArgumentRunRefusal = "busy" | "unusable" | "exists" | "missing" | "finished" | "not_paused" | "legacy" | "disposed";
+export type ArgumentRunRefusal =
+  "busy" | "unusable" | "exists" | "missing" | "finished" | "not_paused" | "legacy" | "disposed";
 export class ArgumentRunError extends Error {
   constructor(readonly code: ArgumentRunRefusal) {
     super(`argument run refused: ${code}`);
@@ -677,7 +678,9 @@ export class ArgumentRuns {
           const h = next.hypotheses.find(x => x.id === action.hypothesisId)!;
           return {
             next,
-            reparent: [{ id: h.id, parentId: next.roles.unconfirmed ?? next.roles.eliminated ?? next.roles.conclusion }],
+            reparent: [
+              { id: h.id, parentId: next.roles.unconfirmed ?? next.roles.eliminated ?? next.roles.conclusion }
+            ],
             notes: () =>
               this.noteDetail(
                 map,
@@ -940,7 +943,8 @@ export class ArgumentRuns {
       };
       result = await this.ask(drive, ARGUMENT_STEPS.propose_hypotheses, request);
     }
-    const proposed: { title: string; statement: string; citedData?: string[]; alternative?: boolean }[] = result.hypotheses;
+    const proposed: { title: string; statement: string; citedData?: string[]; alternative?: boolean }[] =
+      result.hypotheses;
     await this.checkpoint(drive, async (s, map) => {
       // Dry run with placeholder ids first: a refused batch (the gate) must not leave notes behind.
       applyHypotheses(
@@ -998,7 +1002,9 @@ export class ArgumentRuns {
           ? {
               ...(n.proof?.claim ? { claim: n.proof.claim } : {}),
               ...(n.proof?.figure?.period ? { period: n.proof.figure.period } : {}),
-              ...(n.state === "not_found" && (n.searchLog?.why ?? n.reason) ? { reason: n.searchLog?.why ?? n.reason } : {})
+              ...(n.state === "not_found" && (n.searchLog?.why ?? n.reason)
+                ? { reason: n.searchLog?.why ?? n.reason }
+                : {})
             }
           : {})
       })),
@@ -1149,7 +1155,12 @@ export class ArgumentRuns {
         reason: f.reason,
         data: state.situation.data
           .filter(d => d.facetId === f.id && d.state === "found" && d.proof && d.propStance !== "irrelevant")
-          .map(d => ({ claim: d.proof!.claim, quote: d.proof!.quote, url: d.proof!.url, stance: d.propStance ?? "uncertain" }))
+          .map(d => ({
+            claim: d.proof!.claim,
+            quote: d.proof!.quote,
+            url: d.proof!.url,
+            stance: d.propStance ?? "uncertain"
+          }))
       })),
       ...(isSituationUnconfirmed(state) ? { unconfirmed: true } : {})
     };
@@ -1165,7 +1176,9 @@ export class ArgumentRuns {
         isSituationUnconfirmed(next) ? this.t("ui.argument_premise_unconfirmed") : undefined
       );
       const path = map.nodes.find(n => n.id === next.roles.conclusion)?.path;
-      this.ports.log(`argument-run concluded runId=${s.run.runId} phase=concluded questionType=fact outcome=${outcome}`);
+      this.ports.log(
+        `argument-run concluded runId=${s.run.runId} phase=concluded questionType=fact outcome=${outcome}`
+      );
       return {
         next,
         notes: async () => {
@@ -1317,10 +1330,7 @@ export class ArgumentRuns {
       const proposition = await this.proposition(drive, state);
       // A hypothesis need carries the claim it tests (the stance is relative to it) and the assumed period.
       const context = hypothesis
-        ? [
-            assumptionScope(state),
-            `hypothesis claim: ${plainLine(await this.statementOf(drive, hypothesis))}`
-          ]
+        ? [assumptionScope(state), `hypothesis claim: ${plainLine(await this.statementOf(drive, hypothesis))}`]
             .filter(Boolean)
             .join("; ")
         : scopeOf(false, state).context;
@@ -1450,7 +1460,10 @@ export class ArgumentRuns {
   ): Promise<{ proof?: SecondSource; log: string }> {
     const second = entry.second;
     if (!second) return { log: "missing" };
-    const host = (url: string): string => domainOf(url).replace(/^www\./, "").toLowerCase();
+    const host = (url: string): string =>
+      domainOf(url)
+        .replace(/^www\./, "")
+        .toLowerCase();
     if (!second.agrees || host(second.url) === host(entry.url)) return { log: "mismatch" };
     const check = await untilAborted(
       signal,
@@ -1466,7 +1479,12 @@ export class ArgumentRuns {
     );
     if (!check.ok) return { log: "failed" };
     return {
-      proof: { url: check.proof.url, quote: check.proof.quote, check: check.proof.check, checkedAt: check.proof.checkedAt },
+      proof: {
+        url: check.proof.url,
+        quote: check.proof.quote,
+        check: check.proof.check,
+        checkedAt: check.proof.checkedAt
+      },
       log: "found"
     };
   }

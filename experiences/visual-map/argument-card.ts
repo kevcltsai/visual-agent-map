@@ -99,7 +99,10 @@ function pausedParts(
   const lines = reason ? [t("ui.argument_reason_0", t(reason))] : [];
   // Decision #66 (R1 M1): an unfinished map made before question types is never resumed; the card says how to start a new one instead.
   if (isLegacyFacetMap(state))
-    return { chip: { tone: "maybe", text: t("ui.argument_bar_paused") }, lines: [...lines, t("ui.argument_resume_refused_legacy")] };
+    return {
+      chip: { tone: "maybe", text: t("ui.argument_bar_paused") },
+      lines: [...lines, t("ui.argument_resume_refused_legacy")]
+    };
   return {
     chip: { tone: "maybe", text: t("ui.argument_bar_paused") },
     lines,
@@ -280,7 +283,12 @@ function hypothesisCard(state: ArgumentMapData, h: Hypothesis, t: Translate): Ar
   const cutChip = state.roles.unconfirmed ? "ui.argument_unconfirmed_chip" : "ui.argument_unverified_limit";
   const chips: ArgumentChip[] =
     h.location === "eliminated" || cutOff
-      ? [{ tone: state.roles.unconfirmed && cutOff ? "maybe" : "gap", text: t(cutOff ? cutChip : "ui.argument_eliminated_chip") }]
+      ? [
+          {
+            tone: state.roles.unconfirmed && cutOff ? "maybe" : "gap",
+            text: t(cutOff ? cutChip : "ui.argument_eliminated_chip")
+          }
+        ]
       : [
           shown === "verifying"
             ? { tone: "open", text: t("ui.argument_verifying") }
@@ -410,7 +418,9 @@ function facetSituationCard(state: ArgumentMapData, t: Translate): ArgumentCardV
   const question = state.situation.question;
   const gate = state.situation.gate;
   const type = state.situation.questionType;
-  const typeText = type ? t(type === "fact" ? "ui.argument_question_type_fact" : "ui.argument_question_type_causal") : "";
+  const typeText = type
+    ? t(type === "fact" ? "ui.argument_question_type_fact" : "ui.argument_question_type_causal")
+    : "";
   const base: ArgumentCardView = {
     role: "situation",
     kind,
@@ -442,8 +452,7 @@ function facetSituationCard(state: ArgumentMapData, t: Translate): ArgumentCardV
         .map(([key, count]) => t(key, count))
         .join(t("ui.argument_list_sep"))
     );
-    if (type === "fact")
-      return { ...base, lines: [line], label: [kind, typeText, line].join(", ") };
+    if (type === "fact") return { ...base, lines: [line], label: [kind, typeText, line].join(", ") };
     return finish({ tone: "yes", text: t("ui.argument_gate_premise_holds") }, [line]);
   }
   if (gate.state === "matched")
@@ -461,7 +470,8 @@ function facetSituationCard(state: ArgumentMapData, t: Translate): ArgumentCardV
     const data = state.situation.data;
     const count = t("ui.argument_data_count_0_1", data.filter(d => d.state === "found").length, data.length);
     const paused = pausedParts(state, "situation", t);
-    if (paused) return { ...finish(paused.chip, [count, ...paused.lines]), ...(paused.resume ? { resume: paused.resume } : {}) };
+    if (paused)
+      return { ...finish(paused.chip, [count, ...paused.lines]), ...(paused.resume ? { resume: paused.resume } : {}) };
     return finish({ tone: "open", text: t("ui.argument_gate_pending") }, [count]);
   }
   if (gate.kind === "data_insufficient")
@@ -545,7 +555,10 @@ export function describeArgumentCard(state: ArgumentMapData, id: string, t: Tran
   const datum = state.situation.data.find(item => item.id === id);
   if (datum) return isFacetMap(state) ? facetDatumCard(datum, t) : datumCard(datum, t);
   // A stopped mismatch ran no hypothesis research: the groups carry no "0 / 3" count, only their label.
-  if ((id === roles.verified || id === roles.eliminated || id === roles.unconfirmed) && state.run.phase === "stopped_mismatch")
+  if (
+    (id === roles.verified || id === roles.eliminated || id === roles.unconfirmed) &&
+    state.run.phase === "stopped_mismatch"
+  )
     return plain("group", t("ui.argument_group_label"));
   if (id === roles.verified) {
     const verifying = state.hypotheses.filter(h => h.location === "verifying").length;

@@ -79,7 +79,10 @@ export function parseNeeds(raw: string, request: NeedsRequest): NeedsResult {
     throw new ArgumentStepError(`expected 1 to ${request.max} needs`);
   const seen = new Set(request.existing.map(n => normalized(n.text)));
   const needs = entries.map(entry => {
-    const one = parseObject(JSON.stringify(entry), entry && typeof entry === "object" && "core" in entry ? ["text", "core"] : ["text"]);
+    const one = parseObject(
+      JSON.stringify(entry),
+      entry && typeof entry === "object" && "core" in entry ? ["text", "core"] : ["text"]
+    );
     if (one.core !== undefined && typeof one.core !== "boolean") throw new ArgumentStepError("core must be a boolean");
     if (one.core === true && !request.core) throw new ArgumentStepError("no core need is asked for");
     const body = text(one.text, "text");
@@ -121,7 +124,13 @@ export const needsStep: StepDefinition<NeedsRequest, NeedsResult> = {
       ),
       coreRule: ` ${request.core ? CORE_RULES[request.core] : NO_CORE_RULE}`,
       existing: JSON.stringify(
-        request.existing.map(n => ({ text: n.text, state: n.state, claim: n.claim, period: n.period, reason: n.reason }))
+        request.existing.map(n => ({
+          text: n.text,
+          state: n.state,
+          claim: n.claim,
+          period: n.period,
+          reason: n.reason
+        }))
       )
     }),
   schema: NEEDS_SCHEMA,

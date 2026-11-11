@@ -76,8 +76,10 @@ const OUTCOME_TEXT: Record<FacetComposite, string> = {
 };
 
 const checked = (request: ConclusionFactRequest): ConclusionFactFacet[] => {
-  if (!(FACET_COMPOSITES as readonly string[]).includes(request.outcome)) throw new ArgumentStepError("unknown outcome");
-  if (!Array.isArray(request.facets) || !request.facets.length) throw new ArgumentStepError("a fact conclusion needs facets");
+  if (!(FACET_COMPOSITES as readonly string[]).includes(request.outcome))
+    throw new ArgumentStepError("unknown outcome");
+  if (!Array.isArray(request.facets) || !request.facets.length)
+    throw new ArgumentStepError("a fact conclusion needs facets");
   return request.facets;
 };
 const sourcesOf = (request: ConclusionFactRequest): string[] => [
@@ -105,7 +107,10 @@ export function parseConclusionFact(raw: string, request: ConclusionFactRequest)
     return { text: body, facetIds };
   });
   const replyTexts = [summary, ...points.map(p => p.text)];
-  noIds(replyTexts, request.facets.map(f => f.id));
+  noIds(
+    replyTexts,
+    request.facets.map(f => f.id)
+  );
   grounded(replyTexts, sourcesOf(request));
   return { summary, points, basedOn };
 }

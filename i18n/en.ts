@@ -2942,6 +2942,7 @@ export const en = {
   "ui.argument_bar_used_0_1": "{0}/{1} research calls used",
   "ui.argument_bar_stop": "Stop",
   "ui.argument_bar_paused": "Paused",
+  "ui.argument_bar_concluding_facts": "Writing the conclusion from the facets",
   "ui.argument_bar_verified_0_1": "{0}/{1} hypotheses verified",
   "ui.argument_bar_resume": "Resume",
   "ui.argument_bar_interrupted": "Interrupted last time, paused",

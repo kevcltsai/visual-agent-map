@@ -2752,6 +2752,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.argument_bar_used_0_1": "已用 {0}／{1} 次研究",
   "ui.argument_bar_stop": "停止",
   "ui.argument_bar_paused": "已暫停",
+  "ui.argument_bar_concluding_facts": "依各面向寫結論中",
   "ui.argument_bar_verified_0_1": "驗證完成 {0}／{1} 個假設",
   "ui.argument_bar_resume": "接續",
   "ui.argument_bar_interrupted": "上次中斷，已暫停",

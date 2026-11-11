@@ -1338,9 +1338,11 @@ test('#59 facet run: an unconfirmed premise with no hypothesis verified stops at
   assert.ok(cut, 'a hypothesis was cut by the limit');
   assert.ok((await r.text(cut.id)).detail.includes('未驗證（研究次數用完）'));
   assert.ok(!(await r.text(cut.id)).detail.includes('round_limit'));
-  assert.ok(cardLib.describeArgumentCard(state, cut.id, tw).chips.some(c => c.text === '未驗證（研究次數用完）'));
-  const group = cardLib.describeArgumentCard(state, state.roles.eliminated, tw);
-  assert.ok(group.lines.some(l => l.includes('未驗證（研究次數用完）')), JSON.stringify(group));
+  // P8a (mockup 改後): a map with the unconfirmed group calls the cut hypothesis 未確認 and counts it in that group, not in the eliminated one.
+  assert.ok(cardLib.describeArgumentCard(state, cut.id, tw).chips.some(c => c.text === '未確認'));
+  const group = cardLib.describeArgumentCard(state, state.roles.unconfirmed, tw);
+  assert.ok(group.lines.some(l => /^未確認 \d+ 個$/.test(l)), JSON.stringify(group));
+  assert.ok(!cardLib.describeArgumentCard(state, state.roles.eliminated, tw).lines.some(l => l.includes('未驗證')));
   await noCodeShown(r, 'stopped_limit');
 });
 test('#59 facet run: a hypothesis the evidence refuted is eliminated (not "unverified"), the ones the research budget cut are listed apart', async () => {

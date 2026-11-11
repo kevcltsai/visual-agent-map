@@ -428,3 +428,19 @@ test('definitions re-run: a double click creates and starts ONE new map; the gua
   await h.view.rerunFromDefinitions(def.id);
   assert.equal(starts.length, 2, 'the guard is reset after the first finished');
 });
+
+test('definitions re-run: the 題型 line on the definitions note reaches start as presetQuestionType; no line starts it undefined', async () => {
+  const starts = [];
+  const h = await harness([...'PSCVEHNF'].concat('D', 'A'), { argumentRuns: { start: async (path, claim, opts) => { starts.push(opts); } }, openMapInNewTab: async () => {} });
+  const def = h.nodes[9];
+  h.view.map.argumentMap.situation.assumptions = { id: def.id, items: [{ label: 'l', value: 'v', reason: 'r' }] };
+  await h.repo.saveMap(MAP, h.view.map);
+  await h.repo.updateNote(def.path, { detail: '題型: 事實題\n\n| a | b | c |\n| --- | --- | --- |\n| l | v | r |' });
+  await h.view.rerunFromDefinitions(def.id);
+  await h.repo.updateNote(def.path, { detail: '| a | b | c |\n| --- | --- | --- |\n| l | v | r |' });
+  await h.view.rerunFromDefinitions(def.id);
+  assert.equal(starts.length, 2);
+  assert.equal(starts[0].presetQuestionType, 'fact');
+  assert.equal(starts[1].presetQuestionType, undefined);
+  assert.equal(h.notices.length, 0, h.notices.join('|'));
+});

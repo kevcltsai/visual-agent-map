@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Hypothesis research now tells fact questions from causal questions. The current-situation card shows the type, and you can change it on the definitions card before you re-run.
+- Fact questions skip the hypothesis stage: the conclusion card is one of holds, does not hold, holds in part or not enough data, built from the facets, and says how many facets lacked data.
+- Causal questions stop when the current situation does not match, and otherwise compare the verified hypotheses in the conclusion.
+- Each hypothesis now has one core piece of evidence, marked "Core". Supplementary evidence that is not found no longer blocks a hypothesis.
+- A new group, "Hypotheses with evidence, unconfirmed", holds hypotheses that have evidence but were not confirmed. "Eliminated" now holds only hypotheses the evidence refuted.
+- Evidence from a page that is not an official, academic or major news source now needs a second independent source; without one it counts as uncertain and cannot carry a facet on its own.
+- Hypothesis-research maps made before this change still open and show as before. An unfinished one cannot be resumed; use "Re-run with these assumptions" on its definitions card to start a new map.
 - Hypothesis research now checks the situation by facets, starting from a definitions card, with readable reasons and a separate "insufficient data" stop. Each card keeps full research notes, and the opening screen has tabs, including a Beta hypothesis research tab.
 - AIM is removed; your old AIM maps still open and work as ordinary maps.
 - Argument map: when the AI does not answer in time for a situation item or an evidence item, the run now retries once and then pauses so you can resume it, instead of counting it as not found.

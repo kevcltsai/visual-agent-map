@@ -138,6 +138,38 @@
           "note": {
             "type": "string",
             "maxLength": 200
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "other"
+            ]
+          },
+          "second": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "quote": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "claim": {
+                "type": "string"
+              },
+              "agrees": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "url",
+              "quote",
+              "claim",
+              "agrees"
+            ]
           }
         },
         "required": [

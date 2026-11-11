@@ -1,6 +1,6 @@
 import { neutralizeUnsafeMermaid } from "../../../ai/mermaid-safety";
 import { truncateSummary } from "../../../ai/result-utils";
-import type { AiResult, ArgumentEvidenceFigure, ArgumentEvidenceItem } from "../../../ai/types";
+import type { AiResult, ArgumentEvidenceFigure, ArgumentEvidenceItem, ArgumentEvidenceSecond } from "../../../ai/types";
 import { foldText, QUOTE_MAX, QUOTE_MIN } from "../../argument-map/source-proof";
 import { t, type ContentLanguage, translateNote } from "../../../i18n";
 
@@ -47,7 +47,8 @@ export function extractJsonObject(raw: string): string {
 
 const EVIDENCE_KEYS = ["need", "status", "stance", "claim", "quote", "url"];
 /** Optional reply fields (V1 boost): a malformed one is dropped, the entry itself is kept. */
-const EVIDENCE_OPTIONAL_KEYS = ["figure", "note"];
+const EVIDENCE_OPTIONAL_KEYS = ["figure", "note", "tier", "second"];
+const EVIDENCE_TIERS = ["primary", "other"];
 const NOTE_MAX = 200;
 const FIGURE_NUMBER_MAX = 40;
 const FIGURE_PERIOD_MAX = 60;
@@ -70,6 +71,27 @@ function readFigure(value: unknown): ArgumentEvidenceFigure | undefined {
   )
     return undefined;
   return figure;
+}
+
+/** The optional second source of a found entry: exactly url, quote, claim and a boolean `agrees`, the url http(s) and the quote 12 to 200 characters; anything else is dropped (the source then counts as having no second). */
+function readSecond(value: unknown): ArgumentEvidenceSecond | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const keys = Object.keys(raw);
+  if (keys.length !== 4 || !["url", "quote", "claim", "agrees"].every(key => keys.includes(key))) return undefined;
+  const { url, quote, claim, agrees } = raw;
+  if (typeof url !== "string" || typeof quote !== "string" || typeof claim !== "string" || typeof agrees !== "boolean")
+    return undefined;
+  const trimmed = quote.normalize("NFKC").trim();
+  const length = Array.from(trimmed).length;
+  if (length < QUOTE_MIN || length > QUOTE_MAX || !claim.trim()) return undefined;
+  try {
+    const protocol = new URL(url.trim()).protocol;
+    if (protocol !== "http:" && protocol !== "https:") return undefined;
+  } catch {
+    return undefined;
+  }
+  return { url: url.trim(), quote: quote.trim(), claim: claim.trim(), agrees };
 }
 
 /** The note of an entry (what was found, why it was not used), trimmed and cut to 200 characters; undefined when not text. */
@@ -106,6 +128,8 @@ export function parseArgumentEvidence(value: unknown, needIds: readonly string[]
       return refuse("an entry has missing or extra fields");
     const { need, status, stance, claim, quote, url } = item;
     const note = readNote(item.note);
+    if (item.tier !== undefined && !EVIDENCE_TIERS.includes(item.tier as string))
+      return refuse("tier is not an allowed value");
     if (typeof need !== "string" || !allowed.has(need)) return refuse("an entry cites an unknown need");
     if (seen.has(need)) return refuse("a need is answered twice");
     seen.add(need);
@@ -113,7 +137,8 @@ export function parseArgumentEvidence(value: unknown, needIds: readonly string[]
       return refuse("an entry field is not a string");
     if (status === "not_found") {
       // A claimed miss may not smuggle in a source; its claim text (a reason) is dropped.
-      if (quote.trim() || url.trim() || stance !== "uncertain") return refuse("a not_found entry carries a source");
+      if (quote.trim() || url.trim() || stance !== "uncertain" || item.second !== undefined)
+        return refuse("a not_found entry carries a source");
       return { need, status, ...(note ? { note } : {}) };
     }
     if (status !== "found") return refuse("status must be found or not_found");
@@ -131,6 +156,7 @@ export function parseArgumentEvidence(value: unknown, needIds: readonly string[]
     }
     if (protocol !== "http:" && protocol !== "https:") return refuse("a url is not http or https");
     const figure = readFigure(item.figure);
+    const second = readSecond(item.second);
     return {
       need,
       status: "found",
@@ -139,7 +165,9 @@ export function parseArgumentEvidence(value: unknown, needIds: readonly string[]
       quote: quote.trim(),
       url: url.trim(),
       ...(figure ? { figure } : {}),
-      ...(note ? { note } : {})
+      ...(note ? { note } : {}),
+      ...(item.tier !== undefined ? { tier: item.tier as "primary" | "other" } : {}),
+      ...(second ? { second } : {})
     };
   });
 }

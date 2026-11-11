@@ -51,6 +51,10 @@ export type ArgumentEvidenceItem =
       figure?: ArgumentEvidenceFigure;
       /** Optional note from the reply (shown only in the note, never trusted as evidence). */
       note?: string;
+      /** Decision #64: who published the cited page. Absent when the reply omitted it (the caller then treats the source as `other`). */
+      tier?: ArgumentEvidenceTier;
+      /** Decision #64: a second source the reply claims agrees; only shape-checked here, the caller verifies it. */
+      second?: ArgumentEvidenceSecond;
     }
   | {
       need: string;
@@ -58,6 +62,13 @@ export type ArgumentEvidenceItem =
       /** Optional: what was found and why it was not used. */
       note?: string;
     };
+export type ArgumentEvidenceTier = "primary" | "other";
+export interface ArgumentEvidenceSecond {
+  url: string;
+  quote: string;
+  claim: string;
+  agrees: boolean;
+}
 export interface ArgumentEvidenceFigure {
   number: string;
   period: string;

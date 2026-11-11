@@ -570,6 +570,36 @@ const stubResearch = h => {
   return calls;
 };
 
+integrationTest('parity (integration): the topic chat researches never-researched subtopics first in the same way as the map chat, then integrates with the same Quick options', async () => {
+  const h = await harness(); const ran = [], seen = [];
+  h.view.detailTemplateFor = async () => undefined;
+  h.view.runAgent = async (node, done, failed, request, accepted) => { ran.push({ id: node.id, mode: request.researchMode }); done({}); accepted?.(); return { finished: Promise.resolve() }; };
+  h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push({ id: node.id, options }); accepted(); observer.onWritten(); };
+  await h.view.hydrate();
+  for (const n of h.view.notes.values()) n.status = 'idea';
+  const children = h.view.map.nodes.filter(n => n.parentId === h.ids.root).map(n => n.id);
+  const host = h.host('root'); host.setMode('quick');
+  assert.equal(await host.submit('synthesize', 'Integrate'), true);
+  await waitFor(() => seen.length === 1 && !h.entry('root').session.running);
+  assert.deepEqual(plain(ran.map(r => r.id).sort()), plain(children.slice().sort()));
+  assert.equal(ran[0].mode, 'local');
+  const o = seen[0].options; assert.deepEqual(plain([o.researchMode, o.researchDepth, o.visualMode, o.synthesisContent]), ['local', 'normal', 'off', 'full']);
+});
+
+integrationTest('parity (expand, research): the topic chat sends the generator the same request as the map chat (note-led, 2 levels, 15 topics) and researches with the topic\'s own prompt first', async () => {
+  const h = await harness(); const requests = [], tasks = [];
+  await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.', prompt: 'My own research prompt' }); await h.view.hydrate();
+  h.plugin.outlineGeneration = { generate: async request => { requests.push(request); return outlineOf('# Body\n## Light'); } };
+  h.view.detailTemplateFor = async () => undefined;
+  h.view.runAgent = async (node, done, failed, request, accepted) => { tasks.push(request.task); done({}); accepted?.(); return { finished: Promise.resolve() }; };
+  const host = h.host('a');
+  await host.submit('expand', 'split by cause'); await finished(h);
+  const r = requests[0];
+  assert.deepEqual(plain([r.limits, r.fromNote, r.direction, r.topic]), [{ levels: 2, maxTopics: 15 }, true, 'split by cause', 'Body']);
+  host.setMode('quick'); await host.submit('research', 'more'); await finished(h);
+  assert.ok(tasks[0].startsWith('My own research prompt') && tasks[0].endsWith('more'));
+});
+
 integrationTest('topic chat counterexample 7: openTopicChat does not open while notes load, in presentation or on a locked topic', async () => {
   const h = await harness();
   h.view.noteLoad = {}; h.view.openTopicChat(h.node('a')); assert.equal(h.win(), undefined, 'notes loading');
@@ -663,6 +693,7 @@ integrationTest('topic chat integration: a written result reaches the window eve
 
 integrationTest('topic chat counterexample 4: expand makes the subtopics at once - no dialog, no proposal step, one undo step, one sentence with the titles', async () => {
   const h = await harness();
+  await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.' });
   h.view.proposeChildren = () => assert.fail('the guided proposal path is not used'); h.view.openChildSuggestions = () => assert.fail('no review window');
   h.plugin.outlineGeneration = { generate: async () => outlineOf('# Body\n## Light\n## Noise\n## Heat') };
   await h.view.aiModeMemory().rememberAiMode('quick'); // an unchanged mode adds no undo step of its own
@@ -682,6 +713,7 @@ integrationTest('topic chat counterexample 4: expand makes the subtopics at once
 
 integrationTest('topic chat counterexample 5: closing the window does not stop the task; the result lands in the conversation and a Notice tells it; reopening shows it', async () => {
   const h = await harness(); const gate = deferred(); let signal;
+  await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.' });
   h.plugin.outlineGeneration = { generate: async (_r, s) => { signal = s; await gate.promise; return outlineOf('# Body\n## Light'); } };
   const host = h.host('a');
   await host.submit('expand', 'x');
@@ -783,6 +815,7 @@ test('topic chat record format: path whitelist, cut last line, broken lines, unk
 
 integrationTest('topic chat counterexample 5 (reload): the conversation is saved and comes back after the sessions are gone', async () => {
   const h = await harness(); h.view.plugin.settings.mapChatRecords = false; // saved whatever the sidebar switch says
+  await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.' });
   h.plugin.outlineGeneration = { generate: async () => outlineOf('# Body\n## Light') };
   const host = h.host('a'); await host.submit('expand', 'split by cause'); await finished(h);
   const lines = await topicLines(h, 'a');
@@ -1656,6 +1689,7 @@ integrationTest('topic chat steer: an addition typed while the subtopics are res
 
 integrationTest('topic chat steer: research and expand hand the steer on; a synthesis without researching first passes the same one', async () => {
   const h = await harness(); const entry0 = () => h.entry('a'); const got = {};
+  await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.' });
   h.view.runAgent = async (node, done, failed, request, accepted, runOnce, steer) => { got.research = steer; accepted?.(); done({ summary: 'S', detail: 'D' }); return { finished: Promise.resolve() }; };
   h.view.detailTemplateFor = async () => undefined;
   h.plugin.outlineGeneration = { generate: async (_r, _s, steer) => { got.expand = steer; return outlineOf('# Body\n## Light'); } };

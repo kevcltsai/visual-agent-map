@@ -921,6 +921,7 @@ integrationTest('map chat: research on named topics selects exactly those first'
 
 integrationTest('map chat: expand is the multi-level outline expansion (2 levels, at most 15 topics), every topic is added without a review window, the new topics are Quick (research-mode local), and a nested mutate inside it does not deadlock', async () => {
   const h = await harness(); await h.view.hydrate();
+  await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.' });
   const outline = ['# Body', ...Array.from({ length: 10 }, (_, i) => `## Part ${i}\n### Detail ${i}\n#### Too deep ${i}`)].join('\n');
   const requests = [];
   const modalsBefore = (h.control.modals ?? []).length;
@@ -930,7 +931,7 @@ integrationTest('map chat: expand is the multi-level outline expansion (2 levels
   const lines = await withTimeout(apply(h, [{ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a], title: '', goal: '', direction: 'sleep hygiene' }]));
   eq(lines.map(l => l.status), ['done']);
   await withTimeout(until(() => h.plugin.running.size === 0 && requests.length === 1 && h.plugin.activeTasks.size === 0), 4000);
-  eq(requests.map(r => [r.request.limits, r.request.topic, r.request.presetText.endsWith('\n\nsleep hygiene'), r.aborted]), [[{ levels: 2, maxTopics: 15 }, 'Body', true, false]]);
+  eq(requests.map(r => [r.request.limits, r.request.topic, r.request.fromNote === true && r.request.direction === 'sleep hygiene', r.aborted]), [[{ levels: 2, maxTopics: 15 }, 'Body', true, false]]);
   const created = (await h.saved()).filter(n => ![h.ids.root, h.ids.a, h.ids.b, h.ids.c].includes(n.id));
   assert.equal(before + created.length, (await h.saved()).length);
   assert.equal(created.length, 15, 'the outline has 30 headings: the first 2 levels are 20 topics, kept up to the 15-topic limit');
@@ -956,6 +957,7 @@ integrationTest('map chat: a chat-started expand sends the card\'s note and its 
 
 integrationTest('map chat: expand with an outline that has nothing below the root writes nothing and says so; Stop before the answer writes nothing', async () => {
   const h = await harness(); await h.view.hydrate();
+  await h.repo.updateNote(h.node('a').path, { detail: 'Notes about Body.' });
   h.plugin.outlineGeneration = { generate: async () => ({ markdown: '# Body', nodes: outlineApi.parseOutline('# Body').nodes }) };
   const before = (await h.saved()).length;
   await apply(h, [{ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a], title: '', goal: '', direction: '' }]);
@@ -4026,6 +4028,7 @@ integrationTest('B2 merge: a merge still locked by an AI merge is skipped with t
 });
 integrationTest('B2 synthesize: the plan card keeps the user\'s message as the integration direction', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.view.detailTemplateFor = async () => undefined; h.view.runAgent = async (_n, done, _f, _r, accepted) => { done({}); accepted?.(); return { finished: Promise.resolve() }; };
   const calls = []; h.view.startSynthesis = async (node, options, direction, failed, accepted) => { calls.push({ id: node.id, direction, options }); accepted(); };
   h.control.reply = async () => ({ reply: 'plan', actions: [...Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), { kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a], title: '', goal: '', direction: 'ignored model words', mode: '', images: false }], rejected: [] });
   h.type('Integrate Body around sleep debt'); await h.view.sendMapChat();
@@ -4034,6 +4037,28 @@ integrationTest('B2 synthesize: the plan card keeps the user\'s message as the i
   planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
   assert.equal(calls.length, 1); assert.equal(calls[0].id, h.ids.a); assert.equal(calls[0].direction, 'Integrate Body around sleep debt', 'the message, not the model\'s direction');
   const o = calls[0].options; eq([o.researchMode, o.visualMode, o.synthesisContent, 'depth' in o && o.depth !== undefined], ['local', 'off', 'full', false], 'an integration from the chat is always Quick (D-2026-10-229)');
+});
+
+integrationTest('parity (integration): a chat integration researches the never-researched subtopics first with the topic chat\'s own research, then integrates with the same options', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const ran = [], calls = [];
+  h.view.detailTemplateFor = async () => undefined;
+  h.view.runAgent = async (node, done, failed, request, accepted) => { ran.push({ id: node.id, task: request.task, mode: request.researchMode }); done({}); accepted?.(); return { finished: Promise.resolve() }; };
+  h.view.startSynthesis = async (node, options, direction, failed, accepted) => { calls.push({ id: node.id, options, direction }); accepted(); };
+  h.view.notes.get(h.ids.c).status = 'idea';
+  const lines = await apply(h, [{ kind: 'run_map_action', action: 'synthesize', nodeIds: [h.ids.a], title: '', goal: '', direction: 'Integrate', mode: '', images: false }]);
+  assert.deepEqual(ran.map(r => r.id), [h.ids.c], 'the idea subtopic is researched first, as the topic chat does');
+  assert.equal(ran[0].mode, 'local', 'Quick: a chat integration never searches the web');
+  assert.equal(calls.length, 1); assert.equal(calls[0].id, h.ids.a);
+  const o = calls[0].options; eq([o.researchMode, o.researchDepth, o.visualMode, o.synthesisContent], ['local', 'normal', 'off', 'full']);
+  assert.equal(lines[0].status !== 'failed', true);
+});
+integrationTest('parity (research task): both entries build the task with the topic\'s own prompt first', async () => {
+  const { topicResearchTask } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, MarkdownView: class {} } });
+  const own = topicResearchTask({ title: 'T', prompt: 'My own prompt' }, 'en', 'extra');
+  assert.ok(own.startsWith('My own prompt') && own.endsWith('extra'));
+  const plain0 = topicResearchTask({ title: 'T' }, 'en');
+  assert.ok(plain0.length > 0 && !plain0.includes('My own prompt'));
 });
 
 // ---- B3-feat: find_images (automatic placement, lifecycle) and "save as a note" ----------------------------------------
@@ -7664,6 +7689,7 @@ integrationTest('R3 M6: a round that starts an integration ends the chain when m
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat);
   h.view.startSynthesis = async (_node, _options, _direction, _failed, accepted) => { accepted(); };
   await h.repo.updateNote(h.node('a').path, { detail: 'x' }); await h.view.hydrate();
+  for (const n of h.view.notes.values()) n.status = 'completed';
   chainReplies(h, say('Integrating Body.', [ms03Act('synthesize', [h.ids.a])], 'Then rate the cards'));
   h.type('integrate and go on'); await h.view.sendMapChat(); await chainEnded(spy);
   eq(spy.reasons(), ['other_background_work']); assert.equal(h.control.requests.length, 1, 'no second round'); assert.equal(h.view.chatChain, null);

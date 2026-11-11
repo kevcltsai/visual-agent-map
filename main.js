@@ -55131,6 +55131,9 @@ function chatSynthesisOptions(input2) {
     ...input2.synthesisTitle !== void 0 ? { synthesisTitle: input2.synthesisTitle } : {}
   };
 }
+function topicResearchTask(note, language2, extra) {
+  return [note.prompt || researchTopicTask(language2, note.title), extra].filter(Boolean).join("\n\n");
+}
 var newChatWork = () => ({
   controller: new AbortController(),
   research: [],
@@ -68427,7 +68430,7 @@ ${request.requirements}` : preset.text,
     }
   }
   async runTopicChatBody(entry, node, note, kind, mode, text10, controller, steers, userTurn) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f;
     const mapId = entry.mapId;
     const live2 = () => {
       var _a3;
@@ -68492,21 +68495,11 @@ ${request.requirements}` : preset.text,
         return;
       }
       const children = (_d = (_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === node.id).length) != null ? _d : 0;
-      const toResearch = ((_f = (_e = this.map) == null ? void 0 : _e.nodes) != null ? _f : []).filter((item) => {
-        var _a3;
-        if (item.parentId !== node.id) return false;
-        const status = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.status;
-        return (status === "idea" || status === "error") && !this.topicChatBusy(item);
-      });
+      const toResearch = this.unresearchedChildren(node);
       let researchedFirst = 0;
       if (toResearch.length) {
         steers.live(false);
-        for (const child of toResearch) {
-          if (controller.signal.aborted || !live2()) break;
-          const childNote = await this.plugin.repo.readNote(child.path, (_g = this.map) != null ? _g : void 0);
-          const done = await this.runTopicChatResearch(child, childNote, mode, language2, "", controller.signal);
-          if (done.result) researchedFirst++;
-        }
+        researchedFirst = await this.researchChildrenFirst(toResearch, mode, language2, controller.signal, live2);
         if (controller.signal.aborted) {
           endHooks();
           this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live2, false, "stopped");
@@ -68530,8 +68523,8 @@ ${request.requirements}` : preset.text,
         const early = steers.takeQueued();
         steers.live(true);
         if (early.length) {
-          (_h = entry.steerFolded) == null ? void 0 : _h.push(...early);
-          this.syncTopicSteerTurn(userTurn, (_i = entry.steerFolded) != null ? _i : [], steers);
+          (_e = entry.steerFolded) == null ? void 0 : _e.push(...early);
+          this.syncTopicSteerTurn(userTurn, (_f = entry.steerFolded) != null ? _f : [], steers);
           this.notifyTopicChat(entry);
           direction = [text10, ...early].join("\n\n");
         }
@@ -68592,6 +68585,31 @@ ${request.requirements}` : preset.text,
       );
     }
   }
+  /** The direct subtopics of a card that were never researched (idea or error) and are free to run: an integration researches them first. */
+  unresearchedChildren(node) {
+    var _a2, _b2;
+    return ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []).filter((item) => {
+      var _a3;
+      if (item.parentId !== node.id) return false;
+      const status = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.status;
+      return (status === "idea" || status === "error") && !this.topicChatBusy(item);
+    });
+  }
+  /**
+   * Researches those subtopics one after another, each as the topic chat's Research does, in `mode`; returns how many came out.
+   * Every integration entry (the topic chat's button and free question, the map chat) runs this before it integrates.
+   */
+  async researchChildrenFirst(children, mode, language2, signal, live2 = () => !this.closed) {
+    var _a2;
+    let researched = 0;
+    for (const child of children) {
+      if (signal.aborted || !live2()) break;
+      const childNote = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
+      const done = await this.runTopicChatResearch(child, childNote, mode, language2, "", signal);
+      if (done.result) researched++;
+    }
+    return researched;
+  }
   /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
   async runTopicChatResearch(node, note, mode, language2, text10, signal, accepted, launched, steer) {
     let result;
@@ -68608,7 +68626,7 @@ ${request.requirements}` : preset.text,
       },
       {
         runStyle,
-        task: [researchTopicTask(language2, note.title), text10].filter(Boolean).join("\n\n"),
+        task: topicResearchTask(note, language2, text10),
         referenceGroups,
         signal,
         outputLanguage: language2,
@@ -68823,6 +68841,16 @@ ${request.requirements}` : preset.text,
         else if (outcome.status === "failed") reason = outcome.reason;
       } else if (action.action === "synthesize") {
         let written2 = false;
+        const bare = this.unresearchedChildren(target);
+        if (bare.length) {
+          const researched = await this.researchChildrenFirst(bare, mode, language2, signal);
+          if (signal.aborted) break;
+          if (!researched) {
+            reason = t("ui.topic_chat_failed_children");
+            continue;
+          }
+          await this.hydrate();
+        }
         await this.startSynthesis(
           target,
           {
@@ -71306,7 +71334,7 @@ ${request.requirements}` : preset.text,
         visualMode: choices.visualMode,
         mapAiMode: choices.mapAiMode,
         addCharts: charts,
-        task: [note.prompt || researchTopicTask(outputLanguage2, note.title), choices.requirements].filter(Boolean).join("\n\n")
+        task: topicResearchTask(note, outputLanguage2, choices.requirements)
       },
       () => {
         started = true;
@@ -76630,7 +76658,7 @@ ${note.detail.trim()}` : "",
         return { status: "done", ...allBasis ? { basis: allBasis } : {} };
       }
       case "synthesize":
-        return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message);
+        return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message, work == null ? void 0 : work.controller.signal);
       case "rate_by_goal": {
         const goal = action.goal.trim();
         if (!goal || !this.relevanceGradeable()) return skipped("ui.map_chat_skip_unavailable");
@@ -77225,7 +77253,7 @@ ${addition}` : addition },
    * the selection integration does (`startSelectionSynthesis`). Resolves when the provider has accepted the request (started),
    * or the start failed or was skipped; what happens after that is the task's own (badge, status bar, Notice, undo notice).
    */
-  async chatSynthesize(ids2, message) {
+  async chatSynthesize(ids2, message, signal) {
     var _a2;
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
@@ -77249,10 +77277,18 @@ ${addition}` : addition },
           map.title
         )
       });
-      return this.launchChatTask(
-        note.model,
-        (failed, accepted) => this.startSynthesis(node, options2, message, failed, accepted)
-      );
+      return this.launchChatTask(note.model, async (failed, accepted) => {
+        var _a3;
+        const bare = this.unresearchedChildren(node);
+        if (bare.length) {
+          const stop = signal != null ? signal : new AbortController().signal;
+          const researched = await this.researchChildrenFirst(bare, "quick", (_a3 = options2.outputLanguage) != null ? _a3 : settings.language, stop);
+          if (stop.aborted) return failed(t("ui.topic_chat_stopped"));
+          if (!researched) return failed(t("ui.topic_chat_failed_children"));
+          await this.hydrate();
+        }
+        return this.startSynthesis(node, options2, message, failed, accepted);
+      });
     }
     const waiting = ((_a2 = this.integrationTask) == null ? void 0 : _a2.mapPath) === this.path ? this.integrationTask : null;
     if (this.selectionStarting || waiting && waiting.state !== "failed" && waiting.state !== "cancelled")
@@ -86785,7 +86821,7 @@ var OutlineGenerationService = class {
       } catch (error) {
         if (signal.aborted && !(error instanceof OutlineGenerateError)) throw stopped();
         if (error instanceof OutlineGenerateError && error.code === "stopped") throw stopped();
-        if (!signal.aborted && attempt < 2 && error instanceof OutlineGenerateError && (error.code === "missing_summary" || error.code === "non_heading" || error.code === "invalid"))
+        if (!signal.aborted && attempt < 2 && error instanceof OutlineGenerateError && (error.code === "missing_summary" || error.code === "non_heading"))
           continue;
         throw error;
       }

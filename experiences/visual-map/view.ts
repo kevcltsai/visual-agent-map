@@ -1002,6 +1002,17 @@ export function chatSynthesisOptions(input: { outputLanguage: ContentLanguage; s
     ...(input.synthesisTitle !== undefined ? { synthesisTitle: input.synthesisTitle } : {})
   };
 }
+/**
+ * The task text of one topic's research, the same wherever the research starts (the map chat's batch and the topic chat): the
+ * topic's own research prompt when it has one, else the default, then what the user added for this run.
+ */
+export function topicResearchTask(
+  note: { prompt?: string; title: string },
+  language: ContentLanguage,
+  extra?: string
+): string {
+  return [note.prompt || researchTopicTask(language, note.title), extra].filter(Boolean).join("\n\n");
+}
 /** Web activity of the topics a research batch finished: searches made, topics that reported it, and those that made none. */
 interface ResearchWebTally {
   searches: number;
@@ -15684,22 +15695,13 @@ export class VisualAgentMapView extends ItemView {
       }
       // synthesize: subtopics that were never researched are researched first (same mode), then everything is integrated.
       const children = this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0;
-      const toResearch = (this.map?.nodes ?? []).filter(item => {
-        if (item.parentId !== node.id) return false;
-        const status = this.notes.get(item.id)?.status;
-        return (status === "idea" || status === "error") && !this.topicChatBusy(item);
-      });
+      const toResearch = this.unresearchedChildren(node);
       let researchedFirst = 0;
       if (toResearch.length) {
         // The subtopic researches take no additions (they are not this request): what is typed meanwhile waits, and goes
         // into the integration's text below, once.
         steers.live(false);
-        for (const child of toResearch) {
-          if (controller.signal.aborted || !live()) break;
-          const childNote = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
-          const done = await this.runTopicChatResearch(child, childNote, mode, language, "", controller.signal);
-          if (done.result) researchedFirst++;
-        }
+        researchedFirst = await this.researchChildrenFirst(toResearch, mode, language, controller.signal, live);
         if (controller.signal.aborted) {
           endHooks();
           this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped");
@@ -15786,6 +15788,34 @@ export class VisualAgentMapView extends ItemView {
       );
     }
   }
+  /** The direct subtopics of a card that were never researched (idea or error) and are free to run: an integration researches them first. */
+  private unresearchedChildren(node: MapNode): MapNode[] {
+    return (this.map?.nodes ?? []).filter(item => {
+      if (item.parentId !== node.id) return false;
+      const status = this.notes.get(item.id)?.status;
+      return (status === "idea" || status === "error") && !this.topicChatBusy(item);
+    });
+  }
+  /**
+   * Researches those subtopics one after another, each as the topic chat's Research does, in `mode`; returns how many came out.
+   * Every integration entry (the topic chat's button and free question, the map chat) runs this before it integrates.
+   */
+  private async researchChildrenFirst(
+    children: MapNode[],
+    mode: TopicChatMode,
+    language: ContentLanguage,
+    signal: AbortSignal,
+    live: () => boolean = () => !this.closed
+  ): Promise<number> {
+    let researched = 0;
+    for (const child of children) {
+      if (signal.aborted || !live()) break;
+      const childNote = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
+      const done = await this.runTopicChatResearch(child, childNote, mode, language, "", signal);
+      if (done.result) researched++;
+    }
+    return researched;
+  }
   /** One research run for the topic chat (own task, no selection and no side-panel state); resolves when it has ended. */
   private async runTopicChatResearch(
     node: MapNode,
@@ -15814,7 +15844,7 @@ export class VisualAgentMapView extends ItemView {
       },
       {
         runStyle,
-        task: [researchTopicTask(language, note.title), text].filter(Boolean).join("\n\n"),
+        task: topicResearchTask(note, language, text),
         referenceGroups,
         signal,
         outputLanguage: language,
@@ -16056,6 +16086,16 @@ export class VisualAgentMapView extends ItemView {
         else if (outcome.status === "failed") reason = outcome.reason;
       } else if (action.action === "synthesize") {
         let written = false;
+        const bare = this.unresearchedChildren(target);
+        if (bare.length) {
+          const researched = await this.researchChildrenFirst(bare, mode, language, signal);
+          if (signal.aborted) break;
+          if (!researched) {
+            reason = t("ui.topic_chat_failed_children");
+            continue;
+          }
+          await this.hydrate();
+        }
         await this.startSynthesis(
           target,
           {
@@ -18722,9 +18762,7 @@ export class VisualAgentMapView extends ItemView {
         visualMode: choices.visualMode,
         mapAiMode: choices.mapAiMode,
         addCharts: charts,
-        task: [note.prompt || researchTopicTask(outputLanguage, note.title), choices.requirements]
-          .filter(Boolean)
-          .join("\n\n")
+        task: topicResearchTask(note, outputLanguage, choices.requirements)
       },
       () => {
         started = true;
@@ -24646,7 +24684,7 @@ export class VisualAgentMapView extends ItemView {
         return { status: "done", ...(allBasis ? { basis: allBasis } : {}) };
       }
       case "synthesize":
-        return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message);
+        return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message, work?.controller.signal);
       case "rate_by_goal": {
         const goal = action.goal.trim();
         if (!goal || !this.relevanceGradeable()) return skipped("ui.map_chat_skip_unavailable");
@@ -25315,7 +25353,7 @@ export class VisualAgentMapView extends ItemView {
    * the selection integration does (`startSelectionSynthesis`). Resolves when the provider has accepted the request (started),
    * or the start failed or was skipped; what happens after that is the task's own (badge, status bar, Notice, undo notice).
    */
-  private async chatSynthesize(ids: string[], message: string): Promise<ChatOutcome> {
+  private async chatSynthesize(ids: string[], message: string, signal?: AbortSignal): Promise<ChatOutcome> {
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
     const nodes = ids
@@ -25346,9 +25384,18 @@ export class VisualAgentMapView extends ItemView {
           map.title
         )
       });
-      return this.launchChatTask(note.model, (failed, accepted) =>
-        this.startSynthesis(node, options, message, failed, accepted)
-      );
+      return this.launchChatTask(note.model, async (failed, accepted) => {
+        // As the topic chat does: subtopics never researched are researched first (Quick: the chat integration never searches the web).
+        const bare = this.unresearchedChildren(node);
+        if (bare.length) {
+          const stop = signal ?? new AbortController().signal;
+          const researched = await this.researchChildrenFirst(bare, "quick", options.outputLanguage ?? settings.language, stop);
+          if (stop.aborted) return failed(t("ui.topic_chat_stopped"));
+          if (!researched) return failed(t("ui.topic_chat_failed_children"));
+          await this.hydrate();
+        }
+        return this.startSynthesis(node, options, message, failed, accepted);
+      });
     }
     const waiting = this.integrationTask?.mapPath === this.path ? this.integrationTask : null;
     if (this.selectionStarting || (waiting && waiting.state !== "failed" && waiting.state !== "cancelled"))

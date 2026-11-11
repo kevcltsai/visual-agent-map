@@ -22,9 +22,19 @@ export const MAX_SITUATION_NEEDS = 15;
 export const MAX_RETRY_NEEDS = 9;
 export const MAX_SITUATION_RESEARCH = 24;
 
-export const ROLE_KEYS = ["proposition", "situation", "conclusion", "verified", "eliminated"] as const;
+/** The three role nodes every map has; the group nodes are optional (a fact map has none, a causal map has all three, a map made before question types has the first two). */
+export const REQUIRED_ROLE_KEYS = ["proposition", "situation", "conclusion"] as const;
+export const GROUP_ROLE_KEYS = ["verified", "eliminated", "unconfirmed"] as const;
+export const ROLE_KEYS = [...REQUIRED_ROLE_KEYS, ...GROUP_ROLE_KEYS] as const;
 export type RoleKey = (typeof ROLE_KEYS)[number];
-export type ArgumentRoles = Record<RoleKey, string>;
+export type ArgumentRoles = Record<(typeof REQUIRED_ROLE_KEYS)[number], string> &
+  Partial<Record<(typeof GROUP_ROLE_KEYS)[number], string>>;
+/** Decision #60: a fact question is concluded from its facets by the program; a causal question goes on to hypotheses. */
+export const QUESTION_TYPES = ["fact", "causal"] as const;
+export type QuestionType = (typeof QUESTION_TYPES)[number];
+/** Source tier (decision #64): `primary` = official/government/international body, large news organisation or academic work; `other` needs a second independent source. */
+export const SOURCE_TIERS = ["primary", "other"] as const;
+export type SourceTier = (typeof SOURCE_TIERS)[number];
 
 export const RUN_PHASES = ["situation", "analysis", "concluded", "stopped_mismatch", "stopped_limit"] as const;
 export type RunPhase = (typeof RUN_PHASES)[number];
@@ -95,7 +105,20 @@ export interface SourceProof {
   check: ProofCheck;
   checkedAt: string;
   figure?: SourceFigure;
+  /** Decision #64. Absent on every older proof. */
+  tier?: SourceTier;
+  /** A second, independent source that agrees and passed the same source check. Stored only then. */
+  second?: SecondSource;
 }
+export interface SecondSource {
+  url: string;
+  quote: string;
+  check: ProofCheck;
+  checkedAt: string;
+}
+/** An `other`-tier source with no verified second source: its data cannot alone carry a facet's supports or refutes (decision #64). Older proofs (no tier) are not uncertain. */
+export const isUncertainSource = (proof: { tier?: SourceTier; second?: unknown } | undefined): boolean =>
+  proof?.tier === "other" && !proof.second;
 export interface SituationDatum {
   id: string;
   need: string;
@@ -146,6 +169,8 @@ export interface Need {
   reason?: string;
   /** On a need added in a later round: the id of a `not_found` need of the same hypothesis it stands in for. The dead need itself is never rewritten. */
   replaces?: string;
+  /** Decision #62: the one need whose finding decides the hypothesis (exactly one per hypothesis in the first round; a later round may replace a dead one). */
+  core?: true;
   searchLog?: SearchLog;
 }
 export interface Hypothesis {
@@ -173,6 +198,8 @@ export interface ArgumentRun {
   researchCalls: number;
   /** A re-run: the definitions the owner kept. Saved here so a run paused before the facet plan still uses them on resume. */
   presetAssumptions?: AssumptionItem[];
+  /** A re-run: the question type the owner kept on the definitions card; it wins over the AI's. */
+  presetQuestionType?: QuestionType;
 }
 export interface ArgumentConclusion {
   state: ConclusionState;
@@ -195,6 +222,8 @@ export interface ArgumentMapData {
     causalQuestions?: string[];
     /** Facet-judged maps: the question the situation card is titled with. */
     question?: string;
+    /** Decision #60. Absent on a map made before question types: with facets it is a legacy facet map (see isLegacyFacetMap). */
+    questionType?: QuestionType;
   };
   hypotheses: Hypothesis[];
   conclusion: ArgumentConclusion;
@@ -233,6 +262,17 @@ function badFigure(value: unknown): boolean {
   return !isStr(value.number) || !isStr(value.period) || !isStr(value.unit);
 }
 
+function badSecond(value: unknown): boolean {
+  if (value === undefined) return false;
+  return (
+    !isRec(value) ||
+    !isStr(value.url) ||
+    !isStr(value.quote) ||
+    !oneOf(PROOF_CHECKS, value.check) ||
+    !isStr(value.checkedAt)
+  );
+}
+
 function badProof(value: unknown): boolean {
   if (value === undefined) return false;
   return (
@@ -242,7 +282,9 @@ function badProof(value: unknown): boolean {
     !isStr(value.claim) ||
     !oneOf(PROOF_CHECKS, value.check) ||
     !isStr(value.checkedAt) ||
-    badFigure(value.figure)
+    badFigure(value.figure) ||
+    !optOneOf(SOURCE_TIERS, value.tier) ||
+    badSecond(value.second)
   );
 }
 
@@ -290,9 +332,15 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
   if (!isRec(raw)) return "not an object";
   if (raw.v !== ARGUMENT_MAP_VERSION) return "unsupported version";
   if (!isRec(raw.roles)) return "roles missing";
-  for (const key of ROLE_KEYS) {
+  for (const key of REQUIRED_ROLE_KEYS) {
     const id = raw.roles[key];
     if (!isStr(id)) return `role ${key} missing`;
+    if (!nodeIds.has(id)) return `role ${key} points to a missing node`;
+  }
+  for (const key of GROUP_ROLE_KEYS) {
+    const id = raw.roles[key];
+    if (id === undefined) continue;
+    if (!isStr(id)) return `role ${key} malformed`;
     if (!nodeIds.has(id)) return `role ${key} points to a missing node`;
   }
   const run = raw.run;
@@ -307,10 +355,12 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
     )
       return "run malformed";
   }
+  if (!optOneOf(QUESTION_TYPES, run.presetQuestionType)) return "unknown run enum";
   if (!oneOf(RUN_PHASES, run.phase) || !oneOf(RUN_STATUSES, run.status) || !optOneOf(STOP_REASONS, run.stopReason))
     return "unknown run enum";
   const situation = raw.situation;
   if (!isRec(situation) || !Array.isArray(situation.data) || !isRec(situation.gate)) return "situation malformed";
+  if (!optOneOf(QUESTION_TYPES, situation.questionType)) return "unknown situation enum";
   const ids = new Set<string>();
   const facetProblem = readFacets(situation, ids);
   if (facetProblem) return facetProblem;
@@ -355,6 +405,7 @@ function problem(raw: unknown, nodeIds: ReadonlySet<string>): string | null {
       if (!oneOf(ITEM_STATES, need.state) || !optOneOf(NEED_STANCES, need.stance)) return "unknown need enum";
       if (badProof(need.proof) || !optStr(need.reason) || badSearchLog(need.searchLog)) return "need malformed";
       if (need.replaces !== undefined && !isStr(need.replaces)) return "need malformed";
+      if (need.core !== undefined && need.core !== true) return "need malformed";
     }
     const replaced = new Set<string>();
     for (const need of hypothesis.needs as Rec[]) {
@@ -422,25 +473,46 @@ export function foundNeeds(h: Hypothesis): Need[] {
 }
 /** A miss caused by the source (the URL or the quote failed to check): the question stays open, so another source may answer it. Any other miss says the evidence is not there, and no later need may stand in for it. */
 export const isSourceSideMiss = (need: { reason?: string }): boolean => (need.reason ?? "").startsWith("source_");
-/** Ids of dead needs that a later need of the same hypothesis stands in for. Re-checked here (not trusted from the field alone): only a `not_found` need whose miss was source-side can be retired, and only by a need of a later round. A "nothing found", unanswered, uncertain or failed need keeps blocking verification. */
+/** Ids of dead needs that a later need of the same hypothesis stands in for. Re-checked here (not trusted from the field alone): only a `not_found` need can be retired, only by a need of a later round, and only when the miss was source-side or the dead need was the core (decision #62: a core nobody found, for any reason, may be replaced). A "nothing found", unanswered, uncertain or failed supplementary need keeps blocking old-rule verification. */
 export function retiredNeedIds(h: Hypothesis): Set<string> {
   const retired = new Set<string>();
   for (const need of h.needs) {
     if (need.replaces === undefined) continue;
     const dead = h.needs.find(other => other.id === need.replaces);
-    if (dead && dead.state === "not_found" && isSourceSideMiss(dead) && need.addedRound > dead.addedRound)
+    if (
+      dead &&
+      dead.state === "not_found" &&
+      (isSourceSideMiss(dead) || dead.core === true) &&
+      need.addedRound > dead.addedRound
+    )
       retired.add(dead.id);
   }
   return retired;
+}
+/** The core need that still counts (decision #62): the last core need not replaced by a later one. Absent on a hypothesis without a core (a map made before cores, or a V1 map). */
+export function liveCore(h: Hypothesis): Need | undefined {
+  const retired = retiredNeedIds(h);
+  return [...h.needs].reverse().find(need => need.core === true && !retired.has(need.id));
 }
 export function allNeedsFound(h: Hypothesis): boolean {
   const retired = retiredNeedIds(h);
   const live = h.needs.filter(need => !retired.has(need.id));
   return live.length > 0 && live.every(need => need.state === "found");
 }
-/** "Verified" is never stored: needs listed and all found, still in the verifying group, and the effective verdict is supported. */
+/** Core rule (decision #62): the core is found and its stance supports the hypothesis, and the live found needs that support outnumber those that contradict. An uncertain stance counts for neither side. Stances are program data, checked here. */
+export function coreEvidenceHolds(h: Hypothesis): boolean {
+  const core = liveCore(h);
+  if (!core || core.state !== "found" || core.stance !== "supports") return false;
+  const retired = retiredNeedIds(h);
+  const stances = foundNeeds(h)
+    .filter(n => !retired.has(n.id))
+    .map(n => n.stance);
+  return stances.filter(s => s === "supports").length > stances.filter(s => s === "contradicts").length;
+}
+/** "Verified" is never stored. With a live core: the core rule above, still in the verifying group, effective verdict supported (supplementary needs that were not found do not block). Without a core: needs listed and all found, verifying, effective verdict supported (the rule of maps made before cores). */
 export function isVerified(h: Hypothesis): boolean {
-  return allNeedsFound(h) && h.location === "verifying" && effectiveVerdict(h) === "supported";
+  if (h.location !== "verifying" || effectiveVerdict(h) !== "supported") return false;
+  return liveCore(h) ? coreEvidenceHolds(h) : allNeedsFound(h);
 }
 /**
  * Evidence gate (decision #59, B3): a hypothesis is supported only if its found evidence leans clearly toward it. Supports must outnumber
@@ -467,21 +539,49 @@ export function verifiedHypotheses(state: ArgumentMapData): Hypothesis[] {
 export function verifiedCount(state: ArgumentMapData): number {
   return verifiedHypotheses(state).length;
 }
-/** What a hypothesis card shows: any unfound need means "verifying", whatever the stored verdicts say. */
+/** What a hypothesis card shows: any unfound need means "verifying" (with a core: until the needs are settled and the core is found), whatever the stored verdicts say. */
 export function displayVerdict(h: Hypothesis): Verdict | "verifying" {
+  const core = liveCore(h);
+  if (core)
+    return core.state === "found" && h.needs.every(n => n.state === "found" || n.state === "not_found")
+      ? effectiveVerdict(h)
+      : "verifying";
   return allNeedsFound(h) ? effectiveVerdict(h) : "verifying";
 }
+export const HYPOTHESIS_STATUSES = ["verified", "unconfirmed", "eliminated"] as const;
+export type HypothesisStatus = (typeof HYPOTHESIS_STATUSES)[number];
+/** Where a hypothesis stands for the conclusion (decision #63): verified; refuted and eliminated; or evidence-in-hand but not confirmed (cut by a limit, or still short when the run ended). */
+export const hypothesisStatus = (h: Hypothesis): HypothesisStatus =>
+  isVerified(h) ? "verified" : h.location === "eliminated" && !isLimitCut(h) ? "eliminated" : "unconfirmed";
 /** A conclusion written from fewer verified hypotheses than the target (decision #59). */
 export const isPartialConclusion = (state: ArgumentMapData): boolean =>
   state.run.phase === "concluded" && state.conclusion.partial === true && verifiedCount(state) < MIN_VERIFIED;
 /** The situation gate ended data_insufficient and the run went on (decision #58). */
 export const isSituationUnconfirmed = (state: ArgumentMapData): boolean => state.situation.gate.state === "unconfirmed";
+/** A facet map made before question types (0.34.0): facets, no questionType. A finished one reads as before; an unfinished one is never resumed (decision #66). */
+export const isLegacyFacetMap = (state: ArgumentMapData): boolean =>
+  state.situation.facets !== undefined && state.situation.questionType === undefined;
+export const isFactMap = (state: ArgumentMapData): boolean => state.situation.questionType === "fact";
+export const FACET_COMPOSITES = ["holds", "fails", "partial", "insufficient"] as const;
+export type FacetComposite = (typeof FACET_COMPOSITES)[number];
+/** What the facets say together (decision #60). Supports and no refutation holds; refutation and no support fails; both is partial; neither (all insufficient or still pending) is insufficient. `insufficientCount` is shown next to the result. */
+export function composeFacets(facets: readonly { verdict: FacetVerdict }[]): {
+  outcome: FacetComposite;
+  insufficientCount: number;
+} {
+  const supports = facets.some(f => f.verdict === "supports");
+  const refutes = facets.some(f => f.verdict === "refutes");
+  const insufficientCount = facets.filter(f => f.verdict === "insufficient").length;
+  const outcome = supports && refutes ? "partial" : supports ? "holds" : refutes ? "fails" : "insufficient";
+  return { outcome, insufficientCount };
+}
 export type ConclusionView = "in_progress" | "concluded" | "stopped_limit" | "stopped_mismatch";
 /** The four conclusion card states, derived from the run and the verified count. A concluded map falls back to in_progress when support is lost. */
 export function conclusionView(state: ArgumentMapData): ConclusionView {
   const { phase } = state.run;
   if (phase === "stopped_mismatch") return "stopped_mismatch";
   if (phase === "stopped_limit") return "stopped_limit";
+  if (isFactMap(state)) return phase === "concluded" ? "concluded" : "in_progress";
   if (
     phase === "concluded" &&
     (verifiedCount(state) >= MIN_VERIFIED || (state.conclusion.partial === true && verifiedCount(state) >= 1))

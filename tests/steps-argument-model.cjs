@@ -50,7 +50,7 @@ const corrupt = {
   'unknown stance': s => { s.situation.data.push({ id: 'd1', need: 'x', attempts: 0, state: 'found', stance: 'shrug' }); },
   'unknown proof check': s => { s.situation.data.push({ id: 'd1', need: 'x', attempts: 1, state: 'found', stance: 'supports', proof: { url: 'https://a.b', quote: 'q', claim: 'c', check: 'vibes', checkedAt: 't' } }); },
   'role points to a missing node': s => { s.roles.conclusion = 'ghost'; },
-  'role missing': s => { delete s.roles.eliminated; },
+  'role missing': s => { delete s.roles.conclusion; },
   'duplicate id': s => { s.hypotheses.push({ id: 'h', citedData: [], round: 1, location: 'verifying', needs: [] }, { id: 'h', citedData: [], round: 1, location: 'verifying', needs: [] }); },
   'negative counter': s => { s.run.researchCalls = -1; },
   'not an object': (s, doc) => { doc.argumentMap = 'oops'; },
@@ -133,7 +133,8 @@ test('dead need reader: a valid replaces is usable and round-trips; forgeries ma
 const facetPlan = () => ({
   assumptions: { id: 'as1', items: [{ label: 'Age', value: '16-24 in 2024', reason: 'young people' }] },
   facets: [1, 2, 3, 4].map(i => ({ id: `f${i}`, title: `Facet ${i}`, needs: [{ id: `d${i}`, need: `need ${i}` }] })),
-  causalQuestions: ['why?']
+  causalQuestions: ['why?'],
+  questionType: 'fact'
 });
 const withNeed = fn => { const d = facetMapDoc(); fn(d.argumentMap.situation); return model.readArgumentMap(core.parseMap(core.serializeMap(d))); };
 test('sem3 model: criterion, baseline and definitionNeeds are optional (old maps) and, when present, must be strings', () => {
@@ -264,3 +265,59 @@ for (const [name, edit] of Object.entries(badOptionals)) {
     assert.equal(model.readArgumentMap(core.parseMap(text)).kind, 'unusable');
   });
 }
+
+// ---- question types: optional fields (decisions #60, #62, #64, #66) ---------------------------------------------------------------------
+const qUsable = fn => { const d = baseMap({ argumentMap: usable() }); fn(d.argumentMap, d); return model.readArgumentMap(core.parseMap(core.serializeMap(d))); };
+test('question type fields read as usable and round-trip; an unknown value is unusable and preserved', () => {
+  for (const type of ['fact', 'causal']) {
+    const read = qUsable(a => { a.situation.questionType = type; a.run.presetQuestionType = type; });
+    assert.equal(read.kind, 'usable');
+    assert.equal(read.data.situation.questionType, type);
+  }
+  const text = core.serializeMap(baseMap({ argumentMap: Object.assign(usable(), { situation: { ...usable().situation, questionType: 'fact' } }) }));
+  assert.equal(roundTrip(text), text);
+  for (const mutate of [a => { a.situation.questionType = 'opinion'; }, a => { a.run.presetQuestionType = 'x'; }, a => { a.situation.questionType = 1; }]) {
+    const read = qUsable(mutate);
+    assert.equal(read.kind, 'unusable');
+    assert.equal(read.reason, 'unknown ' + (read.reason.includes('run') ? 'run' : 'situation') + ' enum');
+  }
+});
+test('group roles are optional; a present one must be a string pointing at an existing node (counter-example 8)', () => {
+  const lean = () => qUsable((a, d) => { delete a.roles.verified; delete a.roles.eliminated; });
+  assert.equal(lean().kind, 'usable');
+  const three = qUsable((a, d) => { d.nodes.push({ id: 'u', path: 'u.md', parentId: null, x: 0, y: 0, collapsed: false }); a.roles.unconfirmed = 'u'; });
+  assert.equal(three.kind, 'usable');
+  assert.equal(qUsable(a => { a.roles.unconfirmed = 'ghost'; }).reason, 'role unconfirmed points to a missing node');
+  assert.equal(qUsable(a => { a.roles.unconfirmed = 7; }).reason, 'role unconfirmed malformed');
+  assert.equal(qUsable(a => { a.roles.verified = ''; }).kind, 'unusable');
+  assert.equal(qUsable(a => { a.roles.eliminated = 'ghost'; }).kind, 'unusable');
+  assert.equal(qUsable(a => { delete a.roles.proposition; }).kind, 'unusable', 'the three role nodes stay required');
+});
+test('need.core, proof.tier and proof.second are optional, round-trip, and reject malformed values (counter-example 8)', () => {
+  const proofOf = extra => ({ url: 'https://a.example.org/x', quote: 'q', claim: 'c', check: 'page_match', checkedAt: '2026-11-09T00:00:00.000Z', ...extra });
+  const second = { url: 'https://b.example.net/y', quote: 'q2', check: 'provider_read', checkedAt: '2026-11-09T00:00:00.000Z' };
+  const withNeed = extra => qUsable(a => { a.hypotheses.push({ id: 'h1', citedData: [], round: 1, location: 'verifying', needs: [{ id: 'n1', text: 't', addedRound: 1, state: 'found', stance: 'supports', ...extra }] }); });
+  const ok = withNeed({ core: true, proof: proofOf({ tier: 'other', second }) });
+  assert.equal(ok.kind, 'usable');
+  assert.equal(withNeed({ proof: proofOf({ tier: 'primary' }) }).kind, 'usable');
+  assert.equal(withNeed({ proof: proofOf() }).kind, 'usable', 'an older proof has neither');
+  for (const [name, extra] of Object.entries({
+    'core false': { core: false }, 'core string': { core: 'true' },
+    'unknown tier': { proof: proofOf({ tier: 'gold' }) },
+    'second without url': { proof: proofOf({ tier: 'other', second: { ...second, url: '' } }) },
+    'second with unknown check': { proof: proofOf({ tier: 'other', second: { ...second, check: 'guess' } }) },
+    'second not an object': { proof: proofOf({ tier: 'other', second: 'https://b.example.net' }) }
+  })) assert.equal(withNeed(extra).kind, 'unusable', name);
+  const datum = qUsable(a => { a.situation.data.push({ id: 'd9', need: 'x', attempts: 1, state: 'found', stance: 'supports', proof: proofOf({ tier: 'other', second }) }); });
+  assert.equal(datum.kind, 'usable');
+});
+test('managedNodeIds covers the unconfirmed group; composeFacets and isLegacyFacetMap read tolerant states', () => {
+  assert.deepEqual([...model.managedNodeIds({ argumentMap: { roles: { proposition: 'p', unconfirmed: 'u', verified: 7 } } })].sort(), ['p', 'u']);
+  const s = usable();
+  assert.equal(model.isLegacyFacetMap(s), false);
+  s.situation.facets = [];
+  assert.equal(model.isLegacyFacetMap(s), true);
+  s.situation.questionType = 'causal';
+  assert.equal(model.isLegacyFacetMap(s), false);
+  assert.equal(model.isFactMap(s), false);
+});

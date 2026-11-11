@@ -610,7 +610,8 @@ test('situation research budget exhausted with data still pending ends at the li
 const f4 = (counts = [1, 1, 1, 1]) => ({
   assumptions: { id: 'as1', items: [{ label: 'Age band', value: '16-24 in 2024', reason: 'the proposition says young people' }] },
   facets: counts.map((c, i) => ({ id: `f${i + 1}`, title: `Facet ${i + 1}`, needs: Array.from({ length: c }, (_, j) => ({ id: `f${i + 1}d${j + 1}`, need: `need f${i + 1}-${j + 1}` })) })),
-  causalQuestions: ['why did it happen?']
+  causalQuestions: ['why did it happen?'],
+  questionType: 'causal', groups: { verified: 'gv', eliminated: 'ge', unconfirmed: 'gu' }
 });
 const planned = (counts, run = 'run-f') => m.applySituationPlan(m.newArgumentMap(roles, run), f4(counts));
 const dataOf = (s, facetId) => s.situation.data.filter(d => d.facetId === facetId);
@@ -638,6 +639,8 @@ function judgement(s, stances = {}, verdicts = {}) {
   };
 }
 const judged = (s, stances, verdicts) => m.applyFacetVerdicts(s, judgement(s, stances, verdicts));
+/** Ends the round-1 retry offer with an empty batch (decision #60: an insufficient facet and budget left means one more batch is offered first). */
+const finish = s => (types(s)[0] === 'add_retry_needs' ? m.addRetryNeeds(s, []) : s);
 
 test('facet boost: the unemployment fixture (5 found + 1 not_found) still stops an old map with gate_missing', () => {
   let s = m.newArgumentMap(roles, 'r');
@@ -697,28 +700,38 @@ test('facet boost: plan limits: 6 facets, 2 facets, 0 or 4 needs in a facet, 16 
   gateError(() => m.applySituationPlan(old, f4()));
   gateError(() => m.applySituationData(planned(), [{ id: 'zz', need: 'x' }]));
 });
-test('facet boost: any refuting facet: unmatched / not_matching, hypotheses refused', () => {
+test('facet boost: refuting facets and no supporting one (decision #60 fails): unmatched / not_matching, hypotheses refused', () => {
   let s = researchAll(planned([1, 1, 1, 1]));
-  s = judged(s, { f2d1: 'refutes' }, { f2: 'refutes' });
+  const all = { f1d1: 'refutes', f2d1: 'refutes', f3d1: 'refutes', f4d1: 'refutes' };
+  assert.equal(m.composeFacets([{ verdict: 'refutes' }, { verdict: 'insufficient' }]).outcome, 'fails');
+  s = judged(s, all, { f1: 'refutes', f2: 'refutes', f3: 'refutes', f4: 'refutes' });
   assert.equal(s.situation.gate.state, 'unmatched');
   assert.equal(s.situation.gate.kind, 'not_matching');
-  assert.deepEqual(plain(s.situation.gate.citedData), ['f2d1']);
+  assert.deepEqual(plain(s.situation.gate.citedData), ['f1d1', 'f2d1', 'f3d1', 'f4d1']);
   assert.equal(s.situation.gate.round, 1);
   assert.equal(s.run.phase, 'stopped_mismatch');
   assert.equal(s.run.stopReason, 'mismatch');
   assert.deepEqual(actions(s), []);
   refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'] }]));
 });
-test('facet boost: 2 of 4 supports and no refutes goes to analysis, and hypotheses are accepted', () => {
+test('decision #60: one refuting facet next to supporting ones is partial: matched, the premise stays (a causal run goes on)', () => {
+  const s = judged(researchAll(planned([1, 1, 1, 1])), { f2d1: 'refutes' }, { f2: 'refutes' });
+  assert.equal(m.composeFacets(s.situation.facets).outcome, 'partial');
+  assert.equal(s.situation.gate.state, 'matched');
+  assert.equal(s.run.phase, 'analysis');
+});
+test('facet boost: 2 of 4 supports and no refutes goes to analysis (after the one retry offer), and hypotheses are accepted', () => {
   let s = researchAll(planned([1, 1, 1, 1]));
   s = judged(s, {}, { f3: 'insufficient', f4: 'insufficient' });
+  assert.deepEqual(types(s), ['add_retry_needs'], 'decision #60: insufficient facets in round 1 and budget left: one more batch is offered first');
+  s = m.addRetryNeeds(s, []);
   assert.equal(s.situation.gate.state, 'matched');
   assert.equal(s.run.phase, 'analysis');
   assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'supports', 'insufficient', 'insufficient']);
   assert.ok(s.situation.gate.citedData.length >= 1);
   assert.equal(m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'], basis: 'from f1d1 we observe the rate, so we guess a cause' }]).hypotheses.length, 1);
 });
-test('facet boost: 1 of 4 supports: retry round, then still short: data_insufficient (unconfirmed, the run goes on)', () => {
+test('facet boost: 1 of 4 supports: retry round, then still short: holds with 3 insufficient facets, the run goes on', () => {
   let s = researchAll(planned([1, 1, 1, 1]), ['f2d1', 'f3d1']);
   s = judged(s, {}, { f1: 'supports', f2: 'supports', f3: 'supports', f4: 'insufficient' });
   assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'insufficient', 'insufficient', 'insufficient'], 'facets without found data are forced insufficient');
@@ -731,10 +744,10 @@ test('facet boost: 1 of 4 supports: retry round, then still short: data_insuffic
   s = researchAll(s, ['r2', 'r3']);
   assert.deepEqual(types(s), ['judge_facets']);
   s = judged(s, {}, {});
-  assert.equal(s.situation.gate.state, 'unconfirmed');
-  assert.equal(s.situation.gate.kind, 'data_insufficient');
+  assert.equal(m.composeFacets(s.situation.facets).insufficientCount, 3);
+  assert.equal(s.situation.gate.state, 'matched', 'decision #60: one supporting facet and no refutation holds, with 3 facets insufficient');
   assert.equal(s.situation.gate.round, 2);
-  assert.equal(s.run.phase, 'analysis', 'decision #58: insufficient data no longer stops the run');
+  assert.equal(s.run.phase, 'analysis');
   assert.equal(s.run.stopReason, undefined);
   assert.deepEqual(plain(s.situation.facets.map(f => f.verdict)), ['supports', 'insufficient', 'insufficient', 'insufficient']);
   assert.deepEqual(types(s), ['propose_hypotheses']);
@@ -750,7 +763,7 @@ test('facet boost: round 2 only re-judges the facets that were insufficient; a s
   const withExtra = { ...j, facets: [...j.facets, { id: 'f1', verdict: 'refutes', reason: 'x', citedData: ['f1d1'] }] };
   refuses(s, () => m.applyFacetVerdicts(s, withExtra));
   s = m.applyFacetVerdicts(s, j);
-  assert.equal(s.situation.gate.state, 'matched', '2 supports of 4 once f3 is supported');
+  assert.equal(s.situation.gate.state, 'matched', 'f1 and f3 support, f2 and f4 stay insufficient: holds');
 });
 test('facet boost: a facet with no found data judged supports is stored insufficient', () => {
   let s = researchAll(planned([1, 1, 1, 1]), ['f4d1']);
@@ -864,13 +877,15 @@ test('facet boost: retry needs: only insufficient facets, once, 3 per facet, 9 i
   assert.equal(after.situation.data.length, 14);
   // a second batch is refused (round is 2 now)
   refuses(after, () => m.addRetryNeeds(after, [need('f1', 'again')]));
-  // an empty batch ends the run as data_insufficient (round 1)
+  // an empty batch settles the facets as they are (round 1): f5 supports, the rest are insufficient: holds
   const none = m.addRetryNeeds(base, []);
-  assert.equal(none.situation.gate.kind, 'data_insufficient');
-  assert.equal(none.situation.gate.state, 'unconfirmed');
+  assert.equal(none.situation.gate.state, 'matched');
   assert.equal(none.run.phase, 'analysis');
   assert.equal(none.run.stopReason, undefined);
   assert.equal(none.situation.gate.round, 1);
+  const allInsufficient = m.addRetryNeeds(judged(researchAll(planned([1, 1, 1, 1]), ['f1d1', 'f2d1', 'f3d1', 'f4d1']), {}, {}), []);
+  assert.equal(allInsufficient.situation.gate.state, 'unconfirmed', 'every facet insufficient: data_insufficient');
+  assert.equal(allInsufficient.situation.gate.kind, 'data_insufficient');
   // a refuting facet never reaches a retry
   const refuted = judged(researchAll(planned([1, 1, 1, 1])), { f1d1: 'refutes' }, { f1: 'refutes' });
   refuses(refuted, () => m.addRetryNeeds(refuted, [need('f2', 'x')]));
@@ -943,17 +958,16 @@ test('facet summary: the judgement stores each facet summary; a blank or missing
 });
 
 // ---- V1 boost P4 (decision #50): basis, alternative and the supports-only citation on a facet map ----
-const matchedFacets = () => judged(researchAll(planned([1, 1, 1, 1])), { f3d1: 'irrelevant', f4d1: 'refutes' }, { f3: 'insufficient', f4: 'insufficient' });
-test('facet hypotheses: basis and alternative are stored; a blank basis is refused; only data that support the proposition can be cited', () => {
+const matchedFacets = () => finish(judged(researchAll(planned([1, 1, 1, 1])), { f3d1: 'irrelevant', f4d1: 'refutes' }, { f3: 'insufficient', f4: 'insufficient' }));
+test('#62 facet hypotheses: no basis is asked or stored, alternative is stored, citations are optional but must name found data (any stance)', () => {
   const s = matchedFacets();
   assert.equal(s.situation.gate.state, 'matched');
-  const h = m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'], basis: 'from f1d1 we observe a rise, so we guess hiring slowed', alternative: true }]).hypotheses[0];
-  assert.equal(h.basis, 'from f1d1 we observe a rise, so we guess hiring slowed');
+  const h = m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'], basis: 'ignored', alternative: true }]).hypotheses[0];
+  assert.equal('basis' in h, false);
   assert.equal(h.alternative, true);
-  for (const basis of ['', '  ', undefined]) refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'], basis }]));
-  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f3d1'], basis: 'b' }]));
-  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f4d1'], basis: 'b' }]));
-  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1', 'f4d1'], basis: 'b' }]));
+  assert.deepEqual(plain(m.applyHypotheses(s, [{ id: 'h1' }]).hypotheses[0].citedData), []);
+  assert.equal(m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1', 'f4d1'] }]).hypotheses.length, 1);
+  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['ghost'] }]));
 });
 test('facet hypotheses: an old map (no facets) accepts the old item shape and stores no basis or alternative', () => {
   const h = withHypotheses(["h1"]).hypotheses[0];
@@ -1001,9 +1015,9 @@ test('sem3 machine: supports/refutes stay fixed in round 2 (changing them is ref
     refuses(s, () => m.applyFacetVerdicts(s, j));
   }
 });
-test('sem3 machine: situationOutcome matches three baseline facets that each support (run 2/3 real data shape)', () => {
+test('sem3 machine: composeFacets holds for three baseline facets that each support (run 2/3 real data shape)', () => {
   const plan = { assumptions: { id: 'as', items: [{ label: 'Baselines', value: 'overall; pre-pandemic; 25+', reason: 'compare' }] }, definitionNeeds: ['how youth unemployment is measured'],
-    facets: [['vs overall', 'The overall rate in the same period'], ['vs pre-pandemic', 'pre-pandemic'], ['vs 25+', '25+']].map(([title, baseline], i) => ({ id: `b${i}`, title, criterion: `Supports when 16-24 is higher than ${baseline}`, baseline, needs: [{ id: `b${i}s`, need: `16-24 rate ${title}` }, { id: `b${i}b`, need: `baseline ${title}` }] })), causalQuestions: [] };
+    facets: [['vs overall', 'The overall rate in the same period'], ['vs pre-pandemic', 'pre-pandemic'], ['vs 25+', '25+']].map(([title, baseline], i) => ({ id: `b${i}`, title, criterion: `Supports when 16-24 is higher than ${baseline}`, baseline, needs: [{ id: `b${i}s`, need: `16-24 rate ${title}` }, { id: `b${i}b`, need: `baseline ${title}` }] })), causalQuestions: [], questionType: 'fact' };
   let s = m.applySituationPlan(m.newArgumentMap(roles, 'run-b'), plan);
   assert.equal(s.situation.data.length, 6, 'the definition need makes no datum');
   assert.deepEqual(plain(s.situation.assumptions.definitionNeeds), ['how youth unemployment is measured']);
@@ -1014,8 +1028,314 @@ test('sem3 machine: situationOutcome matches three baseline facets that each sup
     s = m.applySituationEvidence(s, d.id, { found: true, stance: 'supports', proof: { ...proof(1), figure: { number, period, unit: '%' } } });
   }
   s = m.applyFacetVerdicts(s, judgement(s));
-  assert.equal(m.situationOutcome(s.situation.facets, 1), 'matched');
+  assert.equal(m.composeFacets(s.situation.facets).outcome, 'holds');
   assert.equal(s.situation.gate.state, 'matched');
   assert.equal(s.situation.facets[1].baseline, 'pre-pandemic');
   assert.ok(s.situation.facets[0].criterion.includes('higher than'));
+});
+
+// ---- question types (decisions #60, #61, #64, #66) -----------------------------------------------------------------------------------
+const factPlan = (counts) => { const p = f4(counts); p.questionType = 'fact'; delete p.groups; return p; };
+const factMap = (counts, run = 'run-fact') => m.applySituationPlan(m.newArgumentMap(roles, run), factPlan(counts));
+const allV = v => ({ f1: v, f2: v, f3: v, f4: v });
+const stanceAll = v => ({ f1d1: v, f2d1: v, f3d1: v, f4d1: v });
+test('composeFacets: the four outcomes and the insufficient count (decision #60 table)', () => {
+  const of = (...v) => plain(m.composeFacets(v.map(verdict => ({ verdict }))));
+  assert.deepEqual(of('supports', 'insufficient', 'insufficient'), { outcome: 'holds', insufficientCount: 2 });
+  assert.deepEqual(of('refutes', 'insufficient'), { outcome: 'fails', insufficientCount: 1 });
+  assert.deepEqual(of('supports', 'refutes', 'supports'), { outcome: 'partial', insufficientCount: 0 });
+  assert.deepEqual(of('insufficient', 'insufficient', 'insufficient'), { outcome: 'insufficient', insufficientCount: 3 });
+  assert.equal(m.composeFacets([{ verdict: 'supports' }, { verdict: 'supports' }, { verdict: 'insufficient' }, { verdict: 'insufficient' }, { verdict: 'insufficient' }]).outcome, 'holds', 'no half-supporting threshold any more');
+});
+test('question type: the plan must carry one; a causal plan makes the three groups in the same mutation, a fact plan makes none', () => {
+  const missing = f4(); delete missing.questionType;
+  gateError(() => m.applySituationPlan(m.newArgumentMap(roles, 'r'), missing));
+  const bad = f4(); bad.questionType = 'opinion';
+  gateError(() => m.applySituationPlan(m.newArgumentMap(roles, 'r'), bad));
+  const noGroups = f4(); delete noGroups.groups;
+  gateError(() => m.applySituationPlan(m.newArgumentMap(roles, 'r'), noGroups));
+  const factWithGroups = factPlan(); factWithGroups.groups = f4().groups;
+  gateError(() => m.applySituationPlan(m.newArgumentMap(roles, 'r'), factWithGroups));
+  const clash = f4(); clash.groups.unconfirmed = 'f1';
+  gateError(() => m.applySituationPlan(m.newArgumentMap(roles, 'r'), clash));
+  const lean = { proposition: 'p', situation: 's', conclusion: 'c' };
+  const causal = m.applySituationPlan(m.newArgumentMap(lean, 'r'), f4());
+  assert.equal(causal.situation.questionType, 'causal');
+  assert.deepEqual(plain(causal.roles), { proposition: 'p', situation: 's', conclusion: 'c', verified: 'gv', eliminated: 'ge', unconfirmed: 'gu' });
+  const fact = m.applySituationPlan(m.newArgumentMap(lean, 'r'), factPlan());
+  assert.equal(fact.situation.questionType, 'fact');
+  assert.deepEqual(plain(fact.roles), lean);
+  assert.equal(m.newArgumentMap(lean, 'r', undefined, 'fact').run.presetQuestionType, 'fact');
+  assert.equal(m.newArgumentMap(lean, 'r').run.presetQuestionType, undefined);
+});
+test('fact question (counter-example 1): facets settled go to analysis with only conclude_facts; no hypotheses, no proposing, no conclusion from hypotheses', () => {
+  const s = judged(researchAll(factMap()), {}, {});
+  assert.equal(s.run.phase, 'analysis');
+  assert.deepEqual(actions(s), [{ type: 'conclude_facts' }]);
+  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'] }]));
+  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1', citedData: ['f1d1'], basis: 'b' }]));
+  refuses(s, () => m.prepareConclusion(s));
+  refuses(s, () => m.applyConclusion(s, { basedOn: ['h1'] }));
+  refuses(s, () => m.applyLimitStop(s));
+  assert.equal(s.hypotheses.length, 0);
+  assert.equal(model.conclusionView(s), 'in_progress');
+});
+test('fact question: a failing or partial outcome still goes to conclude_facts; every facet insufficient stops (R1 M2, no conclusion step)', () => {
+  const failing = judged(researchAll(factMap()), stanceAll('refutes'), allV('refutes'));
+  assert.equal(failing.run.phase, 'analysis');
+  assert.equal(failing.situation.gate.state, 'matched');
+  assert.deepEqual(actions(failing), [{ type: 'conclude_facts' }]);
+  const partial = judged(researchAll(factMap()), { f2d1: 'refutes' }, { f2: 'refutes' });
+  assert.deepEqual(actions(partial), [{ type: 'conclude_facts' }]);
+  const none = m.addRetryNeeds(judged(researchAll(factMap(), ['f1d1', 'f2d1', 'f3d1', 'f4d1']), {}, {}), []);
+  assert.equal(none.situation.gate.state, 'unmatched');
+  assert.equal(none.situation.gate.kind, 'data_insufficient');
+  assert.equal(none.run.phase, 'stopped_mismatch');
+  assert.equal(none.run.status, 'finished');
+  assert.deepEqual(actions(none), []);
+});
+test('fact question: applyFactConclusion rests on facet ids only; hypothesis ids, unknown ids and an empty list are refused', () => {
+  const s = judged(researchAll(factMap()), {}, {});
+  for (const basedOn of [[], ['h1'], ['f1', 'ghost'], ['f1d1'], 'f1']) refuses(s, () => m.applyFactConclusion(s, { basedOn }));
+  const done = m.applyFactConclusion(s, { basedOn: ['f1', 'f2', 'f1'] });
+  assert.equal(done.run.phase, 'concluded');
+  assert.equal(done.run.status, 'finished');
+  assert.deepEqual(plain(done.conclusion), { state: 'concluded', basedOn: ['f1', 'f2'], missing: [] });
+  assert.equal(model.conclusionView(done), 'concluded');
+  assert.deepEqual(actions(done), []);
+  refuses(done, () => m.applyFactConclusion(done, { basedOn: ['f1'] }));
+  const causal = judged(researchAll(planned([1, 1, 1, 1])), {}, {});
+  refuses(causal, () => m.applyFactConclusion(causal, { basedOn: ['f1'] }));
+});
+test('causal premise (counter-example 2): 1 refuting + 4 insufficient facets stop as mismatch once the retry offer is settled; supporting + refuting goes on', () => {
+  const five = () => researchAll(m.applySituationPlan(m.newArgumentMap(roles, 'r'), f4([1, 1, 1, 1, 1])), ['f2d1', 'f3d1', 'f4d1', 'f5d1']);
+  let s = judged(five(), { f1d1: 'refutes' }, { f1: 'refutes' });
+  assert.deepEqual(types(s), ['add_retry_needs']);
+  s = m.addRetryNeeds(s, []);
+  assert.equal(s.run.phase, 'stopped_mismatch');
+  assert.equal(s.situation.gate.kind, 'not_matching');
+  assert.deepEqual(actions(s), []);
+  const both = judged(researchAll(planned()), { f1d1: 'refutes' }, { f1: 'refutes' });
+  assert.equal(both.run.phase, 'analysis');
+  assert.equal(both.situation.gate.state, 'matched');
+  assert.deepEqual(plain(both.situation.gate.citedData), ['f2d1', 'f3d1', 'f4d1'], 'the premise rests on the supporting facets');
+});
+test('retry offer: an insufficient facet in round 1 with budget left offers one batch first, with a refuting facet too; no budget or round 2 settles at once', () => {
+  const s = judged(researchAll(planned(), ['f4d1']), { f1d1: 'refutes' }, { f1: 'refutes' });
+  assert.deepEqual(types(s), ['add_retry_needs']);
+  assert.equal(s.run.phase, 'situation');
+  let spent = researchAll(planned(), ['f4d1']);
+  spent.run.researchCalls = 78;
+  spent = judged(spent, {}, {});
+  assert.equal(spent.run.phase, 'analysis', 'no research budget: no retry offer');
+  assert.equal(spent.situation.gate.state, 'matched');
+  let round2 = m.addRetryNeeds(judged(researchAll(planned(), ['f4d1']), {}, {}), [{ facetId: 'f4', id: 'r4', need: 'again' }]);
+  round2 = judged(researchAll(round2, ['r4']), {}, {});
+  assert.equal(round2.run.phase, 'analysis', 'round 2 settles with the facet still insufficient');
+});
+test('uncertain source (counter-example 7 part): a facet verdict cannot rest only on data whose source needs a second source and has none', () => {
+  const tiered = (tier, second) => {
+    let s = planned([2, 1, 1, 1]);
+    for (const d of plain(s.situation.data)) {
+      s = m.beginSituationResearch(s, d.id);
+      const withTier = d.id.startsWith('f1') ? { ...proof(1), tier, ...(second && d.id === 'f1d1' ? { second: { url: 'https://other.example.net/x', quote: 'quote two from the page', check: 'page_match', checkedAt: '2026-11-09T00:00:00.000Z' } } : {}) } : { ...proof(2), tier: 'primary' };
+      s = m.applySituationEvidence(s, d.id, { found: true, stance: 'supports', proof: withTier });
+    }
+    return s;
+  };
+  const onlyF1d1 = s => { const j = judgement(s); j.facets.find(f => f.id === 'f1').citedData = ['f1d1']; return j; };
+  const unsure = tiered('other', false);
+  // R1 M3: not a GateError (a retry would loop on the same answer): the program forces insufficient and stores a reason code.
+  const forced = m.applyFacetVerdicts(unsure, onlyF1d1(unsure)).situation.facets[0];
+  assert.equal(forced.verdict, 'insufficient');
+  assert.equal(forced.reason, m.UNCERTAIN_SOURCES_REASON);
+  assert.deepEqual(plain(forced.citedData), []);
+  const both = judgement(unsure); both.facets.find(f => f.id === 'f1').citedData = ['f1d1', 'f1d2'];
+  assert.equal(m.applyFacetVerdicts(unsure, both).situation.facets[0].verdict, 'insufficient');
+  const refutes = judgement(unsure, { f1d1: 'refutes', f1d2: 'refutes' }, { f1: 'refutes' }); refutes.facets.find(f => f.id === 'f1').citedData = ['f1d1'];
+  assert.equal(m.applyFacetVerdicts(unsure, refutes).situation.facets[0].verdict, 'insufficient', 'refutes on uncertain sources only is forced too');
+  const insufficient = judgement(unsure, {}, { f1: 'insufficient' });
+  assert.equal(m.applyFacetVerdicts(unsure, insufficient).situation.facets[0].verdict, 'insufficient', 'insufficient needs no citation');
+  const confirmed = tiered('other', true);
+  assert.equal(m.applyFacetVerdicts(confirmed, onlyF1d1(confirmed)).situation.facets[0].verdict, 'supports', 'a verified second source makes it certain');
+  const primary = tiered('primary', false);
+  assert.equal(m.applyFacetVerdicts(primary, onlyF1d1(primary)).situation.facets[0].verdict, 'supports');
+  const mixed = tiered('other', false);
+  const f1d2 = mixed.situation.data.find(d => d.id === 'f1d2'); f1d2.proof.tier = 'primary';
+  const j = judgement(mixed); j.facets.find(f => f.id === 'f1').citedData = ['f1d1', 'f1d2'];
+  assert.equal(m.applyFacetVerdicts(mixed, j).situation.facets[0].verdict, 'supports', 'one certain datum among the cited ones is enough');
+  assert.equal(model.isUncertainSource({ tier: 'other' }), true);
+  assert.equal(model.isUncertainSource({}), false, 'a proof from before tiers is not uncertain');
+});
+test('legacy facet map (counter-example 9 part): facets without a question type have no next action and refuse resume; the state is untouched', () => {
+  const legacy = plain(judged(researchAll(planned()), {}, {}));
+  delete legacy.situation.questionType;
+  assert.equal(model.isLegacyFacetMap(legacy), true);
+  assert.deepEqual(actions(legacy), [], 'running but legacy: nothing to run');
+  const paused = m.applyPause(legacy, 'user');
+  refuses(paused, () => m.applyResume(paused));
+  assert.throws(() => m.applyResume(paused), e => e instanceof m.GateError && e.message === 'legacy');
+  const ok = judged(researchAll(planned()), {}, {});
+  assert.equal(model.isLegacyFacetMap(ok), false);
+  assert.equal(model.isLegacyFacetMap(matched()), false, 'a V1 map without facets is not legacy');
+  assert.equal(m.applyResume(m.applyPause(ok, 'user')).run.status, 'running');
+});
+test('checkedProof keeps tier and a verified second source; an unknown tier or a malformed second is a GateError (counter-example 8)', () => {
+  const base = { ...proof(1), tier: 'other', second: { url: 'https://b.example.net/y', quote: 'quote two', check: 'page_match', checkedAt: '2026-11-09T00:00:00.000Z' } };
+  const s0 = planned([1, 1, 1, 1]);
+  const run = p => { const s = m.beginSituationResearch(s0, 'f1d1'); return m.applySituationEvidence(s, 'f1d1', { found: true, stance: 'supports', proof: p }); };
+  assert.deepEqual(plain(run(base).situation.data[0].proof.second), base.second);
+  assert.equal(run(base).situation.data[0].proof.tier, 'other');
+  assert.equal(run(proof(1)).situation.data[0].proof.tier, undefined);
+  for (const bad of [{ ...base, tier: 'gold' }, { ...base, second: { ...base.second, url: 'ftp://x.example/y' } }, { ...base, second: { ...base.second, quote: ' ' } }, { ...base, second: { ...base.second, check: 'guess' } }, { ...base, second: 'https://b.example.net' }]) {
+    const s = m.beginSituationResearch(s0, 'f1d1');
+    refuses(s, () => m.applySituationEvidence(s, 'f1d1', { found: true, stance: 'supports', proof: bad }));
+  }
+});
+
+// ---- P2 (decisions #62 #63): core need, verification rule, core replacement, verdict timing, refuted elimination, conclusion input ----
+const causalMatched = () => matchedFacets();
+const factMatched = () => finish(judged(researchAll(factMap([1, 1, 1, 1])), {}, {}));
+/** Hypothesis `hid` with a core `<hid>c` and plain needs `<hid>a`, `<hid>b`, researched with the given states: 'f:supports' found with that stance, 'miss' not_found. */
+function coreHyp(s, hid, [core, a = 'f:supports', b = 'miss'] = ['f:supports']) {
+  if (!s.hypotheses.some(h => h.id === hid)) s = m.applyHypotheses(s, [{ id: hid }]);
+  s = m.addNeeds(s, hid, [{ id: `${hid}c`, text: 'core', core: true }, { id: `${hid}a`, text: 'a' }, { id: `${hid}b`, text: 'b' }]);
+  [[`${hid}c`, core], [`${hid}a`, a], [`${hid}b`, b]].forEach(([id, how], i) => {
+    s = m.beginResearch(s, hid, id);
+    s = m.applyEvidence(s, hid, id, how === 'miss' ? { found: false, reason: 'nothing' } : { found: true, stance: how.split(':')[1], proof: proof(i + 1) });
+  });
+  return s;
+}
+const say = (s, hid, extra = {}) => m.applyVerdict(s, hid, { verdict: 'supported', citedNeeds: [`${hid}c`], reason: 'core supports', ...extra });
+const hyp = (s, hid) => s.hypotheses.find(h => h.id === hid);
+
+test('P2 core needs (counter-example 4): the first round lists exactly one core; 0 or 2 are refused; a V1 map refuses any; the list cannot be sent twice', () => {
+  const s = m.applyHypotheses(causalMatched(), [{ id: 'h1' }]);
+  refuses(s, () => m.addNeeds(s, 'h1', [{ id: 'n1', text: 'x' }]));
+  refuses(s, () => m.addNeeds(s, 'h1', [{ id: 'n1', text: 'x', core: true }, { id: 'n2', text: 'y', core: true }]));
+  const ok = m.addNeeds(s, 'h1', [{ id: 'n1', text: 'x', core: true }, { id: 'n2', text: 'y' }]);
+  assert.deepEqual(plain(hyp(ok, 'h1').needs.map(n => n.core === true)), [true, false]);
+  refuses(ok, () => m.addNeeds(ok, 'h1', [{ id: 'n3', text: 'z', core: true }]));
+  const v1 = withHypotheses(['h1', 'h2', 'h3']);
+  refuses(v1, () => m.addNeeds(v1, 'h1', [{ id: 'n1', text: 'x', core: true }]));
+  refuses(s, () => m.addNeeds(s, 'h1', [{ id: 'n1', text: 'x', core: 'yes' }]));
+});
+test('P2 verification (counter-example 3): core found and supporting, supplementary not_found, 2:0 -> verified', () => {
+  const s = say(coreHyp(causalMatched(), 'h1'), 'h1');
+  assert.equal(hyp(s, 'h1').aiVerdict, 'supported');
+  assert.equal(model.isVerified(hyp(s, 'h1')), true);
+  assert.equal(model.hypothesisStatus(hyp(s, 'h1')), 'verified');
+});
+test('P2 verification (counter-example 3): an uncertain core stance, or supports = contradicts, is not verified and the verdict is kept undecided', () => {
+  const unsure = say(coreHyp(causalMatched(), 'h1', ['f:uncertain']), 'h1');
+  assert.equal(hyp(unsure, 'h1').aiVerdict, 'undecided');
+  assert.equal(model.isVerified(hyp(unsure, 'h1')), false);
+  const tie = say(coreHyp(causalMatched(), 'h1', ['f:supports', 'f:contradicts', 'miss']), 'h1');
+  assert.equal(hyp(tie, 'h1').aiVerdict, 'undecided');
+  assert.equal(model.isVerified(hyp(tie, 'h1')), false);
+  // The stored verdict alone never verifies: force "supported" onto the tie and it still fails.
+  const forced = plain(tie);
+  forced.hypotheses[0].aiVerdict = 'supported';
+  assert.equal(model.isVerified(forced.hypotheses[0]), false);
+  // An uncertain plain need counts for neither side.
+  const plainUncertain = say(coreHyp(causalMatched(), 'h1', ['f:supports', 'f:uncertain', 'miss']), 'h1');
+  assert.equal(model.isVerified(hyp(plainUncertain, 'h1')), true);
+});
+test('P2 legacy hypotheses (no core) keep the old rule: all needs found and clearly supporting; a not_found need blocks', () => {
+  const allFound = settle(withHypotheses(['h1', 'h2', 'h3']), 'h1', 2, 'supported');
+  assert.equal(model.isVerified(hyp(allFound, 'h1')), true);
+  assert.equal(model.liveCore(hyp(allFound, 'h1')), undefined);
+  const blocked = plain(allFound);
+  blocked.hypotheses[0].needs[1].state = 'not_found';
+  assert.equal(model.isVerified(blocked.hypotheses[0]), false);
+});
+test('P2 verdict timing: no verdict while the core is pending or not found; due once settled with a found core; a missing core revises', () => {
+  let s = m.applyHypotheses(causalMatched(), [{ id: 'h1' }]);
+  s = m.addNeeds(s, 'h1', [{ id: 'kc', text: 'core', core: true }, { id: 'a', text: 'a' }]);
+  s = m.beginResearch(s, 'h1', 'kc'); s = m.applyEvidence(s, 'h1', 'kc', found('supports', 1));
+  assert.ok(!types(s).includes('verdict'), 'the plain need is still pending');
+  refuses(s, () => m.prepareVerdict(s, 'h1'));
+  s = m.beginResearch(s, 'h1', 'a'); s = m.applyEvidence(s, 'h1', 'a', { found: false, reason: 'nothing' });
+  assert.deepEqual(actions(s).filter(a => a.hypothesisId === 'h1'), [{ type: 'verdict', hypothesisId: 'h1' }]);
+  assert.equal(m.prepareVerdict(s, 'h1').evidence.length, 1);
+  assert.equal(m.prepareVerdict(s, 'h1').evidence[0].core, true);
+  const missing = coreHyp(causalMatched(), 'h2', ['miss', 'f:supports', 'f:supports']);
+  assert.ok(types(missing).includes('revise'));
+  refuses(missing, () => m.prepareVerdict(missing, 'h2'));
+});
+test('P2 core replacement (counter-example 4): only a not_found core can be replaced, by one core; the dead core is retired and the new one is live', () => {
+  const s = coreHyp(causalMatched(), 'h1', ['miss', 'f:supports', 'f:supports']);
+  refuses(s, () => m.startNextRound(s, 'h1', [{ id: 'k1', text: 'x', core: true }, { id: 'k2', text: 'y', core: true }]));
+  const next = m.startNextRound(s, 'h1', [{ id: 'k1', text: 'new core', core: true }]);
+  const h = hyp(next, 'h1');
+  assert.equal(h.needs.find(n => n.id === 'k1').replaces, 'h1c');
+  assert.equal(model.liveCore(h).id, 'k1');
+  assert.ok(model.retiredNeedIds(h).has('h1c'));
+  const plainOnly = m.startNextRound(s, 'h1', [{ id: 'k1', text: 'plain' }]);
+  assert.equal(model.liveCore(hyp(plainOnly, 'h1')).id, 'h1c', 'a plain need never replaces the core');
+  // A found core, or a pending one, is never replaced.
+  const foundCore = coreHyp(causalMatched(), 'h1', ['f:supports', 'miss', 'miss']);
+  refuses(foundCore, () => m.startNextRound(foundCore, 'h1', [{ id: 'k1', text: 'x', core: true }]));
+  const keep = m.startNextRound(foundCore, 'h1', [{ id: 'k1', text: 'plain' }]);
+  assert.equal(model.liveCore(hyp(keep, 'h1')).id, 'h1c');
+});
+test('P2 sameQuestion (counter-example 4): a replaced core needs the answer; false keeps the hypothesis undecided, true keeps the verdict', () => {
+  const dead = coreHyp(causalMatched(), 'h1', ['miss', 'miss', 'miss']);
+  let s = m.startNextRound(dead, 'h1', [{ id: 'k1', text: 'new core', core: true }]);
+  s = m.beginResearch(s, 'h1', 'k1'); s = m.applyEvidence(s, 'h1', 'k1', found('supports', 4));
+  const input = m.prepareVerdict(s, 'h1');
+  assert.deepEqual(plain(input.replacedCore), { id: 'h1c', text: 'core' });
+  const ask = extra => m.applyVerdict(s, 'h1', { verdict: 'supported', citedNeeds: ['k1'], reason: 'r', ...extra });
+  refuses(s, () => ask({}));
+  refuses(s, () => ask({ sameQuestion: 'yes' }));
+  assert.equal(hyp(ask({ sameQuestion: false }), 'h1').aiVerdict, 'undecided');
+  assert.equal(hyp(ask({ sameQuestion: true }), 'h1').aiVerdict, 'supported');
+  assert.equal(model.isVerified(hyp(ask({ sameQuestion: true }), 'h1')), true);
+  const refutedNotSame = m.applyVerdict(s, 'h1', { verdict: 'refuted', citedNeeds: ['k1'], reason: 'r', sameQuestion: false });
+  assert.equal(hyp(refutedNotSame, 'h1').aiVerdict, 'undecided');
+  assert.equal(hyp(refutedNotSame, 'h1').location, 'verifying');
+  const plainInput = m.prepareVerdict(coreHyp(causalMatched(), 'h2'), 'h2');
+  assert.equal('replacedCore' in plainInput, false);
+});
+test('P2 refuted (counter-example 5): the verdict step eliminates in the same mutation with the reason; no verifying-and-refuted state exists; a V1 map still waits for eliminate()', () => {
+  const s = m.applyVerdict(coreHyp(causalMatched(), 'h1'), 'h1', { verdict: 'refuted', citedNeeds: ['h1c'], reason: 'the core contradicts it' });
+  const h = hyp(s, 'h1');
+  assert.equal(h.aiVerdict, 'refuted');
+  assert.equal(h.location, 'eliminated');
+  assert.equal(h.eliminationReason, 'the core contradicts it');
+  assert.equal(model.hypothesisStatus(h), 'eliminated');
+  assert.ok(!s.hypotheses.some(x => x.location === 'verifying' && model.effectiveVerdict(x) === 'refuted'));
+  assert.equal(actions(s).filter(a => a.hypothesisId === 'h1').length, 0);
+  const v1 = settle(withHypotheses(['h1', 'h2', 'h3']), 'h1', 1, 'refuted');
+  assert.equal(hyp(v1, 'h1').location, 'verifying');
+});
+test('P2 limit cut: a hypothesis cut at its limit is unconfirmed, a refuted one is eliminated', () => {
+  const t = plain(say(coreHyp(causalMatched(), 'h1', ['f:uncertain', 'miss', 'miss']), 'h1'));
+  assert.equal(t.hypotheses[0].aiVerdict, 'undecided');
+  t.hypotheses[0].round = 3;
+  assert.deepEqual(actions(t).filter(a => a.hypothesisId === 'h1'), [{ type: 'eliminate_limit', hypothesisId: 'h1' }]);
+  const cut = m.eliminateAtLimit(t, 'h1');
+  assert.equal(hyp(cut, 'h1').eliminationReason.startsWith('round_limit'), true);
+  assert.equal(model.hypothesisStatus(hyp(cut, 'h1')), 'unconfirmed');
+});
+test('P2 conclusion input (counter-example 6): a facet map lists every hypothesis with its status; a V1 map lists verified only; basedOn may hold verified ids only', () => {
+  let s = causalMatched();
+  for (const id of ['h1', 'h2', 'h3']) s = say(coreHyp(s, id), id);
+  s = m.applyVerdict(coreHyp(s, 'h4'), 'h4', { verdict: 'refuted', citedNeeds: ['h4c'], reason: 'no' });
+  const input = m.prepareConclusion(s);
+  assert.deepEqual(plain(input.hypotheses.map(h => [h.id, h.status])), [['h1', 'verified'], ['h2', 'verified'], ['h3', 'verified'], ['h4', 'eliminated']]);
+  assert.ok(input.hypotheses[0].evidence.some(e => e.core === true));
+  refuses(s, () => m.applyConclusion(s, { basedOn: ['h4'] }));
+  refuses(s, () => m.applyConclusion(s, { basedOn: ['h1', 'h4'] }));
+  refuses(s, () => m.applyConclusion(s, { basedOn: [] }));
+  assert.equal(m.applyConclusion(s, { basedOn: ['h1', 'h2'] }).conclusion.state, 'concluded');
+  let v1 = withHypotheses(['h1', 'h2', 'h3']);
+  for (const id of ['h1', 'h2', 'h3']) v1 = settle(v1, id);
+  const old = m.prepareConclusion(v1);
+  assert.deepEqual(plain(old.hypotheses.map(h => h.status)), ['verified', 'verified', 'verified']);
+});
+test('P2 fact map: no hypothesis can be applied, so no core or conclusion path opens (counter-example 1)', () => {
+  const s = factMatched();
+  refuses(s, () => m.applyHypotheses(s, [{ id: 'h1' }]));
+  refuses(s, () => m.prepareConclusion(s));
 });

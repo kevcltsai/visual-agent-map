@@ -230,3 +230,34 @@ test('V1 boost: the result carries the queries of this call\'s search events (pr
   const result = await makeService(rt).askModel(context(), 'gpt-6-luna', 'low');
   assert.deepEqual(plain(result.evidence), { openedUrls: ['https://stats.example.org/report'], searchQueries: ['youth unemployment 2024', 'cpi march 2024'] });
 });
+
+// ---- P3 (decision #64): tier and second source ----
+const SECOND = { url: 'https://other.example.net/page', quote: 'Unemployment among youths reached 9.2 percent', claim: 'Same rate reported', agrees: true };
+test('P3 tier: primary and other are kept; an unknown or non-string tier is unusable (counter-example 8); omitted stays absent', () => {
+  for (const tier of ['primary', 'other']) assert.equal(parseEv([found('n1', { tier })])[0].tier, tier);
+  assert.equal('tier' in plain(parseEv([found('n1')])[0]), false);
+  for (const tier of ['official', '', 'Primary', 5, null, ['primary']]) refuse([found('n1', { tier })]);
+  refuse([miss('n2', { tier: 'bogus' })]);
+});
+test('P3 second: kept when exactly url, quote, claim and a boolean agrees; agrees=false is kept for the caller; a malformed one is dropped, the entry kept', () => {
+  assert.deepEqual(plain(parseEv([found('n1', { tier: 'other', second: SECOND })])[0].second), SECOND);
+  assert.equal(parseEv([found('n1', { tier: 'other', second: { ...SECOND, agrees: false } })])[0].second.agrees, false);
+  const bad = [null, 'x', [], {}, { ...SECOND, agrees: 'true' }, { ...SECOND, extra: 1 }, { ...SECOND, url: 'ftp://x.example/a' }, { ...SECOND, url: 'not a url' }, { ...SECOND, quote: 'short' }, { ...SECOND, quote: 'q'.repeat(201) }, { ...SECOND, claim: ' ' }, { url: SECOND.url, quote: SECOND.quote, claim: SECOND.claim }];
+  for (const second of bad) {
+    const entry = plain(parseEv([found('n1', { tier: 'other', second })])[0]);
+    assert.equal('second' in entry, false, JSON.stringify(second));
+    assert.equal(entry.tier, 'other');
+    assert.equal(entry.claim, 'Rate rose');
+  }
+});
+test('P3 second: a not_found entry may not carry one', () => {
+  refuse([miss('n2', { second: SECOND })]);
+});
+test('P3 schema: tier and second are optional fields with the strict shape; the required list is unchanged', () => {
+  const item = plain(schemas.taskResponseShape(context(), 'en').schema).properties.argumentEvidence.items;
+  assert.deepEqual(item.properties.tier.enum, ['primary', 'other']);
+  assert.deepEqual(item.properties.second.required.sort(), ['agrees', 'claim', 'quote', 'url']);
+  assert.equal(item.properties.second.properties.agrees.type, 'boolean');
+  assert.equal(item.properties.second.additionalProperties, false);
+  assert.deepEqual(item.required, ['need', 'status', 'stance', 'claim', 'quote', 'url']);
+});

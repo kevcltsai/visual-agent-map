@@ -215,16 +215,25 @@ test('conclusion: a number or URL outside the input throws; no verified hypothes
 
 // ---- schemas and registry ----
 test('every step has a strict schema and the registry maps the machine actions', () => {
-  for (const step of [mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep]) {
+  for (const step of [mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep, mod.conclusionFactStep]) {
     assert.equal(step.schema.additionalProperties, false);
-    assert.deepEqual([...step.schema.required].sort(), Object.keys(step.schema.properties).sort());
+    const strict = (node, where) => {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'object') {
+        assert.equal(node.additionalProperties, false, `${step.id} ${where}`);
+        assert.deepEqual([...node.required].sort(), Object.keys(node.properties).sort(), `${step.id} ${where}`);
+        for (const [k, v] of Object.entries(node.properties)) strict(v, `${where}.${k}`);
+      }
+      if (node.type === 'array') strict(node.items, `${where}[]`);
+    };
+    strict(step.schema, '$');
   }
-  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'judge_facets', 'judge_gate', 'plan_facets', 'propose_facet_hypotheses', 'propose_hypotheses', 'revise', 'verdict']);
+  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'conclude_facts', 'judge_facets', 'judge_gate', 'plan_facets', 'propose_facet_hypotheses', 'propose_hypotheses', 'revise', 'verdict']);
   assert.equal(mod.ARGUMENT_STEPS.plan_facets, mod.facetPlanStep);
   assert.equal(mod.ARGUMENT_STEPS.plan_situation, undefined); // the old plan step was removed; plan_facets serves the action
   assert.equal(mod.ARGUMENT_STEPS.revise, mod.needsStep);
   const ids = new Set(Object.values(mod.ARGUMENT_STEPS).map(step => step.id));
-  assert.equal(ids.size, 8);
+  assert.equal(ids.size, 9);
 });
 
 // ---- text-only through the real runtimes ----
@@ -357,31 +366,55 @@ test('facet judge: the prompt shows only the proposition and the facets; a secre
   assert.throws(() => sr.prepareStep(mod.facetJudgeStep, fjReq({ facets: [] })), error => error.name === 'ArgumentStepError');
 });
 
+// ---- #62: core needs ----
+test('needs (#62): core first needs exactly one core need; replace allows at most one; no mode keeps V1 and refuses a core', () => {
+  const first = { ...needReq, core: 'first' };
+  const r = ok(mod.needsStep, first, { needs: [{ text: 'Job posting trends for juniors', core: true }, { text: 'Hiring counts by firm size' }] });
+  assert.deepEqual(plain(r.needs), [{ text: 'Job posting trends for juniors', core: true }, { text: 'Hiring counts by firm size' }]);
+  bad(mod.needsStep, first, { needs: [{ text: 'Job posting trends for juniors' }] }, /exactly one/);
+  bad(mod.needsStep, first, { needs: [{ text: 'a', core: true }, { text: 'b', core: true }] }, /exactly one/);
+  bad(mod.needsStep, first, { needs: [{ text: 'a', core: 'yes' }] }, /core must be a boolean/);
+  const replace = { ...needReq, core: 'replace' };
+  assert.equal(ok(mod.needsStep, replace, { needs: [{ text: 'Job posting trends for juniors' }] }).needs.length, 1);
+  assert.equal(ok(mod.needsStep, replace, { needs: [{ text: 'Job posting trends for juniors', core: true }] }).needs[0].core, true);
+  bad(mod.needsStep, replace, { needs: [{ text: 'a', core: true }, { text: 'b', core: true }] }, /at most one/);
+  bad(mod.needsStep, needReq, { needs: [{ text: 'a', core: true }] }, /no core need/);
+  assert.equal(ok(mod.needsStep, needReq, { needs: [{ text: 'a', core: false }] }).needs[0].core, undefined);
+  assert.throws(() => mod.needsStep.policy('x', { ...needReq, core: 'later' }), error => error.name === 'ArgumentStepError');
+  assert.match(mod.needsStep.render(first), /Exactly one of the needs is the core need/);
+  assert.match(mod.needsStep.render(replace), /earlier core need was not found/);
+  assert.doesNotMatch(mod.needsStep.render(needReq), /core need/);
+});
+test('needs (#62): existing needs show claim, period and reason to the model and to the grounding check', () => {
+  const req = { ...needReq, core: 'replace', existing: [{ text: 'Monthly junior hiring counts', state: 'not_found', claim: 'Juniors hired per month', period: '2019 to 2020', reason: 'no page reports it' }] };
+  const prompt = mod.needsStep.render(req);
+  assert.match(prompt, /"claim":"Juniors hired per month","period":"2019 to 2020","reason":"no page reports it"/);
+  assert.ok(ok(mod.needsStep, req, { needs: [{ text: 'Hiring per month in 2019', core: true }] }));
+  assert.doesNotMatch(mod.needsStep.render(needReq), /"period"|"reason"/);
+});
+
 // ---- V1 boost P4 (decision #50): hypotheses of a facet map ----
 const fhReq = (over = {}) => ({ ...base, proposition: PROP, count: 3, existing: [], causalQuestions: ['Did automation drive the rise?'],
   data: [datum('d1', { propStance: 'supports' }), datum('d2', { propStance: 'supports' }), datum('d3', { propStance: 'irrelevant' }), datum('d4', { propStance: 'refutes' })], ...over });
-const fh = (title, over = {}) => ({ title, statement: `${title} statement`, basis: `From d1 we observe the rate, so we guess ${title}`, alternative: false, citedData: ['d1'], ...over });
-const fhOk = () => ({ hypotheses: [fh('Hiring slowed'), fh('Entry jobs automated'), fh('Wages stalled', { alternative: true, citedData: ['d1', 'd2'] })] });
+const fh = (title, over = {}) => ({ title, statement: `${title} statement`, alternative: false, ...over });
+const fhOk = () => ({ hypotheses: [fh('Hiring slowed'), fh('Entry jobs automated'), fh('Wages stalled', { alternative: true })] });
 const fhWith = fn => { const v = fhOk(); fn(v); return v; };
-test('facet hypotheses: a well formed reply parses with basis and alternative; the old step keeps its V1 schema and parser', () => {
+test('facet hypotheses: a well formed reply parses with title, statement and alternative only; the old step keeps its V1 schema and parser', () => {
   assert.deepEqual(plain(ok(mod.facetHypothesesStep, fhReq(), fhOk())), fhOk());
   assert.deepEqual(Object.keys(mod.hypothesesStep.schema.properties.hypotheses.items.properties), ['title', 'statement', 'citedData']);
   assert.deepEqual(plain(ok(mod.hypothesesStep, hypReq, hypOk)), hypOk);
   bad(mod.hypothesesStep, hypReq, { hypotheses: hypOk.hypotheses.map(h => ({ ...h, basis: 'x' })) });
-  assert.deepEqual(Object.keys(mod.facetHypothesesStep.schema.properties.hypotheses.items.properties), ['title', 'statement', 'basis', 'alternative', 'citedData']);
+  assert.deepEqual(Object.keys(mod.facetHypothesesStep.schema.properties.hypotheses.items.properties), ['title', 'statement', 'alternative']);
   assert.equal(mod.ARGUMENT_STEPS.propose_facet_hypotheses, mod.facetHypothesesStep);
 });
-test('facet hypotheses: an empty or missing basis, or a non-boolean alternative, is refused', () => {
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = ''; }), /basis/);
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = '  '; }), /basis/);
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { delete v.hypotheses[0].basis; }));
+test('facet hypotheses (#62): basis and citedData are no longer accepted; a non-boolean alternative or an invented number is refused', () => {
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = 'because'; }), /unexpected fields/);
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d1']; }), /unexpected fields/);
   bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].alternative = 'yes'; }), /alternative/);
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].basis = 'we guess 11.4 percent'; }), /number 11.4/);
-});
-test('facet hypotheses: citing irrelevant or refuting data is refused', () => {
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d3']; }), /support/);
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d4']; }), /support/);
-  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].citedData = ['d1', 'd4']; }), /support/);
+  bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[0].statement = 'we guess 11.4 percent'; }), /number 11.4/);
+  assert.doesNotMatch(mod.facetHypothesesStep.render(fhReq()), /basis|citedData/);
+  assert.match(mod.facetHypothesesStep.render(fhReq({ unconfirmed: true })), /situation is unconfirmed/);
+  assert.doesNotMatch(mod.facetHypothesesStep.render(fhReq()), /situation is unconfirmed/);
 });
 test('facet hypotheses: the first batch needs one alternative; a later (replacement) batch does not', () => {
   bad(mod.facetHypothesesStep, fhReq(), fhWith(v => { v.hypotheses[2].alternative = false; }), /alternative/);
@@ -465,13 +498,14 @@ const fpOk = () => ({
     { title: 'Who is counted', criterion: 'Supports: the agency counts the young people the proposition means.', baseline: '', needs: [fneed('Definition of unemployed used by the agency'), fneed('Why the labour force survey changed', 'cause')] }
   ],
   causalQuestions: ['Did automation drive the rise?'],
-  question: 'Did youth unemployment rise in 2024?'
+  question: 'Did youth unemployment rise in 2024?',
+  questionType: 'causal'
 });
 const fpWith = fn => { const v = fpOk(); fn(v); return v; };
 
 test('facet plan: a well formed reply parses; ids are not in the output; cause needs move to causalQuestions and build no data', () => {
   const out = plain(ok(mod.facetPlanStep, fpReq, fpOk()));
-  assert.deepEqual(Object.keys(out).sort(), ['assumptions', 'causalQuestions', 'definitionNeeds', 'facets', 'question']);
+  assert.deepEqual(Object.keys(out).sort(), ['assumptions', 'causalQuestions', 'definitionNeeds', 'facets', 'question', 'questionType']);
   assert.equal(out.question, 'Did youth unemployment rise in 2024?');
   assert.equal(out.facets.length, 3);
   assert.deepEqual(out.facets[2].needs, [{ need: 'Definition of unemployed used by the agency' }]);
@@ -481,7 +515,8 @@ test('facet plan: a well formed reply parses; ids are not in the output; cause n
   assert.deepEqual(plain(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.assumptions = { items: [] }; v.facets.forEach(f => { f.baseline = ''; }); }))).assumptions, { items: [] });
 });
 // Real claude:haiku replies (ids 5aaf3f5e, 6633f1f1, 752a4543) the parser wrongly refused for 「紐西蘭治安相比20年前, 是不是有變差了」.
-const liveNzFixture = name => require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', `facet-plan-nz-${name}.json`), 'utf8');
+// The recorded replies predate questionType (decision #60); the loader adds it, the files stay as recorded.
+const liveNzFixture = name => JSON.stringify({ questionType: 'fact', ...JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', `facet-plan-nz-${name}.json`), 'utf8')) });
 const liveNzReq = { ...base, language: 'zh-TW', proposition: '紐西蘭治安相比20年前, 是不是有變差了', today: '2026-11-11' };
 test('facet plan: real replies that restate a stated year range, use a year inside it, or write the date before a fullwidth comma are accepted', () => {
   for (const name of ['baseline-restates-range', 'year-inside-range', 'date-with-fullwidth-comma']) assert.doesNotThrow(() => mod.facetPlanStep.parse(liveNzFixture(name), liveNzReq), name);
@@ -499,7 +534,7 @@ test('facet plan: a number outside the request and outside every stated range is
 });
 test('facet plan: the output feeds applySituationPlan (the ids come from the program)', () => {
   const out = ok(mod.facetPlanStep, fpReq, fpOk());
-  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions };
+  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions, questionType: 'fact' };
   assert.equal(m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan).situation.data.length, 4);
 });
 // ---- sem3: baseline-type facets (criterion, baseline, definition needs) ----
@@ -523,7 +558,7 @@ test('sem3 facet plan: a definition need builds no datum, is kept for the defini
   assert.equal(out.facets.reduce((n, f) => n + f.needs.length, 0), 4, 'no datum for the definition need');
   bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs = [fneed('How is it measured', 'definition')]; }), /1 to 3/);
   bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[1].needs.push(fneed('official youth unemployment rate series', 'definition')); }), /repeats/);
-  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, definitionNeeds: out.definitionNeeds, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions };
+  const plan = { assumptions: { id: 'as', items: out.assumptions.items }, definitionNeeds: out.definitionNeeds, facets: out.facets.map((f, i) => ({ id: `f${i}`, title: f.title, criterion: f.criterion, baseline: f.baseline, needs: f.needs.map((n, j) => ({ id: `f${i}d${j}`, need: n.need })) })), causalQuestions: out.causalQuestions, questionType: 'fact' };
   const state = m.applySituationPlan(m.newArgumentMap(roles, 'r'), plan);
   assert.equal(state.situation.data.length, 4);
   assert.deepEqual(plain(state.situation.assumptions.definitionNeeds), ['How the agency defines the youth group']);
@@ -756,8 +791,9 @@ test('facet judge request without fixed data has no fixed stances block', () => 
 // ---- real haiku replies (owner's first run, 2026-11-11) that an over-strict parser refused ----
 const REAL_PROP = '台灣少子化主要是因為經濟壓力嗎';
 const realReq = { ...base, language: 'zh-TW', proposition: REAL_PROP };
-const REAL_YEARS = "{\"assumptions\":{\"items\":[{\"label\":\"指標\",\"value\":\"總生育率（TFR）與年出生人數\",\"reason\":\"少子化通常以生育率與出生數衡量，原命題未指明用哪一個指標。\"},{\"label\":\"期間\",\"value\":\"2015至2025年\",\"reason\":\"原命題沒有時間範圍，以近十年作為預設，較能反映目前狀況。\"},{\"label\":\"比較基準（更替水準）\",\"value\":\"更替水準（每位婦女約2.1人）\",\"reason\":\"判斷是否屬於少子化，需要一個生育率門檻。\"},{\"label\":\"比較基準（前期）\",\"value\":\"2015年的水準\",\"reason\":\"判斷是否在下降，需要一個起點。\"},{\"label\":\"比較對象（同區域）\",\"value\":\"南韓與日本的同期生育率\",\"reason\":\"判斷台灣的情況是否比鄰近經濟體更低。\"}]},\"facets\":[{\"title\":\"台灣總生育率低於更替水準\",\"criterion\":\"若2015至2025年間台灣總生育率長期低於2.1，支持此面向；若達到或高於2.1，則反駁。\",\"baseline\":\"更替水準（每位婦女約2.1人）\",\"needs\":[{\"need\":\"台灣近年總生育率數值及其與更替水準的差距\",\"kind\":\"fact\"},{\"need\":\"總生育率與更替水準的定義及計算方式\",\"kind\":\"definition\"}]},{\"title\":\"台灣出生率較2015年下降\",\"criterion\":\"若2015至2025年間台灣年出生人數與總生育率明顯下降，支持此面向；若持平或上升，則反駁。\",\"baseline\":\"2015年的水準\",\"needs\":[{\"need\":\"2015至2025年台灣年出生人數與總生育率的變化數據\",\"kind\":\"fact\"}]},{\"title\":\"台灣生育率低於南韓與日本同期水準\",\"criterion\":\"若同期台灣總生育率低於南韓與日本，支持此面向；若不低於或較高，則反駁。\",\"baseline\":\"南韓與日本的同期生育率\",\"needs\":[{\"need\":\"同期南韓與日本總生育率的官方統計數據\",\"kind\":\"fact\"}]}],\"causalQuestions\":[\"經濟壓力是否為台灣少子化的主要原因？\"],\"question\":\"台灣是否正在經歷少子化？\"}";
-const REAL_PARTS = "{\"assumptions\":{\"items\":[{\"label\":\"地理範圍\",\"value\":\"臺灣全境（全國層級）\",\"reason\":\"命題只寫「台灣」，未說明是全國或某個縣市，預設採全國資料。\"},{\"label\":\"時間範圍\",\"value\":\"最近已公布的完整年度；比較對象為較早的同期（約十年前）\",\"reason\":\"命題沒有指定時間，預設看最新可得的統計，並與較早的同期比較才能判斷「少子化」是否存在。\"},{\"label\":\"少子化指標\",\"value\":\"總生育率與年度出生數\",\"reason\":\"「少子化」在命題中沒有數值定義，預設以官方常用的總生育率與出生數來檢查。\"},{\"label\":\"國際比較基準\",\"value\":\"其他已開發經濟體的平均總生育率\",\"reason\":\"命題沒有比較對象；若要判斷臺灣的水準是否偏低，需要與其他已開發經濟體比較。\"},{\"label\":\"替代水準基準\",\"value\":\"總生育率需達到的人口替代水準（每名婦女約2.1名子女）\",\"reason\":\"人口學上常以維持人口穩定所需的生育率作為判斷少子化的門檻，預設用來衡量臺灣是否低於該水準。\"}]},\"facets\":[{\"title\":\"出生數或總生育率低於較早的同期\",\"criterion\":\"若臺灣最近已公布年度的總生育率或出生數低於較早的同期，支持此面向；若兩者持平或更高，則反駁。\",\"baseline\":\"較早的同期（約十年前）\",\"needs\":[{\"need\":\"臺灣最近已公布年度的總生育率與較早同期的總生育率\",\"kind\":\"fact\"},{\"need\":\"臺灣最近已公布年度的出生數與較早同期的出生數\",\"kind\":\"fact\"},{\"need\":\"少子化的定義，以及官方採用的總生育率與出生數計算方式\",\"kind\":\"definition\"}]},{\"title\":\"總生育率低於人口替代水準\",\"criterion\":\"若臺灣最近已公布年度的總生育率低於人口替代水準，支持此面向；若達到或高於該水準，則反駁。\",\"baseline\":\"人口替代水準\",\"needs\":[{\"need\":\"臺灣最近已公布年度總生育率與人口替代水準的差距\",\"kind\":\"fact\"}]},{\"title\":\"總生育率在已開發經濟體中偏低\",\"criterion\":\"若臺灣最近已公布年度的總生育率低於其他已開發經濟體的平均值，支持此面向；若高於或相近，則反駁。\",\"baseline\":\"其他已開發經濟體的平均總生育率\",\"needs\":[{\"need\":\"臺灣與其他已開發經濟體最近年度平均總生育率的比較資料\",\"kind\":\"fact\"}]}],\"causalQuestions\":[\"經濟壓力是否是臺灣少子化的主要原因？\"],\"question\":\"臺灣正在出現少子化現象嗎？\"}";
+const typed = raw => JSON.stringify({ questionType: 'causal', ...JSON.parse(raw) }); // recorded replies predate questionType (decision #60)
+const REAL_YEARS = typed("{\"assumptions\":{\"items\":[{\"label\":\"指標\",\"value\":\"總生育率（TFR）與年出生人數\",\"reason\":\"少子化通常以生育率與出生數衡量，原命題未指明用哪一個指標。\"},{\"label\":\"期間\",\"value\":\"2015至2025年\",\"reason\":\"原命題沒有時間範圍，以近十年作為預設，較能反映目前狀況。\"},{\"label\":\"比較基準（更替水準）\",\"value\":\"更替水準（每位婦女約2.1人）\",\"reason\":\"判斷是否屬於少子化，需要一個生育率門檻。\"},{\"label\":\"比較基準（前期）\",\"value\":\"2015年的水準\",\"reason\":\"判斷是否在下降，需要一個起點。\"},{\"label\":\"比較對象（同區域）\",\"value\":\"南韓與日本的同期生育率\",\"reason\":\"判斷台灣的情況是否比鄰近經濟體更低。\"}]},\"facets\":[{\"title\":\"台灣總生育率低於更替水準\",\"criterion\":\"若2015至2025年間台灣總生育率長期低於2.1，支持此面向；若達到或高於2.1，則反駁。\",\"baseline\":\"更替水準（每位婦女約2.1人）\",\"needs\":[{\"need\":\"台灣近年總生育率數值及其與更替水準的差距\",\"kind\":\"fact\"},{\"need\":\"總生育率與更替水準的定義及計算方式\",\"kind\":\"definition\"}]},{\"title\":\"台灣出生率較2015年下降\",\"criterion\":\"若2015至2025年間台灣年出生人數與總生育率明顯下降，支持此面向；若持平或上升，則反駁。\",\"baseline\":\"2015年的水準\",\"needs\":[{\"need\":\"2015至2025年台灣年出生人數與總生育率的變化數據\",\"kind\":\"fact\"}]},{\"title\":\"台灣生育率低於南韓與日本同期水準\",\"criterion\":\"若同期台灣總生育率低於南韓與日本，支持此面向；若不低於或較高，則反駁。\",\"baseline\":\"南韓與日本的同期生育率\",\"needs\":[{\"need\":\"同期南韓與日本總生育率的官方統計數據\",\"kind\":\"fact\"}]}],\"causalQuestions\":[\"經濟壓力是否為台灣少子化的主要原因？\"],\"question\":\"台灣是否正在經歷少子化？\"}");
+const REAL_PARTS = typed("{\"assumptions\":{\"items\":[{\"label\":\"地理範圍\",\"value\":\"臺灣全境（全國層級）\",\"reason\":\"命題只寫「台灣」，未說明是全國或某個縣市，預設採全國資料。\"},{\"label\":\"時間範圍\",\"value\":\"最近已公布的完整年度；比較對象為較早的同期（約十年前）\",\"reason\":\"命題沒有指定時間，預設看最新可得的統計，並與較早的同期比較才能判斷「少子化」是否存在。\"},{\"label\":\"少子化指標\",\"value\":\"總生育率與年度出生數\",\"reason\":\"「少子化」在命題中沒有數值定義，預設以官方常用的總生育率與出生數來檢查。\"},{\"label\":\"國際比較基準\",\"value\":\"其他已開發經濟體的平均總生育率\",\"reason\":\"命題沒有比較對象；若要判斷臺灣的水準是否偏低，需要與其他已開發經濟體比較。\"},{\"label\":\"替代水準基準\",\"value\":\"總生育率需達到的人口替代水準（每名婦女約2.1名子女）\",\"reason\":\"人口學上常以維持人口穩定所需的生育率作為判斷少子化的門檻，預設用來衡量臺灣是否低於該水準。\"}]},\"facets\":[{\"title\":\"出生數或總生育率低於較早的同期\",\"criterion\":\"若臺灣最近已公布年度的總生育率或出生數低於較早的同期，支持此面向；若兩者持平或更高，則反駁。\",\"baseline\":\"較早的同期（約十年前）\",\"needs\":[{\"need\":\"臺灣最近已公布年度的總生育率與較早同期的總生育率\",\"kind\":\"fact\"},{\"need\":\"臺灣最近已公布年度的出生數與較早同期的出生數\",\"kind\":\"fact\"},{\"need\":\"少子化的定義，以及官方採用的總生育率與出生數計算方式\",\"kind\":\"definition\"}]},{\"title\":\"總生育率低於人口替代水準\",\"criterion\":\"若臺灣最近已公布年度的總生育率低於人口替代水準，支持此面向；若達到或高於該水準，則反駁。\",\"baseline\":\"人口替代水準\",\"needs\":[{\"need\":\"臺灣最近已公布年度總生育率與人口替代水準的差距\",\"kind\":\"fact\"}]},{\"title\":\"總生育率在已開發經濟體中偏低\",\"criterion\":\"若臺灣最近已公布年度的總生育率低於其他已開發經濟體的平均值，支持此面向；若高於或相近，則反駁。\",\"baseline\":\"其他已開發經濟體的平均總生育率\",\"needs\":[{\"need\":\"臺灣與其他已開發經濟體最近年度平均總生育率的比較資料\",\"kind\":\"fact\"}]}],\"causalQuestions\":[\"經濟壓力是否是臺灣少子化的主要原因？\"],\"question\":\"臺灣正在出現少子化現象嗎？\"}");
 const realWith = (raw, fn) => { const v = JSON.parse(raw); fn(v); return v; };
 
 test('facet plan: years in the reply\'s own assumption values may be reused in question, titles, criteria, baselines and needs', () => {
@@ -806,8 +842,8 @@ test('P2-7: an assumption label, reason and a causal question may reuse a year t
 // years the model wrote into its own assumption values (period, baseline). Both must parse now.
 const NZ_PROP = '紐西蘭治安相比20年前, 是不是有變差了';
 const nzReq = { ...base, language: 'zh-TW', proposition: NZ_PROP, today: '2026-11-11' };
-const NZ_2006 = "{\"assumptions\":{\"items\":[{\"label\":\"比較基準時點\",\"value\":\"約2006年（20年前）\",\"reason\":\"提問以「20年前」為比較起點，以今年往前推算。\"},{\"label\":\"現況時點\",\"value\":\"最新可得的官方資料\",\"reason\":\"提問說「現在」但未指定年份，因此採用最新公布的資料。\"},{\"label\":\"治安衡量指標\",\"value\":\"警方登記的犯罪率，並以國家受害調查為輔\",\"reason\":\"治安沒有單一數字，需先決定用哪類統計來判斷。\"},{\"label\":\"地區範圍\",\"value\":\"紐西蘭全國\",\"reason\":\"提問未限定地區，採全國整體。\"},{\"label\":\"對象範圍\",\"value\":\"全體居民\",\"reason\":\"提問未指定年齡或族群，採整體人口。\"}]},\"facets\":[{\"title\":\"警方登記的整體犯罪率與基準時點相比\",\"criterion\":\"若最新官方資料的整體登記犯罪率高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。需同時取得最新與基準時點的數字。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭警方公布的最新整體登記犯罪率統計\",\"kind\":\"fact\"},{\"need\":\"紐西蘭約2006年的整體登記犯罪率統計\",\"kind\":\"fact\"},{\"need\":\"登記犯罪與受害調查在統計口徑與定義上的差異\",\"kind\":\"definition\"}]},{\"title\":\"國家受害調查的被害比例與基準時點相比\",\"criterion\":\"若最新受害調查的被害比例高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。受害調查可補足未報案的犯罪。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭國家受害調查中最新的被害比例\",\"kind\":\"fact\"},{\"need\":\"紐西蘭國家受害調查中約2006年的被害比例\",\"kind\":\"fact\"}]},{\"title\":\"暴力犯罪數字與基準時點相比\",\"criterion\":\"若最新暴力犯罪的登記數字或比率高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭警方統計中最新的暴力犯罪數字\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方統計中約2006年的暴力犯罪數字\",\"kind\":\"fact\"}]}],\"causalQuestions\":[],\"question\":\"紐西蘭治安相比20年前有變差嗎？\"}";
-const NZ_2026 = "{\"assumptions\":{\"items\":[{\"label\":\"時間範圍\",\"value\":\"現在（2026年）與20年前（2006年）\",\"reason\":\"今天是2026-11-11，「20年前」可換算為2006年，命題未寫明確切年份。\"},{\"label\":\"地區範圍\",\"value\":\"紐西蘭全國\",\"reason\":\"命題說「紐西蘭」，未限定城市或地區。\"},{\"label\":\"對象範圍\",\"value\":\"全體人口\",\"reason\":\"命題未指定特定年齡、族群或對象。\"},{\"label\":\"比較基準\",\"value\":\"2006年的全國治安指標\",\"reason\":\"命題以20年前作為比較基準，因此以2006年的同類指標為對照。\"},{\"label\":\"治安指標\",\"value\":\"警方登記的暴力與財產犯罪率，並參考住戶犯罪被害調查\",\"reason\":\"「治安」沒有單一量測方式，需同時看登記數據與民眾被害經驗才能判斷。\"}]},\"facets\":[{\"title\":\"警方登記犯罪率高於20年前\",\"criterion\":\"若2026年與2006年的全國每人口登記犯罪率比較顯示上升，支持此面向；若下降或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭警方或統計局公布的2026年全國每人口登記犯罪率\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方或統計局公布的2006年全國每人口登記犯罪率\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方「登記犯罪」與計算每人口犯罪率的定義與方法\",\"kind\":\"definition\"}]},{\"title\":\"暴力犯罪率高於20年前\",\"criterion\":\"若2026年與2006年的全國暴力犯罪率比較顯示上升，支持此面向；若下降或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭2026年全國暴力犯罪的每人口登記數據\",\"kind\":\"fact\"},{\"need\":\"紐西蘭2006年全國暴力犯罪的每人口登記數據\",\"kind\":\"fact\"}]},{\"title\":\"民眾犯罪被害經驗高於20年前\",\"criterion\":\"若住戶犯罪被害調查顯示近期的被害比例高於2006年前後，支持此面向；若較低或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭犯罪與被害調查（NZCVS）近期年度的民眾被害比例\",\"kind\":\"fact\"},{\"need\":\"紐西蘭犯罪與被害調查2006年前後的民眾被害比例\",\"kind\":\"fact\"}]},{\"title\":\"近年治安指標的變化方向\",\"criterion\":\"若近年警方登記犯罪與被害調查的年度數據整體走升，且長期高於2006年水準，支持此面向；若整體走降或回到原水準，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭警方登記犯罪的近年年度變化數據與官方趨勢說明\",\"kind\":\"fact\"}]}],\"causalQuestions\":[],\"question\":\"紐西蘭治安相比20年前是否變差？\"}";
+const NZ_2006 = typed("{\"assumptions\":{\"items\":[{\"label\":\"比較基準時點\",\"value\":\"約2006年（20年前）\",\"reason\":\"提問以「20年前」為比較起點，以今年往前推算。\"},{\"label\":\"現況時點\",\"value\":\"最新可得的官方資料\",\"reason\":\"提問說「現在」但未指定年份，因此採用最新公布的資料。\"},{\"label\":\"治安衡量指標\",\"value\":\"警方登記的犯罪率，並以國家受害調查為輔\",\"reason\":\"治安沒有單一數字，需先決定用哪類統計來判斷。\"},{\"label\":\"地區範圍\",\"value\":\"紐西蘭全國\",\"reason\":\"提問未限定地區，採全國整體。\"},{\"label\":\"對象範圍\",\"value\":\"全體居民\",\"reason\":\"提問未指定年齡或族群，採整體人口。\"}]},\"facets\":[{\"title\":\"警方登記的整體犯罪率與基準時點相比\",\"criterion\":\"若最新官方資料的整體登記犯罪率高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。需同時取得最新與基準時點的數字。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭警方公布的最新整體登記犯罪率統計\",\"kind\":\"fact\"},{\"need\":\"紐西蘭約2006年的整體登記犯罪率統計\",\"kind\":\"fact\"},{\"need\":\"登記犯罪與受害調查在統計口徑與定義上的差異\",\"kind\":\"definition\"}]},{\"title\":\"國家受害調查的被害比例與基準時點相比\",\"criterion\":\"若最新受害調查的被害比例高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。受害調查可補足未報案的犯罪。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭國家受害調查中最新的被害比例\",\"kind\":\"fact\"},{\"need\":\"紐西蘭國家受害調查中約2006年的被害比例\",\"kind\":\"fact\"}]},{\"title\":\"暴力犯罪數字與基準時點相比\",\"criterion\":\"若最新暴力犯罪的登記數字或比率高於約2006年（20年前），則支持「變差」；若低於或持平，則反駁。\",\"baseline\":\"約2006年（20年前）\",\"needs\":[{\"need\":\"紐西蘭警方統計中最新的暴力犯罪數字\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方統計中約2006年的暴力犯罪數字\",\"kind\":\"fact\"}]}],\"causalQuestions\":[],\"question\":\"紐西蘭治安相比20年前有變差嗎？\"}");
+const NZ_2026 = typed("{\"assumptions\":{\"items\":[{\"label\":\"時間範圍\",\"value\":\"現在（2026年）與20年前（2006年）\",\"reason\":\"今天是2026-11-11，「20年前」可換算為2006年，命題未寫明確切年份。\"},{\"label\":\"地區範圍\",\"value\":\"紐西蘭全國\",\"reason\":\"命題說「紐西蘭」，未限定城市或地區。\"},{\"label\":\"對象範圍\",\"value\":\"全體人口\",\"reason\":\"命題未指定特定年齡、族群或對象。\"},{\"label\":\"比較基準\",\"value\":\"2006年的全國治安指標\",\"reason\":\"命題以20年前作為比較基準，因此以2006年的同類指標為對照。\"},{\"label\":\"治安指標\",\"value\":\"警方登記的暴力與財產犯罪率，並參考住戶犯罪被害調查\",\"reason\":\"「治安」沒有單一量測方式，需同時看登記數據與民眾被害經驗才能判斷。\"}]},\"facets\":[{\"title\":\"警方登記犯罪率高於20年前\",\"criterion\":\"若2026年與2006年的全國每人口登記犯罪率比較顯示上升，支持此面向；若下降或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭警方或統計局公布的2026年全國每人口登記犯罪率\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方或統計局公布的2006年全國每人口登記犯罪率\",\"kind\":\"fact\"},{\"need\":\"紐西蘭警方「登記犯罪」與計算每人口犯罪率的定義與方法\",\"kind\":\"definition\"}]},{\"title\":\"暴力犯罪率高於20年前\",\"criterion\":\"若2026年與2006年的全國暴力犯罪率比較顯示上升，支持此面向；若下降或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭2026年全國暴力犯罪的每人口登記數據\",\"kind\":\"fact\"},{\"need\":\"紐西蘭2006年全國暴力犯罪的每人口登記數據\",\"kind\":\"fact\"}]},{\"title\":\"民眾犯罪被害經驗高於20年前\",\"criterion\":\"若住戶犯罪被害調查顯示近期的被害比例高於2006年前後，支持此面向；若較低或持平，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭犯罪與被害調查（NZCVS）近期年度的民眾被害比例\",\"kind\":\"fact\"},{\"need\":\"紐西蘭犯罪與被害調查2006年前後的民眾被害比例\",\"kind\":\"fact\"}]},{\"title\":\"近年治安指標的變化方向\",\"criterion\":\"若近年警方登記犯罪與被害調查的年度數據整體走升，且長期高於2006年水準，支持此面向；若整體走降或回到原水準，則反駁。\",\"baseline\":\"2006年的全國治安指標\",\"needs\":[{\"need\":\"紐西蘭警方登記犯罪的近年年度變化數據與官方趨勢說明\",\"kind\":\"fact\"}]}],\"causalQuestions\":[],\"question\":\"紐西蘭治安相比20年前是否變差？\"}");
 test('owner regression 2026-11-11: the New Zealand 20-years replies with 2006 and 2026 from the assumption values parse', () => {
   for (const raw of [NZ_2006, NZ_2026]) {
     const out = plain(ok(mod.facetPlanStep, nzReq, JSON.parse(raw)));
@@ -864,4 +900,98 @@ test('#59 conclusion: an id in the summary or a point is refused; one verified h
   const partial = mod.conclusionStep.render({ ...req, partial: true });
   assert.notEqual(partial, full);
   assert.ok(partial.length > full.length);
+});
+
+// ---- P4 (decisions #60 #64): question type, preset type, uncertain-source rule in the judge ----
+test('P4 facet plan: questionType is required and must be fact or causal; an unknown one is unusable (counter-example 8)', () => {
+  assert.equal(ok(mod.facetPlanStep, fpReq, fpOk()).questionType, 'causal');
+  assert.equal(ok(mod.facetPlanStep, fpReq, fpWith(v => { v.questionType = 'fact'; })).questionType, 'fact');
+  for (const bad_ of ['opinion', '', 'Fact', 5, null]) bad(mod.facetPlanStep, fpReq, fpWith(v => { v.questionType = bad_; }), /questionType/);
+  bad(mod.facetPlanStep, fpReq, fpWith(v => { delete v.questionType; }), /questionType|fields/);
+});
+test('P4 facet plan: the owner preset question type wins over the AI; an unusable preset fails the policy; the schema requires the field', () => {
+  assert.equal(ok(mod.facetPlanStep, { ...fpReq, presetQuestionType: 'fact' }, fpOk()).questionType, 'fact');
+  assert.equal(ok(mod.facetPlanStep, { ...fpReq, presetQuestionType: 'causal' }, fpWith(v => { v.questionType = 'fact'; })).questionType, 'causal');
+  assert.throws(() => mod.facetPlanStep.policy(mod.facetPlanStep.render({ ...fpReq, presetQuestionType: 'opinion' }), { ...fpReq, presetQuestionType: 'opinion' }), /preset question type/);
+  assert.deepEqual(plain(mod.FACET_PLAN_SCHEMA.properties.questionType.enum), ['fact', 'causal']);
+  assert.ok(mod.FACET_PLAN_SCHEMA.required.includes('questionType'));
+});
+test('P4 facet judge: a datum flagged uncertainSource reaches the prompt as such; an unflagged one is rendered as before', () => {
+  const req = { ...base, proposition: 'P', round: 1, facets: [{ id: 'f1', title: 'T', criterion: 'C', data: [
+    { id: 'd1', need: 'n', claim: 'c', quote: 'q', url: 'https://a.example/x', stance: 'supports', uncertainSource: true },
+    { id: 'd2', need: 'n', claim: 'c', quote: 'q', url: 'https://b.example/x', stance: 'supports' }] }] };
+  const prompt = mod.facetJudgeStep.render(req);
+  assert.match(prompt, /"id":"d1"[^}]*"uncertainSource":true/);
+  assert.doesNotMatch(prompt, /"id":"d2"[^}]*uncertainSource/);
+  assert.match(prompt, /Source rule/);
+});
+
+const fvCore = { ...fvInput, evidence: [{ ...fvInput.evidence[0], core: true }] };
+test('facet verdict (#62): the core flag reaches the prompt; sameQuestion is always in the strict schema (R1 B2) but only used when a core was replaced', () => {
+  const req = fvReq(fvCore);
+  const prompt = mod.facetVerdictStep.render(req);
+  assert.match(prompt, /"core":true/);
+  assert.match(prompt, /evidence marked core/);
+  assert.match(prompt, /"sameQuestion":true\|false/);
+  assert.match(prompt, /no replaced core need, so return sameQuestion: false/);
+  assert.doesNotMatch(prompt, /Earlier core need/);
+  assert.doesNotMatch(mod.facetVerdictStep.render(fvReq(fvInput)), /"core"/);
+  assert.doesNotMatch(mod.verdictStep.render(vReq(fvCore)), /"core"/);
+  assert.equal(ok(mod.facetVerdictStep, req, fvGood).sameQuestion, undefined);
+  assert.equal(ok(mod.facetVerdictStep, req, { ...fvGood, sameQuestion: true }).sameQuestion, undefined, 'an unasked sameQuestion is dropped');
+  const replaced = fvReq({ ...fvCore, replacedCore: { id: 'n0', text: 'Rate in the old survey' } });
+  const rp = mod.facetVerdictStep.render(replaced);
+  assert.match(rp, /"sameQuestion":true\|false/);
+  assert.match(rp, /Earlier core need that was not found[^]*Rate in the old survey/);
+  assert.equal(ok(mod.facetVerdictStep, replaced, { ...fvGood, sameQuestion: false }).sameQuestion, false);
+  assert.equal(ok(mod.facetVerdictStep, replaced, { ...fvGood, sameQuestion: true }).sameQuestion, true);
+  bad(mod.facetVerdictStep, replaced, fvGood, /sameQuestion/);
+  bad(mod.facetVerdictStep, replaced, { ...fvGood, sameQuestion: 'yes' }, /sameQuestion/);
+  assert.ok(mod.FACET_VERDICT_SCHEMA.properties.sameQuestion);
+  assert.ok(mod.FACET_VERDICT_SCHEMA.required.includes('sameQuestion'));
+  assert.doesNotMatch(rp, /no replaced core need/);
+});
+
+// ---- #63: conclusion of all hypotheses; fact conclusion from facets ----
+const allInput = () => ({ hypotheses: [
+  { id: 'h1', round: 1, status: 'verified', evidence: [{ id: 'n1', claim: 'Rate was 9.2 percent', quote: 'rate 9.2 percent', url: 'https://stats.example.org/a', stance: 'supports', core: true }] },
+  { id: 'h2', round: 2, status: 'unconfirmed', evidence: [{ id: 'n2', claim: 'Hiring fell', quote: 'hiring fell', url: 'https://stats.example.org/b', stance: 'uncertain' }] },
+  { id: 'h3', round: 1, status: 'eliminated', evidence: [{ id: 'n3', claim: 'Wages rose', quote: 'wages rose', url: 'https://stats.example.org/c', stance: 'contradicts' }] }
+] });
+const allReq = (over = {}) => ({ ...base, proposition: PROP, input: allInput(), statements: { h1: 'Hiring slowed', h2: 'Entry jobs automated', h3: 'Wages stalled' }, ...over });
+test('conclusion (#63): the prompt lists every hypothesis with its status; a point may cite an unverified one, but basedOn keeps the verified only', () => {
+  const prompt = mod.conclusionStep.render(allReq());
+  for (const word of ['"status":"verified"', '"status":"unconfirmed"', '"status":"eliminated"', 'Wages rose', '"core":true', 'main explanation']) assert.ok(prompt.includes(word), word);
+  const r = ok(mod.conclusionStep, allReq(), { summary: 'Slow hiring is the main explanation', points: [{ text: 'Hiring slowed', hypothesisIds: ['h1'] }, { text: 'Automation is not confirmed', hypothesisIds: ['h2', 'h3'] }, { text: 'Both together', hypothesisIds: ['h1', 'h2'] }] });
+  assert.deepEqual(plain(r.basedOn), ['h1']);
+});
+test('conclusion (#63): every point resting only on unverified hypotheses is refused; so is a request with no verified hypothesis', () => {
+  bad(mod.conclusionStep, allReq(), { summary: 's', points: [{ text: 'x', hypothesisIds: ['h2'] }, { text: 'y', hypothesisIds: ['h3'] }] }, /verified/);
+  bad(mod.conclusionStep, allReq(), { summary: 's', points: [{ text: 'x', hypothesisIds: ['h9'] }] }, /outside/);
+  const none = allReq({ input: { hypotheses: allInput().hypotheses.slice(1) } });
+  assert.throws(() => sr.prepareStep(mod.conclusionStep, none), error => error.name === 'ArgumentStepError');
+  assert.throws(() => mod.conclusionStep.render(allReq({ statements: { h1: 'x', h2: 'y' } })), error => error.name === 'ArgumentStepError');
+});
+const factFacets = () => [
+  { id: 'fa-0000001', title: 'Level of the rate', verdict: 'supports', summary: 'The rate is above the overall rate.', reason: 'Data agree', data: [{ claim: 'Rate was 9.2 percent', quote: 'rate 9.2 percent', url: 'https://stats.example.org/a', stance: 'supports' }] },
+  { id: 'fb-0000002', title: 'Direction of change', verdict: 'insufficient', summary: 'Not shown.', reason: 'No data', data: [] }
+];
+const factReq = (over = {}) => ({ ...base, proposition: PROP, outcome: 'holds', facets: factFacets(), ...over });
+test('conclusion-fact (#60): points rest on facet ids only; the program outcome is in the prompt; ids, numbers and links outside the request are refused', () => {
+  const prompt = mod.conclusionFactStep.render(factReq());
+  assert.match(prompt, /already decided the overall result from the facets: holds/);
+  assert.match(prompt, /"verdict":"insufficient"/);
+  assert.doesNotMatch(prompt, /citedData|hypothes/i);
+  assert.match(mod.conclusionFactStep.render(factReq({ outcome: 'insufficient' })), /cannot be decided/);
+  const good = { summary: 'The rate is 9.2 percent', points: [{ text: 'The level fits', facetIds: ['fa-0000001'] }, { text: 'The direction is not shown', facetIds: ['fb-0000002', 'fa-0000001'] }] };
+  assert.deepEqual(plain(ok(mod.conclusionFactStep, factReq(), good).basedOn), ['fa-0000001', 'fb-0000002']);
+  bad(mod.conclusionFactStep, factReq(), { ...good, points: [{ text: 'x', facetIds: ['h1'] }] }, /outside/);
+  bad(mod.conclusionFactStep, factReq(), { ...good, points: [{ text: 'x', facetIds: [] }] }, /at least one/);
+  bad(mod.conclusionFactStep, factReq(), { ...good, points: [{ text: 'x', hypothesisIds: ['fa-0000001'] }] }, /unexpected fields/);
+  bad(mod.conclusionFactStep, factReq(), { ...good, summary: 'Jobless rate was 14 percent' }, /number 14/);
+  bad(mod.conclusionFactStep, factReq(), { ...good, summary: 'see fa-0000001' }, /id/);
+  assert.throws(() => sr.prepareStep(mod.conclusionFactStep, factReq({ facets: [] })), error => error.name === 'ArgumentStepError');
+  assert.throws(() => sr.prepareStep(mod.conclusionFactStep, factReq({ outcome: 'maybe' })), error => error.name === 'ArgumentStepError');
+  assert.match(mod.conclusionFactStep.render(factReq({ unconfirmed: true })), /situation behind the proposition is unconfirmed/);
+  assert.equal(mod.ARGUMENT_STEPS.conclude_facts, mod.conclusionFactStep);
 });

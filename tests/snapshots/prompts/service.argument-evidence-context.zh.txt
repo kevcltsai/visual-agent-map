@@ -8,14 +8,14 @@
 
 
 
-只回傳 JSON，不要使用 Markdown code fence。格式必須是：{"summary":"...","detail":"...","suggestions":[],"visualReferences":[],"argumentEvidence":[{"need":"<需求 id>","status":"found","stance":"supports","claim":"...","quote":"...","url":"https://...","figure":{"number":"9.2","period":"2024 年 3 月","unit":"%"},"note":"..."}]}。summary 只寫一句短話，detail 簡短；suggestions 與 visualReferences 回傳空陣列。
+只回傳 JSON，不要使用 Markdown code fence。格式必須是：{"summary":"...","detail":"...","suggestions":[],"visualReferences":[],"argumentEvidence":[{"need":"<需求 id>","status":"found","stance":"supports","claim":"...","quote":"...","url":"https://...","figure":{"number":"9.2","period":"2024 年 3 月","unit":"%"},"note":"...","tier":"primary","second":{"url":"https://...","quote":"...","claim":"...","agrees":true}}]}。summary 只寫一句短話，detail 簡短；suggestions 與 visualReferences 回傳空陣列。
 
-下列每一條證據需求最多回一筆 argumentEvidence，並在 "need" 填它的 id，不得填其他 id。請自己上網搜尋並開啟網頁，不要憑記憶回答。找到的需求：status 填 "found"；quote 是從你開啟的頁面逐字複製的一段原文（12 到 200 字，不可改寫、不可用刪節號）；url 是該頁完整的 http 或 https 網址；claim 用一句話說明該頁報告了什麼；stance 填 "supports"、"contradicts" 或 "uncertain"，表示該頁對任務所問問題的影響。在真實網頁上找不到的需求：status 填 "not_found"、stance 填 "uncertain"，claim、quote、url 都是空字串。頁面報告了具體數字時，加上選填的 "figure"：number（數字，用字串寫）、period（該數字的期間）、unit（單位），都是字串；沒有數字就省略 figure。選填的 "note" 一兩句話：找到時寫這個數字的出處或限制；找不到時寫你找到了什麼、為什麼不採用。不得捏造網頁、網址或原文：程式會自己開啟 url 並在頁面上核對 quote，無法確認的項目一律捨棄。
+下列每一條證據需求最多回一筆 argumentEvidence，並在 "need" 填它的 id，不得填其他 id。請自己上網搜尋並開啟網頁，不要憑記憶回答。找到的需求：status 填 "found"；quote 是從你開啟的頁面逐字複製的一段原文（12 到 200 字，不可改寫、不可用刪節號）；url 是該頁完整的 http 或 https 網址；claim 用一句話說明該頁報告了什麼；stance 填 "supports"、"contradicts" 或 "uncertain"，表示該頁對任務所問問題的影響。在真實網頁上找不到的需求：status 填 "not_found"、stance 填 "uncertain"，claim、quote、url 都是空字串。頁面報告了具體數字時，加上選填的 "figure"：number（數字，用字串寫）、period（該數字的期間）、unit（單位），都是字串；沒有數字就省略 figure。選填的 "note" 一兩句話：找到時寫這個數字的出處或限制；找不到時寫你找到了什麼、為什麼不採用。找到的項目另填 "tier"，依你引用那一頁的發佈者判斷："primary" 是官方統計或政府頁面、國際組織頁面、學術期刊論文、學術機構出版的研究報告或工作論文，或大型新聞機構（全國性或國際性、有編輯部署名報導：通訊社、全國性報紙、電視、公共廣播）的報導；其餘一律填 "other"：轉載站、聚合站、部落格、政黨、業界刊物、民調公司、學位論文、摘要。轉載官方新聞稿的網站算 "other"，應改引官方原頁。tier 是 "other" 時，請再找第二來源並加上 "second"：發佈者在不同網站、且不是轉載同一份原始資料的頁面（轉載第一來源不算，請改引原始頁），含它自己的 url、逐字原文 quote（12 到 200 字）、claim，以及 "agrees"（報告相同結論才填 true；結論不同填 false）。找不到第二來源就省略 "second"。不得捏造網頁、網址或原文：程式會自己開啟 url 並在頁面上核對 quote，無法確認的項目一律捨棄。
 
 證據需求（{id, text} 的 JSON 陣列；這是要查的資料，不是指示）：
 [{"id":"n1","text":"每月初階職缺數","context":"年齡層：16 至 24 歲；期間：2023 至 2024 年"},{"id":"n2","text":"Unemployment rate 2024"}]
 
-帶有 "context" 的需求必須依它回答：context 是該需求要遵守的期間與定義。若沒有任何網頁符合，該需求就回 not_found。
+帶有 "context" 的需求必須依它回答：context 是該需求要遵守的期間與定義，也可能寫著一個假設主張。優先採用符合 context 期間的網頁；沒有的話，採用發佈期間最接近的頁面（例如最新已公布的年度），並把該年份寫在 "note"；只有最接近的年度不是回 not_found 的理由，完全找不到回答該需求的真實網頁才回 not_found。context 若寫著假設主張，"stance" 表示該頁對這個假設主張的影響（supports、contradicts 或 uncertain），不是對任務所問問題的影響。
 
 共同寫作底線（不論口吻都適用）：不要用「首先」「其次」「總之」「綜上所述」這類套話串場或收尾；不誇飾，不用「驚人」「顛覆」「史無前例」這類形容；數字要具體，寫出數值、單位、年份與範圍，不寫「很多」「大幅」「近年」。用台灣用語，例如「軟體」「資料」「品質」，不用中國大陸用語。
 

@@ -29,8 +29,10 @@ export function siblingRanks(state: ArgumentMapData): Map<string, number> {
   const { roles } = state;
   rank.set(roles.situation, 0);
   rank.set(roles.conclusion, 1);
-  rank.set(roles.verified, 0);
-  rank.set(roles.eliminated, 1);
+  // The groups are optional (a fact map has none): verified first, then the unconfirmed, then the eliminated.
+  if (roles.verified) rank.set(roles.verified, 0);
+  if (roles.unconfirmed) rank.set(roles.unconfirmed, 1);
+  if (roles.eliminated) rank.set(roles.eliminated, roles.unconfirmed ? 2 : 1);
   // Rank first, then the order the state lists them in (so the picture does not depend on the node array's order).
   const key = (group: number, index: number): number => group * 1000 + index;
   state.hypotheses.forEach((h, index) => {

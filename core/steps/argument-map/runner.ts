@@ -2,6 +2,7 @@ import type { AiCalls } from "../../ai-calls";
 import { providerStepRunner, type ProviderStepRunner } from "../../provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
 import { conclusionStep } from "./conclusion";
+import { conclusionFactStep } from "./conclusion-fact";
 import { facetHypothesesStep } from "./facet-hypotheses";
 import { facetJudgeStep } from "./facet-judge";
 import { facetPlanStep } from "./facet-plan";
@@ -13,6 +14,7 @@ import { verdictStep } from "./verdict";
 import retryReasonTemplate from "./retry-reason.md";
 
 export * from "./conclusion";
+export * from "./conclusion-fact";
 export * from "./facet-hypotheses";
 export * from "./facet-judge";
 export * from "./facet-plan";
@@ -35,7 +37,8 @@ export const ARGUMENT_STEPS = {
   add_needs: needsStep,
   revise: needsStep,
   verdict: verdictStep,
-  conclude: conclusionStep
+  conclude: conclusionStep,
+  conclude_facts: conclusionFactStep
 } as const;
 
 /** The same step for the corrective retry: its prompt also says why the previous reply was refused (one short plain line). Only the render differs; the parser, schema and policy are the step's own. */

@@ -19,9 +19,9 @@ import partialRule from "./conclusion-partial.md";
 
 export interface ConclusionRequest extends ArgumentStepBase {
   proposition: string;
-  /** `prepareConclusion`'s output: verified hypotheses and their evidence only. */
+  /** `prepareConclusion`'s output: every hypothesis of a facet map with its status and evidence (decision #63); a map without facets lists the verified ones only. */
   input: ConclusionInput;
-  /** Statement of each verified hypothesis, by id (exactly the ids in `input`). */
+  /** Statement of each listed hypothesis, by id (exactly the ids in `input`). */
   statements: Record<string, string>;
   /** The situation gate ended data_insufficient (decision #58): the premise is unconfirmed; the program writes the first line, the model must not state the situation as fact. */
   unconfirmed?: boolean;
@@ -35,7 +35,7 @@ export interface ConclusionPoint {
 export interface ConclusionResult {
   summary: string;
   points: ConclusionPoint[];
-  /** Every hypothesis a point rests on, for `applyConclusion`. */
+  /** Every verified hypothesis a point rests on, for `applyConclusion`; a point may also cite a hypothesis that is not verified, which is never added here. */
   basedOn: string[];
 }
 
@@ -63,8 +63,12 @@ const pick = (e: EvidenceInput): EvidenceInput => ({
   claim: e.claim,
   quote: e.quote,
   url: e.url,
-  stance: e.stance
+  stance: e.stance,
+  ...(e.core === true ? { core: true as const } : {})
 });
+/** A hypothesis without a status comes from a map that lists verified hypotheses only. */
+const isVerifiedIn = (h: ConclusionInput["hypotheses"][number]): boolean =>
+  h.status === undefined || h.status === "verified";
 const statementOf = (request: ConclusionRequest, id: string): string => {
   const value = Object.prototype.hasOwnProperty.call(request.statements, id) ? request.statements[id] : undefined;
   if (typeof value !== "string" || !value.trim()) throw new ArgumentStepError(`no statement for hypothesis ${id}`);
@@ -84,14 +88,16 @@ export function parseConclusion(raw: string, request: ConclusionRequest): Conclu
   const entries = list(item.points, "points");
   if (!entries.length) throw new ArgumentStepError("the conclusion needs at least one point");
   const allowed = new Set(request.input.hypotheses.map(h => h.id));
+  const verified = new Set(request.input.hypotheses.filter(isVerifiedIn).map(h => h.id));
   const basedOn: string[] = [];
   const points = entries.map(entry => {
     const one = parseObject(JSON.stringify(entry), ["text", "hypothesisIds"]);
     const body = text(one.text, "text");
     const hypothesisIds = citation(one.hypothesisIds, allowed, "hypothesisIds");
-    for (const id of hypothesisIds) if (!basedOn.includes(id)) basedOn.push(id);
+    for (const id of hypothesisIds) if (verified.has(id) && !basedOn.includes(id)) basedOn.push(id);
     return { text: body, hypothesisIds };
   });
+  if (!basedOn.length) throw new ArgumentStepError("at least one point must rest on a verified hypothesis");
   noIds(
     [summary, ...points.map(p => p.text)],
     request.input.hypotheses.flatMap(h => [h.id, ...h.evidence.map(e => e.id)])
@@ -100,7 +106,7 @@ export function parseConclusion(raw: string, request: ConclusionRequest): Conclu
   return { summary, points, basedOn };
 }
 
-/** Write the conclusion from verified hypotheses and their evidence only. Text-only. */
+/** Write the conclusion from the hypotheses and their evidence: compare their strength, rest it on the verified ones. Text-only. */
 export const conclusionStep: StepDefinition<ConclusionRequest, ConclusionResult> = {
   id: "argument-map.conclusion",
   version: 1,
@@ -113,6 +119,7 @@ export const conclusionStep: StepDefinition<ConclusionRequest, ConclusionResult>
       hypotheses: JSON.stringify(
         request.input.hypotheses.map(h => ({
           id: h.id,
+          ...(h.status === undefined ? {} : { status: h.status }),
           statement: statementOf(request, h.id),
           evidence: h.evidence.map(pick)
         }))
@@ -120,7 +127,7 @@ export const conclusionStep: StepDefinition<ConclusionRequest, ConclusionResult>
     }),
   schema: CONCLUSION_SCHEMA,
   policy: (prompt, request) => {
-    if (!request.input.hypotheses.length)
+    if (!request.input.hypotheses.some(isVerifiedIn))
       throw new ArgumentStepError("a conclusion needs at least one verified hypothesis");
     overBudget(prompt, CONCLUSION_SCHEMA);
   },

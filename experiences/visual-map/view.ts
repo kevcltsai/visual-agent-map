@@ -1399,7 +1399,15 @@ function requestArgumentResume(
     onFailed();
     (button as HTMLButtonElement).disabled = false;
     if (!(error instanceof ArgumentRunError) || error.code === "busy") return;
-    new Notice(t(error.code === "finished" ? "ui.argument_resume_refused_finished" : "ui.argument_resume_refused"));
+    new Notice(
+      t(
+        error.code === "finished"
+          ? "ui.argument_resume_refused_finished"
+          : error.code === "legacy"
+            ? "ui.argument_resume_refused_legacy"
+            : "ui.argument_resume_refused"
+      )
+    );
   });
 }
 
@@ -14479,10 +14487,12 @@ export class VisualAgentMapView extends ItemView {
           });
           return created;
         },
-        start: (mapPath, claim, presetAssumptions) =>
-          this.plugin.argumentRuns.start(mapPath, claim, { presetAssumptions }).catch((error: unknown) => {
-            if (error instanceof ArgumentRunError) new Notice(t("ui.argument_start_refused"));
-          })
+        start: (mapPath, claim, presetAssumptions, presetQuestionType) =>
+          this.plugin.argumentRuns
+            .start(mapPath, claim, { presetAssumptions, presetQuestionType })
+            .catch((error: unknown) => {
+              if (error instanceof ArgumentRunError) new Notice(t("ui.argument_start_refused"));
+            })
       });
       if (result.kind === "unreadable") new Notice(t("ui.argument_rerun_unreadable"));
       else await this.plugin.openMapInNewTab(result.mapPath);
@@ -26651,7 +26661,11 @@ export class VisualAgentMapView extends ItemView {
     const argumentRead = this.map.argumentMap === undefined ? null : readArgumentMap(this.map);
     const tipSkip =
       argumentRead?.kind === "usable"
-        ? new Set([argumentRead.data.roles.proposition, argumentRead.data.roles.eliminated])
+        ? new Set(
+            [argumentRead.data.roles.proposition, argumentRead.data.roles.eliminated].filter(
+              (id): id is string => id !== undefined
+            )
+          )
         : null;
     const tipped = new Set<string>();
     for (const node of this.canvasNodes()) {

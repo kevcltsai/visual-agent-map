@@ -16,6 +16,7 @@ const make = (phase, status, stopReason, facets = false) => {
   state.run.status = status;
   if (stopReason) state.run.stopReason = stopReason;
   if (facets) state.situation.facets = [{ id: 'f1', title: 'F', verdict: 'pending', reason: '', citedData: [], summary: '' }];
+  if (facets === true) state.situation.questionType = 'causal'; // a map made with question types resumes; `'legacy'` (0.34.0, no type) does not (R1 M1)
   return state;
 };
 const view = (state, id) => card.describeArgumentCard(state, id, t);
@@ -51,6 +52,23 @@ for (const facets of [false, true]) {
     assert.equal(view(make('analysis', 'running', undefined, facets), 'c').resume, undefined);
   });
 }
+
+test('R1 M1: a paused 0.34.0 facet map (no question type) shows the re-run hint on its card and no 接續 button', () => {
+  const hint = t('ui.argument_resume_refused_legacy');
+  const situation = view(make('situation', 'paused', 'user', 'legacy'), 's');
+  assert.equal(situation.resume, undefined);
+  assert.deepEqual(chipTexts(situation), ['已暫停']);
+  assert.ok(situation.lines.includes(hint), JSON.stringify(situation));
+  const state = make('analysis', 'paused', 'interrupted', 'legacy');
+  state.situation.gate = { state: 'matched', citedData: [] };
+  const conclusion = view(state, 'c');
+  assert.equal(conclusion.resume, undefined);
+  assert.ok(conclusion.lines.includes(hint) && conclusion.lines.includes('原因：上次中斷'));
+  const root = el('div');
+  card.renderArgumentCardBody(root, conclusion, () => {}, () => {});
+  const flat = []; const walk = n => { flat.push(n); n.children.forEach(walk); }; walk(root);
+  assert.equal(flat.filter(n => n.tag === 'button').length, 0);
+});
 
 test('every stop reason reads as plain words; an unknown reason adds no raw code', () => {
   const reasons = { user: '你已停止', interrupted: '上次中斷', limit: '研究次數已用完' };

@@ -1,5 +1,12 @@
 import { renderTemplate, type StepDefinition } from "../../step-runner";
-import { MAX_FACET_NEEDS, MAX_FACETS, MAX_SITUATION_NEEDS, MIN_FACETS } from "../../argument-map/model";
+import {
+  MAX_FACET_NEEDS,
+  MAX_FACETS,
+  MAX_SITUATION_NEEDS,
+  MIN_FACETS,
+  QUESTION_TYPES,
+  type QuestionType
+} from "../../argument-map/model";
 import {
   ArgumentStepError,
   grounded,
@@ -19,6 +26,8 @@ export interface FacetPlanRequest extends ArgumentStepBase {
   proposition: string;
   /** Rerun from an edited assumption card: these replace whatever the AI proposes (and are shown to it so the facets fit them). */
   presetAssumptions?: { label: string; value: string; reason: string }[];
+  /** Rerun from an edited definition card: the owner's question type; it wins over the AI's (decision #60). */
+  presetQuestionType?: QuestionType;
   /** Today's date (YYYY-MM-DD) from the program clock: a relative period ("20 years ago") needs it, and its numbers count as given. */
   today?: string;
 }
@@ -31,6 +40,8 @@ export interface FacetPlanResult {
   causalQuestions: string[];
   /** The proposition restated as the question the situation card is titled with. */
   question: string;
+  /** Decision #60: the AI's call, or the owner's preset when there is one. */
+  questionType: QuestionType;
 }
 
 /**
@@ -102,9 +113,10 @@ export const FACET_PLAN_SCHEMA = {
       minItems: MIN_FACETS
     },
     causalQuestions: { type: "array", items: { type: "string", minLength: 1 } },
-    question: { type: "string", minLength: 1 }
+    question: { type: "string", minLength: 1 },
+    questionType: { type: "string", enum: [...QUESTION_TYPES] }
   },
-  required: ["assumptions", "facets", "causalQuestions", "question"]
+  required: ["assumptions", "facets", "causalQuestions", "question", "questionType"]
 };
 
 /** A text long enough to be a baseline match: at least 4 latin characters or 2 CJK characters (a CJK character counts double). */
@@ -143,11 +155,13 @@ const baselineMatches = (baseline: string, items: { value: string }[]): boolean 
 };
 
 export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPlanResult {
-  const item = parseObject(raw, ["assumptions", "facets", "causalQuestions", "question"]);
+  const item = parseObject(raw, ["assumptions", "facets", "causalQuestions", "question", "questionType"]);
   const sources = [request.proposition];
   const today = request.today ? [request.today] : [];
   const question = text(item.question, "question");
   if (isCausal(question)) throw new ArgumentStepError("the question must restate only the factual claim, not a cause");
+  if (!(QUESTION_TYPES as readonly unknown[]).includes(item.questionType))
+    throw new ArgumentStepError("questionType must be fact or causal");
   const assumptionList = parseObject(JSON.stringify(item.assumptions), ["items"]);
   const items = list(assumptionList.items, "assumptions.items").map(entry => {
     const one = parseObject(JSON.stringify(entry), ["label", "value", "reason"]);
@@ -237,13 +251,16 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
     facets,
     definitionNeeds,
     causalQuestions: causal,
-    question
+    question,
+    questionType: request.presetQuestionType ?? (item.questionType as QuestionType)
   };
 }
 
 const PRESET_KEYS = ["label", "value", "reason"];
 /** A preset is a program value read from the owner's note: three non-blank strings per item, nothing else. */
-function checkPreset(preset: FacetPlanRequest["presetAssumptions"]): void {
+function checkPreset(preset: FacetPlanRequest["presetAssumptions"], type?: unknown): void {
+  if (type !== undefined && !(QUESTION_TYPES as readonly unknown[]).includes(type))
+    throw new ArgumentStepError("the preset question type is not usable");
   if (preset === undefined) return;
   if (
     !Array.isArray(preset) ||
@@ -275,7 +292,7 @@ export const facetPlanStep: StepDefinition<FacetPlanRequest, FacetPlanResult> = 
     }),
   schema: FACET_PLAN_SCHEMA,
   policy: (prompt, request) => {
-    checkPreset(request.presetAssumptions);
+    checkPreset(request.presetAssumptions, request.presetQuestionType);
     overBudget(prompt, FACET_PLAN_SCHEMA);
   },
   parse: parseFacetPlan

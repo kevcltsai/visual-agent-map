@@ -30,6 +30,8 @@ export interface FacetJudgeDatum {
   stance: string;
   /** Decided for good (supports or refutes): the judge copies it. */
   fixedStance?: PropStance;
+  /** Decision #64: the source needs a second one and has none; the judge may not rest a supports or refutes verdict on such data alone. Set by the program. */
+  uncertainSource?: true;
   /** An earlier `irrelevant` judgement that may be judged again in round 2. */
   priorStance?: PropStance;
 }
@@ -117,7 +119,8 @@ const pick = (d: FacetJudgeDatum): FacetJudgeDatum => ({
   url: d.url,
   stance: d.stance,
   ...(d.fixedStance ? { fixedStance: d.fixedStance } : {}),
-  ...(d.priorStance ? { priorStance: d.priorStance } : {})
+  ...(d.priorStance ? { priorStance: d.priorStance } : {}),
+  ...(d.uncertainSource ? { uncertainSource: true } : {})
 });
 const sourcesOf = (request: FacetJudgeRequest): string[] => [
   request.proposition,

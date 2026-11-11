@@ -321,3 +321,139 @@ test('live4: a facet-map card for a not-found datum or need shows readable text 
     for (const code of WHY_CODES) assert.ok(!text.includes(code), `${code} in ${id}: ${text}`);
   }
 });
+
+// ---- 0.34.0 facet maps (no questionType): the cards read exactly as before question types (decision #66) ------------------------------------
+test('0.34.0 facet maps (completed maps match the stored golden; paused ones show the re-run hint): every card matches the output stored in tests/fixtures/argument-card-v034.json', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const hyps = () => [verifiedHyp('h1'), hyp('h2', [need('n4', 'found', { stance: 'contradicts' })], { location: 'eliminated', eliminationReason: 'refuted: evidence', aiVerdict: 'refuted' }), hyp('h3', [need('n5', 'found'), need('n6', 'not_found', { reason: 'not_found: gone' })], { location: 'eliminated', eliminationReason: 'round_limit: no more', aiVerdict: 'undecided' }), hyp('h4', [need('n7', 'searching')], { aiVerdict: 'supported', alternative: true })];
+  const build = (phase, gate, status, stopReason) => {
+    const state = facetState(phase, gate, { hypotheses: hyps() });
+    state.run.status = status;
+    if (stopReason) state.run.stopReason = stopReason;
+    return state;
+  };
+  const cases = {
+    completed: build('concluded', { state: 'matched', citedData: ['d1'], round: 1 }, 'finished'),
+    completed_unconfirmed: build('concluded', { state: 'unconfirmed', kind: 'data_insufficient', reason: 'x', citedData: [], round: 2 }, 'finished'),
+    stopped_insufficient: build('stopped_mismatch', { state: 'unmatched', kind: 'data_insufficient', reason: 'x', citedData: [], round: 2 }, 'finished', 'data_missing'),
+    paused_situation: build('situation', { state: 'pending', citedData: [] }, 'paused', 'user'),
+    paused_analysis: build('analysis', { state: 'matched', citedData: ['d1'], round: 1 }, 'paused', 'interrupted')
+  };
+  const out = {};
+  for (const [name, state] of Object.entries(cases)) {
+    out[name] = {};
+    for (const id of [...allIds, 'h1', 'h2', 'h3', 'h4', 'n4', 'n5', 'n6', 'n7']) out[name][id] = card.describeArgumentCard(state, id, t);
+  }
+  const file = path.join(__dirname, 'fixtures', 'argument-card-v034.json');
+  if (process.env.UPDATE_GOLDEN_V034) fs.writeFileSync(file, `${JSON.stringify(out, null, 1)}\n`);
+  assert.equal(JSON.stringify(out, null, 1) + '\n', fs.readFileSync(file, 'utf8'));
+  for (const view of Object.values(out).flatMap(map => Object.values(map))) assert.equal(view.badge, undefined, 'no badge on a map made before question types');
+  assert.equal(out.completed.s.chips[0].text, '✓ 符合命題');
+  // R1 M1 (decision #66, spec §9): the golden binds completed maps only. An unfinished one is never resumed, so its card shows the re-run hint instead of 接續.
+  for (const name of ['paused_situation', 'paused_analysis']) {
+    for (const view of Object.values(out[name])) assert.equal(view.resume, undefined, `${name}: no resume button`);
+  }
+  assert.ok(out.paused_analysis.c.lines.includes(t('ui.argument_resume_refused_legacy')));
+  assert.ok(out.paused_situation.s.lines.includes(t('ui.argument_resume_refused_legacy')));
+});
+
+// ---- new design (question types, core evidence, three groups, fact and comparison conclusions) ---------------------------------------------
+const typed = (type, phase, gate, verdicts, over = {}) => {
+  const state = facetState(phase, gate, { hypotheses: over.hypotheses ?? [] });
+  state.situation.questionType = type;
+  state.situation.facets.forEach((f, i) => { f.verdict = verdicts[i]; });
+  if (type === 'causal') state.roles.unconfirmed = 'u';
+  return state;
+};
+const done = { state: 'matched', citedData: [], round: 1 };
+
+test('situation card: the question type is a badge on the type line, and the counts say what the facets found', () => {
+  const fact = card.describeArgumentCard(typed('fact', 'analysis', done, ['refutes', 'insufficient', 'insufficient']), 's', t);
+  same(fact.badge, { text: '事實題', tone: 'qtype' });
+  same(fact.chips, [], 'a fact map has no premise chip');
+  same(fact.lines, ['3 個面向：1 反駁、2 資料不足']);
+  assert.ok(fact.label.includes('事實題'));
+  const causal = card.describeArgumentCard(typed('causal', 'analysis', done, ['supports', 'supports', 'supports']), 's', t);
+  same(causal.badge, { text: '因果題', tone: 'qtype' });
+  same(causal.chips.map(c => c.text), ['✓ 前提成立']);
+  same(causal.lines, ['3 個面向：3 支持']);
+  const stopped = card.describeArgumentCard(typed('causal', 'stopped_mismatch', { state: 'unmatched', kind: 'not_matching', reason: 'r', citedData: [] }, ['refutes', 'insufficient', 'insufficient']), 's', t);
+  assert.equal(stopped.badge.text, '因果題');
+});
+
+test('fact conclusion card: the state comes from the facets, the answer from the summary, the number of facets without data is said', () => {
+  const cases = [[['supports', 'supports', 'supports'], '結論・成立', 0], [['refutes', 'insufficient', 'insufficient'], '結論・不成立', 2], [['supports', 'refutes', 'insufficient'], '結論・部分成立', 1]];
+  for (const [verdicts, kind, lacks] of cases) {
+    const state = typed('fact', 'concluded', done, verdicts);
+    state.conclusion = { state: 'concluded', basedOn: ['f1'], missing: [] };
+    const view = card.describeArgumentCard(state, 'c', t);
+    assert.equal(view.kind, kind);
+    assert.equal(view.state, 'concluded');
+    assert.equal(view.titleFrom, 'summary');
+    same(view.lines, lacks ? [`其中 ${lacks} 個面向資料不足`] : []);
+    assert.ok(!JSON.stringify(view).includes('驗證完成'), 'no hypothesis count on a fact map');
+  }
+  const running = card.describeArgumentCard(typed('fact', 'analysis', done, ['supports', 'supports', 'supports']), 'c', t);
+  assert.equal(running.state, 'in_progress');
+  assert.equal(running.titleFrom, 'text');
+  assert.ok(!running.title.includes('／3') && running.lines.length === 0, JSON.stringify(running));
+  const none = card.describeArgumentCard(typed('fact', 'stopped_mismatch', { state: 'unmatched', kind: 'data_insufficient', reason: 'r', citedData: [], round: 2 }, ['insufficient', 'insufficient', 'insufficient']), 'c', t);
+  assert.equal(none.state, 'stopped_insufficient', 'all facets short of data keeps the outlined 資料不足 card');
+});
+
+test('causal conclusion card: a comparison with the verified count; an older facet map keeps its words', () => {
+  const three = [verifiedHyp('h1'), verifiedHyp('h2'), verifiedHyp('h3')];
+  const state = typed('causal', 'concluded', done, ['supports', 'supports', 'supports'], { hypotheses: three });
+  const view = card.describeArgumentCard(state, 'c', t);
+  assert.equal(view.kind, '結論・比較（3 個驗證完成）');
+  assert.equal(view.state, 'concluded');
+  delete state.situation.questionType;
+  assert.equal(card.describeArgumentCard(state, 'c', t).kind, '結論・已結案');
+});
+
+test('core evidence: the core card carries the badge, a missing supplementary card says it does not block, the hypothesis shows the core state', () => {
+  const core = need('n1', 'found', { core: true });
+  const supp = need('n2', 'not_found', { reason: 'not_found: gone' });
+  const state = typed('causal', 'analysis', done, ['supports', 'supports', 'supports'], { hypotheses: [hyp('h1', [core, supp], { aiVerdict: 'supported' })] });
+  const coreView = card.describeArgumentCard(state, 'n1', t);
+  same(coreView.badge, { text: '核心', tone: 'core' });
+  assert.ok(coreView.label.includes('核心'));
+  const suppView = card.describeArgumentCard(state, 'n2', t);
+  assert.equal(suppView.badge, undefined);
+  assert.equal(suppView.kind, '證據・補充');
+  assert.equal(suppView.lines[0], '補充需求，不擋驗證');
+  assert.equal(suppView.dashed, true);
+  same(card.describeArgumentCard(state, 'h1', t).lines, ['核心證據支持・第 1／3 輪']);
+  state.hypotheses[0].needs[0] = need('n1', 'found', { core: true, stance: 'contradicts' });
+  same(card.describeArgumentCard(state, 'h1', t).lines, ['核心證據反對・第 1／3 輪']);
+  state.hypotheses[0].needs[0] = need('n1', 'not_found', { core: true });
+  const dead = card.describeArgumentCard(state, 'h1', t);
+  same(dead.lines, ['核心證據尚未找到・第 1／3 輪']);
+  assert.equal(card.describeArgumentCard(state, 'n1', t).kind, '證據', 'a core is never called supplementary');
+  // no core (an older map or a V1 map): the old need count and no supplementary wording
+  const old = typed('causal', 'analysis', done, ['supports', 'supports', 'supports'], { hypotheses: [hyp('h1', [need('n1', 'found'), need('n2', 'not_found', { reason: 'not_found: gone' })])] });
+  assert.ok(card.describeArgumentCard(old, 'h1', t).lines[0].startsWith('證據需求 1／2 找到'));
+  assert.equal(card.describeArgumentCard(old, 'n2', t).kind, '證據');
+});
+
+test('three groups: unconfirmed counts the limit-cut ones, eliminated holds the refuted only; a hypothesis cut off by the limit is called unconfirmed', () => {
+  const cut = hyp('h2', [need('n3', 'found')], { location: 'eliminated', eliminationReason: 'round_limit: no more', aiVerdict: 'undecided' });
+  const refuted = hyp('h3', [need('n4', 'found', { stance: 'contradicts' })], { location: 'eliminated', eliminationReason: 'refuted: evidence', aiVerdict: 'refuted' });
+  const state = typed('causal', 'concluded', done, ['supports', 'supports', 'supports'], { hypotheses: [verifiedHyp('h1'), cut, refuted] });
+  same(card.describeArgumentCard(state, 'u', t).lines, ['未確認 1 個']);
+  assert.equal(card.describeArgumentCard(state, 'u', t).role, 'group');
+  same(card.describeArgumentCard(state, 'e', t).lines, ['1 個']);
+  const chip = card.describeArgumentCard(state, 'h2', t).chips[0];
+  same(chip, { tone: 'maybe', text: '未確認' });
+  assert.equal(card.describeArgumentCard(state, 'h3', t).chips[0].text, '已淘汰');
+  const stopped = typed('causal', 'stopped_mismatch', { state: 'unmatched', kind: 'not_matching', reason: 'r', citedData: [] }, ['refutes', 'insufficient', 'insufficient']);
+  same(card.describeArgumentCard(stopped, 'u', t).lines, [], 'no count on a stopped premise');
+});
+
+test('renderArgumentKind: the badge is a text-only span inside the type line', () => {
+  const spans = [];
+  const header = { createSpan: o => { const s = { cls: o.cls, text: o.text, dataset: {}, createSpan: c => { const k = { cls: c.cls, text: c.text }; s.kids = [...(s.kids || []), k]; return k; } }; spans.push(s); return s; } };
+  card.renderArgumentKind(header, { role: 'situation', kind: '現況', badge: { text: '<b>事實題</b>', tone: 'qtype' }, titleFrom: 'note', chips: [], lines: [], label: '現況' });
+  assert.equal(spans[0].kids[0].cls, 'vam-argument-badge is-qtype');
+  assert.equal(spans[0].kids[0].text, '<b>事實題</b>');
+});

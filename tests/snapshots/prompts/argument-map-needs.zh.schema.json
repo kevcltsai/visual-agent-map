@@ -11,10 +11,14 @@
           "text": {
             "type": "string",
             "minLength": 1
+          },
+          "core": {
+            "type": "boolean"
           }
         },
         "required": [
-          "text"
+          "text",
+          "core"
         ]
       },
       "minItems": 1

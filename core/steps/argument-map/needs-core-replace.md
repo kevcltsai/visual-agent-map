@@ -1,0 +1,1 @@
+The earlier core need was not found. You may list at most one new core need, marked with "core": true, only if it asks for something that can decide the hypothesis and can be found; set "core": false on every other need.

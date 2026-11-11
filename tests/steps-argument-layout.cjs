@@ -142,3 +142,17 @@ test('facet map: under the situation the definitions card comes first, then the 
   const at = id => arranged.find(n => n.id === id);
   assert.ok(at('as').y < at('f1').y && at('f1').y < at('f2').y && at('f2').y < at('f3').y);
 });
+
+// ---- question types: optional group roles ----
+test('layout: the groups are optional and unconfirmed sorts between verified and eliminated', () => {
+  const machine = S.load('core/argument-map/machine.ts');
+  const model = S.load('core/argument-map/model.ts');
+  const lean = machine.newArgumentMap({ proposition: 'p', situation: 's', conclusion: 'c' }, 'r');
+  assert.deepEqual([...model.managedNodeIds({ argumentMap: lean })].sort(), ['c', 'p', 's']);
+  const lay = require('./support.cjs').load('core/argument-map/layout.ts');
+  const ranks = lay.siblingRanks(lean);
+  assert.equal(ranks.has('undefined'), false, 'no rank is written for an absent group');
+  const full = machine.newArgumentMap({ proposition: 'p', situation: 's', conclusion: 'c', verified: 'v', unconfirmed: 'u', eliminated: 'e' }, 'r');
+  const r = lay.siblingRanks(full);
+  assert.ok(r.get('v') < r.get('u') && r.get('u') < r.get('e'));
+});

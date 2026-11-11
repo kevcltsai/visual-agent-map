@@ -265,3 +265,42 @@ test('counterexample: a press on one map does not move focus in a bar of another
   view.plugin.argumentRuns.isRunning = () => false;
   assert.equal(buttons(repaint(view).parent)[0].focused, undefined);
 });
+
+test('legacy refusal: resuming a pre-question-type facet map shows the "use the definitions card" notice, not the generic one', async () => {
+  const runs = new Plugin().argumentRuns;
+  const base = await runs.start('Nothing.md', '').catch(error => error);
+  const { view } = fakeView(make({ status: 'paused', stopReason: 'user' }));
+  view.resumeResult = () => Promise.reject(Object.assign(Object.create(Object.getPrototypeOf(base)), base, { code: 'legacy' }));
+  notices.length = 0;
+  buttons(bars(render(view))[0])[0].click();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(notices, [translate('en', 'ui.argument_resume_refused_legacy')]);
+  assert.match(notices[0], /Re-run with these assumptions/);
+});
+
+test('R1 M1: an unfinished facet map made before question types offers no resume and says to re-run from the definitions card; a typed one still resumes', () => {
+  for (const stopReason of ['user', 'interrupted', 'error']) {
+    const legacy = make({ status: 'paused', stopReason });
+    legacy.situation.facets = [{ id: 'f1', title: 'F', verdict: 'supports', reason: '', citedData: [], summary: '' }];
+    const view = describe(legacy, false);
+    assert.equal(view.action, null, stopReason);
+    assert.equal(view.detail, t('ui.argument_resume_refused_legacy'), stopReason);
+    legacy.situation.questionType = 'causal';
+    assert.equal(describe(legacy, false).action, 'resume', `${stopReason}: a typed map resumes`);
+  }
+});
+
+test('fact question: the running bar says the conclusion is being written (no hypothesis round); a paused one shows no verified count', () => {
+  const fact = make({ calls: 4 });
+  fact.situation.facets = [{ id: 'f1', title: 'F', verdict: 'supports', reason: '', citedData: [], summary: '' }];
+  fact.situation.questionType = 'fact';
+  assert.deepEqual(describe(fact, true), { tone: 'run', title: 'Writing the conclusion from the facets', count: '4/78 research calls used', action: 'stop' });
+  fact.run.status = 'paused';
+  fact.run.stopReason = 'user';
+  const paused = describe(fact, false);
+  assert.equal(paused.detail, undefined);
+  assert.equal(paused.action, 'resume');
+  const causal = make({ status: 'paused', stopReason: 'user' });
+  causal.situation.questionType = 'causal';
+  assert.match(describe(causal, false).detail, /hypotheses verified/);
+});

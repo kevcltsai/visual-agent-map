@@ -39,7 +39,20 @@ function argumentEvidenceSchema(responseSchema: typeof baseResponseSchema, needI
               properties: { number: { type: "string" }, period: { type: "string" }, unit: { type: "string" } },
               required: ["number", "period", "unit"]
             },
-            note: { type: "string", maxLength: 200 }
+            note: { type: "string", maxLength: 200 },
+            // Decision #64: optional in the schema; a missing tier is treated as `other` by the caller, an unknown one is refused by the parser.
+            tier: { type: "string", enum: ["primary", "other"] },
+            second: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                url: { type: "string" },
+                quote: { type: "string", maxLength: 200 },
+                claim: { type: "string" },
+                agrees: { type: "boolean" }
+              },
+              required: ["url", "quote", "claim", "agrees"]
+            }
           },
           required: ["need", "status", "stance", "claim", "quote", "url"]
         }

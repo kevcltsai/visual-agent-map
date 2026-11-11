@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Hypothesis research now tells fact questions from causal questions. The current-situation card shows the type, and you can change it on the definitions card before you re-run.
+- Fact questions skip the hypothesis stage: the conclusion card is one of holds, does not hold, holds in part or not enough data, built from the facets, and says how many facets lacked data.
+- Causal questions stop when the current situation does not match, and otherwise compare the verified hypotheses in the conclusion.
+- Each hypothesis now has one core piece of evidence, marked "Core". Supplementary evidence that is not found no longer blocks a hypothesis.
+- A new group, "Hypotheses with evidence, unconfirmed", holds hypotheses that have evidence but were not confirmed. "Eliminated" now holds only hypotheses the evidence refuted.
+- Evidence from a page that is not an official, academic or major news source now needs a second independent source; without one it counts as uncertain and cannot carry a facet on its own.
+- Hypothesis-research maps made before this change still open and show as before. An unfinished one cannot be resumed; use "Re-run with these assumptions" on its definitions card to start a new map.
 - Topic chat Synthesize now asks how deep to integrate when the subtopics have subtopics of their own, integrates the whole subtree (rewriting each note, with a backup) instead of re-researching the direct subtopics, and tells how many topics it read and how many were not researched.
 
 ## [0.34.0] - 2026-11-11

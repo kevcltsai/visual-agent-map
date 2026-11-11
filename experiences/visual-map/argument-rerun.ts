@@ -2,7 +2,7 @@
  * Re-run from the definitions card (V1 boost). The owner edits the definitions table in the card's note; this reads it back (the inverse of
  * `definitionsDetail`) and starts a NEW map (created in the mind-maps folder like any new map) with those items as the assumption card. The original map is never written.
  */
-import type { AssumptionItem } from "../../core/argument-map/model";
+import type { AssumptionItem, QuestionType } from "../../core/argument-map/model";
 
 const ENTITY: Record<string, string> = { lt: "<", gt: ">", amp: "&" };
 /** The reverse of a full-width twin (U+FF01..U+FF5E) back to its ASCII character. */
@@ -55,6 +55,31 @@ export function parseDefinitionsTable(detail: string): AssumptionItem[] | null {
   return items;
 }
 
+/** Names the 題型 line may use, in the three languages the note is written in (and the stored words). */
+const QUESTION_TYPE_NAMES: Record<string, QuestionType> = {
+  事實題: "fact",
+  事实题: "fact",
+  "fact question": "fact",
+  fact: "fact",
+  因果題: "causal",
+  因果题: "causal",
+  "causal question": "causal",
+  causal: "causal"
+};
+
+/**
+ * The question type the owner left on the definitions note's 題型 line (the lines above the table): a type, `undefined` when there is
+ * no such line (the AI decides), or `null` when the line is there but its value is not a known type (nothing is guessed).
+ */
+export function parseQuestionType(detail: string): QuestionType | null | undefined {
+  for (const raw of detail.split(/\r?\n/)) {
+    if (raw.trim().startsWith("|")) return undefined;
+    const m = /^\s*(?:題型|题型|question type)\s*[:：]\s*(.*?)\s*$/i.exec(raw);
+    if (m) return QUESTION_TYPE_NAMES[m[1].toLowerCase()] ?? null;
+  }
+  return undefined;
+}
+
 export interface RerunPorts {
   /** The definitions card's note body (what the owner may have edited). */
   readDefinitions(): Promise<string>;
@@ -63,17 +88,24 @@ export interface RerunPorts {
   /** Creates the new map in the mind-maps folder (not necessarily next to the original) and returns its path. Only called after the table was read. */
   createMap(): Promise<string>;
   /** Starts the run on the new map with the assumption card preset. */
-  start(mapPath: string, proposition: string, presetAssumptions: AssumptionItem[]): Promise<void>;
+  start(
+    mapPath: string,
+    proposition: string,
+    presetAssumptions: AssumptionItem[],
+    presetQuestionType?: QuestionType
+  ): Promise<void>;
 }
 
 /** "unreadable": nothing was created. "started": the new map's path (the run is not awaited by the caller's UI). */
 export type RerunResult = { kind: "unreadable" } | { kind: "started"; mapPath: string };
 
 export async function rerunWithAssumptions(ports: RerunPorts): Promise<RerunResult> {
-  const items = parseDefinitionsTable(await ports.readDefinitions());
+  const detail = await ports.readDefinitions();
+  const items = parseDefinitionsTable(detail);
+  const questionType = parseQuestionType(detail);
   const proposition = ports.proposition().trim();
-  if (!items?.length || !proposition) return { kind: "unreadable" };
+  if (!items?.length || !proposition || questionType === null) return { kind: "unreadable" };
   const mapPath = await ports.createMap();
-  void ports.start(mapPath, proposition, items);
+  void ports.start(mapPath, proposition, items, questionType);
   return { kind: "started", mapPath };
 }

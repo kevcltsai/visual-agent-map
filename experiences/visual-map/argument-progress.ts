@@ -1,5 +1,12 @@
 import type { TranslationKey } from "../../i18n";
-import { MAX_RESEARCH_CALLS, MIN_VERIFIED, verifiedCount, type ArgumentMapData } from "../../core/argument-map/model";
+import {
+  isFactMap,
+  isLegacyFacetMap,
+  MAX_RESEARCH_CALLS,
+  MIN_VERIFIED,
+  verifiedCount,
+  type ArgumentMapData
+} from "../../core/argument-map/model";
 
 type Translate = (key: TranslationKey, ...values: unknown[]) => string;
 export type ArgumentProgressTone = "run" | "paused" | "warn" | "done";
@@ -51,6 +58,9 @@ export function describeArgumentProgress(state: ArgumentMapData, owned: boolean,
         action: "stop"
       };
     }
+    // A fact question has no hypothesis rounds: after the facets it only writes the conclusion.
+    if (isFactMap(state))
+      return { tone: "run", title: t("ui.argument_bar_concluding_facts"), count: used, action: "stop" };
     const verifying = state.hypotheses.filter(h => h.location === "verifying");
     const round = verifying.reduce((most, h) => Math.max(most, h.round), 1);
     const searching = verifying.reduce((sum, h) => sum + h.needs.filter(need => need.state === "searching").length, 0);
@@ -62,6 +72,15 @@ export function describeArgumentProgress(state: ArgumentMapData, owned: boolean,
       action: "stop"
     };
   }
+  // Decision #66 (R1 M1): an unfinished map made before question types is never resumed; the bar says how to start a new one.
+  if (isLegacyFacetMap(state))
+    return {
+      tone: "paused",
+      title: t("ui.argument_bar_paused"),
+      detail: t("ui.argument_resume_refused_legacy"),
+      count: used,
+      action: null
+    };
   if (run.stopReason === "interrupted")
     return {
       tone: "warn",
@@ -74,7 +93,7 @@ export function describeArgumentProgress(state: ArgumentMapData, owned: boolean,
   return {
     tone: "paused",
     title: t("ui.argument_bar_paused"),
-    detail: t("ui.argument_bar_verified_0_1", verifiedCount(state), MIN_VERIFIED),
+    ...(isFactMap(state) ? {} : { detail: t("ui.argument_bar_verified_0_1", verifiedCount(state), MIN_VERIFIED) }),
     count: used,
     action: "resume"
   };

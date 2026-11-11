@@ -407,7 +407,7 @@ test('V1 boost: managedNodeIds also lists facet card ids and the assumption card
   assert.deepEqual([...model.managedNodeIds({ argumentMap: { situation: { data: [], assumptions: 'junk', facets: 'junk' } } })], []);
   const state = machine.applySituationPlan(machine.newArgumentMap({ proposition: 'p', situation: 's', conclusion: 'c', verified: 'v', eliminated: 'e' }, 'r'), {
     assumptions: { id: 'as9', items: [{ label: 'a', value: 'b', reason: 'c' }] },
-    facets: [1, 2, 3].map(i => ({ id: `f${i}`, title: `F${i}`, needs: [{ id: `d${i}`, need: `n${i}` }] })), causalQuestions: []
+    facets: [1, 2, 3].map(i => ({ id: `f${i}`, title: `F${i}`, needs: [{ id: `d${i}`, need: `n${i}` }] })), causalQuestions: [], questionType: 'fact'
   });
   assert.deepEqual([...model.managedNodeIds({ argumentMap: state })].sort(), ['as9', 'c', 'd1', 'd2', 'd3', 'e', 'f1', 'f2', 'f3', 'p', 's', 'v']);
 });
@@ -427,4 +427,20 @@ test('definitions re-run: a double click creates and starts ONE new map; the gua
   assert.equal(h.notices.length, 0, h.notices.join('|'));
   await h.view.rerunFromDefinitions(def.id);
   assert.equal(starts.length, 2, 'the guard is reset after the first finished');
+});
+
+test('definitions re-run: the 題型 line on the definitions note reaches start as presetQuestionType; no line starts it undefined', async () => {
+  const starts = [];
+  const h = await harness([...'PSCVEHNF'].concat('D', 'A'), { argumentRuns: { start: async (path, claim, opts) => { starts.push(opts); } }, openMapInNewTab: async () => {} });
+  const def = h.nodes[9];
+  h.view.map.argumentMap.situation.assumptions = { id: def.id, items: [{ label: 'l', value: 'v', reason: 'r' }] };
+  await h.repo.saveMap(MAP, h.view.map);
+  await h.repo.updateNote(def.path, { detail: '題型: 事實題\n\n| a | b | c |\n| --- | --- | --- |\n| l | v | r |' });
+  await h.view.rerunFromDefinitions(def.id);
+  await h.repo.updateNote(def.path, { detail: '| a | b | c |\n| --- | --- | --- |\n| l | v | r |' });
+  await h.view.rerunFromDefinitions(def.id);
+  assert.equal(starts.length, 2);
+  assert.equal(starts[0].presetQuestionType, 'fact');
+  assert.equal(starts[1].presetQuestionType, undefined);
+  assert.equal(h.notices.length, 0, h.notices.join('|'));
 });

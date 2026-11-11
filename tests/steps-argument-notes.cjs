@@ -254,7 +254,8 @@ test('live4: a not-found datum or need with a composite searchLog.why renders no
     const md = N.notFoundDetail(t, log, code);
     noCode(md);
     assert.ok(!md.includes('&#58;') || !md.includes(code), md);
-    assert.ok(md.includes(t(`ui.argument_why_${code}`)) && md.includes('16–19歲13&#46;9&#37;') || md.includes('13'), md);
+    assert.ok(md.includes(t(`ui.argument_why_${code}`)), `readable reason missing: ${md}`);
+    assert.ok(md.includes('13.9&#37;'), `encoded agent note missing: ${md}`);
     assert.ok(md.includes(t('ui.argument_note_agent_note')), md);
     const d = datum({ id: 'd9', state: 'not_found', proof: undefined, propStance: undefined, stanceReason: undefined, reason: code, searchLog: log });
     const st = state([datum(), d], [facet(), facet({ id: 'f2', verdict: 'insufficient', reason: why })]);

@@ -45817,7 +45817,10 @@ function pausedParts(state, phase, t2) {
   const reason = run.stopReason === void 0 ? void 0 : PAUSE_REASON_KEY[run.stopReason];
   const lines = reason ? [t2("ui.argument_reason_0", t2(reason))] : [];
   if (isLegacyFacetMap(state))
-    return { chip: { tone: "maybe", text: t2("ui.argument_bar_paused") }, lines: [...lines, t2("ui.argument_resume_refused_legacy")] };
+    return {
+      chip: { tone: "maybe", text: t2("ui.argument_bar_paused") },
+      lines: [...lines, t2("ui.argument_resume_refused_legacy")]
+    };
   return {
     chip: { tone: "maybe", text: t2("ui.argument_bar_paused") },
     lines,
@@ -45970,7 +45973,12 @@ function hypothesisCard(state, h, t2) {
   const shown = displayVerdict(h);
   const cutOff = isLimitCut(h) || state.run.status === "finished" && h.location === "verifying" && shown === "verifying";
   const cutChip = state.roles.unconfirmed ? "ui.argument_unconfirmed_chip" : "ui.argument_unverified_limit";
-  const chips = h.location === "eliminated" || cutOff ? [{ tone: state.roles.unconfirmed && cutOff ? "maybe" : "gap", text: t2(cutOff ? cutChip : "ui.argument_eliminated_chip") }] : [
+  const chips = h.location === "eliminated" || cutOff ? [
+    {
+      tone: state.roles.unconfirmed && cutOff ? "maybe" : "gap",
+      text: t2(cutOff ? cutChip : "ui.argument_eliminated_chip")
+    }
+  ] : [
     shown === "verifying" ? { tone: "open", text: t2("ui.argument_verifying") } : { tone: shown === "supported" ? "yes" : shown === "refuted" ? "no" : "open", text: t2(VERDICT_KEY[shown]) }
   ];
   if (isVerified(h)) chips.push({ tone: "yes", text: t2("ui.argument_verified_done") });
@@ -46112,8 +46120,7 @@ function facetSituationCard(state, t2) {
       facets.length,
       parts.filter(([, count3]) => count3 > 0).map(([key4, count3]) => t2(key4, count3)).join(t2("ui.argument_list_sep"))
     );
-    if (type === "fact")
-      return { ...base, lines: [line2], label: [kind, typeText, line2].join(", ") };
+    if (type === "fact") return { ...base, lines: [line2], label: [kind, typeText, line2].join(", ") };
     return finish({ tone: "yes", text: t2("ui.argument_gate_premise_holds") }, [line2]);
   }
   if (gate.state === "matched")
@@ -46131,7 +46138,8 @@ function facetSituationCard(state, t2) {
     const data = state.situation.data;
     const count3 = t2("ui.argument_data_count_0_1", data.filter((d) => d.state === "found").length, data.length);
     const paused = pausedParts(state, "situation", t2);
-    if (paused) return { ...finish(paused.chip, [count3, ...paused.lines]), ...paused.resume ? { resume: paused.resume } : {} };
+    if (paused)
+      return { ...finish(paused.chip, [count3, ...paused.lines]), ...paused.resume ? { resume: paused.resume } : {} };
     return finish({ tone: "open", text: t2("ui.argument_gate_pending") }, [count3]);
   }
   if (gate.kind === "data_insufficient")
@@ -46609,8 +46617,10 @@ var OUTCOME_TEXT = {
   insufficient: conclusion_fact_insufficient_default.trim()
 };
 var checked = (request) => {
-  if (!FACET_COMPOSITES.includes(request.outcome)) throw new ArgumentStepError("unknown outcome");
-  if (!Array.isArray(request.facets) || !request.facets.length) throw new ArgumentStepError("a fact conclusion needs facets");
+  if (!FACET_COMPOSITES.includes(request.outcome))
+    throw new ArgumentStepError("unknown outcome");
+  if (!Array.isArray(request.facets) || !request.facets.length)
+    throw new ArgumentStepError("a fact conclusion needs facets");
   return request.facets;
 };
 var sourcesOf2 = (request) => [
@@ -46637,7 +46647,10 @@ function parseConclusionFact(raw, request) {
     return { text: body, facetIds };
   });
   const replyTexts = [summary, ...points.map((p) => p.text)];
-  noIds(replyTexts, request.facets.map((f) => f.id));
+  noIds(
+    replyTexts,
+    request.facets.map((f) => f.id)
+  );
   grounded(replyTexts, sourcesOf2(request));
   return { summary, points, basedOn };
 }
@@ -47474,7 +47487,10 @@ function parseNeeds(raw, request) {
     throw new ArgumentStepError(`expected 1 to ${request.max} needs`);
   const seen = new Set(request.existing.map((n) => normalized(n.text)));
   const needs = entries.map((entry) => {
-    const one = parseObject(JSON.stringify(entry), entry && typeof entry === "object" && "core" in entry ? ["text", "core"] : ["text"]);
+    const one = parseObject(
+      JSON.stringify(entry),
+      entry && typeof entry === "object" && "core" in entry ? ["text", "core"] : ["text"]
+    );
     if (one.core !== void 0 && typeof one.core !== "boolean") throw new ArgumentStepError("core must be a boolean");
     if (one.core === true && !request.core) throw new ArgumentStepError("no core need is asked for");
     const body = text8(one.text, "text");
@@ -47513,7 +47529,13 @@ var needsStep = {
     ),
     coreRule: ` ${request.core ? CORE_RULES[request.core] : NO_CORE_RULE}`,
     existing: JSON.stringify(
-      request.existing.map((n) => ({ text: n.text, state: n.state, claim: n.claim, period: n.period, reason: n.reason }))
+      request.existing.map((n) => ({
+        text: n.text,
+        state: n.state,
+        claim: n.claim,
+        period: n.period,
+        reason: n.reason
+      }))
     )
   }),
   schema: NEEDS_SCHEMA,
@@ -48134,7 +48156,9 @@ var ArgumentRuns = class {
           const h = next.hypotheses.find((x) => x.id === action.hypothesisId);
           return {
             next,
-            reparent: [{ id: h.id, parentId: (_b2 = (_a2 = next.roles.unconfirmed) != null ? _a2 : next.roles.eliminated) != null ? _b2 : next.roles.conclusion }],
+            reparent: [
+              { id: h.id, parentId: (_b2 = (_a2 = next.roles.unconfirmed) != null ? _a2 : next.roles.eliminated) != null ? _b2 : next.roles.conclusion }
+            ],
             notes: () => this.noteDetail(
               map,
               h.id,
@@ -48557,7 +48581,12 @@ var ArgumentRuns = class {
         reason: f.reason,
         data: state.situation.data.filter((d) => d.facetId === f.id && d.state === "found" && d.proof && d.propStance !== "irrelevant").map((d) => {
           var _a3;
-          return { claim: d.proof.claim, quote: d.proof.quote, url: d.proof.url, stance: (_a3 = d.propStance) != null ? _a3 : "uncertain" };
+          return {
+            claim: d.proof.claim,
+            quote: d.proof.quote,
+            url: d.proof.url,
+            stance: (_a3 = d.propStance) != null ? _a3 : "uncertain"
+          };
         })
       })),
       ...isSituationUnconfirmed(state) ? { unconfirmed: true } : {}
@@ -48575,7 +48604,9 @@ var ArgumentRuns = class {
         isSituationUnconfirmed(next) ? this.t("ui.argument_premise_unconfirmed") : void 0
       );
       const path = (_a3 = map.nodes.find((n) => n.id === next.roles.conclusion)) == null ? void 0 : _a3.path;
-      this.ports.log(`argument-run concluded runId=${s.run.runId} phase=concluded questionType=fact outcome=${outcome}`);
+      this.ports.log(
+        `argument-run concluded runId=${s.run.runId} phase=concluded questionType=fact outcome=${outcome}`
+      );
       return {
         next,
         notes: async () => {
@@ -48702,10 +48733,7 @@ var ArgumentRuns = class {
       if (!began || this.dead(drive)) return;
       const signal = busy ? linked(drive.controller.signal, busy.signal) : drive.controller.signal;
       const proposition = await this.proposition(drive, state);
-      const context = hypothesis ? [
-        assumptionScope(state),
-        `hypothesis claim: ${plainLine2(await this.statementOf(drive, hypothesis))}`
-      ].filter(Boolean).join("; ") : scopeOf(false, state).context;
+      const context = hypothesis ? [assumptionScope(state), `hypothesis claim: ${plainLine2(await this.statementOf(drive, hypothesis))}`].filter(Boolean).join("; ") : scopeOf(false, state).context;
       let result;
       let openedUrls = [];
       let domain = "-";
@@ -48835,7 +48863,12 @@ var ArgumentRuns = class {
     );
     if (!check.ok) return { log: "failed" };
     return {
-      proof: { url: check.proof.url, quote: check.proof.quote, check: check.proof.check, checkedAt: check.proof.checkedAt },
+      proof: {
+        url: check.proof.url,
+        quote: check.proof.quote,
+        check: check.proof.check,
+        checkedAt: check.proof.checkedAt
+      },
       log: "found"
     };
   }

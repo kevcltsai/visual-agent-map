@@ -11,6 +11,7 @@ import {
   text,
   type ArgumentStepBase
 } from "./shared";
+import { isCausal } from "./facet-plan";
 import template from "./facet-judge.md";
 import retryOnce from "./facet-judge-retry1.md";
 import retryNone from "./facet-judge-retry2.md";
@@ -203,6 +204,8 @@ export function parseFacetJudge(raw: string, request: FacetJudgeRequest): FacetJ
     const retryNeeds: string[] = [];
     for (const raw of list(one.retryNeeds, "retryNeeds")) {
       const need = text(raw, "retry need");
+      // Same guard as the facet plan: a retry need asks for data of the fact, never for a cause.
+      if (isCausal(need)) throw new ArgumentStepError("a retry need must ask for a fact, not a cause");
       const key = normalized(need);
       if (asked.has(key)) throw new ArgumentStepError("a retry need repeats another need");
       asked.add(key);

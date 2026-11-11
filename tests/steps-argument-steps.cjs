@@ -747,3 +747,9 @@ test('facet plan: a baseline may be a part of an assumption value, or contain on
   bad(mod.facetPlanStep, realReq, realWith(REAL_PARTS, v => { v.facets[1].baseline = '年'; }), /baseline/);
   bad(mod.facetPlanStep, fpReq, fpWith(v => { v.facets[0].baseline = 'all'; v.assumptions.items.forEach(i => { i.value = 'overall'; }); }), /baseline/);
 });
+
+test('P1-4: a retry need that asks for a cause is refused like a facet-plan need (zh-TW, zh-CN and en markers)', () => {
+  for (const need of ['What caused the rise in the youth rate', 'Why the youth rate went up', '青年失業率上升的原因', '青年失业率上升的成因', 'Youth rate rise due to automation']) {
+    bad(mod.facetJudgeStep, fjReq(), fjWith(v => { fjFacet(v, 'fb').retryNeeds = [need]; }), /cause|retry/);
+  }
+});

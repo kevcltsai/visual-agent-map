@@ -48,7 +48,7 @@ const CAUSAL_RE = new RegExp(
   ].join("|"),
   "i"
 );
-const isCausal = (value: string): boolean => CAUSAL_RE.test(value);
+export const isCausal = (value: string): boolean => CAUSAL_RE.test(value);
 
 export const NEED_KINDS = ["fact", "cause", "definition"] as const;
 

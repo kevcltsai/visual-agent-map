@@ -22,15 +22,25 @@ export type Translate = (key: TranslationKey, ...values: string[]) => string;
 const wide = (c: string): string => String.fromCharCode(c.charCodeAt(0) + 0xfee0);
 const wideRun = (run: string): string => [...run].map(wide).join("");
 
-/** Model/web text as inert plain single-line text: line breaks become a space, 3+ backtick/tilde runs cannot form a fence, and Markdown inline constructs that load or link things (`![` images/embeds, `[[` `]]` wikilinks, `<` `>` raw HTML) become their full-width twins. Ordinary text is unchanged. */
+/** A non-web URL scheme (`obsidian://`, `file://`, `javascript:`-style) would open something: its colon is full-width. `http(s)://` stays readable. */
+const ACTIVE_SCHEME = /(?<![A-Za-z0-9+.-])(?!https?:)([A-Za-z][A-Za-z0-9+.-]*):(?=\/\/)/g;
+/** Model/web text as inert plain single-line text: line breaks become a space, 3+ backtick/tilde runs cannot form a fence, and Markdown inline constructs that load, link or hide things become their full-width twins: `![` images/embeds, `[[` `]]` wikilinks, `](` link targets, `[^` footnotes, `<` `>` raw HTML, `$` math, `%%` comments, `==` and `~~` runs, a non-web URL scheme, and a leading `#`, list, quote or ordered-list marker. Ordinary text is unchanged. */
 export function plainLine(text: string): string {
   return text
     .replace(/[\r\n\u2028\u2029]+/g, " ")
     .replace(/`{3,}|~{3,}/g, m => [...m].join(" "))
     .replace(/</g, "＜")
     .replace(/>/g, "＞")
-    .replace(/!\[|\[(?=\[)/g, m => m.replace("[", "［"))
-    .replace(/\](?=\])/g, "］");
+    .replace(/!\[|\[(?=[\[^])/g, m => m.replace("[", "［"))
+    .replace(/\](?=[\](])/g, "］")
+    .replace(/\$/g, "＄")
+    .replace(/%{2,}|={2,}|~{2,}/g, wideRun)
+    .replace(ACTIVE_SCHEME, (_m, scheme: string) => `${scheme}：`)
+    .replace(
+      /^(\s*)(?:(#)|([+\-*])(?=\s)|(\d+)([.)])(?=\s))/,
+      (_m, space: string, hash?: string, bullet?: string, digits?: string, ordered?: string) =>
+        hash ? `${space}＃` : bullet ? `${space}${wide(bullet)}` : `${space}${digits}${ordered === "." ? "．" : "）"}`
+    );
 }
 /** Always full-width: each of these can start or end syntax anywhere in a line (escape, code, emphasis, tag, math, sup, link/embed/footnote brackets, HTML, table cell). */
 const ALWAYS_WIDE = /[\\`*_^#$[\]<|]/g;

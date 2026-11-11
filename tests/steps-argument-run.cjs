@@ -1175,3 +1175,32 @@ test('P1-3: a hypothesis note edited by the user does not change what the verdic
   assert.ok(seen.needs.slice(1).every(t => /^statement \d$/.test(t)), 'the needs step of a later hypothesis too');
   assert.ok(r.stat.logs.some(l => l.includes('hypothesis note edited')), 'the edit is logged (ids only)');
 });
+
+// ---- P1-5: summaries and titles (the card text the user reads) cannot carry active Markdown ----
+const ACTIVE = ['[click](obsidian://open?vault=Secret)', '[a](javascript:alert(1))', 'see obsidian://open?vault=Secret now', '%%hidden comment%%', 'costs $$x^2$$ here', 'inline $y$ math', '# Heading', '> quote', '- item', '1. item', '+ item', '==marked==', '[^1]', '<a href="x">y</a>', '![[Embed]]'];
+const activeLeft = text => /\]\(|obsidian:\/\/|%%|\$|^#|^[-+>]|^\d+[.)]|==|\[\^|[<>]|!\[|\[\[/.test(text);
+test('P1-5: plainLine neutralizes links, comments, math, highlight, footnotes, a leading heading/list/quote marker and non-web URL schemes', () => {
+  const { plainLine } = S.load('experiences/visual-map/argument-run.ts');
+  for (const bad of ACTIVE) assert.ok(!activeLeft(plainLine(bad)), `${bad} -> ${plainLine(bad)}`);
+  for (const text of ['GDP grew 3.2% in 2020 (see Table 1)', 'see [x] and a & b', 'https://stats.example.org/report?a=1&b=2', 'a-b and 5 - 3', 'rate: 9.2%']) assert.equal(plainLine(text), text);
+});
+test('P1-5: the hypothesis, need, conclusion and gate-reason notes written from model text carry none of it as active Markdown', async () => {
+  const payload = i => ACTIVE[i % ACTIVE.length];
+  const r = await rig({ script: { step: steps({
+    propose_hypotheses: request => ({ hypotheses: Array.from({ length: request.count }, (_, i) => ({ title: payload(i), statement: payload(i + 3), citedData: [request.data[0].id] })) }),
+    add_needs: () => ({ needs: [{ text: payload(0) }, { text: payload(5) }] }),
+    verdict: request => ({ verdict: 'supported', citedNeeds: [request.input.evidence[0].id], reason: 'enough' }),
+    conclude: request => ({ summary: payload(6), points: [{ text: payload(1), hypothesisIds: request.input.hypotheses.map(h => h.id) }], basedOn: request.input.hypotheses.map(h => h.id) })
+  }) } });
+  await r.runs.start(r.mapPath, 'p');
+  const doc = await r.repo.readMap(r.mapPath);
+  const state = await r.state();
+  const ids = [...state.hypotheses.flatMap(h => [h.id, ...h.needs.map(n => n.id)]), state.roles.conclusion];
+  for (const id of ids) {
+    const note = await r.text(id);
+    assert.ok(!activeLeft(note.summary), `summary ${note.summary}`);
+    assert.ok(!activeLeft(doc.nodes.find(n => n.id === id).title ?? ''), 'title');
+  }
+  const detail = (await r.text(state.roles.conclusion)).detail.split('\n').filter(l => l.startsWith('- ' + '') && !l.startsWith('| ')).slice(0, 1).join('');
+  assert.ok(!/\]\(|obsidian:\/\//.test(detail), detail);
+});

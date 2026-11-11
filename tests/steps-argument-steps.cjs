@@ -620,6 +620,20 @@ test('facet judge: the prompt carries the scope rule (judged against the claim w
   assert.match(prompt, /different subgroup[\s\S]*"irrelevant"[\s\S]*scope difference/);
   assert.match(prompt, /"refutes" only when a datum inside the scope contradicts/);
 });
+test('facet plan: a relative or current period is "the latest published year" and a baseline is a range around the point (prompt-only, not program-checkable)', () => {
+  const prompt = mod.facetPlanStep.render(fpReq);
+  assert.match(prompt, /relative or current period[\s\S]*latest published year[\s\S]*not today's calendar year/);
+  assert.match(prompt, /about 20 years ago[\s\S]*span of a few years around it/);
+  assert.match(prompt, /written as such in the assumption value/);
+});
+test('facet judge: a datum in the assumption period range or the nearest period within a few years is in scope, and the reason names the gap (prompt-only, not program-checkable)', () => {
+  for (const step of [mod.facetJudgeStep]) {
+    const prompt = step.render(fjReq());
+    assert.match(prompt, /Period rule[\s\S]*inside the range of the assumption[\s\S]*nearest available period[\s\S]*within a few years[\s\S]*IN scope/);
+    assert.match(prompt, /reason must say the period gap in plain words/);
+    assert.match(prompt, /different place, population or measure, or a period clearly outside the range/);
+  }
+});
 const preset = [{ label: 'Age band', value: 'ages 25 to 34, 2018 to 2019', reason: 'edited by the owner' }];
 test('facet plan: preset assumptions replace the AI assumption card; without them the AI card stays; the prompt shows them only when given', () => {
   const withPreset = { ...fpReq, presetAssumptions: preset };

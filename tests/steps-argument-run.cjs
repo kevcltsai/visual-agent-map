@@ -2082,11 +2082,11 @@ test('P1b: the call judged the question a fact one: its hypotheses are dropped a
   assert.equal(r2.stat.steps[0], 'plan_facets');
 });
 
-test('P1b: a proposition with no causal wording, the switch off, and a re-run keep the ordinary steps (plan, propose, needs) exactly as before', async () => {
-  for (const [label, proposition, ports] of [['not causal wording', 'Youth unemployment is rising', {}], ['switch off', CAUSAL_Q, { quickCausalRun: false }]]) {
+test('P1b: a proposition with no causal wording, the switch off, and a preset question type (re-run) keep the ordinary steps (plan, propose, needs) exactly as before', async () => {
+  for (const [label, proposition, ports, options] of [['not causal wording', 'Youth unemployment is rising', {}], ['switch off', CAUSAL_Q, { quickCausalRun: false }], ['preset causal', 'Youth unemployment is rising', {}, { presetQuestionType: 'causal' }]]) {
     const clock = vclock();
     const r = await oneCallRig(clock, { ports, researchMs: () => 1 });
-    await clock.runUntil(r.runs.start(r.mapPath, proposition));
+    await clock.runUntil(r.runs.start(r.mapPath, proposition, options));
     assert.ok(!r.stat.steps.includes('quick_causal'), label);
     assert.equal(r.stat.steps[0], 'plan_facets', label);
     assert.ok(r.stat.steps.includes('propose_facet_hypotheses') && r.stat.steps.includes('add_needs'), label);

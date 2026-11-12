@@ -868,7 +868,7 @@ export class ArgumentRuns {
   private quickEligible(drive: Drive, proposition: string): boolean {
     if (!(this.ports.quickCausalRun ?? QUICK_CAUSAL_RUN) || drive.quickDeclined || drive.presetQuestionType === "fact")
       return false;
-    return drive.presetQuestionType === "causal" || isCausal(proposition);
+    return !drive.presetQuestionType && isCausal(proposition); // a preset type (the owner re-ran with a chosen one) keeps the ordinary plan: the quick prompt does not carry it
   }
 
   /**

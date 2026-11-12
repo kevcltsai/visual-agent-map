@@ -769,7 +769,9 @@ export class ArgumentRuns {
     switch (action.type) {
       case "plan_situation":
         // A map with no data yet is always planned by facets (a new map; old maps are already past this step).
-        return this.quickEligible(drive, proposition) ? this.planQuick(drive, state, proposition) : this.planFacets(drive, state, proposition);
+        return this.quickEligible(drive, proposition)
+          ? this.planQuick(drive, state, proposition)
+          : this.planFacets(drive, state, proposition);
       case "judge_facets":
         return this.judgeFacets(drive, state, proposition);
       case "situation_budget": {
@@ -894,7 +896,11 @@ export class ArgumentRuns {
     await this.writePlan(drive, result, result.hypotheses);
   }
 
-  private async writePlan(drive: Drive, result: FacetPlanResult, quick?: QuickCausalResult["hypotheses"]): Promise<void> {
+  private async writePlan(
+    drive: Drive,
+    result: FacetPlanResult,
+    quick?: QuickCausalResult["hypotheses"]
+  ): Promise<void> {
     await this.checkpoint(drive, async (s, map) => {
       const items = result.assumptions.items;
       const definitionNeeds = result.definitionNeeds ?? [];
@@ -921,7 +927,12 @@ export class ArgumentRuns {
           needs: h.needs.map((n, j) => ({ id: id(`h${i}-${j}`), text: n.text, ...(n.core ? { core: true } : {}) }))
         }));
       // Dry run first: a refused plan must not leave notes behind.
-      if (quick) applyQuickCausal(s, plan(name => `dry-${name}`), hypothesesFor(name => `dry-${name}`));
+      if (quick)
+        applyQuickCausal(
+          s,
+          plan(name => `dry-${name}`),
+          hypothesesFor(name => `dry-${name}`)
+        );
       else
         applySituationPlan(
           s,
@@ -982,7 +993,11 @@ export class ArgumentRuns {
         }
       }
       if (quick) {
-        const done = applyQuickCausal(s, plan(name => ids.get(name)!), hypothesesFor(name => ids.get(name)!));
+        const done = applyQuickCausal(
+          s,
+          plan(name => ids.get(name)!),
+          hypothesesFor(name => ids.get(name)!)
+        );
         done.situation.question = result.question;
         this.ports.log(`argument-run planned runId=${s.run.runId} questionType=${result.questionType}`);
         this.ports.log(`argument-run quick run runId=${s.run.runId} hypotheses=${quick.length}`);

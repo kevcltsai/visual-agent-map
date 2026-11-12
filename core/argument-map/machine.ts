@@ -330,7 +330,8 @@ function analysisActions(state: ArgumentMapData): ArgumentAction[] {
     const verdictDue = core ? core.state === "found" : allNeedsFound(h);
     if (verdictDue) {
       if (h.aiVerdict === undefined) actions.push({ type: "verdict", hypothesisId: h.id });
-      else if (!isVerified(h)) actions.push({ type: canRevise(state, h) ? "revise" : "eliminate_limit", hypothesisId: h.id });
+      else if (!isVerified(h))
+        actions.push({ type: canRevise(state, h) ? "revise" : "eliminate_limit", hypothesisId: h.id });
     } else actions.push({ type: canRevise(state, h) ? "revise" : "eliminate_limit", hypothesisId: h.id });
   }
   return actions;
@@ -616,7 +617,8 @@ export const isQuickRun = (state: ArgumentMapData): boolean =>
  */
 export function applyQuickRun(state: ArgumentMapData): ArgumentMapData {
   inSituation(state);
-  if (!hasFacets(state) || state.situation.questionType !== "causal") throw new GateError("a quick run needs a causal facet map");
+  if (!hasFacets(state) || state.situation.questionType !== "causal")
+    throw new GateError("a quick run needs a causal facet map");
   if (state.situation.data.some(d => d.state === "searching")) throw new GateError("situation research is still out");
   const next = clone(state);
   for (const datum of next.situation.data)

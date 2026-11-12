@@ -181,6 +181,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "argument-map-quick-causal.en": {
+      "builder": "core/steps/argument-map/quick-causal.ts quickCausalStep",
+      "language": "en",
+      "schema": true
+    },
+    "argument-map-quick-causal.zh": {
+      "builder": "core/steps/argument-map/quick-causal.ts quickCausalStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "argument-map-quick-causal.zh-CN": {
+      "builder": "core/steps/argument-map/quick-causal.ts quickCausalStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "argument-map-situation-gate.en": {
       "builder": "core/steps/argument-map/gate.ts situationGateStep",
       "language": "en",

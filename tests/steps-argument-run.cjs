@@ -12,7 +12,7 @@ const { translate } = S.load('i18n.ts');
 const QUOTE = 'Youth unemployment rose to 9.2 percent in March';
 const URL_OK = 'https://stats.example.org/report';
 const PAGE = `<html><body><p>${QUOTE}, the highest in a decade.</p></body></html>`;
-const STEP_NAME = { 'argument-map.facet-plan': 'plan_facets', 'argument-map.facet-judge': 'judge_facets', 'argument-map.facet-hypotheses': 'propose_facet_hypotheses', 'argument-map.facet-verdict': 'verdict_facets', 'argument-map.situation-gate': 'judge_gate', 'argument-map.hypotheses': 'propose_hypotheses', 'argument-map.verdict': 'verdict', 'argument-map.conclusion': 'conclude', 'argument-map.conclusion-fact': 'conclude_facts' };
+const STEP_NAME = { 'argument-map.facet-plan': 'plan_facets', 'argument-map.quick-causal': 'quick_causal', 'argument-map.facet-judge': 'judge_facets', 'argument-map.facet-hypotheses': 'propose_facet_hypotheses', 'argument-map.facet-verdict': 'verdict_facets', 'argument-map.situation-gate': 'judge_gate', 'argument-map.hypotheses': 'propose_hypotheses', 'argument-map.verdict': 'verdict', 'argument-map.conclusion': 'conclude', 'argument-map.conclusion-fact': 'conclude_facts' };
 const stepName = (step, request) => (step.id === ARGUMENT_STEPS.add_needs.id ? (request.existing.length ? 'revise' : 'add_needs') : STEP_NAME[step.id]);
 const plain = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -1977,4 +1977,156 @@ test('P1: the idle detector does not fire while text steps are out (a slow verdi
   const r = await quickRig(clock, { stepMs: 600000, researchMs: () => 1 });
   await clock.runUntil(r.runs.start(r.mapPath, 'p'));
   assert.equal((await r.state()).run.phase, 'concluded');
+});
+
+
+// ---- P1b: ONE no-web call plans, proposes the hypotheses and lists their needs (quick causal run) -------------------------------------
+const CAUSAL_Q = 'Is youth unemployment rising because of AI?';
+/** The single call's parsed output: the facet plan of `quickSteps`, plus `hyps` hypotheses with a core need `Hn-core` and two more. */
+const quickCall = (hyps = 3, over = {}) => () => ({
+  ...facetSteps().plan_facets(),
+  hypotheses: Array.from({ length: hyps }, (_, i) => ({ title: `H${i + 1}`, statement: `statement ${i + 1}`, alternative: i === 0, needs: [{ text: `H${i + 1}-core`, core: true }, { text: `H${i + 1}-a` }, { text: `H${i + 1}-b` }] })),
+  ...over
+});
+const SECONDS = { quick_causal: 10000, verdict_facets: 9000, conclude: 9000 };
+const oneCallRig = async (clock, { steps = {}, researchMs = () => 30000, ask, ports = {} } = {}) => {
+  const base = quickSteps(3, { quick_causal: quickCall() });
+  const scripted = { ...base, ...steps };
+  const timedSteps = Object.fromEntries(Object.entries(scripted).map(([name, fn]) => [name, async (...args) => { await clock.sleep(SECONDS[name] ?? 9000); return fn(...args); }]));
+  let r;
+  r = await rig({ facet: true, ports: { quickCausalRun: true, setTimer: clock.setTimer, ...ports },
+    script: { step: timedSteps, ask: ask ?? ((ctx, n, signal) => clock.sleep(researchMs(ctx), signal).then(() => okAnswer(ctx))) } });
+  return r;
+};
+
+test('P1b (a) one call replaces plan + propose + needs: first research at 10 s, concluded within 70 simulated seconds (10 + 30 + 9 + 9), 9 research calls', async () => {
+  const clock = vclock();
+  const seen = {};
+  const r = await oneCallRig(clock, { ask: (ctx, n, signal) => { if (!seen.at) { seen.at = clock.now(); seen.state = r.state(); } return clock.sleep(30000, signal).then(() => okAnswer(ctx)); } });
+  await clock.runUntil(r.runs.start(r.mapPath, CAUSAL_Q));
+  const state = await r.state();
+  assert.equal(state.run.phase, 'concluded');
+  assert.ok(clock.now() <= 70000, `simulated ${clock.now()} ms`);
+  assert.equal(seen.at, 10000, 'the first search starts right after the one call');
+  assert.deepEqual([...new Set(r.stat.steps)].sort(), ['conclude', 'quick_causal', 'verdict_facets']);
+  assert.equal(r.stat.steps.filter(n => n === 'quick_causal').length, 1);
+  assert.equal(r.stat.ask.length, 9);
+  assert.equal(state.run.researchCalls, 9);
+  assert.equal(state.situation.gate.reason, 'quick_run');
+  assert.equal(state.situation.question, 'Is youth unemployment rising?');
+  assert.equal(state.situation.questionType, 'causal');
+  assert.equal(state.hypotheses.filter(h => model.isVerified(h)).length, 3);
+});
+
+test('P1b: the map shows the hypothesis cards and need cards from the same write as the plan (first search sees them all), under the right parents', async () => {
+  const clock = vclock();
+  let at;
+  const r = await oneCallRig(clock, { ask: async (ctx, n, signal) => { if (!at) { const doc = await r.repo.readMap(r.mapPath); at = { doc, state: model.readArgumentMap(doc).data }; } return clock.sleep(30000, signal).then(() => okAnswer(ctx)); } });
+  await clock.runUntil(r.runs.start(r.mapPath, CAUSAL_Q));
+  assert.equal(at.state.hypotheses.length, 3);
+  assert.equal(at.state.hypotheses.reduce((n, h) => n + h.needs.length, 0), 9);
+  assert.equal(at.state.hypotheses.every(h => h.needs.filter(x => x.core).length === 1 && h.needs.length === 3), true);
+  const node = id => at.doc.nodes.find(n => n.id === id);
+  assert.equal(at.state.situation.facets.length, 3);
+  for (const h of at.state.hypotheses) {
+    assert.equal(node(h.id).parentId, at.state.roles.verified, 'a hypothesis sits in the verified group while it is verified');
+    for (const n of h.needs) assert.equal(node(n.id).parentId, h.id);
+  }
+  assert.equal(node(at.state.roles.verified).parentId, at.state.roles.conclusion);
+  assert.equal((await r.text(at.state.hypotheses[1].id)).summary, 'statement 2');
+  assert.equal(at.doc.nodes.length, 3 + 1 + 3 + 3 + 3 + 3 + 9, 'proposition, situation, conclusion, definitions, 3 facets, 3 groups, 3 facet needs, 3 hypotheses, 9 needs');
+});
+
+test('P1b: a refused output (two core needs) writes no card and no state, gets ONE corrective retry, then works; two refusals pause with error and still no card', async () => {
+  const clock = vclock();
+  let calls = 0;
+  const badCall = () => quickCall(3, { hypotheses: quickCall()().hypotheses.map((h, i) => (i === 1 ? { ...h, needs: h.needs.map(n => ({ ...n, core: true })) } : h)) })();
+  const r = await oneCallRig(clock, { steps: { quick_causal: () => { calls++; return calls === 1 ? badCall() : quickCall()(); } } });
+  await clock.runUntil(r.runs.start(r.mapPath, CAUSAL_Q));
+  assert.equal(calls, 2);
+  assert.ok(r.stat.logs.some(l => l.includes('step failed attempt=1 kind=GateError')));
+  const state = await r.state();
+  assert.equal(state.run.phase, 'concluded');
+  assert.equal(state.hypotheses.length, 3, 'only the second output was written');
+  const doc = await r.repo.readMap(r.mapPath);
+  assert.equal(doc.nodes.length, 25, 'the refused first output left no card behind');
+  const clock2 = vclock();
+  const r2 = await oneCallRig(clock2, { steps: { quick_causal: badCall } });
+  await clock2.runUntil(r2.runs.start(r2.mapPath, CAUSAL_Q));
+  const paused = await r2.state();
+  assert.equal(paused.run.status, 'paused');
+  assert.equal(paused.run.stopReason, 'error');
+  assert.equal(paused.hypotheses.length, 0);
+  assert.equal(paused.situation.facets, undefined, 'a refused call leaves the plan unwritten');
+  assert.equal((await r2.repo.readMap(r2.mapPath)).nodes.length, 3, 'no note was left behind');
+  assert.equal(r2.stat.steps.filter(n => n === 'quick_causal').length, 2);
+  assert.equal(r2.stat.ask.length, 0);
+});
+
+test('P1b: the call judged the question a fact one: its hypotheses are dropped and the ordinary plan step runs (fact path unchanged); a preset fact never asks it', async () => {
+  const clock = vclock();
+  const factPlan = () => ({ ...facetSteps().plan_facets(), questionType: 'fact' });
+  const factSteps = { quick_causal: () => ({ ...factPlan(), hypotheses: [] }), plan_facets: factPlan, conclude_facts: request => ({ summary: 'answer', points: [], basedOn: request.facets.map(f => f.id) }) };
+  const r = await oneCallRig(clock, { steps: factSteps, researchMs: () => 1 });
+  await clock.runUntil(r.runs.start(r.mapPath, 'Why is the sky blue?'));
+  assert.deepEqual(r.stat.steps.slice(0, 2), ['quick_causal', 'plan_facets']);
+  assert.ok(r.stat.steps.includes('judge_facets'));
+  const state = await r.state();
+  assert.equal(state.situation.questionType, 'fact');
+  assert.notEqual(state.situation.gate.reason, 'quick_run');
+  assert.equal(state.hypotheses.length, 0);
+  const clock2 = vclock();
+  const r2 = await oneCallRig(clock2, { steps: factSteps, researchMs: () => 1 });
+  await clock2.runUntil(r2.runs.start(r2.mapPath, 'Why is the sky blue?', { presetQuestionType: 'fact' }));
+  assert.ok(!r2.stat.steps.includes('quick_causal'));
+  assert.equal(r2.stat.steps[0], 'plan_facets');
+});
+
+test('P1b: a proposition with no causal wording, the switch off, and a re-run keep the ordinary steps (plan, propose, needs) exactly as before', async () => {
+  for (const [label, proposition, ports] of [['not causal wording', 'Youth unemployment is rising', {}], ['switch off', CAUSAL_Q, { quickCausalRun: false }]]) {
+    const clock = vclock();
+    const r = await oneCallRig(clock, { ports, researchMs: () => 1 });
+    await clock.runUntil(r.runs.start(r.mapPath, proposition));
+    assert.ok(!r.stat.steps.includes('quick_causal'), label);
+    assert.equal(r.stat.steps[0], 'plan_facets', label);
+    assert.ok(r.stat.steps.includes('propose_facet_hypotheses') && r.stat.steps.includes('add_needs'), label);
+  }
+});
+
+test('P1b: the quick run proposes one batch only: 3 hypotheses, 9 research calls, NO second add_needs round or replacement batch; 1 verified still concludes on it, 0 verified stops at the limit', async () => {
+  for (const verified of [1, 2, 0]) {
+    const clock = vclock();
+    const hit = ctx => Number(ctx.task[1]) <= verified;
+    const r = await oneCallRig(clock, { ask: (ctx, n, signal) => clock.sleep(5000, signal).then(() => (hit(ctx) ? okAnswer(ctx) : notFound(ctx))) });
+    await clock.runUntil(r.runs.start(r.mapPath, CAUSAL_Q));
+    const state = await r.state();
+    assert.equal(r.stat.steps.filter(n => n === 'quick_causal').length, 1);
+    assert.ok(!r.stat.steps.includes('propose_facet_hypotheses') && !r.stat.steps.includes('add_needs') && !r.stat.steps.includes('revise'), `verified=${verified}`);
+    assert.equal(state.hypotheses.length, 3, 'no replacement hypotheses');
+    assert.equal(state.run.researchCalls, 9);
+    assert.equal(r.stat.ask.length, 9);
+    if (verified) {
+      assert.equal(state.run.phase, 'concluded');
+      assert.equal(state.hypotheses.filter(h => model.isVerified(h)).length, verified);
+      assert.equal(state.hypotheses.filter(h => h.location === 'eliminated').length, 3 - verified);
+    } else {
+      assert.equal(state.run.phase, 'stopped_limit');
+    }
+  }
+});
+
+test('P1b: Stop while the one call is out pauses with user and writes nothing; the late result is dropped', async () => {
+  const clock = vclock();
+  const r = await oneCallRig(clock, { steps: { quick_causal: async () => { await clock.sleep(10000); return quickCall()(); } } });
+  // a provider that ignores abort: the step still answers after the Stop
+  const run = r.runs.start(r.mapPath, CAUSAL_Q);
+  await clock.advanceTo(5000);
+  await r.runs.stop(r.mapPath);
+  await run;
+  await clock.advanceTo(100000);
+  const state = await r.state();
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'user');
+  assert.equal(state.hypotheses.length, 0);
+  assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, 3);
 });

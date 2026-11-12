@@ -38,6 +38,7 @@ import {
   applyLimitStop,
   applyPause,
   applyResume,
+  applyQuickCausal,
   applyQuickRun,
   applySituationBudgetOut,
   applySituationEvidence,
@@ -98,6 +99,7 @@ import {
   ArgumentStepError,
   facetVerdictStep,
   gateData,
+  isCausal,
   needsAllowed,
   type ArgumentStepBase,
   type ConclusionRequest,
@@ -110,6 +112,7 @@ import {
   type FacetJudgeResult,
   type FacetPlanRequest,
   type FacetPlanResult,
+  type QuickCausalResult,
   type FacetVerdictResult,
   type GateDatum,
   type GateRequest,
@@ -232,6 +235,8 @@ interface Drive {
   preset?: AssumptionItem[];
   /** A re-run's question type (the definitions card's 題型 line); it wins over the AI's. */
   presetQuestionType?: QuestionType;
+  /** The single quick call came back as a fact question: the ordinary plan step runs instead (memory only, per drive). */
+  quickDeclined?: boolean;
 }
 interface Plan {
   next: ArgumentMapData;
@@ -764,7 +769,7 @@ export class ArgumentRuns {
     switch (action.type) {
       case "plan_situation":
         // A map with no data yet is always planned by facets (a new map; old maps are already past this step).
-        return this.planFacets(drive, state, proposition);
+        return this.quickEligible(drive, proposition) ? this.planQuick(drive, state, proposition) : this.planFacets(drive, state, proposition);
       case "judge_facets":
         return this.judgeFacets(drive, state, proposition);
       case "situation_budget": {
@@ -856,6 +861,40 @@ export class ArgumentRuns {
       ...(state.run.presetQuestionType ? { presetQuestionType: state.run.presetQuestionType } : {})
     };
     const result: FacetPlanResult = await this.ask(drive, ARGUMENT_STEPS.plan_facets, request);
+    await this.writePlan(drive, result);
+  }
+
+  /** The quick causal run asks one call for the plan and the first hypotheses with their needs, but only for a question that reads as causal. */
+  private quickEligible(drive: Drive, proposition: string): boolean {
+    if (!(this.ports.quickCausalRun ?? QUICK_CAUSAL_RUN) || drive.quickDeclined || drive.presetQuestionType === "fact")
+      return false;
+    return drive.presetQuestionType === "causal" || isCausal(proposition);
+  }
+
+  /**
+   * Plan, quick run, hypotheses and their needs in one call and one checkpoint, so the map shows the situation, the three groups, the
+   * hypothesis cards and their need cards at once. A call that judged the question a fact one is dropped; the ordinary plan step runs next.
+   */
+  private async planQuick(drive: Drive, state: ArgumentMapData, proposition: string): Promise<void> {
+    const request: FacetPlanRequest = {
+      ...this.base(drive),
+      proposition,
+      today: this.ports.now().slice(0, 10),
+      ...(state.run.presetAssumptions?.length
+        ? { presetAssumptions: state.run.presetAssumptions.map(item => ({ ...item })) }
+        : {}),
+      ...(state.run.presetQuestionType ? { presetQuestionType: state.run.presetQuestionType } : {})
+    };
+    const result: QuickCausalResult = await this.ask(drive, ARGUMENT_STEPS.quick_causal, request);
+    if (result.questionType !== "causal") {
+      this.ports.log(`argument-run quick call declined runId=${state.run.runId} questionType=${result.questionType}`);
+      drive.quickDeclined = true;
+      return;
+    }
+    await this.writePlan(drive, result, result.hypotheses);
+  }
+
+  private async writePlan(drive: Drive, result: FacetPlanResult, quick?: QuickCausalResult["hypotheses"]): Promise<void> {
     await this.checkpoint(drive, async (s, map) => {
       const items = result.assumptions.items;
       const definitionNeeds = result.definitionNeeds ?? [];
@@ -874,11 +913,20 @@ export class ArgumentRuns {
           ? { groups: { verified: id("g-ok"), eliminated: id("g-out"), unconfirmed: id("g-open") } }
           : {})
       });
+      const hypothesesFor = (id: (name: string) => string): Parameters<typeof applyQuickCausal>[2] =>
+        (quick ?? []).map((h, i) => ({
+          id: id(`h${i}`),
+          statement: h.statement,
+          alternative: h.alternative,
+          needs: h.needs.map((n, j) => ({ id: id(`h${i}-${j}`), text: n.text, ...(n.core ? { core: true } : {}) }))
+        }));
       // Dry run first: a refused plan must not leave notes behind.
-      applySituationPlan(
-        s,
-        plan(name => `dry-${name}`)
-      );
+      if (quick) applyQuickCausal(s, plan(name => `dry-${name}`), hypothesesFor(name => `dry-${name}`));
+      else
+        applySituationPlan(
+          s,
+          plan(name => `dry-${name}`)
+        );
       const nodes: Plan["nodes"] = [];
       const make = async (kind: NoteKind, title: string, summary: string | undefined, detail?: string) => {
         const node = await this.makeNote({ kind, title: shorten(title, 80), summary, detail }, map, drive.mapPath);
@@ -915,6 +963,31 @@ export class ArgumentRuns {
           nodes.push({ node, parentId: ids.get(`f${i}`)! });
           ids.set(`f${i}-${j}`, node.id);
         }
+      for (const [i, h] of (quick ?? []).entries()) {
+        const node = await this.makeNote(
+          { kind: "hypothesis", title: h.title, summary: h.statement },
+          map,
+          drive.mapPath
+        );
+        nodes.push({ node, parentId: ids.get("g-ok")! });
+        ids.set(`h${i}`, node.id);
+        for (const [j, n] of h.needs.entries()) {
+          const need = await this.makeNote(
+            { kind: "need", title: shorten(n.text, 80), summary: n.text },
+            map,
+            drive.mapPath
+          );
+          nodes.push({ node: need, parentId: node.id });
+          ids.set(`h${i}-${j}`, need.id);
+        }
+      }
+      if (quick) {
+        const done = applyQuickCausal(s, plan(name => ids.get(name)!), hypothesesFor(name => ids.get(name)!));
+        done.situation.question = result.question;
+        this.ports.log(`argument-run planned runId=${s.run.runId} questionType=${result.questionType}`);
+        this.ports.log(`argument-run quick run runId=${s.run.runId} hypotheses=${quick.length}`);
+        return { next: done, nodes };
+      }
       const next = applySituationPlan(
         s,
         plan(name => ids.get(name)!)

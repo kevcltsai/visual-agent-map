@@ -258,7 +258,7 @@ export function parseFacetPlan(raw: string, request: FacetPlanRequest): FacetPla
 
 const PRESET_KEYS = ["label", "value", "reason"];
 /** A preset is a program value read from the owner's note: three non-blank strings per item, nothing else. */
-function checkPreset(preset: FacetPlanRequest["presetAssumptions"], type?: unknown): void {
+export function checkPreset(preset: FacetPlanRequest["presetAssumptions"], type?: unknown): void {
   if (type !== undefined && !(QUESTION_TYPES as readonly unknown[]).includes(type))
     throw new ArgumentStepError("the preset question type is not usable");
   if (preset === undefined) return;

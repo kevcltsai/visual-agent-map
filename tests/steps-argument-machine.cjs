@@ -1389,3 +1389,65 @@ test('quick run: the analysis after it concludes from 3 verified hypotheses like
   s = m.applyConclusion(s, { basedOn: ['h1', 'h2', 'h3'] });
   assert.equal(s.run.phase, 'concluded');
 });
+
+// ---- P1b: the single quick call (plan + quick run + hypotheses + needs in one mutation) and no replacement batch ----------------------
+const qHyps = (n = 3, needs = 3) => Array.from({ length: n }, (_, i) => ({ id: `h${i + 1}`, statement: `statement ${i + 1}`, alternative: i === 0, needs: Array.from({ length: needs }, (_, j) => ({ id: `h${i + 1}n${j + 1}`, text: `need ${i + 1}-${j + 1}`, ...(j === 0 ? { core: true } : {}) })) }));
+const qPlan = () => f4([1, 1, 1]);
+const qNew = (run = 'run-q') => m.newArgumentMap(roles, run);
+test('P1b applyQuickCausal: one mutation leaves a valid quick-run state: causal facets, groups, closed situation, 3 hypotheses with a core need each, ready to research', () => {
+  const s = m.applyQuickCausal(qNew(), qPlan(), qHyps());
+  assert.equal(s.run.phase, 'analysis');
+  assert.equal(m.isQuickRun(s), true);
+  assert.equal(s.situation.questionType, 'causal');
+  assert.equal(s.roles.verified, 'gv');
+  assert.equal(s.situation.facets.length, 3);
+  assert.ok(s.situation.data.every(d => d.state === 'not_found' && d.reason === 'quick_run'));
+  assert.equal(s.hypotheses.length, 3);
+  assert.ok(s.hypotheses.every(h => h.location === 'verifying' && h.round === 1 && h.needs.length === 3 && h.needs.filter(n => n.core).length === 1));
+  assert.equal(s.hypotheses[0].alternative, true);
+  assert.equal(s.hypotheses[1].statement, 'statement 2');
+  assert.equal(s.run.researchCalls, 0);
+  assert.deepEqual(plain(m.nextActions(s)).map(a => a.type), Array(9).fill('research_need'));
+});
+test('P1b applyQuickCausal: every gate of the parts applies and a refusal changes nothing (counts, caps, blanks, core, fact plan, repeats)', () => {
+  const s = qNew();
+  refuses(s, () => m.applyQuickCausal(s, qPlan(), []));
+  refuses(s, () => m.applyQuickCausal(s, qPlan(), qHyps(model.MAX_HYPOTHESES + 1)));
+  refuses(s, () => m.applyQuickCausal(s, qPlan(), qHyps(3, model.MAX_ROUND_NEEDS + 1)));
+  refuses(s, () => m.applyQuickCausal(s, qPlan(), qHyps(3).map((h, i) => (i === 1 ? { ...h, needs: [] } : h))));
+  refuses(s, () => m.applyQuickCausal(s, qPlan(), qHyps(3).map((h, i) => (i === 1 ? { ...h, needs: h.needs.map(n => ({ ...n, core: undefined })) } : h))));
+  refuses(s, () => m.applyQuickCausal(s, qPlan(), qHyps(3).map((h, i) => (i === 2 ? { ...h, needs: h.needs.map(n => ({ ...n, core: true })) } : h))));
+  refuses(s, () => m.applyQuickCausal(s, qPlan(), qHyps(3).map((h, i) => (i === 0 ? { ...h, needs: h.needs.map((n, j) => (j === 1 ? { ...n, text: '  ' } : n)) } : h))));
+  refuses(s, () => m.applyQuickCausal(s, { ...qPlan(), questionType: 'fact', groups: undefined }, qHyps()));
+  refuses(s, () => m.applyQuickCausal(s, { ...qPlan(), facets: qPlan().facets.slice(0, 2) }, qHyps()));
+  refuses(s, () => m.applyQuickCausal(s, qPlan(), qHyps().map((h, i) => (i === 1 ? { ...h, id: 'h1' } : h))));
+  const planned1 = m.applySituationPlan(qNew(), qPlan());
+  refuses(planned1, () => m.applyQuickCausal(planned1, qPlan(), qHyps()));
+});
+test('P1b quick run proposes ONE batch: hypotheses cut at their limit are not replaced (that second batch with its own needs was the second needs round); no hypotheses yet still proposes the first batch', () => {
+  let s = m.applyQuickCausal(qNew(), qPlan(), qHyps());
+  // none verified: every hypothesis researched, none supported by its core
+  for (const h of ['h1', 'h2', 'h3']) for (const [j, id] of [`${h}n1`, `${h}n2`, `${h}n3`].entries()) { s = m.beginResearch(s, h, id); s = m.applyEvidence(s, h, id, { found: false, reason: 'nothing' }); }
+  assert.deepEqual(plain(m.nextActions(s)).map(a => a.type), ['eliminate_limit', 'eliminate_limit', 'eliminate_limit']);
+  for (const h of ['h1', 'h2', 'h3']) s = m.eliminateAtLimit(s, h);
+  assert.deepEqual(plain(m.nextActions(s)), [{ type: 'stop_limit' }], 'nothing verified: no replacement batch, the run stops at the limit');
+  // no hypothesis yet: the first batch is still proposed
+  assert.equal(plain(quick()).hypotheses.length, 0);
+  assert.deepEqual(plain(m.nextActions(quick())), [{ type: 'propose_hypotheses', count: 3 }]);
+});
+test('P1b quick run with 1 or 2 verified and the rest cut at their limit concludes on those (decision #59), and does not propose replacements', () => {
+  for (const verified of [1, 2]) {
+    let s = m.applyQuickCausal(qNew(), qPlan(), qHyps());
+    for (const [i, h] of ['h1', 'h2', 'h3'].entries()) {
+      const win = i < verified;
+      for (const [j, id] of [`${h}n1`, `${h}n2`, `${h}n3`].entries()) { s = m.beginResearch(s, h, id); s = m.applyEvidence(s, h, id, win || j === 1 ? { found: true, stance: 'supports', proof: proof(i * 3 + j + 1) } : { found: false, reason: 'nothing' }); }
+      if (win) s = m.applyVerdict(s, h, { verdict: 'supported', citedNeeds: [`${h}n1`], reason: 'core supports' });
+      else s = m.eliminateAtLimit(s, h);
+    }
+    assert.deepEqual(plain(m.nextActions(s)), [{ type: 'conclude' }]);
+    const input = m.prepareConclusion(s);
+    assert.equal(input.hypotheses.filter(h => h.status === 'verified').length, verified);
+    const done = m.applyConclusion(s, { basedOn: ['h1', 'h2'].slice(0, verified) });
+    assert.equal(done.run.phase, 'concluded');
+  }
+});

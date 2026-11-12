@@ -215,7 +215,7 @@ test('conclusion: a number or URL outside the input throws; no verified hypothes
 
 // ---- schemas and registry ----
 test('every step has a strict schema and the registry maps the machine actions', () => {
-  for (const step of [mod.facetPlanStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep, mod.conclusionFactStep]) {
+  for (const step of [mod.facetPlanStep, mod.quickCausalStep, mod.situationGateStep, mod.facetJudgeStep, mod.hypothesesStep, mod.facetHypothesesStep, mod.needsStep, mod.verdictStep, mod.facetVerdictStep, mod.conclusionStep, mod.conclusionFactStep]) {
     assert.equal(step.schema.additionalProperties, false);
     const strict = (node, where) => {
       if (!node || typeof node !== 'object') return;
@@ -228,12 +228,12 @@ test('every step has a strict schema and the registry maps the machine actions',
     };
     strict(step.schema, '$');
   }
-  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'conclude_facts', 'judge_facets', 'judge_gate', 'plan_facets', 'propose_facet_hypotheses', 'propose_hypotheses', 'revise', 'verdict']);
+  assert.deepEqual(Object.keys(mod.ARGUMENT_STEPS).sort(), ['add_needs', 'conclude', 'conclude_facts', 'judge_facets', 'judge_gate', 'plan_facets', 'propose_facet_hypotheses', 'propose_hypotheses', 'quick_causal', 'revise', 'verdict']);
   assert.equal(mod.ARGUMENT_STEPS.plan_facets, mod.facetPlanStep);
   assert.equal(mod.ARGUMENT_STEPS.plan_situation, undefined); // the old plan step was removed; plan_facets serves the action
   assert.equal(mod.ARGUMENT_STEPS.revise, mod.needsStep);
   const ids = new Set(Object.values(mod.ARGUMENT_STEPS).map(step => step.id));
-  assert.equal(ids.size, 9);
+  assert.equal(ids.size, 10);
 });
 
 // ---- text-only through the real runtimes ----
@@ -994,4 +994,73 @@ test('conclusion-fact (#60): points rest on facet ids only; the program outcome 
   assert.throws(() => sr.prepareStep(mod.conclusionFactStep, factReq({ outcome: 'maybe' })), error => error.name === 'ArgumentStepError');
   assert.match(mod.conclusionFactStep.render(factReq({ unconfirmed: true })), /situation behind the proposition is unconfirmed/);
   assert.equal(mod.ARGUMENT_STEPS.conclude_facts, mod.conclusionFactStep);
+});
+
+
+// ---- P1b: the single quick-run call (plan + hypotheses + needs) ----
+const qcOk = () => {
+  const v = fpOk();
+  v.facets = v.facets.slice(0, 3).map(f => ({ ...f, needs: [f.needs[0]] }));
+  return { ...v, hypotheses: [
+    { title: 'Automation cut junior jobs', statement: 'Firms replaced entry roles with software.', alternative: false, needs: [{ text: 'Junior job postings before and after', core: true }, { text: 'Firm surveys on automation', core: false }] },
+    { title: 'Weak demand', statement: 'Overall hiring slowed for every age band.', alternative: true, needs: [{ text: 'Overall hiring rate by age band', core: true }] },
+    { title: 'Education timing', statement: 'More graduates entered the market at once.', alternative: true, needs: [{ text: 'Graduate cohort sizes', core: true }, { text: 'Graduate job search duration', core: false }, { text: 'Entry wage trend', core: false }] }
+  ] };
+};
+const qcWith = fn => { const v = qcOk(); fn(v); return v; };
+test('quick causal step: a well formed reply parses to the plan and 3 hypotheses with exactly one core need each; the plan part is the facet plan\'s own result', () => {
+  const out = plain(ok(mod.quickCausalStep, fpReq, qcOk()));
+  assert.equal(out.hypotheses.length, 3);
+  assert.deepEqual(out.hypotheses.map(h => h.needs.filter(n => n.core).length), [1, 1, 1]);
+  assert.equal(out.hypotheses[0].needs[1].core, undefined);
+  assert.equal(out.facets.length, 3);
+  assert.equal(out.questionType, 'causal');
+  const planOnly = plain(ok(mod.facetPlanStep, fpReq, (({ hypotheses, ...v }) => v)(qcOk())));
+  assert.deepEqual(out.facets, planOnly.facets);
+  assert.deepEqual(out.assumptions, planOnly.assumptions);
+  assert.deepEqual(out.causalQuestions, planOnly.causalQuestions);
+});
+test('quick causal step: refusals - hypothesis count, core count, need count, blanks, repeats, alternative, causal-question copy, ungrounded numbers, extra fields, facet count', () => {
+  const R = mod.quickCausalStep;
+  bad(R, fpReq, qcWith(v => { v.hypotheses.pop(); }), /exactly 3 hypotheses/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses.push({ ...v.hypotheses[0], title: 'Fourth' }); }), /exactly 3 hypotheses/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses = []; }), /exactly 3 hypotheses/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[0].needs[1].core = true; }), /exactly one need/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[1].needs[0].core = false; }), /exactly one need/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[1].needs = []; }), /1 to 3/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[2].needs.push({ text: 'a fourth need', core: false }); }), /1 to 3/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[0].needs[1].text = '  '; }), /text/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[0].needs[1].text = 'junior job postings before and AFTER.'; }), /repeats/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[1].title = ' '; }), /title/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[1].title = 'automation cut junior jobs!'; }), /repeats/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[1].title = 'Did automation drive the rise?'; }), /causal question/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses.forEach(h => { h.alternative = false; }); }), /alternative/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[0].alternative = 'yes'; }), /alternative/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[0].statement = 'Postings fell 37 percent.'; }), /number 37/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[0].needs[0].text = 'See https://memory.example.com/x'; }), /link/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[0].id = 'h1'; }), /unexpected fields/);
+  bad(R, fpReq, qcWith(v => { v.hypotheses[0].needs[0].id = 'n1'; }), /unexpected fields/);
+  bad(R, fpReq, qcWith(v => { delete v.hypotheses; }), /unexpected fields/);
+  bad(R, fpReq, qcWith(v => { v.facets.push({ ...v.facets[0], title: 'Fourth facet', needs: [fneed('Another series')] }); }), /exactly 3 facets/);
+  bad(R, fpReq, qcWith(v => { v.facets.pop(); }), /3 to 5|exactly 3/);
+  bad(R, fpReq, qcWith(v => { v.question = 'Did it rise because of AI?'; }), /question/);
+});
+test('quick causal step: a fact question returns no hypotheses (anything sent with it is dropped unread); a preset type wins; the preset is checked', () => {
+  const fact = out => out.hypotheses.length === 0 && out.questionType === 'fact';
+  assert.ok(fact(ok(mod.quickCausalStep, fpReq, qcWith(v => { v.questionType = 'fact'; v.hypotheses = []; }))));
+  assert.ok(fact(ok(mod.quickCausalStep, fpReq, qcWith(v => { v.questionType = 'fact'; v.hypotheses = [{ junk: 1 }]; }))));
+  assert.equal(ok(mod.quickCausalStep, { ...fpReq, presetQuestionType: 'causal' }, qcWith(v => { v.questionType = 'fact'; })).hypotheses.length, 3);
+  assert.throws(() => sr.prepareStep(mod.quickCausalStep, { ...fpReq, presetAssumptions: [{ label: '', value: 'x', reason: 'y' }] }), error => error.name === 'ArgumentStepError');
+  assert.throws(() => sr.prepareStep(mod.quickCausalStep, { ...fpReq, presetQuestionType: 'opinion' }), error => error.name === 'ArgumentStepError');
+});
+test('quick causal step: the prompt lives in the step template, names the proposition once as JSON, is text-only and carries the language and preset lines', () => {
+  const prompt = mod.quickCausalStep.render({ ...fpReq, today: '2026-11-12', presetAssumptions: [{ label: 'a', value: 'b', reason: 'c' }] });
+  assert.ok(prompt.includes(JSON.stringify(PROP)));
+  assert.ok(prompt.includes("Today's date: 2026-11-12."));
+  assert.ok(prompt.includes('Assumptions fixed by the owner'));
+  assert.ok(prompt.includes('Write in English.') || /English/.test(prompt));
+  assert.ok(/do not inspect files, use tools or search the web/.test(prompt));
+  assert.ok(!mod.quickCausalStep.render(fpReq).includes('Assumptions fixed by the owner'));
+  const zh = mod.quickCausalStep.render({ ...fpReq, language: 'zh-TW', proposition: '台灣青少年失業率上升是不是因為 AI' });
+  assert.ok(zh.includes('繁體') || /zh|Traditional|台灣/.test(zh));
 });

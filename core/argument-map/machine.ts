@@ -306,7 +306,12 @@ function analysisActions(state: ArgumentMapData): ArgumentAction[] {
   let budget = MAX_RESEARCH_CALLS - state.run.researchCalls;
   // Finish the hypotheses already on the table before proposing more (decision #59): replacements wait until none is still open.
   const open = state.hypotheses.some(h => h.location === "verifying" && !isVerified(h));
-  const want = open ? 0 : Math.min(MIN_VERIFIED - verifyingCount(state), MAX_HYPOTHESES - state.hypotheses.length);
+  // A quick run proposes one batch only (it has no revise round either): hypotheses cut at their limit are not replaced by a second
+  // batch with its own needs; with 1 or 2 verified the conclusion is written on those (decision #59), with none the run stops at the limit.
+  const want =
+    open || (isQuickRun(state) && state.hypotheses.length > 0)
+      ? 0
+      : Math.min(MIN_VERIFIED - verifyingCount(state), MAX_HYPOTHESES - state.hypotheses.length);
   if (want > 0) actions.push({ type: "propose_hypotheses", count: want });
   for (const h of state.hypotheses) {
     if (h.location !== "verifying") continue;
@@ -627,6 +632,24 @@ export function applyQuickRun(state: ArgumentMapData): ArgumentMapData {
     round: 1
   };
   next.run.phase = "analysis";
+  return next;
+}
+/**
+ * The plan, the quick run and the first hypotheses with their needs of one causal question, in one mutation (the single quick-run call).
+ * Every part goes through the machine's own gates (applySituationPlan, applyQuickRun, applyHypotheses, addNeeds), so a refused part
+ * refuses the whole and writes nothing. Each hypothesis lists exactly one core need, as a facet map's first round does.
+ */
+export function applyQuickCausal(
+  state: ArgumentMapData,
+  plan: SituationPlan,
+  hypotheses: { id: string; statement?: string; alternative?: boolean; needs: NeedItem[] }[]
+): ArgumentMapData {
+  let next = applyQuickRun(applySituationPlan(state, plan));
+  next = applyHypotheses(
+    next,
+    hypotheses.map(h => ({ id: h.id, statement: h.statement, alternative: h.alternative }))
+  );
+  for (const h of hypotheses) next = addNeeds(next, h.id, h.needs);
   return next;
 }
 export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudgement): ArgumentMapData {

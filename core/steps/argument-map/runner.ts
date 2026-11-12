@@ -9,6 +9,7 @@ import { facetPlanStep } from "./facet-plan";
 import { situationGateStep } from "./gate";
 import { hypothesesStep } from "./hypotheses";
 import { needsStep } from "./needs";
+import { quickCausalStep } from "./quick-causal";
 import { ArgumentStepError, type ArgumentStepBase } from "./shared";
 import { verdictStep } from "./verdict";
 import retryReasonTemplate from "./retry-reason.md";
@@ -21,6 +22,7 @@ export * from "./facet-plan";
 export * from "./gate";
 export * from "./hypotheses";
 export * from "./needs";
+export * from "./quick-causal";
 export { ArgumentStepError, type ArgumentStepBase } from "./shared";
 export * from "./verdict";
 
@@ -30,6 +32,7 @@ export * from "./verdict";
  */
 export const ARGUMENT_STEPS = {
   plan_facets: facetPlanStep,
+  quick_causal: quickCausalStep,
   judge_gate: situationGateStep,
   judge_facets: facetJudgeStep,
   propose_hypotheses: hypothesesStep,

@@ -351,10 +351,11 @@ test('collect snapshots: chart step (chart.add@1)', () => {
       ['facet-judge-round2', 'facetJudgeStep', { ...request, round: 2, facets: judgeFacets.slice(1, 2) }],
       ['facet-hypotheses', 'facetHypothesesStep', { ...request, data: argumentData.map(d => ({ ...d, propStance: 'supports' })), count: 3, existing: [], causalQuestions: ['Did automation drive the rise?'] }],
       ['facet-plan', 'facetPlanStep', request],
+      ['quick-causal', 'quickCausalStep', request],
       ['facet-plan-preset', 'facetPlanStep', { ...request, presetAssumptions: [{ label: 'Age band', value: 'ages 25 to 34 in 2018 to 2019', reason: 'edited by the owner' }] }],
       ['facet-judge-assumptions', 'facetJudgeStep', { ...request, round: 1, facets: judgeFacets, assumptions: [{ label: 'Age band', value: 'ages 16 to 24 in 2023 to 2024', reason: 'young people' }] }],
       ['facet-verdict', 'facetVerdictStep', { ...argumentBase, language, hypothesis: 'Firms hired fewer juniors', input: { hypothesisId: 'h1', round: 1, evidence: [argumentEvidence('n1', 'supports'), argumentEvidence('n2', 'uncertain')] } }]
-    ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name.startsWith('facet-judge') ? 'facet-judge' : name === 'facet-verdict' ? 'verdict' : name === 'facet-hypotheses' ? 'facet-hypotheses' : 'facet-plan'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
+    ]) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name.startsWith('facet-judge') ? 'facet-judge' : name === 'facet-verdict' ? 'verdict' : name === 'facet-hypotheses' ? 'facet-hypotheses' : name === 'quick-causal' ? 'quick-causal' : 'facet-plan'}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
     for (const [name, key, input] of steps) record(`argument-map-${name}.${tag}`, `core/steps/argument-map/${name === 'situation-gate' ? 'gate' : name}.ts ${key}`, language, argumentSteps[key].render(input), argumentSteps[key].schema);
     // P2-8: the corrective-retry variant of the facet plan (the reason line is the only difference)
     record(`argument-map-facet-plan-retry.${tag}`, 'core/steps/argument-map/runner.ts withRetryReason(facetPlanStep)', language, argumentSteps.withRetryReason(argumentSteps.facetPlanStep, 'The reply uses the number 9, which the request does not have').render(request), argumentSteps.facetPlanStep.schema);

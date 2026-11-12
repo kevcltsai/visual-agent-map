@@ -21,6 +21,10 @@ export const MAX_FACET_NEEDS = 3;
 export const MAX_SITUATION_NEEDS = 15;
 export const MAX_RETRY_NEEDS = 9;
 export const MAX_SITUATION_RESEARCH = 24;
+/** The quick run for a causal question: no situation research and no revise rounds (the run goes straight to hypotheses). */
+export const QUICK_CAUSAL_RUN = true;
+/** One research call's model time limit; a call still out then is a miss (not_found_in_time), not a failure. */
+export const RESEARCH_DEADLINE_MS = 45_000;
 
 /** The three role nodes every map has; the group nodes are optional (a fact map has none, a causal map has all three, a map made before question types has the first two). */
 export const REQUIRED_ROLE_KEYS = ["proposition", "situation", "conclusion"] as const;

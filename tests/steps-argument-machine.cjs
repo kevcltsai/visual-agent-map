@@ -1339,3 +1339,53 @@ test('P2 fact map: no hypothesis can be applied, so no core or conclusion path o
   refuses(s, () => m.applyHypotheses(s, [{ id: 'h1' }]));
   refuses(s, () => m.prepareConclusion(s));
 });
+
+// ---- quick run of a causal question: no situation research, no revise rounds ----------------------------------------------------
+const quick = () => m.applyQuickRun(planned([1, 1, 1]));
+test('quick run: pending situation data close as not_found(quick_run), the gate is unconfirmed with the program reason, the analysis begins, no research was done', () => {
+  const s = quick();
+  assert.equal(m.QUICK_RUN_REASON, 'quick_run');
+  assert.equal(s.run.phase, 'analysis');
+  assert.equal(s.run.researchCalls, 0);
+  assert.deepEqual(plain(s.situation.gate), { state: 'unconfirmed', kind: 'data_insufficient', reason: 'quick_run', citedData: [], round: 1 });
+  assert.ok(s.situation.data.every(d => d.state === 'not_found' && d.reason === 'quick_run' && d.attempts === 0));
+  assert.equal(m.isQuickRun(s), true);
+  assert.equal(model.isSituationUnconfirmed(s), true);
+  assert.deepEqual(plain(m.nextActions(s)), [{ type: 'propose_hypotheses', count: 3 }]);
+  assert.equal(m.isQuickRun(planned([1, 1, 1])), false);
+});
+test('quick run: refused for a fact map, a V1 map, a searching datum and a run past the situation; a reason another gate stored is not a quick run', () => {
+  refuses(factMap([1, 1, 1]), () => m.applyQuickRun(factMap([1, 1, 1])));
+  refuses(m.newArgumentMap(roles, 'r'), () => m.applyQuickRun(m.newArgumentMap(roles, 'r')));
+  const busy = m.beginSituationResearch(planned([1, 1, 1]), 'f1d1');
+  refuses(busy, () => m.applyQuickRun(busy));
+  const done = quick();
+  refuses(done, () => m.applyQuickRun(done));
+  const other = plain(done);
+  other.situation.gate.reason = 'Rate: quick_run';
+  assert.equal(m.isQuickRun(other), false);
+  const matchedGate = plain(done);
+  matchedGate.situation.gate.state = 'matched';
+  assert.equal(m.isQuickRun(matchedGate), false);
+});
+test('quick run: a hypothesis not verified after round 1 is cut at its limit (eliminate_limit), never revised; startNextRound refuses; a normal run still revises', () => {
+  const s = m.applyHypotheses(quick(), [{ id: 'h1' }]);
+  const t = plain(say(coreHyp(s, 'h1', ['f:uncertain', 'miss', 'miss']), 'h1'));
+  assert.equal(t.hypotheses[0].aiVerdict, 'undecided');
+  assert.deepEqual(plain(m.nextActions(t)).filter(a => a.hypothesisId === 'h1'), [{ type: 'eliminate_limit', hypothesisId: 'h1' }]);
+  refuses(t, () => m.startNextRound(t, 'h1', [{ id: 'x', text: 'x' }]));
+  const cut = m.eliminateAtLimit(t, 'h1');
+  assert.equal(model.hypothesisStatus(hyp(cut, 'h1')), 'unconfirmed');
+  const normal = plain(say(coreHyp(m.applyHypotheses(causalMatched(), [{ id: 'h1' }]), 'h1', ['f:uncertain', 'miss', 'miss']), 'h1'));
+  assert.deepEqual(plain(m.nextActions(normal)).filter(a => a.hypothesisId === 'h1'), [{ type: 'revise', hypothesisId: 'h1' }]);
+  refuses(normal, () => m.eliminateAtLimit(normal, 'h1'));
+});
+test('quick run: the analysis after it concludes from 3 verified hypotheses like any other unconfirmed premise', () => {
+  let s = m.applyHypotheses(quick(), [{ id: 'h1' }, { id: 'h2' }, { id: 'h3' }]);
+  for (const id of ['h1', 'h2', 'h3']) s = say(coreHyp(s, id), id);
+  assert.deepEqual(plain(m.nextActions(s)), [{ type: 'conclude' }]);
+  const input = m.prepareConclusion(s);
+  assert.equal(input.hypotheses.length, 3);
+  s = m.applyConclusion(s, { basedOn: ['h1', 'h2', 'h3'] });
+  assert.equal(s.run.phase, 'concluded');
+});

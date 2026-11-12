@@ -38,6 +38,7 @@ import {
   applyLimitStop,
   applyPause,
   applyResume,
+  applyQuickRun,
   applySituationBudgetOut,
   applySituationEvidence,
   applySituationGate,
@@ -65,6 +66,8 @@ import {
   MAX_RESEARCH_CALLS,
   MAX_ROUND,
   MIN_VERIFIED,
+  QUICK_CAUSAL_RUN,
+  RESEARCH_DEADLINE_MS,
   foundNeeds,
   isLimitCut,
   composeFacets,
@@ -121,7 +124,7 @@ import {
 import type { StepDefinition } from "../../core/step-runner";
 import type { MapDocument, MapNode } from "../../map-model";
 
-export const MAX_RESEARCH_CONCURRENCY = 6;
+export const MAX_RESEARCH_CONCURRENCY = 9;
 /**
  * The most AI calls one run can make, shown before it starts (corrections and retries not counted): the research calls, plan_facets,
  * the facet judgement (at most two: round 1 and the retry round), propose (up to MAX_HYPOTHESES - MIN_VERIFIED + 1), a needs step and
@@ -200,11 +203,24 @@ export interface ArgumentRunPorts {
   t(key: TranslationKey, ...values: unknown[]): string;
   /** Asks the usage confirmation before the first provider call of a run; false pauses it. Absent means allowed. */
   confirmUsage?(mapPath: string): Promise<boolean>;
+  /** Test seam: the model time limit of one research call (default RESEARCH_DEADLINE_MS). */
+  researchDeadlineMs?: number;
+  /** Test seam: the timer behind that limit; returns its cancel (default: window.setTimeout). */
+  setTimer?(handler: () => void, ms: number): () => void;
+  /** Test seam: the quick run of a causal question (default QUICK_CAUSAL_RUN). */
+  quickCausalRun?: boolean;
 }
 
 interface Drive {
   mapPath: string;
   controller: AbortController;
+  /**
+   * Wind-down of the calls still out (research and concurrent text steps) once the run only has its conclusion left. Separate from
+   * `controller` (Stop) so it never pauses the run as 'user'; replaced by a fresh one after the calls have drained.
+   */
+  wind: AbortController;
+  /** Set only on the per-task view of a concurrent text step: the wind-down signal that task was started under. */
+  windSignal?: AbortSignal;
   stopRequested: boolean;
   disposed: boolean;
   done: Promise<void>;
@@ -426,6 +442,7 @@ export class ArgumentRuns {
     const drive: Drive = {
       mapPath,
       controller: new AbortController(),
+      wind: new AbortController(),
       stopRequested: false,
       disposed: false,
       done: Promise.resolve(),
@@ -501,16 +518,21 @@ export class ArgumentRuns {
   /**
    * Research runs as a pool: up to MAX_RESEARCH_CONCURRENCY calls are out, and a finished one frees its slot for the next pending item
    * at once. Each dispatch waits for its begin write (researchCalls, `searching`) before the next state read, so the budget and the
-   * pending list are never read stale. Text steps run one at a time and only with no research call out.
+   * pending list are never read stale. The independent text steps (a hypothesis's needs, a hypothesis's verdict) run beside the pool and
+   * each other, at most one per hypothesis; every other text step (whole-map steps) runs alone, with nothing out. When only the
+   * conclusion is left the calls still out are wound down (aborted, their late results dropped) instead of waited for.
    */
   private async loop(drive: Drive): Promise<void> {
     const pool = new Set<Promise<void>>();
+    const texts = new Map<string, Promise<void>>();
     let thrown: { error: unknown } | undefined;
+    let textFailed = false;
     let idle = 0;
     let last = "";
     // Items whose begin wrote nothing (note busy, stale): skipped until a call out lands, so they never hold the others back.
     const refused = new Set<string>();
     const failedTwice = (): boolean => [...drive.failures.values()].some(n => n >= 2);
+    const out = (): Promise<void>[] => [...pool, ...texts.values()];
     // A run whose state stops changing ends (pause 'error'); counted only when nothing is out and no new item is tried.
     const stuck = (state: ArgumentMapData): boolean => {
       const key = JSON.stringify(state);
@@ -521,10 +543,10 @@ export class ArgumentRuns {
     try {
       for (;;) {
         if (this.dead(drive) || thrown) break;
-        // Two consecutive provider failures on one item: the one automatic retry is spent; let the calls out land, then pause.
-        if (failedTwice()) {
-          if (pool.size) {
-            await Promise.race(pool);
+        // Two consecutive provider failures on one item, or a text step out of its retry: let the calls out land, then pause.
+        if (failedTwice() || textFailed) {
+          if (out().length) {
+            await Promise.race(out());
             continue;
           }
           await this.pause(drive, "error", false);
@@ -533,7 +555,42 @@ export class ArgumentRuns {
         const state = await this.state(drive);
         if (!state || thrown) break;
         const actions = nextActions(state);
-        if (!actions.length && !pool.size) break;
+        if (!actions.length && !out().length) break;
+        if (out().length && actions.length === 1 && actions[0].type === "conclude") {
+          // Enough verified: nothing still out can change the conclusion. Abort it all (not a Stop) and conclude once it has drained.
+          this.ports.log("argument-run wind-down");
+          drive.wind.abort();
+          await Promise.all(out());
+          drive.wind = new AbortController();
+          refused.clear();
+          continue;
+        }
+        const startable = actions.filter(
+          (a): a is Extract<ArgumentAction, { type: "add_needs" | "verdict" }> =>
+            (a.type === "add_needs" || a.type === "verdict") && !texts.has(a.hypothesisId)
+        );
+        if (startable.length) {
+          for (const action of startable) {
+            // A per-task view: the corrective-retry reason and the wind-down signal belong to this step only.
+            const view = Object.create(drive) as Drive;
+            view.windSignal = drive.wind.signal;
+            view.retryReason = undefined;
+            let task: Promise<void>;
+            task = this.guarded(
+              view,
+              () => this.textStep(view, state, action),
+              () => {
+                textFailed = true;
+              }
+            )
+              .catch((error: unknown) => {
+                thrown ??= { error };
+              })
+              .finally(() => texts.delete(action.hypothesisId));
+            texts.set(action.hypothesisId, task);
+          }
+          continue;
+        }
         const research = actions.filter(a => a.type === "research_situation" || a.type === "research_need");
         const next = research.find(a => !refused.has(researchItem(a)));
         if (next && pool.size < MAX_RESEARCH_CONCURRENCY) {
@@ -550,8 +607,8 @@ export class ArgumentRuns {
           if (!(await Promise.race([started, task.then(() => false)]))) refused.add(researchItem(next));
           continue;
         }
-        if (pool.size) {
-          await Promise.race(pool);
+        if (out().length) {
+          await Promise.race(out());
           refused.clear();
           continue;
         }
@@ -567,7 +624,7 @@ export class ArgumentRuns {
         if (drive.stopRequested) return;
       }
     } finally {
-      await Promise.all(pool);
+      await Promise.all(out());
     }
     if (thrown) throw thrown.error;
   }
@@ -577,19 +634,21 @@ export class ArgumentRuns {
   }
 
   /** One corrective retry for a text step (parse refusal, gate refusal or provider error); a second failure pauses with 'error'. */
-  private async guarded(drive: Drive, work: () => Promise<void>): Promise<void> {
+  private async guarded(drive: Drive, work: () => Promise<void>, onFinalFailure?: () => void): Promise<void> {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         await work();
         return;
       } catch (error) {
-        if (this.dead(drive)) return;
+        if (this.dead(drive) || drive.windSignal?.aborted) return;
         const known = error instanceof ArgumentStepError || error instanceof GateError;
         // Only a refusal the model can correct is passed on, as a short plain line; a provider error says nothing it could fix.
         drive.retryReason = known ? error.message.replace(/\s+/g, " ").trim().slice(0, 200) : undefined;
         this.ports.log(`argument-run step failed attempt=${attempt} kind=${known ? error.name : "other"}`);
         if (attempt === 2) {
-          await this.pause(drive, "error", false);
+          // A concurrent text step leaves the pause to the loop, which first waits for the calls still out.
+          if (onFinalFailure) onFinalFailure();
+          else await this.pause(drive, "error", false);
           return;
         }
       } finally {
@@ -638,6 +697,21 @@ export class ArgumentRuns {
     });
     return wrote;
   }
+  /**
+   * The write of a concurrent text step. `build` re-reads the fresh state on every call, so when another write made the fence stale the
+   * write is built again onto the fresh state: the model result is kept, no second AI call, and no other step's write is overwritten or lost.
+   */
+  private async checkpointFresh(
+    drive: Drive,
+    build: (state: ArgumentMapData, map: MapDocument) => Promise<Plan | null>
+  ): Promise<void> {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (await this.checkpoint(drive, build)) return;
+      if (this.dead(drive) || drive.windSignal?.aborted) return;
+      this.ports.log(`argument-run rebuilt n=${attempt}`);
+    }
+    throw new GateError("the map kept changing under the write");
+  }
   private place(doc: MapDocument, node: MapNode, parentId: string | null): void {
     const parent = parentId ? doc.nodes.find(n => n.id === parentId) : undefined;
     const siblings = doc.nodes.filter(n => n.parentId === parentId && n.id !== node.id).length;
@@ -680,7 +754,8 @@ export class ArgumentRuns {
     request: Request
   ): Promise<Output> {
     const sent = drive.retryReason ? withRetryReason(step, drive.retryReason) : step;
-    return untilAborted(drive.controller.signal, this.ports.runStep(sent, request, drive.controller.signal));
+    const signal = drive.windSignal ? linked(drive.controller.signal, drive.windSignal) : drive.controller.signal;
+    return untilAborted(signal, this.ports.runStep(sent, request, signal));
   }
 
   private async textStep(drive: Drive, state: ArgumentMapData, action: ArgumentAction): Promise<void> {
@@ -846,6 +921,11 @@ export class ArgumentRuns {
       );
       next.situation.question = result.question;
       this.ports.log(`argument-run planned runId=${s.run.runId} questionType=${result.questionType}`);
+      // Quick run (causal only): no situation research and no revise rounds; the analysis begins in this same write.
+      if (result.questionType === "causal" && (this.ports.quickCausalRun ?? QUICK_CAUSAL_RUN)) {
+        this.ports.log(`argument-run quick run runId=${s.run.runId}`);
+        return { next: applyQuickRun(next), nodes };
+      }
       return { next, nodes };
     });
   }
@@ -1070,7 +1150,7 @@ export class ArgumentRuns {
       max: needsAllowed({ ...h, round })
     };
     const result: NeedsResult = await this.ask(drive, ARGUMENT_STEPS[revise ? "revise" : "add_needs"], request);
-    await this.checkpoint(drive, async (s, map) => {
+    await this.checkpointFresh(drive, async (s, map) => {
       const dry = result.needs.map((n, i) => ({ id: `dry-${i}`, text: n.text, ...(n.core ? { core: true } : {}) }));
       if (revise) startNextRound(s, hypothesisId, dry);
       else addNeeds(s, hypothesisId, dry);
@@ -1103,7 +1183,7 @@ export class ArgumentRuns {
       ? await this.ask(drive, facetVerdictStep, request)
       : undefined;
     let result: VerdictResult = facet ?? (await this.ask(drive, ARGUMENT_STEPS.verdict, request));
-    await this.checkpoint(drive, async (s, map) => {
+    await this.checkpointFresh(drive, async (s, map) => {
       const next = applyVerdict(s, hypothesisId, result);
       // The program kept a "supported" verdict as undecided because the stances do not clearly back it: the model's reason would argue
       // the opposite of the card, so the note says what the program decided.
@@ -1375,6 +1455,8 @@ export class ArgumentRuns {
       ? (state.hypotheses.find(h => h.id === hypothesisId)?.needs.find(n => n.id === itemId)?.text ?? "")
       : (state.situation.data.find(d => d.id === itemId)?.need ?? "");
     await this.slot();
+    // The wind-down this call was started under (a later episode gets a new controller).
+    const windSignal = drive.wind.signal;
     let busy: BusyHandle | null = null;
     try {
       if (this.dead(drive)) return;
@@ -1387,7 +1469,9 @@ export class ArgumentRuns {
       }));
       if (!began || this.dead(drive)) return;
       begun();
-      const signal = busy ? linked(drive.controller.signal, busy.signal) : drive.controller.signal;
+      const runSignal = busy ? linked(drive.controller.signal, busy.signal) : drive.controller.signal;
+      // Stop, the card's busy signal and the wind-down. The deadline joins it for the model call only (not for verifySource).
+      const signal = linked(runSignal, windSignal);
       const proposition = await this.proposition(drive, state);
       // A hypothesis need carries the claim it tests (the stance is relative to it) and the assumed period.
       const context = hypothesis
@@ -1401,11 +1485,20 @@ export class ArgumentRuns {
       let tierLog = "-";
       let secondLog = "-";
       let code = "";
-      let reply: AiResult;
+      let reply: AiResult | undefined;
       let note = "";
+      let timedOut = false;
+      const deadline = new AbortController();
+      const startTimer = (handler: () => void, ms: number): (() => void) => {
+        if (this.ports.setTimer) return this.ports.setTimer(handler, ms);
+        const handle = window.setTimeout(handler, ms);
+        return () => window.clearTimeout(handle);
+      };
+      const cancelTimer = startTimer(() => deadline.abort(), this.ports.researchDeadlineMs ?? RESEARCH_DEADLINE_MS);
+      const callSignal = linked(signal, deadline.signal);
       try {
         reply = await untilAborted(
-          signal,
+          callSignal,
           this.ports.askModel(
             {
               title: shorten(needText, 120),
@@ -1423,7 +1516,7 @@ export class ArgumentRuns {
             },
             this.ports.config(drive.mapPath).model,
             this.ports.config(drive.mapPath).reasoning,
-            signal
+            callSignal
           )
         );
       } catch (error) {
@@ -1432,15 +1525,26 @@ export class ArgumentRuns {
           void this.stop(drive.mapPath);
           return;
         }
-        await this.releaseFailed(drive, state, isNeed, hypothesisId, itemId, error);
-        return;
+        if (windSignal.aborted) {
+          await this.releaseWound(drive, state, isNeed, hypothesisId, itemId);
+          return;
+        }
+        // The deadline passed with no answer: a miss (the model was too slow), not a provider failure and never a pause.
+        if (!deadline.signal.aborted) {
+          await this.releaseFailed(drive, state, isNeed, hypothesisId, itemId, error);
+          return;
+        }
+        timedOut = true;
+      } finally {
+        cancelTimer();
       }
       try {
-        openedUrls = reply.evidence?.openedUrls ?? [];
-        const entry = reply.argumentEvidence?.find(e => e.need === itemId);
+        openedUrls = reply?.evidence?.openedUrls ?? [];
+        const entry = reply?.argumentEvidence?.find(e => e.need === itemId);
         note = entry?.note ?? "";
         const facetMap = !isNeed && hasFacets(state);
-        if (!entry) result = { found: false, reason: "no_answer" };
+        if (timedOut) result = { found: false, reason: "not_found_in_time" };
+        else if (!entry) result = { found: false, reason: "no_answer" };
         else if (entry.status !== "found") result = { found: false, reason: "not_found" };
         else {
           domain = domainOf(entry.url);
@@ -1484,6 +1588,12 @@ export class ArgumentRuns {
         code = error instanceof Error ? error.name : "error";
       }
       if (this.dead(drive)) return;
+      if (windSignal.aborted) {
+        // The run is concluding: a result that lands now is dropped; the item goes back to pending like an aborted call.
+        this.ports.log(`argument-run stale dropped runId=${state.run.runId}`);
+        await this.releaseWound(drive, state, isNeed, hypothesisId, itemId);
+        return;
+      }
       this.ports.log(
         `argument-run proof runId=${state.run.runId} phase=${state.run.phase} result=${result.found ? "found" : result.reason} proof=${code || "-"} domain=${domain} tier=${tierLog} second=${secondLog}`
       );
@@ -1491,7 +1601,7 @@ export class ArgumentRuns {
         const searchLog: SearchLog | undefined = result.found
           ? undefined
           : {
-              queries: (reply.evidence?.searchQueries ?? [])
+              queries: (reply?.evidence?.searchQueries ?? [])
                 .slice(0, SEARCH_LOG_MAX_ITEMS)
                 .map(q => capText(q, SEARCH_LOG_MAX_TEXT)),
               opened: openedUrls.slice(0, SEARCH_LOG_MAX_ITEMS).map(u => capText(u, SEARCH_LOG_MAX_TEXT)),
@@ -1548,6 +1658,24 @@ export class ArgumentRuns {
       },
       log: "found"
     };
+  }
+
+  /** A call aborted by the wind-down (the run is concluding): the item goes back to pending, nothing else is written and no failure is counted. */
+  private async releaseWound(
+    drive: Drive,
+    state: ArgumentMapData,
+    isNeed: boolean,
+    hypothesisId: string,
+    itemId: string
+  ): Promise<void> {
+    try {
+      await this.checkpoint(drive, async s => ({
+        next: isNeed ? releaseNeedResearch(s, hypothesisId, itemId) : releaseSituationResearch(s, itemId)
+      }));
+    } catch (failure) {
+      if (!(failure instanceof GateError)) throw failure;
+      this.ports.log(`argument-run stale dropped runId=${state.run.runId}`);
+    }
   }
 
   /** A provider failure is not a try: the item goes back to pending (no note, no card text) and the failure is counted for this drive. */

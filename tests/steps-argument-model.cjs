@@ -321,3 +321,10 @@ test('managedNodeIds covers the unconfirmed group; composeFacets and isLegacyFac
   assert.equal(model.isLegacyFacetMap(s), false);
   assert.equal(model.isFactMap(s), false);
 });
+
+test('quick run constants: the causal quick run is on; a research call has 45 seconds of model time; the research caps are unchanged', () => {
+  assert.equal(model.QUICK_CAUSAL_RUN, true);
+  assert.equal(model.RESEARCH_DEADLINE_MS, 45000);
+  assert.equal(model.MAX_RESEARCH_CALLS, 78);
+  assert.equal(model.MIN_VERIFIED, 3);
+});

@@ -61,6 +61,7 @@ async function rig(over = {}) {
     clearUndo: path => stat.undo.push(path),
     log: line => { stat.logs.push(line); },
     t: (key, ...values) => translate('zh-TW', key, ...values),
+    quickCausalRun: false, // the earlier tests cover the full flow (situation research, revise); the quick run has its own tests at the end
     ...over.ports
   };
   if (!over.facet) {
@@ -285,13 +286,13 @@ test('dispose: aborts and never writes afterwards', async () => {
   await assert.rejects(() => r.runs.start(r.mapPath, 'p'), e => e instanceof ArgumentRunError && e.code === 'disposed');
 });
 
-test('concurrency: at most 6 research dispatches at once', async () => {
+test('concurrency: at most 9 research dispatches at once', async () => {
   const r = await rig({ facet: true, script: { step: manyNeeds(15), ask: async ctx => {
     await tick(); await tick();
     return { summary: 's', detail: 'd', suggestions: [], visualReferences: [], evidence: { openedUrls: [] }, argumentEvidence: [foundEntry(ctx.argumentEvidenceNeeds[0].id)] };
   } } });
   await r.runs.start(r.mapPath, 'p');
-  assert.equal(MAX, 6);
+  assert.equal(MAX, 9);
   assert.ok(r.stat.maxActive <= MAX && r.stat.maxActive >= 2, `max ${r.stat.maxActive}`);
 });
 
@@ -1717,4 +1718,263 @@ test('pool: an item whose card note is busy (begin refused) does not hold the ot
   assert.equal(state.run.status, 'paused');
   assert.equal(state.run.stopReason, 'error');
   assert.equal(state.run.researchCalls, r.stat.ask.length);
+});
+
+// ---- P1 speed: the quick causal run, concurrent text steps, the 45 s research deadline, wind-down (virtual clock) -----------------
+/** A virtual clock: nothing waits in real time; `runUntil` advances time to the next timer once the run is idle. */
+const vclock = () => {
+  let now = 0; let seq = 0;
+  const timers = new Map();
+  const add = (fn, ms) => { const id = ++seq; timers.set(id, { at: now + ms, fn }); return id; };
+  const settle = async () => { for (let i = 0; i < 40; i++) await tick(); };
+  const fireNext = (limit = Infinity) => {
+    const next = [...timers.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+    if (!next || next[1].at > limit) return false;
+    now = Math.max(now, next[1].at); timers.delete(next[0]); next[1].fn(); return true;
+  };
+  return {
+    now: () => now,
+    setTimer: (fn, ms) => { const id = add(fn, ms); return () => timers.delete(id); },
+    /** Resolves after `ms` virtual ms; rejects when `signal` aborts first (a provider that honours abort). */
+    sleep: (ms, signal) => new Promise((resolve, reject) => {
+      let id;
+      const onAbort = () => { timers.delete(id); reject(new Error('aborted')); };
+      if (signal?.aborted) { onAbort(); return; }
+      id = add(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+      signal?.addEventListener('abort', onAbort, { once: true });
+    }),
+    settle,
+    async advanceTo(t) { await settle(); while (fireNext(t)) await settle(); now = Math.max(now, t); await settle(); },
+    async runUntil(promise) {
+      let done = false;
+      promise.then(() => { done = true; }, () => { done = true; });
+      let idle = 0;
+      while (!done) { await settle(); if (done) break; idle = fireNext() ? 0 : idle + 1; if (idle > 20) throw new Error('stalled: nothing is waiting on the clock'); }
+      await promise;
+    }
+  };
+};
+const timed = (clock, ms, steps) => Object.fromEntries(Object.entries(steps).map(([name, fn]) => [name, async (...args) => { await clock.sleep(ms); return fn(...args); }]));
+/** A causal quick-run script: `hyps` hypotheses H1.., each with a core need `Hn-core` and two more (`Hn-a`, `Hn-b`). */
+const quickSteps = (hyps = 3, over = {}) => facetSteps({
+  propose_facet_hypotheses: request => ({ hypotheses: Array.from({ length: hyps }, (_, i) => ({ title: `H${i + 1}`, statement: `statement ${i + 1}`, alternative: false, citedData: [] })) }),
+  add_needs: request => ({ needs: [{ text: `${request.hypothesis.title}-core`, core: true }, { text: `${request.hypothesis.title}-a` }, { text: `${request.hypothesis.title}-b` }] }),
+  ...over
+});
+const hypOf = (state, title) => state.hypotheses.find(h => state.hypotheses.indexOf(h) === Number(title.slice(1)) - 1);
+const needByText = (state, text) => state.hypotheses.flatMap(h => h.needs).find(n => n.text === text);
+const quickRig = async (clock, { stepMs = 9000, researchMs = () => 30000, steps = quickSteps(), ports = {}, ask } = {}) => rig({
+  facet: true,
+  ports: { quickCausalRun: true, setTimer: clock.setTimer, ...ports },
+  script: { step: timed(clock, stepMs, steps), ask: ask ?? ((ctx, n, signal) => clock.sleep(researchMs(ctx), signal).then(() => okAnswer(ctx))) }
+});
+
+test('P1 (a) quick causal run: no situation research, no facet judgement, no revise; reaches concluded in 9 s x 5 text stages + 30 s research = 75 virtual seconds', async () => {
+  const clock = vclock();
+  const r = await quickRig(clock);
+  await clock.runUntil(r.runs.start(r.mapPath, 'Youth unemployment is rising'));
+  const state = await r.state();
+  assert.equal(state.run.phase, 'concluded');
+  assert.ok(clock.now() <= 75000, `simulated ${clock.now()} ms`);
+  assert.ok(!r.stat.steps.includes('judge_facets') && !r.stat.steps.includes('revise'));
+  assert.ok(r.stat.ask.every(ctx => /^H\d-/.test(ctx.task)), 'every research call is a hypothesis need, none is situation data');
+  assert.equal(r.stat.ask.length, 9);
+  assert.equal(state.run.researchCalls, 9);
+  assert.equal(state.situation.gate.state, 'unconfirmed');
+  assert.equal(state.situation.gate.reason, 'quick_run');
+  assert.ok(state.situation.data.every(d => d.state === 'not_found' && d.reason === 'quick_run'));
+  assert.equal(state.hypotheses.filter(h => h.location === 'verifying' && model.isVerified(h)).length, 3);
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+});
+
+test('P1: a non-causal (fact) question is not a quick run: it plans, researches the situation and judges the facets as before', async () => {
+  const clock = vclock();
+  const r = await quickRig(clock, { stepMs: 1, researchMs: () => 1, steps: facetSteps({ plan_facets: () => ({ ...facetSteps().plan_facets(), questionType: 'fact' }), conclude_facts: request => ({ summary: 'answer', points: [], basedOn: request.facets.map(f => f.id) }) }) });
+  await clock.runUntil(r.runs.start(r.mapPath, 'How many people live in X'));
+  const state = await r.state();
+  assert.ok(r.stat.steps.includes('judge_facets'));
+  assert.ok(r.stat.ask.length >= 3, 'the situation data are researched');
+  assert.notEqual(state.situation.gate.reason, 'quick_run');
+});
+
+test('P1 (b) research concurrency reaches the cap of 9 and never exceeds it', async () => {
+  const clock = vclock();
+  const r = await rig({ facet: true, ports: { setTimer: clock.setTimer }, script: { step: timed(clock, 1000, manyNeeds(15)), ask: (ctx, n, signal) => clock.sleep(30000, signal).then(() => okAnswer(ctx)) } });
+  await clock.runUntil(r.runs.start(r.mapPath, 'p'));
+  assert.equal(MAX, 9);
+  assert.equal(r.stat.maxActive, 9);
+});
+
+test('P1 (c) a research call past 45 s is a miss (not_found_in_time), not a failure: the run is not paused, the other needs are unaffected, no failure is counted', async () => {
+  const clock = vclock();
+  let abortedSlow = false;
+  const r = await quickRig(clock, { ask: (ctx, n, signal) => clock.sleep(ctx.task === 'H1-a' ? 90000 : 30000, signal).then(() => okAnswer(ctx), e => { if (ctx.task === 'H1-a') abortedSlow = true; throw e; }) });
+  await clock.runUntil(r.runs.start(r.mapPath, 'p'));
+  const state = await r.state();
+  const slow = needByText(state, 'H1-a');
+  assert.equal(slow.state, 'not_found');
+  assert.equal(slow.reason, 'not_found_in_time');
+  assert.equal(slow.searchLog.why, 'not_found_in_time');
+  assert.equal(abortedSlow, true, 'the call itself was aborted at the deadline');
+  assert.equal(state.run.phase, 'concluded');
+  assert.ok(!state.run.stopReason);
+  assert.ok(!r.stat.logs.some(l => l.includes('provider_failure') || l.includes('argument-run paused')));
+  for (const t of ['H1-core', 'H1-b', 'H2-core', 'H2-a', 'H3-b']) assert.equal(needByText(state, t).state, 'found', t);
+  assert.equal(state.run.researchCalls, 9, 'the missed call is counted once, never asked again');
+  // 9 + 9 + 9 + 45 (the deadline, not the 90 s the call would take) + 9 + 9
+  assert.ok(clock.now() <= 9000 * 5 + 45000, `simulated ${clock.now()} ms`);
+});
+
+test('P1 (c2) the deadline covers the model call only: a slow verifySource after an answer is not cut at 45 s', async () => {
+  const clock = vclock();
+  const r = await quickRig(clock, { researchMs: () => 40000, ports: { fetch: async request => { await clock.sleep(30000); return { status: 200, headers: { 'content-type': 'text/html' }, text: PAGE, url: request.url }; } } });
+  await clock.runUntil(r.runs.start(r.mapPath, 'p'));
+  const state = await r.state();
+  assert.ok(state.hypotheses.flatMap(h => h.needs).every(n => n.state === 'found'));
+  assert.equal(state.run.phase, 'concluded');
+});
+
+test('P1 (d) concluding with calls out: the calls are aborted at once (no wait for their 45 s), their late results write nothing, the run is not paused', async () => {
+  const clock = vclock();
+  let abortedFourth = 0;
+  const late = [];
+  const r = await quickRig(clock, {
+    steps: quickSteps(4),
+    // the 4th hypothesis never answers in time: its three needs are still out when H1..H3 are verified
+    ask: (ctx, n, signal) => ctx.task.startsWith('H4-')
+      ? clock.sleep(40000, signal).then(() => { late.push(ctx.task); return okAnswer(ctx); }, e => { abortedFourth++; throw e; })
+      : clock.sleep(10000, signal).then(() => okAnswer(ctx))
+  });
+  const run = r.runs.start(r.mapPath, 'p');
+  await clock.runUntil(run);
+  const state = await r.state();
+  assert.equal(state.run.phase, 'concluded');
+  assert.ok(!state.run.stopReason);
+  assert.equal(abortedFourth, 3, 'the three calls still out were aborted');
+  assert.ok(clock.now() < 9000 * 5 + 10000 + 5000, `concluded without waiting for the deadline: ${clock.now()} ms`);
+  const before = JSON.stringify(await r.state());
+  await clock.advanceTo(200000);
+  assert.deepEqual(late, []);
+  assert.equal(JSON.stringify(await r.state()), before, 'nothing is written afterwards');
+  assert.ok(state.hypotheses[3].needs.every(n => n.state === 'pending'), 'the aborted needs are not left searching');
+  assert.ok(!r.stat.logs.some(l => l.includes('paused')), 'wind-down is not a Stop');
+});
+
+test('P1 (d2) a result that lands exactly as the run winds down is dropped (the item goes back to pending, nothing found is written)', async () => {
+  const clock = vclock();
+  const r = await quickRig(clock, {
+    steps: quickSteps(4),
+    // a provider that ignores abort: H4's calls answer 5 s after they start, in the middle of the verdict steps of H1..H3
+    ask: (ctx, n, signal) => ctx.task.startsWith('H4-') ? clock.sleep(5000).then(() => okAnswer(ctx)) : clock.sleep(10000, signal).then(() => okAnswer(ctx))
+  });
+  await clock.runUntil(r.runs.start(r.mapPath, 'p'));
+  const state = await r.state();
+  assert.equal(state.run.phase, 'concluded');
+  assert.ok(state.hypotheses.flatMap(h => h.needs).every(n => n.state !== 'searching'));
+});
+
+test('P1 (e) Stop with 9 calls out ends cleanly: paused (user), every need back to pending, late results write nothing', async () => {
+  const clock = vclock();
+  const answered = [];
+  const r = await quickRig(clock, { ask: (ctx, n, signal) => clock.sleep(30000).then(() => { answered.push(ctx.task); return okAnswer(ctx); }) }); // ignores abort
+  const run = r.runs.start(r.mapPath, 'p');
+  await clock.advanceTo(27000 + 5000);
+  assert.equal(r.stat.active, 9, 'nine calls are out');
+  await r.runs.stop(r.mapPath);
+  await run;
+  const state = await r.state();
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'user');
+  assert.ok(state.hypotheses.flatMap(h => h.needs).every(n => n.state === 'pending'));
+  const before = JSON.stringify(state);
+  await clock.advanceTo(200000);
+  assert.equal(answered.length, 9, 'the provider did answer late');
+  assert.equal(JSON.stringify(await r.state()), before, 'the late results are not written');
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+});
+
+test('P1 (f) the verdicts of different hypotheses run at the same time and both persist; needs steps too', async () => {
+  const clock = vclock();
+  let verdicts = 0; let maxVerdicts = 0; let needsOut = 0; let maxNeeds = 0;
+  const base = quickSteps(3);
+  const r = await quickRig(clock, { stepMs: 0, researchMs: () => 10000, steps: { ...base,
+    add_needs: async (...a) => { needsOut++; maxNeeds = Math.max(maxNeeds, needsOut); try { await clock.sleep(9000); return base.add_needs(...a); } finally { needsOut--; } },
+    verdict_facets: async (...a) => { verdicts++; maxVerdicts = Math.max(maxVerdicts, verdicts); try { await clock.sleep(9000); return base.verdict_facets(...a); } finally { verdicts--; } } } });
+  await clock.runUntil(r.runs.start(r.mapPath, 'p'));
+  const state = await r.state();
+  assert.equal(maxVerdicts, 3, 'three verdict steps were out together');
+  assert.equal(maxNeeds, 3, 'three needs steps were out together');
+  assert.deepEqual(plain(state.hypotheses.map(h => h.aiVerdict)), ['supported', 'supported', 'supported']);
+  assert.ok(state.hypotheses.every(h => h.insights?.length === 1), 'each verdict kept its insights');
+  assert.ok(state.hypotheses.every(h => h.needs.length === 3));
+  assert.equal(r.stat.steps.filter(n => n === 'verdict_facets').length, 3, 'one AI call per verdict');
+  assert.equal(r.stat.steps.filter(n => n === 'add_needs').length, 3, 'one AI call per hypothesis, needs are never batched');
+});
+
+test('P1 (f2) a verdict whose write went stale (another writer changed the map) is rebuilt on the fresh state with no second AI call; no write is lost', async () => {
+  const clock = vclock();
+  let injected = 0;
+  const r = await quickRig(clock, { researchMs: () => 10000 });
+  const real = r.ports.updateMap;
+  r.ports.updateMap = async (path, change) => {
+    const doc = await r.repo.readMap(path);
+    const read = model.readArgumentMap(doc);
+    // the first verdict write: someone else (not through the write queue) edits the map between the read and the write
+    if (read.kind === 'usable' && injected === 0 && read.data.hypotheses.length === 3 && read.data.hypotheses.every(h => h.needs.length === 3 && h.needs.every(n => n.state === 'found'))
+      && read.data.hypotheses.some(h => h.aiVerdict === undefined) && r.stat.steps.filter(n => n === 'verdict_facets').length === 3 && read.data.hypotheses.filter(h => h.aiVerdict !== undefined).length === 0) {
+      injected++;
+      await real(path, d => { d.argumentMap.situation.question = 'edited by the owner'; });
+    }
+    return real(path, change);
+  };
+  await clock.runUntil(r.runs.start(r.mapPath, 'p'));
+  const state = await r.state();
+  assert.equal(injected, 1);
+  assert.ok(r.stat.logs.some(l => l.includes('argument-run rebuilt')), 'the stale write was rebuilt');
+  assert.deepEqual(plain(state.hypotheses.map(h => h.aiVerdict)), ['supported', 'supported', 'supported']);
+  assert.equal(r.stat.steps.filter(n => n === 'verdict_facets').length, 3, 'no second AI call');
+  assert.equal(state.situation.question, 'edited by the owner', 'the other writer is not overwritten');
+  assert.equal(state.run.phase, 'concluded');
+});
+
+test('P1 (g) the first evidence is written as its need lands, not when the whole set is done', async () => {
+  const clock = vclock();
+  const r = await quickRig(clock, { stepMs: 1000, researchMs: ctx => ({ 'H1-core': 5000, 'H1-a': 20000 }[ctx.task] ?? 30000) });
+  const run = r.runs.start(r.mapPath, 'p');
+  await clock.advanceTo(3000 + 5000 + 2000);
+  let state = await r.state();
+  assert.equal(needByText(state, 'H1-core').state, 'found', 'the 5 s need is in the map at once');
+  assert.equal(needByText(state, 'H1-a').state, 'searching');
+  assert.equal(needByText(state, 'H2-core').state, 'searching');
+  await clock.advanceTo(3000 + 20000 + 2000);
+  state = await r.state();
+  assert.equal(needByText(state, 'H1-a').state, 'found');
+  assert.equal(needByText(state, 'H1-b').state, 'searching');
+  await clock.runUntil(run);
+});
+
+test('P1: a failing concurrent text step keeps the guarded rule (one corrective retry, then a pause with error) and the pause waits for the research out', async () => {
+  const clock = vclock();
+  const base = quickSteps(3);
+  let calls = 0;
+  const r = await quickRig(clock, { stepMs: 1000, researchMs: ctx => ctx.task === 'H2-a' ? 60000 : 5000, steps: { ...base,
+    verdict_facets: request => { if (request.hypothesis === 'statement 1') { calls++; throw new Error('provider down'); } return base.verdict_facets(request); } },
+    ports: { researchDeadlineMs: 100000 } });
+  const run = r.runs.start(r.mapPath, 'p');
+  await clock.advanceTo(30000);
+  assert.equal(r.runs.isRunning(r.mapPath), true, 'the run waits for the call still out before it pauses');
+  assert.equal((await r.state()).run.status, 'running');
+  await clock.runUntil(run);
+  const state = await r.state();
+  assert.equal(calls, 2, 'one retry');
+  assert.equal(state.run.status, 'paused');
+  assert.equal(state.run.stopReason, 'error');
+  assert.ok(state.hypotheses.flatMap(h => h.needs).every(n => n.state !== 'searching'));
+});
+
+test('P1: the idle detector does not fire while text steps are out (a slow verdict step is not a stuck run)', async () => {
+  const clock = vclock();
+  const r = await quickRig(clock, { stepMs: 600000, researchMs: () => 1 });
+  await clock.runUntil(r.runs.start(r.mapPath, 'p'));
+  assert.equal((await r.state()).run.phase, 'concluded');
 });

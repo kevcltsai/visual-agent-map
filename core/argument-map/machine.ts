@@ -234,7 +234,9 @@ const settled = (h: Hypothesis): boolean => h.needs.every(n => n.state === "foun
 const hasSearching = (state: ArgumentMapData): boolean =>
   state.situation.data.some(d => d.state === "searching") ||
   state.hypotheses.some(h => h.needs.some(n => n.state === "searching"));
-const canRevise = (h: Hypothesis): boolean => h.round < MAX_ROUND && h.needs.length < MAX_NEEDS;
+const canReviseHypothesis = (h: Hypothesis): boolean => h.round < MAX_ROUND && h.needs.length < MAX_NEEDS;
+/** A quick run never revises: a hypothesis not verified after round 1 is cut at its limit. */
+const canRevise = (state: ArgumentMapData, h: Hypothesis): boolean => !isQuickRun(state) && canReviseHypothesis(h);
 const verifyingCount = (state: ArgumentMapData): number =>
   state.hypotheses.filter(h => h.location === "verifying").length;
 
@@ -323,8 +325,8 @@ function analysisActions(state: ArgumentMapData): ArgumentAction[] {
     const verdictDue = core ? core.state === "found" : allNeedsFound(h);
     if (verdictDue) {
       if (h.aiVerdict === undefined) actions.push({ type: "verdict", hypothesisId: h.id });
-      else if (!isVerified(h)) actions.push({ type: canRevise(h) ? "revise" : "eliminate_limit", hypothesisId: h.id });
-    } else actions.push({ type: canRevise(h) ? "revise" : "eliminate_limit", hypothesisId: h.id });
+      else if (!isVerified(h)) actions.push({ type: canRevise(state, h) ? "revise" : "eliminate_limit", hypothesisId: h.id });
+    } else actions.push({ type: canRevise(state, h) ? "revise" : "eliminate_limit", hypothesisId: h.id });
   }
   return actions;
 }
@@ -599,6 +601,34 @@ const stopFacets = (
 export const NO_USABLE_DATA_REASON = "no_usable_data";
 /** Program code: the AI judged supports or refutes but every datum it cited comes from an uncertain source (decision #64); forced insufficient instead of a retry that would loop. */
 export const UNCERTAIN_SOURCES_REASON = "uncertain_sources_only";
+/** Program code: the situation was skipped on purpose (quick run), not judged; the notes render it, never the raw code. */
+export const QUICK_RUN_REASON = "quick_run";
+export const isQuickRun = (state: ArgumentMapData): boolean =>
+  state.situation.gate.state === "unconfirmed" && state.situation.gate.reason === QUICK_RUN_REASON;
+/**
+ * The quick run of a causal question, applied right after the plan: the situation data not yet researched are closed as not found
+ * (a program reason) and the analysis begins with an unconfirmed premise, the same end state as `stopFacets` data_insufficient.
+ */
+export function applyQuickRun(state: ArgumentMapData): ArgumentMapData {
+  inSituation(state);
+  if (!hasFacets(state) || state.situation.questionType !== "causal") throw new GateError("a quick run needs a causal facet map");
+  if (state.situation.data.some(d => d.state === "searching")) throw new GateError("situation research is still out");
+  const next = clone(state);
+  for (const datum of next.situation.data)
+    if (datum.state === "pending") {
+      datum.state = "not_found";
+      datum.reason = QUICK_RUN_REASON;
+    }
+  next.situation.gate = {
+    state: "unconfirmed",
+    kind: "data_insufficient",
+    reason: QUICK_RUN_REASON,
+    citedData: [],
+    round: 1
+  };
+  next.run.phase = "analysis";
+  return next;
+}
 export function applyFacetVerdicts(state: ArgumentMapData, judgement: FacetJudgement): ArgumentMapData {
   inSituation(state);
   const facets = facetsOf(state);
@@ -848,6 +878,7 @@ export function startNextRound(state: ArgumentMapData, hypothesisId: string, ite
   const h = hypothesisOf(next, hypothesisId);
   if (!h.needs.length || !settled(h)) throw new GateError("the round is not finished");
   if (isVerified(h)) throw new GateError("the hypothesis is already verified");
+  if (isQuickRun(state)) throw new GateError("a quick run has no revise round");
   if (h.round >= MAX_ROUND) throw new GateError("round limit reached");
   h.round += 1;
   pushNeeds(next, h, items, true);
@@ -975,7 +1006,7 @@ export function eliminateAtLimit(state: ArgumentMapData, hypothesisId: string): 
   inAnalysis(state);
   const next = clone(state);
   const h = hypothesisOf(next, hypothesisId);
-  if (!h.needs.length || !settled(h) || canRevise(h) || isVerified(h))
+  if (!h.needs.length || !settled(h) || canRevise(state, h) || isVerified(h))
     throw new GateError("the hypothesis is not at its limit");
   if (allNeedsFound(h) && h.aiVerdict === undefined) throw new GateError("the verdict is still due");
   h.location = "eliminated";

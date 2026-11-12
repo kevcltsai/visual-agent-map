@@ -1053,6 +1053,11 @@ test('quick causal step: a fact question returns no hypotheses (anything sent wi
   assert.throws(() => sr.prepareStep(mod.quickCausalStep, { ...fpReq, presetAssumptions: [{ label: '', value: 'x', reason: 'y' }] }), error => error.name === 'ArgumentStepError');
   assert.throws(() => sr.prepareStep(mod.quickCausalStep, { ...fpReq, presetQuestionType: 'opinion' }), error => error.name === 'ArgumentStepError');
 });
+test('quick causal step: facet baselines are asked empty (the quick run never researches facets), and an empty baseline passes while a baseline outside the assumptions is still refused', () => {
+  assert.ok(/baseline \(always ""/.test(mod.quickCausalStep.render(fpReq)));
+  assert.ok(ok(mod.quickCausalStep, fpReq, qcWith(v => { for (const f of v.facets) f.baseline = ''; })));
+  assert.throws(() => ok(mod.quickCausalStep, fpReq, qcWith(v => { v.facets[0].baseline = 'a figure nobody gave'; })), error => error.name === 'ArgumentStepError');
+});
 test('quick causal step: the prompt lives in the step template, names the proposition once as JSON, is text-only and carries the language and preset lines', () => {
   const prompt = mod.quickCausalStep.render({ ...fpReq, today: '2026-11-12', presetAssumptions: [{ label: 'a', value: 'b', reason: 'c' }] });
   assert.ok(prompt.includes(JSON.stringify(PROP)));

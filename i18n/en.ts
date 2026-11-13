@@ -1316,6 +1316,8 @@ export const en = {
     "The automatic continuation wants to delete or rewrite things; it waits for your confirmation",
   "ui.map_chat_plan_reason_research_text_other_actions":
     "The AI read the full web research text and now wants to delete or rewrite things; it waits for your confirmation",
+  "ui.map_chat_plan_reason_source_text_other_actions":
+    "The AI read the map's data sources and now wants to delete or rewrite things; it waits for your confirmation",
   "ui.map_chat_research_deferred_0": "“{0}” did not fit this round and is read in the next one.",
   "ui.map_chat_research_oversize_0": "“{0}” is too long, so it was not read.",
   "ui.map_chat_basis_quote_0": "“{0}”",
@@ -1353,6 +1355,7 @@ export const en = {
   "ui.map_chat_undo_files_changed": "Files have changed since; this cannot be undone.",
   "ui.map_chat_guard_exists": "a file already exists there",
   "ui.map_chat_guard_no_baseline": "the file was not part of this message",
+  "ui.map_chat_guard_map_source": "the file is one of this map's data sources; the chat only reads it",
   "ui.map_chat_skip_stale": "the file changed after you sent the message",
   "ui.map_chat_skip_topic_gone": "the topic is no longer on the map",
   "ui.map_chat_skip_find_failed": "the text to replace was not found exactly once",

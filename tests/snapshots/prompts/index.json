@@ -586,6 +586,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "map-chat-sources.en": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt (map data sources with an injection attempt)",
+      "language": "en",
+      "schema": true
+    },
+    "map-chat-sources.zh": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt (map data sources with an injection attempt)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "map-chat-sources.zh-CN": {
+      "builder": "core/map-chat-service.ts buildMapChatPrompt (map data sources with an injection attempt)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "map-chat-steer.en": {
       "builder": "core/steps/map-chat/step.ts renderMapChatSteer",
       "language": "en",

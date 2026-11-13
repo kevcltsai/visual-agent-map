@@ -497,6 +497,7 @@ import {
   type MapChatTopicHash,
   type MapChatTopicRef
 } from "../../core/map-chat-context";
+import { mapChatSourceMaterial, type MapChatSourceCache } from "../../core/map-chat-sources";
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
@@ -1104,6 +1105,8 @@ interface TopicChatEntry {
   steerFolded?: string[];
   /** How the current task ended (set by `settleTopicChat`); `plan`: the reply needs a plan, so nothing is sent on. */
   steerEnd?: { status: TopicRecordStatus; plan: boolean } | null;
+  /** A turn of this conversation sent the map's data sources: they are untrusted, so a later reply's writes need a plan (the same rule as after research). */
+  readsSources?: boolean;
   /** The AbortController of the current run (the window's stop button aborts it). */
   controller?: AbortController;
 }
@@ -1321,7 +1324,8 @@ const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   reserved_frontmatter: "ui.map_chat_guard_reserved_frontmatter",
   hypothesis_frontmatter_changed: "ui.map_chat_guard_hypothesis_frontmatter_changed",
   exists: "ui.map_chat_guard_exists",
-  no_baseline: "ui.map_chat_guard_no_baseline"
+  no_baseline: "ui.map_chat_guard_no_baseline",
+  map_source: "ui.map_chat_guard_map_source"
 };
 const guardSkipped = (code: MapChatGuardCode, editing = false): ChatOutcome =>
   skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
@@ -1550,6 +1554,10 @@ export class VisualAgentMapView extends ItemView {
    * only a new conversation clears it, and a restored record sets it again. Any turn of it may read web text (decision #17).
    */
   private chatStartedResearch = false;
+  /** The conversation has sent the map's data sources in this turn or an earlier one: they and the turns after them are untrusted, so the research allow-list applies. */
+  private chatReadsSources = false;
+  /** The findings of the last condensing of oversized sources (map chat and topic chat share it); cleared with the conversation and on close. */
+  private chatSourceCache: MapChatSourceCache | null = null;
   /** The record conversation whose file already carries the `research_started` mark (kept apart from the flag: the record may have been off when research began). */
   private chatResearchMarkedIn: string | null = null;
   /** Research notes an earlier round already sent whole (they go last when the budget is short). */
@@ -3251,6 +3259,7 @@ export class VisualAgentMapView extends ItemView {
   async onClose(): Promise<void> {
     this.closeTopicLinkMenu();
     this.closed = true;
+    this.chatSourceCache = null;
     this.unsyncedPaths = null;
     this.closeTopicChatWindow();
     this.topicChatSessions.clear();
@@ -15463,6 +15472,50 @@ export class VisualAgentMapView extends ItemView {
     return readSourceGroups(this.taskSourceSettings().mapSources, signal);
   }
   /**
+   * The map's sources for one chat turn (map chat and topic chat), read-only and untrusted: the documents as they are within the
+   * per-turn limit, else their findings (condensed once, reused while the sources are unchanged). A stop is rethrown; a failed read
+   * gives no sources. A result that arrives after the map changed or the view closed is dropped (nothing is cached or sent).
+   */
+  private async chatMapSources(signal: AbortSignal): Promise<{ text: string; paths: string[] } | undefined> {
+    const mapPath = this.path;
+    const mapId = this.map?.id;
+    const conversation = this.chatConversation;
+    const current = (): boolean =>
+      !this.closed && this.path === mapPath && this.map?.id === mapId && this.chatConversation === conversation;
+    const groups = await this.readMapSourceGroups(signal);
+    const settings = this.plugin.settings;
+    const material = await mapChatSourceMaterial({
+      groups,
+      mapPath,
+      cache: this.chatSourceCache,
+      condense: () =>
+        this.plugin.aiTasks.condenseReferences(
+          {
+            title: this.map?.title ?? "",
+            summary: "",
+            rules: "",
+            detail: "",
+            task: "",
+            ancestors: "",
+            referenceGroups: groups,
+            mode: "task",
+            researchMode: "local",
+            researchDepth: "fast",
+            visualMode: "off",
+            ...this.usageMapField()
+          },
+          settings.cliModel,
+          normalizeReasoningLevel(settings.cliReasoning),
+          signal
+        ),
+      refuse: () => new Error(t("ui.source_context_exceeds_budget"))
+    });
+    if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+    if (!current()) return undefined;
+    this.chatSourceCache = material.cache;
+    return material.text ? { text: material.text, paths: material.paths } : undefined;
+  }
+  /**
    * The sources a batch of research children shares: the map's own sources are read once. When they are too large for one request
    * the condensing runs once for the whole batch (`sharedFindings`), not once per child.
    */
@@ -16414,7 +16467,8 @@ export class VisualAgentMapView extends ItemView {
     entry: TopicChatEntry,
     node: MapNode,
     note: Note,
-    message: string
+    message: string,
+    signal: AbortSignal
   ): Promise<MapChatRequest> {
     const map = this.map!;
     const settings = this.plugin.settings;
@@ -16461,6 +16515,7 @@ export class VisualAgentMapView extends ItemView {
           },
           { role: "assistant", text: turns[i + 1].text }
         );
+    const mapSources = await this.chatMapSources(signal);
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapTitles: [],
@@ -16483,8 +16538,11 @@ export class VisualAgentMapView extends ItemView {
         ? (map.topicRelations ?? []).filter(relation => scope.has(relation.from) && scope.has(relation.to))
         : [],
       activeFile: null,
-      history
+      history,
+      ...(mapSources ? { mapSources } : {})
     });
+    // Sent once, untrusted for every later turn of this topic's conversation.
+    if (context.mapSourcesSent) entry.readsSources = true;
     // The prompt hides the topic's parent (outline parentId null), but the stale check compares against the real one:
     // keep the baseline true so a topic that is not the map root is not judged moved. `topicHashes` is never sent to the model.
     if (context.topicHashes[node.id])
@@ -16521,7 +16579,7 @@ export class VisualAgentMapView extends ItemView {
       hooks.end();
     };
     try {
-      const request = await this.buildTopicChatRequest(entry, node, note, text);
+      const request = await this.buildTopicChatRequest(entry, node, note, text, controller.signal);
       began = true;
       this.plugin.activeTasks?.set(key, controller);
       hooks.begin(controller);
@@ -16553,7 +16611,8 @@ export class VisualAgentMapView extends ItemView {
       const plan = allowed.length
         ? planFor(allowed, request.context, {
             diagrams: this.plugin.settings.addDiagramsAfterResearch,
-            mapAiMode: map.aiMode
+            mapAiMode: map.aiMode,
+            chatReadSources: entry.readsSources === true
           })
         : null;
       if (plan) {
@@ -22288,6 +22347,7 @@ export class VisualAgentMapView extends ItemView {
       imageDataUrl = await this.readChatImage(picture.path, settings.cliModel, signal);
       picture.selected.imageAttached = true;
     }
+    const mapSources = await this.chatMapSources(signal);
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapTitles,
@@ -22310,8 +22370,11 @@ export class VisualAgentMapView extends ItemView {
       history: chat.turns(),
       ...(picture ? { selectedImage: picture.selected } : {}),
       ...(researchNotes.length ? { researchNotes } : {}),
+      ...(mapSources ? { mapSources } : {}),
       ...(continuation ? { continuation } : {})
     });
+    // From this turn on the conversation holds source text (and what the model made of it): its writes need the user's yes.
+    if (context.mapSourcesSent) this.chatReadsSources = true;
     return {
       message,
       context,
@@ -22572,6 +22635,7 @@ export class VisualAgentMapView extends ItemView {
                     imageAttached: !!request.imageDataUrl,
                     chain: planChainOf(run.state),
                     chatStartedResearch: this.chatStartedResearch,
+                    chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
                     trusted: {
                       createdIds: run.createdIds,
                       researchedIds: new Set(
@@ -23088,13 +23152,18 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_plan_reason_auto_round_other_actions");
       case "research_text_other_actions":
         return t("ui.map_chat_plan_reason_research_text_other_actions");
+      case "source_text_other_actions":
+        return t("ui.map_chat_plan_reason_source_text_other_actions");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
   private offerChatPlan(
     result: MapChatResult,
     plan: MapChatPlan,
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research">,
+    baseline: Pick<
+      MapChatContext,
+      "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research" | "mapSourcePaths"
+    >,
     anchor: { path: string; id: string | undefined },
     /** The user's message: an integration in the plan takes it as its direction when the plan is applied, as it would have at once. */
     message: string,
@@ -23161,7 +23230,7 @@ export class VisualAgentMapView extends ItemView {
     card: MapChatPlanCard,
     token: number,
     result: MapChatResult & { message?: string },
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "basis" | "parents" | "research">,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "basis" | "parents" | "research" | "mapSourcePaths">,
     anchor: { path: string; id: string | undefined },
     run: ChatChainRun | null = null
   ): Promise<void> {
@@ -23361,6 +23430,8 @@ export class VisualAgentMapView extends ItemView {
     this.chatResearched.clear();
     this.chatResearchSent.clear();
     this.chatStartedResearch = false;
+    this.chatReadsSources = false;
+    this.chatSourceCache = null;
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   private startChatRecords(): void {
@@ -23831,7 +23902,7 @@ export class VisualAgentMapView extends ItemView {
       /** The user's message; an integration in the reply takes it as its direction. */
       message?: string;
     },
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
     alive: () => boolean = () => true,
     anchor: { path: string; id: string | undefined } = { path: this.path, id: this.map?.id },
     /** A continuation's round: the context the basis of new cards is judged by, and where the work the reply starts is collected. */
@@ -23883,7 +23954,11 @@ export class VisualAgentMapView extends ItemView {
     // ... and why: the map was never made, or it was made but could not be opened here.
     let noNewMapReason: TranslationKey = "ui.map_chat_skip_map_not_created";
     // Copied: the turn's own writes move the baseline along, the request's context stays as it was sent.
-    const own = { mdHashes: baseline.mdHashes, topicHashes: { ...baseline.topicHashes } };
+    const own = {
+      mdHashes: baseline.mdHashes,
+      topicHashes: { ...baseline.topicHashes },
+      mapSourcePaths: baseline.mapSourcePaths
+    };
     // A reply that adds many cards is laid out as a whole afterwards, so its writes repaint once at the end. One that adds a
     // few cards places each against the cards painted so far, so it keeps repainting after every write.
     const adds = result.actions.filter(action => action.kind === "add_child").length;
@@ -24431,7 +24506,7 @@ export class VisualAgentMapView extends ItemView {
       MapChatAction,
       { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
     >,
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
     same: () => boolean,
     run: ChatRun = { refs: new Map(), created: [] }
   ): Promise<ChatOutcome> {
@@ -24599,6 +24674,7 @@ export class VisualAgentMapView extends ItemView {
           path: action.path,
           newContent: "",
           knownHashes: hashes,
+          readOnlyPaths: baseline.mapSourcePaths,
           configDir
         });
         if (!early.ok) return guardSkipped(early.code);
@@ -24634,6 +24710,7 @@ export class VisualAgentMapView extends ItemView {
           oldContent: source.text,
           newContent: next,
           knownHashes: hashes,
+          readOnlyPaths: baseline.mapSourcePaths,
           configDir
         });
         if (!verdict.ok) return guardSkipped(verdict.code, true);
@@ -24673,6 +24750,7 @@ export class VisualAgentMapView extends ItemView {
           path: action.path,
           newContent: content,
           exists,
+          readOnlyPaths: baseline.mapSourcePaths,
           configDir
         });
         if (!verdict.ok || !key) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
@@ -25345,7 +25423,7 @@ export class VisualAgentMapView extends ItemView {
     for (const id of ids) batch.imageNodes.add(id);
     const anchor = { path: this.path, id: map.id };
     // Web text can reach the model once research ran: the search words then come from the cards' own titles, never from the model.
-    const readsResearch = this.chatStartedResearch || continuation;
+    const readsResearch = this.chatStartedResearch || this.chatReadsSources || continuation;
     const words = readsResearch ? "" : cleanImageQuery(direction);
     const jobs: { block: MapChatImages; controller: AbortController; model: string; key?: number }[] = [];
     const blocks: MapChatImages[] = [];

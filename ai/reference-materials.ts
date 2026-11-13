@@ -35,7 +35,12 @@ export function dedupeReferenceGroups(groups: ReferenceGroup[]): ReferenceGroup[
   }));
 }
 
-export function packReferenceChunks(chunks: string[], characterLimit = 18_000): string[] {
+/** One document is split into parts above this many characters. */
+export const REFERENCE_DOCUMENT_CHARACTER_LIMIT = 150_000;
+/** Sources that fit one batch (characters) go to the model as written; chinese text is about 1 token per character. */
+export const REFERENCE_BATCH_CHARACTER_LIMIT = 160_000;
+
+export function packReferenceChunks(chunks: string[], characterLimit = REFERENCE_BATCH_CHARACTER_LIMIT): string[] {
   const batches: string[] = [];
   let batch = "";
   for (const chunk of chunks) {
@@ -49,7 +54,11 @@ export function packReferenceChunks(chunks: string[], characterLimit = 18_000): 
   return batches;
 }
 
-export function referenceBatches(groups: ReferenceGroup[], documentLimit = 14_000, batchLimit = 18_000): string[] {
+export function referenceBatches(
+  groups: ReferenceGroup[],
+  documentLimit = REFERENCE_DOCUMENT_CHARACTER_LIMIT,
+  batchLimit = REFERENCE_BATCH_CHARACTER_LIMIT
+): string[] {
   const chunks: string[] = [];
   let sourceNumber = 0;
   for (const group of dedupeReferenceGroups(groups))

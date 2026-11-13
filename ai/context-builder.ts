@@ -1,5 +1,7 @@
 import type { AiTaskKind, PreparedTaskContext, TaskContext } from "./types";
 
+/** Estimated tokens allowed for source content (about 192k characters). */
+export const SOURCE_CONTEXT_TOKEN_BUDGET = 48_000;
 export const estimateTokens = (value: string | undefined): number => Math.ceil((value || "").length / 4);
 const dedupeRules = (value: string): string =>
   Array.from(
@@ -15,7 +17,7 @@ const dedupeRules = (value: string): string =>
 export function buildPreparedTaskContext(
   input: TaskContext,
   model: string,
-  budget = 32_000,
+  budget = SOURCE_CONTEXT_TOKEN_BUDGET,
   provider = "codex"
 ): PreparedTaskContext {
   const started = Date.now(),

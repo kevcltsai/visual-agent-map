@@ -29,6 +29,16 @@ test('reference batches include every selected Markdown source, deduplicate over
   assert.equal(api.resolveDetailReferences('Unknown [S3]', namesake), 'Unknown Source to confirm: [S3]');
   assert.equal(api.resolveDetailReferences('See [[same.md]]', [{ id: 'a', documents: [{ path: '/a/same.md', external: true, content: '' }, { path: '/b/same.md', external: true, content: '' }] }]), 'See Source to confirm: same.md');
 });
+test('reference batches: 129k characters of several files fit one batch; over 160k splits; one file over 150k is split into parts', () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const docs = sizes => ({ id: 'g', name: 'g', location: 'l', documents: sizes.map((size, index) => ({ path: `n${index}.md`, content: 'a'.repeat(size) })) });
+  const one = api.referenceBatches([docs([16_000, 16_000, 16_000, 16_000, 16_000, 16_000, 16_000, 17_000])]);
+  assert.equal(one.length, 1); assert.match(one[0], /\[S8\]/);
+  assert.equal(api.referenceBatches([docs([100_000, 100_000])]).length, 2);
+  const parts = api.referenceBatches([docs([150_001])]).join('\n');
+  assert.match(parts, /part 1\/2/); assert.match(parts, /part 2\/2/);
+  assert.doesNotMatch(api.referenceBatches([docs([150_000])]).join('\n'), /part 1/);
+});
 test('source footnotes: numbered by first use, one definition per source, placed in the evidence section', () => {
   const api = load('ai/reference-materials.ts', { obsidian });
   const groups = [{ id: 'g', documents: [{ path: 'Maps/A/one.md', content: '' }, { path: 'Maps/B/two.md', content: '' }, { path: '/Volumes/Refs/x.md', external: true, content: '' }] }];

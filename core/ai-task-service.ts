@@ -7,7 +7,7 @@ import {
   resolveDetailReferences,
   resolveSummaryReferences
 } from "../ai/reference-materials";
-import { buildPreparedTaskContext, estimateTokens } from "../ai/context-builder";
+import { buildPreparedTaskContext, estimateTokens, SOURCE_CONTEXT_TOKEN_BUDGET } from "../ai/context-builder";
 import { effectiveReasoningLevel, normalizeReasoningLevel } from "../ai/task-policy";
 import { canonicalDetail, normalizeOutputScriptHeadings } from "../ai/result-utils";
 import { normalizeDetailHeadings, normalizeMathDelimiters } from "../ai/markdown-blocks";
@@ -149,7 +149,8 @@ export class AiTaskService {
       throw new Error(t("ui.claude_model_is_not_supported_0", model));
     }
 
-    if (estimateTokens(input.sourceContext) > 32_000) throw new Error(t("ui.source_context_exceeds_budget"));
+    if (estimateTokens(input.sourceContext) > SOURCE_CONTEXT_TOKEN_BUDGET)
+      throw new Error(t("ui.source_context_exceeds_budget"));
     let context = input;
     let accepted = onRequestAccepted;
     const referenceGroups = context.referenceGroups ?? [];
@@ -184,7 +185,7 @@ export class AiTaskService {
     const prepared = buildPreparedTaskContext(
       context,
       model,
-      32_000 - estimateTokens(context.subtreeOutline),
+      SOURCE_CONTEXT_TOKEN_BUDGET - estimateTokens(context.subtreeOutline),
       provider
     );
     if (prepared.context.sourceContext !== context.sourceContext) {

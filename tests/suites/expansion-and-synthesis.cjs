@@ -1886,7 +1886,7 @@ integrationTest('W1: all four synthesize call sites ask for direct reference del
   assert.equal(h.contexts.at(-1).referenceDelivery, 'direct', 'multi-select draft');
   await h.view.researchChild(h.topic, new AbortController().signal, () => {}, options());
   await until(() => !h.plugin.running.size);
-  assert.equal(h.contexts.at(-1).referenceDelivery, undefined, 'research keeps its extraction behaviour');
+  assert.equal(h.contexts.at(-1).referenceDelivery, 'direct', 'research sends sources that fit one request as written');
 });
 const countedTemplate = () => ({ id: 'K', name: 'Counted', sections: [templateSection('k0', 'Main'), templateSection('k1', 'Examples', { count: { mode: 'exact', n: 3 } })] });
 // Synthesis: call 1 proposes an angle, call 2 drafts; the draft is then saved (optionally edited) through the real save path.
@@ -2746,13 +2746,13 @@ integrationTest('synthesis carry-forward: nothing missing leaves the detail as t
   assert.ok(first.includes('Sources from earlier research'));
 });
 integrationTest('synthesis carry-forward with a large (over one batch) child note keeps the earlier links', async () => {
-  const f = await keepSourcesFixture(Array.from({ length: 300 }, (_, i) => `Line ${i} of a long child note with enough words to pass the batch size.`).join('\n'));
+  const f = await keepSourcesFixture(Array.from({ length: 3000 }, (_, i) => `Line ${i} of a long child note with enough words to pass the batch size.`).join('\n'));
   await synthesize(f);
   const file = await f.repo.app.vault.adapter.read(f.parent.path);
   for (const url of earlierSources) assert.ok(file.includes(url), url);
   // The mock model bypasses AiTaskService, so extraction itself does not run here; the request carries the over-budget source that sends it down that path, and the write path is the same.
   const sent = f.contexts.at(-1).referenceGroups.flatMap(group => group.documents).map(doc => JSON.stringify(doc)).join('').length;
-  assert.ok(sent > 18000, 'the synthesis request holds more than one 18k batch');
+  assert.ok(sent > 160000, 'the synthesis request holds more than one 160k batch');
   assert.match(file, /Sources from earlier research/);
 });
 integrationTest('synthesis carry-forward on the drafted-callback path: an edited detail keeps the earlier links and Undo is exact', async () => {

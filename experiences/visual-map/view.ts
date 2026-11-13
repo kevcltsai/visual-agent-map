@@ -16223,6 +16223,8 @@ export class VisualAgentMapView extends ItemView {
         runStyle,
         task: [researchTopicTask(language, note.title), text].filter(Boolean).join("\n\n"),
         referenceGroups,
+        // Within one request the map's sources go in as written; larger ones are still extracted first.
+        referenceDelivery: "direct",
         signal,
         outputLanguage: language,
         rules: "",
@@ -19123,6 +19125,7 @@ export class VisualAgentMapView extends ItemView {
         runStyle,
         rules: "",
         referenceGroups: choices.referenceGroups ?? [],
+        referenceDelivery: "direct",
         signal: batchSignal,
         outputLanguage,
         researchMode: choices.researchMode,

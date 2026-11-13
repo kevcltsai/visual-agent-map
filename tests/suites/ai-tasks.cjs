@@ -570,13 +570,35 @@ test('W2: synthesize and merge are observed on the main request only; reference 
   for (const mode of ['synthesize', 'merge']) {
     const direct = await run(mode, 'direct', 'short');
     assert.equal(direct.calls.length, 1, `${mode}: one request`); assert.equal(direct.calls[0].stream, true, `${mode}: the one request streams`); assert.equal(direct.attempts.length, 1);
-    const extracted = await run(mode, 'direct', 'x'.repeat(18_001));
+    const extracted = await run(mode, 'direct', 'x'.repeat(160_001));
     assert.ok(extracted.calls.length >= 2, `${mode}: over-budget sources are extracted first`);
     assert.deepEqual(extracted.calls.slice(0, -1).map(call => call.stream), extracted.calls.slice(0, -1).map(() => undefined), `${mode}: extraction is not observed`);
     assert.equal(extracted.calls.at(-1).stream, true, `${mode}: the main request streams`); assert.equal(extracted.attempts.length, 1);
   }
   const old = await run('synthesize', undefined, 'short');
   assert.equal(old.calls.length, 2, 'without the direct flag a synthesis still extracts first'); assert.equal(old.calls[0].stream, undefined); assert.equal(old.calls[1].stream, true);
+});
+test('research with sources: one request holds the original text when it fits one batch; over one batch it is still extracted; the source budget is 48k tokens', async () => {
+  const { AiTaskService } = load('core/ai-task-service.ts');
+  const reply = JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] });
+  const run = async (sizes, sourceContext) => {
+    const calls = [];
+    const service = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => { throw new Error('x'); },
+      claudeRuntime: () => ({ runTask: async prompt => { calls.push(prompt); return reply; } }) });
+    const documents = sizes.map((size, index) => ({ path: `Notes/n${index}.md`, content: `SENTINEL_${index} ${'x'.repeat(size)}` }));
+    await service.askModel({ title: 'T', summary: '', rules: '', detail: '', task: 'Research it', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceDelivery: 'direct', ...(sourceContext ? { sourceContext } : {}), referenceGroups: [{ id: 'g', name: 'Sources', location: 'Map.md', documents }] }, 'claude:sonnet', 'low');
+    return calls;
+  };
+  const fit = await run(Array(8).fill(16_000));
+  assert.equal(fit.length, 1, 'one main request only');
+  assert.doesNotMatch(fit[0], /Extract relevant facts/);
+  for (let index = 0; index < 8; index++) assert.match(fit[0], new RegExp(`SENTINEL_${index} `));
+  assert.match(fit[0], /Source registry/);
+  const over = await run([100_000, 100_000]);
+  assert.ok(over.length >= 3, 'two batches are extracted, then the main request');
+  assert.match(over[0], /Extract relevant facts/);
+  await run([1_000], 'y'.repeat(180_000));
+  await assert.rejects(run([1_000], 'y'.repeat(192_004)), /budget|exceed/i);
 });
 test('S3: 20 s without a model event shows the slow notice; re-send replaces the attempt with the same prompt and nothing from the old one counts', async () => {
   const h = observedHarness({ attempts: call => {

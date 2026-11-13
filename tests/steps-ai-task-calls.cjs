@@ -275,22 +275,22 @@ test('re-send with a runtime that ignores the abort: the first entry is failed a
 });
 
 // ---- reference rounds ----
-test('reference rounds: four extract, four reduce and the main task each end parsed with no completed', async () => {
+test('reference rounds: four extract, one reduce and the main task each end parsed with no completed', async () => {
   const big = JSON.stringify({ summary: 'S', detail: 'e'.repeat(9_001), suggestions: [], visualReferences: [] });
   const h = rig({ handler: call => answer(call, call.prompt.includes('Extract relevant facts') ? big : GOOD) });
-  const documents = [1, 2, 3, 4].map(n => ({ path: `n${n}.md`, content: 'x'.repeat(9_001) }));
+  const documents = [1, 2, 3, 4].map(n => ({ path: `n${n}.md`, content: 'x'.repeat(90_001) }));
   const progress = [];
   await h.service.askModel(context({ referenceGroups: [{ id: 'g', name: 'g', location: 'l', documents }], onProgress: text => progress.push(text) }), 'gpt-6-luna', 'low', undefined, h.mark);
   assert.ok(h.state.calls[0].prompt.includes('Extract relevant facts'));
   assert.ok(h.state.calls[4].prompt.includes('Combine the supplied extracted evidence'));
-  assert.ok(h.state.calls[8].prompt.includes('Source registry (retain these identities in citations):\n[S1]'));
+  assert.ok(h.state.calls[5].prompt.includes('Source registry (retain these identities in citations):\n[S1]'));
   assert.equal(progress.at(-1), '');
   const begins = h.order.filter(event => event[0] === 'begin');
-  assert.deepEqual(begins.map(event => event[2].step), [...Array(4).fill('task.reference-extract@1'), ...Array(4).fill('task.reference-reduce@1'), 'task.run@1']);
-  assert.equal(h.state.calls.length, 9);
+  assert.deepEqual(begins.map(event => event[2].step), [...Array(4).fill('task.reference-extract@1'), 'task.reference-reduce@1', 'task.run@1']);
+  assert.equal(h.state.calls.length, 6);
   const ids = begins.map(event => event[1]);
-  assert.deepEqual(h.ids, [ids[8]], 'onExchange sees the main task entry only; the reference rounds are not reported');
-  for (const id of ids) assert.deepEqual(h.of(id), id === ids[8] ? ['begin', 'ox', 'sent', 'received', 'milestones', 'parsed'] : ['begin', 'sent', 'received', 'milestones', 'parsed'], id);
+  assert.deepEqual(h.ids, [ids[5]], 'onExchange sees the main task entry only; the reference rounds are not reported');
+  for (const id of ids) assert.deepEqual(h.of(id), id === ids[5] ? ['begin', 'ox', 'sent', 'received', 'milestones', 'parsed'] : ['begin', 'sent', 'received', 'milestones', 'parsed'], id);
 });
 
 // ---- 6. log switches ----

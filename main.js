@@ -24834,7 +24834,9 @@ function dedupeReferenceGroups(groups) {
     })
   }));
 }
-function packReferenceChunks(chunks, characterLimit = 18e3) {
+var REFERENCE_DOCUMENT_CHARACTER_LIMIT = 15e4;
+var REFERENCE_BATCH_CHARACTER_LIMIT = 16e4;
+function packReferenceChunks(chunks, characterLimit = REFERENCE_BATCH_CHARACTER_LIMIT) {
   const batches = [];
   let batch = "";
   for (const chunk of chunks) {
@@ -24847,7 +24849,7 @@ function packReferenceChunks(chunks, characterLimit = 18e3) {
   if (batch) batches.push(batch);
   return batches;
 }
-function referenceBatches(groups, documentLimit = 14e3, batchLimit = 18e3) {
+function referenceBatches(groups, documentLimit = REFERENCE_DOCUMENT_CHARACTER_LIMIT, batchLimit = REFERENCE_BATCH_CHARACTER_LIMIT) {
   var _a2;
   const chunks = [];
   let sourceNumber = 0;
@@ -41938,13 +41940,14 @@ async function loadableImages(candidates, signal) {
 var import_node_crypto7 = require("node:crypto");
 
 // ai/context-builder.ts
+var SOURCE_CONTEXT_TOKEN_BUDGET = 48e3;
 var estimateTokens = (value) => Math.ceil((value || "").length / 4);
 var dedupeRules = (value) => Array.from(
   new Map(
     value.split("\n").map((line2) => line2.trim()).filter(Boolean).map((line2) => [line2.replace(/\s+/g, " ").toLowerCase(), line2])
   ).values()
 ).join("\n");
-function buildPreparedTaskContext(input2, model, budget = 32e3, provider = "codex") {
+function buildPreparedTaskContext(input2, model, budget = SOURCE_CONTEXT_TOKEN_BUDGET, provider = "codex") {
   const started = Date.now(), mode = input2.mode || "task";
   const context = {
     ...input2,
@@ -44710,7 +44713,8 @@ var AiTaskService = class {
     if (provider === "claude" && !CLAUDE_MODEL_CHOICES.some((choice) => choice.id === model)) {
       throw new Error(t("ui.claude_model_is_not_supported_0", model));
     }
-    if (estimateTokens(input2.sourceContext) > 32e3) throw new Error(t("ui.source_context_exceeds_budget"));
+    if (estimateTokens(input2.sourceContext) > SOURCE_CONTEXT_TOKEN_BUDGET)
+      throw new Error(t("ui.source_context_exceeds_budget"));
     let context = input2;
     let accepted = onRequestAccepted;
     const referenceGroups = (_a2 = context.referenceGroups) != null ? _a2 : [];
@@ -44733,7 +44737,7 @@ var AiTaskService = class {
     const prepared = buildPreparedTaskContext(
       context,
       model,
-      32e3 - estimateTokens(context.subtreeOutline),
+      SOURCE_CONTEXT_TOKEN_BUDGET - estimateTokens(context.subtreeOutline),
       provider
     );
     if (prepared.context.sourceContext !== context.sourceContext) {
@@ -71199,6 +71203,8 @@ ${request.requirements}` : preset.text,
         runStyle,
         task: [researchTopicTask(language2, note.title), text10].filter(Boolean).join("\n\n"),
         referenceGroups,
+        // Within one request the map's sources go in as written; larger ones are still extracted first.
+        referenceDelivery: "direct",
         signal,
         outputLanguage: language2,
         rules: "",
@@ -73889,6 +73895,7 @@ ${request.requirements}` : preset.text,
         runStyle,
         rules: "",
         referenceGroups: (_c = choices.referenceGroups) != null ? _c : [],
+        referenceDelivery: "direct",
         signal: batchSignal,
         outputLanguage: outputLanguage2,
         researchMode: choices.researchMode,

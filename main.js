@@ -25321,11 +25321,13 @@ async function addExternalSource(app, mapId, input2, scope) {
     return { ok: true, source, sources };
   });
 }
-function removeExternalSource(app, mapId, label) {
+function removeExternalSource(app, mapId, expected) {
   return enqueueCommit(app, mapId, async () => {
-    const sources = loadExternalSources(app, mapId).filter((item) => item.label !== label);
-    saveExternalSources(app, mapId, sources);
-    return sources;
+    const current = loadExternalSources(app, mapId);
+    const sources = current.filter((item) => !(item.label === expected.label && item.path === expected.path));
+    const removed = sources.length !== current.length;
+    if (removed) saveExternalSources(app, mapId, sources);
+    return { removed, sources };
   });
 }
 
@@ -61244,12 +61246,12 @@ ${request.requirements}` : preset.text,
     const mapId = (_a2 = this.map) == null ? void 0 : _a2.id;
     if (!mapId || this.closed || this.path !== mapPath) return;
     const epoch = this.viewEpoch;
-    void removeExternalSource(this.app, mapId, source.label).then((sources) => {
+    void removeExternalSource(this.app, mapId, source).then(({ removed, sources }) => {
       var _a3, _b2;
       if (this.closed || this.viewEpoch !== epoch || this.path !== mapPath || ((_a3 = this.map) == null ? void 0 : _a3.id) !== mapId) return;
       this.externalSources = sources;
       this.externalStatuses.delete(source.label);
-      (_b2 = this.announcer) == null ? void 0 : _b2.setText(t("ui.map_sources_removed_0", source.label));
+      if (removed) (_b2 = this.announcer) == null ? void 0 : _b2.setText(t("ui.map_sources_removed_0", source.label));
       this.refreshExternalStatuses();
       this.paintMapSourcesButton();
       if (this.mapSourcesOpen) this.drawMapSourcesPanelEl({ input: true });

@@ -2825,11 +2825,11 @@ integrationTest('B8: empty Working Findings add no label to the prompt and the s
   assert.equal((await f.repo.readNote(f.parent.path)).newFindings, '');
 });
 integrationTest('B8: Working Findings the context budget cut off are kept on save', async () => {
-  // 128001 = the 32_000-token budget (core/ai-task-service.ts buildPreparedTaskContext(..., 32_000)) * 4 chars per token + 1; the budget is a literal there, not exported.
-  const f = await findingsFixture('KEPT_FINDING_START ' + 'x'.repeat(128001));
+  // 192001 = the 48_000-token SOURCE_CONTEXT_TOKEN_BUDGET * 4 chars per token + 1; exported from ai/context-builder.ts.
+  const f = await findingsFixture('KEPT_FINDING_START ' + 'x'.repeat(192001));
   await synthesize(f);
   assert.equal(f.runtime.calls.length, 2);
-  assert.ok(!f.runtime.calls[1].prompt.includes('x'.repeat(128001)), 'the findings were cut');
+  assert.ok(!f.runtime.calls[1].prompt.includes('x'.repeat(192001)), 'the findings were cut');
   const saved = await f.repo.readNote(f.parent.path);
   assert.equal(saved.summary, 'Draft summary');
   assert.match(saved.newFindings, /^KEPT_FINDING_START x+$/);

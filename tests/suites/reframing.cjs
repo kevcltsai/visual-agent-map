@@ -210,7 +210,7 @@ integrationTest('Reframing runner uses structured output and disabled tools on b
 });
 integrationTest('Oversized Thinking Origin is rejected before provider work without trimming', async () => {
   const {default:Plugin}=load('main.ts',{obsidian});const plugin=new Plugin();let calls=0;plugin.runtime=()=>{calls++;throw Error('must not run');};
-  await assert.rejects(plugin.askModel({title:'Q',summary:'',detail:'',task:'Research',rules:'',ancestors:'',sourceContext:'x'.repeat(128001 /* 32_000 tokens * 4 chars + 1: the hardcoded limit in core/ai-task-service.ts:124 */)},'m'),/budget|預算/i);assert.equal(calls,0);
+  await assert.rejects(plugin.askModel({title:'Q',summary:'',detail:'',task:'Research',rules:'',ancestors:'',sourceContext:'x'.repeat(192001 /* SOURCE_CONTEXT_TOKEN_BUDGET (48_000) tokens * 4 chars + 1 */)},'m'),/budget|預算/i);assert.equal(calls,0);
 });
 integrationTest('Coffee becoming busy during the final snapshot read blocks handoff writes', async () => {
   const data=await reframingModalFixture();let checks=0;const read=data.store.assertHandoffSnapshot.bind(data.store);

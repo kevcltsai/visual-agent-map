@@ -86,6 +86,24 @@ test('imageMarkdown removes angle brackets as well as square ones from the title
   assert.ok(md.startsWith('![ img src=x onerror=alert(1)   a ]('));
 });
 
+test('Wikimedia original image links become 1280px thumbnails (a 226 MB original renders blank in Obsidian)', () => {
+  const { wikimediaThumbnail, wikimediaThumbnails } = load('core/image-candidates.ts');
+  const file = 'Hans_Holbein_the_Younger_-_The_Ambassadors_-_Google_Art_Project.jpg';
+  const original = `https://upload.wikimedia.org/wikipedia/commons/8/88/${file}`;
+  const thumb = `https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/${file}/1280px-${file}`;
+  assert.equal(wikimediaThumbnail(original), thumb);
+  assert.equal(wikimediaThumbnail(thumb), thumb, 'a thumbnail stays as it is');
+  assert.equal(wikimediaThumbnail('https://upload.wikimedia.org/wikipedia/commons/1/1a/Logo.svg'), 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Logo.svg', 'SVG is left alone');
+  assert.equal(wikimediaThumbnail('https://example.org/8/88/a.jpg'), 'https://example.org/8/88/a.jpg');
+  const encoded = 'https://upload.wikimedia.org/wikipedia/commons/3/3a/La_ronda_de_noche%2C_por_Rembrandt_van_Rijn.jpg';
+  const md = `Text ${original} stays.\n\n![A](${original})\n\n> ![B](<${encoded}>)`;
+  assert.equal(
+    wikimediaThumbnails(md),
+    `Text ${original} stays.\n\n![A](${thumb})\n\n> ![B](<https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/La_ronda_de_noche%2C_por_Rembrandt_van_Rijn.jpg/1280px-La_ronda_de_noche%2C_por_Rembrandt_van_Rijn.jpg>)`,
+    'only image embeds are rewritten, plain and angle-bracket links alike'
+  );
+});
+
 test('web image search keeps https image and source links, drops invented or unsafe ones, dedupes and caps at six', () => {
   const { parseImageCandidates, imageSearchStep } = load('core/steps/image-search/step.ts', {}, { URL });
   const images = [

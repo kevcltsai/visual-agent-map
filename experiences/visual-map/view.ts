@@ -534,6 +534,7 @@ import { TopicChatRecordWriter } from "./topic-chat-record-writer";
 import { judgeTopicScope, topicSubtreeIds } from "./topic-chat-scope";
 import {
   restoreTopicChat,
+  topicChatReadsSources,
   isSafeTopicNodeId,
   type TopicChatLineInput,
   type TopicRecordStatus
@@ -1560,6 +1561,8 @@ export class VisualAgentMapView extends ItemView {
   private chatSourceCache: MapChatSourceCache | null = null;
   /** The record conversation whose file already carries the `research_started` mark (kept apart from the flag: the record may have been off when research began). */
   private chatResearchMarkedIn: string | null = null;
+  /** The record conversation whose file already carries the `sources_read` mark. */
+  private chatSourcesMarkedIn: string | null = null;
   /** Research notes an earlier round already sent whole (they go last when the budget is short). */
   private chatResearchSent = new Set<string>();
   /** Counts conversations: the result of research another conversation started is not recorded in this one. */
@@ -15517,14 +15520,14 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * The sources a batch of research children shares: the map's own sources are read once. When they are too large for one request
-   * the condensing runs once for the whole batch (`sharedFindings`), not once per child.
+   * the condensing runs once for the whole batch (`sharedCondense`), not once per child.
    */
   private async batchSources(
     own: ReferenceGroup[],
     childCount: number,
     model: string,
     signal: AbortSignal | undefined
-  ): Promise<{ groups: ReferenceGroup[]; sharedFindings: (signal: AbortSignal) => Promise<string | undefined> }> {
+  ): Promise<{ groups: ReferenceGroup[]; sharedCondense: ((signal: AbortSignal) => Promise<string>) | undefined }> {
     let mapGroups: ReferenceGroup[] = [];
     try {
       mapGroups = await this.readMapSourceGroups(signal ?? new AbortController().signal);
@@ -15535,7 +15538,7 @@ export class VisualAgentMapView extends ItemView {
     const groups = withMapSources(mapGroups, own);
     return {
       groups,
-      sharedFindings: sharedSourceFindings(groups, childCount, condenseSignal =>
+      sharedCondense: sharedSourceFindings(childCount, condenseSignal =>
         this.plugin.aiTasks.condenseReferences(
           {
             title: this.map?.title ?? "",
@@ -15654,6 +15657,8 @@ export class VisualAgentMapView extends ItemView {
     if (!writer || !isSafeTopicNodeId(entry.nodeId)) return;
     const parsed = await writer.read(this.topicChatRoot(entry), entry.nodeId);
     if (!parsed || this.closed || this.topicChatSessions.get(entry.nodeId) !== entry) return;
+    // A turn of the saved conversation sent the sources: its later writes stay behind the plan (before anything of it is used).
+    if (topicChatReadsSources(parsed.lines)) entry.readsSources = true;
     const restored: TopicChatTurn[] = [];
     for (const turn of restoreTopicChat(parsed.lines)) {
       if (turn.id === entry.runningTurnId) continue;
@@ -16542,7 +16547,11 @@ export class VisualAgentMapView extends ItemView {
       ...(mapSources ? { mapSources } : {})
     });
     // Sent once, untrusted for every later turn of this topic's conversation.
-    if (context.mapSourcesSent) entry.readsSources = true;
+    if (context.mapSourcesSent) {
+      entry.readsSources = true;
+      if (entry.runningTurnId)
+        this.writeTopicChatLine(entry, { type: "sources", id: entry.runningTurnId, at: new Date().toISOString() });
+    }
     // The prompt hides the topic's parent (outline parentId null), but the stale check compares against the real one:
     // keep the baseline true so a topic that is not the map root is not judged moved. `topicHashes` is never sent to the model.
     if (context.topicHashes[node.id])
@@ -19310,7 +19319,7 @@ export class VisualAgentMapView extends ItemView {
           child,
           batchSignal,
           accepted,
-          { ...pendingOptions, preparedReferenceFindings: await sources.sharedFindings(batchSignal) },
+          { ...pendingOptions, sharedReferenceCondense: sources.sharedCondense },
           pendingOptions.researchMode !== "local",
           undefined,
           gate,
@@ -19369,6 +19378,7 @@ export class VisualAgentMapView extends ItemView {
         ...(choices.preparedReferenceFindings !== undefined
           ? { preparedReferenceFindings: choices.preparedReferenceFindings }
           : {}),
+        ...(choices.sharedReferenceCondense ? { sharedReferenceCondense: choices.sharedReferenceCondense } : {}),
         signal: batchSignal,
         outputLanguage,
         researchMode: choices.researchMode,
@@ -19578,10 +19588,7 @@ export class VisualAgentMapView extends ItemView {
               }
               const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
               try {
-                const choices = {
-                  ...choicesFor(note),
-                  preparedReferenceFindings: await sources.sharedFindings(batchSignal)
-                };
+                const choices = { ...choicesFor(note), sharedReferenceCondense: sources.sharedCondense };
                 await this.researchChild(
                   child,
                   batchSignal,
@@ -23410,11 +23417,20 @@ export class VisualAgentMapView extends ItemView {
       this.chatLastRecord = record;
       // Research began while the record was off: the mark goes in with the first turn written after it came back on.
       this.markResearchRecorded(record);
+      this.markSourcesRecorded(record);
       return record;
     } catch (error) {
       this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
       return null;
     }
+  }
+  /** Writes the `sources_read` mark once per record conversation (the sources were sent: a reopened conversation keeps its writes behind the plan). */
+  private markSourcesRecorded(record: MapChatTurnRecord | null): void {
+    const writer = this.chatRecords;
+    if (!this.chatReadsSources || !record || !writer || this.plugin.settings.mapChatRecords !== true) return;
+    if (writer.conversationId !== record.conversationId || this.chatSourcesMarkedIn === record.conversationId) return;
+    this.chatSourcesMarkedIn = record.conversationId;
+    record.event("sources_read");
   }
   /** Writes the `research_started` mark once per record conversation, and only while the record is on (otherwise the next turn writes it). */
   private markResearchRecorded(record: MapChatTurnRecord | null): void {
@@ -23431,6 +23447,7 @@ export class VisualAgentMapView extends ItemView {
     this.chatResearchSent.clear();
     this.chatStartedResearch = false;
     this.chatReadsSources = false;
+    this.chatSourcesMarkedIn = null;
     this.chatSourceCache = null;
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
@@ -23516,13 +23533,19 @@ export class VisualAgentMapView extends ItemView {
       this.chatStartedResearch = true;
       this.chatResearchMarkedIn = restored.id;
     }
+    // Likewise for the sources: the restored conversation's turns stay untrusted and its writes behind the plan (an older file: false).
+    if (restored.readsSources) {
+      this.chatReadsSources = true;
+      this.chatSourcesMarkedIn = restored.id;
+    }
     const handle = this.plugin.repo.app.vault.getAbstractFileByPath(latest.path ?? "");
     writer.resume(
       latest.id,
       handle instanceof TFile ? handle : (latest.path ?? ""),
       this.chatRecordTarget(),
       latest.parsed.cleanEnd,
-      restored.startedResearch
+      restored.startedResearch,
+      restored.readsSources
     );
     // Every turn number of the file is taken: a late result of one of them can never be written again.
     const numbers = latest.parsed.lines.flatMap((line: RecordLine) =>
@@ -24519,6 +24542,18 @@ export class VisualAgentMapView extends ItemView {
     /** The real id behind an id of the reply; null when it names a card of this reply that was never created. */
     const real = (id: string): string | null =>
       id.startsWith(MAP_CHAT_NEW_PREFIX) ? (run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) ?? null) : id;
+    /** A card whose note is one of the map's data sources must not be rewritten through the card (same rule and reason as the file actions). */
+    const sourceFileRefusal = (node: MapNode): ChatOutcome | null => {
+      const verdict = guardMapChatWrite({
+        kind: "edit",
+        path: node.path,
+        newContent: "",
+        knownHashes: hashes,
+        readOnlyPaths: baseline.mapSourcePaths,
+        configDir
+      });
+      return !verdict.ok && verdict.code === "map_source" ? guardSkipped(verdict.code) : null;
+    };
     // AI lock: the real guard of the chat is here, on apply (a confirmation that comes later is checked again here).
     const locked = await this.chatLockSkip(action, real);
     if (locked) return locked;
@@ -24598,6 +24633,8 @@ export class VisualAgentMapView extends ItemView {
       case "edit_topic_note": {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
+        const sourceRefusal = sourceFileRefusal(node);
+        if (sourceRefusal) return sourceRefusal;
         // Model-written note body: same allow-list and parser check as an AI task result (a manual edit never comes here).
         // Done before the merge and stale checks so no await sits between the stale check and the write.
         const detail =
@@ -24660,6 +24697,8 @@ export class VisualAgentMapView extends ItemView {
       case "delete_topic": {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
+        const sourceRefusal = sourceFileRefusal(node);
+        if (sourceRefusal) return sourceRefusal;
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;

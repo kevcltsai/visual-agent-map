@@ -3061,9 +3061,11 @@ integrationTest('map sources: a batch whose sources need condensing condenses on
     if (entry === 'multi') { h.view.selection.replaceMulti(h.nodes.slice(1).map(n => n.id)); await h.view.startMultiResearch(h.request); }
     else pending = h.view.startShallowResearch(h.nodes[0], h.nodes.slice(1), { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [] });
     await until(() => h.runs.length === 3);
-    assert.equal(prompts.length, oneCondensing, `${entry}: three topics, one condensing`);
-    const findings = h.runs.map(run => run.options.preparedReferenceFindings);
-    assert.ok(findings[0] && findings.every(value => value === findings[0]), `${entry}: every topic gets the same prepared findings`);
+    assert.equal(prompts.length, 0, `${entry}: nothing is condensed before a child asks`);
+    const shared = h.runs.map(run => run.options.sharedReferenceCondense);
+    assert.ok(shared[0] && shared.every(value => value === shared[0]), `${entry}: every topic gets the same shared condensing`);
+    const results = await Promise.all(shared.map(condense => condense(new AbortController().signal)));
+    assert.equal(prompts.length, oneCondensing, `${entry}: three topics, one condensing`); assert.ok(results.every(value => value === results[0]));
     assert.ok(!prompts.some(prompt => /(^|\s)\/(Users|home|var)\//.test(prompt)), 'no absolute path in what was sent');
     for (const finish of h.finish.values()) finish(); await pending;
   }

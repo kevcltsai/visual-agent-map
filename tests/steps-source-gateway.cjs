@@ -126,3 +126,17 @@ test('prepared findings skip extraction and keep the catalog from the groups', a
   assert.ok(h.calls[1].prompt.includes('[S1]') && h.calls[1].prompt.includes('Notes/a.md'), 'the catalog still names the source');
   assert.ok(h.calls[1].prompt.includes('Evidence:'));
 });
+
+test('batch sharing decided per child request: sources fit alone but not beside each child\'s content, three children, exactly one condensing', async () => {
+  const groups = [group([doc('a.md', 150_000)])];
+  const h = rig();
+  const shared = gateway.sharedSourceFindings(3, signal => h.service.condenseReferences(context({ referenceGroups: groups }), 'gpt-6-luna', 'low', signal));
+  const rules = 'r'.repeat(50_000);
+  for (let child = 0; child < 3; child++) await ask(h, { referenceGroups: groups, referenceDelivery: 'direct', rules, sharedReferenceCondense: shared });
+  assert.equal(h.calls.filter(call => call.prompt.includes('Extract relevant facts')).length, 1, 'one extraction for the batch');
+  assert.equal(h.calls.length, 4, 'one condensing plus one task request per child');
+  // A child whose own request fits sends the documents whole and never starts the condensing.
+  const small = rig(); const lazy = gateway.sharedSourceFindings(3, signal => small.service.condenseReferences(context({ referenceGroups: [group([doc('a.md', 100_000)])] }), 'gpt-6-luna', 'low', signal));
+  await ask(small, { referenceGroups: [group([doc('a.md', 100_000)])], referenceDelivery: 'direct', sharedReferenceCondense: lazy });
+  assert.equal(small.calls.length, 1); assert.equal(gateway.sharedSourceFindings(1, async () => 'x'), undefined);
+});

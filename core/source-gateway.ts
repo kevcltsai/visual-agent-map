@@ -145,17 +145,15 @@ export function withMapSources(
 }
 
 /**
- * One condensing for a whole batch: the returned function gives every child the same findings (the first caller starts the
- * condensing, the others wait for it; a failure fails each child, nothing is sent again). It gives `undefined` (each request
- * decides for itself) for a single child or when the sources fit a request even with nothing else in it.
+ * One condensing for a whole batch. Every child still decides for itself, with its own full request (cards, rules, task), whether
+ * the documents go in whole; the children that must condense all call the returned function, the first starts the condensing and
+ * the others wait for it (a failure fails each of them, nothing is sent again). `undefined` for a single child.
  */
 export function sharedSourceFindings(
-  groups: readonly ReferenceGroup[],
   childCount: number,
   condense: (signal: AbortSignal) => Promise<string>
-): (signal: AbortSignal) => Promise<string | undefined> {
-  const empty = { title: "", summary: "", rules: "", detail: "", task: "", ancestors: "" };
-  const needed = childCount > 1 && planSourceDelivery(groups, empty).kind === "condense";
+): ((signal: AbortSignal) => Promise<string>) | undefined {
+  if (childCount <= 1) return undefined;
   let shared: Promise<string> | undefined;
-  return async signal => (needed ? (shared ??= condense(signal)) : undefined);
+  return signal => (shared ??= condense(signal));
 }

@@ -32,6 +32,8 @@ export interface TaskOptions {
   referenceGroups?: ReferenceGroup[];
   /** A batch's sources condensed once (set by the view while a batch runs): the request uses them instead of condensing `referenceGroups` itself. */
   preparedReferenceFindings?: string;
+  /** A batch's one shared condensing: each request decides direct or condense with its own full content, and those that condense await this one. */
+  sharedReferenceCondense?: (signal: AbortSignal) => Promise<string>;
   onProgress?: (message: string) => void;
   signal?: AbortSignal;
   outputLanguage?: ContentLanguage;

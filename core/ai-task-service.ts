@@ -198,14 +198,18 @@ export class AiTaskService {
         parts: context,
         allowDirect: context.referenceDelivery === "direct",
         prepared: context.preparedReferenceFindings,
-        condense: () => this.extractReferenceFindings(context, model, reasoning, signal, accepted),
+        condense: () =>
+          context.sharedReferenceCondense
+            ? context.sharedReferenceCondense(signal ?? new AbortController().signal)
+            : this.extractReferenceFindings(context, model, reasoning, signal, accepted),
         overBudget: () => new Error(t("ui.source_context_exceeds_budget"))
       });
       context = {
         ...context,
         sourceContext: sourceText(referenceGroups, findings, context.sourceContext),
         referenceGroups: undefined,
-        preparedReferenceFindings: undefined
+        preparedReferenceFindings: undefined,
+        sharedReferenceCondense: undefined
       };
     }
 

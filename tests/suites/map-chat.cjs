@@ -8469,6 +8469,38 @@ integrationTest('map sources 05: injection effect on a later turn - sources sent
   h.view.resetChatResearch(); assert.equal(h.view.chatReadsSources, false, 'a new conversation starts trusted again');
 });
 
+integrationTest('map sources review: a reopened conversation keeps "sources were read" (saved in the record): after the sources are gone, a proposed write is still behind the plan; an older record without the mark is trusted as before', async () => {
+  const first = await harness({ records: true }); await first.view.hydrate(); await withSources(first, sourceGroups(SRC)); first.open();
+  await sendOne(first, 'read the sources', 'Read.');
+  assert.equal(first.view.chatReadsSources, true); const [file] = recordFiles(first);
+  assert.ok(recordLines(first, file).some(l => l.type === 'event' && l.kind === 'sources_read'), 'the mark is in the record');
+  const reopen = async lines => {
+    const h = await harness({ records: true }); await h.view.hydrate(); h.view.readMapSourceGroups = async () => [];
+    await seedRecord(h, lines.map(l => ({ ...l })), file.split('/').at(-1).replace('.jsonl', ''));
+    const chat = h.open(); await until(() => chat.hasMessages); chat.addFile('Notes/Research.md');
+    h.control.reply = async () => say('ok', [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: 'LATER' }]);
+    h.type('now edit'); await h.view.sendMapChat();
+    return { h, chat };
+  };
+  const kept = await reopen(recordLines(first, file));
+  assert.equal(kept.h.view.chatReadsSources, true); assert.ok(kept.chat.pendingPlan(), 'still behind the plan'); assert.ok(!kept.h.contents.get('Notes/Research.md').includes('LATER'));
+  const older = await reopen(recordLines(first, file).filter(l => !(l.type === 'event' && l.kind === 'sources_read')));
+  assert.equal(older.chat.pendingPlan(), null, 'a record without the mark: false, as before'); assert.ok(older.h.contents.get('Notes/Research.md').includes('LATER'));
+});
+
+integrationTest('map sources review: a card that is also a source file is not rewritten by rename_topic / update_summary / edit_topic_note, also after Apply, and no write happens', async () => {
+  const h = await harness(); await h.view.hydrate(); const node = h.view.map.nodes.find(n => n.path);
+  const baseline = { mdHashes: {}, topicHashes: {}, mapSourcePaths: [node.path] };
+  let writes = 0; const original = h.view.noteChange.bind(h.view); h.view.noteChange = async (...args) => { writes++; return original(...args); };
+  for (const action of [{ kind: 'rename_topic', nodeId: node.id, title: 'HACKED' }, { kind: 'update_summary', nodeId: node.id, summary: 'HACKED' }, { kind: 'edit_topic_note', nodeId: node.id, detail: 'HACKED' }, { kind: 'delete_topic', nodeId: node.id, branch: false }]) {
+    const outcome = await h.view.applyChatWrite(action, baseline, () => true);
+    assert.equal(outcome.status, 'skipped', action.kind); assert.match(outcome.reason, /one of this map's data sources/, action.kind);
+  }
+  assert.equal(writes, 0); assert.ok(h.view.map.nodes.some(n => n.id === node.id));
+  const other = await h.view.applyChatWrite({ kind: 'rename_topic', nodeId: node.id, title: 'Fine' }, { ...baseline, mapSourcePaths: ['Elsewhere/x.md'] }, () => true);
+  assert.notEqual(other.reason ?? '', load('i18n.ts').translate('en', 'ui.map_chat_guard_map_source'), 'a card that is not a source is not refused as one'); void other;
+});
+
 integrationTest('map sources 05: multi-turn - within the cap the full text goes every turn and never more than 60,000 characters; nothing is condensed', async () => {
   const h = await harness(); await h.view.hydrate(); const content = 'y'.repeat(30_000); await withSources(h, sourceGroups(SRC, content)); const chat = h.open();
   let condensed = 0; h.plugin.aiTasks = { condenseReferences: async () => { condensed++; return 'F'; } };

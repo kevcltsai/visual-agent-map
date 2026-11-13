@@ -161,3 +161,17 @@ test('resolveDetailReferences: a child that uses [^1] without defining it is dro
   assert.equal(api.resolveDetailReferences('Claim[^2]', docs('a[^2]\n\n[^2]: child'), previous), 'Claim[^2]');
   assert.equal(api.resolveDetailReferences('Claim[^2]', docs('a[^2]\n\n[^2]: x', 'b[^2]\n\n[^2]: y'), previous), 'Claim[^2]');
 });
+
+test('external references: same relative file under two labels gets two footnote targets and two catalog lines, never merged', () => {
+  const api = load('ai/reference-materials.ts', { obsidian });
+  const groups = [
+    { id: 'external:docs', name: 'docs', location: 'docs', documents: [{ path: 'docs/x.md', key: 'external:docs/x.md', external: true, content: 'ALPHA' }] },
+    { id: 'external:docs#2', name: 'docs#2', location: 'docs#2', documents: [{ path: 'docs#2/x.md', key: 'external:docs#2/x.md', external: true, content: 'BETA' }] },
+    { id: 'folder:docs', name: 'docs', location: 'docs', documents: [{ path: 'docs/x.md', key: 'docs/x.md', content: 'VAULT' }] }
+  ];
+  const catalog = api.referenceCatalog(groups);
+  assert.match(catalog, /\[S1\] External file \(plain path\): docs\/x\.md/); assert.match(catalog, /\[S2\] External file \(plain path\): docs#2\/x\.md/);
+  assert.match(catalog, /\[S3\] Vault note \(wikilink\): docs\/x\.md/, 'a vault note with the same path is not swallowed by the external one');
+  const detail = api.resolveDetailReferences('A [S1]. B [S2]. C [S3].\n\n### Sources\n', groups);
+  assert.match(detail, /\[\^1\]: .*docs\/x\.md/); assert.match(detail, /\[\^2\]: .*docs#2\/x\.md/); assert.match(detail, /\[\^3\]: \[\[docs\/x\.md\|x\]\]/);
+});

@@ -4,6 +4,7 @@ import type { SharePayload } from "./share-format";
 /** Last gate before writing a share file: any forbidden string in the final HTML blocks the export (fail closed). */
 export type LeakCategory =
   | "vault-path"
+  | "external-path"
   | "map-folder"
   | "note-path"
   | "wikilink"
@@ -28,6 +29,8 @@ export interface ShareVaultInfo {
   vaultName?: string;
   /** Vault-relative folder that holds the map. */
   mapFolder: string;
+  /** Root paths (as typed and real) of this map's external data folders; they live only on this device. */
+  externalPaths?: readonly string[];
 }
 
 export const INTERNAL_FIELD_NAMES = [
@@ -69,6 +72,7 @@ export function forbiddenStringsFor(
     if (text) list.push({ category, value: text });
   };
   add("vault-path", vault.vaultPath);
+  for (const external of vault.externalPaths ?? []) add("external-path", external);
   add("map-folder", vault.mapFolder);
   for (const node of map.nodes) add("note-path", node.path);
   add("wikilink", "[[");

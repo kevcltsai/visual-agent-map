@@ -1,10 +1,19 @@
 import { FuzzySuggestModal, TFile, TFolder, setIcon, type App, type FuzzyMatch } from "obsidian";
 import { t } from "../i18n";
+import type {
+  ExternalRejection,
+  ExternalSource,
+  ExternalUnreadableReason
+} from "../experiences/visual-map/external-sources";
 import { mapSourceStatus, type MapSource, type MapSourceKind } from "../experiences/visual-map/map-sources";
 import type { MapSwitcherItem } from "../repository";
 
 /** Where focus goes after the panel is (re)drawn: the search button, a remove button by stored index, or nowhere. */
-export type MapSourcesPanelFocus = { search: true } | { remove: number } | null;
+export type MapSourcesPanelFocus = { search: true } | { remove: number } | { input: true } | null;
+
+/** What an external row shows: its Markdown count, or why a task skips it. Absent while the check is still running. */
+export type ExternalRowStatus = { count: number } | { unreadable: ExternalUnreadableReason };
+export type ExternalAddFailure = ExternalRejection | "duplicate";
 
 /** What the panel shows between redraws: the last drop's rejection lines and the rows it just added (shown on top). */
 export interface MapSourcesSession {
@@ -12,8 +21,18 @@ export interface MapSourcesSession {
   fresh: string[];
   /** The success line of the last drop (empty when nothing was added); survives the redraw an add causes. */
   added: string;
+  /** What is typed in the path field, kept across redraws (a status result or an add redraws the panel). */
+  pathDraft: string;
+  /** The orange reason under the path field for the last refused path (empty when none). */
+  externalRejected: string;
 }
-export const newMapSourcesSession = (): MapSourcesSession => ({ rejected: [], fresh: [], added: "" });
+export const newMapSourcesSession = (): MapSourcesSession => ({
+  rejected: [],
+  fresh: [],
+  added: "",
+  pathDraft: "",
+  externalRejected: ""
+});
 
 export interface MapSourcesPanelHost {
   app: App;
@@ -29,6 +48,13 @@ export interface MapSourcesPanelHost {
   /** Listens for a drag ending anywhere (Esc, drop elsewhere); the host removes the listener with the panel. */
   onDragEnd?(handler: () => void): void;
   remove(source: MapSource): void;
+  /** External folders of this map (labels only; the path never reaches the panel). */
+  externals?: readonly ExternalSource[];
+  /** Status of one external row by label; undefined while it is being checked. */
+  externalStatus?(label: string): ExternalRowStatus | undefined;
+  /** Checks and stores a pasted path. Resolves null when added, the reason when refused, "stale" when the map changed meanwhile. */
+  addExternal?(input: string): Promise<ExternalAddFailure | "stale" | null>;
+  removeExternal?(source: ExternalSource): void;
   /** Esc inside the panel. */
   close(refocusButton: boolean): void;
   /** True while a picker modal is open: focus leaving to it must not close the panel. */
@@ -65,9 +91,41 @@ export function mapSourceName(app: App, source: MapSource): string {
   return parts.length > 1 ? parts[parts.length - 2] : source.path;
 }
 
-/** How many of the sources cannot be read now (a missing file, folder or map). */
-export function unreadableMapSources(app: App, sources: readonly MapSource[]): number {
-  return sources.filter(source => !mapSourceStatus(app, source).exists).length;
+/** How many of the sources cannot be read now (a missing file, folder or map, or an external folder found unreadable). */
+export function unreadableMapSources(
+  app: App,
+  sources: readonly MapSource[],
+  externalStatuses: readonly (ExternalRowStatus | undefined)[] = []
+): number {
+  return (
+    sources.filter(source => !mapSourceStatus(app, source).exists).length +
+    externalStatuses.filter(status => status && "unreadable" in status).length
+  );
+}
+
+function externalFailureText(reason: ExternalAddFailure): string {
+  switch (reason) {
+    case "relative":
+      return t("ui.map_sources_external_reject_relative");
+    case "malformed":
+      return t("ui.map_sources_external_reject_malformed");
+    case "no-vault-path":
+      return t("ui.map_sources_external_reject_no_vault_path");
+    case "not-folder":
+      return t("ui.map_sources_external_reject_not_folder");
+    case "root":
+      return t("ui.map_sources_external_reject_root");
+    case "home":
+      return t("ui.map_sources_external_reject_home");
+    case "vault":
+      return t("ui.map_sources_external_reject_vault");
+    case "inside-vault":
+      return t("ui.map_sources_external_reject_inside_vault");
+    case "duplicate":
+      return t("ui.map_sources_external_reject_duplicate");
+    default:
+      return t("ui.map_sources_external_reject_missing");
+  }
 }
 
 /** The toolbar button's label: 「資料來源 · N 份」, or just 「資料來源」 with none. */
@@ -405,9 +463,77 @@ export function drawMapSourcesPanel(
     void openSearch(host, search, items => void commit(items, []));
   });
 
+  let pathInput: HTMLInputElement | null = null;
+  const externals = host.externals ?? [];
+  if (host.addExternal) {
+    const block = panel.createDiv({ cls: "vam-map-sources-external" });
+    const line = block.createDiv({ cls: "vam-map-sources-path-row" });
+    const input = line.createEl("input", {
+      cls: "vam-map-sources-path",
+      attr: {
+        type: "text",
+        spellcheck: "false",
+        autocomplete: "off",
+        placeholder: t("ui.map_sources_external_placeholder"),
+        "aria-label": t("ui.map_sources_external_label")
+      }
+    });
+    input.value = session.pathDraft;
+    pathInput = input;
+    const addButton = line.createEl("button", {
+      cls: "vam-map-sources-path-add",
+      text: t("ui.map_sources_external_add")
+    });
+    const reject = block.createDiv({ cls: "vam-map-sources-external-reject", attr: { role: "status" } });
+    const paintReject = (): void => {
+      reject.empty();
+      reject.toggleClass("is-visible", !!session.externalRejected);
+      if (!session.externalRejected) return;
+      reject.createEl("b", { text: t("ui.map_sources_external_rejected_title") });
+      reject.createDiv({ text: session.externalRejected });
+    };
+    paintReject();
+    block.createEl("p", { text: t("ui.map_sources_external_note"), cls: "vam-hint vam-map-sources-external-note" });
+    input.addEventListener("input", () => {
+      session.pathDraft = input.value;
+    });
+    const submit = async (): Promise<void> => {
+      const text = input.value.trim();
+      if (!text || addButton.disabled) return;
+      addButton.disabled = true;
+      let result: ExternalAddFailure | "stale" | null;
+      try {
+        result = host.addExternal ? await host.addExternal(text) : "missing";
+      } catch {
+        result = "missing";
+      }
+      addButton.disabled = false;
+      if (result === "stale") return;
+      if (result === null) {
+        session.pathDraft = "";
+        session.externalRejected = "";
+        return;
+      }
+      session.externalRejected = t("ui.map_sources_reject_line_0", text, externalFailureText(result));
+      paintReject();
+      host.announce?.(`${t("ui.map_sources_external_rejected_title")} ${session.externalRejected}`);
+    };
+    input.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      void submit();
+    });
+    addButton.addEventListener("click", event => {
+      event.stopPropagation();
+      void submit();
+    });
+    addButton.addEventListener("mousedown", e => e.preventDefault());
+  }
+
   const list = panel.createDiv({ cls: "vam-map-sources-list", attr: { role: "list" } });
   const removers: HTMLButtonElement[] = [];
-  if (!host.sources.length)
+  const externalRemovers: HTMLButtonElement[] = [];
+  if (!host.sources.length && !externals.length)
     list.createEl("p", { text: t("ui.map_sources_none"), cls: "vam-hint vam-map-sources-empty" });
   // Rows just added come first; the stored order (and the remove focus index) is unchanged.
   const fresh = (source: MapSource): number => session.fresh.indexOf(sourceKey(source));
@@ -442,6 +568,36 @@ export function drawMapSourcesPanel(
     });
     removers[index] = remove;
   }
+  for (const source of externals) {
+    const status = host.externalStatus?.(source.label);
+    const bad = !!status && "unreadable" in status;
+    const row = list.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
+    row.toggleClass("is-unreadable", bad);
+    setIcon(row.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), "folder-open");
+    row.createSpan({ cls: "vam-map-sources-name", text: source.label, attr: { dir: "auto" } });
+    const meta = !status
+      ? t("ui.map_sources_external_meta_pending")
+      : "count" in status
+        ? t("ui.map_sources_external_meta_0", status.count)
+        : status.unreadable === "too-large"
+          ? t("ui.map_sources_external_too_large")
+          : t("ui.map_sources_unreadable_row");
+    row.createSpan({ cls: "vam-map-sources-meta", text: meta });
+    const remove = row.createEl("button", {
+      cls: "vam-map-sources-remove",
+      text: t("ui.reference_remove"),
+      attr: { "aria-label": t("ui.map_sources_remove_0", source.label) }
+    });
+    remove.addEventListener("click", event => {
+      event.stopPropagation();
+      session.rejected = [];
+      session.added = "";
+      session.fresh = [];
+      session.externalRejected = "";
+      host.removeExternal?.(source);
+    });
+    externalRemovers.push(remove);
+  }
   panel.createEl("p", { text: t("ui.reference_time_and_citations_hint"), cls: "vam-hint vam-map-sources-hint" });
 
   // Esc closes and hands focus back to the toolbar button.
@@ -452,7 +608,7 @@ export function drawMapSourcesPanel(
     host.close(true);
   });
   // Pressing a panel button must not move focus out of the panel first.
-  for (const control of [search, ...removers.filter(Boolean)])
+  for (const control of [search, ...removers.filter(Boolean), ...externalRemovers])
     control.addEventListener("mousedown", e => e.preventDefault());
   // Focus moving to a real element outside the panel (not the button, not a picker list) closes it. A draggable row
   // (the explorer's) is where a drag starts, so it does not.
@@ -465,7 +621,8 @@ export function drawMapSourcesPanel(
 
   host.panelCreated?.(panel);
   if (focus) {
-    const target = "search" in focus ? search : (removers[focus.remove] ?? search);
+    const target =
+      "search" in focus ? search : "input" in focus ? (pathInput ?? search) : (removers[focus.remove] ?? search);
     target.focus();
   }
   return panel;

@@ -4609,7 +4609,7 @@ test('map sources panel: texts, a drop zone and one search button (no three pick
   assert.equal(panel.attrs.role, 'dialog'); assert.equal(panel.attrs.id, 'panel-1'); assert.equal(panel.attrs['aria-label'], 'Data sources for this mind map');
   assert.equal(dom.findAll(panel, c => c.tag === 'button' && dom.hasCls(c, 'vam-map-sources-pick')).length, 0, 'the three Select buttons are gone');
   const zone = dom.find(panel, c => dom.hasCls(c, 'vam-map-sources-drop')), sub = dom.find(zone, c => c.cls === 'vam-map-sources-drop-sub');
-  assert.equal(dom.find(zone, c => c.cls === 'vam-map-sources-drop-main').text, 'Drag files, folders or mind maps from the left to here'); assert.equal(sub.text, 'Only Markdown, folders or mind maps from this vault');
+  assert.equal(dom.find(zone, c => c.cls === 'vam-map-sources-drop-main').text, 'Drag files, folders or mind maps from the left to here'); assert.equal(sub.text, 'Dragging works only for items in this vault');
   assert.equal(zone.attrs['aria-describedby'], sub.attrs.id); assert.ok(zone.attrs['aria-label']); assert.equal(dom.find(zone, c => c.cls === 'vam-map-sources-drop-result').attrs['aria-live'], undefined, 'the result node is replaced by redraws, so the host announcer speaks instead');
   const searches = dom.findAll(panel, c => c.tag === 'button' && dom.hasCls(c, 'vam-map-sources-search'));
   assert.deepEqual(searches.map(b => dom.find(b, c => c.cls === 'vam-map-sources-pick-label').text), ['Search and add…']);
@@ -4678,6 +4678,54 @@ test('map sources picker (P6): an empty vault says there is nothing to add; a va
   const fullPanel = api.drawMapSourcesPanel(dom.element('tools'), msHost(msTree().app).host, null);
   dom.find(fullPanel, c => dom.hasCls(c, 'vam-map-sources-search')).click(); await dom.tick(); await dom.tick();
   assert.equal(modals.at(-1).emptyStateText, 'Nothing matches your search.');
+});
+
+test('map sources panel (external folders): path row, Enter and Add, orange reason with the pasted text, label-only rows with count or reason, draft kept, stale result ignored', async () => {
+  const api = load('ui/map-sources-panel.ts', { obsidian: msObsidian([]) });
+  const calls = []; let answer = null;
+  const status = { docs: { count: 38 }, 'docs#2': { unreadable: 'unreadable' }, big: { unreadable: 'too-large' } };
+  const externals = [{ path: '/SECRET/path/docs', label: 'docs' }, { path: '/SECRET/b/docs', label: 'docs#2' }, { path: '/SECRET/big', label: 'big' }, { path: '/SECRET/pending', label: 'pending' }];
+  const { host, log } = msHost(msTree().app, { externals, externalStatus: label => status[label], addExternal: async input => { calls.push(input); return answer; }, removeExternal: source => log.removed.push(source) });
+  const session = { rejected: [], fresh: [], added: '', pathDraft: 'draft text', externalRejected: '' };
+  host.session = session;
+  const panel = api.drawMapSourcesPanel(dom.element('tools'), host, { input: true });
+  const input = dom.find(panel, c => c.tag === 'input'), add = dom.find(panel, c => c.cls === 'vam-map-sources-path-add' || dom.hasCls(c, 'vam-map-sources-path-add'));
+  assert.equal(input.value, 'draft text', 'the draft survives a redraw'); assert.equal(dom.focusedNow(), input);
+  assert.equal(input.attrs.placeholder, 'Paste the path of a folder outside the vault, e.g. /Users/…/research'); assert.ok(input.attrs['aria-label']); assert.equal(add.text, 'Add');
+  assert.ok(dom.find(panel, c => c.text === 'External folders are stored only on this computer; add them again on another computer.'));
+  const metas = dom.findAll(panel, c => dom.hasCls(c, 'vam-map-sources-meta')).map(c => c.text);
+  assert.deepEqual(metas, ['External folder · 38 files · this computer', 'Unreadable; tasks skip it', 'Too large (over 500 files, 1 MB per file or 10 levels); tasks skip it', 'External folder · this computer']);
+  const rows = dom.findAll(panel, c => dom.hasCls(c, 'vam-map-sources-row'));
+  assert.deepEqual(rows.map(r => dom.find(r, c => dom.hasCls(c, 'vam-map-sources-name')).text), ['docs', 'docs#2', 'big', 'pending'], 'rows show labels only');
+  assert.ok(rows[1].hasClass('is-unreadable') && rows[2].hasClass('is-unreadable') && !rows[0].hasClass('is-unreadable') && !rows[3].hasClass('is-unreadable'));
+  assert.ok(!JSON.stringify(dom.findAll(panel, () => true).map(c => [c.text, c.attrs])).includes('SECRET'), 'no path anywhere in the panel');
+  const removes = dom.findAll(panel, c => c.tag === 'button' && (c.cls ?? '').includes('vam-map-sources-remove'));
+  assert.equal(removes[0].attrs['aria-label'], 'Remove "docs"'); removes[1].click(); assert.deepEqual(plain(log.removed), [externals[1]]);
+  // Refused: the reason shows in the orange block, with the pasted text; the draft stays for editing.
+  answer = 'relative'; input.value = 'research'; input.fire('input'); assert.equal(session.pathDraft, 'research');
+  input.fire('keydown', { key: 'Enter', preventDefault() {} }); await dom.tick();
+  const reject = dom.find(panel, c => dom.hasCls(c, 'vam-map-sources-external-reject'));
+  assert.deepEqual(calls, ['research']); assert.ok(reject.hasClass('is-visible'));
+  assert.match(JSON.stringify(plain(dom.findAll(reject, () => true).map(c => c.text))), /Not added/); assert.match(JSON.stringify(plain(dom.findAll(reject, () => true).map(c => c.text))), /Paste the full path/);
+  assert.match(log.spoken.at(-1), /Not added.*Paste the full path/); assert.equal(input.value, 'research');
+  for (const [reason, text] of [['home', /home folder/], ['inside-vault', /inside this vault/], ['vault', /vault itself/], ['root', /root of the disk/], ['malformed', /\.\./], ['missing', /cannot be found/], ['duplicate', /already added/]]) {
+    answer = reason; add.click(); await dom.tick();
+    assert.match(JSON.stringify(plain(dom.findAll(reject, () => true).map(c => c.text))), text, reason);
+  }
+  // Empty text sends nothing; "stale" (the map changed meanwhile) shows nothing new.
+  const before = calls.length; input.value = '   '; input.fire('keydown', { key: 'Enter', preventDefault() {} }); await dom.tick(); assert.equal(calls.length, before);
+  session.externalRejected = ''; answer = 'stale'; input.value = '/x'; add.click(); await dom.tick(); assert.equal(session.externalRejected, '');
+  // Added: the draft is cleared (the host redraws).
+  answer = null; input.value = '/ok/docs'; add.click(); await dom.tick(); assert.equal(session.pathDraft, ''); assert.equal(session.externalRejected, '');
+});
+test('map sources panel (external folders): a host without external support draws no path row; the toolbar count and warning include external rows', () => {
+  const api = load('ui/map-sources-panel.ts', { obsidian: msObsidian([]) });
+  const panel = api.drawMapSourcesPanel(dom.element('tools'), msHost(msTree().app).host, null);
+  assert.equal(dom.findAll(panel, c => c.tag === 'input').length, 0);
+  const app = msTree().app;
+  assert.equal(api.unreadableMapSources(app, [{ kind: 'folder', path: 'Research' }]), 0);
+  assert.equal(api.unreadableMapSources(app, [{ kind: 'folder', path: 'Research' }], [{ count: 3 }, { unreadable: 'too-large' }, undefined, { unreadable: 'unreadable' }]), 2, 'a pending external source is not counted');
+  assert.equal(api.unreadableMapSources(app, [{ kind: 'folder', path: 'Gone' }], [{ unreadable: 'unreadable' }]), 2);
 });
 
 // Drop zone. The zone's drop handler is async (it reads the other maps first), so every drop is followed by a tick.

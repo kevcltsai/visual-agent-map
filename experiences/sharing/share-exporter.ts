@@ -52,6 +52,7 @@ import {
   type ForbiddenString,
   type LeakCategory
 } from "./share-leak-scan";
+import { externalForbiddenPaths, loadExternalSources } from "../visual-map/external-sources";
 import { shareViewerUiFor } from "./share-viewer-text";
 import type { ShareTranslateDiagram, ShareTranslateSource } from "./share-translate-service";
 import { topLevelSvgs } from "./share-translate-segments";
@@ -668,7 +669,8 @@ export class ShareExporter {
         {
           vaultPath: adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined,
           vaultName: this.app.vault.getName(),
-          mapFolder: folder
+          mapFolder: folder,
+          externalPaths: externalForbiddenPaths(loadExternalSources(this.app, this.source.map.id))
         },
         this.source.map,
         [...this.source.notes.values()]

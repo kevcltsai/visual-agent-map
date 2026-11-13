@@ -830,3 +830,24 @@ test('share exporter layout: a non-default map layout and branch layouts are car
   harness.map.layout = { direction: 'balanced', spacing: 'compact' };
   assert.deepEqual(plain(harness.exporter.assemble({ includeDetail: false, includeImages: false }).payload.layout), { direction: 'balanced', spacing: 'compact' });
 });
+
+test('share exporter: an outside data folder of this map (as typed, and its real path) blocks the export; another map\'s folder does not', () => {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-ext-')));
+  try {
+    const realDir = path.join(tmp, 'real', 'research'); fs.mkdirSync(realDir, { recursive: true });
+    const alias = path.join(tmp, 'alias'); fs.symlinkSync(realDir, alias);
+    class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+    const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+    const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [{ id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false }] };
+    const store = { 'vam-map-external-sources:map-1': [{ path: alias, label: 'alias' }], 'vam-map-external-sources:map-2': [{ path: '/elsewhere/zzz', label: 'zzz' }] };
+    const run = summary => new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' }, loadLocalStorage: key => store[key] ?? null }, { map, notes: new Map([['a', { title: 'A', summary, status: 'idea', model: '' }]]), mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' }).assemble({ includeDetail: false, includeImages: false });
+    assert.deepEqual(plain(run('clean text').leakCategories), []);
+    for (const leak of [alias, realDir, `see ${realDir}/a.md`]) {
+      const blocked = run(leak);
+      assert.ok(blocked.leakCategories.includes('external-path'), leak);
+      assert.equal(blocked.html, undefined); assert.equal(blocked.bytes, 0);
+    }
+    assert.deepEqual(plain(run('/elsewhere/zzz').leakCategories), [], 'only this map\'s folders are forbidden');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});

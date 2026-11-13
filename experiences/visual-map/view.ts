@@ -193,6 +193,7 @@ import {
   type ContentLanguage
 } from "../../i18n";
 import {
+  FileSystemAdapter,
   MarkdownRenderer,
   ItemView,
   type Editor,
@@ -212,9 +213,19 @@ import { addedMermaidBlocks, demoteUnparsableMermaid, neutralizeUnsafeMermaid } 
 import { type ReferenceGroup } from "../../ai/reference-materials";
 import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
 import {
+  addExternalSource,
+  externalSourceStatus,
+  loadExternalSources,
+  removeExternalSource,
+  type ExternalScope,
+  type ExternalSource
+} from "./external-sources";
+import {
   drawMapSourcesPanel,
   isDragSourceTarget,
   newMapSourcesSession,
+  type ExternalAddFailure,
+  type ExternalRowStatus,
   type MapSourcesSession,
   mapSourceName,
   mapSourcesButtonLabel,
@@ -1467,6 +1478,11 @@ export class VisualAgentMapView extends ItemView {
   /** The attachments of the latest chat turn, as reference documents for a research the chat starts. */
   private chatTurnReferences: ReferenceGroup[] = [];
   private readonly mapSourcesPanelId = `vam-map-sources-panel-${++relevancePanelSeq}`;
+  /** Folders outside the vault for the open map (device-local list; never shown with their paths). */
+  private externalSources: ExternalSource[] = [];
+  private externalStatuses = new Map<string, ExternalRowStatus>();
+  private externalMapId: string | undefined;
+  private externalStatusRun: AbortController | null = null;
   private mapSourcesOpen = false;
   private mapSourcesPickerOpen = false;
   private mapSourcesSession: MapSourcesSession = newMapSourcesSession();
@@ -3257,6 +3273,7 @@ export class VisualAgentMapView extends ItemView {
     this.goalSuggestCleanup = null;
     this.mapSourcesPanelCleanup?.();
     this.mapSourcesPanelCleanup = null;
+    this.clearExternalSources();
     // An open goal edit pre-started the CLI for a grade that will never be sent: it is dropped, nothing is saved.
     this.dropGoalEdit();
     this.abortRelevanceGrade();
@@ -3614,6 +3631,7 @@ export class VisualAgentMapView extends ItemView {
     this.relevanceGoal = goal;
     this.relevanceContext = context;
     this.mapSources = sources;
+    this.loadExternalSourcesForMap();
     return { failedPaths: Array.from(ctx.failedPaths) };
   }
   /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
@@ -3682,6 +3700,7 @@ export class VisualAgentMapView extends ItemView {
       this.relevanceGoal = undefined;
       this.relevanceContext = undefined;
       this.mapSources = [];
+      this.clearExternalSources();
       const state: NoteLoadState = {
         epoch: openEpoch,
         read: 0,
@@ -5115,13 +5134,18 @@ export class VisualAgentMapView extends ItemView {
   private paintMapSourcesButton(): void {
     const button = this.mapSourcesButtonEl;
     if (!button) return;
-    const label = mapSourcesButtonLabel(this.mapSources.length);
-    const unreadable = unreadableMapSources(this.app, this.mapSources);
+    const total = this.mapSources.length + this.externalSources.length;
+    const label = mapSourcesButtonLabel(total);
+    const unreadable = unreadableMapSources(
+      this.app,
+      this.mapSources,
+      this.externalSources.map(source => this.externalStatuses.get(source.label))
+    );
     button.empty();
     const icon = button.createSpan({ cls: "vam-sources-button-icon" });
     icon.setAttr("aria-hidden", "true");
     setIcon(icon, "files");
-    const count = this.mapSources.length;
+    const count = total;
     if (unreadable || count > 0) {
       const badge = button.createSpan({ cls: "vam-sources-button-badge", text: unreadable ? "!" : String(count) });
       badge.setAttr("aria-hidden", "true");
@@ -5132,13 +5156,14 @@ export class VisualAgentMapView extends ItemView {
     if (unreadable) button.setAttr("aria-description", t("ui.map_sources_unreadable_description_0", unreadable));
     else button.removeAttribute?.("aria-description");
     button.toggleClass("has-unreadable", unreadable > 0);
-    button.toggleClass("is-empty", !this.mapSources.length);
+    button.toggleClass("is-empty", !total);
   }
   private openMapSourcesPanel(): void {
     if (!this.mapSourcesToolsEl) return;
     this.mapSourcesOpen = true;
     this.mapSourcesButtonEl?.setAttr("aria-expanded", "true");
     this.mapSourcesSession = newMapSourcesSession();
+    this.refreshExternalStatuses();
     this.drawMapSourcesPanelEl({ search: true });
   }
   private closeMapSourcesPanel(refocus: boolean): void {
@@ -5178,6 +5203,10 @@ export class VisualAgentMapView extends ItemView {
           panelCleanups.push(() => doc.removeEventListener("dragend", handler, true));
         },
         remove: source => this.changeMapSources(mapPath, "remove", source),
+        externals: this.externalSources,
+        externalStatus: label => this.externalStatuses.get(label),
+        addExternal: input => this.addExternalFolder(mapPath, input),
+        removeExternal: source => this.removeExternalFolder(mapPath, source),
         close: refocus => this.closeMapSourcesPanel(refocus),
         setPickerOpen: open => {
           this.mapSourcesPickerOpen = open;
@@ -5258,9 +5287,100 @@ export class VisualAgentMapView extends ItemView {
       if (this.mapSourcesOpen) this.drawMapSourcesPanelEl(focus);
     });
   }
+  /** Where an outside folder is judged from: this vault's real location (absent on a vault the plugin cannot locate). */
+  private externalScope(): ExternalScope {
+    const adapter = this.app.vault.adapter;
+    return { vaultBase: adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined };
+  }
+  private clearExternalSources(): void {
+    this.externalStatusRun?.abort();
+    this.externalStatusRun = null;
+    this.externalSources = [];
+    this.externalStatuses = new Map();
+    this.externalMapId = undefined;
+  }
+  /** Reads the open map's local external list. Another map starts with no statuses; the same map keeps what it knew. */
+  private loadExternalSourcesForMap(): void {
+    const id = this.map?.id;
+    if (id !== this.externalMapId) {
+      this.clearExternalSources();
+      this.externalMapId = id;
+    }
+    this.externalSources = loadExternalSources(this.app, id);
+    this.refreshExternalStatuses();
+  }
+  /**
+   * Checks each external folder in the background (fresh range check, file count, limits) and repaints as results come.
+   * A result that arrives after the map changed or the view closed is dropped.
+   */
+  private refreshExternalStatuses(): void {
+    this.externalStatusRun?.abort();
+    this.externalStatusRun = null;
+    const sources = this.externalSources;
+    if (!sources.length) return;
+    const controller = new AbortController();
+    this.externalStatusRun = controller;
+    const mapId = this.externalMapId;
+    const epoch = this.viewEpoch;
+    const scope = this.externalScope();
+    void (async () => {
+      for (const source of sources) {
+        let status: ExternalRowStatus;
+        try {
+          status = await externalSourceStatus(source, scope, controller.signal);
+        } catch {
+          return;
+        }
+        if (controller.signal.aborted || this.closed || this.viewEpoch !== epoch || this.externalMapId !== mapId)
+          return;
+        this.externalStatuses.set(source.label, status);
+        this.repaintExternalStatus();
+      }
+    })();
+  }
+  private repaintExternalStatus(): void {
+    if (this.closed || !this.mapSourcesButtonEl) return;
+    this.paintMapSourcesButton();
+    if (!this.mapSourcesOpen || this.mapSourcesPickerOpen) return;
+    const typing = this.mapSourcesPanelEl?.querySelector?.(".vam-map-sources-path") ?? null;
+    const focused = !!typing && this.contentEl?.ownerDocument?.activeElement === typing;
+    this.drawMapSourcesPanelEl(focused ? { input: true } : null);
+  }
+  /** Panel "Add": checks the pasted path, stores it on this device and shows the row. Resolves null when added. */
+  private async addExternalFolder(mapPath: string, input: string): Promise<ExternalAddFailure | "stale" | null> {
+    const mapId = this.map?.id;
+    const epoch = this.viewEpoch;
+    if (!mapId) return "stale";
+    let result;
+    try {
+      result = await addExternalSource(this.app, mapId, input, this.externalScope());
+    } catch {
+      return "missing";
+    }
+    if (this.closed || this.viewEpoch !== epoch || this.path !== mapPath || this.map?.id !== mapId) return "stale";
+    if (!result.ok) return result.reason;
+    this.externalSources = result.sources;
+    this.mapSourcesSession.pathDraft = "";
+    this.mapSourcesSession.externalRejected = "";
+    this.announcer?.setText(t("ui.map_sources_added_0", result.source.label));
+    this.refreshExternalStatuses();
+    this.paintMapSourcesButton();
+    if (this.mapSourcesOpen) this.drawMapSourcesPanelEl({ input: true });
+    return null;
+  }
+  private removeExternalFolder(mapPath: string, source: ExternalSource): void {
+    const mapId = this.map?.id;
+    if (!mapId || this.closed || this.path !== mapPath) return;
+    this.externalSources = removeExternalSource(this.app, mapId, source.label);
+    this.externalStatuses.delete(source.label);
+    this.announcer?.setText(t("ui.map_sources_removed_0", source.label));
+    this.refreshExternalStatuses();
+    this.paintMapSourcesButton();
+    if (this.mapSourcesOpen) this.drawMapSourcesPanelEl({ input: true });
+  }
   /** A vault delete or rename: repaint the button and an open panel (a source may have become unreadable). */
   private refreshMapSourcesUi(): void {
-    if (this.closed || !this.mapSources.length || !this.mapSourcesButtonEl) return;
+    if (this.closed || (!this.mapSources.length && !this.externalSources.length) || !this.mapSourcesButtonEl) return;
     this.paintMapSourcesButton();
     // A panel with a picker list open stays as it is; it is redrawn with the next change.
     if (this.mapSourcesOpen && !this.mapSourcesPickerOpen) this.drawMapSourcesPanelEl(null);
@@ -15199,12 +15319,14 @@ export class VisualAgentMapView extends ItemView {
   /** The map's saved sources, read from the map the dialog opened on (not the one open when the task starts). */
   private taskSourceSettings(): TaskSourceSettings {
     const mapPath = this.path;
+    const mapId = this.map?.id;
     return {
       mapSources: async signal => {
         const sources = await this.plugin.repo.readMapSources(mapPath);
-        if (!sources.length) return [];
+        const external = { sources: loadExternalSources(this.app, mapId), scope: this.externalScope() };
+        if (!sources.length && !external.sources.length) return [];
         const { groups } = await resolveMapSources(
-          { app: this.app, readMap: path => this.plugin.repo.readMap(path) },
+          { app: this.app, readMap: path => this.plugin.repo.readMap(path), external },
           sources,
           mapPath,
           signal

@@ -616,3 +616,14 @@ test('sharing: a cover keeps only a usable look, needs its asset in the file, an
   assert.equal('layout' in plain(format.buildSharePayload(map, notesById, options({}))), false);
   assert.equal('images' in plain(format.buildSharePayload(map, notesById, options({}))), false);
 });
+
+test('sharing leak: external-path blocks an outside data folder root (as typed and real) anywhere in the payload; a clean payload passes', () => {
+  const external = ['/Users/someone/Research/client-research', '/Volumes/Real/client-research'];
+  const forbidden = scan.forbiddenStringsFor({ vaultPath: '/Users/someone/Vault One', mapFolder: 'Private Vault Folder/Share Map', externalPaths: external }, fixtureMap(), []);
+  const categories = fields => new Set(scan.scanPayloadForLeaks(payloadWith(fields), forbidden).map(hit => hit.category));
+  assert.ok(categories({ summary: 'from /Users/someone/Research/client-research/a.md' }).has('external-path'));
+  assert.ok(categories({ detailHtml: '<code>/Volumes/Real/client-research</code>' }).has('external-path'), 'code is scanned too');
+  assert.ok(!categories({ summary: 'from client-research/a.md' }).has('external-path'), 'the label alone is fine');
+  assert.ok(!categories({ summary: 'plain' }).has('external-path'));
+  assert.ok(scan.forbiddenStringsFor({ mapFolder: 'M' }, { nodes: [] }, []).every(item => item.category !== 'external-path'));
+});

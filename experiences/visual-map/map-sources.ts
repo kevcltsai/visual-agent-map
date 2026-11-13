@@ -6,6 +6,7 @@ import {
   type ReferenceGroup
 } from "../../ai/reference-materials";
 import type { MapDocument } from "../../map-model";
+import { readExternalSource, type ExternalScope, type ExternalSource } from "./external-sources";
 
 /**
  * The data sources of one mind map, kept in its `Map.md` frontmatter key `map-sources` as an ordered list of
@@ -92,6 +93,8 @@ export interface MapSourceDeps {
   app: App;
   /** Reads and parses a map file; throws when it cannot. */
   readMap(path: string): Promise<MapDocument>;
+  /** Folders outside the vault (device-local list) and the scope they are checked against on every read. */
+  external?: { sources: readonly ExternalSource[]; scope: ExternalScope };
 }
 
 const aborted = (): Error => Object.assign(new Error("Aborted"), { name: "AbortError" });
@@ -150,16 +153,19 @@ const baseName = (path: string): string => path.split("/").at(-1) || path;
  * group id `map:<id>`, `folder:<path>`, `files:<path>`; documents vault-relative with `external: false`). A `map:`
  * entry equal to the current map is dropped. An entry whose path is missing or cannot be read is skipped and listed in
  * `unreadable`; missing or unreadable notes inside an existing folder or map are skipped quietly. Rejects with an
- * AbortError when the signal aborts, so the caller sends no request.
+ * AbortError when the signal aborts, so the caller sends no request. External folders (`deps.external`) come after the
+ * vault sources, one group each named by its label; one that cannot be read, is over a limit or fails the range check
+ * is listed in `externalUnreadable` and the rest still load.
  */
 export async function resolveMapSources(
   deps: MapSourceDeps,
   sources: readonly MapSource[],
   currentMapPath: string,
   signal: AbortSignal
-): Promise<{ groups: ReferenceGroup[]; unreadable: MapSource[] }> {
+): Promise<{ groups: ReferenceGroup[]; unreadable: MapSource[]; externalUnreadable: ExternalSource[] }> {
   const groups: ReferenceGroup[] = [];
   const unreadable: MapSource[] = [];
+  const externalUnreadable: ExternalSource[] = [];
   for (const source of sources) {
     if (signal.aborted) throw aborted();
     if (source.kind === "map" && source.path === currentMapPath) continue;
@@ -197,7 +203,17 @@ export async function resolveMapSources(
       unreadable.push(source);
     }
   }
-  return { groups: dedupeReferenceGroups(groups), unreadable };
+  for (const source of deps.external?.sources ?? []) {
+    if (signal.aborted) throw aborted();
+    try {
+      const group = await readExternalSource(source, deps.external!.scope, signal);
+      if (group) groups.push(group);
+    } catch (error) {
+      if (signal.aborted || (error instanceof Error && error.name === "AbortError")) throw aborted();
+      externalUnreadable.push(source);
+    }
+  }
+  return { groups: dedupeReferenceGroups(groups), unreadable, externalUnreadable };
 }
 
 /**

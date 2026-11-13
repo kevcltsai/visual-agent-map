@@ -1024,6 +1024,15 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-map-sources-remove { flex: 0 0 auto; height: auto; min-height: 26px; padding: 2px 8px; white-space: nowrap; }
 .vam-map-sources-search:focus-visible, .vam-map-sources-remove:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-sources-empty, .vam-map-sources-hint { font-size: var(--font-ui-smaller); }
+.vam-map-sources-external { display: flex; flex-direction: column; gap: 6px; }
+.vam-map-sources-path-row { display: flex; gap: 6px; }
+.vam-map-sources-path { flex: 1 1 auto; min-width: 0; font-family: var(--font-monospace); font-size: var(--font-ui-smaller); }
+.vam-map-sources-path-add { flex: 0 0 auto; height: auto; min-height: 30px; padding: 6px 10px; white-space: nowrap; }
+.vam-map-sources-path-add:focus-visible, .vam-map-sources-path:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-sources-external-reject { display: none; padding: 6px 8px; border: 1px solid var(--color-orange); border-radius: var(--radius-s); background: rgba(var(--color-orange-rgb), 0.12); color: var(--text-normal); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-map-sources-external-reject.is-visible { display: block; }
+.vam-map-sources-external-reject b { color: color-mix(in srgb, var(--color-orange) 50%, var(--text-normal)); }
+.vam-map-sources-external-note { font-size: var(--font-ui-smaller); }
 @media (prefers-reduced-motion: reduce) { .vam-map-sources-panel, .vam-map-sources-row.is-new { animation: none; } }
 
 /* Coffee Tables uses Obsidian theme tokens in both light and dark rooms. */

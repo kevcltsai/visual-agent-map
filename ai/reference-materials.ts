@@ -105,6 +105,11 @@ export function sourceFootnoteLabel(path: string): string {
   return `src-${hash.toString(36).padStart(7, "0")}`;
 }
 
+/** An external document and a vault note can share a path text (`docs/x.md`); the label tells them apart. */
+function documentFootnoteLabel(document: ReferenceDocument): string {
+  return sourceFootnoteLabel(document.external ? `external:${document.path}` : document.path);
+}
+
 /** Summary shows on map cards: drop `[S#]` marker runs (with their separators and brackets), keep other link handling. */
 export function resolveSummaryReferences(summary: string, groups: ReferenceGroup[]): string {
   const documents = dedupeReferenceGroups(groups).flatMap(group => group.documents);
@@ -197,7 +202,7 @@ export function resolveDetailReferences(
     const identified = line.replace(/\[S(\d+)\]/g, (original, number: string) => {
       const document = documents[Number(number) - 1];
       if (!document) return tNote("note.source_unconfirmed_0", original);
-      const label = sourceFootnoteLabel(document.path);
+      const label = documentFootnoteLabel(document);
       cited.set(label, footnoteTarget(document));
       return `[^${label}]`;
     });
@@ -225,7 +230,7 @@ export function resolveDetailReferences(
   });
   const previous = sourceDefinitions(previousDetail);
   const writerLabels = footnoteDefinitionLabels(previousDetail);
-  const byLabel = new Map(documents.map(document => [sourceFootnoteLabel(document.path), document]));
+  const byLabel = new Map(documents.map(document => [documentFootnoteLabel(document), document]));
   const targetOf = (label: string): string | undefined => {
     const target = cited.get(label) ?? defined.get(label) ?? previous.get(label);
     if (target) return target;

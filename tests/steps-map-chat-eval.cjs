@@ -167,7 +167,7 @@ test('flows: ids are unique, every flow has turns and an expected final tree, an
   }
 });
 
-test('sim: add with refs, move, reorder, delete (branch and not), merge, kind, appearance and relations', () => {
+test('sim: add with refs, move, reorder, delete (branch and not), kind, appearance and relations', () => {
   const sim = new SimMap('t', [['r', 'R', null], ['a', 'A', 'r'], ['b', 'B', 'r'], ['c', 'C', 'b']]);
   sim.apply([item('add_child', { ref: 'n', parentId: 'r', title: 'N', summary: 's' }), item('add_child', { parentId: 'new:n', title: 'M', summary: 's' })]);
   assert.deepEqual(sim.snapshot()[0].children.map(c => c.title), ['A', 'B', 'N']);
@@ -176,7 +176,7 @@ test('sim: add with refs, move, reorder, delete (branch and not), merge, kind, a
   sim.apply([item('reorder_topics', { parentId: 'r', nodeIds: ['b', 'a'] })]);
   assert.deepEqual(sim.snapshot()[0].children.slice(0, 2).map(c => c.title), ['B', 'A']);
   sim.apply([item('delete_topic', { nodeId: 'a', branch: false })]);
-  assert.ok(sim.nodes.has('c') && sim.nodes.get('c').parentId === 'r', 'children move up when the card goes alone');
+  assert.equal(sim.nodes.get('c').parentId, null, 'product removeNodes: a card deleted alone leaves its children TOP-LEVEL (not promoted)');
   sim.apply([item('delete_topic', { nodeId: 'b', branch: true })]);
   assert.ok(!sim.nodes.has('b'));
   sim.apply([item('set_topic_kind', { nodeIds: ['c'], topicKind: 'hypothesis' }), item('set_appearance', { nodeIds: ['c'], color: 'red', markers: ['star'] }), item('add_relation', { fromId: 'c', toId: 'r', relationKind: 'supports' })]);
@@ -184,6 +184,39 @@ test('sim: add with refs, move, reorder, delete (branch and not), merge, kind, a
   assert.deepEqual([c.kind, c.leaning, c.strength, c.color, [...c.markers], sim.relations.length], ['hypothesis', 'undecided', 'none', 'red', ['star'], 1]);
   sim.apply([item('delete_topic', { nodeId: 'c', branch: true })]);
   assert.equal(sim.relations.length, 0, 'a relation goes with its card');
+});
+
+test('S5 parity: the simulator runs the product functions, so their quirks hold (partial reorder, exclusive markers, text size, branch delete)', () => {
+  const sim = new SimMap('t', [['r', 'R', null], ['a', 'A', 'r'], ['b', 'B', 'r'], ['c', 'C', 'r']]);
+  sim.apply([item('reorder_topics', { parentId: 'r', nodeIds: ['c', 'a'] })]);
+  assert.deepEqual(sim.snapshot()[0].children.map(x => x.title), ['C', 'B', 'A'], 'unlisted B keeps its place (product orderSiblings); a naive sort would give C,A,B');
+  sim.apply([item('set_appearance', { nodeIds: ['a'], markers: ['progress-25'] })]);
+  sim.apply([item('set_appearance', { nodeIds: ['a'], markers: ['progress-50'] })]);
+  assert.deepEqual([...sim.nodes.get('a').markers], ['progress-50'], 'a single-choice marker group keeps one value (a union would keep both)');
+  sim.apply([item('set_appearance', { nodeIds: ['a'], formats: ['text-small'] })]);
+  sim.apply([item('set_appearance', { nodeIds: ['a'], formats: ['text-large'] })]);
+  assert.deepEqual([...sim.nodes.get('a').styles], ['text-large'], 'text size is one choice');
+  sim.apply([item('set_appearance', { nodeIds: ['a'], removeMarkers: ['all'] })]);
+  assert.deepEqual([...sim.nodes.get('a').markers], []);
+  sim.apply([item('delete_topic', { nodeId: 'r', branch: true })]);
+  assert.equal(sim.list.length, 0, 'branch delete takes the whole subtree');
+});
+
+test('S5: evidence labels: only product-backed operations and plain writes keep a flow "product"; move, kind, relations and merge make it simulator-only', () => {
+  const label = acts => { const s = new SimMap('t', [['r', 'R', null], ['a', 'A', 'r']]); s.apply(acts); return s.evidence(); };
+  assert.equal(label([item('rename_topic', { nodeId: 'a', title: 'X' }), item('delete_topic', { nodeId: 'a', branch: true })]).label, 'product');
+  assert.equal(label([item('move_topic', { nodeId: 'a', newParentId: 'r' })]).label, 'simulator-only');
+  assert.equal(label([item('set_topic_kind', { nodeIds: ['a'], topicKind: 'evidence' })]).label, 'simulator-only');
+  assert.equal(label([item('run_map_action', { action: 'merge', nodeIds: ['r', 'a'], title: 'T' })]).label, 'simulator-only');
+  assert.deepEqual(label([item('set_appearance', { nodeIds: ['a'], color: 'red' })]).productBacked, ['set_appearance']);
+});
+
+test('S5: the simulator carries the selection into the next turn context', () => {
+  const sim = new SimMap('t', [['r', 'R', null], ['a', 'A', 'r']]);
+  sim.apply([item('select_topics', { nodeIds: ['a'] })]);
+  assert.deepEqual(sim.contextInput().selected.map(x => x.id), ['a']);
+  sim.apply([item('delete_topic', { nodeId: 'a', branch: true })]);
+  assert.deepEqual(sim.contextInput().selected, [], 'a deleted card leaves the selection');
 });
 
 test('matchTree: exact children, unordered, attributes; extras and misses are reported', () => {

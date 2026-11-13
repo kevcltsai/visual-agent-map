@@ -165,7 +165,7 @@ async function playFlow(p, flow, ask) {
   }
   if (sim.skipped.length) problems.push(`unsimulated actions used: ${sim.skipped.join(",")}`);
   const turnFailures = turns.flatMap((t, i) => t.checks.filter(c => !c.ok).map(c => `turn ${i + 1}: ${c.desc}${c.note ? ` (${c.note})` : ""}`));
-  return { turns, problems, turnFailures, final: sim.snapshot(), invalid, finalOk: !invalid && problems.length === 0 };
+  return { turns, problems, turnFailures, final: sim.snapshot(), invalid, evidence: sim.evidence(), finalOk: !invalid && problems.length === 0 };
 }
 
 async function runFlows() {
@@ -189,11 +189,12 @@ async function runFlows() {
   const dir = path.join(out, slug);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "flows.json"), JSON.stringify({ slug, model, runs, at: new Date().toISOString(), meta: runMeta(p, model), results }, null, 1));
-  const lines = [`# 長對話流程評測：${slug}`, "", `模型 ${model}，每個流程 ${runs} 次。通過 = 最後一張地圖和預期完全一致（卡片、層級、類型、外觀、關係、不該出現的字）。`, ""];
-  lines.push("| 流程 | 最終地圖一致 | 無效（有一輪失敗） | 每輪檢查全過 |", "| --- | --- | --- | --- |");
+  const lines = [`# 長對話流程評測：${slug}`, "", `模型 ${model}，每個流程 ${runs} 次。通過 = 最後一張地圖和預期完全一致（卡片、層級、類型、外觀、關係、不該出現的字）。`, "「模擬器證據」的流程用到產品沒有現成純函式的操作（移動、類型、關係、合併），是參考，不計入產品通過數。", ""];
+  lines.push("| 流程 | 證據 | 最終地圖一致 | 無效（有一輪失敗） | 每輪檢查全過 |", "| --- | --- | --- | --- | --- |");
   for (const f of flows) {
     const mine = results.filter(r => r.id === f.id);
-    lines.push(`| ${f.id} ${f.title} | ${mine.filter(r => r.finalOk).length}/${mine.length} | ${mine.filter(r => r.invalid).length}/${mine.length} | ${mine.filter(r => !r.turnFailures.length).length}/${mine.length} |`);
+    const ev = mine[0]?.evidence;
+    lines.push(`| ${f.id} ${f.title} | ${ev ? (ev.label === "product" ? "產品證據" : `模擬器證據（用到：${ev.simulatorOnly.join("、")}）`) : "?"} | ${mine.filter(r => r.finalOk).length}/${mine.length} | ${mine.filter(r => r.invalid).length}/${mine.length} | ${mine.filter(r => !r.turnFailures.length).length}/${mine.length} |`);
   }
   lines.push("");
   for (const f of flows) for (const r of results.filter(x => x.id === f.id && (!x.finalOk || x.turnFailures.length))) {

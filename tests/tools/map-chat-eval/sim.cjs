@@ -1,18 +1,47 @@
-// A small in-memory map for long-conversation flows: it applies the parsed actions of each turn so the next turn is built
-// from the map the earlier turns made, and the final map can be compared with the expected one. It models only the effects a
-// flow can check (cards, parents, order, type, appearance, relations). Actions that need a real run (research, expand,
-// synthesize, find_images, rate_by_goal) are recorded in `skipped` and change nothing, so flows avoid them.
+// A small in-memory map for long-conversation flows: it applies the parsed actions of each turn so the next turn is built from the
+// map the earlier turns made, and the final map can be compared with the expected one.
+//
+// Evidence rule: a flow is evidence about the PRODUCT only for operations whose logic is the product's own code. These run through
+// product functions loaded with load():
+//   delete_topic    -> removeNodes (map-model.ts)        reorder_topics -> orderSiblings (map-layout.ts)
+//   set_appearance  -> changeTopicMarkers (topic-markers.ts), changeTopicStyles (topic-colors.ts)
+// Plain field writes (add_child, rename_topic, update_summary, rename_map, edit_topic_note) have no product logic beyond a field
+// assignment. Everything else (move_topic, set_topic_kind, add/remove_relation, merge) is this file's own re-implementation: a flow
+// that uses one is labelled "simulator-only" and kept out of the pass counts. Merge has no exported pure product function (it is
+// view code, and a merge with content starts a background AI); other view-bound behaviour (selection after an add) is not modelled.
+// Actions that need a real run (research, expand, synthesize, find_images, rate_by_goal) are recorded in `skipped`.
+const { load } = require("../../support-replay.cjs");
+
+let productFns = null;
+function product() {
+  if (!productFns) {
+    productFns = {
+      removeNodes: load("map-model.ts").removeNodes,
+      orderSiblings: load("map-layout.ts").orderSiblings,
+      changeTopicMarkers: load("topic-markers.ts").changeTopicMarkers,
+      changeTopicStyles: load("topic-colors.ts").changeTopicStyles
+    };
+  }
+  return productFns;
+}
+
+const PRODUCT_BACKED = new Set(["delete_topic", "reorder_topics", "set_appearance"]);
+const SIMPLE_WRITE = new Set(["add_child", "rename_topic", "update_summary", "rename_map", "edit_topic_note"]);
+const NO_EFFECT = new Set(["collapse_topic", "expand_topic", "focus_topic", "auto_layout", "select_topics", "ask_topic_kind", "create_map", "open_map", "create_md_file", "edit_md_file", "add_anchor", "link_anchor"]);
+
 class SimMap {
   constructor(title, rows = []) {
     this.title = title;
-    this.nodes = new Map();
+    this.list = rows.map(([id, t, parentId]) => ({ id, title: t, summary: `${t} 的摘要`, parentId, kind: undefined, leaning: undefined, strength: undefined, color: undefined, markers: [], styles: [], detail: "" }));
     this.relations = [];
     this.skipped = [];
+    this.opsUsed = new Set();
+    this.selection = [];
     this.next = 1;
-    rows.forEach(([id, t, parentId]) => this.nodes.set(id, { id, title: t, summary: `${t} 的摘要`, parentId, kind: undefined, leaning: undefined, strength: undefined, color: undefined, markers: [], styles: [], detail: "" }));
   }
-  children(id) { return [...this.nodes.values()].filter(n => (n.parentId ?? null) === id); }
-  /** Context input for the next turn: outline in tree order with depth, relations, and the empty/name flags. */
+  get nodes() { return new Map(this.list.map(n => [n.id, n])); }
+  children(id) { return this.list.filter(n => (n.parentId ?? null) === id); }
+  /** Context input for the next turn: outline in tree order with depth, relations, selection, and the empty/name flags. */
   contextInput() {
     const out = [];
     const walk = (parent, depth) => this.children(parent).forEach(n => {
@@ -20,21 +49,26 @@ class SimMap {
       walk(n.id, depth + 1);
     });
     walk(null, 0);
-    return { mapTitle: this.title, outline: out, relations: this.relations.map(r => ({ ...r })), emptyMap: out.length === 0 };
+    const ids = new Set(out.map(n => n.id));
+    const selected = this.selection.filter(id => ids.has(id)).map(id => { const n = this.nodes.get(id); return { id, title: n.title, summary: n.summary, detail: n.detail, path: `Maps/Notes/${id}.md` }; });
+    return { mapTitle: this.title, outline: out, relations: this.relations.map(r => ({ ...r })), emptyMap: out.length === 0, selected };
   }
   descendants(id) { return this.children(id).flatMap(c => [c.id, ...this.descendants(c.id)]); }
-  /** Applies one parsed reply. A deleted card with `branch` leaves with its subtree; without it the children move up to its parent. */
+
+  /** Applies one parsed reply. */
   apply(actions) {
     const refs = new Map();
     const resolve = id => (id && id.startsWith("new:") ? refs.get(id.slice(4)) : id);
-    let selection = [];
+    const get = id => this.list.find(n => n.id === id);
     for (const a of actions) {
-      const node = a.nodeId ? this.nodes.get(resolve(a.nodeId)) : undefined;
+      const node = a.nodeId ? get(resolve(a.nodeId)) : undefined;
+      const op = a.kind === "run_map_action" ? `run:${a.action}` : a.kind;
+      this.opsUsed.add(a.kind === "run_map_action" && a.action === "merge" ? "merge" : op);
       switch (a.kind) {
         case "add_child": {
           const id = `n${this.next++}`;
           if (a.ref) refs.set(a.ref, id);
-          this.nodes.set(id, { id, title: a.title, summary: a.summary || "", parentId: a.parentId ? resolve(a.parentId) : null, kind: a.topicKind && a.topicKind !== "topic" ? a.topicKind : undefined, leaning: a.leaning, strength: a.strength, color: undefined, markers: [], styles: [], detail: "" });
+          this.list.push({ id, title: a.title, summary: a.summary || "", parentId: a.parentId ? resolve(a.parentId) : null, kind: a.topicKind && a.topicKind !== "topic" ? a.topicKind : undefined, leaning: a.leaning, strength: a.strength, color: undefined, markers: [], styles: [], detail: "" });
           break;
         }
         case "rename_topic": if (node) node.title = a.title; break;
@@ -42,12 +76,12 @@ class SimMap {
         case "edit_topic_note": if (node) node.detail = a.detail; break;
         case "rename_map": this.title = a.title; break;
         case "move_topic": if (node) this.moveTo(node, resolve(a.newParentId), a.beforeId); break;
-        case "reorder_topics": this.reorder(resolve(a.parentId), a.nodeIds.map(resolve)); break;
-        case "delete_topic": if (node) this.remove(node, a.branch); break;
-        case "select_topics": selection = a.all ? [...this.nodes.keys()] : a.nodeIds.map(resolve); break;
+        case "reorder_topics": this.list = product().orderSiblings(this.list, resolve(a.parentId), a.nodeIds.map(resolve)); break;
+        case "delete_topic": if (node) this.list = product().removeNodes(this.list, node.id, !!a.branch); break;
+        case "select_topics": this.selection = a.all ? this.list.map(n => n.id) : a.nodeIds.map(resolve); break;
         case "set_topic_kind":
           a.nodeIds.map(resolve).forEach(id => {
-            const n = this.nodes.get(id);
+            const n = get(id);
             if (!n) return;
             n.kind = a.topicKind === "topic" ? undefined : a.topicKind;
             if (a.topicKind === "hypothesis") { n.leaning = a.leaning || n.leaning || "undecided"; n.strength = a.strength || n.strength || "none"; } else { n.leaning = undefined; n.strength = undefined; }
@@ -55,13 +89,11 @@ class SimMap {
           break;
         case "set_appearance":
           a.nodeIds.map(resolve).forEach(id => {
-            const n = this.nodes.get(id);
+            const n = get(id);
             if (!n) return;
             if (a.color) n.color = a.color === "none" ? undefined : a.color;
-            if (a.removeMarkers) n.markers = a.removeMarkers.includes("all") ? [] : n.markers.filter(m => !a.removeMarkers.includes(m));
-            if (a.markers) n.markers = [...new Set([...n.markers, ...a.markers])];
-            if (a.removeFormats) n.styles = a.removeFormats.includes("all") ? [] : n.styles.filter(m => !a.removeFormats.includes(m));
-            if (a.formats) n.styles = [...new Set([...n.styles, ...a.formats])];
+            n.markers = product().changeTopicMarkers(n.markers, a.markers || [], a.removeMarkers || []) || [];
+            n.styles = product().changeTopicStyles(n.styles, a.formats || [], a.removeFormats || []) || [];
           });
           break;
         case "add_relation": {
@@ -75,42 +107,38 @@ class SimMap {
           break;
         }
         case "run_map_action":
-          if (a.action === "merge") this.merge(a.nodeIds.length ? a.nodeIds.map(resolve) : selection, a.title);
+          if (a.action === "merge") this.merge(a.nodeIds.length ? a.nodeIds.map(resolve) : this.selection, a.title);
           else this.skipped.push(a.action);
           break;
-        default: break; // view operations, files and maps change nothing a flow checks
+        default: break;
       }
     }
-    this.relations = this.relations.filter(r => this.nodes.has(r.from) && this.nodes.has(r.to));
+    const ids = new Set(this.list.map(n => n.id));
+    this.relations = this.relations.filter(r => ids.has(r.from) && ids.has(r.to));
+    this.selection = this.selection.filter(id => ids.has(id));
   }
   moveTo(node, parentId, beforeId) {
     if (parentId === node.id || this.descendants(node.id).includes(parentId)) return;
     node.parentId = parentId || null;
-    this.nodes.delete(node.id);
-    const all = [...this.nodes.entries()];
-    const at = beforeId ? all.findIndex(([id]) => id === beforeId) : -1;
-    if (at >= 0) all.splice(at, 0, [node.id, node]); else all.push([node.id, node]);
-    this.nodes = new Map(all);
+    this.list = this.list.filter(n => n !== node);
+    const at = beforeId ? this.list.findIndex(n => n.id === beforeId) : -1;
+    if (at >= 0) this.list.splice(at, 0, node); else this.list.push(node);
   }
-  reorder(parentId, ids) {
-    const siblings = this.children(parentId);
-    const ordered = ids.map(id => this.nodes.get(id)).filter(n => n && siblings.includes(n));
-    const rest = siblings.filter(n => !ordered.includes(n));
-    const keep = [...this.nodes.values()].filter(n => !siblings.includes(n));
-    this.nodes = new Map([...keep, ...ordered, ...rest].map(n => [n.id, n]));
-  }
-  remove(node, branch) {
-    if (branch) this.descendants(node.id).forEach(id => this.nodes.delete(id));
-    else this.children(node.id).forEach(c => (c.parentId = node.parentId));
-    this.nodes.delete(node.id);
-  }
+  /** Own re-implementation (the product merge is view code): the first card keeps its id, takes the title, and inherits the others' children and relations. */
   merge(ids, title) {
-    const sources = ids.map(id => this.nodes.get(id)).filter(Boolean);
+    const sources = ids.map(id => this.list.find(n => n.id === id)).filter(Boolean);
     if (sources.length < 2 || !title) return;
     const [first, ...others] = sources;
     first.title = title;
-    others.forEach(o => { this.children(o.id).forEach(c => (c.parentId = first.id)); this.nodes.delete(o.id); });
+    others.forEach(o => { this.children(o.id).forEach(c => (c.parentId = first.id)); });
+    this.list = this.list.filter(n => !others.includes(n));
     this.relations = this.relations.map(r => ({ ...r, from: others.some(o => o.id === r.from) ? first.id : r.from, to: others.some(o => o.id === r.to) ? first.id : r.to })).filter(r => r.from !== r.to);
+  }
+  /** How much of what this map did is the product's own logic. */
+  evidence() {
+    const ops = [...this.opsUsed];
+    const simOnly = ops.filter(o => !PRODUCT_BACKED.has(o) && !SIMPLE_WRITE.has(o) && !NO_EFFECT.has(o) && !o.startsWith("run:"));
+    return { label: simOnly.length ? "simulator-only" : "product", productBacked: ops.filter(o => PRODUCT_BACKED.has(o)), simpleWrites: ops.filter(o => SIMPLE_WRITE.has(o)), simulatorOnly: simOnly };
   }
   /** The map as a nested structure of the fields a flow checks. */
   snapshot(parent = null) {
@@ -135,4 +163,4 @@ function matchTree(actual, expected, path = "") {
   return problems;
 }
 
-module.exports = { SimMap, matchTree };
+module.exports = { SimMap, matchTree, PRODUCT_BACKED, SIMPLE_WRITE };

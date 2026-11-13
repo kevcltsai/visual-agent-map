@@ -28,6 +28,8 @@ import SynthesisDirectionsEN from "./synthesis-directions.en.md";
 import SynthesisGoalZH from "./synthesis-goal.zh.md";
 import SynthesisGoalEN from "./synthesis-goal.en.md";
 import MergeGoalZH from "./merge-goal.zh.md";
+import MergeSupplementZH from "./merge-supplement.zh.md";
+import MergeSupplementEN from "./merge-supplement.en.md";
 import MergeGoalEN from "./merge-goal.en.md";
 
 /**
@@ -51,6 +53,7 @@ const RESEARCH_TOPIC: FragmentPair = { zh: ResearchTopicZH, en: ResearchTopicEN 
 const SYNTHESIS_DIRECTIONS: FragmentPair = pair(SynthesisDirectionsZH, SynthesisDirectionsEN);
 const SYNTHESIS_GOAL: FragmentPair = pair(SynthesisGoalZH, SynthesisGoalEN);
 const MERGE_GOAL: FragmentPair = pair(MergeGoalZH, MergeGoalEN);
+const MERGE_SUPPLEMENT: FragmentPair = pair(MergeSupplementZH, MergeSupplementEN);
 
 export const researchTopicTask = (language: ContentLanguage, title: string): string =>
   renderTemplate(inLanguage(RESEARCH_TOPIC, language), { title });
@@ -66,6 +69,8 @@ export const synthesisDirectionsTask = (language: ContentLanguage): string =>
 export const synthesisGoalTask = (language: ContentLanguage): string => inLanguage(SYNTHESIS_GOAL, language);
 /** The task of an AI merge of selected sibling topics into one (prompt.merge_goal). */
 export const mergeGoalTask = (language: ContentLanguage): string => inLanguage(MERGE_GOAL, language);
+/** The task of the second request of an AI merge: what the map's data sources add to the finished merged text, in a block of its own. */
+export const mergeSupplementTask = (language: ContentLanguage): string => inLanguage(MERGE_SUPPLEMENT, language);
 export const noSummaryYet = (language: ContentLanguage): string => inLanguage(NO_SUMMARY_YET, language);
 export const labelCurrentSummary = (language: ContentLanguage): string => inLanguage(LABEL_CURRENT_SUMMARY, language);
 export const labelVisualReferences = (language: ContentLanguage): string =>

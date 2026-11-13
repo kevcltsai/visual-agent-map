@@ -2448,6 +2448,8 @@ export const en = {
   "log.codex_recheck_failed": "Codex App Server recheck failed",
   "log.codex_not_ready_0": "Codex App Server is not ready yet: {0}",
   "note.kept_from_earlier_version": "Earlier version (not kept in the rewrite)",
+  "note.merge_data_sources": "From the map's data sources (supplement, not the cards' text)",
+  "note.merge_data_sources_failed": "The map's data sources could not be used for this merge; no supplement was added.",
   "note.no_conclusion_yet": "No conclusion yet",
   "note.untitled_topic": "Untitled topic",
   "note.source_unconfirmed_0": "Source to confirm: {0}",

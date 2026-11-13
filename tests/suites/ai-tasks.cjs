@@ -579,6 +579,24 @@ test('W2: synthesize and merge are observed on the main request only; reference 
   const old = await run('synthesize', undefined, 'short');
   assert.equal(old.calls.length, 2, 'without the direct flag a synthesis still extracts first'); assert.equal(old.calls[0].stream, undefined); assert.equal(old.calls[1].stream, true);
 });
+test('merge supplement over budget (ticket 03): only the map sources are condensed, the merged card text is never in an extraction request, and the count is bounded', async () => {
+  const { AiTaskService } = load('core/ai-task-service.ts');
+  const reply = JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] });
+  const calls = [];
+  const service = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => { throw new Error('x'); },
+    claudeRuntime: () => ({ runTask: async prompt => { calls.push(prompt); return reply; } }) });
+  const documents = [100_000, 100_000].map((size, index) => ({ path: `Policy/p${index}.md`, content: `SOURCE_SENTINEL_${index} ${'x'.repeat(size)}` }));
+  await service.askModel({ title: 'T', summary: 'CARD_SUMMARY', rules: '', detail: 'CARD_TEXT 不得公開客戶資料', task: 'supplement', ancestors: '', mode: 'merge', researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceDelivery: 'direct', referenceGroups: [{ id: 'g', name: 'Sources', location: 'Map.md', documents }] }, 'claude:sonnet', 'low');
+  assert.ok(calls.length >= 3 && calls.length <= 16, `extraction batches, then the main request (${calls.length} requests)`);
+  const extraction = calls.slice(0, -1), main = calls.at(-1);
+  for (const prompt of extraction) { assert.match(prompt, /Extract relevant facts/); assert.doesNotMatch(prompt, /CARD_TEXT|CARD_SUMMARY|不得公開客戶資料/, 'the cards are not part of any extraction'); }
+  assert.match(main, /CARD_TEXT 不得公開客戶資料/, 'the card text reaches the main request whole');
+  assert.doesNotMatch(main, /SOURCE_SENTINEL_0 x{1000}/, 'the sources arrive condensed, not whole');
+  // The same sources that fit one request are sent as they are, with no extraction.
+  calls.length = 0;
+  await service.askModel({ title: 'T', summary: '', rules: '', detail: 'CARD_TEXT', task: 'supplement', ancestors: '', mode: 'merge', researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceDelivery: 'direct', referenceGroups: [{ id: 'g', name: 'Sources', location: 'Map.md', documents: [{ path: 'a.md', content: 'SOURCE_SENTINEL_SMALL' }] }] }, 'claude:sonnet', 'low');
+  assert.equal(calls.length, 1); assert.match(calls[0], /SOURCE_SENTINEL_SMALL/);
+});
 test('research with sources: one request holds the original text when it fits one batch; over one batch it is still extracted; the source budget is 48k tokens', async () => {
   const { AiTaskService } = load('core/ai-task-service.ts');
   const reply = JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] });

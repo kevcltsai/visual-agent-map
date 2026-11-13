@@ -2285,6 +2285,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "log.codex_recheck_failed": "Codex App Server 重新檢查失敗",
   "log.codex_not_ready_0": "Codex App Server 尚未就緒：{0}",
   "note.kept_from_earlier_version": "舊版內容（改寫時未保留）",
+  "note.merge_data_sources": "來自地圖資料來源的補充（非卡片原文）",
+  "note.merge_data_sources_failed": "這次合併讀不到地圖的資料來源，沒有補充。",
   "note.no_conclusion_yet": "尚未形成結論",
   "note.untitled_topic": "未命名主題",
   "note.source_unconfirmed_0": "來源待確認：{0}",

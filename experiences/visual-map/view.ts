@@ -326,7 +326,12 @@ import { branchDirectionResolver, depthOf, lineKind } from "./tree-edge-rules";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
 import { mergeRepair } from "../../core/steps/task/fragments";
-import { checkMergePreservation, findingList, type MergeCheckResult } from "../../core/steps/task/merge-check";
+import {
+  checkMergePreservation,
+  findingList,
+  withSourceSupplement,
+  type MergeCheckResult
+} from "../../core/steps/task/merge-check";
 import {
   expansionTask,
   labelCurrentSummary,
@@ -334,6 +339,7 @@ import {
   labelOldFindings,
   labelVisualReferences,
   mergeGoalTask,
+  mergeSupplementTask,
   noSummaryYet,
   researchTopicTask,
   synthesisDirectionsTask,
@@ -751,6 +757,10 @@ interface MergeTask {
   reasoning: ModelChoice["reasoning"];
   /** The sources as sent to the model (JSON of the reference documents); compared again before the draft is saved. */
   sourceContent: string;
+  /** The model's additions from the map's data sources (written as a separate block, never into the merged text). */
+  supplement?: string;
+  /** The supplement request failed: the block says so instead of silently leaving the sources out. */
+  supplementFailed?: boolean;
   controller: AbortController;
   /** running: the model works (Stop works); applying: the result is being written; a task that ends is removed. */
   state: "running" | "applying";
@@ -7684,9 +7694,10 @@ export class VisualAgentMapView extends ItemView {
     const language = this.plugin.settings.language;
     const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath), task.model);
     try {
-      const sourceGroup = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
+      const snapshot = await this.mergeSourceSnapshot(task.sources, task.controller.signal);
+      const sourceGroup = snapshot.group;
       if (!this.isLiveMergeTask(task)) return;
-      task.sourceContent = JSON.stringify(sourceGroup.documents);
+      task.sourceContent = snapshot.content;
       const request: TaskContext = {
         title: t("ui.merge_ai_untitled"),
         summary: noSummaryYet(language),
@@ -7720,9 +7731,9 @@ export class VisualAgentMapView extends ItemView {
       /** The sources must still be what the model was given; a change during any request fails with the stale message. */
       const sourcesUnchanged = async (): Promise<boolean> => {
         if (!this.isLiveMergeTask(task)) return false;
-        const latest = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
+        const latest = await this.mergeSourceSnapshot(task.sources, task.controller.signal);
         if (!this.isLiveMergeTask(task)) return false;
-        if (JSON.stringify(latest.documents) !== task.sourceContent) throw new Error(t("ui.merge_draft_stale"));
+        if (latest.content !== task.sourceContent) throw new Error(t("ui.merge_draft_stale"));
         return true;
       };
       let result = await ask(request);
@@ -7755,6 +7766,28 @@ export class VisualAgentMapView extends ItemView {
           if (task.controller.signal.aborted || this.closed || !this.isLiveMergeTask(task)) throw error;
           if (error instanceof Error && error.message === t("ui.merge_draft_stale")) throw error;
           this.plugin.recordFailure(t("log.merge_failed"), error);
+        }
+      }
+      // The map's data sources only ever add a separate block after the merged text: the request that wrote the merged text
+      // never saw them, so nothing in them can change what the cards say.
+      if (snapshot.mapGroups.some(group => group.documents.length)) {
+        try {
+          const supplement = await ask({
+            ...request,
+            summary: result.summary,
+            detail: result.detail,
+            task: mergeSupplementTask(language),
+            referenceGroups: snapshot.mapGroups
+          });
+          if (!(await sourcesUnchanged())) return;
+          task.supplement = supplement.detail;
+        } catch (error) {
+          if (task.controller.signal.aborted || this.closed || !this.isLiveMergeTask(task)) throw error;
+          if (error instanceof Error && error.message === t("ui.merge_draft_stale")) throw error;
+          // The cards' merge is still good: it is written, with a line saying the sources were not read.
+          this.plugin.recordFailure(t("log.merge_failed"), error);
+          task.supplement = "";
+          task.supplementFailed = true;
         }
       }
       // The result is final: the unsaved preview goes away before anything is written.
@@ -7870,6 +7903,18 @@ export class VisualAgentMapView extends ItemView {
     task.controller.abort();
     this.render();
   }
+  /** The merged cards as one reference group, and the map's data sources, with the key that tells whether either changed. */
+  private async mergeSourceSnapshot(
+    sources: { id: string; path: string }[],
+    signal: AbortSignal
+  ): Promise<{ group: ReferenceGroup; mapGroups: ReferenceGroup[]; content: string }> {
+    const group = await this.topicReferenceGroup(sources, "strong", { origin: false });
+    const mapGroups = await this.readMapSourceGroups(signal);
+    const content = mapGroups.length
+      ? `${JSON.stringify(group.documents)}\n${JSON.stringify(mapGroups.map(item => item.documents))}`
+      : JSON.stringify(group.documents);
+    return { group, mapGroups, content };
+  }
   /** Compares the merged summary and Detail with what the sources hold (numbers, links, embeds; no invented numbers). */
   private async checkMergeResult(task: MergeTask, result: AiResult): Promise<MergeCheckResult> {
     const notes = await Promise.all(
@@ -7900,6 +7945,7 @@ export class VisualAgentMapView extends ItemView {
           visualReferences: draft.visualReferences,
           formatIssues: draft.formatIssues,
           sourceContent: task.sourceContent,
+          supplement: task.supplementFailed ? null : (task.supplement ?? ""),
           task
         },
         task.appearance
@@ -7919,6 +7965,8 @@ export class VisualAgentMapView extends ItemView {
       visualReferences: AiResult["visualReferences"];
       formatIssues: AiResult["formatIssues"];
       sourceContent: string;
+      /** The data-source block: its text, "" for none, null when the request failed. */
+      supplement?: string | null;
       task: MergeTask;
     },
     /** What the chat reply asked for the merged card (colour, markers, styles); written on top of what the sources share. */
@@ -7970,7 +8018,7 @@ export class VisualAgentMapView extends ItemView {
     if (content) {
       let latest: string | undefined;
       try {
-        latest = JSON.stringify((await this.topicReferenceGroup(sources, "strong", { origin: false })).documents);
+        latest = (await this.mergeSourceSnapshot(sources, new AbortController().signal)).content;
       } catch {
         /* An unreadable source is a changed source. */
       }
@@ -8019,7 +8067,12 @@ export class VisualAgentMapView extends ItemView {
           created.path,
           {
             summary: content.summary,
-            detail: canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+            detail: withSourceSupplement(
+              canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+              content.supplement,
+              detailTemplate,
+              noteLanguageOf(language)
+            ),
             visualReferences: visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language)),
             prompt: mergeGoalTask(language),
             sourcePaths: sources.map(source => source.path),
@@ -8116,6 +8169,7 @@ export class VisualAgentMapView extends ItemView {
           detail: string;
           visualReferences: AiResult["visualReferences"];
           formatIssues: AiResult["formatIssues"];
+          supplement?: string | null;
           task: MergeTask;
         }
       | undefined,
@@ -8136,7 +8190,12 @@ export class VisualAgentMapView extends ItemView {
       const references = visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language));
       patch = {
         summary: content.summary,
-        detail: canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+        detail: withSourceSupplement(
+          canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+          content.supplement,
+          detailTemplate,
+          noteLanguageOf(language)
+        ),
         status: "completed",
         sourcePaths,
         ...(references.trim() ? { visualReferences: references } : {}),

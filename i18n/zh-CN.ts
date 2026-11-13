@@ -2284,6 +2284,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "log.codex_recheck_failed": "Codex App Server 重新检查失败",
   "log.codex_not_ready_0": "Codex App Server 尚未就绪：{0}",
   "note.kept_from_earlier_version": "旧版内容（改写时未保留）",
+  "note.merge_data_sources": "来自地图数据来源的补充（非卡片原文）",
+  "note.merge_data_sources_failed": "这次合并读不到地图的数据来源，没有补充。",
   "note.no_conclusion_yet": "尚未形成结论",
   "note.untitled_topic": "未命名主题",
   "note.source_unconfirmed_0": "来源待确认：{0}",

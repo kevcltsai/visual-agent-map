@@ -344,7 +344,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_sources_button_count_0": "資料來源 · {0} 份",
   "ui.map_sources_unreadable_description_0": "{0} 份讀不到",
   "ui.map_sources_title": "這張心智圖的資料來源",
-  "ui.map_sources_intro": "研究、展開、整合都會使用這些資料，並存在這張心智圖裡，下次打開還在。",
+  "ui.map_sources_intro": "研究、展開、整合、合併和對話等 AI 功能都會使用這些資料，並存在這張心智圖裡，下次打開還在。",
   "ui.map_sources_folder_count_0": "資料夾 · {0} 份",
   "ui.map_sources_kind_map": "心智圖",
   "ui.map_sources_unreadable_row": "讀不到，任務會略過",

@@ -344,7 +344,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_sources_button_count_0": "数据源 · {0} 份",
   "ui.map_sources_unreadable_description_0": "{0} 份读不到",
   "ui.map_sources_title": "这张心智图的数据源",
-  "ui.map_sources_intro": "研究、展开、整合都会使用这些数据，并保存在这张心智图里，下次打开还在。",
+  "ui.map_sources_intro":
+    "研究、展开、整合、合并和对话等 AI 功能都会使用这些数据，并保存在这张心智图里，下次打开还在。",
   "ui.map_sources_folder_count_0": "文件夹 · {0} 份",
   "ui.map_sources_kind_map": "心智图",
   "ui.map_sources_unreadable_row": "读不到，任务会略过",

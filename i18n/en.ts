@@ -377,7 +377,7 @@ export const en = {
   "ui.map_sources_unreadable_description_0": "{0} unreadable",
   "ui.map_sources_title": "Data sources for this mind map",
   "ui.map_sources_intro":
-    "Research, expand and synthesize use these sources. They are saved in this mind map and stay the next time you open it.",
+    "Research, expand, synthesize, merge and chat use these sources. They are saved in this mind map and stay the next time you open it.",
   "ui.map_sources_folder_count_0": "Folder · {0} files",
   "ui.map_sources_kind_map": "Mind map",
   "ui.map_sources_unreadable_row": "Unreadable; tasks skip it",

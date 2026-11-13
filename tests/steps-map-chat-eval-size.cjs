@@ -46,7 +46,7 @@ test('size cases: the text is Chinese and the same every time it is built', () =
 test('size cases: each large case reaches the budget it is about; its control fits every budget', () => {
   const sz1 = sent('SZ1');
   assert.equal(sz1.outline.length, 500);
-  assert.ok(sz1.outline.every(n => n.summary.length >= 230 && n.summary.length <= 240), 'summaries of about 240 characters (the clip)');
+  assert.ok(byId('SZ1').input.outline.every(n => n.summary.length === 240), 'summaries of 240 characters (the clip)');
   assert.ok(sz1.outline.some(n => n.title === '冷鏈物流的溫度紀錄'));
 
   const sz2Input = byId('SZ2').input.selected.reduce((n, ref) => n + ref.detail.length, 0);
@@ -80,12 +80,8 @@ test('size cases: no control is refused before sending (a request that fits is s
   for (const k of CASES.filter(x => x.group !== LARGE_GROUP)) assert.equal(prepare(p, k).refused, null, k.id);
 });
 
-test('size cases: the product refuses before sending exactly the ones its Chinese token estimate puts over the budget', () => {
-  // The 500-card outline and the 200k-character note are over the model's window once Chinese is counted as Chinese; nothing
-  // shortens them yet, so they are refused with over_budget instead of failing at the provider. The rest fit.
-  const refused = LARGE.filter(k => prepare(p, k).refused).map(k => k.id);
-  assert.deepEqual(refused, ['SZ1', 'SZ5', 'SZ6']);
-  for (const id of refused) assert.equal(prepare(p, byId(id)).refused, 'over_budget', id);
+test('size cases: once the context is shortened to its total budget, the product sends every one of them', () => {
+  for (const k of LARGE) assert.equal(prepare(p, k).refused, null, k.id);
 });
 
 test('size cases: the checks fail a reply that presents an unread note as read, and pass an honest one', () => {

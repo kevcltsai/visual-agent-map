@@ -1,4 +1,5 @@
 import { normalizeVaultPath } from "./map-chat-guard";
+import { estimateMapChatTokens } from "./map-chat-tokens";
 import type { MapChatBasisIndex } from "./map-chat-basis";
 import type { HypothesisLeaning, HypothesisStrength, TopicKind } from "../note-values";
 import type { TopicRelationKind } from "../map-model";
@@ -7,9 +8,15 @@ import type { TopicMarker } from "../topic-markers";
 
 /**
  * Builds what the model sees in a map chat turn. Pure: the caller reads the map, the selection and the Markdown text; this
- * only shapes it. Nothing here is cut to the 600-character neighbourhood limit of the selection AI: a snippet, a file and
- * the active file go in whole. Every Markdown file whose full text is sent gets a content hash, the baseline a later
- * `edit_md_file` is checked against.
+ * only shapes it. Nothing here is cut to the 600-character neighbourhood limit of the selection AI: a snippet goes in whole,
+ * and a file and the active file go in whole up to {@link MAP_CHAT_FILE_CHAR_LIMIT}. Every Markdown file whose full text is
+ * sent gets a content hash, the baseline a later `edit_md_file` is checked against; a file sent cut gets none.
+ *
+ * The whole context has one budget, {@link MAP_CHAT_CONTEXT_TOKEN_BUDGET}, in the step's own token measure
+ * (estimateMapChatTokens, Chinese counted as Chinese). A context over it is shortened in a fixed order until it fits
+ * (see {@link shrinkSteps}); every part that is shortened says so in the JSON (`truncated`, `…Omitted`, `detailOmitted`,
+ * `researchDeferred`) and the context then carries {@link MAP_CHAT_SHORTENED_NOTE}. A context within every limit is built
+ * exactly as before: no new field appears.
  */
 export const MAP_CHAT_DEFAULT_TURNS = 6;
 /** Total characters of card Detail sent in one turn; cards past it go without Detail (and without a Detail baseline). */
@@ -25,6 +32,22 @@ export const MAP_CHAT_CONTINUATION_LINES = 40;
 const CONTINUATION_TEXT_LIMIT = 200;
 /** Titles of the user's other maps sent so the model can tell "make a new map" from "go to that map"; the rest are left out. */
 export const MAP_CHAT_MAP_TITLE_LIMIT = 200;
+/**
+ * Estimated tokens the context JSON may take. The step refuses a prompt over 150k (MAP_CHAT_TOKEN_BUDGET); the other 30k are for
+ * the prompt template (about 10k), the reply schema and the user's own message, which is never shortened.
+ */
+export const MAP_CHAT_CONTEXT_TOKEN_BUDGET = 120_000;
+/** Cards of the outline sent at most; the deepest levels go first (`outlineOmitted`). */
+export const MAP_CHAT_OUTLINE_CARD_LIMIT = 1500;
+/** Characters of one attached file or of the active file sent at most; the rest is cut (`truncated`, no content hash). */
+export const MAP_CHAT_FILE_CHAR_LIMIT = 60_000;
+/** Characters of one earlier conversation message sent at most. */
+export const MAP_CHAT_TURN_CHAR_LIMIT = 6_000;
+/** Characters of one user text node or one summary bracket sent at most. */
+export const MAP_CHAT_USER_TEXT_CHAR_LIMIT = 4_000;
+/** The fixed note sent when any part of the context was shortened (a constant, never built from the content). */
+export const MAP_CHAT_SHORTENED_NOTE =
+  "This context was shortened to fit what you can read. A part with truncated: true holds only the beginning of its text (totalChars is its whole length); outlineSummariesOmitted: true means the outline cards are sent without their summaries; outlineOmitted counts cards left out of the outline (those deeper than outlineDepthLimit, or past the card limit), and they still exist on the map; earlierTurnsOmitted counts older conversation messages left out. Text that was cut or left out is not in front of you: never say or imply that you read, used or checked it, and build nothing from it. When the user's request needs that part, say it was not sent this time. A truncated file has no contentHash and cannot be edited.";
 const TITLE_LIMIT = 200;
 const SUMMARY_LIMIT = 240;
 const ERROR_LIMIT = 200;
@@ -234,6 +257,8 @@ export interface MapChatContextInput {
   researchBudget?: number;
   /** Only for the second round on of an automatic continuation; the first round and every ordinary message leave it out. */
   continuation?: MapChatContinuationInput;
+  /** Estimated tokens the whole context may take; default {@link MAP_CHAT_CONTEXT_TOKEN_BUDGET}. */
+  tokenBudget?: number;
 }
 export interface MapChatContext {
   /** The context as the JSON text put in the prompt. */
@@ -294,6 +319,13 @@ export function isMdStale(hashes: Readonly<Record<string, string>>, path: string
   if (key === null || !Object.prototype.hasOwnProperty.call(hashes, key)) return true;
   return hashes[key] !== contentHash(currentContent);
 }
+
+/** The first `limit` characters of `text` (never half a surrogate pair), and whether anything was cut. */
+const head = (text: string, limit: number): { text: string; cut: boolean } => {
+  if (text.length <= limit) return { text, cut: false };
+  const end = /[\ud800-\udbff]/.test(text.charAt(limit - 1)) ? limit - 1 : limit;
+  return { text: text.slice(0, Math.max(0, end)), cut: true };
+};
 
 const clip = (value: string, limit: number): string => {
   const text = value.replace(/\s+/g, " ").trim();
@@ -401,7 +433,87 @@ function imageParts(image: MapChatSelectedImage): {
   };
 }
 
+/**
+ * How far one attempt shortens the context; each step of {@link shrinkSteps} goes further than the one before. `null` keeps a part
+ * as the input and its own limits give it.
+ */
+interface Shrink {
+  /** Messages of the history window kept, newest last; null keeps the whole window. */
+  turns: number | null;
+  /** Outline cards keep their summaries. */
+  outlineSummaries: boolean;
+  /** Deepest outline depth sent; null sends every level (up to {@link MAP_CHAT_OUTLINE_CARD_LIMIT} cards). */
+  outlineDepth: number | null;
+  /** Characters of research notes; null uses the input's budget. */
+  researchBudget: number | null;
+  /** Characters of each attached file and of the active file. */
+  fileChars: number;
+  /** Referenced cards keep their Detail. */
+  referencesDetail: boolean;
+  /** Characters of card Detail (selected, then references); null uses the input's budget. */
+  detailBudget: number | null;
+}
+
+/**
+ * The order in which an over-budget context is shortened, gentlest first; each step keeps what the earlier ones cut. What the user
+ * pointed at is kept longest: (1) older conversation messages go first, down to the newest question and answer; (2) the outline
+ * loses its summaries, then its deepest levels down to depth 1; (3) research notes are deferred, by halving their budget to zero;
+ * (4) attached files and the active note are cut to their beginning, and referenced cards lose their Detail; (5) selected cards
+ * lose their Detail, by lowering the Detail budget to zero; (6) last, the outline keeps only its roots and the history goes.
+ * The user's message is not in the context and is never shortened.
+ */
+function* shrinkSteps(input: MapChatContextInput): Generator<Shrink> {
+  const step: Shrink = {
+    turns: null,
+    outlineSummaries: true,
+    outlineDepth: null,
+    researchBudget: null,
+    fileChars: MAP_CHAT_FILE_CHAR_LIMIT,
+    referencesDetail: true,
+    detailBudget: null
+  };
+  yield { ...step };
+  const windowed = historyWindow(input).length;
+  for (let kept = windowed - 2; kept >= 2; kept -= 2) yield { ...step, turns: (step.turns = kept) };
+  yield { ...step, outlineSummaries: (step.outlineSummaries = false) };
+  const deepest = input.outline.reduce((max, node) => Math.max(max, node.depth), 0);
+  for (let depth = deepest - 1; depth >= 1; depth--) yield { ...step, outlineDepth: (step.outlineDepth = depth) };
+  const research = input.researchBudget ?? MAP_CHAT_RESEARCH_BUDGET;
+  if ((input.researchNotes ?? []).length)
+    for (const share of [2, 4, 8, Infinity])
+      yield { ...step, researchBudget: (step.researchBudget = Math.floor(research / share)) };
+  yield { ...step, fileChars: (step.fileChars = 30_000) };
+  yield { ...step, referencesDetail: (step.referencesDetail = false) };
+  for (const chars of [15_000, 8_000, 4_000, 2_000]) yield { ...step, fileChars: (step.fileChars = chars) };
+  const detail = input.detailBudget ?? MAP_CHAT_DETAIL_BUDGET;
+  for (const share of [2, 4, 12, Infinity])
+    yield { ...step, detailBudget: (step.detailBudget = Math.floor(detail / share)) };
+  yield { ...step, outlineDepth: (step.outlineDepth = 0) };
+  yield { ...step, turns: (step.turns = 0) };
+}
+
+/** The question and answer rounds kept by `maxTurns` (the conversation window), before any budget shortening. */
+function historyWindow(input: MapChatContextInput): MapChatTurn[] {
+  const turns = Math.max(0, input.maxTurns ?? MAP_CHAT_DEFAULT_TURNS) * 2;
+  return turns ? input.history.slice(-turns) : [];
+}
+
+/**
+ * The context for this turn: built whole, then, while its estimated tokens are over the budget, rebuilt with each step of
+ * {@link shrinkSteps} in turn. When even the last step is over, that last attempt is returned and the step refuses it (over_budget).
+ */
 export function buildMapChatContext(input: MapChatContextInput): MapChatContext {
+  const budget = input.tokenBudget ?? MAP_CHAT_CONTEXT_TOKEN_BUDGET;
+  let built: MapChatContext | null = null;
+  for (const shrink of shrinkSteps(input)) {
+    built = buildOnce(input, shrink);
+    if (estimateMapChatTokens(built.json) <= budget) return built;
+  }
+  return built as MapChatContext;
+}
+
+function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
+  let shortened = false;
   const image = input.selectedImage ? imageParts(input.selectedImage) : null;
   const hashes: Record<string, string> = {};
   const topicHashes: Record<string, MapChatTopicHash> = {};
@@ -418,7 +530,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     const found = (links ?? []).map(brief).filter((entry): entry is { id: string; title: string } => entry !== null);
     return found.length ? { linkedTo: found } : {};
   };
-  let detailLeft = input.detailBudget ?? MAP_CHAT_DETAIL_BUDGET;
+  let detailLeft = shrink.detailBudget ?? input.detailBudget ?? MAP_CHAT_DETAIL_BUDGET;
   const researched = new Set((input.researchNotes ?? []).map(note => note.id));
   const basis: MapChatBasisIndex = { cards: {}, read: [] };
   const wholeSent = new Set<string>();
@@ -426,7 +538,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
   const topic = (ref: MapChatTopicRef, withLinks: boolean): Record<string, unknown> => {
     ids.add(ref.id);
     const node = byId.get(ref.id);
-    const withDetail = ref.detail.length <= detailLeft;
+    const withDetail = (withLinks || shrink.referencesDetail) && ref.detail.length <= detailLeft;
     if (withDetail) {
       detailLeft -= ref.detail.length;
       wholeSent.add(ref.id);
@@ -463,7 +575,19 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     hashes[key] = contentHash(content);
     return key;
   };
+  // A file cut to its beginning was not read whole: no content hash (it cannot be edited) and it is not a basis of new cards.
   const files = input.files.map(file => {
+    const sent = head(file.content, shrink.fileChars);
+    if (sent.cut) {
+      shortened = true;
+      return {
+        path: file.path,
+        contentHash: null,
+        content: sent.text,
+        truncated: true,
+        totalChars: file.content.length
+      };
+    }
     basis.read.push({ path: file.path, title: noteTitle(file.path) });
     const key = record(file.path, file.content);
     return { path: file.path, contentHash: key === null ? null : hashes[key], content: file.content };
@@ -472,17 +596,25 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     ? (() => {
         const key = normalizeVaultPath(input.activeFile.path);
         const duplicate = key !== null && input.files.some(file => normalizeVaultPath(file.path) === key);
-        if (!duplicate) {
-          record(input.activeFile.path, input.activeFile.content);
-          basis.read.push({ path: input.activeFile.path, title: noteTitle(input.activeFile.path) });
+        if (duplicate) return { path: input.activeFile.path, sameAsListedFile: true };
+        const sent = head(input.activeFile.content, shrink.fileChars);
+        if (sent.cut) {
+          shortened = true;
+          return {
+            path: input.activeFile.path,
+            contentHash: null,
+            content: sent.text,
+            truncated: true,
+            totalChars: input.activeFile.content.length
+          };
         }
-        return duplicate
-          ? { path: input.activeFile.path, sameAsListedFile: true }
-          : {
-              path: input.activeFile.path,
-              contentHash: key === null ? null : hashes[key],
-              content: input.activeFile.content
-            };
+        record(input.activeFile.path, input.activeFile.content);
+        basis.read.push({ path: input.activeFile.path, title: noteTitle(input.activeFile.path) });
+        return {
+          path: input.activeFile.path,
+          contentHash: key === null ? null : hashes[key],
+          content: input.activeFile.content
+        };
       })()
     : null;
   const snippets = input.snippets.map(snippet => {
@@ -516,15 +648,50 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
   const referencesOut = input.references.map(ref => topic(ref, false));
   const research = planResearchNotes(
     input.researchNotes ?? [],
-    input.researchBudget ?? MAP_CHAT_RESEARCH_BUDGET,
+    shrink.researchBudget ?? input.researchBudget ?? MAP_CHAT_RESEARCH_BUDGET,
     wholeSent
   );
   for (const note of research.sent) {
     basis.cards[note.id] = { title: note.title, research: true };
     basis.read.push({ id: note.id, path: note.path, title: note.title });
   }
-  const turns = Math.max(0, input.maxTurns ?? MAP_CHAT_DEFAULT_TURNS) * 2;
-  const history = turns ? input.history.slice(-turns) : [];
+  const windowed = historyWindow(input);
+  const history = shrink.turns === null ? windowed : shrink.turns > 0 ? windowed.slice(-shrink.turns) : [];
+  const turnsOmitted = windowed.length - history.length;
+  const earlierTurns = history.map(turn => {
+    const sent = head(turn.text, MAP_CHAT_TURN_CHAR_LIMIT);
+    return { role: turn.role, text: sent.text, ...(sent.cut ? { truncated: true, totalChars: turn.text.length } : {}) };
+  });
+  // The outline in tree order; past the depth or the card limit the deepest levels go first, so every card sent keeps its parent.
+  const ordered = treeOrder(input.outline);
+  let outlineDepth = shrink.outlineDepth;
+  const within = (depth: number | null): MapChatOutlineNode[] =>
+    depth === null ? ordered : ordered.filter(node => node.depth <= depth);
+  let outline = within(outlineDepth);
+  if (outline.length > MAP_CHAT_OUTLINE_CARD_LIMIT) {
+    let depth = outline.reduce((max, node) => Math.max(max, node.depth), 0);
+    while (depth > 0 && within(depth).length > MAP_CHAT_OUTLINE_CARD_LIMIT) depth--;
+    outlineDepth = depth;
+    outline = within(depth).slice(0, MAP_CHAT_OUTLINE_CARD_LIMIT);
+  }
+  const outlineOmitted = ordered.length - outline.length;
+  const userTexts = (input.userTexts ?? []).map(item => ({
+    item,
+    sent: head(item.text, MAP_CHAT_USER_TEXT_CHAR_LIMIT)
+  }));
+  const summaries = (input.summaries ?? []).map(item => ({
+    item,
+    sent: head(item.text, MAP_CHAT_USER_TEXT_CHAR_LIMIT)
+  }));
+  if (
+    turnsOmitted ||
+    earlierTurns.some(turn => turn.truncated) ||
+    outlineOmitted ||
+    !shrink.outlineSummaries ||
+    userTexts.some(entry => entry.sent.cut) ||
+    summaries.some(entry => entry.sent.cut)
+  )
+    shortened = true;
   const json = JSON.stringify({
     mapTitle: input.mapTitle,
     ...(input.noEditableMap ? { noEditableMap: true } : {}),
@@ -532,10 +699,10 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     ...(!input.noEditableMap && !input.outline.length ? { emptyMap: true } : {}),
     ...(!input.noEditableMap && input.mapNeedsName ? { mapNeedsName: true } : {}),
     mapTitles,
-    outline: treeOrder(input.outline).map(node => ({
+    outline: outline.map(node => ({
       id: node.id,
       title: clip(node.title, TITLE_LIMIT),
-      summary: clip(node.summary, SUMMARY_LIMIT),
+      ...(shrink.outlineSummaries ? { summary: clip(node.summary, SUMMARY_LIMIT) } : {}),
       parentId: node.parentId,
       depth: node.depth,
       ...kindFields(node, !!input.aim),
@@ -543,6 +710,10 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
       ...(node.aiLocked ? { aiLocked: true } : {}),
       ...errorFields(node)
     })),
+    ...(shrink.outlineSummaries ? {} : { outlineSummariesOmitted: true }),
+    ...(outlineOmitted
+      ? { outlineOmitted, ...(outlineDepth !== null ? { outlineDepthLimit: outlineDepth } : {}) }
+      : {}),
     // Only when a card is locked, so a map without locks sends exactly what it did before. A hint: the apply side refuses.
     ...(input.outline.some(node => node.aiLocked)
       ? {
@@ -557,12 +728,13 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     files,
     ...(input.userTexts?.length
       ? {
-          userTexts: input.userTexts.map(item => ({
+          userTexts: userTexts.map(({ item, sent }) => ({
             id: item.id,
             parentId: item.parentId,
             ...(item.parentId === null ? { unattached: true } : {}),
             readOnly: true,
-            text: item.text,
+            text: sent.text,
+            ...(sent.cut ? { truncated: true, totalChars: item.text.length } : {}),
             ...linkedTo(item.links),
             ...(item.followedBy?.length ? { followedBy: item.followedBy } : {})
           })),
@@ -575,12 +747,13 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
       : {}),
     ...(input.summaries?.length
       ? {
-          summaries: input.summaries.map(item => ({
+          summaries: summaries.map(({ item, sent }) => ({
             id: item.id,
             parentId: item.parentId,
             readOnly: true,
             members: item.members.map(brief).filter(Boolean),
-            text: item.text
+            text: sent.text,
+            ...(sent.cut ? { truncated: true, totalChars: item.text.length } : {})
           })),
           summariesNote:
             "summaries are conclusions the user wrote over neighbouring child topics (summary brackets). Read them as the user's own words and as the direction of the conclusion; they are not cards, have no card id you may act on, and must not be rewritten or deleted."
@@ -606,8 +779,10 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
       : {}),
     ...(image ? { selectedImage: image.sent, selectedImageNote: image.note } : {}),
     activeFile: active,
-    earlierTurns: history.map(turn => ({ role: turn.role, text: turn.text })),
-    ...(input.continuation ? continuationFields(input.continuation) : {})
+    earlierTurns,
+    ...(turnsOmitted ? { earlierTurnsOmitted: turnsOmitted } : {}),
+    ...(input.continuation ? continuationFields(input.continuation) : {}),
+    ...(shortened ? { shortenedNote: MAP_CHAT_SHORTENED_NOTE } : {})
   });
   return {
     json,

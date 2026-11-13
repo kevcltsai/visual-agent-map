@@ -55,7 +55,8 @@ test('the budget leaves room in the model window for the CLI system prompt and t
 });
 
 test('a Chinese context that the length / 4 estimate let through, but that is really over the window, is now refused', () => {
-  const req = request({ files: [{ path: 'Notes/長筆記.md', content: zhText(185_000, 5) }] });
+  // A selected snippet: the one part the context never cuts (files are cut to fit since the total budget).
+  const req = request({ snippets: [{ path: 'Notes/長筆記.md', text: zhText(185_000, 5) }] });
   const prompt = mapChatStep.render(req);
   assert.ok(estimateTokens(prompt) < MAP_CHAT_TOKEN_BUDGET, 'the old estimate passed it');
   const cjk = (prompt.match(/[㐀-鿿]/g) || []).length;

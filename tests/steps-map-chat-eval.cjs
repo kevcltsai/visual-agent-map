@@ -750,5 +750,8 @@ test('ticket 15: the new raw checks catch what they name and pass the legitimate
   assert.deepEqual(failed(run('N22', R('我會新增舒肥並研究它，之後我會補上步驟。', research, '依研究結果補上步驟'))), []);
   for (const promise of ['之後我會補上子議題', '研究完成後我會補上步驟', 'Then I will add the steps']) assert.ok(failed(run('N22', R(`我會新增舒肥。${promise}。`, research))).includes('raw:custom:N22-promise'), promise);
   // N18: a reply that says it read the omitted note fails even with no action.
-  assert.ok(failed(run('N18', R('我看過筆記了，內容太長。'))).some(id => id.startsWith('raw:reply:')));
+  assert.ok(failed(run('N18', R('我看過筆記了，內容太長。'))).includes('raw:custom:N18-read'));
+  assert.ok(failed(run('N18', R('I have read the note and will shorten it.'))).includes('raw:custom:N18-read'));
+  // An honest "I have not read it" is not a read claim (Codex review on kevcltsai/visual-agent-map#138).
+  for (const honest of ['我沒有讀過這張卡的筆記，請貼上內容後我才能改寫。', '我還沒看過筆記，請提供原文。', "I haven't read this note because it was not sent."]) assert.deepEqual(failed(run('N18', R(honest))), [], honest);
 });

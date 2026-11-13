@@ -44,6 +44,9 @@ function closesCycle(relations, kind) {
   };
 }
 const READ_CLAIM = /(?:讀|看|閱讀|查看)(?:過|了|完)|根據(?:你|妳|您)?的?筆記|筆記(?:裡|中)(?:提到|寫|說)|\bI(?:'ve| have)? (?:read|reviewed|looked at)\b/i;
+/** Drops negated phrases first, so "我沒有讀過筆記" / "I have not read the note" (an honest answer) is not taken as a read claim. */
+const NEGATED = /(?:沒有?|未曾?|不曾|還沒|無法|不能|不會)[^，。,.！!？?；;\n]{0,10}|\b(?:haven't|hasn't|have not|has not|did not|didn't|can't|cannot|couldn't|could not|not)\b[^,.;!?\n]{0,30}/gi;
+const claimsRead = raw => (READ_CLAIM.test(String(raw.reply).replace(NEGATED, "")) ? `claims to have read the note: ${raw.reply.slice(0, 80)}` : true);
 /** A promise of a step after this reply ("接著會…", "之後我會…"). "接下來我會…" for this reply's own actions is allowed by the prompt. */
 const LATER_PROMISE = /接著(?:我)?(?:會|再|就)|之後(?:我)?(?:會|再|就)|稍後(?:我)?(?:會|再)|下一步(?:我)?(?:會|再)|(?:完成|結束|好)(?:後|之後|以後)(?:我)?(?:會|再|就)|\b(?:then|next|later|afterwards),? I(?:'ll| will)\b/i;
 const EDITS = new Set(["rename_topic", "update_summary", "edit_topic_note", "set_topic_kind", "set_appearance", "move_topic", "delete_topic"]);
@@ -116,7 +119,7 @@ const NEG = [
 
   // ---- ticket 15: prompt rules that had no case ----
   neg("N18", "筆記沒送進來：不能改寫、不能說讀過", "prompt: edit_topic_note 只能用在已提供目前 detail 的議題；沒送進來的筆記不可說讀過", [], { message: "把「手沖」的筆記改寫得更簡潔", outline: COFFEE, selected: [ref("h", "手沖", { detail: LONG_NOTE })] },
-    [C.rawNone(a => a.kind === "edit_topic_note" && a.nodeId === "h", "rewrites a note whose text was not sent (detailOmitted)"), C.rawReplyNot(READ_CLAIM, "claims to have read the note"), C.replyNonEmpty()]),
+    [C.rawNone(a => a.kind === "edit_topic_note" && a.nodeId === "h", "rewrites a note whose text was not sent (detailOmitted)"), C.rawCustom("N18-read", "raw reply does not claim to have read the note that was not sent", claimsRead), C.replyNonEmpty()]),
   neg("N18c", "對照：筆記有送進來", "control of N18", ["edit_topic_note"], { message: "把「手沖」的筆記改寫得更簡潔", outline: COFFEE, selected: [ref("h", "手沖", { detail: NOTE })] }, [C.hasAction("edit_topic_note", a => a.nodeId === "h", "h note rewritten")]),
   neg("N19", "沿關係修改只走一層", "prompt: 沿著關係修改內容時只走一層", [], { message: "把和「價格太高」有關係的議題，摘要都補上一句它和價格的關聯", outline: PRICE, relations: PRICE_REL },
     [C.rawNone(editsCard("h3"), "edits a card two relation steps away (h3)"), C.rawNone(editsCard("h4"), "edits an unrelated card (h4)"), C.hasAction("update_summary", a => a.nodeId === "h2", "the directly related card h2 is updated")]),

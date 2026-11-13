@@ -68,6 +68,8 @@ const C = {
   /** Attempt check: NO raw action (before the parser drops anything) satisfies `pred`. A violation here is the model proposing it. */
   rawNone: (pred, desc) => check(`raw:${desc}`, `raw output does not: ${desc}`, env => { const hit = (env.raw?.actions ?? []).find(pred); return hit ? fail(`proposed ${JSON.stringify(hit).slice(0, 110)}`) : ok(); }),
   rawReplyNot: (re, desc) => check(`raw:reply:${desc}`, `raw reply does not: ${desc}`, env => (re.test(env.raw?.reply ?? env.reply) ? fail((env.raw?.reply ?? env.reply).slice(0, 90)) : ok())),
+  /** Owner-judged corpus checks: fn(raw) returns true/undefined for pass, or a string explaining the failure. raw = { actions, reply, remaining }. */
+  rawCustom: (id, desc, fn) => check(`raw:custom:${id}`, desc, env => { const r = fn(env.raw ?? { actions: [], reply: env.reply, remaining: env.remaining }); return r === true || r === undefined ? ok() : fail(String(r)); }),
   /** `remaining` is a note for the next round, never a question for the user. */
   rawRemainingNotQuestion: () => check("raw:remainingQuestion", "raw remaining is not a question to the user", env => (/[?？]\s*$|^\s*(請問|是否|要不要|你要|您要)/.test(env.raw?.remaining ?? "") ? fail(env.raw.remaining.slice(0, 90)) : ok())),
   /** A pair that already has a relation: a new add_relation must come after a remove_relation of that pair (or the model declines). */

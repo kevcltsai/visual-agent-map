@@ -15,6 +15,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+// A case names its turn either as "<record>.jsonl 第 N 輪" (Map Chat records) or "<file>.json 第 N 筆" (the AI exchange log array, replayed with the exact stored prompt).
+const SOURCE_RECORD = /^(.+\.jsonl)\s*第\s*(\d+)\s*輪$/;
+const SOURCE_EXCHANGE = /^(.+\.json)\s*第\s*(\d+)\s*筆$/;
 const FIELDS = ["來源", "類別", "使用者說", "該答什麼或做什麼", "不可接受的答案", "可接受的答案", "為什麼不合格", "hold-out"];
 const CATEGORIES = ["答非所問", "多做", "少做", "編造", "語氣", "格式", "其他"];
 const TEMPLATE = `# 案例 C01
@@ -43,7 +46,7 @@ function parseCase(text) {
 function validateCase(c) {
   const problems = FIELDS.filter(f => !c[f] || /^<.*>$/.test(c[f])).map(f => `缺「${f}」或還是範本文字`);
   if (c["類別"] && !CATEGORIES.some(x => c["類別"].includes(x))) problems.push(`類別要是：${CATEGORIES.join("、")}`);
-  if (c["來源"] && !/^(.+\.jsonl)\s*第\s*(\d+)\s*輪$/.test(c["來源"])) problems.push("來源格式：<檔名>.jsonl 第 N 輪");
+  if (c["來源"] && !SOURCE_RECORD.test(c["來源"]) && !SOURCE_EXCHANGE.test(c["來源"])) problems.push("來源格式：<檔名>.jsonl 第 N 輪，或 <檔名>.json 第 N 筆");
   return problems;
 }
 
@@ -75,6 +78,14 @@ function showTurn(file, n) {
     `被丟棄：${JSON.stringify(t.end?.rejected ?? [])}`, "套用結果列：", ...(t.end?.lines ?? []).map(l => `  [${l.status}] ${l.text}`),
     "（這份紀錄沒有套用後的地圖快照）"
   ].join("\n"));
+}
+
+/** Exchange-log turns have no stored context object, so only the RAW layer exists: checks run on what the model itself proposed. */
+function evaluateRawOnly(checks, raw) {
+  const layer = require("./map-chat-eval.cjs").rawLayer(raw);
+  if (!layer) return [{ desc: "回覆不是 JSON", ok: false }];
+  const env = { reply: layer.reply, actions: layer.actions, rejected: [], remaining: layer.remaining, input: { outline: [] }, raw: layer };
+  return checks.map(c => { try { const r = c.run(env); return { desc: c.desc, ok: r.ok }; } catch (e) { return { desc: c.desc, ok: false }; } });
 }
 
 function loadCorpus(dir) {
@@ -110,18 +121,26 @@ async function run(args, ask) {
   for (const c of loadCorpus(dir)) {
     const problems = validateCase(c.fields);
     if (problems.length) { lines.push(`## ${c.id}`, `略過：${problems.join("；")}`, ""); continue; }
-    const [, recFile, turnNo] = c.fields["來源"].match(/^(.+\.jsonl)\s*第\s*(\d+)\s*輪$/);
-    const turn = readRecord(path.join(records, recFile)).turns.get(Number(turnNo));
-    if (!turn) { lines.push(`## ${c.id}`, `略過：找不到 ${recFile} 第 ${turnNo} 輪`, ""); continue; }
-    const request = requestOf(turn);
-    const prompt = p.step.mapChatStep.render(request);
+    const exchange = c.fields["來源"].match(SOURCE_EXCHANGE);
+    let prompt, request;
+    if (exchange) {
+      const entry = JSON.parse(fs.readFileSync(path.join(records, exchange[1]), "utf8"))[Number(exchange[2])];
+      if (!entry || !String(entry.step).startsWith("map-chat")) { lines.push(`## ${c.id}`, `略過：${exchange[1]} 第 ${exchange[2]} 筆不是地圖對話`, ""); continue; }
+      prompt = entry.prompt;
+    } else {
+      const [, recFile, turnNo] = c.fields["來源"].match(SOURCE_RECORD);
+      const turn = readRecord(path.join(records, recFile)).turns.get(Number(turnNo));
+      if (!turn) { lines.push(`## ${c.id}`, `略過：找不到 ${recFile} 第 ${turnNo} 輪`, ""); continue; }
+      request = requestOf(turn);
+      prompt = p.step.mapChatStep.render(request);
+    }
     const checkFile = path.join(dir, `${c.id}.check.cjs`);
     const checks = fs.existsSync(checkFile) ? require(path.resolve(checkFile)) : [];
     lines.push(`## ${c.id}（${c.fields["類別"]}${/是/.test(c.fields["hold-out"]) ? "，hold-out" : ""}）`, `使用者說：${c.fields["使用者說"]}`, `該答什麼：${c.fields["該答什麼或做什麼"]}`, `不可接受：${c.fields["不可接受的答案"]}`, `可接受：${c.fields["可接受的答案"]}`, "");
     for (let i = 1; i <= runs; i++) {
       const reply = await ask(p, prompt, p.step.MAP_CHAT_SCHEMA, model);
       if (!reply.raw) { lines.push(`- 第 ${i} 次：呼叫失敗 ${reply.error}`); continue; }
-      const verdict = checks.length ? evaluate(p, { input: {}, checks }, { context: request.context }, reply.raw).map(x => `${x.ok ? "過" : "不過"}：${x.desc}`).join("；") : "未裁定";
+      const verdict = checks.length ? (request ? evaluate(p, { input: {}, checks }, { context: request.context }, reply.raw) : evaluateRawOnly(checks, reply.raw)).map(x => `${x.ok ? "過" : "不過"}：${x.desc}`).join("；") : "未裁定";
       let shown = "";
       try { const j = JSON.parse(reply.raw); shown = `${clip(j.reply, 120)}｜動作：${j.actions.map(a => a.kind).join("、") || "無"}`; } catch { shown = "(無法解析)"; }
       lines.push(`- 第 ${i} 次：${verdict}｜${shown}`);

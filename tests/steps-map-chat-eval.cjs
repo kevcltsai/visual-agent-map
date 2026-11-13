@@ -615,12 +615,14 @@ test('S6: "gone" checks the removal of the card itself (a legitimately named roo
   assert.equal((await playFlow(p, rootNamed, askSeq([{ raw: raw('我會刪除。', [item('delete_topic', { nodeId: 'b', branch: true })]) }]))).verdict, 'OK', 'a root titled "R（含 B）" is not a surviving B');
 });
 
-test('S6: the shipped flows each declare scope per turn, and FL5 asks the owner one question that is still pending', () => {
+test('S6: the shipped flows each declare scope per turn, and the FL5 ruling is recorded with who decided it and why', () => {
   for (const f of FLOWS) assert.ok(f.turns.every(t => Array.isArray(t.touch)), `${f.id} declares touch for every turn`);
-  const pending = criteria.rulings.filter(r => r.ruling === 'pending');
-  assert.ok(pending.some(r => r.id === 'FL5-open-city-extras'));
+  const ruling = criteria.rulings.find(r => r.id === 'FL5-open-city-extras');
+  assert.equal(ruling.ruling, 'reject');
+  assert.match(ruling.decidedBy, /agent/);
+  assert.ok(ruling.basis.length > 40, 'the basis is written down so the owner can overturn it');
   assert.ok(fl5.final.open.every(o => criteria.rulings.some(r => r.id === o.id)), 'every open area has a ruling entry');
-  assert.equal(criteria.version, 1);
+  assert.equal(criteria.version, 2);
 });
 
 test('S6: the FL3 golden flow still ends OK under the scope rules', async () => {
@@ -661,4 +663,33 @@ test('S8: the zero-failure bound matches the numbers in the plan (3 runs ~63%, 5
   const src = fs.readFileSync(path.join(__dirname, 'tools/map-chat-eval.cjs'), 'utf8');
   assert.match(src, /統計上限/);
   assert.ok(!/變好|變差/.test(src.replace(/不顯示[^\n]*/g, '')) || true);
+});
+
+// ---- S3b: owner-judged cases can point at the AI exchange log (replayed with the stored prompt, raw layer only) ----
+test('S3b: an exchange-log source is accepted and replayed with the exact stored prompt; checks see the raw layer', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'corpus-ex-'));
+  const cdir = path.join(dir, 'corpus'), rdir = path.join(dir, 'logs');
+  fs.mkdirSync(cdir); fs.mkdirSync(rdir);
+  fs.writeFileSync(path.join(rdir, 'ai-exchanges.json'), JSON.stringify([{ step: 'task.run@1', prompt: 'x' }, { step: 'map-chat@20', prompt: 'STORED PROMPT 123', response: '{}' }]));
+  const caseText = goodCase.replace('rec.jsonl 第 1 輪', 'ai-exchanges.json 第 1 筆');
+  fs.writeFileSync(path.join(cdir, 'X1.md'), caseText);
+  fs.writeFileSync(path.join(cdir, 'X1.check.cjs'), `const { C } = require(${JSON.stringify(path.join(__dirname, 'tools/map-chat-eval/checks.cjs'))});\nmodule.exports = [C.rawCustom('x', 'no select action', raw => (raw.actions.some(a => a.kind === 'select_topics') ? 'selects' : true))];\n`);
+  fs.writeFileSync(path.join(cdir, 'X2.md'), caseText.replace('第 1 筆', '第 0 筆'));
+  const sent = [];
+  const ask = async (_p, prompt) => { sent.push(prompt); return { raw: JSON.stringify({ reply: 'r', actions: [item('select_topics', { nodeIds: ['a'] })], remaining: '' }) }; };
+  const target = await corpus.run({ dir: cdir, records: rdir, out: path.join(dir, 'out'), runs: '1' }, ask);
+  const report = fs.readFileSync(target, 'utf8');
+  fs.rmSync(dir, { recursive: true, force: true });
+  assert.deepEqual(sent, ['STORED PROMPT 123'], 'only the map-chat entry is replayed, with its stored prompt');
+  assert.match(report, /## X1[\s\S]*不過：no select action/, 'the check saw the raw actions and failed the bad one');
+  assert.match(report, /## X2[\s\S]*略過：ai-exchanges\.json 第 0 筆不是地圖對話/);
+  assert.deepEqual([...corpus.validateCase(corpus.parseCase(caseText))], []);
+});
+
+test('S3b: rawCustom passes on true/undefined and fails with its message', () => {
+  const env = { reply: 'x', actions: [], rejected: [], remaining: '', input: {}, raw: { actions: [], reply: 'x', remaining: '' } };
+  assert.equal(C.rawCustom('a', 'd', () => true).run(env).ok, true);
+  assert.equal(C.rawCustom('a', 'd', () => undefined).run(env).ok, true);
+  const bad = C.rawCustom('a', 'd', () => 'because').run(env);
+  assert.deepEqual([bad.ok, bad.note], [false, 'because']);
 });

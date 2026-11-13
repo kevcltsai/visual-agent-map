@@ -1,12 +1,14 @@
 {
-  "version": 1,
+  "version": 2,
   "note": "Owner rulings on flow outcomes the checks cannot decide (extra content on an OPEN request). pending = undetermined, shown as a count and never counted as a pass. A ruling is frozen BEFORE a candidate is judged; never loosen it after seeing candidate output. Any change bumps `version`, and results record the version they were judged under.",
   "rulings": [
     {
       "id": "FL5-open-city-extras",
       "flow": "FL5",
       "question": "「幫我規劃日本旅行」之後，AI 在每個城市底下自己補了景點／美食／住宿，這可以接受嗎？（accept = 可接受，reject = 算違規）",
-      "ruling": "pending"
+      "ruling": "reject",
+      "decidedBy": "agent, on the owner's instruction \"你幫我決定\" (2026-11-13)",
+      "basis": "DECISION_PRINCIPLES C1 (do not overturn what the owner already decided): the product prompt the owner approved says the reply should hold only what the user asked for (\"actions 要精簡，只放使用者要求的內容\"). The user in FL5 later names exact children (淺草寺、澀谷…), so a generic group the user did not name is an extra. Tightened after seeing the v1 baseline (extras present); the owner can overturn by editing this ruling and bumping `version`."
     }
   ]
 }

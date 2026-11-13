@@ -214,9 +214,11 @@ import { type ReferenceGroup } from "../../ai/reference-materials";
 import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
 import {
   addExternalSource,
+  externalScrubRoots,
   externalSourceStatus,
   loadExternalSources,
   removeExternalSource,
+  scrubExternalPaths,
   type ExternalScope,
   type ExternalSource
 } from "./external-sources";
@@ -237,6 +239,7 @@ import { classifyProviderError, otherProviderModel, providerOfFailure } from "..
 import { UsageControl } from "./usage-panel";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
+import { readSourceGroups, scrubReferenceGroups } from "../../core/source-gateway";
 import { createNoteReadContext } from "../../core/note-read-context";
 import { needsReadBack, UnsyncedPaths } from "../../core/sync-scope";
 import { chainRebase, type RenamePair } from "../../core/rename-batch";
@@ -15335,9 +15338,15 @@ export class VisualAgentMapView extends ItemView {
           mapPath,
           signal
         );
-        return groups;
+        // Every group, vault notes included, may quote a registered external root: none leaves this exit with it.
+        const roots = await externalScrubRoots(external.sources);
+        return roots.length ? scrubReferenceGroups(groups, text => scrubExternalPaths(text, roots)) : groups;
       }
     };
+  }
+  /** The map's sources for an AI request: a stop (AbortError) is rethrown so nothing is sent; any other read failure gives no sources. */
+  private readMapSourceGroups(signal: AbortSignal): Promise<ReferenceGroup[]> {
+    return readSourceGroups(this.taskSourceSettings().mapSources, signal);
   }
   /**
    * What a Next Step dialog needs to hide itself once AI starts: the card shows running and Stop from `begin` until
@@ -16207,9 +16216,7 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<{ result?: AiResult; failure?: string }> {
     let result: AiResult | undefined;
     let failure: string | undefined;
-    const referenceGroups = await this.taskSourceSettings()
-      .mapSources(signal)
-      .catch(() => []);
+    const referenceGroups = await this.readMapSourceGroups(signal);
     const runStyle = await this.detailTemplateFor(node, undefined, undefined, language);
     const handle = await this.runAgent(
       node,
@@ -24949,9 +24956,7 @@ export class VisualAgentMapView extends ItemView {
         const conversation = this.chatConversation;
         const key = this.multiResearchKey();
         // The map's own source files (as a single research gets them) plus what this turn attached; read before the batch starts.
-        const mapSourceGroups = await this.taskSourceSettings()
-          .mapSources(work?.controller.signal ?? new AbortController().signal)
-          .catch(() => [] as ReferenceGroup[]);
+        const mapSourceGroups = await this.readMapSourceGroups(work?.controller.signal ?? new AbortController().signal);
         const referenceGroups = [...mapSourceGroups, ...this.chatTurnReferences];
         // From here on any turn of this conversation may read web text (decision #17): set before the first card is written, and
         // kept in the record so a reopened conversation keeps it.

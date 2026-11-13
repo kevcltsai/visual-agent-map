@@ -14,6 +14,26 @@ const dedupeRules = (value: string): string =>
     ).values()
   ).join("\n");
 
+/** Estimated tokens of the parts the budget step counts; the one definition of "the full request" for the budget. */
+export function contextTokens(
+  context: Pick<
+    TaskContext,
+    "title" | "summary" | "rules" | "detail" | "task" | "ancestors" | "workingFindings" | "sourceContext" | "anchorContext"
+  >
+): number {
+  return [
+    context.title,
+    context.summary,
+    context.rules,
+    context.detail,
+    context.task,
+    context.ancestors,
+    context.workingFindings,
+    context.sourceContext,
+    context.anchorContext
+  ].reduce((sum, value) => sum + estimateTokens(value), 0);
+}
+
 export function buildPreparedTaskContext(
   input: TaskContext,
   model: string,
@@ -41,18 +61,7 @@ export function buildPreparedTaskContext(
     "sourceContext",
     "anchorContext"
   ];
-  const used = (): number =>
-    [
-      context.title,
-      context.summary,
-      context.rules,
-      context.detail,
-      context.task,
-      context.ancestors,
-      context.workingFindings,
-      context.sourceContext,
-      context.anchorContext
-    ].reduce((sum, value) => sum + estimateTokens(value), 0);
+  const used = (): number => contextTokens(context);
   for (const key of optional)
     if (used() > budget && context[key])
       context[key] = String(context[key]).slice(

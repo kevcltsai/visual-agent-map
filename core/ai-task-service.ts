@@ -3,7 +3,6 @@ import { demoteUnparsableMermaid, type MermaidSyntaxCheck } from "../ai/mermaid-
 import {
   packReferenceChunks,
   referenceBatches,
-  referenceCatalog,
   resolveDetailReferences,
   resolveSummaryReferences
 } from "../ai/reference-materials";
@@ -26,10 +25,11 @@ import type { AiRuntimeId, RuntimeTaskControls } from "./ai-runtime";
 import { prepareStep } from "./step-runner";
 import { AiCalls, type AiCallExchange } from "./ai-calls";
 import { aiRuntimeForModel } from "./ai-runtime-service";
+import { resolveSourceDelivery, sourceText, MAX_CONDENSE_CALLS, estimateCondenseCalls } from "./source-gateway";
 import { referenceTask } from "./steps/reference/step";
 import { taskResponseShape } from "./steps/task/schemas";
 import { openedUrlsFromEvents, searchQueriesFromEvents } from "./argument-map/source-proof";
-import { repairCounts, sourceRegistry } from "./steps/task/fragments";
+import { repairCounts } from "./steps/task/fragments";
 import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step";
 import { chartStep, ChartRejected } from "./steps/chart/step";
 import { applyCharts, existingDiagrams, type ChartCode } from "./steps/chart/insert";
@@ -127,6 +127,25 @@ export class AiTaskService {
     return this.execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer);
   }
 
+  /**
+   * Condenses the context's reference groups into findings once, so several requests can share them
+   * (pass the result as `preparedReferenceFindings`). Refuses before sending when the estimated request count is over the cap;
+   * a failed extraction throws and nothing falls back to no sources.
+   */
+  async condenseReferences(
+    context: TaskContext,
+    model: string,
+    reasoning?: unknown,
+    signal?: AbortSignal,
+    onRequestAccepted?: () => void
+  ): Promise<string> {
+    if (!(context.referenceGroups ?? []).some(group => group.documents.length)) return "";
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    if (estimateCondenseCalls(context.referenceGroups ?? []) > MAX_CONDENSE_CALLS)
+      throw new Error(t("ui.source_context_exceeds_budget"));
+    return this.extractReferenceFindings(context, model, reasoning ?? this.options.defaultReasoning(), signal, onRequestAccepted);
+  }
+
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
   private async execute(
     input: TaskContext,
@@ -165,19 +184,22 @@ export class AiTaskService {
             onRequestAccepted();
           }
         : undefined;
-      // A merge or synthesis that fits one batch sends the documents as they are: an extraction pass would paraphrase (and
-      // may drop) the very text being combined, and costs a second request. Over-budget sources still go through extraction.
-      const direct = context.referenceDelivery === "direct" ? referenceBatches(referenceGroups) : [];
-      const findings =
-        direct.length === 1
-          ? direct[0]
-          : await this.extractReferenceFindings(context, model, reasoning, signal, accepted);
+      // A merge or synthesis whose whole request fits the budget sends the documents as they are: an extraction pass would
+      // paraphrase (and may drop) the very text being combined, and costs a second request. Otherwise they are condensed
+      // (or the caller's prepared findings are used), within the call cap.
+      const findings = await resolveSourceDelivery({
+        groups: referenceGroups,
+        parts: context,
+        allowDirect: context.referenceDelivery === "direct",
+        prepared: context.preparedReferenceFindings,
+        condense: () => this.extractReferenceFindings(context, model, reasoning, signal, accepted),
+        overBudget: () => new Error(t("ui.source_context_exceeds_budget"))
+      });
       context = {
         ...context,
-        sourceContext: [context.sourceContext, findings, sourceRegistry(referenceCatalog(referenceGroups))]
-          .filter(Boolean)
-          .join("\n\n"),
-        referenceGroups: undefined
+        sourceContext: sourceText(referenceGroups, findings, context.sourceContext),
+        referenceGroups: undefined,
+        preparedReferenceFindings: undefined
       };
     }
 
@@ -748,12 +770,15 @@ export class AiTaskService {
   ): Promise<string> {
     let working = referenceBatches(context.referenceGroups ?? []);
     let round = 0;
+    let sent = 0;
     while (true) {
       round++;
       const batches = round === 1 ? working : packReferenceChunks(working);
       const findings: string[] = [];
       for (let index = 0; index < batches.length; index++) {
         if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        // The estimate before sending is a worst case; the count here is the hard cap while running.
+        if (++sent > MAX_CONDENSE_CALLS) throw new Error(t("ui.source_context_exceeds_budget"));
         context.onProgress?.(t("ui.reference_processing_progress", index + 1, batches.length));
         const result = await this.execute(
           {

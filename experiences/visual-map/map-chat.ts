@@ -696,23 +696,37 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    */
   turns(): MapChatTurn[] {
     const turns: MapChatTurn[] = [];
+    // Chains whose turn is already closed. The retry of an old failed round is added at the end of the conversation, after
+    // whatever the user asked since, so a round of such a chain does not join the turn before it: it is a turn of its own.
+    const closed = new Set<number>();
+    const seqOf = (message: MapChatMessage): number | undefined => message.origin?.chain?.seq;
     // Messages always come in pairs (question, answer); a pair whose answer is unfinished or failed is not history.
     for (let at = 0; at + 1 < this.messages.length;) {
       // A question the user sent, then the automatic rounds that continued it, if any.
+      const chains = new Set<number>();
+      const first = seqOf(this.messages[at]);
+      if (first !== undefined) chains.add(first);
       let end = at + 2;
-      while (end + 1 < this.messages.length && this.messages[end].auto) end += 2;
+      while (end + 1 < this.messages.length && this.messages[end].auto) {
+        const seq = seqOf(this.messages[end]);
+        if (seq !== undefined && closed.has(seq) && !chains.has(seq)) break;
+        if (seq !== undefined) chains.add(seq);
+        end += 2;
+      }
+      for (const seq of chains) closed.add(seq);
       const asked: string[] = [];
       const replies: { text: string; auto?: MapChatAutoInfo }[] = [];
       for (let pair = at; pair < end; pair += 2) {
         const question = this.messages[pair];
+        // A turn that starts with an automatic round (a retried old round) is asked by the chain's own message, not by its label.
+        if (pair === at) asked.push(question.auto ? (question.origin?.text ?? question.text) : question.text);
         // Follow-ups that went into the turn are part of what the user asked: joined by a blank line, no tag.
-        if (pair === at) asked.push(question.text);
         asked.push(...(question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text));
         const answer = this.messages[pair + 1];
         if (answer.streaming || answer.error || !answer.text.trim()) continue;
         replies.push({
           text: answer.text,
-          ...(pair > at ? { auto: question.autoInfo ?? { maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS } } : {})
+          ...(question.auto ? { auto: question.autoInfo ?? { maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS } } : {})
         });
       }
       at = end;

@@ -39427,22 +39427,36 @@ var MapChatPanel = class {
    * before a long chain out of the window.
    */
   turns() {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     const turns = [];
+    const closed = /* @__PURE__ */ new Set();
+    const seqOf = (message) => {
+      var _a3, _b3;
+      return (_b3 = (_a3 = message.origin) == null ? void 0 : _a3.chain) == null ? void 0 : _b3.seq;
+    };
     for (let at = 0; at + 1 < this.messages.length; ) {
+      const chains = /* @__PURE__ */ new Set();
+      const first = seqOf(this.messages[at]);
+      if (first !== void 0) chains.add(first);
       let end = at + 2;
-      while (end + 1 < this.messages.length && this.messages[end].auto) end += 2;
+      while (end + 1 < this.messages.length && this.messages[end].auto) {
+        const seq = seqOf(this.messages[end]);
+        if (seq !== void 0 && closed.has(seq) && !chains.has(seq)) break;
+        if (seq !== void 0) chains.add(seq);
+        end += 2;
+      }
+      for (const seq of chains) closed.add(seq);
       const asked = [];
       const replies = [];
       for (let pair5 = at; pair5 < end; pair5 += 2) {
         const question = this.messages[pair5];
-        if (pair5 === at) asked.push(question.text);
-        asked.push(...((_a2 = question.steers) != null ? _a2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text));
+        if (pair5 === at) asked.push(question.auto ? (_b2 = (_a2 = question.origin) == null ? void 0 : _a2.text) != null ? _b2 : question.text : question.text);
+        asked.push(...((_c = question.steers) != null ? _c : []).filter((steer) => steer.state === "live").map((steer) => steer.text));
         const answer = this.messages[pair5 + 1];
         if (answer.streaming || answer.error || !answer.text.trim()) continue;
         replies.push({
           text: answer.text,
-          ...pair5 > at ? { auto: (_b2 = question.autoInfo) != null ? _b2 : { maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS } } : {}
+          ...question.auto ? { auto: (_d = question.autoInfo) != null ? _d : { maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS } } : {}
         });
       }
       at = end;

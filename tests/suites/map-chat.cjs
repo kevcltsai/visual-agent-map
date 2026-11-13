@@ -7499,6 +7499,21 @@ test('ticket 06: a failed chain round is left out and the rounds that worked sta
   eq(f.panel.turns().filter(t => t.role === 'user').map(t => t.text), ['before', 'go', 'after'], 'the next user message starts a new turn');
 });
 
+test('ticket 06: the retry of an old failed round, sent after a newer message, is its own turn and does not join the newer one', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  const cats = seq => ({ text: 'build cats', chips: [], selectedIds: [], chain: { seq, state: {}, continuation: {} } });
+  f.panel.begin('build cats'); f.panel.finish('Cats root.', []);
+  f.panel.beginAutoRound(2, 8, REMAINING, cats(1)); f.panel.fail('It broke');
+  f.panel.begin('build dogs'); f.panel.finish('Dogs root.', []);
+  f.panel.beginAutoRound(2, 8, REMAINING, { ...cats(1), text: 'build cats' }); f.panel.finish('Cats round 2.', []);
+  f.panel.beginAutoRound(3, 8, REMAINING, cats(3)); f.panel.finish('Cats round 3.', []);
+  eq(f.panel.turns(), [
+    { role: 'user', text: 'build cats' }, { role: 'assistant', text: 'Cats root.' },
+    { role: 'user', text: 'build dogs' }, { role: 'assistant', text: 'Dogs root.' },
+    { role: 'user', text: 'build cats' }, { role: 'assistant', text: '[Automatic continuation · round 2 of 8]\nCats round 2.\n\n[Automatic continuation · round 3 of 8]\nCats round 3.' }
+  ], 'the retried cats round is asked by the cats message, and the rounds after it go on in that turn; the dogs reply stays whole');
+});
+
 test('ticket 06 control: a conversation without a chain gives exactly the pairs it did before', () => {
   const f = panelFixture(); f.panel.setOpen(true);
   f.panel.begin('one'); f.panel.finish('answer one', []);

@@ -851,3 +851,13 @@ test('share exporter: an outside data folder of this map (as typed, and its real
     assert.deepEqual(plain(run('/elsewhere/zzz').leakCategories), [], 'only this map\'s folders are forbidden');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
+
+test('share exporter: an outside folder path with & is blocked when the page text carries it as an HTML entity', () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [{ id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false }] };
+  const store = { 'vam-map-external-sources:map-1': [{ path: '/outside/R&D', label: 'R&D' }] };
+  const run = summary => new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' }, loadLocalStorage: key => store[key] ?? null }, { map, notes: new Map([['a', { title: 'A', summary, status: 'idea', model: '' }]]), mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' }).assemble({ includeDetail: false, includeImages: false });
+  for (const leak of ['/outside/R&D/a.md', '/outside/R&amp;D/a.md', '/outside/R&#38;D']) { const blocked = run(`see ${leak}`); assert.ok(blocked.leakCategories.includes('external-path'), leak); assert.equal(blocked.html, undefined); }
+  assert.deepEqual(plain(run('see R&D label').leakCategories), []);
+});

@@ -46,17 +46,38 @@ export const INTERNAL_FIELD_NAMES = [
   "content-language"
 ] as const;
 
+const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\u00a0" };
+
+/** Text as a reader sees it: named (the common ones), decimal and hex character references turned into characters. */
+export function decodeHtmlEntities(text: string): string {
+  return text.replace(
+    /&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([A-Za-z]+));/g,
+    (original, dec?: string, hex?: string, name?: string) => {
+      if (name) return NAMED_ENTITIES[name] ?? original;
+      const code = dec ? Number(dec) : parseInt(hex ?? "", 16);
+      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : original;
+    }
+  );
+}
+
+function occurrences(text: string, category: LeakCategory, value: string, hits: LeakHit[]): void {
+  let from = 0;
+  for (;;) {
+    const index = text.indexOf(value, from);
+    if (index < 0) break;
+    hits.push({ category, index });
+    from = index + value.length;
+  }
+}
+
 export function scanForLeaks(html: string, forbidden: readonly ForbiddenString[]): LeakHit[] {
   const hits: LeakHit[] = [];
+  // A path with `&` is `&amp;` in HTML (text and attribute values alike): the outside-folder path is also looked for in the decoded text.
+  const decoded = html.includes("&") ? decodeHtmlEntities(html) : html;
   for (const { category, value } of forbidden) {
     if (!value) continue;
-    let from = 0;
-    for (;;) {
-      const index = html.indexOf(value, from);
-      if (index < 0) break;
-      hits.push({ category, index });
-      from = index + value.length;
-    }
+    occurrences(html, category, value, hits);
+    if (category === "external-path" && decoded !== html) occurrences(decoded, category, value, hits);
   }
   return hits.sort((a, b) => a.index - b.index);
 }

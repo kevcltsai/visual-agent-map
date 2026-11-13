@@ -627,3 +627,12 @@ test('sharing leak: external-path blocks an outside data folder root (as typed a
   assert.ok(!categories({ summary: 'plain' }).has('external-path'));
   assert.ok(scan.forbiddenStringsFor({ mapFolder: 'M' }, { nodes: [] }, []).every(item => item.category !== 'external-path'));
 });
+
+test('sharing leak: an outside folder path containing & is found through HTML entities (text, attribute value, code and pre), raw or encoded', () => {
+  const forbidden = scan.forbiddenStringsFor({ mapFolder: 'Private Vault Folder/Share Map', externalPaths: ['/outside/R&D', "/outside/a'b"] }, fixtureMap(), []);
+  const categories = fields => new Set(scan.scanPayloadForLeaks(payloadWith(fields), forbidden).map(hit => hit.category));
+  for (const html of ['<p>/outside/R&amp;D/a.md</p>', '<a title="/outside/R&amp;D">x</a>', '<code>/outside/R&amp;D</code>', '<pre>/outside/R&#38;D</pre>', '<p>/outside/R&#x26;D</p>', '<p>/outside/a&#39;b</p>', '<p>/outside/R&D</p>'])
+    assert.ok(categories({ detailHtml: html }).has('external-path'), html);
+  assert.ok(!categories({ detailHtml: '<p>/outside/R&amp;E and R&amp;D alone</p>' }).has('external-path'));
+  assert.equal(scan.decodeHtmlEntities('a&amp;lt;b &unknown; &#0;'), 'a&lt;b &unknown; &#0;', 'one pass, unknown references stay');
+});

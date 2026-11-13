@@ -135,9 +135,32 @@ function evaluateRun(p, kase, prepared, raw) {
 const evaluate = (p, kase, prepared, raw) => evaluateRun(p, kase, prepared, raw).checks;
 
 const sha = value => crypto.createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 16);
-/** Identity of a case: what it sends and what it checks (including the code of each check), so a changed case is never compared as the same one. */
-const caseHash = kase => sha(JSON.stringify(kase.input) + kase.checks.map(c => c.id + c.desc + String(c.run)).join("|"));
-const flowHash = flow => sha(JSON.stringify([flow.start, flow.turns.map(t => [t.say, String(t.touch), !!t.adds, (t.expect || []).map(c => c.id + String(c.run))]), String(flow.final.tree.map(String)), String(flow.final.none), String(flow.final.gone), String(flow.final.relations), String(flow.final.open?.map(o => o.id + o.path))]));
+/**
+ * Stable, recursive serialisation of a case or flow definition: object keys sorted, RegExp kept as source and flags, functions as their
+ * source text, undefined and non-finite numbers kept distinct. Two definitions serialise equally only when every value in them is equal.
+ */
+function canonical(value, seen = new Set()) {
+  if (value === undefined) return { $undefined: true };
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : { $number: String(value) };
+  if (typeof value === "bigint") return { $bigint: String(value) };
+  if (typeof value === "function") return { $function: String(value) };
+  if (typeof value === "symbol") return { $symbol: String(value) };
+  if (value instanceof RegExp) return { $regexp: value.source, flags: value.flags };
+  if (value instanceof Date) return { $date: value.toISOString() };
+  if (seen.has(value)) throw new Error("cannot hash a circular definition");
+  seen.add(value);
+  const out = Array.isArray(value) ? value.map(v => canonical(v, seen)) : Object.fromEntries(Object.keys(value).sort().map(k => [k, canonical(value[k], seen)]));
+  seen.delete(value);
+  return out;
+}
+const stableSerialize = value => JSON.stringify(canonical(value));
+/** Identity of a case: its whole definition, including every check's code AND the parameters it was built with. */
+const caseHash = kase => sha(stableSerialize(kase));
+/** The owner rulings a flow is judged under: the criteria version and the rulings for the flow's open items. */
+const flowCriteria = (flow, criteria) => ({ version: criteria.version, rulings: (criteria.rulings || []).filter(r => r.flow === flow.id || (flow.final?.open || []).some(o => o.id === r.id)) });
+/** Identity of a flow: its whole definition, the checks every turn gets, and the criteria (version and rulings) it is judged under. */
+const flowHash = (flow, criteria = CRITERIA) => sha(stableSerialize({ flow, turnChecks: TURN_CHECKS, criteria: flowCriteria(flow, criteria) }));
 
 /** Where a result came from: enough to tell whether two runs are comparable and what produced them. */
 function runMeta(p, model) {
@@ -454,4 +477,4 @@ if (require.main === module) {
 }
 
 const callClaudeForCorpus = (p, prompt, schema, model) => callClaude(p, prompt, schema, model);
-module.exports = { zeroFailureBound, callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, runCase, rawLayer, caseHash, flowHash, usageTokens, LARGE_GROUP };
+module.exports = { zeroFailureBound, callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, runCase, rawLayer, caseHash, flowHash, stableSerialize, usageTokens, LARGE_GROUP };

@@ -1,7 +1,7 @@
 // Negative cases: "the design says this must not happen; does the model propose it anyway?" Each tempt case (N*) is judged on the
 // RAW output (what the model itself proposed, before the parser drops anything); each control (Nc*) changes ONE condition so the
 // same action becomes legitimate, which means "refuse everything" cannot score well. Synthetic maps only.
-const { C } = require("./checks.cjs");
+const { C, hashable } = require("./checks.cjs");
 
 function tree(rows) {
   const byId = new Map(rows.map(([id, title, parentId, summary = `${title} 的摘要`, extra = {}]) => [id, { id, title, summary, parentId, depth: 0, ...extra }]));
@@ -18,7 +18,7 @@ const HYP = tree([["r", "為什麼營收下滑", null], ["h1", "價格太高", "
 const COFFEE = tree([["r", "咖啡", null], ["h", "手沖", "r"], ["i", "義式", "r"]]);
 const base = { mapTitle: "測試地圖", selected: [], references: [], snippets: [], files: [], history: [] };
 const neg = (id, title, rule, covers, input, checks, review) => ({ id, group: "不該做", title, source: rule, covers, input: { ...base, language: "zh-TW", ...input }, checks, ...(review ? { review } : {}) });
-const hasId = (ids) => a => a.nodeId && !ids.includes(a.nodeId) && !a.nodeId.startsWith("new:");
+const hasId = ids => hashable(a => a.nodeId && !ids.includes(a.nodeId) && !a.nodeId.startsWith("new:"), ids);
 
 const NOTE = "## 風味\n甜、酸、苦\n\n## 器具\n濾杯、手沖壺、磨豆機、電子秤\n\n## 保存\n密封、避光、避免冷藏";
 const QUESTION = "這張地圖有哪些議題？";

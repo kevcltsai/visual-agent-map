@@ -46,7 +46,7 @@ test('the set covers every action kind and every run action, except the two that
 
 test('the set covers every group the plan names', () => {
   const groups = new Set(CASES.map(k => k.group));
-  for (const g of ['發問', '建樹', '完整', '研究', '改結構', '檔案', '語氣', '安全', '圖片', '多輪', '接續']) assert.ok(groups.has(g), g);
+  for (const g of ['發問', '建樹', '完整', '研究', '改結構', '檔案', '語氣', '安全', '圖片', '多輪', '接續', '大小']) assert.ok(groups.has(g), g);
 });
 
 test('style patterns: done-claims, counts and approval requests are caught, plain future wording is not', () => {

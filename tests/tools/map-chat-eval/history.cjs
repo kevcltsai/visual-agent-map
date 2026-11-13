@@ -1,7 +1,7 @@
 // S7 cases: things a long conversation does to the model. History keeps only the last 6 question/answer rounds
 // (MAP_CHAT_DEFAULT_TURNS), so a fact said earlier is simply not in front of the model; conflicting sources must resolve to the newest
 // explicit user instruction; a continuation round must build only on what really finished.
-const { C } = require("./checks.cjs");
+const { C, hashable } = require("./checks.cjs");
 
 function tree(rows) {
   const byId = new Map(rows.map(([id, title, parentId, summary = `${title} 的摘要`, extra = {}]) => [id, { id, title, summary, parentId, depth: 0, ...extra }]));
@@ -25,7 +25,7 @@ function rounds(total, goalRound) {
 }
 const base = { mapTitle: "測試地圖", selected: [], references: [], snippets: [], files: [], history: [], language: "zh-TW" };
 const mk = (id, group, title, source, covers, input, checks, review) => ({ id, group, title, source, covers, input: { ...base, ...input }, checks, ...(review ? { review } : {}) });
-const mentions = re => a => Object.values(a).some(v => typeof v === "string" && re.test(v));
+const mentions = re => hashable(a => Object.values(a).some(v => typeof v === "string" && re.test(v)), re);
 
 const HISTORY = [
   mk("S7a", "多輪", "目標在 8 輪前：已掉出視窗，不能憑空說出", "history cap: MAP_CHAT_DEFAULT_TURNS=6", ["add_child"],

@@ -95,6 +95,14 @@ test('size cases: the checks fail a reply that presents an unread note as read, 
   const later = raw('最舊的那份研究這一輪沒有送出，下一輪再處理；其餘四份我各加一張發現卡。', [q(2, '共享單車使用量回升'), q(3, '公車準點率改善'), q(4, '停車費調漲效果有限'), q(5, '自行車道使用集中在週末')]);
   assert.deepEqual(failed('SZ3', later), []);
   assert.ok(failed('SZ3', raw('我會加上發現。', [q(1, '電池回收率偏低')])).includes('noTargetIds:q1'));
+  const underRoot = raw('最舊的那份研究這一輪沒有送出；其餘四份的發現我放在根底下。', [2, 3, 4, 5].map(n => item('add_child', { parentId: 'r', title: ['共享單車使用量回升', '公車準點率改善', '停車費調漲效果有限', '自行車道使用集中在週末'][n - 2], summary: 'x' })));
+  assert.ok(failed('SZ3', underRoot).includes('childrenPerParent'), 'findings must land under the researched cards');
+
+  const budgetCard = raw('我會加一張預算卡。', [item('add_child', { parentId: 'p', title: '預算上限 37,500 元', summary: 'x' })]);
+  assert.deepEqual(failed('SZ4', budgetCard), []);
+  assert.deepEqual(failed('SZ4c', budgetCard), []);
+  const replyOnly = raw('預算上限是 37,500 元。');
+  assert.ok(failed('SZ4', replyOnly).some(id => id.startsWith('hasAction:add_child')), 'the amount in the reply alone is not the card asked for');
 });
 
 test('NOT_READ: says-not-read wording matches; a plain answer does not', () => {

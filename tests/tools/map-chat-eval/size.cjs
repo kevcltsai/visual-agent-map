@@ -125,6 +125,8 @@ function longHistory(rounds, chars) {
   return out;
 }
 const historyOutline = [node("r", "辦公室採購", null, 0, "採購規劃"), node("p", "採購", "r", 1, "要買的東西")];
+/** A new card under 採購 whose title carries the amount: the amount in the reply alone does not do what was asked. */
+const sz4Checks = [C.noRejected(), C.addChildParentsIn(["p"]), C.hasAction("add_child", a => a.parentId === "p" && /37,?500|3\.75\s*萬|三萬七千五/.test(a.title), "a card under 採購 titled with the budget said in the history")];
 const SZ4_MESSAGE = "依照我前面說的預算上限，在「採購」底下加一張卡，標題寫出預算上限的金額";
 
 // ---- SZ5 / SZ6: a very long open note ----
@@ -144,14 +146,14 @@ const LARGE = [
   sz("SZ2c", "對照：同樣五張卡，筆記都很短", "control of SZ2", ["add_child"], { message: SZ2_MESSAGE, outline: detailOutline, selected: detailCards(1_500) },
     [C.noRejected(), C.childrenPerParent(["d1", "d2", "d3", "d4", "d5"], 1), C.titlesCover(CONCLUSIONS)]),
   sz("SZ3", "研究筆記超過研究預算（最舊一份延後）", "size: MAP_CHAT_RESEARCH_BUDGET", ["add_child"], { message: SZ3_MESSAGE, outline: researchOutline, researchNotes: researchNotes(20_000) },
-    [C.noRejected(), C.titlesCover(FINDINGS.slice(1)), C.noTargetIds(["q1"]), C.replySaysNotRead("the deferred research note")],
+    [C.noRejected(), C.childrenPerParent(["q2", "q3", "q4", "q5"], 1), C.titlesCover(FINDINGS.slice(1)), C.noTargetIds(["q1"]), C.replySaysNotRead("the deferred research note")],
     "最舊的研究筆記這一輪沒送：AI 有沒有說它還沒讀到或下一輪再處理"),
   sz("SZ3c", "對照：同樣五份研究，筆記都很短", "control of SZ3", ["add_child"], { message: SZ3_MESSAGE, outline: researchOutline, researchNotes: researchNotes(2_000) },
     [C.noRejected(), C.childrenPerParent(["q1", "q2", "q3", "q4", "q5"], 1), C.titlesCover(FINDINGS)]),
   sz("SZ4", "12 輪長對話（每則約 3000 字）", "size: earlierTurns text is not capped", ["add_child"], { message: SZ4_MESSAGE, outline: historyOutline, history: longHistory(12, 3_000) },
-    [C.noRejected(), C.addChildParentsIn(["p"]), C.anyTextMatches(/37,?500|3\.75\s*萬|三萬七千五/, "the budget said in the history")]),
+    sz4Checks),
   sz("SZ4c", "對照：同樣請求，2 輪短對話", "control of SZ4", ["add_child"], { message: SZ4_MESSAGE, outline: historyOutline, history: longHistory(2, 120) },
-    [C.noRejected(), C.addChildParentsIn(["p"]), C.anyTextMatches(/37,?500|3\.75\s*萬|三萬七千五/, "the budget said in the history")]),
+    sz4Checks),
   sz("SZ5", "約 20 萬字的開啟筆記：問開頭", "size: activeFile content is not capped", ["add_child"], { message: SZ5_MESSAGE, outline: noteOutline, activeFile: longNote(200_000) },
     [C.noRejected(), C.addChildParentsIn(["r"]), C.titlesCover(["晨曦", "潮汐", "北極星"])]),
   sz("SZ5c", "對照：同樣請求，短筆記", "control of SZ5", ["add_child"], { message: SZ5_MESSAGE, outline: noteOutline, activeFile: longNote(3_000) },

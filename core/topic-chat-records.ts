@@ -39,10 +39,20 @@ export interface TopicChatSteerLine {
   at: string;
   text: string;
 }
-export type TopicChatLine = TopicChatTurnLine | TopicChatResultLine | TopicChatSteerLine;
+/** A turn (`id`) sent the map's data sources: a reopened conversation keeps its writes behind the plan. */
+export interface TopicChatSourcesLine {
+  v: 1;
+  type: "sources";
+  id: string;
+  at: string;
+}
+export type TopicChatLine = TopicChatTurnLine | TopicChatResultLine | TopicChatSteerLine | TopicChatSourcesLine;
 /** A line as the caller hands it over: no `v`. */
 export type TopicChatLineInput =
-  Omit<TopicChatTurnLine, "v"> | Omit<TopicChatResultLine, "v"> | Omit<TopicChatSteerLine, "v">;
+  | Omit<TopicChatTurnLine, "v">
+  | Omit<TopicChatResultLine, "v">
+  | Omit<TopicChatSteerLine, "v">
+  | Omit<TopicChatSourcesLine, "v">;
 
 const KINDS: readonly string[] = ["research", "expand", "synthesize", "ask"];
 const MODES: readonly string[] = ["quick", "standard"];
@@ -110,6 +120,7 @@ function validLine(value: Record<string, unknown>): TopicChatLine | null {
     if (!isText(value.text)) return null;
     return value as unknown as TopicChatSteerLine;
   }
+  if (value.type === "sources") return value as unknown as TopicChatSourcesLine;
   return null;
 }
 
@@ -174,10 +185,15 @@ export function restoreTopicChat(lines: readonly TopicChatLine[]): RestoredTopic
       turns.push(turn);
     } else if (line.type === "steer") {
       byId.get(line.id)?.steers.push(line.text);
-    } else {
+    } else if (line.type === "result") {
       const turn = byId.get(line.id);
       if (turn && !turn.result) turn.result = { status: line.status, text: line.text };
     }
   }
   return turns;
+}
+
+/** True when any turn of the saved conversation sent the map's data sources (an older file has no such line: false). */
+export function topicChatReadsSources(lines: readonly TopicChatLine[]): boolean {
+  return lines.some(line => line.type === "sources");
 }

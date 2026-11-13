@@ -140,7 +140,7 @@ test('outline service: provider path sends the prompt with no schema, logs the s
   assert.equal(prompt, outline.buildOutlineGeneratePrompt(outlineRequest())); assert.equal(model, 'gpt-6-luna'); assert.equal(effort, 'low');
   assert.equal(schema, undefined); assert.equal(controls.textOnly, true); assert.equal(controls.searchBudget, 0);
   const [entry] = fx.log.getEntries();
-  assert.equal(entry.step, 'outline-generate@4'); assert.equal(entry.status, 'completed');
+  assert.equal(entry.step, 'outline-generate@5'); assert.equal(entry.status, 'completed');
 });
 
 test('outline service: invalid reply rejects with the typed error and nothing is returned; empty topic never reaches the provider', async () => {
@@ -286,7 +286,7 @@ test('outline prompt: the summary contract comes after the preset and overrides 
   assert.ok(prompt.indexOf('Output contract') > prompt.indexOf('只輸出 Markdown 標題'));
   assert.match(prompt, /overrides any output-format wording in the preset/);
   assert.match(prompt, /EVERY heading line, including the root/);
-  assert.equal(outlineGenerateStep.version, 4);
+  assert.equal(outlineGenerateStep.version, 5);
 });
 
 test('outline summaries: the bank finds each summary again by heading path; edited or typed headings stay empty', () => {

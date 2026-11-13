@@ -441,12 +441,12 @@ integrationTest('accepted shallow research is parallel, detached from modal clos
   const children = await view.createChildBatch(parent, [
     { title: 'First', task: 'Research first', contribution: '' },
     { title: 'Second', task: 'Research second', contribution: '' }
-  ], { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [{ id: 'parent-source', documents: [{ path: 'External.md' }] }] });
-  const pending = view.startShallowResearch(parent, children, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [{ id: 'parent-source', documents: [{ path: 'External.md' }] }], shallowResearch: true, signal: controller.signal, onProgress: () => assert.fail('modal progress callback retained') });
+  ], { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [{ id: 'parent-source', documents: [{ path: 'External.md', content: 'external text' }] }] });
+  const pending = view.startShallowResearch(parent, children, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [{ id: 'parent-source', documents: [{ path: 'External.md', content: 'external text' }] }], shallowResearch: true, signal: controller.signal, onProgress: () => assert.fail('modal progress callback retained') });
   await pending;
   await until(() => started.length === 2);
   assert.deepEqual(started, ['First', 'Second']);
-  for (const child of children) assert.deepEqual(plain(received.get(child.path)), [{ id: 'parent-source', documents: [{ path: 'External.md' }] }], 'each child researches with the sources chosen in the dialog');
+  for (const child of children) assert.deepEqual(plain(received.get(child.path)), [{ id: 'parent-source', documents: [{ path: 'External.md', content: 'external text' }] }], 'each child researches with the sources chosen in the dialog');
   controller.abort();
   assert.equal(signals[0].aborted, false);
   finish.get(children[0].path)();
@@ -3002,4 +3002,90 @@ integrationTest('map transaction C5: synthesis topic undo parks the note, and re
   assert.equal(h.contents.has(parked), true, 'the note stays parked');
   assert.equal((await h.repo.readMap(h.mapPath)).title, 'Written by AIM');
   assert.equal(h.view.history.canRedo, true, 'the pointer is back');
+});
+
+// Map sources in the research family (ticket 02): every entry reads the map's sources through readMapSourceGroups and sends them.
+const mapSourceGroup = { id: 'map-source', name: 'Map sources', location: 'Sources', documents: [{ path: 'Sources/a.md', content: 'map source text' }] };
+const hasMapSource = groups => (groups ?? []).some(group => group.id === 'map-source');
+integrationTest('map sources: multi research (dialog, other-provider retry) sends the map sources once, without doubling those the request already has', async () => {
+  const h = await multiResearchHarness(['A', 'B']);
+  h.view.readMapSourceGroups = async () => [mapSourceGroup];
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  await h.view.startMultiResearch(h.request);
+  await until(() => h.runs.length === 2);
+  for (const run of h.runs) assert.deepEqual(plain(run.options.referenceGroups), [mapSourceGroup]);
+  for (const finish of h.finish.values()) finish();
+  await until(() => h.plugin.expansionBatches.get(h.key).status !== 'running');
+  h.runs.length = 0; h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  await h.view.startMultiResearch({ ...h.request, referenceGroups: [mapSourceGroup, { id: 'chat-turn', name: 'Turn', location: '', documents: [{ path: 'T.md', content: 't' }] }] });
+  await until(() => h.runs.length === 2);
+  assert.deepEqual(plain(h.runs[0].options.referenceGroups.map(group => group.id)), ['map-source', 'chat-turn'], 'a group the request already carries is not added twice');
+  for (const finish of h.finish.values()) finish();
+  await until(() => h.plugin.expansionBatches.get(h.key).status !== 'running');
+  h.runs.length = 0; h.view.notesLoading = () => false;
+  await h.view.retryWithOtherProvider(h.nodes, 'model-b');
+  await until(() => h.runs.length === 2);
+  for (const run of h.runs) assert.ok(hasMapSource(run.options.referenceGroups), 'the switch-model retry carries the sources'); assert.equal(h.runs[0].runOnce.model, 'model-b');
+});
+integrationTest('map sources: rerun with Standard sends the map sources', async () => {
+  const h = await multiResearchHarness(['A']);
+  h.view.readMapSourceGroups = async () => [mapSourceGroup]; h.view.notesLoading = () => false;
+  h.view.rerunStandard(h.nodes[0]);
+  await until(() => h.runs.length === 1);
+  assert.deepEqual(plain(h.runs[0].options.referenceGroups), [mapSourceGroup]); assert.equal(h.runs[0].options.referenceDelivery, 'direct');
+  h.finish.get('A')?.();
+});
+integrationTest('map sources: shallow research (import outline, create subtopics) reads the sources once for the whole batch and keeps the dialog picks', async () => {
+  const h = await multiResearchHarness(['Parent', 'A', 'B']);
+  let reads = 0; h.view.readMapSourceGroups = async () => { reads++; return [mapSourceGroup]; };
+  const own = { id: 'picked', name: 'Picked', location: '', documents: [{ path: 'P.md', content: 'p' }] };
+  const pending = h.view.startShallowResearch(h.nodes[0], h.nodes.slice(1), { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [own] });
+  await until(() => h.runs.length === 2);
+  assert.equal(reads, 1);
+  for (const run of h.runs) assert.deepEqual(plain(run.options.referenceGroups.map(group => group.id)), ['map-source', 'picked']);
+  for (const finish of h.finish.values()) finish(); await pending;
+});
+integrationTest('map sources: a batch whose sources need condensing condenses once, shares the findings, and sends no external absolute path', async () => {
+  const { AiTaskService } = load('core/ai-task-service.ts');
+  const prompts = [];
+  const runtime = { runTask: async (prompt, _model, _effort, _schema, controls) => { prompts.push(prompt); controls.onRequest?.({}); return JSON.stringify({ summary: 'S', detail: 'Evidence about the topic', suggestions: [], visualReferences: [] }); } };
+  const service = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime });
+  const big = { id: 'map-source', name: 'Map sources', location: 'Sources', documents: [1, 2].map(n => ({ path: `Sources/n${n}.md`, content: 'x'.repeat(100_000) })) };
+  const baselineGroups = [big]; prompts.length = 0;
+  await service.condenseReferences({ title: 'T', summary: '', rules: '', detail: '', task: '', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: baselineGroups }, 'gpt-6-luna', 'low');
+  const oneCondensing = prompts.length; assert.ok(oneCondensing >= 2, 'the fixture needs more than one request to condense');
+  for (const entry of ['multi', 'shallow']) {
+    const h = await multiResearchHarness(['Parent', 'A', 'B', 'C']); h.plugin.aiTasks = service;
+    h.view.readMapSourceGroups = async () => [big]; prompts.length = 0;
+    let pending;
+    if (entry === 'multi') { h.view.selection.replaceMulti(h.nodes.slice(1).map(n => n.id)); await h.view.startMultiResearch(h.request); }
+    else pending = h.view.startShallowResearch(h.nodes[0], h.nodes.slice(1), { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [] });
+    await until(() => h.runs.length === 3);
+    assert.equal(prompts.length, 0, `${entry}: nothing is condensed before a child asks`);
+    const shared = h.runs.map(run => run.options.sharedReferenceCondense);
+    assert.ok(shared[0] && shared.every(value => value === shared[0]), `${entry}: every topic gets the same shared condensing`);
+    const results = await Promise.all(shared.map(condense => condense(new AbortController().signal)));
+    assert.equal(prompts.length, oneCondensing, `${entry}: three topics, one condensing`); assert.ok(results.every(value => value === results[0]));
+    assert.ok(!prompts.some(prompt => /(^|\s)\/(Users|home|var)\//.test(prompt)), 'no absolute path in what was sent');
+    for (const finish of h.finish.values()) finish(); await pending;
+  }
+});
+test('map sources: no research-family entry reads the map sources any other way than readMapSourceGroups (the scrubbing exit)', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../experiences/visual-map/view.ts'), 'utf8');
+  assert.equal([...source.matchAll(/\.mapSources\(/g)].length, 0, 'no direct mapSources( call outside the exit');
+  assert.equal([...source.matchAll(/readSourceGroups\(/g)].length, 1, 'readSourceGroups is called only by readMapSourceGroups');
+});
+integrationTest('map sources: map chat integration (one card and several cards) sends the map sources', async () => {
+  const f = await subtreeFixture();
+  f.view.readMapSourceGroups = async () => [mapSourceGroup];
+  f.view.launchChatTask = async (_model, run) => { let accepted = false; await run(m => assert.fail(m), () => { accepted = true; }); return { status: 'started', accepted }; };
+  f.view.outputLanguageMemory = () => ({});
+  await f.view.chatSynthesize([f.parent.id], 'Integrate');
+  assert.equal(f.contexts.length, 1);
+  assert.ok(hasMapSource(f.contexts[0].referenceGroups), 'the single-card integration request carries the map sources');
+  let seen;
+  f.view.startSelectionSynthesis = async (_nodes, options) => { seen = options; };
+  f.view.chatSelect = () => {}; f.view.selectionModel = async () => ({ model: 'model-a' });
+  await f.view.chatSynthesize([f.parent.id, f.child.id], 'Integrate both');
+  assert.deepEqual(plain(seen.referenceGroups), [mapSourceGroup], 'the several-card integration (selection synthesis) carries them too');
 });

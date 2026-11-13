@@ -231,12 +231,29 @@ test('A3 chain: a non-empty remaining opens the next round; "" ends as done; res
 });
 test('A4 chain no_progress: text only, everything skipped, or only view operations is no progress; any write is progress', () => {
   for (const [name, actions] of [['text only', []], ['all skipped', [{ kind: 'add_child', done: false }, { kind: 'delete_topic', done: false }]],
-    ['view operations only', ['focus_topic', 'select_topics', 'collapse_topic', 'expand_topic', 'auto_layout', 'ask_topic_kind'].map(kind => ({ kind, done: true }))],
+    ['view operations only', ['focus_topic', 'collapse_topic', 'expand_topic', 'auto_layout', 'ask_topic_kind'].map(kind => ({ kind, done: true }))],
     ['a research start is not a write', [{ kind: 'run_map_action', done: true }]]])
     end(chain.finishRound(at(2), roundEnd({ actions })), 'no_progress', 'build the rest');
   for (const kind of ['add_child', 'rename_topic', 'update_summary', 'edit_topic_note', 'delete_topic', 'create_md_file', 'add_relation', 'set_appearance', 'set_topic_kind', 'create_map'])
     assert.equal(chain.finishRound(at(2), roundEnd({ actions: [{ kind: 'focus_topic', done: true }, { kind, done: true }] })).decision.kind, 'next', kind);
   assert.equal(chain.wroteSomething(wrote), true); assert.equal(chain.wroteSomething(text), false);
+});
+test('A4 chain select-only: a round that only selected cards, with something left to do, continues once so the next round reads their notes; twice in a row is no progress', () => {
+  const selectOnly = [{ kind: 'select_topics', done: true }];
+  // Control: a view operation that is not a selection stays no progress.
+  end(chain.finishRound(at(2), roundEnd({ actions: [{ kind: 'focus_topic', done: true }] })), 'no_progress', 'build the rest');
+  // A skipped selection changes nothing either.
+  end(chain.finishRound(at(2), roundEnd({ actions: [{ kind: 'select_topics', done: false }] })), 'no_progress');
+  // Nothing left to do: done, not continued.
+  end(chain.finishRound(at(1), roundEnd({ remaining: '', actions: selectOnly })), 'done', '');
+  const first = chain.finishRound(at(1), roundEnd({ actions: [...selectOnly, { kind: 'focus_topic', done: true }] }));
+  assert.deepEqual(plain(first.decision), { kind: 'next', round: 2, remaining: 'build the rest' });
+  end(chain.finishRound(first.state, roundEnd({ actions: selectOnly })), 'no_progress', 'build the rest');
+  // A write in between allows another selection round later.
+  const wroteThen = chain.finishRound(first.state, roundEnd());
+  assert.equal(chain.finishRound(wroteThen.state, roundEnd({ actions: selectOnly })).decision.kind, 'next');
+  // The round limit still wins.
+  end(chain.finishRound(at(8), roundEnd({ actions: selectOnly })), 'max_rounds');
 });
 test('A4 chain max_rounds: round 8 never opens a ninth; round 7 opens round 8', () => {
   assert.deepEqual(plain(chain.finishRound(at(7), roundEnd()).decision), { kind: 'next', round: 8, remaining: 'build the rest' });

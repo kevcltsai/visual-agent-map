@@ -25523,6 +25523,7 @@ var DEFAULT_SETTINGS = {
   mapChatOpen: true,
   mapChatImageMode: "preview",
   mapChatRecords: false,
+  experimentalArgumentMap: false,
   cliReasoning: "low",
   previewScale: 120,
   models: "",
@@ -56987,6 +56988,10 @@ var NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-map-
 );
 var CLICKABLE_SELECTOR = ["button", "input", "textarea", "a", "[role='button']"].join(",");
 var NOTE_LOAD_FRAME_DELAY_MS = 150;
+function argumentEnabled(plugin) {
+  var _a2;
+  return ((_a2 = plugin.settings) == null ? void 0 : _a2.experimentalArgumentMap) === true;
+}
 function requestArgumentResume(plugin, path, button, onFailed) {
   button.disabled = true;
   plugin.argumentRuns.resume(path).catch((error) => {
@@ -59470,7 +59475,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
         this.argumentBarPressed = { path, action: "stop" };
         void this.plugin.argumentRuns.stop(path);
       });
-    } else if (view.action === "resume") {
+    } else if (view.action === "resume" && argumentEnabled(this.plugin)) {
       const resume = bar.createEl("button", {
         text: t("ui.argument_bar_resume"),
         cls: "mod-cta",
@@ -68546,7 +68551,7 @@ ${request.requirements}` : preset.text,
     if (argumentView)
       renderArgumentCardBody(
         card,
-        argumentView,
+        argumentEnabled(this.plugin) ? argumentView : { ...argumentView, action: void 0, resume: void 0 },
         () => void this.rerunFromDefinitions(node.id),
         (button) => {
           this.argumentBarPressed = { path: this.path, action: "resume" };
@@ -69093,7 +69098,7 @@ ${request.requirements}` : preset.text,
   async rerunFromDefinitions(cardId) {
     var _a2, _b2;
     const map = this.map;
-    if (this.rerunning || this.closed || !map || map.argumentMap === void 0) return;
+    if (!argumentEnabled(this.plugin) || this.rerunning || this.closed || !map || map.argumentMap === void 0) return;
     const read = readArgumentMap(map);
     if (read.kind !== "usable" || ((_a2 = read.data.situation.assumptions) == null ? void 0 : _a2.id) !== cardId) return;
     const definitions2 = map.nodes.find((node) => node.id === cardId);
@@ -75573,7 +75578,7 @@ ${note.detail.trim()}` : "",
     var _a2;
     const map = this.map;
     const text10 = claim2.trim();
-    if (this.closed || !map || !this.chatHero() || !text10) return;
+    if (!argumentEnabled(this.plugin) || this.closed || !map || !this.chatHero() || !text10) return;
     const path = this.path;
     if (map.argumentMap !== void 0 || map.nodes.length > 0 || this.plugin.argumentRuns.isRunning(path)) return;
     (_a2 = this.chat) == null ? void 0 : _a2.clearDraft();
@@ -75586,7 +75591,7 @@ ${note.detail.trim()}` : "",
   chatHost() {
     return {
       createEmptyMap: () => this.startBlankMap(),
-      startArgumentResearch: (claim2) => this.startArgumentFromTab(claim2),
+      ...argumentEnabled(this.plugin) ? { startArgumentResearch: (claim2) => this.startArgumentFromTab(claim2) } : {},
       argumentCalls: () => WORST_CASE_AI_CALLS,
       topicTitle: (id) => {
         var _a2, _b2, _c;
@@ -90286,6 +90291,7 @@ function settingsFromSaved(saved, appLocale) {
     mapChatOpen: normalizeMapChatOpen(saved == null ? void 0 : saved.mapChatOpen),
     mapChatImageMode: normalizeMapChatImageMode(saved == null ? void 0 : saved.mapChatImageMode),
     mapChatRecords: (saved == null ? void 0 : saved.mapChatRecords) === true,
+    experimentalArgumentMap: (saved == null ? void 0 : saved.experimentalArgumentMap) === true,
     cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning),
     previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize),
     models: "",

@@ -87,7 +87,7 @@ function fakeView(state, { owned = false, argumentMap = state } = {}) {
     path: 'M.vam',
     contentEl: dom.element('div'),
     map: { id: 'm1', nodes: [{ id: 'p' }, { id: 's' }, { id: 'c' }, { id: 'v' }, { id: 'e' }], ...(argumentMap === undefined ? {} : { argumentMap }) },
-    plugin: { argumentRuns: { isRunning: () => owned, stop: path => { calls.stop.push(path); return Promise.resolve(); }, resume: path => { calls.resume.push(path); return view.resumeResult(path); } } },
+    plugin: { settings: { experimentalArgumentMap: true }, argumentRuns: { isRunning: () => owned, stop: path => { calls.stop.push(path); return Promise.resolve(); }, resume: path => { calls.resume.push(path); return view.resumeResult(path); } } },
     resumeResult: () => Promise.resolve()
   };
   return { view, calls };

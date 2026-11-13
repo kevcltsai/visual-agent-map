@@ -35,7 +35,7 @@ async function harness(titles = ['P', 'S', 'C', 'V', 'E', 'H', 'N', 'F'], plugin
   let gate = null;
   const reply = { summary: 'AI summary', detail: 'AI detail', visualReferences: [], suggestions: [] };
   const host = withExpansionCoordinator({
-    repo, settings: { ...DEFAULT_SETTINGS, language: 'zh-TW', cliModel: 'gpt-6-luna', cliReasoning: 'low' }, running: new Set(),
+    repo, settings: { ...DEFAULT_SETTINGS, language: 'zh-TW', cliModel: 'gpt-6-luna', cliReasoning: 'low', experimentalArgumentMap: true }, running: new Set(),
     pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {},
     recordFailure: (_label, error) => String(error?.message ?? error), views: () => [],
     mutate: async work => work(),

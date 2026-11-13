@@ -1387,6 +1387,10 @@ interface NoteLoadState {
   raf: number | null;
   isCurrent: () => boolean;
 }
+/** The hidden switch: false (the default) shows no way to start or resume hypothesis research; existing argument maps still display. */
+function argumentEnabled(plugin: VisualAgentMapPlugin): boolean {
+  return plugin.settings?.experimentalArgumentMap === true;
+}
 /** The one resume action, shared by the progress bar's button and the paused card's button. */
 function requestArgumentResume(
   plugin: VisualAgentMapPlugin,
@@ -4029,7 +4033,7 @@ export class VisualAgentMapView extends ItemView {
         this.argumentBarPressed = { path, action: "stop" };
         void this.plugin.argumentRuns.stop(path);
       });
-    } else if (view.action === "resume") {
+    } else if (view.action === "resume" && argumentEnabled(this.plugin)) {
       const resume = bar.createEl("button", {
         text: t("ui.argument_bar_resume"),
         cls: "mod-cta",
@@ -13864,7 +13868,7 @@ export class VisualAgentMapView extends ItemView {
     if (argumentView)
       renderArgumentCardBody(
         card,
-        argumentView,
+        argumentEnabled(this.plugin) ? argumentView : { ...argumentView, action: undefined, resume: undefined },
         () => void this.rerunFromDefinitions(node.id),
         button => {
           this.argumentBarPressed = { path: this.path, action: "resume" };
@@ -14464,7 +14468,7 @@ export class VisualAgentMapView extends ItemView {
   private rerunning = false;
   private async rerunFromDefinitions(cardId: string): Promise<void> {
     const map = this.map;
-    if (this.rerunning || this.closed || !map || map.argumentMap === undefined) return;
+    if (!argumentEnabled(this.plugin) || this.rerunning || this.closed || !map || map.argumentMap === undefined) return;
     const read = readArgumentMap(map);
     if (read.kind !== "usable" || read.data.situation.assumptions?.id !== cardId) return;
     const definitions = map.nodes.find(node => node.id === cardId);
@@ -21463,7 +21467,7 @@ export class VisualAgentMapView extends ItemView {
   private startArgumentFromTab(claim: string): void {
     const map = this.map;
     const text = claim.trim();
-    if (this.closed || !map || !this.chatHero() || !text) return;
+    if (!argumentEnabled(this.plugin) || this.closed || !map || !this.chatHero() || !text) return;
     const path = this.path;
     if (map.argumentMap !== undefined || map.nodes.length > 0 || this.plugin.argumentRuns.isRunning(path)) return;
     this.chat?.clearDraft();
@@ -21478,7 +21482,9 @@ export class VisualAgentMapView extends ItemView {
   private chatHost(): MapChatHost {
     return {
       createEmptyMap: () => this.startBlankMap(),
-      startArgumentResearch: claim => this.startArgumentFromTab(claim),
+      ...(argumentEnabled(this.plugin)
+        ? { startArgumentResearch: (claim: string) => this.startArgumentFromTab(claim) }
+        : {}),
       argumentCalls: () => WORST_CASE_AI_CALLS,
       topicTitle: id => {
         const node = this.map?.nodes.find(item => item.id === id);

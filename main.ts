@@ -282,6 +282,7 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
     mapChatOpen: normalizeMapChatOpen(saved?.mapChatOpen),
     mapChatImageMode: normalizeMapChatImageMode(saved?.mapChatImageMode),
     mapChatRecords: saved?.mapChatRecords === true,
+    experimentalArgumentMap: saved?.experimentalArgumentMap === true,
     cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
     previewScale:
       saved?.previewScale !== undefined

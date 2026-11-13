@@ -24,7 +24,7 @@ function fakeView(over = {}) {
     chatHero: () => true,
     chat: { clearDraft() { calls.cleared++; } },
     plugin: {
-      settings: { cliModel: 'a' },
+      settings: { cliModel: 'a', experimentalArgumentMap: true },
       argumentRuns: { isRunning: () => false, start(mapPath, claim) { calls.starts.push([mapPath, claim]); return Promise.resolve(); } }
     },
     ...over
@@ -130,4 +130,40 @@ test('the proposition card takes the keyboard focus once, not just the camera, w
   composer.focus();
   VisualAgentMapView.prototype.focusArgumentRootOnce.call(view);
   assert.equal(doc.activeElement, composer, 'only once: a later sync does not steal focus again');
+});
+
+// The hidden switch (experimentalArgumentMap, default off): off hides and blocks every way to start research; on keeps today's behaviour.
+test('the switch defaults to off and only a literal true turns it on', () => {
+  const { settingsFromSaved } = MODULES;
+  assert.equal(settingsFromSaved(null).experimentalArgumentMap, false);
+  assert.equal(settingsFromSaved({ experimentalArgumentMap: 'yes' }).experimentalArgumentMap, false);
+  assert.equal(settingsFromSaved({ experimentalArgumentMap: true }).experimentalArgumentMap, true);
+});
+
+test('switch off: the opening screen offers no research tab (host has no startArgumentResearch) and a press starts nothing', async () => {
+  for (const on of [false, true]) {
+    const { view, calls } = fakeView();
+    view.plugin.settings.experimentalArgumentMap = on;
+    view.startArgumentFromTab = claim => VisualAgentMapView.prototype.startArgumentFromTab.call(view, claim);
+    view.chatSelectionIds = () => [];
+    const host = VisualAgentMapView.prototype.chatHost.call(view);
+    assert.equal(typeof host.startArgumentResearch, on ? 'function' : 'undefined', `host, switch ${on}`);
+    press(view, 'claim');
+    await settle();
+    assert.equal(calls.starts.length, on ? 1 : 0, `start, switch ${on}`);
+  }
+});
+
+test('switch off: the re-run button and the resume buttons are gone, existing cards still render', async () => {
+  const src = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(src, /argumentEnabled\(this\.plugin\) \? argumentView : \{ \.\.\.argumentView, action: undefined, resume: undefined \}/);
+  assert.match(src, /view\.action === "resume" && argumentEnabled\(this\.plugin\)/);
+  assert.match(src, /if \(!argumentEnabled\(this\.plugin\) \|\| this\.rerunning/);
+  const calls = { rerun: 0 };
+  const view = {
+    plugin: { settings: {}, argumentRuns: { start() { calls.rerun++; } } }, rerunning: false, closed: false,
+    map: { argumentMap: {} }
+  };
+  await VisualAgentMapView.prototype.rerunFromDefinitions.call(view, 'c');
+  assert.equal(calls.rerun, 0);
 });

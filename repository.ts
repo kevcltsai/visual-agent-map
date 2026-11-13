@@ -153,6 +153,8 @@ export interface Note {
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
+  /** Hidden developer switch (edit data.json only, no settings UI): off hides every way to start or resume hypothesis research. Old argument maps still open. */
+  experimentalArgumentMap: boolean;
   /** Save every map AI conversation as a record file in the map folder (off by default). */
   mapChatRecords: boolean;
   detailTemplates: DetailTemplate[];
@@ -305,6 +307,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mapChatOpen: true,
   mapChatImageMode: "preview",
   mapChatRecords: false,
+  experimentalArgumentMap: false,
   cliReasoning: "low",
   previewScale: 120,
   models: "",

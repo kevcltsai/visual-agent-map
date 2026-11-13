@@ -24441,6 +24441,8 @@ function buildMapChatContext(input2) {
   const history2 = turns ? input2.history.slice(-turns) : [];
   const json = JSON.stringify({
     mapTitle: input2.mapTitle,
+    // Only on an AIM map, so the model does not read "no relations or types yet" on an ordinary map as AIM.
+    ...input2.aim ? { aimMap: true } : {},
     ...input2.noEditableMap ? { noEditableMap: true } : {},
     // An empty map the reply can edit is where the tree goes: it is not a reason to make another map.
     ...!input2.noEditableMap && !input2.outline.length ? { emptyMap: true } : {},
@@ -38311,6 +38313,7 @@ var NOT_A_WRITE = /* @__PURE__ */ new Set([
   "ask_topic_kind",
   "run_map_action"
 ]);
+var selectedCards = (actions) => actions.some((action) => action.done && action.kind === "select_topics");
 var wroteSomething = (actions) => actions.some((action) => action.done && !NOT_A_WRITE.has(action.kind));
 var startChain = (maxRounds = MAP_CHAT_CHAIN_MAX_ROUNDS) => ({
   phase: "round",
@@ -38341,7 +38344,8 @@ function finishRound(state, end) {
     ...state,
     remaining,
     researchTargets: state.researchTargets + Math.max(0, end.started.research),
-    wrote: wroteSomething(end.actions)
+    wrote: wroteSomething(end.actions),
+    selectedOnly: false
   };
   if (!remaining && end.researchDeferred <= 0) return ended(next, "done");
   if (end.started.otherBackground) return ended(next, "other_background_work");
@@ -38350,7 +38354,10 @@ function finishRound(state, end) {
   if (end.started.research > 0) waitFor.push("research");
   if (end.started.expand > 0) waitFor.push("expand");
   if (waitFor.length) return { state: { ...next, phase: "waiting" }, decision: { kind: "wait", waitFor } };
-  if (!next.wrote) return ended(next, "no_progress");
+  if (!next.wrote) {
+    if (state.selectedOnly || !selectedCards(end.actions)) return ended(next, "no_progress");
+    return startNext({ ...next, selectedOnly: true });
+  }
   return startNext(next);
 }
 var startNext = (state) => ({

@@ -1084,6 +1084,11 @@ test('chat 02: an AIM map sends no topic type, strength or relation, even when t
   assert.equal('relations' in sent, false);
 });
 
+test('chat 02: an AIM map says so with aimMap; an ordinary map without relations or types sends no aimMap', () => {
+  assert.equal(JSON.parse(context({ aim: true }).json).aimMap, true);
+  assert.equal('aimMap' in JSON.parse(context().json), false, 'ordinary map with no relations yet: no flag, context as before');
+});
+
 test('chat 02: types and relations count toward the token budget of the whole prompt', () => {
   const many = Array.from({ length: 4000 }, (_, i) => ({ id: `n${i}`, title: `T${i}`, summary: '', parentId: null, depth: 0, kind: 'evidence' }));
   const relations = many.slice(1).map((n, i) => ({ kind: 'supports', from: n.id, to: many[i].id, description: 'd'.repeat(200) }));

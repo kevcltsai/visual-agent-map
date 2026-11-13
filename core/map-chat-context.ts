@@ -527,6 +527,8 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
   const history = turns ? input.history.slice(-turns) : [];
   const json = JSON.stringify({
     mapTitle: input.mapTitle,
+    // Only on an AIM map, so the model does not read "no relations or types yet" on an ordinary map as AIM.
+    ...(input.aim ? { aimMap: true } : {}),
     ...(input.noEditableMap ? { noEditableMap: true } : {}),
     // An empty map the reply can edit is where the tree goes: it is not a reason to make another map.
     ...(!input.noEditableMap && !input.outline.length ? { emptyMap: true } : {}),

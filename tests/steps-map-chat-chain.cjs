@@ -255,6 +255,20 @@ test('A4 chain select-only: a round that only selected cards, with something lef
   // The round limit still wins.
   end(chain.finishRound(at(8), roundEnd({ actions: selectOnly })), 'max_rounds');
 });
+test('A4 chain select-only, whole path: a batch reply that selects the cards and says what is left opens round 2, whose context carries their notes', () => {
+  // Round 1: nothing selected, so no note is in the context.
+  const first = context();
+  assert.equal(json(first).selected.length, 0);
+  const reply = parseMapChat(raw({ actions: [{ kind: 'select_topics', nodeIds: ['a', 'b'], all: false }], remaining: 'rewrite the notes of A and B' }), first);
+  assert.deepEqual(plain(reply.actions.map(action => action.kind)), ['select_topics']);
+  const step = chain.finishRound(chain.startChain(), roundEnd({ remaining: reply.remaining, actions: reply.actions.map(action => ({ kind: action.kind, done: true })) }));
+  assert.deepEqual(plain(step.decision), { kind: 'next', round: 2, remaining: 'rewrite the notes of A and B' });
+  // Round 2: the view builds the context from the selection the round made.
+  const second = json(context({ selected: [topic('a'), topic('b')], continuation: { round: 2, maxRounds: 8, remaining: reply.remaining, lastResults: [{ text: 'Selected 2 cards', status: 'done' }], research: [] } }));
+  assert.deepEqual(plain(second.selected.map(card => [card.id, card.detail])), [['a', 'a detail'], ['b', 'b detail']]);
+  // Control: the same reply with nothing left to do ends the chain; the v22 wording ("send again", remaining empty) never reaches round 2.
+  end(chain.finishRound(chain.startChain(), roundEnd({ remaining: '', actions: [{ kind: 'select_topics', done: true }] })), 'done', '');
+});
 test('A4 chain max_rounds: round 8 never opens a ninth; round 7 opens round 8', () => {
   assert.deepEqual(plain(chain.finishRound(at(7), roundEnd()).decision), { kind: 'next', round: 8, remaining: 'build the rest' });
   end(chain.finishRound(at(8), roundEnd()), 'max_rounds', 'build the rest');

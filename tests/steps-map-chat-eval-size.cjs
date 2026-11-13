@@ -80,6 +80,14 @@ test('size cases: no control is refused before sending (a request that fits is s
   for (const k of CASES.filter(x => x.group !== LARGE_GROUP)) assert.equal(prepare(p, k).refused, null, k.id);
 });
 
+test('size cases: the product refuses before sending exactly the ones its Chinese token estimate puts over the budget', () => {
+  // The 500-card outline and the 200k-character note are over the model's window once Chinese is counted as Chinese; nothing
+  // shortens them yet, so they are refused with over_budget instead of failing at the provider. The rest fit.
+  const refused = LARGE.filter(k => prepare(p, k).refused).map(k => k.id);
+  assert.deepEqual(refused, ['SZ1', 'SZ5', 'SZ6']);
+  for (const id of refused) assert.equal(prepare(p, byId(id)).refused, 'over_budget', id);
+});
+
 test('size cases: the checks fail a reply that presents an unread note as read, and pass an honest one', () => {
   const d = (n, title) => item('add_child', { parentId: `d${n}`, title, summary: title });
   const honest = raw('第五張的筆記這次沒有送到我這裡，我先為前四張各加一張結論卡。', [d(1, '改用季度盤點'), d(2, '外包客服夜班'), d(3, '停用舊版報表'), d(4, '合併兩個倉庫')]);
@@ -129,6 +137,7 @@ test('runCase: records prompt and context characters and the real input tokens n
   assert.equal(result.inputTokens, 12345);
   assert.equal(result.outputTokens, 80);
   assert.equal(result.caseHash, caseHash(k));
+  assert.equal(result.estimatedTokens, p.step.estimateMapChatTokens(prepared.prompt + JSON.stringify(prepared.schema)), 'the product estimate sits next to the real count');
 });
 
 test('runCase: a prompt the product refuses is recorded as refused and makes no call', async () => {
@@ -151,7 +160,7 @@ test('compare: shows characters and real input tokens per case, and "—" where 
   write('b', [row({ promptChars: 2000, contextChars: 1400, inputTokens: 2500 })]);
   const cmp = (x, y) => spawnSync('node', [path.join(__dirname, 'tools/map-chat-eval.cjs'), 'compare', `--out=${dir}`, `--a=${x}`, `--b=${y}`], { encoding: 'utf8' }).stdout;
   const out = cmp('a', 'b');
-  assert.match(out, /\| A1 \| 1000 → 2000 \| 400 → 1400 \| 1000 → 2500 \| 1\.00 → 1\.25 \|/);
-  assert.match(cmp('old', 'b'), /\| A1 \| — → 2000 \| — → 1400 \| — → 2500 \| — → 1\.25 \|/);
+  assert.match(out, /\| A1 \| 1000 → 2000 \| 400 → 1400 \| 1000 → 2500 \| 1\.00 → 1\.25 \| — → — \|/);
+  assert.match(cmp('old', 'b'), /\| A1 \| — → 2000 \| — → 1400 \| — → 2500 \| — → 1\.25 \| — → — \|/);
   fs.rmSync(dir, { recursive: true, force: true });
 });

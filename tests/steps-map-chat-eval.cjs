@@ -6,10 +6,9 @@ const assert = require('node:assert/strict');
 const { CASES } = require('./tools/map-chat-eval/cases.cjs');
 const { C, DONE_CLAIM, COUNT, APPROVAL } = require('./tools/map-chat-eval/checks.cjs');
 const { prepare, evaluate, product } = require('./tools/map-chat-eval.cjs');
-const { estimateTokens } = require('./support-replay.cjs').load('ai/context-builder.ts');
 
 const p = product();
-const { MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MAP_CHAT_TOKEN_BUDGET } = p.step;
+const { MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MAP_CHAT_TOKEN_BUDGET, estimateMapChatTokens } = p.step;
 const byId = id => CASES.find(k => k.id === id);
 const item = (kind, fields = {}) => ({ kind, nodeId: '', ref: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '', mode: '', images: false, needsWeb: false, imageId: '', anchorId: '', x: 0, y: 0, ...fields });
 const raw = (reply, actions = [], remaining = '') => JSON.stringify({ reply, actions, remaining });
@@ -28,11 +27,11 @@ test('case ids are unique and every case has a source, checks and a message', ()
   }
 });
 
-test('every case builds a context and renders a prompt inside the token budget', () => {
+test('every case builds a context and renders a prompt; every case outside the size group is inside the token budget', () => {
   for (const k of CASES) {
     const { prompt, schema } = prepare(p, k);
     assert.ok(prompt.includes(JSON.stringify(k.input.message)), k.id);
-    assert.ok(estimateTokens(prompt + JSON.stringify(schema)) < MAP_CHAT_TOKEN_BUDGET, k.id);
+    if (k.group !== '大小') assert.ok(estimateMapChatTokens(prompt + JSON.stringify(schema)) < MAP_CHAT_TOKEN_BUDGET, k.id);
   }
 });
 

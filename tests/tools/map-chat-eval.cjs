@@ -178,7 +178,7 @@ async function playFlow(p, flow, ask) {
     const input = { selected: [], references: [], snippets: [], files: [], history: history.slice(), language: "zh-TW", message: turn.say, ...sim.contextInput(), mapNeedsName: !sim.title };
     const kase = { input, checks: [...TURN_CHECKS, ...(turn.expect || [])] };
     const prepared = prepare(p, kase);
-    const size = { promptChars: prepared.prompt.length, contextChars: prepared.context.json.length };
+    const size = { promptChars: prepared.prompt.length, contextChars: prepared.context.json.length, ...estimated(p, prepared) };
     if (prepared.refused) { turns.push({ say: turn.say, error: `the product refuses to send it (${prepared.refused})`, ...size, checks: [] }); break; }
     const reply = await ask(prepared.prompt, prepared.schema);
     Object.assign(size, reply.inputTokens !== undefined ? { inputTokens: reply.inputTokens } : {});
@@ -296,7 +296,7 @@ async function run() {
  */
 async function runCase(p, kase, model, ask) {
   const prepared = prepare(p, kase);
-  const size = { promptChars: prepared.prompt.length, contextChars: prepared.context.json.length };
+  const size = { promptChars: prepared.prompt.length, contextChars: prepared.context.json.length, ...estimated(p, prepared) };
   const head = { id: kase.id, caseHash: caseHash(kase), model, ...size };
   if (prepared.refused) return { ...head, status: "refused", refused: prepared.refused, prompt: prepared.prompt, checks: [] };
   const reply = await ask(prepared.prompt, prepared.schema);
@@ -305,11 +305,13 @@ async function runCase(p, kase, model, ask) {
   return { ...head, ...tokens, modelUsed: reply.modelUsed, ms: reply.ms, status: run.status, error: reply.error, prompt: prepared.prompt, raw: reply.raw, checks: run.checks };
 }
 
+/** The product's own token estimate of what it sends (the number its over_budget check uses), where the product has one. */
+const estimated = (p, prepared) => (p.step.estimateMapChatTokens ? { estimatedTokens: p.step.estimateMapChatTokens(prepared.prompt + JSON.stringify(prepared.schema)) } : {});
 const average = values => (values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null);
 /** Average sizes of one case's calls: characters always, real input tokens only where the CLI reported them. */
 function sizeOf(results) {
   const tokens = results.filter(r => typeof r.inputTokens === "number");
-  return { promptChars: average(results.filter(r => typeof r.promptChars === "number").map(r => r.promptChars)), contextChars: average(results.filter(r => typeof r.contextChars === "number").map(r => r.contextChars)), inputTokens: average(tokens.map(r => r.inputTokens)) };
+  return { estimatedTokens: average(results.filter(r => typeof r.estimatedTokens === "number").map(r => r.estimatedTokens)), promptChars: average(results.filter(r => typeof r.promptChars === "number").map(r => r.promptChars)), contextChars: average(results.filter(r => typeof r.contextChars === "number").map(r => r.contextChars)), inputTokens: average(tokens.map(r => r.inputTokens)) };
 }
 const show = value => (value === null || value === undefined ? "—" : String(value));
 
@@ -378,8 +380,8 @@ function report(cases, results, runs, model, slug) {
     s.replies.slice(0, 1).forEach(r => lines.push(`回覆：${r.reply}`, `動作：${r.actions.map(a => a.kind + (a.title ? `「${a.title}」` : "")).join("、") || "無"}`));
     lines.push("");
   }
-  lines.push("## 全部案例", "", "輸入大小是每次呼叫的平均：提示與脈絡的字元數，和 CLI 回報的實際輸入 token（input + cache 寫入 + cache 讀取）。", "", "| 案例 | 群組 | 通過 | 提示字元 | 脈絡字元 | 輸入 token |", "| --- | --- | --- | --- | --- | --- |");
-  for (const s of sum) lines.push(`| ${s.kase.id} ${s.kase.title} | ${s.kase.group} | ${s.refused ? `拒絕 ${s.refused}/${s.attempts}` : `${s.rows.reduce((n, r) => n + r.passes, 0)}/${s.rows.reduce((n, r) => n + r.total, 0)}`} | ${show(s.size.promptChars)} | ${show(s.size.contextChars)} | ${show(s.size.inputTokens)} |`);
+  lines.push("## 全部案例", "", "輸入大小是每次呼叫的平均：提示與脈絡的字元數，和 CLI 回報的實際輸入 token（input + cache 寫入 + cache 讀取）。", "", "| 案例 | 群組 | 通過 | 提示字元 | 脈絡字元 | 輸入 token | 產品估計 token |", "| --- | --- | --- | --- | --- | --- | --- |");
+  for (const s of sum) lines.push(`| ${s.kase.id} ${s.kase.title} | ${s.kase.group} | ${s.refused ? `拒絕 ${s.refused}/${s.attempts}` : `${s.rows.reduce((n, r) => n + r.passes, 0)}/${s.rows.reduce((n, r) => n + r.total, 0)}`} | ${show(s.size.promptChars)} | ${show(s.size.contextChars)} | ${show(s.size.inputTokens)} | ${show(s.size.estimatedTokens)} |`);
   return lines.join("\n") + "\n";
 }
 
@@ -424,11 +426,11 @@ function compare() {
   // Sizes of every case either run has (also changed ones: the size of a changed case is what changed). Old results have no sizes.
   const sized = ids.filter(id => [a, b].some(data => data.results.some(r => r.id === id && (typeof r.promptChars === "number" || typeof r.inputTokens === "number"))));
   if (sized.length) {
-    lines.push("", "## 輸入大小（每次呼叫的平均；token 是 CLI 回報的實際輸入：input + cache 寫入 + cache 讀取）", "", "| 題目 | 提示字元 | 脈絡字元 | 輸入 token | token／提示字元 |", "| --- | --- | --- | --- | --- |");
+    lines.push("", "## 輸入大小（每次呼叫的平均；token 是 CLI 回報的實際輸入：input + cache 寫入 + cache 讀取）", "", "| 題目 | 提示字元 | 脈絡字元 | 輸入 token | token／提示字元 | 產品估計 token |", "| --- | --- | --- | --- | --- | --- |");
     const ratio = s => (s.inputTokens && s.promptChars ? (s.inputTokens / s.promptChars).toFixed(2) : "—");
     for (const id of sized) {
       const x = sizeOf(a.results.filter(r => r.id === id)), y = sizeOf(b.results.filter(r => r.id === id));
-      lines.push(`| ${id}${changed.includes(id) ? "（定義已變更）" : ""} | ${show(x.promptChars)} → ${show(y.promptChars)} | ${show(x.contextChars)} → ${show(y.contextChars)} | ${show(x.inputTokens)} → ${show(y.inputTokens)} | ${ratio(x)} → ${ratio(y)} |`);
+      lines.push(`| ${id}${changed.includes(id) ? "（定義已變更）" : ""} | ${show(x.promptChars)} → ${show(y.promptChars)} | ${show(x.contextChars)} → ${show(y.contextChars)} | ${show(x.inputTokens)} → ${show(y.inputTokens)} | ${ratio(x)} → ${ratio(y)} | ${show(x.estimatedTokens)} → ${show(y.estimatedTokens)} |`);
     }
   }
   const fa = read(A, "flows.json"), fb = read(B, "flows.json");

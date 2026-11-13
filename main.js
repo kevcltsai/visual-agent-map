@@ -50253,6 +50253,17 @@ var MAP_CHAT_ANCHOR_PREFIX = "anchor:";
 var MAP_CHAT_NEW_PREFIX = "new:";
 var REF_FORMAT = /^[A-Za-z0-9_-]{1,40}$/;
 var MAP_CHAT_TOKEN_BUDGET = 15e4;
+var MAP_CHAT_CJK_TOKENS_PER_CHAR = 1.25;
+var CJK_CHARS = /[\u3000-\u303f\u3040-\u30ff\u3100-\u312f\u3190-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef]|[\u{20000}-\u{3134f}]/gu;
+function estimateMapChatTokens(text10) {
+  let cjk = 0;
+  let cjkUnits = 0;
+  for (const match of text10.matchAll(CJK_CHARS)) {
+    cjk += 1;
+    cjkUnits += match[0].length;
+  }
+  return Math.ceil(cjk * MAP_CHAT_CJK_TOKENS_PER_CHAR + (text10.length - cjkUnits) / 4);
+}
 var MapChatError = class extends Error {
   constructor(code, message) {
     super(message);
@@ -50780,7 +50791,7 @@ var mapChatStep = {
   schema: MAP_CHAT_SCHEMA,
   policy: (prompt, request) => {
     if (!request.message.trim()) throw new MapChatError("empty", "Map chat message is empty");
-    if (estimateTokens(prompt + JSON.stringify(MAP_CHAT_SCHEMA)) > MAP_CHAT_TOKEN_BUDGET)
+    if (estimateMapChatTokens(prompt + JSON.stringify(MAP_CHAT_SCHEMA)) > MAP_CHAT_TOKEN_BUDGET)
       throw new MapChatError("over_budget", "Map chat context is too large");
   },
   parse: (raw, request) => parseMapChat(raw, request.context)

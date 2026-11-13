@@ -30,6 +30,8 @@ export type SynthesisContent = "full" | "summary";
 export interface TaskOptions {
   synthesisContent?: SynthesisContent;
   referenceGroups?: ReferenceGroup[];
+  /** A batch's sources condensed once (set by the view while a batch runs): the request uses them instead of condensing `referenceGroups` itself. */
+  preparedReferenceFindings?: string;
   onProgress?: (message: string) => void;
   signal?: AbortSignal;
   outputLanguage?: ContentLanguage;

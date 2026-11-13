@@ -239,7 +239,12 @@ import { classifyProviderError, otherProviderModel, providerOfFailure } from "..
 import { UsageControl } from "./usage-panel";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
-import { readSourceGroups, scrubReferenceGroups } from "../../core/source-gateway";
+import {
+  readSourceGroups,
+  scrubReferenceGroups,
+  sharedSourceFindings,
+  withMapSources
+} from "../../core/source-gateway";
 import { createNoteReadContext } from "../../core/note-read-context";
 import { needsReadBack, UnsyncedPaths } from "../../core/sync-scope";
 import { chainRebase, type RenamePair } from "../../core/rename-batch";
@@ -1014,14 +1019,20 @@ const relationIdentity = (r: Pick<TopicRelation, "kind" | "from" | "to">): strin
 
 /**
  * The options a chat integration runs with: what the integration dialog hands over when its fields are left as they come up
- * (no sources picked, no web search or images, the full content of the subtopics, no template or tone chosen, no extra
- * requirements). An integration is always Quick (no web search; D-2026-10-229). `synthesisTitle` is the new topic's name and
- * only a multi-select integration has one. Pure, so a test can hold it against the real dialog.
+ * (no web search or images, the full content of the subtopics, no template or tone chosen, no extra requirements). An
+ * integration is always Quick (no web search; D-2026-10-229). The user picks no sources in the chat; the map's own data
+ * sources (`referenceGroups`, read by the caller) go in as they do for a research (the owner overturned the old rule that
+ * an integration reads none). `synthesisTitle` is the new topic's name and only a multi-select integration has one. Pure,
+ * so a test can hold it against the real dialog.
  */
-export function chatSynthesisOptions(input: { outputLanguage: ContentLanguage; synthesisTitle?: string }): TaskOptions {
+export function chatSynthesisOptions(input: {
+  outputLanguage: ContentLanguage;
+  synthesisTitle?: string;
+  referenceGroups?: ReferenceGroup[];
+}): TaskOptions {
   return {
     synthesisContent: "full",
-    referenceGroups: [],
+    referenceGroups: input.referenceGroups ?? [],
     outputLanguage: input.outputLanguage,
     requirements: "",
     researchMode: "local",
@@ -3568,10 +3579,13 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
+        const referenceGroups = await this.readMapSourceGroups(new AbortController().signal);
         const outputLanguage = cardOutputLanguage(this.map, this.plugin.settings.language, note.title);
         await this.runAgent(node, undefined, message => new Notice(message), {
           task: researchTopicTask(outputLanguage, note.title),
-          referenceGroups: [],
+          referenceGroups,
+          // Within one request the map's sources go in as written; larger ones are still extracted first.
+          referenceDelivery: "direct",
           outputLanguage,
           rules: "",
           ...aiModeOptions("standard", "research")
@@ -15349,6 +15363,49 @@ export class VisualAgentMapView extends ItemView {
     return readSourceGroups(this.taskSourceSettings().mapSources, signal);
   }
   /**
+   * The sources a batch of research children shares: the map's own sources are read once. When they are too large for one request
+   * the condensing runs once for the whole batch (`sharedFindings`), not once per child.
+   */
+  private async batchSources(
+    own: ReferenceGroup[],
+    childCount: number,
+    model: string,
+    signal: AbortSignal | undefined
+  ): Promise<{ groups: ReferenceGroup[]; sharedFindings: (signal: AbortSignal) => Promise<string | undefined> }> {
+    let mapGroups: ReferenceGroup[] = [];
+    try {
+      mapGroups = await this.readMapSourceGroups(signal ?? new AbortController().signal);
+    } catch (error) {
+      // A stop leaves the batch to its own signal (the coordinator starts nothing for an aborted one).
+      if ((error as { name?: string } | null)?.name !== "AbortError") throw error;
+    }
+    const groups = withMapSources(mapGroups, own);
+    return {
+      groups,
+      sharedFindings: sharedSourceFindings(groups, childCount, condenseSignal =>
+        this.plugin.aiTasks.condenseReferences(
+          {
+            title: this.map?.title ?? "",
+            summary: "",
+            rules: "",
+            detail: "",
+            task: "",
+            ancestors: "",
+            referenceGroups: groups,
+            mode: "task",
+            researchMode: "local",
+            researchDepth: "fast",
+            visualMode: "off",
+            ...this.usageMapField()
+          },
+          model,
+          undefined,
+          condenseSignal
+        )
+      )
+    };
+  }
+  /**
    * What a Next Step dialog needs to hide itself once AI starts: the card shows running and Stop from `begin` until
    * the provider accepts (`end`), and a result that arrives with the dialog closed is announced by one Notice.
    */
@@ -16017,7 +16074,10 @@ export class VisualAgentMapView extends ItemView {
       await this.startSynthesis(
         node,
         {
-          ...chatSynthesisOptions({ outputLanguage: language }),
+          ...chatSynthesisOptions({
+            outputLanguage: language,
+            referenceGroups: await this.readMapSourceGroups(controller.signal)
+          }),
           researchMode: researchModeOf(mode),
           // Only a chosen depth over a deeper subtree (the chain) sends the outline; a plain integration keeps its old form.
           ...(depth !== undefined ? { subtreeIntegration: true } : {}),
@@ -16164,7 +16224,10 @@ export class VisualAgentMapView extends ItemView {
           await this.startSynthesis(
             target,
             {
-              ...chatSynthesisOptions({ outputLanguage: language }),
+              ...chatSynthesisOptions({
+                outputLanguage: language,
+                referenceGroups: await this.readMapSourceGroups(controller.signal)
+              }),
               researchMode: "local",
               subtreeIntegration: true,
               skipCharts: true,
@@ -16475,7 +16538,10 @@ export class VisualAgentMapView extends ItemView {
         await this.startSynthesis(
           target,
           {
-            ...chatSynthesisOptions({ outputLanguage: language }),
+            ...chatSynthesisOptions({
+              outputLanguage: language,
+              referenceGroups: await this.readMapSourceGroups(signal)
+            }),
             researchMode: researchModeOf(mode),
             signal,
             onProgress: () => {}
@@ -19051,14 +19117,14 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   /** `noticeGate` is the caller's gate when it already told the user about an unreadable template block. */
-  private startShallowResearch(
+  private async startShallowResearch(
     parent: MapNode,
     children: MapNode[],
     options: TaskOptions,
     noticeGate?: { shown: boolean }
   ): Promise<void> {
     const signal = options.signal;
-    const pendingOptions = this.researchChoices(options);
+    // Everything that depends on the map as it is when the batch starts is taken before the sources are read.
     const languageSource = this.batchLanguageSource();
     const placed = new Map<string, { x: number; y: number }>();
     for (const child of children) {
@@ -19068,16 +19134,24 @@ export class VisualAgentMapView extends ItemView {
     let respaced = false;
     const gate = noticeGate ?? { shown: false };
     this.plugin.quickExpandPending.add(parent.path);
+    // The map's sources are read once before the batch starts and go to every child; too large for one request, they are condensed once.
+    const sources = await this.batchSources(
+      options.referenceGroups ?? [],
+      children.length,
+      options.runOnce?.model ?? this.currentModelId(),
+      signal
+    );
+    const pendingOptions = this.researchChoices({ ...options, referenceGroups: sources.groups });
     return this.plugin.expansionCoordinator.start(
       parent.path,
       children,
       // Quick research that reads local context only (the S7 default) is a first look: no diagram call per child.
-      (child, batchSignal, accepted) =>
+      async (child, batchSignal, accepted) =>
         this.researchChild(
           child,
           batchSignal,
           accepted,
-          pendingOptions,
+          { ...pendingOptions, preparedReferenceFindings: await sources.sharedFindings(batchSignal) },
           pendingOptions.researchMode !== "local",
           undefined,
           gate,
@@ -19133,6 +19207,9 @@ export class VisualAgentMapView extends ItemView {
         rules: "",
         referenceGroups: choices.referenceGroups ?? [],
         referenceDelivery: "direct",
+        ...(choices.preparedReferenceFindings !== undefined
+          ? { preparedReferenceFindings: choices.preparedReferenceFindings }
+          : {}),
         signal: batchSignal,
         outputLanguage,
         researchMode: choices.researchMode,
@@ -19292,8 +19369,15 @@ export class VisualAgentMapView extends ItemView {
         // The batch runs in the background: leave selection mode so the selection bar gets out of the way.
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
+        // Too large for one request: condensed once for the whole batch, by the first topic that runs, and shared.
+        const sources = await this.batchSources(
+          request.referenceGroups ?? [],
+          nodes.length,
+          request.model ?? this.currentModelId(),
+          signal
+        );
         const shared = {
-          referenceGroups: request.referenceGroups ?? [],
+          referenceGroups: sources.groups,
           requirements: request.requirements,
           // The picked model is for this batch only (D4): it never becomes a topic's own model.
           ...(request.model ? { runOnce: { model: request.model } } : {}),
@@ -19334,8 +19418,11 @@ export class VisualAgentMapView extends ItemView {
                 return "skipped";
               }
               const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
-              const choices = choicesFor(note);
               try {
+                const choices = {
+                  ...choicesFor(note),
+                  preparedReferenceFindings: await sources.sharedFindings(batchSignal)
+                };
                 await this.researchChild(
                   child,
                   batchSignal,
@@ -25774,7 +25861,8 @@ export class VisualAgentMapView extends ItemView {
           existingNoteLanguage(note),
           remembered,
           map.title
-        )
+        ),
+        referenceGroups: await this.readMapSourceGroups(new AbortController().signal)
       });
       return this.launchChatTask(note.model, (failed, accepted) =>
         this.startSynthesis(node, options, message, failed, accepted)
@@ -25786,7 +25874,8 @@ export class VisualAgentMapView extends ItemView {
     const names = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
     const options = chatSynthesisOptions({
       outputLanguage: defaultOutputLanguage(settings.language, "", undefined, remembered),
-      synthesisTitle: synthesisDefaultName(resolveMapTextLanguage(map, settings.language), names)
+      synthesisTitle: synthesisDefaultName(resolveMapTextLanguage(map, settings.language), names),
+      referenceGroups: await this.readMapSourceGroups(new AbortController().signal)
     });
     // The run lives on the selection bar, so the sources are the selection while it runs.
     this.chatSelect(nodes.map(node => node.id));

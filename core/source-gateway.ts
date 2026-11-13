@@ -75,7 +75,10 @@ export function estimateCondenseCalls(groups: readonly ReferenceGroup[]): number
   let findings = referenceBatches([...groups]).length;
   let calls = findings;
   while (findings > 1) {
-    findings = Math.max(1, Math.ceil((findings * CONDENSED_FINDINGS_CHARACTER_LIMIT) / REFERENCE_BATCH_CHARACTER_LIMIT));
+    findings = Math.max(
+      1,
+      Math.ceil((findings * CONDENSED_FINDINGS_CHARACTER_LIMIT) / REFERENCE_BATCH_CHARACTER_LIMIT)
+    );
     calls += findings;
     if (calls > MAX_CONDENSE_CALLS) break;
   }
@@ -130,4 +133,29 @@ export async function readSourceGroups(
     if (signal.aborted || (error as { name?: string } | null)?.name === "AbortError") throw error;
     return [];
   }
+}
+
+/** The map's groups first, then the caller's own; a group whose id the map's groups already carry is not added twice. */
+export function withMapSources(
+  mapGroups: readonly ReferenceGroup[],
+  own: readonly ReferenceGroup[] = []
+): ReferenceGroup[] {
+  const ids = new Set(mapGroups.map(group => group.id));
+  return [...mapGroups, ...own.filter(group => !ids.has(group.id))];
+}
+
+/**
+ * One condensing for a whole batch: the returned function gives every child the same findings (the first caller starts the
+ * condensing, the others wait for it; a failure fails each child, nothing is sent again). It gives `undefined` (each request
+ * decides for itself) for a single child or when the sources fit a request even with nothing else in it.
+ */
+export function sharedSourceFindings(
+  groups: readonly ReferenceGroup[],
+  childCount: number,
+  condense: (signal: AbortSignal) => Promise<string>
+): (signal: AbortSignal) => Promise<string | undefined> {
+  const empty = { title: "", summary: "", rules: "", detail: "", task: "", ancestors: "" };
+  const needed = childCount > 1 && planSourceDelivery(groups, empty).kind === "condense";
+  let shared: Promise<string> | undefined;
+  return async signal => (needed ? (shared ??= condense(signal)) : undefined);
 }

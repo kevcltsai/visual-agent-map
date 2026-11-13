@@ -627,6 +627,8 @@ integrationTest('topic chat opens one window at a time: opening B closes A, A ke
 
 integrationTest('topic chat counterexample 1: Standard integration is not Local (web search on), Quick is Local; the sidebar integration stays Local', async () => {
   const h = await harness(); h.flatten(); const seen = []; await researched(h);
+  const mapGroup = { id: 'map-source', name: 'Map sources', location: 'Sources', documents: [{ path: 'Sources/a.md', content: 'map source text' }] };
+  h.view.readMapSourceGroups = async () => [mapGroup];
   h.view.startSynthesis = async (node, options, direction, failed, accepted, observer) => { seen.push({ id: node.id, options, direction, observer }); accepted(); };
   const host = h.host('root');
   host.setMode('standard');
@@ -637,7 +639,7 @@ integrationTest('topic chat counterexample 1: Standard integration is not Local 
   await waitFor(() => seen.length === 2 && !h.entry('root').session.running);
   assert.equal(seen[0].options.researchMode, 'research'); assert.equal(seen[1].options.researchMode, 'local');
   assert.equal(seen[0].direction, 'Integrate sleep');
-  assert.equal(seen[0].options.visualMode, 'off'); assert.equal(seen[0].options.researchDepth, 'normal'); assert.deepEqual(plain(seen[0].options.referenceGroups), []);
+  assert.equal(seen[0].options.visualMode, 'off'); assert.equal(seen[0].options.researchDepth, 'normal'); assert.deepEqual(plain(seen[0].options.referenceGroups), [mapGroup], 'the topic chat integration sends the map sources (the owner overturned D-2026-10-229 on sources)'); assert.deepEqual(plain(chatSynthesisOptions({ outputLanguage: 'en' }).referenceGroups), []);
   assert.equal(h.view.map.aiMode, undefined, 'an integration does not remember the mode on the map (only research and expand do)');
   assert.equal(chatSynthesisOptions({ outputLanguage: 'en' }).researchMode, 'local', 'the sidebar integration is still Quick');
   // The task service turns the Standard value into a web search, Quick into none.

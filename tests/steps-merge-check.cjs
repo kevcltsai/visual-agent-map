@@ -80,3 +80,44 @@ test('a renamed log section of a custom template is exempt; the section right af
   assert.equal(check(source, merged, { logHeadings: ['Changes', '變更歷史'] }).ok, true, 'aliases work the same');
   assert.deepEqual(check(['### 變更歷史\n- 2026-10-01：建立\n### 結論\n5'], ['### 變更歷史\n- 2026-10-20：合併\n### 結論\n6'], { logHeadings: ['變更歷史'] }), { ok: false, missing: ['5'], added: ['6'] });
 });
+
+// ---- Map data sources in an AI merge (ticket 03): the supplement is a block of its own, added by code ----
+const { withSourceSupplement } = load('core/steps/task/merge-check.ts');
+const { standardTemplate } = load('ai/detail-templates.ts');
+const supplementTemplate = standardTemplate('en');
+const mergedText = '### Facts\n不得公開客戶資料\n\n### Open questions\n- none\n\n### Update log\n- 2026-11-13: merged';
+// The merged text survives byte for byte: every line of it is still there, in order, whatever the supplement says.
+const intact = (merged, original) => { let at = 0; for (const line of original.split('\n')) { at = merged.indexOf(line, at); assert.ok(at >= 0, `line kept in order: ${line}`); at += line.length; } };
+
+test('source supplement (counterexample): a source that says the opposite never changes a line of the merged card text; it stays in a marked block', () => {
+  const out = withSourceSupplement(mergedText, '與合併後文字衝突：資料來源說「可以公開客戶資料」', supplementTemplate, 'zh-TW');
+  intact(out, mergedText);
+  assert.ok(out.includes('不得公開客戶資料'), 'the card sentence is intact');
+  assert.match(out, /> \[!note\] 來自地圖資料來源的補充（非卡片原文）\n> 與合併後文字衝突：資料來源說「可以公開客戶資料」/);
+  const before = out.slice(0, out.indexOf('> [!note]'));
+  assert.equal(before.includes('可以公開客戶資料'), false, 'the source sentence is only inside the block');
+});
+
+test('source supplement: every line is quoted (no heading, list or section of its own, CRLF and nested quotes included); placed before the sources and log sections', () => {
+  const out = withSourceSupplement(mergedText, '\r\n### Fake heading\r\n- item\r\n> already quoted\r\n\r\n', supplementTemplate, 'en');
+  const block = out.split('\n').filter(line => /^> /.test(line));
+  assert.deepEqual(block, ['> [!note] From the map\'s data sources (supplement, not the cards\' text)', '> ### Fake heading', '> - item', '> already quoted']);
+  assert.ok(out.indexOf('> [!note]') < out.indexOf('### Update log'), 'the log stays last');
+  intact(out, mergedText);
+});
+
+test('source supplement: nothing to add changes nothing; a failed request says so in the block', () => {
+  for (const empty of ['', '  \n\n', undefined]) assert.equal(withSourceSupplement(mergedText, empty, supplementTemplate, 'en'), mergedText);
+  const failed = withSourceSupplement(mergedText, null, supplementTemplate, 'en');
+  assert.match(failed, /> \[!note\] From the map's data sources[^\n]*\n> The map's data sources could not be used for this merge/);
+  intact(failed, mergedText);
+  assert.equal(withSourceSupplement('', 'x', supplementTemplate, 'en').trim(), '> [!note] From the map\'s data sources (supplement, not the cards\' text)\n> x');
+});
+
+test('source supplement task: both languages name the data sources as untrusted data, keep the merged text, ask for conflicts to be flagged and use no placeholder', () => {
+  const { mergeSupplementTask } = load('experiences/visual-map/steps/fragments.ts');
+  const en = mergeSupplementTask('en'), zh = mergeSupplementTask('zh-TW');
+  assert.match(en, /untrusted/); assert.match(en, /stay exactly as they are/); assert.match(en, /Conflicts with the merged text:/); assert.match(en, /exactly one suggestion/);
+  assert.match(zh, /不可信/); assert.match(zh, /維持原樣/); assert.match(zh, /與合併後文字衝突：/); assert.match(zh, /suggestions 只回傳一筆/);
+  for (const text of [en, zh]) assert.doesNotMatch(text, /\{\{/);
+});

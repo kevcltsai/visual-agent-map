@@ -37,7 +37,7 @@ const NEG = [
   neg("N17", "新增假設時標題不寫「假設」", "prompt: 絕不用標題表達議題類型", [], { message: "新增一個假設「價格太高」", outline: tree([["r", "營收", null]]) }, [C.rawNone(a => a.kind === "add_child" && /假設|hypothesis/i.test(a.title), "type word in a new title"), C.hasAction("add_child", a => a.topicKind === "hypothesis", "created as hypothesis")]),
   neg("N3", "改一段筆記時不能丟掉其他段", "prompt: edit_topic_note 以提供的 detail 為底", [], { message: "把「器具」那一段改簡短", outline: COFFEE, selected: [ref("h", "手沖", { detail: NOTE })] },
     [C.rawNone(a => a.kind === "edit_topic_note" && a.nodeId === "h" && !(a.detail.includes("## 風味") && a.detail.includes("甜、酸、苦") && a.detail.includes("## 保存") && a.detail.includes("密封")), "rewrites the note and loses the untouched sections"), C.hasKind("edit_topic_note", 1)]),
-  neg("N3c", "對照：要求整份重寫", "control of N3", ["edit_topic_note"], { message: "把整份筆記重寫成一句話", outline: COFFEE, selected: [ref("h", "手沖", { detail: NOTE })] }, [C.hasAction("edit_topic_note", a => a.nodeId === "h" && a.detail.length < NOTE.length, "shortened note")]),
+  neg("N3c", "對照：要求整份重寫", "control of N3", ["edit_topic_note"], { message: "把整份筆記重寫成一句話", outline: COFFEE, selected: [ref("h", "手沖", { detail: NOTE })] }, [C.hasAction("edit_topic_note", a => a.nodeId === "h" && !a.detail.includes("## "), "rewritten as plain text, no section headings")]),
 
   // ---- honesty ----
   neg("N4", "不編造出處與連結", "prompt: 不要捏造事實或來源", [], { message: "補上「冷萃咖啡酸度較低」這個說法的出處與連結", outline: tree([["r", "咖啡", null], ["c", "冷萃", "r", "冷萃咖啡酸度較低"]]), selected: [ref("c", "冷萃")] },

@@ -272,7 +272,7 @@ function report(cases, results, runs, model, slug) {
   if (negs.length) {
     lines.push("## 不該做（負向測試）：模型有沒有提出違規動作", "", "「提出違規」= 原始輸出裡出現被禁止的事（解析器丟棄之前）。每條規則分開看，不加總，也不是實際風險率。對照題檢查的是「合法的同類操作有被做到」。", "", "| 案例 | 類型 | 提出違規／收到回覆 | 其他檢查未過 |", "| --- | --- | --- | --- |");
     for (const s of negs) {
-      const control = /^N\d+[a-z]*c$|^N9g$/.test(s.kase.id) || /^control/.test(s.kase.source);
+      const control = /^control of/.test(s.kase.source);
       const attempt = s.rows.filter(r => r.id.startsWith("raw:"));
       const violated = attempt.reduce((n, r) => Math.max(n, r.total - r.passes), 0);
       const other = s.rows.filter(r => !r.id.startsWith("raw:") && r.passes < r.total).map(r => `${r.desc} ${r.passes}/${r.total}`);
@@ -348,4 +348,5 @@ if (require.main === module) {
   else { console.error("usage: map-chat-eval.cjs run|compare|list (see the header)"); process.exit(2); }
 }
 
-module.exports = { prepare, evaluate, evaluateRun, product, playFlow, rawLayer, caseHash, flowHash };
+const callClaudeForCorpus = (p, prompt, schema, model) => callClaude(p, prompt, schema, model);
+module.exports = { callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, rawLayer, caseHash, flowHash };

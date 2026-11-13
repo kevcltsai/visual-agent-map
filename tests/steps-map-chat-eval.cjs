@@ -382,3 +382,73 @@ test('KNOWN DEFECT: guardMapChatWrite refuses a quoted "node-id" key added to an
   const result = g({ kind: 'edit', path: 'Notes/plain.md', oldContent: oldText, newContent: '---\ntitle: Plain\n"node-id": injected\n---\nbody\n', knownHashes: { 'Notes/plain.md': contentHashOf(oldText) }, configDir: '.obsidian' });
   assert.equal(result.ok, false);
 });
+
+// ---- S3: the real-failure corpus tool ----
+const corpus = require('./tools/map-chat-corpus.cjs');
+const jsonl = lines => lines.map(l => JSON.stringify(l)).join('\n') + '\n';
+const goodCase = `# 案例 T1
+來源: rec.jsonl 第 1 輪
+類別: 多做
+使用者說: 只把「烤」改名成「炙烤」
+該答什麼或做什麼: 只有一個 rename_topic
+不可接受的答案: 還改了別的卡
+可接受的答案: 只改名一張
+為什麼不合格: 多動了別的卡
+hold-out: 是
+`;
+
+test('S3: case files are parsed (values may span lines) and validated; the template itself is not valid', () => {
+  const parsed = corpus.parseCase(goodCase);
+  assert.deepEqual([...corpus.validateCase(parsed)], []);
+  assert.equal(parsed['hold-out'], '是');
+  const multi = corpus.parseCase(goodCase.replace('只有一個 rename_topic', '只有一個 rename_topic\n目標是烤'));
+  assert.match(multi['該答什麼或做什麼'], /目標是烤/);
+  const template = corpus.parseCase(require('node:child_process').spawnSync('node', [path.join(__dirname, 'tools/map-chat-corpus.cjs'), 'template'], { encoding: 'utf8' }).stdout);
+  assert.ok(corpus.validateCase(template).length >= 6, 'the unfilled template must be rejected');
+  assert.ok(corpus.validateCase(corpus.parseCase(goodCase.replace('類別: 多做', '類別: 隨便'))).some(m => /類別/.test(m)));
+  assert.ok(corpus.validateCase(corpus.parseCase(goodCase.replace('第 1 輪', ''))).some(m => /來源/.test(m)));
+});
+
+test('S3: a record is read per turn, and a backfilled turn (no stored request) cannot be replayed', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'corpus-test-'));
+  const k = byId('E6');
+  const prepared = prepare(p, k);
+  const request = { step: { id: 'map-chat', version: 20 }, model: 'claude:haiku', language: 'zh-TW', message: k.input.message, context: prepared.context };
+  fs.writeFileSync(path.join(dir, 'rec.jsonl'), jsonl([
+    { v: 1, type: 'conversation', id: 'c', at: 'x', startedAt: 'x', mapPath: 'm', mapId: 'm', pluginVersion: '0' },
+    { v: 1, type: 'turn_start', at: 'x', turn: 1, message: k.input.message, request },
+    { v: 1, type: 'turn_end', at: 'x', turn: 1, status: 'done', raw: JSON.stringify({ reply: '我會改名。', actions: [item('rename_topic', { nodeId: 'b1', title: '平底鍋煎' })], remaining: '' }), reply: '我會改名。', lines: [], modelLabel: 'm' },
+    { v: 1, type: 'turn_start', at: 'x', turn: 2, message: '舊的一輪', backfilled: true },
+    { v: 1, type: 'turn_end', at: 'x', turn: 2, status: 'done', raw: null, reply: '舊的回覆', lines: [], modelLabel: 'm' }
+  ]));
+  const rec = corpus.readRecord(path.join(dir, 'rec.jsonl'));
+  assert.equal(rec.turns.size, 2);
+  assert.equal(corpus.requestOf(rec.turns.get(1)).message, k.input.message);
+  assert.throws(() => corpus.requestOf(rec.turns.get(2)), /no stored request/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('S3: run replays the stored context, runs a case check file when there is one, and leaves the rest UNDETERMINED', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'corpus-run-'));
+  const cdir = path.join(dir, 'corpus'), rdir = path.join(dir, 'records');
+  fs.mkdirSync(cdir); fs.mkdirSync(rdir);
+  const k = byId('E6');
+  const request = { step: { id: 'map-chat', version: 20 }, model: 'claude:haiku', language: 'zh-TW', message: k.input.message, context: prepare(p, k).context };
+  fs.writeFileSync(path.join(rdir, 'rec.jsonl'), jsonl([{ v: 1, type: 'turn_start', at: 'x', turn: 1, message: k.input.message, request }, { v: 1, type: 'turn_end', at: 'x', turn: 1, status: 'done', raw: '{}', reply: 'x', lines: [], modelLabel: 'm' }]));
+  fs.writeFileSync(path.join(cdir, 'T1.md'), goodCase);
+  fs.writeFileSync(path.join(cdir, 'T2.md'), goodCase.replace('案例 T1', '案例 T2'));
+  fs.writeFileSync(path.join(cdir, 'T2.check.cjs'), `const { C } = require(${JSON.stringify(path.join(__dirname, 'tools/map-chat-eval/checks.cjs'))});\nmodule.exports = [C.onlyTargets(['b1'])];\n`);
+  const sent = [];
+  const ask = async (_p, prompt) => { sent.push(prompt); return { raw: JSON.stringify({ reply: '我會改名。', actions: [item('rename_topic', { nodeId: 'b1', title: 'X' })], remaining: '' }) }; };
+  const target = await corpus.run({ dir: cdir, records: rdir, out: path.join(dir, 'out'), runs: '1' }, ask);
+  const report = fs.readFileSync(target, 'utf8');
+  fs.rmSync(dir, { recursive: true, force: true });
+  assert.ok(sent.every(t => t.includes(JSON.stringify(k.input.message))), 'the stored context is what is sent');
+  assert.match(report, /## T1（多做，hold-out）[\s\S]*未裁定/);
+  assert.match(report, /## T2[\s\S]*過：actions touch only b1/);
+  assert.match(report, /不可接受：還改了別的卡/);
+});
+
+test('S3: the corpus tool refuses an output folder inside the repository', async () => {
+  await assert.rejects(corpus.run({ dir: 'x', records: 'y', out: path.join(__dirname, 'inside-repo') }, async () => ({})), /outside this repository/);
+});

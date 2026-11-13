@@ -1328,6 +1328,12 @@ const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   no_baseline: "ui.map_chat_guard_no_baseline",
   map_source: "ui.map_chat_guard_map_source"
 };
+/** A chat write action reached a note that is one of the map's data sources (read-only). */
+class MapSourceWriteError extends Error {
+  constructor() {
+    super("map source is read-only");
+  }
+}
 const guardSkipped = (code: MapChatGuardCode, editing = false): ChatOutcome =>
   skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
 let mapChatTaskSequence = 0;
@@ -1545,6 +1551,8 @@ export class VisualAgentMapView extends ItemView {
   private chatCarryOver = false;
   /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
   private chatApplying = false;
+  /** Lower-cased normalised paths of the map's data sources while a chat write action runs; null otherwise. */
+  private chatReadOnlyPaths: ReadonlySet<string> | null = null;
   /** The automatic continuation of the latest message (running, waiting for work or for a plan); null when there is none. */
   private chatChain: ChatChainRun | null = null;
   private chatChainSeq = 0;
@@ -12090,6 +12098,7 @@ export class VisualAgentMapView extends ItemView {
       repo: this.plugin.repo,
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       refreshNotes: paths => this.plugin.rebuildDerivedData(paths),
+      guardPath: path => this.assertChatWritable(path),
       onApplied: (mapPath, map) => {
         if (mapPath === this.path) this.adoptSavedMap(map);
       },
@@ -12205,6 +12214,7 @@ export class VisualAgentMapView extends ItemView {
     /** Where the undo entry goes (default: the history); the picture placement folds its two entries before they reach it. */
     sink: (entry: Action) => void = entry => this.history.push(entry)
   ): Promise<void> {
+    this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
       before: NotePatch = {};
     for (const key of Object.keys(patch) as (keyof Note)[]) (before as Record<string, unknown>)[key] = current[key];
@@ -24523,7 +24533,19 @@ export class VisualAgentMapView extends ItemView {
     }
     return !this.closed && this.path === mapPath && this.map ? mapPath : "";
   }
-  /** One write action. Runs inside `plugin.mutate`: it must not queue another one. */
+  /**
+   * Throws {@link MapSourceWriteError} when `path` is one of the map's data sources and a chat write action is running. Every
+   * write to a card's note file goes through `noteChange` or a map transaction (both call this), so an action that is added
+   * later is covered without a check of its own, and a refused step writes nothing (a transaction checks as steps are queued).
+   */
+  private assertChatWritable(path: string): void {
+    const guarded = this.chatReadOnlyPaths;
+    if (guarded && guarded.has((normalizeVaultPath(path) ?? path).toLowerCase())) throw new MapSourceWriteError();
+  }
+  /**
+   * One write action. Runs inside `plugin.mutate`: it must not queue another one. The map's data sources are read-only for the
+   * whole action: a write to one of them (through any card, any descendant of a branch) is refused as "a data source".
+   */
   private async applyChatWrite(
     action: Exclude<
       MapChatAction,
@@ -24532,6 +24554,28 @@ export class VisualAgentMapView extends ItemView {
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
     same: () => boolean,
     run: ChatRun = { refs: new Map(), created: [] }
+  ): Promise<ChatOutcome> {
+    const previous = this.chatReadOnlyPaths;
+    this.chatReadOnlyPaths = new Set(
+      (baseline.mapSourcePaths ?? []).map(path => (normalizeVaultPath(path) ?? path).toLowerCase())
+    );
+    try {
+      return await this.applyChatWriteGuarded(action, baseline, same, run);
+    } catch (error) {
+      if (error instanceof MapSourceWriteError) return guardSkipped("map_source");
+      throw error;
+    } finally {
+      this.chatReadOnlyPaths = previous;
+    }
+  }
+  private async applyChatWriteGuarded(
+    action: Exclude<
+      MapChatAction,
+      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
+    >,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
+    same: () => boolean,
+    run: ChatRun
   ): Promise<ChatOutcome> {
     const hashes = baseline.mdHashes;
     if (!same() || !this.map) return skipped("ui.map_chat_skip_map_changed");
@@ -24662,6 +24706,13 @@ export class VisualAgentMapView extends ItemView {
         if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
         const parent = nodeOf(parentId);
         if (!node || !parent) return gone;
+        // The move rewrites the derived "Parent topic" / "Child topics" lines of the moved card and of both parents: a data source
+        // among them would be rewritten, so the move is refused (the map file alone changes otherwise).
+        const oldParent = node.parentId ? nodeOf(node.parentId) : undefined;
+        for (const touched of [node, parent, oldParent]) {
+          const sourceRefusal = touched ? sourceFileRefusal(touched) : null;
+          if (sourceRefusal) return sourceRefusal;
+        }
         if (this.isMerging(node.id) || this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;

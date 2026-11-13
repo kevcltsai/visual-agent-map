@@ -8501,6 +8501,54 @@ integrationTest('map sources review: a card that is also a source file is not re
   assert.notEqual(other.reason ?? '', load('i18n.ts').translate('en', 'ui.map_chat_guard_map_source'), 'a card that is not a source is not refused as one'); void other;
 });
 
+// Source `c` is a card (child of `a`). Every action that would write a card's note file must be refused when `c` is among what it
+// touches (a target, or a descendant of a deleted branch), with the one write boundary (noteChange / map transaction) as the check.
+const sourceCardActions = h => [
+  { kind: 'rename_topic', nodeId: h.ids.c, title: 'HACKED' }, { kind: 'update_summary', nodeId: h.ids.c, summary: 'HACKED' }, { kind: 'edit_topic_note', nodeId: h.ids.c, detail: 'HACKED' },
+  { kind: 'delete_topic', nodeId: h.ids.c, branch: false }, { kind: 'delete_topic', nodeId: h.ids.a, branch: true },
+  { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b }, { kind: 'move_topic', nodeId: h.ids.b, newParentId: h.ids.c },
+  { kind: 'set_appearance', nodeIds: [h.ids.b, h.ids.c], color: 'red' }, { kind: 'set_topic_kind', nodeIds: [h.ids.b, h.ids.c], topicKind: 'evidence' }
+];
+const sourceCardHarness = async () => { const h = await harness(); await h.view.hydrate(); h.source = h.view.map.nodes.find(n => n.id === h.ids.c); return h; };
+
+integrationTest('map sources review 2: every action that writes a card note refuses a source card (target or branch descendant) with nothing written, on direct apply; a non-source card is still written', async () => {
+  for (let index = 0; index < sourceCardActions(await sourceCardHarness()).length; index++) {
+    const h = await sourceCardHarness(); const action = sourceCardActions(h)[index];
+    const baseline = { mdHashes: {}, topicHashes: topicBaseline(h), mapSourcePaths: [h.source.path] };
+    const before = vaultState(h); const nodes = h.view.map.nodes.length;
+    const outcome = await h.view.applyChatWrite(action, baseline, () => true);
+    assert.equal(outcome.status, 'skipped', action.kind); assert.match(outcome.reason, /one of this map's data sources/, `${action.kind} #${index}`);
+    assert.equal(vaultState(h), before, `${action.kind} #${index}: no file (source or other) was written`); assert.equal(h.view.map.nodes.length, nodes);
+    // The same action with no source: it is written (so the refusal above is the guard, not a harness that cannot write).
+    const control = await sourceCardHarness(); const free = await control.view.applyChatWrite(sourceCardActions(control)[index], { mdHashes: {}, topicHashes: topicBaseline(control), mapSourcePaths: [] }, () => true);
+    assert.equal(free.status, 'done', `${action.kind} #${index} control`); assert.notEqual(vaultState(control), vaultState(await sourceCardHarness()), `${action.kind} #${index} control wrote`);
+  }
+  // A source spelled differently (case, ./) is the same file; a different note as source leaves the card writable.
+  const h = await sourceCardHarness(); const before = vaultState(h);
+  const spelled = await h.view.applyChatWrite({ kind: 'set_appearance', nodeIds: [h.ids.c], color: 'red' }, { mdHashes: {}, topicHashes: topicBaseline(h), mapSourcePaths: [`./${h.source.path.toUpperCase()}`] }, () => true);
+  assert.equal(spelled.status, 'skipped'); assert.equal(vaultState(h), before);
+  const other = await h.view.applyChatWrite({ kind: 'rename_topic', nodeId: h.ids.b, title: 'Fine' }, { mdHashes: {}, topicHashes: topicBaseline(h), mapSourcePaths: [h.source.path] }, () => true);
+  assert.equal(other.status, 'done', 'a card that is not a source is written'); assert.equal((await h.note('b')).title, 'Fine');
+  // The old parent being a source also refuses the move (its Child topics line would be rewritten).
+  const beforeMove = vaultState(h);
+  const oldParent = await h.view.applyChatWrite({ kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b }, { mdHashes: {}, topicHashes: topicBaseline(h), mapSourcePaths: [h.view.map.nodes.find(n => n.id === h.ids.a).path] }, () => true);
+  assert.equal(oldParent.status, 'skipped'); assert.equal(h.view.map.nodes.find(n => n.id === h.ids.c).parentId, h.ids.a); assert.equal(vaultState(h), beforeMove, 'nothing written');
+  assert.equal(h.view.chatReadOnlyPaths, null, 'the read-only window closes after the action');
+});
+
+integrationTest('map sources review 2: the same actions in a conversation that read the sources (with and without the plan card) never write the source card', async () => {
+  for (let index = 0; index < sourceCardActions(await sourceCardHarness()).length; index++) {
+    const h = await sourceCardHarness(); const action = sourceCardActions(h)[index]; const chat = h.open();
+    await h.view.hydrate(); h.view.readMapSourceGroups = async () => [{ id: 'g', name: 'S', location: 'Topics', documents: [{ path: h.source.path, content: 'Facts.' }] }];
+    h.control.reply = async () => say('ok', [action]);
+    const before = vaultState(h);
+    h.type('go'); await h.view.sendMapChat(); await until(() => !h.view.chatApplying);
+    if (chat.pendingPlan()) { assert.equal(vaultState(h), before, `${action.kind} #${index}: the plan writes nothing`); planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying); }
+    assert.equal(vaultState(h), before, `${action.kind} #${index}: nothing written, with or without the plan`);
+    assert.match(visibleText(h.view.chat.logEl), /one of this map's data sources/, `${action.kind} #${index}`);
+  }
+});
+
 integrationTest('map sources 05: multi-turn - within the cap the full text goes every turn and never more than 60,000 characters; nothing is condensed', async () => {
   const h = await harness(); await h.view.hydrate(); const content = 'y'.repeat(30_000); await withSources(h, sourceGroups(SRC, content)); const chat = h.open();
   let condensed = 0; h.plugin.aiTasks = { condenseReferences: async () => { condensed++; return 'F'; } };

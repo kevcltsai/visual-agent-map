@@ -22172,10 +22172,14 @@ function begin(deps) {
   }
   const transaction = {
     move(path, folder, lifecycle) {
+      var _a2;
+      (_a2 = deps.guardPath) == null ? void 0 : _a2.call(deps, path);
       moves.push({ kind: "move", path, folder, lifecycle });
       return transaction;
     },
     create(path, parkFolder, topicId, title) {
+      var _a2;
+      (_a2 = deps.guardPath) == null ? void 0 : _a2.call(deps, path);
       moves.push({
         kind: "create",
         path,
@@ -22186,6 +22190,8 @@ function begin(deps) {
       return transaction;
     },
     rename(path, title) {
+      var _a2;
+      (_a2 = deps.guardPath) == null ? void 0 : _a2.call(deps, path);
       moves.push({
         kind: "rename",
         path,
@@ -22209,6 +22215,8 @@ function begin(deps) {
       return transaction;
     },
     rewriteNote(path, write) {
+      var _a2;
+      (_a2 = deps.guardPath) == null ? void 0 : _a2.call(deps, path);
       noteOps.push({ path, write });
       return transaction;
     },
@@ -57831,6 +57839,11 @@ var GUARD_REASON = {
   no_baseline: "ui.map_chat_guard_no_baseline",
   map_source: "ui.map_chat_guard_map_source"
 };
+var MapSourceWriteError = class extends Error {
+  constructor() {
+    super("map source is read-only");
+  }
+};
 var guardSkipped = (code, editing = false) => skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
 var mapChatTaskSequence = 0;
 function relationPairKey(a, b) {
@@ -57941,6 +57954,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "chatCarryOver", false);
     /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
     __publicField(this, "chatApplying", false);
+    /** Lower-cased normalised paths of the map's data sources while a chat write action runs; null otherwise. */
+    __publicField(this, "chatReadOnlyPaths", null);
     /** The automatic continuation of the latest message (running, waiting for work or for a plan); null when there is none. */
     __publicField(this, "chatChain", null);
     __publicField(this, "chatChainSeq", 0);
@@ -67807,6 +67822,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       repo: this.plugin.repo,
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       refreshNotes: (paths) => this.plugin.rebuildDerivedData(paths),
+      guardPath: (path) => this.assertChatWritable(path),
       onApplied: (mapPath, map) => {
         if (mapPath === this.path) this.adoptSavedMap(map);
       },
@@ -67902,6 +67918,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   }
   async noteChange(node, patch, sink = (entry) => this.history.push(entry)) {
     var _a2, _b2, _c;
+    this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0), before = {};
     for (const key4 of Object.keys(patch)) before[key4] = current[key4];
     const followsSummary = patch.summary !== void 0 && patch.preview === void 0 && patch.previewSection === void 0;
@@ -79128,8 +79145,39 @@ ${note.detail.trim()}` : "",
     }
     return !this.closed && this.path === mapPath && this.map ? mapPath : "";
   }
-  /** One write action. Runs inside `plugin.mutate`: it must not queue another one. */
+  /**
+   * Throws {@link MapSourceWriteError} when `path` is one of the map's data sources and a chat write action is running. Every
+   * write to a card's note file goes through `noteChange` or a map transaction (both call this), so an action that is added
+   * later is covered without a check of its own, and a refused step writes nothing (a transaction checks as steps are queued).
+   */
+  assertChatWritable(path) {
+    var _a2;
+    const guarded = this.chatReadOnlyPaths;
+    if (guarded && guarded.has(((_a2 = normalizeVaultPath(path)) != null ? _a2 : path).toLowerCase())) throw new MapSourceWriteError();
+  }
+  /**
+   * One write action. Runs inside `plugin.mutate`: it must not queue another one. The map's data sources are read-only for the
+   * whole action: a write to one of them (through any card, any descendant of a branch) is refused as "a data source".
+   */
   async applyChatWrite(action, baseline, same2, run = { refs: /* @__PURE__ */ new Map(), created: [] }) {
+    var _a2;
+    const previous = this.chatReadOnlyPaths;
+    this.chatReadOnlyPaths = new Set(
+      ((_a2 = baseline.mapSourcePaths) != null ? _a2 : []).map((path) => {
+        var _a3;
+        return ((_a3 = normalizeVaultPath(path)) != null ? _a3 : path).toLowerCase();
+      })
+    );
+    try {
+      return await this.applyChatWriteGuarded(action, baseline, same2, run);
+    } catch (error) {
+      if (error instanceof MapSourceWriteError) return guardSkipped("map_source");
+      throw error;
+    } finally {
+      this.chatReadOnlyPaths = previous;
+    }
+  }
+  async applyChatWriteGuarded(action, baseline, same2, run) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     const hashes = baseline.mdHashes;
     if (!same2() || !this.map) return skipped("ui.map_chat_skip_map_changed");
@@ -79247,6 +79295,11 @@ ${note.detail.trim()}` : "",
         if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
         const parent = nodeOf(parentId);
         if (!node || !parent) return gone;
+        const oldParent = node.parentId ? nodeOf(node.parentId) : void 0;
+        for (const touched of [node, parent, oldParent]) {
+          const sourceRefusal = touched ? sourceFileRefusal(touched) : null;
+          if (sourceRefusal) return sourceRefusal;
+        }
         if (this.isMerging(node.id) || this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;

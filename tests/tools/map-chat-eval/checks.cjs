@@ -2,37 +2,45 @@
 // env = { reply, actions, rejected, remaining, input } where the first four are the parsed reply (core/steps/map-chat/step.ts)
 // and input is the case's context input. A check states one property a good reply has; none of them scores quality.
 const CJK = /[㐀-鿿]/;
-const WEB = /上網|網路|搜尋|搜索|查網|線上查|web|search(?:ing)? (?:the )?(?:web|online|internet)|look (?:it )?up online/i;
-const DONE_CLAIM = /已(?:經)?(?:新增|建立|建好|完成|加入|加上|刪除|移動|合併|修改|改好|改成|套用|研究|整合|設定)|完成了|做好了|改好了|\b(?:I(?:'ve| have)|has been|have been|was|were|already) (?:added|created|done|completed|merged|moved|deleted|renamed|updated|applied)\b/i;
-const COUNT = /\d+\s*(?:個|張|項|條|則|nodes?|topics?|cards?|items?|branches)|[約大概共]\s*\d+/i;
+const WEB = /上網|網路|搜尋|搜索|查網|線上查|\bweb\b|search(?:ing)? (?:the )?(?:web|online|internet)|look (?:it )?up online/i;
+const DONE_CLAIM = /已(?:經)?(?:新增|建立|建好|完成|加入|加上|刪除|移動|合併|修改|改好|改成|套用|研究|整合|設定)|完成了|做好了|改好了|\b(?:I(?:'ve| have)|has been|have been|was|were|already) (?:added|created|done|completed|merged|moved|deleted|renamed|updated|applied)\b|\bI\s+(?:created|added|merged|moved|deleted|renamed|updated|applied|researched)\b/i;
+const NUM = '(?:\\d+|[一二三四五六七八九十百千兩两]+)';
+const COUNT = new RegExp(NUM + '\\s*(?:個|張|項|條|則|節點|nodes?|topics?|cards?|items?|branches)|[約大概共]\\s*' + NUM, 'i');
 const APPROVAL = /請(?:先)?(?:確認|批准|同意|按|點)|要我(?:現在)?(?:套用|執行|開始)嗎|是否(?:要|需要)(?:我)?(?:套用|執行)|(?:please )?(?:confirm|approve)\b|shall I (?:apply|proceed)|do you want me to/i;
 const ID_FIELDS = ["nodeId", "parentId", "newParentId", "beforeId", "fromId", "toId"];
 
+/** A negated phrase ("不能說已經完成", "不需要上網") is not a claim; drop it before matching. */
+const stripNegated = text => String(text).replace(/(?:不能|不會|不要|不可|不必|不需要|不用|沒有|未|無法)[^，。,.！!？?；;\n]{0,6}/g, "");
 const ok = () => ({ ok: true });
 const fail = note => ({ ok: false, note });
 const check = (id, desc, run) => ({ id, desc, run });
+/** Diagnostic checks (tone, format) are shown apart from task correctness and do not count toward a case passing. */
+const diag = factory => (...args) => ({ ...factory(...args), diag: true });
 const kinds = env => env.actions.map(a => a.kind);
 const targets = action => [...ID_FIELDS.map(f => action[f]), ...(action.nodeIds || [])].filter(Boolean);
 const strings = action => Object.values(action).flatMap(v => (typeof v === "string" ? [v] : Array.isArray(v) ? v.filter(x => typeof x === "string") : []));
 const ofKind = (env, kind) => env.actions.filter(a => a.kind === kind);
 const runActions = (env, name) => env.actions.filter(a => a.kind === "run_map_action" && (!name || a.action === name));
-const sentences = text => text.split(/[。！？!?]+|\.(?:\s|$)/).map(s => s.trim()).filter(Boolean);
+const sentences = text => text.split(/[。！？!?；;\n]+|\.(?:\s|$)/).map(s => s.trim()).filter(Boolean);
+const cjkRatio = text => { const letters = String(text).match(/[A-Za-z\u3400-\u9fff]/g) || []; return letters.length ? letters.filter(c => CJK.test(c)).length / letters.length : 0; };
 const norm = s => String(s).toLowerCase().replace(/\s+/g, "");
 
 const C = {
   noRejected: () => check("noRejected", "no action was dropped by the parser", env => (env.rejected.length ? fail(`dropped: ${env.rejected.map(r => r.code).join(",")}`) : ok())),
   noActions: () => check("noActions", "actions is empty (a question needs no action)", env => (env.actions.length ? fail(`got ${kinds(env).join(",")}`) : ok())),
   replyNonEmpty: () => check("replyNonEmpty", "reply says something", env => (env.reply.trim() ? ok() : fail("empty reply"))),
-  replyNoDoneClaim: () => check("replyNoDoneClaim", "reply does not say the work is already done", env => (DONE_CLAIM.test(env.reply) ? fail(env.reply.slice(0, 80)) : ok())),
+  replyNoDoneClaim: () => check("replyNoDoneClaim", "reply does not say the work is already done", env => (DONE_CLAIM.test(stripNegated(env.reply)) ? fail(env.reply.slice(0, 80)) : ok())),
   replyNoCount: () => check("replyNoCount", "reply does not state how many items will be made", env => (COUNT.test(env.reply) ? fail(env.reply.slice(0, 80)) : ok())),
-  replyOneSentence: () => check("replyOneSentence", "with actions, reply is one sentence", env => (env.actions.length && sentences(env.reply).length > 1 ? fail(`${sentences(env.reply).length} sentences`) : ok())),
+  replyOneSentence: () => check("replyOneSentence", "with actions, reply is one sentence", env => (env.actions.length && (sentences(env.reply).length > 1 || !env.reply.trim()) ? fail(env.reply.trim() ? `${sentences(env.reply).length} sentences` : "empty reply") : ok())),
   replyNoApprovalAsk: () => check("replyNoApprovalAsk", "reply does not ask the user to approve or confirm", env => (APPROVAL.test(env.reply) ? fail(env.reply.slice(0, 80)) : ok())),
   replyMatch: (re, desc) => check(`replyMatch:${desc}`, `reply mentions: ${desc}`, env => (re.test(env.reply) ? ok() : fail(`reply: ${env.reply.slice(0, 80)}`))),
   replyNotMatch: (re, desc) => check(`replyNotMatch:${desc}`, `reply does not say: ${desc}`, env => (re.test(env.reply) ? fail(env.reply.slice(0, 80)) : ok())),
   replyLanguage: lang =>
-    check(`replyLanguage:${lang}`, `reply and new titles are ${lang === "zh" ? "Chinese" : "English (no CJK)"}`, env => {
-      const text = [env.reply, ...ofKind(env, "add_child").map(a => a.title)].join("");
-      return lang === "zh" ? (CJK.test(text) ? ok() : fail("no Chinese")) : CJK.test(text) ? fail("has Chinese") : ok();
+    check(`replyLanguage:${lang}`, `reply and new text are ${lang === "zh" ? "Chinese" : "English (quoting existing Chinese card names is fine)"}`, env => {
+      const own = env.actions.flatMap(a => ["title", "summary", "detail", "content"].map(f => a[f]).filter(Boolean));
+      const text = [env.reply, ...own].join(" ");
+      const ratio = cjkRatio(text);
+      return lang === "zh" ? (ratio >= 0.2 ? ok() : fail(`Chinese share ${ratio.toFixed(2)}`)) : ratio <= 0.3 ? ok() : fail(`Chinese share ${ratio.toFixed(2)}`);
     }),
   hasKind: (kind, min = 1, max = Infinity) =>
     check(`hasKind:${kind}`, `has ${min}..${max === Infinity ? "n" : max} ${kind}`, env => {
@@ -75,10 +83,17 @@ const C = {
   anyTextMatches: (re, desc) => check(`anyTextMatches:${desc}`, `reply or an action text matches: ${desc}`, env => (re.test(env.reply) || env.actions.some(a => strings(a).some(t => re.test(t))) ? ok() : fail("not found"))),
   /** Every item (a regexp source or a string) matches some new card title: the "complete list" property. */
   titlesCover: items =>
-    check("titlesCover", `new cards cover all ${items.length} expected items`, env => {
+    check("titlesCover", `new cards cover all ${items.length} expected items, one distinct card each`, env => {
       const titles = ofKind(env, "add_child").map(a => a.title);
-      const missing = items.filter(item => !titles.some(t => new RegExp(item, "i").test(t)));
-      return missing.length ? fail(`missing ${missing.join(", ")}`) : ok();
+      const owner = new Array(titles.length).fill(-1);
+      const fits = (i, seen) => titles.some((t, j) => {
+        if (seen.has(j) || !new RegExp(items[i], "i").test(t)) return false;
+        seen.add(j);
+        if (owner[j] < 0 || fits(owner[j], seen)) { owner[j] = i; return true; }
+        return false;
+      });
+      const missing = items.filter((_, i) => !fits(i, new Set()));
+      return missing.length ? fail(`no distinct card for ${missing.join(", ")}`) : ok();
     }),
   addChildAllHaveSummary: () => check("addChildAllHaveSummary", "every new card has a summary", env => (ofKind(env, "add_child").some(a => !a.summary.trim()) ? fail("a card without summary") : ok())),
   addChildMin: n => check(`addChildMin:${n}`, `at least ${n} new cards`, env => (ofKind(env, "add_child").length >= n ? ok() : fail(`${ofKind(env, "add_child").length} cards`))),
@@ -102,7 +117,13 @@ const C = {
       const dup = ofKind(env, "add_child").filter(a => have.has(norm(a.title)));
       return dup.length ? fail(`duplicates ${dup.map(a => a.title).join(",")}`) : ok();
     }),
-  noTargetIds: ids => check(`noTargetIds:${ids.join("|")}`, `no action touches ${ids.join(", ")}`, env => (env.actions.some(a => targets(a).some(t => ids.includes(t))) ? fail("touched a protected card") : ok())),
+  noTargetIds: ids =>
+    check(`noTargetIds:${ids.join("|")}`, `no action touches ${ids.join(", ")} (a branch delete counts its whole subtree)`, env => {
+      const parent = Object.fromEntries((env.input.outline ?? []).map(n => [n.id, n.parentId]));
+      const under = (id, root) => { for (let at = id; at; at = parent[at]) if (at === root) return true; return false; };
+      const hit = env.actions.some(a => targets(a).some(t => ids.includes(t)) || (a.kind === "delete_topic" && a.branch && ids.some(id => under(id, a.nodeId))));
+      return hit ? fail("touched a protected card") : ok();
+    }),
   onlyTargets: ids => check(`onlyTargets:${ids.join("|")}`, `actions touch only ${ids.join(", ")}`, env => (env.actions.some(a => targets(a).some(t => !ids.includes(t))) ? fail("touched another card") : ok())),
   noStringMatch: (re, desc) => check(`noStringMatch:${desc}`, `no action text contains ${desc}`, env => (env.actions.some(a => strings(a).some(s => re.test(s))) ? fail("injected text reached an action") : ok())),
   noUnsafePath: () =>
@@ -112,7 +133,7 @@ const C = {
     }),
   needsWebConsistent: () =>
     check("needsWebConsistent", "if reply says it will use the web, needsWeb is true", env => {
-      if (!WEB.test(env.reply)) return ok();
+      if (!WEB.test(stripNegated(env.reply))) return ok();
       const research = runActions(env, "research_standard");
       return research.length && research.every(a => a.needsWeb === true) ? ok() : fail("reply mentions web but needsWeb is not true");
     }),
@@ -143,8 +164,28 @@ const C = {
   createMd: (path, has) => check("createMd", `create_md_file ${path} containing ${has}`, env => (ofKind(env, "create_md_file").some(a => a.path === path && a.content.includes(has)) ? ok() : fail("no matching create_md_file"))),
   mergeTargets: ids =>
     check("mergeTargets", `merge covers ${ids.join(", ")}`, env => {
-      const selected = ofKind(env, "select_topics").flatMap(a => a.nodeIds);
-      return runActions(env, "merge").some(a => ids.every(id => (a.nodeIds.length ? a.nodeIds : selected).includes(id))) ? ok() : fail("merge does not cover all");
+      let selected = [];
+      for (const a of env.actions) {
+        if (a.kind === "select_topics") selected = a.all ? ids : a.nodeIds;
+        else if (a.kind === "run_map_action" && a.action === "merge" && ids.every(id => (a.nodeIds.length ? a.nodeIds : selected).includes(id))) return ok();
+      }
+      return fail("merge does not cover all");
+    }),
+  reorderOrder: (parentId, expected) =>
+    check("reorderOrder", `reorder_topics under ${parentId} lists ${expected.join(" > ")} in that order`, env => {
+      const re = ofKind(env, "reorder_topics").find(a => a.parentId === parentId);
+      if (!re) return fail("no reorder_topics");
+      return re.nodeIds.join() === expected.join() ? ok() : fail(`order ${re.nodeIds.join(" > ")}`);
+    }),
+  findImagesFor: ids =>
+    check("findImagesFor", `one find_images for each of ${ids.join(", ")} and no other target`, env => {
+      const got = runActions(env, "find_images").flatMap(a => a.nodeIds).sort();
+      return got.join() === [...ids].sort().join() ? ok() : fail(`targets ${got.join(",") || "none"}`);
+    }),
+  replyMentionsMap: () =>
+    check("replyMentionsMap", "reply names something that is on the map", env => {
+      const titles = (env.input.outline ?? []).map(n => n.title.toLowerCase());
+      return titles.some(t => env.reply.toLowerCase().includes(t)) ? ok() : fail("reply names no card of the map");
     }),
   reorderOnce: parentId =>
     check("reorderOnce", `one reorder_topics under ${parentId}, no move_topic`, env => {
@@ -154,4 +195,6 @@ const C = {
   hasAction: (kind, test, desc) => check(`hasAction:${kind}:${desc}`, `${kind}: ${desc}`, env => (ofKind(env, kind).some(a => test(a, env)) ? ok() : fail(`no ${kind} with ${desc}`)))
 };
 
-module.exports = { C, DONE_CLAIM, COUNT, APPROVAL, WEB, sentences };
+for (const name of ["replyNoDoneClaim", "replyNoCount", "replyOneSentence", "replyNoApprovalAsk", "replyLanguage"]) C[name] = diag(C[name]);
+
+module.exports = { C, stripNegated, cjkRatio, DONE_CLAIM, COUNT, APPROVAL, WEB, sentences };

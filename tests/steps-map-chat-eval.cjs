@@ -53,14 +53,14 @@ test('style patterns: done-claims, counts and approval requests are caught, plai
   for (const bad of ['已新增三個分支', '完成了', 'I have added the cards', '已經研究完']) assert.ok(DONE_CLAIM.test(bad), bad);
   for (const good of ['我會新增三個分支。', '接下來我會把它改名。', 'I will add the branches.']) assert.ok(!DONE_CLAIM.test(good), good);
   for (const bad of ['約 87 個節點', '新增 3 個分支', 'about 20 nodes']) assert.ok(COUNT.test(bad), bad);
-  assert.ok(!COUNT.test('我會新增三個分支。'));
+  assert.ok(!COUNT.test('我會新增手沖、義式與冷萃分支。'));
   for (const bad of ['請確認後套用', '要我執行嗎', 'Please confirm']) assert.ok(APPROVAL.test(bad), bad);
   assert.ok(!APPROVAL.test('我會直接新增。'));
 });
 
 test('A1 question: no action passes; an action fails noActions', () => {
-  assert.deepEqual(failed(run('A1', raw('還缺保存方式與器具。'))), []);
-  assert.deepEqual(failed(run('A1', raw('我會新增。', [item('add_child', { parentId: 'r', title: 'X', summary: 'x' })]))), ['noActions']);
+  assert.deepEqual(failed(run('A1', raw('牛排還缺保存方式與器具。'))), []);
+  assert.deepEqual(failed(run('A1', raw('牛排我會新增。', [item('add_child', { parentId: 'r', title: 'X', summary: 'x' })]))), ['noActions']);
 });
 
 test('B1 complete list: all eight planets pass; a missing planet fails titlesCover', () => {
@@ -451,4 +451,82 @@ test('S3: run replays the stored context, runs a case check file when there is o
 
 test('S3: the corpus tool refuses an output folder inside the repository', async () => {
   await assert.rejects(corpus.run({ dir: 'x', records: 'y', out: path.join(__dirname, 'inside-repo') }, async () => ({})), /outside this repository/);
+});
+
+// ---- S4: weak oracles are repaired; each repair has a bad answer that must fail ----
+const envOf = (actions = [], reply = '我會做。', extra = {}) => ({ reply, actions, rejected: [], remaining: '', input: { outline: [] }, raw: { actions, reply, remaining: '' }, ...extra });
+const okOf = (check, env) => check.run(env).ok;
+
+test('S4: a question answered with nonsense fails (reply must name something on the map)', () => {
+  assert.ok(failed(run('A1', raw('香蕉是藍色的。'))).includes('replyMentionsMap'));
+  assert.ok(failed(run('A3', raw('今天天氣很好。'))).includes('replyMentionsMap'));
+  assert.equal(CASES.filter(k => k.weak).length, 4, 'the question cases are flagged weak in the report');
+});
+
+test('S4: completeness needs one distinct card per item', () => {
+  const card = t => A('add_child', { parentId: '', title: t, summary: 's' });
+  const check = C.titlesCover(['水星', '金星']);
+  assert.equal(okOf(check, envOf([card('水星'), card('金星')])), true);
+  assert.equal(okOf(check, envOf([card('水星、金星')])), false, 'both items stuffed into one card must fail');
+  assert.equal(okOf(C.titlesCover(['水', '水星']), envOf([card('水星')])), false, 'one card cannot satisfy two items');
+  assert.equal(okOf(C.titlesCover(['水', '水星']), envOf([card('水星'), card('水')])), true, 'matching finds the distinct assignment');
+});
+
+test('S4: reorder checks the resulting order, find_images the targets one by one', () => {
+  const re = ids => A('reorder_topics', { parentId: 'a', nodeIds: ids });
+  assert.equal(okOf(C.reorderOrder('a', ['a2', 'a1', 'a3']), envOf([re(['a2', 'a1', 'a3'])])), true);
+  assert.equal(okOf(C.reorderOrder('a', ['a2', 'a1', 'a3']), envOf([re(['a1', 'a2', 'a3'])])), false, 'the original order is not a sort');
+  const img = id => A('run_map_action', { action: 'find_images', nodeIds: [id], direction: 'x' });
+  assert.equal(okOf(C.findImagesFor(['a1', 'a2']), envOf([img('a1'), img('a2')])), true);
+  assert.equal(okOf(C.findImagesFor(['a1', 'a2']), envOf([img('a1'), img('a1')])), false, 'both aimed at one card must fail');
+});
+
+test('S4: merge uses explicit targets first and the last selection before the merge', () => {
+  const sel = ids => A('select_topics', { nodeIds: ids });
+  const merge = (ids = []) => A('run_map_action', { action: 'merge', nodeIds: ids, title: 'T' });
+  const check = C.mergeTargets(['x', 'y']);
+  assert.equal(okOf(check, envOf([sel(['x', 'y']), merge()])), true);
+  assert.equal(okOf(check, envOf([sel(['x', 'y']), merge(['z'])])), false, 'explicit nodeIds override the selection');
+  assert.equal(okOf(check, envOf([sel(['x', 'y']), sel(['z']), merge()])), false, 'only the LAST selection counts');
+});
+
+test('S4: protecting a card also protects it from a branch delete above it', () => {
+  const env = envOf([A('delete_topic', { nodeId: 'a', branch: true })], 'x', { input: { outline: [{ id: 'a', parentId: null }, { id: 'a1', parentId: 'a' }] } });
+  assert.equal(okOf(C.noTargetIds(['a1']), env), false);
+  assert.equal(okOf(C.noTargetIds(['zz']), env), true, 'control: an unrelated card is not protected by this');
+});
+
+test('S4: regex repairs (negation, English past tense, Chinese numerals, web, sentences, language)', () => {
+  const done = r => !okOf(C.replyNoDoneClaim(), envOf([], r));
+  assert.equal(done('I created the cards.'), true);
+  assert.equal(done('我不能說已經完成。'), false, 'negated phrase is not a claim');
+  assert.equal(!okOf(C.replyNoCount(), envOf([], '我會新增五十個節點。')), true);
+  assert.equal(!okOf(C.replyNoCount(), envOf([], '我會新增手沖與義式。')), false);
+  const web = r => okOf(C.needsWebConsistent(), envOf([A('run_map_action', { action: 'research_standard', nodeIds: ['a'] })], r));
+  assert.equal(web('這次不需要上網。'), true, 'denying the web is not promising it');
+  assert.equal(web('我會上網研究。'), false);
+  assert.equal(web('我們用 WebSocket 示範。'), true, 'web needs a word boundary');
+  const one = (acts, r) => okOf(C.replyOneSentence(), envOf(acts, r));
+  const act = [A('auto_layout')];
+  assert.equal(one(act, '我會排版。'), true);
+  assert.equal(one(act, '第一件事\n第二件事'), false, 'a list on separate lines is not one sentence');
+  assert.equal(one(act, ''), false, 'an empty reply with actions fails');
+  assert.equal(okOf(C.replyLanguage('en'), envOf([], 'I will add a branch under 牛排.')), true, 'quoting a Chinese card name is fine');
+  assert.equal(okOf(C.replyLanguage('en'), envOf([], '我會新增一個分支，名稱是牛排。')), false);
+  assert.equal(okOf(C.replyLanguage('zh'), envOf([], 'I will add it.')), false);
+});
+
+test('S4: tone checks are diagnostics and carry the flag into the results', () => {
+  const results = run('G1', raw('我已經改好了。', [item('rename_topic', { nodeId: 'i', title: '濃縮咖啡' })]));
+  const tone = results.find(c => c.id === 'replyNoDoneClaim');
+  assert.equal(tone.ok, false);
+  assert.equal(tone.diag, true);
+  assert.equal(results.find(c => c.id === 'hasKind:rename_topic').diag, undefined, 'task checks are not diagnostics');
+});
+
+test('S4: C3 now really produces researchDeferred in the context the model sees', () => {
+  const k = byId('C3');
+  const json = prepare(p, k).context.json;
+  assert.match(json, /researchDeferred/);
+  assert.match(json, /oversize/);
 });

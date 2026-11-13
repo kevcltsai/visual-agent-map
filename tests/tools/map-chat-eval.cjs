@@ -91,9 +91,9 @@ function evaluateRun(p, kase, prepared, raw) {
   const checks = kase.checks.map(c => {
     try {
       const r = c.run(env);
-      return { id: c.id, desc: c.desc, ok: r.ok, ...(r.note ? { note: r.note } : {}) };
+      return { id: c.id, desc: c.desc, ok: r.ok, ...(c.diag ? { diag: true } : {}), ...(r.note ? { note: r.note } : {}) };
     } catch (error) {
-      return { id: c.id, desc: c.desc, ok: false, note: `check crashed: ${error.message}` };
+      return { id: c.id, desc: c.desc, ok: false, ...(c.diag ? { diag: true } : {}), note: `check crashed: ${error.message}` };
     }
   });
   return { status: "ok", checks };
@@ -241,7 +241,7 @@ function summarize(cases, results) {
     const rows = kase.checks.map(c => {
       const passes = received.filter(r => r.checks.find(x => x.id === c.id)?.ok).length;
       const notes = [...new Set(received.map(r => r.checks.find(x => x.id === c.id)).filter(x => x && !x.ok && x.note).map(x => x.note))].slice(0, 2);
-      return { id: c.id, desc: c.desc, passes, total: received.length, notes };
+      return { id: c.id, desc: c.desc, diag: !!c.diag, passes, total: received.length, notes };
     });
     return { kase, errors, parseErrors: received.filter(r => r.status === "parse_error").length, received: received.length, attempts: mine.length, rows, replies: received.filter(r => r.status !== "parse_error").map(r => JSON.parse(r.raw)) };
   });
@@ -255,17 +255,20 @@ function report(cases, results, runs, model, slug) {
   const allChecks = sum.flatMap(s => s.rows);
   const received = sum.reduce((n, s) => n + s.received, 0);
   const parseErrors = sum.reduce((n, s) => n + s.parseErrors, 0);
-  const casePass = results.filter(r => r.raw && r.status === "ok" && r.checks.every(c => c.ok)).length;
-  lines.push(`呼叫成功率 ${received}/${calls}（基礎設施失敗 ${errored} 次）；可解析率 ${received - parseErrors}/${received}（產品會整則拒絕的壞格式 ${parseErrors} 次）；題目通過 ${casePass}/${received}（壞格式算失敗；各檢查以收到的回覆為分母）。`, "");
+  const casePass = results.filter(r => r.raw && r.status === "ok" && r.checks.every(c => c.ok || c.diag)).length;
+  lines.push(`呼叫成功率 ${received}/${calls}（基礎設施失敗 ${errored} 次）；可解析率 ${received - parseErrors}/${received}（產品會整則拒絕的壞格式 ${parseErrors} 次）；題目通過 ${casePass}/${received}（只算任務檢查；壞格式算失敗；語氣與格式屬「診斷」，另列）。`, "");
   lines.push(`呼叫 ${calls} 次（失敗 ${errored} 次）；檢查項 ${allChecks.length} 條，全部通過 ${allChecks.filter(r => r.passes === r.total && r.total > 0).length} 條，有任一次失敗 ${allChecks.filter(r => r.passes < r.total).length} 條。`, "");
-  const failing = sum.filter(s => s.rows.some(r => r.passes < r.total) || s.errors);
+  const failing = sum.filter(s => s.rows.some(r => r.passes < r.total) || s.errors || s.parseErrors);
+  const weak = sum.filter(s => s.kase.weak);
+  if (weak.length) lines.push("## 弱檢查（通過不代表答對）", "", ...weak.map(s => `- ${s.kase.id} ${s.kase.title}：${s.kase.weak}`), "");
   lines.push("## 有失敗的案例", "");
   if (!failing.length) lines.push("無。", "");
   for (const s of failing) {
     lines.push(`### ${s.kase.id} ${s.kase.title}（${s.kase.group}）`, `來源：${s.kase.source}`, "");
     if (s.errors) lines.push(`- 基礎設施失敗 ${s.errors} 次`);
     if (s.parseErrors) lines.push(`- 壞格式（整則被產品拒絕）${s.parseErrors} 次`);
-    for (const r of s.rows) if (r.passes < r.total) lines.push(`- ${r.passes}/${r.total} ${r.desc}${r.notes.length ? `（${r.notes.join("；")}）` : ""}`);
+    for (const r of s.rows) if (r.passes < r.total) lines.push(`- ${r.diag ? "（診斷）" : ""}${r.passes}/${r.total} ${r.desc}${r.notes.length ? `（${r.notes.join("；")}）` : ""}`);
+    if (s.kase.weak) lines.push(`- 注意：${s.kase.weak}`);
     lines.push("");
   }
   const negs = sum.filter(x => x.kase.group === "不該做");

@@ -44,6 +44,11 @@ export interface TransactionDeps {
    * rebuild runs. A note whose derived text is already current is not written.
    */
   refreshNotes?: (paths: string[]) => Promise<void>;
+  /**
+   * Called with the path of every note a step moves, renames or rewrites, when the step is queued (before anything is written);
+   * throwing refuses the step with nothing written. The one place a caller can keep a set of notes read-only.
+   */
+  guardPath?: (path: string) => void;
   /** Called once per edited map after commit, undo and redo, with the map as now stored. */
   onApplied: (mapPath: string, map: MapDocument) => void | Promise<void>;
   /** Called for each edited map before anything is written; throwing cancels the whole transaction. */
@@ -519,10 +524,12 @@ export function begin(deps: TransactionDeps): Transaction {
 
   const transaction: Transaction = {
     move(path, folder, lifecycle) {
+      deps.guardPath?.(path);
       moves.push({ kind: "move", path, folder, lifecycle });
       return transaction;
     },
     create(path, parkFolder, topicId, title) {
+      deps.guardPath?.(path);
       moves.push({
         kind: "create",
         path,
@@ -533,6 +540,7 @@ export function begin(deps: TransactionDeps): Transaction {
       return transaction;
     },
     rename(path, title) {
+      deps.guardPath?.(path);
       moves.push({
         kind: "rename",
         path,
@@ -558,6 +566,7 @@ export function begin(deps: TransactionDeps): Transaction {
       return transaction;
     },
     rewriteNote(path, write) {
+      deps.guardPath?.(path);
       noteOps.push({ path, write });
       return transaction;
     },

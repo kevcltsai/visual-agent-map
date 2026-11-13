@@ -18,9 +18,11 @@ import limitsZh from "./limits.zh.md";
 import template from "./prompt.md";
 import sourceBlock from "./source-block.md";
 import sourceChildren from "./source-children.md";
+import sourceMaterial from "./source-material.md";
 import sourceNote from "./source-note.md";
 import summaryBasis from "./summary-basis.md";
 import summaryBasisNote from "./summary-basis-note.md";
+import summaryBasisSource from "./summary-basis-source.md";
 import topicLineEn from "./topic-line.en.md";
 import topicLineZh from "./topic-line.zh.md";
 
@@ -41,6 +43,8 @@ export interface OutlineGenerateRequest {
   noteDetail?: string;
   /** Untrusted: titles of the topic's current subtopics, quoted as data; the outline must not repeat them. */
   existingChildren?: string[];
+  /** Untrusted: the map's data sources (documents or condensed findings, then the source list), quoted as data in a block of its own before the note. Blank = none. */
+  sourceMaterial?: string;
 }
 export interface OutlineGenerateResult {
   /** Heading-only Markdown (fence removed, summary lines taken out), ready for the outline textarea and `parseOutline`. */
@@ -96,6 +100,11 @@ function noteInputs(request: OutlineGenerateRequest): { note: string; children: 
     note: request.noteDetail?.trim() ? request.noteDetail : "",
     children: (request.existingChildren ?? []).map(item => item.trim()).filter(Boolean)
   };
+}
+/** The map's data sources as their own quoted, untrusted block. Empty when the request carries none. */
+function sourceSection(request: OutlineGenerateRequest): string {
+  const material = request.sourceMaterial?.trim() ? request.sourceMaterial : "";
+  return material ? `${renderTemplate(sourceMaterial, { json: JSON.stringify(material) })}\n\n` : "";
 }
 /** The block placed before the preset: the note and subtopics as quoted, untrusted data. Empty when there are neither. */
 function noteSection(request: OutlineGenerateRequest): string {
@@ -197,13 +206,14 @@ export function parseOutlineReply(raw: string, language: ContentLanguage): Outli
  */
 export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, OutlineGenerateResult> = {
   id: "outline-generate",
-  version: 4,
+  version: 5,
   render: request => {
     const content = request.contentLanguage ?? request.language;
-    const hasSource = !!noteSection(request);
+    const hasSource = !!sourceSection(request);
+    const hasNote = !!noteSection(request);
     return renderTemplate(template, {
-      noteSection: noteSection(request),
-      summaryBasis: hasSource ? summaryBasisNote : summaryBasis,
+      noteSection: `${sourceSection(request)}${noteSection(request)}`,
+      summaryBasis: hasSource ? summaryBasisSource : hasNote ? summaryBasisNote : summaryBasis,
       languageInstruction: inLanguageNaming({ zh: languageZh, en: languageEn }, content, { language: "region" }, "en", {
         kind: "topic",
         text: request.topic
@@ -223,7 +233,7 @@ export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, Outline
     if (estimateTokens(prompt) > OUTLINE_GENERATE_TOKEN_BUDGET) {
       // A request with a note or subtopics is refused whole (never truncated, never retried with the title only), with its own wording.
       const { note, children } = noteInputs(request);
-      if (note || children.length)
+      if (note || children.length || request.sourceMaterial?.trim())
         throw new OutlineGenerateError("note_too_long", translate(locale, "error.outline_generate_note_too_long"));
       throw new OutlineGenerateError("over_budget", translate(locale, "error.outline_generate_over_budget"));
     }

@@ -15,7 +15,8 @@ export type MapChatGuardCode =
   | "reserved_frontmatter"
   | "hypothesis_frontmatter_changed"
   | "exists"
-  | "no_baseline";
+  | "no_baseline"
+  | "map_source";
 export type MapChatGuardResult = { ok: true } | { ok: false; code: MapChatGuardCode };
 
 export interface MapChatWriteCheck {
@@ -30,6 +31,8 @@ export interface MapChatWriteCheck {
   exists?: boolean;
   /** Paths (normalised) of the Markdown files that were sent in this turn's context, with their content hash. */
   knownHashes?: Readonly<Record<string, string>>;
+  /** Normalised paths of the map's data sources: read-only for the chat, a write to one is refused (edit and create alike). */
+  readOnlyPaths?: readonly string[];
   /** `app.vault.configDir`, the vault's configuration folder (not always `.obsidian`). */
   configDir: string;
 }
@@ -111,6 +114,7 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
   if (path === null) return { ok: false, code: "outside_vault" };
   const configDir = normalizeVaultPath(check.configDir);
   const lower = path.toLowerCase();
+  if (check.readOnlyPaths?.some(source => source.toLowerCase() === lower)) return { ok: false, code: "map_source" };
   const inside = (dir: string | null): boolean =>
     !!dir && (lower === dir.toLowerCase() || lower.startsWith(`${dir.toLowerCase()}/`));
   if (configDir === null || inside(configDir)) return { ok: false, code: "config_dir" };

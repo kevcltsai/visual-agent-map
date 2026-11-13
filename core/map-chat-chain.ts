@@ -64,6 +64,9 @@ export interface MapChatRoundAction {
   /** Applied (not skipped, refused or failed). */
   done: boolean;
 }
+/** True when a `select_topics` was applied: the next round's context carries the selected cards' notes. */
+export const selectedCards = (actions: readonly MapChatRoundAction[]): boolean =>
+  actions.some(action => action.done && action.kind === "select_topics");
 /** True when at least one action that writes (cards, notes, links, looks, maps) was applied in the round. */
 export const wroteSomething = (actions: readonly MapChatRoundAction[]): boolean =>
   actions.some(action => action.done && !NOT_A_WRITE.has(action.kind));
@@ -80,6 +83,8 @@ export interface MapChatChainState {
   researchTargets: number;
   /** The round being waited on wrote something. */
   wrote: boolean;
+  /** The last finished round went on only because it selected cards (so the next one could read their notes); a second one in a row does not. */
+  selectedOnly?: boolean;
   ended?: { reason: MapChatChainEndReason; remaining: string };
 }
 export const startChain = (maxRounds = MAP_CHAT_CHAIN_MAX_ROUNDS): MapChatChainState => ({
@@ -145,7 +150,8 @@ export interface MapChatRoundEnd {
 /**
  * A round is over. Continues when the reply left something to do or research notes were left out; then, in this order: another
  * background feature, the round limit, work to wait for, no progress. Nothing left to do ends the chain as `done` (so a pure
- * research request is not followed up).
+ * research request is not followed up). A round that wrote nothing but selected cards goes on once, so the next round reads the
+ * notes of the cards it selected; a second such round in a row is no progress.
  */
 export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Step {
   if (state.phase !== "round" && state.phase !== "plan") return ignored(state);
@@ -154,7 +160,8 @@ export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Ste
     ...state,
     remaining,
     researchTargets: state.researchTargets + Math.max(0, end.started.research),
-    wrote: wroteSomething(end.actions)
+    wrote: wroteSomething(end.actions),
+    selectedOnly: false
   };
   if (!remaining && end.researchDeferred <= 0) return ended(next, "done");
   if (end.started.otherBackground) return ended(next, "other_background_work");
@@ -163,7 +170,10 @@ export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Ste
   if (end.started.research > 0) waitFor.push("research");
   if (end.started.expand > 0) waitFor.push("expand");
   if (waitFor.length) return { state: { ...next, phase: "waiting" }, decision: { kind: "wait", waitFor } };
-  if (!next.wrote) return ended(next, "no_progress");
+  if (!next.wrote) {
+    if (state.selectedOnly || !selectedCards(end.actions)) return ended(next, "no_progress");
+    return startNext({ ...next, selectedOnly: true });
+  }
   return startNext(next);
 }
 

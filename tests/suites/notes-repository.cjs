@@ -999,6 +999,68 @@ integrationTest('AI merge: the model sees the sources but no Thinking Origin, wi
   assert.equal(context.referenceGroups.length, 1); assert.equal(context.mode, 'merge'); assert.equal(context.researchMode, 'local'); assert.equal(context.visualMode, 'off'); assert.equal(context.referenceDelivery, 'direct');
   assert.equal(context.task, load('experiences/visual-map/steps/fragments.ts').mergeGoalTask(h.plugin.settings.language));
 });
+// Map data sources in an AI merge (ticket 03): the cards' own request never sees them; a second request adds a separate block.
+const mapSourceGroup = (content = '可以公開客戶資料') => ({ id: 'files:policy.md', name: 'policy.md', location: 'policy.md', documents: [{ path: 'policy.md', content }] });
+const isMapSourceRequest = context => (context.referenceGroups ?? []).some(g => g.id === 'files:policy.md');
+integrationTest('AI merge with map sources: a source that states the opposite of a card never changes the merged card text; it is only in the marked block', async () => {
+  const h = await aiMergeHarness(); h.view.readMapSourceGroups = async () => [mapSourceGroup()];
+  h.answer = async (signal, context) => isMapSourceRequest(context)
+    // The fake model adopts the source in every way it can: in the supplement and in the summary.
+    ? { summary: 'Sources say public', detail: '與合併後文字衝突：資料來源說「可以公開客戶資料」', visualReferences: [], formatIssues: [], suggestions: [] }
+    : { summary: 'Merged one-liner', detail: '### Facts\n\n不得公開客戶資料 (Alpha detail and Gamma detail)', visualReferences: [], formatIssues: [], suggestions: [] };
+  const { task } = await h.begin(); await h.untilSettled(task);
+  assert.equal(h.asks.length, 2, 'the merge, then the supplement');
+  const first = JSON.stringify(h.asks[0].context), second = h.asks[1].context;
+  assert.equal(first.includes('可以公開客戶資料'), false, 'the request that writes the merged text never carries the map sources');
+  assert.equal(h.asks[0].context.referenceGroups.length, 1); assert.equal(isMapSourceRequest(h.asks[0].context), false);
+  assert.deepEqual(second.referenceGroups.map(g => g.id), ['files:policy.md'], 'the supplement request sees the map sources only, no card');
+  assert.match(second.detail, /不得公開客戶資料/); assert.equal(second.mode, 'merge'); assert.equal(second.referenceDelivery, 'direct');
+  assert.equal(second.task, load('experiences/visual-map/steps/fragments.ts').mergeSupplementTask(h.plugin.settings.language));
+  const note = await h.repo.readNote((await h.mergedNode('AI merged')).path);
+  assert.equal(note.summary, 'Merged one-liner', 'the summary is the cards\' own');
+  assert.match(note.detail, /### Facts\n\n不得公開客戶資料 \(Alpha detail and Gamma detail\)/, 'the card text is intact');
+  const at = note.detail.indexOf('> [!note]'); assert.ok(at > 0);
+  assert.equal(note.detail.slice(0, at).includes('可以公開客戶資料'), false, 'the source sentence is only inside the block');
+  assert.match(note.detail.slice(at), /From the map's data sources[^\n]*\n> 與合併後文字衝突：資料來源說「可以公開客戶資料」/);
+});
+integrationTest('AI merge with map sources: no map sources means one request and no block; a failed supplement still merges the cards and says so', async () => {
+  const none = await aiMergeHarness(); none.view.readMapSourceGroups = async () => [];
+  await none.untilSettled((await none.begin()).task); assert.equal(none.asks.length, 1);
+  assert.doesNotMatch((await none.repo.readNote((await none.mergedNode('AI merged')).path)).detail, /\[!note\]/);
+  const h = await aiMergeHarness(); h.view.readMapSourceGroups = async () => [mapSourceGroup()];
+  const answer = h.answer; h.answer = async (signal, context) => { if (isMapSourceRequest(context)) throw new Error('provider down'); return answer(signal, context); };
+  await h.untilSettled((await h.begin()).task);
+  const note = await h.repo.readNote((await h.mergedNode('AI merged')).path);
+  assert.match(note.detail, /Alpha detail and Gamma detail/); assert.match(note.detail, /> The map's data sources could not be used for this merge/);
+  assert.ok(h.failures.length >= 1, 'the failure is logged');
+});
+integrationTest('AI merge with map sources: a map source that changes while either request runs fails the merge as stale and writes nothing', async () => {
+  for (const when of ['merge request', 'supplement request']) {
+    const h = await aiMergeHarness(); let content = 'v1'; h.view.readMapSourceGroups = async () => [mapSourceGroup(content)];
+    const original = await h.shape(); const files = h.files();
+    const answer = h.answer; let calls = 0;
+    h.answer = async (...args) => { calls++; if ((when === 'merge request') === (calls === 1)) content = 'v2'; return answer(...args); };
+    await h.untilSettled((await h.begin()).task);
+    assert.deepEqual(await h.shape(), original, `${when}: nothing merged`); assert.deepEqual(h.files(), files, `${when}: nothing written`);
+    assert.deepEqual(h.notices.filter(m => /nothing was merged/.test(m)), ['A source topic changed or left the map, so nothing was merged'], `${when}: reported`);
+  }
+});
+integrationTest('AI merge with map sources: a map source that changes after the supplement but before the write is caught by the write fence', async () => {
+  const h = await aiMergeHarness(); let content = 'v1'; h.view.readMapSourceGroups = async () => [mapSourceGroup(content)];
+  const original = await h.shape(); const confirm = h.view.confirmMergeDraft.bind(h.view);
+  h.view.confirmMergeDraft = (...args) => { content = 'v2'; return confirm(...args); };
+  await h.untilSettled((await h.begin()).task);
+  assert.deepEqual(await h.shape(), original); assert.equal(await h.mergedNode('AI merged'), undefined);
+});
+integrationTest('AI merge with map sources: the sources come from the one scrubbing exit (readMapSourceGroups), nothing is read around it', async () => {
+  const h = await aiMergeHarness(); const reads = [];
+  // The exit's own scrub of external roots is tested with the exit (ticket 01); here the merge must send what the exit returned.
+  h.view.readMapSourceGroups = async signal => { reads.push(signal); return [mapSourceGroup('see [external source] only')]; };
+  await h.untilSettled((await h.begin()).task);
+  assert.ok(reads.length >= 3, 'read for the request, the stale checks and the write fence');
+  const sent = JSON.stringify(h.asks.map(a => a.context));
+  assert.match(sent, /see \[external source\] only/); assert.doesNotMatch(sent, /\/Users\/|\/private\/|[A-Z]:\\/);
+});
 integrationTest('AI merge: the result is written through the structure merge in one history step (undo, redo, undo)', async () => {
   const h = await aiMergeHarness(); const original = await h.shape();
   const { task } = await h.begin('Merged by AI'); await h.untilSettled(task);

@@ -436,8 +436,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 20 (version 20: find_images takes several targets and the picture is put in automatically; version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 20);
+test('C1: the style is not part of the action schema, and the step version is 22 (version 22: auditing the whole map researches its main cards, not only the root, and no requested item is announced as skipped; version 21: a batch whose notes are not in the context selects the cards instead of asking the user to, and a title plus a list is one root card with the items as children; version 20: find_images takes several targets and the picture is put in automatically; version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 22);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -1088,6 +1088,11 @@ test('chat 02: an AIM map sends no topic type, strength or relation, even when t
   assert.equal('relations' in sent, false);
 });
 
+test('chat 02: an AIM map says so with aimMap; an ordinary map without relations or types sends no aimMap', () => {
+  assert.equal(JSON.parse(context({ aim: true }).json).aimMap, true);
+  assert.equal('aimMap' in JSON.parse(context().json), false, 'ordinary map with no relations yet: no flag, context as before');
+});
+
 test('chat 02: types and relations count toward the token budget of the whole prompt', () => {
   const many = Array.from({ length: 4000 }, (_, i) => ({ id: `n${i}`, title: `T${i}`, summary: '', parentId: null, depth: 0, kind: 'evidence' }));
   const relations = many.slice(1).map((n, i) => ({ kind: 'supports', from: n.id, to: many[i].id, description: 'd'.repeat(200) }));
@@ -1554,8 +1559,8 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(en, /go one step only/); assert.match(en, /Never express a topic type through the title/);
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
-test('hypothesis-leaning: S21 the step version is 20 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 20);
+test('hypothesis-leaning: S21 the step version is 22 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
+  assert.equal(mapChatStep.version, 22);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [

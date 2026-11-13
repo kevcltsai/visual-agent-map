@@ -693,3 +693,15 @@ test('S3b: rawCustom passes on true/undefined and fails with its message', () =>
   const bad = C.rawCustom('a', 'd', () => 'because').run(env);
   assert.deepEqual([bad.ok, bad.note], [false, 'because']);
 });
+
+test('S1: compare counts a failed diagnostic (tone/format) check as a pass for the whole case, like the report does', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-diag-'));
+  const a1 = byId('A1');
+  const mk = checks => [1, 2, 3].map(i => ({ id: 'A1', run: i, caseHash: caseHash(a1), raw: '{}', status: 'ok', checks }));
+  const write = (slug, results) => { fs.mkdirSync(path.join(dir, slug), { recursive: true }); fs.writeFileSync(path.join(dir, slug, 'results.json'), JSON.stringify({ meta: {}, results })); };
+  write('a', mk([{ id: 'noActions', desc: 'task check', ok: true }, { id: 'replyNoCount', desc: 'tone check', ok: true, diag: true }]));
+  write('b', mk([{ id: 'noActions', desc: 'task check', ok: true }, { id: 'replyNoCount', desc: 'tone check', ok: false, diag: true }]));
+  const out = spawnSync('node', [path.join(__dirname, 'tools/map-chat-eval.cjs'), 'compare', `--out=${dir}`, '--a=a', '--b=b'], { encoding: 'utf8' }).stdout;
+  fs.rmSync(dir, { recursive: true, force: true });
+  assert.ok(!/整題通過 3\/3 → 0\/3/.test(out), `a failing diagnostic must not fail the whole case: ${out}`);
+});

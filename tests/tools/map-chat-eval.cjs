@@ -345,7 +345,7 @@ function compare() {
     if (x && y) (x === y ? same : changed).push(id); else (x ? removed : added).push(id);
   }
   lines.push("", `題目：相同 ${same.length}，定義已變更 ${changed.length}${changed.length ? `（${changed.join("、")}）` : ""}，新增 ${added.length}${added.length ? `（${added.join("、")}）` : ""}，移除 ${removed.length}${removed.length ? `（${removed.join("、")}）` : ""}。只比較「相同」的題目。`, "");
-  const stat = (data, id) => { const rs = data.results.filter(r => r.id === id && r.raw); return { n: rs.length, ok: rs.filter(r => r.status === "ok" && r.checks.every(c => c.ok)).length }; };
+  const stat = (data, id) => { const rs = data.results.filter(r => r.id === id && r.raw); return { n: rs.length, ok: rs.filter(r => r.status === "ok" && r.checks.every(c => c.ok || c.diag)).length }; };
   const diffs = [];
   for (const id of same) {
     const kase = CASES.find(k => k.id === id);

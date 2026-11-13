@@ -1,5 +1,5 @@
 import { constants, realpathSync } from "node:fs";
-import { lstat, open, readdir, realpath } from "node:fs/promises";
+import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, normalize, parse, sep } from "node:path";
 import type { ReferenceDocument, ReferenceGroup } from "../../ai/reference-materials";
@@ -207,20 +207,39 @@ export function scrubExternalPaths(text: string, roots: readonly string[]): stri
   return text.replace(new RegExp(ordered.map(escapeRegExp).join("|"), "g"), EXTERNAL_PATH_PLACEHOLDER);
 }
 
+/** The file calls readExternalFile makes; a test replaces them to play a swap between two of the calls. */
+export interface FileIo {
+  realpath: typeof realpath;
+  lstat: typeof lstat;
+  stat: typeof stat;
+  open: typeof open;
+}
+const DEFAULT_FILE_IO: FileIo = { realpath, lstat, stat, open };
+
 /**
  * Reads one listed file without trusting the listing: its real path must still be inside the source, it is opened
  * with O_NOFOLLOW (a link swapped in since the listing is refused), and the same handle is checked (regular file, size)
  * and read, at most 1 MB + 1 byte. Where O_NOFOLLOW does not exist (Windows) an lstat check stands in for it.
  */
-export async function readExternalFile(absolute: string, rootReal: string): Promise<string> {
+export async function readExternalFile(
+  absolute: string,
+  rootReal: string,
+  io: FileIo = DEFAULT_FILE_IO
+): Promise<string> {
   let handle;
   try {
-    if (!within(await realpath(absolute), rootReal)) throw new ExternalSourceError("unreadable");
+    if (!within(await io.realpath(absolute), rootReal)) throw new ExternalSourceError("unreadable");
     const noFollow = constants.O_NOFOLLOW as number | undefined;
-    if (noFollow === undefined && !(await lstat(absolute)).isFile()) throw new ExternalSourceError("unreadable");
-    handle = await open(absolute, constants.O_RDONLY | (noFollow ?? 0));
+    if (noFollow === undefined && !(await io.lstat(absolute)).isFile()) throw new ExternalSourceError("unreadable");
+    handle = await io.open(absolute, constants.O_RDONLY | (noFollow ?? 0));
     const info = await handle.stat();
     if (!info.isFile()) throw new ExternalSourceError("unreadable");
+    // O_NOFOLLOW only covers the last path part. A parent swapped for a link before or during the open is caught here:
+    // the path must still resolve inside the source, and to the very file the handle holds (same device and inode).
+    const after = await io.realpath(absolute);
+    if (!within(after, rootReal)) throw new ExternalSourceError("unreadable");
+    const there = await io.stat(after);
+    if (there.dev !== info.dev || there.ino !== info.ino) throw new ExternalSourceError("unreadable");
     if (info.size > EXTERNAL_MAX_FILE_BYTES) throw new ExternalSourceError("too-large");
     const buffer = new Uint8Array(EXTERNAL_MAX_FILE_BYTES + 1);
     let length = 0;

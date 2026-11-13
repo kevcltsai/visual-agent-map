@@ -359,3 +359,25 @@ test('external read: a file swapped for a link after the listing is refused (out
     await assert.rejects(ext.readExternalFile(big, real), error => error.reason === 'too-large');
   } finally { cleanup(w); }
 });
+
+test('external read: a parent folder swapped for a link around the open is refused (path no longer inside the source, or not the file the handle holds)', async () => {
+  const w = world(); try {
+    const docs = mk(w.outside, 'docs'), file = put(path.join(docs, 'sub', 'a.md'), 'inside'), real = fs.realpathSync(docs);
+    const secret = put(path.join(w.home, 'elsewhere', 'a.md'), 'TOP SECRET');
+    const fsp = require('node:fs/promises');
+    const io = (over = {}) => ({ realpath: fsp.realpath, lstat: fsp.lstat, stat: fsp.stat, open: fsp.open, ...over });
+    assert.equal(await ext.readExternalFile(file, real, io()), 'inside');
+    // 1) After the open the path resolves outside the source (the parent became a link to another folder).
+    let calls = 0;
+    await assert.rejects(ext.readExternalFile(file, real, io({ realpath: async p => (++calls === 1 ? fsp.realpath(p) : fs.realpathSync(secret)) })), error => error.reason === 'unreadable' && !String(error.message).includes('SECRET'));
+    // 2) Still a path inside the source, but another file than the one opened: device and inode differ.
+    const other = put(path.join(docs, 'sub', 'b.md'), 'other');
+    calls = 0;
+    await assert.rejects(ext.readExternalFile(file, real, io({ realpath: async p => (++calls === 1 ? fsp.realpath(p) : fs.realpathSync(other)) })), error => error.reason === 'unreadable');
+    // 3) A real swap: the parent is replaced by a link to the outside folder right after the first realpath.
+    const swapDir = mk(w.outside, 'swap'); const victim = put(path.join(swapDir, 'sub', 'a.md'), 'inside'); const swapReal = fs.realpathSync(swapDir);
+    calls = 0;
+    const swapped = io({ realpath: async p => { const r = await fsp.realpath(p); if (++calls === 1) { fs.renameSync(path.join(swapDir, 'sub'), path.join(swapDir, 'sub.old')); fs.symlinkSync(path.dirname(secret), path.join(swapDir, 'sub')); } return r; } });
+    await assert.rejects(ext.readExternalFile(victim, swapReal, swapped), error => error.reason === 'unreadable');
+  } finally { cleanup(w); }
+});

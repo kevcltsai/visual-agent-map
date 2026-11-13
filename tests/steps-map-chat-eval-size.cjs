@@ -1,6 +1,6 @@
 // Self-test of the size cases and the bookkeeping of the map chat evaluation (tests/tools/map-chat-eval): no AI is called.
 // It proves the large cases really reach the budgets they are about while their controls fit everything, that a run records
-// sizes and real input tokens, that compare shows them, and that a case or flow hash changes whenever its definition does.
+// sizes and real input tokens, and that compare shows them.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -8,9 +8,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { CASES } = require('./tools/map-chat-eval/cases.cjs');
-const { C, check, hashable, NOT_READ } = require('./tools/map-chat-eval/checks.cjs');
-const { LARGE, zhText } = require('./tools/map-chat-eval/large.cjs');
-const { prepare, product, evaluate, runCase, caseHash, flowHash, stable, usageTokens, LARGE_GROUP } = require('./tools/map-chat-eval.cjs');
+const { LARGE, zhText, NOT_READ } = require('./tools/map-chat-eval/size.cjs');
+const { prepare, product, evaluate, runCase, caseHash, usageTokens, LARGE_GROUP } = require('./tools/map-chat-eval.cjs');
 const { MAP_CHAT_DETAIL_BUDGET, MAP_CHAT_RESEARCH_BUDGET } = require('./support-replay.cjs').load('core/map-chat-context.ts');
 
 const p = product();
@@ -41,7 +40,7 @@ test('size cases: the text is Chinese and the same every time it is built', () =
   assert.ok(cjk(text) / text.length > 0.85, 'mostly CJK characters');
   assert.equal(zhText(5000, 7), text);
   assert.notEqual(zhText(5000, 8), text);
-  assert.equal(caseHash(require('./tools/map-chat-eval/large.cjs').LARGE[0]), caseHash(byId('SZ1')), 'building the cases twice gives the same hash');
+  assert.equal(caseHash(require('./tools/map-chat-eval/size.cjs').LARGE[0]), caseHash(byId('SZ1')), 'building the cases twice gives the same hash');
 });
 
 test('size cases: each large case reaches the budget it is about; its control fits every budget', () => {
@@ -138,81 +137,13 @@ test('compare: shows characters and real input tokens per case, and "—" where 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-size-'));
   const a1 = byId('A1');
   const row = extra => ({ id: 'A1', run: 1, caseHash: caseHash(a1), raw: '{}', status: 'ok', checks: [{ id: 'noActions', ok: true }], ...extra });
-  const write = (slug, results, meta = {}) => { fs.mkdirSync(path.join(dir, slug), { recursive: true }); fs.writeFileSync(path.join(dir, slug, 'results.json'), JSON.stringify({ meta: { hashVersion: 2, ...meta }, results })); };
+  const write = (slug, results, meta = {}) => { fs.mkdirSync(path.join(dir, slug), { recursive: true }); fs.writeFileSync(path.join(dir, slug, 'results.json'), JSON.stringify({ meta, results })); };
   write('old', [row({})]);
   write('a', [row({ promptChars: 1000, contextChars: 400, inputTokens: 900 }), row({ run: 2, promptChars: 1000, contextChars: 400, inputTokens: 1100 })]);
   write('b', [row({ promptChars: 2000, contextChars: 1400, inputTokens: 2500 })]);
-  write('v1', [row({})], { hashVersion: 1 });
   const cmp = (x, y) => spawnSync('node', [path.join(__dirname, 'tools/map-chat-eval.cjs'), 'compare', `--out=${dir}`, `--a=${x}`, `--b=${y}`], { encoding: 'utf8' }).stdout;
   const out = cmp('a', 'b');
   assert.match(out, /\| A1 \| 1000 → 2000 \| 400 → 1400 \| 1000 → 2500 \| 1\.00 → 1\.25 \|/);
   assert.match(cmp('old', 'b'), /\| A1 \| — → 2000 \| — → 1400 \| — → 2500 \| — → 1\.25 \|/);
-  assert.match(cmp('v1', 'b'), /雜湊的算法不同/);
   fs.rmSync(dir, { recursive: true, force: true });
-});
-
-// ---- hashing ----
-
-test('stable: structure decides, not key order; RegExp source and flags and undefined are kept', () => {
-  assert.equal(stable({ a: 1, b: [2, { c: 3 }] }), stable({ b: [2, { c: 3 }], a: 1 }));
-  assert.notEqual(stable({ t: /x/ }), stable({ t: /y/ }));
-  assert.notEqual(stable({ t: /x/ }), stable({ t: /x/i }));
-  assert.notEqual(stable({ a: undefined }), stable({ a: null }));
-  assert.notEqual(stable([{ t: /a/ }]), stable([{ t: /a/, c: [] }]));
-  assert.notEqual(stable(hashable(v => v, 1)), stable(hashable(v => v, 2)));
-  const loop = { a: 1 };
-  loop.self = loop;
-  assert.doesNotThrow(() => stable(loop));
-});
-
-const flow = {
-  id: 'H', title: 'hash', source: 'test', start: { title: 't', rows: [['r', 'R', null]] },
-  turns: [{ say: '加子項', touch: [], adds: true, expect: [C.hasKind('add_child', 1)] }],
-  final: { tree: [{ t: /R/, c: [{ t: /甲/, color: 'red' }] }], relations: [{ from: /甲/, to: /R/, kind: 'supports' }], none: /乙/, gone: [/丙/], open: [{ id: 'o1', path: /R/ }] }
-};
-const withFinal = final => ({ ...flow, final: { ...flow.final, ...final } });
-
-test('flowHash: changing only the expected tree changes the hash (String() made every tree "[object Object]")', () => {
-  assert.equal(flowHash(flow), flowHash({ ...flow }));
-  assert.notEqual(flowHash(flow), flowHash(withFinal({ tree: [{ t: /R/, c: [{ t: /甲/, color: 'blue' }] }] })), 'a nested attribute');
-  assert.notEqual(flowHash(flow), flowHash(withFinal({ tree: [{ t: /R/, c: [{ t: /丁/, color: 'red' }] }] })), 'a nested title pattern');
-  assert.notEqual(flowHash(flow), flowHash(withFinal({ tree: [{ t: /R/, c: [{ t: /甲/, color: 'red' }, { t: /丁/ }] }] })), 'one more child');
-  assert.notEqual(flowHash(flow), flowHash(withFinal({ tree: [{ t: /R/i, c: [{ t: /甲/, color: 'red' }] }] })), 'only the flags of a pattern');
-});
-
-test('flowHash: changing only a relation, a forbidden title or an open path changes the hash', () => {
-  assert.notEqual(flowHash(flow), flowHash(withFinal({ relations: [{ from: /甲/, to: /R/, kind: 'contradicts' }] })), 'relation kind');
-  assert.notEqual(flowHash(flow), flowHash(withFinal({ relations: [{ from: /丁/, to: /R/, kind: 'supports' }] })), 'relation end');
-  assert.notEqual(flowHash(flow), flowHash(withFinal({ none: /戊/ })));
-  assert.notEqual(flowHash(flow), flowHash(withFinal({ gone: [/戊/] })));
-  assert.notEqual(flowHash(flow), flowHash(withFinal({ open: [{ id: 'o1', path: /甲/ }] })));
-});
-
-test('flowHash: changing a turn\'s scope or a turn check\'s argument changes the hash', () => {
-  assert.notEqual(flowHash(flow), flowHash({ ...flow, turns: [{ ...flow.turns[0], touch: [/R/] }] }));
-  assert.notEqual(flowHash(flow), flowHash({ ...flow, turns: [{ ...flow.turns[0], expect: [C.hasKind('add_child', 1, 3)] }] }));
-});
-
-test('caseHash: changing only a check\'s predicate argument changes the hash (the closure body did not show it)', () => {
-  const k = byId('A1');
-  const withChecks = checks => ({ ...k, checks });
-  // Same id, same desc, same factory body: only the predicate passed in differs.
-  assert.notEqual(caseHash(withChecks([C.rawNone(a => a.kind === 'delete_topic', 'deletes')])), caseHash(withChecks([C.rawNone(a => a.kind === 'merge_topics', 'deletes')])));
-  assert.notEqual(caseHash(withChecks([C.hasAction('add_child', a => a.title === 'X', 'x')])), caseHash(withChecks([C.hasAction('add_child', a => a.title === 'Y', 'x')])));
-  // A value only in the arguments, not in id or desc.
-  assert.notEqual(caseHash(withChecks([C.editMdValid('a.md', 'one', 'z')])), caseHash(withChecks([C.editMdValid('a.md', 'two', 'z')])));
-  assert.notEqual(caseHash(withChecks([C.noteKeepsOriginal('a', ['甲'], 'z')])), caseHash(withChecks([C.noteKeepsOriginal('a', ['乙'], 'z')])));
-  // A RegExp argument: source and flags.
-  assert.notEqual(caseHash(withChecks([C.replyMatch(/x/, 'd')])), caseHash(withChecks([C.replyMatch(/x/i, 'd')])));
-  // A predicate made by a helper that closes over its own value, marked hashable.
-  const mentions = re => hashable(a => re.test(a.title), re);
-  assert.notEqual(caseHash(withChecks([C.rawNone(mentions(/雅思/), 'm')])), caseHash(withChecks([C.rawNone(mentions(/托福/), 'm')])));
-  // A hand-written check names its values in params.
-  const own = v => check('own', 'own', env => env.reply === v, [v]);
-  assert.notEqual(caseHash(withChecks([own('a')])), caseHash(withChecks([own('b')])));
-  assert.equal(caseHash(withChecks([own('a')])), caseHash(withChecks([own('a')])));
-});
-
-test('every check of every case carries the arguments it was made with', () => {
-  for (const k of CASES) for (const c of k.checks) assert.ok(Array.isArray(c.params), `${k.id} ${c.id}`);
 });

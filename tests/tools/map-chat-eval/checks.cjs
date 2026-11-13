@@ -1,9 +1,6 @@
 // Checks for the map chat evaluation set. Each factory returns { id, desc, run(env) -> { ok, note? } }.
 // env = { reply, actions, rejected, remaining, input } where the first four are the parsed reply (core/steps/map-chat/step.ts)
 // and input is the case's context input. A check states one property a good reply has; none of them scores quality.
-// Every check made by a factory of C also carries `factory` and `params` (the arguments it was made with): the case hash
-// (map-chat-eval.cjs) serialises them, since the body of `run` does not show the values it closes over. A predicate built by a
-// helper that closes over a value of its own is wrapped in `hashable(fn, ...params)` so that value is hashed too.
 const CJK = /[㐀-鿿]/;
 const WEB = /上網|網路|搜尋|搜索|查網|線上查|\bweb\b|search(?:ing)? (?:the )?(?:web|online|internet)|look (?:it )?up online/i;
 const DONE_CLAIM = /已(?:經)?(?:新增|建立|建好|完成|加入|加上|刪除|移動|合併|修改|改好|改成|套用|研究|整合|設定)|完成了|做好了|改好了|\b(?:I(?:'ve| have)|has been|have been|was|were|already) (?:added|created|done|completed|merged|moved|deleted|renamed|updated|applied)\b|\bI\s+(?:created|added|merged|moved|deleted|renamed|updated|applied|researched)\b/i;
@@ -16,12 +13,7 @@ const ID_FIELDS = ["nodeId", "parentId", "newParentId", "beforeId", "fromId", "t
 const stripNegated = text => String(text).replace(/(?:不能|不會|不要|不可|不必|不需要|不用|沒有|未|無法)[^，。,.！!？?；;\n]{0,6}/g, "");
 const ok = () => ({ ok: true });
 const fail = note => ({ ok: false, note });
-/** A check written by hand: `params` are the values `run` depends on beyond its own source (hashed with the case). */
-const check = (id, desc, run, params = []) => ({ id, desc, run, params });
-/** Marks a predicate made by a closure: `params` are the values it closes over, hashed with it. Returns `fn`. */
-const hashable = (fn, ...params) => Object.defineProperty(fn, "hashParams", { value: params, enumerable: false });
-/** Words that say a text was not read, not sent or not in front of the model (Chinese and English). */
-const NOT_READ = /沒(?:有)?(?:讀|看|收到|拿到|提供|附上|送)|未(?:讀|看|收到|送|提供|附|包含|納入)|無法(?:讀|看|取得|確認|得知)|看不到|讀不到|不在(?:這次|本次|這一輪|目前)|省略|被截|截斷|太長|下一輪|稍後|之後再|not (?:read|sent|included|available|visible)|omitted|truncated|cut off|can(?:not|'t) see/i;
+const check = (id, desc, run) => ({ id, desc, run });
 /** Diagnostic checks (tone, format) are shown apart from task correctness and do not count toward a case passing. */
 const diag = factory => (...args) => ({ ...factory(...args), diag: true });
 const kinds = env => env.actions.map(a => a.kind);
@@ -202,20 +194,9 @@ const C = {
       const re = ofKind(env, "reorder_topics").filter(a => a.parentId === parentId);
       return re.length === 1 && !ofKind(env, "move_topic").length ? ok() : fail(`${re.length} reorder, ${ofKind(env, "move_topic").length} move`);
     }),
-  hasAction: (kind, test, desc) => check(`hasAction:${kind}:${desc}`, `${kind}: ${desc}`, env => (ofKind(env, kind).some(a => test(a, env)) ? ok() : fail(`no ${kind} with ${desc}`))),
-  /** Either the reply states the fact (it read the text that holds it) or it says the text was not read: never an answer without either. */
-  replyFactOrNotRead: (fact, desc) =>
-    check(`replyFactOrNotRead:${desc}`, `reply states ${desc} or says that part was not read`, env => (fact.test(env.reply) || NOT_READ.test(env.reply) ? ok() : fail(`reply: ${env.reply.slice(0, 80)}`))),
-  /** The reply says some text was not read (for a case where part of the input was left out). */
-  replySaysNotRead: desc => check(`replySaysNotRead:${desc}`, `reply says ${desc} was not read`, env => (NOT_READ.test(env.reply) ? ok() : fail(`reply: ${env.reply.slice(0, 80)}`)))
+  hasAction: (kind, test, desc) => check(`hasAction:${kind}:${desc}`, `${kind}: ${desc}`, env => (ofKind(env, kind).some(a => test(a, env)) ? ok() : fail(`no ${kind} with ${desc}`)))
 };
-
-// Each factory's arguments travel with the check it makes, for the case hash.
-for (const name of Object.keys(C)) {
-  const factory = C[name];
-  C[name] = (...args) => ({ ...factory(...args), factory: name, params: args });
-}
 
 for (const name of ["replyNoDoneClaim", "replyNoCount", "replyOneSentence", "replyNoApprovalAsk", "replyLanguage"]) C[name] = diag(C[name]);
 
-module.exports = { C, check, hashable, stripNegated, cjkRatio, DONE_CLAIM, COUNT, APPROVAL, WEB, NOT_READ, sentences };
+module.exports = { C, stripNegated, cjkRatio, DONE_CLAIM, COUNT, APPROVAL, WEB, sentences };

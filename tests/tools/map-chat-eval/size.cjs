@@ -10,7 +10,20 @@
 //   SZ5  an open note of about 200,000 characters: a fact at its start
 //   SZ6  the same note: a fact at its very end
 // Each control has the same id plus "c" and fits every budget.
-const { C } = require("./checks.cjs");
+const { C: SHARED } = require("./checks.cjs");
+
+/** Words that say a text was not read, not sent or not in front of the model (Chinese and English). */
+const NOT_READ = /沒(?:有)?(?:讀|看|收到|拿到|提供|附上|送)|未(?:讀|看|收到|送|提供|附|包含|納入)|無法(?:讀|看|取得|確認|得知)|看不到|讀不到|不在(?:這次|本次|這一輪|目前)|省略|被截|截斷|太長|下一輪|稍後|之後再|not (?:read|sent|included|available|visible)|omitted|truncated|cut off|can(?:not|'t) see/i;
+const ok = () => ({ ok: true });
+const fail = note => ({ ok: false, note });
+/** The shared checks plus the two this group needs; kept here so the size cases touch no shared eval file. */
+const C = {
+  ...SHARED,
+  /** The reply says some text was not read (for a case where part of the input was left out). */
+  replySaysNotRead: desc => ({ id: `replySaysNotRead:${desc}`, desc: `reply says ${desc} was not read`, run: env => (NOT_READ.test(env.reply) ? ok() : fail(`reply: ${env.reply.slice(0, 80)}`)) }),
+  /** Either the reply states the fact (it read the text that holds it) or it says the text was not read: never an answer without either. */
+  replyFactOrNotRead: (fact, desc) => ({ id: `replyFactOrNotRead:${desc}`, desc: `reply states ${desc} or says that part was not read`, run: env => (fact.test(env.reply) || NOT_READ.test(env.reply) ? ok() : fail(`reply: ${env.reply.slice(0, 80)}`)) })
+};
 
 /** Plain Chinese sentences of the kind a work note holds; combined in a fixed order with numbers so no two paragraphs are equal. */
 const SENTENCES = [
@@ -150,4 +163,4 @@ const LARGE = [
     [C.noRejected(), C.noActions(), C.replyMatch(/方案丙/, "the conclusion at the end")])
 ];
 
-module.exports = { LARGE, zhText };
+module.exports = { LARGE, zhText, NOT_READ };

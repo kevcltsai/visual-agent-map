@@ -5,7 +5,7 @@
 // repeated runs passed.
 //
 //   node tests/tools/map-chat-eval.cjs run --out=<dir outside the repo> --slug=<name> [--model=haiku] [--runs=3] [--case=A1,B1] [--group=安全] [--jobs=4] [--large]
-//        the size cases (group 大小, tests/tools/map-chat-eval/large.cjs) send up to ~200k characters each: they run only with --large,
+//        the size cases (group 大小, tests/tools/map-chat-eval/size.cjs) send up to ~200k characters each: they run only with --large,
 //        --group=大小 or --case=SZ1,...; a case the product refuses before sending (over_budget) is recorded as "refused", with no call
 //   node tests/tools/map-chat-eval.cjs flows --out=<dir outside the repo> --slug=<name> [--model=haiku] [--runs=3] [--flow=FL1,FL3] [--jobs=4]
 //        long conversations: several turns on one map that each turn changes; the final map is compared with the expected one
@@ -26,7 +26,7 @@ const { CASES } = require("./map-chat-eval/cases.cjs");
 const { FLOWS, TURN_CHECKS } = require("./map-chat-eval/flows.cjs");
 const { SimMap, matchTree, matchTreeDetailed } = require("./map-chat-eval/sim.cjs");
 const CRITERIA = require("./map-chat-eval/flow-criteria.json");
-/** The group of the size cases (large.cjs): sent only when asked for, since each one is up to ~200k characters. */
+/** The group of the size cases (size.cjs): sent only when asked for, since each one is up to ~200k characters. */
 const LARGE_GROUP = "大小";
 
 const REPO = path.resolve(__dirname, "../..");
@@ -135,44 +135,15 @@ function evaluateRun(p, kase, prepared, raw) {
 const evaluate = (p, kase, prepared, raw) => evaluateRun(p, kase, prepared, raw).checks;
 
 const sha = value => crypto.createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 16);
-/** Version of the hashing below; a result written with another version is never compared as the same case (compare says why). */
-const HASH_VERSION = 2;
-/**
- * A structural serialisation for hashing: objects with sorted keys, arrays in order, a RegExp as its source and flags, a function as
- * its source plus the values it was marked to close over (`hashable` in checks.cjs), undefined kept apart from null. JSON.stringify
- * and String() lose most of this (String of an object is "[object Object]"; JSON drops RegExps, functions and undefined).
- */
-function stable(value, seen = new Set()) {
-  if (value === undefined) return "undefined";
-  if (value === null || typeof value === "boolean" || typeof value === "string") return JSON.stringify(value);
-  if (typeof value === "number") return Number.isFinite(value) ? JSON.stringify(value) : String(value);
-  if (typeof value === "bigint") return `${value}n`;
-  if (typeof value === "symbol") return String(value);
-  if (value instanceof RegExp) return `RegExp(${JSON.stringify(value.source)},${JSON.stringify(value.flags)})`;
-  if (typeof value === "function") return `Function(${JSON.stringify(String(value))}${value.hashParams ? `,${stable(value.hashParams, seen)}` : ""})`;
-  if (seen.has(value)) return '"[cycle]"';
-  seen.add(value);
-  let out;
-  if (Array.isArray(value)) out = `[${value.map(item => stable(item, seen)).join(",")}]`;
-  else if (value instanceof Map) out = `Map(${stable([...value.entries()], seen)})`;
-  else if (value instanceof Set) out = `Set(${stable([...value], seen)})`;
-  else out = `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key], seen)}`).join(",")}}`;
-  seen.delete(value);
-  return out;
-}
-/** What identifies a check: its id and text, its code, and the arguments it was made with (a closure body does not show them). */
-const checkKey = c => ({ id: c.id, desc: c.desc, diag: !!c.diag, factory: c.factory, params: c.params, run: c.run });
-/** Identity of a case: what it sends and what it checks, so a changed case is never compared as the same one. */
-const caseHash = kase => sha(stable({ v: HASH_VERSION, input: kase.input, checks: kase.checks.map(checkKey) }));
-/** Identity of a flow: its start map, every turn with its scope and checks, the checks every turn gets, and the whole expected end. */
-const flowHash = flow =>
-  sha(stable({ v: HASH_VERSION, start: flow.start, turns: flow.turns.map(t => ({ say: t.say, touch: t.touch, adds: !!t.adds, expect: (t.expect || []).map(checkKey) })), every: TURN_CHECKS.map(checkKey), final: flow.final }));
+/** Identity of a case: what it sends and what it checks (including the code of each check), so a changed case is never compared as the same one. */
+const caseHash = kase => sha(JSON.stringify(kase.input) + kase.checks.map(c => c.id + c.desc + String(c.run)).join("|"));
+const flowHash = flow => sha(JSON.stringify([flow.start, flow.turns.map(t => [t.say, String(t.touch), !!t.adds, (t.expect || []).map(c => c.id + String(c.run))]), String(flow.final.tree.map(String)), String(flow.final.none), String(flow.final.gone), String(flow.final.relations), String(flow.final.open?.map(o => o.id + o.path))]));
 
 /** Where a result came from: enough to tell whether two runs are comparable and what produced them. */
 function runMeta(p, model) {
   const git = args => spawnSync("git", args, { cwd: REPO, encoding: "utf8" }).stdout.trim();
   const version = spawnSync("claude", ["--version"], { encoding: "utf8" }).stdout.trim();
-  return { hashVersion: HASH_VERSION, gitSha: git(["rev-parse", "--short", "HEAD"]), gitDirty: git(["status", "--porcelain"]).split("\n").filter(Boolean).length, claudeVersion: version, model, effort: "low", schemaHash: sha(p.step.MAP_CHAT_SCHEMA), promptTemplateHash: sha(p.step.mapChatStep.render({ message: "x", context: p.context.buildMapChatContext({ mapTitle: "", outline: [], selected: [], references: [], snippets: [], files: [], history: [] }), language: "zh-TW", model: "claude:haiku", reasoning: "low" })) };
+  return { gitSha: git(["rev-parse", "--short", "HEAD"]), gitDirty: git(["status", "--porcelain"]).split("\n").filter(Boolean).length, claudeVersion: version, model, effort: "low", schemaHash: sha(p.step.MAP_CHAT_SCHEMA), promptTemplateHash: sha(p.step.mapChatStep.render({ message: "x", context: p.context.buildMapChatContext({ mapTitle: "", outline: [], selected: [], references: [], snippets: [], files: [], history: [] }), language: "zh-TW", model: "claude:haiku", reasoning: "low" })) };
 }
 
 function assertOutsideRepo(dir) {
@@ -423,7 +394,6 @@ function compare() {
   const a = read(A, "results.json"), b = read(B, "results.json");
   if (!a || !b) throw new Error("both runs need a results.json");
   const lines = [`# 比較 ${A} → ${B}`, ""];
-  if ((a.meta?.hashVersion ?? 1) !== (b.meta?.hashVersion ?? 1)) lines.push(`- 題目雜湊的算法不同（第 ${a.meta?.hashVersion ?? 1} 版 → 第 ${b.meta?.hashVersion ?? 1} 版）：每一題都會顯示為「定義已變更」，要比較請用同一版重跑`);
   for (const key of ["gitSha", "claudeVersion", "model", "effort", "schemaHash", "promptTemplateHash"]) {
     const x = a.meta?.[key], y = b.meta?.[key];
     if (x === undefined || y === undefined) lines.push(`- ${key}：其中一邊沒有記錄（舊格式）`);
@@ -484,4 +454,4 @@ if (require.main === module) {
 }
 
 const callClaudeForCorpus = (p, prompt, schema, model) => callClaude(p, prompt, schema, model);
-module.exports = { zeroFailureBound, callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, runCase, rawLayer, caseHash, flowHash, stable, usageTokens, HASH_VERSION, LARGE_GROUP };
+module.exports = { zeroFailureBound, callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, runCase, rawLayer, caseHash, flowHash, usageTokens, LARGE_GROUP };

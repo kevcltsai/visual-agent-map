@@ -42830,6 +42830,19 @@ function imageMarkdown(candidate) {
 
 [${title}](<${candidate.source}>)`;
 }
+var WIKIMEDIA_ORIGINAL = /^https:\/\/upload\.wikimedia\.org\/wikipedia\/([^/]+)\/([0-9a-f])\/([0-9a-f]{2})\/([^/?#]+\.(?:jpe?g|png|gif|webp))$/i;
+function wikimediaThumbnail(url) {
+  const match = WIKIMEDIA_ORIGINAL.exec(url);
+  if (!match) return url;
+  const [, project, a, ab, file] = match;
+  return `https://upload.wikimedia.org/wikipedia/${project}/thumb/${a}/${ab}/${file}/1280px-${file}`;
+}
+function wikimediaThumbnails(markdown) {
+  return markdown.replace(
+    /(!\[[^\]\n]*\]\(<?)(https:\/\/upload\.wikimedia\.org\/[^\s)>]+)/g,
+    (_, head, url) => head + wikimediaThumbnail(url)
+  );
+}
 
 // ui/image-candidates.ts
 async function loadableImages(candidates, signal) {
@@ -45442,16 +45455,16 @@ function parseAiResult(raw, label, language2, argumentEvidenceNeedIds) {
     (item) => isRecord5(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
   ).map((item) => ({
     title: typeof item.title === "string" ? item.title.trim() : translateNote(language2, "note.visual_reference"),
-    imageUrl: String(item.imageUrl).trim(),
+    imageUrl: wikimediaThumbnail(String(item.imageUrl).trim()),
     sourceUrl: String(item.sourceUrl).trim(),
     description: typeof item.description === "string" ? item.description.trim() : "",
     palette: Array.isArray(item.palette) ? item.palette.map(String).map((color2) => color2.trim()).filter(Boolean).slice(0, 8) : [],
     formula: typeof item.formula === "string" ? item.formula.trim() : ""
   })).filter((item) => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
   const result = {
-    summary: truncateSummary(parsed.summary),
+    summary: wikimediaThumbnails(truncateSummary(parsed.summary)),
     // Checked before anything is written: an unsafe mermaid block is kept as plain code, never rendered.
-    detail: neutralizeUnsafeMermaid(parsed.detail.trim()),
+    detail: wikimediaThumbnails(neutralizeUnsafeMermaid(parsed.detail.trim())),
     suggestions,
     visualReferences,
     ...argumentEvidenceNeedIds ? { argumentEvidence: parseArgumentEvidence(parsed.argumentEvidence, argumentEvidenceNeedIds) } : {}
@@ -89633,7 +89646,7 @@ function parseImageCandidates(raw) {
       if (url.protocol !== "https:" || source.protocol !== "https:" || seen.has(url.href)) continue;
       seen.add(url.href);
       const title = typeof item.title === "string" && item.title.trim() ? item.title.trim() : url.pathname.split("/").pop() || url.hostname;
-      found.push({ title, url: url.href, source: source.href });
+      found.push({ title, url: wikimediaThumbnail(url.href), source: source.href });
     } catch (e) {
     }
     if (found.length === 6) break;

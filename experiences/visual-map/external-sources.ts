@@ -387,10 +387,20 @@ export async function addExternalSource(
   });
 }
 
-export function removeExternalSource(app: object, mapId: string, label: string): Promise<ExternalSource[]> {
+/**
+ * Removes the source the caller saw: label and stored path must both match the current list. A label that now belongs
+ * to another folder (removed and re-added from another window) is left alone and reported as `removed: false`.
+ */
+export function removeExternalSource(
+  app: object,
+  mapId: string,
+  expected: ExternalSource
+): Promise<{ removed: boolean; sources: ExternalSource[] }> {
   return enqueueCommit(app, mapId, async () => {
-    const sources = loadExternalSources(app, mapId).filter(item => item.label !== label);
-    saveExternalSources(app, mapId, sources);
-    return sources;
+    const current = loadExternalSources(app, mapId);
+    const sources = current.filter(item => !(item.label === expected.label && item.path === expected.path));
+    const removed = sources.length !== current.length;
+    if (removed) saveExternalSources(app, mapId, sources);
+    return { removed, sources };
   });
 }

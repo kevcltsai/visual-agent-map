@@ -5372,11 +5372,11 @@ export class VisualAgentMapView extends ItemView {
     const mapId = this.map?.id;
     if (!mapId || this.closed || this.path !== mapPath) return;
     const epoch = this.viewEpoch;
-    void removeExternalSource(this.app, mapId, source.label).then(sources => {
+    void removeExternalSource(this.app, mapId, source).then(({ removed, sources }) => {
       if (this.closed || this.viewEpoch !== epoch || this.path !== mapPath || this.map?.id !== mapId) return;
       this.externalSources = sources;
       this.externalStatuses.delete(source.label);
-      this.announcer?.setText(t("ui.map_sources_removed_0", source.label));
+      if (removed) this.announcer?.setText(t("ui.map_sources_removed_0", source.label));
       this.refreshExternalStatuses();
       this.paintMapSourcesButton();
       if (this.mapSourcesOpen) this.drawMapSourcesPanelEl({ input: true });

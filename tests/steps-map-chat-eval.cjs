@@ -301,6 +301,39 @@ test('S1: case and flow hashes change when what a case sends or checks changes',
   assert.notEqual(flowHash(miniFlow), flowHash({ ...miniFlow, turns: [...miniFlow.turns, { say: '多一輪' }] }));
 });
 
+test('S1: the case hash sees values captured by a check (expected values, regex source and flags), not only its code', () => {
+  const mk = checks => ({ id: 'Z1', group: 'x', title: 't', source: 's', covers: [], input: { message: 'm', outline: [] }, checks });
+  // An identical definition built twice (fresh closures) hashes the same.
+  assert.equal(caseHash(mk([C.titlesCover(['甲', '乙']), C.replyMatch(/甲/, 'a')])), caseHash(mk([C.titlesCover(['甲', '乙']), C.replyMatch(/甲/, 'a')])));
+  // Only an expected value changes: same check code, same id and desc.
+  assert.notEqual(caseHash(mk([C.titlesCover(['甲', '乙'])])), caseHash(mk([C.titlesCover(['丙', '丁'])])));
+  assert.notEqual(caseHash(mk([C.reorderOrder('a', ['a1', 'a2'])])), caseHash(mk([C.reorderOrder('a', ['a2', 'a1'])])));
+  // Only a regex changes (source, then flags), with the same desc.
+  assert.notEqual(caseHash(mk([C.replyMatch(/甲/, 'a')])), caseHash(mk([C.replyMatch(/乙/, 'a')])));
+  assert.notEqual(caseHash(mk([C.replyMatch(/abc/, 'a')])), caseHash(mk([C.replyMatch(/abc/i, 'a')])));
+  // Every check exposes the parameters it was built with, diagnostics included.
+  assert.deepEqual(C.titlesCover(['甲']).params, [['甲']]);
+  assert.equal(C.replyLanguage('zh').diag, true);
+  assert.deepEqual(C.replyLanguage('zh').params, ['zh']);
+  for (const k of CASES) for (const c of k.checks) assert.ok(Array.isArray(c.params), `${k.id} ${c.id} has params`);
+});
+
+test('S1: the flow hash sees the final tree, expected regexes and the criteria version', () => {
+  const flow = tree => ({ ...miniFlow, final: { tree } });
+  const base = [{ t: /^X$/, c: [{ t: /甲/ }] }];
+  assert.equal(flowHash(flow(base)), flowHash(flow([{ t: /^X$/, c: [{ t: /甲/ }] }])), 'an identical definition hashes the same');
+  assert.notEqual(flowHash(flow(base)), flowHash(flow([{ t: /^X$/, c: [{ t: /乙/ }] }])), 'an expected child card changed');
+  assert.notEqual(flowHash(flow(base)), flowHash(flow([{ t: /^X$/, c: [{ t: /甲/, color: 'red' }] }])), 'an expected attribute in a subtree changed');
+  assert.notEqual(flowHash(flow(base)), flowHash(flow([{ t: /^X$/i, c: [{ t: /甲/ }] }])), 'a regex flag changed');
+  assert.notEqual(flowHash({ ...miniFlow, turns: [{ say: '把 R 改名成 X', touch: [/R/] }] }), flowHash({ ...miniFlow, turns: [{ say: '把 R 改名成 X', touch: [/Q/] }] }), 'a turn scope changed');
+  const criteria = require('./tools/map-chat-eval/flow-criteria.json');
+  assert.equal(flowHash(miniFlow, criteria), flowHash(miniFlow, { ...criteria }));
+  assert.notEqual(flowHash(miniFlow, criteria), flowHash(miniFlow, { ...criteria, version: criteria.version + 1 }), 'the criteria version changed');
+  const open = { ...miniFlow, id: 'FL5', final: { tree: base, open: [{ id: 'FL5-open-city-extras', path: /x/ }] } };
+  const flipped = { ...criteria, rulings: criteria.rulings.map(r => (r.id === 'FL5-open-city-extras' ? { ...r, ruling: r.ruling === 'accept' ? 'reject' : 'accept' } : r)) };
+  assert.notEqual(flowHash(open, criteria), flowHash(open, flipped), 'a ruling the flow is judged under changed');
+});
+
 test('S1: compare compares only identical cases, lists added/changed/removed, and prints no verdict', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-test-'));
   const run = (id, hash, oks) => oks.map((ok, i) => ({ id, run: i + 1, caseHash: hash, raw: '{}', status: 'ok', checks: [{ id: 'noActions', desc: 'actions is empty (a question needs no action)', ok }] }));

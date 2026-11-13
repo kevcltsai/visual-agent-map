@@ -1,4 +1,6 @@
-// Checks for the map chat evaluation set. Each factory returns { id, desc, run(env) -> { ok, note? } }.
+// Checks for the map chat evaluation set. Each factory returns { id, desc, run(env) -> { ok, note? }, params }, where params are the
+// arguments the factory was called with (expected values, regexes, predicates). The case hash serialises params, because run's
+// source text alone does not show the values its closure captured.
 // env = { reply, actions, rejected, remaining, input } where the first four are the parsed reply (core/steps/map-chat/step.ts)
 // and input is the case's context input. A check states one property a good reply has; none of them scores quality.
 const CJK = /[㐀-鿿]/;
@@ -197,6 +199,8 @@ const C = {
   hasAction: (kind, test, desc) => check(`hasAction:${kind}:${desc}`, `${kind}: ${desc}`, env => (ofKind(env, kind).some(a => test(a, env)) ? ok() : fail(`no ${kind} with ${desc}`)))
 };
 
+// Every check records the arguments it was built with, so two checks with the same code but different expected values hash differently.
+for (const [name, factory] of Object.entries(C)) C[name] = (...args) => ({ ...factory(...args), params: args });
 for (const name of ["replyNoDoneClaim", "replyNoCount", "replyOneSentence", "replyNoApprovalAsk", "replyLanguage"]) C[name] = diag(C[name]);
 
 module.exports = { C, stripNegated, cjkRatio, DONE_CLAIM, COUNT, APPROVAL, WEB, sentences };

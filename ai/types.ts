@@ -100,6 +100,10 @@ export interface TaskContext {
   referenceGroups?: ReferenceGroup[];
   /** "direct" (merge and synthesize): send the reference documents themselves when they fit one batch, instead of extracting findings first. */
   referenceDelivery?: "direct";
+  /** Findings the caller already condensed from `referenceGroups` (AiTaskService.condenseReferences): used as they are, no extraction runs. The catalog still comes from `referenceGroups`. */
+  preparedReferenceFindings?: string;
+  /** A batch's one shared condensing: a request whose own full content does not fit the sources direct awaits this instead of condensing again. */
+  sharedReferenceCondense?: (signal: AbortSignal) => Promise<string>;
   onProgress?: (message: string) => void;
   /** Called once with the Working Findings text that was actually put in the prompt, after the context budget step (a count repair does not call it). */
   onWorkingFindingsSent?: (sent: string) => void;

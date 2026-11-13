@@ -92,8 +92,10 @@ export interface RecordImagesLine extends RecordLineBase {
   items: { title: string; sourceUrl: string }[];
   inserted: number[];
 }
+/** `sources_read` marks that a turn sent the map's data sources (a restored conversation keeps its writes behind the plan). */
 /** `research_started` marks that the conversation started web research (it keeps the plan allow-list on after a restore). */
-export type RecordEventKind = "resend" | "undo" | "redo" | "undo_refused" | "chain_end" | "research_started";
+export type RecordEventKind =
+  "resend" | "undo" | "redo" | "undo_refused" | "chain_end" | "research_started" | "sources_read";
 export interface RecordEventLine extends RecordLineBase {
   type: "event";
   turn: number;
@@ -358,6 +360,8 @@ export interface RestoredConversation {
   restoredAt: string | null;
   /** The file says this conversation started web research (an older file has no mark: false). */
   startedResearch: boolean;
+  /** A turn of the file sent the map's data sources (an older file has no mark: false). */
+  readsSources: boolean;
 }
 
 /** Result lines read back from a file: the basis keeps its known shape only (a hand-edited file cannot put anything else on screen). */
@@ -384,6 +388,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
   const undone = new Map<number, boolean>();
   const chainEnds = new Map<number, { reason: MapChatChainEndReason; round: number; remaining: string }>();
   let startedResearch = false;
+  let readsSources = false;
   for (const line of lines) {
     if (line.type === "conversation") {
       mapPath = typeof line.mapPath === "string" ? line.mapPath : mapPath;
@@ -411,6 +416,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       if (line.kind === "undo") undone.set(line.turn, true);
       else if (line.kind === "redo") undone.set(line.turn, false);
       else if (line.kind === "research_started") startedResearch = true;
+      else if (line.kind === "sources_read") readsSources = true;
       else if (line.kind === "chain_end") {
         // A hand-edited file cannot put anything but a known reason on screen; the words are the panel's, the rest is plain text.
         const reason = (MAP_CHAT_CHAIN_END_REASONS as readonly unknown[]).find(item => item === line.reason);
@@ -479,6 +485,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     mapId,
     turns,
     restoredAt: turns.length ? turns[turns.length - 1].at : null,
-    startedResearch
+    startedResearch,
+    readsSources
   };
 }

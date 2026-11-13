@@ -424,3 +424,29 @@ function insertIntoSection(
     ...lines.slice(end)
   ].join("\n");
 }
+
+/**
+ * The block of an AI merge that comes from the map's data sources, added after the merged text by code. The model that wrote the
+ * merged text never saw the sources, and this block never changes a line of it: it is a callout of its own (every line quoted, so
+ * nothing in it is a heading, a list item or a section of the template), at the end of the last ordinary section.
+ * `supplement` "" or undefined adds nothing; null means the request for it failed, and the block says so.
+ */
+export function withSourceSupplement(
+  detail: string,
+  supplement: string | null | undefined,
+  template: DetailTemplate,
+  language: ContentLanguage
+): string {
+  const lines =
+    supplement === null
+      ? [translateNote(language, "note.merge_data_sources_failed")]
+      : (supplement ?? "")
+          .replace(/\r\n/g, "\n")
+          .split("\n")
+          .map(line => line.replace(/^[ \t]*(?:>[ \t]*)+/, "").trimEnd());
+  while (lines.length && !lines[0].trim()) lines.shift();
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  if (!lines.length) return detail;
+  const block = [`> [!note] ${translateNote(language, "note.merge_data_sources")}`, ...lines.map(line => `> ${line}`)];
+  return insertIntoSection(detail, -1, block, template, sectionLookup(template));
+}

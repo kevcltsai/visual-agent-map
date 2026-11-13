@@ -27,6 +27,9 @@ export const MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
  * `research_text_other_actions`: the same rule for a first round or an ordinary message of a conversation that has started research
  * (decisions #14, #16): the text can reach the model by any card or earlier reply and is untrusted wherever it is read.
  *
+ * `source_text_other_actions`: the same rule when the conversation read the map's data sources (this turn or an earlier one):
+ * the sources, their condensed text and the turns after them are untrusted input.
+ *
  * `image_preview`: the reply places or links anchors and the user chose to see image changes first. `image_other_actions`: a turn
  * that sent an image also asked for something besides the image-safe actions; the picture is untrusted input, so this is
  * a plan in either mode.
@@ -38,7 +41,8 @@ export type MapChatPlanReason =
   | "image_preview"
   | "image_other_actions"
   | "auto_round_other_actions"
-  | "research_text_other_actions";
+  | "research_text_other_actions"
+  | "source_text_other_actions";
 
 /** "AI changes to an image: show me first" or "apply at once"; the setting `mapChatImageMode`. */
 export type MapChatImageMode = "preview" | "direct";
@@ -176,6 +180,8 @@ export function planFor(
     trusted?: MapChatTrusted;
     /** This conversation has started research (decision #17): any turn of it may read web text, so the allow-list applies. */
     chatStartedResearch?: boolean;
+    /** This conversation sent the map's data sources in this turn or an earlier one: the same allow-list applies. */
+    chatReadSources?: boolean;
   } = {}
 ): MapChatPlan | null {
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
@@ -190,7 +196,8 @@ export function planFor(
   // that text could have injected: only safe actions on safe cards go without a plan. An automatic round of only such actions is
   // also not stopped by the number of actions (the first round keeps the rule).
   const autoRound = (options.chain?.round ?? 1) >= 2;
-  const readsResearch = autoRound || options.chatStartedResearch === true;
+  const readsSources = options.chatReadSources === true;
+  const readsResearch = autoRound || options.chatStartedResearch === true || readsSources;
   const onlySafe =
     readsResearch && actions.every(action => isFindImages(action) || isChainSafeFor(action, options.trusted));
   const autoOnlySafe = autoRound && onlySafe;
@@ -248,7 +255,14 @@ export function planFor(
     reasons.push("image_preview");
   if (options.imageAttached && actions.some(action => !isFindImages(action) && !IMAGE_SAFE_KINDS.has(action.kind)))
     reasons.push("image_other_actions");
-  if (readsResearch && !onlySafe) reasons.push(autoRound ? "auto_round_other_actions" : "research_text_other_actions");
+  if (readsResearch && !onlySafe)
+    reasons.push(
+      autoRound
+        ? "auto_round_other_actions"
+        : options.chatStartedResearch === true
+          ? "research_text_other_actions"
+          : "source_text_other_actions"
+    );
   return reasons.length ? { reasons, estimatedCalls: calls } : null;
 }
 

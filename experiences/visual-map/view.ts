@@ -5371,12 +5371,16 @@ export class VisualAgentMapView extends ItemView {
   private removeExternalFolder(mapPath: string, source: ExternalSource): void {
     const mapId = this.map?.id;
     if (!mapId || this.closed || this.path !== mapPath) return;
-    this.externalSources = removeExternalSource(this.app, mapId, source.label);
-    this.externalStatuses.delete(source.label);
-    this.announcer?.setText(t("ui.map_sources_removed_0", source.label));
-    this.refreshExternalStatuses();
-    this.paintMapSourcesButton();
-    if (this.mapSourcesOpen) this.drawMapSourcesPanelEl({ input: true });
+    const epoch = this.viewEpoch;
+    void removeExternalSource(this.app, mapId, source.label).then(sources => {
+      if (this.closed || this.viewEpoch !== epoch || this.path !== mapPath || this.map?.id !== mapId) return;
+      this.externalSources = sources;
+      this.externalStatuses.delete(source.label);
+      this.announcer?.setText(t("ui.map_sources_removed_0", source.label));
+      this.refreshExternalStatuses();
+      this.paintMapSourcesButton();
+      if (this.mapSourcesOpen) this.drawMapSourcesPanelEl({ input: true });
+    });
   }
   /** A vault delete or rename: repaint the button and an open panel (a source may have become unreadable). */
   private refreshMapSourcesUi(): void {

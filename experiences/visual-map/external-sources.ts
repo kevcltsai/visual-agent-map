@@ -339,9 +339,24 @@ export type AddExternalResult =
   | { ok: true; source: ExternalSource; sources: ExternalSource[] }
   | { ok: false; reason: ExternalRejection | "duplicate" };
 
+/** Adds and removals of one map's list run one after another, so none of them writes from an older copy of the list. */
+const commitQueues = new WeakMap<object, Map<string, Promise<unknown>>>();
+function enqueueCommit<T>(app: object, mapId: string, task: () => Promise<T>): Promise<T> {
+  const queues = commitQueues.get(app) ?? new Map<string, Promise<unknown>>();
+  commitQueues.set(app, queues);
+  const run = (queues.get(mapId) ?? Promise.resolve()).then(task, task);
+  const tail = run.catch(() => undefined);
+  queues.set(mapId, tail);
+  void tail.then(() => {
+    if (queues.get(mapId) === tail) queues.delete(mapId);
+  });
+  return run;
+}
+
 /**
- * Checks and stores one pasted folder for a map. The label comes from the folder's name, made unique among every label
- * this map already holds. Re-reads the stored list first, so a repeat add is a no-op.
+ * Checks and stores one pasted folder for a map. The check can take a while, so the list is read only when the add
+ * commits (inside the queue): the duplicate test, the label (unique among every label the map holds now) and the write
+ * all use that fresh list. A source removed meanwhile stays removed; two adds at once both stay.
  */
 export async function addExternalSource(
   app: object,
@@ -352,26 +367,30 @@ export async function addExternalSource(
   const check = await checkExternalRoot(input, scope);
   if (!check.ok) return check;
   const text = cleanExternalInput(input);
-  const existing = loadExternalSources(app, mapId);
-  for (const item of existing) {
-    let other = item.path;
-    try {
-      other = await realpath(item.path);
-    } catch {
-      /* compared as written */
+  return enqueueCommit(app, mapId, async (): Promise<AddExternalResult> => {
+    const existing = loadExternalSources(app, mapId);
+    for (const item of existing) {
+      let other = item.path;
+      try {
+        other = await realpath(item.path);
+      } catch {
+        /* compared as written */
+      }
+      if (item.path === text || other === check.real) return { ok: false, reason: "duplicate" };
     }
-    if (item.path === text || other === check.real) return { ok: false, reason: "duplicate" };
-  }
-  const name = parse(text).base || parse(check.real).base;
-  const label = allocateExternalLabel(name, new Set(existing.map(item => item.label)));
-  const source = { path: text, label };
-  const sources = [...existing, source];
-  saveExternalSources(app, mapId, sources);
-  return { ok: true, source, sources };
+    const name = parse(text).base || parse(check.real).base;
+    const label = allocateExternalLabel(name, new Set(existing.map(item => item.label)));
+    const source = { path: text, label };
+    const sources = [...existing, source];
+    saveExternalSources(app, mapId, sources);
+    return { ok: true, source, sources };
+  });
 }
 
-export function removeExternalSource(app: object, mapId: string, label: string): ExternalSource[] {
-  const sources = loadExternalSources(app, mapId).filter(item => item.label !== label);
-  saveExternalSources(app, mapId, sources);
-  return sources;
+export function removeExternalSource(app: object, mapId: string, label: string): Promise<ExternalSource[]> {
+  return enqueueCommit(app, mapId, async () => {
+    const sources = loadExternalSources(app, mapId).filter(item => item.label !== label);
+    saveExternalSources(app, mapId, sources);
+    return sources;
+  });
 }

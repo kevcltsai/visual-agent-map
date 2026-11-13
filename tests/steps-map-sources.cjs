@@ -287,7 +287,7 @@ test('external labels are unique across the whole map and never move: docs, docs
     const labels = () => plain(ext.loadExternalSources(app, 'map-1').map(s => s.label));
     for (const dir of [a, b, c]) assert.equal((await ext.addExternalSource(app, 'map-1', dir, w.scope)).ok, true);
     assert.deepEqual(labels(), ['docs', 'docs#2', 'docs#2#2']);
-    ext.removeExternalSource(app, 'map-1', 'docs#2');
+    await ext.removeExternalSource(app, 'map-1', 'docs#2');
     assert.deepEqual(labels(), ['docs', 'docs#2#2'], 'the others are not renumbered');
     assert.equal((await ext.addExternalSource(app, 'map-1', d, w.scope)).source.label, 'docs#2');
     assert.deepEqual(labels(), ['docs', 'docs#2#2', 'docs#2']);
@@ -321,7 +321,7 @@ test('external storage: only device-local storage holds the path; another vault 
     assert.equal(JSON.stringify(plain(await data.repo.readMapSources(mapPath))).includes(w.tmp), false);
     vaultA.store.set(`vam-map-external-sources:${map.id}`, '[{"path":1},{"path":"/x","label":"l"},{"path":"/y","label":"l"},"z"]');
     assert.deepEqual(plain(ext.loadExternalSources(vaultA, map.id)), [{ path: '/x', label: 'l' }], 'malformed entries and repeated labels are dropped');
-    ext.removeExternalSource(vaultA, map.id, 'l');
+    await ext.removeExternalSource(vaultA, map.id, 'l');
     assert.equal(vaultA.store.size, 0, 'an empty list removes the key');
   } finally { cleanup(w); }
 });
@@ -393,5 +393,25 @@ test('external no-leak: a file of source A that quotes source B\'s root or a fil
     const all = JSON.stringify(plain(groups)) + refs.referenceBatches(groups).join('\n') + refs.resolveDetailReferences('c [S1]', groups) + refs.referenceCatalog(groups);
     assert.ok(!all.includes(b) && !all.includes(link) && !all.includes(w.tmp), 'no path of source B anywhere');
     assert.ok(all.includes(ext.EXTERNAL_PATH_PLACEHOLDER));
+  } finally { cleanup(w); }
+});
+
+test('external add/remove are serialized: a source removed while an add is validating stays removed; two adds at once both stay with different labels', async () => {
+  const w = world(); try {
+    const app = fakeStore(), labels = () => plain(ext.loadExternalSources(app, 'm').map(s => s.label));
+    const a = mk(w.outside, 'a', 'docs'), b = mk(w.outside, 'b', 'docs'), c = mk(w.outside, 'c', 'notes'), d = mk(w.outside, 'd', 'more');
+    assert.equal((await ext.addExternalSource(app, 'm', a, w.scope)).ok, true);
+    assert.equal((await ext.addExternalSource(app, 'm', c, w.scope)).ok, true);
+    // The add of d is validating when the removal of "docs" is queued: the add commits from the list after the removal.
+    const adding = ext.addExternalSource(app, 'm', d, w.scope); const removing = ext.removeExternalSource(app, 'm', 'docs');
+    const [added, left] = await Promise.all([adding, removing]);
+    assert.deepEqual(labels(), ['notes', 'more'], 'docs is not brought back'); assert.deepEqual(plain(added.sources.map(s => s.label)), ['notes', 'more']); assert.ok(left);
+    // Two adds in flight for same-named folders: both kept, labels differ, and the second sees the first.
+    const [x, y] = await Promise.all([ext.addExternalSource(app, 'm', a, w.scope), ext.addExternalSource(app, 'm', b, w.scope)]);
+    assert.ok(x.ok && y.ok); assert.deepEqual(labels(), ['notes', 'more', 'docs', 'docs#2']);
+    // The same folder twice at once: one is added, the other is a duplicate.
+    const fresh = mk(w.outside, 'e', 'once');
+    const twice = await Promise.all([ext.addExternalSource(app, 'm', fresh, w.scope), ext.addExternalSource(app, 'm', fresh, w.scope)]);
+    assert.deepEqual(plain(twice.map(r => r.ok ? 'ok' : r.reason)), ['ok', 'duplicate']);
   } finally { cleanup(w); }
 });

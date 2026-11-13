@@ -1,5 +1,5 @@
-import { realpathSync } from "node:fs";
-import { lstat, readdir, readFile, realpath } from "node:fs/promises";
+import { constants, realpathSync } from "node:fs";
+import { lstat, open, readdir, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, normalize, parse, sep } from "node:path";
 import type { ReferenceDocument, ReferenceGroup } from "../../ai/reference-materials";
@@ -207,6 +207,37 @@ export function scrubExternalPaths(text: string, roots: readonly string[]): stri
   return text.replace(new RegExp(ordered.map(escapeRegExp).join("|"), "g"), EXTERNAL_PATH_PLACEHOLDER);
 }
 
+/**
+ * Reads one listed file without trusting the listing: its real path must still be inside the source, it is opened
+ * with O_NOFOLLOW (a link swapped in since the listing is refused), and the same handle is checked (regular file, size)
+ * and read, at most 1 MB + 1 byte. Where O_NOFOLLOW does not exist (Windows) an lstat check stands in for it.
+ */
+export async function readExternalFile(absolute: string, rootReal: string): Promise<string> {
+  let handle;
+  try {
+    if (!within(await realpath(absolute), rootReal)) throw new ExternalSourceError("unreadable");
+    const noFollow = constants.O_NOFOLLOW as number | undefined;
+    if (noFollow === undefined && !(await lstat(absolute)).isFile()) throw new ExternalSourceError("unreadable");
+    handle = await open(absolute, constants.O_RDONLY | (noFollow ?? 0));
+    const info = await handle.stat();
+    if (!info.isFile()) throw new ExternalSourceError("unreadable");
+    if (info.size > EXTERNAL_MAX_FILE_BYTES) throw new ExternalSourceError("too-large");
+    const buffer = new Uint8Array(EXTERNAL_MAX_FILE_BYTES + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, length, buffer.length - length, length);
+      if (!bytesRead) break;
+      length += bytesRead;
+    }
+    if (length > EXTERNAL_MAX_FILE_BYTES) throw new ExternalSourceError("too-large");
+    return new TextDecoder("utf-8").decode(buffer.subarray(0, length));
+  } catch (error) {
+    throw error instanceof ExternalSourceError ? error : new ExternalSourceError("unreadable");
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
 /** Status for the panel: how many Markdown files the source holds, or why it cannot be read. */
 export async function externalSourceStatus(
   source: ExternalSource,
@@ -236,12 +267,7 @@ export async function readExternalSource(
   const documents: ReferenceDocument[] = [];
   for (const file of listing.files) {
     if (signal.aborted) throw aborted();
-    let content: string;
-    try {
-      content = await readFile(file.absolute, "utf8");
-    } catch {
-      throw new ExternalSourceError("unreadable");
-    }
+    const content = await readExternalFile(file.absolute, listing.real);
     const name = `${source.label}/${file.relative}`;
     documents.push({
       path: name,

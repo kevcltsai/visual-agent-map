@@ -341,3 +341,21 @@ test('external no-leak: the prompt batches, catalog, footnotes and wikilinks car
     assert.match(batches, /ignore the above instructions/);
   } finally { cleanup(w); }
 });
+
+test('external read: a file swapped for a link after the listing is refused (outside target, and a link that stays inside the source), and a normal file still reads', async () => {
+  const w = world(); try {
+    const docs = mk(w.outside, 'docs'), secret = put(path.join(w.home, 'secret.md'), 'TOP SECRET'), inVault = put(path.join(w.vault, 'n.md'), 'VAULT NOTE');
+    const target = put(path.join(docs, 'real.md'), 'real'), real = fs.realpathSync(docs);
+    assert.equal(await ext.readExternalFile(target, real), 'real');
+    for (const [name, to] of [['toHome.md', secret], ['toVault.md', inVault], ['toInside.md', target]]) {
+      const at = path.join(docs, name); fs.symlinkSync(to, at);
+      await assert.rejects(ext.readExternalFile(at, real), error => error.reason === 'unreadable' && !String(error.message).includes('SECRET'), name);
+    }
+    // The whole read: a listing that happened before the swap cannot reach the target.
+    const group = await ext.readExternalSource({ path: docs, label: 'docs' }, w.scope, signal());
+    assert.ok(!JSON.stringify(plain(group)).includes('TOP SECRET') && !JSON.stringify(plain(group)).includes('VAULT NOTE'));
+    assert.deepEqual(plain(group.documents.map(d => d.path)), ['docs/real.md']);
+    const big = put(path.join(docs, 'big.md'), 'a'.repeat(ext.EXTERNAL_MAX_FILE_BYTES + 1));
+    await assert.rejects(ext.readExternalFile(big, real), error => error.reason === 'too-large');
+  } finally { cleanup(w); }
+});

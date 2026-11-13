@@ -1,5 +1,5 @@
 import { renderTemplate, type StepDefinition } from "../../step-runner";
-import type { ImageCandidate } from "../../image-candidates";
+import { wikimediaThumbnail, type ImageCandidate } from "../../image-candidates";
 import template from "./prompt.md";
 
 export interface ImageSearchInput {
@@ -40,7 +40,7 @@ export function parseImageCandidates(raw: string): ImageCandidate[] {
         typeof item.title === "string" && item.title.trim()
           ? item.title.trim()
           : url.pathname.split("/").pop() || url.hostname;
-      found.push({ title, url: url.href, source: source.href });
+      found.push({ title, url: wikimediaThumbnail(url.href), source: source.href });
     } catch {
       /* Not a URL. */
     }

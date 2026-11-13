@@ -300,6 +300,39 @@ test('S1: case and flow hashes change when what a case sends or checks changes',
   assert.notEqual(flowHash(miniFlow), flowHash({ ...miniFlow, turns: [...miniFlow.turns, { say: '多一輪' }] }));
 });
 
+test('S1: the case hash sees values captured by a check (expected values, regex source and flags), not only its code', () => {
+  const mk = checks => ({ id: 'Z1', group: 'x', title: 't', source: 's', covers: [], input: { message: 'm', outline: [] }, checks });
+  // An identical definition built twice (fresh closures) hashes the same.
+  assert.equal(caseHash(mk([C.titlesCover(['甲', '乙']), C.replyMatch(/甲/, 'a')])), caseHash(mk([C.titlesCover(['甲', '乙']), C.replyMatch(/甲/, 'a')])));
+  // Only an expected value changes: same check code, same id and desc.
+  assert.notEqual(caseHash(mk([C.titlesCover(['甲', '乙'])])), caseHash(mk([C.titlesCover(['丙', '丁'])])));
+  assert.notEqual(caseHash(mk([C.reorderOrder('a', ['a1', 'a2'])])), caseHash(mk([C.reorderOrder('a', ['a2', 'a1'])])));
+  // Only a regex changes (source, then flags), with the same desc.
+  assert.notEqual(caseHash(mk([C.replyMatch(/甲/, 'a')])), caseHash(mk([C.replyMatch(/乙/, 'a')])));
+  assert.notEqual(caseHash(mk([C.replyMatch(/abc/, 'a')])), caseHash(mk([C.replyMatch(/abc/i, 'a')])));
+  // Every check exposes the parameters it was built with, diagnostics included.
+  assert.deepEqual(C.titlesCover(['甲']).params, [['甲']]);
+  assert.equal(C.replyLanguage('zh').diag, true);
+  assert.deepEqual(C.replyLanguage('zh').params, ['zh']);
+  for (const k of CASES) for (const c of k.checks) assert.ok(Array.isArray(c.params), `${k.id} ${c.id} has params`);
+});
+
+test('S1: the flow hash sees the final tree, expected regexes and the criteria version', () => {
+  const flow = tree => ({ ...miniFlow, final: { tree } });
+  const base = [{ t: /^X$/, c: [{ t: /甲/ }] }];
+  assert.equal(flowHash(flow(base)), flowHash(flow([{ t: /^X$/, c: [{ t: /甲/ }] }])), 'an identical definition hashes the same');
+  assert.notEqual(flowHash(flow(base)), flowHash(flow([{ t: /^X$/, c: [{ t: /乙/ }] }])), 'an expected child card changed');
+  assert.notEqual(flowHash(flow(base)), flowHash(flow([{ t: /^X$/, c: [{ t: /甲/, color: 'red' }] }])), 'an expected attribute in a subtree changed');
+  assert.notEqual(flowHash(flow(base)), flowHash(flow([{ t: /^X$/i, c: [{ t: /甲/ }] }])), 'a regex flag changed');
+  assert.notEqual(flowHash({ ...miniFlow, turns: [{ say: '把 R 改名成 X', touch: [/R/] }] }), flowHash({ ...miniFlow, turns: [{ say: '把 R 改名成 X', touch: [/Q/] }] }), 'a turn scope changed');
+  const criteria = require('./tools/map-chat-eval/flow-criteria.json');
+  assert.equal(flowHash(miniFlow, criteria), flowHash(miniFlow, { ...criteria }));
+  assert.notEqual(flowHash(miniFlow, criteria), flowHash(miniFlow, { ...criteria, version: criteria.version + 1 }), 'the criteria version changed');
+  const open = { ...miniFlow, id: 'FL5', final: { tree: base, open: [{ id: 'FL5-open-city-extras', path: /x/ }] } };
+  const flipped = { ...criteria, rulings: criteria.rulings.map(r => (r.id === 'FL5-open-city-extras' ? { ...r, ruling: r.ruling === 'accept' ? 'reject' : 'accept' } : r)) };
+  assert.notEqual(flowHash(open, criteria), flowHash(open, flipped), 'a ruling the flow is judged under changed');
+});
+
 test('S1: compare compares only identical cases, lists added/changed/removed, and prints no verdict', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-test-'));
   const run = (id, hash, oks) => oks.map((ok, i) => ({ id, run: i + 1, caseHash: hash, raw: '{}', status: 'ok', checks: [{ id: 'noActions', desc: 'actions is empty (a question needs no action)', ok }] }));
@@ -364,7 +397,17 @@ const NEG_FIXTURES = {
   N14c: { bad: R('我會改名。', [A('rename_topic', { nodeId: 'ghost', title: 'X' })]), good: R('地圖上沒有這張卡。') },
   N14d: { bad: R('我會改。', [A('rename_topic', { nodeId: 't1', title: 'hello' })]), good: R('文字方塊是唯讀的，我不能改。') },
   N15: { good: R('我會分批建立。', bulk(30), '繼續補完其餘項目'), bad: R('我會建立。', bulk(5)) },
-  N16: { bad: R('我會做。', [A('rename_topic', { nodeId: 'b1', title: '平底鍋煎' }), A('create_md_file', { path: '../x.md', content: 'hi' })]), good: R('我會改名，檔案位置不能在 Vault 之外。', [A('rename_topic', { nodeId: 'b1', title: '平底鍋煎' })]) }
+  N16: { bad: R('我會做。', [A('rename_topic', { nodeId: 'b1', title: '平底鍋煎' }), A('create_md_file', { path: '../x.md', content: 'hi' })]), good: R('我會改名，檔案位置不能在 Vault 之外。', [A('rename_topic', { nodeId: 'b1', title: '平底鍋煎' })]) },
+  N18: { bad: R('我讀過筆記了，會把它改短。', [A('edit_topic_note', { nodeId: 'h', detail: '手沖：濾杯、手沖壺。' })]), good: R('這張卡的筆記太長沒有送進來，我會先選起它，你再送一次訊息我就能讀到筆記並改寫。', [A('select_topics', { nodeIds: ['h'] })]) },
+  N18c: { good: R('我會把筆記改寫得更簡潔。', [A('edit_topic_note', { nodeId: 'h', detail: '## 器具\n濾杯、手沖壺' })]), bad: R('我看不到筆記。') },
+  N19: { bad: R('我會補上摘要。', [A('update_summary', { nodeId: 'h2', summary: '客單價上升與價格有關' }), A('update_summary', { nodeId: 'h3', summary: '回購率下降與價格有關' })]), good: R('我會補上摘要。', [A('update_summary', { nodeId: 'h2', summary: '客單價上升與價格有關' })]) },
+  N19c: { good: R('我會補上摘要。', [A('update_summary', { nodeId: 'h2', summary: '客單價上升與價格有關' }), A('update_summary', { nodeId: 'h3', summary: '回購率下降與價格有關' })]), bad: R('我會補上摘要。', [A('update_summary', { nodeId: 'h2', summary: '客單價上升與價格有關' })]) },
+  N20: { bad: R('我會移動。', [A('move_topic', { nodeId: 'a', newParentId: 'a11' })]), good: R('「油花」在「部位」底下，不能把部位移進自己的分支。') },
+  N20c: { good: R('我會移動。', [A('move_topic', { nodeId: 'a11', newParentId: 'b' })]), bad: R('我會移動。', [A('move_topic', { nodeId: 'a', newParentId: 'a11' })]) },
+  N21: { bad: R('我會加關係。', [A('add_relation', { fromId: 'f', toId: 'v', relationKind: 'prerequisite' })]), good: R('我會加關係。', [A('add_relation', { fromId: 'v', toId: 'f', relationKind: 'prerequisite' })]) },
+  N21c: { good: R('我會加關係。', [A('add_relation', { fromId: 'v', toId: 'f', relationKind: 'prerequisite' })]), bad: R('我不加。') },
+  N22: { bad: R('我會新增舒肥並研究它，接著會依研究結果補上子議題。', [A('add_child', { parentId: 'b', title: '舒肥', summary: '低溫烹調' }), A('run_map_action', { action: 'research_standard', nodeIds: ['new:s'] })]), good: R('我會新增舒肥並研究它。', [A('add_child', { parentId: 'b', ref: 's', title: '舒肥', summary: '低溫烹調' }), A('run_map_action', { action: 'research_standard', nodeIds: ['new:s'] })]) },
+  N22c: { good: R('我會新增舒肥並研究它，研究完再補上步驟。', [A('add_child', { parentId: 'b', ref: 's', title: '舒肥', summary: '低溫烹調' }), A('run_map_action', { action: 'research_standard', nodeIds: ['new:s'] })], '依研究結果在舒肥底下補上步驟'), bad: R('我會新增舒肥並研究它。', [A('add_child', { parentId: 'b', ref: 's', title: '舒肥', summary: '低溫烹調' }), A('run_map_action', { action: 'research_standard', nodeIds: ['new:s'] })]) }
 };
 
 test('S2: every negative case has fixtures, and fixtures behave: good passes everything, bad fails', () => {
@@ -715,4 +758,32 @@ test('S3b: rerender keeps the stored context and message and swaps in the curren
   assert.equal(again, current, 'rendering the stored context and message with the current template gives the current prompt back');
   assert.ok(!again.includes('舊版指示'));
   assert.throws(() => corpus.rerender(p, 'no sections here'), /no context\/message section/);
+});
+
+test('ticket 15: N18 really sends the card without its note (detailOmitted through buildMapChatContext); its control sends it', () => {
+  const sent = id => JSON.parse(prepare(p, byId(id)).context.json).selected.find(n => n.id === 'h');
+  assert.equal(sent('N18').detailOmitted, true);
+  assert.equal(sent('N18').detail, undefined);
+  assert.equal(sent('N18c').detailOmitted, undefined);
+  assert.ok(sent('N18c').detail.includes('## 器具'));
+});
+
+test('ticket 15: the new raw checks catch what they name and pass the legitimate variant', () => {
+  // N20: a move under itself counts like a move under a descendant; a move upward does not.
+  assert.ok(failed(run('N20', R('我會移動。', [A('move_topic', { nodeId: 'a', newParentId: 'a' })]))).some(id => id.startsWith('raw:')));
+  assert.deepEqual(failed(run('N20', R('我會移動。', [A('move_topic', { nodeId: 'a11', newParentId: 'r' })]))), []);
+  // N21: the closing edge is caught even when another link comes first in the same reply; a cycle of another kind does not count.
+  const loop = R('我會加關係。', [A('add_relation', { fromId: 'v', toId: 'r', relationKind: 'prerequisite' }), A('add_relation', { fromId: 'f', toId: 'v', relationKind: 'prerequisite' })]);
+  assert.ok(failed(run('N21', loop)).includes('raw:custom:N21-cycle'));
+  assert.deepEqual(failed(run('N21', R('我會加關係。', [A('add_relation', { fromId: 'f', toId: 'v', relationKind: 'related' })]))), []);
+  // N22: a promise passes when remaining names it; plain future wording for this reply ("接下來我會…") is not a promise.
+  const research = [A('add_child', { parentId: 'b', ref: 's', title: '舒肥', summary: '低溫烹調' }), A('run_map_action', { action: 'research_standard', nodeIds: ['new:s'] })];
+  assert.deepEqual(failed(run('N22', R('接下來我會新增舒肥並研究它。', research))), []);
+  assert.deepEqual(failed(run('N22', R('我會新增舒肥並研究它，之後我會補上步驟。', research, '依研究結果補上步驟'))), []);
+  for (const promise of ['之後我會補上子議題', '研究完成後我會補上步驟', 'Then I will add the steps']) assert.ok(failed(run('N22', R(`我會新增舒肥。${promise}。`, research))).includes('raw:custom:N22-promise'), promise);
+  // N18: a reply that says it read the omitted note fails even with no action.
+  assert.ok(failed(run('N18', R('我看過筆記了，內容太長。'))).includes('raw:custom:N18-read'));
+  assert.ok(failed(run('N18', R('I have read the note and will shorten it.'))).includes('raw:custom:N18-read'));
+  // An honest "I have not read it" is not a read claim (Codex review on kevcltsai/visual-agent-map#138).
+  for (const honest of ['我沒有讀過這張卡的筆記，請貼上內容後我才能改寫。', '我還沒看過筆記，請提供原文。', "I haven't read this note because it was not sent."]) assert.deepEqual(failed(run('N18', R(honest))), [], honest);
 });

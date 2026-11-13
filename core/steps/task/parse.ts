@@ -1,5 +1,6 @@
 import { neutralizeUnsafeMermaid } from "../../../ai/mermaid-safety";
 import { truncateSummary } from "../../../ai/result-utils";
+import { wikimediaThumbnail, wikimediaThumbnails } from "../../image-candidates";
 import type { AiResult, ArgumentEvidenceFigure, ArgumentEvidenceItem, ArgumentEvidenceSecond } from "../../../ai/types";
 import { foldText, QUOTE_MAX, QUOTE_MIN } from "../../argument-map/source-proof";
 import { t, type ContentLanguage, translateNote } from "../../../i18n";
@@ -220,7 +221,7 @@ export function parseAiResult(
         )
         .map(item => ({
           title: typeof item.title === "string" ? item.title.trim() : translateNote(language, "note.visual_reference"),
-          imageUrl: String(item.imageUrl).trim(),
+          imageUrl: wikimediaThumbnail(String(item.imageUrl).trim()),
           sourceUrl: String(item.sourceUrl).trim(),
           description: typeof item.description === "string" ? item.description.trim() : "",
           palette: Array.isArray(item.palette)
@@ -236,9 +237,9 @@ export function parseAiResult(
         .slice(0, 6)
     : [];
   const result: AiResult = {
-    summary: truncateSummary(parsed.summary),
+    summary: wikimediaThumbnails(truncateSummary(parsed.summary)),
     // Checked before anything is written: an unsafe mermaid block is kept as plain code, never rendered.
-    detail: neutralizeUnsafeMermaid(parsed.detail.trim()),
+    detail: wikimediaThumbnails(neutralizeUnsafeMermaid(parsed.detail.trim())),
     suggestions,
     visualReferences,
     ...(argumentEvidenceNeedIds

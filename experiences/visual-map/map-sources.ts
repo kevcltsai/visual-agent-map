@@ -6,7 +6,7 @@ import {
   type ReferenceGroup
 } from "../../ai/reference-materials";
 import type { MapDocument } from "../../map-model";
-import { readExternalSource, type ExternalScope, type ExternalSource } from "./external-sources";
+import { externalScrubRoots, readExternalSource, type ExternalScope, type ExternalSource } from "./external-sources";
 
 /**
  * The data sources of one mind map, kept in its `Map.md` frontmatter key `map-sources` as an ordered list of
@@ -203,10 +203,11 @@ export async function resolveMapSources(
       unreadable.push(source);
     }
   }
+  const mapRoots = await externalScrubRoots(deps.external?.sources ?? []);
   for (const source of deps.external?.sources ?? []) {
     if (signal.aborted) throw aborted();
     try {
-      const group = await readExternalSource(source, deps.external!.scope, signal);
+      const group = await readExternalSource(source, deps.external!.scope, signal, mapRoots);
       if (group) groups.push(group);
     } catch (error) {
       if (signal.aborted || (error instanceof Error && error.name === "AbortError")) throw aborted();

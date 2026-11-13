@@ -381,3 +381,17 @@ test('external read: a parent folder swapped for a link around the open is refus
     await assert.rejects(ext.readExternalFile(victim, swapReal, swapped), error => error.reason === 'unreadable');
   } finally { cleanup(w); }
 });
+
+test('external no-leak: a file of source A that quotes source B\'s root or a file under it is scrubbed (prompt batches and every document text)', async () => {
+  const w = world(); try {
+    const a = mk(w.outside, 'a'), b = mk(w.outside, 'b'), link = path.join(w.outside, 'b-alias'); fs.symlinkSync(b, link);
+    const bFile = put(path.join(b, 'deep', 'n.md'), 'b text');
+    put(path.join(a, 'x.md'), `root ${b}\nfile ${bFile}\nreal ${fs.realpathSync(b)}/deep/n.md\nvia ${link}/deep/n.md`);
+    const data = fixture();
+    const sources = [{ path: a, label: 'a' }, { path: link, label: 'b' }];
+    const { groups } = await src.resolveMapSources({ ...deps(data), external: { sources, scope: w.scope } }, [], 'Cur/Map.md', signal());
+    const all = JSON.stringify(plain(groups)) + refs.referenceBatches(groups).join('\n') + refs.resolveDetailReferences('c [S1]', groups) + refs.referenceCatalog(groups);
+    assert.ok(!all.includes(b) && !all.includes(link) && !all.includes(w.tmp), 'no path of source B anywhere');
+    assert.ok(all.includes(ext.EXTERNAL_PATH_PLACEHOLDER));
+  } finally { cleanup(w); }
+});

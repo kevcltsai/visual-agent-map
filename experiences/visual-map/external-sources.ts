@@ -279,10 +279,11 @@ export async function externalSourceStatus(
 export async function readExternalSource(
   source: ExternalSource,
   scope: ExternalScope,
-  signal: AbortSignal
+  signal: AbortSignal,
+  mapRoots: readonly string[] = []
 ): Promise<ReferenceGroup | null> {
   const listing = await listExternalSource(source, scope, signal);
-  const roots = [source.path, cleanExternalInput(source.path), listing.real];
+  const roots = [source.path, cleanExternalInput(source.path), listing.real, ...mapRoots];
   const documents: ReferenceDocument[] = [];
   for (const file of listing.files) {
     if (signal.aborted) throw aborted();
@@ -298,6 +299,25 @@ export async function readExternalSource(
   if (signal.aborted) throw aborted();
   if (!documents.length) return null;
   return { id: `external:${source.label}`, name: source.label, location: source.label, documents };
+}
+
+/**
+ * Every root (as typed and real) of all the external sources of one map. A file of one source may quote another
+ * source's path, so each file's text is scrubbed with this whole set.
+ */
+export async function externalScrubRoots(sources: readonly ExternalSource[]): Promise<string[]> {
+  const roots = new Set<string>();
+  for (const source of sources) {
+    roots.add(source.path);
+    const text = cleanExternalInput(source.path);
+    if (text) roots.add(text);
+    try {
+      roots.add(await realpath(text));
+    } catch {
+      /* a folder that is gone has no other spelling to find */
+    }
+  }
+  return [...roots];
 }
 
 /** Root paths of the given sources, as typed and real (best effort, synchronous); for the share leak gate. */

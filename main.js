@@ -42840,7 +42840,7 @@ function wikimediaThumbnail(url) {
 function wikimediaThumbnails(markdown) {
   return markdown.replace(
     /(!\[[^\]\n]*\]\(<?)(https:\/\/upload\.wikimedia\.org\/[^\s)>]+)/g,
-    (_, head, url) => head + wikimediaThumbnail(url)
+    (_, head2, url) => head2 + wikimediaThumbnail(url)
   );
 }
 

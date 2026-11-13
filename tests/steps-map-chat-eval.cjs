@@ -563,3 +563,73 @@ test('S4: C3 now really produces researchDeferred in the context the model sees'
   assert.match(json, /researchDeferred/);
   assert.match(json, /oversize/);
 });
+
+// ---- S6: flow verdicts ----
+const criteria = require('./tools/map-chat-eval/flow-criteria.json');
+const fl5 = FLOWS.find(f => f.id === 'FL5');
+const mini = (over = {}) => ({
+  id: 'V', title: 'v', source: 't', start: { title: 't', rows: [['r', 'R', null], ['a', 'A', 'r'], ['b', 'B', 'r']] },
+  turns: [{ say: '把 A 改名成 X', touch: [/^A$/] }], final: { tree: [{ t: /^R$/, c: [{ t: /^X$/ }, { t: /^B$/ }] }] }, ...over
+});
+const rename = (id, title) => ({ raw: raw('我會改名。', [item('rename_topic', { nodeId: id, title })]) });
+
+test('S6: OK when only the asked card changes; VIOLATION when a turn touches a card it was not asked to', async () => {
+  const ok = await playFlow(p, mini(), askSeq([rename('a', 'X')]));
+  assert.equal(ok.verdict, 'OK');
+  const touchedOther = await playFlow(p, mini(), askSeq([{ raw: raw('我會改名。', [item('rename_topic', { nodeId: 'a', title: 'X' }), item('rename_topic', { nodeId: 'b', title: 'Y' })]) }]));
+  assert.equal(touchedOther.verdict, 'VIOLATION');
+  assert.ok(touchedOther.violations.some(v => /changed "B", which the request did not ask for/.test(v)), touchedOther.violations.join('|'));
+});
+
+test('S6: a turn that adds cards it was not asked to add is a violation (adds:false)', async () => {
+  const r = await playFlow(p, mini(), askSeq([{ raw: raw('我會改名。', [item('rename_topic', { nodeId: 'a', title: 'X' }), item('add_child', { parentId: 'r', title: 'Z', summary: 's' })]) }]));
+  assert.equal(r.verdict, 'VIOLATION');
+  assert.ok(r.violations.some(v => /added Z/.test(v)));
+});
+
+test('S6: extras on a CLOSED request are violations; on an OPEN request they are NEEDS_REVIEW until the owner rules', async () => {
+  const closedExtra = { raw: raw('我會改名並加一個。', [item('rename_topic', { nodeId: 'a', title: 'X' }), item('add_child', { parentId: 'a', title: 'Extra', summary: 's' })]) };
+  const closedFlow = mini({ turns: [{ say: '把 A 改名成 X', touch: [/^A$/], adds: true }] });
+  const strict = await playFlow(p, closedFlow, askSeq([closedExtra]));
+  assert.equal(strict.verdict, 'VIOLATION');
+  const openFlow = mini({ turns: [{ say: '把 A 改名成 X', touch: [/^A$/], adds: true }], final: { tree: [{ t: /^R$/, c: [{ t: /^X$/ }, { t: /^B$/ }] }], open: [{ id: 'T-open', path: /^\/R\/X$/ }] } });
+  criteria.rulings.push({ id: 'T-open', flow: 'V', question: 'q', ruling: 'pending' });
+  try {
+    const pending = await playFlow(p, openFlow, askSeq([closedExtra]));
+    assert.equal(pending.verdict, 'NEEDS_REVIEW');
+    assert.equal(pending.finalOk, false, 'undetermined is never counted as a pass');
+    criteria.rulings.find(r => r.id === 'T-open').ruling = 'accept';
+    assert.equal((await playFlow(p, openFlow, askSeq([closedExtra]))).verdict, 'OK');
+    criteria.rulings.find(r => r.id === 'T-open').ruling = 'reject';
+    assert.equal((await playFlow(p, openFlow, askSeq([closedExtra]))).verdict, 'VIOLATION');
+  } finally { criteria.rulings.pop(); }
+});
+
+test('S6: "gone" checks the removal of the card itself (a legitimately named root is not flagged), "unexpected missing" is a violation', async () => {
+  const f = mini({ turns: [{ say: '刪掉 B', touch: [/^B$/] }], final: { tree: [{ t: /^R$/, c: [{ t: /^A$/ }] }], gone: [/^B$/] } });
+  assert.equal((await playFlow(p, f, askSeq([{ raw: raw('我會刪除。', [item('delete_topic', { nodeId: 'b', branch: true })]) }]))).verdict, 'OK');
+  const kept = await playFlow(p, f, askSeq([{ raw: raw('我會處理。', [item('focus_topic', { nodeId: 'b' })]) }]));
+  assert.equal(kept.verdict, 'VIOLATION');
+  assert.ok(kept.violations.some(v => /still on the map: B/.test(v)));
+  const rootNamed = mini({ start: { title: 't', rows: [['r', 'R（含 B）', null], ['b', 'B', 'r']] }, turns: [{ say: '刪掉 B', touch: [/^B$/] }], final: { tree: [{ t: /^R/ }], gone: [/^B$/] } });
+  assert.equal((await playFlow(p, rootNamed, askSeq([{ raw: raw('我會刪除。', [item('delete_topic', { nodeId: 'b', branch: true })]) }]))).verdict, 'OK', 'a root titled "R（含 B）" is not a surviving B');
+});
+
+test('S6: the shipped flows each declare scope per turn, and FL5 asks the owner one question that is still pending', () => {
+  for (const f of FLOWS) assert.ok(f.turns.every(t => Array.isArray(t.touch)), `${f.id} declares touch for every turn`);
+  const pending = criteria.rulings.filter(r => r.ruling === 'pending');
+  assert.ok(pending.some(r => r.id === 'FL5-open-city-extras'));
+  assert.ok(fl5.final.open.every(o => criteria.rulings.some(r => r.id === o.id)), 'every open area has a ruling entry');
+  assert.equal(criteria.version, 1);
+});
+
+test('S6: the FL3 golden flow still ends OK under the scope rules', async () => {
+  const r = await playFlow(p, fl3, scripted(fl3Golden()));
+  assert.equal(r.verdict, 'OK', r.problems.join('|'));
+});
+
+test('S6: a spec leaf is exact: a child nobody expected under it is reported (the Codex "leaf loophole")', () => {
+  const snap = [{ title: '根', summary: '', markers: [], children: [{ title: 'A', summary: '', markers: [], children: [{ title: '多出來', summary: '', markers: [], children: [] }] }] }];
+  assert.ok(matchTree(snap, [{ t: /根/, c: [{ t: /A/ }] }]).some(x => /unexpected 多出來/.test(x)));
+  assert.deepEqual(matchTree(snap, [{ t: /根/, c: [{ t: /A/, c: 'any' }] }]), [], 'c: "any" opts out on purpose');
+});

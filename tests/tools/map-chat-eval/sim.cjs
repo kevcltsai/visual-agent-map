@@ -38,6 +38,7 @@ class SimMap {
     this.opsUsed = new Set();
     this.selection = [];
     this.next = 1;
+    this.titleHistory = new Map(this.list.map(n => [n.id, new Set([n.title])]));
   }
   get nodes() { return new Map(this.list.map(n => [n.id, n])); }
   children(id) { return this.list.filter(n => (n.parentId ?? null) === id); }
@@ -58,6 +59,7 @@ class SimMap {
   /** Applies one parsed reply. */
   apply(actions) {
     const refs = new Map();
+    const remember = () => this.list.forEach(n => { if (!this.titleHistory.has(n.id)) this.titleHistory.set(n.id, new Set()); this.titleHistory.get(n.id).add(n.title); });
     const resolve = id => (id && id.startsWith("new:") ? refs.get(id.slice(4)) : id);
     const get = id => this.list.find(n => n.id === id);
     for (const a of actions) {
@@ -113,6 +115,7 @@ class SimMap {
         default: break;
       }
     }
+    remember();
     const ids = new Set(this.list.map(n => n.id));
     this.relations = this.relations.filter(r => ids.has(r.from) && ids.has(r.to));
     this.selection = this.selection.filter(id => ids.has(id));
@@ -134,6 +137,24 @@ class SimMap {
     this.list = this.list.filter(n => !others.includes(n));
     this.relations = this.relations.map(r => ({ ...r, from: others.some(o => o.id === r.from) ? first.id : r.from, to: others.some(o => o.id === r.to) ? first.id : r.to })).filter(r => r.from !== r.to);
   }
+  /** What each card looked like (id -> fields), to see which cards a turn changed. */
+  state() {
+    return new Map(this.list.map(n => [n.id, JSON.stringify([n.title, n.summary, n.parentId, n.kind, n.leaning, n.strength, n.color, n.markers, n.styles, n.detail])]));
+  }
+  /** Cards a turn changed: { changed: [title before], added: [title], removed: [title before] }. */
+  diff(before, titlesBefore) {
+    const after = this.state();
+    const changed = [], added = [], removed = [];
+    for (const [id, was] of before) { if (!after.has(id)) removed.push(titlesBefore.get(id)); else if (after.get(id) !== was) changed.push(titlesBefore.get(id)); }
+    for (const id of after.keys()) if (!before.has(id)) added.push(this.list.find(n => n.id === id).title);
+    return { changed, added, removed };
+  }
+  titles() { return new Map(this.list.map(n => [n.id, n.title])); }
+  /** Ids that ever carried a title matching `re` and are still on the map. */
+  survivors(re) {
+    const alive = new Set(this.list.map(n => n.id));
+    return [...this.titleHistory].filter(([id, set]) => alive.has(id) && [...set].some(t => re.test(t))).map(([id]) => this.list.find(n => n.id === id).title);
+  }
   /** How much of what this map did is the product's own logic. */
   evidence() {
     const ops = [...this.opsUsed];
@@ -148,19 +169,21 @@ class SimMap {
 
 /**
  * Compares a snapshot with an expected tree. spec = { t: RegExp (title), s?: RegExp (summary), kind?, leaning?, strength?, color?, marker?, c?: spec[] }.
- * Children match unordered and exactly: an expected child with no match, or a child nobody expected, is a mismatch. Omitting `c` says nothing about children.
+ * Children match unordered and exactly: an expected child with no match, or a child nobody expected, is a mismatch. Omitting `c` means the card is a leaf (children are unexpected); `c: "any"` leaves them unchecked.
  */
-function matchTree(actual, expected, path = "") {
+function matchTreeDetailed(actual, expected, path = "") {
   const problems = [];
   const left = [...actual];
   for (const want of expected) {
     const at = left.findIndex(a => want.t.test(a.title) && ["kind", "leaning", "strength", "color"].every(k => want[k] === undefined || a[k] === want[k]) && (!want.s || want.s.test(a.summary)) && (!want.marker || a.markers.includes(want.marker)));
-    if (at < 0) { problems.push(`${path}/${want.t}: no match (have ${left.map(a => a.title).join("、") || "nothing"})`); continue; }
+    if (at < 0) { problems.push({ type: "missing", path, text: `${path}/${want.t}: no match (have ${left.map(a => a.title).join("、") || "nothing"})` }); continue; }
     const [got] = left.splice(at, 1);
-    if (want.c) problems.push(...matchTree(got.children, want.c, `${path}/${got.title}`));
+    // A spec without `c` is a LEAF: any child under it is unexpected. Say `c: "any"` to leave its children unchecked.
+    if (want.c !== "any") problems.push(...matchTreeDetailed(got.children, want.c || [], `${path}/${got.title}`));
   }
-  if (left.length) problems.push(`${path || "/"}: unexpected ${left.map(a => a.title).join("、")}`);
+  if (left.length) problems.push({ type: "unexpected", path: path || "/", text: `${path || "/"}: unexpected ${left.map(a => a.title).join("、")}`, titles: left.map(a => a.title) });
   return problems;
 }
+const matchTree = (actual, expected) => matchTreeDetailed(actual, expected).map(p => p.text);
 
-module.exports = { SimMap, matchTree, PRODUCT_BACKED, SIMPLE_WRITE };
+module.exports = { SimMap, matchTree, matchTreeDetailed, PRODUCT_BACKED, SIMPLE_WRITE };

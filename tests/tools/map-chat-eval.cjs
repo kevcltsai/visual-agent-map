@@ -19,7 +19,8 @@ const crypto = require("node:crypto");
 const { load } = require("../support-replay.cjs");
 const { CASES } = require("./map-chat-eval/cases.cjs");
 const { FLOWS, TURN_CHECKS } = require("./map-chat-eval/flows.cjs");
-const { SimMap, matchTree } = require("./map-chat-eval/sim.cjs");
+const { SimMap, matchTree, matchTreeDetailed } = require("./map-chat-eval/sim.cjs");
+const CRITERIA = require("./map-chat-eval/flow-criteria.json");
 
 const REPO = path.resolve(__dirname, "../..");
 const arg = (name, fallback) => (process.argv.find(a => a.startsWith(`--${name}=`)) || "").slice(name.length + 3) || fallback;
@@ -103,7 +104,7 @@ const evaluate = (p, kase, prepared, raw) => evaluateRun(p, kase, prepared, raw)
 const sha = value => crypto.createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 16);
 /** Identity of a case: what it sends and what it checks (including the code of each check), so a changed case is never compared as the same one. */
 const caseHash = kase => sha(JSON.stringify(kase.input) + kase.checks.map(c => c.id + c.desc + String(c.run)).join("|"));
-const flowHash = flow => sha(JSON.stringify([flow.start, flow.turns.map(t => [t.say, (t.expect || []).map(c => c.id + String(c.run))]), String(flow.final.tree.map(String)), String(flow.final.none), String(flow.final.relations)]));
+const flowHash = flow => sha(JSON.stringify([flow.start, flow.turns.map(t => [t.say, String(t.touch), !!t.adds, (t.expect || []).map(c => c.id + String(c.run))]), String(flow.final.tree.map(String)), String(flow.final.none), String(flow.final.gone), String(flow.final.relations), String(flow.final.open?.map(o => o.id + o.path))]));
 
 /** Where a result came from: enough to tell whether two runs are comparable and what produced them. */
 function runMeta(p, model) {
@@ -139,6 +140,7 @@ async function playFlow(p, flow, ask) {
   const sim = new SimMap(flow.start.title, flow.start.rows);
   const history = [];
   const turns = [];
+  const scopeBreaches = [];
   for (const turn of flow.turns) {
     const input = { selected: [], references: [], snippets: [], files: [], history: history.slice(), language: "zh-TW", message: turn.say, ...sim.contextInput(), mapNeedsName: !sim.title };
     const kase = { input, checks: [...TURN_CHECKS, ...(turn.expect || [])] };
@@ -149,23 +151,43 @@ async function playFlow(p, flow, ask) {
     if (run.status !== "ok") { turns.push({ say: turn.say, error: "reply not valid (the product rejects the whole reply)", raw: reply.raw, prompt: prepared.prompt, checks: run.checks }); break; }
     const parsed = p.step.parseMapChat(reply.raw, prepared.context);
     const actions = JSON.parse(JSON.stringify(parsed.actions));
+    const before = sim.state(), titlesBefore = sim.titles();
     sim.apply(actions);
+    const diff = sim.diff(before, titlesBefore);
+    if (turn.touch) {
+      for (const t of [...diff.changed, ...diff.removed]) if (!turn.touch.some(re => re.test(t))) scopeBreaches.push(`turn ${turns.length + 1}: changed "${t}", which the request did not ask for`);
+      if (!turn.adds && diff.added.length) scopeBreaches.push(`turn ${turns.length + 1}: added ${diff.added.join("、")} though the request adds nothing`);
+    }
     history.push({ role: "user", text: turn.say }, { role: "assistant", text: parsed.reply });
-    turns.push({ say: turn.say, reply: parsed.reply, actions, raw: reply.raw, prompt: prepared.prompt, checks: run.checks });
+    turns.push({ say: turn.say, reply: parsed.reply, actions, diff, raw: reply.raw, prompt: prepared.prompt, checks: run.checks });
   }
   // A turn that failed (CLI error, rejected reply) makes the whole flow INVALID, even if the map happens to match: nothing was proven.
   const failed = turns.findIndex(t => t.error);
   const invalid = failed >= 0 || turns.length < flow.turns.length;
-  const problems = invalid ? [`invalid: turn ${(failed >= 0 ? failed : turns.length) + 1} failed (${turns[failed]?.error ?? "no reply"})`] : matchTree(sim.snapshot(), flow.final.tree);
-  const titles = [...sim.nodes.values()].map(n => n.title);
-  if (!invalid && flow.final.none && titles.some(t => flow.final.none.test(t))) problems.push(`a title still matches ${flow.final.none}: ${titles.filter(t => flow.final.none.test(t)).join("、")}`);
-  for (const want of flow.final.relations || []) {
-    const title = id => sim.nodes.get(id)?.title ?? "";
-    if (!sim.relations.some(r => want.from.test(title(r.from)) && want.to.test(title(r.to)) && r.kind === want.kind)) problems.push(`relation ${want.from} ${want.kind} ${want.to} missing`);
+  // Verdict: INVALID (a turn failed) / VIOLATION / NEEDS_REVIEW (extra content on an open request, no owner ruling yet) / OK.
+  const violations = [];
+  const needsReview = [];
+  if (invalid) violations.push(`invalid: turn ${(failed >= 0 ? failed : turns.length) + 1} failed (${turns[failed]?.error ?? "no reply"})`);
+  else {
+    violations.push(...scopeBreaches);
+    for (const prob of matchTreeDetailed(sim.snapshot(), flow.final.tree)) {
+      const open = prob.type === "unexpected" && (flow.final.open || []).find(o => o.path.test(prob.path));
+      const ruling = open && CRITERIA.rulings.find(r => r.id === open.id)?.ruling;
+      if (open && ruling === "accept") continue;
+      if (open && ruling !== "reject") needsReview.push({ id: open.id, text: prob.text }); else violations.push(prob.text);
+    }
+    if (flow.final.none) { const hit = [...sim.list].filter(n => flow.final.none.test(n.title)); if (hit.length) violations.push(`a title still matches ${flow.final.none}: ${hit.map(n => n.title).join("、")}`); }
+    for (const re of flow.final.gone || []) { const alive = sim.survivors(re); if (alive.length) violations.push(`a card that was meant to be removed is still on the map: ${alive.join("、")}`); }
+    for (const want of flow.final.relations || []) {
+      const title = id => sim.nodes.get(id)?.title ?? "";
+      if (!sim.relations.some(r => want.from.test(title(r.from)) && want.to.test(title(r.to)) && r.kind === want.kind)) violations.push(`relation ${want.from} ${want.kind} ${want.to} missing`);
+    }
+    if (sim.skipped.length) violations.push(`unsimulated actions used: ${sim.skipped.join(",")}`);
   }
-  if (sim.skipped.length) problems.push(`unsimulated actions used: ${sim.skipped.join(",")}`);
+  const verdict = invalid ? "INVALID" : violations.length ? "VIOLATION" : needsReview.length ? "NEEDS_REVIEW" : "OK";
+  const problems = [...violations, ...needsReview.map(n => `needs review (${n.id}): ${n.text}`)];
   const turnFailures = turns.flatMap((t, i) => t.checks.filter(c => !c.ok).map(c => `turn ${i + 1}: ${c.desc}${c.note ? ` (${c.note})` : ""}`));
-  return { turns, problems, turnFailures, final: sim.snapshot(), invalid, evidence: sim.evidence(), finalOk: !invalid && problems.length === 0 };
+  return { turns, problems, violations, needsReview, verdict, criteriaVersion: CRITERIA.version, turnFailures, final: sim.snapshot(), invalid, evidence: sim.evidence(), finalOk: verdict === "OK" };
 }
 
 async function runFlows() {
@@ -189,12 +211,12 @@ async function runFlows() {
   const dir = path.join(out, slug);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "flows.json"), JSON.stringify({ slug, model, runs, at: new Date().toISOString(), meta: runMeta(p, model), results }, null, 1));
-  const lines = [`# 長對話流程評測：${slug}`, "", `模型 ${model}，每個流程 ${runs} 次。通過 = 最後一張地圖和預期完全一致（卡片、層級、類型、外觀、關係、不該出現的字）。`, "「模擬器證據」的流程用到產品沒有現成純函式的操作（移動、類型、關係、合併），是參考，不計入產品通過數。", ""];
-  lines.push("| 流程 | 證據 | 最終地圖一致 | 無效（有一輪失敗） | 每輪檢查全過 |", "| --- | --- | --- | --- | --- |");
+  const lines = [`# 長對話流程評測：${slug}`, "", `模型 ${model}，每個流程 ${runs} 次。通過 = 最後一張地圖和預期完全一致（卡片、層級、類型、外觀、關係、不該出現的字）。`, "「模擬器證據」的流程用到產品沒有現成純函式的操作（移動、類型、關係、合併），是參考，不計入產品通過數。", `「待你判斷」= 開放式請求下多出來的內容，等你裁定（flow-criteria.json 第 ${CRITERIA.version} 版）；它顯示為未裁定的數量，不算通過也不算違規。`, ""];
+  lines.push("| 流程 | 證據 | 可接受 | 待你判斷 | 違規 | 無效 | 每輪檢查全過 |", "| --- | --- | --- | --- | --- | --- | --- |");
   for (const f of flows) {
     const mine = results.filter(r => r.id === f.id);
     const ev = mine[0]?.evidence;
-    lines.push(`| ${f.id} ${f.title} | ${ev ? (ev.label === "product" ? "產品證據" : `模擬器證據（用到：${ev.simulatorOnly.join("、")}）`) : "?"} | ${mine.filter(r => r.finalOk).length}/${mine.length} | ${mine.filter(r => r.invalid).length}/${mine.length} | ${mine.filter(r => !r.turnFailures.length).length}/${mine.length} |`);
+    lines.push(`| ${f.id} ${f.title} | ${ev ? (ev.label === "product" ? "產品證據" : `模擬器證據（用到：${ev.simulatorOnly.join("、")}）`) : "?"} | ${mine.filter(r => r.verdict === "OK").length}/${mine.length} | ${mine.filter(r => r.verdict === "NEEDS_REVIEW").length}/${mine.length} | ${mine.filter(r => r.verdict === "VIOLATION").length}/${mine.length} | ${mine.filter(r => r.invalid).length}/${mine.length} | ${mine.filter(r => !r.turnFailures.length).length}/${mine.length} |`);
   }
   lines.push("");
   for (const f of flows) for (const r of results.filter(x => x.id === f.id && (!x.finalOk || x.turnFailures.length))) {

@@ -39103,6 +39103,17 @@ function hasUnsavedChat(completedTurns, savedTurns) {
 }
 
 // experiences/visual-map/map-chat.ts
+var MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS = 400;
+function chainReplyText(replies) {
+  return replies.map((reply, index) => {
+    const chars = Array.from(reply.text.trim());
+    const body = index < replies.length - 1 && chars.length > MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS ? `${chars.slice(0, MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS - 1).join("")}\u2026` : reply.text;
+    if (!reply.auto) return body;
+    const label = reply.auto.round ? t("ui.map_chat_auto_round_0_1", reply.auto.round, reply.auto.maxRounds) : t("ui.map_chat_role_auto");
+    return `[${label}]
+${body}`;
+  }).join("\n\n");
+}
 function placedImage(block) {
   return block.state === "ready" ? block.items.find((item) => item.inserted) : void 0;
 }
@@ -39409,19 +39420,34 @@ var MapChatPanel = class {
   attachments() {
     return this.chips.map((chip) => ({ ...chip }));
   }
-  /** Finished question and answer turns, oldest first, for the next request. */
+  /**
+   * Finished question and answer turns, oldest first, for the next request. An automatic continuation is one turn: the question the
+   * user sent (with its live follow-ups and any typed during the rounds) and the replies of all its rounds in order. Each round is its
+   * own pair in the panel, but history keeps only the last few pairs, so counting rounds as turns would push everything the user said
+   * before a long chain out of the window.
+   */
   turns() {
-    var _a2;
+    var _a2, _b2;
     const turns = [];
-    for (let at = 0; at + 1 < this.messages.length; at += 2) {
-      const question = this.messages[at];
-      const answer = this.messages[at + 1];
-      if (answer.streaming || answer.error || !answer.text.trim()) continue;
-      const steered = ((_a2 = question.steers) != null ? _a2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text);
-      turns.push(
-        { role: "user", text: [question.text, ...steered].join("\n\n") },
-        { role: "assistant", text: answer.text }
-      );
+    for (let at = 0; at + 1 < this.messages.length; ) {
+      let end = at + 2;
+      while (end + 1 < this.messages.length && this.messages[end].auto) end += 2;
+      const asked = [];
+      const replies = [];
+      for (let pair5 = at; pair5 < end; pair5 += 2) {
+        const question = this.messages[pair5];
+        if (pair5 === at) asked.push(question.text);
+        asked.push(...((_a2 = question.steers) != null ? _a2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text));
+        const answer = this.messages[pair5 + 1];
+        if (answer.streaming || answer.error || !answer.text.trim()) continue;
+        replies.push({
+          text: answer.text,
+          ...pair5 > at ? { auto: (_b2 = question.autoInfo) != null ? _b2 : { maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS } } : {}
+        });
+      }
+      at = end;
+      if (!replies.length) continue;
+      turns.push({ role: "user", text: asked.join("\n\n") }, { role: "assistant", text: chainReplyText(replies) });
     }
     return turns;
   }

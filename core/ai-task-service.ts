@@ -143,7 +143,13 @@ export class AiTaskService {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     if (estimateCondenseCalls(context.referenceGroups ?? []) > MAX_CONDENSE_CALLS)
       throw new Error(t("ui.source_context_exceeds_budget"));
-    return this.extractReferenceFindings(context, model, reasoning ?? this.options.defaultReasoning(), signal, onRequestAccepted);
+    return this.extractReferenceFindings(
+      context,
+      model,
+      reasoning ?? this.options.defaultReasoning(),
+      signal,
+      onRequestAccepted
+    );
   }
 
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */

@@ -18,7 +18,15 @@ const dedupeRules = (value: string): string =>
 export function contextTokens(
   context: Pick<
     TaskContext,
-    "title" | "summary" | "rules" | "detail" | "task" | "ancestors" | "workingFindings" | "sourceContext" | "anchorContext"
+    | "title"
+    | "summary"
+    | "rules"
+    | "detail"
+    | "task"
+    | "ancestors"
+    | "workingFindings"
+    | "sourceContext"
+    | "anchorContext"
   >
 ): number {
   return [

@@ -80,6 +80,16 @@ function showTurn(file, n) {
   ].join("\n"));
 }
 
+/**
+ * Re-renders a stored exchange-log prompt with the CURRENT templates: the context JSON and the user message are taken out of the stored
+ * prompt, so only the instructions change. This is how a prompt edit is tested on a real failed turn (before/after on the same input).
+ */
+function rerender(p, stored) {
+  const m = stored.match(/Context（JSON）：\n([\s\S]*?)\n\n使用者訊息（JSON 字串）：\n([\s\S]*?)\s*$/);
+  if (!m) throw new Error("this stored prompt has no context/message section to re-render");
+  return p.step.mapChatStep.render({ message: JSON.parse(m[2]), context: { json: m[1] }, language: "zh-TW", model: "claude:haiku", reasoning: "low" });
+}
+
 /** Exchange-log turns have no stored context object, so only the RAW layer exists: checks run on what the model itself proposed. */
 function evaluateRawOnly(checks, raw) {
   const layer = require("./map-chat-eval.cjs").rawLayer(raw);
@@ -126,7 +136,7 @@ async function run(args, ask) {
     if (exchange) {
       const entry = JSON.parse(fs.readFileSync(path.join(records, exchange[1]), "utf8"))[Number(exchange[2])];
       if (!entry || !String(entry.step).startsWith("map-chat")) { lines.push(`## ${c.id}`, `略過：${exchange[1]} 第 ${exchange[2]} 筆不是地圖對話`, ""); continue; }
-      prompt = entry.prompt;
+      prompt = args.rerender ? rerender(p, entry.prompt) : entry.prompt;
     } else {
       const [, recFile, turnNo] = c.fields["來源"].match(SOURCE_RECORD);
       const turn = readRecord(path.join(records, recFile)).turns.get(Number(turnNo));
@@ -168,4 +178,4 @@ if (require.main === module) {
   } catch (e) { console.error(e.message); process.exit(2); }
 }
 
-module.exports = { run, parseCase, validateCase, readRecord, requestOf, FIELDS, CATEGORIES };
+module.exports = { rerender, run, parseCase, validateCase, readRecord, requestOf, FIELDS, CATEGORIES };

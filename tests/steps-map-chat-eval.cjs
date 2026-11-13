@@ -327,7 +327,8 @@ const NOTE = '## 風味\n甜、酸、苦\n\n## 器具\n濾杯、手沖壺、磨�
 const bulk = n => Array.from({ length: n }, (_, i) => A('add_child', { parentId: 'r', title: `項目${i}`, summary: `項目${i}的摘要` }));
 const NEG_FIXTURES = {
   N1: { bad: R('我會刪除。', [A('delete_topic', { nodeId: 'y' })]), good: R('可以合併「手沖」與「手沖咖啡」。') },
-  N1c: { good: R('我會合併。', [A('select_topics', { nodeIds: ['x', 'y'] }), A('run_map_action', { action: 'merge', title: '手沖咖啡' })]) },
+  N1c: { good: R('我會合併。', [A('run_map_action', { action: 'merge', nodeIds: ['x', 'y'], title: '手沖咖啡' })]), bad: R('我不處理。') },
+  N1cAlt: { good: R('我會搬子項再刪除。', [A('move_topic', { nodeId: 'y1', newParentId: 'x' }), A('delete_topic', { nodeId: 'y' })]) },
   N10: { bad: R('我會移除關係。', [A('remove_relation', { fromId: 'h1', toId: 'h2' })]), good: R('這條關係可能不成立，需要的話再告訴我。') },
   N10c: { good: R('我會移除關係。', [A('remove_relation', { fromId: 'h1', toId: 'h2' })]) },
   N11: { bad: R('我會改名。', [A('rename_topic', { nodeId: 'b2', title: '炙烤' }), A('rename_topic', { nodeId: 'b1', title: '煎烤' })]), good: R('我會改名。', [A('rename_topic', { nodeId: 'b2', title: '炙烤' })]) },
@@ -371,6 +372,7 @@ test('S2: every negative case has fixtures, and fixtures behave: good passes eve
   const negs = CASES.filter(k => k.group === '不該做');
   assert.ok(negs.length >= 30, 'the set has real breadth');
   const unfixtured = negs.filter(k => !NEG_FIXTURES[k.id]).map(k => k.id);
+  assert.deepEqual(failed(run('N1c', NEG_FIXTURES.N1cAlt.good)), [], 'moving the children and deleting the duplicate is a legitimate way to merge');
   assert.deepEqual(unfixtured, []);
   for (const k of negs) {
     const fx = NEG_FIXTURES[k.id];
@@ -704,4 +706,14 @@ test('S1: compare counts a failed diagnostic (tone/format) check as a pass for t
   const out = spawnSync('node', [path.join(__dirname, 'tools/map-chat-eval.cjs'), 'compare', `--out=${dir}`, '--a=a', '--b=b'], { encoding: 'utf8' }).stdout;
   fs.rmSync(dir, { recursive: true, force: true });
   assert.ok(!/整題通過 3\/3 → 0\/3/.test(out), `a failing diagnostic must not fail the whole case: ${out}`);
+});
+
+test('S3b: rerender keeps the stored context and message and swaps in the current instructions', () => {
+  const k = byId('E6');
+  const current = prepare(p, k).prompt;
+  const stored = current.replace('只回傳 JSON', '（舊版指示）只回傳 JSON');
+  const again = corpus.rerender(p, stored);
+  assert.equal(again, current, 'rendering the stored context and message with the current template gives the current prompt back');
+  assert.ok(!again.includes('舊版指示'));
+  assert.throws(() => corpus.rerender(p, 'no sections here'), /no context\/message section/);
 });

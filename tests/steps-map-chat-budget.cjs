@@ -220,6 +220,20 @@ test('order: as the budget tightens, older history goes first, then the outline,
   assert.deepEqual(order, ['history', 'outline', 'research', 'files', 'selected']);
 });
 
+test('a research note left out because the total budget lowered this round\'s allowance is deferred, not oversize, and stays pending', () => {
+  const input = { ...base, outline: [node('r', '根', null, 0), node('q', '研究', 'r', 1)], files: [{ path: 'Notes/附件.md', content: zhText(60_000, 51) }], researchNotes: [{ id: 'q', title: '研究', path: 'Maps/Notes/q.md', detail: zhText(50_000, 52) }] };
+  const built = buildMapChatContext(input);
+  const out = JSON.parse(built.json);
+  assert.ok(estimateMapChatTokens(built.json) <= MAP_CHAT_CONTEXT_TOKEN_BUDGET);
+  assert.equal(out.researchNotes, undefined, 'the note did not fit this round');
+  assert.deepEqual(out.researchDeferred.map(d => ({ id: d.id, oversize: d.oversize })), [{ id: 'q', oversize: undefined }]);
+  assert.equal(ctx.pendingResearchCount(built), 1, 'the continuation still has it to send');
+  // A note longer than the turn's own research budget is still oversize.
+  const huge = buildMapChatContext({ ...input, files: [], researchNotes: [{ ...input.researchNotes[0], detail: zhText(90_000, 53) }] });
+  assert.equal(JSON.parse(huge.json).researchDeferred[0].oversize, true);
+  assert.equal(ctx.pendingResearchCount(huge), 0);
+});
+
 test('a context that cannot be shortened enough (a huge selected snippet) is still refused by the step, not sent', () => {
   const built = buildMapChatContext({ ...base, snippets: [{ path: 'n.md', text: '中'.repeat(130_000) }] });
   assert.throws(() => prepareStep(mapChatStep, { message: '整理', context: built, language: 'zh-TW', model: 'claude:haiku', reasoning: 'low' }), error => error.code === 'over_budget');

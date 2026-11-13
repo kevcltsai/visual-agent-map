@@ -646,10 +646,14 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
   // Same order as before (selected, then references), so the Detail budget is spent the same way.
   const selectedOut = input.selected.map(ref => topic(ref, true));
   const referencesOut = input.references.map(ref => topic(ref, false));
+  // A note is `oversize` only against the turn's own research budget: one left out because the total budget lowered this round's
+  // allowance is deferred like any note that did not fit, so the continuation still counts it as pending.
+  const researchBudget = input.researchBudget ?? MAP_CHAT_RESEARCH_BUDGET;
   const research = planResearchNotes(
     input.researchNotes ?? [],
-    shrink.researchBudget ?? input.researchBudget ?? MAP_CHAT_RESEARCH_BUDGET,
-    wholeSent
+    Math.min(shrink.researchBudget ?? researchBudget, researchBudget),
+    wholeSent,
+    researchBudget
   );
   for (const note of research.sent) {
     basis.cards[note.id] = { title: note.title, research: true };
@@ -806,13 +810,14 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
 /**
  * Which research notes go into this turn. Whole or not at all: a note is never cut. Notes not sent before come first, then the
  * ones that were, each newest first, so a note left out one round leads the next. A note whose card was already sent whole as
- * `selected` or `references` is not repeated; an empty note says nothing and is skipped; one longer than the whole budget is
- * `oversize` and is never sent.
+ * `selected` or `references` is not repeated; an empty note says nothing and is skipped; one longer than `oversizeLimit` (the
+ * turn's whole research budget, which `budget` may be lowered below to fit the total) is `oversize` and is never sent.
  */
 function planResearchNotes(
   notes: readonly MapChatResearchNote[],
   budget: number,
-  alreadySent: ReadonlySet<string>
+  alreadySent: ReadonlySet<string>,
+  oversizeLimit: number = budget
 ): { sent: MapChatResearchNote[]; deferred: MapChatResearchDeferred[] } {
   const live = notes.filter(note => note.detail.trim() && !alreadySent.has(note.id)).reverse();
   const ordered = [...live.filter(note => !note.sentBefore), ...live.filter(note => note.sentBefore)];
@@ -821,7 +826,8 @@ function planResearchNotes(
   let left = budget;
   for (const note of ordered) {
     const chars = note.detail.length;
-    if (chars > budget) deferred.push({ id: note.id, title: clip(note.title, TITLE_LIMIT), chars, oversize: true });
+    if (chars > oversizeLimit)
+      deferred.push({ id: note.id, title: clip(note.title, TITLE_LIMIT), chars, oversize: true });
     else if (chars <= left) {
       sent.push(note);
       left -= chars;

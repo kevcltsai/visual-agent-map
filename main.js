@@ -24519,10 +24519,12 @@ function buildOnce(input2, shrink) {
   }));
   const selectedOut = input2.selected.map((ref) => topic(ref, true));
   const referencesOut = input2.references.map((ref) => topic(ref, false));
+  const researchBudget = (_g = input2.researchBudget) != null ? _g : MAP_CHAT_RESEARCH_BUDGET;
   const research = planResearchNotes(
-    (_g = input2.researchNotes) != null ? _g : [],
-    (_i = (_h = shrink.researchBudget) != null ? _h : input2.researchBudget) != null ? _i : MAP_CHAT_RESEARCH_BUDGET,
-    wholeSent
+    (_h = input2.researchNotes) != null ? _h : [],
+    Math.min((_i = shrink.researchBudget) != null ? _i : researchBudget, researchBudget),
+    wholeSent,
+    researchBudget
   );
   for (const note of research.sent) {
     basis.cards[note.id] = { title: note.title, research: true };
@@ -24652,7 +24654,7 @@ function buildOnce(input2, shrink) {
     ...research.sent.length || research.deferred.length ? { research: { sent: research.sent.map((note) => note.id), deferred: research.deferred } } : {}
   };
 }
-function planResearchNotes(notes, budget, alreadySent) {
+function planResearchNotes(notes, budget, alreadySent, oversizeLimit = budget) {
   const live2 = notes.filter((note) => note.detail.trim() && !alreadySent.has(note.id)).reverse();
   const ordered = [...live2.filter((note) => !note.sentBefore), ...live2.filter((note) => note.sentBefore)];
   const sent = [];
@@ -24660,7 +24662,8 @@ function planResearchNotes(notes, budget, alreadySent) {
   let left = budget;
   for (const note of ordered) {
     const chars = note.detail.length;
-    if (chars > budget) deferred.push({ id: note.id, title: clip(note.title, TITLE_LIMIT), chars, oversize: true });
+    if (chars > oversizeLimit)
+      deferred.push({ id: note.id, title: clip(note.title, TITLE_LIMIT), chars, oversize: true });
     else if (chars <= left) {
       sent.push(note);
       left -= chars;

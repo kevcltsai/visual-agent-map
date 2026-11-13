@@ -28,7 +28,7 @@ const parseRemaining = fields => parseMapChat(raw(fields), context()).remaining;
 test('remaining: a required string in the schema; a missing field or a value that is not a string reads as "" and never continues', () => {
   assert.ok(MAP_CHAT_SCHEMA.required.includes('remaining'));
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.remaining), { type: 'string' });
-  assert.equal(mapChatStep.version, 22);
+  assert.equal(mapChatStep.version, 23);
   assert.equal(parseMapChat(JSON.stringify({ reply: 'ok', actions: [] }), context()).remaining, '', 'a version 15/16/17 reply has none');
   for (const value of [null, 0, 12, true, false, ['x'], { a: 1 }, undefined]) assert.equal(parseRemaining({ remaining: value }), '', JSON.stringify(value));
 });
@@ -231,12 +231,43 @@ test('A3 chain: a non-empty remaining opens the next round; "" ends as done; res
 });
 test('A4 chain no_progress: text only, everything skipped, or only view operations is no progress; any write is progress', () => {
   for (const [name, actions] of [['text only', []], ['all skipped', [{ kind: 'add_child', done: false }, { kind: 'delete_topic', done: false }]],
-    ['view operations only', ['focus_topic', 'select_topics', 'collapse_topic', 'expand_topic', 'auto_layout', 'ask_topic_kind'].map(kind => ({ kind, done: true }))],
+    ['view operations only', ['focus_topic', 'collapse_topic', 'expand_topic', 'auto_layout', 'ask_topic_kind'].map(kind => ({ kind, done: true }))],
     ['a research start is not a write', [{ kind: 'run_map_action', done: true }]]])
     end(chain.finishRound(at(2), roundEnd({ actions })), 'no_progress', 'build the rest');
   for (const kind of ['add_child', 'rename_topic', 'update_summary', 'edit_topic_note', 'delete_topic', 'create_md_file', 'add_relation', 'set_appearance', 'set_topic_kind', 'create_map'])
     assert.equal(chain.finishRound(at(2), roundEnd({ actions: [{ kind: 'focus_topic', done: true }, { kind, done: true }] })).decision.kind, 'next', kind);
   assert.equal(chain.wroteSomething(wrote), true); assert.equal(chain.wroteSomething(text), false);
+});
+test('A4 chain select-only: a round that only selected cards, with something left to do, continues once so the next round reads their notes; twice in a row is no progress', () => {
+  const selectOnly = [{ kind: 'select_topics', done: true }];
+  // Control: a view operation that is not a selection stays no progress.
+  end(chain.finishRound(at(2), roundEnd({ actions: [{ kind: 'focus_topic', done: true }] })), 'no_progress', 'build the rest');
+  // A skipped selection changes nothing either.
+  end(chain.finishRound(at(2), roundEnd({ actions: [{ kind: 'select_topics', done: false }] })), 'no_progress');
+  // Nothing left to do: done, not continued.
+  end(chain.finishRound(at(1), roundEnd({ remaining: '', actions: selectOnly })), 'done', '');
+  const first = chain.finishRound(at(1), roundEnd({ actions: [...selectOnly, { kind: 'focus_topic', done: true }] }));
+  assert.deepEqual(plain(first.decision), { kind: 'next', round: 2, remaining: 'build the rest' });
+  end(chain.finishRound(first.state, roundEnd({ actions: selectOnly })), 'no_progress', 'build the rest');
+  // A write in between allows another selection round later.
+  const wroteThen = chain.finishRound(first.state, roundEnd());
+  assert.equal(chain.finishRound(wroteThen.state, roundEnd({ actions: selectOnly })).decision.kind, 'next');
+  // The round limit still wins.
+  end(chain.finishRound(at(8), roundEnd({ actions: selectOnly })), 'max_rounds');
+});
+test('A4 chain select-only, whole path: a batch reply that selects the cards and says what is left opens round 2, whose context carries their notes', () => {
+  // Round 1: nothing selected, so no note is in the context.
+  const first = context();
+  assert.equal(json(first).selected.length, 0);
+  const reply = parseMapChat(raw({ actions: [{ kind: 'select_topics', nodeIds: ['a', 'b'], all: false }], remaining: 'rewrite the notes of A and B' }), first);
+  assert.deepEqual(plain(reply.actions.map(action => action.kind)), ['select_topics']);
+  const step = chain.finishRound(chain.startChain(), roundEnd({ remaining: reply.remaining, actions: reply.actions.map(action => ({ kind: action.kind, done: true })) }));
+  assert.deepEqual(plain(step.decision), { kind: 'next', round: 2, remaining: 'rewrite the notes of A and B' });
+  // Round 2: the view builds the context from the selection the round made.
+  const second = json(context({ selected: [topic('a'), topic('b')], continuation: { round: 2, maxRounds: 8, remaining: reply.remaining, lastResults: [{ text: 'Selected 2 cards', status: 'done' }], research: [] } }));
+  assert.deepEqual(plain(second.selected.map(card => [card.id, card.detail])), [['a', 'a detail'], ['b', 'b detail']]);
+  // Control: the same reply with nothing left to do ends the chain; the v22 wording ("send again", remaining empty) never reaches round 2.
+  end(chain.finishRound(chain.startChain(), roundEnd({ remaining: '', actions: [{ kind: 'select_topics', done: true }] })), 'done', '');
 });
 test('A4 chain max_rounds: round 8 never opens a ninth; round 7 opens round 8', () => {
   assert.deepEqual(plain(chain.finishRound(at(7), roundEnd()).decision), { kind: 'next', round: 8, remaining: 'build the rest' });

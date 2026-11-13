@@ -964,7 +964,7 @@ integrationTest('map chat: expand with an outline that has nothing below the roo
   const gate = deferred(); let signal;
   h.plugin.outlineGeneration = { generate: async (_r, s2) => { signal = s2; await gate.promise; return { markdown: '# Body\n## X', nodes: outlineApi.parseOutline('# Body\n## X').nodes }; } };
   await apply(h, [{ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a], title: '', goal: '', direction: '' }]);
-  await withTimeout(until(() => h.plugin.activeTasks.has(h.view.map.nodes.find(n => n.id === h.ids.a).path)), 2000);
+  await withTimeout(until(() => signal && h.plugin.activeTasks.has(h.view.map.nodes.find(n => n.id === h.ids.a).path)), 2000); // the sources are read first, so wait until the request is really in flight
   h.plugin.activeTasks.get(h.view.map.nodes.find(n => n.id === h.ids.a).path).abort(); gate.resolve();
   await withTimeout(until(() => h.plugin.running.size === 0), 4000);
   assert.equal(signal.aborted, true); assert.equal((await h.saved()).length, before, 'a stopped expand adds nothing');

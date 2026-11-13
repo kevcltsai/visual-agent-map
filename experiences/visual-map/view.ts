@@ -245,6 +245,8 @@ import {
   sharedSourceFindings,
   withMapSources
 } from "../../core/source-gateway";
+import { outlineSourceMaterial } from "../../core/outline-sources";
+import type { OutlineGenerateRequest } from "../../core/outline-generation-service";
 import { createNoteReadContext } from "../../core/note-read-context";
 import { needsReadBack, UnsyncedPaths } from "../../core/sync-scope";
 import { chainRebase, type RenamePair } from "../../core/rename-batch";
@@ -3991,15 +3993,18 @@ export class VisualAgentMapView extends ItemView {
           if (!this.closed) this.render();
           try {
             const result = await this.plugin.outlineGeneration.generate(
-              {
-                ...forService,
-                ...carry,
-                ...this.usageMapField(),
-                language: settings.language,
-                contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
-                model,
-                reasoning
-              },
+              await this.withOutlineSources(
+                {
+                  ...forService,
+                  ...carry,
+                  ...this.usageMapField(),
+                  language: settings.language,
+                  contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
+                  model,
+                  reasoning
+                },
+                controller.signal
+              ),
               controller.signal
             );
             // Stopped, replaced or the view closed meanwhile: the late result is dropped.
@@ -4202,20 +4207,23 @@ export class VisualAgentMapView extends ItemView {
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
         const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
-          {
-            ...this.usageMapField(),
-            topic: note.title,
-            presetText: request.requirements ? `${preset.text}\n\n${request.requirements}` : preset.text,
-            language: request.language,
-            model: used.model,
-            reasoning: normalizeReasoningLevel(used.reasoning ?? settings.cliReasoning),
-            limits: request.limits,
-            // The card's own note and its current subtopics, so the new subtopics follow the note and do not repeat (quoted as data).
-            noteDetail: note.detail,
-            existingChildren: (this.map?.nodes ?? [])
-              .filter(item => item.parentId === node.id)
-              .map(item => this.notes.get(item.id)?.title ?? "")
-          },
+          await this.withOutlineSources(
+            {
+              ...this.usageMapField(),
+              topic: note.title,
+              presetText: request.requirements ? `${preset.text}\n\n${request.requirements}` : preset.text,
+              language: request.language,
+              model: used.model,
+              reasoning: normalizeReasoningLevel(used.reasoning ?? settings.cliReasoning),
+              limits: request.limits,
+              // The card's own note and its current subtopics, so the new subtopics follow the note and do not repeat (quoted as data).
+              noteDetail: note.detail,
+              existingChildren: (this.map?.nodes ?? [])
+                .filter(item => item.parentId === node.id)
+                .map(item => this.notes.get(item.id)?.title ?? "")
+            },
+            signal
+          ),
           signal,
           steer
         );
@@ -15416,6 +15424,39 @@ export class VisualAgentMapView extends ItemView {
         return roots.length ? scrubReferenceGroups(groups, text => scrubExternalPaths(text, roots)) : groups;
       }
     };
+  }
+  /**
+   * The outline request with the map's data sources in its own untrusted block. The sources go in as they are when the whole
+   * request fits the outline budget, else condensed once; still too big refuses before any request. A stop is rethrown; a
+   * failed read gives no sources and the request continues as it was.
+   */
+  private async withOutlineSources(
+    request: OutlineGenerateRequest,
+    signal: AbortSignal
+  ): Promise<OutlineGenerateRequest> {
+    const groups = await this.readMapSourceGroups(signal);
+    const sourceMaterial = await outlineSourceMaterial(request, groups, () =>
+      this.plugin.aiTasks.condenseReferences(
+        {
+          title: this.map?.title ?? "",
+          summary: "",
+          rules: "",
+          detail: "",
+          task: "",
+          ancestors: "",
+          referenceGroups: groups,
+          mode: "task",
+          researchMode: "local",
+          researchDepth: "fast",
+          visualMode: "off",
+          ...this.usageMapField()
+        },
+        request.model,
+        request.reasoning,
+        signal
+      )
+    );
+    return sourceMaterial ? { ...request, sourceMaterial } : request;
   }
   /** The map's sources for an AI request: a stop (AbortError) is rethrown so nothing is sent; any other read failure gives no sources. */
   private readMapSourceGroups(signal: AbortSignal): Promise<ReferenceGroup[]> {

@@ -651,6 +651,21 @@
       "language": "zh-CN",
       "schema": false
     },
+    "outline-generate-sources.en": {
+      "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (map data sources with an injection attempt, then note and existing subtopics)",
+      "language": "en",
+      "schema": false
+    },
+    "outline-generate-sources.zh": {
+      "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (map data sources with an injection attempt, then note and existing subtopics)",
+      "language": "zh-TW",
+      "schema": false
+    },
+    "outline-generate-sources.zh-CN": {
+      "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (map data sources with an injection attempt, then note and existing subtopics)",
+      "language": "zh-CN",
+      "schema": false
+    },
     "outline-generate.en": {
       "builder": "core/outline-generation-service.ts buildOutlineGeneratePrompt (preset with topic placeholder)",
       "language": "en",

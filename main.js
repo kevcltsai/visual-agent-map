@@ -42712,7 +42712,10 @@ function wikimediaThumbnail(url) {
   return `https://upload.wikimedia.org/wikipedia/${project}/thumb/${a}/${ab}/${file}/1280px-${file}`;
 }
 function wikimediaThumbnails(markdown) {
-  return markdown.replace(/(!\[[^\]\n]*\]\(<?)(https:\/\/upload\.wikimedia\.org\/[^\s)>]+)/g, (_, head, url) => head + wikimediaThumbnail(url));
+  return markdown.replace(
+    /(!\[[^\]\n]*\]\(<?)(https:\/\/upload\.wikimedia\.org\/[^\s)>]+)/g,
+    (_, head, url) => head + wikimediaThumbnail(url)
+  );
 }
 
 // ui/image-candidates.ts

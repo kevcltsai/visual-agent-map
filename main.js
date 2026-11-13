@@ -25204,15 +25204,20 @@ function scrubExternalPaths(text10, roots) {
   if (!ordered.length) return text10;
   return text10.replace(new RegExp(ordered.map(escapeRegExp).join("|"), "g"), EXTERNAL_PATH_PLACEHOLDER);
 }
-async function readExternalFile(absolute, rootReal) {
+var DEFAULT_FILE_IO = { realpath: import_promises.realpath, lstat: import_promises.lstat, stat: import_promises.stat, open: import_promises.open };
+async function readExternalFile(absolute, rootReal, io = DEFAULT_FILE_IO) {
   let handle;
   try {
-    if (!within(await (0, import_promises.realpath)(absolute), rootReal)) throw new ExternalSourceError("unreadable");
+    if (!within(await io.realpath(absolute), rootReal)) throw new ExternalSourceError("unreadable");
     const noFollow = import_node_fs.constants.O_NOFOLLOW;
-    if (noFollow === void 0 && !(await (0, import_promises.lstat)(absolute)).isFile()) throw new ExternalSourceError("unreadable");
-    handle = await (0, import_promises.open)(absolute, import_node_fs.constants.O_RDONLY | (noFollow != null ? noFollow : 0));
+    if (noFollow === void 0 && !(await io.lstat(absolute)).isFile()) throw new ExternalSourceError("unreadable");
+    handle = await io.open(absolute, import_node_fs.constants.O_RDONLY | (noFollow != null ? noFollow : 0));
     const info = await handle.stat();
     if (!info.isFile()) throw new ExternalSourceError("unreadable");
+    const after = await io.realpath(absolute);
+    if (!within(after, rootReal)) throw new ExternalSourceError("unreadable");
+    const there = await io.stat(after);
+    if (there.dev !== info.dev || there.ino !== info.ino) throw new ExternalSourceError("unreadable");
     if (info.size > EXTERNAL_MAX_FILE_BYTES) throw new ExternalSourceError("too-large");
     const buffer = new Uint8Array(EXTERNAL_MAX_FILE_BYTES + 1);
     let length = 0;
@@ -25237,9 +25242,9 @@ async function externalSourceStatus(source, scope, signal) {
     return { unreadable: error instanceof ExternalSourceError ? error.reason : "unreadable" };
   }
 }
-async function readExternalSource(source, scope, signal) {
+async function readExternalSource(source, scope, signal, mapRoots = []) {
   const listing = await listExternalSource(source, scope, signal);
-  const roots = [source.path, cleanExternalInput(source.path), listing.real];
+  const roots = [source.path, cleanExternalInput(source.path), listing.real, ...mapRoots];
   const documents = [];
   for (const file of listing.files) {
     if (signal.aborted) throw aborted();
@@ -25256,6 +25261,19 @@ async function readExternalSource(source, scope, signal) {
   if (!documents.length) return null;
   return { id: `external:${source.label}`, name: source.label, location: source.label, documents };
 }
+async function externalScrubRoots(sources) {
+  const roots = /* @__PURE__ */ new Set();
+  for (const source of sources) {
+    roots.add(source.path);
+    const text10 = cleanExternalInput(source.path);
+    if (text10) roots.add(text10);
+    try {
+      roots.add(await (0, import_promises.realpath)(text10));
+    } catch (e) {
+    }
+  }
+  return [...roots];
+}
 function externalForbiddenPaths(sources) {
   const paths = /* @__PURE__ */ new Set();
   for (const source of sources) {
@@ -25268,30 +25286,47 @@ function externalForbiddenPaths(sources) {
   }
   return [...paths];
 }
+var commitQueues = /* @__PURE__ */ new WeakMap();
+function enqueueCommit(app, mapId, task) {
+  var _a2, _b2;
+  const queues = (_a2 = commitQueues.get(app)) != null ? _a2 : /* @__PURE__ */ new Map();
+  commitQueues.set(app, queues);
+  const run = ((_b2 = queues.get(mapId)) != null ? _b2 : Promise.resolve()).then(task, task);
+  const tail = run.catch(() => void 0);
+  queues.set(mapId, tail);
+  void tail.then(() => {
+    if (queues.get(mapId) === tail) queues.delete(mapId);
+  });
+  return run;
+}
 async function addExternalSource(app, mapId, input2, scope) {
   const check = await checkExternalRoot(input2, scope);
   if (!check.ok) return check;
   const text10 = cleanExternalInput(input2);
-  const existing = loadExternalSources(app, mapId);
-  for (const item of existing) {
-    let other = item.path;
-    try {
-      other = await (0, import_promises.realpath)(item.path);
-    } catch (e) {
+  return enqueueCommit(app, mapId, async () => {
+    const existing = loadExternalSources(app, mapId);
+    for (const item of existing) {
+      let other = item.path;
+      try {
+        other = await (0, import_promises.realpath)(item.path);
+      } catch (e) {
+      }
+      if (item.path === text10 || other === check.real) return { ok: false, reason: "duplicate" };
     }
-    if (item.path === text10 || other === check.real) return { ok: false, reason: "duplicate" };
-  }
-  const name2 = (0, import_node_path.parse)(text10).base || (0, import_node_path.parse)(check.real).base;
-  const label = allocateExternalLabel(name2, new Set(existing.map((item) => item.label)));
-  const source = { path: text10, label };
-  const sources = [...existing, source];
-  saveExternalSources(app, mapId, sources);
-  return { ok: true, source, sources };
+    const name2 = (0, import_node_path.parse)(text10).base || (0, import_node_path.parse)(check.real).base;
+    const label = allocateExternalLabel(name2, new Set(existing.map((item) => item.label)));
+    const source = { path: text10, label };
+    const sources = [...existing, source];
+    saveExternalSources(app, mapId, sources);
+    return { ok: true, source, sources };
+  });
 }
 function removeExternalSource(app, mapId, label) {
-  const sources = loadExternalSources(app, mapId).filter((item) => item.label !== label);
-  saveExternalSources(app, mapId, sources);
-  return sources;
+  return enqueueCommit(app, mapId, async () => {
+    const sources = loadExternalSources(app, mapId).filter((item) => item.label !== label);
+    saveExternalSources(app, mapId, sources);
+    return sources;
+  });
 }
 
 // experiences/visual-map/map-sources.ts
@@ -25387,7 +25422,7 @@ async function readFiles(app, files, signal, skipArchived) {
 }
 var baseName = (path) => path.split("/").at(-1) || path;
 async function resolveMapSources(deps, sources, currentMapPath, signal) {
-  var _a2, _b2;
+  var _a2, _b2, _c, _d;
   const groups = [];
   const unreadable = [];
   const externalUnreadable = [];
@@ -25426,10 +25461,11 @@ async function resolveMapSources(deps, sources, currentMapPath, signal) {
       unreadable.push(source);
     }
   }
-  for (const source of (_b2 = (_a2 = deps.external) == null ? void 0 : _a2.sources) != null ? _b2 : []) {
+  const mapRoots = await externalScrubRoots((_b2 = (_a2 = deps.external) == null ? void 0 : _a2.sources) != null ? _b2 : []);
+  for (const source of (_d = (_c = deps.external) == null ? void 0 : _c.sources) != null ? _d : []) {
     if (signal.aborted) throw aborted2();
     try {
-      const group = await readExternalSource(source, deps.external.scope, signal);
+      const group = await readExternalSource(source, deps.external.scope, signal, mapRoots);
       if (group) groups.push(group);
     } catch (error) {
       if (signal.aborted || error instanceof Error && error.name === "AbortError") throw aborted2();
@@ -61204,15 +61240,20 @@ ${request.requirements}` : preset.text,
     return null;
   }
   removeExternalFolder(mapPath, source) {
-    var _a2, _b2;
+    var _a2;
     const mapId = (_a2 = this.map) == null ? void 0 : _a2.id;
     if (!mapId || this.closed || this.path !== mapPath) return;
-    this.externalSources = removeExternalSource(this.app, mapId, source.label);
-    this.externalStatuses.delete(source.label);
-    (_b2 = this.announcer) == null ? void 0 : _b2.setText(t("ui.map_sources_removed_0", source.label));
-    this.refreshExternalStatuses();
-    this.paintMapSourcesButton();
-    if (this.mapSourcesOpen) this.drawMapSourcesPanelEl({ input: true });
+    const epoch = this.viewEpoch;
+    void removeExternalSource(this.app, mapId, source.label).then((sources) => {
+      var _a3, _b2;
+      if (this.closed || this.viewEpoch !== epoch || this.path !== mapPath || ((_a3 = this.map) == null ? void 0 : _a3.id) !== mapId) return;
+      this.externalSources = sources;
+      this.externalStatuses.delete(source.label);
+      (_b2 = this.announcer) == null ? void 0 : _b2.setText(t("ui.map_sources_removed_0", source.label));
+      this.refreshExternalStatuses();
+      this.paintMapSourcesButton();
+      if (this.mapSourcesOpen) this.drawMapSourcesPanelEl({ input: true });
+    });
   }
   /** A vault delete or rename: repaint the button and an open panel (a source may have become unreadable). */
   refreshMapSourcesUi() {
@@ -84894,17 +84935,34 @@ var INTERNAL_FIELD_NAMES = [
   "map-sources",
   "content-language"
 ];
+var NAMED_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\xA0" };
+function decodeHtmlEntities(text10) {
+  return text10.replace(
+    /&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([A-Za-z]+));/g,
+    (original, dec, hex, name2) => {
+      var _a2;
+      if (name2) return (_a2 = NAMED_ENTITIES[name2]) != null ? _a2 : original;
+      const code = dec ? Number(dec) : parseInt(hex != null ? hex : "", 16);
+      return code > 0 && code <= 1114111 ? String.fromCodePoint(code) : original;
+    }
+  );
+}
+function occurrences(text10, category, value, hits) {
+  let from = 0;
+  for (; ; ) {
+    const index = text10.indexOf(value, from);
+    if (index < 0) break;
+    hits.push({ category, index });
+    from = index + value.length;
+  }
+}
 function scanForLeaks(html, forbidden) {
   const hits = [];
+  const decoded2 = html.includes("&") ? decodeHtmlEntities(html) : html;
   for (const { category, value } of forbidden) {
     if (!value) continue;
-    let from = 0;
-    for (; ; ) {
-      const index = html.indexOf(value, from);
-      if (index < 0) break;
-      hits.push({ category, index });
-      from = index + value.length;
-    }
+    occurrences(html, category, value, hits);
+    if (category === "external-path" && decoded2 !== html) occurrences(decoded2, category, value, hits);
   }
   return hits.sort((a, b) => a.index - b.index);
 }
@@ -89584,7 +89642,7 @@ var imageTranslateStep = {
 };
 
 // experiences/markdown-context/image-translate-action.ts
-function occurrences(source, text10) {
+function occurrences2(source, text10) {
   const found = [];
   for (let at = source.indexOf(text10); at >= 0; at = source.indexOf(text10, at + text10.length)) found.push(at);
   return found;
@@ -89826,7 +89884,7 @@ var ImageTranslateAction = class extends import_obsidian44.Component {
     const edit = (text10) => {
       var _a2, _b2, _c, _d;
       if (noteTextAiLocked(text10, import_obsidian44.parseYaml)) throw new Error(t("ui.ai_locked_notice"));
-      const copies = target.token ? occurrences(text10, target.token.text) : [];
+      const copies = target.token ? occurrences2(text10, target.token.text) : [];
       const at = target.token && copies.length === target.token.count ? copies[target.token.occurrence] : copies.length === 1 ? copies[0] : -1;
       const token = (_b2 = (_a2 = target.token) == null ? void 0 : _a2.text) != null ? _b2 : "";
       const unique3 = at >= 0;

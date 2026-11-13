@@ -40,7 +40,7 @@ test('schema and kinds carry add_anchor and link_anchor with the new required fi
   assert.equal(item.properties.y.type, 'number');
   assert.equal(item.properties.imageId.type, 'string');
   assert.ok(item.properties.kind.enum.includes('add_anchor'));
-  assert.equal(mapChatStep.version, 21);
+  assert.equal(mapChatStep.version, 22);
 });
 test('add_anchor and link_anchor are parsed with clamped coordinates, a cleaned one-line note and anchor refs', () => {
   const result = parse(reply(
@@ -288,5 +288,5 @@ test('P6: MAP_CHAT_SCHEMA still has add_child parentId as a string and the same 
   const item = MAP_CHAT_SCHEMA.properties.actions.items;
   assert.equal(item.properties.parentId.type, 'string');
   assert.ok(item.required.includes('parentId'));
-  assert.equal(mapChatStep.version, 21);
+  assert.equal(mapChatStep.version, 22);
 });

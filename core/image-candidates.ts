@@ -10,3 +10,18 @@ export function imageMarkdown(candidate: ImageCandidate): string {
   const title = candidate.title.replace(/[\]\\\r\n[<>]/g, " ");
   return `![${title}](<${candidate.url}>)\n\n[${title}](<${candidate.source}>)`;
 }
+
+const WIKIMEDIA_ORIGINAL = /^https:\/\/upload\.wikimedia\.org\/wikipedia\/([^/]+)\/([0-9a-f])\/([0-9a-f]{2})\/([^/?#]+\.(?:jpe?g|png|gif|webp))$/i;
+
+/** A Wikimedia original (can be hundreds of MB, which Obsidian renders blank) as its 1280px thumbnail; any other link unchanged. */
+export function wikimediaThumbnail(url: string): string {
+  const match = WIKIMEDIA_ORIGINAL.exec(url);
+  if (!match) return url;
+  const [, project, a, ab, file] = match;
+  return `https://upload.wikimedia.org/wikipedia/${project}/thumb/${a}/${ab}/${file}/1280px-${file}`;
+}
+
+/** Every Markdown image embed of the text, `![alt](url)` or `![alt](<url>)`, with Wikimedia originals swapped for thumbnails. */
+export function wikimediaThumbnails(markdown: string): string {
+  return markdown.replace(/(!\[[^\]\n]*\]\(<?)(https:\/\/upload\.wikimedia\.org\/[^\s)>]+)/g, (_, head: string, url: string) => head + wikimediaThumbnail(url));
+}

@@ -255,6 +255,9 @@ async function run() {
   console.log(`wrote ${path.join(dir, "report.md")}`);
 }
 
+/** One-sided 95% upper bound on a failure rate after n repeats with zero failures: 1 - 0.05^(1/n). Valid only for a pre-specified condition and independent identical trials. */
+const zeroFailureBound = n => (n > 0 ? 1 - Math.pow(0.05, 1 / n) : 1);
+
 function summarize(cases, results) {
   return cases.map(kase => {
     const mine = results.filter(r => r.id === kase.id);
@@ -279,6 +282,7 @@ function report(cases, results, runs, model, slug) {
   const received = sum.reduce((n, s) => n + s.received, 0);
   const parseErrors = sum.reduce((n, s) => n + s.parseErrors, 0);
   const casePass = results.filter(r => r.raw && r.status === "ok" && r.checks.every(c => c.ok || c.diag)).length;
+  lines.push(`統計上限：每題只跑 ${runs} 次，即使全部通過，也只能說失敗率上限約 ${(zeroFailureBound(runs) * 100).toFixed(0)}%（單側 95%，且只在「事先指定條件、獨立同分布」下成立；要壓到 5% 需要約 59 次）。一題的 N 次不是 N 個獨立使用情境。`, "");
   lines.push(`呼叫成功率 ${received}/${calls}（基礎設施失敗 ${errored} 次）；可解析率 ${received - parseErrors}/${received}（產品會整則拒絕的壞格式 ${parseErrors} 次）；題目通過 ${casePass}/${received}（只算任務檢查；壞格式算失敗；語氣與格式屬「診斷」，另列）。`, "");
   lines.push(`呼叫 ${calls} 次（失敗 ${errored} 次）；檢查項 ${allChecks.length} 條，全部通過 ${allChecks.filter(r => r.passes === r.total && r.total > 0).length} 條，有任一次失敗 ${allChecks.filter(r => r.passes < r.total).length} 條。`, "");
   const failing = sum.filter(s => s.rows.some(r => r.passes < r.total) || s.errors || s.parseErrors);
@@ -375,4 +379,4 @@ if (require.main === module) {
 }
 
 const callClaudeForCorpus = (p, prompt, schema, model) => callClaude(p, prompt, schema, model);
-module.exports = { callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, rawLayer, caseHash, flowHash };
+module.exports = { zeroFailureBound, callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, rawLayer, caseHash, flowHash };

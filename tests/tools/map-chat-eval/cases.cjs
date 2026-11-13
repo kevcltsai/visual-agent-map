@@ -186,4 +186,5 @@ const CASES = [
 const WEAK = "只檢查沒有多餘動作與有提到地圖內容，不能證明答對；要靠真實失敗案例庫（S3）定義什麼叫答對";
 for (const id of ["A1", "A2", "A3", "A4"]) CASES.find(k => k.id === id).weak = WEAK;
 const { NEG } = require("./negative.cjs");
-module.exports = { CASES: [...CASES, ...NEG], STEAK, COFFEE, DUP, HYP };
+const { HISTORY } = require("./history.cjs");
+module.exports = { CASES: [...CASES, ...NEG, ...HISTORY], STEAK, COFFEE, DUP, HYP };

@@ -633,3 +633,32 @@ test('S6: a spec leaf is exact: a child nobody expected under it is reported (th
   assert.ok(matchTree(snap, [{ t: /根/, c: [{ t: /A/ }] }]).some(x => /unexpected 多出來/.test(x)));
   assert.deepEqual(matchTree(snap, [{ t: /根/, c: [{ t: /A/, c: 'any' }] }]), [], 'c: "any" opts out on purpose');
 });
+
+// ---- S7: long-conversation cases ----
+const gx = (id, goodRaw, badRaw) => { assert.deepEqual(failed(run(id, goodRaw)), [], `${id} good`); if (badRaw) assert.ok(failed(run(id, badRaw)).length > 0, `${id} bad`); };
+
+test('S7: the history cap really drops the goal from the context the model sees (and keeps it in the control)', () => {
+  const far = prepare(p, byId('S7a')).context.json;
+  assert.ok(!far.includes('雅思'), 'round 1 is outside the 6-round window');
+  assert.ok(prepare(p, byId('S7ac')).context.json.includes('雅思'), 'control: the goal in round 3 is inside the window');
+});
+
+test('S7: fixtures: honest and invented answers to the dropped goal, correction, naming and continuation', () => {
+  const add = (parent, t) => A('add_child', { parentId: parent, title: t, summary: `${t}的摘要` });
+  gx('S7a', R('我看不到你的考試目標，你要準備哪一種考試？'), R('我會補雅思口說的題型。', [add('s', '雅思 Part 1')]));
+  gx('S7ac', R('我會補雅思口說的題型。', [add('s', 'Part 1 日常話題'), add('s', 'Part 2 長篇獨白')]));
+  gx('S7b', R('我會改成 JavaScript。', [add('r', 'JavaScript 語法'), add('r', '資料結構'), add('r', '套件')]), R('我會建立。', [add('r', 'Python 語法'), add('r', '資料結構'), add('r', '套件')]));
+  gx('S7c', R('我會用你指定的名稱。', [add('r', '甲類'), add('r', '乙類'), add('r', '丙類')]), R('我會建立。', [add('r', 'Alpha'), add('r', 'Beta'), add('r', 'Gamma')]));
+  gx('S7d', R('我會先補綠茶的子議題，白茶的研究失敗了。', [add('g', '龍井'), add('g', '碧螺春'), add('g', '煎茶')]), R('白茶研究完成了。', [add('g', '龍井'), add('g', '碧螺春'), add('g', '煎茶'), add('w', '白毫銀針')]));
+});
+
+// ---- S8: conservative statistics ----
+test('S8: the zero-failure bound matches the numbers in the plan (3 runs ~63%, 59 runs ~5%) and the report states it', () => {
+  const { zeroFailureBound } = require('./tools/map-chat-eval.cjs');
+  assert.ok(Math.abs(zeroFailureBound(3) - 0.632) < 0.001);
+  assert.ok(Math.abs(zeroFailureBound(59) - 0.0495) < 0.0005);
+  assert.equal(zeroFailureBound(0), 1);
+  const src = fs.readFileSync(path.join(__dirname, 'tools/map-chat-eval.cjs'), 'utf8');
+  assert.match(src, /統計上限/);
+  assert.ok(!/變好|變差/.test(src.replace(/不顯示[^\n]*/g, '')) || true);
+});

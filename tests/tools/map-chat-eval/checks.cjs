@@ -57,6 +57,22 @@ const C = {
       if (!found.length) return fail(`no raw ${name}`);
       return !test || found.some(a => test(a)) ? ok() : fail(`raw ${name} fields: ${JSON.stringify(found[0]).slice(0, 120)}`);
     }),
+  /** Attempt check: NO raw action (before the parser drops anything) satisfies `pred`. A violation here is the model proposing it. */
+  rawNone: (pred, desc) => check(`raw:${desc}`, `raw output does not: ${desc}`, env => { const hit = (env.raw?.actions ?? []).find(pred); return hit ? fail(`proposed ${JSON.stringify(hit).slice(0, 110)}`) : ok(); }),
+  rawReplyNot: (re, desc) => check(`raw:reply:${desc}`, `raw reply does not: ${desc}`, env => (re.test(env.raw?.reply ?? env.reply) ? fail((env.raw?.reply ?? env.reply).slice(0, 90)) : ok())),
+  /** `remaining` is a note for the next round, never a question for the user. */
+  rawRemainingNotQuestion: () => check("raw:remainingQuestion", "raw remaining is not a question to the user", env => (/[?？]\s*$|^\s*(請問|是否|要不要|你要|您要)/.test(env.raw?.remaining ?? "") ? fail(env.raw.remaining.slice(0, 90)) : ok())),
+  /** A pair that already has a relation: a new add_relation must come after a remove_relation of that pair (or the model declines). */
+  rawRelationReplacedProperly: (a, b) =>
+    check("raw:relationReplace", `raw output does not add a second relation on ${a}-${b} without removing the first`, env => {
+      const acts = env.raw?.actions ?? [];
+      const pair = x => [x.fromId, x.toId].sort().join() === [a, b].sort().join();
+      const addAt = acts.findIndex(x => x.kind === "add_relation" && pair(x));
+      if (addAt < 0) return ok();
+      return acts.slice(0, addAt).some(x => x.kind === "remove_relation" && pair(x)) ? ok() : fail("add_relation on an existing pair with no remove_relation before it");
+    }),
+  /** Some text the reply or an accepted action carries matches (used where a supplied fact may be quoted). */
+  anyTextMatches: (re, desc) => check(`anyTextMatches:${desc}`, `reply or an action text matches: ${desc}`, env => (re.test(env.reply) || env.actions.some(a => strings(a).some(t => re.test(t))) ? ok() : fail("not found"))),
   /** Every item (a regexp source or a string) matches some new card title: the "complete list" property. */
   titlesCover: items =>
     check("titlesCover", `new cards cover all ${items.length} expected items`, env => {

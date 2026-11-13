@@ -183,4 +183,5 @@ const CASES = [
     [C.noRejected(), C.noKinds(["add_child"]), C.remaining(false)])
 ];
 
-module.exports = { CASES, STEAK, COFFEE, DUP, HYP };
+const { NEG } = require("./negative.cjs");
+module.exports = { CASES: [...CASES, ...NEG], STEAK, COFFEE, DUP, HYP };

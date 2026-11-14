@@ -363,6 +363,7 @@ import {
   type TopicAppearanceChange
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
+import { guardInlineHtmlLineStarts } from "../../ai/markdown-blocks";
 import type { DetailTemplate } from "../../ai/detail-templates";
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
@@ -8096,7 +8097,7 @@ export class VisualAgentMapView extends ItemView {
           {
             summary: content.summary,
             detail: withSourceSupplement(
-              canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+              canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language), detailTemplate),
               content.supplement,
               detailTemplate,
               noteLanguageOf(language)
@@ -8219,7 +8220,7 @@ export class VisualAgentMapView extends ItemView {
       patch = {
         summary: content.summary,
         detail: withSourceSupplement(
-          canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+          canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language), detailTemplate),
           content.supplement,
           detailTemplate,
           noteLanguageOf(language)
@@ -12328,7 +12329,11 @@ export class VisualAgentMapView extends ItemView {
         if (top && !job.preserve?.(charted)) return false;
         await this.plugin.repo.updateNote(
           path,
-          { detail: top ? charted : canonicalDetail(charted, noteLanguageOf(job.language), job.template) },
+          {
+            detail: top
+              ? charted
+              : canonicalDetail(guardInlineHtmlLineStarts(charted), noteLanguageOf(job.language), job.template)
+          },
           { detailTemplate: job.template }
         );
         const after = await this.plugin.repo.readNote(path, map);
@@ -19206,7 +19211,11 @@ export class VisualAgentMapView extends ItemView {
           detail: researchOptions
             ? ""
             : item.contribution
-              ? canonicalDetail(item.contribution, noteLanguageOf(this.plugin.settings.language), contributionTemplate)
+              ? canonicalDetail(
+                  guardInlineHtmlLineStarts(item.contribution),
+                  noteLanguageOf(this.plugin.settings.language),
+                  contributionTemplate
+                )
               : "",
           ...(researchOptions
             ? {
@@ -20847,7 +20856,7 @@ export class VisualAgentMapView extends ItemView {
         integrated.path,
         {
           summary: result.summary,
-          detail: canonicalDetail(result.detail, noteLanguageOf(language), detailTemplate),
+          detail: canonicalDetail(guardInlineHtmlLineStarts(result.detail), noteLanguageOf(language), detailTemplate),
           visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
           prompt: goal,
           sourcePaths: sources.map(source => source.path),
@@ -24685,7 +24694,10 @@ export class VisualAgentMapView extends ItemView {
         // Done before the merge and stale checks so no await sits between the stale check and the write.
         const detail =
           action.kind === "edit_topic_note"
-            ? await demoteUnparsableMermaid(neutralizeUnsafeMermaid(action.detail), this.plugin.mermaidSyntax)
+            ? await demoteUnparsableMermaid(
+                neutralizeUnsafeMermaid(guardInlineHtmlLineStarts(action.detail)),
+                this.plugin.mermaidSyntax
+              )
             : "";
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
@@ -24773,8 +24785,16 @@ export class VisualAgentMapView extends ItemView {
         let source = await this.readChatFile(action.path);
         if (!source) return skipped("ui.map_chat_skip_file_missing");
         if (isMdStale(hashes, action.path, source.text)) return skipped("ui.map_chat_skip_stale");
-        const next = applyMdEdit(source.text, action.find, action.replace);
-        if (next === null) return skipped("ui.map_chat_skip_find_failed");
+        const raw = applyMdEdit(source.text, action.find, action.replace);
+        if (raw === null) return skipped("ui.map_chat_skip_find_failed");
+        // A line the replacement starts with an inline tag gets a harmless lead; fence and frontmatter state come from the
+        // text after the edit, and only the inserted range changes. Checks, the write and the undo entry all use this result.
+        const at = source.text.indexOf(action.find);
+        const next = guardInlineHtmlLineStarts(raw, {
+          frontmatter: true,
+          range: { start: at, end: at + action.replace.length }
+        });
+        const replace = next.slice(at, next.length - (source.text.length - at - action.find.length));
         // Only the mermaid blocks the edit adds are judged (allow-list, then parser); what the note already had stays as it is.
         const added = addedMermaidBlocks(source.text, next);
         if (added.some(block => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
@@ -24807,9 +24827,8 @@ export class VisualAgentMapView extends ItemView {
         });
         if (!verdict.ok) return guardSkipped(verdict.code, true);
         if (source.editor) {
-          const at = source.text.indexOf(action.find);
           source.editor.replaceRange(
-            action.replace,
+            replace,
             source.editor.offsetToPos(at),
             source.editor.offsetToPos(at + action.find.length)
           );
@@ -24834,7 +24853,7 @@ export class VisualAgentMapView extends ItemView {
         const exists = key ? !!this.app.vault.getAbstractFileByPath(key) : false;
         // Model-written file: same allow-list and parser check as an AI task result.
         const content = await demoteUnparsableMermaid(
-          neutralizeUnsafeMermaid(action.content),
+          neutralizeUnsafeMermaid(guardInlineHtmlLineStarts(action.content, { frontmatter: true })),
           this.plugin.mermaidSyntax
         );
         const verdict = guardMapChatWrite({

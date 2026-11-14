@@ -16,7 +16,7 @@ detail 會在 Obsidian 中渲染，請依內容的形態選用下列語法，不
 2. 每個段落最多使用兩種特殊語法，表格和畫同一組數字的圖合算一種；callout 最多巢狀一層，且只在明顯有幫助時才巢狀。
 3. mermaid 每張圖最多 12 個節點、資料點或項目（pie 最多 8 塊、quadrantChart 最多 10 個點）；第一行寫圖型名稱，有 -beta 的要寫完整（例如 xychart-beta、sankey-beta）；sankey-beta 的標籤只能用英文字母、數字與空白，需要中文標籤時改用 flowchart 或表格。只用文字標籤：方括號裡的文字一律加雙引號，例如 flowchart 與 architecture-beta 的 `A["中文標籤"]`；mindmap 每個項目都寫成 `代號["文字"]`，不要只寫 `"文字"`；pie 的每一塊、quadrantChart 的軸、quadrant-N 標籤與點、xychart-beta 的標題、類別與軸標題也加雙引號。pie、quadrantChart、gantt、timeline 的 title 行，以及 timeline、gantt 與 classDiagram 的文字，不加雙引號，否則引號會原樣顯示。pie 的第一行只能是 `pie` 或 `pie showData`，`title` 另起一行，例如依序四行：`pie`、`  title 標題`、`  "甲" : 6`、`  "乙" : 4`。不要寫以 click、link、callback、class、style、classDef 開頭的行，也不要用 :::、<<…>>、<br> 等 HTML 標籤、%%{}%% 或 --- 設定、URL、圖片與 ::icon 圖示。
 4. 沒有內容的段落只寫「本次無新增內容」，不加 callout。
-5. 可以用 Obsidian 會渲染的 HTML（例如 <details>/<summary>、<sup>、<sub>、<kbd>、<mark>，以及 mermaid 以外的 <br>）；<details> 內只能是純文字或行內 HTML，中間不能有空行，也不能寫 Markdown；內容需要清單或表格時改用可摺疊 callout `> [!note]-`；不要用 <iframe>、<form>、<object>、<embed>、<script>、<style> 與 on… 事件屬性，也不要輸出 Obsidian 不支援的語法（例如 :::）。
+5. 可以用 Obsidian 會渲染的 HTML（例如 <details>/<summary>、<sup>、<sub>、<kbd>、<mark>，以及 mermaid 以外的 <br>）；行內 HTML（<sup>、<sub>、<kbd>、<mark>、<span>、<small>、<u>、<br>）不可放在行首，前面要先有同一行的文字；<details> 內只能是純文字或行內 HTML，中間不能有空行，也不能寫 Markdown；內容需要清單或表格時改用可摺疊 callout `> [!note]-`；不要用 <iframe>、<form>、<object>、<embed>、<script>、<style> 與 on… 事件屬性，也不要輸出 Obsidian 不支援的語法（例如 :::）。
 6. 有指定項目數量的段落，項目要寫成頂層清單或 #### 小標題，不要放進 callout 或表格。
 7. detail 是給讀者看的內容：不要寫內部 ID（節點、證據、來源或報告的 ID）、審查意見，或對草稿與研究過程本身的評論。
 8. detail 內的標題一律從三級標題（###）開始，往下依序用 ####，不跳級；不要用 # 或 ##。

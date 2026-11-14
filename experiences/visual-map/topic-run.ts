@@ -16,6 +16,7 @@ import {
   type ResearchSteer
 } from "../../ai/research-observer";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
+import { guardInlineHtmlLineStarts } from "../../ai/markdown-blocks";
 import { checkCounts, standardTemplate } from "../../ai/detail-templates";
 import { carryForwardSources } from "../../core/steps/task/carry-sources";
 import { keepDroppedContent } from "../../core/steps/task/merge-check";
@@ -777,8 +778,10 @@ export class TopicRuns {
       await repo.updateNote(path, { status: note.status });
       // The status is back; this is the file the write-time check compares with (the backup is `original`).
       const raw = await this.snapshotRaw(original, path, options);
-      const save = async (summary: string, detail: string): Promise<void> =>
+      const save = async (summary: string, draft: string): Promise<void> =>
         this.ports.mutate()(async () => {
+          // New AI text only: a line it starts with an inline tag would stop Obsidian's editor from parsing the note.
+          const detail = guardInlineHtmlLineStarts(draft);
           if (signal.aborted || prepared.viewChanged()) throw changed();
           if (await prepared.sourcesChanged()) throw changed();
           const latest = await repo.readNote(path, options.map());
@@ -813,7 +816,7 @@ export class TopicRuns {
             const canonicalOnly = canonicalDetail(detail, noteLanguage, detailTemplate);
             // An edited draft is checked again so the topic's format mark matches what is saved.
             issues =
-              result.formatIssues && detail !== result.detail
+              result.formatIssues && draft !== result.detail
                 ? checkCounts(canonicalOnly, detailTemplate)
                 : result.formatIssues;
             // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
@@ -1306,8 +1309,8 @@ export class TopicRuns {
           const mode: WritebackMode = writeContext.updateMode ?? "merge";
           const writeLanguage = noteLanguageOf(context.outputLanguage ?? settings().language);
           // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
-          let aiDetail =
-            mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, writeContext.detailTemplate);
+          const fresh = guardInlineHtmlLineStarts(result.detail);
+          let aiDetail = mode === "top" ? fresh : canonicalDetail(fresh, writeLanguage, writeContext.detailTemplate);
           // "AI suggested" later research (or a note whose sections cannot be followed): the numbers and links the rewrite
           // dropped are put back from the Detail this run started from; the write is never refused for it.
           if (

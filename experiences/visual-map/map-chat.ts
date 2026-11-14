@@ -11,6 +11,7 @@ import {
   type MapChatChainState,
   type MapChatChainWaiting
 } from "../../core/map-chat-chain";
+import { summarizeChatBatch, type ChatBatch, type ChatBatchSummary } from "../../core/map-chat-batch";
 import { renderChatMarkdown } from "../../core/map-chat-render";
 import { hasUnsavedChat } from "../../core/map-chat-transcript";
 import {
@@ -284,6 +285,8 @@ export interface MapChatMessage {
   stale?: boolean;
   /** On an assistant message: the sentence that told why the automatic continuation ended after this reply (in memory only). */
   chainNote?: { reason: MapChatChainEndReason; text: string };
+  /** On an assistant message: the research batch this turn started (the view keeps it up to date); `restored` = read back from a record. */
+  batch?: ChatBatch & { running?: boolean; restored?: boolean };
   /** On an assistant message: research notes of the conversation this round did not read (in memory only). */
   unread?: { title: string; oversize: boolean }[];
 }
@@ -317,6 +320,8 @@ export interface MapChatRestoredConversation {
     remaining?: string;
     /** How the continuation that ended with this turn ended: shown as its end sentence, nothing is resumed. */
     chainEnd?: { reason: MapChatChainEndReason; round: number; remaining: string };
+    /** The research batch the turn started, as the record knows it. */
+    batch?: ChatBatch;
     /** What became of the plan card: no line (undefined) = it was still waiting; stopped counts as applied. */
     planState?: "applied" | "cancelled" | "stopped";
     /** The result lines the applied plan wrote. */
@@ -387,6 +392,8 @@ export interface MapChatHost {
   setWidth?(width: number, commit: boolean): void;
   /** "Retry" on a failed turn: send the same question again. */
   retry?(origin: MapChatOrigin): void;
+  /** "Run the ones not done again" on a research batch the chat started that stopped (the message carries the batch). */
+  rerunBatch?(message: MapChatMessage): void;
   /** The conversation's state changed (a turn started or ended, a plan appeared or was settled); the canvas may say so. */
   stateChanged?(): void;
   /** The picture the chat is about now, or null (none chosen). */
@@ -1621,6 +1628,25 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.renderLog();
     return at >= 0 ? next : was;
   }
+  /** A research batch this turn started: it hangs on the last answer (nothing shows until it ends or is running again). */
+  attachBatch(batch: NonNullable<MapChatMessage["batch"]>): MapChatMessage | null {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return null;
+    last.batch = batch;
+    return last;
+  }
+  /** The batch of `message` changed: its row is laid out again, the keyboard stays on the box, and the reader hears a finished one once. */
+  refreshBatch(message: MapChatMessage): void {
+    if (!this.messages.includes(message)) return;
+    const box = (): HTMLElement | null => this.rows.get(message)?.row.querySelector(".vam-map-chat-batch") ?? null;
+    const active = this.built ? this.host.activeElement() : null;
+    const held = !!active && !!box()?.contains(active);
+    this.renderLog();
+    if (held) box()?.focus();
+    const batch = message.batch;
+    const summary = batch ? summarizeChatBatch(batch, batch.restored === true) : null;
+    if (batch && summary && batch.ended && !batch.running) this.announce(this.batchTitle(summary));
+  }
   /** A picture search starts under the last answer. The block is shown at once and changes with {@link settleImages}. */
   addImages(block: MapChatImages): void {
     const last = this.messages.at(-1);
@@ -1780,6 +1806,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         const text = this.chainEndText(end.reason, end.remaining, undefined, answer, end.round, true);
         if (text) answer.chainNote = { reason: end.reason, text };
       }
+      if (turn.batch) answer.batch = { ...turn.batch, restored: true };
       this.messages.push(answer);
     }
     const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
@@ -2676,6 +2703,14 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         ? `wait:${this.chainWaitingState.kinds.join(",")}:${this.chainWaitingLeft}:${this.waitWord(this.chainWaitingState)}`
         : "",
       message.chainNote ? `chain:${message.chainNote.reason}:${message.chainNote.text}` : "",
+      message.batch
+        ? `batch:${message.batch.topics.length}:${message.batch.succeeded.length}:${message.batch.failed.length}:${message.batch.ended ? 1 : 0}:${message.batch.running ? 1 : 0}:${message.batch.restored ? 1 : 0}:${message.batch.topics.map(topic => topic.id).join(",")}:${this.host.rerunBatch ? 1 : 0}`
+        : "",
+      t("ui.map_chat_batch_left_0", ""),
+      t("ui.map_chat_batch_more_0", 0),
+      t("ui.map_chat_batch_rerun_0", 0),
+      t("ui.map_chat_batch_running_0", 0),
+      t("ui.map_chat_batch_stopped_0_1_2", 0, 0, 0),
       (message.unread ?? []).map(item => `${item.oversize ? "o" : "d"}:${item.title}`).join("\n"),
       JSON.stringify(message.lines.map(line => line.basis ?? null)),
       t("ui.map_chat_basis_title_only"),
@@ -2717,6 +2752,39 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         .join(";"),
       message.text
     ].join("\u0001");
+  }
+  private batchTitle(summary: ChatBatchSummary): string {
+    const left = summary.pending.length;
+    if (summary.interrupted) return t("ui.map_chat_batch_interrupted_0_1_2", summary.done, summary.total, left);
+    if (!summary.failed) return t("ui.map_chat_batch_stopped_0_1_2", summary.done, summary.total, left);
+    return summary.notRun
+      ? t("ui.map_chat_batch_stopped_failed_0_1_2_3", summary.done, summary.total, summary.failed, summary.notRun)
+      : t("ui.map_chat_batch_finished_failed_0_1_2", summary.done, summary.total, summary.failed);
+  }
+  /** What a batch that stopped, failed in part or was cut by a reload says, and the one button that runs the rest again. Titles are untrusted text. */
+  private buildBatch(row: HTMLElement, message: MapChatMessage, batch: NonNullable<MapChatMessage["batch"]>): void {
+    const summary = summarizeChatBatch(batch, batch.restored === true);
+    if (!summary || !(batch.ended || summary.interrupted || batch.running)) return;
+    const box = row.createDiv({ cls: "vam-map-chat-batch", attr: { role: "status", tabindex: "-1" } });
+    box.createDiv({ cls: "vam-map-chat-batch-title", text: this.batchTitle(summary) });
+    const shown = summary.pending.slice(0, 5);
+    const left = box.createDiv("vam-map-chat-batch-left");
+    left.createSpan({ text: t("ui.map_chat_batch_left_0", shown.map(topic => `「${topic.title}」`).join("")) });
+    if (summary.pending.length > shown.length)
+      left.createSpan({
+        cls: "vam-map-chat-batch-more",
+        text: t("ui.map_chat_batch_more_0", summary.pending.length - shown.length)
+      });
+    const run = box.createEl("button", {
+      cls: "vam-map-chat-batch-rerun",
+      text: batch.running
+        ? t("ui.map_chat_batch_running_0", summary.pending.length)
+        : t("ui.map_chat_batch_rerun_0", summary.pending.length),
+      attr: { type: "button" }
+    });
+    run.disabled = batch.running === true;
+    if (!this.host.rerunBatch) this.makeInert(run);
+    else run.addEventListener("click", () => this.host.rerunBatch?.(message));
   }
   private canRetry(message: MapChatMessage, asked: MapChatMessage | undefined): boolean {
     return (
@@ -2810,6 +2878,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     }
     if (message.chainNote)
       row.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
+    if (message.batch) this.buildBatch(row, message, message.batch);
     if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row, message.replyUndo.token);
     // What the AI actually did comes straight after what it said; the buttons that act on the answer come last.
     const asked = this.messages[this.messages.indexOf(message) - 1];

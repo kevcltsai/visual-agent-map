@@ -527,6 +527,7 @@ import {
   pickLatest,
   recordsDir,
   restoreConversation,
+  type RecordEventKind,
   type RecordLine,
   type RecordOriginChip,
   type RecordTurnStatus
@@ -554,6 +555,12 @@ import {
   type MapChatPlan,
   type MapChatPlanReason
 } from "../../core/map-chat-plan";
+import {
+  markChatBatchTopic,
+  summarizeChatBatch,
+  type ChatBatch,
+  type ChatBatchRequest
+} from "../../core/map-chat-batch";
 import {
   CHAT_PLAN_GROUP_ORDER,
   chatDockedWidth,
@@ -19487,7 +19494,9 @@ export class VisualAgentMapView extends ItemView {
     retryBatchKey?: string,
     onSettled?: (web: ResearchWebTally) => void,
     onOutcome?: (outcome: ChatResearchOutcome) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    /** Hears each card as it comes out (succeeded, failed or stopped); a throw here never touches the batch. */
+    onTopic?: (topic: ChatWorkTopic) => void
   ): Promise<void> {
     let told = false;
     const tell = (outcome: ChatResearchOutcome): void => {
@@ -19501,9 +19510,17 @@ export class VisualAgentMapView extends ItemView {
     };
     let batchStarted = false;
     try {
-      await this.runMultiResearch(request, retryBatchKey, onSettled, tell, signal, () => {
-        batchStarted = true;
-      });
+      await this.runMultiResearch(
+        request,
+        retryBatchKey,
+        onSettled,
+        tell,
+        signal,
+        () => {
+          batchStarted = true;
+        },
+        onTopic
+      );
     } finally {
       // Every way out that never started a batch tells it; a started one tells itself when it ends.
       if (!batchStarted) tell({ kind: "not_started" });
@@ -19515,7 +19532,8 @@ export class VisualAgentMapView extends ItemView {
     onSettled: ((web: ResearchWebTally) => void) | undefined,
     tell: (outcome: ChatResearchOutcome) => void,
     signal: AbortSignal | undefined,
-    markStarted: () => void
+    markStarted: () => void,
+    onTopic?: (topic: ChatWorkTopic) => void
   ): Promise<void> {
     if (!this.map || !this.selection.state.multiSelected.size) return;
     const languageSource = this.batchLanguageSource();
@@ -19606,6 +19624,14 @@ export class VisualAgentMapView extends ItemView {
         let skipped = 0;
         // How each card of the batch came out (the cards that never ran when the batch was stopped are filled in at the end).
         const topics = new Map<string, ChatWorkTopic>();
+        const come = (topic: ChatWorkTopic): void => {
+          topics.set(topic.id, topic);
+          try {
+            onTopic?.(topic);
+          } catch (error) {
+            errorNotice(error);
+          }
+        };
         // Web activity of the topics that finished: Research mode only (a local run searches nothing, so it has nothing to report).
         const web: ResearchWebTally = { searches: 0, counted: 0, withoutSearch: 0 };
         try {
@@ -19639,7 +19665,7 @@ export class VisualAgentMapView extends ItemView {
                   languageSource
                 );
               } catch (error) {
-                topics.set(child.id, {
+                come({
                   id: child.id,
                   title: note.title,
                   status: batchSignal.aborted ? "stopped" : "failed",
@@ -19647,7 +19673,7 @@ export class VisualAgentMapView extends ItemView {
                 });
                 throw error;
               }
-              topics.set(child.id, {
+              come({
                 id: child.id,
                 title: note.title,
                 status: batchSignal.aborted ? "stopped" : "succeeded"
@@ -21938,6 +21964,9 @@ export class VisualAgentMapView extends ItemView {
       },
       retry: origin => {
         void this.sendMapChat(origin);
+      },
+      rerunBatch: message => {
+        void this.rerunChatBatch(message).catch(error => errorNotice(error));
       },
       modelName: id => this.plugin.modelLabel(id),
       resolveLink: link => {
@@ -25308,6 +25337,129 @@ export class VisualAgentMapView extends ItemView {
     this.selection.chatSelect(ids);
     if (!this.closed) this.render();
   }
+  /** The chat remembers what it researched; a card researched again moves to the end, and a later failure does not undo a success. */
+  private rememberChatResearched(topics: ChatWorkTopic[]): void {
+    for (const topic of topics) {
+      if (topic.status !== "succeeded" && this.chatResearched.get(topic.id)?.status === "succeeded") continue;
+      this.chatResearched.delete(topic.id);
+      this.chatResearched.set(topic.id, { title: topic.title, status: topic.status });
+    }
+  }
+  /**
+   * Follows a research batch the chat started (or runs again): the conversation's last answer carries it, the record keeps it
+   * (so a reload can still tell it was cut), and the panel tells how it ended. Nothing is shown or written for a conversation
+   * that is gone. `rerun`: the batch was already told once, so a start that never happened only ends the rerun.
+   */
+  private watchChatBatch(
+    chat: MapChatPanel | null,
+    message: MapChatMessage | null,
+    batch: NonNullable<MapChatMessage["batch"]>,
+    conversation: number,
+    rerun: boolean,
+    /** The cards this run covers (the record's `research_batch` line lists them; a rerun covers only the ones still to do). */
+    listed: ChatBatch["topics"] = batch.topics
+  ): { onTopic: (topic: ChatWorkTopic) => void; settled: (result: ChatResearchOutcome) => void } {
+    const writer = this.chatRecords;
+    const recordId = writer?.conversationId;
+    const record = (
+      kind: RecordEventKind,
+      extra: {
+        topics?: { id: string; title: string }[];
+        request?: Record<string, unknown>;
+        id?: string;
+        status?: string;
+      } = {}
+    ): void => {
+      const live = this.chatRecords;
+      if (!live || live.conversationId !== recordId || this.plugin.settings.mapChatRecords !== true || batch.turn <= 0)
+        return;
+      try {
+        live.write({ type: "event", turn: batch.turn, kind, ...extra });
+      } catch (error) {
+        this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
+      }
+    };
+    const current = (): boolean => conversation === this.chatConversation;
+    const show = (): void => {
+      if (chat && message && current()) chat.refreshBatch(message);
+    };
+    if (current()) record("research_batch", { topics: listed, request: { ...batch.request } });
+    let finished = false;
+    return {
+      onTopic: topic => {
+        if (!current()) return;
+        markChatBatchTopic(batch, topic.id, topic.status);
+        if (topic.status !== "stopped") record("research_batch_topic", { id: topic.id, status: topic.status });
+        if (batch.running) show();
+      },
+      settled: result => {
+        if (finished) return;
+        finished = true;
+        if (!current()) return;
+        batch.running = false;
+        if (result.kind === "settled") {
+          for (const topic of result.topics) markChatBatchTopic(batch, topic.id, topic.status);
+          batch.ended = true;
+          record("research_batch_end");
+        } else if (rerun) {
+          batch.ended = true;
+          record("research_batch_end");
+        } else {
+          // Nothing started: no batch to tell about, and a restore drops it too.
+          if (message) delete message.batch;
+          record("research_batch_end", { status: "not_started" });
+        }
+        show();
+      }
+    };
+  }
+  /** "Run the ones not done again" on a chat batch that stopped: only the cards still on the map, with the request the batch had. */
+  private async rerunChatBatch(message: MapChatMessage): Promise<void> {
+    const batch = message.batch;
+    const chat = this.chat;
+    if (!batch || !chat || !this.map || batch.running) return;
+    const key = this.multiResearchKey();
+    if (this.plugin.expansionCoordinator.isRunning(key)) {
+      new Notice(t("ui.multi_research_already_running"));
+      return;
+    }
+    const summary = summarizeChatBatch(batch, batch.restored === true);
+    if (!summary) return;
+    // A card deleted since is not part of the batch any more.
+    const onMap = new Set(this.map.nodes.map(node => node.id));
+    batch.topics = batch.topics.filter(topic => onMap.has(topic.id) || batch.succeeded.includes(topic.id));
+    const pending = summary.pending.filter(topic => onMap.has(topic.id));
+    if (!pending.length) {
+      chat.refreshBatch(message);
+      return;
+    }
+    const conversation = this.chatConversation;
+    const sourceGroups = await this.readMapSourceGroups(new AbortController().signal);
+    if (conversation !== this.chatConversation || batch.running) return;
+    this.chatSelect(pending.map(topic => topic.id));
+    batch.running = true;
+    batch.ended = false;
+    batch.restored = false;
+    const watch = this.watchChatBatch(chat, message, batch, conversation, true, pending);
+    chat.refreshBatch(message);
+    try {
+      await this.startMultiResearch(
+        { ...batch.request, ...(sourceGroups.length ? { referenceGroups: sourceGroups } : {}) },
+        undefined,
+        undefined,
+        result => {
+          if (result.kind === "settled" && conversation === this.chatConversation)
+            this.rememberChatResearched(result.topics);
+          watch.settled(result);
+        },
+        undefined,
+        watch.onTopic
+      );
+    } catch (error) {
+      errorNotice(error);
+      watch.settled({ kind: "not_started" });
+    }
+  }
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
   private async runChatSelection(
     action: Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
@@ -25380,23 +25532,35 @@ export class VisualAgentMapView extends ItemView {
         this.markResearchRecorded(this.chatLastRecord);
         // Told once (see startMultiResearch), whichever way the batch ends or never starts; the conversation remembers what
         // it researched, and the continuation (if any) waits on the same promise.
+        const request: ChatBatchRequest = {
+          ...chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
+          ...(retryModel ? { model: retryModel } : {})
+        };
+        // The cards the chat asked for: a batch that stops is told in the chat.
+        const watch = researchIds.length
+          ? (() => {
+              const batch: ChatBatch = {
+                turn: this.chatLastRecord?.turn ?? 0,
+                topics: researchIds.map(id => ({ id, title: this.notes.get(id)?.title ?? id })),
+                succeeded: [],
+                failed: [],
+                ended: false,
+                request
+              };
+              return this.watchChatBatch(chat, chat?.attachBatch(batch) ?? null, batch, conversation, false);
+            })()
+          : null;
         const outcome = new Promise<ChatResearchOutcome>(resolve => {
           const settle = (result: ChatResearchOutcome): void => {
             if (result.kind === "settled" && conversation === this.chatConversation)
-              for (const topic of result.topics) {
-                // A later attempt that did not work out does not undo the research that did (its text is still in the note).
-                if (topic.status !== "succeeded" && this.chatResearched.get(topic.id)?.status === "succeeded") continue;
-                // Newest research last: a card researched again moves to the end.
-                this.chatResearched.delete(topic.id);
-                this.chatResearched.set(topic.id, { title: topic.title, status: topic.status });
-              }
+              this.rememberChatResearched(result.topics);
+            watch?.settled(result);
             resolve(result);
           };
           Promise.resolve(
             this.startMultiResearch(
               {
-                ...chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
-                ...(retryModel ? { model: retryModel } : {}),
+                ...request,
                 ...(referenceGroups.length ? { referenceGroups } : {})
               },
               undefined,
@@ -25406,7 +25570,8 @@ export class VisualAgentMapView extends ItemView {
                   chat.appendLines(lines);
               },
               settle,
-              work?.controller.signal
+              work?.controller.signal,
+              watch?.onTopic
             )
           ).catch(error => {
             errorNotice(error);

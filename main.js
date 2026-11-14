@@ -1451,6 +1451,14 @@ var en = {
   "ui.map_chat_details_show": "View details",
   "ui.map_chat_lines_hide": "Show the summary only",
   "ui.map_chat_retry": "Retry",
+  "ui.map_chat_batch_stopped_failed_0_1_2_3": "Research stopped: {0}/{1} done, {2} failed, {3} never ran.",
+  "ui.map_chat_batch_stopped_0_1_2": "Research stopped: {0}/{1} done, {2} not done.",
+  "ui.map_chat_batch_finished_failed_0_1_2": "Research finished: {0}/{1} done, {2} failed.",
+  "ui.map_chat_batch_interrupted_0_1_2": "Research was interrupted when the plugin reloaded: {0}/{1} done, {2} not done.",
+  "ui.map_chat_batch_left_0": "Not done: {0}",
+  "ui.map_chat_batch_more_0": "and {0} more",
+  "ui.map_chat_batch_rerun_0": "Run the {0} not done again",
+  "ui.map_chat_batch_running_0": "Running {0} again\u2026",
   "ui.map_chat_plan_summary_0": "This plan needs your confirmation: {0}.",
   "ui.map_chat_plan_group_create_0": "Add or create ({0})",
   "ui.map_chat_plan_group_change_0": "Edit or move ({0})",
@@ -4345,6 +4353,14 @@ var zhCN = {
   "ui.map_chat_details_show": "\u770B\u5185\u5BB9",
   "ui.map_chat_lines_hide": "\u53EA\u663E\u793A\u6458\u8981",
   "ui.map_chat_retry": "\u91CD\u8BD5",
+  "ui.map_chat_batch_stopped_failed_0_1_2_3": "\u7814\u7A76\u505C\u4E86\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u5931\u8D25\u3001{3} \u7BC7\u6CA1\u8DD1\u5230\u3002",
+  "ui.map_chat_batch_stopped_0_1_2": "\u7814\u7A76\u505C\u4E86\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u6CA1\u505A\u3002",
+  "ui.map_chat_batch_finished_failed_0_1_2": "\u7814\u7A76\u8DD1\u5B8C\u4E86\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u5931\u8D25\u3002",
+  "ui.map_chat_batch_interrupted_0_1_2": "\u7814\u7A76\u5728\u63D2\u4EF6\u91CD\u65B0\u52A0\u8F7D\u65F6\u4E2D\u65AD\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u6CA1\u505A\u3002",
+  "ui.map_chat_batch_left_0": "\u6CA1\u505A\u7684\uFF1A{0}",
+  "ui.map_chat_batch_more_0": "\u7B49 {0} \u7BC7",
+  "ui.map_chat_batch_rerun_0": "\u91CD\u8DD1\u6CA1\u505A\u7684 {0} \u7BC7",
+  "ui.map_chat_batch_running_0": "\u6B63\u5728\u91CD\u8DD1 {0} \u7BC7\u2026",
   "ui.map_chat_plan_summary_0": "\u8FD9\u4EFD\u8BA1\u5212\u9700\u8981\u4F60\u786E\u8BA4\uFF1A{0}\u3002",
   "ui.map_chat_plan_group_create_0": "\u65B0\u589E\u6216\u5EFA\u7ACB\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_change_0": "\u4FEE\u6539\u6216\u79FB\u52A8\uFF08{0}\uFF09",
@@ -7239,6 +7255,14 @@ var zhTW = {
   "ui.map_chat_details_show": "\u770B\u5167\u5BB9",
   "ui.map_chat_lines_hide": "\u53EA\u986F\u793A\u6458\u8981",
   "ui.map_chat_retry": "\u91CD\u8A66",
+  "ui.map_chat_batch_stopped_failed_0_1_2_3": "\u7814\u7A76\u505C\u4E86\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u5931\u6557\u3001{3} \u7BC7\u6C92\u8DD1\u5230\u3002",
+  "ui.map_chat_batch_stopped_0_1_2": "\u7814\u7A76\u505C\u4E86\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u6C92\u505A\u3002",
+  "ui.map_chat_batch_finished_failed_0_1_2": "\u7814\u7A76\u8DD1\u5B8C\u4E86\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u5931\u6557\u3002",
+  "ui.map_chat_batch_interrupted_0_1_2": "\u7814\u7A76\u5728\u5916\u639B\u91CD\u65B0\u8F09\u5165\u6642\u4E2D\u65B7\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u6C92\u505A\u3002",
+  "ui.map_chat_batch_left_0": "\u6C92\u505A\u7684\uFF1A{0}",
+  "ui.map_chat_batch_more_0": "\u7B49 {0} \u7BC7",
+  "ui.map_chat_batch_rerun_0": "\u91CD\u8DD1\u6C92\u505A\u7684 {0} \u7BC7",
+  "ui.map_chat_batch_running_0": "\u6B63\u5728\u91CD\u8DD1 {0} \u7BC7\u2026",
   "ui.map_chat_plan_summary_0": "\u9019\u4EFD\u8A08\u756B\u9700\u8981\u4F60\u78BA\u8A8D\uFF1A{0}\u3002",
   "ui.map_chat_plan_group_create_0": "\u65B0\u589E\u6216\u5EFA\u7ACB\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_change_0": "\u4FEE\u6539\u6216\u79FB\u52D5\uFF08{0}\uFF09",
@@ -39482,6 +39506,29 @@ function finishWait(state, end) {
   return startNext(state);
 }
 
+// core/map-chat-batch.ts
+function summarizeChatBatch(batch, restored) {
+  const done = new Set(batch.succeeded);
+  const failed = new Set(batch.failed.filter((id) => !done.has(id)));
+  const pending2 = batch.topics.filter((topic) => !done.has(topic.id));
+  if (!pending2.length) return null;
+  const failedCount = pending2.filter((topic) => failed.has(topic.id)).length;
+  return {
+    total: batch.topics.length,
+    done: batch.topics.length - pending2.length,
+    failed: failedCount,
+    notRun: pending2.length - failedCount,
+    pending: pending2,
+    interrupted: restored && !batch.ended
+  };
+}
+function markChatBatchTopic(batch, id, status) {
+  if (status === "succeeded") {
+    if (!batch.succeeded.includes(id)) batch.succeeded.push(id);
+    batch.failed = batch.failed.filter((item) => item !== id);
+  } else if (status === "failed" && !batch.succeeded.includes(id) && !batch.failed.includes(id)) batch.failed.push(id);
+}
+
 // core/map-chat-render.ts
 var MAX_INLINE_DEPTH = 4;
 var MAX_QUOTE_DEPTH = 3;
@@ -41415,6 +41462,29 @@ ${typed}` : draft;
     this.renderLog();
     return at >= 0 ? next : was;
   }
+  /** A research batch this turn started: it hangs on the last answer (nothing shows until it ends or is running again). */
+  attachBatch(batch) {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return null;
+    last.batch = batch;
+    return last;
+  }
+  /** The batch of `message` changed: its row is laid out again, the keyboard stays on the box, and the reader hears a finished one once. */
+  refreshBatch(message) {
+    var _a2, _b2;
+    if (!this.messages.includes(message)) return;
+    const box = () => {
+      var _a3, _b3;
+      return (_b3 = (_a3 = this.rows.get(message)) == null ? void 0 : _a3.row.querySelector(".vam-map-chat-batch")) != null ? _b3 : null;
+    };
+    const active = this.built ? this.host.activeElement() : null;
+    const held = !!active && !!((_a2 = box()) == null ? void 0 : _a2.contains(active));
+    this.renderLog();
+    if (held) (_b2 = box()) == null ? void 0 : _b2.focus();
+    const batch = message.batch;
+    const summary = batch ? summarizeChatBatch(batch, batch.restored === true) : null;
+    if (batch && summary && batch.ended && !batch.running) this.announce(this.batchTitle(summary));
+  }
   /** A picture search starts under the last answer. The block is shown at once and changes with {@link settleImages}. */
   addImages(block) {
     var _a2;
@@ -41578,6 +41648,7 @@ ${typed}` : draft;
         const text10 = this.chainEndText(end.reason, end.remaining, void 0, answer, end.round, true);
         if (text10) answer.chainNote = { reason: end.reason, text: text10 };
       }
+      if (turn.batch) answer.batch = { ...turn.batch, restored: true };
       this.messages.push(answer);
     }
     const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
@@ -42417,6 +42488,12 @@ ${shown}` : t("ui.map_chat_model_label"));
       message.replyUndo ? "undo" : "",
       this.chainWaitingState && this.messages.at(-1) === message ? `wait:${this.chainWaitingState.kinds.join(",")}:${this.chainWaitingLeft}:${this.waitWord(this.chainWaitingState)}` : "",
       message.chainNote ? `chain:${message.chainNote.reason}:${message.chainNote.text}` : "",
+      message.batch ? `batch:${message.batch.topics.length}:${message.batch.succeeded.length}:${message.batch.failed.length}:${message.batch.ended ? 1 : 0}:${message.batch.running ? 1 : 0}:${message.batch.restored ? 1 : 0}:${message.batch.topics.map((topic) => topic.id).join(",")}:${this.host.rerunBatch ? 1 : 0}` : "",
+      t("ui.map_chat_batch_left_0", ""),
+      t("ui.map_chat_batch_more_0", 0),
+      t("ui.map_chat_batch_rerun_0", 0),
+      t("ui.map_chat_batch_running_0", 0),
+      t("ui.map_chat_batch_stopped_0_1_2", 0, 0, 0),
       ((_i = message.unread) != null ? _i : []).map((item) => `${item.oversize ? "o" : "d"}:${item.title}`).join("\n"),
       JSON.stringify(message.lines.map((line2) => {
         var _a3;
@@ -42455,6 +42532,38 @@ ${shown}` : t("ui.map_chat_model_label"));
       ).join(";"),
       message.text
     ].join("");
+  }
+  batchTitle(summary) {
+    const left = summary.pending.length;
+    if (summary.interrupted) return t("ui.map_chat_batch_interrupted_0_1_2", summary.done, summary.total, left);
+    if (!summary.failed) return t("ui.map_chat_batch_stopped_0_1_2", summary.done, summary.total, left);
+    return summary.notRun ? t("ui.map_chat_batch_stopped_failed_0_1_2_3", summary.done, summary.total, summary.failed, summary.notRun) : t("ui.map_chat_batch_finished_failed_0_1_2", summary.done, summary.total, summary.failed);
+  }
+  /** What a batch that stopped, failed in part or was cut by a reload says, and the one button that runs the rest again. Titles are untrusted text. */
+  buildBatch(row, message, batch) {
+    const summary = summarizeChatBatch(batch, batch.restored === true);
+    if (!summary || !(batch.ended || summary.interrupted || batch.running)) return;
+    const box = row.createDiv({ cls: "vam-map-chat-batch", attr: { role: "status", tabindex: "-1" } });
+    box.createDiv({ cls: "vam-map-chat-batch-title", text: this.batchTitle(summary) });
+    const shown = summary.pending.slice(0, 5);
+    const left = box.createDiv("vam-map-chat-batch-left");
+    left.createSpan({ text: t("ui.map_chat_batch_left_0", shown.map((topic) => `\u300C${topic.title}\u300D`).join("")) });
+    if (summary.pending.length > shown.length)
+      left.createSpan({
+        cls: "vam-map-chat-batch-more",
+        text: t("ui.map_chat_batch_more_0", summary.pending.length - shown.length)
+      });
+    const run = box.createEl("button", {
+      cls: "vam-map-chat-batch-rerun",
+      text: batch.running ? t("ui.map_chat_batch_running_0", summary.pending.length) : t("ui.map_chat_batch_rerun_0", summary.pending.length),
+      attr: { type: "button" }
+    });
+    run.disabled = batch.running === true;
+    if (!this.host.rerunBatch) this.makeInert(run);
+    else run.addEventListener("click", () => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.host).rerunBatch) == null ? void 0 : _b2.call(_a2, message);
+    });
   }
   canRetry(message, asked) {
     return message.role === "assistant" && !!message.error && !message.streaming && !!(asked == null ? void 0 : asked.origin) && !!this.host.retry;
@@ -42538,6 +42647,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     }
     if (message.chainNote)
       row.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
+    if (message.batch) this.buildBatch(row, message, message.batch);
     if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row, message.replyUndo.token);
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
@@ -52069,6 +52179,38 @@ function pickLatest(files) {
   }
   return best;
 }
+var BATCH_TOPIC_LIMIT = 1e3;
+var BATCH_TITLE_LIMIT = 200;
+function restoredBatchRequest(raw) {
+  const value = raw && typeof raw === "object" ? raw : {};
+  const pick7 = (item, allowed, fallback) => {
+    var _a2;
+    return (_a2 = allowed.find((name2) => name2 === item)) != null ? _a2 : fallback;
+  };
+  return {
+    mapAiMode: pick7(value.mapAiMode, ["quick", "standard"], "standard"),
+    researchMode: pick7(value.researchMode, ["local", "research"], "research"),
+    researchDepth: pick7(value.researchDepth, ["fast", "normal", "deep"], "normal"),
+    requirements: typeof value.requirements === "string" ? value.requirements.slice(0, 4e3) : "",
+    imageSearch: value.imageSearch === true,
+    ...value.rewrite === true ? { rewrite: true } : {},
+    ...typeof value.model === "string" && value.model.length <= 200 ? { model: value.model } : {}
+  };
+}
+function restoredBatchTopics(raw) {
+  if (!Array.isArray(raw)) return [];
+  const topics = [];
+  for (const entry of raw) {
+    if (topics.length >= BATCH_TOPIC_LIMIT) break;
+    const item = entry;
+    if (!item || typeof item !== "object" || typeof item.id !== "string" || !item.id) continue;
+    topics.push({
+      id: item.id.slice(0, 200),
+      title: typeof item.title === "string" ? item.title.slice(0, BATCH_TITLE_LIMIT) : ""
+    });
+  }
+  return topics;
+}
 function restoredItems(items) {
   if (!Array.isArray(items)) return [];
   return items.map((item) => {
@@ -52090,6 +52232,7 @@ function restoreConversation(id, lines) {
   const current = /* @__PURE__ */ new Map();
   const undone = /* @__PURE__ */ new Map();
   const chainEnds = /* @__PURE__ */ new Map();
+  const batches = /* @__PURE__ */ new Map();
   let startedResearch = false;
   let readsSources = false;
   for (const line2 of lines) {
@@ -52118,7 +52261,40 @@ function restoreConversation(id, lines) {
       else if (line2.kind === "redo") undone.set(line2.turn, false);
       else if (line2.kind === "research_started") startedResearch = true;
       else if (line2.kind === "sources_read") readsSources = true;
-      else if (line2.kind === "chain_end") {
+      else if (line2.kind === "research_batch") {
+        const topics = restoredBatchTopics(line2.topics);
+        const batch = batches.get(line2.turn);
+        if (!batch)
+          batches.set(line2.turn, {
+            turn: line2.turn,
+            topics,
+            succeeded: [],
+            failed: [],
+            ended: false,
+            request: restoredBatchRequest(line2.request)
+          });
+        else {
+          for (const topic of topics)
+            if (!batch.topics.some((item) => item.id === topic.id) && batch.topics.length < BATCH_TOPIC_LIMIT)
+              batch.topics.push(topic);
+          batch.ended = false;
+          batch.request = restoredBatchRequest(line2.request);
+        }
+      } else if (line2.kind === "research_batch_topic") {
+        const batch = batches.get(line2.turn);
+        if (batch && typeof line2.id === "string" && batch.topics.some((topic) => topic.id === line2.id))
+          markChatBatchTopic(
+            batch,
+            line2.id,
+            line2.status === "succeeded" ? "succeeded" : line2.status === "failed" ? "failed" : "stopped"
+          );
+      } else if (line2.kind === "research_batch_end") {
+        if (line2.status === "not_started") batches.delete(line2.turn);
+        else {
+          const batch = batches.get(line2.turn);
+          if (batch) batch.ended = true;
+        }
+      } else if (line2.kind === "chain_end") {
         const reason = MAP_CHAT_CHAIN_END_REASONS.find((item) => item === line2.reason);
         if (reason && reason !== "map_changed")
           chainEnds.set(line2.turn, {
@@ -52167,7 +52343,8 @@ function restoreConversation(id, lines) {
       auto: start.auto === true,
       ...start.auto === true && typeof start.round === "number" && Number.isInteger(start.round) && start.round >= 2 ? { round: start.round } : {},
       ...start.auto === true && typeof start.remaining === "string" && start.remaining.trim() ? { remaining: start.remaining.slice(0, 1e3) } : {},
-      ...chainEnds.has(number) || carried.has(number) ? { chainEnd: (_f = chainEnds.get(number)) != null ? _f : carried.get(number) } : {}
+      ...chainEnds.has(number) || carried.has(number) ? { chainEnd: (_f = chainEnds.get(number)) != null ? _f : carried.get(number) } : {},
+      ...batches.has(number) ? { batch: batches.get(number) } : {}
     });
   }
   return {
@@ -74991,7 +75168,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
    * `settled` when the batch has ended. Without it nothing changes. `signal` stops a batch that has not started yet (a batch that
    * runs is stopped through its key, see `stopMultiResearch`).
    */
-  async startMultiResearch(request, retryBatchKey, onSettled, onOutcome, signal) {
+  async startMultiResearch(request, retryBatchKey, onSettled, onOutcome, signal, onTopic) {
     let told = false;
     const tell = (outcome) => {
       if (told) return;
@@ -75004,14 +75181,22 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     };
     let batchStarted = false;
     try {
-      await this.runMultiResearch(request, retryBatchKey, onSettled, tell, signal, () => {
-        batchStarted = true;
-      });
+      await this.runMultiResearch(
+        request,
+        retryBatchKey,
+        onSettled,
+        tell,
+        signal,
+        () => {
+          batchStarted = true;
+        },
+        onTopic
+      );
     } finally {
       if (!batchStarted) tell({ kind: "not_started" });
     }
   }
-  async runMultiResearch(request, retryBatchKey, onSettled, tell, signal, markStarted) {
+  async runMultiResearch(request, retryBatchKey, onSettled, tell, signal, markStarted, onTopic) {
     if (!this.map || !this.selection.state.multiSelected.size) return;
     const languageSource = this.batchLanguageSource();
     const key4 = this.multiResearchKey();
@@ -75084,6 +75269,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         let reported = false;
         let skipped2 = 0;
         const topics = /* @__PURE__ */ new Map();
+        const come = (topic) => {
+          topics.set(topic.id, topic);
+          try {
+            onTopic == null ? void 0 : onTopic(topic);
+          } catch (error) {
+            errorNotice(error);
+          }
+        };
         const web = { searches: 0, counted: 0, withoutSearch: 0 };
         try {
           const gate = { shown: false };
@@ -75117,7 +75310,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
                   languageSource
                 );
               } catch (error) {
-                topics.set(child.id, {
+                come({
                   id: child.id,
                   title: note.title,
                   status: batchSignal.aborted ? "stopped" : "failed",
@@ -75125,7 +75318,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
                 });
                 throw error;
               }
-              topics.set(child.id, {
+              come({
                 id: child.id,
                 title: note.title,
                 status: batchSignal.aborted ? "stopped" : "succeeded"
@@ -77253,6 +77446,9 @@ ${note.detail.trim()}` : "",
       },
       retry: (origin) => {
         void this.sendMapChat(origin);
+      },
+      rerunBatch: (message) => {
+        void this.rerunChatBatch(message).catch((error) => errorNotice(error));
       },
       modelName: (id) => this.plugin.modelLabel(id),
       resolveLink: (link) => {
@@ -80222,9 +80418,115 @@ ${note.detail.trim()}` : "",
     this.selection.chatSelect(ids2);
     if (!this.closed) this.render();
   }
+  /** The chat remembers what it researched; a card researched again moves to the end, and a later failure does not undo a success. */
+  rememberChatResearched(topics) {
+    var _a2;
+    for (const topic of topics) {
+      if (topic.status !== "succeeded" && ((_a2 = this.chatResearched.get(topic.id)) == null ? void 0 : _a2.status) === "succeeded") continue;
+      this.chatResearched.delete(topic.id);
+      this.chatResearched.set(topic.id, { title: topic.title, status: topic.status });
+    }
+  }
+  /**
+   * Follows a research batch the chat started (or runs again): the conversation's last answer carries it, the record keeps it
+   * (so a reload can still tell it was cut), and the panel tells how it ended. Nothing is shown or written for a conversation
+   * that is gone. `rerun`: the batch was already told once, so a start that never happened only ends the rerun.
+   */
+  watchChatBatch(chat, message, batch, conversation, rerun, listed = batch.topics) {
+    const writer = this.chatRecords;
+    const recordId = writer == null ? void 0 : writer.conversationId;
+    const record = (kind, extra = {}) => {
+      const live2 = this.chatRecords;
+      if (!live2 || live2.conversationId !== recordId || this.plugin.settings.mapChatRecords !== true || batch.turn <= 0)
+        return;
+      try {
+        live2.write({ type: "event", turn: batch.turn, kind, ...extra });
+      } catch (error) {
+        this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
+      }
+    };
+    const current = () => conversation === this.chatConversation;
+    const show = () => {
+      if (chat && message && current()) chat.refreshBatch(message);
+    };
+    if (current()) record("research_batch", { topics: listed, request: { ...batch.request } });
+    let finished = false;
+    return {
+      onTopic: (topic) => {
+        if (!current()) return;
+        markChatBatchTopic(batch, topic.id, topic.status);
+        if (topic.status !== "stopped") record("research_batch_topic", { id: topic.id, status: topic.status });
+        if (batch.running) show();
+      },
+      settled: (result) => {
+        if (finished) return;
+        finished = true;
+        if (!current()) return;
+        batch.running = false;
+        if (result.kind === "settled") {
+          for (const topic of result.topics) markChatBatchTopic(batch, topic.id, topic.status);
+          batch.ended = true;
+          record("research_batch_end");
+        } else if (rerun) {
+          batch.ended = true;
+          record("research_batch_end");
+        } else {
+          if (message) delete message.batch;
+          record("research_batch_end", { status: "not_started" });
+        }
+        show();
+      }
+    };
+  }
+  /** "Run the ones not done again" on a chat batch that stopped: only the cards still on the map, with the request the batch had. */
+  async rerunChatBatch(message) {
+    const batch = message.batch;
+    const chat = this.chat;
+    if (!batch || !chat || !this.map || batch.running) return;
+    const key4 = this.multiResearchKey();
+    if (this.plugin.expansionCoordinator.isRunning(key4)) {
+      new import_obsidian34.Notice(t("ui.multi_research_already_running"));
+      return;
+    }
+    const summary = summarizeChatBatch(batch, batch.restored === true);
+    if (!summary) return;
+    const onMap = new Set(this.map.nodes.map((node) => node.id));
+    batch.topics = batch.topics.filter((topic) => onMap.has(topic.id) || batch.succeeded.includes(topic.id));
+    const pending2 = summary.pending.filter((topic) => onMap.has(topic.id));
+    if (!pending2.length) {
+      chat.refreshBatch(message);
+      return;
+    }
+    const conversation = this.chatConversation;
+    const sourceGroups = await this.readMapSourceGroups(new AbortController().signal);
+    if (conversation !== this.chatConversation || batch.running) return;
+    this.chatSelect(pending2.map((topic) => topic.id));
+    batch.running = true;
+    batch.ended = false;
+    batch.restored = false;
+    const watch = this.watchChatBatch(chat, message, batch, conversation, true, pending2);
+    chat.refreshBatch(message);
+    try {
+      await this.startMultiResearch(
+        { ...batch.request, ...sourceGroups.length ? { referenceGroups: sourceGroups } : {} },
+        void 0,
+        void 0,
+        (result) => {
+          if (result.kind === "settled" && conversation === this.chatConversation)
+            this.rememberChatResearched(result.topics);
+          watch.settled(result);
+        },
+        void 0,
+        watch.onTopic
+      );
+    } catch (error) {
+      errorNotice(error);
+      watch.settled({ kind: "not_started" });
+    }
+  }
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
   async runChatSelection(action, message = "", batch = newChatImageBatch(), held, work, continuation = false) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
     const launch = (work2) => {
@@ -80276,23 +80578,36 @@ ${note.detail.trim()}` : "",
         const referenceGroups = [...mapSourceGroups, ...this.chatTurnReferences];
         this.chatStartedResearch = true;
         this.markResearchRecorded(this.chatLastRecord);
+        const request = {
+          ...chatResearchRequest(action, (_c = this.map) == null ? void 0 : _c.aiMode, (mode) => aiModeOptions(mode, "research")),
+          ...retryModel ? { model: retryModel } : {}
+        };
+        const watch = researchIds.length ? (() => {
+          var _a3, _b3, _c2;
+          const batch2 = {
+            turn: (_b3 = (_a3 = this.chatLastRecord) == null ? void 0 : _a3.turn) != null ? _b3 : 0,
+            topics: researchIds.map((id) => {
+              var _a4, _b4;
+              return { id, title: (_b4 = (_a4 = this.notes.get(id)) == null ? void 0 : _a4.title) != null ? _b4 : id };
+            }),
+            succeeded: [],
+            failed: [],
+            ended: false,
+            request
+          };
+          return this.watchChatBatch(chat, (_c2 = chat == null ? void 0 : chat.attachBatch(batch2)) != null ? _c2 : null, batch2, conversation, false);
+        })() : null;
         const outcome = new Promise((resolve) => {
-          var _a3;
           const settle = (result) => {
-            var _a4;
             if (result.kind === "settled" && conversation === this.chatConversation)
-              for (const topic of result.topics) {
-                if (topic.status !== "succeeded" && ((_a4 = this.chatResearched.get(topic.id)) == null ? void 0 : _a4.status) === "succeeded") continue;
-                this.chatResearched.delete(topic.id);
-                this.chatResearched.set(topic.id, { title: topic.title, status: topic.status });
-              }
+              this.rememberChatResearched(result.topics);
+            watch == null ? void 0 : watch.settled(result);
             resolve(result);
           };
           Promise.resolve(
             this.startMultiResearch(
               {
-                ...chatResearchRequest(action, (_a3 = this.map) == null ? void 0 : _a3.aiMode, (mode) => aiModeOptions(mode, "research")),
-                ...retryModel ? { model: retryModel } : {},
+                ...request,
                 ...referenceGroups.length ? { referenceGroups } : {}
               },
               void 0,
@@ -80302,7 +80617,8 @@ ${note.detail.trim()}` : "",
                   chat.appendLines(lines);
               },
               settle,
-              work == null ? void 0 : work.controller.signal
+              work == null ? void 0 : work.controller.signal,
+              watch == null ? void 0 : watch.onTopic
             )
           ).catch((error) => {
             errorNotice(error);
@@ -80333,7 +80649,7 @@ ${note.detail.trim()}` : "",
           })
         );
         const expandChat = this.chat;
-        const expandTurns = (_c = expandChat == null ? void 0 : expandChat.transcript().length) != null ? _c : 0;
+        const expandTurns = (_d = expandChat == null ? void 0 : expandChat.transcript().length) != null ? _d : 0;
         const expandRecord = this.chatLastRecord;
         const cards = infos.map(({ parent, note }) => ({
           id: parent.id,

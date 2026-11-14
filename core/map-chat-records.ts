@@ -6,6 +6,7 @@
 
 import { parseChatBasis, type MapChatBasis } from "./map-chat-basis";
 import { MAP_CHAT_CHAIN_END_REASONS, type MapChatChainEndReason } from "./map-chat-chain";
+import { markChatBatchTopic, type ChatBatch, type ChatBatchRequest, type ChatBatchTopic } from "./map-chat-batch";
 
 export const RECORD_VERSION = 1;
 export const RECORDS_SUBPATH = "Chats/records";
@@ -95,7 +96,16 @@ export interface RecordImagesLine extends RecordLineBase {
 /** `sources_read` marks that a turn sent the map's data sources (a restored conversation keeps its writes behind the plan). */
 /** `research_started` marks that the conversation started web research (it keeps the plan allow-list on after a restore). */
 export type RecordEventKind =
-  "resend" | "undo" | "redo" | "undo_refused" | "chain_end" | "research_started" | "sources_read";
+  | "resend"
+  | "undo"
+  | "redo"
+  | "undo_refused"
+  | "chain_end"
+  | "research_started"
+  | "sources_read"
+  | "research_batch"
+  | "research_batch_topic"
+  | "research_batch_end";
 export interface RecordEventLine extends RecordLineBase {
   type: "event";
   turn: number;
@@ -104,6 +114,12 @@ export interface RecordEventLine extends RecordLineBase {
   reason?: string;
   round?: number;
   remaining?: string;
+  /** `research_batch`: the cards the chat's research batch runs, and what it was asked to do (read back through a whitelist). */
+  topics?: { id: string; title: string }[];
+  request?: Record<string, unknown>;
+  /** `research_batch_topic`: one card of the batch and how it came out. `research_batch_end`: `not_started` when nothing ran. */
+  id?: string;
+  status?: string;
 }
 export interface RecordMovedLine extends RecordLineBase {
   type: "moved";
@@ -350,6 +366,8 @@ export interface RestoredTurn {
   remaining?: string;
   /** How the continuation that ended with this turn ended (known reasons only; its words are the panel's). */
   chainEnd?: { reason: MapChatChainEndReason; round: number; remaining: string };
+  /** The research batch this turn started, as far as the file knows (no end: the plugin was reloaded while it ran). */
+  batch?: ChatBatch;
 }
 export interface RestoredConversation {
   id: string;
@@ -362,6 +380,38 @@ export interface RestoredConversation {
   startedResearch: boolean;
   /** A turn of the file sent the map's data sources (an older file has no mark: false). */
   readsSources: boolean;
+}
+
+const BATCH_TOPIC_LIMIT = 1000;
+const BATCH_TITLE_LIMIT = 200;
+/** A hand-edited file cannot put anything but known, typed values into a batch: every field is checked, unknown ones are dropped. */
+function restoredBatchRequest(raw: unknown): ChatBatchRequest {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const pick = <T extends string>(item: unknown, allowed: readonly T[], fallback: T): T =>
+    allowed.find(name => name === item) ?? fallback;
+  return {
+    mapAiMode: pick(value.mapAiMode, ["quick", "standard"] as const, "standard"),
+    researchMode: pick(value.researchMode, ["local", "research"] as const, "research"),
+    researchDepth: pick(value.researchDepth, ["fast", "normal", "deep"] as const, "normal"),
+    requirements: typeof value.requirements === "string" ? value.requirements.slice(0, 4000) : "",
+    imageSearch: value.imageSearch === true,
+    ...(value.rewrite === true ? { rewrite: true as const } : {}),
+    ...(typeof value.model === "string" && value.model.length <= 200 ? { model: value.model } : {})
+  };
+}
+function restoredBatchTopics(raw: unknown): ChatBatchTopic[] {
+  if (!Array.isArray(raw)) return [];
+  const topics: ChatBatchTopic[] = [];
+  for (const entry of raw as unknown[]) {
+    if (topics.length >= BATCH_TOPIC_LIMIT) break;
+    const item = entry as { id?: unknown; title?: unknown } | null;
+    if (!item || typeof item !== "object" || typeof item.id !== "string" || !item.id) continue;
+    topics.push({
+      id: item.id.slice(0, 200),
+      title: typeof item.title === "string" ? item.title.slice(0, BATCH_TITLE_LIMIT) : ""
+    });
+  }
+  return topics;
 }
 
 /** Result lines read back from a file: the basis keeps its known shape only (a hand-edited file cannot put anything else on screen). */
@@ -387,6 +437,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
   const current = new Map<number, RecordLineItem[]>();
   const undone = new Map<number, boolean>();
   const chainEnds = new Map<number, { reason: MapChatChainEndReason; round: number; remaining: string }>();
+  const batches = new Map<number, ChatBatch>();
   let startedResearch = false;
   let readsSources = false;
   for (const line of lines) {
@@ -417,7 +468,41 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       else if (line.kind === "redo") undone.set(line.turn, false);
       else if (line.kind === "research_started") startedResearch = true;
       else if (line.kind === "sources_read") readsSources = true;
-      else if (line.kind === "chain_end") {
+      else if (line.kind === "research_batch") {
+        // A second one in the same turn is a rerun: the batch is open again and its cards join the first one's.
+        const topics = restoredBatchTopics(line.topics);
+        const batch = batches.get(line.turn);
+        if (!batch)
+          batches.set(line.turn, {
+            turn: line.turn,
+            topics,
+            succeeded: [],
+            failed: [],
+            ended: false,
+            request: restoredBatchRequest(line.request)
+          });
+        else {
+          for (const topic of topics)
+            if (!batch.topics.some(item => item.id === topic.id) && batch.topics.length < BATCH_TOPIC_LIMIT)
+              batch.topics.push(topic);
+          batch.ended = false;
+          batch.request = restoredBatchRequest(line.request);
+        }
+      } else if (line.kind === "research_batch_topic") {
+        const batch = batches.get(line.turn);
+        if (batch && typeof line.id === "string" && batch.topics.some(topic => topic.id === line.id))
+          markChatBatchTopic(
+            batch,
+            line.id,
+            line.status === "succeeded" ? "succeeded" : line.status === "failed" ? "failed" : "stopped"
+          );
+      } else if (line.kind === "research_batch_end") {
+        if (line.status === "not_started") batches.delete(line.turn);
+        else {
+          const batch = batches.get(line.turn);
+          if (batch) batch.ended = true;
+        }
+      } else if (line.kind === "chain_end") {
         // A hand-edited file cannot put anything but a known reason on screen; the words are the panel's, the rest is plain text.
         const reason = (MAP_CHAT_CHAIN_END_REASONS as readonly unknown[]).find(item => item === line.reason);
         if (reason && reason !== "map_changed")
@@ -476,7 +561,8 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
         : {}),
       ...(chainEnds.has(number) || carried.has(number)
         ? { chainEnd: chainEnds.get(number) ?? carried.get(number) }
-        : {})
+        : {}),
+      ...(batches.has(number) ? { batch: batches.get(number) } : {})
     });
   }
   return {

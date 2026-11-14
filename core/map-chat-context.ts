@@ -228,6 +228,8 @@ export interface MapChatContinuationInput {
 
 export interface MapChatContextInput {
   mapTitle: string;
+  /** Vault folder that holds this map (its topic root); a new file the user gives no location for goes under it. Omitted or empty sends none. */
+  mapFolder?: string;
   outline: MapChatOutlineNode[];
   selected: MapChatTopicRef[];
   references: MapChatTopicRef[];
@@ -730,6 +732,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
       ? { mapSources: { readOnly: true, text: mapSources.text }, mapSourcesNote: MAP_CHAT_MAP_SOURCES_NOTE }
       : {}),
     mapTitle: input.mapTitle,
+    ...(input.mapFolder ? { mapFolder: input.mapFolder } : {}),
     // Only on an AIM map, so the model does not read "no relations or types yet" on an ordinary map as AIM.
     ...(input.aim ? { aimMap: true } : {}),
     ...(input.noEditableMap ? { noEditableMap: true } : {}),

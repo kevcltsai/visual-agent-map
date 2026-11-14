@@ -16533,6 +16533,7 @@ export class VisualAgentMapView extends ItemView {
     const mapSources = await this.chatMapSources(signal);
     const context = buildMapChatContext({
       mapTitle: map.title,
+      mapFolder: this.plugin.repo.topicRoot(this.path),
       mapTitles: [],
       noEditableMap: !isManagedMapPath(settings, this.path),
       outline,
@@ -22367,6 +22368,7 @@ export class VisualAgentMapView extends ItemView {
     const mapSources = await this.chatMapSources(signal);
     const context = buildMapChatContext({
       mapTitle: map.title,
+      mapFolder: this.plugin.repo.topicRoot(this.path),
       mapTitles,
       noEditableMap: !isManagedMapPath(settings, this.path),
       mapNeedsName: isPlaceholderMapTitle(map.title, PLACEHOLDER_MAP_NAMES),

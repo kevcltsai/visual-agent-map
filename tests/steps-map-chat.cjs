@@ -132,6 +132,28 @@ test('context builder carries selection with parent and children, references, ou
   assert.deepEqual(data.earlierTurns.map(turn => turn.text), ['turn 16', 'turn 17', 'turn 18', 'turn 19']);
   assert.deepEqual(plain(built.nodeIds).sort(), ['a', 'a1', 'b', 'r']);
 });
+test('ticket 02: the context carries the map folder, the prompt sends a bare create_md_file under it, and the guard keeps the path', () => {
+  const data = JSON.parse(context({ mapFolder: 'Agent Workspace/Mind Maps/Steak' }).json);
+  assert.equal(data.mapFolder, 'Agent Workspace/Mind Maps/Steak');
+  assert.equal('mapFolder' in JSON.parse(context().json), false);
+  assert.equal('mapFolder' in JSON.parse(context({ mapFolder: '' }).json), false);
+  for (const language of ['en', 'zh']) {
+    const prompt = buildMapChatPrompt({ language, message: 'Write a summary file', context: context({ mapFolder: 'M/Steak' }), model: 'm', reasoning: 'low' });
+    const line = prompt.split('\n').find(text => text.startsWith('- create_md_file'));
+    assert.match(line, /"mapFolder"/, language);
+    assert.match(line, /<mapFolder>\/</, language);
+    assert.match(prompt, /"mapFolder":"M\/Steak"/, language);
+  }
+  // The model's path is applied as written: a bare file name is not moved into the map folder by the guard.
+  const verdict = guardMapChatWrite({ kind: 'create', path: 'Summary.md', newContent: '# s', exists: false, configDir: CONFIG });
+  assert.equal(verdict.ok, true);
+  assert.equal(normalizeVaultPath('Summary.md'), 'Summary.md');
+  // Both map chat contexts of the view (map chat and topic chat) pass the map folder.
+  const view = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'experiences', 'visual-map', 'view.ts'), 'utf8');
+  const calls = view.split('buildMapChatContext({').slice(1);
+  assert.equal(calls.length, 2);
+  for (const call of calls) assert.match(call.slice(0, 200), /mapFolder: this\.plugin\.repo\.topicRoot\(this\.path\)/);
+});
 test('F2: topicHashes cover every outline card (title, parent) and, for cards sent in full, summary and the Detail hash', () => {
   const built = context({ selected: [topic('a')], references: [topic('b', { detail: '' })] });
   const data = JSON.parse(built.json);

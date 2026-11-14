@@ -9,7 +9,7 @@
 - reorder_topics：parentId（既有議題 id 或 "new:<ref>"）、nodeIds（兩張以上，都已經是 parentId 的子議題，依想要的順序由前到後列出）。只調整列出的這幾張在同層的先後；它們仍在 parentId 底下，沒列出的同層議題位置不變。一個動作就排好全部，不要用 move_topic 做這件事。
 - delete_topic：nodeId、branch（true 表示整個分支一起處理）。議題是移到「未歸類」，不是真的刪除。
 - edit_md_file：path、find、replace。把 "path" 指向的 Markdown 檔中「恰好一處」的 "find" 換成 "replace"。"find" 在下方提供的檔案內容中必須剛好出現一次，請多複製一些前後文使它唯一。只有 "files" 或 "snippets" 裡帶有內容雜湊的檔案可以編輯。
-- create_md_file：path（Vault 內尚不存在的 .md 相對路徑）、content（整份檔案內容）。
+- create_md_file：path（Vault 內尚不存在的 .md 相對路徑；使用者沒有指定資料夾或位置時，放在這張心智圖的資料夾下，即 context 的 "mapFolder"，寫成 "<mapFolder>/<檔名>.md"）、content（整份檔案內容）。
 - select_topics：在地圖上選取議題。欄位：nodeIds，或 all=true 表示全部議題。
 - run_map_action：啟動既有的地圖功能。欄位：action，視需要加 nodeIds（目標；空 = 目前選取）、title（merge：合併後議題標題）、goal（rate_by_goal：學習目標）、direction（expand：選填的方向；research_standard：這次研究的額外要求；find_images：簡短的搜尋詞）、mode（只用於 research_standard："quick" 或 "standard"；使用者說「快速研究」填 "quick"、說「標準研究」填 "standard"，只說「研究」就留空，由程式依地圖記住的模式決定）、images（只用於 research_standard：只有使用者要求搜尋圖片且 mode 不是 "quick" 時才填 true，否則 false）、needsWeb（只用於 research_standard：這次研究需要上網時填 true，見下方「研究」，否則 false）。action 為下列之一：research_standard（對選取議題做研究；快速研究用模型自身知識、不上網，標準研究會上網）、expand（用多層大綱展開選取議題：一次產生多層子議題並全部直接新增，不會開檢閱視窗，也不必先提案讓使用者選方向）、synthesize（把選取的一張議題的子議題整合進該議題，或把選取的多張議題整合成一張新議題；它會立刻開始，以使用者的訊息為整合方向，所以不會開對話框，你也不必請使用者開）、rate_by_goal（依目標評定相關度）、merge（把選取議題合併成一張）、find_images（自動為目標議題放入一張圖，每張議題一個動作；見下方「圖片」）。run_map_action 要放在它所依賴的 select_topics 或編輯動作之後。nodeIds 也可以放 "new:<ref>"。
 - create_map：title（新地圖的名稱）。只能放在第一個動作，用於使用者要求另開一張獨立的新地圖，或 context 的 "noEditableMap" 為 true（代表沒有可編輯的地圖）。context 的 "emptyMap" 為 true 時，你正在對話的這張地圖是空的，樹就建在這張上：用 add_child 建，不要用 create_map，除非使用者明確要求另開新地圖。新地圖會被打開，之後的動作在新地圖上建樹（只能用 parentId 為空字串或 "new:<ref>" 的 add_child，不可用舊地圖的議題 id）。

@@ -123,12 +123,13 @@ export function neutralizeUnsafeMermaid(markdown: string): string {
     if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
     const body: string[] = [];
     for (let next = index + 1; next < lines.length; next++) {
+      // A `<br>` line break in a label becomes a space, so the HTML-tag rule does not turn the whole diagram into code.
+      // Swapped first, so the fence and safety checks read exactly the text that is written.
+      lines[next] = lines[next].replace(BR_TAG, " ");
       const content = core(lines[next]);
       const close = FENCE.exec(content);
       if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
-      // A `<br>` line break in a label becomes a space, so the HTML-tag rule does not turn the whole diagram into code.
-      lines[next] = lines[next].replace(BR_TAG, " ");
-      body.push(content.replace(BR_TAG, " "));
+      body.push(content);
     }
     if (unsafeMermaid(body)) lines[index] = line.replace(/mermaid/i, "text");
   });

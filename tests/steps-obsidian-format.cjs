@@ -102,6 +102,8 @@ test('a <br> line break in a mermaid label becomes a space, so the diagram still
   const expected = ['<br> outside stays', '', '```mermaid', 'flowchart TD', '  A["one two"] --> B["three four five"]', '```'].join('\n');
   assert.equal(parse(detail), expected);
   assert.equal(parse('> ```mermaid\n> graph TD\n> A["a<br>b"] --> B\n> ```'), '> ```mermaid\n> graph TD\n> A["a b"] --> B\n> ```');
+  // The check reads the line after the swap, the same text that is written: a <br> cannot hide a quote prefix in front of a directive.
+  assert.equal(parse('> ```mermaid\n> flowchart LR\n> A --> B\n> <br>> click A "x"\n> ```'), '> ```text\n> flowchart LR\n> A --> B\n>  > click A "x"\n> ```');
   // Any other HTML in the same block still turns it into plain code.
   assert.equal(parse('```mermaid\nflowchart LR\nA["a<br>b"] --> B["<b>x</b>"]\n```'), '```text\nflowchart LR\nA["a b"] --> B["<b>x</b>"]\n```');
 });

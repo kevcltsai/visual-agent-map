@@ -29721,11 +29721,11 @@ function neutralizeUnsafeMermaid(markdown) {
     if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
     const body = [];
     for (let next = index + 1; next < lines.length; next++) {
+      lines[next] = lines[next].replace(BR_TAG, " ");
       const content = core(lines[next]);
       const close = FENCE.exec(content);
       if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
-      lines[next] = lines[next].replace(BR_TAG, " ");
-      body.push(content.replace(BR_TAG, " "));
+      body.push(content);
     }
     if (unsafeMermaid(body)) lines[index] = line2.replace(/mermaid/i, "text");
   });

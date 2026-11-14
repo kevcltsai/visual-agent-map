@@ -836,8 +836,8 @@ test('rewrite: strict schema field; only a boolean true counts; missing or wrong
 });
 test('rewrite prompt (zh and en): rewrite is only for an explicit whole-note rewrite and is listed in the JSON template', () => {
   const en = mapChatStep.render(request({ language: 'en' })), zh = mapChatStep.render(request({ language: 'zh-TW' }));
-  for (const pattern of [/rewrite \(research_standard only: true only when the user explicitly asks for the whole note to be rewritten/, /"otherProvider":false,"rewrite":false/]) assert.match(en, pattern, String(pattern));
-  for (const pattern of [/rewrite（只用於 research_standard：只有使用者明確要求整篇重寫/, /"otherProvider":false,"rewrite":false/]) assert.match(zh, pattern, String(pattern));
+  for (const pattern of [/rewrite \(research_standard only: true only when the user explicitly asks for the whole note to be rewritten/, /"otherProvider":false,"rewrite":false/, /with rewrite=true and let the research write the new note; do not write the new note yourself or delete or edit the old text with edit_topic_note or edit_md_file/]) assert.match(en, pattern, String(pattern));
+  for (const pattern of [/rewrite（只用於 research_standard：只有使用者明確要求整篇重寫/, /"otherProvider":false,"rewrite":false/, /設 rewrite=true，由研究寫出新筆記；不要自己用 edit_topic_note 或 edit_md_file 寫新筆記/]) assert.match(zh, pattern, String(pattern));
 });
 test('D-231 mode resolution: a named mode > the map mode > Quick; the all-new-cards rule is gone', () => {
   const action = (fields = {}) => parse(reply(researchItem(fields))).actions[0];

@@ -79740,7 +79740,6 @@ ${note.detail.trim()}` : "",
         });
         const tail = source.text.length - at - action.find.length;
         const next = dedupeImageEmbeds(guarded, { file: true, range: { start: at, end: guarded.length - tail } });
-        const replace = next.slice(at, next.length - (source.text.length - at - action.find.length));
         const added = addedMermaidBlocks(source.text, next);
         if (added.some((block) => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
         const check = this.plugin.mermaidSyntax;
@@ -79777,11 +79776,21 @@ ${note.detail.trim()}` : "",
         });
         if (!verdict.ok) return guardSkipped(verdict.code, true);
         if (source.editor) {
-          source.editor.replaceRange(
-            replace,
-            source.editor.offsetToPos(at),
-            source.editor.offsetToPos(at + action.find.length)
-          );
+          const before = source.text;
+          let from = at;
+          let to = at + action.find.length;
+          let replace = next.slice(at, next.length - tail);
+          if (!(next.startsWith(before.slice(0, at)) && next.endsWith(before.slice(before.length - tail)) && next.length >= at + tail)) {
+            const limit = Math.min(before.length, next.length);
+            from = 0;
+            while (from < limit && before.charCodeAt(from) === next.charCodeAt(from)) from++;
+            let rest = 0;
+            while (rest < limit - from && before.charCodeAt(before.length - 1 - rest) === next.charCodeAt(next.length - 1 - rest))
+              rest++;
+            to = before.length - rest;
+            replace = next.slice(from, next.length - rest);
+          }
+          source.editor.replaceRange(replace, source.editor.offsetToPos(from), source.editor.offsetToPos(to));
           this.recordChatFileEdit(source.file.path, source.text, next, run);
           return done;
         }

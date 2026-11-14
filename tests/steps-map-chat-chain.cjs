@@ -28,7 +28,7 @@ const parseRemaining = fields => parseMapChat(raw(fields), context()).remaining;
 test('remaining: a required string in the schema; a missing field or a value that is not a string reads as "" and never continues', () => {
   assert.ok(MAP_CHAT_SCHEMA.required.includes('remaining'));
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.remaining), { type: 'string' });
-  assert.equal(mapChatStep.version, 23);
+  assert.equal(mapChatStep.version, 24);
   assert.equal(parseMapChat(JSON.stringify({ reply: 'ok', actions: [] }), context()).remaining, '', 'a version 15/16/17 reply has none');
   for (const value of [null, 0, 12, true, false, ['x'], { a: 1 }, undefined]) assert.equal(parseRemaining({ remaining: value }), '', JSON.stringify(value));
 });

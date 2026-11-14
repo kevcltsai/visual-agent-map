@@ -278,6 +278,18 @@ test('F6c: an edit cannot turn an ordinary note into a topic note (adding an ide
   assert.equal(code(edit('Notes/p.md', plain, plain.replace('title: P', 'title: Q'))), 'ok');
   assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('Body', 'Changed body'))), 'ok');
 });
+test('F6d: an identity key or map marker wrapped in quotes is the same key (YAML reads "node-id" as node-id)', () => {
+  const plain = '---\ntitle: P\n---\nText\n';
+  for (const key of ['"node-id": x', "'topic-id': y", '"agent-map-node": true'])
+    assert.equal(code(edit('Notes/p.md', plain, plain.replace('title: P', `title: P\n${key}`))), 'reserved_frontmatter', key);
+  assert.equal(code(create('Notes/fake.md', '---\n"node-id": x\n---\nText\n')), 'reserved_frontmatter');
+  assert.equal(code(create('Notes/fakemap.md', '---\n"visual-agent-map": true\n---\nText\n')), 'reserved_frontmatter');
+  assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('node-id: n\n', 'node-id: n\n"node-id": other\n'))), 'duplicate_identity_key');
+  assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('node-id: n', '"node-id": other'))), 'topic_identity_changed');
+  assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('node-id: n', '"node-id": n'))), 'ok', 'quoting the key alone is not a change');
+  assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('node-id: n\n', 'node-id: n\rnode-id: other\n'))), 'duplicate_identity_key', 'a lone CR is a YAML line break');
+  assert.equal(code(edit('Notes/p.md', plain, plain.replace('title: P', 'title: P\r"node-id": x'))), 'reserved_frontmatter', 'a key after a lone CR');
+});
 test('guard refuses removing or changing agent-map-node, node-id or topic-id of a topic note', () => {
   for (const [from, to] of [['agent-map-node: true\n', ''], ['node-id: n\n', ''], ['topic-id: m\n', ''], ['node-id: n', 'node-id: other'], ['topic-id: m', 'topic-id: "z"'], ['agent-map-node: true', 'agent-map-node: false']])
     assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace(from, to))), 'topic_identity_changed', `${from} -> ${to}`);
@@ -460,7 +472,7 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
 test('C1: the style is not part of the action schema, and the step version is 22 (version 22: auditing the whole map researches its main cards, not only the root, and no requested item is announced as skipped; version 21: a batch whose notes are not in the context selects the cards instead of asking the user to, and a title plus a list is one root card with the items as children; version 20: find_images takes several targets and the picture is put in automatically; version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 23);
+  assert.equal(mapChatStep.version, 24);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -1267,6 +1279,21 @@ test('chat 06: remove_relation names the pair in either order; a pair with no re
   // Without the remove first, the same add is a second link on the pair and is refused.
   assert.deepEqual(codes(parse(reply(rel('b', 'a', 'contradicts')), ctx)), ['0:relation_not_allowed']);
 });
+test('chat 06: a bare ref on a relation end reads as new:<ref> only when an earlier kept add_child defined it', () => {
+  const got = parse(reply(child('n1', 'a'), rel('n1', 'a1', 'related'), rel('r', 'n1', 'prerequisite')));
+  assert.deepEqual(got.actions.slice(1), [
+    { kind: 'add_relation', fromId: 'new:n1', toId: 'a1', relationKind: 'related' },
+    { kind: 'add_relation', fromId: 'r', toId: 'new:n1', relationKind: 'prerequisite' }
+  ]);
+  assert.deepEqual(got.rejected, []);
+  // An existing card id wins over a ref of the same string.
+  const same = parse(reply(child('b', 'a'), rel('b', 'a1', 'related')));
+  assert.deepEqual(same.actions[1], { kind: 'add_relation', fromId: 'b', toId: 'a1', relationKind: 'related' });
+  // Forward ref, rejected definition and unknown ref stay unknown_node.
+  assert.deepEqual(codes(parse(reply(rel('n1', 'a1', 'related'), child('n1', 'a')))), ['0:unknown_node']);
+  assert.deepEqual(codes(parse(reply(child('n1', 'ghost'), rel('n1', 'a1', 'related')))), ['0:unknown_node', '1:unknown_node']);
+  assert.deepEqual(codes(parse(reply(child('n1', 'a'), rel('zz', 'a1', 'related')))), ['1:unknown_node']);
+});
 test('chat 06: on an AIM map every relation action is dropped and counted', () => {
   const ctx = linked([{ kind: 'supports', from: 'a', to: 'b' }], { aim: true });
   assert.deepEqual(plain(ctx.relations), [], 'an AIM context carries no relations');
@@ -1583,7 +1610,7 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
 test('hypothesis-leaning: S21 the step version is 22 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 23);
+  assert.equal(mapChatStep.version, 24);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [

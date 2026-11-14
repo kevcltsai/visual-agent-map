@@ -761,8 +761,15 @@ export function parseMapChat(
           break;
         }
         case "add_relation": {
-          const fromId = node("fromId", true),
-            toId = node("toId", true);
+          // A bare string that is no supplied card but names a ref an earlier kept add_child defined reads as `new:<ref>`.
+          const end = (key: string): string => {
+            const id = text(key);
+            if (!id.startsWith(MAP_CHAT_NEW_PREFIX) && !created && !known.has(id) && refs.has(id))
+              return `${MAP_CHAT_NEW_PREFIX}${id}`;
+            return resolve(id, true);
+          };
+          const fromId = end("fromId"),
+            toId = end("toId");
           const given = text("relationKind");
           if (!(TOPIC_RELATION_KINDS as readonly string[]).includes(given)) throw new Dropped("bad_value");
           const relationKind = given as TopicRelationKind;
@@ -849,7 +856,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 23,
+  version: 24,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

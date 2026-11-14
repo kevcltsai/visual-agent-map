@@ -17,7 +17,7 @@ const eq = (actual, expected, message) => assert.deepEqual(plain(actual), plain(
 const visibleText = el => (el.text ?? '') + el.children.map(visibleText).join('');
 const replyBody = f => find(f.parts.log(), i => hasClass(i, 'is-assistant')).children.find(c => hasClass(c, 'vam-map-chat-text'));
 const MAP = 'Agent Workspace/Topics/map-a/Map.md';
-const { contentHash, buildMapChatContext } = load('core/map-chat-context.ts');
+const { contentHash, buildMapChatContext, MAP_CHAT_TURN_CHAR_LIMIT } = load('core/map-chat-context.ts');
 const outlineApi = load('experiences/visual-map/outline-import.ts', { obsidian });
 const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
 const { chatResearchRequest } = load('core/map-chat-plan.ts');
@@ -7479,6 +7479,17 @@ test('ticket 06: earlier rounds are cut to their opening and the last round stay
   const parts = assistant.text.split('\n\n');
   eq(parts.map(p => Array.from(p.split('\n').at(-1)).length), [400, 400, 1000], 'two earlier rounds cut to 400 characters (with an ellipsis), the last one whole');
   assert.ok(parts[0].endsWith('…') && parts[1].endsWith('…'));
+});
+
+test('ticket 06 with the total budget: an 8-round chain whose last reply is long still sends the last round whole', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  chainTurns(f, 'go', 7, round => (round === 8 ? 'END '.repeat(1000) + 'final line' : `r${round} `.repeat(300)));
+  const assistant = f.panel.turns().at(-1).text;
+  assert.ok(assistant.length <= MAP_CHAT_TURN_CHAR_LIMIT, `the chain turn fits the per-turn cap (${assistant.length})`);
+  assert.ok(assistant.endsWith('END '.repeat(1000) + 'final line'), 'the last round is whole');
+  assert.match(assistant, /\[Automatic continuation · round 2 of 8\]/, 'earlier rounds keep their label');
+  const earlier = JSON.parse(buildMapChatContext({ mapTitle: 'M', outline: [], selected: [], references: [], snippets: [], files: [], history: f.panel.turns() }).json).earlierTurns;
+  assert.ok(earlier.at(-1).text.endsWith('final line') && !earlier.at(-1).truncated, 'the context does not cut it');
 });
 
 test('ticket 06: a failed chain round is left out and the rounds that worked stay; a round still running is not history yet', () => {

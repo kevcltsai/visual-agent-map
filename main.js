@@ -40039,14 +40039,18 @@ function hasUnsavedChat(completedTurns, savedTurns) {
 // experiences/visual-map/map-chat.ts
 var MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS = 400;
 function chainReplyText(replies) {
-  return replies.map((reply, index) => {
+  const render = (earlier2) => replies.map((reply, index) => {
     const chars = Array.from(reply.text.trim());
-    const body = index < replies.length - 1 && chars.length > MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS ? `${chars.slice(0, MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS - 1).join("")}\u2026` : reply.text;
+    const body = index < replies.length - 1 && chars.length > earlier2 ? `${chars.slice(0, Math.max(0, earlier2 - 1)).join("")}\u2026` : reply.text;
     if (!reply.auto) return body;
     const label = reply.auto.round ? t("ui.map_chat_auto_round_0_1", reply.auto.round, reply.auto.maxRounds) : t("ui.map_chat_role_auto");
     return `[${label}]
 ${body}`;
   }).join("\n\n");
+  let earlier = MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS;
+  let text10 = render(earlier);
+  while (text10.length > MAP_CHAT_TURN_CHAR_LIMIT && earlier > 0) text10 = render(earlier = Math.floor(earlier / 2));
+  return text10;
 }
 function placedImage(block) {
   return block.state === "ready" ? block.items.find((item) => item.inserted) : void 0;

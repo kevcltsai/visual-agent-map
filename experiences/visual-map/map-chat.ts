@@ -2,7 +2,7 @@ import { Keymap, setIcon } from "obsidian";
 import { t } from "../../i18n";
 import type { ImageCandidate } from "../../core/image-candidates";
 import { summarizeBasis, type BasisSummaryEntry, type MapChatBasis } from "../../core/map-chat-basis";
-import type { MapChatContinuationInput, MapChatTurn } from "../../core/map-chat-context";
+import { MAP_CHAT_TURN_CHAR_LIMIT, type MapChatContinuationInput, type MapChatTurn } from "../../core/map-chat-context";
 import {
   MAP_CHAT_CHAIN_MAX_ROUNDS,
   MAP_CHAT_CHAIN_WAIT_MS,
@@ -34,22 +34,29 @@ export const MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS = 400;
 /**
  * The assistant text of one history turn: a single reply as it is; the replies of a chain in order, a blank line apart, each automatic
  * round headed by its label (with its number when known), every reply but the last cut to {@link MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS}.
+ * The context keeps only the head of a turn longer than {@link MAP_CHAT_TURN_CHAR_LIMIT}, which would cut the last round, so when the
+ * whole is longer the earlier rounds give up more of their text first (down to their label) to keep the last round whole.
  */
 export function chainReplyText(replies: readonly { text: string; auto?: MapChatAutoInfo }[]): string {
-  return replies
-    .map((reply, index) => {
-      const chars = Array.from(reply.text.trim());
-      const body =
-        index < replies.length - 1 && chars.length > MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS
-          ? `${chars.slice(0, MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS - 1).join("")}…`
-          : reply.text;
-      if (!reply.auto) return body;
-      const label = reply.auto.round
-        ? t("ui.map_chat_auto_round_0_1", reply.auto.round, reply.auto.maxRounds)
-        : t("ui.map_chat_role_auto");
-      return `[${label}]\n${body}`;
-    })
-    .join("\n\n");
+  const render = (earlier: number): string =>
+    replies
+      .map((reply, index) => {
+        const chars = Array.from(reply.text.trim());
+        const body =
+          index < replies.length - 1 && chars.length > earlier
+            ? `${chars.slice(0, Math.max(0, earlier - 1)).join("")}…`
+            : reply.text;
+        if (!reply.auto) return body;
+        const label = reply.auto.round
+          ? t("ui.map_chat_auto_round_0_1", reply.auto.round, reply.auto.maxRounds)
+          : t("ui.map_chat_role_auto");
+        return `[${label}]\n${body}`;
+      })
+      .join("\n\n");
+  let earlier = MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS;
+  let text = render(earlier);
+  while (text.length > MAP_CHAT_TURN_CHAR_LIMIT && earlier > 0) text = render((earlier = Math.floor(earlier / 2)));
+  return text;
 }
 
 /** What the user attached to the next message. Topic chips come from a dragged card; snippets and files from a drop. */

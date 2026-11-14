@@ -104,6 +104,15 @@ test('Wikimedia original image links become 1280px thumbnails (a 226 MB original
   );
 });
 
+test('a Wikimedia thumbnail at a width Wikimedia does not serve becomes 1280px; served widths stay', () => {
+  const { wikimediaThumbnail, wikimediaThumbnails } = load('core/image-candidates.ts');
+  const file = '%22The_School_of_Athens%22_by_Raffaello_Sanzio_da_Urbino.jpg';
+  const at = width => `https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/${file}/${width}px-${file}`;
+  for (const width of [320, 640, 800]) assert.equal(wikimediaThumbnail(at(width)), at(1280), `${width}px`);
+  for (const width of [250, 330, 500, 960, 1280]) assert.equal(wikimediaThumbnail(at(width)), at(width), `${width}px stays`);
+  assert.equal(wikimediaThumbnails(`![A](<${at(640)}>)\n\nSee ${at(640)}.`), `![A](<${at(1280)}>)\n\nSee ${at(640)}.`, 'only the embed changes');
+});
+
 test('web image search keeps https image and source links, drops invented or unsafe ones, dedupes and caps at six', () => {
   const { parseImageCandidates, imageSearchStep } = load('core/steps/image-search/step.ts', {}, { URL });
   const images = [

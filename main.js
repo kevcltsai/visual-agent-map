@@ -43038,7 +43038,11 @@ function imageMarkdown(candidate) {
 [${title}](<${candidate.source}>)`;
 }
 var WIKIMEDIA_ORIGINAL = /^https:\/\/upload\.wikimedia\.org\/wikipedia\/([^/]+)\/([0-9a-f])\/([0-9a-f]{2})\/([^/?#]+\.(?:jpe?g|png|gif|webp))$/i;
+var WIKIMEDIA_THUMB = /^(https:\/\/upload\.wikimedia\.org\/wikipedia\/[^/]+\/thumb\/[0-9a-f]\/[0-9a-f]{2}\/[^/?#]+\/)(\d+)(px-[^/?#]+)$/i;
+var WIKIMEDIA_THUMB_WIDTHS = /* @__PURE__ */ new Set([20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840]);
 function wikimediaThumbnail(url) {
+  const thumb = WIKIMEDIA_THUMB.exec(url);
+  if (thumb) return WIKIMEDIA_THUMB_WIDTHS.has(Number(thumb[2])) ? url : `${thumb[1]}1280${thumb[3]}`;
   const match = WIKIMEDIA_ORIGINAL.exec(url);
   if (!match) return url;
   const [, project, a, ab, file] = match;

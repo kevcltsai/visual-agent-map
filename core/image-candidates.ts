@@ -14,7 +14,8 @@ export function imageMarkdown(candidate: ImageCandidate): string {
 const WIKIMEDIA_ORIGINAL =
   /^https:\/\/upload\.wikimedia\.org\/wikipedia\/([^/]+)\/([0-9a-f])\/([0-9a-f]{2})\/([^/?#]+\.(?:jpe?g|png|gif|webp))$/i;
 
-const WIKIMEDIA_THUMB = /^(https:\/\/upload\.wikimedia\.org\/wikipedia\/[^/]+\/thumb\/[0-9a-f]\/[0-9a-f]{2}\/[^/?#]+\/)(\d+)(px-[^/?#]+)$/i;
+const WIKIMEDIA_THUMB =
+  /^(https:\/\/upload\.wikimedia\.org\/wikipedia\/[^/]+\/thumb\/[0-9a-f]\/[0-9a-f]{2}\/[^/?#]+\/)(\d+)(px-[^/?#]+)$/i;
 /** The thumbnail widths Wikimedia serves; any other width answers 400 (measured 2026-11-14: 320, 640 and 800 fail). */
 const WIKIMEDIA_THUMB_WIDTHS = new Set([20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840]);
 

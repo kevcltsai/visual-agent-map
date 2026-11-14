@@ -47,7 +47,7 @@ export const MAP_CHAT_TURN_CHAR_LIMIT = 6_000;
 export const MAP_CHAT_USER_TEXT_CHAR_LIMIT = 4_000;
 /** The fixed note sent when any part of the context was shortened (a constant, never built from the content). */
 export const MAP_CHAT_SHORTENED_NOTE =
-  "This context was shortened to fit what you can read. A part with truncated: true holds only the beginning of its text (totalChars is its whole length); outlineSummariesOmitted: true means the outline cards are sent without their summaries; outlineOmitted counts cards left out of the outline (those deeper than outlineDepthLimit, or past the card limit), and they still exist on the map; earlierTurnsOmitted counts older conversation messages left out. Text that was cut or left out is not in front of you: never say or imply that you read, used or checked it, and build nothing from it. When the user's request needs that part, say it was not sent this time. A truncated file has no contentHash and cannot be edited.";
+  "This context was shortened to fit what you can read. A part with truncated: true holds only the beginning of its text (totalChars is its whole length); outlineSummariesOmitted: true means the outline cards are sent without their summaries; outlineOmitted counts cards left out of the outline (those deeper than outlineDepthLimit, or past the card limit), and they still exist on the map; earlierTurnsOmitted counts older conversation messages left out; a card with detailOmitted: true is sent without its Detail; researchDeferred lists research notes not sent this round. Text that was cut or left out is not in front of you: never say or imply that you read, used or checked it, and build nothing from it. When the user's request needs that part, say it was not sent this time. A truncated file has no contentHash and cannot be edited.";
 const TITLE_LIMIT = 200;
 const SUMMARY_LIMIT = 240;
 const ERROR_LIMIT = 200;
@@ -487,17 +487,22 @@ function* shrinkSteps(input: MapChatContextInput): Generator<Shrink> {
   for (let kept = windowed - 2; kept >= 2; kept -= 2) yield { ...step, turns: (step.turns = kept) };
   yield { ...step, outlineSummaries: (step.outlineSummaries = false) };
   const deepest = input.outline.reduce((max, node) => Math.max(max, node.depth), 0);
-  for (let depth = deepest - 1; depth >= 1; depth--) yield { ...step, outlineDepth: (step.outlineDepth = depth) };
+  // One level at a time on an ordinary map; a very deep one drops about a quarter of its levels per step, so the rebuilds stay few.
+  for (let depth = deepest - 1; depth >= 1; depth -= Math.max(1, Math.floor(depth / 4)))
+    yield { ...step, outlineDepth: (step.outlineDepth = depth) };
   const research = input.researchBudget ?? MAP_CHAT_RESEARCH_BUDGET;
   if ((input.researchNotes ?? []).length)
     for (const share of [2, 4, 8, Infinity])
       yield { ...step, researchBudget: (step.researchBudget = Math.floor(research / share)) };
-  yield { ...step, fileChars: (step.fileChars = 30_000) };
-  yield { ...step, referencesDetail: (step.referencesDetail = false) };
-  for (const chars of [15_000, 8_000, 4_000, 2_000]) yield { ...step, fileChars: (step.fileChars = chars) };
+  // Steps that would change nothing (no file, no referenced or selected Detail) are skipped: each one is a whole rebuild.
+  const hasFiles = input.files.length > 0 || !!input.activeFile;
+  if (hasFiles) yield { ...step, fileChars: (step.fileChars = 30_000) };
+  if (input.references.some(ref => ref.detail.length)) yield { ...step, referencesDetail: (step.referencesDetail = false) };
+  if (hasFiles) for (const chars of [15_000, 8_000, 4_000, 2_000]) yield { ...step, fileChars: (step.fileChars = chars) };
   const detail = input.detailBudget ?? MAP_CHAT_DETAIL_BUDGET;
-  for (const share of [2, 4, 12, Infinity])
-    yield { ...step, detailBudget: (step.detailBudget = Math.floor(detail / share)) };
+  if (input.selected.some(ref => ref.detail.length))
+    for (const share of [2, 4, 12, Infinity])
+      yield { ...step, detailBudget: (step.detailBudget = Math.floor(detail / share)) };
   yield { ...step, outlineDepth: (step.outlineDepth = 0) };
   yield { ...step, turns: (step.turns = 0) };
 }
@@ -514,12 +519,17 @@ function historyWindow(input: MapChatContextInput): MapChatTurn[] {
  */
 export function buildMapChatContext(input: MapChatContextInput): MapChatContext {
   const budget = input.tokenBudget ?? MAP_CHAT_CONTEXT_TOKEN_BUDGET;
-  let built: MapChatContext | null = null;
-  for (const shrink of shrinkSteps(input)) {
-    built = buildOnce(input, shrink);
+  const steps = [...shrinkSteps(input)];
+  const first = buildOnce(input, steps[0]);
+  if (steps.length === 1 || estimateMapChatTokens(first.json) <= budget) return first;
+  // When even the last step is over (an uncut part such as a huge snippet), the step refuses it: do not rebuild every step first.
+  const last = buildOnce(input, steps[steps.length - 1]);
+  if (estimateMapChatTokens(last.json) > budget) return last;
+  for (const shrink of steps.slice(1, -1)) {
+    const built = buildOnce(input, shrink);
     if (estimateMapChatTokens(built.json) <= budget) return built;
   }
-  return built as MapChatContext;
+  return last;
 }
 
 function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
@@ -549,6 +559,8 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
     ids.add(ref.id);
     const node = byId.get(ref.id);
     const withDetail = (withLinks || shrink.referencesDetail) && ref.detail.length <= detailLeft;
+    // Detail dropped by a budget step (not by the ordinary Detail budget) counts as shortened, so the note explains detailOmitted.
+    if (!withDetail && ref.detail.length && (shrink.detailBudget !== null || !shrink.referencesDetail)) shortened = true;
     if (withDetail) {
       detailLeft -= ref.detail.length;
       wholeSent.add(ref.id);
@@ -665,6 +677,8 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
     wholeSent,
     researchBudget
   );
+  // A note deferred because a budget step lowered this round's research allowance counts as shortened.
+  if (shrink.researchBudget !== null && research.deferred.length) shortened = true;
   for (const note of research.sent) {
     basis.cards[note.id] = { title: note.title, research: true };
     basis.read.push({ id: note.id, path: note.path, title: note.title });

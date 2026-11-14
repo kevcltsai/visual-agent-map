@@ -9,7 +9,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { CASES } = require('./tools/map-chat-eval/cases.cjs');
 const { LARGE, zhText, NOT_READ } = require('./tools/map-chat-eval/size.cjs');
-const { prepare, product, evaluate, runCase, caseHash, usageTokens, LARGE_GROUP } = require('./tools/map-chat-eval.cjs');
+const { prepare, product, evaluate, runCase, caseHash, usageTokens, LARGE_GROUP, report } = require('./tools/map-chat-eval.cjs');
 const { MAP_CHAT_DETAIL_BUDGET, MAP_CHAT_RESEARCH_BUDGET } = require('./support-replay.cjs').load('core/map-chat-context.ts');
 
 const p = product();
@@ -159,4 +159,17 @@ test('compare: shows characters and real input tokens per case, and "—" where 
   assert.match(out, /\| A1 \| 1000 → 2000 \| 400 → 1400 \| 1000 → 2500 \| 1\.00 → 1\.25 \| — → — \|/);
   assert.match(cmp('old', 'b'), /\| A1 \| — → 2000 \| — → 1400 \| — → 2500 \| — → 1\.25 \| — → — \|/);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('report and compare: a refused request is a failed case in the pass rate, not left out of it', () => {
+  const a1 = byId('A1');
+  const ok = { id: 'A1', run: 1, caseHash: caseHash(a1), raw: '{}', status: 'ok', checks: [{ id: 'noActions', ok: true }] };
+  const refused = { id: 'A1', run: 2, caseHash: caseHash(a1), status: 'refused', refused: 'over_budget', checks: [] };
+  assert.match(report([a1], [ok, refused], 2, 'haiku', 't'), /題目通過 1\/2/);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-refused-'));
+  const write = (slug, results) => { fs.mkdirSync(path.join(dir, slug), { recursive: true }); fs.writeFileSync(path.join(dir, slug, 'results.json'), JSON.stringify({ meta: {}, results })); };
+  write('a', [ok, { ...ok, run: 2 }]);
+  write('b', [ok, refused]);
+  const out = spawnSync('node', [path.join(__dirname, 'tools/map-chat-eval.cjs'), 'compare', `--out=${dir}`, '--a=a', '--b=b'], { encoding: 'utf8' }).stdout;
+  assert.match(out, /整題通過 2\/2 → 1\/2/);
 });

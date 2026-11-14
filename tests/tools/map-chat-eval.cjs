@@ -369,7 +369,7 @@ function report(cases, results, runs, model, slug) {
   const casePass = results.filter(r => r.raw && r.status === "ok" && r.checks.every(c => c.ok || c.diag)).length;
   lines.push(`統計上限：每題只跑 ${runs} 次，即使全部通過，也只能說失敗率上限約 ${(zeroFailureBound(runs) * 100).toFixed(0)}%（單側 95%，且只在「事先指定條件、獨立同分布」下成立；要壓到 5% 需要約 59 次）。一題的 N 次不是 N 個獨立使用情境。`, "");
   if (refused) lines.push(`產品在送出前拒絕 ${refused} 次（over_budget 等；沒有呼叫模型，不算在呼叫成功率裡，但每一題都是使用者會送的請求，被拒絕就是失敗）。`, "");
-  lines.push(`呼叫成功率 ${received}/${calls - refused}（基礎設施失敗 ${errored} 次）；可解析率 ${received - parseErrors}/${received}（產品會整則拒絕的壞格式 ${parseErrors} 次）；題目通過 ${casePass}/${received}（只算任務檢查；壞格式算失敗；語氣與格式屬「診斷」，另列）。`, "");
+  lines.push(`呼叫成功率 ${received}/${calls - refused}（基礎設施失敗 ${errored} 次）；可解析率 ${received - parseErrors}/${received}（產品會整則拒絕的壞格式 ${parseErrors} 次）；題目通過 ${casePass}/${received + refused}（只算任務檢查；壞格式與送出前被拒絕都算失敗；語氣與格式屬「診斷」，另列）。`, "");
   lines.push(`呼叫 ${calls} 次（失敗 ${errored} 次）；檢查項 ${allChecks.length} 條，全部通過 ${allChecks.filter(r => r.passes === r.total && r.total > 0).length} 條，有任一次失敗 ${allChecks.filter(r => r.passes < r.total).length} 條。`, "");
   const failing = sum.filter(s => s.rows.some(r => r.passes < r.total) || s.errors || s.parseErrors || s.refused);
   const weak = sum.filter(s => s.kase.weak);
@@ -432,7 +432,8 @@ function compare() {
     if (x && y) (x === y ? same : changed).push(id); else (x ? removed : added).push(id);
   }
   lines.push("", `題目：相同 ${same.length}，定義已變更 ${changed.length}${changed.length ? `（${changed.join("、")}）` : ""}，新增 ${added.length}${added.length ? `（${added.join("、")}）` : ""}，移除 ${removed.length}${removed.length ? `（${removed.join("、")}）` : ""}。只比較「相同」的題目。`, "");
-  const stat = (data, id) => { const rs = data.results.filter(r => r.id === id && r.raw); return { n: rs.length, ok: rs.filter(r => r.status === "ok" && r.checks.every(c => c.ok || c.diag)).length, refused: data.results.filter(r => r.id === id && r.status === "refused").length }; };
+  // A refused request counts in the denominator: it is a request the user really sends, and it failed.
+  const stat = (data, id) => { const rs = data.results.filter(r => r.id === id && r.raw); const refused = data.results.filter(r => r.id === id && r.status === "refused").length; return { n: rs.length + refused, ok: rs.filter(r => r.status === "ok" && r.checks.every(c => c.ok || c.diag)).length, refused }; };
   const diffs = [];
   for (const id of same) {
     const kase = CASES.find(k => k.id === id);
@@ -479,4 +480,4 @@ if (require.main === module) {
 }
 
 const callClaudeForCorpus = (p, prompt, schema, model) => callClaude(p, prompt, schema, model);
-module.exports = { zeroFailureBound, callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, runCase, rawLayer, caseHash, flowHash, stableSerialize, usageTokens, LARGE_GROUP };
+module.exports = { report, zeroFailureBound, callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, runCase, rawLayer, caseHash, flowHash, stableSerialize, usageTokens, LARGE_GROUP };

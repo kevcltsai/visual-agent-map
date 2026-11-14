@@ -24257,7 +24257,7 @@ var MAP_CHAT_OUTLINE_CARD_LIMIT = 1500;
 var MAP_CHAT_FILE_CHAR_LIMIT = 6e4;
 var MAP_CHAT_TURN_CHAR_LIMIT = 6e3;
 var MAP_CHAT_USER_TEXT_CHAR_LIMIT = 4e3;
-var MAP_CHAT_SHORTENED_NOTE = "This context was shortened to fit what you can read. A part with truncated: true holds only the beginning of its text (totalChars is its whole length); outlineSummariesOmitted: true means the outline cards are sent without their summaries; outlineOmitted counts cards left out of the outline (those deeper than outlineDepthLimit, or past the card limit), and they still exist on the map; earlierTurnsOmitted counts older conversation messages left out. Text that was cut or left out is not in front of you: never say or imply that you read, used or checked it, and build nothing from it. When the user's request needs that part, say it was not sent this time. A truncated file has no contentHash and cannot be edited.";
+var MAP_CHAT_SHORTENED_NOTE = "This context was shortened to fit what you can read. A part with truncated: true holds only the beginning of its text (totalChars is its whole length); outlineSummariesOmitted: true means the outline cards are sent without their summaries; outlineOmitted counts cards left out of the outline (those deeper than outlineDepthLimit, or past the card limit), and they still exist on the map; earlierTurnsOmitted counts older conversation messages left out; a card with detailOmitted: true is sent without its Detail; researchDeferred lists research notes not sent this round. Text that was cut or left out is not in front of you: never say or imply that you read, used or checked it, and build nothing from it. When the user's request needs that part, say it was not sent this time. A truncated file has no contentHash and cannot be edited.";
 var TITLE_LIMIT = 200;
 var SUMMARY_LIMIT = 240;
 var ERROR_LIMIT = 200;
@@ -24393,17 +24393,20 @@ function* shrinkSteps(input2) {
   for (let kept = windowed - 2; kept >= 2; kept -= 2) yield { ...step, turns: step.turns = kept };
   yield { ...step, outlineSummaries: step.outlineSummaries = false };
   const deepest = input2.outline.reduce((max, node) => Math.max(max, node.depth), 0);
-  for (let depth = deepest - 1; depth >= 1; depth--) yield { ...step, outlineDepth: step.outlineDepth = depth };
+  for (let depth = deepest - 1; depth >= 1; depth -= Math.max(1, Math.floor(depth / 4)))
+    yield { ...step, outlineDepth: step.outlineDepth = depth };
   const research = (_a2 = input2.researchBudget) != null ? _a2 : MAP_CHAT_RESEARCH_BUDGET;
   if (((_b2 = input2.researchNotes) != null ? _b2 : []).length)
     for (const share of [2, 4, 8, Infinity])
       yield { ...step, researchBudget: step.researchBudget = Math.floor(research / share) };
-  yield { ...step, fileChars: step.fileChars = 3e4 };
-  yield { ...step, referencesDetail: step.referencesDetail = false };
-  for (const chars of [15e3, 8e3, 4e3, 2e3]) yield { ...step, fileChars: step.fileChars = chars };
+  const hasFiles = input2.files.length > 0 || !!input2.activeFile;
+  if (hasFiles) yield { ...step, fileChars: step.fileChars = 3e4 };
+  if (input2.references.some((ref) => ref.detail.length)) yield { ...step, referencesDetail: step.referencesDetail = false };
+  if (hasFiles) for (const chars of [15e3, 8e3, 4e3, 2e3]) yield { ...step, fileChars: step.fileChars = chars };
   const detail = (_c = input2.detailBudget) != null ? _c : MAP_CHAT_DETAIL_BUDGET;
-  for (const share of [2, 4, 12, Infinity])
-    yield { ...step, detailBudget: step.detailBudget = Math.floor(detail / share) };
+  if (input2.selected.some((ref) => ref.detail.length))
+    for (const share of [2, 4, 12, Infinity])
+      yield { ...step, detailBudget: step.detailBudget = Math.floor(detail / share) };
   yield { ...step, outlineDepth: step.outlineDepth = 0 };
   yield { ...step, turns: step.turns = 0 };
 }
@@ -24415,12 +24418,16 @@ function historyWindow(input2) {
 function buildMapChatContext(input2) {
   var _a2;
   const budget = (_a2 = input2.tokenBudget) != null ? _a2 : MAP_CHAT_CONTEXT_TOKEN_BUDGET;
-  let built = null;
-  for (const shrink of shrinkSteps(input2)) {
-    built = buildOnce(input2, shrink);
+  const steps = [...shrinkSteps(input2)];
+  const first = buildOnce(input2, steps[0]);
+  if (steps.length === 1 || estimateMapChatTokens(first.json) <= budget) return first;
+  const last = buildOnce(input2, steps[steps.length - 1]);
+  if (estimateMapChatTokens(last.json) > budget) return last;
+  for (const shrink of steps.slice(1, -1)) {
+    const built = buildOnce(input2, shrink);
     if (estimateMapChatTokens(built.json) <= budget) return built;
   }
-  return built;
+  return last;
 }
 function buildOnce(input2, shrink) {
   var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
@@ -24454,6 +24461,7 @@ function buildOnce(input2, shrink) {
     ids2.add(ref.id);
     const node = byId.get(ref.id);
     const withDetail = (withLinks2 || shrink.referencesDetail) && ref.detail.length <= detailLeft;
+    if (!withDetail && ref.detail.length && (shrink.detailBudget !== null || !shrink.referencesDetail)) shortened = true;
     if (withDetail) {
       detailLeft -= ref.detail.length;
       wholeSent.add(ref.id);
@@ -24557,6 +24565,7 @@ function buildOnce(input2, shrink) {
     wholeSent,
     researchBudget
   );
+  if (shrink.researchBudget !== null && research.deferred.length) shortened = true;
   for (const note of research.sent) {
     basis.cards[note.id] = { title: note.title, research: true };
     basis.read.push({ id: note.id, path: note.path, title: note.title });

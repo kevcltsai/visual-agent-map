@@ -238,3 +238,64 @@ test('a context that cannot be shortened enough (a huge selected snippet) is sti
   const built = buildMapChatContext({ ...base, snippets: [{ path: 'n.md', text: '中'.repeat(130_000) }] });
   assert.throws(() => prepareStep(mapChatStep, { message: '整理', context: built, language: 'zh-TW', model: 'claude:haiku', reasoning: 'low' }), error => error.code === 'over_budget');
 });
+
+// ---- review fixes (2026-11-14) ----
+
+/** How many builds `build(input)` takes: each build reads `mapTitle` the same number of times, and choosing the steps never does. */
+function builds(input) {
+  let reads = 0;
+  const counted = Object.defineProperty({ ...input }, 'mapTitle', { get: () => (reads++, '地圖'), enumerable: true });
+  buildMapChatContext(counted);
+  return reads;
+}
+
+test('a context that can never fit (huge snippet, deep map, files, long history) is refused after about two builds, not one per shrink step', () => {
+  const outline = [node('r', '根', null, 0)];
+  for (let i = 1; i < 61; i++) outline.push(node(`n${i}`, `卡${i}`, i === 1 ? 'r' : `n${i - 1}`, i, zhText(200, i)));
+  const input = {
+    ...base,
+    outline,
+    selected: [{ id: 'n1', title: '卡1', summary: '', detail: zhText(20_000, 3), path: 'Maps/Notes/n1.md' }],
+    snippets: [{ path: 'a.md', text: zhText(110_000, 4) }],
+    files: [{ path: 'b.md', content: zhText(60_000, 5) }],
+    history: Array.from({ length: 12 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', text: zhText(6000, i + 6) }))
+  };
+  const one = builds({ ...input, tokenBudget: Infinity });
+  assert.ok(one > 0);
+  const refused = builds(input);
+  assert.ok(refused <= one * 2, `refused after ${refused / one} builds`);
+  assert.ok(estimateMapChatTokens(buildMapChatContext(input).json) > MAP_CHAT_CONTEXT_TOKEN_BUDGET);
+});
+
+test('a 60-level map that does fit after shortening its outline takes far fewer builds than one per level', () => {
+  const outline = [node('r', '根', null, 0)];
+  for (let i = 1; i < 61; i++) outline.push(node(`n${i}`, zhText(100, i), i === 1 ? 'r' : `n${i - 1}`, i, zhText(300, i)));
+  const input = { ...base, outline, tokenBudget: 3_000 };
+  const one = builds({ ...input, tokenBudget: Infinity });
+  assert.ok(one > 0);
+  const built = builds(input);
+  assert.ok(built / one <= 25, `${built / one} builds`);
+  const out = JSON.parse(buildMapChatContext(input).json);
+  assert.ok(out.outlineOmitted > 0 && out.outlineOmitted < 55 && out.shortenedNote, `the outline was shortened and says so (${out.outlineOmitted} left out)`);
+  assert.ok(estimateMapChatTokens(buildMapChatContext(input).json) <= 3_000, 'it fits');
+});
+
+test('when the budget drops only Detail or only research notes, the context still carries the shortened note, which explains both', () => {
+  const ref = (id, n) => ({ id, title: id, summary: id, detail: zhText(n, id.length + 70), path: `Maps/Notes/${id}.md` });
+  const detailOnly = { ...base, outline: [node('r', '根', null, 0), node('a', 'a', 'r', 1)], selected: [ref('a', 40_000)] };
+  const full = estimateMapChatTokens(buildMapChatContext(detailOnly).json);
+  const out = JSON.parse(buildMapChatContext({ ...detailOnly, tokenBudget: Math.floor(full / 2) }).json);
+  assert.equal(out.selected[0].detailOmitted, true);
+  assert.equal(out.shortenedNote, MAP_CHAT_SHORTENED_NOTE);
+  assert.match(MAP_CHAT_SHORTENED_NOTE, /detailOmitted/);
+  assert.match(MAP_CHAT_SHORTENED_NOTE, /researchDeferred/);
+  const researchOnly = { ...base, outline: [node('r', '根', null, 0), node('q', 'q', 'r', 1)], researchNotes: [{ id: 'q', title: 'q', path: 'Maps/Notes/q.md', detail: zhText(40_000, 80) }] };
+  const rFull = estimateMapChatTokens(buildMapChatContext(researchOnly).json);
+  const rOut = JSON.parse(buildMapChatContext({ ...researchOnly, tokenBudget: Math.floor(rFull / 2) }).json);
+  assert.equal(rOut.researchDeferred[0].id, 'q');
+  assert.equal(rOut.shortenedNote, MAP_CHAT_SHORTENED_NOTE);
+  // The ordinary Detail budget (no total budget involved) is unchanged: detailOmitted alone, no shortened note.
+  const ordinary = JSON.parse(buildMapChatContext({ ...detailOnly, selected: [ref('a', 70_000)] }).json);
+  assert.equal(ordinary.selected[0].detailOmitted, true);
+  assert.equal(ordinary.shortenedNote, undefined);
+});

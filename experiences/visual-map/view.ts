@@ -1268,6 +1268,8 @@ const CHAT_TOOLS_GAP = 12;
 const GOAL_SUGGEST_GAP = 6;
 /** Picture searches of one reply that run at the same time; the others wait. */
 const CHAT_IMAGE_SEARCH_PARALLEL = 3;
+/** One card of one map, for the picture searches that are queued or running. */
+const chatImageTopicKey = (mapId: string, nodeId: string): string => `${mapId}\u0000${nodeId}`;
 /** The longest search words a picture search may carry. */
 const CHAT_IMAGE_QUERY_MAX = 80;
 /** How long the cover picture may take to download before the card keeps only the picture in its Detail. */
@@ -25543,15 +25545,23 @@ export class VisualAgentMapView extends ItemView {
     if (!map || !chat) return skipped("ui.map_chat_skip_map_changed");
     const wanted = targets.length ? targets : this.chatSelectionIds();
     if (!wanted.length) return skipped("ui.map_chat_skip_images_one_card");
-    // A card is searched once per reply.
-    const ids = [...new Set(wanted)].filter(id => !batch.imageNodes.has(id));
+    // A card is searched once per reply, and not again while a search of it in this map is queued or running.
+    const ids = [...new Set(wanted)].filter(
+      id => !batch.imageNodes.has(id) && !this.chatImageTopics.has(chatImageTopicKey(map.id, id))
+    );
     if (!ids.length) return skipped("ui.map_chat_skip_images_dup");
     for (const id of ids) batch.imageNodes.add(id);
     const anchor = { path: this.path, id: map.id };
     // Web text can reach the model once research ran: the search words then come from the cards' own titles, never from the model.
     const readsResearch = this.chatStartedResearch || this.chatReadsSources || continuation;
     const words = readsResearch ? "" : cleanImageQuery(direction);
-    const jobs: { block: MapChatImages; controller: AbortController; model: string; key?: number }[] = [];
+    const jobs: {
+      block: MapChatImages;
+      controller: AbortController;
+      model: string;
+      key?: number;
+      release?: () => void;
+    }[] = [];
     const blocks: MapChatImages[] = [];
     for (const id of ids) {
       const node = map.nodes.find(item => item.id === id);
@@ -25612,6 +25622,14 @@ export class VisualAgentMapView extends ItemView {
       return skipped("ui.map_chat_skip_map_changed");
     for (const job of jobs) {
       const { block, controller } = job;
+      // The card counts as being searched from here until its job ends, fails or is stopped (any abort releases it).
+      const topic = chatImageTopicKey(anchor.id, block.nodeId);
+      this.chatImageTopics.set(topic, controller);
+      const release = (): void => {
+        if (this.chatImageTopics.get(topic) === controller) this.chatImageTopics.delete(topic);
+      };
+      job.release = release;
+      controller.signal.addEventListener("abort", release, { once: true });
       const key = ++this.chatImageSequence;
       this.chatImageSearches.set(key, controller);
       job.key = key;
@@ -25636,6 +25654,7 @@ export class VisualAgentMapView extends ItemView {
         try {
           await this.runImageSearch(job.block, job.controller, chat, job.model);
         } finally {
+          job.release?.();
           this.releaseImageSlot();
           if (job.key !== undefined && this.chatImageSearches.get(job.key) === job.controller)
             this.chatImageSearches.delete(job.key);
@@ -25643,6 +25662,8 @@ export class VisualAgentMapView extends ItemView {
       })();
     return { status: "done", images: batch.group };
   }
+  /** Cards of a map with a queued or running picture search (key: chatImageTopicKey), with the search's controller. */
+  private chatImageTopics = new Map<string, AbortController>();
   private chatImageRunning = 0;
   private chatImageWaiters: (() => void)[] = [];
   private async acquireImageSlot(): Promise<void> {

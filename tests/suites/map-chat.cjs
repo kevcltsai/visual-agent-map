@@ -8782,3 +8782,41 @@ integrationTest('ticket 04 edit_topic_note: duplicate embeds in the new Detail a
   eq(edit.map(l => l.status), ['done'], JSON.stringify(edit));
   assert.equal(h.contents.get('Notes/Research.md'), '# R\n\n![Pic 0](<https://img.example/0.jpg>)\n\nSleep needs darkness.\n\n![Pic 1](https://img.example/1.jpg)\n');
 });
+
+// Ticket 05: a card with a queued or running picture search in this map is not searched again by a later find_images.
+const DUP_SKIP = 'this topic was already searched in this reply';
+integrationTest('ticket 05 find_images: a second request for a card whose search is running, or still queued, is skipped with the existing line', async () => {
+  const { h } = await imageHarness();
+  const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(1); };
+  // Three searches fill the parallel places (root, a, b); c waits in the queue.
+  const first = await apply(h, [findAct(h, null, { nodeIds: [h.ids.root, h.ids.a, h.ids.b, h.ids.c] })]);
+  eq(first.map(l => l.status), ['done'], JSON.stringify(first));
+  await withTimeout(until(() => h.control.searches.length === 3));
+  const running = await apply(h, [findAct(h, 'a')]);
+  eq(running.map(l => l.status), ['skipped'], JSON.stringify(running)); assert.match(running[0].text, new RegExp(DUP_SKIP));
+  const queued = await apply(h, [findAct(h, 'c')]);
+  eq(queued.map(l => l.status), ['skipped'], JSON.stringify(queued)); assert.match(queued[0].text, new RegExp(DUP_SKIP));
+  assert.equal(h.control.searches.length, 3, 'no search was started for either');
+  gate.resolve(); await waitImages(h);
+  assert.equal(h.control.searches.length, 4, 'the queued card ran once, as its own search');
+});
+integrationTest('ticket 05 find_images: after the search was stopped, or failed, or finished, the card can be searched again', async () => {
+  const { h } = await imageHarness();
+  const gate = deferred(); h.control.search = async (_q, _m, signal) => { await Promise.race([gate.promise, new Promise(resolve => signal.addEventListener('abort', resolve, { once: true }))]); return imageItems(1); };
+  await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => h.control.searches.length === 1));
+  allImages(h).at(-1).stop();
+  assert.equal(allImages(h).at(-1).state, 'stopped');
+  const afterStop = await apply(h, [findAct(h, 'a')]);
+  eq(afterStop.map(l => l.status), ['done'], `stopped: searched again ${JSON.stringify(afterStop)}`);
+  gate.resolve(); await withTimeout(until(() => imagesDone(h)));
+  h.control.search = async () => { throw new Error('search boom'); };
+  const failing = await apply(h, [findAct(h, 'b')]); eq(failing.map(l => l.status), ['done']);
+  await withTimeout(until(() => allImages(h).at(-1).state === 'failed'));
+  h.control.search = async () => imageItems(1);
+  const afterFail = await apply(h, [findAct(h, 'b')]);
+  eq(afterFail.map(l => l.status), ['done'], `failed: searched again ${JSON.stringify(afterFail)}`);
+  await withTimeout(until(() => imagesDone(h)));
+  const afterDone = await apply(h, [findAct(h, 'b')]);
+  eq(afterDone.map(l => l.status), ['done'], 'finished: searched again');
+  await withTimeout(until(() => imagesDone(h)));
+});

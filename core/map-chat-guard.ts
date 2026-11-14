@@ -63,14 +63,24 @@ function frontmatterBlock(content: string): string | null {
   return match ? match[1] : null;
 }
 
+/**
+ * One top-level `key: value` line: the key (a key may be wrapped in single or double quotes, `"node-id": x`; YAML reads it
+ * as the same key) and the value trimmed and unquoted; null for any other line.
+ */
+function keyLine(line: string): { key: string; value: string } | null {
+  const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
+  if (!match) return null;
+  return { key: match[1] ?? match[2] ?? match[3], value: match[4].replace(/^(["'])(.*)\1$/, "$2") };
+}
+
 /** Top-level `key: value` lines of a front matter block, value trimmed and unquoted. Enough to compare identity keys. */
 function topLevelValues(block: string | null, keys: readonly string[]): Map<string, string> {
   const found = new Map<string, string>();
   if (block === null) return found;
   for (const line of block.split(/\r?\n/)) {
-    const match = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
-    if (!match || !keys.includes(match[1]) || found.has(match[1])) continue;
-    found.set(match[1], match[2].replace(/^(["'])(.*)\1$/, "$2"));
+    const entry = keyLine(line);
+    if (!entry || !keys.includes(entry.key) || found.has(entry.key)) continue;
+    found.set(entry.key, entry.value);
   }
   return found;
 }
@@ -83,11 +93,8 @@ function hypothesisLines(block: string | null): string[] {
   if (block === null) return [];
   const found: string[] = [];
   for (const line of block.split(/\r?\n/)) {
-    // A key may be wrapped in single or double quotes (`"topic-kind": hypothesis`); YAML reads it as the same key.
-    const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
-    const key = match ? (match[1] ?? match[2] ?? match[3]) : undefined;
-    if (match && key !== undefined && HYPOTHESIS_KEYS.includes(key))
-      found.push(`${key}=${match[4].replace(/^(["'])(.*)\1$/, "$2")}`);
+    const entry = keyLine(line);
+    if (entry && HYPOTHESIS_KEYS.includes(entry.key)) found.push(`${entry.key}=${entry.value}`);
   }
   return found;
 }
@@ -97,10 +104,10 @@ function hasDuplicateIdentityKey(block: string | null): boolean {
   if (block === null) return false;
   const seen = new Set<string>();
   for (const line of block.split(/\r?\n/)) {
-    const match = line.match(/^([A-Za-z0-9_-]+)\s*:/);
-    if (!match || !TOPIC_IDENTITY_KEYS.includes(match[1])) continue;
-    if (seen.has(match[1])) return true;
-    seen.add(match[1]);
+    const entry = keyLine(line);
+    if (!entry || !TOPIC_IDENTITY_KEYS.includes(entry.key)) continue;
+    if (seen.has(entry.key)) return true;
+    seen.add(entry.key);
   }
   return false;
 }

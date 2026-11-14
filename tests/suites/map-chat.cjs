@@ -7376,7 +7376,7 @@ integrationTest('P3 records: an automatic round is written with auto and its rou
   chainReplies(h, say('Added.', [{ kind: 'add_child', parentId: rootId, title: 'Alpha', summary: '' }], 'Still more'), async () => { throw new Error('boom'); });
   settleRun(runs[0]); await until(() => h.control.requests.length === 3 && h.view.chatChain === null); await recordIdle(h);
   const [file] = recordFiles(h); const lines = recordLines(h, file);
-  eq(lineKinds(lines), ['conversation', 'turn_start', 'event:research_started', 'end:done', 'turn_start', 'end:done', 'turn_start', 'end:failed', 'event:chain_end']); // R5: the research mark (decision #17)
+  eq(lineKinds(lines), ['conversation', 'turn_start', 'event:research_started', 'event:research_batch', 'end:done', 'event:research_batch_end', 'turn_start', 'end:done', 'turn_start', 'end:failed', 'event:chain_end']); // R5: the research mark (decision #17); the batch the chat started is written with its start and end (batch-interrupted note)
   const starts = lines.filter(l => l.type === 'turn_start'); eq(starts.map(s => [s.auto ?? false, s.round ?? 0]), [[false, 0], [true, 2], [true, 3]]);
   eq(lines.filter(l => l.type === 'turn_end')[1].lines[0].basis.kind, 'research'); eq(lines.at(-1).reason, 'failed'); eq(lines.at(-1).remaining, 'Still more');
   const again = await harness({ records: true }); const { restoreConversation } = load('core/map-chat-records.ts'); const restored = restoreConversation('x', lines);

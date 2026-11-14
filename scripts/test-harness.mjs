@@ -94,7 +94,8 @@ function ensureNativeMenusOff(vault) {
 export function updateCurrentTestVault({ vault = canonicalVault, artifact = root, source = {}, owner = canonicalVault } = {}) {
   if (!existsSync(vault) || lstatSync(vault).isSymbolicLink() || !lstatSync(vault).isDirectory() || !existsSync(join(vault, marker))) throw new Error("Refusing to update a missing or unowned test vault.");
   const recordPath = join(vault, marker), record = json(recordPath);
-  if (record.owner !== realpathSync(root) || record.kind !== "vam-disposable-test-vault") throw new Error(`Refusing to update a test vault owned by another checkout: ${ownerCheckoutState(record.owner)}. Run --update-current from that checkout once it is on main; if another session holds it, tell the session that opened you what you are waiting for.`);
+  if (record.kind !== "vam-disposable-test-vault") throw new Error("Refusing to update a missing or unowned test vault.");
+  if (record.owner !== realpathSync(root)) throw new Error(`Refusing to update a test vault owned by another checkout: ${ownerCheckoutState(record.owner)}. Run --update-current from that checkout once it is on main; if another session holds it, tell the session that opened you what you are waiting for.`);
   const manifest = json(join(artifact, "manifest.json"));
   const plugin = join(vault, ".obsidian/plugins/visual-agent-map");
   if (!existsSync(plugin) || lstatSync(plugin).isSymbolicLink() || !lstatSync(plugin).isDirectory()) throw new Error("Refusing an invalid installed plugin directory.");

@@ -124,6 +124,9 @@
           "otherProvider": {
             "type": "boolean"
           },
+          "rewrite": {
+            "type": "boolean"
+          },
           "topicKind": {
             "type": "string",
             "enum": [
@@ -315,6 +318,7 @@
           "images",
           "needsWeb",
           "otherProvider",
+          "rewrite",
           "topicKind",
           "leaning",
           "strength",

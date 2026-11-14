@@ -23,6 +23,8 @@ export interface MultiResearchRequest {
    * topic); undefined keeps each topic's own style.
    */
   noteStyle?: string;
+  /** Map chat only: the user asked for a whole rewrite, so every started topic is written back "fresh" (backup, then replace) this batch only. */
+  rewrite?: boolean;
 }
 
 export class MultiResearchModal extends Modal {

@@ -8838,3 +8838,23 @@ integrationTest('ticket 05 find_images: after the search was stopped, or failed,
   eq(afterDone.map(l => l.status), ['done'], 'finished: searched again');
   await withTimeout(until(() => imagesDone(h)));
 });
+
+// ---- Full rewrite (issue rewrite-honors-request 01): research_standard with rewrite=true hands the flag to the batch -----------
+integrationTest('rewrite: research_standard with rewrite=true starts one research that carries rewrite; without it the request has no rewrite', async () => {
+  const h = await harness(); const started = startedResearch(h);
+  await apply(h, [researchAct({ nodeIds: [h.ids.a], rewrite: true })]);
+  assert.equal(started.length, 1); assert.equal(started[0].request.rewrite, true); eq(started[0].selected, [h.ids.a]);
+  await apply(h, [researchAct({ nodeIds: [h.ids.b] })]);
+  assert.equal(started.length, 2); assert.equal('rewrite' in started[1].request, false);
+});
+integrationTest('rewrite: the real startMultiResearch hands rewrite to every started topic of the batch; a request without it hands none', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const runs = [];
+  h.view.researchChild = async (child, _signal, accepted, choices, charts, done) => { runs.push({ id: child.id, rewrite: choices.rewrite }); accepted(); done?.({ retrievals: 0 }); };
+  for (const [fields, expected] of [[{ rewrite: true }, true], [{}, undefined]]) {
+    runs.length = 0; h.view.chatSelect([h.ids.a, h.ids.b]);
+    const request = chatResearchRequest(researchAct({ nodeIds: [h.ids.a, h.ids.b], mode: 'quick', ...fields }), undefined, m => aiModeOptions(m, 'research'));
+    await h.view.startMultiResearch(request); await withTimeout(until(() => runs.length === 2), 3000);
+    eq(runs.map(run => run.rewrite), [expected, expected]);
+  }
+});

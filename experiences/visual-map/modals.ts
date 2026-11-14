@@ -69,6 +69,8 @@ export interface TaskOptions {
   skipCharts?: boolean;
   /** Takes user additions while the run's main call is going (the topic chat window). Absent: the run takes none. */
   steer?: ResearchSteer;
+  /** A batch research the user asked to rewrite whole: written back "fresh" for this run only; the note style is not changed. */
+  rewrite?: boolean;
 }
 /** A model chosen for one run. Absent reasoning means the current model's. */
 export interface RunOnceModel {

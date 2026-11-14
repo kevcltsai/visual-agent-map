@@ -1133,7 +1133,8 @@ export class TopicRuns {
         ...overrides,
         detailTemplate,
         ...runStyle.contextFields,
-        updateMode: runStyle.updateMode,
+        // A run that asks for its own update mode (a whole rewrite from the map chat) wins over the style's.
+        updateMode: overrides.updateMode ?? runStyle.updateMode,
         addCharts: overrides.addCharts ?? true
       },
       note

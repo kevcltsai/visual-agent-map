@@ -137,6 +137,8 @@ export type MapChatAction =
       needsWeb?: true;
       /** research_standard: true = retry the targets on the other provider (this run only); the view honours it only for targets that offer `retryWith`. Present only when true. */
       otherProvider?: true;
+      /** research_standard: true = the user explicitly asked for the whole note to be rewritten; the write-back replaces it ("fresh", with a backup) for this run only. Present only when true. */
+      rewrite?: true;
     }
   /** Always the first action: a new map, opened for the rest of the reply. */
   | { kind: "create_map"; title: string }
@@ -318,6 +320,7 @@ export const MAP_CHAT_SCHEMA = {
           images: { type: "boolean" },
           needsWeb: { type: "boolean" },
           otherProvider: { type: "boolean" },
+          rewrite: { type: "boolean" },
           topicKind: { type: "string", enum: [...TOPIC_KINDS, ""] },
           leaning: { type: "string", enum: [...HYPOTHESIS_LEANINGS, ""] },
           strength: { type: "string", enum: [...HYPOTHESIS_STRENGTHS, ""] },
@@ -360,6 +363,7 @@ export const MAP_CHAT_SCHEMA = {
           "images",
           "needsWeb",
           "otherProvider",
+          "rewrite",
           "topicKind",
           "leaning",
           "strength",
@@ -665,7 +669,8 @@ export function parseMapChat(
             images: research && mode !== "quick" && flag("images"),
             // Only a boolean `true` counts: a missing field (an older reply) or a string "true" is false.
             ...(research && flag("needsWeb") ? { needsWeb: true as const } : {}),
-            ...(research && flag("otherProvider") ? { otherProvider: true as const } : {})
+            ...(research && flag("otherProvider") ? { otherProvider: true as const } : {}),
+            ...(research && flag("rewrite") ? { rewrite: true as const } : {})
           });
           break;
         }

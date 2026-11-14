@@ -58,6 +58,7 @@ async function harness({ style = 'builtin:ai-suggested', detail } = {}) {
     await until(() => contexts.length === before + 1 && !host.running.has(node.path));
     await until(() => true);
   };
+  run.queue = reply => { replies.push(reply); };
   return { repo, host, view, node, mapDoc, contexts, prompts, notices, jobs, read, run, settings, noteStyles };
 }
 
@@ -621,4 +622,39 @@ test('keepDroppedContent: a heading the new draft repeats is not a kept line, so
   const m5 = k('### 概況\nx\n\n### 更新紀錄\n- 2026-10-01\n\n## 附錄\n- 營收 42 億', '### 概況\nx\n\n## 附錄\n- 營收 43 億', std);
   assert.equal(m5.restored, 1);
   assert.ok(m5.detail.split('\n').some(l => l.startsWith('>') && l.includes('營收 42 億')));
+});
+
+// ---- Full rewrite (issue rewrite-honors-request 01) -------------------------------------------------------------------------
+const DROPPED = ['### Swing plane', 'The plane is about 59 degrees.', '', '### Common faults', '- Over the top.', '', '### Drills', 'Use drill A.', '', '### Sources', '[S2] https://example.com/other', ''].join('\n');
+const researchOnce = async (h, reply, choices) => {
+  const before = h.contexts.length;
+  h.view.writebackHooks = () => ({ readRaw: async path => h.repo.app.vault.adapter.read(path), backupNote: async (path, content) => { h.backups.push({ path, content }); return { ok: true, path: `Backups/${h.backups.length}.md` }; } });
+  await h.run.queue(reply);
+  await h.view.researchChild(h.view.map.nodes[0], new AbortController().signal, () => {}, { ...research, requirements: '', ...choices }, false);
+  await until(() => h.contexts.length === before + 1 && !h.host.running.has(h.node.path));
+  await until(() => true);
+};
+test('rewrite: a batch research with rewrite=true writes fresh: no "kept from the earlier version" block, the old note is backed up, the style is not changed', async () => {
+  const h = await harness(); h.backups = [];
+  await h.run({ detail: FIRST });
+  const styleBefore = JSON.stringify(h.settings.noteStyleByKind);
+  h.notices.length = 0;
+  await researchOnce(h, { detail: DROPPED }, { rewrite: true });
+  assert.equal(h.contexts.at(-1).updateMode, 'fresh');
+  const note = await h.read();
+  assert.equal(note.detail.includes(translate('en', 'note.kept_from_earlier_version')), false, note.detail);
+  assert.equal(note.detail.includes('The plane is 60 degrees.'), false, note.detail);
+  assert.equal(h.notices.some(message => message.startsWith('The rewrite dropped')), false);
+  assert.equal(h.backups.length, 1); assert.ok(h.backups[0].content.includes('The plane is 60 degrees.'));
+  assert.equal(JSON.stringify(h.settings.noteStyleByKind), styleBefore, 'the stored note style is untouched');
+});
+test('rewrite counterexample: the same batch research without rewrite still merges and puts the dropped lines back', async () => {
+  const h = await harness(); h.backups = [];
+  await h.run({ detail: FIRST });
+  await researchOnce(h, { detail: DROPPED }, {});
+  assert.notEqual(h.contexts.at(-1).updateMode, 'fresh');
+  const note = await h.read();
+  assert.ok(note.detail.includes(translate('en', 'note.kept_from_earlier_version')), note.detail);
+  assert.ok(note.detail.includes('> The plane is 60 degrees.'), note.detail);
+  assert.equal(h.backups.length, 0);
 });

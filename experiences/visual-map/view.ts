@@ -19417,6 +19417,8 @@ export class VisualAgentMapView extends ItemView {
         visualMode: choices.visualMode,
         mapAiMode: choices.mapAiMode,
         addCharts: charts,
+        // A whole rewrite the user asked for: this run replaces the note (backup first) instead of the style's update mode.
+        ...(choices.rewrite ? { updateMode: "fresh" as const } : {}),
         task: [note.prompt || researchTopicTask(outputLanguage, note.title), choices.requirements]
           .filter(Boolean)
           .join("\n\n")
@@ -19581,7 +19583,8 @@ export class VisualAgentMapView extends ItemView {
           requirements: request.requirements,
           // The picked model is for this batch only (D4): it never becomes a topic's own model.
           ...(request.model ? { runOnce: { model: request.model } } : {}),
-          ...(request.noteStyle ? { noteStyle: request.noteStyle } : {})
+          ...(request.noteStyle ? { noteStyle: request.noteStyle } : {}),
+          ...(request.rewrite ? { rewrite: true } : {})
         };
         // The dialog and the map chat set the research choices for the whole batch; only "retry with another provider" does
         // not, so each topic then runs in the mode its own note stores: Quick without the web and without charts, Standard with both.

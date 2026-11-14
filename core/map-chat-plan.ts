@@ -319,6 +319,8 @@ export interface ChatResearchRequest {
   researchDepth: ResearchDepth;
   requirements: string;
   imageSearch: boolean;
+  /** The user explicitly asked for the whole note to be rewritten: this research replaces it ("fresh"). Present only when true. */
+  rewrite?: true;
 }
 /**
  * The mode a research runs in: the mode the user named, then Standard when the model says the research needs the web
@@ -353,6 +355,7 @@ export function chatResearchRequest(
     researchMode: options.researchMode,
     researchDepth: options.researchDepth,
     requirements: action.direction,
-    imageSearch: mode === "standard" && action.images === true
+    imageSearch: mode === "standard" && action.images === true,
+    ...(action.rewrite ? { rewrite: true as const } : {})
   };
 }

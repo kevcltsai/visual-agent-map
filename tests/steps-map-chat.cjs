@@ -823,6 +823,22 @@ test('P1 prompt (zh and en): complete is defined, later steps are not promised, 
   for (const pattern of [/「完整」要完整/, /來源列出的每一項都要有議題/, /不可承諾其他之後的步驟/, /接續："remaining"/, /"remaining":""\}/, /只建根議題，並把 research_standard 放在最後一個動作/, /needsWeb（只用於 research_standard/, /"images":false,"needsWeb":false/]) assert.match(zh, pattern, String(pattern));
   for (const text of [en, zh]) assert.doesNotMatch(text, /單純建樹或擴充樹不需要|building or extending a tree on its own never needs it/);
 });
+test('rewrite: strict schema field; only a boolean true counts; missing or wrong type is false; other actions ignore it; the request carries it only when true', () => {
+  const entry = MAP_CHAT_SCHEMA.properties.actions.items;
+  assert.deepEqual(plain(entry.properties.rewrite), { type: 'boolean' }); assert.ok(entry.required.includes('rewrite'));
+  assert.equal(parse(reply(researchItem({ rewrite: true }))).actions[0].rewrite, true);
+  for (const value of ['true', 1, 'yes', null, false, undefined]) assert.equal(parse(reply(researchItem({ rewrite: value }))).actions[0].rewrite, undefined, String(value));
+  assert.equal(parse(reply(researchItem())).actions[0].rewrite, undefined, 'an older reply has no rewrite: parses, false');
+  assert.equal(parse(reply(item('run_map_action', { action: 'expand', nodeIds: ['a'], rewrite: true }))).actions[0].rewrite, undefined, 'only a research reads it');
+  const ask = fields => chatResearchRequest(parse(reply(researchItem(fields))).actions[0], 'quick', mode => aiModeOptions(mode, 'research'));
+  assert.equal(ask({ rewrite: true }).rewrite, true);
+  assert.equal('rewrite' in ask({ rewrite: false }), false, 'false: the request is exactly as before');
+});
+test('rewrite prompt (zh and en): rewrite is only for an explicit whole-note rewrite and is listed in the JSON template', () => {
+  const en = mapChatStep.render(request({ language: 'en' })), zh = mapChatStep.render(request({ language: 'zh-TW' }));
+  for (const pattern of [/rewrite \(research_standard only: true only when the user explicitly asks for the whole note to be rewritten/, /"otherProvider":false,"rewrite":false/]) assert.match(en, pattern, String(pattern));
+  for (const pattern of [/rewrite（只用於 research_standard：只有使用者明確要求整篇重寫/, /"otherProvider":false,"rewrite":false/]) assert.match(zh, pattern, String(pattern));
+});
 test('D-231 mode resolution: a named mode > the map mode > Quick; the all-new-cards rule is gone', () => {
   const action = (fields = {}) => parse(reply(researchItem(fields))).actions[0];
   const ask = (fields, mapMode) => chatResearchRequest(action(fields), mapMode, mode => aiModeOptions(mode, 'research'));

@@ -17,6 +17,7 @@ import {
 } from "../../ai/research-observer";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
 import { guardInlineHtmlLineStarts } from "../../ai/markdown-blocks";
+import { dedupeImageEmbeds, imageKeysIn } from "../../core/image-keys";
 import { checkCounts, standardTemplate } from "../../ai/detail-templates";
 import { carryForwardSources } from "../../core/steps/task/carry-sources";
 import { keepDroppedContent } from "../../core/steps/task/merge-check";
@@ -96,7 +97,11 @@ export interface RunProgress extends ChartProgress {
 export interface RunRepository {
   isDisposed?(): boolean;
   readNote(path: string, map?: MapDocument): Promise<Note>;
-  updateNote(path: string, patch: NotePatch, options?: { detailTemplate?: DetailTemplate }): Promise<void>;
+  updateNote(
+    path: string,
+    patch: NotePatch,
+    options?: { detailTemplate?: DetailTemplate; newVisualReferences?: boolean }
+  ): Promise<void>;
   resolveTopicModel(
     path: string,
     map?: MapDocument,
@@ -801,7 +806,8 @@ export class TopicRuns {
               mode,
               path,
               oldDetail: latest.detail,
-              aiDetail: detail,
+              // Appended on top: the old Detail stays, so an image it has is not embedded again.
+              aiDetail: dedupeImageEmbeds(detail, { seen: imageKeysIn(latest.detail) }),
               summary,
               template: detailTemplate,
               language: noteLanguage,
@@ -839,7 +845,8 @@ export class TopicRuns {
               mode,
               path,
               oldDetail: latest.detail,
-              aiDetail: carried,
+              // A full rewrite: only a repeat inside the new Detail is dropped.
+              aiDetail: dedupeImageEmbeds(carried),
               summary,
               template: detailTemplate,
               language: noteLanguage,
@@ -862,7 +869,7 @@ export class TopicRuns {
               status: "completed",
               ...formatIssuesPatch(issues, language)
             },
-            { detailTemplate }
+            { detailTemplate, newVisualReferences: true }
           );
           const saved = await repo.readNote(path, options.map());
           await options.onWritten({ before: { ...latest, status: note.status }, after: saved });
@@ -1329,6 +1336,9 @@ export class TopicRuns {
             aiDetail = kept.detail;
             if (kept.restored > 0) options.notify?.(t("ui.note_style_restored_0", kept.restored));
           }
+          // Images: "top" keeps the old Detail, so its images count as seen; a full rewrite replaces it, so only repeats
+          // inside the new Detail are dropped.
+          aiDetail = dedupeImageEmbeds(aiDetail, { seen: mode === "top" ? imageKeysIn(latest.detail) : [] });
           const composed = await this.composeWrite({
             mode,
             path,
@@ -1359,7 +1369,7 @@ export class TopicRuns {
               ...(context.researchMode ? { researchMode: context.researchMode } : {}),
               ...(mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language))
             },
-            { detailTemplate: writeContext.detailTemplate }
+            { detailTemplate: writeContext.detailTemplate, newVisualReferences: true }
           );
           const saved = await repo.readNote(path, options.map);
           options.onWritten?.({ before: { ...latest, status: note.status }, after: saved });

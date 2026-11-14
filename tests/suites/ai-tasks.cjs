@@ -973,3 +973,31 @@ integrationTest('research write-back: a reply line that starts with <sup> is wri
     if (updateMode === 'top') assert.ok(detail.includes(old), `top keeps the old Detail byte for byte: ${detail}`);
   }
 });
+// Ticket 04: research write-back does not embed the same image twice. A full rewrite replaces the old Detail (its images do
+// not count); "top" keeps it (they do). Source text stays; a visual reference repeating an image keeps its text only.
+integrationTest('research write-back: old Detail has A and the rewrite has A (twice) → exactly one A; appended on top → A not embedded again; source text kept', async () => {
+  const thumb = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Latte.jpg/1280px-Latte.jpg';
+  const original = 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Latte.jpg';
+  for (const updateMode of ['merge', 'top']) {
+    const { repo, app } = fixture('en'), n = await topicNote(repo, `Img ${updateMode}`);
+    const old = `### Earlier\n\n![A](<${thumb}>)\n\n[A](<https://s.example/old>)`;
+    await repo.updateNote(n.path, { prompt: 'Research', detail: old });
+    const reply = `### Core conclusions\n\n![A](<${original}>)\n\n[A](<https://s.example/new>)\n\nText\n\n![A](${thumb})\n\n### Sources\n\n- s`;
+    const refs = [{ title: 'Latte ref', imageUrl: original, sourceUrl: 'https://s.example/ref', description: '', palette: [], formula: '' }];
+    let view;
+    const plugin = { repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
+      askModel: async () => ({ summary: 'Researched', detail: reply, suggestions: [], visualReferences: refs }), mutate: async work => work(), views: () => [view] };
+    const { NoteStyleStore } = load('ai/note-style-store.ts', { obsidian });
+    const store = new NoteStyleStore({ settings: () => plugin.settings, port: {}, save: async () => {} });
+    plugin.noteStyles = { runStyle: input => ({ ...store.runStyle(input), updateMode }) };
+    const { VisualAgentMapView } = load('main.ts', { obsidian });
+    view = new VisualAgentMapView({ app }, attachTopicRuns(plugin)); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => {};
+    await startResearch(plugin, n, { map: view.map, request: { task: 'Research it' } }); await new Promise(resolve => setTimeout(resolve, 20));
+    const detail = (await repo.readNote(n.path)).detail;
+    assert.equal((detail.match(/!\[A\]/g) || []).length, 1, `${updateMode}: exactly one A: ${detail}`);
+    assert.match(detail, /https:\/\/s\.example\/new/, `${updateMode}: the new source text stays`);
+    assert.match(detail, /\*\*Latte ref\*\*/, `${updateMode}: the reference title stays`); assert.match(detail, /https:\/\/s\.example\/ref/, `${updateMode}: its source stays`);
+    assert.doesNotMatch(detail, /!\[Latte ref\]/, `${updateMode}: its image line goes`);
+    if (updateMode === 'top') assert.ok(detail.includes(old), `top keeps the old Detail as it was: ${detail}`);
+  }
+});

@@ -26030,6 +26030,101 @@ function conclusionView(state) {
   return "in_progress";
 }
 
+// core/image-keys.ts
+function imageKey(url) {
+  var _a2;
+  const link = url.trim().replace(/^<(.*)>$/, "$1");
+  const upload = /^https?:\/\/upload\.wikimedia\.org\/wikipedia\/([^/]+)\/(?:thumb\/[0-9a-f]\/[0-9a-f]{2}\/([^/?#]+)\/\d+px-[^/?#]+|[0-9a-f]\/[0-9a-f]{2}\/([^/?#]+))(?:[?#].*)?$/i.exec(
+    link
+  );
+  if (upload) return wikimediaKey(upload[1], (_a2 = upload[2]) != null ? _a2 : upload[3]);
+  const filePath = /^https?:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/([^/?#]+)(?:[?#].*)?$/i.exec(link);
+  if (filePath) return wikimediaKey("commons", filePath[1]);
+  return link;
+}
+function wikimediaKey(project, file) {
+  let name2 = file;
+  try {
+    name2 = decodeURIComponent(file);
+  } catch (e) {
+  }
+  return `wikimedia:${project.toLowerCase()}:${name2.replace(/ /g, "_")}`;
+}
+var EMBED = /!\[[^\]\n]*\]\((<[^>\n]+>|[^)\s]+)(?:\s+"[^"\n]*")?\)/g;
+var EMBED_LINE = /^\s*(?:>\s*)*!\[[^\]\n]*\]\((<[^>\n]+>|[^)\s]+)(?:\s+"[^"\n]*")?\)\s*$/;
+var PREVIEW_SECTION = /^##\s+(?:Preview|預覽|预览)\s*$/;
+function frontmatterMarks(lines) {
+  var _a2;
+  const marks = lines.map(() => false);
+  if (!/^---\s*$/.test((_a2 = lines[0]) != null ? _a2 : "")) return marks;
+  const end = lines.findIndex((line2, index) => index > 0 && /^(?:---|\.\.\.)\s*$/.test(line2));
+  for (let index = 0; end > 0 && index <= end; index++) marks[index] = true;
+  return marks;
+}
+function previewMarks(lines, code) {
+  let inside2 = false;
+  return lines.map((line2, index) => {
+    if (!code[index] && /^#{1,2}\s/.test(line2)) inside2 = PREVIEW_SECTION.test(line2);
+    return inside2;
+  });
+}
+function imageKeysIn(markdown, options = {}) {
+  const lines = markdown.split("\n");
+  const code = fencedLines(lines);
+  const front = options.file ? frontmatterMarks(lines) : lines.map(() => false);
+  const preview = options.file ? previewMarks(lines, code) : lines.map(() => false);
+  const keys = /* @__PURE__ */ new Set();
+  lines.forEach((line2, index) => {
+    if (code[index] || front[index] || preview[index]) return;
+    for (const match of line2.matchAll(EMBED)) keys.add(imageKey(match[1]));
+  });
+  return keys;
+}
+function dedupeImageEmbeds(markdown, options = {}) {
+  var _a2;
+  const lines = markdown.split("\n");
+  const code = fencedLines(lines);
+  const front = options.file ? frontmatterMarks(lines) : lines.map(() => false);
+  const preview = options.file ? previewMarks(lines, code) : lines.map(() => false);
+  const starts = [];
+  let offset = 0;
+  for (const line2 of lines) {
+    starts.push(offset);
+    offset += line2.length + 1;
+  }
+  const isNew = (index) => !options.range || starts[index] >= options.range.start && starts[index] < options.range.end;
+  const seen = new Set((_a2 = options.seen) != null ? _a2 : []);
+  const content = (index) => !code[index] && !front[index] && !preview[index];
+  if (options.range)
+    lines.forEach((line2, index) => {
+      if (isNew(index) || !content(index)) return;
+      for (const match of line2.matchAll(EMBED)) seen.add(imageKey(match[1]));
+    });
+  const out = [];
+  let dropped = false;
+  lines.forEach((line2, index) => {
+    if (dropped && !line2.trim() && (out.length === 0 || !out[out.length - 1].trim()) && isNew(index)) {
+      dropped = false;
+      return;
+    }
+    dropped = false;
+    if (!isNew(index) || !content(index)) return void out.push(line2);
+    const embed = EMBED_LINE.exec(line2);
+    if (embed) {
+      const key4 = imageKey(embed[1]);
+      if (seen.has(key4)) {
+        dropped = true;
+        return;
+      }
+      seen.add(key4);
+      return void out.push(line2);
+    }
+    for (const match of line2.matchAll(EMBED)) seen.add(imageKey(match[1]));
+    out.push(line2);
+  });
+  return out.join("\n");
+}
+
 // repository.ts
 function normalizeMapChatWidth(value) {
   return clampMapChatWidth(value);
@@ -26507,14 +26602,17 @@ function withoutReference(content) {
   const legacy = /\n?^## 關聯議題\s*\n+(?:母議題：[^\n]*\n+)?(?:子議題：[^\n]*\n*)?$/m;
   return legacy.test(content) ? content.replace(legacy, "\n") : content;
 }
-function detailWithVisualReferences(detail, visualReferences, template2) {
+function detailWithVisualReferences(detail, visualReferences, template2, keepText = false) {
   var _a2;
   let current = detail.trim();
   const references2 = visualReferences.trim().split(/\n(?=\*\*[^\n]+\*\*\n|### )/).filter(Boolean);
   for (const reference of references2) {
     const image = reference.match(/!\[[^\]]*\]\(([^)]+)\)/);
-    if (!image || current.includes(`](${image[1]})`)) continue;
-    const block = reference.replace(/^### (.+)$/gm, "**$1**").trim();
+    if (!image) continue;
+    const repeated = keepText ? imageKeysIn(current).has(imageKey(image[1])) : current.includes(`](${image[1]})`);
+    if (repeated && !keepText) continue;
+    const written2 = repeated ? dedupeImageEmbeds(reference, { seen: [imageKey(image[1])] }) : reference;
+    const block = written2.replace(/^### (.+)$/gm, "**$1**").trim();
     const title = (_a2 = block.match(/^\*\*(.+)\*\*/)) == null ? void 0 : _a2[1];
     const paragraphs = current.split("\n\n");
     const related = title ? paragraphs.findIndex((text10) => !/^#{1,6} /.test(text10) && text10.includes(title)) : -1;
@@ -27201,7 +27299,8 @@ var Repository = class {
           detailWithVisualReferences(
             section2(body, "Detail"),
             patch.visualReferences,
-            (_d = options.detailTemplate) != null ? _d : standardTemplate(language2)
+            (_d = options.detailTemplate) != null ? _d : standardTemplate(language2),
+            options.newVisualReferences === true
           )
         );
     }
@@ -37548,7 +37647,8 @@ var TopicRuns = class {
             mode,
             path,
             oldDetail: latest.detail,
-            aiDetail: detail,
+            // Appended on top: the old Detail stays, so an image it has is not embedded again.
+            aiDetail: dedupeImageEmbeds(detail, { seen: imageKeysIn(latest.detail) }),
             summary,
             template: detailTemplate,
             language: noteLanguage,
@@ -37574,7 +37674,8 @@ var TopicRuns = class {
             mode,
             path,
             oldDetail: latest.detail,
-            aiDetail: carried,
+            // A full rewrite: only a repeat inside the new Detail is dropped.
+            aiDetail: dedupeImageEmbeds(carried),
             summary,
             template: detailTemplate,
             language: noteLanguage,
@@ -37597,7 +37698,7 @@ var TopicRuns = class {
             status: "completed",
             ...formatIssuesPatch(issues, language2)
           },
-          { detailTemplate }
+          { detailTemplate, newVisualReferences: true }
         );
         const saved = await repo.readNote(path, options.map());
         await options.onWritten({ before: { ...latest, status: note.status }, after: saved });
@@ -37989,6 +38090,7 @@ var TopicRuns = class {
           aiDetail = kept.detail;
           if (kept.restored > 0) (_g2 = options.notify) == null ? void 0 : _g2.call(options, t("ui.note_style_restored_0", kept.restored));
         }
+        aiDetail = dedupeImageEmbeds(aiDetail, { seen: mode === "top" ? imageKeysIn(latest.detail) : [] });
         const composed = await this.composeWrite({
           mode,
           path,
@@ -38019,7 +38121,7 @@ var TopicRuns = class {
             ...context.researchMode ? { researchMode: context.researchMode } : {},
             ...mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language2)
           },
-          { detailTemplate: writeContext.detailTemplate }
+          { detailTemplate: writeContext.detailTemplate, newVisualReferences: true }
         );
         const saved = await repo.readNote(path, options.map);
         (_j = options.onWritten) == null ? void 0 : _j.call(options, { before: { ...latest, status: note.status }, after: saved });
@@ -64331,11 +64433,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           created.path,
           {
             summary: content.summary,
-            detail: withSourceSupplement(
-              canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language2), detailTemplate),
-              content.supplement,
-              detailTemplate,
-              noteLanguageOf(language2)
+            // A new note: only an image repeated inside the merged Detail is dropped.
+            detail: dedupeImageEmbeds(
+              withSourceSupplement(
+                canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language2), detailTemplate),
+                content.supplement,
+                detailTemplate,
+                noteLanguageOf(language2)
+              )
             ),
             visualReferences: visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language2)),
             prompt: mergeGoalTask(language2),
@@ -64343,7 +64448,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
             status: "completed",
             ...formatIssuesPatch(content.formatIssues, language2)
           },
-          { detailTemplate }
+          { detailTemplate, newVisualReferences: true }
         );
       } else
         await repo.updateNote(created.path, {
@@ -64425,11 +64530,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const references2 = visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language2));
       patch = {
         summary: content.summary,
-        detail: withSourceSupplement(
-          canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language2), detailTemplate),
-          content.supplement,
-          detailTemplate,
-          noteLanguageOf(language2)
+        // The merge rewrites the target's Detail in full: only an image repeated inside the new Detail is dropped.
+        detail: dedupeImageEmbeds(
+          withSourceSupplement(
+            canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language2), detailTemplate),
+            content.supplement,
+            detailTemplate,
+            noteLanguageOf(language2)
+          )
         ),
         status: "completed",
         sourcePaths,
@@ -64445,7 +64553,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     let entry;
     try {
       const tx = this.beginMapTransaction().rewriteNote(target.path, async (path) => {
-        await repo.updateNote(path, patch, { detailTemplate });
+        await repo.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
         if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
         if (asked) await repo.writeTopicAppearance(path, asked);
       });
@@ -74598,10 +74706,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           prompt: item.task,
           // A suggestion's contribution is the card's summary (the task when there is none); empty only when both are.
           ...cleanOutlineSummary(item.contribution) || cleanOutlineSummary(item.task) ? { summary: cleanOutlineSummary(item.contribution) || cleanOutlineSummary(item.task) } : {},
-          detail: researchOptions ? "" : item.contribution ? canonicalDetail(
-            guardInlineHtmlLineStarts(item.contribution),
-            noteLanguageOf(this.plugin.settings.language),
-            contributionTemplate
+          detail: researchOptions ? "" : item.contribution ? dedupeImageEmbeds(
+            canonicalDetail(
+              guardInlineHtmlLineStarts(item.contribution),
+              noteLanguageOf(this.plugin.settings.language),
+              contributionTemplate
+            )
           ) : "",
           ...researchOptions ? {
             researchMode: "local",
@@ -76112,14 +76222,16 @@ ${note.detail.trim()}` : "",
         integrated.path,
         {
           summary: result.summary,
-          detail: canonicalDetail(guardInlineHtmlLineStarts(result.detail), noteLanguageOf(language2), detailTemplate),
+          detail: dedupeImageEmbeds(
+            canonicalDetail(guardInlineHtmlLineStarts(result.detail), noteLanguageOf(language2), detailTemplate)
+          ),
           visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
           prompt: goal,
           sourcePaths: sources.map((source) => source.path),
           status: "completed",
           ...formatIssuesPatch(result.formatIssues, this.plugin.settings.language)
         },
-        { detailTemplate }
+        { detailTemplate, newVisualReferences: true }
       );
       integrated.parentId = null;
       integrated.x = Math.max(...sources.map((node) => node.x)) + 340;
@@ -79535,7 +79647,8 @@ ${note.detail.trim()}` : "",
         const sourceRefusal = sourceFileRefusal(node);
         if (sourceRefusal) return sourceRefusal;
         const detail = action.kind === "edit_topic_note" ? await demoteUnparsableMermaid(
-          neutralizeUnsafeMermaid(guardInlineHtmlLineStarts(action.detail)),
+          // A full replace: only an image repeated inside the new Detail is dropped.
+          neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLineStarts(action.detail))),
           this.plugin.mermaidSyntax
         ) : "";
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
@@ -79618,10 +79731,12 @@ ${note.detail.trim()}` : "",
         const raw = applyMdEdit(source.text, action.find, action.replace);
         if (raw === null) return skipped("ui.map_chat_skip_find_failed");
         const at = source.text.indexOf(action.find);
-        const next = guardInlineHtmlLineStarts(raw, {
+        const guarded = guardInlineHtmlLineStarts(raw, {
           frontmatter: true,
           range: { start: at, end: at + action.replace.length }
         });
+        const tail = source.text.length - at - action.find.length;
+        const next = dedupeImageEmbeds(guarded, { file: true, range: { start: at, end: guarded.length - tail } });
         const replace = next.slice(at, next.length - (source.text.length - at - action.find.length));
         const added = addedMermaidBlocks(source.text, next);
         if (added.some((block) => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
@@ -79683,7 +79798,9 @@ ${note.detail.trim()}` : "",
         const key4 = normalizeVaultPath(action.path);
         const exists = key4 ? !!this.app.vault.getAbstractFileByPath(key4) : false;
         const content = await demoteUnparsableMermaid(
-          neutralizeUnsafeMermaid(guardInlineHtmlLineStarts(action.content, { frontmatter: true })),
+          neutralizeUnsafeMermaid(
+            dedupeImageEmbeds(guardInlineHtmlLineStarts(action.content, { frontmatter: true }), { file: true })
+          ),
           this.plugin.mermaidSyntax
         );
         const verdict = guardMapChatWrite({
@@ -80385,9 +80502,10 @@ ${note.detail.trim()}` : "",
    * Nothing is written when the view, the panel or the map is not the same any more, or the search was stopped.
    */
   async runImageSearch(block, controller, chat, model) {
+    var _a2;
     const sameMap = () => {
-      var _a2;
-      return this.path === block.mapPath && ((_a2 = this.map) == null ? void 0 : _a2.id) === block.mapId;
+      var _a3;
+      return this.path === block.mapPath && ((_a3 = this.map) == null ? void 0 : _a3.id) === block.mapId;
     };
     const current = () => !this.closed && !controller.signal.aborted && this.chat === chat && sameMap();
     const dropped = () => {
@@ -80402,9 +80520,11 @@ ${note.detail.trim()}` : "",
       chat.markImagesRunning(block);
       const found = await this.plugin.searchImages(block.query, model, controller.signal);
       if (!current()) return dropped();
-      const [first] = (await this.chatProbeImages(found, controller.signal)).filter(
+      const loadable = (await this.chatProbeImages(found, controller.signal)).filter(
         (item) => item.url.startsWith("https://")
       );
+      const used = this.imageKeysOfMap();
+      const first = (_a2 = loadable.find((item) => !used.has(imageKey(item.url)))) != null ? _a2 : loadable[0];
       if (!current()) return dropped();
       if (!first) return this.settleChatImages(chat, block, { state: "empty" });
       const placed = await this.chatPlaceImage(block, first, current, controller.signal);
@@ -80419,6 +80539,14 @@ ${note.detail.trim()}` : "",
       if (!current()) return dropped();
       this.settleChatImages(chat, block, { state: "failed", reason: errorMessage(error) });
     }
+  }
+  /** The image keys (see imageKey) of every picture in the Detail of this map's cards, as the view last read them. */
+  imageKeysOfMap() {
+    var _a2, _b2, _c, _d;
+    const keys = /* @__PURE__ */ new Set();
+    for (const node of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [])
+      for (const key4 of imageKeysIn((_d = (_c = this.notes.get(node.id)) == null ? void 0 : _c.detail) != null ? _d : "")) keys.add(key4);
+    return keys;
   }
   /** Whether a picture can go into the card of `block` now: the card, or the reason in words. */
   chatImageFence(block) {
@@ -80483,10 +80611,13 @@ ${note.detail.trim()}` : "",
               return;
             }
             const before = note.detail.replace(/\s+$/, "");
-            const addition = imageMarkdown({
-              ...candidate,
-              title: cleanImageTitle(candidate.title) || cleanImageTitle(block.nodeTitle) || t("ui.map_chat_image_alt")
-            });
+            const addition = dedupeImageEmbeds(
+              imageMarkdown({
+                ...candidate,
+                title: cleanImageTitle(candidate.title) || cleanImageTitle(block.nodeTitle) || t("ui.map_chat_image_alt")
+              }),
+              { seen: imageKeysIn(note.detail) }
+            );
             await this.noteChange(
               again.node,
               { detail: before ? `${before}

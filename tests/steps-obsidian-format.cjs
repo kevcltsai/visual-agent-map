@@ -76,7 +76,6 @@ test('a mermaid block with click, HTML, an init directive or a URL is kept as pl
     click: ['flowchart LR', '  A --> B', '  click A "https://example.com"'],
     callback: ['graph TD', '  A --> B', '  click B callback'],
     html: ['flowchart LR', '  A["<img src=x onerror=alert(1)>"] --> B'],
-    br: ['flowchart LR', '  A["one<br>two"] --> B'],
     init: ['%%{init: {"securityLevel": "loose"}}%%', 'flowchart LR', '  A --> B'],
     frontMatter: ['---', 'config:', '  securityLevel: loose', '---', 'flowchart LR', '  A --> B'],
     url: ['flowchart LR', '  A["see https://evil.example/x"] --> B'],
@@ -96,6 +95,15 @@ test('a mermaid block with click, HTML, an init directive or a URL is kept as pl
   assert.equal(parse('> [!example]\n> ```mermaid\n> flowchart LR\n> A --> B\n> click A "x"\n> ```'), '> [!example]\n> ```text\n> flowchart LR\n> A --> B\n> click A "x"\n> ```');
   assert.equal(parse('````mermaid\ngraph TD\nA --> B\n```\nclick A "x"\n````'), '````text\ngraph TD\nA --> B\n```\nclick A "x"\n````');
   assert.equal(parse('x\n\n```mermaid\nflowchart LR\nA["<b>x</b>"] --> B'), 'x\n\n```text\nflowchart LR\nA["<b>x</b>"] --> B');
+});
+
+test('a <br> line break in a mermaid label becomes a space, so the diagram still renders (owner 2026-11-14)', () => {
+  const detail = ['<br> outside stays', '', '```mermaid', 'flowchart TD', '  A["one<br/>two"] --> B["three<br>four<BR />five"]', '```'].join('\n');
+  const expected = ['<br> outside stays', '', '```mermaid', 'flowchart TD', '  A["one two"] --> B["three four five"]', '```'].join('\n');
+  assert.equal(parse(detail), expected);
+  assert.equal(parse('> ```mermaid\n> graph TD\n> A["a<br>b"] --> B\n> ```'), '> ```mermaid\n> graph TD\n> A["a b"] --> B\n> ```');
+  // Any other HTML in the same block still turns it into plain code.
+  assert.equal(parse('```mermaid\nflowchart LR\nA["a<br>b"] --> B["<b>x</b>"]\n```'), '```text\nflowchart LR\nA["a b"] --> B["<b>x</b>"]\n```');
 });
 
 test('only the unsafe mermaid block changes; safe blocks and other code stay as written', () => {
@@ -270,7 +278,7 @@ test('mermaid types: the safe fixture keeps every block as mermaid, one block pe
 
 test('mermaid types: generic unsafe lines neutralize a block of every type', () => {
   const generic = {
-    init: ['%%{init: {}}%%'], br: ['A["<br>x"]'], url: ['https://x'], click: ['click A "x"'], style: ['style A fill:red'],
+    init: ['%%{init: {}}%%'], url: ['https://x'], click: ['click A "x"'], style: ['style A fill:red'],
     classDef: ['classDef x fill:red'], shorthand: ['A:::x']
   };
   for (const lines of fixtureBlocks) {

@@ -29575,6 +29575,7 @@ function unsafeMermaid(body) {
     return UNSAFE_LINE.some((pattern) => pattern.test(text10));
   });
 }
+var BR_TAG = /<br\s*\/?>/gi;
 function neutralizeUnsafeMermaid(markdown) {
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
   lines.forEach((line2, index) => {
@@ -29585,7 +29586,8 @@ function neutralizeUnsafeMermaid(markdown) {
       const content = core(lines[next]);
       const close = FENCE.exec(content);
       if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
-      body.push(content);
+      lines[next] = lines[next].replace(BR_TAG, " ");
+      body.push(content.replace(BR_TAG, " "));
     }
     if (unsafeMermaid(body)) lines[index] = line2.replace(/mermaid/i, "text");
   });
@@ -89129,9 +89131,9 @@ function mermaidLabelSpans(source) {
   }
   return spans.sort((a, b) => a.start - b.start);
 }
-var BR_TAG = /<br\s*\/?>/gi;
+var BR_TAG2 = /<br\s*\/?>/gi;
 function isSafeMermaidLabel(translated, quoted) {
-  const text10 = translated.replace(BR_TAG, " ");
+  const text10 = translated.replace(BR_TAG2, " ");
   if (!text10.trim() || /[\r\n]/.test(text10)) return false;
   if (text10.includes("%%") || UNSAFE_TEXT.test(text10)) return false;
   if (/#\w+;/.test(text10) || /&/.test(text10)) return false;

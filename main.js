@@ -58151,6 +58151,7 @@ var CHAT_RAIL_WIDTH = 44;
 var CHAT_TOOLS_GAP = 12;
 var GOAL_SUGGEST_GAP = 6;
 var CHAT_IMAGE_SEARCH_PARALLEL = 3;
+var chatImageTopicKey = (mapId, nodeId) => `${mapId}\0${nodeId}`;
 var CHAT_IMAGE_QUERY_MAX = 80;
 var CHAT_IMAGE_DOWNLOAD_MS = 15e3;
 function cleanImageQuery(text10) {
@@ -58650,6 +58651,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
      * changed (a card added, another map in this tab, the view closed, a run already going), so the press is checked again.
      */
     __publicField(this, "argumentFocusMapId", null);
+    /** Cards of a map with a queued or running picture search (key: chatImageTopicKey), with the search's controller. */
+    __publicField(this, "chatImageTopics", /* @__PURE__ */ new Map());
     __publicField(this, "chatImageRunning", 0);
     __publicField(this, "chatImageWaiters", []);
     /** Writes of pictures go one after another (the searches overlap, the writes and their undo steps do not). */
@@ -80394,7 +80397,9 @@ ${note.detail.trim()}` : "",
     if (!map || !chat) return skipped("ui.map_chat_skip_map_changed");
     const wanted = targets.length ? targets : this.chatSelectionIds();
     if (!wanted.length) return skipped("ui.map_chat_skip_images_one_card");
-    const ids2 = [...new Set(wanted)].filter((id) => !batch.imageNodes.has(id));
+    const ids2 = [...new Set(wanted)].filter(
+      (id) => !batch.imageNodes.has(id) && !this.chatImageTopics.has(chatImageTopicKey(map.id, id))
+    );
     if (!ids2.length) return skipped("ui.map_chat_skip_images_dup");
     for (const id of ids2) batch.imageNodes.add(id);
     const anchor = { path: this.path, id: map.id };
@@ -80452,6 +80457,13 @@ ${note.detail.trim()}` : "",
       return skipped("ui.map_chat_skip_map_changed");
     for (const job of jobs) {
       const { block, controller } = job;
+      const topic = chatImageTopicKey(anchor.id, block.nodeId);
+      this.chatImageTopics.set(topic, controller);
+      const release2 = () => {
+        if (this.chatImageTopics.get(topic) === controller) this.chatImageTopics.delete(topic);
+      };
+      job.release = release2;
+      controller.signal.addEventListener("abort", release2, { once: true });
       const key4 = ++this.chatImageSequence;
       this.chatImageSearches.set(key4, controller);
       job.key = key4;
@@ -80470,10 +80482,12 @@ ${note.detail.trim()}` : "",
     for (const block of blocks) if (block.state !== "searching") (_b2 = this.chatImageRecords.get(block)) == null ? void 0 : _b2.images(block);
     for (const job of jobs)
       void (async () => {
+        var _a3;
         await this.acquireImageSlot();
         try {
           await this.runImageSearch(job.block, job.controller, chat, job.model);
         } finally {
+          (_a3 = job.release) == null ? void 0 : _a3.call(job);
           this.releaseImageSlot();
           if (job.key !== void 0 && this.chatImageSearches.get(job.key) === job.controller)
             this.chatImageSearches.delete(job.key);

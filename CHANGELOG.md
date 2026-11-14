@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- A mind map's data sources are now used by expand, merge, multi-topic research and its retries, rerun with Standard, chat synthesis, topic chat and map chat replies, and outline import. Sources stay read-only, untrusted reference material.
 - Hypothesis research now tells fact questions from causal questions. The current-situation card shows the type, and you can change it on the definitions card before you re-run.
 - Fact questions skip the hypothesis stage: the conclusion card is one of holds, does not hold, holds in part or not enough data, built from the facets, and says how many facets lacked data.
 - Causal questions stop when the current situation does not match, and otherwise compare the verified hypotheses in the conclusion.

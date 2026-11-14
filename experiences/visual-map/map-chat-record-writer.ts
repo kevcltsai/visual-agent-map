@@ -49,6 +49,8 @@ interface Conversation {
   ended: Set<number>;
   /** The serialized `research_started` line of this conversation (null before research): a file made again starts with it. */
   researchLine: string | null;
+  /** The serialized `sources_read` line (null before a turn sent the map's sources): a file made again starts with it. */
+  sourcesLine: string | null;
 }
 
 const isFile = (item: TAbstractFile | null | undefined): item is TFile => !!item && !("children" in item);
@@ -112,7 +114,8 @@ export class MapChatRecordWriter {
     file: TFile | string,
     target: MapChatRecordTarget,
     cleanEnd = true,
-    startedResearch = false
+    startedResearch = false,
+    readsSources = false
   ): void {
     this.conv = {
       ...this.freshConversation(id),
@@ -126,6 +129,9 @@ export class MapChatRecordWriter {
       ended: new Set(),
       researchLine: startedResearch
         ? serializeLine({ type: "event", turn: 0, kind: "research_started", at: this.stamp() })
+        : null,
+      sourcesLine: readsSources
+        ? serializeLine({ type: "event", turn: 0, kind: "sources_read", at: this.stamp() })
         : null
     };
     this.target = target;
@@ -151,6 +157,7 @@ export class MapChatRecordWriter {
       conv.pending.push(text);
       // Remembered when it is queued, not when it is taken: an earlier line's file creation must not write it ahead of its turn.
       if (line.type === "event" && line.kind === "research_started") conv.researchLine = text;
+      if (line.type === "event" && line.kind === "sources_read") conv.sourcesLine = text;
       await this.flush(conv, target);
     });
   }
@@ -250,7 +257,8 @@ export class MapChatRecordWriter {
       failed: false,
       notified: false,
       ended: new Set(),
-      researchLine: null
+      researchLine: null,
+      sourcesLine: null
     };
   }
   private dead(): boolean {
@@ -326,7 +334,9 @@ export class MapChatRecordWriter {
         conv.mapPath = target?.mapPath ?? conv.mapPath;
         conv.mapId = target?.mapId ?? conv.mapId;
         // The mark is the writer's to keep: a file made again (deleted while open) must still say the conversation started research.
-        const lines = conv.researchLine && !conv.pending.includes(conv.researchLine) ? [conv.researchLine] : [];
+        const lines = [conv.researchLine, conv.sourcesLine].filter(
+          (mark): mark is string => !!mark && !conv.pending.includes(mark)
+        );
         conv.file = await vault.create(path, header + lines.join("") + conv.pending.join(""));
         conv.root = root;
         conv.pending = [];

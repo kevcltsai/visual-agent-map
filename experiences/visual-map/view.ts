@@ -214,9 +214,11 @@ import { type ReferenceGroup } from "../../ai/reference-materials";
 import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
 import {
   addExternalSource,
+  externalScrubRoots,
   externalSourceStatus,
   loadExternalSources,
   removeExternalSource,
+  scrubExternalPaths,
   type ExternalScope,
   type ExternalSource
 } from "./external-sources";
@@ -237,6 +239,14 @@ import { classifyProviderError, otherProviderModel, providerOfFailure } from "..
 import { UsageControl } from "./usage-panel";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
+import {
+  readSourceGroups,
+  scrubReferenceGroups,
+  sharedSourceFindings,
+  withMapSources
+} from "../../core/source-gateway";
+import { outlineSourceMaterial } from "../../core/outline-sources";
+import type { OutlineGenerateRequest } from "../../core/outline-generation-service";
 import { createNoteReadContext } from "../../core/note-read-context";
 import { needsReadBack, UnsyncedPaths } from "../../core/sync-scope";
 import { chainRebase, type RenamePair } from "../../core/rename-batch";
@@ -318,7 +328,12 @@ import { branchDirectionResolver, depthOf, lineKind } from "./tree-edge-rules";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
 import { mergeRepair } from "../../core/steps/task/fragments";
-import { checkMergePreservation, findingList, type MergeCheckResult } from "../../core/steps/task/merge-check";
+import {
+  checkMergePreservation,
+  findingList,
+  withSourceSupplement,
+  type MergeCheckResult
+} from "../../core/steps/task/merge-check";
 import {
   expansionTask,
   labelCurrentSummary,
@@ -326,6 +341,7 @@ import {
   labelOldFindings,
   labelVisualReferences,
   mergeGoalTask,
+  mergeSupplementTask,
   noSummaryYet,
   researchTopicTask,
   synthesisDirectionsTask,
@@ -481,6 +497,7 @@ import {
   type MapChatTopicHash,
   type MapChatTopicRef
 } from "../../core/map-chat-context";
+import { mapChatSourceMaterial, type MapChatSourceCache } from "../../core/map-chat-sources";
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
@@ -517,6 +534,7 @@ import { TopicChatRecordWriter } from "./topic-chat-record-writer";
 import { judgeTopicScope, topicSubtreeIds } from "./topic-chat-scope";
 import {
   restoreTopicChat,
+  topicChatReadsSources,
   isSafeTopicNodeId,
   type TopicChatLineInput,
   type TopicRecordStatus
@@ -743,6 +761,10 @@ interface MergeTask {
   reasoning: ModelChoice["reasoning"];
   /** The sources as sent to the model (JSON of the reference documents); compared again before the draft is saved. */
   sourceContent: string;
+  /** The model's additions from the map's data sources (written as a separate block, never into the merged text). */
+  supplement?: string;
+  /** The supplement request failed: the block says so instead of silently leaving the sources out. */
+  supplementFailed?: boolean;
   controller: AbortController;
   /** running: the model works (Stop works); applying: the result is being written; a task that ends is removed. */
   state: "running" | "applying";
@@ -1011,14 +1033,20 @@ const relationIdentity = (r: Pick<TopicRelation, "kind" | "from" | "to">): strin
 
 /**
  * The options a chat integration runs with: what the integration dialog hands over when its fields are left as they come up
- * (no sources picked, no web search or images, the full content of the subtopics, no template or tone chosen, no extra
- * requirements). An integration is always Quick (no web search; D-2026-10-229). `synthesisTitle` is the new topic's name and
- * only a multi-select integration has one. Pure, so a test can hold it against the real dialog.
+ * (no web search or images, the full content of the subtopics, no template or tone chosen, no extra requirements). An
+ * integration is always Quick (no web search; D-2026-10-229). The user picks no sources in the chat; the map's own data
+ * sources (`referenceGroups`, read by the caller) go in as they do for a research (the owner overturned the old rule that
+ * an integration reads none). `synthesisTitle` is the new topic's name and only a multi-select integration has one. Pure,
+ * so a test can hold it against the real dialog.
  */
-export function chatSynthesisOptions(input: { outputLanguage: ContentLanguage; synthesisTitle?: string }): TaskOptions {
+export function chatSynthesisOptions(input: {
+  outputLanguage: ContentLanguage;
+  synthesisTitle?: string;
+  referenceGroups?: ReferenceGroup[];
+}): TaskOptions {
   return {
     synthesisContent: "full",
-    referenceGroups: [],
+    referenceGroups: input.referenceGroups ?? [],
     outputLanguage: input.outputLanguage,
     requirements: "",
     researchMode: "local",
@@ -1078,6 +1106,8 @@ interface TopicChatEntry {
   steerFolded?: string[];
   /** How the current task ended (set by `settleTopicChat`); `plan`: the reply needs a plan, so nothing is sent on. */
   steerEnd?: { status: TopicRecordStatus; plan: boolean } | null;
+  /** A turn of this conversation sent the map's data sources: they are untrusted, so a later reply's writes need a plan (the same rule as after research). */
+  readsSources?: boolean;
   /** The AbortController of the current run (the window's stop button aborts it). */
   controller?: AbortController;
 }
@@ -1295,8 +1325,15 @@ const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   reserved_frontmatter: "ui.map_chat_guard_reserved_frontmatter",
   hypothesis_frontmatter_changed: "ui.map_chat_guard_hypothesis_frontmatter_changed",
   exists: "ui.map_chat_guard_exists",
-  no_baseline: "ui.map_chat_guard_no_baseline"
+  no_baseline: "ui.map_chat_guard_no_baseline",
+  map_source: "ui.map_chat_guard_map_source"
 };
+/** A chat write action reached a note that is one of the map's data sources (read-only). */
+class MapSourceWriteError extends Error {
+  constructor() {
+    super("map source is read-only");
+  }
+}
 const guardSkipped = (code: MapChatGuardCode, editing = false): ChatOutcome =>
   skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
 let mapChatTaskSequence = 0;
@@ -1514,6 +1551,8 @@ export class VisualAgentMapView extends ItemView {
   private chatCarryOver = false;
   /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
   private chatApplying = false;
+  /** Lower-cased normalised paths of the map's data sources while a chat write action runs; null otherwise. */
+  private chatReadOnlyPaths: ReadonlySet<string> | null = null;
   /** The automatic continuation of the latest message (running, waiting for work or for a plan); null when there is none. */
   private chatChain: ChatChainRun | null = null;
   private chatChainSeq = 0;
@@ -1524,8 +1563,14 @@ export class VisualAgentMapView extends ItemView {
    * only a new conversation clears it, and a restored record sets it again. Any turn of it may read web text (decision #17).
    */
   private chatStartedResearch = false;
+  /** The conversation has sent the map's data sources in this turn or an earlier one: they and the turns after them are untrusted, so the research allow-list applies. */
+  private chatReadsSources = false;
+  /** The findings of the last condensing of oversized sources (map chat and topic chat share it); cleared with the conversation and on close. */
+  private chatSourceCache: MapChatSourceCache | null = null;
   /** The record conversation whose file already carries the `research_started` mark (kept apart from the flag: the record may have been off when research began). */
   private chatResearchMarkedIn: string | null = null;
+  /** The record conversation whose file already carries the `sources_read` mark. */
+  private chatSourcesMarkedIn: string | null = null;
   /** Research notes an earlier round already sent whole (they go last when the budget is short). */
   private chatResearchSent = new Set<string>();
   /** Counts conversations: the result of research another conversation started is not recorded in this one. */
@@ -3225,6 +3270,7 @@ export class VisualAgentMapView extends ItemView {
   async onClose(): Promise<void> {
     this.closeTopicLinkMenu();
     this.closed = true;
+    this.chatSourceCache = null;
     this.unsyncedPaths = null;
     this.closeTopicChatWindow();
     this.topicChatSessions.clear();
@@ -3565,10 +3611,13 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
+        const referenceGroups = await this.readMapSourceGroups(new AbortController().signal);
         const outputLanguage = cardOutputLanguage(this.map, this.plugin.settings.language, note.title);
         await this.runAgent(node, undefined, message => new Notice(message), {
           task: researchTopicTask(outputLanguage, note.title),
-          referenceGroups: [],
+          referenceGroups,
+          // Within one request the map's sources go in as written; larger ones are still extracted first.
+          referenceDelivery: "direct",
           outputLanguage,
           rules: "",
           ...aiModeOptions("standard", "research")
@@ -3964,15 +4013,18 @@ export class VisualAgentMapView extends ItemView {
           if (!this.closed) this.render();
           try {
             const result = await this.plugin.outlineGeneration.generate(
-              {
-                ...forService,
-                ...carry,
-                ...this.usageMapField(),
-                language: settings.language,
-                contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
-                model,
-                reasoning
-              },
+              await this.withOutlineSources(
+                {
+                  ...forService,
+                  ...carry,
+                  ...this.usageMapField(),
+                  language: settings.language,
+                  contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
+                  model,
+                  reasoning
+                },
+                controller.signal
+              ),
               controller.signal
             );
             // Stopped, replaced or the view closed meanwhile: the late result is dropped.
@@ -4175,20 +4227,23 @@ export class VisualAgentMapView extends ItemView {
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
         const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
-          {
-            ...this.usageMapField(),
-            topic: note.title,
-            presetText: request.requirements ? `${preset.text}\n\n${request.requirements}` : preset.text,
-            language: request.language,
-            model: used.model,
-            reasoning: normalizeReasoningLevel(used.reasoning ?? settings.cliReasoning),
-            limits: request.limits,
-            // The card's own note and its current subtopics, so the new subtopics follow the note and do not repeat (quoted as data).
-            noteDetail: note.detail,
-            existingChildren: (this.map?.nodes ?? [])
-              .filter(item => item.parentId === node.id)
-              .map(item => this.notes.get(item.id)?.title ?? "")
-          },
+          await this.withOutlineSources(
+            {
+              ...this.usageMapField(),
+              topic: note.title,
+              presetText: request.requirements ? `${preset.text}\n\n${request.requirements}` : preset.text,
+              language: request.language,
+              model: used.model,
+              reasoning: normalizeReasoningLevel(used.reasoning ?? settings.cliReasoning),
+              limits: request.limits,
+              // The card's own note and its current subtopics, so the new subtopics follow the note and do not repeat (quoted as data).
+              noteDetail: note.detail,
+              existingChildren: (this.map?.nodes ?? [])
+                .filter(item => item.parentId === node.id)
+                .map(item => this.notes.get(item.id)?.title ?? "")
+            },
+            signal
+          ),
           signal,
           steer
         );
@@ -7667,9 +7722,10 @@ export class VisualAgentMapView extends ItemView {
     const language = this.plugin.settings.language;
     const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath), task.model);
     try {
-      const sourceGroup = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
+      const snapshot = await this.mergeSourceSnapshot(task.sources, task.controller.signal);
+      const sourceGroup = snapshot.group;
       if (!this.isLiveMergeTask(task)) return;
-      task.sourceContent = JSON.stringify(sourceGroup.documents);
+      task.sourceContent = snapshot.content;
       const request: TaskContext = {
         title: t("ui.merge_ai_untitled"),
         summary: noSummaryYet(language),
@@ -7703,9 +7759,9 @@ export class VisualAgentMapView extends ItemView {
       /** The sources must still be what the model was given; a change during any request fails with the stale message. */
       const sourcesUnchanged = async (): Promise<boolean> => {
         if (!this.isLiveMergeTask(task)) return false;
-        const latest = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
+        const latest = await this.mergeSourceSnapshot(task.sources, task.controller.signal);
         if (!this.isLiveMergeTask(task)) return false;
-        if (JSON.stringify(latest.documents) !== task.sourceContent) throw new Error(t("ui.merge_draft_stale"));
+        if (latest.content !== task.sourceContent) throw new Error(t("ui.merge_draft_stale"));
         return true;
       };
       let result = await ask(request);
@@ -7738,6 +7794,28 @@ export class VisualAgentMapView extends ItemView {
           if (task.controller.signal.aborted || this.closed || !this.isLiveMergeTask(task)) throw error;
           if (error instanceof Error && error.message === t("ui.merge_draft_stale")) throw error;
           this.plugin.recordFailure(t("log.merge_failed"), error);
+        }
+      }
+      // The map's data sources only ever add a separate block after the merged text: the request that wrote the merged text
+      // never saw them, so nothing in them can change what the cards say.
+      if (snapshot.mapGroups.some(group => group.documents.length)) {
+        try {
+          const supplement = await ask({
+            ...request,
+            summary: result.summary,
+            detail: result.detail,
+            task: mergeSupplementTask(language),
+            referenceGroups: snapshot.mapGroups
+          });
+          if (!(await sourcesUnchanged())) return;
+          task.supplement = supplement.detail;
+        } catch (error) {
+          if (task.controller.signal.aborted || this.closed || !this.isLiveMergeTask(task)) throw error;
+          if (error instanceof Error && error.message === t("ui.merge_draft_stale")) throw error;
+          // The cards' merge is still good: it is written, with a line saying the sources were not read.
+          this.plugin.recordFailure(t("log.merge_failed"), error);
+          task.supplement = "";
+          task.supplementFailed = true;
         }
       }
       // The result is final: the unsaved preview goes away before anything is written.
@@ -7853,6 +7931,18 @@ export class VisualAgentMapView extends ItemView {
     task.controller.abort();
     this.render();
   }
+  /** The merged cards as one reference group, and the map's data sources, with the key that tells whether either changed. */
+  private async mergeSourceSnapshot(
+    sources: { id: string; path: string }[],
+    signal: AbortSignal
+  ): Promise<{ group: ReferenceGroup; mapGroups: ReferenceGroup[]; content: string }> {
+    const group = await this.topicReferenceGroup(sources, "strong", { origin: false });
+    const mapGroups = await this.readMapSourceGroups(signal);
+    const content = mapGroups.length
+      ? `${JSON.stringify(group.documents)}\n${JSON.stringify(mapGroups.map(item => item.documents))}`
+      : JSON.stringify(group.documents);
+    return { group, mapGroups, content };
+  }
   /** Compares the merged summary and Detail with what the sources hold (numbers, links, embeds; no invented numbers). */
   private async checkMergeResult(task: MergeTask, result: AiResult): Promise<MergeCheckResult> {
     const notes = await Promise.all(
@@ -7883,6 +7973,7 @@ export class VisualAgentMapView extends ItemView {
           visualReferences: draft.visualReferences,
           formatIssues: draft.formatIssues,
           sourceContent: task.sourceContent,
+          supplement: task.supplementFailed ? null : (task.supplement ?? ""),
           task
         },
         task.appearance
@@ -7902,6 +7993,8 @@ export class VisualAgentMapView extends ItemView {
       visualReferences: AiResult["visualReferences"];
       formatIssues: AiResult["formatIssues"];
       sourceContent: string;
+      /** The data-source block: its text, "" for none, null when the request failed. */
+      supplement?: string | null;
       task: MergeTask;
     },
     /** What the chat reply asked for the merged card (colour, markers, styles); written on top of what the sources share. */
@@ -7953,7 +8046,7 @@ export class VisualAgentMapView extends ItemView {
     if (content) {
       let latest: string | undefined;
       try {
-        latest = JSON.stringify((await this.topicReferenceGroup(sources, "strong", { origin: false })).documents);
+        latest = (await this.mergeSourceSnapshot(sources, new AbortController().signal)).content;
       } catch {
         /* An unreadable source is a changed source. */
       }
@@ -8002,7 +8095,12 @@ export class VisualAgentMapView extends ItemView {
           created.path,
           {
             summary: content.summary,
-            detail: canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+            detail: withSourceSupplement(
+              canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+              content.supplement,
+              detailTemplate,
+              noteLanguageOf(language)
+            ),
             visualReferences: visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language)),
             prompt: mergeGoalTask(language),
             sourcePaths: sources.map(source => source.path),
@@ -8099,6 +8197,7 @@ export class VisualAgentMapView extends ItemView {
           detail: string;
           visualReferences: AiResult["visualReferences"];
           formatIssues: AiResult["formatIssues"];
+          supplement?: string | null;
           task: MergeTask;
         }
       | undefined,
@@ -8119,7 +8218,12 @@ export class VisualAgentMapView extends ItemView {
       const references = visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language));
       patch = {
         summary: content.summary,
-        detail: canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+        detail: withSourceSupplement(
+          canonicalDetail(content.detail, noteLanguageOf(language), detailTemplate),
+          content.supplement,
+          detailTemplate,
+          noteLanguageOf(language)
+        ),
         status: "completed",
         sourcePaths,
         ...(references.trim() ? { visualReferences: references } : {}),
@@ -11994,6 +12098,7 @@ export class VisualAgentMapView extends ItemView {
       repo: this.plugin.repo,
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       refreshNotes: paths => this.plugin.rebuildDerivedData(paths),
+      guardPath: path => this.assertChatWritable(path),
       onApplied: (mapPath, map) => {
         if (mapPath === this.path) this.adoptSavedMap(map);
       },
@@ -12109,6 +12214,7 @@ export class VisualAgentMapView extends ItemView {
     /** Where the undo entry goes (default: the history); the picture placement folds its two entries before they reach it. */
     sink: (entry: Action) => void = entry => this.history.push(entry)
   ): Promise<void> {
+    this.assertChatWritable(node.path);
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
       before: NotePatch = {};
     for (const key of Object.keys(patch) as (keyof Note)[]) (before as Record<string, unknown>)[key] = current[key];
@@ -15335,8 +15441,134 @@ export class VisualAgentMapView extends ItemView {
           mapPath,
           signal
         );
-        return groups;
+        // Every group, vault notes included, may quote a registered external root: none leaves this exit with it.
+        const roots = await externalScrubRoots(external.sources);
+        return roots.length ? scrubReferenceGroups(groups, text => scrubExternalPaths(text, roots)) : groups;
       }
+    };
+  }
+  /**
+   * The outline request with the map's data sources in its own untrusted block. The sources go in as they are when the whole
+   * request fits the outline budget, else condensed once; still too big refuses before any request. A stop is rethrown; a
+   * failed read gives no sources and the request continues as it was.
+   */
+  private async withOutlineSources(
+    request: OutlineGenerateRequest,
+    signal: AbortSignal
+  ): Promise<OutlineGenerateRequest> {
+    const groups = await this.readMapSourceGroups(signal);
+    const sourceMaterial = await outlineSourceMaterial(request, groups, () =>
+      this.plugin.aiTasks.condenseReferences(
+        {
+          title: this.map?.title ?? "",
+          summary: "",
+          rules: "",
+          detail: "",
+          task: "",
+          ancestors: "",
+          referenceGroups: groups,
+          mode: "task",
+          researchMode: "local",
+          researchDepth: "fast",
+          visualMode: "off",
+          ...this.usageMapField()
+        },
+        request.model,
+        request.reasoning,
+        signal
+      )
+    );
+    return sourceMaterial ? { ...request, sourceMaterial } : request;
+  }
+  /** The map's sources for an AI request: a stop (AbortError) is rethrown so nothing is sent; any other read failure gives no sources. */
+  private readMapSourceGroups(signal: AbortSignal): Promise<ReferenceGroup[]> {
+    return readSourceGroups(this.taskSourceSettings().mapSources, signal);
+  }
+  /**
+   * The map's sources for one chat turn (map chat and topic chat), read-only and untrusted: the documents as they are within the
+   * per-turn limit, else their findings (condensed once, reused while the sources are unchanged). A stop is rethrown; a failed read
+   * gives no sources. A result that arrives after the map changed or the view closed is dropped (nothing is cached or sent).
+   */
+  private async chatMapSources(signal: AbortSignal): Promise<{ text: string; paths: string[] } | undefined> {
+    const mapPath = this.path;
+    const mapId = this.map?.id;
+    const conversation = this.chatConversation;
+    const current = (): boolean =>
+      !this.closed && this.path === mapPath && this.map?.id === mapId && this.chatConversation === conversation;
+    const groups = await this.readMapSourceGroups(signal);
+    const settings = this.plugin.settings;
+    const material = await mapChatSourceMaterial({
+      groups,
+      mapPath,
+      cache: this.chatSourceCache,
+      condense: () =>
+        this.plugin.aiTasks.condenseReferences(
+          {
+            title: this.map?.title ?? "",
+            summary: "",
+            rules: "",
+            detail: "",
+            task: "",
+            ancestors: "",
+            referenceGroups: groups,
+            mode: "task",
+            researchMode: "local",
+            researchDepth: "fast",
+            visualMode: "off",
+            ...this.usageMapField()
+          },
+          settings.cliModel,
+          normalizeReasoningLevel(settings.cliReasoning),
+          signal
+        ),
+      refuse: () => new Error(t("ui.source_context_exceeds_budget"))
+    });
+    if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+    if (!current()) return undefined;
+    this.chatSourceCache = material.cache;
+    return material.text ? { text: material.text, paths: material.paths } : undefined;
+  }
+  /**
+   * The sources a batch of research children shares: the map's own sources are read once. When they are too large for one request
+   * the condensing runs once for the whole batch (`sharedCondense`), not once per child.
+   */
+  private async batchSources(
+    own: ReferenceGroup[],
+    childCount: number,
+    model: string,
+    signal: AbortSignal | undefined
+  ): Promise<{ groups: ReferenceGroup[]; sharedCondense: ((signal: AbortSignal) => Promise<string>) | undefined }> {
+    let mapGroups: ReferenceGroup[] = [];
+    try {
+      mapGroups = await this.readMapSourceGroups(signal ?? new AbortController().signal);
+    } catch (error) {
+      // A stop leaves the batch to its own signal (the coordinator starts nothing for an aborted one).
+      if ((error as { name?: string } | null)?.name !== "AbortError") throw error;
+    }
+    const groups = withMapSources(mapGroups, own);
+    return {
+      groups,
+      sharedCondense: sharedSourceFindings(childCount, condenseSignal =>
+        this.plugin.aiTasks.condenseReferences(
+          {
+            title: this.map?.title ?? "",
+            summary: "",
+            rules: "",
+            detail: "",
+            task: "",
+            ancestors: "",
+            referenceGroups: groups,
+            mode: "task",
+            researchMode: "local",
+            researchDepth: "fast",
+            visualMode: "off",
+            ...this.usageMapField()
+          },
+          model,
+          undefined,
+          condenseSignal
+        )
+      )
     };
   }
   /**
@@ -15435,6 +15667,8 @@ export class VisualAgentMapView extends ItemView {
     if (!writer || !isSafeTopicNodeId(entry.nodeId)) return;
     const parsed = await writer.read(this.topicChatRoot(entry), entry.nodeId);
     if (!parsed || this.closed || this.topicChatSessions.get(entry.nodeId) !== entry) return;
+    // A turn of the saved conversation sent the sources: its later writes stay behind the plan (before anything of it is used).
+    if (topicChatReadsSources(parsed.lines)) entry.readsSources = true;
     const restored: TopicChatTurn[] = [];
     for (const turn of restoreTopicChat(parsed.lines)) {
       if (turn.id === entry.runningTurnId) continue;
@@ -16008,7 +16242,10 @@ export class VisualAgentMapView extends ItemView {
       await this.startSynthesis(
         node,
         {
-          ...chatSynthesisOptions({ outputLanguage: language }),
+          ...chatSynthesisOptions({
+            outputLanguage: language,
+            referenceGroups: await this.readMapSourceGroups(controller.signal)
+          }),
           researchMode: researchModeOf(mode),
           // Only a chosen depth over a deeper subtree (the chain) sends the outline; a plain integration keeps its old form.
           ...(depth !== undefined ? { subtreeIntegration: true } : {}),
@@ -16155,7 +16392,10 @@ export class VisualAgentMapView extends ItemView {
           await this.startSynthesis(
             target,
             {
-              ...chatSynthesisOptions({ outputLanguage: language }),
+              ...chatSynthesisOptions({
+                outputLanguage: language,
+                referenceGroups: await this.readMapSourceGroups(controller.signal)
+              }),
               researchMode: "local",
               subtreeIntegration: true,
               skipCharts: true,
@@ -16207,9 +16447,7 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<{ result?: AiResult; failure?: string }> {
     let result: AiResult | undefined;
     let failure: string | undefined;
-    const referenceGroups = await this.taskSourceSettings()
-      .mapSources(signal)
-      .catch(() => []);
+    const referenceGroups = await this.readMapSourceGroups(signal);
     const runStyle = await this.detailTemplateFor(node, undefined, undefined, language);
     const handle = await this.runAgent(
       node,
@@ -16244,7 +16482,8 @@ export class VisualAgentMapView extends ItemView {
     entry: TopicChatEntry,
     node: MapNode,
     note: Note,
-    message: string
+    message: string,
+    signal: AbortSignal
   ): Promise<MapChatRequest> {
     const map = this.map!;
     const settings = this.plugin.settings;
@@ -16291,6 +16530,7 @@ export class VisualAgentMapView extends ItemView {
           },
           { role: "assistant", text: turns[i + 1].text }
         );
+    const mapSources = await this.chatMapSources(signal);
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapTitles: [],
@@ -16313,8 +16553,15 @@ export class VisualAgentMapView extends ItemView {
         ? (map.topicRelations ?? []).filter(relation => scope.has(relation.from) && scope.has(relation.to))
         : [],
       activeFile: null,
-      history
+      history,
+      ...(mapSources ? { mapSources } : {})
     });
+    // Sent once, untrusted for every later turn of this topic's conversation.
+    if (context.mapSourcesSent) {
+      entry.readsSources = true;
+      if (entry.runningTurnId)
+        this.writeTopicChatLine(entry, { type: "sources", id: entry.runningTurnId, at: new Date().toISOString() });
+    }
     // The prompt hides the topic's parent (outline parentId null), but the stale check compares against the real one:
     // keep the baseline true so a topic that is not the map root is not judged moved. `topicHashes` is never sent to the model.
     if (context.topicHashes[node.id])
@@ -16351,7 +16598,7 @@ export class VisualAgentMapView extends ItemView {
       hooks.end();
     };
     try {
-      const request = await this.buildTopicChatRequest(entry, node, note, text);
+      const request = await this.buildTopicChatRequest(entry, node, note, text, controller.signal);
       began = true;
       this.plugin.activeTasks?.set(key, controller);
       hooks.begin(controller);
@@ -16383,7 +16630,8 @@ export class VisualAgentMapView extends ItemView {
       const plan = allowed.length
         ? planFor(allowed, request.context, {
             diagrams: this.plugin.settings.addDiagramsAfterResearch,
-            mapAiMode: map.aiMode
+            mapAiMode: map.aiMode,
+            chatReadSources: entry.readsSources === true
           })
         : null;
       if (plan) {
@@ -16468,7 +16716,10 @@ export class VisualAgentMapView extends ItemView {
         await this.startSynthesis(
           target,
           {
-            ...chatSynthesisOptions({ outputLanguage: language }),
+            ...chatSynthesisOptions({
+              outputLanguage: language,
+              referenceGroups: await this.readMapSourceGroups(signal)
+            }),
             researchMode: researchModeOf(mode),
             signal,
             onProgress: () => {}
@@ -19044,14 +19295,14 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   /** `noticeGate` is the caller's gate when it already told the user about an unreadable template block. */
-  private startShallowResearch(
+  private async startShallowResearch(
     parent: MapNode,
     children: MapNode[],
     options: TaskOptions,
     noticeGate?: { shown: boolean }
   ): Promise<void> {
     const signal = options.signal;
-    const pendingOptions = this.researchChoices(options);
+    // Everything that depends on the map as it is when the batch starts is taken before the sources are read.
     const languageSource = this.batchLanguageSource();
     const placed = new Map<string, { x: number; y: number }>();
     for (const child of children) {
@@ -19061,16 +19312,24 @@ export class VisualAgentMapView extends ItemView {
     let respaced = false;
     const gate = noticeGate ?? { shown: false };
     this.plugin.quickExpandPending.add(parent.path);
+    // The map's sources are read once before the batch starts and go to every child; too large for one request, they are condensed once.
+    const sources = await this.batchSources(
+      options.referenceGroups ?? [],
+      children.length,
+      options.runOnce?.model ?? this.currentModelId(),
+      signal
+    );
+    const pendingOptions = this.researchChoices({ ...options, referenceGroups: sources.groups });
     return this.plugin.expansionCoordinator.start(
       parent.path,
       children,
       // Quick research that reads local context only (the S7 default) is a first look: no diagram call per child.
-      (child, batchSignal, accepted) =>
+      async (child, batchSignal, accepted) =>
         this.researchChild(
           child,
           batchSignal,
           accepted,
-          pendingOptions,
+          { ...pendingOptions, sharedReferenceCondense: sources.sharedCondense },
           pendingOptions.researchMode !== "local",
           undefined,
           gate,
@@ -19126,6 +19385,10 @@ export class VisualAgentMapView extends ItemView {
         rules: "",
         referenceGroups: choices.referenceGroups ?? [],
         referenceDelivery: "direct",
+        ...(choices.preparedReferenceFindings !== undefined
+          ? { preparedReferenceFindings: choices.preparedReferenceFindings }
+          : {}),
+        ...(choices.sharedReferenceCondense ? { sharedReferenceCondense: choices.sharedReferenceCondense } : {}),
         signal: batchSignal,
         outputLanguage,
         researchMode: choices.researchMode,
@@ -19285,8 +19548,15 @@ export class VisualAgentMapView extends ItemView {
         // The batch runs in the background: leave selection mode so the selection bar gets out of the way.
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
+        // Too large for one request: condensed once for the whole batch, by the first topic that runs, and shared.
+        const sources = await this.batchSources(
+          request.referenceGroups ?? [],
+          nodes.length,
+          request.model ?? this.currentModelId(),
+          signal
+        );
         const shared = {
-          referenceGroups: request.referenceGroups ?? [],
+          referenceGroups: sources.groups,
           requirements: request.requirements,
           // The picked model is for this batch only (D4): it never becomes a topic's own model.
           ...(request.model ? { runOnce: { model: request.model } } : {}),
@@ -19327,8 +19597,8 @@ export class VisualAgentMapView extends ItemView {
                 return "skipped";
               }
               const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
-              const choices = choicesFor(note);
               try {
+                const choices = { ...choicesFor(note), sharedReferenceCondense: sources.sharedCondense };
                 await this.researchChild(
                   child,
                   batchSignal,
@@ -22094,6 +22364,7 @@ export class VisualAgentMapView extends ItemView {
       imageDataUrl = await this.readChatImage(picture.path, settings.cliModel, signal);
       picture.selected.imageAttached = true;
     }
+    const mapSources = await this.chatMapSources(signal);
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapTitles,
@@ -22116,8 +22387,11 @@ export class VisualAgentMapView extends ItemView {
       history: chat.turns(),
       ...(picture ? { selectedImage: picture.selected } : {}),
       ...(researchNotes.length ? { researchNotes } : {}),
+      ...(mapSources ? { mapSources } : {}),
       ...(continuation ? { continuation } : {})
     });
+    // From this turn on the conversation holds source text (and what the model made of it): its writes need the user's yes.
+    if (context.mapSourcesSent) this.chatReadsSources = true;
     return {
       message,
       context,
@@ -22378,6 +22652,7 @@ export class VisualAgentMapView extends ItemView {
                     imageAttached: !!request.imageDataUrl,
                     chain: planChainOf(run.state),
                     chatStartedResearch: this.chatStartedResearch,
+                    chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
                     trusted: {
                       createdIds: run.createdIds,
                       researchedIds: new Set(
@@ -22894,13 +23169,18 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_plan_reason_auto_round_other_actions");
       case "research_text_other_actions":
         return t("ui.map_chat_plan_reason_research_text_other_actions");
+      case "source_text_other_actions":
+        return t("ui.map_chat_plan_reason_source_text_other_actions");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
   private offerChatPlan(
     result: MapChatResult,
     plan: MapChatPlan,
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research">,
+    baseline: Pick<
+      MapChatContext,
+      "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research" | "mapSourcePaths"
+    >,
     anchor: { path: string; id: string | undefined },
     /** The user's message: an integration in the plan takes it as its direction when the plan is applied, as it would have at once. */
     message: string,
@@ -22967,7 +23247,7 @@ export class VisualAgentMapView extends ItemView {
     card: MapChatPlanCard,
     token: number,
     result: MapChatResult & { message?: string },
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "basis" | "parents" | "research">,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "basis" | "parents" | "research" | "mapSourcePaths">,
     anchor: { path: string; id: string | undefined },
     run: ChatChainRun | null = null
   ): Promise<void> {
@@ -23147,11 +23427,20 @@ export class VisualAgentMapView extends ItemView {
       this.chatLastRecord = record;
       // Research began while the record was off: the mark goes in with the first turn written after it came back on.
       this.markResearchRecorded(record);
+      this.markSourcesRecorded(record);
       return record;
     } catch (error) {
       this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
       return null;
     }
+  }
+  /** Writes the `sources_read` mark once per record conversation (the sources were sent: a reopened conversation keeps its writes behind the plan). */
+  private markSourcesRecorded(record: MapChatTurnRecord | null): void {
+    const writer = this.chatRecords;
+    if (!this.chatReadsSources || !record || !writer || this.plugin.settings.mapChatRecords !== true) return;
+    if (writer.conversationId !== record.conversationId || this.chatSourcesMarkedIn === record.conversationId) return;
+    this.chatSourcesMarkedIn = record.conversationId;
+    record.event("sources_read");
   }
   /** Writes the `research_started` mark once per record conversation, and only while the record is on (otherwise the next turn writes it). */
   private markResearchRecorded(record: MapChatTurnRecord | null): void {
@@ -23167,6 +23456,9 @@ export class VisualAgentMapView extends ItemView {
     this.chatResearched.clear();
     this.chatResearchSent.clear();
     this.chatStartedResearch = false;
+    this.chatReadsSources = false;
+    this.chatSourcesMarkedIn = null;
+    this.chatSourceCache = null;
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   private startChatRecords(): void {
@@ -23251,13 +23543,19 @@ export class VisualAgentMapView extends ItemView {
       this.chatStartedResearch = true;
       this.chatResearchMarkedIn = restored.id;
     }
+    // Likewise for the sources: the restored conversation's turns stay untrusted and its writes behind the plan (an older file: false).
+    if (restored.readsSources) {
+      this.chatReadsSources = true;
+      this.chatSourcesMarkedIn = restored.id;
+    }
     const handle = this.plugin.repo.app.vault.getAbstractFileByPath(latest.path ?? "");
     writer.resume(
       latest.id,
       handle instanceof TFile ? handle : (latest.path ?? ""),
       this.chatRecordTarget(),
       latest.parsed.cleanEnd,
-      restored.startedResearch
+      restored.startedResearch,
+      restored.readsSources
     );
     // Every turn number of the file is taken: a late result of one of them can never be written again.
     const numbers = latest.parsed.lines.flatMap((line: RecordLine) =>
@@ -23637,7 +23935,7 @@ export class VisualAgentMapView extends ItemView {
       /** The user's message; an integration in the reply takes it as its direction. */
       message?: string;
     },
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
     alive: () => boolean = () => true,
     anchor: { path: string; id: string | undefined } = { path: this.path, id: this.map?.id },
     /** A continuation's round: the context the basis of new cards is judged by, and where the work the reply starts is collected. */
@@ -23689,7 +23987,11 @@ export class VisualAgentMapView extends ItemView {
     // ... and why: the map was never made, or it was made but could not be opened here.
     let noNewMapReason: TranslationKey = "ui.map_chat_skip_map_not_created";
     // Copied: the turn's own writes move the baseline along, the request's context stays as it was sent.
-    const own = { mdHashes: baseline.mdHashes, topicHashes: { ...baseline.topicHashes } };
+    const own = {
+      mdHashes: baseline.mdHashes,
+      topicHashes: { ...baseline.topicHashes },
+      mapSourcePaths: baseline.mapSourcePaths
+    };
     // A reply that adds many cards is laid out as a whole afterwards, so its writes repaint once at the end. One that adds a
     // few cards places each against the cards painted so far, so it keeps repainting after every write.
     const adds = result.actions.filter(action => action.kind === "add_child").length;
@@ -24231,15 +24533,49 @@ export class VisualAgentMapView extends ItemView {
     }
     return !this.closed && this.path === mapPath && this.map ? mapPath : "";
   }
-  /** One write action. Runs inside `plugin.mutate`: it must not queue another one. */
+  /**
+   * Throws {@link MapSourceWriteError} when `path` is one of the map's data sources and a chat write action is running. Every
+   * write to a card's note file goes through `noteChange` or a map transaction (both call this), so an action that is added
+   * later is covered without a check of its own, and a refused step writes nothing (a transaction checks as steps are queued).
+   */
+  private assertChatWritable(path: string): void {
+    const guarded = this.chatReadOnlyPaths;
+    if (guarded && guarded.has((normalizeVaultPath(path) ?? path).toLowerCase())) throw new MapSourceWriteError();
+  }
+  /**
+   * One write action. Runs inside `plugin.mutate`: it must not queue another one. The map's data sources are read-only for the
+   * whole action: a write to one of them (through any card, any descendant of a branch) is refused as "a data source".
+   */
   private async applyChatWrite(
     action: Exclude<
       MapChatAction,
       { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
     >,
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
     same: () => boolean,
     run: ChatRun = { refs: new Map(), created: [] }
+  ): Promise<ChatOutcome> {
+    const previous = this.chatReadOnlyPaths;
+    this.chatReadOnlyPaths = new Set(
+      (baseline.mapSourcePaths ?? []).map(path => (normalizeVaultPath(path) ?? path).toLowerCase())
+    );
+    try {
+      return await this.applyChatWriteGuarded(action, baseline, same, run);
+    } catch (error) {
+      if (error instanceof MapSourceWriteError) return guardSkipped("map_source");
+      throw error;
+    } finally {
+      this.chatReadOnlyPaths = previous;
+    }
+  }
+  private async applyChatWriteGuarded(
+    action: Exclude<
+      MapChatAction,
+      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
+    >,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
+    same: () => boolean,
+    run: ChatRun
   ): Promise<ChatOutcome> {
     const hashes = baseline.mdHashes;
     if (!same() || !this.map) return skipped("ui.map_chat_skip_map_changed");
@@ -24250,6 +24586,18 @@ export class VisualAgentMapView extends ItemView {
     /** The real id behind an id of the reply; null when it names a card of this reply that was never created. */
     const real = (id: string): string | null =>
       id.startsWith(MAP_CHAT_NEW_PREFIX) ? (run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) ?? null) : id;
+    /** A card whose note is one of the map's data sources must not be rewritten through the card (same rule and reason as the file actions). */
+    const sourceFileRefusal = (node: MapNode): ChatOutcome | null => {
+      const verdict = guardMapChatWrite({
+        kind: "edit",
+        path: node.path,
+        newContent: "",
+        knownHashes: hashes,
+        readOnlyPaths: baseline.mapSourcePaths,
+        configDir
+      });
+      return !verdict.ok && verdict.code === "map_source" ? guardSkipped(verdict.code) : null;
+    };
     // AI lock: the real guard of the chat is here, on apply (a confirmation that comes later is checked again here).
     const locked = await this.chatLockSkip(action, real);
     if (locked) return locked;
@@ -24329,6 +24677,8 @@ export class VisualAgentMapView extends ItemView {
       case "edit_topic_note": {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
+        const sourceRefusal = sourceFileRefusal(node);
+        if (sourceRefusal) return sourceRefusal;
         // Model-written note body: same allow-list and parser check as an AI task result (a manual edit never comes here).
         // Done before the merge and stale checks so no await sits between the stale check and the write.
         const detail =
@@ -24356,6 +24706,13 @@ export class VisualAgentMapView extends ItemView {
         if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
         const parent = nodeOf(parentId);
         if (!node || !parent) return gone;
+        // The move rewrites the derived "Parent topic" / "Child topics" lines of the moved card and of both parents: a data source
+        // among them would be rewritten, so the move is refused (the map file alone changes otherwise).
+        const oldParent = node.parentId ? nodeOf(node.parentId) : undefined;
+        for (const touched of [node, parent, oldParent]) {
+          const sourceRefusal = touched ? sourceFileRefusal(touched) : null;
+          if (sourceRefusal) return sourceRefusal;
+        }
         if (this.isMerging(node.id) || this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
@@ -24391,6 +24748,8 @@ export class VisualAgentMapView extends ItemView {
       case "delete_topic": {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
+        const sourceRefusal = sourceFileRefusal(node);
+        if (sourceRefusal) return sourceRefusal;
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
@@ -24405,6 +24764,7 @@ export class VisualAgentMapView extends ItemView {
           path: action.path,
           newContent: "",
           knownHashes: hashes,
+          readOnlyPaths: baseline.mapSourcePaths,
           configDir
         });
         if (!early.ok) return guardSkipped(early.code);
@@ -24440,6 +24800,7 @@ export class VisualAgentMapView extends ItemView {
           oldContent: source.text,
           newContent: next,
           knownHashes: hashes,
+          readOnlyPaths: baseline.mapSourcePaths,
           configDir
         });
         if (!verdict.ok) return guardSkipped(verdict.code, true);
@@ -24479,6 +24840,7 @@ export class VisualAgentMapView extends ItemView {
           path: action.path,
           newContent: content,
           exists,
+          readOnlyPaths: baseline.mapSourcePaths,
           configDir
         });
         if (!verdict.ok || !key) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
@@ -24949,9 +25311,7 @@ export class VisualAgentMapView extends ItemView {
         const conversation = this.chatConversation;
         const key = this.multiResearchKey();
         // The map's own source files (as a single research gets them) plus what this turn attached; read before the batch starts.
-        const mapSourceGroups = await this.taskSourceSettings()
-          .mapSources(work?.controller.signal ?? new AbortController().signal)
-          .catch(() => [] as ReferenceGroup[]);
+        const mapSourceGroups = await this.readMapSourceGroups(work?.controller.signal ?? new AbortController().signal);
         const referenceGroups = [...mapSourceGroups, ...this.chatTurnReferences];
         // From here on any turn of this conversation may read web text (decision #17): set before the first card is written, and
         // kept in the record so a reopened conversation keeps it.
@@ -25153,7 +25513,7 @@ export class VisualAgentMapView extends ItemView {
     for (const id of ids) batch.imageNodes.add(id);
     const anchor = { path: this.path, id: map.id };
     // Web text can reach the model once research ran: the search words then come from the cards' own titles, never from the model.
-    const readsResearch = this.chatStartedResearch || continuation;
+    const readsResearch = this.chatStartedResearch || this.chatReadsSources || continuation;
     const words = readsResearch ? "" : cleanImageQuery(direction);
     const jobs: { block: MapChatImages; controller: AbortController; model: string; key?: number }[] = [];
     const blocks: MapChatImages[] = [];
@@ -25769,7 +26129,8 @@ export class VisualAgentMapView extends ItemView {
           existingNoteLanguage(note),
           remembered,
           map.title
-        )
+        ),
+        referenceGroups: await this.readMapSourceGroups(new AbortController().signal)
       });
       return this.launchChatTask(note.model, (failed, accepted) =>
         this.startSynthesis(node, options, message, failed, accepted)
@@ -25781,7 +26142,8 @@ export class VisualAgentMapView extends ItemView {
     const names = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
     const options = chatSynthesisOptions({
       outputLanguage: defaultOutputLanguage(settings.language, "", undefined, remembered),
-      synthesisTitle: synthesisDefaultName(resolveMapTextLanguage(map, settings.language), names)
+      synthesisTitle: synthesisDefaultName(resolveMapTextLanguage(map, settings.language), names),
+      referenceGroups: await this.readMapSourceGroups(new AbortController().signal)
     });
     // The run lives on the selection bar, so the sources are the selection while it runs.
     this.chatSelect(nodes.map(node => node.id));

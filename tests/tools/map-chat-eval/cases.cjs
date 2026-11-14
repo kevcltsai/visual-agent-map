@@ -57,6 +57,10 @@ const CASES = [
     [C.noRejected(), C.firstKind("create_map"), C.hasKind("add_child", 3)]),
   kase("B6", "建樹", "明確要另開新地圖", "prompt: create_map 用於使用者要求另開", ["create_map"], { message: "另外開一張新地圖『烘焙』，建三個分支", outline: STEAK },
     [C.noRejected(), C.firstKind("create_map"), C.hasAction("create_map", a => /烘焙/.test(a.title), "title 烘焙"), C.hasKind("add_child", 3)]),
+  kase("B8", "建樹", "批次改筆記、沒有選取：自己選起，不請使用者選", "prompt: 批次規則（筆記不在 context 時用 select_topics，remaining 寫還要做什麼）", ["select_topics"],
+    { message: "把這三張卡的筆記各自加一行重點摘要", outline: tree([["r", "讀書筆記", null], ["n1", "專注力", "r"], ["n2", "間隔複習", "r"], ["n3", "主動回想", "r"]]) },
+    [C.rawReplyNot(/請(?:你|您)?(?:先)?(?:在地圖上)?(?:選取|選起|點選|選擇|框選)|select (?:the|those|these) cards/i, "asks the user to select the cards"),
+      C.hasAction("select_topics", a => a.all || ["n1", "n2", "n3"].every(id => a.nodeIds.includes(id)), "n1,n2,n3"), C.remaining(true), C.noKinds(["edit_topic_note", "delete_topic"])]),
   kase("B7", "建樹", "大型請求不在 reply 寫數量", "C1: reply 不可寫將建立的數量", ["add_child"], { message: "做一棵三層、大約五十個節點的 Python 學習樹", outline: [], emptyMap: true },
     [...STYLE, C.addChildMin(20)]),
 

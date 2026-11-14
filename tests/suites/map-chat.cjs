@@ -8743,3 +8743,42 @@ integrationTest('ticket 03: edit_topic_note detail gives a line-leading <sup> a 
   await h.view.history.undo().undo(); await h.view.history.undo().undo();
   assert.equal((await h.note('a')).detail, before, 'undo restores the note before the writes');
 });
+
+// Ticket 04: find_images does not embed a picture the card already has, and prefers one no other card of the map shows.
+integrationTest('ticket 04 find_images: an image the card already has is not embedded again, its source link is still added', async () => {
+  const { h } = await imageHarness();
+  await h.repo.updateNote(h.node('a').path, { detail: `Old\n\n${imageEmbed(0)}` }); await h.view.hydrate();
+  h.control.search = async () => imageItems(1);
+  await apply(h, [findAct(h, 'a')]); await waitImages(h);
+  const detail = (await h.note('a')).detail;
+  assert.equal((detail.match(/!\[Pic 0\]/g) || []).length, 1, `not embedded again: ${detail}`);
+  assert.equal((detail.match(/\[Pic 0\]\(<https:\/\/page\.example\/0>\)/g) || []).length, 2, `the source text is kept: ${detail}`);
+});
+integrationTest('ticket 04 find_images: the first loadable candidate is used by another card of the map, so the second is chosen; when all are used one is still chosen', async () => {
+  const { h } = await imageHarness();
+  await h.repo.updateNote(h.node('b').path, { detail: imageEmbed(0) }); await h.view.hydrate();
+  h.control.search = async () => imageItems(2);
+  await apply(h, [findAct(h, 'a')]); await waitImages(h);
+  assert.equal(lastImages(h).items[0].candidate.title, 'Pic 1', 'the unused one');
+  assert.equal((await h.note('a')).detail, imageEmbed(1));
+  // All loadable candidates are used somewhere in the map: the first is taken all the same.
+  await h.repo.updateNote(h.node('c').path, { detail: 'nothing yet' }); await h.view.hydrate();
+  const before = allImages(h).length;
+  await apply(h, [findAct(h, 'c')]); await withTimeout(until(() => allImages(h).length > before && imagesDone(h)));
+  const block = allImages(h).at(-1);
+  assert.equal(block.state, 'ready'); assert.equal(block.items.length, 1); assert.equal(block.items[0].candidate.title, 'Pic 0');
+  assert.match((await h.note('c')).detail, /!\[Pic 0\]/);
+});
+integrationTest('ticket 04 edit_topic_note: duplicate embeds in the new Detail are reduced to one (the replaced Detail does not count); edit_md_file does not repeat an image the rest of the file has', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await h.repo.updateNote(h.node('a').path, { detail: imageEmbed(0) }); await h.view.hydrate();
+  const lines = await apply(h, [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail: `${imageEmbed(0)}\n\nText\n\n${imageEmbed(0)}` }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  const detail = (await h.note('a')).detail;
+  assert.equal((detail.match(/!\[Pic 0\]/g) || []).length, 1, detail);
+  assert.equal((detail.match(/\[Pic 0\]\(<https:\/\/page\.example\/0>\)/g) || []).length, 2, `source text kept: ${detail}`);
+  h.contents.set('Notes/Research.md', `# R\n\n![Pic 0](<https://img.example/0.jpg>)\n\nSleep needs darkness.\n`);
+  const edit = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'Sleep needs darkness.', replace: 'Sleep needs darkness.\n\n![Pic 0](https://img.example/0.jpg)\n\n![Pic 1](https://img.example/1.jpg)' }], h.hashes('Notes/Research.md'));
+  eq(edit.map(l => l.status), ['done'], JSON.stringify(edit));
+  assert.equal(h.contents.get('Notes/Research.md'), '# R\n\n![Pic 0](<https://img.example/0.jpg>)\n\nSleep needs darkness.\n\n![Pic 1](https://img.example/1.jpg)\n');
+});

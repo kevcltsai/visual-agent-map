@@ -74,6 +74,7 @@ import {
 } from "./experiences/visual-map/map-sources";
 import { upgradeLegacyAimText } from "./core/legacy-names";
 import { managedNodeIds } from "./core/argument-map/model";
+import { dedupeImageEmbeds, imageKey, imageKeysIn } from "./core/image-keys";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
 export { normalizeReasoningLevel } from "./ai/task-policy";
 
@@ -889,7 +890,17 @@ function withoutReference(content: string): string {
   return legacy.test(content) ? content.replace(legacy, "\n") : content;
 }
 
-function detailWithVisualReferences(detail: string, visualReferences: string, template: DetailTemplate): string {
+/**
+ * Puts each visual reference block into the Detail. By default a block whose exact image link the Detail already has is left
+ * out. With `keepText` (new AI content): a block whose image the Detail already has (same image key, see imageKey) keeps its
+ * title and source text and drops only the image line.
+ */
+function detailWithVisualReferences(
+  detail: string,
+  visualReferences: string,
+  template: DetailTemplate,
+  keepText = false
+): string {
   let current = detail.trim();
   const references = visualReferences
     .trim()
@@ -897,8 +908,11 @@ function detailWithVisualReferences(detail: string, visualReferences: string, te
     .filter(Boolean);
   for (const reference of references) {
     const image = reference.match(/!\[[^\]]*\]\(([^)]+)\)/);
-    if (!image || current.includes(`](${image[1]})`)) continue;
-    const block = reference.replace(/^### (.+)$/gm, "**$1**").trim();
+    if (!image) continue;
+    const repeated = keepText ? imageKeysIn(current).has(imageKey(image[1])) : current.includes(`](${image[1]})`);
+    if (repeated && !keepText) continue;
+    const written = repeated ? dedupeImageEmbeds(reference, { seen: [imageKey(image[1])] }) : reference;
+    const block = written.replace(/^### (.+)$/gm, "**$1**").trim();
     const title = block.match(/^\*\*(.+)\*\*/)?.[1];
     const paragraphs = current.split("\n\n");
     const related = title ? paragraphs.findIndex(text => !/^#{1,6} /.test(text) && text.includes(title)) : -1;
@@ -1676,7 +1690,12 @@ export class Repository {
   async updateNote(
     path: string,
     patch: NotePatch,
-    options: { contentLanguage?: NoteLanguage; detailTemplate?: DetailTemplate } = {}
+    options: {
+      contentLanguage?: NoteLanguage;
+      detailTemplate?: DetailTemplate;
+      /** New AI content: a visual reference whose image the Detail already has keeps its text, without the image line. */
+      newVisualReferences?: boolean;
+    } = {}
   ): Promise<void> {
     await this.app.vault.process(this.file(path), content => this.patchedNote(path, content, patch, options));
   }
@@ -1700,7 +1719,7 @@ export class Repository {
     path: string,
     content: string,
     patch: NotePatch,
-    options: { contentLanguage?: NoteLanguage; detailTemplate?: DetailTemplate }
+    options: { contentLanguage?: NoteLanguage; detailTemplate?: DetailTemplate; newVisualReferences?: boolean }
   ): string {
     const fm = frontmatter(content);
     // One decision for every label this write emits: the note's own scaffolding language (see scaffoldLanguage).
@@ -1762,7 +1781,8 @@ export class Repository {
           detailWithVisualReferences(
             section(body, "Detail"),
             patch.visualReferences,
-            options.detailTemplate ?? standardTemplate(language)
+            options.detailTemplate ?? standardTemplate(language),
+            options.newVisualReferences === true
           )
         );
     }

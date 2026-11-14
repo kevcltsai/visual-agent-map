@@ -364,6 +364,7 @@ import {
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
 import { guardInlineHtmlLineStarts } from "../../ai/markdown-blocks";
+import { dedupeImageEmbeds, imageKey, imageKeysIn } from "../../core/image-keys";
 import type { DetailTemplate } from "../../ai/detail-templates";
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
@@ -8096,11 +8097,14 @@ export class VisualAgentMapView extends ItemView {
           created.path,
           {
             summary: content.summary,
-            detail: withSourceSupplement(
-              canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language), detailTemplate),
-              content.supplement,
-              detailTemplate,
-              noteLanguageOf(language)
+            // A new note: only an image repeated inside the merged Detail is dropped.
+            detail: dedupeImageEmbeds(
+              withSourceSupplement(
+                canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language), detailTemplate),
+                content.supplement,
+                detailTemplate,
+                noteLanguageOf(language)
+              )
             ),
             visualReferences: visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language)),
             prompt: mergeGoalTask(language),
@@ -8108,7 +8112,7 @@ export class VisualAgentMapView extends ItemView {
             status: "completed",
             ...formatIssuesPatch(content.formatIssues, language)
           },
-          { detailTemplate }
+          { detailTemplate, newVisualReferences: true }
         );
       } else
         await repo.updateNote(created.path, {
@@ -8219,11 +8223,14 @@ export class VisualAgentMapView extends ItemView {
       const references = visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language));
       patch = {
         summary: content.summary,
-        detail: withSourceSupplement(
-          canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language), detailTemplate),
-          content.supplement,
-          detailTemplate,
-          noteLanguageOf(language)
+        // The merge rewrites the target's Detail in full: only an image repeated inside the new Detail is dropped.
+        detail: dedupeImageEmbeds(
+          withSourceSupplement(
+            canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language), detailTemplate),
+            content.supplement,
+            detailTemplate,
+            noteLanguageOf(language)
+          )
         ),
         status: "completed",
         sourcePaths,
@@ -8240,7 +8247,7 @@ export class VisualAgentMapView extends ItemView {
     let entry: TransactionEntry;
     try {
       const tx = this.beginMapTransaction().rewriteNote(target.path, async path => {
-        await repo.updateNote(path, patch, { detailTemplate });
+        await repo.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
         if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
         if (asked) await repo.writeTopicAppearance(path, asked);
       });
@@ -19210,10 +19217,12 @@ export class VisualAgentMapView extends ItemView {
           detail: researchOptions
             ? ""
             : item.contribution
-              ? canonicalDetail(
-                  guardInlineHtmlLineStarts(item.contribution),
-                  noteLanguageOf(this.plugin.settings.language),
-                  contributionTemplate
+              ? dedupeImageEmbeds(
+                  canonicalDetail(
+                    guardInlineHtmlLineStarts(item.contribution),
+                    noteLanguageOf(this.plugin.settings.language),
+                    contributionTemplate
+                  )
                 )
               : "",
           ...(researchOptions
@@ -20855,14 +20864,16 @@ export class VisualAgentMapView extends ItemView {
         integrated.path,
         {
           summary: result.summary,
-          detail: canonicalDetail(guardInlineHtmlLineStarts(result.detail), noteLanguageOf(language), detailTemplate),
+          detail: dedupeImageEmbeds(
+            canonicalDetail(guardInlineHtmlLineStarts(result.detail), noteLanguageOf(language), detailTemplate)
+          ),
           visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
           prompt: goal,
           sourcePaths: sources.map(source => source.path),
           status: "completed",
           ...formatIssuesPatch(result.formatIssues, this.plugin.settings.language)
         },
-        { detailTemplate }
+        { detailTemplate, newVisualReferences: true }
       );
       integrated.parentId = null;
       integrated.x = Math.max(...sources.map(node => node.x)) + 340;
@@ -24693,7 +24704,8 @@ export class VisualAgentMapView extends ItemView {
         const detail =
           action.kind === "edit_topic_note"
             ? await demoteUnparsableMermaid(
-                neutralizeUnsafeMermaid(guardInlineHtmlLineStarts(action.detail)),
+                // A full replace: only an image repeated inside the new Detail is dropped.
+                neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLineStarts(action.detail))),
                 this.plugin.mermaidSyntax
               )
             : "";
@@ -24788,10 +24800,13 @@ export class VisualAgentMapView extends ItemView {
         // A line the replacement starts with an inline tag gets a harmless lead; fence and frontmatter state come from the
         // text after the edit, and only the inserted range changes. Checks, the write and the undo entry all use this result.
         const at = source.text.indexOf(action.find);
-        const next = guardInlineHtmlLineStarts(raw, {
+        const guarded = guardInlineHtmlLineStarts(raw, {
           frontmatter: true,
           range: { start: at, end: at + action.replace.length }
         });
+        // An image the rest of the file already has (outside the replaced text) is not embedded again by the edit.
+        const tail = source.text.length - at - action.find.length;
+        const next = dedupeImageEmbeds(guarded, { file: true, range: { start: at, end: guarded.length - tail } });
         const replace = next.slice(at, next.length - (source.text.length - at - action.find.length));
         // Only the mermaid blocks the edit adds are judged (allow-list, then parser); what the note already had stays as it is.
         const added = addedMermaidBlocks(source.text, next);
@@ -24851,7 +24866,9 @@ export class VisualAgentMapView extends ItemView {
         const exists = key ? !!this.app.vault.getAbstractFileByPath(key) : false;
         // Model-written file: same allow-list and parser check as an AI task result.
         const content = await demoteUnparsableMermaid(
-          neutralizeUnsafeMermaid(guardInlineHtmlLineStarts(action.content, { frontmatter: true })),
+          neutralizeUnsafeMermaid(
+            dedupeImageEmbeds(guardInlineHtmlLineStarts(action.content, { frontmatter: true }), { file: true })
+          ),
           this.plugin.mermaidSyntax
         );
         const verdict = guardMapChatWrite({
@@ -25673,9 +25690,12 @@ export class VisualAgentMapView extends ItemView {
       const found = await this.plugin.searchImages(block.query, model, controller.signal);
       if (!current()) return dropped();
       // Web results can be stale or block hotlinking: only an image that actually loads is used.
-      const [first] = (await this.chatProbeImages(found, controller.signal)).filter(item =>
+      const loadable = (await this.chatProbeImages(found, controller.signal)).filter(item =>
         item.url.startsWith("https://")
       );
+      // A picture another card of this map already shows is taken only when every loadable one is used.
+      const used = this.imageKeysOfMap();
+      const first = loadable.find(item => !used.has(imageKey(item.url))) ?? loadable[0];
       if (!current()) return dropped();
       if (!first) return this.settleChatImages(chat, block, { state: "empty" });
       const placed = await this.chatPlaceImage(block, first, current, controller.signal);
@@ -25691,6 +25711,13 @@ export class VisualAgentMapView extends ItemView {
       if (!current()) return dropped();
       this.settleChatImages(chat, block, { state: "failed", reason: errorMessage(error) });
     }
+  }
+  /** The image keys (see imageKey) of every picture in the Detail of this map's cards, as the view last read them. */
+  private imageKeysOfMap(): Set<string> {
+    const keys = new Set<string>();
+    for (const node of this.map?.nodes ?? [])
+      for (const key of imageKeysIn(this.notes.get(node.id)?.detail ?? "")) keys.add(key);
+    return keys;
   }
   /** Whether a picture can go into the card of `block` now: the card, or the reason in words. */
   private chatImageFence(block: MapChatImages): { reason: TranslationKey } | { node: MapNode } {
@@ -25774,10 +25801,15 @@ export class VisualAgentMapView extends ItemView {
             }
             const before = note.detail.replace(/\s+$/, "");
             // The title is a whitelist (see cleanImageTitle): nothing the search result says becomes Markdown the reader acts on.
-            const addition = imageMarkdown({
-              ...candidate,
-              title: cleanImageTitle(candidate.title) || cleanImageTitle(block.nodeTitle) || t("ui.map_chat_image_alt")
-            });
+            // An append: the old Detail stays, so an image it already has is not embedded again (its source link still is).
+            const addition = dedupeImageEmbeds(
+              imageMarkdown({
+                ...candidate,
+                title:
+                  cleanImageTitle(candidate.title) || cleanImageTitle(block.nodeTitle) || t("ui.map_chat_image_alt")
+              }),
+              { seen: imageKeysIn(note.detail) }
+            );
             await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition }, entry =>
               collected.push(entry)
             );

@@ -51662,7 +51662,13 @@ function parseMapChat(raw, context) {
           break;
         }
         case "add_relation": {
-          const fromId = node("fromId", true), toId = node("toId", true);
+          const end = (key4) => {
+            const id = text10(key4);
+            if (!id.startsWith(MAP_CHAT_NEW_PREFIX) && !created && !known.has(id) && refs.has(id))
+              return `${MAP_CHAT_NEW_PREFIX}${id}`;
+            return resolve(id, true);
+          };
+          const fromId = end("fromId"), toId = end("toId");
           const given = text10("relationKind");
           if (!TOPIC_RELATION_KINDS.includes(given)) throw new Dropped("bad_value");
           const relationKind = given;

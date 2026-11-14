@@ -608,9 +608,16 @@ test('guardInlineHtmlLinks: lines that do not trip the editor, fence content and
   assert.equal(guardInlineHtmlLinks('&#8203;<sup>1</sup> x\n  &#8203;<kbd>k</kbd>\n&#8203;text'), '<sup>1</sup> x\n  <kbd>k</kbd>\n&#8203;text');
 });
 
-test('obsidian-format rule 5 says inline HTML must not start a line, in both languages', () => {
+test('guardInlineHtmlLinks: only http(s) and mailto targets become an anchor; another scheme only loses its angle brackets', () => {
+  assert.equal(guardInlineHtmlLinks('<sup>[a](<https://x.org/a>)</sup>'), '<sup><a href="https://x.org/a">a</a></sup>');
+  const other = guardInlineHtmlLinks('<sup>[a](<javascript:alert(1)>)</sup>');
+  assert.ok(!/<a\b/i.test(other), other);
+  assert.ok(!other.includes('(<javascript'), other);
+});
+
+test('obsidian-format rule 5 says no angle-bracket link inside inline HTML, in both languages', () => {
   const fs = require('node:fs');
   const read = file => fs.readFileSync(require('node:path').join(__dirname, '..', file), 'utf8');
-  assert.match(read('core/steps/_shared/obsidian-format.en.md'), /^5\. .*inline HTML \([^)]*<sup>[^)]*\) must not start a line/m);
-  assert.match(read('core/steps/_shared/obsidian-format.zh.md'), /^5\. .*行內 HTML（[^）]*<sup>[^）]*）不可放在行首/m);
+  assert.match(read('core/steps/_shared/obsidian-format.en.md'), /^5\. .*inside inline HTML \([^)]*<sup>[^)]*\) never write an angle-bracket link/m);
+  assert.match(read('core/steps/_shared/obsidian-format.zh.md'), /^5\. .*行內 HTML（[^）]*<sup>[^）]*）裡面不要放角括號連結/m);
 });

@@ -174,7 +174,11 @@ function guardInlineHtmlLine(line: string): string {
     .slice(from, end)
     .replace(
       /(?<!!)\[([^[\]]*)\]\(<([^<>\n]*)>(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,
-      (_all, text: string, dest: string) => `<a href="${attributeValue(dest)}">${text}</a>`
+      // Only web and mail targets become an anchor; any other scheme just loses its angle brackets.
+      (all: string, text: string, dest: string) =>
+        /^(?:https?|mailto):/i.test(dest)
+          ? `<a href="${attributeValue(dest)}">${text}</a>`
+          : all.replace(`(<${dest}>`, `(${encodeDestination(dest)}`)
     )
     .replace(/\]\(<([^<>\n]*)>/g, (_all, dest: string) => `](${encodeDestination(dest)}`)
     .replace(/<((?:https?|mailto):[^<>\s]+)>/gi, (_all, url: string) => `<a href="${attributeValue(url)}">${url}</a>`);

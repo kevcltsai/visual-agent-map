@@ -24401,8 +24401,10 @@ function* shrinkSteps(input2) {
       yield { ...step, researchBudget: step.researchBudget = Math.floor(research / share) };
   const hasFiles = input2.files.length > 0 || !!input2.activeFile;
   if (hasFiles) yield { ...step, fileChars: step.fileChars = 3e4 };
-  if (input2.references.some((ref) => ref.detail.length)) yield { ...step, referencesDetail: step.referencesDetail = false };
-  if (hasFiles) for (const chars of [15e3, 8e3, 4e3, 2e3]) yield { ...step, fileChars: step.fileChars = chars };
+  if (input2.references.some((ref) => ref.detail.length))
+    yield { ...step, referencesDetail: step.referencesDetail = false };
+  if (hasFiles)
+    for (const chars of [15e3, 8e3, 4e3, 2e3]) yield { ...step, fileChars: step.fileChars = chars };
   const detail = (_c = input2.detailBudget) != null ? _c : MAP_CHAT_DETAIL_BUDGET;
   if (input2.selected.some((ref) => ref.detail.length))
     for (const share of [2, 4, 12, Infinity])
@@ -24461,7 +24463,8 @@ function buildOnce(input2, shrink) {
     ids2.add(ref.id);
     const node = byId.get(ref.id);
     const withDetail = (withLinks2 || shrink.referencesDetail) && ref.detail.length <= detailLeft;
-    if (!withDetail && ref.detail.length && (shrink.detailBudget !== null || !shrink.referencesDetail)) shortened = true;
+    if (!withDetail && ref.detail.length && (shrink.detailBudget !== null || !shrink.referencesDetail))
+      shortened = true;
     if (withDetail) {
       detailLeft -= ref.detail.length;
       wholeSent.add(ref.id);

@@ -497,8 +497,10 @@ function* shrinkSteps(input: MapChatContextInput): Generator<Shrink> {
   // Steps that would change nothing (no file, no referenced or selected Detail) are skipped: each one is a whole rebuild.
   const hasFiles = input.files.length > 0 || !!input.activeFile;
   if (hasFiles) yield { ...step, fileChars: (step.fileChars = 30_000) };
-  if (input.references.some(ref => ref.detail.length)) yield { ...step, referencesDetail: (step.referencesDetail = false) };
-  if (hasFiles) for (const chars of [15_000, 8_000, 4_000, 2_000]) yield { ...step, fileChars: (step.fileChars = chars) };
+  if (input.references.some(ref => ref.detail.length))
+    yield { ...step, referencesDetail: (step.referencesDetail = false) };
+  if (hasFiles)
+    for (const chars of [15_000, 8_000, 4_000, 2_000]) yield { ...step, fileChars: (step.fileChars = chars) };
   const detail = input.detailBudget ?? MAP_CHAT_DETAIL_BUDGET;
   if (input.selected.some(ref => ref.detail.length))
     for (const share of [2, 4, 12, Infinity])
@@ -560,7 +562,8 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
     const node = byId.get(ref.id);
     const withDetail = (withLinks || shrink.referencesDetail) && ref.detail.length <= detailLeft;
     // Detail dropped by a budget step (not by the ordinary Detail budget) counts as shortened, so the note explains detailOmitted.
-    if (!withDetail && ref.detail.length && (shrink.detailBudget !== null || !shrink.referencesDetail)) shortened = true;
+    if (!withDetail && ref.detail.length && (shrink.detailBudget !== null || !shrink.referencesDetail))
+      shortened = true;
     if (withDetail) {
       detailLeft -= ref.detail.length;
       wholeSent.add(ref.id);

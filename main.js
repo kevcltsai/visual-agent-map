@@ -24151,16 +24151,17 @@ function frontmatterBlock(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   return match ? match[1] : null;
 }
+var YAML_LINE_BREAK = /\r\n|\r|\n/;
 function keyLine(line2) {
   var _a2, _b2;
-  const match = line2.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
+  const match = line2.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*([\s\S]*?)\s*$/);
   if (!match) return null;
   return { key: (_b2 = (_a2 = match[1]) != null ? _a2 : match[2]) != null ? _b2 : match[3], value: match[4].replace(/^(["'])(.*)\1$/, "$2") };
 }
 function topLevelValues(block, keys) {
   const found = /* @__PURE__ */ new Map();
   if (block === null) return found;
-  for (const line2 of block.split(/\r?\n/)) {
+  for (const line2 of block.split(YAML_LINE_BREAK)) {
     const entry = keyLine(line2);
     if (!entry || !keys.includes(entry.key) || found.has(entry.key)) continue;
     found.set(entry.key, entry.value);
@@ -24171,7 +24172,7 @@ var HYPOTHESIS_KEYS = ["topic-kind", "hypothesis-leaning", "hypothesis-strength"
 function hypothesisLines(block) {
   if (block === null) return [];
   const found = [];
-  for (const line2 of block.split(/\r?\n/)) {
+  for (const line2 of block.split(YAML_LINE_BREAK)) {
     const entry = keyLine(line2);
     if (entry && HYPOTHESIS_KEYS.includes(entry.key)) found.push(`${entry.key}=${entry.value}`);
   }
@@ -24180,7 +24181,7 @@ function hypothesisLines(block) {
 function hasDuplicateIdentityKey(block) {
   if (block === null) return false;
   const seen = /* @__PURE__ */ new Set();
-  for (const line2 of block.split(/\r?\n/)) {
+  for (const line2 of block.split(YAML_LINE_BREAK)) {
     const entry = keyLine(line2);
     if (!entry || !TOPIC_IDENTITY_KEYS.includes(entry.key)) continue;
     if (seen.has(entry.key)) return true;

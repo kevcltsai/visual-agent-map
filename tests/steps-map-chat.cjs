@@ -265,6 +265,8 @@ test('F6d: an identity key or map marker wrapped in quotes is the same key (YAML
   assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('node-id: n\n', 'node-id: n\n"node-id": other\n'))), 'duplicate_identity_key');
   assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('node-id: n', '"node-id": other'))), 'topic_identity_changed');
   assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('node-id: n', '"node-id": n'))), 'ok', 'quoting the key alone is not a change');
+  assert.equal(code(edit('Topics/n.md', NOTE_TEXT, NOTE_TEXT.replace('node-id: n\n', 'node-id: n\rnode-id: other\n'))), 'duplicate_identity_key', 'a lone CR is a YAML line break');
+  assert.equal(code(edit('Notes/p.md', plain, plain.replace('title: P', 'title: P\r"node-id": x'))), 'reserved_frontmatter', 'a key after a lone CR');
 });
 test('guard refuses removing or changing agent-map-node, node-id or topic-id of a topic note', () => {
   for (const [from, to] of [['agent-map-node: true\n', ''], ['node-id: n\n', ''], ['topic-id: m\n', ''], ['node-id: n', 'node-id: other'], ['topic-id: m', 'topic-id: "z"'], ['agent-map-node: true', 'agent-map-node: false']])

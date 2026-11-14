@@ -63,12 +63,15 @@ function frontmatterBlock(content: string): string | null {
   return match ? match[1] : null;
 }
 
+/** Every line break YAML reads (a lone `\r` too), so the guard sees the same lines as the note's parser. */
+const YAML_LINE_BREAK = /\r\n|\r|\n/;
+
 /**
  * One top-level `key: value` line: the key (a key may be wrapped in single or double quotes, `"node-id": x`; YAML reads it
  * as the same key) and the value trimmed and unquoted; null for any other line.
  */
 function keyLine(line: string): { key: string; value: string } | null {
-  const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
+  const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*([\s\S]*?)\s*$/);
   if (!match) return null;
   return { key: match[1] ?? match[2] ?? match[3], value: match[4].replace(/^(["'])(.*)\1$/, "$2") };
 }
@@ -77,7 +80,7 @@ function keyLine(line: string): { key: string; value: string } | null {
 function topLevelValues(block: string | null, keys: readonly string[]): Map<string, string> {
   const found = new Map<string, string>();
   if (block === null) return found;
-  for (const line of block.split(/\r?\n/)) {
+  for (const line of block.split(YAML_LINE_BREAK)) {
     const entry = keyLine(line);
     if (!entry || !keys.includes(entry.key) || found.has(entry.key)) continue;
     found.set(entry.key, entry.value);
@@ -92,7 +95,7 @@ export const HYPOTHESIS_KEYS: readonly string[] = ["topic-kind", "hypothesis-lea
 function hypothesisLines(block: string | null): string[] {
   if (block === null) return [];
   const found: string[] = [];
-  for (const line of block.split(/\r?\n/)) {
+  for (const line of block.split(YAML_LINE_BREAK)) {
     const entry = keyLine(line);
     if (entry && HYPOTHESIS_KEYS.includes(entry.key)) found.push(`${entry.key}=${entry.value}`);
   }
@@ -103,7 +106,7 @@ function hypothesisLines(block: string | null): string[] {
 function hasDuplicateIdentityKey(block: string | null): boolean {
   if (block === null) return false;
   const seen = new Set<string>();
-  for (const line of block.split(/\r?\n/)) {
+  for (const line of block.split(YAML_LINE_BREAK)) {
     const entry = keyLine(line);
     if (!entry || !TOPIC_IDENTITY_KEYS.includes(entry.key)) continue;
     if (seen.has(entry.key)) return true;

@@ -112,8 +112,17 @@ test('in-place refresh refuses vaults owned by another checkout without changing
   const original = readFileSync(record, 'utf8'); writeFileSync(record, original.replace(root.replace(/\/$/, ''), '/another/checkout'));
   const plugin = join(vault, '.obsidian/plugins/visual-agent-map'), main = join(plugin, 'main.js');
   writeFileSync(main, 'keep the existing build');
-  assert.throws(() => updateCurrentTestVault({ vault }), /another checkout/);
+  assert.throws(() => updateCurrentTestVault({ vault }), /another checkout: \/another\/checkout \(branch unknown\)\. Run --update-current from that checkout/);
   assert.equal(readFileSync(main, 'utf8'), 'keep the existing build');
+});
+
+test('the refusal names the branch the owning checkout is on', t => {
+  const { folder, vault } = environment(t); prepareTestVault({ vault });
+  const owner = join(folder, 'owner');
+  mkdirSync(owner); execFileSync('git', ['init', '-q', '-b', 'fix/someone-else', owner]);
+  const record = join(vault, '.vam-test-environment.json');
+  writeFileSync(record, JSON.stringify({ ...JSON.parse(readFileSync(record, 'utf8')), owner }));
+  assert.throws(() => updateCurrentTestVault({ vault }), /owner \(on branch fix\/someone-else\)/);
 });
 
 test('reset refuses unowned directories and symlinks without touching user data', t => {

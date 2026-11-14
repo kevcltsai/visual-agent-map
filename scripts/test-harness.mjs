@@ -28,6 +28,11 @@ const obsidianApp = "/Applications/Obsidian.app";
 const hash = data => createHash("sha256").update(data).digest("hex");
 const hashes = folder => Object.fromEntries(assets.map(name => [name, hash(readFileSync(join(folder, name)))]));
 const json = path => JSON.parse(readFileSync(path, "utf8"));
+// Names the checkout that owns a vault and the branch it is on, so a refused agent can say what it is waiting for.
+function ownerCheckoutState(owner) {
+  try { return `${owner} (on branch ${execFileSync("git", ["-C", owner, "branch", "--show-current"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || "detached HEAD"})`; }
+  catch { return `${owner} (branch unknown)`; }
+}
 
 // The owner's canonical vault holds their own maps; the regression fixture maps are neither seeded into nor required of it.
 // Session and --prepare vaults keep both. `owner` is a parameter only so tests can designate a temp vault.
@@ -89,7 +94,7 @@ function ensureNativeMenusOff(vault) {
 export function updateCurrentTestVault({ vault = canonicalVault, artifact = root, source = {}, owner = canonicalVault } = {}) {
   if (!existsSync(vault) || lstatSync(vault).isSymbolicLink() || !lstatSync(vault).isDirectory() || !existsSync(join(vault, marker))) throw new Error("Refusing to update a missing or unowned test vault.");
   const recordPath = join(vault, marker), record = json(recordPath);
-  if (record.owner !== realpathSync(root) || record.kind !== "vam-disposable-test-vault") throw new Error("Refusing to update a test vault owned by another checkout.");
+  if (record.owner !== realpathSync(root) || record.kind !== "vam-disposable-test-vault") throw new Error(`Refusing to update a test vault owned by another checkout: ${ownerCheckoutState(record.owner)}. Run --update-current from that checkout once it is on main; if another session holds it, tell the session that opened you what you are waiting for.`);
   const manifest = json(join(artifact, "manifest.json"));
   const plugin = join(vault, ".obsidian/plugins/visual-agent-map");
   if (!existsSync(plugin) || lstatSync(plugin).isSymbolicLink() || !lstatSync(plugin).isDirectory()) throw new Error("Refusing an invalid installed plugin directory.");

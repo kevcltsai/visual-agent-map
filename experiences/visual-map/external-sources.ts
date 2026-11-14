@@ -1,12 +1,23 @@
-import { constants, realpathSync } from "node:fs";
+import {
+  constants,
+  chmodSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync
+} from "node:fs";
 import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, platform } from "node:os";
 import { isAbsolute, join, normalize, parse, sep } from "node:path";
 import type { ReferenceDocument, ReferenceGroup } from "../../ai/reference-materials";
 
 /**
- * Folders outside the vault used as map data sources. The list lives only in this device's Obsidian local storage
- * (per vault, per map id): never in data.json, Map.md, a prompt, a note, a log or a share file. Every read re-checks the
+ * Folders outside the vault used as map data sources. The list lives only on this device, in one file in the OS
+ * per-user app-data folder shared by every Obsidian instance on the computer (keyed by the vault's real path and the
+ * map id); Obsidian's local storage is the fallback where that file cannot be used and the source of a one-time copy.
+ * Never in the vault, data.json, Map.md, a prompt, a note, a log or a share file. Every read re-checks the
  * folder's real location; tasks and the UI only ever see the label (`name`, `name#2`, ...), never the path.
  */
 export interface ExternalSource {
@@ -26,17 +37,75 @@ const storageKey = (mapId: string): string => `${STORAGE_PREFIX}${mapId}`;
 interface LocalStorageApp {
   loadLocalStorage?(key: string): unknown;
   saveLocalStorage?(key: string, data: unknown): void;
+  vault?: { adapter?: { getBasePath?: () => unknown } };
 }
 
-/** This map's external sources from device-local storage; anything malformed is dropped. Never throws. */
-export function loadExternalSources(app: object, mapId: string | undefined): ExternalSource[] {
-  if (!mapId) return [];
-  let raw: unknown;
+const FILE_NAME = "external-sources.json";
+let dirOverride: string | undefined;
+/** Tests point the device file at a temp folder; `undefined` restores the OS location. */
+export function setExternalSourcesDir(dir: string | undefined): void {
+  dirOverride = dir;
+}
+
+function deviceDir(): string {
+  if (dirOverride) return dirOverride;
+  const home = homedir();
+  const os = platform();
+  if (os === "darwin") return join(home, "Library", "Application Support", "visual-agent-map");
+  if (os === "win32") return join(process.env.APPDATA || join(home, "AppData", "Roaming"), "visual-agent-map");
+  return join(process.env.XDG_CONFIG_HOME || join(home, ".config"), "visual-agent-map");
+}
+
+/** Device-file key for this vault and map; null where the vault has no real folder (mobile, tests with no vault). */
+function deviceKey(app: object, mapId: string): string | null {
   try {
-    raw = (app as LocalStorageApp).loadLocalStorage?.(storageKey(mapId));
+    const base = (app as LocalStorageApp).vault?.adapter?.getBasePath?.();
+    if (typeof base !== "string" || !base) return null;
+    return `${realpathSync.native(base)}\n${mapId}`;
   } catch {
-    return [];
+    return null;
   }
+}
+
+/** The file's entries; unreadable or malformed content is an empty set. Never throws. */
+function readDeviceEntries(): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(join(deviceDir(), FILE_NAME), "utf8"));
+    const entries = (parsed as { entries?: unknown } | null)?.entries;
+    if (entries && typeof entries === "object" && !Array.isArray(entries)) return entries as Record<string, unknown>;
+  } catch {
+    /* missing or malformed: nothing stored yet */
+  }
+  return {};
+}
+
+/** Re-reads the file, sets one key, writes a temp file and renames it over the real one. False when it cannot. */
+function writeDeviceEntry(key: string, value: unknown): boolean {
+  const dir = deviceDir();
+  const temp = join(dir, `${FILE_NAME}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
+  try {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    try {
+      chmodSync(dir, 0o700);
+    } catch {
+      /* a folder we do not own keeps its mode */
+    }
+    const entries = readDeviceEntries();
+    entries[key] = value;
+    writeFileSync(temp, JSON.stringify({ version: 1, entries }), { mode: 0o600 });
+    renameSync(temp, join(dir, FILE_NAME));
+    return true;
+  } catch {
+    try {
+      unlinkSync(temp);
+    } catch {
+      /* no temp file was left */
+    }
+    return false;
+  }
+}
+
+function cleanSources(raw: unknown): ExternalSource[] {
   if (!Array.isArray(raw)) return [];
   const result: ExternalSource[] = [];
   const labels = new Set<string>();
@@ -50,11 +119,35 @@ export function loadExternalSources(app: object, mapId: string | undefined): Ext
   return result;
 }
 
+function loadLocal(app: object, mapId: string): unknown {
+  try {
+    return (app as LocalStorageApp).loadLocalStorage?.(storageKey(mapId));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * This map's external sources from the device file (shared by every Obsidian profile on this computer); anything
+ * malformed is dropped. A vault+map the file does not know yet is copied once from local storage. Never throws.
+ */
+export function loadExternalSources(app: object, mapId: string | undefined): ExternalSource[] {
+  if (!mapId) return [];
+  const key = deviceKey(app, mapId);
+  if (key === null) return cleanSources(loadLocal(app, mapId));
+  const stored = readDeviceEntries()[key];
+  if (Array.isArray(stored)) return cleanSources(stored);
+  const migrated = cleanSources(loadLocal(app, mapId));
+  if (migrated.length) writeDeviceEntry(key, migrated);
+  return migrated;
+}
+
 export function saveExternalSources(app: object, mapId: string, sources: readonly ExternalSource[]): void {
-  (app as LocalStorageApp).saveLocalStorage?.(
-    storageKey(mapId),
-    sources.length ? sources.map(source => ({ path: source.path, label: source.label })) : null
-  );
+  const list = sources.map(source => ({ path: source.path, label: source.label }));
+  const key = deviceKey(app, mapId);
+  // An empty list is stored as [] (not removed) so the old local-storage copy is not migrated back in.
+  if (key !== null && writeDeviceEntry(key, list)) return;
+  (app as LocalStorageApp).saveLocalStorage?.(storageKey(mapId), list.length ? list : null);
 }
 
 /** First of `name`, `name#2`, `name#3`... that no label of this map uses. Assigned once; never recomputed. */

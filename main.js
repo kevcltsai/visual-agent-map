@@ -25325,15 +25325,59 @@ var EXTERNAL_MAX_DEPTH = 10;
 var EXTERNAL_PATH_PLACEHOLDER = "[external folder]";
 var STORAGE_PREFIX = "vam-map-external-sources:";
 var storageKey = (mapId) => `${STORAGE_PREFIX}${mapId}`;
-function loadExternalSources(app, mapId) {
-  var _a2;
-  if (!mapId) return [];
-  let raw;
+var FILE_NAME = "external-sources.json";
+var dirOverride;
+function deviceDir() {
+  if (dirOverride) return dirOverride;
+  const home = (0, import_node_os.homedir)();
+  const os = (0, import_node_os.platform)();
+  if (os === "darwin") return (0, import_node_path.join)(home, "Library", "Application Support", "visual-agent-map");
+  if (os === "win32") return (0, import_node_path.join)(process.env.APPDATA || (0, import_node_path.join)(home, "AppData", "Roaming"), "visual-agent-map");
+  return (0, import_node_path.join)(process.env.XDG_CONFIG_HOME || (0, import_node_path.join)(home, ".config"), "visual-agent-map");
+}
+function deviceKey(app, mapId) {
+  var _a2, _b2, _c;
   try {
-    raw = (_a2 = app.loadLocalStorage) == null ? void 0 : _a2.call(app, storageKey(mapId));
+    const base = (_c = (_b2 = (_a2 = app.vault) == null ? void 0 : _a2.adapter) == null ? void 0 : _b2.getBasePath) == null ? void 0 : _c.call(_b2);
+    if (typeof base !== "string" || !base) return null;
+    return `${import_node_fs.realpathSync.native(base)}
+${mapId}`;
   } catch (e) {
-    return [];
+    return null;
   }
+}
+function readDeviceEntries() {
+  try {
+    const parsed = JSON.parse((0, import_node_fs.readFileSync)((0, import_node_path.join)(deviceDir(), FILE_NAME), "utf8"));
+    const entries = parsed == null ? void 0 : parsed.entries;
+    if (entries && typeof entries === "object" && !Array.isArray(entries)) return entries;
+  } catch (e) {
+  }
+  return {};
+}
+function writeDeviceEntry(key4, value) {
+  const dir = deviceDir();
+  const temp = (0, import_node_path.join)(dir, `${FILE_NAME}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
+  try {
+    (0, import_node_fs.mkdirSync)(dir, { recursive: true, mode: 448 });
+    try {
+      (0, import_node_fs.chmodSync)(dir, 448);
+    } catch (e) {
+    }
+    const entries = readDeviceEntries();
+    entries[key4] = value;
+    (0, import_node_fs.writeFileSync)(temp, JSON.stringify({ version: 1, entries }), { mode: 384 });
+    (0, import_node_fs.renameSync)(temp, (0, import_node_path.join)(dir, FILE_NAME));
+    return true;
+  } catch (e) {
+    try {
+      (0, import_node_fs.unlinkSync)(temp);
+    } catch (e2) {
+    }
+    return false;
+  }
+}
+function cleanSources(raw) {
   if (!Array.isArray(raw)) return [];
   const result = [];
   const labels = /* @__PURE__ */ new Set();
@@ -25346,13 +25390,30 @@ function loadExternalSources(app, mapId) {
   }
   return result;
 }
+function loadLocal(app, mapId) {
+  var _a2;
+  try {
+    return (_a2 = app.loadLocalStorage) == null ? void 0 : _a2.call(app, storageKey(mapId));
+  } catch (e) {
+    return null;
+  }
+}
+function loadExternalSources(app, mapId) {
+  if (!mapId) return [];
+  const key4 = deviceKey(app, mapId);
+  if (key4 === null) return cleanSources(loadLocal(app, mapId));
+  const stored = readDeviceEntries()[key4];
+  if (Array.isArray(stored)) return cleanSources(stored);
+  const migrated = cleanSources(loadLocal(app, mapId));
+  if (migrated.length) writeDeviceEntry(key4, migrated);
+  return migrated;
+}
 function saveExternalSources(app, mapId, sources) {
   var _a2;
-  (_a2 = app.saveLocalStorage) == null ? void 0 : _a2.call(
-    app,
-    storageKey(mapId),
-    sources.length ? sources.map((source) => ({ path: source.path, label: source.label })) : null
-  );
+  const list2 = sources.map((source) => ({ path: source.path, label: source.label }));
+  const key4 = deviceKey(app, mapId);
+  if (key4 !== null && writeDeviceEntry(key4, list2)) return;
+  (_a2 = app.saveLocalStorage) == null ? void 0 : _a2.call(app, storageKey(mapId), list2.length ? list2 : null);
 }
 function allocateExternalLabel(name2, used) {
   if (!used.has(name2)) return name2;

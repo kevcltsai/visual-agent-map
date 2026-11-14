@@ -430,3 +430,73 @@ test('external remove: a stale row (label and path from before another window re
     assert.deepEqual(labels(), []);
   } finally { cleanup(w); }
 });
+
+// ---- external list in one device-local file shared by every Obsidian instance ---------------------------------------
+
+/** An app whose vault sits at `base` (a real folder); its own local storage stands in for one Obsidian profile. */
+const deviceApp = base => ({ ...fakeStore(), vault: { adapter: { getBasePath: () => base } } });
+async function withDeviceDir(body) {
+  const w = world(); const dir = path.join(w.tmp, 'appdata', 'visual-agent-map');
+  ext.setExternalSourcesDir(dir);
+  try { await body(w, dir); } finally { ext.setExternalSourcesDir(undefined); cleanup(w); }
+}
+
+test('device file: two profiles (different vault ids) on the same vault folder share the list; add in one, remove in the other', () => withDeviceDir(async (w, dir) => {
+  const docs = mk(w.outside, 'docs'), more = mk(w.outside, 'more');
+  const normal = deviceApp(w.vault), harness = deviceApp(w.vault);
+  assert.equal((await ext.addExternalSource(normal, 'm1', docs, w.scope)).ok, true);
+  assert.deepEqual(plain(ext.loadExternalSources(harness, 'm1')), [{ path: docs, label: 'docs' }], 'the other profile sees it');
+  assert.equal((await ext.addExternalSource(harness, 'm1', more, w.scope)).ok, true);
+  assert.deepEqual(plain(ext.loadExternalSources(normal, 'm1').map(s => s.label)), ['docs', 'more']);
+  assert.equal((await ext.removeExternalSource(normal, 'm1', { path: more, label: 'more' })).removed, true);
+  assert.deepEqual(plain(ext.loadExternalSources(harness, 'm1').map(s => s.label)), ['docs']);
+  assert.equal(normal.store.size, 0, 'nothing written to local storage');
+  assert.equal(fs.readdirSync(dir).join(), 'external-sources.json', 'atomic write leaves no temp file');
+  if (process.platform !== 'win32') { assert.equal(fs.statSync(path.join(dir, 'external-sources.json')).mode & 0o777, 0o600); assert.equal(fs.statSync(dir).mode & 0o777, 0o700); }
+}));
+
+test('device file: another vault folder never sees it; another map does not; two maps in one file do not clobber each other', () => withDeviceDir(async w => {
+  const docs = mk(w.outside, 'docs'), other = mk(w.home, 'Other'), here = deviceApp(w.vault), there = deviceApp(other);
+  assert.equal((await ext.addExternalSource(here, 'm1', docs, w.scope)).ok, true);
+  assert.deepEqual(plain(ext.loadExternalSources(there, 'm1')), [], 'different vault path');
+  assert.deepEqual(plain(ext.loadExternalSources(here, 'm2')), [], 'different map');
+  assert.equal((await ext.addExternalSource(there, 'm1', docs, { ...w.scope, vaultBase: other })).ok, true);
+  assert.equal((await ext.addExternalSource(here, 'm2', docs, w.scope)).ok, true);
+  assert.equal(ext.loadExternalSources(here, 'm1').length + ext.loadExternalSources(there, 'm1').length + ext.loadExternalSources(here, 'm2').length, 3);
+  const alias = path.join(w.tmp, 'alias'); fs.symlinkSync(w.vault, alias);
+  assert.deepEqual(plain(ext.loadExternalSources(deviceApp(alias), 'm1')), [{ path: docs, label: 'docs' }], 'a link to the same folder is the same vault');
+}));
+
+test('device file: a list only in local storage is copied once into the file; emptying it later does not bring it back', () => withDeviceDir(async (w, dir) => {
+  const docs = mk(w.outside, 'docs'), app = deviceApp(w.vault);
+  app.store.set('vam-map-external-sources:m1', JSON.stringify([{ path: docs, label: 'docs' }]));
+  assert.deepEqual(plain(ext.loadExternalSources(app, 'm1')), [{ path: docs, label: 'docs' }]);
+  assert.ok(fs.readFileSync(path.join(dir, 'external-sources.json'), 'utf8').includes(docs), 'copied into the file');
+  assert.equal(app.store.size, 1, 'the local-storage value is kept');
+  assert.deepEqual(plain(ext.loadExternalSources(deviceApp(w.vault), 'm1')), [{ path: docs, label: 'docs' }], 'another profile gets it from the file');
+  await ext.removeExternalSource(app, 'm1', { path: docs, label: 'docs' });
+  assert.deepEqual(plain(ext.loadExternalSources(app, 'm1')), [], 'an emptied list stays empty');
+}));
+
+test('device file: a malformed or unreadable file reads as empty without throwing, and the next write repairs it', () => withDeviceDir(async (w, dir) => {
+  const docs = mk(w.outside, 'docs'), app = deviceApp(w.vault);
+  fs.mkdirSync(dir, { recursive: true });
+  for (const bad of ['{not json', '[]', 'null', '{"entries":[1]}', '{"entries":{"x":1}}', '']) {
+    fs.writeFileSync(path.join(dir, 'external-sources.json'), bad);
+    assert.deepEqual(plain(ext.loadExternalSources(app, 'm1')), [], JSON.stringify(bad));
+  }
+  fs.rmSync(path.join(dir, 'external-sources.json')); fs.mkdirSync(path.join(dir, 'external-sources.json'));
+  assert.deepEqual(plain(ext.loadExternalSources(app, 'm1')), [], 'a folder where the file should be');
+  fs.rmdirSync(path.join(dir, 'external-sources.json'));
+  fs.writeFileSync(path.join(dir, 'external-sources.json'), '{not json');
+  assert.equal((await ext.addExternalSource(app, 'm1', docs, w.scope)).ok, true);
+  assert.deepEqual(plain(ext.loadExternalSources(app, 'm1')), [{ path: docs, label: 'docs' }]);
+}));
+
+test('device file: when the file cannot be written the list falls back to local storage', () => withDeviceDir(async (w, dir) => {
+  const docs = mk(w.outside, 'docs'), app = deviceApp(w.vault);
+  fs.mkdirSync(path.dirname(dir), { recursive: true }); fs.writeFileSync(dir, 'a file where the folder should be');
+  assert.equal((await ext.addExternalSource(app, 'm1', docs, w.scope)).ok, true);
+  assert.equal(app.store.size, 1);
+  assert.deepEqual(plain(ext.loadExternalSources(app, 'm1')), [{ path: docs, label: 'docs' }]);
+}));

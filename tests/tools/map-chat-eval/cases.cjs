@@ -191,4 +191,5 @@ const WEAK = "只檢查沒有多餘動作與有提到地圖內容，不能證明
 for (const id of ["A1", "A2", "A3", "A4"]) CASES.find(k => k.id === id).weak = WEAK;
 const { NEG } = require("./negative.cjs");
 const { HISTORY } = require("./history.cjs");
-module.exports = { CASES: [...CASES, ...NEG, ...HISTORY], STEAK, COFFEE, DUP, HYP };
+const { LARGE } = require("./size.cjs");
+module.exports = { CASES: [...CASES, ...NEG, ...HISTORY, ...LARGE], STEAK, COFFEE, DUP, HYP };

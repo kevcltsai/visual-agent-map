@@ -4,11 +4,16 @@
 // product parser, and checks the properties each case states. Output has no total score: each check reports how many of the
 // repeated runs passed.
 //
-//   node tests/tools/map-chat-eval.cjs run --out=<dir outside the repo> --slug=<name> [--model=haiku] [--runs=3] [--case=A1,B1] [--group=安全] [--jobs=4]
+//   node tests/tools/map-chat-eval.cjs run --out=<dir outside the repo> --slug=<name> [--model=haiku] [--runs=3] [--case=A1,B1] [--group=安全] [--jobs=4] [--large]
+//        the size cases (group 大小, tests/tools/map-chat-eval/size.cjs) send up to ~200k characters each: they run only with --large,
+//        --group=大小 or --case=SZ1,...; a case the product refuses before sending (over_budget) is recorded as "refused", with no call
 //   node tests/tools/map-chat-eval.cjs flows --out=<dir outside the repo> --slug=<name> [--model=haiku] [--runs=3] [--flow=FL1,FL3] [--jobs=4]
 //        long conversations: several turns on one map that each turn changes; the final map is compared with the expected one
 //   node tests/tools/map-chat-eval.cjs compare --out=<dir> --a=<slug> --b=<slug>
 //   node tests/tools/map-chat-eval.cjs list
+//
+// Every call records the real input tokens the CLI reports (usage: input + cache creation + cache read) next to the prompt and context
+// characters, so a size estimate can be checked against what the model was really sent.
 //
 // The output (prompts, replies) may contain case text only, but it still must not go inside this repository.
 const fs = require("node:fs");
@@ -21,6 +26,8 @@ const { CASES } = require("./map-chat-eval/cases.cjs");
 const { FLOWS, TURN_CHECKS } = require("./map-chat-eval/flows.cjs");
 const { SimMap, matchTree, matchTreeDetailed } = require("./map-chat-eval/sim.cjs");
 const CRITERIA = require("./map-chat-eval/flow-criteria.json");
+/** The group of the size cases (size.cjs): sent only when asked for, since each one is up to ~200k characters. */
+const LARGE_GROUP = "大小";
 
 const REPO = path.resolve(__dirname, "../..");
 const arg = (name, fallback) => (process.argv.find(a => a.startsWith(`--${name}=`)) || "").slice(name.length + 3) || fallback;
@@ -38,7 +45,26 @@ function prepare(p, kase) {
   const { message, language, ...input } = kase.input;
   const context = p.context.buildMapChatContext(input);
   const request = { message, context, language, model: "claude:haiku", reasoning: "low" };
-  return { context, request, prompt: p.step.mapChatStep.render(request), schema: p.step.MAP_CHAT_SCHEMA };
+  const prompt = p.step.mapChatStep.render(request);
+  return { context, request, prompt, schema: p.step.MAP_CHAT_SCHEMA, refused: refusal(p, prompt, request) };
+}
+
+/** The error code the product's own check gives before sending (for example "over_budget"), or null when it would send the prompt. */
+function refusal(p, prompt, request) {
+  try {
+    p.step.mapChatStep.policy(prompt, request);
+    return null;
+  } catch (error) {
+    return error.code || String(error.message || error);
+  }
+}
+
+/** Input tokens the model really read in one call: plain input plus prompt-cache writes and reads (the CLI reports them apart). */
+function usageTokens(result) {
+  const u = result?.usage;
+  if (!u || typeof u !== "object") return {};
+  const input = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
+  return { inputTokens: input, ...(typeof u.output_tokens === "number" ? { outputTokens: u.output_tokens } : {}) };
 }
 
 function callClaude(p, prompt, schema, model) {
@@ -56,13 +82,20 @@ function callClaude(p, prompt, schema, model) {
       fs.rmSync(cwd, { recursive: true, force: true });
       try {
         if (code !== 0) throw new Error(`claude exited ${code}: ${(err || out).slice(0, 200)}`);
-        const parsed = JSON.parse(out);
-        const result = Array.isArray(parsed) ? parsed.find(e => e.type === "result") : parsed;
-        if (!result || result.is_error) throw new Error(`claude error: ${String(result?.result).slice(0, 200)}`);
-        if (result.structured_output == null) throw new Error("no structured_output");
-        resolve({ raw: JSON.stringify(result.structured_output), ms: Date.now() - started, modelUsed: Object.keys(result.modelUsage || {}).join(",") });
+        let result = null;
+        try {
+          const parsed = JSON.parse(out);
+          result = Array.isArray(parsed) ? parsed.find(e => e.type === "result") : parsed;
+        } catch {
+          // not JSON: reported below
+        }
+        if (code !== 0) throw Object.assign(new Error(`claude exited ${code}: ${(err || out).slice(0, 200)}`), { result });
+        if (!result) throw new Error("claude output is not JSON");
+        if (result.is_error) throw Object.assign(new Error(`claude error: ${String(result.result).slice(0, 200)}`), { result });
+        if (result.structured_output == null) throw Object.assign(new Error("no structured_output"), { result });
+        resolve({ raw: JSON.stringify(result.structured_output), ms: Date.now() - started, modelUsed: Object.keys(result.modelUsage || {}).join(","), ...usageTokens(result) });
       } catch (error) {
-        resolve({ error: String(error.message || error), ms: Date.now() - started });
+        resolve({ error: String(error.message || error), ms: Date.now() - started, ...usageTokens(error.result) });
       }
     });
     child.stdin.end(prompt);
@@ -168,10 +201,13 @@ async function playFlow(p, flow, ask) {
     const input = { selected: [], references: [], snippets: [], files: [], history: history.slice(), language: "zh-TW", message: turn.say, ...sim.contextInput(), mapNeedsName: !sim.title };
     const kase = { input, checks: [...TURN_CHECKS, ...(turn.expect || [])] };
     const prepared = prepare(p, kase);
+    const size = { promptChars: prepared.prompt.length, contextChars: prepared.context.json.length, ...estimated(p, prepared) };
+    if (prepared.refused) { turns.push({ say: turn.say, error: `the product refuses to send it (${prepared.refused})`, ...size, checks: [] }); break; }
     const reply = await ask(prepared.prompt, prepared.schema);
-    if (!reply.raw) { turns.push({ say: turn.say, error: reply.error || "no reply", checks: [] }); break; }
+    Object.assign(size, reply.inputTokens !== undefined ? { inputTokens: reply.inputTokens } : {});
+    if (!reply.raw) { turns.push({ say: turn.say, error: reply.error || "no reply", ...size, checks: [] }); break; }
     const run = evaluateRun(p, kase, prepared, reply.raw);
-    if (run.status !== "ok") { turns.push({ say: turn.say, error: "reply not valid (the product rejects the whole reply)", raw: reply.raw, prompt: prepared.prompt, checks: run.checks }); break; }
+    if (run.status !== "ok") { turns.push({ say: turn.say, error: "reply not valid (the product rejects the whole reply)", raw: reply.raw, prompt: prepared.prompt, ...size, checks: run.checks }); break; }
     const parsed = p.step.parseMapChat(reply.raw, prepared.context);
     const actions = JSON.parse(JSON.stringify(parsed.actions));
     const before = sim.state(), titlesBefore = sim.titles();
@@ -182,7 +218,7 @@ async function playFlow(p, flow, ask) {
       if (!turn.adds && diff.added.length) scopeBreaches.push(`turn ${turns.length + 1}: added ${diff.added.join("、")} though the request adds nothing`);
     }
     history.push({ role: "user", text: turn.say }, { role: "assistant", text: parsed.reply });
-    turns.push({ say: turn.say, reply: parsed.reply, actions, diff, raw: reply.raw, prompt: prepared.prompt, checks: run.checks });
+    turns.push({ say: turn.say, reply: parsed.reply, actions, diff, raw: reply.raw, prompt: prepared.prompt, ...size, checks: run.checks });
   }
   // A turn that failed (CLI error, rejected reply) makes the whole flow INVALID, even if the map happens to match: nothing was proven.
   const failed = turns.findIndex(t => t.error);
@@ -257,7 +293,8 @@ async function run() {
   const runs = Number(arg("runs", "3"));
   const ids = arg("case") ? arg("case").split(",") : null;
   const group = arg("group");
-  const cases = CASES.filter(k => (!ids || ids.includes(k.id)) && (!group || k.group === group));
+  const large = process.argv.includes("--large");
+  const cases = CASES.filter(k => (!ids || ids.includes(k.id)) && (!group || k.group === group) && (ids || group || large || k.group !== LARGE_GROUP));
   const p = product();
   const jobs = [];
   for (const kase of cases) for (let n = 1; n <= runs; n++) jobs.push({ kase, n });
@@ -266,17 +303,40 @@ async function run() {
   console.log(`${cases.length} cases x ${runs} runs = ${jobs.length} ${model} calls`);
   let done = 0;
   const results = await pool(jobs, Number(arg("jobs", "4")), async ({ kase, n }) => {
-    const prepared = prepare(p, kase);
-    const reply = await callClaude(p, prepared.prompt, prepared.schema, model);
-    const run = reply.raw ? evaluateRun(p, kase, prepared, reply.raw) : { status: "infra_error", checks: [] };
+    const result = await runCase(p, kase, model, (prompt, schema) => callClaude(p, prompt, schema, model));
     process.stdout.write(`\r${++done}/${jobs.length}`);
-    return { id: kase.id, run: n, caseHash: caseHash(kase), model, modelUsed: reply.modelUsed, ms: reply.ms, status: run.status, error: reply.error, prompt: prepared.prompt, raw: reply.raw, checks: run.checks };
+    return { run: n, ...result };
   });
   console.log("");
   fs.writeFileSync(path.join(dir, "results.json"), JSON.stringify({ slug, model, runs, at: new Date().toISOString(), meta: runMeta(p, model), results }, null, 1));
   fs.writeFileSync(path.join(dir, "report.md"), report(cases, results, runs, model, slug));
   console.log(`wrote ${path.join(dir, "report.md")}`);
 }
+
+/**
+ * One case, one call: what the product would send, what came back, and the sizes. A prompt the product refuses before sending
+ * (status "refused", e.g. over_budget) makes no call. Pure apart from `ask(prompt, schema)` -> { raw, inputTokens? } | { error }.
+ */
+async function runCase(p, kase, model, ask) {
+  const prepared = prepare(p, kase);
+  const size = { promptChars: prepared.prompt.length, contextChars: prepared.context.json.length, ...estimated(p, prepared) };
+  const head = { id: kase.id, caseHash: caseHash(kase), model, ...size };
+  if (prepared.refused) return { ...head, status: "refused", refused: prepared.refused, prompt: prepared.prompt, checks: [] };
+  const reply = await ask(prepared.prompt, prepared.schema);
+  const run = reply.raw ? evaluateRun(p, kase, prepared, reply.raw) : { status: "infra_error", checks: [] };
+  const tokens = { ...(reply.inputTokens !== undefined ? { inputTokens: reply.inputTokens } : {}), ...(reply.outputTokens !== undefined ? { outputTokens: reply.outputTokens } : {}) };
+  return { ...head, ...tokens, modelUsed: reply.modelUsed, ms: reply.ms, status: run.status, error: reply.error, prompt: prepared.prompt, raw: reply.raw, checks: run.checks };
+}
+
+/** The product's own token estimate of what it sends (the number its over_budget check uses), where the product has one. */
+const estimated = (p, prepared) => (p.step.estimateMapChatTokens ? { estimatedTokens: p.step.estimateMapChatTokens(prepared.prompt + JSON.stringify(prepared.schema)) } : {});
+const average = values => (values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null);
+/** Average sizes of one case's calls: characters always, real input tokens only where the CLI reported them. */
+function sizeOf(results) {
+  const tokens = results.filter(r => typeof r.inputTokens === "number");
+  return { estimatedTokens: average(results.filter(r => typeof r.estimatedTokens === "number").map(r => r.estimatedTokens)), promptChars: average(results.filter(r => typeof r.promptChars === "number").map(r => r.promptChars)), contextChars: average(results.filter(r => typeof r.contextChars === "number").map(r => r.contextChars)), inputTokens: average(tokens.map(r => r.inputTokens)) };
+}
+const show = value => (value === null || value === undefined ? "—" : String(value));
 
 /** One-sided 95% upper bound on a failure rate after n repeats with zero failures: 1 - 0.05^(1/n). Valid only for a pre-specified condition and independent identical trials. */
 const zeroFailureBound = n => (n > 0 ? 1 - Math.pow(0.05, 1 / n) : 1);
@@ -285,6 +345,7 @@ function summarize(cases, results) {
   return cases.map(kase => {
     const mine = results.filter(r => r.id === kase.id);
     const errors = mine.filter(r => r.error).length;
+    const refused = mine.filter(r => r.status === "refused").length;
     const received = mine.filter(r => r.raw);
     // Denominator = replies received. A reply the product rejects counts as failed on every check; an infrastructure error is not a reply.
     const rows = kase.checks.map(c => {
@@ -292,7 +353,7 @@ function summarize(cases, results) {
       const notes = [...new Set(received.map(r => r.checks.find(x => x.id === c.id)).filter(x => x && !x.ok && x.note).map(x => x.note))].slice(0, 2);
       return { id: c.id, desc: c.desc, diag: !!c.diag, passes, total: received.length, notes };
     });
-    return { kase, errors, parseErrors: received.filter(r => r.status === "parse_error").length, received: received.length, attempts: mine.length, rows, replies: received.filter(r => r.status !== "parse_error").map(r => JSON.parse(r.raw)) };
+    return { kase, errors, refused, size: sizeOf(mine), parseErrors: received.filter(r => r.status === "parse_error").length, received: received.length, attempts: mine.length, rows, replies: received.filter(r => r.status !== "parse_error").map(r => JSON.parse(r.raw)) };
   });
 }
 
@@ -304,17 +365,20 @@ function report(cases, results, runs, model, slug) {
   const allChecks = sum.flatMap(s => s.rows);
   const received = sum.reduce((n, s) => n + s.received, 0);
   const parseErrors = sum.reduce((n, s) => n + s.parseErrors, 0);
+  const refused = results.filter(r => r.status === "refused").length;
   const casePass = results.filter(r => r.raw && r.status === "ok" && r.checks.every(c => c.ok || c.diag)).length;
   lines.push(`統計上限：每題只跑 ${runs} 次，即使全部通過，也只能說失敗率上限約 ${(zeroFailureBound(runs) * 100).toFixed(0)}%（單側 95%，且只在「事先指定條件、獨立同分布」下成立；要壓到 5% 需要約 59 次）。一題的 N 次不是 N 個獨立使用情境。`, "");
-  lines.push(`呼叫成功率 ${received}/${calls}（基礎設施失敗 ${errored} 次）；可解析率 ${received - parseErrors}/${received}（產品會整則拒絕的壞格式 ${parseErrors} 次）；題目通過 ${casePass}/${received}（只算任務檢查；壞格式算失敗；語氣與格式屬「診斷」，另列）。`, "");
+  if (refused) lines.push(`產品在送出前拒絕 ${refused} 次（over_budget 等；沒有呼叫模型，不算在呼叫成功率裡，但每一題都是使用者會送的請求，被拒絕就是失敗）。`, "");
+  lines.push(`呼叫成功率 ${received}/${calls - refused}（基礎設施失敗 ${errored} 次）；可解析率 ${received - parseErrors}/${received}（產品會整則拒絕的壞格式 ${parseErrors} 次）；題目通過 ${casePass}/${received + refused}（只算任務檢查；壞格式與送出前被拒絕都算失敗；語氣與格式屬「診斷」，另列）。`, "");
   lines.push(`呼叫 ${calls} 次（失敗 ${errored} 次）；檢查項 ${allChecks.length} 條，全部通過 ${allChecks.filter(r => r.passes === r.total && r.total > 0).length} 條，有任一次失敗 ${allChecks.filter(r => r.passes < r.total).length} 條。`, "");
-  const failing = sum.filter(s => s.rows.some(r => r.passes < r.total) || s.errors || s.parseErrors);
+  const failing = sum.filter(s => s.rows.some(r => r.passes < r.total) || s.errors || s.parseErrors || s.refused);
   const weak = sum.filter(s => s.kase.weak);
   if (weak.length) lines.push("## 弱檢查（通過不代表答對）", "", ...weak.map(s => `- ${s.kase.id} ${s.kase.title}：${s.kase.weak}`), "");
   lines.push("## 有失敗的案例", "");
   if (!failing.length) lines.push("無。", "");
   for (const s of failing) {
     lines.push(`### ${s.kase.id} ${s.kase.title}（${s.kase.group}）`, `來源：${s.kase.source}`, "");
+    if (s.refused) lines.push(`- 產品在送出前拒絕 ${s.refused} 次（${[...new Set(results.filter(r => r.id === s.kase.id && r.refused).map(r => r.refused))].join("、")}）`);
     if (s.errors) lines.push(`- 基礎設施失敗 ${s.errors} 次`);
     if (s.parseErrors) lines.push(`- 壞格式（整則被產品拒絕）${s.parseErrors} 次`);
     for (const r of s.rows) if (r.passes < r.total) lines.push(`- ${r.diag ? "（診斷）" : ""}${r.passes}/${r.total} ${r.desc}${r.notes.length ? `（${r.notes.join("；")}）` : ""}`);
@@ -339,8 +403,8 @@ function report(cases, results, runs, model, slug) {
     s.replies.slice(0, 1).forEach(r => lines.push(`回覆：${r.reply}`, `動作：${r.actions.map(a => a.kind + (a.title ? `「${a.title}」` : "")).join("、") || "無"}`));
     lines.push("");
   }
-  lines.push("## 全部案例", "", "| 案例 | 群組 | 通過 |", "| --- | --- | --- |");
-  for (const s of sum) lines.push(`| ${s.kase.id} ${s.kase.title} | ${s.kase.group} | ${s.rows.reduce((n, r) => n + r.passes, 0)}/${s.rows.reduce((n, r) => n + r.total, 0)} |`);
+  lines.push("## 全部案例", "", "輸入大小是每次呼叫的平均：提示與脈絡的字元數，和 CLI 回報的實際輸入 token（input + cache 寫入 + cache 讀取）。", "", "| 案例 | 群組 | 通過 | 提示字元 | 脈絡字元 | 輸入 token | 產品估計 token |", "| --- | --- | --- | --- | --- | --- | --- |");
+  for (const s of sum) lines.push(`| ${s.kase.id} ${s.kase.title} | ${s.kase.group} | ${s.refused ? `拒絕 ${s.refused}/${s.attempts}` : `${s.rows.reduce((n, r) => n + r.passes, 0)}/${s.rows.reduce((n, r) => n + r.total, 0)}`} | ${show(s.size.promptChars)} | ${show(s.size.contextChars)} | ${show(s.size.inputTokens)} | ${show(s.size.estimatedTokens)} |`);
   return lines.join("\n") + "\n";
 }
 
@@ -368,7 +432,8 @@ function compare() {
     if (x && y) (x === y ? same : changed).push(id); else (x ? removed : added).push(id);
   }
   lines.push("", `題目：相同 ${same.length}，定義已變更 ${changed.length}${changed.length ? `（${changed.join("、")}）` : ""}，新增 ${added.length}${added.length ? `（${added.join("、")}）` : ""}，移除 ${removed.length}${removed.length ? `（${removed.join("、")}）` : ""}。只比較「相同」的題目。`, "");
-  const stat = (data, id) => { const rs = data.results.filter(r => r.id === id && r.raw); return { n: rs.length, ok: rs.filter(r => r.status === "ok" && r.checks.every(c => c.ok || c.diag)).length }; };
+  // A refused request counts in the denominator: it is a request the user really sends, and it failed.
+  const stat = (data, id) => { const rs = data.results.filter(r => r.id === id && r.raw); const refused = data.results.filter(r => r.id === id && r.status === "refused").length; return { n: rs.length + refused, ok: rs.filter(r => r.status === "ok" && r.checks.every(c => c.ok || c.diag)).length, refused }; };
   const diffs = [];
   for (const id of same) {
     const kase = CASES.find(k => k.id === id);
@@ -378,16 +443,29 @@ function compare() {
       const py = b.results.filter(r => r.id === id && r.raw).filter(r => r.checks.find(z => z.id === c.id)?.ok).length;
       return px === py ? [] : [`    ${c.desc}：${px}/${x.n} → ${py}/${y.n}`];
     });
-    if (perCheck.length || x.ok !== y.ok) diffs.push(`- ${id} ${kase?.title ?? ""}：整題通過 ${x.ok}/${x.n} → ${y.ok}/${y.n}`, ...perCheck);
+    const refusedLine = x.refused || y.refused ? [`    送出前被拒絕：${x.refused} → ${y.refused}`] : [];
+    if (perCheck.length || x.ok !== y.ok || x.refused !== y.refused) diffs.push(`- ${id} ${kase?.title ?? ""}：整題通過 ${x.ok}/${x.n} → ${y.ok}/${y.n}`, ...refusedLine, ...perCheck);
   }
   lines.push("## 次數有差的題目（原始次數，不是結論）", "", ...(diffs.length ? diffs : ["沒有任何題目的次數改變。"]));
+  // Sizes of every case either run has (also changed ones: the size of a changed case is what changed). Old results have no sizes.
+  const sized = ids.filter(id => [a, b].some(data => data.results.some(r => r.id === id && (typeof r.promptChars === "number" || typeof r.inputTokens === "number"))));
+  if (sized.length) {
+    lines.push("", "## 輸入大小（每次呼叫的平均；token 是 CLI 回報的實際輸入：input + cache 寫入 + cache 讀取）", "", "| 題目 | 提示字元 | 脈絡字元 | 輸入 token | token／提示字元 | 產品估計 token |", "| --- | --- | --- | --- | --- | --- |");
+    const ratio = s => (s.inputTokens && s.promptChars ? (s.inputTokens / s.promptChars).toFixed(2) : "—");
+    for (const id of sized) {
+      const x = sizeOf(a.results.filter(r => r.id === id)), y = sizeOf(b.results.filter(r => r.id === id));
+      lines.push(`| ${id}${changed.includes(id) ? "（定義已變更）" : ""} | ${show(x.promptChars)} → ${show(y.promptChars)} | ${show(x.contextChars)} → ${show(y.contextChars)} | ${show(x.inputTokens)} → ${show(y.inputTokens)} | ${ratio(x)} → ${ratio(y)} | ${show(x.estimatedTokens)} → ${show(y.estimatedTokens)} |`);
+    }
+  }
   const fa = read(A, "flows.json"), fb = read(B, "flows.json");
   if (fa && fb) {
     lines.push("", "## 長流程");
     for (const id of [...new Set([...fa.results, ...fb.results].map(r => r.id))]) {
       const ra = fa.results.filter(r => r.id === id), rb = fb.results.filter(r => r.id === id);
       if (ra[0]?.flowHash !== rb[0]?.flowHash) { lines.push(`- ${id}：定義不同或只在一邊，不比較`); continue; }
-      lines.push(`- ${id}：最終地圖一致 ${ra.filter(r => r.finalOk).length}/${ra.length} → ${rb.filter(r => r.finalOk).length}/${rb.length}；無效 ${ra.filter(r => r.invalid).length} → ${rb.filter(r => r.invalid).length}`);
+      const tokens = rs => average(rs.flatMap(r => r.turns.filter(t => typeof t.inputTokens === "number").map(t => t.inputTokens)));
+      const tokenText = tokens(ra) !== null || tokens(rb) !== null ? `；每輪平均輸入 token ${show(tokens(ra))} → ${show(tokens(rb))}` : "";
+      lines.push(`- ${id}：最終地圖一致 ${ra.filter(r => r.finalOk).length}/${ra.length} → ${rb.filter(r => r.finalOk).length}/${rb.length}；無效 ${ra.filter(r => r.invalid).length} → ${rb.filter(r => r.invalid).length}${tokenText}`);
     }
   }
   console.log(lines.join("\n"));
@@ -397,9 +475,9 @@ if (require.main === module) {
   if (command === "flows") runFlows().catch(e => { console.error(e.message); process.exit(2); });
   else if (command === "run") run().catch(e => { console.error(e.message); process.exit(2); });
   else if (command === "compare") compare();
-  else if (command === "list") CASES.forEach(k => console.log(`${k.id}\t${k.group}\t${k.title}\t${k.checks.length} checks`));
+  else if (command === "list") CASES.forEach(k => console.log(`${k.id}\t${k.group}\t${k.title}\t${k.checks.length} checks${k.group === LARGE_GROUP ? "\t(only with --large)" : ""}`));
   else { console.error("usage: map-chat-eval.cjs run|compare|list (see the header)"); process.exit(2); }
 }
 
 const callClaudeForCorpus = (p, prompt, schema, model) => callClaude(p, prompt, schema, model);
-module.exports = { zeroFailureBound, callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, rawLayer, caseHash, flowHash, stableSerialize };
+module.exports = { report, zeroFailureBound, callClaudeForCorpus, prepare, evaluate, evaluateRun, product, playFlow, runCase, rawLayer, caseHash, flowHash, stableSerialize, usageTokens, LARGE_GROUP };

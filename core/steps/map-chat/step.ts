@@ -1,4 +1,4 @@
-import { estimateTokens } from "../../../ai/context-builder";
+import { estimateMapChatTokens } from "../../map-chat-tokens";
 import { instructionLanguageOf, type ContentLanguage } from "../../../i18n";
 import type { ReasoningLevel } from "../../../ai/types";
 import { languageVariables } from "../_shared/fragments";
@@ -78,7 +78,15 @@ export const MAP_CHAT_ANCHOR_PREFIX = "anchor:";
 /** Prefix of a temporary id a reply gives to a card it creates itself; `ref: "n1"` is named `new:n1` by later actions. */
 export const MAP_CHAT_NEW_PREFIX = "new:";
 const REF_FORMAT = /^[A-Za-z0-9_-]{1,40}$/;
+/**
+ * Most tokens a map chat prompt (with its schema) may be estimated at; a larger one is refused before sending (`over_budget`).
+ * The model reads 200k tokens ({@link MAP_CHAT_MODEL_WINDOW}); the other 50k are left for the CLI's own system prompt and the
+ * reply. Measured with {@link estimateMapChatTokens}, which counts Chinese as Chinese.
+ */
 export const MAP_CHAT_TOKEN_BUDGET = 150_000;
+/** The context window of the models map chat runs on, in tokens. */
+export const MAP_CHAT_MODEL_WINDOW = 200_000;
+export { estimateMapChatTokens, MAP_CHAT_CJK_TOKENS_PER_CHAR } from "../../map-chat-tokens";
 
 export type MapChatAction =
   /**
@@ -861,7 +869,7 @@ export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   schema: MAP_CHAT_SCHEMA,
   policy: (prompt, request) => {
     if (!request.message.trim()) throw new MapChatError("empty", "Map chat message is empty");
-    if (estimateTokens(prompt + JSON.stringify(MAP_CHAT_SCHEMA)) > MAP_CHAT_TOKEN_BUDGET)
+    if (estimateMapChatTokens(prompt + JSON.stringify(MAP_CHAT_SCHEMA)) > MAP_CHAT_TOKEN_BUDGET)
       throw new MapChatError("over_budget", "Map chat context is too large");
   },
   parse: (raw, request) => parseMapChat(raw, request.context)

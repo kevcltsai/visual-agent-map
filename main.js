@@ -23971,8 +23971,8 @@ function baseOf(path) {
 }
 function splitFrontmatter(text10) {
   var _a2, _b2;
-  const head = (_b2 = (_a2 = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(text10)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
-  return { head, body: text10.slice(head.length) };
+  const head2 = (_b2 = (_a2 = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(text10)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
+  return { head: head2, body: text10.slice(head2.length) };
 }
 function codeRanges(text10) {
   const ranges = [];
@@ -24232,6 +24232,19 @@ function applyMdEdit(content, find, replace) {
   return content.slice(0, at) + replace + content.slice(at + find.length);
 }
 
+// core/map-chat-tokens.ts
+var MAP_CHAT_CJK_TOKENS_PER_CHAR = 1.25;
+var CJK_CHARS = /[\u3000-\u303f\u3040-\u30ff\u3100-\u312f\u3190-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef]|[\u{20000}-\u{3134f}]/gu;
+function estimateMapChatTokens(text10) {
+  let cjk = 0;
+  let cjkUnits = 0;
+  for (const match of text10.matchAll(CJK_CHARS)) {
+    cjk += 1;
+    cjkUnits += match[0].length;
+  }
+  return Math.ceil(cjk * MAP_CHAT_CJK_TOKENS_PER_CHAR + (text10.length - cjkUnits) / 4);
+}
+
 // core/map-chat-context.ts
 var MAP_CHAT_DEFAULT_TURNS = 6;
 var MAP_CHAT_DETAIL_BUDGET = 6e4;
@@ -24239,6 +24252,12 @@ var MAP_CHAT_RESEARCH_BUDGET = 8e4;
 var MAP_CHAT_CONTINUATION_LINES = 40;
 var CONTINUATION_TEXT_LIMIT = 200;
 var MAP_CHAT_MAP_TITLE_LIMIT = 200;
+var MAP_CHAT_CONTEXT_TOKEN_BUDGET = 12e4;
+var MAP_CHAT_OUTLINE_CARD_LIMIT = 1500;
+var MAP_CHAT_FILE_CHAR_LIMIT = 6e4;
+var MAP_CHAT_TURN_CHAR_LIMIT = 6e3;
+var MAP_CHAT_USER_TEXT_CHAR_LIMIT = 4e3;
+var MAP_CHAT_SHORTENED_NOTE = "This context was shortened to fit what you can read. A part with truncated: true holds only the beginning of its text (totalChars is its whole length); outlineSummariesOmitted: true means the outline cards are sent without their summaries; outlineOmitted counts cards left out of the outline (those deeper than outlineDepthLimit, or past the card limit), and they still exist on the map; earlierTurnsOmitted counts older conversation messages left out; a card with detailOmitted: true is sent without its Detail; researchDeferred lists research notes not sent this round. Text that was cut or left out is not in front of you: never say or imply that you read, used or checked it, and build nothing from it. When the user's request needs that part, say it was not sent this time. A truncated file has no contentHash and cannot be edited.";
 var TITLE_LIMIT = 200;
 var SUMMARY_LIMIT = 240;
 var ERROR_LIMIT = 200;
@@ -24270,6 +24289,11 @@ function isMdStale(hashes, path, currentContent) {
   if (key4 === null || !Object.prototype.hasOwnProperty.call(hashes, key4)) return true;
   return hashes[key4] !== contentHash2(currentContent);
 }
+var head = (text10, limit) => {
+  if (text10.length <= limit) return { text: text10, cut: false };
+  const end = /[\ud800-\udbff]/.test(text10.charAt(limit - 1)) ? limit - 1 : limit;
+  return { text: text10.slice(0, Math.max(0, end)), cut: true };
+};
 var clip = (value, limit) => {
   const text10 = value.replace(/\s+/g, " ").trim();
   const characters = [...text10];
@@ -24353,8 +24377,63 @@ function imageParts(image) {
     }
   };
 }
+function* shrinkSteps(input2) {
+  var _a2, _b2, _c;
+  const step = {
+    turns: null,
+    outlineSummaries: true,
+    outlineDepth: null,
+    researchBudget: null,
+    fileChars: MAP_CHAT_FILE_CHAR_LIMIT,
+    referencesDetail: true,
+    detailBudget: null
+  };
+  yield { ...step };
+  const windowed = historyWindow(input2).length;
+  for (let kept = windowed - 2; kept >= 2; kept -= 2) yield { ...step, turns: step.turns = kept };
+  yield { ...step, outlineSummaries: step.outlineSummaries = false };
+  const deepest = input2.outline.reduce((max, node) => Math.max(max, node.depth), 0);
+  for (let depth = deepest - 1; depth >= 1; depth -= Math.max(1, Math.floor(depth / 4)))
+    yield { ...step, outlineDepth: step.outlineDepth = depth };
+  const research = (_a2 = input2.researchBudget) != null ? _a2 : MAP_CHAT_RESEARCH_BUDGET;
+  if (((_b2 = input2.researchNotes) != null ? _b2 : []).length)
+    for (const share of [2, 4, 8, Infinity])
+      yield { ...step, researchBudget: step.researchBudget = Math.floor(research / share) };
+  const hasFiles = input2.files.length > 0 || !!input2.activeFile;
+  if (hasFiles) yield { ...step, fileChars: step.fileChars = 3e4 };
+  if (input2.references.some((ref) => ref.detail.length))
+    yield { ...step, referencesDetail: step.referencesDetail = false };
+  if (hasFiles)
+    for (const chars of [15e3, 8e3, 4e3, 2e3]) yield { ...step, fileChars: step.fileChars = chars };
+  const detail = (_c = input2.detailBudget) != null ? _c : MAP_CHAT_DETAIL_BUDGET;
+  if (input2.selected.some((ref) => ref.detail.length))
+    for (const share of [2, 4, 12, Infinity])
+      yield { ...step, detailBudget: step.detailBudget = Math.floor(detail / share) };
+  yield { ...step, outlineDepth: step.outlineDepth = 0 };
+  yield { ...step, turns: step.turns = 0 };
+}
+function historyWindow(input2) {
+  var _a2;
+  const turns = Math.max(0, (_a2 = input2.maxTurns) != null ? _a2 : MAP_CHAT_DEFAULT_TURNS) * 2;
+  return turns ? input2.history.slice(-turns) : [];
+}
 function buildMapChatContext(input2) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+  var _a2;
+  const budget = (_a2 = input2.tokenBudget) != null ? _a2 : MAP_CHAT_CONTEXT_TOKEN_BUDGET;
+  const steps = [...shrinkSteps(input2)];
+  const first = buildOnce(input2, steps[0]);
+  if (steps.length === 1 || estimateMapChatTokens(first.json) <= budget) return first;
+  const last = buildOnce(input2, steps[steps.length - 1]);
+  if (estimateMapChatTokens(last.json) > budget) return last;
+  for (const shrink of steps.slice(1, -1)) {
+    const built = buildOnce(input2, shrink);
+    if (estimateMapChatTokens(built.json) <= budget) return built;
+  }
+  return last;
+}
+function buildOnce(input2, shrink) {
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+  let shortened = false;
   const image = input2.selectedImage ? imageParts(input2.selectedImage) : null;
   const hashes = {};
   const topicHashes = {};
@@ -24371,8 +24450,8 @@ function buildMapChatContext(input2) {
     const found = (links != null ? links : []).map(brief).filter((entry) => entry !== null);
     return found.length ? { linkedTo: found } : {};
   };
-  let detailLeft = (_b2 = input2.detailBudget) != null ? _b2 : MAP_CHAT_DETAIL_BUDGET;
-  const researched = new Set(((_c = input2.researchNotes) != null ? _c : []).map((note) => note.id));
+  let detailLeft = (_c = (_b2 = shrink.detailBudget) != null ? _b2 : input2.detailBudget) != null ? _c : MAP_CHAT_DETAIL_BUDGET;
+  const researched = new Set(((_d = input2.researchNotes) != null ? _d : []).map((note) => note.id));
   const basis = { cards: {}, read: [] };
   const wholeSent = /* @__PURE__ */ new Set();
   const noteTitle2 = (path) => {
@@ -24383,7 +24462,9 @@ function buildMapChatContext(input2) {
     var _a3, _b3;
     ids2.add(ref.id);
     const node = byId.get(ref.id);
-    const withDetail = ref.detail.length <= detailLeft;
+    const withDetail = (withLinks2 || shrink.referencesDetail) && ref.detail.length <= detailLeft;
+    if (!withDetail && ref.detail.length && (shrink.detailBudget !== null || !shrink.referencesDetail))
+      shortened = true;
     if (withDetail) {
       detailLeft -= ref.detail.length;
       wholeSent.add(ref.id);
@@ -24419,6 +24500,17 @@ function buildMapChatContext(input2) {
     return key4;
   };
   const files = input2.files.map((file) => {
+    const sent = head(file.content, shrink.fileChars);
+    if (sent.cut) {
+      shortened = true;
+      return {
+        path: file.path,
+        contentHash: null,
+        content: sent.text,
+        truncated: true,
+        totalChars: file.content.length
+      };
+    }
     basis.read.push({ path: file.path, title: noteTitle2(file.path) });
     const key4 = record(file.path, file.content);
     return { path: file.path, contentHash: key4 === null ? null : hashes[key4], content: file.content };
@@ -24426,11 +24518,21 @@ function buildMapChatContext(input2) {
   const active = input2.activeFile ? (() => {
     const key4 = normalizeVaultPath(input2.activeFile.path);
     const duplicate = key4 !== null && input2.files.some((file) => normalizeVaultPath(file.path) === key4);
-    if (!duplicate) {
-      record(input2.activeFile.path, input2.activeFile.content);
-      basis.read.push({ path: input2.activeFile.path, title: noteTitle2(input2.activeFile.path) });
+    if (duplicate) return { path: input2.activeFile.path, sameAsListedFile: true };
+    const sent = head(input2.activeFile.content, shrink.fileChars);
+    if (sent.cut) {
+      shortened = true;
+      return {
+        path: input2.activeFile.path,
+        contentHash: null,
+        content: sent.text,
+        truncated: true,
+        totalChars: input2.activeFile.content.length
+      };
     }
-    return duplicate ? { path: input2.activeFile.path, sameAsListedFile: true } : {
+    record(input2.activeFile.path, input2.activeFile.content);
+    basis.read.push({ path: input2.activeFile.path, title: noteTitle2(input2.activeFile.path) });
+    return {
       path: input2.activeFile.path,
       contentHash: key4 === null ? null : hashes[key4],
       content: input2.activeFile.content
@@ -24447,11 +24549,11 @@ function buildMapChatContext(input2) {
       text: snippet.text
     };
   });
-  const mapTitles = [...new Set(((_d = input2.mapTitles) != null ? _d : []).map((title) => clip(title, TITLE_LIMIT)).filter(Boolean))].slice(
+  const mapTitles = [...new Set(((_e = input2.mapTitles) != null ? _e : []).map((title) => clip(title, TITLE_LIMIT)).filter(Boolean))].slice(
     0,
     MAP_CHAT_MAP_TITLE_LIMIT
   );
-  const relations = input2.aim ? [] : ((_e = input2.relations) != null ? _e : []).filter((link) => byId.has(link.from) && byId.has(link.to)).map((link) => ({
+  const relations = input2.aim ? [] : ((_f = input2.relations) != null ? _f : []).filter((link) => byId.has(link.from) && byId.has(link.to)).map((link) => ({
     kind: link.kind,
     from: link.from,
     to: link.to,
@@ -24459,18 +24561,47 @@ function buildMapChatContext(input2) {
   }));
   const selectedOut = input2.selected.map((ref) => topic(ref, true));
   const referencesOut = input2.references.map((ref) => topic(ref, false));
+  const researchBudget = (_g = input2.researchBudget) != null ? _g : MAP_CHAT_RESEARCH_BUDGET;
   const research = planResearchNotes(
-    (_f = input2.researchNotes) != null ? _f : [],
-    (_g = input2.researchBudget) != null ? _g : MAP_CHAT_RESEARCH_BUDGET,
-    wholeSent
+    (_h = input2.researchNotes) != null ? _h : [],
+    Math.min((_i = shrink.researchBudget) != null ? _i : researchBudget, researchBudget),
+    wholeSent,
+    researchBudget
   );
+  if (shrink.researchBudget !== null && research.deferred.length) shortened = true;
   for (const note of research.sent) {
     basis.cards[note.id] = { title: note.title, research: true };
     basis.read.push({ id: note.id, path: note.path, title: note.title });
   }
-  const turns = Math.max(0, (_h = input2.maxTurns) != null ? _h : MAP_CHAT_DEFAULT_TURNS) * 2;
-  const history2 = turns ? input2.history.slice(-turns) : [];
-  const mapSources = ((_i = input2.mapSources) == null ? void 0 : _i.text) ? input2.mapSources : null;
+  const windowed = historyWindow(input2);
+  const history2 = shrink.turns === null ? windowed : shrink.turns > 0 ? windowed.slice(-shrink.turns) : [];
+  const turnsOmitted = windowed.length - history2.length;
+  const earlierTurns = history2.map((turn) => {
+    const sent = head(turn.text, MAP_CHAT_TURN_CHAR_LIMIT);
+    return { role: turn.role, text: sent.text, ...sent.cut ? { truncated: true, totalChars: turn.text.length } : {} };
+  });
+  const ordered = treeOrder(input2.outline);
+  let outlineDepth = shrink.outlineDepth;
+  const within2 = (depth) => depth === null ? ordered : ordered.filter((node) => node.depth <= depth);
+  let outline = within2(outlineDepth);
+  if (outline.length > MAP_CHAT_OUTLINE_CARD_LIMIT) {
+    let depth = outline.reduce((max, node) => Math.max(max, node.depth), 0);
+    while (depth > 0 && within2(depth).length > MAP_CHAT_OUTLINE_CARD_LIMIT) depth--;
+    outlineDepth = depth;
+    outline = within2(depth).slice(0, MAP_CHAT_OUTLINE_CARD_LIMIT);
+  }
+  const outlineOmitted = ordered.length - outline.length;
+  const userTexts = ((_j = input2.userTexts) != null ? _j : []).map((item) => ({
+    item,
+    sent: head(item.text, MAP_CHAT_USER_TEXT_CHAR_LIMIT)
+  }));
+  const summaries = ((_k = input2.summaries) != null ? _k : []).map((item) => ({
+    item,
+    sent: head(item.text, MAP_CHAT_USER_TEXT_CHAR_LIMIT)
+  }));
+  if (turnsOmitted || earlierTurns.some((turn) => turn.truncated) || outlineOmitted || !shrink.outlineSummaries || userTexts.some((entry) => entry.sent.cut) || summaries.some((entry) => entry.sent.cut))
+    shortened = true;
+  const mapSources = ((_l = input2.mapSources) == null ? void 0 : _l.text) ? input2.mapSources : null;
   const json = JSON.stringify({
     // First and fixed: the sources are the same text every turn, so the start of the prompt stays stable.
     ...mapSources ? { mapSources: { readOnly: true, text: mapSources.text }, mapSourcesNote: MAP_CHAT_MAP_SOURCES_NOTE } : {},
@@ -24482,10 +24613,10 @@ function buildMapChatContext(input2) {
     ...!input2.noEditableMap && !input2.outline.length ? { emptyMap: true } : {},
     ...!input2.noEditableMap && input2.mapNeedsName ? { mapNeedsName: true } : {},
     mapTitles,
-    outline: treeOrder(input2.outline).map((node) => ({
+    outline: outline.map((node) => ({
       id: node.id,
       title: clip(node.title, TITLE_LIMIT),
-      summary: clip(node.summary, SUMMARY_LIMIT),
+      ...shrink.outlineSummaries ? { summary: clip(node.summary, SUMMARY_LIMIT) } : {},
       parentId: node.parentId,
       depth: node.depth,
       ...kindFields(node, !!input2.aim),
@@ -24493,6 +24624,8 @@ function buildMapChatContext(input2) {
       ...node.aiLocked ? { aiLocked: true } : {},
       ...errorFields(node)
     })),
+    ...shrink.outlineSummaries ? {} : { outlineSummariesOmitted: true },
+    ...outlineOmitted ? { outlineOmitted, ...outlineDepth !== null ? { outlineDepthLimit: outlineDepth } : {} } : {},
     // Only when a card is locked, so a map without locks sends exactly what it did before. A hint: the apply side refuses.
     ...input2.outline.some((node) => node.aiLocked) ? {
       aiLockedNote: "Cards with aiLocked are locked by the user: read them, but do not rename, edit, move, delete or merge them, add or remove their children, or delete or merge cards related to them. Such actions will be refused."
@@ -24502,15 +24635,16 @@ function buildMapChatContext(input2) {
     references: referencesOut,
     snippets,
     files,
-    ...((_j = input2.userTexts) == null ? void 0 : _j.length) ? {
-      userTexts: input2.userTexts.map((item) => {
+    ...((_m = input2.userTexts) == null ? void 0 : _m.length) ? {
+      userTexts: userTexts.map(({ item, sent }) => {
         var _a3;
         return {
           id: item.id,
           parentId: item.parentId,
           ...item.parentId === null ? { unattached: true } : {},
           readOnly: true,
-          text: item.text,
+          text: sent.text,
+          ...sent.cut ? { truncated: true, totalChars: item.text.length } : {},
           ...linkedTo(item.links),
           ...((_a3 = item.followedBy) == null ? void 0 : _a3.length) ? { followedBy: item.followedBy } : {}
         };
@@ -24520,13 +24654,14 @@ function buildMapChatContext(input2) {
         return (_a3 = item.followedBy) == null ? void 0 : _a3.length;
       }) ? " followedBy lists the topics that come after that text in the reading order; read the text as leading into them." : "")
     } : {},
-    ...((_k = input2.summaries) == null ? void 0 : _k.length) ? {
-      summaries: input2.summaries.map((item) => ({
+    ...((_n = input2.summaries) == null ? void 0 : _n.length) ? {
+      summaries: summaries.map(({ item, sent }) => ({
         id: item.id,
         parentId: item.parentId,
         readOnly: true,
         members: item.members.map(brief).filter(Boolean),
-        text: item.text
+        text: sent.text,
+        ...sent.cut ? { truncated: true, totalChars: item.text.length } : {}
       })),
       summariesNote: "summaries are conclusions the user wrote over neighbouring child topics (summary brackets). Read them as the user's own words and as the direction of the conclusion; they are not cards, have no card id you may act on, and must not be rewritten or deleted."
     } : {},
@@ -24546,8 +24681,10 @@ function buildMapChatContext(input2) {
     } : {},
     ...image ? { selectedImage: image.sent, selectedImageNote: image.note } : {},
     activeFile: active,
-    earlierTurns: history2.map((turn) => ({ role: turn.role, text: turn.text })),
-    ...input2.continuation ? continuationFields(input2.continuation) : {}
+    earlierTurns,
+    ...turnsOmitted ? { earlierTurnsOmitted: turnsOmitted } : {},
+    ...input2.continuation ? continuationFields(input2.continuation) : {},
+    ...shortened ? { shortenedNote: MAP_CHAT_SHORTENED_NOTE } : {}
   });
   return {
     json,
@@ -24566,7 +24703,7 @@ function buildMapChatContext(input2) {
     ...research.sent.length || research.deferred.length ? { research: { sent: research.sent.map((note) => note.id), deferred: research.deferred } } : {}
   };
 }
-function planResearchNotes(notes, budget, alreadySent) {
+function planResearchNotes(notes, budget, alreadySent, oversizeLimit = budget) {
   const live2 = notes.filter((note) => note.detail.trim() && !alreadySent.has(note.id)).reverse();
   const ordered = [...live2.filter((note) => !note.sentBefore), ...live2.filter((note) => note.sentBefore)];
   const sent = [];
@@ -24574,7 +24711,8 @@ function planResearchNotes(notes, budget, alreadySent) {
   let left = budget;
   for (const note of ordered) {
     const chars = note.detail.length;
-    if (chars > budget) deferred.push({ id: note.id, title: clip(note.title, TITLE_LIMIT), chars, oversize: true });
+    if (chars > oversizeLimit)
+      deferred.push({ id: note.id, title: clip(note.title, TITLE_LIMIT), chars, oversize: true });
     else if (chars <= left) {
       sent.push(note);
       left -= chars;
@@ -27817,7 +27955,7 @@ ${body}`);
         var _a2;
         return linkPath ? (_a2 = this.app.metadataCache.getFirstLinkpathDest(linkPath, path)) == null ? void 0 : _a2.path : void 0;
       };
-      const { head, body } = splitFrontmatter(before);
+      const { head: head2, body } = splitFrontmatter(before);
       const fm = frontmatter(before);
       const userKeyLink = Object.entries(fm).some(
         ([key4, value]) => key4 !== "agent-map-references" && findWikilinks(JSON.stringify(value)).some((link) => {
@@ -27830,7 +27968,7 @@ ${body}`);
         foreign.add(path);
         continue;
       }
-      if (result.text !== body) edits.push({ path, before, after: head + result.text });
+      if (result.text !== body) edits.push({ path, before, after: head2 + result.text });
     }
     return { foreign: foreign.size, edits };
   }
@@ -28558,10 +28696,10 @@ function fishboneBone(parent, child) {
   const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2, above = childY < parentY, x = child.x + child.width / 2, y = above ? child.y + child.height : child.y;
   return { jointX: x + Math.abs(parentY - y) * BONE_RUN2, parentY, x, y };
 }
-function fishboneSpinePathData(head, topics) {
+function fishboneSpinePathData(head2, topics) {
   if (!topics.length) return "";
-  const end = Math.min(...topics.map((topic) => fishboneBone(head, topic).jointX));
-  return `M ${head.x} ${head.y + head.height / 2} L ${end} ${head.y + head.height / 2}`;
+  const end = Math.min(...topics.map((topic) => fishboneBone(head2, topic).jointX));
+  return `M ${head2.x} ${head2.y + head2.height / 2} L ${end} ${head2.y + head2.height / 2}`;
 }
 function fishboneEdgePathData(parent, child, depth) {
   if (depth <= 1) {
@@ -30853,9 +30991,9 @@ var UsageControl = class {
     root.setAttr("role", "dialog");
     root.setAttr("aria-label", t("ui.usage_panel_title"));
     root.setAttr("tabindex", "0");
-    const head = root.createEl("h3", { cls: "vam-usage-title" });
-    head.createSpan({ text: t("ui.usage_panel_title") });
-    const group = head.createSpan({ cls: "vam-usage-filter" });
+    const head2 = root.createEl("h3", { cls: "vam-usage-title" });
+    head2.createSpan({ text: t("ui.usage_panel_title") });
+    const group = head2.createSpan({ cls: "vam-usage-filter" });
     group.setAttr("role", "radiogroup");
     group.setAttr("aria-label", t("ui.usage_filter_label"));
     const filters = /* @__PURE__ */ new Map();
@@ -33574,9 +33712,9 @@ function standardKeyOf(heading) {
   );
 }
 function parseCount(line2) {
-  const head = /^(?:數量|数量|count)\s*[:：]\s*(.*)$/i.exec(line2.trim());
-  if (!head) return void 0;
-  const value = /^(至少|at\s+least)?\s*(\d{1,6})$/i.exec(head[1].trim());
+  const head2 = /^(?:數量|数量|count)\s*[:：]\s*(.*)$/i.exec(line2.trim());
+  if (!head2) return void 0;
+  const value = /^(至少|at\s+least)?\s*(\d{1,6})$/i.exec(head2[1].trim());
   return value ? { mode: value[1] ? "min" : "exact", n: Number(value[2]) } : "invalid";
 }
 function parseCallouts(lines, code) {
@@ -33584,8 +33722,8 @@ function parseCallouts(lines, code) {
   const callouts = [];
   const rest = [];
   for (let index = 0; index < lines.length; index++) {
-    const head = code[index] ? null : /^>[ \t]?\[!([A-Za-z][\w-]*)\]([+-])?(?:[ \t]+(.*))?$/.exec(lines[index]);
-    if (!head) {
+    const head2 = code[index] ? null : /^>[ \t]?\[!([A-Za-z][\w-]*)\]([+-])?(?:[ \t]+(.*))?$/.exec(lines[index]);
+    if (!head2) {
       rest.push(lines[index]);
       continue;
     }
@@ -33593,9 +33731,9 @@ function parseCallouts(lines, code) {
     while (index + 1 < lines.length && !code[index + 1] && /^>/.test(lines[index + 1]))
       body.push(lines[++index].replace(/^>[ \t]?/, ""));
     callouts.push({
-      type: head[1].toLowerCase(),
-      fold: (_a2 = head[2]) != null ? _a2 : "",
-      title: ((_b2 = head[3]) != null ? _b2 : "").trim(),
+      type: head2[1].toLowerCase(),
+      fold: (_a2 = head2[2]) != null ? _a2 : "",
+      title: ((_b2 = head2[3]) != null ? _b2 : "").trim(),
       body: body.join("\n").trim()
     });
   }
@@ -34932,7 +35070,7 @@ function updateRecipeFileText(oldText, parts, language2) {
   const closing = bare(lines[0]).trimEnd() === "---" ? lines.findIndex((line2, index) => index > 0 && bare(line2).trimEnd() === "---") : -1;
   const wanted = (slot) => slotValue(slot, parts, language2);
   if (closing < 0) {
-    const head = [
+    const head2 = [
       "---",
       ...SLOTS.flatMap((slot) => {
         const value = wanted(slot);
@@ -34940,7 +35078,7 @@ function updateRecipeFileText(oldText, parts, language2) {
       }),
       "---"
     ];
-    return `${bom}${head.join(eol)}${eol}${text10}`;
+    return `${bom}${head2.join(eol)}${eol}${text10}`;
   }
   const seen = /* @__PURE__ */ new Set();
   const removed = /* @__PURE__ */ new Set();
@@ -35037,9 +35175,9 @@ var trimBlankLines2 = (text10) => {
   return lines.slice(start, end).join("\n");
 };
 function templateSectionsText(template2, language2) {
-  const head = serializeLegacyV1({ ...template2, sections: [] }, language2);
+  const head2 = serializeLegacyV1({ ...template2, sections: [] }, language2);
   const full = serializeLegacyV1(template2, language2);
-  return trimBlankLines2(full.startsWith(head) ? full.slice(head.length) : full);
+  return trimBlankLines2(full.startsWith(head2) ? full.slice(head2.length) : full);
 }
 var sectionShape = (section3) => {
   var _a2, _b2;
@@ -39564,16 +39702,16 @@ function itemCost(item) {
 var blocksCost = (blocks) => blocks.reduce((sum2, block) => sum2 + blockCost(block), 0);
 function layoutReply(text10, budget = MAX_REPLY_NODES) {
   const clean3 = text10.replace(/\r\n?/g, "\n");
-  let head = clean3;
+  let head2 = clean3;
   let tail = "";
   if (clean3.length > MAX_REPLY_CHARS) {
     const line3 = clean3.lastIndexOf("\n", MAX_REPLY_CHARS);
     let cut = line3 >= MAX_REPLY_CHARS / 2 ? line3 : MAX_REPLY_CHARS;
     if (isLowSurrogate(clean3.charCodeAt(cut)) && isHighSurrogate(clean3.charCodeAt(cut - 1))) cut--;
-    head = clean3.slice(0, cut);
+    head2 = clean3.slice(0, cut);
     tail = clean3.slice(cut);
   }
-  const lines = head.split("\n");
+  const lines = head2.split("\n");
   const starts = [];
   const limit = { room: budget, used: 0, over: false };
   const blocks = parseBlocks(lines, 0, starts, limit);
@@ -39837,23 +39975,23 @@ function refMarkdown(ref) {
 }
 function imagesMarkdown(block, labels) {
   var _a2;
-  const head = `**${fill(labels.images, block.nodeTitle)}**`;
-  if (block.state === "searching") return `${head}
+  const head2 = `**${fill(labels.images, block.nodeTitle)}**`;
+  if (block.state === "searching") return `${head2}
 
 ${fill(labels.imagesSearching, block.query)}`;
-  if (block.state === "empty") return `${head}
+  if (block.state === "empty") return `${head2}
 
 ${escapeLine(block.reason || labels.imagesNone)}`;
-  if (block.state === "stopped") return `${head}
+  if (block.state === "stopped") return `${head2}
 
 ${escapeLine(labels.imagesStopped)}`;
-  if (block.state === "failed") return `${head}
+  if (block.state === "failed") return `${head2}
 
 ${fill(labels.imagesFailed, (_a2 = block.reason) != null ? _a2 : "")}`;
   const rows2 = block.items.map(
     (item) => `- ${pageLink(item.title, item.source)}${item.inserted ? ` ${fill(labels.inserted, item.inserted)}` : ""}`
   );
-  return `${head}
+  return `${head2}
 
 ${rows2.join("\n")}`;
 }
@@ -39903,14 +40041,18 @@ function hasUnsavedChat(completedTurns, savedTurns) {
 // experiences/visual-map/map-chat.ts
 var MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS = 400;
 function chainReplyText(replies) {
-  return replies.map((reply, index) => {
+  const render = (earlier2) => replies.map((reply, index) => {
     const chars = Array.from(reply.text.trim());
-    const body = index < replies.length - 1 && chars.length > MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS ? `${chars.slice(0, MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS - 1).join("")}\u2026` : reply.text;
+    const body = index < replies.length - 1 && chars.length > earlier2 ? `${chars.slice(0, Math.max(0, earlier2 - 1)).join("")}\u2026` : reply.text;
     if (!reply.auto) return body;
     const label = reply.auto.round ? t("ui.map_chat_auto_round_0_1", reply.auto.round, reply.auto.maxRounds) : t("ui.map_chat_role_auto");
     return `[${label}]
 ${body}`;
   }).join("\n\n");
+  let earlier = MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS;
+  let text10 = render(earlier);
+  while (text10.length > MAP_CHAT_TURN_CHAR_LIMIT && earlier > 0) text10 = render(earlier = Math.floor(earlier / 2));
+  return text10;
 }
 function placedImage(block) {
   return block.state === "ready" ? block.items.find((item) => item.inserted) : void 0;
@@ -42567,10 +42709,10 @@ ${shown}` : t("ui.map_chat_model_label"));
       attr: { role: "group", "aria-label": t("ui.map_chat_images_label") }
     });
     const placed = blocks.filter((block) => placedImage(block)).length;
-    const head = box.createDiv({ cls: "vam-map-chat-images-status" });
+    const head2 = box.createDiv({ cls: "vam-map-chat-images-status" });
     if (pending2.length) {
       const current = (_a2 = pending2.find((block) => block.running)) != null ? _a2 : pending2[0];
-      head.setText(t("ui.map_chat_images_searching_0", clip3(current.nodeTitle || current.query, 80)));
+      head2.setText(t("ui.map_chat_images_searching_0", clip3(current.nodeTitle || current.query, 80)));
       box.createDiv({
         cls: "vam-map-chat-images-progress",
         text: t("ui.map_chat_images_progress_0_1", blocks.length - pending2.length, blocks.length)
@@ -42586,7 +42728,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
     } else {
       const missed = blocks.length - placed;
-      head.setText(
+      head2.setText(
         missed ? t("ui.map_chat_images_summary_0_1", placed, missed) : t("ui.map_chat_images_summary_0", placed)
       );
     }
@@ -42756,7 +42898,7 @@ function wikimediaThumbnail(url) {
 function wikimediaThumbnails(markdown) {
   return markdown.replace(
     /(!\[[^\]\n]*\]\(<?)(https:\/\/upload\.wikimedia\.org\/[^\s)>]+)/g,
-    (_, head, url) => head + wikimediaThumbnail(url)
+    (_, head2, url) => head2 + wikimediaThumbnail(url)
   );
 }
 
@@ -45033,12 +45175,12 @@ function ipv6Groups(literal) {
     const groups = text10.split(":").map((g) => /^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN);
     return groups.some(Number.isNaN) ? null : groups;
   };
-  const head = read((_a2 = parts[0]) != null ? _a2 : "");
+  const head2 = read((_a2 = parts[0]) != null ? _a2 : "");
   const tail = parts.length === 2 ? read((_b2 = parts[1]) != null ? _b2 : "") : [];
-  if (!head || !tail) return null;
-  if (parts.length === 1) return head.length === 8 ? head : null;
-  const fill2 = 8 - head.length - tail.length;
-  return fill2 < 1 ? null : [...head, ...new Array(fill2).fill(0), ...tail];
+  if (!head2 || !tail) return null;
+  if (parts.length === 1) return head2.length === 8 ? head2 : null;
+  const fill2 = 8 - head2.length - tail.length;
+  return fill2 < 1 ? null : [...head2, ...new Array(fill2).fill(0), ...tail];
 }
 var embeddedBlocked = (high) => ipv4Blocked(high >> 8, high & 255);
 function ipv6Blocked(literal) {
@@ -46985,9 +47127,9 @@ function safeUrl(url) {
   }
 }
 var quote2 = (text10) => `"${line(text10)}"`;
-var table = (head, rows2) => [
-  `| ${head.map(cell).join(" | ")} |`,
-  `| ${head.map(() => "---").join(" | ")} |`,
+var table = (head2, rows2) => [
+  `| ${head2.map(cell).join(" | ")} |`,
+  `| ${head2.map(() => "---").join(" | ")} |`,
   ...rows2.map((r) => `| ${r.map(cell).join(" | ")} |`)
 ];
 var callout = (text10) => ["> [!summary]", `> ${line(text10)}`];
@@ -51611,7 +51753,7 @@ var mapChatStep = {
   schema: MAP_CHAT_SCHEMA,
   policy: (prompt, request) => {
     if (!request.message.trim()) throw new MapChatError("empty", "Map chat message is empty");
-    if (estimateTokens(prompt + JSON.stringify(MAP_CHAT_SCHEMA)) > MAP_CHAT_TOKEN_BUDGET)
+    if (estimateMapChatTokens(prompt + JSON.stringify(MAP_CHAT_SCHEMA)) > MAP_CHAT_TOKEN_BUDGET)
       throw new MapChatError("over_budget", "Map chat context is too large");
   },
   parse: (raw, request) => parseMapChat(raw, request.context)
@@ -53419,12 +53561,12 @@ function aiModeField(parent, options = {}) {
 }
 function linkedField(parent, label) {
   const field = parent.createDiv("vam-field");
-  const head = field.createDiv("vam-field-head");
-  head.createSpan({ text: label });
-  return { field, head };
+  const head2 = field.createDiv("vam-field-head");
+  head2.createSpan({ text: label });
+  return { field, head: head2 };
 }
-function fieldLink(head, text10, run) {
-  const link = head.createEl("button", { text: text10, cls: "vam-field-link" });
+function fieldLink(head2, text10, run) {
+  const link = head2.createEl("button", { text: text10, cls: "vam-field-link" });
   link.type = "button";
   link.addEventListener("click", (event) => {
     event.preventDefault();
@@ -53432,7 +53574,7 @@ function fieldLink(head, text10, run) {
   });
 }
 function modelField(parent, models, defaultLabel, repair) {
-  const { field, head } = linkedField(parent, t("ui.model"));
+  const { field, head: head2 } = linkedField(parent, t("ui.model"));
   const model = field.createEl("select");
   model.setAttr("aria-label", t("ui.model"));
   const fill2 = () => {
@@ -53444,7 +53586,7 @@ function modelField(parent, models, defaultLabel, repair) {
     model.value = choices.some((option) => option.id === selected) ? selected : "";
   };
   fill2();
-  if (repair) fieldLink(head, t("ui.connection_repair"), () => repair(model.value || void 0));
+  if (repair) fieldLink(head2, t("ui.connection_repair"), () => repair(model.value || void 0));
   const dispose = models.watch(fill2);
   return {
     value: () => model.value || void 0,
@@ -54286,8 +54428,8 @@ function parseOutlineExchange(input2, options = {}) {
       const body = elementsOf(root, "body")[0];
       tops = body ? elementsOf(body, "outline") : [];
       read = readOpml;
-      const head = elementsOf(root, "head")[0];
-      const headTitle = head ? elementsOf(head, "title")[0] : void 0;
+      const head2 = elementsOf(root, "head")[0];
+      const headTitle = head2 ? elementsOf(head2, "title")[0] : void 0;
       const titleText = headTitle == null ? void 0 : headTitle.children.filter((child) => typeof child === "string").join("");
       if (titleText == null ? void 0 : titleText.trim()) {
         try {
@@ -54420,12 +54562,12 @@ function toFreeMind(map, notes) {
     roots,
     (node, depth) => {
       const note = noteOf2(notes, node.id);
-      const head = `${indent(depth + 1)}<node ID="ID_${++counter}" TEXT="${escapeAttr(note.title)}"`;
+      const head2 = `${indent(depth + 1)}<node ID="ID_${++counter}" TEXT="${escapeAttr(note.title)}"`;
       const rich = note.body ? [
         `${indent(depth + 2)}<richcontent TYPE="NOTE"><html><head></head><body>${note.body.split(/\r\n?|\n/).map((part) => part ? `<p>${escapeText2(part)}</p>` : "<p><br/></p>").join("")}</body></html></richcontent>`
       ] : [];
-      if (!node.children.length && !rich.length) return `${head}/>`;
-      return [`${head}>`, ...rich].join("\n");
+      if (!node.children.length && !rich.length) return `${head2}/>`;
+      return [`${head2}>`, ...rich].join("\n");
     },
     (node, depth) => node.children.length || noteOf2(notes, node.id).body ? `${indent(depth + 1)}</node>` : ""
   );
@@ -55300,9 +55442,9 @@ var NextStepModal = class extends import_obsidian28.Modal {
     });
   }
 };
-function renderProposalKind(head, row, item) {
+function renderProposalKind(head2, row, item) {
   if (item.kind)
-    head.createSpan({
+    head2.createSpan({
       cls: `vam-proposal-kind vam-proposal-kind-${item.kind}`,
       text: t(`ui.proposal_kind_${item.kind}`)
     });
@@ -55371,18 +55513,18 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
   for (const item of ordered) {
     const row = list2.createDiv(parentOf2(item) ? "vam-proposal is-child" : "vam-proposal");
     if (keyed) row.addClass(`vam-proposal-depth-${Math.min(depthOf2(item), 5)}`);
-    const head = row.createDiv("vam-proposal-head");
-    const check = head.createEl("input", { type: "checkbox" });
+    const head2 = row.createDiv("vam-proposal-head");
+    const check = head2.createEl("input", { type: "checkbox" });
     check.checked = !review;
     check.hidden = review;
     check.setAttr("aria-label", t("ui.select_proposal_0", item.title));
-    const title = head.createEl("input", { type: "text", value: item.title, cls: "vam-proposal-title" });
+    const title = head2.createEl("input", { type: "text", value: item.title, cls: "vam-proposal-title" });
     title.setAttr("aria-label", t("ui.proposal_name"));
     title.readOnly = !!item.kind && item.kind !== "add";
-    renderProposalKind(head, row, item);
+    renderProposalKind(head2, row, item);
     let task, contribution;
     if (!options.compact && (!item.kind || item.kind === "add")) {
-      const more = head.createEl("button", { text: t("ui.proposal_details"), cls: "vam-proposal-more" });
+      const more = head2.createEl("button", { text: t("ui.proposal_details"), cls: "vam-proposal-more" });
       more.setAttr("aria-expanded", "false");
       const body = row.createDiv("vam-proposal-body");
       body.hidden = true;
@@ -55403,7 +55545,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       contribution.setAttr("aria-label", t("ui.contribution_to_the_parent_topic"));
     }
     rows2.push({ item, check, title, task, contribution });
-    (_a2 = options.apply) == null ? void 0 : _a2.call(options, item, { element: row, head, title });
+    (_a2 = options.apply) == null ? void 0 : _a2.call(options, item, { element: row, head: head2, title });
     check.addEventListener("change", () => {
       const uncheckChildren = (key4) => rows2.forEach((other) => {
         if (parentOf2(other.item) === key4 && other.check.checked) {
@@ -56884,9 +57026,9 @@ var TopicChatWindow = class {
       attr: { id: labelId }
     });
     this.el.setAttr("aria-labelledby", labelId);
-    const head = this.el.createDiv("vam-topic-chat-head");
-    head.createSpan({ cls: "vam-topic-chat-title", text: host.topicTitle() });
-    const close = head.createEl("button", {
+    const head2 = this.el.createDiv("vam-topic-chat-head");
+    head2.createSpan({ cls: "vam-topic-chat-title", text: host.topicTitle() });
+    const close = head2.createEl("button", {
       cls: "vam-topic-chat-close clickable-icon",
       text: "\xD7",
       attr: { type: "button", "aria-label": t("ui.topic_chat_close") }
@@ -81526,15 +81668,15 @@ ${addition}` : addition },
   }
   /** The head and first-level topic boxes of one spine, read from the cards on screen. */
   spineBoxes(headId) {
-    const head = this.cardEls.get(headId);
-    if (!head || !this.map) return null;
+    const head2 = this.cardEls.get(headId);
+    if (!head2 || !this.map) return null;
     const topics = [];
     for (const node of this.canvasNodes()) {
       if (node.parentId !== headId || node.afterTextId) continue;
       const card = this.cardEls.get(node.id);
       if (card) topics.push({ id: node.id, box: boxOf(card) });
     }
-    return { head: boxOf(head), topics };
+    return { head: boxOf(head2), topics };
   }
   /**
    * Sets one spine's path from the cards on screen; `moved` is a card being dragged, whose box is not yet in the DOM,
@@ -81883,15 +82025,15 @@ ${addition}` : addition },
     const anchored = this.anchorLinks.get(key4), titleOf = (id) => {
       var _a2, _b2;
       return anchored && id === anchored.anchorId ? anchored.anchorNote ? t("ui.anchor_relation_end_0", anchored.anchorNote) : t("ui.anchor_relation_end_empty") : (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
-    }, at = this.relationLabelAt.get(key4), head = createSvg("tspan");
-    head.textContent = t(
+    }, at = this.relationLabelAt.get(key4), head2 = createSvg("tspan");
+    head2.textContent = t(
       link.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
       name2,
       titleOf(link.from),
       titleOf(link.to)
     );
-    if (at) head.setAttribute("x", String(at.x));
-    label.appendChild(head);
+    if (at) head2.setAttribute("x", String(at.x));
+    label.appendChild(head2);
     if (link.description) {
       const note = createSvg("tspan"), chars = Array.from(link.description);
       note.textContent = chars.length > RELATION_LABEL_NOTE_MAX ? `${chars.slice(0, RELATION_LABEL_NOTE_MAX).join("")}\u2026` : link.description;
@@ -82232,12 +82374,12 @@ ${addition}` : addition },
 // experiences/visual-map/math-repair.ts
 function splitFrontmatter2(content) {
   var _a2, _b2;
-  const head = (_b2 = (_a2 = content.match(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
-  return { head, body: content.slice(head.length) };
+  const head2 = (_b2 = (_a2 = content.match(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
+  return { head: head2, body: content.slice(head2.length) };
 }
 function repairNoteMath(content) {
-  const { head, body } = splitFrontmatter2(content);
-  return head + normalizeMathDelimiters(body);
+  const { head: head2, body } = splitFrontmatter2(content);
+  return head2 + normalizeMathDelimiters(body);
 }
 var withoutBom = (text10) => text10.replace(/^\uFEFF/, "");
 async function planMathRepair(vault, files) {
@@ -82589,8 +82731,8 @@ var trimTrailingBlank = (lines) => {
 };
 function composeStructure(chunks, rows2) {
   const pieces = [];
-  const head = trimTrailingBlank(chunks.head);
-  if (head.length) pieces.push(head);
+  const head2 = trimTrailingBlank(chunks.head);
+  if (head2.length) pieces.push(head2);
   for (const row of rows2) {
     const original = row.origin === null ? void 0 : chunks.sections[row.origin];
     if (!original) {

@@ -1245,6 +1245,21 @@ test('chat 06: remove_relation names the pair in either order; a pair with no re
   // Without the remove first, the same add is a second link on the pair and is refused.
   assert.deepEqual(codes(parse(reply(rel('b', 'a', 'contradicts')), ctx)), ['0:relation_not_allowed']);
 });
+test('chat 06: a bare ref on a relation end reads as new:<ref> only when an earlier kept add_child defined it', () => {
+  const got = parse(reply(child('n1', 'a'), rel('n1', 'a1', 'related'), rel('r', 'n1', 'prerequisite')));
+  assert.deepEqual(got.actions.slice(1), [
+    { kind: 'add_relation', fromId: 'new:n1', toId: 'a1', relationKind: 'related' },
+    { kind: 'add_relation', fromId: 'r', toId: 'new:n1', relationKind: 'prerequisite' }
+  ]);
+  assert.deepEqual(got.rejected, []);
+  // An existing card id wins over a ref of the same string.
+  const same = parse(reply(child('b', 'a'), rel('b', 'a1', 'related')));
+  assert.deepEqual(same.actions[1], { kind: 'add_relation', fromId: 'b', toId: 'a1', relationKind: 'related' });
+  // Forward ref, rejected definition and unknown ref stay unknown_node.
+  assert.deepEqual(codes(parse(reply(rel('n1', 'a1', 'related'), child('n1', 'a')))), ['0:unknown_node']);
+  assert.deepEqual(codes(parse(reply(child('n1', 'ghost'), rel('n1', 'a1', 'related')))), ['0:unknown_node', '1:unknown_node']);
+  assert.deepEqual(codes(parse(reply(child('n1', 'a'), rel('zz', 'a1', 'related')))), ['1:unknown_node']);
+});
 test('chat 06: on an AIM map every relation action is dropped and counted', () => {
   const ctx = linked([{ kind: 'supports', from: 'a', to: 'b' }], { aim: true });
   assert.deepEqual(plain(ctx.relations), [], 'an AIM context carries no relations');

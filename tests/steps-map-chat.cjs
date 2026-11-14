@@ -191,7 +191,8 @@ test('context text is data: markdown with prompt-like text stays inside the JSON
 test('step policy refuses an empty message and an over-budget context', () => {
   const { prepareStep } = load('core/step-runner.ts');
   assert.throws(() => prepareStep(mapChatStep, request({ message: '  ' })), error => error.code === 'empty');
-  const huge = context({ files: [{ path: 'n.md', content: 'x'.repeat(MAP_CHAT_TOKEN_BUDGET * 4) /* 4 chars per estimated token (ai/context-builder.ts:3); the JSON wrapper pushes it over */ }] });
+  // A selected snippet is never cut (files are, to MAP_CHAT_FILE_CHAR_LIMIT): one this long is over whatever the context gives up.
+  const huge = context({ snippets: [{ path: 'n.md', text: 'x'.repeat(MAP_CHAT_TOKEN_BUDGET * 4) /* 4 ASCII chars per estimated token; the JSON wrapper pushes it over */ }] });
   assert.ok(estimateTokens(huge.json) > 150_000);
   assert.throws(() => prepareStep(mapChatStep, request({ context: huge })), error => error.code === 'over_budget');
 });

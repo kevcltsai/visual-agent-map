@@ -113,6 +113,8 @@ export function unsafeMermaid(body: readonly string[]): boolean {
  * the text after it, so a misread boundary only blocks more, never lets an unsafe block through. A mermaid fence
  * quoted inside another code block is checked as well, which only changes text that is never rendered.
  */
+const BR_TAG = /<br\s*\/?>/gi;
+
 export function neutralizeUnsafeMermaid(markdown: string): string {
   // CRLF and a lone CR are line breaks to the renderer too; split on all of them so no fence, header or directive hides.
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
@@ -121,6 +123,9 @@ export function neutralizeUnsafeMermaid(markdown: string): string {
     if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
     const body: string[] = [];
     for (let next = index + 1; next < lines.length; next++) {
+      // A `<br>` line break in a label becomes a space, so the HTML-tag rule does not turn the whole diagram into code.
+      // Swapped first, so the fence and safety checks read exactly the text that is written.
+      lines[next] = lines[next].replace(BR_TAG, " ");
       const content = core(lines[next]);
       const close = FENCE.exec(content);
       if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;

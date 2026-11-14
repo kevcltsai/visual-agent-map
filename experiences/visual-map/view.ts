@@ -24811,7 +24811,6 @@ export class VisualAgentMapView extends ItemView {
         // An image the rest of the file already has (outside the replaced text) is not embedded again by the edit.
         const tail = source.text.length - at - action.find.length;
         const next = dedupeImageEmbeds(guarded, { file: true, range: { start: at, end: guarded.length - tail } });
-        const replace = next.slice(at, next.length - (source.text.length - at - action.find.length));
         // Only the mermaid blocks the edit adds are judged (allow-list, then parser); what the note already had stays as it is.
         const added = addedMermaidBlocks(source.text, next);
         if (added.some(block => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
@@ -24844,11 +24843,30 @@ export class VisualAgentMapView extends ItemView {
         });
         if (!verdict.ok) return guardSkipped(verdict.code, true);
         if (source.editor) {
-          source.editor.replaceRange(
-            replace,
-            source.editor.offsetToPos(at),
-            source.editor.offsetToPos(at + action.find.length)
-          );
+          // The dedupe can drop a line whose newline belongs to the tail; then the changed range is found from the two texts,
+          // so the editor ends up exactly as `next`, which the undo entry compares against.
+          const before = source.text;
+          let from = at;
+          let to = at + action.find.length;
+          let replace = next.slice(at, next.length - tail);
+          if (!(
+            next.startsWith(before.slice(0, at)) &&
+            next.endsWith(before.slice(before.length - tail)) &&
+            next.length >= at + tail
+          )) {
+            const limit = Math.min(before.length, next.length);
+            from = 0;
+            while (from < limit && before.charCodeAt(from) === next.charCodeAt(from)) from++;
+            let rest = 0;
+            while (
+              rest < limit - from &&
+              before.charCodeAt(before.length - 1 - rest) === next.charCodeAt(next.length - 1 - rest)
+            )
+              rest++;
+            to = before.length - rest;
+            replace = next.slice(from, next.length - rest);
+          }
+          source.editor.replaceRange(replace, source.editor.offsetToPos(from), source.editor.offsetToPos(to));
           this.recordChatFileEdit(source.file.path, source.text, next, run);
           return done;
         }

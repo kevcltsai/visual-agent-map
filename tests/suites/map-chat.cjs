@@ -8783,6 +8783,24 @@ integrationTest('ticket 04 edit_topic_note: duplicate embeds in the new Detail a
   assert.equal(h.contents.get('Notes/Research.md'), '# R\n\n![Pic 0](<https://img.example/0.jpg>)\n\nSleep needs darkness.\n\n![Pic 1](https://img.example/1.jpg)\n');
 });
 
+integrationTest('ticket 04 edit_md_file editor branch: a replacement that is only a duplicate embed line leaves the editor exactly as the validated text, and undo works', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const original = '# T\n\n![a](https://x.org/A.png)\n\n![b](https://x.org/B.png)\nrest\n';
+  const expected = '# T\n\n![a](https://x.org/A.png)\n\nrest\n';
+  let text = original;
+  const editor = {
+    getValue: () => text, setValue: v => { text = v; }, offsetToPos: o => ({ ch: o, line: 0 }),
+    replaceRange: (r, from, to) => { text = text.slice(0, from.ch) + r + text.slice(to.ch); }
+  };
+  h.contents.set('Notes/Research.md', original);
+  h.setActive('Notes/Research.md', original, editor);
+  const lines = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: '![b](https://x.org/B.png)', replace: '![a](https://x.org/A.png)' }], h.hashes('Notes/Research.md'));
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  assert.equal(text, expected, 'the editor holds exactly the validated text');
+  await h.view.history.undo().undo();
+  assert.equal(text, original, 'undo put the old text back');
+});
+
 // Ticket 05: a card with a queued or running picture search in this map is not searched again by a later find_images.
 const DUP_SKIP = 'this topic was already searched in this reply';
 integrationTest('ticket 05 find_images: a second request for a card whose search is running, or still queued, is skipped with the existing line', async () => {

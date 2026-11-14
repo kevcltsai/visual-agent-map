@@ -24,6 +24,34 @@ import {
   type ChatLineCounts
 } from "../../core/map-chat-layout";
 
+/**
+ * How much of each earlier round's reply a chain keeps in history. A chain has up to {@link MAP_CHAT_CHAIN_MAX_ROUNDS} rounds in one
+ * history turn; whole replies would make that one turn as long as all of them, so the last round (what the chain ended on) stays whole
+ * and the earlier ones are cut to their opening, which usually says what the round did.
+ */
+export const MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS = 400;
+
+/**
+ * The assistant text of one history turn: a single reply as it is; the replies of a chain in order, a blank line apart, each automatic
+ * round headed by its label (with its number when known), every reply but the last cut to {@link MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS}.
+ */
+export function chainReplyText(replies: readonly { text: string; auto?: MapChatAutoInfo }[]): string {
+  return replies
+    .map((reply, index) => {
+      const chars = Array.from(reply.text.trim());
+      const body =
+        index < replies.length - 1 && chars.length > MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS
+          ? `${chars.slice(0, MAP_CHAT_CHAIN_EARLIER_REPLY_CHARS - 1).join("")}…`
+          : reply.text;
+      if (!reply.auto) return body;
+      const label = reply.auto.round
+        ? t("ui.map_chat_auto_round_0_1", reply.auto.round, reply.auto.maxRounds)
+        : t("ui.map_chat_role_auto");
+      return `[${label}]\n${body}`;
+    })
+    .join("\n\n");
+}
+
 /** What the user attached to the next message. Topic chips come from a dragged card; snippets and files from a drop. */
 export type MapChatChip =
   | { kind: "topic"; id: string }
@@ -660,20 +688,50 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   attachments(): MapChatChip[] {
     return this.chips.map(chip => ({ ...chip }));
   }
-  /** Finished question and answer turns, oldest first, for the next request. */
+  /**
+   * Finished question and answer turns, oldest first, for the next request. An automatic continuation is one turn: the question the
+   * user sent (with its live follow-ups and any typed during the rounds) and the replies of all its rounds in order. Each round is its
+   * own pair in the panel, but history keeps only the last few pairs, so counting rounds as turns would push everything the user said
+   * before a long chain out of the window.
+   */
   turns(): MapChatTurn[] {
     const turns: MapChatTurn[] = [];
+    // Chains whose turn is already closed. The retry of an old failed round is added at the end of the conversation, after
+    // whatever the user asked since, so a round of such a chain does not join the turn before it: it is a turn of its own.
+    const closed = new Set<number>();
+    const seqOf = (message: MapChatMessage): number | undefined => message.origin?.chain?.seq;
     // Messages always come in pairs (question, answer); a pair whose answer is unfinished or failed is not history.
-    for (let at = 0; at + 1 < this.messages.length; at += 2) {
-      const question = this.messages[at];
-      const answer = this.messages[at + 1];
-      if (answer.streaming || answer.error || !answer.text.trim()) continue;
-      // Follow-ups that went into the turn are part of what the user asked: joined by a blank line, no tag.
-      const steered = (question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text);
-      turns.push(
-        { role: "user", text: [question.text, ...steered].join("\n\n") },
-        { role: "assistant", text: answer.text }
-      );
+    for (let at = 0; at + 1 < this.messages.length;) {
+      // A question the user sent, then the automatic rounds that continued it, if any.
+      const chains = new Set<number>();
+      const first = seqOf(this.messages[at]);
+      if (first !== undefined) chains.add(first);
+      let end = at + 2;
+      while (end + 1 < this.messages.length && this.messages[end].auto) {
+        const seq = seqOf(this.messages[end]);
+        if (seq !== undefined && closed.has(seq) && !chains.has(seq)) break;
+        if (seq !== undefined) chains.add(seq);
+        end += 2;
+      }
+      for (const seq of chains) closed.add(seq);
+      const asked: string[] = [];
+      const replies: { text: string; auto?: MapChatAutoInfo }[] = [];
+      for (let pair = at; pair < end; pair += 2) {
+        const question = this.messages[pair];
+        // A turn that starts with an automatic round (a retried old round) is asked by the chain's own message, not by its label.
+        if (pair === at) asked.push(question.auto ? (question.origin?.text ?? question.text) : question.text);
+        // Follow-ups that went into the turn are part of what the user asked: joined by a blank line, no tag.
+        asked.push(...(question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text));
+        const answer = this.messages[pair + 1];
+        if (answer.streaming || answer.error || !answer.text.trim()) continue;
+        replies.push({
+          text: answer.text,
+          ...(question.auto ? { auto: question.autoInfo ?? { maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS } } : {})
+        });
+      }
+      at = end;
+      if (!replies.length) continue;
+      turns.push({ role: "user", text: asked.join("\n\n") }, { role: "assistant", text: chainReplyText(replies) });
     }
     return turns;
   }

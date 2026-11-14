@@ -7193,7 +7193,7 @@ integrationTest('P3 e2e: one message builds a root and researches it, the resear
   const turns = chat.transcript(); eq(turns.map(m => m.role), ['user', 'assistant', 'user', 'assistant']); eq(turns.map(m => !!m.auto), [false, false, true, false]);
   eq(turns.at(-1).lines.map(l => l.basis?.kind), ['research', 'research']); eq(turns.at(-1).lines[0].basis.sources, [{ id: rootId, title: 'Pstack' }]);
   eq(h.view.map.nodes.filter(n => n.parentId === rootId).length, 2); assert.equal(h.control.requests.length, 2, 'two requests, one message');
-  eq(chat.turns().map(t => t.role), ['user', 'assistant', 'user', 'assistant']); assert.equal(chat.turns()[2].text, 'Automatic continuation', 'history records the round as an automatic continuation, not as the user\'s words');
+  eq(chat.turns(), [{ role: 'user', text: 'make the full knowledge tree' }, { role: 'assistant', text: 'Built the root and started the research.\n\n[Automatic continuation · round 2 of 8]\nAdded the subtopics.' }], 'ticket 06: the chain is one history turn, the user\'s own words and the rounds\' replies in order');
 });
 integrationTest('P3 A5: partial research failure carries on and tells the failure in continuation.research; all failed, all stopped and not started each end the chain without hanging', async () => {
   for (const [label, run, reason] of [['all failed', run => settleRun(run, 'failed', 'quota'), 'research_failed'], ['all stopped', run => settleRun(run, 'stopped'), 'research_stopped'], ['never started', run => run.onOutcome({ kind: 'not_started' }), 'research_not_started']]) {
@@ -7446,6 +7446,85 @@ test('P4 unread research: a note that did not fit is told as read next round, on
   f.panel.setUnreadNotes(turn, []); eq(basisOf(f.parts.log()), ['Based on research note “Notes” (cards: 1)']);
   const z = panelFixture(); z.setLanguage('zh-TW'); z.panel.setOpen(true); const zt = z.panel.begin('q'); z.panel.finish('好', []); z.panel.setUnreadNotes(zt, [{ title: '瀏覽器工具', oversize: false }, { title: '完整手冊', oversize: true }]);
   eq(basisOf(z.parts.log()), ['「瀏覽器工具」這輪放不下，下一輪讀。', '「完整手冊」太長，沒有讀。']); z.setLanguage('en');
+});
+
+// ---- ticket 06: an automatic chain is one history turn ----------------------------------------------------------------
+
+/** One user turn answered, then `rounds` automatic rounds (2..rounds+1) with replies `reply(round)`. */
+function chainTurns(f, ask, rounds, reply = round => `Round ${round} reply.`) {
+  f.panel.begin(ask); f.panel.finish('Round 1 reply.', []);
+  for (let round = 2; round <= rounds + 1; round++) { f.panel.beginAutoRound(round, 8, REMAINING, autoOrigin()); f.panel.finish(reply(round), []); }
+}
+
+test('ticket 06: three user turns then an 8-round chain still send the three earlier user turns in the six-turn window', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  for (const ask of ['first ask', 'second ask', 'third ask']) { f.panel.begin(ask); f.panel.finish(`answer to ${ask}`, []); }
+  chainTurns(f, 'build the whole tree', 7);
+  const turns = f.panel.turns();
+  eq(turns.filter(t => t.role === 'user').map(t => t.text), ['first ask', 'second ask', 'third ask', 'build the whole tree'], 'the chain is one turn; no round label stands in for the user');
+  const earlier = JSON.parse(buildMapChatContext({ mapTitle: 'M', outline: [], selected: [], references: [], snippets: [], files: [], history: turns }).json).earlierTurns;
+  eq(earlier.filter(t => t.role === 'user').map(t => t.text), ['first ask', 'second ask', 'third ask', 'build the whole tree'], 'all four turns fit the default six-turn window');
+  const reply = turns.at(-1).text;
+  assert.match(reply, /^Round 1 reply\.\n\n\[Automatic continuation · round 2 of 8\]\nRound 2 reply\./, 'the rounds\' replies in order, each automatic round headed by its label');
+  assert.match(reply, /\[Automatic continuation · round 8 of 8\]\nRound 8 reply\.$/, 'the last round ends the turn');
+});
+
+test('ticket 06: earlier rounds are cut to their opening and the last round stays whole; live steers typed during the chain join the question', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('go'); f.panel.addSteer('also cats', 'live'); f.panel.finish('x'.repeat(1000), []);
+  f.panel.beginAutoRound(2, 8, REMAINING, autoOrigin()); f.panel.addSteer('and dogs', 'live'); f.panel.addSteer('queued one', 'queued'); f.panel.finish('y'.repeat(1000), []);
+  f.panel.beginAutoRound(3, 8, REMAINING, autoOrigin()); f.panel.finish('z'.repeat(1000), []);
+  const [user, assistant] = f.panel.turns();
+  eq(user, { role: 'user', text: 'go\n\nalso cats\n\nand dogs' });
+  const parts = assistant.text.split('\n\n');
+  eq(parts.map(p => Array.from(p.split('\n').at(-1)).length), [400, 400, 1000], 'two earlier rounds cut to 400 characters (with an ellipsis), the last one whole');
+  assert.ok(parts[0].endsWith('…') && parts[1].endsWith('…'));
+});
+
+test('ticket 06: a failed chain round is left out and the rounds that worked stay; a round still running is not history yet', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('before'); f.panel.finish('before answer', []);
+  f.panel.begin('go'); f.panel.finish('Round 1 reply.', []);
+  f.panel.beginAutoRound(2, 8, REMAINING, autoOrigin()); f.panel.fail('It broke');
+  f.panel.beginAutoRound(3, 8, REMAINING, autoOrigin()); f.panel.finish('Round 3 reply.', []);
+  f.panel.beginAutoRound(4, 8, REMAINING, autoOrigin()); f.panel.streamReply('half');
+  eq(f.panel.turns(), [
+    { role: 'user', text: 'before' }, { role: 'assistant', text: 'before answer' },
+    { role: 'user', text: 'go' }, { role: 'assistant', text: 'Round 1 reply.\n\n[Automatic continuation · round 3 of 8]\nRound 3 reply.' }
+  ]);
+  const g = panelFixture(); g.panel.setOpen(true);
+  g.panel.begin('go'); g.panel.fail('It broke'); g.panel.beginAutoRound(2, 8, REMAINING, autoOrigin()); g.panel.fail('Again');
+  eq(g.panel.turns(), [], 'a chain with no finished reply is not history');
+  f.panel.begin('after'); f.panel.finish('after answer', []);
+  eq(f.panel.turns().filter(t => t.role === 'user').map(t => t.text), ['before', 'go', 'after'], 'the next user message starts a new turn');
+});
+
+test('ticket 06: the retry of an old failed round, sent after a newer message, is its own turn and does not join the newer one', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  const cats = seq => ({ text: 'build cats', chips: [], selectedIds: [], chain: { seq, state: {}, continuation: {} } });
+  f.panel.begin('build cats'); f.panel.finish('Cats root.', []);
+  f.panel.beginAutoRound(2, 8, REMAINING, cats(1)); f.panel.fail('It broke');
+  f.panel.begin('build dogs'); f.panel.finish('Dogs root.', []);
+  f.panel.beginAutoRound(2, 8, REMAINING, { ...cats(1), text: 'build cats' }); f.panel.finish('Cats round 2.', []);
+  f.panel.beginAutoRound(3, 8, REMAINING, cats(3)); f.panel.finish('Cats round 3.', []);
+  eq(f.panel.turns(), [
+    { role: 'user', text: 'build cats' }, { role: 'assistant', text: 'Cats root.' },
+    { role: 'user', text: 'build dogs' }, { role: 'assistant', text: 'Dogs root.' },
+    { role: 'user', text: 'build cats' }, { role: 'assistant', text: '[Automatic continuation · round 2 of 8]\nCats round 2.\n\n[Automatic continuation · round 3 of 8]\nCats round 3.' }
+  ], 'the retried cats round is asked by the cats message, and the rounds after it go on in that turn; the dogs reply stays whole');
+});
+
+test('ticket 06 control: a conversation without a chain gives exactly the pairs it did before', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('one'); f.panel.finish('answer one', []);
+  f.panel.begin('two'); f.panel.addSteer('more', 'live'); f.panel.finish('  answer two  ', []);
+  f.panel.begin('three'); f.panel.fail('It broke');
+  f.panel.begin('four'); f.panel.finish('x'.repeat(1000), []);
+  eq(f.panel.turns(), [
+    { role: 'user', text: 'one' }, { role: 'assistant', text: 'answer one' },
+    { role: 'user', text: 'two\n\nmore' }, { role: 'assistant', text: '  answer two  ' },
+    { role: 'user', text: 'four' }, { role: 'assistant', text: 'x'.repeat(1000) }
+  ], 'one pair per turn, failed ones out, replies untouched (no cut, no label)');
 });
 
 test('P4 round: an automatic round shows a separator with the round and what is left (also in Traditional Chinese), the reader hears the round once, and a restored round shows its separator too', () => {

@@ -945,3 +945,31 @@ integrationTest('Quick research reaches the providers without any web tool; a St
     assert.equal(quickSub.calls[0].options.webSearch, false, `${model}: Quick subtopic has no web`); assert.equal('webSearchOnly' in quickSub.calls[0].options, false, `${model}: Quick subtopic is not forced to search`);
   }
 });
+// Ticket 03: research write-back is new AI text, so a line it starts with inline HTML gets the harmless lead; the old Detail is not touched.
+integrationTest('research write-back: a reply line that starts with <sup> is written with a lead so later headings and mermaid still parse; the old Detail is kept as it was', async () => {
+  const { INLINE_HTML_LEAD } = load('ai/markdown-blocks.ts');
+  for (const updateMode of ['merge', 'top']) {
+    const { repo, app } = fixture('en'), n = await topicNote(repo, `Sup ${updateMode}`);
+    const old = '### Earlier\n\n<sup>0</sup> user wrote this';
+    await repo.updateNote(n.path, { prompt: 'Research', detail: old });
+    const reply = '### Core conclusions\n\n<sup>1</sup> Sleep matters.\n\n<details>\n<summary>More</summary>\nx\n</details>\n\n```mermaid\nflowchart TD\n  A["a"] --> B["b"]\n```\n\n```text\n<sup>2</sup> fenced\n```\n\n### Sources\n\n- s';
+    let view;
+    const plugin = { repo, settings: { ...DEFAULT_SETTINGS, language: 'en' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
+      askModel: async () => ({ summary: 'Researched', detail: reply, suggestions: [], visualReferences: [] }), mutate: async work => work(), views: () => [view] };
+    const { VisualAgentMapView } = load('main.ts', { obsidian });
+    // The update way comes from the note style; the run's own style is kept with only that changed.
+    const { NoteStyleStore } = load('ai/note-style-store.ts', { obsidian });
+    const store = new NoteStyleStore({ settings: () => plugin.settings, port: {}, save: async () => {} });
+    plugin.noteStyles = { runStyle: input => ({ ...store.runStyle(input), updateMode }) };
+    view = new VisualAgentMapView({ app }, attachTopicRuns(plugin)); view.path = 'Map.md'; view.map = map([n]); view.render = () => {}; view.hydrate = async () => {};
+    await startResearch(plugin, n, { map: view.map, request: { task: 'Research it' } }); await new Promise(resolve => setTimeout(resolve, 20));
+    const detail = (await repo.readNote(n.path)).detail;
+    assert.ok(detail.includes(`${INLINE_HTML_LEAD}<sup>1</sup> Sleep matters.`), `${updateMode}: ${detail}`);
+    assert.doesNotMatch(detail, /^<sup>1/m, updateMode);
+    assert.match(detail, /^<details>$/m, `${updateMode}: a lone block tag stays`);
+    assert.match(detail, /^```mermaid\nflowchart TD\n {2}A\["a"\] --> B\["b"\]\n```$/m, `${updateMode}: the mermaid block is still a code block`);
+    assert.match(detail, /^```text\n<sup>2<\/sup> fenced\n```$/m, `${updateMode}: fence content is unchanged`);
+    assert.match(detail, /^### Sources$/m, `${updateMode}: a later heading is still a heading`);
+    if (updateMode === 'top') assert.ok(detail.includes(old), `top keeps the old Detail byte for byte: ${detail}`);
+  }
+});

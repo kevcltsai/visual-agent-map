@@ -567,3 +567,44 @@ test('addedMermaidBlocks: only the blocks the after text has beyond the before t
   assert.equal(addedMermaidBlocks(style, foo).length, 1, 'only the info string changed: still a new block');
   assert.equal(addedMermaidBlocks(`${foo}\n\ntext`, `${foo}\n\nother`).length, 0, 'same body and same info: not new');
 });
+
+// Ticket 03: a new AI line that starts with inline HTML (`<sup>1</sup> …`) made Obsidian's editor stop parsing the rest of the
+// note (headings, callouts and mermaid shown as raw text). Such a line gets a zero-width-space entity first.
+const { guardInlineHtmlLineStarts, INLINE_HTML_LEAD } = load('ai/markdown-blocks.ts');
+/** Lines a reader of the editor would see as structure: headings and the fence lines of a mermaid block, outside any HTML-led line. */
+const leadsWithInlineHtml = text => text.split('\n').filter(line => /^ {0,3}<\/?(?:sup|sub|kbd|mark|span|small|u|br)[\s/>]/i.test(line) && !/^ {0,3}<\/?[a-z]+[^<>]*>\s*$/i.test(line));
+const INLINE_CASE = ['### 核心結論', '', '<sup>1</sup> 研究顯示睡眠很重要。', '<kbd>Ctrl</kbd> 開啟', '', '### 關鍵知識', '', '```mermaid', 'flowchart TD', '  A["x"] --> B["y"]', '```', ''].join('\n');
+
+test('guardInlineHtmlLineStarts: a line led by an inline tag no longer starts with "<"; headings and the mermaid fence stay as they were', () => {
+  const out = guardInlineHtmlLineStarts(INLINE_CASE);
+  assert.deepEqual(leadsWithInlineHtml(out), []);
+  assert.ok(out.includes(`${INLINE_HTML_LEAD}<sup>1</sup> 研究顯示睡眠很重要。`), out);
+  assert.ok(out.includes(`${INLINE_HTML_LEAD}<kbd>Ctrl</kbd> 開啟`), out);
+  const lines = out.split('\n');
+  assert.equal(lines.filter(line => /^### /.test(line)).length, 2);
+  assert.deepEqual(lines.slice(7, 11), ['```mermaid', 'flowchart TD', '  A["x"] --> B["y"]', '```']);
+  assert.equal(guardInlineHtmlLineStarts(out), out, 'twice equals once');
+  for (const tag of ['sup', 'sub', 'kbd', 'mark', 'span', 'small', 'u', 'br'])
+    assert.ok(!guardInlineHtmlLineStarts(`<${tag}>a</${tag}> b`).startsWith('<'), tag);
+  assert.ok(!guardInlineHtmlLineStarts('   <br/>text').startsWith('   <'), 'indented up to three spaces');
+});
+
+test('guardInlineHtmlLineStarts: a lone block tag line, other HTML, fence content and frontmatter are unchanged', () => {
+  for (const kept of ['<details>', '<summary>x</summary>', '<br>', '</span>', '<span class="a">', '<div><sup>1</sup> x</div>', 'text <sup>1</sup>', '<supper> x'])
+    assert.equal(guardInlineHtmlLineStarts(kept), kept, kept);
+  const fenced = '```md\n<sup>1</sup> x\n```\n~~~\n<kbd>a</kbd> b\n~~~';
+  assert.equal(guardInlineHtmlLineStarts(fenced), fenced);
+  const front = '---\nnote: <sup>1</sup> x\n<u>a</u> b\n---\n<u>a</u> b';
+  assert.equal(guardInlineHtmlLineStarts(front, { frontmatter: true }), `---\nnote: <sup>1</sup> x\n<u>a</u> b\n---\n${INLINE_HTML_LEAD}<u>a</u> b`);
+  // With a range only lines that start inside it change; the state comes from the whole text.
+  const text = '<sup>1</sup> old\n```\n<sup>2</sup> in fence\n```\n<sup>3</sup> new';
+  const start = text.indexOf('```\n<sup>2'), out = guardInlineHtmlLineStarts(text, { range: { start, end: text.length } });
+  assert.equal(out, `<sup>1</sup> old\n\`\`\`\n<sup>2</sup> in fence\n\`\`\`\n${INLINE_HTML_LEAD}<sup>3</sup> new`);
+});
+
+test('obsidian-format rule 5 says inline HTML must not start a line, in both languages', () => {
+  const fs = require('node:fs');
+  const read = file => fs.readFileSync(require('node:path').join(__dirname, '..', file), 'utf8');
+  assert.match(read('core/steps/_shared/obsidian-format.en.md'), /^5\. .*inline HTML \([^)]*<sup>[^)]*\) must not start a line/m);
+  assert.match(read('core/steps/_shared/obsidian-format.zh.md'), /^5\. .*行內 HTML（[^）]*<sup>[^）]*）不可放在行首/m);
+});

@@ -147,3 +147,54 @@ export function normalizeMathDelimiters(markdown: string): string {
   }
   return lines.join("\n");
 }
+
+/** Inline tags whose line-leading use makes Obsidian's editor read the line (and the rest of the note) as an HTML block. */
+const INLINE_LINE_START = /^( {0,3})(<\/?(?:sup|sub|kbd|mark|span|small|u|br)(?=[\s/>]))/i;
+/** A line that is one complete tag and nothing else (`<br>`, `<span class="x">`, `</span>`): a deliberate HTML line, kept. */
+const LONE_TAG = /^ {0,3}<\/?[a-z][a-z0-9-]*(?:\s[^<>]*)?\/?>\s*$/i;
+/**
+ * The leading character a line-leading inline tag gets: the HTML entity of a zero-width space. Obsidian's editor (like
+ * CommonMark) starts an HTML block only when a line's first non-space character is `<`; a line that starts with `&` is an
+ * ordinary paragraph line, so the following headings, callouts and fences parse again. The entity renders as nothing, so
+ * reading view and live preview show the same text; it is visible in source mode, which says why it is there.
+ */
+export const INLINE_HTML_LEAD = "&#8203;";
+
+/** Lines of the note's YAML frontmatter (the opening and closing `---` included), when the text starts with one. */
+function frontmatterLines(lines: string[]): boolean[] {
+  const marks = lines.map(() => false);
+  if (!/^---\s*$/.test(lines[0] ?? "")) return marks;
+  const end = lines.findIndex((line, index) => index > 0 && /^(?:---|\.\.\.)\s*$/.test(line));
+  if (end < 0) return marks;
+  for (let index = 0; index <= end; index++) marks[index] = true;
+  return marks;
+}
+
+/**
+ * New AI-written Markdown only: a line that starts with an inline tag (`<sup>`, `<sub>`, `<kbd>`, `<mark>`, `<span>`,
+ * `<small>`, `<u>`, `<br>`) and is not a lone tag line gets INLINE_HTML_LEAD before the tag, so it no longer starts with `<`.
+ * Fence content is never touched, nor frontmatter when `frontmatter` is set (a whole file). With `range`, fence and
+ * frontmatter state come from the whole text but only lines that start inside [start, end) are changed (an inserted
+ * replacement). Idempotent: a changed line starts with `&`.
+ */
+export function guardInlineHtmlLineStarts(
+  text: string,
+  options: { frontmatter?: boolean; range?: { start: number; end: number } } = {}
+): string {
+  if (!/<\/?(?:sup|sub|kbd|mark|span|small|u|br)\b/i.test(text)) return text;
+  const lines = text.split("\n");
+  const code = fencedLines(lines);
+  const front = options.frontmatter ? frontmatterLines(lines) : lines.map(() => false);
+  let offset = 0;
+  return lines
+    .map((line, index) => {
+      const start = offset;
+      offset += line.length + 1;
+      if (code[index] || front[index]) return line;
+      if (options.range && (start < options.range.start || start >= options.range.end)) return line;
+      const match = INLINE_LINE_START.exec(line);
+      if (!match || LONE_TAG.test(line)) return line;
+      return `${match[1]}${INLINE_HTML_LEAD}${line.slice(match[1].length)}`;
+    })
+    .join("\n");
+}

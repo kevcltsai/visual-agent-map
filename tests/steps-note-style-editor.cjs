@@ -156,14 +156,14 @@ const sectionNames = ed => nameInputs(ed).map(node => node.value);
 const renameSection = (ed, index, value) => { const input = nameInputs(ed)[index]; input.value = value; input.fire('input'); };
 const rowButton = (ed, index, kind) => dom.findAll(ed.content, node => dom.hasCls(node, `vam-editor-section-${kind}`))[index];
 const addSection = ed => dom.button(ed.content, `＋ ${M.translate('en', 'ui.editor_section_add')}`).click();
-const VOICE_NAME = { academic: M.translate('en', 'ui.preset_name_academic'), plain: M.translate('en', 'ui.preset_name_plain'), magazine: M.translate('en', 'ui.preset_name_magazine') };
+const VOICE_NAME = { academic: M.translate('en', 'ui.preset_name_academic'), plain: M.translate('en', 'ui.preset_name_plain'), magazine: M.translate('en', 'ui.preset_name_magazine'), 'picture-book': M.translate('en', 'ui.preset_name_picture_book') };
 const chip = (ed, id) => dom.find(ed.content, node => node.attrs.role === 'radio' && node.text === VOICE_NAME[id]);
 const pickVoice = (ed, id) => chip(ed, id).click();
 const checkedVoice = ed => dom.findAll(ed.content, node => node.attrs.role === 'radio' && node.attrs['aria-checked'] === 'true').map(node => node.text);
 const sampleOf = ed => dom.find(ed.content, node => dom.hasCls(node, 'vam-style-sample'));
 const applyAllOf = ed => dom.find(ed.root, node => node.attrs.id === 'vam-editor-apply-all');
 const setApplyAll = (ed, on) => { applyAllOf(ed).checked = on; applyAllOf(ed).fire('change'); };
-const sampleText = id => M.translate('en', `ui.note_style_sample_${id}`);
+const sampleText = id => M.translate('en', `ui.note_style_sample_${id.replace('-', '_')}`);
 const recipeText = parts => M.recipeFileText({ structure: 'builtin:standard', voice: null, format: null, update: 'merge', ...parts }, 'en');
 const STRUCT_SRC = '%% about this part %%\n## Alpha\nDescribe alpha.\n\n## Beta\nCount: 2\nDescribe beta\n%% hidden note %%\n\n## Gamma\nGamma words\n';
 const OWN_STRUCT = `${STRUCTURE_DIR}/Own.md`;
@@ -591,15 +591,15 @@ test('section list: a list that is empty, a name used twice, an empty name or a 
   assert.equal(saveOf(ed).disabled, true);
 });
 
-test('voice chips: the three built-in voices are chips in a radio group that change the sample sentence; a voice that is a file or retired has no chip checked and no sample sentence (A9); the arrow keys pick and keep the focus on the chip', async () => {
+test('voice chips: the four built-in voices are chips in a radio group that change the sample sentence; a voice that is a file or retired has no chip checked and no sample sentence (A9); the arrow keys pick and keep the focus on the chip', async () => {
   const setup = await editorSetup({ ...SEED, [`${VOICE_DIR}/Dry.md`]: 'x\n', [`${RECIPE_DIR}/Filed.md`]: recipeText({ voice: 'file:Dry' }), [`${RECIPE_DIR}/Old.md`]: '---\nvoice: Key-point summary\n---\n' });
   const ed = openEditor(setup, { source: null, name: 'Chips' });
   await settle();
   const group = dom.find(ed.content, node => node.attrs.role === 'radiogroup');
-  assert.equal(dom.findAll(group, node => node.attrs.role === 'radio').length, 3);
+  assert.equal(dom.findAll(group, node => node.attrs.role === 'radio').length, 4);
   assert.deepEqual(checkedVoice(ed), [VOICE_NAME.academic]);
   assert.ok(sampleOf(ed).children.some(node => node.text === sampleText('academic')));
-  for (const id of ['plain', 'magazine', 'academic']) {
+  for (const id of ['plain', 'magazine', 'picture-book', 'academic']) {
     pickVoice(ed, id);
     assert.deepEqual(checkedVoice(ed), [VOICE_NAME[id]]);
     assert.ok(sampleOf(ed).children.some(node => node.text === sampleText(id)), id);
@@ -872,7 +872,7 @@ test('K3 (P4): the voice chips offer no retired voice; a style that uses one has
   const fresh = openEditor(setup, { source: null, name: 'Fresh' });
   await settle();
   const labels = dom.findAll(fresh.content, node => node.attrs.role === 'radio').map(node => node.text);
-  assert.deepEqual(labels, [VOICE_NAME.academic, VOICE_NAME.plain, VOICE_NAME.magazine]);
+  assert.deepEqual(labels, [VOICE_NAME.academic, VOICE_NAME.plain, VOICE_NAME.magazine, VOICE_NAME['picture-book']]);
   const ed = openEditor(setup, { source: 'file:Old' });
   await settle();
   assert.deepEqual(checkedVoice(ed), []);

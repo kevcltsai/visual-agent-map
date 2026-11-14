@@ -6,18 +6,30 @@ const { taskPrompt } = load('core/steps/task/render.ts');
 const base = { title: 'T', summary: 'S', rules: 'R', detail: 'D', task: 'Do X', ancestors: 'A', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'auto' };
 const custom = [{ id: 'mine', kind: 'tone', name: 'Mine', text: 'Tone: be brief.' }, { id: 'tree2', kind: 'outline', name: 'Tree 2', text: 'Outline {x}' }];
 
-test('built-in presets: six tones plus the knowledge-tree outline, localized, academic is the default', () => {
+test('built-in presets: seven tones plus the knowledge-tree outline, localized, academic is the default', () => {
   for (const language of ['zh-TW', 'zh-CN', 'en']) {
     const tones = presets.builtinPresets(language, 'tone');
-    assert.deepEqual(plain(tones.map(item => item.id)), ['plain', 'magazine', 'summary', 'guide', 'academic', 'auto']);
+    assert.deepEqual(plain(tones.map(item => item.id)), ['plain', 'magazine', 'picture-book', 'summary', 'guide', 'academic', 'auto']);
     assert.ok(tones.every(item => item.name && item.text && !item.text.endsWith('\n')));
     const [outline] = presets.builtinPresets(language, 'outline');
     assert.equal(outline.id, 'knowledge-tree');
     assert.ok(outline.text.includes(presets.OUTLINE_TOPIC_PLACEHOLDER[language]));
   }
-  assert.deepEqual(plain(presets.builtinPresets('zh-TW', 'tone').map(item => item.name)), ['白話說明', '敘事', '重點摘要', '實用指南', '專業', 'AI 建議']);
+  assert.deepEqual(plain(presets.builtinPresets('zh-TW', 'tone').map(item => item.name)), ['白話說明', '敘事', '圖文書', '重點摘要', '實用指南', '專業', 'AI 建議']);
   assert.ok(presets.builtinPresets('zh-TW', 'outline')[0].text.startsWith('# VAM Knowledge Tree Generator'));
   assert.equal(presets.DEFAULT_TONE_ID, 'academic');
+});
+
+test('picture-book tone: registered after magazine, zh and en texts, named in every interface language', () => {
+  const { LANGUAGES, translate } = load('i18n.ts');
+  for (const { id: language } of LANGUAGES) assert.ok(translate(language, 'ui.preset_name_picture_book').trim(), language);
+  assert.deepEqual([translate('zh-TW', 'ui.preset_name_picture_book'), translate('zh-CN', 'ui.preset_name_picture_book'), translate('en', 'ui.preset_name_picture_book')], ['圖文書', '图文书', 'Picture book']);
+  const zh = presets.builtinPresets('zh-TW', 'tone').find(item => item.id === 'picture-book');
+  const en = presets.builtinPresets('en', 'tone').find(item => item.id === 'picture-book');
+  assert.ok(zh.text.startsWith('寫作語氣：圖文書。') && zh.text.includes('收藏地點'));
+  assert.ok(en.text.startsWith('Tone: picture book.') && en.text.includes('where it is held'));
+  assert.equal(presets.isBuiltinPreset('picture-book'), true);
+  assert.equal(presets.resolveToneText([], ['picture-book'], 'zh-TW'), zh.text);
 });
 
 test('normalizePresets drops malformed, duplicate and built-in-id entries; missing setting is empty', () => {
@@ -28,7 +40,7 @@ test('normalizePresets drops malformed, duplicate and built-in-id entries; missi
 });
 
 test('list and resolve: built-ins first, then custom; unknown or missing id falls back to the default', () => {
-  assert.deepEqual(plain(presets.listPresets(custom, 'tone', 'en').map(item => item.id)), ['plain', 'magazine', 'summary', 'guide', 'academic', 'auto', 'mine']);
+  assert.deepEqual(plain(presets.listPresets(custom, 'tone', 'en').map(item => item.id)), ['plain', 'magazine', 'picture-book', 'summary', 'guide', 'academic', 'auto', 'mine']);
   assert.deepEqual(plain(presets.listPresets(custom, 'outline', 'en').map(item => item.id)), ['knowledge-tree', 'tree2']);
   assert.equal(presets.resolvePreset(custom, 'tone', 'mine', 'en').preset.id, 'mine');
   const unknown = presets.resolvePreset(custom, 'tone', 'gone', 'en');

@@ -1852,6 +1852,7 @@ var en = {
   "ui.map_file_description": "This file stores the mind map structure. Full content lives in the topic notes. Choose Open as mind map from the file menu.",
   "ui.preset_name_plain": "Plain explanation",
   "ui.preset_name_magazine": "Narrative",
+  "ui.preset_name_picture_book": "Picture book",
   "ui.preset_name_summary": "Key-point summary",
   "ui.preset_name_guide": "Practical guide",
   "ui.preset_name_academic": "Professional",
@@ -2545,6 +2546,7 @@ var en = {
   "ui.note_style_sample_academic": "Total housing cost is driven mainly by rent and how often you move; in Taipei, buying only costs less per year than renting after 10 or more years ([source]).",
   "ui.note_style_sample_plain": "In short: if you will live in Taipei for under 10 years, renting is usually cheaper; the longer you stay, the more buying pays off ([source]).",
   "ui.note_style_sample_magazine": "Picture year 11 in Taipei: rent has kept rising, and only now does the home you stretched to buy start saving you money ([source]).",
+  "ui.note_style_sample_picture_book": "This 1990 Taipei lease on the wall says rent was NT$18,000 a month; the question it opens is how many years you must stay before buying beats renting ([source]).",
   "ui.note_style_voice_other_0": "The current voice is \u201C{0}\u201D, which is not one of the choices above.",
   "ui.note_style_chip_format_standard": "Standard",
   "ui.note_style_chip_format_lean": "Lean",
@@ -4744,6 +4746,7 @@ var zhCN = {
   "ui.map_file_description": "\u6B64\u6587\u4EF6\u4FDD\u5B58\u5FC3\u667A\u56FE\u7ED3\u6784\uFF1B\u5B8C\u6574\u5185\u5BB9\u4FDD\u5B58\u5728\u5404\u8BAE\u9898\u7B14\u8BB0\u3002\u4ECE\u6587\u4EF6\u83DC\u5355\u9009\u62E9\u201C\u4EE5\u5FC3\u667A\u56FE\u6253\u5F00\u201D\u3002",
   "ui.preset_name_plain": "\u767D\u8BDD\u8BF4\u660E",
   "ui.preset_name_magazine": "\u53D9\u4E8B",
+  "ui.preset_name_picture_book": "\u56FE\u6587\u4E66",
   "ui.preset_name_summary": "\u91CD\u70B9\u6458\u8981",
   "ui.preset_name_guide": "\u5B9E\u7528\u6307\u5357",
   "ui.preset_name_academic": "\u4E13\u4E1A",
@@ -5437,6 +5440,7 @@ var zhCN = {
   "ui.note_style_sample_academic": "\u79DF\u623F\u7684\u603B\u6210\u672C\u4E3B\u8981\u7531\u6708\u79DF\u4E0E\u642C\u8FC1\u9891\u7387\u51B3\u5B9A\uFF1B\u4EE5\u53F0\u5317\u4E3A\u4F8B\uFF0C\u6301\u6709 10 \u5E74\u4EE5\u4E0A\u65F6\uFF0C\u8D2D\u623F\u7684\u5E74\u5316\u6210\u672C\u624D\u53EF\u80FD\u4F4E\u4E8E\u79DF\u623F\uFF08[\u6765\u6E90]\uFF09\u3002",
   "ui.note_style_sample_plain": "\u7B80\u5355\u8BF4\uFF1A\u5728\u53F0\u5317\u4F4F\u4E0D\u5230 10 \u5E74\uFF0C\u79DF\u623F\u901A\u5E38\u6BD4\u8F83\u7701\uFF1B\u4F4F\u5F97\u8D8A\u4E45\uFF0C\u4E70\u623F\u624D\u5F00\u59CB\u5212\u7B97\uFF08[\u6765\u6E90]\uFF09\u3002",
   "ui.note_style_sample_magazine": "\u60F3\u8C61\u4F60\u5728\u53F0\u5317\u4F4F\u4E86\u7B2C 11 \u5E74\uFF1A\u623F\u79DF\u4E00\u8DEF\u6DA8\uFF0C\u8FD9\u65F6\u5F53\u521D\u54AC\u7259\u4E70\u4E0B\u7684\u623F\u5B50\uFF0C\u624D\u5F00\u59CB\u771F\u6B63\u66FF\u4F60\u7701\u94B1\uFF08[\u6765\u6E90]\uFF09\u3002",
+  "ui.note_style_sample_picture_book": "\u5899\u4E0A\u8FD9\u5F20 1990 \u5E74\u7684\u53F0\u5317\u79DF\u7EA6\u5199\u7740\u6708\u79DF 1 \u4E07 8\uFF1B\u5B83\u8981\u56DE\u7B54\u7684\u95EE\u9898\u662F\uFF1A\u4F4F\u5230\u7B2C\u51E0\u5E74\uFF0C\u4E70\u623F\u624D\u771F\u7684\u6BD4\u79DF\u623F\u5212\u7B97\uFF08[\u6765\u6E90]\uFF09\uFF1F",
   "ui.note_style_voice_other_0": "\u76EE\u524D\u7684\u53E3\u543B\u662F\u201C{0}\u201D\uFF0C\u4E0D\u5728\u4E0A\u9762\u7684\u9009\u9879\u4E2D\u3002",
   "ui.note_style_chip_format_standard": "\u6807\u51C6",
   "ui.note_style_chip_format_lean": "\u7CBE\u7B80",
@@ -7636,6 +7640,7 @@ var zhTW = {
   "ui.map_file_description": "\u6B64\u6A94\u6848\u4FDD\u5B58\u5FC3\u667A\u5716\u7D50\u69CB\uFF1B\u5B8C\u6574\u5167\u5BB9\u4FDD\u5B58\u5728\u5404\u8B70\u984C\u7B46\u8A18\u3002\u5F9E\u6A94\u6848\u9078\u55AE\u9078\u64C7\u300C\u4EE5\u5FC3\u667A\u5716\u958B\u555F\u300D\u3002",
   "ui.preset_name_plain": "\u767D\u8A71\u8AAA\u660E",
   "ui.preset_name_magazine": "\u6558\u4E8B",
+  "ui.preset_name_picture_book": "\u5716\u6587\u66F8",
   "ui.preset_name_summary": "\u91CD\u9EDE\u6458\u8981",
   "ui.preset_name_guide": "\u5BE6\u7528\u6307\u5357",
   "ui.preset_name_academic": "\u5C08\u696D",
@@ -8329,6 +8334,7 @@ var zhTW = {
   "ui.note_style_sample_academic": "\u79DF\u5C4B\u7684\u7E3D\u6210\u672C\u4E3B\u8981\u7531\u6708\u79DF\u8207\u642C\u9077\u983B\u7387\u6C7A\u5B9A\uFF1B\u4EE5\u53F0\u5317\u70BA\u4F8B\uFF0C\u6301\u6709 10 \u5E74\u4EE5\u4E0A\u6642\uFF0C\u8CFC\u5C4B\u7684\u5E74\u5316\u6210\u672C\u624D\u53EF\u80FD\u4F4E\u65BC\u79DF\u5C4B\uFF08[\u4F86\u6E90]\uFF09\u3002",
   "ui.note_style_sample_plain": "\u7C21\u55AE\u8AAA\uFF1A\u5728\u53F0\u5317\u4F4F\u4E0D\u5230 10 \u5E74\uFF0C\u79DF\u623F\u901A\u5E38\u6BD4\u8F03\u7701\uFF1B\u4F4F\u5F97\u8D8A\u4E45\uFF0C\u8CB7\u623F\u624D\u958B\u59CB\u5212\u7B97\uFF08[\u4F86\u6E90]\uFF09\u3002",
   "ui.note_style_sample_magazine": "\u60F3\u50CF\u4F60\u5728\u53F0\u5317\u4F4F\u4E86\u7B2C 11 \u5E74\uFF1A\u623F\u79DF\u4E00\u8DEF\u6F32\uFF0C\u9019\u6642\u7576\u521D\u54AC\u7259\u8CB7\u4E0B\u7684\u623F\u5B50\uFF0C\u624D\u958B\u59CB\u771F\u6B63\u66FF\u4F60\u7701\u9322\uFF08[\u4F86\u6E90]\uFF09\u3002",
+  "ui.note_style_sample_picture_book": "\u7246\u4E0A\u9019\u5F35 1990 \u5E74\u7684\u53F0\u5317\u79DF\u7D04\u5BEB\u8457\u6708\u79DF 1 \u842C 8\uFF1B\u5B83\u8981\u56DE\u7B54\u7684\u554F\u984C\u662F\uFF1A\u4F4F\u5230\u7B2C\u5E7E\u5E74\uFF0C\u8CB7\u623F\u624D\u771F\u7684\u6BD4\u79DF\u623F\u5212\u7B97\uFF08[\u4F86\u6E90]\uFF09\uFF1F",
   "ui.note_style_voice_other_0": "\u76EE\u524D\u7684\u53E3\u543B\u662F\u300C{0}\u300D\uFF0C\u4E0D\u5728\u4E0A\u9762\u7684\u9078\u9805\u4E2D\u3002",
   "ui.note_style_chip_format_standard": "\u6A19\u6E96",
   "ui.note_style_chip_format_lean": "\u7CBE\u7C21",
@@ -34019,6 +34025,12 @@ var magazine_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u6558\u4E8B\u3002\u5BE
 // ai/prompt-presets/magazine.en.md
 var magazine_en_default = "Tone: narrative. Write for readers who want to keep reading: keep the section headings, but write each section as connected prose instead of a bullet list; carry each section's main point with one concrete example or scene, and let sentences follow on from one another naturally. Sections that are a table or a to-do list by design (such as an evidence table or steps) keep that form. Keep the content accurate: no exaggeration and no invention; say plainly what is uncertain.\n";
 
+// ai/prompt-presets/picture-book.zh.md
+var picture_book_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u5716\u6587\u66F8\u3002\u5BEB\u7D66\u60F3\u4E00\u8DEF\u8B80\u4E0B\u53BB\u7684\u4E00\u822C\u8B80\u8005\uFF0C\u50CF\u6709\u4EBA\u5728\u5C55\u5834\u65C1\u908A\u5C0E\u89BD\u3002\n- \u7528\u4E00\u500B\u5177\u9AD4\u7684\u4F5C\u54C1\u3001\u5834\u666F\u6216\u4EBA\u7269\u958B\u5834\uFF0C\u5148\u63CF\u8FF0\u8B80\u8005\u6703\u770B\u5230\u4EC0\u9EBC\uFF0C\u518D\u63D0\u51FA\u9019\u7AE0\u8981\u56DE\u7B54\u7684\u554F\u984C\u3002\n- \u5168\u6587\u570D\u7E5E 2\uFF5E3 \u500B\u5177\u9AD4\u4F8B\u5B50\uFF0C\u6BCF\u500B\u4F8B\u5B50\u4E00\u6BB5\uFF0C\u7528\u6545\u4E8B\u65B9\u5F0F\u4EA4\u4EE3\u4EBA\u7269\u3001\u6642\u9593\u3001\u70BA\u4EC0\u9EBC\u3002\n- \u6BCF\u7AE0\u6311\u4E00\u500B\u7D30\u7BC0\u653E\u5927\u8B1B\uFF08\u50F9\u683C\u3001\u624B\u52E2\u3001\u6750\u6599\u3001\u4E00\u53E5\u7576\u6642\u7684\u8A71\uFF09\u3002\n- \u958B\u982D\u4E00\u53E5\u63A5\u4E0A\u4E00\u7AE0\uFF0C\u7D50\u5C3E\u7559\u4E00\u500B\u554F\u984C\u5E36\u5230\u4E0B\u4E00\u7AE0\uFF1B\u5176\u4ED6\u7AE0\u63D0\u904E\u7684\u4F8B\u5B50\uFF0C\u7528\u4E00\u53E5\u8A71\u56DE\u982D\u63D0\uFF0C\u4E0D\u91CD\u65B0\u4ECB\u7D39\u3002\n- \u4E0D\u689D\u5217\u91CD\u9EDE\u3001\u4E0D\u5BEB\u300C\u5C0F\u7D50\u300D\uFF1B\u5BEB\u6210\u9023\u8CAB\u7684\u6587\u7AE0\u3002\u539F\u672C\u5C31\u662F\u8868\u683C\u6216\u5F85\u8FA6\u6E05\u55AE\u7684\u6BB5\u843D\u4FDD\u7559\u8A72\u5F62\u5F0F\u3002\n- \u5716\u7247\u653E\u5728\u8A0E\u8AD6\u90A3\u500B\u4F8B\u5B50\u7684\u6BB5\u843D\u88E1\uFF0C\u5716\u8AAA\u5BEB\u51FA\u540D\u7A31\u3001\u4F5C\u8005\u3001\u5E74\u4EFD\u3001\u6536\u85CF\u5730\u9EDE\u3002\n- \u4FDD\u6301\u5167\u5BB9\u6E96\u78BA\uFF0C\u4E0D\u78BA\u5B9A\u7684\u5E74\u4EFD\u6216\u6578\u5B57\u7167\u5BE6\u8AAA\uFF0C\u4E0D\u8981\u7DE8\u3002\n";
+
+// ai/prompt-presets/picture-book.en.md
+var picture_book_en_default = 'Tone: picture book. Write for general readers who want to keep reading, like a guide walking beside them through an exhibition.\n- Open with one concrete work, scene or person: first describe what the reader would see, then pose the question this chapter answers.\n- Build the whole text around 2\u20133 concrete examples, one paragraph each, told as a story: who, when, and why.\n- In each chapter, pick one detail and zoom in on it (a price, a gesture, a material, a line someone said at the time).\n- Let the first sentence pick up from the previous chapter and end with a question that leads into the next; mention examples from other chapters in one sentence, without introducing them again.\n- No bullet-point takeaways and no "summary" section; write connected prose. Sections that are a table or a to-do list by design keep that form.\n- Place each image in the paragraph that discusses that example, with a caption giving the title, artist, year and where it is held.\n- Keep the content accurate: say plainly when a year or number is uncertain, and do not invent one.\n';
+
 // ai/prompt-presets/summary.zh.md
 var summary_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u91CD\u9EDE\u6458\u8981\u3002\u4EE5\u7CBE\u7C21\u7684\u689D\u5217\u8207\u77ED\u53E5\u5448\u73FE\u7D50\u8AD6\u3001\u95DC\u9375\u4E8B\u5BE6\u8207\u6578\u5B57\uFF0C\u53BB\u9664\u92EA\u9673\u8207\u4FEE\u98FE\uFF1B\u6BCF\u9EDE\u53EA\u8AAA\u4E00\u4EF6\u4E8B\uFF0C\u8B93\u8B80\u8005\u5728\u6700\u77ED\u6642\u9593\u5167\u638C\u63E1\u5168\u8C8C\u3002\n";
 
@@ -34068,6 +34080,13 @@ var BUILTINS = [
     nameKey: "ui.preset_name_magazine",
     zh: magazine_zh_default,
     en: magazine_en_default
+  },
+  {
+    id: "picture-book",
+    kind: "tone",
+    nameKey: "ui.preset_name_picture_book",
+    zh: picture_book_zh_default,
+    en: picture_book_en_default
   },
   { id: "summary", kind: "tone", nameKey: "ui.preset_name_summary", zh: summary_zh_default, en: summary_en_default },
   { id: "guide", kind: "tone", nameKey: "ui.preset_name_guide", zh: guide_zh_default, en: guide_en_default },
@@ -34322,6 +34341,7 @@ var BUILTIN_BLOCKS = [
   tone("academic", "ui.preset_name_academic", ["ui.preset_name_academic_old"]),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine", ["ui.preset_name_magazine_old"]),
+  tone("picture-book", "ui.preset_name_picture_book"),
   tone("summary", "ui.preset_name_summary", void 0, true),
   tone("guide", "ui.preset_name_guide", void 0, true),
   tone("auto", "ui.preset_name_auto", void 0, true)
@@ -34468,7 +34488,7 @@ function promptStepOf(context) {
   }
 }
 function toneChoiceFromText(toneText, language2) {
-  const builtinTone = toneText ? ["plain", "magazine", "summary", "guide", "auto"].find(
+  const builtinTone = toneText ? ["plain", "magazine", "picture-book", "summary", "guide", "auto"].find(
     (id) => lookupBuiltinBlock("tone", id, language2) === toneText
   ) : void 0;
   return !toneText ? { id: DEFAULT_TONE } : builtinTone ? { id: builtinTone } : { id: CUSTOM_LEGACY_TONE, body: toneText };
@@ -82887,7 +82907,8 @@ var import_obsidian39 = require("obsidian");
 var CARD_VOICES = [
   { id: "academic", name: "ui.preset_name_academic", sample: "ui.note_style_sample_academic" },
   { id: "plain", name: "ui.preset_name_plain", sample: "ui.note_style_sample_plain" },
-  { id: "magazine", name: "ui.preset_name_magazine", sample: "ui.note_style_sample_magazine" }
+  { id: "magazine", name: "ui.preset_name_magazine", sample: "ui.note_style_sample_magazine" },
+  { id: "picture-book", name: "ui.preset_name_picture_book", sample: "ui.note_style_sample_picture_book" }
 ];
 
 // ui/radio-group.ts

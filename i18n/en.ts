@@ -1931,6 +1931,7 @@ export const en = {
     "This file stores the mind map structure. Full content lives in the topic notes. Choose Open as mind map from the file menu.",
   "ui.preset_name_plain": "Plain explanation",
   "ui.preset_name_magazine": "Narrative",
+  "ui.preset_name_picture_book": "Picture book",
   "ui.preset_name_summary": "Key-point summary",
   "ui.preset_name_guide": "Practical guide",
   "ui.preset_name_academic": "Professional",
@@ -2719,6 +2720,8 @@ export const en = {
     "In short: if you will live in Taipei for under 10 years, renting is usually cheaper; the longer you stay, the more buying pays off ([source]).",
   "ui.note_style_sample_magazine":
     "Picture year 11 in Taipei: rent has kept rising, and only now does the home you stretched to buy start saving you money ([source]).",
+  "ui.note_style_sample_picture_book":
+    "This 1990 Taipei lease on the wall says rent was NT$18,000 a month; the question it opens is how many years you must stay before buying beats renting ([source]).",
   "ui.note_style_voice_other_0": "The current voice is “{0}”, which is not one of the choices above.",
   "ui.note_style_chip_format_standard": "Standard",
   "ui.note_style_chip_format_lean": "Lean",

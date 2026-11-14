@@ -1822,6 +1822,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_file_description": "此檔案保存心智圖結構；完整內容保存在各議題筆記。從檔案選單選擇「以心智圖開啟」。",
   "ui.preset_name_plain": "白話說明",
   "ui.preset_name_magazine": "敘事",
+  "ui.preset_name_picture_book": "圖文書",
   "ui.preset_name_summary": "重點摘要",
   "ui.preset_name_guide": "實用指南",
   "ui.preset_name_academic": "專業",
@@ -2539,6 +2540,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.note_style_sample_plain": "簡單說：在台北住不到 10 年，租房通常比較省；住得越久，買房才開始划算（[來源]）。",
   "ui.note_style_sample_magazine":
     "想像你在台北住了第 11 年：房租一路漲，這時當初咬牙買下的房子，才開始真正替你省錢（[來源]）。",
+  "ui.note_style_sample_picture_book":
+    "牆上這張 1990 年的台北租約寫著月租 1 萬 8；它要回答的問題是：住到第幾年，買房才真的比租房划算（[來源]）？",
   "ui.note_style_voice_other_0": "目前的口吻是「{0}」，不在上面的選項中。",
   "ui.note_style_chip_format_standard": "標準",
   "ui.note_style_chip_format_lean": "精簡",

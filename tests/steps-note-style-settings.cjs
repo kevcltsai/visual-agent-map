@@ -120,12 +120,12 @@ test('P3 card: the top of the Note style page is the "How notes are written" car
   assert.equal(i18n.translate('zh-TW', 'ui.note_style_card_title'), '筆記要怎麼寫');
 });
 
-test('P3 card: voice chips are Professional, Plain explanation, Narrative (retired voices are not listed) and format chips are Standard, Lean, Rich, Skim list; the defaults are the ones checked', async () => {
+test('P3 card: voice chips are Professional, Plain explanation, Narrative, Picture book (retired voices are not listed) and format chips are Standard, Lean, Rich, Skim list; the defaults are the ones checked', async () => {
   const { view } = cardRow();
   await flush();
   const voices = radiosOf(view, 'Voice');
   const formats = radiosOf(view, 'Length and layout');
-  assert.deepEqual(voices.map(button => button.text), ['Professional', 'Plain explanation', 'Narrative']);
+  assert.deepEqual(voices.map(button => button.text), ['Professional', 'Plain explanation', 'Narrative', 'Picture book']);
   assert.deepEqual(formats.map(button => button.text), ['Standard', 'Lean', 'Rich', 'Skim list']);
   assert.deepEqual(checkedOf(voices), ['Professional']);
   assert.deepEqual(checkedOf(formats), ['Standard']);
@@ -160,14 +160,14 @@ test('P3 card: the sample sentence follows the chosen voice (one sentence per bu
   await flush();
   const text = () => sampleOf(view).children.map(child => child.text).join('|');
   const seen = new Set();
-  for (const [index, id] of [[0, 'academic'], [1, 'plain'], [2, 'magazine']]) {
+  for (const [index, id] of [[0, 'academic'], [1, 'plain'], [2, 'magazine'], [3, 'picture-book']]) {
     radiosOf(view, 'Voice')[index].fire('click');
     await flush();
-    assert.equal(text(), `${t('ui.note_style_sample_caption')}|${t(`ui.note_style_sample_${id}`)}`);
+    assert.equal(text(), `${t('ui.note_style_sample_caption')}|${t(`ui.note_style_sample_${id.replace('-', '_')}`)}`);
     seen.add(text());
   }
-  assert.equal(seen.size, 3, 'three different sentences');
-  for (const language of ['zh-TW', 'zh-CN', 'en']) for (const id of ['academic', 'plain', 'magazine']) assert.ok(i18n.translate(language, `ui.note_style_sample_${id}`).length > 10);
+  assert.equal(seen.size, 4, 'four different sentences');
+  for (const language of ['zh-TW', 'zh-CN', 'en']) for (const id of ['academic', 'plain', 'magazine', 'picture_book']) assert.ok(i18n.translate(language, `ui.note_style_sample_${id}`).length > 10);
   // a voice file as the global voice: no sample, no chip checked
   const file = cardRow({ noteStyleDefaults: { voice: 'file:Calm' } });
   await flush();
@@ -195,7 +195,7 @@ test('P3 card: the chips are a keyboard radio group: Tab lands on the checked ch
   assert.equal('noteStyleDefaults' in settings, false);
   press(radiosOf(view, 'Voice')[0], 'ArrowLeft');
   await flush();
-  assert.deepEqual(plainOf(settings.noteStyleDefaults), { voice: 'builtin:magazine' }, 'wraps around');
+  assert.deepEqual(plainOf(settings.noteStyleDefaults), { voice: 'builtin:picture-book' }, 'wraps around');
   assert.equal(press(radiosOf(view, 'Voice')[2], 'a'), false, 'other keys are left alone');
 });
 
@@ -629,7 +629,7 @@ test('P3 rows: "Voice retired" shows beside the name only when the style\'s voic
     assert.equal(row.view.nameEl.children[0].hasClass('vam-style-tag'), true);
     assert.match(lines(row.view)[0], /Key-point summary \(retired\) \(set apart\)/);
   }
-  for (const id of ['academic', 'plain', 'magazine']) {
+  for (const id of ['academic', 'plain', 'magazine', 'picture-book']) {
     const live = rec('file:Live', 'Live', { voice: { ref: `builtin:${id}`, name: 'X' }, voiceSource: 'style' });
     const row = kindRow('atomic', { settings: { noteStyleByKind: { atomic: 'file:Live' } }, recipes: [...RECIPES(), live] });
     await flush();

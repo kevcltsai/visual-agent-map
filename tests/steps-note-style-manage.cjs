@@ -108,7 +108,7 @@ test('counter 3: updateRecipeFileText changes only the values of the four known 
 });
 
 // ---- listParts (decision #22) ----
-test('listParts: built-ins first (8 structures, 6 voices, 4 formats), then the user\'s files; a file named like a built-in in any language or case is the user\'s file with a builtin_name issue and does not mark the built-in as changed (counter 6, decision #22)', async () => {
+test('listParts: built-ins first (8 structures, 7 voices, 4 formats), then the user\'s files; a file named like a built-in in any language or case is the user\'s file with a builtin_name issue and does not mark the built-in as changed (counter 6, decision #22)', async () => {
   const files = {
     [`${dirOf('en', 'template')}/Standard six.md`]: '## A\nx\n',
     [`${dirOf('en', 'template')}/標準六段.md`]: '## A\nx\n',
@@ -137,7 +137,7 @@ test('listParts: built-ins first (8 structures, 6 voices, 4 formats), then the u
   assert.deepEqual(plain(own.Mine.issues), []);
   assert.ok(own.Broken.issues.length > 0 && own.Broken.issues[0].line === 2);
   const voices = store.listParts('voice');
-  assert.equal(voices.filter(item => item.kind === 'builtin').length, 6);
+  assert.equal(voices.filter(item => item.kind === 'builtin').length, 7);
   assert.ok(voices.find(item => item.ref === 'file:Practical guide').issues.some(issue => issue.code === 'builtin_name'));
   const formats = store.listParts('format');
   assert.equal(formats.filter(item => item.kind === 'builtin').length, 4);

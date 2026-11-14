@@ -10,6 +10,8 @@ import PlainZH from "./prompt-presets/plain.zh.md";
 import PlainEN from "./prompt-presets/plain.en.md";
 import MagazineZH from "./prompt-presets/magazine.zh.md";
 import MagazineEN from "./prompt-presets/magazine.en.md";
+import PictureBookZH from "./prompt-presets/picture-book.zh.md";
+import PictureBookEN from "./prompt-presets/picture-book.en.md";
 import SummaryZH from "./prompt-presets/summary.zh.md";
 import SummaryEN from "./prompt-presets/summary.en.md";
 import GuideZH from "./prompt-presets/guide.zh.md";
@@ -68,6 +70,13 @@ const BUILTINS: readonly BuiltinDefinition[] = [
     nameKey: "ui.preset_name_magazine",
     zh: MagazineZH,
     en: MagazineEN
+  },
+  {
+    id: "picture-book",
+    kind: "tone",
+    nameKey: "ui.preset_name_picture_book",
+    zh: PictureBookZH,
+    en: PictureBookEN
   },
   { id: "summary", kind: "tone", nameKey: "ui.preset_name_summary", zh: SummaryZH, en: SummaryEN },
   { id: "guide", kind: "tone", nameKey: "ui.preset_name_guide", zh: GuideZH, en: GuideEN },

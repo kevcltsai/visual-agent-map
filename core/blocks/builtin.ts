@@ -129,6 +129,7 @@ export const BUILTIN_BLOCKS: readonly BuiltinBlock[] = [
   tone("academic", "ui.preset_name_academic", ["ui.preset_name_academic_old"]),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine", ["ui.preset_name_magazine_old"]),
+  tone("picture-book", "ui.preset_name_picture_book"),
   tone("summary", "ui.preset_name_summary", undefined, true),
   tone("guide", "ui.preset_name_guide", undefined, true),
   tone("auto", "ui.preset_name_auto", undefined, true)

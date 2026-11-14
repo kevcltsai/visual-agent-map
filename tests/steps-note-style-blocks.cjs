@@ -325,7 +325,7 @@ test('counter 10 (menu): the list marks a changed built-in, shows own files, ign
   assert.equal(textbook.modified, false);
   assert.equal(textbook.fileName, 'Intro + six.md');
   assert.deepEqual(plain(items.filter(item => item.kind === 'file').map(item => item.ref)), ['file:Mine']);
-  assert.equal(store.listBlocks('tone').filter(item => item.kind === 'builtin').length, 6);
+  assert.equal(store.listBlocks('tone').filter(item => item.kind === 'builtin').length, 7);
 });
 
 // ---- counter 11: language gate ----

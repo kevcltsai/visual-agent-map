@@ -166,7 +166,7 @@ export function promptStepOf(context: TaskContext): PromptStep {
 /** The tone choice a tone text stands for: nothing is academic rigor, a built-in tone's text is that tone, any other text is sent as written. */
 export function toneChoiceFromText(toneText: string | undefined, language: ContentLanguage): BlockChoice {
   const builtinTone = toneText
-    ? ["plain", "magazine", "summary", "guide", "auto"].find(
+    ? ["plain", "magazine", "picture-book", "summary", "guide", "auto"].find(
         id => lookupBuiltinBlock("tone", id, language) === toneText
       )
     : undefined;

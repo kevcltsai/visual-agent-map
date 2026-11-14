@@ -23,7 +23,7 @@ function frozenLegacyFormat(language, preferences) {
 test('academic rigor tone block is empty; the other tones equal the built-in tone presets', () => {
   for (const language of LANGUAGES) {
     assert.equal(M.lookupBuiltinBlock('tone', 'academic', language), '');
-    for (const id of ['plain', 'magazine', 'summary', 'guide', 'auto']) {
+    for (const id of ['plain', 'magazine', 'picture-book', 'summary', 'guide', 'auto']) {
       const preset = M.builtinPresets(language, 'tone').find(item => item.id === id);
       assert.ok(preset.text.length > 0);
       assert.equal(M.lookupBuiltinBlock('tone', id, language), preset.text);

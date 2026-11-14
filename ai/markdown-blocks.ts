@@ -148,17 +148,38 @@ export function normalizeMathDelimiters(markdown: string): string {
   return lines.join("\n");
 }
 
-/** Inline tags whose line-leading use makes Obsidian's editor read the line (and the rest of the note) as an HTML block. */
-const INLINE_LINE_START = /^( {0,3})(<\/?(?:sup|sub|kbd|mark|span|small|u|br)(?=[\s/>]))/i;
-/** A line that is one complete tag and nothing else (`<br>`, `<span class="x">`, `</span>`): a deliberate HTML line, kept. */
-const LONE_TAG = /^ {0,3}<\/?[a-z][a-z0-9-]*(?:\s[^<>]*)?\/?>\s*$/i;
+/** An opening inline tag (`<br>` is void and never trips the editor). */
+const INLINE_OPEN = /<(sup|sub|kbd|mark|span|small|u)(?=[\s>])/i;
+/** The entity an earlier version put before a line-leading inline tag; it showed as text in live preview. */
+const OLD_LEAD = /^( {0,3})&#8203;(?=<(?:sup|sub|kbd|mark|span|small|u)[\s>])/i;
+const encodeDestination = (dest: string): string =>
+  dest.replace(/ /g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29");
+const attributeValue = (url: string): string => url.replace(/ /g, "%20").replace(/&/g, "&amp;").replace(/"/g, "%22");
+
 /**
- * The leading character a line-leading inline tag gets: the HTML entity of a zero-width space. Obsidian's editor (like
- * CommonMark) starts an HTML block only when a line's first non-space character is `<`; a line that starts with `&` is an
- * ordinary paragraph line, so the following headings, callouts and fences parse again. The entity renders as nothing, so
- * reading view and live preview show the same text; it is visible in source mode, which says why it is there.
+ * Obsidian's editor stops parsing the rest of the note (headings, callouts and fences show as raw text) when one line
+ * has an angle-bracket link target (`[t](<https://…>)`) or an autolink (`<https://…>`) inside an inline tag that is still
+ * open (`<sup>…[t](<https://…>)…</sup>`). Observed in Obsidian 1.15.1; the line start does not matter and a leading
+ * character does not help. Markdown inside an inline tag is not rendered anyway (it shows as raw text), so the link
+ * becomes an HTML anchor (`<a href="url">t</a>`), which parses normally and renders as a real link; an image target loses
+ * only its angle brackets (spaces and parentheses percent-encoded).
  */
-export const INLINE_HTML_LEAD = "&#8203;";
+function guardInlineHtmlLine(line: string): string {
+  const open = INLINE_OPEN.exec(line);
+  if (!open || !line.includes("<", open.index + open[0].length)) return line;
+  const from = open.index + open[0].length;
+  const closeAt = line.toLowerCase().indexOf(`</${open[1].toLowerCase()}>`, from);
+  const end = closeAt < 0 ? line.length : closeAt;
+  const inner = line
+    .slice(from, end)
+    .replace(
+      /(?<!!)\[([^[\]]*)\]\(<([^<>\n]*)>(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,
+      (_all, text: string, dest: string) => `<a href="${attributeValue(dest)}">${text}</a>`
+    )
+    .replace(/\]\(<([^<>\n]*)>/g, (_all, dest: string) => `](${encodeDestination(dest)}`)
+    .replace(/<((?:https?|mailto):[^<>\s]+)>/gi, (_all, url: string) => `<a href="${attributeValue(url)}">${url}</a>`);
+  return line.slice(0, from) + inner + line.slice(end);
+}
 
 /** Lines of the note's YAML frontmatter (the opening and closing `---` included), when the text starts with one. */
 function frontmatterLines(lines: string[]): boolean[] {
@@ -171,17 +192,17 @@ function frontmatterLines(lines: string[]): boolean[] {
 }
 
 /**
- * New AI-written Markdown only: a line that starts with an inline tag (`<sup>`, `<sub>`, `<kbd>`, `<mark>`, `<span>`,
- * `<small>`, `<u>`, `<br>`) and is not a lone tag line gets INLINE_HTML_LEAD before the tag, so it no longer starts with `<`.
- * Fence content is never touched, nor frontmatter when `frontmatter` is set (a whole file). With `range`, fence and
- * frontmatter state come from the whole text but only lines that start inside [start, end) are changed (an inserted
- * replacement). Idempotent: a changed line starts with `&`.
+ * New AI-written Markdown only: a line holding an inline tag (`<sup>`, `<sub>`, `<kbd>`, `<mark>`, `<span>`, `<small>`,
+ * `<u>`) with an angle-bracket link inside it is rewritten (see guardInlineHtmlLine); a leftover
+ * `&#8203;` lead from the earlier version is dropped. Fence content is never touched, nor frontmatter when `frontmatter`
+ * is set (a whole file). With `range`, fence and frontmatter state come from the whole text but only lines that start
+ * inside [start, end) are changed (an inserted replacement). Idempotent.
  */
-export function guardInlineHtmlLineStarts(
+export function guardInlineHtmlLinks(
   text: string,
   options: { frontmatter?: boolean; range?: { start: number; end: number } } = {}
 ): string {
-  if (!/<\/?(?:sup|sub|kbd|mark|span|small|u|br)\b/i.test(text)) return text;
+  if (!/&#8203;|<(?:sup|sub|kbd|mark|span|small|u)\b/i.test(text)) return text;
   const lines = text.split("\n");
   const code = fencedLines(lines);
   const front = options.frontmatter ? frontmatterLines(lines) : lines.map(() => false);
@@ -192,9 +213,7 @@ export function guardInlineHtmlLineStarts(
       offset += line.length + 1;
       if (code[index] || front[index]) return line;
       if (options.range && (start < options.range.start || start >= options.range.end)) return line;
-      const match = INLINE_LINE_START.exec(line);
-      if (!match || LONE_TAG.test(line)) return line;
-      return `${match[1]}${INLINE_HTML_LEAD}${line.slice(match[1].length)}`;
+      return guardInlineHtmlLine(line.replace(OLD_LEAD, "$1"));
     })
     .join("\n");
 }

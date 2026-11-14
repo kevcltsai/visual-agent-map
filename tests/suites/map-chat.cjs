@@ -8678,64 +8678,64 @@ integrationTest('map sources 05: sources too large to condense are refused with 
   h.type('again'); await h.view.sendMapChat(); assert.equal(h.control.requests.length, 1); assert.equal(sentSources(h.control.requests[0]), undefined); assert.equal(h.view.chatReadsSources, false);
 });
 
-// Ticket 03: map chat writes are new AI text; a line they start with inline HTML gets a harmless lead (Obsidian's editor
-// otherwise stops parsing the rest of the note), never in fences or frontmatter, and undo puts the earlier text back.
+// Ticket 03: map chat writes are new AI text; an angle-bracket link inside an inline tag is rewritten without the brackets
+// (Obsidian's editor otherwise stops parsing the rest of the note), never in fences or frontmatter, and undo puts the earlier text back.
 const T03 = (() => {
-  const { INLINE_HTML_LEAD: LEAD } = load('ai/markdown-blocks.ts');
+  const RAW = (n, text) => `<sup>${n} [S](<https://a.org/s>)</sup> ${text}`, FIXED = (n, text) => `<sup>${n} <a href="https://a.org/s">S</a></sup> ${text}`;
   const later = '\n\n### Later\n\n```mermaid\nflowchart TD\n  A["a"] --> B["b"]\n```';
   const parses = (text, label) => {
     assert.match(text, /^### Later$/m, `${label}: the later heading is still a heading`);
     assert.match(text, /^```mermaid\nflowchart TD\n {2}A\["a"\] --> B\["b"\]\n```$/m, `${label}: the mermaid block is still a code block`);
   };
-  return { LEAD, later, parses };
+  return { RAW, FIXED, later, parses };
 })();
-integrationTest('ticket 03: edit_md_file and create_md_file give a line-leading <sup> a lead; headings and mermaid after it still parse; undo restores the file', async () => {
-  const { LEAD, later, parses } = T03;
+integrationTest('ticket 03: edit_md_file and create_md_file rewrite an angle-bracket link inside <sup>; headings and mermaid after it still parse; undo restores the file', async () => {
+  const { RAW, FIXED, later, parses } = T03;
   const h = await harness(); await h.view.hydrate(); h.plugin.mermaidSyntax = async () => 'ok';
   h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
   const before = '# Research\n\nSleep needs darkness.\nSleep needs quiet.\n';
-  const edit = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'Sleep needs darkness.', replace: `Sleep needs darkness.\n<sup>1</sup> Cited.${later}\n\n<details>\n<summary>x</summary>\n</details>` }], h.hashes('Notes/Research.md'));
+  const edit = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'Sleep needs darkness.', replace: `Sleep needs darkness.\n${RAW(1, 'Cited.')}${later}\n\n<details>\n<summary>x</summary>\n</details>` }], h.hashes('Notes/Research.md'));
   eq(edit.map(l => l.status), ['done'], JSON.stringify(edit));
   const after = h.contents.get('Notes/Research.md');
-  assert.ok(after.includes(`\n${LEAD}<sup>1</sup> Cited.\n`), after); assert.doesNotMatch(after, /^<sup>/m);
+  assert.ok(after.includes(`\n${FIXED(1, 'Cited.')}\n`), after); assert.doesNotMatch(after, /\]\(<https/);
   assert.match(after, /^<details>$/m, 'a lone <details> line stays'); parses(after, 'edit_md_file');
   assert.ok(after.startsWith('# Research\n\nSleep needs darkness.\n'), 'the text before the edit is unchanged');
   const entry = h.view.history.undo(); await entry.undo();
   assert.equal(h.contents.get('Notes/Research.md'), before, 'undo restores the text before the write');
-  const created = await apply(h, [{ kind: 'create_md_file', path: 'Notes/New.md', content: `---\ntitle: x\n---\n<sup>1</sup> First.\n<kbd>K</kbd> key${later}\n\n\`\`\`text\n<sup>2</sup> fenced\n\`\`\`\n` }]);
+  const created = await apply(h, [{ kind: 'create_md_file', path: 'Notes/New.md', content: `---\ntitle: x\n---\n${RAW(1, 'First.')}\n<kbd>K</kbd> key${later}\n\n\`\`\`text\n<sup>2</sup> fenced\n\`\`\`\n` }]);
   eq(created.map(l => l.status), ['done'], JSON.stringify(created));
   const text = h.contents.get('Notes/New.md');
-  assert.ok(text.startsWith(`---\ntitle: x\n---\n${LEAD}<sup>1</sup> First.\n${LEAD}<kbd>K</kbd> key\n`), text);
+  assert.ok(text.startsWith(`---\ntitle: x\n---\n${FIXED(1, 'First.')}\n<kbd>K</kbd> key\n`), text);
   assert.ok(text.includes('```text\n<sup>2</sup> fenced\n```'), 'fence content unchanged'); parses(text, 'create_md_file');
 });
 integrationTest('ticket 03: edit_md_file inserting into an existing fence or frontmatter does not transform; the editor write uses the same result as the check', async () => {
-  const { LEAD } = T03;
+  const { RAW, FIXED } = T03;
   const h = await harness(); await h.view.hydrate();
   const original = '---\nnote: x\n---\n```text\nFENCE\n```\nSleep needs darkness.\n';
   h.contents.set('Notes/Research.md', original);
-  const inFence = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'FENCE', replace: 'FENCE\n<sup>1</sup> in fence' }], h.hashes('Notes/Research.md'));
+  const inFence = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'FENCE', replace: `FENCE\n${RAW(1, 'in fence')}` }], h.hashes('Notes/Research.md'));
   eq(inFence.map(l => l.status), ['done'], JSON.stringify(inFence));
-  assert.equal(h.contents.get('Notes/Research.md'), '---\nnote: x\n---\n```text\nFENCE\n<sup>1</sup> in fence\n```\nSleep needs darkness.\n');
-  const inFront = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'note: x', replace: 'note: |\n <sup>1</sup> in front' }], h.hashes('Notes/Research.md'));
+  assert.equal(h.contents.get('Notes/Research.md'), `---\nnote: x\n---\n\`\`\`text\nFENCE\n${RAW(1, 'in fence')}\n\`\`\`\nSleep needs darkness.\n`);
+  const inFront = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'note: x', replace: `note: |\n ${RAW(1, 'in front')}` }], h.hashes('Notes/Research.md'));
   eq(inFront.map(l => l.status), ['done'], JSON.stringify(inFront));
-  assert.ok(h.contents.get('Notes/Research.md').startsWith('---\nnote: |\n <sup>1</sup> in front\n---\n'), h.contents.get('Notes/Research.md'));
+  assert.ok(h.contents.get('Notes/Research.md').startsWith(`---\nnote: |\n ${RAW(1, 'in front')}\n---\n`), h.contents.get('Notes/Research.md'));
   // The open editor gets the transformed replacement too.
   const current = h.contents.get('Notes/Research.md'); const replaced = [];
   h.setActive('Notes/Research.md', current, { getValue: () => h.contents.get('Notes/Research.md'), offsetToPos: o => ({ ch: o, line: 0 }), replaceRange: r => replaced.push(r) });
-  const viaEditor = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'Sleep needs darkness.', replace: 'Sleep needs darkness.\n<sup>2</sup> outside' }], h.hashes('Notes/Research.md'));
+  const viaEditor = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'Sleep needs darkness.', replace: `Sleep needs darkness.\n${RAW(2, 'outside')}` }], h.hashes('Notes/Research.md'));
   eq(viaEditor.map(l => l.status), ['done'], JSON.stringify(viaEditor));
-  eq(replaced, [`Sleep needs darkness.\n${LEAD}<sup>2</sup> outside`]);
+  eq(replaced, [`Sleep needs darkness.\n${FIXED(2, 'outside')}`]);
 });
-integrationTest('ticket 03: edit_topic_note detail gives a line-leading <sup> a lead; twice equals once; undo restores the note', async () => {
-  const { LEAD, later, parses } = T03;
+integrationTest('ticket 03: edit_topic_note detail rewrites an angle-bracket link inside <sup>; twice equals once; undo restores the note', async () => {
+  const { RAW, FIXED, later, parses } = T03;
   const h = await harness(); await h.view.hydrate(); h.plugin.mermaidSyntax = async () => 'ok';
   h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
   const before = (await h.note('a')).detail;
-  const detail = `<sup>1</sup> Cited first.\n<details>${later}\n\n\`\`\`text\n<u>u</u> fenced\n\`\`\``;
+  const detail = `${RAW(1, 'Cited first.')}\n<details>${later}\n\n\`\`\`text\n<u>u</u> fenced\n\`\`\``;
   const lines = await apply(h, [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail }]);
   eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
   const written = (await h.note('a')).detail;
-  assert.ok(written.startsWith(`${LEAD}<sup>1</sup> Cited first.\n<details>\n`), written);
+  assert.ok(written.startsWith(`${FIXED(1, 'Cited first.')}\n<details>\n`), written);
   assert.ok(written.includes('```text\n<u>u</u> fenced\n```')); parses(written, 'edit_topic_note');
   const again = await apply(h, [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail: written }], {}, undefined, topicBaseline(h));
   eq(again.map(l => l.status), ['done'], JSON.stringify(again));

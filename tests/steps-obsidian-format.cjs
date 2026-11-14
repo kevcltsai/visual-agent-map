@@ -568,38 +568,44 @@ test('addedMermaidBlocks: only the blocks the after text has beyond the before t
   assert.equal(addedMermaidBlocks(`${foo}\n\ntext`, `${foo}\n\nother`).length, 0, 'same body and same info: not new');
 });
 
-// Ticket 03: a new AI line that starts with inline HTML (`<sup>1</sup> …`) made Obsidian's editor stop parsing the rest of the
-// note (headings, callouts and mermaid shown as raw text). Such a line gets a zero-width-space entity first.
-const { guardInlineHtmlLineStarts, INLINE_HTML_LEAD } = load('ai/markdown-blocks.ts');
-/** Lines a reader of the editor would see as structure: headings and the fence lines of a mermaid block, outside any HTML-led line. */
-const leadsWithInlineHtml = text => text.split('\n').filter(line => /^ {0,3}<\/?(?:sup|sub|kbd|mark|span|small|u|br)[\s/>]/i.test(line) && !/^ {0,3}<\/?[a-z]+[^<>]*>\s*$/i.test(line));
-const INLINE_CASE = ['### 核心結論', '', '<sup>1</sup> 研究顯示睡眠很重要。', '<kbd>Ctrl</kbd> 開啟', '', '### 關鍵知識', '', '```mermaid', 'flowchart TD', '  A["x"] --> B["y"]', '```', ''].join('\n');
+// Ticket 03: a new AI line with an inline tag that holds an angle-bracket link (`<sup>…[t](<https://…>)</sup>`) made Obsidian's
+// editor stop parsing the rest of the note (headings, callouts and mermaid shown as raw text; measured over CDP in 1.15.1).
+// The line start does not matter and a leading character does not help, so the angle brackets are rewritten instead.
+const { guardInlineHtmlLinks } = load('ai/markdown-blocks.ts');
+const WIKI = 'https://commons.wikimedia.org/wiki/File:Frans_Hals.jpg';
+const TRIGGER = `<sup>圖：笛卡兒肖像，來源 [Wikimedia Commons](<${WIKI}>)</sup>`;
+const INLINE_CASE = ['### 核心結論', '', '![肖像](<https://upload.wikimedia.org/a.jpg>)', TRIGGER, '', '### 關鍵知識', '', '```mermaid', 'flowchart TD', '  A["x"] --> B["y"]', '```', ''].join('\n');
 
-test('guardInlineHtmlLineStarts: a line led by an inline tag no longer starts with "<"; headings and the mermaid fence stay as they were', () => {
-  const out = guardInlineHtmlLineStarts(INLINE_CASE);
-  assert.deepEqual(leadsWithInlineHtml(out), []);
-  assert.ok(out.includes(`${INLINE_HTML_LEAD}<sup>1</sup> 研究顯示睡眠很重要。`), out);
-  assert.ok(out.includes(`${INLINE_HTML_LEAD}<kbd>Ctrl</kbd> 開啟`), out);
+test('guardInlineHtmlLinks: the minimal trigger (angle-bracket link inside an open inline tag) is rewritten; everything else stays', () => {
+  const out = guardInlineHtmlLinks(INLINE_CASE);
   const lines = out.split('\n');
-  assert.equal(lines.filter(line => /^### /.test(line)).length, 2);
+  assert.equal(lines[3], `<sup>圖：笛卡兒肖像，來源 <a href="${WIKI}">Wikimedia Commons</a></sup>`);
+  assert.equal(lines[2], '![肖像](<https://upload.wikimedia.org/a.jpg>)', 'an image line without an inline tag is untouched');
+  assert.ok(!out.includes('&#8203;') && !out.includes('\u200b'), 'nothing invisible or visible is added');
   assert.deepEqual(lines.slice(7, 11), ['```mermaid', 'flowchart TD', '  A["x"] --> B["y"]', '```']);
-  assert.equal(guardInlineHtmlLineStarts(out), out, 'twice equals once');
-  for (const tag of ['sup', 'sub', 'kbd', 'mark', 'span', 'small', 'u', 'br'])
-    assert.ok(!guardInlineHtmlLineStarts(`<${tag}>a</${tag}> b`).startsWith('<'), tag);
-  assert.ok(!guardInlineHtmlLineStarts('   <br/>text').startsWith('   <'), 'indented up to three spaces');
+  assert.equal(guardInlineHtmlLinks(out), out, 'twice equals once');
+  // Other inline tags, mid-line use, no closing tag, and a space or parentheses in the target.
+  for (const tag of ['sup', 'sub', 'kbd', 'mark', 'span', 'small', 'u'])
+    assert.equal(guardInlineHtmlLinks(`<${tag}>[a](<https://a.org/b>)</${tag}>`), `<${tag}><a href="https://a.org/b">a</a></${tag}>`, tag);
+  assert.equal(guardInlineHtmlLinks('see <SUP>[a](<https://a.org/b>)'), 'see <SUP><a href="https://a.org/b">a</a>', 'mid-line, upper case, unclosed');
+  assert.equal(guardInlineHtmlLinks('<sup>[a](<https://a.org/b c(1)> "t")</sup>'), '<sup><a href="https://a.org/b%20c(1)">a</a></sup>');
+  assert.equal(guardInlineHtmlLinks('<sup>![i](<https://a.org/i j.jpg>)</sup>'), '<sup>![i](https://a.org/i%20j.jpg)</sup>', 'an image target only loses its brackets');
+  assert.equal(guardInlineHtmlLinks('<sup>x <https://a.org/b></sup>'), '<sup>x <a href="https://a.org/b">https://a.org/b</a></sup>', 'autolink');
+  assert.equal(guardInlineHtmlLinks('- <sup>[a](<https://a.org/b>)</sup> after [c](<https://c.org>)'), '- <sup><a href="https://a.org/b">a</a></sup> after [c](<https://c.org>)', 'only inside the tag');
 });
 
-test('guardInlineHtmlLineStarts: a lone block tag line, other HTML, fence content and frontmatter are unchanged', () => {
-  for (const kept of ['<details>', '<summary>x</summary>', '<br>', '</span>', '<span class="a">', '<div><sup>1</sup> x</div>', 'text <sup>1</sup>', '<supper> x'])
-    assert.equal(guardInlineHtmlLineStarts(kept), kept, kept);
-  const fenced = '```md\n<sup>1</sup> x\n```\n~~~\n<kbd>a</kbd> b\n~~~';
-  assert.equal(guardInlineHtmlLineStarts(fenced), fenced);
-  const front = '---\nnote: <sup>1</sup> x\n<u>a</u> b\n---\n<u>a</u> b';
-  assert.equal(guardInlineHtmlLineStarts(front, { frontmatter: true }), `---\nnote: <sup>1</sup> x\n<u>a</u> b\n---\n${INLINE_HTML_LEAD}<u>a</u> b`);
+test('guardInlineHtmlLinks: lines that do not trip the editor, fence content and frontmatter are unchanged; an old "&#8203;" lead is dropped', () => {
+  for (const kept of ['<sup>[a](https://a.org/b)</sup>', '<sup>1</sup> x', '[a](<https://a.org/b>) <sup>1</sup>', '<sup>1</sup> <https://a.org>', '<br>[a](<https://a.org/b>)', 'plain [a](<https://a.org/b>)', '<details>', '<supper>[a](<https://a.org/b>)'])
+    assert.equal(guardInlineHtmlLinks(kept), kept, kept);
+  const fenced = `\`\`\`md\n${TRIGGER}\n\`\`\`\n~~~\n${TRIGGER}\n~~~`;
+  assert.equal(guardInlineHtmlLinks(fenced), fenced);
+  const front = `---\nnote: ${TRIGGER}\n---\n${TRIGGER}`;
+  assert.equal(guardInlineHtmlLinks(front, { frontmatter: true }), `---\nnote: ${TRIGGER}\n---\n${guardInlineHtmlLinks(TRIGGER)}`);
   // With a range only lines that start inside it change; the state comes from the whole text.
-  const text = '<sup>1</sup> old\n```\n<sup>2</sup> in fence\n```\n<sup>3</sup> new';
-  const start = text.indexOf('```\n<sup>2'), out = guardInlineHtmlLineStarts(text, { range: { start, end: text.length } });
-  assert.equal(out, `<sup>1</sup> old\n\`\`\`\n<sup>2</sup> in fence\n\`\`\`\n${INLINE_HTML_LEAD}<sup>3</sup> new`);
+  const text = `${TRIGGER}\n\`\`\`\n${TRIGGER}\n\`\`\`\n${TRIGGER}`;
+  const start = text.indexOf('```\n<sup>'), out = guardInlineHtmlLinks(text, { range: { start, end: text.length } });
+  assert.equal(out, `${TRIGGER}\n\`\`\`\n${TRIGGER}\n\`\`\`\n${guardInlineHtmlLinks(TRIGGER)}`);
+  assert.equal(guardInlineHtmlLinks('&#8203;<sup>1</sup> x\n  &#8203;<kbd>k</kbd>\n&#8203;text'), '<sup>1</sup> x\n  <kbd>k</kbd>\n&#8203;text');
 });
 
 test('obsidian-format rule 5 says inline HTML must not start a line, in both languages', () => {

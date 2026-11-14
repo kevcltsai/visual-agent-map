@@ -16,7 +16,7 @@ import {
   type ResearchSteer
 } from "../../ai/research-observer";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
-import { guardInlineHtmlLineStarts } from "../../ai/markdown-blocks";
+import { guardInlineHtmlLinks } from "../../ai/markdown-blocks";
 import { dedupeImageEmbeds, imageKeysIn } from "../../core/image-keys";
 import { checkCounts, standardTemplate } from "../../ai/detail-templates";
 import { carryForwardSources } from "../../core/steps/task/carry-sources";
@@ -786,7 +786,7 @@ export class TopicRuns {
       const save = async (summary: string, draft: string): Promise<void> =>
         this.ports.mutate()(async () => {
           // New AI text only: a line it starts with an inline tag would stop Obsidian's editor from parsing the note.
-          const detail = guardInlineHtmlLineStarts(draft);
+          const detail = guardInlineHtmlLinks(draft);
           if (signal.aborted || prepared.viewChanged()) throw changed();
           if (await prepared.sourcesChanged()) throw changed();
           const latest = await repo.readNote(path, options.map());
@@ -1316,7 +1316,7 @@ export class TopicRuns {
           const mode: WritebackMode = writeContext.updateMode ?? "merge";
           const writeLanguage = noteLanguageOf(context.outputLanguage ?? settings().language);
           // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
-          const fresh = guardInlineHtmlLineStarts(result.detail);
+          const fresh = guardInlineHtmlLinks(result.detail);
           let aiDetail = mode === "top" ? fresh : canonicalDetail(fresh, writeLanguage, writeContext.detailTemplate);
           // "AI suggested" later research (or a note whose sections cannot be followed): the numbers and links the rewrite
           // dropped are put back from the Detail this run started from; the write is never refused for it.

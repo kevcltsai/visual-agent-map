@@ -363,7 +363,7 @@ import {
   type TopicAppearanceChange
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
-import { guardInlineHtmlLineStarts } from "../../ai/markdown-blocks";
+import { guardInlineHtmlLinks } from "../../ai/markdown-blocks";
 import { dedupeImageEmbeds, imageKey, imageKeysIn } from "../../core/image-keys";
 import type { DetailTemplate } from "../../ai/detail-templates";
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
@@ -8102,7 +8102,7 @@ export class VisualAgentMapView extends ItemView {
             // A new note: only an image repeated inside the merged Detail is dropped.
             detail: dedupeImageEmbeds(
               withSourceSupplement(
-                canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language), detailTemplate),
+                canonicalDetail(guardInlineHtmlLinks(content.detail), noteLanguageOf(language), detailTemplate),
                 content.supplement,
                 detailTemplate,
                 noteLanguageOf(language)
@@ -8228,7 +8228,7 @@ export class VisualAgentMapView extends ItemView {
         // The merge rewrites the target's Detail in full: only an image repeated inside the new Detail is dropped.
         detail: dedupeImageEmbeds(
           withSourceSupplement(
-            canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language), detailTemplate),
+            canonicalDetail(guardInlineHtmlLinks(content.detail), noteLanguageOf(language), detailTemplate),
             content.supplement,
             detailTemplate,
             noteLanguageOf(language)
@@ -12341,7 +12341,7 @@ export class VisualAgentMapView extends ItemView {
           {
             detail: top
               ? charted
-              : canonicalDetail(guardInlineHtmlLineStarts(charted), noteLanguageOf(job.language), job.template)
+              : canonicalDetail(guardInlineHtmlLinks(charted), noteLanguageOf(job.language), job.template)
           },
           { detailTemplate: job.template }
         );
@@ -19222,7 +19222,7 @@ export class VisualAgentMapView extends ItemView {
             : item.contribution
               ? dedupeImageEmbeds(
                   canonicalDetail(
-                    guardInlineHtmlLineStarts(item.contribution),
+                    guardInlineHtmlLinks(item.contribution),
                     noteLanguageOf(this.plugin.settings.language),
                     contributionTemplate
                   )
@@ -20868,7 +20868,7 @@ export class VisualAgentMapView extends ItemView {
         {
           summary: result.summary,
           detail: dedupeImageEmbeds(
-            canonicalDetail(guardInlineHtmlLineStarts(result.detail), noteLanguageOf(language), detailTemplate)
+            canonicalDetail(guardInlineHtmlLinks(result.detail), noteLanguageOf(language), detailTemplate)
           ),
           visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
           prompt: goal,
@@ -24709,7 +24709,7 @@ export class VisualAgentMapView extends ItemView {
           action.kind === "edit_topic_note"
             ? await demoteUnparsableMermaid(
                 // A full replace: only an image repeated inside the new Detail is dropped.
-                neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLineStarts(action.detail))),
+                neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(action.detail))),
                 this.plugin.mermaidSyntax
               )
             : "";
@@ -24804,7 +24804,7 @@ export class VisualAgentMapView extends ItemView {
         // A line the replacement starts with an inline tag gets a harmless lead; fence and frontmatter state come from the
         // text after the edit, and only the inserted range changes. Checks, the write and the undo entry all use this result.
         const at = source.text.indexOf(action.find);
-        const guarded = guardInlineHtmlLineStarts(raw, {
+        const guarded = guardInlineHtmlLinks(raw, {
           frontmatter: true,
           range: { start: at, end: at + action.replace.length }
         });
@@ -24889,7 +24889,7 @@ export class VisualAgentMapView extends ItemView {
         // Model-written file: same allow-list and parser check as an AI task result.
         const content = await demoteUnparsableMermaid(
           neutralizeUnsafeMermaid(
-            dedupeImageEmbeds(guardInlineHtmlLineStarts(action.content, { frontmatter: true }), { file: true })
+            dedupeImageEmbeds(guardInlineHtmlLinks(action.content, { frontmatter: true }), { file: true })
           ),
           this.plugin.mermaidSyntax
         );

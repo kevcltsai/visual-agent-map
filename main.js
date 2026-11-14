@@ -22898,9 +22898,22 @@ function normalizeMathDelimiters(markdown) {
   }
   return lines.join("\n");
 }
-var INLINE_LINE_START = /^( {0,3})(<\/?(?:sup|sub|kbd|mark|span|small|u|br)(?=[\s/>]))/i;
-var LONE_TAG = /^ {0,3}<\/?[a-z][a-z0-9-]*(?:\s[^<>]*)?\/?>\s*$/i;
-var INLINE_HTML_LEAD = "&#8203;";
+var INLINE_OPEN = /<(sup|sub|kbd|mark|span|small|u)(?=[\s>])/i;
+var OLD_LEAD = /^( {0,3})&#8203;(?=<(?:sup|sub|kbd|mark|span|small|u)[\s>])/i;
+var encodeDestination = (dest) => dest.replace(/ /g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29");
+var attributeValue = (url) => url.replace(/ /g, "%20").replace(/&/g, "&amp;").replace(/"/g, "%22");
+function guardInlineHtmlLine(line2) {
+  const open2 = INLINE_OPEN.exec(line2);
+  if (!open2 || !line2.includes("<", open2.index + open2[0].length)) return line2;
+  const from = open2.index + open2[0].length;
+  const closeAt = line2.toLowerCase().indexOf(`</${open2[1].toLowerCase()}>`, from);
+  const end = closeAt < 0 ? line2.length : closeAt;
+  const inner = line2.slice(from, end).replace(
+    /(?<!!)\[([^[\]]*)\]\(<([^<>\n]*)>(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,
+    (_all, text10, dest) => `<a href="${attributeValue(dest)}">${text10}</a>`
+  ).replace(/\]\(<([^<>\n]*)>/g, (_all, dest) => `](${encodeDestination(dest)}`).replace(/<((?:https?|mailto):[^<>\s]+)>/gi, (_all, url) => `<a href="${attributeValue(url)}">${url}</a>`);
+  return line2.slice(0, from) + inner + line2.slice(end);
+}
 function frontmatterLines(lines) {
   var _a2;
   const marks = lines.map(() => false);
@@ -22910,8 +22923,8 @@ function frontmatterLines(lines) {
   for (let index = 0; index <= end; index++) marks[index] = true;
   return marks;
 }
-function guardInlineHtmlLineStarts(text10, options = {}) {
-  if (!/<\/?(?:sup|sub|kbd|mark|span|small|u|br)\b/i.test(text10)) return text10;
+function guardInlineHtmlLinks(text10, options = {}) {
+  if (!/&#8203;|<(?:sup|sub|kbd|mark|span|small|u)\b/i.test(text10)) return text10;
   const lines = text10.split("\n");
   const code = fencedLines(lines);
   const front = options.frontmatter ? frontmatterLines(lines) : lines.map(() => false);
@@ -22921,9 +22934,7 @@ function guardInlineHtmlLineStarts(text10, options = {}) {
     offset += line2.length + 1;
     if (code[index] || front[index]) return line2;
     if (options.range && (start < options.range.start || start >= options.range.end)) return line2;
-    const match = INLINE_LINE_START.exec(line2);
-    if (!match || LONE_TAG.test(line2)) return line2;
-    return `${match[1]}${INLINE_HTML_LEAD}${line2.slice(match[1].length)}`;
+    return guardInlineHtmlLine(line2.replace(OLD_LEAD, "$1"));
   }).join("\n");
 }
 
@@ -37629,7 +37640,7 @@ var TopicRuns = class {
       const raw = await this.snapshotRaw(original, path, options);
       const save = async (summary, draft) => this.ports.mutate()(async () => {
         var _a3, _b3;
-        const detail = guardInlineHtmlLineStarts(draft);
+        const detail = guardInlineHtmlLinks(draft);
         if (signal.aborted || prepared.viewChanged()) throw changed();
         if (await prepared.sourcesChanged()) throw changed();
         const latest = await repo.readNote(path, options.map());
@@ -38076,7 +38087,7 @@ var TopicRuns = class {
         if (result.aiSectionsFallback) (_c2 = options.notify) == null ? void 0 : _c2.call(options, t("ui.note_style_ai_sections_invalid"));
         const mode = (_d2 = writeContext.updateMode) != null ? _d2 : "merge";
         const writeLanguage = noteLanguageOf((_e2 = context.outputLanguage) != null ? _e2 : settings().language);
-        const fresh = guardInlineHtmlLineStarts(result.detail);
+        const fresh = guardInlineHtmlLinks(result.detail);
         let aiDetail = mode === "top" ? fresh : canonicalDetail(fresh, writeLanguage, writeContext.detailTemplate);
         if ((context.aiSections === "follow" || context.aiSections === "general") && mode === "merge" && latest.detail.trim()) {
           const kept = keepDroppedContent({
@@ -64439,7 +64450,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
             // A new note: only an image repeated inside the merged Detail is dropped.
             detail: dedupeImageEmbeds(
               withSourceSupplement(
-                canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language2), detailTemplate),
+                canonicalDetail(guardInlineHtmlLinks(content.detail), noteLanguageOf(language2), detailTemplate),
                 content.supplement,
                 detailTemplate,
                 noteLanguageOf(language2)
@@ -64536,7 +64547,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         // The merge rewrites the target's Detail in full: only an image repeated inside the new Detail is dropped.
         detail: dedupeImageEmbeds(
           withSourceSupplement(
-            canonicalDetail(guardInlineHtmlLineStarts(content.detail), noteLanguageOf(language2), detailTemplate),
+            canonicalDetail(guardInlineHtmlLinks(content.detail), noteLanguageOf(language2), detailTemplate),
             content.supplement,
             detailTemplate,
             noteLanguageOf(language2)
@@ -68375,7 +68386,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         await this.plugin.repo.updateNote(
           path,
           {
-            detail: top ? charted : canonicalDetail(guardInlineHtmlLineStarts(charted), noteLanguageOf(job.language), job.template)
+            detail: top ? charted : canonicalDetail(guardInlineHtmlLinks(charted), noteLanguageOf(job.language), job.template)
           },
           { detailTemplate: job.template }
         );
@@ -74711,7 +74722,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           ...cleanOutlineSummary(item.contribution) || cleanOutlineSummary(item.task) ? { summary: cleanOutlineSummary(item.contribution) || cleanOutlineSummary(item.task) } : {},
           detail: researchOptions ? "" : item.contribution ? dedupeImageEmbeds(
             canonicalDetail(
-              guardInlineHtmlLineStarts(item.contribution),
+              guardInlineHtmlLinks(item.contribution),
               noteLanguageOf(this.plugin.settings.language),
               contributionTemplate
             )
@@ -76226,7 +76237,7 @@ ${note.detail.trim()}` : "",
         {
           summary: result.summary,
           detail: dedupeImageEmbeds(
-            canonicalDetail(guardInlineHtmlLineStarts(result.detail), noteLanguageOf(language2), detailTemplate)
+            canonicalDetail(guardInlineHtmlLinks(result.detail), noteLanguageOf(language2), detailTemplate)
           ),
           visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
           prompt: goal,
@@ -79651,7 +79662,7 @@ ${note.detail.trim()}` : "",
         if (sourceRefusal) return sourceRefusal;
         const detail = action.kind === "edit_topic_note" ? await demoteUnparsableMermaid(
           // A full replace: only an image repeated inside the new Detail is dropped.
-          neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLineStarts(action.detail))),
+          neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(action.detail))),
           this.plugin.mermaidSyntax
         ) : "";
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
@@ -79734,7 +79745,7 @@ ${note.detail.trim()}` : "",
         const raw = applyMdEdit(source.text, action.find, action.replace);
         if (raw === null) return skipped("ui.map_chat_skip_find_failed");
         const at = source.text.indexOf(action.find);
-        const guarded = guardInlineHtmlLineStarts(raw, {
+        const guarded = guardInlineHtmlLinks(raw, {
           frontmatter: true,
           range: { start: at, end: at + action.replace.length }
         });
@@ -79811,7 +79822,7 @@ ${note.detail.trim()}` : "",
         const exists = key4 ? !!this.app.vault.getAbstractFileByPath(key4) : false;
         const content = await demoteUnparsableMermaid(
           neutralizeUnsafeMermaid(
-            dedupeImageEmbeds(guardInlineHtmlLineStarts(action.content, { frontmatter: true }), { file: true })
+            dedupeImageEmbeds(guardInlineHtmlLinks(action.content, { frontmatter: true }), { file: true })
           ),
           this.plugin.mermaidSyntax
         );

@@ -77242,7 +77242,7 @@ ${note.detail.trim()}` : "",
       went = await this.plugin.confirmAiUsage(
         request.model,
         async () => {
-          var _a3, _b2, _c, _d, _e;
+          var _a3, _b2, _c, _d, _e, _f;
           if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a3 = this.map) == null ? void 0 : _a3.id) !== anchor.id) {
             abandon();
             return;
@@ -77252,178 +77252,151 @@ ${note.detail.trim()}` : "",
           const record = this.beginChatRecord(chat, turn, request, origin);
           run.record = record;
           if (record) record.steerTexts = () => steerState.steers.delivered();
-          const openAttempt = () => {
-            var _a4;
-            const controller = new AbortController();
-            const key4 = `map-chat-view:${++mapChatTaskSequence}`;
-            this.chatController = controller;
-            this.chatTaskKey = key4;
-            (_a4 = this.plugin.activeTasks) == null ? void 0 : _a4.set(key4, controller);
-            return {
-              controller,
-              alive: () => !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path
-            };
-          };
-          let attempt = openAttempt();
+          const turnController = new AbortController();
+          const key4 = `map-chat-view:${++mapChatTaskSequence}`;
+          this.chatController = turnController;
+          this.chatTaskKey = key4;
+          (_b2 = this.plugin.activeTasks) == null ? void 0 : _b2.set(key4, turnController);
+          const alive = () => !this.closed && !turnController.signal.aborted && this.chatController === turnController && this.path === anchor.path;
           this.supersedeChatPlan();
           this.relocateMapChat();
           chat.setStage("waiting");
           const modelName = this.plugin.modelLabel(request.model);
-          for (; ; ) {
-            const { controller, alive } = attempt;
-            if (!alive()) return;
-            let replaced = false;
-            let wake = () => void 0;
-            const swapped = new Promise((resolve) => {
-              wake = resolve;
-            });
-            let watching = true;
-            let timer = null;
-            const stopWatching = () => {
-              watching = false;
-              if (timer !== null) window.clearTimeout(timer);
-              timer = null;
-            };
-            const modelEvent = () => {
-              stopWatching();
-              if (alive()) chat.clearSlow();
-            };
-            const resend = () => {
-              if (!alive() || replaced || !watching) return;
-              replaced = true;
-              stopWatching();
-              record == null ? void 0 : record.event("resend");
-              this.releaseChatTask();
-              controller.abort();
-              steerState.steers.drop();
-              attempt = openAttempt();
-              chat.restartWaiting();
-              wake();
-            };
-            timer = window.setTimeout(() => {
-              timer = null;
-              if (watching && alive() && !replaced) chat.showSlow(t("ui.map_chat_slow_0", modelName), resend);
-            }, FIRST_EVENT_WAIT_MS);
-            try {
-              const outcome = await Promise.race([
-                this.plugin.mapChat.chat(
+          try {
+            const outcome = await runAttempts({
+              signal: turnController.signal,
+              stopped: () => new Error(t("ui.ai_task_cancelled")),
+              start: async (attempt) => {
+                if (!alive()) throw new Error(t("ui.ai_task_cancelled"));
+                const live2 = () => alive() && attempt.live();
+                attempt.arm();
+                return this.plugin.mapChat.chat(
                   request,
-                  controller.signal,
+                  attempt.signal,
                   (text10) => {
-                    if (!alive()) return;
-                    modelEvent();
+                    if (!live2()) return;
+                    attempt.seen();
                     chat.streamReply(text10);
                   },
                   (event) => {
-                    if (!alive()) return;
+                    if (!live2()) return;
                     if (event.kind === "stream-mode") {
-                      if (event.mode !== "stream-json") stopWatching();
+                      attempt.streamMode(event.mode);
                       steerState.steers.setLive(event.mode === "stream-json");
                       return;
                     }
-                    if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
+                    if (!(event.kind === "activity" && event.activity === "started")) attempt.seen();
                     if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
                   },
                   (handler) => {
-                    if (alive()) steerState.steers.bind(handler);
+                    if (live2()) steerState.steers.bind(handler);
                   },
                   // The model's raw output, kept for the record (only while the switch is on, and never from a stopped or replaced attempt).
                   record ? (raw) => {
-                    if (alive()) record.raw = raw;
+                    if (live2()) record.raw = raw;
                   } : void 0
-                ),
-                swapped.then(() => null)
-              ]);
-              stopWatching();
-              if (outcome === null) continue;
-              if (!alive()) return;
-              const result = outcome;
-              for (const id of (_c = (_b2 = request.context.research) == null ? void 0 : _b2.sent) != null ? _c : []) this.chatResearchSent.add(id);
-              await steerState.steers.close();
-              if (!alive()) return;
-              const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
-              run.message = fullMessage;
-              run.replyRemaining = result.remaining;
-              run.state = syncAutoApply(run.state, this.chatAutoApply);
-              const plan = result.actions.length ? planFor(result.actions, request.context, {
-                diagrams: this.plugin.settings.addDiagramsAfterResearch,
-                mapAiMode: (_d = this.map) == null ? void 0 : _d.aiMode,
-                imageMode: this.chatImageMode(),
-                imageAttached: !!request.imageDataUrl,
-                chain: planChainOf(run.state),
-                autoApply: this.chatAutoApply,
-                mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
-                readablePaths: this.chatFiles.readablePaths(),
-                callsSoFar: run.state.calls,
-                chatStartedResearch: this.chatStartedResearch,
-                chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
-                trusted: {
-                  createdIds: run.createdIds,
-                  researchedIds: new Set(
-                    [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
-                  )
-                }
-              }) : null;
-              if (plan) {
-                if (chat.isBusy) {
-                  chat.finish(result.reply, []);
-                  this.showUnreadResearch(chat, turn, request.context);
-                  this.markChatTurn(origin, request);
-                  run.state = pauseForPlan(run.state);
-                  this.offerChatPlan(
-                    result,
-                    plan,
-                    request.context,
-                    { path: anchor.path, id: anchor.id },
-                    fullMessage,
-                    record,
-                    run
-                  );
-                  if (record == null ? void 0 : record.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
-                    this.chatRecordLogged.add(turn.assistant);
-                  this.flushSteers(false);
-                }
-                return;
+                );
+              },
+              onSlow: (_attempt, resend) => {
+                if (alive())
+                  chat.showSlow(t("ui.map_chat_slow_0", modelName), () => {
+                    if (alive()) resend();
+                  });
+              },
+              onCleared: () => {
+                if (alive()) chat.clearSlow();
+              },
+              onResend: () => {
+                record == null ? void 0 : record.event("resend");
+                steerState.steers.drop();
+                chat.restartWaiting();
               }
-              if (result.actions.length) chat.setStage("applying");
-              const work = newChatWork();
-              run.work = work;
-              const lines = await this.applyMapChatActions(
-                { ...result, message: fullMessage },
-                request.context,
-                alive,
-                anchor,
-                { context: request.context, work, continuation: Boolean(autoOrigin), chain: run }
-              );
-              if (alive() && chat.isBusy) {
-                const entry = this.chatReplyEntry();
-                const shown = chat.finish(result.reply, lines);
+            });
+            if (!alive()) return;
+            const result = outcome;
+            for (const id of (_d = (_c = request.context.research) == null ? void 0 : _c.sent) != null ? _d : []) this.chatResearchSent.add(id);
+            await steerState.steers.close();
+            if (!alive()) return;
+            const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
+            run.message = fullMessage;
+            run.replyRemaining = result.remaining;
+            run.state = syncAutoApply(run.state, this.chatAutoApply);
+            const plan = result.actions.length ? planFor(result.actions, request.context, {
+              diagrams: this.plugin.settings.addDiagramsAfterResearch,
+              mapAiMode: (_e = this.map) == null ? void 0 : _e.aiMode,
+              imageMode: this.chatImageMode(),
+              imageAttached: !!request.imageDataUrl,
+              chain: planChainOf(run.state),
+              autoApply: this.chatAutoApply,
+              mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
+              readablePaths: this.chatFiles.readablePaths(),
+              callsSoFar: run.state.calls,
+              chatStartedResearch: this.chatStartedResearch,
+              chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
+              trusted: {
+                createdIds: run.createdIds,
+                researchedIds: new Set(
+                  [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
+                )
+              }
+            }) : null;
+            if (plan) {
+              if (chat.isBusy) {
+                chat.finish(result.reply, []);
                 this.showUnreadResearch(chat, turn, request.context);
-                this.markChatTurn(origin, request, entry);
-                if (record == null ? void 0 : record.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
+                this.markChatTurn(origin, request);
+                run.state = pauseForPlan(run.state);
+                this.offerChatPlan(
+                  result,
+                  plan,
+                  request.context,
+                  { path: anchor.path, id: anchor.id },
+                  fullMessage,
+                  record,
+                  run
+                );
+                if (record == null ? void 0 : record.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
                   this.chatRecordLogged.add(turn.assistant);
-                this.finishChatRound(run, { result, context: request.context, lines, work, anchor });
+                this.flushSteers(false);
               }
               return;
-            } catch (error) {
-              stopWatching();
-              if (replaced) continue;
-              if (alive()) {
-                const failure = this.chatErrorText(error);
-                chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
-                record == null ? void 0 : record.end("failed", {
-                  reason: /time(d)?[\s-]?out/i.test(errorMessage3(error)) ? "timeout" : "error",
-                  reply: failure.text,
-                  lines: [],
-                  error: { text: failure.text, technical: (_e = failure.technical) != null ? _e : "" }
-                });
-                this.returnSteers(steerState);
-                if (!this.retryAutoRound(run, origin)) this.interruptChain(run, "failed");
-              }
-              return;
-            } finally {
-              if (!replaced && this.chatController === controller) this.releaseChatTask();
             }
+            if (result.actions.length) chat.setStage("applying");
+            const work = newChatWork();
+            run.work = work;
+            const lines = await this.applyMapChatActions(
+              { ...result, message: fullMessage },
+              request.context,
+              alive,
+              anchor,
+              { context: request.context, work, continuation: Boolean(autoOrigin), chain: run }
+            );
+            if (alive() && chat.isBusy) {
+              const entry = this.chatReplyEntry();
+              const shown = chat.finish(result.reply, lines);
+              this.showUnreadResearch(chat, turn, request.context);
+              this.markChatTurn(origin, request, entry);
+              if (record == null ? void 0 : record.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
+                this.chatRecordLogged.add(turn.assistant);
+              this.finishChatRound(run, { result, context: request.context, lines, work, anchor });
+            }
+            return;
+          } catch (error) {
+            if (alive()) {
+              const failure = this.chatErrorText(error);
+              chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
+              record == null ? void 0 : record.end("failed", {
+                reason: /time(d)?[\s-]?out/i.test(errorMessage3(error)) ? "timeout" : "error",
+                reply: failure.text,
+                lines: [],
+                error: { text: failure.text, technical: (_f = failure.technical) != null ? _f : "" }
+              });
+              this.returnSteers(steerState);
+              if (!this.retryAutoRound(run, origin)) this.interruptChain(run, "failed");
+            }
+            return;
+          } finally {
+            if (this.chatController === turnController) this.releaseChatTask();
           }
         },
         // The usage notice opens: the bubble and an empty canvas say the send waits for the user, not that a map is being built.

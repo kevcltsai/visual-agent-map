@@ -9753,3 +9753,13 @@ integrationTest('map chat records 18 counter-example: Resend and then Stop at on
   eq(lineKinds(recordLines(h, recordFiles(h)[0])), ['conversation', 'turn_start', 'event:resend', 'end:stopped']);
   assert.equal(chat.transcript().at(-1).text, 'Stopped.'); assert.equal(h.plugin.activeTasks.size, 0);
 });
+
+integrationTest('map chat 18 counter-example: a runtime that ignores the abort cannot hold the turn after Stop; the late reply writes nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred();
+  h.control.reply = async () => { await gate.promise; return { reply: 'LATE', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'LATE' }], rejected: [] }; };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  chat.stopEl.click(); await sending;
+  assert.equal(chat.transcript().at(-1).text, 'Stopped.'); assert.equal(chat.isBusy, false); assert.equal(chat.stage, null); assert.equal(h.plugin.activeTasks.size, 0);
+  gate.resolve(); await tick(); await tick();
+  assert.equal(chat.transcript().at(-1).text, 'Stopped.', 'the late reply is not shown'); assert.equal(h.control.mutates, 0, 'and its actions are not applied');
+});

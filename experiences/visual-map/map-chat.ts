@@ -4,6 +4,7 @@ import type { ImageCandidate } from "../../core/image-candidates";
 import { summarizeBasis, type BasisSummaryEntry, type MapChatBasis } from "../../core/map-chat-basis";
 import { MAP_CHAT_TURN_CHAR_LIMIT, type MapChatContinuationInput, type MapChatTurn } from "../../core/map-chat-context";
 import {
+  MAP_CHAT_AUTO_MAX_CALLS,
   MAP_CHAT_CHAIN_MAX_ROUNDS,
   MAP_CHAT_CHAIN_WAIT_MS,
   type MapChatChainEndReason,
@@ -307,6 +308,18 @@ export interface MapChatAutoInfo {
   remaining?: string;
   /** Research that went on after some of it failed: how many cards failed and how many notes the round is built on. */
   partial?: { failed: number; succeeded: number };
+  /** Auto-apply chain: the AI calls used so far (the label counts calls, never "of 8"). */
+  calls?: number;
+  /** Auto-apply chain: what the previous round applied directly ("research 12, ..."), one plain sentence part. */
+  applied?: string;
+}
+/** The whole multi-step instruction as the view tells it (names are plain text from the model). */
+export interface MapChatFlow {
+  steps: { name: string; status: "done" | "current" | "todo" }[];
+  /** The round in flight (or the last one, when the flow is done). */
+  round: number;
+  calls: number;
+  maxCalls: number;
 }
 
 /** A saved conversation as {@link MapChatPanel.restore} takes it (core `restoreConversation` returns this shape). */
@@ -419,6 +432,10 @@ export interface MapChatHost {
   imageMode?(): "preview" | "direct";
   /** The user switched it; the view remembers it at once. */
   setImageMode?(mode: "preview" | "direct"): void;
+  /** "Apply this conversation automatically" is on (the view owns it; it is never saved). Absent together with `setAutoApply`: no switch. */
+  autoApply?(): boolean;
+  /** The user (or a reset, a restore, a new conversation) changed the switch; the view uses the new value from the next round on. */
+  setAutoApply?(on: boolean): void;
   /** Where the undo step of a written reply is now. */
   replyUndoState?(token: object): MapChatReplyUndoState;
   /** The "Undo this reply" button: undoes exactly that reply when it is the newest step, otherwise changes nothing and says how to undo in order. */
@@ -602,6 +619,13 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private stopWatchingImage: (() => void) | null = null;
   private imageModeEl!: HTMLElement;
   private imageModeButtons: Record<"preview" | "direct", HTMLButtonElement> | null = null;
+  /** "Apply this conversation automatically": the row, its Off/On buttons (built on first use) and the warning shown while it is on. */
+  private autoApplyEl!: HTMLElement;
+  private autoApplyButtons: { off: HTMLButtonElement; on: HTMLButtonElement } | null = null;
+  private autoWarnEl!: HTMLElement;
+  /** The whole-flow block: the steps of the instruction and where it stands (in memory only). */
+  private flowEl!: HTMLElement;
+  private flow: MapChatFlow | null = null;
   private messageEls: HTMLElement[] = [];
   private bodyEls: HTMLElement[] = [];
   /** The laid-out row of each message with the state it was built from; a message that has not changed keeps its row. */
@@ -1017,7 +1041,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     maxRounds: number,
     remaining: string,
     origin: MapChatOrigin,
-    partial?: { failed: number; succeeded: number }
+    partial?: { failed: number; succeeded: number },
+    auto?: { calls: number; applied: string }
   ): MapChatTurnHandle {
     this.chainRound = round;
     this.chainMax = maxRounds;
@@ -1025,10 +1050,13 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       round,
       maxRounds,
       remaining,
-      ...(partial ? { partial } : {})
+      ...(partial ? { partial } : {}),
+      ...(auto ? { calls: auto.calls, ...(auto.applied ? { applied: auto.applied } : {}) } : {})
     });
     if (this.built && this.stage)
-      this.liveEl.setText(`${t("ui.map_chat_auto_round_0_1", round, maxRounds)}. ${this.stageLabel(this.stage.kind)}`);
+      this.liveEl.setText(
+        `${this.autoRoundLabel({ round, maxRounds, calls: auto?.calls })}. ${this.stageLabel(this.stage.kind)}`
+      );
     return handle;
   }
   /**
@@ -1095,7 +1123,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    * where it applies, what was left. "Done" is told only for a chain of two rounds or more. A map change says nothing (the
    * conversation goes with it).
    */
-  endChain(reason: MapChatChainEndReason, remaining: string, details?: string[]): void {
+  endChain(reason: MapChatChainEndReason, remaining: string, details?: string[], calls?: number): void {
     const was = this.chainWaitingState !== null;
     this.chainWaitingState = null;
     this.chainWaitingLeft = "";
@@ -1108,7 +1136,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       }
       return;
     }
-    const text = this.chainEndText(reason, remaining, details, last);
+    const text = this.chainEndText(reason, remaining, details, last, this.chainRound, false, calls);
     last.chainNote = { reason, text };
     this.renderLog();
     this.renderBusy();
@@ -1131,7 +1159,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     details: string[] | undefined,
     last: MapChatMessage,
     round = this.chainRound,
-    restored = false
+    restored = false,
+    calls?: number
   ): string {
     // One sentence's tail is cut so a model's "..." or full stop does not double the one the template ends with.
     const bare = (value: string): string => clip(value, 200).replace(/[\s.。!！?？…]+$/u, "");
@@ -1157,6 +1186,12 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         return this.joinSentences(
           say("ui.map_chat_chain_end_max_rounds_0", this.chainMax),
           left,
+          say("ui.map_chat_chain_end_max_rounds_more")
+        );
+      case "call_limit":
+        return this.joinSentences(
+          say("ui.map_chat_chain_end_call_limit_0", calls ?? MAP_CHAT_AUTO_MAX_CALLS),
+          remaining.trim() ? say("ui.map_chat_chain_left_call_limit_0", bare(remaining)) : "",
           say("ui.map_chat_chain_end_max_rounds_more")
         );
       case "research_failed":
@@ -1734,6 +1769,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.chainMax = MAP_CHAT_CHAIN_MAX_ROUNDS;
     this.clearStage();
     this.unread = false;
+    this.switchAutoApplyOff();
     // A stage name said for the turn that is gone must not stay in the live region.
     if (this.built) this.liveEl.setText("");
     if (this.built) this.inputEl.value = "";
@@ -1753,6 +1789,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
    */
   restore(conversation: MapChatRestoredConversation): void {
     if (this.working) return;
+    this.switchAutoApplyOff();
     // Only the messages are replaced: the draft and the references the user added while the record was read stay.
     this.cancelFrame();
     this.rows = new WeakMap();
@@ -1996,6 +2033,15 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     });
     this.imageModeEl = this.bodyEl.createDiv({ cls: "vam-map-chat-image-mode" });
     this.imageModeEl.hidden = true;
+    this.flowEl = this.bodyEl.createDiv({
+      cls: "vam-map-chat-flow",
+      attr: { role: "group", "aria-label": t("ui.map_chat_flow_aria") }
+    });
+    this.flowEl.hidden = true;
+    this.autoApplyEl = this.bodyEl.createDiv({ cls: "vam-map-chat-auto-apply" });
+    this.autoApplyEl.hidden = true;
+    this.autoWarnEl = this.bodyEl.createDiv({ cls: "vam-map-chat-auto-apply-warning" });
+    this.autoWarnEl.hidden = true;
     this.hintEl = this.bodyEl.createDiv({ cls: "vam-map-chat-plan-hint" });
     this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
@@ -2076,6 +2122,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.stopWatching = this.host.watchModels(() => this.refreshControls());
     this.stopWatchingImage = this.host.watchImage?.(() => this.refreshImage()) ?? null;
     this.renderImageMode();
+    this.renderAutoApply();
   }
 
   /**
@@ -2594,6 +2641,121 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.renderImageMode();
   }
 
+  /** The switch follows the host's value (a repainted panel keeps the view's state); also the flow block, which only shows while it is on. */
+  refreshAutoApply(): void {
+    this.renderAutoApply();
+  }
+  /** The view tells how far the whole instruction is (an auto-apply chain with two steps or more shows it). */
+  setFlowProgress(flow: MapChatFlow | null): void {
+    this.flow = flow;
+    this.renderFlow();
+  }
+  /** Back to off when the conversation is replaced (reset, restore): the host is told only when it was on. */
+  private switchAutoApplyOff(): void {
+    this.flow = null;
+    if (this.host.autoApply?.()) this.host.setAutoApply?.(false);
+    this.renderAutoApply();
+  }
+  /** "Apply this conversation automatically" [Off | On]: above the composer, with the warning under it while it is on. */
+  private renderAutoApply(): void {
+    if (!this.built) return;
+    const shown = !!this.host.autoApply && !!this.host.setAutoApply;
+    this.autoApplyEl.hidden = !shown;
+    if (!shown) {
+      this.autoWarnEl.hidden = true;
+      this.renderFlow();
+      return;
+    }
+    if (!this.autoApplyButtons) {
+      this.autoApplyEl.createSpan({ cls: "vam-map-chat-auto-apply-label", text: t("ui.map_chat_auto_apply_label") });
+      const group = this.autoApplyEl.createSpan({
+        cls: "vam-map-chat-auto-apply-group",
+        attr: { role: "group", "aria-label": t("ui.map_chat_auto_apply_label") }
+      });
+      const make = (wantOn: boolean): HTMLButtonElement => {
+        const button = group.createEl("button", {
+          cls: "vam-map-chat-image-mode-button",
+          text: t(wantOn ? "ui.map_chat_auto_apply_on" : "ui.map_chat_auto_apply_off"),
+          attr: { type: "button", "aria-pressed": "false" }
+        });
+        button.addEventListener("click", () => {
+          if (!!this.host.autoApply?.() === wantOn) return;
+          this.host.setAutoApply?.(wantOn);
+          this.renderAutoApply();
+        });
+        return button;
+      };
+      this.autoApplyButtons = { off: make(false), on: make(true) };
+      this.autoWarnEl.setText(t("ui.map_chat_auto_apply_warning"));
+    }
+    const on = !!this.host.autoApply?.();
+    for (const [button, pressed] of [
+      [this.autoApplyButtons.off, !on],
+      [this.autoApplyButtons.on, on]
+    ] as const) {
+      button.setAttr("aria-pressed", String(pressed));
+      button.toggleClass("is-active", pressed);
+    }
+    this.autoWarnEl.hidden = !on;
+    this.renderFlow();
+  }
+  /**
+   * The whole-flow block: header (steps done or the step in work, the round, a thin bar like the research bar, the AI calls), then
+   * one line per step. Names are plain text. Shown only while the switch is on and the instruction has two steps or more.
+   */
+  private renderFlow(): void {
+    if (!this.built) return;
+    const flow = this.flow;
+    const shown = !!flow && flow.steps.length >= 2 && !!this.host.autoApply?.();
+    this.flowEl.hidden = !shown;
+    this.flowEl.empty();
+    if (!flow || !shown) return;
+    const total = flow.steps.length;
+    const done = flow.steps.filter(step => step.status === "done").length;
+    const head = this.flowEl.createDiv({ cls: "vam-map-chat-flow-head" });
+    head.createEl("b", { text: t("ui.map_chat_flow_label") });
+    head.createSpan({
+      text:
+        done === total
+          ? t("ui.map_chat_flow_done_0_1_2", done, total, flow.round)
+          : t(
+              "ui.map_chat_flow_step_0_1_2",
+              Math.max(1, flow.steps.findIndex(step => step.status !== "done") + 1),
+              total,
+              flow.round
+            )
+    });
+    const track = head.createSpan({
+      cls: "vam-research-progress-track",
+      attr: {
+        role: "progressbar",
+        "aria-valuemin": "0",
+        "aria-valuemax": String(total),
+        "aria-valuenow": String(done),
+        "aria-valuetext": t("ui.map_chat_flow_value_0_1", done, total)
+      }
+    });
+    track.createSpan({ cls: "vam-research-progress-fill" }).style.width = `${(done / total) * 100}%`;
+    head.createSpan({ text: t("ui.map_chat_flow_calls_0_1", flow.calls, flow.maxCalls) });
+    const list = this.flowEl.createEl("ul", { cls: "vam-map-chat-flow-steps" });
+    flow.steps.forEach((step, index) => {
+      const item = list.createEl("li", { cls: `vam-map-chat-flow-step is-${step.status}` });
+      item.createSpan({
+        cls: "vam-map-chat-flow-icon",
+        text: step.status === "done" ? "✓" : step.status === "current" ? "●" : "○",
+        attr: { role: "img", "aria-label": t(`ui.map_chat_flow_status_${step.status}`) }
+      });
+      item.createSpan({ text: `${index + 1}. ${step.name}` });
+    });
+  }
+
+  /** The separator of an automatic round: an auto-apply chain counts AI calls (its limit is calls), the plain one counts rounds of 8. */
+  private autoRoundLabel(info: { round: number; maxRounds: number; calls?: number }): string {
+    return info.calls === undefined
+      ? t("ui.map_chat_auto_round_0_1", info.round, info.maxRounds)
+      : t("ui.map_chat_auto_round_calls_0_1_2", info.round, info.calls, MAP_CHAT_AUTO_MAX_CALLS);
+  }
+
   /** "Before AI edits the picture" [Show me first | Apply directly]: only while a picture is chosen. */
   private renderImageMode(): void {
     if (!this.built) return;
@@ -2716,7 +2878,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     return [
       message.role,
       message.auto
-        ? `auto:${message.autoInfo?.round ?? ""}:${message.autoInfo?.maxRounds ?? ""}:${message.autoInfo?.remaining ?? ""}:${message.autoInfo?.partial ? `${message.autoInfo.partial.failed}/${message.autoInfo.partial.succeeded}` : ""}`
+        ? `auto:${message.autoInfo?.round ?? ""}:${message.autoInfo?.maxRounds ?? ""}:${message.autoInfo?.remaining ?? ""}:${message.autoInfo?.partial ? `${message.autoInfo.partial.failed}/${message.autoInfo.partial.succeeded}` : ""}:${message.autoInfo?.calls ?? ""}:${message.autoInfo?.applied ?? ""}`
         : "",
       message.auto
         ? t("ui.map_chat_auto_round_0_1", "", "") +
@@ -2906,9 +3068,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (message.auto) {
       const info = message.autoInfo;
       const body = row.createDiv({ cls: "vam-map-chat-auto-title" });
-      body.setText(
-        info?.round ? t("ui.map_chat_auto_round_0_1", info.round, info.maxRounds) : t("ui.map_chat_role_auto")
-      );
+      body.setText(info?.round ? this.autoRoundLabel(info) : t("ui.map_chat_role_auto"));
       if (info?.partial)
         row.createDiv({
           cls: "vam-map-chat-auto-note",
@@ -2916,6 +3076,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         });
       if (info?.remaining?.trim())
         row.createDiv({ cls: "vam-map-chat-auto-left", text: t("ui.map_chat_chain_left_0", info.remaining) });
+      if (info?.applied)
+        row.createDiv({ cls: "vam-map-chat-auto-applied", text: t("ui.map_chat_auto_applied_0", info.applied) });
       return { row, body, more: null };
     }
     row.createSpan({

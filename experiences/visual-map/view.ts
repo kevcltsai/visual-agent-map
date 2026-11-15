@@ -463,6 +463,9 @@ import {
 } from "../../core/map-chat-transcript";
 import { loadableImages } from "../../ui/image-candidates";
 import {
+  MAP_CHAT_AUTO_MAX_CALLS,
+  MAP_CHAT_AUTO_MAX_ROUNDS,
+  MAP_CHAT_CHAIN_MAX_ROUNDS,
   MAP_CHAT_CHAIN_WAIT_MS,
   chainEndNeedsNotice,
   finishRound,
@@ -475,6 +478,7 @@ import {
   resumedChain,
   startAutoChain,
   startChain,
+  syncAutoApply,
   type MapChatChainDecision,
   type MapChatChainEndReason,
   type MapChatChainInterrupt,
@@ -550,6 +554,7 @@ import { MapChatTurnRecord, type TurnEndFields } from "./map-chat-turn-record";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
   chatResearchMode,
+  estimateChatCalls,
   chatResearchRequest,
   mapChoiceParts,
   matchMapTitle,
@@ -1186,7 +1191,7 @@ interface ChatApplyOptions {
 /** What a finished round hands to its chain: the reply, what was applied, and the work it started. */
 interface ChatRoundEnd {
   result: MapChatResult;
-  context: Pick<MapChatContext, "research">;
+  context: Pick<MapChatContext, "research" | "selectedCount">;
   lines: MapChatLine[];
   work: ChatRoundWork;
   anchor: { path: string; id: string | undefined };
@@ -1230,6 +1235,8 @@ interface ChatChainRun {
   createdFiles: Set<string>;
   /** Auto-apply chain: the round that was already retried once after a failure (a second failure ends the chain). */
   retriedRound: number | null;
+  /** Auto-apply chain: what the last applied round did directly ("research 12, ..."), shown on the next round's separator. */
+  appliedText: string;
 }
 /** The lines of research and expansions that did not work out, one line each, for the end notice of a chain. */
 const chainWorkDetail = (item: { title: string; status: string; error?: string }): string =>
@@ -21509,8 +21516,14 @@ export class VisualAgentMapView extends ItemView {
         this.abortMapChat();
         this.chatPlanToken++;
         this.clearChatPreview();
+        // The first map of the view has no conversation to leave: a switch turned on before the window was built stays on.
+        const keepAutoApply = this.chatMapId === "" && this.chatAutoApply;
         this.chat.reset();
         this.resetChatResearch();
+        if (keepAutoApply) {
+          this.chatAutoApply = true;
+          this.chat.refreshAutoApply();
+        }
         this.chatMapId = this.map.id;
         this.startChatRecords();
       }
@@ -22049,6 +22062,8 @@ export class VisualAgentMapView extends ItemView {
       canSave: () => (!this.map ? { ok: false, reason: t("ui.map_chat_save_unavailable") } : { ok: true }),
       saveTranscript: turns => this.saveChatTranscript(turns),
       recordsEnabled: () => this.plugin.settings.mapChatRecords === true,
+      autoApply: () => this.chatAutoApply,
+      setAutoApply: on => this.setChatAutoApply(on),
       newConversation: () => this.newChatConversation()
     };
   }
@@ -22556,7 +22571,14 @@ export class VisualAgentMapView extends ItemView {
     // or the usage notice is asked. Until the request really goes out, every early end takes the messages back (see `abandon`).
     const draft = chat.draft;
     const turn = autoOrigin
-      ? chat.beginAutoRound(run.state.round, run.state.maxRounds, run.state.remaining, origin, run.partial ?? undefined)
+      ? chat.beginAutoRound(
+          run.state.round,
+          run.state.maxRounds,
+          run.state.remaining,
+          origin,
+          run.partial ?? undefined,
+          ...(run.state.autoApply ? [{ calls: run.state.calls, applied: run.appliedText }] : [])
+        )
       : chat.begin(message, origin, Boolean(again), "preparing");
     run.turn = turn;
     let sent = false;
@@ -22747,6 +22769,8 @@ export class VisualAgentMapView extends ItemView {
               // The follow-ups that went into this round are part of the message every later round asks.
               run.message = fullMessage;
               run.replyRemaining = result.remaining;
+              // The switch of the moment decides this round's plan (and the limits of the chain from here on).
+              run.state = syncAutoApply(run.state, this.chatAutoApply);
               const plan = result.actions.length
                 ? planFor(result.actions, request.context, {
                     diagrams: this.plugin.settings.addDiagramsAfterResearch,
@@ -22754,6 +22778,9 @@ export class VisualAgentMapView extends ItemView {
                     imageMode: this.chatImageMode(),
                     imageAttached: !!request.imageDataUrl,
                     chain: planChainOf(run.state),
+                    autoApply: this.chatAutoApply,
+                    mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
+                    callsSoFar: run.state.calls,
                     chatStartedResearch: this.chatStartedResearch,
                     chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
                     trusted: {
@@ -23026,7 +23053,8 @@ export class VisualAgentMapView extends ItemView {
       roundRemaining: origin?.continuation.remaining ?? "",
       backedUp: new Set(),
       createdFiles: new Set(),
-      retriedRound: null
+      retriedRound: null,
+      appliedText: ""
     };
     this.chatChain = run;
     return run;
@@ -23089,7 +23117,8 @@ export class VisualAgentMapView extends ItemView {
         seq: 0,
         resumed: true,
         ...(selected.length ? { aiSelection: selected } : {}),
-        state: resumedChain(point, this.chatAutoApply),
+        // The toggle of the moment (never the saved one) decides the segment: a reload leaves it off.
+        state: resumedChain({ ...point, maxRounds: this.resumeSegmentEnd(point.round) }, this.chatAutoApply),
         createdIds: [],
         continuation: {
           round: point.round,
@@ -23102,6 +23131,11 @@ export class VisualAgentMapView extends ItemView {
     };
     void this.sendMapChat(origin).catch(error => errorNotice(error));
     return true;
+  }
+  /** The last round of the segment a resumed chain starts at `round`, by the toggle of the moment (60-round segments when on, 8 when off). */
+  private resumeSegmentEnd(round: number): number {
+    const segment = this.chatAutoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS;
+    return segment * Math.ceil(round / segment);
   }
   /** The continuation is more than a single answer (a later round, or one that said something was left): its end is told and recorded. */
   private chainShows(run: ChatChainRun): boolean {
@@ -23128,24 +23162,37 @@ export class VisualAgentMapView extends ItemView {
     if (run.waitShown) chat?.setChainWaiting(null);
     run.waitShown = false;
     if (!this.chainShows(run)) return;
-    this.chatLastRecord?.event("chain_end", { reason, round: run.state.round, remaining });
+    // The AI calls of the segment are counted and told only for an auto-apply chain.
+    const calls = run.state.autoApply ? run.state.calls : undefined;
+    this.chatLastRecord?.event("chain_end", {
+      reason,
+      round: run.state.round,
+      remaining,
+      ...(calls === undefined ? {} : { calls })
+    });
     // "Done" is told only to a chain that went on by itself (round 2 on): a single round that finished adds nothing.
     if (chat && (chainEndNeedsNotice(reason) || (reason === "done" && run.state.round >= 2))) {
       // A failed round has its Retry button; the rest of the ends that can go on offer the next round.
       const next =
         reason === "failed"
           ? null
-          : resumeRound({
-              reason,
-              round: run.state.round,
-              applied,
-              startRemaining: run.roundRemaining,
-              replyRemaining: remaining
-            });
-      chat.endChain(reason, remaining, run.details.length ? run.details : undefined);
+          : resumeRound(
+              {
+                reason,
+                round: run.state.round,
+                applied,
+                startRemaining: run.roundRemaining,
+                replyRemaining: remaining
+              },
+              run.state.autoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS
+            );
+      const details = run.details.length ? run.details : undefined;
+      if (calls === undefined) chat.endChain(reason, remaining, details);
+      else chat.endChain(reason, remaining, details, calls);
       if (next)
         chat.offerResume({
           ...next,
+          ...(run.state.progress ? { progress: run.state.progress } : {}),
           stoppedRound: run.state.round,
           reason,
           message: run.message,
@@ -23176,7 +23223,19 @@ export class VisualAgentMapView extends ItemView {
     if (round.work.selected) run.aiSelection = [...round.work.selected];
     run.lastResults = chatResultLines(round.lines).map(line => ({ text: line.text, status: line.status }));
     run.anchor = { path: round.anchor.path, id: round.anchor.id };
+    // The switch of the moment decides the limits of the segment from here on.
+    run.state = syncAutoApply(run.state, this.chatAutoApply);
+    const appliedActions = round.result.actions.filter((_, index) => round.lines[index]?.status === "done");
+    run.appliedText = run.state.autoApply ? this.appliedDirectlyText(appliedActions, round.context.selectedCount) : "";
     const step = finishRound(run.state, {
+      // The round's own request plus the AI calls its applied actions started (counted for the auto-apply limit).
+      calls:
+        1 +
+        estimateChatCalls(appliedActions, round.context, {
+          diagrams: this.plugin.settings.addDiagramsAfterResearch,
+          mapAiMode: this.map?.aiMode
+        }),
+      progress: round.result.progress ?? null,
       remaining: round.result.remaining,
       researchDeferred: pendingResearchCount(round.context),
       actions: round.result.actions.map((action, index) => ({
@@ -23190,7 +23249,33 @@ export class VisualAgentMapView extends ItemView {
       }
     });
     run.state = step.state;
+    this.showChainFlow(run);
     this.followChainDecision(run, step.decision, round.work);
+  }
+  /** The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). */
+  private showChainFlow(run: ChatChainRun): void {
+    const progress = run.state.progress;
+    if (!run.state.autoApply || !progress) return;
+    this.chat?.setFlowProgress({
+      steps: progress.steps.map(step => ({ ...step })),
+      round: run.state.round,
+      calls: run.state.calls,
+      maxCalls: MAP_CHAT_AUTO_MAX_CALLS
+    });
+  }
+  /** "research 12, rewritten summaries 12, updated notes 3": what an auto-apply round did without asking (empty: nothing of these). */
+  private appliedDirectlyText(actions: readonly MapChatAction[], selectedCount: number): string {
+    const research = researchTargetsOf(actions, selectedCount);
+    const summaries = actions.filter(action => action.kind === "update_summary").length;
+    const notes = actions.filter(
+      action => action.kind === "edit_topic_note" || action.kind === "edit_md_file" || action.kind === "create_md_file"
+    ).length;
+    const parts = [
+      research ? t("ui.map_chat_auto_applied_research_0", research) : "",
+      summaries ? t("ui.map_chat_auto_applied_summary_0", summaries) : "",
+      notes ? t("ui.map_chat_auto_applied_notes_0", notes) : ""
+    ].filter(Boolean);
+    return parts.join(t("ui.map_chat_chain_detail_separator"));
   }
   private followChainDecision(run: ChatChainRun, decision: MapChatChainDecision, work: ChatRoundWork | null): void {
     if (decision.kind === "end") this.endChatChain(run, decision.reason, decision.remaining);
@@ -23385,6 +23470,10 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_plan_reason_research_text_other_actions");
       case "source_text_other_actions":
         return t("ui.map_chat_plan_reason_source_text_other_actions");
+      case "call_budget":
+        return t("ui.map_chat_plan_reason_call_budget_0", MAP_CHAT_AUTO_MAX_CALLS);
+      case "auto_apply_confirm":
+        return t("ui.map_chat_plan_reason_auto_apply_confirm");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
@@ -23621,6 +23710,7 @@ export class VisualAgentMapView extends ItemView {
         type: "turn_start",
         turn: number,
         message: origin.text,
+        ...(this.chatAutoApply ? { autoApply: true as const } : {}),
         ...(origin.chain
           ? {
               auto: true as const,
@@ -23669,6 +23759,8 @@ export class VisualAgentMapView extends ItemView {
   /** A new conversation (another map, "New conversation"): the research of the old one is no longer this one's, and results still to come are not recorded. */
   private resetChatResearch(): void {
     this.chatConversation++;
+    // "Apply this conversation automatically" belongs to the conversation: a new one starts with it off.
+    this.chatAutoApply = false;
     this.chatResearched.clear();
     this.chatResearchSent.clear();
     this.chatStartedResearch = false;
@@ -23694,6 +23786,7 @@ export class VisualAgentMapView extends ItemView {
     // The searches of the old conversation stop: a late picture is not put into a card for a conversation that is gone.
     this.abortChatImageSearches();
     this.resetChatResearch();
+    this.chat?.refreshAutoApply();
     this.chatPlanToken++;
     this.chatRecordEpoch++;
     this.chatRecordTurnSeq = 0;
@@ -24169,7 +24262,7 @@ export class VisualAgentMapView extends ItemView {
       skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines: MapChatLine[] = [];
     const later: number[] = [];
-    const autoChain = options.chain?.state.autoApply ? options.chain : null;
+    const autoChain = options.chain && (options.chain.state.autoApply || this.chatAutoApply) ? options.chain : null;
     const run: ChatRun = {
       refs: new Map(),
       // Shared with the round's work, which hands the ids to its chain.
@@ -25141,8 +25234,18 @@ export class VisualAgentMapView extends ItemView {
         }
         break;
       }
+      // Map.md itself: structure, relations, looks and layout live in it (a rename is a card's own note, not Map.md).
+      case "add_child":
       case "move_topic":
       case "reorder_topics":
+      case "delete_topic":
+      case "add_relation":
+      case "remove_relation":
+      case "set_appearance":
+      case "set_topic_kind":
+      case "add_anchor":
+      case "link_anchor":
+      case "auto_layout":
         paths.push(this.path);
         break;
       case "edit_md_file":

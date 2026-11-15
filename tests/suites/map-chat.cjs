@@ -3200,8 +3200,8 @@ integrationTest('B1 ui: Escape on any control of the window folds it; the view\'
 integrationTest('B1 ui: Tab order follows the document: the reference chips, then the message field, then Send', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.addTopicReference(h.ids.a);
   const focusable = findAll(chat.bodyEl, i => (i.tag === 'button' || i.tag === 'textarea' || i.tag === 'select') && !i.hidden && i.attrs.tabindex !== '-1');
-  const names = focusable.map(i => hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : i.tag === 'select' ? 'model' : 'other');
-  const tail = names.slice(names.indexOf('chip')).filter(n => n !== 'stop'); eq(tail, ['chip', 'input', 'model', 'send'], 'the model menu is in the composer, between the field and Send');
+  const names = focusable.map(i => hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : i.tag === 'select' ? 'model' : i.text === 'Off' || i.text === 'On' ? 'switch' : 'other');
+  const tail = names.slice(names.indexOf('chip')).filter(n => n !== 'stop'); eq(tail, ['chip', 'switch', 'switch', 'input', 'model', 'send'], 'the auto-apply Off/On row sits above the field; the model menu is in the composer, between the field and Send');
   assert.ok(!focusable.some(i => i.attrs.tabindex && Number(i.attrs.tabindex) > 0), 'no positive tabindex');
 });
 
@@ -9012,7 +9012,7 @@ integrationTest('P3 (h) auto-apply: a card the chain created itself and a file i
   const made = await applyIn(h, run, [addRoot('r', 'Fresh'), { kind: 'create_md_file', path: 'Notes/Made.md', content: '# Made\n' }]); eq(made.slice(0, 2).map(l => l.status), ['done', 'done']);
   const fresh = h.view.map.nodes.find(n => n.id !== h.ids.root && ![h.ids.a, h.ids.b, h.ids.c].includes(n.id)); run.createdIds.add(fresh.id); await h.view.hydrate();
   const mine = (await applyIn(h, run, [{ kind: 'update_summary', nodeId: fresh.id, summary: 'mine' }, { kind: 'edit_md_file', path: 'Notes/Made.md', find: 'Made', replace: 'Done' }], h.hashes('Notes/Made.md'))).filter(l => l.text !== NOT_UNDOABLE);
-  eq(mine.map(l => l.status), ['done', 'done'], JSON.stringify(mine)); eq(calls, [], 'cards and files of the chain itself are never backed up');
+  eq(mine.map(l => l.status), ['done', 'done'], JSON.stringify(mine)); eq(calls.map(c => c[0]), [MAP], 'cards and files of the chain itself are never backed up (only Map.md, which the chain did not create, once)');
   const f = await harness(); await f.view.hydrate(); const failing = backupSpy(f, { ok: false }); const frun = autoRun(f); const original = (await f.note('a')).summary;
   const out = (await applyIn(f, frun, [{ kind: 'update_summary', nodeId: f.ids.a, summary: 'AI summary' }, { kind: 'rename_topic', nodeId: f.ids.a, title: 'Body clock' }])).filter(l => l.text !== NOT_UNDOABLE);
   eq(out.map(l => l.status), ['skipped', 'skipped']); assert.match(out[0].text, /Could not save a backup/); assert.equal(failing.length, 2, 'a failed backup is not remembered as done'); assert.equal((await f.note('a')).summary, original, 'nothing was written'); assert.equal((await f.note('a')).title, 'Body');

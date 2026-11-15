@@ -41576,7 +41576,7 @@ ${typed}` : draft;
   /** The resume point of the last reply, or null (nothing to resume, or the panel is working). */
   resumePoint() {
     const last = this.messages.at(-1);
-    return (last == null ? void 0 : last.role) === "assistant" && last.resume && !this.working ? last.resume : null;
+    return (last == null ? void 0 : last.role) === "assistant" && last.resume && !this.working && this.resumeShown(last) ? last.resume : null;
   }
   /** The point is used up: the box goes away and the row is laid out again. */
   dropResume(point) {
@@ -52602,7 +52602,7 @@ function chainResumeOf(lines, turns) {
     round: next.round,
     maxRounds: next.maxRounds,
     remaining: next.remaining,
-    stoppedRound: next.round,
+    stoppedRound: round3,
     reason,
     message: typeof last.message === "string" ? last.message : "",
     selectedIds: Array.isArray((_c = last.origin) == null ? void 0 : _c.selectedIds) ? last.origin.selectedIds.filter((id) => typeof id === "string") : [],
@@ -78777,7 +78777,6 @@ ${note.detail.trim()}` : "",
     const point = message.resume;
     if (!chat || !point || chat.isBusy || this.chatApplying || this.closed || !this.map || this.notesLoading() || this.chatChain || point !== chat.resumePoint() || point.conversationId !== chat.conversationId)
       return false;
-    delete message.resume;
     chat.dropResume(point);
     const selected = this.chainSelection(point.selectedIds);
     const origin = {

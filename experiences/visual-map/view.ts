@@ -23035,7 +23035,6 @@ export class VisualAgentMapView extends ItemView {
       point.conversationId !== chat.conversationId
     )
       return false;
-    delete message.resume;
     chat.dropResume(point);
     const selected = this.chainSelection(point.selectedIds);
     const origin: MapChatOrigin = {

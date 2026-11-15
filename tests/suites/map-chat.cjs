@@ -8955,6 +8955,18 @@ integrationTest('resume: a batch the chat started that was cut by the reload sho
     rec('event', { turn: 3, at, kind: 'research_batch', topics: [{ id: 'p', title: 'P' }, { id: 'q', title: 'Q' }], request: {} })];
   const r = await harness({ records: true }); await r.view.hydrate(); await seedRecord(r, lines.map(l => ({ ...l })), REC_ID); const c = r.open(); await until(() => c.hasMessages);
   assert.ok(find(c.logEl, i => hasClass(i, 'vam-map-chat-batch') && !hasClass(i, 'vam-map-chat-resume')), 'the batch box'); assert.equal(resumeBox(c), undefined);
+  const message = c.messages.at(-1); message.batch.ended = true; message.batch.restored = false; c.refreshBatch(message);
+  assert.ok(resumeBox(c), 'the resume box appears once the batch has ended');
+});
+
+integrationTest('resume: typing "continue" while the cut batch still shows its own box does not resume the chain (it is an ordinary message)', async () => {
+  const at = REC_AT;
+  const lines = [...resumeFixture({ a: 'x' }).slice(0, 8), rec('turn_end', { turn: 3, at, status: 'plan', raw: null, reply: 'Round three.', lines: [], modelLabel: 'C' }),
+    rec('event', { turn: 3, at, kind: 'research_batch', topics: [{ id: 'p', title: 'P' }, { id: 'q', title: 'Q' }], request: {} })];
+  const r = await harness({ records: true }); await r.view.hydrate(); await seedRecord(r, lines.map(l => ({ ...l })), REC_ID); const c = r.open(); await until(() => c.hasMessages);
+  assert.equal(c.resumePoint(), null, 'hidden box, no resume point'); chainReplies(r, say('Sure.', [], ''));
+  r.type('continue'); await r.view.sendMapChat(); await until(() => r.control.requests.length === 1 && !c.isBusy);
+  assert.equal(contextOf(r.control.requests[0]).continuation, undefined, 'not a resumed round'); assert.equal(r.control.requests[0].message, 'continue');
 });
 
 integrationTest('resume: the cards the AI selected stay with the chain - a cleared selection, a card deleted meanwhile, and a chain that never selected', async () => {

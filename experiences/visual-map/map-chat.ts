@@ -1661,7 +1661,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   /** The resume point of the last reply, or null (nothing to resume, or the panel is working). */
   resumePoint(): MapChatResumePoint | null {
     const last = this.messages.at(-1);
-    return last?.role === "assistant" && last.resume && !this.working ? last.resume : null;
+    return last?.role === "assistant" && last.resume && !this.working && this.resumeShown(last) ? last.resume : null;
   }
   /** The point is used up: the box goes away and the row is laid out again. */
   dropResume(point: MapChatResumePoint): void {

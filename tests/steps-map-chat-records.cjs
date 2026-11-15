@@ -429,7 +429,7 @@ test('R6 chain end of a turn that cannot come back: goes to the closest earlier 
   });
   test('resume: applied round with a reply remaining and no next round resumes at round + 1 with the remaining of the raw reply; no remaining means nothing', () => {
     const r = resumeOf([...owner(), plan(41)]);
-    assert.equal(r.round, 6); assert.equal(r.remaining, 'raw left 41'); assert.equal(r.stoppedRound, 6); assert.equal(r.turn, 41);
+    assert.equal(r.round, 6); assert.equal(r.remaining, 'raw left 41'); assert.equal(r.stoppedRound, 5, 'titled with the round the chain stopped at, not the next'); assert.equal(r.turn, 41);
     assert.deepEqual(S.plain(r.lastResults), [{ text: 'applied41', status: 'done' }]);
     assert.equal(resumeOf([...owner(), plan(41), ev(41, 'map_changed')]).round, 6, 'a map_changed alone counts as a reload');
     const none = owner(); none[none.length - 1] = end(41, 'done', { raw: JSON.stringify({ reply: 'r', remaining: '' }) });

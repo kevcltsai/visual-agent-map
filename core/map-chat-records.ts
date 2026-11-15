@@ -660,7 +660,7 @@ export function chainResumeOf(lines: RecordLine[], turns: RestoredTurn[]): Resto
     round: next.round,
     maxRounds: next.maxRounds,
     remaining: next.remaining,
-    stoppedRound: next.round,
+    stoppedRound: round,
     reason,
     message: typeof last.message === "string" ? last.message : "",
     selectedIds: Array.isArray(last.origin?.selectedIds)

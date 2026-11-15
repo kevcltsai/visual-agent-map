@@ -72,6 +72,7 @@ export const CHAIN_SAFE: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAct
   "set_appearance",
   "select_topics",
   "focus_topic",
+  "read_md_file",
   "collapse_topic",
   "expand_topic",
   "auto_layout"

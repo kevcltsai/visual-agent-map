@@ -56,7 +56,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "rename_map",
   "reorder_topics",
   "add_anchor",
-  "link_anchor"
+  "link_anchor",
+  "read_md_file"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = [
@@ -117,6 +118,7 @@ export type MapChatAction =
   | { kind: "delete_topic"; nodeId: string; branch: boolean }
   | { kind: "edit_md_file"; path: string; find: string; replace: string }
   | { kind: "create_md_file"; path: string; content: string }
+  | { kind: "read_md_file"; path: string }
   /** `all` is true when the reply asked for every card; `nodeIds` then lists them all. */
   | { kind: "select_topics"; nodeIds: string[]; all: boolean }
   | {
@@ -632,6 +634,9 @@ export function parseMapChat(
           actions.push({ kind: "create_md_file", path, content });
           break;
         }
+        case "read_md_file":
+          actions.push({ kind: "read_md_file", path: text("path") });
+          break;
         case "select_topics": {
           const all = flag("all");
           if (all && created) throw new Dropped("bad_value");
@@ -864,7 +869,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 25,
+  version: 26,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

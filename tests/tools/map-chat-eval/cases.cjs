@@ -140,6 +140,8 @@ const CASES = [
     [...STYLE, C.editMdValid("Notes/沖煮.md", "# 沖煮\n烘焙度：中焙\n水溫 90 度\n粉水比 1:15\n", "92")]),
   kase("F2", "檔案", "建立新檔", "prompt: create_md_file 路徑為 Vault 內尚不存在", ["create_md_file"], { message: "建立 Notes/筆記.md，內容寫「你好」", outline: COFFEE },
     [...STYLE, C.createMd("Notes/筆記.md", "你好"), C.noUnsafePath()]),
+  kase("F3", "檔案", "讀回這次沒帶進來的自己建的檔", "prompt: read_md_file 只用於 ownFilesDeferred 的路徑", ["read_md_file"], { message: "請對照「第二批」的內容，繼續寫第三批", outline: COFFEE, ownFiles: [{ path: "Agent Workspace/Topics/咖啡/第一批.md", content: "# 第一批\n" + "甲".repeat(35000) }, { path: "Agent Workspace/Topics/咖啡/第二批.md", content: "# 第二批\n" + "乙".repeat(35000) }] },
+    [...STYLE, C.readMd("Agent Workspace/Topics/咖啡/第二批.md")]),
 
   // ---- G. tone and format ----
   kase("G1", "語氣", "說「將要」不說「已經」", "prompt: reply 只說將要做什麼", ["rename_topic"], { message: "把「義式」改成「濃縮咖啡」", outline: COFFEE }, [...STYLE, C.hasKind("rename_topic", 1, 1)]),

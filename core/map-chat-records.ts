@@ -98,6 +98,7 @@ export interface RecordImagesLine extends RecordLineBase {
   inserted: number[];
 }
 /** `file_written` notes a Markdown file this conversation created or edited: its path and the hash of the text it wrote (the chat sends the file back while it still holds that text). */
+/** `file_read` notes an own file the chat asked to read with `read_md_file` (accepted; its text goes in the next turn): path and characters. */
 /** `sources_read` marks that a turn sent the map's data sources (a restored conversation keeps its writes behind the plan). */
 /** `research_started` marks that the conversation started web research (it keeps the plan allow-list on after a restore). */
 export type RecordEventKind =
@@ -109,6 +110,7 @@ export type RecordEventKind =
   | "research_started"
   | "sources_read"
   | "file_written"
+  | "file_read"
   | "research_batch"
   | "research_batch_topic"
   | "research_batch_end";
@@ -129,6 +131,8 @@ export interface RecordEventLine extends RecordLineBase {
   /** `file_written`: the file and the content hash of what was written. */
   path?: string;
   hash?: string;
+  /** `file_read`: the characters of the own file whose read the chat asked for (path above); a trace only, a restore ignores it. */
+  chars?: number;
 }
 export interface RecordMovedLine extends RecordLineBase {
   type: "moved";

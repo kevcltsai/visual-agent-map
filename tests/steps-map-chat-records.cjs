@@ -482,3 +482,9 @@ test('restoreConversation collects file_written paths and hashes, and skips an u
   ]);
   assert.equal(records.restoreConversation('20261106-100000-abcdef', []).ownFiles.length, 0);
 });
+
+test('restoreConversation tolerates file_read events (path and chars are only a trace) and they add nothing to ownFiles', () => {
+  const lines = [{ v: 1, type: 'event', turn: 1, at: T0, kind: 'file_read', path: 'Maps/Steak/A.md', chars: 120 }, { v: 1, type: 'event', turn: 1, at: T0, kind: 'file_read', path: 7 }];
+  const restored = records.restoreConversation('20261106-100000-abcdef', lines);
+  assert.equal(restored.ownFiles.length, 0);
+});

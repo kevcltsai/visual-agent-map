@@ -334,3 +334,16 @@ test('ownFiles are shortened before research notes when the whole context is ove
   assert.ok(json.ownFilesDeferred.length >= 1);
   assert.ok(estimateMapChatTokens(out.json) <= 30_000);
 });
+
+test('requested own files are sent first from their own 40k allowance, whole or not at all; the rest stays in ownFilesDeferred; the order of ownFiles is the order given', () => {
+  const big = n => 'x'.repeat(n);
+  const req = (path, content) => ({ path, content, requested: true });
+  const out = buildMapChatContext({ ...base, ownFiles: [req('r1.md', big(35000)), own('a.md', big(60000)), req('r2.md', big(10000)), req('r3.md', big(41000))] });
+  const json = JSON.parse(out.json);
+  assert.deepEqual(json.ownFiles.map(f => f.path), ['r1.md', 'a.md'], 'requested allowance and the ordinary budget are separate');
+  assert.deepEqual(json.ownFilesDeferred.map(f => f.path).sort(), ['r2.md', 'r3.md']);
+  assert.equal(out.mdHashes['r1.md'], ctx.contentHash(big(35000)));
+  assert.equal(out.mdHashes['r2.md'], undefined);
+  assert.equal('requested' in json.ownFiles[0], false, 'no new field in what is sent');
+  assert.match(MAP_CHAT_SHORTENED_NOTE, /ownFilesDeferred/);
+});

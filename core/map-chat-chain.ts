@@ -57,7 +57,8 @@ const NOT_A_WRITE: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAction["k
   "expand_topic",
   "auto_layout",
   "ask_topic_kind",
-  "run_map_action"
+  "run_map_action",
+  "read_md_file"
 ]);
 export interface MapChatRoundAction {
   kind: MapChatAction["kind"];
@@ -67,6 +68,9 @@ export interface MapChatRoundAction {
 /** True when a `select_topics` was applied: the next round's context carries the selected cards' notes. */
 export const selectedCards = (actions: readonly MapChatRoundAction[]): boolean =>
   actions.some(action => action.done && action.kind === "select_topics");
+/** True when a `read_md_file` was applied: the next round's context carries that file. */
+export const readFile = (actions: readonly MapChatRoundAction[]): boolean =>
+  actions.some(action => action.done && action.kind === "read_md_file");
 /** True when at least one action that writes (cards, notes, links, looks, maps) was applied in the round. */
 export const wroteSomething = (actions: readonly MapChatRoundAction[]): boolean =>
   actions.some(action => action.done && !NOT_A_WRITE.has(action.kind));
@@ -163,7 +167,8 @@ export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Ste
     wrote: wroteSomething(end.actions),
     selectedOnly: false
   };
-  if (!remaining && end.researchDeferred <= 0) return ended(next, "done");
+  const read = readFile(end.actions);
+  if (!remaining && end.researchDeferred <= 0 && !read) return ended(next, "done");
   if (end.started.otherBackground) return ended(next, "other_background_work");
   if (state.round >= state.maxRounds) return ended(next, "max_rounds");
   const waitFor: ("research" | "expand")[] = [];
@@ -171,6 +176,8 @@ export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Ste
   if (end.started.expand > 0) waitFor.push("expand");
   if (waitFor.length) return { state: { ...next, phase: "waiting" }, decision: { kind: "wait", waitFor } };
   if (!next.wrote) {
+    // The file it asked to read comes in the next round: that is progress, and the round limit still ends a chain that only reads.
+    if (read) return startNext(next);
     if (state.selectedOnly || !selectedCards(end.actions)) return ended(next, "no_progress");
     return startNext({ ...next, selectedOnly: true });
   }

@@ -46,13 +46,15 @@ export const MAP_CHAT_FILE_CHAR_LIMIT = 60_000;
  * not at all (one longer than {@link MAP_CHAT_FILE_CHAR_LIMIT} is never sent); the rest wait in `ownFilesDeferred`.
  */
 export const MAP_CHAT_OWN_FILE_BUDGET = 60_000;
+/** Total characters of the own files the chat asked for with `read_md_file` in one turn (their own allowance, before the ordinary budget). */
+export const MAP_CHAT_OWN_READ_BUDGET = 40_000;
 /** Characters of one earlier conversation message sent at most. */
 export const MAP_CHAT_TURN_CHAR_LIMIT = 6_000;
 /** Characters of one user text node or one summary bracket sent at most. */
 export const MAP_CHAT_USER_TEXT_CHAR_LIMIT = 4_000;
 /** The fixed note sent when any part of the context was shortened (a constant, never built from the content). */
 export const MAP_CHAT_SHORTENED_NOTE =
-  "This context was shortened to fit what you can read. A part with truncated: true holds only the beginning of its text (totalChars is its whole length); outlineSummariesOmitted: true means the outline cards are sent without their summaries; outlineOmitted counts cards left out of the outline (those deeper than outlineDepthLimit, or past the card limit), and they still exist on the map; earlierTurnsOmitted counts older conversation messages left out; a card with detailOmitted: true is sent without its Detail; researchDeferred lists research notes not sent this round; ownFilesDeferred lists files you made earlier in this conversation that were not sent this round. Text that was cut or left out is not in front of you: never say or imply that you read, used or checked it, and build nothing from it. When the user's request needs that part, say it was not sent this time. A truncated file has no contentHash and cannot be edited.";
+  "This context was shortened to fit what you can read. A part with truncated: true holds only the beginning of its text (totalChars is its whole length); outlineSummariesOmitted: true means the outline cards are sent without their summaries; outlineOmitted counts cards left out of the outline (those deeper than outlineDepthLimit, or past the card limit), and they still exist on the map; earlierTurnsOmitted counts older conversation messages left out; a card with detailOmitted: true is sent without its Detail; researchDeferred lists research notes not sent this round; ownFilesDeferred lists files you made earlier in this conversation that were not sent this round (read_md_file asks for one of them; it arrives in the next round). Text that was cut or left out is not in front of you: never say or imply that you read, used or checked it, and build nothing from it. When the user's request needs that part, say it was not sent this time. A truncated file has no contentHash and cannot be edited.";
 const TITLE_LIMIT = 200;
 const SUMMARY_LIMIT = 240;
 const ERROR_LIMIT = 200;
@@ -151,6 +153,8 @@ export interface MapChatSnippet {
 export interface MapChatFile {
   path: string;
   content: string;
+  /** An own file the chat asked for with `read_md_file`: it is taken from {@link MAP_CHAT_OWN_READ_BUDGET}, not from the ordinary budget. */
+  requested?: boolean;
 }
 export interface MapChatTurn {
   role: "user" | "assistant";
@@ -675,15 +679,17 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
   const ownSent: { path: string; contentHash: string; content: string }[] = [];
   const ownDeferred: { path: string; chars: number }[] = [];
   let ownLeft = shrink.ownFilesBudget;
+  let readLeft = Math.floor((MAP_CHAT_OWN_READ_BUDGET * shrink.ownFilesBudget) / MAP_CHAT_OWN_FILE_BUDGET);
   for (const file of input.ownFiles ?? []) {
     const key = normalizeVaultPath(file.path);
     if (key === null) continue;
     const chars = file.content.length;
-    if (chars > MAP_CHAT_FILE_CHAR_LIMIT || chars > ownLeft) {
+    if (chars > MAP_CHAT_FILE_CHAR_LIMIT || chars > (file.requested ? readLeft : ownLeft)) {
       ownDeferred.push({ path: file.path, chars });
       continue;
     }
-    ownLeft -= chars;
+    if (file.requested) readLeft -= chars;
+    else ownLeft -= chars;
     basis.read.push({ path: file.path, title: noteTitle(file.path) });
     record(file.path, file.content);
     ownSent.push({ path: file.path, contentHash: hashes[key], content: file.content });

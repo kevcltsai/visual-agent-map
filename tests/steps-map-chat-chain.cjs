@@ -28,7 +28,7 @@ const parseRemaining = fields => parseMapChat(raw(fields), context()).remaining;
 test('remaining: a required string in the schema; a missing field or a value that is not a string reads as "" and never continues', () => {
   assert.ok(MAP_CHAT_SCHEMA.required.includes('remaining'));
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.remaining), { type: 'string' });
-  assert.equal(mapChatStep.version, 25);
+  assert.equal(mapChatStep.version, 26);
   assert.equal(parseMapChat(JSON.stringify({ reply: 'ok', actions: [] }), context()).remaining, '', 'a version 15/16/17 reply has none');
   for (const value of [null, 0, 12, true, false, ['x'], { a: 1 }, undefined]) assert.equal(parseRemaining({ remaining: value }), '', JSON.stringify(value));
 });
@@ -126,7 +126,7 @@ const UNSAFE = [
 test('A9 plan: CHAIN_SAFE is exactly the safe kinds, and run_map_action is judged by its action', () => {
   for (const action of SAFE) assert.equal(isChainSafe(action), true, `${action.kind} ${action.action ?? ''}`);
   for (const action of UNSAFE) assert.equal(isChainSafe(action), false, `${action.kind} ${action.action ?? ''}`);
-  assert.deepEqual([...CHAIN_SAFE].sort(), ['add_child', 'add_relation', 'auto_layout', 'collapse_topic', 'expand_topic', 'focus_topic', 'select_topics', 'set_appearance', 'set_topic_kind', 'update_summary']);
+  assert.deepEqual([...CHAIN_SAFE].sort(), ['add_child', 'add_relation', 'auto_layout', 'collapse_topic', 'expand_topic', 'focus_topic', 'read_md_file', 'select_topics', 'set_appearance', 'set_topic_kind', 'update_summary']);
 });
 // find_images is outside CHAIN_SAFE as a kind of action, but the owner decided pictures are put in without asking: it never makes a plan (see the next test).
 const PLANNED = UNSAFE.filter(action => action.action !== 'find_images');
@@ -430,4 +430,15 @@ test('isResumeKeyword: the keywords with spaces, punctuation, width and case; a 
     assert.equal(chain.isResumeKeyword(text), true, text);
   for (const text of ['繼續改第三章', '不要繼續', '', '   ', 'continue the essay', 'stop'])
     assert.equal(chain.isResumeKeyword(text), false, text);
+});
+
+test('read_md_file: needs no plan card, is not a write, and an accepted read goes on without anything remaining (the round cap still ends it)', () => {
+  assert.equal(isChainSafe({ kind: 'read_md_file', path: 'a.md' }), true);
+  assert.equal(chain.wroteSomething([{ kind: 'read_md_file', done: true }]), false);
+  const read = [{ kind: 'read_md_file', done: true }];
+  const step = chain.finishRound(at(1), roundEnd({ remaining: '', actions: read }));
+  assert.equal(step.decision.kind, 'next', JSON.stringify(step.decision));
+  assert.equal(step.decision.round, 2);
+  end(chain.finishRound(at(1), roundEnd({ remaining: '', actions: [{ kind: 'read_md_file', done: false }] })), 'done', '');
+  end(chain.finishRound(at(chain.startChain().maxRounds), roundEnd({ remaining: '', actions: read })), 'max_rounds');
 });

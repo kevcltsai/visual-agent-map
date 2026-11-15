@@ -6565,7 +6565,7 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(ends[1].error.text.length > 0, true); assert.match(ends[1].error.technical, /model exploded/);
   assert.equal(ends[0].raw, JSON.stringify({ reply: 'Renamed.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }], rejected: [] }));
   assert.equal(ends[4].reply, 'second try'); assert.equal(ends[4].raw, JSON.stringify({ reply: 'second try', actions: [], rejected: [] }));
-  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 25 }); assert.equal(start.request.model, 'claude:sonnet');
+  const start = lines.find(l => l.type === 'turn_start'); eq(start.request.step, { id: 'map-chat', version: 26 }); assert.equal(start.request.model, 'claude:sonnet');
   assert.equal(JSON.stringify(lines).includes('Sleep needs'), false, 'no note text outside the context');
   assert.equal(lines.every(l => l.v === 1), true);
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');
@@ -9115,4 +9115,61 @@ integrationTest('map chat own files: field case - three batch files made in earl
   const edited = await withTimeout(h.view.applyMapChatActions({ actions: [{ kind: 'edit_md_file', path: paths[1], find: '內容2', replace: '內容2（改）' }], rejected: [] }, { mdHashes: request.context.mdHashes, topicHashes: request.context.topicHashes }));
   assert.equal(edited[0].status, 'done', JSON.stringify(edited));
   assert.match(h.contents.get(paths[1]), /內容2（改）/);
+});
+
+// ---- read_md_file: the chat asks for an own file that did not fit (decisions 2026-11-15-map-chat-file-bugs #1, #2) ----
+const bigDoc = (tag, chars = 25000) => `# ${tag}\n\n${'x'.repeat(chars - tag.length - 4)}`;
+const readAct = path => ({ kind: 'read_md_file', path });
+const readEvents = (h) => recordFiles(h).flatMap(f => recordLines(h, f)).filter(l => l.type === 'event' && l.kind === 'file_read');
+
+integrationTest('map chat read_md_file: over the budget a deferred own file is read on request, the next round carries it with its hash, the chain goes on without remaining, and no result line shows the read', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat);
+  const [a, b, c] = ['A', 'B', 'C'].map(n => `${ownRoot}/${n}.md`);
+  for (const path of [a, b, c]) await apply(h, [{ kind: 'create_md_file', path, content: bigDoc(path) }]);
+  chainReplies(h, say('I need the first file.', [readAct(a)], ''), say('Read it.', [], ''));
+  h.type('continue'); await h.view.sendMapChat(); await until(() => spy.ends().length >= 1 && h.control.requests.length === 2); await recordIdle(h);
+  const first = contextOf(h.control.requests[0]); const second = contextOf(h.control.requests[1]);
+  eq(first.ownFiles.map(f => f.path), [c, b], 'newest first within the budget'); eq(first.ownFilesDeferred.map(f => f.path), [a]);
+  eq(second.ownFiles.map(f => f.path)[0], a, 'the requested file comes first');
+  eq(second.ownFiles[0].contentHash, contentHash(bigDoc(a))); eq(second.ownFiles[0].content, bigDoc(a));
+  eq(h.control.requests[1].context.mdHashes[a], contentHash(bigDoc(a)));
+  eq(second.continuation.round, 2); eq(spy.reasons(), ['done']);
+  const turns = chat.transcript().filter(m => m.role === 'assistant');
+  eq(turns[0].lines.map(l => l.text), [], 'the read has no result line'); eq(turns[0].lines.length, 0);
+  eq(readEvents(h).map(l => [l.path, l.chars]), [[a, bigDoc(a).length]]);
+  eq((await ownTurn(h)).ownFiles.map(f => f.path), [c, b], 'the queue is used up: later turns follow the ordinary order');
+});
+
+integrationTest('map chat read_md_file: a path outside the map folder, a vault file this conversation never wrote, a file the user changed and a missing file are refused (no read, no continuation)', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat);
+  const inside = `${ownRoot}/Mine.md`; const outside = 'Notes/Outside.md'; const changed = `${ownRoot}/Changed.md`;
+  await apply(h, [{ kind: 'create_md_file', path: inside, content: '# Mine\n' }, { kind: 'create_md_file', path: outside, content: '# Outside\n' }, { kind: 'create_md_file', path: changed, content: '# Changed\n' }]);
+  await h.app.vault.process(h.app.vault.getAbstractFileByPath(changed), () => '# the user rewrote it\n');
+  chainReplies(h, say('Reading.', [readAct(outside), readAct('Notes/Other.md'), readAct(changed), readAct(`${ownRoot}/Nope.md`), readAct('../x.md')], ''));
+  h.type('read'); await h.view.sendMapChat(); await until(() => !chat.isBusy && h.view.chatChain === null); await recordIdle(h);
+  eq(h.control.requests.length, 1, 'no continuation'); eq(spy.rounds(), []); eq(readEvents(h), []);
+  const next = await ownTurn(h); eq(next.ownFiles.map(f => f.path), [inside], 'nothing queued; the ordinary own files only');
+  const all = chat.transcript().filter(m => m.role === 'assistant')[0].lines; eq(all.filter(l => /Outside|Other|Changed|Nope/.test(l.text)).length, 0, 'a refused read shows nothing either');
+});
+
+integrationTest('map chat read_md_file: the order of own files when over budget is requested, then a 進度 file and the files of the latest turn, then the rest newest first', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const z = `${ownRoot}/Z.md`; const progress = `${ownRoot}/專案進度.md`; const m = `${ownRoot}/M.md`; const n = `${ownRoot}/N.md`;
+  for (const path of [z, progress, m, n]) await apply(h, [{ kind: 'create_md_file', path, content: bigDoc(path) }]);
+  const json = await ownTurn(h);
+  eq(json.ownFiles.map(f => f.path), [n, progress], 'the latest turn and the 進度 file first (newest first), then the budget is gone');
+  eq(json.ownFilesDeferred.map(f => f.path), [m, z]);
+  await apply(h, [readAct(z)]);
+  eq((await ownTurn(h)).ownFiles.map(f => f.path), [z, n, progress], 'a requested file goes before them, from its own allowance');
+});
+
+integrationTest('map chat read_md_file: a read that does not fit its own 40k allowance stays deferred, whole or not at all', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const huge = `${ownRoot}/Huge.md`; const small = `${ownRoot}/Small.md`;
+  await apply(h, [{ kind: 'create_md_file', path: huge, content: bigDoc('huge', 45000) }]);
+  await apply(h, [{ kind: 'create_md_file', path: small, content: bigDoc('small', 30000) }]);
+  eq((await ownTurn(h)).ownFilesDeferred.map(f => f.path), [huge]);
+  await apply(h, [readAct(huge)]);
+  const json = await ownTurn(h);
+  assert.ok(!json.ownFiles.some(f => f.path === huge), 'not cut'); assert.ok(json.ownFilesDeferred.some(f => f.path === huge));
 });

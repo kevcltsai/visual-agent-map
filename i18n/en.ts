@@ -1381,10 +1381,13 @@ export const en = {
   "ui.map_chat_undo_label": "AI chat reply",
   "ui.map_chat_undo_files_changed": "Files have changed since; this cannot be undone.",
   "ui.map_chat_guard_exists": "a file already exists there",
+  "ui.map_chat_guard_exists_not_own":
+    "a file this chat did not write is already there; the user can drag it in to read or change it, else use a new file name",
   "ui.map_chat_guard_exists_in_map":
     "a file already exists there; read it with read_md_file, then change it with edit_md_file",
   "ui.map_chat_guard_no_baseline": "the file was not part of this message",
   "ui.map_chat_guard_map_source": "the file is one of this map's data sources; the chat only reads it",
+  "ui.map_chat_skip_attached_read_only": "the file is outside this map\u2019s folder, so the chat only reads it",
   "ui.map_chat_skip_stale": "the file changed after you sent the message",
   "ui.map_chat_skip_topic_gone": "the topic is no longer on the map",
   "ui.map_chat_skip_find_failed": "the text to replace was not found exactly once",

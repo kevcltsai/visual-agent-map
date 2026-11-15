@@ -488,3 +488,11 @@ test('restoreConversation tolerates file_read events (path and chars are only a 
   const restored = records.restoreConversation('20261106-100000-abcdef', lines);
   assert.equal(restored.ownFiles.length, 0);
 });
+
+test('restoreConversation collects file_attached like file_written (safe path, hex hash) and an older file has none', () => {
+  const ev = extra => ({ v: 1, type: 'event', turn: 1, at: T0, kind: 'file_attached', ...extra });
+  const lines = [ev({ path: 'Maps/Steak/A.md', hash: '00ff12' }), ev({ path: '../x.md', hash: 'aa' }), ev({ path: '.obsidian/x.md', hash: 'aa' }), ev({ path: 'Maps/Steak/B.md', hash: 'XYZ' }), ev({ path: 7, hash: 'aa' })];
+  const restored = records.restoreConversation('20261106-100000-abcdef', lines);
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.attachedFiles)), [{ path: 'Maps/Steak/A.md', hash: '00ff12' }]); assert.equal(restored.ownFiles.length, 0);
+  assert.equal(records.restoreConversation('20261106-100000-abcdef', []).attachedFiles.length, 0);
+});

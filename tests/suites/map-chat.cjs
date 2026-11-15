@@ -9730,3 +9730,26 @@ integrationTest('attached file: a new conversation clears the attachments', asyn
   eq((await ownTurn(h)).ownFiles.map(f => f.path), [OLD]); h.view.resetChatResearch();
   assert.equal((await ownTurn(h)).ownFiles, undefined); assert.equal(await h.view.acceptChatRead(OLD, null), false);
 });
+
+// ---- attempt runner (characterization, written against the view's own loop first): resend twice, and resend then Stop with a record open ----
+
+integrationTest('map chat 18 counter-example: pressing Resend twice runs three attempts, every older one is aborted and exactly one task stays registered', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (request, signal) => new Promise((resolve, reject) => { attempts.push({ request, signal, resolve, reject }); });
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); assert.equal(h.plugin.activeTasks.size, 1);
+  h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2); assert.equal(h.plugin.activeTasks.size, 1);
+  h.clock.advance(20_000); assert.ok(resendButton(chat), 'the second attempt has its own notice'); resendButton(chat).click(); await until(() => attempts.length === 3);
+  assert.deepEqual(attempts.map(a => a.signal.aborted), [true, true, false]); assert.equal(h.plugin.activeTasks.size, 1); assert.equal(attempts[2].request, attempts[0].request);
+  assert.equal(chat.transcript().length, 2, 'one user bubble');
+  attempts[2].resolve({ reply: 'THIRD', actions: [], rejected: [] }); await sending;
+  assert.equal(chat.transcript().at(-1).text, 'THIRD'); assert.equal(attempts.length, 3); assert.equal(h.plugin.activeTasks.size, 0);
+});
+
+integrationTest('map chat records 18 counter-example: Resend and then Stop at once write start, resend and stopped once each, in that order', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (request, signal) => new Promise((resolve, reject) => { attempts.push({ signal, resolve }); signal.addEventListener('abort', () => reject(new Error('aborted'))); });
+  h.type('slow'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000);
+  resendButton(chat).click(); chat.stopEl.click(); await sending; await recordIdle(h);
+  eq(lineKinds(recordLines(h, recordFiles(h)[0])), ['conversation', 'turn_start', 'event:resend', 'end:stopped']);
+  assert.equal(chat.transcript().at(-1).text, 'Stopped.'); assert.equal(h.plugin.activeTasks.size, 0);
+});

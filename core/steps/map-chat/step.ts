@@ -1,3 +1,4 @@
+import { normalizeProgress, type MapChatProgress } from "../../map-chat-progress";
 import { estimateMapChatTokens } from "../../map-chat-tokens";
 import { instructionLanguageOf, type ContentLanguage } from "../../../i18n";
 import type { ReasoningLevel } from "../../../ai/types";
@@ -245,6 +246,8 @@ export interface MapChatResult {
   actions: MapChatAction[];
   /** What is still to do after this reply, one line of at most {@link MAP_CHAT_REMAINING_LIMIT} characters; "" = everything asked is done (or a reply that has no such field). The program continues on its own when it is not empty. */
   remaining: string;
+  /** The steps of a whole multi-step instruction and where it stands; absent or malformed = none (never fails the reply). */
+  progress?: MapChatProgress;
   /** Items that were dropped (never applied) or, for `no_topic_kinds`, applied without their type; shown only as a count. */
   rejected: MapChatRejection[];
 }
@@ -384,7 +387,24 @@ export const MAP_CHAT_SCHEMA = {
         ]
       }
     },
-    remaining: STRING
+    remaining: STRING,
+    progress: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        steps: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: { name: STRING, status: { type: "string", enum: ["done", "current", "todo"] } },
+            required: ["name", "status"]
+          }
+        },
+        current: { type: "integer" }
+      },
+      required: ["steps"]
+    }
   },
   required: ["reply", "actions", "remaining"]
 };
@@ -847,7 +867,14 @@ export function parseMapChat(
       rejected.push({ index, code: error.code });
     }
   });
-  return { reply: body.reply, actions, rejected, remaining: normalizeRemaining(body.remaining) };
+  const progress = normalizeProgress(body.progress);
+  return {
+    reply: body.reply,
+    actions,
+    rejected,
+    remaining: normalizeRemaining(body.remaining),
+    ...(progress ? { progress } : {})
+  };
 }
 
 /**

@@ -510,10 +510,14 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       else if (line.kind === "file_written") {
         // A hand-edited file cannot make the chat read a path it was never allowed to write: only a normal vault path counts.
         const path = typeof line.path === "string" ? normalizeVaultPath(line.path) : null;
-        if (path !== null && !path.split("/").some(part => part.startsWith(".")) && typeof line.hash === "string" && /^[0-9a-f]{1,32}$/.test(line.hash))
+        if (
+          path !== null &&
+          !path.split("/").some(part => part.startsWith(".")) &&
+          typeof line.hash === "string" &&
+          /^[0-9a-f]{1,32}$/.test(line.hash)
+        )
           ownFiles.push({ path, hash: line.hash });
-      }
-      else if (line.kind === "research_batch") {
+      } else if (line.kind === "research_batch") {
         // A second one in the same turn is a rerun: the batch is open again and its cards join the first one's.
         const topics = restoredBatchTopics(line.topics);
         const batch = batches.get(line.turn);

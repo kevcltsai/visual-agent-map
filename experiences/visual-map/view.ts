@@ -23298,15 +23298,21 @@ export class VisualAgentMapView extends ItemView {
       }
     });
     run.state = step.state;
-    this.showChainFlow(run);
+    this.showChainFlow(
+      run,
+      step.decision.kind === "end" && step.decision.reason === "done" && !step.decision.remaining.trim()
+    );
     this.followChainDecision(run, step.decision, round.work);
   }
-  /** The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). */
-  private showChainFlow(run: ChatChainRun): void {
+  /**
+   * The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). A chain
+   * that ended done with nothing left shows every step done, even when the last reply did not move the statuses.
+   */
+  private showChainFlow(run: ChatChainRun, finished = false): void {
     const progress = run.state.progress;
     if (!run.state.autoApply || !progress) return;
     this.chat?.setFlowProgress({
-      steps: progress.steps.map(step => ({ ...step })),
+      steps: progress.steps.map(step => ({ ...step, ...(finished ? { status: "done" as const } : {}) })),
       round: run.state.round,
       calls: run.state.calls,
       maxCalls: MAP_CHAT_AUTO_MAX_CALLS
@@ -25390,6 +25396,10 @@ export class VisualAgentMapView extends ItemView {
           readOnlyPaths: baseline.mapSourcePaths,
           configDir
         });
+        // An existing file inside the map folder is read and then edited, not created again (the model sees this text next round).
+        const mapFolder = this.path.slice(0, Math.max(0, this.path.lastIndexOf("/")));
+        if (!verdict.ok && verdict.code === "exists" && mapFolder && key?.startsWith(`${mapFolder}/`))
+          return skipped("ui.map_chat_guard_exists_in_map");
         if (!verdict.ok || !key) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
         const folders = key.split("/").slice(0, -1);
         for (let depth = 1; depth <= folders.length; depth++) {

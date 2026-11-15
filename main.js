@@ -1358,6 +1358,7 @@ var en = {
   "ui.map_chat_undo_label": "AI chat reply",
   "ui.map_chat_undo_files_changed": "Files have changed since; this cannot be undone.",
   "ui.map_chat_guard_exists": "a file already exists there",
+  "ui.map_chat_guard_exists_in_map": "a file already exists there; read it with read_md_file, then change it with edit_md_file",
   "ui.map_chat_guard_no_baseline": "the file was not part of this message",
   "ui.map_chat_guard_map_source": "the file is one of this map's data sources; the chat only reads it",
   "ui.map_chat_skip_stale": "the file changed after you sent the message",
@@ -4286,6 +4287,7 @@ var zhCN = {
   "ui.map_chat_undo_label": "AI \u5BF9\u8BDD\u56DE\u590D",
   "ui.map_chat_undo_files_changed": "\u6587\u4EF6\u5DF2\u53D8\u66F4\uFF0C\u65E0\u6CD5\u64A4\u9500",
   "ui.map_chat_guard_exists": "\u90A3\u91CC\u5DF2\u7ECF\u6709\u6587\u4EF6",
+  "ui.map_chat_guard_exists_in_map": "\u90A3\u91CC\u5DF2\u7ECF\u6709\u6587\u4EF6\uFF1B\u8BF7\u5148\u7528 read_md_file \u8BFB\u53D6\u5B83\uFF0C\u518D\u7528 edit_md_file \u4FEE\u6539",
   "ui.map_chat_guard_no_baseline": "\u8FD9\u4E2A\u6587\u4EF6\u4E0D\u5728\u672C\u6B21\u53D1\u9001\u7684\u5185\u5BB9\u91CC",
   "ui.map_chat_guard_map_source": "\u8FD9\u4E2A\u6587\u4EF6\u662F\u8FD9\u5F20\u5730\u56FE\u7684\u8D44\u6599\u6765\u6E90\uFF0C\u5BF9\u8BDD\u53EA\u80FD\u8BFB\u53D6",
   "ui.map_chat_skip_stale": "\u53D1\u9001\u540E\u6587\u4EF6\u53C8\u88AB\u4FEE\u6539\u8FC7",
@@ -7214,6 +7216,7 @@ var zhTW = {
   "ui.map_chat_undo_label": "AI \u5C0D\u8A71\u56DE\u8986",
   "ui.map_chat_undo_files_changed": "\u6A94\u6848\u5DF2\u8B8A\u66F4\uFF0C\u7121\u6CD5\u5FA9\u539F",
   "ui.map_chat_guard_exists": "\u90A3\u88E1\u5DF2\u7D93\u6709\u6A94\u6848",
+  "ui.map_chat_guard_exists_in_map": "\u90A3\u88E1\u5DF2\u7D93\u6709\u6A94\u6848\uFF1B\u8ACB\u5148\u7528 read_md_file \u8B80\u53D6\u5B83\uFF0C\u518D\u7528 edit_md_file \u4FEE\u6539",
   "ui.map_chat_guard_no_baseline": "\u9019\u500B\u6A94\u6848\u4E0D\u5728\u672C\u6B21\u9001\u51FA\u7684\u5167\u5BB9\u88E1",
   "ui.map_chat_guard_map_source": "\u9019\u500B\u6A94\u6848\u662F\u9019\u5F35\u5FC3\u667A\u5716\u7684\u8CC7\u6599\u4F86\u6E90\uFF0C\u5C0D\u8A71\u53EA\u80FD\u8B80\u53D6",
   "ui.map_chat_skip_stale": "\u9001\u51FA\u5F8C\u6A94\u6848\u53C8\u88AB\u4FEE\u6539\u904E",
@@ -79406,16 +79409,22 @@ ${note.detail.trim()}` : "",
       }
     });
     run.state = step.state;
-    this.showChainFlow(run);
+    this.showChainFlow(
+      run,
+      step.decision.kind === "end" && step.decision.reason === "done" && !step.decision.remaining.trim()
+    );
     this.followChainDecision(run, step.decision, round3.work);
   }
-  /** The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). */
-  showChainFlow(run) {
+  /**
+   * The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). A chain
+   * that ended done with nothing left shows every step done, even when the last reply did not move the statuses.
+   */
+  showChainFlow(run, finished = false) {
     var _a2;
     const progress = run.state.progress;
     if (!run.state.autoApply || !progress) return;
     (_a2 = this.chat) == null ? void 0 : _a2.setFlowProgress({
-      steps: progress.steps.map((step) => ({ ...step })),
+      steps: progress.steps.map((step) => ({ ...step, ...finished ? { status: "done" } : {} })),
       round: run.state.round,
       calls: run.state.calls,
       maxCalls: MAP_CHAT_AUTO_MAX_CALLS
@@ -81208,6 +81217,9 @@ ${note.detail.trim()}` : "",
           readOnlyPaths: baseline.mapSourcePaths,
           configDir
         });
+        const mapFolder = this.path.slice(0, Math.max(0, this.path.lastIndexOf("/")));
+        if (!verdict.ok && verdict.code === "exists" && mapFolder && (key4 == null ? void 0 : key4.startsWith(`${mapFolder}/`)))
+          return skipped("ui.map_chat_guard_exists_in_map");
         if (!verdict.ok || !key4) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
         const folders = key4.split("/").slice(0, -1);
         for (let depth = 1; depth <= folders.length; depth++) {

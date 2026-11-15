@@ -1175,7 +1175,7 @@ integrationTest('multi-select synthesis: Stop while the sources are re-read afte
   assert.equal(reads, 2);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 2, 'no topic was created');
   assert.equal(view.history.undoEntry, undefined);
-  assert.equal(view.integrationTask.state, 'cancelled');
+  assert.equal(view.plugin.topicRuns.syntheses(view).selection.state, 'cancelled');
 });
 integrationTest('Stop on the node cancels background synthesis and preserves the topic', async () => {
   const f = await backgroundSynthesisFixture((_call, signal, onAccepted) => new Promise((_resolve, reject) => { onAccepted(); signal.addEventListener('abort', () => { const error = new Error('cancelled'); error.name = 'AbortError'; reject(error); }, { once: true }); }));
@@ -1909,7 +1909,7 @@ integrationTest('W1: all four synthesize call sites ask for direct reference del
   assert.equal(h.contexts.at(-1).referenceDelivery, 'direct', 'child synthesis draft');
   await h.view.startSelectionSynthesis([h.topic, other], options(), null, message => assert.fail(message), () => {});
   assert.equal(h.contexts.at(-1).mode, 'synthesize'); assert.equal(h.contexts.at(-1).referenceDelivery, 'direct', 'multi-select directions');
-  h.view.integrationTask = null;
+  h.view.plugin.topicRuns.syntheses(h.view).selection = null;
   await h.view.createIntegratedNode('Combined', [h.topic, other], 'Compare', '');
   assert.equal(h.contexts.at(-1).referenceDelivery, 'direct', 'multi-select draft');
   await h.view.researchChild(h.topic, new AbortController().signal, () => {}, options());
@@ -2528,7 +2528,7 @@ integrationTest('W2b: multi-select synthesis (directions and draft) uses a task 
   await h.view.startSelectionSynthesis([h.topic, h.other], h.options(), null, message => assert.fail(message), () => {});
   assert.equal(seen[0].entry.stage, 'writing'); assert.equal(seen[0].entry.preview.summary, 'Unsaved 1'); assert.equal(seen[0].nodes, nodesBefore);
   assert.equal(h.store.get(h.key), undefined, 'directions: entry gone');
-  h.view.integrationTask = null;
+  h.view.plugin.topicRuns.syntheses(h.view).selection = null;
   await h.view.startSelectionSynthesis([h.topic, h.other], { ...h.options(), synthesisTitle: 'Combined' }, 'Compare', message => assert.fail(message), () => {});
   assert.equal(seen[1].entry.preview.summary, 'Unsaved 2'); assert.equal(seen[1].nodes, nodesBefore, 'no node before the result');
   assert.equal(h.store.get(h.key), undefined);
@@ -2539,7 +2539,7 @@ integrationTest('W2b: multi-select synthesis Stop and a failed request clear the
   for (const scenario of ['stop', 'fail']) {
     const h = await synthesisProgressHarness(async ({ observer, h: harness }) => {
       observer.onAttempt('b1', 1); observer.onPreview('b1', { summary: 'Unsaved' });
-      if (scenario === 'stop') { harness.view.integrationTask.controller.abort(); throw Object.assign(new Error('cancelled'), { name: 'AbortError' }); }
+      if (scenario === 'stop') { harness.view.plugin.topicRuns.syntheses(harness.view).selection.controller.abort(); throw Object.assign(new Error('cancelled'), { name: 'AbortError' }); }
       throw new Error('provider down');
     });
     const nodesBefore = await h.mapShape();

@@ -5116,8 +5116,8 @@ integrationTest('MS-03: the selection integration run (directions step) sends th
   const failures = [];
   await h.view.startSelectionSynthesis([h.node('a'), h.node('b')], { ...ms03Options }, null, message => failures.push(message), () => {});
   assert.equal(calls.length, 1); assert.equal(calls[0].model, 'gpt-x'); assert.equal(calls[0].reasoning, 'high');
-  assert.equal(h.view.integrationTask.model, 'gpt-x'); assert.equal(h.view.integrationTask.reasoning, 'high'); assert.equal(h.view.integrationTask.state, 'failed');
-  const task = h.view.integrationTask; h.control.models.length = 0;
+  assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selection.model, 'gpt-x'); assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selection.reasoning, 'high'); assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selection.state, 'failed');
+  const task = h.view.plugin.topicRuns.syntheses(h.view).selection; h.control.models.length = 0;
   h.view.startSelectionSynthesis = async () => {};
   h.view.retrySelectionSynthesis(task); await withTimeout(until(() => h.control.models.length === 1));
   eq(h.control.models, ['gpt-x'], 'the retry notice is for the task\'s model, not the current one');
@@ -5128,7 +5128,7 @@ integrationTest('MS-03 counter-example: a selection integration with only one ov
   h.view.startTaskProgress = () => ({ end() {}, observer: undefined });
   await ms03Override(h, 'a', 'gpt-x');
   await h.view.startSelectionSynthesis([h.node('a'), h.node('b')], { ...ms03Options }, null, () => {}, () => {});
-  assert.equal(calls[0].model, 'claude:sonnet'); assert.equal(h.view.integrationTask.model, 'claude:sonnet');
+  assert.equal(calls[0].model, 'claude:sonnet'); assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selection.model, 'claude:sonnet');
 });
 
 integrationTest('MS-03: a chat synthesis of several cards asks its usage notice for the resolved model (shared override, else current)', async () => {

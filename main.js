@@ -37509,6 +37509,8 @@ var TopicRuns = class {
     __publicField(this, "chartRunning", 0);
     /** What each open view has in flight for synthesis: a closed view's entry goes away with the view. */
     __publicField(this, "synthesisStates", /* @__PURE__ */ new WeakMap());
+    /** The redraw hook of each view's selection synthesis, kept for {@link stopSelection}. */
+    __publicField(this, "selectionChanged", /* @__PURE__ */ new WeakMap());
     /** Callers waiting in {@link whenIdle}; woken whenever a run or chart step ends. */
     __publicField(this, "idleWaiters", /* @__PURE__ */ new Set());
   }
@@ -38596,6 +38598,209 @@ var TopicRuns = class {
     const topics = this.syntheses(owner).topics;
     for (const task of topics.values()) if (task.state === "running") task.controller.abort();
     topics.clear();
+  }
+  /**
+   * One step of multi-select synthesis: the AI's suggested directions (`direction === null`), then the draft. Both
+   * report to the open dialog through `observer`; once it is closed the run carries on and the selection bar shows it.
+   * The view has already checked the map, the selection size and the AI lock.
+   */
+  async startSelectionSynthesis(owner, input2) {
+    var _a2;
+    const { sources, options, direction, failed, accepted, observer, errorSink } = input2;
+    const state = this.syntheses(owner);
+    this.selectionChanged.set(owner, input2.changed);
+    const existing = state.selection && state.selection.mapPath === input2.mapPath ? state.selection : null;
+    const step = direction === null ? "directions" : "draft";
+    if ((existing == null ? void 0 : existing.state) === "running" || state.selectionStarting) {
+      failed(t("ui.ai_running_ai"));
+      return;
+    }
+    if (step === "directions" && (existing == null ? void 0 : existing.state) === "directions" || (existing == null ? void 0 : existing.state) === "applying") {
+      failed(t("ui.synthesis_pending_review_first"));
+      return;
+    }
+    const continuing = step === "draft" && !!(existing == null ? void 0 : existing.directions.length) && (existing.state === "directions" || !!options.continuesDirections);
+    const base = continuing && existing ? existing.options : options;
+    const title = (continuing && existing ? existing.title : (_a2 = options.synthesisTitle) == null ? void 0 : _a2.trim()) || (existing == null ? void 0 : existing.title) || "";
+    state.selectionStarting = true;
+    const controller = new AbortController();
+    const modalSignal = options.signal;
+    const abortBeforeAcceptance = () => controller.abort();
+    if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
+    else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    const releaseStarting = () => {
+      state.selectionStarting = false;
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      input2.changed();
+    };
+    let own2;
+    const runOptions = {
+      ...base,
+      requirements: options.requirements || base.requirements,
+      signal: controller.signal,
+      onProgress: (message) => {
+        var _a3;
+        if (state.selection) state.selection.progress = message;
+        (_a3 = options.onProgress) == null ? void 0 : _a3.call(options, message);
+        input2.changed();
+      }
+    };
+    let launched = false;
+    const markAccepted = () => {
+      var _a3;
+      if (launched || controller.signal.aborted) return;
+      launched = true;
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      (_a3 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a3.call(observer, () => controller.abort());
+      accepted();
+    };
+    const fail3 = (error) => {
+      const aborted3 = controller.signal.aborted || error instanceof Error && error.name === "AbortError";
+      const task2 = state.selection;
+      if (aborted3 && (observer == null ? void 0 : observer.isOpen())) {
+        if (own2 && state.selection === own2) state.selection = null;
+        input2.changed();
+        failed(t("ui.research_stopped_existing_content_was_preserved"));
+        return;
+      }
+      if (task2) {
+        task2.state = aborted3 ? "cancelled" : "failed";
+        task2.progress = aborted3 ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
+        input2.changed();
+      }
+      if (errorSink && !aborted3) {
+        errorSink(error);
+        failed(error instanceof Error ? error.message : String(error));
+        return;
+      }
+      failed(
+        aborted3 ? t("ui.research_stopped_existing_content_was_preserved") : this.ports.recordFailure(
+          t(step === "draft" ? "log.child_integration_failed" : "log.integration_directions_failed"),
+          error
+        )
+      );
+    };
+    let task;
+    let modelChoice;
+    const mapPath = input2.mapPath, mapId = input2.mapId;
+    const summaryMode = base.synthesisContent === "summary" ? "summary" : "strong";
+    const isDraft = step === "draft";
+    await this.start(mapPath, "synthesizeSelection", {
+      step,
+      signal: controller.signal,
+      stop: () => controller.abort(),
+      refused: () => {
+        releaseStarting();
+        failed(t("ui.ai_running_ai"));
+      },
+      model: async () => {
+        await this.whenIdle(
+          sources.map((source) => source.path),
+          controller.signal
+        );
+        return modelChoice = await input2.model();
+      },
+      readSources: () => input2.readSources(summaryMode, runOptions.outputLanguage),
+      begin: (group) => {
+        task = {
+          title,
+          goal: isDraft ? direction != null ? direction : "" : "",
+          rules: "",
+          sources,
+          options: { ...runOptions, signal: void 0, onProgress: void 0 },
+          mapPath,
+          mapId,
+          sourceContent: JSON.stringify(group.documents),
+          controller,
+          state: "running",
+          step: isDraft ? "draft" : "directions",
+          directions: isDraft && continuing && existing ? existing.directions : [],
+          progress: "",
+          model: modelChoice.model,
+          reasoning: modelChoice.reasoning
+        };
+        state.selection = task;
+        if (!isDraft) own2 = task;
+        input2.changed();
+      },
+      startProgress: (model) => input2.startProgress(model),
+      buildContext: (group) => {
+        const current = task;
+        return input2.buildContext(group, current, runOptions, (message) => {
+          var _a3;
+          if (state.selection !== current) return;
+          current.progress = message;
+          (_a3 = runOptions.onProgress) == null ? void 0 : _a3.call(runOptions, message);
+          input2.changed();
+        });
+      },
+      accepted: markAccepted,
+      current: () => state.selection === task,
+      mapChanged: () => input2.mapChanged(mapPath, mapId),
+      recordedSources: () => task.sourceContent,
+      found: (angles) => {
+        const waiting = task;
+        waiting.state = "directions";
+        waiting.directions = angles;
+        input2.changed();
+        if ((observer == null ? void 0 : observer.isOpen()) && observer.directions) observer.directions(angles);
+        else input2.offerDirections(waiting);
+      },
+      noDirections: () => {
+        state.selection = null;
+        input2.changed();
+        failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
+      },
+      closed: () => input2.closed(),
+      applying: () => {
+        task.state = "applying";
+        input2.changed();
+        return input2.undoMark();
+      },
+      write: (result) => input2.write(result, task, modelChoice.model),
+      written: (previous) => {
+        var _a3;
+        input2.written(previous, task);
+        if (observer == null ? void 0 : observer.isOpen()) (_a3 = observer.written) == null ? void 0 : _a3.call(observer);
+      },
+      draftFailed: (error) => {
+        const draftTask = task;
+        if (controller.signal.aborted && (observer == null ? void 0 : observer.isOpen())) {
+          if (draftTask.directions.length) draftTask.state = "directions";
+          else state.selection = null;
+          input2.changed();
+          throw error;
+        }
+        draftTask.state = controller.signal.aborted ? "cancelled" : "failed";
+        draftTask.progress = controller.signal.aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
+        input2.changed();
+        if (!controller.signal.aborted) throw error;
+      },
+      finished: markAccepted,
+      fail: fail3,
+      settled: releaseStarting
+    });
+  }
+  /** The selection bar's Stop: aborts the running task's controller and marks it cancelled. */
+  stopSelection(owner) {
+    var _a2;
+    const task = this.syntheses(owner).selection;
+    if (!task) return;
+    task.controller.abort();
+    task.state = "cancelled";
+    (_a2 = this.selectionChanged.get(owner)) == null ? void 0 : _a2();
+  }
+  /** Forgets the selection synthesis unless it is running; true when it was removed. */
+  discardSelection(owner) {
+    const state = this.syntheses(owner);
+    const task = state.selection;
+    if (!task || task.state === "running") return false;
+    state.selection = null;
+    return true;
+  }
+  /** The synthesis was written: its task is no longer shown. */
+  clearSelection(owner) {
+    this.syntheses(owner).selection = null;
   }
   pending(path) {
     return this.pendingSuggestions.get(path);
@@ -59836,9 +60041,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     /** The note the user last had open beside the map; dropped text is assumed to come from it. */
     __publicField(this, "lastMarkdownPath", null);
     __publicField(this, "deletedMap", null);
-    __publicField(this, "integrationTask", null);
-    /** A multi-select synthesis step is starting (before its task exists), so a second request is refused. */
-    __publicField(this, "selectionStarting", false);
     /** A merge dialog is open or its write is queued; a second Merge press (or the Enter that confirmed) is ignored. */
     __publicField(this, "mergeOpen", false);
     /** AI merges that hid their dialog, keyed by map path (one per map). */
@@ -65419,7 +65621,7 @@ ${request.requirements}` : preset.text,
   }
   mergeBusy(node, except) {
     var _a2, _b2, _c, _d;
-    const batch = (_a2 = this.plugin.expansionBatches) == null ? void 0 : _a2.get(this.multiResearchKey()), task = this.integrationTask;
+    const batch = (_a2 = this.plugin.expansionBatches) == null ? void 0 : _a2.get(this.multiResearchKey()), task = this.plugin.topicRuns.syntheses(this).selection;
     return !!(((_c = (_b2 = this.plugin.relevanceGrades) == null ? void 0 : _b2.get(this.path)) == null ? void 0 : _c.status) === "running" || this.plugin.topicRuns.isBusy(node.path) || ((_d = this.plugin.quickExpandPending) == null ? void 0 : _d.has(node.path)) || this.plugin.topicRuns.hasTask(node.path) || (batch == null ? void 0 : batch.status) === "running" && (batch.currentPath === node.path || batch.queuedPaths.includes(node.path)) || (task == null ? void 0 : task.state) === "running" && task.mapPath === this.path && task.sources.some((source) => source.id === node.id) || this.isMerging(node.id, except));
   }
   /** True while an AI merge on this map still holds the card (running or being written): the card is locked. */
@@ -70689,7 +70891,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     this.settleCardHeights();
   }
   paint() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
     if (!this.closed && this.hiddenTab()) this.renderWhenShown = true;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
@@ -70844,7 +71046,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if ((_v = this.deletedMap) == null ? void 0 : _v.deleted)
       this.button(toolbar, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
     const startingSelection = this.startingTasks.get(this.selectionTaskKey());
-    if (startingSelection && !(((_w = this.integrationTask) == null ? void 0 : _w.mapPath) === this.path && this.integrationTask.state === "running")) {
+    const selectionTask = this.plugin.topicRuns.syntheses(this).selection;
+    if (startingSelection && !((selectionTask == null ? void 0 : selectionTask.mapPath) === this.path && selectionTask.state === "running")) {
       const state = this.contentEl.createDiv("vam-integration-progress");
       state.setAttr("aria-live", "polite");
       state.createSpan({ text: t("ui.integration_running") });
@@ -70853,8 +71056,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         return (_a3 = this.startingTasks.get(this.selectionTaskKey())) == null ? void 0 : _a3.abort();
       });
     }
-    if (this.integrationTask && this.integrationTask.mapPath === this.path && !(startingSelection && this.integrationTask.state !== "running")) {
-      const task = this.integrationTask, state = this.contentEl.createDiv("vam-integration-progress");
+    if (selectionTask && selectionTask.mapPath === this.path && !(startingSelection && selectionTask.state !== "running")) {
+      const task = selectionTask, state = this.contentEl.createDiv("vam-integration-progress");
       state.setAttr("aria-live", "polite");
       state.createSpan({
         text: task.state === "running" ? task.progress || t("ui.integration_running") : task.state === "applying" ? t("ui.integration_running") : task.state === "directions" ? t("ui.choose_synthesis_direction") : task.state === "failed" ? task.progress || t("ui.integration_failed") : t("ui.research_stopped_existing_content_was_preserved")
@@ -70862,11 +71065,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       if (task.state === "running")
         this.renderTaskProgress(state, this.contentEl, this.taskProgressKey("integration", task.mapPath));
       if (task.state === "running")
-        this.button(state, t("ui.stop_research"), () => {
-          task.controller.abort();
-          task.state = "cancelled";
-          this.render();
-        });
+        this.button(state, t("ui.stop_research"), () => this.plugin.topicRuns.stopSelection(this));
       if (task.state === "directions")
         this.button(state, t("ui.choose_synthesis_direction"), () => this.openSelectionSynthesis(task)).addClass(
           "vam-badge-new"
@@ -70894,7 +71093,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         this.button(actions, t("ui.repair_agent_workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
-      if ((_x = this.deletedMap) == null ? void 0 : _x.deleted)
+      if ((_w = this.deletedMap) == null ? void 0 : _w.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       this.dropGoalEdit();
       return;
@@ -70907,7 +71106,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    if ((_y = this.map) == null ? void 0 : _y.aim) this.renderHiddenAimMapTools(tools);
+    if ((_x = this.map) == null ? void 0 : _x.aim) this.renderHiddenAimMapTools(tools);
     else this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     const canvas = workspace.createDiv("vam-canvas");
@@ -70930,7 +71129,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }) : null;
     const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");
     const zoom = controls.createDiv("vam-zoom-controls");
-    (_z = this.usageControl) == null ? void 0 : _z.mount(zoom, controls);
+    (_y = this.usageControl) == null ? void 0 : _y.mount(zoom, controls);
     this.iconButton(zoom, "minus", t("ui.zoom_out"), () => {
       var _a3;
       this.markCanvasHintSeen();
@@ -71004,7 +71203,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_A = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _A.focus({ preventScroll: true });
+        (_z = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _z.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -71014,9 +71213,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
-        (_B = this.stageEl.querySelector(
+        (_A = this.stageEl.querySelector(
           `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
-        )) == null ? void 0 : _B.focus({ preventScroll: true });
+        )) == null ? void 0 : _A.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -77137,7 +77336,10 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       undoMark: () => this.history.undoEntry,
       written: (previous) => {
         var _a2, _b2;
-        return this.undoNotice(t("ui.synthesis_written_0", (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : ""), previous);
+        return this.undoNotice(
+          t("ui.synthesis_written_0", (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : ""),
+          previous
+        );
       }
     });
   }
@@ -77173,7 +77375,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       new import_obsidian34.Notice(t("ui.select_at_least_two_topics"));
       return;
     }
-    const task = this.integrationTask && this.integrationTask.mapPath === this.path ? this.integrationTask : null;
+    const selection = this.plugin.topicRuns.syntheses(this).selection;
+    const task = selection && selection.mapPath === this.path ? selection : null;
     if ((task == null ? void 0 : task.state) === "running") {
       new import_obsidian34.Notice(t("ui.ai_running_ai"));
       return;
@@ -77256,7 +77459,6 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
    * report to the open dialog through `observer`; once it is closed the run carries on and the selection bar shows it.
    */
   async startSelectionSynthesis(sources, options, direction, failed, accepted, observer, errorSink) {
-    var _a2;
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
       return;
@@ -77265,131 +77467,32 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       failed(t("ui.ai_locked_notice"));
       return;
     }
-    const existing = this.integrationTask && this.integrationTask.mapPath === this.path ? this.integrationTask : null;
-    const step = direction === null ? "directions" : "draft";
-    if ((existing == null ? void 0 : existing.state) === "running" || this.selectionStarting) {
-      failed(t("ui.ai_running_ai"));
-      return;
-    }
-    if (step === "directions" && (existing == null ? void 0 : existing.state) === "directions" || (existing == null ? void 0 : existing.state) === "applying") {
-      failed(t("ui.synthesis_pending_review_first"));
-      return;
-    }
-    const continuing = step === "draft" && !!(existing == null ? void 0 : existing.directions.length) && (existing.state === "directions" || !!options.continuesDirections);
-    const base = continuing && existing ? existing.options : options;
-    const title = (continuing && existing ? existing.title : (_a2 = options.synthesisTitle) == null ? void 0 : _a2.trim()) || (existing == null ? void 0 : existing.title) || "";
-    this.selectionStarting = true;
-    const controller = new AbortController();
-    const modalSignal = options.signal;
-    const abortBeforeAcceptance = () => controller.abort();
-    if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
-    else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    const releaseStarting = () => {
-      this.selectionStarting = false;
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      this.render();
-    };
-    let own2;
-    const runOptions = {
-      ...base,
-      requirements: options.requirements || base.requirements,
-      signal: controller.signal,
-      onProgress: (message) => {
-        var _a3;
-        if (this.integrationTask) this.integrationTask.progress = message;
-        (_a3 = options.onProgress) == null ? void 0 : _a3.call(options, message);
-        this.render();
-      }
-    };
-    let launched = false;
-    const markAccepted = () => {
-      var _a3;
-      if (launched || controller.signal.aborted) return;
-      launched = true;
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      (_a3 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a3.call(observer, () => controller.abort());
-      accepted();
-    };
-    const fail3 = (error) => {
-      const aborted3 = controller.signal.aborted || error instanceof Error && error.name === "AbortError";
-      const task2 = this.integrationTask;
-      if (aborted3 && (observer == null ? void 0 : observer.isOpen())) {
-        if (own2 && this.integrationTask === own2) this.integrationTask = null;
-        this.render();
-        failed(t("ui.research_stopped_existing_content_was_preserved"));
-        return;
-      }
-      if (task2) {
-        task2.state = aborted3 ? "cancelled" : "failed";
-        task2.progress = aborted3 ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
-        this.render();
-      }
-      if (errorSink && !aborted3) {
-        errorSink(error);
-        failed(error instanceof Error ? error.message : String(error));
-        return;
-      }
-      failed(
-        aborted3 ? t("ui.research_stopped_existing_content_was_preserved") : this.plugin.recordFailure(
-          t(step === "draft" ? "log.child_integration_failed" : "log.integration_directions_failed"),
-          error
-        )
-      );
-    };
-    let task;
-    let modelChoice;
+    const mapId = this.map.id;
     let draftContext;
-    const mapPath = this.path, mapId = this.map.id;
-    const summaryMode = base.synthesisContent === "summary" ? "summary" : "strong";
-    const isDraft = step === "draft";
-    await this.plugin.topicRuns.start(mapPath, "synthesizeSelection", {
-      step,
-      signal: controller.signal,
-      stop: () => controller.abort(),
-      refused: () => {
-        releaseStarting();
-        failed(t("ui.ai_running_ai"));
-      },
-      model: async () => {
-        await this.plugin.topicRuns.whenIdle(
-          sources.map((source) => source.path),
-          controller.signal
-        );
-        return modelChoice = await this.selectionModel(sources);
-      },
-      readSources: () => this.topicReferenceGroup(sources, summaryMode, { language: runOptions.outputLanguage }),
-      begin: (group) => {
-        task = {
-          title,
-          goal: isDraft ? direction != null ? direction : "" : "",
-          rules: "",
-          sources,
-          options: { ...runOptions, signal: void 0, onProgress: void 0 },
-          mapPath,
-          mapId,
-          sourceContent: JSON.stringify(group.documents),
-          controller,
-          state: "running",
-          step: isDraft ? "draft" : "directions",
-          directions: isDraft && continuing && existing ? existing.directions : [],
-          progress: "",
-          model: modelChoice.model,
-          reasoning: modelChoice.reasoning
-        };
-        this.integrationTask = task;
-        if (!isDraft) own2 = task;
-        this.render();
-      },
+    await this.plugin.topicRuns.startSelectionSynthesis(this, {
+      sources,
+      options,
+      direction,
+      failed,
+      accepted,
+      observer,
+      errorSink,
+      mapPath: this.path,
+      mapId,
+      changed: () => this.render(),
+      model: () => this.selectionModel(sources),
+      readSources: (mode, language2) => this.topicReferenceGroup(sources, mode, { language: language2 }),
       startProgress: (model) => {
         return this.startTaskProgress(this.taskProgressKey("integration"), model);
       },
-      buildContext: async (group) => {
-        var _a3, _b2, _c, _d, _e, _f, _g, _h, _i;
+      buildContext: async (group, task, runOptions, progress) => {
+        var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
         const language2 = this.plugin.settings.language;
-        if (!isDraft)
+        const title = task.title;
+        if (direction === null)
           return {
             title,
-            summary: translateNote((_a3 = runOptions.outputLanguage) != null ? _a3 : language2, "note.no_conclusion_yet"),
+            summary: translateNote((_a2 = runOptions.outputLanguage) != null ? _a2 : language2, "note.no_conclusion_yet"),
             rules: "",
             detail: "",
             task: [synthesisDirectionsTask((_b2 = runOptions.outputLanguage) != null ? _b2 : language2), runOptions.requirements].filter(Boolean).join("\n\n"),
@@ -77412,7 +77515,6 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           kind: "topic",
           notify: true
         });
-        const own3 = task;
         draftContext = {
           title,
           summary: translateNote((_e = runOptions.outputLanguage) != null ? _e : language2, "note.no_conclusion_yet"),
@@ -77423,13 +77525,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           referenceGroups: [...(_f = runOptions.referenceGroups) != null ? _f : [], group],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
           referenceDelivery: "direct",
-          onProgress: (message) => {
-            var _a4;
-            if (this.integrationTask !== own3) return;
-            own3.progress = message;
-            (_a4 = runOptions.onProgress) == null ? void 0 : _a4.call(runOptions, message);
-            this.render();
-          },
+          onProgress: progress,
           outputLanguage: runOptions.outputLanguage,
           ...integrationStyle.toneText ? { toneText: integrationStyle.toneText } : {},
           mode: "synthesize",
@@ -77443,81 +77539,39 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         };
         return draftContext;
       },
-      accepted: markAccepted,
-      current: () => this.integrationTask === task,
-      mapChanged: () => {
-        var _a3;
-        return this.path !== mapPath || ((_a3 = this.map) == null ? void 0 : _a3.id) !== mapId;
+      mapChanged: (mapPath, id) => {
+        var _a2;
+        return this.path !== mapPath || ((_a2 = this.map) == null ? void 0 : _a2.id) !== id;
       },
-      recordedSources: () => task.sourceContent,
-      found: (angles) => {
-        const waiting = task;
-        waiting.state = "directions";
-        waiting.directions = angles;
-        this.render();
-        if ((observer == null ? void 0 : observer.isOpen()) && observer.directions) observer.directions(angles);
-        else
-          backgroundResultNotice(t("ui.background_synthesis_directions_ready"), {
-            label: t("ui.choose_synthesis_direction"),
-            open: () => {
-              if (this.integrationTask === waiting && waiting.state === "directions")
-                this.openSelectionSynthesis(waiting);
-            }
-          });
-      },
-      noDirections: () => {
-        this.integrationTask = null;
-        this.render();
-        failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
-      },
+      offerDirections: (waiting) => backgroundResultNotice(t("ui.background_synthesis_directions_ready"), {
+        label: t("ui.choose_synthesis_direction"),
+        open: () => {
+          if (this.plugin.topicRuns.syntheses(this).selection === waiting && waiting.state === "directions")
+            this.openSelectionSynthesis(waiting);
+        }
+      }),
       closed: () => this.closed,
-      applying: () => {
-        task.state = "applying";
-        this.render();
-        return this.history.undoEntry;
-      },
-      write: (result) => {
-        var _a3;
-        const language2 = (_a3 = runOptions.outputLanguage) != null ? _a3 : this.plugin.settings.language;
+      undoMark: () => this.history.undoEntry,
+      write: (result, task, model) => {
+        var _a2;
+        const language2 = (_a2 = task.options.outputLanguage) != null ? _a2 : this.plugin.settings.language;
         return this.saveIntegratedNode(
-          title,
+          task.title,
           sources,
           direction != null ? direction : "",
           "",
-          modelChoice.model,
+          model,
           result,
           language2,
           task,
           draftContext
         );
       },
-      written: (previous) => {
-        var _a3;
-        this.undoNotice(t("ui.synthesis_new_topic_0", title), previous);
-        if (observer == null ? void 0 : observer.isOpen()) (_a3 = observer.written) == null ? void 0 : _a3.call(observer);
-      },
-      draftFailed: (error) => {
-        const draftTask = task;
-        if (controller.signal.aborted && (observer == null ? void 0 : observer.isOpen())) {
-          if (draftTask.directions.length) draftTask.state = "directions";
-          else this.integrationTask = null;
-          this.render();
-          throw error;
-        }
-        draftTask.state = controller.signal.aborted ? "cancelled" : "failed";
-        draftTask.progress = controller.signal.aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
-        this.render();
-        if (!controller.signal.aborted) throw error;
-      },
-      finished: markAccepted,
-      fail: fail3,
-      settled: releaseStarting
+      written: (previous, task) => this.undoNotice(t("ui.synthesis_new_topic_0", task.title), previous)
     });
   }
   discardSelectionSynthesis() {
-    const task = this.integrationTask;
-    if (!task || task.state === "running") return;
-    this.integrationTask = null;
+    if (!this.plugin.topicRuns.discardSelection(this)) return;
     this.render();
   }
   retrySelectionSynthesis(task) {
@@ -77595,7 +77649,7 @@ ${note.detail.trim()}` : "",
   }
   async saveIntegratedNode(title, sources, goal, rules, model, result, language2, task, context) {
     var _a2;
-    if (!this.map || this.integrationTask !== task || this.closed || task.controller.signal.aborted || this.path !== task.mapPath || this.map.id !== task.mapId || task.state !== "applying")
+    if (!this.map || this.plugin.topicRuns.syntheses(this).selection !== task || this.closed || task.controller.signal.aborted || this.path !== task.mapPath || this.map.id !== task.mapId || task.state !== "applying")
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     const latest = await this.topicReferenceGroup(
       sources,
@@ -77657,7 +77711,7 @@ ${note.detail.trim()}` : "",
         const pushed = this.history.undoEntry;
         if (pushed && pushed !== previousEntry) pushed.label = t("ui.confirm_new_synthesis_topic");
       }
-      this.integrationTask = null;
+      this.plugin.topicRuns.clearSelection(this);
       this.selection.afterSynthesis(integrated.id);
       await this.hydrate();
       this.render();
@@ -77687,7 +77741,7 @@ ${note.detail.trim()}` : "",
         await this.plugin.repo.setLifecycle(parked, disk.id, "", "unassigned");
         await this.plugin.rebuildDerivedData();
       } else {
-        this.integrationTask = null;
+        this.plugin.topicRuns.clearSelection(this);
         this.map = disk;
         this.selection.afterSynthesis(integrated.id);
         try {
@@ -82760,8 +82814,9 @@ ${addition}` : addition },
         (failed, accepted) => this.startSynthesis(node, options2, message, failed, accepted)
       );
     }
-    const waiting = ((_a2 = this.integrationTask) == null ? void 0 : _a2.mapPath) === this.path ? this.integrationTask : null;
-    if (this.selectionStarting || waiting && waiting.state !== "failed" && waiting.state !== "cancelled")
+    const synthesisState = this.plugin.topicRuns.syntheses(this);
+    const waiting = ((_a2 = synthesisState.selection) == null ? void 0 : _a2.mapPath) === this.path ? synthesisState.selection : null;
+    if (synthesisState.selectionStarting || waiting && waiting.state !== "failed" && waiting.state !== "cancelled")
       return skipped("ui.map_chat_skip_synthesis_busy");
     const names3 = nodes.map((node) => {
       var _a3, _b2;

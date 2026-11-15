@@ -156,7 +156,7 @@ test('R2-N4: a synthesis topic whose rebuild fails keeps the synthesis label on 
     state: 'applying', controller: new AbortController(), mapPath: MAP, mapId: view.map.id,
     options: { synthesisContent: 'strong' }, directions: [], sourceContent: ''
   };
-  view.integrationTask = task;
+  view.plugin.topicRuns.syntheses(view).selection = task;
   task.sourceContent = JSON.stringify((await view.topicReferenceGroup(sources, 'strong', {})).documents);
   const result = { summary: 's', detail: 'd', visualReferences: [], formatIssues: [] };
   // The note is saved and on disk, so a failing rebuild is reported but does not fail the save.
@@ -178,7 +178,7 @@ test('persona-03: a synthesis topic is a conclusion and derives from every sourc
     state: 'applying', controller: new AbortController(), mapPath: MAP, mapId: view.map.id,
     options: { synthesisContent: 'strong' }, directions: [], sourceContent: ''
   };
-  view.integrationTask = task;
+  view.plugin.topicRuns.syntheses(view).selection = task;
   task.sourceContent = JSON.stringify((await view.topicReferenceGroup(sources, 'strong', {})).documents);
   const result = { summary: 's', detail: 'd', visualReferences: [], formatIssues: [] };
   await view.saveIntegratedNode('Synth', sources, 'goal', '', 'gpt-6-luna', result, 'en', task, {});

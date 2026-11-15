@@ -429,7 +429,7 @@ integrationTest('multi-select synthesis: pressing hides the dialog; directions, 
   const modal = await h.openSelection();
   const name = byLabel(modal.contentEl, 'New topic name'); name.value = 'Cooking water'; name.input();
   visibleBar(modal, 'Get synthesis suggestions first').click();
-  await until(() => h.view.integrationTask?.state === 'directions');
+  await until(() => h.view.plugin.topicRuns.syntheses(h.view).selection?.state === 'directions');
   assert.equal(h.calls.length, 1); assert.equal(h.calls[0].directions, true);
   assert.equal(h.calls[0].context.title, 'Cooking water');
   assert.equal(modal.closeCount, 1, 'the dialog hid itself once AI started'); assert.equal(h.modals.length, 1, 'nothing opens by itself');
@@ -449,7 +449,7 @@ integrationTest('multi-select synthesis: pressing hides the dialog; directions, 
   const saved = await h.repo.readMap(h.mapPath);
   const created = await h.repo.readNote(saved.nodes.at(-1).path);
   assert.equal(created.title, 'Cooking water'); assert.equal(created.summary, 'Draft summary'); assert.equal(created.status, 'completed');
-  assert.equal(h.view.integrationTask, null);
+  assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selection, null);
   assert.equal(actionNotices(h).filter(n => n.actions[0].text === 'Undo').length, 1);
   const createdPath = saved.nodes.at(-1).path;
   pressNotice(h, 'Undo'); await tick(); await tick(); await tick();
@@ -487,8 +487,8 @@ integrationTest('multi-select synthesis: Stop on the bar writes nothing and show
   const gate = h.hold();
   visibleBar(modal, 'Get synthesis suggestions first').click(); await until(() => h.calls.length === 1); await tick();
   assert.equal(modal.closeCount, 1);
-  h.view.integrationTask.controller.abort(); await until(() => h.calls[0].signal.aborted); await tick(); await tick();
-  assert.equal(h.view.integrationTask.state, 'cancelled', 'a stopped request shows the cancelled bar with Try again / Discard');
+  h.view.plugin.topicRuns.syntheses(h.view).selection.controller.abort(); await until(() => h.calls[0].signal.aborted); await tick(); await tick();
+  assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selection.state, 'cancelled', 'a stopped request shows the cancelled bar with Try again / Discard');
   assert.equal((await h.repo.readMap(h.mapPath)).nodes.length, notesBefore);
   assert.equal(actionNotices(h).length, 0); assert.equal(h.view.startingTasks.size, 0);
   gate.resolve();
@@ -503,7 +503,7 @@ integrationTest('multi-select synthesis: Stop on the bar writes nothing and show
   draftGate.resolve(); await untilAsync(async () => (await h.repo.readMap(h.mapPath)).nodes.length === notesBefore + 1);
   assert.equal(find(second.contentEl, i => hasCls(i, 'vam-next-review')), undefined);
   assert.equal(actionNotices(h).length, 1); assert.equal(actionNotices(h)[0].actions[0].text, 'Undo');
-  assert.equal(h.modals.length, 2, 'no review dialog opens'); assert.equal(h.view.integrationTask, null);
+  assert.equal(h.modals.length, 2, 'no review dialog opens'); assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selection, null);
 });
 integrationTest('multi-select synthesis: nothing is created when a source changed while the result was being made', async () => {
   const h = await synthesisHarness();
@@ -512,7 +512,7 @@ integrationTest('multi-select synthesis: nothing is created when a source change
   const gate = h.hold();
   visibleBar(modal, 'Skip suggestions and synthesize now').click(); await until(() => h.calls.length === 1);
   await h.repo.updateNote(h.kids[0].path, { summary: 'Edited elsewhere' });
-  gate.resolve(); await until(() => h.view.integrationTask?.state === 'failed');
+  gate.resolve(); await until(() => h.view.plugin.topicRuns.syntheses(h.view).selection?.state === 'failed');
   assert.equal((await h.repo.readMap(h.mapPath)).nodes.length, before);
   assert.equal(h.view.history.undoEntry, undefined);
   assert.equal(actionNotices(h).filter(n => n.actions[0].text === 'Undo').length, 0);
@@ -533,8 +533,8 @@ integrationTest('multi-select synthesis: Stop before the provider accepts sends 
   h.knobs.ignoreAbort = true;
   const gate = h.hold();
   visibleBar(second, 'Get synthesis suggestions first').click(); await until(() => h.calls.length === 1);
-  h.view.integrationTask.controller.abort(); gate.resolve(); await tick(); await tick(); await tick();
-  assert.notEqual(h.view.integrationTask?.state, 'directions'); assert.equal(actionNotices(h).length, 0, 'a late result after Stop makes no Notice');
+  h.view.plugin.topicRuns.syntheses(h.view).selection.controller.abort(); gate.resolve(); await tick(); await tick(); await tick();
+  assert.notEqual(h.view.plugin.topicRuns.syntheses(h.view).selection?.state, 'directions'); assert.equal(actionNotices(h).length, 0, 'a late result after Stop makes no Notice');
 });
 integrationTest('multi-select synthesis: a request needs a name and two requests do not both start', async () => {
   const h = await synthesisHarness();
@@ -549,7 +549,7 @@ integrationTest('multi-select synthesis: a request needs a name and two requests
   const second = h.view.startSelectionSynthesis(nodes, options, null, m => failures.push(m), () => {});
   await second; assert.equal(failures.length, 1); assert.match(failures[0], /running/i);
   await until(() => h.calls.length === 1); gate.resolve(); await first;
-  assert.equal(h.calls.length, 1); assert.equal(h.view.integrationTask.state, 'directions');
+  assert.equal(h.calls.length, 1); assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selection.state, 'directions');
 });
 integrationTest('05c: a selection synthesis refused by the run registry frees this view and its modal abort listener', async () => {
   const h = await synthesisHarness();
@@ -560,24 +560,24 @@ integrationTest('05c: a selection synthesis refused by the run registry frees th
   const listeners = new Set(); const modalSignal = { aborted: false, addEventListener: (_n, f) => listeners.add(f), removeEventListener: (_n, f) => listeners.delete(f) };
   const failures = [];
   await h.view.startSelectionSynthesis(h.kids, { ...options, signal: modalSignal }, null, m => failures.push(m), () => {});
-  assert.equal(failures.length, 1); assert.equal(h.view.selectionStarting, false, 'a refused start does not keep the view blocked');
+  assert.equal(failures.length, 1); assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selectionStarting, false, 'a refused start does not keep the view blocked');
   assert.equal(listeners.size, 0, 'the modal abort listener is removed');
   const gate = h.hold();
   const again = h.view.startSelectionSynthesis(h.kids, options, null, m => failures.push(m), () => {});
   await until(() => h.calls.length === 1); gate.resolve(); await again;
-  assert.equal(failures.length, 1, 'the same view starts again after the refusal'); assert.equal(h.view.integrationTask.state, 'directions');
+  assert.equal(failures.length, 1, 'the same view starts again after the refusal'); assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selection.state, 'directions');
 });
 integrationTest('multi-select synthesis: Stop during the draft then Try again runs a fresh request instead of aborting at once (D2)', async () => {
   const h = await synthesisHarness();
   const modal = await h.openSelection();
   const gate = h.hold();
   visibleBar(modal, 'Skip suggestions and synthesize now').click(); await until(() => h.calls.length === 1); await tick();
-  h.view.integrationTask.controller.abort(); await until(() => h.calls[0].signal.aborted); await tick(); await tick();
-  assert.equal(h.view.integrationTask.state, 'cancelled'); gate.resolve();
-  h.view.retrySelectionSynthesis(h.view.integrationTask);
+  h.view.plugin.topicRuns.syntheses(h.view).selection.controller.abort(); await until(() => h.calls[0].signal.aborted); await tick(); await tick();
+  assert.equal(h.view.plugin.topicRuns.syntheses(h.view).selection.state, 'cancelled'); gate.resolve();
+  h.view.retrySelectionSynthesis(h.view.plugin.topicRuns.syntheses(h.view).selection);
   await until(() => h.calls.length === 2); await tick();
   assert.equal(h.calls[1].signal.aborted, false, 'the retry does not inherit the stopped run signal');
-  assert.notEqual(h.view.integrationTask?.state, 'cancelled');
+  assert.notEqual(h.view.plugin.topicRuns.syntheses(h.view).selection?.state, 'cancelled');
 });
 integrationTest('synthesis: a result for a map that is no longer open raises no Notice and stores nothing under the new map (Low 1)', async () => {
   const h = await synthesisHarness();

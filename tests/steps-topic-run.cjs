@@ -918,7 +918,9 @@ test('synthesizeSelection draft: a thrown draftFailed or a failing write reaches
   assert.equal(h.fails.length, 1); assert.equal(h.fails[0].message, 'boom'); assert.ok(!h.events.includes('finished'));
   const src = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   const body = src.slice(src.indexOf('private async startSelectionSynthesis('), src.indexOf('private discardSelectionSynthesis('));
-  assert.match(body, /topicRuns\.start\(mapPath, "synthesizeSelection"/); assert.doesNotMatch(body, /plugin\.askModel|running\.(add|delete)/);
+  assert.match(body, /topicRuns\.startSelectionSynthesis\(this,/); assert.doesNotMatch(body, /plugin\.askModel|running\.(add|delete)/);
+  const runSrc = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/topic-run.ts'), 'utf8');
+  assert.match(runSrc, /this\.start\(mapPath, "synthesizeSelection"/);
 });
 
 test('04c: isBusy, hasTask, stopTask, registerTask and releaseTask go through the ports', () => {

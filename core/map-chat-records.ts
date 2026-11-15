@@ -6,6 +6,7 @@
 
 import { parseChatBasis, type MapChatBasis } from "./map-chat-basis";
 import { MAP_CHAT_CHAIN_END_REASONS, resumeRound, type MapChatChainEndReason } from "./map-chat-chain";
+import { normalizeVaultPath } from "./map-chat-guard";
 import { normalizeRemaining } from "./steps/map-chat/step";
 import { markChatBatchTopic, type ChatBatch, type ChatBatchRequest, type ChatBatchTopic } from "./map-chat-batch";
 
@@ -96,6 +97,7 @@ export interface RecordImagesLine extends RecordLineBase {
   items: { title: string; sourceUrl: string }[];
   inserted: number[];
 }
+/** `file_written` notes a Markdown file this conversation created or edited: its path and the hash of the text it wrote (the chat sends the file back while it still holds that text). */
 /** `sources_read` marks that a turn sent the map's data sources (a restored conversation keeps its writes behind the plan). */
 /** `research_started` marks that the conversation started web research (it keeps the plan allow-list on after a restore). */
 export type RecordEventKind =
@@ -106,6 +108,7 @@ export type RecordEventKind =
   | "chain_end"
   | "research_started"
   | "sources_read"
+  | "file_written"
   | "research_batch"
   | "research_batch_topic"
   | "research_batch_end";
@@ -123,6 +126,9 @@ export interface RecordEventLine extends RecordLineBase {
   /** `research_batch_topic`: one card of the batch and how it came out. `research_batch_end`: `not_started` when nothing ran. */
   id?: string;
   status?: string;
+  /** `file_written`: the file and the content hash of what was written. */
+  path?: string;
+  hash?: string;
 }
 export interface RecordMovedLine extends RecordLineBase {
   type: "moved";
@@ -383,6 +389,8 @@ export interface RestoredConversation {
   startedResearch: boolean;
   /** A turn of the file sent the map's data sources (an older file has no mark: false). */
   readsSources: boolean;
+  /** Files this conversation wrote (path and hash of each version), oldest first; only a safe vault path and a hex hash are kept. */
+  ownFiles: { path: string; hash: string }[];
   /** The last chain was interrupted and the user can pick it up again (derived from the lines; nothing of it is written). */
   resume?: RestoredChainResume;
 }
@@ -466,6 +474,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
   const batches = new Map<number, ChatBatch>();
   let startedResearch = false;
   let readsSources = false;
+  const ownFiles: { path: string; hash: string }[] = [];
   for (const line of lines) {
     if (line.type === "conversation") {
       mapPath = typeof line.mapPath === "string" ? line.mapPath : mapPath;
@@ -494,6 +503,12 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       else if (line.kind === "redo") undone.set(line.turn, false);
       else if (line.kind === "research_started") startedResearch = true;
       else if (line.kind === "sources_read") readsSources = true;
+      else if (line.kind === "file_written") {
+        // A hand-edited file cannot make the chat read a path it was never allowed to write: only a normal vault path counts.
+        const path = typeof line.path === "string" ? normalizeVaultPath(line.path) : null;
+        if (path !== null && !path.split("/").some(part => part.startsWith(".")) && typeof line.hash === "string" && /^[0-9a-f]{1,32}$/.test(line.hash))
+          ownFiles.push({ path, hash: line.hash });
+      }
       else if (line.kind === "research_batch") {
         // A second one in the same turn is a rerun: the batch is open again and its cards join the first one's.
         const topics = restoredBatchTopics(line.topics);
@@ -600,6 +615,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     restoredAt: turns.length ? turns[turns.length - 1].at : null,
     startedResearch,
     readsSources,
+    ownFiles,
     ...(resume ? { resume } : {})
   };
 }

@@ -71,7 +71,7 @@ export class MapChatTurnRecord {
       this.log(error instanceof Error ? error.message : String(error));
     }
   }
-  event(kind: RecordEventKind, extra: { reason?: string; round?: number; remaining?: string } = {}): void {
+  event(kind: RecordEventKind, extra: { reason?: string; round?: number; remaining?: string; path?: string; hash?: string } = {}): void {
     this.write({ type: "event", turn: this.turn, kind, ...extra });
   }
   /** The turn ended. Only the first call writes (a late result of a stopped, replaced or closed attempt finds it ended). */

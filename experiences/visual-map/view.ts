@@ -1590,6 +1590,10 @@ export class VisualAgentMapView extends ItemView {
   private chatResearchMarkedIn: string | null = null;
   /** The record conversation whose file already carries the `sources_read` mark. */
   private chatSourcesMarkedIn: string | null = null;
+  /** Markdown files this conversation created or edited -> the content hash of each version it wrote. Only the program writes it. */
+  private chatOwnFiles = new Map<string, Set<string>>();
+  /** The record conversation whose file already holds a `file_written` line for each of these "path\0hash" pairs. */
+  private chatOwnRecorded: { id: string | null; keys: Set<string> } = { id: null, keys: new Set() };
   /** Research notes an earlier round already sent whole (they go last when the budget is short). */
   private chatResearchSent = new Set<string>();
   /** Counts conversations: the result of research another conversation started is not recorded in this one. */
@@ -22445,6 +22449,14 @@ export class VisualAgentMapView extends ItemView {
       picture.selected.imageAttached = true;
     }
     const mapSources = await this.chatMapSources(signal);
+    // Files this conversation made that hold what it wrote: sent whole so edit_md_file can update them. A file already sent as a
+    // chip, the open note or a map source goes in that part, not twice.
+    const sentPaths = new Set<string>();
+    for (const item of [...files, ...(activeSource ? [{ path: activeSource.file.path }] : []), ...snippets, ...(mapSources?.paths ?? []).map(path => ({ path }))]) {
+      const key = normalizeVaultPath(item.path);
+      if (key) sentPaths.add(key);
+    }
+    const ownFiles = await this.chatOwnFilesNow(sentPaths);
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapFolder: this.plugin.repo.topicRoot(this.path),
@@ -22460,6 +22472,7 @@ export class VisualAgentMapView extends ItemView {
         .filter(item => !selectedIds.includes(item.id)),
       snippets,
       files,
+      ...(ownFiles.length ? { ownFiles } : {}),
       userTexts: this.chatUserTexts(),
       summaries: this.chatSummaries(),
       aim: !this.relationsEnabled(),
@@ -23595,6 +23608,7 @@ export class VisualAgentMapView extends ItemView {
       // Research began while the record was off: the mark goes in with the first turn written after it came back on.
       this.markResearchRecorded(record);
       this.markSourcesRecorded(record);
+      this.markOwnFilesRecorded(record);
       return record;
     } catch (error) {
       this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
@@ -23608,6 +23622,44 @@ export class VisualAgentMapView extends ItemView {
     if (writer.conversationId !== record.conversationId || this.chatSourcesMarkedIn === record.conversationId) return;
     this.chatSourcesMarkedIn = record.conversationId;
     record.event("sources_read");
+  }
+  /** Writes a `file_written` line for each version of an own file the record does not hold yet (the record may have been off, or new). */
+  private markOwnFilesRecorded(record: MapChatTurnRecord | null): void {
+    const writer = this.chatRecords;
+    if (!record || !writer || this.plugin.settings.mapChatRecords !== true) return;
+    if (writer.conversationId !== record.conversationId) return;
+    if (this.chatOwnRecorded.id !== record.conversationId) this.chatOwnRecorded = { id: record.conversationId, keys: new Set() };
+    for (const [path, hashes] of this.chatOwnFiles)
+      for (const hash of hashes) {
+        const key = `${path}\0${hash}`;
+        if (this.chatOwnRecorded.keys.has(key)) continue;
+        this.chatOwnRecorded.keys.add(key);
+        record.event("file_written", { path, hash });
+      }
+  }
+  /**
+   * A write of this conversation's own: a created file always counts; an edit counts only for a file already its own (an attached
+   * or open note the chat edits does not become the chat's). Only the program calls this, with what it just wrote.
+   */
+  private noteChatOwnFile(path: string, text: string, created: boolean): void {
+    const key = normalizeVaultPath(path);
+    if (key === null || (!created && !this.chatOwnFiles.has(key))) return;
+    const hashes = this.chatOwnFiles.get(key) ?? new Set<string>();
+    hashes.add(contentHash(text));
+    this.chatOwnFiles.set(key, hashes);
+    this.markOwnFilesRecorded(this.chatLastRecord);
+  }
+  /** The files this conversation wrote that still hold exactly one of the versions it wrote, newest first; `skip` are sent another way. */
+  private async chatOwnFilesNow(skip: Set<string>): Promise<{ path: string; content: string }[]> {
+    const found: { path: string; content: string }[] = [];
+    // Only this map's own folder: a file the conversation wrote elsewhere (another folder it was allowed to write to) is not read back.
+    const root = normalizeVaultPath(this.plugin.repo.topicRoot(this.path));
+    for (const [path, hashes] of [...this.chatOwnFiles].reverse()) {
+      if (skip.has(path) || root === null || !path.startsWith(`${root}/`)) continue;
+      const source = await this.readChatFile(path);
+      if (source && hashes.has(contentHash(source.text))) found.push({ path: source.file.path, content: source.text });
+    }
+    return found;
   }
   /** Writes the `research_started` mark once per record conversation, and only while the record is on (otherwise the next turn writes it). */
   private markResearchRecorded(record: MapChatTurnRecord | null): void {
@@ -23626,6 +23678,8 @@ export class VisualAgentMapView extends ItemView {
     this.chatReadsSources = false;
     this.chatSourcesMarkedIn = null;
     this.chatSourceCache = null;
+    this.chatOwnFiles.clear();
+    this.chatOwnRecorded = { id: null, keys: new Set() };
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   private startChatRecords(): void {
@@ -23730,6 +23784,13 @@ export class VisualAgentMapView extends ItemView {
     );
     writer.markEnded(numbers);
     this.chatRecordTurnSeq = Math.max(0, ...numbers);
+    for (const item of restored.ownFiles) {
+      const hashes = this.chatOwnFiles.get(item.path) ?? new Set<string>();
+      hashes.add(item.hash);
+      this.chatOwnFiles.set(item.path, hashes);
+      this.chatOwnRecorded.keys.add(`${item.path}\0${item.hash}`);
+    }
+    this.chatOwnRecorded.id = restored.id;
     for (const item of chat.completedTurns()) this.chatRecordLogged.add(item.answer);
     this.relocateMapChat();
   }
@@ -25347,6 +25408,7 @@ export class VisualAgentMapView extends ItemView {
   /** edit_md_file as an undo entry: undo puts the old text back, redo the new one, each only over the text it expects. */
   private recordChatFileEdit(path: string, before: string, after: string, run: ChatRun): void {
     run.files?.add(path);
+    this.noteChatOwnFile(path, after, false);
     const swap = async (expected: string, replacement: string): Promise<void> => {
       if ((await this.chatFileText(path)) !== expected) throw this.chatUndoRefusal();
       await this.chatWriteFile(path, replacement);
@@ -25356,6 +25418,7 @@ export class VisualAgentMapView extends ItemView {
   /** create_md_file as an undo entry: undo moves the file to the trash, redo creates it again, each only when nothing changed. */
   private recordChatFileCreate(path: string, content: string, run: ChatRun): void {
     run.files?.add(path);
+    this.noteChatOwnFile(path, content, true);
     this.history.push({
       undo: async () => {
         const file = this.app.vault.getAbstractFileByPath(path);

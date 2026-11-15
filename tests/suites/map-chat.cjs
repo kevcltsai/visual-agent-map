@@ -9006,3 +9006,113 @@ integrationTest('map chat: a file the reply creates under the old map folder aft
   assert.equal(h.files.has(oldRoot), false, 'the old folder is not made again');
   assert.equal(h.contents.get('Notes/Elsewhere.md'), '# Elsewhere\n', 'a path outside the map folder is kept as given');
 });
+
+// ---- bug 2: the files this conversation made come back to it (ownFiles) ----
+const ownTurn = async (h, text = 'go') => { saySomething(h); h.type(text); await h.view.sendMapChat(); await recordIdle(h); return contextOf(h.control.requests.at(-1)); };
+const ownRoot = 'Agent Workspace/Topics/map-a';
+
+integrationTest('map chat own files: a file the chat created comes back in the next turn with its hash, and edit_md_file on it applies (A1)', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const path = `${ownRoot}/Progress.md`;
+  eq((await apply(h, [{ kind: 'create_md_file', path, content: '# Progress\n\nStep one.\n' }])).map(l => l.status), ['done']);
+  const first = await ownTurn(h);
+  eq(first.ownFiles, [{ path, contentHash: contentHash('# Progress\n\nStep one.\n'), content: '# Progress\n\nStep one.\n' }]);
+  const request = h.control.requests.at(-1);
+  eq(request.context.mdHashes[path], contentHash('# Progress\n\nStep one.\n'), 'the hash is the baseline of an edit');
+  const edited = await withTimeout(h.view.applyMapChatActions({ actions: [{ kind: 'edit_md_file', path, find: 'Step one.', replace: 'Step one.\nStep two.' }], rejected: [] }, { mdHashes: request.context.mdHashes, topicHashes: request.context.topicHashes }));
+  assert.equal(edited[0].status, 'done', JSON.stringify(edited));
+  assert.equal(h.contents.get(path), '# Progress\n\nStep one.\nStep two.\n');
+  const second = await ownTurn(h);
+  eq(second.ownFiles.map(f => [f.path, f.content]), [[path, '# Progress\n\nStep one.\nStep two.\n']], 'the new version is the one sent');
+});
+
+integrationTest('map chat own files: a file the user changed, deleted or replaced under the same path is not sent (A2)', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const [a, b, c] = ['A', 'B', 'C'].map(n => `${ownRoot}/${n}.md`);
+  await apply(h, [a, b, c].map(path => ({ kind: 'create_md_file', path, content: `# ${path}\n` })));
+  eq((await ownTurn(h)).ownFiles.length, 3);
+  await h.app.vault.process(h.app.vault.getAbstractFileByPath(a), () => '# the user rewrote it\n');
+  h.files.delete(b); h.contents.delete(b);
+  const sent = (await ownTurn(h)).ownFiles.map(f => f.path);
+  eq(sent, [c], 'only the untouched file');
+  await h.app.vault.create(b, '# a different file\n');
+  eq((await ownTurn(h)).ownFiles.map(f => f.path), [c], 'same path, other content: still not sent');
+});
+
+integrationTest('map chat own files: an attached file that is edited does not become the chat\'s own; a created file that is also the open note is sent once (A3)', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const other = 'Notes/Other.md';
+  const edited = await apply(h, [{ kind: 'edit_md_file', path: other, find: 'naps', replace: 'sleep' }], h.hashes(other));
+  assert.equal(edited[0].status, 'done', JSON.stringify(edited));
+  assert.equal((await ownTurn(h)).ownFiles, undefined, 'no ownFiles key without an own file');
+  const path = `${ownRoot}/Mine.md`;
+  await apply(h, [{ kind: 'create_md_file', path, content: '# Mine\n' }]);
+  h.setActive(path, '# Mine\n');
+  const json = await ownTurn(h);
+  assert.equal(json.activeFile?.path, path, 'sent as the open note');
+  assert.equal(json.ownFiles, undefined, 'not repeated in ownFiles');
+});
+
+integrationTest('map chat own files: create_md_file on an existing path is still refused (A6)', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const path = `${ownRoot}/Again.md`;
+  await apply(h, [{ kind: 'create_md_file', path, content: '# one\n' }]);
+  const again = await apply(h, [{ kind: 'create_md_file', path, content: '# two\n' }]);
+  assert.equal(again[0].status, 'skipped', JSON.stringify(again));
+  assert.equal(h.contents.get(path), '# one\n');
+});
+
+integrationTest('map chat own files: a write is recorded as file_written, once, and a restored conversation sends the file again; a bad line is ignored (A4)', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); h.open();
+  const path = `${ownRoot}/Kept.md`;
+  await sendOne(h, 'first', 'hello');
+  await apply(h, [{ kind: 'create_md_file', path, content: '# Kept\n' }]);
+  await ownTurn(h); await ownTurn(h);
+  await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]);
+  const written = lines.filter(l => l.type === 'event' && l.kind === 'file_written');
+  eq(written.map(l => [l.path, l.hash]), [[path, contentHash('# Kept\n')]], 'written once');
+  const bad = [{ path: 7, hash: 'aa' }, { path: '../x.md', hash: 'aa' }, { path: '.obsidian/x.md', hash: 'aa' }, { path: `${ownRoot}/Bad.md`, hash: 'not hex!' }]
+    .map(extra => rec('event', { turn: 1, at: REC_AT, kind: 'file_written', ...extra }));
+  const g = await harness({ records: true }); await g.view.hydrate();
+  await g.app.vault.create(path, '# Kept\n');
+  await seedRecord(g, [...lines.map(l => ({ ...l })), ...bad], recordFiles(h)[0].split('/').at(-1).replace('.jsonl', ''));
+  const chat = g.open(); await until(() => chat.hasMessages);
+  eq((await ownTurn(g)).ownFiles.map(f => f.path), [path]);
+});
+
+integrationTest('map chat own files: with the record off at first, turning it on writes the earlier files once (like the research mark)', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const path = `${ownRoot}/Late.md`;
+  await apply(h, [{ kind: 'create_md_file', path, content: '# Late\n' }]);
+  await ownTurn(h);
+  h.plugin.settings.mapChatRecords = true; for (const w of h.control.writers) w.setEnabled(true);
+  await ownTurn(h); await ownTurn(h);
+  const written = recordLines(h, recordFiles(h)[0]).filter(l => l.type === 'event' && l.kind === 'file_written');
+  eq(written.map(l => l.path), [path]);
+});
+
+integrationTest('map chat own files: a file made outside the map folder is not sent back (negative)', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  await apply(h, [{ kind: 'create_md_file', path: 'Notes/Outside.md', content: '# Outside\n' }, { kind: 'create_md_file', path: `${ownRoot}/Inside.md`, content: '# Inside\n' }]);
+  eq((await ownTurn(h)).ownFiles.map(f => f.path), [`${ownRoot}/Inside.md`]);
+});
+
+integrationTest('map chat own files: field case - three batch files made in earlier replies come back whole in a new, attachment-free turn (also after a chain ended and the user types 繼續), and an edit applies', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const paths = [1, 2, 3].map(n => `${ownRoot}/各章四項_第${n}批.md`);
+  for (const [i, path] of paths.entries()) {
+    h.control.reply = async () => ({ reply: `batch ${i + 1}`, actions: [{ kind: 'create_md_file', path, content: `# 第${i + 1}批\n\n內容${i + 1}\n` }], rejected: [] });
+    h.type(`做第${i + 1}批`); await h.view.sendMapChat(); await recordIdle(h);
+    assert.equal(h.contents.get(path), `# 第${i + 1}批\n\n內容${i + 1}\n`, `batch ${i + 1} was created`);
+  }
+  for (const text of ['下一步', '繼續']) {
+    const json = await ownTurn(h, text);
+    eq(json.ownFiles.map(f => [f.path, f.content, f.contentHash]).sort(), paths.map((path, i) => [path, `# 第${i + 1}批\n\n內容${i + 1}\n`, contentHash(`# 第${i + 1}批\n\n內容${i + 1}\n`)]).sort());
+    assert.equal(json.continuation, undefined, 'a user turn, not a chain round');
+  }
+  const request = h.control.requests.at(-1);
+  const edited = await withTimeout(h.view.applyMapChatActions({ actions: [{ kind: 'edit_md_file', path: paths[1], find: '內容2', replace: '內容2（改）' }], rejected: [] }, { mdHashes: request.context.mdHashes, topicHashes: request.context.topicHashes }));
+  assert.equal(edited[0].status, 'done', JSON.stringify(edited));
+  assert.match(h.contents.get(paths[1]), /內容2（改）/);
+});

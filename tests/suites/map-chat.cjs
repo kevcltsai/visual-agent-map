@@ -9504,7 +9504,7 @@ integrationTest('P2 view: the call budget counts across rounds - three rounds of
 });
 integrationTest('P2 view (k): a 71-chapter book - research for 71 cards, 71 summaries, a file made then edited, run to the end: done, no plan card, at most 300 calls; a delete in a later message still gets a card', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const spy = chainSpy(chat); const runs = researchStub(h);
-  let endedRun = null; const real = h.view.endChatRecordedProbe; void real; const realEnd = h.view.endChatChain.bind(h.view); h.view.endChatChain = (run, ...rest) => { endedRun = { calls: run.state.calls, round: run.state.round }; return realEnd(run, ...rest); };
+  let endedRun = null; const real = h.view.endChatRecordedProbe; void real; const realEnd = h.view.chatChainRunner.endChatChain.bind(h.view.chatChainRunner); h.view.chatChainRunner.endChatChain = (run, ...rest) => { endedRun = { calls: run.state.calls, round: run.state.round }; return realEnd(run, ...rest); };
   const refs = Array.from({ length: 71 }, (_, i) => `c${i}`);
   chainReplies(h,
     say('Chapters.', [...refs.map((r, i) => addRoot(r, `Chapter ${i + 1}`, h.ids.root)), researchAct({ nodeIds: refs.map(r => `new:${r}`), mode: 'standard' })], 'Summaries and a file'),

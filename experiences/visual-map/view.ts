@@ -451,7 +451,6 @@ import {
   type MapChatSteer,
   type MapChatTurnHandle,
   settledLine,
-  chatResultLines,
   expandFailureLine
 } from "./map-chat";
 import { imageMarkdown, type ImageCandidate } from "../../core/image-candidates";
@@ -465,26 +464,11 @@ import { loadableImages } from "../../ui/image-candidates";
 import { ChatImageFinder, newChatImageBatch, type ChatImageBatch } from "./chat-image-finder";
 import {
   MAP_CHAT_AUTO_MAX_CALLS,
-  MAP_CHAT_AUTO_MAX_ROUNDS,
-  MAP_CHAT_CHAIN_MAX_ROUNDS,
-  MAP_CHAT_CHAIN_WAIT_MS,
-  chainEndNeedsNotice,
-  finishRound,
-  finishWait,
   isResumeKeyword,
-  resumeRound,
-  interrupt as interruptChainState,
   pauseForPlan,
   planChainOf,
-  resumedChain,
-  startAutoChain,
-  startChain,
   syncAutoApply,
-  type MapChatChainDecision,
-  type MapChatChainEndReason,
-  type MapChatChainInterrupt,
-  type MapChatChainState,
-  type MapChatWaitEnd
+  type MapChatChainInterrupt
 } from "../../core/map-chat-chain";
 import {
   chatBasisFor,
@@ -495,8 +479,6 @@ import {
 } from "../../core/map-chat-basis";
 import {
   buildMapChatContext,
-  pendingResearchCount,
-  type MapChatContinuationInput,
   type MapChatResearchNote,
   type MapChatSummary,
   type MapChatUserText,
@@ -532,6 +514,17 @@ import {
 } from "../../core/map-chat-records";
 import { MapChatRecordWriter, type MapChatRecordTarget } from "./map-chat-record-writer";
 import { MapChatRecordSession, type MapChatRecordSessionPorts } from "./map-chat-record-session";
+import {
+  MapChatChainRunner,
+  newChatWork,
+  type ChatChainRun,
+  type ChatExpandOutcome,
+  type ChatResearchOutcome,
+  type ChatRoundEnd,
+  type ChatRoundWork,
+  type ChatWorkTopic,
+  type MapChatChainPorts
+} from "./map-chat-chain-run";
 import { TopicChatRecordWriter } from "./topic-chat-record-writer";
 import { judgeTopicScope, topicSubtreeIds } from "./topic-chat-scope";
 import {
@@ -545,7 +538,6 @@ import { MapChatTurnRecord, type TurnEndFields } from "./map-chat-turn-record";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
   chatResearchMode,
-  estimateChatCalls,
   chatResearchRequest,
   mapChoiceParts,
   matchMapTitle,
@@ -1028,17 +1020,6 @@ interface ResearchWebTally {
   counted: number;
   withoutSearch: number;
 }
-/** One card of research or expansion work a continuation waited for, and how it came out. */
-interface ChatWorkTopic {
-  id: string;
-  title: string;
-  status: "succeeded" | "failed" | "stopped";
-  error?: string;
-}
-/** How a research batch that the chat started came out. Told exactly once, whichever way the batch ends (or never starts). */
-export type ChatResearchOutcome =
-  | { kind: "not_started" }
-  | { kind: "settled"; succeeded: number; failed: number; stopped: number; topics: ChatWorkTopic[] };
 /** One topic's chat: the conversation lives here (not in the window), so a task that outlives a closed window can still tell its result. */
 interface TopicChatEntry {
   nodeId: string;
@@ -1083,38 +1064,6 @@ interface SubtreeChainOutcome {
   /** Topics below the root the root's integration reads. */
   read: number;
 }
-/** How one expansion the chat started came out. */
-type ChatExpandOutcome =
-  { status: "succeeded"; titles: string[] } | { status: "failed"; reason: string } | { status: "stopped" };
-/** The work one reply started that a continuation may wait for, and the handle that stops it. */
-interface ChatRoundWork {
-  /** Aborted by Stop: work not started yet is not started, and a running expansion stops. */
-  controller: AbortController;
-  /** One promise per research action, each settling once. */
-  research: Promise<ChatResearchOutcome>[];
-  researchTargets: number;
-  /** The batch keys (one per map) of the research, to stop what is running. */
-  researchKeys: Set<string>;
-  /** Ids of the cards the round created (the chain keeps them: its later rounds may rewrite and research those without a plan). */
-  created: string[];
-  expand: { id: string; title: string; path: string; done: Promise<ChatExpandOutcome> }[];
-  /** An integration, a merge or a rating started: a continuation does not wait for these and ends. */
-  otherBackground: boolean;
-  /** The cards a select_topics of the round selected (the chain keeps them for its later rounds). */
-  selected?: string[];
-  /** Positions of the `read_md_file` actions of the round that were accepted (they have no result line; the chain goes on for them). */
-  reads: Set<number>;
-}
-const newChatWork = (): ChatRoundWork => ({
-  controller: new AbortController(),
-  research: [],
-  researchTargets: 0,
-  researchKeys: new Set(),
-  created: [],
-  expand: [],
-  otherBackground: false,
-  reads: new Set()
-});
 /** What `applyMapChatActions` is given beyond the reply: the context the basis is judged by and where the started work is collected. */
 interface ChatApplyOptions {
   context?: Pick<MapChatContext, "basis" | "parents">;
@@ -1132,59 +1081,6 @@ interface ChatApplyOptions {
     run?: (action: Extract<MapChatAction, { kind: "run_map_action" }>, targets: string[]) => Promise<ChatOutcome>;
   };
 }
-/** What a finished round hands to its chain: the reply, what was applied, and the work it started. */
-interface ChatRoundEnd {
-  result: MapChatResult;
-  context: Pick<MapChatContext, "research" | "selectedCount">;
-  lines: MapChatLine[];
-  work: ChatRoundWork;
-  anchor: { path: string; id: string | undefined };
-}
-/** One automatic continuation of a chat message, owned by the view (at most one). Lives in memory only. */
-interface ChatChainRun {
-  /** Tells this chain from an earlier one in a late event or a retry. */
-  seq: number;
-  state: MapChatChainState;
-  /** The map the chain belongs to; a create or open the chain performs moves it. */
-  anchor: { path: string; id: string | undefined };
-  /** The message every round asks: the user's words plus the follow-ups that went into earlier rounds. */
-  message: string;
-  /** The turn of the round in flight, or of the last one. */
-  turn: MapChatTurnHandle | null;
-  record: MapChatTurnRecord | null;
-  /** What the latest reply said was still to do (known before the round has ended). */
-  replyRemaining: string;
-  lastResults: MapChatContinuationInput["lastResults"];
-  /** Cards the chain's rounds created so far (real ids). */
-  createdIds: Set<string>;
-  /** The chips of the user's message (not the follow-ups'): every round of the chain is built with them. */
-  chips: MapChatChip[];
-  /** What the work waited for came to, for the next round. */
-  waited: MapChatContinuationInput["research"];
-  /** Lines about failed work, for the notice at the end. */
-  details: string[];
-  /** Research that went on after some of it failed (the next round says so on its separator). */
-  partial: { failed: number; succeeded: number } | null;
-  work: ChatRoundWork | null;
-  timer: number | null;
-  /** The panel was told that the chain waits (and must be told that it does not). */
-  waitShown: boolean;
-  /** The cards the AI selected in a round of this chain (null: it never selected); later rounds read these. */
-  aiSelection: string[] | null;
-  /** What was still to do when the current round began (a resume that redoes the round starts from it). */
-  roundRemaining: string;
-  /** Auto-apply chain: vault paths already backed up in this chain (once per file per chain). */
-  backedUp: Set<string>;
-  /** Auto-apply chain: vault paths (md files, Map.md of a new map) the chain created itself; they have nothing to back up. */
-  createdFiles: Set<string>;
-  /** Auto-apply chain: the round that was already retried once after a failure (a second failure ends the chain). */
-  retriedRound: number | null;
-  /** Auto-apply chain: what the last applied round did directly ("research 12, ..."), shown on the next round's separator. */
-  appliedText: string;
-}
-/** The lines of research and expansions that did not work out, one line each, for the end notice of a chain. */
-const chainWorkDetail = (item: { title: string; status: string; error?: string }): string =>
-  item.error ? `${item.title}: ${item.error}` : item.title;
 /** The lines that say how many web searches a research batch made; a topic with none is a warning of its own. */
 function researchWebLines(web: ResearchWebTally): MapChatLine[] {
   if (!web.counted) return [];
@@ -1438,8 +1334,15 @@ export class VisualAgentMapView extends ItemView {
   /** Lower-cased normalised paths of the map's data sources while a chat write action runs; null otherwise. */
   private chatReadOnlyPaths: ReadonlySet<string> | null = null;
   /** The automatic continuation of the latest message (running, waiting for work or for a plan); null when there is none. */
-  private chatChain: ChatChainRun | null = null;
-  private chatChainSeq = 0;
+  /** The automatic continuation of the latest message (see MapChatChainRunner); the runner lives and dies with the view. */
+  private readonly chatChainRunner = new MapChatChainRunner(this.chatChainPorts());
+  // The runner's chain under its old name (the `?.` is for fixtures that never ran the constructor).
+  private get chatChain(): ChatChainRun | null {
+    return this.chatChainRunner?.current ?? null;
+  }
+  private set chatChain(run: ChatChainRun | null) {
+    this.chatChainRunner.current = run;
+  }
   /** "Apply this whole conversation automatically" is on: the next chain the user starts (or resumes) is an auto-apply chain. */
   private chatAutoApply = false;
   /** Cards this conversation researched (a `research_standard` that really started) and how each came out; reset with the conversation. */
@@ -21991,444 +21894,58 @@ export class VisualAgentMapView extends ItemView {
   }
   // ---- automatic continuation (the chain) ---------------------------------------------------------------------------------
 
-  /**
-   * The chain a round belongs to. A message of the user's starts a new one (round 1); an automatic round goes on with the chain it
-   * came from. A retry of a failed automatic round finds no live chain (it ended as `failed`) and takes the round again from the
-   * state saved in its origin, without counting it twice.
-   */
+  /** The chain a round belongs to (see MapChatChainRunner). */
   private chainForRound(
     origin: MapChatChainOrigin | undefined,
     anchor: { path: string; id: string | undefined },
     message: string
   ): ChatChainRun {
-    const live = this.chatChain;
-    if (origin && live && live.seq === origin.seq && live.state.phase === "round") {
-      live.anchor = anchor;
-      live.message = message;
-      live.replyRemaining = origin.continuation.remaining;
-      live.roundRemaining = origin.continuation.remaining;
-      return live;
-    }
-    // A retry of an old failed round while another chain is still alive (waiting, with its timer): that chain ends first.
-    if (live) this.interruptChain(live, "user_took_over");
-    const run: ChatChainRun = {
-      seq: ++this.chatChainSeq,
-      state: origin ? { ...origin.state, phase: "round" } : this.chatAutoApply ? startAutoChain() : startChain(),
-      anchor,
-      message,
-      turn: null,
-      record: null,
-      replyRemaining: origin?.continuation.remaining ?? "",
-      lastResults: origin?.continuation.lastResults ?? [],
-      createdIds: new Set(origin?.createdIds ?? []),
-      chips: [],
-      waited: origin?.continuation.research ?? [],
-      details: [],
-      partial: null,
-      work: null,
-      timer: null,
-      waitShown: false,
-      aiSelection: origin?.aiSelection ? [...origin.aiSelection] : null,
-      roundRemaining: origin?.continuation.remaining ?? "",
-      backedUp: new Set(),
-      createdFiles: new Set(),
-      retriedRound: null,
-      appliedText: ""
-    };
-    this.chatChain = run;
-    return run;
+    return this.chatChainRunner.chainForRound(origin, anchor, message);
   }
   /** Turns "apply this whole conversation automatically" on or off for the chains that start (or resume) from now on. */
   setChatAutoApply(on: boolean): void {
     this.chatAutoApply = on;
   }
-  /**
-   * A round of an auto-apply chain failed (provider timeout, transient or format failure): the same round is sent once more, at once,
-   * counting as one more call of the chain. Only the live, un-stopped chain of this round is retried (a Stop or a new message has
-   * already ended it); a second failure of the round ends the chain as `failed` as usual. Returns whether a retry was started.
-   */
   private retryAutoRound(run: ChatChainRun, origin: MapChatOrigin): boolean {
-    // The switch is read live (run.state.autoApply lags it); the retry is only started when sendMapChat would really send it.
-    if (
-      !this.chatAutoApply ||
-      run.retriedRound === run.state.round ||
-      this.chatChain !== run ||
-      run.state.phase !== "round" ||
-      this.closed ||
-      this.chatApplying ||
-      !this.map ||
-      this.notesLoading() ||
-      !origin.text
-    )
-      return false;
-    run.retriedRound = run.state.round;
-    run.state = { ...run.state, calls: run.state.calls + 1 };
-    void this.sendMapChat({ ...origin }, undefined, run).catch(error => errorNotice(error));
-    return true;
+    return this.chatChainRunner.retryAutoRound(run, origin);
   }
-  /** The cards of an earlier AI selection that are still on the map. */
-  private chainSelection(ids: string[]): string[] {
-    const map = this.map;
-    return map ? ids.filter(id => map.nodes.some(node => node.id === id)) : [];
-  }
-  /**
-   * Sends the round after an interrupted chain (the button under the last reply, or the word "continue"). Every guard that fails
-   * leaves the resume point where it is; once it passes the point is used up before anything is sent, so a second press sends nothing.
-   */
   private resumeChatChain(message: MapChatMessage): boolean {
-    const chat = this.chat;
-    const point = message.resume;
-    if (
-      !chat ||
-      !point ||
-      chat.isBusy ||
-      this.chatApplying ||
-      this.closed ||
-      !this.map ||
-      this.notesLoading() ||
-      this.chatChain ||
-      point !== chat.resumePoint() ||
-      point.conversationId !== chat.conversationId
-    )
-      return false;
-    chat.dropResume(point);
-    const selected = this.chainSelection(point.selectedIds);
-    const origin: MapChatOrigin = {
-      text: point.message,
-      chips: [],
-      selectedIds: selected.length ? selected : this.chatSelectionIds(),
-      chain: {
-        seq: 0,
-        resumed: true,
-        ...(selected.length ? { aiSelection: selected } : {}),
-        // The toggle of the moment (never the saved one) decides the segment: a reload leaves it off.
-        state: resumedChain({ ...point, maxRounds: this.resumeSegmentEnd(point.round) }, this.chatAutoApply),
-        createdIds: [],
-        continuation: {
-          round: point.round,
-          maxRounds: point.maxRounds,
-          remaining: point.remaining,
-          lastResults: point.lastResults,
-          research: [],
-          ...(point.progress ? { progress: point.progress } : {})
-        }
-      }
-    };
-    void this.sendMapChat(origin).catch(error => errorNotice(error));
-    return true;
+    return this.chatChainRunner.resumeChatChain(message);
   }
-  /** The last round of the segment a resumed chain starts at `round`, by the toggle of the moment (60-round segments when on, 8 when off). */
-  private resumeSegmentEnd(round: number): number {
-    const segment = this.chatAutoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS;
-    return segment * Math.ceil(round / segment);
-  }
-  /** The continuation is more than a single answer (a later round, or one that said something was left): its end is told and recorded. */
   private chainShows(run: ChatChainRun): boolean {
-    return run.state.round >= 2 || !!run.replyRemaining || !!run.state.remaining;
+    return this.chatChainRunner.chainShows(run);
   }
-  /** Ends the chain from the outside (Stop, a new message, a failure, a map change): the first ending wins, a later one changes nothing. */
   private interruptChain(run: ChatChainRun | null, reason: MapChatChainInterrupt): void {
-    if (!run) return;
-    const step = interruptChainState(run.state, reason);
-    if (step.decision.kind !== "end") return;
-    // Waiting for the work means the round's reply was applied; any earlier phase means it was not.
-    const applied = run.state.phase === "waiting";
-    run.state = step.state;
-    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining, applied);
+    this.chatChainRunner.interruptChain(run, reason);
   }
-  /** The chain is over: its timer and wait go, the end is recorded, and (unless it simply finished) the panel says why. */
-  private endChatChain(run: ChatChainRun, reason: MapChatChainEndReason, remaining: string, applied = true): void {
-    if (this.chatChain === run) this.chatChain = null;
-    if (run.timer !== null) window.clearTimeout(run.timer);
-    run.timer = null;
-    run.state = { ...run.state, phase: "ended" };
-    if (this.closed) return;
-    const chat = this.chat;
-    if (run.waitShown) chat?.setChainWaiting(null);
-    run.waitShown = false;
-    if (!this.chainShows(run)) return;
-    // The AI calls of the segment are counted and told only for an auto-apply chain.
-    const calls = run.state.autoApply ? run.state.calls : undefined;
-    this.chatLastRecord?.event("chain_end", {
-      reason,
-      round: run.state.round,
-      remaining,
-      ...(calls === undefined ? {} : { calls })
-    });
-    // "Done" is told only to a chain that went on by itself (round 2 on): a single round that finished adds nothing.
-    if (chat && (chainEndNeedsNotice(reason) || (reason === "done" && run.state.round >= 2))) {
-      // A failed round has its Retry button; the rest of the ends that can go on offer the next round.
-      const next =
-        reason === "failed"
-          ? null
-          : resumeRound(
-              {
-                reason,
-                round: run.state.round,
-                applied,
-                startRemaining: run.roundRemaining,
-                replyRemaining: remaining
-              },
-              run.state.autoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS
-            );
-      const details = run.details.length ? run.details : undefined;
-      if (calls === undefined) chat.endChain(reason, remaining, details);
-      else chat.endChain(reason, remaining, details, calls);
-      if (next)
-        chat.offerResume({
-          ...next,
-          ...(run.state.progress ? { progress: run.state.progress } : {}),
-          stoppedRound: run.state.round,
-          reason,
-          message: run.message,
-          selectedIds: run.aiSelection ? [...run.aiSelection] : [],
-          lastResults: run.lastResults.map(line => ({ text: line.text, status: line.status }))
-        });
-    }
-  }
-  /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
   private stopChainWork(run: ChatChainRun): void {
-    const work = run.work;
-    if (!work) return;
-    // The controller reaches the expansions (chatExpand listens to it) and the research that has not started.
-    work.controller.abort();
-    for (const key of work.researchKeys) this.plugin.expansionCoordinator.stop(key);
+    this.chatChainRunner.stopChainWork(run);
   }
-  /** A round ended with its reply applied (or its plan): the chain goes on, waits or ends, unless the user spoke meanwhile. */
   private finishChatRound(run: ChatChainRun, round: ChatRoundEnd): void {
-    // Follow-ups that waited are the user speaking: the chain ends and they are sent once as the next message.
-    if (this.chat?.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
-    else this.advanceChain(run, round);
-    this.flushSteers(true);
+    this.chatChainRunner.finishChatRound(run, round);
   }
   private advanceChain(run: ChatChainRun, round: ChatRoundEnd): void {
-    if (this.chatChain !== run || run.state.phase === "ended") return;
-    run.partial = null;
-    for (const id of round.work.created) run.createdIds.add(id);
-    if (round.work.selected) run.aiSelection = [...round.work.selected];
-    run.lastResults = chatResultLines(round.lines).map(line => ({ text: line.text, status: line.status }));
-    run.anchor = { path: round.anchor.path, id: round.anchor.id };
-    // The switch of the moment decides the limits of the segment from here on.
-    run.state = syncAutoApply(run.state, this.chatAutoApply);
-    const appliedActions = round.result.actions.filter((_, index) => round.lines[index]?.status === "done");
-    run.appliedText = run.state.autoApply ? this.appliedDirectlyText(appliedActions, round.context.selectedCount) : "";
-    const step = finishRound(run.state, {
-      // The round's own request plus the AI calls its applied actions started (counted for the auto-apply limit).
-      calls:
-        1 +
-        estimateChatCalls(appliedActions, round.context, {
-          diagrams: this.plugin.settings.addDiagramsAfterResearch,
-          mapAiMode: this.map?.aiMode
-        }),
-      progress: round.result.progress ?? null,
-      ...(round.result.droppedOnRetry ? { droppedOnRetry: true } : {}),
-      remaining: round.result.remaining,
-      researchDeferred: pendingResearchCount(round.context),
-      // A read has no line of its own: the lines are the other actions', in order.
-      actions: round.result.actions.map((action, index) => ({
-        kind: action.kind,
-        done:
-          action.kind === "read_md_file"
-            ? round.work.reads.has(index)
-            : round.lines[round.result.actions.slice(0, index).filter(other => other.kind !== "read_md_file").length]
-                ?.status === "done"
-      })),
-      started: {
-        research: round.work.researchTargets,
-        expand: round.work.expand.length,
-        otherBackground: round.work.otherBackground
-      }
-    });
-    run.state = step.state;
-    this.showChainFlow(
-      run,
-      step.decision.kind === "end" && step.decision.reason === "done" && !step.decision.remaining.trim()
-    );
-    this.followChainDecision(run, step.decision, round.work);
+    this.chatChainRunner.advanceChain(run, round);
   }
-  /**
-   * The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). A chain
-   * that ended done with nothing left shows every step done, even when the last reply did not move the statuses.
-   */
-  private showChainFlow(run: ChatChainRun, finished = false): void {
-    const progress = run.state.progress;
-    if (!run.state.autoApply || !progress) return;
-    this.chat?.setFlowProgress({
-      steps: progress.steps.map(step => ({ ...step, ...(finished ? { status: "done" as const } : {}) })),
-      round: run.state.round,
-      calls: run.state.calls,
-      maxCalls: MAP_CHAT_AUTO_MAX_CALLS
-    });
-  }
-  /** "research 12, rewritten summaries 12, updated notes 3": what an auto-apply round did without asking (empty: nothing of these). */
-  private appliedDirectlyText(actions: readonly MapChatAction[], selectedCount: number): string {
-    const research = researchTargetsOf(actions, selectedCount);
-    const summaries = actions.filter(action => action.kind === "update_summary").length;
-    const notes = actions.filter(
-      action => action.kind === "edit_topic_note" || action.kind === "edit_md_file" || action.kind === "create_md_file"
-    ).length;
-    const parts = [
-      research ? t("ui.map_chat_auto_applied_research_0", research) : "",
-      summaries ? t("ui.map_chat_auto_applied_summary_0", summaries) : "",
-      notes ? t("ui.map_chat_auto_applied_notes_0", notes) : ""
-    ].filter(Boolean);
-    return parts.join(t("ui.map_chat_chain_detail_separator"));
-  }
-  private followChainDecision(run: ChatChainRun, decision: MapChatChainDecision, work: ChatRoundWork | null): void {
-    if (decision.kind === "end") this.endChatChain(run, decision.reason, decision.remaining);
-    else if (decision.kind === "wait" && work) this.waitForChain(run, decision.waitFor, work);
-    else if (decision.kind === "next") this.startNextRound(run, decision.round, decision.remaining);
-  }
-  /** Waits for the research and expansions the round started; the 30 minutes only end the chain, never the work (auto-apply: 30 minutes with none finishing). */
-  private waitForChain(run: ChatChainRun, waitFor: ("research" | "expand")[], work: ChatRoundWork): void {
-    const chat = this.chat;
-    const research = waitFor.includes("research") ? work.research : [];
-    const expand = waitFor.includes("expand") ? work.expand : [];
-    const waiting = { kinds: waitFor, total: (research.length ? work.researchTargets : 0) + expand.length, settled: 0 };
-    chat?.setChainWaiting(waiting, run.state.remaining);
-    run.waitShown = true;
-    const progress = (by: number): void => {
-      if (this.chatChain !== run || run.state.phase !== "waiting") return;
-      waiting.settled = Math.min(waiting.total, waiting.settled + by);
-      this.chat?.setChainWaiting(waiting, run.state.remaining);
-      // Auto-apply: the 30 minutes count from the last research or expansion that finished, not from the start of the wait.
-      if (this.chatAutoApply) {
-        if (run.timer !== null) window.clearTimeout(run.timer);
-        arm();
+  private chatChainPorts(): MapChatChainPorts {
+    return {
+      panel: () => this.chat,
+      closed: () => this.closed,
+      applying: () => this.chatApplying,
+      notesLoading: () => this.notesLoading(),
+      path: () => this.path,
+      map: () => this.map,
+      selectionIds: () => this.chatSelectionIds(),
+      autoApply: () => this.chatAutoApply,
+      diagrams: () => this.plugin.settings.addDiagramsAfterResearch,
+      lastRecord: () => this.chatLastRecord,
+      stopResearch: key => this.plugin.expansionCoordinator.stop(key),
+      flushSteers: send => this.flushSteers(send),
+      // Read at call time (a wrapped or replaced sendMapChat is used); the failure notice is the view's.
+      send: (...args) => {
+        void this.sendMapChat(...args).catch(error => errorNotice(error));
       }
     };
-    const arm = (): void => {
-      run.timer = window.setTimeout(() => {
-        run.timer = null;
-        this.settleChainWait(run, { timedOut: true }, []);
-      }, MAP_CHAT_CHAIN_WAIT_MS);
-    };
-    arm();
-    let researched: ChatResearchOutcome | undefined;
-    const waited: ChatWorkTopic[] = [];
-    let expandSucceeded = 0;
-    let expandFailed = 0;
-    const pending: Promise<void>[] = [];
-    if (research.length)
-      pending.push(
-        Promise.all(research).then(outcomes => {
-          const settled = outcomes.flatMap(outcome => (outcome.kind === "settled" ? [outcome] : []));
-          researched = settled.length
-            ? {
-                kind: "settled",
-                succeeded: settled.reduce((sum, outcome) => sum + outcome.succeeded, 0),
-                failed: settled.reduce((sum, outcome) => sum + outcome.failed, 0),
-                stopped: settled.reduce((sum, outcome) => sum + outcome.stopped, 0),
-                topics: settled.flatMap(outcome => outcome.topics)
-              }
-            : { kind: "not_started" };
-          if (researched.kind === "settled") waited.push(...researched.topics);
-          progress(work.researchTargets);
-        })
-      );
-    for (const item of expand)
-      pending.push(
-        item.done.then(outcome => {
-          if (outcome.status === "succeeded") expandSucceeded++;
-          else if (outcome.status === "failed") expandFailed++;
-          waited.push({
-            id: item.id,
-            title: item.title,
-            status: outcome.status,
-            ...(outcome.status === "failed" ? { error: outcome.reason } : {})
-          });
-          progress(1);
-        })
-      );
-    void Promise.all(pending).then(() =>
-      this.settleChainWait(
-        run,
-        {
-          ...(researched ? { research: researched } : {}),
-          ...(expand.length ? { expand: { succeeded: expandSucceeded, failed: expandFailed } } : {})
-        },
-        waited
-      )
-    );
-  }
-  /** What the chain waited for is over (or the 30 minutes are). A late or repeated call, for a chain that has moved on, changes nothing. */
-  private settleChainWait(run: ChatChainRun, end: MapChatWaitEnd, waited: ChatWorkTopic[]): void {
-    if (this.chatChain !== run || run.state.phase !== "waiting") return;
-    if (run.timer !== null) window.clearTimeout(run.timer);
-    run.timer = null;
-    const chat = this.chat;
-    if (
-      this.closed ||
-      !chat ||
-      this.path !== run.anchor.path ||
-      this.map?.id !== run.anchor.id ||
-      (run.turn !== null && !chat.hasTurn(run.turn))
-    ) {
-      this.interruptChain(run, "map_changed");
-      return;
-    }
-    chat.setChainWaiting(null);
-    run.waitShown = false;
-    run.waited = waited.map(item => ({
-      id: item.id,
-      title: item.title,
-      status: item.status,
-      ...(item.error ? { error: item.error } : {})
-    }));
-    run.details = waited.filter(item => item.status !== "succeeded").map(chainWorkDetail);
-    const step = finishWait(run.state, end);
-    run.state = step.state;
-    // Research that partly failed and goes on is told on the separator of the next round (it is not an ending).
-    run.partial =
-      step.decision.kind === "next" &&
-      end.research?.kind === "settled" &&
-      end.research.failed > 0 &&
-      end.research.succeeded > 0
-        ? { failed: end.research.failed, succeeded: end.research.succeeded }
-        : null;
-    this.followChainDecision(run, step.decision, null);
-  }
-  /** Round `round` of the chain begins now, as a message of its own: the same preparation, request, plan rules and apply as any send. */
-  private startNextRound(run: ChatChainRun, round: number, remaining: string): void {
-    const chat = this.chat;
-    if (
-      this.closed ||
-      !chat ||
-      this.path !== run.anchor.path ||
-      this.map?.id !== run.anchor.id ||
-      (run.turn !== null && !chat.hasTurn(run.turn))
-    ) {
-      this.interruptChain(run, "map_changed");
-      return;
-    }
-    if (chat.isBusy || this.chatApplying) {
-      this.interruptChain(run, "user_took_over");
-      return;
-    }
-    const origin: MapChatOrigin = {
-      text: run.message,
-      // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
-      // a picture is sent with the first round only and a follow-up adds no chip.
-      chips: [...run.chips],
-      selectedIds: run.aiSelection ? this.chainSelection(run.aiSelection) : this.chatSelectionIds(),
-      chain: {
-        seq: run.seq,
-        ...(run.aiSelection ? { aiSelection: [...run.aiSelection] } : {}),
-        state: run.state,
-        createdIds: [...run.createdIds],
-        continuation: {
-          round,
-          maxRounds: run.state.maxRounds,
-          remaining,
-          lastResults: run.lastResults,
-          research: run.waited,
-          ...(run.state.progress ? { progress: run.state.progress } : {}),
-          ...(run.state.checkingDone ? { checkDone: true } : {})
-        }
-      }
-    };
-    run.work = null;
-    void this.sendMapChat(origin).catch(error => errorNotice(error));
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   private supersedeChatPlan(): void {

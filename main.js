@@ -53555,6 +53555,636 @@ var MapChatRecordSession = class {
   }
 };
 
+// core/map-chat-plan.ts
+var MAP_CHAT_PLAN_ACTION_LIMIT = 15;
+var MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
+var MAP_CHAT_AUTO_LAYOUT_MIN_NEW = 5;
+var MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
+var IMAGE_SAFE_KINDS = /* @__PURE__ */ new Set([
+  "add_anchor",
+  "link_anchor",
+  "add_child",
+  "add_relation",
+  "focus_topic",
+  "auto_layout",
+  "collapse_topic",
+  "expand_topic"
+]);
+var CHAIN_SAFE = /* @__PURE__ */ new Set([
+  "add_child",
+  "add_relation",
+  "update_summary",
+  "set_topic_kind",
+  "set_appearance",
+  "select_topics",
+  "focus_topic",
+  "read_md_file",
+  "collapse_topic",
+  "expand_topic",
+  "auto_layout"
+]);
+var CHAIN_SAFE_RUN = /* @__PURE__ */ new Set(["research_standard", "expand"]);
+var isChainSafe = (action) => action.kind === "run_map_action" ? CHAIN_SAFE_RUN.has(action.action) : CHAIN_SAFE.has(action.kind);
+function isChainSafeFor(action, trusted = {}) {
+  var _a2, _b2;
+  if (!isChainSafe(action)) return false;
+  const made = (id) => {
+    var _a3, _b3;
+    return id.startsWith(MAP_CHAT_NEW_PREFIX) || ((_b3 = (_a3 = trusted.createdIds) == null ? void 0 : _a3.has(id)) != null ? _b3 : false);
+  };
+  const every = (ids2, ok) => ids2.length > 0 && ids2.every(ok);
+  switch (action.kind) {
+    case "update_summary":
+      return made(action.nodeId) || ((_b2 = (_a2 = trusted.researchedIds) == null ? void 0 : _a2.has(action.nodeId)) != null ? _b2 : false);
+    case "set_topic_kind":
+      return every(action.nodeIds, (id) => {
+        var _a3, _b3;
+        return made(id) || ((_b3 = (_a3 = trusted.researchedIds) == null ? void 0 : _a3.has(id)) != null ? _b3 : false);
+      });
+    case "run_map_action":
+      return action.action !== "research_standard" || every(action.nodeIds, (id) => {
+        var _a3;
+        return made(id) && !((_a3 = trusted.researchedIds) == null ? void 0 : _a3.has(id));
+      });
+    default:
+      return true;
+  }
+}
+function targetCount(nodeIds, selection) {
+  return nodeIds.length ? nodeIds.length : selection;
+}
+function researchTargetsOf(actions, selectedCount) {
+  let research = 0;
+  let selection = selectedCount;
+  for (const action of actions) {
+    if (action.kind === "select_topics") selection = action.nodeIds.length;
+    else if (action.kind === "run_map_action") {
+      if (action.nodeIds.length) selection = action.nodeIds.length;
+      if (action.action === "research_standard") research += targetCount(action.nodeIds, selection);
+    }
+  }
+  return research;
+}
+var mapChatCallsPerTask = (diagrams) => diagrams ? 2 : 1;
+var isFindImages = (action) => action.kind === "run_map_action" && action.action === "find_images";
+function estimateChatCalls(actions, context, options = {}) {
+  const perTask = mapChatCallsPerTask(options.diagrams !== false);
+  let calls = 0;
+  let selection = context.selectedCount;
+  for (const action of actions) {
+    if (action.kind === "select_topics") selection = action.nodeIds.length;
+    else if (action.kind === "run_map_action") {
+      if (action.nodeIds.length) selection = action.nodeIds.length;
+      switch (action.action) {
+        case "research_standard":
+          calls += targetCount(action.nodeIds, selection) * (chatResearchMode(action, options.mapAiMode) === "quick" ? 1 : perTask);
+          break;
+        case "expand":
+          calls += targetCount(action.nodeIds, selection) * MAP_CHAT_EXPAND_CALLS_PER_CARD;
+          break;
+        case "rate_by_goal":
+        case "merge":
+          calls += 1;
+          break;
+        case "synthesize":
+          calls += perTask;
+          break;
+        case "find_images":
+          calls += targetCount(action.nodeIds, selection);
+          break;
+      }
+    }
+  }
+  return calls;
+}
+var AUTO_ALLOWED_KINDS = /* @__PURE__ */ new Set([
+  "add_child",
+  "rename_topic",
+  "update_summary",
+  "edit_topic_note",
+  "set_topic_kind",
+  "move_topic",
+  "reorder_topics",
+  "add_relation",
+  "remove_relation",
+  "set_appearance",
+  "select_topics",
+  "focus_topic",
+  "collapse_topic",
+  "expand_topic",
+  "auto_layout",
+  "ask_topic_kind"
+]);
+var AUTO_ALLOWED_RUN = /* @__PURE__ */ new Set([
+  "research_standard",
+  "expand",
+  "find_images",
+  "synthesize",
+  "rate_by_goal"
+]);
+function pathSegments(path) {
+  const raw = path.replace(/\\/g, "/");
+  if (raw.startsWith("/")) return null;
+  const parts = raw.split("/").filter((part) => part !== "" && part !== ".");
+  return parts.length && !parts.includes("..") ? parts : null;
+}
+function isReadablePath(path, paths) {
+  var _a2;
+  const own2 = (_a2 = pathSegments(path)) == null ? void 0 : _a2.join("/");
+  return !!own2 && !!(paths == null ? void 0 : paths.some((item) => {
+    var _a3;
+    return ((_a3 = pathSegments(item)) == null ? void 0 : _a3.join("/")) === own2;
+  }));
+}
+function isInsideMapFolder(path, folder) {
+  if (!folder) return false;
+  const inner = pathSegments(path);
+  const base = pathSegments(folder);
+  if (!inner || !base || inner.length <= base.length) return false;
+  return base.every((part, index) => inner[index] === part);
+}
+function planFor(actions, context, options = {}) {
+  var _a2, _b2, _c, _d, _e;
+  const reasons = [];
+  const auto = options.autoApply === true;
+  const imageAddsOnly = options.imageMode === "direct" && options.imageAttached === true && actions.every((action) => isFindImages(action) || IMAGE_SAFE_KINDS.has(action.kind));
+  const autoRound = ((_b2 = (_a2 = options.chain) == null ? void 0 : _a2.round) != null ? _b2 : 1) >= 2;
+  const readsSources = options.chatReadSources === true;
+  const readsResearch = autoRound || options.chatStartedResearch === true || readsSources;
+  const onlySafe = readsResearch && actions.every((action) => isFindImages(action) || isChainSafeFor(action, options.trusted));
+  const autoOnlySafe = autoRound && onlySafe;
+  const planned = actions.filter((action) => !isFindImages(action) && action.kind !== "read_md_file");
+  if (planned.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe && !auto)
+    reasons.push("many_actions");
+  const research = researchTargetsOf(actions, context.selectedCount);
+  const calls = estimateChatCalls(actions, context, options);
+  const createsMap = actions.some((action) => action.kind === "create_map");
+  if (!auto && research > 0 && research + ((_d = (_c = options.chain) == null ? void 0 : _c.researchSoFar) != null ? _d : 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT)
+    reasons.push("many_research");
+  if (createsMap) reasons.push("new_map");
+  if (options.imageMode === "preview" && actions.some((action) => action.kind === "add_anchor" || action.kind === "link_anchor"))
+    reasons.push("image_preview");
+  if (options.imageAttached && actions.some((action) => !isFindImages(action) && !IMAGE_SAFE_KINDS.has(action.kind)))
+    reasons.push("image_other_actions");
+  const autoAllowed = (action) => isFindImages(action) || (action.kind === "run_map_action" ? AUTO_ALLOWED_RUN.has(action.action) : AUTO_ALLOWED_KINDS.has(action.kind)) || (action.kind === "edit_md_file" || action.kind === "create_md_file" || action.kind === "read_md_file") && isInsideMapFolder(action.path, options.mapFolder) || action.kind === "read_md_file" && isReadablePath(action.path, options.readablePaths) || imageAddsOnly && IMAGE_SAFE_KINDS.has(action.kind);
+  const allAllowed = auto && actions.every(autoAllowed);
+  if (readsResearch && !onlySafe && !allAllowed)
+    reasons.push(
+      autoRound ? "auto_round_other_actions" : options.chatStartedResearch === true ? "research_text_other_actions" : "source_text_other_actions"
+    );
+  if (auto && calls + ((_e = options.callsSoFar) != null ? _e : 0) > MAP_CHAT_AUTO_MAX_CALLS) reasons.push("call_budget");
+  if (auto && !allAllowed && !reasons.length) reasons.push("auto_apply_confirm");
+  return reasons.length ? { reasons, estimatedCalls: calls } : null;
+}
+var fold = (value) => toSimplifiedFold(value.normalize("NFKC")).replace(/\s+/g, " ").trim().toLowerCase();
+function matchMapTitle(query, maps) {
+  const wanted = fold(query);
+  if (!wanted) return { kind: "none" };
+  const keyed = maps.map((map) => ({ map, key: fold(map.title) })).filter((entry) => entry.key);
+  let hits = keyed.filter((entry) => entry.key === wanted);
+  if (!hits.length) hits = keyed.filter((entry) => entry.key.includes(wanted));
+  if (!hits.length) return { kind: "none" };
+  return hits.length === 1 ? { kind: "one", map: hits[0].map } : { kind: "many", maps: hits.map((entry) => entry.map) };
+}
+function mapChoiceParts(maps) {
+  const shown = (map) => map.title.trim();
+  const folder = (map) => map.mapPath.split("/").slice(0, -1).join("/");
+  const same2 = (a, b) => shown(a) === shown(b);
+  const seen = /* @__PURE__ */ new Map();
+  return maps.map((map) => {
+    var _a2;
+    if (maps.filter((other) => same2(other, map)).length < 2) return { title: map.title };
+    const key4 = `${shown(map)}\0${folder(map)}`;
+    const alike = maps.filter((other) => same2(other, map) && folder(other) === folder(map));
+    if (alike.length < 2) return { title: map.title, folder: folder(map) };
+    const seq = ((_a2 = seen.get(key4)) != null ? _a2 : 0) + 1;
+    seen.set(key4, seq);
+    return { title: map.title, folder: folder(map), seq };
+  });
+}
+function chatResearchMode(action, mapAiMode) {
+  if (action.mode) return action.mode;
+  if (action.needsWeb === true || action.images === true) return "standard";
+  return mapAiMode || "quick";
+}
+function chatResearchRequest(action, mapAiMode, optionsOf) {
+  const mode = chatResearchMode(action, mapAiMode);
+  const options = optionsOf(mode);
+  return {
+    mapAiMode: mode,
+    researchMode: options.researchMode,
+    researchDepth: options.researchDepth,
+    requirements: action.direction,
+    imageSearch: mode === "standard" && action.images === true,
+    ...action.rewrite ? { rewrite: true } : {}
+  };
+}
+
+// experiences/visual-map/map-chat-chain-run.ts
+var newChatWork = () => ({
+  controller: new AbortController(),
+  research: [],
+  researchTargets: 0,
+  researchKeys: /* @__PURE__ */ new Set(),
+  created: [],
+  expand: [],
+  otherBackground: false,
+  reads: /* @__PURE__ */ new Set()
+});
+var chainWorkDetail = (item) => item.error ? `${item.title}: ${item.error}` : item.title;
+var MapChatChainRunner = class {
+  constructor(ports) {
+    this.ports = ports;
+    /** The automatic continuation of the latest message (running, waiting for work or for a plan); null when there is none. */
+    __publicField(this, "current", null);
+    __publicField(this, "seq", 0);
+  }
+  /**
+   * The chain a round belongs to. A message of the user's starts a new one (round 1); an automatic round goes on with the chain it
+   * came from. A retry of a failed automatic round finds no live chain (it ended as `failed`) and takes the round again from the
+   * state saved in its origin, without counting it twice.
+   */
+  chainForRound(origin, anchor, message) {
+    var _a2, _b2, _c, _d, _e;
+    const live2 = this.current;
+    if (origin && live2 && live2.seq === origin.seq && live2.state.phase === "round") {
+      live2.anchor = anchor;
+      live2.message = message;
+      live2.replyRemaining = origin.continuation.remaining;
+      live2.roundRemaining = origin.continuation.remaining;
+      return live2;
+    }
+    if (live2) this.interruptChain(live2, "user_took_over");
+    const run = {
+      seq: ++this.seq,
+      state: origin ? { ...origin.state, phase: "round" } : this.ports.autoApply() ? startAutoChain() : startChain(),
+      anchor,
+      message,
+      turn: null,
+      record: null,
+      replyRemaining: (_a2 = origin == null ? void 0 : origin.continuation.remaining) != null ? _a2 : "",
+      lastResults: (_b2 = origin == null ? void 0 : origin.continuation.lastResults) != null ? _b2 : [],
+      createdIds: new Set((_c = origin == null ? void 0 : origin.createdIds) != null ? _c : []),
+      chips: [],
+      waited: (_d = origin == null ? void 0 : origin.continuation.research) != null ? _d : [],
+      details: [],
+      partial: null,
+      work: null,
+      timer: null,
+      waitShown: false,
+      aiSelection: (origin == null ? void 0 : origin.aiSelection) ? [...origin.aiSelection] : null,
+      roundRemaining: (_e = origin == null ? void 0 : origin.continuation.remaining) != null ? _e : "",
+      backedUp: /* @__PURE__ */ new Set(),
+      createdFiles: /* @__PURE__ */ new Set(),
+      retriedRound: null,
+      appliedText: ""
+    };
+    this.current = run;
+    return run;
+  }
+  /**
+   * A round of an auto-apply chain failed (provider timeout, transient or format failure): the same round is sent once more, at once,
+   * counting as one more call of the chain. Only the live, un-stopped chain of this round is retried (a Stop or a new message has
+   * already ended it); a second failure of the round ends the chain as `failed` as usual. Returns whether a retry was started.
+   */
+  retryAutoRound(run, origin) {
+    if (!this.ports.autoApply() || run.retriedRound === run.state.round || this.current !== run || run.state.phase !== "round" || this.ports.closed() || this.ports.applying() || !this.ports.map() || this.ports.notesLoading() || !origin.text)
+      return false;
+    run.retriedRound = run.state.round;
+    run.state = { ...run.state, calls: run.state.calls + 1 };
+    this.ports.send({ ...origin }, void 0, run);
+    return true;
+  }
+  /** The cards of an earlier AI selection that are still on the map. */
+  chainSelection(ids2) {
+    const map = this.ports.map();
+    return map ? ids2.filter((id) => map.nodes.some((node) => node.id === id)) : [];
+  }
+  /**
+   * Sends the round after an interrupted chain (the button under the last reply, or the word "continue"). Every guard that fails
+   * leaves the resume point where it is; once it passes the point is used up before anything is sent, so a second press sends nothing.
+   */
+  resumeChatChain(message) {
+    const chat = this.ports.panel();
+    const point = message.resume;
+    if (!chat || !point || chat.isBusy || this.ports.applying() || this.ports.closed() || !this.ports.map() || this.ports.notesLoading() || this.current || point !== chat.resumePoint() || point.conversationId !== chat.conversationId)
+      return false;
+    chat.dropResume(point);
+    const selected = this.chainSelection(point.selectedIds);
+    const origin = {
+      text: point.message,
+      chips: [],
+      selectedIds: selected.length ? selected : this.ports.selectionIds(),
+      chain: {
+        seq: 0,
+        resumed: true,
+        ...selected.length ? { aiSelection: selected } : {},
+        // The toggle of the moment (never the saved one) decides the segment: a reload leaves it off.
+        state: resumedChain({ ...point, maxRounds: this.resumeSegmentEnd(point.round) }, this.ports.autoApply()),
+        createdIds: [],
+        continuation: {
+          round: point.round,
+          maxRounds: point.maxRounds,
+          remaining: point.remaining,
+          lastResults: point.lastResults,
+          research: [],
+          ...point.progress ? { progress: point.progress } : {}
+        }
+      }
+    };
+    this.ports.send(origin);
+    return true;
+  }
+  /** The last round of the segment a resumed chain starts at `round`, by the toggle of the moment (60-round segments when on, 8 when off). */
+  resumeSegmentEnd(round3) {
+    const segment = this.ports.autoApply() ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS;
+    return segment * Math.ceil(round3 / segment);
+  }
+  /** The continuation is more than a single answer (a later round, or one that said something was left): its end is told and recorded. */
+  chainShows(run) {
+    return run.state.round >= 2 || !!run.replyRemaining || !!run.state.remaining;
+  }
+  /** Ends the chain from the outside (Stop, a new message, a failure, a map change): the first ending wins, a later one changes nothing. */
+  interruptChain(run, reason) {
+    if (!run) return;
+    const step = interrupt(run.state, reason);
+    if (step.decision.kind !== "end") return;
+    const applied = run.state.phase === "waiting";
+    run.state = step.state;
+    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining, applied);
+  }
+  /** The chain is over: its timer and wait go, the end is recorded, and (unless it simply finished) the panel says why. */
+  endChatChain(run, reason, remaining, applied = true) {
+    var _a2;
+    if (this.current === run) this.current = null;
+    if (run.timer !== null) window.clearTimeout(run.timer);
+    run.timer = null;
+    run.state = { ...run.state, phase: "ended" };
+    if (this.ports.closed()) return;
+    const chat = this.ports.panel();
+    if (run.waitShown) chat == null ? void 0 : chat.setChainWaiting(null);
+    run.waitShown = false;
+    if (!this.chainShows(run)) return;
+    const calls = run.state.autoApply ? run.state.calls : void 0;
+    (_a2 = this.ports.lastRecord()) == null ? void 0 : _a2.event("chain_end", {
+      reason,
+      round: run.state.round,
+      remaining,
+      ...calls === void 0 ? {} : { calls }
+    });
+    if (chat && (chainEndNeedsNotice(reason) || reason === "done" && run.state.round >= 2)) {
+      const next = reason === "failed" ? null : resumeRound(
+        {
+          reason,
+          round: run.state.round,
+          applied,
+          startRemaining: run.roundRemaining,
+          replyRemaining: remaining
+        },
+        run.state.autoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS
+      );
+      const details = run.details.length ? run.details : void 0;
+      if (calls === void 0) chat.endChain(reason, remaining, details);
+      else chat.endChain(reason, remaining, details, calls);
+      if (next)
+        chat.offerResume({
+          ...next,
+          ...run.state.progress ? { progress: run.state.progress } : {},
+          stoppedRound: run.state.round,
+          reason,
+          message: run.message,
+          selectedIds: run.aiSelection ? [...run.aiSelection] : [],
+          lastResults: run.lastResults.map((line2) => ({ text: line2.text, status: line2.status }))
+        });
+    }
+  }
+  /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
+  stopChainWork(run) {
+    const work = run.work;
+    if (!work) return;
+    work.controller.abort();
+    for (const key4 of work.researchKeys) this.ports.stopResearch(key4);
+  }
+  /** A round ended with its reply applied (or its plan): the chain goes on, waits or ends, unless the user spoke meanwhile. */
+  finishChatRound(run, round3) {
+    var _a2;
+    if ((_a2 = this.ports.panel()) == null ? void 0 : _a2.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
+    else this.advanceChain(run, round3);
+    this.ports.flushSteers(true);
+  }
+  advanceChain(run, round3) {
+    var _a2, _b2;
+    if (this.current !== run || run.state.phase === "ended") return;
+    run.partial = null;
+    for (const id of round3.work.created) run.createdIds.add(id);
+    if (round3.work.selected) run.aiSelection = [...round3.work.selected];
+    run.lastResults = chatResultLines(round3.lines).map((line2) => ({ text: line2.text, status: line2.status }));
+    run.anchor = { path: round3.anchor.path, id: round3.anchor.id };
+    run.state = syncAutoApply(run.state, this.ports.autoApply());
+    const appliedActions = round3.result.actions.filter((_, index) => {
+      var _a3;
+      return ((_a3 = round3.lines[index]) == null ? void 0 : _a3.status) === "done";
+    });
+    run.appliedText = run.state.autoApply ? this.appliedDirectlyText(appliedActions, round3.context.selectedCount) : "";
+    const step = finishRound(run.state, {
+      // The round's own request plus the AI calls its applied actions started (counted for the auto-apply limit).
+      calls: 1 + estimateChatCalls(appliedActions, round3.context, {
+        diagrams: this.ports.diagrams(),
+        mapAiMode: (_a2 = this.ports.map()) == null ? void 0 : _a2.aiMode
+      }),
+      progress: (_b2 = round3.result.progress) != null ? _b2 : null,
+      ...round3.result.droppedOnRetry ? { droppedOnRetry: true } : {},
+      remaining: round3.result.remaining,
+      researchDeferred: pendingResearchCount(round3.context),
+      // A read has no line of its own: the lines are the other actions', in order.
+      actions: round3.result.actions.map((action, index) => {
+        var _a3;
+        return {
+          kind: action.kind,
+          done: action.kind === "read_md_file" ? round3.work.reads.has(index) : ((_a3 = round3.lines[round3.result.actions.slice(0, index).filter((other) => other.kind !== "read_md_file").length]) == null ? void 0 : _a3.status) === "done"
+        };
+      }),
+      started: {
+        research: round3.work.researchTargets,
+        expand: round3.work.expand.length,
+        otherBackground: round3.work.otherBackground
+      }
+    });
+    run.state = step.state;
+    this.showChainFlow(
+      run,
+      step.decision.kind === "end" && step.decision.reason === "done" && !step.decision.remaining.trim()
+    );
+    this.followChainDecision(run, step.decision, round3.work);
+  }
+  /**
+   * The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). A chain
+   * that ended done with nothing left shows every step done, even when the last reply did not move the statuses.
+   */
+  showChainFlow(run, finished = false) {
+    var _a2;
+    const progress = run.state.progress;
+    if (!run.state.autoApply || !progress) return;
+    (_a2 = this.ports.panel()) == null ? void 0 : _a2.setFlowProgress({
+      steps: progress.steps.map((step) => ({ ...step, ...finished ? { status: "done" } : {} })),
+      round: run.state.round,
+      calls: run.state.calls,
+      maxCalls: MAP_CHAT_AUTO_MAX_CALLS
+    });
+  }
+  /** "research 12, rewritten summaries 12, updated notes 3": what an auto-apply round did without asking (empty: nothing of these). */
+  appliedDirectlyText(actions, selectedCount) {
+    const research = researchTargetsOf(actions, selectedCount);
+    const summaries = actions.filter((action) => action.kind === "update_summary").length;
+    const notes = actions.filter(
+      (action) => action.kind === "edit_topic_note" || action.kind === "edit_md_file" || action.kind === "create_md_file"
+    ).length;
+    const parts = [
+      research ? t("ui.map_chat_auto_applied_research_0", research) : "",
+      summaries ? t("ui.map_chat_auto_applied_summary_0", summaries) : "",
+      notes ? t("ui.map_chat_auto_applied_notes_0", notes) : ""
+    ].filter(Boolean);
+    return parts.join(t("ui.map_chat_chain_detail_separator"));
+  }
+  followChainDecision(run, decision, work) {
+    if (decision.kind === "end") this.endChatChain(run, decision.reason, decision.remaining);
+    else if (decision.kind === "wait" && work) this.waitForChain(run, decision.waitFor, work);
+    else if (decision.kind === "next") this.startNextRound(run, decision.round, decision.remaining);
+  }
+  /** Waits for the research and expansions the round started; the 30 minutes only end the chain, never the work (auto-apply: 30 minutes with none finishing). */
+  waitForChain(run, waitFor, work) {
+    const chat = this.ports.panel();
+    const research = waitFor.includes("research") ? work.research : [];
+    const expand2 = waitFor.includes("expand") ? work.expand : [];
+    const waiting = { kinds: waitFor, total: (research.length ? work.researchTargets : 0) + expand2.length, settled: 0 };
+    chat == null ? void 0 : chat.setChainWaiting(waiting, run.state.remaining);
+    run.waitShown = true;
+    const progress = (by) => {
+      var _a2;
+      if (this.current !== run || run.state.phase !== "waiting") return;
+      waiting.settled = Math.min(waiting.total, waiting.settled + by);
+      (_a2 = this.ports.panel()) == null ? void 0 : _a2.setChainWaiting(waiting, run.state.remaining);
+      if (this.ports.autoApply()) {
+        if (run.timer !== null) window.clearTimeout(run.timer);
+        arm();
+      }
+    };
+    const arm = () => {
+      run.timer = window.setTimeout(() => {
+        run.timer = null;
+        this.settleChainWait(run, { timedOut: true }, []);
+      }, MAP_CHAT_CHAIN_WAIT_MS);
+    };
+    arm();
+    let researched;
+    const waited = [];
+    let expandSucceeded = 0;
+    let expandFailed = 0;
+    const pending2 = [];
+    if (research.length)
+      pending2.push(
+        Promise.all(research).then((outcomes) => {
+          const settled2 = outcomes.flatMap((outcome) => outcome.kind === "settled" ? [outcome] : []);
+          researched = settled2.length ? {
+            kind: "settled",
+            succeeded: settled2.reduce((sum2, outcome) => sum2 + outcome.succeeded, 0),
+            failed: settled2.reduce((sum2, outcome) => sum2 + outcome.failed, 0),
+            stopped: settled2.reduce((sum2, outcome) => sum2 + outcome.stopped, 0),
+            topics: settled2.flatMap((outcome) => outcome.topics)
+          } : { kind: "not_started" };
+          if (researched.kind === "settled") waited.push(...researched.topics);
+          progress(work.researchTargets);
+        })
+      );
+    for (const item of expand2)
+      pending2.push(
+        item.done.then((outcome) => {
+          if (outcome.status === "succeeded") expandSucceeded++;
+          else if (outcome.status === "failed") expandFailed++;
+          waited.push({
+            id: item.id,
+            title: item.title,
+            status: outcome.status,
+            ...outcome.status === "failed" ? { error: outcome.reason } : {}
+          });
+          progress(1);
+        })
+      );
+    void Promise.all(pending2).then(
+      () => this.settleChainWait(
+        run,
+        {
+          ...researched ? { research: researched } : {},
+          ...expand2.length ? { expand: { succeeded: expandSucceeded, failed: expandFailed } } : {}
+        },
+        waited
+      )
+    );
+  }
+  /** What the chain waited for is over (or the 30 minutes are). A late or repeated call, for a chain that has moved on, changes nothing. */
+  settleChainWait(run, end, waited) {
+    var _a2, _b2;
+    if (this.current !== run || run.state.phase !== "waiting") return;
+    if (run.timer !== null) window.clearTimeout(run.timer);
+    run.timer = null;
+    const chat = this.ports.panel();
+    if (this.ports.closed() || !chat || this.ports.path() !== run.anchor.path || ((_a2 = this.ports.map()) == null ? void 0 : _a2.id) !== run.anchor.id || run.turn !== null && !chat.hasTurn(run.turn)) {
+      this.interruptChain(run, "map_changed");
+      return;
+    }
+    chat.setChainWaiting(null);
+    run.waitShown = false;
+    run.waited = waited.map((item) => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      ...item.error ? { error: item.error } : {}
+    }));
+    run.details = waited.filter((item) => item.status !== "succeeded").map(chainWorkDetail);
+    const step = finishWait(run.state, end);
+    run.state = step.state;
+    run.partial = step.decision.kind === "next" && ((_b2 = end.research) == null ? void 0 : _b2.kind) === "settled" && end.research.failed > 0 && end.research.succeeded > 0 ? { failed: end.research.failed, succeeded: end.research.succeeded } : null;
+    this.followChainDecision(run, step.decision, null);
+  }
+  /** Round `round` of the chain begins now, as a message of its own: the same preparation, request, plan rules and apply as any send. */
+  startNextRound(run, round3, remaining) {
+    var _a2;
+    const chat = this.ports.panel();
+    if (this.ports.closed() || !chat || this.ports.path() !== run.anchor.path || ((_a2 = this.ports.map()) == null ? void 0 : _a2.id) !== run.anchor.id || run.turn !== null && !chat.hasTurn(run.turn)) {
+      this.interruptChain(run, "map_changed");
+      return;
+    }
+    if (chat.isBusy || this.ports.applying()) {
+      this.interruptChain(run, "user_took_over");
+      return;
+    }
+    const origin = {
+      text: run.message,
+      // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
+      // a picture is sent with the first round only and a follow-up adds no chip.
+      chips: [...run.chips],
+      selectedIds: run.aiSelection ? this.chainSelection(run.aiSelection) : this.ports.selectionIds(),
+      chain: {
+        seq: run.seq,
+        ...run.aiSelection ? { aiSelection: [...run.aiSelection] } : {},
+        state: run.state,
+        createdIds: [...run.createdIds],
+        continuation: {
+          round: round3,
+          maxRounds: run.state.maxRounds,
+          remaining,
+          lastResults: run.lastResults,
+          research: run.waited,
+          ...run.state.progress ? { progress: run.state.progress } : {},
+          ...run.state.checkingDone ? { checkDone: true } : {}
+        }
+      }
+    };
+    run.work = null;
+    this.ports.send(origin);
+  }
+};
+
 // core/topic-chat-records.ts
 var TOPIC_CHAT_RECORD_VERSION = 1;
 var TOPIC_CHAT_SUBPATH = "Chats/topics";
@@ -53854,231 +54484,6 @@ function judgeTopicScope(actions, nodes, rootId) {
         return "out";
     }
   });
-}
-
-// core/map-chat-plan.ts
-var MAP_CHAT_PLAN_ACTION_LIMIT = 15;
-var MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
-var MAP_CHAT_AUTO_LAYOUT_MIN_NEW = 5;
-var MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
-var IMAGE_SAFE_KINDS = /* @__PURE__ */ new Set([
-  "add_anchor",
-  "link_anchor",
-  "add_child",
-  "add_relation",
-  "focus_topic",
-  "auto_layout",
-  "collapse_topic",
-  "expand_topic"
-]);
-var CHAIN_SAFE = /* @__PURE__ */ new Set([
-  "add_child",
-  "add_relation",
-  "update_summary",
-  "set_topic_kind",
-  "set_appearance",
-  "select_topics",
-  "focus_topic",
-  "read_md_file",
-  "collapse_topic",
-  "expand_topic",
-  "auto_layout"
-]);
-var CHAIN_SAFE_RUN = /* @__PURE__ */ new Set(["research_standard", "expand"]);
-var isChainSafe = (action) => action.kind === "run_map_action" ? CHAIN_SAFE_RUN.has(action.action) : CHAIN_SAFE.has(action.kind);
-function isChainSafeFor(action, trusted = {}) {
-  var _a2, _b2;
-  if (!isChainSafe(action)) return false;
-  const made = (id) => {
-    var _a3, _b3;
-    return id.startsWith(MAP_CHAT_NEW_PREFIX) || ((_b3 = (_a3 = trusted.createdIds) == null ? void 0 : _a3.has(id)) != null ? _b3 : false);
-  };
-  const every = (ids2, ok) => ids2.length > 0 && ids2.every(ok);
-  switch (action.kind) {
-    case "update_summary":
-      return made(action.nodeId) || ((_b2 = (_a2 = trusted.researchedIds) == null ? void 0 : _a2.has(action.nodeId)) != null ? _b2 : false);
-    case "set_topic_kind":
-      return every(action.nodeIds, (id) => {
-        var _a3, _b3;
-        return made(id) || ((_b3 = (_a3 = trusted.researchedIds) == null ? void 0 : _a3.has(id)) != null ? _b3 : false);
-      });
-    case "run_map_action":
-      return action.action !== "research_standard" || every(action.nodeIds, (id) => {
-        var _a3;
-        return made(id) && !((_a3 = trusted.researchedIds) == null ? void 0 : _a3.has(id));
-      });
-    default:
-      return true;
-  }
-}
-function targetCount(nodeIds, selection) {
-  return nodeIds.length ? nodeIds.length : selection;
-}
-function researchTargetsOf(actions, selectedCount) {
-  let research = 0;
-  let selection = selectedCount;
-  for (const action of actions) {
-    if (action.kind === "select_topics") selection = action.nodeIds.length;
-    else if (action.kind === "run_map_action") {
-      if (action.nodeIds.length) selection = action.nodeIds.length;
-      if (action.action === "research_standard") research += targetCount(action.nodeIds, selection);
-    }
-  }
-  return research;
-}
-var mapChatCallsPerTask = (diagrams) => diagrams ? 2 : 1;
-var isFindImages = (action) => action.kind === "run_map_action" && action.action === "find_images";
-function estimateChatCalls(actions, context, options = {}) {
-  const perTask = mapChatCallsPerTask(options.diagrams !== false);
-  let calls = 0;
-  let selection = context.selectedCount;
-  for (const action of actions) {
-    if (action.kind === "select_topics") selection = action.nodeIds.length;
-    else if (action.kind === "run_map_action") {
-      if (action.nodeIds.length) selection = action.nodeIds.length;
-      switch (action.action) {
-        case "research_standard":
-          calls += targetCount(action.nodeIds, selection) * (chatResearchMode(action, options.mapAiMode) === "quick" ? 1 : perTask);
-          break;
-        case "expand":
-          calls += targetCount(action.nodeIds, selection) * MAP_CHAT_EXPAND_CALLS_PER_CARD;
-          break;
-        case "rate_by_goal":
-        case "merge":
-          calls += 1;
-          break;
-        case "synthesize":
-          calls += perTask;
-          break;
-        case "find_images":
-          calls += targetCount(action.nodeIds, selection);
-          break;
-      }
-    }
-  }
-  return calls;
-}
-var AUTO_ALLOWED_KINDS = /* @__PURE__ */ new Set([
-  "add_child",
-  "rename_topic",
-  "update_summary",
-  "edit_topic_note",
-  "set_topic_kind",
-  "move_topic",
-  "reorder_topics",
-  "add_relation",
-  "remove_relation",
-  "set_appearance",
-  "select_topics",
-  "focus_topic",
-  "collapse_topic",
-  "expand_topic",
-  "auto_layout",
-  "ask_topic_kind"
-]);
-var AUTO_ALLOWED_RUN = /* @__PURE__ */ new Set([
-  "research_standard",
-  "expand",
-  "find_images",
-  "synthesize",
-  "rate_by_goal"
-]);
-function pathSegments(path) {
-  const raw = path.replace(/\\/g, "/");
-  if (raw.startsWith("/")) return null;
-  const parts = raw.split("/").filter((part) => part !== "" && part !== ".");
-  return parts.length && !parts.includes("..") ? parts : null;
-}
-function isReadablePath(path, paths) {
-  var _a2;
-  const own2 = (_a2 = pathSegments(path)) == null ? void 0 : _a2.join("/");
-  return !!own2 && !!(paths == null ? void 0 : paths.some((item) => {
-    var _a3;
-    return ((_a3 = pathSegments(item)) == null ? void 0 : _a3.join("/")) === own2;
-  }));
-}
-function isInsideMapFolder(path, folder) {
-  if (!folder) return false;
-  const inner = pathSegments(path);
-  const base = pathSegments(folder);
-  if (!inner || !base || inner.length <= base.length) return false;
-  return base.every((part, index) => inner[index] === part);
-}
-function planFor(actions, context, options = {}) {
-  var _a2, _b2, _c, _d, _e;
-  const reasons = [];
-  const auto = options.autoApply === true;
-  const imageAddsOnly = options.imageMode === "direct" && options.imageAttached === true && actions.every((action) => isFindImages(action) || IMAGE_SAFE_KINDS.has(action.kind));
-  const autoRound = ((_b2 = (_a2 = options.chain) == null ? void 0 : _a2.round) != null ? _b2 : 1) >= 2;
-  const readsSources = options.chatReadSources === true;
-  const readsResearch = autoRound || options.chatStartedResearch === true || readsSources;
-  const onlySafe = readsResearch && actions.every((action) => isFindImages(action) || isChainSafeFor(action, options.trusted));
-  const autoOnlySafe = autoRound && onlySafe;
-  const planned = actions.filter((action) => !isFindImages(action) && action.kind !== "read_md_file");
-  if (planned.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe && !auto)
-    reasons.push("many_actions");
-  const research = researchTargetsOf(actions, context.selectedCount);
-  const calls = estimateChatCalls(actions, context, options);
-  const createsMap = actions.some((action) => action.kind === "create_map");
-  if (!auto && research > 0 && research + ((_d = (_c = options.chain) == null ? void 0 : _c.researchSoFar) != null ? _d : 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT)
-    reasons.push("many_research");
-  if (createsMap) reasons.push("new_map");
-  if (options.imageMode === "preview" && actions.some((action) => action.kind === "add_anchor" || action.kind === "link_anchor"))
-    reasons.push("image_preview");
-  if (options.imageAttached && actions.some((action) => !isFindImages(action) && !IMAGE_SAFE_KINDS.has(action.kind)))
-    reasons.push("image_other_actions");
-  const autoAllowed = (action) => isFindImages(action) || (action.kind === "run_map_action" ? AUTO_ALLOWED_RUN.has(action.action) : AUTO_ALLOWED_KINDS.has(action.kind)) || (action.kind === "edit_md_file" || action.kind === "create_md_file" || action.kind === "read_md_file") && isInsideMapFolder(action.path, options.mapFolder) || action.kind === "read_md_file" && isReadablePath(action.path, options.readablePaths) || imageAddsOnly && IMAGE_SAFE_KINDS.has(action.kind);
-  const allAllowed = auto && actions.every(autoAllowed);
-  if (readsResearch && !onlySafe && !allAllowed)
-    reasons.push(
-      autoRound ? "auto_round_other_actions" : options.chatStartedResearch === true ? "research_text_other_actions" : "source_text_other_actions"
-    );
-  if (auto && calls + ((_e = options.callsSoFar) != null ? _e : 0) > MAP_CHAT_AUTO_MAX_CALLS) reasons.push("call_budget");
-  if (auto && !allAllowed && !reasons.length) reasons.push("auto_apply_confirm");
-  return reasons.length ? { reasons, estimatedCalls: calls } : null;
-}
-var fold = (value) => toSimplifiedFold(value.normalize("NFKC")).replace(/\s+/g, " ").trim().toLowerCase();
-function matchMapTitle(query, maps) {
-  const wanted = fold(query);
-  if (!wanted) return { kind: "none" };
-  const keyed = maps.map((map) => ({ map, key: fold(map.title) })).filter((entry) => entry.key);
-  let hits = keyed.filter((entry) => entry.key === wanted);
-  if (!hits.length) hits = keyed.filter((entry) => entry.key.includes(wanted));
-  if (!hits.length) return { kind: "none" };
-  return hits.length === 1 ? { kind: "one", map: hits[0].map } : { kind: "many", maps: hits.map((entry) => entry.map) };
-}
-function mapChoiceParts(maps) {
-  const shown = (map) => map.title.trim();
-  const folder = (map) => map.mapPath.split("/").slice(0, -1).join("/");
-  const same2 = (a, b) => shown(a) === shown(b);
-  const seen = /* @__PURE__ */ new Map();
-  return maps.map((map) => {
-    var _a2;
-    if (maps.filter((other) => same2(other, map)).length < 2) return { title: map.title };
-    const key4 = `${shown(map)}\0${folder(map)}`;
-    const alike = maps.filter((other) => same2(other, map) && folder(other) === folder(map));
-    if (alike.length < 2) return { title: map.title, folder: folder(map) };
-    const seq = ((_a2 = seen.get(key4)) != null ? _a2 : 0) + 1;
-    seen.set(key4, seq);
-    return { title: map.title, folder: folder(map), seq };
-  });
-}
-function chatResearchMode(action, mapAiMode) {
-  if (action.mode) return action.mode;
-  if (action.needsWeb === true || action.images === true) return "standard";
-  return mapAiMode || "quick";
-}
-function chatResearchRequest(action, mapAiMode, optionsOf) {
-  const mode = chatResearchMode(action, mapAiMode);
-  const options = optionsOf(mode);
-  return {
-    mapAiMode: mode,
-    researchMode: options.researchMode,
-    researchDepth: options.researchDepth,
-    requirements: action.direction,
-    imageSearch: mode === "standard" && action.images === true,
-    ...action.rewrite ? { rewrite: true } : {}
-  };
 }
 
 // experiences/visual-map/clipboard.ts
@@ -58388,17 +58793,6 @@ function integrationUpdateMode(run) {
   const unset = run.recipe.implicit === true || run.recipe.source === "kind" && run.recipe.ref.startsWith("builtin:");
   return run.updateMode === "merge" && unset ? "fresh" : run.updateMode;
 }
-var newChatWork = () => ({
-  controller: new AbortController(),
-  research: [],
-  researchTargets: 0,
-  researchKeys: /* @__PURE__ */ new Set(),
-  created: [],
-  expand: [],
-  otherBackground: false,
-  reads: /* @__PURE__ */ new Set()
-});
-var chainWorkDetail = (item) => item.error ? `${item.title}: ${item.error}` : item.title;
 function researchWebLines(web) {
   if (!web.counted) return [];
   const lines = [{ status: "done", text: t("ui.multi_research_searches_0", web.searches) }];
@@ -58560,8 +58954,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     /** Lower-cased normalised paths of the map's data sources while a chat write action runs; null otherwise. */
     __publicField(this, "chatReadOnlyPaths", null);
     /** The automatic continuation of the latest message (running, waiting for work or for a plan); null when there is none. */
-    __publicField(this, "chatChain", null);
-    __publicField(this, "chatChainSeq", 0);
+    /** The automatic continuation of the latest message (see MapChatChainRunner); the runner lives and dies with the view. */
+    __publicField(this, "chatChainRunner", new MapChatChainRunner(this.chatChainPorts()));
     /** "Apply this whole conversation automatically" is on: the next chain the user starts (or resumes) is an auto-apply chain. */
     __publicField(this, "chatAutoApply", false);
     /** Cards this conversation researched (a `research_standard` that really started) and how each came out; reset with the conversation. */
@@ -59000,6 +59394,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
   /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
   droppedCyclesOfLastMerge() {
     return this.lastDroppedCycles;
+  }
+  // The runner's chain under its old name (the `?.` is for fixtures that never ran the constructor).
+  get chatChain() {
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.chatChainRunner) == null ? void 0 : _a2.current) != null ? _b2 : null;
+  }
+  set chatChain(run) {
+    this.chatChainRunner.current = run;
   }
   /** Files changed while VAM was writing that this view has not read back yet (the plugin fills it; see synchronize). */
   get unsynced() {
@@ -77647,393 +78049,54 @@ ${note.detail.trim()}` : "",
     );
   }
   // ---- automatic continuation (the chain) ---------------------------------------------------------------------------------
-  /**
-   * The chain a round belongs to. A message of the user's starts a new one (round 1); an automatic round goes on with the chain it
-   * came from. A retry of a failed automatic round finds no live chain (it ended as `failed`) and takes the round again from the
-   * state saved in its origin, without counting it twice.
-   */
+  /** The chain a round belongs to (see MapChatChainRunner). */
   chainForRound(origin, anchor, message) {
-    var _a2, _b2, _c, _d, _e;
-    const live2 = this.chatChain;
-    if (origin && live2 && live2.seq === origin.seq && live2.state.phase === "round") {
-      live2.anchor = anchor;
-      live2.message = message;
-      live2.replyRemaining = origin.continuation.remaining;
-      live2.roundRemaining = origin.continuation.remaining;
-      return live2;
-    }
-    if (live2) this.interruptChain(live2, "user_took_over");
-    const run = {
-      seq: ++this.chatChainSeq,
-      state: origin ? { ...origin.state, phase: "round" } : this.chatAutoApply ? startAutoChain() : startChain(),
-      anchor,
-      message,
-      turn: null,
-      record: null,
-      replyRemaining: (_a2 = origin == null ? void 0 : origin.continuation.remaining) != null ? _a2 : "",
-      lastResults: (_b2 = origin == null ? void 0 : origin.continuation.lastResults) != null ? _b2 : [],
-      createdIds: new Set((_c = origin == null ? void 0 : origin.createdIds) != null ? _c : []),
-      chips: [],
-      waited: (_d = origin == null ? void 0 : origin.continuation.research) != null ? _d : [],
-      details: [],
-      partial: null,
-      work: null,
-      timer: null,
-      waitShown: false,
-      aiSelection: (origin == null ? void 0 : origin.aiSelection) ? [...origin.aiSelection] : null,
-      roundRemaining: (_e = origin == null ? void 0 : origin.continuation.remaining) != null ? _e : "",
-      backedUp: /* @__PURE__ */ new Set(),
-      createdFiles: /* @__PURE__ */ new Set(),
-      retriedRound: null,
-      appliedText: ""
-    };
-    this.chatChain = run;
-    return run;
+    return this.chatChainRunner.chainForRound(origin, anchor, message);
   }
   /** Turns "apply this whole conversation automatically" on or off for the chains that start (or resume) from now on. */
   setChatAutoApply(on) {
     this.chatAutoApply = on;
   }
-  /**
-   * A round of an auto-apply chain failed (provider timeout, transient or format failure): the same round is sent once more, at once,
-   * counting as one more call of the chain. Only the live, un-stopped chain of this round is retried (a Stop or a new message has
-   * already ended it); a second failure of the round ends the chain as `failed` as usual. Returns whether a retry was started.
-   */
   retryAutoRound(run, origin) {
-    if (!this.chatAutoApply || run.retriedRound === run.state.round || this.chatChain !== run || run.state.phase !== "round" || this.closed || this.chatApplying || !this.map || this.notesLoading() || !origin.text)
-      return false;
-    run.retriedRound = run.state.round;
-    run.state = { ...run.state, calls: run.state.calls + 1 };
-    void this.sendMapChat({ ...origin }, void 0, run).catch((error) => errorNotice(error));
-    return true;
+    return this.chatChainRunner.retryAutoRound(run, origin);
   }
-  /** The cards of an earlier AI selection that are still on the map. */
-  chainSelection(ids2) {
-    const map = this.map;
-    return map ? ids2.filter((id) => map.nodes.some((node) => node.id === id)) : [];
-  }
-  /**
-   * Sends the round after an interrupted chain (the button under the last reply, or the word "continue"). Every guard that fails
-   * leaves the resume point where it is; once it passes the point is used up before anything is sent, so a second press sends nothing.
-   */
   resumeChatChain(message) {
-    const chat = this.chat;
-    const point = message.resume;
-    if (!chat || !point || chat.isBusy || this.chatApplying || this.closed || !this.map || this.notesLoading() || this.chatChain || point !== chat.resumePoint() || point.conversationId !== chat.conversationId)
-      return false;
-    chat.dropResume(point);
-    const selected = this.chainSelection(point.selectedIds);
-    const origin = {
-      text: point.message,
-      chips: [],
-      selectedIds: selected.length ? selected : this.chatSelectionIds(),
-      chain: {
-        seq: 0,
-        resumed: true,
-        ...selected.length ? { aiSelection: selected } : {},
-        // The toggle of the moment (never the saved one) decides the segment: a reload leaves it off.
-        state: resumedChain({ ...point, maxRounds: this.resumeSegmentEnd(point.round) }, this.chatAutoApply),
-        createdIds: [],
-        continuation: {
-          round: point.round,
-          maxRounds: point.maxRounds,
-          remaining: point.remaining,
-          lastResults: point.lastResults,
-          research: [],
-          ...point.progress ? { progress: point.progress } : {}
-        }
-      }
-    };
-    void this.sendMapChat(origin).catch((error) => errorNotice(error));
-    return true;
+    return this.chatChainRunner.resumeChatChain(message);
   }
-  /** The last round of the segment a resumed chain starts at `round`, by the toggle of the moment (60-round segments when on, 8 when off). */
-  resumeSegmentEnd(round3) {
-    const segment = this.chatAutoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS;
-    return segment * Math.ceil(round3 / segment);
-  }
-  /** The continuation is more than a single answer (a later round, or one that said something was left): its end is told and recorded. */
   chainShows(run) {
-    return run.state.round >= 2 || !!run.replyRemaining || !!run.state.remaining;
+    return this.chatChainRunner.chainShows(run);
   }
-  /** Ends the chain from the outside (Stop, a new message, a failure, a map change): the first ending wins, a later one changes nothing. */
   interruptChain(run, reason) {
-    if (!run) return;
-    const step = interrupt(run.state, reason);
-    if (step.decision.kind !== "end") return;
-    const applied = run.state.phase === "waiting";
-    run.state = step.state;
-    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining, applied);
+    this.chatChainRunner.interruptChain(run, reason);
   }
-  /** The chain is over: its timer and wait go, the end is recorded, and (unless it simply finished) the panel says why. */
-  endChatChain(run, reason, remaining, applied = true) {
-    var _a2;
-    if (this.chatChain === run) this.chatChain = null;
-    if (run.timer !== null) window.clearTimeout(run.timer);
-    run.timer = null;
-    run.state = { ...run.state, phase: "ended" };
-    if (this.closed) return;
-    const chat = this.chat;
-    if (run.waitShown) chat == null ? void 0 : chat.setChainWaiting(null);
-    run.waitShown = false;
-    if (!this.chainShows(run)) return;
-    const calls = run.state.autoApply ? run.state.calls : void 0;
-    (_a2 = this.chatLastRecord) == null ? void 0 : _a2.event("chain_end", {
-      reason,
-      round: run.state.round,
-      remaining,
-      ...calls === void 0 ? {} : { calls }
-    });
-    if (chat && (chainEndNeedsNotice(reason) || reason === "done" && run.state.round >= 2)) {
-      const next = reason === "failed" ? null : resumeRound(
-        {
-          reason,
-          round: run.state.round,
-          applied,
-          startRemaining: run.roundRemaining,
-          replyRemaining: remaining
-        },
-        run.state.autoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS
-      );
-      const details = run.details.length ? run.details : void 0;
-      if (calls === void 0) chat.endChain(reason, remaining, details);
-      else chat.endChain(reason, remaining, details, calls);
-      if (next)
-        chat.offerResume({
-          ...next,
-          ...run.state.progress ? { progress: run.state.progress } : {},
-          stoppedRound: run.state.round,
-          reason,
-          message: run.message,
-          selectedIds: run.aiSelection ? [...run.aiSelection] : [],
-          lastResults: run.lastResults.map((line2) => ({ text: line2.text, status: line2.status }))
-        });
-    }
-  }
-  /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
   stopChainWork(run) {
-    const work = run.work;
-    if (!work) return;
-    work.controller.abort();
-    for (const key4 of work.researchKeys) this.plugin.expansionCoordinator.stop(key4);
+    this.chatChainRunner.stopChainWork(run);
   }
-  /** A round ended with its reply applied (or its plan): the chain goes on, waits or ends, unless the user spoke meanwhile. */
   finishChatRound(run, round3) {
-    var _a2;
-    if ((_a2 = this.chat) == null ? void 0 : _a2.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
-    else this.advanceChain(run, round3);
-    this.flushSteers(true);
+    this.chatChainRunner.finishChatRound(run, round3);
   }
   advanceChain(run, round3) {
-    var _a2, _b2;
-    if (this.chatChain !== run || run.state.phase === "ended") return;
-    run.partial = null;
-    for (const id of round3.work.created) run.createdIds.add(id);
-    if (round3.work.selected) run.aiSelection = [...round3.work.selected];
-    run.lastResults = chatResultLines(round3.lines).map((line2) => ({ text: line2.text, status: line2.status }));
-    run.anchor = { path: round3.anchor.path, id: round3.anchor.id };
-    run.state = syncAutoApply(run.state, this.chatAutoApply);
-    const appliedActions = round3.result.actions.filter((_, index) => {
-      var _a3;
-      return ((_a3 = round3.lines[index]) == null ? void 0 : _a3.status) === "done";
-    });
-    run.appliedText = run.state.autoApply ? this.appliedDirectlyText(appliedActions, round3.context.selectedCount) : "";
-    const step = finishRound(run.state, {
-      // The round's own request plus the AI calls its applied actions started (counted for the auto-apply limit).
-      calls: 1 + estimateChatCalls(appliedActions, round3.context, {
-        diagrams: this.plugin.settings.addDiagramsAfterResearch,
-        mapAiMode: (_a2 = this.map) == null ? void 0 : _a2.aiMode
-      }),
-      progress: (_b2 = round3.result.progress) != null ? _b2 : null,
-      ...round3.result.droppedOnRetry ? { droppedOnRetry: true } : {},
-      remaining: round3.result.remaining,
-      researchDeferred: pendingResearchCount(round3.context),
-      // A read has no line of its own: the lines are the other actions', in order.
-      actions: round3.result.actions.map((action, index) => {
-        var _a3;
-        return {
-          kind: action.kind,
-          done: action.kind === "read_md_file" ? round3.work.reads.has(index) : ((_a3 = round3.lines[round3.result.actions.slice(0, index).filter((other) => other.kind !== "read_md_file").length]) == null ? void 0 : _a3.status) === "done"
-        };
-      }),
-      started: {
-        research: round3.work.researchTargets,
-        expand: round3.work.expand.length,
-        otherBackground: round3.work.otherBackground
-      }
-    });
-    run.state = step.state;
-    this.showChainFlow(
-      run,
-      step.decision.kind === "end" && step.decision.reason === "done" && !step.decision.remaining.trim()
-    );
-    this.followChainDecision(run, step.decision, round3.work);
+    this.chatChainRunner.advanceChain(run, round3);
   }
-  /**
-   * The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). A chain
-   * that ended done with nothing left shows every step done, even when the last reply did not move the statuses.
-   */
-  showChainFlow(run, finished = false) {
-    var _a2;
-    const progress = run.state.progress;
-    if (!run.state.autoApply || !progress) return;
-    (_a2 = this.chat) == null ? void 0 : _a2.setFlowProgress({
-      steps: progress.steps.map((step) => ({ ...step, ...finished ? { status: "done" } : {} })),
-      round: run.state.round,
-      calls: run.state.calls,
-      maxCalls: MAP_CHAT_AUTO_MAX_CALLS
-    });
-  }
-  /** "research 12, rewritten summaries 12, updated notes 3": what an auto-apply round did without asking (empty: nothing of these). */
-  appliedDirectlyText(actions, selectedCount) {
-    const research = researchTargetsOf(actions, selectedCount);
-    const summaries = actions.filter((action) => action.kind === "update_summary").length;
-    const notes = actions.filter(
-      (action) => action.kind === "edit_topic_note" || action.kind === "edit_md_file" || action.kind === "create_md_file"
-    ).length;
-    const parts = [
-      research ? t("ui.map_chat_auto_applied_research_0", research) : "",
-      summaries ? t("ui.map_chat_auto_applied_summary_0", summaries) : "",
-      notes ? t("ui.map_chat_auto_applied_notes_0", notes) : ""
-    ].filter(Boolean);
-    return parts.join(t("ui.map_chat_chain_detail_separator"));
-  }
-  followChainDecision(run, decision, work) {
-    if (decision.kind === "end") this.endChatChain(run, decision.reason, decision.remaining);
-    else if (decision.kind === "wait" && work) this.waitForChain(run, decision.waitFor, work);
-    else if (decision.kind === "next") this.startNextRound(run, decision.round, decision.remaining);
-  }
-  /** Waits for the research and expansions the round started; the 30 minutes only end the chain, never the work (auto-apply: 30 minutes with none finishing). */
-  waitForChain(run, waitFor, work) {
-    const chat = this.chat;
-    const research = waitFor.includes("research") ? work.research : [];
-    const expand2 = waitFor.includes("expand") ? work.expand : [];
-    const waiting = { kinds: waitFor, total: (research.length ? work.researchTargets : 0) + expand2.length, settled: 0 };
-    chat == null ? void 0 : chat.setChainWaiting(waiting, run.state.remaining);
-    run.waitShown = true;
-    const progress = (by) => {
-      var _a2;
-      if (this.chatChain !== run || run.state.phase !== "waiting") return;
-      waiting.settled = Math.min(waiting.total, waiting.settled + by);
-      (_a2 = this.chat) == null ? void 0 : _a2.setChainWaiting(waiting, run.state.remaining);
-      if (this.chatAutoApply) {
-        if (run.timer !== null) window.clearTimeout(run.timer);
-        arm();
+  chatChainPorts() {
+    return {
+      panel: () => this.chat,
+      closed: () => this.closed,
+      applying: () => this.chatApplying,
+      notesLoading: () => this.notesLoading(),
+      path: () => this.path,
+      map: () => this.map,
+      selectionIds: () => this.chatSelectionIds(),
+      autoApply: () => this.chatAutoApply,
+      diagrams: () => this.plugin.settings.addDiagramsAfterResearch,
+      lastRecord: () => this.chatLastRecord,
+      stopResearch: (key4) => this.plugin.expansionCoordinator.stop(key4),
+      flushSteers: (send) => this.flushSteers(send),
+      // Read at call time (a wrapped or replaced sendMapChat is used); the failure notice is the view's.
+      send: (...args) => {
+        void this.sendMapChat(...args).catch((error) => errorNotice(error));
       }
     };
-    const arm = () => {
-      run.timer = window.setTimeout(() => {
-        run.timer = null;
-        this.settleChainWait(run, { timedOut: true }, []);
-      }, MAP_CHAT_CHAIN_WAIT_MS);
-    };
-    arm();
-    let researched;
-    const waited = [];
-    let expandSucceeded = 0;
-    let expandFailed = 0;
-    const pending2 = [];
-    if (research.length)
-      pending2.push(
-        Promise.all(research).then((outcomes) => {
-          const settled2 = outcomes.flatMap((outcome) => outcome.kind === "settled" ? [outcome] : []);
-          researched = settled2.length ? {
-            kind: "settled",
-            succeeded: settled2.reduce((sum2, outcome) => sum2 + outcome.succeeded, 0),
-            failed: settled2.reduce((sum2, outcome) => sum2 + outcome.failed, 0),
-            stopped: settled2.reduce((sum2, outcome) => sum2 + outcome.stopped, 0),
-            topics: settled2.flatMap((outcome) => outcome.topics)
-          } : { kind: "not_started" };
-          if (researched.kind === "settled") waited.push(...researched.topics);
-          progress(work.researchTargets);
-        })
-      );
-    for (const item of expand2)
-      pending2.push(
-        item.done.then((outcome) => {
-          if (outcome.status === "succeeded") expandSucceeded++;
-          else if (outcome.status === "failed") expandFailed++;
-          waited.push({
-            id: item.id,
-            title: item.title,
-            status: outcome.status,
-            ...outcome.status === "failed" ? { error: outcome.reason } : {}
-          });
-          progress(1);
-        })
-      );
-    void Promise.all(pending2).then(
-      () => this.settleChainWait(
-        run,
-        {
-          ...researched ? { research: researched } : {},
-          ...expand2.length ? { expand: { succeeded: expandSucceeded, failed: expandFailed } } : {}
-        },
-        waited
-      )
-    );
-  }
-  /** What the chain waited for is over (or the 30 minutes are). A late or repeated call, for a chain that has moved on, changes nothing. */
-  settleChainWait(run, end, waited) {
-    var _a2, _b2;
-    if (this.chatChain !== run || run.state.phase !== "waiting") return;
-    if (run.timer !== null) window.clearTimeout(run.timer);
-    run.timer = null;
-    const chat = this.chat;
-    if (this.closed || !chat || this.path !== run.anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== run.anchor.id || run.turn !== null && !chat.hasTurn(run.turn)) {
-      this.interruptChain(run, "map_changed");
-      return;
-    }
-    chat.setChainWaiting(null);
-    run.waitShown = false;
-    run.waited = waited.map((item) => ({
-      id: item.id,
-      title: item.title,
-      status: item.status,
-      ...item.error ? { error: item.error } : {}
-    }));
-    run.details = waited.filter((item) => item.status !== "succeeded").map(chainWorkDetail);
-    const step = finishWait(run.state, end);
-    run.state = step.state;
-    run.partial = step.decision.kind === "next" && ((_b2 = end.research) == null ? void 0 : _b2.kind) === "settled" && end.research.failed > 0 && end.research.succeeded > 0 ? { failed: end.research.failed, succeeded: end.research.succeeded } : null;
-    this.followChainDecision(run, step.decision, null);
-  }
-  /** Round `round` of the chain begins now, as a message of its own: the same preparation, request, plan rules and apply as any send. */
-  startNextRound(run, round3, remaining) {
-    var _a2;
-    const chat = this.chat;
-    if (this.closed || !chat || this.path !== run.anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== run.anchor.id || run.turn !== null && !chat.hasTurn(run.turn)) {
-      this.interruptChain(run, "map_changed");
-      return;
-    }
-    if (chat.isBusy || this.chatApplying) {
-      this.interruptChain(run, "user_took_over");
-      return;
-    }
-    const origin = {
-      text: run.message,
-      // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
-      // a picture is sent with the first round only and a follow-up adds no chip.
-      chips: [...run.chips],
-      selectedIds: run.aiSelection ? this.chainSelection(run.aiSelection) : this.chatSelectionIds(),
-      chain: {
-        seq: run.seq,
-        ...run.aiSelection ? { aiSelection: [...run.aiSelection] } : {},
-        state: run.state,
-        createdIds: [...run.createdIds],
-        continuation: {
-          round: round3,
-          maxRounds: run.state.maxRounds,
-          remaining,
-          lastResults: run.lastResults,
-          research: run.waited,
-          ...run.state.progress ? { progress: run.state.progress } : {},
-          ...run.state.checkingDone ? { checkDone: true } : {}
-        }
-      }
-    };
-    run.work = null;
-    void this.sendMapChat(origin).catch((error) => errorNotice(error));
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   supersedeChatPlan() {

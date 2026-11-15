@@ -1358,6 +1358,7 @@ var en = {
   "ui.map_chat_undo_label": "AI chat reply",
   "ui.map_chat_undo_files_changed": "Files have changed since; this cannot be undone.",
   "ui.map_chat_guard_exists": "a file already exists there",
+  "ui.map_chat_guard_exists_not_own": "a file already exists there and this conversation did not write it, so it cannot be read or changed here; use a new file name",
   "ui.map_chat_guard_exists_in_map": "a file already exists there; read it with read_md_file, then change it with edit_md_file",
   "ui.map_chat_guard_no_baseline": "the file was not part of this message",
   "ui.map_chat_guard_map_source": "the file is one of this map's data sources; the chat only reads it",
@@ -4287,6 +4288,7 @@ var zhCN = {
   "ui.map_chat_undo_label": "AI \u5BF9\u8BDD\u56DE\u590D",
   "ui.map_chat_undo_files_changed": "\u6587\u4EF6\u5DF2\u53D8\u66F4\uFF0C\u65E0\u6CD5\u64A4\u9500",
   "ui.map_chat_guard_exists": "\u90A3\u91CC\u5DF2\u7ECF\u6709\u6587\u4EF6",
+  "ui.map_chat_guard_exists_not_own": "\u90A3\u91CC\u5DF2\u7ECF\u6709\u4E00\u4E2A\u4E0D\u662F\u8FD9\u6BB5\u5BF9\u8BDD\u521B\u5EFA\u7684\u6587\u4EF6\uFF0C\u8FD9\u91CC\u4E0D\u80FD\u8BFB\u6216\u6539\u5B83\uFF1B\u8BF7\u6362\u4E00\u4E2A\u65B0\u6587\u4EF6\u540D",
   "ui.map_chat_guard_exists_in_map": "\u90A3\u91CC\u5DF2\u7ECF\u6709\u6587\u4EF6\uFF1B\u8BF7\u5148\u7528 read_md_file \u8BFB\u53D6\u5B83\uFF0C\u518D\u7528 edit_md_file \u4FEE\u6539",
   "ui.map_chat_guard_no_baseline": "\u8FD9\u4E2A\u6587\u4EF6\u4E0D\u5728\u672C\u6B21\u53D1\u9001\u7684\u5185\u5BB9\u91CC",
   "ui.map_chat_guard_map_source": "\u8FD9\u4E2A\u6587\u4EF6\u662F\u8FD9\u5F20\u5730\u56FE\u7684\u8D44\u6599\u6765\u6E90\uFF0C\u5BF9\u8BDD\u53EA\u80FD\u8BFB\u53D6",
@@ -7216,6 +7218,7 @@ var zhTW = {
   "ui.map_chat_undo_label": "AI \u5C0D\u8A71\u56DE\u8986",
   "ui.map_chat_undo_files_changed": "\u6A94\u6848\u5DF2\u8B8A\u66F4\uFF0C\u7121\u6CD5\u5FA9\u539F",
   "ui.map_chat_guard_exists": "\u90A3\u88E1\u5DF2\u7D93\u6709\u6A94\u6848",
+  "ui.map_chat_guard_exists_not_own": "\u90A3\u88E1\u5DF2\u7D93\u6709\u4E00\u500B\u4E0D\u662F\u9019\u6BB5\u5C0D\u8A71\u5EFA\u7ACB\u7684\u6A94\u6848\uFF0C\u9019\u88E1\u4E0D\u80FD\u8B80\u6216\u6539\u5B83\uFF1B\u8ACB\u63DB\u4E00\u500B\u65B0\u6A94\u540D",
   "ui.map_chat_guard_exists_in_map": "\u90A3\u88E1\u5DF2\u7D93\u6709\u6A94\u6848\uFF1B\u8ACB\u5148\u7528 read_md_file \u8B80\u53D6\u5B83\uFF0C\u518D\u7528 edit_md_file \u4FEE\u6539",
   "ui.map_chat_guard_no_baseline": "\u9019\u500B\u6A94\u6848\u4E0D\u5728\u672C\u6B21\u9001\u51FA\u7684\u5167\u5BB9\u88E1",
   "ui.map_chat_guard_map_source": "\u9019\u500B\u6A94\u6848\u662F\u9019\u5F35\u5FC3\u667A\u5716\u7684\u8CC7\u6599\u4F86\u6E90\uFF0C\u5C0D\u8A71\u53EA\u80FD\u8B80\u53D6",
@@ -81219,7 +81222,9 @@ ${note.detail.trim()}` : "",
         });
         const mapFolder = this.path.slice(0, Math.max(0, this.path.lastIndexOf("/")));
         if (!verdict.ok && verdict.code === "exists" && mapFolder && (key4 == null ? void 0 : key4.startsWith(`${mapFolder}/`)))
-          return skipped("ui.map_chat_guard_exists_in_map");
+          return skipped(
+            this.chatOwnFiles.has(key4) ? "ui.map_chat_guard_exists_in_map" : "ui.map_chat_guard_exists_not_own"
+          );
         if (!verdict.ok || !key4) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
         const folders = key4.split("/").slice(0, -1);
         for (let depth = 1; depth <= folders.length; depth++) {

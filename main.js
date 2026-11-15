@@ -53908,6 +53908,123 @@ var MapChatChainRunner = class {
   }
 };
 
+// experiences/visual-map/topic-chat-steer.ts
+var TopicChatSteers = class {
+  constructor(options = {}) {
+    this.options = options;
+    __publicField(this, "entries", []);
+    __publicField(this, "handler", null);
+    __publicField(this, "gen", 0);
+    __publicField(this, "chain", Promise.resolve());
+    __publicField(this, "noLive", false);
+    __publicField(this, "closed", false);
+  }
+  /** True once additions wait for the end of the reply: the request cannot take them as it runs, or the reply is in. */
+  get waits() {
+    return this.noLive || this.closed;
+  }
+  /** Takes an addition; returns its entry. After `close` or on a run that cannot take one it waits (queued) at once. */
+  add(text10) {
+    const entry = { text: text10, state: this.closed || this.noLive ? "queued" : "pending" };
+    this.entries.push(entry);
+    this.changed();
+    this.pump();
+    return entry;
+  }
+  /** `null`: a new attempt starts, the old handler and every answer still on its way are dropped. A function: the new attempt's way in. */
+  bind(send) {
+    if (this.closed || !this.isAlive()) return;
+    this.gen++;
+    this.chain = Promise.resolve();
+    this.handler = send;
+    for (const entry of this.entries)
+      if (entry.state === "sending" || entry.state === "delivered") entry.state = "pending";
+    this.changed();
+    this.pump();
+  }
+  /** The current attempt's way in is gone (a new attempt is on its way); entries and answers on their way stay as they are. */
+  drop() {
+    this.handler = null;
+  }
+  /** The turn stopped or failed: no answer changes anything any more; what did not go in waits (queued), what did stays. */
+  abandon() {
+    this.closed = true;
+    this.gen++;
+    this.handler = null;
+    for (const entry of this.entries) if (entry.state !== "delivered") entry.state = "queued";
+    this.changed();
+  }
+  live(on) {
+    this.setLive(on);
+  }
+  /** `false`: the request cannot take an addition as it runs; everything not queued yet waits for the end. */
+  setLive(on) {
+    if (this.closed || !this.isAlive()) return;
+    this.noLive = !on;
+    if (on) return;
+    this.gen++;
+    this.handler = null;
+    for (const entry of this.entries) if (entry.state !== "queued") entry.state = "queued";
+    this.changed("live-off");
+  }
+  /** The reply is in: hand-overs still running settle, then what has not gone in waits. Later additions are queued. */
+  async close() {
+    await this.chain;
+    this.closed = true;
+    for (const entry of this.entries) if (entry.state !== "delivered") entry.state = "queued";
+    this.handler = null;
+    this.changed();
+  }
+  /** The texts of the additions the task took in, in typed order (what a request or record should carry). */
+  delivered() {
+    return this.entries.filter((entry) => entry.state === "delivered").map((entry) => entry.text);
+  }
+  /** Removes and returns the waiting additions, in typed order. */
+  takeQueued() {
+    const texts = this.entries.filter((entry) => entry.state === "queued").map((entry) => entry.text);
+    if (!texts.length) return texts;
+    this.entries.splice(0, this.entries.length, ...this.entries.filter((entry) => entry.state !== "queued"));
+    this.changed();
+    return texts;
+  }
+  /** What the window shows, in typed order. */
+  views() {
+    return this.entries.map((entry) => ({ text: entry.text, state: entry.state === "queued" ? "queued" : "live" }));
+  }
+  isAlive() {
+    return this.options.alive ? this.options.alive() : true;
+  }
+  changed(reason) {
+    var _a2, _b2;
+    (_b2 = (_a2 = this.options).onChange) == null ? void 0 : _b2.call(_a2, reason);
+  }
+  pump() {
+    const handler = this.handler;
+    if (!handler || this.noLive || this.closed) return;
+    const gen = this.gen;
+    for (const entry of this.entries) {
+      if (entry.state !== "pending") continue;
+      entry.state = "sending";
+      this.chain = this.chain.then(async () => {
+        const current = () => gen === this.gen && entry.state === "sending" && this.isAlive();
+        if (!current()) return;
+        try {
+          await handler(entry.text);
+        } catch (e) {
+          if (!current()) return;
+          entry.state = "queued";
+          this.changed();
+          return;
+        }
+        if (!current()) return;
+        entry.state = "delivered";
+        this.changed("delivered");
+      });
+    }
+    this.changed();
+  }
+};
+
 // experiences/visual-map/map-chat-conversation.ts
 function errorMessage3(error) {
   const message = error == null ? void 0 : error.message;
@@ -53922,6 +54039,14 @@ var MapChatConversation = class {
     __publicField(this, "planStopped", false);
     /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
     __publicField(this, "planToken", 0);
+    /** The running turn's request (Stop and closing abort it); null while none runs. */
+    __publicField(this, "controller", null);
+    /** Takes back the send that is still preparing (no request yet): what Stop does before there is a request to abort. */
+    __publicField(this, "prepAbandon", null);
+    /** The activity key of the running request. */
+    __publicField(this, "taskKey", null);
+    /** The follow-ups of the running turn: their state machine and the panel row each one has. */
+    __publicField(this, "steer", null);
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   supersedeChatPlan() {
@@ -54065,6 +54190,349 @@ var MapChatConversation = class {
       }
       this.ports.flushSteers(!stopped());
     }
+  }
+  /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
+  async sendMapChat(again, restore, retryOf) {
+    var _a2, _b2;
+    const chat = this.ports.panel();
+    if (chat && !again && this.applying && !chat.isBusy && !this.ports.closed() && chat.draft.trim()) {
+      this.steerMapChat();
+      return;
+    }
+    if (!chat || chat.isBusy || this.applying || this.ports.closed() || !this.ports.map() || this.ports.notesLoading())
+      return;
+    const message = again ? again.text : chat.draft.trim();
+    if (!message) return;
+    if (!again && isResumeKeyword(message)) {
+      const last = chat.transcript().at(-1);
+      if ((last == null ? void 0 : last.resume) && this.ports.chain().resumeChatChain(last)) {
+        chat.clearDraft();
+        return;
+      }
+    }
+    const autoOrigin = again == null ? void 0 : again.chain;
+    if (!autoOrigin && !retryOf) this.ports.chain().interruptChain(this.ports.chain().current, "user_took_over");
+    const imageId = this.ports.imageId();
+    const origin = again ? { ...again } : {
+      text: message,
+      chips: chat.attachments(),
+      selectedIds: this.ports.selectionIds(),
+      // Only the id: the picture is read again (a retry too) when the request is built, and never kept.
+      ...imageId ? { imageId } : {}
+    };
+    const anchor = { path: this.ports.path(), id: (_a2 = this.ports.map()) == null ? void 0 : _a2.id };
+    const run = retryOf && !autoOrigin ? retryOf : this.ports.chain().chainForRound(autoOrigin, anchor, message);
+    if (run === retryOf) run.message = message;
+    run.chips = [...origin.chips];
+    const draft = chat.draft;
+    const turn = autoOrigin ? chat.beginAutoRound(
+      run.state.round,
+      run.state.maxRounds,
+      run.state.remaining,
+      origin,
+      (_b2 = run.partial) != null ? _b2 : void 0,
+      ...run.state.autoApply ? [{ calls: run.state.calls, applied: run.appliedText }] : []
+    ) : chat.begin(message, origin, Boolean(again), "preparing");
+    run.turn = turn;
+    let sent = false;
+    const abandon = (reason, ends = "map_changed") => {
+      if (this.prepAbandon === stopPreparing) this.prepAbandon = null;
+      const retracted = chat.retract(turn, again ? restore : draft);
+      this.ports.chain().interruptChain(run, ends);
+      if (!retracted) return;
+      if (reason !== void 0 && (!autoOrigin || ends === "failed")) this.ports.notice(reason);
+    };
+    const preparing = new AbortController();
+    const stopPreparing = () => {
+      preparing.abort();
+      abandon(void 0, "stopped");
+    };
+    this.prepAbandon = stopPreparing;
+    const steerRows = /* @__PURE__ */ new Map();
+    const steerState = {
+      turn,
+      rows: steerRows,
+      steers: new TopicChatSteers({
+        alive: () => {
+          var _a3;
+          return !this.ports.closed() && this.steer === steerState && !!((_a3 = this.ports.panel()) == null ? void 0 : _a3.hasTurn(turn));
+        },
+        onChange: (reason) => {
+          var _a3;
+          for (const [entry, row] of steerRows)
+            if (entry.state === "queued") (_a3 = this.ports.panel()) == null ? void 0 : _a3.setSteerState(row, "queued");
+          if (reason) origin.text = [message, ...steerState.steers.delivered()].join("\n\n");
+        }
+      })
+    };
+    this.steer = steerState;
+    const notSent = () => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
+    let request;
+    try {
+      request = await this.ports.buildRequest(message, origin, preparing.signal);
+    } catch (error) {
+      abandon(this.ports.closed() ? void 0 : errorMessage3(error), "failed");
+      return;
+    }
+    if (this.ports.closed() || !chat.hasTurn(turn)) {
+      abandon();
+      return;
+    }
+    let went = false;
+    try {
+      went = await this.ports.confirmAiUsage(
+        request.model,
+        async () => {
+          var _a3, _b3, _c, _d;
+          if (this.ports.closed() || this.applying || !chat.hasTurn(turn) || this.ports.path() !== anchor.path || ((_a3 = this.ports.map()) == null ? void 0 : _a3.id) !== anchor.id) {
+            abandon();
+            return;
+          }
+          sent = true;
+          if (this.prepAbandon === stopPreparing) this.prepAbandon = null;
+          const record = this.ports.beginRecord(turn, request, origin);
+          run.record = record;
+          if (record) record.steerTexts = () => steerState.steers.delivered();
+          const turnController = new AbortController();
+          const key4 = this.ports.taskKey();
+          this.controller = turnController;
+          this.taskKey = key4;
+          this.ports.registerTask(key4, turnController);
+          const alive = () => !this.ports.closed() && !turnController.signal.aborted && this.controller === turnController && this.ports.path() === anchor.path;
+          this.supersedeChatPlan();
+          this.ports.relocate();
+          chat.setStage("waiting");
+          const modelName = this.ports.modelLabel(request.model);
+          try {
+            const outcome = await runAttempts({
+              signal: turnController.signal,
+              streamModeEndsResend: true,
+              stopped: () => new Error(t("ui.ai_task_cancelled")),
+              start: async (attempt) => {
+                if (!alive()) throw new Error(t("ui.ai_task_cancelled"));
+                const live2 = () => alive() && attempt.live();
+                attempt.arm();
+                return this.ports.requestChat(
+                  request,
+                  attempt.signal,
+                  (text10) => {
+                    if (!live2()) return;
+                    attempt.seen();
+                    chat.streamReply(text10);
+                  },
+                  (event) => {
+                    if (!live2()) return;
+                    if (event.kind === "stream-mode") {
+                      attempt.streamMode(event.mode);
+                      steerState.steers.setLive(event.mode === "stream-json");
+                      return;
+                    }
+                    if (!(event.kind === "activity" && event.activity === "started")) attempt.seen();
+                    if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+                  },
+                  (handler) => {
+                    if (live2()) steerState.steers.bind(handler);
+                  },
+                  // The model's raw output, kept for the record (only while the switch is on, and never from a stopped or replaced attempt).
+                  record ? (raw) => {
+                    if (live2()) record.raw = raw;
+                  } : void 0
+                );
+              },
+              onSlow: (_attempt, resend) => {
+                if (alive())
+                  chat.showSlow(t("ui.map_chat_slow_0", modelName), () => {
+                    if (alive()) resend();
+                  });
+              },
+              onCleared: () => {
+                if (alive()) chat.clearSlow();
+              },
+              onResend: () => {
+                record == null ? void 0 : record.event("resend");
+                steerState.steers.drop();
+                chat.restartWaiting();
+              }
+            });
+            if (!alive()) return;
+            const result = outcome;
+            for (const id of (_c = (_b3 = request.context.research) == null ? void 0 : _b3.sent) != null ? _c : []) this.ports.researchSent().add(id);
+            await steerState.steers.close();
+            if (!alive()) return;
+            const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
+            run.message = fullMessage;
+            run.replyRemaining = result.remaining;
+            run.state = syncAutoApply(run.state, this.ports.autoApply());
+            const plan = result.actions.length ? planFor(result.actions, request.context, this.ports.planOptions(run, request)) : null;
+            if (plan) {
+              if (chat.isBusy) {
+                chat.finish(result.reply, []);
+                this.showUnreadResearch(chat, turn, request.context);
+                this.ports.markTurn(origin, request);
+                run.state = pauseForPlan(run.state);
+                this.offerChatPlan(
+                  result,
+                  plan,
+                  request.context,
+                  { path: anchor.path, id: anchor.id },
+                  fullMessage,
+                  record,
+                  run
+                );
+                if (record == null ? void 0 : record.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
+                  this.ports.markLogged(turn.assistant);
+                this.ports.flushSteers(false);
+              }
+              return;
+            }
+            if (result.actions.length) chat.setStage("applying");
+            const work = newChatWork();
+            run.work = work;
+            const lines = await this.ports.applyActions(
+              { ...result, message: fullMessage },
+              request.context,
+              alive,
+              anchor,
+              {
+                context: request.context,
+                work,
+                continuation: Boolean(autoOrigin),
+                chain: run
+              }
+            );
+            if (alive() && chat.isBusy) {
+              const entry = this.ports.replyEntry();
+              const shown = chat.finish(result.reply, lines);
+              this.showUnreadResearch(chat, turn, request.context);
+              this.ports.markTurn(origin, request, entry);
+              if (record == null ? void 0 : record.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
+                this.ports.markLogged(turn.assistant);
+              this.ports.chain().finishChatRound(run, { result, context: request.context, lines, work, anchor });
+            }
+            return;
+          } catch (error) {
+            if (alive()) {
+              const failure = this.ports.errorText(error);
+              chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
+              record == null ? void 0 : record.end("failed", {
+                reason: /time(d)?[\s-]?out/i.test(errorMessage3(error)) ? "timeout" : "error",
+                reply: failure.text,
+                lines: [],
+                error: { text: failure.text, technical: (_d = failure.technical) != null ? _d : "" }
+              });
+              this.returnSteers(steerState);
+              if (!this.ports.chain().retryAutoRound(run, origin)) this.ports.chain().interruptChain(run, "failed");
+            }
+            return;
+          } finally {
+            if (this.controller === turnController) this.releaseChatTask();
+          }
+        },
+        // The usage notice opens: the bubble and an empty canvas say the send waits for the user, not that a map is being built.
+        {
+          noticeOpening: () => {
+            if (chat.hasTurn(turn)) chat.setStage("consent");
+          }
+        }
+      );
+    } catch (error) {
+      if (sent) throw error;
+      abandon(this.ports.closed() ? void 0 : errorMessage3(error), "failed");
+      return;
+    }
+    if (!went && !sent) abandon(this.ports.closed() ? void 0 : notSent(), "not_ready");
+  }
+  /** Research notes of the conversation that this round did not read (no room, or too long) are told under its results. */
+  showUnreadResearch(chat, turn, context) {
+    var _a2, _b2;
+    const deferred = ((_b2 = (_a2 = context.research) == null ? void 0 : _a2.deferred) != null ? _b2 : []).filter((note) => !note.sentBefore);
+    if (deferred.length)
+      chat.setUnreadNotes(
+        turn,
+        deferred.map((note) => ({ title: note.title, oversize: note.oversize === true }))
+      );
+  }
+  /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
+  steerMapChat() {
+    const chat = this.ports.panel();
+    if (!chat || this.ports.closed()) return;
+    const text10 = chat.draft.trim();
+    if (!text10) return;
+    const state = this.steer;
+    if (state && chat.isBusy && chat.hasTurn(state.turn)) {
+      const steer = chat.addSteer(text10, state.steers.waits ? "queued" : "live");
+      if (!steer) return;
+      state.rows.set(state.steers.add(text10), steer);
+      return;
+    }
+    if (chat.isBusy || this.applying) chat.addSteer(text10, "queued");
+  }
+  /** The turn stopped or failed: follow-ups that did not go in are not sent; they are in the field again. */
+  returnSteers(state) {
+    const chat = this.ports.panel();
+    if (chat) {
+      for (const [entry, row] of state.rows) if (entry.state !== "delivered") chat.setSteerState(row, "queued", false);
+    }
+    state.steers.abandon();
+    chat == null ? void 0 : chat.restoreDraft(chat.takeQueued());
+  }
+  /** Follow-ups that waited become one new message (sent once), or, when it cannot be sent now, go back into the field. */
+  flushSteers(send) {
+    const chat = this.ports.panel();
+    if (!chat) return;
+    const texts = chat.takeQueued();
+    if (!texts.length) return;
+    if (!send || this.ports.closed() || chat.isBusy || this.applying || !this.ports.map()) {
+      chat.restoreDraft(texts);
+      return;
+    }
+    const imageId = this.ports.imageId();
+    void this.ports.send(
+      {
+        text: texts.join("\n\n"),
+        chips: [],
+        selectedIds: this.ports.selectionIds(),
+        ...imageId ? { imageId } : {}
+      },
+      texts.join("\n")
+    );
+  }
+  releaseChatTask() {
+    if (this.taskKey) this.ports.unregisterTask(this.taskKey);
+    this.taskKey = null;
+    this.controller = null;
+  }
+  /** Stop button: the request is aborted and whatever came back is dropped. */
+  stopMapChat() {
+    var _a2, _b2, _c, _d, _e, _f;
+    const run = this.ports.chain().current;
+    if ((run == null ? void 0 : run.state.phase) === "waiting") {
+      this.ports.chain().stopChainWork(run);
+      this.ports.chain().interruptChain(run, "stopped");
+      (_a2 = this.ports.panel()) == null ? void 0 : _a2.focusInput();
+      return;
+    }
+    if (this.applying && !this.controller) {
+      this.planToken++;
+      this.planStopped = true;
+      if (run && this.ports.chain().chainShows(run)) this.ports.chain().stopChainWork(run);
+      (_b2 = this.ports.panel()) == null ? void 0 : _b2.focusInput();
+      return;
+    }
+    const controller = this.controller;
+    if (!controller) {
+      (_c = this.prepAbandon) == null ? void 0 : _c.call(this);
+      (_d = this.ports.panel()) == null ? void 0 : _d.focusInput();
+      return;
+    }
+    if (run && this.ports.chain().chainShows(run)) this.ports.chain().stopChainWork(run);
+    this.releaseChatTask();
+    controller.abort();
+    this.ports.endRecord("stopped");
+    (_e = this.ports.panel()) == null ? void 0 : _e.markStopped();
+    this.ports.chain().interruptChain(run, "stopped");
+    if (this.steer) this.returnSteers(this.steer);
+    (_f = this.ports.panel()) == null ? void 0 : _f.focusInput();
   }
 };
 
@@ -58596,123 +59064,6 @@ function depthHint(depth, choice) {
   if (depth === "bottom-up") return t("ui.topic_chat_choice_bottom_up_hint_0", calls);
   return t("ui.topic_chat_choice_research_first_hint_0_1", choice.leaves, calls);
 }
-
-// experiences/visual-map/topic-chat-steer.ts
-var TopicChatSteers = class {
-  constructor(options = {}) {
-    this.options = options;
-    __publicField(this, "entries", []);
-    __publicField(this, "handler", null);
-    __publicField(this, "gen", 0);
-    __publicField(this, "chain", Promise.resolve());
-    __publicField(this, "noLive", false);
-    __publicField(this, "closed", false);
-  }
-  /** True once additions wait for the end of the reply: the request cannot take them as it runs, or the reply is in. */
-  get waits() {
-    return this.noLive || this.closed;
-  }
-  /** Takes an addition; returns its entry. After `close` or on a run that cannot take one it waits (queued) at once. */
-  add(text10) {
-    const entry = { text: text10, state: this.closed || this.noLive ? "queued" : "pending" };
-    this.entries.push(entry);
-    this.changed();
-    this.pump();
-    return entry;
-  }
-  /** `null`: a new attempt starts, the old handler and every answer still on its way are dropped. A function: the new attempt's way in. */
-  bind(send) {
-    if (this.closed || !this.isAlive()) return;
-    this.gen++;
-    this.chain = Promise.resolve();
-    this.handler = send;
-    for (const entry of this.entries)
-      if (entry.state === "sending" || entry.state === "delivered") entry.state = "pending";
-    this.changed();
-    this.pump();
-  }
-  /** The current attempt's way in is gone (a new attempt is on its way); entries and answers on their way stay as they are. */
-  drop() {
-    this.handler = null;
-  }
-  /** The turn stopped or failed: no answer changes anything any more; what did not go in waits (queued), what did stays. */
-  abandon() {
-    this.closed = true;
-    this.gen++;
-    this.handler = null;
-    for (const entry of this.entries) if (entry.state !== "delivered") entry.state = "queued";
-    this.changed();
-  }
-  live(on) {
-    this.setLive(on);
-  }
-  /** `false`: the request cannot take an addition as it runs; everything not queued yet waits for the end. */
-  setLive(on) {
-    if (this.closed || !this.isAlive()) return;
-    this.noLive = !on;
-    if (on) return;
-    this.gen++;
-    this.handler = null;
-    for (const entry of this.entries) if (entry.state !== "queued") entry.state = "queued";
-    this.changed("live-off");
-  }
-  /** The reply is in: hand-overs still running settle, then what has not gone in waits. Later additions are queued. */
-  async close() {
-    await this.chain;
-    this.closed = true;
-    for (const entry of this.entries) if (entry.state !== "delivered") entry.state = "queued";
-    this.handler = null;
-    this.changed();
-  }
-  /** The texts of the additions the task took in, in typed order (what a request or record should carry). */
-  delivered() {
-    return this.entries.filter((entry) => entry.state === "delivered").map((entry) => entry.text);
-  }
-  /** Removes and returns the waiting additions, in typed order. */
-  takeQueued() {
-    const texts = this.entries.filter((entry) => entry.state === "queued").map((entry) => entry.text);
-    if (!texts.length) return texts;
-    this.entries.splice(0, this.entries.length, ...this.entries.filter((entry) => entry.state !== "queued"));
-    this.changed();
-    return texts;
-  }
-  /** What the window shows, in typed order. */
-  views() {
-    return this.entries.map((entry) => ({ text: entry.text, state: entry.state === "queued" ? "queued" : "live" }));
-  }
-  isAlive() {
-    return this.options.alive ? this.options.alive() : true;
-  }
-  changed(reason) {
-    var _a2, _b2;
-    (_b2 = (_a2 = this.options).onChange) == null ? void 0 : _b2.call(_a2, reason);
-  }
-  pump() {
-    const handler = this.handler;
-    if (!handler || this.noLive || this.closed) return;
-    const gen = this.gen;
-    for (const entry of this.entries) {
-      if (entry.state !== "pending") continue;
-      entry.state = "sending";
-      this.chain = this.chain.then(async () => {
-        const current = () => gen === this.gen && entry.state === "sending" && this.isAlive();
-        if (!current()) return;
-        try {
-          await handler(entry.text);
-        } catch (e) {
-          if (!current()) return;
-          entry.state = "queued";
-          this.changed();
-          return;
-        }
-        if (!current()) return;
-        entry.state = "delivered";
-        this.changed("delivered");
-      });
-    }
-    this.changed();
-  }
-};
 
 // experiences/visual-map/canvas-gestures.ts
 function canvasPointerIntent(state) {
@@ -78281,7 +78632,61 @@ ${note.detail.trim()}` : "",
       actionLabel: (action, refTitles) => this.chatActionLabel(action, refTitles),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).
       applyActions: (...args) => this.applyMapChatActions(...args),
-      flushSteers: (send) => this.flushSteers(send)
+      flushSteers: (send) => this.flushSteers(send),
+      notesLoading: () => this.notesLoading(),
+      selectionIds: () => this.chatSelectionIds(),
+      imageId: () => this.chatImageId,
+      buildRequest: async (message, origin, signal) => ({
+        ...await this.buildChatRequest(message, this.chat, origin, signal),
+        ...this.usageMapField()
+      }),
+      confirmAiUsage: (model, run, hooks) => this.plugin.confirmAiUsage(model, run, hooks),
+      beginRecord: (turn, request, origin) => this.beginChatRecord(this.chat, turn, request, origin),
+      endRecord: (status, fields) => this.endChatRecord(status, fields),
+      markLogged: (answer) => this.chatRecordSession.markLogged(answer),
+      taskKey: () => `map-chat-view:${++mapChatTaskSequence}`,
+      registerTask: (key4, controller) => {
+        var _a2;
+        return (_a2 = this.plugin.activeTasks) == null ? void 0 : _a2.set(key4, controller);
+      },
+      unregisterTask: (key4) => {
+        var _a2;
+        return (_a2 = this.plugin.activeTasks) == null ? void 0 : _a2.delete(key4);
+      },
+      relocate: () => this.relocateMapChat(),
+      modelLabel: (model) => this.plugin.modelLabel(model),
+      requestChat: (...args) => this.plugin.mapChat.chat(...args),
+      researchSent: () => this.chatResearchSent,
+      autoApply: () => this.chatAutoApply,
+      planOptions: (run, request) => {
+        var _a2;
+        return {
+          diagrams: this.plugin.settings.addDiagramsAfterResearch,
+          mapAiMode: (_a2 = this.map) == null ? void 0 : _a2.aiMode,
+          imageMode: this.chatImageMode(),
+          imageAttached: !!request.imageDataUrl,
+          chain: planChainOf(run.state),
+          autoApply: this.chatAutoApply,
+          mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
+          readablePaths: this.chatFiles.readablePaths(),
+          callsSoFar: run.state.calls,
+          chatStartedResearch: this.chatStartedResearch,
+          chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
+          trusted: {
+            createdIds: run.createdIds,
+            researchedIds: new Set(
+              [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
+            )
+          }
+        };
+      },
+      replyEntry: () => this.chatReplyEntry(),
+      markTurn: (origin, request, entry) => this.markChatTurn(origin, request, entry),
+      errorText: (error) => this.chatErrorText(error),
+      notice: (text10) => {
+        new import_obsidian34.Notice(text10);
+      },
+      send: (...args) => this.sendMapChat(...args)
     };
   }
   // ---- conversation records (the settings switch "save map AI conversations") -----------------------------------------

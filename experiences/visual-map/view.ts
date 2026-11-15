@@ -21957,7 +21957,52 @@ export class VisualAgentMapView extends ItemView {
       actionLabel: (action, refTitles) => this.chatActionLabel(action, refTitles),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).
       applyActions: (...args) => this.applyMapChatActions(...args),
-      flushSteers: send => this.flushSteers(send)
+      flushSteers: send => this.flushSteers(send),
+      notesLoading: () => this.notesLoading(),
+      selectionIds: () => this.chatSelectionIds(),
+      imageId: () => this.chatImageId,
+      buildRequest: async (message, origin, signal) => ({
+        ...(await this.buildChatRequest(message, this.chat!, origin, signal)),
+        ...this.usageMapField()
+      }),
+      confirmAiUsage: (model, run, hooks) => this.plugin.confirmAiUsage(model, run, hooks),
+      beginRecord: (turn, request, origin) => this.beginChatRecord(this.chat!, turn, request, origin),
+      endRecord: (status, fields) => this.endChatRecord(status, fields),
+      markLogged: answer => this.chatRecordSession.markLogged(answer),
+      taskKey: () => `map-chat-view:${++mapChatTaskSequence}`,
+      registerTask: (key, controller) => this.plugin.activeTasks?.set(key, controller),
+      unregisterTask: key => this.plugin.activeTasks?.delete(key),
+      relocate: () => this.relocateMapChat(),
+      modelLabel: model => this.plugin.modelLabel(model),
+      requestChat: (...args) => this.plugin.mapChat.chat(...args),
+      researchSent: () => this.chatResearchSent,
+      autoApply: () => this.chatAutoApply,
+      planOptions: (run, request) => ({
+        diagrams: this.plugin.settings.addDiagramsAfterResearch,
+        mapAiMode: this.map?.aiMode,
+        imageMode: this.chatImageMode(),
+        imageAttached: !!request.imageDataUrl,
+        chain: planChainOf(run.state),
+        autoApply: this.chatAutoApply,
+        mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
+        readablePaths: this.chatFiles.readablePaths(),
+        callsSoFar: run.state.calls,
+        chatStartedResearch: this.chatStartedResearch,
+        chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
+        trusted: {
+          createdIds: run.createdIds,
+          researchedIds: new Set(
+            [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
+          )
+        }
+      }),
+      replyEntry: () => this.chatReplyEntry(),
+      markTurn: (origin, request, entry) => this.markChatTurn(origin, request, entry),
+      errorText: error => this.chatErrorText(error),
+      notice: text => {
+        new Notice(text);
+      },
+      send: (...args) => this.sendMapChat(...args)
     };
   }
   // ---- conversation records (the settings switch "save map AI conversations") -----------------------------------------

@@ -9545,6 +9545,36 @@ integrationTest('existing file that was not attached: not carried, not readable;
   await attachOld(h); const b = await applyIn(h, autoRun(h), [{ kind: 'create_md_file', path: OLD, content: 'x' }]);
   assert.match(b.at(-1).text, /read_md_file/);
 });
+integrationTest('attached file (M1): the chip paths belong to the round - a later message built (not sent) with a chip does not make the old plan\'s edit of that file pass the read-only check', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open(); const out = 'Notes/Research.md'; const text = h.contents.get(out);
+  await ownTurn(h); const oldBase = h.control.requests.at(-1).context;
+  h.view.chat.addFile(out); await ownTurn(h); const newBase = h.control.requests.at(-1).context; h.view.chat.chips.length = 0;
+  oldBase.mdHashes = { ...newBase.mdHashes };
+  const edit = [{ kind: 'edit_md_file', path: out, find: 'needs darkness', replace: 'PWNED' }];
+  const old = await h.view.applyMapChatActions({ actions: edit, rejected: [] }, oldBase, undefined, undefined, { chain: autoRun(h) });
+  assert.equal(old.at(-1).status, 'skipped'); assert.match(old.at(-1).text, /only reads it/); assert.equal(h.contents.get(out), text);
+  const own = await h.view.applyMapChatActions({ actions: edit, rejected: [] }, newBase, undefined, undefined, { chain: autoRun(h) });
+  assert.doesNotMatch(own.at(-1).text, /only reads it/, 'the message that carried the chip keeps the old rules');
+});
+integrationTest('attached file (L2): under auto-apply a read_md_file of an attached file outside the map folder raises no plan card and the chain goes on', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const out = 'Notes/Research.md';
+  chat.addFile(out); await ownTurn(h); chat.chips.length = 0; const n0 = h.control.requests.length;
+  chainReplies(h, say('Reading.', [readAct(out)], 'go on'), say('Done.', [], ''));
+  h.type('read it'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === n0 + 2);
+  eq(planCard(h).length, 0, 'no plan card');
+});
+integrationTest('attached file (L2): a read of a file that is not attached or own outside the map folder still gets a plan under auto-apply', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open();
+  h.control.reply = async () => say('Reading.', [readAct('Notes/Other.md')], '');
+  h.type('read it'); await h.view.sendMapChat();
+  eq(planCard(h).length, 1);
+});
+integrationTest('attached file (L4): create on a map-folder file edited by hand after the drag gets the not-own words, not "read it then edit"', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open(); await attachOld(h);
+  h.contents.set(OLD, '# Old\n\nHand edit.\n');
+  const out = await applyIn(h, autoRun(h), [{ kind: 'create_md_file', path: OLD, content: 'x' }]);
+  assert.match(out.at(-1).text, /drag/i); assert.doesNotMatch(out.at(-1).text, /read_md_file/);
+});
 integrationTest('attached file: a new conversation clears the attachments', async () => {
   const h = await harness(); await h.view.hydrate(); h.open(); await attachOld(h);
   eq((await ownTurn(h)).ownFiles.map(f => f.path), [OLD]); h.view.resetChatResearch();

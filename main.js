@@ -47486,7 +47486,7 @@ async function runAttempts(options) {
     const controller = new AbortController();
     const onOuterAbort = () => controller.abort();
     outer == null ? void 0 : outer.addEventListener("abort", onOuterAbort, { once: true });
-    let resendRequested = false, firstEvent = false, slowShown = false, watching = true, timer;
+    let resendRequested = false, firstEvent = false, slowShown = false, watching = true, ended2 = false, timer;
     const live2 = () => !controller.signal.aborted && !resendRequested;
     const disarm = () => {
       if (timer === void 0) return;
@@ -47530,7 +47530,7 @@ async function runAttempts(options) {
       }
     };
     const resend = () => {
-      if ((outer == null ? void 0 : outer.aborted) || !live2() || firstEvent || !watching) return;
+      if ((outer == null ? void 0 : outer.aborted) || !live2() || ended2 || firstEvent || !watching && options.streamModeEndsResend) return;
       resendRequested = true;
       disarm();
       safe(() => {
@@ -47555,6 +47555,7 @@ async function runAttempts(options) {
     } catch (error) {
       if ((outer == null ? void 0 : outer.aborted) || !resendRequested) throw error;
     } finally {
+      ended2 = true;
       disarm();
       outer == null ? void 0 : outer.removeEventListener("abort", onOuterAbort);
     }
@@ -77265,6 +77266,7 @@ ${note.detail.trim()}` : "",
           try {
             const outcome = await runAttempts({
               signal: turnController.signal,
+              streamModeEndsResend: true,
               stopped: () => new Error(t("ui.ai_task_cancelled")),
               start: async (attempt) => {
                 if (!alive()) throw new Error(t("ui.ai_task_cancelled"));

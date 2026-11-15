@@ -37,13 +37,13 @@ function countedSignal() {
 }
 
 /** Runs attempts whose `start` is controlled by the test; `starts[i]` holds attempt i with its resolve / reject. */
-function rig({ armOnStart = true, hooks = {}, signal } = {}) {
+function rig({ armOnStart = true, hooks = {}, signal, streamModeEndsResend } = {}) {
   const clock = fakeClock();
   const log = [];
   const starts = [];
   const slow = [];
   const run = runAttempts({
-    signal, clock, stopped,
+    signal, clock, stopped, streamModeEndsResend,
     start: attempt => new Promise((resolve, reject) => {
       starts.push({ attempt, resolve, reject });
       log.push(`start ${attempt.number}`);
@@ -101,7 +101,7 @@ test('stream mode other than stream-json: no notice, and a re-send is a no-op (j
     r.starts[0].attempt.streamMode(mode); r.clock.advance(120_000); assert.equal(r.slow.length, 0, `${mode}: no notice`);
     r.starts[0].resolve('ok'); await r.run;
   }
-  const r = rig(); await flush();
+  const r = rig({ streamModeEndsResend: true }); await flush();
   r.starts[0].attempt.streamMode('stream-json'); r.clock.advance(20_000); assert.equal(r.slow.length, 1, 'stream-json keeps the watch');
   r.starts[0].attempt.streamMode('json-fallback'); r.slow[0].resend(); await flush();
   assert.equal(r.starts.length, 1, 'a notice already shown cannot replace the attempt once watching stopped'); assert.equal(r.starts[0].attempt.signal.aborted, false);
@@ -188,4 +188,21 @@ test('a hook that throws does not fail the request', async () => {
   const r = rig({ hooks: { onAttempt: boom, onSlow: boom, onCleared: boom, onResend: boom, onReplaced: boom } }); await flush();
   r.clock.advance(20_000); r.slow[0].resend(); await flush(); assert.equal(r.starts.length, 2);
   r.clock.advance(20_000); r.starts[1].attempt.seen(); r.starts[1].resolve('ok'); assert.equal(await r.run, 'ok');
+});
+
+test('research (option off): a notice already shown can still re-send after a json-fallback stream mode, and no new notice comes', async () => {
+  const r = rig(); await flush();
+  r.clock.advance(20_000); r.starts[0].attempt.streamMode('json-fallback'); r.slow[0].resend(); await flush();
+  assert.equal(r.starts.length, 2, 're-sent'); assert.equal(r.starts[0].attempt.signal.aborted, true);
+  r.starts[1].attempt.streamMode('json'); r.clock.advance(120_000); assert.equal(r.slow.length, 1, 'json still shows no notice');
+  r.starts[1].resolve('ok'); await r.run;
+});
+
+test('after the attempt has its answer, Resend does nothing (both modes)', async () => {
+  for (const streamModeEndsResend of [true, false]) {
+    const r = rig({ streamModeEndsResend }); await flush();
+    r.clock.advance(20_000); r.starts[0].resolve('ok'); assert.equal(await r.run, 'ok');
+    r.slow[0].resend(); await flush();
+    assert.equal(r.starts.length, 1); assert.ok(!r.log.some(line => line.startsWith('resend')), 'no onResend after the runner returned');
+  }
 });

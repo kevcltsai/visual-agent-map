@@ -21761,6 +21761,7 @@ export class VisualAgentMapView extends ItemView {
           try {
             const outcome = await runAttempts<MapChatResult>({
               signal: turnController.signal,
+              streamModeEndsResend: true,
               stopped: () => new Error(t("ui.ai_task_cancelled")),
               start: async attempt => {
                 // Stop, a closed view or a map switch came between a resend and its request: nothing more is sent.

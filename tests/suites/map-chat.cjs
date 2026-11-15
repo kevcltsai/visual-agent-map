@@ -9763,3 +9763,16 @@ integrationTest('map chat 18 counter-example: a runtime that ignores the abort c
   gate.resolve(); await tick(); await tick();
   assert.equal(chat.transcript().at(-1).text, 'Stopped.', 'the late reply is not shown'); assert.equal(h.control.mutates, 0, 'and its actions are not applied');
 });
+
+integrationTest('map chat records 18 counter-example: once the reply is in, a late Resend does nothing (no resend event, no new request, no waiting bubble)', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open(); const attempts = []; const gate = deferred(); let held = 0;
+  const mutate = h.plugin.mutate; h.plugin.mutate = async work => { held++; await gate.promise; return mutate.call(h.plugin, work); };
+  h.control.reply = () => new Promise(resolve => { attempts.push({ resolve }); });
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000);
+  const resend = resendButton(chat); assert.ok(resend);
+  attempts[0].resolve({ reply: 'done', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Renamed' }], rejected: [] });
+  await until(() => held > 0); resend.click(); await tick();
+  assert.equal(attempts.length, 1, 'no second request'); assert.notEqual(chat.stage?.kind, 'waiting', 'the bubble does not go back to waiting');
+  gate.resolve(); await sending; await recordIdle(h);
+  const kinds = lineKinds(recordLines(h, recordFiles(h)[0])); assert.ok(!kinds.includes('event:resend'), `no resend event: ${kinds}`); assert.equal(chat.transcript().at(-1).text, 'done');
+});

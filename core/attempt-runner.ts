@@ -37,6 +37,8 @@ export interface RunAttemptsOptions<T> {
   /** The caller's own signal (task or whole map-chat turn). It wins over a re-send. */
   signal?: AbortSignal;
   clock?: AttemptClock;
+  /** True: once the stream mode shows that events cannot be seen, a notice already shown can no longer re-send (map chat). Research leaves it off. */
+  streamModeEndsResend?: boolean;
   /** The error thrown when the outer signal aborts. */
   stopped: () => Error;
   start: (attempt: Attempt) => Promise<T>;
@@ -79,6 +81,7 @@ export async function runAttempts<T>(options: RunAttemptsOptions<T>): Promise<T>
       firstEvent = false,
       slowShown = false,
       watching = true,
+      ended = false,
       timer: unknown;
     // After a re-send or a stop, whatever the old attempt still reports is dropped.
     const live = (): boolean => !controller.signal.aborted && !resendRequested;
@@ -119,7 +122,7 @@ export async function runAttempts<T>(options: RunAttemptsOptions<T>): Promise<T>
     };
     // Stop wins; an attempt that was stopped, replaced, already answered or not watched cannot be replaced.
     const resend = (): void => {
-      if (outer?.aborted || !live() || firstEvent || !watching) return;
+      if (outer?.aborted || !live() || ended || firstEvent || (!watching && options.streamModeEndsResend)) return;
       resendRequested = true;
       disarm();
       safe(() => options.onResend?.(attempt));
@@ -140,6 +143,8 @@ export async function runAttempts<T>(options: RunAttemptsOptions<T>): Promise<T>
     } catch (error) {
       if (outer?.aborted || !resendRequested) throw error;
     } finally {
+      // The attempt has its answer (or failed): a late Resend must not touch what the caller does with it.
+      ended = true;
       disarm();
       outer?.removeEventListener("abort", onOuterAbort);
     }

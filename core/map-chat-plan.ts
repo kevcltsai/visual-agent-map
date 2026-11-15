@@ -1,6 +1,7 @@
 import { toSimplifiedFold } from "../i18n/han-fold";
 import type { MapAiMode, ResearchDepth, ResearchMode } from "../ai/types";
 import type { MapChatContext } from "./map-chat-context";
+import { MAP_CHAT_AUTO_MAX_CALLS } from "./map-chat-chain";
 import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "./steps/map-chat/step";
 
 /**
@@ -30,6 +31,10 @@ export const MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
  * `source_text_other_actions`: the same rule when the conversation read the map's data sources (this turn or an earlier one):
  * the sources, their condensed text and the turns after them are untrusted input.
  *
+ * `call_budget` (auto-apply only): the segment's AI calls so far plus this reply's estimate pass {@link MAP_CHAT_AUTO_MAX_CALLS}.
+ * `auto_apply_confirm` (auto-apply only): an action outside the allow-list (delete, maps, a file outside the map folder)
+ * that no other reason already holds back.
+ *
  * `image_preview`: the reply places or links anchors and the user chose to see image changes first. `image_other_actions`: a turn
  * that sent an image also asked for something besides the image-safe actions; the picture is untrusted input, so this is
  * a plan in either mode.
@@ -42,7 +47,9 @@ export type MapChatPlanReason =
   | "image_other_actions"
   | "auto_round_other_actions"
   | "research_text_other_actions"
-  | "source_text_other_actions";
+  | "source_text_other_actions"
+  | "call_budget"
+  | "auto_apply_confirm";
 
 /** "AI changes to an image: show me first" or "apply at once"; the setting `mapChatImageMode`. */
 export type MapChatImageMode = "preview" | "direct";
@@ -167,6 +174,90 @@ export const mapChatCallsPerTask = (diagrams: boolean): number => (diagrams ? 2 
 const isFindImages = (action: MapChatAction): boolean =>
   action.kind === "run_map_action" && action.action === "find_images";
 
+/**
+ * AI calls the actions start, counted at least (see {@link MapChatPlan.estimatedCalls}). `diagrams` is the "Add diagrams after
+ * research" setting (on unless false); `mapAiMode` is the mode a research action falls back to.
+ */
+export function estimateChatCalls(
+  actions: readonly MapChatAction[],
+  context: Pick<PlanContext, "selectedCount">,
+  options: { diagrams?: boolean; mapAiMode?: MapAiMode } = {}
+): number {
+  const perTask = mapChatCallsPerTask(options.diagrams !== false);
+  let calls = 0;
+  let selection = context.selectedCount;
+  for (const action of actions) {
+    if (action.kind === "select_topics") selection = action.nodeIds.length;
+    else if (action.kind === "run_map_action") {
+      if (action.nodeIds.length) selection = action.nodeIds.length;
+      switch (action.action) {
+        case "research_standard":
+          // Quick: the research call alone (no images or charts). Standard: the research call plus the diagram call.
+          calls +=
+            targetCount(action.nodeIds, selection) *
+            (chatResearchMode(action, options.mapAiMode) === "quick" ? 1 : perTask);
+          break;
+        case "expand":
+          calls += targetCount(action.nodeIds, selection) * MAP_CHAT_EXPAND_CALLS_PER_CARD;
+          break;
+        case "rate_by_goal":
+        case "merge":
+          calls += 1;
+          break;
+        case "synthesize":
+          calls += perTask;
+          break;
+        case "find_images":
+          calls += targetCount(action.nodeIds, selection);
+          break;
+      }
+    }
+  }
+  return calls;
+}
+
+const AUTO_ALLOWED_KINDS: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAction["kind"]>([
+  "add_child",
+  "rename_topic",
+  "update_summary",
+  "edit_topic_note",
+  "set_topic_kind",
+  "move_topic",
+  "reorder_topics",
+  "add_relation",
+  "remove_relation",
+  "set_appearance",
+  "select_topics",
+  "focus_topic",
+  "collapse_topic",
+  "expand_topic",
+  "auto_layout",
+  "ask_topic_kind"
+]);
+const AUTO_ALLOWED_RUN: ReadonlySet<string> = new Set([
+  "research_standard",
+  "expand",
+  "find_images",
+  "synthesize",
+  "rate_by_goal"
+]);
+
+/** A vault path as a list of segments, or null when it is absolute, empty or climbs out with `..`. */
+function pathSegments(path: string): string[] | null {
+  const raw = path.replace(/\\/g, "/");
+  if (raw.startsWith("/")) return null;
+  const parts = raw.split("/").filter(part => part !== "" && part !== ".");
+  return parts.length && !parts.includes("..") ? parts : null;
+}
+/** True when `path` is a file inside `folder` (whole segments, so "Foo" does not hold "Foobar/x.md"; no `..` escape). */
+export function isInsideMapFolder(path: string, folder: string | undefined): boolean {
+  if (!folder) return false;
+  const inner = pathSegments(path);
+  const base = pathSegments(folder);
+  if (!inner || !base || inner.length <= base.length) return false;
+  return base.every((part, index) => inner[index] === part);
+}
+
 /** The plan a reply needs, or null when it can be applied at once. `diagrams` is the "Add diagrams after research" setting. */
 export function planFor(
   actions: readonly MapChatAction[],
@@ -183,10 +274,16 @@ export function planFor(
     chatStartedResearch?: boolean;
     /** This conversation sent the map's data sources in this turn or an earlier one: the same allow-list applies. */
     chatReadSources?: boolean;
+    /** "Apply this whole conversation automatically": skips the size and other-actions rules for the allow-listed actions; deleting, maps and files outside `mapFolder` still get a plan. */
+    autoApply?: boolean;
+    /** Folder of the current Map.md: md files inside it are allowed under `autoApply`. */
+    mapFolder?: string;
+    /** AI calls this segment of the chain already made (the call budget under `autoApply`). */
+    callsSoFar?: number;
   } = {}
 ): MapChatPlan | null {
-  const perTask = mapChatCallsPerTask(options.diagrams !== false);
   const reasons: MapChatPlanReason[] = [];
+  const auto = options.autoApply === true;
   // A picture turn applied directly may place many anchors, links and topics at once (decision #14): they only add, and one undo takes them all back.
   const imageAddsOnly =
     options.imageMode === "direct" &&
@@ -205,49 +302,12 @@ export function planFor(
   // find_images never needs a plan (owner: pictures are put in without asking), so it does not count toward the action limit or the other-actions rules.
   // read_md_file writes nothing and is never shown (decision 2026-11-15-map-chat-file-bugs#2): it does not count either.
   const planned = actions.filter(action => !isFindImages(action) && action.kind !== "read_md_file");
-  if (planned.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe) reasons.push("many_actions");
-  let research = 0;
-  let calls = 0;
-  let selection = context.selectedCount;
-  let createsMap = false;
-  for (const action of actions) {
-    switch (action.kind) {
-      case "create_map":
-        createsMap = true;
-        break;
-      case "select_topics":
-        selection = action.nodeIds.length;
-        break;
-      case "run_map_action":
-        if (action.nodeIds.length) selection = action.nodeIds.length;
-        switch (action.action) {
-          case "research_standard": {
-            const targets = targetCount(action.nodeIds, selection);
-            research += targets;
-            // Quick: the research call alone (no images or charts). Standard: the research call plus the diagram call.
-            calls += targets * (chatResearchMode(action, options.mapAiMode) === "quick" ? 1 : perTask);
-            break;
-          }
-          case "expand":
-            calls += targetCount(action.nodeIds, selection) * MAP_CHAT_EXPAND_CALLS_PER_CARD;
-            break;
-          case "rate_by_goal":
-          case "merge":
-            calls += 1;
-            break;
-          case "synthesize":
-            calls += perTask;
-            break;
-          case "find_images":
-            calls += targetCount(action.nodeIds, selection);
-            break;
-        }
-        break;
-      default:
-        break;
-    }
-  }
-  if (research > 0 && research + (options.chain?.researchSoFar ?? 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT)
+  if (planned.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe && !auto)
+    reasons.push("many_actions");
+  const research = researchTargetsOf(actions, context.selectedCount);
+  const calls = estimateChatCalls(actions, context, options);
+  const createsMap = actions.some(action => action.kind === "create_map");
+  if (!auto && research > 0 && research + (options.chain?.researchSoFar ?? 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT)
     reasons.push("many_research");
   if (createsMap) reasons.push("new_map");
   if (
@@ -257,7 +317,15 @@ export function planFor(
     reasons.push("image_preview");
   if (options.imageAttached && actions.some(action => !isFindImages(action) && !IMAGE_SAFE_KINDS.has(action.kind)))
     reasons.push("image_other_actions");
-  if (readsResearch && !onlySafe)
+  // Under autoApply the allow-listed actions are not held back by the other-actions rules; anything else is.
+  const autoAllowed = (action: MapChatAction): boolean =>
+    isFindImages(action) ||
+    (action.kind === "run_map_action" ? AUTO_ALLOWED_RUN.has(action.action) : AUTO_ALLOWED_KINDS.has(action.kind)) ||
+    ((action.kind === "edit_md_file" || action.kind === "create_md_file") &&
+      isInsideMapFolder(action.path, options.mapFolder)) ||
+    (imageAddsOnly && IMAGE_SAFE_KINDS.has(action.kind));
+  const allAllowed = auto && actions.every(autoAllowed);
+  if (readsResearch && !onlySafe && !allAllowed)
     reasons.push(
       autoRound
         ? "auto_round_other_actions"
@@ -265,6 +333,9 @@ export function planFor(
           ? "research_text_other_actions"
           : "source_text_other_actions"
     );
+  if (auto && calls + (options.callsSoFar ?? 0) > MAP_CHAT_AUTO_MAX_CALLS) reasons.push("call_budget");
+  // Nothing above caught an action that auto-apply does not allow (e.g. a delete with no research read): it is still a plan.
+  if (auto && !allAllowed && !reasons.length) reasons.push("auto_apply_confirm");
   return reasons.length ? { reasons, estimatedCalls: calls } : null;
 }
 

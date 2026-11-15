@@ -843,6 +843,19 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-view .vam-map-chat button.vam-map-chat-image-mode-button:hover { background: var(--background-modifier-hover); }
 .vam-view .vam-map-chat button.vam-map-chat-image-mode-button[aria-pressed="true"] { background: var(--interactive-accent); color: var(--text-on-accent); font-weight: var(--font-semibold); }
 .vam-view .vam-map-chat button.vam-map-chat-image-mode-button:focus-visible, .vam-view .vam-map-chat button.vam-map-chat-undo-reply:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-view .vam-map-chat-auto-apply { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-view .vam-map-chat-auto-apply[hidden], .vam-view .vam-map-chat-auto-apply-warning[hidden], .vam-view .vam-map-chat-flow[hidden] { display: none; }
+.vam-view .vam-map-chat-auto-apply-group { display: inline-flex; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); overflow: hidden; }
+.vam-view .vam-map-chat-auto-apply-warning { flex: 0 0 auto; padding: 8px 10px; border: 1px solid var(--text-warning); border-radius: var(--radius-s); background: var(--background-modifier-message); color: var(--text-normal); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-view .vam-map-chat-flow { display: flex; flex: 0 0 auto; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vam-view .vam-map-chat-flow-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.vam-view .vam-map-chat-flow-head b { color: var(--text-normal); font-weight: var(--font-semibold); }
+.vam-view .vam-map-chat-flow .vam-research-progress-track { display: block; flex: 1 1 88px; max-width: 160px; }
+.vam-view .vam-map-chat-flow-steps { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.vam-view .vam-map-chat-flow-step { display: flex; align-items: baseline; gap: 6px; }
+.vam-view .vam-map-chat-flow-step.is-current { color: var(--text-normal); font-weight: var(--font-semibold); }
+.vam-view .vam-map-chat-flow-icon { flex: 0 0 14px; width: 14px; text-align: center; }
+.vam-view .vam-map-chat-auto-applied { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-view .vam-map-chat-seen { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
 .vam-view .vam-map-chat button.vam-map-chat-undo-reply { align-self: flex-start; height: auto; margin-top: 6px; padding: 3px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-small); }
 .vam-view .vam-map-chat button.vam-map-chat-undo-reply:hover { background: var(--background-modifier-hover); }
@@ -905,7 +918,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 /* An automatic round has no question of the user's: its row is the separator between two rounds. */
 .vam-map-chat-msg.is-auto { background: transparent; padding: 4px 8px; border-top: 1px solid var(--background-modifier-border); border-radius: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-auto-title { color: var(--text-normal); font-weight: var(--font-semibold); }
-.vam-map-chat-auto-note, .vam-map-chat-auto-left { overflow-wrap: anywhere; }
+.vam-map-chat-auto-note, .vam-map-chat-auto-left, .vam-map-chat-auto-applied { overflow-wrap: anywhere; }
 /* What the results were built from (read, never "checked"): under the results, so a folded list still shows it. */
 .vam-map-chat-basis { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-basis-line { overflow-wrap: anywhere; }

@@ -221,7 +221,7 @@ const at = (round, fields = {}) => ({ ...chain.startChain(), round, ...fields })
 const end = (step, reason, remaining) => { assert.equal(step.decision.kind, 'end', JSON.stringify(step.decision)); assert.equal(step.decision.reason, reason); if (remaining !== undefined) assert.equal(step.decision.remaining, remaining); assert.equal(step.state.phase, 'ended'); assert.deepEqual(plain(step.state.ended), { reason, remaining: step.decision.remaining }); };
 test('chain constants and types: eight rounds, thirty minutes, every end reason listed', () => {
   assert.equal(chain.MAP_CHAT_CHAIN_MAX_ROUNDS, 8); assert.equal(chain.MAP_CHAT_CHAIN_WAIT_MS, 30 * 60 * 1000);
-  assert.deepEqual([...chain.MAP_CHAT_CHAIN_END_REASONS].sort(), ['done', 'failed', 'map_changed', 'max_rounds', 'no_progress', 'not_ready', 'other_background_work', 'plan_cancelled', 'research_failed', 'research_not_started', 'research_stopped', 'stopped', 'user_took_over', 'wait_timeout']);
+  assert.deepEqual([...chain.MAP_CHAT_CHAIN_END_REASONS].sort(), ['call_limit', 'done', 'failed', 'map_changed', 'max_rounds', 'no_progress', 'not_ready', 'other_background_work', 'plan_cancelled', 'research_failed', 'research_not_started', 'research_stopped', 'stopped', 'user_took_over', 'wait_timeout']);
   assert.equal(chain.chainEndNeedsNotice('done'), false);
   for (const reason of chain.MAP_CHAT_CHAIN_END_REASONS.filter(reason => reason !== 'done')) assert.equal(chain.chainEndNeedsNotice(reason), true, reason);
 });
@@ -412,7 +412,7 @@ test('A11 expand basis: the card\'s own note and how many subtopics it already h
 // ---- resume of an interrupted chain ----
 const resumeEnd = (extra = {}) => ({ reason: null, round: 5, applied: false, startRemaining: 'left 5', replyRemaining: '', ...extra });
 test('resumeRound: every resumable reason resumes; done / user_took_over / other_background_work / not_ready / research_failed / research_not_started do not', () => {
-  assert.deepEqual([...chain.MAP_CHAT_CHAIN_RESUMABLE].sort(), ['failed', 'max_rounds', 'no_progress', 'plan_cancelled', 'research_stopped', 'stopped', 'wait_timeout']);
+  assert.deepEqual([...chain.MAP_CHAT_CHAIN_RESUMABLE].sort(), ['call_limit', 'failed', 'max_rounds', 'no_progress', 'plan_cancelled', 'research_stopped', 'stopped', 'wait_timeout']);
   for (const reason of chain.MAP_CHAT_CHAIN_RESUMABLE) assert.ok(chain.resumeRound(resumeEnd({ reason })), reason);
   for (const reason of ['done', 'user_took_over', 'other_background_work', 'not_ready', 'research_failed', 'research_not_started', 'map_changed'])
     assert.equal(chain.resumeRound(resumeEnd({ reason })), null, reason);
@@ -446,4 +446,87 @@ test('read_md_file: needs no plan card, is not a write, and an accepted read goe
   assert.equal(step.decision.round, 2);
   end(chain.finishRound(at(1), roundEnd({ remaining: '', actions: [{ kind: 'read_md_file', done: false }] })), 'done', '');
   end(chain.finishRound(at(chain.startChain().maxRounds), roundEnd({ remaining: '', actions: read })), 'max_rounds');
+});
+
+// ---- auto-apply segments: 60 rounds, 300 calls ----
+test('auto chain: constants; round 40 goes on, round 60 is max_rounds', () => {
+  assert.equal(chain.MAP_CHAT_AUTO_MAX_ROUNDS, 60); assert.equal(chain.MAP_CHAT_AUTO_MAX_CALLS, 300);
+  const auto = chain.startAutoChain();
+  assert.equal(auto.maxRounds, 60); assert.equal(auto.calls, 0); assert.equal(auto.autoApply, true);
+  assert.equal(chain.startChain().calls, 0); assert.equal(chain.startChain().autoApply, undefined);
+  assert.equal(chain.finishRound({ ...auto, round: 40 }, roundEnd()).decision.kind, 'next');
+  end(chain.finishRound({ ...auto, round: 60 }, roundEnd()), 'max_rounds');
+  end(chain.finishRound(at(8), roundEnd()), 'max_rounds', 'build the rest');
+});
+test('auto chain: calls add up per round; 300 is call_limit for an auto chain only', () => {
+  const auto = chain.startAutoChain();
+  const one = chain.finishRound({ ...auto, round: 3, calls: 100 }, roundEnd({ calls: 150 }));
+  assert.equal(one.decision.kind, 'next'); assert.equal(one.state.calls, 250);
+  end(chain.finishRound({ ...auto, round: 3, calls: 250 }, roundEnd({ calls: 50 })), 'call_limit', 'build the rest');
+  end(chain.finishRound({ ...auto, round: 3 }, roundEnd({ calls: 400 })), 'call_limit');
+  assert.equal(chain.finishRound(at(3), roundEnd({ calls: 400 })).decision.kind, 'next', 'a normal chain has no call limit');
+  assert.equal(chain.finishRound(at(3), roundEnd()).state.calls, 0, 'no calls given = 0');
+  assert.equal(chain.finishRound({ ...auto, round: 3, calls: 299 }, roundEnd({ remaining: '' })).decision.reason, 'done', 'done wins');
+  assert.equal(chain.chainEndNeedsNotice('call_limit'), true);
+  assert.ok(chain.MAP_CHAT_CHAIN_RESUMABLE.has('call_limit'));
+});
+test('auto chain: resume starts a fresh segment (60 rounds, calls 0) and keeps counting rounds', () => {
+  const resume = chain.resumeRound(resumeEnd({ reason: 'max_rounds', round: 60, applied: true, replyRemaining: 'x' }), 60);
+  assert.deepEqual(plain(resume), { round: 61, maxRounds: 120, remaining: 'x' });
+  const fresh = chain.resumedChain(resume, true);
+  assert.equal(fresh.round, 61); assert.equal(fresh.maxRounds, 120); assert.equal(fresh.calls, 0); assert.equal(fresh.researchTargets, 0); assert.equal(fresh.autoApply, true); assert.equal(fresh.phase, 'round'); assert.equal(fresh.remaining, 'x');
+  assert.equal(chain.resumeRound(resumeEnd({ reason: 'call_limit', round: 7 }), 60).maxRounds, 60);
+  assert.equal(chain.resumeRound(resumeEnd({ reason: 'call_limit', round: 7 })).maxRounds, 8, 'default segment is 8');
+  assert.equal(chain.resumedChain(resume).autoApply, undefined);
+  end(chain.finishRound({ ...fresh, round: 120 }, roundEnd()), 'max_rounds');
+  assert.equal(chain.finishRound({ ...fresh, round: 100 }, roundEnd()).decision.kind, 'next');
+});
+
+// ---- whole-flow progress (packet P2, plan "整段流程進度") ----
+const progressApi = load('core/map-chat-progress.ts');
+const steps = (...pairs) => pairs.map(([name, status]) => ({ name, status }));
+test('progress: a reply may carry steps; absence, wrong types and malformed entries read as no progress and never fail the reply', () => {
+  assert.ok(!('progress' in MAP_CHAT_SCHEMA.required) && !MAP_CHAT_SCHEMA.required.includes('progress'));
+  assert.ok(MAP_CHAT_SCHEMA.properties.progress, 'the schema names the optional field');
+  const good = { steps: steps(['Plan', 'done'], ['Write', 'current'], ['Check', 'todo']), current: 1 };
+  assert.deepEqual(plain(parseMapChat(raw({ progress: good }), context()).progress), plain(good));
+  assert.equal(parseMapChat(raw({}), context()).progress, undefined, 'absent');
+  for (const bad of [null, 'x', 5, [], {}, { steps: 'x' }, { steps: [] }, { steps: [{ name: 'A', status: 'bogus' }] }, { steps: [{ name: 7, status: 'done' }] }, { steps: [null] }, { steps: Array.from({ length: 40 }, (_, i) => ({ name: `s${i}`, status: 'todo' })) }])
+    assert.equal(parseMapChat(raw({ progress: bad }), context()).progress, undefined, JSON.stringify(bad));
+  const withBad = parseMapChat(raw({ progress: { steps: 'x' }, remaining: 'more' }), context()); assert.equal(withBad.remaining, 'more'); assert.equal(withBad.reply, 'ok');
+});
+test('progress: names are plain text clipped to 60 characters on one line; a missing or wrong current is worked out from the statuses', () => {
+  const long = 'x'.repeat(100);
+  const p = progressApi.normalizeProgress({ steps: [{ name: `  A\n  b ${long}`, status: 'done' }, { name: '<img src=x onerror=1>', status: 'current' }, { name: 'C', status: 'todo' }], current: 99 });
+  assert.equal([...p.steps[0].name].length, 60); assert.ok(!/\n/.test(p.steps[0].name)); assert.equal(p.steps[1].name, '<img src=x onerror=1>', 'kept as text, rendered as text');
+  assert.equal(p.current, 1);
+  assert.equal(progressApi.normalizeProgress({ steps: steps(['A', 'done'], ['B', 'todo']) }).current, 1, 'first step not done');
+  assert.equal(progressApi.normalizeProgress({ steps: steps(['A', 'done'], ['B', 'done']) }).current, 1, 'all done: the last');
+});
+test('progress: the first progress sets the steps; later rounds only move statuses forward; other names or another count are ignored whole', () => {
+  const first = progressApi.normalizeProgress({ steps: steps(['A', 'current'], ['B', 'todo'], ['C', 'todo']) });
+  assert.equal(progressApi.mergeProgress(null, first).steps.length, 3);
+  assert.equal(progressApi.mergeProgress(first, null), first, 'absent: the old one stays');
+  const next = progressApi.mergeProgress(first, progressApi.normalizeProgress({ steps: steps(['A', 'done'], ['B', 'current'], ['C', 'todo']) }));
+  assert.deepEqual(plain(next.steps.map(s => s.status)), ['done', 'current', 'todo']); assert.equal(next.current, 1);
+  const back = progressApi.mergeProgress(next, progressApi.normalizeProgress({ steps: steps(['A', 'todo'], ['B', 'todo'], ['C', 'current']) }));
+  assert.deepEqual(plain(back.steps.map(s => s.status)), ['done', 'current', 'current'], 'done and current never go back; forward moves are taken'); 
+  assert.equal(progressApi.mergeProgress(next, progressApi.normalizeProgress({ steps: steps(['A', 'done'], ['B', 'current']) })), next, 'another count: ignored');
+  assert.equal(progressApi.mergeProgress(next, progressApi.normalizeProgress({ steps: steps(['A', 'done'], ['Renamed', 'current'], ['C', 'todo']) })), next, 'another name: ignored');
+});
+test('progress: the chain keeps it across rounds and a resume; only finishRound merges it', () => {
+  const first = progressApi.normalizeProgress({ steps: steps(['A', 'current'], ['B', 'todo']) });
+  const one = chain.finishRound(chain.startAutoChain(), roundEnd({ progress: first }));
+  assert.equal(one.state.progress.steps.length, 2);
+  const two = chain.finishRound({ ...one.state, phase: 'round', round: 2 }, roundEnd({ progress: null }));
+  assert.equal(two.state.progress.steps.length, 2, 'a round without progress keeps it');
+  assert.equal(chain.resumedChain({ round: 3, maxRounds: 60, remaining: 'x', progress: two.state.progress }, true).progress.steps.length, 2);
+  assert.equal(chain.resumedChain({ round: 3, maxRounds: 60, remaining: 'x' }, true).progress, undefined);
+});
+test('syncAutoApply: the toggle of the moment decides the segment limits of a running chain', () => {
+  const on = chain.syncAutoApply({ ...chain.startChain(), round: 3 }, true);
+  assert.equal(on.autoApply, true); assert.equal(on.maxRounds, 60);
+  const off = chain.syncAutoApply({ ...chain.startAutoChain(), round: 3 }, false);
+  assert.equal(off.autoApply, undefined); assert.equal(off.maxRounds, 8);
+  const same = chain.startChain(); assert.equal(chain.syncAutoApply(same, false), same); const auto = chain.startAutoChain(); assert.equal(chain.syncAutoApply(auto, true), auto);
 });

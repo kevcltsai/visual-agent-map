@@ -7,7 +7,7 @@ const { estimateTokens } = load('ai/context-builder.ts');
 const { MAP_CHAT_TOKEN_BUDGET, renderMapChatSteer, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
 const { buildMapChatContext, contentHash, isMdStale, MAP_CHAT_MAP_TITLE_LIMIT } = load('core/map-chat-context.ts');
 const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
-const { planFor, matchMapTitle, chatResearchRequest, chatResearchMode, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT } = load('core/map-chat-plan.ts');
+const { estimateChatCalls, isInsideMapFolder, planFor, matchMapTitle, chatResearchRequest, chatResearchMode, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT } = load('core/map-chat-plan.ts');
 const { guardMapChatWrite, normalizeVaultPath, applyMdEdit } = load('core/map-chat-guard.ts');
 const { mapChatSourceMaterial, mapSourcePaths, MAP_CHAT_SOURCE_CHAR_LIMIT } = load('core/map-chat-sources.ts');
 const { scrubReferenceGroups } = load('core/source-gateway.ts');
@@ -1789,4 +1789,85 @@ test('map chat: an action with a field the schema does not name (mapFolder copie
 test('read_md_file: parsed with its path only', () => {
   const out = parse(JSON.stringify({ reply: 'r', remaining: '', actions: [item('read_md_file', { path: 'Maps/M/a.md' })] }));
   assert.deepEqual(out.actions, [{ kind: 'read_md_file', path: 'Maps/M/a.md' }]);
+});
+
+// ---- auto-apply conversation: plan rules (a)-(d) ----
+const AUTO = { autoApply: true, mapFolder: 'Maps/Steak' };
+const autoRun = (action, nodeIds = ['a'], extra = {}) => ({ kind: 'run_map_action', action, nodeIds, title: '', goal: '', direction: '', mode: '', images: false, ...extra });
+const autoCtx = { parents: { a: 'r', a1: 'a', b: 'r', r: null }, selectedCount: 0 };
+const autoPlan = (actions, options = {}) => planFor(actions, autoCtx, { ...AUTO, ...options });
+const autoAdd = i => ({ kind: 'add_child', ref: 'r' + i, parentId: '', title: 'T' + i, summary: '' });
+const ALLOWED = [
+  autoAdd(1), { kind: 'rename_topic', nodeId: 'a', title: 'T' }, { kind: 'update_summary', nodeId: 'a', summary: 's' }, { kind: 'edit_topic_note', nodeId: 'a', detail: 'd' },
+  { kind: 'set_topic_kind', nodeIds: ['a'], topicKind: 'concept' }, { kind: 'move_topic', nodeId: 'a1', newParentId: 'b' }, { kind: 'reorder_topics', parentId: 'r', nodeIds: ['a', 'b'] },
+  { kind: 'add_relation', fromId: 'a', toId: 'b', relationKind: 'related' }, { kind: 'remove_relation', fromId: 'a', toId: 'b' }, { kind: 'set_appearance', nodeIds: ['a'] },
+  { kind: 'select_topics', nodeIds: ['a'], all: false }, { kind: 'focus_topic', nodeId: 'a' }, { kind: 'collapse_topic', nodeId: 'a' }, { kind: 'expand_topic', nodeId: 'a' },
+  { kind: 'auto_layout' }, { kind: 'ask_topic_kind', nodeIds: ['a'], topicKind: 'concept' },
+  autoRun('research_standard'), autoRun('research_standard', ['a'], { rewrite: true }), autoRun('expand'), autoRun('find_images'), autoRun('synthesize'), autoRun('rate_by_goal', ['a'], { goal: 'g' }),
+  { kind: 'edit_md_file', path: 'Maps/Steak/Notes/a.md', find: 'x', replace: 'y' }, { kind: 'create_md_file', path: 'Maps/Steak/Notes/new.md', content: 'c' }
+];
+const READS = [{ chain: { round: 3, researchSoFar: 0 } }, { chatStartedResearch: true }, { chatReadSources: true }];
+test('auto-apply plan (a): off or absent changes nothing, every old reason stays', () => {
+  for (const options of [undefined, {}, { autoApply: false, mapFolder: 'Maps/Steak', callsSoFar: 999 }]) {
+    assert.deepEqual(plain(plan(renameRows(16), {}, options)), { reasons: ['many_actions'], estimatedCalls: 0 });
+    assert.deepEqual(plain(plan([autoRun('research_standard', Array.from({ length: 10 }, (_, i) => 'n' + i), { mode: 'quick' })], {}, options).reasons), ['many_research']);
+    assert.deepEqual(plain(plan([{ kind: 'delete_topic', nodeId: 'a', branch: true }], {}, options)), null);
+    assert.deepEqual(plain(plan([{ kind: 'delete_topic', nodeId: 'a', branch: true }], {}, { ...options, chatStartedResearch: true }).reasons), ['research_text_other_actions']);
+    assert.deepEqual(plain(plan([{ kind: 'rename_topic', nodeId: 'a', title: 'T' }], {}, { ...options, chain: { round: 2, researchSoFar: 0 } }).reasons), ['auto_round_other_actions']);
+    assert.deepEqual(plain(plan([{ kind: 'rename_topic', nodeId: 'a', title: 'T' }], {}, { ...options, chatReadSources: true }).reasons), ['source_text_other_actions']);
+  }
+});
+test('auto-apply plan (b): the size and other-actions gates are skipped for allow-listed actions', () => {
+  assert.equal(autoPlan(renameRows(40)), null, 'no many_actions');
+  assert.equal(autoPlan([autoRun('research_standard', Array.from({ length: 20 }, (_, i) => 'n' + i), { mode: 'quick' })]), null, 'no many_research');
+  assert.equal(autoPlan([autoRun('research_standard', ['a'], { mode: 'quick' })], { chain: { round: 2, researchSoFar: 30 } }), null, 'researchSoFar does not count');
+  for (const action of ALLOWED) {
+    assert.equal(autoPlan([action]), null, action.kind + ' ' + (action.action || ''));
+    for (const read of READS) assert.equal(autoPlan([action], read), null, action.kind + ' ' + (action.action || '') + ' ' + JSON.stringify(read));
+  }
+  for (const read of READS) assert.equal(autoPlan(ALLOWED, read), null, 'all together ' + JSON.stringify(read));
+  assert.equal(autoPlan([{ kind: 'edit_md_file', path: 'Maps/Steak/a.md', find: 'x', replace: 'y' }], { mapFolder: 'Maps/Steak/' }), null, 'trailing slash on the folder');
+});
+test('auto-apply plan (c): what still needs a plan, whatever else is in the reply and whether research was read', () => {
+  const still = [
+    { kind: 'delete_topic', nodeId: 'a', branch: false }, { kind: 'create_map', title: 'Q' }, { kind: 'open_map', title: 'Q' }, { kind: 'rename_map', title: 'Q' },
+    autoRun('merge', ['a', 'b'], { title: 'M' }),
+    { kind: 'edit_md_file', path: 'Other/a.md', find: 'x', replace: 'y' }, { kind: 'create_md_file', path: 'Other/n.md', content: 'c' },
+    { kind: 'edit_md_file', path: 'Maps/Steak/../Secret/a.md', find: 'x', replace: 'y' }, { kind: 'create_md_file', path: 'Maps/Steak/../../n.md', content: 'c' },
+    { kind: 'create_md_file', path: 'Maps/SteakHouse/n.md', content: 'c' }, { kind: 'edit_md_file', path: '/Maps/Steak/a.md', find: 'x', replace: 'y' },
+    { kind: 'edit_md_file', path: 'Maps\\Steak\\..\\x.md', find: 'x', replace: 'y' }, { kind: 'create_md_file', path: 'Maps/Steak', content: 'c' }
+  ];
+  for (const action of still) {
+    assert.ok(autoPlan([action]), 'alone: ' + action.kind + ' ' + (action.path || ''));
+    assert.ok(autoPlan([...renameRows(3), action, autoAdd(1)]), 'mixed: ' + action.kind);
+    for (const read of READS) assert.ok(autoPlan([action], read), action.kind + ' ' + JSON.stringify(read));
+  }
+  assert.deepEqual(plain(autoPlan([{ kind: 'delete_topic', nodeId: 'a', branch: false }]).reasons), ['auto_apply_confirm']);
+  assert.deepEqual(plain(autoPlan([{ kind: 'create_map', title: 'Q' }]).reasons), ['new_map']);
+  assert.deepEqual(plain(autoPlan([{ kind: 'delete_topic', nodeId: 'a', branch: false }], { chain: { round: 2, researchSoFar: 0 } }).reasons), ['auto_round_other_actions']);
+  assert.deepEqual(plain(autoPlan([{ kind: 'delete_topic', nodeId: 'a', branch: false }], { chatStartedResearch: true }).reasons), ['research_text_other_actions']);
+  assert.ok(autoPlan([{ kind: 'edit_md_file', path: 'Maps/Steak/a.md', find: 'x', replace: 'y' }], { mapFolder: undefined }), 'unknown folder');
+  assert.ok(autoPlan([{ kind: 'edit_md_file', path: 'Maps/Steak/a.md', find: 'x', replace: 'y' }], { mapFolder: '' }), 'empty folder');
+  const anchor = { kind: 'add_anchor', imageId: 'i', ref: 'x', x: 0, y: 0, note: '' };
+  assert.ok(autoPlan([anchor], { imageMode: 'preview', imageAttached: true }).reasons.includes('image_preview'), 'image_preview');
+  assert.ok(autoPlan([anchor, { kind: 'delete_topic', nodeId: 'a', branch: false }], { imageMode: 'direct', imageAttached: true }).reasons.includes('image_other_actions'), 'image_other_actions');
+  assert.ok(autoPlan([anchor, ...renameRows(1)], { imageMode: 'direct', imageAttached: true }).reasons.includes('image_other_actions'), 'rename in an image turn');
+  assert.equal(autoPlan([anchor], { imageMode: 'direct', imageAttached: true }), null, 'an image turn applied directly is as before');
+  assert.ok(autoPlan([anchor]), 'an anchor with no image in the turn is not allow-listed');
+});
+test('auto-apply plan (d): estimateChatCalls is what planFor counts; call_budget when callsSoFar + estimate passes 300', () => {
+  const acts = [autoRun('research_standard', ['a', 'b'], { mode: 'standard' }), autoRun('expand', ['a']), autoRun('merge', ['a', 'b']), autoRun('synthesize'), autoRun('rate_by_goal'), autoRun('find_images', ['a', 'b', 'a1'])];
+  assert.equal(estimateChatCalls(acts, autoCtx, {}), 4 + 2 + 1 + 2 + 1 + 3);
+  assert.equal(estimateChatCalls(acts, autoCtx, { diagrams: false }), 2 + 2 + 1 + 1 + 1 + 3);
+  assert.equal(estimateChatCalls([{ kind: 'select_topics', nodeIds: ['a', 'b'], all: false }, autoRun('expand', [])], autoCtx), 4, 'selection');
+  assert.equal(estimateChatCalls([autoRun('research_standard', [])], { selectedCount: 3 }, { mapAiMode: 'quick' }), 3);
+  assert.equal(estimateChatCalls([], autoCtx), 0);
+  const exp = n => [autoRun('expand', Array.from({ length: n }, (_, i) => 'n' + i))];
+  assert.equal(autoPlan(exp(150)), null, '300 exactly is allowed');
+  assert.deepEqual(plain(autoPlan(exp(151))), { reasons: ['call_budget'], estimatedCalls: 302 });
+  assert.equal(autoPlan(exp(10), { callsSoFar: 280 }), null);
+  assert.deepEqual(plain(autoPlan(exp(11), { callsSoFar: 280 }).reasons), ['call_budget']);
+  assert.deepEqual(plain(autoPlan([...exp(151), { kind: 'create_map', title: 'Q' }]).reasons), ['new_map', 'call_budget']);
+  assert.ok(!(plan(exp(151), {}, { callsSoFar: 999 })?.reasons || []).includes('call_budget'));
+  assert.equal(planFor(exp(1), autoCtx, { ...AUTO }), null);
 });

@@ -465,3 +465,52 @@ test('auto chain: resume starts a fresh segment (60 rounds, calls 0) and keeps c
   end(chain.finishRound({ ...fresh, round: 120 }, roundEnd()), 'max_rounds');
   assert.equal(chain.finishRound({ ...fresh, round: 100 }, roundEnd()).decision.kind, 'next');
 });
+
+// ---- whole-flow progress (packet P2, plan "整段流程進度") ----
+const progressApi = load('core/map-chat-progress.ts');
+const steps = (...pairs) => pairs.map(([name, status]) => ({ name, status }));
+test('progress: a reply may carry steps; absence, wrong types and malformed entries read as no progress and never fail the reply', () => {
+  assert.ok(!('progress' in MAP_CHAT_SCHEMA.required) && !MAP_CHAT_SCHEMA.required.includes('progress'));
+  assert.ok(MAP_CHAT_SCHEMA.properties.progress, 'the schema names the optional field');
+  const good = { steps: steps(['Plan', 'done'], ['Write', 'current'], ['Check', 'todo']), current: 1 };
+  assert.deepEqual(plain(parseMapChat(raw({ progress: good }), context()).progress), plain(good));
+  assert.equal(parseMapChat(raw({}), context()).progress, undefined, 'absent');
+  for (const bad of [null, 'x', 5, [], {}, { steps: 'x' }, { steps: [] }, { steps: [{ name: 'A', status: 'bogus' }] }, { steps: [{ name: 7, status: 'done' }] }, { steps: [null] }, { steps: Array.from({ length: 40 }, (_, i) => ({ name: `s${i}`, status: 'todo' })) }])
+    assert.equal(parseMapChat(raw({ progress: bad }), context()).progress, undefined, JSON.stringify(bad));
+  const withBad = parseMapChat(raw({ progress: { steps: 'x' }, remaining: 'more' }), context()); assert.equal(withBad.remaining, 'more'); assert.equal(withBad.reply, 'ok');
+});
+test('progress: names are plain text clipped to 60 characters on one line; a missing or wrong current is worked out from the statuses', () => {
+  const long = 'x'.repeat(100);
+  const p = progressApi.normalizeProgress({ steps: [{ name: `  A\n  b ${long}`, status: 'done' }, { name: '<img src=x onerror=1>', status: 'current' }, { name: 'C', status: 'todo' }], current: 99 });
+  assert.equal([...p.steps[0].name].length, 60); assert.ok(!/\n/.test(p.steps[0].name)); assert.equal(p.steps[1].name, '<img src=x onerror=1>', 'kept as text, rendered as text');
+  assert.equal(p.current, 1);
+  assert.equal(progressApi.normalizeProgress({ steps: steps(['A', 'done'], ['B', 'todo']) }).current, 1, 'first step not done');
+  assert.equal(progressApi.normalizeProgress({ steps: steps(['A', 'done'], ['B', 'done']) }).current, 1, 'all done: the last');
+});
+test('progress: the first progress sets the steps; later rounds only move statuses forward; other names or another count are ignored whole', () => {
+  const first = progressApi.normalizeProgress({ steps: steps(['A', 'current'], ['B', 'todo'], ['C', 'todo']) });
+  assert.equal(progressApi.mergeProgress(null, first).steps.length, 3);
+  assert.equal(progressApi.mergeProgress(first, null), first, 'absent: the old one stays');
+  const next = progressApi.mergeProgress(first, progressApi.normalizeProgress({ steps: steps(['A', 'done'], ['B', 'current'], ['C', 'todo']) }));
+  assert.deepEqual(plain(next.steps.map(s => s.status)), ['done', 'current', 'todo']); assert.equal(next.current, 1);
+  const back = progressApi.mergeProgress(next, progressApi.normalizeProgress({ steps: steps(['A', 'todo'], ['B', 'todo'], ['C', 'current']) }));
+  assert.deepEqual(plain(back.steps.map(s => s.status)), ['done', 'current', 'current'], 'done and current never go back; forward moves are taken'); 
+  assert.equal(progressApi.mergeProgress(next, progressApi.normalizeProgress({ steps: steps(['A', 'done'], ['B', 'current']) })), next, 'another count: ignored');
+  assert.equal(progressApi.mergeProgress(next, progressApi.normalizeProgress({ steps: steps(['A', 'done'], ['Renamed', 'current'], ['C', 'todo']) })), next, 'another name: ignored');
+});
+test('progress: the chain keeps it across rounds and a resume; only finishRound merges it', () => {
+  const first = progressApi.normalizeProgress({ steps: steps(['A', 'current'], ['B', 'todo']) });
+  const one = chain.finishRound(chain.startAutoChain(), roundEnd({ progress: first }));
+  assert.equal(one.state.progress.steps.length, 2);
+  const two = chain.finishRound({ ...one.state, phase: 'round', round: 2 }, roundEnd({ progress: null }));
+  assert.equal(two.state.progress.steps.length, 2, 'a round without progress keeps it');
+  assert.equal(chain.resumedChain({ round: 3, maxRounds: 60, remaining: 'x', progress: two.state.progress }, true).progress.steps.length, 2);
+  assert.equal(chain.resumedChain({ round: 3, maxRounds: 60, remaining: 'x' }, true).progress, undefined);
+});
+test('syncAutoApply: the toggle of the moment decides the segment limits of a running chain', () => {
+  const on = chain.syncAutoApply({ ...chain.startChain(), round: 3 }, true);
+  assert.equal(on.autoApply, true); assert.equal(on.maxRounds, 60);
+  const off = chain.syncAutoApply({ ...chain.startAutoChain(), round: 3 }, false);
+  assert.equal(off.autoApply, undefined); assert.equal(off.maxRounds, 8);
+  const same = chain.startChain(); assert.equal(chain.syncAutoApply(same, false), same); const auto = chain.startAutoChain(); assert.equal(chain.syncAutoApply(auto, true), auto);
+});

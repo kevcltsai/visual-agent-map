@@ -9068,3 +9068,160 @@ integrationTest('P3 (j) auto-apply: the 30 minutes of waiting count from the las
   const n = await harness(); await n.view.hydrate(); const { spy: nspy, finish: nfinish } = await expandWait(n, [n.ids.a, n.ids.b]);
   n.clock.advance(CHAIN_WAIT_MS - 60_000); nfinish(n.ids.a); await tick(); n.clock.advance(59_999); eq(nspy.reasons(), []); n.clock.advance(1); await chainEnded(nspy); eq(nspy.reasons(), ['wait_timeout'], 'fixed 30 minutes from the start of the wait');
 });
+
+// ---- auto-apply: the switch, the wiring, the whole-flow progress (packet P2) -------------------------------------------------
+const autoSwitch = (extra = {}) => {
+  const s = { on: false, sets: [] };
+  const f = panelFixture({ autoApply: () => s.on, setAutoApply: v => { s.sets.push(v); s.on = v; }, ...extra }); f.panel.setOpen(true);
+  const row = () => find(f.panel.bodyEl, i => hasClass(i, 'vam-map-chat-auto-apply'));
+  const group = () => find(f.panel.bodyEl, i => i.attrs?.role === 'group' && hasClass(i, 'vam-map-chat-auto-apply-group'));
+  const buttons = () => findAll(group(), i => i.tag === 'button');
+  const warning = () => find(f.panel.bodyEl, i => hasClass(i, 'vam-map-chat-auto-apply-warning'));
+  return { ...f, s, row, group, buttons, warning };
+};
+const WARNING_EN = /without stopping for your Apply/;
+test('P2 switch: a row above the composer, "Apply this conversation automatically" with an Off/On group of aria-pressed buttons, off by default; On tells the host and shows the warning, Off hides it', () => {
+  const f = autoSwitch();
+  assert.ok(f.row(), 'the row exists'); assert.equal(f.row().hidden, false);
+  assert.equal(f.group().attrs['aria-label'], 'Apply this conversation automatically');
+  const [off, on] = f.buttons(); assert.deepEqual([off.text, on.text], ['Off', 'On']); assert.deepEqual([off, on].map(b => b.attrs.type), ['button', 'button']);
+  assert.deepEqual([off, on].map(b => b.attrs['aria-pressed']), ['true', 'false']); assert.equal(f.warning().hidden, true, 'no warning while off');
+  const rowText = visibleText(f.row()); assert.match(rowText, /Apply this conversation automatically/);
+  on.click(); eq(f.s.sets, [true]); assert.deepEqual([off, on].map(b => b.attrs['aria-pressed']), ['false', 'true']);
+  assert.equal(f.warning().hidden, false); assert.match(visibleText(f.warning()), WARNING_EN); assert.match(visibleText(f.warning()), /Deleting, merging, creating or switching mind maps/);
+  on.click(); eq(f.s.sets, [true], 'the same choice twice changes nothing');
+  off.click(); eq(f.s.sets, [true, false]); assert.equal(f.warning().hidden, true);
+  const order = findAll(f.panel.bodyEl, i => hasClass(i, 'vam-map-chat-auto-apply') || hasClass(i, 'vam-map-chat-composer')); assert.ok(hasClass(order[0], 'vam-map-chat-auto-apply'), 'above the composer');
+});
+test('P2 switch: a host without the hooks shows no row; the panel follows the host\'s value (so a repainted panel keeps the view\'s state)', () => {
+  const plain1 = panelFixture(); plain1.panel.setOpen(true); assert.equal(find(plain1.panel.bodyEl, i => hasClass(i, 'vam-map-chat-auto-apply'))?.hidden ?? true, true);
+  const f = autoSwitch(); f.s.on = true; f.panel.refreshAutoApply(); assert.deepEqual(f.buttons().map(b => b.attrs['aria-pressed']), ['false', 'true']); assert.equal(f.warning().hidden, false);
+});
+test('P2 switch (g): a new conversation, reset (another map) and restoring an old conversation all turn it back off', () => {
+  const f = autoSwitch(); const on = () => f.buttons()[1].click();
+  on(); f.panel.reset(); eq(f.s.sets, [true, false]); assert.equal(f.s.on, false); assert.deepEqual(f.buttons().map(b => b.attrs['aria-pressed']), ['true', 'false']); assert.equal(f.warning().hidden, true);
+  on(); f.panel.restore(restoredConversation()); assert.equal(f.s.on, false, 'restore'); assert.equal(f.warning().hidden, true);
+  on(); const fresh = findAll(f.panel.bodyEl, i => i.tag === 'button' && /New conversation/.test(i.attrs?.['aria-label'] ?? i.attrs?.title ?? '')); if (fresh[0]) { fresh[0].click(); assert.equal(f.s.on, false, 'new conversation'); }
+  const off = autoSwitch(); off.panel.reset(); eq(off.s.sets, [], 'already off: nothing told to the host');
+});
+integrationTest('P2 view (g): setChatAutoApply is off after a new conversation, a map change reset and a restore; a view starts off (nothing is persisted)', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); assert.equal(chat.host.autoApply(), false, 'default off');
+  assert.equal(h.view.chainForRound(undefined, { path: MAP, id: 'map-a' }, 'x').state.autoApply, undefined); h.view.chatChain = null;
+  h.view.setChatAutoApply(true); chat.reset(); assert.equal(chat.host.autoApply(), false, 'reset');
+  h.view.setChatAutoApply(true); chat.restore(restoredConversation()); assert.equal(chat.host.autoApply(), false, 'restore');
+  h.view.setChatAutoApply(true); h.view.newChatConversation(); assert.equal(chat.host.autoApply(), false, 'new conversation');
+  assert.equal(h.plugin.settings.mapChatAutoApply, undefined, 'not a setting');
+});
+integrationTest('P2 view: with the switch on an auto chain applies what a plan card held back (16 renames in round 2); the switch of the moment wins - turned off before round 2 plans, the same reply gets a card', async () => {
+  const renames = () => ['a', 'b', 'c'].flatMap(key => [0, 1, 2, 3, 4].map(i => ({ kind: 'rename_topic', nodeId: h.ids[key], title: `T${key}${i}` }))).concat([{ kind: 'rename_topic', nodeId: h.ids.root, title: 'Top' }]);
+  let h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); let chat = h.open();
+  chainReplies(h, say('One.', [addRoot('x', 'X')], 'More'), say('Renamed.', renames(), ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 2); assert.equal(chat.pendingPlan(), null, 'on: no card'); assert.equal((await h.note('a')).title, 'Tc4' === 'x' ? '' : (await h.note('a')).title);
+  assert.equal((await h.note('root')).title, 'Top');
+  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open();
+  chainReplies(h, say('One.', [addRoot('x', 'X')], 'More'), () => { h.view.setChatAutoApply(false); return say('Renamed.', renames(), ''); });
+  h.type('go'); await h.view.sendMapChat(); await until(() => chat.pendingPlan() !== null); assert.equal(h.control.requests.length, 2); assert.equal((await h.note('root')).title !== 'Top', true, 'nothing written before Apply');
+  assert.equal(h.view.chatChain.state.autoApply, undefined, 'the chain follows the switch');
+});
+integrationTest('P2 view (f): the switch is read at every planFor - a chain started with it off that is turned on mid-way stops asking from the next round, and delete still gets a card', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const many = ['a', 'b', 'c'].flatMap(key => [0, 1, 2, 3, 4].map(i => ({ kind: 'rename_topic', nodeId: h.ids[key], title: `T${key}${i}` }))).concat([{ kind: 'rename_topic', nodeId: h.ids.root, title: 'Top' }]);
+  chainReplies(h, say('One.', [addRoot('x', 'X')], 'More'), () => { h.view.setChatAutoApply(true); return say('Renamed.', many, 'Delete too'); }, say('Delete.', [{ kind: 'delete_topic', nodeId: h.ids.c }], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => chat.pendingPlan() !== null || h.view.chatChain === null); await until(() => h.control.requests.length === 3);
+  assert.equal(chat.pendingPlan()?.reasons.length > 0, true, 'a delete is still planned'); assert.equal((await h.note('root')).title, 'Top', 'round 2 was applied without a card'); assert.equal(h.view.chatChain.state.autoApply, true); assert.equal(h.view.chatChain.state.maxRounds, 60);
+});
+integrationTest('P2 view (e): Stop while an auto chain waits ends the whole chain; research that settles later changes nothing and no more request goes out', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const spy = chainSpy(chat); const runs = researchStub(h);
+  chainReplies(h, say('Started.', [addRoot('r', 'R'), researchAct({ nodeIds: ['new:r'] })], 'Build from it'), say('never', [addRoot('z', 'Z')], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain?.state.phase === 'waiting'); h.view.stopMapChat(); await chainEnded(spy); eq(spy.reasons(), ['stopped']);
+  settleRun(runs[0]); await tick(); await tick(); assert.equal(h.control.requests.length, 1, 'late results are ignored'); assert.equal(h.view.chatChain, null); eq(spy.reasons(), ['stopped']);
+});
+integrationTest('P2 view: the round label of an auto chain counts AI calls, never "of 8"; the call_limit end names the calls and offers the next segment', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const spy = chainSpy(chat); const runs = researchStub(h);
+  chainReplies(h, say('Started.', [addRoot('r', 'R'), researchAct({ nodeIds: ['new:r'] })], 'Build from it'), say('Built.', [addRoot('y', 'Y')], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => runs.length === 1); settleRun(runs[0]); await until(() => h.view.chatChain === null && h.control.requests.length === 2);
+  const sep = chat.transcript().find(m => m.auto); assert.equal(sep.autoInfo.calls > 0, true); const label = find(chat.logEl, i => hasClass(i, 'vam-map-chat-auto-title')); assert.match(visibleText(label), /^Automatic continuation · round 2 · AI calls used \d+\/300$/);
+  assert.doesNotMatch(visibleText(label), /of 8/);
+  const f = autoSwitch(); f.panel.begin('m'); f.panel.finish('r', []); f.panel.endChain('call_limit', 'More to do', undefined, 300); assert.match(f.panel.transcript().at(-1).chainNote.text, /Used 300 AI calls; stopping here\. Left: More to do\. To go on, say “continue”\./);
+});
+integrationTest('P2 view: the call budget counts across rounds - three rounds of 60 researched cards pass 300 calls in round 3 and that round gets a plan card ("call_budget")', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const runs = researchStub(h);
+  const round = tag => say(`Round ${tag}.`, [...Array.from({ length: 60 }, (_, i) => addRoot(`${tag}${i}`, `C${tag}${i}`)), researchAct({ nodeIds: Array.from({ length: 60 }, (_, i) => `new:${tag}${i}`) })], 'More');
+  chainReplies(h, round('p'), round('q'), round('r'));
+  h.type('go'); await h.view.sendMapChat(); await until(() => runs.length === 1); settleRun(runs[0]); await until(() => runs.length === 2); settleRun(runs[1]); await until(() => chat.pendingPlan() !== null);
+  assert.equal(h.control.requests.length, 3); assert.match(chat.pendingPlan().reasons.join(' '), /300 AI calls/); assert.equal(runs.length, 2, 'the third round started no research before Apply');
+});
+integrationTest('P2 view (k): a 71-chapter book - research for 71 cards, 71 summaries, a file made then edited, run to the end: done, no plan card, at most 300 calls; a delete in a later message still gets a card', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const spy = chainSpy(chat); const runs = researchStub(h);
+  let endedRun = null; const real = h.view.endChatRecordedProbe; void real; const realEnd = h.view.endChatChain.bind(h.view); h.view.endChatChain = (run, ...rest) => { endedRun = { calls: run.state.calls, round: run.state.round }; return realEnd(run, ...rest); };
+  const refs = Array.from({ length: 71 }, (_, i) => `c${i}`);
+  chainReplies(h,
+    say('Chapters.', [...refs.map((r, i) => addRoot(r, `Chapter ${i + 1}`, h.ids.root)), researchAct({ nodeIds: refs.map(r => `new:${r}`) })], 'Summaries and a file'),
+    () => say('Summaries.', h.view.map.nodes.filter(n => /^Chapter /.test(n.path.split('/').at(-1) ?? '') || /Chapter/.test(n.path)).slice(0, 71).map(n => ({ kind: 'update_summary', nodeId: n.id, summary: `S ${n.id.slice(0, 4)}` })), 'Write the file'),
+    say('File.', [{ kind: 'create_md_file', path: 'Agent Workspace/Topics/map-a/Book.md', content: '# Book\n' }, { kind: 'edit_md_file', path: 'Agent Workspace/Topics/map-a/Book.md', find: 'Book', replace: 'The Book' }], ''));
+  h.type('make the book'); await h.view.sendMapChat(); await until(() => runs.length === 1); settleRun(runs[0]); await until(() => h.view.chatChain === null && h.control.requests.length === 3, 8000);
+  eq(spy.reasons(), ['done']); assert.equal(chat.pendingPlan(), null, 'no plan card'); assert.equal(planCard(h).length, 0); assert.ok(endedRun.calls <= 300 && endedRun.calls >= 142, `calls ${endedRun.calls}`);
+  assert.equal(h.view.map.nodes.filter(n => /Chapter/.test(n.path)).length, 71);
+  assert.ok(runs[0].ids.length >= 71, 'every chapter was researched');
+  chainReplies(h, say('Delete.', [{ kind: 'delete_topic', nodeId: h.ids.c }], ''));
+  h.type('now delete C'); await h.view.sendMapChat(); assert.ok(chat.pendingPlan(), 'a delete in a later message still gets a card');
+});
+integrationTest('P2 records: an auto-apply turn writes autoApply:true on turn_start and the chain_end carries calls (numbers and booleans only); a chain without it writes neither', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const spy = chainSpy(chat);
+  chainReplies(h, say('One.', [addRoot('x', 'X')], 'More'), say('Two.', [addRoot('y', 'Y')], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 2); await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]); const starts = lines.filter(l => l.type === 'turn_start'); eq(starts.map(l => l.autoApply), [true, true]);
+  const end2 = lines.find(l => l.type === 'event' && l.kind === 'chain_end'); assert.equal(typeof end2.calls, 'number'); assert.ok(end2.calls >= 2);
+  const g = await harness({ records: true }); await g.view.hydrate(); const gchat = g.open(); chainReplies(g, say('One.', [addRoot('x', 'X')], 'More'), say('Two.', [addRoot('y', 'Y')], ''));
+  g.type('go'); await g.view.sendMapChat(); await until(() => g.view.chatChain === null && g.control.requests.length === 2); await recordIdle(g);
+  const glines = recordLines(g, recordFiles(g)[0]); assert.equal(glines.some(l => 'autoApply' in l), false); assert.equal(glines.find(l => l.type === 'event' && l.kind === 'chain_end') && 'calls' in glines.find(l => l.type === 'event' && l.kind === 'chain_end'), false);
+});
+integrationTest('P2 (backup gap): in an auto chain Map.md is backed up once, before the first add_child (or any other write to Map.md); a chain without the switch backs nothing up', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = backupSpy(h); const run = autoRun(h);
+  const lines = await applyIn(h, run, [addRoot('n', 'New', h.ids.root), { kind: 'add_relation', fromId: h.ids.a, toId: h.ids.b, relationKind: 'supports', description: '' }]); eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status).slice(0, 2), ['done', 'done'], JSON.stringify(lines));
+  eq(calls.map(c => c[0]), [MAP], 'Map.md once for both writes'); assert.equal(calls[0][1].includes('map-a'), true, 'a copy of Map.md as it was');
+  await applyIn(h, run, [addRoot('m', 'More', h.ids.root), { kind: 'remove_relation', fromId: h.ids.a, toId: h.ids.b }]); eq(calls.map(c => c[0]), [MAP], 'a second reply backs it up again no more');
+  const f = await harness(); await f.view.hydrate(); const fcalls = backupSpy(f); const frun = autoRun(f); const before = f.contents.get(MAP);
+  const { writebackHooks } = f.view; f.view.writebackHooks = () => ({ backupNote: async () => ({ ok: false }) }); const out = await applyIn(f, frun, [addRoot('n', 'New', f.ids.root)]); void writebackHooks; void fcalls;
+  assert.equal(out[0].status, 'skipped', 'a failed backup of Map.md skips the write'); assert.equal(f.contents.get(MAP), before);
+  const n = await harness(); await n.view.hydrate(); const ncalls = backupSpy(n); const nrun = autoRun(n, false); await applyIn(n, nrun, [addRoot('n', 'New', n.ids.root)]); eq(ncalls, []);
+});
+// whole-flow progress, driven through the real view and panel
+const flowOf = h => find(h.view.chat.bodyEl, i => hasClass(i, 'vam-map-chat-flow'));
+const prog = (...pairs) => ({ steps: pairs.map(([name, status]) => ({ name, status })), current: 0 });
+const sayP = (progress, actions = [], remaining = 'more') => ({ ...say('Step.', actions, remaining), ...(progress ? { progress } : {}) });
+integrationTest('P2 (l) progress: set in round 1, statuses updated later; header, bar (aria), calls and the step list follow; done shows "M of M steps done"', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open();
+  chainReplies(h, sayP(prog(['Outline', 'current'], ['Write', 'todo'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(prog(['Outline', 'done'], ['Write', 'current'], ['Check', 'todo']), [addRoot('y', 'Y')]), sayP(prog(['Outline', 'done'], ['Write', 'done'], ['Check', 'done']), [addRoot('z', 'Z')], ''));
+  h.type('three phases'); await h.view.sendMapChat(); await until(() => h.control.requests.length >= 1 && flowOf(h) && /Step 1 of 3/.test(visibleText(flowOf(h)))); 
+  await until(() => h.view.chatChain === null && h.control.requests.length === 3); const flow = flowOf(h); assert.equal(flow.hidden, false); assert.equal(flow.attrs.role, 'group');
+  const text = visibleText(flow); assert.match(text, /Whole flow/); assert.match(text, /3 of 3 steps done · 3 rounds in all/); assert.match(text, /AI calls used \d+\/300/);
+  const bar = find(flow, i => i.attrs?.role === 'progressbar'); assert.deepEqual([bar.attrs['aria-valuenow'], bar.attrs['aria-valuemax'], bar.attrs['aria-valuemin']], ['3', '3', '0']); assert.equal(bar.attrs['aria-valuetext'], '3 of 3 steps done'); assert.ok(hasClass(bar, 'vam-research-progress-track'));
+  assert.ok(find(bar, i => hasClass(i, 'vam-research-progress-fill'))); const items = findAll(flow, i => i.tag === 'li'); eq(items.map(i => visibleText(i)), ['✓1. Outline', '✓2. Write', '✓3. Check']);
+});
+integrationTest('P2 (l) progress: a mid-way state reads "Step N of M · round X"; ● for the current step, ○ for the rest', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const runs = researchStub(h);
+  chainReplies(h, sayP(prog(['Outline', 'done'], ['Write', 'current'], ['Check', 'todo']), [addRoot('x', 'X'), researchAct({ nodeIds: ['new:x'] })]));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain?.state.phase === 'waiting'); const flow = flowOf(h); assert.match(visibleText(flow), /Step 2 of 3 · round 1/);
+  eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)), ['✓1. Outline', '●2. Write', '○3. Check']); assert.equal(find(flow, i => i.attrs?.role === 'progressbar').attrs['aria-valuenow'], '1');
+  h.view.stopMapChat(); void runs;
+});
+integrationTest('P2 (l) progress: another step count or names, a status that goes back, absent or malformed progress change nothing; names are text', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open();
+  chainReplies(h, sayP(prog(['Outline', 'done'], ['<b>Write</b>', 'current'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(prog(['Outline', 'done'], ['Write', 'current']), [addRoot('y', 'Y')]), sayP(prog(['Outline', 'todo'], ['<b>Write</b>', 'todo'], ['Check', 'todo']), [addRoot('z', 'Z')]), sayP({ steps: 'bad' }, [addRoot('w', 'W')]), sayP(undefined, [addRoot('v', 'V')], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 5);
+  const flow = flowOf(h); eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)), ['✓1. Outline', '●2. <b>Write</b>', '○3. Check']); assert.equal(find(flow, i => i.tag === 'b' && /Write/.test(i.text ?? '')), undefined, 'the name is text, not markup');
+  assert.equal(h.control.requests.length, 5, 'no round failed over the odd progress');
+});
+integrationTest('P2 (l) progress: hidden with the switch off, with one step only, and after a new conversation; nothing extra for a chain without it', async () => {
+  let h = await harness(); await h.view.hydrate(); let chat = h.open(); chainReplies(h, sayP(prog(['A', 'current'], ['B', 'todo']), [addRoot('x', 'X')], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 1 && !chat.isBusy); assert.equal(flowOf(h)?.hidden ?? true, true, 'switch off: not shown');
+  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open(); chainReplies(h, sayP(prog(['Only', 'current']), [addRoot('x', 'X')], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 1 && !chat.isBusy); assert.equal(flowOf(h)?.hidden ?? true, true, 'one step: not shown');
+  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open(); chainReplies(h, sayP(prog(['A', 'current'], ['B', 'todo']), [addRoot('x', 'X')], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 1 && !chat.isBusy); assert.equal(flowOf(h).hidden, false); h.view.setChatAutoApply(false); chat.refreshAutoApply(); assert.equal(flowOf(h).hidden, true, 'switch turned off: hidden'); h.view.setChatAutoApply(true); chat.refreshAutoApply(); chat.reset(); assert.equal(flowOf(h).hidden, true, 'reset clears it');
+});
+test('P2 progress: the prompt asks for steps on the first round of a multi-step instruction and statuses only afterwards, in both languages', () => {
+  const { MAP_CHAT_PROMPT_EN, MAP_CHAT_PROMPT_ZH } = { MAP_CHAT_PROMPT_EN: fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.en.md'), 'utf8'), MAP_CHAT_PROMPT_ZH: fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.zh.md'), 'utf8') };
+  assert.match(MAP_CHAT_PROMPT_EN, /"progress"/); assert.match(MAP_CHAT_PROMPT_EN, /first round/i); assert.match(MAP_CHAT_PROMPT_ZH, /"progress"/);
+});

@@ -148,7 +148,9 @@ function resultText(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
-    .map(item => (item && typeof item === "object" && typeof (item as Block).text === "string" ? (item as Block).text : ""))
+    .map(item =>
+      item && typeof item === "object" && typeof (item as Block).text === "string" ? (item as Block).text : ""
+    )
     .join(" ");
 }
 /** The number of actions in a StructuredOutput input, when it has an `actions` list. */

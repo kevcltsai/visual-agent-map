@@ -45098,7 +45098,9 @@ var REJECT_REASON_LIMIT = 200;
 function resultText(content) {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
-  return content.map((item) => item && typeof item === "object" && typeof item.text === "string" ? item.text : "").join(" ");
+  return content.map(
+    (item) => item && typeof item === "object" && typeof item.text === "string" ? item.text : ""
+  ).join(" ");
 }
 var actionCount = (input2) => input2 && typeof input2 === "object" && Array.isArray(input2.actions) ? input2.actions.length : null;
 var MODEL_RECORDS = /* @__PURE__ */ new Set(["stream_event", "assistant", "user", "result"]);

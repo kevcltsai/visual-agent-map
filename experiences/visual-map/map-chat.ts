@@ -3068,7 +3068,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (message.auto) {
       const info = message.autoInfo;
       const body = row.createDiv({ cls: "vam-map-chat-auto-title" });
-      body.setText(info?.round ? this.autoRoundLabel(info) : t("ui.map_chat_role_auto"));
+      body.setText(info?.round ? this.autoRoundLabel({ ...info, round: info.round }) : t("ui.map_chat_role_auto"));
       if (info?.partial)
         row.createDiv({
           cls: "vam-map-chat-auto-note",

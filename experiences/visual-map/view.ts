@@ -23550,7 +23550,10 @@ export class VisualAgentMapView extends ItemView {
     card: MapChatPlanCard,
     token: number,
     result: MapChatResult & { message?: string },
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "basis" | "parents" | "research" | "mapSourcePaths">,
+    baseline: Pick<
+      MapChatContext,
+      "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research" | "mapSourcePaths"
+    >,
     anchor: { path: string; id: string | undefined },
     run: ChatChainRun | null = null
   ): Promise<void> {

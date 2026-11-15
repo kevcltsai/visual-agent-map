@@ -202,7 +202,7 @@ test('6 panel: when the rerun finishes everything the box goes away', () => {
 });
 test('panel restore: a restored turn carries its batch and marks it restored', () => {
   const { panel } = makePanel();
-  panel.renderLog = () => {}; panel.refreshNote = () => {}; panel.renderHint = () => {}; panel.stopWaitTimer = () => {};
+  panel.renderLog = () => {}; panel.refreshNote = () => {}; panel.renderHint = () => {}; panel.renderAutoApply = () => {}; panel.stopWaitTimer = () => {};
   panel.host = { stateChanged() {}, activeElement: () => null };
   panel.restore({ id: 'x', restoredAt: null, turns: [{ message: 'm', reply: 'r', lines: [], modelLabel: '', stalePlan: false, batch: batchOf(5, 2, { ended: false }) }] });
   const answer = panel.messages.find(message => message.role === 'assistant');

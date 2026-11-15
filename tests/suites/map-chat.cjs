@@ -9146,7 +9146,7 @@ integrationTest('P2 view: the round label of an auto chain counts AI calls, neve
 });
 integrationTest('P2 view: the call budget counts across rounds - three rounds of 60 researched cards pass 300 calls in round 3 and that round gets a plan card ("call_budget")', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const runs = researchStub(h);
-  const round = tag => say(`Round ${tag}.`, [...Array.from({ length: 60 }, (_, i) => addRoot(`${tag}${i}`, `C${tag}${i}`)), researchAct({ nodeIds: Array.from({ length: 60 }, (_, i) => `new:${tag}${i}`) })], 'More');
+  const round = tag => say(`Round ${tag}.`, [...Array.from({ length: 60 }, (_, i) => addRoot(`${tag}${i}`, `C${tag}${i}`)), researchAct({ nodeIds: Array.from({ length: 60 }, (_, i) => `new:${tag}${i}`), mode: 'standard' })], 'More');
   chainReplies(h, round('p'), round('q'), round('r'));
   h.type('go'); await h.view.sendMapChat(); await until(() => runs.length === 1); settleRun(runs[0]); await until(() => runs.length === 2); settleRun(runs[1]); await until(() => chat.pendingPlan() !== null);
   assert.equal(h.control.requests.length, 3); assert.match(chat.pendingPlan().reasons.join(' '), /300 AI calls/); assert.equal(runs.length, 2, 'the third round started no research before Apply');
@@ -9156,7 +9156,7 @@ integrationTest('P2 view (k): a 71-chapter book - research for 71 cards, 71 summ
   let endedRun = null; const real = h.view.endChatRecordedProbe; void real; const realEnd = h.view.endChatChain.bind(h.view); h.view.endChatChain = (run, ...rest) => { endedRun = { calls: run.state.calls, round: run.state.round }; return realEnd(run, ...rest); };
   const refs = Array.from({ length: 71 }, (_, i) => `c${i}`);
   chainReplies(h,
-    say('Chapters.', [...refs.map((r, i) => addRoot(r, `Chapter ${i + 1}`, h.ids.root)), researchAct({ nodeIds: refs.map(r => `new:${r}`) })], 'Summaries and a file'),
+    say('Chapters.', [...refs.map((r, i) => addRoot(r, `Chapter ${i + 1}`, h.ids.root)), researchAct({ nodeIds: refs.map(r => `new:${r}`), mode: 'standard' })], 'Summaries and a file'),
     () => say('Summaries.', h.view.map.nodes.filter(n => /^Chapter /.test(n.path.split('/').at(-1) ?? '') || /Chapter/.test(n.path)).slice(0, 71).map(n => ({ kind: 'update_summary', nodeId: n.id, summary: `S ${n.id.slice(0, 4)}` })), 'Write the file'),
     say('File.', [{ kind: 'create_md_file', path: 'Agent Workspace/Topics/map-a/Book.md', content: '# Book\n' }, { kind: 'edit_md_file', path: 'Agent Workspace/Topics/map-a/Book.md', find: 'Book', replace: 'The Book' }], ''));
   h.type('make the book'); await h.view.sendMapChat(); await until(() => runs.length === 1); settleRun(runs[0]); await until(() => h.view.chatChain === null && h.control.requests.length === 3, 8000);

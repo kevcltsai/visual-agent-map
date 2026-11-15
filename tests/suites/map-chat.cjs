@@ -4162,7 +4162,7 @@ integrationTest('B3 find_images: the Stop button ends the searches that have not
   await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await withTimeout(until(() => lastImages(h, 0).state === 'ready'));
   const done = lastImages(h, 0); const waiting = lastImages(h, 1); assert.equal(waiting.state, 'searching');
   find(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).click();
-  assert.equal(waiting.state, 'stopped'); assert.equal(done.state, 'ready', 'the picture that was put in stays'); assert.equal(h.view.chatImageSearches.size, 0);
+  assert.equal(waiting.state, 'stopped'); assert.equal(done.state, 'ready', 'the picture that was put in stays'); assert.equal(h.view.chatImageFinder.searches.size, 0);
   assert.equal(h.control.searches[1].signal.aborted, true);
   assert.match(visibleText(h.view.chat.logEl), /The picture search was stopped\. Nothing was put in\./);
   const probedBefore = probed; gate.resolve(); await tick(); await tick();
@@ -4183,11 +4183,11 @@ integrationTest('B3 find_images: closing the view, or opening another map by han
     h.control.search = async () => { await gate.promise; return imageItems(2); }; h.control.probe = async found => { probed++; return found; };
     const settle = chat.settleImages.bind(chat); chat.settleImages = (...args) => { settled++; return settle(...args); };
     const file = noteFile(h, 'a'); const before = h.contents.get(file);
-    await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => h.control.searches.length === 1)); assert.equal(h.view.chatImageSearches.size, 1);
+    await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => h.control.searches.length === 1)); assert.equal(h.view.chatImageFinder.searches.size, 1);
     const asBefore = settled;
     if (how === 'close') { h.view.closed = true; h.view.abortMapChat(); }
     else { h.view.map = { ...h.view.map, id: 'map-b' }; h.repaint(); }
-    assert.equal(h.control.searches[0].signal.aborted, true, how); assert.equal(h.view.chatImageSearches.size, 0, how);
+    assert.equal(h.control.searches[0].signal.aborted, true, how); assert.equal(h.view.chatImageFinder.searches.size, 0, how);
     gate.resolve(); await tick(); await tick();
     assert.equal(probed, 0, how); assert.equal(settled, asBefore, `${how}: the block is not updated`); assert.equal(h.contents.get(file), before, how);
   }
@@ -4247,7 +4247,7 @@ integrationTest('B3 find_images: the target card is deleted while the search run
 });
 integrationTest('B3 find_images: the note gets the picture and, when the cover step has bytes for it, the cover is written inside the same write - and the two are ONE undo step', async () => {
   const { h } = await imageHarness(); h.control.search = perQuery; const calls = []; const undone = [];
-  h.view.chatCoverBytes = async (block, candidate) => ({ name: `${block.nodeId}.png`, data: new ArrayBuffer(4), url: candidate.url });
+  h.view.chatImageFinder.coverBytes = async (block, candidate) => ({ name: `${block.nodeId}.png`, data: new ArrayBuffer(4), url: candidate.url });
   h.view.chatCoverWrite = async (block, cover) => { calls.push([block.nodeId, cover.name]); return { undo: async () => { undone.push(`cover ${block.nodeId}`); }, redo: async () => {}, label: 'cover' }; };
   h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' }); const detailBefore = (await h.note('a')).detail;
   await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b] })]); await waitImages(h);
@@ -4295,7 +4295,7 @@ integrationTest('R1-6 place: the cover and the note are written inside ONE mutat
 integrationTest('R1-8 find_images: starting a new conversation stops the picture searches; a late result writes nothing', async () => {
   const { h } = await imageHarness(); const gate = deferred(); let probed = 0; h.control.search = async () => { await gate.promise; return imageItems(2); }; h.control.probe = async found => { probed++; return found; };
   const file = noteFile(h, 'a'); const before = h.contents.get(file); await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => h.control.searches.length === 1));
-  h.view.newChatConversation(); assert.equal(h.control.searches[0].signal.aborted, true); assert.equal(h.view.chatImageSearches.size, 0);
+  h.view.newChatConversation(); assert.equal(h.control.searches[0].signal.aborted, true); assert.equal(h.view.chatImageFinder.searches.size, 0);
   gate.resolve(); await tick(); await tick(); assert.equal(probed, 0); assert.equal(h.contents.get(file), before);
 });
 integrationTest('R1-9 save: a card that was refused (locked, busy) is written with its own reason, never as "no loadable picture"; the heading no longer says candidates', async () => {
@@ -6654,7 +6654,7 @@ integrationTest('map chat records: A7 a restored plan and choice do nothing, and
     rec('images', { turn: 1, at: REC_AT, state: 'ready', items: [{ title: 'Pic', sourceUrl: 'https://example.com/1' }], inserted: [] })
   ]);
   const chat = h.open(); await until(() => chat.hasMessages);
-  const calls = []; h.view.applyChatPlan = async () => { calls.push('apply'); }; h.view.chatPlaceImage = async () => { calls.push('insert'); return { ok: true }; };
+  const calls = []; h.view.applyChatPlan = async () => { calls.push('apply'); }; h.view.chatImageFinder.place = async () => { calls.push('insert'); return { ok: true }; };
   const send = h.view.sendMapChat; h.view.sendMapChat = async (...args) => { calls.push('send'); return send(...args); };
   const controls = findAll(chat.logEl, i => i.tag === 'button' && (hasClass(i, 'is-stale') || i.attrs['aria-disabled'] === 'true'));
   assert.ok(controls.length >= 2, 'the plan buttons are there but inert'); assert.equal(findAll(chat.logEl, i => i.tag === 'button' && /images/.test(i.cls)).length, 0, 'the restored picture block has no button'); assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-images-item')).length, 1, 'but it is listed');

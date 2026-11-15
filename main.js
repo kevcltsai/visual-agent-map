@@ -43685,6 +43685,269 @@ async function loadableImages(candidates, signal) {
   return candidates.filter((_, index) => loads[index]);
 }
 
+// experiences/visual-map/chat-image-finder.ts
+function errorMessage(error) {
+  const message = error == null ? void 0 : error.message;
+  return typeof message === "string" ? message : String(error);
+}
+var newChatImageBatch = () => ({
+  imageNodes: /* @__PURE__ */ new Set(),
+  asked: /* @__PURE__ */ new Set(),
+  declined: false,
+  group: []
+});
+var CHAT_IMAGE_SEARCH_PARALLEL = 3;
+var chatImageTopicKey = (mapId, nodeId) => `${mapId}\0${nodeId}`;
+var CHAT_IMAGE_QUERY_MAX = 80;
+var CHAT_IMAGE_DOWNLOAD_MS = 15e3;
+function cleanImageQuery(text10) {
+  const plain = Array.from(text10, (char) => {
+    const code = char.charCodeAt(0);
+    return code < 32 || code >= 127 && code <= 159 || code === 8232 || code === 8233 ? " " : char;
+  }).join("");
+  return plain.replace(/\S*:\/\/\S*/g, " ").replace(/\bwww\.\S*/gi, " ").replace(/\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?(?:[/?#]\S*)?/g, " ").replace(/\[[0-9a-f:.]*:[0-9a-f:.]*\](?::\d+)?(?:[/?#]\S*)?/gi, " ").replace(/(?:[\p{L}\p{N}-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?/giu, " ").replace(/\s+/g, " ").trim().slice(0, CHAT_IMAGE_QUERY_MAX).trim();
+}
+var ChatImageFinder = class {
+  constructor(ports) {
+    this.ports = ports;
+    /** Picture searches the chat started and that have not ended; the view owns them, so closing it or leaving the map stops them. */
+    __publicField(this, "searches", /* @__PURE__ */ new Map());
+    __publicField(this, "sequence", 0);
+    /** Cards of a map with a queued or running picture search (key: chatImageTopicKey), with the search's controller. */
+    __publicField(this, "topics", /* @__PURE__ */ new Map());
+    __publicField(this, "running", 0);
+    __publicField(this, "waiters", []);
+    /** Writes of pictures go one after another (the searches overlap, the writes and their undo steps do not). */
+    __publicField(this, "writes", Promise.resolve());
+  }
+  /** A search is queued or running. */
+  isRunning() {
+    return this.searches.size > 0;
+  }
+  /** A search of this card of this map is queued or running. */
+  isSearching(mapId, nodeId) {
+    return this.topics.has(chatImageTopicKey(mapId, nodeId));
+  }
+  /** Every picture search the chat started stops; a result that still arrives is neither shown nor written. */
+  stopAll() {
+    const searches = [...this.searches.values()];
+    this.searches.clear();
+    for (const controller of searches) controller.abort();
+  }
+  /** `readsResearch`: the chat reads researched web text, so the search words come from the cards' own titles. */
+  async find(map, chat, cards, direction, readsResearch, batch) {
+    const ports = this.ports;
+    const ids2 = [...new Set(cards)].filter((id) => !batch.imageNodes.has(id) && !this.isSearching(map.id, id));
+    if (!ids2.length) return { skipped: "ui.map_chat_skip_images_dup" };
+    for (const id of ids2) batch.imageNodes.add(id);
+    const anchor = { path: ports.where().path, id: map.id };
+    const words2 = readsResearch ? "" : cleanImageQuery(direction);
+    const jobs = [];
+    const blocks = [];
+    for (const id of ids2) {
+      const node = map.nodes.find((item) => item.id === id);
+      if (!node) continue;
+      const note = await ports.readNote(node.path, map);
+      const title = cleanImageQuery(note.title);
+      const parent = node.parentId ? map.nodes.find((item) => item.id === node.parentId) : void 0;
+      const parentTitle = readsResearch && parent ? cleanImageQuery((await ports.readNote(parent.path, map)).title) : "";
+      const joined = cleanImageQuery(
+        (readsResearch ? [parentTitle, title] : ids2.length > 1 ? [words2, title] : [words2 || title]).filter(Boolean).join(" ")
+      );
+      const query = title ? joined || title : "";
+      const block = {
+        query,
+        nodeId: node.id,
+        nodeTitle: note.title,
+        modelLabel: ports.modelLabel(note.model),
+        mapPath: anchor.path,
+        mapId: anchor.id,
+        state: "searching",
+        items: []
+      };
+      blocks.push(block);
+      const reason = query ? await ports.preflight(block) : t("ui.map_chat_skip_unavailable");
+      if (reason) {
+        block.state = "empty";
+        block.reason = reason;
+        continue;
+      }
+      jobs.push({ block, controller: new AbortController(), model: note.model });
+    }
+    if (!blocks.length) return { skipped: "ui.map_chat_skip_topic_gone" };
+    if (batch.declined) return { skipped: "ui.map_chat_skip_not_started" };
+    for (const model of new Set(jobs.map((job) => job.model))) {
+      if (batch.asked.has(model)) continue;
+      let ok = false;
+      try {
+        ok = await ports.confirmUsage(model);
+      } catch (error) {
+        return { failed: errorMessage(error) };
+      }
+      if (!ok) {
+        batch.declined = true;
+        return { skipped: "ui.map_chat_skip_not_started" };
+      }
+      batch.asked.add(model);
+    }
+    const here = ports.where();
+    if (here.closed || here.chat !== chat || here.path !== anchor.path || here.mapId !== anchor.id)
+      return { skipped: "ui.map_chat_skip_map_changed" };
+    for (const job of jobs) {
+      const { block, controller } = job;
+      const topic = chatImageTopicKey(anchor.id, block.nodeId);
+      this.topics.set(topic, controller);
+      const release2 = () => {
+        if (this.topics.get(topic) === controller) this.topics.delete(topic);
+      };
+      job.release = release2;
+      controller.signal.addEventListener("abort", release2, { once: true });
+      const key4 = ++this.sequence;
+      this.searches.set(key4, controller);
+      job.key = key4;
+      block.stop = () => {
+        if (this.searches.get(key4) !== controller) return;
+        this.searches.delete(key4);
+        controller.abort();
+        ports.settle(chat, block, { state: "stopped" });
+      };
+    }
+    batch.group.push(...blocks);
+    ports.added(chat, blocks);
+    for (const job of jobs)
+      void (async () => {
+        var _a2;
+        await this.acquireSlot();
+        try {
+          await this.run(job.block, job.controller, chat, job.model);
+        } finally {
+          (_a2 = job.release) == null ? void 0 : _a2.call(job);
+          this.releaseSlot();
+          if (job.key !== void 0 && this.searches.get(job.key) === job.controller) this.searches.delete(job.key);
+        }
+      })();
+    return { blocks: batch.group };
+  }
+  async acquireSlot() {
+    if (this.running < CHAT_IMAGE_SEARCH_PARALLEL) {
+      this.running += 1;
+      return;
+    }
+    await new Promise((resolve) => this.waiters.push(resolve));
+  }
+  releaseSlot() {
+    const next = this.waiters.shift();
+    if (next) next();
+    else this.running -= 1;
+  }
+  /**
+   * Runs one card's picture search to its end: the first loadable picture is put into the card, or the block says why none was.
+   * Nothing is written when the view, the panel or the map is not the same any more, or the search was stopped.
+   */
+  async run(block, controller, chat, model) {
+    var _a2;
+    const ports = this.ports;
+    const sameMap = () => {
+      const here = ports.where();
+      return here.path === block.mapPath && here.mapId === block.mapId;
+    };
+    const current = () => !ports.where().closed && !controller.signal.aborted && ports.where().chat === chat && sameMap();
+    const dropped = () => {
+      const here = ports.where();
+      if (here.closed || controller.signal.aborted || here.chat !== chat) return;
+      ports.settle(chat, block, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
+    };
+    if (!current()) return dropped();
+    try {
+      const refused = await ports.preflight(block);
+      if (!current()) return dropped();
+      if (refused) return ports.settle(chat, block, { state: "empty", reason: refused });
+      ports.running(chat, block);
+      const found = await ports.searchImages(block.query, model, controller.signal);
+      if (!current()) return dropped();
+      const loadable = (await ports.probe(found, controller.signal)).filter((item) => item.url.startsWith("https://"));
+      const used = ports.usedImageKeys();
+      const first = (_a2 = loadable.find((item) => !used.has(imageKey(item.url)))) != null ? _a2 : loadable[0];
+      if (!current()) return dropped();
+      if (!first) return ports.settle(chat, block, { state: "empty" });
+      const placed = await this.place(block, first, current, controller.signal);
+      if (placed.ok) {
+        ports.settle(chat, block, {
+          state: "ready",
+          items: [{ candidate: first, inserted: block.nodeTitle }]
+        });
+      } else if (current()) ports.settle(chat, block, { state: "empty", reason: placed.reason });
+      else dropped();
+    } catch (error) {
+      if (!current()) return dropped();
+      ports.settle(chat, block, { state: "failed", reason: errorMessage(error) });
+    }
+  }
+  /**
+   * Puts the found picture at the end of the card's Detail (a blank line before it) and, when the card has no cover, saves it
+   * beside the note as the cover: both are one undo step (one ⌘Z takes the picture back out of the note and off the card).
+   * The cover is downloaded first, outside the write queue and with a time limit (a slow download holds no other card back);
+   * then the note and the cover are written by the view's `write` port inside one `mutate`, and their undo entries are folded before
+   * they reach the history. Refused, with the reason in words and nothing written, when `alive` says the search was stopped or the
+   * view's write refuses (the map in view is not the one the search came from, the card is gone, locked, being merged or being
+   * worked on by an AI task, the map cannot be edited). The same checks run again inside the write, where nothing else can change the map.
+   */
+  async place(block, candidate, alive, signal = new AbortController().signal) {
+    const cover = await this.coverBytes(block, candidate, signal);
+    if (!alive()) return { ok: false, reason: t("ui.map_chat_images_stale_map") };
+    const work = () => this.ports.write(block, candidate, alive, cover);
+    const run = this.writes.then(work, work);
+    this.writes = run.catch(() => void 0);
+    return run;
+  }
+  /** A download that ends when the search is stopped or after {@link CHAT_IMAGE_DOWNLOAD_MS}, whichever comes first. */
+  download(url, signal) {
+    return new Promise((resolve, reject2) => {
+      if (signal.aborted) return reject2(new Error("aborted"));
+      const end = () => {
+        window.clearTimeout(timer);
+        signal.removeEventListener("abort", onAbort);
+      };
+      const onAbort = () => {
+        end();
+        reject2(new Error("aborted"));
+      };
+      const timer = window.setTimeout(() => {
+        end();
+        reject2(new Error("timeout"));
+      }, CHAT_IMAGE_DOWNLOAD_MS);
+      signal.addEventListener("abort", onAbort);
+      this.ports.fetchBytes(url).then(
+        (data) => {
+          end();
+          resolve(data);
+        },
+        (error) => {
+          end();
+          reject2(error instanceof Error ? error : new Error(String(error)));
+        }
+      );
+    });
+  }
+  /**
+   * The cover picture of a placed picture, downloaded before the write: only when the card has no cover and has not turned it
+   * off (nothing is downloaded otherwise). The picture is checked by its bytes ({@link acceptImage}). Null when there is none to write.
+   */
+  async coverBytes(block, candidate, signal) {
+    if (!this.ports.coverWanted(block)) return null;
+    let data;
+    try {
+      data = await this.download(candidate.url, signal);
+    } catch (e) {
+      return null;
+    }
+    const accepted = acceptImage({ mime: "image/*", size: data.byteLength, bytes: data });
+    if (!accepted.ok) return null;
+    const name2 = safeImageName(candidate.title, accepted.mime);
+    return name2 ? { name: name2, data } : null;
+  }
+};
+
 // core/map-chat-sources.ts
 var MAP_CHAT_SOURCE_CHAR_LIMIT = 6e4;
 function mapSourcePaths(groups) {
@@ -58952,7 +59215,7 @@ function isEditableTarget(target) {
   var _a2;
   return !!((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, EDITABLE_SELECTOR));
 }
-function errorMessage(error) {
+function errorMessage2(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
@@ -59176,26 +59439,9 @@ function researchWebLines(web) {
   if (web.withoutSearch) lines.push({ status: "skipped", text: t("ui.multi_research_no_search_0", web.withoutSearch) });
   return lines;
 }
-var newChatImageBatch = () => ({
-  imageNodes: /* @__PURE__ */ new Set(),
-  asked: /* @__PURE__ */ new Set(),
-  declined: false,
-  group: []
-});
 var CHAT_RAIL_WIDTH = 44;
 var CHAT_TOOLS_GAP = 12;
 var GOAL_SUGGEST_GAP = 6;
-var CHAT_IMAGE_SEARCH_PARALLEL = 3;
-var chatImageTopicKey = (mapId, nodeId) => `${mapId}\0${nodeId}`;
-var CHAT_IMAGE_QUERY_MAX = 80;
-var CHAT_IMAGE_DOWNLOAD_MS = 15e3;
-function cleanImageQuery(text10) {
-  const plain = Array.from(text10, (char) => {
-    const code = char.charCodeAt(0);
-    return code < 32 || code >= 127 && code <= 159 || code === 8232 || code === 8233 ? " " : char;
-  }).join("");
-  return plain.replace(/\S*:\/\/\S*/g, " ").replace(/\bwww\.\S*/gi, " ").replace(/\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?(?:[/?#]\S*)?/g, " ").replace(/\[[0-9a-f:.]*:[0-9a-f:.]*\](?::\d+)?(?:[/?#]\S*)?/gi, " ").replace(/(?:[\p{L}\p{N}-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?/giu, " ").replace(/\s+/g, " ").trim().slice(0, CHAT_IMAGE_QUERY_MAX).trim();
-}
 function cleanImageTitle(text10) {
   return text10.replace(/[^\p{L}\p{M}\p{N}\s.,;:'"()\-_?+，。、：；？（）「」『』《》—…·]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 120).trim();
 }
@@ -59386,9 +59632,36 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "chatConversation", 0);
     /** The follow-ups of the turn that is running (or ran last). */
     __publicField(this, "chatSteer", null);
-    /** Picture searches the chat started and that have not ended; the view owns them, so closing it or leaving the map stops them. */
-    __publicField(this, "chatImageSearches", /* @__PURE__ */ new Map());
-    __publicField(this, "chatImageSequence", 0);
+    /** Picture searches the chat started; the view owns them, so closing it or leaving the map stops them. */
+    __publicField(this, "chatImageFinder", new ChatImageFinder({
+      where: () => {
+        var _a2;
+        return { closed: this.closed, chat: this.chat, path: this.path, mapId: (_a2 = this.map) == null ? void 0 : _a2.id };
+      },
+      readNote: (path, map) => this.plugin.repo.readNote(path, map),
+      modelLabel: (model) => this.plugin.modelLabel(model),
+      preflight: (block) => this.chatImagePreflight(block),
+      confirmUsage: (model) => this.plugin.confirmAiUsage(model, async () => void 0),
+      searchImages: (query, model, signal) => this.plugin.searchImages(query, model, signal),
+      probe: (found, signal) => this.chatProbeImages(found, signal),
+      usedImageKeys: () => this.imageKeysOfMap(),
+      coverWanted: (block) => {
+        const node = this.chatCoverTarget(block);
+        return !!node && this.chatHasNoCover(node);
+      },
+      fetchBytes: (url) => this.chatFetchImage(url),
+      write: (block, candidate, alive, cover) => this.chatPlaceImageNow(block, candidate, alive, cover),
+      added: (chat, blocks) => {
+        var _a2;
+        for (const block of blocks) {
+          chat.addImages(block);
+          if (this.chatLastRecord) this.chatImageRecords.set(block, this.chatLastRecord);
+        }
+        for (const block of blocks) if (block.state !== "searching") (_a2 = this.chatImageRecords.get(block)) == null ? void 0 : _a2.images(block);
+      },
+      running: (chat, block) => chat.markImagesRunning(block),
+      settle: (chat, block, patch) => this.settleChatImages(chat, block, patch)
+    }));
     /** While a reply's actions are applied, repaints and the views' re-reads wait and happen once at the end (see holdChatBatch). */
     __publicField(this, "renderHold", 0);
     __publicField(this, "renderPending", false);
@@ -59705,12 +59978,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
      * changed (a card added, another map in this tab, the view closed, a run already going), so the press is checked again.
      */
     __publicField(this, "argumentFocusMapId", null);
-    /** Cards of a map with a queued or running picture search (key: chatImageTopicKey), with the search's controller. */
-    __publicField(this, "chatImageTopics", /* @__PURE__ */ new Map());
-    __publicField(this, "chatImageRunning", 0);
-    __publicField(this, "chatImageWaiters", []);
-    /** Writes of pictures go one after another (the searches overlap, the writes and their undo steps do not). */
-    __publicField(this, "chatImageWrites", Promise.resolve());
     __publicField(this, "noStyleFiles");
     this.installUndoScope();
   }
@@ -60101,7 +60368,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
    */
   hasRunningWork() {
     var _a2, _b2, _c;
-    if (this.chatController || this.chatApplying || this.chatImageSearches.size) return true;
+    if (this.chatController || this.chatApplying || this.chatImageFinder.isRunning()) return true;
     if (((_a2 = this.chat) == null ? void 0 : _a2.isBusy) || this.chatPrepAbandon) return true;
     for (const task of this.synthesisTasks.values()) if (task.state === "running") return true;
     if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
@@ -62750,7 +63017,7 @@ ${request.requirements}` : preset.text,
           raised: true
         });
       } catch (error) {
-        this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage(error)));
+        this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage2(error)));
       }
     }
     if (!changes.length) return;
@@ -63401,7 +63668,7 @@ ${request.requirements}` : preset.text,
           });
         } catch (error) {
           outcome.failed++;
-          this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage(error)));
+          this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage2(error)));
         }
       }
     } finally {
@@ -64396,7 +64663,7 @@ ${request.requirements}` : preset.text,
             return;
           }
           state.saveFailed = true;
-          new import_obsidian34.Notice(t("ui.outline_import_map_save_failed", `${errorMessage(cause)} (${kept.join(", ")})`));
+          new import_obsidian34.Notice(t("ui.outline_import_map_save_failed", `${errorMessage2(cause)} (${kept.join(", ")})`));
         };
         if (result.failure) return rollBack(new Error(result.failure));
         const top2 = created[0];
@@ -69934,7 +70201,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       await this.app.vault.createBinary(destination, data);
       new import_obsidian34.Notice(t("ui.export_saved", destination));
     } catch (error) {
-      if (isCurrent()) new import_obsidian34.Notice(t("ui.export_failed", errorMessage(error)));
+      if (isCurrent()) new import_obsidian34.Notice(t("ui.export_failed", errorMessage2(error)));
     }
   }
   /**
@@ -73081,7 +73348,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const stopped = controller.signal.aborted;
       this.settleTopicChat(
         entry,
-        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage(error)),
+        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage2(error)),
         live2,
         !stopped,
         stopped ? "stopped" : "failed"
@@ -76152,7 +76419,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
                   id: child.id,
                   title: note.title,
                   status: batchSignal.aborted ? "stopped" : "failed",
-                  error: errorMessage(error)
+                  error: errorMessage2(error)
                 });
                 throw error;
               }
@@ -78808,7 +79075,7 @@ ${note.detail.trim()}` : "",
     return {
       text: plainFailure(t("error.plain_chat_context"), error),
       wrapped: true,
-      technical: rawErrorText(error) || errorMessage(error)
+      technical: rawErrorText(error) || errorMessage2(error)
     };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
@@ -78883,7 +79150,7 @@ ${note.detail.trim()}` : "",
     try {
       request = { ...await this.buildChatRequest(message, chat, origin, preparing.signal), ...this.usageMapField() };
     } catch (error) {
-      abandon(this.closed ? void 0 : errorMessage(error), "failed");
+      abandon(this.closed ? void 0 : errorMessage2(error), "failed");
       return;
     }
     if (this.closed || !chat.hasTurn(turn)) {
@@ -79066,7 +79333,7 @@ ${note.detail.trim()}` : "",
                 const failure = this.chatErrorText(error);
                 chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
                 record == null ? void 0 : record.end("failed", {
-                  reason: /time(d)?[\s-]?out/i.test(errorMessage(error)) ? "timeout" : "error",
+                  reason: /time(d)?[\s-]?out/i.test(errorMessage2(error)) ? "timeout" : "error",
                   reply: failure.text,
                   lines: [],
                   error: { text: failure.text, technical: (_e = failure.technical) != null ? _e : "" }
@@ -79089,7 +79356,7 @@ ${note.detail.trim()}` : "",
       );
     } catch (error) {
       if (sent) throw error;
-      abandon(this.closed ? void 0 : errorMessage(error), "failed");
+      abandon(this.closed ? void 0 : errorMessage2(error), "failed");
       return;
     }
     if (!went && !sent) abandon(this.closed ? void 0 : notSent(), "not_ready");
@@ -79735,7 +80002,7 @@ ${note.detail.trim()}` : "",
         chain: run
       });
     } catch (error) {
-      lines = [{ status: "failed", text: errorMessage(error) }];
+      lines = [{ status: "failed", text: errorMessage2(error) }];
     } finally {
       this.chatApplying = false;
       chat.setApplying(false);
@@ -79878,7 +80145,7 @@ ${note.detail.trim()}` : "",
       this.markOwnFilesRecorded(record);
       return record;
     } catch (error) {
-      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage2(error)}`);
       return null;
     }
   }
@@ -80093,7 +80360,7 @@ ${note.detail.trim()}` : "",
     try {
       latest = await this.readLatestChatRecord(this.plugin.repo.topicRoot(mapPath));
     } catch (error) {
-      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage2(error)}`);
       return;
     }
     if (!latest || latest.parsed.unrecoverable || this.closed || epoch !== this.chatRecordEpoch || chat !== this.chat || chat.hasMessages || chat.isBusy || this.chatApplying || this.path !== mapPath || ((_a2 = this.map) == null ? void 0 : _a2.id) !== map.id)
@@ -80196,9 +80463,7 @@ ${note.detail.trim()}` : "",
   }
   /** Every picture search the chat started stops; a result that still arrives is neither shown nor written. */
   abortChatImageSearches() {
-    const searches = [...this.chatImageSearches.values()];
-    this.chatImageSearches.clear();
-    for (const controller of searches) controller.abort();
+    this.chatImageFinder.stopAll();
   }
   /** Titles the reply gave to the cards it creates, by `new:<ref>` id, so a later action can name them before they exist. */
   chatRefTitles(actions) {
@@ -80370,7 +80635,7 @@ ${note.detail.trim()}` : "",
       );
       if (this.chat === chat) chat.appendLines(lines);
     } catch (error) {
-      if (this.chat === chat) chat.appendLines([{ status: "failed", text: errorMessage(error) }]);
+      if (this.chat === chat) chat.appendLines([{ status: "failed", text: errorMessage2(error) }]);
     } finally {
       this.chatApplying = false;
     }
@@ -80596,7 +80861,7 @@ ${note.detail.trim()}` : "",
               box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own2, same2, run));
             });
         } catch (error) {
-          box.outcome = { status: "failed", reason: errorMessage(error) };
+          box.outcome = { status: "failed", reason: errorMessage2(error) };
         }
         if (autoChain && box.outcome.status === "done" && action.kind === "create_md_file") {
           const key5 = normalizeVaultPath(action.path);
@@ -80793,7 +81058,7 @@ ${note.detail.trim()}` : "",
             }
           }
         } catch (error) {
-          outcome = { status: "failed", reason: errorMessage(error) };
+          outcome = { status: "failed", reason: errorMessage2(error) };
         }
       }
       lines[index] = this.chatLine(label, outcome);
@@ -80887,7 +81152,7 @@ ${note.detail.trim()}` : "",
         opened = await this.chatSwitchTo(mapPath, anchor);
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage(error), created: made.created };
+      return { status: "failed", reason: errorMessage2(error), created: made.created };
     }
     if (opened) return { status: "done" };
     return made.created ? { status: "skipped", reason: t("ui.map_chat_skip_map_not_opened"), created: true } : skipped("ui.map_chat_skip_map_changed");
@@ -80911,7 +81176,7 @@ ${note.detail.trim()}` : "",
         anchor.path = this.path;
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage(error) };
+      return { status: "failed", reason: errorMessage2(error) };
     }
     return outcome;
   }
@@ -80958,7 +81223,7 @@ ${note.detail.trim()}` : "",
         opened ? { status: "done", text: t("ui.map_chat_choose_opened_0", topic.title) } : { status: "skipped", text: t("ui.map_chat_skip_map_changed") }
       ]);
     } catch (error) {
-      (_b2 = this.chat) == null ? void 0 : _b2.appendLines([{ status: "failed", text: errorMessage(error) }]);
+      (_b2 = this.chat) == null ? void 0 : _b2.appendLines([{ status: "failed", text: errorMessage2(error) }]);
     } finally {
       this.chatApplying = false;
     }
@@ -81749,7 +82014,7 @@ ${note.detail.trim()}` : "",
       try {
         live2.write({ type: "event", turn: batch.turn, kind, ...extra });
       } catch (error) {
-        this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
+        this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage2(error)}`);
       }
     };
     const current = () => conversation === this.chatConversation;
@@ -81996,7 +82261,7 @@ ${note.detail.trim()}` : "",
               },
               (error) => {
                 errorNotice(error);
-                resolve({ status: "failed", reason: errorMessage(error) });
+                resolve({ status: "failed", reason: errorMessage2(error) });
               }
             );
           }).then((outcome) => {
@@ -82068,175 +82333,25 @@ ${note.detail.trim()}` : "",
     }
   }
   /**
-   * find_images: the chat only picked the cards and the search words. For every target card (its `nodeIds`, or every selected
-   * card) the Markdown quick action's `markdown.image-search` step runs through the card's own model (after its usage notice, once
-   * for the whole reply), only pictures whose thumbnail loads are kept, and the first one is put into the card's note by itself
-   * (see {@link chatPlaceImage}); there is nothing for the user to pick. Several cards are several searches, at most
-   * {@link CHAT_IMAGE_SEARCH_PARALLEL} at a time in the view. The outcome is "done" once the searches are set up; their blocks change later.
+   * find_images: the cards and the search words come from the chat; {@link ChatImageFinder} runs the searches and puts the
+   * pictures in (the note and cover write stays here, see {@link chatPlaceImageNow}). The outcome is "done" once the searches
+   * are set up; their blocks change later.
    */
   async chatFindImages(direction, targets, batch, continuation) {
-    var _a2, _b2;
     const map = this.map;
     const chat = this.chat;
     if (!map || !chat) return skipped("ui.map_chat_skip_map_changed");
     const wanted = targets.length ? targets : this.chatSelectionIds();
     if (!wanted.length) return skipped("ui.map_chat_skip_images_one_card");
-    const ids2 = [...new Set(wanted)].filter(
-      (id) => !batch.imageNodes.has(id) && !this.chatImageTopics.has(chatImageTopicKey(map.id, id))
-    );
-    if (!ids2.length) return skipped("ui.map_chat_skip_images_dup");
-    for (const id of ids2) batch.imageNodes.add(id);
-    const anchor = { path: this.path, id: map.id };
     const readsResearch = this.chatStartedResearch || this.chatReadsSources || continuation;
-    const words2 = readsResearch ? "" : cleanImageQuery(direction);
-    const jobs = [];
-    const blocks = [];
-    for (const id of ids2) {
-      const node = map.nodes.find((item) => item.id === id);
-      if (!node) continue;
-      const note = await this.plugin.repo.readNote(node.path, map);
-      const title = cleanImageQuery(note.title);
-      const parent = node.parentId ? map.nodes.find((item) => item.id === node.parentId) : void 0;
-      const parentTitle = readsResearch && parent ? cleanImageQuery((await this.plugin.repo.readNote(parent.path, map)).title) : "";
-      const joined = cleanImageQuery(
-        (readsResearch ? [parentTitle, title] : ids2.length > 1 ? [words2, title] : [words2 || title]).filter(Boolean).join(" ")
-      );
-      const query = title ? joined || title : "";
-      const block = {
-        query,
-        nodeId: node.id,
-        nodeTitle: note.title,
-        modelLabel: this.plugin.modelLabel(note.model),
-        mapPath: anchor.path,
-        mapId: anchor.id,
-        state: "searching",
-        items: []
-      };
-      blocks.push(block);
-      const reason = query ? await this.chatImagePreflight(block) : t("ui.map_chat_skip_unavailable");
-      if (reason) {
-        block.state = "empty";
-        block.reason = reason;
-        continue;
-      }
-      jobs.push({ block, controller: new AbortController(), model: note.model });
-    }
-    if (!blocks.length) return skipped("ui.map_chat_skip_topic_gone");
-    if (batch.declined) return skipped("ui.map_chat_skip_not_started");
-    for (const model of new Set(jobs.map((job) => job.model))) {
-      if (batch.asked.has(model)) continue;
-      let ok = false;
-      try {
-        ok = await this.plugin.confirmAiUsage(model, async () => void 0);
-      } catch (error) {
-        return { status: "failed", reason: errorMessage(error) };
-      }
-      if (!ok) {
-        batch.declined = true;
-        return skipped("ui.map_chat_skip_not_started");
-      }
-      batch.asked.add(model);
-    }
-    if (this.closed || this.chat !== chat || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id)
-      return skipped("ui.map_chat_skip_map_changed");
-    for (const job of jobs) {
-      const { block, controller } = job;
-      const topic = chatImageTopicKey(anchor.id, block.nodeId);
-      this.chatImageTopics.set(topic, controller);
-      const release2 = () => {
-        if (this.chatImageTopics.get(topic) === controller) this.chatImageTopics.delete(topic);
-      };
-      job.release = release2;
-      controller.signal.addEventListener("abort", release2, { once: true });
-      const key4 = ++this.chatImageSequence;
-      this.chatImageSearches.set(key4, controller);
-      job.key = key4;
-      block.stop = () => {
-        if (this.chatImageSearches.get(key4) !== controller) return;
-        this.chatImageSearches.delete(key4);
-        controller.abort();
-        this.settleChatImages(chat, block, { state: "stopped" });
-      };
-    }
-    batch.group.push(...blocks);
-    for (const block of blocks) {
-      chat.addImages(block);
-      if (this.chatLastRecord) this.chatImageRecords.set(block, this.chatLastRecord);
-    }
-    for (const block of blocks) if (block.state !== "searching") (_b2 = this.chatImageRecords.get(block)) == null ? void 0 : _b2.images(block);
-    for (const job of jobs)
-      void (async () => {
-        var _a3;
-        await this.acquireImageSlot();
-        try {
-          await this.runImageSearch(job.block, job.controller, chat, job.model);
-        } finally {
-          (_a3 = job.release) == null ? void 0 : _a3.call(job);
-          this.releaseImageSlot();
-          if (job.key !== void 0 && this.chatImageSearches.get(job.key) === job.controller)
-            this.chatImageSearches.delete(job.key);
-        }
-      })();
-    return { status: "done", images: batch.group };
-  }
-  async acquireImageSlot() {
-    if (this.chatImageRunning < CHAT_IMAGE_SEARCH_PARALLEL) {
-      this.chatImageRunning += 1;
-      return;
-    }
-    await new Promise((resolve) => this.chatImageWaiters.push(resolve));
-  }
-  releaseImageSlot() {
-    const next = this.chatImageWaiters.shift();
-    if (next) next();
-    else this.chatImageRunning -= 1;
+    const found = await this.chatImageFinder.find(map, chat, wanted, direction, readsResearch, batch);
+    if ("skipped" in found) return skipped(found.skipped);
+    if ("failed" in found) return { status: "failed", reason: found.failed };
+    return { status: "done", images: found.blocks };
   }
   /** The thumbnail check of a search (a seam: it loads images, which only a real page can). */
   chatProbeImages(found, signal) {
     return loadableImages(found, signal);
-  }
-  /**
-   * Runs one card's picture search to its end: the first loadable picture is put into the card, or the block says why none was.
-   * Nothing is written when the view, the panel or the map is not the same any more, or the search was stopped.
-   */
-  async runImageSearch(block, controller, chat, model) {
-    var _a2;
-    const sameMap = () => {
-      var _a3;
-      return this.path === block.mapPath && ((_a3 = this.map) == null ? void 0 : _a3.id) === block.mapId;
-    };
-    const current = () => !this.closed && !controller.signal.aborted && this.chat === chat && sameMap();
-    const dropped = () => {
-      if (this.closed || controller.signal.aborted || this.chat !== chat) return;
-      this.settleChatImages(chat, block, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
-    };
-    if (!current()) return dropped();
-    try {
-      const refused = await this.chatImagePreflight(block);
-      if (!current()) return dropped();
-      if (refused) return this.settleChatImages(chat, block, { state: "empty", reason: refused });
-      chat.markImagesRunning(block);
-      const found = await this.plugin.searchImages(block.query, model, controller.signal);
-      if (!current()) return dropped();
-      const loadable = (await this.chatProbeImages(found, controller.signal)).filter(
-        (item) => item.url.startsWith("https://")
-      );
-      const used = this.imageKeysOfMap();
-      const first = (_a2 = loadable.find((item) => !used.has(imageKey(item.url)))) != null ? _a2 : loadable[0];
-      if (!current()) return dropped();
-      if (!first) return this.settleChatImages(chat, block, { state: "empty" });
-      const placed = await this.chatPlaceImage(block, first, current, controller.signal);
-      if (placed.ok) {
-        this.settleChatImages(chat, block, {
-          state: "ready",
-          items: [{ candidate: first, inserted: block.nodeTitle }]
-        });
-      } else if (current()) this.settleChatImages(chat, block, { state: "empty", reason: placed.reason });
-      else dropped();
-    } catch (error) {
-      if (!current()) return dropped();
-      this.settleChatImages(chat, block, { state: "failed", reason: errorMessage(error) });
-    }
   }
   /** The image keys (see imageKey) of every picture in the Detail of this map's cards, as the view last read them. */
   imageKeysOfMap() {
@@ -82264,23 +82379,6 @@ ${note.detail.trim()}` : "",
     if ("reason" in fence) return t(fence.reason);
     const note = await this.plugin.repo.readNote(fence.node.path, (_a2 = this.map) != null ? _a2 : void 0);
     return note.aiLocked ? t("ui.ai_locked_notice") : null;
-  }
-  /**
-   * Puts the found picture at the end of the card's Detail (a blank line before it) and, when the card has no cover, saves it
-   * beside the note as the cover: both are one undo step (one ⌘Z takes the picture back out of the note and off the card).
-   * The cover is downloaded first, outside the write queue and with a time limit (a slow download holds no other card back);
-   * then the note and the cover are written inside one `mutate`, and their undo entries are folded before they reach the history.
-   * Refused, with the reason in words and nothing written, when the map in view is not the one the search came from, the card is
-   * gone, locked, being merged or being worked on by an AI task, the map cannot be edited, or `alive` says the search was stopped.
-   * The same checks run again inside the write, where nothing else can change the map.
-   */
-  async chatPlaceImage(block, candidate, alive, signal = new AbortController().signal) {
-    const cover = await this.chatCoverBytes(block, candidate, signal);
-    if (!alive()) return { ok: false, reason: t("ui.map_chat_images_stale_map") };
-    const work = () => this.chatPlaceImageNow(block, candidate, alive, cover);
-    const run = this.chatImageWrites.then(work, work);
-    this.chatImageWrites = run.catch(() => void 0);
-    return run;
   }
   async chatPlaceImageNow(block, candidate, alive, cover) {
     const fence = () => alive() ? this.chatImageFence(block) : { reason: "ui.map_chat_images_stale_map" };
@@ -82325,7 +82423,7 @@ ${addition}` : addition },
             );
             outcome.result = { ok: true };
           } catch (error) {
-            outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+            outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage2(error)) };
             return;
           }
           if (cover) {
@@ -82346,7 +82444,7 @@ ${addition}` : addition },
         }
       });
     } catch (error) {
-      return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
+      return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage2(error)) };
     }
     if (outcome.coverWritten) await this.refreshAfterSavedChange();
     return outcome.result;
@@ -82354,35 +82452,6 @@ ${addition}` : addition },
   /** The bytes of a picked picture (a seam: it needs the network). */
   async chatFetchImage(url) {
     return (await (0, import_obsidian34.requestUrl)({ url, method: "GET", throw: true })).arrayBuffer;
-  }
-  /** A download that ends when the search is stopped or after {@link CHAT_IMAGE_DOWNLOAD_MS}, whichever comes first. */
-  chatDownload(url, signal) {
-    return new Promise((resolve, reject2) => {
-      if (signal.aborted) return reject2(new Error("aborted"));
-      const end = () => {
-        window.clearTimeout(timer);
-        signal.removeEventListener("abort", onAbort);
-      };
-      const onAbort = () => {
-        end();
-        reject2(new Error("aborted"));
-      };
-      const timer = window.setTimeout(() => {
-        end();
-        reject2(new Error("timeout"));
-      }, CHAT_IMAGE_DOWNLOAD_MS);
-      signal.addEventListener("abort", onAbort);
-      this.chatFetchImage(url).then(
-        (data) => {
-          end();
-          resolve(data);
-        },
-        (error) => {
-          end();
-          reject2(error instanceof Error ? error : new Error(String(error)));
-        }
-      );
-    });
   }
   /** The card of `block` when it may take a cover picture now (same map, not locked by AIM, not merging), else null. */
   chatCoverTarget(block) {
@@ -82399,24 +82468,6 @@ ${addition}` : addition },
     const declared = (_a2 = cache == null ? void 0 : cache.frontmatter) == null ? void 0 : _a2["topic-cover"];
     if (declared !== void 0 && declared !== null) return false;
     return resolveCoverWithFrame(cache, (link) => this.app.metadataCache.getFirstLinkpathDest(link, node.path)) === null;
-  }
-  /**
-   * The cover picture of a placed picture, downloaded before the write: only when the card has no cover and has not turned it
-   * off (nothing is downloaded otherwise). The picture is checked by its bytes ({@link acceptImage}). Null when there is none to write.
-   */
-  async chatCoverBytes(block, candidate, signal) {
-    const node = this.chatCoverTarget(block);
-    if (!node || !this.chatHasNoCover(node)) return null;
-    let data;
-    try {
-      data = await this.chatDownload(candidate.url, signal);
-    } catch (e) {
-      return null;
-    }
-    const accepted = acceptImage({ mime: "image/*", size: data.byteLength, bytes: data });
-    if (!accepted.ok) return null;
-    const name2 = safeImageName(candidate.title, accepted.mime);
-    return name2 ? { name: name2, data } : null;
   }
   /**
    * Makes the downloaded picture the card's cover: stored beside the note, embedded in `## User Notes` and set as `topic-cover`
@@ -82542,7 +82593,7 @@ ${addition}` : addition },
       written2.error = error;
     }
     if (written2.error !== void 0) {
-      const reason = t("ui.map_chat_save_failed_0", errorMessage(written2.error));
+      const reason = t("ui.map_chat_save_failed_0", errorMessage2(written2.error));
       new import_obsidian34.Notice(reason);
       return { ok: false, reason };
     }
@@ -82616,7 +82667,7 @@ ${addition}` : addition },
     } catch (error) {
       if (controller.signal.aborted) return { status: "stopped" };
       new import_obsidian34.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
-      return { status: "failed", reason: errorMessage(error) };
+      return { status: "failed", reason: errorMessage2(error) };
     } finally {
       signal == null ? void 0 : signal.removeEventListener("abort", stopWithOwner);
       if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
@@ -82703,7 +82754,7 @@ ${addition}` : addition },
         );
       }).then(
         () => settle(skipped("ui.map_chat_skip_not_started")),
-        (error) => settle({ status: "failed", reason: errorMessage(error) })
+        (error) => settle({ status: "failed", reason: errorMessage2(error) })
       );
     });
   }
@@ -90291,7 +90342,7 @@ async function saveShareFile(html, suggestedName, shouldWrite, env = browserSave
 }
 
 // experiences/sharing/share-modal.ts
-var errorMessage2 = (error) => {
+var errorMessage3 = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : "";
 };
@@ -90628,7 +90679,7 @@ var ShareModal = class extends import_obsidian42.Modal {
       this.phase = "idle";
       this.estimateMemo = null;
       const stopped = abort.signal.aborted || (error == null ? void 0 : error.code) === "stopped";
-      this.translateNote = stopped ? t("share.translate_stopped") : t("share.translate_failed_0", errorMessage2(error).slice(0, 200));
+      this.translateNote = stopped ? t("share.translate_stopped") : t("share.translate_failed_0", errorMessage3(error).slice(0, 200));
       this.render();
     } finally {
       if (this.translateAbort === abort) this.translateAbort = null;

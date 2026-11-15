@@ -270,7 +270,7 @@ const pick = { url: 'https://example.org/a.png', title: 'A picture', source: 'ht
 const chatPick = async (h, fetchImage = async () => png()) => {
   h.view.plugin.topicRuns = { isBusy: () => false, hasTask: () => false, stopTask() {}, dropPending() {}, flushPending: async () => {} };
   h.view.chatFetchImage = fetchImage;
-  const result = await h.view.chatPlaceImage({ mapPath: MAP, mapId: h.view.map.id, nodeId: h.node.id }, pick, () => true);
+  const result = await h.view.chatImageFinder.place({ mapPath: MAP, mapId: h.view.map.id, nodeId: h.node.id }, pick, () => true);
   await h.settle();
   return result;
 };

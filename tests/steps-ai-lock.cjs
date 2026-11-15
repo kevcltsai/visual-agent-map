@@ -721,7 +721,7 @@ test('07 chat: a picture is not inserted into a locked card; run_map_action on l
   const [a] = h.nodes;
   await h.view.setAiLock([a], true);
   const before = h.raw(a);
-  const result = await h.view.chatPlaceImage({ mapPath: MAP, mapId: h.view.map.id, nodeId: a.id }, { url: 'https://example.org/a.png', title: 'A', source: 'https://example.org' }, () => true);
+  const result = await h.view.chatImageFinder.place({ mapPath: MAP, mapId: h.view.map.id, nodeId: a.id }, { url: 'https://example.org/a.png', title: 'A', source: 'https://example.org' }, () => true);
   assert.equal(result.ok, false);
   assert.match(result.reason, LOCKED_NOTICE);
   assert.equal(h.raw(a), before);

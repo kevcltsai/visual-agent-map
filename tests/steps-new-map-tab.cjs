@@ -290,7 +290,7 @@ test('N5 hasRunningWork: false when idle, true for each kind of work', () => {
     chatApplying: v => { v.chatApplying = true; },
     chatPreparing: v => { v.chat = { isBusy: true }; },
     chatPrepAbandon: v => { v.chatPrepAbandon = () => {}; },
-    chatImageSearches: v => { v.chatImageSearches.set(1, new AbortController()); },
+    chatImageSearches: v => { v.chatImageFinder.searches.set(1, new AbortController()); },
     synthesisRunning: v => { v.synthesisTasks.set('k', { state: 'running', controller: new AbortController() }); },
     startingTasks: v => { v.startingTasks.set('k', new AbortController()); },
     startingExpand: v => { v.startingExpand.add('k'); },

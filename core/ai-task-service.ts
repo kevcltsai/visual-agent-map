@@ -37,6 +37,9 @@ import { readerFacingDetail } from "./steps/task/render";
 import { chartsWanted, selectionFromContext } from "./steps/task/assemble";
 import { renderTaskSteer } from "./steps/task-steer/steer";
 
+/** How many independent extract requests of one condensing run at the same time. */
+export const CONDENSE_EXTRACT_CONCURRENCY = 3;
+
 export { extractJsonObject } from "./steps/task/parse";
 
 /** How long a research request may go without any model event before the slow notice (and the re-send) is offered. */
@@ -787,42 +790,57 @@ export class AiTaskService {
     while (true) {
       round++;
       const batches = round === 1 ? working : packReferenceChunks(working);
-      const findings: string[] = [];
-      for (let index = 0; index < batches.length; index++) {
-        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-        // The estimate before sending is a worst case; the count here is the hard cap while running.
-        if (++sent > MAX_CONDENSE_CALLS) throw new Error(t("ui.source_context_exceeds_budget"));
-        context.onProgress?.(t("ui.reference_processing_progress", index + 1, batches.length));
-        const result = await this.execute(
-          {
-            title: context.title,
-            summary: "",
-            rules: "",
-            detail: "",
-            task: referenceTask(round === 1 ? "extract" : "reduce", this.options.language(), focus),
-            ancestors: "",
-            sourceContext: batches[index],
-            mode: "task",
-            researchMode: "local",
-            researchDepth: "fast",
-            visualMode: "off",
-            intermediateDetail: true,
-            ...(context.usageMapPath ? { usageMapPath: context.usageMapPath } : {}),
-            // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
-            ...(context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {})
-          },
-          model,
-          reasoning,
-          signal,
-          undefined,
-          onRequestAccepted,
-          undefined,
-          undefined,
-          round === 1 ? "reference-extract" : "reference-reduce"
-        );
-        if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
-        findings.push(result.detail.trim());
-      }
+      const findings: string[] = new Array<string>(batches.length);
+      // Extract chunks are independent, so they run a few at a time; reduce stays one by one.
+      const slots = round === 1 ? Math.min(CONDENSE_EXTRACT_CONCURRENCY, batches.length) : 1;
+      let next = 0;
+      let failed = false;
+      const worker = async (): Promise<void> => {
+        while (next < batches.length && !failed) {
+          const index = next++;
+          if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+          // The estimate before sending is a worst case; the count here is the hard cap while running.
+          if (++sent > MAX_CONDENSE_CALLS) throw new Error(t("ui.source_context_exceeds_budget"));
+          context.onProgress?.(t("ui.reference_processing_progress", index + 1, batches.length));
+          const result = await this.execute(
+            {
+              title: context.title,
+              summary: "",
+              rules: "",
+              detail: "",
+              task: referenceTask(round === 1 ? "extract" : "reduce", this.options.language(), focus),
+              ancestors: "",
+              sourceContext: batches[index],
+              mode: "task",
+              researchMode: "local",
+              researchDepth: "fast",
+              visualMode: "off",
+              intermediateDetail: true,
+              ...(context.usageMapPath ? { usageMapPath: context.usageMapPath } : {}),
+              // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
+              ...(context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {})
+            },
+            model,
+            reasoning,
+            signal,
+            undefined,
+            onRequestAccepted,
+            undefined,
+            undefined,
+            round === 1 ? "reference-extract" : "reference-reduce"
+          );
+          if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
+          findings[index] = result.detail.trim();
+        }
+      };
+      await Promise.all(
+        Array.from({ length: slots }, () =>
+          worker().catch(error => {
+            failed = true;
+            throw error;
+          })
+        )
+      );
       const joined = findings.map(value => `Evidence:\n${value}`).join("\n\n");
       if (joined.length <= 18_000) {
         context.onProgress?.("");

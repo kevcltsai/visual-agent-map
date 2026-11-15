@@ -23,20 +23,26 @@ test('a running expansion batch cannot be overwritten for the same parent', asyn
   assert.equal(active.has('parent.md'), false);
 });
 test('a batch reports topics waiting for a slot as queued until they start, and none after stop', async () => {
-  const { ShallowExpansionCoordinator } = load('experiences/visual-map/expansion-batch.ts');
+  const { ShallowExpansionCoordinator, MAX_BATCH_CONCURRENCY } = load('experiences/visual-map/expansion-batch.ts');
+  assert.equal(MAX_BATCH_CONCURRENCY, 6);
   const active = new Map(), states = new Map(), coordinator = new ShallowExpansionCoordinator(active, states);
   const release = new Map();
-  const children = ['a', 'b', 'c', 'd', 'e'].map(id => node(id));
-  await coordinator.start('batch', children, async (child, _signal, accepted) => {
-    accepted(); await new Promise(resolve => release.set(child.id, resolve));
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+  let running = 0, peak = 0;
+  await coordinator.start('batch', ids.map(id => node(id)), async (child, _signal, accepted) => {
+    accepted(); running++; peak = Math.max(peak, running);
+    await new Promise(resolve => release.set(child.id, resolve)); running--;
   }, () => {});
-  await until(() => release.size === 3);
-  assert.deepEqual(['a', 'b', 'c', 'd', 'e'].map(id => coordinator.isQueued(`${id}.md`)), [false, false, false, true, true]);
+  await until(() => release.size === 6);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(release.size, 6, 'no seventh child starts while six are running');
+  assert.deepEqual(ids.map(id => coordinator.isQueued(`${id}.md`)), [false, false, false, false, false, false, true, true]);
   release.get('a')();
-  await until(() => release.has('d'));
-  assert.equal(coordinator.isQueued('d.md'), false); assert.equal(coordinator.isQueued('e.md'), true);
+  await until(() => release.has('g'));
+  assert.equal(coordinator.isQueued('g.md'), false); assert.equal(coordinator.isQueued('h.md'), true);
   coordinator.stop('batch');
-  assert.equal(coordinator.isQueued('e.md'), false);
+  assert.equal(coordinator.isQueued('h.md'), false);
+  assert.equal(peak, 6, 'at most six at once');
   for (const resolve of release.values()) resolve();
   await until(() => states.get('batch').status === 'stopped');
 });
@@ -390,20 +396,20 @@ integrationTest('cancelling shallow research stops the batch without marking uns
     { title: 'First', task: 'Research first', contribution: '' },
     { title: 'Second', task: 'Research second', contribution: '' },
     { title: 'Third', task: 'Research third', contribution: '' },
-    { title: 'Fourth', task: 'Research fourth', contribution: '' }
+    { title: 'Fourth', task: 'Research fourth', contribution: '' },
+    { title: 'Fifth', task: 'Research fifth', contribution: '' },
+    { title: 'Sixth', task: 'Research sixth', contribution: '' },
+    { title: 'Seventh', task: 'Research seventh', contribution: '' }
   ], { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [] });
   await view.startShallowResearch(parent, children, { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], signal: controller.signal });
-  await until(() => started.length === 3);
+  await until(() => started.length === 6);
   plugin.expansionCoordinator.stop(parent.path);
   await until(() => plugin.expansionBatches.get(parent.path).status !== 'running');
   finishFirst?.();
   const saved = await repo.readMap(mapPath);
-  assert.deepEqual(started, ['First', 'Second', 'Third']);
+  assert.deepEqual(started, ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth']);
   assert.equal(saved.nodes.slice(1).map(child => child.path).join('|'), Array.from(children, child => child.path).join('|'));
-  assert.equal((await repo.readNote(saved.nodes[1].path)).status, 'idea');
-  assert.equal((await repo.readNote(saved.nodes[2].path)).status, 'idea');
-  assert.equal((await repo.readNote(saved.nodes[3].path)).status, 'idea');
-  assert.equal((await repo.readNote(saved.nodes[4].path)).status, 'idea');
+  for (const child of saved.nodes.slice(1)) assert.equal((await repo.readNote(child.path)).status, 'idea');
   assert.deepEqual(failures, []);
 });
 integrationTest('shallow research without chosen sources gives each child no reference groups', async () => {
@@ -1385,17 +1391,17 @@ integrationTest('multi research without requirements uses the topic prompt alone
   assert.doesNotMatch(h.runs[0].options.task, /\n\n$/); assert.equal(h.runs[0].options.researchMode, 'research');
   h.finish.get('Solo')(); await until(() => h.plugin.expansionBatches.get(h.key).status === 'completed');
 });
-integrationTest('multi research runs at most three topics at once and stop aborts every running one', async () => {
-  const h = await multiResearchHarness(['A', 'B', 'C', 'D', 'E']);
+integrationTest('multi research runs at most six topics at once and stop aborts every running one', async () => {
+  const h = await multiResearchHarness(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
   h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request);
-  await until(() => h.runs.length === 3); await new Promise(r => setTimeout(r, 20));
-  assert.equal(h.runs.length, 3);
-  h.finish.get('A')(); await until(() => h.runs.length === 4);
+  await until(() => h.runs.length === 6); await new Promise(r => setTimeout(r, 20));
+  assert.equal(h.runs.length, 6);
+  h.finish.get('A')(); await until(() => h.runs.length === 7);
   assert.equal(h.plugin.expansionBatches.get(h.key).completed, 1);
   h.view.stopMultiResearch();
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'stopped');
-  assert.equal(h.runs.length, 4); assert.equal(h.plugin.running.size, 0);
+  assert.equal(h.runs.length, 7); assert.equal(h.plugin.running.size, 0);
   assert.ok(h.runs.every(run => run.options.signal.aborted));
 });
 integrationTest('multi research skips topics already running AI and tells the owner how many', async () => {
@@ -1472,6 +1478,28 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'stopped');
   assert.equal(toolbar().length, 1);
 });
+integrationTest('the multi research bar counts the topics running and names the first two, which change as topics finish', async () => {
+  const h = await multiResearchHarness(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+  const element = (tag, o = {}) => ({ tag, text: o.text ?? '', cls: o.cls ?? '', children: [], listeners: {}, attrs: {},
+    createDiv(v) { const c = element('div', { cls: typeof v === 'string' ? v : v?.cls }); this.children.push(c); return c; },
+    createEl(n, v = {}) { const c = element(n, v); this.children.push(c); return c; }, createSpan(v = {}) { const c = element('span', v); this.children.push(c); return c; },
+    addEventListener(n, fn) { this.listeners[n] = fn; }, addClass(n) { this.cls = `${this.cls} ${n}`.trim(); }, setAttr(k, v) { this.attrs[k] = v; } });
+  const all = root => [root, ...root.children.flatMap(all)];
+  const text = () => { const root = element('content'); h.view.renderMultiResearchStatus(root); return all(root).map(i => i.text).join('|'); };
+  h.view.notes = new Map(h.nodes.map((n, index) => [n.id, { title: 'ABCDEFGH'[index] }]));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 6);
+  assert.ok(text().includes('Researching: 0 of 8 done · 6 running: A, B and more'), text());
+  for (const id of ['A', 'B', 'C']) h.finish.get(id)();
+  await until(() => h.plugin.expansionBatches.get(h.key).completed === 3 && h.runs.length === 8);
+  assert.ok(text().includes('Researching: 3 of 8 done · 5 running: D, E and more'), text());
+  for (const id of ['D', 'E', 'F', 'G']) h.finish.get(id)();
+  await until(() => h.plugin.expansionBatches.get(h.key).completed === 7);
+  assert.ok(text().includes('Researching: 7 of 8 done · H'), text());
+  assert.ok(text().includes('Stop research'));
+  h.view.stopMultiResearch();
+  await until(() => h.plugin.expansionBatches.get(h.key).status === 'stopped');
+});
 integrationTest('multi research with a chosen model runs each started topic on it once, saves nothing on the topic and confirms usage for it', async () => {
   const h = await multiResearchHarness(['A', 'B', 'C']);
   h.plugin.running.add(h.nodes[2].path);
@@ -1512,17 +1540,17 @@ integrationTest('multi research: stop before any topic is accepted gives exactly
   assert.equal(h.notices[0], 'Research stopped: 0 of 1 succeeded, 0 failed, 0 skipped.');
 });
 integrationTest('multi research: a topic that became busy before dispatch is skipped, not failed', async () => {
-  const h = await multiResearchHarness(['A', 'B', 'C', 'D']);
+  const h = await multiResearchHarness(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
   h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request);
-  await until(() => h.runs.length === 3);
-  h.plugin.running.add(h.nodes[3].path);
-  h.finish.get('A')(); h.finish.get('B')(); h.finish.get('C')();
+  await until(() => h.runs.length === 6);
+  h.plugin.running.add(h.nodes[6].path);
+  for (const id of ['A', 'B', 'C', 'D', 'E', 'F']) h.finish.get(id)();
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'completed');
-  assert.equal(h.runs.length, 3);
+  assert.equal(h.runs.length, 6);
   const state = h.plugin.expansionBatches.get(h.key);
   assert.equal(state.failures.length, 0);
-  assert.equal(h.notices.at(-1), 'Research finished: 3 of 4 succeeded, 0 failed, 1 skipped.');
+  assert.equal(h.notices.at(-1), 'Research finished: 6 of 7 succeeded, 0 failed, 1 skipped.');
 });
 integrationTest('multi research summary counts only successful topics as succeeded', async () => {
   const h = await multiResearchHarness(['A', 'B']);

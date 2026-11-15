@@ -19809,15 +19809,27 @@ export class VisualAgentMapView extends ItemView {
     if (!running && !state.failures.length) return;
     const bar = parent.createDiv(`vam-aim-statusbar vam-multi-research-statusbar${running ? " is-active" : ""}`);
     bar.setAttr("aria-live", "polite");
-    const current = state.currentPath ? this.map?.nodes.find(node => node.path === state.currentPath) : undefined;
-    const title = current ? this.notes.get(current.id)?.title : undefined;
+    // Several topics run at once: the bar counts them and names the first two, which change as topics finish
+    // (owner pick, mockup 甲, 2026-11-15). One running topic is named alone, as before.
+    const names = state.runningPaths
+      .map(path => this.map?.nodes.find(node => node.path === path))
+      .map(node => (node ? this.notes.get(node.id)?.title : undefined))
+      .filter((name): name is string => !!name);
+    const runningLabel =
+      names.length > 1
+        ? t(
+            state.runningPaths.length > 2 ? "ui.multi_research_running_names_more" : "ui.multi_research_running_names",
+            state.runningPaths.length,
+            names.slice(0, 2).join(t("ui.list_separator"))
+          )
+        : names[0];
     bar.createSpan({ cls: "vam-aim-status-title", text: t("ui.multi_research") });
     bar.createSpan({
       cls: `vam-aim-status-value ${running ? "vam-status-running" : "vam-status-error"}`,
       text: this.batchProgressLabel(
         t(running ? "ui.multi_research_progress" : "ui.multi_research_ended", state.succeeded, state.total),
         state,
-        title
+        runningLabel
       )
     });
     if (running) this.button(bar, t("ui.stop_research"), () => this.stopMultiResearch());

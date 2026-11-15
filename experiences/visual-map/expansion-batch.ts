@@ -1,5 +1,8 @@
 import type { MapNode } from "../../map-model";
 
+/** How many children of one batch research at the same time (argument research allows up to 9). */
+export const MAX_BATCH_CONCURRENCY = 6;
+
 export interface ExpansionBatchState {
   parentPath: string;
   controller: AbortController;
@@ -9,6 +12,8 @@ export interface ExpansionBatchState {
   /** Children that finished successfully (accepted, not aborted, not skipped). */
   succeeded: number;
   currentPath?: string;
+  /** Children running now, in start order; emptied when the batch ends. */
+  runningPaths: string[];
   /** Children waiting for a free slot, in run order; emptied when the batch stops. */
   queuedPaths: string[];
   failures: string[];
@@ -39,6 +44,7 @@ export class ShallowExpansionCoordinator {
       completed: 0,
       succeeded: 0,
       queuedPaths: children.map(child => child.path),
+      runningPaths: [],
       failures: [],
       failedPaths: [],
       status: "running"
@@ -60,7 +66,8 @@ export class ShallowExpansionCoordinator {
       let nextChild = 0;
       const runningPaths = new Set<string>();
       const updateCurrent = (): void => {
-        state.currentPath = [...runningPaths][0];
+        state.runningPaths = [...runningPaths];
+        state.currentPath = state.runningPaths[0];
         changed();
       };
       const worker = async (): Promise<void> => {
@@ -96,10 +103,11 @@ export class ShallowExpansionCoordinator {
         }
       };
       try {
-        await Promise.all(Array.from({ length: Math.min(3, children.length) }, () => worker()));
+        await Promise.all(Array.from({ length: Math.min(MAX_BATCH_CONCURRENCY, children.length) }, () => worker()));
       } finally {
         state.status = controller.signal.aborted ? "stopped" : "completed";
         state.currentPath = undefined;
+        state.runningPaths = [];
         state.queuedPaths = [];
         if (!dispatchAccepted) rejectFirst(new Error("Shallow research stopped before launch."));
         if (this.activeTasks.get(parentPath) === controller) this.activeTasks.delete(parentPath);

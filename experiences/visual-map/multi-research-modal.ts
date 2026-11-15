@@ -4,6 +4,7 @@ import type { ResearchDepth, ResearchMode } from "../../ai/types";
 import { aiModeOptions, DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
 import { aiModeField, modelField, styleChoiceField, type FieldLinks, type ModelChoices } from "./research-fields";
 import { modalActions } from "../../ui/modals/action-bar";
+import { MAX_BATCH_CONCURRENCY } from "./expansion-batch";
 
 export interface MultiResearchRequest {
   /**
@@ -54,7 +55,10 @@ export class MultiResearchModal extends Modal {
 
   onOpen(): void {
     this.titleEl.setText(t("ui.multi_research_title"));
-    this.contentEl.createEl("p", { text: t("ui.multi_research_intro", this.names.length), cls: "vam-modal-intro" });
+    this.contentEl.createEl("p", {
+      text: t("ui.multi_research_intro", this.names.length, MAX_BATCH_CONCURRENCY),
+      cls: "vam-modal-intro"
+    });
     let mode: MapAiMode = this.initialMode;
     const standardTopics = this.modes.filter(item => item === "standard").length;
     let paintNote = (): void => {};

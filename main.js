@@ -275,11 +275,13 @@ var en = {
   "ui.outline_import_selected_missing": "The selected topic is no longer on the map.",
   "ui.multi_research": "Research",
   "ui.multi_research_title": "Research selected topics",
-  "ui.multi_research_intro": "Research {0} selected topics in the background, up to 3 at a time. This uses AI quota.",
+  "ui.multi_research_intro": "Research {0} selected topics in the background, up to {1} at a time. This uses AI quota.",
   "ui.multi_research_topics": "Topics to research",
   "ui.multi_research_progress": "Researching: {0} of {1} done",
   "ui.multi_research_ended": "Research finished: {0} of {1} done",
   "ui.batch_failed_count": "{0} failed",
+  "ui.multi_research_running_names": "{0} running: {1}",
+  "ui.multi_research_running_names_more": "{0} running: {1} and more",
   "ui.shallow_research_counts": "Short research: {0} of {1} done",
   "ui.shallow_research_current": "researching: {0}",
   "ui.retry_failed_topics": "Retry failed topics ({0})",
@@ -3177,11 +3179,13 @@ var zhCN = {
   "ui.outline_import_selected_missing": "\u9009\u62E9\u7684\u8BAE\u9898\u5DF2\u4E0D\u5728\u5FC3\u667A\u56FE\u4E0A\u3002",
   "ui.multi_research": "\u7814\u7A76",
   "ui.multi_research_title": "\u7814\u7A76\u5DF2\u9009\u8BAE\u9898",
-  "ui.multi_research_intro": "\u5728\u80CC\u666F\u7814\u7A76\u5DF2\u9009\u7684 {0} \u4E2A\u8BAE\u9898\uFF0C\u6700\u591A\u540C\u65F6 3 \u4E2A\u3002\u4F1A\u4F7F\u7528 AI \u989D\u5EA6\u3002",
+  "ui.multi_research_intro": "\u5728\u80CC\u666F\u7814\u7A76\u5DF2\u9009\u7684 {0} \u4E2A\u8BAE\u9898\uFF0C\u6700\u591A\u540C\u65F6 {1} \u4E2A\u3002\u4F1A\u4F7F\u7528 AI \u989D\u5EA6\u3002",
   "ui.multi_research_topics": "\u8981\u7814\u7A76\u7684\u8BAE\u9898",
   "ui.multi_research_progress": "\u7814\u7A76\u4E2D\uFF1A\u5B8C\u6210 {0}\uFF0F{1}",
   "ui.multi_research_ended": "\u7814\u7A76\u7ED3\u675F\uFF1A\u5B8C\u6210 {0}\uFF0F{1}",
   "ui.batch_failed_count": "\u5931\u8D25 {0}",
+  "ui.multi_research_running_names": "{0} \u4E2A\u8FDB\u884C\u4E2D\uFF1A{1}",
+  "ui.multi_research_running_names_more": "{0} \u4E2A\u8FDB\u884C\u4E2D\uFF1A{1} \u7B49",
   "ui.shallow_research_counts": "\u7B80\u77ED\u7814\u7A76\uFF1A\u5B8C\u6210 {0}\uFF0F{1}",
   "ui.shallow_research_current": "\u7814\u7A76\u4E2D\uFF1A{0}",
   "ui.retry_failed_topics": "\u91CD\u8BD5\u5931\u8D25\u7684\u8BAE\u9898\uFF08{0}\uFF09",
@@ -6079,11 +6083,13 @@ var zhTW = {
   "ui.outline_import_selected_missing": "\u9078\u53D6\u7684\u8B70\u984C\u5DF2\u4E0D\u5728\u5FC3\u667A\u5716\u4E0A\u3002",
   "ui.multi_research": "\u7814\u7A76",
   "ui.multi_research_title": "\u7814\u7A76\u5DF2\u9078\u8B70\u984C",
-  "ui.multi_research_intro": "\u5728\u80CC\u666F\u7814\u7A76\u5DF2\u9078\u7684 {0} \u500B\u8B70\u984C\uFF0C\u6700\u591A\u540C\u6642 3 \u500B\u3002\u6703\u4F7F\u7528 AI \u984D\u5EA6\u3002",
+  "ui.multi_research_intro": "\u5728\u80CC\u666F\u7814\u7A76\u5DF2\u9078\u7684 {0} \u500B\u8B70\u984C\uFF0C\u6700\u591A\u540C\u6642 {1} \u500B\u3002\u6703\u4F7F\u7528 AI \u984D\u5EA6\u3002",
   "ui.multi_research_topics": "\u8981\u7814\u7A76\u7684\u8B70\u984C",
   "ui.multi_research_progress": "\u7814\u7A76\u4E2D\uFF1A\u5B8C\u6210 {0}\uFF0F{1}",
   "ui.multi_research_ended": "\u7814\u7A76\u7D50\u675F\uFF1A\u5B8C\u6210 {0}\uFF0F{1}",
   "ui.batch_failed_count": "\u5931\u6557 {0}",
+  "ui.multi_research_running_names": "{0} \u500B\u9032\u884C\u4E2D\uFF1A{1}",
+  "ui.multi_research_running_names_more": "{0} \u500B\u9032\u884C\u4E2D\uFF1A{1} \u7B49",
   "ui.shallow_research_counts": "\u7C21\u77ED\u7814\u7A76\uFF1A\u5B8C\u6210 {0}\uFF0F{1}",
   "ui.shallow_research_current": "\u7814\u7A76\u4E2D\uFF1A{0}",
   "ui.retry_failed_topics": "\u91CD\u8A66\u5931\u6557\u7684\u8B70\u984C\uFF08{0}\uFF09",
@@ -45987,6 +45993,7 @@ function renderTaskSteer(text10) {
 }
 
 // core/ai-task-service.ts
+var CONDENSE_EXTRACT_CONCURRENCY = 3;
 var FIRST_EVENT_WAIT_MS = 2e4;
 function cancelled() {
   const error = new Error(t("ui.ai_task_cancelled"));
@@ -46572,7 +46579,7 @@ var AiTaskService = class {
     }
   }
   async extractReferenceFindings(context, model, reasoning, signal, onRequestAccepted) {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     let working = referenceBatches((_a2 = context.referenceGroups) != null ? _a2 : []);
     const focus = context.mode === "merge" ? void 0 : { title: context.title, task: context.task };
     let round3 = 0;
@@ -46580,45 +46587,61 @@ var AiTaskService = class {
     while (true) {
       round3++;
       const batches = round3 === 1 ? working : packReferenceChunks(working);
-      const findings = [];
-      for (let index = 0; index < batches.length; index++) {
-        if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
-        if (++sent > MAX_CONDENSE_CALLS) throw new Error(t("ui.source_context_exceeds_budget"));
-        (_b2 = context.onProgress) == null ? void 0 : _b2.call(context, t("ui.reference_processing_progress", index + 1, batches.length));
-        const result = await this.execute(
-          {
-            title: context.title,
-            summary: "",
-            rules: "",
-            detail: "",
-            task: referenceTask(round3 === 1 ? "extract" : "reduce", this.options.language(), focus),
-            ancestors: "",
-            sourceContext: batches[index],
-            mode: "task",
-            researchMode: "local",
-            researchDepth: "fast",
-            visualMode: "off",
-            intermediateDetail: true,
-            ...context.usageMapPath ? { usageMapPath: context.usageMapPath } : {},
-            // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
-            ...context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {}
-          },
-          model,
-          reasoning,
-          signal,
-          void 0,
-          onRequestAccepted,
-          void 0,
-          void 0,
-          round3 === 1 ? "reference-extract" : "reference-reduce"
-        );
-        if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
-        findings.push(result.detail.trim());
-      }
+      const findings = new Array(batches.length);
+      const slots = round3 === 1 ? Math.min(CONDENSE_EXTRACT_CONCURRENCY, batches.length) : 1;
+      let next = 0;
+      let failed = false;
+      const worker = async () => {
+        var _a3;
+        while (next < batches.length && !failed) {
+          const index = next++;
+          if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
+          if (++sent > MAX_CONDENSE_CALLS) throw new Error(t("ui.source_context_exceeds_budget"));
+          (_a3 = context.onProgress) == null ? void 0 : _a3.call(context, t("ui.reference_processing_progress", index + 1, batches.length));
+          const result = await this.execute(
+            {
+              title: context.title,
+              summary: "",
+              rules: "",
+              detail: "",
+              task: referenceTask(round3 === 1 ? "extract" : "reduce", this.options.language(), focus),
+              ancestors: "",
+              sourceContext: batches[index],
+              mode: "task",
+              researchMode: "local",
+              researchDepth: "fast",
+              visualMode: "off",
+              intermediateDetail: true,
+              ...context.usageMapPath ? { usageMapPath: context.usageMapPath } : {},
+              // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
+              ...context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {}
+            },
+            model,
+            reasoning,
+            signal,
+            void 0,
+            onRequestAccepted,
+            void 0,
+            void 0,
+            round3 === 1 ? "reference-extract" : "reference-reduce"
+          );
+          if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
+          findings[index] = result.detail.trim();
+        }
+      };
+      await Promise.all(
+        Array.from(
+          { length: slots },
+          () => worker().catch((error) => {
+            failed = true;
+            throw error;
+          })
+        )
+      );
       const joined = findings.map((value) => `Evidence:
 ${value}`).join("\n\n");
       if (joined.length <= 18e3) {
-        (_c = context.onProgress) == null ? void 0 : _c.call(context, "");
+        (_b2 = context.onProgress) == null ? void 0 : _b2.call(context, "");
         return joined;
       }
       if (joined.length >= working.reduce((sum2, value) => sum2 + value.length, 0)) {
@@ -55112,6 +55135,125 @@ async function exportMapWithNotice(vault, request) {
 
 // experiences/visual-map/multi-research-modal.ts
 var import_obsidian26 = require("obsidian");
+
+// experiences/visual-map/expansion-batch.ts
+var MAX_BATCH_CONCURRENCY = 6;
+var ShallowExpansionCoordinator = class {
+  constructor(activeTasks, states) {
+    this.activeTasks = activeTasks;
+    this.states = states;
+  }
+  async start(parentPath2, children, startChild, changed, externalSignal) {
+    if (this.isRunning(parentPath2)) throw new Error("Shallow research is already running for this topic.");
+    const controller = new AbortController();
+    const state = {
+      parentPath: parentPath2,
+      controller,
+      total: children.length,
+      completed: 0,
+      succeeded: 0,
+      queuedPaths: children.map((child) => child.path),
+      runningPaths: [],
+      failures: [],
+      failedPaths: [],
+      status: "running"
+    };
+    this.activeTasks.set(parentPath2, controller);
+    const abortFromOwner = () => controller.abort();
+    if (externalSignal == null ? void 0 : externalSignal.aborted) controller.abort();
+    else externalSignal == null ? void 0 : externalSignal.addEventListener("abort", abortFromOwner, { once: true });
+    this.states.set(parentPath2, state);
+    changed();
+    let acceptFirst = () => {
+    };
+    let rejectFirst = () => {
+    };
+    const accepted = new Promise((resolve, reject2) => {
+      acceptFirst = resolve;
+      rejectFirst = reject2;
+    });
+    void (async () => {
+      let dispatchAccepted = false;
+      let nextChild = 0;
+      const runningPaths = /* @__PURE__ */ new Set();
+      const updateCurrent = () => {
+        state.runningPaths = [...runningPaths];
+        state.currentPath = state.runningPaths[0];
+        changed();
+      };
+      const worker = async () => {
+        while (nextChild < children.length) {
+          const child = children[nextChild++];
+          if (controller.signal.aborted) break;
+          state.queuedPaths = state.queuedPaths.filter((path) => path !== child.path);
+          runningPaths.add(child.path);
+          updateCurrent();
+          let acceptedChild = false;
+          try {
+            const outcome = await startChild(child, controller.signal, () => {
+              acceptedChild = true;
+              if (!dispatchAccepted) {
+                dispatchAccepted = true;
+                externalSignal == null ? void 0 : externalSignal.removeEventListener("abort", abortFromOwner);
+                acceptFirst();
+              }
+            });
+            if (!acceptedChild) throw new Error("Shallow research did not start.");
+            if (outcome !== "skipped" && !controller.signal.aborted) state.succeeded++;
+          } catch (error) {
+            if (!controller.signal.aborted) {
+              const message = error instanceof Error ? error.message : String(error);
+              state.failures.push(`${child.path}: ${message}`);
+              state.failedPaths.push(child.path);
+            }
+          } finally {
+            state.completed++;
+            runningPaths.delete(child.path);
+            updateCurrent();
+          }
+        }
+      };
+      try {
+        await Promise.all(Array.from({ length: Math.min(MAX_BATCH_CONCURRENCY, children.length) }, () => worker()));
+      } finally {
+        state.status = controller.signal.aborted ? "stopped" : "completed";
+        state.currentPath = void 0;
+        state.runningPaths = [];
+        state.queuedPaths = [];
+        if (!dispatchAccepted) rejectFirst(new Error("Shallow research stopped before launch."));
+        if (this.activeTasks.get(parentPath2) === controller) this.activeTasks.delete(parentPath2);
+        externalSignal == null ? void 0 : externalSignal.removeEventListener("abort", abortFromOwner);
+        changed();
+      }
+    })();
+    return accepted;
+  }
+  stop(parentPath2) {
+    const state = this.states.get(parentPath2);
+    if (!state) return;
+    state.queuedPaths = [];
+    state.controller.abort();
+  }
+  /** Whether a running batch is still waiting to start this note. */
+  isQueued(path) {
+    for (const state of this.states.values())
+      if (state.status === "running" && state.queuedPaths.includes(path)) return true;
+    return false;
+  }
+  isRunning(parentPath2) {
+    var _a2;
+    return ((_a2 = this.states.get(parentPath2)) == null ? void 0 : _a2.status) === "running";
+  }
+  stopAll() {
+    for (const state of this.states.values())
+      if (state.status === "running") {
+        state.queuedPaths = [];
+        state.controller.abort();
+      }
+  }
+};
+
+// experiences/visual-map/multi-research-modal.ts
 var MultiResearchModal = class extends import_obsidian26.Modal {
   constructor(app, names3, models, submit, links = {}, modes = [], initialMode = DEFAULT_MAP_AI_MODE) {
     super(app);
@@ -55126,7 +55268,10 @@ var MultiResearchModal = class extends import_obsidian26.Modal {
   }
   onOpen() {
     this.titleEl.setText(t("ui.multi_research_title"));
-    this.contentEl.createEl("p", { text: t("ui.multi_research_intro", this.names.length), cls: "vam-modal-intro" });
+    this.contentEl.createEl("p", {
+      text: t("ui.multi_research_intro", this.names.length, MAX_BATCH_CONCURRENCY),
+      cls: "vam-modal-intro"
+    });
     let mode = this.initialMode;
     const standardTopics = this.modes.filter((item) => item === "standard").length;
     let paintNote = () => {
@@ -75522,7 +75667,6 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   }
   /** Status bar under the toolbar (same place and look as the AIM status bar) with progress, Stop, and Retry/Dismiss after failures. */
   renderMultiResearchStatus(parent) {
-    var _a2, _b2;
     const key4 = this.multiResearchKey();
     const state = this.plugin.expansionBatches.get(key4);
     if (!state) return;
@@ -75530,15 +75674,25 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!running2 && !state.failures.length) return;
     const bar = parent.createDiv(`vam-aim-statusbar vam-multi-research-statusbar${running2 ? " is-active" : ""}`);
     bar.setAttr("aria-live", "polite");
-    const current = state.currentPath ? (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.path === state.currentPath) : void 0;
-    const title = current ? (_b2 = this.notes.get(current.id)) == null ? void 0 : _b2.title : void 0;
+    const names3 = state.runningPaths.map((path) => {
+      var _a2;
+      return (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.path === path);
+    }).map((node) => {
+      var _a2;
+      return node ? (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title : void 0;
+    }).filter((name2) => !!name2);
+    const runningLabel = names3.length > 1 ? t(
+      state.runningPaths.length > 2 ? "ui.multi_research_running_names_more" : "ui.multi_research_running_names",
+      state.runningPaths.length,
+      names3.slice(0, 2).join(t("ui.list_separator"))
+    ) : names3[0];
     bar.createSpan({ cls: "vam-aim-status-title", text: t("ui.multi_research") });
     bar.createSpan({
       cls: `vam-aim-status-value ${running2 ? "vam-status-running" : "vam-status-error"}`,
       text: this.batchProgressLabel(
         t(running2 ? "ui.multi_research_progress" : "ui.multi_research_ended", state.succeeded, state.total),
         state,
-        title
+        runningLabel
       )
     });
     if (running2) this.button(bar, t("ui.stop_research"), () => this.stopMultiResearch());
@@ -90375,119 +90529,6 @@ function parseImageCandidates(raw) {
   }
   return found;
 }
-
-// experiences/visual-map/expansion-batch.ts
-var ShallowExpansionCoordinator = class {
-  constructor(activeTasks, states) {
-    this.activeTasks = activeTasks;
-    this.states = states;
-  }
-  async start(parentPath2, children, startChild, changed, externalSignal) {
-    if (this.isRunning(parentPath2)) throw new Error("Shallow research is already running for this topic.");
-    const controller = new AbortController();
-    const state = {
-      parentPath: parentPath2,
-      controller,
-      total: children.length,
-      completed: 0,
-      succeeded: 0,
-      queuedPaths: children.map((child) => child.path),
-      failures: [],
-      failedPaths: [],
-      status: "running"
-    };
-    this.activeTasks.set(parentPath2, controller);
-    const abortFromOwner = () => controller.abort();
-    if (externalSignal == null ? void 0 : externalSignal.aborted) controller.abort();
-    else externalSignal == null ? void 0 : externalSignal.addEventListener("abort", abortFromOwner, { once: true });
-    this.states.set(parentPath2, state);
-    changed();
-    let acceptFirst = () => {
-    };
-    let rejectFirst = () => {
-    };
-    const accepted = new Promise((resolve, reject2) => {
-      acceptFirst = resolve;
-      rejectFirst = reject2;
-    });
-    void (async () => {
-      let dispatchAccepted = false;
-      let nextChild = 0;
-      const runningPaths = /* @__PURE__ */ new Set();
-      const updateCurrent = () => {
-        state.currentPath = [...runningPaths][0];
-        changed();
-      };
-      const worker = async () => {
-        while (nextChild < children.length) {
-          const child = children[nextChild++];
-          if (controller.signal.aborted) break;
-          state.queuedPaths = state.queuedPaths.filter((path) => path !== child.path);
-          runningPaths.add(child.path);
-          updateCurrent();
-          let acceptedChild = false;
-          try {
-            const outcome = await startChild(child, controller.signal, () => {
-              acceptedChild = true;
-              if (!dispatchAccepted) {
-                dispatchAccepted = true;
-                externalSignal == null ? void 0 : externalSignal.removeEventListener("abort", abortFromOwner);
-                acceptFirst();
-              }
-            });
-            if (!acceptedChild) throw new Error("Shallow research did not start.");
-            if (outcome !== "skipped" && !controller.signal.aborted) state.succeeded++;
-          } catch (error) {
-            if (!controller.signal.aborted) {
-              const message = error instanceof Error ? error.message : String(error);
-              state.failures.push(`${child.path}: ${message}`);
-              state.failedPaths.push(child.path);
-            }
-          } finally {
-            state.completed++;
-            runningPaths.delete(child.path);
-            updateCurrent();
-          }
-        }
-      };
-      try {
-        await Promise.all(Array.from({ length: Math.min(3, children.length) }, () => worker()));
-      } finally {
-        state.status = controller.signal.aborted ? "stopped" : "completed";
-        state.currentPath = void 0;
-        state.queuedPaths = [];
-        if (!dispatchAccepted) rejectFirst(new Error("Shallow research stopped before launch."));
-        if (this.activeTasks.get(parentPath2) === controller) this.activeTasks.delete(parentPath2);
-        externalSignal == null ? void 0 : externalSignal.removeEventListener("abort", abortFromOwner);
-        changed();
-      }
-    })();
-    return accepted;
-  }
-  stop(parentPath2) {
-    const state = this.states.get(parentPath2);
-    if (!state) return;
-    state.queuedPaths = [];
-    state.controller.abort();
-  }
-  /** Whether a running batch is still waiting to start this note. */
-  isQueued(path) {
-    for (const state of this.states.values())
-      if (state.status === "running" && state.queuedPaths.includes(path)) return true;
-    return false;
-  }
-  isRunning(parentPath2) {
-    var _a2;
-    return ((_a2 = this.states.get(parentPath2)) == null ? void 0 : _a2.status) === "running";
-  }
-  stopAll() {
-    for (const state of this.states.values())
-      if (state.status === "running") {
-        state.queuedPaths = [];
-        state.controller.abort();
-      }
-  }
-};
 
 // experiences/visual-map/research-progress.ts
 var PREVIEW_THROTTLE_MS = 200;

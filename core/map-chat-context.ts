@@ -5,6 +5,7 @@ import type { HypothesisLeaning, HypothesisStrength, TopicKind } from "../note-v
 import type { TopicRelationKind } from "../map-model";
 import type { TopicColor, TopicStyle } from "../topic-colors";
 import type { TopicMarker } from "../topic-markers";
+import type { MapChatProgress } from "./map-chat-progress";
 
 /**
  * Builds what the model sees in a map chat turn. Pure: the caller reads the map, the selection and the Markdown text; this
@@ -233,6 +234,8 @@ export interface MapChatContinuationInput {
   lastResults: { text: string; status: "done" | "skipped" | "failed" }[];
   /** The research and expand work the chain waited for: which finished, failed or were stopped, and why. */
   research: { id?: string; title: string; status: "succeeded" | "failed" | "stopped"; error?: string }[];
+  /** The whole-flow steps so far (names and statuses), so the model can send them back with the statuses moved on. */
+  progress?: MapChatProgress;
 }
 
 export interface MapChatContextInput {
@@ -948,7 +951,10 @@ function continuationFields(input: MapChatContinuationInput): Record<string, unk
         title: clip(item.title, TITLE_LIMIT),
         status: item.status,
         ...(item.error ? { error: clip(item.error, ERROR_LIMIT) } : {})
-      }))
+      })),
+      ...(input.progress
+        ? { progress: { steps: input.progress.steps.map(step => ({ name: step.name, status: step.status })) } }
+        : {})
     },
     continuationNote: MAP_CHAT_CONTINUATION_NOTE
   };

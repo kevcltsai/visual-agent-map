@@ -23161,7 +23161,8 @@ export class VisualAgentMapView extends ItemView {
           maxRounds: point.maxRounds,
           remaining: point.remaining,
           lastResults: point.lastResults,
-          research: []
+          research: [],
+          ...(point.progress ? { progress: point.progress } : {})
         }
       }
     };
@@ -23471,7 +23472,8 @@ export class VisualAgentMapView extends ItemView {
           maxRounds: run.state.maxRounds,
           remaining,
           lastResults: run.lastResults,
-          research: run.waited
+          research: run.waited,
+          ...(run.state.progress ? { progress: run.state.progress } : {})
         }
       }
     };

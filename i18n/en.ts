@@ -1275,6 +1275,9 @@ export const en = {
   "ui.map_chat_auto_apply_label": "Apply this conversation automatically",
   "ui.map_chat_auto_apply_off": "Off",
   "ui.map_chat_auto_apply_on": "On",
+  "ui.map_chat_auto_apply_note": "Edits notes directly",
+  "ui.map_chat_auto_apply_more": "Details",
+  "ui.map_chat_auto_apply_less": "Hide details",
   "ui.map_chat_auto_apply_warning":
     "Research, summary rewrites and creating or updating notes happen directly, without stopping for your Apply, all the way to the end or until you press Stop. Text from the web can carry instructions that make the AI rewrite notes; every change can be undone or restored from a note backup. Deleting, merging, creating or switching mind maps and changing files outside the map folder still ask you first.",
   "ui.map_chat_auto_round_calls_0_1_2": "Automatic continuation · round {0} · AI calls used {1}/{2}",
@@ -1290,7 +1293,7 @@ export const en = {
     "Automatic apply is on, but this reply deletes, merges, creates or switches mind maps, or changes files outside the map folder; it waits for your confirmation",
   "ui.map_chat_flow_aria": "Whole flow progress",
   "ui.map_chat_flow_label": "Whole flow",
-  "ui.map_chat_flow_step_0_1_2": "Step {0} of {1} · round {2}",
+  "ui.map_chat_flow_step_0_1_2_3": "Step {0} of {1}: {3} · round {2}",
   "ui.map_chat_flow_done_0_1_2": "{0} of {1} steps done · {2} rounds in all",
   "ui.map_chat_flow_value_0_1": "{0} of {1} steps done",
   "ui.map_chat_flow_calls_0_1": "AI calls used {0}/{1}",

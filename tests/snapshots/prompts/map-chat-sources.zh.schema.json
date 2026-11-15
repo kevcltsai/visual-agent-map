@@ -10,6 +10,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
+        "x-vam-ignore-extra-fields": true,
         "properties": {
           "kind": {
             "type": "string",

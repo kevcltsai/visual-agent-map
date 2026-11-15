@@ -1765,3 +1765,23 @@ test('map sources 05: no absolute external path reaches the text sent; external 
   assert.ok(!m.text.includes('/Users/me'), m.text); assert.ok(m.text.includes('Docs/a.md'), 'the label path is what the model sees');
   assert.deepEqual(plain(mapSourcePaths(srcGroup([{ path: '/Users/me/x.md', content: '', external: true }, { path: 'Notes/V.md', content: '' }, { path: 'Docs/a.md', content: '', external: true }]))), ['Notes/V.md', 'Docs/a.md']);
 });
+
+test('map chat: an action with a field the schema does not name (mapFolder copied from the context) passes the Claude schema and is parsed without it; Codex keeps the strict schema', () => {
+  const Ajv = require('ajv');
+  const { claudeOutputSchema } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn() {} } });
+  const { codexOutputSchema } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn() {} } });
+  const blank = Object.fromEntries(MAP_CHAT_SCHEMA.properties.actions.items.required.map(key => {
+    const type = MAP_CHAT_SCHEMA.properties.actions.items.properties[key].type;
+    return [key, type === 'array' ? [] : type === 'boolean' ? false : type === 'number' ? 0 : ''];
+  }));
+  const reply = { reply: 'ok', actions: [{ ...blank, kind: 'create_md_file', path: 'Notes/Progress.md', content: '# Progress\n', mapFolder: 'Agent Workspace/Mind Maps/x' }], remaining: '' };
+  const claude = new Ajv({ strict: false }).compile(claudeOutputSchema(MAP_CHAT_SCHEMA));
+  assert.equal(claude(reply), true, JSON.stringify(claude.errors));
+  assert.equal(claude({ ...reply, extra: 1 }), false, 'the top level stays closed');
+  assert.equal(claude({ ...reply, actions: [{ ...reply.actions[0], kind: 'delete_vault' }] }), false, 'every named field keeps its rule');
+  const parsed = parseMapChat(JSON.stringify(reply), { nodeIds: [], parents: {} });
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.actions)), [{ kind: 'create_md_file', path: 'Notes/Progress.md', content: '# Progress\n' }]);
+  const strict = JSON.stringify(codexOutputSchema(MAP_CHAT_SCHEMA));
+  assert.ok(!strict.includes('x-vam'), 'no private keyword reaches Codex');
+  assert.equal(codexOutputSchema(MAP_CHAT_SCHEMA).properties.actions.items.additionalProperties, false, 'Codex strict mode keeps every object closed');
+});

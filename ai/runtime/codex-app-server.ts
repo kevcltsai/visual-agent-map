@@ -1,4 +1,5 @@
 import type { WebSearchEvent } from "../types";
+import { outputSchemaFor } from "./output-schema";
 import type { AiMilestones } from "../../ai-exchange-log";
 import { spawn as nodeSpawn } from "node:child_process";
 import { createUtf8StreamDecoder } from "./utf8-stream";
@@ -396,7 +397,7 @@ export class CodexAppServerRuntime {
         model: model || null,
         effort: effort || "low",
         sandboxPolicy: { type: "readOnly", networkAccess: false },
-        ...(outputSchema ? { outputSchema } : {})
+        ...(outputSchema ? { outputSchema: codexOutputSchema(outputSchema) } : {})
       };
       // The picture stays in the request sent to Codex; whoever watches the request (the exchange log) only gets its length.
       controls?.onRequest?.({
@@ -756,4 +757,9 @@ export class CodexAppServerRuntime {
     this.initializing = null;
     child.kill();
   }
+}
+
+/** Codex strict mode wants every object closed: the private keyword goes, `additionalProperties: false` stays. */
+export function codexOutputSchema(schema: unknown): unknown {
+  return outputSchemaFor(schema, false);
 }

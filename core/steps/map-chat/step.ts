@@ -1,4 +1,5 @@
 import { estimateMapChatTokens } from "../../map-chat-tokens";
+import { IGNORE_EXTRA_FIELDS } from "../../../ai/runtime/output-schema";
 import { instructionLanguageOf, type ContentLanguage } from "../../../i18n";
 import type { ReasoningLevel } from "../../../ai/types";
 import { languageVariables } from "../_shared/fragments";
@@ -296,6 +297,8 @@ export const MAP_CHAT_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
+        // parseMapChat reads only the named fields, so a stray one (a context key copied over) must not fail the whole reply.
+        [IGNORE_EXTRA_FIELDS]: true,
         properties: {
           kind: { type: "string", enum: [...MAP_CHAT_ACTION_KINDS] },
           nodeId: STRING,

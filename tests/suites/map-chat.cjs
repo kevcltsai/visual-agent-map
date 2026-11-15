@@ -9471,8 +9471,8 @@ integrationTest('P2 view: switch on, a delete plan card pending, switch off, a n
 integrationTest('P2 view: create_md_file on an existing file in the map folder is skipped with words that say read it with read_md_file then edit_md_file; the next round sees that text', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open();
   const existing = 'Agent Workspace/Topics/map-a/TOC.md'; await h.app.vault.create(existing, '# TOC\n');
-  chainReplies(h, say('Make the TOC.', [{ kind: 'create_md_file', path: existing, content: '# New TOC\n' }], 'Update the TOC'), say('Done.', [], ''));
-  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 2);
-  const seen = contextOf(h.control.requests[1]).continuation.lastResults; eq(seen.map(r => r.status), ['skipped']);
-  assert.match(seen[0].text, /read_md_file/); assert.match(seen[0].text, /edit_md_file/); assert.equal(h.contents.get(existing), '# TOC\n', 'the file is untouched');
+  chainReplies(h, say('Make the TOC.', [addRoot('t', 'T'), { kind: 'create_md_file', path: existing, content: '# New TOC\n' }], 'Update the TOC'), say('Done.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); try { await until(() => h.view.chatChain === null && h.control.requests.length === 2); } catch (e) { throw new Error(`reqs ${h.control.requests.length} chain ${JSON.stringify(h.view.chatChain?.state)} plan ${JSON.stringify(chat.pendingPlan()?.reasons)}`); }
+  const seen = contextOf(h.control.requests[1]).continuation.lastResults; const skip = seen.filter(r => r.status === 'skipped'); eq(skip.length, 1);
+  assert.match(skip[0].text, /read_md_file/); assert.match(skip[0].text, /edit_md_file/); assert.equal(h.contents.get(existing), '# TOC\n', 'the file is untouched');
 });

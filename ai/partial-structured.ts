@@ -96,14 +96,20 @@ const skipSpace = (buffer: string, from: number) => {
   return i;
 };
 
-export function partialFields(buffer: string): PartialFields {
-  const out: PartialFields = { summaryComplete: false, detailComplete: false };
+// The requested top-level string fields of an incomplete JSON object, decoded so far. Stops at the first unfinished string, or once every
+// requested key is complete; a key that appears twice counts at its first complete occurrence. Never throws.
+export function partialStringFields<K extends string>(
+  buffer: string,
+  keys: readonly K[]
+): Partial<Record<K, { value: string; complete: boolean }>> {
+  const out: Partial<Record<K, { value: string; complete: boolean }>> = {};
   try {
     if (typeof buffer !== "string") return out;
     let i = skipSpace(buffer, 0);
     if (buffer[i] !== "{") return out;
     i++;
-    while (i < buffer.length) {
+    let pending = new Set<string>(keys).size;
+    while (i < buffer.length && pending > 0) {
       i = skipSpace(buffer, i);
       if (buffer[i] === ",") {
         i = skipSpace(buffer, i + 1);
@@ -115,16 +121,15 @@ export function partialFields(buffer: string): PartialFields {
       if (buffer[i] !== ":") break;
       i = skipSpace(buffer, i + 1);
       if (i >= buffer.length) break;
-      if ((key.value === "summary" || key.value === "detail") && buffer[i] === '"') {
+      const wanted = (keys as readonly string[]).includes(key.value) && !(out as Record<string, unknown>)[key.value];
+      if (wanted && buffer[i] === '"') {
         const text = decodeString(buffer, i + 1);
-        if (key.value === "summary") {
-          out.summary = text.value;
-          out.summaryComplete = text.complete;
-        } else {
-          out.detail = text.value;
-          out.detailComplete = text.complete;
-        }
+        (out as Record<string, { value: string; complete: boolean }>)[key.value] = {
+          value: text.value,
+          complete: text.complete
+        };
         if (!text.complete) break;
+        pending--;
         i = text.end;
         continue;
       }
@@ -135,6 +140,14 @@ export function partialFields(buffer: string): PartialFields {
   } catch {
     /* partial text must never throw */
   }
+  return out;
+}
+
+export function partialFields(buffer: string): PartialFields {
+  const { summary, detail } = partialStringFields(buffer, ["summary", "detail"] as const);
+  const out: PartialFields = { summaryComplete: summary?.complete ?? false, detailComplete: detail?.complete ?? false };
+  if (summary) out.summary = summary.value;
+  if (detail) out.detail = detail.value;
   return out;
 }
 

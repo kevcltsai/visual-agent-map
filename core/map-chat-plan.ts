@@ -249,6 +249,11 @@ function pathSegments(path: string): string[] | null {
   const parts = raw.split("/").filter(part => part !== "" && part !== ".");
   return parts.length && !parts.includes("..") ? parts : null;
 }
+/** True when `path` is one of `paths` (same segments). */
+function isReadablePath(path: string, paths: readonly string[] | undefined): boolean {
+  const own = pathSegments(path)?.join("/");
+  return !!own && !!paths?.some(item => pathSegments(item)?.join("/") === own);
+}
 /** True when `path` is a file inside `folder` (whole segments, so "Foo" does not hold "Foobar/x.md"; no `..` escape). */
 export function isInsideMapFolder(path: string, folder: string | undefined): boolean {
   if (!folder) return false;
@@ -278,6 +283,8 @@ export function planFor(
     autoApply?: boolean;
     /** Folder of the current Map.md: md files inside it are allowed under `autoApply`. */
     mapFolder?: string;
+    /** Attached or own files the chat may read (read_md_file only, never edits): allowed under `autoApply` even outside `mapFolder`. */
+    readablePaths?: readonly string[];
     /** AI calls this segment of the chain already made (the call budget under `autoApply`). */
     callsSoFar?: number;
   } = {}
@@ -323,6 +330,7 @@ export function planFor(
     (action.kind === "run_map_action" ? AUTO_ALLOWED_RUN.has(action.action) : AUTO_ALLOWED_KINDS.has(action.kind)) ||
     ((action.kind === "edit_md_file" || action.kind === "create_md_file" || action.kind === "read_md_file") &&
       isInsideMapFolder(action.path, options.mapFolder)) ||
+    (action.kind === "read_md_file" && isReadablePath(action.path, options.readablePaths)) ||
     (imageAddsOnly && IMAGE_SAFE_KINDS.has(action.kind));
   const allAllowed = auto && actions.every(autoAllowed);
   if (readsResearch && !onlySafe && !allAllowed)

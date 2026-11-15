@@ -1618,7 +1618,8 @@ export class VisualAgentMapView extends ItemView {
   /** Markdown files the user dragged into this conversation -> the content hash each held then. Readable (and, inside the map folder, editable) only while the file still holds one of these or a version the chat wrote after. */
   private chatAttached = new Map<string, Set<string>>();
   /** The files the chips of the message being sent carry (their text is sent whole this round, whatever the folder). */
-  private chatChipPaths = new Set<string>();
+  /** The files dragged in as chips of the message a context was built for: an old plan's apply uses its own round's value, not the latest message's. */
+  private chatChipPaths = new WeakMap<object, Set<string>>();
   /** Order of the writes to {@link chatOwnFiles}: a counter per write and the reply (apply call) it belonged to; restored paths are round 0. */
   private chatOwnOrder = new Map<string, { seq: number; round: number }>();
   private chatWriteSeq = 0;
@@ -22482,7 +22483,7 @@ export class VisualAgentMapView extends ItemView {
         }
       }
     }
-    this.chatChipPaths = new Set(files.flatMap(file => normalizeVaultPath(file.path) ?? []));
+    const chipPaths = new Set(files.flatMap(file => normalizeVaultPath(file.path) ?? []));
     // Only the note the chip shows is sent; with the chip taken off nothing is, so no edit of it has a baseline.
     const activePath = chat.currentNote();
     const activeSource = activePath ? await this.readChatFile(activePath) : null;
@@ -22547,6 +22548,7 @@ export class VisualAgentMapView extends ItemView {
     });
     // From this turn on the conversation holds source text (and what the model made of it): its writes need the user's yes.
     if (context.mapSourcesSent) this.chatReadsSources = true;
+    this.chatChipPaths.set(context, chipPaths);
     return {
       message,
       context,
@@ -22827,6 +22829,7 @@ export class VisualAgentMapView extends ItemView {
                     chain: planChainOf(run.state),
                     autoApply: this.chatAutoApply,
                     mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
+                    readablePaths: [...this.chatOwnFiles.keys(), ...this.chatAttached.keys()],
                     callsSoFar: run.state.calls,
                     chatStartedResearch: this.chatStartedResearch,
                     chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
@@ -23851,6 +23854,12 @@ export class VisualAgentMapView extends ItemView {
     this.chatAttached.set(key, hashes);
     this.markOwnFilesRecorded(this.chatLastRecord);
   }
+  /** True when the file holds a version the chat wrote or the user attached (the test a read uses). */
+  private async chatReadableNow(key: string): Promise<boolean> {
+    const hashes = this.chatReadableHashes(key);
+    const source = hashes ? await this.readChatFile(key) : null;
+    return !!source && !!hashes && hashes.has(contentHash(source.text));
+  }
   private insideChatMapFolder(key: string): boolean {
     const root = normalizeVaultPath(this.plugin.repo.topicRoot(this.path));
     return root !== null && key.startsWith(`${root}/`);
@@ -23952,7 +23961,6 @@ export class VisualAgentMapView extends ItemView {
     this.chatSourceCache = null;
     this.chatOwnFiles.clear();
     this.chatAttached.clear();
-    this.chatChipPaths.clear();
     this.chatOwnOrder.clear();
     this.chatReadQueue = [];
     this.chatLastReads.clear();
@@ -24513,6 +24521,9 @@ export class VisualAgentMapView extends ItemView {
       topicHashes: { ...baseline.topicHashes },
       mapSourcePaths: baseline.mapSourcePaths
     };
+    // The copy belongs to the same round: its chip paths are the request's, not the latest message's.
+    const chips = this.chatChipPaths.get(baseline);
+    if (chips) this.chatChipPaths.set(own, chips);
     // A reply that adds many cards is laid out as a whole afterwards, so its writes repaint once at the end. One that adds a
     // few cards places each against the cards painted so far, so it keeps repainting after every write.
     const adds = result.actions.filter(action => action.kind === "add_child").length;
@@ -25341,7 +25352,7 @@ export class VisualAgentMapView extends ItemView {
         if (
           editKey &&
           this.chatAttached.has(editKey) &&
-          !this.chatChipPaths.has(editKey) &&
+          !this.chatChipPaths.get(baseline)?.has(editKey) &&
           !this.insideChatMapFolder(editKey)
         )
           return skipped("ui.map_chat_skip_attached_read_only");
@@ -25455,9 +25466,7 @@ export class VisualAgentMapView extends ItemView {
         const mapFolder = this.path.slice(0, Math.max(0, this.path.lastIndexOf("/")));
         if (!verdict.ok && verdict.code === "exists" && mapFolder && key?.startsWith(`${mapFolder}/`))
           return skipped(
-            this.chatOwnFiles.has(key) || this.chatAttached.has(key)
-              ? "ui.map_chat_guard_exists_in_map"
-              : "ui.map_chat_guard_exists_not_own"
+            (await this.chatReadableNow(key)) ? "ui.map_chat_guard_exists_in_map" : "ui.map_chat_guard_exists_not_own"
           );
         if (!verdict.ok || !key) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
         const folders = key.split("/").slice(0, -1);

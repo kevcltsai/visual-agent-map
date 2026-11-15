@@ -36,6 +36,20 @@ export interface AiMilestones {
   enforceRetry?: boolean;
   structuredStartAt?: string;
   structuredCalls?: number;
+  /**
+   * Each StructuredOutput call of a Claude stream-json call, in order: accepted, rejected by the CLI (with its reason, clipped),
+   * replaced by a later call with no answer (a retried stream), or pending at the end. Size in characters and action count only.
+   */
+  structuredAttempts?: {
+    outcome: "accepted" | "rejected" | "replaced" | "pending";
+    chars: number;
+    actions: number | null;
+    error?: string;
+  }[];
+  /** The CLI retried the API request: the HTTP status of each (null when none). */
+  apiRetries?: (number | null)[];
+  /** The CLI switched the turn to its fallback model: the trigger of each. */
+  modelFallbacks?: string[];
   previewSummaryAt?: string;
   receivedAt?: string;
   searches?: Array<{

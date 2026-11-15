@@ -186,15 +186,17 @@ export class MapChatService {
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(mapChatStep, request);
     let shown = "";
-    const onStructuredJson = onReply
-      ? (buffer: string | null): void => {
-          if (signal.aborted) return;
-          const text = buffer ? partialReply(buffer).text : "";
-          if (text === shown) return;
-          shown = text;
-          onReply(text);
-        }
-      : undefined;
+    // The StructuredOutput JSON of each call the CLI started ("" starts one); only the last one is the reply taken.
+    const attempts: string[] = [];
+    const onStructuredJson = (buffer: string | null): void => {
+      if (buffer === "") attempts.push("");
+      else if (buffer && attempts.length) attempts[attempts.length - 1] = buffer;
+      if (signal.aborted || !onReply) return;
+      const text = buffer ? partialReply(buffer).text : "";
+      if (text === shown) return;
+      shown = text;
+      onReply(text);
+    };
     // Codex's text only grows on screen: a shorter reading (another message item started, a different cut) never replaces it.
     const onText = onReply
       ? (full: string): void => {
@@ -255,6 +257,24 @@ export class MapChatService {
       throw error;
     }
     if (signal.aborted) throw stopped();
-    return prepared.parse(raw);
+    const result = prepared.parse(raw);
+    return droppedOnRetry(attempts.slice(0, -1), raw) ? { ...result, droppedOnRetry: true } : result;
   }
+}
+
+/** The number of actions of a complete StructuredOutput JSON; null when it does not parse (a call cut off). */
+function rawActionCount(json: string): number | null {
+  try {
+    const value: unknown = JSON.parse(json);
+    const actions = value && typeof value === "object" ? (value as { actions?: unknown }).actions : undefined;
+    return Array.isArray(actions) ? actions.length : null;
+  } catch {
+    return null;
+  }
+}
+/** An earlier call the provider did not take had more actions than the reply it took: the retry dropped work. */
+function droppedOnRetry(earlier: readonly string[], taken: string): boolean {
+  const final = rawActionCount(taken);
+  if (final === null) return false;
+  return earlier.some(json => (rawActionCount(json) ?? -1) > final);
 }

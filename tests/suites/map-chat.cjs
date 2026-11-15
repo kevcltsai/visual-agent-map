@@ -9310,6 +9310,21 @@ const autoSwitch = (extra = {}) => {
   return { ...f, s, row, group, buttons, warning };
 };
 const WARNING_EN = /without stopping for your Apply/;
+test('layout fix: with the switch on the warning is one small line in the switch row ("Edits notes directly" and Details); Details opens the full text, Hide details closes it; never a box on its own', () => {
+  const f = autoSwitch(); const [, on] = f.buttons(); on.click();
+  const note = find(f.row(), i => hasClass(i, 'vam-map-chat-auto-apply-note')); assert.ok(note, 'the short line is in the switch row'); assert.equal(note.hidden, false); assert.match(visibleText(note), /Edits notes directly/);
+  assert.equal(f.warning().hidden, true, 'the full text is closed, also right after turning it on');
+  const more = find(note, i => i.tag === 'button'); assert.equal(more.text, 'Details'); assert.equal(more.attrs['aria-expanded'], 'false');
+  more.click(); assert.equal(f.warning().hidden, false); assert.match(visibleText(f.warning()), WARNING_EN); assert.equal(more.text, 'Hide details'); assert.equal(more.attrs['aria-expanded'], 'true');
+  more.click(); assert.equal(f.warning().hidden, true);
+  const [off] = f.buttons(); off.click(); assert.equal(note.hidden, true); assert.equal(f.warning().hidden, true);
+});
+test('layout fix: the chat history keeps at least half of the panel; the warning has no box; an open step list scrolls inside a capped height', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-map-chat-body > \.vam-map-chat-log \{[^}]*min-height: 50%/);
+  const warn = css.match(/\.vam-view \.vam-map-chat-auto-apply-warning \{([^}]*)\}/)[1]; assert.doesNotMatch(warn, /border:/);
+  const steps = css.match(/\.vam-view \.vam-map-chat-flow-steps \{([^}]*)\}/)[1]; assert.match(steps, /max-height/); assert.match(steps, /overflow-y: auto/);
+});
 test('P2 switch: a row above the composer, "Apply this conversation automatically" with an Off/On group of aria-pressed buttons, off by default; On tells the host and shows the warning, Off hides it', () => {
   const f = autoSwitch();
   assert.ok(f.row(), 'the row exists'); assert.equal(f.row().hidden, false);
@@ -9318,14 +9333,14 @@ test('P2 switch: a row above the composer, "Apply this conversation automaticall
   assert.deepEqual([off, on].map(b => b.attrs['aria-pressed']), ['true', 'false']); assert.equal(f.warning().hidden, true, 'no warning while off');
   const rowText = visibleText(f.row()); assert.match(rowText, /Apply this conversation automatically/);
   on.click(); eq(f.s.sets, [true]); assert.deepEqual([off, on].map(b => b.attrs['aria-pressed']), ['false', 'true']);
-  assert.equal(f.warning().hidden, false); assert.match(visibleText(f.warning()), WARNING_EN); assert.match(visibleText(f.warning()), /Deleting, merging, creating or switching mind maps/);
+  assert.equal(f.warning().hidden, true, 'the full text waits for Details'); assert.match(f.warning().text ?? visibleText(f.warning()), /Deleting, merging, creating or switching mind maps/);
   on.click(); eq(f.s.sets, [true], 'the same choice twice changes nothing');
   off.click(); eq(f.s.sets, [true, false]); assert.equal(f.warning().hidden, true);
   const order = findAll(f.panel.bodyEl, i => hasClass(i, 'vam-map-chat-auto-apply') || hasClass(i, 'vam-map-chat-composer')); assert.ok(hasClass(order[0], 'vam-map-chat-auto-apply'), 'above the composer');
 });
 test('P2 switch: a host without the hooks shows no row; the panel follows the host\'s value (so a repainted panel keeps the view\'s state)', () => {
   const plain1 = panelFixture(); plain1.panel.setOpen(true); assert.equal(find(plain1.panel.bodyEl, i => hasClass(i, 'vam-map-chat-auto-apply'))?.hidden ?? true, true);
-  const f = autoSwitch(); f.s.on = true; f.panel.refreshAutoApply(); assert.deepEqual(f.buttons().map(b => b.attrs['aria-pressed']), ['false', 'true']); assert.equal(f.warning().hidden, false);
+  const f = autoSwitch(); f.s.on = true; f.panel.refreshAutoApply(); assert.deepEqual(f.buttons().map(b => b.attrs['aria-pressed']), ['false', 'true']); assert.equal(find(f.row(), i => hasClass(i, 'vam-map-chat-auto-apply-note')).hidden, false, 'the one-line warning follows the host value');
 });
 test('P2 switch (g): a new conversation, reset (another map) and restoring an old conversation all turn it back off', () => {
   const f = autoSwitch(); const on = () => f.buttons()[1].click();
@@ -9417,6 +9432,7 @@ integrationTest('P2 (backup gap): in an auto chain Map.md is backed up once, bef
   const n = await harness(); await n.view.hydrate(); const ncalls = backupSpy(n); const nrun = autoRun(n, false); await applyIn(n, nrun, [addRoot('n', 'New', n.ids.root)]); eq(ncalls, []);
 });
 // whole-flow progress, driven through the real view and panel
+const shownText = el => (el.hidden ? '' : (el.text ?? '') + el.children.map(shownText).join(''));
 const flowOf = h => find(h.view.chat.bodyEl, i => hasClass(i, 'vam-map-chat-flow'));
 const prog = (...pairs) => ({ steps: pairs.map(([name, status]) => ({ name, status })), current: 0 });
 const sayP = (progress, actions = [], remaining = 'more') => ({ ...say('Step.', actions, remaining), ...(progress ? { progress } : {}) });
@@ -9429,11 +9445,41 @@ integrationTest('P2 (l) progress: set in round 1, statuses updated later; header
   const bar = find(flow, i => i.attrs?.role === 'progressbar'); assert.deepEqual([bar.attrs['aria-valuenow'], bar.attrs['aria-valuemax'], bar.attrs['aria-valuemin']], ['3', '3', '0']); assert.equal(bar.attrs['aria-valuetext'], '3 of 3 steps done'); assert.ok(hasClass(bar, 'vam-research-progress-track'));
   assert.ok(find(bar, i => hasClass(i, 'vam-research-progress-fill'))); const items = findAll(flow, i => i.tag === 'li'); eq(items.map(i => visibleText(i)), ['✓1. Outline', '✓2. Write', '✓3. Check']);
 });
+integrationTest('flow fix: every later round is told the steps so far (continuation.progress, names and statuses), so the AI can report them back', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open();
+  chainReplies(h, sayP(prog(['Outline', 'done'], ['Write', 'current'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(undefined, [addRoot('y', 'Y')]), sayP(undefined, [addRoot('z', 'Z')], ''), say('Checked.', [], ''));
+  h.type('three phases'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 4);
+  assert.equal(contextOf(h.control.requests[3]).continuation.checkDone, true, 'steps still open after an empty remaining: a check round');
+  assert.equal('checkDone' in contextOf(h.control.requests[2]).continuation, false);
+  assert.equal(contextOf(h.control.requests[0]).continuation, undefined, 'round 1 has no continuation');
+  const want = { steps: [{ name: 'Outline', status: 'done' }, { name: 'Write', status: 'current' }, { name: 'Check', status: 'todo' }] };
+  eq(contextOf(h.control.requests[1]).continuation.progress, want, 'round 2 gets the steps of round 1');
+  eq(contextOf(h.control.requests[2]).continuation.progress, want, 'round 3 still gets them though round 2 sent none');
+  const g = await harness(); await g.view.hydrate(); g.view.setChatAutoApply(true); g.open(); chainReplies(g, say('One.', [addRoot('x', 'X')], 'More'), say('Two.', [addRoot('y', 'Y')], ''));
+  g.type('go'); await g.view.sendMapChat(); await until(() => g.view.chatChain === null && g.control.requests.length === 2);
+  assert.equal('progress' in contextOf(g.control.requests[1]).continuation, false, 'no progress, no field');
+});
+test('flow fix: the prompt says later rounds read continuation.progress and send the steps back every round, in both languages', () => {
+  const en = fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.en.md'), 'utf8'); const zh = fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.zh.md'), 'utf8');
+  assert.match(en, /continuation\.progress/); assert.match(en, /every round/i); assert.match(zh, /continuation\.progress/); assert.match(zh, /每一輪都要/);
+});
+integrationTest('layout fix: the flow block is one line by default (step N of M: name · round K and the bar); its head button opens the step list and calls, a new conversation closes it', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const runs = researchStub(h);
+  chainReplies(h, sayP(prog(['Outline', 'done'], ['Write', 'current'], ['Check', 'todo']), [addRoot('x', 'X'), researchAct({ nodeIds: ['new:x'] })]));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain?.state.phase === 'waiting'); const flow = flowOf(h);
+  const head = find(flow, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-flow-head')); assert.ok(head, 'the head is a button'); assert.equal(head.attrs['aria-expanded'], 'false');
+  assert.match(visibleText(flow), /Step 2 of 3: Write · round 1/); assert.doesNotMatch(shownText(flow), /AI calls used/); eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)).filter(Boolean).length, 3, 'the steps stay in the DOM');
+  assert.equal(find(flow, i => i.tag === 'ul').hidden, true, 'the list is closed'); assert.ok(find(head, i => i.attrs?.role === 'progressbar'), 'the bar stays on the line');
+  head.click(); const open = flowOf(h); const openHead = find(open, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-flow-head')); assert.equal(openHead.attrs['aria-expanded'], 'true'); assert.equal(find(open, i => i.tag === 'ul').hidden, false); assert.match(visibleText(open), /AI calls used \d+\/300/);
+  openHead.click(); assert.equal(find(flowOf(h), i => i.tag === 'ul').hidden, true, 'a second click closes it');
+  find(flowOf(h), i => i.tag === 'button' && hasClass(i, 'vam-map-chat-flow-head')).click(); h.view.stopMapChat(); await until(() => h.view.chatChain === null); chat.reset(); chat.setFlowProgress({ steps: [{ name: 'A', status: 'current' }, { name: 'B', status: 'todo' }], round: 1, calls: 1, maxCalls: 300 }); h.view.setChatAutoApply(true); chat.refreshAutoApply();
+  assert.equal(find(flowOf(h), i => i.tag === 'ul').hidden, true, 'a new conversation starts closed'); void runs;
+});
 integrationTest('e2e: a chain that ends done with nothing left shows every step done even when the last reply did not say so', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open();
-  chainReplies(h, sayP(prog(['Write', 'current'], ['Add', 'todo']), [addRoot('x', 'X')]), sayP(undefined, [addRoot('y', 'Y')], ''));
-  h.type('two steps'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 2);
-  const flow = flowOf(h); assert.equal(flow.hidden, false); assert.match(visibleText(flow), /2 of 2 steps done · 2 rounds in all/);
+  chainReplies(h, sayP(prog(['Write', 'current'], ['Add', 'todo']), [addRoot('x', 'X')]), sayP(undefined, [addRoot('y', 'Y')], ''), say('Checked.', [], ''));
+  h.type('two steps'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 3);
+  const flow = flowOf(h); assert.equal(flow.hidden, false); assert.match(visibleText(flow), /2 of 2 steps done · 3 rounds in all/, 'the check round that wrote nothing ends it done');
   eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)), ['✓1. Write', '✓2. Add']);
 });
 integrationTest('e2e: a chain that stops before done keeps the steps as the AI reported them', async () => {
@@ -9445,25 +9491,25 @@ integrationTest('e2e: a chain that stops before done keeps the steps as the AI r
 integrationTest('P2 (l) progress: a mid-way state reads "Step N of M · round X"; ● for the current step, ○ for the rest', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const runs = researchStub(h);
   chainReplies(h, sayP(prog(['Outline', 'done'], ['Write', 'current'], ['Check', 'todo']), [addRoot('x', 'X'), researchAct({ nodeIds: ['new:x'] })]));
-  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain?.state.phase === 'waiting'); const flow = flowOf(h); assert.match(visibleText(flow), /Step 2 of 3 · round 1/);
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain?.state.phase === 'waiting'); const flow = flowOf(h); assert.match(visibleText(flow), /Step 2 of 3: Write · round 1/);
   eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)), ['✓1. Outline', '●2. Write', '○3. Check']); assert.equal(find(flow, i => i.attrs?.role === 'progressbar').attrs['aria-valuenow'], '1');
   h.view.stopMapChat(); void runs;
 });
 integrationTest('P2 (l) progress: another step count or names, a status that goes back, absent or malformed progress change nothing; names are text', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open();
-  chainReplies(h, sayP(prog(['Outline', 'done'], ['<b>Write</b>', 'current'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(prog(['Outline', 'done'], ['Write', 'current']), [addRoot('y', 'Y')]), sayP(prog(['Outline', 'todo'], ['<b>Write</b>', 'todo'], ['Check', 'todo']), [addRoot('z', 'Z')]), sayP({ steps: 'bad' }, [addRoot('w', 'W')]), sayP(undefined, [addRoot('v', 'V')], ''));
-  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 5);
+  chainReplies(h, sayP(prog(['Outline', 'done'], ['<b>Write</b>', 'current'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(prog(['Outline', 'done'], ['Write', 'current']), [addRoot('y', 'Y')]), sayP(prog(['Outline', 'todo'], ['<b>Write</b>', 'todo'], ['Check', 'todo']), [addRoot('z', 'Z')]), sayP({ steps: 'bad' }, [addRoot('w', 'W')]), sayP(undefined, [addRoot('v', 'V')], ''), say('Checked.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 6);
   // The chain ended done with nothing left, so every step reads done; the odd progress of rounds 2–5 changed no names or count.
   const flow = flowOf(h); eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)), ['✓1. Outline', '✓2. <b>Write</b>', '✓3. Check']); assert.equal(find(flow, i => i.tag === 'b' && /Write/.test(i.text ?? '')), undefined, 'the name is text, not markup');
-  assert.equal(h.control.requests.length, 5, 'no round failed over the odd progress');
+  assert.equal(h.control.requests.length, 6, 'no round failed over the odd progress (the last is the check round)');
 });
 integrationTest('P2 (l) progress: hidden with the switch off, with one step only, and after a new conversation; nothing extra for a chain without it', async () => {
   let h = await harness(); await h.view.hydrate(); let chat = h.open(); chainReplies(h, sayP(prog(['A', 'current'], ['B', 'todo']), [addRoot('x', 'X')], ''));
   h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 1 && !chat.isBusy); assert.equal(flowOf(h)?.hidden ?? true, true, 'switch off: not shown');
-  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open(); chainReplies(h, sayP(prog(['Only', 'current']), [addRoot('x', 'X')], ''));
-  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 1 && !chat.isBusy); assert.equal(flowOf(h)?.hidden ?? true, true, 'one step: not shown');
-  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open(); chainReplies(h, sayP(prog(['A', 'current'], ['B', 'todo']), [addRoot('x', 'X')], ''));
-  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 1 && !chat.isBusy); assert.equal(flowOf(h).hidden, false); h.view.setChatAutoApply(false); chat.refreshAutoApply(); assert.equal(flowOf(h).hidden, true, 'switch turned off: hidden'); h.view.setChatAutoApply(true); chat.refreshAutoApply(); chat.reset(); assert.equal(flowOf(h).hidden, true, 'reset clears it');
+  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open(); chainReplies(h, sayP(prog(['Only', 'current']), [addRoot('x', 'X')], ''), say('Checked.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 2 && h.view.chatChain === null); assert.equal(flowOf(h)?.hidden ?? true, true, 'one step: not shown');
+  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open(); chainReplies(h, sayP(prog(['A', 'current'], ['B', 'todo']), [addRoot('x', 'X')], ''), say('Checked.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 2 && h.view.chatChain === null); assert.equal(flowOf(h).hidden, false); h.view.setChatAutoApply(false); chat.refreshAutoApply(); assert.equal(flowOf(h).hidden, true, 'switch turned off: hidden'); h.view.setChatAutoApply(true); chat.refreshAutoApply(); chat.reset(); assert.equal(flowOf(h).hidden, true, 'reset clears it');
 });
 test('P2 progress: the prompt asks for steps on the first round of a multi-step instruction and statuses only afterwards, in both languages', () => {
   const { MAP_CHAT_PROMPT_EN, MAP_CHAT_PROMPT_ZH } = { MAP_CHAT_PROMPT_EN: fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.en.md'), 'utf8'), MAP_CHAT_PROMPT_ZH: fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.zh.md'), 'utf8') };

@@ -5,6 +5,7 @@ import type { HypothesisLeaning, HypothesisStrength, TopicKind } from "../note-v
 import type { TopicRelationKind } from "../map-model";
 import type { TopicColor, TopicStyle } from "../topic-colors";
 import type { TopicMarker } from "../topic-markers";
+import type { MapChatProgress } from "./map-chat-progress";
 
 /**
  * Builds what the model sees in a map chat turn. Pure: the caller reads the map, the selection and the Markdown text; this
@@ -233,6 +234,10 @@ export interface MapChatContinuationInput {
   lastResults: { text: string; status: "done" | "skipped" | "failed" }[];
   /** The research and expand work the chain waited for: which finished, failed or were stopped, and why. */
   research: { id?: string; title: string; status: "succeeded" | "failed" | "stopped"; error?: string }[];
+  /** The whole-flow steps so far (names and statuses), so the model can send them back with the statuses moved on. */
+  progress?: MapChatProgress;
+  /** This round checks whether the work is really done (the chain's `checkingDone`): sent with {@link MAP_CHAT_CHECK_DONE_NOTE}. */
+  checkDone?: boolean;
 }
 
 export interface MapChatContextInput {
@@ -932,6 +937,10 @@ export function pendingResearchCount(context: Pick<MapChatContext, "research">):
   return (context.research?.deferred ?? []).filter(note => !note.oversize && !note.sentBefore).length;
 }
 
+/** The fixed note of a check round (`continuation.checkDone`). */
+export const MAP_CHAT_CHECK_DONE_NOTE =
+  "checkDone: your last reply left remaining empty, but the progress steps are not all done, or that reply was resent with fewer actions than first written. Compare the progress steps, the files and the map with the user's message. If work is left, do the next part now and fill remaining with what is still to do after it. If everything is really done, return no actions, remaining empty and every progress step done.";
+
 /** `continuation` and its fixed note, as put in the context JSON. */
 function continuationFields(input: MapChatContinuationInput): Record<string, unknown> {
   const lines = input.lastResults.slice(0, MAP_CHAT_CONTINUATION_LINES);
@@ -948,8 +957,13 @@ function continuationFields(input: MapChatContinuationInput): Record<string, unk
         title: clip(item.title, TITLE_LIMIT),
         status: item.status,
         ...(item.error ? { error: clip(item.error, ERROR_LIMIT) } : {})
-      }))
+      })),
+      ...(input.progress
+        ? { progress: { steps: input.progress.steps.map(step => ({ name: step.name, status: step.status })) } }
+        : {}),
+      ...(input.checkDone ? { checkDone: true } : {})
     },
-    continuationNote: MAP_CHAT_CONTINUATION_NOTE
+    continuationNote: MAP_CHAT_CONTINUATION_NOTE,
+    ...(input.checkDone ? { checkDoneNote: MAP_CHAT_CHECK_DONE_NOTE } : {})
   };
 }

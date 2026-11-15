@@ -314,6 +314,34 @@ test('Claude stream-json: answer text before the tool call, a rejected call (ret
   assert.equal(m.textBeforeTool, true); assert.ok(m.textBeforeToolChars > 300); assert.equal(m.structuredCalls, 2); assert.equal(m.enforceRetry, true); assert.ok(m.firstTextAt);
 });
 
+test('Claude stream-json: every StructuredOutput attempt is recorded with its outcome, size and action count, never its content', async () => {
+  const h = streamHarness();
+  const body = n => JSON.stringify({ reply: 'secret reply text', actions: Array.from({ length: n }, () => ({ kind: 'create_md_file', content: 'secret chapter' })), remaining: '' });
+  const call = (id, n) => { const text = body(n); return [h.ev({ type: 'message_start' }), h.tool(id, 'StructuredOutput'), h.json(0, text.slice(0, 20)), h.json(0, text.slice(20)), h.stop(0), h.assistantTool(id, 'StructuredOutput', JSON.parse(text))]; };
+  const why = 'Output does not match required schema: /actions/3 must have required property \'note\'. ' + 'x'.repeat(400);
+  const out = await h.run([
+    h.sys, ...call('so1', 6), h.toolResult('so1', { is_error: true, content: [{ type: 'text', text: why }] }),
+    { type: 'system', subtype: 'api_retry', attempt: 1, max_retries: 10, retry_delay_ms: 500, error_status: 529, error: 'overloaded' },
+    // A call cut off by a retried stream: no tool_result, a new call replaces it.
+    ...call('so2', 4).slice(0, 3),
+    { type: 'system', subtype: 'model_fallback', trigger: 'overloaded', original_model: 'sonnet', fallback_model: 'haiku', content: 'x' },
+    ...call('so3', 1), h.toolResult('so3', { content: 'Structured output provided successfully' }), h.result()
+  ]);
+  const m = out.milestones[0];
+  assert.equal(m.structuredCalls, 3);
+  assert.deepEqual(m.structuredAttempts.map(a => [a.outcome, a.actions]), [['rejected', 6], ['replaced', null], ['accepted', 1]]);
+  assert.equal(m.structuredAttempts[0].chars, body(6).length);
+  assert.ok(m.structuredAttempts[0].error.startsWith('Output does not match required schema: /actions/3'));
+  assert.ok(m.structuredAttempts[0].error.length <= 200, 'the reason is clipped');
+  assert.equal(m.structuredAttempts[1].error, undefined);
+  assert.deepEqual(m.apiRetries, [529]);
+  assert.deepEqual(m.modelFallbacks, ['overloaded']);
+  assert.doesNotMatch(JSON.stringify(m), /secret/, 'no reply or file content is kept');
+  const plainCall = await h.run([h.sys, ...h.structuredCall('so1'), h.toolResult('so1'), h.result()]);
+  const one = plainCall.milestones[0];
+  assert.deepEqual(one.structuredAttempts.map(a => a.outcome), ['accepted']); assert.equal(one.apiRetries, undefined); assert.equal(one.modelFallbacks, undefined);
+});
+
 test('Claude stream-json: the raw StructuredOutput JSON accumulates, resets for a new call and clears when the CLI rejects one', async () => {
   const h = streamHarness();
   const call = id => [h.ev({ type: 'message_start' }), h.tool(id, 'StructuredOutput'), h.json(0, '{"items":[{"id":"c1","tier":"core"},'), h.json(0, '{"id":"c2","tier":"side"}]}'), h.stop(0), h.assistantTool(id, 'StructuredOutput', h.output)];

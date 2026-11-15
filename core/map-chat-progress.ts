@@ -60,3 +60,7 @@ export function mergeProgress(
   }));
   return { steps, current: currentOf(steps) };
 }
+
+/** True when some step is not done yet (todo or current). */
+export const hasOpenSteps = (progress: MapChatProgress | null | undefined): boolean =>
+  !!progress?.steps.some(step => step.status !== "done");

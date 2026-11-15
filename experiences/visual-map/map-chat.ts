@@ -623,6 +623,12 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private autoApplyEl!: HTMLElement;
   private autoApplyButtons: { off: HTMLButtonElement; on: HTMLButtonElement } | null = null;
   private autoWarnEl!: HTMLElement;
+  /** The one-line warning beside the switch ("Edits notes directly" and Details) and whether its full text is open. */
+  private autoNoteEl: HTMLElement | null = null;
+  private autoMoreEl: HTMLButtonElement | null = null;
+  private autoWarnOpen = false;
+  /** Whether the whole-flow block shows its step list (closed by default, closed again by a new conversation). */
+  private flowOpen = false;
   /** The whole-flow block: the steps of the instruction and where it stands (in memory only). */
   private flowEl!: HTMLElement;
   private flow: MapChatFlow | null = null;
@@ -2653,6 +2659,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   /** Back to off when the conversation is replaced (reset, restore): the host is told only when it was on. */
   private switchAutoApplyOff(): void {
     this.flow = null;
+    this.flowOpen = false;
+    this.autoWarnOpen = false;
     if (this.host.autoApply?.()) this.host.setAutoApply?.(false);
     this.renderAutoApply();
   }
@@ -2686,6 +2694,17 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         return button;
       };
       this.autoApplyButtons = { off: make(false), on: make(true) };
+      this.autoNoteEl = this.autoApplyEl.createSpan({ cls: "vam-map-chat-auto-apply-note" });
+      this.autoNoteEl.createSpan({ text: `⚠ ${t("ui.map_chat_auto_apply_note")}` });
+      this.autoMoreEl = this.autoNoteEl.createEl("button", {
+        cls: "vam-map-chat-auto-apply-more",
+        attr: { type: "button", "aria-expanded": "false", "aria-controls": `${this.id}-auto-warning` }
+      });
+      this.autoMoreEl.addEventListener("click", () => {
+        this.autoWarnOpen = !this.autoWarnOpen;
+        this.renderAutoApply();
+      });
+      this.autoWarnEl.id = `${this.id}-auto-warning`;
       this.autoWarnEl.setText(t("ui.map_chat_auto_apply_warning"));
     }
     const on = !!this.host.autoApply?.();
@@ -2696,12 +2715,19 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       button.setAttr("aria-pressed", String(pressed));
       button.toggleClass("is-active", pressed);
     }
-    this.autoWarnEl.hidden = !on;
+    if (!on) this.autoWarnOpen = false;
+    if (this.autoNoteEl) this.autoNoteEl.hidden = !on;
+    if (this.autoMoreEl) {
+      this.autoMoreEl.hidden = !on;
+      this.autoMoreEl.setText(t(this.autoWarnOpen ? "ui.map_chat_auto_apply_less" : "ui.map_chat_auto_apply_more"));
+      this.autoMoreEl.setAttr("aria-expanded", String(this.autoWarnOpen));
+    }
+    this.autoWarnEl.hidden = !on || !this.autoWarnOpen;
     this.renderFlow();
   }
   /**
-   * The whole-flow block: header (steps done or the step in work, the round, a thin bar like the research bar, the AI calls), then
-   * one line per step. Names are plain text. Shown only while the switch is on and the instruction has two steps or more.
+   * The whole-flow block: one line (steps done or the step in work with its name, the round, a thin bar like the research bar)
+   * that opens the AI calls and one line per step. Names are plain text. Shown only while the switch is on and the instruction has two steps or more.
    */
   private renderFlow(): void {
     if (!this.built) return;
@@ -2712,18 +2738,31 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (!flow || !shown) return;
     const total = flow.steps.length;
     const done = flow.steps.filter(step => step.status === "done").length;
-    const head = this.flowEl.createDiv({ cls: "vam-map-chat-flow-head" });
+    const currentIndex = Math.max(
+      0,
+      flow.steps.findIndex(step => step.status !== "done")
+    );
+    // One line by default: a button with the step in work (or done), the round and the bar; it opens the AI calls and the steps.
+    const head = this.flowEl.createEl("button", {
+      cls: "vam-map-chat-flow-head",
+      attr: { type: "button", "aria-expanded": String(this.flowOpen), "aria-controls": `${this.id}-flow-steps` }
+    });
+    head.addEventListener("click", () => {
+      this.flowOpen = !this.flowOpen;
+      this.renderFlow();
+    });
+    head.createSpan({
+      cls: "vam-map-chat-flow-caret",
+      text: this.flowOpen ? "▾" : "▸",
+      attr: { "aria-hidden": "true" }
+    });
     head.createEl("b", { text: t("ui.map_chat_flow_label") });
     head.createSpan({
+      cls: "vam-map-chat-flow-now",
       text:
         done === total
           ? t("ui.map_chat_flow_done_0_1_2", done, total, flow.round)
-          : t(
-              "ui.map_chat_flow_step_0_1_2",
-              Math.max(1, flow.steps.findIndex(step => step.status !== "done") + 1),
-              total,
-              flow.round
-            )
+          : t("ui.map_chat_flow_step_0_1_2_3", currentIndex + 1, total, flow.round, flow.steps[currentIndex].name)
     });
     const track = head.createSpan({
       cls: "vam-research-progress-track",
@@ -2736,8 +2775,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       }
     });
     track.createSpan({ cls: "vam-research-progress-fill" }).style.width = `${(done / total) * 100}%`;
-    head.createSpan({ text: t("ui.map_chat_flow_calls_0_1", flow.calls, flow.maxCalls) });
-    const list = this.flowEl.createEl("ul", { cls: "vam-map-chat-flow-steps" });
+    const calls = this.flowEl.createDiv({ text: t("ui.map_chat_flow_calls_0_1", flow.calls, flow.maxCalls) });
+    calls.hidden = !this.flowOpen;
+    const list = this.flowEl.createEl("ul", { cls: "vam-map-chat-flow-steps", attr: { id: `${this.id}-flow-steps` } });
+    list.hidden = !this.flowOpen;
     flow.steps.forEach((step, index) => {
       const item = list.createEl("li", { cls: `vam-map-chat-flow-step is-${step.status}` });
       item.createSpan({

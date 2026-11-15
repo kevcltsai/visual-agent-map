@@ -10,9 +10,13 @@ type Block = {
   input?: unknown;
   tool_use_id?: unknown;
   is_error?: unknown;
+  content?: unknown;
 };
 export interface ClaudeRecord {
   type?: unknown;
+  subtype?: unknown;
+  error_status?: unknown;
+  trigger?: unknown;
   parent_tool_use_id?: unknown;
   usage?: {
     input_tokens?: unknown;
@@ -135,6 +139,25 @@ export interface ClaudeStreamHooks {
 
 const LIST_LIMIT = 20;
 const QUERY_LIMIT = 200;
+/** Characters kept of the CLI's reason for rejecting a StructuredOutput call (a schema message, not the reply). */
+const REJECT_REASON_LIMIT = 200;
+type StructuredAttempt = NonNullable<AiMilestones["structuredAttempts"]>[number];
+
+/** The text of a tool_result's content (a string or text blocks). */
+function resultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map(item =>
+      item && typeof item === "object" && typeof (item as Block).text === "string" ? (item as Block).text : ""
+    )
+    .join(" ");
+}
+/** The number of actions in a StructuredOutput input, when it has an `actions` list. */
+const actionCount = (input: unknown): number | null =>
+  input && typeof input === "object" && Array.isArray((input as { actions?: unknown }).actions)
+    ? (input as { actions: unknown[] }).actions.length
+    : null;
 const MODEL_RECORDS = new Set(["stream_event", "assistant", "user", "result"]);
 
 /**
@@ -151,6 +174,8 @@ export class ClaudeStreamObserver {
   private stage: ResearchStageName | "" = "";
   private structuredId = "";
   private structuredJson = "";
+  /** One entry per StructuredOutput call, by tool id: what became of it and how big it was (never its content). */
+  private readonly attempts = new Map<string, StructuredAttempt>();
   private stopped = false;
 
   constructor(
@@ -183,7 +208,12 @@ export class ClaudeStreamObserver {
 
   /** The records already read stay; the milestones of the finished call. */
   milestones(): AiMilestones {
-    return { ...this.milestoneData, ...this.facts.milestones() };
+    const attempts = [...this.attempts.values()].slice(0, LIST_LIMIT).map(attempt => ({ ...attempt }));
+    return {
+      ...this.milestoneData,
+      ...(attempts.length ? { structuredAttempts: attempts } : {}),
+      ...this.facts.milestones()
+    };
   }
 
   read(value: unknown): void {
@@ -196,17 +226,44 @@ export class ClaudeStreamObserver {
       this.milestoneData.firstEventAt = this.now();
       this.call(() => this.hooks.onFirstEvent?.());
     }
-    if (record.type === "stream_event") this.event(record.event);
+    if (record.type === "system") this.system(record);
+    else if (record.type === "stream_event") this.event(record.event);
     else if (record.type === "assistant") {
       for (const block of record.message?.content ?? [])
         if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
           this.toolStart(block.id, block.name);
           this.toolInput(block.id, block.input);
+          if (block.name === "StructuredOutput") this.structuredInput(block.id, block.input);
         }
     } else if (record.type === "user") {
       for (const block of record.message?.content ?? [])
         if (block.type === "tool_result" && typeof block.tool_use_id === "string")
-          this.toolResult(block.tool_use_id, block.is_error === true);
+          this.toolResult(block.tool_use_id, block.is_error === true, block.content);
+    }
+  }
+
+  /** The CLI's own retries: a request retried after an API error, a turn switched to the fallback model. */
+  private system(record: ClaudeRecord): void {
+    if (record.subtype === "api_retry") {
+      const list = (this.milestoneData.apiRetries ??= []);
+      if (list.length < LIST_LIMIT) list.push(typeof record.error_status === "number" ? record.error_status : null);
+    } else if (record.subtype === "model_fallback") {
+      const list = (this.milestoneData.modelFallbacks ??= []);
+      if (list.length < LIST_LIMIT) list.push(typeof record.trigger === "string" ? record.trigger.slice(0, 40) : "");
+    }
+  }
+
+  /** The complete input of a StructuredOutput call: its action count, and its size when no stream events gave one. */
+  private structuredInput(id: string, input: unknown): void {
+    const attempt = this.attempts.get(id);
+    if (!attempt) return;
+    attempt.actions = actionCount(input);
+    if (!attempt.chars) {
+      try {
+        attempt.chars = JSON.stringify(input ?? null).length;
+      } catch {
+        /* Size is best effort. */
+      }
     }
   }
 
@@ -235,6 +292,8 @@ export class ClaudeStreamObserver {
         if (block.id !== this.structuredId) return;
         this.preview.append(event.delta.partial_json);
         this.structuredJson += event.delta.partial_json;
+        const attempt = this.attempts.get(block.id);
+        if (attempt) attempt.chars = this.structuredJson.length;
         const json = this.structuredJson;
         this.call(() => this.hooks.onStructuredJson?.(json));
         const fields = this.preview.snapshot();
@@ -268,7 +327,10 @@ export class ClaudeStreamObserver {
     } else if (name === "StructuredOutput") {
       this.tools.set(id, { name });
       this.facts.structuredStart();
-      // A new call replaces the earlier one: only the last is ever shown.
+      // A new call replaces the earlier one: only the last is ever shown. One the CLI never answered was cut off (a retried stream).
+      const earlier = this.attempts.get(this.structuredId);
+      if (earlier && earlier.outcome === "pending") earlier.outcome = "replaced";
+      this.attempts.set(id, { outcome: "pending", chars: 0, actions: null });
       this.structuredId = id;
       this.milestoneData.structuredCalls = (this.milestoneData.structuredCalls ?? 0) + 1;
       this.milestoneData.structuredStartAt ??= at;
@@ -292,9 +354,15 @@ export class ClaudeStreamObserver {
     if (this.stage === "searching") this.call(() => this.hooks.onStage?.("searching", text));
   }
 
-  private toolResult(id: string, failed: boolean): void {
+  private toolResult(id: string, failed: boolean, content?: unknown): void {
     const tool = this.tools.get(id);
     if (!tool) return;
+    const attempt = this.attempts.get(id);
+    if (attempt && attempt.outcome === "pending") {
+      attempt.outcome = failed ? "rejected" : "accepted";
+      const reason = failed ? resultText(content).replace(/\s+/g, " ").trim().slice(0, REJECT_REASON_LIMIT) : "";
+      if (reason) attempt.error = reason;
+    }
     const entry = tool.search === undefined ? undefined : this.milestoneData.searches?.[tool.search];
     if (entry) {
       entry.completedAt = this.now();

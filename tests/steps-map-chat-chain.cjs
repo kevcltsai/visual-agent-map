@@ -530,3 +530,39 @@ test('syncAutoApply: the toggle of the moment decides the segment limits of a ru
   assert.equal(off.autoApply, undefined); assert.equal(off.maxRounds, 8);
   const same = chain.startChain(); assert.equal(chain.syncAutoApply(same, false), same); const auto = chain.startAutoChain(); assert.equal(chain.syncAutoApply(auto, true), auto);
 });
+test('auto chain check round: an empty remaining while the flow still has steps to do is not done; a check round that writes nothing is', () => {
+  const open = progressApi.normalizeProgress({ steps: steps(['Ch 1-3', 'done'], ['Ch 4-6', 'current'], ['Ch 7-9', 'todo']) });
+  const allDone = progressApi.normalizeProgress({ steps: steps(['Ch 1-3', 'done'], ['Ch 4-6', 'done'], ['Ch 7-9', 'done']) });
+  const auto = (fields = {}) => ({ ...chain.startAutoChain(), round: 11, ...fields });
+  // The owner's turn 11: one chapter written, remaining "", steps still open -> one more round that checks the steps.
+  const check = chain.finishRound(auto({ progress: open }), roundEnd({ remaining: '' }));
+  assert.equal(check.decision.kind, 'next', JSON.stringify(check.decision));
+  assert.equal(check.state.checkingDone, true);
+  // The check round writes nothing more and leaves nothing: done.
+  end(chain.finishRound({ ...check.state, phase: 'round' }, roundEnd({ remaining: '', actions: text })), 'done', '');
+  // The check round finds work and does it: it goes on checking until a round writes nothing.
+  const more = chain.finishRound({ ...check.state, phase: 'round' }, roundEnd({ remaining: '' }));
+  assert.equal(more.decision.kind, 'next'); assert.equal(more.state.checkingDone, true);
+  // A check round that fills remaining again is an ordinary round.
+  const back = chain.finishRound({ ...check.state, phase: 'round' }, roundEnd());
+  assert.equal(back.decision.kind, 'next'); assert.equal(back.state.checkingDone, false);
+  // A round that wrote nothing and said nothing left, steps open: it still gets its one check round (not no_progress).
+  assert.equal(chain.finishRound(auto({ progress: open }), roundEnd({ remaining: '', actions: text })).decision.kind, 'next');
+  // Research started by a round that leaves "" with open steps is waited for, then checked.
+  assert.deepEqual(plain(chain.finishRound(auto({ progress: open }), roundEnd({ remaining: '', started: started(2) })).decision), { kind: 'wait', waitFor: ['research'] });
+  // Controls: every step done, no progress at all, or auto-apply off: "" stays done at once.
+  end(chain.finishRound(auto({ progress: open }), roundEnd({ remaining: '', progress: allDone })), 'done', '');
+  end(chain.finishRound(auto(), roundEnd({ remaining: '' })), 'done', '');
+  end(chain.finishRound(at(2, { progress: open }), roundEnd({ remaining: '' })), 'done', '');
+  // The limits still end it.
+  end(chain.finishRound(auto({ progress: open, round: 60 }), roundEnd({ remaining: '' })), 'max_rounds');
+  end(chain.finishRound(auto({ progress: open, calls: 299 }), roundEnd({ remaining: '', calls: 1 })), 'call_limit');
+});
+test('continuation: a check round says so with a fixed note; other rounds carry neither', () => {
+  const base = { round: 12, maxRounds: 60, remaining: '', lastResults: [], research: [] };
+  const sent = json(context({ continuation: { ...base, checkDone: true } }));
+  assert.equal(sent.continuation.checkDone, true);
+  assert.match(sent.checkDoneNote, /progress/); assert.match(sent.checkDoneNote, /remaining/);
+  const plainRound = json(context({ continuation: base }));
+  assert.equal('checkDone' in plainRound.continuation, false); assert.equal('checkDoneNote' in plainRound, false);
+});

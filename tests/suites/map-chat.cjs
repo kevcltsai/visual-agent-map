@@ -9429,6 +9429,19 @@ integrationTest('P2 (l) progress: set in round 1, statuses updated later; header
   const bar = find(flow, i => i.attrs?.role === 'progressbar'); assert.deepEqual([bar.attrs['aria-valuenow'], bar.attrs['aria-valuemax'], bar.attrs['aria-valuemin']], ['3', '3', '0']); assert.equal(bar.attrs['aria-valuetext'], '3 of 3 steps done'); assert.ok(hasClass(bar, 'vam-research-progress-track'));
   assert.ok(find(bar, i => hasClass(i, 'vam-research-progress-fill'))); const items = findAll(flow, i => i.tag === 'li'); eq(items.map(i => visibleText(i)), ['✓1. Outline', '✓2. Write', '✓3. Check']);
 });
+integrationTest('e2e: a chain that ends done with nothing left shows every step done even when the last reply did not say so', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open();
+  chainReplies(h, sayP(prog(['Write', 'current'], ['Add', 'todo']), [addRoot('x', 'X')]), sayP(undefined, [addRoot('y', 'Y')], ''));
+  h.type('two steps'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 2);
+  const flow = flowOf(h); assert.equal(flow.hidden, false); assert.match(visibleText(flow), /2 of 2 steps done · 2 rounds in all/);
+  eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)), ['✓1. Write', '✓2. Add']);
+});
+integrationTest('e2e: a chain that stops before done keeps the steps as the AI reported them', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open(); const runs = researchStub(h);
+  chainReplies(h, sayP(prog(['Write', 'current'], ['Add', 'todo']), [addRoot('x', 'X'), researchAct({ nodeIds: ['new:x'] })]));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain?.state.phase === 'waiting'); h.view.stopMapChat(); await until(() => h.view.chatChain === null);
+  eq(findAll(flowOf(h), i => i.tag === 'li').map(i => visibleText(i)), ['●1. Write', '○2. Add']); void runs;
+});
 integrationTest('P2 (l) progress: a mid-way state reads "Step N of M · round X"; ● for the current step, ○ for the rest', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const runs = researchStub(h);
   chainReplies(h, sayP(prog(['Outline', 'done'], ['Write', 'current'], ['Check', 'todo']), [addRoot('x', 'X'), researchAct({ nodeIds: ['new:x'] })]));
@@ -9440,7 +9453,8 @@ integrationTest('P2 (l) progress: another step count or names, a status that goe
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open();
   chainReplies(h, sayP(prog(['Outline', 'done'], ['<b>Write</b>', 'current'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(prog(['Outline', 'done'], ['Write', 'current']), [addRoot('y', 'Y')]), sayP(prog(['Outline', 'todo'], ['<b>Write</b>', 'todo'], ['Check', 'todo']), [addRoot('z', 'Z')]), sayP({ steps: 'bad' }, [addRoot('w', 'W')]), sayP(undefined, [addRoot('v', 'V')], ''));
   h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 5);
-  const flow = flowOf(h); eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)), ['✓1. Outline', '●2. <b>Write</b>', '○3. Check']); assert.equal(find(flow, i => i.tag === 'b' && /Write/.test(i.text ?? '')), undefined, 'the name is text, not markup');
+  // The chain ended done with nothing left, so every step reads done; the odd progress of rounds 2–5 changed no names or count.
+  const flow = flowOf(h); eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)), ['✓1. Outline', '✓2. <b>Write</b>', '✓3. Check']); assert.equal(find(flow, i => i.tag === 'b' && /Write/.test(i.text ?? '')), undefined, 'the name is text, not markup');
   assert.equal(h.control.requests.length, 5, 'no round failed over the odd progress');
 });
 integrationTest('P2 (l) progress: hidden with the switch off, with one step only, and after a new conversation; nothing extra for a chain without it', async () => {

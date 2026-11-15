@@ -372,7 +372,7 @@ import { resolveBlockFolder } from "../../core/blocks/block-files";
 import { CANONICAL_LANGUAGES } from "../../ai/note-style-file";
 import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNote } from "../../ai/note-writeback";
-import { stopLabelKey, type WritebackHooks } from "./topic-run";
+import { stopLabelKey, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
 import {
   INTEGRATION_DEPTHS,
   bottomUpOrder,
@@ -1648,26 +1648,7 @@ export class VisualAgentMapView extends ItemView {
     deleted: boolean;
     deleteAction?: Action;
   } | null = null;
-  private integrationTask: {
-    title: string;
-    goal: string;
-    rules: string;
-    sources: MapNode[];
-    options: TaskOptions;
-    mapPath: string;
-    mapId: string;
-    sourceContent: string;
-    controller: AbortController;
-    /** `applying`: the AI result passed its fences and is being written (no Stop; nothing to review). */
-    state: "running" | "directions" | "applying" | "failed" | "cancelled";
-    /** The step this run is on: the AI's suggested directions, or the draft itself. */
-    step: "directions" | "draft";
-    directions: Suggestion[];
-    progress: string;
-    /** The model (and reasoning) this run uses, resolved when it started; a retry asks its usage notice for the same one. */
-    model: string;
-    reasoning: ModelChoice["reasoning"];
-  } | null = null;
+  private integrationTask: SelectionSynthesisTask | null = null;
   /** A multi-select synthesis step is starting (before its task exists), so a second request is refused. */
   private selectionStarting = false;
   /** A merge dialog is open or its write is queued; a second Merge press (or the Enter that confirmed) is ignored. */
@@ -1733,20 +1714,6 @@ export class VisualAgentMapView extends ItemView {
   } | null = null;
   /** The summaries of each parent's latest quick outline (by heading path below its root), used when the reviewed list is created. */
   private quickOutlineSummaries = new Map<string, OutlineSummaryBank>();
-  private synthesisTasks = new Map<
-    string,
-    {
-      mapPath: string;
-      mapId: string;
-      state: "running" | "directions" | "failed" | "cancelled";
-      step: "directions" | "draft";
-      controller: AbortController;
-      progress: string;
-      options: TaskOptions;
-      directions: Suggestion[];
-      direction: string;
-    }
-  >();
   private viewportEl: HTMLElement | null = null;
   private stageEl: HTMLElement | null = null;
   private edgesEl: SVGSVGElement | null = null;
@@ -2366,7 +2333,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.chatController || this.chatApplying || this.chatImageFinder.isRunning()) return true;
     // The chat's preparing stage (before its controller exists) is stopped by a map change too.
     if (this.chat?.isBusy || this.chatPrepAbandon) return true;
-    for (const task of this.synthesisTasks.values()) if (task.state === "running") return true;
+    for (const task of this.plugin.topicRuns.syntheses(this).topics.values()) if (task.state === "running") return true;
     if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
     if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
     if (this.startedRelevance && this.path) {
@@ -3363,8 +3330,7 @@ export class VisualAgentMapView extends ItemView {
     // An open goal edit pre-started the CLI for a grade that will never be sent: it is dropped, nothing is saved.
     this.dropGoalEdit();
     this.abortRelevanceGrade();
-    for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
-    this.synthesisTasks.clear();
+    this.plugin.topicRuns.dropSyntheses(this);
     for (const controller of this.startingTasks.values()) controller.abort();
     this.startingTasks.clear();
     this.startingExpand.clear();
@@ -13992,7 +13958,7 @@ export class VisualAgentMapView extends ItemView {
     }
     // One Stop for every AI run on this card: a dialog's run still starting, guided expand, and research. A batch and
     // a synthesis show their own Stop; a child researched by a running batch is stopped through its batch.
-    const ownSynthesis = this.synthesisTasks.get(node.path);
+    const ownSynthesis = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
     const parentNode = node.parentId ? this.mapNodeById(node.parentId) : undefined;
     const batchChild = !!parentNode && !!this.plugin.expansionCoordinator?.isRunning(parentNode.path);
     const stoppable =
@@ -14050,11 +14016,11 @@ export class VisualAgentMapView extends ItemView {
       !merging
     )
       this.renderOtherProviderButton(header, [node]);
-    const synthesis = this.synthesisTasks.get(node.path);
+    const synthesis = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
     if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
-        this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
+        this.button(header, t("ui.stop_research"), () => this.plugin.topicRuns.stopSynthesis(this, node.path));
       } else if (synthesis.state !== "directions") {
         header.createSpan({
           cls: "vam-status vam-status-error",
@@ -15900,7 +15866,7 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.topicRuns.isBusy(path) ||
       this.plugin.quickExpandPending.has(path) ||
       this.startingTasks.has(path) ||
-      this.synthesisTasks.get(path)?.state === "running"
+      this.plugin.topicRuns.syntheses(this).topics.get(path)?.state === "running"
     );
   }
   /**
@@ -18403,8 +18369,7 @@ export class VisualAgentMapView extends ItemView {
     this.plugin.topicRuns.taskController(path)?.abort();
     this.plugin.topicRuns.stop(path);
     this.plugin.abortChartJobs(path);
-    const synthesis = this.synthesisTasks.get(path);
-    if (synthesis?.state === "running") synthesis.controller.abort();
+    this.plugin.topicRuns.stopSynthesis(this, path);
   }
   /**
    * Locks or unlocks the topics for AI (`ai-locked`) in one undoable step: the notes and Map.md (viewport only).
@@ -20277,154 +20242,36 @@ export class VisualAgentMapView extends ItemView {
     accepted: () => void,
     observer?: SynthesisObserver & { onWritten?: () => void }
   ): Promise<void> {
-    const path = node.path;
-    const existing = this.synthesisTasks.get(path);
-    const step = direction === null ? "directions" : "draft";
     if (!this.map) {
       failed(t("ui.no_mind_map_is_available"));
       return;
     }
-    if (this.plugin.topicRuns.isBusy(path) || this.plugin.topicRuns.hasTask(path) || existing?.state === "running") {
-      failed(t("ui.ai_running_ai"));
-      return;
-    }
-    if (step === "directions" && existing?.state === "directions") {
-      failed(t("ui.synthesis_pending_review_first"));
-      return;
-    }
-    if (step === "draft") {
-      // A draft follows chosen directions, or starts fresh when the suggestions were skipped; it never overwrites
-      // a draft that is still waiting for review.
-      if (existing && (existing.mapPath !== this.path || existing.mapId !== this.map.id)) {
-        failed(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        return;
-      }
-    }
-    const controller = new AbortController();
-    const modalSignal = options.signal;
-    const abortBeforeAcceptance = (): void => controller.abort();
-    if (modalSignal?.aborted) controller.abort();
-    else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    // `steer` belongs to this run only: a task kept for the next step must not carry it (and the next step brings its own).
-    const stored = { ...options, signal: undefined, onProgress: undefined, steer: undefined };
-    const task: NonNullable<ReturnType<VisualAgentMapView["synthesisTasks"]["get"]>> =
-      step === "draft" &&
-      existing?.directions.length &&
-      (existing.state === "directions" || options.continuesDirections)
-        ? existing
-        : {
-            mapPath: this.path,
-            mapId: this.map.id,
-            state: "running",
-            step,
-            controller,
-            progress: "",
-            options: stored,
-            directions: [],
-            direction: ""
-          };
-    task.state = "running";
-    task.step = step;
-    task.controller = controller;
-    task.progress = "";
-    task.direction = direction ?? "";
-    this.synthesisTasks.set(path, task);
-    this.plugin.topicRuns.registerTask(path, controller);
-    const runOptions: TaskOptions = {
-      ...(step === "draft"
-        ? { ...task.options, requirements: options.requirements || task.options.requirements }
-        : options),
-      // The model of this step is the dialog's choice now, not the one the first step was started with.
-      runOnce: options.runOnce,
-      steer: options.steer,
-      signal: controller.signal,
-      onProgress: message => {
-        task.progress = message;
-        options.onProgress?.(message);
-        if (this.synthesisTasks.get(path) === task) this.render();
-      }
-    };
-    let launched = false;
-    let outcome: "found" | "written" | "failed" | null = null;
-    const markAccepted = (): void => {
-      if (launched || controller.signal.aborted) return;
-      launched = true;
-      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
-      observer?.accepted?.(() => controller.abort());
-      accepted();
-    };
-    const fail = (message: string): void => {
-      if (outcome) return;
-      outcome = "failed";
-      if (this.synthesisTasks.get(path) === task) {
-        if (controller.signal.aborted && observer?.isOpen()) {
-          // Stopped from the open dialog: nothing was produced, so leave no badge behind. A draft that was stopped
-          // returns to its directions; a directions request that was stopped just goes away.
-          if (step === "draft" && task.directions.length) task.state = "directions";
-          else this.synthesisTasks.delete(path);
-        } else if (!launched && step === "draft" && task.directions.length) task.state = "directions";
-        else {
-          task.state = controller.signal.aborted ? "cancelled" : "failed";
-          task.progress = message;
-        }
-      }
-      failed(message);
-    };
-    try {
-      if (step === "directions")
-        await this.proposeIntegrationDirections(
-          node,
-          runOptions,
-          items => {
-            // A result that arrives after Stop or after the task was replaced is dropped.
-            if (controller.signal.aborted || this.synthesisTasks.get(path) !== task) return;
-            outcome = "found";
-            task.state = "directions";
-            task.directions = items;
-            // Shown in the dialog that started the step.
-            if (observer?.isOpen() && observer.directions) observer.directions(items);
-          },
-          fail,
-          markAccepted
-        );
-      else
-        await this.integrateChildren(
-          node,
-          runOptions,
-          direction ?? "",
-          async (_result, save, summary, detail) => {
-            // Stop, close or a replaced task before the write: nothing is written.
-            if (controller.signal.aborted || this.synthesisTasks.get(path) !== task) return;
-            const previous = this.history.undoEntry;
-            await save(summary, detail);
-            outcome = "written";
-            if (this.synthesisTasks.get(path) === task) this.synthesisTasks.delete(path);
-            this.undoNotice(t("ui.synthesis_written_0", this.notes.get(node.id)?.title ?? ""), previous);
-            if (observer?.isOpen()) observer.written?.();
-            observer?.onWritten?.();
-          },
-          fail,
-          markAccepted
-        );
-      if (!outcome) fail(t("ui.ai_task_cancelled"));
-    } catch (error) {
-      fail(error instanceof Error ? error.message : String(error));
-    } finally {
-      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
-      this.plugin.topicRuns.releaseTask(path, controller);
-      this.render();
-    }
+    await this.plugin.topicRuns.startTopicSynthesis(this, node.path, {
+      mapPath: this.path,
+      mapId: this.map.id,
+      options,
+      direction,
+      failed,
+      accepted,
+      observer,
+      changed: () => this.render(),
+      directions: (runOptions, found, fail, markAccepted) =>
+        this.proposeIntegrationDirections(node, runOptions, found, fail, markAccepted),
+      draft: (runOptions, chosen, drafted, fail, markAccepted) =>
+        this.integrateChildren(node, runOptions, chosen, drafted, fail, markAccepted),
+      undoMark: () => this.history.undoEntry,
+      written: previous =>
+        this.undoNotice(t("ui.synthesis_written_0", this.notes.get(node.id)?.title ?? ""), previous as Action | undefined)
+    });
   }
   private discardSynthesis(node: MapNode): void {
     if (this.notesLoading()) return;
-    const task = this.synthesisTasks.get(node.path);
-    if (!task || task.state === "running") return;
-    this.synthesisTasks.delete(node.path);
+    if (!this.plugin.topicRuns.discardSynthesis(this, node.path)) return;
     this.render();
   }
   private retrySynthesis(node: MapNode): void {
     if (this.notesLoading()) return;
-    const task = this.synthesisTasks.get(node.path);
+    const task = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
     if (!task || (task.state !== "failed" && task.state !== "cancelled")) return;
     void this.plugin.repo.readNote(node.path, this.map ?? undefined).then(note =>
       this.plugin.confirmAiUsage(task.options.runOnce?.model || note.model, async () => {
@@ -26718,7 +26565,7 @@ export class VisualAgentMapView extends ItemView {
     if (nodes.length === 1) {
       const node = nodes[0];
       if (!map.nodes.some(item => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
-      const task = this.synthesisTasks.get(node.path);
+      const task = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
       if (
         this.plugin.topicRuns.isBusy(node.path) ||
         this.plugin.topicRuns.hasTask(node.path) ||

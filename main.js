@@ -37507,6 +37507,8 @@ var TopicRuns = class {
     /** Jobs waiting for a free slot, first in first out. */
     __publicField(this, "chartQueue", []);
     __publicField(this, "chartRunning", 0);
+    /** What each open view has in flight for synthesis: a closed view's entry goes away with the view. */
+    __publicField(this, "synthesisStates", /* @__PURE__ */ new WeakMap());
     /** Callers waiting in {@link whenIdle}; woken whenever a run or chart step ends. */
     __publicField(this, "idleWaiters", /* @__PURE__ */ new Set());
   }
@@ -38432,7 +38434,7 @@ var TopicRuns = class {
     var _a2;
     (_a2 = this.ports.activeTasks().get(path)) == null ? void 0 : _a2.abort();
   }
-  /** Registers the stop handle of a run the view owns (selection synthesis, until ticket 05). */
+  /** Registers the stop handle of a single topic's integration (startTopicSynthesis); it is released only when still the same one. */
   registerTask(path, controller) {
     this.ports.activeTasks().set(path, controller);
   }
@@ -38440,6 +38442,160 @@ var TopicRuns = class {
   releaseTask(path, controller) {
     const tasks = this.ports.activeTasks();
     if (tasks.get(path) === controller) tasks.delete(path);
+  }
+  /** The synthesis state of one view, created on the first read. The view reads it and tests may write it. */
+  syntheses(owner) {
+    let state = this.synthesisStates.get(owner);
+    if (!state) {
+      state = { selection: null, selectionStarting: false, topics: /* @__PURE__ */ new Map() };
+      this.synthesisStates.set(owner, state);
+    }
+    return state;
+  }
+  /**
+   * One step of a single topic's integration: the AI's suggested directions (`direction === null`), then the draft.
+   * The task is kept for the card until it is written or discarded; the stop handle is registered for the topic.
+   */
+  async startTopicSynthesis(owner, path, input2) {
+    const { options, direction, failed, accepted, observer } = input2;
+    const topics = this.syntheses(owner).topics;
+    const existing = topics.get(path);
+    const step = direction === null ? "directions" : "draft";
+    if (this.isBusy(path) || this.hasTask(path) || (existing == null ? void 0 : existing.state) === "running") {
+      failed(t("ui.ai_running_ai"));
+      return;
+    }
+    if (step === "directions" && (existing == null ? void 0 : existing.state) === "directions") {
+      failed(t("ui.synthesis_pending_review_first"));
+      return;
+    }
+    if (step === "draft") {
+      if (existing && (existing.mapPath !== input2.mapPath || existing.mapId !== input2.mapId)) {
+        failed(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+        return;
+      }
+    }
+    const controller = new AbortController();
+    const modalSignal = options.signal;
+    const abortBeforeAcceptance = () => controller.abort();
+    if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
+    else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    const stored = { ...options, signal: void 0, onProgress: void 0, steer: void 0 };
+    const task = step === "draft" && (existing == null ? void 0 : existing.directions.length) && (existing.state === "directions" || options.continuesDirections) ? existing : {
+      mapPath: input2.mapPath,
+      mapId: input2.mapId,
+      state: "running",
+      step,
+      controller,
+      progress: "",
+      options: stored,
+      directions: [],
+      direction: ""
+    };
+    task.state = "running";
+    task.step = step;
+    task.controller = controller;
+    task.progress = "";
+    task.direction = direction != null ? direction : "";
+    topics.set(path, task);
+    this.registerTask(path, controller);
+    const runOptions = {
+      ...step === "draft" ? { ...task.options, requirements: options.requirements || task.options.requirements } : options,
+      // The model of this step is the dialog's choice now, not the one the first step was started with.
+      runOnce: options.runOnce,
+      steer: options.steer,
+      signal: controller.signal,
+      onProgress: (message) => {
+        var _a2;
+        task.progress = message;
+        (_a2 = options.onProgress) == null ? void 0 : _a2.call(options, message);
+        if (topics.get(path) === task) input2.changed();
+      }
+    };
+    let launched = false;
+    let outcome = null;
+    const markAccepted = () => {
+      var _a2;
+      if (launched || controller.signal.aborted) return;
+      launched = true;
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      (_a2 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a2.call(observer, () => controller.abort());
+      accepted();
+    };
+    const fail3 = (message) => {
+      if (outcome) return;
+      outcome = "failed";
+      if (topics.get(path) === task) {
+        if (controller.signal.aborted && (observer == null ? void 0 : observer.isOpen())) {
+          if (step === "draft" && task.directions.length) task.state = "directions";
+          else topics.delete(path);
+        } else if (!launched && step === "draft" && task.directions.length) task.state = "directions";
+        else {
+          task.state = controller.signal.aborted ? "cancelled" : "failed";
+          task.progress = message;
+        }
+      }
+      failed(message);
+    };
+    try {
+      if (step === "directions")
+        await input2.directions(
+          runOptions,
+          (items) => {
+            if (controller.signal.aborted || topics.get(path) !== task) return;
+            outcome = "found";
+            task.state = "directions";
+            task.directions = items;
+            if ((observer == null ? void 0 : observer.isOpen()) && observer.directions) observer.directions(items);
+          },
+          fail3,
+          markAccepted
+        );
+      else
+        await input2.draft(
+          runOptions,
+          direction != null ? direction : "",
+          async (_result, save, summary, detail) => {
+            var _a2, _b2;
+            if (controller.signal.aborted || topics.get(path) !== task) return;
+            const previous = input2.undoMark();
+            await save(summary, detail);
+            outcome = "written";
+            if (topics.get(path) === task) topics.delete(path);
+            input2.written(previous);
+            if (observer == null ? void 0 : observer.isOpen()) (_a2 = observer.written) == null ? void 0 : _a2.call(observer);
+            (_b2 = observer == null ? void 0 : observer.onWritten) == null ? void 0 : _b2.call(observer);
+          },
+          fail3,
+          markAccepted
+        );
+      if (!outcome) fail3(t("ui.ai_task_cancelled"));
+    } catch (error) {
+      fail3(error instanceof Error ? error.message : String(error));
+    } finally {
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      this.releaseTask(path, controller);
+      input2.changed();
+    }
+  }
+  /** Stops the topic's running integration through its own controller (a task that is not running has nothing to stop). */
+  stopSynthesis(owner, path) {
+    const task = this.syntheses(owner).topics.get(path);
+    if ((task == null ? void 0 : task.state) === "running") task.controller.abort();
+  }
+  /** Forgets the topic's integration unless it is running; true when it was removed. */
+  discardSynthesis(owner, path) {
+    const topics = this.syntheses(owner).topics;
+    const task = topics.get(path);
+    if (!task || task.state === "running") return false;
+    topics.delete(path);
+    return true;
+  }
+  /** The view closed: its running integrations are stopped and every entry goes away. */
+  dropSyntheses(owner) {
+    const topics = this.syntheses(owner).topics;
+    for (const task of topics.values()) if (task.state === "running") task.controller.abort();
+    topics.clear();
   }
   pending(path) {
     return this.pendingSuggestions.get(path);
@@ -59727,7 +59883,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "outlineDraftTask", null);
     /** The summaries of each parent's latest quick outline (by heading path below its root), used when the reviewed list is created. */
     __publicField(this, "quickOutlineSummaries", /* @__PURE__ */ new Map());
-    __publicField(this, "synthesisTasks", /* @__PURE__ */ new Map());
     __publicField(this, "viewportEl", null);
     __publicField(this, "stageEl", null);
     __publicField(this, "edgesEl", null);
@@ -60370,7 +60525,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     var _a2, _b2, _c;
     if (this.chatController || this.chatApplying || this.chatImageFinder.isRunning()) return true;
     if (((_a2 = this.chat) == null ? void 0 : _a2.isBusy) || this.chatPrepAbandon) return true;
-    for (const task of this.synthesisTasks.values()) if (task.state === "running") return true;
+    for (const task of this.plugin.topicRuns.syntheses(this).topics.values()) if (task.state === "running") return true;
     if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
     if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
     if (this.startedRelevance && this.path) {
@@ -61314,8 +61469,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.clearExternalSources();
     this.dropGoalEdit();
     this.abortRelevanceGrade();
-    for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
-    this.synthesisTasks.clear();
+    this.plugin.topicRuns.dropSyntheses(this);
     for (const controller of this.startingTasks.values()) controller.abort();
     this.startingTasks.clear();
     this.startingExpand.clear();
@@ -71153,7 +71307,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       }
       this.renderRetryFailedButton(header2, node.path, batch);
     }
-    const ownSynthesis = this.synthesisTasks.get(node.path);
+    const ownSynthesis = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
     const parentNode = node.parentId ? this.mapNodeById(node.parentId) : void 0;
     const batchChild = !!parentNode && !!((_t = this.plugin.expansionCoordinator) == null ? void 0 : _t.isRunning(parentNode.path));
     const stoppable = this.startingTasks.has(node.path) || ((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
@@ -71194,11 +71348,11 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       );
     if ((note == null ? void 0 : note.status) === "error" && !this.selection.state.multiSelectMode && !active && !queued && !research && !merging)
       this.renderOtherProviderButton(header2, [node]);
-    const synthesis = this.synthesisTasks.get(node.path);
+    const synthesis = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
     if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header2.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
-        this.button(header2, t("ui.stop_research"), () => synthesis.controller.abort());
+        this.button(header2, t("ui.stop_research"), () => this.plugin.topicRuns.stopSynthesis(this, node.path));
       } else if (synthesis.state !== "directions") {
         header2.createSpan({
           cls: "vam-status vam-status-error",
@@ -72933,7 +73087,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   topicChatBusy(node) {
     var _a2;
     const path = node.path;
-    return this.plugin.topicRuns.isBusy(path) || this.plugin.quickExpandPending.has(path) || this.startingTasks.has(path) || ((_a2 = this.synthesisTasks.get(path)) == null ? void 0 : _a2.state) === "running";
+    return this.plugin.topicRuns.isBusy(path) || this.plugin.quickExpandPending.has(path) || this.startingTasks.has(path) || ((_a2 = this.plugin.topicRuns.syntheses(this).topics.get(path)) == null ? void 0 : _a2.state) === "running";
   }
   /**
    * Sends one button's request. Resolves true when it started (the window clears its input), false when it was declined
@@ -75232,8 +75386,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     (_b2 = this.plugin.topicRuns.taskController(path)) == null ? void 0 : _b2.abort();
     this.plugin.topicRuns.stop(path);
     this.plugin.abortChartJobs(path);
-    const synthesis = this.synthesisTasks.get(path);
-    if ((synthesis == null ? void 0 : synthesis.state) === "running") synthesis.controller.abort();
+    this.plugin.topicRuns.stopSynthesis(this, path);
   }
   /**
    * Locks or unlocks the topics for AI (`ai-locked`) in one undoable step: the notes and Map.md (viewport only).
@@ -76966,143 +77119,37 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     });
   }
   async startSynthesis(node, options, direction, failed, accepted, observer) {
-    const path = node.path;
-    const existing = this.synthesisTasks.get(path);
-    const step = direction === null ? "directions" : "draft";
     if (!this.map) {
       failed(t("ui.no_mind_map_is_available"));
       return;
     }
-    if (this.plugin.topicRuns.isBusy(path) || this.plugin.topicRuns.hasTask(path) || (existing == null ? void 0 : existing.state) === "running") {
-      failed(t("ui.ai_running_ai"));
-      return;
-    }
-    if (step === "directions" && (existing == null ? void 0 : existing.state) === "directions") {
-      failed(t("ui.synthesis_pending_review_first"));
-      return;
-    }
-    if (step === "draft") {
-      if (existing && (existing.mapPath !== this.path || existing.mapId !== this.map.id)) {
-        failed(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        return;
-      }
-    }
-    const controller = new AbortController();
-    const modalSignal = options.signal;
-    const abortBeforeAcceptance = () => controller.abort();
-    if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
-    else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    const stored = { ...options, signal: void 0, onProgress: void 0, steer: void 0 };
-    const task = step === "draft" && (existing == null ? void 0 : existing.directions.length) && (existing.state === "directions" || options.continuesDirections) ? existing : {
+    await this.plugin.topicRuns.startTopicSynthesis(this, node.path, {
       mapPath: this.path,
       mapId: this.map.id,
-      state: "running",
-      step,
-      controller,
-      progress: "",
-      options: stored,
-      directions: [],
-      direction: ""
-    };
-    task.state = "running";
-    task.step = step;
-    task.controller = controller;
-    task.progress = "";
-    task.direction = direction != null ? direction : "";
-    this.synthesisTasks.set(path, task);
-    this.plugin.topicRuns.registerTask(path, controller);
-    const runOptions = {
-      ...step === "draft" ? { ...task.options, requirements: options.requirements || task.options.requirements } : options,
-      // The model of this step is the dialog's choice now, not the one the first step was started with.
-      runOnce: options.runOnce,
-      steer: options.steer,
-      signal: controller.signal,
-      onProgress: (message) => {
-        var _a2;
-        task.progress = message;
-        (_a2 = options.onProgress) == null ? void 0 : _a2.call(options, message);
-        if (this.synthesisTasks.get(path) === task) this.render();
+      options,
+      direction,
+      failed,
+      accepted,
+      observer,
+      changed: () => this.render(),
+      directions: (runOptions, found, fail3, markAccepted) => this.proposeIntegrationDirections(node, runOptions, found, fail3, markAccepted),
+      draft: (runOptions, chosen, drafted, fail3, markAccepted) => this.integrateChildren(node, runOptions, chosen, drafted, fail3, markAccepted),
+      undoMark: () => this.history.undoEntry,
+      written: (previous) => {
+        var _a2, _b2;
+        return this.undoNotice(t("ui.synthesis_written_0", (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : ""), previous);
       }
-    };
-    let launched = false;
-    let outcome = null;
-    const markAccepted = () => {
-      var _a2;
-      if (launched || controller.signal.aborted) return;
-      launched = true;
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      (_a2 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a2.call(observer, () => controller.abort());
-      accepted();
-    };
-    const fail3 = (message) => {
-      if (outcome) return;
-      outcome = "failed";
-      if (this.synthesisTasks.get(path) === task) {
-        if (controller.signal.aborted && (observer == null ? void 0 : observer.isOpen())) {
-          if (step === "draft" && task.directions.length) task.state = "directions";
-          else this.synthesisTasks.delete(path);
-        } else if (!launched && step === "draft" && task.directions.length) task.state = "directions";
-        else {
-          task.state = controller.signal.aborted ? "cancelled" : "failed";
-          task.progress = message;
-        }
-      }
-      failed(message);
-    };
-    try {
-      if (step === "directions")
-        await this.proposeIntegrationDirections(
-          node,
-          runOptions,
-          (items) => {
-            if (controller.signal.aborted || this.synthesisTasks.get(path) !== task) return;
-            outcome = "found";
-            task.state = "directions";
-            task.directions = items;
-            if ((observer == null ? void 0 : observer.isOpen()) && observer.directions) observer.directions(items);
-          },
-          fail3,
-          markAccepted
-        );
-      else
-        await this.integrateChildren(
-          node,
-          runOptions,
-          direction != null ? direction : "",
-          async (_result, save, summary, detail) => {
-            var _a2, _b2, _c, _d;
-            if (controller.signal.aborted || this.synthesisTasks.get(path) !== task) return;
-            const previous = this.history.undoEntry;
-            await save(summary, detail);
-            outcome = "written";
-            if (this.synthesisTasks.get(path) === task) this.synthesisTasks.delete(path);
-            this.undoNotice(t("ui.synthesis_written_0", (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : ""), previous);
-            if (observer == null ? void 0 : observer.isOpen()) (_c = observer.written) == null ? void 0 : _c.call(observer);
-            (_d = observer == null ? void 0 : observer.onWritten) == null ? void 0 : _d.call(observer);
-          },
-          fail3,
-          markAccepted
-        );
-      if (!outcome) fail3(t("ui.ai_task_cancelled"));
-    } catch (error) {
-      fail3(error instanceof Error ? error.message : String(error));
-    } finally {
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      this.plugin.topicRuns.releaseTask(path, controller);
-      this.render();
-    }
+    });
   }
   discardSynthesis(node) {
     if (this.notesLoading()) return;
-    const task = this.synthesisTasks.get(node.path);
-    if (!task || task.state === "running") return;
-    this.synthesisTasks.delete(node.path);
+    if (!this.plugin.topicRuns.discardSynthesis(this, node.path)) return;
     this.render();
   }
   retrySynthesis(node) {
     var _a2;
     if (this.notesLoading()) return;
-    const task = this.synthesisTasks.get(node.path);
+    const task = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
     if (!task || task.state !== "failed" && task.state !== "cancelled") return;
     void this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0).then(
       (note) => {
@@ -82694,7 +82741,7 @@ ${addition}` : addition },
     if (nodes.length === 1) {
       const node = nodes[0];
       if (!map.nodes.some((item) => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
-      const task = this.synthesisTasks.get(node.path);
+      const task = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
       if (this.plugin.topicRuns.isBusy(node.path) || this.plugin.topicRuns.hasTask(node.path) || (task == null ? void 0 : task.state) === "running" || (task == null ? void 0 : task.state) === "directions")
         return skipped("ui.map_chat_skip_synthesis_busy");
       const note = await this.plugin.repo.readNote(node.path, map);

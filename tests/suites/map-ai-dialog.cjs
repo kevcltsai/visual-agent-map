@@ -419,7 +419,7 @@ integrationTest('synthesis: two requests for the same topic start one run', asyn
   await h.view.startSynthesis(h.parent, options, null, m => failures.push(m), () => {});
   assert.equal(h.calls.length, 1, 'the second request never reached the provider'); assert.equal(failures.length, 1); assert.match(failures[0], /running/i);
   gate.resolve(); await first;
-  assert.equal(h.view.synthesisTasks.get(h.parent.path).state, 'directions');
+  assert.equal(h.view.plugin.topicRuns.syntheses(h.view).topics.get(h.parent.path).state, 'directions');
 });
 
 // Fields that belong to the run itself: both dialogs must show exactly these (the name is the selection's own extra).
@@ -666,7 +666,7 @@ integrationTest('B2 synthesize (chat): one card with subtopics is integrated int
   assert.equal(h.modals.length, 0, 'no dialog of any kind opened');
   assert.equal(h.calls.length, 1); assert.equal(h.calls[0].directions, false, 'the directions step is skipped');
   assert.equal(h.calls[0].context.task, 'Integrate around sleep debt', 'the request task is the message, not the model\'s direction');
-  assert.match((await h.note()).detail, /Draft detail/); assert.equal(h.view.synthesisTasks.size, 0);
+  assert.match((await h.note()).detail, /Draft detail/); assert.equal(h.view.plugin.topicRuns.syntheses(h.view).topics.size, 0);
   assert.equal(actionNotices(h).filter(n => n.actions[0].text === 'Undo').length, 1, 'the usual done Notice with Undo');
 });
 integrationTest('B2 synthesize (chat): the selection is the target when the reply names none', async () => {

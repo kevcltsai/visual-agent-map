@@ -1070,10 +1070,10 @@ integrationTest('the retry of a failed subtree-chain step keeps the fresh defaul
   const f = await subtreeFixture(undefined, async call => { if (call === 1) throw new Error('boom'); return f.draftResult; });
   const failures = [];
   await f.view.startSynthesis(f.parent, { ...f.options(), subtreeIntegration: true }, 'Integrate', m => failures.push(m), () => {});
-  assert.equal(failures.length, 1); assert.equal(f.view.synthesisTasks.get(f.parent.path).state, 'failed');
+  assert.equal(failures.length, 1); assert.equal(f.view.plugin.topicRuns.syntheses(f.view).topics.get(f.parent.path).state, 'failed');
   f.plugin.confirmAiUsage = async (_model, run) => run(); f.view.notesLoading = () => false;
   f.view.retrySynthesis(f.parent);
-  await until(() => f.contexts.length === 2 && !f.view.synthesisTasks.has(f.parent.path));
+  await until(() => f.contexts.length === 2 && !f.view.plugin.topicRuns.syntheses(f.view).topics.has(f.parent.path));
   assert.equal(f.contexts[1].updateMode, 'fresh'); assert.ok(f.contexts[1].subtreeOutline);
 });
 integrationTest('a one-level subtree sends no outline; the direct subtopics travel as before', async () => {
@@ -1098,15 +1098,15 @@ integrationTest('closing the modal after dispatch does not abort background synt
   const modalController = new AbortController(); let acceptedCalls = 0, failures = [];
   const started = f.view.startSynthesis(f.parent, { ...f.options(), signal: modalController.signal }, null, message => failures.push(message), () => { acceptedCalls++; modalController.abort(); });
   await until(() => acceptedCalls === 1);
-  assert.equal(f.view.synthesisTasks.get(f.parent.path).state, 'running'); assert.equal(f.plugin.activeTasks.has(f.parent.path), true);
+  assert.equal(f.view.plugin.topicRuns.syntheses(f.view).topics.get(f.parent.path).state, 'running'); assert.equal(f.plugin.activeTasks.has(f.parent.path), true);
   assert.equal(seenSignal.aborted, false, 'closing the modal must not abort the background task');
   gate.resolve(); await started;
-  const task = f.view.synthesisTasks.get(f.parent.path);
+  const task = f.view.plugin.topicRuns.syntheses(f.view).topics.get(f.parent.path);
   assert.equal(task.state, 'directions'); assert.equal(task.directions[0].title, 'Common ground'); assert.equal(f.plugin.activeTasks.size, 0); assert.equal(f.plugin.running.size, 0); assert.deepEqual(failures, []);
   assert.equal((await f.repo.readNote(f.parent.path)).summary, 'Existing conclusion');
   await f.view.startSynthesis(f.parent, f.options(), 'Find shared constraints', message => failures.push(message), () => {});
   // No draft review step: the AI result is written as soon as it passes the fences.
-  assert.equal(f.contexts[1].task, 'Find shared constraints'); assert.equal(f.view.synthesisTasks.has(f.parent.path), false);
+  assert.equal(f.contexts[1].task, 'Find shared constraints'); assert.equal(f.view.plugin.topicRuns.syntheses(f.view).topics.has(f.parent.path), false);
   const saved = await f.repo.readNote(f.parent.path);
   assert.equal(saved.summary, 'Draft summary'); assert.match(saved.detail, /Draft detail/); assert.equal(saved.status, 'completed'); assert.deepEqual(failures, []);
 });
@@ -1115,7 +1115,7 @@ integrationTest('direct synthesis write: Undo restores the parent note verbatim,
   const before = await f.repo.readNote(f.parent.path);
   await f.view.startSynthesis(f.parent, f.options(), null, message => assert.fail(message), () => {});
   await f.view.startSynthesis(f.parent, f.options(), 'Find shared constraints', message => assert.fail(message), () => {});
-  assert.equal(f.view.synthesisTasks.has(f.parent.path), false);
+  assert.equal(f.view.plugin.topicRuns.syntheses(f.view).topics.has(f.parent.path), false);
   assert.equal((await f.repo.readNote(f.parent.path)).summary, 'Draft summary');
   await f.view.history.undo().undo();
   const restored = await f.repo.readNote(f.parent.path);
@@ -1182,8 +1182,8 @@ integrationTest('Stop on the node cancels background synthesis and preserves the
   let accepted = 0; const failures = [];
   const started = f.view.startSynthesis(f.parent, f.options(), null, message => failures.push(message), () => accepted++);
   await until(() => accepted === 1);
-  f.view.synthesisTasks.get(f.parent.path).controller.abort(); await started;
-  const task = f.view.synthesisTasks.get(f.parent.path);
+  f.view.plugin.topicRuns.syntheses(f.view).topics.get(f.parent.path).controller.abort(); await started;
+  const task = f.view.plugin.topicRuns.syntheses(f.view).topics.get(f.parent.path);
   assert.equal(task.state, 'cancelled'); assert.equal(f.plugin.activeTasks.size, 0); assert.equal(f.plugin.running.size, 0);
   assert.match(failures[0], /stopped|preserved/i);
   const after = await f.repo.readNote(f.parent.path); assert.equal(after.status, 'completed'); assert.equal(after.summary, 'Existing conclusion');
@@ -1197,7 +1197,7 @@ integrationTest('a second synthesis start on a busy topic is refused without a s
   await f.view.startSynthesis(f.parent, f.options(), null, message => failures.push(message), () => assert.fail('second start must not be accepted'));
   assert.equal(failures.length, 1); assert.equal(f.contexts.length, 1);
   gate.resolve(); await first;
-  assert.equal(f.view.synthesisTasks.get(f.parent.path).state, 'directions');
+  assert.equal(f.view.plugin.topicRuns.syntheses(f.view).topics.get(f.parent.path).state, 'directions');
   await f.view.startSynthesis(f.parent, f.options(), null, message => failures.push(message), () => assert.fail('pending directions must be handled first'));
   assert.equal(failures.length, 2); assert.equal(f.contexts.length, 1);
 });
@@ -1210,7 +1210,7 @@ integrationTest('a parent topic edited while the draft AI call is pending refuse
   await until(() => accepted === 1);
   await f.repo.updateNote(f.parent.path, { summary: 'Edited while drafting' });
   gate.resolve(); await drafting;
-  const task = f.view.synthesisTasks.get(f.parent.path); assert.equal(task.state, 'failed'); assert.match(task.progress, /Integration was not saved/i);
+  const task = f.view.plugin.topicRuns.syntheses(f.view).topics.get(f.parent.path); assert.equal(task.state, 'failed'); assert.match(task.progress, /Integration was not saved/i);
   assert.equal(f.view.history.undoEntry, undefined, 'a refused write records no history step');
   const after = await f.repo.readNote(f.parent.path); assert.equal(after.summary, 'Edited while drafting'); assert.equal(after.detail, 'Existing knowledge');
 });
@@ -1220,7 +1220,7 @@ integrationTest('aborting before dispatch acceptance leaves a cancelled synthesi
   const started = f.view.startSynthesis(f.parent, { ...f.options(), signal: modalController.signal }, null, message => failures.push(message), () => assert.fail('must not be accepted'));
   await until(() => f.contexts.length === 1);
   modalController.abort(); await started;
-  assert.equal(f.view.synthesisTasks.get(f.parent.path).state, 'cancelled'); assert.equal(f.plugin.activeTasks.size, 0); assert.equal(f.plugin.running.size, 0); assert.equal(failures.length, 1);
+  assert.equal(f.view.plugin.topicRuns.syntheses(f.view).topics.get(f.parent.path).state, 'cancelled'); assert.equal(f.plugin.activeTasks.size, 0); assert.equal(f.plugin.running.size, 0); assert.equal(failures.length, 1);
   assert.equal((await f.repo.readNote(f.parent.path)).status, 'completed');
 });
 
@@ -1228,7 +1228,7 @@ integrationTest('a provider failure before acceptance keeps a failed synthesis w
   const f = await backgroundSynthesisFixture(async () => { throw new Error('Codex is not signed in'); });
   const failures = [];
   await f.view.startSynthesis(f.parent, f.options(), null, message => failures.push(message), () => assert.fail('must not be accepted'));
-  const task = f.view.synthesisTasks.get(f.parent.path);
+  const task = f.view.plugin.topicRuns.syntheses(f.view).topics.get(f.parent.path);
   assert.equal(task.state, 'failed'); assert.match(task.progress, /Codex is not signed in/); assert.equal(failures.length, 1);
   assert.equal(f.plugin.activeTasks.size, 0); assert.equal(f.plugin.running.size, 0);
   assert.equal((await f.repo.readNote(f.parent.path)).status, 'completed');
@@ -1815,7 +1815,7 @@ integrationTest('synthesis, integrated topics and contributions save with the te
   await h.view.startSynthesis(h.topic, options(), null, message => assert.fail(message), () => {});
   await h.view.startSynthesis(h.topic, options(), 'Compare them', message => assert.fail(message), () => {});
   assert.equal(h.contexts.at(-1).detailTemplate.id, 'file:Custom');
-  assert.equal(h.view.synthesisTasks.has(h.topic.path), false, 'written directly');
+  assert.equal(h.view.plugin.topicRuns.syntheses(h.view).topics.has(h.topic.path), false, 'written directly');
   const parent = await h.repo.readNote(h.topic.path);
   assert.ok(parent.detail.indexOf('### First part') < parent.detail.indexOf('### Second part'), parent.detail);
   assert.ok(!/### Core conclusions/.test(parent.detail), parent.detail);
@@ -2488,7 +2488,7 @@ integrationTest('W2a: Stop, a stale topic and a failed request all clear the syn
   for (const scenario of ['stop', 'stale', 'parse']) {
     const h = await synthesisProgressHarness(async ({ observer, h: harness }) => {
       observer.onAttempt('a1', 1); observer.onPreview('a1', { summary: 'Unsaved', detail: 'Unsaved detail' });
-      if (scenario === 'stop') { harness.view.synthesisTasks.get(harness.topic.path).controller.abort(); throw Object.assign(new Error('cancelled'), { name: 'AbortError' }); }
+      if (scenario === 'stop') { harness.view.plugin.topicRuns.syntheses(harness.view).topics.get(harness.topic.path).controller.abort(); throw Object.assign(new Error('cancelled'), { name: 'AbortError' }); }
       if (scenario === 'stale') { await harness.repo.updateNote(harness.topic.path, { prompt: 'The user edited the question' }); return SYNTH; }
       throw new Error('The reply could not be parsed');
     });

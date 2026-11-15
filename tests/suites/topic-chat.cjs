@@ -731,7 +731,7 @@ integrationTest('topic chat busy topic: submit is refused with a Notice and noth
   assert.equal(await h.host('a').submit('research', 'x'), false);
   h.plugin.quickExpandPending.clear(); h.view.startingTasks.set(h.node('a').path, new AbortController());
   assert.equal(await h.host('a').submit('research', 'x'), false);
-  h.view.startingTasks.clear(); h.view.synthesisTasks.set(h.node('a').path, { state: 'running' });
+  h.view.startingTasks.clear(); h.view.plugin.topicRuns.syntheses(h.view).topics.set(h.node('a').path, { state: 'running' });
   assert.equal(await h.host('a').submit('research', 'x'), false);
   assert.equal(calls.length, 0); assert.equal(h.control.usageAsks, 0); assert.equal(h.notices.at(-1), t('ui.ai_running_ai'));
 });
@@ -1630,13 +1630,13 @@ integrationTest('topic chat steer: startSynthesis hands the steer to the run of 
   const h = await harness(); const seen = []; const steer = { bind() {}, live() {} };
   h.plugin.topicRuns.start = async (_path, kind, options) => { seen.push([kind, options.steer]); return null; };
   const node = h.node('root'); const path = node.path;
-  h.view.synthesisTasks.set(path, { mapPath: h.view.path, mapId: h.view.map.id, state: 'directions', step: 'directions', controller: new AbortController(), progress: '', options: { requirements: 'r' }, directions: [{ id: 'd' }], direction: '' });
+  h.view.plugin.topicRuns.syntheses(h.view).topics.set(path, { mapPath: h.view.path, mapId: h.view.map.id, state: 'directions', step: 'directions', controller: new AbortController(), progress: '', options: { requirements: 'r' }, directions: [{ id: 'd' }], direction: '' });
   await h.view.startSynthesis(node, { steer, continuesDirections: true, onProgress() {} }, 'go', () => {}, () => {});
   assert.deepEqual(seen.map(x => x[0]), ['integrateChildren']); assert.equal(seen[0][1], steer, 'a task kept from the first step still gets the steer');
-  assert.equal(h.view.synthesisTasks.get(path).options.steer, undefined);
-  h.view.synthesisTasks.delete(path);
+  assert.equal(h.view.plugin.topicRuns.syntheses(h.view).topics.get(path).options.steer, undefined);
+  h.view.plugin.topicRuns.syntheses(h.view).topics.delete(path);
   await h.view.startSynthesis(node, { steer, onProgress() {} }, 'go', () => {}, () => {});
-  assert.equal(seen[1][1], steer); assert.equal(h.view.synthesisTasks.get(path).options.steer, undefined, 'the stored options carry no steer (a retry must not)');
+  assert.equal(seen[1][1], steer); assert.equal(h.view.plugin.topicRuns.syntheses(h.view).topics.get(path).options.steer, undefined, 'the stored options carry no steer (a retry must not)');
 });
 
 integrationTest('topic chat steer: an addition typed while the subtopics are researched first rides in the integration text once, shows as taken in, and is written', async () => {

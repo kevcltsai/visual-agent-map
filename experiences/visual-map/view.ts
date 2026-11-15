@@ -24153,6 +24153,8 @@ export class VisualAgentMapView extends ItemView {
     let noNewMap = false;
     // ... and why: the map was never made, or it was made but could not be opened here.
     let noNewMapReason: TranslationKey = "ui.map_chat_skip_map_not_created";
+    // The map folder before and after this reply's rename_map, when it moved.
+    let movedRoot: { from: string; to: string } | null = null;
     // Copied: the turn's own writes move the baseline along, the request's context stays as it was sent.
     const own = {
       mdHashes: baseline.mdHashes,
@@ -24195,10 +24197,13 @@ export class VisualAgentMapView extends ItemView {
         }
         if (action.kind === "rename_map") {
           // The folder moves with the name, so the reply's anchor follows the map to its new path.
+          const fromRoot = this.plugin.repo.topicRoot(anchor.path);
           const outcome = await this.chatRenameMap(action.title, anchor, same);
           if (outcome.status === "done") {
             wrote = true;
             touched.add(anchor.path);
+            const toRoot = this.plugin.repo.topicRoot(anchor.path);
+            if (toRoot !== fromRoot) movedRoot = { from: fromRoot, to: toRoot };
           }
           lines[index] = this.chatLine(label, outcome);
           continue;
@@ -24220,11 +24225,17 @@ export class VisualAgentMapView extends ItemView {
           lines[index] = this.chatLine(label, outcome);
           continue;
         }
+        // A file the reply names under the map's folder from before its own rename_map goes to the folder the map moved to.
+        const key = action.kind === "create_md_file" && movedRoot ? normalizeVaultPath(action.path) : null;
+        const write =
+          key && movedRoot && key.startsWith(`${movedRoot.from}/`)
+            ? { ...action, path: `${movedRoot.to}${key.slice(movedRoot.from.length)}` }
+            : action;
         const box: { outcome: ChatOutcome } = { outcome: { status: "done" } };
         try {
           await this.plugin.mutate(async () => {
             // Only this write's own entries join the reply; what another job pushes between two writes stays its own step.
-            box.outcome = await this.history.ownWrites(() => this.applyChatWrite(action, own, same, run));
+            box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own, same, run));
           });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };

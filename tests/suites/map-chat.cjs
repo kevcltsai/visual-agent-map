@@ -8987,3 +8987,22 @@ integrationTest('resume: the cards the AI selected stay with the chain - a clear
     h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain?.state.phase === 'waiting'); h.view.chatSelect([h.ids.b]); settleRun(runs[0]); await until(() => h.control.requests.length === 2 && !chat.isBusy);
     eq(contextOf(h.control.requests[1]).selected.map(item => item.id), [h.ids.b], 'never selected by the AI: the selection of the moment, as before'); }
 });
+
+integrationTest('map chat: a file the reply creates under the old map folder after its own rename_map lands in the renamed folder', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.map.title = 'Untitled mind map';
+  await h.repo.saveMap(MAP, h.view.map);
+  const oldRoot = 'Agent Workspace/Topics/map-a';
+  const lines = await apply(h, [
+    { kind: 'rename_map', title: 'Art book' },
+    { kind: 'create_md_file', path: `${oldRoot}/Progress.md`, content: '# Progress\n' },
+    { kind: 'create_md_file', path: 'Notes/Elsewhere.md', content: '# Elsewhere\n' }
+  ]);
+  eq(lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines));
+  const newRoot = h.view.path.split('/').slice(0, -1).join('/');
+  assert.notEqual(newRoot, oldRoot, 'the map folder moved');
+  assert.equal(h.contents.get(`${newRoot}/Progress.md`), '# Progress\n', 'the file follows the map to its new folder');
+  assert.equal(h.contents.has(`${oldRoot}/Progress.md`), false, 'nothing is left in the old folder');
+  assert.equal(h.files.has(oldRoot), false, 'the old folder is not made again');
+  assert.equal(h.contents.get('Notes/Elsewhere.md'), '# Elsewhere\n', 'a path outside the map folder is kept as given');
+});

@@ -523,23 +523,15 @@ import { rerunWithAssumptions } from "./argument-rerun";
 import { describeArgumentProgress } from "./argument-progress";
 import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
 import { aiLockBlock, aiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
+import { MAP_CHAT_ANCHOR_PREFIX, MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import {
-  MAP_CHAT_ANCHOR_PREFIX,
-  MAP_CHAT_NEW_PREFIX,
-  mapChatStep,
-  type MapChatAction
-} from "../../core/steps/map-chat/step";
-import {
-  isRecordFilePath,
   pickLatest,
-  recordsDir,
   restoreConversation,
   type RecordEventKind,
-  type RecordLine,
-  type RecordOriginChip,
   type RecordTurnStatus
 } from "../../core/map-chat-records";
 import { MapChatRecordWriter, type MapChatRecordTarget } from "./map-chat-record-writer";
+import { MapChatRecordSession, type MapChatRecordSessionPorts } from "./map-chat-record-session";
 import { TopicChatRecordWriter } from "./topic-chat-record-writer";
 import { judgeTopicScope, topicSubtreeIds } from "./topic-chat-scope";
 import {
@@ -1549,10 +1541,11 @@ export class VisualAgentMapView extends ItemView {
     added: (chat, blocks) => {
       for (const block of blocks) {
         chat.addImages(block);
-        if (this.chatLastRecord) this.chatImageRecords.set(block, this.chatLastRecord);
+        if (this.chatLastRecord) this.chatRecordSession.images.set(block, this.chatLastRecord);
       }
       // The cards that could not start are settled now (their record line is written with the others).
-      for (const block of blocks) if (block.state !== "searching") this.chatImageRecords.get(block)?.images(block);
+      for (const block of blocks)
+        if (block.state !== "searching") this.chatRecordSession.images.get(block)?.images(block);
     },
     running: (chat, block) => chat.markImagesRunning(block),
     settle: (chat, block, patch) => this.settleChatImages(chat, block, patch)
@@ -1611,19 +1604,21 @@ export class VisualAgentMapView extends ItemView {
    * Conversation records (the settings switch "save map AI conversations"). The writer exists only after the switch was on at a use
    * (send, open); with the switch off nothing here runs.
    */
-  private chatRecords: MapChatRecordWriter | null = null;
+  private readonly chatRecordSession = new MapChatRecordSession(this.chatRecordPorts());
   private topicChatRecords: TopicChatRecordWriter | null = null;
-  private chatRecordsUnregister: (() => void) | null = null;
-  /** The highest turn number used in the conversation's record. */
-  private chatRecordTurnSeq = 0;
-  /** Finished answers that are in the record (written, restored or backfilled). */
-  private chatRecordLogged = new WeakSet<MapChatMessage>();
-  /** The record of the newest turn (running or finished): plan results, picture candidates and undo / redo of it go to its conversation. */
-  private chatLastRecord: MapChatTurnRecord | null = null;
-  private chatPlanRecords = new WeakMap<MapChatPlanCard, MapChatTurnRecord>();
-  private chatImageRecords = new WeakMap<MapChatImages, MapChatTurnRecord>();
-  /** Counts the times the conversation left its map or began anew: a restore that read the files meanwhile is dropped. */
-  private chatRecordEpoch = 0;
+  // The session's writer and newest turn record, under their old names (the `?.` is for fixtures that never ran the constructor).
+  private get chatRecords(): MapChatRecordWriter | null {
+    return this.chatRecordSession?.writer ?? null;
+  }
+  private set chatRecords(writer: MapChatRecordWriter | null) {
+    this.chatRecordSession.writer = writer;
+  }
+  private get chatLastRecord(): MapChatTurnRecord | null {
+    return this.chatRecordSession?.last ?? null;
+  }
+  private set chatLastRecord(record: MapChatTurnRecord | null) {
+    this.chatRecordSession.last = record;
+  }
   /** Stop was pressed while a plan was applying: the plan line says so. */
   private chatPlanStopped = false;
 
@@ -21873,7 +21868,7 @@ export class VisualAgentMapView extends ItemView {
                   run
                 );
                 if (record?.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
-                  this.chatRecordLogged.add(turn.assistant);
+                  this.chatRecordSession.markLogged(turn.assistant);
                 // The plan waits for the user's yes: a message sent now would cancel it, so waiting follow-ups go back to the field.
                 this.flushSteers(false);
               }
@@ -21897,7 +21892,7 @@ export class VisualAgentMapView extends ItemView {
               this.showUnreadResearch(chat, turn, request.context);
               this.markChatTurn(origin, request, entry);
               if (record?.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
-                this.chatRecordLogged.add(turn.assistant);
+                this.chatRecordSession.markLogged(turn.assistant);
               // The round is over: the continuation goes on, waits or ends; follow-ups that waited are the next message instead.
               this.finishChatRound(run, { result, context: request.context, lines, work, anchor });
             }
@@ -22442,7 +22437,7 @@ export class VisualAgentMapView extends ItemView {
     this.clearChatPreview();
     if (pending) {
       this.chat?.settlePlan(pending, "cancelled");
-      this.chatPlanRecords.get(pending)?.plan("cancelled");
+      this.chatRecordSession.plans.get(pending)?.plan("cancelled");
     }
   }
   private planReasonText(
@@ -22548,11 +22543,11 @@ export class VisualAgentMapView extends ItemView {
         this.chatPlanToken++;
         this.clearChatPreview();
         this.chat?.settlePlan(card, "cancelled");
-        this.chatPlanRecords.get(card)?.plan("cancelled");
+        this.chatRecordSession.plans.get(card)?.plan("cancelled");
         this.interruptChain(run, "plan_cancelled");
       }
     };
-    if (record) this.chatPlanRecords.set(card, record);
+    if (record) this.chatRecordSession.plans.set(card, record);
     chat.showPlan(card);
   }
   private async applyChatPlan(
@@ -22575,7 +22570,7 @@ export class VisualAgentMapView extends ItemView {
       this.interruptChain(run, "map_changed");
       const skip: MapChatLine[] = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
       chat.settlePlan(card, "cancelled", skip);
-      this.chatPlanRecords.get(card)?.plan("cancelled", skip);
+      this.chatRecordSession.plans.get(card)?.plan("cancelled", skip);
       return;
     }
     this.chatApplying = true;
@@ -22607,7 +22602,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.closed) {
       // The lines as shown (failures that came in meanwhile merged): the screen, the record and the chain's next round agree.
       lines = chat.settlePlan(card, "applied", lines) ?? lines;
-      this.chatPlanRecords.get(card)?.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
+      this.chatRecordSession.plans.get(card)?.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
       if (run) {
         // Stop ends the continuation (and the work it started); otherwise the round is over like any other.
         if (stopped()) {
@@ -22630,26 +22625,40 @@ export class VisualAgentMapView extends ItemView {
       mapId: this.map?.id ?? ""
     };
   }
-  /** This view's writer, made at the first use while the switch is on (and registered, so the switch reaches it); null while it is off. */
-  private ensureChatRecords(): MapChatRecordWriter | null {
-    if (this.plugin.settings.mapChatRecords !== true || this.closed) return null;
-    if (!this.chatRecords) {
-      const writer = new MapChatRecordWriter({
-        app: this.plugin.repo.app,
-        log: (level, message) => this.plugin.logs.appendLog(level, message),
-        disposed: () => this.plugin.repo.isDisposed(),
-        // The writer calls this once per conversation; the chat itself goes on.
-        onFailure: () => {
-          new Notice(t("ui.map_chat_record_failed"));
-        },
-        pluginVersion: this.plugin.manifest?.version ?? "0.0.0",
-        configDir: this.app.vault.configDir
-      });
-      writer.setTarget(this.chatRecordTarget());
-      this.chatRecords = writer;
-      this.chatRecordsUnregister = this.plugin.registerMapChatRecordWriter(writer);
-    }
-    return this.chatRecords;
+  /** What the record session reads from this view and the plugin (all lazily: the view's app may not exist yet when it is built). */
+  private chatRecordPorts(): MapChatRecordSessionPorts {
+    const adapter = () => this.plugin.repo.app.vault.adapter;
+    const app = () => this.app;
+    return {
+      enabled: () => this.plugin.settings.mapChatRecords === true,
+      closed: () => this.closed,
+      createWriter: () => {
+        const writer = new MapChatRecordWriter({
+          app: this.plugin.repo.app,
+          log: (level, message) => this.plugin.logs.appendLog(level, message),
+          disposed: () => this.plugin.repo.isDisposed(),
+          // The writer calls this once per conversation; the chat itself goes on.
+          onFailure: () => {
+            new Notice(t("ui.map_chat_record_failed"));
+          },
+          pluginVersion: this.plugin.manifest?.version ?? "0.0.0",
+          configDir: this.app.vault.configDir
+        });
+        return writer;
+      },
+      register: writer => this.plugin.registerMapChatRecordWriter(writer),
+      disposed: () => this.plugin.repo.isDisposed(),
+      target: () => this.chatRecordTarget(),
+      log: message => this.plugin.logs.appendLog("error", `Map chat record: ${message}`),
+      files: {
+        exists: path => adapter().exists(path),
+        list: dir => adapter().list(dir),
+        read: path => adapter().read(path)
+      },
+      get configDir() {
+        return app().vault.configDir;
+      }
+    };
   }
   /** The settings switch for conversation records was flipped: the panel shows or hides what depends on it. */
   refreshChatRecordsSwitch(): void {
@@ -22657,25 +22666,15 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Closing the view loses nothing: the switch is on, no write failed, and the record has every finished turn. */
   private chatRecordSaved(): boolean {
-    const writer = this.chatRecords;
-    if (!writer || this.plugin.settings.mapChatRecords !== true || writer.unsaved) return false;
-    return this.chat?.completedTurns().every(turn => this.chatRecordLogged.has(turn.answer)) ?? true;
+    return this.chatRecordSession.saved(this.chat?.completedTurns());
   }
   /** The view closes: the writer takes no new line (what is queued still runs), or none at all once the plugin is unloading. */
   private closeChatRecords(): void {
-    const writer = this.chatRecords;
-    if (!writer) return;
-    this.chatRecordsUnregister?.();
-    this.chatRecordsUnregister = null;
-    if (this.plugin.repo.isDisposed()) writer.dispose();
-    else writer.close();
+    this.chatRecordSession.close();
   }
   /** Ends the running turn's record (a no-op when there is none or it already ended). */
   private endChatRecord(status: RecordTurnStatus, fields?: TurnEndFields): void {
-    const record = this.chatLastRecord;
-    // Whatever the status, the turn's answer is in the record now: a stopped turn that left text must not be written again
-    // as a backfilled one by the next send, and closing the view loses nothing of it.
-    if (record?.isOpen && record.end(status, fields)) this.chatRecordLogged.add(record.answer);
+    this.chatRecordSession.end(status, fields);
   }
   /**
    * The request went out: writes the turn's start (and, for a conversation that began while the switch was off, its finished
@@ -22687,62 +22686,9 @@ export class VisualAgentMapView extends ItemView {
     request: MapChatRequest,
     origin: MapChatOrigin
   ): MapChatTurnRecord | null {
-    const writer = this.ensureChatRecords();
-    if (!writer) return null;
+    if (!this.chatRecordSession.ensure()) return null;
     try {
-      writer.setTarget(this.chatRecordTarget());
-      const missing = chat.completedTurns().filter(item => !this.chatRecordLogged.has(item.answer));
-      if (missing.length) {
-        writer.backfill(
-          missing.map(item => ({
-            turn: ++this.chatRecordTurnSeq,
-            message: item.question.text,
-            reply: item.answer.text,
-            lines: item.answer.lines.map(line => ({ status: settledLine(line).status, text: settledLine(line).text })),
-            modelLabel: item.answer.modelLabel ?? "",
-            steers: (item.question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text)
-          }))
-        );
-        for (const item of missing) this.chatRecordLogged.add(item.answer);
-      }
-      chat.conversationId = writer.conversationId;
-      const number = ++this.chatRecordTurnSeq;
-      const record = new MapChatTurnRecord(writer, writer.conversationId, number, turn.assistant, message =>
-        this.plugin.logs.appendLog("error", `Map chat record: ${message}`)
-      );
-      const chips: RecordOriginChip[] = origin.chips.map(chip =>
-        chip.kind === "topic"
-          ? { kind: chip.kind, id: chip.id }
-          : chip.kind === "snippet"
-            ? { kind: chip.kind, path: chip.path, text: chip.text }
-            : { kind: chip.kind, path: chip.path }
-      );
-      // The rendered prompt is not stored (step id and version rebuild it); the model is only its id.
-      record.write({
-        type: "turn_start",
-        turn: number,
-        message: origin.text,
-        ...(this.chatAutoApply ? { autoApply: true as const } : {}),
-        ...(origin.chain
-          ? {
-              auto: true as const,
-              round: origin.chain.state.round,
-              ...(origin.chain.resumed ? { resumed: true as const } : {}),
-              ...(origin.chain.continuation.remaining.trim() ? { remaining: origin.chain.continuation.remaining } : {})
-            }
-          : {}),
-        origin: { chips, selectedIds: [...origin.selectedIds] },
-        request: {
-          step: { id: mapChatStep.id, version: mapChatStep.version },
-          model: request.model,
-          reasoning: request.reasoning,
-          language: request.language,
-          contentLanguage: request.contentLanguage,
-          message: request.message,
-          context: request.context
-        }
-      });
-      this.chatLastRecord = record;
+      const record = this.chatRecordSession.begin(chat, turn, request, origin, this.chatAutoApply);
       // Research began while the record was off: the mark goes in with the first turn written after it came back on.
       this.markResearchRecorded(record);
       this.markSourcesRecorded(record);
@@ -22803,14 +22749,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   private startChatRecords(): void {
-    this.chatRecordEpoch++;
-    this.chatRecordTurnSeq = 0;
-    this.chatLastRecord = null;
-    const writer = this.chatRecords;
-    if (writer) {
-      writer.newConversation();
-      writer.setTarget(this.chatRecordTarget());
-    }
+    this.chatRecordSession.restart();
     if (this.plugin.settings.mapChatRecords === true) void this.restoreChatRecords();
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
@@ -22821,29 +22760,7 @@ export class VisualAgentMapView extends ItemView {
     this.resetChatResearch();
     this.chat?.refreshAutoApply();
     this.chatPlanToken++;
-    this.chatRecordEpoch++;
-    this.chatRecordTurnSeq = 0;
-    this.chatLastRecord = null;
-    const writer = this.chatRecords;
-    if (!writer) return;
-    writer.newConversation();
-    writer.setTarget(this.chatRecordTarget());
-  }
-  /** The latest record file of the map's folder, read through the adapter (the Vault index may not list a .jsonl). */
-  private async readLatestChatRecord(root: string): Promise<ReturnType<typeof pickLatest>> {
-    const adapter = this.plugin.repo.app.vault.adapter;
-    const dir = recordsDir(root, this.app.vault.configDir);
-    if (!(await adapter.exists(dir))) return null;
-    const files: { id: string; path: string; text: string }[] = [];
-    for (const path of (await adapter.list(dir)).files) {
-      if (!isRecordFilePath(path) || path.slice(0, path.lastIndexOf("/")) !== dir) continue;
-      files.push({
-        id: path.slice(path.lastIndexOf("/") + 1, -".jsonl".length),
-        path,
-        text: await adapter.read(path)
-      });
-    }
-    return pickLatest(files);
+    this.chatRecordSession.restart();
   }
   /**
    * Shows the map's latest saved conversation again and goes on writing to its file. Nothing happens when the file's version is
@@ -22853,13 +22770,12 @@ export class VisualAgentMapView extends ItemView {
     const chat = this.chat;
     const map = this.map;
     if (!chat || !map || !isManagedMapPath(this.plugin.settings, this.path)) return;
-    const writer = this.ensureChatRecords();
-    if (!writer) return;
-    const epoch = this.chatRecordEpoch;
+    if (!this.chatRecordSession.ensure()) return;
+    const epoch = this.chatRecordSession.epoch;
     const mapPath = this.path;
     let latest: ReturnType<typeof pickLatest>;
     try {
-      latest = await this.readLatestChatRecord(this.plugin.repo.topicRoot(mapPath));
+      latest = await this.chatRecordSession.readLatest(this.plugin.repo.topicRoot(mapPath));
     } catch (error) {
       this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
       return;
@@ -22868,7 +22784,7 @@ export class VisualAgentMapView extends ItemView {
       !latest ||
       latest.parsed.unrecoverable ||
       this.closed ||
-      epoch !== this.chatRecordEpoch ||
+      epoch !== this.chatRecordSession.epoch ||
       chat !== this.chat ||
       chat.hasMessages ||
       chat.isBusy ||
@@ -22891,22 +22807,9 @@ export class VisualAgentMapView extends ItemView {
       this.chatSourcesMarkedIn = restored.id;
     }
     const handle = this.plugin.repo.app.vault.getAbstractFileByPath(latest.path ?? "");
-    writer.resume(
-      latest.id,
-      handle instanceof TFile ? handle : (latest.path ?? ""),
-      this.chatRecordTarget(),
-      latest.parsed.cleanEnd,
-      restored.startedResearch,
-      restored.readsSources
-    );
-    // Every turn number of the file is taken: a late result of one of them can never be written again.
-    const numbers = latest.parsed.lines.flatMap((line: RecordLine) =>
-      "turn" in line && typeof line.turn === "number" ? [line.turn] : []
-    );
-    writer.markEnded(numbers);
-    this.chatRecordTurnSeq = Math.max(0, ...numbers);
+    this.chatRecordSession.resume(latest, restored, handle instanceof TFile ? handle : (latest.path ?? ""));
     this.chatFiles.restore(restored.id, restored.ownFiles, restored.attachedFiles);
-    for (const item of chat.completedTurns()) this.chatRecordLogged.add(item.answer);
+    for (const item of chat.completedTurns()) this.chatRecordSession.markLogged(item.answer);
     this.relocateMapChat();
   }
   private settleChatImages(
@@ -22915,7 +22818,7 @@ export class VisualAgentMapView extends ItemView {
     patch: Partial<Pick<MapChatImages, "state" | "reason" | "items">>
   ): void {
     chat.settleImages(block, patch);
-    const record = this.chatImageRecords.get(block);
+    const record = this.chatRecordSession.images.get(block);
     record?.images(block);
     // The result line of the turn (progress, then the count) follows the blocks.
     record?.relines();

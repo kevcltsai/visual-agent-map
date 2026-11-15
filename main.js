@@ -53278,6 +53278,283 @@ var MapChatRecordWriter = class {
 };
 var errorText2 = (error) => error instanceof Error ? error.message : String(error);
 
+// experiences/visual-map/map-chat-turn-record.ts
+var missedImageRows = (blocks) => blocks.flatMap((block) => {
+  var _a2, _b2;
+  if (block.state === "searching" || placedImage(block)) return [];
+  const why2 = block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", (_a2 = block.reason) != null ? _a2 : "") : (_b2 = block.reason) != null ? _b2 : t("ui.map_chat_images_none");
+  return [{ status: block.state === "failed" ? "failed" : "skipped", text: `${block.nodeTitle}: ${why2}` }];
+});
+var plainLines = (lines) => onceImageLines(lines).flatMap((line2) => {
+  const settled2 = settledLine(line2);
+  return [
+    { status: settled2.status, text: settled2.text, ...settled2.basis ? { basis: settled2.basis } : {} },
+    ...line2.imageGroup ? missedImageRows(line2.imageGroup) : []
+  ];
+});
+var MapChatTurnRecord = class {
+  constructor(writer, conversationId, turn, answer, log) {
+    this.writer = writer;
+    this.conversationId = conversationId;
+    this.turn = turn;
+    this.answer = answer;
+    this.log = log;
+    /** The model's raw output of the attempt that is current (set by `onRaw`). */
+    __publicField(this, "raw", null);
+    /** The follow-ups that went into the turn (the view sets it; read when the turn ends, so only the delivered ones count). */
+    __publicField(this, "steerTexts", () => []);
+    __publicField(this, "ended", false);
+  }
+  /** The turn has not written its end yet. */
+  get isOpen() {
+    return !this.ended;
+  }
+  live() {
+    return this.writer.conversationId === this.conversationId;
+  }
+  /** Writes a line of this turn into its own conversation; a failure to build the line is logged, never thrown into the chat. */
+  write(line2) {
+    if (!this.live()) return;
+    try {
+      this.writer.write(line2);
+    } catch (error) {
+      this.log(error instanceof Error ? error.message : String(error));
+    }
+  }
+  event(kind, extra = {}) {
+    this.write({ type: "event", turn: this.turn, kind, ...extra });
+  }
+  /** The turn ended. Only the first call writes (a late result of a stopped, replaced or closed attempt finds it ended). */
+  end(status, fields = {}) {
+    var _a2, _b2, _c, _d;
+    if (this.ended) return false;
+    this.ended = true;
+    const partial = this.answer.streaming ? this.answer.text : "";
+    const steers = this.steerTexts();
+    this.write({
+      type: "turn_end",
+      turn: this.turn,
+      status,
+      ...fields.reason ? { reason: fields.reason } : {},
+      raw: this.raw,
+      reply: (_a2 = fields.reply) != null ? _a2 : partial,
+      lines: plainLines((_b2 = fields.lines) != null ? _b2 : this.answer.lines),
+      modelLabel: (_c = this.answer.modelLabel) != null ? _c : "",
+      ...((_d = fields.rejected) == null ? void 0 : _d.length) ? { rejected: fields.rejected } : {},
+      ...steers.length ? { steers } : {},
+      ...fields.error ? { error: fields.error } : {}
+    });
+    return true;
+  }
+  /** What became of the plan card of this turn. */
+  plan(state, lines = []) {
+    this.write({ type: "plan", turn: this.turn, state, lines: plainLines(lines) });
+  }
+  /**
+   * The result lines of the turn changed after its end (an expansion that failed): the answer's lines as they are now. Before the
+   * end nothing is written: a `lines` line ahead of `turn_end` would make a restore show those partial lines for the whole turn.
+   */
+  relines() {
+    if (!this.ended) return;
+    this.write({ type: "lines", turn: this.turn, lines: plainLines(this.answer.lines) });
+  }
+  /**
+   * The pictures this turn put into its cards (the failure reasons are in the result lines). One line for the whole turn, the
+   * newest wins: each item is "card: picture title", and every item was inserted. The state is `ready` when any picture was
+   * put in, else `stopped` when every search was stopped, else `failed` / `empty`.
+   */
+  images(block) {
+    var _a2;
+    const blocks = ((_a2 = this.answer.images) == null ? void 0 : _a2.includes(block)) ? this.answer.images : [block];
+    const placed = blocks.flatMap((entry) => {
+      var _a3;
+      const item = placedImage(entry);
+      return item ? [{ title: `${entry.nodeTitle}: ${item.candidate.title}`, sourceUrl: (_a3 = item.candidate.source) != null ? _a3 : "" }] : [];
+    });
+    const ended2 = blocks.filter((entry) => entry.state !== "searching");
+    const state = placed.length ? "ready" : ended2.every((entry) => entry.state === "stopped") ? "stopped" : ended2.some((entry) => entry.state === "failed") ? "failed" : "empty";
+    this.write({
+      type: "images",
+      turn: this.turn,
+      state,
+      items: placed,
+      inserted: placed.map((_, index) => index)
+    });
+  }
+};
+
+// experiences/visual-map/map-chat-record-session.ts
+var MapChatRecordSession = class {
+  constructor(ports) {
+    this.ports = ports;
+    /** This view's writer; null until the first use while the switch is on. */
+    __publicField(this, "writer", null);
+    /** The record of the newest turn (running or finished): plan results, picture candidates and undo / redo of it go to its conversation. */
+    __publicField(this, "last", null);
+    __publicField(this, "plans", /* @__PURE__ */ new WeakMap());
+    __publicField(this, "images", /* @__PURE__ */ new WeakMap());
+    __publicField(this, "unregister", null);
+    /** The highest turn number used in the conversation's record. */
+    __publicField(this, "turnSeq", 0);
+    /** Finished answers that are in the record (written, restored or backfilled). */
+    __publicField(this, "logged", /* @__PURE__ */ new WeakSet());
+    /** Counts the times the conversation left its map or began anew: a restore that read the files meanwhile is dropped. */
+    __publicField(this, "epochCount", 0);
+  }
+  get epoch() {
+    return this.epochCount;
+  }
+  /** This view's writer, made at the first use while the switch is on (and registered, so the switch reaches it); null while it is off. */
+  ensure() {
+    if (!this.ports.enabled() || this.ports.closed()) return null;
+    if (!this.writer) {
+      const writer = this.ports.createWriter();
+      writer.setTarget(this.ports.target());
+      this.writer = writer;
+      this.unregister = this.ports.register(writer);
+    }
+    return this.writer;
+  }
+  /**
+   * The request went out: writes the turn's start (and, for a conversation that began while the switch was off, its finished
+   * turns first). The writer must exist (`ensure`); a write that throws is the caller's to catch.
+   */
+  begin(chat, turn, request, origin, autoApply) {
+    const writer = this.writer;
+    if (!writer) throw new Error("Map chat record: no writer");
+    writer.setTarget(this.ports.target());
+    const missing = chat.completedTurns().filter((item) => !this.logged.has(item.answer));
+    if (missing.length) {
+      writer.backfill(
+        missing.map((item) => {
+          var _a2, _b2;
+          return {
+            turn: ++this.turnSeq,
+            message: item.question.text,
+            reply: item.answer.text,
+            lines: item.answer.lines.map((line2) => ({ status: settledLine(line2).status, text: settledLine(line2).text })),
+            modelLabel: (_a2 = item.answer.modelLabel) != null ? _a2 : "",
+            steers: ((_b2 = item.question.steers) != null ? _b2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text)
+          };
+        })
+      );
+      for (const item of missing) this.logged.add(item.answer);
+    }
+    chat.conversationId = writer.conversationId;
+    const number = ++this.turnSeq;
+    const record = new MapChatTurnRecord(
+      writer,
+      writer.conversationId,
+      number,
+      turn.assistant,
+      (message) => this.ports.log(message)
+    );
+    const chips = origin.chips.map(
+      (chip) => chip.kind === "topic" ? { kind: chip.kind, id: chip.id } : chip.kind === "snippet" ? { kind: chip.kind, path: chip.path, text: chip.text } : { kind: chip.kind, path: chip.path }
+    );
+    record.write({
+      type: "turn_start",
+      turn: number,
+      message: origin.text,
+      ...autoApply ? { autoApply: true } : {},
+      ...origin.chain ? {
+        auto: true,
+        round: origin.chain.state.round,
+        ...origin.chain.resumed ? { resumed: true } : {},
+        ...origin.chain.continuation.remaining.trim() ? { remaining: origin.chain.continuation.remaining } : {}
+      } : {},
+      origin: { chips, selectedIds: [...origin.selectedIds] },
+      request: {
+        step: { id: mapChatStep.id, version: mapChatStep.version },
+        model: request.model,
+        reasoning: request.reasoning,
+        language: request.language,
+        contentLanguage: request.contentLanguage,
+        message: request.message,
+        context: request.context
+      }
+    });
+    this.last = record;
+    return record;
+  }
+  /** The answer is in the record. */
+  markLogged(answer) {
+    this.logged.add(answer);
+  }
+  isLogged(answer) {
+    return this.logged.has(answer);
+  }
+  /** Ends the running turn's record (a no-op when there is none or it already ended). */
+  end(status, fields) {
+    const record = this.last;
+    if ((record == null ? void 0 : record.isOpen) && record.end(status, fields)) this.logged.add(record.answer);
+  }
+  /** Closing the view loses nothing: the switch is on, no write failed, and the record has every finished turn (no chat: nothing to lose). */
+  saved(turns) {
+    var _a2;
+    const writer = this.writer;
+    if (!writer || !this.ports.enabled() || writer.unsaved) return false;
+    return (_a2 = turns == null ? void 0 : turns.every((turn) => this.logged.has(turn.answer))) != null ? _a2 : true;
+  }
+  /** The view closes: the writer takes no new line (what is queued still runs), or none at all once the plugin is unloading. */
+  close() {
+    var _a2;
+    const writer = this.writer;
+    if (!writer) return;
+    (_a2 = this.unregister) == null ? void 0 : _a2.call(this);
+    this.unregister = null;
+    if (this.ports.disposed()) writer.dispose();
+    else writer.close();
+  }
+  /** The conversation left its map, or began anew: a new record conversation (the epoch drops a restore still reading). */
+  restart() {
+    this.epochCount++;
+    this.turnSeq = 0;
+    this.last = null;
+    const writer = this.writer;
+    if (!writer) return;
+    writer.newConversation();
+    writer.setTarget(this.ports.target());
+  }
+  /** The latest record file of the map's folder, read through the adapter (the Vault index may not list a .jsonl). */
+  async readLatest(root) {
+    const adapter = this.ports.files;
+    const dir = recordsDir(root, this.ports.configDir);
+    if (!await adapter.exists(dir)) return null;
+    const files = [];
+    for (const path of (await adapter.list(dir)).files) {
+      if (!isRecordFilePath(path) || path.slice(0, path.lastIndexOf("/")) !== dir) continue;
+      files.push({
+        id: path.slice(path.lastIndexOf("/") + 1, -".jsonl".length),
+        path,
+        text: await adapter.read(path)
+      });
+    }
+    return pickLatest(files);
+  }
+  /**
+   * The writer's part of a restore: later lines go on in the restored file, and every turn number of it is taken (a late result of
+   * one of them can never be written again). `file` is the vault file when the index lists it, else its path.
+   */
+  resume(latest, restored, file) {
+    const writer = this.writer;
+    if (!writer) return;
+    writer.resume(
+      latest.id,
+      file,
+      this.ports.target(),
+      latest.parsed.cleanEnd,
+      restored.startedResearch,
+      restored.readsSources
+    );
+    const numbers = latest.parsed.lines.flatMap(
+      (line2) => "turn" in line2 && typeof line2.turn === "number" ? [line2.turn] : []
+    );
+    writer.markEnded(numbers);
+    this.turnSeq = Math.max(0, ...numbers);
+  }
+};
+
 // core/topic-chat-records.ts
 var TOPIC_CHAT_RECORD_VERSION = 1;
 var TOPIC_CHAT_SUBPATH = "Chats/topics";
@@ -53578,111 +53855,6 @@ function judgeTopicScope(actions, nodes, rootId) {
     }
   });
 }
-
-// experiences/visual-map/map-chat-turn-record.ts
-var missedImageRows = (blocks) => blocks.flatMap((block) => {
-  var _a2, _b2;
-  if (block.state === "searching" || placedImage(block)) return [];
-  const why2 = block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", (_a2 = block.reason) != null ? _a2 : "") : (_b2 = block.reason) != null ? _b2 : t("ui.map_chat_images_none");
-  return [{ status: block.state === "failed" ? "failed" : "skipped", text: `${block.nodeTitle}: ${why2}` }];
-});
-var plainLines = (lines) => onceImageLines(lines).flatMap((line2) => {
-  const settled2 = settledLine(line2);
-  return [
-    { status: settled2.status, text: settled2.text, ...settled2.basis ? { basis: settled2.basis } : {} },
-    ...line2.imageGroup ? missedImageRows(line2.imageGroup) : []
-  ];
-});
-var MapChatTurnRecord = class {
-  constructor(writer, conversationId, turn, answer, log) {
-    this.writer = writer;
-    this.conversationId = conversationId;
-    this.turn = turn;
-    this.answer = answer;
-    this.log = log;
-    /** The model's raw output of the attempt that is current (set by `onRaw`). */
-    __publicField(this, "raw", null);
-    /** The follow-ups that went into the turn (the view sets it; read when the turn ends, so only the delivered ones count). */
-    __publicField(this, "steerTexts", () => []);
-    __publicField(this, "ended", false);
-  }
-  /** The turn has not written its end yet. */
-  get isOpen() {
-    return !this.ended;
-  }
-  live() {
-    return this.writer.conversationId === this.conversationId;
-  }
-  /** Writes a line of this turn into its own conversation; a failure to build the line is logged, never thrown into the chat. */
-  write(line2) {
-    if (!this.live()) return;
-    try {
-      this.writer.write(line2);
-    } catch (error) {
-      this.log(error instanceof Error ? error.message : String(error));
-    }
-  }
-  event(kind, extra = {}) {
-    this.write({ type: "event", turn: this.turn, kind, ...extra });
-  }
-  /** The turn ended. Only the first call writes (a late result of a stopped, replaced or closed attempt finds it ended). */
-  end(status, fields = {}) {
-    var _a2, _b2, _c, _d;
-    if (this.ended) return false;
-    this.ended = true;
-    const partial = this.answer.streaming ? this.answer.text : "";
-    const steers = this.steerTexts();
-    this.write({
-      type: "turn_end",
-      turn: this.turn,
-      status,
-      ...fields.reason ? { reason: fields.reason } : {},
-      raw: this.raw,
-      reply: (_a2 = fields.reply) != null ? _a2 : partial,
-      lines: plainLines((_b2 = fields.lines) != null ? _b2 : this.answer.lines),
-      modelLabel: (_c = this.answer.modelLabel) != null ? _c : "",
-      ...((_d = fields.rejected) == null ? void 0 : _d.length) ? { rejected: fields.rejected } : {},
-      ...steers.length ? { steers } : {},
-      ...fields.error ? { error: fields.error } : {}
-    });
-    return true;
-  }
-  /** What became of the plan card of this turn. */
-  plan(state, lines = []) {
-    this.write({ type: "plan", turn: this.turn, state, lines: plainLines(lines) });
-  }
-  /**
-   * The result lines of the turn changed after its end (an expansion that failed): the answer's lines as they are now. Before the
-   * end nothing is written: a `lines` line ahead of `turn_end` would make a restore show those partial lines for the whole turn.
-   */
-  relines() {
-    if (!this.ended) return;
-    this.write({ type: "lines", turn: this.turn, lines: plainLines(this.answer.lines) });
-  }
-  /**
-   * The pictures this turn put into its cards (the failure reasons are in the result lines). One line for the whole turn, the
-   * newest wins: each item is "card: picture title", and every item was inserted. The state is `ready` when any picture was
-   * put in, else `stopped` when every search was stopped, else `failed` / `empty`.
-   */
-  images(block) {
-    var _a2;
-    const blocks = ((_a2 = this.answer.images) == null ? void 0 : _a2.includes(block)) ? this.answer.images : [block];
-    const placed = blocks.flatMap((entry) => {
-      var _a3;
-      const item = placedImage(entry);
-      return item ? [{ title: `${entry.nodeTitle}: ${item.candidate.title}`, sourceUrl: (_a3 = item.candidate.source) != null ? _a3 : "" }] : [];
-    });
-    const ended2 = blocks.filter((entry) => entry.state !== "searching");
-    const state = placed.length ? "ready" : ended2.every((entry) => entry.state === "stopped") ? "stopped" : ended2.some((entry) => entry.state === "failed") ? "failed" : "empty";
-    this.write({
-      type: "images",
-      turn: this.turn,
-      state,
-      items: placed,
-      inserted: placed.map((_, index) => index)
-    });
-  }
-};
 
 // core/map-chat-plan.ts
 var MAP_CHAT_PLAN_ACTION_LIMIT = 15;
@@ -58492,9 +58664,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
         var _a2;
         for (const block of blocks) {
           chat.addImages(block);
-          if (this.chatLastRecord) this.chatImageRecords.set(block, this.chatLastRecord);
+          if (this.chatLastRecord) this.chatRecordSession.images.set(block, this.chatLastRecord);
         }
-        for (const block of blocks) if (block.state !== "searching") (_a2 = this.chatImageRecords.get(block)) == null ? void 0 : _a2.images(block);
+        for (const block of blocks)
+          if (block.state !== "searching") (_a2 = this.chatRecordSession.images.get(block)) == null ? void 0 : _a2.images(block);
       },
       running: (chat, block) => chat.markImagesRunning(block),
       settle: (chat, block, patch) => this.settleChatImages(chat, block, patch)
@@ -58544,19 +58717,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
      * Conversation records (the settings switch "save map AI conversations"). The writer exists only after the switch was on at a use
      * (send, open); with the switch off nothing here runs.
      */
-    __publicField(this, "chatRecords", null);
+    __publicField(this, "chatRecordSession", new MapChatRecordSession(this.chatRecordPorts()));
     __publicField(this, "topicChatRecords", null);
-    __publicField(this, "chatRecordsUnregister", null);
-    /** The highest turn number used in the conversation's record. */
-    __publicField(this, "chatRecordTurnSeq", 0);
-    /** Finished answers that are in the record (written, restored or backfilled). */
-    __publicField(this, "chatRecordLogged", /* @__PURE__ */ new WeakSet());
-    /** The record of the newest turn (running or finished): plan results, picture candidates and undo / redo of it go to its conversation. */
-    __publicField(this, "chatLastRecord", null);
-    __publicField(this, "chatPlanRecords", /* @__PURE__ */ new WeakMap());
-    __publicField(this, "chatImageRecords", /* @__PURE__ */ new WeakMap());
-    /** Counts the times the conversation left its map or began anew: a restore that read the files meanwhile is dropped. */
-    __publicField(this, "chatRecordEpoch", 0);
     /** Stop was pressed while a plan was applying: the plan line says so. */
     __publicField(this, "chatPlanStopped", false);
     /**
@@ -58843,6 +59005,21 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
   get unsynced() {
     var _a2;
     return (_a2 = this.unsyncedPaths) != null ? _a2 : this.unsyncedPaths = new UnsyncedPaths();
+  }
+  // The session's writer and newest turn record, under their old names (the `?.` is for fixtures that never ran the constructor).
+  get chatRecords() {
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.chatRecordSession) == null ? void 0 : _a2.writer) != null ? _b2 : null;
+  }
+  set chatRecords(writer) {
+    this.chatRecordSession.writer = writer;
+  }
+  get chatLastRecord() {
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.chatRecordSession) == null ? void 0 : _a2.last) != null ? _b2 : null;
+  }
+  set chatLastRecord(record) {
+    this.chatRecordSession.last = record;
   }
   /**
    * The one measurer of a text block: its width and height as the browser lays it out. Without `as` a drawn block is read
@@ -77358,7 +77535,7 @@ ${note.detail.trim()}` : "",
                   run
                 );
                 if (record == null ? void 0 : record.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
-                  this.chatRecordLogged.add(turn.assistant);
+                  this.chatRecordSession.markLogged(turn.assistant);
                 this.flushSteers(false);
               }
               return;
@@ -77379,7 +77556,7 @@ ${note.detail.trim()}` : "",
               this.showUnreadResearch(chat, turn, request.context);
               this.markChatTurn(origin, request, entry);
               if (record == null ? void 0 : record.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
-                this.chatRecordLogged.add(turn.assistant);
+                this.chatRecordSession.markLogged(turn.assistant);
               this.finishChatRound(run, { result, context: request.context, lines, work, anchor });
             }
             return;
@@ -77866,7 +78043,7 @@ ${note.detail.trim()}` : "",
     this.clearChatPreview();
     if (pending2) {
       (_c = this.chat) == null ? void 0 : _c.settlePlan(pending2, "cancelled");
-      (_d = this.chatPlanRecords.get(pending2)) == null ? void 0 : _d.plan("cancelled");
+      (_d = this.chatRecordSession.plans.get(pending2)) == null ? void 0 : _d.plan("cancelled");
     }
   }
   planReasonText(reason, result, selectedCount, researchSoFar = 0) {
@@ -77946,11 +78123,11 @@ ${note.detail.trim()}` : "",
         this.chatPlanToken++;
         this.clearChatPreview();
         (_a2 = this.chat) == null ? void 0 : _a2.settlePlan(card, "cancelled");
-        (_b2 = this.chatPlanRecords.get(card)) == null ? void 0 : _b2.plan("cancelled");
+        (_b2 = this.chatRecordSession.plans.get(card)) == null ? void 0 : _b2.plan("cancelled");
         this.interruptChain(run, "plan_cancelled");
       }
     };
-    if (record) this.chatPlanRecords.set(card, record);
+    if (record) this.chatRecordSession.plans.set(card, record);
     chat.showPlan(card);
   }
   async applyChatPlan(card, token, result, baseline, anchor, run = null) {
@@ -77963,7 +78140,7 @@ ${note.detail.trim()}` : "",
       this.interruptChain(run, "map_changed");
       const skip = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
       chat.settlePlan(card, "cancelled", skip);
-      (_a2 = this.chatPlanRecords.get(card)) == null ? void 0 : _a2.plan("cancelled", skip);
+      (_a2 = this.chatRecordSession.plans.get(card)) == null ? void 0 : _a2.plan("cancelled", skip);
       return;
     }
     this.chatApplying = true;
@@ -77991,7 +78168,7 @@ ${note.detail.trim()}` : "",
     }
     if (!this.closed) {
       lines = (_c = chat.settlePlan(card, "applied", lines)) != null ? _c : lines;
-      (_d = this.chatPlanRecords.get(card)) == null ? void 0 : _d.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
+      (_d = this.chatRecordSession.plans.get(card)) == null ? void 0 : _d.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
       if (run) {
         if (stopped()) {
           if (this.chainShows(run)) this.stopChainWork(run);
@@ -78012,27 +78189,41 @@ ${note.detail.trim()}` : "",
       mapId: (_b2 = (_a2 = this.map) == null ? void 0 : _a2.id) != null ? _b2 : ""
     };
   }
-  /** This view's writer, made at the first use while the switch is on (and registered, so the switch reaches it); null while it is off. */
-  ensureChatRecords() {
-    var _a2, _b2;
-    if (this.plugin.settings.mapChatRecords !== true || this.closed) return null;
-    if (!this.chatRecords) {
-      const writer = new MapChatRecordWriter({
-        app: this.plugin.repo.app,
-        log: (level, message) => this.plugin.logs.appendLog(level, message),
-        disposed: () => this.plugin.repo.isDisposed(),
-        // The writer calls this once per conversation; the chat itself goes on.
-        onFailure: () => {
-          new import_obsidian34.Notice(t("ui.map_chat_record_failed"));
-        },
-        pluginVersion: (_b2 = (_a2 = this.plugin.manifest) == null ? void 0 : _a2.version) != null ? _b2 : "0.0.0",
-        configDir: this.app.vault.configDir
-      });
-      writer.setTarget(this.chatRecordTarget());
-      this.chatRecords = writer;
-      this.chatRecordsUnregister = this.plugin.registerMapChatRecordWriter(writer);
-    }
-    return this.chatRecords;
+  /** What the record session reads from this view and the plugin (all lazily: the view's app may not exist yet when it is built). */
+  chatRecordPorts() {
+    const adapter = () => this.plugin.repo.app.vault.adapter;
+    const app = () => this.app;
+    return {
+      enabled: () => this.plugin.settings.mapChatRecords === true,
+      closed: () => this.closed,
+      createWriter: () => {
+        var _a2, _b2;
+        const writer = new MapChatRecordWriter({
+          app: this.plugin.repo.app,
+          log: (level, message) => this.plugin.logs.appendLog(level, message),
+          disposed: () => this.plugin.repo.isDisposed(),
+          // The writer calls this once per conversation; the chat itself goes on.
+          onFailure: () => {
+            new import_obsidian34.Notice(t("ui.map_chat_record_failed"));
+          },
+          pluginVersion: (_b2 = (_a2 = this.plugin.manifest) == null ? void 0 : _a2.version) != null ? _b2 : "0.0.0",
+          configDir: this.app.vault.configDir
+        });
+        return writer;
+      },
+      register: (writer) => this.plugin.registerMapChatRecordWriter(writer),
+      disposed: () => this.plugin.repo.isDisposed(),
+      target: () => this.chatRecordTarget(),
+      log: (message) => this.plugin.logs.appendLog("error", `Map chat record: ${message}`),
+      files: {
+        exists: (path) => adapter().exists(path),
+        list: (dir) => adapter().list(dir),
+        read: (path) => adapter().read(path)
+      },
+      get configDir() {
+        return app().vault.configDir;
+      }
+    };
   }
   /** The settings switch for conversation records was flipped: the panel shows or hides what depends on it. */
   refreshChatRecordsSwitch() {
@@ -78041,87 +78232,25 @@ ${note.detail.trim()}` : "",
   }
   /** Closing the view loses nothing: the switch is on, no write failed, and the record has every finished turn. */
   chatRecordSaved() {
-    var _a2, _b2;
-    const writer = this.chatRecords;
-    if (!writer || this.plugin.settings.mapChatRecords !== true || writer.unsaved) return false;
-    return (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.completedTurns().every((turn) => this.chatRecordLogged.has(turn.answer))) != null ? _b2 : true;
+    var _a2;
+    return this.chatRecordSession.saved((_a2 = this.chat) == null ? void 0 : _a2.completedTurns());
   }
   /** The view closes: the writer takes no new line (what is queued still runs), or none at all once the plugin is unloading. */
   closeChatRecords() {
-    var _a2;
-    const writer = this.chatRecords;
-    if (!writer) return;
-    (_a2 = this.chatRecordsUnregister) == null ? void 0 : _a2.call(this);
-    this.chatRecordsUnregister = null;
-    if (this.plugin.repo.isDisposed()) writer.dispose();
-    else writer.close();
+    this.chatRecordSession.close();
   }
   /** Ends the running turn's record (a no-op when there is none or it already ended). */
   endChatRecord(status, fields) {
-    const record = this.chatLastRecord;
-    if ((record == null ? void 0 : record.isOpen) && record.end(status, fields)) this.chatRecordLogged.add(record.answer);
+    this.chatRecordSession.end(status, fields);
   }
   /**
    * The request went out: writes the turn's start (and, for a conversation that began while the switch was off, its finished
    * turns first). Returns the turn's record, or null with the switch off.
    */
   beginChatRecord(chat, turn, request, origin) {
-    const writer = this.ensureChatRecords();
-    if (!writer) return null;
+    if (!this.chatRecordSession.ensure()) return null;
     try {
-      writer.setTarget(this.chatRecordTarget());
-      const missing = chat.completedTurns().filter((item) => !this.chatRecordLogged.has(item.answer));
-      if (missing.length) {
-        writer.backfill(
-          missing.map((item) => {
-            var _a2, _b2;
-            return {
-              turn: ++this.chatRecordTurnSeq,
-              message: item.question.text,
-              reply: item.answer.text,
-              lines: item.answer.lines.map((line2) => ({ status: settledLine(line2).status, text: settledLine(line2).text })),
-              modelLabel: (_a2 = item.answer.modelLabel) != null ? _a2 : "",
-              steers: ((_b2 = item.question.steers) != null ? _b2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text)
-            };
-          })
-        );
-        for (const item of missing) this.chatRecordLogged.add(item.answer);
-      }
-      chat.conversationId = writer.conversationId;
-      const number = ++this.chatRecordTurnSeq;
-      const record = new MapChatTurnRecord(
-        writer,
-        writer.conversationId,
-        number,
-        turn.assistant,
-        (message) => this.plugin.logs.appendLog("error", `Map chat record: ${message}`)
-      );
-      const chips = origin.chips.map(
-        (chip) => chip.kind === "topic" ? { kind: chip.kind, id: chip.id } : chip.kind === "snippet" ? { kind: chip.kind, path: chip.path, text: chip.text } : { kind: chip.kind, path: chip.path }
-      );
-      record.write({
-        type: "turn_start",
-        turn: number,
-        message: origin.text,
-        ...this.chatAutoApply ? { autoApply: true } : {},
-        ...origin.chain ? {
-          auto: true,
-          round: origin.chain.state.round,
-          ...origin.chain.resumed ? { resumed: true } : {},
-          ...origin.chain.continuation.remaining.trim() ? { remaining: origin.chain.continuation.remaining } : {}
-        } : {},
-        origin: { chips, selectedIds: [...origin.selectedIds] },
-        request: {
-          step: { id: mapChatStep.id, version: mapChatStep.version },
-          model: request.model,
-          reasoning: request.reasoning,
-          language: request.language,
-          contentLanguage: request.contentLanguage,
-          message: request.message,
-          context: request.context
-        }
-      });
-      this.chatLastRecord = record;
+      const record = this.chatRecordSession.begin(chat, turn, request, origin, this.chatAutoApply);
       this.markResearchRecorded(record);
       this.markSourcesRecorded(record);
       this.markOwnFilesRecorded(record);
@@ -78180,14 +78309,7 @@ ${note.detail.trim()}` : "",
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   startChatRecords() {
-    this.chatRecordEpoch++;
-    this.chatRecordTurnSeq = 0;
-    this.chatLastRecord = null;
-    const writer = this.chatRecords;
-    if (writer) {
-      writer.newConversation();
-      writer.setTarget(this.chatRecordTarget());
-    }
+    this.chatRecordSession.restart();
     if (this.plugin.settings.mapChatRecords === true) void this.restoreChatRecords();
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
@@ -78198,29 +78320,7 @@ ${note.detail.trim()}` : "",
     this.resetChatResearch();
     (_a2 = this.chat) == null ? void 0 : _a2.refreshAutoApply();
     this.chatPlanToken++;
-    this.chatRecordEpoch++;
-    this.chatRecordTurnSeq = 0;
-    this.chatLastRecord = null;
-    const writer = this.chatRecords;
-    if (!writer) return;
-    writer.newConversation();
-    writer.setTarget(this.chatRecordTarget());
-  }
-  /** The latest record file of the map's folder, read through the adapter (the Vault index may not list a .jsonl). */
-  async readLatestChatRecord(root) {
-    const adapter = this.plugin.repo.app.vault.adapter;
-    const dir = recordsDir(root, this.app.vault.configDir);
-    if (!await adapter.exists(dir)) return null;
-    const files = [];
-    for (const path of (await adapter.list(dir)).files) {
-      if (!isRecordFilePath(path) || path.slice(0, path.lastIndexOf("/")) !== dir) continue;
-      files.push({
-        id: path.slice(path.lastIndexOf("/") + 1, -".jsonl".length),
-        path,
-        text: await adapter.read(path)
-      });
-    }
-    return pickLatest(files);
+    this.chatRecordSession.restart();
   }
   /**
    * Shows the map's latest saved conversation again and goes on writing to its file. Nothing happens when the file's version is
@@ -78231,18 +78331,17 @@ ${note.detail.trim()}` : "",
     const chat = this.chat;
     const map = this.map;
     if (!chat || !map || !isManagedMapPath(this.plugin.settings, this.path)) return;
-    const writer = this.ensureChatRecords();
-    if (!writer) return;
-    const epoch = this.chatRecordEpoch;
+    if (!this.chatRecordSession.ensure()) return;
+    const epoch = this.chatRecordSession.epoch;
     const mapPath = this.path;
     let latest;
     try {
-      latest = await this.readLatestChatRecord(this.plugin.repo.topicRoot(mapPath));
+      latest = await this.chatRecordSession.readLatest(this.plugin.repo.topicRoot(mapPath));
     } catch (error) {
       this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage3(error)}`);
       return;
     }
-    if (!latest || latest.parsed.unrecoverable || this.closed || epoch !== this.chatRecordEpoch || chat !== this.chat || chat.hasMessages || chat.isBusy || this.chatApplying || this.path !== mapPath || ((_a2 = this.map) == null ? void 0 : _a2.id) !== map.id)
+    if (!latest || latest.parsed.unrecoverable || this.closed || epoch !== this.chatRecordSession.epoch || chat !== this.chat || chat.hasMessages || chat.isBusy || this.chatApplying || this.path !== mapPath || ((_a2 = this.map) == null ? void 0 : _a2.id) !== map.id)
       return;
     const restored = restoreConversation(latest.id, latest.parsed.lines);
     chat.restore(restored);
@@ -78256,26 +78355,14 @@ ${note.detail.trim()}` : "",
       this.chatSourcesMarkedIn = restored.id;
     }
     const handle = this.plugin.repo.app.vault.getAbstractFileByPath((_b2 = latest.path) != null ? _b2 : "");
-    writer.resume(
-      latest.id,
-      handle instanceof import_obsidian34.TFile ? handle : (_c = latest.path) != null ? _c : "",
-      this.chatRecordTarget(),
-      latest.parsed.cleanEnd,
-      restored.startedResearch,
-      restored.readsSources
-    );
-    const numbers = latest.parsed.lines.flatMap(
-      (line2) => "turn" in line2 && typeof line2.turn === "number" ? [line2.turn] : []
-    );
-    writer.markEnded(numbers);
-    this.chatRecordTurnSeq = Math.max(0, ...numbers);
+    this.chatRecordSession.resume(latest, restored, handle instanceof import_obsidian34.TFile ? handle : (_c = latest.path) != null ? _c : "");
     this.chatFiles.restore(restored.id, restored.ownFiles, restored.attachedFiles);
-    for (const item of chat.completedTurns()) this.chatRecordLogged.add(item.answer);
+    for (const item of chat.completedTurns()) this.chatRecordSession.markLogged(item.answer);
     this.relocateMapChat();
   }
   settleChatImages(chat, block, patch) {
     chat.settleImages(block, patch);
-    const record = this.chatImageRecords.get(block);
+    const record = this.chatRecordSession.images.get(block);
     record == null ? void 0 : record.images(block);
     record == null ? void 0 : record.relines();
   }

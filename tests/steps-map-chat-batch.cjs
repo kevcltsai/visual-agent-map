@@ -233,7 +233,7 @@ async function rig(options = {}) {
   const chat = chatStub();
   const nodes = ids(6).map(topic => ({ ...topic, path: `Maps/${topic.id}.md` }));
   Object.assign(instance, {
-    closed: false, chat, chatConversation: 1, chatLastRecord: null, chatResearched: new Map(), map: { nodes },
+    closed: false, chat, chatConversation: 1, chatRecordSession: { writer: null, last: null }, chatResearched: new Map(), map: { nodes },
     selection: { state: { multiSelected: new Set() }, chatSelect(list) { this.state.multiSelected = new Set(list); } },
     plugin: { settings: { mapChatRecords: false }, expansionCoordinator: { isRunning: () => options.running === true } },
     notes: new Map(nodes.map(node => [node.id, { title: node.title }])),
@@ -296,8 +296,8 @@ async function chatRig() {
   const r = await rig();
   const writes = [];
   Object.assign(r.instance, {
-    aiLockReason: () => null, chatStartedResearch: false, chatLastRecord: { turn: 3 },
-    chatRecords: { conversationId: 'c1', write: line => writes.push(JSON.parse(JSON.stringify(line))) },
+    aiLockReason: () => null, chatStartedResearch: false,
+    chatRecordSession: { last: { turn: 3 }, writer: { conversationId: 'c1', write: line => writes.push(JSON.parse(JSON.stringify(line))) } },
     freshNotesOf: async () => new Map(), chatSelectionIds: () => [],
     map: { aiMode: 'standard', nodes: r.nodes }
   });

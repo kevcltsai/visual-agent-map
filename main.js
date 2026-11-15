@@ -45967,6 +45967,7 @@ function renderTaskSteer(text10) {
 }
 
 // core/ai-task-service.ts
+var CONDENSE_EXTRACT_CONCURRENCY = 3;
 var FIRST_EVENT_WAIT_MS = 2e4;
 function cancelled() {
   const error = new Error(t("ui.ai_task_cancelled"));
@@ -46552,52 +46553,68 @@ var AiTaskService = class {
     }
   }
   async extractReferenceFindings(context, model, reasoning, signal, onRequestAccepted) {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     let working = referenceBatches((_a2 = context.referenceGroups) != null ? _a2 : []);
     let round3 = 0;
     let sent = 0;
     while (true) {
       round3++;
       const batches = round3 === 1 ? working : packReferenceChunks(working);
-      const findings = [];
-      for (let index = 0; index < batches.length; index++) {
-        if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
-        if (++sent > MAX_CONDENSE_CALLS) throw new Error(t("ui.source_context_exceeds_budget"));
-        (_b2 = context.onProgress) == null ? void 0 : _b2.call(context, t("ui.reference_processing_progress", index + 1, batches.length));
-        const result = await this.execute(
-          {
-            title: context.title,
-            summary: "",
-            rules: "",
-            detail: "",
-            task: referenceTask(round3 === 1 ? "extract" : "reduce", this.options.language()),
-            ancestors: "",
-            sourceContext: batches[index],
-            mode: "task",
-            researchMode: "local",
-            researchDepth: "fast",
-            visualMode: "off",
-            intermediateDetail: true,
-            ...context.usageMapPath ? { usageMapPath: context.usageMapPath } : {},
-            // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
-            ...context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {}
-          },
-          model,
-          reasoning,
-          signal,
-          void 0,
-          onRequestAccepted,
-          void 0,
-          void 0,
-          round3 === 1 ? "reference-extract" : "reference-reduce"
-        );
-        if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
-        findings.push(result.detail.trim());
-      }
+      const findings = new Array(batches.length);
+      const slots = round3 === 1 ? Math.min(CONDENSE_EXTRACT_CONCURRENCY, batches.length) : 1;
+      let next = 0;
+      let failed = false;
+      const worker = async () => {
+        var _a3;
+        while (next < batches.length && !failed) {
+          const index = next++;
+          if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
+          if (++sent > MAX_CONDENSE_CALLS) throw new Error(t("ui.source_context_exceeds_budget"));
+          (_a3 = context.onProgress) == null ? void 0 : _a3.call(context, t("ui.reference_processing_progress", index + 1, batches.length));
+          const result = await this.execute(
+            {
+              title: context.title,
+              summary: "",
+              rules: "",
+              detail: "",
+              task: referenceTask(round3 === 1 ? "extract" : "reduce", this.options.language()),
+              ancestors: "",
+              sourceContext: batches[index],
+              mode: "task",
+              researchMode: "local",
+              researchDepth: "fast",
+              visualMode: "off",
+              intermediateDetail: true,
+              ...context.usageMapPath ? { usageMapPath: context.usageMapPath } : {},
+              // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
+              ...context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {}
+            },
+            model,
+            reasoning,
+            signal,
+            void 0,
+            onRequestAccepted,
+            void 0,
+            void 0,
+            round3 === 1 ? "reference-extract" : "reference-reduce"
+          );
+          if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
+          findings[index] = result.detail.trim();
+        }
+      };
+      await Promise.all(
+        Array.from(
+          { length: slots },
+          () => worker().catch((error) => {
+            failed = true;
+            throw error;
+          })
+        )
+      );
       const joined = findings.map((value) => `Evidence:
 ${value}`).join("\n\n");
       if (joined.length <= 18e3) {
-        (_c = context.onProgress) == null ? void 0 : _c.call(context, "");
+        (_b2 = context.onProgress) == null ? void 0 : _b2.call(context, "");
         return joined;
       }
       if (joined.length >= working.reduce((sum2, value) => sum2 + value.length, 0)) {
@@ -90346,6 +90363,7 @@ function parseImageCandidates(raw) {
 }
 
 // experiences/visual-map/expansion-batch.ts
+var MAX_BATCH_CONCURRENCY = 6;
 var ShallowExpansionCoordinator = class {
   constructor(activeTasks, states) {
     this.activeTasks = activeTasks;
@@ -90420,7 +90438,7 @@ var ShallowExpansionCoordinator = class {
         }
       };
       try {
-        await Promise.all(Array.from({ length: Math.min(3, children.length) }, () => worker()));
+        await Promise.all(Array.from({ length: Math.min(MAX_BATCH_CONCURRENCY, children.length) }, () => worker()));
       } finally {
         state.status = controller.signal.aborted ? "stopped" : "completed";
         state.currentPath = void 0;

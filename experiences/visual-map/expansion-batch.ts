@@ -1,5 +1,8 @@
 import type { MapNode } from "../../map-model";
 
+/** How many children of one batch research at the same time (argument research allows up to 9). */
+export const MAX_BATCH_CONCURRENCY = 6;
+
 export interface ExpansionBatchState {
   parentPath: string;
   controller: AbortController;
@@ -96,7 +99,7 @@ export class ShallowExpansionCoordinator {
         }
       };
       try {
-        await Promise.all(Array.from({ length: Math.min(3, children.length) }, () => worker()));
+        await Promise.all(Array.from({ length: Math.min(MAX_BATCH_CONCURRENCY, children.length) }, () => worker()));
       } finally {
         state.status = controller.signal.aborted ? "stopped" : "completed";
         state.currentPath = undefined;

@@ -1460,6 +1460,8 @@ var en = {
   "ui.map_chat_batch_left_0": "Not done: {0}",
   "ui.map_chat_batch_more_0": "and {0} more",
   "ui.map_chat_batch_rerun_0": "Run the {0} not done again",
+  "ui.map_chat_chain_interrupted_0_1": "The automatic continuation was cut off when the plugin reloaded: it stopped at round {0} of {1}.",
+  "ui.map_chat_chain_resume_0": "Continue from round {0}",
   "ui.map_chat_batch_running_0": "Running {0} again\u2026",
   "ui.map_chat_plan_summary_0": "This plan needs your confirmation: {0}.",
   "ui.map_chat_plan_group_create_0": "Add or create ({0})",
@@ -4364,6 +4366,8 @@ var zhCN = {
   "ui.map_chat_batch_left_0": "\u6CA1\u505A\u7684\uFF1A{0}",
   "ui.map_chat_batch_more_0": "\u7B49 {0} \u7BC7",
   "ui.map_chat_batch_rerun_0": "\u91CD\u8DD1\u6CA1\u505A\u7684 {0} \u7BC7",
+  "ui.map_chat_chain_interrupted_0_1": "\u81EA\u52A8\u63A5\u7EED\u5728\u63D2\u4EF6\u91CD\u65B0\u52A0\u8F7D\u65F6\u4E2D\u65AD\uFF1A\u505C\u5728\u7B2C {0}\uFF0F{1} \u8F6E\u3002",
+  "ui.map_chat_chain_resume_0": "\u4ECE\u7B2C {0} \u8F6E\u63A5\u7740\u505A",
   "ui.map_chat_batch_running_0": "\u6B63\u5728\u91CD\u8DD1 {0} \u7BC7\u2026",
   "ui.map_chat_plan_summary_0": "\u8FD9\u4EFD\u8BA1\u5212\u9700\u8981\u4F60\u786E\u8BA4\uFF1A{0}\u3002",
   "ui.map_chat_plan_group_create_0": "\u65B0\u589E\u6216\u5EFA\u7ACB\uFF08{0}\uFF09",
@@ -7268,6 +7272,8 @@ var zhTW = {
   "ui.map_chat_batch_left_0": "\u6C92\u505A\u7684\uFF1A{0}",
   "ui.map_chat_batch_more_0": "\u7B49 {0} \u7BC7",
   "ui.map_chat_batch_rerun_0": "\u91CD\u8DD1\u6C92\u505A\u7684 {0} \u7BC7",
+  "ui.map_chat_chain_interrupted_0_1": "\u81EA\u52D5\u63A5\u7E8C\u5728\u5916\u639B\u91CD\u65B0\u8F09\u5165\u6642\u4E2D\u65B7\uFF1A\u505C\u5728\u7B2C {0}\uFF0F{1} \u8F2A\u3002",
+  "ui.map_chat_chain_resume_0": "\u5F9E\u7B2C {0} \u8F2A\u63A5\u8457\u505A",
   "ui.map_chat_batch_running_0": "\u6B63\u5728\u91CD\u8DD1 {0} \u7BC7\u2026",
   "ui.map_chat_plan_summary_0": "\u9019\u4EFD\u8A08\u756B\u9700\u8981\u4F60\u78BA\u8A8D\uFF1A{0}\u3002",
   "ui.map_chat_plan_group_create_0": "\u65B0\u589E\u6216\u5EFA\u7ACB\uFF08{0}\uFF09",
@@ -39572,6 +39578,29 @@ function finishWait(state, end) {
   if (!state.wrote && researchSucceeded === 0 && expandSucceeded === 0) return ended(state, "no_progress");
   return startNext(state);
 }
+var MAP_CHAT_CHAIN_RESUMABLE = /* @__PURE__ */ new Set([
+  "stopped",
+  "plan_cancelled",
+  "research_stopped",
+  "failed",
+  "wait_timeout",
+  "no_progress",
+  "max_rounds"
+]);
+function resumeRound(end) {
+  if (end.reason !== null && !MAP_CHAT_CHAIN_RESUMABLE.has(end.reason)) return null;
+  let round3 = end.round;
+  let remaining = end.startRemaining;
+  if (end.applied) {
+    round3 += 1;
+    remaining = end.replyRemaining;
+    if (!remaining) return null;
+  }
+  if (!Number.isInteger(round3) || round3 < 2) return null;
+  return { round: round3, maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS * Math.ceil(round3 / MAP_CHAT_CHAIN_MAX_ROUNDS), remaining };
+}
+var RESUME_KEYWORDS = /* @__PURE__ */ new Set(["\u7E7C\u7E8C", "\u7EE7\u7EED", "\u63A5\u8457\u505A", "\u63A5\u7740\u505A", "continue", "resume", "goon"]);
+var isResumeKeyword = (text10) => RESUME_KEYWORDS.has(text10.normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]/gu, ""));
 
 // core/map-chat-batch.ts
 function summarizeChatBatch(batch, restored) {
@@ -40882,6 +40911,7 @@ var MapChatPanel = class {
       (message) => message.choices && !message.choices.picked ? [message.choices] : []
     );
     this.retireChoices();
+    for (const message of this.messages) delete message.resume;
     const user = {
       role: "user",
       text: userText,
@@ -41536,6 +41566,25 @@ ${typed}` : draft;
     last.batch = batch;
     return last;
   }
+  /** The chain that just ended can go on: the last reply gets the box with the next round (after {@link endChain} told why it ended). */
+  offerResume(resume) {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return;
+    last.resume = { ...resume, conversationId: this.conversationId };
+    this.renderLog();
+  }
+  /** The resume point of the last reply, or null (nothing to resume, or the panel is working). */
+  resumePoint() {
+    const last = this.messages.at(-1);
+    return (last == null ? void 0 : last.role) === "assistant" && last.resume && !this.working ? last.resume : null;
+  }
+  /** The point is used up: the box goes away and the row is laid out again. */
+  dropResume(point) {
+    const held = this.messages.find((message) => message.resume === point);
+    if (!held) return;
+    delete held.resume;
+    this.renderLog();
+  }
   /** The batch of `message` changed: its row is laid out again, the keyboard stays on the box, and the reader hears a finished one once. */
   refreshBatch(message) {
     var _a2, _b2;
@@ -41716,6 +41765,10 @@ ${typed}` : draft;
         if (text10) answer.chainNote = { reason: end.reason, text: text10 };
       }
       if (turn.batch) answer.batch = { ...turn.batch, restored: true };
+      if (conversation.resume && turn.turn === conversation.resume.turn) {
+        const { turn: _turn, ...point } = conversation.resume;
+        answer.resume = { ...point, conversationId: conversation.id };
+      }
       this.messages.push(answer);
     }
     const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
@@ -42533,7 +42586,7 @@ ${shown}` : t("ui.map_chat_model_label"));
   }
   /** Everything a message row shows; the row is rebuilt only when this changes. */
   rowKey(message) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     const asked = this.messages[this.messages.indexOf(message) - 1];
     return [
       message.role,
@@ -42556,12 +42609,15 @@ ${shown}` : t("ui.map_chat_model_label"));
       this.chainWaitingState && this.messages.at(-1) === message ? `wait:${this.chainWaitingState.kinds.join(",")}:${this.chainWaitingLeft}:${this.waitWord(this.chainWaitingState)}` : "",
       message.chainNote ? `chain:${message.chainNote.reason}:${message.chainNote.text}` : "",
       message.batch ? `batch:${message.batch.topics.length}:${message.batch.succeeded.length}:${message.batch.failed.length}:${message.batch.ended ? 1 : 0}:${message.batch.running ? 1 : 0}:${message.batch.restored ? 1 : 0}:${message.batch.topics.map((topic) => topic.id).join(",")}:${this.host.rerunBatch ? 1 : 0}` : "",
+      this.resumeShown(message) ? `resume:${message.resume.round}:${message.resume.maxRounds}:${(_i = message.resume.reason) != null ? _i : ""}:${message.resume.remaining}:${this.working ? 1 : 0}:${this.host.resumeChain ? 1 : 0}` : "",
+      t("ui.map_chat_chain_interrupted_0_1", "", ""),
+      t("ui.map_chat_chain_resume_0", ""),
       t("ui.map_chat_batch_left_0", ""),
       t("ui.map_chat_batch_more_0", 0),
       t("ui.map_chat_batch_rerun_0", 0),
       t("ui.map_chat_batch_running_0", 0),
       t("ui.map_chat_batch_stopped_0_1_2", 0, 0, 0),
-      ((_i = message.unread) != null ? _i : []).map((item) => `${item.oversize ? "o" : "d"}:${item.title}`).join("\n"),
+      ((_j = message.unread) != null ? _j : []).map((item) => `${item.oversize ? "o" : "d"}:${item.title}`).join("\n"),
       JSON.stringify(message.lines.map((line2) => {
         var _a3;
         return (_a3 = line2.basis) != null ? _a3 : null;
@@ -42570,7 +42626,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_chain_wait_tail"),
       t("ui.map_chat_seen_image_0", ""),
       t("ui.map_chat_undo_reply"),
-      ((_j = message.steers) != null ? _j : []).map((steer) => `${steer.state}:${steer.text}`).join("\n"),
+      ((_k = message.steers) != null ? _k : []).map((steer) => `${steer.state}:${steer.text}`).join("\n"),
       t("ui.map_chat_steer_tag_live"),
       t("ui.map_chat_steer_tag_queued"),
       t("ui.map_chat_retry"),
@@ -42581,14 +42637,14 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_plan_title_applied"),
       t("ui.map_chat_plan_title_cancelled"),
       t("ui.map_chat_role_you"),
-      message.role === "assistant" ? (_k = message.modelLabel) != null ? _k : "" : "",
+      message.role === "assistant" ? (_l = message.modelLabel) != null ? _l : "" : "",
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
       message.lines.map(settledLine).map((line2) => `${line2.status}:${line2.text}`).join("\n"),
-      message.plan ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.aiWork ? "ai:" : ""}${message.plan.openGroups ? "open:" : ""}${message.plan.items.length}:${message.plan.estimate}:${(_m = (_l = message.plan.groups) == null ? void 0 : _l.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _m : ""}` : "",
+      message.plan ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.aiWork ? "ai:" : ""}${message.plan.openGroups ? "open:" : ""}${message.plan.items.length}:${message.plan.estimate}:${(_n = (_m = message.plan.groups) == null ? void 0 : _m.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _n : ""}` : "",
       message.choices ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
-      ((_n = message.images) != null ? _n : []).map(
+      ((_o = message.images) != null ? _o : []).map(
         (block) => {
           var _a3;
           return `images:${block.stale ? "stale:" : ""}${block.state}:${block.running ? 1 : 0}:${block.nodeTitle}:${(_a3 = block.reason) != null ? _a3 : ""}:${block.items.map((item) => {
@@ -42631,6 +42687,34 @@ ${shown}` : t("ui.map_chat_model_label"));
       var _a2, _b2;
       return (_b2 = (_a2 = this.host).rerunBatch) == null ? void 0 : _b2.call(_a2, message);
     });
+  }
+  /** A batch the chat started that was cut or is running shows its own box first; the resume box waits for it. */
+  resumeShown(message) {
+    if (!message.resume) return false;
+    const batch = message.batch;
+    return !(batch && (batch.restored && !batch.ended || batch.running));
+  }
+  /** What an interrupted chain says and the one button that goes on with the next round. */
+  buildResume(row, message, point) {
+    const box = row.createDiv({ cls: "vam-map-chat-batch vam-map-chat-resume", attr: { role: "status", tabindex: "-1" } });
+    if (point.reason === null)
+      box.createDiv({
+        cls: "vam-map-chat-batch-title",
+        text: t("ui.map_chat_chain_interrupted_0_1", point.stoppedRound, point.maxRounds)
+      });
+    if (point.remaining.trim())
+      box.createDiv({ cls: "vam-map-chat-batch-left", text: t("ui.map_chat_chain_left_0", point.remaining) });
+    const run = box.createEl("button", {
+      cls: "vam-map-chat-batch-rerun vam-map-chat-resume-run",
+      text: t("ui.map_chat_chain_resume_0", point.round),
+      attr: { type: "button" }
+    });
+    run.disabled = this.working;
+    if (!this.host.resumeChain) this.makeInert(run);
+    else run.addEventListener("click", () => this.handOffFocus(() => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.host).resumeChain) == null ? void 0 : _b2.call(_a2, message);
+    }));
   }
   canRetry(message, asked) {
     return message.role === "assistant" && !!message.error && !message.streaming && !!(asked == null ? void 0 : asked.origin) && !!this.host.retry;
@@ -42715,6 +42799,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     if (message.chainNote)
       row.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
     if (message.batch) this.buildBatch(row, message, message.batch);
+    if (this.resumeShown(message) && message.resume) this.buildResume(row, message, message.resume);
     if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row, message.replyUndo.token);
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
@@ -52451,6 +52536,7 @@ function restoreConversation(id, lines) {
       ...batches.has(number) ? { batch: batches.get(number) } : {}
     });
   }
+  const resume = chainResumeOf(lines, turns);
   return {
     id,
     mapPath,
@@ -52458,7 +52544,72 @@ function restoreConversation(id, lines) {
     turns,
     restoredAt: turns.length ? turns[turns.length - 1].at : null,
     startedResearch,
-    readsSources
+    readsSources,
+    ...resume ? { resume } : {}
+  };
+}
+var resultStatus = (status) => status === "done" ? "done" : status === "skipped" ? "skipped" : "failed";
+function chainResumeOf(lines, turns) {
+  var _a2, _b2, _c;
+  if (!turns.length) return null;
+  let last = null;
+  for (const line2 of lines) if (line2.type === "turn_start") last = line2;
+  if (!last) return null;
+  const number = last.turn;
+  let round3 = 1;
+  if (last.auto === true) {
+    if (typeof last.round !== "number" || !Number.isInteger(last.round) || last.round < 2) return null;
+    round3 = last.round;
+  }
+  let reason = null;
+  let endRemaining = null;
+  let turnEnd = null;
+  let plan = null;
+  for (const line2 of lines) {
+    if (line2.type === "turn_end" && line2.turn === number) turnEnd = line2;
+    else if (line2.type === "plan" && line2.turn === number) plan = line2;
+    else if (line2.type === "event" && line2.kind === "chain_end" && line2.turn === number) {
+      const known = MAP_CHAT_CHAIN_END_REASONS.find((item) => item === line2.reason);
+      if (!known) return null;
+      if (known === "map_changed") continue;
+      reason = known;
+      endRemaining = typeof line2.remaining === "string" ? line2.remaining.slice(0, 1e3) : null;
+    }
+  }
+  const applied = !!turnEnd && (turnEnd.status === "done" || turnEnd.status === "plan" && (plan == null ? void 0 : plan.state) === "applied");
+  let replyRemaining = endRemaining;
+  if (replyRemaining === null) {
+    replyRemaining = "";
+    if (turnEnd && typeof turnEnd.raw === "string") {
+      try {
+        replyRemaining = normalizeRemaining((_a2 = JSON.parse(turnEnd.raw)) == null ? void 0 : _a2.remaining);
+      } catch (e) {
+        replyRemaining = "";
+      }
+    }
+  }
+  const startRemaining = typeof last.remaining === "string" ? last.remaining.slice(0, 1e3) : "";
+  const next = resumeRound({ reason, round: round3, applied, startRemaining, replyRemaining });
+  if (!next) return null;
+  let lastApplied = null;
+  for (let i = turns.length - 1; i >= 0 && !lastApplied; i--) {
+    const turn = turns[i];
+    if (turn.status === "done" || turn.planState === "applied") lastApplied = turn;
+  }
+  const results = lastApplied ? (_b2 = lastApplied.planLines) != null ? _b2 : lastApplied.lines : [];
+  return {
+    turn: turns[turns.length - 1].turn,
+    round: next.round,
+    maxRounds: next.maxRounds,
+    remaining: next.remaining,
+    stoppedRound: next.round,
+    reason,
+    message: typeof last.message === "string" ? last.message : "",
+    selectedIds: Array.isArray((_c = last.origin) == null ? void 0 : _c.selectedIds) ? last.origin.selectedIds.filter((id) => typeof id === "string") : [],
+    lastResults: results.map((item) => {
+      var _a3;
+      return { text: String((_a3 = item == null ? void 0 : item.text) != null ? _a3 : ""), status: resultStatus(item == null ? void 0 : item.status) };
+    })
   };
 }
 
@@ -77682,6 +77833,7 @@ ${note.detail.trim()}` : "",
       retry: (origin) => {
         void this.sendMapChat(origin);
       },
+      resumeChain: (message) => this.resumeChatChain(message),
       rerunBatch: (message) => {
         void this.rerunChatBatch(message).catch((error) => errorNotice(error));
       },
@@ -78182,6 +78334,13 @@ ${note.detail.trim()}` : "",
     if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map || this.notesLoading()) return;
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
+    if (!again && isResumeKeyword(message)) {
+      const last = chat.transcript().at(-1);
+      if ((last == null ? void 0 : last.resume) && this.resumeChatChain(last)) {
+        chat.clearDraft();
+        return;
+      }
+    }
     const autoOrigin = again == null ? void 0 : again.chain;
     if (!autoOrigin) this.interruptChain(this.chatChain, "user_took_over");
     const origin = again ? { ...again } : {
@@ -78571,12 +78730,13 @@ ${note.detail.trim()}` : "",
    * state saved in its origin, without counting it twice.
    */
   chainForRound(origin, anchor, message) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const live2 = this.chatChain;
     if (origin && live2 && live2.seq === origin.seq && live2.state.phase === "round") {
       live2.anchor = anchor;
       live2.message = message;
       live2.replyRemaining = origin.continuation.remaining;
+      live2.roundRemaining = origin.continuation.remaining;
       return live2;
     }
     if (live2) this.interruptChain(live2, "user_took_over");
@@ -78596,10 +78756,51 @@ ${note.detail.trim()}` : "",
       partial: null,
       work: null,
       timer: null,
-      waitShown: false
+      waitShown: false,
+      aiSelection: (origin == null ? void 0 : origin.aiSelection) ? [...origin.aiSelection] : null,
+      roundRemaining: (_e = origin == null ? void 0 : origin.continuation.remaining) != null ? _e : ""
     };
     this.chatChain = run;
     return run;
+  }
+  /** The cards of an earlier AI selection that are still on the map. */
+  chainSelection(ids2) {
+    const map = this.map;
+    return map ? ids2.filter((id) => map.nodes.some((node) => node.id === id)) : [];
+  }
+  /**
+   * Sends the round after an interrupted chain (the button under the last reply, or the word "continue"). Every guard that fails
+   * leaves the resume point where it is; once it passes the point is used up before anything is sent, so a second press sends nothing.
+   */
+  resumeChatChain(message) {
+    const chat = this.chat;
+    const point = message.resume;
+    if (!chat || !point || chat.isBusy || this.chatApplying || this.closed || !this.map || this.notesLoading() || this.chatChain || point !== chat.resumePoint() || point.conversationId !== chat.conversationId)
+      return false;
+    delete message.resume;
+    chat.dropResume(point);
+    const selected = this.chainSelection(point.selectedIds);
+    const origin = {
+      text: point.message,
+      chips: [],
+      selectedIds: selected.length ? selected : this.chatSelectionIds(),
+      chain: {
+        seq: 0,
+        resumed: true,
+        ...selected.length ? { aiSelection: selected } : {},
+        state: { ...startChain(point.maxRounds), round: point.round, remaining: point.remaining },
+        createdIds: [],
+        continuation: {
+          round: point.round,
+          maxRounds: point.maxRounds,
+          remaining: point.remaining,
+          lastResults: point.lastResults,
+          research: []
+        }
+      }
+    };
+    void this.sendMapChat(origin).catch((error) => errorNotice(error));
+    return true;
   }
   /** The continuation is more than a single answer (a later round, or one that said something was left): its end is told and recorded. */
   chainShows(run) {
@@ -78610,11 +78811,12 @@ ${note.detail.trim()}` : "",
     if (!run) return;
     const step = interrupt(run.state, reason);
     if (step.decision.kind !== "end") return;
+    const applied = run.state.phase === "waiting";
     run.state = step.state;
-    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining);
+    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining, applied);
   }
   /** The chain is over: its timer and wait go, the end is recorded, and (unless it simply finished) the panel says why. */
-  endChatChain(run, reason, remaining) {
+  endChatChain(run, reason, remaining, applied = true) {
     var _a2;
     if (this.chatChain === run) this.chatChain = null;
     if (run.timer !== null) window.clearTimeout(run.timer);
@@ -78626,8 +78828,25 @@ ${note.detail.trim()}` : "",
     run.waitShown = false;
     if (!this.chainShows(run)) return;
     (_a2 = this.chatLastRecord) == null ? void 0 : _a2.event("chain_end", { reason, round: run.state.round, remaining });
-    if (chat && (chainEndNeedsNotice(reason) || reason === "done" && run.state.round >= 2))
+    if (chat && (chainEndNeedsNotice(reason) || reason === "done" && run.state.round >= 2)) {
+      const next = reason === "failed" ? null : resumeRound({
+        reason,
+        round: run.state.round,
+        applied,
+        startRemaining: run.roundRemaining,
+        replyRemaining: remaining
+      });
       chat.endChain(reason, remaining, run.details.length ? run.details : void 0);
+      if (next)
+        chat.offerResume({
+          ...next,
+          stoppedRound: run.state.round,
+          reason,
+          message: run.message,
+          selectedIds: run.aiSelection ? [...run.aiSelection] : [],
+          lastResults: run.lastResults.map((line2) => ({ text: line2.text, status: line2.status }))
+        });
+    }
   }
   /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
   stopChainWork(run) {
@@ -78647,6 +78866,7 @@ ${note.detail.trim()}` : "",
     if (this.chatChain !== run || run.state.phase === "ended") return;
     run.partial = null;
     for (const id of round3.work.created) run.createdIds.add(id);
+    if (round3.work.selected) run.aiSelection = [...round3.work.selected];
     run.lastResults = chatResultLines(round3.lines).map((line2) => ({ text: line2.text, status: line2.status }));
     run.anchor = { path: round3.anchor.path, id: round3.anchor.id };
     const step = finishRound(run.state, {
@@ -78778,9 +78998,10 @@ ${note.detail.trim()}` : "",
       // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
       // a picture is sent with the first round only and a follow-up adds no chip.
       chips: [...run.chips],
-      selectedIds: this.chatSelectionIds(),
+      selectedIds: run.aiSelection ? this.chainSelection(run.aiSelection) : this.chatSelectionIds(),
       chain: {
         seq: run.seq,
+        ...run.aiSelection ? { aiSelection: [...run.aiSelection] } : {},
         state: run.state,
         createdIds: [...run.createdIds],
         continuation: {
@@ -79034,6 +79255,7 @@ ${note.detail.trim()}` : "",
         ...origin.chain ? {
           auto: true,
           round: origin.chain.state.round,
+          ...origin.chain.resumed ? { resumed: true } : {},
           ...origin.chain.continuation.remaining.trim() ? { remaining: origin.chain.continuation.remaining } : {}
         } : {},
         origin: { chips, selectedIds: [...origin.selectedIds] },
@@ -80776,6 +80998,7 @@ ${note.detail.trim()}` : "",
       const ids2 = action.all ? map.nodes.map((node) => node.id) : known(action.nodeIds);
       if (!ids2.length) return skipped("ui.map_chat_skip_topic_gone");
       this.chatSelect(ids2);
+      if (work) work.selected = ids2;
       return { status: "done" };
     }
     if (!this.canSelectTopics()) return skipped("ui.map_chat_skip_unavailable");

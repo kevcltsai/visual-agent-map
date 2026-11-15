@@ -1408,6 +1408,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_batch_left_0": "沒做的：{0}",
   "ui.map_chat_batch_more_0": "等 {0} 篇",
   "ui.map_chat_batch_rerun_0": "重跑沒做的 {0} 篇",
+  "ui.map_chat_chain_interrupted_0_1": "自動接續在外掛重新載入時中斷：停在第 {0}／{1} 輪。",
+  "ui.map_chat_chain_resume_0": "從第 {0} 輪接著做",
   "ui.map_chat_batch_running_0": "正在重跑 {0} 篇…",
   "ui.map_chat_plan_summary_0": "這份計畫需要你確認：{0}。",
   "ui.map_chat_plan_group_create_0": "新增或建立（{0}）",

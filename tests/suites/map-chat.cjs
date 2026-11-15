@@ -8964,13 +8964,13 @@ integrationTest('resume: the cards the AI selected stay with the chain - a clear
     h.type('go'); await h.view.sendMapChat(); return { h, chat, runs };
   };
   { const { h, runs } = await selectChain(x => [x.ids.a, x.ids.b]); assert.equal(h.view.chatChain.state.phase, 'waiting');
-    h.view.selection.state.multiSelected.clear(); h.view.selection.state.selected = null; settleRun(runs[0]); await until(() => h.control.requests.length === 2 && !h.chat?.isBusy);
+    h.view.chatSelect([h.ids.c]); settleRun(runs[0]); await until(() => h.control.requests.length === 2 && !h.chat?.isBusy);
     eq(contextOf(h.control.requests[1]).selected.map(item => item.id), [h.ids.a, h.ids.b], 'round 2 reads what the AI selected'); }
-  { const { h, runs } = await selectChain(x => [x.ids.a, x.ids.c]); h.view.selection.state.multiSelected.clear(); h.view.selection.state.selected = null;
+  { const { h, runs } = await selectChain(x => [x.ids.a, x.ids.c]); h.view.chatSelect([h.ids.b]);
     h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.c); settleRun(runs[0]); await until(() => h.control.requests.length === 2);
     eq(contextOf(h.control.requests[1]).selected.map(item => item.id), [h.ids.a], 'a card that is gone is skipped'); }
   { const h = await harness(); await h.view.hydrate(); const chat = h.open(); const runs = researchStub(h);
     chainReplies(h, say('Researching.', [{ kind: 'select_topics', nodeIds: [h.ids.a], all: false }].slice(0, 0).concat([addRoot('r', 'Pstack'), researchAct({ nodeIds: ['new:r'] })]), 'More'), say('Built.', [], ''));
-    h.type('go'); await h.view.sendMapChat(); h.view.selection.state.multiSelected.clear(); h.view.selection.state.selected = h.ids.b; settleRun(runs[0]); await until(() => h.control.requests.length === 2 && !chat.isBusy);
+    h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain?.state.phase === 'waiting'); h.view.chatSelect([h.ids.b]); settleRun(runs[0]); await until(() => h.control.requests.length === 2 && !chat.isBusy);
     eq(contextOf(h.control.requests[1]).selected.map(item => item.id), [h.ids.b], 'never selected by the AI: the selection of the moment, as before'); }
 });

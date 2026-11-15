@@ -11,6 +11,7 @@ import {
   type MapChatChainState,
   type MapChatChainWaiting
 } from "../../core/map-chat-chain";
+import type { RestoredChainResume } from "../../core/map-chat-records";
 import { summarizeChatBatch, type ChatBatch, type ChatBatchSummary } from "../../core/map-chat-batch";
 import { renderChatMarkdown } from "../../core/map-chat-render";
 import { hasUnsavedChat } from "../../core/map-chat-transcript";
@@ -139,7 +140,13 @@ export interface MapChatChainOrigin {
   continuation: MapChatContinuationInput;
   /** Cards the chain created so far (real ids); a retry of the round starts from them. */
   createdIds?: string[];
+  /** A round that goes on from a record after an interruption (not a round the live chain made). */
+  resumed?: true;
+  /** The cards the AI selected in an earlier round: later rounds read these, not the selection of the moment. */
+  aiSelection?: string[];
 }
+/** Where an interrupted chain goes on: kept on the last reply of the panel until a new message, a resume or a restore replaces it. */
+export type MapChatResumePoint = Omit<RestoredChainResume, "turn"> & { conversationId: string | null };
 
 /** A reply that waits for the user's yes: what it would do, what it costs, and the two buttons. */
 export interface MapChatPlanCard {
@@ -287,6 +294,8 @@ export interface MapChatMessage {
   chainNote?: { reason: MapChatChainEndReason; text: string };
   /** On an assistant message: the research batch this turn started (the view keeps it up to date); `restored` = read back from a record. */
   batch?: ChatBatch & { running?: boolean; restored?: boolean };
+  /** On the last assistant message: the interrupted chain can go on from here (in memory only). */
+  resume?: MapChatResumePoint;
   /** On an assistant message: research notes of the conversation this round did not read (in memory only). */
   unread?: { title: string; oversize: boolean }[];
 }
@@ -305,7 +314,11 @@ export interface MapChatRestoredConversation {
   id: string;
   /** The time of the last finished turn (ISO); the "restored" line shows it in local time. Null with no turn. */
   restoredAt: string | null;
+  /** Where an interrupted chain goes on; it hangs under the answer of the turn numbered `resume.turn`. */
+  resume?: RestoredChainResume;
   turns: {
+    /** The turn number in the record (only `resume` looks for it). */
+    turn?: number;
     message: string;
     reply: string;
     lines: { status: string; text: string; basis?: MapChatBasis }[];
@@ -394,6 +407,8 @@ export interface MapChatHost {
   retry?(origin: MapChatOrigin): void;
   /** "Run the ones not done again" on a research batch the chat started that stopped (the message carries the batch). */
   rerunBatch?(message: MapChatMessage): void;
+  /** The button under a reply of an interrupted chain: send the round the record says is next. */
+  resumeChain?(message: MapChatMessage): void;
   /** The conversation's state changed (a turn started or ended, a plan appeared or was settled); the canvas may say so. */
   stateChanged?(): void;
   /** The picture the chat is about now, or null (none chosen). */
@@ -959,6 +974,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       message.choices && !message.choices.picked ? [message.choices] : []
     );
     this.retireChoices();
+    for (const message of this.messages) delete message.resume;
     const user: MapChatMessage = {
       role: "user",
       text: userText,
@@ -1635,6 +1651,25 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     last.batch = batch;
     return last;
   }
+  /** The chain that just ended can go on: the last reply gets the box with the next round (after {@link endChain} told why it ended). */
+  offerResume(resume: Omit<MapChatResumePoint, "conversationId">): void {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return;
+    last.resume = { ...resume, conversationId: this.conversationId };
+    this.renderLog();
+  }
+  /** The resume point of the last reply, or null (nothing to resume, or the panel is working). */
+  resumePoint(): MapChatResumePoint | null {
+    const last = this.messages.at(-1);
+    return last?.role === "assistant" && last.resume && !this.working ? last.resume : null;
+  }
+  /** The point is used up: the box goes away and the row is laid out again. */
+  dropResume(point: MapChatResumePoint): void {
+    const held = this.messages.find(message => message.resume === point);
+    if (!held) return;
+    delete held.resume;
+    this.renderLog();
+  }
   /** The batch of `message` changed: its row is laid out again, the keyboard stays on the box, and the reader hears a finished one once. */
   refreshBatch(message: MapChatMessage): void {
     if (!this.messages.includes(message)) return;
@@ -1807,6 +1842,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         if (text) answer.chainNote = { reason: end.reason, text };
       }
       if (turn.batch) answer.batch = { ...turn.batch, restored: true };
+      if (conversation.resume && turn.turn === conversation.resume.turn) {
+        const { turn: _turn, ...point } = conversation.resume;
+        answer.resume = { ...point, conversationId: conversation.id };
+      }
       this.messages.push(answer);
     }
     const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
@@ -2706,6 +2745,11 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       message.batch
         ? `batch:${message.batch.topics.length}:${message.batch.succeeded.length}:${message.batch.failed.length}:${message.batch.ended ? 1 : 0}:${message.batch.running ? 1 : 0}:${message.batch.restored ? 1 : 0}:${message.batch.topics.map(topic => topic.id).join(",")}:${this.host.rerunBatch ? 1 : 0}`
         : "",
+      this.resumeShown(message)
+        ? `resume:${message.resume!.round}:${message.resume!.maxRounds}:${message.resume!.reason ?? ""}:${message.resume!.remaining}:${this.working ? 1 : 0}:${this.host.resumeChain ? 1 : 0}`
+        : "",
+      t("ui.map_chat_chain_interrupted_0_1", "", ""),
+      t("ui.map_chat_chain_resume_0", ""),
       t("ui.map_chat_batch_left_0", ""),
       t("ui.map_chat_batch_more_0", 0),
       t("ui.map_chat_batch_rerun_0", 0),
@@ -2785,6 +2829,31 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     run.disabled = batch.running === true;
     if (!this.host.rerunBatch) this.makeInert(run);
     else run.addEventListener("click", () => this.host.rerunBatch?.(message));
+  }
+  /** A batch the chat started that was cut or is running shows its own box first; the resume box waits for it. */
+  private resumeShown(message: MapChatMessage): boolean {
+    if (!message.resume) return false;
+    const batch = message.batch;
+    return !(batch && ((batch.restored && !batch.ended) || batch.running));
+  }
+  /** What an interrupted chain says and the one button that goes on with the next round. */
+  private buildResume(row: HTMLElement, message: MapChatMessage, point: MapChatResumePoint): void {
+    const box = row.createDiv({ cls: "vam-map-chat-batch vam-map-chat-resume", attr: { role: "status", tabindex: "-1" } });
+    if (point.reason === null)
+      box.createDiv({
+        cls: "vam-map-chat-batch-title",
+        text: t("ui.map_chat_chain_interrupted_0_1", point.stoppedRound, point.maxRounds)
+      });
+    if (point.remaining.trim())
+      box.createDiv({ cls: "vam-map-chat-batch-left", text: t("ui.map_chat_chain_left_0", point.remaining) });
+    const run = box.createEl("button", {
+      cls: "vam-map-chat-batch-rerun vam-map-chat-resume-run",
+      text: t("ui.map_chat_chain_resume_0", point.round),
+      attr: { type: "button" }
+    });
+    run.disabled = this.working;
+    if (!this.host.resumeChain) this.makeInert(run);
+    else run.addEventListener("click", () => this.handOffFocus(() => this.host.resumeChain?.(message)));
   }
   private canRetry(message: MapChatMessage, asked: MapChatMessage | undefined): boolean {
     return (
@@ -2879,6 +2948,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (message.chainNote)
       row.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
     if (message.batch) this.buildBatch(row, message, message.batch);
+    if (this.resumeShown(message) && message.resume) this.buildResume(row, message, message.resume);
     if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row, message.replyUndo.token);
     // What the AI actually did comes straight after what it said; the buttons that act on the answer come last.
     const asked = this.messages[this.messages.indexOf(message) - 1];

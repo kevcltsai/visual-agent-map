@@ -467,6 +467,8 @@ import {
   chainEndNeedsNotice,
   finishRound,
   finishWait,
+  isResumeKeyword,
+  resumeRound,
   interrupt as interruptChainState,
   pauseForPlan,
   planChainOf,
@@ -1150,6 +1152,8 @@ interface ChatRoundWork {
   expand: { id: string; title: string; path: string; done: Promise<ChatExpandOutcome> }[];
   /** An integration, a merge or a rating started: a continuation does not wait for these and ends. */
   otherBackground: boolean;
+  /** The cards a select_topics of the round selected (the chain keeps them for its later rounds). */
+  selected?: string[];
 }
 const newChatWork = (): ChatRoundWork => ({
   controller: new AbortController(),
@@ -1212,6 +1216,10 @@ interface ChatChainRun {
   timer: number | null;
   /** The panel was told that the chain waits (and must be told that it does not). */
   waitShown: boolean;
+  /** The cards the AI selected in a round of this chain (null: it never selected); later rounds read these. */
+  aiSelection: string[] | null;
+  /** What was still to do when the current round began (a resume that redoes the round starts from it). */
+  roundRemaining: string;
 }
 /** The lines of research and expansions that did not work out, one line each, for the end notice of a chain. */
 const chainWorkDetail = (item: { title: string; status: string; error?: string }): string =>
@@ -21977,6 +21985,7 @@ export class VisualAgentMapView extends ItemView {
       retry: origin => {
         void this.sendMapChat(origin);
       },
+      resumeChain: message => this.resumeChatChain(message),
       rerunBatch: message => {
         void this.rerunChatBatch(message).catch(error => errorNotice(error));
       },
@@ -22498,6 +22507,14 @@ export class VisualAgentMapView extends ItemView {
     // A retry sends the same question with the same references again, after a failure; a normal send reads the draft.
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
+    // Only the word "continue" goes on with an interrupted chain; any other text below is the user taking over.
+    if (!again && isResumeKeyword(message)) {
+      const last = chat.transcript().at(-1);
+      if (last?.resume && this.resumeChatChain(last)) {
+        chat.clearDraft();
+        return;
+      }
+    }
     // The user speaking ends the continuation that is running, waiting for work or waiting for a plan: the text is a new message.
     const autoOrigin = again?.chain;
     if (!autoOrigin) this.interruptChain(this.chatChain, "user_took_over");
@@ -22965,6 +22982,7 @@ export class VisualAgentMapView extends ItemView {
       live.anchor = anchor;
       live.message = message;
       live.replyRemaining = origin.continuation.remaining;
+      live.roundRemaining = origin.continuation.remaining;
       return live;
     }
     // A retry of an old failed round while another chain is still alive (waiting, with its timer): that chain ends first.
@@ -22985,10 +23003,62 @@ export class VisualAgentMapView extends ItemView {
       partial: null,
       work: null,
       timer: null,
-      waitShown: false
+      waitShown: false,
+      aiSelection: origin?.aiSelection ? [...origin.aiSelection] : null,
+      roundRemaining: origin?.continuation.remaining ?? ""
     };
     this.chatChain = run;
     return run;
+  }
+  /** The cards of an earlier AI selection that are still on the map. */
+  private chainSelection(ids: string[]): string[] {
+    const map = this.map;
+    return map ? ids.filter(id => map.nodes.some(node => node.id === id)) : [];
+  }
+  /**
+   * Sends the round after an interrupted chain (the button under the last reply, or the word "continue"). Every guard that fails
+   * leaves the resume point where it is; once it passes the point is used up before anything is sent, so a second press sends nothing.
+   */
+  private resumeChatChain(message: MapChatMessage): boolean {
+    const chat = this.chat;
+    const point = message.resume;
+    if (
+      !chat ||
+      !point ||
+      chat.isBusy ||
+      this.chatApplying ||
+      this.closed ||
+      !this.map ||
+      this.notesLoading() ||
+      this.chatChain ||
+      point !== chat.resumePoint() ||
+      point.conversationId !== chat.conversationId
+    )
+      return false;
+    delete message.resume;
+    chat.dropResume(point);
+    const selected = this.chainSelection(point.selectedIds);
+    const origin: MapChatOrigin = {
+      text: point.message,
+      chips: [],
+      selectedIds: selected.length ? selected : this.chatSelectionIds(),
+      chain: {
+        seq: 0,
+        resumed: true,
+        ...(selected.length ? { aiSelection: selected } : {}),
+        state: { ...startChain(point.maxRounds), round: point.round, remaining: point.remaining },
+        createdIds: [],
+        continuation: {
+          round: point.round,
+          maxRounds: point.maxRounds,
+          remaining: point.remaining,
+          lastResults: point.lastResults,
+          research: []
+        }
+      }
+    };
+    void this.sendMapChat(origin).catch(error => errorNotice(error));
+    return true;
   }
   /** The continuation is more than a single answer (a later round, or one that said something was left): its end is told and recorded. */
   private chainShows(run: ChatChainRun): boolean {
@@ -22999,11 +23069,13 @@ export class VisualAgentMapView extends ItemView {
     if (!run) return;
     const step = interruptChainState(run.state, reason);
     if (step.decision.kind !== "end") return;
+    // Waiting for the work means the round's reply was applied; any earlier phase means it was not.
+    const applied = run.state.phase === "waiting";
     run.state = step.state;
-    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining);
+    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining, applied);
   }
   /** The chain is over: its timer and wait go, the end is recorded, and (unless it simply finished) the panel says why. */
-  private endChatChain(run: ChatChainRun, reason: MapChatChainEndReason, remaining: string): void {
+  private endChatChain(run: ChatChainRun, reason: MapChatChainEndReason, remaining: string, applied = true): void {
     if (this.chatChain === run) this.chatChain = null;
     if (run.timer !== null) window.clearTimeout(run.timer);
     run.timer = null;
@@ -23015,8 +23087,29 @@ export class VisualAgentMapView extends ItemView {
     if (!this.chainShows(run)) return;
     this.chatLastRecord?.event("chain_end", { reason, round: run.state.round, remaining });
     // "Done" is told only to a chain that went on by itself (round 2 on): a single round that finished adds nothing.
-    if (chat && (chainEndNeedsNotice(reason) || (reason === "done" && run.state.round >= 2)))
+    if (chat && (chainEndNeedsNotice(reason) || (reason === "done" && run.state.round >= 2))) {
+      // A failed round has its Retry button; the rest of the ends that can go on offer the next round.
+      const next =
+        reason === "failed"
+          ? null
+          : resumeRound({
+              reason,
+              round: run.state.round,
+              applied,
+              startRemaining: run.roundRemaining,
+              replyRemaining: remaining
+            });
       chat.endChain(reason, remaining, run.details.length ? run.details : undefined);
+      if (next)
+        chat.offerResume({
+          ...next,
+          stoppedRound: run.state.round,
+          reason,
+          message: run.message,
+          selectedIds: run.aiSelection ? [...run.aiSelection] : [],
+          lastResults: run.lastResults.map(line => ({ text: line.text, status: line.status }))
+        });
+    }
   }
   /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
   private stopChainWork(run: ChatChainRun): void {
@@ -23037,6 +23130,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.chatChain !== run || run.state.phase === "ended") return;
     run.partial = null;
     for (const id of round.work.created) run.createdIds.add(id);
+    if (round.work.selected) run.aiSelection = [...round.work.selected];
     run.lastResults = chatResultLines(round.lines).map(line => ({ text: line.text, status: line.status }));
     run.anchor = { path: round.anchor.path, id: round.anchor.id };
     const step = finishRound(run.state, {
@@ -23183,9 +23277,10 @@ export class VisualAgentMapView extends ItemView {
       // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
       // a picture is sent with the first round only and a follow-up adds no chip.
       chips: [...run.chips],
-      selectedIds: this.chatSelectionIds(),
+      selectedIds: run.aiSelection ? this.chainSelection(run.aiSelection) : this.chatSelectionIds(),
       chain: {
         seq: run.seq,
+        ...(run.aiSelection ? { aiSelection: [...run.aiSelection] } : {}),
         state: run.state,
         createdIds: [...run.createdIds],
         continuation: {
@@ -23478,6 +23573,7 @@ export class VisualAgentMapView extends ItemView {
           ? {
               auto: true as const,
               round: origin.chain.state.round,
+              ...(origin.chain.resumed ? { resumed: true as const } : {}),
               ...(origin.chain.continuation.remaining.trim() ? { remaining: origin.chain.continuation.remaining } : {})
             }
           : {}),
@@ -25497,6 +25593,7 @@ export class VisualAgentMapView extends ItemView {
       const ids = action.all ? map.nodes.map(node => node.id) : known(action.nodeIds);
       if (!ids.length) return skipped("ui.map_chat_skip_topic_gone");
       this.chatSelect(ids);
+      if (work) work.selected = ids;
       return { status: "done" };
     }
     if (!this.canSelectTopics()) return skipped("ui.map_chat_skip_unavailable");

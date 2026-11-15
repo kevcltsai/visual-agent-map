@@ -1407,6 +1407,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_batch_left_0": "没做的：{0}",
   "ui.map_chat_batch_more_0": "等 {0} 篇",
   "ui.map_chat_batch_rerun_0": "重跑没做的 {0} 篇",
+  "ui.map_chat_chain_interrupted_0_1": "自动接续在插件重新加载时中断：停在第 {0}／{1} 轮。",
+  "ui.map_chat_chain_resume_0": "从第 {0} 轮接着做",
   "ui.map_chat_batch_running_0": "正在重跑 {0} 篇…",
   "ui.map_chat_plan_summary_0": "这份计划需要你确认：{0}。",
   "ui.map_chat_plan_group_create_0": "新增或建立（{0}）",

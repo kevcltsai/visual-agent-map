@@ -1485,6 +1485,9 @@ export const en = {
   "ui.map_chat_batch_left_0": "Not done: {0}",
   "ui.map_chat_batch_more_0": "and {0} more",
   "ui.map_chat_batch_rerun_0": "Run the {0} not done again",
+  "ui.map_chat_chain_interrupted_0_1":
+    "The automatic continuation was cut off when the plugin reloaded: it stopped at round {0} of {1}.",
+  "ui.map_chat_chain_resume_0": "Continue from round {0}",
   "ui.map_chat_batch_running_0": "Running {0} again…",
   "ui.map_chat_plan_summary_0": "This plan needs your confirmation: {0}.",
   "ui.map_chat_plan_group_create_0": "Add or create ({0})",

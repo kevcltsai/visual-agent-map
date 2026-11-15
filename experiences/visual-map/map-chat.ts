@@ -2738,7 +2738,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (!flow || !shown) return;
     const total = flow.steps.length;
     const done = flow.steps.filter(step => step.status === "done").length;
-    const currentIndex = Math.max(0, flow.steps.findIndex(step => step.status !== "done"));
+    const currentIndex = Math.max(
+      0,
+      flow.steps.findIndex(step => step.status !== "done")
+    );
     // One line by default: a button with the step in work (or done), the round and the bar; it opens the AI calls and the steps.
     const head = this.flowEl.createEl("button", {
       cls: "vam-map-chat-flow-head",
@@ -2748,7 +2751,11 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       this.flowOpen = !this.flowOpen;
       this.renderFlow();
     });
-    head.createSpan({ cls: "vam-map-chat-flow-caret", text: this.flowOpen ? "▾" : "▸", attr: { "aria-hidden": "true" } });
+    head.createSpan({
+      cls: "vam-map-chat-flow-caret",
+      text: this.flowOpen ? "▾" : "▸",
+      attr: { "aria-hidden": "true" }
+    });
     head.createEl("b", { text: t("ui.map_chat_flow_label") });
     head.createSpan({
       cls: "vam-map-chat-flow-now",

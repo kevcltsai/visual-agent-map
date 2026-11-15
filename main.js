@@ -42790,7 +42790,10 @@ ${shown}` : t("ui.map_chat_model_label"));
     if (!flow || !shown) return;
     const total2 = flow.steps.length;
     const done = flow.steps.filter((step) => step.status === "done").length;
-    const currentIndex = Math.max(0, flow.steps.findIndex((step) => step.status !== "done"));
+    const currentIndex = Math.max(
+      0,
+      flow.steps.findIndex((step) => step.status !== "done")
+    );
     const head2 = this.flowEl.createEl("button", {
       cls: "vam-map-chat-flow-head",
       attr: { type: "button", "aria-expanded": String(this.flowOpen), "aria-controls": `${this.id}-flow-steps` }
@@ -42799,7 +42802,11 @@ ${shown}` : t("ui.map_chat_model_label"));
       this.flowOpen = !this.flowOpen;
       this.renderFlow();
     });
-    head2.createSpan({ cls: "vam-map-chat-flow-caret", text: this.flowOpen ? "\u25BE" : "\u25B8", attr: { "aria-hidden": "true" } });
+    head2.createSpan({
+      cls: "vam-map-chat-flow-caret",
+      text: this.flowOpen ? "\u25BE" : "\u25B8",
+      attr: { "aria-hidden": "true" }
+    });
     head2.createEl("b", { text: t("ui.map_chat_flow_label") });
     head2.createSpan({
       cls: "vam-map-chat-flow-now",

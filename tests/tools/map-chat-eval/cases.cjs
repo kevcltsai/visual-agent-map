@@ -31,6 +31,9 @@ const HYP = tree([
   ["h2", "競爭者變多", "r", "新店開張", { kind: "hypothesis", leaning: "undecided", strength: "none" }], ["e1", "客單價上升 12%", "r"]
 ]);
 const GOAL = "我在準備雅思口說考試";
+/** A picture-book request with picture rules but no literal "search for images" (the 2026-11-15 run, retold on the steak map). */
+const PICTURE_BOOK = "做成給一般讀者的牛排圖文書，存在「圖文書」資料夾，每個議題一章。分很多輪做，一輪只做一小段。\n每章兩個檔：本文、研究備註（資料來源、圖片網址、沒放圖的原因）。\n圖片規則：內文講到的每個部位，二選一：在講它的段落放圖，網址要是圖檔本身，圖說寫部位名稱和出處；或在研究備註寫「無圖」和原因。每個部位找圖最多 3 次。\n【總編輯】寫大綱，不寫內文，不找圖。\n【作者】先研究，定好內容和圖，寫好研究備註，再動筆。";
+
 
 const STYLE = [C.noRejected(), C.replyNoDoneClaim(), C.replyNoCount(), C.replyOneSentence(), C.replyNoApprovalAsk()];
 const Q = [C.noActions(), C.replyNonEmpty(), C.noRejected()];
@@ -82,6 +85,8 @@ const CASES = [
     [C.noRejected(), C.runAction("research_standard", a => a.mode === "quick", "mode quick"), C.rawRunAction("research_standard", a => a.images !== true, "model did not ask for images")]),
   kase("D4", "研究", "使用者說標準研究並要圖", "prompt: 只有使用者要求圖片且不是 quick 才 images=true", ["run_map_action"], { message: "標準研究這張卡，順便找圖片", outline: STEAK, selected: [ref("a2", "菲力")] },
     [C.noRejected(), C.runAction("research_standard", a => a.mode === "standard" && a.images === true, "standard + images")]),
+  kase("D10", "研究", "使用者訂了放圖規則就是要圖", "2026-11-15 圖文書實跑：使用者訂了圖片規則（放圖、圖檔網址、無圖寫原因）但沒說「搜圖」，研究送 images=false", ["run_map_action"], { message: `${PICTURE_BOOK}\n\n現在先研究這三張卡。`, outline: STEAK, selected: [ref("a1", "肋眼"), ref("a2", "菲力"), ref("a3", "紐約客")] },
+    [C.noRejected(), C.runAction("research_standard", a => a.images === true, "images for a picture book")]),
   kase("D5", "研究", "只說研究不指定模式", "prompt: 只說研究就留空 mode", ["run_map_action"], { message: "研究一下這張卡", outline: STEAK, selected: [ref("a2", "菲力")] },
     [C.noRejected(), C.runAction("research_standard", a => a.mode === "" && a.images === false, "mode left empty")]),
   kase("D6", "研究", "要求展開", "prompt: expand 一次產生多層子議題", ["run_map_action"], { message: "把「部位」展開兩層", outline: STEAK, selected: [ref("a", "部位")] },
@@ -186,7 +191,10 @@ const CASES = [
     [C.noRejected(), C.replyNotMatch(/已(?:經)?(?:研究|查過|搜尋)|researched|completed the research/i, "says the failed research was done")], "研究失敗後：AI 是停下來說明，還是憑印象硬建？兩者都要看有沒有誠實"),
   kase("L3", "接續", "第 2 輪：全部已完成就收尾", "prompt: 沒有剩下的事 remaining 留空", [], { message: "幫我建咖啡的三個分支", outline: COFFEE,
     continuation: { round: 2, maxRounds: 8, remaining: "確認是否完成", lastResults: [{ text: "新增手沖、義式、冷萃", status: "done" }], research: [] } },
-    [C.noRejected(), C.noKinds(["add_child"]), C.remaining(false)])
+    [C.noRejected(), C.noKinds(["add_child"]), C.remaining(false)]),
+  kase("L4", "接續", "圖文書第 4 輪：作者研究時要搜圖", "2026-11-15 圖文書實跑：使用者訂了圖片規則（放圖、圖檔網址、無圖寫原因）但沒說「搜圖」，每次研究都送 images=false，整本書沒有圖", ["run_map_action"], { message: PICTURE_BOOK, outline: STEAK,
+    continuation: { round: 4, maxRounds: 8, remaining: "作者寫第 1–3 章（肋眼、菲力、紐約客）：先研究，定好作品和圖，再寫本文", lastResults: [{ text: "建立 圖文書/全書大綱.md", status: "done" }], research: [] } },
+    [C.noRejected(), C.runAction("research_standard", a => a.images === true, "images for a picture book")])
 ];
 
 const WEAK = "只檢查沒有多餘動作與有提到地圖內容，不能證明答對；要靠真實失敗案例庫（S3）定義什麼叫答對";

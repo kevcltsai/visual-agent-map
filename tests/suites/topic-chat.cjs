@@ -1488,6 +1488,36 @@ test('steer state: a dead owner (alive false) ignores late answers and binds', a
   const changes = []; const c = new TopicChatSteers({ onChange: () => changes.push(1) }); c.add('q'); assert.ok(changes.length > 0);
 });
 
+test('steer state: abandon queues what did not go in at once, keeps delivered, ignores late answers and later binds', async () => {
+  const s = new TopicChatSteers(); const log = handlerLog(); const later = handlerLog();
+  s.bind(log.send); s.add('d'); await tick(); log.gates[0].resolve(); await tick();
+  s.add('s'); await tick(); s.add('p');
+  assert.deepEqual(states(s), ['delivered', 'sending', 'sending']);
+  s.abandon();
+  assert.deepEqual(states(s), ['delivered', 'queued', 'queued'], 'synchronous');
+  log.gates[1].resolve(); await tick(); await tick();
+  assert.deepEqual(states(s), ['delivered', 'queued', 'queued'], 'a late answer changes nothing');
+  s.bind(later.send); await tick(); assert.deepEqual(later.sent, [], 'binding after abandon does nothing');
+  s.add('after'); assert.equal(s.entries.at(-1).state, 'queued'); assert.deepEqual(plain(s.delivered()), ['d']);
+});
+
+test('steer state: drop only takes the handler away; entries and answers on their way stay, a later bind hands over again', async () => {
+  const s = new TopicChatSteers(); const old = handlerLog(); const fresh = handlerLog();
+  s.bind(old.send); s.add('x'); await tick();
+  s.drop(); assert.deepEqual(states(s), ['sending'], 'the entry is not reset');
+  old.gates[0].resolve(); await tick(); assert.deepEqual(states(s), ['delivered'], 'the answer still counts (no new generation)');
+  s.add('y'); assert.deepEqual(states(s).at(-1), 'pending', 'no handler: waits as pending');
+  s.bind(fresh.send); await tick(); assert.deepEqual(fresh.sent, ['x'], 'the new attempt gets the first one; y waits for it');
+});
+
+test('steer state: waits is true once the request cannot take additions or the reply is in; the change reason names delivered and live-off', async () => {
+  const reasons = []; const s = new TopicChatSteers({ onChange: reason => reasons.push(reason) }); const log = handlerLog();
+  assert.equal(s.waits, false); s.bind(log.send); s.add('a'); await tick(); log.gates[0].resolve(); await tick();
+  assert.ok(reasons.includes('delivered')); assert.equal(reasons.filter(r => r === 'delivered').length, 1);
+  s.setLive(false); assert.equal(s.waits, true); assert.ok(reasons.includes('live-off'));
+  const t2 = new TopicChatSteers(); assert.equal(t2.waits, false); await t2.close(); assert.equal(t2.waits, true);
+});
+
 test('steer records: a steer line is written, read back in order, paired by id', () => {
   const turn = { type: 'turn', id: 't1', at: 'a', kind: 'research', mode: 'quick', message: 'hi' };
   const text = records.serializeTopicChatLine(turn)

@@ -650,7 +650,7 @@ import {
   type TopicChatTurn
 } from "./topic-chat";
 import type { ResearchObserver, ResearchSteer } from "../../ai/research-observer";
-import { TopicChatSteers } from "./topic-chat-steer";
+import { TopicChatSteers, type TopicSteerEntry } from "./topic-chat-steer";
 import type { ResearchProgress } from "./research-progress";
 import type { ExpansionBatchState } from "./expansion-batch";
 import { canvasPointerIntent } from "./canvas-gestures";
@@ -1282,31 +1282,6 @@ interface GoalEditState {
   warmed: boolean;
 }
 
-/** One follow-up typed while a map-chat turn works, and where it is: not yet handed over, being handed over, taken in, or waiting. */
-interface ChatSteerEntry {
-  text: string;
-  steer: MapChatSteer;
-  status: "pending" | "sending" | "delivered" | "queued";
-}
-/** What one running turn knows about its follow-ups. Every list is the one `entries`, so a follow-up is in exactly one state. */
-interface ChatSteerState {
-  turn: MapChatTurnHandle;
-  /** The question as first asked and the origin a retry would send; delivered follow-ups are added to it. */
-  question: string;
-  origin: MapChatOrigin;
-  /** Hands text to the running attempt; null until that attempt gives one. */
-  handler: ((text: string) => Promise<void>) | null;
-  /** Counts handlers: an answer from an earlier attempt's handler changes nothing. */
-  gen: number;
-  entries: ChatSteerEntry[];
-  /** Hand-overs run one after the other, so follow-ups go in as typed. */
-  chain: Promise<void>;
-  /** The attempt cannot take a follow-up as it runs (Claude json): everything waits for the end. */
-  noLive: boolean;
-  /** The reply is in: later follow-ups wait for the next message. */
-  closed: boolean;
-}
-
 /** What takes a click: the strip toward the floating goal icons must not lie over any of it. */
 /** Presses here are not "elsewhere" for the goal edit: Obsidian's menus, dialogs and command palette, and the buttons that open a menu. */
 const NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-map-actions-button", ".view-action"].join(
@@ -1513,7 +1488,12 @@ export class VisualAgentMapView extends ItemView {
   /** Counts conversations: the result of research another conversation started is not recorded in this one. */
   private chatConversation = 0;
   /** The follow-ups of the turn that is running (or ran last). */
-  private chatSteer: ChatSteerState | null = null;
+  /** The follow-ups of the running turn: their state machine and the panel row each one has. */
+  private chatSteer: {
+    turn: MapChatTurnHandle;
+    steers: TopicChatSteers;
+    rows: Map<TopicSteerEntry, MapChatSteer>;
+  } | null = null;
   /** Writes the actions of a chat reply one at a time; every read goes back to this view when it happens. */
   private chatWriter = new ChatActionWriter({
     map: () => this.map,
@@ -21709,16 +21689,19 @@ export class VisualAgentMapView extends ItemView {
       abandon(undefined, "stopped");
     };
     this.chatPrepAbandon = stopPreparing;
-    const steerState: ChatSteerState = {
+    // The follow-ups of this turn. Rows that wait are told to the panel as the machine queues them (once each, the panel
+    // ignores a state it already shows); a retry asks the question with the follow-ups that went in, and only those.
+    const steerRows = new Map<TopicSteerEntry, MapChatSteer>();
+    const steerState: NonNullable<typeof this.chatSteer> = {
       turn,
-      question: message,
-      origin,
-      handler: null,
-      gen: 0,
-      entries: [],
-      chain: Promise.resolve(),
-      noLive: false,
-      closed: false
+      rows: steerRows,
+      steers: new TopicChatSteers({
+        alive: () => !this.closed && this.chatSteer === steerState && !!this.chat?.hasTurn(turn),
+        onChange: reason => {
+          for (const [entry, row] of steerRows) if (entry.state === "queued") this.chat?.setSteerState(row, "queued");
+          if (reason) origin.text = [message, ...steerState.steers.delivered()].join("\n\n");
+        }
+      })
     };
     this.chatSteer = steerState;
     const notSent = (): string => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
@@ -21756,8 +21739,7 @@ export class VisualAgentMapView extends ItemView {
           const record = this.beginChatRecord(chat, turn, request, origin);
           run.record = record;
           // The follow-ups that went into this turn are written with its end (queued ones become the next turn).
-          if (record)
-            record.steerTexts = () => steerState.entries.filter(e => e.status === "delivered").map(e => e.text);
+          if (record) record.steerTexts = () => steerState.steers.delivered();
           // One attempt is one request to the model. "Resend" (the slow notice) replaces it with another attempt of the same
           // question: a reply that arrives from a replaced attempt changes nothing, like one that arrives after Stop.
           const openAttempt = (): { controller: AbortController; alive: () => boolean } => {
@@ -21816,7 +21798,7 @@ export class VisualAgentMapView extends ItemView {
               this.releaseChatTask();
               controller.abort();
               // Follow-ups typed before the new attempt hands out its handler wait for it; they are not for the old one.
-              steerState.handler = null;
+              steerState.steers.drop();
               attempt = openAttempt();
               chat.restartWaiting();
               wake();
@@ -21839,7 +21821,7 @@ export class VisualAgentMapView extends ItemView {
                     if (!alive()) return;
                     if (event.kind === "stream-mode") {
                       if (event.mode !== "stream-json") stopWatching();
-                      this.setSteerLive(steerState, event.mode === "stream-json");
+                      steerState.steers.setLive(event.mode === "stream-json");
                       return;
                     }
                     // Claude's first event, and Codex's searching / reading / writing, are model events. Codex's `started` is not: the
@@ -21851,7 +21833,7 @@ export class VisualAgentMapView extends ItemView {
                   },
                   handler => {
                     // A handler from a replaced or stopped attempt is not taken.
-                    if (alive()) this.bindSteerHandler(steerState, handler);
+                    if (alive()) steerState.steers.bind(handler);
                   },
                   // The model's raw output, kept for the record (only while the switch is on, and never from a stopped or replaced attempt).
                   record
@@ -21871,7 +21853,7 @@ export class VisualAgentMapView extends ItemView {
               for (const id of request.context.research?.sent ?? []) this.chatResearchSent.add(id);
               // Follow-ups still being handed over settle first; later ones wait for the next message. The ones that went in are
               // part of the message the plan and the actions are applied for.
-              await this.closeSteers(steerState);
+              await steerState.steers.close();
               if (!alive()) return;
               const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
               // The follow-ups that went into this round are part of the message every later round asks.
@@ -22006,98 +21988,22 @@ export class VisualAgentMapView extends ItemView {
     const text = chat.draft.trim();
     if (!text) return;
     const state = this.chatSteer;
-    if (state && !state.closed && chat.isBusy && chat.hasTurn(state.turn)) {
-      const waits = state.noLive;
-      const steer = chat.addSteer(text, waits ? "queued" : "live");
+    if (state && chat.isBusy && chat.hasTurn(state.turn)) {
+      const steer = chat.addSteer(text, state.steers.waits ? "queued" : "live");
       if (!steer) return;
-      state.entries.push({ text, steer, status: waits ? "queued" : "pending" });
-      this.pumpSteers(state);
+      state.rows.set(state.steers.add(text), steer);
       return;
     }
     // The reply is in and its actions (or a plan, a choice) are being applied: the follow-up is the next message.
     if (chat.isBusy || this.chatApplying) chat.addSteer(text, "queued");
   }
-  private steerAlive(state: ChatSteerState): boolean {
-    return !this.closed && this.chatSteer === state && !!this.chat?.hasTurn(state.turn);
-  }
-  /** The attempt can (or cannot) take a follow-up as it runs; when it cannot, the ones waiting for it wait for the end. */
-  private setSteerLive(state: ChatSteerState, live: boolean): void {
-    if (!this.steerAlive(state)) return;
-    state.noLive = !live;
-    if (live) return;
-    // json-fallback: the first process (which may already have taken a follow-up) is gone and the rerun never asks for one again,
-    // so what was handed over or is being handed over waits for the end like the rest.
-    state.handler = null;
-    for (const entry of state.entries) {
-      if (entry.status !== "pending" && entry.status !== "sending" && entry.status !== "delivered") continue;
-      entry.status = "queued";
-      this.chat?.setSteerState(entry.steer, "queued");
-    }
-    // What is no longer delivered must not ride along with a retry of the question.
-    this.syncSteerOrigin(state);
-  }
-  /** A retry after a failure asks the question with the follow-ups that went in, and only those. */
-  private syncSteerOrigin(state: ChatSteerState): void {
-    state.origin.text = [state.question, ...state.entries.filter(e => e.status === "delivered").map(e => e.text)].join(
-      "\n\n"
-    );
-  }
-  /** A new attempt has a new way in: what the earlier one took is handed over again, once, and what waited for it goes in. */
-  private bindSteerHandler(state: ChatSteerState, handler: (text: string) => Promise<void>): void {
-    if (!this.steerAlive(state) || state.closed) return;
-    state.gen++;
-    state.handler = handler;
-    state.chain = Promise.resolve();
-    for (const entry of state.entries)
-      if (entry.status === "sending" || entry.status === "delivered") entry.status = "pending";
-    this.pumpSteers(state);
-  }
-  /** Hands every pending follow-up to the attempt, in the order typed. A refusal (the turn already ended) leaves it waiting. */
-  private pumpSteers(state: ChatSteerState): void {
-    const handler = state.handler;
-    if (!handler || state.noLive) return;
-    const gen = state.gen;
-    for (const entry of state.entries) {
-      if (entry.status !== "pending") continue;
-      entry.status = "sending";
-      state.chain = state.chain.then(async () => {
-        const current = (): boolean => gen === state.gen && entry.status === "sending" && this.steerAlive(state);
-        if (!current()) return;
-        try {
-          await handler(entry.text);
-        } catch {
-          if (!current()) return;
-          entry.status = "queued";
-          this.chat?.setSteerState(entry.steer, "queued");
-          return;
-        }
-        if (!current()) return;
-        entry.status = "delivered";
-        this.syncSteerOrigin(state);
-      });
-    }
-  }
-  /** The reply is in: hand-overs still running settle, and what has not gone in waits for the next message. */
-  private async closeSteers(state: ChatSteerState): Promise<void> {
-    await state.chain;
-    state.closed = true;
-    for (const entry of state.entries) {
-      if (entry.status === "delivered" || entry.status === "queued") continue;
-      entry.status = "queued";
-      this.chat?.setSteerState(entry.steer, "queued");
-    }
-  }
   /** The turn stopped or failed: follow-ups that did not go in are not sent; they are in the field again. */
-  private returnSteers(state: ChatSteerState): void {
-    state.closed = true;
+  private returnSteers(state: NonNullable<typeof this.chatSteer>): void {
     const chat = this.chat;
-    if (!chat) return;
-    for (const entry of state.entries) {
-      if (entry.status === "delivered") continue;
-      entry.status = "queued";
-      chat.setSteerState(entry.steer, "queued", false);
-    }
-    chat.restoreDraft(chat.takeQueued());
+    if (chat)
+      for (const [entry, row] of state.rows) if (entry.state !== "delivered") chat.setSteerState(row, "queued", false);
+    state.steers.abandon();
+    chat?.restoreDraft(chat.takeQueued());
   }
   /** Follow-ups that waited become one new message (sent once), or, when it cannot be sent now, go back into the field. */
   private flushSteers(send: boolean): void {

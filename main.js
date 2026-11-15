@@ -60780,6 +60780,10 @@ var TopicChatSteers = class {
     __publicField(this, "noLive", false);
     __publicField(this, "closed", false);
   }
+  /** True once additions wait for the end of the reply: the request cannot take them as it runs, or the reply is in. */
+  get waits() {
+    return this.noLive || this.closed;
+  }
   /** Takes an addition; returns its entry. After `close` or on a run that cannot take one it waits (queued) at once. */
   add(text10) {
     const entry = { text: text10, state: this.closed || this.noLive ? "queued" : "pending" };
@@ -60799,6 +60803,18 @@ var TopicChatSteers = class {
     this.changed();
     this.pump();
   }
+  /** The current attempt's way in is gone (a new attempt is on its way); entries and answers on their way stay as they are. */
+  drop() {
+    this.handler = null;
+  }
+  /** The turn stopped or failed: no answer changes anything any more; what did not go in waits (queued), what did stays. */
+  abandon() {
+    this.closed = true;
+    this.gen++;
+    this.handler = null;
+    for (const entry of this.entries) if (entry.state !== "delivered") entry.state = "queued";
+    this.changed();
+  }
   live(on) {
     this.setLive(on);
   }
@@ -60810,7 +60826,7 @@ var TopicChatSteers = class {
     this.gen++;
     this.handler = null;
     for (const entry of this.entries) if (entry.state !== "queued") entry.state = "queued";
-    this.changed();
+    this.changed("live-off");
   }
   /** The reply is in: hand-overs still running settle, then what has not gone in waits. Later additions are queued. */
   async close() {
@@ -60839,9 +60855,9 @@ var TopicChatSteers = class {
   isAlive() {
     return this.options.alive ? this.options.alive() : true;
   }
-  changed() {
+  changed(reason) {
     var _a2, _b2;
-    (_b2 = (_a2 = this.options).onChange) == null ? void 0 : _b2.call(_a2);
+    (_b2 = (_a2 = this.options).onChange) == null ? void 0 : _b2.call(_a2, reason);
   }
   pump() {
     const handler = this.handler;
@@ -60863,7 +60879,7 @@ var TopicChatSteers = class {
         }
         if (!current()) return;
         entry.state = "delivered";
-        this.changed();
+        this.changed("delivered");
       });
     }
     this.changed();
@@ -61322,6 +61338,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     /** Counts conversations: the result of research another conversation started is not recorded in this one. */
     __publicField(this, "chatConversation", 0);
     /** The follow-ups of the turn that is running (or ran last). */
+    /** The follow-ups of the running turn: their state machine and the panel row each one has. */
     __publicField(this, "chatSteer", null);
     /** Writes the actions of a chat reply one at a time; every read goes back to this view when it happens. */
     __publicField(this, "chatWriter", new ChatActionWriter({
@@ -80104,16 +80121,21 @@ ${note.detail.trim()}` : "",
       abandon(void 0, "stopped");
     };
     this.chatPrepAbandon = stopPreparing;
+    const steerRows = /* @__PURE__ */ new Map();
     const steerState = {
       turn,
-      question: message,
-      origin,
-      handler: null,
-      gen: 0,
-      entries: [],
-      chain: Promise.resolve(),
-      noLive: false,
-      closed: false
+      rows: steerRows,
+      steers: new TopicChatSteers({
+        alive: () => {
+          var _a3;
+          return !this.closed && this.chatSteer === steerState && !!((_a3 = this.chat) == null ? void 0 : _a3.hasTurn(turn));
+        },
+        onChange: (reason) => {
+          var _a3;
+          for (const [entry, row] of steerRows) if (entry.state === "queued") (_a3 = this.chat) == null ? void 0 : _a3.setSteerState(row, "queued");
+          if (reason) origin.text = [message, ...steerState.steers.delivered()].join("\n\n");
+        }
+      })
     };
     this.chatSteer = steerState;
     const notSent = () => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
@@ -80142,8 +80164,7 @@ ${note.detail.trim()}` : "",
           if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
           const record = this.beginChatRecord(chat, turn, request, origin);
           run.record = record;
-          if (record)
-            record.steerTexts = () => steerState.entries.filter((e) => e.status === "delivered").map((e) => e.text);
+          if (record) record.steerTexts = () => steerState.steers.delivered();
           const openAttempt = () => {
             var _a4;
             const controller = new AbortController();
@@ -80187,7 +80208,7 @@ ${note.detail.trim()}` : "",
               record == null ? void 0 : record.event("resend");
               this.releaseChatTask();
               controller.abort();
-              steerState.handler = null;
+              steerState.steers.drop();
               attempt = openAttempt();
               chat.restartWaiting();
               wake();
@@ -80210,14 +80231,14 @@ ${note.detail.trim()}` : "",
                     if (!alive()) return;
                     if (event.kind === "stream-mode") {
                       if (event.mode !== "stream-json") stopWatching();
-                      this.setSteerLive(steerState, event.mode === "stream-json");
+                      steerState.steers.setLive(event.mode === "stream-json");
                       return;
                     }
                     if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
                     if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
                   },
                   (handler) => {
-                    if (alive()) this.bindSteerHandler(steerState, handler);
+                    if (alive()) steerState.steers.bind(handler);
                   },
                   // The model's raw output, kept for the record (only while the switch is on, and never from a stopped or replaced attempt).
                   record ? (raw) => {
@@ -80231,7 +80252,7 @@ ${note.detail.trim()}` : "",
               if (!alive()) return;
               const result = outcome;
               for (const id of (_c = (_b2 = request.context.research) == null ? void 0 : _b2.sent) != null ? _c : []) this.chatResearchSent.add(id);
-              await this.closeSteers(steerState);
+              await steerState.steers.close();
               if (!alive()) return;
               const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
               run.message = fullMessage;
@@ -80349,98 +80370,22 @@ ${note.detail.trim()}` : "",
     const text10 = chat.draft.trim();
     if (!text10) return;
     const state = this.chatSteer;
-    if (state && !state.closed && chat.isBusy && chat.hasTurn(state.turn)) {
-      const waits = state.noLive;
-      const steer = chat.addSteer(text10, waits ? "queued" : "live");
+    if (state && chat.isBusy && chat.hasTurn(state.turn)) {
+      const steer = chat.addSteer(text10, state.steers.waits ? "queued" : "live");
       if (!steer) return;
-      state.entries.push({ text: text10, steer, status: waits ? "queued" : "pending" });
-      this.pumpSteers(state);
+      state.rows.set(state.steers.add(text10), steer);
       return;
     }
     if (chat.isBusy || this.chatApplying) chat.addSteer(text10, "queued");
   }
-  steerAlive(state) {
-    var _a2;
-    return !this.closed && this.chatSteer === state && !!((_a2 = this.chat) == null ? void 0 : _a2.hasTurn(state.turn));
-  }
-  /** The attempt can (or cannot) take a follow-up as it runs; when it cannot, the ones waiting for it wait for the end. */
-  setSteerLive(state, live2) {
-    var _a2;
-    if (!this.steerAlive(state)) return;
-    state.noLive = !live2;
-    if (live2) return;
-    state.handler = null;
-    for (const entry of state.entries) {
-      if (entry.status !== "pending" && entry.status !== "sending" && entry.status !== "delivered") continue;
-      entry.status = "queued";
-      (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
-    }
-    this.syncSteerOrigin(state);
-  }
-  /** A retry after a failure asks the question with the follow-ups that went in, and only those. */
-  syncSteerOrigin(state) {
-    state.origin.text = [state.question, ...state.entries.filter((e) => e.status === "delivered").map((e) => e.text)].join(
-      "\n\n"
-    );
-  }
-  /** A new attempt has a new way in: what the earlier one took is handed over again, once, and what waited for it goes in. */
-  bindSteerHandler(state, handler) {
-    if (!this.steerAlive(state) || state.closed) return;
-    state.gen++;
-    state.handler = handler;
-    state.chain = Promise.resolve();
-    for (const entry of state.entries)
-      if (entry.status === "sending" || entry.status === "delivered") entry.status = "pending";
-    this.pumpSteers(state);
-  }
-  /** Hands every pending follow-up to the attempt, in the order typed. A refusal (the turn already ended) leaves it waiting. */
-  pumpSteers(state) {
-    const handler = state.handler;
-    if (!handler || state.noLive) return;
-    const gen = state.gen;
-    for (const entry of state.entries) {
-      if (entry.status !== "pending") continue;
-      entry.status = "sending";
-      state.chain = state.chain.then(async () => {
-        var _a2;
-        const current = () => gen === state.gen && entry.status === "sending" && this.steerAlive(state);
-        if (!current()) return;
-        try {
-          await handler(entry.text);
-        } catch (e) {
-          if (!current()) return;
-          entry.status = "queued";
-          (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
-          return;
-        }
-        if (!current()) return;
-        entry.status = "delivered";
-        this.syncSteerOrigin(state);
-      });
-    }
-  }
-  /** The reply is in: hand-overs still running settle, and what has not gone in waits for the next message. */
-  async closeSteers(state) {
-    var _a2;
-    await state.chain;
-    state.closed = true;
-    for (const entry of state.entries) {
-      if (entry.status === "delivered" || entry.status === "queued") continue;
-      entry.status = "queued";
-      (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
-    }
-  }
   /** The turn stopped or failed: follow-ups that did not go in are not sent; they are in the field again. */
   returnSteers(state) {
-    state.closed = true;
     const chat = this.chat;
-    if (!chat) return;
-    for (const entry of state.entries) {
-      if (entry.status === "delivered") continue;
-      entry.status = "queued";
-      chat.setSteerState(entry.steer, "queued", false);
+    if (chat) {
+      for (const [entry, row] of state.rows) if (entry.state !== "delivered") chat.setSteerState(row, "queued", false);
     }
-    chat.restoreDraft(chat.takeQueued());
+    state.steers.abandon();
+    chat == null ? void 0 : chat.restoreDraft(chat.takeQueued());
   }
   /** Follow-ups that waited become one new message (sent once), or, when it cannot be sent now, go back into the field. */
   flushSteers(send) {

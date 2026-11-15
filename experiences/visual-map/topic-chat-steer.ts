@@ -15,8 +15,11 @@ export interface TopicSteerView {
 }
 
 export interface TopicChatSteersOptions {
-  /** Called after any entry changes state, so the window can repaint. */
-  onChange?: () => void;
+  /**
+   * Called after any entry changes state, so the window can repaint. `reason` names the two changes a retry text must follow:
+   * an addition was taken in ("delivered"), or the request cannot take additions as it runs ("live-off").
+   */
+  onChange?: (reason?: "delivered" | "live-off") => void;
   /** False once the owner (view or map) is gone: a late answer then changes nothing. */
   alive?: () => boolean;
 }
@@ -36,6 +39,11 @@ export class TopicChatSteers implements ResearchSteer {
   private closed = false;
 
   constructor(private readonly options: TopicChatSteersOptions = {}) {}
+
+  /** True once additions wait for the end of the reply: the request cannot take them as it runs, or the reply is in. */
+  get waits(): boolean {
+    return this.noLive || this.closed;
+  }
 
   /** Takes an addition; returns its entry. After `close` or on a run that cannot take one it waits (queued) at once. */
   add(text: string): TopicSteerEntry {
@@ -59,6 +67,20 @@ export class TopicChatSteers implements ResearchSteer {
     this.pump();
   }
 
+  /** The current attempt's way in is gone (a new attempt is on its way); entries and answers on their way stay as they are. */
+  drop(): void {
+    this.handler = null;
+  }
+
+  /** The turn stopped or failed: no answer changes anything any more; what did not go in waits (queued), what did stays. */
+  abandon(): void {
+    this.closed = true;
+    this.gen++;
+    this.handler = null;
+    for (const entry of this.entries) if (entry.state !== "delivered") entry.state = "queued";
+    this.changed();
+  }
+
   live(on: boolean): void {
     this.setLive(on);
   }
@@ -71,7 +93,7 @@ export class TopicChatSteers implements ResearchSteer {
     this.gen++;
     this.handler = null;
     for (const entry of this.entries) if (entry.state !== "queued") entry.state = "queued";
-    this.changed();
+    this.changed("live-off");
   }
 
   /** The reply is in: hand-overs still running settle, then what has not gone in waits. Later additions are queued. */
@@ -106,8 +128,8 @@ export class TopicChatSteers implements ResearchSteer {
     return this.options.alive ? this.options.alive() : true;
   }
 
-  private changed(): void {
-    this.options.onChange?.();
+  private changed(reason?: "delivered" | "live-off"): void {
+    this.options.onChange?.(reason);
   }
 
   private pump(): void {
@@ -130,7 +152,7 @@ export class TopicChatSteers implements ResearchSteer {
         }
         if (!current()) return;
         entry.state = "delivered";
-        this.changed();
+        this.changed("delivered");
       });
     }
     this.changed();

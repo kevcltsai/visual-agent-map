@@ -176,7 +176,7 @@ test('A4: Delete on a card with subtopics opens the existing confirmation and re
 
 test('A4: a merging card is refused with the merge Notice and nothing is removed', async () => {
   const h = await harness();
-  h.view.mergeTasks.set(MAP, { mapPath: MAP, sources: [{ id: h.ids.leaf }], controller: new AbortController() });
+  h.view.mergeDrafts.tasks.set(MAP, { mapPath: MAP, sources: [{ id: h.ids.leaf }], controller: new AbortController() });
   send(h, 'leaf', 'Delete'); await tick(); await tick();
   assert.equal(h.map().nodes.some(n => n.id === h.ids.leaf), true);
   assert.equal(String(h.Notice.all.at(-1).message), 'Merging; try again when it finishes');

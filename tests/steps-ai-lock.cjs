@@ -480,7 +480,7 @@ test('05 merge: late fence: a source locked while the AI merges gets no merge wr
   await until(() => gate.length === 1);
   await h.repo.writeAiLocked(a.path, true);
   gate[0]();
-  await h.view.mergeTasks.get(MAP)?.run;
+  await h.view.mergeDrafts.tasks.get(MAP)?.run;
   assert.equal(h.view.map.nodes.length, nodes, 'no merged topic');
   assert.equal(h.raw(b), before, 'the other source is untouched');
   assert.match((await h.repo.readNote(a.path)).aiLocked ? 'locked' : '', /locked/);

@@ -95,7 +95,7 @@ test('a descendant is not highlighted; dropping there puts the card back, writes
 
 test('a card that is merging stays put and cannot change parent', () => {
   const h = harness();
-  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: 'd', path: 'd.md' }], controller: new AbortController(), state: 'running' });
+  h.view.mergeDrafts.tasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: 'd', path: 'd.md' }], controller: new AbortController(), state: 'running' });
   h.drag('d', 450, 250); assert.deepEqual(h.lit(), []);
   h.drop('d', 450, 250);
   assert.equal(h.changes.length, 0); assert.deepEqual(h.notes, ['Merging; try again when it finishes']);
@@ -103,7 +103,7 @@ test('a card that is merging stays put and cannot change parent', () => {
 
 test('a target that is merging is refused with the existing Notice', () => {
   const h = harness();
-  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: 'b', path: 'b.md' }], controller: new AbortController(), state: 'running' });
+  h.view.mergeDrafts.tasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: 'b', path: 'b.md' }], controller: new AbortController(), state: 'running' });
   h.drag('d', 450, 250); h.drop('d', 450, 250);
   assert.equal(h.changes.length, 0); assert.deepEqual(h.notes, ['Merging; try again when it finishes']);
 });

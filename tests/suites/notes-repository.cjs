@@ -933,7 +933,7 @@ const aiMergeHarness = async (options = {}) => {
     const check = h.view.mergeCheck(); assert.equal(check.ok, true);
     const snapshot = { path: h.path, mapId: h.mapDoc.id, parentId: check.parentId, sources: check.sources.map(n => ({ id: n.id, path: n.path })) };
     const began = await h.view.startMergeDraft(title, snapshot, () => { h.started++; }, signal);
-    return { began, task: h.view.mergeTasks.get(h.path), snapshot };
+    return { began, task: h.view.mergeDrafts.tasks.get(h.path), snapshot };
   };
   h.untilSettled = async task => { await task.run; };
   // The merge is applied by the run itself (no draft step): these read what it left behind.
@@ -954,7 +954,7 @@ integrationTest('AI merge: usage notice first, a locked "merging" task while the
   for (const other of [h.parent, h.kid]) assert.equal(h.view.isMerging(other.id), false, 'other cards are not');
   assert.deepEqual(h.files(), files, 'nothing is written while the model runs'); assert.deepEqual(await h.shape(), original);
   release(); await h.untilSettled(live);
-  assert.equal(h.view.mergeTasks.size, 0, 'the task is gone once the result is written');
+  assert.equal(h.view.mergeDrafts.tasks.size, 0, 'the task is gone once the result is written');
   for (const source of h.sources) assert.equal(h.view.isMerging(source.id), false);
   const merged = await h.mergedNode('AI merged'); assert.ok(merged, 'the AI result was applied without any review');
   assert.equal((await h.repo.readNote(merged.path)).summary, 'Merged one-liner');
@@ -1074,7 +1074,7 @@ integrationTest('AI merge: the result is written through the structure merge in 
   const unassigned = (await h.repo.collectionFiles(h.path, 'Unassigned')).map(f => f.path);
   assert.equal(unassigned.length, 3); assert.deepEqual([...note.sourcePaths].sort(), unassigned.slice().sort());
   for (const file of unassigned) assert.equal(h.fm(file).state, 'unassigned');
-  assert.equal(h.view.mergeTasks.size, 0, 'the task ends with the write'); assert.equal(h.view.history.undoEntry.label, 'Merge topics');
+  assert.equal(h.view.mergeDrafts.tasks.size, 0, 'the task ends with the write'); assert.equal(h.view.history.undoEntry.label, 'Merge topics');
   const done = await h.shape();
   await h.view.travel(false); assert.deepEqual((await h.shape()).nodes, original.nodes);
   await h.view.travel(true); assert.deepEqual(await h.shape(), done);
@@ -1163,7 +1163,7 @@ integrationTest('W2b merge: Stop while a preview shows clears it and writes noth
   for (const scenario of ['stop', 'fail']) {
     const h = await mergeProgress({}, async ({ h: harness, observer }) => {
       observer.onAttempt('m1', 1); observer.onPreview('m1', { summary: 'Unsaved' });
-      if (scenario === 'stop') { harness.view.stopMergeTask(harness.view.mergeTasks.get(harness.path)); throw Object.assign(new Error('aborted'), { name: 'AbortError' }); }
+      if (scenario === 'stop') { harness.view.mergeDrafts.stop(harness.view.mergeDrafts.tasks.get(harness.path)); throw Object.assign(new Error('aborted'), { name: 'AbortError' }); }
       throw new Error('provider down');
     });
     const files = h.files(); const original = await h.shape();
@@ -1205,10 +1205,10 @@ integrationTest('AI merge check: Stop, closing the view or a source edit during 
       return abortable(signal);
     };
     const { task } = await h.begin(); await reached;
-    if (scenario === 'stop') h.view.stopMergeTask(task);
-    if (scenario === 'close') { h.view.closed = true; for (const t of h.view.mergeTasks.values()) t.controller.abort(); }
+    if (scenario === 'stop') h.view.mergeDrafts.stop(task);
+    if (scenario === 'close') { h.view.closed = true; for (const t of h.view.mergeDrafts.tasks.values()) t.controller.abort(); }
     await h.untilSettled(task);
-    assert.equal(h.view.mergeTasks.size, 0, scenario); assert.equal(h.view.history.canUndo, false, scenario); assert.deepEqual((await h.shape()).nodes, original.nodes, scenario);
+    assert.equal(h.view.mergeDrafts.tasks.size, 0, scenario); assert.equal(h.view.history.canUndo, false, scenario); assert.deepEqual((await h.shape()).nodes, original.nodes, scenario);
     if (scenario === 'stale') { assert.deepEqual(h.notices.filter(m => /nothing was merged/.test(m)), ['A source topic changed or left the map, so nothing was merged']); assert.notDeepEqual(h.files(), files); }
     else { assert.deepEqual(h.files(), files, scenario); assert.equal(h.notices.length, 0, scenario); }
     assert.equal(h.asks.length, 2, scenario);
@@ -1480,7 +1480,7 @@ integrationTest('V11: a guard refusal carries kind "guard" and the merged-topic 
 const parentBegin = async (h, title) => {
   const snapshot = parentSnapshot(h);
   const began = await h.view.startMergeDraft(title, snapshot, () => { h.started++; }, new AbortController().signal);
-  return { began, task: h.view.mergeTasks.get(h.path), snapshot };
+  return { began, task: h.view.mergeDrafts.tasks.get(h.path), snapshot };
 };
 integrationTest('parent merge (AI): one request with the parent first and no Thinking Origin; the result replaces Summary and Detail only, applied directly; undo restores the text', async () => {
   const h = await aiMergeHarness({ origin: 'SECRET-ORIGIN-TEXT', parentModel: 'claude:haiku', parentSource: 'manual' }); await parentOf(h);
@@ -1494,7 +1494,7 @@ integrationTest('parent merge (AI): one request with the parent first and no Thi
   const note = await h.repo.readNote(h.parent.path);
   assert.equal(note.summary, 'Merged one-liner'); assert.match(note.detail, /Parent detail and Gamma detail/); assert.equal(note.title, 'Parent'); assert.equal(h.fm(h.parent.path).status, 'completed');
   assert.equal(note.prompt, 'Parent prompt', 'the parent’s own Prompt is kept'); assert.equal(note.thinkingOrigin, 'PARENT-ORIGIN'); assert.equal(note.model, 'claude:haiku');
-  assert.equal(h.view.mergeTasks.size, 0); assert.equal((await h.repo.readMap(h.path)).nodes.find(n => n.id === h.parent.id).path, h.parent.path);
+  assert.equal(h.view.mergeDrafts.tasks.size, 0); assert.equal((await h.repo.readMap(h.path)).nodes.find(n => n.id === h.parent.id).path, h.parent.path);
   assert.equal((await h.repo.collectionFiles(h.path, 'Unassigned')).length, 2);
   const done = await h.shape();
   await h.view.travel(false); assert.equal(h.contents.get(h.parent.path), text); assert.deepEqual(await h.shape(), original);
@@ -1516,7 +1516,7 @@ integrationTest('parent merge (AI): editing the parent while the AI runs makes t
     let release; const gate = new Promise(resolve => { release = resolve; });
     h.answer = async () => { await gate; return { summary: 'S', detail: 'D', visualReferences: [], formatIssues: [], suggestions: [] }; };
     const { task } = await parentBegin(h, 'Parent'); await edit(h); const edited = h.files(); release(); await h.untilSettled(task);
-    assert.equal(h.view.mergeTasks.size, 0, 'the task is cleared'); assert.ok(h.notices.includes('A source topic changed or left the map, so nothing was merged')); assert.deepEqual(h.files(), edited); assert.notDeepEqual(edited, before); assert.deepEqual((await h.shape()).nodes, original.nodes); assert.equal(h.view.history.canUndo, false);
+    assert.equal(h.view.mergeDrafts.tasks.size, 0, 'the task is cleared'); assert.ok(h.notices.includes('A source topic changed or left the map, so nothing was merged')); assert.deepEqual(h.files(), edited); assert.notDeepEqual(edited, before); assert.deepEqual((await h.shape()).nodes, original.nodes); assert.equal(h.view.history.canUndo, false);
   }
 });
 integrationTest('AI merge: a missing, blank or over-long AI name falls back to the first source title', async () => {
@@ -1555,10 +1555,10 @@ integrationTest('structure merge also takes the parent-resolved model (manual pa
 integrationTest('AI merge: declining the usage notice, or closing before it is answered, starts nothing', async () => {
   const h = await aiMergeHarness(); const files = h.files(); h.decline = true;
   const out = await h.begin();
-  assert.equal(out.began, false); assert.equal(h.started, 0); assert.equal(h.asks.length, 0); assert.equal(h.view.mergeTasks.size, 0); assert.deepEqual(h.files(), files);
+  assert.equal(out.began, false); assert.equal(h.started, 0); assert.equal(h.asks.length, 0); assert.equal(h.view.mergeDrafts.tasks.size, 0); assert.deepEqual(h.files(), files);
   h.decline = false; const gone = new AbortController(); gone.abort();
   const closed = await h.begin('x', gone.signal);
-  assert.equal(closed.began, false); assert.equal(h.asks.length, 0); assert.equal(h.view.mergeTasks.size, 0);
+  assert.equal(closed.began, false); assert.equal(h.asks.length, 0); assert.equal(h.view.mergeDrafts.tasks.size, 0);
 });
 integrationTest('AI merge: Stop before or after the request, an AI failure and closing the view leave every file and the map untouched and clear the merging state', async () => {
   for (const scenario of ['stop', 'fail', 'close']) {
@@ -1566,11 +1566,11 @@ integrationTest('AI merge: Stop before or after the request, an AI failure and c
     h.answer = signal => scenario === 'fail' ? Promise.reject(new Error('provider down')) : abortable(signal);
     const { task } = await h.begin();
     assert.equal(task.state, 'running');
-    if (scenario === 'stop') h.view.stopMergeTask(task);
-    if (scenario === 'close') { while (!h.asks.length) await new Promise(r => setImmediate(r)); h.view.closed = true; for (const t of h.view.mergeTasks.values()) t.controller.abort(); }
+    if (scenario === 'stop') h.view.mergeDrafts.stop(task);
+    if (scenario === 'close') { while (!h.asks.length) await new Promise(r => setImmediate(r)); h.view.closed = true; for (const t of h.view.mergeDrafts.tasks.values()) t.controller.abort(); }
     await h.untilSettled(task);
     assert.deepEqual(h.files(), files, scenario); assert.deepEqual(await h.shape(), original, scenario); assert.equal(h.view.history.canUndo, false, scenario);
-    assert.equal(h.view.mergeTasks.size, 0, `${scenario}: the merging state is cleared`);
+    assert.equal(h.view.mergeDrafts.tasks.size, 0, `${scenario}: the merging state is cleared`);
     for (const source of h.sources) assert.equal(h.view.isMerging(source.id), false, `${scenario}: cards are free again`);
     if (scenario === 'fail') { assert.deepEqual(h.failures, ['AI merge failed']); assert.ok(h.notices.some(m => /AI merge failed: provider down/.test(m))); }
     else assert.equal(h.notices.some(m => /Merged into|AI merge failed/.test(m)), false, `${scenario}: no Notice`);
@@ -1580,14 +1580,14 @@ integrationTest('AI merge: a result that arrives after Stop is dropped (no task,
   const h = await aiMergeHarness(); const files = h.files(); let release;
   h.answer = () => new Promise(resolve => { release = () => resolve({ summary: 'late', detail: 'late', visualReferences: [], formatIssues: [], suggestions: [] }); });
   const { task } = await h.begin(); await new Promise(r => setImmediate(r));
-  h.view.stopMergeTask(task); release(); await h.untilSettled(task);
-  assert.equal(h.view.mergeTasks.size, 0); assert.equal(task.state, 'running'); assert.equal(h.notices.length, 0); assert.deepEqual(h.files(), files);
+  h.view.mergeDrafts.stop(task); release(); await h.untilSettled(task);
+  assert.equal(h.view.mergeDrafts.tasks.size, 0); assert.equal(task.state, 'running'); assert.equal(h.notices.length, 0); assert.deepEqual(h.files(), files);
 });
 integrationTest('AI merge: a source that changes while the model runs fails with the stale message, writes nothing and clears the task', async () => {
   const h = await aiMergeHarness(); const files = h.files();
   h.answer = async () => { await h.repo.updateNote(h.sources[0].path, { detail: 'Changed meanwhile' }); return { summary: 's', detail: 'd', visualReferences: [], formatIssues: [], suggestions: [] }; };
   const { task } = await h.begin(); await h.untilSettled(task);
-  assert.equal(h.view.mergeTasks.size, 0); assert.deepEqual(h.notices.filter(m => /nothing was merged/.test(m)), ['A source topic changed or left the map, so nothing was merged']);
+  assert.equal(h.view.mergeDrafts.tasks.size, 0); assert.deepEqual(h.notices.filter(m => /nothing was merged/.test(m)), ['A source topic changed or left the map, so nothing was merged']);
   assert.equal(h.notices.some(m => /Merged into/.test(m)), false);
   assert.equal(h.view.history.canUndo, false); assert.equal((await h.repo.readMap(h.path)).nodes.length, 5);
   assert.notDeepEqual(h.files(), files, 'only the test edit changed a file');
@@ -1605,7 +1605,7 @@ integrationTest('AI merge: when the sources or the map change during the run (so
     const { task } = await h.begin();
     await h.untilSettled(task);
     assert.deepEqual(h.files(), files, `${name}: no file created or moved`); assert.equal(JSON.stringify(h.view.map.nodes), nodes, name);
-    assert.equal(h.view.mergeTasks.size, 0, name); assert.equal(h.view.history.canUndo, false, name);
+    assert.equal(h.view.mergeDrafts.tasks.size, 0, name); assert.equal(h.view.history.canUndo, false, name);
     assert.deepEqual(h.notices.filter(m => /nothing was merged/.test(m)), ['A source topic changed or left the map, so nothing was merged'], name);
     assert.equal((await h.repo.readMap(h.path)).nodes.length, 5, name);
   }
@@ -1618,7 +1618,7 @@ integrationTest('AI merge: a second Merge press while the merge runs only report
   h.view.openMerge(); assert.deepEqual(h.notices.slice(-1), ['Merging; try again when it finishes'], 'the merge-specific Notice, not “AI running…”');
   assert.deepEqual(plain(h.view.mergeCheck()), { ok: false, reason: 'ui.merge_busy' }, 'the sources stay locked while it runs');
   release(); await h.untilSettled(task);
-  assert.equal(h.view.mergeTasks.size, 0);
+  assert.equal(h.view.mergeDrafts.tasks.size, 0);
 });
 integrationTest('AI merge: reference progress messages repaint nothing; the run still ends written, or with its failure shown', async () => {
   for (const outcome of ['done', 'failed']) {
@@ -1635,7 +1635,7 @@ integrationTest('AI merge: reference progress messages repaint nothing; the run 
     const { task } = await h.begin(); const rendersAtStart = renders; await h.untilSettled(task);
     assert.equal(during, 0, `${outcome}: progress messages trigger no whole-view render`);
     assert.ok(renders > rendersAtStart, `${outcome}: the end of the run still repaints`);
-    assert.equal(h.view.mergeTasks.size, 0, `${outcome}: the task is cleared`);
+    assert.equal(h.view.mergeDrafts.tasks.size, 0, `${outcome}: the task is cleared`);
     if (outcome === 'done') { assert.ok(await h.mergedNode('AI merged')); assert.deepEqual(h.notices.filter(m => /Merged into/.test(m)), ['Merged into “AI merged”. You can undo.']); }
     else { assert.deepEqual(h.failures, ['AI merge failed']); assert.ok(h.notices.some(m => /AI merge failed: model down/.test(m))); assert.equal(await h.mergedNode('AI merged'), undefined); }
   }
@@ -1650,7 +1650,7 @@ integrationTest('AI merge: a failure while moving a source rolls everything back
   assert.equal(JSON.stringify((await h.repo.readMap(h.path)).nodes), nodes); assert.deepEqual(after.nodes, original.nodes);
   for (const source of h.sources) { assert.ok(h.app.vault.getAbstractFileByPath(source.path)); assert.equal(h.fm(source.path).state, 'active'); }
   assert.equal(after.unassigned.length, 1, 'the new note is parked, not deleted'); assert.equal(h.view.history.canUndo, false);
-  assert.equal(h.view.mergeTasks.size, 0, 'no draft state is left to retry'); assert.deepEqual(h.failures, ['AI merge failed']); assert.ok(h.notices.some(m => /AI merge failed: disk full/.test(m)));
+  assert.equal(h.view.mergeDrafts.tasks.size, 0, 'no draft state is left to retry'); assert.deepEqual(h.failures, ['AI merge failed']); assert.ok(h.notices.some(m => /AI merge failed: disk full/.test(m)));
   assert.equal(h.notices.some(m => /Merged into/.test(m)), false);
   for (const source of h.sources) assert.equal(h.view.isMerging(source.id), false, 'the next merge is not blocked');
   const again = await h.begin('Second try'); await h.untilSettled(again.task);
@@ -1687,7 +1687,7 @@ integrationTest('AI merge lock: while merging, delete, remove, move, copy and st
   assert.notDeepEqual(await state(), before);
   release(); await h.untilSettled(task);
   assert.ok(await h.mergedNode('AI merged'));
-  assert.equal(h.view.mergeTasks.size, 0);
+  assert.equal(h.view.mergeDrafts.tasks.size, 0);
   h.notices.length = 0; await h.view.removeToUnassigned(h.kid, false);
   assert.equal(h.notices.includes(locked), false, 'after the merge the lock is gone');
 });

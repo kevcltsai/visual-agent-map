@@ -1269,7 +1269,7 @@ integrationTest('map chat: while the map is sorted by relevance a card dropped o
 
 integrationTest('map chat: a merging card dropped on the panel is a reference too, and cancelling the drag leaves nothing highlighted', async () => {
   const d = await dragHarness();
-  d.view.mergeTasks.set(d.view.path, { mapPath: d.view.path, sources: [{ id: d.ids.a, path: d.node('a').path }], controller: new AbortController(), state: 'running' });
+  d.view.mergeDrafts.tasks.set(d.view.path, { mapPath: d.view.path, sources: [{ id: d.ids.a, path: d.node('a').path }], controller: new AbortController(), state: 'running' });
   d.down(); d.move(100, 400); d.up(); assert.equal(d.chat.attachments().length, 1);
   const c = await dragHarness(); c.down(); c.move(100, 400); c.events.get('pointercancel')({ type: 'pointercancel' });
   assert.ok(!hasClass(c.chat.el, 'is-drop')); assert.equal(c.chat.attachments().length, 0); assert.equal(c.changes.length, 0);
@@ -3916,7 +3916,7 @@ integrationTest('B2 merge: two merges in one reply are both completed; the secon
   const titles = []; for (const n of await h.saved()) titles.push((await h.repo.readNote(n.path)).title);
   assert.ok(titles.includes('First merged') && titles.includes('Second merged'), titles.join('|'));
   assert.ok(!titles.some(t2 => /^Merge p\d$/.test(t2)), 'the four sources are gone from the map');
-  assert.equal(h.view.mergeTasks.size, 0); assert.equal(h.control.nested, 0);
+  assert.equal(h.view.mergeDrafts.tasks.size, 0); assert.equal(h.control.nested, 0);
 });
 // Jobs-sim #6 (2026-11-05): "merge X and Y into one card called Z, and make it red". Cards with a summary are content: the
 // chat starts the AI merge (as the merge button does), keeps the name the user gave, and the merged card keeps the colour
@@ -3934,7 +3934,7 @@ integrationTest('map chat merge: summary-only cards run the AI merge under the c
     { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }
   ]);
   eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines));
-  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+  await h.view.mergeDrafts.tasks.get(h.view.path)?.run; await tick();
   eq(asks, ['merge'], 'the AI merge ran once');
   const merged = [];
   for (const n of await h.saved()) { const note = await h.repo.readNote(n.path); if (note.title === 'Nothing to Fear') merged.push(note); }
@@ -3955,7 +3955,7 @@ const mergeReply = async h => {
     lookAct([h.ids.a, h.ids.b, h.ids.c], { color: 'red' }),
     { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }
   ]);
-  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+  await h.view.mergeDrafts.tasks.get(h.view.path)?.run; await tick();
 };
 integrationTest('persona 17: a chat reply that recolours and then AI-merges is one undo step and one redo step', async () => {
   const h = await harness({ viaSync: false }); await h.view.hydrate();
@@ -3979,7 +3979,7 @@ integrationTest('persona 17: when another step was pushed before the merge lands
   h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
   h.plugin.askModel = async () => { h.view.history.push(foreignEntry('later edit', log)); return { summary: 'S.', detail: 'D.', visualReferences: [], suggestions: [] }; };
   await apply(h, [lookAct([h.ids.a, h.ids.b, h.ids.c], { color: 'red' }), { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }]);
-  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+  await h.view.mergeDrafts.tasks.get(h.view.path)?.run; await tick();
   assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1, 'the reply keeps its own step');
   assert.ok(h.view.history.past.length >= 3, 'the merge is a separate step above the reply and the other edit');
 });
@@ -4000,7 +4000,7 @@ integrationTest('map chat merge: a colour asked for one source in the same reply
   ]);
   eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines));
   eq((await h.note('a')).color ?? null, null, 'the source that goes to Unassigned is not coloured');
-  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+  await h.view.mergeDrafts.tasks.get(h.view.path)?.run; await tick();
   const merged = [], parked = [];
   for (const n of await h.saved()) { const note = await h.repo.readNote(n.path); if (note.title === 'Nothing to Fear') merged.push(note); }
   assert.equal(merged.length, 1);
@@ -4021,7 +4021,7 @@ integrationTest('map chat merge: when the merge is skipped, the cards named for 
 });
 integrationTest('B2 merge: a merge still locked by an AI merge is skipped with the locked reason', async () => {
   const h = await harness(); await h.view.hydrate();
-  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
+  h.view.mergeDrafts.tasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
   const lines = await apply(h, [{ kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'X', goal: '', direction: '', mode: '', images: false }]);
   eq(lines.map(l => l.status), ['skipped']); assert.match(lines[0].text, /being merged/);
 });
@@ -4227,7 +4227,7 @@ integrationTest('B3 find_images: an AI-locked card gets no search and no picture
 });
 integrationTest('B3 find_images: a card that is merging or has an AI task running gets no search (no AI call) and says why; a card put under an AI task during the search is refused at the write', async () => {
   const { h } = await imageHarness(); h.control.search = perQuery;
-  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
+  h.view.mergeDrafts.tasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
   h.plugin.running.add(h.node('b').path);
   await apply(h, [findAct(h, null, { nodeIds: [h.ids.a, h.ids.b, h.ids.c] })]); await waitImages(h);
   assert.equal(h.control.searches.length, 1, 'only REM is searched'); assert.match(lastImages(h, 0).reason, /being merged/); assert.match(lastImages(h, 1).reason, /AI is working on the card/);
@@ -4413,7 +4413,7 @@ const spoilCases = [
   ['another map', h => { h.view.map = { ...h.view.map, id: 'map-x' }; }, /The map was switched/],
   ['another path', h => { h.view.path = 'Agent Workspace/Topics/other/Map.md'; }, /The map was switched/],
   ['card gone', h => { h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.a); }, /no longer on the map/],
-  ['merging', h => { h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' }); }, /being merged/],
+  ['merging', h => { h.view.mergeDrafts.tasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' }); }, /being merged/],
   ['AI running (activeTasks)', h => { h.plugin.activeTasks.set(h.node('a').path, new AbortController()); }, /AI is working on the card/],
   ['AI running (running)', h => { h.plugin.running.add(h.node('a').path); }, /AI is working on the card/]
 ];
@@ -6025,7 +6025,7 @@ integrationTest('hypothesis-leaning: S19 add_child writes topicKind, leaning and
 });
 integrationTest('hypothesis-leaning: S20 set_topic_kind with a leaning skips a card being merged, and writes nothing', async () => {
   const h = await harness(); await hypNote(h, 'a');
-  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
+  h.view.mergeDrafts.tasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
   const before = h.contents.get(h.node('a').path);
   const lines = await apply(h, [setKind([h.ids.a], { leaning: 'refuted' })]);
   eq(lines.map(l => l.status), ['skipped']); assert.equal(h.contents.get(h.node('a').path), before);

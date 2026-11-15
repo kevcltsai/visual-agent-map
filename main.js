@@ -20482,6 +20482,45 @@ function synthesisDefaultName(language2, names3) {
   return names3.length > 2 ? translate(language2, "ui.synthesis_of_0_and_1_more", names3[0], names3.length) : translate(language2, "ui.synthesis_of_0", names3.join(translate(language2, "ui.list_separator")));
 }
 
+// experiences/visual-map/merge-drafts.ts
+var MergeDrafts = class {
+  constructor(ports) {
+    this.ports = ports;
+    /** AI merges that hid their dialog, keyed by map path (one per map). */
+    __publicField(this, "tasks", /* @__PURE__ */ new Map());
+  }
+  /** True while an AI merge on this map still holds the card (running or being written): the card is locked. */
+  isMerging(nodeId, except) {
+    var _a2, _b2;
+    return [...(_b2 = (_a2 = this.tasks) == null ? void 0 : _a2.values()) != null ? _b2 : []].some(
+      (merge) => merge !== except && merge.mapPath === this.ports.path() && merge.sources.some((source) => source.id === nodeId)
+    );
+  }
+  has(mapPath) {
+    return this.tasks.has(mapPath);
+  }
+  isRunning() {
+    return this.tasks.size > 0;
+  }
+  isLive(task) {
+    return this.tasks.get(task.mapPath) === task && !task.controller.signal.aborted && !this.ports.closed();
+  }
+  forget(mapPath, task) {
+    if (this.tasks.get(mapPath) === task) this.tasks.delete(mapPath);
+  }
+  /** Stop, or clear a finished one: the run is aborted and forgotten, so a late result changes nothing. */
+  stop(task) {
+    this.forget(task.mapPath, task);
+    task.controller.abort();
+    this.ports.changed();
+  }
+  /** The view closes: every run is aborted first, then all are forgotten. */
+  stopAll() {
+    for (const task of this.tasks.values()) task.controller.abort();
+    this.tasks.clear();
+  }
+};
+
 // log-manager.ts
 var LogManager = class {
   constructor(limit = 500) {
@@ -60154,8 +60193,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "deletedMap", null);
     /** A merge dialog is open or its write is queued; a second Merge press (or the Enter that confirmed) is ignored. */
     __publicField(this, "mergeOpen", false);
-    /** AI merges that hid their dialog, keyed by map path (one per map). */
-    __publicField(this, "mergeTasks", /* @__PURE__ */ new Map());
+    __publicField(this, "mergeDrafts", new MergeDrafts({
+      path: () => this.path,
+      closed: () => this.closed,
+      changed: () => this.render()
+    }));
     /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
     __publicField(this, "chatReplyStep");
     /**
@@ -60839,7 +60881,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     if (this.chatController || this.chatApplying || this.chatImageFinder.isRunning()) return true;
     if (((_a2 = this.chat) == null ? void 0 : _a2.isBusy) || this.chatPrepAbandon) return true;
     for (const task of this.plugin.topicRuns.syntheses(this).topics.values()) if (task.state === "running") return true;
-    if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
+    if (this.startingTasks.size || this.startingExpand.size || this.mergeDrafts.isRunning()) return true;
     if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
     if (this.startedRelevance && this.path) {
       const run = this.plugin.relevanceGrades.get(this.path);
@@ -61786,8 +61828,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     for (const controller of this.startingTasks.values()) controller.abort();
     this.startingTasks.clear();
     this.startingExpand.clear();
-    for (const task of this.mergeTasks.values()) task.controller.abort();
-    this.mergeTasks.clear();
+    this.mergeDrafts.stopAll();
     this.dropMapBackground();
     this.viewEpoch++;
     this.mapOpenEpoch++;
@@ -62591,7 +62632,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
         }
       });
     }
-    const merge = this.mergeTasks.get(this.path);
+    const merge = this.mergeDrafts.tasks.get(this.path);
     if (merge) {
       const names3 = merge.sources.map((source) => {
         var _a3, _b3;
@@ -62602,7 +62643,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
         value: names3.join(t("ui.list_separator")),
         running: true,
         ...merge.state === "running" ? {
-          onStop: () => this.stopMergeTask(merge),
+          onStop: () => this.mergeDrafts.stop(merge),
           stopLabel: t("ui.merge_stop"),
           detail: (bar) => this.renderTaskProgress(bar, parent, this.taskProgressKey("merge", merge.mapPath))
         } : {}
@@ -65738,9 +65779,7 @@ ${request.requirements}` : preset.text,
   /** True while an AI merge on this map still holds the card (running or being written): the card is locked. */
   isMerging(nodeId, except) {
     var _a2, _b2;
-    return [...(_b2 = (_a2 = this.mergeTasks) == null ? void 0 : _a2.values()) != null ? _b2 : []].some(
-      (merge) => merge !== except && merge.mapPath === this.path && merge.sources.some((source) => source.id === nodeId)
-    );
+    return (_b2 = (_a2 = this.mergeDrafts) == null ? void 0 : _a2.isMerging(nodeId, except)) != null ? _b2 : false;
   }
   /** A card and everything below it. */
   branchIds(id) {
@@ -65768,7 +65807,7 @@ ${request.requirements}` : preset.text,
   openMerge() {
     var _a2, _b2, _c, _d, _e;
     if (!this.map || this.mergeOpen || !this.selection.state.multiSelected.size) return;
-    if (this.mergeTasks.has(this.path)) {
+    if (this.mergeDrafts.has(this.path)) {
       new import_obsidian34.Notice(t("ui.merge_locked"));
       return;
     }
@@ -65881,7 +65920,7 @@ ${request.requirements}` : preset.text,
         controller: new AbortController(),
         state: "running"
       };
-      this.mergeTasks.set(snapshot.path, task);
+      this.mergeDrafts.tasks.set(snapshot.path, task);
       this.mergeOpen = false;
       started();
       this.render();
@@ -65890,9 +65929,6 @@ ${request.requirements}` : preset.text,
     if (accepted && !began && !signal.aborted) new import_obsidian34.Notice(t("ui.merge_draft_stale"));
     return began;
   }
-  isLiveMergeTask(task) {
-    return this.mergeTasks.get(task.mapPath) === task && !task.controller.signal.aborted && !this.closed;
-  }
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   async runMergeDraft(task) {
     const language2 = this.plugin.settings.language;
@@ -65900,7 +65936,7 @@ ${request.requirements}` : preset.text,
     try {
       const snapshot = await this.mergeSourceSnapshot(task.sources, task.controller.signal);
       const sourceGroup = snapshot.group;
-      if (!this.isLiveMergeTask(task)) return;
+      if (!this.mergeDrafts.isLive(task)) return;
       task.sourceContent = snapshot.content;
       const request = {
         title: t("ui.merge_ai_untitled"),
@@ -65934,9 +65970,9 @@ ${request.requirements}` : preset.text,
         )
       );
       const sourcesUnchanged = async () => {
-        if (!this.isLiveMergeTask(task)) return false;
+        if (!this.mergeDrafts.isLive(task)) return false;
         const latest = await this.mergeSourceSnapshot(task.sources, task.controller.signal);
-        if (!this.isLiveMergeTask(task)) return false;
+        if (!this.mergeDrafts.isLive(task)) return false;
         if (latest.content !== task.sourceContent) throw new Error(t("ui.merge_draft_stale"));
         return true;
       };
@@ -65965,7 +66001,7 @@ ${request.requirements}` : preset.text,
             if (!task.keepTitle) task.title = mergeTitleFromResult(result, task.title);
           }
         } catch (error) {
-          if (task.controller.signal.aborted || this.closed || !this.isLiveMergeTask(task)) throw error;
+          if (task.controller.signal.aborted || this.closed || !this.mergeDrafts.isLive(task)) throw error;
           if (error instanceof Error && error.message === t("ui.merge_draft_stale")) throw error;
           this.plugin.recordFailure(t("log.merge_failed"), error);
         }
@@ -65982,7 +66018,7 @@ ${request.requirements}` : preset.text,
           if (!await sourcesUnchanged()) return;
           task.supplement = supplement.detail;
         } catch (error) {
-          if (task.controller.signal.aborted || this.closed || !this.isLiveMergeTask(task)) throw error;
+          if (task.controller.signal.aborted || this.closed || !this.mergeDrafts.isLive(task)) throw error;
           if (error instanceof Error && error.message === t("ui.merge_draft_stale")) throw error;
           this.plugin.recordFailure(t("log.merge_failed"), error);
           task.supplement = "";
@@ -66025,8 +66061,8 @@ ${request.requirements}` : preset.text,
         );
       else new import_obsidian34.Notice(done, MERGE_DONE_NOTICE_MS);
     } catch (error) {
-      const live2 = this.mergeTasks.get(task.mapPath) === task;
-      if (live2) this.mergeTasks.delete(task.mapPath);
+      const live2 = this.mergeDrafts.tasks.get(task.mapPath) === task;
+      if (live2) this.mergeDrafts.forget(task.mapPath, task);
       if (!this.closed) this.render();
       if (task.controller.signal.aborted || this.closed) return;
       const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
@@ -66085,12 +66121,6 @@ ${request.requirements}` : preset.text,
       MERGE_DONE_NOTICE_MS
     );
     this.removalRun = { notice, entries, titles, until: Date.now() + MERGE_DONE_NOTICE_MS };
-  }
-  /** Stop, or clear a finished one: the run is aborted and forgotten, so a late result changes nothing. */
-  stopMergeTask(task) {
-    if (this.mergeTasks.get(task.mapPath) === task) this.mergeTasks.delete(task.mapPath);
-    task.controller.abort();
-    this.render();
   }
   /** The merged cards as one reference group, and the map's data sources, with the key that tells whether either changed. */
   async mergeSourceSnapshot(sources, signal) {
@@ -66154,7 +66184,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       if (content) stale();
       return;
     }
-    if (content && (this.mergeTasks.get(snapshot.path) !== content.task || content.task.state !== "applying")) stale();
+    if (content && (this.mergeDrafts.tasks.get(snapshot.path) !== content.task || content.task.state !== "applying"))
+      stale();
     const check = this.mergeCheck(
       snapshot.sources.map((source) => source.id),
       content == null ? void 0 : content.task
@@ -66287,7 +66318,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       }
       throw this.mergeError(error);
     }
-    if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
+    if (content) this.mergeDrafts.forget(mapPath, content.task);
     const mergeStep = this.mergeEntry(entry);
     this.history.push(mergeStep);
     this.selection.afterMerge(created.id);
@@ -66369,7 +66400,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       this.render();
       throw this.mergeError(error);
     }
-    if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
+    if (content) this.mergeDrafts.forget(mapPath, content.task);
     const mergeStep = this.mergeEntry(entry);
     this.history.push(mergeStep);
     this.selection.afterMerge(target.id);
@@ -82510,7 +82541,7 @@ ${note.detail.trim()}` : "",
         if (targets.length) this.chatSelect(targets);
         const title = action.title.trim();
         if (!title) return skipped("ui.map_chat_skip_unavailable");
-        if (this.mergeTasks.has(this.path)) return skipped("ui.map_chat_skip_merge_locked");
+        if (this.mergeDrafts.has(this.path)) return skipped("ui.map_chat_skip_merge_locked");
         const check = this.mergeCheck();
         if (!check.ok) return skipped("ui.map_chat_skip_unavailable");
         if (this.mergeLockReason(

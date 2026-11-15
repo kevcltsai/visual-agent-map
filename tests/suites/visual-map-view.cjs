@@ -1112,7 +1112,7 @@ integrationTest('AI merge shows on the cards ("Merging…" chip, running frame) 
   const chips = card => { const all = el => [el, ...el.children.flatMap(all)]; return all(card).filter(e => e.classes?.has('vam-status')).map(e => e.text); };
   fixture.build(); let cards = fixture.cards();
   assert.deepEqual(chips(cards.a), ['Researched']); assert.notEqual(cards.a.dataset.status, 'running');
-  view.mergeTasks.set(view.path, task); fixture.build(); cards = fixture.cards();
+  view.mergeDrafts.tasks.set(view.path, task); fixture.build(); cards = fixture.cards();
   for (const id of ['a', 'b']) { assert.deepEqual(chips(cards[id]), ['Merging…'], `${id} is marked`); assert.equal(cards[id].dataset.status, 'running'); }
   for (const id of ['root', 'c']) { assert.equal(chips(cards[id]).includes('Merging…'), false, `${id} is not`); assert.notEqual(cards[id].dataset.status, 'running'); }
   const make = selectionDom(); const bar = () => { const parent = make('div'); view.renderBackgroundBars(parent); return parent; };
@@ -1122,13 +1122,13 @@ integrationTest('AI merge shows on the cards ("Merging…" chip, running frame) 
   task.state = 'applying'; texts = all(bar()).map(e => e.text).filter(Boolean);
   assert.ok(texts.includes('Merging:')); assert.equal(texts.includes('Stop merge'), false, 'no Stop once the result is being written');
   const stop = (task.state = 'running', all(bar()).find(e => e.tag === 'button' && e.text === 'Stop merge')); stop.handlers.get('click')();
-  assert.equal(view.mergeTasks.size, 0); assert.equal(task.controller.signal.aborted, true);
+  assert.equal(view.mergeDrafts.tasks.size, 0); assert.equal(task.controller.signal.aborted, true);
   fixture.build(); assert.deepEqual(chips(fixture.cards().a), ['Researched']); assert.equal(texts.length > 0 && all(bar()).some(e => e.text === 'Merging:'), false, 'the bar is gone');
 });
 integrationTest('AI merge lock: a merging card cannot be dragged; other cards still can', () => {
   for (const [merging, expected] of [[true, 0], [false, 1]]) {
     const { view, b, events, down, frames } = dragFixture();
-    if (merging) view.mergeTasks.set(view.path, { mapPath: view.path, sources: [{ id: b.id, path: b.path }], controller: new AbortController(), state: 'running' });
+    if (merging) view.mergeDrafts.tasks.set(view.path, { mapPath: view.path, sources: [{ id: b.id, path: b.path }], controller: new AbortController(), state: 'running' });
     const changes = []; view.mapChange = async change => { changes.push(change); };
     down(); events.get('pointermove')({ clientX: 50, clientY: 20 });
     assert.equal(frames.length, expected, merging ? 'the card does not follow the pointer' : 'the card moves');
@@ -1723,7 +1723,7 @@ integrationTest('merge dialog offers AI only when a selected card has Detail, an
   view.openMerge(); assert.ok(checkbox(opened[1]), 'content: the AI merge with its skip option');
   opened[1].close();
   // A running merge on this map only reports itself; its sources stay locked after it fails or finishes a draft.
-  view.mergeTasks.set(view.path, { mapPath: view.path, state: 'running', sources: [{ id: 'a', path: 'a' }, { id: 'b', path: 'b' }], controller: new AbortController() });
+  view.mergeDrafts.tasks.set(view.path, { mapPath: view.path, state: 'running', sources: [{ id: 'a', path: 'a' }, { id: 'b', path: 'b' }], controller: new AbortController() });
   view.openMerge(); assert.equal(opened.length, 2, 'no second dialog while a merge is running');
 });
 

@@ -140,7 +140,7 @@ test('dragging a card that is not picked does not move anything; dropping it on 
 test('a merging member blocks the whole group with one Notice', () => {
   const notes = [];
   const h = harness({ notes });
-  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: 'b', path: 'b.md' }], controller: new AbortController(), state: 'running' });
+  h.view.mergeDrafts.tasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: 'b', path: 'b.md' }], controller: new AbortController(), state: 'running' });
   h.down('a'); h.fire('a', 'pointermove', 40, 0); h.fire('a', 'pointermove', 80, 0); h.flush();
   assert.equal(notes.length, 1); assert.equal(notes[0], 'Merging; try again when it finishes');
   h.fire('a', 'pointerup', 80, 0);

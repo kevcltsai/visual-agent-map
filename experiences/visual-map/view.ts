@@ -113,6 +113,7 @@ import {
 } from "./presentation-mode";
 import { alignSiblingsToScreen, bySiblingAxis, readingOrder } from "./presentation-order";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
+import { MergeDrafts, type ChatReplyStep, type MergeTask } from "./merge-drafts";
 import {
   begin as beginTransaction,
   isTransactionError,
@@ -754,43 +755,6 @@ function withoutAimFields(node: MapNode): MapNode {
   delete copy.aimConvergesFromNodeIds;
   delete copy.aimDismissedQuestionRequestIds;
   return copy;
-}
-/** The AI merge that hid its dialog: owned by the view, one per map. It writes nothing until the draft is confirmed. */
-/** A chat reply's undo step, still open to the one AI merge the reply started (it lands later and joins the step). */
-interface ChatReplyStep {
-  entry: TransactionEntry;
-  absorb: (entry: TransactionEntry) => Promise<void>;
-}
-interface MergeTask {
-  /** The reply step this merge may join when it is written (the chat's merge); see {@link ChatReplyStep}. */
-  replyStep?: ChatReplyStep;
-  mapPath: string;
-  mapId: string;
-  mapTitle: string;
-  /** The fallback name (first source's title) until the AI names the topic; then the AI's name. */
-  title: string;
-  /** The name was given by the user (the map chat's merge): the AI's suggested name does not replace it. */
-  keepTitle?: boolean;
-  /** The map chat's "make it red" of the same reply: written to the merged card (the sources go to Unassigned). */
-  appearance?: TopicAppearanceChange;
-  sources: { id: string; path: string }[];
-  parentId: string | null;
-  /** Parent mode: the parent topic that keeps its card (first of `sources`); null when a new topic replaces siblings. */
-  targetId: string | null;
-  model: string;
-  reasoning: ModelChoice["reasoning"];
-  /** The sources as sent to the model (JSON of the reference documents); compared again before the draft is saved. */
-  sourceContent: string;
-  /** The model's additions from the map's data sources (written as a separate block, never into the merged text). */
-  supplement?: string;
-  /** The supplement request failed: the block says so instead of silently leaving the sources out. */
-  supplementFailed?: boolean;
-  controller: AbortController;
-  /** running: the model works (Stop works); applying: the result is being written; a task that ends is removed. */
-  state: "running" | "applying";
-  draft?: AiResult;
-  /** The request in flight (tests await it). */
-  run?: Promise<void>;
 }
 /** Progress keys for runs that have no card (multi-select synthesis, AI merge); Obsidian file names cannot contain ":". */
 /** Alt+arrow: how far a card trades places with its siblings (Up/Left earlier, Down/Right later). */
@@ -1650,8 +1614,11 @@ export class VisualAgentMapView extends ItemView {
   } | null = null;
   /** A merge dialog is open or its write is queued; a second Merge press (or the Enter that confirmed) is ignored. */
   private mergeOpen = false;
-  /** AI merges that hid their dialog, keyed by map path (one per map). */
-  private mergeTasks = new Map<string, MergeTask>();
+  private mergeDrafts = new MergeDrafts({
+    path: () => this.path,
+    closed: () => this.closed,
+    changed: () => this.render()
+  });
   /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
   private chatReplyStep: ChatReplyStep | undefined;
   /**
@@ -2331,7 +2298,7 @@ export class VisualAgentMapView extends ItemView {
     // The chat's preparing stage (before its controller exists) is stopped by a map change too.
     if (this.chat?.isBusy || this.chatPrepAbandon) return true;
     for (const task of this.plugin.topicRuns.syntheses(this).topics.values()) if (task.state === "running") return true;
-    if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
+    if (this.startingTasks.size || this.startingExpand.size || this.mergeDrafts.isRunning()) return true;
     if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
     if (this.startedRelevance && this.path) {
       const run = this.plugin.relevanceGrades.get(this.path);
@@ -3331,8 +3298,7 @@ export class VisualAgentMapView extends ItemView {
     for (const controller of this.startingTasks.values()) controller.abort();
     this.startingTasks.clear();
     this.startingExpand.clear();
-    for (const task of this.mergeTasks.values()) task.controller.abort();
-    this.mergeTasks.clear();
+    this.mergeDrafts.stopAll();
     this.dropMapBackground();
     this.viewEpoch++;
     this.mapOpenEpoch++;
@@ -4202,7 +4168,7 @@ export class VisualAgentMapView extends ItemView {
         }
       });
     }
-    const merge = this.mergeTasks.get(this.path);
+    const merge = this.mergeDrafts.tasks.get(this.path);
     if (merge) {
       const names = merge.sources.map(source => this.notes.get(source.id)?.title ?? source.path);
       renderBackgroundStatus(parent, {
@@ -4211,7 +4177,7 @@ export class VisualAgentMapView extends ItemView {
         running: true,
         ...(merge.state === "running"
           ? {
-              onStop: () => this.stopMergeTask(merge),
+              onStop: () => this.mergeDrafts.stop(merge),
               stopLabel: t("ui.merge_stop"),
               detail: bar => this.renderTaskProgress(bar, parent, this.taskProgressKey("merge", merge.mapPath))
             }
@@ -7546,9 +7512,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** True while an AI merge on this map still holds the card (running or being written): the card is locked. */
   private isMerging(nodeId: string, except?: MergeTask): boolean {
-    return [...(this.mergeTasks?.values() ?? [])].some(
-      merge => merge !== except && merge.mapPath === this.path && merge.sources.some(source => source.id === nodeId)
-    );
+    return this.mergeDrafts?.isMerging(nodeId, except) ?? false;
   }
   /** A card and everything below it. */
   private branchIds(id: string): string[] {
@@ -7575,7 +7539,7 @@ export class VisualAgentMapView extends ItemView {
   private openMerge(): void {
     if (!this.map || this.mergeOpen || !this.selection.state.multiSelected.size) return;
     // One AI merge per map: a running one is only reported.
-    if (this.mergeTasks.has(this.path)) {
+    if (this.mergeDrafts.has(this.path)) {
       new Notice(t("ui.merge_locked"));
       return;
     }
@@ -7708,7 +7672,7 @@ export class VisualAgentMapView extends ItemView {
         controller: new AbortController(),
         state: "running"
       };
-      this.mergeTasks.set(snapshot.path, task);
+      this.mergeDrafts.tasks.set(snapshot.path, task);
       this.mergeOpen = false;
       started();
       this.render();
@@ -7717,9 +7681,6 @@ export class VisualAgentMapView extends ItemView {
     if (accepted && !began && !signal.aborted) new Notice(t("ui.merge_draft_stale"));
     return began;
   }
-  private isLiveMergeTask(task: MergeTask): boolean {
-    return this.mergeTasks.get(task.mapPath) === task && !task.controller.signal.aborted && !this.closed;
-  }
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   private async runMergeDraft(task: MergeTask): Promise<void> {
     const language = this.plugin.settings.language;
@@ -7727,7 +7688,7 @@ export class VisualAgentMapView extends ItemView {
     try {
       const snapshot = await this.mergeSourceSnapshot(task.sources, task.controller.signal);
       const sourceGroup = snapshot.group;
-      if (!this.isLiveMergeTask(task)) return;
+      if (!this.mergeDrafts.isLive(task)) return;
       task.sourceContent = snapshot.content;
       const request: TaskContext = {
         title: t("ui.merge_ai_untitled"),
@@ -7761,9 +7722,9 @@ export class VisualAgentMapView extends ItemView {
         );
       /** The sources must still be what the model was given; a change during any request fails with the stale message. */
       const sourcesUnchanged = async (): Promise<boolean> => {
-        if (!this.isLiveMergeTask(task)) return false;
+        if (!this.mergeDrafts.isLive(task)) return false;
         const latest = await this.mergeSourceSnapshot(task.sources, task.controller.signal);
-        if (!this.isLiveMergeTask(task)) return false;
+        if (!this.mergeDrafts.isLive(task)) return false;
         if (latest.content !== task.sourceContent) throw new Error(t("ui.merge_draft_stale"));
         return true;
       };
@@ -7794,7 +7755,7 @@ export class VisualAgentMapView extends ItemView {
             if (!task.keepTitle) task.title = mergeTitleFromResult(result, task.title);
           }
         } catch (error) {
-          if (task.controller.signal.aborted || this.closed || !this.isLiveMergeTask(task)) throw error;
+          if (task.controller.signal.aborted || this.closed || !this.mergeDrafts.isLive(task)) throw error;
           if (error instanceof Error && error.message === t("ui.merge_draft_stale")) throw error;
           this.plugin.recordFailure(t("log.merge_failed"), error);
         }
@@ -7813,7 +7774,7 @@ export class VisualAgentMapView extends ItemView {
           if (!(await sourcesUnchanged())) return;
           task.supplement = supplement.detail;
         } catch (error) {
-          if (task.controller.signal.aborted || this.closed || !this.isLiveMergeTask(task)) throw error;
+          if (task.controller.signal.aborted || this.closed || !this.mergeDrafts.isLive(task)) throw error;
           if (error instanceof Error && error.message === t("ui.merge_draft_stale")) throw error;
           // The cards' merge is still good: it is written, with a line saying the sources were not read.
           this.plugin.recordFailure(t("log.merge_failed"), error);
@@ -7861,8 +7822,8 @@ export class VisualAgentMapView extends ItemView {
       else new Notice(done, MERGE_DONE_NOTICE_MS);
     } catch (error) {
       // Nothing was written (a write that fails midway has already rolled itself back); the task is forgotten.
-      const live = this.mergeTasks.get(task.mapPath) === task;
-      if (live) this.mergeTasks.delete(task.mapPath);
+      const live = this.mergeDrafts.tasks.get(task.mapPath) === task;
+      if (live) this.mergeDrafts.forget(task.mapPath, task);
       if (!this.closed) this.render();
       if (task.controller.signal.aborted || this.closed) return;
       const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
@@ -7927,12 +7888,6 @@ export class VisualAgentMapView extends ItemView {
       MERGE_DONE_NOTICE_MS
     );
     this.removalRun = { notice, entries, titles, until: Date.now() + MERGE_DONE_NOTICE_MS };
-  }
-  /** Stop, or clear a finished one: the run is aborted and forgotten, so a late result changes nothing. */
-  private stopMergeTask(task: MergeTask): void {
-    if (this.mergeTasks.get(task.mapPath) === task) this.mergeTasks.delete(task.mapPath);
-    task.controller.abort();
-    this.render();
   }
   /** The merged cards as one reference group, and the map's data sources, with the key that tells whether either changed. */
   private async mergeSourceSnapshot(
@@ -8012,7 +7967,8 @@ export class VisualAgentMapView extends ItemView {
       if (content) stale();
       return;
     }
-    if (content && (this.mergeTasks.get(snapshot.path) !== content.task || content.task.state !== "applying")) stale();
+    if (content && (this.mergeDrafts.tasks.get(snapshot.path) !== content.task || content.task.state !== "applying"))
+      stale();
     const check = this.mergeCheck(
       snapshot.sources.map(source => source.id),
       content?.task
@@ -8170,7 +8126,7 @@ export class VisualAgentMapView extends ItemView {
       }
       throw this.mergeError(error);
     }
-    if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
+    if (content) this.mergeDrafts.forget(mapPath, content.task);
     const mergeStep = this.mergeEntry(entry);
     this.history.push(mergeStep);
     this.selection.afterMerge(created.id);
@@ -8279,7 +8235,7 @@ export class VisualAgentMapView extends ItemView {
       this.render();
       throw this.mergeError(error);
     }
-    if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
+    if (content) this.mergeDrafts.forget(mapPath, content.task);
     const mergeStep = this.mergeEntry(entry);
     this.history.push(mergeStep);
     this.selection.afterMerge(target.id);
@@ -25958,7 +25914,7 @@ export class VisualAgentMapView extends ItemView {
         if (targets.length) this.chatSelect(targets);
         const title = action.title.trim();
         if (!title) return skipped("ui.map_chat_skip_unavailable");
-        if (this.mergeTasks.has(this.path)) return skipped("ui.map_chat_skip_merge_locked");
+        if (this.mergeDrafts.has(this.path)) return skipped("ui.map_chat_skip_merge_locked");
         const check = this.mergeCheck();
         if (!check.ok) return skipped("ui.map_chat_skip_unavailable");
         // AI lock: the chat's merge is AI-initiated, so locked topics, their parents and relations refuse it.

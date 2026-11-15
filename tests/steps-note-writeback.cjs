@@ -895,7 +895,7 @@ test('F1 entries: an AI merge reads a style file that was not loaded yet (its re
   w.host.confirmAiUsage = async (_model, run) => { await run(); return true; };
   w.host.currentModelChoice = () => ({ model: 'model-a' });
   const began = await w.view.startMergeDraft('合併', { path: MAP_PATH, mapId: 'map-a', parentId: null, sources: [a, b].map(item => ({ id: item.id, path: item.path })) }, () => {}, new AbortController().signal);
-  await w.view.mergeTasks.get(MAP_PATH)?.run;
+  await w.view.mergeDrafts.tasks.get(MAP_PATH)?.run;
   assert.equal(began, true);
   assert.deepEqual(plain(w.calls.asks[0].detailTemplate.sections.map(section => section.name)), ['Mine A', 'Mine B']);
 });

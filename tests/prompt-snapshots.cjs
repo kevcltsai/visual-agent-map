@@ -194,7 +194,7 @@ test('collect snapshots: Visual Map expansion and synthesis tasks', async () => 
     plugin.confirmAiUsage = async (_model, run) => { await run(); return true; };
     contexts.kind = 'merge-draft';
     await view.startMergeDraft('Merged child', { path: mapPath, mapId: 'map-a', parentId: parent.id, sources: [child, second].map(item => ({ id: item.id, path: item.path })) }, () => {}, new AbortController().signal);
-    await view.mergeTasks.get(mapPath).run;
+    await view.mergeDrafts.tasks.get(mapPath).run;
     assert.doesNotMatch(JSON.stringify(contexts.at(-1).context), /Origin never sent/);
     const seen = new Set();
     for (const { kind, context } of contexts) {

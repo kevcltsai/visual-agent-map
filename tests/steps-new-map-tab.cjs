@@ -294,7 +294,7 @@ test('N5 hasRunningWork: false when idle, true for each kind of work', () => {
     synthesisRunning: v => { v.plugin.topicRuns.syntheses(v).topics.set('k', { state: 'running', controller: new AbortController() }); },
     startingTasks: v => { v.startingTasks.set('k', new AbortController()); },
     startingExpand: v => { v.startingExpand.add('k'); },
-    mergeTasks: v => { v.mergeTasks.set('k', { controller: new AbortController() }); },
+    mergeTasks: v => { v.mergeDrafts.tasks.set('k', { controller: new AbortController() }); },
     goalSuggestTask: v => { v.goalSuggestTask = { controller: new AbortController(), state: 'running' }; },
     structureReviewTask: v => { v.structureReviewTask = { controller: new AbortController() }; },
     outlineDraftTask: v => { v.outlineDraftTask = { controller: new AbortController() }; },

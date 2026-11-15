@@ -328,13 +328,7 @@ import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchD
 import { branchDirectionResolver, depthOf, lineKind } from "./tree-edge-rules";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
-import { mergeRepair } from "../../core/steps/task/fragments";
-import {
-  checkMergePreservation,
-  findingList,
-  withSourceSupplement,
-  type MergeCheckResult
-} from "../../core/steps/task/merge-check";
+import { checkMergePreservation, withSourceSupplement, type MergeCheckResult } from "../../core/steps/task/merge-check";
 import {
   expansionTask,
   labelCurrentSummary,
@@ -342,7 +336,6 @@ import {
   labelOldFindings,
   labelVisualReferences,
   mergeGoalTask,
-  mergeSupplementTask,
   noSummaryYet,
   researchTopicTask,
   synthesisDirectionsTask,
@@ -526,7 +519,7 @@ import { ArgumentRunError, WORST_CASE_AI_CALLS } from "./argument-run";
 import { rerunWithAssumptions } from "./argument-rerun";
 import { describeArgumentProgress } from "./argument-progress";
 import { arrangeArgumentMap, arrangeUnarrangedArgumentMap } from "../../core/argument-map/layout";
-import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
+import { aiLockBlock, aiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import {
   MAP_CHAT_ANCHOR_PREFIX,
   MAP_CHAT_NEW_PREFIX,
@@ -673,7 +666,6 @@ import {
   sharedMergeAppearance,
   mergedDetail,
   mergedStatus,
-  mergeTitleFromResult,
   mergeEligibility,
   MergeTopicsModal,
   resolveMergeModel,
@@ -1617,7 +1609,18 @@ export class VisualAgentMapView extends ItemView {
   private mergeDrafts = new MergeDrafts({
     path: () => this.path,
     closed: () => this.closed,
-    changed: () => this.render()
+    changed: () => this.render(),
+    language: () => this.plugin.settings.language,
+    detailTemplate: language => this.mapStyleCached(language, { notify: true }).template,
+    progress: (mapPath, model) => this.startTaskProgress(this.taskProgressKey("merge", mapPath), model),
+    snapshot: (sources, signal) => this.mergeSourceSnapshot(sources, signal),
+    ask: (context, model, reasoning, signal, observer) =>
+      // Each request is its own attempt of one entry: the repair request clears the first request's preview.
+      this.plugin.askModel(context, model, reasoning, signal, undefined, undefined, undefined, observer),
+    check: (task, result) => this.checkMergeResult(task, result),
+    recordFailure: (label, error) => this.plugin.recordFailure(label, error),
+    notice: message => new Notice(message),
+    write: (task, result, check) => this.writeMergeDraft(task, result, check)
   });
   /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
   private chatReplyStep: ChatReplyStep | undefined;
@@ -7672,166 +7675,50 @@ export class VisualAgentMapView extends ItemView {
         controller: new AbortController(),
         state: "running"
       };
-      this.mergeDrafts.tasks.set(snapshot.path, task);
-      this.mergeOpen = false;
-      started();
-      this.render();
-      task.run = this.runMergeDraft(task);
+      this.mergeDrafts.start(task, () => {
+        this.mergeOpen = false;
+        started();
+        this.render();
+      });
     });
     if (accepted && !began && !signal.aborted) new Notice(t("ui.merge_draft_stale"));
     return began;
   }
-  /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
-  private async runMergeDraft(task: MergeTask): Promise<void> {
-    const language = this.plugin.settings.language;
-    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath), task.model);
-    try {
-      const snapshot = await this.mergeSourceSnapshot(task.sources, task.controller.signal);
-      const sourceGroup = snapshot.group;
-      if (!this.mergeDrafts.isLive(task)) return;
-      task.sourceContent = snapshot.content;
-      const request: TaskContext = {
-        title: t("ui.merge_ai_untitled"),
-        summary: noSummaryYet(language),
-        rules: "",
-        detail: "",
-        task: mergeGoalTask(language),
-        ancestors: "",
-        referenceGroups: [sourceGroup],
-        // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
-        referenceDelivery: "direct",
-        outputLanguage: language,
-        mode: "merge",
-        usageMapPath: task.mapPath,
-        researchMode: "local",
-        researchDepth: "normal",
-        visualMode: "off",
-        detailTemplate: this.mapStyleCached(language, { notify: true }).template
-      };
-      const ask = (context: TaskContext): Promise<AiResult> =>
-        // Each request is its own attempt of one entry: the repair request clears the first request's preview.
-        this.plugin.askModel(
-          context,
-          task.model,
-          task.reasoning,
-          task.controller.signal,
-          undefined,
-          undefined,
-          undefined,
-          progress.observer
-        );
-      /** The sources must still be what the model was given; a change during any request fails with the stale message. */
-      const sourcesUnchanged = async (): Promise<boolean> => {
-        if (!this.mergeDrafts.isLive(task)) return false;
-        const latest = await this.mergeSourceSnapshot(task.sources, task.controller.signal);
-        if (!this.mergeDrafts.isLive(task)) return false;
-        if (latest.content !== task.sourceContent) throw new Error(t("ui.merge_draft_stale"));
-        return true;
-      };
-      let result = await ask(request);
-      if (!(await sourcesUnchanged())) return;
-      if (!task.keepTitle) task.title = mergeTitleFromResult(result, task.title);
-      // Programmatic content check, one repair round; whatever is still wrong then is applied with a warning.
-      let check = await this.checkMergeResult(task, result);
-      if (!check.ok) {
-        try {
-          const repaired = await ask({
-            ...request,
-            summary: result.summary,
-            detail: result.detail,
-            task: mergeRepair(
-              language,
-              findingList(check.missing, inLanguage(NONE, language)),
-              findingList(check.added, inLanguage(NONE, language)),
-              task.title
-            )
-          });
-          if (!(await sourcesUnchanged())) return;
-          const again = await this.checkMergeResult(task, repaired);
-          // A repair that made it worse is not used.
-          if (again.missing.length + again.added.length <= check.missing.length + check.added.length) {
-            result = repaired;
-            check = again;
-            if (!task.keepTitle) task.title = mergeTitleFromResult(result, task.title);
-          }
-        } catch (error) {
-          if (task.controller.signal.aborted || this.closed || !this.mergeDrafts.isLive(task)) throw error;
-          if (error instanceof Error && error.message === t("ui.merge_draft_stale")) throw error;
-          this.plugin.recordFailure(t("log.merge_failed"), error);
-        }
-      }
-      // The map's data sources only ever add a separate block after the merged text: the request that wrote the merged text
-      // never saw them, so nothing in them can change what the cards say.
-      if (snapshot.mapGroups.some(group => group.documents.length)) {
-        try {
-          const supplement = await ask({
-            ...request,
-            summary: result.summary,
-            detail: result.detail,
-            task: mergeSupplementTask(language),
-            referenceGroups: snapshot.mapGroups
-          });
-          if (!(await sourcesUnchanged())) return;
-          task.supplement = supplement.detail;
-        } catch (error) {
-          if (task.controller.signal.aborted || this.closed || !this.mergeDrafts.isLive(task)) throw error;
-          if (error instanceof Error && error.message === t("ui.merge_draft_stale")) throw error;
-          // The cards' merge is still good: it is written, with a line saying the sources were not read.
-          this.plugin.recordFailure(t("log.merge_failed"), error);
-          task.supplement = "";
-          task.supplementFailed = true;
-        }
-      }
-      // The result is final: the unsaved preview goes away before anything is written.
-      progress.end();
-      task.state = "applying";
-      task.draft = result;
-      this.render();
-      const previous = this.history.undoEntry;
-      await this.confirmMergeDraft(task, result.summary, result.detail);
-      let entry = this.history.undoEntry;
-      // A merge the chat reply started joins that reply's step when the reply is still the newest one: one undo, one redo.
-      let folded = false;
-      const step = task.replyStep;
-      if (step && entry && entry !== previous && previous === step.entry && this.history.dropTop(entry)) {
-        await step.absorb(entry);
-        entry = step.entry;
-        folded = true;
-      }
-      let done = t("ui.merge_done_0", task.title);
-      if (!check.ok) {
-        const found = check.missing.length + check.added.length;
-        this.plugin.recordFailure(
-          t("log.merge_check_warning"),
-          `${task.title}: missing ${JSON.stringify(check.missing)}; added ${JSON.stringify(check.added)}`
-        );
-        done = `${done} ${t("ui.merge_check_warning_0", String(found))}`;
-      }
-      // The Undo button only while this merge is still the newest history step.
-      if (entry && (entry !== previous || folded))
-        backgroundResultNotice(
-          done,
-          {
-            label: t("ui.undo"),
-            open: () => {
-              if (this.history.undoEntry === entry && !this.closed) this.enqueue(() => this.travel(false));
-            }
-          },
-          MERGE_DONE_NOTICE_MS
-        );
-      else new Notice(done, MERGE_DONE_NOTICE_MS);
-    } catch (error) {
-      // Nothing was written (a write that fails midway has already rolled itself back); the task is forgotten.
-      const live = this.mergeDrafts.tasks.get(task.mapPath) === task;
-      if (live) this.mergeDrafts.forget(task.mapPath, task);
-      if (!this.closed) this.render();
-      if (task.controller.signal.aborted || this.closed) return;
-      const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
-      if (isAiLockedError(error)) new Notice(t("ui.ai_locked_notice"));
-      else new Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
-    } finally {
-      progress.end();
+  /** The merged result is written (History, the chat reply's step, Undo Notice); the run itself lives in MergeDrafts. */
+  private async writeMergeDraft(task: MergeTask, result: AiResult, check: MergeCheckResult): Promise<void> {
+    const previous = this.history.undoEntry;
+    await this.confirmMergeDraft(task, result.summary, result.detail);
+    let entry = this.history.undoEntry;
+    // A merge the chat reply started joins that reply's step when the reply is still the newest one: one undo, one redo.
+    let folded = false;
+    const step = task.replyStep;
+    if (step && entry && entry !== previous && previous === step.entry && this.history.dropTop(entry)) {
+      await step.absorb(entry);
+      entry = step.entry;
+      folded = true;
     }
+    let done = t("ui.merge_done_0", task.title);
+    if (!check.ok) {
+      const found = check.missing.length + check.added.length;
+      this.plugin.recordFailure(
+        t("log.merge_check_warning"),
+        `${task.title}: missing ${JSON.stringify(check.missing)}; added ${JSON.stringify(check.added)}`
+      );
+      done = `${done} ${t("ui.merge_check_warning_0", String(found))}`;
+    }
+    // The Undo button only while this merge is still the newest history step.
+    if (entry && (entry !== previous || folded))
+      backgroundResultNotice(
+        done,
+        {
+          label: t("ui.undo"),
+          open: () => {
+            if (this.history.undoEntry === entry && !this.closed) this.enqueue(() => this.travel(false));
+          }
+        },
+        MERGE_DONE_NOTICE_MS
+      );
+    else new Notice(done, MERGE_DONE_NOTICE_MS);
   }
   /** A done Notice with Undo while the write is still the newest history step (the merge pattern). */
   private undoNotice(message: string, previous: Action | undefined): void {

@@ -114,7 +114,6 @@ export interface MapChatConversationPorts {
     anchor: { path: string; id: string | undefined },
     options: ChatPlanApplyOptions
   ): Promise<MapChatLine[]>;
-  flushSteers(send: boolean): void;
   buildRequest(message: string, origin: MapChatOrigin, signal: AbortSignal): Promise<MapChatRequest>;
   confirmAiUsage(model: string, run: () => Promise<void>, hooks: { noticeOpening?: () => void }): Promise<boolean>;
   beginRecord(turn: MapChatTurnHandle, request: MapChatRequest, origin: MapChatOrigin): MapChatTurnRecord | null;
@@ -341,7 +340,7 @@ export class MapChatConversation {
         else this.ports.chain().advanceChain(run, { result, context: baseline, lines, work, anchor: live });
       }
       // Follow-ups typed while the plan was applied: sent once, unless Stop ended it.
-      this.ports.flushSteers(!stopped());
+      this.flushSteers(!stopped());
     }
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
@@ -594,7 +593,7 @@ export class MapChatConversation {
                 if (record?.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
                   this.ports.markLogged(turn.assistant);
                 // The plan waits for the user's yes: a message sent now would cancel it, so waiting follow-ups go back to the field.
-                this.ports.flushSteers(false);
+                this.flushSteers(false);
               }
               return;
             }

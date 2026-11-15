@@ -9308,7 +9308,7 @@ const backupSpy = (h, { ok = true } = {}) => {
   const calls = []; h.view.writebackHooks = () => ({ backupNote: async (file, content) => { calls.push([file, content]); return ok ? { ok: true, path: `Backups/${calls.length}.md` } : { ok: false }; } });
   return calls;
 };
-const autoRun = (h, on = true) => { h.view.setChatAutoApply(on); return h.view.chainForRound(undefined, { path: MAP, id: 'map-a' }, 'go'); };
+const autoRun = (h, on = true) => { h.view.setChatAutoApply(on); return h.view.chatChainRunner.chainForRound(undefined, { path: MAP, id: 'map-a' }, 'go'); };
 const applyIn = (h, run, actions, hashes = {}) => withTimeout(h.view.applyMapChatActions({ actions, rejected: [] }, { mdHashes: hashes, topicHashes: topicBaseline(h) }, undefined, undefined, { chain: run }));
 integrationTest('P3 (h) auto-apply: an existing note is backed up once before the first write in the chain, a second write to it adds no second backup, and Map.md is backed up once for the moves', async () => {
   const h = await harness(); await h.view.hydrate(); const calls = backupSpy(h); const before = h.contents.get((h.view.map.nodes.find(n => n.id === h.ids.a)).path); const run = autoRun(h);
@@ -9457,7 +9457,7 @@ test('P2 switch (g): a new conversation, reset (another map) and restoring an ol
 });
 integrationTest('P2 view (g): setChatAutoApply is off after a new conversation, a map change reset and a restore; a view starts off (nothing is persisted)', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); assert.equal(chat.host.autoApply(), false, 'default off');
-  assert.equal(h.view.chainForRound(undefined, { path: MAP, id: 'map-a' }, 'x').state.autoApply, undefined); h.view.chatChain = null;
+  assert.equal(h.view.chatChainRunner.chainForRound(undefined, { path: MAP, id: 'map-a' }, 'x').state.autoApply, undefined); h.view.chatChain = null;
   h.view.setChatAutoApply(true); chat.reset(); assert.equal(chat.host.autoApply(), false, 'reset');
   h.view.setChatAutoApply(true); chat.restore(restoredConversation()); assert.equal(chat.host.autoApply(), false, 'restore');
   h.view.setChatAutoApply(true); h.view.newChatConversation(); assert.equal(chat.host.autoApply(), false, 'new conversation');

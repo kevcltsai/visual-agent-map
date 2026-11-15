@@ -441,13 +441,11 @@ import {
   MapChatPanel,
   type MapChatChip,
   type MapChatHost,
-  type MapChatChainOrigin,
   type MapChatImages,
   type MapChatLine,
   type MapChatMessage,
   type MapChatOrigin,
   type MapChatSavedTurn,
-  type MapChatSteer,
   type MapChatTurnHandle,
   settledLine,
   expandFailureLine
@@ -461,13 +459,7 @@ import {
 } from "../../core/map-chat-transcript";
 import { loadableImages } from "../../ui/image-candidates";
 import { ChatImageFinder, newChatImageBatch, type ChatImageBatch } from "./chat-image-finder";
-import {
-  isResumeKeyword,
-  pauseForPlan,
-  planChainOf,
-  syncAutoApply,
-  type MapChatChainInterrupt
-} from "../../core/map-chat-chain";
+import { planChainOf, type MapChatChainInterrupt } from "../../core/map-chat-chain";
 import {
   chatBasisFor,
   createdParentsOf,
@@ -489,7 +481,6 @@ import { mapChatSourceMaterial, type MapChatSourceCache } from "../../core/map-c
 import { normalizeVaultPath } from "../../core/map-chat-guard";
 import { MapChatFiles } from "../../core/map-chat-files";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
-import { runAttempts } from "../../core/attempt-runner";
 import { GateError, applyPause } from "../../core/argument-map/machine";
 import { effectiveVerdict, managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
 import {
@@ -515,11 +506,9 @@ import { MapChatConversation, type MapChatConversationPorts } from "./map-chat-c
 import { MapChatRecordSession, type MapChatRecordSessionPorts } from "./map-chat-record-session";
 import {
   MapChatChainRunner,
-  newChatWork,
   type ChatChainRun,
   type ChatExpandOutcome,
   type ChatResearchOutcome,
-  type ChatRoundEnd,
   type ChatRoundWork,
   type ChatWorkTopic,
   type MapChatChainPorts
@@ -622,7 +611,7 @@ import {
   type TopicChatTurn
 } from "./topic-chat";
 import type { ResearchObserver, ResearchSteer } from "../../ai/research-observer";
-import { TopicChatSteers, type TopicSteerEntry } from "./topic-chat-steer";
+import { TopicChatSteers } from "./topic-chat-steer";
 import type { ResearchProgress } from "./research-progress";
 import type { ExpansionBatchState } from "./expansion-batch";
 import { canvasPointerIntent } from "./canvas-gestures";
@@ -1301,10 +1290,18 @@ export class VisualAgentMapView extends ItemView {
   private chat: MapChatPanel | null = null;
   /** The map the conversation belongs to; opening another map starts a new conversation. */
   private chatMapId = "";
-  private chatController: AbortController | null = null;
-  /** Takes back the send that is still preparing (no request yet): what Stop does before there is a request to abort. */
-  private chatPrepAbandon: (() => void) | null = null;
-  private chatTaskKey: string | null = null;
+  private get chatController(): AbortController | null {
+    return this.mapChatConversation?.controller ?? null;
+  }
+  private set chatController(value: AbortController | null) {
+    this.mapChatConversation.controller = value;
+  }
+  private get chatPrepAbandon(): (() => void) | null {
+    return this.mapChatConversation?.prepAbandon ?? null;
+  }
+  private set chatPrepAbandon(value: (() => void) | null) {
+    this.mapChatConversation.prepAbandon = value;
+  }
   private get chatPlanToken(): number {
     return this.mapChatConversation?.planToken ?? 0;
   }
@@ -1373,13 +1370,6 @@ export class VisualAgentMapView extends ItemView {
   private chatResearchSent = new Set<string>();
   /** Counts conversations: the result of research another conversation started is not recorded in this one. */
   private chatConversation = 0;
-  /** The follow-ups of the turn that is running (or ran last). */
-  /** The follow-ups of the running turn: their state machine and the panel row each one has. */
-  private chatSteer: {
-    turn: MapChatTurnHandle;
-    steers: TopicChatSteers;
-    rows: Map<TopicSteerEntry, MapChatSteer>;
-  } | null = null;
   /** Writes the actions of a chat reply one at a time; every read goes back to this view when it happens. */
   private chatWriter = new ChatActionWriter({
     map: () => this.map,
@@ -21504,421 +21494,27 @@ export class VisualAgentMapView extends ItemView {
       technical: rawErrorText(error) || errorMessage(error)
     };
   }
-  /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
-  private async sendMapChat(again?: MapChatOrigin, restore?: string, retryOf?: ChatChainRun): Promise<void> {
-    const chat = this.chat;
-    // A message typed while a plan or a choice is being applied waits for it like a follow-up (it is sent when that ends).
-    if (chat && !again && this.chatApplying && !chat.isBusy && !this.closed && chat.draft.trim()) {
-      this.steerMapChat();
-      return;
-    }
-    if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map || this.notesLoading()) return;
-    // A retry sends the same question with the same references again, after a failure; a normal send reads the draft.
-    const message = again ? again.text : chat.draft.trim();
-    if (!message) return;
-    // Only the word "continue" goes on with an interrupted chain; any other text below is the user taking over.
-    if (!again && isResumeKeyword(message)) {
-      const last = chat.transcript().at(-1);
-      if (last?.resume && this.resumeChatChain(last)) {
-        chat.clearDraft();
-        return;
-      }
-    }
-    // The user speaking ends the continuation that is running, waiting for work or waiting for a plan: the text is a new message.
-    const autoOrigin = again?.chain;
-    if (!autoOrigin && !retryOf) this.interruptChain(this.chatChain, "user_took_over");
-    // The turn has its own copy: follow-ups that go in are added to it, and a copy keeps the earlier turn's retry as it was.
-    const origin: MapChatOrigin = again
-      ? { ...again }
-      : {
-          text: message,
-          chips: chat.attachments(),
-          selectedIds: this.chatSelectionIds(),
-          // Only the id: the picture is read again (a retry too) when the request is built, and never kept.
-          ...(this.chatImageId ? { imageId: this.chatImageId } : {})
-        };
-    // Where this turn is anchored. A create_map / open_map of the turn itself moves it (see applyMapChatActions).
-    const anchor = { path: this.path, id: this.map.id as string | undefined };
-    // The continuation this round belongs to: a message of the user's starts a new one; an automatic round (or the retry of one)
-    // goes on with the chain it came from, at the round it was.
-    // The automatic retry of round 1 of an auto-apply chain goes on with that chain (it has no chain origin to find it by).
-    const run = retryOf && !autoOrigin ? retryOf : this.chainForRound(autoOrigin, anchor, message);
-    if (run === retryOf) run.message = message;
-    run.chips = [...origin.chips];
-    // The press is answered at once: the messages and a "Preparing" bubble appear before the AI is checked, the request is built
-    // or the usage notice is asked. Until the request really goes out, every early end takes the messages back (see `abandon`).
-    const draft = chat.draft;
-    const turn = autoOrigin
-      ? chat.beginAutoRound(
-          run.state.round,
-          run.state.maxRounds,
-          run.state.remaining,
-          origin,
-          run.partial ?? undefined,
-          ...(run.state.autoApply ? [{ calls: run.state.calls, applied: run.appliedText }] : [])
-        )
-      : chat.begin(message, origin, Boolean(again), "preparing");
-    run.turn = turn;
-    let sent = false;
-    // Takes the turn back and puts the draft into the field again (a retry has no draft to put back). `reason`
-    // is the Notice; closing the view or switching maps needs none, and then the panel has already dropped the turn.
-    // `ends` is why the continuation (if one was running) ends with it.
-    const abandon = (reason?: string, ends: MapChatChainInterrupt = "map_changed"): void => {
-      if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-      // Take the turn back first: the end sentence goes under the last reply, which must be the one before this round, not the
-      // round that is being taken back (its sentence would go with it).
-      const retracted = chat.retract(turn, again ? restore : draft);
-      this.interruptChain(run, ends);
-      if (!retracted) return;
-      if (reason !== undefined && (!autoOrigin || ends === "failed")) new Notice(reason);
-    };
-    // Stop while preparing is the user's own act: the send is taken back like any early end, without a Notice.
-    const preparing = new AbortController();
-    const stopPreparing = (): void => {
-      preparing.abort();
-      abandon(undefined, "stopped");
-    };
-    this.chatPrepAbandon = stopPreparing;
-    // The follow-ups of this turn. Rows that wait are told to the panel as the machine queues them (once each, the panel
-    // ignores a state it already shows); a retry asks the question with the follow-ups that went in, and only those.
-    const steerRows = new Map<TopicSteerEntry, MapChatSteer>();
-    const steerState: NonNullable<typeof this.chatSteer> = {
-      turn,
-      rows: steerRows,
-      steers: new TopicChatSteers({
-        alive: () => !this.closed && this.chatSteer === steerState && !!this.chat?.hasTurn(turn),
-        onChange: reason => {
-          for (const [entry, row] of steerRows) if (entry.state === "queued") this.chat?.setSteerState(row, "queued");
-          if (reason) origin.text = [message, ...steerState.steers.delivered()].join("\n\n");
-        }
-      })
-    };
-    this.chatSteer = steerState;
-    const notSent = (): string => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
-    let request: MapChatRequest;
-    try {
-      request = { ...(await this.buildChatRequest(message, chat, origin, preparing.signal)), ...this.usageMapField() };
-    } catch (error) {
-      abandon(this.closed ? undefined : errorMessage(error), "failed");
-      return;
-    }
-    // Stop, closing the view or a map switch while the request was being built: no usage notice, no setup guide.
-    if (this.closed || !chat.hasTurn(turn)) {
-      abandon();
-      return;
-    }
-    let went = false;
-    try {
-      went = await this.plugin.confirmAiUsage(
-        request.model,
-        async () => {
-          // The view closed, the map changed or a plan began applying while the notice was open: nothing is sent.
-          if (
-            this.closed ||
-            this.chatApplying ||
-            !chat.hasTurn(turn) ||
-            this.path !== anchor.path ||
-            this.map?.id !== anchor.id
-          ) {
-            abandon();
-            return;
-          }
-          sent = true;
-          if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-          // Conversation record (switch on): the turn is written from here, not before (a send taken back leaves no trace).
-          const record = this.beginChatRecord(chat, turn, request, origin);
-          run.record = record;
-          // The follow-ups that went into this turn are written with its end (queued ones become the next turn).
-          if (record) record.steerTexts = () => steerState.steers.delivered();
-          // One attempt is one request to the model; runAttempts runs them. "Resend" (the slow notice) replaces the attempt with
-          // another of the same question: a reply that arrives from a replaced attempt changes nothing, like one that arrives after Stop.
-          // The whole turn shares one controller (Stop, closing the view or a map switch abort it), so Stop between a resend and its
-          // next request takes the normal Stopped path.
-          const turnController = new AbortController();
-          const key = `map-chat-view:${++mapChatTaskSequence}`;
-          this.chatController = turnController;
-          this.chatTaskKey = key;
-          this.plugin.activeTasks?.set(key, turnController);
-          // A reply that arrives after Stop, closing the view or switching maps changes nothing.
-          const alive = (): boolean =>
-            !this.closed &&
-            !turnController.signal.aborted &&
-            this.chatController === turnController &&
-            this.path === anchor.path;
-          // A plan still waiting for its yes belongs to the question before this one.
-          this.mapChatConversation.supersedeChatPlan();
-          // The first message of a conversation moves the opening screen's panel into the side window.
-          this.relocateMapChat();
-          // From here the request goes out: the bubble leaves "Preparing".
-          chat.setStage("waiting");
-          const modelName = this.plugin.modelLabel(request.model);
-          try {
-            const outcome = await runAttempts<MapChatResult>({
-              signal: turnController.signal,
-              streamModeEndsResend: true,
-              stopped: () => new Error(t("ui.ai_task_cancelled")),
-              start: async attempt => {
-                // Stop, a closed view or a map switch came between a resend and its request: nothing more is sent.
-                if (!alive()) throw new Error(t("ui.ai_task_cancelled"));
-                const live = (): boolean => alive() && attempt.live();
-                // The slow notice counts from the start of the wait (the send, and each resend).
-                attempt.arm();
-                return this.plugin.mapChat.chat(
-                  request,
-                  attempt.signal,
-                  text => {
-                    if (!live()) return;
-                    attempt.seen();
-                    chat.streamReply(text);
-                  },
-                  event => {
-                    if (!live()) return;
-                    if (event.kind === "stream-mode") {
-                      attempt.streamMode(event.mode);
-                      steerState.steers.setLive(event.mode === "stream-json");
-                      return;
-                    }
-                    // Claude's first event, and Codex's searching / reading / writing, are model events. Codex's `started` is not: the
-                    // runtime sends it for any `item/*`, including the echo of our own prompt (`userMessage`, about 3 s in), so it
-                    // proves nothing about the model. Codex text arrives through the reply callback above.
-                    if (!(event.kind === "activity" && event.activity === "started")) attempt.seen();
-                    // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
-                    if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
-                  },
-                  handler => {
-                    // A handler from a replaced or stopped attempt is not taken.
-                    if (live()) steerState.steers.bind(handler);
-                  },
-                  // The model's raw output, kept for the record (only while the switch is on, and never from a stopped or replaced attempt).
-                  record
-                    ? raw => {
-                        if (live()) record.raw = raw;
-                      }
-                    : undefined
-                );
-              },
-              onSlow: (_attempt, resend) => {
-                if (alive())
-                  chat.showSlow(t("ui.map_chat_slow_0", modelName), () => {
-                    if (alive()) resend();
-                  });
-              },
-              onCleared: () => {
-                if (alive()) chat.clearSlow();
-              },
-              onResend: () => {
-                record?.event("resend");
-                // Follow-ups typed before the new attempt hands out its handler wait for it; they are not for the old one.
-                steerState.steers.drop();
-                chat.restartWaiting();
-              }
-            });
-            if (!alive()) return;
-            const result = outcome;
-            // The research notes this request carried are "sent before" for the next round (they go last when the budget is short).
-            // Only a reply that came back counts: a request that failed read nothing, so a retry still owes them.
-            for (const id of request.context.research?.sent ?? []) this.chatResearchSent.add(id);
-            // Follow-ups still being handed over settle first; later ones wait for the next message. The ones that went in are
-            // part of the message the plan and the actions are applied for.
-            await steerState.steers.close();
-            if (!alive()) return;
-            const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
-            // The follow-ups that went into this round are part of the message every later round asks.
-            run.message = fullMessage;
-            run.replyRemaining = result.remaining;
-            // The switch of the moment decides this round's plan (and the limits of the chain from here on).
-            run.state = syncAutoApply(run.state, this.chatAutoApply);
-            const plan = result.actions.length
-              ? planFor(result.actions, request.context, {
-                  diagrams: this.plugin.settings.addDiagramsAfterResearch,
-                  mapAiMode: this.map?.aiMode,
-                  imageMode: this.chatImageMode(),
-                  imageAttached: !!request.imageDataUrl,
-                  chain: planChainOf(run.state),
-                  autoApply: this.chatAutoApply,
-                  mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
-                  readablePaths: this.chatFiles.readablePaths(),
-                  callsSoFar: run.state.calls,
-                  chatStartedResearch: this.chatStartedResearch,
-                  chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
-                  trusted: {
-                    createdIds: run.createdIds,
-                    researchedIds: new Set(
-                      [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
-                    )
-                  }
-                })
-              : null;
-            if (plan) {
-              // Nothing is touched until the user applies the plan.
-              if (chat.isBusy) {
-                chat.finish(result.reply, []);
-                this.showUnreadResearch(chat, turn, request.context);
-                this.markChatTurn(origin, request);
-                // The continuation stops where it is until the plan is applied (it goes on) or cancelled (it ends).
-                run.state = pauseForPlan(run.state);
-                this.mapChatConversation.offerChatPlan(
-                  result,
-                  plan,
-                  request.context,
-                  { path: anchor.path, id: anchor.id },
-                  fullMessage,
-                  record,
-                  run
-                );
-                if (record?.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
-                  this.chatRecordSession.markLogged(turn.assistant);
-                // The plan waits for the user's yes: a message sent now would cancel it, so waiting follow-ups go back to the field.
-                this.flushSteers(false);
-              }
-              return;
-            }
-            // A pure answer has nothing to apply: the reader is not told "applying" for it.
-            if (result.actions.length) chat.setStage("applying");
-            const work = newChatWork();
-            run.work = work;
-            const lines = await this.applyMapChatActions(
-              { ...result, message: fullMessage },
-              request.context,
-              alive,
-              anchor,
-              { context: request.context, work, continuation: Boolean(autoOrigin), chain: run }
-            );
-            if (alive() && chat.isBusy) {
-              // Read at once: the next reply's step replaces `chatReplyEntry`.
-              const entry = this.chatReplyEntry();
-              const shown = chat.finish(result.reply, lines);
-              this.showUnreadResearch(chat, turn, request.context);
-              this.markChatTurn(origin, request, entry);
-              if (record?.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
-                this.chatRecordSession.markLogged(turn.assistant);
-              // The round is over: the continuation goes on, waits or ends; follow-ups that waited are the next message instead.
-              this.finishChatRound(run, { result, context: request.context, lines, work, anchor });
-            }
-            return;
-          } catch (error) {
-            if (alive()) {
-              const failure = this.chatErrorText(error);
-              chat.fail(failure.text, failure.wrapped ? failure.text : undefined, failure.technical);
-              record?.end("failed", {
-                reason: /time(d)?[\s-]?out/i.test(errorMessage(error)) ? "timeout" : "error",
-                reply: failure.text,
-                lines: [],
-                error: { text: failure.text, technical: failure.technical ?? "" }
-              });
-              this.returnSteers(steerState);
-              if (!this.retryAutoRound(run, origin)) this.interruptChain(run, "failed");
-            }
-            return;
-          } finally {
-            if (this.chatController === turnController) this.releaseChatTask();
-          }
-        },
-        // The usage notice opens: the bubble and an empty canvas say the send waits for the user, not that a map is being built.
-        {
-          noticeOpening: () => {
-            if (chat.hasTurn(turn)) chat.setStage("consent");
-          }
-        }
-      );
-    } catch (error) {
-      // Only a failure before the request went out is taken back; once sent, the turn reports its own failures.
-      if (sent) throw error;
-      abandon(this.closed ? undefined : errorMessage(error), "failed");
-      return;
-    }
-    // The AI is not ready (it said why itself) or the usage notice was declined.
-    if (!went && !sent) abandon(this.closed ? undefined : notSent(), "not_ready");
+  /** Sends the draft (see MapChatConversation). */
+  private sendMapChat(again?: MapChatOrigin, restore?: string, retryOf?: ChatChainRun): Promise<void> {
+    return this.mapChatConversation.sendMapChat(again, restore, retryOf);
   }
-  /** Research notes of the conversation that this round did not read (no room, or too long) are told under its results. */
-  private showUnreadResearch(
-    chat: MapChatPanel,
-    turn: MapChatTurnHandle,
-    context: Pick<MapChatContext, "research">
-  ): void {
-    // A note read in an earlier round only did not fit again: it is not unread, so the screen does not say "next round".
-    const deferred = (context.research?.deferred ?? []).filter(note => !note.sentBefore);
-    if (deferred.length)
-      chat.setUnreadNotes(
-        turn,
-        deferred.map(note => ({ title: note.title, oversize: note.oversize === true }))
-      );
-  }
-  /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
   private steerMapChat(): void {
-    const chat = this.chat;
-    if (!chat || this.closed) return;
-    const text = chat.draft.trim();
-    if (!text) return;
-    const state = this.chatSteer;
-    if (state && chat.isBusy && chat.hasTurn(state.turn)) {
-      const steer = chat.addSteer(text, state.steers.waits ? "queued" : "live");
-      if (!steer) return;
-      state.rows.set(state.steers.add(text), steer);
-      return;
-    }
-    // The reply is in and its actions (or a plan, a choice) are being applied: the follow-up is the next message.
-    if (chat.isBusy || this.chatApplying) chat.addSteer(text, "queued");
+    this.mapChatConversation.steerMapChat();
   }
-  /** The turn stopped or failed: follow-ups that did not go in are not sent; they are in the field again. */
-  private returnSteers(state: NonNullable<typeof this.chatSteer>): void {
-    const chat = this.chat;
-    if (chat)
-      for (const [entry, row] of state.rows) if (entry.state !== "delivered") chat.setSteerState(row, "queued", false);
-    state.steers.abandon();
-    chat?.restoreDraft(chat.takeQueued());
-  }
-  /** Follow-ups that waited become one new message (sent once), or, when it cannot be sent now, go back into the field. */
   private flushSteers(send: boolean): void {
-    const chat = this.chat;
-    if (!chat) return;
-    const texts = chat.takeQueued();
-    if (!texts.length) return;
-    if (!send || this.closed || chat.isBusy || this.chatApplying || !this.map) {
-      chat.restoreDraft(texts);
-      return;
-    }
-    void this.sendMapChat(
-      {
-        text: texts.join("\n\n"),
-        chips: [],
-        selectedIds: this.chatSelectionIds(),
-        ...(this.chatImageId ? { imageId: this.chatImageId } : {})
-      },
-      texts.join("\n")
-    );
+    this.mapChatConversation.flushSteers(send);
   }
   // ---- automatic continuation (the chain) ---------------------------------------------------------------------------------
 
-  /** The chain a round belongs to (see MapChatChainRunner). */
-  private chainForRound(
-    origin: MapChatChainOrigin | undefined,
-    anchor: { path: string; id: string | undefined },
-    message: string
-  ): ChatChainRun {
-    return this.chatChainRunner.chainForRound(origin, anchor, message);
-  }
   /** Turns "apply this whole conversation automatically" on or off for the chains that start (or resume) from now on. */
   setChatAutoApply(on: boolean): void {
     this.chatAutoApply = on;
   }
-  private retryAutoRound(run: ChatChainRun, origin: MapChatOrigin): boolean {
-    return this.chatChainRunner.retryAutoRound(run, origin);
-  }
   private resumeChatChain(message: MapChatMessage): boolean {
     return this.chatChainRunner.resumeChatChain(message);
   }
-  private chainShows(run: ChatChainRun): boolean {
-    return this.chatChainRunner.chainShows(run);
-  }
   private interruptChain(run: ChatChainRun | null, reason: MapChatChainInterrupt): void {
     this.chatChainRunner.interruptChain(run, reason);
-  }
-  private stopChainWork(run: ChatChainRun): void {
-    this.chatChainRunner.stopChainWork(run);
-  }
-  private finishChatRound(run: ChatChainRun, round: ChatRoundEnd): void {
-    this.chatChainRunner.finishChatRound(run, round);
   }
   private chatChainPorts(): MapChatChainPorts {
     return {
@@ -21957,7 +21553,6 @@ export class VisualAgentMapView extends ItemView {
       actionLabel: (action, refTitles) => this.chatActionLabel(action, refTitles),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).
       applyActions: (...args) => this.applyMapChatActions(...args),
-      flushSteers: send => this.flushSteers(send),
       notesLoading: () => this.notesLoading(),
       selectionIds: () => this.chatSelectionIds(),
       imageId: () => this.chatImageId,
@@ -22214,46 +21809,11 @@ export class VisualAgentMapView extends ItemView {
     record?.relines();
   }
   private releaseChatTask(): void {
-    if (this.chatTaskKey) this.plugin.activeTasks?.delete(this.chatTaskKey);
-    this.chatTaskKey = null;
-    this.chatController = null;
+    this.mapChatConversation.releaseChatTask();
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   private stopMapChat(): void {
-    const run = this.chatChain;
-    // Waiting for the research or expansions of a continuation: no request runs. Stop ends the wait and the work the chain started;
-    // what was written stays.
-    if (run?.state.phase === "waiting") {
-      this.stopChainWork(run);
-      this.interruptChain(run, "stopped");
-      this.chat?.focusInput();
-      return;
-    }
-    // A plan being applied has no request to abort: the plan's number moves on, what is done stays and the rest is skipped.
-    if (this.chatApplying && !this.chatController) {
-      this.chatPlanToken++;
-      this.mapChatConversation.planStopped = true;
-      if (run && this.chainShows(run)) this.stopChainWork(run);
-      this.chat?.focusInput();
-      return;
-    }
-    const controller = this.chatController;
-    if (!controller) {
-      this.chatPrepAbandon?.();
-      this.chat?.focusInput();
-      return;
-    }
-    // A reply of a continuation that already started research or expansions: Stop stops those too.
-    if (run && this.chainShows(run)) this.stopChainWork(run);
-    this.releaseChatTask();
-    controller.abort();
-    // Before the panel marks the answer stopped: the record keeps the text that had streamed in.
-    this.endChatRecord("stopped");
-    this.chat?.markStopped();
-    this.interruptChain(run, "stopped");
-    // Follow-ups that did not go in are not sent after a stop: they are in the field again.
-    if (this.chatSteer) this.returnSteers(this.chatSteer);
-    this.chat?.focusInput();
+    this.mapChatConversation.stopMapChat();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
   private abortMapChat(): void {

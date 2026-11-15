@@ -48,10 +48,10 @@ function rig(options = {}) {
     clearPreview: () => log.push(['clearPreview']),
     refTitles: actions => new Map(),
     actionLabel: action => `L:${action.kind}`,
-    applyActions: (...args) => { applyCalls.push(args); return state.apply ? state.apply(...args) : Promise.resolve([{ status: 'done', text: 'ok' }]); },
-    flushSteers: send => log.push(['flush', send])
+    applyActions: (...args) => { applyCalls.push(args); return state.apply ? state.apply(...args) : Promise.resolve([{ status: 'done', text: 'ok' }]); }
   };
   const conv = new MapChatConversation(ports);
+  conv.flushSteers = send => log.push(['flush', send]);
   const record = { calls: [], plan(...args) { record.calls.push(args); } };
   return { conv, state, panel, log, plans, record, applyCalls };
 }
@@ -410,7 +410,7 @@ function turnRig(options = {}) {
     stopChainWork: () => log.push(['stopChainWork']),
     advanceChain: () => log.push(['advance'])
   };
-  const record = { calls: [], steerTexts: () => [], raw: null, end(status, fields) { record.calls.push(['end', status, fields]); log.push(['recordEnd', status]); return state.endReturns; }, event: kind => { record.calls.push(['event', kind]); log.push(['recordEvent', kind]); } };
+  const record = { calls: [], steerTexts: () => [], raw: null, end(status, fields) { record.calls.push(['end', status, fields]); log.push(['recordEnd', status]); return state.endReturns; }, plan() {}, event: kind => { record.calls.push(['event', kind]); log.push(['recordEvent', kind]); } };
   const registry = new Map();
   let sequence = 0;
   const plans = new WeakMap();
@@ -420,7 +420,6 @@ function turnRig(options = {}) {
     chain: () => chain, plans: () => plans,
     showPreview: () => {}, clearPreview: () => log.push(['clearPreview']), refTitles: () => new Map(), actionLabel: a => a.kind,
     applyActions: (...args) => { log.push(['apply']); return Promise.resolve(state.applyLines); },
-    flushSteers: send => log.push(['portFlush', send]),
     buildRequest: (message, origin, signal) => { log.push(['build', message]); state.buildSignal = signal; return state.build(message, origin, signal); },
     confirmAiUsage: async (model, run, hooks) => {
       log.push(['confirm']);
@@ -795,6 +794,7 @@ test('turn: a failure shows the text, records failed (timeout or error), returns
 
 test('turn: a plan is needed: only while busy; offers the card, flushes with false, records plan and marks logged', async () => {
   const r = turnRig();
+  r.conv.flushSteers = send => r.log.push(['portFlush', send]);
   await start(r);
   r.state.requests[0].resolve(REPLY([{ kind: 'create_map', title: 'T' }]));
   await r.sending;
@@ -962,4 +962,17 @@ test('unread research notes are told under the result; a note read in an earlier
   r.state.requests[0].resolve(REPLY());
   await r.sending;
   assert.deepEqual(plain(first(r, 'unread')[1]), [{ title: 'A', oversize: true }]);
+});
+
+test('the plan apply ends through the instance flushSteers (a replaced one is called), after the settle', async () => {
+  const r = turnRig();
+  const calls = [];
+  r.conv.flushSteers = send => calls.push(send);
+  await start(r);
+  r.state.requests[0].resolve(REPLY([{ kind: 'create_map', title: 'T' }]));
+  await r.sending;
+  assert.deepEqual(calls, [false], 'the plan card step flushes with false through the instance');
+  const card = r.panel.pending;
+  await r.conv.applyChatPlan(card, r.conv.planToken, REPLY([act.child]), { selectedCount: 0 }, { ...ANCHOR }, null);
+  assert.deepEqual(calls, [false, true]);
 });

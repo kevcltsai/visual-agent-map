@@ -47461,111 +47461,6 @@ var MapChatFiles = class {
   }
 };
 
-// core/attempt-runner.ts
-var import_node_crypto7 = require("node:crypto");
-var FIRST_EVENT_WAIT_MS = 2e4;
-var realClock = {
-  now: () => Date.now(),
-  setTimeout: (callback, ms) => window.setTimeout(callback, ms),
-  clearTimeout: (handle) => window.clearTimeout(handle)
-};
-async function runAttempts(options) {
-  var _a2;
-  const { signal: outer, stopped } = options;
-  const clock = (_a2 = options.clock) != null ? _a2 : realClock;
-  const safe = (callback) => {
-    try {
-      callback == null ? void 0 : callback();
-    } catch (e) {
-    }
-  };
-  let number = 0;
-  for (; ; ) {
-    if (outer == null ? void 0 : outer.aborted) throw stopped();
-    number++;
-    const controller = new AbortController();
-    const onOuterAbort = () => controller.abort();
-    outer == null ? void 0 : outer.addEventListener("abort", onOuterAbort, { once: true });
-    let resendRequested = false, firstEvent = false, slowShown = false, watching = true, ended2 = false, timer;
-    const live2 = () => !controller.signal.aborted && !resendRequested;
-    const disarm = () => {
-      if (timer === void 0) return;
-      clock.clearTimeout(timer);
-      timer = void 0;
-    };
-    const attempt = {
-      id: (0, import_node_crypto7.randomUUID)(),
-      number,
-      signal: controller.signal,
-      live: live2,
-      arm: () => {
-        disarm();
-        if (!watching || firstEvent || !live2()) return;
-        timer = clock.setTimeout(() => {
-          timer = void 0;
-          if (firstEvent || !live2()) return;
-          slowShown = true;
-          safe(() => {
-            var _a3;
-            return (_a3 = options.onSlow) == null ? void 0 : _a3.call(options, attempt, resend);
-          });
-        }, FIRST_EVENT_WAIT_MS);
-      },
-      seen: () => {
-        if (!live2()) return false;
-        if (!firstEvent) {
-          firstEvent = true;
-          disarm();
-          if (slowShown) safe(() => {
-            var _a3;
-            return (_a3 = options.onCleared) == null ? void 0 : _a3.call(options, attempt);
-          });
-        }
-        return true;
-      },
-      streamMode: (mode) => {
-        if (mode === "stream-json") return;
-        watching = false;
-        disarm();
-      }
-    };
-    const resend = () => {
-      if ((outer == null ? void 0 : outer.aborted) || !live2() || ended2 || firstEvent || !watching && options.streamModeEndsResend) return;
-      resendRequested = true;
-      disarm();
-      safe(() => {
-        var _a3;
-        return (_a3 = options.onResend) == null ? void 0 : _a3.call(options, attempt);
-      });
-      controller.abort();
-    };
-    safe(() => {
-      var _a3;
-      return (_a3 = options.onAttempt) == null ? void 0 : _a3.call(options, attempt);
-    });
-    const replaced = new Promise(
-      (_resolve, reject2) => controller.signal.addEventListener("abort", () => reject2(stopped()), { once: true })
-    );
-    replaced.catch(() => void 0);
-    try {
-      const running2 = options.start(attempt);
-      running2.catch(() => void 0);
-      const sent = await Promise.race([running2, replaced]);
-      if (!(resendRequested && !(outer == null ? void 0 : outer.aborted))) return sent;
-    } catch (error) {
-      if ((outer == null ? void 0 : outer.aborted) || !resendRequested) throw error;
-    } finally {
-      ended2 = true;
-      disarm();
-      outer == null ? void 0 : outer.removeEventListener("abort", onOuterAbort);
-    }
-    safe(() => {
-      var _a3;
-      return (_a3 = options.onReplaced) == null ? void 0 : _a3.call(options, attempt);
-    });
-  }
-}
-
 // core/argument-map/machine.ts
 var GateError = class extends Error {
   constructor(message) {
@@ -53278,6 +53173,111 @@ var MapChatRecordWriter = class {
 };
 var errorText2 = (error) => error instanceof Error ? error.message : String(error);
 
+// core/attempt-runner.ts
+var import_node_crypto7 = require("node:crypto");
+var FIRST_EVENT_WAIT_MS = 2e4;
+var realClock = {
+  now: () => Date.now(),
+  setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+  clearTimeout: (handle) => window.clearTimeout(handle)
+};
+async function runAttempts(options) {
+  var _a2;
+  const { signal: outer, stopped } = options;
+  const clock = (_a2 = options.clock) != null ? _a2 : realClock;
+  const safe = (callback) => {
+    try {
+      callback == null ? void 0 : callback();
+    } catch (e) {
+    }
+  };
+  let number = 0;
+  for (; ; ) {
+    if (outer == null ? void 0 : outer.aborted) throw stopped();
+    number++;
+    const controller = new AbortController();
+    const onOuterAbort = () => controller.abort();
+    outer == null ? void 0 : outer.addEventListener("abort", onOuterAbort, { once: true });
+    let resendRequested = false, firstEvent = false, slowShown = false, watching = true, ended2 = false, timer;
+    const live2 = () => !controller.signal.aborted && !resendRequested;
+    const disarm = () => {
+      if (timer === void 0) return;
+      clock.clearTimeout(timer);
+      timer = void 0;
+    };
+    const attempt = {
+      id: (0, import_node_crypto7.randomUUID)(),
+      number,
+      signal: controller.signal,
+      live: live2,
+      arm: () => {
+        disarm();
+        if (!watching || firstEvent || !live2()) return;
+        timer = clock.setTimeout(() => {
+          timer = void 0;
+          if (firstEvent || !live2()) return;
+          slowShown = true;
+          safe(() => {
+            var _a3;
+            return (_a3 = options.onSlow) == null ? void 0 : _a3.call(options, attempt, resend);
+          });
+        }, FIRST_EVENT_WAIT_MS);
+      },
+      seen: () => {
+        if (!live2()) return false;
+        if (!firstEvent) {
+          firstEvent = true;
+          disarm();
+          if (slowShown) safe(() => {
+            var _a3;
+            return (_a3 = options.onCleared) == null ? void 0 : _a3.call(options, attempt);
+          });
+        }
+        return true;
+      },
+      streamMode: (mode) => {
+        if (mode === "stream-json") return;
+        watching = false;
+        disarm();
+      }
+    };
+    const resend = () => {
+      if ((outer == null ? void 0 : outer.aborted) || !live2() || ended2 || firstEvent || !watching && options.streamModeEndsResend) return;
+      resendRequested = true;
+      disarm();
+      safe(() => {
+        var _a3;
+        return (_a3 = options.onResend) == null ? void 0 : _a3.call(options, attempt);
+      });
+      controller.abort();
+    };
+    safe(() => {
+      var _a3;
+      return (_a3 = options.onAttempt) == null ? void 0 : _a3.call(options, attempt);
+    });
+    const replaced = new Promise(
+      (_resolve, reject2) => controller.signal.addEventListener("abort", () => reject2(stopped()), { once: true })
+    );
+    replaced.catch(() => void 0);
+    try {
+      const running2 = options.start(attempt);
+      running2.catch(() => void 0);
+      const sent = await Promise.race([running2, replaced]);
+      if (!(resendRequested && !(outer == null ? void 0 : outer.aborted))) return sent;
+    } catch (error) {
+      if ((outer == null ? void 0 : outer.aborted) || !resendRequested) throw error;
+    } finally {
+      ended2 = true;
+      disarm();
+      outer == null ? void 0 : outer.removeEventListener("abort", onOuterAbort);
+    }
+    safe(() => {
+      var _a3;
+      return (_a3 = options.onReplaced) == null ? void 0 : _a3.call(options, attempt);
+    });
+  }
+}
+
 // core/map-chat-plan.ts
 var MAP_CHAT_PLAN_ACTION_LIMIT = 15;
 var MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
@@ -54188,7 +54188,7 @@ var MapChatConversation = class {
         } else if (chat.hasQueuedSteers()) this.ports.chain().interruptChain(run, "user_took_over");
         else this.ports.chain().advanceChain(run, { result, context: baseline, lines, work, anchor: live2 });
       }
-      this.ports.flushSteers(!stopped());
+      this.flushSteers(!stopped());
     }
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
@@ -54381,7 +54381,7 @@ var MapChatConversation = class {
                 );
                 if (record == null ? void 0 : record.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
                   this.ports.markLogged(turn.assistant);
-                this.ports.flushSteers(false);
+                this.flushSteers(false);
               }
               return;
             }
@@ -59444,10 +59444,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "chat", null);
     /** The map the conversation belongs to; opening another map starts a new conversation. */
     __publicField(this, "chatMapId", "");
-    __publicField(this, "chatController", null);
-    /** Takes back the send that is still preparing (no request yet): what Stop does before there is a request to abort. */
-    __publicField(this, "chatPrepAbandon", null);
-    __publicField(this, "chatTaskKey", null);
     /** The anchors the pending plan would place, drawn as dashed dots; it only counts while its token is the plan's current one. */
     __publicField(this, "chatPreview", null);
     /**
@@ -59496,9 +59492,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "chatResearchSent", /* @__PURE__ */ new Set());
     /** Counts conversations: the result of research another conversation started is not recorded in this one. */
     __publicField(this, "chatConversation", 0);
-    /** The follow-ups of the turn that is running (or ran last). */
-    /** The follow-ups of the running turn: their state machine and the panel row each one has. */
-    __publicField(this, "chatSteer", null);
     /** Writes the actions of a chat reply one at a time; every read goes back to this view when it happens. */
     __publicField(this, "chatWriter", new ChatActionWriter({
       map: () => this.map,
@@ -59900,6 +59893,20 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
   /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
   droppedCyclesOfLastMerge() {
     return this.lastDroppedCycles;
+  }
+  get chatController() {
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.mapChatConversation) == null ? void 0 : _a2.controller) != null ? _b2 : null;
+  }
+  set chatController(value) {
+    this.mapChatConversation.controller = value;
+  }
+  get chatPrepAbandon() {
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.mapChatConversation) == null ? void 0 : _a2.prepAbandon) != null ? _b2 : null;
+  }
+  set chatPrepAbandon(value) {
+    this.mapChatConversation.prepAbandon = value;
   }
   get chatPlanToken() {
     var _a2, _b2;
@@ -78253,347 +78260,26 @@ ${note.detail.trim()}` : "",
       technical: rawErrorText(error) || errorMessage4(error)
     };
   }
-  /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
-  async sendMapChat(again, restore, retryOf) {
-    var _a2;
-    const chat = this.chat;
-    if (chat && !again && this.chatApplying && !chat.isBusy && !this.closed && chat.draft.trim()) {
-      this.steerMapChat();
-      return;
-    }
-    if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map || this.notesLoading()) return;
-    const message = again ? again.text : chat.draft.trim();
-    if (!message) return;
-    if (!again && isResumeKeyword(message)) {
-      const last = chat.transcript().at(-1);
-      if ((last == null ? void 0 : last.resume) && this.resumeChatChain(last)) {
-        chat.clearDraft();
-        return;
-      }
-    }
-    const autoOrigin = again == null ? void 0 : again.chain;
-    if (!autoOrigin && !retryOf) this.interruptChain(this.chatChain, "user_took_over");
-    const origin = again ? { ...again } : {
-      text: message,
-      chips: chat.attachments(),
-      selectedIds: this.chatSelectionIds(),
-      // Only the id: the picture is read again (a retry too) when the request is built, and never kept.
-      ...this.chatImageId ? { imageId: this.chatImageId } : {}
-    };
-    const anchor = { path: this.path, id: this.map.id };
-    const run = retryOf && !autoOrigin ? retryOf : this.chainForRound(autoOrigin, anchor, message);
-    if (run === retryOf) run.message = message;
-    run.chips = [...origin.chips];
-    const draft = chat.draft;
-    const turn = autoOrigin ? chat.beginAutoRound(
-      run.state.round,
-      run.state.maxRounds,
-      run.state.remaining,
-      origin,
-      (_a2 = run.partial) != null ? _a2 : void 0,
-      ...run.state.autoApply ? [{ calls: run.state.calls, applied: run.appliedText }] : []
-    ) : chat.begin(message, origin, Boolean(again), "preparing");
-    run.turn = turn;
-    let sent = false;
-    const abandon = (reason, ends = "map_changed") => {
-      if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-      const retracted = chat.retract(turn, again ? restore : draft);
-      this.interruptChain(run, ends);
-      if (!retracted) return;
-      if (reason !== void 0 && (!autoOrigin || ends === "failed")) new import_obsidian34.Notice(reason);
-    };
-    const preparing = new AbortController();
-    const stopPreparing = () => {
-      preparing.abort();
-      abandon(void 0, "stopped");
-    };
-    this.chatPrepAbandon = stopPreparing;
-    const steerRows = /* @__PURE__ */ new Map();
-    const steerState = {
-      turn,
-      rows: steerRows,
-      steers: new TopicChatSteers({
-        alive: () => {
-          var _a3;
-          return !this.closed && this.chatSteer === steerState && !!((_a3 = this.chat) == null ? void 0 : _a3.hasTurn(turn));
-        },
-        onChange: (reason) => {
-          var _a3;
-          for (const [entry, row] of steerRows) if (entry.state === "queued") (_a3 = this.chat) == null ? void 0 : _a3.setSteerState(row, "queued");
-          if (reason) origin.text = [message, ...steerState.steers.delivered()].join("\n\n");
-        }
-      })
-    };
-    this.chatSteer = steerState;
-    const notSent = () => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
-    let request;
-    try {
-      request = { ...await this.buildChatRequest(message, chat, origin, preparing.signal), ...this.usageMapField() };
-    } catch (error) {
-      abandon(this.closed ? void 0 : errorMessage4(error), "failed");
-      return;
-    }
-    if (this.closed || !chat.hasTurn(turn)) {
-      abandon();
-      return;
-    }
-    let went = false;
-    try {
-      went = await this.plugin.confirmAiUsage(
-        request.model,
-        async () => {
-          var _a3, _b2, _c, _d, _e, _f;
-          if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a3 = this.map) == null ? void 0 : _a3.id) !== anchor.id) {
-            abandon();
-            return;
-          }
-          sent = true;
-          if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-          const record = this.beginChatRecord(chat, turn, request, origin);
-          run.record = record;
-          if (record) record.steerTexts = () => steerState.steers.delivered();
-          const turnController = new AbortController();
-          const key4 = `map-chat-view:${++mapChatTaskSequence}`;
-          this.chatController = turnController;
-          this.chatTaskKey = key4;
-          (_b2 = this.plugin.activeTasks) == null ? void 0 : _b2.set(key4, turnController);
-          const alive = () => !this.closed && !turnController.signal.aborted && this.chatController === turnController && this.path === anchor.path;
-          this.mapChatConversation.supersedeChatPlan();
-          this.relocateMapChat();
-          chat.setStage("waiting");
-          const modelName = this.plugin.modelLabel(request.model);
-          try {
-            const outcome = await runAttempts({
-              signal: turnController.signal,
-              streamModeEndsResend: true,
-              stopped: () => new Error(t("ui.ai_task_cancelled")),
-              start: async (attempt) => {
-                if (!alive()) throw new Error(t("ui.ai_task_cancelled"));
-                const live2 = () => alive() && attempt.live();
-                attempt.arm();
-                return this.plugin.mapChat.chat(
-                  request,
-                  attempt.signal,
-                  (text10) => {
-                    if (!live2()) return;
-                    attempt.seen();
-                    chat.streamReply(text10);
-                  },
-                  (event) => {
-                    if (!live2()) return;
-                    if (event.kind === "stream-mode") {
-                      attempt.streamMode(event.mode);
-                      steerState.steers.setLive(event.mode === "stream-json");
-                      return;
-                    }
-                    if (!(event.kind === "activity" && event.activity === "started")) attempt.seen();
-                    if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
-                  },
-                  (handler) => {
-                    if (live2()) steerState.steers.bind(handler);
-                  },
-                  // The model's raw output, kept for the record (only while the switch is on, and never from a stopped or replaced attempt).
-                  record ? (raw) => {
-                    if (live2()) record.raw = raw;
-                  } : void 0
-                );
-              },
-              onSlow: (_attempt, resend) => {
-                if (alive())
-                  chat.showSlow(t("ui.map_chat_slow_0", modelName), () => {
-                    if (alive()) resend();
-                  });
-              },
-              onCleared: () => {
-                if (alive()) chat.clearSlow();
-              },
-              onResend: () => {
-                record == null ? void 0 : record.event("resend");
-                steerState.steers.drop();
-                chat.restartWaiting();
-              }
-            });
-            if (!alive()) return;
-            const result = outcome;
-            for (const id of (_d = (_c = request.context.research) == null ? void 0 : _c.sent) != null ? _d : []) this.chatResearchSent.add(id);
-            await steerState.steers.close();
-            if (!alive()) return;
-            const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
-            run.message = fullMessage;
-            run.replyRemaining = result.remaining;
-            run.state = syncAutoApply(run.state, this.chatAutoApply);
-            const plan = result.actions.length ? planFor(result.actions, request.context, {
-              diagrams: this.plugin.settings.addDiagramsAfterResearch,
-              mapAiMode: (_e = this.map) == null ? void 0 : _e.aiMode,
-              imageMode: this.chatImageMode(),
-              imageAttached: !!request.imageDataUrl,
-              chain: planChainOf(run.state),
-              autoApply: this.chatAutoApply,
-              mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
-              readablePaths: this.chatFiles.readablePaths(),
-              callsSoFar: run.state.calls,
-              chatStartedResearch: this.chatStartedResearch,
-              chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
-              trusted: {
-                createdIds: run.createdIds,
-                researchedIds: new Set(
-                  [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
-                )
-              }
-            }) : null;
-            if (plan) {
-              if (chat.isBusy) {
-                chat.finish(result.reply, []);
-                this.showUnreadResearch(chat, turn, request.context);
-                this.markChatTurn(origin, request);
-                run.state = pauseForPlan(run.state);
-                this.mapChatConversation.offerChatPlan(
-                  result,
-                  plan,
-                  request.context,
-                  { path: anchor.path, id: anchor.id },
-                  fullMessage,
-                  record,
-                  run
-                );
-                if (record == null ? void 0 : record.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
-                  this.chatRecordSession.markLogged(turn.assistant);
-                this.flushSteers(false);
-              }
-              return;
-            }
-            if (result.actions.length) chat.setStage("applying");
-            const work = newChatWork();
-            run.work = work;
-            const lines = await this.applyMapChatActions(
-              { ...result, message: fullMessage },
-              request.context,
-              alive,
-              anchor,
-              { context: request.context, work, continuation: Boolean(autoOrigin), chain: run }
-            );
-            if (alive() && chat.isBusy) {
-              const entry = this.chatReplyEntry();
-              const shown = chat.finish(result.reply, lines);
-              this.showUnreadResearch(chat, turn, request.context);
-              this.markChatTurn(origin, request, entry);
-              if (record == null ? void 0 : record.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
-                this.chatRecordSession.markLogged(turn.assistant);
-              this.finishChatRound(run, { result, context: request.context, lines, work, anchor });
-            }
-            return;
-          } catch (error) {
-            if (alive()) {
-              const failure = this.chatErrorText(error);
-              chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
-              record == null ? void 0 : record.end("failed", {
-                reason: /time(d)?[\s-]?out/i.test(errorMessage4(error)) ? "timeout" : "error",
-                reply: failure.text,
-                lines: [],
-                error: { text: failure.text, technical: (_f = failure.technical) != null ? _f : "" }
-              });
-              this.returnSteers(steerState);
-              if (!this.retryAutoRound(run, origin)) this.interruptChain(run, "failed");
-            }
-            return;
-          } finally {
-            if (this.chatController === turnController) this.releaseChatTask();
-          }
-        },
-        // The usage notice opens: the bubble and an empty canvas say the send waits for the user, not that a map is being built.
-        {
-          noticeOpening: () => {
-            if (chat.hasTurn(turn)) chat.setStage("consent");
-          }
-        }
-      );
-    } catch (error) {
-      if (sent) throw error;
-      abandon(this.closed ? void 0 : errorMessage4(error), "failed");
-      return;
-    }
-    if (!went && !sent) abandon(this.closed ? void 0 : notSent(), "not_ready");
+  /** Sends the draft (see MapChatConversation). */
+  sendMapChat(again, restore, retryOf) {
+    return this.mapChatConversation.sendMapChat(again, restore, retryOf);
   }
-  /** Research notes of the conversation that this round did not read (no room, or too long) are told under its results. */
-  showUnreadResearch(chat, turn, context) {
-    var _a2, _b2;
-    const deferred = ((_b2 = (_a2 = context.research) == null ? void 0 : _a2.deferred) != null ? _b2 : []).filter((note) => !note.sentBefore);
-    if (deferred.length)
-      chat.setUnreadNotes(
-        turn,
-        deferred.map((note) => ({ title: note.title, oversize: note.oversize === true }))
-      );
-  }
-  /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
   steerMapChat() {
-    const chat = this.chat;
-    if (!chat || this.closed) return;
-    const text10 = chat.draft.trim();
-    if (!text10) return;
-    const state = this.chatSteer;
-    if (state && chat.isBusy && chat.hasTurn(state.turn)) {
-      const steer = chat.addSteer(text10, state.steers.waits ? "queued" : "live");
-      if (!steer) return;
-      state.rows.set(state.steers.add(text10), steer);
-      return;
-    }
-    if (chat.isBusy || this.chatApplying) chat.addSteer(text10, "queued");
+    this.mapChatConversation.steerMapChat();
   }
-  /** The turn stopped or failed: follow-ups that did not go in are not sent; they are in the field again. */
-  returnSteers(state) {
-    const chat = this.chat;
-    if (chat) {
-      for (const [entry, row] of state.rows) if (entry.state !== "delivered") chat.setSteerState(row, "queued", false);
-    }
-    state.steers.abandon();
-    chat == null ? void 0 : chat.restoreDraft(chat.takeQueued());
-  }
-  /** Follow-ups that waited become one new message (sent once), or, when it cannot be sent now, go back into the field. */
   flushSteers(send) {
-    const chat = this.chat;
-    if (!chat) return;
-    const texts = chat.takeQueued();
-    if (!texts.length) return;
-    if (!send || this.closed || chat.isBusy || this.chatApplying || !this.map) {
-      chat.restoreDraft(texts);
-      return;
-    }
-    void this.sendMapChat(
-      {
-        text: texts.join("\n\n"),
-        chips: [],
-        selectedIds: this.chatSelectionIds(),
-        ...this.chatImageId ? { imageId: this.chatImageId } : {}
-      },
-      texts.join("\n")
-    );
+    this.mapChatConversation.flushSteers(send);
   }
   // ---- automatic continuation (the chain) ---------------------------------------------------------------------------------
-  /** The chain a round belongs to (see MapChatChainRunner). */
-  chainForRound(origin, anchor, message) {
-    return this.chatChainRunner.chainForRound(origin, anchor, message);
-  }
   /** Turns "apply this whole conversation automatically" on or off for the chains that start (or resume) from now on. */
   setChatAutoApply(on) {
     this.chatAutoApply = on;
   }
-  retryAutoRound(run, origin) {
-    return this.chatChainRunner.retryAutoRound(run, origin);
-  }
   resumeChatChain(message) {
     return this.chatChainRunner.resumeChatChain(message);
   }
-  chainShows(run) {
-    return this.chatChainRunner.chainShows(run);
-  }
   interruptChain(run, reason) {
     this.chatChainRunner.interruptChain(run, reason);
-  }
-  stopChainWork(run) {
-    this.chatChainRunner.stopChainWork(run);
-  }
-  finishChatRound(run, round3) {
-    this.chatChainRunner.finishChatRound(run, round3);
   }
   chatChainPorts() {
     return {
@@ -78632,7 +78318,6 @@ ${note.detail.trim()}` : "",
       actionLabel: (action, refTitles) => this.chatActionLabel(action, refTitles),
       // Read at call time (a wrapped or replaced applyMapChatActions is used).
       applyActions: (...args) => this.applyMapChatActions(...args),
-      flushSteers: (send) => this.flushSteers(send),
       notesLoading: () => this.notesLoading(),
       selectionIds: () => this.chatSelectionIds(),
       imageId: () => this.chatImageId,
@@ -78877,42 +78562,11 @@ ${note.detail.trim()}` : "",
     record == null ? void 0 : record.relines();
   }
   releaseChatTask() {
-    var _a2;
-    if (this.chatTaskKey) (_a2 = this.plugin.activeTasks) == null ? void 0 : _a2.delete(this.chatTaskKey);
-    this.chatTaskKey = null;
-    this.chatController = null;
+    this.mapChatConversation.releaseChatTask();
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   stopMapChat() {
-    var _a2, _b2, _c, _d, _e, _f;
-    const run = this.chatChain;
-    if ((run == null ? void 0 : run.state.phase) === "waiting") {
-      this.stopChainWork(run);
-      this.interruptChain(run, "stopped");
-      (_a2 = this.chat) == null ? void 0 : _a2.focusInput();
-      return;
-    }
-    if (this.chatApplying && !this.chatController) {
-      this.chatPlanToken++;
-      this.mapChatConversation.planStopped = true;
-      if (run && this.chainShows(run)) this.stopChainWork(run);
-      (_b2 = this.chat) == null ? void 0 : _b2.focusInput();
-      return;
-    }
-    const controller = this.chatController;
-    if (!controller) {
-      (_c = this.chatPrepAbandon) == null ? void 0 : _c.call(this);
-      (_d = this.chat) == null ? void 0 : _d.focusInput();
-      return;
-    }
-    if (run && this.chainShows(run)) this.stopChainWork(run);
-    this.releaseChatTask();
-    controller.abort();
-    this.endChatRecord("stopped");
-    (_e = this.chat) == null ? void 0 : _e.markStopped();
-    this.interruptChain(run, "stopped");
-    if (this.chatSteer) this.returnSteers(this.chatSteer);
-    (_f = this.chat) == null ? void 0 : _f.focusInput();
+    this.mapChatConversation.stopMapChat();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
   abortMapChat() {

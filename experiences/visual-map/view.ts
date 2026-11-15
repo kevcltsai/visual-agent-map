@@ -409,7 +409,6 @@ import {
   TOPIC_KINDS,
   type HypothesisLeaning,
   type HypothesisStrength,
-  type NoteRelevance,
   type RelevanceTier,
   type TopicKind
 } from "../../note-values";
@@ -437,6 +436,7 @@ import {
   statusBarClearance
 } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
+import { RelevanceGradeRun } from "./relevance-grade-run";
 import {
   MapChatPanel,
   type MapChatChip,
@@ -619,26 +619,16 @@ import { StructureReviewModal } from "./structure-review-modal";
 import {
   buildStructureReviewNodes,
   isSuggestionStale,
-  type StructureNode,
   type StructureReviewResult,
   type StructureSuggestion
 } from "../../core/structure-review-service";
 import type {
   GoalRecommendChange,
-  GoalRecommendItem,
   GoalRecommendOutcome,
-  GoalRecommendReceived,
-  GoalRecommendRequest,
-  GoalRecommendResult,
   GoalRecommendRun,
-  GoalRecommendScope,
   GoalRecommendSuggestion
 } from "../../core/goal-recommend-service";
-import {
-  GOAL_RECOMMEND_SCHEMA,
-  goalRecommendFailureDetail,
-  goalRecommendTitleKey
-} from "../../core/goal-recommend-service";
+import { GOAL_RECOMMEND_SCHEMA, goalRecommendTitleKey } from "../../core/goal-recommend-service";
 import { ancestorTrail, createCardSearchField, type CardSearchSource } from "../../ui/card-search-field";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
@@ -814,8 +804,6 @@ const cardImageRelationMarks = new WeakMap<HTMLElement, HTMLElement>();
 const cardLinkButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
 /** The AI lock button of each locked card, so a repaint replaces it instead of adding a second. */
 const cardAiLockButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
-/** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
-let relevanceRunToken = 0;
 let relevancePanelSeq = 0;
 type GoalIcon = "target" | "spark" | "sort" | "select";
 /** The goal bar's own inline icons (drawn like the approved mock-up); colour follows `currentColor`. */
@@ -1391,8 +1379,35 @@ export class VisualAgentMapView extends ItemView {
   private structureHighlight = new Set<string>();
   /** How many times the map was repainted; a run compares it to repaint once, not twice. */
   private paintCount = 0;
-  /** True once this view has started a relevance grading run (so closing it has a run to abort). */
-  private startedRelevance = false;
+  private relevanceRun = new RelevanceGradeRun(this, {
+    plugin: () => this.plugin,
+    path: () => this.path,
+    closed: () => this.closed,
+    map: () => this.map,
+    notes: () => this.notes,
+    history: () => this.history,
+    paintCount: () => this.paintCount,
+    gradeable: () => this.relevanceGradeable(),
+    notesLoading: () => this.notesLoading(),
+    dropGoalSuggest: () => {
+      if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
+    },
+    setGoal: (goal, context) => {
+      this.relevanceGoal = goal;
+      this.relevanceContext = context;
+    },
+    aiGrades: () => this.relevanceAiGrades(),
+    pins: () => this.relevancePinList(),
+    describe: id => this.describeForReview(id),
+    usageMapField: () => this.usageMapField(),
+    contentLanguage: language => outputLanguageForMap(this.map, language, this.map?.title),
+    lockedParent: parentId => !!this.aiLockReason("addChild", [parentId]),
+    refresh: focusBar => this.refreshRelevance(focusBar),
+    paintReceived: run => this.paintGoalRecommendReceived(run),
+    updateHistoryButtons: () => this.updateHistoryButtons(),
+    openRecommendations: (run, mapPath, suggestions) => this.openRecommendations(run, mapPath, suggestions),
+    notice: message => new Notice(message)
+  });
   private readonly relevancePanelId = `vam-relevance-panel-${++relevancePanelSeq}`;
   /** The goal being edited in place (null when the goal is just shown). Changes only through startGoalEdit / closeGoalEdit. */
   private goalEdit: GoalEditState | null = null;
@@ -2296,10 +2311,7 @@ export class VisualAgentMapView extends ItemView {
     for (const task of this.plugin.topicRuns.syntheses(this).topics.values()) if (task.state === "running") return true;
     if (this.startingTasks.size || this.startingExpand.size || this.mergeDrafts.isRunning()) return true;
     if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
-    if (this.startedRelevance && this.path) {
-      const run = this.plugin.relevanceGrades.get(this.path);
-      if (run?.owner === this && run.status === "running") return true;
-    }
+    if (this.relevanceRun.isRunning()) return true;
     const runs = this.plugin.topicRuns,
       batches = this.plugin.expansionCoordinator;
     return (this.map?.nodes ?? []).some(
@@ -5086,8 +5098,8 @@ export class VisualAgentMapView extends ItemView {
     if (!changes.length) return;
     this.history.push({
       label: t("ui.relevance_history_label"),
-      undo: () => this.restoreRelevance(changes, "undo"),
-      redo: () => this.restoreRelevance(changes, "redo")
+      undo: () => this.relevanceRun.restore(changes, "undo"),
+      redo: () => this.relevanceRun.restore(changes, "redo")
     });
   }
   /** True when the suggestion no longer fits the map as it is now. */
@@ -5409,35 +5421,11 @@ export class VisualAgentMapView extends ItemView {
     // A panel with a picker list open stays as it is; it is redrawn with the next change.
     if (this.mapSourcesOpen && !this.mapSourcesPickerOpen) this.drawMapSourcesPanelEl(null);
   }
-  private relevanceRunIsCurrent(run: GoalRecommendRun, mapPath: string): boolean {
-    return (
-      !this.closed &&
-      this.path === mapPath &&
-      this.plugin.relevanceGrades.get(mapPath) === run &&
-      run.status === "running" &&
-      !run.controller.signal.aborted
-    );
+  private submitRelevanceGoal(raw: string, contextRaw?: string): Promise<void> {
+    return this.relevanceRun.start(raw, contextRaw);
   }
-  /** View closed or map switched: stop this view's run and forget it. A late result then fails every fence. */
   private abortRelevanceGrade(mapPath = this.path): void {
-    if (!this.startedRelevance) return;
-    const run = this.plugin.relevanceGrades.get(mapPath);
-    if (!run || run.owner !== this) return;
-    this.plugin.relevanceGrades.delete(mapPath);
-    run.controller.abort();
-  }
-  private finishRelevance(
-    run: GoalRecommendRun,
-    mapPath: string,
-    status: "failed" | "declined",
-    message: string
-  ): void {
-    if (!this.relevanceRunIsCurrent(run, mapPath)) return;
-    this.plugin.releaseWarmClaude?.();
-    run.received = undefined;
-    run.status = status;
-    run.message = message;
-    this.refreshRelevance();
+    this.relevanceRun.abort(mapPath);
   }
   /**
    * Call before a repaint: when the keyboard is inside the relevance status bar, the returned function (call it after
@@ -5466,123 +5454,6 @@ export class VisualAgentMapView extends ItemView {
     this.render();
     if ((focusBar && !this.holdFocusOnGrade) || hadFocus)
       this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar button")?.focus();
-  }
-  /**
-   * Enter in the goal field, the goal icon, or the chat's `rate_by_goal`. The goal is saved first (its own undo step),
-   * then, after the usage confirmation, ONE request recommends new cards and rates the map. The scope is decided by the
-   * repository (a changed setup, or a map without AI tiers, asks for every card; otherwise only what should change).
-   * Nothing is written when the AI is declined, stopped, fails or returns a reply the strict parser refuses; there is no
-   * repair round and no second call. The recommended cards open as a list once the tiers are written.
-   */
-  private async submitRelevanceGoal(raw: string, contextRaw?: string): Promise<void> {
-    const goal = normalizeRelevanceGoal(raw);
-    const context = contextRaw === undefined ? undefined : normalizeRelevanceContext(contextRaw);
-    const mapPath = this.path;
-    if (!goal || !this.relevanceGradeable() || this.notesLoading()) return;
-    if (this.plugin.relevanceGrades.get(mapPath)?.status === "running") return;
-    // The run takes over the spot under the bar: an open list or a waiting suggestion call is dropped.
-    if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
-    const run: GoalRecommendRun = {
-      token: ++relevanceRunToken,
-      owner: this,
-      controller: new AbortController(),
-      goal,
-      status: "running",
-      startedAt: Date.now()
-    };
-    // Claim the map before the first await, so a second Enter cannot start another run.
-    this.plugin.relevanceGrades.set(mapPath, run);
-    this.startedRelevance = true;
-    // Stop, closing the view or switching maps before the run took the pre-started process leaves nothing waiting.
-    run.controller.signal.addEventListener("abort", () => this.plugin.releaseWarmClaude?.(), { once: true });
-    this.refreshRelevance(true);
-    const settings = this.plugin.settings;
-    let result: GoalRecommendResult | undefined;
-    let basis: StructureNode[] = [];
-    let scope: GoalRecommendScope = "all";
-    let pins: RelevancePin[] = [];
-    try {
-      await this.plugin.mutate(async () => {
-        const { previous, next, setupChanged } = await this.plugin.repo.writeRelevanceGoal(mapPath, goal, context);
-        if (this.path !== mapPath) return;
-        this.relevanceGoal = goal;
-        this.relevanceContext = context;
-        // The repository has the last word: a changed setup, or a map with no AI tier yet, is rated in full.
-        scope = setupChanged || !this.relevanceAiGrades().length ? "all" : "current";
-        // Goal and context are one undo step; none changed means nothing to undo.
-        if (!setupChanged) return;
-        this.history.push({
-          label: t("ui.relevance_goal_history_label"),
-          undo: () => this.plugin.repo.restoreRelevanceGoal(mapPath, previous),
-          redo: () => this.plugin.repo.restoreRelevanceGoal(mapPath, next)
-        });
-        this.updateHistoryButtons();
-      });
-      const { model, reasoning } = this.plugin.currentModelChoice();
-      // The run stays "running" (the map is locked and Stop works) but the bar must not claim recommending while the
-      // usage notice waits for an answer. Only a notice that really opens needs the bar to say so.
-      if (this.plugin.usageNoticePending?.(model)) {
-        run.awaitingUsage = true;
-        this.refreshRelevance();
-      }
-      const started = await this.plugin.confirmAiUsage(model, async () => {
-        // Stopped, or the map changed, while the usage dialog was open.
-        if (!this.relevanceRunIsCurrent(run, mapPath) || !this.map) return;
-        if (run.awaitingUsage) {
-          run.awaitingUsage = false;
-          // The seconds count the model's work, not the wait for the usage notice.
-          run.startedAt = Date.now();
-          this.refreshRelevance();
-        }
-        basis = buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id));
-        // Pinned (hand-set) and locked cards are the learner's: the AI sees them as anchors and never rates them.
-        pins = this.relevancePinList();
-        const lockedIds = basis
-          .filter(node => node.parentId !== null && this.notes.get(node.id)?.aiLocked)
-          .map(node => node.id);
-        const request: GoalRecommendRequest = {
-          goal,
-          ...(context ? { context } : {}),
-          nodes: basis,
-          language: settings.language,
-          contentLanguage: outputLanguageForMap(this.map, settings.language, this.map.title),
-          model,
-          reasoning,
-          ...(pins.length ? { pins } : {}),
-          ...(lockedIds.length ? { lockedIds } : {}),
-          scope,
-          // Scope `all` sends no earlier tier: the model rates every card from scratch.
-          ...(scope === "current" ? { current: this.relevanceAiGrades() } : {}),
-          ...this.usageMapField()
-        };
-        const hooks = {
-          // Text only: the count changes in place, the map is not repainted for it.
-          onProgress: (progress: GoalRecommendReceived | null) => {
-            if (!this.relevanceRunIsCurrent(run, mapPath)) return;
-            run.received = progress ?? undefined;
-            this.paintGoalRecommendReceived(run);
-          }
-        };
-        result = await this.plugin.goalRecommend.recommend(request, run.controller.signal, hooks);
-      });
-      if (!this.relevanceRunIsCurrent(run, mapPath)) return;
-      if (!started) return this.finishRelevance(run, mapPath, "declined", t("ui.relevance_not_started"));
-      const answered: GoalRecommendResult | undefined = result;
-      if (!answered) return;
-      // Writing the notes makes the view synchronize, which repaints when a note changed (the run is already "done"
-      // by then); repaint here only when it did not, so a run costs one repaint after the write.
-      const paintedBefore = this.paintCount;
-      await this.plugin.mutate(() => this.applyRelevanceGrade(run, mapPath, basis, answered, { scope, pins }));
-      if (this.paintCount === paintedBefore) this.refreshRelevance();
-      this.openRecommendations(run, mapPath, answered.suggestions);
-    } catch (error) {
-      this.finishRelevance(
-        run,
-        mapPath,
-        "failed",
-        t("ui.relevance_failed_0", goalRecommendFailureDetail(error, this.plugin.settings.language))
-      );
-    }
   }
   /**
    * Hands the recommended cards to the list once the run has written its tiers. Only the view that started the run, still
@@ -5614,178 +5485,6 @@ export class VisualAgentMapView extends ItemView {
     if (!active || active === doc?.body) return true;
     const inside = (selector: string): boolean => !!this.contentEl?.querySelector?.(selector)?.contains?.(active);
     return inside(".vam-relevance-statusbar") || inside(".vam-goal-bar");
-  }
-  /**
-   * Writes the tiers as one undo step. Each card is checked against what the AI was shown: a card deleted, renamed or
-   * moved meanwhile is skipped (its old tier stays), and cards added meanwhile are not in the result so they stay
-   * unrated. A card never ranks below one it holds: the program raises such a parent (any number of levels) in the same
-   * write and the same undo step, unless the parent is hand-set, locked, outside what the AI saw, or changed meanwhile.
-   * A note that cannot be written is counted; the undo step covers only the notes actually written.
-   */
-  private async applyRelevanceGrade(
-    run: GoalRecommendRun,
-    mapPath: string,
-    basis: StructureNode[],
-    graded: GoalRecommendResult,
-    meta: { scope: GoalRecommendScope; pins: RelevancePin[] }
-  ): Promise<void> {
-    if (!this.relevanceRunIsCurrent(run, mapPath) || !this.map) return;
-    const items: GoalRecommendItem[] = graded.items;
-    run.writing = true;
-    run.received = undefined;
-    const startedAt = Date.now();
-    const repo = this.plugin.repo;
-    const fresh = new Map<string, Note>();
-    for (const node of this.map.nodes) {
-      try {
-        fresh.set(node.id, await repo.readNote(node.path, this.map));
-      } catch {
-        /* A card whose note cannot be read counts as changed and is skipped below. */
-      }
-    }
-    const current = new Map(
-      buildStructureReviewNodes(this.map.nodes, id => {
-        const note = fresh.get(id);
-        return note ? { title: note.title, summary: "", status: "" } : undefined;
-      }).map(node => [node.id, node])
-    );
-    // Parent before child, over every card the map holds now (not only the ones the AI saw).
-    const tree = buildStructureReviewNodes(this.map.nodes, () => undefined).map(node => ({
-      id: node.id,
-      parentId: node.parentId
-    }));
-    const pathOf = new Map(this.map.nodes.map(node => [node.id, node.path]));
-    const byId = new Map(items.map(item => [item.id, item]));
-    const titleOf = new Map(basis.map(base => [base.id, base.title]));
-    const pinned = new Set(meta.pins.map(pin => pin.id));
-    const outcome: GoalRecommendOutcome = {
-      graded: 0,
-      changes: [],
-      skipped: 0,
-      failed: 0,
-      pinned: 0,
-      scope: meta.scope,
-      raised: 0,
-      // The list drops cards under a locked parent, so only the ones it will show are counted.
-      recommended: graded.suggestions.filter(item => !this.aiLockReason("addChild", [item.parentId])).length,
-      pins: meta.pins.map(pin => ({ id: pin.id, title: titleOf.get(pin.id) ?? "", tier: pin.tier })),
-      conflicts: (graded.conflicts ?? []).map(conflict => ({
-        ancestor: titleOf.get(conflict.ancestorId) ?? "",
-        ancestorTier: conflict.ancestorTier,
-        descendant: titleOf.get(conflict.descendantId) ?? "",
-        descendantTier: conflict.descendantTier
-      })),
-      ...(graded.pinnedIgnored ? { pinnedIgnored: graded.pinnedIgnored } : {}),
-      ...(graded.anchorsDropped ? { anchorsDropped: graded.anchorsDropped } : {}),
-      ...(graded.unchangedIgnored ? { unchangedIgnored: graded.unchangedIgnored } : {})
-    };
-    try {
-      // Which cards the AI may write: seen by the AI, unchanged since, not locked, not hand-set.
-      const writable = new Set<string>();
-      for (const base of basis) {
-        if (base.parentId === null) continue;
-        const now = current.get(base.id),
-          note = fresh.get(base.id);
-        const item = byId.get(base.id);
-        if (!now || !note || !pathOf.get(base.id) || now.title !== base.title || now.parentId !== base.parentId) {
-          if (item) outcome.skipped++;
-          continue;
-        }
-        if (note.aiLocked) {
-          // AI lock: a locked card keeps its tier, like a hand-set one, and is counted as skipped.
-          if (item) outcome.skipped++;
-          continue;
-        }
-        if (note.relevance?.manual) {
-          // A hand-set (pinned) card is never written by the AI, whatever the AI said.
-          pinned.add(base.id);
-          continue;
-        }
-        writable.add(base.id);
-      }
-      // Merged result: what the notes hold now, plus the AI's tier for every card it may write.
-      const merged = new Map<string, RelevanceTier>();
-      for (const [id, note] of fresh) if (note.relevance) merged.set(id, note.relevance.tier);
-      for (const item of items) if (writable.has(item.id)) merged.set(item.id, item.tier);
-      // Everything else is frozen: its tier stays, though the height of what it holds still passes up. `raised` therefore
-      // never names a frozen card, and a frozen card has no item here: this is the only gate on who is written.
-      const frozen = new Set(tree.filter(node => !writable.has(node.id)).map(node => node.id));
-      const raised = raiseParents(tree, merged, frozen);
-      for (const base of basis) {
-        const item = writable.has(base.id) ? byId.get(base.id) : undefined;
-        const lift = raised.get(base.id);
-        const tier = lift ?? item?.tier;
-        if (!tier) continue;
-        const note = fresh.get(base.id) as Note;
-        const path = pathOf.get(base.id) as string;
-        const after = { tier };
-        const before = note.relevance ? { tier: note.relevance.tier } : undefined;
-        if (before && before.tier === after.tier) {
-          if (item) outcome.graded++;
-          continue;
-        }
-        try {
-          await repo.writeRelevance(path, after);
-          if (item) outcome.graded++;
-          if (lift) outcome.raised++;
-          outcome.changes.push({
-            id: base.id,
-            path,
-            title: note.title,
-            before,
-            after,
-            ...(item?.anchor && !lift ? { anchor: item.anchor } : {}),
-            ...(lift ? { raised: true } : {})
-          });
-        } catch (error) {
-          outcome.failed++;
-          this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage(error)));
-        }
-      }
-    } finally {
-      outcome.pinned = pinned.size;
-      this.plugin.logs.appendLog(
-        "info",
-        `Relevance ${meta.scope}: raised ${outcome.raised}, suggestions ${graded.suggestions.length}, suggestionsDropped ${graded.dropped.length}, pinned ${pinned.size}, pinnedIgnored ${graded.pinnedIgnored ?? 0}, anchorsDropped ${graded.anchorsDropped ?? 0}, unchangedIgnored ${graded.unchangedIgnored ?? 0}, written ${outcome.changes.length}, failed ${outcome.failed}, skipped ${outcome.skipped}, ${Date.now() - startedAt} ms`
-      );
-      if (outcome.changes.length) {
-        const changes = outcome.changes;
-        const entry: Action = {
-          label: t("ui.relevance_history_label"),
-          undo: () => this.restoreRelevance(changes, "undo"),
-          redo: () => this.restoreRelevance(changes, "redo")
-        };
-        this.history.push(entry);
-        run.historyEntry = entry;
-        this.updateHistoryButtons();
-      }
-      run.outcome = outcome;
-      run.status = "done";
-    }
-  }
-  /**
-   * Undo or redo a grading run. A note is only put back when it still holds exactly what the run wrote (or, for redo,
-   * what it replaced); a note the owner edited since is left alone and counted in a Notice.
-   */
-  private async restoreRelevance(changes: GoalRecommendChange[], direction: "undo" | "redo"): Promise<void> {
-    let skipped = 0;
-    const same = (a: NoteRelevance | undefined, b: NoteRelevance | undefined): boolean =>
-      a === b || (!!a && !!b && a.tier === b.tier && !!a.manual === !!b.manual);
-    for (const change of changes) {
-      const expected = direction === "undo" ? change.after : change.before;
-      const replacement = direction === "undo" ? change.before : change.after;
-      try {
-        const latest = (await this.plugin.repo.readNote(change.path)).relevance;
-        if (!same(latest, expected)) {
-          skipped++;
-          continue;
-        }
-        await this.plugin.repo.writeRelevance(change.path, replacement ?? null);
-      } catch {
-        skipped++;
-      }
-    }
-    if (skipped) new Notice(t("ui.relevance_undo_skipped_0", skipped));
   }
   /**
    * The tag's menu: the three tiers (a check on the current one) and Clear grade. Disabled while a grading run is
@@ -5871,15 +5570,6 @@ export class VisualAgentMapView extends ItemView {
     if (this.plugin.relevanceGrades.get(this.path)?.status === "running") return;
     this.plugin.runMutation(() => this.plugin.repo.writeRelevance(node.path, tier ? { tier, manual: true } : null));
   }
-  private stopRelevanceGrade(): void {
-    const run = this.plugin.relevanceGrades.get(this.path);
-    if (!run || run.status !== "running" || run.writing) return;
-    run.status = "stopped";
-    run.received = undefined;
-    run.message = t("ui.relevance_stopped");
-    run.controller.abort();
-    this.refreshRelevance();
-  }
   /** Status bar under the toolbar, same place and look as the AIM and multi-research bars. */
   private renderRelevanceStatus(parent: HTMLElement): void {
     const run = this.plugin.relevanceGrades.get(this.path);
@@ -5923,7 +5613,7 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     if (running) {
-      if (!run.writing) this.button(bar, t("ui.relevance_stop"), () => this.stopRelevanceGrade());
+      if (!run.writing) this.button(bar, t("ui.relevance_stop"), () => this.relevanceRun.stop());
       return;
     }
     if (outcome?.changes.length || outcome?.conflicts?.length) {

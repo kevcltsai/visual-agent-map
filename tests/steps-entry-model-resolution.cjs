@@ -72,11 +72,11 @@ test('relevance prewarm starts the resolved model and reasoning', async () => {
 
 test('structure review and relevance grading read the one resolution (no direct settings model in those functions)', () => {
   const source = fs.readFileSync(path.resolve(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
-  const body = (start, end) => { const from = source.indexOf(start); assert.ok(from >= 0, start); const to = source.indexOf(end, from); assert.ok(to > from, end); return source.slice(from, to); };
+  const body = (start, end, text = source) => { const from = text.indexOf(start); assert.ok(from >= 0, start); const to = text.indexOf(end, from); assert.ok(to > from, end); return text.slice(from, to); };
   const structure = body('  openStructureReview(scopeId', '  private reopenStructureReview(');
   assert.match(structure, /const \{ model, reasoning \} = this\.plugin\.currentModelChoice\(\)/);
   assert.doesNotMatch(structure, /settings\.cliModel|settings\.cliReasoning/);
-  const grade = body('  private async submitRelevanceGoal(', '  private async applyRelevanceGrade(');
+  const grade = body('  async start(', '  async apply(', fs.readFileSync(path.resolve(__dirname, '..', 'experiences/visual-map/relevance-grade-run.ts'), 'utf8'));
   assert.match(grade, /const \{ model, reasoning \} = this\.plugin\.currentModelChoice\(\)/);
   assert.doesNotMatch(grade, /settings\.cliModel|settings\.cliReasoning/);
   assert.match(grade, /\n\s+model,\n\s+reasoning,\n/, 'the request carries the resolved model and reasoning');

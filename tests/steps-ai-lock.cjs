@@ -586,7 +586,7 @@ test('06 grade by goal: a locked card keeps its tier and is counted as skipped',
   h.host.logs = { appendLog() {} };
   const basis = h.nodes.map(n => ({ id: n.id, title: h.view.notes.get(n.id).title, parentId: n.parentId ?? null }));
   const before = h.raw(a);
-  await h.view.applyRelevanceGrade(run, MAP, basis, { items: [{ id: a.id, tier: 'core' }, { id: b.id, tier: 'core' }], suggestions: [], dropped: [] }, { scope: 'all', pins: [] });
+  await h.view.relevanceRun.apply(run, MAP, basis, { items: [{ id: a.id, tier: 'core' }, { id: b.id, tier: 'core' }], suggestions: [], dropped: [] }, { scope: 'all', pins: [] });
   assert.equal(h.raw(a), before, 'the locked tier is unchanged');
   assert.equal((await h.repo.readNote(b.path)).relevance.tier, 'core');
   assert.equal(run.outcome.skipped, 1);

@@ -298,7 +298,7 @@ test('N5 hasRunningWork: false when idle, true for each kind of work', () => {
     goalSuggestTask: v => { v.goalSuggestTask = { controller: new AbortController(), state: 'running' }; },
     structureReviewTask: v => { v.structureReviewTask = { controller: new AbortController() }; },
     outlineDraftTask: v => { v.outlineDraftTask = { controller: new AbortController() }; },
-    relevanceGrade: v => { v.startedRelevance = true; v.plugin.relevanceGrades.set(v.path, { owner: v, status: 'running', controller: new AbortController() }); },
+    relevanceGrade: v => { v.relevanceRun.started = true; v.plugin.relevanceGrades.set(v.path, { owner: v, status: 'running', controller: new AbortController() }); },
     topicRunsBusy: v => { v.map.nodes.push({ id: 'n', path: 'Maps/A/Notes/n.md' }); v.plugin.topicRuns.isBusy = p => p === 'Maps/A/Notes/n.md'; },
     expansionRunning: v => { v.map.nodes.push({ id: 'n', path: 'Maps/A/Notes/n.md' }); v.plugin.expansionCoordinator.isRunning = p => p === 'Maps/A/Notes/n.md'; },
     expansionQueued: v => { v.map.nodes.push({ id: 'n', path: 'Maps/A/Notes/n.md' }); v.plugin.expansionCoordinator.isQueued = p => p === 'Maps/A/Notes/n.md'; },

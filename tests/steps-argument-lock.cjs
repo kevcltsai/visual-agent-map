@@ -274,7 +274,7 @@ test('entry goal grading: a managed card keeps its tier and is counted as skippe
   await h.view.hydrate();
   const basis = h.nodes.map(n => ({ id: n.id, title: h.view.notes.get(n.id).title, parentId: n.parentId ?? null }));
   const before = h.raw(a);
-  await h.view.applyRelevanceGrade(run, MAP, basis, { items: [{ id: a.id, tier: 'core' }, { id: f.id, tier: 'core' }], suggestions: [], dropped: [] }, { scope: 'all', pins: [] });
+  await h.view.relevanceRun.apply(run, MAP, basis, { items: [{ id: a.id, tier: 'core' }, { id: f.id, tier: 'core' }], suggestions: [], dropped: [] }, { scope: 'all', pins: [] });
   assert.equal(h.raw(a), before);
   assert.equal((await h.repo.readNote(f.path)).relevance.tier, 'core');
   assert.equal(run.outcome.skipped, 1);

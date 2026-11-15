@@ -1313,7 +1313,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_guard_exists_in_map": "那裡已經有檔案；請先用 read_md_file 讀取它，再用 edit_md_file 修改",
   "ui.map_chat_guard_no_baseline": "這個檔案不在本次送出的內容裡",
   "ui.map_chat_guard_map_source": "這個檔案是這張心智圖的資料來源，對話只能讀取",
-  "ui.map_chat_skip_attached_read_only": "檔案在這張地圖的資料夾之外，對話只能讀、不能改",
+  "ui.map_chat_skip_attached_read_only": "檔案在這張心智圖的資料夾之外，對話只能讀、不能改",
   "ui.map_chat_skip_stale": "送出後檔案又被修改過",
   "ui.map_chat_skip_topic_gone": "議題已不在心智圖上",
   "ui.map_chat_skip_find_failed": "要取代的文字沒有剛好出現一次",

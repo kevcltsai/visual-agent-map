@@ -9340,7 +9340,7 @@ test('P2 switch: a row above the composer, "Apply this conversation automaticall
 });
 test('P2 switch: a host without the hooks shows no row; the panel follows the host\'s value (so a repainted panel keeps the view\'s state)', () => {
   const plain1 = panelFixture(); plain1.panel.setOpen(true); assert.equal(find(plain1.panel.bodyEl, i => hasClass(i, 'vam-map-chat-auto-apply'))?.hidden ?? true, true);
-  const f = autoSwitch(); f.s.on = true; f.panel.refreshAutoApply(); assert.deepEqual(f.buttons().map(b => b.attrs['aria-pressed']), ['false', 'true']); assert.equal(f.warning().hidden, false);
+  const f = autoSwitch(); f.s.on = true; f.panel.refreshAutoApply(); assert.deepEqual(f.buttons().map(b => b.attrs['aria-pressed']), ['false', 'true']); assert.equal(find(f.row(), i => hasClass(i, 'vam-map-chat-auto-apply-note')).hidden, false, 'the one-line warning follows the host value');
 });
 test('P2 switch (g): a new conversation, reset (another map) and restoring an old conversation all turn it back off', () => {
   const f = autoSwitch(); const on = () => f.buttons()[1].click();

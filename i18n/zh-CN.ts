@@ -1208,6 +1208,9 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_auto_apply_label": "这段对话自动套用",
   "ui.map_chat_auto_apply_off": "关",
   "ui.map_chat_auto_apply_on": "开",
+  "ui.map_chat_auto_apply_note": "会直接改笔记",
+  "ui.map_chat_auto_apply_more": "说明",
+  "ui.map_chat_auto_apply_less": "收起说明",
   "ui.map_chat_auto_apply_warning":
     "研究、改写摘要、创建或更新笔记会直接做，不再停下来等你点“套用”，一路做到完或你点停止。网络上的文字可能夹带指令让 AI 改写笔记；每一项改动都能用撤销或笔记备份还原。删除、合并、创建或切换思维导图、改思维导图文件夹外的文件仍会先问你。",
   "ui.map_chat_auto_round_calls_0_1_2": "自动接续・第 {0} 轮　已用 AI 调用 {1}／{2}",
@@ -1222,7 +1225,7 @@ export const zhCN: Record<TranslationKey, string> = {
     "自动套用打开时，删除、合并、创建或切换思维导图、改思维导图文件夹外的文件仍要你确认",
   "ui.map_chat_flow_aria": "整段流程进度",
   "ui.map_chat_flow_label": "整段流程",
-  "ui.map_chat_flow_step_0_1_2": "第 {0}／{1} 步・第 {2} 轮",
+  "ui.map_chat_flow_step_0_1_2_3": "第 {0}／{1} 步：{3}・第 {2} 轮",
   "ui.map_chat_flow_done_0_1_2": "{0}／{1} 步完成・共 {2} 轮",
   "ui.map_chat_flow_value_0_1": "完成 {0} 步，共 {1} 步",
   "ui.map_chat_flow_calls_0_1": "已用 AI 调用 {0}／{1}",

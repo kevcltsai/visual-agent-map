@@ -1263,6 +1263,9 @@ var en = {
   "ui.map_chat_auto_apply_label": "Apply this conversation automatically",
   "ui.map_chat_auto_apply_off": "Off",
   "ui.map_chat_auto_apply_on": "On",
+  "ui.map_chat_auto_apply_note": "Edits notes directly",
+  "ui.map_chat_auto_apply_more": "Details",
+  "ui.map_chat_auto_apply_less": "Hide details",
   "ui.map_chat_auto_apply_warning": "Research, summary rewrites and creating or updating notes happen directly, without stopping for your Apply, all the way to the end or until you press Stop. Text from the web can carry instructions that make the AI rewrite notes; every change can be undone or restored from a note backup. Deleting, merging, creating or switching mind maps and changing files outside the map folder still ask you first.",
   "ui.map_chat_auto_round_calls_0_1_2": "Automatic continuation \xB7 round {0} \xB7 AI calls used {1}/{2}",
   "ui.map_chat_auto_applied_0": "Applied directly: {0}",
@@ -1275,7 +1278,7 @@ var en = {
   "ui.map_chat_plan_reason_auto_apply_confirm": "Automatic apply is on, but this reply deletes, merges, creates or switches mind maps, or changes files outside the map folder; it waits for your confirmation",
   "ui.map_chat_flow_aria": "Whole flow progress",
   "ui.map_chat_flow_label": "Whole flow",
-  "ui.map_chat_flow_step_0_1_2": "Step {0} of {1} \xB7 round {2}",
+  "ui.map_chat_flow_step_0_1_2_3": "Step {0} of {1}: {3} \xB7 round {2}",
   "ui.map_chat_flow_done_0_1_2": "{0} of {1} steps done \xB7 {2} rounds in all",
   "ui.map_chat_flow_value_0_1": "{0} of {1} steps done",
   "ui.map_chat_flow_calls_0_1": "AI calls used {0}/{1}",
@@ -4194,6 +4197,9 @@ var zhCN = {
   "ui.map_chat_auto_apply_label": "\u8FD9\u6BB5\u5BF9\u8BDD\u81EA\u52A8\u5957\u7528",
   "ui.map_chat_auto_apply_off": "\u5173",
   "ui.map_chat_auto_apply_on": "\u5F00",
+  "ui.map_chat_auto_apply_note": "\u4F1A\u76F4\u63A5\u6539\u7B14\u8BB0",
+  "ui.map_chat_auto_apply_more": "\u8BF4\u660E",
+  "ui.map_chat_auto_apply_less": "\u6536\u8D77\u8BF4\u660E",
   "ui.map_chat_auto_apply_warning": "\u7814\u7A76\u3001\u6539\u5199\u6458\u8981\u3001\u521B\u5EFA\u6216\u66F4\u65B0\u7B14\u8BB0\u4F1A\u76F4\u63A5\u505A\uFF0C\u4E0D\u518D\u505C\u4E0B\u6765\u7B49\u4F60\u70B9\u201C\u5957\u7528\u201D\uFF0C\u4E00\u8DEF\u505A\u5230\u5B8C\u6216\u4F60\u70B9\u505C\u6B62\u3002\u7F51\u7EDC\u4E0A\u7684\u6587\u5B57\u53EF\u80FD\u5939\u5E26\u6307\u4EE4\u8BA9 AI \u6539\u5199\u7B14\u8BB0\uFF1B\u6BCF\u4E00\u9879\u6539\u52A8\u90FD\u80FD\u7528\u64A4\u9500\u6216\u7B14\u8BB0\u5907\u4EFD\u8FD8\u539F\u3002\u5220\u9664\u3001\u5408\u5E76\u3001\u521B\u5EFA\u6216\u5207\u6362\u601D\u7EF4\u5BFC\u56FE\u3001\u6539\u601D\u7EF4\u5BFC\u56FE\u6587\u4EF6\u5939\u5916\u7684\u6587\u4EF6\u4ECD\u4F1A\u5148\u95EE\u4F60\u3002",
   "ui.map_chat_auto_round_calls_0_1_2": "\u81EA\u52A8\u63A5\u7EED\u30FB\u7B2C {0} \u8F6E\u3000\u5DF2\u7528 AI \u8C03\u7528 {1}\uFF0F{2}",
   "ui.map_chat_auto_applied_0": "\u5DF2\u76F4\u63A5\u5957\u7528\uFF1A{0}",
@@ -4206,7 +4212,7 @@ var zhCN = {
   "ui.map_chat_plan_reason_auto_apply_confirm": "\u81EA\u52A8\u5957\u7528\u6253\u5F00\u65F6\uFF0C\u5220\u9664\u3001\u5408\u5E76\u3001\u521B\u5EFA\u6216\u5207\u6362\u601D\u7EF4\u5BFC\u56FE\u3001\u6539\u601D\u7EF4\u5BFC\u56FE\u6587\u4EF6\u5939\u5916\u7684\u6587\u4EF6\u4ECD\u8981\u4F60\u786E\u8BA4",
   "ui.map_chat_flow_aria": "\u6574\u6BB5\u6D41\u7A0B\u8FDB\u5EA6",
   "ui.map_chat_flow_label": "\u6574\u6BB5\u6D41\u7A0B",
-  "ui.map_chat_flow_step_0_1_2": "\u7B2C {0}\uFF0F{1} \u6B65\u30FB\u7B2C {2} \u8F6E",
+  "ui.map_chat_flow_step_0_1_2_3": "\u7B2C {0}\uFF0F{1} \u6B65\uFF1A{3}\u30FB\u7B2C {2} \u8F6E",
   "ui.map_chat_flow_done_0_1_2": "{0}\uFF0F{1} \u6B65\u5B8C\u6210\u30FB\u5171 {2} \u8F6E",
   "ui.map_chat_flow_value_0_1": "\u5B8C\u6210 {0} \u6B65\uFF0C\u5171 {1} \u6B65",
   "ui.map_chat_flow_calls_0_1": "\u5DF2\u7528 AI \u8C03\u7528 {0}\uFF0F{1}",
@@ -7125,6 +7131,9 @@ var zhTW = {
   "ui.map_chat_auto_apply_label": "\u9019\u6BB5\u5C0D\u8A71\u81EA\u52D5\u5957\u7528",
   "ui.map_chat_auto_apply_off": "\u95DC",
   "ui.map_chat_auto_apply_on": "\u958B",
+  "ui.map_chat_auto_apply_note": "\u6703\u76F4\u63A5\u6539\u7B46\u8A18",
+  "ui.map_chat_auto_apply_more": "\u8AAA\u660E",
+  "ui.map_chat_auto_apply_less": "\u6536\u8D77\u8AAA\u660E",
   "ui.map_chat_auto_apply_warning": "\u7814\u7A76\u3001\u6539\u5BEB\u6458\u8981\u3001\u5EFA\u7ACB\u6216\u66F4\u65B0\u7B46\u8A18\u6703\u76F4\u63A5\u505A\uFF0C\u4E0D\u518D\u505C\u4E0B\u4F86\u7B49\u4F60\u6309\u300C\u5957\u7528\u300D\uFF0C\u4E00\u8DEF\u505A\u5230\u5B8C\u6216\u4F60\u6309\u505C\u6B62\u3002\u7DB2\u8DEF\u4E0A\u7684\u6587\u5B57\u53EF\u80FD\u593E\u5E36\u6307\u4EE4\u8B93 AI \u6539\u5BEB\u7B46\u8A18\uFF1B\u6BCF\u4E00\u9805\u6539\u52D5\u90FD\u80FD\u7528\u5FA9\u539F\u6216\u7B46\u8A18\u5099\u4EFD\u9084\u539F\u3002\u522A\u9664\u3001\u5408\u4F75\u3001\u5EFA\u7ACB\u6216\u5207\u63DB\u5FC3\u667A\u5716\u3001\u6539\u5FC3\u667A\u5716\u8CC7\u6599\u593E\u5916\u7684\u6A94\u6848\u4ECD\u6703\u5148\u554F\u4F60\u3002",
   "ui.map_chat_auto_round_calls_0_1_2": "\u81EA\u52D5\u63A5\u7E8C\u30FB\u7B2C {0} \u8F2A\u3000\u5DF2\u7528 AI \u547C\u53EB {1}\uFF0F{2}",
   "ui.map_chat_auto_applied_0": "\u5DF2\u76F4\u63A5\u5957\u7528\uFF1A{0}",
@@ -7137,7 +7146,7 @@ var zhTW = {
   "ui.map_chat_plan_reason_auto_apply_confirm": "\u81EA\u52D5\u5957\u7528\u6253\u958B\u6642\uFF0C\u522A\u9664\u3001\u5408\u4F75\u3001\u5EFA\u7ACB\u6216\u5207\u63DB\u5FC3\u667A\u5716\u3001\u6539\u5FC3\u667A\u5716\u8CC7\u6599\u593E\u5916\u7684\u6A94\u6848\u4ECD\u8981\u4F60\u78BA\u8A8D",
   "ui.map_chat_flow_aria": "\u6574\u6BB5\u6D41\u7A0B\u9032\u5EA6",
   "ui.map_chat_flow_label": "\u6574\u6BB5\u6D41\u7A0B",
-  "ui.map_chat_flow_step_0_1_2": "\u7B2C {0}\uFF0F{1} \u6B65\u30FB\u7B2C {2} \u8F2A",
+  "ui.map_chat_flow_step_0_1_2_3": "\u7B2C {0}\uFF0F{1} \u6B65\uFF1A{3}\u30FB\u7B2C {2} \u8F2A",
   "ui.map_chat_flow_done_0_1_2": "{0}\uFF0F{1} \u6B65\u5B8C\u6210\u30FB\u5171 {2} \u8F2A",
   "ui.map_chat_flow_value_0_1": "\u5B8C\u6210 {0} \u6B65\uFF0C\u5171 {1} \u6B65",
   "ui.map_chat_flow_calls_0_1": "\u5DF2\u7528 AI \u547C\u53EB {0}\uFF0F{1}",
@@ -40744,6 +40753,12 @@ var MapChatPanel = class {
     __publicField(this, "autoApplyEl");
     __publicField(this, "autoApplyButtons", null);
     __publicField(this, "autoWarnEl");
+    /** The one-line warning beside the switch ("Edits notes directly" and Details) and whether its full text is open. */
+    __publicField(this, "autoNoteEl", null);
+    __publicField(this, "autoMoreEl", null);
+    __publicField(this, "autoWarnOpen", false);
+    /** Whether the whole-flow block shows its step list (closed by default, closed again by a new conversation). */
+    __publicField(this, "flowOpen", false);
     /** The whole-flow block: the steps of the instruction and where it stands (in memory only). */
     __publicField(this, "flowEl");
     __publicField(this, "flow", null);
@@ -42693,6 +42708,8 @@ ${shown}` : t("ui.map_chat_model_label"));
   switchAutoApplyOff() {
     var _a2, _b2, _c, _d;
     this.flow = null;
+    this.flowOpen = false;
+    this.autoWarnOpen = false;
     if ((_b2 = (_a2 = this.host).autoApply) == null ? void 0 : _b2.call(_a2)) (_d = (_c = this.host).setAutoApply) == null ? void 0 : _d.call(_c, false);
     this.renderAutoApply();
   }
@@ -42728,6 +42745,17 @@ ${shown}` : t("ui.map_chat_model_label"));
         return button;
       };
       this.autoApplyButtons = { off: make(false), on: make(true) };
+      this.autoNoteEl = this.autoApplyEl.createSpan({ cls: "vam-map-chat-auto-apply-note" });
+      this.autoNoteEl.createSpan({ text: `\u26A0 ${t("ui.map_chat_auto_apply_note")}` });
+      this.autoMoreEl = this.autoNoteEl.createEl("button", {
+        cls: "vam-map-chat-auto-apply-more",
+        attr: { type: "button", "aria-expanded": "false", "aria-controls": `${this.id}-auto-warning` }
+      });
+      this.autoMoreEl.addEventListener("click", () => {
+        this.autoWarnOpen = !this.autoWarnOpen;
+        this.renderAutoApply();
+      });
+      this.autoWarnEl.id = `${this.id}-auto-warning`;
       this.autoWarnEl.setText(t("ui.map_chat_auto_apply_warning"));
     }
     const on = !!((_b2 = (_a2 = this.host).autoApply) == null ? void 0 : _b2.call(_a2));
@@ -42738,12 +42766,19 @@ ${shown}` : t("ui.map_chat_model_label"));
       button.setAttr("aria-pressed", String(pressed));
       button.toggleClass("is-active", pressed);
     }
-    this.autoWarnEl.hidden = !on;
+    if (!on) this.autoWarnOpen = false;
+    if (this.autoNoteEl) this.autoNoteEl.hidden = !on;
+    if (this.autoMoreEl) {
+      this.autoMoreEl.hidden = !on;
+      this.autoMoreEl.setText(t(this.autoWarnOpen ? "ui.map_chat_auto_apply_less" : "ui.map_chat_auto_apply_more"));
+      this.autoMoreEl.setAttr("aria-expanded", String(this.autoWarnOpen));
+    }
+    this.autoWarnEl.hidden = !on || !this.autoWarnOpen;
     this.renderFlow();
   }
   /**
-   * The whole-flow block: header (steps done or the step in work, the round, a thin bar like the research bar, the AI calls), then
-   * one line per step. Names are plain text. Shown only while the switch is on and the instruction has two steps or more.
+   * The whole-flow block: one line (steps done or the step in work with its name, the round, a thin bar like the research bar)
+   * that opens the AI calls and one line per step. Names are plain text. Shown only while the switch is on and the instruction has two steps or more.
    */
   renderFlow() {
     var _a2, _b2;
@@ -42755,15 +42790,20 @@ ${shown}` : t("ui.map_chat_model_label"));
     if (!flow || !shown) return;
     const total2 = flow.steps.length;
     const done = flow.steps.filter((step) => step.status === "done").length;
-    const head2 = this.flowEl.createDiv({ cls: "vam-map-chat-flow-head" });
+    const currentIndex = Math.max(0, flow.steps.findIndex((step) => step.status !== "done"));
+    const head2 = this.flowEl.createEl("button", {
+      cls: "vam-map-chat-flow-head",
+      attr: { type: "button", "aria-expanded": String(this.flowOpen), "aria-controls": `${this.id}-flow-steps` }
+    });
+    head2.addEventListener("click", () => {
+      this.flowOpen = !this.flowOpen;
+      this.renderFlow();
+    });
+    head2.createSpan({ cls: "vam-map-chat-flow-caret", text: this.flowOpen ? "\u25BE" : "\u25B8", attr: { "aria-hidden": "true" } });
     head2.createEl("b", { text: t("ui.map_chat_flow_label") });
     head2.createSpan({
-      text: done === total2 ? t("ui.map_chat_flow_done_0_1_2", done, total2, flow.round) : t(
-        "ui.map_chat_flow_step_0_1_2",
-        Math.max(1, flow.steps.findIndex((step) => step.status !== "done") + 1),
-        total2,
-        flow.round
-      )
+      cls: "vam-map-chat-flow-now",
+      text: done === total2 ? t("ui.map_chat_flow_done_0_1_2", done, total2, flow.round) : t("ui.map_chat_flow_step_0_1_2_3", currentIndex + 1, total2, flow.round, flow.steps[currentIndex].name)
     });
     const track = head2.createSpan({
       cls: "vam-research-progress-track",
@@ -42776,8 +42816,10 @@ ${shown}` : t("ui.map_chat_model_label"));
       }
     });
     track.createSpan({ cls: "vam-research-progress-fill" }).style.width = `${done / total2 * 100}%`;
-    head2.createSpan({ text: t("ui.map_chat_flow_calls_0_1", flow.calls, flow.maxCalls) });
-    const list2 = this.flowEl.createEl("ul", { cls: "vam-map-chat-flow-steps" });
+    const calls = this.flowEl.createDiv({ text: t("ui.map_chat_flow_calls_0_1", flow.calls, flow.maxCalls) });
+    calls.hidden = !this.flowOpen;
+    const list2 = this.flowEl.createEl("ul", { cls: "vam-map-chat-flow-steps", attr: { id: `${this.id}-flow-steps` } });
+    list2.hidden = !this.flowOpen;
     flow.steps.forEach((step, index) => {
       const item = list2.createEl("li", { cls: `vam-map-chat-flow-step is-${step.status}` });
       item.createSpan({

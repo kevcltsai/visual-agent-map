@@ -25411,6 +25411,7 @@ export class VisualAgentMapView extends ItemView {
           }
           source.editor.replaceRange(replace, source.editor.offsetToPos(from), source.editor.offsetToPos(to));
           this.recordChatFileEdit(source.file.path, source.text, next, run);
+          if (editKey) hashes[editKey] = contentHash(next);
           return done;
         }
         let raced = false;
@@ -25424,6 +25425,8 @@ export class VisualAgentMapView extends ItemView {
         });
         if (raced) return skipped("ui.map_chat_skip_stale");
         this.recordChatFileEdit(source.file.path, source.text, next, run);
+        // A later action of this reply edits on top of this write, not against the text that was sent.
+        if (editKey) hashes[editKey] = contentHash(next);
         return done;
       }
       case "create_md_file": {
@@ -25459,6 +25462,8 @@ export class VisualAgentMapView extends ItemView {
         }
         await this.app.vault.create(key, content);
         this.recordChatFileCreate(key, content, run);
+        // A file this reply created can be edited by a later action of the same reply.
+        hashes[key] = contentHash(content);
         return done;
       }
     }

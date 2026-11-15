@@ -796,6 +796,25 @@ integrationTest('map chat: a stale Markdown file is skipped with its reason, not
   assert.equal((await h.note('b')).title, 'Still renamed'); assert.equal(h.contents.get('Notes/Other.md'), 'Other note about sleep.\n');
 });
 
+integrationTest('map chat: one reply can edit the same file several times, and edit a file it created earlier in the reply; another writer still makes it stale', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [
+    { kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: 'needs total darkness' },
+    { kind: 'edit_md_file', path: 'Notes/Research.md', find: 'Sleep needs total', replace: 'Deep sleep needs total' },
+    { kind: 'create_md_file', path: 'Notes/進度.md', content: '# 進度\n下一步：寫大綱\n' },
+    { kind: 'edit_md_file', path: 'Notes/進度.md', find: '寫大綱', replace: '寫第一章' }
+  ], h.hashes('Notes/Research.md'));
+  eq(lines.map(l => l.status), ['done', 'done', 'done', 'done']);
+  assert.match(h.contents.get('Notes/Research.md'), /Deep sleep needs total darkness/);
+  assert.equal(h.contents.get('Notes/進度.md'), '# 進度\n下一步：寫第一章\n');
+  const hashes = h.hashes('Notes/Research.md');
+  const first = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'total', replace: 'full' }], hashes);
+  eq(first.map(l => l.status), ['done']);
+  h.contents.set('Notes/Research.md', `${h.contents.get('Notes/Research.md')}typed by the user\n`);
+  const after = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'full', replace: 'x' }], hashes);
+  eq(after.map(l => l.status), ['skipped']); assert.match(after[0].text, /changed after you sent/);
+});
+
 integrationTest('map chat: a file that was never sent, text that is not found exactly once, and a missing file are all skipped without writes', async () => {
   const h = await harness(); await h.view.hydrate();
   const hashes = h.hashes('Notes/Research.md');
@@ -9215,7 +9234,7 @@ integrationTest('P3 (h) auto-apply: an existing note is backed up once before th
   eq(more.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done', 'done']); eq(calls.map(c => c[0]), [h.view.map.nodes.find(n => n.id === h.ids.a).path, MAP, ...[h.ids.c, h.ids.b].map(id => h.view.map.nodes.find(n => n.id === id).path)], 'a second reply of the chain backs nothing up again; Map.md once, then the notes the move rewrites (the card, the new parent)');
   const md = await harness(); await md.view.hydrate(); const mdCalls = backupSpy(md); const mdRun = autoRun(md);
   const edited = await applyIn(md, mdRun, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: 'needs total darkness' }, { kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs quiet', replace: 'needs calm' }], md.hashes('Notes/Research.md'));
-  eq(edited.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'skipped'], 'the second edit is the reply\'s own stale-hash skip, not a backup problem'); eq(mdCalls.map(c => c[0]), ['Notes/Research.md']); assert.equal(mdCalls[0][1], '# Research\n\nSleep needs darkness.\nSleep needs quiet.\n');
+  eq(edited.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done'], 'the second edit of the same file in one reply builds on the first'); eq(mdCalls.map(c => c[0]), ['Notes/Research.md'], 'two edits of one file, one backup'); assert.equal(md.contents.get('Notes/Research.md'), '# Research\n\nSleep needs total darkness.\nSleep needs calm.\n'); assert.equal(mdCalls[0][1], '# Research\n\nSleep needs darkness.\nSleep needs quiet.\n');
 });
 integrationTest('P3 (h) auto-apply: a card the chain created itself and a file it created are not backed up; a failed backup skips the action (nothing written) and the next write tries again', async () => {
   const h = await harness(); await h.view.hydrate(); const calls = backupSpy(h); const run = autoRun(h);

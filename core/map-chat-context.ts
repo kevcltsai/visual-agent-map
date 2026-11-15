@@ -684,11 +684,13 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
     const key = normalizeVaultPath(file.path);
     if (key === null) continue;
     const chars = file.content.length;
-    if (chars > MAP_CHAT_FILE_CHAR_LIMIT || chars > (file.requested ? readLeft : ownLeft)) {
+    // A requested file the read allowance cannot hold still gets the ordinary budget, so a read is not lost to the allowance alone.
+    const fromRead = !!file.requested && chars <= readLeft;
+    if (chars > MAP_CHAT_FILE_CHAR_LIMIT || (!fromRead && chars > ownLeft)) {
       ownDeferred.push({ path: file.path, chars });
       continue;
     }
-    if (file.requested) readLeft -= chars;
+    if (fromRead) readLeft -= chars;
     else ownLeft -= chars;
     basis.read.push({ path: file.path, title: noteTitle(file.path) });
     record(file.path, file.content);

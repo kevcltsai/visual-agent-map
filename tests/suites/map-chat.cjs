@@ -9163,7 +9163,7 @@ integrationTest('map chat read_md_file: the order of own files when over budget 
   eq((await ownTurn(h)).ownFiles.map(f => f.path), [z, n, progress], 'a requested file goes before them, from its own allowance');
 });
 
-integrationTest('map chat read_md_file: a read that does not fit its own 40k allowance stays deferred, whole or not at all', async () => {
+integrationTest('map chat read_md_file: a read over its own 40k allowance goes in whole from the ordinary budget, and what that pushes out is deferred, never cut', async () => {
   const h = await harness(); await h.view.hydrate(); h.open();
   const huge = `${ownRoot}/Huge.md`; const small = `${ownRoot}/Small.md`;
   await apply(h, [{ kind: 'create_md_file', path: huge, content: bigDoc('huge', 45000) }]);
@@ -9171,5 +9171,29 @@ integrationTest('map chat read_md_file: a read that does not fit its own 40k all
   eq((await ownTurn(h)).ownFilesDeferred.map(f => f.path), [huge]);
   await apply(h, [readAct(huge)]);
   const json = await ownTurn(h);
-  assert.ok(!json.ownFiles.some(f => f.path === huge), 'not cut'); assert.ok(json.ownFilesDeferred.some(f => f.path === huge));
+  eq(json.ownFiles.map(f => [f.path, f.content.length]), [[huge, 45000]], 'the read file is sent whole');
+  eq(json.ownFilesDeferred.map(f => f.path), [small]);
+});
+
+integrationTest('map chat read_md_file: a file too long to send, and the same version asked again right after it was carried, are not reads - the chain does not go round to max_rounds', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat);
+  const a = `${ownRoot}/A.md`; const b = `${ownRoot}/B.md`; const c = `${ownRoot}/C.md`; const giant = `${ownRoot}/Giant.md`;
+  for (const path of [a, b, c]) await apply(h, [{ kind: 'create_md_file', path, content: bigDoc(path) }]);
+  await apply(h, [{ kind: 'create_md_file', path: giant, content: bigDoc('giant', 61000) }]);
+  chainReplies(h, say('Need A.', [readAct(a)], ''), say('Need A and the giant again.', [readAct(a), readAct(giant)], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => !chat.isBusy && h.view.chatChain === null && h.control.requests.length === 2); await recordIdle(h);
+  eq(h.control.requests.length, 2, 'one read round, then the repeated read is refused and the chain stops');
+  assert.ok(!spy.reasons().includes('max_rounds'), JSON.stringify(spy.reasons()));
+  eq(readEvents(h).map(l => l.path), [a], 'only the first read was taken');
+});
+
+integrationTest('map chat read_md_file: a plan card never lists the read (decision #2), nor counts it', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const own = `${ownRoot}/Own.md`;
+  await apply(h, [{ kind: 'create_md_file', path: own, content: '# Own\n' }]);
+  h.control.reply = async () => ({ reply: 'Many cards.', actions: [readAct(own), ...Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' }))], rejected: [] });
+  h.type('add many'); await h.view.sendMapChat();
+  assert.equal(planCard(h).length, 1); openDetails(h.view.chat.logEl);
+  const text = visibleText(planCard(h)[0]);
+  assert.ok(!text.includes('Own.md'), text); assert.match(text, /16 actions/); assert.ok(!/17 actions/.test(text));
 });

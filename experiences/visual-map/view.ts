@@ -499,7 +499,8 @@ import {
   type MapChatOutlineNode,
   type MapChatTurn,
   type MapChatTopicHash,
-  type MapChatTopicRef
+  type MapChatTopicRef,
+  MAP_CHAT_FILE_CHAR_LIMIT
 } from "../../core/map-chat-context";
 import { mapChatSourceMaterial, type MapChatSourceCache } from "../../core/map-chat-sources";
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
@@ -1601,6 +1602,8 @@ export class VisualAgentMapView extends ItemView {
   private chatApplyRound = 0;
   /** Own files the chat asked to read with `read_md_file`; the next context carries them first and empties this. */
   private chatReadQueue: string[] = [];
+  /** `path\0hash` of the reads the last context carried: the same version asked again right after is refused (no read loop). */
+  private chatLastReads = new Set<string>();
   /** The record conversation whose file already holds a `file_written` line for each of these "path\0hash" pairs. */
   private chatOwnRecorded: { id: string | null; keys: Set<string> } = { id: null, keys: new Set() };
   /** Research notes an earlier round already sent whole (they go last when the budget is short). */
@@ -18308,7 +18311,16 @@ export class VisualAgentMapView extends ItemView {
   private async chatLockSkip(
     action: Exclude<
       MapChatAction,
-      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" | "read_md_file" }
+      {
+        kind:
+          | "select_topics"
+          | "run_map_action"
+          | "create_map"
+          | "rename_map"
+          | "open_map"
+          | "ask_topic_kind"
+          | "read_md_file";
+      }
     >,
     real: (id: string) => string | null
   ): Promise<ChatOutcome | null> {
@@ -22461,7 +22473,12 @@ export class VisualAgentMapView extends ItemView {
     // Files this conversation made that hold what it wrote: sent whole so edit_md_file can update them. A file already sent as a
     // chip, the open note or a map source goes in that part, not twice.
     const sentPaths = new Set<string>();
-    for (const item of [...files, ...(activeSource ? [{ path: activeSource.file.path }] : []), ...snippets, ...(mapSources?.paths ?? []).map(path => ({ path }))]) {
+    for (const item of [
+      ...files,
+      ...(activeSource ? [{ path: activeSource.file.path }] : []),
+      ...snippets,
+      ...(mapSources?.paths ?? []).map(path => ({ path }))
+    ]) {
       const key = normalizeVaultPath(item.path);
       if (key) sentPaths.add(key);
     }
@@ -23167,7 +23184,8 @@ export class VisualAgentMapView extends ItemView {
         done:
           action.kind === "read_md_file"
             ? round.work.reads.has(index)
-            : round.lines[round.result.actions.slice(0, index).filter(other => other.kind !== "read_md_file").length]?.status === "done"
+            : round.lines[round.result.actions.slice(0, index).filter(other => other.kind !== "read_md_file").length]
+                ?.status === "done"
       })),
       started: {
         research: round.work.researchTargets,
@@ -23343,7 +23361,10 @@ export class VisualAgentMapView extends ItemView {
   ): string {
     switch (reason) {
       case "many_actions":
-        return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
+        return t(
+          "ui.map_chat_plan_reason_many_actions_0",
+          result.actions.filter(action => action.kind !== "read_md_file").length
+        );
       case "many_research":
         // The same count the plan was judged by: the whole continuation (earlier rounds too), and a selection made earlier in the reply.
         return t(
@@ -23391,10 +23412,12 @@ export class VisualAgentMapView extends ItemView {
     if (anchorsToPlace.length) this.chatPreview = { token, anchors: anchorsToPlace };
     this.syncAnchorPreview();
     const refTitles = this.chatRefTitles(result.actions);
-    const items = result.actions.map(action => this.chatActionLabel(action, refTitles));
+    // A read_md_file is never shown (decision 2026-11-15-map-chat-file-bugs#2), on the plan card as in the result lines.
+    const shown = result.actions.flatMap((action, index) => (action.kind === "read_md_file" ? [] : [index]));
+    const items = shown.map(index => this.chatActionLabel(result.actions[index], refTitles));
     // The same lines by kind of work, so a 100-action plan reads as five folded lists.
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap(group => {
-      const own = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
+      const own = items.filter((_, at) => chatPlanGroupOf(result.actions[shown[at]].kind) === group);
       return own.length
         ? [
             {
@@ -23641,7 +23664,8 @@ export class VisualAgentMapView extends ItemView {
     const writer = this.chatRecords;
     if (!record || !writer || this.plugin.settings.mapChatRecords !== true) return;
     if (writer.conversationId !== record.conversationId) return;
-    if (this.chatOwnRecorded.id !== record.conversationId) this.chatOwnRecorded = { id: record.conversationId, keys: new Set() };
+    if (this.chatOwnRecorded.id !== record.conversationId)
+      this.chatOwnRecorded = { id: record.conversationId, keys: new Set() };
     for (const [path, hashes] of this.chatOwnFiles)
       for (const hash of hashes) {
         const key = `${path}\0${hash}`;
@@ -23677,12 +23701,19 @@ export class VisualAgentMapView extends ItemView {
       if (skip.has(path) || root === null || !path.startsWith(`${root}/`)) continue;
       const source = await this.readChatFile(path);
       if (source && hashes.has(contentHash(source.text)))
-        found.push({ path: source.file.path, content: source.text, ...(this.chatOwnOrder.get(path) ?? { seq: 0, round: 0 }) });
+        found.push({
+          path: source.file.path,
+          content: source.text,
+          ...(this.chatOwnOrder.get(path) ?? { seq: 0, round: 0 })
+        });
     }
     const latest = Math.max(0, ...[...this.chatOwnOrder.values()].map(item => item.round));
     const first = (file: { path: string; round: number }): boolean =>
       (file.path.split("/").at(-1) ?? "").includes("進度") || (latest > 0 && file.round === latest);
     const requested = queue.flatMap(path => found.filter(file => normalizeVaultPath(file.path) === path));
+    this.chatLastReads = new Set(
+      requested.map(file => `${normalizeVaultPath(file.path) ?? file.path}\0${contentHash(file.content)}`)
+    );
     return [
       ...requested.map(({ path, content }) => ({ path, content, requested: true })),
       ...found
@@ -23702,6 +23733,10 @@ export class VisualAgentMapView extends ItemView {
     if (key === null || !hashes || root === null || !key.startsWith(`${root}/`)) return false;
     const source = await this.readChatFile(key);
     if (!source || !hashes.has(contentHash(source.text))) return false;
+    // A file that can never be sent whole, or the version the last context already carried, is not a read: the chain must not
+    // go round asking for it again.
+    if (source.text.length > MAP_CHAT_FILE_CHAR_LIMIT || this.chatLastReads.has(`${key}\0${contentHash(source.text)}`))
+      return false;
     if (!this.chatReadQueue.includes(key)) this.chatReadQueue.push(key);
     record?.event("file_read", { path: key, chars: source.text.length });
     return true;
@@ -23726,6 +23761,7 @@ export class VisualAgentMapView extends ItemView {
     this.chatOwnFiles.clear();
     this.chatOwnOrder.clear();
     this.chatReadQueue = [];
+    this.chatLastReads.clear();
     this.chatOwnRecorded = { id: null, keys: new Set() };
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
@@ -24847,7 +24883,16 @@ export class VisualAgentMapView extends ItemView {
   private async applyChatWrite(
     action: Exclude<
       MapChatAction,
-      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" | "read_md_file" }
+      {
+        kind:
+          | "select_topics"
+          | "run_map_action"
+          | "create_map"
+          | "rename_map"
+          | "open_map"
+          | "ask_topic_kind"
+          | "read_md_file";
+      }
     >,
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
     same: () => boolean,
@@ -24869,7 +24914,16 @@ export class VisualAgentMapView extends ItemView {
   private async applyChatWriteGuarded(
     action: Exclude<
       MapChatAction,
-      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" | "read_md_file" }
+      {
+        kind:
+          | "select_topics"
+          | "run_map_action"
+          | "create_map"
+          | "rename_map"
+          | "open_map"
+          | "ask_topic_kind"
+          | "read_md_file";
+      }
     >,
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
     same: () => boolean,

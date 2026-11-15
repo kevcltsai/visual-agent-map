@@ -24649,11 +24649,12 @@ function buildOnce(input2, shrink) {
     const key4 = normalizeVaultPath(file.path);
     if (key4 === null) continue;
     const chars = file.content.length;
-    if (chars > MAP_CHAT_FILE_CHAR_LIMIT || chars > (file.requested ? readLeft : ownLeft)) {
+    const fromRead = !!file.requested && chars <= readLeft;
+    if (chars > MAP_CHAT_FILE_CHAR_LIMIT || !fromRead && chars > ownLeft) {
       ownDeferred.push({ path: file.path, chars });
       continue;
     }
-    if (file.requested) readLeft -= chars;
+    if (fromRead) readLeft -= chars;
     else ownLeft -= chars;
     basis.read.push({ path: file.path, title: noteTitle2(file.path) });
     record(file.path, file.content);
@@ -59009,6 +59010,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "chatApplyRound", 0);
     /** Own files the chat asked to read with `read_md_file`; the next context carries them first and empties this. */
     __publicField(this, "chatReadQueue", []);
+    /** `path\0hash` of the reads the last context carried: the same version asked again right after is refused (no read loop). */
+    __publicField(this, "chatLastReads", /* @__PURE__ */ new Set());
     /** The record conversation whose file already holds a `file_written` line for each of these "path\0hash" pairs. */
     __publicField(this, "chatOwnRecorded", { id: null, keys: /* @__PURE__ */ new Set() });
     /** Research notes an earlier round already sent whole (they go last when the budget is short). */
@@ -78371,7 +78374,12 @@ ${note.detail.trim()}` : "",
     }
     const mapSources = await this.chatMapSources(signal);
     const sentPaths = /* @__PURE__ */ new Set();
-    for (const item of [...files, ...activeSource ? [{ path: activeSource.file.path }] : [], ...snippets, ...((_b2 = mapSources == null ? void 0 : mapSources.paths) != null ? _b2 : []).map((path) => ({ path }))]) {
+    for (const item of [
+      ...files,
+      ...activeSource ? [{ path: activeSource.file.path }] : [],
+      ...snippets,
+      ...((_b2 = mapSources == null ? void 0 : mapSources.paths) != null ? _b2 : []).map((path) => ({ path }))
+    ]) {
       const key4 = normalizeVaultPath(item.path);
       if (key4) sentPaths.add(key4);
     }
@@ -79129,7 +79137,10 @@ ${note.detail.trim()}` : "",
   planReasonText(reason, result, selectedCount, researchSoFar = 0) {
     switch (reason) {
       case "many_actions":
-        return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
+        return t(
+          "ui.map_chat_plan_reason_many_actions_0",
+          result.actions.filter((action) => action.kind !== "read_md_file").length
+        );
       case "many_research":
         return t(
           "ui.map_chat_plan_reason_many_research_0",
@@ -79161,9 +79172,10 @@ ${note.detail.trim()}` : "",
     if (anchorsToPlace.length) this.chatPreview = { token, anchors: anchorsToPlace };
     this.syncAnchorPreview();
     const refTitles = this.chatRefTitles(result.actions);
-    const items = result.actions.map((action) => this.chatActionLabel(action, refTitles));
+    const shown = result.actions.flatMap((action, index) => action.kind === "read_md_file" ? [] : [index]);
+    const items = shown.map((index) => this.chatActionLabel(result.actions[index], refTitles));
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap((group) => {
-      const own2 = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
+      const own2 = items.filter((_, at) => chatPlanGroupOf(result.actions[shown[at]].kind) === group);
       return own2.length ? [
         {
           label: t(`ui.map_chat_plan_group_${group}_0`, own2.length),
@@ -79391,7 +79403,8 @@ ${note.detail.trim()}` : "",
     const writer = this.chatRecords;
     if (!record || !writer || this.plugin.settings.mapChatRecords !== true) return;
     if (writer.conversationId !== record.conversationId) return;
-    if (this.chatOwnRecorded.id !== record.conversationId) this.chatOwnRecorded = { id: record.conversationId, keys: /* @__PURE__ */ new Set() };
+    if (this.chatOwnRecorded.id !== record.conversationId)
+      this.chatOwnRecorded = { id: record.conversationId, keys: /* @__PURE__ */ new Set() };
     for (const [path, hashes] of this.chatOwnFiles)
       for (const hash of hashes) {
         const key4 = `${path}\0${hash}`;
@@ -79428,7 +79441,11 @@ ${note.detail.trim()}` : "",
       if (skip.has(path) || root === null || !path.startsWith(`${root}/`)) continue;
       const source = await this.readChatFile(path);
       if (source && hashes.has(contentHash2(source.text)))
-        found.push({ path: source.file.path, content: source.text, ...(_a2 = this.chatOwnOrder.get(path)) != null ? _a2 : { seq: 0, round: 0 } });
+        found.push({
+          path: source.file.path,
+          content: source.text,
+          ...(_a2 = this.chatOwnOrder.get(path)) != null ? _a2 : { seq: 0, round: 0 }
+        });
     }
     const latest = Math.max(0, ...[...this.chatOwnOrder.values()].map((item) => item.round));
     const first = (file) => {
@@ -79436,6 +79453,12 @@ ${note.detail.trim()}` : "",
       return ((_a3 = file.path.split("/").at(-1)) != null ? _a3 : "").includes("\u9032\u5EA6") || latest > 0 && file.round === latest;
     };
     const requested = queue.flatMap((path) => found.filter((file) => normalizeVaultPath(file.path) === path));
+    this.chatLastReads = new Set(
+      requested.map((file) => {
+        var _a3;
+        return `${(_a3 = normalizeVaultPath(file.path)) != null ? _a3 : file.path}\0${contentHash2(file.content)}`;
+      })
+    );
     return [
       ...requested.map(({ path, content }) => ({ path, content, requested: true })),
       ...found.filter((file) => !requested.includes(file)).sort((a, b) => Number(first(b)) - Number(first(a)) || b.seq - a.seq).map(({ path, content }) => ({ path, content }))
@@ -79452,6 +79475,8 @@ ${note.detail.trim()}` : "",
     if (key4 === null || !hashes || root === null || !key4.startsWith(`${root}/`)) return false;
     const source = await this.readChatFile(key4);
     if (!source || !hashes.has(contentHash2(source.text))) return false;
+    if (source.text.length > MAP_CHAT_FILE_CHAR_LIMIT || this.chatLastReads.has(`${key4}\0${contentHash2(source.text)}`))
+      return false;
     if (!this.chatReadQueue.includes(key4)) this.chatReadQueue.push(key4);
     record == null ? void 0 : record.event("file_read", { path: key4, chars: source.text.length });
     return true;
@@ -79476,6 +79501,7 @@ ${note.detail.trim()}` : "",
     this.chatOwnFiles.clear();
     this.chatOwnOrder.clear();
     this.chatReadQueue = [];
+    this.chatLastReads.clear();
     this.chatOwnRecorded = { id: null, keys: /* @__PURE__ */ new Set() };
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */

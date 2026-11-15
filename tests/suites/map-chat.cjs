@@ -8858,3 +8858,119 @@ integrationTest('rewrite: the real startMultiResearch hands rewrite to every sta
     eq(runs.map(run => run.rewrite), [expected, expected]);
   }
 });
+
+// ---- Resume of an interrupted chain: the box under the last reply, the button, "continue", and the AI's selection staying with the chain ----
+const resumeFixture = (ids, { last = 'plan', selected, extra = [], remaining3 = 'left 3' } = {}) => {
+  const at = REC_AT; const sel = selected ?? [ids.a];
+  return [
+    rec('conversation', { id: REC_ID, startedAt: at, mapPath: MAP, mapId: 'map-a', pluginVersion: '1' }),
+    rec('turn_start', { turn: 1, at, message: 'make the tree', origin: { chips: [], selectedIds: [] } }),
+    rec('turn_end', { turn: 1, at, status: 'plan', raw: JSON.stringify({ reply: 'r', remaining: 'left 2' }), reply: 'Round one.', lines: [], modelLabel: 'Claude' }),
+    rec('plan', { turn: 1, at, state: 'applied', lines: [{ status: 'done', text: 'Added Alpha' }] }),
+    rec('turn_start', { turn: 2, at, message: 'make the tree', auto: true, round: 2, remaining: 'left 2', origin: { chips: [], selectedIds: sel } }),
+    rec('turn_end', { turn: 2, at, status: 'plan', raw: JSON.stringify({ reply: 'r', remaining: remaining3 }), reply: 'Round two.', lines: [], modelLabel: 'Claude' }),
+    rec('plan', { turn: 2, at, state: 'applied', lines: [{ status: 'done', text: 'Added Beta' }] }),
+    rec('turn_start', { turn: 3, at, message: 'make the tree', auto: true, round: 3, remaining: remaining3, origin: { chips: [], selectedIds: sel } }),
+    rec('turn_end', { turn: 3, at, status: 'plan', raw: JSON.stringify({ reply: 'r', remaining: 'left 4' }), reply: 'Round three.', lines: [], modelLabel: 'Claude' }),
+    ...extra
+  ];
+};
+const resumeBox = c => find(c.logEl, i => hasClass(i, 'vam-map-chat-resume'));
+const resumeButton = c => find(c.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-resume-run'));
+const reopenResume = async (build = resumeFixture, options) => { const r = await harness({ records: true }); await r.view.hydrate(); await seedRecord(r, build(r.ids, options).map(l => ({ ...l })), REC_ID); const c = r.open(); await until(() => c.hasMessages); return { r, c }; };
+
+integrationTest('resume: a plan card that was never applied before the reload shows the batch-interrupted style box under the last reply, with the round, what was left and the button (English and Traditional Chinese)', async () => {
+  const { c } = await reopenResume();
+  const box = resumeBox(c); assert.ok(box, 'the box is there'); assert.ok(hasClass(box, 'vam-map-chat-batch'), 'the batch box class'); assert.equal(box.attrs.role, 'status'); assert.equal(box.attrs.tabindex, '-1');
+  eq(classTexts(box, 'vam-map-chat-batch-title'), ['The automatic continuation was cut off when the plugin reloaded: it stopped at round 3 of 8.']);
+  eq(classTexts(box, 'vam-map-chat-batch-left'), ['Left to do: left 3']);
+  const button = resumeButton(c); assert.ok(hasClass(button, 'vam-map-chat-batch-rerun')); assert.equal(button.attrs.type, 'button'); assert.equal(visibleText(button), 'Continue from round 3'); assert.equal(button.disabled, false);
+  const { translate } = load('i18n.ts');
+  eq(['zh-TW', 'zh-CN'].map(l => translate(l, 'ui.map_chat_chain_resume_0', 3)), ['從第 3 輪接著做', '从第 3 轮接着做']);
+  eq(['zh-TW', 'zh-CN'].map(l => translate(l, 'ui.map_chat_chain_interrupted_0_1', 3, 8)), ['自動接續在外掛重新載入時中斷：停在第 3／8 輪。', '自动接续在插件重新加载时中断：停在第 3／8 轮。']);
+  assert.equal(findAll(c.logEl, i => hasClass(i, 'vam-map-chat-resume')).length, 1, 'once, under the last reply only');
+});
+
+integrationTest('resume: the button sends auto round 3 with the remaining, the message and the selection from the record, writes resumed:true, and a second press sends nothing', async () => {
+  const { r, c } = await reopenResume(); chainReplies(r, say('Added Gamma.', [], ''));
+  const button = resumeButton(c); button.click(); button.click(); c.logEl && 0;
+  await until(() => r.control.requests.length >= 1 && !c.isBusy); await recordIdle(r); await tick();
+  assert.equal(r.control.requests.length, 1, 'one request for two presses');
+  const request = r.control.requests[0]; const context = contextOf(request);
+  assert.equal(request.message, 'make the tree'); assert.equal(context.continuation.round, 3); assert.equal(context.continuation.remaining, 'left 3');
+  eq(context.continuation.lastResults, [{ status: 'done', text: 'Added Beta' }]); eq(context.selected.map(item => item.id), [r.ids.a], 'the selection of the last round of the record');
+  assert.equal(resumeBox(c), undefined, 'the box is gone once the round is on'); assert.equal(c.resumePoint(), null);
+  const starts = recordLines(r, recordFiles(r)[0]).filter(l => l.type === 'turn_start'); const last = starts.at(-1);
+  assert.equal(last.auto, true); assert.equal(last.round, 3); assert.equal(last.resumed, true); assert.equal(last.remaining, 'left 3');
+  assert.equal(starts.filter(l => l.resumed).length, 1, 'only the first resumed round is marked');
+  eq(classTexts(c.logEl, 'vam-map-chat-auto-title').at(-1), 'Automatic continuation · round 3 of 8');
+});
+
+integrationTest('resume: stale fences - busy or applying keeps the point, a new message takes it away, another conversation never sends, and the button is off while the panel works', async () => {
+  const { r, c } = await reopenResume(); const message = c.transcript().at(-1); const point = message.resume; assert.ok(point, 'the restored answer carries it');
+  r.view.chatApplying = true; r.view.resumeChatChain(message); r.view.chatApplying = false;
+  assert.equal(r.control.requests.length, 0); assert.equal(message.resume, point, 'applying: the point is kept');
+  c.setApplying(true); assert.equal(resumeButton(c).disabled, true, 'the button is off while the panel works'); c.setApplying(false);
+  assert.equal(resumeButton(c).disabled, false);
+  const other = { ...point, conversationId: 'someone-else' }; message.resume = other; r.view.resumeChatChain(message);
+  assert.equal(r.control.requests.length, 0, 'a point of another conversation is not sent'); message.resume = point;
+  chainReplies(r, say('Fresh.', [], '')); r.type('something else entirely'); await r.view.sendMapChat();
+  assert.equal(r.control.requests.length, 1); assert.equal(contextOf(r.control.requests[0]).continuation, undefined, 'a new message is round 1');
+  assert.equal(resumeBox(c), undefined, 'the box went with the new message'); assert.equal(c.resumePoint(), null);
+  const before = r.control.requests.length; r.view.resumeChatChain(message); await tick(); assert.equal(r.control.requests.length, before, 'the old message cannot resume any more');
+});
+
+integrationTest('resume: typing "continue" (spaces, punctuation, other words for it) resumes from the record; a longer sentence is an ordinary new message that takes the chain over', async () => {
+  for (const word of ['Continue.', ' 繼續 ', 'go on!']) {
+    const { r, c } = await reopenResume(); chainReplies(r, say('Added Gamma.', [], '')); r.type(word); await r.view.sendMapChat(); await until(() => r.control.requests.length === 1 && !c.isBusy);
+    const context = contextOf(r.control.requests[0]); assert.equal(context.continuation.round, 3, word); assert.equal(context.continuation.remaining, 'left 3'); assert.equal(c.inputEl.value, '', 'the field is emptied');
+    assert.equal(c.transcript().filter(m => m.role === 'user' && !m.auto && /continue|繼續|go on/i.test(m.text)).length, 0, 'the word is not shown as a message of its own');
+  }
+  const { r, c } = await reopenResume(); chainReplies(r, say('Sure.', [], '')); r.type('continue the essay about sleep'); await r.view.sendMapChat(); await until(() => r.control.requests.length === 1 && !c.isBusy);
+  assert.equal(contextOf(r.control.requests[0]).continuation, undefined, 'not a resume'); assert.equal(r.control.requests[0].message, 'continue the essay about sleep'); assert.equal(c.resumePoint(), null);
+  const none = await harness({ records: true }); await none.view.hydrate(); const nchat = none.open(); chainReplies(none, say('Hello.', [], '')); none.type('continue'); await none.view.sendMapChat(); await until(() => none.control.requests.length === 1 && !nchat.isBusy);
+  assert.equal(none.control.requests[0].message, 'continue', 'with nothing to resume the word is just a message');
+});
+
+integrationTest('resume: a round that stopped (Stop while the chain waits) gets the box with the stop sentence and the next round, and the button carries on from round 2', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const { chat } = await researchChain(h);
+  chat.stopEl.click(); await until(() => h.view.chatChain === null); await recordIdle(h);
+  const box = resumeBox(chat); assert.ok(box, 'the box after Stop'); assert.equal(visibleText(resumeButton(chat)), 'Continue from round 2');
+  eq(classTexts(box, 'vam-map-chat-batch-left'), ['Left to do: Add the subtopics from the research']);
+  eq(classTexts(chat.logEl, 'vam-map-chat-chain-note'), ['Stopped, and the research stopped with it. The cards already made stay.']);
+  chainReplies(h, say('Built.', [], '')); resumeButton(chat).click(); await until(() => h.control.requests.length === 2 && !chat.isBusy);
+  const context = contextOf(h.control.requests[1]); assert.equal(context.continuation.round, 2); assert.equal(context.continuation.remaining, 'Add the subtopics from the research');
+});
+
+integrationTest('resume: a round that failed live has only its Retry button (no resume box); after a reload the same record offers the resume', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const { chat, runs } = await researchChain(h, { second: async () => { throw new Error('boom'); } });
+  settleRun(runs[0]); await until(() => h.view.chatChain === null && h.control.requests.length === 2 && !chat.isBusy); await recordIdle(h);
+  assert.equal(resumeBox(chat), undefined, 'live: Retry only'); assert.ok(find(chat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-retry')));
+  const { c } = await r6Reopen(recordLines(h, recordFiles(h)[0])); assert.ok(resumeBox(c), 'after the reload'); assert.equal(visibleText(resumeButton(c)), 'Continue from round 2');
+});
+
+integrationTest('resume: a batch the chat started that was cut by the reload shows its own box first; the resume box waits until the batch is dealt with', async () => {
+  const at = REC_AT;
+  const lines = [...resumeFixture({ a: 'x' }).slice(0, 8), rec('turn_end', { turn: 3, at, status: 'plan', raw: null, reply: 'Round three.', lines: [], modelLabel: 'C' }),
+    rec('event', { turn: 3, at, kind: 'research_batch', topics: [{ id: 'p', title: 'P' }, { id: 'q', title: 'Q' }], request: {} })];
+  const r = await harness({ records: true }); await r.view.hydrate(); await seedRecord(r, lines.map(l => ({ ...l })), REC_ID); const c = r.open(); await until(() => c.hasMessages);
+  assert.ok(find(c.logEl, i => hasClass(i, 'vam-map-chat-batch') && !hasClass(i, 'vam-map-chat-resume')), 'the batch box'); assert.equal(resumeBox(c), undefined);
+});
+
+integrationTest('resume: the cards the AI selected stay with the chain - a cleared selection, a card deleted meanwhile, and a chain that never selected', async () => {
+  const selectChain = async ids => {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const runs = researchStub(h);
+    chainReplies(h, say('Selected and researching.', [{ kind: 'select_topics', nodeIds: ids(h), all: false }, researchAct({ nodeIds: [] })], 'Build under them'), say('Built.', [], ''));
+    h.type('go'); await h.view.sendMapChat(); return { h, chat, runs };
+  };
+  { const { h, runs } = await selectChain(x => [x.ids.a, x.ids.b]); assert.equal(h.view.chatChain.state.phase, 'waiting');
+    h.view.selection.state.multiSelected.clear(); h.view.selection.state.selected = null; settleRun(runs[0]); await until(() => h.control.requests.length === 2 && !h.chat?.isBusy);
+    eq(contextOf(h.control.requests[1]).selected.map(item => item.id), [h.ids.a, h.ids.b], 'round 2 reads what the AI selected'); }
+  { const { h, runs } = await selectChain(x => [x.ids.a, x.ids.c]); h.view.selection.state.multiSelected.clear(); h.view.selection.state.selected = null;
+    h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.c); settleRun(runs[0]); await until(() => h.control.requests.length === 2);
+    eq(contextOf(h.control.requests[1]).selected.map(item => item.id), [h.ids.a], 'a card that is gone is skipped'); }
+  { const h = await harness(); await h.view.hydrate(); const chat = h.open(); const runs = researchStub(h);
+    chainReplies(h, say('Researching.', [{ kind: 'select_topics', nodeIds: [h.ids.a], all: false }].slice(0, 0).concat([addRoot('r', 'Pstack'), researchAct({ nodeIds: ['new:r'] })]), 'More'), say('Built.', [], ''));
+    h.type('go'); await h.view.sendMapChat(); h.view.selection.state.multiSelected.clear(); h.view.selection.state.selected = h.ids.b; settleRun(runs[0]); await until(() => h.control.requests.length === 2 && !chat.isBusy);
+    eq(contextOf(h.control.requests[1]).selected.map(item => item.id), [h.ids.b], 'never selected by the AI: the selection of the moment, as before'); }
+});

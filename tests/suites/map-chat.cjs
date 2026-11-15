@@ -7017,6 +7017,73 @@ integrationTest('map chat steer N6/C7/C8: Stop and a failure leave the follow-up
   }
 });
 
+// ---- steer characterization (series A): pins today's behaviour of the in-view steer machine before it moves to TopicChatSteers ----
+/** Attempts that give out a handler, optionally slow (`hold` keeps the hand-over in flight until its gate opens) or refusing; an attempt can also fail before it gives one. */
+function steerAttempts(h, plan) {
+  const attempts = [];
+  h.control.reply = async (_request, signal, _onReply, onProgress, onSteer) => {
+    const index = attempts.length; const spec = plan[index] ?? {};
+    const attempt = { handled: [], gate: deferred(), hold: deferred(), progress: onProgress }; attempts.push(attempt);
+    onProgress({ kind: 'stream-mode', mode: 'stream-json' });
+    if (spec.failBeforeHandler) throw new Error('boom');
+    onSteer(async text => { if (spec.reject) throw new Error('already ended'); attempt.handled.push(text); if (spec.hold) await attempt.hold.promise; });
+    if (spec.abortable) await new Promise(resolve => signal.addEventListener('abort', resolve)); else await attempt.gate.promise;
+    if (spec.failAfterHandler) throw new Error('boom');
+    return { reply: 'ok', actions: [], rejected: [] };
+  };
+  return attempts;
+}
+const retryButton = chat => findAll(chat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-retry'))[0];
+
+integrationTest('map chat steer characterization D1: json-fallback while a hand-over is still in flight queues it; the late answer changes nothing; it is sent once after the reply', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = steerAttempts(h, [{ hold: true }]); const raw = h.control.reply; let n = 0;
+  h.control.reply = async (...args) => { n++; if (n === 2) return { reply: 'second', actions: [], rejected: [] }; return raw(...args); };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('extra'); pressEnter(chat); await tick(); await tick();
+  eq(attempts[0].handled, ['extra']); eq(steerTags(chat), ['Added midway'], 'in flight, shown as live');
+  attempts[0].progress({ kind: 'stream-mode', mode: 'json-fallback' }); await tick();
+  eq(steerTags(chat), ['Sends after this reply ends']);
+  attempts[0].hold.resolve(); await tick(); await tick();
+  eq(steerTags(chat), ['Sends after this reply ends'], 'the late answer of the dropped hand-over changes nothing');
+  attempts[0].gate.resolve(); await until(() => h.control.requests.length === 2 && !chat.isBusy); await sending;
+  assert.equal(h.control.requests[0].message, 'go'); assert.equal(h.control.requests[1].message, 'extra', 'sent once, as its own message');
+  assert.equal(chat.transcript().map(m => m.text).filter(m => m === 'extra').length, 1);
+});
+
+integrationTest('map chat steer characterization D2: "Resend" while a hand-over is in flight goes to the new attempt once; the old answer changes nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = steerAttempts(h, [{ hold: true, abortable: true }, {}]);
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('extra'); pressEnter(chat); await tick(); await tick();
+  eq(attempts[0].handled, ['extra']); h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2); await tick(); await tick();
+  eq(attempts[1].handled, ['extra'], 'the new attempt took it once'); attempts[0].hold.resolve(); await tick(); await tick();
+  eq(steerTags(chat), ['Added midway']); eq(attempts[0].handled, ['extra']); eq(attempts[1].handled, ['extra']);
+  attempts[1].gate.resolve(); await sending; eq(steerTexts(chat), ['extra']); assert.equal(h.control.requests.length, 2, 'nothing sent as its own message');
+});
+
+integrationTest('map chat steer characterization D2: after "Resend" the new attempt fails before it hands out a handler: a delivered follow-up stays delivered, an in-flight one goes back to the field', async () => {
+  for (const hold of [false, true]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = steerAttempts(h, [{ hold, abortable: true }, { failBeforeHandler: true }]);
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('extra'); pressEnter(chat); await tick(); await tick();
+    h.clock.advance(20_000); resendButton(chat).click(); await sending.catch(() => {}); await tick(); await tick();
+    assert.ok(retryButton(chat), `${hold}: retry offered`);
+    if (!hold) { assert.equal(chat.draft, '', 'delivered: nothing back in the field'); eq(steerTexts(chat), ['extra']); }
+    else { assert.equal(chat.draft, 'extra', 'in flight: back in the field'); eq(steerTexts(chat), []); }
+    h.type(''); h.control.reply = async () => ({ reply: 'retried', actions: [], rejected: [] });
+    retryButton(chat).click(); await until(() => h.control.requests.length === 3 && !chat.isBusy);
+    assert.equal(h.control.requests[2].message, hold ? 'go' : 'go\n\nextra', `${hold}: what the retry asks`);
+  }
+});
+
+integrationTest('map chat steer characterization D3: after "Resend" the new attempt refuses a delivered follow-up and then fails: it is in the field and the retry text still carries it (current behaviour, not endorsed)', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = steerAttempts(h, [{ abortable: true }, { reject: true, failAfterHandler: true }]);
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('one'); pressEnter(chat); await tick(); await tick();
+  eq(attempts[0].handled, ['one']); h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2); await tick(); await tick(); await tick();
+  eq(steerTags(chat), ['Sends after this reply ends'], 'the refusal queued it');
+  attempts[1].gate.resolve(); await sending.catch(() => {}); await tick();
+  assert.equal(chat.draft, 'one', 'back in the field'); assert.ok(retryButton(chat), 'retry offered');
+  h.type(''); h.control.reply = async () => ({ reply: 'retried', actions: [], rejected: [] });
+  retryButton(chat).click(); await until(() => h.control.requests.length === 3 && !chat.isBusy);
+  assert.equal(h.control.requests[2].message, 'go\n\none', 'the stale retry text still carries the text that is back in the field');
+});
+
 integrationTest('map chat steer N7: switching maps or closing the view drops the follow-ups; a late handler or reply changes nothing', async () => {
   for (const how of ['switch', 'close']) {
     const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h);

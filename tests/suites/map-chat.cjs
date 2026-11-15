@@ -9053,6 +9053,26 @@ integrationTest('P3 (i) auto-apply: Stop before the failure arrives, or while th
   g.type('go'); const gsending = g.view.sendMapChat(); await until(() => g.control.requests.length === 2 && gchat.isBusy); g.view.stopMapChat(); hold.resolve(); await gsending; await tick(); await tick();
   assert.equal(g.control.requests.length, 2, 'stopped during the retry: no third request'); assert.equal(g.view.chatChain, null); assert.equal(g.view.map.nodes.some(n => n.path.includes('Z')), false);
 });
+integrationTest('P3 review M1/L1: a retry that cannot be sent (notes loading) ends the chain as failed; the toggle turned off mid-round is read live, so no retry', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const spy = chainSpy(chat);
+  chainReplies(h, () => { h.view.noteLoad = {}; throw new Error('request timed out'); }, say('never', [], ''));
+  h.type('go'); await h.view.sendMapChat(); await chainEnded(spy); eq(spy.reasons(), ['failed']); assert.equal(h.control.requests.length, 1, 'no second request'); assert.equal(h.view.chatChain, null, 'not stuck in the round');
+  const g = await harness(); await g.view.hydrate(); g.view.setChatAutoApply(true); const gchat = g.open(); const gspy = chainSpy(gchat);
+  chainReplies(g, () => { g.view.setChatAutoApply(false); throw new Error('request timed out'); }, say('never', [], ''));
+  g.type('go'); await g.view.sendMapChat(); await chainEnded(gspy); await tick(); eq(gspy.reasons(), ['failed']); assert.equal(g.control.requests.length, 1, 'switch off mid-round: no retry');
+});
+integrationTest('P3 review M2: set_appearance on an existing card backs up its note once, add_child and move_topic back up the parent notes, a failed backup writes nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = backupSpy(h); const run = autoRun(h); const path = id => h.view.map.nodes.find(n => n.id === id).path;
+  const out = await applyIn(h, run, [{ kind: 'set_appearance', nodeIds: [h.ids.a], color: 'red' }, { kind: 'set_appearance', nodeIds: [h.ids.a], color: 'blue' }]);
+  eq(out.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status).includes('done'), true, JSON.stringify(out)); eq(calls.filter(c => c[0] === path(h.ids.a)).length, 1, 'the card note once');
+  const k = await harness(); await k.view.hydrate(); const kcalls = backupSpy(k); const krun = autoRun(k); const kp = id => k.view.map.nodes.find(n => n.id === id).path;
+  await applyIn(k, krun, [{ kind: 'add_child', parentId: k.ids.b, title: 'Kid' }]); assert.ok(kcalls.some(c => c[0] === kp(k.ids.b)), 'the parent note of add_child');
+  const m = await harness(); await m.view.hydrate(); const mcalls = backupSpy(m); const mrun = autoRun(m); const mp = id => m.view.map.nodes.find(n => n.id === id).path; const oldParent = m.view.map.nodes.find(n => n.id === m.ids.c).parentId;
+  await applyIn(m, mrun, [{ kind: 'move_topic', nodeId: m.ids.c, newParentId: m.ids.b }]); const got = mcalls.map(c => c[0]);
+  for (const id of [m.ids.c, m.ids.b, oldParent]) assert.ok(got.includes(mp(id)), `move backs up ${mp(id)}`); eq(got.length, new Set(got).size, 'each file once');
+  const f = await harness(); await f.view.hydrate(); const failing = backupSpy(f, { ok: false }); const frun = autoRun(f); const original = await f.note('a');
+  const bad = (await applyIn(f, frun, [{ kind: 'set_appearance', nodeIds: [f.ids.a], color: 'red' }])).filter(l => l.text !== NOT_UNDOABLE); eq(bad.map(l => l.status), ['skipped']); assert.ok(failing.length >= 1); eq(await f.note('a'), original, 'nothing written');
+});
 const expandWait = async (h, ids) => {
   const chat = h.open(); const spy = chainSpy(chat); const open = new Map();
   h.view.chatExpand = (parent, _d, signal) => new Promise(resolve => { open.set(parent.id, resolve); signal.addEventListener('abort', () => resolve({ status: 'stopped' }), { once: true }); });

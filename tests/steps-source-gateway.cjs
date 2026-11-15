@@ -110,7 +110,9 @@ test('a stop throws AbortError and reads and sends nothing; a read failure gives
 test('a condensing failure fails the task: no main request, no fallback to no sources', async () => {
   const h = rig(call => { throw new Error('provider down'); });
   await assert.rejects(ask(h, { mode: 'task', referenceGroups: [group([doc('a.md', 200_000)])] }), /provider down/);
-  assert.equal(h.calls.length, 1, 'only the failed extraction was sent');
+  // The two chunks of the 200k source extract side by side, so both are out before the failure lands; the task request never goes.
+  assert.equal(h.calls.length, 2, 'only the extractions were sent');
+  assert.ok(h.calls.every(call => call.prompt.includes('Extract relevant facts')));
   const empty = rig(call => (call.prompt.includes('Extract relevant facts') ? finding(0) : GOOD));
   await assert.rejects(ask(empty, { mode: 'task', referenceGroups: [group([doc('a.md', 10)])] }));
   assert.equal(empty.calls.length, 1);
@@ -139,4 +141,41 @@ test('batch sharing decided per child request: sources fit alone but not beside 
   const small = rig(); const lazy = gateway.sharedSourceFindings(3, signal => small.service.condenseReferences(context({ referenceGroups: [group([doc('a.md', 100_000)])] }), 'gpt-6-luna', 'low', signal));
   await ask(small, { referenceGroups: [group([doc('a.md', 100_000)])], referenceDelivery: 'direct', sharedReferenceCondense: lazy });
   assert.equal(small.calls.length, 1); assert.equal(gateway.sharedSourceFindings(1, async () => 'x'), undefined);
+});
+
+test('first condensing round runs extract requests a few at a time, keeps findings in source order, and a stop halts new sends', async () => {
+  const { CONDENSE_EXTRACT_CONCURRENCY } = load('core/ai-task-service.ts');
+  assert.equal(CONDENSE_EXTRACT_CONCURRENCY, 3);
+  const documents = [1, 2, 3, 4, 5].map(n => doc(`n${n}.md`, 100_000, String(n)));
+  let running = 0, peak = 0;
+  const reply = async call => {
+    running++; peak = Math.max(peak, running);
+    const which = (call.prompt.match(/([1-5])\1{40}/) || [])[1];
+    // Later chunks answer first, so order can only come from the chunk index.
+    await new Promise(resolve => setTimeout(resolve, 60 - Number(which) * 10));
+    running--;
+    return JSON.stringify({ summary: 'S', detail: `finding-${which}`, suggestions: [], visualReferences: [] });
+  };
+  const h = rig(reply);
+  const progress = [];
+  const findings = await h.service.condenseReferences(context({ referenceGroups: [group(documents)], onProgress: text => progress.push(text) }), 'gpt-6-luna', 'low');
+  assert.equal(h.calls.length, 5, 'one extract per chunk, no reduce needed');
+  assert.equal(peak, 3, 'never more than three extract requests at once');
+  assert.deepEqual(findings.match(/finding-\d/g), ['finding-1', 'finding-2', 'finding-3', 'finding-4', 'finding-5']);
+  assert.equal(progress.at(-1), '', 'progress is cleared at the end');
+  assert.equal(progress.filter(Boolean).length, 5);
+
+  const stop = new AbortController();
+  const stopped = rig(async call => { if (call.n === 2) stop.abort(); await new Promise(resolve => setTimeout(resolve, 20)); return JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] }); });
+  await assert.rejects(stopped.service.condenseReferences(context({ referenceGroups: [group(documents)] }), 'gpt-6-luna', 'low', stop.signal), error => error.name === 'AbortError');
+  await new Promise(resolve => setTimeout(resolve, 80));
+  assert.ok(stopped.calls.length <= 3, `no request starts after the stop (sent ${stopped.calls.length})`);
+});
+
+test('a failed extract stops the other slots from sending more chunks', async () => {
+  const documents = [1, 2, 3, 4, 5, 6].map(n => doc(`n${n}.md`, 100_000));
+  const h = rig(async call => { await new Promise(resolve => setTimeout(resolve, 10)); if (call.n === 1) throw new Error('provider down'); return finding(100); });
+  await assert.rejects(h.service.condenseReferences(context({ referenceGroups: [group(documents)] }), 'gpt-6-luna', 'low'), /provider down/);
+  await new Promise(resolve => setTimeout(resolve, 60));
+  assert.equal(h.calls.length, 3, 'only the three already in flight were sent');
 });

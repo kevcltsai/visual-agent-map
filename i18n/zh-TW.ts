@@ -1308,6 +1308,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_undo_label": "AI 對話回覆",
   "ui.map_chat_undo_files_changed": "檔案已變更，無法復原",
   "ui.map_chat_guard_exists": "那裡已經有檔案",
+  "ui.map_chat_guard_exists_in_map": "那裡已經有檔案；請先用 read_md_file 讀取它，再用 edit_md_file 修改",
   "ui.map_chat_guard_no_baseline": "這個檔案不在本次送出的內容裡",
   "ui.map_chat_guard_map_source": "這個檔案是這張心智圖的資料來源，對話只能讀取",
   "ui.map_chat_skip_stale": "送出後檔案又被修改過",

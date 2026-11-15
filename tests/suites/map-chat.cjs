@@ -9455,3 +9455,24 @@ test('P2 progress: the prompt asks for steps on the first round of a multi-step 
   const { MAP_CHAT_PROMPT_EN, MAP_CHAT_PROMPT_ZH } = { MAP_CHAT_PROMPT_EN: fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.en.md'), 'utf8'), MAP_CHAT_PROMPT_ZH: fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.zh.md'), 'utf8') };
   assert.match(MAP_CHAT_PROMPT_EN, /"progress"/); assert.match(MAP_CHAT_PROMPT_EN, /first round/i); assert.match(MAP_CHAT_PROMPT_ZH, /"progress"/);
 });
+integrationTest('P2 view: switch on, a delete plan card pending, switch off, a new multi-round message is a plain chain (8-round label, no calls count, no backup)', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const calls = backupSpy(h);
+  const upd = text => ({ kind: 'update_summary', nodeId: h.ids.a, summary: text });
+  chainReplies(h, say('Deleting.', [{ kind: 'delete_topic', nodeId: h.ids.c }], ''), say('One.', [addRoot('p', 'P')], 'Again'), say('Two.', [addRoot('q', 'Q')], 'Again'), say('Three.', [addRoot('r', 'R')], ''));
+  h.type('first'); await h.view.sendMapChat(); await until(() => chat.pendingPlan() !== null);
+  h.view.setChatAutoApply(false); chat.refreshAutoApply?.(); assert.equal(chat.host.autoApply(), false);
+  const seen = []; chat.host.autoApply = (orig => () => { const v = orig(); return v; })(chat.host.autoApply);
+  h.type('second'); await h.view.sendMapChat();
+  try { await until(() => h.view.chatChain === null && h.control.requests.length === 4); } catch (e) { throw new Error(`reqs ${h.control.requests.length} chain ${JSON.stringify(h.view.chatChain?.state)} plan ${JSON.stringify(chat.pendingPlan()?.reasons)}`); }
+  const rows = chat.transcript().filter(m => m.auto); assert.equal(rows.length >= 2, true, 'automatic rounds ran');
+  for (const m of rows) assert.equal(m.autoInfo?.calls, undefined, `no calls in ${JSON.stringify(m.autoInfo)}`);
+  assert.doesNotMatch(visibleText(chat.logEl), /AI calls used/); assert.match(visibleText(chat.logEl), /round 2 of 8/); eq(calls, [], 'no backup');
+});
+integrationTest('P2 view: create_md_file on an existing file in the map folder is skipped with words that say read it with read_md_file then edit_md_file; the next round sees that text', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open();
+  const existing = 'Agent Workspace/Topics/map-a/TOC.md'; await h.app.vault.create(existing, '# TOC\n');
+  chainReplies(h, say('Make the TOC.', [addRoot('t', 'T'), { kind: 'create_md_file', path: existing, content: '# New TOC\n' }], 'Update the TOC'), say('Done.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); try { await until(() => h.view.chatChain === null && h.control.requests.length === 2); } catch (e) { throw new Error(`reqs ${h.control.requests.length} chain ${JSON.stringify(h.view.chatChain?.state)} plan ${JSON.stringify(chat.pendingPlan()?.reasons)}`); }
+  const seen = contextOf(h.control.requests[1]).continuation.lastResults; const skip = seen.filter(r => r.status === 'skipped'); eq(skip.length, 1);
+  assert.match(skip[0].text, /read_md_file/); assert.match(skip[0].text, /edit_md_file/); assert.equal(h.contents.get(existing), '# TOC\n', 'the file is untouched');
+});

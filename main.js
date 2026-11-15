@@ -39599,8 +39599,18 @@ function resumeRound(end) {
   if (!Number.isInteger(round3) || round3 < 2) return null;
   return { round: round3, maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS * Math.ceil(round3 / MAP_CHAT_CHAIN_MAX_ROUNDS), remaining };
 }
-var RESUME_KEYWORDS = /* @__PURE__ */ new Set(["\u7E7C\u7E8C", "\u7EE7\u7EED", "\u63A5\u8457\u505A", "\u63A5\u7740\u505A", "continue", "resume", "goon"]);
-var isResumeKeyword = (text10) => RESUME_KEYWORDS.has(text10.normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]/gu, ""));
+var RESUME_KEYWORDS = /* @__PURE__ */ new Set([
+  "\u7E7C\u7E8C",
+  "\u7EE7\u7EED",
+  "\u63A5\u8457\u505A",
+  "\u63A5\u7740\u505A",
+  "continue",
+  "resume",
+  "goon"
+]);
+var isResumeKeyword = (text10) => RESUME_KEYWORDS.has(
+  text10.normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "")
+);
 
 // core/map-chat-batch.ts
 function summarizeChatBatch(batch, restored) {
@@ -42696,7 +42706,10 @@ ${shown}` : t("ui.map_chat_model_label"));
   }
   /** What an interrupted chain says and the one button that goes on with the next round. */
   buildResume(row, message, point) {
-    const box = row.createDiv({ cls: "vam-map-chat-batch vam-map-chat-resume", attr: { role: "status", tabindex: "-1" } });
+    const box = row.createDiv({
+      cls: "vam-map-chat-batch vam-map-chat-resume",
+      attr: { role: "status", tabindex: "-1" }
+    });
     if (point.reason === null)
       box.createDiv({
         cls: "vam-map-chat-batch-title",

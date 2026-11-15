@@ -500,15 +500,14 @@ import {
   type MapChatResearchNote,
   type MapChatSummary,
   type MapChatUserText,
-  contentHash,
   type MapChatContext,
   type MapChatOutlineNode,
   type MapChatTurn,
-  type MapChatTopicRef,
-  MAP_CHAT_FILE_CHAR_LIMIT
+  type MapChatTopicRef
 } from "../../core/map-chat-context";
 import { mapChatSourceMaterial, type MapChatSourceCache } from "../../core/map-chat-sources";
 import { normalizeVaultPath } from "../../core/map-chat-guard";
+import { MapChatFiles } from "../../core/map-chat-files";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
 import { GateError, applyPause } from "../../core/argument-map/machine";
@@ -1466,23 +1465,17 @@ export class VisualAgentMapView extends ItemView {
   private chatResearchMarkedIn: string | null = null;
   /** The record conversation whose file already carries the `sources_read` mark. */
   private chatSourcesMarkedIn: string | null = null;
-  /** Markdown files this conversation created or edited -> the content hash of each version it wrote. Only the program writes it. */
-  private chatOwnFiles = new Map<string, Set<string>>();
-  /** Markdown files the user dragged into this conversation -> the content hash each held then. Readable (and, inside the map folder, editable) only while the file still holds one of these or a version the chat wrote after. */
-  private chatAttached = new Map<string, Set<string>>();
   /** The files the chips of the message being sent carry (their text is sent whole this round, whatever the folder). */
   /** The files dragged in as chips of the message a context was built for: an old plan's apply uses its own round's value, not the latest message's. */
   private chatChipPaths = new WeakMap<object, Set<string>>();
-  /** Order of the writes to {@link chatOwnFiles}: a counter per write and the reply (apply call) it belonged to; restored paths are round 0. */
-  private chatOwnOrder = new Map<string, { seq: number; round: number }>();
-  private chatWriteSeq = 0;
-  private chatApplyRound = 0;
-  /** Own files the chat asked to read with `read_md_file`; the next context carries them first and empties this. */
-  private chatReadQueue: string[] = [];
-  /** `path\0hash` of the reads the last context carried: the same version asked again right after is refused (no read loop). */
-  private chatLastReads = new Set<string>();
-  /** The record conversation whose file already holds a `file_written` line for each of these "path\0hash" pairs. */
-  private chatOwnRecorded: { id: string | null; keys: Set<string> } = { id: null, keys: new Set() };
+  /** The file ledger of this conversation (what it wrote, what the user dragged in, what it may read back); the record marks are written here by {@link markOwnFilesRecorded}. */
+  private chatFiles = new MapChatFiles({
+    read: async key => {
+      const source = await this.readChatFile(key);
+      return source ? { path: source.file.path, text: source.text } : null;
+    },
+    mapFolder: () => normalizeVaultPath(this.plugin.repo.topicRoot(this.path))
+  });
   /** Research notes an earlier round already sent whole (they go last when the budget is short). */
   private chatResearchSent = new Set<string>();
   /** Counts conversations: the result of research another conversation started is not recorded in this one. */
@@ -1526,10 +1519,12 @@ export class VisualAgentMapView extends ItemView {
     readChatFile: path => this.readChatFile(path),
     chatFileText: path => this.chatFileText(path),
     chatUndoRefusal: () => this.chatUndoRefusal(),
-    chatReadableNow: key => this.chatReadableNow(key),
+    chatReadableNow: key => this.chatFiles.readableNow(key),
     attachedReadOnly: (key, baseline) =>
-      this.chatAttached.has(key) && !this.chatChipPaths.get(baseline)?.has(key) && !this.insideChatMapFolder(key),
-    noteChatOwnFile: (path, text, created) => this.noteChatOwnFile(path, text, created),
+      this.chatFiles.isAttached(key) && !this.chatChipPaths.get(baseline)?.has(key) && !this.insideChatMapFolder(key),
+    noteChatOwnFile: (path, text, created) => {
+      if (this.chatFiles.noteWrite(path, text, created)) this.markOwnFilesRecorded(this.chatLastRecord);
+    },
     fileOf: path => {
       const file = this.app.vault.getAbstractFileByPath(path);
       return file instanceof TFile ? file : null;
@@ -21518,7 +21513,8 @@ export class VisualAgentMapView extends ItemView {
         const source = await this.readChatFile(chip.path);
         if (source) {
           files.push({ path: source.file.path, content: source.text });
-          this.noteChatAttached(source.file.path, source.text);
+          if (this.chatFiles.noteAttached(source.file.path, source.text))
+            this.markOwnFilesRecorded(this.chatLastRecord);
         }
       }
     }
@@ -21557,7 +21553,7 @@ export class VisualAgentMapView extends ItemView {
       const key = normalizeVaultPath(item.path);
       if (key) sentPaths.add(key);
     }
-    const ownFiles = await this.chatOwnFilesNow(sentPaths);
+    const ownFiles = await this.chatFiles.carry(sentPaths);
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapFolder: this.plugin.repo.topicRoot(this.path),
@@ -21870,7 +21866,7 @@ export class VisualAgentMapView extends ItemView {
                     chain: planChainOf(run.state),
                     autoApply: this.chatAutoApply,
                     mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
-                    readablePaths: [...this.chatOwnFiles.keys(), ...this.chatAttached.keys()],
+                    readablePaths: this.chatFiles.readablePaths(),
                     callsSoFar: run.state.calls,
                     chatStartedResearch: this.chatStartedResearch,
                     chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
@@ -22797,116 +22793,18 @@ export class VisualAgentMapView extends ItemView {
     const writer = this.chatRecords;
     if (!record || !writer || this.plugin.settings.mapChatRecords !== true) return;
     if (writer.conversationId !== record.conversationId) return;
-    if (this.chatOwnRecorded.id !== record.conversationId)
-      this.chatOwnRecorded = { id: record.conversationId, keys: new Set() };
-    for (const [path, hashes] of this.chatOwnFiles)
-      for (const hash of hashes) {
-        const key = `${path}\0${hash}`;
-        if (this.chatOwnRecorded.keys.has(key)) continue;
-        this.chatOwnRecorded.keys.add(key);
-        record.event("file_written", { path, hash });
-      }
-    for (const [path, hashes] of this.chatAttached)
-      for (const hash of hashes) {
-        const key = `A\0${path}\0${hash}`;
-        if (this.chatOwnRecorded.keys.has(key)) continue;
-        this.chatOwnRecorded.keys.add(key);
-        record.event("file_attached", { path, hash });
-      }
-  }
-  /** A Markdown file the user dragged in: this version becomes the baseline the chat may read (and edit inside the map folder) while the file holds it. Only the program calls this, with text it just read. */
-  private noteChatAttached(path: string, text: string): void {
-    const key = normalizeVaultPath(path);
-    if (key === null || !key.toLowerCase().endsWith(".md") || key.split("/").some(part => part.startsWith("."))) return;
-    const hashes = this.chatAttached.get(key) ?? new Set<string>();
-    hashes.add(contentHash(text));
-    this.chatAttached.set(key, hashes);
-    this.markOwnFilesRecorded(this.chatLastRecord);
-  }
-  /** True when the file holds a version the chat wrote or the user attached (the test a read uses). */
-  private async chatReadableNow(key: string): Promise<boolean> {
-    const hashes = this.chatReadableHashes(key);
-    const source = hashes ? await this.readChatFile(key) : null;
-    return !!source && !!hashes && hashes.has(contentHash(source.text));
+    for (const mark of this.chatFiles.marksFor(record.conversationId))
+      record.event(mark.kind, { path: mark.path, hash: mark.hash });
   }
   private insideChatMapFolder(key: string): boolean {
     const root = normalizeVaultPath(this.plugin.repo.topicRoot(this.path));
     return root !== null && key.startsWith(`${root}/`);
   }
-  /** The versions of a file the chat may read now: what it wrote (inside this map's folder only) and what the user attached (anywhere). */
-  private chatReadableHashes(key: string): Set<string> | undefined {
-    const own = this.insideChatMapFolder(key) ? this.chatOwnFiles.get(key) : undefined;
-    const attached = this.chatAttached.get(key);
-    return own || attached ? new Set([...(own ?? []), ...(attached ?? [])]) : undefined;
-  }
-  /**
-   * A write of this conversation's own: a created file always counts; an edit counts only for a file already its own (an attached
-   * or open note the chat edits does not become the chat's). Only the program calls this, with what it just wrote.
-   */
-  private noteChatOwnFile(path: string, text: string, created: boolean): void {
-    const key = normalizeVaultPath(path);
-    if (key === null) return;
-    // An attached file the chat edits inside the map folder becomes one of its own versions (carried like the rest).
-    if (!created && !this.chatOwnFiles.has(key) && !(this.chatAttached.has(key) && this.insideChatMapFolder(key)))
-      return;
-    const hashes = this.chatOwnFiles.get(key) ?? new Set<string>();
-    hashes.add(contentHash(text));
-    this.chatOwnFiles.set(key, hashes);
-    this.chatOwnOrder.set(key, { seq: ++this.chatWriteSeq, round: this.chatApplyRound });
-    this.markOwnFilesRecorded(this.chatLastRecord);
-  }
-  /**
-   * The files this conversation wrote that still hold exactly one of the versions it wrote, in the order the context spends its budget
-   * on them: the ones the chat asked to read (`requested`, taken from the queue, which this empties), then a 進度 file and the files of
-   * the latest reply, then the rest, each group newest write first. `skip` are sent another way.
-   */
-  private async chatOwnFilesNow(skip: Set<string>): Promise<{ path: string; content: string; requested?: boolean }[]> {
-    const found: { path: string; content: string; seq: number; round: number }[] = [];
-    // Only this map's own folder: a file the conversation wrote elsewhere (another folder it was allowed to write to) is not read back.
-    const queue = this.chatReadQueue.splice(0);
-    // Attached files are carried the same way, from any folder (the hash rule is the same).
-    for (const path of new Set([...this.chatOwnFiles.keys(), ...this.chatAttached.keys()])) {
-      const hashes = this.chatReadableHashes(path);
-      if (skip.has(path) || !hashes) continue;
-      const source = await this.readChatFile(path);
-      if (source && hashes.has(contentHash(source.text)))
-        found.push({
-          path: source.file.path,
-          content: source.text,
-          ...(this.chatOwnOrder.get(path) ?? { seq: 0, round: 0 })
-        });
-    }
-    const latest = Math.max(0, ...[...this.chatOwnOrder.values()].map(item => item.round));
-    const first = (file: { path: string; round: number }): boolean =>
-      (file.path.split("/").at(-1) ?? "").includes("進度") || (latest > 0 && file.round === latest);
-    const requested = queue.flatMap(path => found.filter(file => normalizeVaultPath(file.path) === path));
-    this.chatLastReads = new Set(
-      requested.map(file => `${normalizeVaultPath(file.path) ?? file.path}\0${contentHash(file.content)}`)
-    );
-    return [
-      ...requested.map(({ path, content }) => ({ path, content, requested: true })),
-      ...found
-        .filter(file => !requested.includes(file))
-        .sort((a, b) => Number(first(b)) - Number(first(a)) || b.seq - a.seq)
-        .map(({ path, content }) => ({ path, content }))
-    ];
-  }
-  /**
-   * A `read_md_file` of the chat: accepted only for a file this conversation wrote that is in this map's folder and still holds one
-   * of the versions it wrote (the same rule as {@link chatOwnFilesNow}). The next context carries it; nothing is shown for it.
-   */
+  /** A `read_md_file` of the chat: the file ledger decides (see {@link MapChatFiles.acceptRead}); the record gets the `file_read` line. */
   private async acceptChatRead(path: string, record: MapChatTurnRecord | null): Promise<boolean> {
-    const key = normalizeVaultPath(path);
-    const hashes = key === null ? undefined : this.chatReadableHashes(key);
-    if (key === null || !hashes) return false;
-    const source = await this.readChatFile(key);
-    if (!source || !hashes.has(contentHash(source.text))) return false;
-    // A file that can never be sent whole, or the version the last context already carried, is not a read: the chain must not
-    // go round asking for it again.
-    if (source.text.length > MAP_CHAT_FILE_CHAR_LIMIT || this.chatLastReads.has(`${key}\0${contentHash(source.text)}`))
-      return false;
-    if (!this.chatReadQueue.includes(key)) this.chatReadQueue.push(key);
-    record?.event("file_read", { path: key, chars: source.text.length });
+    const accepted = await this.chatFiles.acceptRead(path);
+    if (!accepted) return false;
+    record?.event("file_read", { path: accepted.path, chars: accepted.chars });
     return true;
   }
   /** Writes the `research_started` mark once per record conversation, and only while the record is on (otherwise the next turn writes it). */
@@ -22928,12 +22826,7 @@ export class VisualAgentMapView extends ItemView {
     this.chatReadsSources = false;
     this.chatSourcesMarkedIn = null;
     this.chatSourceCache = null;
-    this.chatOwnFiles.clear();
-    this.chatAttached.clear();
-    this.chatOwnOrder.clear();
-    this.chatReadQueue = [];
-    this.chatLastReads.clear();
-    this.chatOwnRecorded = { id: null, keys: new Set() };
+    this.chatFiles.reset();
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   private startChatRecords(): void {
@@ -23039,20 +22932,7 @@ export class VisualAgentMapView extends ItemView {
     );
     writer.markEnded(numbers);
     this.chatRecordTurnSeq = Math.max(0, ...numbers);
-    for (const item of restored.ownFiles) {
-      const hashes = this.chatOwnFiles.get(item.path) ?? new Set<string>();
-      hashes.add(item.hash);
-      this.chatOwnFiles.set(item.path, hashes);
-      this.chatOwnOrder.set(item.path, { seq: ++this.chatWriteSeq, round: 0 });
-      this.chatOwnRecorded.keys.add(`${item.path}\0${item.hash}`);
-    }
-    for (const item of restored.attachedFiles) {
-      const hashes = this.chatAttached.get(item.path) ?? new Set<string>();
-      hashes.add(item.hash);
-      this.chatAttached.set(item.path, hashes);
-      this.chatOwnRecorded.keys.add(`A\0${item.path}\0${item.hash}`);
-    }
-    this.chatOwnRecorded.id = restored.id;
+    this.chatFiles.restore(restored.id, restored.ownFiles, restored.attachedFiles);
     for (const item of chat.completedTurns()) this.chatRecordLogged.add(item.answer);
     this.relocateMapChat();
   }
@@ -23445,7 +23325,7 @@ export class VisualAgentMapView extends ItemView {
     const later: number[] = [];
     /** Positions of the actions that get no result line (`read_md_file`). */
     const hidden = new Set<number>();
-    if (!scope) this.chatApplyRound += 1;
+    if (!scope) this.chatFiles.startRound();
     const autoChain = options.chain && (options.chain.state.autoApply || this.chatAutoApply) ? options.chain : null;
     const run: ChatRun = {
       refs: new Map(),

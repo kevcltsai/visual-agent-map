@@ -31,26 +31,29 @@ export class MapChatFiles {
 
   /**
    * A write of this conversation's own: a created file always counts; an edit counts only for a file already its own (an attached
-   * or open note the chat edits does not become the chat's). Only the program calls this, with what it just wrote.
+   * or open note the chat edits does not become the chat's). Only the program calls this, with what it just wrote. True when the write was taken (the caller then writes the record marks).
    */
-  noteWrite(path: string, text: string, created: boolean): void {
+  noteWrite(path: string, text: string, created: boolean): boolean {
     const key = normalizeVaultPath(path);
-    if (key === null) return;
+    if (key === null) return false;
     // An attached file the chat edits inside the map folder becomes one of its own versions (carried like the rest).
-    if (!created && !this.ownFiles.has(key) && !(this.attached.has(key) && this.insideMapFolder(key))) return;
+    if (!created && !this.ownFiles.has(key) && !(this.attached.has(key) && this.insideMapFolder(key))) return false;
     const hashes = this.ownFiles.get(key) ?? new Set<string>();
     hashes.add(contentHash(text));
     this.ownFiles.set(key, hashes);
     this.ownOrder.set(key, { seq: ++this.writeSeq, round: this.applyRound });
+    return true;
   }
 
   /** A Markdown file the user dragged in: this version becomes the baseline the chat may read (and edit inside the map folder) while the file holds it. Only the program calls this, with text it just read. */
-  noteAttached(path: string, text: string): void {
+  noteAttached(path: string, text: string): boolean {
     const key = normalizeVaultPath(path);
-    if (key === null || !key.toLowerCase().endsWith(".md") || key.split("/").some(part => part.startsWith("."))) return;
+    if (key === null || !key.toLowerCase().endsWith(".md") || key.split("/").some(part => part.startsWith(".")))
+      return false;
     const hashes = this.attached.get(key) ?? new Set<string>();
     hashes.add(contentHash(text));
     this.attached.set(key, hashes);
+    return true;
   }
 
   /** A reply (apply call) of the chat begins: the files it writes belong to this round. */

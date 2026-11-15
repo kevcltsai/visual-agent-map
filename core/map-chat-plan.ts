@@ -321,7 +321,7 @@ export function planFor(
   const autoAllowed = (action: MapChatAction): boolean =>
     isFindImages(action) ||
     (action.kind === "run_map_action" ? AUTO_ALLOWED_RUN.has(action.action) : AUTO_ALLOWED_KINDS.has(action.kind)) ||
-    ((action.kind === "edit_md_file" || action.kind === "create_md_file") &&
+    ((action.kind === "edit_md_file" || action.kind === "create_md_file" || action.kind === "read_md_file") &&
       isInsideMapFolder(action.path, options.mapFolder)) ||
     (imageAddsOnly && IMAGE_SAFE_KINDS.has(action.kind));
   const allAllowed = auto && actions.every(autoAllowed);

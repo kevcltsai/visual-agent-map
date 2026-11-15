@@ -1871,3 +1871,9 @@ test('auto-apply plan (d): estimateChatCalls is what planFor counts; call_budget
   assert.ok(!(plan(exp(151), {}, { callsSoFar: 999 })?.reasons || []).includes('call_budget'));
   assert.equal(planFor(exp(1), autoCtx, { ...AUTO }), null);
 });
+
+test('auto-apply: a read_md_file in the map folder beside an edit there does not stop the flow with a plan card', () => {
+  const edit = { kind: 'edit_md_file', path: 'Maps/Steak/進度.md', find: 'a', replace: 'b' };
+  assert.equal(autoPlan([edit, { kind: 'read_md_file', path: 'Maps/Steak/各章四項_第1批.md' }], { chain: { round: 2, researchSoFar: 0 } }), null);
+  assert.notEqual(autoPlan([edit, { kind: 'read_md_file', path: 'Notes/Elsewhere.md' }], { chain: { round: 2, researchSoFar: 0 } }), null, 'outside the folder still asks');
+});

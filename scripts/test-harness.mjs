@@ -8,6 +8,7 @@ import { focusAction, frontApp, instancePattern } from "./keep-background.mjs";
 import { enterHeavy, keepProfile } from "./heavy-lock.mjs";
 export { focusAction };
 import { createTestVault, ensureSourceSelectionFixture } from "./create-onboarding-test-vault.mjs";
+import { assertOwnerIdle } from "./owner-idle.mjs";
 
 export const root = fileURLToPath(new URL("..", import.meta.url));
 // The owner's vault must survive reboots (macOS clears /private/tmp), so it lives beside the main checkout, never under the temp session prefix.
@@ -91,7 +92,10 @@ function ensureNativeMenusOff(vault) {
 }
 
 // Refresh only installed code in an owned Vault. Preserve every fixture, note, and attachment.
-export function updateCurrentTestVault({ vault = canonicalVault, artifact = root, source = {}, owner = canonicalVault } = {}) {
+// The owner's vault is refused while the owner may be using it (scripts/owner-idle.mjs) unless the session that has the owner's
+// own 「可以裝」 passes ownerIdleConfirmed (--owner-idle-confirmed).
+export function updateCurrentTestVault({ vault = canonicalVault, artifact = root, source = {}, owner = canonicalVault, ownerIdleConfirmed = false, now } = {}) {
+  if (isOwnerVault(vault, owner) && !ownerIdleConfirmed) assertOwnerIdle(vault, { now });
   if (!existsSync(vault) || lstatSync(vault).isSymbolicLink() || !lstatSync(vault).isDirectory() || !existsSync(join(vault, marker))) throw new Error("Refusing to update a missing or unowned test vault.");
   const recordPath = join(vault, marker), record = json(recordPath);
   if (record.kind !== "vam-disposable-test-vault") throw new Error("Refusing to update a missing or unowned test vault.");
@@ -265,14 +269,23 @@ export const smokeVault = process.platform === "darwin" ? "/private/tmp/vam-e2e-
 
 export function main(args = process.argv.slice(2)) {
   if (args.some(arg => arg.startsWith("--session="))) return sessionMain(args);
-  for (const arg of args) if (!["--ui", "--prepare", "--update-current"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`Unknown argument: ${arg}`);
+  if (args.includes("--which-installed")) {
+    if (args.length !== 1) throw new Error("--which-installed takes no other options.");
+    return process.stdout.write(`${whichInstalled()}\n`);
+  }
+  for (const arg of args) if (!["--ui", "--prepare", "--update-current", "--owner-idle-confirmed"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`Unknown argument: ${arg}`);
   const ui = args.includes("--ui"), prepare = ui || args.includes("--prepare");
   const update = args.includes("--update-current");
   if (update && prepare) throw new Error("--update-current cannot be combined with reset/prepare options.");
+  const ownerIdleConfirmed = args.includes("--owner-idle-confirmed");
+  if (ownerIdleConfirmed && !update) throw new Error("--owner-idle-confirmed applies only to --update-current.");
   if (args.some(arg => arg.startsWith("--profile=")) && !prepare) throw new Error("Profile requires --prepare or --ui.");
   for (const name of ["VAM_TEST_TARGET_VERSION", "VAM_TEST_VAULT_PARENT", "VAM_TEST_ARTIFACT_DIR", "VAM_TEST_WORKSPACE_ROOT"]) if (process.env[name]) throw new Error(`${name} is retired in the current-branch harness; unset it to avoid testing a stale target.`);
   if (prepare) assertObsidianClosed();
   if (update) {
+    // Checked before the build so a busy owner is not kept waiting, and again right before the files are replaced.
+    if (ownerIdleConfirmed) process.stdout.write("--owner-idle-confirmed: skipping the owner-idle check (only after the owner said 「可以裝」).\n");
+    else assertOwnerIdle(canonicalVault);
     run("npm", ["run", "build"]);
     const builtHashes = hashes(root);
     // The build regenerates ignored artifacts; anchor the non-destructive update
@@ -287,7 +300,7 @@ export function main(args = process.argv.slice(2)) {
     const runtime = installedObsidianRuntime();
     source.obsidianRuntime = { version: runtime.version, hash: runtime.hash };
     source.diffHash = gitDiffHash(root, ["diff", "HEAD", "--binary"]);
-    const record = updateCurrentTestVault({ source });
+    const record = updateCurrentTestVault({ source, ownerIdleConfirmed });
     const appProfile = join(canonicalVault, ".vam-app");
     if (!existsSync(join(appProfile, "obsidian.json")) || !readdirSync(appProfile).some(name => name.endsWith(".asar"))) prepareObsidianProfile(canonicalVault, installedObsidianRuntime());
     process.stdout.write(`${JSON.stringify({ vault: canonicalVault, version: record.version, hashes: record.hashes, updatedInPlace: true, appProfile }, null, 2)}\n`);
@@ -327,9 +340,33 @@ export function main(args = process.argv.slice(2)) {
   } finally { if (prepare) rmSync(lock, { recursive: true }); }
 }
 
+// Names the commit installed in a vault (default: the owner's): the install record's commit when the installed main.js still
+// has the hash recorded at install time, and how that commit stands against origin/main. Read-only.
+export function whichInstalled(vault = canonicalVault, checkout = root) {
+  const plugin = join(vault, ".obsidian/plugins/visual-agent-map");
+  const record = json(join(vault, marker));
+  const installed = hash(readFileSync(join(plugin, "main.js")));
+  const version = json(join(plugin, "manifest.json")).version;
+  const lines = [`vault: ${vault}`, `version: ${version}`];
+  const git = (...values) => { try { return execFileSync("git", ["-C", checkout, ...values], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return null; } };
+  if (installed !== record.hashes?.["main.js"]) {
+    const here = existsSync(join(checkout, "main.js")) && hash(readFileSync(join(checkout, "main.js"))) === installed;
+    lines.push(`commit: unknown (main.js changed after the recorded install${here ? `; it matches this checkout's build of ${git("rev-parse", "HEAD") ?? "?"}` : ""})`);
+    return lines.join("\n");
+  }
+  const commit = record.source?.commit ?? "unknown";
+  const dirty = record.source?.status ? " (built with uncommitted changes)" : "";
+  lines.push(`commit: ${commit}${dirty}`, `branch at install: ${record.source?.branch || "unknown"}`);
+  const subject = git("log", "-1", "--format=%s", commit);
+  if (subject) lines.push(`subject: ${subject}`);
+  if (git("merge-base", "--is-ancestor", commit, "origin/main") !== null) lines.push(`on origin/main: yes, ${git("rev-list", "--count", `${commit}..origin/main`)} commit(s) behind`);
+  else lines.push("on origin/main: no (or unknown here; run git fetch)");
+  return lines.join("\n");
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
-  // --smoke and --session= are the Obsidian-only setup paths; every other form builds and runs the test layers.
-  if (!argv.includes("--smoke") && !argv.some(arg => arg.startsWith("--session="))) await enterHeavy(`npm test ${argv.join(" ")}`.trim(), { blocking: true }); // main() runs spawnSync: see enterHeavy
+  // --smoke, --session= and --which-installed are the paths that build nothing; every other form builds and runs the test layers.
+  if (!argv.includes("--smoke") && !argv.includes("--which-installed") && !argv.some(arg => arg.startsWith("--session="))) await enterHeavy(`npm test ${argv.join(" ")}`.trim(), { blocking: true }); // main() runs spawnSync: see enterHeavy
   main();
 }

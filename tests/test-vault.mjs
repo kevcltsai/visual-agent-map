@@ -4,7 +4,8 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction } from '../scripts/test-harness.mjs';
+import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled } from '../scripts/test-harness.mjs';
+import { ownerBusyReasons } from '../scripts/owner-idle.mjs';
 import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
 function environment(t) {
@@ -58,7 +59,7 @@ test('owner vault update neither seeds nor requires fixture maps; other vaults s
   for (const f of fixtures) rmSync(join(owner, 'Agent Workspace', f), { recursive: true, force: true });
   writeFileSync(join(owner, '.obsidian/plugins/visual-agent-map/main.js'), 'stale plugin build');
   assert.throws(() => verifyTestVault(owner), /hash mismatch|Fixture\/settings/);
-  updateCurrentTestVault({ vault: owner, owner });
+  updateCurrentTestVault({ vault: owner, owner, ownerIdleConfirmed: true });
   for (const f of fixtures) assert.equal(existsSync(join(owner, 'Agent Workspace', f)), false);
   verifyTestVault(owner, root, owner);
   assert.throws(() => verifyTestVault(owner), /Fixture\/settings/);
@@ -345,8 +346,110 @@ test('in-place refresh turns native menus off for session vaults only when unset
   const ownerAppearance = join(owner, '.obsidian/appearance.json');
   writeFileSync(ownerAppearance, '{"theme":"system"}');
   const before = readFileSync(ownerAppearance);
-  updateCurrentTestVault({ vault: owner, owner });
+  updateCurrentTestVault({ vault: owner, owner, ownerIdleConfirmed: true });
   assert.deepEqual(readFileSync(ownerAppearance), before);
-  rmSync(ownerAppearance); updateCurrentTestVault({ vault: owner, owner });
+  rmSync(ownerAppearance); updateCurrentTestVault({ vault: owner, owner, ownerIdleConfirmed: true });
   assert.equal(existsSync(ownerAppearance), false);
+});
+
+// Owner-idle install guard (scripts/owner-idle.mjs): every refusal condition and the matching allowed case, on fixture vaults.
+const NOW = Date.parse('2026-11-15T02:00:00.000Z');
+const ago = minutes => new Date(NOW - minutes * 60000).toISOString();
+function busyVault(t, { records = { 'Mind Maps/甲': { '20261115-010000-aaaaaa': [] } }, exchanges = [{ startedAt: ago(120), completedAt: ago(119) }] } = {}) {
+  const { vault } = environment(t);
+  for (const [map, files] of Object.entries(records)) {
+    const dir = join(vault, 'Agent Workspace', map, 'Chats/records'); mkdirSync(dir, { recursive: true });
+    for (const [name, lines] of Object.entries(files)) writeFileSync(join(dir, `${name}.jsonl`), [{ v: 1, type: 'conversation', id: name }, ...lines].map(line => typeof line === 'string' ? line : JSON.stringify(line)).join('\n') + '\n');
+  }
+  const plugin = join(vault, '.obsidian/plugins/visual-agent-map'); mkdirSync(plugin, { recursive: true });
+  if (exchanges !== 'missing') writeFileSync(join(plugin, 'ai-exchanges.json'), typeof exchanges === 'string' ? exchanges : JSON.stringify(exchanges));
+  return vault;
+}
+const start = (turn, minutes, extra = {}) => ({ v: 1, type: 'turn_start', turn, message: 'x', at: ago(minutes), ...extra });
+const end = (turn, status, minutes) => ({ v: 1, type: 'turn_end', turn, status, at: ago(minutes) });
+const one = lines => ({ records: { 'Mind Maps/甲': { '20261115-010000-aaaaaa': lines } } });
+const reasons = (t, setup) => ownerBusyReasons(busyVault(t, setup), { now: NOW });
+
+test('owner-idle guard: idle vault passes; a finished chain and an applied plan pass', t => {
+  assert.deepEqual(reasons(t, one([start(1, 60), end(1, 'done', 59), start(2, 59, { auto: true, round: 2 }), end(2, 'plan', 58), { v: 1, type: 'plan', turn: 2, state: 'applied', at: ago(57) }, { v: 1, type: 'event', turn: 2, kind: 'chain_end', reason: 'done', at: ago(57) }])), []);
+  assert.deepEqual(reasons(t, { records: {} }), []);
+});
+
+test('owner-idle guard: a plan nobody applied or cancelled refuses; applied, cancelled or chain_end after it passes', t => {
+  const pending = [start(1, 60), end(1, 'plan', 59)];
+  assert.match(reasons(t, one(pending)).join('\n'), /甲：最後一輪（第 1 輪）有待套用的計畫/);
+  for (const state of ['applied', 'cancelled', 'stopped']) assert.deepEqual(reasons(t, one([...pending, { v: 1, type: 'plan', turn: 1, state, at: ago(58) }])), []);
+  assert.deepEqual(reasons(t, one([...pending, { v: 1, type: 'event', turn: 1, kind: 'chain_end', reason: 'plan_cancelled', at: ago(58) }])), []);
+  // Only the newest conversation of a map decides: an older one left on a plan does not refuse.
+  assert.deepEqual(reasons(t, { records: { 'Mind Maps/甲': { '20261114-010000-old000': pending, '20261115-010000-new000': [start(1, 50), end(1, 'done', 49)] } } }), []);
+  // Every map counts.
+  assert.match(reasons(t, { records: { 'Mind Maps/甲': { '20261115-010000-aaaaaa': [] }, 'Topics/乙': { '20261115-010000-bbbbbb': pending } } }).join('\n'), /乙：最後一輪/);
+});
+
+test('owner-idle guard: an automatic continuation with no chain_end refuses; chain_end or a later user turn passes', t => {
+  const running = [start(1, 60), end(1, 'done', 59), start(2, 59, { auto: true, round: 2 })];
+  assert.match(reasons(t, one(running)).join('\n'), /自動接續還在跑（第 2 輪/);
+  assert.match(reasons(t, one([...running, end(2, 'done', 40)])).join('\n'), /自動接續還在跑/);
+  assert.deepEqual(reasons(t, one([...running, end(2, 'done', 40), { v: 1, type: 'event', turn: 2, kind: 'chain_end', reason: 'done', at: ago(40) }])), []);
+  assert.deepEqual(reasons(t, one([...running, end(2, 'done', 40), start(3, 30), end(3, 'done', 29)])), []);
+});
+
+test('owner-idle guard: a turn_start or an AI call in the last 15 minutes refuses; 16 minutes ago passes', t => {
+  assert.match(reasons(t, one([start(1, 10), end(1, 'done', 9)])).join('\n'), /剛開始一輪對話（15 分鐘內）/);
+  assert.deepEqual(reasons(t, one([start(1, 16), end(1, 'done', 15.5)])), []);
+  // An older conversation written in the window still counts.
+  assert.match(reasons(t, { records: { 'Mind Maps/甲': { '20261114-000000-old000': [start(1, 5)], '20261115-010000-new000': [] } } }).join('\n'), /15 分鐘內/);
+  assert.match(reasons(t, { exchanges: [{ startedAt: ago(200) }, { startedAt: ago(14), completedAt: ago(13) }] }).join('\n'), /ai-exchanges\.json：.*有 AI 呼叫/);
+  assert.match(reasons(t, { exchanges: [{ startedAt: ago(20) }, { startedAt: ago(16), sentAt: ago(16) }, { startedAt: ago(30), completedAt: ago(5) }] }).join('\n'), /有 AI 呼叫/);
+  assert.deepEqual(reasons(t, { exchanges: [{ startedAt: ago(20), completedAt: ago(16) }] }), []);
+  assert.deepEqual(reasons(t, { exchanges: [] }), []);
+});
+
+test('owner-idle guard: anything it cannot read refuses', t => {
+  assert.match(reasons(t, one(['{not json'])).join('\n'), /格式不對/);
+  assert.match(reasons(t, one([{ v: 1, type: 'turn_start', turn: 1 }])).join('\n'), /沒有可讀的時間/);
+  assert.match(reasons(t, { exchanges: 'missing' }).join('\n'), /檔案不存在/);
+  assert.match(reasons(t, { exchanges: '{"a":1}' }).join('\n'), /not a list/);
+  assert.match(reasons(t, { exchanges: '[{"startedAt":' }).join('\n'), /判斷不出狀態/);
+  assert.match(reasons(t, { exchanges: [{ id: 'no time' }] }).join('\n'), /no readable time/);
+  assert.match(ownerBusyReasons(join(tmpdir(), 'vam-no-such-vault-owner-idle'), { now: NOW }).join('\n'), /無法讀取 vault/);
+});
+
+test('owner-idle guard: updating the owner vault refuses while busy and leaves main.js; --owner-idle-confirmed installs', t => {
+  const { folder } = environment(t);
+  const owner = join(folder, 'owner', 'current'); prepareTestVault({ vault: owner });
+  const plugin = join(owner, '.obsidian/plugins/visual-agent-map');
+  const dir = join(owner, 'Agent Workspace/Mind Maps/甲/Chats/records'); mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, '20261115-010000-aaaaaa.jsonl'), [start(1, 60), end(1, 'plan', 59)].map(l => JSON.stringify(l)).join('\n'));
+  writeFileSync(join(plugin, 'ai-exchanges.json'), JSON.stringify([{ startedAt: ago(120) }]));
+  writeFileSync(join(plugin, 'main.js'), 'stale plugin build');
+  assert.throws(() => updateCurrentTestVault({ vault: owner, owner, now: NOW }), /Refusing to install into the owner's vault[\s\S]*待套用的計畫[\s\S]*--owner-idle-confirmed/);
+  assert.equal(readFileSync(join(plugin, 'main.js'), 'utf8'), 'stale plugin build');
+  // The owner applied the plan: the same update goes through.
+  writeFileSync(join(dir, '20261115-010000-aaaaaa.jsonl'), [start(1, 60), end(1, 'plan', 59), { v: 1, type: 'plan', turn: 1, state: 'applied', at: ago(58) }].map(l => JSON.stringify(l)).join('\n'));
+  updateCurrentTestVault({ vault: owner, owner, now: NOW });
+  assert.equal(readFileSync(join(plugin, 'main.js'), 'utf8'), readFileSync(join(root, 'main.js'), 'utf8'));
+  // Busy again, but the owner said 「可以裝」.
+  writeFileSync(join(plugin, 'ai-exchanges.json'), JSON.stringify([{ startedAt: ago(1) }]));
+  writeFileSync(join(plugin, 'main.js'), 'stale plugin build');
+  assert.throws(() => updateCurrentTestVault({ vault: owner, owner, now: NOW }), /有 AI 呼叫/);
+  updateCurrentTestVault({ vault: owner, owner, now: NOW, ownerIdleConfirmed: true });
+  assert.equal(readFileSync(join(plugin, 'main.js'), 'utf8'), readFileSync(join(root, 'main.js'), 'utf8'));
+  // A session vault is never checked.
+  const { vault } = environment(t); prepareTestVault({ vault });
+  writeFileSync(join(vault, '.obsidian/plugins/visual-agent-map/ai-exchanges.json'), JSON.stringify([{ startedAt: ago(1) }]));
+  updateCurrentTestVault({ vault, now: NOW });
+});
+
+test('--owner-idle-confirmed only goes with --update-current; --which-installed stands alone and names the installed commit', t => {
+  assert.throws(() => main(['--owner-idle-confirmed']), /applies only to --update-current/);
+  assert.throws(() => main(['--prepare', '--owner-idle-confirmed']), /cannot be combined|applies only/);
+  assert.throws(() => main(['--which-installed', '--ui']), /takes no other options/);
+  const { vault } = environment(t);
+  prepareTestVault({ vault, source: { branch: 'main', commit: 'abc1234deadbeef', status: '' } });
+  const text = whichInstalled(vault);
+  assert.match(text, /commit: abc1234deadbeef\n/);
+  assert.match(text, /branch at install: main/);
+  writeFileSync(join(vault, '.obsidian/plugins/visual-agent-map/main.js'), 'hand edited');
+  assert.match(whichInstalled(vault), /commit: unknown \(main\.js changed after the recorded install\)/);
 });

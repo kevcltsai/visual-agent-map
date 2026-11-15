@@ -55024,7 +55024,7 @@ function mapChoiceParts(maps) {
 }
 function chatResearchMode(action, mapAiMode) {
   if (action.mode) return action.mode;
-  if (action.needsWeb === true) return "standard";
+  if (action.needsWeb === true || action.images === true) return "standard";
   return mapAiMode || "quick";
 }
 function chatResearchRequest(action, mapAiMode, optionsOf) {
@@ -81793,6 +81793,7 @@ ${note.detail.trim()}` : "",
           }
           source.editor.replaceRange(replace, source.editor.offsetToPos(from), source.editor.offsetToPos(to));
           this.recordChatFileEdit(source.file.path, source.text, next, run);
+          if (editKey) hashes[editKey] = contentHash2(next);
           return done;
         }
         let raced = false;
@@ -81805,6 +81806,7 @@ ${note.detail.trim()}` : "",
         });
         if (raced) return skipped("ui.map_chat_skip_stale");
         this.recordChatFileEdit(source.file.path, source.text, next, run);
+        if (editKey) hashes[editKey] = contentHash2(next);
         return done;
       }
       case "create_md_file": {
@@ -81837,6 +81839,7 @@ ${note.detail.trim()}` : "",
         }
         await this.app.vault.create(key4, content);
         this.recordChatFileCreate(key4, content, run);
+        hashes[key4] = contentHash2(content);
         return done;
       }
     }

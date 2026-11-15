@@ -866,7 +866,10 @@ test('D-231 mode resolution: a named mode > the map mode > Quick; the all-new-ca
   assert.deepEqual(plain(ask({ mode: 'standard' }, undefined)), { mapAiMode: 'standard', researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false });
   assert.equal(ask({ mode: 'standard', images: true, direction: 'recent only' }).imageSearch, true, 'Standard: images when asked');
   assert.equal(ask({ mode: 'standard', images: true, direction: 'recent only' }).requirements, 'recent only');
-  assert.equal(ask({ images: true }, 'quick').imageSearch, false, 'Quick: never images');
+  assert.equal(ask({ mode: 'quick', images: true }, 'standard').imageSearch, false, 'the user said quick: never images');
+  assert.equal(ask({ images: true }, 'quick').mapAiMode, 'standard', 'images asked, no mode named: Standard even on a Quick map');
+  assert.equal(ask({ images: true }, 'quick').imageSearch, true, 'images asked on a Quick map: images are searched');
+  assert.equal(ask({ images: true }, undefined).imageSearch, true, 'images asked, map without a mode: images are searched');
 });
 test('B2 plan counterexample: researching 9 cards the reply created needs no plan, 10 do (the research limit counts new: targets too)', () => {
   const news = count => researchOn(Array.from({ length: count }, (_, i) => `new:n${i}`));

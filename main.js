@@ -31486,6 +31486,307 @@ var ChatActionWriter = class {
   get history() {
     return this.ports.history();
   }
+  get app() {
+    return this.ports.app();
+  }
+  async write(action, baseline, same2, run) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    const hashes = baseline.mdHashes;
+    if (!same2() || !this.map) return skipped("ui.map_chat_skip_map_changed");
+    const nodeOf = (id) => {
+      var _a3;
+      return (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === id);
+    };
+    const gone = skipped("ui.map_chat_skip_topic_gone");
+    const done = { status: "done" };
+    const configDir = this.app.vault.configDir;
+    const real = (id) => {
+      var _a3;
+      return id.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : id;
+    };
+    const sourceFileRefusal = (node) => {
+      const verdict = guardMapChatWrite({
+        kind: "edit",
+        path: node.path,
+        newContent: "",
+        knownHashes: hashes,
+        readOnlyPaths: baseline.mapSourcePaths,
+        configDir
+      });
+      return !verdict.ok && verdict.code === "map_source" ? guardSkipped(verdict.code) : null;
+    };
+    const locked = await this.chatLockSkip(action, real);
+    if (locked) return locked;
+    switch (action.kind) {
+      case "add_child": {
+        let parent = null;
+        if (action.parentId) {
+          const parentId = real(action.parentId);
+          if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
+          parent = (_a2 = nodeOf(parentId)) != null ? _a2 : null;
+          if (!parent) return gone;
+          if (this.ports.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
+        }
+        const before = new Set(this.map.nodes.map((item) => item.id));
+        if (run.deferRebuild) run.ownershipDirty = true;
+        await this.ports.addNode(parent, action.title, !run.deferRebuild, false, (_b2 = action.topicKind) != null ? _b2 : "topic", false, {
+          leaning: action.leaning,
+          strength: action.strength
+        });
+        const created = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => !before.has(item.id));
+        if (!created) return skipped("ui.map_chat_skip_unavailable");
+        run.created.push(created.id);
+        (_d = run.notes) == null ? void 0 : _d.add(created.id);
+        if (action.ref) run.refs.set(action.ref, created.id);
+        if (action.summary) await this.ports.noteChange(created, { summary: action.summary });
+        return done;
+      }
+      case "set_topic_kind":
+        return this.chatSetTopicKind(action, real, run);
+      case "add_relation":
+      case "remove_relation":
+        return this.chatChangeRelation(action, real);
+      case "add_anchor":
+      case "link_anchor":
+        return this.chatChangeAnchor(action, real, run);
+      case "set_appearance":
+        return this.chatSetAppearance(action, real, run);
+      case "collapse_topic":
+      case "expand_topic": {
+        this.ports.flushChatRender();
+        const id = real(action.nodeId);
+        if (id === null) return skipped("ui.map_chat_skip_parent_missing");
+        const node = nodeOf(id);
+        if (!node) return gone;
+        if (!this.map.nodes.some((item) => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
+        const collapsed = action.kind === "collapse_topic";
+        await this.ports.mapChange((map) => {
+          const target = map.nodes.find((item) => item.id === node.id);
+          if (target) target.collapsed = collapsed;
+          this.ports.arrangeAll(map);
+        });
+        return done;
+      }
+      case "auto_layout":
+        this.ports.flushChatRender();
+        await this.ports.mapChange((map) => {
+          this.ports.arrangeAll(map);
+        }, false);
+        return done;
+      case "focus_topic": {
+        this.ports.flushChatRender();
+        const id = real(action.nodeId);
+        if (id === null) return skipped("ui.map_chat_skip_parent_missing");
+        const node = nodeOf(id);
+        if (!node) return gone;
+        this.ports.focusNode(node);
+        return done;
+      }
+      case "rename_topic":
+      case "update_summary":
+      case "edit_topic_note": {
+        const node = nodeOf(action.nodeId);
+        if (!node) return gone;
+        const sourceRefusal = sourceFileRefusal(node);
+        if (sourceRefusal) return sourceRefusal;
+        const detail = action.kind === "edit_topic_note" ? await demoteUnparsableMermaid(
+          // A full replace: only an image repeated inside the new Detail is dropped.
+          neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(action.detail))),
+          this.plugin.mermaidSyntax
+        ) : "";
+        if (this.ports.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
+        const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
+        if (changed) return changed;
+        (_e = run.notes) == null ? void 0 : _e.add(node.id);
+        await this.ports.noteChange(
+          node,
+          action.kind === "rename_topic" ? { title: action.title } : action.kind === "update_summary" ? { summary: action.summary } : { detail }
+        );
+        await this.chatTopicAccept(node.id, baseline.topicHashes);
+        return done;
+      }
+      case "move_topic": {
+        const node = nodeOf(action.nodeId);
+        const parentId = real(action.newParentId);
+        if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
+        const parent = nodeOf(parentId);
+        if (!node || !parent) return gone;
+        const oldParent = node.parentId ? nodeOf(node.parentId) : void 0;
+        for (const touched of [node, parent, oldParent]) {
+          const sourceRefusal = touched ? sourceFileRefusal(touched) : null;
+          if (sourceRefusal) return sourceRefusal;
+        }
+        if (this.ports.isMerging(node.id) || this.ports.isMerging(parent.id))
+          return skipped("ui.map_chat_skip_merge_locked");
+        const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
+        if (changed) return changed;
+        if (!canParent(this.map.nodes, node.id, parent.id)) return skipped("ui.map_chat_skip_cycle");
+        if (action.beforeId) {
+          const beforeId = real(action.beforeId);
+          if (beforeId === null) return skipped("ui.map_chat_skip_parent_missing");
+          const before = nodeOf(beforeId);
+          if (!before) return gone;
+          if (before.id === node.id || before.parentId !== parent.id || before.afterTextId)
+            return skipped("ui.map_chat_skip_not_sibling");
+          if (!await this.ports.chatMoveBefore(node, parent, before)) return skipped("ui.map_chat_skip_not_sibling");
+        } else await this.ports.moveTopic(node, parent);
+        await this.chatTopicAccept(node.id, baseline.topicHashes);
+        return done;
+      }
+      case "reorder_topics": {
+        const parentId = real(action.parentId);
+        const ids2 = action.nodeIds.map((id) => real(id));
+        if (parentId === null || ids2.some((id) => id === null)) return skipped("ui.map_chat_skip_parent_missing");
+        const parent = nodeOf(parentId);
+        const kids = ids2.map((id) => nodeOf(id));
+        if (!parent || kids.some((kid) => !kid)) return gone;
+        if (this.ports.isMerging(parent.id) || kids.some((kid) => this.ports.isMerging(kid.id)))
+          return skipped("ui.map_chat_skip_merge_locked");
+        if (kids.some((kid) => kid.parentId !== parent.id || kid.afterTextId !== kids[0].afterTextId))
+          return skipped("ui.map_chat_skip_not_sibling");
+        await this.ports.chatReorderChildren(parent, ids2);
+        return done;
+      }
+      case "delete_topic": {
+        const node = nodeOf(action.nodeId);
+        if (!node) return gone;
+        const sourceRefusal = sourceFileRefusal(node);
+        if (sourceRefusal) return sourceRefusal;
+        if (this.ports.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
+        const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
+        if (changed) return changed;
+        const removed = await this.ports.removeToUnassignedEntry(node, action.branch);
+        for (const path of (_g = (_f = removed == null ? void 0 : removed.parkedPaths) == null ? void 0 : _f.call(removed)) != null ? _g : []) (_h = run.parked) == null ? void 0 : _h.add(path);
+        return done;
+      }
+      case "edit_md_file": {
+        const early = guardMapChatWrite({
+          kind: "edit",
+          path: action.path,
+          newContent: "",
+          knownHashes: hashes,
+          readOnlyPaths: baseline.mapSourcePaths,
+          configDir
+        });
+        if (!early.ok) return guardSkipped(early.code);
+        const editKey = normalizeVaultPath(action.path);
+        if (editKey && this.ports.attachedReadOnly(editKey, baseline))
+          return skipped("ui.map_chat_skip_attached_read_only");
+        let source = await this.ports.readChatFile(action.path);
+        if (!source) return skipped("ui.map_chat_skip_file_missing");
+        if (isMdStale(hashes, action.path, source.text)) return skipped("ui.map_chat_skip_stale");
+        const raw = applyMdEdit(source.text, action.find, action.replace);
+        if (raw === null) return skipped("ui.map_chat_skip_find_failed");
+        const at = source.text.indexOf(action.find);
+        const guarded = guardInlineHtmlLinks(raw, {
+          frontmatter: true,
+          range: { start: at, end: at + action.replace.length }
+        });
+        const tail = source.text.length - at - action.find.length;
+        const next = dedupeImageEmbeds(guarded, { file: true, range: { start: at, end: guarded.length - tail } });
+        const added = addedMermaidBlocks(source.text, next);
+        if (added.some((block) => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
+        const check = this.plugin.mermaidSyntax;
+        const codes = added.flatMap((block) => {
+          var _a3;
+          return ((_a3 = block.code) == null ? void 0 : _a3.trim()) ? [block.code] : [];
+        });
+        if (check && codes.length) {
+          for (const code of codes) {
+            const syntax = await check(code);
+            if (syntax === "invalid") return skipped("ui.map_chat_skip_invalid_mermaid");
+            if (syntax === "unavailable") {
+              console.warn("Visual Agent Map edit mermaid unchecked");
+              break;
+            }
+          }
+          const again = await this.ports.readChatFile(action.path);
+          if (!again || again.text !== source.text) return skipped("ui.map_chat_skip_stale");
+          source = again;
+        } else if (added.some((block) => {
+          var _a3;
+          return (_a3 = block.code) == null ? void 0 : _a3.trim();
+        })) {
+          console.warn("Visual Agent Map edit mermaid unchecked");
+        }
+        const verdict = guardMapChatWrite({
+          kind: "edit",
+          path: action.path,
+          oldContent: source.text,
+          newContent: next,
+          knownHashes: hashes,
+          readOnlyPaths: baseline.mapSourcePaths,
+          configDir
+        });
+        if (!verdict.ok) return guardSkipped(verdict.code, true);
+        if (source.editor) {
+          const before = source.text;
+          let from = at;
+          let to = at + action.find.length;
+          let replace = next.slice(at, next.length - tail);
+          if (!(next.startsWith(before.slice(0, at)) && next.endsWith(before.slice(before.length - tail)) && next.length >= at + tail)) {
+            const limit = Math.min(before.length, next.length);
+            from = 0;
+            while (from < limit && before.charCodeAt(from) === next.charCodeAt(from)) from++;
+            let rest = 0;
+            while (rest < limit - from && before.charCodeAt(before.length - 1 - rest) === next.charCodeAt(next.length - 1 - rest))
+              rest++;
+            to = before.length - rest;
+            replace = next.slice(from, next.length - rest);
+          }
+          source.editor.replaceRange(replace, source.editor.offsetToPos(from), source.editor.offsetToPos(to));
+          this.recordChatFileEdit(source.file.path, source.text, next, run);
+          if (editKey) hashes[editKey] = contentHash2(next);
+          return done;
+        }
+        let raced = false;
+        await this.app.vault.process(source.file, (current) => {
+          if (current !== source.text) {
+            raced = true;
+            return current;
+          }
+          return next;
+        });
+        if (raced) return skipped("ui.map_chat_skip_stale");
+        this.recordChatFileEdit(source.file.path, source.text, next, run);
+        if (editKey) hashes[editKey] = contentHash2(next);
+        return done;
+      }
+      case "create_md_file": {
+        const key4 = normalizeVaultPath(action.path);
+        const exists = key4 ? !!this.app.vault.getAbstractFileByPath(key4) : false;
+        const content = await demoteUnparsableMermaid(
+          neutralizeUnsafeMermaid(
+            dedupeImageEmbeds(guardInlineHtmlLinks(action.content, { frontmatter: true }), { file: true })
+          ),
+          this.plugin.mermaidSyntax
+        );
+        const verdict = guardMapChatWrite({
+          kind: "create",
+          path: action.path,
+          newContent: content,
+          exists,
+          readOnlyPaths: baseline.mapSourcePaths,
+          configDir
+        });
+        const mapFolder = this.path.slice(0, Math.max(0, this.path.lastIndexOf("/")));
+        if (!verdict.ok && verdict.code === "exists" && mapFolder && (key4 == null ? void 0 : key4.startsWith(`${mapFolder}/`)))
+          return skipped(
+            await this.ports.chatReadableNow(key4) ? "ui.map_chat_guard_exists_in_map" : "ui.map_chat_guard_exists_not_own"
+          );
+        if (!verdict.ok || !key4) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
+        const folders = key4.split("/").slice(0, -1);
+        for (let depth = 1; depth <= folders.length; depth++) {
+          const folder = folders.slice(0, depth).join("/");
+          if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+        }
+        await this.app.vault.create(key4, content);
+        this.recordChatFileCreate(key4, content, run);
+        hashes[key4] = contentHash2(content);
+        return done;
+      }
+    }
+  }
   /**
    * set_appearance: the colour, markers and styles of every target in one step, with the topic panel's rules (one colour, one
    * value per single-choice marker group, one text size; unknown frontmatter values stay). Only the notes whose appearance
@@ -31712,6 +32013,146 @@ var ChatActionWriter = class {
     }).commit({ deferRebuild: true, label: t("ui.topic_type") });
     this.history.push(entry);
     return { status: "done" };
+  }
+  /**
+   * The AI lock of a map chat write, read from disk at apply time (so a lock set after the reply was proposed still
+   * counts): what the tool would change, add under, move or remove. Null when the write may go ahead.
+   */
+  async chatLockSkip(action, real) {
+    var _a2, _b2;
+    const refused = skipped("ui.ai_locked_notice");
+    const check = async (op, ids2, to) => {
+      const known = ids2.filter((id) => !!id);
+      if (!known.length) return null;
+      const involved = [...known, ...to ? [to] : []];
+      const fresh = op === "remove" || op === "move" ? await this.ports.freshNotes() : await this.ports.freshNotesOf(involved);
+      return this.ports.aiLockReason(op, known, fresh, to === void 0 ? void 0 : { to }) ? refused : null;
+    };
+    switch (action.kind) {
+      case "add_child":
+        return action.parentId ? check("addChild", [real(action.parentId)]) : null;
+      case "set_topic_kind":
+      case "set_appearance":
+        return check(
+          "write",
+          action.nodeIds.map((id) => real(id))
+        );
+      case "rename_topic":
+      case "update_summary":
+      case "edit_topic_note":
+        return check("write", [action.nodeId]);
+      case "collapse_topic":
+      case "expand_topic":
+        return check("write", [real(action.nodeId)]);
+      case "move_topic":
+        return check("move", [action.nodeId], real(action.newParentId));
+      case "reorder_topics":
+        return check(
+          "move",
+          action.nodeIds.map((id) => real(id)),
+          real(action.parentId)
+        );
+      // A relation writes both end notes' lines and Map.md: a locked end refuses it (the end cards can be ones of this reply).
+      case "add_relation":
+      case "remove_relation":
+        return check("write", [real(action.fromId), real(action.toId)]);
+      // An anchor relation is written to the card's note like a topic relation; its anchor end is no card.
+      case "link_anchor":
+        return check("write", [real(action.nodeId)]);
+      case "delete_topic":
+        return check("remove", [action.nodeId]);
+      case "edit_md_file": {
+        const key4 = normalizeVaultPath(action.path);
+        if (!key4) return null;
+        const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === key4);
+        if (node) return check("write", [node.id]);
+        const file = this.ports.fileOf(key4);
+        const frontmatter2 = file ? (_b2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _b2.frontmatter : void 0;
+        return frontmatter2 && readAiLocked(frontmatter2) ? refused : null;
+      }
+      default:
+        return null;
+    }
+  }
+  /** The card as the vault has it right now (the view's cache can be a debounce behind a user's edit); the cache is refreshed too. */
+  async chatTopicNow(id) {
+    var _a2, _b2;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    if (!node) return null;
+    let fresh;
+    try {
+      fresh = await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0);
+    } catch (e) {
+      return null;
+    }
+    this.notes.set(id, fresh);
+    return this.ports.topicState(id, fresh);
+  }
+  /**
+   * The reason to skip a card action, or null when the card is as the model saw it. Title and parent are always compared;
+   * the summary and the Detail text only when the card was sent in full. `edit_topic_note` replaces the whole body, so it
+   * needs a Detail baseline: a card the model saw only in the outline is never overwritten.
+   */
+  async chatTopicStale(id, topicHashes, needsDetail = false) {
+    const seen = Object.prototype.hasOwnProperty.call(topicHashes, id) ? topicHashes[id] : void 0;
+    const now = await this.chatTopicNow(id);
+    if (!seen || !now) return skipped("ui.map_chat_skip_topic_changed");
+    if (needsDetail && seen.detailHash === void 0) return skipped("ui.map_chat_skip_topic_not_seen");
+    if (seen.title !== now.title || seen.parentId !== now.parentId || seen.summary !== void 0 && seen.summary !== now.summary || seen.detailHash !== void 0 && seen.detailHash !== contentHash2(now.detail))
+      return skipped("ui.map_chat_skip_topic_changed");
+    return null;
+  }
+  /** After this reply's own write to a card, its baseline follows, so a second action in the same reply is not mistaken for a user edit. */
+  async chatTopicAccept(id, topicHashes) {
+    const seen = topicHashes[id];
+    const now = await this.chatTopicNow(id);
+    if (!seen || !now) return;
+    topicHashes[id] = {
+      title: now.title,
+      parentId: now.parentId,
+      ...seen.summary !== void 0 ? { summary: now.summary } : {},
+      ...seen.detailHash !== void 0 ? { detailHash: contentHash2(now.detail) } : {}
+    };
+  }
+  /** Writes `text` to the file, through its open editor when there is one, so the editor and the file stay one. */
+  async chatWriteFile(path, text10) {
+    const source = await this.ports.readChatFile(path);
+    if (!source) throw this.ports.chatUndoRefusal();
+    if (source.editor) source.editor.setValue(text10);
+    else await this.app.vault.process(source.file, () => text10);
+  }
+  /** edit_md_file as an undo entry: undo puts the old text back, redo the new one, each only over the text it expects. */
+  recordChatFileEdit(path, before, after, run) {
+    var _a2;
+    (_a2 = run.files) == null ? void 0 : _a2.add(path);
+    this.ports.noteChatOwnFile(path, after, false);
+    const swap = async (expected, replacement) => {
+      if (await this.ports.chatFileText(path) !== expected) throw this.ports.chatUndoRefusal();
+      await this.chatWriteFile(path, replacement);
+    };
+    this.history.push({ undo: () => swap(after, before), redo: () => swap(before, after) });
+  }
+  /** create_md_file as an undo entry: undo moves the file to the trash, redo creates it again, each only when nothing changed. */
+  recordChatFileCreate(path, content, run) {
+    var _a2;
+    (_a2 = run.files) == null ? void 0 : _a2.add(path);
+    this.ports.noteChatOwnFile(path, content, true);
+    this.history.push({
+      undo: async () => {
+        const file = this.ports.fileOf(path);
+        if (!file || await this.ports.chatFileText(path) !== content) throw this.ports.chatUndoRefusal();
+        await this.app.fileManager.trashFile(file);
+      },
+      redo: async () => {
+        if (this.app.vault.getAbstractFileByPath(path)) throw this.ports.chatUndoRefusal();
+        const folders = path.split("/").slice(0, -1);
+        for (let depth = 1; depth <= folders.length; depth++) {
+          const folder = folders.slice(0, depth).join("/");
+          if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+        }
+        await this.app.vault.create(path, content);
+      }
+    });
   }
 };
 
@@ -60520,7 +60961,34 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       hypothesisLeaningOf: (id) => this.hypothesisLeaningOf(id),
       hypothesisStrengthOf: (id) => this.hypothesisStrengthOf(id),
       mapChange: (change2, rebuildDerivedData) => this.mapChange(change2, rebuildDerivedData),
-      beginMapTransaction: () => this.beginMapTransaction()
+      beginMapTransaction: () => this.beginMapTransaction(),
+      app: () => this.app,
+      aiLockReason: (op, ids2, fresh, options) => this.aiLockReason(op, ids2, fresh, options),
+      freshNotes: () => this.freshNotes(),
+      freshNotesOf: (ids2) => this.freshNotesOf(ids2),
+      topicState: (id, fresh) => this.chatTopicState(id, fresh),
+      addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart) => this.addNode(parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart),
+      noteChange: (node, patch) => this.noteChange(node, patch),
+      moveTopic: (node, parent) => this.moveTopic(node, parent),
+      removeToUnassignedEntry: (node, branch, adopterId) => this.removeToUnassignedEntry(node, branch, adopterId),
+      chatMoveBefore: (node, parent, before) => this.chatMoveBefore(node, parent, before),
+      chatReorderChildren: (parent, ids2) => this.chatReorderChildren(parent, ids2),
+      arrangeAll: (map) => this.arrangeAll(map),
+      focusNode: (target) => this.focusNode(target),
+      flushChatRender: () => this.flushChatRender(),
+      readChatFile: (path) => this.readChatFile(path),
+      chatFileText: (path) => this.chatFileText(path),
+      chatUndoRefusal: () => this.chatUndoRefusal(),
+      chatReadableNow: (key4) => this.chatReadableNow(key4),
+      attachedReadOnly: (key4, baseline) => {
+        var _a2;
+        return this.chatAttached.has(key4) && !((_a2 = this.chatChipPaths.get(baseline)) == null ? void 0 : _a2.has(key4)) && !this.insideChatMapFolder(key4);
+      },
+      noteChatOwnFile: (path, text10, created) => this.noteChatOwnFile(path, text10, created),
+      fileOf: (path) => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        return file instanceof import_obsidian34.TFile ? file : null;
+      }
     }));
     /** Picture searches the chat started; the view owns them, so closing it or leaving the map stops them. */
     __publicField(this, "chatImageFinder", new ChatImageFinder({
@@ -75932,66 +76400,6 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     return fresh;
   }
-  /**
-   * The AI lock of a map chat write, read from disk at apply time (so a lock set after the reply was proposed still
-   * counts): what the tool would change, add under, move or remove. Null when the write may go ahead.
-   */
-  async chatLockSkip(action, real) {
-    var _a2, _b2;
-    const refused = skipped("ui.ai_locked_notice");
-    const check = async (op, ids2, to) => {
-      const known = ids2.filter((id) => !!id);
-      if (!known.length) return null;
-      const involved = [...known, ...to ? [to] : []];
-      const fresh = op === "remove" || op === "move" ? await this.freshNotes() : await this.freshNotesOf(involved);
-      return this.aiLockReason(op, known, fresh, to === void 0 ? void 0 : { to }) ? refused : null;
-    };
-    switch (action.kind) {
-      case "add_child":
-        return action.parentId ? check("addChild", [real(action.parentId)]) : null;
-      case "set_topic_kind":
-      case "set_appearance":
-        return check(
-          "write",
-          action.nodeIds.map((id) => real(id))
-        );
-      case "rename_topic":
-      case "update_summary":
-      case "edit_topic_note":
-        return check("write", [action.nodeId]);
-      case "collapse_topic":
-      case "expand_topic":
-        return check("write", [real(action.nodeId)]);
-      case "move_topic":
-        return check("move", [action.nodeId], real(action.newParentId));
-      case "reorder_topics":
-        return check(
-          "move",
-          action.nodeIds.map((id) => real(id)),
-          real(action.parentId)
-        );
-      // A relation writes both end notes' lines and Map.md: a locked end refuses it (the end cards can be ones of this reply).
-      case "add_relation":
-      case "remove_relation":
-        return check("write", [real(action.fromId), real(action.toId)]);
-      // An anchor relation is written to the card's note like a topic relation; its anchor end is no card.
-      case "link_anchor":
-        return check("write", [real(action.nodeId)]);
-      case "delete_topic":
-        return check("remove", [action.nodeId]);
-      case "edit_md_file": {
-        const key4 = normalizeVaultPath(action.path);
-        if (!key4) return null;
-        const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === key4);
-        if (node) return check("write", [node.id]);
-        const file = this.app.vault.getAbstractFileByPath(key4);
-        const frontmatter2 = file instanceof import_obsidian34.TFile ? (_b2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _b2.frontmatter : void 0;
-        return frontmatter2 && readAiLocked(frontmatter2) ? refused : null;
-      }
-      default:
-        return null;
-    }
-  }
   /** Every topic note of the map read again from disk: the write-time fence must not trust the view's copy. */
   async freshNotes() {
     var _a2, _b2, _c;
@@ -79249,46 +79657,6 @@ ${note.detail.trim()}` : "",
       parentId: node.parentId
     };
   }
-  /** The card as the vault has it right now (the view's cache can be a debounce behind a user's edit); the cache is refreshed too. */
-  async chatTopicNow(id) {
-    var _a2, _b2;
-    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
-    if (!node) return null;
-    let fresh;
-    try {
-      fresh = await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0);
-    } catch (e) {
-      return null;
-    }
-    this.notes.set(id, fresh);
-    return this.chatTopicState(id, fresh);
-  }
-  /**
-   * The reason to skip a card action, or null when the card is as the model saw it. Title and parent are always compared;
-   * the summary and the Detail text only when the card was sent in full. `edit_topic_note` replaces the whole body, so it
-   * needs a Detail baseline: a card the model saw only in the outline is never overwritten.
-   */
-  async chatTopicStale(id, topicHashes, needsDetail = false) {
-    const seen = Object.prototype.hasOwnProperty.call(topicHashes, id) ? topicHashes[id] : void 0;
-    const now = await this.chatTopicNow(id);
-    if (!seen || !now) return skipped("ui.map_chat_skip_topic_changed");
-    if (needsDetail && seen.detailHash === void 0) return skipped("ui.map_chat_skip_topic_not_seen");
-    if (seen.title !== now.title || seen.parentId !== now.parentId || seen.summary !== void 0 && seen.summary !== now.summary || seen.detailHash !== void 0 && seen.detailHash !== contentHash2(now.detail))
-      return skipped("ui.map_chat_skip_topic_changed");
-    return null;
-  }
-  /** After this reply's own write to a card, its baseline follows, so a second action in the same reply is not mistaken for a user edit. */
-  async chatTopicAccept(id, topicHashes) {
-    const seen = topicHashes[id];
-    const now = await this.chatTopicNow(id);
-    if (!seen || !now) return;
-    topicHashes[id] = {
-      title: now.title,
-      parentId: now.parentId,
-      ...seen.summary !== void 0 ? { summary: now.summary } : {},
-      ...seen.detailHash !== void 0 ? { detailHash: contentHash2(now.detail) } : {}
-    };
-  }
   /**
    * The canvas image the chat is about now, or null (none chosen, or it is gone from the map). `note` is untrusted text: only
    * setText / aria may show it. For the chat panel's chip; `watchChatImage` tells it when this changes.
@@ -81804,309 +82172,12 @@ ${note.detail.trim()}` : "",
       })
     );
     try {
-      return await this.applyChatWriteGuarded(action, baseline, same2, run);
+      return await this.chatWriter.write(action, baseline, same2, run);
     } catch (error) {
       if (error instanceof MapSourceWriteError) return guardSkipped("map_source");
       throw error;
     } finally {
       this.chatReadOnlyPaths = previous;
-    }
-  }
-  async applyChatWriteGuarded(action, baseline, same2, run) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
-    const hashes = baseline.mdHashes;
-    if (!same2() || !this.map) return skipped("ui.map_chat_skip_map_changed");
-    const nodeOf = (id) => {
-      var _a3;
-      return (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === id);
-    };
-    const gone = skipped("ui.map_chat_skip_topic_gone");
-    const done = { status: "done" };
-    const configDir = this.app.vault.configDir;
-    const real = (id) => {
-      var _a3;
-      return id.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : id;
-    };
-    const sourceFileRefusal = (node) => {
-      const verdict = guardMapChatWrite({
-        kind: "edit",
-        path: node.path,
-        newContent: "",
-        knownHashes: hashes,
-        readOnlyPaths: baseline.mapSourcePaths,
-        configDir
-      });
-      return !verdict.ok && verdict.code === "map_source" ? guardSkipped(verdict.code) : null;
-    };
-    const locked = await this.chatLockSkip(action, real);
-    if (locked) return locked;
-    switch (action.kind) {
-      case "add_child": {
-        let parent = null;
-        if (action.parentId) {
-          const parentId = real(action.parentId);
-          if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
-          parent = (_a2 = nodeOf(parentId)) != null ? _a2 : null;
-          if (!parent) return gone;
-          if (this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
-        }
-        const before = new Set(this.map.nodes.map((item) => item.id));
-        if (run.deferRebuild) run.ownershipDirty = true;
-        await this.addNode(parent, action.title, !run.deferRebuild, false, (_b2 = action.topicKind) != null ? _b2 : "topic", false, {
-          leaning: action.leaning,
-          strength: action.strength
-        });
-        const created = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => !before.has(item.id));
-        if (!created) return skipped("ui.map_chat_skip_unavailable");
-        run.created.push(created.id);
-        (_d = run.notes) == null ? void 0 : _d.add(created.id);
-        if (action.ref) run.refs.set(action.ref, created.id);
-        if (action.summary) await this.noteChange(created, { summary: action.summary });
-        return done;
-      }
-      case "set_topic_kind":
-        return this.chatWriter.chatSetTopicKind(action, real, run);
-      case "add_relation":
-      case "remove_relation":
-        return this.chatWriter.chatChangeRelation(action, real);
-      case "add_anchor":
-      case "link_anchor":
-        return this.chatWriter.chatChangeAnchor(action, real, run);
-      case "set_appearance":
-        return this.chatWriter.chatSetAppearance(action, real, run);
-      case "collapse_topic":
-      case "expand_topic": {
-        this.flushChatRender();
-        const id = real(action.nodeId);
-        if (id === null) return skipped("ui.map_chat_skip_parent_missing");
-        const node = nodeOf(id);
-        if (!node) return gone;
-        if (!this.map.nodes.some((item) => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
-        const collapsed = action.kind === "collapse_topic";
-        await this.mapChange((map) => {
-          const target = map.nodes.find((item) => item.id === node.id);
-          if (target) target.collapsed = collapsed;
-          this.arrangeAll(map);
-        });
-        return done;
-      }
-      case "auto_layout":
-        this.flushChatRender();
-        await this.mapChange((map) => {
-          this.arrangeAll(map);
-        }, false);
-        return done;
-      case "focus_topic": {
-        this.flushChatRender();
-        const id = real(action.nodeId);
-        if (id === null) return skipped("ui.map_chat_skip_parent_missing");
-        const node = nodeOf(id);
-        if (!node) return gone;
-        this.focusNode(node);
-        return done;
-      }
-      case "rename_topic":
-      case "update_summary":
-      case "edit_topic_note": {
-        const node = nodeOf(action.nodeId);
-        if (!node) return gone;
-        const sourceRefusal = sourceFileRefusal(node);
-        if (sourceRefusal) return sourceRefusal;
-        const detail = action.kind === "edit_topic_note" ? await demoteUnparsableMermaid(
-          // A full replace: only an image repeated inside the new Detail is dropped.
-          neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(action.detail))),
-          this.plugin.mermaidSyntax
-        ) : "";
-        if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
-        if (changed) return changed;
-        (_e = run.notes) == null ? void 0 : _e.add(node.id);
-        await this.noteChange(
-          node,
-          action.kind === "rename_topic" ? { title: action.title } : action.kind === "update_summary" ? { summary: action.summary } : { detail }
-        );
-        await this.chatTopicAccept(node.id, baseline.topicHashes);
-        return done;
-      }
-      case "move_topic": {
-        const node = nodeOf(action.nodeId);
-        const parentId = real(action.newParentId);
-        if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
-        const parent = nodeOf(parentId);
-        if (!node || !parent) return gone;
-        const oldParent = node.parentId ? nodeOf(node.parentId) : void 0;
-        for (const touched of [node, parent, oldParent]) {
-          const sourceRefusal = touched ? sourceFileRefusal(touched) : null;
-          if (sourceRefusal) return sourceRefusal;
-        }
-        if (this.isMerging(node.id) || this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
-        if (changed) return changed;
-        if (!canParent(this.map.nodes, node.id, parent.id)) return skipped("ui.map_chat_skip_cycle");
-        if (action.beforeId) {
-          const beforeId = real(action.beforeId);
-          if (beforeId === null) return skipped("ui.map_chat_skip_parent_missing");
-          const before = nodeOf(beforeId);
-          if (!before) return gone;
-          if (before.id === node.id || before.parentId !== parent.id || before.afterTextId)
-            return skipped("ui.map_chat_skip_not_sibling");
-          if (!await this.chatMoveBefore(node, parent, before)) return skipped("ui.map_chat_skip_not_sibling");
-        } else await this.moveTopic(node, parent);
-        await this.chatTopicAccept(node.id, baseline.topicHashes);
-        return done;
-      }
-      case "reorder_topics": {
-        const parentId = real(action.parentId);
-        const ids2 = action.nodeIds.map((id) => real(id));
-        if (parentId === null || ids2.some((id) => id === null)) return skipped("ui.map_chat_skip_parent_missing");
-        const parent = nodeOf(parentId);
-        const kids = ids2.map((id) => nodeOf(id));
-        if (!parent || kids.some((kid) => !kid)) return gone;
-        if (this.isMerging(parent.id) || kids.some((kid) => this.isMerging(kid.id)))
-          return skipped("ui.map_chat_skip_merge_locked");
-        if (kids.some((kid) => kid.parentId !== parent.id || kid.afterTextId !== kids[0].afterTextId))
-          return skipped("ui.map_chat_skip_not_sibling");
-        await this.chatReorderChildren(parent, ids2);
-        return done;
-      }
-      case "delete_topic": {
-        const node = nodeOf(action.nodeId);
-        if (!node) return gone;
-        const sourceRefusal = sourceFileRefusal(node);
-        if (sourceRefusal) return sourceRefusal;
-        if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
-        if (changed) return changed;
-        const removed = await this.removeToUnassignedEntry(node, action.branch);
-        for (const path of (_g = (_f = removed == null ? void 0 : removed.parkedPaths) == null ? void 0 : _f.call(removed)) != null ? _g : []) (_h = run.parked) == null ? void 0 : _h.add(path);
-        return done;
-      }
-      case "edit_md_file": {
-        const early = guardMapChatWrite({
-          kind: "edit",
-          path: action.path,
-          newContent: "",
-          knownHashes: hashes,
-          readOnlyPaths: baseline.mapSourcePaths,
-          configDir
-        });
-        if (!early.ok) return guardSkipped(early.code);
-        const editKey = normalizeVaultPath(action.path);
-        if (editKey && this.chatAttached.has(editKey) && !((_i = this.chatChipPaths.get(baseline)) == null ? void 0 : _i.has(editKey)) && !this.insideChatMapFolder(editKey))
-          return skipped("ui.map_chat_skip_attached_read_only");
-        let source = await this.readChatFile(action.path);
-        if (!source) return skipped("ui.map_chat_skip_file_missing");
-        if (isMdStale(hashes, action.path, source.text)) return skipped("ui.map_chat_skip_stale");
-        const raw = applyMdEdit(source.text, action.find, action.replace);
-        if (raw === null) return skipped("ui.map_chat_skip_find_failed");
-        const at = source.text.indexOf(action.find);
-        const guarded = guardInlineHtmlLinks(raw, {
-          frontmatter: true,
-          range: { start: at, end: at + action.replace.length }
-        });
-        const tail = source.text.length - at - action.find.length;
-        const next = dedupeImageEmbeds(guarded, { file: true, range: { start: at, end: guarded.length - tail } });
-        const added = addedMermaidBlocks(source.text, next);
-        if (added.some((block) => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
-        const check = this.plugin.mermaidSyntax;
-        const codes = added.flatMap((block) => {
-          var _a3;
-          return ((_a3 = block.code) == null ? void 0 : _a3.trim()) ? [block.code] : [];
-        });
-        if (check && codes.length) {
-          for (const code of codes) {
-            const syntax = await check(code);
-            if (syntax === "invalid") return skipped("ui.map_chat_skip_invalid_mermaid");
-            if (syntax === "unavailable") {
-              console.warn("Visual Agent Map edit mermaid unchecked");
-              break;
-            }
-          }
-          const again = await this.readChatFile(action.path);
-          if (!again || again.text !== source.text) return skipped("ui.map_chat_skip_stale");
-          source = again;
-        } else if (added.some((block) => {
-          var _a3;
-          return (_a3 = block.code) == null ? void 0 : _a3.trim();
-        })) {
-          console.warn("Visual Agent Map edit mermaid unchecked");
-        }
-        const verdict = guardMapChatWrite({
-          kind: "edit",
-          path: action.path,
-          oldContent: source.text,
-          newContent: next,
-          knownHashes: hashes,
-          readOnlyPaths: baseline.mapSourcePaths,
-          configDir
-        });
-        if (!verdict.ok) return guardSkipped(verdict.code, true);
-        if (source.editor) {
-          const before = source.text;
-          let from = at;
-          let to = at + action.find.length;
-          let replace = next.slice(at, next.length - tail);
-          if (!(next.startsWith(before.slice(0, at)) && next.endsWith(before.slice(before.length - tail)) && next.length >= at + tail)) {
-            const limit = Math.min(before.length, next.length);
-            from = 0;
-            while (from < limit && before.charCodeAt(from) === next.charCodeAt(from)) from++;
-            let rest = 0;
-            while (rest < limit - from && before.charCodeAt(before.length - 1 - rest) === next.charCodeAt(next.length - 1 - rest))
-              rest++;
-            to = before.length - rest;
-            replace = next.slice(from, next.length - rest);
-          }
-          source.editor.replaceRange(replace, source.editor.offsetToPos(from), source.editor.offsetToPos(to));
-          this.recordChatFileEdit(source.file.path, source.text, next, run);
-          if (editKey) hashes[editKey] = contentHash2(next);
-          return done;
-        }
-        let raced = false;
-        await this.app.vault.process(source.file, (current) => {
-          if (current !== source.text) {
-            raced = true;
-            return current;
-          }
-          return next;
-        });
-        if (raced) return skipped("ui.map_chat_skip_stale");
-        this.recordChatFileEdit(source.file.path, source.text, next, run);
-        if (editKey) hashes[editKey] = contentHash2(next);
-        return done;
-      }
-      case "create_md_file": {
-        const key4 = normalizeVaultPath(action.path);
-        const exists = key4 ? !!this.app.vault.getAbstractFileByPath(key4) : false;
-        const content = await demoteUnparsableMermaid(
-          neutralizeUnsafeMermaid(
-            dedupeImageEmbeds(guardInlineHtmlLinks(action.content, { frontmatter: true }), { file: true })
-          ),
-          this.plugin.mermaidSyntax
-        );
-        const verdict = guardMapChatWrite({
-          kind: "create",
-          path: action.path,
-          newContent: content,
-          exists,
-          readOnlyPaths: baseline.mapSourcePaths,
-          configDir
-        });
-        const mapFolder = this.path.slice(0, Math.max(0, this.path.lastIndexOf("/")));
-        if (!verdict.ok && verdict.code === "exists" && mapFolder && (key4 == null ? void 0 : key4.startsWith(`${mapFolder}/`)))
-          return skipped(
-            await this.chatReadableNow(key4) ? "ui.map_chat_guard_exists_in_map" : "ui.map_chat_guard_exists_not_own"
-          );
-        if (!verdict.ok || !key4) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
-        const folders = key4.split("/").slice(0, -1);
-        for (let depth = 1; depth <= folders.length; depth++) {
-          const folder = folders.slice(0, depth).join("/");
-          if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
-        }
-        await this.app.vault.create(key4, content);
-        this.recordChatFileCreate(key4, content, run);
-        hashes[key4] = contentHash2(content);
-        return done;
-      }
     }
   }
   /**
@@ -82184,48 +82255,8 @@ ${note.detail.trim()}` : "",
     var _a2, _b2;
     return (_b2 = (_a2 = await this.readChatFile(path)) == null ? void 0 : _a2.text) != null ? _b2 : null;
   }
-  /** Writes `text` to the file, through its open editor when there is one, so the editor and the file stay one. */
-  async chatWriteFile(path, text10) {
-    const source = await this.readChatFile(path);
-    if (!source) throw this.chatUndoRefusal();
-    if (source.editor) source.editor.setValue(text10);
-    else await this.app.vault.process(source.file, () => text10);
-  }
   chatUndoRefusal() {
     return Object.assign(new Error(t("ui.map_chat_undo_files_changed")), { kind: "stale" });
-  }
-  /** edit_md_file as an undo entry: undo puts the old text back, redo the new one, each only over the text it expects. */
-  recordChatFileEdit(path, before, after, run) {
-    var _a2;
-    (_a2 = run.files) == null ? void 0 : _a2.add(path);
-    this.noteChatOwnFile(path, after, false);
-    const swap = async (expected, replacement) => {
-      if (await this.chatFileText(path) !== expected) throw this.chatUndoRefusal();
-      await this.chatWriteFile(path, replacement);
-    };
-    this.history.push({ undo: () => swap(after, before), redo: () => swap(before, after) });
-  }
-  /** create_md_file as an undo entry: undo moves the file to the trash, redo creates it again, each only when nothing changed. */
-  recordChatFileCreate(path, content, run) {
-    var _a2;
-    (_a2 = run.files) == null ? void 0 : _a2.add(path);
-    this.noteChatOwnFile(path, content, true);
-    this.history.push({
-      undo: async () => {
-        const file = this.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof import_obsidian34.TFile) || await this.chatFileText(path) !== content) throw this.chatUndoRefusal();
-        await this.app.fileManager.trashFile(file);
-      },
-      redo: async () => {
-        if (this.app.vault.getAbstractFileByPath(path)) throw this.chatUndoRefusal();
-        const folders = path.split("/").slice(0, -1);
-        for (let depth = 1; depth <= folders.length; depth++) {
-          const folder = folders.slice(0, depth).join("/");
-          if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
-        }
-        await this.app.vault.create(path, content);
-      }
-    });
   }
   /**
    * What a reply's undo step checks before it touches anything: the structure of Map.md (positions and viewport are layout,

@@ -127,6 +127,8 @@ import {
   guardSkipped,
   skipped,
   type ChatOutcome,
+  type ChatWriteAction,
+  type ChatWriteBaseline,
   type ChatRun
 } from "./chat-action-writer";
 import { TopicSelection, type SelectionChange } from "./topic-selection";
@@ -218,7 +220,6 @@ import {
   setIcon,
   setTooltip
 } from "obsidian";
-import { addedMermaidBlocks, demoteUnparsableMermaid, neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
 import { type ReferenceGroup } from "../../ai/reference-materials";
 import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
 import {
@@ -405,7 +406,6 @@ import {
   RELEVANCE_GOAL_MAX_LENGTH,
   HYPOTHESIS_LEANINGS,
   HYPOTHESIS_STRENGTHS,
-  readAiLocked,
   TOPIC_KINDS,
   type HypothesisLeaning,
   type HypothesisStrength,
@@ -501,16 +501,14 @@ import {
   type MapChatSummary,
   type MapChatUserText,
   contentHash,
-  isMdStale,
   type MapChatContext,
   type MapChatOutlineNode,
   type MapChatTurn,
-  type MapChatTopicHash,
   type MapChatTopicRef,
   MAP_CHAT_FILE_CHAR_LIMIT
 } from "../../core/map-chat-context";
 import { mapChatSourceMaterial, type MapChatSourceCache } from "../../core/map-chat-sources";
-import { applyMdEdit, guardMapChatWrite, normalizeVaultPath } from "../../core/map-chat-guard";
+import { normalizeVaultPath } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
 import { GateError, applyPause } from "../../core/argument-map/machine";
@@ -1514,7 +1512,33 @@ export class VisualAgentMapView extends ItemView {
     hypothesisLeaningOf: id => this.hypothesisLeaningOf(id),
     hypothesisStrengthOf: id => this.hypothesisStrengthOf(id),
     mapChange: (change, rebuildDerivedData) => this.mapChange(change, rebuildDerivedData),
-    beginMapTransaction: () => this.beginMapTransaction()
+    beginMapTransaction: () => this.beginMapTransaction(),
+    app: () => this.app,
+    aiLockReason: (op, ids, fresh, options) => this.aiLockReason(op, ids, fresh, options),
+    freshNotes: () => this.freshNotes(),
+    freshNotesOf: ids => this.freshNotesOf(ids),
+    topicState: (id, fresh) => this.chatTopicState(id, fresh),
+    addNode: (parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart) =>
+      this.addNode(parentNode, suggestedTitle, rebuildDerivedData, focus, kind, keyboardFocus, hypothesisStart),
+    noteChange: (node, patch) => this.noteChange(node, patch),
+    moveTopic: (node, parent) => this.moveTopic(node, parent),
+    removeToUnassignedEntry: (node, branch, adopterId) => this.removeToUnassignedEntry(node, branch, adopterId),
+    chatMoveBefore: (node, parent, before) => this.chatMoveBefore(node, parent, before),
+    chatReorderChildren: (parent, ids) => this.chatReorderChildren(parent, ids),
+    arrangeAll: map => this.arrangeAll(map),
+    focusNode: target => this.focusNode(target),
+    flushChatRender: () => this.flushChatRender(),
+    readChatFile: path => this.readChatFile(path),
+    chatFileText: path => this.chatFileText(path),
+    chatUndoRefusal: () => this.chatUndoRefusal(),
+    chatReadableNow: key => this.chatReadableNow(key),
+    attachedReadOnly: (key, baseline) =>
+      this.chatAttached.has(key) && !this.chatChipPaths.get(baseline)?.has(key) && !this.insideChatMapFolder(key),
+    noteChatOwnFile: (path, text, created) => this.noteChatOwnFile(path, text, created),
+    fileOf: path => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      return file instanceof TFile ? file : null;
+    }
   });
   /** Picture searches the chat started; the view owns them, so closing it or leaving the map stops them. */
   private chatImageFinder = new ChatImageFinder({
@@ -18078,82 +18102,6 @@ export class VisualAgentMapView extends ItemView {
     }
     return fresh;
   }
-  /**
-   * The AI lock of a map chat write, read from disk at apply time (so a lock set after the reply was proposed still
-   * counts): what the tool would change, add under, move or remove. Null when the write may go ahead.
-   */
-  private async chatLockSkip(
-    action: Exclude<
-      MapChatAction,
-      {
-        kind:
-          | "select_topics"
-          | "run_map_action"
-          | "create_map"
-          | "rename_map"
-          | "open_map"
-          | "ask_topic_kind"
-          | "read_md_file";
-      }
-    >,
-    real: (id: string) => string | null
-  ): Promise<ChatOutcome | null> {
-    const refused: ChatOutcome = skipped("ui.ai_locked_notice");
-    const check = async (op: AiLockOp, ids: (string | null)[], to?: string | null): Promise<ChatOutcome | null> => {
-      const known = ids.filter((id): id is string => !!id);
-      if (!known.length) return null;
-      const involved = [...known, ...(to ? [to] : [])];
-      // The parents, the subtree and the related cards count too, so every card of the map is read when one may be removed.
-      const fresh = op === "remove" || op === "move" ? await this.freshNotes() : await this.freshNotesOf(involved);
-      return this.aiLockReason(op, known, fresh, to === undefined ? undefined : { to }) ? refused : null;
-    };
-    switch (action.kind) {
-      case "add_child":
-        return action.parentId ? check("addChild", [real(action.parentId)]) : null;
-      case "set_topic_kind":
-      case "set_appearance":
-        return check(
-          "write",
-          action.nodeIds.map(id => real(id))
-        );
-      case "rename_topic":
-      case "update_summary":
-      case "edit_topic_note":
-        return check("write", [action.nodeId]);
-      case "collapse_topic":
-      case "expand_topic":
-        return check("write", [real(action.nodeId)]);
-      case "move_topic":
-        return check("move", [action.nodeId], real(action.newParentId));
-      case "reorder_topics":
-        return check(
-          "move",
-          action.nodeIds.map(id => real(id)),
-          real(action.parentId)
-        );
-      // A relation writes both end notes' lines and Map.md: a locked end refuses it (the end cards can be ones of this reply).
-      case "add_relation":
-      case "remove_relation":
-        return check("write", [real(action.fromId), real(action.toId)]);
-      // An anchor relation is written to the card's note like a topic relation; its anchor end is no card.
-      case "link_anchor":
-        return check("write", [real(action.nodeId)]);
-      case "delete_topic":
-        return check("remove", [action.nodeId]);
-      case "edit_md_file": {
-        const key = normalizeVaultPath(action.path);
-        if (!key) return null;
-        const node = this.map?.nodes.find(item => item.path === key);
-        if (node) return check("write", [node.id]);
-        // A note that is not a card of this map: its own frontmatter decides.
-        const file = this.app.vault.getAbstractFileByPath(key);
-        const frontmatter = file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined;
-        return frontmatter && readAiLocked(frontmatter) ? refused : null;
-      }
-      default:
-        return null;
-    }
-  }
   /** Every topic note of the map read again from disk: the write-time fence must not trust the view's copy. */
   private async freshNotes(): Promise<Map<string, Note>> {
     const fresh = new Map<string, Note>();
@@ -21661,56 +21609,6 @@ export class VisualAgentMapView extends ItemView {
       parentId: node.parentId
     };
   }
-  /** The card as the vault has it right now (the view's cache can be a debounce behind a user's edit); the cache is refreshed too. */
-  private async chatTopicNow(
-    id: string
-  ): Promise<{ title: string; summary: string; detail: string; parentId: string | null } | null> {
-    const node = this.map?.nodes.find(item => item.id === id);
-    if (!node) return null;
-    let fresh: Note | undefined;
-    try {
-      fresh = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-    } catch {
-      return null;
-    }
-    this.notes.set(id, fresh);
-    return this.chatTopicState(id, fresh);
-  }
-  /**
-   * The reason to skip a card action, or null when the card is as the model saw it. Title and parent are always compared;
-   * the summary and the Detail text only when the card was sent in full. `edit_topic_note` replaces the whole body, so it
-   * needs a Detail baseline: a card the model saw only in the outline is never overwritten.
-   */
-  private async chatTopicStale(
-    id: string,
-    topicHashes: Readonly<Record<string, MapChatTopicHash>>,
-    needsDetail = false
-  ): Promise<ChatOutcome | null> {
-    const seen = Object.prototype.hasOwnProperty.call(topicHashes, id) ? topicHashes[id] : undefined;
-    const now = await this.chatTopicNow(id);
-    if (!seen || !now) return skipped("ui.map_chat_skip_topic_changed");
-    if (needsDetail && seen.detailHash === undefined) return skipped("ui.map_chat_skip_topic_not_seen");
-    if (
-      seen.title !== now.title ||
-      seen.parentId !== now.parentId ||
-      (seen.summary !== undefined && seen.summary !== now.summary) ||
-      (seen.detailHash !== undefined && seen.detailHash !== contentHash(now.detail))
-    )
-      return skipped("ui.map_chat_skip_topic_changed");
-    return null;
-  }
-  /** After this reply's own write to a card, its baseline follows, so a second action in the same reply is not mistaken for a user edit. */
-  private async chatTopicAccept(id: string, topicHashes: Record<string, MapChatTopicHash>): Promise<void> {
-    const seen = topicHashes[id];
-    const now = await this.chatTopicNow(id);
-    if (!seen || !now) return;
-    topicHashes[id] = {
-      title: now.title,
-      parentId: now.parentId,
-      ...(seen.summary !== undefined ? { summary: now.summary } : {}),
-      ...(seen.detailHash !== undefined ? { detailHash: contentHash(now.detail) } : {})
-    };
-  }
   /**
    * The canvas image the chat is about now, or null (none chosen, or it is gone from the map). `note` is untrusted text: only
    * setText / aria may show it. For the chat panel's chip; `watchChatImage` tells it when this changes.
@@ -24577,20 +24475,8 @@ export class VisualAgentMapView extends ItemView {
    * whole action: a write to one of them (through any card, any descendant of a branch) is refused as "a data source".
    */
   private async applyChatWrite(
-    action: Exclude<
-      MapChatAction,
-      {
-        kind:
-          | "select_topics"
-          | "run_map_action"
-          | "create_map"
-          | "rename_map"
-          | "open_map"
-          | "ask_topic_kind"
-          | "read_md_file";
-      }
-    >,
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
+    action: ChatWriteAction,
+    baseline: ChatWriteBaseline,
     same: () => boolean,
     run: ChatRun = { refs: new Map(), created: [] }
   ): Promise<ChatOutcome> {
@@ -24599,363 +24485,12 @@ export class VisualAgentMapView extends ItemView {
       (baseline.mapSourcePaths ?? []).map(path => (normalizeVaultPath(path) ?? path).toLowerCase())
     );
     try {
-      return await this.applyChatWriteGuarded(action, baseline, same, run);
+      return await this.chatWriter.write(action, baseline, same, run);
     } catch (error) {
       if (error instanceof MapSourceWriteError) return guardSkipped("map_source");
       throw error;
     } finally {
       this.chatReadOnlyPaths = previous;
-    }
-  }
-  private async applyChatWriteGuarded(
-    action: Exclude<
-      MapChatAction,
-      {
-        kind:
-          | "select_topics"
-          | "run_map_action"
-          | "create_map"
-          | "rename_map"
-          | "open_map"
-          | "ask_topic_kind"
-          | "read_md_file";
-      }
-    >,
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
-    same: () => boolean,
-    run: ChatRun
-  ): Promise<ChatOutcome> {
-    const hashes = baseline.mdHashes;
-    if (!same() || !this.map) return skipped("ui.map_chat_skip_map_changed");
-    const nodeOf = (id: string): MapNode | undefined => this.map?.nodes.find(item => item.id === id);
-    const gone = skipped("ui.map_chat_skip_topic_gone");
-    const done: ChatOutcome = { status: "done" };
-    const configDir = this.app.vault.configDir;
-    /** The real id behind an id of the reply; null when it names a card of this reply that was never created. */
-    const real = (id: string): string | null =>
-      id.startsWith(MAP_CHAT_NEW_PREFIX) ? (run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) ?? null) : id;
-    /** A card whose note is one of the map's data sources must not be rewritten through the card (same rule and reason as the file actions). */
-    const sourceFileRefusal = (node: MapNode): ChatOutcome | null => {
-      const verdict = guardMapChatWrite({
-        kind: "edit",
-        path: node.path,
-        newContent: "",
-        knownHashes: hashes,
-        readOnlyPaths: baseline.mapSourcePaths,
-        configDir
-      });
-      return !verdict.ok && verdict.code === "map_source" ? guardSkipped(verdict.code) : null;
-    };
-    // AI lock: the real guard of the chat is here, on apply (a confirmation that comes later is checked again here).
-    const locked = await this.chatLockSkip(action, real);
-    if (locked) return locked;
-    switch (action.kind) {
-      case "add_child": {
-        // An empty parent is a new root card.
-        let parent: MapNode | null = null;
-        if (action.parentId) {
-          const parentId = real(action.parentId);
-          if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
-          parent = nodeOf(parentId) ?? null;
-          if (!parent) return gone;
-          if (this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
-        }
-        const before = new Set(this.map.nodes.map(item => item.id));
-        // The derived data (every map is read for it) is rebuilt once, when the reply ends, not after each card; marked first so
-        // a card that was written before the action failed is covered too.
-        if (run.deferRebuild) run.ownershipDirty = true;
-        // The type is written when the note is created, like "+ Topic" of that type (the parser dropped it on an AIM map).
-        // Its leaning and strength go in the same creation (initial values), not a write after it.
-        await this.addNode(parent, action.title, !run.deferRebuild, false, action.topicKind ?? "topic", false, {
-          leaning: action.leaning,
-          strength: action.strength
-        });
-        const created = this.map?.nodes.find(item => !before.has(item.id));
-        if (!created) return skipped("ui.map_chat_skip_unavailable");
-        run.created.push(created.id);
-        run.notes?.add(created.id);
-        if (action.ref) run.refs.set(action.ref, created.id);
-        if (action.summary) await this.noteChange(created, { summary: action.summary });
-        return done;
-      }
-      case "set_topic_kind":
-        return this.chatWriter.chatSetTopicKind(action, real, run);
-      case "add_relation":
-      case "remove_relation":
-        return this.chatWriter.chatChangeRelation(action, real);
-      case "add_anchor":
-      case "link_anchor":
-        return this.chatWriter.chatChangeAnchor(action, real, run);
-      case "set_appearance":
-        return this.chatWriter.chatSetAppearance(action, real, run);
-      case "collapse_topic":
-      case "expand_topic": {
-        this.flushChatRender();
-        const id = real(action.nodeId);
-        if (id === null) return skipped("ui.map_chat_skip_parent_missing");
-        const node = nodeOf(id);
-        if (!node) return gone;
-        if (!this.map.nodes.some(item => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
-        const collapsed = action.kind === "collapse_topic";
-        await this.mapChange(map => {
-          const target = map.nodes.find(item => item.id === node.id);
-          if (target) target.collapsed = collapsed;
-          this.arrangeAll(map);
-        });
-        return done;
-      }
-      case "auto_layout":
-        // The layout measures the cards, so a held repaint comes first.
-        this.flushChatRender();
-        await this.mapChange(map => {
-          this.arrangeAll(map);
-        }, false);
-        return done;
-      case "focus_topic": {
-        this.flushChatRender();
-        const id = real(action.nodeId);
-        if (id === null) return skipped("ui.map_chat_skip_parent_missing");
-        const node = nodeOf(id);
-        if (!node) return gone;
-        this.focusNode(node);
-        return done;
-      }
-      case "rename_topic":
-      case "update_summary":
-      case "edit_topic_note": {
-        const node = nodeOf(action.nodeId);
-        if (!node) return gone;
-        const sourceRefusal = sourceFileRefusal(node);
-        if (sourceRefusal) return sourceRefusal;
-        // Model-written note body: same allow-list and parser check as an AI task result (a manual edit never comes here).
-        // Done before the merge and stale checks so no await sits between the stale check and the write.
-        const detail =
-          action.kind === "edit_topic_note"
-            ? await demoteUnparsableMermaid(
-                // A full replace: only an image repeated inside the new Detail is dropped.
-                neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(action.detail))),
-                this.plugin.mermaidSyntax
-              )
-            : "";
-        if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
-        if (changed) return changed;
-        run.notes?.add(node.id);
-        await this.noteChange(
-          node,
-          action.kind === "rename_topic"
-            ? { title: action.title }
-            : action.kind === "update_summary"
-              ? { summary: action.summary }
-              : { detail }
-        );
-        await this.chatTopicAccept(node.id, baseline.topicHashes);
-        return done;
-      }
-      case "move_topic": {
-        const node = nodeOf(action.nodeId);
-        const parentId = real(action.newParentId);
-        if (parentId === null) return skipped("ui.map_chat_skip_parent_missing");
-        const parent = nodeOf(parentId);
-        if (!node || !parent) return gone;
-        // The move rewrites the derived "Parent topic" / "Child topics" lines of the moved card and of both parents: a data source
-        // among them would be rewritten, so the move is refused (the map file alone changes otherwise).
-        const oldParent = node.parentId ? nodeOf(node.parentId) : undefined;
-        for (const touched of [node, parent, oldParent]) {
-          const sourceRefusal = touched ? sourceFileRefusal(touched) : null;
-          if (sourceRefusal) return sourceRefusal;
-        }
-        if (this.isMerging(node.id) || this.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
-        if (changed) return changed;
-        if (!canParent(this.map.nodes, node.id, parent.id)) return skipped("ui.map_chat_skip_cycle");
-        if (action.beforeId) {
-          const beforeId = real(action.beforeId);
-          if (beforeId === null) return skipped("ui.map_chat_skip_parent_missing");
-          const before = nodeOf(beforeId);
-          if (!before) return gone;
-          // The moved card becomes a direct child, so only a direct child of the parent can stand behind it.
-          if (before.id === node.id || before.parentId !== parent.id || before.afterTextId)
-            return skipped("ui.map_chat_skip_not_sibling");
-          if (!(await this.chatMoveBefore(node, parent, before))) return skipped("ui.map_chat_skip_not_sibling");
-        } else await this.moveTopic(node, parent);
-        await this.chatTopicAccept(node.id, baseline.topicHashes);
-        return done;
-      }
-      case "reorder_topics": {
-        const parentId = real(action.parentId);
-        const ids = action.nodeIds.map(id => real(id));
-        if (parentId === null || ids.some(id => id === null)) return skipped("ui.map_chat_skip_parent_missing");
-        const parent = nodeOf(parentId);
-        const kids = ids.map(id => nodeOf(id!));
-        if (!parent || kids.some(kid => !kid)) return gone;
-        if (this.isMerging(parent.id) || kids.some(kid => this.isMerging(kid!.id)))
-          return skipped("ui.map_chat_skip_merge_locked");
-        // Topics after a text block and direct children are not siblings of each other: a mixed list orders nothing.
-        if (kids.some(kid => kid!.parentId !== parent.id || kid!.afterTextId !== kids[0]!.afterTextId))
-          return skipped("ui.map_chat_skip_not_sibling");
-        await this.chatReorderChildren(parent, ids as string[]);
-        return done;
-      }
-      case "delete_topic": {
-        const node = nodeOf(action.nodeId);
-        if (!node) return gone;
-        const sourceRefusal = sourceFileRefusal(node);
-        if (sourceRefusal) return sourceRefusal;
-        if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
-        const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
-        if (changed) return changed;
-        const removed = await this.removeToUnassignedEntry(node, action.branch);
-        for (const path of removed?.parkedPaths?.() ?? []) run.parked?.add(path);
-        return done;
-      }
-      case "edit_md_file": {
-        // Path rules first, so a refused place is named as such rather than as a missing or stale file.
-        const early = guardMapChatWrite({
-          kind: "edit",
-          path: action.path,
-          newContent: "",
-          knownHashes: hashes,
-          readOnlyPaths: baseline.mapSourcePaths,
-          configDir
-        });
-        if (!early.ok) return guardSkipped(early.code);
-        // An attached file outside the map folder is read-only (the chip of this very message keeps its old rules).
-        const editKey = normalizeVaultPath(action.path);
-        if (
-          editKey &&
-          this.chatAttached.has(editKey) &&
-          !this.chatChipPaths.get(baseline)?.has(editKey) &&
-          !this.insideChatMapFolder(editKey)
-        )
-          return skipped("ui.map_chat_skip_attached_read_only");
-        let source = await this.readChatFile(action.path);
-        if (!source) return skipped("ui.map_chat_skip_file_missing");
-        if (isMdStale(hashes, action.path, source.text)) return skipped("ui.map_chat_skip_stale");
-        const raw = applyMdEdit(source.text, action.find, action.replace);
-        if (raw === null) return skipped("ui.map_chat_skip_find_failed");
-        // A line the replacement starts with an inline tag gets a harmless lead; fence and frontmatter state come from the
-        // text after the edit, and only the inserted range changes. Checks, the write and the undo entry all use this result.
-        const at = source.text.indexOf(action.find);
-        const guarded = guardInlineHtmlLinks(raw, {
-          frontmatter: true,
-          range: { start: at, end: at + action.replace.length }
-        });
-        // An image the rest of the file already has (outside the replaced text) is not embedded again by the edit.
-        const tail = source.text.length - at - action.find.length;
-        const next = dedupeImageEmbeds(guarded, { file: true, range: { start: at, end: guarded.length - tail } });
-        // Only the mermaid blocks the edit adds are judged (allow-list, then parser); what the note already had stays as it is.
-        const added = addedMermaidBlocks(source.text, next);
-        if (added.some(block => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
-        const check = this.plugin.mermaidSyntax;
-        const codes = added.flatMap(block => (block.code?.trim() ? [block.code] : []));
-        if (check && codes.length) {
-          for (const code of codes) {
-            const syntax = await check(code);
-            if (syntax === "invalid") return skipped("ui.map_chat_skip_invalid_mermaid");
-            if (syntax === "unavailable") {
-              console.warn("Visual Agent Map edit mermaid unchecked");
-              break;
-            }
-          }
-          // The editor branch has no race check at the write, so the file is read again after the wait.
-          const again = await this.readChatFile(action.path);
-          if (!again || again.text !== source.text) return skipped("ui.map_chat_skip_stale");
-          source = again;
-        } else if (added.some(block => block.code?.trim())) {
-          console.warn("Visual Agent Map edit mermaid unchecked");
-        }
-        const verdict = guardMapChatWrite({
-          kind: "edit",
-          path: action.path,
-          oldContent: source.text,
-          newContent: next,
-          knownHashes: hashes,
-          readOnlyPaths: baseline.mapSourcePaths,
-          configDir
-        });
-        if (!verdict.ok) return guardSkipped(verdict.code, true);
-        if (source.editor) {
-          // The dedupe can drop a line whose newline belongs to the tail; then the changed range is found from the two texts,
-          // so the editor ends up exactly as `next`, which the undo entry compares against.
-          const before = source.text;
-          let from = at;
-          let to = at + action.find.length;
-          let replace = next.slice(at, next.length - tail);
-          if (!(
-            next.startsWith(before.slice(0, at)) &&
-            next.endsWith(before.slice(before.length - tail)) &&
-            next.length >= at + tail
-          )) {
-            const limit = Math.min(before.length, next.length);
-            from = 0;
-            while (from < limit && before.charCodeAt(from) === next.charCodeAt(from)) from++;
-            let rest = 0;
-            while (
-              rest < limit - from &&
-              before.charCodeAt(before.length - 1 - rest) === next.charCodeAt(next.length - 1 - rest)
-            )
-              rest++;
-            to = before.length - rest;
-            replace = next.slice(from, next.length - rest);
-          }
-          source.editor.replaceRange(replace, source.editor.offsetToPos(from), source.editor.offsetToPos(to));
-          this.recordChatFileEdit(source.file.path, source.text, next, run);
-          if (editKey) hashes[editKey] = contentHash(next);
-          return done;
-        }
-        let raced = false;
-        await this.app.vault.process(source.file, current => {
-          // The file moved on between the check and the write: leave it as it is.
-          if (current !== source.text) {
-            raced = true;
-            return current;
-          }
-          return next;
-        });
-        if (raced) return skipped("ui.map_chat_skip_stale");
-        this.recordChatFileEdit(source.file.path, source.text, next, run);
-        // A later action of this reply edits on top of this write, not against the text that was sent.
-        if (editKey) hashes[editKey] = contentHash(next);
-        return done;
-      }
-      case "create_md_file": {
-        const key = normalizeVaultPath(action.path);
-        const exists = key ? !!this.app.vault.getAbstractFileByPath(key) : false;
-        // Model-written file: same allow-list and parser check as an AI task result.
-        const content = await demoteUnparsableMermaid(
-          neutralizeUnsafeMermaid(
-            dedupeImageEmbeds(guardInlineHtmlLinks(action.content, { frontmatter: true }), { file: true })
-          ),
-          this.plugin.mermaidSyntax
-        );
-        const verdict = guardMapChatWrite({
-          kind: "create",
-          path: action.path,
-          newContent: content,
-          exists,
-          readOnlyPaths: baseline.mapSourcePaths,
-          configDir
-        });
-        // An existing file inside the map folder is not created again (the model sees this text next round): a file this chat
-        // wrote is read and then edited; any other one cannot be read here (read_md_file only reads own files), so a new name is asked.
-        const mapFolder = this.path.slice(0, Math.max(0, this.path.lastIndexOf("/")));
-        if (!verdict.ok && verdict.code === "exists" && mapFolder && key?.startsWith(`${mapFolder}/`))
-          return skipped(
-            (await this.chatReadableNow(key)) ? "ui.map_chat_guard_exists_in_map" : "ui.map_chat_guard_exists_not_own"
-          );
-        if (!verdict.ok || !key) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
-        const folders = key.split("/").slice(0, -1);
-        for (let depth = 1; depth <= folders.length; depth++) {
-          const folder = folders.slice(0, depth).join("/");
-          if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
-        }
-        await this.app.vault.create(key, content);
-        this.recordChatFileCreate(key, content, run);
-        // A file this reply created can be edited by a later action of the same reply.
-        hashes[key] = contentHash(content);
-        return done;
-      }
     }
   }
   /**
@@ -25038,46 +24573,8 @@ export class VisualAgentMapView extends ItemView {
   private async chatFileText(path: string): Promise<string | null> {
     return (await this.readChatFile(path))?.text ?? null;
   }
-  /** Writes `text` to the file, through its open editor when there is one, so the editor and the file stay one. */
-  private async chatWriteFile(path: string, text: string): Promise<void> {
-    const source = await this.readChatFile(path);
-    if (!source) throw this.chatUndoRefusal();
-    if (source.editor) source.editor.setValue(text);
-    else await this.app.vault.process(source.file, () => text);
-  }
   private chatUndoRefusal(): Error {
     return Object.assign(new Error(t("ui.map_chat_undo_files_changed")), { kind: "stale" as const });
-  }
-  /** edit_md_file as an undo entry: undo puts the old text back, redo the new one, each only over the text it expects. */
-  private recordChatFileEdit(path: string, before: string, after: string, run: ChatRun): void {
-    run.files?.add(path);
-    this.noteChatOwnFile(path, after, false);
-    const swap = async (expected: string, replacement: string): Promise<void> => {
-      if ((await this.chatFileText(path)) !== expected) throw this.chatUndoRefusal();
-      await this.chatWriteFile(path, replacement);
-    };
-    this.history.push({ undo: () => swap(after, before), redo: () => swap(before, after) });
-  }
-  /** create_md_file as an undo entry: undo moves the file to the trash, redo creates it again, each only when nothing changed. */
-  private recordChatFileCreate(path: string, content: string, run: ChatRun): void {
-    run.files?.add(path);
-    this.noteChatOwnFile(path, content, true);
-    this.history.push({
-      undo: async () => {
-        const file = this.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof TFile) || (await this.chatFileText(path)) !== content) throw this.chatUndoRefusal();
-        await this.app.fileManager.trashFile(file);
-      },
-      redo: async () => {
-        if (this.app.vault.getAbstractFileByPath(path)) throw this.chatUndoRefusal();
-        const folders = path.split("/").slice(0, -1);
-        for (let depth = 1; depth <= folders.length; depth++) {
-          const folder = folders.slice(0, depth).join("/");
-          if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
-        }
-        await this.app.vault.create(path, content);
-      }
-    });
   }
   /**
    * What a reply's undo step checks before it touches anything: the structure of Map.md (positions and viewport are layout,

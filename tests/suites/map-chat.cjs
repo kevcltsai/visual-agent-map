@@ -9498,3 +9498,55 @@ integrationTest('P2 view: create_md_file again on a file this chat created is sk
   const skip = contextOf(h.control.requests[2]).continuation.lastResults.filter(r => r.status === 'skipped'); eq(skip.length, 1);
   assert.match(skip[0].text, /read_md_file/); assert.match(skip[0].text, /edit_md_file/); assert.equal(h.contents.get(path), '# TOC\n');
 });
+
+// ---- attached files (授權檔): a Markdown file dragged in as a chip stays readable/editable for the conversation while its hash holds ----
+const OLD = `${ownRoot}/Old.md`, OLD_TEXT = '# Old\n\nOld line.\n';
+const attachOld = async (h, path = OLD, text = OLD_TEXT) => { await h.app.vault.create(path, text); const chat = h.view.chat; chat.addFile(path); const sent = await ownTurn(h, 'look at this'); chat.chips.length = 0; return sent; };
+integrationTest('attached file: a file dragged in is carried in later rounds and edit_md_file changes it in an auto chain, with one backup', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open(); const calls = backupSpy(h);
+  await attachOld(h); const n0 = h.control.requests.length;
+  chainReplies(h, say('Edit.', [{ kind: 'edit_md_file', path: OLD, find: 'Old line.', replace: 'New line.' }], 'check'), say('Done.', [], ''));
+  h.type('change it'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === n0 + 2);
+  eq(contextOf(h.control.requests[n0]).ownFiles.map(f => f.path), [OLD], 'carried the round after the drag');
+  assert.equal(h.contents.get(OLD), '# Old\n\nNew line.\n'); eq(calls.map(c => c[0]), [OLD]);
+  eq(contextOf(h.control.requests[n0 + 1]).ownFiles.map(f => f.content), ['# Old\n\nNew line.\n'], 'the version the chat wrote stays carried');
+});
+integrationTest('attached file: recorded as file_attached once, and a restored conversation carries it again; a bad line is ignored', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); h.open();
+  await attachOld(h); await ownTurn(h); await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]); const att = lines.filter(l => l.type === 'event' && l.kind === 'file_attached');
+  eq(att.map(l => [l.path, l.hash]), [[OLD, contentHash(OLD_TEXT)]]);
+  const bad = [{ path: '../x.md', hash: 'aa' }, { path: '.obsidian/x.md', hash: 'aa' }, { path: `${ownRoot}/B.md`, hash: 'zz!' }].map(extra => rec('event', { turn: 1, at: REC_AT, kind: 'file_attached', ...extra }));
+  const g = await harness({ records: true }); await g.view.hydrate(); await g.app.vault.create(OLD, OLD_TEXT);
+  await seedRecord(g, [...lines.map(l => ({ ...l })), ...bad], recordFiles(h)[0].split('/').at(-1).replace('.jsonl', ''));
+  const chat = g.open(); await until(() => chat.hasMessages);
+  eq((await ownTurn(g)).ownFiles.map(f => f.path), [OLD]);
+});
+integrationTest('attached file: edited by hand after the drag it is neither carried, nor readable, nor editable', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open(); await attachOld(h);
+  h.contents.set(OLD, '# Old\n\nHand edit.\n');
+  const next = await ownTurn(h); assert.equal(next.ownFiles, undefined);
+  assert.equal(await h.view.acceptChatRead(OLD, null), false);
+  const out = await applyIn(h, autoRun(h), [{ kind: 'edit_md_file', path: OLD, find: 'Hand edit.', replace: 'X' }], h.control.requests.at(-1).context.mdHashes);
+  assert.equal(out.at(-1).status, 'skipped'); assert.equal(h.contents.get(OLD), '# Old\n\nHand edit.\n');
+});
+integrationTest('attached file outside the map folder: carried and readable, never edited', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open(); const out = 'Notes/Research.md'; const text = h.contents.get(out);
+  h.view.chat.addFile(out); await ownTurn(h); h.view.chat.chips.length = 0;
+  const next = await ownTurn(h); eq(next.ownFiles.map(f => f.path), [out]);
+  const edited = await applyIn(h, autoRun(h), [{ kind: 'edit_md_file', path: out, find: 'needs darkness', replace: 'PWNED' }], h.control.requests.at(-1).context.mdHashes);
+  assert.equal(edited.at(-1).status, 'skipped'); assert.equal(h.contents.get(out), text);
+  assert.equal(await h.view.acceptChatRead(out, null), true);
+});
+integrationTest('existing file that was not attached: not carried, not readable; a create on it says drag it in or use a new name; an attached one is offered read then edit', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open(); const other = `${ownRoot}/Other.md`; await h.app.vault.create(other, 'Other.\n');
+  assert.equal((await ownTurn(h)).ownFiles, undefined); assert.equal(await h.view.acceptChatRead(other, null), false);
+  const a = await applyIn(h, autoRun(h), [{ kind: 'create_md_file', path: other, content: 'x' }]); assert.match(a.at(-1).text, /drag/i); assert.match(a.at(-1).text, /new file name/);
+  await attachOld(h); const b = await applyIn(h, autoRun(h), [{ kind: 'create_md_file', path: OLD, content: 'x' }]);
+  assert.match(b.at(-1).text, /read_md_file/);
+});
+integrationTest('attached file: a new conversation clears the attachments', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open(); await attachOld(h);
+  eq((await ownTurn(h)).ownFiles.map(f => f.path), [OLD]); h.view.resetChatResearch();
+  assert.equal((await ownTurn(h)).ownFiles, undefined); assert.equal(await h.view.acceptChatRead(OLD, null), false);
+});

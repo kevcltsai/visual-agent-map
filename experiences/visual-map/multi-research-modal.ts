@@ -15,6 +15,8 @@ export interface MultiResearchRequest {
   researchDepth?: ResearchDepth;
   /** Search for image references (an override; only meaningful with web search). */
   imageSearch?: boolean;
+  /** Map chat only: the user asked for images in words, so every topic must search and place them (visual mode "on", not "auto"). */
+  imagesRequired?: boolean;
   requirements: string;
   /** Model for every started topic, for this batch only (never saved on a topic); undefined keeps each topic's model. */
   model?: string;

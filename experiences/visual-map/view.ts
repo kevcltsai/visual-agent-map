@@ -19546,18 +19546,25 @@ export class VisualAgentMapView extends ItemView {
       .map(id => this.map!.nodes.find(node => node.id === id))
       .filter((node): node is MapNode => !!node);
     try {
+      // The model of the batch is taken once, here: a switch while it runs changes the next batch only. A topic with its own
+      // model keeps it; every other one runs this model once (never written to the topic, D4).
+      const current = {
+        model: request.model ?? this.currentModelId(),
+        reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
+      };
+      const resolved = request.model
+        ? []
+        : await Promise.all(
+            selected.map(async node => ({
+              path: node.path,
+              ...(await this.plugin.repo.resolveTopicModel(node.path, this.map ?? undefined))
+            }))
+          );
+      const ownModel = new Set(resolved.filter(item => item.origin === "override").map(item => item.path));
       // The usage notice of every model the batch will really use, once each, in order; a refusal starts nothing.
       const models = request.model
         ? [request.model]
-        : [
-            ...new Set(
-              (
-                await Promise.all(
-                  selected.map(node => this.plugin.repo.resolveTopicModel(node.path, this.map ?? undefined))
-                )
-              ).map(item => (item.origin === "override" ? item.model : this.currentModelId()))
-            )
-          ];
+        : [...new Set(resolved.map(item => (item.origin === "override" ? item.model : current.model)))];
       if (!models.length) models.push(this.plugin.settings.cliModel);
       const confirmEach = async (index: number, run: () => Promise<void>): Promise<boolean> =>
         index >= models.length
@@ -19593,14 +19600,12 @@ export class VisualAgentMapView extends ItemView {
         const sources = await this.batchSources(
           request.referenceGroups ?? [],
           nodes.length,
-          request.model ?? this.currentModelId(),
+          current.model,
           signal
         );
         const shared = {
           referenceGroups: sources.groups,
           requirements: request.requirements,
-          // The picked model is for this batch only (D4): it never becomes a topic's own model.
-          ...(request.model ? { runOnce: { model: request.model } } : {}),
           ...(request.noteStyle ? { noteStyle: request.noteStyle } : {}),
           ...(request.rewrite ? { rewrite: true } : {})
         };
@@ -19613,7 +19618,8 @@ export class VisualAgentMapView extends ItemView {
                 ...aiModeOptions(noteAiMode(request.researchMode), "research"),
                 researchMode: request.researchMode,
                 researchDepth: request.researchDepth ?? "normal",
-                visualMode: request.imageSearch ? "auto" : "off",
+                // Images the user asked for in the chat are a rule (VISUAL_ON); the dialog's Standard default lets the AI judge.
+                visualMode: request.imagesRequired ? "on" : request.imageSearch ? "auto" : "off",
                 ...shared
               }
             : { ...aiModeOptions(noteAiMode(note.researchMode), "research"), ...shared };
@@ -19648,7 +19654,12 @@ export class VisualAgentMapView extends ItemView {
               }
               const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
               try {
-                const choices = { ...choicesFor(note), sharedReferenceCondense: sources.sharedCondense };
+                const choices = {
+                  ...choicesFor(note),
+                  sharedReferenceCondense: sources.sharedCondense,
+                  // The picked model, or the one current when the batch started (D4: never a topic's own model).
+                  ...(request.model || !ownModel.has(child.path) ? { runOnce: current } : {})
+                };
                 await this.researchChild(
                   child,
                   batchSignal,
@@ -25444,7 +25455,11 @@ export class VisualAgentMapView extends ItemView {
     chat.refreshBatch(message);
     try {
       await this.startMultiResearch(
-        { ...batch.request, ...(sourceGroups.length ? { referenceGroups: sourceGroups } : {}) },
+        {
+          ...batch.request,
+          imagesRequired: batch.request.imageSearch,
+          ...(sourceGroups.length ? { referenceGroups: sourceGroups } : {})
+        },
         undefined,
         undefined,
         result => {
@@ -25532,9 +25547,10 @@ export class VisualAgentMapView extends ItemView {
         this.markResearchRecorded(this.chatLastRecord);
         // Told once (see startMultiResearch), whichever way the batch ends or never starts; the conversation remembers what
         // it researched, and the continuation (if any) waits on the same promise.
+        // The batch runs on the model the chat menu shows now, every card and every rerun (kept in the record).
         const request: ChatBatchRequest = {
           ...chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
-          ...(retryModel ? { model: retryModel } : {})
+          model: retryModel ?? this.currentModelId()
         };
         // The cards the chat asked for: a batch that stops is told in the chat.
         const watch = researchIds.length
@@ -25561,6 +25577,8 @@ export class VisualAgentMapView extends ItemView {
             this.startMultiResearch(
               {
                 ...request,
+                // The chat sets imageSearch only when the user asked for images: they are required.
+                imagesRequired: request.imageSearch,
                 ...(referenceGroups.length ? { referenceGroups } : {})
               },
               undefined,

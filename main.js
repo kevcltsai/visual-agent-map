@@ -35669,10 +35669,10 @@ var NoteStyleStore = class {
       chosen = (_d = tryRef(typeof own2 === "string" ? own2 : void 0)) != null ? _d : this.recipeFromRef(KIND_DEFAULT_RECIPE[kind], kind, language2);
     }
     const style = this.assemble(chosen, source, missing, language2);
-    return chosen.aiDecidesSections ? this.withAiSections(style, request.detail, language2) : style;
+    return chosen.aiDecidesSections ? this.withAiSections(style, request.detail, language2, request.rewrite) : style;
   }
   /** The AI-suggested style for one run: the state the note's detail puts it in (the table in the note-style spec). */
-  withAiSections(style, detail, language2) {
+  withAiSections(style, detail, language2, rewrite = false) {
     const named = (mode, template2, key4) => {
       const aiSections = Object.freeze({ mode, ...detail !== void 0 ? { forDetail: detail } : {} });
       const { styleSelection } = style.contextFields;
@@ -35693,7 +35693,7 @@ var NoteStyleStore = class {
       });
     };
     if (detail === void 0) return named("no-note", style.template, "ui.note_style_ai_sections_decide");
-    if (!detail.trim()) return named("decide", style.template, "ui.note_style_ai_sections_decide");
+    if (!detail.trim() || rewrite) return named("decide", style.template, "ui.note_style_ai_sections_decide");
     const read = templateFromDetail(detail, noteLanguageOf(language2));
     return read.ok ? named("follow", read.template, "ui.note_style_ai_sections_follow") : named("note-unusable", style.template, void 0);
   }
@@ -38015,8 +38015,9 @@ var TopicRuns = class {
     }
     const outputLanguage2 = (_d = overrides.outputLanguage) != null ? _d : this.ports.settings().language;
     let runStyle = givenStyle != null ? givenStyle : options.resolveStyle ? await options.resolveStyle(outputLanguage2) : this.ports.runStyle({ note, outputLanguage: outputLanguage2 });
-    if (runStyle.aiSections && runStyle.aiSections.forDetail !== note.detail)
-      runStyle = this.ports.runStyle({ note, outputLanguage: outputLanguage2 });
+    const rewrite = overrides.updateMode === "fresh";
+    if (runStyle.aiSections && (runStyle.aiSections.forDetail !== note.detail || rewrite && runStyle.aiSections.mode !== "decide"))
+      runStyle = this.ports.runStyle({ note, outputLanguage: outputLanguage2, ...rewrite ? { rewrite } : {} });
     const detailTemplate = runStyle.template;
     const anchorText = ((_e = options.anchorContext) == null ? void 0 : _e.call(options, outputLanguage2)) || void 0;
     const context = withThinkingOrigin(
@@ -75278,6 +75279,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
   }
   async runMultiResearch(request, retryBatchKey, onSettled, tell, signal, markStarted, onTopic) {
+    var _a2;
     if (!this.map || !this.selection.state.multiSelected.size) return;
     const languageSource = this.batchLanguageSource();
     const key4 = this.multiResearchKey();
@@ -75287,22 +75289,27 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     const selected = [...this.selection.state.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     try {
-      const models = request.model ? [request.model] : [
-        ...new Set(
-          (await Promise.all(
-            selected.map((node) => {
-              var _a2;
-              return this.plugin.repo.resolveTopicModel(node.path, (_a2 = this.map) != null ? _a2 : void 0);
-            })
-          )).map((item) => item.origin === "override" ? item.model : this.currentModelId())
-        )
-      ];
+      const current = {
+        model: (_a2 = request.model) != null ? _a2 : this.currentModelId(),
+        reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
+      };
+      const resolved = request.model ? [] : await Promise.all(
+        selected.map(async (node) => {
+          var _a3;
+          return {
+            path: node.path,
+            ...await this.plugin.repo.resolveTopicModel(node.path, (_a3 = this.map) != null ? _a3 : void 0)
+          };
+        })
+      );
+      const ownModel = new Set(resolved.filter((item) => item.origin === "override").map((item) => item.path));
+      const models = request.model ? [request.model] : [...new Set(resolved.map((item) => item.origin === "override" ? item.model : current.model))];
       if (!models.length) models.push(this.plugin.settings.cliModel);
       const confirmEach = async (index, run) => index >= models.length ? (await run(), true) : this.plugin.confirmAiUsage(models[index], async () => {
         await confirmEach(index + 1, run);
       });
       await confirmEach(0, async () => {
-        var _a2, _b2, _c;
+        var _a3, _b2;
         if (this.plugin.expansionCoordinator.isRunning(key4)) {
           new import_obsidian34.Notice(t("ui.multi_research_already_running"));
           return;
@@ -75321,31 +75328,30 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         const sources = await this.batchSources(
-          (_a2 = request.referenceGroups) != null ? _a2 : [],
+          (_a3 = request.referenceGroups) != null ? _a3 : [],
           nodes.length,
-          (_b2 = request.model) != null ? _b2 : this.currentModelId(),
+          current.model,
           signal
         );
         const shared = {
           referenceGroups: sources.groups,
           requirements: request.requirements,
-          // The picked model is for this batch only (D4): it never becomes a topic's own model.
-          ...request.model ? { runOnce: { model: request.model } } : {},
           ...request.noteStyle ? { noteStyle: request.noteStyle } : {},
           ...request.rewrite ? { rewrite: true } : {}
         };
         const choicesFor = (note) => {
-          var _a3;
+          var _a4;
           return request.researchMode !== void 0 ? {
             // The mode follows the override (local = Quick), so a Quick run gets the Quick prompt and no charts.
             ...aiModeOptions(noteAiMode(request.researchMode), "research"),
             researchMode: request.researchMode,
-            researchDepth: (_a3 = request.researchDepth) != null ? _a3 : "normal",
-            visualMode: request.imageSearch ? "auto" : "off",
+            researchDepth: (_a4 = request.researchDepth) != null ? _a4 : "normal",
+            // Images the user asked for in the chat are a rule (VISUAL_ON); the dialog's Standard default lets the AI judge.
+            visualMode: request.imagesRequired ? "on" : request.imageSearch ? "auto" : "off",
             ...shared
           } : { ...aiModeOptions(noteAiMode(note.researchMode), "research"), ...shared };
         };
-        if (retryBatchKey && ((_c = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _c.status) !== "running")
+        if (retryBatchKey && ((_b2 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _b2.status) !== "running")
           this.plugin.expansionBatches.delete(retryBatchKey);
         let reported = false;
         let skipped2 = 0;
@@ -75366,15 +75372,20 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
             key4,
             nodes,
             async (child, batchSignal, accepted) => {
-              var _a3;
+              var _a4;
               if (busy(child)) {
                 skipped2++;
                 accepted();
                 return "skipped";
               }
-              const note = await this.plugin.repo.readNote(child.path, (_a3 = this.map) != null ? _a3 : void 0);
+              const note = await this.plugin.repo.readNote(child.path, (_a4 = this.map) != null ? _a4 : void 0);
               try {
-                const choices = { ...choicesFor(note), sharedReferenceCondense: sources.sharedCondense };
+                const choices = {
+                  ...choicesFor(note),
+                  sharedReferenceCondense: sources.sharedCondense,
+                  // The picked model, or the one current when the batch started (D4: never a topic's own model).
+                  ...request.model || !ownModel.has(child.path) ? { runOnce: current } : {}
+                };
                 await this.researchChild(
                   child,
                   batchSignal,
@@ -75407,7 +75418,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
               return void 0;
             },
             () => {
-              var _a3, _b3;
+              var _a4, _b3;
               const state = this.plugin.expansionBatches.get(key4);
               if (state && state.status !== "running" && !reported) {
                 reported = true;
@@ -75429,7 +75440,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
                   if (stopped && !topics.has(node.id))
                     topics.set(node.id, {
                       id: node.id,
-                      title: (_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : node.path,
+                      title: (_b3 = (_a4 = this.notes.get(node.id)) == null ? void 0 : _a4.title) != null ? _b3 : node.path,
                       status: "stopped"
                     });
                 tell({
@@ -80589,7 +80600,11 @@ ${note.detail.trim()}` : "",
     chat.refreshBatch(message);
     try {
       await this.startMultiResearch(
-        { ...batch.request, ...sourceGroups.length ? { referenceGroups: sourceGroups } : {} },
+        {
+          ...batch.request,
+          imagesRequired: batch.request.imageSearch,
+          ...sourceGroups.length ? { referenceGroups: sourceGroups } : {}
+        },
         void 0,
         void 0,
         (result) => {
@@ -80661,7 +80676,7 @@ ${note.detail.trim()}` : "",
         this.markResearchRecorded(this.chatLastRecord);
         const request = {
           ...chatResearchRequest(action, (_c = this.map) == null ? void 0 : _c.aiMode, (mode) => aiModeOptions(mode, "research")),
-          ...retryModel ? { model: retryModel } : {}
+          model: retryModel != null ? retryModel : this.currentModelId()
         };
         const watch = researchIds.length ? (() => {
           var _a3, _b3, _c2;
@@ -80689,6 +80704,8 @@ ${note.detail.trim()}` : "",
             this.startMultiResearch(
               {
                 ...request,
+                // The chat sets imageSearch only when the user asked for images: they are required.
+                imagesRequired: request.imageSearch,
                 ...referenceGroups.length ? { referenceGroups } : {}
               },
               void 0,
@@ -92350,13 +92367,14 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
       settings: () => this.settings,
       exchanges: () => this.exchanges,
       recordFailure: (context, error) => this.recordFailure(context, error),
-      runStyle: ({ note, outputLanguage: outputLanguage2 }) => {
+      runStyle: ({ note, outputLanguage: outputLanguage2, rewrite }) => {
         var _a2;
         return this.noteStyles.runStyle({
           topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
           kind: (_a2 = note.topicKind) != null ? _a2 : "topic",
           outputLanguage: outputLanguage2,
-          detail: note.detail
+          detail: note.detail,
+          ...rewrite ? { rewrite } : {}
         });
       },
       resolveModel: (path, map, runOnce) => this.repo.resolveTopicModel(path, map, runOnce),

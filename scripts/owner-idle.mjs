@@ -4,9 +4,13 @@
 // an AI call in ai-exchanges.json in the last 15 minutes. A file that cannot be read or parsed refuses too.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { harnessConfigDir } from "./create-onboarding-test-vault.mjs";
 
 export const OWNER_IDLE_WINDOW_MS = 15 * 60 * 1000;
-const SKIP = new Set([".obsidian", ".vam-app", ".trash", ".git", "node_modules"]);
+// A turn or call that started but has not ended counts as running this long (a chain waits up to 30 minutes for research);
+// older unfinished ones are left behind by a crash and must not block installing for ever.
+export const OWNER_RUNNING_WINDOW_MS = 60 * 60 * 1000;
+const SKIP = new Set([harnessConfigDir, ".vam-app", ".trash", ".git", "node_modules"]);
 
 export const taiwanTime = ms => `${new Date(ms + 8 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ")} 台灣時間`;
 
@@ -31,7 +35,7 @@ const time = value => { const ms = typeof value === "string" ? Date.parse(value)
 // Returns the reasons the owner may be using the vault; an empty list means installing is allowed.
 export function ownerBusyReasons(vault, { now = Date.now() } = {}) {
   const reasons = [];
-  const since = now - OWNER_IDLE_WINDOW_MS;
+  const since = now - OWNER_IDLE_WINDOW_MS, running = now - OWNER_RUNNING_WINDOW_MS;
   let directories;
   try { directories = recordDirectories(vault); } catch (error) { return [`無法讀取 vault（${error.message}），判斷不出狀態`]; }
   for (const directory of directories) {
@@ -54,6 +58,9 @@ export function ownerBusyReasons(vault, { now = Date.now() } = {}) {
       const lastIndex = predicate => { for (let i = lines.length - 1; i >= 0; i--) if (predicate(lines[i])) return i; return -1; };
       const chainEnd = lastIndex(line => line?.type === "event" && line.kind === "chain_end");
       const turnEnd = lastIndex(line => line?.type === "turn_end");
+      const lastTurnStart = lastIndex(line => line?.type === "turn_start");
+      if (lastTurnStart > turnEnd && (time(lines[lastTurnStart].at) ?? now) >= running)
+        reasons.push(`${map}：第 ${lines[lastTurnStart].turn} 輪（${taiwanTime(time(lines[lastTurnStart].at) ?? now)} 開始）還沒結束`);
       if (turnEnd >= 0 && lines[turnEnd].status === "plan" && chainEnd < turnEnd && lastIndex(line => line?.type === "plan") < turnEnd)
         reasons.push(`${map}：最後一輪（第 ${lines[turnEnd].turn} 輪）有待套用的計畫，還沒套用或取消`);
       // A turn the user typed after an automatic round ends that continuation even when an older build wrote no chain_end.
@@ -63,7 +70,7 @@ export function ownerBusyReasons(vault, { now = Date.now() } = {}) {
         reasons.push(`${map}：自動接續還在跑（第 ${lines[autoStart].round ?? "?"} 輪開始後沒有 chain_end）`);
     }
   }
-  const exchanges = join(vault, ".obsidian/plugins/visual-agent-map/ai-exchanges.json");
+  const exchanges = join(vault, harnessConfigDir, "plugins/visual-agent-map/ai-exchanges.json");
   try {
     const list = JSON.parse(readFileSync(exchanges, "utf8"));
     if (!Array.isArray(list)) throw new Error("not a list");
@@ -71,6 +78,7 @@ export function ownerBusyReasons(vault, { now = Date.now() } = {}) {
     for (const entry of list) {
       const at = Math.max(...[entry?.startedAt, entry?.sentAt, entry?.completedAt].map(time).filter(value => value !== null));
       if (!Number.isFinite(at)) throw new Error("an entry has no readable time");
+      if (time(entry.completedAt) === null && at >= running) reasons.push(`ai-exchanges.json：${taiwanTime(at)} 開始的 AI 呼叫還沒結束`);
       if (latest === null || at > latest) latest = at;
     }
     if (latest !== null && latest >= since) reasons.push(`ai-exchanges.json：${taiwanTime(latest)} 有 AI 呼叫（15 分鐘內）`);

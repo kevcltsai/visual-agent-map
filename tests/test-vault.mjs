@@ -405,6 +405,13 @@ test('owner-idle guard: a turn_start or an AI call in the last 15 minutes refuse
   assert.deepEqual(reasons(t, { exchanges: [] }), []);
 });
 
+test('owner-idle guard: a turn or an AI call still running (no end, under 60 minutes) refuses; an older leftover passes', t => {
+  assert.match(reasons(t, one([start(1, 20)])).join('\n'), /第 1 輪（.*開始）還沒結束/);
+  assert.deepEqual(reasons(t, one([start(1, 61)])), []);
+  assert.match(reasons(t, { exchanges: [{ startedAt: ago(20), sentAt: ago(20) }] }).join('\n'), /開始的 AI 呼叫還沒結束/);
+  assert.deepEqual(reasons(t, { exchanges: [{ startedAt: ago(61), sentAt: ago(61) }] }), []);
+});
+
 test('owner-idle guard: anything it cannot read refuses', t => {
   assert.match(reasons(t, one(['{not json'])).join('\n'), /格式不對/);
   assert.match(reasons(t, one([{ v: 1, type: 'turn_start', turn: 1 }])).join('\n'), /沒有可讀的時間/);

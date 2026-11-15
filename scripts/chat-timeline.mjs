@@ -8,9 +8,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { harnessConfigDir } from "./create-onboarding-test-vault.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const SKIP = new Set([".obsidian", ".vam-app", ".trash", ".git", "node_modules"]);
+const SKIP = new Set([harnessConfigDir, ".vam-app", ".trash", ".git", "node_modules"]);
 export const taiwanTime = value => { const ms = Date.parse(value); return Number.isFinite(ms) ? new Date(ms + 8 * 3600 * 1000).toISOString().slice(5, 19).replace("T", " ") : "??-?? ??:??:??"; };
 const cut = (text, length = 80) => { const flat = String(text ?? "").replace(/\s+/g, " ").trim(); return [...flat].length > length ? `${[...flat].slice(0, length).join("")}…` : flat; };
 
@@ -109,7 +110,7 @@ export function promptParts(prompt, markers = promptMarkers()) {
 }
 
 export function readExchanges(vault) {
-  const list = JSON.parse(readFileSync(join(vault, ".obsidian/plugins/visual-agent-map/ai-exchanges.json"), "utf8"));
+  const list = JSON.parse(readFileSync(join(vault, harnessConfigDir, "plugins/visual-agent-map/ai-exchanges.json"), "utf8"));
   if (!Array.isArray(list)) throw new Error("ai-exchanges.json 不是清單");
   return list.filter(entry => String(entry?.step ?? "").startsWith("task.run"));
 }

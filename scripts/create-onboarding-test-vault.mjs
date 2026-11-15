@@ -3,6 +3,9 @@ import { createHash } from "node:crypto";
 import { isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// The config folder every harness-made vault (session vaults and the owner's testing vault) is created with.
+export const harnessConfigDir = ".obsidian";
+
 const root = fileURLToPath(new URL("..", import.meta.url));
 const fixtureRoot = join(root, "tests/fixtures/taiwan-travel-regression");
 // Shared fixture builder; environment/reset/launch policy belongs to test-harness.mjs.

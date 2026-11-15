@@ -375,8 +375,8 @@ test('collect snapshots: preset instruction strings composed directly from i18n'
   const presetSteps = support.load('experiences/markdown-context/steps/presets/step.ts');
   for (const [language, tag] of LANGUAGES) {
     const presets = { 'prompt.context_ai_condense': presetSteps.condensePresetStep, 'prompt.context_ai_translate': presetSteps.translatePresetStep, 'prompt.context_ai_search_images': presetSteps.searchImagesPresetStep };
-    const others = { 'prompt.research_topic': () => researchTopicTask(language, 'Target language'), 'prompt.search_budget_exhausted': () => searchBudgetExhaustedMessage(language), 'prompt.reference_reduce': () => referenceTask('reduce', language) };
-    const keys = [...Object.keys(presets), 'prompt.research_topic', 'prompt.search_budget_exhausted', 'prompt.reference_reduce'];
+    const others = { 'prompt.research_topic': () => researchTopicTask(language, 'Target language'), 'prompt.search_budget_exhausted': () => searchBudgetExhaustedMessage(language), 'prompt.reference_reduce': () => referenceTask('reduce', language), 'prompt.reference_extract_focus': () => referenceTask('extract', language, { title: 'Topic T', task: 'Research Topic T.\n\nPaste the full text' }), 'prompt.reference_reduce_focus': () => referenceTask('reduce', language, { title: 'Topic T', task: 'Research Topic T.\n\nPaste the full text' }) };
+    const keys = [...Object.keys(presets), 'prompt.research_topic', 'prompt.search_budget_exhausted', 'prompt.reference_reduce', 'prompt.reference_extract_focus', 'prompt.reference_reduce_focus'];
     const text = key => (presets[key] ? presets[key].render({ language, target: 'Target language' }) : others[key]());
     record(`i18n-direct.preset-instructions.${tag}`, 'i18n translate() of strings assembled in UI/runtime classes (selection-ai presets, view research task, codex search-budget steer, reference reduce round which needs >18k chars of evidence to trigger); weaker than a builder snapshot', language, keys.map(key => `${key}: ${text(key)}`).join('\n\n'));
   }

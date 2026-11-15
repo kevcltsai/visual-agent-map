@@ -45351,12 +45351,31 @@ var reduce_zh_default = "\u6574\u5408\u6240\u63D0\u4F9B\u7684\u8B49\u64DA\u6458\
 // core/steps/reference/reduce.en.md
 var reduce_en_default = "Combine the supplied extracted evidence without dropping materially different facts, disagreements, caveats, source identifiers, or source mappings. Keep every original [S#] citation attached to its supported claims and preserve every exact [S#]-to-path mapping; never replace an identifier or alter a path.\n";
 
+// core/steps/reference/focus.zh.md
+var focus_zh_default = "\u9019\u4EFD\u8B49\u64DA\u662F\u70BA\u4E86\u4E0B\u9762\u9019\u500B\u8B70\u984C\u7684\u7814\u7A76\uFF1B\u53EA\u7528\u5B83\u5224\u65B7\u4F86\u6E90\u4E2D\u54EA\u4E9B\u5167\u5BB9\u8981\u4FDD\u7559\uFF0C\u4E0D\u8981\u5728\u9019\u88E1\u56DE\u7B54\u5B83\u3002\n\u8B70\u984C\uFF1A{{title}}\n\u7814\u7A76\u8981\u6C42\uFF1A{{task}}\n\u7814\u7A76\u8981\u6C42\u63D0\u5230\u539F\u6587\u3001\u5168\u6587\u3001\u9010\u5B57\u6216\u5B8C\u6574\u5167\u5BB9\u6642\uFF0C\u8207\u8B70\u984C\u76F8\u95DC\u7684\u4F86\u6E90\u6BB5\u843D\u8981\u9010\u5B57\u7167\u6284\uFF08\u6BCF\u6BB5\u653E\u5728 code block \u88E1\uFF0C\u524D\u9762\u6A19\u4E0A\u5B83\u7684 [S#]\uFF09\uFF0C\u4E0D\u53EF\u6458\u8981\u3001\u6539\u5BEB\u6216\u53EA\u5BEB\u63CF\u8FF0\uFF1B\u5176\u4ED6\u4F86\u6E90\u7167\u5E38\u8655\u7406\u3002\n";
+
+// core/steps/reference/focus.en.md
+var focus_en_default = "This evidence is for the research on the topic below. Use it only to decide what to keep from the sources; do not answer it here.\nTopic: {{title}}\nResearch request: {{task}}\nWhen the research request asks for original, full, verbatim or complete text, copy the relevant source passages word for word (each in a code block, preceded by its [S#]) instead of summarizing, rewriting or describing them; handle the other sources as usual.\n";
+
+// core/steps/reference/focus-reduce.zh.md
+var focus_reduce_zh_default = "\u9019\u4EFD\u8B49\u64DA\u662F\u70BA\u4E86\u4E0B\u9762\u9019\u500B\u8B70\u984C\u7684\u7814\u7A76\uFF1B\u53EA\u7528\u5B83\u5224\u65B7\u8981\u4FDD\u7559\u4EC0\u9EBC\uFF0C\u4E0D\u8981\u5728\u9019\u88E1\u56DE\u7B54\u5B83\u3002\n\u8B70\u984C\uFF1A{{title}}\n\u7814\u7A76\u8981\u6C42\uFF1A{{task}}\n\u9010\u5B57\u6BB5\u843D\uFF08\u6A19\u6709 [S#] \u7684 code block\uFF09\u539F\u6A23\u4FDD\u7559\u3002\u5168\u90E8\u52A0\u8D77\u4F86\u8D85\u904E\u7D04 15,000 \u5B57\u6642\uFF0C\u8207\u8B70\u984C\u6700\u76F8\u95DC\u7684\u6BB5\u843D\u9010\u5B57\u4FDD\u7559\uFF0C\u5176\u9918\u6BCF\u6BB5\u53EA\u5BEB\u4E00\u884C\uFF1A\u5B83\u7684 [S#]\u3001\u8DEF\u5F91\u8207\u300C\u672A\u6536\u9304\u5168\u6587\u300D\uFF1B\u5176\u4ED6\u8B49\u64DA\u5148\u7CBE\u7C21\u3002\n";
+
+// core/steps/reference/focus-reduce.en.md
+var focus_reduce_en_default = 'This evidence is for the research on the topic below. Use it only to decide what to keep; do not answer it here.\nTopic: {{title}}\nResearch request: {{task}}\nKeep the word-for-word passages (code blocks with their [S#]) unchanged. If all of them together would not fit in about 15,000 characters, keep the passages most relevant to the topic word for word and, for each one left out, write one line with its [S#], its path and "full text not included"; shorten the other evidence first.\n';
+
 // core/steps/reference/step.ts
 var text7 = (template2) => renderTemplate(template2, {});
 var EXTRACT = { zh: text7(extract_zh_default), en: text7(extract_en_default) };
 var REDUCE = { zh: text7(reduce_zh_default), en: text7(reduce_en_default) };
-function referenceTask(round3, language2) {
-  return inLanguage(round3 === "extract" ? EXTRACT : REDUCE, language2);
+var FOCUS_EXTRACT = { zh: focus_zh_default, en: focus_en_default };
+var FOCUS_REDUCE = { zh: focus_reduce_zh_default, en: focus_reduce_en_default };
+function referenceTask(round3, language2, focus) {
+  const base = inLanguage(round3 === "extract" ? EXTRACT : REDUCE, language2);
+  if (!(focus == null ? void 0 : focus.task.trim())) return base;
+  const template2 = inLanguage(round3 === "extract" ? FOCUS_EXTRACT : FOCUS_REDUCE, language2);
+  return `${base}
+
+${renderTemplate(template2, { title: focus.title, task: focus.task.trim() })}`;
 }
 
 // core/steps/task/schema-summary-description.md
@@ -46554,6 +46573,7 @@ var AiTaskService = class {
   async extractReferenceFindings(context, model, reasoning, signal, onRequestAccepted) {
     var _a2, _b2, _c;
     let working = referenceBatches((_a2 = context.referenceGroups) != null ? _a2 : []);
+    const focus = context.mode === "merge" ? void 0 : { title: context.title, task: context.task };
     let round3 = 0;
     let sent = 0;
     while (true) {
@@ -46570,7 +46590,7 @@ var AiTaskService = class {
             summary: "",
             rules: "",
             detail: "",
-            task: referenceTask(round3 === 1 ? "extract" : "reduce", this.options.language()),
+            task: referenceTask(round3 === 1 ? "extract" : "reduce", this.options.language(), focus),
             ancestors: "",
             sourceContext: batches[index],
             mode: "task",

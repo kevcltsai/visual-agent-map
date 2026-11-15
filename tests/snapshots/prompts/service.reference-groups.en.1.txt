@@ -51,3 +51,8 @@ Ancestor topic context:
 
 Current task:
 Extract relevant facts, evidence, disagreements, and limitations from every supplied source section. Do not omit a section because it seems less relevant. Preserve its [S#] identifier beside each extracted claim, and include a source mapping that lists every supplied [S#] with its exact original path. Keep source headings when they help identify a section. The final answer needs this mapping to cite the original file. Do not infer beyond the text.
+
+This evidence is for the research on the topic below. Use it only to decide what to keep from the sources; do not answer it here.
+Topic: Topic T
+Research request: Do task X
+When the research request asks for original, full, verbatim or complete text, copy the relevant source passages word for word (each in a code block, preceded by its [S#]) instead of summarizing, rewriting or describing them; handle the other sources as usual.

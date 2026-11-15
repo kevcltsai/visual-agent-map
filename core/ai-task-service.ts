@@ -779,6 +779,9 @@ export class AiTaskService {
     onRequestAccepted?: () => void
   ): Promise<string> {
     let working = referenceBatches(context.referenceGroups ?? []);
+    // The user's ask steers what is kept (a request for the sources' own text keeps it verbatim). A merge's task is the
+    // merge contract, not an ask about the sources, so its rounds stay as they were.
+    const focus = context.mode === "merge" ? undefined : { title: context.title, task: context.task };
     let round = 0;
     let sent = 0;
     while (true) {
@@ -796,7 +799,7 @@ export class AiTaskService {
             summary: "",
             rules: "",
             detail: "",
-            task: referenceTask(round === 1 ? "extract" : "reduce", this.options.language()),
+            task: referenceTask(round === 1 ? "extract" : "reduce", this.options.language(), focus),
             ancestors: "",
             sourceContext: batches[index],
             mode: "task",

@@ -293,6 +293,30 @@ test('reference rounds: four extract, one reduce and the main task each end pars
   for (const id of ids) assert.deepEqual(h.of(id), id === ids[5] ? ['begin', 'ox', 'sent', 'received', 'milestones', 'parsed'] : ['begin', 'sent', 'received', 'milestones', 'parsed'], id);
 });
 
+test('reference rounds carry the topic and the user ask, so a request for verbatim text keeps it; a blank task adds nothing', async () => {
+  const big = JSON.stringify({ summary: 'S', detail: 'e'.repeat(9_001), suggestions: [], visualReferences: [] });
+  const documents = [1, 2, 3, 4].map(n => ({ path: `n${n}.md`, content: 'x'.repeat(90_001) }));
+  const groups = [{ id: 'g', name: 'g', location: 'l', documents }];
+  const isReference = call => call.prompt.includes('Extract relevant facts') || call.prompt.includes('Combine the supplied extracted evidence');
+  const asked = rig({ handler: call => answer(call, isReference(call) ? big : GOOD) });
+  await asked.service.askModel(context({ title: 'Quick mode prompt', task: 'Research it.\n\nPaste the full prompt text', referenceGroups: groups }), 'gpt-6-luna', 'low', undefined, asked.mark);
+  const rounds = asked.state.calls.filter(isReference);
+  assert.equal(rounds.length, 5);
+  for (const call of rounds) {
+    assert.ok(call.prompt.includes('Topic: Quick mode prompt'), 'every round names the topic');
+    assert.ok(call.prompt.includes('Research request: Research it.\n\nPaste the full prompt text'), 'every round carries the user ask');
+  }
+  for (const call of rounds.slice(0, 4)) assert.ok(call.prompt.includes('copy the relevant source passages word for word'), 'extract keeps verbatim text when asked');
+  assert.ok(rounds[4].prompt.includes('Keep the word-for-word passages') && rounds[4].prompt.includes('full text not included'), 'reduce keeps them but may list the least relevant by [S#] and path');
+  for (const extra of [{ task: '' }, { task: '  \n ' }, { mode: 'merge', task: 'Merge contract text' }]) {
+    const plain = rig({ handler: call => answer(call, isReference(call) ? big : GOOD) });
+    await plain.service.askModel(context({ ...extra, referenceGroups: groups }), 'gpt-6-luna', 'low', undefined, plain.mark);
+    const calls = plain.state.calls.filter(isReference);
+    assert.equal(calls.length, 5);
+    for (const call of calls) assert.ok(!call.prompt.includes('do not answer it here'), `no focus for ${JSON.stringify(extra)}`);
+  }
+});
+
 // ---- 6. log switches ----
 test('logging off from the start: no log write, no onExchange, the result is returned', async () => {
   const h = rig({ logging: false, handler: call => answer(call) });

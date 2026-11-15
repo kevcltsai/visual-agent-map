@@ -8987,3 +8987,84 @@ integrationTest('resume: the cards the AI selected stay with the chain - a clear
     h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain?.state.phase === 'waiting'); h.view.chatSelect([h.ids.b]); settleRun(runs[0]); await until(() => h.control.requests.length === 2 && !chat.isBusy);
     eq(contextOf(h.control.requests[1]).selected.map(item => item.id), [h.ids.b], 'never selected by the AI: the selection of the moment, as before'); }
 });
+
+// ---- auto-apply chains: backup before the first write, one retry of a failed round, idle wait (packet P3) -------------------
+// An auto-apply chain is started through the view's internal `setChatAutoApply(true)` (no visible control yet); a chain without it must not change.
+const backupSpy = (h, { ok = true } = {}) => {
+  const calls = []; h.view.writebackHooks = () => ({ backupNote: async (file, content) => { calls.push([file, content]); return ok ? { ok: true, path: `Backups/${calls.length}.md` } : { ok: false }; } });
+  return calls;
+};
+const autoRun = (h, on = true) => { h.view.setChatAutoApply(on); return h.view.chainForRound(undefined, { path: MAP, id: 'map-a' }, 'go'); };
+const applyIn = (h, run, actions, hashes = {}) => withTimeout(h.view.applyMapChatActions({ actions, rejected: [] }, { mdHashes: hashes, topicHashes: topicBaseline(h) }, undefined, undefined, { chain: run }));
+integrationTest('P3 (h) auto-apply: an existing note is backed up once before the first write in the chain, a second write to it adds no second backup, and Map.md is backed up once for the moves', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = backupSpy(h); const before = h.contents.get((h.view.map.nodes.find(n => n.id === h.ids.a)).path); const run = autoRun(h);
+  const lines = await applyIn(h, run, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'AI summary' }, { kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }]);
+  eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done']); assert.equal(calls.length, 1, 'one backup for two writes'); assert.equal(calls[0][0], h.view.map.nodes.find(n => n.id === h.ids.a).path); assert.equal(calls[0][1], before, 'the copy is the note as it was before the write');
+  assert.equal((await h.note('a')).summary, 'AI summary');
+  const more = await applyIn(h, run, [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail: 'Fresh' }, { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b }, { kind: 'reorder_topics', parentId: h.ids.root, nodeIds: [h.ids.b, h.ids.a] }]);
+  eq(more.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done', 'done']); eq(calls.map(c => c[0]), [h.view.map.nodes.find(n => n.id === h.ids.a).path, MAP], 'a second reply of the chain backs nothing up again; Map.md once');
+  const md = await harness(); await md.view.hydrate(); const mdCalls = backupSpy(md); const mdRun = autoRun(md);
+  const edited = await applyIn(md, mdRun, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: 'needs total darkness' }, { kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs quiet', replace: 'needs calm' }], md.hashes('Notes/Research.md'));
+  eq(edited.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'skipped'], 'the second edit is the reply\'s own stale-hash skip, not a backup problem'); eq(mdCalls.map(c => c[0]), ['Notes/Research.md']); assert.equal(mdCalls[0][1], '# Research\n\nSleep needs darkness.\nSleep needs quiet.\n');
+});
+integrationTest('P3 (h) auto-apply: a card the chain created itself and a file it created are not backed up; a failed backup skips the action (nothing written) and the next write tries again', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = backupSpy(h); const run = autoRun(h);
+  const made = await applyIn(h, run, [addRoot('r', 'Fresh'), { kind: 'create_md_file', path: 'Notes/Made.md', content: '# Made\n' }]); eq(made.slice(0, 2).map(l => l.status), ['done', 'done']);
+  const fresh = h.view.map.nodes.find(n => n.id !== h.ids.root && ![h.ids.a, h.ids.b, h.ids.c].includes(n.id)); run.createdIds.add(fresh.id); await h.view.hydrate();
+  const mine = (await applyIn(h, run, [{ kind: 'update_summary', nodeId: fresh.id, summary: 'mine' }, { kind: 'edit_md_file', path: 'Notes/Made.md', find: 'Made', replace: 'Done' }], h.hashes('Notes/Made.md'))).filter(l => l.text !== NOT_UNDOABLE);
+  eq(mine.map(l => l.status), ['done', 'done'], JSON.stringify(mine)); eq(calls, [], 'cards and files of the chain itself are never backed up');
+  const f = await harness(); await f.view.hydrate(); const failing = backupSpy(f, { ok: false }); const frun = autoRun(f); const original = (await f.note('a')).summary;
+  const out = (await applyIn(f, frun, [{ kind: 'update_summary', nodeId: f.ids.a, summary: 'AI summary' }, { kind: 'rename_topic', nodeId: f.ids.a, title: 'Body clock' }])).filter(l => l.text !== NOT_UNDOABLE);
+  eq(out.map(l => l.status), ['skipped', 'skipped']); assert.match(out[0].text, /Could not save a backup/); assert.equal(failing.length, 2, 'a failed backup is not remembered as done'); assert.equal((await f.note('a')).summary, original, 'nothing was written'); assert.equal((await f.note('a')).title, 'Body');
+});
+integrationTest('P3 (h) not an auto-apply chain: no backup call, the write goes through as before', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = backupSpy(h); const run = autoRun(h, false); assert.equal(run.state.autoApply, undefined);
+  const lines = await applyIn(h, run, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'AI summary' }, { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b }]);
+  eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done']); eq(calls, []);
+  const plain = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.b, title: 'Mind map' }]); eq(plain.map(l => l.status), ['done']); eq(calls, []);
+});
+integrationTest('P3 (i) auto-apply: a round that fails is sent once more; the second failure ends the chain; a non-auto chain does not retry', async () => {
+  const boom = () => { throw new Error('request timed out'); };
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); chainReplies(h, boom, say('Back again.', [addRoot('x', 'X')], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 2 && !chat.isBusy); await tick();
+  assert.equal(h.control.requests.length, 2, 'one retry'); assert.ok(h.view.map.nodes.some(n => n.path.includes('X')), 'the retried round wrote'); assert.equal(h.view.chatChain, null);
+  const g = await harness(); await g.view.hydrate(); g.view.setChatAutoApply(true); const gchat = g.open(); chainReplies(g, boom, boom, say('never', [], ''));
+  g.type('go'); await g.view.sendMapChat(); await until(() => g.control.requests.length === 2 && !gchat.isBusy); await tick(); await tick();
+  assert.equal(g.control.requests.length, 2, 'the second failure is final'); assert.equal(g.view.chatChain, null); assert.equal(gchat.transcript().at(-1).error, true);
+  const n = await harness(); await n.view.hydrate(); const nchat = n.open(); chainReplies(n, boom, say('never', [], ''));
+  n.type('go'); await n.view.sendMapChat(); await tick(); await tick(); assert.equal(n.control.requests.length, 1, 'without auto-apply a failure is not retried'); assert.equal(nchat.transcript().at(-1).error, true);
+});
+integrationTest('P3 (i) auto-apply: a later round that fails is retried once (counted as a call, not as a round); its second failure ends the chain as failed', async () => {
+  const boom = () => { throw new Error('boom'); };
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const spy = chainSpy(chat);
+  chainReplies(h, say('One.', [addRoot('x', 'X')], 'More'), boom, say('Two.', [addRoot('y', 'Y')], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 3 && h.view.chatChain === null); await tick();
+  eq(spy.rounds(), [2, 2], 'the retried round is round 2 again'); eq(spy.reasons(), ['done']); assert.equal(h.view.map.nodes.filter(n => /X|Y/.test(n.path)).length >= 2, true);
+  const g = await harness(); await g.view.hydrate(); g.view.setChatAutoApply(true); const gchat = g.open(); const gspy = chainSpy(gchat); chainReplies(g, say('One.', [addRoot('x', 'X')], 'More'), boom, boom, say('never', [], ''));
+  g.type('go'); await g.view.sendMapChat(); await chainEnded(gspy); eq(gspy.reasons(), ['failed']); assert.equal(g.control.requests.length, 3);
+});
+integrationTest('P3 (i) auto-apply: Stop before the failure arrives, or while the retry prepares, sends no retry', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const gate = deferred();
+  chainReplies(h, async () => { await gate.promise; throw new Error('late failure'); }, say('never', [], ''));
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.view.stopMapChat(); gate.resolve(); await sending; await tick(); await tick();
+  assert.equal(h.control.requests.length, 1, 'stopped before the failure: no retry'); assert.equal(h.view.chatChain, null);
+  const g = await harness(); await g.view.hydrate(); g.view.setChatAutoApply(true); const gchat = g.open(); let seen = 0; const hold = deferred();
+  g.control.reply = async (_request, signal) => { seen++; if (seen === 1) throw new Error('boom'); await new Promise(resolve => signal.addEventListener('abort', resolve)); await hold.promise; return say('never', [addRoot('z', 'Z')], ''); };
+  g.type('go'); const gsending = g.view.sendMapChat(); await until(() => g.control.requests.length === 2 && gchat.isBusy); g.view.stopMapChat(); hold.resolve(); await gsending; await tick(); await tick();
+  assert.equal(g.control.requests.length, 2, 'stopped during the retry: no third request'); assert.equal(g.view.chatChain, null); assert.equal(g.view.map.nodes.some(n => n.path.includes('Z')), false);
+});
+const expandWait = async (h, ids) => {
+  const chat = h.open(); const spy = chainSpy(chat); const open = new Map();
+  h.view.chatExpand = (parent, _d, signal) => new Promise(resolve => { open.set(parent.id, resolve); signal.addEventListener('abort', () => resolve({ status: 'stopped' }), { once: true }); });
+  chainReplies(h, say('Expanding.', [{ kind: 'run_map_action', action: 'expand', nodeIds: ids, title: '', goal: '', direction: '', mode: '', images: false }], 'Then more'));
+  h.type('expand'); await h.view.sendMapChat(); await until(() => open.size === ids.length); assert.equal(h.view.chatChain.state.phase, 'waiting');
+  return { spy, finish: id => open.get(id)({ status: 'succeeded', titles: [] }) };
+};
+integrationTest('P3 (j) auto-apply: the 30 minutes of waiting count from the last research or expansion that finished; a chain without auto-apply keeps the fixed 30 minutes', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const { spy, finish } = await expandWait(h, [h.ids.a, h.ids.b]);
+  h.clock.advance(CHAIN_WAIT_MS - 60_000); eq(spy.reasons(), []); finish(h.ids.a); await tick();
+  h.clock.advance(CHAIN_WAIT_MS - 60_000); eq(spy.reasons(), [], 'the timer started again when the first expansion finished'); assert.equal(h.view.chatChain.state.phase, 'waiting');
+  h.clock.advance(60_000); await chainEnded(spy); eq(spy.reasons(), ['wait_timeout'], '30 idle minutes end the wait'); assert.equal(h.view.chatChain, null);
+  const n = await harness(); await n.view.hydrate(); const { spy: nspy, finish: nfinish } = await expandWait(n, [n.ids.a, n.ids.b]);
+  n.clock.advance(CHAIN_WAIT_MS - 60_000); nfinish(n.ids.a); await tick(); n.clock.advance(59_999); eq(nspy.reasons(), []); n.clock.advance(1); await chainEnded(nspy); eq(nspy.reasons(), ['wait_timeout'], 'fixed 30 minutes from the start of the wait');
+});

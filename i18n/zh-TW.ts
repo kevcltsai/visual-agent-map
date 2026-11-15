@@ -1210,7 +1210,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_auto_apply_off": "關",
   "ui.map_chat_auto_apply_on": "開",
   "ui.map_chat_auto_apply_warning":
-    "研究、改寫摘要、建立或更新筆記會直接做，不再停下來等你按「套用」，一路做到完或你按停止。網路上的文字可能夾帶指令讓 AI 改寫筆記；每一項改動都能用復原或筆記備份還原。刪除、合併、建立或切換心智圖、改地圖資料夾外的檔案仍會先問你。",
+    "研究、改寫摘要、建立或更新筆記會直接做，不再停下來等你按「套用」，一路做到完或你按停止。網路上的文字可能夾帶指令讓 AI 改寫筆記；每一項改動都能用復原或筆記備份還原。刪除、合併、建立或切換心智圖、改心智圖資料夾外的檔案仍會先問你。",
   "ui.map_chat_auto_round_calls_0_1_2": "自動接續・第 {0} 輪　已用 AI 呼叫 {1}／{2}",
   "ui.map_chat_auto_applied_0": "已直接套用：{0}",
   "ui.map_chat_auto_applied_research_0": "研究 {0} 篇",
@@ -1220,7 +1220,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_chain_left_call_limit_0": "剩下：{0}。",
   "ui.map_chat_plan_reason_call_budget_0": "這一輪會讓自動接續超過 {0} 次 AI 呼叫，等你確認",
   "ui.map_chat_plan_reason_auto_apply_confirm":
-    "自動套用打開時，刪除、合併、建立或切換心智圖、改地圖資料夾外的檔案仍要你確認",
+    "自動套用打開時，刪除、合併、建立或切換心智圖、改心智圖資料夾外的檔案仍要你確認",
   "ui.map_chat_flow_aria": "整段流程進度",
   "ui.map_chat_flow_label": "整段流程",
   "ui.map_chat_flow_step_0_1_2": "第 {0}／{1} 步・第 {2} 輪",

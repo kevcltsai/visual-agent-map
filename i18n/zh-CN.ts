@@ -1209,7 +1209,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_auto_apply_off": "关",
   "ui.map_chat_auto_apply_on": "开",
   "ui.map_chat_auto_apply_warning":
-    "研究、改写摘要、创建或更新笔记会直接做，不再停下来等你点“套用”，一路做到完或你点停止。网络上的文字可能夹带指令让 AI 改写笔记；每一项改动都能用撤销或笔记备份还原。删除、合并、创建或切换思维导图、改地图文件夹外的文件仍会先问你。",
+    "研究、改写摘要、创建或更新笔记会直接做，不再停下来等你点“套用”，一路做到完或你点停止。网络上的文字可能夹带指令让 AI 改写笔记；每一项改动都能用撤销或笔记备份还原。删除、合并、创建或切换思维导图、改思维导图文件夹外的文件仍会先问你。",
   "ui.map_chat_auto_round_calls_0_1_2": "自动接续・第 {0} 轮　已用 AI 调用 {1}／{2}",
   "ui.map_chat_auto_applied_0": "已直接套用：{0}",
   "ui.map_chat_auto_applied_research_0": "研究 {0} 篇",
@@ -1219,7 +1219,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_chain_left_call_limit_0": "剩下：{0}。",
   "ui.map_chat_plan_reason_call_budget_0": "这一轮会让自动接续超过 {0} 次 AI 调用，等你确认",
   "ui.map_chat_plan_reason_auto_apply_confirm":
-    "自动套用打开时，删除、合并、创建或切换思维导图、改地图文件夹外的文件仍要你确认",
+    "自动套用打开时，删除、合并、创建或切换思维导图、改思维导图文件夹外的文件仍要你确认",
   "ui.map_chat_flow_aria": "整段流程进度",
   "ui.map_chat_flow_label": "整段流程",
   "ui.map_chat_flow_step_0_1_2": "第 {0}／{1} 步・第 {2} 轮",

@@ -9,6 +9,10 @@ import type { MapChatPlanChain } from "./map-chat-plan";
 
 /** Rounds in a chain, the first one included. A reply is at most 100 actions; a 38 + 29 card tree plus research takes about 4 rounds, so twice that. */
 export const MAP_CHAT_CHAIN_MAX_ROUNDS = 8;
+/** Rounds in one segment of a chain with "apply this whole conversation automatically" on; a resume starts a new segment. */
+export const MAP_CHAT_AUTO_MAX_ROUNDS = 60;
+/** AI calls (research, expand, ...) in one segment of an auto-apply chain; `planFor` plans a reply that would pass it, and the chain ends as `call_limit` at it. */
+export const MAP_CHAT_AUTO_MAX_CALLS = 300;
 /** How long a chain waits for the research and expands it started; on expiry only the chain ends, the work goes on. */
 export const MAP_CHAT_CHAIN_WAIT_MS = 30 * 60 * 1000;
 
@@ -16,6 +20,7 @@ export const MAP_CHAT_CHAIN_END_REASONS = [
   "done",
   "no_progress",
   "max_rounds",
+  "call_limit",
   "stopped",
   "user_took_over",
   "plan_cancelled",
@@ -81,6 +86,10 @@ export interface MapChatChainState {
   remaining: string;
   /** Research targets the finished rounds started (the plan's `many_research` counts them). */
   researchTargets: number;
+  /** AI calls the finished rounds of this segment started (counted for the auto-apply limit). */
+  calls: number;
+  /** This chain applies the whole conversation automatically: it also ends at {@link MAP_CHAT_AUTO_MAX_CALLS} calls. */
+  autoApply?: boolean;
   /** The round being waited on wrote something. */
   wrote: boolean;
   /** The last finished round went on only because it selected cards (so the next one could read their notes); a second one in a row does not. */
@@ -93,7 +102,23 @@ export const startChain = (maxRounds = MAP_CHAT_CHAIN_MAX_ROUNDS): MapChatChainS
   maxRounds,
   remaining: "",
   researchTargets: 0,
+  calls: 0,
   wrote: false
+});
+/** A chain with auto-apply on: segments of {@link MAP_CHAT_AUTO_MAX_ROUNDS} rounds and {@link MAP_CHAT_AUTO_MAX_CALLS} calls. */
+export const startAutoChain = (): MapChatChainState => ({ ...startChain(MAP_CHAT_AUTO_MAX_ROUNDS), autoApply: true });
+/**
+ * The chain of a resume (`resume` from {@link resumeRound}): a fresh segment, so the call and research counters start at 0 and the
+ * round keeps counting.
+ */
+export const resumedChain = (
+  resume: { round: number; maxRounds: number; remaining: string },
+  autoApply = false
+): MapChatChainState => ({
+  ...startChain(resume.maxRounds),
+  round: resume.round,
+  remaining: resume.remaining,
+  ...(autoApply ? { autoApply: true } : {})
 });
 /** The chain facts `planFor` needs for the reply of the round in flight. */
 export const planChainOf = (state: MapChatChainState): MapChatPlanChain => ({
@@ -138,6 +163,8 @@ export interface MapChatRoundEnd {
   /** Research notes this round's context left out that a later round can still send (not the oversize ones). */
   researchDeferred: number;
   actions: readonly MapChatRoundAction[];
+  /** AI calls the round started (from `estimateChatCalls`); added to the segment's count. Absent = 0. */
+  calls?: number;
   started: {
     /** Research targets started. */
     research: number;
@@ -160,12 +187,14 @@ export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Ste
     ...state,
     remaining,
     researchTargets: state.researchTargets + Math.max(0, end.started.research),
+    calls: (state.calls ?? 0) + Math.max(0, end.calls ?? 0),
     wrote: wroteSomething(end.actions),
     selectedOnly: false
   };
   if (!remaining && end.researchDeferred <= 0) return ended(next, "done");
   if (end.started.otherBackground) return ended(next, "other_background_work");
   if (state.round >= state.maxRounds) return ended(next, "max_rounds");
+  if (state.autoApply && next.calls >= MAP_CHAT_AUTO_MAX_CALLS) return ended(next, "call_limit");
   const waitFor: ("research" | "expand")[] = [];
   if (end.started.research > 0) waitFor.push("research");
   if (end.started.expand > 0) waitFor.push("expand");
@@ -225,7 +254,8 @@ export const MAP_CHAT_CHAIN_RESUMABLE: ReadonlySet<MapChatChainEndReason> = new 
   "failed",
   "wait_timeout",
   "no_progress",
-  "max_rounds"
+  "max_rounds",
+  "call_limit"
 ]);
 export interface MapChatChainResumeEnd {
   /** Why the chain ended; null when it was cut off (the plugin reloaded: no `chain_end`, or only `map_changed`). */
@@ -242,10 +272,11 @@ export interface MapChatChainResumeEnd {
 /**
  * Where an interrupted chain goes on: the next round when the stopped one was applied (and its reply left something to do), the same
  * round again when it was not. Round 1 not applied is a resend, not a resume. The round limit counts in whole limits, so a chain
- * that hit it gets one more limit (rounds keep counting).
+ * that hit it gets one more limit (rounds keep counting). `segment` is the limit: 8, or {@link MAP_CHAT_AUTO_MAX_ROUNDS} for an auto-apply chain.
  */
 export function resumeRound(
-  end: MapChatChainResumeEnd
+  end: MapChatChainResumeEnd,
+  segment = MAP_CHAT_CHAIN_MAX_ROUNDS
 ): { round: number; maxRounds: number; remaining: string } | null {
   if (end.reason !== null && !MAP_CHAT_CHAIN_RESUMABLE.has(end.reason)) return null;
   let round = end.round;
@@ -256,7 +287,7 @@ export function resumeRound(
     if (!remaining) return null;
   }
   if (!Number.isInteger(round) || round < 2) return null;
-  return { round, maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS * Math.ceil(round / MAP_CHAT_CHAIN_MAX_ROUNDS), remaining };
+  return { round, maxRounds: segment * Math.ceil(round / segment), remaining };
 }
 
 const RESUME_KEYWORDS: ReadonlySet<string> = new Set([

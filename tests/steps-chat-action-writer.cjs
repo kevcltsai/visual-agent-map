@@ -1,0 +1,224 @@
+// ChatActionWriter (experiences/visual-map/chat-action-writer.ts) on its own: fake ports and a fake map, no view, no real waiting.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { load } = require('./support.cjs');
+const { ChatActionWriter } = load('experiences/visual-map/chat-action-writer.ts', { obsidian: {} });
+const { t } = load('i18n.ts');
+const { contentHash } = load('core/map-chat-context.ts');
+
+// The module runs in its own vm realm, so what it returns is compared as plain data.
+const plain = value => JSON.parse(JSON.stringify(value));
+const skippedOutcome = key => ({ status: 'skipped', reason: t(key) });
+const node = (id, parentId = null) => ({ id, parentId, path: `${id}.md`, x: 0, y: 0, collapsed: false });
+
+function world(options = {}) {
+  const calls = [];
+  const log = (name, ...args) => calls.push([name, ...args.map(arg => (arg === undefined ? null : plain(arg)))]);
+  const map = {
+    id: 'map', title: 'Map', version: 1, nodes: options.nodes ?? [node('a'), node('b'), node('c', 'a')],
+    topicRelations: [], canvasItems: [], viewport: { x: 0, y: 0, zoom: 1 }
+  };
+  // What the vault has now for each card (the writer reads it again at apply time).
+  const notes = new Map(Object.entries(options.notes ?? { a: { title: 'A' }, b: { title: 'B' }, c: { title: 'C' } })
+    .map(([id, note]) => [id, { summary: '', detail: '', ...note }]));
+  const files = new Map(Object.entries(options.files ?? {}));
+  const history = [];
+  const transactions = [];
+  const state = { lock: null };
+  const fileObject = path => ({ path });
+  const app = {
+    vault: {
+      configDir: '.obsidian',
+      getAbstractFileByPath: path => (files.has(path) ? fileObject(path) : null),
+      process: async (file, change) => { log('process', file.path); files.set(file.path, change(files.get(file.path))); },
+      create: async () => {}, createFolder: async () => {}
+    },
+    metadataCache: { getFileCache: () => ({ frontmatter: undefined }) },
+    fileManager: { trashFile: async () => {} }
+  };
+  const plugin = {
+    mermaidSyntax: undefined,
+    repo: {
+      readNote: async path => ({ ...notes.get([...notes.keys()].find(id => `${id}.md` === path)) }),
+      writeTopicAppearance: async (path, change) => log('writeTopicAppearance', path, plain(change))
+    }
+  };
+  const readChatFile = async path => (files.has(path) ? { file: fileObject(path), text: files.get(path), editor: null } : null);
+  const ports = {
+    map: () => map, path: () => 'map.md', plugin: () => plugin, notes: () => notes, history: () => ({ push: entry => history.push(entry) }),
+    isMerging: () => false, relationsEnabled: () => true,
+    topicKindOf: () => 'topic', hypothesisLeaningOf: () => undefined, hypothesisStrengthOf: () => undefined,
+    mapChange: async change => { log('mapChange'); change(map); },
+    beginMapTransaction: () => {
+      const transaction = {
+        rewrites: [], edits: [], commits: [],
+        rewriteNote(path, change) { transaction.rewrites.push([path, change]); return transaction; },
+        editMap(path, change) { transaction.edits.push(path); change(map); return transaction; },
+        async commit(commitOptions) {
+          transaction.commits.push(commitOptions);
+          for (const [path, change] of transaction.rewrites) await change(path);
+          return { undo: async () => {}, redo: async () => {}, label: commitOptions.label };
+        }
+      };
+      transactions.push(transaction);
+      return transaction;
+    },
+    app: () => app,
+    aiLockReason: (...args) => { log('aiLockReason', args[0], args[1]); return state.lock; },
+    freshNotes: async () => { log('freshNotes'); return notes; },
+    freshNotesOf: async ids => { log('freshNotesOf', ids); return notes; },
+    topicState: (id, fresh) => {
+      const found = map.nodes.find(item => item.id === id);
+      return found ? { title: fresh?.title ?? found.path, summary: fresh?.summary ?? '', detail: fresh?.detail ?? '', parentId: found.parentId } : null;
+    },
+    addNode: async (...args) => {
+      log('addNode', args[0]?.id, ...args.slice(1));
+      map.nodes.push(node('n1', args[0]?.id ?? null));
+      notes.set('n1', { title: args[1], summary: '', detail: '' });
+    },
+    noteChange: async (found, patch) => { log('noteChange', found.id, patch); Object.assign(notes.get(found.id), patch); },
+    moveTopic: async (found, parent) => { log('moveTopic', found.id, parent.id); found.parentId = parent.id; },
+    removeToUnassignedEntry: async (found, branch) => { log('removeToUnassignedEntry', found.id, branch); return { parkedPaths: () => [`Unassigned/${found.path}`] }; },
+    chatMoveBefore: async () => true, chatReorderChildren: async () => {}, arrangeAll: () => {}, focusNode: () => {}, flushChatRender: () => {},
+    readChatFile,
+    chatFileText: async path => (await readChatFile(path))?.text ?? null,
+    chatUndoRefusal: () => new Error('refused'),
+    chatReadableNow: async () => false,
+    attachedReadOnly: () => false,
+    noteChatOwnFile: (path, text, created) => log('noteChatOwnFile', path, text, created),
+    fileOf: path => (files.has(path) ? fileObject(path) : null)
+  };
+  const writer = new ChatActionWriter(ports);
+  const nodeById = id => map.nodes.find(item => item.id === id);
+  const baseline = (extra = {}) => ({
+    mdHashes: {}, topicHashes: Object.fromEntries(map.nodes.map(item => [item.id, { title: notes.get(item.id)?.title, parentId: item.parentId }])),
+    mapSourcePaths: [], ...extra
+  });
+  const run = () => ({ refs: new Map(), created: [], notes: new Set(), files: new Set(), parked: new Set() });
+  const only = name => calls.filter(call => call[0] === name);
+  return { writer, map, notes, files, history, transactions, state, calls, only, nodeById, baseline, run };
+}
+const apply = (w, action, baseline = w.baseline(), run = w.run()) => w.writer.write(action, baseline, () => true, run).then(outcome => ({ outcome: plain(outcome), run }));
+
+test('chat action writer: add_child passes the type, leaning and strength to addNode, records the new card and writes the summary', async () => {
+  const w = world();
+  const { outcome, run } = await apply(w, { kind: 'add_child', parentId: 'a', title: 'X1', ref: 'r1', summary: 'S1', topicKind: 'hypothesis', leaning: 'supported', strength: 'weak' });
+  assert.deepEqual(outcome, { status: 'done' });
+  assert.deepEqual(w.only('addNode'), [['addNode', 'a', 'X1', true, false, 'hypothesis', false, { leaning: 'supported', strength: 'weak' }]]);
+  assert.deepEqual(run.created, ['n1']);
+  assert.equal(run.refs.get('r1'), 'n1');
+  assert.deepEqual([...run.notes], ['n1']);
+  assert.deepEqual(w.only('noteChange'), [['noteChange', 'n1', { summary: 'S1' }]]);
+});
+
+test('chat action writer: rename_topic writes the title and moves the baseline; a card the user changed is skipped and not written', async () => {
+  const w = world();
+  const baseline = w.baseline();
+  const { outcome } = await apply(w, { kind: 'rename_topic', nodeId: 'a', title: 'A2' }, baseline);
+  assert.deepEqual(outcome, { status: 'done' });
+  assert.deepEqual(w.only('noteChange'), [['noteChange', 'a', { title: 'A2' }]]);
+  assert.equal(baseline.topicHashes.a.title, 'A2');
+  const stale = world();
+  const changed = stale.baseline();
+  changed.topicHashes.a.title = 'What the model saw';
+  const result = await apply(stale, { kind: 'rename_topic', nodeId: 'a', title: 'A2' }, changed);
+  assert.deepEqual(result.outcome, skippedOutcome('ui.map_chat_skip_topic_changed'));
+  assert.deepEqual(stale.only('noteChange'), []);
+});
+
+test('chat action writer: move_topic moves the card and follows it in the baseline; a move under its own descendant is a cycle', async () => {
+  const w = world();
+  const baseline = w.baseline();
+  const { outcome } = await apply(w, { kind: 'move_topic', nodeId: 'c', newParentId: 'b' }, baseline);
+  assert.deepEqual(outcome, { status: 'done' });
+  assert.deepEqual(w.only('moveTopic'), [['moveTopic', 'c', 'b']]);
+  assert.equal(baseline.topicHashes.c.parentId, 'b');
+  const cycle = world();
+  const result = await apply(cycle, { kind: 'move_topic', nodeId: 'a', newParentId: 'c' });
+  assert.deepEqual(result.outcome, skippedOutcome('ui.map_chat_skip_cycle'));
+  assert.deepEqual(cycle.only('moveTopic'), []);
+});
+
+test('chat action writer: delete_topic removes the card to Unassigned and keeps the parked paths of the reply', async () => {
+  const w = world();
+  const { outcome, run } = await apply(w, { kind: 'delete_topic', nodeId: 'b', branch: false });
+  assert.deepEqual(outcome, { status: 'done' });
+  assert.deepEqual(w.only('removeToUnassignedEntry'), [['removeToUnassignedEntry', 'b', false]]);
+  assert.deepEqual([...run.parked], ['Unassigned/b.md']);
+});
+
+test('chat action writer: add_relation and remove_relation change Map.md through mapChange; a self link and a missing relation are skipped', async () => {
+  const w = world();
+  const added = await apply(w, { kind: 'add_relation', fromId: 'a', toId: 'b', relationKind: 'related' });
+  assert.deepEqual(added.outcome, { status: 'done' });
+  assert.deepEqual(plain(w.map.topicRelations ?? []), [{ kind: 'related', from: 'a', to: 'b' }]);
+  const removed = await apply(w, { kind: 'remove_relation', fromId: 'b', toId: 'a' });
+  assert.deepEqual(removed.outcome, { status: 'done' });
+  assert.deepEqual(plain(w.map.topicRelations ?? []), []);
+  assert.equal(w.only('mapChange').length, 2);
+  const self = await apply(w, { kind: 'add_relation', fromId: 'a', toId: 'a', relationKind: 'related' });
+  assert.deepEqual(self.outcome, skippedOutcome('ui.map_chat_skip_relation_not_allowed'));
+  const missing = await apply(w, { kind: 'remove_relation', fromId: 'a', toId: 'b' });
+  assert.deepEqual(missing.outcome, skippedOutcome('ui.map_chat_skip_relation_missing'));
+  assert.equal(w.only('mapChange').length, 2, 'a refused one writes nothing');
+});
+
+test('chat action writer: set_appearance writes only the cards whose appearance changes, in one transaction and one history step', async () => {
+  const w = world({ notes: { a: { title: 'A' }, b: { title: 'B', color: 'red' }, c: { title: 'C' } } });
+  const { outcome, run } = await apply(w, { kind: 'set_appearance', nodeIds: ['a', 'b'], color: 'red' });
+  assert.deepEqual(outcome, { status: 'done' });
+  assert.equal(w.transactions.length, 1);
+  assert.deepEqual(w.transactions[0].rewrites.map(([path]) => path), ['a.md']);
+  assert.deepEqual(w.transactions[0].edits, ['map.md']);
+  assert.deepEqual(plain(w.transactions[0].commits), [{ deferRebuild: true, label: t('ui.topic_appearance') }]);
+  assert.deepEqual(w.only('writeTopicAppearance'), [['writeTopicAppearance', 'a.md', { color: 'red', addMarkers: [], removeMarkers: [], addStyles: [], removeStyles: [] }]]);
+  assert.equal(w.history.length, 1);
+  assert.equal(w.history[0].label, t('ui.topic_appearance'));
+  assert.deepEqual([...run.notes], ['a']);
+});
+
+test('chat action writer: edit_md_file writes through vault.process, records one undo step that restores and redoes, and moves the hash', async () => {
+  const w = world({ files: { 'notes/x.md': 'hello world' } });
+  const baseline = w.baseline({ mdHashes: { 'notes/x.md': contentHash('hello world') } });
+  const { outcome, run } = await apply(w, { kind: 'edit_md_file', path: 'notes/x.md', find: 'world', replace: 'there' }, baseline);
+  assert.deepEqual(outcome, { status: 'done' });
+  assert.equal(w.files.get('notes/x.md'), 'hello there');
+  assert.deepEqual(w.only('process'), [['process', 'notes/x.md']]);
+  assert.equal(baseline.mdHashes['notes/x.md'], contentHash('hello there'));
+  assert.deepEqual([...run.files], ['notes/x.md']);
+  assert.deepEqual(w.only('noteChatOwnFile'), [['noteChatOwnFile', 'notes/x.md', 'hello there', false]]);
+  assert.equal(w.history.length, 1);
+  await w.history[0].undo();
+  assert.equal(w.files.get('notes/x.md'), 'hello world');
+  await w.history[0].redo();
+  assert.equal(w.files.get('notes/x.md'), 'hello there');
+  w.files.set('notes/x.md', 'typed by the user');
+  await assert.rejects(() => w.history[0].undo(), /refused/);
+  assert.equal(w.files.get('notes/x.md'), 'typed by the user');
+});
+
+test('chat action writer: a card or file that is a data source of the map is refused for rename_topic and edit_md_file, nothing written', async () => {
+  const w = world({ files: { 'a.md': 'source text' } });
+  const baseline = w.baseline({ mapSourcePaths: ['a.md'], mdHashes: { 'a.md': contentHash('source text') } });
+  const refused = { status: 'skipped', reason: t('ui.map_chat_guard_map_source') };
+  const rename = await apply(w, { kind: 'rename_topic', nodeId: 'a', title: 'A2' }, baseline);
+  assert.deepEqual(rename.outcome, refused);
+  const edit = await apply(w, { kind: 'edit_md_file', path: 'a.md', find: 'source', replace: 'changed' }, baseline);
+  assert.deepEqual(edit.outcome, refused);
+  assert.deepEqual(w.only('noteChange'), []);
+  assert.deepEqual(w.only('process'), []);
+  assert.equal(w.files.get('a.md'), 'source text');
+});
+
+test('chat action writer: a card locked for the AI is refused at apply time, read from disk for that card (all cards for a delete)', async () => {
+  const w = world();
+  w.state.lock = { reason: 'locked' };
+  const rename = await apply(w, { kind: 'rename_topic', nodeId: 'a', title: 'A2' });
+  assert.deepEqual(rename.outcome, skippedOutcome('ui.ai_locked_notice'));
+  assert.deepEqual(w.only('freshNotesOf'), [['freshNotesOf', ['a']]]);
+  assert.deepEqual(w.only('noteChange'), []);
+  const removed = await apply(w, { kind: 'delete_topic', nodeId: 'b', branch: false });
+  assert.deepEqual(removed.outcome, skippedOutcome('ui.ai_locked_notice'));
+  assert.equal(w.only('freshNotes').length, 1);
+  assert.deepEqual(w.only('removeToUnassignedEntry'), []);
+});

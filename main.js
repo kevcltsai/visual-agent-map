@@ -79155,7 +79155,7 @@ ${note.detail.trim()}` : "",
    * already ended it); a second failure of the round ends the chain as `failed` as usual. Returns whether a retry was started.
    */
   retryAutoRound(run, origin) {
-    if (!run.state.autoApply || run.retriedRound === run.state.round || this.chatChain !== run || run.state.phase !== "round" || this.closed)
+    if (!this.chatAutoApply || run.retriedRound === run.state.round || this.chatChain !== run || run.state.phase !== "round" || this.closed || this.chatApplying || !this.map || this.notesLoading() || !origin.text)
       return false;
     run.retriedRound = run.state.round;
     run.state = { ...run.state, calls: run.state.calls + 1 };
@@ -79362,7 +79362,7 @@ ${note.detail.trim()}` : "",
       if (this.chatChain !== run || run.state.phase !== "waiting") return;
       waiting.settled = Math.min(waiting.total, waiting.settled + by);
       (_a2 = this.chat) == null ? void 0 : _a2.setChainWaiting(waiting, run.state.remaining);
-      if (run.state.autoApply) {
+      if (this.chatAutoApply) {
         if (run.timer !== null) window.clearTimeout(run.timer);
         arm();
       }
@@ -81019,35 +81019,55 @@ ${note.detail.trim()}` : "",
    * the next write to the file tries the backup again. Research rewrites back up on their own and are not handled here.
    */
   async backupBeforeAutoWrite(chain, action, run) {
-    var _a2, _b2, _c;
+    var _a2;
     const paths = [];
+    const existing = (raw) => {
+      var _a3, _b2, _c;
+      if (!raw) return null;
+      const id = raw.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run.refs.get(raw.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : raw;
+      if (!id || chain.createdIds.has(id) || run.created.includes(id)) return null;
+      return (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === id)) != null ? _c : null;
+    };
+    const noteOf3 = (raw) => {
+      const node = existing(raw);
+      if (node) paths.push(node.path);
+    };
     switch (action.kind) {
       case "rename_topic":
       case "update_summary":
-      case "edit_topic_note": {
-        const id = action.nodeId.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a2 = run.refs.get(action.nodeId.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a2 : null : action.nodeId;
-        if (id && !chain.createdIds.has(id) && !run.created.includes(id)) {
-          const node = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === id);
-          if (node) paths.push(node.path);
-        }
+      case "edit_topic_note":
+        noteOf3(action.nodeId);
+        break;
+      // Map.md itself: structure, relations, looks and layout live in it (a rename is a card's own note, not Map.md). The cards whose
+      // notes these actions also rewrite (frontmatter, derived Parent/Child lines) are backed up too.
+      case "add_child":
+        paths.push(this.path);
+        noteOf3(action.parentId);
+        break;
+      case "move_topic": {
+        paths.push(this.path);
+        noteOf3(action.nodeId);
+        noteOf3(action.newParentId);
+        const moved = existing(action.nodeId);
+        noteOf3(moved == null ? void 0 : moved.parentId);
         break;
       }
-      // Map.md itself: structure, relations, looks and layout live in it (a rename is a card's own note, not Map.md).
-      case "add_child":
-      case "move_topic":
+      case "set_appearance":
+      case "set_topic_kind":
+        paths.push(this.path);
+        for (const id of action.nodeIds) noteOf3(id);
+        break;
       case "reorder_topics":
       case "delete_topic":
       case "add_relation":
       case "remove_relation":
-      case "set_appearance":
-      case "set_topic_kind":
       case "add_anchor":
       case "link_anchor":
       case "auto_layout":
         paths.push(this.path);
         break;
       case "edit_md_file":
-        paths.push((_c = normalizeVaultPath(action.path)) != null ? _c : action.path);
+        paths.push((_a2 = normalizeVaultPath(action.path)) != null ? _a2 : action.path);
         break;
       default:
         break;

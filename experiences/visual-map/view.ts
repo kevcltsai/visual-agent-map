@@ -23069,12 +23069,17 @@ export class VisualAgentMapView extends ItemView {
    * already ended it); a second failure of the round ends the chain as `failed` as usual. Returns whether a retry was started.
    */
   private retryAutoRound(run: ChatChainRun, origin: MapChatOrigin): boolean {
+    // The switch is read live (run.state.autoApply lags it); the retry is only started when sendMapChat would really send it.
     if (
-      !run.state.autoApply ||
+      !this.chatAutoApply ||
       run.retriedRound === run.state.round ||
       this.chatChain !== run ||
       run.state.phase !== "round" ||
-      this.closed
+      this.closed ||
+      this.chatApplying ||
+      !this.map ||
+      this.notesLoading() ||
+      !origin.text
     )
       return false;
     run.retriedRound = run.state.round;
@@ -23295,7 +23300,7 @@ export class VisualAgentMapView extends ItemView {
       waiting.settled = Math.min(waiting.total, waiting.settled + by);
       this.chat?.setChainWaiting(waiting, run.state.remaining);
       // Auto-apply: the 30 minutes count from the last research or expansion that finished, not from the start of the wait.
-      if (run.state.autoApply) {
+      if (this.chatAutoApply) {
         if (run.timer !== null) window.clearTimeout(run.timer);
         arm();
       }
@@ -25223,29 +25228,48 @@ export class VisualAgentMapView extends ItemView {
     run: ChatRun
   ): Promise<ChatOutcome | null> {
     const paths: string[] = [];
+    // A card this chain (or this reply) created is its own work: nothing of the user's to lose.
+    const existing = (raw: string | undefined | null): MapNode | null => {
+      if (!raw) return null;
+      const id = raw.startsWith(MAP_CHAT_NEW_PREFIX)
+        ? (run.refs.get(raw.slice(MAP_CHAT_NEW_PREFIX.length)) ?? null)
+        : raw;
+      if (!id || chain.createdIds.has(id) || run.created.includes(id)) return null;
+      return this.map?.nodes.find(item => item.id === id) ?? null;
+    };
+    const noteOf = (raw: string | undefined | null): void => {
+      const node = existing(raw);
+      if (node) paths.push(node.path);
+    };
     switch (action.kind) {
       case "rename_topic":
       case "update_summary":
-      case "edit_topic_note": {
-        const id = action.nodeId.startsWith(MAP_CHAT_NEW_PREFIX)
-          ? (run.refs.get(action.nodeId.slice(MAP_CHAT_NEW_PREFIX.length)) ?? null)
-          : action.nodeId;
-        // A card this chain (or this reply) created is its own work: nothing of the user's to lose.
-        if (id && !chain.createdIds.has(id) && !run.created.includes(id)) {
-          const node = this.map?.nodes.find(item => item.id === id);
-          if (node) paths.push(node.path);
-        }
+      case "edit_topic_note":
+        noteOf(action.nodeId);
+        break;
+      // Map.md itself: structure, relations, looks and layout live in it (a rename is a card's own note, not Map.md). The cards whose
+      // notes these actions also rewrite (frontmatter, derived Parent/Child lines) are backed up too.
+      case "add_child":
+        paths.push(this.path);
+        noteOf(action.parentId);
+        break;
+      case "move_topic": {
+        paths.push(this.path);
+        noteOf(action.nodeId);
+        noteOf(action.newParentId);
+        const moved = existing(action.nodeId);
+        noteOf(moved?.parentId);
         break;
       }
-      // Map.md itself: structure, relations, looks and layout live in it (a rename is a card's own note, not Map.md).
-      case "add_child":
-      case "move_topic":
+      case "set_appearance":
+      case "set_topic_kind":
+        paths.push(this.path);
+        for (const id of action.nodeIds) noteOf(id);
+        break;
       case "reorder_topics":
       case "delete_topic":
       case "add_relation":
       case "remove_relation":
-      case "set_appearance":
-      case "set_topic_kind":
       case "add_anchor":
       case "link_anchor":
       case "auto_layout":

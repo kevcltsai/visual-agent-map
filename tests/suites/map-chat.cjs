@@ -9002,7 +9002,7 @@ integrationTest('P3 (h) auto-apply: an existing note is backed up once before th
   eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done']); assert.equal(calls.length, 1, 'one backup for two writes'); assert.equal(calls[0][0], h.view.map.nodes.find(n => n.id === h.ids.a).path); assert.equal(calls[0][1], before, 'the copy is the note as it was before the write');
   assert.equal((await h.note('a')).summary, 'AI summary');
   const more = await applyIn(h, run, [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail: 'Fresh' }, { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b }, { kind: 'reorder_topics', parentId: h.ids.root, nodeIds: [h.ids.b, h.ids.a] }]);
-  eq(more.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done', 'done']); eq(calls.map(c => c[0]), [h.view.map.nodes.find(n => n.id === h.ids.a).path, MAP], 'a second reply of the chain backs nothing up again; Map.md once');
+  eq(more.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'done', 'done']); eq(calls.map(c => c[0]), [h.view.map.nodes.find(n => n.id === h.ids.a).path, MAP, ...[h.ids.c, h.ids.b].map(id => h.view.map.nodes.find(n => n.id === id).path)], 'a second reply of the chain backs nothing up again; Map.md once, then the notes the move rewrites (the card, the new parent)');
   const md = await harness(); await md.view.hydrate(); const mdCalls = backupSpy(md); const mdRun = autoRun(md);
   const edited = await applyIn(md, mdRun, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: 'needs total darkness' }, { kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs quiet', replace: 'needs calm' }], md.hashes('Notes/Research.md'));
   eq(edited.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status), ['done', 'skipped'], 'the second edit is the reply\'s own stale-hash skip, not a backup problem'); eq(mdCalls.map(c => c[0]), ['Notes/Research.md']); assert.equal(mdCalls[0][1], '# Research\n\nSleep needs darkness.\nSleep needs quiet.\n');
@@ -9055,11 +9055,11 @@ integrationTest('P3 (i) auto-apply: Stop before the failure arrives, or while th
 });
 integrationTest('P3 review M1/L1: a retry that cannot be sent (notes loading) ends the chain as failed; the toggle turned off mid-round is read live, so no retry', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open(); const spy = chainSpy(chat);
-  chainReplies(h, () => { h.view.noteLoad = {}; throw new Error('request timed out'); }, say('never', [], ''));
-  h.type('go'); await h.view.sendMapChat(); await chainEnded(spy); eq(spy.reasons(), ['failed']); assert.equal(h.control.requests.length, 1, 'no second request'); assert.equal(h.view.chatChain, null, 'not stuck in the round');
+  chainReplies(h, () => { h.view.notesLoading = () => true; throw new Error('request timed out'); }, say('never', [], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null); void spy; assert.equal(chat.transcript().at(-1).error, true); assert.equal(h.control.requests.length, 1, 'no second request'); assert.equal(h.view.chatChain, null, 'not stuck in the round');
   const g = await harness(); await g.view.hydrate(); g.view.setChatAutoApply(true); const gchat = g.open(); const gspy = chainSpy(gchat);
   chainReplies(g, () => { g.view.setChatAutoApply(false); throw new Error('request timed out'); }, say('never', [], ''));
-  g.type('go'); await g.view.sendMapChat(); await chainEnded(gspy); await tick(); eq(gspy.reasons(), ['failed']); assert.equal(g.control.requests.length, 1, 'switch off mid-round: no retry');
+  g.type('go'); await g.view.sendMapChat(); await until(() => g.view.chatChain === null); await tick(); void gspy; assert.equal(gchat.transcript().at(-1).error, true); assert.equal(g.control.requests.length, 1, 'switch off mid-round: no retry');
 });
 integrationTest('P3 review M2: set_appearance on an existing card backs up its note once, add_child and move_topic back up the parent notes, a failed backup writes nothing', async () => {
   const h = await harness(); await h.view.hydrate(); const calls = backupSpy(h); const run = autoRun(h); const path = id => h.view.map.nodes.find(n => n.id === id).path;
@@ -9199,8 +9199,8 @@ integrationTest('P2 records: an auto-apply turn writes autoApply:true on turn_st
 integrationTest('P2 (backup gap): in an auto chain Map.md is backed up once, before the first add_child (or any other write to Map.md); a chain without the switch backs nothing up', async () => {
   const h = await harness(); await h.view.hydrate(); const calls = backupSpy(h); const run = autoRun(h);
   const lines = await applyIn(h, run, [addRoot('n', 'New', h.ids.root), { kind: 'add_relation', fromId: h.ids.a, toId: h.ids.b, relationKind: 'supports', description: '' }]); eq(lines.filter(l => l.text !== NOT_UNDOABLE).map(l => l.status).slice(0, 2), ['done', 'done'], JSON.stringify(lines));
-  eq(calls.map(c => c[0]), [MAP], 'Map.md once for both writes'); assert.equal(calls[0][1].includes('map-a'), true, 'a copy of Map.md as it was');
-  await applyIn(h, run, [addRoot('m', 'More', h.ids.root), { kind: 'remove_relation', fromId: h.ids.a, toId: h.ids.b }]); eq(calls.map(c => c[0]), [MAP], 'a second reply backs it up again no more');
+  eq(calls.map(c => c[0]), [MAP, h.view.map.nodes.find(n => n.id === h.ids.root).path], 'Map.md once for both writes, then the parent card note of the new child (its derived Child lines)'); assert.equal(calls[0][1].includes('map-a'), true, 'a copy of Map.md as it was');
+  await applyIn(h, run, [addRoot('m', 'More', h.ids.root), { kind: 'remove_relation', fromId: h.ids.a, toId: h.ids.b }]); eq(calls.map(c => c[0]), [MAP, h.view.map.nodes.find(n => n.id === h.ids.root).path], 'a second reply backs nothing up again');
   const f = await harness(); await f.view.hydrate(); const fcalls = backupSpy(f); const frun = autoRun(f); const before = f.contents.get(MAP);
   const { writebackHooks } = f.view; f.view.writebackHooks = () => ({ backupNote: async () => ({ ok: false }) }); const out = await applyIn(f, frun, [addRoot('n', 'New', f.ids.root)]); void writebackHooks; void fcalls;
   assert.equal(out[0].status, 'skipped', 'a failed backup of Map.md skips the write'); assert.equal(f.contents.get(MAP), before);

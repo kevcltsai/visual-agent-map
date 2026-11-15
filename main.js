@@ -79409,16 +79409,22 @@ ${note.detail.trim()}` : "",
       }
     });
     run.state = step.state;
-    this.showChainFlow(run);
+    this.showChainFlow(
+      run,
+      step.decision.kind === "end" && step.decision.reason === "done" && !step.decision.remaining.trim()
+    );
     this.followChainDecision(run, step.decision, round3.work);
   }
-  /** The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). */
-  showChainFlow(run) {
+  /**
+   * The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). A chain
+   * that ended done with nothing left shows every step done, even when the last reply did not move the statuses.
+   */
+  showChainFlow(run, finished = false) {
     var _a2;
     const progress = run.state.progress;
     if (!run.state.autoApply || !progress) return;
     (_a2 = this.chat) == null ? void 0 : _a2.setFlowProgress({
-      steps: progress.steps.map((step) => ({ ...step })),
+      steps: progress.steps.map((step) => ({ ...step, ...finished ? { status: "done" } : {} })),
       round: run.state.round,
       calls: run.state.calls,
       maxCalls: MAP_CHAT_AUTO_MAX_CALLS

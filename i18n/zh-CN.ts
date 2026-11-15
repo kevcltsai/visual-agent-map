@@ -1307,6 +1307,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_undo_label": "AI 对话回复",
   "ui.map_chat_undo_files_changed": "文件已变更，无法撤销",
   "ui.map_chat_guard_exists": "那里已经有文件",
+  "ui.map_chat_guard_exists_in_map": "那里已经有文件；请先用 read_md_file 读取它，再用 edit_md_file 修改",
   "ui.map_chat_guard_no_baseline": "这个文件不在本次发送的内容里",
   "ui.map_chat_guard_map_source": "这个文件是这张地图的资料来源，对话只能读取",
   "ui.map_chat_skip_stale": "发送后文件又被修改过",

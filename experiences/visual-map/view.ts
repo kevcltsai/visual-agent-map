@@ -25390,6 +25390,10 @@ export class VisualAgentMapView extends ItemView {
           readOnlyPaths: baseline.mapSourcePaths,
           configDir
         });
+        // An existing file inside the map folder is read and then edited, not created again (the model sees this text next round).
+        const mapFolder = this.path.slice(0, Math.max(0, this.path.lastIndexOf("/")));
+        if (!verdict.ok && verdict.code === "exists" && mapFolder && key.startsWith(`${mapFolder}/`))
+          return skipped("ui.map_chat_guard_exists_in_map");
         if (!verdict.ok || !key) return guardSkipped(verdict.ok ? "outside_vault" : verdict.code);
         const folders = key.split("/").slice(0, -1);
         for (let depth = 1; depth <= folders.length; depth++) {

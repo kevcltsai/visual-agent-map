@@ -53278,283 +53278,6 @@ var MapChatRecordWriter = class {
 };
 var errorText2 = (error) => error instanceof Error ? error.message : String(error);
 
-// experiences/visual-map/map-chat-turn-record.ts
-var missedImageRows = (blocks) => blocks.flatMap((block) => {
-  var _a2, _b2;
-  if (block.state === "searching" || placedImage(block)) return [];
-  const why2 = block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", (_a2 = block.reason) != null ? _a2 : "") : (_b2 = block.reason) != null ? _b2 : t("ui.map_chat_images_none");
-  return [{ status: block.state === "failed" ? "failed" : "skipped", text: `${block.nodeTitle}: ${why2}` }];
-});
-var plainLines = (lines) => onceImageLines(lines).flatMap((line2) => {
-  const settled2 = settledLine(line2);
-  return [
-    { status: settled2.status, text: settled2.text, ...settled2.basis ? { basis: settled2.basis } : {} },
-    ...line2.imageGroup ? missedImageRows(line2.imageGroup) : []
-  ];
-});
-var MapChatTurnRecord = class {
-  constructor(writer, conversationId, turn, answer, log) {
-    this.writer = writer;
-    this.conversationId = conversationId;
-    this.turn = turn;
-    this.answer = answer;
-    this.log = log;
-    /** The model's raw output of the attempt that is current (set by `onRaw`). */
-    __publicField(this, "raw", null);
-    /** The follow-ups that went into the turn (the view sets it; read when the turn ends, so only the delivered ones count). */
-    __publicField(this, "steerTexts", () => []);
-    __publicField(this, "ended", false);
-  }
-  /** The turn has not written its end yet. */
-  get isOpen() {
-    return !this.ended;
-  }
-  live() {
-    return this.writer.conversationId === this.conversationId;
-  }
-  /** Writes a line of this turn into its own conversation; a failure to build the line is logged, never thrown into the chat. */
-  write(line2) {
-    if (!this.live()) return;
-    try {
-      this.writer.write(line2);
-    } catch (error) {
-      this.log(error instanceof Error ? error.message : String(error));
-    }
-  }
-  event(kind, extra = {}) {
-    this.write({ type: "event", turn: this.turn, kind, ...extra });
-  }
-  /** The turn ended. Only the first call writes (a late result of a stopped, replaced or closed attempt finds it ended). */
-  end(status, fields = {}) {
-    var _a2, _b2, _c, _d;
-    if (this.ended) return false;
-    this.ended = true;
-    const partial = this.answer.streaming ? this.answer.text : "";
-    const steers = this.steerTexts();
-    this.write({
-      type: "turn_end",
-      turn: this.turn,
-      status,
-      ...fields.reason ? { reason: fields.reason } : {},
-      raw: this.raw,
-      reply: (_a2 = fields.reply) != null ? _a2 : partial,
-      lines: plainLines((_b2 = fields.lines) != null ? _b2 : this.answer.lines),
-      modelLabel: (_c = this.answer.modelLabel) != null ? _c : "",
-      ...((_d = fields.rejected) == null ? void 0 : _d.length) ? { rejected: fields.rejected } : {},
-      ...steers.length ? { steers } : {},
-      ...fields.error ? { error: fields.error } : {}
-    });
-    return true;
-  }
-  /** What became of the plan card of this turn. */
-  plan(state, lines = []) {
-    this.write({ type: "plan", turn: this.turn, state, lines: plainLines(lines) });
-  }
-  /**
-   * The result lines of the turn changed after its end (an expansion that failed): the answer's lines as they are now. Before the
-   * end nothing is written: a `lines` line ahead of `turn_end` would make a restore show those partial lines for the whole turn.
-   */
-  relines() {
-    if (!this.ended) return;
-    this.write({ type: "lines", turn: this.turn, lines: plainLines(this.answer.lines) });
-  }
-  /**
-   * The pictures this turn put into its cards (the failure reasons are in the result lines). One line for the whole turn, the
-   * newest wins: each item is "card: picture title", and every item was inserted. The state is `ready` when any picture was
-   * put in, else `stopped` when every search was stopped, else `failed` / `empty`.
-   */
-  images(block) {
-    var _a2;
-    const blocks = ((_a2 = this.answer.images) == null ? void 0 : _a2.includes(block)) ? this.answer.images : [block];
-    const placed = blocks.flatMap((entry) => {
-      var _a3;
-      const item = placedImage(entry);
-      return item ? [{ title: `${entry.nodeTitle}: ${item.candidate.title}`, sourceUrl: (_a3 = item.candidate.source) != null ? _a3 : "" }] : [];
-    });
-    const ended2 = blocks.filter((entry) => entry.state !== "searching");
-    const state = placed.length ? "ready" : ended2.every((entry) => entry.state === "stopped") ? "stopped" : ended2.some((entry) => entry.state === "failed") ? "failed" : "empty";
-    this.write({
-      type: "images",
-      turn: this.turn,
-      state,
-      items: placed,
-      inserted: placed.map((_, index) => index)
-    });
-  }
-};
-
-// experiences/visual-map/map-chat-record-session.ts
-var MapChatRecordSession = class {
-  constructor(ports) {
-    this.ports = ports;
-    /** This view's writer; null until the first use while the switch is on. */
-    __publicField(this, "writer", null);
-    /** The record of the newest turn (running or finished): plan results, picture candidates and undo / redo of it go to its conversation. */
-    __publicField(this, "last", null);
-    __publicField(this, "plans", /* @__PURE__ */ new WeakMap());
-    __publicField(this, "images", /* @__PURE__ */ new WeakMap());
-    __publicField(this, "unregister", null);
-    /** The highest turn number used in the conversation's record. */
-    __publicField(this, "turnSeq", 0);
-    /** Finished answers that are in the record (written, restored or backfilled). */
-    __publicField(this, "logged", /* @__PURE__ */ new WeakSet());
-    /** Counts the times the conversation left its map or began anew: a restore that read the files meanwhile is dropped. */
-    __publicField(this, "epochCount", 0);
-  }
-  get epoch() {
-    return this.epochCount;
-  }
-  /** This view's writer, made at the first use while the switch is on (and registered, so the switch reaches it); null while it is off. */
-  ensure() {
-    if (!this.ports.enabled() || this.ports.closed()) return null;
-    if (!this.writer) {
-      const writer = this.ports.createWriter();
-      writer.setTarget(this.ports.target());
-      this.writer = writer;
-      this.unregister = this.ports.register(writer);
-    }
-    return this.writer;
-  }
-  /**
-   * The request went out: writes the turn's start (and, for a conversation that began while the switch was off, its finished
-   * turns first). The writer must exist (`ensure`); a write that throws is the caller's to catch.
-   */
-  begin(chat, turn, request, origin, autoApply) {
-    const writer = this.writer;
-    if (!writer) throw new Error("Map chat record: no writer");
-    writer.setTarget(this.ports.target());
-    const missing = chat.completedTurns().filter((item) => !this.logged.has(item.answer));
-    if (missing.length) {
-      writer.backfill(
-        missing.map((item) => {
-          var _a2, _b2;
-          return {
-            turn: ++this.turnSeq,
-            message: item.question.text,
-            reply: item.answer.text,
-            lines: item.answer.lines.map((line2) => ({ status: settledLine(line2).status, text: settledLine(line2).text })),
-            modelLabel: (_a2 = item.answer.modelLabel) != null ? _a2 : "",
-            steers: ((_b2 = item.question.steers) != null ? _b2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text)
-          };
-        })
-      );
-      for (const item of missing) this.logged.add(item.answer);
-    }
-    chat.conversationId = writer.conversationId;
-    const number = ++this.turnSeq;
-    const record = new MapChatTurnRecord(
-      writer,
-      writer.conversationId,
-      number,
-      turn.assistant,
-      (message) => this.ports.log(message)
-    );
-    const chips = origin.chips.map(
-      (chip) => chip.kind === "topic" ? { kind: chip.kind, id: chip.id } : chip.kind === "snippet" ? { kind: chip.kind, path: chip.path, text: chip.text } : { kind: chip.kind, path: chip.path }
-    );
-    record.write({
-      type: "turn_start",
-      turn: number,
-      message: origin.text,
-      ...autoApply ? { autoApply: true } : {},
-      ...origin.chain ? {
-        auto: true,
-        round: origin.chain.state.round,
-        ...origin.chain.resumed ? { resumed: true } : {},
-        ...origin.chain.continuation.remaining.trim() ? { remaining: origin.chain.continuation.remaining } : {}
-      } : {},
-      origin: { chips, selectedIds: [...origin.selectedIds] },
-      request: {
-        step: { id: mapChatStep.id, version: mapChatStep.version },
-        model: request.model,
-        reasoning: request.reasoning,
-        language: request.language,
-        contentLanguage: request.contentLanguage,
-        message: request.message,
-        context: request.context
-      }
-    });
-    this.last = record;
-    return record;
-  }
-  /** The answer is in the record. */
-  markLogged(answer) {
-    this.logged.add(answer);
-  }
-  isLogged(answer) {
-    return this.logged.has(answer);
-  }
-  /** Ends the running turn's record (a no-op when there is none or it already ended). */
-  end(status, fields) {
-    const record = this.last;
-    if ((record == null ? void 0 : record.isOpen) && record.end(status, fields)) this.logged.add(record.answer);
-  }
-  /** Closing the view loses nothing: the switch is on, no write failed, and the record has every finished turn (no chat: nothing to lose). */
-  saved(turns) {
-    var _a2;
-    const writer = this.writer;
-    if (!writer || !this.ports.enabled() || writer.unsaved) return false;
-    return (_a2 = turns == null ? void 0 : turns.every((turn) => this.logged.has(turn.answer))) != null ? _a2 : true;
-  }
-  /** The view closes: the writer takes no new line (what is queued still runs), or none at all once the plugin is unloading. */
-  close() {
-    var _a2;
-    const writer = this.writer;
-    if (!writer) return;
-    (_a2 = this.unregister) == null ? void 0 : _a2.call(this);
-    this.unregister = null;
-    if (this.ports.disposed()) writer.dispose();
-    else writer.close();
-  }
-  /** The conversation left its map, or began anew: a new record conversation (the epoch drops a restore still reading). */
-  restart() {
-    this.epochCount++;
-    this.turnSeq = 0;
-    this.last = null;
-    const writer = this.writer;
-    if (!writer) return;
-    writer.newConversation();
-    writer.setTarget(this.ports.target());
-  }
-  /** The latest record file of the map's folder, read through the adapter (the Vault index may not list a .jsonl). */
-  async readLatest(root) {
-    const adapter = this.ports.files;
-    const dir = recordsDir(root, this.ports.configDir);
-    if (!await adapter.exists(dir)) return null;
-    const files = [];
-    for (const path of (await adapter.list(dir)).files) {
-      if (!isRecordFilePath(path) || path.slice(0, path.lastIndexOf("/")) !== dir) continue;
-      files.push({
-        id: path.slice(path.lastIndexOf("/") + 1, -".jsonl".length),
-        path,
-        text: await adapter.read(path)
-      });
-    }
-    return pickLatest(files);
-  }
-  /**
-   * The writer's part of a restore: later lines go on in the restored file, and every turn number of it is taken (a late result of
-   * one of them can never be written again). `file` is the vault file when the index lists it, else its path.
-   */
-  resume(latest, restored, file) {
-    const writer = this.writer;
-    if (!writer) return;
-    writer.resume(
-      latest.id,
-      file,
-      this.ports.target(),
-      latest.parsed.cleanEnd,
-      restored.startedResearch,
-      restored.readsSources
-    );
-    const numbers = latest.parsed.lines.flatMap(
-      (line2) => "turn" in line2 && typeof line2.turn === "number" ? [line2.turn] : []
-    );
-    writer.markEnded(numbers);
-    this.turnSeq = Math.max(0, ...numbers);
-  }
-};
-
 // core/map-chat-plan.ts
 var MAP_CHAT_PLAN_ACTION_LIMIT = 15;
 var MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
@@ -54182,6 +53905,443 @@ var MapChatChainRunner = class {
     };
     run.work = null;
     this.ports.send(origin);
+  }
+};
+
+// experiences/visual-map/map-chat-conversation.ts
+function errorMessage3(error) {
+  const message = error == null ? void 0 : error.message;
+  return typeof message === "string" ? message : String(error);
+}
+var MapChatConversation = class {
+  constructor(ports) {
+    this.ports = ports;
+    /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
+    __publicField(this, "applying", false);
+    /** Stop was pressed while a plan was applying: the plan line says so. */
+    __publicField(this, "planStopped", false);
+    /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
+    __publicField(this, "planToken", 0);
+  }
+  /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
+  supersedeChatPlan() {
+    var _a2, _b2, _c, _d;
+    const pending2 = (_b2 = (_a2 = this.ports.panel()) == null ? void 0 : _a2.pendingPlan()) != null ? _b2 : null;
+    this.planToken++;
+    this.ports.clearPreview();
+    if (pending2) {
+      (_c = this.ports.panel()) == null ? void 0 : _c.settlePlan(pending2, "cancelled");
+      (_d = this.ports.plans().get(pending2)) == null ? void 0 : _d.plan("cancelled");
+    }
+  }
+  planReasonText(reason, result, selectedCount, researchSoFar = 0) {
+    switch (reason) {
+      case "many_actions":
+        return t(
+          "ui.map_chat_plan_reason_many_actions_0",
+          result.actions.filter((action) => action.kind !== "read_md_file").length
+        );
+      case "many_research":
+        return t(
+          "ui.map_chat_plan_reason_many_research_0",
+          researchTargetsOf(result.actions, selectedCount) + researchSoFar
+        );
+      case "new_map":
+        return t("ui.map_chat_plan_reason_new_map");
+      case "image_preview":
+        return t("ui.map_chat_plan_reason_image_preview");
+      case "image_other_actions":
+        return t("ui.map_chat_plan_reason_image_other_actions");
+      case "auto_round_other_actions":
+        return t("ui.map_chat_plan_reason_auto_round_other_actions");
+      case "research_text_other_actions":
+        return t("ui.map_chat_plan_reason_research_text_other_actions");
+      case "source_text_other_actions":
+        return t("ui.map_chat_plan_reason_source_text_other_actions");
+      case "call_budget":
+        return t("ui.map_chat_plan_reason_call_budget_0", MAP_CHAT_AUTO_MAX_CALLS);
+      case "auto_apply_confirm":
+        return t("ui.map_chat_plan_reason_auto_apply_confirm");
+    }
+  }
+  /** Shows the plan card under the answer; only its Apply button ever writes anything. */
+  offerChatPlan(result, plan, baseline, anchor, message, record = null, run = null) {
+    const chat = this.ports.panel();
+    if (!chat) return;
+    const token = ++this.planToken;
+    const anchorsToPlace = result.actions.flatMap(
+      (action) => action.kind === "add_anchor" ? [{ imageId: action.imageId, x: action.x, y: action.y, note: action.note }] : []
+    );
+    this.ports.showPreview(token, anchorsToPlace);
+    const refTitles = this.ports.refTitles(result.actions);
+    const shown = result.actions.flatMap((action, index) => action.kind === "read_md_file" ? [] : [index]);
+    const items = shown.map((index) => this.ports.actionLabel(result.actions[index], refTitles));
+    const groups = CHAT_PLAN_GROUP_ORDER.flatMap((group) => {
+      const own2 = items.filter((_, at) => chatPlanGroupOf(result.actions[shown[at]].kind) === group);
+      return own2.length ? [
+        {
+          label: t(`ui.map_chat_plan_group_${group}_0`, own2.length),
+          items: own2,
+          // Removing cards is said in words as well as in the warning colour.
+          ...group === "delete" ? { danger: { mark: t("ui.map_chat_plan_mark_delete") } } : {}
+        }
+      ] : [];
+    });
+    const card = {
+      // A plan about a picture shows its lists open: the user checks the anchors before they apply them.
+      ...plan.reasons.some((reason) => reason === "image_preview" || reason === "image_other_actions") ? { openGroups: true } : {},
+      reasons: plan.reasons.map(
+        (reason) => {
+          var _a2;
+          return this.planReasonText(reason, result, baseline.selectedCount, (_a2 = run == null ? void 0 : run.state.researchTargets) != null ? _a2 : 0);
+        }
+      ),
+      items,
+      groups,
+      estimate: plan.estimatedCalls ? t("ui.map_chat_plan_calls_0", plan.estimatedCalls) : t("ui.map_chat_plan_calls_none"),
+      // Undo takes the plan's changes back; only the AI work it starts is said to stay.
+      aiWork: result.actions.some((action) => action.kind === "run_map_action"),
+      state: "pending",
+      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run),
+      cancel: () => {
+        var _a2, _b2;
+        if (token !== this.planToken) return;
+        this.planToken++;
+        this.ports.clearPreview();
+        (_a2 = this.ports.panel()) == null ? void 0 : _a2.settlePlan(card, "cancelled");
+        (_b2 = this.ports.plans().get(card)) == null ? void 0 : _b2.plan("cancelled");
+        this.ports.chain().interruptChain(run, "plan_cancelled");
+      }
+    };
+    if (record) this.ports.plans().set(card, record);
+    chat.showPlan(card);
+  }
+  async applyChatPlan(card, token, result, baseline, anchor, run = null) {
+    var _a2, _b2, _c, _d;
+    const chat = this.ports.panel();
+    if (!chat || this.ports.closed() || token !== this.planToken || chat.isBusy || this.applying) return;
+    const map = this.ports.map();
+    if (!map || this.ports.path() !== anchor.path || map.id !== anchor.id) {
+      this.planToken++;
+      this.ports.clearPreview();
+      this.ports.chain().interruptChain(run, "map_changed");
+      const skip = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
+      chat.settlePlan(card, "cancelled", skip);
+      (_a2 = this.ports.plans().get(card)) == null ? void 0 : _a2.plan("cancelled", skip);
+      return;
+    }
+    this.applying = true;
+    this.planStopped = false;
+    this.ports.clearPreview();
+    chat.settlePlan(card, "applied");
+    chat.setApplying(true);
+    const stopped = () => token !== this.planToken;
+    let lines;
+    const work = newChatWork();
+    if (run) run.work = work;
+    const live2 = { path: anchor.path, id: anchor.id };
+    try {
+      lines = await this.ports.applyActions(result, baseline, () => token === this.planToken, live2, {
+        context: baseline,
+        work,
+        continuation: ((_b2 = run == null ? void 0 : run.state.round) != null ? _b2 : 1) > 1,
+        chain: run
+      });
+    } catch (error) {
+      lines = [{ status: "failed", text: errorMessage3(error) }];
+    } finally {
+      this.applying = false;
+      chat.setApplying(false);
+    }
+    if (!this.ports.closed()) {
+      lines = (_c = chat.settlePlan(card, "applied", lines)) != null ? _c : lines;
+      (_d = this.ports.plans().get(card)) == null ? void 0 : _d.plan(this.planStopped ? "stopped" : "applied", lines);
+      if (run) {
+        if (stopped()) {
+          if (this.ports.chain().chainShows(run)) this.ports.chain().stopChainWork(run);
+          this.ports.chain().interruptChain(run, "stopped");
+        } else if (chat.hasQueuedSteers()) this.ports.chain().interruptChain(run, "user_took_over");
+        else this.ports.chain().advanceChain(run, { result, context: baseline, lines, work, anchor: live2 });
+      }
+      this.ports.flushSteers(!stopped());
+    }
+  }
+};
+
+// experiences/visual-map/map-chat-turn-record.ts
+var missedImageRows = (blocks) => blocks.flatMap((block) => {
+  var _a2, _b2;
+  if (block.state === "searching" || placedImage(block)) return [];
+  const why2 = block.state === "stopped" ? t("ui.map_chat_images_stopped") : block.state === "failed" ? t("ui.map_chat_images_failed_0", (_a2 = block.reason) != null ? _a2 : "") : (_b2 = block.reason) != null ? _b2 : t("ui.map_chat_images_none");
+  return [{ status: block.state === "failed" ? "failed" : "skipped", text: `${block.nodeTitle}: ${why2}` }];
+});
+var plainLines = (lines) => onceImageLines(lines).flatMap((line2) => {
+  const settled2 = settledLine(line2);
+  return [
+    { status: settled2.status, text: settled2.text, ...settled2.basis ? { basis: settled2.basis } : {} },
+    ...line2.imageGroup ? missedImageRows(line2.imageGroup) : []
+  ];
+});
+var MapChatTurnRecord = class {
+  constructor(writer, conversationId, turn, answer, log) {
+    this.writer = writer;
+    this.conversationId = conversationId;
+    this.turn = turn;
+    this.answer = answer;
+    this.log = log;
+    /** The model's raw output of the attempt that is current (set by `onRaw`). */
+    __publicField(this, "raw", null);
+    /** The follow-ups that went into the turn (the view sets it; read when the turn ends, so only the delivered ones count). */
+    __publicField(this, "steerTexts", () => []);
+    __publicField(this, "ended", false);
+  }
+  /** The turn has not written its end yet. */
+  get isOpen() {
+    return !this.ended;
+  }
+  live() {
+    return this.writer.conversationId === this.conversationId;
+  }
+  /** Writes a line of this turn into its own conversation; a failure to build the line is logged, never thrown into the chat. */
+  write(line2) {
+    if (!this.live()) return;
+    try {
+      this.writer.write(line2);
+    } catch (error) {
+      this.log(error instanceof Error ? error.message : String(error));
+    }
+  }
+  event(kind, extra = {}) {
+    this.write({ type: "event", turn: this.turn, kind, ...extra });
+  }
+  /** The turn ended. Only the first call writes (a late result of a stopped, replaced or closed attempt finds it ended). */
+  end(status, fields = {}) {
+    var _a2, _b2, _c, _d;
+    if (this.ended) return false;
+    this.ended = true;
+    const partial = this.answer.streaming ? this.answer.text : "";
+    const steers = this.steerTexts();
+    this.write({
+      type: "turn_end",
+      turn: this.turn,
+      status,
+      ...fields.reason ? { reason: fields.reason } : {},
+      raw: this.raw,
+      reply: (_a2 = fields.reply) != null ? _a2 : partial,
+      lines: plainLines((_b2 = fields.lines) != null ? _b2 : this.answer.lines),
+      modelLabel: (_c = this.answer.modelLabel) != null ? _c : "",
+      ...((_d = fields.rejected) == null ? void 0 : _d.length) ? { rejected: fields.rejected } : {},
+      ...steers.length ? { steers } : {},
+      ...fields.error ? { error: fields.error } : {}
+    });
+    return true;
+  }
+  /** What became of the plan card of this turn. */
+  plan(state, lines = []) {
+    this.write({ type: "plan", turn: this.turn, state, lines: plainLines(lines) });
+  }
+  /**
+   * The result lines of the turn changed after its end (an expansion that failed): the answer's lines as they are now. Before the
+   * end nothing is written: a `lines` line ahead of `turn_end` would make a restore show those partial lines for the whole turn.
+   */
+  relines() {
+    if (!this.ended) return;
+    this.write({ type: "lines", turn: this.turn, lines: plainLines(this.answer.lines) });
+  }
+  /**
+   * The pictures this turn put into its cards (the failure reasons are in the result lines). One line for the whole turn, the
+   * newest wins: each item is "card: picture title", and every item was inserted. The state is `ready` when any picture was
+   * put in, else `stopped` when every search was stopped, else `failed` / `empty`.
+   */
+  images(block) {
+    var _a2;
+    const blocks = ((_a2 = this.answer.images) == null ? void 0 : _a2.includes(block)) ? this.answer.images : [block];
+    const placed = blocks.flatMap((entry) => {
+      var _a3;
+      const item = placedImage(entry);
+      return item ? [{ title: `${entry.nodeTitle}: ${item.candidate.title}`, sourceUrl: (_a3 = item.candidate.source) != null ? _a3 : "" }] : [];
+    });
+    const ended2 = blocks.filter((entry) => entry.state !== "searching");
+    const state = placed.length ? "ready" : ended2.every((entry) => entry.state === "stopped") ? "stopped" : ended2.some((entry) => entry.state === "failed") ? "failed" : "empty";
+    this.write({
+      type: "images",
+      turn: this.turn,
+      state,
+      items: placed,
+      inserted: placed.map((_, index) => index)
+    });
+  }
+};
+
+// experiences/visual-map/map-chat-record-session.ts
+var MapChatRecordSession = class {
+  constructor(ports) {
+    this.ports = ports;
+    /** This view's writer; null until the first use while the switch is on. */
+    __publicField(this, "writer", null);
+    /** The record of the newest turn (running or finished): plan results, picture candidates and undo / redo of it go to its conversation. */
+    __publicField(this, "last", null);
+    __publicField(this, "plans", /* @__PURE__ */ new WeakMap());
+    __publicField(this, "images", /* @__PURE__ */ new WeakMap());
+    __publicField(this, "unregister", null);
+    /** The highest turn number used in the conversation's record. */
+    __publicField(this, "turnSeq", 0);
+    /** Finished answers that are in the record (written, restored or backfilled). */
+    __publicField(this, "logged", /* @__PURE__ */ new WeakSet());
+    /** Counts the times the conversation left its map or began anew: a restore that read the files meanwhile is dropped. */
+    __publicField(this, "epochCount", 0);
+  }
+  get epoch() {
+    return this.epochCount;
+  }
+  /** This view's writer, made at the first use while the switch is on (and registered, so the switch reaches it); null while it is off. */
+  ensure() {
+    if (!this.ports.enabled() || this.ports.closed()) return null;
+    if (!this.writer) {
+      const writer = this.ports.createWriter();
+      writer.setTarget(this.ports.target());
+      this.writer = writer;
+      this.unregister = this.ports.register(writer);
+    }
+    return this.writer;
+  }
+  /**
+   * The request went out: writes the turn's start (and, for a conversation that began while the switch was off, its finished
+   * turns first). The writer must exist (`ensure`); a write that throws is the caller's to catch.
+   */
+  begin(chat, turn, request, origin, autoApply) {
+    const writer = this.writer;
+    if (!writer) throw new Error("Map chat record: no writer");
+    writer.setTarget(this.ports.target());
+    const missing = chat.completedTurns().filter((item) => !this.logged.has(item.answer));
+    if (missing.length) {
+      writer.backfill(
+        missing.map((item) => {
+          var _a2, _b2;
+          return {
+            turn: ++this.turnSeq,
+            message: item.question.text,
+            reply: item.answer.text,
+            lines: item.answer.lines.map((line2) => ({ status: settledLine(line2).status, text: settledLine(line2).text })),
+            modelLabel: (_a2 = item.answer.modelLabel) != null ? _a2 : "",
+            steers: ((_b2 = item.question.steers) != null ? _b2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text)
+          };
+        })
+      );
+      for (const item of missing) this.logged.add(item.answer);
+    }
+    chat.conversationId = writer.conversationId;
+    const number = ++this.turnSeq;
+    const record = new MapChatTurnRecord(
+      writer,
+      writer.conversationId,
+      number,
+      turn.assistant,
+      (message) => this.ports.log(message)
+    );
+    const chips = origin.chips.map(
+      (chip) => chip.kind === "topic" ? { kind: chip.kind, id: chip.id } : chip.kind === "snippet" ? { kind: chip.kind, path: chip.path, text: chip.text } : { kind: chip.kind, path: chip.path }
+    );
+    record.write({
+      type: "turn_start",
+      turn: number,
+      message: origin.text,
+      ...autoApply ? { autoApply: true } : {},
+      ...origin.chain ? {
+        auto: true,
+        round: origin.chain.state.round,
+        ...origin.chain.resumed ? { resumed: true } : {},
+        ...origin.chain.continuation.remaining.trim() ? { remaining: origin.chain.continuation.remaining } : {}
+      } : {},
+      origin: { chips, selectedIds: [...origin.selectedIds] },
+      request: {
+        step: { id: mapChatStep.id, version: mapChatStep.version },
+        model: request.model,
+        reasoning: request.reasoning,
+        language: request.language,
+        contentLanguage: request.contentLanguage,
+        message: request.message,
+        context: request.context
+      }
+    });
+    this.last = record;
+    return record;
+  }
+  /** The answer is in the record. */
+  markLogged(answer) {
+    this.logged.add(answer);
+  }
+  isLogged(answer) {
+    return this.logged.has(answer);
+  }
+  /** Ends the running turn's record (a no-op when there is none or it already ended). */
+  end(status, fields) {
+    const record = this.last;
+    if ((record == null ? void 0 : record.isOpen) && record.end(status, fields)) this.logged.add(record.answer);
+  }
+  /** Closing the view loses nothing: the switch is on, no write failed, and the record has every finished turn (no chat: nothing to lose). */
+  saved(turns) {
+    var _a2;
+    const writer = this.writer;
+    if (!writer || !this.ports.enabled() || writer.unsaved) return false;
+    return (_a2 = turns == null ? void 0 : turns.every((turn) => this.logged.has(turn.answer))) != null ? _a2 : true;
+  }
+  /** The view closes: the writer takes no new line (what is queued still runs), or none at all once the plugin is unloading. */
+  close() {
+    var _a2;
+    const writer = this.writer;
+    if (!writer) return;
+    (_a2 = this.unregister) == null ? void 0 : _a2.call(this);
+    this.unregister = null;
+    if (this.ports.disposed()) writer.dispose();
+    else writer.close();
+  }
+  /** The conversation left its map, or began anew: a new record conversation (the epoch drops a restore still reading). */
+  restart() {
+    this.epochCount++;
+    this.turnSeq = 0;
+    this.last = null;
+    const writer = this.writer;
+    if (!writer) return;
+    writer.newConversation();
+    writer.setTarget(this.ports.target());
+  }
+  /** The latest record file of the map's folder, read through the adapter (the Vault index may not list a .jsonl). */
+  async readLatest(root) {
+    const adapter = this.ports.files;
+    const dir = recordsDir(root, this.ports.configDir);
+    if (!await adapter.exists(dir)) return null;
+    const files = [];
+    for (const path of (await adapter.list(dir)).files) {
+      if (!isRecordFilePath(path) || path.slice(0, path.lastIndexOf("/")) !== dir) continue;
+      files.push({
+        id: path.slice(path.lastIndexOf("/") + 1, -".jsonl".length),
+        path,
+        text: await adapter.read(path)
+      });
+    }
+    return pickLatest(files);
+  }
+  /**
+   * The writer's part of a restore: later lines go on in the restored file, and every turn number of it is taken (a late result of
+   * one of them can never be written again). `file` is the vault file when the index lists it, else its path.
+   */
+  resume(latest, restored, file) {
+    const writer = this.writer;
+    if (!writer) return;
+    writer.resume(
+      latest.id,
+      file,
+      this.ports.target(),
+      latest.parsed.cleanEnd,
+      restored.startedResearch,
+      restored.readsSources
+    );
+    const numbers = latest.parsed.lines.flatMap(
+      (line2) => "turn" in line2 && typeof line2.turn === "number" ? [line2.turn] : []
+    );
+    writer.markEnded(numbers);
+    this.turnSeq = Math.max(0, ...numbers);
   }
 };
 
@@ -58587,7 +58747,7 @@ function isEditableTarget(target) {
   var _a2;
   return !!((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, EDITABLE_SELECTOR));
 }
-function errorMessage3(error) {
+function errorMessage4(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
@@ -58937,8 +59097,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     /** Takes back the send that is still preparing (no request yet): what Stop does before there is a request to abort. */
     __publicField(this, "chatPrepAbandon", null);
     __publicField(this, "chatTaskKey", null);
-    /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
-    __publicField(this, "chatPlanToken", 0);
     /** The anchors the pending plan would place, drawn as dashed dots; it only counts while its token is the plan's current one. */
     __publicField(this, "chatPreview", null);
     /**
@@ -58949,13 +59107,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "chatImageListeners", /* @__PURE__ */ new Set());
     /** True while the conversation itself switches maps (create_map, open_map): the conversation goes along instead of restarting. */
     __publicField(this, "chatCarryOver", false);
-    /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
-    __publicField(this, "chatApplying", false);
     /** Lower-cased normalised paths of the map's data sources while a chat write action runs; null otherwise. */
     __publicField(this, "chatReadOnlyPaths", null);
-    /** The automatic continuation of the latest message (running, waiting for work or for a plan); null when there is none. */
     /** The automatic continuation of the latest message (see MapChatChainRunner); the runner lives and dies with the view. */
     __publicField(this, "chatChainRunner", new MapChatChainRunner(this.chatChainPorts()));
+    /** The plan flow of the chat (plan card, Apply, Cancel) and its state; the module lives and dies with the view. */
+    __publicField(this, "mapChatConversation", new MapChatConversation(this.mapChatConversationPorts()));
     /** "Apply this whole conversation automatically" is on: the next chain the user starts (or resumes) is an auto-apply chain. */
     __publicField(this, "chatAutoApply", false);
     /** Cards this conversation researched (a `research_standard` that really started) and how each came out; reset with the conversation. */
@@ -59113,8 +59270,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
      */
     __publicField(this, "chatRecordSession", new MapChatRecordSession(this.chatRecordPorts()));
     __publicField(this, "topicChatRecords", null);
-    /** Stop was pressed while a plan was applying: the plan line says so. */
-    __publicField(this, "chatPlanStopped", false);
     /**
      * AI actions whose dialog hid itself and whose provider request is not accepted yet, keyed by node path (or
      * `selection:<map path>`). The value is the dialog's controller, so a card or bar Stop pressed before acceptance
@@ -59394,6 +59549,20 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
   /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
   droppedCyclesOfLastMerge() {
     return this.lastDroppedCycles;
+  }
+  get chatPlanToken() {
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.mapChatConversation) == null ? void 0 : _a2.planToken) != null ? _b2 : 0;
+  }
+  set chatPlanToken(value) {
+    this.mapChatConversation.planToken = value;
+  }
+  get chatApplying() {
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.mapChatConversation) == null ? void 0 : _a2.applying) != null ? _b2 : false;
+  }
+  set chatApplying(value) {
+    this.mapChatConversation.applying = value;
   }
   // The runner's chain under its old name (the `?.` is for fixtures that never ran the constructor).
   get chatChain() {
@@ -62441,7 +62610,7 @@ ${request.requirements}` : preset.text,
           raised: true
         });
       } catch (error) {
-        this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage3(error)));
+        this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage4(error)));
       }
     }
     if (!changes.length) return;
@@ -63791,7 +63960,7 @@ ${request.requirements}` : preset.text,
             return;
           }
           state.saveFailed = true;
-          new import_obsidian34.Notice(t("ui.outline_import_map_save_failed", `${errorMessage3(cause)} (${kept.join(", ")})`));
+          new import_obsidian34.Notice(t("ui.outline_import_map_save_failed", `${errorMessage4(cause)} (${kept.join(", ")})`));
         };
         if (result.failure) return rollBack(new Error(result.failure));
         const top2 = created[0];
@@ -69210,7 +69379,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       await this.app.vault.createBinary(destination, data);
       new import_obsidian34.Notice(t("ui.export_saved", destination));
     } catch (error) {
-      if (isCurrent()) new import_obsidian34.Notice(t("ui.export_failed", errorMessage3(error)));
+      if (isCurrent()) new import_obsidian34.Notice(t("ui.export_failed", errorMessage4(error)));
     }
   }
   /**
@@ -72354,7 +72523,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const stopped = controller.signal.aborted;
       this.settleTopicChat(
         entry,
-        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage3(error)),
+        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage4(error)),
         live2,
         !stopped,
         stopped ? "stopped" : "failed"
@@ -75364,7 +75533,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
                   id: child.id,
                   title: note.title,
                   status: batchSignal.aborted ? "stopped" : "failed",
-                  error: errorMessage3(error)
+                  error: errorMessage4(error)
                 });
                 throw error;
               }
@@ -77730,7 +77899,7 @@ ${note.detail.trim()}` : "",
     return {
       text: plainFailure(t("error.plain_chat_context"), error),
       wrapped: true,
-      technical: rawErrorText(error) || errorMessage3(error)
+      technical: rawErrorText(error) || errorMessage4(error)
     };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
@@ -77810,7 +77979,7 @@ ${note.detail.trim()}` : "",
     try {
       request = { ...await this.buildChatRequest(message, chat, origin, preparing.signal), ...this.usageMapField() };
     } catch (error) {
-      abandon(this.closed ? void 0 : errorMessage3(error), "failed");
+      abandon(this.closed ? void 0 : errorMessage4(error), "failed");
       return;
     }
     if (this.closed || !chat.hasTurn(turn)) {
@@ -77838,7 +78007,7 @@ ${note.detail.trim()}` : "",
           this.chatTaskKey = key4;
           (_b2 = this.plugin.activeTasks) == null ? void 0 : _b2.set(key4, turnController);
           const alive = () => !this.closed && !turnController.signal.aborted && this.chatController === turnController && this.path === anchor.path;
-          this.supersedeChatPlan();
+          this.mapChatConversation.supersedeChatPlan();
           this.relocateMapChat();
           chat.setStage("waiting");
           const modelName = this.plugin.modelLabel(request.model);
@@ -77927,7 +78096,7 @@ ${note.detail.trim()}` : "",
                 this.showUnreadResearch(chat, turn, request.context);
                 this.markChatTurn(origin, request);
                 run.state = pauseForPlan(run.state);
-                this.offerChatPlan(
+                this.mapChatConversation.offerChatPlan(
                   result,
                   plan,
                   request.context,
@@ -77967,7 +78136,7 @@ ${note.detail.trim()}` : "",
               const failure = this.chatErrorText(error);
               chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
               record == null ? void 0 : record.end("failed", {
-                reason: /time(d)?[\s-]?out/i.test(errorMessage3(error)) ? "timeout" : "error",
+                reason: /time(d)?[\s-]?out/i.test(errorMessage4(error)) ? "timeout" : "error",
                 reply: failure.text,
                 lines: [],
                 error: { text: failure.text, technical: (_f = failure.technical) != null ? _f : "" }
@@ -77989,7 +78158,7 @@ ${note.detail.trim()}` : "",
       );
     } catch (error) {
       if (sent) throw error;
-      abandon(this.closed ? void 0 : errorMessage3(error), "failed");
+      abandon(this.closed ? void 0 : errorMessage4(error), "failed");
       return;
     }
     if (!went && !sent) abandon(this.closed ? void 0 : notSent(), "not_ready");
@@ -78075,9 +78244,6 @@ ${note.detail.trim()}` : "",
   finishChatRound(run, round3) {
     this.chatChainRunner.finishChatRound(run, round3);
   }
-  advanceChain(run, round3) {
-    this.chatChainRunner.advanceChain(run, round3);
-  }
   chatChainPorts() {
     return {
       panel: () => this.chat,
@@ -78098,149 +78264,25 @@ ${note.detail.trim()}` : "",
       }
     };
   }
-  /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
-  supersedeChatPlan() {
-    var _a2, _b2, _c, _d;
-    const pending2 = (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.pendingPlan()) != null ? _b2 : null;
-    this.chatPlanToken++;
-    this.clearChatPreview();
-    if (pending2) {
-      (_c = this.chat) == null ? void 0 : _c.settlePlan(pending2, "cancelled");
-      (_d = this.chatRecordSession.plans.get(pending2)) == null ? void 0 : _d.plan("cancelled");
-    }
-  }
-  planReasonText(reason, result, selectedCount, researchSoFar = 0) {
-    switch (reason) {
-      case "many_actions":
-        return t(
-          "ui.map_chat_plan_reason_many_actions_0",
-          result.actions.filter((action) => action.kind !== "read_md_file").length
-        );
-      case "many_research":
-        return t(
-          "ui.map_chat_plan_reason_many_research_0",
-          researchTargetsOf(result.actions, selectedCount) + researchSoFar
-        );
-      case "new_map":
-        return t("ui.map_chat_plan_reason_new_map");
-      case "image_preview":
-        return t("ui.map_chat_plan_reason_image_preview");
-      case "image_other_actions":
-        return t("ui.map_chat_plan_reason_image_other_actions");
-      case "auto_round_other_actions":
-        return t("ui.map_chat_plan_reason_auto_round_other_actions");
-      case "research_text_other_actions":
-        return t("ui.map_chat_plan_reason_research_text_other_actions");
-      case "source_text_other_actions":
-        return t("ui.map_chat_plan_reason_source_text_other_actions");
-      case "call_budget":
-        return t("ui.map_chat_plan_reason_call_budget_0", MAP_CHAT_AUTO_MAX_CALLS);
-      case "auto_apply_confirm":
-        return t("ui.map_chat_plan_reason_auto_apply_confirm");
-    }
-  }
-  /** Shows the plan card under the answer; only its Apply button ever writes anything. */
-  offerChatPlan(result, plan, baseline, anchor, message, record = null, run = null) {
-    const chat = this.chat;
-    if (!chat) return;
-    const token = ++this.chatPlanToken;
-    this.chatPreview = null;
-    const anchorsToPlace = result.actions.flatMap(
-      (action) => action.kind === "add_anchor" ? [{ imageId: action.imageId, x: action.x, y: action.y, note: action.note }] : []
-    );
-    if (anchorsToPlace.length) this.chatPreview = { token, anchors: anchorsToPlace };
-    this.syncAnchorPreview();
-    const refTitles = this.chatRefTitles(result.actions);
-    const shown = result.actions.flatMap((action, index) => action.kind === "read_md_file" ? [] : [index]);
-    const items = shown.map((index) => this.chatActionLabel(result.actions[index], refTitles));
-    const groups = CHAT_PLAN_GROUP_ORDER.flatMap((group) => {
-      const own2 = items.filter((_, at) => chatPlanGroupOf(result.actions[shown[at]].kind) === group);
-      return own2.length ? [
-        {
-          label: t(`ui.map_chat_plan_group_${group}_0`, own2.length),
-          items: own2,
-          // Removing cards is said in words as well as in the warning colour.
-          ...group === "delete" ? { danger: { mark: t("ui.map_chat_plan_mark_delete") } } : {}
-        }
-      ] : [];
-    });
-    const card = {
-      // A plan about a picture shows its lists open: the user checks the anchors before they apply them.
-      ...plan.reasons.some((reason) => reason === "image_preview" || reason === "image_other_actions") ? { openGroups: true } : {},
-      reasons: plan.reasons.map(
-        (reason) => {
-          var _a2;
-          return this.planReasonText(reason, result, baseline.selectedCount, (_a2 = run == null ? void 0 : run.state.researchTargets) != null ? _a2 : 0);
-        }
-      ),
-      items,
-      groups,
-      estimate: plan.estimatedCalls ? t("ui.map_chat_plan_calls_0", plan.estimatedCalls) : t("ui.map_chat_plan_calls_none"),
-      // Undo takes the plan's changes back; only the AI work it starts is said to stay.
-      aiWork: result.actions.some((action) => action.kind === "run_map_action"),
-      state: "pending",
-      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run),
-      cancel: () => {
-        var _a2, _b2;
-        if (token !== this.chatPlanToken) return;
-        this.chatPlanToken++;
-        this.clearChatPreview();
-        (_a2 = this.chat) == null ? void 0 : _a2.settlePlan(card, "cancelled");
-        (_b2 = this.chatRecordSession.plans.get(card)) == null ? void 0 : _b2.plan("cancelled");
-        this.interruptChain(run, "plan_cancelled");
-      }
+  mapChatConversationPorts() {
+    return {
+      panel: () => this.chat,
+      closed: () => this.closed,
+      path: () => this.path,
+      map: () => this.map,
+      chain: () => this.chatChainRunner,
+      plans: () => this.chatRecordSession.plans,
+      showPreview: (token, anchors) => {
+        this.chatPreview = anchors.length ? { token, anchors } : null;
+        this.syncAnchorPreview();
+      },
+      clearPreview: () => this.clearChatPreview(),
+      refTitles: (actions) => this.chatRefTitles(actions),
+      actionLabel: (action, refTitles) => this.chatActionLabel(action, refTitles),
+      // Read at call time (a wrapped or replaced applyMapChatActions is used).
+      applyActions: (...args) => this.applyMapChatActions(...args),
+      flushSteers: (send) => this.flushSteers(send)
     };
-    if (record) this.chatRecordSession.plans.set(card, record);
-    chat.showPlan(card);
-  }
-  async applyChatPlan(card, token, result, baseline, anchor, run = null) {
-    var _a2, _b2, _c, _d;
-    const chat = this.chat;
-    if (!chat || this.closed || token !== this.chatPlanToken || chat.isBusy || this.chatApplying) return;
-    if (!this.map || this.path !== anchor.path || this.map.id !== anchor.id) {
-      this.chatPlanToken++;
-      this.clearChatPreview();
-      this.interruptChain(run, "map_changed");
-      const skip = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
-      chat.settlePlan(card, "cancelled", skip);
-      (_a2 = this.chatRecordSession.plans.get(card)) == null ? void 0 : _a2.plan("cancelled", skip);
-      return;
-    }
-    this.chatApplying = true;
-    this.chatPlanStopped = false;
-    this.clearChatPreview();
-    chat.settlePlan(card, "applied");
-    chat.setApplying(true);
-    const stopped = () => token !== this.chatPlanToken;
-    let lines;
-    const work = newChatWork();
-    if (run) run.work = work;
-    const live2 = { path: anchor.path, id: anchor.id };
-    try {
-      lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, live2, {
-        context: baseline,
-        work,
-        continuation: ((_b2 = run == null ? void 0 : run.state.round) != null ? _b2 : 1) > 1,
-        chain: run
-      });
-    } catch (error) {
-      lines = [{ status: "failed", text: errorMessage3(error) }];
-    } finally {
-      this.chatApplying = false;
-      chat.setApplying(false);
-    }
-    if (!this.closed) {
-      lines = (_c = chat.settlePlan(card, "applied", lines)) != null ? _c : lines;
-      (_d = this.chatRecordSession.plans.get(card)) == null ? void 0 : _d.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
-      if (run) {
-        if (stopped()) {
-          if (this.chainShows(run)) this.stopChainWork(run);
-          this.interruptChain(run, "stopped");
-        } else if (chat.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
-        else this.advanceChain(run, { result, context: baseline, lines, work, anchor: live2 });
-      }
-      this.flushSteers(!stopped());
-    }
   }
   // ---- conversation records (the settings switch "save map AI conversations") -----------------------------------------
   chatRecordTarget() {
@@ -78319,7 +78361,7 @@ ${note.detail.trim()}` : "",
       this.markOwnFilesRecorded(record);
       return record;
     } catch (error) {
-      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage3(error)}`);
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage4(error)}`);
       return null;
     }
   }
@@ -78401,7 +78443,7 @@ ${note.detail.trim()}` : "",
     try {
       latest = await this.chatRecordSession.readLatest(this.plugin.repo.topicRoot(mapPath));
     } catch (error) {
-      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage3(error)}`);
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage4(error)}`);
       return;
     }
     if (!latest || latest.parsed.unrecoverable || this.closed || epoch !== this.chatRecordSession.epoch || chat !== this.chat || chat.hasMessages || chat.isBusy || this.chatApplying || this.path !== mapPath || ((_a2 = this.map) == null ? void 0 : _a2.id) !== map.id)
@@ -78447,7 +78489,7 @@ ${note.detail.trim()}` : "",
     }
     if (this.chatApplying && !this.chatController) {
       this.chatPlanToken++;
-      this.chatPlanStopped = true;
+      this.mapChatConversation.planStopped = true;
       if (run && this.chainShows(run)) this.stopChainWork(run);
       (_b2 = this.chat) == null ? void 0 : _b2.focusInput();
       return;
@@ -78651,7 +78693,7 @@ ${note.detail.trim()}` : "",
       );
       if (this.chat === chat) chat.appendLines(lines);
     } catch (error) {
-      if (this.chat === chat) chat.appendLines([{ status: "failed", text: errorMessage3(error) }]);
+      if (this.chat === chat) chat.appendLines([{ status: "failed", text: errorMessage4(error) }]);
     } finally {
       this.chatApplying = false;
     }
@@ -78877,7 +78919,7 @@ ${note.detail.trim()}` : "",
               box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own2, same2, run));
             });
         } catch (error) {
-          box.outcome = { status: "failed", reason: errorMessage3(error) };
+          box.outcome = { status: "failed", reason: errorMessage4(error) };
         }
         if (autoChain && box.outcome.status === "done" && action.kind === "create_md_file") {
           const key5 = normalizeVaultPath(action.path);
@@ -79074,7 +79116,7 @@ ${note.detail.trim()}` : "",
             }
           }
         } catch (error) {
-          outcome = { status: "failed", reason: errorMessage3(error) };
+          outcome = { status: "failed", reason: errorMessage4(error) };
         }
       }
       lines[index] = this.chatLine(label, outcome);
@@ -79168,7 +79210,7 @@ ${note.detail.trim()}` : "",
         opened = await this.chatSwitchTo(mapPath, anchor);
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage3(error), created: made.created };
+      return { status: "failed", reason: errorMessage4(error), created: made.created };
     }
     if (opened) return { status: "done" };
     return made.created ? { status: "skipped", reason: t("ui.map_chat_skip_map_not_opened"), created: true } : skipped("ui.map_chat_skip_map_changed");
@@ -79192,7 +79234,7 @@ ${note.detail.trim()}` : "",
         anchor.path = this.path;
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage3(error) };
+      return { status: "failed", reason: errorMessage4(error) };
     }
     return outcome;
   }
@@ -79239,7 +79281,7 @@ ${note.detail.trim()}` : "",
         opened ? { status: "done", text: t("ui.map_chat_choose_opened_0", topic.title) } : { status: "skipped", text: t("ui.map_chat_skip_map_changed") }
       ]);
     } catch (error) {
-      (_b2 = this.chat) == null ? void 0 : _b2.appendLines([{ status: "failed", text: errorMessage3(error) }]);
+      (_b2 = this.chat) == null ? void 0 : _b2.appendLines([{ status: "failed", text: errorMessage4(error) }]);
     } finally {
       this.chatApplying = false;
     }
@@ -79485,7 +79527,7 @@ ${note.detail.trim()}` : "",
       try {
         live2.write({ type: "event", turn: batch.turn, kind, ...extra });
       } catch (error) {
-        this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage3(error)}`);
+        this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage4(error)}`);
       }
     };
     const current = () => conversation === this.chatConversation;
@@ -79737,7 +79779,7 @@ ${note.detail.trim()}` : "",
               },
               (error) => {
                 errorNotice(error);
-                resolve({ status: "failed", reason: errorMessage3(error) });
+                resolve({ status: "failed", reason: errorMessage4(error) });
               }
             );
           }).then((outcome) => {
@@ -79899,7 +79941,7 @@ ${addition}` : addition },
             );
             outcome.result = { ok: true };
           } catch (error) {
-            outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage3(error)) };
+            outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage4(error)) };
             return;
           }
           if (cover) {
@@ -79920,7 +79962,7 @@ ${addition}` : addition },
         }
       });
     } catch (error) {
-      return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage3(error)) };
+      return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage4(error)) };
     }
     if (outcome.coverWritten) await this.refreshAfterSavedChange();
     return outcome.result;
@@ -80069,7 +80111,7 @@ ${addition}` : addition },
       written2.error = error;
     }
     if (written2.error !== void 0) {
-      const reason = t("ui.map_chat_save_failed_0", errorMessage3(written2.error));
+      const reason = t("ui.map_chat_save_failed_0", errorMessage4(written2.error));
       new import_obsidian34.Notice(reason);
       return { ok: false, reason };
     }
@@ -80143,7 +80185,7 @@ ${addition}` : addition },
     } catch (error) {
       if (controller.signal.aborted) return { status: "stopped" };
       new import_obsidian34.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
-      return { status: "failed", reason: errorMessage3(error) };
+      return { status: "failed", reason: errorMessage4(error) };
     } finally {
       signal == null ? void 0 : signal.removeEventListener("abort", stopWithOwner);
       if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
@@ -80231,7 +80273,7 @@ ${addition}` : addition },
         );
       }).then(
         () => settle(skipped("ui.map_chat_skip_not_started")),
-        (error) => settle({ status: "failed", reason: errorMessage3(error) })
+        (error) => settle({ status: "failed", reason: errorMessage4(error) })
       );
     });
   }
@@ -87819,7 +87861,7 @@ async function saveShareFile(html, suggestedName, shouldWrite, env = browserSave
 }
 
 // experiences/sharing/share-modal.ts
-var errorMessage4 = (error) => {
+var errorMessage5 = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : "";
 };
@@ -88156,7 +88198,7 @@ var ShareModal = class extends import_obsidian42.Modal {
       this.phase = "idle";
       this.estimateMemo = null;
       const stopped = abort.signal.aborted || (error == null ? void 0 : error.code) === "stopped";
-      this.translateNote = stopped ? t("share.translate_stopped") : t("share.translate_failed_0", errorMessage4(error).slice(0, 200));
+      this.translateNote = stopped ? t("share.translate_stopped") : t("share.translate_failed_0", errorMessage5(error).slice(0, 200));
       this.render();
     } finally {
       if (this.translateAbort === abort) this.translateAbort = null;

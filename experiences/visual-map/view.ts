@@ -446,7 +446,6 @@ import {
   type MapChatLine,
   type MapChatMessage,
   type MapChatOrigin,
-  type MapChatPlanCard,
   type MapChatSavedTurn,
   type MapChatSteer,
   type MapChatTurnHandle,
@@ -463,7 +462,6 @@ import {
 import { loadableImages } from "../../ui/image-candidates";
 import { ChatImageFinder, newChatImageBatch, type ChatImageBatch } from "./chat-image-finder";
 import {
-  MAP_CHAT_AUTO_MAX_CALLS,
   isResumeKeyword,
   pauseForPlan,
   planChainOf,
@@ -513,6 +511,7 @@ import {
   type RecordTurnStatus
 } from "../../core/map-chat-records";
 import { MapChatRecordWriter, type MapChatRecordTarget } from "./map-chat-record-writer";
+import { MapChatConversation, type MapChatConversationPorts } from "./map-chat-conversation";
 import { MapChatRecordSession, type MapChatRecordSessionPorts } from "./map-chat-record-session";
 import {
   MapChatChainRunner,
@@ -542,10 +541,7 @@ import {
   mapChoiceParts,
   matchMapTitle,
   planFor,
-  researchTargetsOf,
-  type MapChatImageMode,
-  type MapChatPlan,
-  type MapChatPlanReason
+  type MapChatImageMode
 } from "../../core/map-chat-plan";
 import {
   markChatBatchTopic,
@@ -553,14 +549,7 @@ import {
   type ChatBatch,
   type ChatBatchRequest
 } from "../../core/map-chat-batch";
-import {
-  CHAT_PLAN_GROUP_ORDER,
-  chatDockedWidth,
-  chatOverlayWidth,
-  chatPlanGroupOf,
-  clampMapChatWidth,
-  isChatNarrow
-} from "../../core/map-chat-layout";
+import { chatDockedWidth, chatOverlayWidth, clampMapChatWidth, isChatNarrow } from "../../core/map-chat-layout";
 import { raiseParents, type RelevancePin } from "./relevance-pins";
 import {
   addOutlineToMap,
@@ -1316,8 +1305,12 @@ export class VisualAgentMapView extends ItemView {
   /** Takes back the send that is still preparing (no request yet): what Stop does before there is a request to abort. */
   private chatPrepAbandon: (() => void) | null = null;
   private chatTaskKey: string | null = null;
-  /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
-  private chatPlanToken = 0;
+  private get chatPlanToken(): number {
+    return this.mapChatConversation?.planToken ?? 0;
+  }
+  private set chatPlanToken(value: number) {
+    this.mapChatConversation.planToken = value;
+  }
   /** The anchors the pending plan would place, drawn as dashed dots; it only counts while its token is the plan's current one. */
   private chatPreview: { token: number; anchors: { imageId: string; x: number; y: number; note: string }[] } | null =
     null;
@@ -1329,13 +1322,18 @@ export class VisualAgentMapView extends ItemView {
   private chatImageListeners = new Set<() => void>();
   /** True while the conversation itself switches maps (create_map, open_map): the conversation goes along instead of restarting. */
   private chatCarryOver = false;
-  /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
-  private chatApplying = false;
+  private get chatApplying(): boolean {
+    return this.mapChatConversation?.applying ?? false;
+  }
+  private set chatApplying(value: boolean) {
+    this.mapChatConversation.applying = value;
+  }
   /** Lower-cased normalised paths of the map's data sources while a chat write action runs; null otherwise. */
   private chatReadOnlyPaths: ReadonlySet<string> | null = null;
-  /** The automatic continuation of the latest message (running, waiting for work or for a plan); null when there is none. */
   /** The automatic continuation of the latest message (see MapChatChainRunner); the runner lives and dies with the view. */
   private readonly chatChainRunner = new MapChatChainRunner(this.chatChainPorts());
+  /** The plan flow of the chat (plan card, Apply, Cancel) and its state; the module lives and dies with the view. */
+  private readonly mapChatConversation = new MapChatConversation(this.mapChatConversationPorts());
   // The runner's chain under its old name (the `?.` is for fixtures that never ran the constructor).
   private get chatChain(): ChatChainRun | null {
     return this.chatChainRunner?.current ?? null;
@@ -1522,8 +1520,6 @@ export class VisualAgentMapView extends ItemView {
   private set chatLastRecord(record: MapChatTurnRecord | null) {
     this.chatRecordSession.last = record;
   }
-  /** Stop was pressed while a plan was applying: the plan line says so. */
-  private chatPlanStopped = false;
 
   /**
    * AI actions whose dialog hid itself and whose provider request is not accepted yet, keyed by node path (or
@@ -21650,7 +21646,7 @@ export class VisualAgentMapView extends ItemView {
             this.chatController === turnController &&
             this.path === anchor.path;
           // A plan still waiting for its yes belongs to the question before this one.
-          this.supersedeChatPlan();
+          this.mapChatConversation.supersedeChatPlan();
           // The first message of a conversation moves the opening screen's panel into the side window.
           this.relocateMapChat();
           // From here the request goes out: the bubble leaves "Preparing".
@@ -21761,7 +21757,7 @@ export class VisualAgentMapView extends ItemView {
                 this.markChatTurn(origin, request);
                 // The continuation stops where it is until the plan is applied (it goes on) or cancelled (it ends).
                 run.state = pauseForPlan(run.state);
-                this.offerChatPlan(
+                this.mapChatConversation.offerChatPlan(
                   result,
                   plan,
                   request.context,
@@ -21924,9 +21920,6 @@ export class VisualAgentMapView extends ItemView {
   private finishChatRound(run: ChatChainRun, round: ChatRoundEnd): void {
     this.chatChainRunner.finishChatRound(run, round);
   }
-  private advanceChain(run: ChatChainRun, round: ChatRoundEnd): void {
-    this.chatChainRunner.advanceChain(run, round);
-  }
   private chatChainPorts(): MapChatChainPorts {
     return {
       panel: () => this.chat,
@@ -21947,190 +21940,25 @@ export class VisualAgentMapView extends ItemView {
       }
     };
   }
-  /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
-  private supersedeChatPlan(): void {
-    const pending = this.chat?.pendingPlan() ?? null;
-    this.chatPlanToken++;
-    this.clearChatPreview();
-    if (pending) {
-      this.chat?.settlePlan(pending, "cancelled");
-      this.chatRecordSession.plans.get(pending)?.plan("cancelled");
-    }
-  }
-  private planReasonText(
-    reason: MapChatPlanReason,
-    result: Pick<MapChatResult, "actions">,
-    selectedCount: number,
-    /** Research targets the earlier rounds of the continuation started (the plan counts the whole chain). */
-    researchSoFar = 0
-  ): string {
-    switch (reason) {
-      case "many_actions":
-        return t(
-          "ui.map_chat_plan_reason_many_actions_0",
-          result.actions.filter(action => action.kind !== "read_md_file").length
-        );
-      case "many_research":
-        // The same count the plan was judged by: the whole continuation (earlier rounds too), and a selection made earlier in the reply.
-        return t(
-          "ui.map_chat_plan_reason_many_research_0",
-          researchTargetsOf(result.actions, selectedCount) + researchSoFar
-        );
-      case "new_map":
-        return t("ui.map_chat_plan_reason_new_map");
-      case "image_preview":
-        return t("ui.map_chat_plan_reason_image_preview");
-      case "image_other_actions":
-        return t("ui.map_chat_plan_reason_image_other_actions");
-      case "auto_round_other_actions":
-        // Reachable from round 2 of a continuation.
-        return t("ui.map_chat_plan_reason_auto_round_other_actions");
-      case "research_text_other_actions":
-        return t("ui.map_chat_plan_reason_research_text_other_actions");
-      case "source_text_other_actions":
-        return t("ui.map_chat_plan_reason_source_text_other_actions");
-      case "call_budget":
-        return t("ui.map_chat_plan_reason_call_budget_0", MAP_CHAT_AUTO_MAX_CALLS);
-      case "auto_apply_confirm":
-        return t("ui.map_chat_plan_reason_auto_apply_confirm");
-    }
-  }
-  /** Shows the plan card under the answer; only its Apply button ever writes anything. */
-  private offerChatPlan(
-    result: MapChatResult,
-    plan: MapChatPlan,
-    baseline: Pick<
-      MapChatContext,
-      "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research" | "mapSourcePaths"
-    >,
-    anchor: { path: string; id: string | undefined },
-    /** The user's message: an integration in the plan takes it as its direction when the plan is applied, as it would have at once. */
-    message: string,
-    /** The turn's conversation record (switch on): what becomes of the card is written to it. */
-    record: MapChatTurnRecord | null = null,
-    /** The continuation the round belongs to: it goes on after Apply and ends when the card is cancelled. */
-    run: ChatChainRun | null = null
-  ): void {
-    const chat = this.chat;
-    if (!chat) return;
-    const token = ++this.chatPlanToken;
-    this.chatPreview = null;
-    const anchorsToPlace = result.actions.flatMap(action =>
-      action.kind === "add_anchor" ? [{ imageId: action.imageId, x: action.x, y: action.y, note: action.note }] : []
-    );
-    if (anchorsToPlace.length) this.chatPreview = { token, anchors: anchorsToPlace };
-    this.syncAnchorPreview();
-    const refTitles = this.chatRefTitles(result.actions);
-    // A read_md_file is never shown (decision 2026-11-15-map-chat-file-bugs#2), on the plan card as in the result lines.
-    const shown = result.actions.flatMap((action, index) => (action.kind === "read_md_file" ? [] : [index]));
-    const items = shown.map(index => this.chatActionLabel(result.actions[index], refTitles));
-    // The same lines by kind of work, so a 100-action plan reads as five folded lists.
-    const groups = CHAT_PLAN_GROUP_ORDER.flatMap(group => {
-      const own = items.filter((_, at) => chatPlanGroupOf(result.actions[shown[at]].kind) === group);
-      return own.length
-        ? [
-            {
-              label: t(`ui.map_chat_plan_group_${group}_0`, own.length),
-              items: own,
-              // Removing cards is said in words as well as in the warning colour.
-              ...(group === "delete" ? { danger: { mark: t("ui.map_chat_plan_mark_delete") } } : {})
-            }
-          ]
-        : [];
-    });
-    const card: MapChatPlanCard = {
-      // A plan about a picture shows its lists open: the user checks the anchors before they apply them.
-      ...(plan.reasons.some(reason => reason === "image_preview" || reason === "image_other_actions")
-        ? { openGroups: true }
-        : {}),
-      reasons: plan.reasons.map(reason =>
-        this.planReasonText(reason, result, baseline.selectedCount, run?.state.researchTargets ?? 0)
-      ),
-      items,
-      groups,
-      estimate: plan.estimatedCalls
-        ? t("ui.map_chat_plan_calls_0", plan.estimatedCalls)
-        : t("ui.map_chat_plan_calls_none"),
-      // Undo takes the plan's changes back; only the AI work it starts is said to stay.
-      aiWork: result.actions.some(action => action.kind === "run_map_action"),
-      state: "pending",
-      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run),
-      cancel: () => {
-        if (token !== this.chatPlanToken) return;
-        this.chatPlanToken++;
-        this.clearChatPreview();
-        this.chat?.settlePlan(card, "cancelled");
-        this.chatRecordSession.plans.get(card)?.plan("cancelled");
-        this.interruptChain(run, "plan_cancelled");
-      }
+  private mapChatConversationPorts(): MapChatConversationPorts {
+    return {
+      panel: () => this.chat,
+      closed: () => this.closed,
+      path: () => this.path,
+      map: () => this.map,
+      chain: () => this.chatChainRunner,
+      plans: () => this.chatRecordSession.plans,
+      showPreview: (token, anchors) => {
+        this.chatPreview = anchors.length ? { token, anchors } : null;
+        this.syncAnchorPreview();
+      },
+      clearPreview: () => this.clearChatPreview(),
+      refTitles: actions => this.chatRefTitles(actions),
+      actionLabel: (action, refTitles) => this.chatActionLabel(action, refTitles),
+      // Read at call time (a wrapped or replaced applyMapChatActions is used).
+      applyActions: (...args) => this.applyMapChatActions(...args),
+      flushSteers: send => this.flushSteers(send)
     };
-    if (record) this.chatRecordSession.plans.set(card, record);
-    chat.showPlan(card);
-  }
-  private async applyChatPlan(
-    card: MapChatPlanCard,
-    token: number,
-    result: MapChatResult & { message?: string },
-    baseline: Pick<
-      MapChatContext,
-      "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research" | "mapSourcePaths"
-    >,
-    anchor: { path: string; id: string | undefined },
-    run: ChatChainRun | null = null
-  ): Promise<void> {
-    const chat = this.chat;
-    if (!chat || this.closed || token !== this.chatPlanToken || chat.isBusy || this.chatApplying) return;
-    // The map the plan was made for is not the one open any more: nothing is written.
-    if (!this.map || this.path !== anchor.path || this.map.id !== anchor.id) {
-      this.chatPlanToken++;
-      this.clearChatPreview();
-      this.interruptChain(run, "map_changed");
-      const skip: MapChatLine[] = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
-      chat.settlePlan(card, "cancelled", skip);
-      this.chatRecordSession.plans.get(card)?.plan("cancelled", skip);
-      return;
-    }
-    this.chatApplying = true;
-    this.chatPlanStopped = false;
-    // The dashed dots give way to the real anchors the writes make.
-    this.clearChatPreview();
-    chat.settlePlan(card, "applied");
-    // Expansions that fail while the plan is still being applied wait in the panel and join the result lines below.
-    // The window shows that it is working, and Stop ends the rest of the plan.
-    chat.setApplying(true);
-    const stopped = (): boolean => token !== this.chatPlanToken;
-    let lines: MapChatLine[];
-    const work = newChatWork();
-    if (run) run.work = work;
-    const live = { path: anchor.path, id: anchor.id };
-    try {
-      lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, live, {
-        context: baseline,
-        work,
-        continuation: (run?.state.round ?? 1) > 1,
-        chain: run
-      });
-    } catch (error) {
-      lines = [{ status: "failed", text: errorMessage(error) }];
-    } finally {
-      this.chatApplying = false;
-      chat.setApplying(false);
-    }
-    if (!this.closed) {
-      // The lines as shown (failures that came in meanwhile merged): the screen, the record and the chain's next round agree.
-      lines = chat.settlePlan(card, "applied", lines) ?? lines;
-      this.chatRecordSession.plans.get(card)?.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
-      if (run) {
-        // Stop ends the continuation (and the work it started); otherwise the round is over like any other.
-        if (stopped()) {
-          if (this.chainShows(run)) this.stopChainWork(run);
-          this.interruptChain(run, "stopped");
-        } else if (chat.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
-        else this.advanceChain(run, { result, context: baseline, lines, work, anchor: live });
-      }
-      // Follow-ups typed while the plan was applied: sent once, unless Stop ended it.
-      this.flushSteers(!stopped());
-    }
   }
   // ---- conversation records (the settings switch "save map AI conversations") -----------------------------------------
 
@@ -22359,7 +22187,7 @@ export class VisualAgentMapView extends ItemView {
     // A plan being applied has no request to abort: the plan's number moves on, what is done stays and the rest is skipped.
     if (this.chatApplying && !this.chatController) {
       this.chatPlanToken++;
-      this.chatPlanStopped = true;
+      this.mapChatConversation.planStopped = true;
       if (run && this.chainShows(run)) this.stopChainWork(run);
       this.chat?.focusInput();
       return;

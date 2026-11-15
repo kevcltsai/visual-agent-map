@@ -6691,7 +6691,7 @@ integrationTest('map chat records: A7 a restored plan and choice do nothing, and
     rec('images', { turn: 1, at: REC_AT, state: 'ready', items: [{ title: 'Pic', sourceUrl: 'https://example.com/1' }], inserted: [] })
   ]);
   const chat = h.open(); await until(() => chat.hasMessages);
-  const calls = []; h.view.applyChatPlan = async () => { calls.push('apply'); }; h.view.chatImageFinder.place = async () => { calls.push('insert'); return { ok: true }; };
+  const calls = []; h.view.mapChatConversation.applyChatPlan = async () => { calls.push('apply'); }; h.view.chatImageFinder.place = async () => { calls.push('insert'); return { ok: true }; };
   const send = h.view.sendMapChat; h.view.sendMapChat = async (...args) => { calls.push('send'); return send(...args); };
   const controls = findAll(chat.logEl, i => i.tag === 'button' && (hasClass(i, 'is-stale') || i.attrs['aria-disabled'] === 'true'));
   assert.ok(controls.length >= 2, 'the plan buttons are there but inert'); assert.equal(findAll(chat.logEl, i => i.tag === 'button' && /images/.test(i.cls)).length, 0, 'the restored picture block has no button'); assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-images-item')).length, 1, 'but it is listed');

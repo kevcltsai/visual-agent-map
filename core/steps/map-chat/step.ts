@@ -253,6 +253,8 @@ export interface MapChatResult {
   progress?: MapChatProgress;
   /** Items that were dropped (never applied) or, for `no_topic_kinds`, applied without their type; shown only as a count. */
   rejected: MapChatRejection[];
+  /** Set by the service: a StructuredOutput call the provider did not take had more actions than this reply (work may be lost). */
+  droppedOnRetry?: boolean;
 }
 export class MapChatError extends Error {
   constructor(

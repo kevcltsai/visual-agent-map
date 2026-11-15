@@ -160,7 +160,8 @@ export class ChatImageFinder {
       // One target keeps the words as they are; several are told apart by their card ("牛肋眼 西式做法" style). A research
       // conversation uses the parent card's title and the card's own.
       const parent = node.parentId ? map.nodes.find(item => item.id === node.parentId) : undefined;
-      const parentTitle = readsResearch && parent ? cleanImageQuery((await ports.readNote(parent.path, map)).title) : "";
+      const parentTitle =
+        readsResearch && parent ? cleanImageQuery((await ports.readNote(parent.path, map)).title) : "";
       const joined = cleanImageQuery(
         (readsResearch ? [parentTitle, title] : ids.length > 1 ? [words, title] : [words || title])
           .filter(Boolean)

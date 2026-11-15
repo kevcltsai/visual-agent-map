@@ -9482,11 +9482,19 @@ integrationTest('P2 view: switch on, a delete plan card pending, switch off, a n
   for (const m of rows) assert.equal(m.autoInfo?.calls, undefined, `no calls in ${JSON.stringify(m.autoInfo)}`);
   assert.doesNotMatch(visibleText(chat.logEl), /AI calls used/); assert.match(visibleText(chat.logEl), /round 2 of 8/); eq(calls, [], 'no backup');
 });
-integrationTest('P2 view: create_md_file on an existing file in the map folder is skipped with words that say read it with read_md_file then edit_md_file; the next round sees that text', async () => {
+integrationTest('P2 view: create_md_file on an existing map-folder file this chat did not write is skipped with words that it cannot be read or changed here (read_md_file only reads own files); the next round sees that text', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open();
   const existing = 'Agent Workspace/Topics/map-a/TOC.md'; await h.app.vault.create(existing, '# TOC\n');
   chainReplies(h, say('Make the TOC.', [addRoot('t', 'T'), { kind: 'create_md_file', path: existing, content: '# New TOC\n' }], 'Update the TOC'), say('Done.', [], ''));
-  h.type('go'); await h.view.sendMapChat(); try { await until(() => h.view.chatChain === null && h.control.requests.length === 2); } catch (e) { throw new Error(`reqs ${h.control.requests.length} chain ${JSON.stringify(h.view.chatChain?.state)} plan ${JSON.stringify(chat.pendingPlan()?.reasons)}`); }
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 2);
   const seen = contextOf(h.control.requests[1]).continuation.lastResults; const skip = seen.filter(r => r.status === 'skipped'); eq(skip.length, 1);
-  assert.match(skip[0].text, /read_md_file/); assert.match(skip[0].text, /edit_md_file/); assert.equal(h.contents.get(existing), '# TOC\n', 'the file is untouched');
+  assert.doesNotMatch(skip[0].text, /read_md_file/, 'it cannot read a file it did not write'); assert.match(skip[0].text, /new file name/); assert.equal(h.contents.get(existing), '# TOC\n', 'the file is untouched');
+});
+integrationTest('P2 view: create_md_file again on a file this chat created is skipped with words that say read it with read_md_file then edit_md_file', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open();
+  const path = 'Agent Workspace/Topics/map-a/TOC.md';
+  chainReplies(h, say('Make it.', [addRoot('t', 'T'), { kind: 'create_md_file', path, content: '# TOC\n' }], 'Rewrite it'), say('Again.', [addRoot('u', 'U'), { kind: 'create_md_file', path, content: '# TOC 2\n' }], 'Fix it'), say('Done.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 3);
+  const skip = contextOf(h.control.requests[2]).continuation.lastResults.filter(r => r.status === 'skipped'); eq(skip.length, 1);
+  assert.match(skip[0].text, /read_md_file/); assert.match(skip[0].text, /edit_md_file/); assert.equal(h.contents.get(path), '# TOC\n');
 });

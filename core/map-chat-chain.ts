@@ -244,7 +244,9 @@ export interface MapChatChainResumeEnd {
  * round again when it was not. Round 1 not applied is a resend, not a resume. The round limit counts in whole limits, so a chain
  * that hit it gets one more limit (rounds keep counting).
  */
-export function resumeRound(end: MapChatChainResumeEnd): { round: number; maxRounds: number; remaining: string } | null {
+export function resumeRound(
+  end: MapChatChainResumeEnd
+): { round: number; maxRounds: number; remaining: string } | null {
   if (end.reason !== null && !MAP_CHAT_CHAIN_RESUMABLE.has(end.reason)) return null;
   let round = end.round;
   let remaining = end.startRemaining;
@@ -257,7 +259,20 @@ export function resumeRound(end: MapChatChainResumeEnd): { round: number; maxRou
   return { round, maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS * Math.ceil(round / MAP_CHAT_CHAIN_MAX_ROUNDS), remaining };
 }
 
-const RESUME_KEYWORDS: ReadonlySet<string> = new Set(["繼續", "继续", "接著做", "接着做", "continue", "resume", "goon"]);
+const RESUME_KEYWORDS: ReadonlySet<string> = new Set([
+  "繼續",
+  "继续",
+  "接著做",
+  "接着做",
+  "continue",
+  "resume",
+  "goon"
+]);
 /** The whole message is "continue" (any of the words, ignoring spaces, punctuation, width and case). */
 export const isResumeKeyword = (text: string): boolean =>
-  RESUME_KEYWORDS.has(text.normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]/gu, ""));
+  RESUME_KEYWORDS.has(
+    text
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/[\s\p{P}\p{S}]/gu, "")
+  );

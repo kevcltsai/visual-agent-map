@@ -2838,7 +2838,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
   /** What an interrupted chain says and the one button that goes on with the next round. */
   private buildResume(row: HTMLElement, message: MapChatMessage, point: MapChatResumePoint): void {
-    const box = row.createDiv({ cls: "vam-map-chat-batch vam-map-chat-resume", attr: { role: "status", tabindex: "-1" } });
+    const box = row.createDiv({
+      cls: "vam-map-chat-batch vam-map-chat-resume",
+      attr: { role: "status", tabindex: "-1" }
+    });
     if (point.reason === null)
       box.createDiv({
         cls: "vam-map-chat-batch-title",
